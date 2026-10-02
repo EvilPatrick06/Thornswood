@@ -1,42 +1,45 @@
 <#
   test-max-online.ps1
 
-  One number for how many a server seats, entry 281.
+  One number for how many people a server holds at once, in one place
+  (entry 281, issue #481).
 
   WHAT WAS WRONG. The engine's slot count is maxPlayers in
-  server-settings.json, and nothing in this repo ever wrote it, so it stayed
-  at the 100 the skymp build puts there. The launcher's Play page says a
-  different number, MaxOnline out of the launcher's config.json, 25, which
-  Publish-Update.ps1 puts in the feed. People were told 25 and the engine
-  seated 100.
+  server-settings.json. Entry 281 set it from MaxOnline in the launcher's
+  config.json, a file the launcher rewrites from the feed and each machine
+  keeps its own of, and past it RakNet refuses with nothing said and no way
+  over it for staff. Patrick, 28 Sep: 25 at once for the alpha, raised later.
 
   WHAT THIS PROVES.
-    1. MaxOnline.ps1 reads MaxOnline by the same rule the feed does, number
-       for number, over every shape of config.json worth trying. The feed
-       half is Publish-Update.ps1's own block, lifted by text.
-    2. It never quotes config.json in what it says, because that file
-       carries the server password.
-    3. It refuses a number the engine will not start with (above 1000).
+    1. MaxOnline.ps1 reads records\most-online.json, over every shape of it
+       worth trying, and the real record says 25. It refuses a seat count
+       the engine will not start with (above 1000).
+    2. Set-MaxPlayers writes thornswoodMostOnline (the gamemode's number) and
+       maxPlayers (the number plus the staff seats), and leaves both alone
+       with no number.
+    3. The feed (Publish-Update.ps1) reads the same record, and nothing reads
+       a launcher's config.json for it any more.
     4. Deploy-Gamemode.ps1's settings section, lifted by text and run against
-       a scratch build folder, writes the number as maxPlayers and keeps
-       every other key.
+       a scratch build folder, writes both keys and keeps every other key.
     5. Deploy-DevGamemode.ps1's block that edits the dev settings on the VPS,
        lifted by text and run by Windows PowerShell against a scratch file,
-       sets maxPlayers, keeps the dev port and name, and treats an unknown
+       writes both keys, keeps the dev port and name, and treats an unknown
        number as nothing to change.
+    6. Publish-Server.ps1's block, lifted by text and run against a scratch
+       build, writes both keys into what it packs, before the zip is made.
 
   Nothing here reaches the VPS or reads a real config.json. Read only apart
   from files under its own temp folder.
 #>
 [CmdletBinding()]
-param([string]$ToolsDir)
+param([string]$RepoDir)
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $ToolsDir) { $ToolsDir = $Here }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $RepoDir) { $RepoDir = $Here }
 
 $script:pass = 0
 $script:fail = 0
@@ -72,114 +75,98 @@ function Get-BlockText([string]$text, [string]$start) {
     return $null
 }
 
-$secret = 'NOT-A-REAL-PASSWORD-281'
 $utf8 = New-Object Text.UTF8Encoding($false)
 
-# A launcher folder holding the config.json given, or none when $json is null.
-function New-Root([string]$name, $json, [bool]$bom) {
-    $d = Join-Path $tmp $name
-    New-Item -ItemType Directory -Force -Path $d | Out-Null
-    if ($null -ne $json) {
-        [IO.File]::WriteAllText((Join-Path $d 'config.json'), [string]$json, (New-Object Text.UTF8Encoding($bom)))
-    }
-    return $d
+# A record file holding the text given, or none when $json is null.
+function New-Record([string]$name, $json, [bool]$bom) {
+    $p = Join-Path $tmp ($name + '.json')
+    if ($null -ne $json) { [IO.File]::WriteAllText($p, [string]$json, (New-Object Text.UTF8Encoding($bom))) }
+    return $p
 }
 
 # ---- 1. the helper ----------------------------------------------------------
-$helper = Join-Path $ToolsDir '..\scripts\deploy\MaxOnline.ps1'
-Yes 'MaxOnline.ps1 is in tools' (Test-Path -LiteralPath $helper)
+$helper = Join-Path $RepoDir 'scripts\deploy\MaxOnline.ps1'
+Yes 'MaxOnline.ps1 is in scripts\deploy' (Test-Path -LiteralPath $helper)
 if (-not (Test-Path -LiteralPath $helper)) { Done }
 . $helper
-Yes 'it gives Get-MaxOnline, Set-MaxPlayers and Find-LauncherRoot' (
-    [bool](Get-Command Get-MaxOnline -ErrorAction SilentlyContinue) -and
-    [bool](Get-Command Set-MaxPlayers -ErrorAction SilentlyContinue) -and
-    [bool](Get-Command Find-LauncherRoot -ErrorAction SilentlyContinue))
+Yes 'it gives Get-MostOnline and Set-MaxPlayers' (
+    [bool](Get-Command Get-MostOnline -ErrorAction SilentlyContinue) -and
+    [bool](Get-Command Set-MaxPlayers -ErrorAction SilentlyContinue))
+Yes 'and no longer reads a launcher''s config.json' (
+    -not (Get-Command Get-MaxOnline -ErrorAction SilentlyContinue) -and
+    -not (Get-Command Find-LauncherRoot -ErrorAction SilentlyContinue))
 
-# name, config.json text (null for no file), byte order mark, the number wanted
+# name, record text (null for no file), byte order mark, the number, the seats
 $cases = @(
-    @('plain',    ('{"MaxOnline":25,"ServerPassword":"' + $secret + '"}'), $false, 25),
-    @('bom',      '{"MaxOnline":40}',                                      $true,  40),
-    @('quoted',   '{"MaxOnline":"12"}',                                    $false, 12),
-    @('nokey',    ('{"ServerPassword":"' + $secret + '"}'),                $false, 0),
-    @('zero',     '{"MaxOnline":0}',                                       $false, 0),
-    @('negative', '{"MaxOnline":-3}',                                      $false, 0),
-    @('words',    '{"MaxOnline":"lots"}',                                  $false, 0),
-    @('fraction', '{"MaxOnline":2.5}',                                     $false, 0),
-    @('broken',   ('{"ServerPassword":"' + $secret + '", "MaxOnline": 25,,'), $false, 0),
-    @('nofile',   $null,                                                   $false, 0),
-    @('ceiling',  '{"MaxOnline":1000}',                                    $false, 1000)
+    @('plain',    '{"people":25,"staffSeats":10}',      $false, 25, 35),
+    @('bom',      '{"people":40,"staffSeats":5}',       $true,  40, 45),
+    @('quoted',   '{"people":"12","staffSeats":"3"}',   $false, 12, 15),
+    @('nostaff',  '{"people":25}',                      $false, 25, 25),
+    @('badstaff', '{"people":25,"staffSeats":-4}',      $false, 25, 25),
+    @('nokey',    '{"staffSeats":10}',                  $false, 0,  0),
+    @('zero',     '{"people":0,"staffSeats":10}',       $false, 0,  0),
+    @('negative', '{"people":-3}',                      $false, 0,  0),
+    @('words',    '{"people":"lots"}',                  $false, 0,  0),
+    @('fraction', '{"people":2.5}',                     $false, 0,  0),
+    @('broken',   '{"people": 25,,',                    $false, 0,  0),
+    @('nofile',   $null,                                $false, 0,  0),
+    @('ceiling',  '{"people":990,"staffSeats":10}',     $false, 990, 1000)
 )
-$roots = @{}
 foreach ($c in $cases) {
-    $root = New-Root $c[0] $c[1] $c[2]
-    $roots[$c[0]] = $root
+    $path = New-Record $c[0] $c[1] $c[2]
     $got = $null
-    try { $got = Get-MaxOnline $root } catch { $got = $null }
-    Yes ("{0}: reads {1}" -f $c[0], $c[3]) ($null -ne $got -and $got.Value -eq $c[3])
+    try { $got = Get-MostOnline $path } catch { $got = $null }
+    Yes ("{0}: reads {1}, engine seats {2}" -f $c[0], $c[3], $c[4]) ($null -ne $got -and $got.Value -eq $c[3] -and $got.Seats -eq $c[4])
     if ($null -ne $got) {
-        Yes ("{0}: says which file" -f $c[0]) ($got.From -eq (Join-Path $root 'config.json'))
+        Yes ("{0}: says which file" -f $c[0]) ($got.From -eq $path)
         if ($c[3] -eq 0) { Yes ("{0}: says why there is no number" -f $c[0]) ([string]$got.Why -ne '') }
-        Yes ("{0}: never quotes the file" -f $c[0]) (-not ([string]$got.Why).Contains($secret))
     }
 }
 
 # Above the engine's ceiling is a stop, and the stop names the ceiling.
-$over = New-Root 'over' ('{"MaxOnline":1001,"ServerPassword":"' + $secret + '"}') $false
+$over = New-Record 'over' '{"people":995,"staffSeats":10}' $false
 $threw = $null
-try { [void](Get-MaxOnline $over) } catch { $threw = $_.Exception.Message }
-Yes 'above 1000 is refused rather than written' ($null -ne $threw)
+try { [void](Get-MostOnline $over) } catch { $threw = $_.Exception.Message }
+Yes 'more than 1000 seats in all is refused rather than written' ($null -ne $threw)
 Yes 'the refusal names the engine ceiling' ($null -ne $threw -and $threw.Contains('1000'))
-Yes 'the refusal never quotes the file' ($null -ne $threw -and -not $threw.Contains($secret))
 
-# ---- the feed reads the same number ----------------------------------------
-#
-# Publish-Update.ps1's own MaxOnline block, lifted by text with its own
-# Set-Prop, run over the same files after the same parse it does. Every case
-# the deploy writes, the feed announces, and every case the deploy leaves
-# alone, the feed says nothing about. That is what "one number" means here.
-$pu = Get-Content -LiteralPath (Join-Path $ToolsDir '..\scripts\release\Publish-Update.ps1') -Raw
-$feedBlock = Get-BlockText $pu "if (`$cfg.PSObject.Properties.Name -contains 'MaxOnline')"
-$setProp = Get-BlockText $pu 'function Set-Prop'
-Yes 'the feed''s MaxOnline block is in Publish-Update.ps1' ($null -ne $feedBlock -and $null -ne $setProp)
-if ($null -ne $feedBlock -and $null -ne $setProp) {
-    . ([scriptblock]::Create($setProp))
-    foreach ($c in $cases) {
-        $doc = [pscustomobject]@{ version = '1.0.0' }
-        $path = Join-Path $roots[$c[0]] 'config.json'
-        if (Test-Path -LiteralPath $path) {
-            try {
-                $raw = [IO.File]::ReadAllBytes($path)
-                $skip = 0
-                if ($raw.Length -ge 3 -and $raw[0] -eq 0xEF -and $raw[1] -eq 0xBB -and $raw[2] -eq 0xBF) { $skip = 3 }
-                $cfg = [Text.Encoding]::UTF8.GetString($raw, $skip, $raw.Length - $skip) | ConvertFrom-Json
-                . ([scriptblock]::Create($feedBlock))
-            } catch { }
-        }
-        $feed = 0
-        if ($doc.PSObject.Properties.Name -contains 'maxOnline') { $feed = [int]$doc.maxOnline }
-        $deploy = (Get-MaxOnline $roots[$c[0]]).Value
-        Yes ("{0}: the feed announces {1} and the deploy writes {2}" -f $c[0], $feed, $deploy) ($feed -eq $deploy)
-    }
-}
+# The real record, found the way every caller finds it: no path given.
+$real = Get-MostOnline
+Yes ("with no path it reads records\most-online.json (got {0})" -f $real.From) (
+    [IO.Path]::GetFullPath($real.From) -eq [IO.Path]::GetFullPath((Join-Path $RepoDir 'records\most-online.json')))
+Yes ("the record says 25 people at once (got {0})" -f $real.Value) ($real.Value -eq 25)
+Yes ("and seats staff over it: engine seats {0}" -f $real.Seats) ($real.Seats -gt 25 -and $real.Seats -le 1000)
 
-# ---- Set-MaxPlayers on its own ---------------------------------------------
+# ---- 2. Set-MaxPlayers on its own -------------------------------------------
+$g35 = [pscustomobject]@{ Value = 25; Staff = 10; Seats = 35; From = 'x'; Why = '' }
+$g0 = [pscustomobject]@{ Value = 0; Staff = 0; Seats = 0; From = 'x'; Why = 'none' }
 $s = [pscustomobject]@{ port = 7777; maxPlayers = 100; keep = 'yes' }
-Set-MaxPlayers $s ([pscustomobject]@{ Value = 25; From = 'x'; Why = '' }) 6>$null
-Yes 'Set-MaxPlayers writes the number' ($s.maxPlayers -eq 25)
+Set-MaxPlayers $s $g35 6>$null
+Yes 'Set-MaxPlayers writes the number for the gamemode' ($s.thornswoodMostOnline -eq 25)
+Yes 'and the engine seats, the number plus the staff seats' ($s.maxPlayers -eq 35)
 Yes 'and keeps every other key' ($s.port -eq 7777 -and $s.keep -eq 'yes')
 $s = [pscustomobject]@{ port = 7777; maxPlayers = 100 }
-Set-MaxPlayers $s ([pscustomobject]@{ Value = 0; From = 'x'; Why = 'none' }) 6>$null
-Yes 'with no number it leaves maxPlayers as it was' ($s.maxPlayers -eq 100)
+Set-MaxPlayers $s $g0 6>$null
+Yes 'with no number it leaves maxPlayers as it was and adds nothing' ($s.maxPlayers -eq 100 -and
+    $s.PSObject.Properties.Name -notcontains 'thornswoodMostOnline')
 $s = [pscustomobject]@{ port = 7777 }
-Set-MaxPlayers $s ([pscustomobject]@{ Value = 25; From = 'x'; Why = '' }) 6>$null
-Yes 'it adds the key when the file had none' ($s.maxPlayers -eq 25)
+Set-MaxPlayers $s $g35 6>$null
+Yes 'it adds both keys when the file had neither' ($s.maxPlayers -eq 35 -and $s.thornswoodMostOnline -eq 25)
+
+# ---- 3. the feed reads the same record --------------------------------------
+$pu = Get-Content -LiteralPath (Join-Path $RepoDir 'scripts\release\Publish-Update.ps1') -Raw
+Yes 'Publish-Update.ps1 dot-sources MaxOnline.ps1 for the feed''s number' ($pu.Contains(". (Join-Path `$PSScriptRoot '..\deploy\MaxOnline.ps1')"))
+Yes 'and announces Get-MostOnline''s number as maxOnline' ($pu.Contains('$mo = (Get-MostOnline).Value') -and
+    $pu.Contains("if (`$mo -gt 0) { Set-Prop `$doc 'maxOnline' `$mo }"))
+Yes 'and no longer reads MaxOnline out of the launcher''s config.json' (-not $pu.Contains('$cfg.MaxOnline'))
 
 # ---- 4. Deploy-Gamemode.ps1 --------------------------------------------------
-$dg = Get-Content -LiteralPath (Join-Path $ToolsDir '..\scripts\deploy\Deploy-Gamemode.ps1') -Raw
-$read = $dg.IndexOf('Get-MaxOnline')
+$dg = Get-Content -LiteralPath (Join-Path $RepoDir 'scripts\deploy\Deploy-Gamemode.ps1') -Raw
+$read = $dg.IndexOf('Get-MostOnline')
 $copy = $dg.IndexOf('Copy-Item -LiteralPath $Gamemode')
 Yes 'Deploy-Gamemode.ps1 dot-sources MaxOnline.ps1' ($dg.Contains("Join-Path `$Here 'MaxOnline.ps1'"))
 Yes 'it reads the number before it writes anything into the build' ($read -ge 0 -and $copy -gt $read)
+Yes 'and has no launcher root to read it from any more' (-not $dg.Contains('LauncherRoot'))
 
 $from = $dg.IndexOf('# ---- rewrite server-settings.json')
 $to = -1
@@ -205,27 +192,28 @@ if ($from -ge 0 -and $to -gt $from) {
     $dist = Join-Path $tmp 'dist'
     Seed-Built $dist
     $ok = $true
-    try { Invoke-Section $dist (Get-MaxOnline $roots['plain']) } catch { $ok = $false; Write-Host ("      " + $_.Exception.Message) }
+    try { Invoke-Section $dist $g35 } catch { $ok = $false; Write-Host ("      " + $_.Exception.Message) }
     Yes 'the lifted settings section runs against a scratch build' $ok
     $w = Get-Content -LiteralPath (Join-Path $dist 'server-settings.json') -Raw | ConvertFrom-Json
-    Yes 'the built settings carry maxPlayers 25, from MaxOnline' ([int]$w.maxPlayers -eq 25)
+    Yes 'the built settings carry thornswoodMostOnline 25' ([int]$w.thornswoodMostOnline -eq 25)
+    Yes 'and maxPlayers 35, ten over it for staff' ([int]$w.maxPlayers -eq 35)
     Yes 'a key nobody sets there survives' ($w.keepMe -eq 'yes')
     Yes 'the file has no byte order mark' ([IO.File]::ReadAllBytes((Join-Path $dist 'server-settings.json'))[0] -ne 0xEF)
 
     Seed-Built $dist
     $ok = $true
-    try { Invoke-Section $dist (Get-MaxOnline $roots['nokey']) } catch { $ok = $false; Write-Host ("      " + $_.Exception.Message) }
+    try { Invoke-Section $dist $g0 } catch { $ok = $false; Write-Host ("      " + $_.Exception.Message) }
     $w = Get-Content -LiteralPath (Join-Path $dist 'server-settings.json') -Raw | ConvertFrom-Json
     Yes 'with no number the build keeps its 100' ($ok -and [int]$w.maxPlayers -eq 100)
 }
 
 # ---- 5. Deploy-DevGamemode.ps1 ----------------------------------------------
-$dd = Get-Content -LiteralPath (Join-Path $ToolsDir '..\scripts\deploy\Deploy-DevGamemode.ps1') -Raw
-$read = $dd.IndexOf('Get-MaxOnline')
+$dd = Get-Content -LiteralPath (Join-Path $RepoDir 'scripts\deploy\Deploy-DevGamemode.ps1') -Raw
+$read = $dd.IndexOf('Get-MostOnline')
 $stop = $dd.IndexOf("Write-Host 'Stopping the dev server...'")
 Yes 'Deploy-DevGamemode.ps1 dot-sources MaxOnline.ps1' ($dd.Contains("Join-Path `$Here 'MaxOnline.ps1'"))
 Yes 'it reads the number before the dev server is stopped' ($read -ge 0 -and $stop -gt $read)
-Yes 'its number comes from the dev launcher, the one the dev feed reads' ($dd.Contains("(Find-LauncherRoot) + '-DevBuild'"))
+Yes 'and has no launcher root to read it from any more' (-not $dd.Contains('LauncherRoot'))
 
 $marker = $dd.IndexOf('`$p = ''$rootWin\server-settings.json''')
 $open = -1; $close = -1
@@ -240,7 +228,7 @@ if ($open -ge 0 -and $close -gt $marker) {
 
     # Expanded the way the real script expands it, as the here-string it is,
     # with the values the script would put in.
-    function Expand-Remote([string]$rootWin, $maxOnline) {
+    function Expand-Remote([string]$rootWin, $maxOnline, $seats) {
         $farOrder = ''
         $remotePlugins = 'C:/Thornswood-Server-Dev/plugins'
         $VoicePort = 7789
@@ -251,8 +239,8 @@ if ($open -ge 0 -and $close -gt $marker) {
     $ps = Get-Command powershell.exe -ErrorAction SilentlyContinue
     $psExe = if ($ps) { $ps.Source } else { (Get-Process -Id $PID).Path }
 
-    function Invoke-Remote([string]$rootWin, $maxOnline) {
-        $text = Expand-Remote $rootWin $maxOnline
+    function Invoke-Remote([string]$rootWin, $maxOnline, $seats) {
+        $text = Expand-Remote $rootWin $maxOnline $seats
         $file = Join-Path $tmp ('remote-' + [Guid]::NewGuid().ToString('N').Substring(0, 8) + '.ps1')
         [IO.File]::WriteAllText($file, $text, (New-Object Text.UTF8Encoding($true)))
         # Continue, so a line on stderr is output to read rather than a stop
@@ -268,32 +256,73 @@ if ($open -ge 0 -and $close -gt $marker) {
             ('{"port":7787,"name":"Thornswood Dev",' + $max + '"thornswoodVoicePort":7789,' +
              '"equipmentSlotCheckEnabled":false,"equipmentSpellCheckEnabled":false,' +
              '"equipmentInventoryCheckEnabled":false,"dataDir":"data",' +
+             '"npcAllowCrimeFaction":true,"npcAllowEssential":true,"thornswoodServer":"dev",' +
              '"loadOrder":["C:/Thornswood-Server-Dev/plugins/Skyrim.esm"]}'), $utf8)
     }
     function Read-Dev([string]$root) { Get-Content -LiteralPath (Join-Path $root 'server-settings.json') -Raw | ConvertFrom-Json }
 
     $dev = Join-Path $tmp 'dev-root'
     Seed-Dev $dev $true
-    $out = Invoke-Remote $dev 25
+    $out = Invoke-Remote $dev 25 35
     $w = Read-Dev $dev
-    Yes 'the dev block sets maxPlayers to 25' ([int]$w.maxPlayers -eq 25)
-    Yes 'and says it moved from 100' (($out -join "`n").Contains('the most online moves from 100 to 25'))
+    Yes 'the dev block sets thornswoodMostOnline to 25' ([int]$w.thornswoodMostOnline -eq 25)
+    Yes 'and maxPlayers to 35' ([int]$w.maxPlayers -eq 35)
+    Yes 'and says what moved' (($out -join "`n").Contains('to 25, engine seats from 100 to 35'))
     Yes 'the dev port and name are untouched' ([int]$w.port -eq 7787 -and $w.name -eq 'Thornswood Dev')
-    Yes 'the read back names the number' (($out -join "`n").Contains('most online 25'))
+    Yes 'the read back names both' (($out -join "`n").Contains('most online 25, engine seats 35'))
     Yes 'the dev file has no byte order mark' ([IO.File]::ReadAllBytes((Join-Path $dev 'server-settings.json'))[0] -ne 0xEF)
-    if ([int]$w.maxPlayers -ne 25) { foreach ($l in $out) { Write-Host ("      " + $l) } }
+    if ([int]$w.maxPlayers -ne 35) { foreach ($l in $out) { Write-Host ("      " + $l) } }
 
-    $out = Invoke-Remote $dev 25
-    Yes 'a second run finds nothing to change' ((($out -join "`n").Contains('already')) -and [int](Read-Dev $dev).maxPlayers -eq 25)
+    $out = Invoke-Remote $dev 25 35
+    Yes 'a second run finds nothing to change' ((($out -join "`n").Contains('already')) -and [int](Read-Dev $dev).maxPlayers -eq 35)
+
+    $out = Invoke-Remote $dev 30 40
+    Yes 'a new number moves both' ([int](Read-Dev $dev).thornswoodMostOnline -eq 30 -and [int](Read-Dev $dev).maxPlayers -eq 40)
 
     Seed-Dev $dev $true
-    $out = Invoke-Remote $dev 0
+    $out = Invoke-Remote $dev 0 0
     Yes 'with no number the dev server keeps its 100' ([int](Read-Dev $dev).maxPlayers -eq 100)
     Yes 'and an unknown number is not a reason to rewrite' (($out -join "`n").Contains('already'))
 
     Seed-Dev $dev $false
-    $out = Invoke-Remote $dev 25
-    Yes 'a dev file with no maxPlayers gets one' ([int](Read-Dev $dev).maxPlayers -eq 25)
+    $out = Invoke-Remote $dev 25 35
+    Yes 'a dev file with no maxPlayers gets both' ([int](Read-Dev $dev).maxPlayers -eq 35 -and [int](Read-Dev $dev).thornswoodMostOnline -eq 25)
+
+    # The other harnesses that lift this block give it no seat count at all.
+    Seed-Dev $dev $true
+    $out = Invoke-Remote $dev 0 $null
+    Yes 'with no seat count given at all the block still parses and runs' ([int](Read-Dev $dev).maxPlayers -eq 100 -and
+        (($out -join "`n").Contains('already')))
+}
+
+# ---- 6. Publish-Server.ps1 ----------------------------------------------------
+$pubs = Get-Content -LiteralPath (Join-Path $RepoDir 'scripts\release\Publish-Server.ps1') -Raw
+$capAt = $pubs.IndexOf('$mostOnline = Get-MostOnline')
+$ifAt = -1
+if ($capAt -ge 0) { $ifAt = $pubs.LastIndexOf('if (Test-Path -LiteralPath $settingsPath) {', $capAt) }
+$capBlock = $null
+if ($ifAt -ge 0) { $capBlock = Get-BlockText $pubs.Substring($ifAt) 'if (Test-Path -LiteralPath $settingsPath) {' }
+Yes 'Publish-Server.ps1 writes the number into the settings it packs' ($null -ne $capBlock -and $capBlock.Contains('Set-MaxPlayers $capJson $mostOnline'))
+$zipAt = $pubs.IndexOf('-File $export -Dist $Dist -Zip $Zip')
+Yes 'before the zip is made' ($capAt -ge 0 -and $zipAt -gt $capAt)
+if ($null -ne $capBlock) {
+    $pdist = Join-Path $tmp 'pub-dist'
+    New-Item -ItemType Directory -Force -Path $pdist | Out-Null
+    $settingsPath = Join-Path $pdist 'server-settings.json'
+    [IO.File]::WriteAllText($settingsPath, '{"port":7777,"name":"Thornswood","maxPlayers":100,"keepMe":"yes"}', $utf8)
+    $ok = $true
+    # The block dot-sources MaxOnline.ps1 from beside itself; here that is $helper.
+    $sb = [scriptblock]::Create($capBlock.Replace("(Join-Path `$PSScriptRoot '..\deploy\MaxOnline.ps1')", "'" + $helper + "'"))
+    try { . $sb 6>$null } catch { $ok = $false; Write-Host ("      " + $_.Exception.Message) }
+    $w = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+    Yes 'the lifted Publish-Server block runs against a scratch build' $ok
+    Yes 'and packs thornswoodMostOnline 25 and maxPlayers over it' ([int]$w.thornswoodMostOnline -eq 25 -and [int]$w.maxPlayers -eq $real.Seats)
+    Yes 'keeping every other key' ($w.keepMe -eq 'yes' -and [int]$w.port -eq 7777)
+    Yes 'with no byte order mark' ([IO.File]::ReadAllBytes($settingsPath)[0] -ne 0xEF)
+    [IO.File]::WriteAllText($settingsPath, ('{ "port":7777, "thornswoodMostOnline":25, "maxPlayers":' + $real.Seats + ' }'), $utf8)
+    $before = [IO.File]::ReadAllText($settingsPath)
+    . $sb 6>$null
+    Yes 'and leaves the file untouched when nothing moved' ([IO.File]::ReadAllText($settingsPath) -eq $before)
 }
 
 Done

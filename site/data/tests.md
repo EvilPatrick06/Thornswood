@@ -111,7 +111,11 @@ Grab `thornswood-front.log`.
 
 ## TEST 5. Spells stay equipped
 
-1. Read a spell tome. Prefer Odin, Apocalypse or Triumvirate over vanilla.
+1. Read a spell tome your character can learn: a Mage with a spell point, and a
+   Novice spell of one of their two schools. Prefer Odin, Apocalypse or
+   Triumvirate over vanilla. A tome you cannot learn stays in your pack and chat
+   says which of the three you are missing (a spell point, the rank, a spell of
+   the rank below); that is the rule working, not a failure.
 2. Equip the spell.
 3. Cast it.
 4. Wait ten seconds and check it is still in your hand.
@@ -248,4 +252,4 @@ without end is for people who are still being shown the scroll.
 
 ## Do not report these
 
-Typing in another window still moves your character. A flute, lute or drum looks wrong when you equip it and plays nothing. They come from PlayFluteLuteDrum.esp, which handles equipping one and playing it with scripts that never fire here. Use the Lute, Flute and Drum emotes instead: open the emote wheel with G, or whatever key the launcher's Controls page gives it if you have moved it, then pick Revelry. Mod settings menus reset every session. NPCs stand still when nobody is near them. That is on the roadmap rather than a bug, so report an NPC only for something the Known Issues page does not already describe. You cannot save.
+Typing in another window still moves your character. A flute, lute or drum looks wrong when you equip it and plays nothing. They come from PlayFluteLuteDrum.esp, which handles equipping one and playing it with scripts that never fire here. Use the Lute, Flute and Drum emotes instead: open the emote wheel with G, or whatever key the launcher's Controls page gives it if you have moved it, then search for Lute, Flute or Drum. Mod settings menus reset every session only in QuickLoot, the instrument menu, MCM Recorder and SkyUI's favourite group and unequip options; Apocalypse, moreHUD, Atlas Map Markers, Skyrim Unbound and chfshVariousActions now keep theirs, so report one of those if it forgets. NPCs stand still when nobody is near them. That is on the roadmap rather than a bug, so report an NPC only for something the Known Issues page does not already describe. You cannot save.

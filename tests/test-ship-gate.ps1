@@ -32,9 +32,9 @@ param([string]$ShipPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $ShipPath) { $ShipPath = Join-Path $Here '..\scripts\release\Ship.ps1' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $ShipPath) { $ShipPath = Join-Path $Here 'scripts\release\Ship.ps1' }
 
 $script:pass = 0
 $script:fail = 0
@@ -161,7 +161,7 @@ try {
     #     14 files under tools are not tracked and every one is ignored
     #     (webhooks, signing.json, __pycache__, the front's zip, a log), so a
     #     gate that counted them would stop every main release.
-    Put 'tools/thornswood-front.zip' 'zip'
+    Put 'local/thornswood-front.zip' 'zip'
     Put 'tools/thornswood.log' "log`n"
     $r = Gate $work $false
     Yes "G5 ignored files under tools do not stop a main release: '$r'" ($r -eq '')

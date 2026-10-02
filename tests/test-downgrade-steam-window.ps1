@@ -44,9 +44,9 @@ param([string]$AppPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $AppPath) { $AppPath = Join-Path $Here '..\launcher\app' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $AppPath) { $AppPath = Join-Path $Here 'launcher\app' }
 
 $script:pass = 0
 $script:fail = 0
@@ -120,7 +120,7 @@ $wanted = [ordered]@{
     'ProgressLine'      = 'static string ProgressLine(int part, int of, long bytes, bool pasted)'
     'Next'              = 'static string Next(int part, int of)'
     'Parts'             = 'static string Parts(int from, int to, string one, string many)'
-    'Depots'            = 'static readonly string[][] Depots ='
+    'FallbackDepots'    = 'static readonly string[][] FallbackDepots ='
     'Command'           = 'static string Command(string[] depot)'
 }
 $lifted = [ordered]@{}
@@ -162,6 +162,14 @@ namespace Probe
             foreach (Process p in All) if (p.Id == id) return p;
             throw new ArgumentException("Process with an Id of " + id + " is not running.");
         }
+    }
+
+    // Stands in for launcher\app\Swallow.cs, which the lifted text calls from
+    // its catch blocks since the silent catches were given a log line.
+    static class Swallow
+    {
+        public static List<string> Notes = new List<string>();
+        public static void Note(string where, Exception e) { Notes.Add(where + ": " + e.Message); }
     }
 
     public class Win
@@ -218,6 +226,8 @@ namespace Probe
 
         // ---- lifted from launcher\app\Downgrade.cs ----
 __LIFTED__
+        // What Run sets from PinnedDepots; a feed with no pin leaves the fallback (#471).
+        static string[][] Depots = FallbackDepots;
     }
 }
 '@

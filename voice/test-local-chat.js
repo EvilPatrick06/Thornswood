@@ -7,19 +7,20 @@
   every socket on the server, /ooc was the only local line, and there was no
   /me.
 
-  The fix is behind THORNSWOOD_CHAT_RANGE and ships off, so this proves both
-  halves against the real service rather than a copy of its logic:
+  The fix is behind THORNSWOOD_CHAT_RANGE. Left unset it is off, which is
+  how the live voice service is left. The dev voice service is installed
+  with it on. This proves both halves against the real service:
 
-    OFF, which is what ships. Every line reaches every socket, the object on
-    the wire is the same six keys it always was, and /me, /s and /ooc are
-    queued for the game server exactly as before.
+    OFF. A plain line still reaches every socket in the box. The line
+    above the head is local either way. /me, /s, /w and /ooc are local
+    speech, not commands for the game server.
 
     ON. The entry's own test: three sockets, positions posted to /positions
     with two close together in one cell and one far off, one plain line from
     the first, and exactly two sockets receive it. Then the rest of what the
     setting promises: a shout carries further, a whisper less, a different
     cell at arm's length hears nothing, /me and /do arrive as actions, /ooc
-    and /roll still go to the game server, somebody with no position reaches
+    is local too, /roll still goes to the game server, somebody with no position reaches
     nobody and is told why, and a stopped position feed falls back to
     everybody rather than silencing the server.
 
@@ -65,6 +66,7 @@ async function service(range) {
   const port = await freePort();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'localchat-'));
   fs.copyFileSync(SERVER, path.join(dir, 'voice-server.js'));
+  fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
   const env = Object.assign({}, process.env, {
     THORNSWOOD_VOICE_PORT: String(port),
     THORNSWOOD_VOICE_BIND: '127.0.0.1',
@@ -189,7 +191,7 @@ function rows(include) {
 // ------------------------------------------------------------------ off ----
 async function off() {
   console.log('');
-  console.log('THORNSWOOD_CHAT_RANGE unset, which is what ships:');
+  console.log('THORNSWOOD_CHAT_RANGE unset, which is how live is left:');
   const svc = await service(null);
   try {
     yes('OFF health says the range is off', svc.health.chatRange === 0);
@@ -201,20 +203,48 @@ async function off() {
     const heard = await say(svc, a, 'Hand over the purse.', ['Aela', 'Brand', 'Cass']);
     yes('OFF a plain line reaches every socket, near or far, as it always has',
         heardBy(heard, ['Aela', 'Brand', 'Cass']));
-    const m = lineOf(svc.socks[2]);
-    yes('OFF and the object on the wire is the same six keys it always was, with no kind',
-        !!m && same(Object.keys(m).sort(), ['at', 'from', 'name', 'profileId', 't', 'text']));
+    const far = lineOf(svc.socks[2]);
+    const near = lineOf(svc.socks[1]);
+    yes('OFF and somebody out of reach gets the box with no line above the head',
+        !!far && far.kind === 'say' && !far.head && far.text === 'Hand over the purse.');
+    yes('OFF and somebody close enough gets the words above the head',
+        !!near && near.head === 'Hand over the purse.');
     yes('OFF and nobody is sent a note about who heard it',
         svc.socks.every((s) => !noteOf(s)));
 
-    for (const line of ['/me draws a knife', '/s Guards!', '/w run', '/ooc brb']) {
-      await queued(svc);
-      const h = await say(svc, a, line);
-      const q = await queued(svc);
-      yes('OFF ' + line.split(' ')[0] + ' is not broadcast', h.length === 0);
-      yes('OFF and it is queued for the game server, as before',
-          q.length === 1 && q[0].text === line && q[0].profileId === 101);
-    }
+    await place(svc, rows(['Aela', 'Brand', 'Cass']));
+    await queued(svc);
+    let local = await say(svc, a, '/me draws a knife', ['Aela', 'Brand']);
+    yes('OFF /me reaches the people within a plain line, not the one up the road',
+        heardBy(local, ['Aela', 'Brand']));
+    const mm = lineOf(svc.socks[1]);
+    yes('OFF and it arrives as an action, with the same words above the head',
+        !!mm && mm.kind === 'me' && mm.text === 'draws a knife' && mm.head === 'draws a knife');
+    yes('OFF and /me is not queued for the game server', (await queued(svc)).length === 0);
+
+    await place(svc, rows(['Aela', 'Brand', 'Cass']));
+    local = await say(svc, a, '/s Guards!', ['Aela', 'Brand', 'Cass']);
+    yes('OFF a shout still reaches the one up the road', heardBy(local, ['Aela', 'Brand', 'Cass']));
+    const sm = lineOf(svc.socks[2]);
+    yes('OFF and the shout is the words above the head',
+        !!sm && sm.kind === 'shout' && sm.text === 'Guards!' && sm.head === 'Guards!');
+
+    await place(svc, rows(['Aela', 'Brand', 'Cass']));
+    await queued(svc);
+    local = await say(svc, a, '/w run', ['Aela']);
+    yes('OFF a whisper reaches only the sender when nobody is that close', heardBy(local, ['Aela']));
+    yes('OFF and they are told nobody heard it',
+        !!noteOf(a) && /Nobody near enough/.test(noteOf(a).text));
+    yes('OFF and /w is not queued', (await queued(svc)).length === 0);
+
+    await place(svc, rows(['Aela', 'Brand', 'Cass']));
+    await queued(svc);
+    local = await say(svc, a, '/ooc brb', ['Aela', 'Brand']);
+    yes('OFF /ooc is local, the same reach as a plain line', heardBy(local, ['Aela', 'Brand']));
+    const om = lineOf(svc.socks[1]);
+    yes('OFF and the line above the head is in brackets',
+        !!om && om.kind === 'ooc' && om.text === 'brb' && om.head === '(( brb ))');
+    yes('OFF and /ooc is not queued', (await queued(svc)).length === 0);
   } finally { await svc.stop(); }
 }
 
@@ -303,8 +333,18 @@ async function on() {
     yes('ON and says how it is used', !!noteOf(a) && /\/me draws a sword/.test(noteOf(a).text));
     yes('ON and is not queued either', (await queued(svc)).length === 0);
 
-    // /ooc, /roll and a word that only starts like a verb are untouched.
-    for (const line of ['/ooc brb', '/roll 20', '/meow', '/spawn cheese']) {
+    // /ooc is speech now. /roll and a word that only starts like a verb
+    // are still commands.
+    await place(svc, rows(['Aela', 'Brand', 'Cass', 'Dagny', 'Eorlund']));
+    await queued(svc);
+    heard = await say(svc, a, '/ooc brb', ['Aela', 'Brand', 'Dagny']);
+    yes('ON /ooc reaches the same people a plain line does', heardBy(heard, ['Aela', 'Brand', 'Dagny']));
+    const oom = lineOf(b);
+    yes('ON and it is in brackets above the head',
+        !!oom && oom.kind === 'ooc' && oom.text === 'brb' && oom.head === '(( brb ))');
+    yes('ON and /ooc is not queued', (await queued(svc)).length === 0);
+
+    for (const line of ['/roll 20', '/meow', '/spawn cheese']) {
       await place(svc, rows(['Aela', 'Brand', 'Cass', 'Dagny', 'Eorlund']));
       await queued(svc);
       const h = await say(svc, a, line);
@@ -385,6 +425,8 @@ function page() {
       text(draw.partsFor({ kind: 'whisper', name: 'Aela', text: 'run' })) === 'Aela whispers: run');
   yes('a shout says so',
       text(draw.partsFor({ kind: 'shout', name: 'Aela', text: 'Guards!' })) === 'Aela shouts: Guards!');
+  yes('an /ooc is in brackets',
+      text(draw.partsFor({ kind: 'ooc', name: 'Aela', text: 'brb' })) === '(( Aela: brb ))');
   yes('a kind the page has never heard of is drawn as a plain line, not dropped',
       text(draw.partsFor({ kind: 'sing', name: 'Aela', text: 'la' })) === 'Aela: la');
   const action = draw.partsFor({ kind: 'me', name: 'Aela', text: 'x' });

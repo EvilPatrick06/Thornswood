@@ -38,14 +38,14 @@
   folder.
 #>
 [CmdletBinding()]
-param([string]$ToolsPath)
+param([string]$RepoPath)
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $ToolsPath) { $ToolsPath = $Here }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $RepoPath) { $RepoPath = $Here }
 
 $script:pass = 0
 $script:fail = 0
@@ -64,13 +64,19 @@ function Done {
     if ($script:fail) { exit 1 }
     exit 0
 }
+# Anything that throws still goes through Done. Without this a throw after
+# the three voice services below had started ended the script with them
+# still running, and they held the output of whatever ran this: the nightly
+# run's harness step waited on them until it was cancelled at 45 minutes on
+# 26, 27 and 28 September (issue #891).
+trap { Yes ('the run finished without an error: ' + $_.Exception.Message) $false; Done }
 
 $nodeExe = (Get-Command node -ErrorAction SilentlyContinue).Source
 Yes 'node is here to run the voice service' ([bool]$nodeExe)
 if (-not $nodeExe) { Done }
 
 # ---- the script, parsed ----------------------------------------------------
-$installPath = Join-Path $ToolsPath '..\scripts\deploy\Install-Voice.ps1'
+$installPath = Join-Path $RepoPath 'scripts\deploy\Install-Voice.ps1'
 $tokens = $null; $errors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($installPath, [ref]$tokens, [ref]$errors)
 Yes 'Install-Voice.ps1 parses' ($errors.Count -eq 0)
@@ -150,7 +156,7 @@ $logPath = Join-Path $root 'voice.log'
 # reach node through the whole line the box runs and not a line without it.
 $psExePath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 $rollPath = Join-Path $root 'roll-log.ps1'
-Copy-Item -LiteralPath (Join-Path $ToolsPath '..\scripts\vps\Roll-Log.ps1') -Destination $rollPath
+Copy-Item -LiteralPath (Join-Path $RepoPath 'scripts\vps\Roll-Log.ps1') -Destination $rollPath
 # Stands in for the service: writes down what cmd.exe handed it and stops.
 $seenPath = Join-Path $root 'seen.json'
 Set-Content -LiteralPath (Join-Path $root 'voice-server.js') -Encoding ASCII -Value @'
@@ -231,11 +237,13 @@ Yes 'and no relay key rides on the command line: the service is handed none ther
 Write-Host ''
 Write-Host 'what is already running is kept, the way -Bind and -Auth are:'
 $stubDir = Join-Path $script:temp 'stub'
-New-Item -ItemType Directory -Force -Path $stubDir | Out-Null
+# Laid out the way scripts\ is since phase 8 of issue #440: the install in
+# deploy, and the Remote.ps1 it calls as ..\vps\Remote.ps1 beside it.
+New-Item -ItemType Directory -Force -Path (Join-Path $stubDir 'deploy'), (Join-Path $stubDir 'vps') | Out-Null
 # Remote.ps1's own parameters, running here instead of on the VPS. A canned
 # answer stands in for a service that is not there, or one saying something
 # no real one would.
-Set-Content -LiteralPath (Join-Path $stubDir 'Remote.ps1') -Encoding ASCII -Value @'
+Set-Content -LiteralPath (Join-Path $stubDir 'vps\Remote.ps1') -Encoding ASCII -Value @'
 param([Parameter(Position = 0)][string]$Script, [string]$VpsHost, [string]$VpsUser)
 if ($env:TS_PROBE_ANSWER) { $env:TS_PROBE_ANSWER; return }
 $full = "`$ProgressPreference = 'SilentlyContinue'`r`n" + $Script
@@ -246,7 +254,8 @@ $b64 = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($full))
 function StartVoice([int]$port, [hashtable]$vars, [string]$key) {
     $dir = Join-Path $script:temp ('voice-' + $port)
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
-    Copy-Item -LiteralPath (Join-Path $ToolsPath '..\voice\voice-server.js') -Destination (Join-Path $dir 'voice-server.js')
+    Copy-Item -LiteralPath (Join-Path $RepoPath 'voice\voice-server.js') -Destination (Join-Path $dir 'voice-server.js')
+    Copy-Item -LiteralPath (Join-Path $RepoPath 'voice\headlines.js') -Destination (Join-Path $dir 'headlines.js')
     Set-Content -LiteralPath (Join-Path $dir 'token-key.txt') -Value 'a join token key for this test only' -Encoding ASCII
     if ($key) { Set-Content -LiteralPath (Join-Path $dir 'turn-key.txt') -Value $key -Encoding ASCII }
     $psi = New-Object System.Diagnostics.ProcessStartInfo
@@ -273,7 +282,7 @@ function StartVoice([int]$port, [hashtable]$vars, [string]$key) {
 # The probe block lifted out of the install, run with the install's own
 # variables as its parameter block would leave them.
 function Probe([int]$port, [hashtable]$given, [string]$canned) {
-    $Here = $stubDir; $Port = $port; $VpsHost = 'vps.invalid'; $VpsUser = 'nobody'
+    $Here = Join-Path $stubDir 'deploy'; $Port = $port; $VpsHost = 'vps.invalid'; $VpsUser = 'nobody'
     $Bind = '0.0.0.0'; $Auth = 'log'; $ChatRange = 'off'; $TurnUrl = ''
     $bindExplicit = $false; $authExplicit = $false; $chatExplicit = $false; $turnExplicit = $false
     if ($given.ContainsKey('TurnUrl')) { $TurnUrl = $given['TurnUrl']; $turnExplicit = $true }

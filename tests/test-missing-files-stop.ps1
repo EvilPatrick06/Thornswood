@@ -18,15 +18,14 @@
   no build stops on something that was never in the repository.
 #>
 [CmdletBinding()]
-param([string]$Tools)
+param([string]$Repo)
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $Tools) { $Tools = $Here }
-$repo = Split-Path -Parent $Tools
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $Repo) { $Repo = $Here }
 
 $script:pass = 0
 $script:fail = 0
@@ -34,10 +33,10 @@ function Yes([string]$what, [bool]$cond) {
     if ($cond) { $script:pass++; Write-Host "PASS  $what" }
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
-# In scripts\<area> since phase 8 of issue #440; tools\ holds forwarding copies.
+# In scripts\<area> since phase 8 of issue #440.
 function Read([string]$name) {
-    $p = @(Get-ChildItem -LiteralPath (Join-Path (Split-Path -Parent $Tools) 'scripts') -Filter $name -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName)[0]
-    if (-not $p) { $p = Join-Path $Tools $name }
+    $p = @(Get-ChildItem -LiteralPath (Join-Path $Repo 'scripts') -Filter $name -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName)[0]
+    if (-not $p) { $p = Join-Path $Repo $name }
     [IO.File]::ReadAllText($p)
 }
 

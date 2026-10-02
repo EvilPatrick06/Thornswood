@@ -138,6 +138,10 @@ namespace Thornswood
                             Last = st;
                             if (st.Name != null && st.Name.Length > 0) log("Discord says yes. " + st.Name + ".");
                             else log("Discord says yes.");
+                            // A yes can still say something: that the world is
+                            // full and there will be a wait in line at the
+                            // game's menu (#481).
+                            if (st.Message != null && st.Message.Length > 0) log(st.Message);
                             if (onAllowed != null) onAllowed();
                             return;
                         }
@@ -210,9 +214,10 @@ namespace Thornswood
                 return;
             }
 
-            if (st.Why == "guild" && st.Invite != null && st.Invite.Length > 0)
+            string ask = InviteQuestion(st);
+            if (ask != null)
             {
-                body += "\n\nOpen the Discord and join it?";
+                body += "\n\n" + ask;
                 if (MessageBox.Show(win, body, title, MessageBoxButton.YesNo,
                                     MessageBoxImage.Information) == MessageBoxResult.Yes)
                 {
@@ -227,9 +232,29 @@ namespace Thornswood
                 return;
             }
 
-            // banned, or a role that is not on the list. Neither is something
-            // the launcher can help with, so it says so once and stops.
+            // banned, or no invite to offer. Neither is something the
+            // launcher can help with, so it says so once and stops.
             MessageBox.Show(win, body, title, MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+
+        /// <summary>
+        /// The question the box ends on when it can open the Discord for
+        /// them, or null when it cannot. 'guild' is somebody not in the
+        /// Discord; 'role' is somebody in it who has not been accepted yet,
+        /// and the site's message tells them to apply there, so the box offers
+        /// the invite the site sent with it rather than leaving them to find
+        /// the Discord themselves (#999). Banned never gets one, and only a web
+        /// address is ever handed to Windows to open.
+        /// tests\test-door-invite.ps1 holds it.
+        /// </summary>
+        public static string InviteQuestion(Standing st)
+        {
+            if (st == null || st.Invite == null) return null;
+            if (!st.Invite.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
+                !st.Invite.StartsWith("http://", StringComparison.OrdinalIgnoreCase)) return null;
+            if (st.Why == "guild") return "Open the Discord and join it?";
+            if (st.Why == "role") return "Open the Discord to apply?";
+            return null;
         }
     }
 }

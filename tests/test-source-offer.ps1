@@ -10,7 +10,7 @@
   and AGPL version 3, each in its own LICENSE file. Nothing Thornswood put in
   front of a stranger said where the source was: credits.md named SkyMP with
   no licence and no link, and on 24 September the installer's READ ME
-  FIRST.txt was still the Skyrim Together one, left in the setup program's
+  FIRST.txt was still the old multiplayer mod's one, left in the setup program's
   scratch folder. The entry's closing condition: a stranger can reach,
   "from the download page and from inside the installed folder", a page
   naming skymp5-client, skyrim-platform and skymp5-server with their licences
@@ -19,8 +19,8 @@
   MEASURED 24 SEPTEMBER. git ls-remote against the public fork with no
   credentials answers c8832519866e for thornswood/engine-changes, the commit
   both records named that day, and the tree, compare and upstream links on the
-  page all answer 200 signed out. Both records name d0006351 since 27
-  September, and this file reads them rather than holding a commit of its own.
+  page all answer 200 signed out. Both records name the pinned commit since
+  #1200, and this file reads them rather than holding a commit of its own.
 
   NOT ALL OF IT IS OURS. The 23 September installer stage also carried
   Data\Platform\UI\build.js (a webpack build of skymp5-front, GPL v3, dated
@@ -51,13 +51,16 @@
   Read only apart from files under its own temp folder.
 #>
 [CmdletBinding()]
-param([string]$Fork = (& (Join-Path $PSScriptRoot '..\scripts\release\Where.ps1') Engine))
+param([string]$Fork)
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
+# Resolved here rather than as the param default: Windows PowerShell 5.1 leaves
+# $PSScriptRoot empty inside a script's param block (issue #991).
+if (-not $Fork) { $Fork = & (Join-Path $Here '..\scripts\release\Where.ps1') Engine }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
 
 $script:pass = 0
 $script:fail = 0
@@ -70,12 +73,12 @@ function Read-Json([string]$p) {
 }
 function Leaf([string]$p) { return $p.Substring($p.LastIndexOf('\') + 1) }
 
-$clientPath  = Join-Path $Here '..\records\client-build.json'
-$serverPath  = Join-Path $Here '..\records\server-build.json'
-$packagePath = Join-Path $Here '..\scripts\release\Package-Thornswood.ps1'
-$setupPath   = Join-Path $Here '..\installer\Setup-Thornswood.ps1'
-$creditsPath = Join-Path $Here '..\site\data\site\credits.md'
-$homePath    = Join-Path $Here '..\site\public\home.html'
+$clientPath  = Join-Path $Here 'records\client-build.json'
+$serverPath  = Join-Path $Here 'records\server-build.json'
+$packagePath = Join-Path $Here 'scripts\release\Package-Thornswood.ps1'
+$setupPath   = Join-Path $Here 'installer\Setup-Thornswood.ps1'
+$creditsPath = Join-Path $Here 'site\data\site\credits.md'
+$homePath    = Join-Path $Here 'site\public\home.html'
 
 $client = Read-Json $clientPath
 $server = Read-Json $serverPath
@@ -269,12 +272,12 @@ Yes 'Setup-Thornswood.ps1 copies SOURCE CODE.txt into the install folder' `
 # And the uninstall takes it out again. Finish ends with a plain rmdir of the
 # install folder, which only works on an empty one, and the farewell calls
 # anything it does not know "not Thornswood's".
-$uninstall = Get-Content -LiteralPath (Join-Path $Here '..\launcher\app\Uninstall.cs') -Raw
+$uninstall = Get-Content -LiteralPath (Join-Path $Here 'launcher\app\Uninstall.cs') -Raw
 Yes 'Uninstall.cs removes SOURCE CODE.txt from the install folder' `
     ($uninstall -match 'leave\.Add\(Path\.Combine\(Paths\.Root, "SOURCE CODE\.txt"\)\)')
 
 # Full GPL / AGPL / WebView2 texts beside the note (issue #421).
-$licenceDir = Join-Path $Here '..\installer\licences'
+$licenceDir = Join-Path $Here 'installer\licences'
 Yes 'installer\licences holds GPL-3.0.txt' (Test-Path -LiteralPath (Join-Path $licenceDir 'GPL-3.0.txt'))
 Yes 'installer\licences holds AGPL-3.0.txt' (Test-Path -LiteralPath (Join-Path $licenceDir 'AGPL-3.0.txt'))
 Yes 'installer\licences holds WebView2-LICENSE.txt' (Test-Path -LiteralPath (Join-Path $licenceDir 'WebView2-LICENSE.txt'))
@@ -295,38 +298,21 @@ Yes 'Uninstall.cs removes WebView2-LICENSE.txt from the install folder' `
 Yes 'SOURCE CODE.txt notice names the three licence files beside it' `
     ($note -match 'AGPL-3\.0\.txt' -and $note -match 'GPL-3\.0\.txt' -and $note -match 'WebView2-LICENSE\.txt')
 
-# ---- GitHub release pages name source beside the feed files (#421) ------
-$publishUpdatePath = Join-Path $Here '..\scripts\release\Publish-Update.ps1'
-$publishPackPath   = Join-Path $Here '..\scripts\release\Publish-Pack.ps1'
-$releaseYmlPath    = Join-Path $Here '..\.github\workflows\release.yml'
+# ---- where release pages said source is (#421, #907) ----------------------
+$publishUpdatePath = Join-Path $Here 'scripts\release\Publish-Update.ps1'
+$publishPackPath   = Join-Path $Here 'scripts\release\Publish-Pack.ps1'
+$releaseYmlPath    = Join-Path $Here '.github\workflows\release.yml'
 $publishUpdate = Get-Content -LiteralPath $publishUpdatePath -Raw
 $publishPack   = Get-Content -LiteralPath $publishPackPath -Raw
 $releaseYml    = Get-Content -LiteralPath $releaseYmlPath -Raw
-Yes 'Publish-Update.ps1 has Get-ReleaseSourceFooter' ($publishUpdate -match 'function Get-ReleaseSourceFooter')
-Yes 'Publish-Update.ps1 appends that footer to gh release create --notes' (
-    $publishUpdate -match 'Get-ReleaseSourceFooter \$clientRec \$serverRec' -and
-    $publishUpdate -match 'gh release create \$Id @assets @repoArg @pre --title "Update \$Id" --notes \$releaseNotes')
-Yes 'Get-ReleaseSourceFooter names credits#source and the licence file names' (
-    $publishUpdate -match 'credits#source' -and
-    $publishUpdate -match 'SOURCE CODE\.txt' -and
-    $publishUpdate -match 'AGPL-3\.0\.txt' -and
-    $publishUpdate -match 'GPL-3\.0\.txt' -and
-    $publishUpdate -match 'WebView2-LICENSE\.txt')
-Yes 'Publish-Pack.ps1 release body points at credits#source' ($publishPack -match 'credits#source')
+# Update and optional packs have had no GitHub release page since #907 (the
+# downloads are on thornswood.net and Thornswood-Releases is gone), so the
+# footer those pages carried went with them. The installer's SOURCE CODE.txt,
+# the credits page and release.yml's draft notes are what say where source is.
+Yes 'Publish-Update.ps1 makes no GitHub release page to put a footer on (#907)' (
+    $publishUpdate -notmatch 'gh release create' -and $publishUpdate -notmatch 'function Get-ReleaseSourceFooter')
+Yes 'nor does Publish-Pack.ps1' ($publishPack -notmatch 'api\.github\.com/repos/.+/releases')
 Yes 'launcher release.yml draft notes point at credits#source' ($releaseYml -match 'credits#source')
-if ($publishUpdate -match 'function Get-ReleaseSourceFooter') {
-    $fnRel = Get-FunctionText $publishUpdate 'Get-ReleaseSourceFooter'
-    Yes 'Get-ReleaseSourceFooter can be lifted from Publish-Update.ps1' ($null -ne $fnRel)
-    if ($fnRel) {
-        . ([ScriptBlock]::Create($fnRel))
-        $footer = Get-ReleaseSourceFooter $clientPath $serverPath
-        Yes 'the release footer names the fork tree for the client commit' ($footer.Contains($forkUrl + '/tree/' + $cCommit))
-        Yes 'the release footer names the server commit tree' ($footer.Contains(($server.source.repo -replace '\.git$', '') + '/tree/' + $sCommit))
-        Yes 'the release footer points at credits#source' ($footer.Contains('https://thornswood.net/credits#source'))
-        Yes 'the release footer is plain ASCII' (-not ($footer -match '[^\x09\x0A\x0D\x20-\x7E]'))
-        Yes 'the release footer has no em dash and never says player' (Test-Words $footer)
-    }
-}
 
 # ---- the credits page ------------------------------------------------------
 $credits = Get-Content -LiteralPath $creditsPath -Raw

@@ -1,0 +1,5 @@
+{
+  "people": 25,
+  "staffSeats": 5,
+  "note": "The most people in the world at once, and the extra seats over it that only the Discord staff roles may take. Patrick, 28 Sep: 25 at once for the alpha, raised later; 29 Sep: 5 staff seats for now. Anyone past the number waits in line at the game's menu. Change it here, then run the deploy for each server. scripts\\deploy\\MaxOnline.ps1 says who reads it."
+}

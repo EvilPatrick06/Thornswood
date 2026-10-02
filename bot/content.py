@@ -42,6 +42,26 @@ _SITE = 'https://thornswood.net'
 # mentions growing into real channel ids.
 LONGEST_PARAGRAPH = 1800
 
+# THE ONE SWITCH (#428). The site's config.json "open", off unless it says
+# true, and handed to this by Setup-Discord.ps1 as THORNSWOOD_OPEN, which reads
+# it off https://thornswood.net/api/public so there is one copy of it. Off, the
+# posts say what is true today: an alpha, open by application. On, they say
+# anyone in the Discord can play, and there is no application to make.
+OPEN = os.environ.get('THORNSWOOD_OPEN', '').strip().lower() in ('1', 'true', 'yes', 'open')
+
+
+def for_mode(md, open_=None):
+    """A page with only the wording for this mode. The same markers as
+       forMode in site/server.js: <!-- alpha --> ... <!-- /alpha --> and
+       <!-- open --> ... <!-- /open --> on lines of their own."""
+    if open_ is None:
+        open_ = OPEN
+    drop = 'alpha' if open_ else 'open'
+    md = md.replace('\r\n', '\n')
+    md = re.sub(r'(?ms)^<!-- ' + drop + r' -->[ \t]*\n.*?^<!-- /' + drop +
+                r' -->[ \t]*(?:\n|\Z)', '', md)
+    return re.sub(r'(?m)^<!-- /?(?:alpha|open) -->[ \t]*(?:\n|\Z)', '', md)
+
 
 def as_discord(md, where='join.md'):
     """A site page as Discord shows it. Links on the site are relative, so
@@ -71,7 +91,7 @@ def section(md, heading, where='join.md'):
 
 
 with open(_JOIN, encoding='utf-8') as _f:
-    JOIN = as_discord(_f.read())
+    JOIN = as_discord(for_mode(_f.read()))
 
 # The page without its own "# How to join", which the channel replaces.
 _JOIN_BODY = re.sub(r'\A# [^\n]*\n+', '', JOIN)
@@ -89,6 +109,36 @@ if len(_YOURS) != 1:
 _YOURS = _YOURS[0]
 _NEED = '\n\n'.join(p for p in _NEED if p != _YOURS)
 
+_GETTING_IN_ALPHA = """\
+## It's an alpha, open by application
+
+Anyone can download it. Getting into the world is an application, and it's
+short.
+
+1. Read <#RULES>. The application asks if you accept them.
+2. Open a ticket in <#TICKETS> and pick **Apply to be an alpha playtester**.
+   It asks if you're 18 or over, if you accept the rules, and a few lines
+   about who you want to play. Somebody reads it and gets back to you.
+3. Once you're accepted you get the Playtester role, and that's what lets you
+   press Play.
+
+It's an alpha, so things break. Four people find a bug and it's fixed by the
+weekend, so tell us when you find one.
+
+## How to install
+
+Follow <#START>. It's **https://thornswood.net/join** word for word, read out
+of the same file, so the two can't disagree. You can install while you wait."""
+
+_GETTING_IN_OPEN = """\
+## It's open
+
+Anyone can download it and anyone here can play.
+
+1. Read <#RULES>. Being here and in the world means accepting them.
+2. Follow <#START>. It's **https://thornswood.net/join** word for word, read
+   out of the same file, so the two can't disagree."""
+
 WELCOME = """\
 # Thornswood
 
@@ -96,24 +146,7 @@ Skyrim, except everybody's in the same one.
 
 """ + _YOURS + """
 
-## We're playtesting
-
-Not open to everyone yet.
-
-Open a ticket in <#TICKETS>. Say who you are and what you're after. A few lines
-is fine, somebody will get back to you.
-
-We're letting people in slowly on purpose. Four people find a bug and it's
-fixed by the weekend. Two hundred people find it and that's a bad week and a
-first impression nobody comes back from.
-
-Not in yet isn't the same as turned away. Stick around, you'll get asked.
-
-## Once you're in
-
-1. Read <#RULES>.
-2. Follow <#START>. It's **https://thornswood.net/join** word for word, read out
-   of the same file, so the two can't disagree.
+""" + (_GETTING_IN_OPEN if OPEN else _GETTING_IN_ALPHA) + """
 
 ## Everything else
 
@@ -126,6 +159,15 @@ It lives on the site, so it can't go stale in here.
 
 Say hello in <#GENERAL>.
 """
+
+_ACCEPTING_ALPHA = """\
+**Accepting them.** The application in <#TICKETS> asks whether you accept
+these rules and the ones at **https://thornswood.net/rules**, and your answer is
+kept against your Discord account. Applying means accepting them."""
+
+_ACCEPTING_OPEN = """\
+**Accepting them.** Being here and in the world means accepting these rules and
+the ones at **https://thornswood.net/rules**."""
 
 RULES = """\
 # Rules
@@ -159,13 +201,14 @@ You can argue about it afterwards.
 
 You get a word, then a mute, then a removal, depending on what it was. Two and
 three skip to the end when they're bad enough.
-"""
+
+""" + (_ACCEPTING_OPEN if OPEN else _ACCEPTING_ALPHA) + "\n"
 
 START = """\
 # Getting in
 
 This is **https://thornswood.net/join**, read out of the same file, so the two
-can't disagree. Step 1 happens in <#TICKETS>. Logs and crash files go in
+can't disagree.""" + ("" if OPEN else " Step 1 happens in <#TICKETS>.") + """ Logs and crash files go in
 <#LOGS>.
 
 """ + _JOIN_BODY + "\n"
@@ -177,70 +220,45 @@ the launcher, so this channel and the Play button can't disagree.
 Same list at **https://thornswood.net/news**.
 """
 
-GAME_RULES = """\
+# THE RULES IN THE WORLD ARE READ OUT OF THE RULES PAGE, NOT WRITTEN HERE.
+#
+# Issue #430: #game-rules, lore\game-rules.md and site\data\site\rules.md
+# were three copies of the rules for playing, and they disagreed on the one
+# people get removed over: this channel and the lore copy had a fight with
+# another character agreed first, the site had it start freely. Patrick
+# decided on 28 Sep that fights start freely, and that the site page is the
+# only copy. So
+# #game-rules is that page's "# In the World" part, to the end of the page,
+# and an edit there reaches the channel with the next Setup-Discord.ps1
+# -Posts. Paragraphs past LONGEST_PARAGRAPH are refused by as_discord, as
+# they are for join.md.
+#
+# RULES above is a different document, the Discord conduct rules posted in
+# #rules, and is left as it is.
+_RULES_MD = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         '..', 'site', 'data', 'site', 'rules.md')
+
+
+def in_the_world(md, where='rules.md'):
+    """The rules page's "# In the World" part, from under its heading to the
+    next top level heading or the end of the page."""
+    md = md.replace('\r\n', '\n')
+    m = re.search(r'^# In the World[ \t]*\n(.*?)(?=^# |\Z)', md, re.M | re.S)
+    if not m:
+        raise ValueError('%s has no "# In the World" part, and #game-rules is '
+                         'read out of it' % where)
+    return m.group(1).strip()
+
+
+with open(_RULES_MD, encoding='utf-8') as _f:
+    GAME_RULES = """\
 # Rules in the world
 
-<#RULES> is about how we treat each other. This is about playing.
+This is **https://thornswood.net/rules** from "In the World" on, read out of
+the same file, so the two can't disagree. <#RULES> is the Discord half.
 
-We're looser than the big roleplay servers on purpose. No character sheet to
-get approved, no lore exam, nobody blessing your backstory. What you do need is
-to not ruin somebody else's evening.
+""" + as_discord(in_the_world(_f.read()), 'rules.md') + "\n"
 
-**1. Your character knows what your character knows.**
-You read here that somebody got robbed on the road. Your character didn't. The
-fun half of this rule: **ask**. "Has word got round about the road?" gets you
-an answer in character, and now it's real.
-
-**2. You don't decide what happens to other people.**
-Write what you try, not what you land. Swinging at his shoulder leaves him a
-choice. Burying the axe in it doesn't.
-
-**3. Nobody dies without agreeing to it.**
-Beaten, robbed, broken, left in a ditch, all fine. Death isn't. Say it out of
-character first and make sure everyone actually wants it. A death somebody
-agreed to is the best thing that happens on a server like this.
-
-**4. Ask before you draw on someone.**
-Go get killed by a draugr all you like. Fighting another character takes one
-line out of character first. Nobody has ever been annoyed by being asked.
-
-**5. Rob people, don't loot them.**
-Pick the lock, lift the key, talk your way in, all fair. Don't empty someone's
-house because you caught it open while they were offline. Take a good thing,
-leave a trace, and give them a story to come back to.
-
-**6. Play a person, not a legend.**
-You can be remarkable. You can't be the Dragonborn, the Listener, the Archmage,
-the Harbinger, or the last of anything.
-
-**7. Titles are given, or taken properly.**
-Jarl, steward, housecarl, thane, captain, priest of a named temple. Most of them
-are sitting empty, and how one comes free is something you find out in
-character.
-
-Claiming an empty one is fine within reason. Nobody will stop you calling
-yourself captain of a guard nobody else has claimed. High King is not within
-reason.
-
-Want one somebody already holds? Take it. Scheme, challenge them, put a knife
-somewhere useful. But take it **in the world, with them in it**. Announcing
-you're the Jarl of Riften now while the Jarl of Riften is asleep isn't taking
-it, it's editing your own name.
-
-**8. Use `/ooc` for out of character talk.**
-`/ooc brb, dog`. It only reaches people near you and it comes out in brackets,
-so nobody has to guess whether your character said it.
-
-**9. If you wouldn't enjoy being on the other end of it, don't.**
-The other eight are made out of this one.
-
-**10. `/ooc can we not` ends anything.**
-Immediately, no explanation owed, no argument. Ignore that and you're done
-here. It's the only rule with no second chance.
-
-The full thing, including what we're deliberately relaxed about, is at
-**https://thornswood.net/rules**
-"""
 
 LORE = """\
 # Where you are
@@ -294,6 +312,24 @@ Skyrim's soil is under Skyrim's law, a Nord standing in the embassy is under
 the Empire's, and neither side can reach in and drag somebody out.
 """
 
+_FAQ_IN_ALPHA = """\
+**Can I bring a friend?**
+Yes. Send them to the Discord. They apply the same way you did.
+
+**Why can't I get in?**
+It's an alpha, open by application. Anyone can download it, and the
+Playtester role is what lets you press Play. Open a ticket in <#TICKETS>, pick
+**Apply to be an alpha playtester**, and say yes to the rules. Somebody reads
+it and gets back to you."""
+
+_FAQ_IN_OPEN = """\
+**Can I bring a friend?**
+Yes. Send them to the Discord and they can play.
+
+**Why can't I get in?**
+Anyone here can play, so it's something else. Open a ticket in <#TICKETS> and
+pick **I need help**."""
+
 FAQ = """\
 # Questions
 
@@ -329,12 +365,7 @@ Off. So is levelling. Difficulty is locked.
 Check **https://thornswood.net/known** first. A lot of it is on that list and a
 lot of that is on purpose. If it isn't there, <#BUGS>.
 
-**Can I bring a friend?**
-Ask. We're small, we're still building, and we're letting people in slowly.
-
-**Why can't I get in?**
-Closed playtest. Open a ticket in <#TICKETS> and say hello.
-"""
+""" + (_FAQ_IN_OPEN if OPEN else _FAQ_IN_ALPHA) + "\n"
 
 LINKS = """\
 # Links

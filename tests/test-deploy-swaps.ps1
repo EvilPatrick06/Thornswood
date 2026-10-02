@@ -1,0 +1,955 @@
+<#
+  test-deploy-swaps.ps1
+
+  Deploy-DevGamemode.ps1, Deploy-Docs.ps1, Install-Voice.ps1, Install-Bot.ps1
+  and Deploy-Server.ps1 -PutBack, each run whole against a scratch folder
+  standing in for the VPS: nothing running is stopped or written over until the
+  new copy has checked out beside it, a new copy that does not come up is put
+  back automatically, and -PutBack puts the last one back.
+
+  WHY THIS EXISTS. Issue #446. Measured on 28 September: Deploy-DevGamemode
+  stopped the dev server and then copied over it; Deploy-Docs, Install-Voice and
+  Install-Bot copied over the running site, voice service and bot and then
+  restarted them; none of them put anything back when the new one did not come
+  up, and two of them said so only in a line nobody had to read. Deploy-Server
+  already staged, checked and swapped (entry 209); these use its blocks, or the
+  same shape for a service (scripts\deploy\Swap.ps1).
+
+  HOW. Each script is copied into a scratch repository with stand-ins for what
+  it sends (a site, a voice service and a bot that each report which version
+  they are, and a game server that holds its two ports), and run by this
+  PowerShell with ssh and scp replaced by functions, the way
+  test-remote-big-script.ps1 replaces them. The ssh stand-in runs what it is
+  sent under Windows PowerShell 5.1, which is what runs it on the VPS, with only
+  the scheduled task and firewall cmdlets replaced: a task is a file here, and
+  starting it starts its real action. The scp stand-in copies into the scratch
+  folder, and can be told to fail or to corrupt a file. The stops, the
+  renames, the health checks and the way back are the real ones.
+
+  For each of them it proves: a good one is swapped in and answers as the new
+  version with what it replaced kept in .prev; a copy that fails, or a stage
+  the box refuses (a file that arrived different, a program that does not
+  parse), stops the run with the running copy untouched and the same process
+  still answering; a new version that does not come up, or a swap whose rename
+  fails because a file is held, is SWAP ROLLED BACK with the old files back
+  and the old version answering again; and -PutBack puts the previous version
+  back and keeps what it took out in .undone.
+
+  For the bot it also proves that a box with no bot.log on it is not a failed
+  swap: the log the health check reads is made in front of the start, the
+  service is started, and the new code stays in, rather than being put back
+  after two waits on a file nothing could write.
+
+  And issue #1121, Patrick, 29 Sep: a deploy sends a commit or nothing. Each
+  of Deploy-Docs, Install-Voice, Install-Bot, Deploy-DevGamemode,
+  Deploy-Server and Publish-Server, run with a file it would send changed,
+  staged, or untracked, is refused before it talks to the box, naming the
+  file, with no ssh or scp run at all. And only the newest two .prev folders
+  are kept, not three.
+
+  Connects to nothing but 127.0.0.1.
+#>
+[CmdletBinding()]
+param()
+
+$ErrorActionPreference = 'Stop'
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+$scripts = [IO.Path]::GetFullPath((Join-Path $Here 'scripts'))
+
+$script:pass = 0
+$script:fail = 0
+function Yes([string]$what, [bool]$cond) {
+    if ($cond) { $script:pass++; Write-Host "PASS  $what" }
+    else { $script:fail++; Write-Host "FAIL  $what" }
+}
+function Done {
+    Remove-Item -Path function:global:ssh, function:global:scp -ErrorAction SilentlyContinue
+    Remove-Variable -Name TsBox -Scope Global -ErrorAction SilentlyContinue
+    Remove-Variable -Name TsScpFail, TsScpCorrupt, TsLastCode, TsRun, TsScpCount -Scope Global -ErrorAction SilentlyContinue
+    Write-Host ''
+    Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
+    if ($script:fail) { exit 1 }
+    exit 0
+}
+
+# ---- read, not run ------------------------------------------------------------
+foreach ($n in 'Deploy-DevGamemode.ps1', 'Deploy-Docs.ps1', 'Install-Voice.ps1', 'Install-Bot.ps1', 'Deploy-Server.ps1') {
+    $t = [IO.File]::ReadAllText((Join-Path $scripts ('deploy\' + $n)))
+    Yes "$n loads Swap.ps1 and takes -PutBack" ($t.Contains(". (Join-Path `$Here 'Swap.ps1')") -and $t -match '\[switch\]\$PutBack')
+}
+
+$node = Get-Command node -CommandType Application -EA SilentlyContinue | Select-Object -First 1
+$python = Get-Command python -CommandType Application -EA SilentlyContinue | Select-Object -First 1
+$ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+if (-not $node -or -not $python -or -not (Test-Path -LiteralPath $ps51) -or
+    -not (Get-Command Get-NetUDPEndpoint -EA SilentlyContinue)) {
+    Write-Host 'SKIP  the runs need node, python, Windows PowerShell 5.1 and Get-NetUDPEndpoint, and this machine lacks one'
+    Done
+}
+
+$started = Get-Date
+$work    = Join-Path ([IO.Path]::GetTempPath()) ('ts-swaps-' + [Guid]::NewGuid().ToString('N'))
+$box     = Join-Path $work 'box'
+$farTemp = Join-Path $box 'Windows\Temp'
+$tasks   = Join-Path $work 'tasks'
+$far     = Join-Path $work 'far'
+$repo    = Join-Path $work 'repo'
+$pidLog  = Join-Path $work 'pids.txt'
+$utf8    = New-Object Text.UTF8Encoding($false)
+foreach ($d in $farTemp, $tasks, $far) { $null = [IO.Directory]::CreateDirectory($d) }
+
+function Put([string]$path, [string]$text) {
+    $null = [IO.Directory]::CreateDirectory((Split-Path -Parent $path))
+    [IO.File]::WriteAllText($path, $text, $utf8)
+}
+# Read even while a service holds it open for writing, as it does its log.
+function Get([string]$path) {
+    if (-not (Test-Path -LiteralPath $path)) { return $null }
+    $fs = New-Object IO.FileStream($path, 'Open', 'Read', 'ReadWrite')
+    try { $r = New-Object IO.StreamReader($fs); return $r.ReadToEnd() } finally { $fs.Dispose() }
+}
+# What is live under a root: every file and its hash, leaving out the stage,
+# the kept .prev and .undone folders, and the logs a running service writes.
+function Live([string]$dir) {
+    $rows = @()
+    foreach ($f in @(Get-ChildItem -LiteralPath $dir -Recurse -File -Force)) {
+        $rel = $f.FullName.Substring($dir.Length)
+        if ($rel -match '^\\\.(stage|prev|undone)-' -or $f.Name -match '\.log(\.\d+)?$') { continue }
+        $rows += ($rel + '|' + (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash)
+    }
+    return (($rows | Sort-Object) -join "`n")
+}
+function Kept([string]$dir, [string]$kind) {
+    return @(Get-ChildItem -LiteralPath $dir -Directory -Force | Where-Object { $_.Name -like $kind } | Sort-Object Name | ForEach-Object { $_.FullName })
+}
+function Free([int]$p) {
+    (-not @(Get-NetUDPEndpoint -LocalPort $p -EA SilentlyContinue).Count) -and
+    (-not @(Get-NetTCPConnection -LocalPort $p -EA SilentlyContinue).Count)
+}
+$rand = New-Object Random
+$script:taken = @()
+function PickPort {
+    do { $p = $rand.Next(41000, 48000) } until ((Free $p) -and (Free ($p + 1)) -and $script:taken -notcontains $p -and $script:taken -notcontains ($p + 1))
+    $script:taken += $p, ($p + 1)
+    return $p
+}
+function Http([int]$port, [string]$path) {
+    # WebClient rather than Invoke-WebRequest, which hands back bytes, not
+    # text, for an answer with no content type, as the stand-ins give.
+    $c = New-Object Net.WebClient
+    try { return $c.DownloadString('http://127.0.0.1:' + $port + $path) } catch { return '' } finally { $c.Dispose() }
+}
+function Listener([int]$port) {
+    $l = @(Get-NetTCPConnection -LocalPort $port -State Listen -EA SilentlyContinue)
+    if ($l.Count) { return [int]$l[0].OwningProcess }
+    return 0
+}
+function UdpOwner([int]$port) {
+    $e = @(Get-NetUDPEndpoint -LocalPort $port -EA SilentlyContinue)
+    if ($e.Count) { return [int]$e[0].OwningProcess }
+    return 0
+}
+function WaitFor([scriptblock]$cond) {
+    for ($i = 0; $i -lt 60; $i++) { if (& $cond) { return $true }; Start-Sleep -Milliseconds 250 }
+    return $false
+}
+function NoRealTask {
+    # The task folder on disk, when this account can read it, because asking
+    # the scheduler takes seconds and this is asked after every far call.
+    $folder = Join-Path $env:SystemRoot 'System32\Tasks'
+    $readable = $false
+    try { $null = [IO.Directory]::GetFiles($folder, 'x'); $readable = $true } catch { }
+    if ($readable -and -not (Test-Path -Path (Join-Path $folder 'Thornswood Test*'))) { return $true }
+    $svc = @(Get-Service -Name 'ThornswoodTest*' -ErrorAction SilentlyContinue)
+    if ($svc.Count) { return $false }
+    $real = @(Get-ScheduledTask -TaskName 'Thornswood Test*' -ErrorAction SilentlyContinue)
+    foreach ($r in $real) {
+        Stop-ScheduledTask -TaskName $r.TaskName -ErrorAction SilentlyContinue
+        Unregister-ScheduledTask -TaskName $r.TaskName -Confirm:$false -ErrorAction SilentlyContinue
+    }
+    return ($real.Count -eq 0)
+}
+
+# The task scheduler and the firewall, for the far side; the same stand-ins
+# tests\test-install-server.ps1 uses. The task module is loaded before the
+# stand-ins are made, because loaded by its first use (New-ScheduledTaskAction)
+# part way through a script it hides them, and the real ones then run. The
+# firewall stand-ins need no such care: every firewall command used is one.
+$prelude = @'
+Import-Module ScheduledTasks -ErrorAction SilentlyContinue
+if (-not (Get-Module ScheduledTasks)) { 'THE TASK MODULE DID NOT LOAD, SO THE STAND-INS CANNOT BE TRUSTED'; exit 98 }
+# And every command of it the scripts use is a stand-in too, so nothing in
+# them can load it again part way through and bring the real ones back.
+function New-ScheduledTaskAction { [CmdletBinding()] param([string]$Execute, [string]$Argument, [string]$WorkingDirectory) [pscustomobject]@{ Execute = $Execute; Arguments = $Argument; WorkingDirectory = $WorkingDirectory } }
+function New-ScheduledTaskTrigger { [CmdletBinding()] param([switch]$AtStartup, [switch]$Once, $At, $RepetitionInterval) [pscustomobject]@{ AtStartup = [bool]$AtStartup } }
+function New-ScheduledTaskSettingsSet { [CmdletBinding()] param([switch]$AllowStartIfOnBatteries, [switch]$DontStopIfGoingOnBatteries, [switch]$StartWhenAvailable, $RestartCount, $RestartInterval, $ExecutionTimeLimit) [pscustomobject]@{ RestartCount = $RestartCount; ExecutionTimeLimit = 'PT0S' } }
+function New-ScheduledTaskPrincipal { [CmdletBinding()] param([string]$UserId, $LogonType, $RunLevel, $RequiredPrivilege, $ProcessTokenSidType) [pscustomobject]@{ UserId = $UserId; RunLevel = [string]$RunLevel } }
+$env:TS_PIDLOG = '@@PIDLOG@@'
+$TsTasks = '@@TASKS@@'
+function TsTaskFile([string]$n) { Join-Path $TsTasks (($n -replace '[^A-Za-z0-9]', '_') + '.json') }
+function TsRead([string]$n) { $f = TsTaskFile $n; if (Test-Path -LiteralPath $f) { return ([IO.File]::ReadAllText($f) | ConvertFrom-Json) }; return $null }
+function TsWrite([string]$n, $t) { [IO.File]::WriteAllText((TsTaskFile $n), ($t | ConvertTo-Json -Depth 4)) }
+function Get-ScheduledTask {
+  [CmdletBinding()] param([string]$TaskName)
+  $t = TsRead $TaskName
+  if (-not $t) { return }
+  [pscustomobject]@{ TaskName = $TaskName; State = 'Ready'
+    Actions = @([pscustomobject]@{ Execute = $t.Execute; Arguments = $t.Argument; WorkingDirectory = $t.WorkingDirectory })
+    Principal = [pscustomobject]@{ UserId = 'SYSTEM'; RunLevel = 'Highest' }; Settings = $null }
+}
+function Register-ScheduledTask {
+  [CmdletBinding()] param([string]$TaskName, $Action, $Trigger, $Settings, $Principal, [string]$Xml, [string]$User, [string]$RunLevel)
+  $t = [ordered]@{ Execute = ''; Argument = ''; WorkingDirectory = ''; Pid = 0 }
+  if ($Xml) {
+    $x = [xml]$Xml
+    $e = $x.Task.Actions.Exec
+    $t.Execute = [string]$e.Command; $t.Argument = [string]$e.Arguments; $t.WorkingDirectory = [string]$e.WorkingDirectory
+  } else {
+    $a = @($Action)[0]
+    $t.Execute = [string]$a.Execute; $t.Argument = [string]$a.Arguments; $t.WorkingDirectory = [string]$a.WorkingDirectory
+  }
+  TsWrite $TaskName $t
+}
+function Set-ScheduledTask {
+  [CmdletBinding()] param([Parameter(ValueFromPipeline = $true)]$InputObject)
+  process {
+    $t = TsRead $InputObject.TaskName
+    $a = @($InputObject.Actions)[0]
+    $n = [ordered]@{ Execute = [string]$a.Execute; Argument = [string]$a.Arguments; WorkingDirectory = [string]$a.WorkingDirectory; Pid = 0 }
+    if ($t) { $n.Pid = $t.Pid }
+    TsWrite $InputObject.TaskName $n
+  }
+}
+function Unregister-ScheduledTask {
+  [CmdletBinding(SupportsShouldProcess = $true)] param([string]$TaskName)
+  Remove-Item -LiteralPath (TsTaskFile $TaskName) -Force -EA SilentlyContinue
+}
+function Export-ScheduledTask {
+  [CmdletBinding()] param([string]$TaskName)
+  $t = TsRead $TaskName
+  if (-not $t) { return }
+  $x = New-Object xml
+  $task = $x.AppendChild($x.CreateElement('Task'))
+  $exec = $task.AppendChild($x.CreateElement('Actions')).AppendChild($x.CreateElement('Exec'))
+  foreach ($k in @(@('Command', $t.Execute), @('Arguments', $t.Argument), @('WorkingDirectory', $t.WorkingDirectory))) {
+    $null = $exec.AppendChild($x.CreateElement($k[0])).AppendChild($x.CreateTextNode([string]$k[1]))
+  }
+  $x.OuterXml
+}
+function Start-ScheduledTask {
+  [CmdletBinding()] param([string]$TaskName)
+  $t = TsRead $TaskName
+  if (-not $t) { return }
+  $p = Start-Process -FilePath $t.Execute -ArgumentList $t.Argument -WorkingDirectory $t.WorkingDirectory -WindowStyle Hidden -PassThru
+  [IO.File]::AppendAllText($env:TS_PIDLOG, [string]$p.Id + "`n")
+  $n = [ordered]@{ Execute = $t.Execute; Argument = $t.Argument; WorkingDirectory = $t.WorkingDirectory; Pid = $p.Id }
+  TsWrite $TaskName $n
+}
+function Stop-ScheduledTask {
+  [CmdletBinding()] param([string]$TaskName)
+  $t = TsRead $TaskName
+  if ($t -and $t.Pid) { Stop-Process -Id ([int]$t.Pid) -Force -EA SilentlyContinue }
+}
+function Get-ScheduledTaskInfo { [CmdletBinding()] param([Parameter(ValueFromPipeline = $true)]$InputObject) process { [pscustomobject]@{ LastTaskResult = 0 } } }
+function Get-NetFirewallRule { }
+function New-NetFirewallRule { }
+function Remove-NetFirewallRule { }
+function icacls { $global:LASTEXITCODE = 0 }
+# The bot's Windows service (issue #465), kept in the same book as the tasks:
+# a service is an entry whose action is what the service runs. Only names the
+# book holds exist; nothing here reaches a real service.
+function Get-Service {
+  [CmdletBinding()] param([string]$Name)
+  $t = TsRead $Name
+  if (-not $t) { return }
+  $up = $false
+  if ($t.Pid) { $up = [bool](Get-Process -Id ([int]$t.Pid) -EA SilentlyContinue) }
+  [pscustomobject]@{ Name = $Name; Status = $(if ($up) { 'Running' } else { 'Stopped' }) }
+}
+function Stop-Service { [CmdletBinding()] param([string]$Name, [switch]$Force) if (-not (TsRead $Name)) { throw ('no service ' + $Name) }; Stop-ScheduledTask -TaskName $Name }
+function Start-Service { [CmdletBinding()] param([string]$Name) if (-not (TsRead $Name)) { throw ('no service ' + $Name) }; Start-ScheduledTask -TaskName $Name }
+foreach ($n in 'Get-ScheduledTask', 'Register-ScheduledTask', 'Start-ScheduledTask', 'Stop-ScheduledTask',
+               'Unregister-ScheduledTask', 'Set-ScheduledTask', 'Export-ScheduledTask', 'New-NetFirewallRule',
+               'New-ScheduledTaskAction', 'New-ScheduledTaskTrigger', 'New-ScheduledTaskSettingsSet', 'New-ScheduledTaskPrincipal',
+               'Get-Service', 'Stop-Service', 'Start-Service') {
+  $c = Get-Command $n
+  if ($c.CommandType -ne 'Function' -or $c.Source) { 'THE STAND-IN FOR ' + $n + ' IS NOT THE ONE FOUND'; exit 97 }
+}
+
+'@
+$prelude = $prelude.Replace('@@PIDLOG@@', $pidLog.Replace("'", "''")).Replace('@@TASKS@@', $tasks.Replace("'", "''"))
+
+# Everything the stand-ins below read is in $global:TsBox, not in a variable
+# of this script: they run inside the script under test, and PowerShell
+# finds that script's own variables first (its Remote has a $far of its own).
+$global:TsBox = [pscustomobject]@{ Far = $far; Prelude = $prelude; Work = $work; Ps51 = $ps51; Box = $box; FarTemp = $farTemp }
+function RunWrapped([string]$body) {
+    $f = Join-Path $global:TsBox.Far ('far-' + [Guid]::NewGuid().ToString('N') + '.ps1')
+    [IO.File]::WriteAllText($f, ($global:TsBox.Prelude + $body), (New-Object Text.UTF8Encoding($true)))
+    $eap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    Push-Location -LiteralPath $global:TsBox.Work
+    try { $out = @(& $global:TsBox.Ps51 -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $f 2>&1 | ForEach-Object { "$_".TrimEnd() }) }
+    finally { Pop-Location; $ErrorActionPreference = $eap }
+    $global:TsLastCode = $LASTEXITCODE
+    if (-not (NoRealTask)) { throw 'a real scheduled task was registered, and has been removed' }
+    return $out
+}
+
+# ssh: the three shapes the Remote helpers send. A script inline as
+# -EncodedCommand, a script sent as a file to C:/Windows/Temp and run with
+# -File, and the Remove-Item that tidies that file away.
+# And the deploy store Artifact.ps1 keeps on the box (issue #459).
+function MapTemp([string]$s) {
+    $store = Join-Path $global:TsBox.Box 'Thornswood-Deploys'
+    return $s.Replace('C:/Windows/Temp/', ($global:TsBox.FarTemp + '\')).Replace('C:\Windows\Temp\', ($global:TsBox.FarTemp + '\')).
+              Replace('C:/Thornswood-Deploys', $store.Replace('\', '/')).Replace('C:\Thornswood-Deploys', $store)
+}
+function global:ssh {
+    $all = @($args | ForEach-Object { [string]$_ })
+    $cmd = $all[-1]
+    $body = ''
+    $m = [regex]::Match($cmd, 'EncodedCommand\s+(\S+)')
+    if ($m.Success) { $body = MapTemp ([Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[1].Value))) }
+    else {
+        $m = [regex]::Match($cmd, '-File\s+(\S+)\s*$')
+        # The file's own text, with the box's fixed places mapped too.
+        if ($m.Success) { $body = MapTemp ([IO.File]::ReadAllText((MapTemp $m.Groups[1].Value))) }
+        else {
+            $m = [regex]::Match($cmd, '-Command\s+(.*)$')
+            if ($m.Success) { $body = MapTemp $m.Groups[1].Value }
+        }
+    }
+    [void]$global:TsRun.Add($body)
+    $out = RunWrapped $body
+    foreach ($l in $out) { $l }
+    $global:LASTEXITCODE = $global:TsLastCode
+}
+# scp: into the scratch box, failing like the real one when the folder is not
+# there, and failing or arriving different when a test asks it to.
+function global:scp {
+    $global:TsScpCount++
+    $all = @($args | ForEach-Object { [string]$_ })
+    $src = $all[-2]; $dst = $all[-1]
+    $m = [regex]::Match($dst, '^[^@\s]+@[^:\s]+:(.+)$')
+    $global:LASTEXITCODE = 1
+    if (-not $m.Success) { return }
+    $to = MapTemp $m.Groups[1].Value
+    if ($global:TsScpFail -and $to -match $global:TsScpFail) { return }
+    if (-not (Test-Path -LiteralPath (Split-Path -Parent $to))) { return }
+    Copy-Item -LiteralPath $src -Destination $to -Force
+    if ($global:TsScpCorrupt -and $to -match $global:TsScpCorrupt) { [IO.File]::AppendAllText($to, ' ') }
+    $global:LASTEXITCODE = 0
+}
+$global:TsRun = New-Object Collections.Generic.List[string]
+$global:TsScpCount = 0
+Yes 'ssh and scp are the stand-ins here, so nothing can reach a server' (
+    (Get-Command ssh).CommandType -eq 'Function' -and (Get-Command scp).CommandType -eq 'Function')
+
+# Runs one of the scripts, from the scratch repository, and says how it ended.
+# What the case wrote into the scratch repository is committed first, because
+# a deploy sends a commit or nothing (#1121); -Dirty leaves it uncommitted,
+# for the cases that prove the refusal. A name with a folder in it is under
+# scripts\, the rest under scripts\deploy\.
+function Commit {
+    $eap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & git -C $repo add -A 2>&1 | Out-Null
+        & git -C $repo -c user.name=harness -c user.email=harness@invalid -c commit.gpgsign=false commit -q -m step 2>&1 | Out-Null
+    } finally { $ErrorActionPreference = $eap }
+}
+function Deploy([string]$name, [hashtable]$a, [switch]$Dirty) {
+    if (-not $Dirty) { Commit }
+    $global:TsScpFail = ''
+    $global:TsScpCorrupt = ''
+    if ($a.ContainsKey('ScpFail')) { $global:TsScpFail = $a['ScpFail']; $a.Remove('ScpFail') }
+    if ($a.ContainsKey('Corrupt')) { $global:TsScpCorrupt = $a['Corrupt']; $a.Remove('Corrupt') }
+    $global:LASTEXITCODE = 0
+    $threw = ''
+    # Kept line by line, so what a script said before it threw is not lost
+    # with the assignment the throw cuts short.
+    $said = New-Object Collections.Generic.List[string]
+    $script = Join-Path $repo ('scripts\deploy\' + $name)
+    if ($name.Contains('\')) { $script = Join-Path $repo ('scripts\' + $name) }
+    try { & $script @a *>&1 | ForEach-Object { [void]$said.Add("$_") } }
+    catch { $threw = $_.Exception.Message }
+    $global:TsScpFail = ''
+    $global:TsScpCorrupt = ''
+    $script:lastSaid = @($said) + @($threw)
+    $ok = (-not $threw) -and ($global:LASTEXITCODE -eq 0)
+    return [pscustomobject]@{ Ok = $ok; Said = ($script:lastSaid -join "`n"); Threw = $threw }
+}
+function Show { foreach ($l in $script:lastSaid) { Write-Host ('        ' + $l) } }
+
+# ---- the scratch repository ---------------------------------------------------
+Copy-Item -LiteralPath $scripts -Destination (Join-Path $repo 'scripts') -Recurse
+# Where.ps1 reads the layout from the repository's root; the artifacts go
+# under the out folder it names, inside the scratch repository.
+Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $scripts) 'layout.json') -Destination (Join-Path $repo 'layout.json')
+Put (Join-Path $repo 'scripts\vps\vps.json') '{ "address": "127.0.0.1" }'
+# The artifacts are built under out\, which is ignored, as it is in the repository.
+Put (Join-Path $repo '.gitignore') "out/`n"
+
+$siteJs = @'
+const http = require('http'), fs = require('fs'), path = require('path');
+const VERSION = '@@V@@';
+try { fs.appendFileSync(process.env.TS_PIDLOG, process.pid + '\n'); } catch (e) { }
+if (VERSION.indexOf('will-not-start') >= 0) { console.error('this site will not start'); process.exit(1); }
+const port = Number(fs.readFileSync(path.join(__dirname, 'port.txt'), 'utf8'));
+http.createServer(function (q, r) { r.end(VERSION); }).listen(port, '127.0.0.1');
+setTimeout(function () { process.exit(0); }, 600000);
+'@
+$voiceJs = @'
+const http = require('http'), fs = require('fs');
+const BUILD = '@@V@@';
+try { fs.appendFileSync(process.env.TS_PIDLOG, process.pid + '\n'); } catch (e) { }
+if (BUILD.indexOf('will-not-start') >= 0) { console.error('this voice will not start'); process.exit(1); }
+const port = Number(process.env.THORNSWOOD_VOICE_PORT);
+http.createServer(function (q, r) {
+  if (q.url === '/health') { r.writeHead(200, { 'content-type': 'application/json' }); r.end(JSON.stringify({ build: BUILD, bind: process.env.THORNSWOOD_VOICE_BIND, auth: process.env.THORNSWOOD_VOICE_AUTH, chatRange: 0, turn: '' })); return; }
+  r.end('voice');
+}).listen(port, '127.0.0.1');
+setTimeout(function () { process.exit(0); }, 600000);
+'@
+$botPy = @'
+import os, sys, time
+VERSION = '@@V@@'
+try:
+    open(os.environ.get('TS_PIDLOG', 'nul'), 'a').write(str(os.getpid()) + '\n')
+except Exception:
+    pass
+if 'will-not-start' in VERSION:
+    raise SystemExit('this bot will not start')
+print('[thornswood-bot] ' + VERSION + ' watching 1 server', flush=True)
+t0 = time.time()
+while time.time() - t0 < 600:
+    time.sleep(1)
+'@
+# The game server, for the dev deploy and Deploy-Server -PutBack: the stub
+# tests\test-deploy-server-swap.ps1 uses, given its root on the command line.
+$gameJs = @'
+const fs = require('fs'), path = require('path'), dgram = require('dgram'), net = require('net');
+const root = process.argv[2];
+try { fs.appendFileSync(process.env.TS_PIDLOG, process.pid + '\n'); } catch (e) { }
+const gm = fs.readFileSync(path.join(root, 'gamemode.js'), 'utf8');
+if (gm.indexOf('will-not-start') >= 0) { fs.appendFileSync(path.join(root, 'server.log'), 'Error: this gamemode will not start\n'); process.exit(1); }
+const s = JSON.parse(fs.readFileSync(path.join(root, 'server-settings.json'), 'utf8'));
+dgram.createSocket('udp4').bind(s.port, '127.0.0.1');
+net.createServer(function (c) { c.end(); }).listen(s.port === 7777 ? 3000 : s.port + 1, '127.0.0.1');
+setTimeout(function () { process.exit(0); }, 600000);
+'@
+$gameStub = Join-Path $work 'game-stub.js'
+Put $gameStub $gameJs
+function Site([string]$v) { Put (Join-Path $repo 'site\server.js') $siteJs.Replace('@@V@@', $v) }
+function Voice([string]$v) { Put (Join-Path $repo 'voice\voice-server.js') $voiceJs.Replace('@@V@@', $v) }
+function Bot([string]$v) { Put (Join-Path $repo 'bot\bot.py') $botPy.Replace('@@V@@', $v) }
+Put (Join-Path $repo 'site\public\home.html') 'home one'
+Put (Join-Path $repo 'site\public\robots.txt') 'robots'
+Put (Join-Path $repo 'site\data\help.md') 'help'
+Put (Join-Path $repo 'site\data\site\about.md') 'about'
+Put (Join-Path $repo 'voice\headlines.js') "module.exports = {};`n"
+Put (Join-Path $repo 'voice\public\index.html') 'voice page'
+Put (Join-Path $repo 'voice\public\voice.js') 'voice script'
+Put (Join-Path $repo 'bot\card.py') 'CARD = 1'
+Put (Join-Path $repo 'bot\dev-channel.txt') '0'
+# What bot.py reads from beside itself for the live smoke (LIVE_SMOKE_EXPORT).
+# Written without a byte order mark by Put, as the real one is, because the
+# stage check parses every .json it sends and refuses one that has a mark.
+Put (Join-Path $repo 'bot\live-smoke-discord-export.json') '{ "channels": [] }'
+Put (Join-Path $repo 'bot\requirements.txt') ''
+Put (Join-Path $repo 'bot\staff-channel.txt') '0'
+Put (Join-Path $repo 'bot\assets\join-card.png') 'not really a picture'
+Put (Join-Path $repo 'game\gamemode.js') '// the committed gamemode'
+Site 'docs v0'
+Voice 'voice-v0'
+Bot 'bot v0'
+# The deploys build their artifact out of git (Artifact.ps1, issue #459), so the
+# scratch repository is one, committed once, and every version a case writes
+# after that is committed by Deploy before the deploy runs.
+$eap = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+try {
+    & git -C $repo init -q 2>&1 | Out-Null
+    & git -C $repo add -A 2>&1 | Out-Null
+    & git -C $repo -c user.name=harness -c user.email=harness@invalid -c commit.gpgsign=false commit -q -m scratch 2>&1 | Out-Null
+} finally { $ErrorActionPreference = $eap }
+$store = Join-Path $box 'Thornswood-Deploys'
+function Current([string]$part) {
+    $f = Join-Path $store ('current\' + $part + '.json')
+    if (-not (Test-Path -LiteralPath $f)) { return $null }
+    return ([IO.File]::ReadAllText($f) | ConvertFrom-Json)
+}
+
+# A task written into the stand-in scheduler's book, and started.
+function Task([string]$name, [string]$exe, [string]$arg, [string]$wd) {
+    $t = [ordered]@{ Execute = $exe; Argument = $arg; WorkingDirectory = $wd; Pid = 0 }
+    [IO.File]::WriteAllText((Join-Path $tasks (($name -replace '[^A-Za-z0-9]', '_') + '.json')), ($t | ConvertTo-Json))
+    $null = RunWrapped ("Start-ScheduledTask -TaskName '" + $name + "'`r`n")
+}
+function TaskArg([string]$name) {
+    $f = Join-Path $tasks (($name -replace '[^A-Za-z0-9]', '_') + '.json')
+    if (-not (Test-Path -LiteralPath $f)) { return '' }
+    return [string]([IO.File]::ReadAllText($f) | ConvertFrom-Json).Argument
+}
+
+try {
+    # ============================================ uncommitted is refused (#1121)
+    # Each deploy, with one file it would send left uncommitted: changed,
+    # staged, new, or one of the files it sends beside its artifact. It must
+    # stop before the first ssh or scp, name the file, and leave the box as it
+    # was. Run before anything is set up on the box, so "as it was" is empty.
+    $docsRoot = Join-Path $box 'Thornswood-Docs'
+    $docsPort = PickPort
+    Put (Join-Path $docsRoot 'port.txt') ([string]$docsPort)
+    $docs = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $docsRoot; Task = 'Thornswood Test Docs'; Port = $docsPort; Wait = 10 }
+    $null = [IO.Directory]::CreateDirectory((Join-Path $work 'dist'))
+    function Git-Scratch { $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'; try { & git -C $repo @args 2>&1 | Out-Null } finally { $ErrorActionPreference = $eap } }
+    $refusals = @(
+        @{ Name = 'Deploy-Docs.ps1'; File = 'site/public/home.html'; How = 'changed'
+           Args = $docs.Clone() },
+        @{ Name = 'Install-Voice.ps1'; File = 'voice/public/extra.js'; How = 'new'
+           Args = @{ VpsHost = '127.0.0.1'; VpsUser = 'nobody'; Root = (Join-Path $box 'Thornswood-Voice'); Port = (PickPort); Site = ''; Bind = '0.0.0.0'
+                     Auth = 'log'; ChatRange = 'off'; TurnUrl = ''; TaskName = 'Thornswood Test Voice'; NoPause = $true; Wait = 10 } },
+        @{ Name = 'Install-Voice.ps1'; File = 'scripts/vps/Roll-Log.ps1'; How = 'changed'
+           Args = @{ VpsHost = '127.0.0.1'; VpsUser = 'nobody'; Root = (Join-Path $box 'Thornswood-Voice'); Port = (PickPort); Site = ''; Bind = '0.0.0.0'
+                     Auth = 'log'; ChatRange = 'off'; TurnUrl = ''; TaskName = 'Thornswood Test Voice'; NoPause = $true; Wait = 10 } },
+        @{ Name = 'Install-Bot.ps1'; File = 'bot/card.py'; How = 'staged'
+           Args = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = (Join-Path $box 'Thornswood-Bot'); Service = 'ThornswoodTestBot'; CodeOnly = $true; NoPause = $true; Wait = 20 } },
+        @{ Name = 'Deploy-DevGamemode.ps1'; File = 'game/gamemode.js'; How = 'changed'
+           Args = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = (Join-Path $box 'Thornswood-Server-Dev'); Task = 'Thornswood Test Dev Server'; Dist = (Join-Path $work 'dist'); Wait = 10; Now = $true } },
+        @{ Name = 'Deploy-Server.ps1'; File = 'game/content/Thornswood-Content.esp'; How = 'new'
+           Args = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = (Join-Path $box 'Thornswood-Server'); Task = 'Thornswood Test Live Server'; Dist = (Join-Path $work 'dist'); Wait = 10 } },
+        @{ Name = 'release\Publish-Server.ps1'; File = 'game/gamemode.js'; How = 'changed'
+           Args = @{ Channel = 'dev'; VpsHost = '127.0.0.1'; VpsUser = 'nobody'; VpsRoot = (Join-Path $box 'Thornswood-Server-Dev'); TaskName = 'Thornswood Test Dev Server'
+                     Dist = (Join-Path $work 'dist'); Zip = (Join-Path $work 'payload.zip'); SkipBuild = $true; NoPause = $true; Wait = 8 } },
+        @{ Name = 'release\Publish-Server.ps1'; File = 'scripts/deploy/Install-ThornswoodServer.ps1'; How = 'changed'
+           Args = @{ Channel = 'dev'; VpsHost = '127.0.0.1'; VpsUser = 'nobody'; VpsRoot = (Join-Path $box 'Thornswood-Server-Dev'); TaskName = 'Thornswood Test Dev Server'
+                     Dist = (Join-Path $work 'dist'); Zip = (Join-Path $work 'payload.zip'); SkipBuild = $true; NoPause = $true; Wait = 8; PutBack = $true } }
+    )
+    foreach ($c in $refusals) {
+        $at = Join-Path $repo ($c.File.Replace('/', '\'))
+        $had = $null
+        if (Test-Path -LiteralPath $at) { $had = [IO.File]::ReadAllBytes($at) }
+        Put $at ('an uncommitted change to ' + $c.File + "`n")
+        if ($c.How -eq 'staged') { Git-Scratch add -- $c.File }
+        $boxBefore = @(Get-ChildItem -LiteralPath $box -Recurse -Force -EA SilentlyContinue | ForEach-Object { $_.FullName }) -join "`n"
+        $sshBefore = $global:TsRun.Count
+        $scpBefore = $global:TsScpCount
+        $r = Deploy $c.Name $c.Args.Clone() -Dirty
+        $failed = $script:fail
+        $label = (Split-Path -Leaf $c.Name) + $(if ($c.Args.ContainsKey('PutBack')) { ' -PutBack' } else { '' })
+        Yes ($label + ': a ' + $c.How + ' ' + $c.File + ' refuses the deploy, naming the file') (
+            (-not $r.Ok) -and $r.Said -match 'Refused' -and $r.Said -match 'not committed' -and $r.Said.Contains($c.File))
+        Yes '  before it talks to the box: no ssh, no scp, nothing on the box changed' (
+            $global:TsRun.Count -eq $sshBefore -and $global:TsScpCount -eq $scpBefore -and
+            (@(Get-ChildItem -LiteralPath $box -Recurse -Force -EA SilentlyContinue | ForEach-Object { $_.FullName }) -join "`n") -eq $boxBefore)
+        if ($script:fail -gt $failed) { Show }
+        if ($c.How -eq 'staged') { Git-Scratch reset -q -- $c.File }
+        if ($null -ne $had) { [IO.File]::WriteAllBytes($at, $had) } else { Remove-Item -LiteralPath $at -Force }
+    }
+    Yes 'and with the files put back the scratch repository is clean again' (
+        -not ((& git -C $repo status --porcelain 2>$null) | Where-Object { $_ }))
+    Yes 'no deploy script takes a switch past the refusal, and Deploy-DevGamemode no longer takes -Gamemode' (
+        -not (@('Deploy-Docs.ps1', 'Install-Voice.ps1', 'Install-Bot.ps1', 'Deploy-DevGamemode.ps1', 'Deploy-Server.ps1') | ForEach-Object {
+            (Get-Command (Join-Path $repo ('scripts\deploy\' + $_))).Parameters.Keys } |
+            Where-Object { $_ -match '^(Gamemode|Force|AllowDirty|Dirty|Edited|AllowEdits|Uncommitted)$' }) -and
+        -not ((Get-Command (Join-Path $repo 'scripts\release\Publish-Server.ps1')).Parameters.Keys | Where-Object { $_ -match '^(Force|AllowDirty|Dirty|Edited|AllowEdits|Uncommitted)$' }))
+
+    # =========================================================== the site
+
+    Site 'docs v1'
+    $r = Deploy 'Deploy-Docs.ps1' $docs.Clone()
+    $failed = $script:fail
+    Yes 'Deploy-Docs: a first deploy is swapped in and the site answers' ($r.Ok -and (WaitFor { (Http $docsPort '/') -eq 'docs v1' }))
+    if ($script:fail -gt $failed) { Show }
+
+    Site 'docs v2'
+    Put (Join-Path $repo 'site\public\home.html') 'home two'
+    $pidBefore = Listener $docsPort
+    $r = Deploy 'Deploy-Docs.ps1' $docs.Clone()
+    $failed = $script:fail
+    Yes 'Deploy-Docs: a good deploy is SWAP OK and the new site answers' ($r.Ok -and $r.Said -match 'SWAP OK' -and (WaitFor { (Http $docsPort '/') -eq 'docs v2' }))
+    $prev = @(Kept $docsRoot '.prev-*')
+    Yes '  and what it replaced is kept in .prev: the old server.js and the page that changed, not the one that did not' (
+        $prev.Count -eq 1 -and (Get (Join-Path $prev[0] 'server.js')) -match 'docs v1' -and
+        (Get (Join-Path $prev[0] 'public\home.html')) -eq 'home one' -and -not (Test-Path -LiteralPath (Join-Path $prev[0] 'public\robots.txt')))
+    Yes '  and it is a new process' ((Listener $docsPort) -ne $pidBefore)
+    $v1rec = Get (Join-Path $prev[0] 'thornswood-deploy.json')
+    $v2rec = Get (Join-Path $docsRoot 'thornswood-deploy.json')
+    Yes '  and the box records the new artifact, beside the site and in the store' (
+        $v2rec -and (Current 'thornswood-docs') -and (Current 'thornswood-docs').name -like 'site-*' -and
+        ($v2rec | ConvertFrom-Json).name -eq (Current 'thornswood-docs').name)
+    Yes '  and the record the site had is kept in .prev with the files it describes' ($v1rec -and $v1rec -ne $v2rec)
+    if ($script:fail -gt $failed) { Show }
+
+    $live = Live $docsRoot
+    $pidBefore = Listener $docsPort
+    foreach ($case in @(
+        @{ Label = 'a server.js that does not parse'; Site = 'function ( { not javascript'; Extra = @{}; Why = 'server\.js does not parse' },
+        @{ Label = 'a server.js that arrived different'; Site = 'docs v3'; Extra = @{ Corrupt = 'server\.js$' }; Why = 'arrived different from what was sent: server\.js' },
+        @{ Label = 'a copy that fails'; Site = 'docs v3'; Extra = @{ ScpFail = 'server\.js$' }; Why = 'scp failed' }
+    )) {
+        if ($case.Site -like 'function*') { Put (Join-Path $repo 'site\server.js') $case.Site } else { Site $case.Site }
+        $a = $docs.Clone(); foreach ($k in $case.Extra.Keys) { $a[$k] = $case.Extra[$k] }
+        $r = Deploy 'Deploy-Docs.ps1' $a
+        $failed = $script:fail
+        Yes ("Deploy-Docs: " + $case.Label + ' stops the deploy, saying why') ((-not $r.Ok) -and $r.Said -match $case.Why)
+        Yes '  and the running site is untouched, the same process answering the same version' (
+            ((Live $docsRoot) -eq $live) -and ((Listener $docsPort) -eq $pidBefore) -and ((Http $docsPort '/') -eq 'docs v2'))
+        if ($script:fail -gt $failed) { Show }
+    }
+
+    Site 'docs v4, will-not-start'
+    $r = Deploy 'Deploy-Docs.ps1' $docs.Clone()
+    $failed = $script:fail
+    Yes 'Deploy-Docs: a site that does not start is SWAP ROLLED BACK, and the deploy fails' ((-not $r.Ok) -and $r.Said -match 'SWAP ROLLED BACK')
+    Yes '  and says why' ($r.Said -match 'this site will not start')
+    Yes '  and the old files are back and the old version answers again' (((Live $docsRoot) -eq $live) -and (WaitFor { (Http $docsPort '/') -eq 'docs v2' }))
+    if ($script:fail -gt $failed) { Show }
+
+    Site 'docs v5'
+    Put (Join-Path $repo 'site\public\home.html') 'home five'
+    $live = Live $docsRoot
+    $held = [IO.File]::Open((Join-Path $docsRoot 'public\home.html'), 'Open', 'Read', 'None')
+    try { $r = Deploy 'Deploy-Docs.ps1' $docs.Clone() } finally { $held.Close() }
+    $failed = $script:fail
+    Yes 'Deploy-Docs: a swap whose rename fails on a held file is SWAP ROLLED BACK' ((-not $r.Ok) -and $r.Said -match 'could not move the old public/home\.html aside' -and $r.Said -match 'SWAP ROLLED BACK')
+    Yes '  and what was live is live again and answering' (((Live $docsRoot) -eq $live) -and (WaitFor { (Http $docsPort '/') -eq 'docs v2' }))
+    if ($script:fail -gt $failed) { Show }
+
+    $r = Deploy 'Deploy-Docs.ps1' @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $docsRoot; Task = 'Thornswood Test Docs'; Port = $docsPort; Wait = 10; PutBack = $true }
+    $failed = $script:fail
+    Yes 'Deploy-Docs -PutBack puts the previous site back, and it answers' ($r.Ok -and (WaitFor { (Http $docsPort '/') -eq 'docs v1' }))
+    $undone = @(Kept $docsRoot '.undone-*')
+    Yes '  and what it took out is kept in .undone' ($undone.Count -eq 1 -and (Get (Join-Path $undone[0] 'server.js')) -match 'docs v2')
+    Yes '  and the record came back with it, and the store names it again' (
+        (Get (Join-Path $docsRoot 'thornswood-deploy.json')) -eq $v1rec -and
+        (Current 'thornswood-docs').name -eq ($v1rec | ConvertFrom-Json).name -and
+        (Get (Join-Path $store 'history.log')) -match 'thornswood-docs put back to site-')
+    if ($script:fail -gt $failed) { Show }
+
+    # Two old copies, not three (#1121): three more good deploys leave the
+    # newest two .prev folders, holding the two versions before the last.
+    foreach ($v in 'docs v6', 'docs v7', 'docs v8') {
+        Site $v
+        $r = Deploy 'Deploy-Docs.ps1' $docs.Clone()
+        if (-not $r.Ok) { break }
+        Start-Sleep -Milliseconds 1100
+    }
+    $prev = @(Kept $docsRoot '.prev-*')
+    $failed = $script:fail
+    Yes 'Deploy-Docs: after three more deploys only the newest two .prev folders are kept' (
+        $r.Ok -and (WaitFor { (Http $docsPort '/') -eq 'docs v8' }) -and $prev.Count -eq 2 -and
+        (Get (Join-Path $prev[0] 'server.js')) -match 'docs v6' -and (Get (Join-Path $prev[1] 'server.js')) -match 'docs v7')
+    if ($script:fail -gt $failed) { Show }
+
+    # ==================================================== the voice service
+    $voiceRoot = Join-Path $box 'Thornswood-Voice'
+    $voicePort = PickPort
+    $voice = @{ VpsHost = '127.0.0.1'; VpsUser = 'nobody'; Root = $voiceRoot; Port = $voicePort; Site = ''; Bind = '0.0.0.0'
+                Auth = 'log'; ChatRange = 'off'; TurnUrl = ''; TaskName = 'Thornswood Test Voice'; NoPause = $true; Wait = 10 }
+    function Build { $h = Http $voicePort '/health'; if ($h) { try { return [string]($h | ConvertFrom-Json).build } catch { } }; return '' }
+
+    Voice 'voice-v1'
+    $r = Deploy 'Install-Voice.ps1' $voice.Clone()
+    $failed = $script:fail
+    Yes 'Install-Voice: a first install is swapped in and answers as the build sent' ($r.Ok -and (WaitFor { (Build) -eq 'voice-v1' }))
+    if ($script:fail -gt $failed) { Show }
+
+    Voice 'voice-v2'
+    $r = Deploy 'Install-Voice.ps1' $voice.Clone()
+    $failed = $script:fail
+    Yes 'Install-Voice: a good install is SWAP OK and the new build answers' ($r.Ok -and $r.Said -match 'SWAP OK' -and (WaitFor { (Build) -eq 'voice-v2' }))
+    $prev = @(Kept $voiceRoot '.prev-*')
+    Yes '  and the old voice-server.js is kept in .prev' ($prev.Count -eq 1 -and (Get (Join-Path $prev[0] 'voice-server.js')) -match 'voice-v1')
+    if ($script:fail -gt $failed) { Show }
+
+    $live = Live $voiceRoot
+    $pidBefore = Listener $voicePort
+    $taskBefore = TaskArg 'Thornswood Test Voice'
+    Put (Join-Path $repo 'voice\voice-server.js') 'function ( { not javascript'
+    $r = Deploy 'Install-Voice.ps1' $voice.Clone()
+    $failed = $script:fail
+    Yes 'Install-Voice: a voice-server.js that does not parse stops the install, saying why' ((-not $r.Ok) -and $r.Said -match 'voice-server\.js does not parse')
+    Yes '  and the running service is untouched, the same process, the same build' (
+        ((Live $voiceRoot) -eq $live) -and ((Listener $voicePort) -eq $pidBefore) -and ((Build) -eq 'voice-v2'))
+    if ($script:fail -gt $failed) { Show }
+
+    Voice 'voice-v3'
+    $a = $voice.Clone(); $a['ScpFail'] = 'public/voice\.js$'
+    $r = Deploy 'Install-Voice.ps1' $a
+    $failed = $script:fail
+    Yes 'Install-Voice: a copy that fails stops the install with the service untouched' (
+        (-not $r.Ok) -and ((Live $voiceRoot) -eq $live) -and ((Listener $voicePort) -eq $pidBefore) -and ((Build) -eq 'voice-v2'))
+    if ($script:fail -gt $failed) { Show }
+
+    Voice 'voice-v4, will-not-start'
+    $a = $voice.Clone(); $a['Auth'] = 'on'
+    $r = Deploy 'Install-Voice.ps1' $a
+    $failed = $script:fail
+    Yes 'Install-Voice: a build that does not start is SWAP ROLLED BACK, and the install fails' ((-not $r.Ok) -and $r.Said -match 'SWAP ROLLED BACK')
+    Yes '  and says why from voice.log' ($r.Said -match 'this voice will not start')
+    Yes '  and the old files are back and the old build answers again' (((Live $voiceRoot) -eq $live) -and (WaitFor { (Build) -eq 'voice-v2' }))
+    Yes '  and the task is back exactly as it was, auth and all, not the one this install made' ((TaskArg 'Thornswood Test Voice') -eq $taskBefore -and $taskBefore -match 'THORNSWOOD_VOICE_AUTH=log')
+    if ($script:fail -gt $failed) { Show }
+
+    $a = $voice.Clone(); $a['PutBack'] = $true
+    $r = Deploy 'Install-Voice.ps1' $a
+    $failed = $script:fail
+    Yes 'Install-Voice -PutBack puts the previous build back, and it answers' ($r.Ok -and (WaitFor { (Build) -eq 'voice-v1' }))
+    Yes '  and leaves the task as it was' ((TaskArg 'Thornswood Test Voice') -eq $taskBefore)
+    if ($script:fail -gt $failed) { Show }
+
+    # ================================================================ the bot
+    $botRoot = Join-Path $box 'Thornswood-Bot'
+    # What a full install leaves, and the code only one needs: the files, the
+    # settings, run.ps1 around python, and the task. run.ps1 here is a
+    # shorter loop than the real one (tests\test-bot-wrapper.ps1 runs that).
+    Bot 'bot v1'
+    $null = [IO.Directory]::CreateDirectory($botRoot)
+    foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt', 'requirements.txt') { Copy-Item -LiteralPath (Join-Path $repo "bot\$f") -Destination (Join-Path $botRoot $f) -Force }
+    Put (Join-Path $botRoot 'bot.env.json') '{ "DISCORD_TOKEN": "not a token" }'
+    $bq = $botRoot.Replace("'", "''")
+    # bot.log in the data folder under the bot's, where the service writes it
+    # since #1104 and where Get-ThornswoodBotLog looks for it first.
+    $botLog = Join-Path $botRoot 'data\bot.log'
+    $null = [IO.Directory]::CreateDirectory((Join-Path $botRoot 'data'))
+    Put (Join-Path $botRoot 'run.ps1') ("Set-Location -LiteralPath '" + $bq + "'`r`nwhile (`$true) {`r`n  & cmd /c ""python """"" + $botRoot + "\bot.py"""" >> """"" + $botLog + """"" 2>&1""`r`n  Start-Sleep -Seconds 2`r`n}`r`n")
+    # The service ThornswoodTestBot, standing in for ThornswoodBot (#465).
+    Task 'ThornswoodTestBot' 'powershell.exe' ('-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $botRoot + '\run.ps1"') $botRoot
+    function BotSays([string]$v) { return ((Get $botLog) -match [regex]::Escape($v + ' watching')) }
+    # The site's data\for-bot, which Install-Bot waits for before it sends the
+    # bot (#1102): a site that has not made it yet is refused below.
+    $siteForBot = Join-Path $box 'Thornswood-Docs'
+    $null = [IO.Directory]::CreateDirectory((Join-Path $siteForBot 'data\for-bot'))
+    $bot = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $botRoot; DocsRoot = $siteForBot; Service = 'ThornswoodTestBot'; CodeOnly = $true; NoPause = $true; Wait = 20 }
+    Yes 'Install-Bot: the stand-in bot is up' (WaitFor { BotSays 'bot v1' })
+
+    Bot 'bot v2'
+    $live = Live $botRoot
+    $a = $bot.Clone(); $a['DocsRoot'] = (Join-Path $box 'No-Site-Yet')
+    $r = Deploy 'Install-Bot.ps1' $a
+    Yes 'Install-Bot: a site with no data\for-bot yet stops it, naming Deploy-Docs, with the bot untouched' (
+        (-not $r.Ok) -and $r.Said -match 'Run \.\\scripts\\deploy\\Deploy-Docs\.ps1 first' -and ((Live $botRoot) -eq $live))
+
+    Bot 'bot v2'
+    $r = Deploy 'Install-Bot.ps1' $bot.Clone()
+    $failed = $script:fail
+    Yes 'Install-Bot -CodeOnly: good code is SWAP OK and the new bot says it is watching' ($r.Ok -and $r.Said -match 'SWAP OK' -and (BotSays 'bot v2'))
+    Yes '  and only then the box records the bot artifact' ((Current 'thornswood-bot').name -like 'bot-*')
+    # bot.py reads this from beside itself, so it goes up with the code
+    # (LIVE_SMOKE_EXPORT). It was on main and never on the box.
+    Yes '  and the live smoke''s export went up beside bot.py' (
+        (Get (Join-Path $botRoot 'live-smoke-discord-export.json')) -eq '{ "channels": [] }')
+    # And the run says so itself, asking the box for the full path under the
+    # root the swap moved the files to. A green run once left the export and
+    # data\bot.log reported missing from the install root with nothing in the
+    # run saying what that folder held, so there was no telling a swap that
+    # lost files from a Test-Path typed on the wrong machine.
+    Yes '  and the run proves it on the box, by full path, for every file it sent and for data\bot.log' (
+        $r.Said -match 'FILES ON THE BOX' -and
+        $r.Said -match ([regex]::Escape('Test-Path ' + (Join-Path $botRoot 'live-smoke-discord-export.json')) + '\s+True') -and
+        $r.Said -match ([regex]::Escape('Test-Path ' + $botLog) + '\s+True') -and
+        $r.Said -match 'Test-Path .*bot\.py\s+True')
+    $prev = @(Kept $botRoot '.prev-*')
+    Yes '  and the old bot.py is kept in .prev' ($prev.Count -eq 1 -and (Get (Join-Path $prev[0] 'bot.py')) -match 'bot v1')
+    if ($script:fail -gt $failed) { Show }
+
+    $live = Live $botRoot
+    Put (Join-Path $repo 'bot\card.py') 'def ( not python'
+    $r = Deploy 'Install-Bot.ps1' $bot.Clone()
+    Put (Join-Path $repo 'bot\card.py') 'CARD = 1'
+    $failed = $script:fail
+    Yes 'Install-Bot: a card.py that does not parse stops it, saying why, with the bot untouched' (
+        (-not $r.Ok) -and $r.Said -match 'card\.py does not parse' -and ((Live $botRoot) -eq $live))
+    if ($script:fail -gt $failed) { Show }
+
+    $a = $bot.Clone(); $a['ScpFail'] = 'bot\.py$'
+    Bot 'bot v3'
+    $r = Deploy 'Install-Bot.ps1' $a
+    $failed = $script:fail
+    Yes 'Install-Bot: a copy that fails stops it with the bot untouched' ((-not $r.Ok) -and $r.Said -match 'scp exited' -and ((Live $botRoot) -eq $live))
+    if ($script:fail -gt $failed) { Show }
+
+    Bot 'bot v4, will-not-start'
+    $r = Deploy 'Install-Bot.ps1' $bot.Clone()
+    $failed = $script:fail
+    Yes 'Install-Bot: code that does not start is SWAP ROLLED BACK, and the run fails' ((-not $r.Ok) -and $r.Said -match 'SWAP ROLLED BACK')
+    Yes '  and the old files are back, and the old bot says it is watching again' (
+        ((Live $botRoot) -eq $live) -and ($r.Said -match 'answering again'))
+    if ($script:fail -gt $failed) { Show }
+
+    $a = $bot.Clone(); $a.Remove('CodeOnly'); $a['PutBack'] = $true
+    $r = Deploy 'Install-Bot.ps1' $a
+    $failed = $script:fail
+    Yes 'Install-Bot -PutBack puts the previous code back, and it comes up' ($r.Ok -and (Get (Join-Path $botRoot 'bot.py')) -match 'bot v1' -and $r.Said -match 'SWAP OK')
+    Yes '  and the store no longer names the code it took out' ((Current 'thornswood-bot').name -eq 'an older copy kept before deploys were recorded')
+    if ($script:fail -gt $failed) { Show }
+
+    # The bot down and no bot.log on the box: one taken off by hand to get a
+    # clean read, or a data folder that went with a restore. The health check
+    # reads the log from a byte offset, so with no file to open it used to
+    # wait out the whole of -Wait, put the code back, wait it out again and
+    # end red, which is a -CodeOnly run that stops the bot and never says
+    # why. The log is made in front of the start now.
+    $null = RunWrapped "Stop-Service -Name 'ThornswoodTestBot'`r`n"
+    foreach ($p in @(Get-CimInstance Win32_Process -EA SilentlyContinue | Where-Object { $_.CommandLine -and $_.CommandLine.Contains($botRoot) })) {
+        if ($p.ProcessId -ne $PID) { Stop-Process -Id $p.ProcessId -Force -EA SilentlyContinue }
+    }
+    $gone = WaitFor { Remove-Item -LiteralPath $botLog -Force -EA SilentlyContinue; -not (Test-Path -LiteralPath $botLog) }
+    Bot 'bot v5'
+    $r = Deploy 'Install-Bot.ps1' $bot.Clone()
+    $failed = $script:fail
+    Yes 'Install-Bot -CodeOnly: with the bot stopped and no bot.log anywhere, an empty one is made and the new code is swapped in' (
+        $gone -and $r.Ok -and $r.Said -match 'SWAP OK' -and $r.Said -match 'made an empty .*data.bot\.log')
+    Yes '  and the service was started, and the new bot says it is watching' (
+        $r.Said -match 'started the service ThornswoodTestBot' -and (WaitFor { BotSays 'bot v5' }))
+    Yes '  and data\bot.log is on the box afterwards, which is the path the docs name, and the run says True for it' (
+        (Test-Path -LiteralPath $botLog) -and $r.Said -match ([regex]::Escape('Test-Path ' + $botLog) + '\s+True'))
+    if ($script:fail -gt $failed) { Show }
+
+    # A bot.log beside the code and none in data, which is the layout of a box
+    # that has had only -CodeOnly runs since #1104, since those leave the
+    # service program as it is. Get-ThornswoodBotLog names the old place then,
+    # and that used to be enough to skip making data\bot.log, so the path
+    # everybody is told to look at did not exist. The run must leave it there,
+    # and must still read the file this start really wrote.
+    $besideCode = Join-Path $botRoot 'bot.log'
+    Put $besideCode "[thornswood-bot] bot v5 watching 1 server, from the old place`r`n"
+    $gone = WaitFor { Remove-Item -LiteralPath $botLog -Force -EA SilentlyContinue; -not (Test-Path -LiteralPath $botLog) }
+    Bot 'bot v6'
+    $r = Deploy 'Install-Bot.ps1' $bot.Clone()
+    $failed = $script:fail
+    Yes 'Install-Bot -CodeOnly: with a bot.log beside the code and none in data, data\bot.log is still made' (
+        $gone -and $r.Ok -and $r.Said -match 'SWAP OK' -and (Test-Path -LiteralPath $botLog) -and
+        $r.Said -match 'made an empty .*data.bot\.log')
+    Yes '  and it followed the file this start wrote rather than the empty one it made' (
+        $r.Said -match 'writing its log to ' -and (WaitFor { BotSays 'bot v6' }))
+    Remove-Item -LiteralPath $besideCode -Force -EA SilentlyContinue
+    if ($script:fail -gt $failed) { Show }
+
+    # ======================================================= the dev server
+    $devRoot = Join-Path $box 'Thornswood-Server-Dev'
+    $devPort = PickPort
+    $devFar = ($devRoot -replace '\\', '/') + '/plugins/'
+    Put (Join-Path $devRoot 'plugins\Skyrim.esm') 'skyrim'
+    Put (Join-Path $devRoot 'gamemode.js') '// dev v1'
+    Put (Join-Path $devRoot 'server-settings.json') (([ordered]@{ port = $devPort; name = 'Thornswood Dev'; dataDir = 'data'
+        loadOrder = @($devFar + 'Skyrim.esm'); thornswoodServer = 'dev' }) | ConvertTo-Json)
+    Put (Join-Path $devRoot 'data\keep.txt') 'the character book'
+    Task 'Thornswood Test Dev Server' $node.Source ('"' + $gameStub + '" "' + $devRoot + '"') $devRoot
+    $gm = Join-Path $repo 'game\gamemode.js'
+    $launcher = Join-Path $work 'launcher'
+    $null = [IO.Directory]::CreateDirectory($launcher)
+    $dev = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $devRoot; Task = 'Thornswood Test Dev Server'
+              Dist = (Join-Path $work 'dist'); Wait = 10 }
+    function DevUp { return ((UdpOwner $devPort) -gt 0) -and ((Listener ($devPort + 1)) -gt 0) }
+    Yes 'Deploy-DevGamemode: the stand-in dev server is up' (WaitFor { DevUp })
+
+    Put $gm '// dev v2'
+    $pidBefore = UdpOwner $devPort
+    $r = Deploy 'Deploy-DevGamemode.ps1' $dev.Clone()
+    $failed = $script:fail
+    Yes 'Deploy-DevGamemode: a good gamemode is SWAP OK and the dev server answers as a new process' (
+        $r.Ok -and $r.Said -match 'SWAP OK' -and (Get (Join-Path $devRoot 'gamemode.js')) -eq '// dev v2' -and
+        (WaitFor { DevUp }) -and ((UdpOwner $devPort) -ne $pidBefore))
+    Yes '  and its stamp went in beside it, and the settings were edited in the stage, not in place' (
+        (Test-Path -LiteralPath (Join-Path $devRoot 'thornswood-build.json')) -and
+        (Get (Join-Path $devRoot 'server-settings.json')) -match 'thornswoodVoicePort')
+    $prev = @(Kept $devRoot '.prev-*')
+    Yes '  and the old gamemode and the old settings are kept in .prev' (
+        $prev.Count -eq 1 -and (Get (Join-Path $prev[0] 'gamemode.js')) -eq '// dev v1' -and
+        (Get (Join-Path $prev[0] 'server-settings.json')) -notmatch 'thornswoodVoicePort')
+    Yes '  and the world data was not touched' ((Get (Join-Path $devRoot 'data\keep.txt')) -eq 'the character book')
+    Yes '  and the box records the gamemode artifact in the data folder the dev server serves' (
+        (Current 'thornswood-server-dev').name -like 'gamemode-*' -and
+        (Get (Join-Path $devRoot 'data\thornswood-deploy.json')) -match 'gamemode-')
+    $devRec = Get (Join-Path $devRoot 'data\thornswood-deploy.json')
+    if ($script:fail -gt $failed) { Show }
+
+    $live = Live $devRoot
+    $pidBefore = UdpOwner $devPort
+    Put $gm '// dev v3'
+    $a = $dev.Clone(); $a['Corrupt'] = 'gamemode\.js$'
+    $r = Deploy 'Deploy-DevGamemode.ps1' $a
+    $failed = $script:fail
+    Yes 'Deploy-DevGamemode: a gamemode that arrived different is refused on the box, before anything stops' (
+        (-not $r.Ok) -and $r.Said -match 'arrived different from what was sent: gamemode\.js')
+    Yes '  and the dev server is untouched, the same process answering' (((Live $devRoot) -eq $live) -and ((UdpOwner $devPort) -eq $pidBefore))
+    if ($script:fail -gt $failed) { Show }
+
+    $a = $dev.Clone(); $a['ScpFail'] = 'thornswood-build\.json$'
+    $r = Deploy 'Deploy-DevGamemode.ps1' $a
+    $failed = $script:fail
+    Yes 'Deploy-DevGamemode: a copy that fails stops it, with the dev server untouched' (
+        (-not $r.Ok) -and ((Live $devRoot) -eq $live) -and ((UdpOwner $devPort) -eq $pidBefore))
+    if ($script:fail -gt $failed) { Show }
+
+    Put $gm '// dev v4, will-not-start'
+    $r = Deploy 'Deploy-DevGamemode.ps1' $dev.Clone()
+    $failed = $script:fail
+    Yes 'Deploy-DevGamemode: a gamemode that does not start is SWAP ROLLED BACK, and the deploy fails' ((-not $r.Ok) -and $r.Said -match 'SWAP ROLLED BACK')
+    Yes '  and the old gamemode is back and the dev server answers again' (((Live $devRoot) -eq $live) -and (WaitFor { DevUp }))
+    if ($script:fail -gt $failed) { Show }
+
+    $a = $dev.Clone(); $a['PutBack'] = $true
+    $r = Deploy 'Deploy-DevGamemode.ps1' $a
+    $failed = $script:fail
+    Yes 'Deploy-DevGamemode -PutBack puts the previous gamemode and settings back, and it answers' (
+        $r.Ok -and (Get (Join-Path $devRoot 'gamemode.js')) -eq '// dev v1' -and
+        (Get (Join-Path $devRoot 'server-settings.json')) -notmatch 'thornswoodVoicePort' -and (WaitFor { DevUp }))
+    Yes '  and, as what came back was never recorded, the box says so rather than naming what it took out' (
+        (Current 'thornswood-server-dev').name -eq 'an older copy kept before deploys were recorded' -and
+        (Get (Join-Path $devRoot 'data\thornswood-deploy.json')) -ne $devRec)
+    if ($script:fail -gt $failed) { Show }
+
+    # ============================================ Deploy-Server.ps1 -PutBack
+    $liveRoot = Join-Path $box 'Thornswood-Server'
+    $livePort = PickPort
+    $liveFar = ($liveRoot -replace '\\', '/') + '/plugins/'
+    $liveSettings = (([ordered]@{ port = $livePort; name = 'Thornswood'; dataDir = 'data'; loadOrder = @($liveFar + 'Skyrim.esm') }) | ConvertTo-Json)
+    Put (Join-Path $liveRoot 'plugins\Skyrim.esm') 'skyrim'
+    Put (Join-Path $liveRoot 'gamemode.js') '// live now'
+    Put (Join-Path $liveRoot 'server-settings.json') $liveSettings
+    Put (Join-Path $liveRoot '.prev-20260928-120000\gamemode.js') '// live before'
+    Put (Join-Path $liveRoot '.prev-20260928-120000\server-settings.json') $liveSettings
+    Task 'Thornswood Test Live Server' $node.Source ('"' + $gameStub + '" "' + $liveRoot + '"') $liveRoot
+    function LiveUp { return ((UdpOwner $livePort) -gt 0) -and ((Listener ($livePort + 1)) -gt 0) }
+    $null = WaitFor { LiveUp }
+    $pidBefore = UdpOwner $livePort
+    $r = Deploy 'Deploy-Server.ps1' @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $liveRoot; Task = 'Thornswood Test Live Server'
+                                       Dist = (Join-Path $work 'dist'); Wait = 10; PutBack = $true }
+    $failed = $script:fail
+    Yes 'Deploy-Server -PutBack puts the newest .prev back, and the server answers as a new process' (
+        $r.Ok -and (Get (Join-Path $liveRoot 'gamemode.js')) -eq '// live before' -and (WaitFor { LiveUp }) -and ((UdpOwner $livePort) -ne $pidBefore))
+    Yes '  and keeps what it took out in .undone' ((@(Kept $liveRoot '.undone-*')).Count -eq 1)
+    if ($script:fail -gt $failed) { Show }
+}
+catch {
+    Yes ('the runs finished without an error: ' + $_.Exception.Message) $false
+    Show
+}
+finally {
+    Yes 'no real scheduled task was left behind' (NoRealTask)
+    # Only what this run started: the pids it wrote down, and only processes
+    # that began after it did.
+    if (Test-Path -LiteralPath $pidLog) {
+        foreach ($id in @(Get-Content -LiteralPath $pidLog | Where-Object { $_ })) {
+            $p = Get-Process -Id ([int]$id) -EA SilentlyContinue
+            if ($p -and $p.StartTime -ge $started) { Stop-Process -Id $p.Id -Force -EA SilentlyContinue }
+        }
+    }
+    # And anything still running from the scratch folder, which a stop in the
+    # middle of a run can leave: python and cmd under the bot's run.ps1.
+    foreach ($p in @(Get-CimInstance Win32_Process -EA SilentlyContinue | Where-Object { $_.CommandLine -and $_.CommandLine.Contains($work) })) {
+        if ($p.ProcessId -ne $PID) { Stop-Process -Id $p.ProcessId -Force -EA SilentlyContinue }
+    }
+    Start-Sleep -Milliseconds 500
+    Remove-Item -LiteralPath $work -Recurse -Force -EA SilentlyContinue
+}
+
+Done

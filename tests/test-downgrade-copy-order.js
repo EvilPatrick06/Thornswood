@@ -15,7 +15,8 @@
         as next, and the notice above tells the person to press Downgrade in
         the launcher, not to pick a build from Steam's Betas list.
 
-    F3  launcher\app\Downgrade.cs: SkyrimSE.exe is held back and copied last,
+    F3  launcher\app\OwnGameShare.cs, TakePinned, which the Downgrade copies
+        through since #1218: SkyrimSE.exe is held back and copied last,
         after every other file is in place. The build is read from that one
         file, so the moment it lands the copy reads as 1.6.1170. Copied first,
         a copy that then stops part way took the Downgrade card and its Try
@@ -31,13 +32,14 @@
   machine has no Windows csc, so like test-downgrade-asks.js this reads the
   source and checks the shape rather than running the button.
 
-  Read only. It reads launcher\app\Downgrade.cs and installer\Setup-Thornswood.ps1.
+  Read only. It reads launcher\app\Downgrade.cs, launcher\app\OwnGameShare.cs
+  and installer\Setup-Thornswood.ps1.
 */
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 
-const ROOT = path.join(TOOLS_DIR, '..');
+const ROOT = REPO_DIR;
 const APP = path.join(ROOT, 'launcher', 'app');
 const DOWN = fs.readFileSync(path.join(APP, 'Downgrade.cs'), 'utf8');
 const SETUP = fs.readFileSync(path.join(ROOT, 'installer', 'Setup-Thornswood.ps1'), 'utf8');
@@ -82,25 +84,33 @@ yes('F1: and no longer sends anybody to Steam\'s Betas list', !/Betas/.test(SETU
 const run = body(DOWN, 'static bool Run(Config cfg');
 yes('Run is found in Downgrade.cs', run.length > 0);
 
-// In the per-depot copy loop SkyrimSE.exe is not copied where it is met: it is
-// held in exeSrc/exeRel and skipped with continue.
-yes('F3: SkyrimSE.exe is held back in the copy loop, not copied in place',
-    /if \(string\.Equals\(rel, "SkyrimSE\.exe", StringComparison\.OrdinalIgnoreCase\)\) \{ exeSrc = f; exeRel = rel; continue; \}/.test(run));
+// Since #1218 the copy is OwnGame.TakePinned (OwnGameShare.cs), which puts the
+// files into Thornswood's own folder and never into the Steam copy; Run calls it
+// and turns what it throws into Stop. test-own-folder-alone.ps1 runs it.
+const SHARE = fs.readFileSync(path.join(APP, 'OwnGameShare.cs'), 'utf8');
+const take = body(SHARE, 'public static string TakePinned(Config cfg');
+yes('TakePinned is found in OwnGameShare.cs, and Run copies through it', take.length > 0 && /OwnGame\.TakePinned\(cfg, folders,/.test(run));
 
-// The held-back exe is copied after the loop, guarded by exeSrc having a value,
-// and a failure there stops through Stop so the card and button stay.
-const heldSkip = run.indexOf('exeSrc = f; exeRel = rel; continue;');
-const exeCopy = run.indexOf('if (exeSrc.Length > 0)');
-yes('F3: the held-back exe is copied after the loop', heldSkip >= 0 && exeCopy > heldSkip);
-const exeBlock = exeCopy >= 0 ? run.slice(exeCopy, run.indexOf('log("Copied ', exeCopy)) : '';
-yes('F3: the last copy writes the exe from exeSrc to exeRel',
-    /File\.Copy\(exeSrc, dest, false\);/.test(exeBlock) && /Path\.Combine\(target, exeRel\)/.test(exeBlock));
-yes('F3: a locked exe stops through Stop, so the card and Try again button stay',
-    /return Stop\("Could not replace " \+ exeRel/.test(exeBlock));
-// The plain copy loop no longer writes SkyrimSE.exe itself: the only File.Copy
-// of exeSrc is the one after the loop, and the loop copies rel.
-const loopCopyOfExe = /File\.Copy\(f, dest, false\);/.test(run);
-yes('F3: the loop still copies the other files by rel', loopCopyOfExe);
+// In the walk of the downloads SkyrimSE.exe is not taken where it is met: it is
+// held in exe and added to the end of the list.
+yes('F3: SkyrimSE.exe is held back in the walk, not copied in place',
+    /if \(string\.Equals\(f\.Rel, "SkyrimSE\.exe", StringComparison\.OrdinalIgnoreCase\)\) exe = f;\s*else take\.Add\(f\);/.test(take));
+
+// The held-back exe goes on the end of the list after the walk, and the list is
+// copied in order.
+const heldSkip = take.indexOf('exe = f;');
+const exeLast = take.indexOf('if (exe != null) take.Add(exe);');
+const copyLoop = take.indexOf('foreach (Found f in take)');
+yes('F3: the held-back exe is copied last, after every other file', heldSkip >= 0 && exeLast > heldSkip && copyLoop > exeLast);
+yes('F3: each file is copied by its path, its old name taken off first',
+    /if \(File\.Exists\(dest\)\) DropName\(dest\);\s*File\.Copy\(f\.From, dest, false\);/.test(take));
+// A file that will not copy (a locked exe) throws, and Run stops through Stop,
+// so the card and Try again button stay.
+yes('F3: a locked file stops the run through Stop, so the card and Try again button stay',
+    /throw new Exception\("Could not put " \+ f\.Rel/.test(take) &&
+    /catch \(Exception ex\)\s*\{\s*return Stop\(ex\.Message, log, status\);\s*\}/.test(run));
+yes('F3: the build is read again after the copy, and a wrong one stops through Stop',
+    /bool right = File\.Exists\(targetExe\) && !Wrong\(cfg, targetExe\);/.test(run));
 
 // ================================================== F4, only at the announced size
 

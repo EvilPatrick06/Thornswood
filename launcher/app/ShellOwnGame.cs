@@ -95,10 +95,7 @@ namespace Thornswood
             */
             if (collection)
             {
-                Log("Thornswood is sharing one Skyrim with every other server on this machine, " +
-                    "in " + Paths.Game + ". Saves, settings and the client's own settings file " +
-                    "are shared, so whichever launcher wrote last is the one the game believes. " +
-                    "The Play button says MAKE THORNSWOOD'S OWN FOLDER until that is put right.");
+                Log(NoOwnFolderYet() + " The Play button says MAKE THORNSWOOD'S OWN FOLDER until that is put right.");
             }
 
             ThreadPool.QueueUserWorkItem(delegate
@@ -107,7 +104,9 @@ namespace Thornswood
                 try
                 {
                     if (active) refresh = OwnGame.NeedsRefresh(c);
-                    else if (collection && !OwnGame.Declined)
+                    // A yes given in the setup window (MakeOwnGame) is newer
+                    // than a no left in the profile by an earlier install.
+                    else if (collection && (!OwnGame.Declined || c.MakeOwnGame))
                     {
                         string src = OwnGame.DeploysInto(c);
                         // Offered whenever it is possible. It used to be offered
@@ -164,6 +163,23 @@ namespace Thornswood
         /// the offer is put up here and now rather than pointing at a button in
         /// another screen.
         /// </summary>
+        /// <summary>
+        /// Where Thornswood stands before its own folder is made, for the log,
+        /// the Play button and the box. Chosen at install (Paths.OwnFirst,
+        /// #1226) nothing is shared: its files wait in Profile\Payload and the
+        /// Steam copy is not written. Otherwise it shares the Steam copy with
+        /// every other server, as it always has.
+        /// </summary>
+        static string NoOwnFolderYet()
+        {
+            if (Paths.OwnFirst)
+                return "Thornswood's own Skyrim folder was chosen when Thornswood was installed and is not made yet. " +
+                       "Until it is, Thornswood's files wait in " + Paths.Payload + " and nothing is written into the Steam copy in " + Paths.SteamCopy + ".";
+            return "Thornswood is sharing one Skyrim with every other server on this machine, in " + Paths.SteamCopy +
+                   ". Saves, settings and the client's own settings file are shared, so whichever launcher wrote last is the one the game believes, " +
+                   "which is how their menus and logins get into Thornswood and Thornswood's get into theirs.";
+        }
+
         static bool OwnGameRequired()
         {
             if (!Paths.Collection) return true;
@@ -182,16 +198,13 @@ namespace Thornswood
 
             string msg =
                 "Thornswood needs a Skyrim folder of its own before it can start.\n\n" +
-                "Right now it would run out of " + Paths.Game + ", which is shared with every " +
-                "other server on this machine. They all write the same client settings file and " +
-                "the game believes whichever wrote last, which is how their menus and logins get " +
-                "into Thornswood and Thornswood's get into theirs.\n\n" +
+                NoOwnFolderYet() + "\n\n" +
                 // Not indented any more: WhyNot's answer can be a long sentence
                 // (a drive apart names both ways out and their paths), and an
                 // indent the box only applies to the first wrapped line reads
                 // as a stray gap in the middle of it.
                 "The folder cannot be made yet:\n\n" + why;
-            Log("Not starting: Thornswood would run out of the shared Skyrim, and the own folder " +
+            Log("Not starting: Thornswood has no Skyrim folder of its own yet, and it " +
                 "cannot be made yet. " + why);
             try
             {
@@ -212,6 +225,17 @@ namespace Thornswood
             {
                 Log(why);
                 if (!atStart) MessageBox.Show(why, "Thornswood", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // Already answered in the setup window (issue #906): its card
+            // carries this panel's words and a tick box, and a tick is the
+            // same yes as the one below, given before the launcher was open.
+            if (cfg.MakeOwnGame)
+            {
+                Log("Making Thornswood's own Skyrim folder, as chosen when Thornswood was installed. " +
+                    "It is made from what Vortex has deployed in " + src + ".");
+                StartOwnGame(true, true);
                 return;
             }
 
@@ -243,11 +267,11 @@ namespace Thornswood
         static void StartOwnGame(bool make, bool loud)
         {
             if (ownGameBusy) return;
-            // The downgrade is writing into the Steam copy this reads from. It
-            // starts the refresh itself when it is done.
+            // The downgrade puts 1.6.1170's files into this folder, or, before
+            // there is one, makes it from them itself when it is done (#1218).
             if (Downgrade.Busy)
             {
-                Log("Skyrim is being downgraded. Thornswood's own folder is brought up to date when that is done.");
+                Log("Skyrim 1.6.1170 is being fetched for Thornswood's own folder. Bring it up to date from Vortex in Settings once that is done; the launcher also does it by itself the next time it starts.");
                 return;
             }
             if (playing || Checks.GameRunning())
@@ -260,6 +284,9 @@ namespace Thornswood
             if (!make && !OwnGame.Active) { Log("Thornswood does not have its own Skyrim folder yet."); return; }
 
             ownGameBusy = true;
+            // The Play button shows how far it has got (#1145): OwnGame counts
+            // the files, and Verify the plugins it checks after.
+            PlayProgress.Begin(OwnGame.Phase, 0);
             DrawStatus();
             DrawOwnGame();
             Log(make ? "Making Thornswood's own Skyrim folder from what Vortex has deployed. Play comes back when it is done."
@@ -275,6 +302,19 @@ namespace Thornswood
                 };
                 try { said = make ? OwnGame.Make(c, say) : OwnGame.Refresh(c, say); }
                 catch (Exception ex) { fail = ex.Message; }
+
+                // Made: from here Paths name the new folder, as they will after
+                // the restart below, so the light flags and the load order are
+                // put right in Thornswood's own folder and its Profile. On the
+                // old Paths they went into the Steam copy's plugins, through
+                // Vortex's links, and Windows' own plugin list, or, with the
+                // folder chosen at install, into a Profile\Payload that is gone
+                // (#1226).
+                if (make && fail == null)
+                {
+                    try { Paths.Init(Paths.Root); }
+                    catch (Exception ex) { Swallow.Note("ShellOwnGame.StartOwnGame, pointing Paths at the new folder", ex); }
+                }
 
                 // Same light-flag and load-order steps Fix runs. Refresh can
                 // bring Vortex's unflagged staging copy of a MustBeLight
@@ -324,57 +364,20 @@ namespace Thornswood
                     }
                 }
 
-                // The firewall rule for the game's browser, written here
-                // because here is where the reason for it happens.
-                //
-                // Skyrim Platform draws the interface in a second program, and
-                // a firewall rule is tied to a program's full path. Every other
-                // server runs from the Steam copy, so that path was decided
-                // once, long ago, and nobody is asked again. Giving Thornswood
-                // a folder of its own makes the same file a new program as far
-                // as Windows is concerned, and that is the entire reason anyone
-                // here sees the prompt. This folder is what moved it, so this
-                // is what should settle it.
-                //
-                // It asks for administrator, which is unavoidable: only
-                // administrators may write firewall rules. It is also why this
-                // is not a button of its own. A prompt inside a folder build
-                // somebody started, which already says it is setting the folder
-                // up, is a prompt with a reason attached. A lone button
-                // offering to quieten a security warning is not, however true
-                // the words beside it are.
-                //
-                // Saying no costs nothing. The rule is a block, this never
-                // needed the network, and the only consequence of refusing is
-                // that Windows asks once on the first launch instead.
-                // Only when a person started this.
-                //
-                // Firewall.Ensure elevates (runas) to write the browser-helper
-                // block rule. That is only needed when Make creates a new own
-                // folder: Windows ties rules to the program's full path, and
-                // that path just changed. Bring it up to date and the silent
-                // startup refresh leave the path alone, so elevation would
-                // only flash UAC / a console for no reason. Existing rules
-                // stay; Make still settles them for a brand-new folder.
-                if (fail == null && loud && make)
-                {
-                    try
-                    {
-                        if (Firewall.Present().Count > 0)
-                        {
-                            say("Asking Windows to stop querying the game's browser. It will ask for administrator.");
-                            string fw = Firewall.Ensure(say);
-                            if (!string.IsNullOrEmpty(fw)) say(fw);
-                        }
-                    }
-                    catch (Exception ex) { Swallow.Note("ShellOwnGame.StartOwnGame, Firewall.Ensure", ex); }
-                }
+                // No firewall rule is written here any more, and nothing asks
+                // for administrator (#911). Windows only asked about the game's
+                // browser because the in-game voice page kept making WebRTC
+                // connections after the launcher had taken the audio, and a
+                // WebRTC connection opens UDP sockets on every network the
+                // machine has. thornswood-voice.js makes none in relay mode now,
+                // so the browser has nothing for Windows to ask about.
 
                 try
                 {
                     win.Dispatcher.BeginInvoke((Action)delegate
                     {
                         ownGameBusy = false;
+                        PlayProgress.End();
                         if (fail != null)
                         {
                             Log((make ? "Thornswood's own Skyrim folder was not made. " : "Thornswood's own Skyrim folder was not brought up to date. ") + fail);

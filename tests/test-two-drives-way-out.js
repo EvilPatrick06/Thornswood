@@ -33,7 +33,7 @@
 //      letters and the two ways out are what the person reads.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 
@@ -43,7 +43,7 @@ function yes(what, cond) {
   else { fail++; console.log('FAIL  ' + what); }
 }
 
-const appDir = path.join(TOOLS_DIR, '..', 'launcher', 'app');
+const appDir = path.join(REPO_DIR, 'launcher', 'app');
 const own = fs.readFileSync(path.join(appDir, 'OwnGame.cs'), 'utf8');
 const shell = fs.readFileSync(path.join(appDir, 'ShellOwnGame.cs'), 'utf8');
 
@@ -65,7 +65,10 @@ const body = whyNot ? whyNot[1] : '';
 
 // Skyrim's volume, then Vortex's staging folders: each still refuses rather
 // than falling through to copies.
-const gate = /if \(!SameVolume\(game, Paths\.Root\)\)\s*return OneDriveOnly\(/.test(body);
+// Since #1218 the folder checked is the Steam copy for a first build and the
+// folder Vortex deploys into once made, since only Vortex's files are linked
+// then (test-own-folder-alone.ps1).
+const gate = /string linked = made \? src : game;\s*if \(!SameVolume\(linked, Paths\.Root\)\)\s*return OneDriveOnly\(/.test(body);
 yes('Skyrim on another drive still refuses, through OneDriveOnly', gate);
 const staging = /foreach \(string dir in rec\.Staging\)[\s\S]*?if \(!SameVolume\(dir, Paths\.Root\)\)\s*return OneDriveOnly\(/.test(body);
 yes("Vortex's mods on another drive still refuse, through OneDriveOnly", staging);

@@ -39,8 +39,7 @@ namespace Thornswood
         static Window win;
         static Config cfg;
         static VersionDoc pendingDoc;
-        static List<Pack> pendingPacks = new List<Pack>();
-        static bool playing, selfUpdateOffered;
+        static bool playing;
         // An update waiting means this build no longer matches what the
         // server expects. Playing anyway is how someone gets turned away at
         // the door, or worse, gets in with a different mod list.
@@ -77,7 +76,6 @@ namespace Thornswood
         static bool updatePending = true;
         static bool updateAnswered;
         static bool checkFailed;
-        static bool retryQueued;
         static DateTime playStartedAt;
 
         // An update published while the game runs. The check that runs every
@@ -88,24 +86,11 @@ namespace Thornswood
         // in three seconds and carries on running files the rest of the room
         // has moved past, which is what happened to everybody on 1.1.40.
         static DateTime updateSeenAt = DateTime.MinValue;
-        static bool checkingInPlay = false;
         static bool closedForUpdate = false;
         static bool installWhenSeen = false;
         static int inPlayTicks = 0;
-        // Said once in launcher.log, not every thirty seconds: which feed the
-        // checks read, and the first in play check that could not be made.
-        // Both were invisible before (#445): the address was nowhere in the
-        // log, and the in play catch was empty, so a launcher that had spent
-        // the hour's sixty anonymous GitHub requests looked exactly like one
-        // that had checked and found nothing.
-        static string feedSaid = "";
-        static bool inPlayFailSaid;
-        static bool notChangedSaid;
         static int modTab;   // 0 server plugins, 1 script extender, 2 your own, 3 add-ons
         static Border addonsCard;
-        // Ids being installed or removed right now, so a second click on the
-        // same row does not start the same download twice.
-        static readonly List<string> packBusy = new List<string>();
         static DispatcherTimer timer;
 
         // The character bar (charBar, charRow, txtCharNote, charPickerOpen)
@@ -121,7 +106,7 @@ namespace Thornswood
                          txtReadyTitle, txtReadyNote;
         static Ellipse dotServer, dotVerify, dotReady;
         static StackPanel statusList, modList, themeRow, themeEditor, pathRows, helpList,
-                          newsList, saveList, logList, displayModeRow,
+                          saveList, logList, displayModeRow,
                           firstRunCard, quickKeysCard, quickKeys;
         // Play hero stats strip: three equal columns (Played / Sessions / Last played).
         static UniformGrid statRow;
@@ -206,6 +191,13 @@ namespace Thornswood
         [STAThread]
         static void Main(string[] args)
         {
+            // PerMonitorV2 is in the application manifest (#463). Framework WPF
+            // only rescales on WM_DPICHANGED when this switch is false; its
+            // default depends on a TargetFrameworkAttribute we do not emit.
+            // WPF reads it once and keeps the answer, so it is set here, before
+            // any window, message box or XAML exists.
+            AppContext.SetSwitch("Switch.System.Windows.DoNotScaleForDpiChanges", false);
+
             bool fresh;
             using (var mutex = new Mutex(true, MutexName(args), out fresh))
             {
@@ -390,10 +382,18 @@ namespace Thornswood
                 Keep.TakeNote();
             }
             try { string leak = Leaks.Clean(cfg); if (leak != null) Log(leak); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
+            // Once the own folder is made, Thornswood's files come out of the Steam copy, once (OwnGameClean.cs, #1226). Off the window's thread: it deletes.
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                string cleaned = null;
+                try { cleaned = OwnGame.CleanSteamCopy(cfg); } catch (Exception ex) { Swallow.Note("Shell.Run, taking Thornswood's files out of the Steam copy", ex); }
+                if (cleaned == null) return;
+                try { win.Dispatcher.BeginInvoke((Action)delegate { Log(cleaned); }); } catch (Exception ex) { Swallow.Note("Shell.Run, saying what came out of the Steam copy", ex); }
+            });
             try { string ini = ThornIni.Ensure(); if (ini != null) Log(ini); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
             try { string fov = ThornIni.UndoShippedFov(); if (fov != null) Log(fov); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
-            // Steam's Updates setting for the Skyrim the downgrade looks after, read only (SteamUpdates).
-            try { if (!Downgrade.Needed(cfg) && !Downgrade.SourceNeeded(cfg)) { string upd = SteamUpdates.Report(Downgrade.Target(cfg)); if (upd != null) Log(upd); } } catch (Exception ex) { Swallow.Note("Shell.Run, reading Steam's Updates setting", ex); }
+            // Steam's Updates setting for the Steam copy of Skyrim: logged, and set when it does not hold the version (ShellSteamUpdates.cs, #493), only until the own folder is made (#1226).
+            try { if (SteamUpdates.LooksAtStart(!Paths.Collection, Downgrade.Needed(cfg))) HoldSteamUpdatesOnStart(); } catch (Exception ex) { Swallow.Note("Shell.Run, Steam's Updates setting", ex); }
             {
                 int parked = playing ? 0 : Keep.Unpark();
                 if (parked > 0) Log("Put back " + parked + " parked " + (parked == 1 ? "plugin" : "plugins") + " from another server or build left behind by the last session.");
@@ -440,12 +440,6 @@ namespace Thornswood
             // wants the server secret and the launcher never sent one. The
             // list lives in Profile\Characters\profiles.txt and the person
             // picks at the game's main menu now.
-            try
-            {
-                int named = Files.FixPresetNames();
-                if (named > 0) Log("Put " + named + " class name" + (named == 1 ? "" : "s") + " back to the right spelling.");
-            }
-            catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
             // Off the window's thread. Ending a stuck game waits on it, and at
             // this point the window has not even been shown yet.
             ThreadPool.QueueUserWorkItem(delegate
@@ -491,10 +485,9 @@ namespace Thornswood
             AutoDisplayOnce();
             StartPing();
             StartGallery();
-            if (Updater.Enabled(cfg))
-                ThreadPool.QueueUserWorkItem(delegate { CheckUpdatesBackground(false); });
-            else
-                Unblock("there is no update source configured");
+            // Always: config.json cannot switch the check off (#937), and Play
+            // stays shut until it has answered (Updater.FeedUrl).
+            ThreadPool.QueueUserWorkItem(delegate { CheckUpdatesBackground(false); });
 
             /*
               Voice comes up with the launcher, not with the game.
@@ -551,6 +544,8 @@ namespace Thornswood
                 });
             };
 
+            // Inside the screen at any display scale, before it is centred (#463).
+            try { WindowFit.Keep(win); } catch (Exception ex) { Swallow.Note("Shell.Run, fitting the window to the screen", ex); }
             CentreOnMainScreen();
 
             /*
@@ -567,12 +562,6 @@ namespace Thornswood
               OnMainWindowClose ties the app's life to this window, which is
               what anyone closing it means.
             */
-            // PerMonitorV2 is in the application manifest (#463). Framework WPF
-            // only rescales on WM_DPICHANGED when this switch is false; its
-            // default depends on a TargetFrameworkAttribute we do not emit, so
-            // set it here before Application is created.
-            AppContext.SetSwitch("Switch.System.Windows.DoNotScaleForDpiChanges", false);
-
             var app = new Application();
             app.ShutdownMode = ShutdownMode.OnMainWindowClose;
             app.Exit += delegate { Voice.Stop(); try { Presence.Stop(); } catch (Exception ex) { Swallow.Note("Shell.Run, dispose", ex); } try { Hold.Release(); } catch (Exception ex) { Swallow.Note("Shell.Run, dispose", ex); } };
@@ -647,16 +636,9 @@ namespace Thornswood
 
         static T F<T>(string name) where T : class { return win.FindName(name) as T; }
 
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        static extern int GetSystemMetrics(int index);
-
         /// <summary>How far a maximized window hangs past the screen: the sizing frame plus its padding, in WPF units.</summary>
         static Thickness MaximizedInset()
         {
-            double px = 0;
-            try { px = GetSystemMetrics(32) + GetSystemMetrics(92); }   // SM_CXSIZEFRAME + SM_CXPADDEDBORDER
-            catch (Exception ex) { Swallow.Note("Shell.MaximizedInset, asking Windows for the frame size", ex); }
-            if (px <= 0) px = 8;
             double scale = 1;
             try
             {
@@ -665,6 +647,12 @@ namespace Thornswood
             }
             catch (Exception ex) { Swallow.Note("Shell.MaximizedInset, reading the screen scale", ex); }
             if (scale <= 0) scale = 1;
+            // At the scale of the monitor the window is on, not the one
+            // Windows started with: they differ on a second monitor (#463).
+            double px = 0;
+            try { px = WindowFit.FramePixels(scale); }   // SM_CXSIZEFRAME + SM_CXPADDEDBORDER
+            catch (Exception ex) { Swallow.Note("Shell.MaximizedInset, asking Windows for the frame size", ex); }
+            if (px <= 0) px = 8;
             return new Thickness(px / scale);
         }
 
@@ -801,10 +789,10 @@ namespace Thornswood
               asked for; the dead Grids cost nothing and can be cut properly
               whenever the xaml is next opened on a machine with the compiler.
 
-              Mods stays wired on purpose even though its button is hidden:
-              a blocked Play still sends people to it (ShowPage(PageMods)) so
-              they can see the scan and press Fix. It just is not somewhere to
-              wander into from the rail any more.
+              A blocked Play sends people to Diagnostics (ShowPage(PageDiag)),
+              where Scan and Fix are since #607 and which the rail shows. Until
+              #982 it sent them to Mods, which by then had no Fix on it
+              and no rail button to come back to.
             */
             int[] hiddenNav = { PageSaves, PageServer, PageMods, PageBuild, PageLogs };
             foreach (int p in hiddenNav)
@@ -903,12 +891,11 @@ namespace Thornswood
 
         static bool linkingDiscord = false;
 
-        /// <summary>Both buttons that can start a link, moved together.</summary>
+        /// <summary>The button that starts a link. The collection bar used to be
+        /// a second one; since #428 it only ever opens the collection.</summary>
         static void SetLinkButtons(bool on)
         {
             if (buttonDiscord != null) buttonDiscord.IsEnabled = on;
-            if (btnInstallNow != null && collectionBarUp && !Discord.Linked)
-                btnInstallNow.IsEnabled = on;
         }
 
         /// <summary>The Discord account block above Settings. Called whenever it changes.</summary>
@@ -993,7 +980,7 @@ namespace Thornswood
                     byte[] raw = null;
                     try
                     {
-                        ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+                        ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12; // added, never replaced (#1360)
                         using (var wc = new System.Net.WebClient())
                         {
                             wc.Headers["User-Agent"] = "ThornswoodLauncher/" + Updater.Version;
@@ -1178,9 +1165,16 @@ namespace Thornswood
                 var frame = new VideoDrawing();
                 frame.Player = player;
                 var brush = new DrawingBrush(frame);
+                // One crop for the band, the still picture's and this one, so
+                // the two line up and the overlook sits where the approved
+                // picture has it (Art.HeaderCrop says why that is not the
+                // middle of the picture). The video is painted at its own size
+                // and its own timing: no scale, no drift, no speed-up.
                 brush.Stretch = Stretch.UniformToFill;
                 brush.AlignmentX = AlignmentX.Center;
                 brush.AlignmentY = AlignmentY.Center;
+                brush.ViewboxUnits = BrushMappingMode.RelativeToBoundingBox;
+                brush.Viewbox = Art.HeaderCrop;
 
                 player.MediaOpened += delegate
                 {
@@ -1284,6 +1278,9 @@ namespace Thornswood
         /// </summary>
         static void MusicDecide()
         {
+            // While the game runs the browser behind the theme is closed, not
+            // paused (#963). The first call after the game closes makes it again.
+            if (playing) { try { MenuMusic.Close(); } catch (Exception ex) { Swallow.Note("Shell.MusicDecide, close", ex); } return; }
             bool want = cfg != null && cfg.MusicOn && cfg.MusicVolume > 0 && !playing
                 && win != null && win.WindowState != WindowState.Minimized;
             double vol = cfg == null ? 0 : Math.Max(0, Math.Min(100, cfg.MusicVolume)) / 100.0;
@@ -2144,6 +2141,8 @@ namespace Thornswood
             {
                 Action fit = delegate { frame.Margin = win.WindowState == WindowState.Maximized ? MaximizedInset() : new Thickness(0); };
                 win.StateChanged += delegate { fit(); };
+                // Maximized onto a monitor with another scale: that monitor's frame.
+                win.DpiChanged += delegate { fit(); };
                 fit();
             }
 
@@ -2173,9 +2172,8 @@ namespace Thornswood
             if (btnDowngrade != null) btnDowngrade.Click += delegate { RunDowngrade(); };
             btnInstallNow.Click += delegate
             {
-                if (collectionBarUp)
+                if (collectionBarUp || (collectionNoteUp && !updatePending))
                 {
-                    if (!Discord.Linked) { ConnectDiscord(); return; }
                     try { Process.Start(new ProcessStartInfo(cfg.CollectionUrl) { UseShellExecute = true }); }
                     catch (Exception ex) { Log("Could not open the collection: " + ex.Message); }
                     return;
@@ -2363,7 +2361,6 @@ namespace Thornswood
             };
             btnCheckNow.Click += delegate
             {
-                if (!Updater.Enabled(cfg)) { Log("No update source is configured in config.json."); return; }
                 Log("Checking for updates...");
                 ThreadPool.QueueUserWorkItem(delegate { CheckUpdatesBackground(true); });
             };
@@ -2385,6 +2382,7 @@ namespace Thornswood
                 };
 
             WirePages();
+            WireProgress();
             WireOwnGame();
             btnFolder.Click += delegate { Open(Paths.Root); };
             btnOpenLog.Click += delegate
@@ -2450,13 +2448,6 @@ namespace Thornswood
                     {
                         int rules = Enforce.Apply();
                         if (rules > 0) did.Add(rules + " mod setting" + (rules == 1 ? "" : "s"));
-                    }
-                    catch (Exception ex) { Swallow.Note("Shell.Wire", ex); }
-
-                    try
-                    {
-                        int names = Files.FixPresetNames();
-                        if (names > 0) did.Add(names + " class preset name" + (names == 1 ? "" : "s"));
                     }
                     catch (Exception ex) { Swallow.Note("Shell.Wire", ex); }
 
@@ -2528,7 +2519,10 @@ namespace Thornswood
                 if (++pingTicks >= 15) { pingTicks = 0; StartPing(); }
 
                 if (!playing) return;
-                if (Checks.GameRunning())
+                // Asks the game processes the last look found whether they are
+                // still up, and lists the machine's processes only when none is
+                // (#978). Same answer as GameRunning, on the same tick.
+                if (Checks.GameStillRunning())
                 {
                     // Who was picked at the game's menu, every tick. One file
                     // read, and nothing when the file says what it said last.
@@ -2592,6 +2586,12 @@ namespace Thornswood
                 btnPlay.Content = "PLAY";
                 btnQuitGame.Visibility = Visibility.Collapsed;
                 Log("Game closed after " + (int)(DateTime.Now - playStartedAt).TotalMinutes + " minutes. Your Windows Skyrim folders are back to normal.");
+                {
+                    // Where the crash log is, and the snapshot beside it on
+                    // the dev build and staff PCs (#1191).
+                    string crashed = CrashDump.AfterSession(playStartedAt, CrashDump.Wanted(cfg));
+                    if (crashed != null) Log(crashed);
+                }
 
                 // The one failure that looks like everything else: a session
                 // that ran the wrong Skyrim. Nothing else in here can be trusted
@@ -2851,15 +2851,13 @@ namespace Thornswood
             // comes up by itself once the build is right. A real update still
             // outranks both, below, because an update can carry a new expected
             // build and settle the question by itself.
+            //
+            // Only the game Thornswood runs counts (#1218). A Steam copy that
+            // moved on after Thornswood's own folder was made no longer brings
+            // the card up: the folder holds 1.6.1170 itself and follows Vortex
+            // whatever build the Steam copy is on.
             bool wrongBuild = Downgrade.Needed(cfg);
-            // With Thornswood's own folder the card also comes up when only the
-            // Steam copy it is made from has moved on: Thornswood still plays,
-            // so Play is not held back, but the folder cannot follow Vortex until
-            // the Steam copy is back on the right build. The mods card waits for
-            // that one as well: Vortex deploys into the Steam copy, and the
-            // downgrade rewrites the Steam copy, so the order is the same.
-            bool steamCopyWrong = !wrongBuild && Downgrade.SourceNeeded(cfg);
-            if (updateBar != null && btnInstallNow != null && ModsMissing() && !wrongBuild && !steamCopyWrong)
+            if (updateBar != null && btnInstallNow != null && ModsMissing() && !wrongBuild)
             {
                 ShowCollectionBar();
             }
@@ -2871,19 +2869,66 @@ namespace Thornswood
                 btnInstallNow.Visibility = Visibility.Collapsed;
             }
 
+            // Mods that could not be confirmed (Djinn, 2 Oct). CollectionProblem
+            // answers "" when it cannot read the revision Vortex installed, which
+            // left no card and no way to the collection on this page at all.
+            // This is a note, not a hold: Play is not shut for it, because a
+            // revision that cannot be read is not proof the mods are wrong.
+            if (updateBar != null && btnInstallNow != null && !collectionBarUp && !updatePending &&
+                !wrongBuild && !playing && !playBar.Active)
+            {
+                bool unsure = CollectionUnconfirmed();
+                if (unsure && (collectionNoteUp || updateBar.Visibility != Visibility.Visible))
+                {
+                    txtUpdateTitle.Text = "Your mods could not be confirmed";
+                    txtUpdateNote.Text =
+                        "The launcher could not read which revision of the Thornswood collection " +
+                        "Vortex has installed. If you have not installed it, or are not sure, open " +
+                        "the collection and let Vortex install or update it. Play is not held for this.";
+                    btnInstallNow.Content = "Open the collection";
+                    btnInstallNow.IsEnabled = true;
+                    updateBar.Visibility = Visibility.Visible;
+                    btnInstallNow.Visibility = Visibility.Visible;
+                    collectionNoteUp = true;
+                }
+                else if (!unsure && collectionNoteUp)
+                {
+                    collectionNoteUp = false;
+                    btnInstallNow.Content = "Install now";
+                    updateBar.Visibility = Visibility.Collapsed;
+                    btnInstallNow.Visibility = Visibility.Collapsed;
+                }
+            }
+            else if (collectionNoteUp)
+            {
+                // An update or the collection card took the bar, or the game is
+                // running: the note steps aside and leaves the bar to them.
+                collectionNoteUp = false;
+                if (!collectionBarUp && !updatePending && updateBar != null && btnInstallNow != null)
+                {
+                    btnInstallNow.Content = "Install now";
+                    updateBar.Visibility = Visibility.Collapsed;
+                    btnInstallNow.Visibility = Visibility.Collapsed;
+                }
+            }
+
             // Wrong Skyrim build: the one thing on this page with a button that
             // fixes it. Below the update bar in priority, because an update can
             // carry a new expected build and settle the question by itself.
             if (downgradeBar != null)
             {
                 bool updateUp = updateBar != null && updateBar.Visibility == Visibility.Visible;
-                downgradeBar.Visibility = ((wrongBuild || steamCopyWrong) && !updateUp && !playing) ? Visibility.Visible : Visibility.Collapsed;
+                downgradeBar.Visibility = (wrongBuild && !updateUp && !playing) ? Visibility.Visible : Visibility.Collapsed;
                 if (btnDowngrade != null) btnDowngrade.IsEnabled = !Downgrade.Busy && !ownGameBusy;
                 if (txtDowngradeTitle != null)
-                    txtDowngradeTitle.Text = steamCopyWrong ? "The Steam copy of Skyrim is on the wrong build" : "Skyrim is on the wrong build";
+                    txtDowngradeTitle.Text = Paths.Collection ? "Skyrim on Steam is not on the server's build"
+                        : OwnGame.Active && OwnGame.Changed().Count > 0 ? "Some of Skyrim's own files in Thornswood's folder changed"
+                        : "Skyrim is on the wrong build";
             }
 
-            btnPlay.IsEnabled = all && !playing && !updatePending && !collectionBarUp && !ownGameBusy && feedNotice.Hold == null;
+            bool working = playBar.Active;
+            btnPlay.IsEnabled = all && !playing && !updatePending && !collectionBarUp && !ownGameBusy && !working && feedNotice.Hold == null;
+            if (!working) HidePlayFill();
             // Only worth offering while there is something to quit, and it is
             // the one control on this page that stays live during a session.
             if (btnQuitGame != null)
@@ -2893,9 +2938,18 @@ namespace Thornswood
             // sets updatePending false, so the old order fell through to the
             // last branch and put PLAY back on a button that could not play:
             // the bar said install the mods and the button said go.
+            // Work that reports how far it has got (#1145): the button is the
+            // progress bar, and says what is going on and how much is left.
+            // ShellProgress.cs paints the fill; this keeps the words when
+            // anything else redraws the button in the meantime.
+            if (working && !playing)
+            {
+                btnPlay.Content = PlayBarCaption(playBar.Text);
+                btnPlay.ToolTip = "Play comes back when this is done.";
+            }
             // The game folder itself is being made or brought up to date, so
             // there is nothing complete to start yet.
-            if (ownGameBusy && !playing)
+            else if (ownGameBusy && !playing)
             {
                 btnPlay.Content = "PREPARING THE GAME FOLDER";
                 btnPlay.ToolTip = "Thornswood's own Skyrim folder is being brought up to date from Vortex. Play comes back when it is done.";
@@ -2946,11 +3000,7 @@ namespace Thornswood
             else if (Paths.Collection && !playing)
             {
                 btnPlay.Content = "MAKE THORNSWOOD'S OWN FOLDER";
-                btnPlay.ToolTip =
-                    "Thornswood is sharing one Skyrim with every other server on this machine, in " +
-                    Paths.Game + ". They all write the same client settings file and the game " +
-                    "believes whichever wrote last, which is how their menus and logins get into " +
-                    "Thornswood and Thornswood's get into theirs. This gives Thornswood a folder " +
+                btnPlay.ToolTip = NoOwnFolderYet() + " This gives Thornswood a folder " +
                     "of its own. It takes a few minutes and the launcher restarts when it is done.";
             }
             else if (!playing)
@@ -3071,10 +3121,9 @@ namespace Thornswood
         /// <summary>
         /// The Downgrade button. Everything happens on Downgrade's own thread;
         /// its words come back here through the dispatcher, into the log and
-        /// the line under the button, and the page is redrawn. With
-        /// Thornswood's own folder the downgrade is done to the Steam copy the
-        /// folder is made from, and the folder is brought up to date from it
-        /// once that has worked.
+        /// the line under the button, and the page is redrawn. The files go
+        /// into Thornswood's own folder, or, before it has one, the folder is
+        /// made from them. The Steam copy of Skyrim is never written (#1218).
         /// </summary>
         static void RunDowngrade()
         {
@@ -3086,8 +3135,10 @@ namespace Thornswood
                 "Downgrade Skyrim to 1.6.1170?\n\n" +
                 "Steam only hands over an older build through its own console, so the launcher works that console for you. " +
                 "Steam's window comes to the front, the launcher clicks the console's command line and types these three lines into it, one at a time, each after the one before has finished downloading:\n\n" +
-                string.Join("\n", Downgrade.Commands()) + "\n\n" +
-                "Steam downloads about 11 GB under your own account, and the launcher then copies the files over the Steam copy of Skyrim. " +
+                string.Join("\n", Downgrade.Commands(cfg)) + "\n\n" +
+                "Steam downloads about 11 GB under your own account, and the launcher then " +
+                (Paths.Collection ? "makes Thornswood's own game folder from those files. " : "puts the files into Thornswood's own game folder. ") +
+                "Your Steam copy of Skyrim is not changed and can stay on any build.\n\n" +
                 "Do not type or click while Steam's window is in front, or the keys go to the wrong place.",
                 "Thornswood", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (r != MessageBoxResult.Yes) { Log("Left Skyrim on the build it is on."); return; }
@@ -3123,10 +3174,16 @@ namespace Thornswood
                             btnDowngrade.Content = ok ? "Done" : "Try again";
                             btnDowngrade.IsEnabled = !ok;
                             if (prgDowngrade != null) { prgDowngrade.IsIndeterminate = false; prgDowngrade.Visibility = Visibility.Collapsed; }
-                            if (ok && OwnGame.Active) StartOwnGame(false, true);
+                            // Before Thornswood has a folder of its own the
+                            // download is what the folder is made from, and
+                            // the person already said yes to that above. With
+                            // a folder, the files went straight into it, and
+                            // there is nothing for Vortex to bring in. The
+                            // Steam copy was not touched either way, so there
+                            // is no question about Steam's updates to ask here.
+                            if (ok && Paths.Collection && Downgrade.Downloaded(cfg) != null) StartOwnGame(true, true);
                             DrawStatus();
                             DrawBuildLine();
-                            if (ok) AskToHoldSteamUpdates();
                         }));
                     }
                     catch (Exception ex) { Swallow.Note("Shell.RunDowngrade, own game source", ex); }
@@ -3222,18 +3279,30 @@ namespace Thornswood
                     shown++;
                 }
                 // Absent ("is not installed") means Vortex never put the mod on
-                // this machine's list. FileMissing means the list still names it
-                // and Data does not have the file: Fix restores those from Vortex
-                // (and from the server when it serves them). Greying the button
-                // for Absent alone is still right; FileMissing keeps Fix on.
+                // this machine. FileMissing means the list still names it and
+                // Data does not have the file: Fix restores those from Vortex
+                // (and from the server when it serves them). Greying Fix for
+                // one absent plugin also greyed the light flags, another
+                // server's menu files and the plugins that are simply extra,
+                // which Fix does put right. 1 October that was a clean
+                // collection install with one plugin the collection does not
+                // ship. Fix stays off only when every blocking issue is a mod
+                // that is not installed at all.
                 int absent = 0;
                 int fileMissing = 0;
+                int fixable = 0;
                 foreach (Issue i in issues) if (i.Absent) absent++;
                 foreach (Issue i in issues) if (i.FileMissing) fileMissing++;
-                if (absent > 0 && !elsewhere)
+                foreach (Issue i in issues) if (i.Blocking && !i.Absent) fixable++;
+                bool onlyAbsent = absent > 0 && fixable == 0;
+                if (onlyAbsent && !elsewhere)
                 {
                     sb.Append("\n\nThese are not installed at all. Fix cannot help. In Vortex, " +
                               "Profiles, press Enable under Thornswood.");
+                }
+                else if (absent > 0 && !elsewhere)
+                {
+                    sb.Append("\n\nFix cannot install a mod Vortex does not have. It still puts right the rest of this list.");
                 }
                 else if (fileMissing > 0 && !elsewhere)
                 {
@@ -3250,7 +3319,7 @@ namespace Thornswood
                               "and Vortex writes its own again the next time it deploys.");
 
                 txtVerifyNote.Text = sb.ToString();
-                btnFix.IsEnabled = blocking > 0 && (absent == 0 || elsewhere);
+                btnFix.IsEnabled = blocking > 0 && (!onlyAbsent || elsewhere);
             }
             // The count alone read the same after every press: 182, 182, 182.
             // When most of them are mods that are simply not in the game folder,
@@ -3262,8 +3331,11 @@ namespace Thornswood
             foreach (Issue i in issues) if (i.Absent) missing++;
             Log("Scan finished. " + issues.Count + " issue" + (issues.Count == 1 ? "" : "s") + " found." +
                 (missing > 0 && !elsewhere
-                    ? " " + missing + " of them are mods that are not in the game folder at all, which Scan and Fix cannot change." +
-                      (Paths.Collection ? " Vortex most likely has another profile deployed." : "")
+                    ? " " + missing + (missing == 1
+                        ? " of them is a mod that is not in the game folder at all, which Scan and Fix cannot change."
+                        : " of them are mods that are not in the game folder at all, which Scan and Fix cannot change.") +
+                      (Paths.Collection && OwnGame.NotThisCollection(missing, Verify.Expected)
+                        ? " Vortex most likely has another profile deployed." : "")
                     : ""));
 
             /*
@@ -3471,243 +3543,6 @@ namespace Thornswood
                 none.Margin = new Thickness(2, 10, 0, 0);
                 modList.Children.Add(none);
             }
-        }
-
-        /// <summary>
-        /// The add-ons tab. One row per optional pack, with a button that says
-        /// what it will do.
-        ///
-        /// The list comes from the same version.json the update check already
-        /// reads, so there is nothing extra to fetch and no second source that
-        /// can disagree with the first.
-        /// </summary>
-        static void BuildPackRows()
-        {
-            // The mods do not come with the installer any more, so this is the
-            // only thing in the launcher that tells anybody where they do come
-            // from. It goes above the add-on list and shows whether or not the
-            // add-ons have loaded, because somebody whose world looks like
-            // plain Skyrim needs to read it before anything else.
-            // BuildModList puts the card above every sub tab now, so adding it
-            // here again would show it twice on this one.
-            var have = pendingDoc == null ? null : pendingDoc.optional;
-
-            if (have == null)
-            {
-                txtModCount.Text = "Add-ons load with the update check. Press " +
-                                   "Check for add-ons above.";
-                return;
-            }
-
-            string filter = (boxSearch.Text == SearchHint) ? "" : boxSearch.Text.Trim().ToLowerInvariant();
-            int total = 0, shown = 0, on = 0;
-            long free = 0;
-
-            foreach (var p in have)
-            {
-                if (p == null || string.IsNullOrEmpty(p.id)) continue;
-                total++;
-                bool installed = Updater.IsInstalled(p.id);
-                if (installed) on++; else free += p.bytes;
-                if (filter.Length > 0 && p.Title.ToLowerInvariant().IndexOf(filter) < 0) continue;
-                modList.Children.Add(PackRow(p, installed));
-                shown++;
-            }
-
-            if (total == 0)
-            {
-                txtModCount.Text = "No add-ons published yet.";
-                return;
-            }
-
-            txtModCount.Text = total + " add-on" + (total == 1 ? "" : "s") + "   ·   " +
-                               on + " installed" +
-                               (free > 0 ? "   ·   " + Bytes(free) + " more available" : "") +
-                               (filter.Length > 0 ? "   ·   showing " + shown : "");
-
-            if (shown == 0 && filter.Length > 0)
-            {
-                var none = new TextBlock();
-                none.Text = "Nothing matches \"" + filter + "\".";
-                none.Foreground = Res("Faint"); none.FontSize = 12.5;
-                none.Margin = new Thickness(2, 10, 0, 0);
-                modList.Children.Add(none);
-            }
-        }
-
-        static string Bytes(long n)
-        {
-            if (n >= 1073741824L) return (n / 1073741824.0).ToString("0.0") + " GB";
-            if (n >= 1048576L) return (n / 1048576.0).ToString("0") + " MB";
-            return (n / 1024.0).ToString("0") + " KB";
-        }
-
-        static UIElement PackRow(Pack p, bool installed)
-        {
-            var g = new Grid();
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-            var left = new StackPanel();
-            Grid.SetColumn(left, 0); g.Children.Add(left);
-
-            var name = new TextBlock();
-            name.Text = p.Title;
-            name.FontSize = 13.5;
-            name.Foreground = Res("Ink");
-            name.TextTrimming = TextTrimming.CharacterEllipsis;
-            left.Children.Add(name);
-
-            var note = new TextBlock();
-            string size = p.Size;
-            string body = p.notes == null ? "" : p.notes.Trim();
-            note.Text = (size.Length > 0 ? size : "") +
-                        (size.Length > 0 && body.Length > 0 ? "   ·   " : "") + body;
-            note.FontSize = 11.5;
-            note.Foreground = Res(installed ? "Muted" : "Faint");
-            note.TextWrapping = TextWrapping.Wrap;
-            note.Margin = new Thickness(0, 3, 12, 0);
-            if (note.Text.Length > 0) left.Children.Add(note);
-
-            var b = new Button();
-            bool busy = packBusy.Contains(p.id);
-            b.Content = busy ? "Working..." : (installed ? "Remove" : "Install");
-            b.Style = (Style)win.Resources[installed ? "Ghost" : "Solid"];
-            b.IsEnabled = !busy;
-            b.VerticalAlignment = VerticalAlignment.Center;
-            b.MinWidth = 96;
-            Grid.SetColumn(b, 1); g.Children.Add(b);
-
-            // C# 4 closures capture the loop variable itself, so the pack has
-            // to be copied to a local before the handler can be trusted.
-            Pack mine = p;
-            bool wasOn = installed;
-            b.Click += delegate { PackAction(mine, wasOn); };
-
-            var card = new Border();
-            card.Padding = new Thickness(14, 12, 14, 12);
-            card.Background = Res("Panel");
-            card.Margin = new Thickness(0, 0, 8, 4);
-            card.Child = g;
-            return card;
-        }
-
-        /// <summary>
-        /// Where the mods come from, and a way to get there.
-        ///
-        /// Built here rather than in ui.xaml on purpose: a named control the
-        /// C# looks up and the xaml does not have comes back null and takes
-        /// the whole page with it, and this is the one row that must not be
-        /// the thing that breaks.
-        /// </summary>
-        static UIElement CollectionCard()
-        {
-            return CollectionCard("The mods",
-                "Thornswood's mods are installed by Vortex from the collection, " +
-                "not by this launcher. If the world looks like plain Skyrim, or " +
-                "the server turns you away when you press Play, the collection is " +
-                "what is missing.");
-        }
-
-        static UIElement CollectionCard(string title, string body)
-        {
-            var g = new Grid();
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-            var left = new StackPanel();
-            Grid.SetColumn(left, 0); g.Children.Add(left);
-
-            var name = new TextBlock();
-            name.Text = title;
-            name.FontSize = 13.5;
-            name.Foreground = Res("Ink");
-            left.Children.Add(name);
-
-            var note = new TextBlock();
-            note.Text = body;
-            note.FontSize = 11.5;
-            note.Foreground = Res("Faint");
-            note.TextWrapping = TextWrapping.Wrap;
-            note.Margin = new Thickness(0, 3, 12, 0);
-            left.Children.Add(note);
-
-            var b = new Button();
-            b.Content = "Open the collection";
-            b.Style = (Style)win.Resources["Solid"];
-            b.VerticalAlignment = VerticalAlignment.Center;
-            b.MinWidth = 96;
-            Grid.SetColumn(b, 1); g.Children.Add(b);
-
-            string url = cfg.CollectionUrl;
-            b.Click += delegate
-            {
-                try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
-                catch (Exception ex) { Log("Could not open the collection: " + ex.Message); }
-            };
-
-            // Connecting Discord only succeeds for an account the site has
-            // already accepted, so a linked launcher is an accepted one and
-            // this is the whole test. Anybody who has not been through the
-            // application can see what is coming and cannot start on it.
-            if (!Discord.Linked)
-            {
-                b.IsEnabled = false;
-                b.Content = "Apply first";
-                b.ToolTip = "The collection opens once your application is accepted and you have " +
-                            "connected Discord in the sidebar.";
-                var gate = new TextBlock();
-                gate.Text = "Connect Discord first. The collection opens once you have been accepted.";
-                gate.FontSize = 11.5;
-                gate.Foreground = Res("Bad");
-                gate.TextWrapping = TextWrapping.Wrap;
-                gate.Margin = new Thickness(0, 7, 12, 0);
-                left.Children.Add(gate);
-            }
-
-            var card = new Border();
-            card.Padding = new Thickness(14, 12, 14, 12);
-            card.Background = Res("Panel");
-            card.Margin = new Thickness(0, 0, 8, 10);
-            card.Child = g;
-            return card;
-        }
-
-        static void PackAction(Pack p, bool installed)
-        {
-            if (p == null || packBusy.Contains(p.id)) return;
-
-            if (Checks.GameRunning())
-            {
-                Log("Close Skyrim first. Files it has open cannot be changed.");
-                return;
-            }
-
-            packBusy.Add(p.id);
-            BuildModList();
-
-            ThreadPool.QueueUserWorkItem(delegate
-            {
-                try
-                {
-                    if (installed) Updater.RemovePack(cfg, p, SafeLog);
-                    else Updater.ApplyPack(cfg, p, SafeLog);
-                }
-                catch (Exception ex)
-                {
-                    SafeLog((installed ? "Could not remove " : "Could not install ") +
-                            p.Title + ": " + ex.Message);
-                }
-                finally
-                {
-                    win.Dispatcher.BeginInvoke(new Action(delegate
-                    {
-                        packBusy.Remove(p.id);
-                        BuildModList();
-                        DrawStatus();
-                    }));
-                }
-            });
         }
 
         /// <summary>Log from a background thread. Log itself touches the UI.</summary>
@@ -4168,6 +4003,7 @@ namespace Thornswood
             AddPathRow("Game", Paths.Game);
             AddPathRow("Saves", Path.Combine(Paths.LiveMyGames, "Saves"));
             AddPathRow("Settings", Paths.LiveMyGames);
+            DrawInGameBrowser();
         }
 
         static void AddPathRow(string label, string value)
@@ -4256,7 +4092,7 @@ namespace Thornswood
             quickKeys.Children.Clear();
 
             // Read out of the real files rather than typed here. A hardcoded
-            // list went stale the moment the build moved off Skyrim Together:
+            // list went stale the moment the build moved to SkyMP:
             // it was still offering an F2 party menu that no longer exists and
             // a trade key belonging to a mod that had been removed. A row now
             // appears only if its binding is really there, and it shows the key
@@ -4339,212 +4175,6 @@ namespace Thornswood
             sp.Children.Add(v);
 
             statRow.Children.Add(sp);
-        }
-
-        // ------------------------------------------------------------- news
-        static void BuildNews()
-        {
-            newsList.Children.Clear();
-            NewsItem[] items = (pendingDoc != null && pendingDoc.news != null) ? pendingDoc.news : new NewsItem[0];
-
-            if (items.Length == 0)
-            {
-                var empty = new TextBlock();
-                empty.Text = Updater.Enabled(cfg)
-                    ? "Nothing posted yet. Anything Patrick writes to the update feed turns up here."
-                    : "Updates are not set up on this copy, so there is no news feed to read.";
-                empty.Foreground = Res("Faint"); empty.FontSize = 12.5;
-                empty.TextWrapping = TextWrapping.Wrap;
-                newsList.Children.Add(empty);
-                return;
-            }
-
-            // What this build has that main does not.
-            //
-            // The dev feed is main's whole history with the dev notes on top,
-            // so the tab used to read as one long list with no seam in it. The
-            // seam is the useful part: it is the difference between the build
-            // in front of you and the build everybody plays, which is the list
-            // of what wants testing before this one becomes that one.
-            int ahead = 0;
-            for (int i = 0; i < items.Length; i++) { if (items[i].IsDev) ahead++; }
-
-            if (cfg.IsDev)
-            {
-                string mine = (pendingDoc != null) ? pendingDoc.launcherVersion : "";
-                string theirs = (pendingDoc != null) ? pendingDoc.mainVersion : "";
-
-                var head = new StackPanel();
-
-                var ht = new TextBlock();
-                ht.Text = string.IsNullOrEmpty(theirs)
-                    ? "This is the dev build."
-                    : "This is the dev build, on " + mine + ". Main is on " + theirs + ".";
-                ht.FontSize = 13.5; ht.FontWeight = FontWeights.SemiBold;
-                ht.Foreground = Res("Ink"); ht.TextWrapping = TextWrapping.Wrap;
-                head.Children.Add(ht);
-
-                var hb = new TextBlock();
-                if (ahead == 0)
-                {
-                    hb.Text = "Nothing below is dev only. Everything here has gone out on main as well, so there is nothing waiting to be tested.";
-                }
-                else
-                {
-                    hb.Text = (ahead == 1 ? "One note below is marked DEV. It is" : ahead + " notes below are marked DEV. They are")
-                            + " on this build and not on main yet, so that is what wants testing before dev goes over.";
-                }
-                hb.FontSize = 12; hb.Foreground = Res("Muted");
-                hb.TextWrapping = TextWrapping.Wrap; hb.LineHeight = 18;
-                hb.Margin = new Thickness(0, 6, 0, 0);
-                head.Children.Add(hb);
-
-                var hc = new Border();
-                hc.Background = Res("Card");
-                hc.BorderBrush = Res("Accent");
-                hc.BorderThickness = new Thickness(2, 0, 0, 0);
-                hc.Padding = new Thickness(16, 14, 16, 14);
-                hc.Margin = new Thickness(0, 0, 0, 24);
-                hc.Child = head;
-                newsList.Children.Add(hc);
-            }
-
-            foreach (NewsItem n in items)
-            {
-                var sp = new StackPanel();
-
-                if (!string.IsNullOrEmpty(n.DateText) || n.IsDev)
-                {
-                    var stamp = new StackPanel();
-                    stamp.Orientation = Orientation.Horizontal;
-                    stamp.Margin = new Thickness(0, 0, 0, 6);
-
-                    if (!string.IsNullOrEmpty(n.DateText))
-                    {
-                        var d = new TextBlock();
-                        d.Text = n.DateText.ToUpperInvariant();
-                        d.FontSize = 9.5; d.FontWeight = FontWeights.SemiBold;
-                        d.Foreground = Res("Accent");
-                        d.VerticalAlignment = VerticalAlignment.Center;
-                        stamp.Children.Add(d);
-                    }
-
-                    // Only a dev feed ever carries one of these, and inside a
-                    // dev feed only the notes main has not had yet.
-                    if (n.IsDev)
-                    {
-                        var ct = new TextBlock();
-                        ct.Text = "DEV";
-                        ct.FontSize = 8.5; ct.FontWeight = FontWeights.Bold;
-                        ct.Foreground = Res("Warn");
-
-                        var chip = new Border();
-                        chip.BorderBrush = Res("Warn");
-                        chip.BorderThickness = new Thickness(1);
-                        chip.CornerRadius = new CornerRadius(3);
-                        chip.Padding = new Thickness(5, 1, 5, 1);
-                        chip.Margin = new Thickness(string.IsNullOrEmpty(n.DateText) ? 0 : 8, 0, 0, 0);
-                        chip.VerticalAlignment = VerticalAlignment.Center;
-                        chip.Child = ct;
-                        stamp.Children.Add(chip);
-                    }
-
-                    sp.Children.Add(stamp);
-                }
-
-                var t = new TextBlock();
-                t.Text = n.title; t.FontSize = 15; t.FontWeight = FontWeights.SemiBold;
-                t.Foreground = Res("Ink"); t.TextWrapping = TextWrapping.Wrap;
-                sp.Children.Add(t);
-
-                if (!string.IsNullOrEmpty(n.body))
-                {
-                    var bd = new TextBlock();
-                    bd.Text = n.body; bd.FontSize = 12.5; bd.Foreground = Res("Muted");
-                    bd.TextWrapping = TextWrapping.Wrap; bd.LineHeight = 20;
-                    bd.Margin = new Thickness(0, 7, 0, 0);
-                    sp.Children.Add(bd);
-                }
-
-                if (n.details != null && n.details.Length > 0)
-                {
-                    var box = new StackPanel();
-                    box.Margin = new Thickness(0, 12, 0, 0);
-                    for (int i = 0; i < n.details.Length; i++)
-                    {
-                        string line = n.details[i];
-                        if (string.IsNullOrEmpty(line)) continue;
-
-                        var row = new StackPanel();
-                        row.Orientation = Orientation.Horizontal;
-                        row.Margin = new Thickness(0, 0, 0, 4);
-
-                        var dot = new TextBlock();
-                        dot.Text = "\u2022";
-                        dot.FontSize = 12;
-                        dot.Foreground = Res("Accent");
-                        dot.Margin = new Thickness(0, 0, 8, 0);
-                        row.Children.Add(dot);
-
-                        var dt = new TextBlock();
-                        dt.Text = line;
-                        dt.FontSize = 11.5;
-                        dt.Foreground = Res("Faint");
-                        dt.TextWrapping = TextWrapping.Wrap;
-                        dt.MaxWidth = 520;
-                        row.Children.Add(dt);
-
-                        box.Children.Add(row);
-                    }
-                    if (box.Children.Count > 0) sp.Children.Add(box);
-                }
-
-                if (n.files != null && n.files.Length > 0)
-                {
-                    var toggle = new Button();
-                    toggle.Style = (Style)win.Resources["Ghost"];
-                    toggle.Content = "Show the " + n.files.Length + " file" + (n.files.Length == 1 ? "" : "s");
-                    toggle.HorizontalAlignment = HorizontalAlignment.Left;
-                    toggle.Margin = new Thickness(0, 12, 0, 0);
-
-                    var filesBox = new StackPanel();
-                    filesBox.Visibility = Visibility.Collapsed;
-                    filesBox.Margin = new Thickness(0, 10, 0, 0);
-                    for (int i = 0; i < n.files.Length; i++)
-                    {
-                        var ft = new TextBlock();
-                        ft.Text = n.files[i];
-                        ft.FontSize = 10.5;
-                        ft.FontFamily = new FontFamily("Cascadia Mono, Consolas");
-                        ft.Foreground = Res(n.files[i].StartsWith("- ") ? "Warn" : "Faint");
-                        ft.TextWrapping = TextWrapping.Wrap;
-                        ft.Margin = new Thickness(0, 0, 0, 2);
-                        filesBox.Children.Add(ft);
-                    }
-
-                    StackPanel captured = filesBox;
-                    Button capturedButton = toggle;
-                    string[] capturedFiles = n.files;
-                    toggle.Click += delegate
-                    {
-                        bool open = captured.Visibility == Visibility.Visible;
-                        captured.Visibility = open ? Visibility.Collapsed : Visibility.Visible;
-                        capturedButton.Content = (open ? "Show the " : "Hide the ") + capturedFiles.Length
-                                               + " file" + (capturedFiles.Length == 1 ? "" : "s");
-                    };
-
-                    sp.Children.Add(toggle);
-                    sp.Children.Add(filesBox);
-                }
-
-                var b = new Border();
-                b.BorderBrush = Res("Line");
-                b.BorderThickness = new Thickness(0, 0, 0, 1);
-                b.Padding = new Thickness(0, 0, 0, 20);
-                b.Margin = new Thickness(0, 0, 0, 20);
-                b.Child = sp;
-                newsList.Children.Add(b);
-            }
         }
 
         // ------------------------------------------------------------- saves and logs
@@ -5465,6 +5095,26 @@ namespace Thornswood
                 // running while their screen says otherwise.
                 if (!ClearStuckGame(true)) return;
 
+                // Skyrim's archives this folder shares with the Steam copy still
+                // hold 1.6.1170's bytes (#1217). The change time is all that is
+                // read unless it moved, so this is instant on an ordinary Play.
+                // The Steam copy is the person's to mod, and a file copied over
+                // one of its archives there changes the one here too, so this is
+                // checked on every Play, and the game never starts on another
+                // build's archives. See OwnGameShare.cs.
+                if (OwnGame.Active)
+                {
+                    string archives = null;
+                    Waiting(delegate { archives = OwnGame.CheckShared(OwnGame.Source(cfg), PresenceLog); });
+                    if (archives != null)
+                    {
+                        Log("Not launching. " + archives);
+                        DrawStatus();
+                        MessageBox.Show(archives, "Thornswood", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                }
+
                 // Checked again here, not just at startup, because the player's
                 // own mods folder and the plugin list can both change in between.
                 int blockers = 0, absent = 0;
@@ -5481,7 +5131,12 @@ namespace Thornswood
                     Log("Not launching. " + blockers + " problem" + (blockers == 1 ? "" : "s") + " with your mod list would desync everyone.");
                     RunScan();
                     DrawStatus();
-                    ShowPage(PageMods);
+                    // Diagnostics, where Scan and Fix are since #607 and which
+                    // the rail still shows. It was the Mods page until #982,
+                    // which by then had no Fix on it and no rail button back.
+                    // tests\test-refused-play-page.js holds this to the page
+                    // that has BtnFix in ui.xaml.
+                    ShowPage(PageDiag);
 
                     // Two different problems wearing the same coat. A list in
                     // the wrong order is Fix's job. Plugins whose files are not
@@ -5490,20 +5145,29 @@ namespace Thornswood
                     // what happened sends them round in circles.
                     if (absent > 0)
                     {
-                        MessageBox.Show(
+                        // The collection's page is the one place that can put
+                        // the mods back, so the box offers it rather than
+                        // naming a page the rail no longer shows (#982).
+                        bool canOpen = !string.IsNullOrEmpty(cfg.CollectionUrl);
+                        MessageBoxResult open = MessageBox.Show(
                             (absent == 1 ? "A mod the server needs is not installed." : absent + " mods the server needs are not installed.") +
                             "\n\nThe usual reason is that a different profile is active in Vortex. Open Vortex, go to " +
                             "Profiles, and press Enable under Thornswood. Close Skyrim first if it is open.\n\n" +
-                            "If you have never installed the collection, the Add-ons page has a button that opens it.\n\n" +
-                            "Pressing Fix will not help with this one. Fix repairs the plugin list, it cannot install a mod.",
-                            "Thornswood", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            "Pressing Fix will not help with this one. Fix repairs the plugin list, it cannot install a mod." +
+                            (canOpen ? "\n\nIf you have never installed the collection, press Yes to open its page and install it in Vortex." : ""),
+                            "Thornswood", canOpen ? MessageBoxButton.YesNo : MessageBoxButton.OK, MessageBoxImage.Warning);
+                        if (canOpen && open == MessageBoxResult.Yes)
+                        {
+                            try { Process.Start(new ProcessStartInfo(cfg.CollectionUrl) { UseShellExecute = true }); }
+                            catch (Exception ex) { Log("Could not open the collection: " + ex.Message); }
+                        }
                     }
                     else
                     {
                         MessageBox.Show(
                             "Your mod list does not match the one this build shipped with.\n\n" +
                             "Joining like this desyncs the whole server, so the launcher will not start the game until it is sorted.\n\n" +
-                            "Press Fix on the Mods page, then try again.",
+                            "Press Fix on the Diagnostics page, which is open behind this box, then try again.",
                             "Thornswood", MessageBoxButton.OK, MessageBoxImage.Warning);
                     }
                     return;
@@ -5534,6 +5198,10 @@ namespace Thornswood
 
                 int held = Enforce.Apply();
                 if (held > 0) Log("Put back " + held + " setting" + (held == 1 ? "" : "s") + " the last session overwrote.");
+                // A full crash snapshot on the dev build and staff PCs only
+                // (#1191). Before the Said lines, which its writes add to.
+                string snapshot = CrashDump.Apply(cfg);
+                if (snapshot != null) Log(snapshot);
                 foreach (string note in Enforce.Said) Log(note);
 
                 // Written fresh every launch so the address and port the client
@@ -5590,8 +5258,8 @@ namespace Thornswood
                 // appropriate address library" when it is wrong, even though
                 // the file is sitting right there.
                 //
-                // No --exePath any more. That existed because Skyrim Together's
-                // own client looked Skyrim up through Steam's registry key and
+                // No --exePath any more. That existed because the old
+                // multiplayer mod's own client looked Skyrim up through Steam's registry key and
                 // would start the wrong copy. skse64_loader starts the exe
                 // beside it, so the build it is sitting in is the one that runs.
                 var psi = new ProcessStartInfo(Paths.Loader);
@@ -5762,231 +5430,6 @@ namespace Thornswood
             });
         }
 
-        // ------------------------------------------------------------- characters
-        //
-        // Until 20 September this was the character picker: NameOf, SlotName,
-        // StartAs(slot, fresh), ForgetChar, DescribeChar, RefreshRoster and
-        // BuildChars drew two slot cards under Play, each with its own Play or
-        // Make a character button and a Delete. The person picks at the game's
-        // own main menu now, from a list Chars.Prepare writes into
-        // Data\Platform, and the plugin writes the answer to a file the two
-        // second tick reads. Nothing here draws a character any more.
-
-        // A Discord check is out and the game starts on its answer. Only
-        // btnPlay was ever switched off while it was, and the slot cards sat
-        // on their own bar: two presses on a slot's Play sent two checks, both
-        // came back allowed, and the second start found the first Skyrim
-        // already up, closed it as a stuck one, and started again. The cards
-        // are gone; the flag stays, because a press that lands while the site
-        // is still thinking is the same race.
-        static bool doorCheckOut = false;
-
-        /// <summary>
-        /// Play, from the button. Door.Check first, exactly as StartAs did,
-        /// then Chars.Prepare, then a check in with the site for every id this
-        /// install could pick, then Play().
-        /// </summary>
-        static void StartPlay()
-        {
-            // Before anything else, including Discord: a shared Skyrim is not
-            // an install this supports any more. OwnGameRequired says why and
-            // offers the folder when it can be made. See ShellOwnGame.cs.
-            if (!OwnGameRequired()) return;
-
-            // Discord decides who gets in, and it is asked here rather than
-            // inside Play() because Play() is also the path a game already
-            // running comes back through. Asked off the UI thread: the site can
-            // take up to fifteen seconds to answer on a bad connection and a
-            // frozen launcher looks like a crash.
-            if (!Door.RecentlyCleared)
-            {
-                if (doorCheckOut) { Log("Still asking Discord. One moment."); return; }
-                doorCheckOut = true;
-                btnPlay.IsEnabled = false;
-                Door.Check(win, Log,
-                    delegate (Standing st)
-                    {
-                        // Whatever it said, do not hold on to it. A refusal for
-                        // a missing role is the one answer most likely to be
-                        // wrong thirty seconds later, because somebody is
-                        // usually giving them the role while they read it.
-                        Door.Forget();
-                        Door.Explain(win, st, delegate { ShowPage(PagePlay); });
-                    },
-                    // Cleared before the start, because this goes straight back
-                    // into StartPlay and the whole launch runs inside that call.
-                    // Door holds the yes for a few minutes, so the second pass
-                    // takes the path below rather than sending another check.
-                    delegate { doorCheckOut = false; StartPlay(); },
-                    delegate
-                    {
-                        doorCheckOut = false;
-                        btnPlay.IsEnabled = true;
-                        RefreshDiscord();
-                        DrawStatus();
-                        DrawServerPick();
-                    });
-                return;
-            }
-
-            // A Skyrim somebody started by hand after the launcher opened is
-            // not 'playing' to this window, and Prepare below rewrites the
-            // client settings, which SkyrimPlatform answers with a reload of
-            // every plugin in the running game. So a running game goes the
-            // way a running game always went, through Play() and its own
-            // checks, and nothing under Data is touched first.
-            if (Checks.GameRunning()) { Play(); return; }
-
-            // The save folder, the client settings, the menu's character list
-            // and voice. Off the window's thread under the wait cursor, because
-            // it asks the server for the roster on the way and that is up to
-            // two and a half seconds of nothing drawing otherwise. A throw
-            // here is the settings file or the list refusing to be written,
-            // and the game is not started on either.
-            string saveNote = null;
-            try
-            {
-                Waiting(delegate { saveNote = Chars.Prepare(cfg); });
-            }
-            catch (Exception ex) { Log(ex.Message); return; }
-            if (saveNote != null) Log(saveNote);
-
-            // The Discord check above went out carrying the id the settings
-            // file held, which is one of several now. Check in again for every
-            // id this install could pick at the menu, characters and spare,
-            // so the site's allowed list carries them all before anybody logs
-            // in: the site keeps the ids against the account and the game
-            // server's door reads that list. In the background, and a failure
-            // is a line in the log and nothing more; the game still starts.
-            List<int> ids = Chars.KnownIds();
-            ThreadPool.QueueUserWorkItem(delegate
-            {
-                // Stop at the first id the site could not be reached for.
-                // It is reachable for all of them or for none, so carrying on
-                // only repeats one sentence once per character.
-                foreach (int id in ids) { if (!CheckIn(id)) break; }
-            });
-
-            chosenId = 0;
-            Log("Starting. You pick your character at the game's main menu.");
-            Play();
-        }
-
-        /// <summary>
-        /// One check in with the site for one id, from a pool thread. What
-        /// went wrong goes to the log; nothing here stops anything.
-        ///
-        /// False means the site could not be reached at all, which is true of
-        /// every id or none of them, so a caller working through a list stops
-        /// rather than saying the same thing once per character.
-        /// </summary>
-        static bool CheckIn(int id)
-        {
-            try
-            {
-                Standing st = Discord.Join(id);
-                // PresenceLog and not Log, and the difference is the whole bug.
-                //
-                // This runs on a pool thread. Log writes txtStatus.Text
-                // straight, which is a WPF object, so off the window's thread
-                // it throws "The calling thread cannot access this object
-                // because a different thread owns it". PresenceLog is the same
-                // line put through win.Dispatcher, which is why the other two
-                // calls below use it.
-                //
-                // WHAT A PLAYTESTER SAW, 21 September: the throw landed in the
-                // catch below, and the catch reports with PresenceLog, which
-                // works. So the status bar read "Could not check profile
-                // 1893288986 in with thornswood.net: The calling thread cannot
-                // access this object because a different thread owns it" on a
-                // check in that had SUCCEEDED. st.Ok was true and the site had
-                // said yes. The launcher was telling somebody it had failed to
-                // do the thing it had just done.
-                if (st.Ok)
-                {
-                    PresenceLog("checked character " + id + " in with thornswood.net");
-                    try
-                    {
-                        win.Dispatcher.BeginInvoke(new Action(delegate
-                        {
-                            try { LoadDiscordAvatar(); }
-                            catch (Exception ex) { Swallow.Note("Shell.CheckIn", ex); }
-                        }));
-                    }
-                    catch (Exception ex) { Swallow.Note("Shell.CheckIn", ex); }
-                    return true;
-                }
-
-                // The site not answering is not the site saying no, and it
-                // used to be reported as though it were.
-                //
-                // Discord.Join returns why "offline" when PostJson gets
-                // nothing back at all. Run through the prefix below that came
-                // out as "Could not check profile 1893288986 in with
-                // thornswood.net: Could not reach thornswood.net to check you
-                // in.", which names the site twice, reads like a refusal, and
-                // was read as one by a tester on 21 September. It is neither:
-                // checking in is done off the window's thread precisely so a
-                // site that is down changes nothing, and the game starts
-                // either way. Say that, once, and let the caller stop.
-                if (st.Why == "offline")
-                {
-                    PresenceLog("thornswood.net is not answering, so your characters were not " +
-                                "checked in. The game still starts.");
-                    return false;
-                }
-
-                string why = st.Message != null && st.Message.Length > 0 ? st.Message : st.Why;
-                PresenceLog("Could not check profile " + id + " in with thornswood.net: " + why);
-            }
-            catch (Exception ex)
-            {
-                PresenceLog("Could not check profile " + id + " in with thornswood.net: " + ex.Message);
-            }
-            return true;
-        }
-
-        /// <summary>
-        /// Who the person picked at the game's menu, while the game runs.
-        ///
-        /// The plugin writes Data\Platform\thornswood-choice.txt when they
-        /// pick, and the two second tick reads it. Each new id is written down
-        /// (Chars.Chose), voice and the site are told, and the id is kept for
-        /// the play time count at close. The settings file is never touched
-        /// here: a write to it hot reloads every plugin under the running game.
-        /// </summary>
-        static readonly HashSet<int> forgotten = new HashSet<int>();
-
-        static void PollChoice()
-        {
-            // The delete icon at the menu. Each id once, whatever the file says
-            // on later ticks; the file itself goes at the next Prepare.
-            List<int> gone = null;
-            try { gone = Chars.ReadForgets(); } catch { gone = null; }
-            if (gone != null)
-            {
-                foreach (int g in gone)
-                {
-                    if (!forgotten.Add(g)) continue;
-                    try { Chars.Forget(g); Log("forgot character " + g + " at the menu"); }
-                    catch (Exception ex) { Log("Could not forget character " + g + ": " + ex.Message); }
-                }
-            }
-
-            int id = 0;
-            try { id = Chars.ReadChoice(); } catch { id = 0; }
-            if (id <= 0 || id == chosenId) return;
-            chosenId = id;
-            try { Chars.Chose(id); }
-            catch (Exception ex) { Log("Could not write that choice down: " + ex.Message); }
-            Log("chose character " + id);
-            ThreadPool.QueueUserWorkItem(delegate
-            {
-                try { Voice.Reconfigure(id); } catch (Exception ex) { Swallow.Note("Shell.PollChoice", ex); }
-                CheckIn(id);
-            });
-        }
-
         // The address, port and password sit behind one toggle. Hidden is the
         // resting state because these boxes are the only place the address is
         // still written down, and a launcher is a thing people screen share.
@@ -6034,6 +5477,8 @@ namespace Thornswood
             if (ClientRuntime.Recorded().Count == 0) return;
             if (ClientRuntime.Good()) return;
             healing = true;
+            // One download, the client runtime, shown on the Play button (#1145).
+            PlayProgress.Begin("Updating", 1);
             ThreadPool.QueueUserWorkItem(delegate
             {
                 int n = 0;
@@ -6056,363 +5501,12 @@ namespace Thornswood
                 finally
                 {
                     healing = false;
+                    PlayProgress.End();
                     if (n > 0) win.Dispatcher.BeginInvoke(new Action(delegate { DrawStatus(); }));
                 }
             });
         }
 
-        static void CheckUpdatesBackground(bool loud)
-        {
-            try
-            {
-                VersionDoc v = Updater.Check(cfg);
-                if (v == null) { win.Dispatcher.BeginInvoke(new Action(delegate { CheckFailed("the update source had nothing to say"); })); return; }
-                win.Dispatcher.BeginInvoke(new Action(delegate { OnVersionDoc(v, loud); }));
-            }
-            catch (Exception ex)
-            {
-                string why = ex.Message;
-                win.Dispatcher.BeginInvoke(new Action(delegate { CheckFailed(why); }));
-            }
-        }
-
-        /// <summary>
-        /// The source did not answer, so it is not known whether this build is
-        /// current, and Play stays shut with the reason on the button. One
-        /// retry is queued at a time, thirty seconds out.
-        /// </summary>
-        static void CheckFailed(string why)
-        {
-            checkFailed = true;
-            updatePending = true;
-            updateAnswered = true;
-            Log("Could not check for updates: " + why + ". Play stays shut until the update source answers; trying again in 30 seconds.");
-            DrawStatus();
-            if (retryQueued) return;
-            retryQueued = true;
-            ThreadPool.QueueUserWorkItem(delegate
-            {
-                Thread.Sleep(30000);
-                retryQueued = false;
-                CheckUpdatesBackground(false);
-            });
-        }
-
-        /// <summary>
-        /// Let Play through when nothing is able to say whether it should.
-        /// Never called on a check that answered; only when there was no
-        /// answer to be had.
-        /// </summary>
-        static void Unblock(string why)
-        {
-            if (updateAnswered) return;
-            updateAnswered = true;
-            updatePending = false;
-            Log("Playing on launcher " + Updater.Version + ", " + why + ".");
-            DrawStatus();
-        }
-
-        /// <summary>
-        /// The feed's message in the bar above Play, and the hold on Play when
-        /// the feed asks for one. Entry 262: until this the message was one
-        /// Log line that scrolled away, so there was no way to say anything to
-        /// everybody when something outside the build broke.
-        ///
-        /// Only ever called with a document that was read, which is what keeps
-        /// the hold from coming out of a failed check. Every call replaces the
-        /// last answer, so a feed that drops the message or the maintenance
-        /// flag takes the bar and the hold away with it. DrawStatus, which
-        /// every path through OnVersionDoc reaches, puts the button right.
-        /// </summary>
-        static void ShowNotice(VersionDoc v)
-        {
-            FeedNotice was = feedNotice;
-            feedNotice = FeedNotice.From(v, Updater.Version);
-            if (noticeBar != null)
-            {
-                noticeBar.Visibility = feedNotice.Title == null ? Visibility.Collapsed : Visibility.Visible;
-                noticeBar.BorderBrush = Res(feedNotice.Hold != null ? "Bad" : "Accent");
-            }
-            if (txtNoticeTitle != null) txtNoticeTitle.Text = feedNotice.Title == null ? "" : feedNotice.Title;
-            if (txtNoticeNote != null) txtNoticeNote.Text = feedNotice.Text;
-
-            // Once in the log when it changes, so a report still shows what the
-            // bar said, without a line on every check.
-            if (feedNotice.Title != null && (feedNotice.Title != was.Title || feedNotice.Text != was.Text))
-                Log(feedNotice.Title + ". " + feedNotice.Text);
-            if (was.Hold != null && feedNotice.Hold == null)
-                Log("The update feed no longer holds Play.");
-        }
-
-        static void OnVersionDoc(VersionDoc v, bool loud)
-        {
-            checkFailed = false;
-            pendingDoc = v;
-
-            // Where the answer came from, once, and again if it ever changes.
-            // A line in launcher.log naming thornswood.net is what says the
-            // checks are off the GitHub Contents API and its sixty anonymous
-            // requests an hour, and a line naming api.github.com is what says
-            // the site feed is missing and the fallback is carrying it (#445).
-            if (feedSaid != Updater.LastFeedUrl)
-            {
-                feedSaid = Updater.LastFeedUrl;
-                LogOnly("Update checks read " + feedSaid + ".");
-            }
-
-            bool install = installWhenSeen;
-            installWhenSeen = false;
-
-            bool moved = false;
-            if (!string.IsNullOrEmpty(v.serverAddress) && v.serverAddress != cfg.ServerAddress) { cfg.ServerAddress = v.serverAddress; moved = true; }
-            if (!string.IsNullOrEmpty(v.collectionUrl) && v.collectionUrl != cfg.CollectionUrl) { cfg.CollectionUrl = v.collectionUrl; moved = true; }
-            if (!string.IsNullOrEmpty(v.serverPort) && v.serverPort != cfg.ServerPort) { cfg.ServerPort = v.serverPort; moved = true; }
-            if (v.maxOnline > 0 && v.maxOnline != cfg.MaxOnline) { cfg.MaxOnline = v.maxOnline; moved = true; }
-            if (moved)
-            {
-                cfg.Save(Paths.CfgFile);
-                PaintServerBoxes();
-                Log("The server moved. The launcher already has the new address.");
-                StartPing();
-            }
-
-            // Which collection revision this release agrees with. Not a
-            // setting and never written to config.json: it is a fact about the
-            // server that belongs to the feed it came from, and a stale copy
-            // outliving its release is exactly the failure this replaced.
-            Updater.FeedCollectionRevision = v.collectionRevision;
-
-            // Quietly, and without a line in the log. Nobody set these and
-            // nobody needs telling they changed.
-            bool quiet = false;
-            if (!string.IsNullOrEmpty(v.voicePort) && v.voicePort != cfg.VoicePort)
-            {
-                cfg.VoicePort = v.voicePort; quiet = true;
-            }
-            if (!string.IsNullOrEmpty(v.updateRepo) && v.updateRepo != cfg.UpdateRepo)
-            {
-                cfg.UpdateRepo = v.updateRepo; quiet = true;
-            }
-            // Same announce-a-rename pattern as updateRepo (#649): a feed can
-            // ship the new site URL under the old one, then move.
-            if (!string.IsNullOrEmpty(v.updateFeedUrl) && v.updateFeedUrl != cfg.UpdateFeedUrl)
-            {
-                cfg.UpdateFeedUrl = v.updateFeedUrl; quiet = true;
-            }
-            // The Discord presence card's application, the site its buttons
-            // point at, and the picture on it.
-            if (!string.IsNullOrEmpty(v.discordAppId) && v.discordAppId != cfg.DiscordAppId) { cfg.DiscordAppId = v.discordAppId; quiet = true; }
-            if (!string.IsNullOrEmpty(v.siteUrl) && v.siteUrl != cfg.SiteUrl) { cfg.SiteUrl = v.siteUrl; quiet = true; }
-            // Not IsNullOrEmpty, deliberately. An empty voiceUrl in the feed is
-            // an instruction to stop using the proxy and go back to the raw
-            // port, and that is the only way back once everybody has been
-            // pointed at Caddy. Null means the feed did not mention it.
-            if (v.voiceUrl != null && v.voiceUrl != cfg.VoiceUrl) { cfg.VoiceUrl = v.voiceUrl; quiet = true; }
-            if (!string.IsNullOrEmpty(v.presenceImage) && v.presenceImage != cfg.PresenceImage) { cfg.PresenceImage = v.presenceImage; quiet = true; }
-            if (quiet)
-            {
-                cfg.Save(Paths.CfgFile);
-                if (txtUpdateSource != null) txtUpdateSource.Text = Updater.WhyDisabled(cfg);
-                DrawVoiceState();
-            }
-            ShowNotice(v);
-            BuildNews();
-
-            // The add-ons tab is drawn straight from this document, so redraw
-            // it if somebody is sitting on that tab while the check lands.
-            if (modTab == 3) BuildModList();
-
-            // Packs a launcher before 1.1.32 marked as applied on a collection
-            // install without writing a single game file. Back into the queue
-            // they go, and this time they land. See Updater.Requeue.
-            int again = Updater.Requeue();
-            if (again > 0)
-                Log(again + (again == 1 ? " earlier update" : " earlier updates") +
-                    " never reached the game folder on this install, a launcher fault fixed in " +
-                    Updater.Version + ". " + (again == 1 ? "It goes" : "They go") +
-                    " in again with this update.");
-            pendingPacks = Updater.Pending(v);
-            bool newLauncher = Updater.IsNewer(v.launcherVersion, Updater.Version)
-                               && !string.IsNullOrEmpty(v.launcherUrl);
-
-            // Before a word is said about updates. An update into a build with
-            // no mods in it cannot work, and reporting that it failed when the
-            // cause is an uninstalled collection sends somebody looking for a
-            // problem that is not there.
-            if (ModsMissing())
-            {
-                if (!newLauncher)
-                {
-                    updatePending = false;
-                    updateAnswered = true;
-                    if (Downgrade.Needed(cfg))
-                    {
-                        DrawStatus();
-                        Log("The collection is not installed yet and Skyrim is on the wrong build. The downgrade comes first; the collection card follows it. Updates wait until both are done.");
-                        return;
-                    }
-                    ShowCollectionBar();
-                    DrawStatus();
-                    Log("The collection is not installed yet. Updates wait until it is.");
-                    return;
-                }
-                // The launcher itself needs no mods to update. Holding it back
-                // with the packs left a machine whose Vortex was on another
-                // server's profile stuck on an old launcher for good, and the
-                // fix for that (this line) could never reach it. The packs
-                // still wait; the exe goes ahead.
-                pendingPacks = new List<Pack>();
-                collectionBarUp = false;
-                Log("The collection is not installed yet. The mod updates wait until it is; the launcher update goes ahead.");
-            }
-            else
-            {
-                collectionBarUp = false;
-            }
-            btnInstallNow.Content = "Install now";
-
-            if (pendingPacks.Count == 0 && !newLauncher)
-            {
-                updateBar.Visibility = Visibility.Collapsed;
-                btnInstallNow.Visibility = Visibility.Collapsed;
-                updatePending = false;
-                updateAnswered = true;
-                DrawStatus();
-                if (loud || !moved) Log("Up to date.");
-                return;
-            }
-            updatePending = true;
-            updateAnswered = true;
-            DrawStatus();
-
-            selfUpdateOffered = newLauncher;
-            var parts = new List<string>();
-            if (newLauncher) parts.Add("launcher " + v.launcherVersion);
-            if (pendingPacks.Count > 0) parts.Add(pendingPacks.Count + (pendingPacks.Count == 1 ? " mod update" : " mod updates"));
-            txtUpdateTitle.Text = "Update available";
-            string note = string.Join(", ", parts.ToArray());
-            if (pendingPacks.Count > 0 && !string.IsNullOrEmpty(pendingPacks[0].notes))
-                note += "  ·  " + pendingPacks[0].notes;
-            txtUpdateNote.Text = note;
-            updateBar.Visibility = Visibility.Visible;
-            btnInstallNow.Visibility = Visibility.Visible;
-            Log("Update available. Install it from the card above the Play button, or in Settings.");
-
-            // The game was just closed for this. With automatic updates on it
-            // goes in now, so the person is back in the world in a minute
-            // rather than looking at a card.
-            if (install && cfg.AutoUpdate)
-            {
-                Log("Installing it now.");
-                RunUpdate();
-            }
-        }
-
-        /// <summary>
-        /// The update check that runs while the game is up. It only decides
-        /// whether an update exists; the cards, the addresses and the rest of
-        /// what a version document brings wait for OnVersionDoc, after the
-        /// game is gone. First sight starts a five minute clock and says so in
-        /// the log; when it runs out the game is closed and the tick's closed
-        /// path takes it from there.
-        /// </summary>
-        static void CheckUpdatesInPlay()
-        {
-            if (checkingInPlay || !Updater.Enabled(cfg)) return;
-            checkingInPlay = true;
-            ThreadPool.QueueUserWorkItem(delegate
-            {
-                bool due = false;
-                // A check that could not be made is not a check that said no.
-                // GitHub answers 403 once the hour's requests are spent, and a
-                // thrown check landed below looking exactly like "no update",
-                // so it wiped the five minute clock every two minutes and the
-                // countdown the server was already running never ran out on
-                // this machine. True until a document actually comes back.
-                bool failed = true;
-                string what = "";
-                try
-                {
-                    VersionDoc v = Updater.Check(cfg);
-                    if (v != null)
-                    {
-                        failed = false;
-                        // Once a session, so launcher.log can show the feed's
-                        // ETag doing its job: a check that cost a few bytes and
-                        // one that downloaded the whole ninety kilobyte
-                        // document look identical from the outside (#445).
-                        if (Updater.LastNotModified && !notChangedSaid)
-                        {
-                            notChangedSaid = true;
-                            LogOnly("The update feed answered that nothing has changed, so this check cost " +
-                                    "a few bytes instead of the whole feed. This is said once a session.");
-                        }
-                        List<Pack> packs = Updater.Pending(v);
-                        bool newLauncher = Updater.IsNewer(v.launcherVersion, Updater.Version)
-                                           && !string.IsNullOrEmpty(v.launcherUrl);
-                        due = packs.Count > 0 || newLauncher;
-                        var parts = new List<string>();
-                        if (newLauncher) parts.Add("launcher " + v.launcherVersion);
-                        if (packs.Count > 0) parts.Add(packs.Count + (packs.Count == 1 ? " mod update" : " mod updates"));
-                        what = string.Join(", ", parts.ToArray());
-                    }
-                }
-                catch (Exception ex)
-                {
-                    // Once a session, in launcher.log only (#445). This catch
-                    // was empty, so a launcher that had spent the hour's sixty
-                    // anonymous GitHub requests left no line anywhere and
-                    // looked exactly like one that had checked and found
-                    // nothing: a search of launcher.log for the rate limit
-                    // wording found nothing on any machine. Every thirty
-                    // seconds would be a hundred and twenty lines an hour, so
-                    // the first one is the one that is kept, and the clock is
-                    // left alone either way by the failed flag above.
-                    if (!inPlayFailSaid)
-                    {
-                        inPlayFailSaid = true;
-                        LogOnly("The update check could not be made while the game runs, reading " +
-                                Updater.LastFeedUrl + ". It runs again in thirty seconds, and this " +
-                                "is said once a session. What came back: " + ex.Message);
-                    }
-                }
-                try
-                {
-                    win.Dispatcher.BeginInvoke(new Action(delegate
-                    {
-                        checkingInPlay = false;
-                        // Leave the clock alone when there was no answer. Only
-                        // a check that came back and found nothing clears it.
-                        if (failed) return;
-                        if (!playing || !due) { updateSeenAt = DateTime.MinValue; return; }
-                        if (updateSeenAt == DateTime.MinValue)
-                        {
-                            updateSeenAt = DateTime.Now;
-                            Log("An update went out while you were playing (" + what + "). The server is telling everybody the same. When its countdown ends, in about four and a half minutes, the game closes so the launcher can install it.");
-                            return;
-                        }
-                        // Ship tells the server five minutes right after the
-                        // pack goes out, and the pack is seen within thirty
-                        // seconds of that, so four and a half minutes from
-                        // first sight is the server's zero, give or take the
-                        // poll. Nobody is left in a world the room has moved
-                        // past: the server says out, and the game goes.
-                        if ((DateTime.Now - updateSeenAt).TotalMinutes < 4.5) return;
-                        if (!Checks.GameRunning()) return;
-                        closedForUpdate = true;
-                        Log("Closing the game for the update (" + what + ").");
-                        bool still = false;
-                        Waiting(delegate { Checks.CloseGame(); still = Checks.GameRunning(); });
-                        if (still)
-                        {
-                            closedForUpdate = false;
-                            Log("Skyrim would not close. Quit it yourself and the update goes in.");
-                        }
-                    }));
-                }
-                catch { checkingInPlay = false; }
-            });
-        }
 
         /// <summary>
         /// Whether the card above Play should be the collection card, and if
@@ -6445,13 +5539,13 @@ namespace Thornswood
 
                 // THE REVISION, NOT A NAMED FILE.
                 //
-                // This used to ask whether po3_StartOnSave.dll was present and
+                // This used to ask whether one mod's file was present and
                 // call the collection stale when it was not. That was wrong in
                 // both directions, and on 22 September it was wrong on
                 // Patrick's own machine in the quietest possible way.
                 //
-                // The file is not in the collection and never has been:
-                // Add-Characters.ps1 puts it into a build by hand. So anybody
+                // The file was not in the collection then: a script put it
+                // into a build by hand. So anybody
                 // who installed the collection correctly and never ran that
                 // script read as behind, and Patrick, who had run it, read as
                 // fine while sitting two revisions behind the collection he
@@ -6481,6 +5575,24 @@ namespace Thornswood
         }
 
         static bool collectionBarUp = false;
+
+        /// <summary>The not-confirmed note is on the bar above Play (see DrawStatus).</summary>
+        static bool collectionNoteUp = false;
+
+        /// <summary>
+        /// True when CollectionProblem found nothing wrong only because it could
+        /// not read which collection revision Vortex installed (Djinn, 2 Oct).
+        /// </summary>
+        static bool CollectionUnconfirmed()
+        {
+            if (string.IsNullOrEmpty(cfg.CollectionUrl)) return false;
+            try
+            {
+                if (CollectionProblem().Length > 0) return false;
+                return Checks.CollectionRevision(cfg) <= 0;
+            }
+            catch (Exception ex) { Swallow.Note("Shell.CollectionUnconfirmed", ex); return false; }
+        }
 
         /// <summary>
         /// Turns the bar above Play into the one thing worth doing first. Same
@@ -6530,115 +5642,17 @@ namespace Thornswood
             btnInstallNow.Visibility = Visibility.Visible;
             collectionBarUp = true;
 
-            if (Discord.Linked)
-            {
-                btnInstallNow.Content = "Open the collection";
-                btnInstallNow.IsEnabled = true;
-            }
-            else
-            {
-                // It used to read "Apply first" and be dead. That is a card
-                // telling somebody to do a thing, with the button that does the
-                // thing switched off, and the only other way to it greyed out
-                // underneath by a bug. Somebody who has been accepted and has
-                // simply not linked yet had nowhere to go from this screen.
-                //
-                // The gate has not moved: the collection still only opens once
-                // Discord is linked and the site says yes. The button is just
-                // the next step now instead of a wall.
-                btnInstallNow.Content = "Connect Discord";
-                btnInstallNow.IsEnabled = !linkingDiscord;
-                txtUpdateNote.Text = txtUpdateNote.Text +
-                    "  Connect Discord first and this opens the collection.";
-            }
+            // Open to everybody (#428). Patrick, 28 Sep: "we are in alpha so the
+            // world is open by application". Anyone can download, and the
+            // collection's link is on the public Downloads page, so holding it
+            // back here until Discord was linked kept nothing from anybody and
+            // left somebody still waiting on their application with a button
+            // that only said Connect Discord, which the site refuses until they
+            // are accepted. The application is what unlocks Play, not the mods.
+            btnInstallNow.Content = "Open the collection";
+            btnInstallNow.IsEnabled = true;
         }
 
-        static void RunUpdate()
-        {
-            if (playing) { Log("Quit the game first."); return; }
-            if (ownGameBusy) { Log("Thornswood's own Skyrim folder is still being prepared. The update can go in when that is done."); return; }
-            // An update writes into the build. A game still holding files open
-            // down there turns that into a half written install.
-            if (!ClearStuckGame(true)) return;
-            btnUpdate.IsEnabled = false;
-            btnInstallNow.IsEnabled = false;
-            btnPlay.IsEnabled = false;
-            txtUpdateTitle.Text = "Updating";
-            var doc = pendingDoc;
-            var packs = pendingPacks;
-
-            ThreadPool.QueueUserWorkItem(delegate
-            {
-                Action<string> log = delegate(string m)
-                {
-                    win.Dispatcher.BeginInvoke(new Action(delegate { Log(m); }));
-                };
-                try
-                {
-                    // A pack published with no url is unusable and always will
-                    // be: there is nothing at the other end to download. It is
-                    // not a network problem and retrying never clears it, so
-                    // stopping the whole update on it means the Play button
-                    // stays off forever, for everyone, including whoever would
-                    // have to publish the fix. Skip it, say so, and let the
-                    // packs that do have somewhere to download from go in.
-                    int dead = 0;
-                    foreach (Pack p in packs)
-                    {
-                        if (p == null) continue;
-                        if (string.IsNullOrEmpty(p.url) || p.url.Trim().Length == 0)
-                        {
-                            dead++;
-                            log("Skipping " + p.id + ": it was published without a download link, so there is nothing to fetch. It will not be offered again.");
-                            Updater.Skip(p.id);
-                            continue;
-                        }
-                        Updater.ApplyPack(cfg, p, log);
-                    }
-                    if (dead > 0)
-                        log(dead + " update" + (dead == 1 ? " was" : "s were") + " published without a download link and had to be skipped. Whatever was in " + (dead == 1 ? "it" : "them") + " comes back in the next one.");
-
-                    if (selfUpdateOffered)
-                    {
-                        log("Updating the launcher. It will restart.");
-                        Updater.SelfUpdate(cfg, doc, log);
-                        win.Dispatcher.BeginInvoke(new Action(delegate { win.Close(); }));
-                        return;
-                    }
-
-                    win.Dispatcher.BeginInvoke(new Action(delegate
-                    {
-                        updateBar.Visibility = Visibility.Collapsed;
-                        btnInstallNow.Visibility = Visibility.Collapsed;
-                        Stats.LastUpdate = DateTime.Now.ToString("d MMM HH:mm");
-                        Stats.Save();
-                        BuildStatRow();
-                        btnUpdate.IsEnabled = true;
-                        updatePending = false;
-                        DrawStatus(); BuildModList();
-                        Log("Update finished.");
-                    }));
-                }
-                catch (Exception ex)
-                {
-                    win.Dispatcher.BeginInvoke(new Action(delegate
-                    {
-                        Log("Update failed: " + ex.Message);
-                        // Everything before the pack that broke is in. Without
-                        // this the card still counts them and pressing Update
-                        // again unpacks them a second time, which rewrites each
-                        // one's file list with every path marked as one the pack
-                        // wrote over, so a later Remove leaves its own files.
-                        pendingPacks = Updater.Pending(doc);
-                        txtUpdateTitle.Text = "Update failed";
-                        btnUpdate.IsEnabled = true;
-                        btnInstallNow.IsEnabled = true;
-                        DrawStatus();
-                        Log("Play stays off until the update goes through, because the server is expecting the newer mod list.");
-                    }));
-                }
-            });
-        }
 
     }
 }

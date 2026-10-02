@@ -11,13 +11,18 @@ because forty channels with nothing in them reads as abandoned rather than
 organised. This is the same skeleton with the empty rooms left out, and it
 grows by adding to a category rather than by rebuilding.
 
-### Top, no category
+### Start Here
 
 | Channel | Who writes | What it is |
 |---|---|---|
-| `#welcome` | staff | What this is and the three steps to get in |
 | `#rules` | staff | Seven rules, short on purpose |
+| `#welcome` | staff | What this is and the three steps to get in |
 | `#start-here` | staff | Installing, joining, where the logs are |
+| `#say-hello` | anybody | The one channel somebody who is not approved yet can talk in |
+
+These four and the Applications category are all somebody sees before staff
+give them Member. The category itself is open to everybody, and the three
+read only ones stay read only.
 
 ### Information
 
@@ -45,44 +50,51 @@ its name, and passes over a `#tickets` anybody else can read.
 
 | Channel | What it is |
 |---|---|
-| `Support` (voice) | Where a ticket goes when typing is slower than talking |
-| `#bugs` | A forum, one post per problem |
 | `#suggestions` | A forum, mods and features, Nexus link included |
-| `#logs-and-crashes` | Drag the file straight in |
+| `Support` (voice) | Where a ticket goes when typing is slower than talking |
 
 Installing and connecting problems are a ticket, not a public forum. Half of
 them involve somebody's machine, their paths, or their account, and none of
 that belongs in a channel everybody reads.
 
+`#bugs` and `#logs-and-crashes` were here and are gone. The builder still
+names both so that a prune never deletes a channel of either name, and never
+makes them again (`make=False`). A bug goes in a ticket or in `#general-chat`
+until somebody decides otherwise.
+
 ### Thornswood
 
-`#general`, `#screenshots`, `#clips`, `#bot-commands`.
+`#general-chat`, `#media`, `#welcome-travelers`, `#game-rules`,
+`#server-progression-and-economy`.
 
-One general. A second one only ever splits the same conversation in half.
+One general. A second one only ever splits the same conversation in half. It
+was `#general` until it was renamed, and the topic on it is written by hand,
+so the builder leaves the topic alone. `#welcome-travelers` is where the join
+cards go, and the server's system channel points at it.
+
+`#game-rules` sits here rather than in In Character, because that is where it
+was moved to. It carries the nine in-world rules, read out of the "In the
+World" part of `site\data\site\rules.md`, the /rules page, so the two cannot
+disagree.
 
 ### In Character
 
-`#character-introductions`, `#tales` (a forum, one story per post),
-`#graveyard`.
+`#character-introductions` (a forum, one post each), `#tales` (a forum, one
+story per post), `#lore`, `#rp-appreciation`, `#graveyard`.
 
 ### The Holds
 
-One channel per hold: `#whiterun` `#solitude` `#windhelm` `#riften` `#markarth`
+`#choose-your-hold` at the top, where the bot's buttons are, then one channel
+per hold: `#whiterun` `#solitude` `#windhelm` `#riften` `#markarth`
 `#dawnstar` `#morthal` `#falkreath` `#winterhold`.
 
 In character. What is said there is said in the hold. A hold with nowhere to
 talk is a line on a map, and it is what makes the onboarding question mean
 something.
 
-### In character, the rest
-
-`#game-rules` carries all ten in-world rules. `#lore` carries the setting.
-`#character-introductions`, `#tales` (a forum), `#rp-appreciation` and
-`#graveyard`.
-
 ### Voice
 
-**The Bannered Mare**, **The Road**, and **AFK**.
+**AFK** and **General**.
 
 Proximity voice is in the launcher, so these are for before, after, and
 whoever is not in the world. AFK is set as the server's real AFK channel, so
@@ -93,13 +105,85 @@ The support voice channel sits in Help, because that is what it is for.
 
 ### Testing
 
-`#test-these` and `#test-results`, visible to Pathfinders and staff. This is
-the Discord end of what the site already does at `thornswood.net/testthese`.
+`test-results` (a forum), `#test-tasks` and **play-testing** (voice), visible
+to Playtesters and staff and to nobody else. `#test-tasks` also lets in the
+lead gamemaster role, because that role may open a Live smoke session and the
+rest of that gate does not include it. It is on that channel's own line in the
+builder's plan, so no other channel moved.
+
+`#test-tasks` replaces `#test-these`, which was deleted in the channel cleanup.
+It is a new channel rather than that one renamed, and `#test-these` is in the
+builder's retired list so a re-run does not bring it back.
+
+It carries the living Live smoke checklist. The rows are not written in
+Discord: they are the Live slice of the acceptance criteria in the vault,
+exported to `live-smoke-discord-export.json`, which is deployed beside
+`bot.py`. Staff open a dated session and the bot posts one message per row,
+each with Pass, Fail, Skip and Fail-known on it, in a thread off the opener:
+
+    /live-smoke start    settings version and live channel, opens a session
+    /live-smoke reset    closes the session open now and opens a fresh one
+    /live-smoke refresh  reads the export again and rewrites the checklist
+    /live-smoke report   counts the marks on the session thread it is run in
+
+Those four are **Owner, Dev and Lead Gamemaster**, which is wider than Owner
+and Dev and narrower than the staff roles: a Moderator alone does not open or
+reset a session. They are matched by role name, never by id, so a renamed role
+is fixed by setting `LIVE_SMOKE_ADMIN_ROLES` in `bot.env.json` rather than by a
+deploy. Testers and staff mark their own rows. Agents do not.
+
+A mark is an edit to the Discord message it was pressed on, and it is one line
+per person: the row grows a `Marks:` block with a line for each display name,
+and marking again corrects that person's line rather than adding a second one.
+Nothing writes a mark, a name or an account id to the site, to a database, to a
+file or to the bot's log, and nothing posts a named fail anywhere outside the
+session thread. Everybody who can read the thread can read the marks in it.
+Going further than that, keeping marks anywhere off Discord, needs the Privacy
+page changed first.
+
+`/live-smoke report` is those marks read back, not a second record of them.
+Run in the session thread that is open, it counts every row the session posted
+and answers the one admin who ran it, as an ephemeral nobody else sees: the
+session name, the day the set was last changed, how many rows are marked and
+how many are not, which rows carry a Fail or a Fail-known and who gave it, and
+the rows nobody has marked at all. Pass and Skip are counted rather than named,
+because eleven names on a Pass are eleven names between a reader and the one
+Fail under it. It posts nothing in the thread, reads nothing but the messages
+Discord already holds, and names people by the display names those messages
+already carry. The standing checklist thread is refused one, because those rows
+carry no buttons and so no marks, and so is a session a reset has closed.
+
+What a session puts in the channel is the checklist rows and nothing wrapped
+around them, which is Djinn's layout call of 1 October. The opener is the
+session's name, the live channel, the Settings version and one line saying
+when the set last changed; the blocks of instructions that used to sit above
+and below the rows are gone. Ticket numbers are not posted either: testers do
+not have GitHub, so `tickets` in the export is for the staff map and the
+harness, and a row carries one only where the export sets
+`rules.discord_show_tickets` to true.
+
+Between sessions the channel carries the standing checklist: one post with the
+heading and the day the set last changed, and under it, in a thread, one
+message for each row saying the whole of what a tester does. It is worded the
+way a session words it, because a list of row names tells somebody what the set
+covers and nothing about how to run any of it. Those rows carry no buttons: a
+mark belongs to a dated session.
+
+When the Live set moves, the export changes in the vault and the copy in `bot`
+changes with it in the same pull request. Then
+`.\scripts\deploy\Install-Bot.ps1 -CodeOnly` puts it on the VPS, and
+`/live-smoke refresh` rewrites that checklist, editing the rows that are there
+and taking down any the set has dropped. A session already open keeps the rows
+it was opened with; the next `start` uses the new set.
 
 ### Staff
 
-`#staff-general`, `#dev-notes`, `#deploys`, `#reports`, and a Staff Room.
-Invisible to everybody else.
+A staff `#news` where the site watcher speaks, `dev-test-results` (a forum),
+`#staff-general` and a Staff Room. Invisible to everybody else.
+
+`#dev-notes`, `#deploys` and `#reports` were here and are gone, and like
+`#bugs` the builder keeps their names so that a prune cannot take a channel of
+that name and no run makes them again.
 
 ## Roles
 
@@ -110,16 +194,28 @@ different servers stitched together.
 | Role | Colour | What it means |
 |---|---|---|
 | Owner | gold | Runs the place. You |
+| Lead Gamemaster | deep blue | Runs the gamemasters, and opens a Live smoke session |
 | Dev | violet | Builds and deploys it |
-| Moderator | green | Moderates |
 | Gamemaster | blue | Runs things in world |
 | Loremaster | teal | Writes the world |
+| Trial Gamemaster | pale blue | A gamemaster on trial. Sees every hold, not the staff channels |
+| Moderator | green | Moderates |
 | Content Creator | rust | Makes videos about it |
+| Server Booster | pink | Boosted the server. Discord's own role, never made here |
 | Playtester | copper | Tests the builds |
 | Milk Drinker, Talos Worshiper, Thalmor Boot-Licker | | The three Patreon tiers |
 | Jarl of *hold* | bright gold | Holds that hold. Nine of them, one each |
 | Citizen of *hold* | slate | Where your character lives |
 | Member | grey | Everybody, handed out on the way in |
+| Banned | grey | What the site keys a ban off. No permissions, not hoisted |
+| Patreon, News Pings, Updates Pings | | Made by Patreon and by the bot, never here. They are in the builder's list for their place in the order and nothing else |
+
+Owner, Dev, Moderator and Gamemaster are staff as far as the channels are
+concerned: they see the staff channels and can post in the read only ones.
+Lead Gamemaster and Trial Gamemaster are not in that list, so neither opens
+`#reports`; both see every hold, and the lead gamemaster role is named on
+`#test-tasks` by that channel's own line in the plan. Loremaster sees every
+hold as well.
 
 Staff roles are job titles on purpose. Thane, Steward, Warden and Housecarl are
 all things somebody should be able to play, and a moderator wearing one makes
@@ -160,6 +256,64 @@ way in, then picks a hold.
 again, and the posts are rewritten in place. It deletes what the bot wrote last
 time rather than adding a second copy, so the rules never end up posted twice.
 
+## Putting a bot change on the VPS
+
+From a checkout of main that has just been pulled, never from a copy of the
+repository that was downloaded earlier:
+
+    git checkout main
+    git pull
+    .\scripts\deploy\Install-Bot.ps1 -CodeOnly
+
+The pull comes first because a deploy sends what the commit holds. A stale
+folder sends the bot as it was before the change and says nothing about it,
+and the same folder builds the Discord as it was before the change if
+`Setup-Discord.ps1` is run from it. That is how a live smoke went out of a
+folder in Downloads that had not been pulled for days.
+
+`-CodeOnly` stages the code beside the running bot and checks it there, then
+stops the service, renames the new files in, starts it again by its name and
+waits for it to say it is watching the server. If it does not, the old files
+go back and it is started on those. Python, the libraries, the token and the
+service itself are left alone.
+
+What goes up with it: `bot.py`, `card.py`, the channel ids, the card artwork,
+`requirements.txt`, and `live-smoke-discord-export.json`, which `bot.py` reads
+from beside itself for the live smoke. A file the bot reads and this list does
+not name is a file that is only ever on main, never on the box.
+
+The bot's log is `C:\Thornswood-Bot\data\bot.log`: in the data folder under
+the bot's folder, the one folder its account writes, rather than beside the
+code where it used to be. Every `-CodeOnly` run leaves that file on the box,
+empty if the bot has not written to it yet, so the path is always something to
+look at. `.\scripts\vps\Show-BotLog.ps1` reads whichever of the two files the
+bot is really writing, which on a box whose service program is older is still
+the one beside the code.
+
+Those paths are on the VPS, not on the machine you run the deploy from, so
+`Test-Path C:\Thornswood-Bot\data\bot.log` there answers for a folder that
+machine does not have. `Show-BotLog.ps1` and `.\scripts\vps\Get-Logs.ps1` are
+how to look at them.
+
+You do not have to check by hand at all. Once the swap has answered, every
+run asks the box itself and prints one line per file, under the heading
+"What the box has, at the folder the swap moved them to":
+
+```text
+asked of THORNSWOOD-VPS, where the bot runs from C:\Thornswood-Bot
+Test-Path C:\Thornswood-Bot\bot.py  True
+Test-Path C:\Thornswood-Bot\live-smoke-discord-export.json  True
+Test-Path C:\Thornswood-Bot\data\bot.log  True
+```
+
+A run that ends green has printed True for every file it sent and for
+`data\bot.log`. A file that is not there turns the run red and names it by
+its full path on the box, so a swap that says SWAP OK while something is
+missing from the install root cannot pass for a good deploy. If a line says
+False, that is the box talking and it is worth looking at; a False you typed
+yourself on the deploy machine is only that machine saying it has no such
+folder.
+
 ## Release notes posting themselves
 
 The build makes a webhook in `#news` and saves it to `news-webhook.txt` beside
@@ -174,6 +328,54 @@ shipped.
 password and it cannot read anything, but anybody holding it can post as
 Thornswood, so do not put it in the repository or paste it anywhere.
 
+## Being told when the bot or the VPS stops, from outside
+
+The watchdog on the VPS tells the staff channel when something there dies,
+and One watches the site from outside (issue #448). Neither can say anything
+when the whole VPS is off or cut off while One is off too. So the bot pings an
+outside uptime monitor once a minute while it is on Discord, and when the
+pings stop for five minutes the monitor emails you (issue #449). That covers
+a bot that stopped, hung or lost Discord, and a VPS that went down.
+
+The monitor is **Cronitor** (cronitor.io): its free plan needs no card, keeps
+five checks, and you sign in with GitHub. The bot only needs a web address to
+ping, so healthchecks.io (free, no card, signs in by an emailed link) works the
+same way if Cronitor ever does not suit.
+
+Once, on One:
+
+1. Go to cronitor.io, Sign up, **Sign up with GitHub**, and sign in as
+   EvilPatrick06. If it offers a trial that asks for a card, pick the free
+   plan instead; it needs none.
+2. Make a new monitor of the kind **Heartbeat**. Name it `Thornswood bot`.
+   Expected every **1 minute**, grace period **5 minutes**.
+3. Alerts: leave the default notification list, which emails the address on
+   the account. To hear it in Discord as well, add a Discord webhook to that
+   list; the monitor posts it itself, so it arrives even when the VPS is
+   down.
+4. Save, then copy the monitor's ping address (its telemetry URL, starting
+   `https://cronitor.link/p/`). It is a secret: whoever has it can keep the
+   monitor quiet. Do not paste it anywhere but the prompt below.
+5. From the repository folder, once the pull request that added this is
+   merged and pulled:
+
+   ```
+   .\scripts\deploy\Install-Bot.ps1 -CodeOnly
+   .\scripts\deploy\Install-Bot.ps1 -SetPing
+   ```
+
+   The first puts the bot code that pings on the VPS. The second asks for the
+   address hidden, puts it in `C:\Thornswood-Bot\bot.env.json` as `PING_URL`
+   over ssh's standard input, restarts the bot by name, and prints the bot's
+   first line about it: `reached the outside monitor` is right. The
+   monitor's page then shows a ping a minute.
+
+To stop it, run `-SetPing` again and type `off`, then pause or delete the
+check on the monitor, or it emails you that the bot went quiet. A full
+`Install-Bot.ps1` run keeps the address. The bot says in `bot.log` once when a
+ping fails and once when they work again, never the address; a slow or dead
+monitor never holds up anything the bot does on Discord.
+
 ## Community setup, field by field
 
 These three are on the Enable Community screen and none of them can be set by
@@ -182,8 +384,8 @@ a bot.
 | Field | Now | After the build |
 |---|---|---|
 | Rules or guidelines channel | `#rules` | leave it |
-| Community Updates Channel | `#general`, because nothing else exists yet | `#staff-general` |
-| Safety Notifications Channel | `#general` | `#staff-general` |
+| Community Updates Channel | `#general-chat`, because nothing else exists yet | `#staff-general` |
+| Safety Notifications Channel | `#general-chat` | `#staff-general` |
 
 Both of the last two carry moderation and safety notices about your own server,
 some of it about specific people, so they do not belong in a channel everybody
@@ -200,65 +402,55 @@ pastes your invite link anywhere, so it is worth more than it looks:
 ## Onboarding
 
 Server Settings, Onboarding. This is the thing that turns a wall of channels
-into a door, and it is also the tidiest way to hand out the hold roles without
-anybody asking a moderator.
+into a door. `Build-Onboarding.py` sets it with the bot, from the rows it was
+written out in (issue #427, the board's "Discord onboarding, field by field"),
+so the words live in one file and every role and channel is looked up by name
+on the server when it runs:
 
-Discord will not let you finish until you have **at least 7 default channels
-and at least 5 of them let everybody post**. That trips most people up, because
-a server full of announcement channels fails the check.
+    .\scripts\deploy\Set-DiscordOnboarding.ps1 -Check    says what it would set, changes nothing
+    .\scripts\deploy\Set-DiscordOnboarding.ps1 -Off      writes it, leaves it off for Preview
+    .\scripts\deploy\Set-DiscordOnboarding.ps1           writes it and switches it on
 
-### Default channels
+Run `-Check` first, every time. It names every channel Discord would refuse
+and why, and sends nothing while anything fails. The bot needs Manage Server
+and Manage Roles for the write: tick Administrator on its role for the run and
+untick it after.
 
-The ones everybody lands in:
+Discord will not switch onboarding on until it has **at least 7 default
+channels and at least 5 of them that everybody can post in**, and it only
+takes channels everybody can see. Read only channels do not count toward the
+five.
 
-`#welcome` `#rules` `#start-here` `#general` `#screenshots`
-`#character-introductions` `#clips` `#logs-and-crashes` `#tickets-and-applications`
+What it sets:
 
-Nine, six of which anybody can post in, so it passes with room to spare.
+- **Default channels**: `#welcome` `#rules` `#start-here` `#news`, read only,
+  and `#general` `#media` `#character-introductions` `#tales`
+  `#rp-appreciation`, where people talk. Nine, five writable, which is exactly
+  the minimum.
+- **What are you here for?** Pick several, optional, channels only: Roleplay
+  shows `#tales`, Just playing `#general`, I want to help test
+  `#tickets-and-applications` (testing starts with an application), I make
+  videos `#media`.
 
-### Question one: where your character is from
+`Build-Onboarding.py` still names `general` and `test-these`, which the server
+no longer has: they are `#general-chat` and `#test-tasks` now. It looks every
+channel up by name on the server, so `-Check` names both and sends nothing
+until the script is caught up. That is its own change and its own issue on the
+board.
+- **Which hold does your character call home?** Only with `-GrantMember`. Pick
+  one, members must answer. Each hold gives Member and its own Citizen role,
+  which opens that hold's channel; Not decided yet gives Member only. Off by
+  default, because Member is what staff give once an application is accepted
+  (the gate in `Build-Discord.py`), and a hold is picked in `#choose-your-hold`
+  after that.
+- **Rules and age.** `-Rules` and `-Age` each add one required question, off
+  by default until it is decided that they belong here (entry 181).
 
-Set it to **pick one**, and mark it as a question everybody answers.
+It never hands out anything but Member and the Citizen roles, and refuses one
+that carries a power such as Administrator or Manage Roles. The role that opens
+the game is given by a person when an application is accepted. The Server
+Guide (the welcome sign, the to do list and the resource pages) has no bot
+side, so it stays a by hand step.
 
-> **Which hold does your character call home?**
-> You can change this later, and it does not stop you going anywhere.
-
-Nine options, each granting the matching `Citizen of` role:
-
-| Option | Grants | Worth saying |
-|---|---|---|
-| Whiterun | Citizen of Whiterun | The middle of everything |
-| Solitude | Citizen of Solitude | Court, trade, and the embassy |
-| Windhelm | Citizen of Windhelm | The High King's seat |
-| Riften | Citizen of Riften | Ask no questions |
-| Markarth | Citizen of Markarth | Stone, silver and old grudges |
-| Dawnstar | Citizen of Dawnstar | Cold, and the ships come in |
-| Morthal | Citizen of Morthal | Quiet. Too quiet |
-| Falkreath | Citizen of Falkreath | More graves than people |
-| Winterhold | Winterhold | What is left of it |
-
-Nobody has to be from anywhere yet, so an "I have not decided" option granting
-nothing is worth adding as a tenth.
-
-### Question two: what you are here for
-
-Set it to **pick as many as you like**, and optional.
-
-> **What are you here for?**
-
-| Option | Shows them |
-|---|---|
-| Roleplay | `#character-introductions`, `#tales` |
-| Just playing | `#general`, your hold's channel |
-| I want to help test | `#bugs`, `#tickets-and-applications` |
-| I make videos | `#clips`, `#screenshots` |
-
-None of these grant a role. Playtester, Loremaster and Content Creator are
-given out by a person, because each one is somebody being trusted with
-something rather than somebody clicking a button.
-
-### What onboarding cannot do
-
-It cannot hand out `Member`. That is the default role setting in Server
-Settings, Roles, and it has to be on or somebody who answered the questions
-still cannot get into the game.
+Then walk it: Server Settings, Onboarding, **Preview** at the top right, and
+check every answer gives the role you meant.

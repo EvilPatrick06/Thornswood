@@ -32,13 +32,13 @@
 //
 // Read only.
 'use strict';
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const CR = String.fromCharCode(13);
 
-const FRONT = process.env.FRONT || path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-front.js');
-const SELECT = process.env.SELECT || path.join(TOOLS_DIR, '..', 'game', 'ui', 'thornswood-select.js');
+const FRONT = process.env.FRONT || path.join(REPO_DIR, 'game', 'plugins', 'thornswood-front.js');
+const SELECT = process.env.SELECT || path.join(REPO_DIR, 'game', 'ui', 'thornswood-select.js');
 const front = fs.readFileSync(FRONT, 'utf8').split(CR).join('');
 const page = fs.readFileSync(SELECT, 'utf8').split(CR).join('');
 
@@ -56,17 +56,25 @@ function between(src, start, end) {
   return b < 0 ? null : src.slice(a, b);
 }
 
-// ======================================================== #609  one zoomed painting ==
+// ============================================ #609  the painting as it is ==
 
-// Patrick: three versions of the backdrop (lighter still, darker still, then
-// the loop that zooms). The page now starts on the zoomed loop alone.
-yes('the painting starts already zoomed, no wide-then-zoom',
-    page.indexOf('animation:tsPaintDrift') >= 0 &&
-    page.indexOf('@keyframes tsPaintDrift{from{transform:scale(1.08)') >= 0);
-yes('the loop is the first painting when it is present, still only on failure',
-    /if \(LIST\.video\) \{/.test(page) &&
-    page.indexOf('} else if (LIST.still) {') >= 0 &&
-    page.indexOf("vid.playbackRate = 1.2") >= 0);
+// Djinn, 1 October: the backdrop is shown at its own size, centred, at its
+// own speed, with the still under it while Skyrim and the mods load. No zoom
+// or drift (it cropped and rescaled the art and moved the ledge out from
+// under the sealed scroll) and no playbackRate.
+yes('the painting is not zoomed, drifted or re-cropped',
+    page.indexOf('tsPaintDrift') < 0 &&
+    !/\.bg video\{[^']*(transform|animation|object-position)/.test(page));
+yes('the loop plays at its own speed',
+    page.indexOf('playbackRate') < 0);
+yes('the still goes behind the loop at once, so it shows while the game loads',
+    page.indexOf("if (LIST.still) { try { elBg.style.backgroundImage") >= 0 &&
+    page.indexOf("if (LIST.still) { try { elBg.style.backgroundImage") < page.indexOf('if (LIST.video) {'));
+
+// The open scroll is smaller than the painted title and sits under it.
+yes('the open scroll is 34% of the stage, centred under the title',
+    page.indexOf("'#ts-select .intro .open{position:absolute;left:50%;top:62%;width:34%;") >= 0 &&
+    page.indexOf('100%{opacity:1;left:50%;top:62%;') >= 0);
 
 // ================================================ #619  the scroll glows ==
 
@@ -158,8 +166,10 @@ yes('the front hears Continue and remembers it for its own repeats',
 
 yes('with the scroll on the page tells the client to wait',
     /if \(LIST\.intro !== false && beats % 5 === 0\) \{\s*try \{ window\.skyrimPlatform\.sendMessage\('thornswood', 'stay'\); \}/.test(page));
-yes('every ten seconds, on a two second beat, until a character is picked',
-    /\}, 2000\);/.test(page) && /if \(sent \|\| root\.className === 'gone'\) \{ clearInterval\(beat\); return; \}/.test(page));
+// Until the pick is taken rather than made (#481): somebody waiting in line
+// at the menu sits on the page, and its beat is what keeps it from reloading.
+yes('every ten seconds, on a two second beat, until the pick is taken',
+    /\}, 2000\);/.test(page) && /if \(acked \|\| root\.className === 'gone'\) \{ clearInterval\(beat\); return; \}/.test(page));
 yes('with the scroll off it says nothing, so the three minutes work as before',
     page.indexOf('LIST.intro !== false && beats % 5 === 0') >= 0);
 yes('the front says the same two words from its own tick, so the wait outlives the page',

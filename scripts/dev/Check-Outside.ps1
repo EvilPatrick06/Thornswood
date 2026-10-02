@@ -17,8 +17,12 @@
   What it asks, all of it anonymously, the way a launcher on somebody's
   machine asks with no token of its own:
 
-    the feed      version.json, read from the releases repository the way
-                  Updater.Check reads it. It has to answer and be JSON.
+    the feed      version.json, read from https://thornswood.net/feed/version.json
+                  (feed-dev with -Branch dev), the one address on the site this
+                  asks, because it is what every launcher reads. It has to
+                  answer and be JSON. Until #907 it was read from
+                  Thornswood-Releases through the GitHub contents API; -Repo
+                  still reads a repository that way.
     every url     every pack, the launcher and the client runtime: https, a
                   host the launcher's AllowedHosts accepts (read out of
                   Updater.cs, so the list here cannot go stale), a checksum,
@@ -34,9 +38,11 @@
                   written down in steam-build.json. It comes from
                   api.steamcmd.net, a third party and not Valve, so when that
                   does not answer it is "unchecked", not a fault here.
-    Nexus         the collection page. Nexus turns away a request that is not
-                  a browser and carries no key, so a 403 says nothing and is
-                  "unchecked". A 404 means the collection is gone.
+    Nexus         the collection, through the same anonymous GraphQL POST
+                  Watch-Outside uses (api.nexusmods.com/v2/graphql). Name and
+                  revision when it answers; red when Nexus says there is no
+                  such collection; "unchecked" only when Nexus does not answer
+                  at all. A plain page request still gets 403 and is not used.
 
   What it cannot ask: whether the three depot manifests Downgrade.cs pins at
   1.6.1170 can still be downloaded. Steam hands a depot only to an account
@@ -50,7 +56,9 @@
   packs point at EvilPatrick06/Thornswood, which answers a stranger with 404,
   so a launcher that has to replay them cannot. The other 63, the launcher
   and the client runtime were all there and downloaded; Steam matched the
-  record; Nexus answered 403. It stays red until those packs move to the
+  record; Nexus's collection page answered 403. From 2 October the collection
+  is asked through Nexus's public GraphQL instead (#1064), the same way
+  Watch-Outside asks it. It stays red until those packs move to the
   public repository or leave the feed.
 
   Read only. It sends no token and reads no config.json, and it never
@@ -64,8 +72,9 @@
 #>
 [CmdletBinding()]
 param(
-  # owner/name of the releases repository. Read from launcher\app\Config.cs when
-  # not given, which is where every installed launcher gets it.
+  # owner/name of a releases repository to read the feed from through the
+  # GitHub contents API, as launchers did before the site feed. Left out, the
+  # feed is the site's (#907).
   [string]$Repo,
   # main is the live feed, dev the dev one.
   [string]$Branch = 'main',
@@ -107,16 +116,22 @@ function Few($names, [int]$n = 10) {
 # reason Check-Site gives: a 404 or a 302 is an answer here, not an error, and
 # it has to read the same in either PowerShell. No Authorization header is set
 # anywhere in this file, on purpose: the question is what a stranger gets.
-function Probe([string]$url, [string]$accept = '', [switch]$Body, [switch]$FirstByte) {
+function Probe([string]$url, [string]$accept = '', [switch]$Body, [switch]$FirstByte, [string]$Method = 'GET', [string]$PostBody = '') {
   $out = @{ code = 0; body = ''; location = ''; range = ''; left = ''; reset = ''; link = ''; error = '' }
   try {
     $r = [Net.HttpWebRequest]::Create($url)
-    $r.Method = 'GET'
+    $r.Method = $(if ($Method) { $Method } else { 'GET' })
     $r.AllowAutoRedirect = $false
     $r.Timeout = 30000
     $r.UserAgent = 'Thornswood Check-Outside'
     if ($accept) { $r.Accept = $accept }
     if ($FirstByte) { $r.AddRange(0, 0) }
+    if ($PostBody) {
+      $bytes = [Text.Encoding]::UTF8.GetBytes($PostBody)
+      $r.ContentType = 'application/json; charset=utf-8'
+      $r.ContentLength = $bytes.Length
+      $st = $r.GetRequestStream(); $st.Write($bytes, 0, $bytes.Length); $st.Close()
+    }
     $resp = $null
     try { $resp = $r.GetResponse() }
     catch [Net.WebException] {
@@ -152,11 +167,11 @@ function On-Server([string]$url) {
 }
 
 # Every request goes through here, so nothing reaches the server by accident.
-function Ask([string]$url, [string]$accept = '', [switch]$Body, [switch]$FirstByte) {
+function Ask([string]$url, [string]$accept = '', [switch]$Body, [switch]$FirstByte, [string]$Method = 'GET', [string]$PostBody = '') {
   if (On-Server $url) {
     return @{ code = 0; body = ''; location = ''; range = ''; left = ''; reset = ''; link = ''; error = 'not asked, that is the server' }
   }
-  $p = Probe $url $accept -Body:$Body -FirstByte:$FirstByte
+  $p = Probe $url $accept -Body:$Body -FirstByte:$FirstByte -Method $Method -PostBody $PostBody
   $gh = $false
   try { $gh = ([Uri]$url).Host -eq 'api.github.com' } catch { }
   if ($gh -and $p.left) { $script:Left = $p.left; $script:Reset = $p.reset }
@@ -225,7 +240,8 @@ function Read-AllowedHosts([string]$updaterCs) {
 # The releases repository, the collection and the server, from the launcher's
 # own config, which is the one place Set-Vps.ps1 and a rename keep them true.
 function Read-Defaults([string]$configCs) {
-  $o = @{ Repo = 'EvilPatrick06/Thornswood-Releases'; Collection = ''; SiteHost = 'thornswood.net'; ServerAddress = '' }
+  # No releases repository by default any more: Config.cs names none since #907.
+  $o = @{ Repo = ''; Collection = ''; SiteHost = 'thornswood.net'; ServerAddress = '' }
   if (-not (Test-Path -LiteralPath $configCs)) { return $o }
   $cs = [IO.File]::ReadAllText($configCs)
   $m = [regex]::Match($cs, 'UpdateRepo\s*=\s*"([^"/\s]+/[^"\s]+)"')
@@ -364,7 +380,10 @@ function Invoke-Outside {
     [string[]]$Hosts,
     [string]$SteamRecord,
     [string]$Collection,
-    [string[]]$Server
+    [string[]]$Server,
+    # The feed is on the site (#907). Asked once, directly, although the site
+    # is the server: it is the one file every launcher reads.
+    [switch]$FeedFromSite
   )
   $script:Problems = 0
   $script:Found = New-Object 'System.Collections.Generic.List[object]'
@@ -379,7 +398,7 @@ function Invoke-Outside {
   # ---- the feed
   Head 'The feed'
   $v = $null
-  $f = Ask $FeedUrl 'application/vnd.github.raw' -Body
+  $f = if ($FeedFromSite) { Probe $FeedUrl 'application/json' -Body } else { Ask $FeedUrl 'application/vnd.github.raw' -Body }
   if (Spent $f) { Bad ('version.json was not read. ' + (Allowance)) }
   elseif ($f.code -ne 200) { Bad ('version.json answers ' + (Answer $f) + ', so no launcher can read it and no pack or download can be checked.') }
   else {
@@ -500,24 +519,41 @@ function Invoke-Outside {
   Skip ('whether the three depot manifests launcher\app\Downgrade.cs pins at 1.6.1170 can still be downloaded.' +
         ' Steam hands a depot only to an account that owns the game, so that stays a check by hand.')
 
-  # ---- Nexus
+  # ---- Nexus (same anonymous GraphQL POST as Watch-Outside / #1063)
   Head 'Nexus'
   $c = $Collection
   if ($v -and $v.collectionUrl) { $c = [string]$v.collectionUrl }
   if (-not $c) { Skip 'the collection: there is no collection address in the feed or in Config.cs.' }
   elseif (On-Server $c) { Skip 'the collection: its address in the feed is on the server, which this does not contact.' }
   else {
-    $n = Ask $c 'text/html'
-    if ($n.code -ge 200 -and $n.code -lt 400) {
-      Ok ('the collection page answers ' + $n.code + '. That is weak evidence: it says the page is there, not which revision it offers or whether it installs.')
-    }
-    elseif ($n.code -eq 404 -or $n.code -eq 410) {
-      Bad ('the collection page answers ' + $n.code + ': the collection is gone or hidden, and every first install is sent there.')
+    $nx = [regex]::Match([string]$c, 'nexusmods\.com/games/([A-Za-z0-9]+)/collections/([A-Za-z0-9]+)')
+    if (-not $nx.Success) {
+      Skip ('the collection: its address is not a Nexus collection page this knows how to ask about.')
       Line $c
-    }
-    else {
-      Skip ('the collection: Nexus answered ' + (Answer $n) + '. It turns away a request that is not a browser and carries no key,' +
-            ' so this says nothing either way. Which revision it offers needs a Nexus API key, and there is none.')
+    } else {
+      $game = $nx.Groups[1].Value
+      $slug = $nx.Groups[2].Value
+      $q = '{ collection(slug: \"' + $slug + '\", domainName: \"' + $game + '\") { name latestPublishedRevision { revisionNumber } } }'
+      $gql = 'https://api.nexusmods.com/v2/graphql'
+      $n = Ask $gql 'application/json' -Body -Method 'POST' -PostBody ('{"query":"' + $q + '"}')
+      if (-not $n.code) {
+        Skip ('the collection: Nexus did not answer (' + (Answer $n) + '). Its public GraphQL is what this asks; without an answer the collection is unchecked.')
+      }
+      elseif ($n.code -ne 200) {
+        Skip ('the collection: Nexus answered ' + (Answer $n) + ' to its public GraphQL, so the collection is unchecked.')
+      }
+      else {
+        $col = $null
+        try { $col = ($n.body | ConvertFrom-Json).data.collection } catch { $col = $null }
+        if (-not $col -or -not $col.name) {
+          Bad ('Nexus says there is no collection ' + $slug + ': every first install is sent there.')
+          Line $c
+        } else {
+          $rev = ''
+          try { $rev = [string]$col.latestPublishedRevision.revisionNumber } catch { $rev = '' }
+          Ok ('the collection "' + $col.name + '" is there, revision ' + $rev + '.')
+        }
+      }
     }
   }
 
@@ -534,6 +570,13 @@ if ($MyInvocation.InvocationName -eq '.') { return }
 
 $d = Read-Defaults (Join-Path $Here '..\..\launcher\app\Config.cs')
 if (-not $Repo) { $Repo = $d.Repo }
+# The feed launchers read is the site's (#907), unless a repository or an
+# address was named.
+$fromSite = $false
+if (-not $FeedUrl -and -not $Repo) {
+  $FeedUrl = 'https://' + $d.SiteHost + $(if ($Branch -eq 'dev') { '/feed-dev' } else { '/feed' }) + '/version.json'
+  $fromSite = $true
+}
 if (-not $SteamRecord) { $SteamRecord = Join-Path $Here '..\..\records\steam-build.json' }
 $allowed = Read-AllowedHosts (Join-Path $Here '..\..\launcher\app\Updater.cs')
 
@@ -541,6 +584,6 @@ Write-Host ''
 Write-Host '  THORNSWOOD  -  what a first install needs that we do not run' -ForegroundColor White
 
 $problems = Invoke-Outside -Repo $Repo -Branch $Branch -FeedUrl $FeedUrl -Hosts $allowed -SteamRecord $SteamRecord `
-  -Collection $d.Collection -Server @($d.SiteHost, $d.ServerAddress)
+  -Collection $d.Collection -Server @($d.SiteHost, $d.ServerAddress) -FeedFromSite:$fromSite
 if ($problems -gt 0) { exit 1 }
 exit 0

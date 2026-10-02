@@ -1,0 +1,540 @@
+/* The same palette and the same faces as the public site. Two halves of one
+   thing should not look like two different products. */
+:root{
+  --ink:#0B0E0A; --panel:#14180F; --raised:#1D2318; --line:#2B3323; --line2:#3D4733;
+  --text:#E4E7DA; --dim:#96A084; --faint:#616B53;
+  --gold:#C9A24B; --gold-dim:#8A6F33;
+  --pass:#6FA05A; --fail:#C05A4E; --skip:#7C8493; --blurple:#5865F2;
+  --mono:ui-monospace,"Cascadia Mono","JetBrains Mono",Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --carve:Cinzel,Spectral,Georgia,serif;
+}
+*{box-sizing:border-box}
+/* Without this, hiding anything that sets its own display (the Discord button
+   is inline-flex) does nothing at all, which is how both halves of the sign in
+   ended up on screen at once. */
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;overflow-x:hidden}
+img{max-width:100%;height:auto}
+body{background:var(--ink);color:var(--text);font:15px/1.65 var(--sans)}
+a{color:var(--gold)}
+:focus-visible{outline:2px solid var(--gold-dim);outline-offset:2px}
+
+/* ------------------------------------------------------------- sign in -- */
+#gate{position:fixed;inset:0;display:none;place-items:center;background:var(--ink);z-index:50;
+  padding:20px}
+#gate .box{width:min(92vw,370px);text-align:center}
+#gate h1{font:600 30px/1.1 var(--carve);letter-spacing:.09em;text-transform:uppercase;
+  color:var(--gold);margin:0 0 6px}
+#gate p{color:var(--dim);margin:0 0 22px;font-size:14px}
+#gate input{width:100%;padding:11px 13px;background:var(--panel);color:var(--text);
+  border:1px solid var(--line);border-radius:7px;font:15px var(--sans)}
+#gate input:focus{outline:none;border-color:var(--gold-dim)}
+#gate button.enter{width:100%;margin-top:10px;padding:11px;background:var(--gold);color:#17190F;
+  border:0;border-radius:7px;font:600 15px var(--sans);cursor:pointer}
+#gate .err{color:var(--fail);font-size:13px;margin-top:12px;min-height:18px}
+.discord.big{width:100%;justify-content:center;padding:14px;font-size:15px}
+#gate #pwbox{margin-top:10px}
+#gate label{display:block;text-align:left;font:600 11px/1.2 var(--sans);
+  letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin:0 0 6px}
+#gate .backhome{margin-top:26px;font-size:13px}
+#gate .backhome a{color:var(--faint);text-decoration:none}
+#gate .backhome a:hover{color:var(--gold)}
+.discord{display:inline-flex;align-items:center;gap:8px;padding:9px 15px;border-radius:7px;
+  background:var(--blurple);color:#fff;text-decoration:none;font:600 14px var(--sans);
+  border:0;cursor:pointer}
+.discord.ghost{background:transparent;color:var(--dim);border:1px solid var(--line)}
+.discord.ghost:hover{color:#fff;background:var(--blurple);border-color:var(--blurple)}
+#gate .or{color:var(--faint);font-size:12px;margin:18px 0 12px;letter-spacing:.06em}
+
+/* ---------------------------------------------------------------- shell -- */
+/*
+  Five shapes to hold: a phone, a tablet, a laptop, a wide desktop, and a
+  monitor stood on its end beside another one. The last is the awkward one,
+  because it is narrow like a phone but as tall as a desk, so it wants the
+  phone's single column and the desktop's density at once. So the column
+  breaks on width alone and nothing keys off orientation.
+*/
+#shell{display:none;height:100%;grid-template-columns:238px minmax(0,1fr)}
+nav{background:var(--panel);border-right:1px solid var(--line);padding:22px 0 18px;
+  display:flex;flex-direction:column;overflow-y:auto;gap:2px}
+nav .brand{display:flex;align-items:center;gap:9px;font:600 17px/1 var(--carve);
+  color:var(--text);padding:0 20px 16px;letter-spacing:.13em;text-transform:uppercase;
+  white-space:nowrap;text-decoration:none}
+nav .brand img{border-radius:5px}
+nav a.tab{display:flex;align-items:center;gap:8px;padding:11px 20px;margin:0 10px;color:var(--dim);
+  text-decoration:none;font-size:14px;border-left:2px solid transparent;border-radius:8px;white-space:nowrap}
+nav a.tab:hover{color:var(--text);background:var(--raised)}
+nav a.tab.on{color:var(--text);border-left-color:var(--gold);background:var(--raised);font-weight:600}
+nav a.tab .key{margin-left:auto;font:600 9px var(--sans);letter-spacing:.1em;color:var(--gold-dim);
+  border:1px solid var(--gold-dim);border-radius:3px;padding:1px 4px}
+nav .group{font:600 10px var(--sans);letter-spacing:.16em;text-transform:uppercase;
+  color:var(--faint);padding:20px 20px 6px}
+nav .backout{display:block;padding:0 20px 16px;margin-top:-8px;font:400 12px var(--sans);
+  color:var(--faint);text-decoration:none}
+nav .backout:hover{color:var(--gold)}
+@media(max-width:900px){ nav .backout{display:none} }
+nav .sep{margin-top:auto;padding:14px 20px 0;border-top:1px solid var(--line);
+  display:flex;flex-direction:column;gap:9px;align-items:flex-start}
+nav .me{font-size:12px;color:var(--dim);line-height:1.4}
+nav .me b{color:var(--gold);font-weight:600}
+nav .out{font-size:12px;color:var(--faint);cursor:pointer;background:none;border:0;padding:0}
+nav .out:hover{color:var(--text)}
+
+main{overflow-y:auto;padding:34px 40px 90px;min-width:0}
+.wrap{max-width:860px;margin:0 auto}
+.wide .wrap{max-width:1280px}
+
+@media(min-width:1500px){
+  .wrap{max-width:920px}
+  .wide .wrap{max-width:1500px}
+  main{padding:44px 56px 110px}
+  nav{width:266px}
+  #shell{grid-template-columns:266px minmax(0,1fr)}
+}
+@media(min-width:2200px){
+  #shell{max-width:2100px;margin:0 auto;border-right:1px solid var(--line)}
+}
+@media(max-width:1180px){
+  #shell{grid-template-columns:200px minmax(0,1fr)}
+  main{padding:30px 26px 80px}
+}
+@media(max-width:900px){
+  html,body{height:auto}
+  main{overflow-y:visible}
+  #shell{grid-template-columns:1fr;height:auto;min-height:100%}
+  nav{border-right:0;border-bottom:1px solid var(--line);padding:12px 0 0;
+    flex-direction:row;flex-wrap:wrap;align-items:center;
+    position:sticky;top:0;z-index:20;
+    padding-top:calc(12px + env(safe-area-inset-top,0px))}
+  nav .brand{padding:0 16px 10px;font-size:19px;flex:1 0 auto}
+  nav .group{display:none}
+  nav .sep{margin:0;padding:0 16px 10px;border-top:0;order:3;flex-direction:row;
+    align-items:center;gap:12px}
+  #tabs{order:4;flex:1 0 100%;display:flex;overflow-x:auto;
+    scrollbar-width:none;-webkit-overflow-scrolling:touch;
+    border-top:1px solid var(--line)}
+  #tabs::-webkit-scrollbar{display:none}
+  nav a.tab{border-left:0;border-bottom:2px solid transparent;padding:11px 14px;margin:0;border-radius:0;flex:0 0 auto}
+  nav a.tab.on{border-left-color:transparent;border-bottom-color:var(--gold)}
+  nav a.tab .key{display:none}
+  main{padding:24px 16px 70px}
+}
+@media(max-width:560px){
+  main{padding:20px 14px 60px}
+  .wrap,.wide .wrap{max-width:100%}
+}
+
+/* ---------------------------------------------------------------- home -- */
+.hero{display:flex;align-items:center;gap:20px;margin-bottom:6px}
+.hero img{width:74px;height:74px;border-radius:16px;flex:0 0 auto}
+.hero h1{font:600 40px/1.05 Spectral,Georgia,serif;margin:0;color:var(--text);text-wrap:balance}
+.hero .sub{color:var(--dim);font-size:15px;margin-top:6px;max-width:52ch}
+@media(max-width:560px){
+  .hero{gap:14px}
+  .hero img{width:56px;height:56px;border-radius:12px}
+  .hero h1{font-size:30px}
+}
+.rule{height:1px;background:var(--line);margin:26px 0 24px}
+.cards{display:grid;gap:13px;grid-template-columns:repeat(auto-fill,minmax(244px,1fr))}
+.card{display:block;text-decoration:none;color:inherit;background:var(--panel);
+  border:1px solid var(--line);border-radius:11px;padding:17px 17px 15px;
+  transition:border-color .12s,transform .12s}
+.card:hover{border-color:var(--gold-dim);transform:translateY(-1px)}
+.card .t{font:600 17px var(--carve);letter-spacing:.02em;color:var(--text);display:flex;align-items:baseline;gap:8px;
+  flex-wrap:wrap}
+.card .t .mark{font:600 10px var(--sans);letter-spacing:.09em;text-transform:uppercase;
+  color:var(--gold);border:1px solid var(--gold-dim);border-radius:3px;padding:1px 5px}
+.card .d{color:var(--dim);font-size:13.5px;margin-top:5px;line-height:1.55}
+.card .n{margin-top:12px;font:600 12px var(--sans);letter-spacing:.05em;color:var(--faint);
+  text-transform:uppercase}
+.card.lead{background:linear-gradient(160deg,#242A1D,#1B1F17);border-color:var(--gold-dim)}
+.card.lead .t{color:var(--gold)}
+.section-label{font:600 11px var(--sans);letter-spacing:.12em;text-transform:uppercase;
+  color:var(--faint);margin:30px 0 12px}
+.latest{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--gold);
+  border-radius:9px;padding:15px 17px;margin-bottom:22px}
+.latest .when{font:600 11px var(--sans);letter-spacing:.09em;text-transform:uppercase;
+  color:var(--faint)}
+.latest .what{font:600 16px var(--sans);margin-top:3px}
+.latest a{font-size:13px}
+
+/* ------------------------------------------------- people and sessions -- */
+/*
+  One card a person, not one row a session. Closed it answers the four things
+  asked of this page at a glance: who they are, their id, how long they have
+  played in total, and when they last did. Open it is the table that used to
+  be the whole page.
+
+  details and summary rather than a button and a handler: the browser gives
+  keyboard and screen reader behaviour for free, and the open state survives a
+  redraw without anything here having to remember it.
+*/
+/*
+  Built out of what the rest of the site already uses, which the first version
+  of this was not: .entry for a panel, .btn for a button, .pill for a tag,
+  --carve for a name and the uppercase letterspaced label that .entry .when
+  established. The search boxes were left on the browser's own styling, white
+  on a dark page, which was most of what looked wrong.
+*/
+.people{display:grid;gap:11px}
+.person{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;
+  transition:border-color .12s}
+.person[open],.person:hover{border-color:var(--gold-dim)}
+.person>summary{cursor:pointer;padding:15px 19px;display:grid;gap:6px 22px;align-items:start;
+  grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) auto auto 12px;list-style:none}
+.person>summary::-webkit-details-marker{display:none}
+.person>summary::marker{content:''}
+.person>summary:focus-visible{outline:2px solid var(--gold-dim);outline-offset:-2px}
+.pf{min-width:0}
+/* The same label as .entry .when, because it is the same kind of label. */
+.pf .lab{display:block;font:600 11px var(--sans);letter-spacing:.09em;text-transform:uppercase;
+  color:var(--faint);margin-bottom:4px}
+.pf .val{display:block;font-size:14px;color:var(--text);word-break:break-word}
+.pf .val.nm{font:600 18px/1.3 var(--carve);letter-spacing:.02em}
+.pf .val.id{font:12.5px var(--mono);color:var(--dim)}
+.pf .val.hrs{font:600 15px var(--sans);color:var(--gold);white-space:nowrap}
+.pf .val.when{white-space:nowrap;color:var(--dim);font-size:13.5px}
+.person .chev{align-self:center;color:var(--faint);transition:transform .12s,color .12s;font-size:11px}
+.person[open] .chev{transform:rotate(90deg);color:var(--gold)}
+.pbody{border-top:1px solid var(--line);background:var(--ink)}
+.pbody .tablewrap{border:0;border-radius:0;background:none}
+.pbody table.board{min-width:0}
+.pbody .bar{padding:13px 19px 0;margin-bottom:0}
+.pbody .tally{padding:13px 19px 0;margin-bottom:0}
+
+/* ------------------------------------------------ one session's logs -- */
+.moreWrap{padding:11px 19px 15px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.keptBy{font:11.5px var(--mono);color:var(--faint)}
+.logs{flex:1 1 100%;display:grid;gap:7px;margin-top:4px}
+.logs .none{font-size:13.5px;color:var(--dim);padding:10px 13px;
+  border:1px dashed var(--line);border-radius:8px}
+.prov{font-size:13px;color:var(--dim);padding:10px 13px;background:var(--panel);
+  border:1px solid var(--line);border-radius:8px;line-height:1.7;word-break:break-word}
+.prov b{color:var(--faint);font-weight:600;font-size:11px;letter-spacing:.07em;
+  text-transform:uppercase;margin-right:3px}
+.prov .warn{color:var(--fail)}
+.logf{border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:hidden;
+  transition:border-color .12s}
+.logf:hover{border-color:var(--line2)}
+.logf[open]{border-color:var(--gold-dim)}
+.logf>summary{cursor:pointer;list-style:none;padding:9px 13px;display:flex;align-items:center;gap:11px}
+.logf>summary::-webkit-details-marker{display:none}
+.logf>summary::marker{content:''}
+.logf>summary:focus-visible{outline:2px solid var(--gold-dim);outline-offset:-2px}
+.logf .nm{font:600 13px var(--mono);color:var(--text);flex:1;min-width:0;word-break:break-all}
+.logf .sz{font:11.5px var(--mono);color:var(--faint);white-space:nowrap}
+.logf .chev{color:var(--faint);font-size:10px;transition:transform .12s,color .12s}
+.logf[open] .chev{transform:rotate(90deg);color:var(--gold)}
+.logf pre{margin:0;padding:12px 13px;border-top:1px solid var(--line);background:var(--ink);
+  font:12px/1.6 var(--mono);color:var(--dim);white-space:pre-wrap;word-break:break-word;
+  max-height:440px;overflow:auto}
+@media(max-width:760px){
+  .person>summary{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 12px;padding:14px 16px}
+  .pf .val.hrs,.pf .val.when{white-space:normal}
+  .moreWrap,.pbody .bar,.pbody .tally{padding-inline:16px}
+}
+
+/* ------------------------------------------------------------- toolbar -- */
+.crumb{font-size:13px;color:var(--faint);margin-bottom:10px}
+.crumb a{color:var(--dim);text-decoration:none}
+.crumb a:hover{color:var(--gold)}
+.bar{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.bar h2{font:600 30px/1.2 var(--carve);letter-spacing:.035em;margin:0;flex:1 1 200px;
+  color:var(--text);text-wrap:balance}
+@media(max-width:560px){.bar h2{font-size:24px}}
+.btn{padding:7px 13px;background:var(--raised);color:var(--text);border:1px solid var(--line);
+  border-radius:6px;font:14px var(--sans);cursor:pointer;min-height:36px}
+.btn:hover{border-color:var(--gold-dim)}
+.btn.key{background:var(--gold);color:#17190F;border-color:var(--gold);font-weight:600}
+.btn.small{min-height:0;padding:4px 9px;font-size:12.5px}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.on{border-color:var(--gold);color:var(--gold);background:rgba(201,162,75,.09)}
+
+/* Search boxes and pickers, matching .btn.
+ *
+ * There was no site-wide rule for these at all: every input outside .form and
+ * .res took the browser's own styling, which on a dark page is a white box
+ * with a system font, and that was most of what made the sessions controls
+ * look bolted on rather than built in. */
+input[type=search],input[type=text],input[type=date],select{
+  padding:7px 11px;background:var(--raised);color:var(--text);
+  border:1px solid var(--line);border-radius:6px;font:14px var(--sans);min-height:36px}
+input[type=search]:hover,input[type=text]:hover,input[type=date]:hover,select:hover{
+  border-color:var(--line2)}
+input[type=search]:focus,input[type=text]:focus,input[type=date]:focus,select:focus{
+  outline:none;border-color:var(--gold-dim)}
+input[type=search]::placeholder,input[type=text]::placeholder{color:var(--faint)}
+select{cursor:pointer;padding-right:26px}
+.bar input[type=search]{flex:1 1 220px;min-width:0}
+.said{font-size:13px;color:var(--dim)}
+.lede{color:var(--dim);font-size:14px;margin:6px 0 26px;max-width:66ch}
+.tagline{display:inline-block;font:600 10px var(--sans);letter-spacing:.1em;text-transform:uppercase;
+  color:var(--gold);border:1px solid var(--gold-dim);border-radius:3px;padding:2px 6px;
+  vertical-align:3px}
+
+/* ------------------------------------------------------------- content -- */
+.doc h1{font:600 30px/1.2 var(--carve);letter-spacing:.03em;margin:34px 0 12px;color:var(--text)}
+.doc h2{font:600 22px/1.25 var(--carve);letter-spacing:.03em;margin:34px 0 10px;
+  padding-bottom:7px;border-bottom:1px solid var(--line);color:var(--text)}
+.doc h3{font:600 17px var(--sans);margin:24px 0 8px;color:var(--gold)}
+.doc p,.doc li{color:var(--text)}
+.doc ol,.doc ul{padding-left:22px}
+.doc li{margin:4px 0}
+.doc hr{border:0;border-top:1px solid var(--line);margin:30px 0}
+.doc strong{color:#F0F4E8}
+.doc table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px;display:block;
+  overflow-x:auto}
+.doc th{text-align:left;padding:8px 11px;background:var(--raised);color:var(--gold);
+  font-weight:600;border-bottom:1px solid var(--line);white-space:nowrap}
+.doc td{padding:8px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+.doc blockquote{margin:16px 0;padding:8px 16px;border-left:3px solid var(--gold-dim);color:var(--dim)}
+.doc code,.mdc code{font:13px var(--mono);background:var(--raised);padding:2px 5px;border-radius:4px;
+  color:var(--gold)}
+.mdc p{margin:0 0 6px}
+.mdc p:last-child{margin:0}
+/* Lists inside a cell are a few short lines, not a document. Marked makes
+   them loose when the source has blank lines, which leaves a paragraph inside
+   every item and a gap you could park a cart in. */
+.mdc ol,.mdc ul{margin:6px 0;padding-left:20px}
+.mdc li{margin:2px 0}
+.mdc li p{margin:0}
+.mdc h1,.mdc h2,.mdc h3{font:600 15px var(--sans);margin:8px 0 4px;color:var(--gold)}
+/* The first column is the name of the thing, so it gets room to be a name
+   rather than one word per line. */
+table.board th:nth-child(2),table.board td:nth-child(2){min-width:168px}
+.cmd{position:relative;margin:14px 0;background:#0D100B;border:1px solid var(--line);
+  border-radius:8px;overflow:hidden}
+.cmd pre{margin:0;padding:14px 52px 14px 15px;overflow-x:auto}
+.cmd code{background:none;padding:0;color:#CFE0BE;font:13px/1.6 var(--mono)}
+.cmd .copy{position:absolute;top:8px;right:8px;padding:4px 9px;background:var(--raised);
+  border:1px solid var(--line);border-radius:5px;color:var(--dim);font:11px var(--sans);
+  cursor:pointer}
+.cmd .copy:hover{color:var(--text);border-color:var(--gold-dim)}
+.cmd .copy.done{color:var(--pass);border-color:var(--pass)}
+textarea.md{width:100%;min-height:62vh;padding:17px;background:#0D100B;color:var(--text);
+  border:1px solid var(--line);border-radius:8px;font:13px/1.7 var(--mono);resize:vertical}
+textarea.md:focus{outline:none;border-color:var(--gold-dim)}
+
+/* --------------------------------------------------------------- board -- */
+.sec{margin:26px 0 34px}
+.sechead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:9px}
+.sechead h3{font:600 19px/1.3 var(--carve);letter-spacing:.03em;margin:0;color:var(--gold);
+  padding:2px 4px;border-radius:5px;min-width:60px}
+.sechead h3[contenteditable]:focus{outline:none;background:var(--raised);color:var(--text)}
+.sechead .count{font:600 11px var(--sans);letter-spacing:.06em;color:var(--faint)}
+.sechead .acts{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+.secnote{color:var(--dim);font-size:13.5px;margin:0 0 10px;max-width:70ch}
+
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+table.board{width:100%;border-collapse:collapse;font-size:14px;min-width:420px}
+table.board th{text-align:left;padding:9px 12px;background:var(--raised);color:var(--gold);
+  font:600 12.5px var(--sans);letter-spacing:.03em;border-bottom:1px solid var(--line);
+  white-space:nowrap;position:relative}
+table.board th span.nm{display:inline-block;padding:1px 3px;border-radius:4px;min-width:30px}
+table.board th span.nm:focus{outline:none;background:var(--panel);color:var(--text)}
+table.board th .x{margin-left:6px;color:var(--faint);background:none;border:0;cursor:pointer;
+  font-size:14px;line-height:1;padding:0 2px}
+table.board th .x:hover{color:var(--fail)}
+table.board td{padding:0;border-bottom:1px solid var(--line);vertical-align:top}
+table.board tr:last-child td{border-bottom:0}
+table.board tr.done .cell{color:var(--faint);text-decoration:line-through}
+/* One session that went wrong, so it can be found in a list of forty. The
+   card stays its normal colour: a person who had one bad evening is not a red
+   person, and a red card would bury the one session worth reading.
+
+   Red is a crash or a throw, which nobody could have done anything about and
+   which the bot also says out loud. Yellow is a session that failed for a
+   reason already understood and with a known fix, an update that did not
+   install or a load order that did not match, and those say nothing in
+   Discord because there are a lot of them. */
+table.board tr.bad td{background:rgba(192,90,78,.07)}
+table.board tr.bad td:first-child{box-shadow:inset 3px 0 0 var(--fail)}
+table.board tr.bad:hover td{background:rgba(192,90,78,.12)}
+table.board tr.warn td{background:rgba(201,162,75,.06)}
+table.board tr.warn td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
+table.board tr.warn:hover td{background:rgba(201,162,75,.11)}
+.pill.warn{background:rgba(201,162,75,.18);color:var(--gold)}
+
+/* What the launcher itself was unhappy about, in more detail than its own
+   window shows. */
+.issues{margin-top:9px;border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:hidden}
+.issues .ihead{padding:8px 11px;border-bottom:1px solid var(--line);
+  font:600 11px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--faint)}
+.issues .i{padding:9px 11px;border-bottom:1px solid var(--line);display:grid;gap:3px}
+.issues .i:last-child{border-bottom:0}
+.issues .i .t{font-size:13.5px;color:var(--text)}
+.issues .i .d{font:11.5px var(--mono);color:var(--faint);word-break:break-word}
+.issues .i.blk{box-shadow:inset 3px 0 0 var(--fail)}
+.issues .i.wrn{box-shadow:inset 3px 0 0 var(--gold)}
+table.board tr:hover td{background:rgba(255,255,255,.012)}
+td.tick,th.tick{width:38px;text-align:center;padding:10px 0 0;vertical-align:top}
+td.tick input{width:16px;height:16px;accent-color:var(--pass);cursor:pointer}
+.cell{padding:9px 12px;min-height:38px;word-break:break-word;cursor:text;border-radius:5px}
+/* Markdown brings its own line breaks. Leaving pre-wrap on turns every
+   newline BETWEEN tags into a blank line, which is what a three item list
+   rendering two hundred pixels tall actually was. */
+.mdc{white-space:normal}
+.ro .cell{cursor:default}
+.cell:hover{background:rgba(201,162,75,.05)}
+.ro .cell:hover{background:none}
+.cell:empty::after{content:'\00a0'}
+td textarea{width:100%;min-height:38px;padding:8px 11px;background:#0D100B;color:var(--text);
+  border:1px solid var(--gold-dim);border-radius:5px;font:14px/1.5 var(--sans);resize:vertical;
+  display:block}
+td textarea:focus{outline:none}
+td.rowacts{width:1%;white-space:nowrap;padding:7px 9px 7px 0;text-align:right}
+td.rowacts button{background:none;border:1px solid transparent;color:var(--faint);
+  border-radius:5px;cursor:pointer;font:12px var(--sans);padding:3px 7px}
+td.rowacts button:hover{color:var(--text);border-color:var(--line2);background:var(--raised)}
+td.rowacts button.del:hover{color:var(--fail);border-color:var(--fail)}
+tr.adder td{background:rgba(255,255,255,.015)}
+tr.adder input{width:100%;padding:9px 12px;background:none;border:0;color:var(--text);
+  font:14px var(--sans)}
+tr.adder input::placeholder{color:var(--faint)}
+tr.adder input:focus{outline:none;background:#0D100B}
+tr.adder .plus{color:var(--faint);font-size:16px;line-height:38px}
+
+/* Phone and narrow: the table becomes stacked cards, because nine columns of
+   Skyrim bug notes on a 380 pixel screen is a horizontal scroll nobody uses. */
+@media(max-width:640px){
+  .tablewrap{border:0;background:none;overflow:visible}
+  table.board,table.board tbody,table.board tr,table.board td{display:block;width:auto}
+  table.board{min-width:0;max-width:100%}
+  table.board thead{display:none}
+  table.board tr{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    margin-bottom:10px;padding:6px 4px;position:relative}
+  table.board td{border-bottom:0;padding:0}
+  table.board td[data-label]::before{content:attr(data-label);display:block;
+    font:600 10px var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--faint);
+    padding:7px 12px 0}
+  td.tick,th.tick{width:auto;text-align:left;padding:8px 12px 0}
+  td.tick input{width:20px;height:20px}
+  .cell{min-height:0;padding:3px 12px 9px}
+  td.rowacts{width:auto;text-align:left;padding:2px 9px 8px}
+  tr.adder input{padding:10px 12px}
+}
+
+/* --------------------------------------------------------------- tests -- */
+.res{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:10px 0 4px;
+  padding:11px 13px;background:var(--raised);border:1px solid var(--line);border-radius:8px}
+.res .mark{padding:5px 13px;border-radius:5px;border:1px solid var(--line);background:var(--panel);
+  color:var(--dim);font:600 12px var(--sans);letter-spacing:.06em;cursor:pointer}
+.res .mark:hover{color:var(--text)}
+.res .mark.on[data-v=pass]{background:var(--pass);border-color:var(--pass);color:#10170C}
+.res .mark.on[data-v=fail]{background:var(--fail);border-color:var(--fail);color:#1A0E0C}
+.res .mark.on[data-v=skip]{background:var(--skip);border-color:var(--skip);color:#12150F}
+.res input{flex:1;min-width:170px;padding:6px 10px;background:var(--panel);color:var(--text);
+  border:1px solid var(--line);border-radius:5px;font:13px var(--sans)}
+.res input:focus{outline:none;border-color:var(--gold-dim)}
+.res input.who{flex:0 0 118px;min-width:0}
+.res .when{font-size:11px;color:var(--faint);white-space:nowrap}
+@media(max-width:620px){
+  .res .mark{flex:1 1 0;min-height:42px;padding:5px 6px;text-align:center}
+  .res input,.res input.who{flex:1 1 100%;min-height:40px}
+  .res .when{flex:1 1 100%}
+}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font:600 11px var(--sans);
+  letter-spacing:.05em}
+.pill.pass{background:rgba(111,160,90,.18);color:var(--pass)}
+.pill.fail{background:rgba(192,90,78,.18);color:var(--fail)}
+.pill.skip{background:rgba(124,132,147,.18);color:var(--skip)}
+.pill.left{background:rgba(141,150,130,.15);color:var(--dim)}
+.tally{display:flex;gap:9px;margin-bottom:22px;flex-wrap:wrap}
+
+/* ------------------------------------------------- files and downloads -- */
+.file{display:flex;align-items:center;gap:15px;padding:15px 17px;background:var(--panel);
+  border:1px solid var(--line);border-radius:9px;margin-bottom:11px;flex-wrap:wrap}
+.file .who{flex:1;min-width:180px}
+.file .nm{font:600 16px var(--sans);color:var(--text);word-break:break-word}
+.file .meta{font-size:13px;color:var(--dim);margin-top:3px}
+.file a.get{padding:9px 17px;background:var(--gold);color:#17190F;border-radius:6px;
+  text-decoration:none;font:600 14px var(--sans)}
+.file a.get.ghost{background:none;color:var(--dim);border:1px solid var(--line)}
+.file a.get.ghost:hover{color:var(--text);border-color:var(--gold-dim)}
+.thumb{flex:0 0 auto;width:74px;height:60px;border-radius:7px;overflow:hidden;background:#0D100B;
+  border:1px solid var(--line);display:grid;place-items:center}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.thumb.kind{font:600 12px var(--mono);color:var(--dim);letter-spacing:.06em}
+.file.compact{gap:10px;padding:8px 11px;margin-bottom:7px}
+.file.compact .nm{font-size:13px}
+.file.compact .meta{font-size:12px;margin-top:1px}
+.thumb.sm{width:48px;height:40px;border-radius:5px}
+.empty{color:var(--dim);padding:26px;border:1px dashed var(--line);border-radius:9px;
+  text-align:center}
+
+/* -------------------------------------------------------------- report -- */
+.form{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:20px}
+.form label{display:block;font:600 12px var(--sans);letter-spacing:.07em;text-transform:uppercase;
+  color:var(--faint);margin:16px 0 6px}
+.form label:first-of-type{margin-top:0}
+.form input,.form textarea{width:100%;padding:10px 12px;background:var(--ink);color:var(--text);
+  border:1px solid var(--line);border-radius:7px;font:15px var(--sans)}
+.form textarea{min-height:170px;resize:vertical;line-height:1.6}
+.form input:focus,.form textarea:focus{outline:none;border-color:var(--gold-dim)}
+.pick{display:flex;gap:8px;flex-wrap:wrap}
+.pick button{flex:1 1 150px;padding:11px;background:var(--ink);color:var(--dim);
+  border:1px solid var(--line);border-radius:8px;font:600 14px var(--sans);cursor:pointer}
+.pick button.on{background:var(--raised);color:var(--text);border-color:var(--gold)}
+.formfoot{display:flex;align-items:center;gap:12px;margin-top:18px;flex-wrap:wrap}
+
+/* ---------------------------------------------------------------- news -- */
+.entry{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:17px 19px;
+  margin-bottom:12px}
+.entry .when{font:600 11px var(--sans);letter-spacing:.09em;text-transform:uppercase;
+  color:var(--faint)}
+.entry h3{font:600 18px/1.3 var(--carve);letter-spacing:.02em;margin:4px 0 8px;color:var(--text);
+  text-wrap:balance}
+.entry .det{color:var(--dim);font-size:13.5px}
+.entry .det span{display:inline-block;margin-right:14px}
+.entry details{margin-top:9px}
+.entry summary{cursor:pointer;color:var(--dim);font-size:13px}
+.entry details ul{margin:8px 0 0;padding-left:20px;color:var(--faint);font:12.5px var(--mono)}
+
+
+/* --------------------------------------------------------------- inbox -- */
+.note{display:flex;gap:14px;align-items:flex-start;background:var(--panel);
+  border:1px solid var(--line);border-radius:10px;padding:15px 17px;margin-bottom:11px}
+.note.done{opacity:.55}
+.note .kind{flex:0 0 auto;font:600 10px var(--sans);letter-spacing:.09em;text-transform:uppercase;
+  padding:3px 7px;border-radius:4px;margin-top:2px}
+.note .kind.bug{background:rgba(192,90,78,.16);color:var(--fail)}
+.note .kind.idea{background:rgba(201,162,75,.16);color:var(--gold)}
+.note .mid{flex:1;min-width:0}
+.note .t{font:600 16px var(--sans);word-break:break-word}
+.note .d{color:var(--dim);font-size:13.5px;margin-top:4px;white-space:pre-wrap}
+.note .m{color:var(--faint);font-size:12px;margin-top:7px}
+.note .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}
+@media(max-width:560px){.note{flex-direction:column;gap:8px}}
+
+/* #1474: former inline style= attributes */
+.gate-logo {
+  display: block;
+  margin: 0 auto 14px;
+  border-radius: 14px;
+}
+.said-gate.said { margin: 0 0 12px; }
+.discord.compact {
+  font-size: 13px;
+  padding: 7px 12px;
+}
+.mt-22 { margin-top: 22px; }
+.mt-20 { margin-top: 20px; }
+.mt-18 { margin-top: 18px; }
+.mt-12 { margin-top: 12px; }
+.mt-9 { margin-top: 9px; }
+.bar-mb-16.bar { margin-bottom: 16px; }
+.said-show.said { margin: -8px 0 16px; }
+.tally-pad.tally { padding: 11px 16px 0; }
+.empty-pad.empty { padding: 22px 0; }
+.said-pad.said { padding: 0 16px 12px; }
+.float-right { float: right; }
+.doc-intro.doc { margin: -10px 0 4px; }
+.lede-gallery.lede { margin: 0 0 12px; }
+.form-center.form { text-align: center; }
+.form-sent-title {
+  font: 600 20px Spectral, Georgia, serif;
+  margin: 6px 0 8px;
+  color: var(--gold);
+}
+.formfoot-center.formfoot { justify-content: center; }

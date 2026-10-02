@@ -19,12 +19,12 @@
 // the VPS is the server's own folder, so the test changes into a temp folder
 // first. Nothing outside that folder is touched.
 
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const SRC = path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
+const SRC = path.join(REPO_DIR, 'game', 'gamemode.js');
 const text = fs.readFileSync(SRC, 'utf8');
 const a = text.indexOf('let logFile = null;');
 const idAt = text.indexOf('Which gamemode.js this is.');

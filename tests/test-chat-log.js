@@ -26,12 +26,12 @@
   fails loudly rather than testing a copy. Read only apart from its own temp
   folder.
 */
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const SRC = path.join(TOOLS_DIR, '..', 'voice', 'voice-server.js');
+const SRC = path.join(REPO_DIR, 'voice', 'voice-server.js');
 const src = fs.readFileSync(SRC, 'utf8');
 
 function grab(name) {
@@ -51,7 +51,11 @@ const CHAT_DAYS = 365;
 const logged = [];
 const console2 = { log: (m) => logged.push(m) };
 
-eval(grab('chatDay').replace(/^function/, 'function') + '\n' +
+// The name a line is logged under is peerName's (#410): the game server's
+// name for a proven profile, none known here, so the page's.
+const positions = new Map();
+eval(grab('peerName') + '\n' +
+     grab('chatDay').replace(/^function/, 'function') + '\n' +
      grab('chatWrite').replace('console.log', 'console2.log') + '\n' +
      grab('chatPrune'));
 

@@ -1,9 +1,9 @@
 {
-  "builtBy": "tools\\Build-HarvestTable.ps1",
+  "builtBy": "scripts\\dev\\Build-HarvestTable.ps1",
   "source": "the FLOR and TREE records of 101 plugins, the 5 masters and what C:\\Thornswood\\Profile\\OwnGame\\plugins.txt enables",
   "language": "english",
   "rankedBy": "the gold value of the produce, the thresholds in RANK_MAX_VALUE at the top of the script",
-  "harvestsAre": "the plants whose produce is an alchemy reagent. A plant whose produce is food is not the gatherer's: food is bit 0x2 of an ALCH record's ENIT flag word, proved in tools\\Build-RecipeTable.ps1, and those rows are in crops, game or unranked instead, but for the ones named in FOOD_STAYS_THE_GATHERERS at the top of the script",
+  "harvestsAre": "the plants whose produce is an alchemy reagent. A plant whose produce is food is not the gatherer's: food is bit 0x2 of an ALCH record's ENIT flag word, proved in scripts\\dev\\Build-RecipeTable.ps1, and those rows are in crops, game or unranked instead, but for the ones named in FOOD_STAYS_THE_GATHERERS at the top of the script. A plant named in FARMYARD_BY_EDITOR_ID (the chicken nest) gives a reagent and is still the farmer's, so it is in unranked and not here",
   "cropsRankedBy": "how hard the crop is to grow, named one at a time in CROP_RANK_BY_EDITOR_ID at the top of the script, because the gold value is the gatherer's ladder and ranking a farm by it put every crop at advanced and left a new farmer nothing to sow",
   "rankMaxValue": {
     "novice": 1,
@@ -11,12 +11,11 @@
     "expert": 12,
     "master": 2147483647
   },
-  "count": 109,
+  "count": 105,
   "harvests": {
     "1016a1:Skyrim.esm": { "produce": "3ad56:Skyrim.esm", "name": "Chaurus Eggs", "rank": "expert" },
     "1016a2:Skyrim.esm": { "produce": "3ad56:Skyrim.esm", "name": "Chaurus Eggs", "rank": "expert" },
     "1016a3:Skyrim.esm": { "produce": "3ad56:Skyrim.esm", "name": "Chaurus Eggs", "rank": "expert" },
-    "1062d1:Skyrim.esm": { "produce": "23d77:Skyrim.esm", "name": "Chicken's Egg", "rank": "advanced" },
     "108ee2:Skyrim.esm": { "produce": "ec870:Skyrim.esm", "name": "Mora Tapinella", "rank": "advanced" },
     "10f37:Dawnguard.esm": { "produce": "b097:Dawnguard.esm", "name": "Gleamblossom", "rank": "advanced" },
     "110c8:HearthFires.esm": { "produce": "59b86:Skyrim.esm", "name": "Nirnroot", "rank": "expert" },
@@ -38,9 +37,6 @@
     "23cff:Skyrim.esm": { "produce": "23d6f:Skyrim.esm", "name": "Pine Thrush Egg", "rank": "advanced" },
     "2a76:Dawnguard.esm": { "produce": "2a78:Dawnguard.esm", "name": "Yellow Mountain Flower", "rank": "advanced" },
     "2a77:Dawnguard.esm": { "produce": "2a78:Dawnguard.esm", "name": "Yellow Mountain Flower", "rank": "advanced" },
-    "306a:Update.esm": { "produce": "306e:Update.esm", "name": "Screaming Maw", "rank": "master" },
-    "306b:Update.esm": { "produce": "306d:Update.esm", "name": "Rot Scale", "rank": "master" },
-    "306c:Update.esm": { "produce": "306f:Update.esm", "name": "Thorn Hook", "rank": "master" },
     "34d2c:Skyrim.esm": { "produce": "34d32:Skyrim.esm", "name": "Frost Mirriam", "rank": "novice" },
     "34d2d:Skyrim.esm": { "produce": "34d31:Skyrim.esm", "name": "Elves Ear", "rank": "expert" },
     "34d30:Skyrim.esm": { "produce": "34d22:Skyrim.esm", "name": "Garlic", "rank": "novice" },
@@ -130,7 +126,7 @@
     "perGold": 15,
     "max": 360
   },
-  "cropCount": 15,
+  "cropCount": 14,
   "crops": {
     "141081:JK's Whiterun's Outskirts.esp": { "produce": "64b2e:Skyrim.esm", "name": "Red Apple", "rank": "expert", "growMinutes": 75 },
     "141088:JK's Whiterun's Outskirts.esp": { "produce": "64b2f:Skyrim.esm", "name": "Green Apple", "rank": "expert", "growMinutes": 75 },
@@ -141,7 +137,6 @@
     "2493e:JKs Skyrim.esp": { "produce": "669a5:Skyrim.esm", "name": "Leek", "rank": "novice", "growMinutes": 75 },
     "2c91:JKs Skyrim.esp": { "produce": "64b2e:Skyrim.esm", "name": "Red Apple", "rank": "expert", "growMinutes": 75 },
     "3274:JKs Skyrim.esp": { "produce": "64b2f:Skyrim.esm", "name": "Green Apple", "rank": "expert", "growMinutes": 75 },
-    "bb947:Skyrim.esm": { "produce": "3f7f8:Skyrim.esm", "name": "Tundra Cotton", "rank": "advanced", "growMinutes": 75 },
     "bb952:Skyrim.esm": { "produce": "669a5:Skyrim.esm", "name": "Leek", "rank": "novice", "growMinutes": 75 },
     "bb953:Skyrim.esm": { "produce": "4b0ba:Skyrim.esm", "name": "Wheat", "rank": "advanced", "growMinutes": 135 },
     "bcf47:Skyrim.esm": { "produce": "64b41:Skyrim.esm", "name": "Potato", "rank": "novice", "growMinutes": 75 },
@@ -168,7 +163,7 @@
     "f5eca:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "from": "Salmon", "rank": "novice" },
     "f5ecb:Skyrim.esm": { "produce": "65c9f:Skyrim.esm", "name": "Salmon Meat", "from": "Salmon", "rank": "novice" }
   },
-  "gameAre": "the plants whose produce is food and which are named in GAME_BY_EDITOR_ID at the top of the script: hanging game, which is the hunter's work rather than the gatherer's. They are not in tools\\hunts.json because that table is built out of NPC_ records and loot() only answers a reference the engine says is a dead actor, and a hanging pheasant is a FLOR standing in a camp",
+  "gameAre": "the plants whose produce is food and which are named in GAME_BY_EDITOR_ID at the top of the script: hanging game, which is the hunter's work rather than the gatherer's. They are not in game\\data\\hunts.json because that table is built out of NPC_ records and loot() only answers a reference the engine says is a dead actor, and a hanging pheasant is a FLOR standing in a camp",
   "gameRankedBy": "the Hunter rank named one at a time in GAME_RANK_BY_EDITOR_ID at the top of the script, because the three produce records are priced at 2, 3 and 4 gold and the gold rule that ranks a plant puts all of them on one rung",
   "gameCount": 7,
   "game": {
@@ -276,6 +271,14 @@
       "produceName": "Nightshade (3)",
       "produceType": "MISC",
       "why": "its produce is a sack, Nightshade (3), that only a Papyrus script opens, and this server does not run Papyrus"
+    },
+    "1062d1:Skyrim.esm": {
+      "editorId": "ChickenNest",
+      "name": "Chickens' Nest",
+      "produce": "23d77:Skyrim.esm",
+      "produceName": "Chicken's Egg",
+      "produceType": "INGR",
+      "why": "it is kept in a farmyard rather than found in the wild, so it is the farmer's and not the gatherer's, and it is named in FARMYARD_BY_EDITOR_ID at the top of this script: collectEgg() in game\\gamemode.js answers it with the farm verb, so it is in none of the tables this script writes"
     },
     "110b9:HearthFires.esm": {
       "editorId": "BYOHHouseFloraCarrots01",
@@ -461,6 +464,30 @@
       "produceType": "LVLI",
       "why": "its produce is a LVLI, which is a list of things rather than one thing, and carries no price"
     },
+    "306a:Update.esm": {
+      "editorId": "ccBGS_RootScreamingMaw",
+      "name": "Screaming Maw",
+      "produce": "306e:Update.esm",
+      "produceName": "Screaming Maw",
+      "produceType": "INGR",
+      "why": "it or its produce is a Creation Club record: every Special Edition has it, but its art comes with the Creation Club files Thornswood leaves out, so nobody is handed one"
+    },
+    "306b:Update.esm": {
+      "editorId": "ccBGS_RootRotScale",
+      "name": "Rot Scale",
+      "produce": "306d:Update.esm",
+      "produceName": "Rot Scale",
+      "produceType": "INGR",
+      "why": "it or its produce is a Creation Club record: every Special Edition has it, but its art comes with the Creation Club files Thornswood leaves out, so nobody is handed one"
+    },
+    "306c:Update.esm": {
+      "editorId": "ccBGS_RootThornHook",
+      "name": "Thorn Hook",
+      "produce": "306f:Update.esm",
+      "produceName": "Thorn Hook",
+      "produceType": "INGR",
+      "why": "it or its produce is a Creation Club record: every Special Edition has it, but its art comes with the Creation Club files Thornswood leaves out, so nobody is handed one"
+    },
     "38a83:Dragonborn.esm": {
       "editorId": "DLC2HorkerDead01",
       "name": "Horker",
@@ -483,7 +510,7 @@
       "produce": "669a3:Skyrim.esm",
       "produceName": "Mammoth Cheese Bowl",
       "produceType": "ALCH",
-      "why": "its produce is food, so it is not the gatherer's, and it is named in FOOD_PROP_BY_EDITOR_ID at the top of this script as a prop that is neither a plant anybody grows nor an animal anybody took, so no class verb in classes.md reaches it"
+      "why": "its produce is food, so it is not the gatherer's, and it is named in FOOD_PROP_BY_EDITOR_ID at the top of this script as a prop that is neither a plant anybody grows nor an animal anybody took, so it is in none of the tables this script writes"
     },
     "bc0:HearthFires.esm": {
       "editorId": "BYOHButterChurn",
@@ -491,15 +518,7 @@
       "produce": "353c:HearthFires.esm",
       "produceName": "Butter",
       "produceType": "ALCH",
-      "why": "its produce is food, so it is not the gatherer's, and it is named in FOOD_PROP_BY_EDITOR_ID at the top of this script as a prop that is neither a plant anybody grows nor an animal anybody took, so no class verb in classes.md reaches it"
-    },
-    "cf19:ElysiumEstateSSE.esp": {
-      "editorId": "EE_ShrineofKynarethHarvestKey",
-      "name": "Harvest Elysium Estate Key",
-      "produce": "cf10:ElysiumEstateSSE.esp",
-      "produceName": "Key to Elysium Estate",
-      "produceType": "KEYM",
-      "why": "its produce is a KEYM, which is not material anybody gathers"
+      "why": "its produce is food, so it is not the gatherer's, and it is named in FOOD_PROP_BY_EDITOR_ID at the top of this script as a prop that is neither a plant anybody grows nor an animal anybody took, so it is in none of the tables this script writes"
     },
     "d790c:Skyrim.esm": {
       "editorId": "CoinPurseSmall",
@@ -613,22 +632,6 @@
       "definedIn": "Skyrim.esm",
       "formId": "0x1016A3",
       "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "1062d1:Skyrim.esm": {
-      "rank": "advanced",
-      "produce": "23d77:Skyrim.esm",
-      "produceName": "Chicken's Egg",
-      "produceType": "INGR",
-      "produceValue": 2,
-      "produceFrom": "Skyrim.esm",
-      "name": "Chickens' Nest",
-      "editorId": "ChickenNest",
-      "recordType": "FLOR",
-      "plugin": "Skyrim.esm",
-      "definedIn": "Skyrim.esm",
-      "formId": "0x1062D1",
-      "seasons": "0,0,0,0",
       "nameFrom": "string table"
     },
     "108ee2:Skyrim.esm": {
@@ -964,54 +967,6 @@
       "plugin": "Dawnguard.esm",
       "definedIn": "Dawnguard.esm",
       "formId": "0x002A77",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "306a:Update.esm": {
-      "rank": "master",
-      "produce": "306e:Update.esm",
-      "produceName": "Screaming Maw",
-      "produceType": "INGR",
-      "produceValue": 20,
-      "produceFrom": "Update.esm",
-      "name": "Screaming Maw",
-      "editorId": "ccBGS_RootScreamingMaw",
-      "recordType": "FLOR",
-      "plugin": "Update.esm",
-      "definedIn": "Update.esm",
-      "formId": "0x00306A",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "306b:Update.esm": {
-      "rank": "master",
-      "produce": "306d:Update.esm",
-      "produceName": "Rot Scale",
-      "produceType": "INGR",
-      "produceValue": 20,
-      "produceFrom": "Update.esm",
-      "name": "Rot Scale",
-      "editorId": "ccBGS_RootRotScale",
-      "recordType": "FLOR",
-      "plugin": "Update.esm",
-      "definedIn": "Update.esm",
-      "formId": "0x00306B",
-      "seasons": "100,100,100,100",
-      "nameFrom": "string table"
-    },
-    "306c:Update.esm": {
-      "rank": "master",
-      "produce": "306f:Update.esm",
-      "produceName": "Thorn Hook",
-      "produceType": "INGR",
-      "produceValue": 20,
-      "produceFrom": "Update.esm",
-      "name": "Thorn Hook",
-      "editorId": "ccBGS_RootThornHook",
-      "recordType": "FLOR",
-      "plugin": "Update.esm",
-      "definedIn": "Update.esm",
-      "formId": "0x00306C",
       "seasons": "100,100,100,100",
       "nameFrom": "string table"
     },

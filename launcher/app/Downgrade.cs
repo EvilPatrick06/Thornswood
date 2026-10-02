@@ -10,8 +10,12 @@ using System.Threading;
 namespace Thornswood
 {
     /// <summary>
-    /// Puts a Steam copy of Skyrim that is on a newer build back on 1.6.1170,
-    /// the build the server runs, from one button and with nothing to paste.
+    /// Gets 1.6.1170, the build the server runs, for Thornswood's own game
+    /// folder, from one button and with nothing to paste. The Steam copy of
+    /// Skyrim is never written (#1218): it is the person's, on whatever build
+    /// they like. Before Thornswood has a folder of its own the downloaded
+    /// files are what the folder is made from (OwnGame.Make); after, they go
+    /// into that folder (OwnGame.TakePinned).
     ///
     /// Steam will hand over any build's files to somebody who owns the game,
     /// through the console command "download_depot", but only from its own
@@ -22,9 +26,10 @@ namespace Thornswood
     /// SteamLog for why that file). Three depots make up the game; they go
     /// one at a time, as Steam wants. When all three are down, the downloaded
     /// exe is checked against the size 1.6.1170 has before anything is
-    /// replaced, the files are copied over the Steam copy, the exe there is
-    /// checked again, and the downloaded copies are removed so eleven
-    /// gigabytes do not stay behind.
+    /// replaced, the files are copied into Thornswood's own folder, the exe
+    /// there is checked again, and the downloaded copies are removed so eleven
+    /// gigabytes do not stay behind. With no folder of its own yet they stay
+    /// until Make has taken them.
     ///
     /// Nothing is typed unless Steam's window is confirmed to be the one in
     /// the foreground. If it cannot be brought there, the command goes on the
@@ -45,16 +50,27 @@ namespace Thornswood
         // line is never cut off: any progress at all resets it. See the loop
         // below for why a deadline is needed at all.
         const int GiveUpMinutes = 25;
-        // Depot id -> the manifest of that depot at 1.6.1170. Same three as
-        // Setup-Thornswood.ps1. (Build-Thornswood.ps1 was deleted on 23
-        // September: it could not produce a working build any more.)
-        static readonly string[][] Depots = {
+        // ---- THE COMPILED FALLBACK (#471) ----
+        // The pin comes from the update feed: version.json carries
+        // expectedExeBytes, newerExeBytes and depots, written by Publish-Update
+        // from records\skyrim-pin.json, and AdoptPin keeps them in config.json.
+        // What follows is only for a launcher that has never had them from the
+        // feed. The same numbers are in records\skyrim-pin.json,
+        // Config.ExpectedExeBytes and Setup-Thornswood.ps1, and
+        // tests\test-skyrim-pin.ps1 fails when any of them disagree.
+        //
+        // Depot id -> the manifest of that depot at 1.6.1170.
+        static readonly string[][] FallbackDepots = {
             new[] { "489831", "8442952117333549665" },
             new[] { "489832", "8042843504692938467" },
             new[] { "489833", "1914580699073641964" },
         };
         /// <summary>SkyrimSE.exe at 1.7.104, the Steam build we never want.</summary>
         public const long NewerExeBytes = 37910440;
+        // ---- end of the compiled fallback ----
+
+        // The depots this run asks Steam for. Run sets it from PinnedDepots.
+        static string[][] Depots = FallbackDepots;
 
         // How many stretches the bar under the button is divided into: one for
         // each of the three downloads, then one for the copy into the game.
@@ -89,38 +105,73 @@ namespace Thornswood
         static volatile bool running;
         public static bool Busy { get { return running; } }
 
-        /// <summary>The game is there and its exe is not the build the server runs.</summary>
-        public static bool Needed(Config cfg) { return Wrong(cfg, Paths.Exe); }
-
         /// <summary>
-        /// Thornswood runs from its own folder (OwnGame) and the Steam copy that
-        /// folder is made from is on another build, which is what Steam does by
-        /// itself when it updates the game. Thornswood still plays, but the next
-        /// refresh from Vortex would bring that build in, so OwnGame refuses to
-        /// refresh until this is put right.
+        /// The game Thornswood runs is not 1.6.1170 and nothing on this machine
+        /// puts it right but a download. In Thornswood's own folder: its exe is
+        /// another build, or archives it shared with the Steam copy were
+        /// written over there (OwnGame.Changed). Before the folder is made: the
+        /// Steam copy it would be made from is on another build and 1.6.1170's
+        /// own files are not downloaded yet.
+        ///
+        /// Until #1218 this also came up, as SourceNeeded, whenever the Steam
+        /// copy alone had moved on, and the folder would not follow Vortex until
+        /// the Steam copy was downgraded. A made folder does not read the Steam
+        /// copy's game any more, so a Steam update costs it nothing.
         /// </summary>
-        public static bool SourceNeeded(Config cfg)
+        public static bool Needed(Config cfg)
         {
-            if (!OwnGame.Active) return false;
-            string src = OwnGame.Source(cfg);
-            return src.Length > 0 && Wrong(cfg, Path.Combine(src, "SkyrimSE.exe"));
+            // Before the folder exists it is the Steam copy's build that counts,
+            // because that is what Make takes the game from. Paths.Exe is not
+            // it when the folder was chosen at install: Game is Profile\Payload
+            // until the folder is made (#1226).
+            if (Paths.Collection) return Wrong(cfg, Path.Combine(Paths.SteamCopy, "SkyrimSE.exe")) && Downloaded(cfg) == null;
+            return Wrong(cfg, Paths.Exe) || (OwnGame.Active && OwnGame.Changed().Count > 0);
         }
 
         /// <summary>
-        /// The Skyrim folder the downgrade writes into. With Thornswood's own
-        /// folder that is the Steam copy the folder is made from, never the own
-        /// folder: its files are brought over from the Steam copy afterwards, the
-        /// same way a Vortex deployment is, so the two cannot end up on different
-        /// builds. Otherwise the folder the game runs from.
+        /// The three folders Steam downloaded 1.6.1170's own files into, when
+        /// every one is complete for the pinned manifest (MarkerIs) and the exe
+        /// among them is 1.6.1170's size. Null otherwise. OwnGame.Make makes
+        /// the folder from these when the Steam copy is on another build.
         /// </summary>
-        public static string Target(Config cfg)
+        public static List<string> Downloaded(Config cfg)
         {
-            if (OwnGame.Active)
+            try
             {
-                string src = OwnGame.Source(cfg);
-                if (src.Length > 0) return src;
+                string steam = Steam.Path_();
+                if (string.IsNullOrEmpty(steam)) return null;
+                string content = Path.Combine(steam, "steamapps\\content\\app_" + AppId);
+                var all = new List<string>();
+                string exe = "";
+                foreach (string[] d in PinnedDepots(cfg))
+                {
+                    string folder = Path.Combine(content, "depot_" + d[0]);
+                    if (!Directory.Exists(folder) || !MarkerIs(folder, d[1])) return null;
+                    all.Add(folder);
+                    if (exe.Length == 0 && File.Exists(Path.Combine(folder, "SkyrimSE.exe"))) exe = Path.Combine(folder, "SkyrimSE.exe");
+                }
+                if (exe.Length == 0 || Wrong(cfg, exe)) return null;
+                return all;
             }
-            return Paths.Game;
+            catch (Exception ex) { Swallow.Note("Downgrade.Downloaded", ex); return null; }
+        }
+
+        /// <summary>The downloaded copies go once their files are in Thornswood's folder, so eleven gigabytes do not stay behind.</summary>
+        public static void ClearDownloads(Config cfg, Action<string> say)
+        {
+            string steam = "";
+            try { steam = Steam.Path_() ?? ""; } catch (Exception ex) { Swallow.Note("Downgrade.ClearDownloads, finding Steam", ex); }
+            if (steam.Length == 0) return;
+            string content = Path.Combine(steam, "steamapps\\content\\app_" + AppId);
+            long freed = 0;
+            foreach (string[] d in PinnedDepots(cfg))
+            {
+                string folder = Path.Combine(content, "depot_" + d[0]);
+                try { if (Directory.Exists(folder)) { freed += FolderSize(folder); Directory.Delete(folder, true); } }
+                catch (Exception ex) { Swallow.Note("Downgrade.ClearDownloads, deleting " + folder, ex); }
+            }
+            try { if (Directory.Exists(content) && Directory.GetFileSystemEntries(content).Length == 0) Directory.Delete(content); } catch (Exception ex) { Swallow.Note("Downgrade.ClearDownloads, deleting empty content folder", ex); }
+            if (freed > 0 && say != null) say((freed / 1048576).ToString("n0") + " MB of downloaded copies removed from Steam's download folder.");
         }
 
         static bool SameFolder(string a, string b)
@@ -149,7 +200,7 @@ namespace Thornswood
                 if (!File.Exists(exe)) return "missing";
                 long n = new FileInfo(exe).Length;
                 if (n == cfg.ExpectedExeBytes) return "1.6.1170";
-                if (n == NewerExeBytes) return "1.7.104, the server runs 1.6.1170";
+                if (n == Newer(cfg)) return "1.7.104, the server runs 1.6.1170";
                 return "not 1.6.1170";
             }
             catch { return "unknown"; }
@@ -161,11 +212,89 @@ namespace Thornswood
         /// Run types the same strings, so the question cannot name one command
         /// and the keyboard send another.
         /// </summary>
-        public static string[] Commands()
+        public static string[] Commands(Config cfg)
         {
-            var all = new string[Depots.Length];
-            for (int i = 0; i < Depots.Length; i++) all[i] = Command(Depots[i]);
+            string[][] depots = PinnedDepots(cfg);
+            var all = new string[depots.Length];
+            for (int i = 0; i < depots.Length; i++) all[i] = Command(depots[i]);
             return all;
+        }
+
+        /// <summary>
+        /// The depots to ask Steam for: the ones the feed sent, kept in
+        /// config.json, or the compiled fallback when it has sent none that
+        /// can be used.
+        /// </summary>
+        static string[][] PinnedDepots(Config cfg)
+        {
+            if (cfg == null || !Usable(cfg.SkyrimDepots)) return FallbackDepots;
+            var all = new string[cfg.SkyrimDepots.Length][];
+            for (int i = 0; i < all.Length; i++) all[i] = new[] { cfg.SkyrimDepots[i].id, cfg.SkyrimDepots[i].manifest };
+            return all;
+        }
+
+        /// <summary>The newer build's exe size, from the feed or the fallback.</summary>
+        static long Newer(Config cfg)
+        {
+            return cfg != null && cfg.NewerExeBytes > 0 ? cfg.NewerExeBytes : NewerExeBytes;
+        }
+
+        /// <summary>
+        /// A depot list worth using: as many parts as the fallback, because the
+        /// card, the bar and every "Part 2 of 3" are built on that many, and each
+        /// one an id and a manifest in digits. Anything else is ignored whole,
+        /// never half used.
+        /// </summary>
+        static bool Usable(PinDepot[] d)
+        {
+            if (d == null || d.Length != FallbackDepots.Length) return false;
+            foreach (PinDepot p in d)
+                if (p == null || !AllDigits(p.id) || !AllDigits(p.manifest)) return false;
+            return true;
+        }
+
+        static bool AllDigits(string s)
+        {
+            if (string.IsNullOrEmpty(s) || s.Length > 20) return false;
+            foreach (char c in s) if (c < '0' || c > '9') return false;
+            return true;
+        }
+
+        /// <summary>A size from the feed, or 0 when it is not a plain number.</summary>
+        static long FeedBytes(string s)
+        {
+            long n;
+            return AllDigits(s) && long.TryParse(s, out n) ? n : 0;
+        }
+
+        /// <summary>
+        /// Takes the Skyrim pin from a version document into cfg (#471). Only
+        /// what the feed carries is taken: a size that is not a number above 0
+        /// and a missing or unusable depot list leave cfg as it is, so a feed
+        /// written before these fields changes nothing. True when anything
+        /// moved; the caller saves.
+        /// </summary>
+        public static bool AdoptPin(Config cfg, VersionDoc v)
+        {
+            if (cfg == null || v == null) return false;
+            bool moved = false;
+            long exe = FeedBytes(v.expectedExeBytes), newer = FeedBytes(v.newerExeBytes);
+            if (exe > 0 && exe != cfg.ExpectedExeBytes) { cfg.ExpectedExeBytes = exe; moved = true; }
+            if (newer > 0 && newer != cfg.NewerExeBytes) { cfg.NewerExeBytes = newer; moved = true; }
+            if (Usable(v.depots))
+            {
+                bool same = cfg.SkyrimDepots != null && cfg.SkyrimDepots.Length == v.depots.Length;
+                for (int i = 0; same && i < v.depots.Length; i++)
+                    same = cfg.SkyrimDepots[i] != null && cfg.SkyrimDepots[i].id == v.depots[i].id && cfg.SkyrimDepots[i].manifest == v.depots[i].manifest;
+                if (!same)
+                {
+                    var copy = new PinDepot[v.depots.Length];
+                    for (int i = 0; i < copy.Length; i++) copy[i] = new PinDepot { id = v.depots[i].id, manifest = v.depots[i].manifest };
+                    cfg.SkyrimDepots = copy;
+                    moved = true;
+                }
+            }
+            return moved;
         }
 
         static string Command(string[] depot)
@@ -239,6 +368,8 @@ namespace Thornswood
             // the longest wait in the whole run was the one with nothing on
             // screen moving. Every early stop hides it again through Stop.
             Progress(-2);
+            // The same depots Commands showed in the question.
+            Depots = PinnedDepots(cfg);
             string steam = Steam.Path_();
             if (string.IsNullOrEmpty(steam) || !Directory.Exists(steam))
                 return Stop("Could not find where Steam is installed, so Steam cannot be asked for the files. Open Steam once, then press the button again.", log, status);
@@ -247,30 +378,29 @@ namespace Thornswood
             if (Checks.GameRunning())
                 return Stop("Skyrim is running. Close it, then press the button again.", log, status);
 
-            string target = Target(cfg);
+            // Where the files go: the folder the game runs from, Thornswood's
+            // own. Before that folder exists nothing is written anywhere: the
+            // Steam copy is never written (#1218) and the download is kept for
+            // OwnGame.Make instead, so target is only the Steam copy the
+            // sentences name. Not Paths.Game, which is Profile\Payload when
+            // the folder was chosen at install (#1226).
+            bool first = Paths.Collection;
+            string target = first ? Paths.SteamCopy : Paths.Game;
             string targetExe = Path.Combine(target, "SkyrimSE.exe");
-            bool ownFolder = !SameFolder(target, Paths.Game);
-            if (ownFolder)
+            if (first && Downloaded(cfg) != null)
             {
-                // Another server's session plays out of the Steam copy, and its
-                // files cannot be replaced while that runs.
-                if (Checks.OtherSkyrimRunning())
-                    return Stop("A Skyrim from another folder is running, most likely another server's session in the Steam copy. Close it, then press the button again.", log, status);
-                if (File.Exists(targetExe) && !Wrong(cfg, targetExe))
-                {
-                    // Steam is not asked for anything here, and the line under
-                    // the button has to say so: a copy another server's tool
-                    // already downgraded is exactly this case, and it used to
-                    // read as a button that did nothing.
-                    log("The Steam copy in " + target + " is already on 1.6.1170, so nothing needs downloading. Thornswood's own folder is brought up to date from it next.");
-                    status("The Steam copy of Skyrim is already on 1.6.1170, so nothing needs downloading. Thornswood's own folder is being brought up to date from it now.");
-                    Progress(-2);
-                    return true;
-                }
-                log("Thornswood runs from its own folder, which is made from the Steam copy in " + target + ". The Steam copy is downgraded, then the folder is brought up to date from it.");
+                // Steam is not asked for anything here, and the line under
+                // the button has to say so, or it reads as a button that did
+                // nothing.
+                log("1.6.1170's own files are already downloaded, so nothing needs downloading. Thornswood's own folder is made from them next; the Steam copy in " + target + " is not changed.");
+                status("1.6.1170's files are already downloaded. Thornswood's own folder is made from them next.");
+                Progress(-2);
+                return true;
             }
+            if (first)
+                log("Skyrim in " + target + " is " + Describe(cfg, targetExe) + ". That copy is yours and stays as it is: Steam downloads 1.6.1170's own files, and Thornswood makes its own folder from them.");
 
-            log("Downgrading Skyrim to 1.6.1170. Steam downloads the build's files under your own account; nothing is touched until all three parts are down.");
+            log("Getting Skyrim 1.6.1170. Steam downloads the build's files under your own account; nothing is touched until all three parts are down.");
             saidWindow = null;
             status("Opening Steam...");
             if (!WaitForSteam(log, status)) return false;
@@ -285,7 +415,7 @@ namespace Thornswood
                 // that manifest counts as this build being down. A folder left
                 // by an attempt at another build is full of the wrong files,
                 // and skipping the depot on one of those copies them over the
-                // Steam copy as if they were 1.6.1170.
+                // game as if they were 1.6.1170.
                 if (Directory.Exists(folder) && MarkerIs(folder, manifest))
                 {
                     log("Part " + (i + 1) + " of 3 (depot " + depot + ") is already downloaded.");
@@ -426,7 +556,7 @@ namespace Thornswood
                     // run started. A folder an aborted run left half written is
                     // also still, and a part Steam stopped writing to part way is
                     // still too; taking either as done writes the marker and
-                    // copies truncated files over the Steam copy, after which
+                    // copies truncated files into the game, after which
                     // every later attempt skips the depot as already downloaded.
                     // Steam gives the size when it starts the part (total, from
                     // DepotBytes), so a folder short of it is a stall, not a
@@ -491,8 +621,8 @@ namespace Thornswood
             if (Checks.GameRunning())
                 return Stop("Skyrim started while the files were coming down. Close it and press the button again; the downloads are kept.", log, status);
 
-            // The downloaded exe is checked before a single file of the Steam
-            // copy is replaced. This used to be checked only after the copy,
+            // The downloaded exe is checked before a single file is put in
+            // place anywhere. This used to be checked only after the copy,
             // by which point a wrong download had already gone over the game.
             // The Downgrader Tool on Nexus checks first, and that is right.
             string gotExe = DownloadedExe(content);
@@ -514,85 +644,51 @@ namespace Thornswood
                     ". Nothing in " + target + " was replaced. Press Try again and Steam is asked for the files once more. If it ends here twice, send your launcher log to the Discord.", log, status);
             }
 
+            // Before Thornswood has a folder of its own, the Steam copy is the
+            // only Skyrim there is, and it is the person's: it is never written
+            // (#1218). The download stays where Steam put it, and the folder is
+            // made from it (OwnGame.Make, which removes it once it has the
+            // files). Shell starts that as soon as this returns.
+            if (first)
+            {
+                log("1.6.1170's own files are downloaded. The Steam copy in " + target + " was not changed. Thornswood's own folder is made from these files next.");
+                status("Done. 1.6.1170's files are downloaded, and Thornswood's own folder is made from them next.");
+                Progress(100);
+                return true;
+            }
+
             status("Putting the 1.6.1170 files in place...");
-            // The copy has a size to measure against too: everything the three
-            // downloads hold.
-            long toCopy = 0;
-            foreach (string[] d in Depots) toCopy += FolderSize(Path.Combine(content, "depot_" + d[0]));
             // The last stretch of the same bar, not a new one: the three
             // downloads have taken it to three quarters and the copy takes it
-            // from there.
-            Progress(Percent(Depots.Length, Stages, 0, toCopy));
-            // A file a mod replaces is the collection's, and in the Steam copy it
-            // is a hard link to Vortex's own copy: writing the vanilla file over
-            // it would change the mod inside Vortex. Those are left as they are.
-            HashSet<string> modded = OwnGame.DeployedIn(target);
-            long copied = 0; int files = 0, leftForMods = 0;
-            // SkyrimSE.exe is held back and copied last, after every other file
-            // is in place. The build is read from that one file (Wrong, Needed,
-            // Describe all measure SkyrimSE.exe), so the moment it lands the
-            // copy reads as 1.6.1170. A copy that then stops part way on a file
-            // it cannot replace used to leave the exe already on the new build,
-            // which took the Downgrade card and its Try again button away with
-            // the job not finished (Shell.cs, DrawStatus). Copied last, a stop
-            // part way leaves the exe on the old build, so the card and the
-            // button stay for the next press. See #369 F3.
-            string exeSrc = "";
-            string exeRel = "";
+            // from there. OwnGame.TakePinned copies SkyrimSE.exe last, so a
+            // stop part way leaves the build reading as not 1.6.1170 and the
+            // card and its Try again button stay (#369 F3).
+            var folders = new List<string>();
+            long toCopy = 0;
             foreach (string[] d in Depots)
             {
-                string folder = Path.Combine(content, "depot_" + d[0]);
-                if (!Directory.Exists(folder)) continue;
-                string prefix = folder.TrimEnd('\\') + "\\";
-                foreach (string f in Directory.GetFiles(folder, "*", SearchOption.AllDirectories))
-                {
-                    string rel = f.Substring(prefix.Length);
-                    if (rel.StartsWith(".thornswood", StringComparison.OrdinalIgnoreCase)) continue;
-                    if (modded.Contains(rel)) { leftForMods++; continue; }
-                    if (string.Equals(rel, "SkyrimSE.exe", StringComparison.OrdinalIgnoreCase)) { exeSrc = f; exeRel = rel; continue; }
-                    string dest = Path.Combine(target, rel);
-                    try
-                    {
-                        Directory.CreateDirectory(Path.GetDirectoryName(dest));
-                        // The name comes off before the copy, so the new file is
-                        // this folder's alone. Copying over the name would write
-                        // through any hard link to it, including the links in
-                        // Thornswood's own folder, which are brought up to date
-                        // from here afterwards.
-                        if (File.Exists(dest)) OwnGame.DropName(dest);
-                        File.Copy(f, dest, false);
-                        copied += new FileInfo(f).Length; files++;
-                        if (files % 25 == 0)
-                        {
-                            status("Putting the 1.6.1170 files in place: " + (copied / 1048576).ToString("n0") + " of " + (toCopy / 1048576).ToString("n0") + " MB");
-                            Progress(Percent(Depots.Length, Stages, copied, toCopy));
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        return Stop("Could not replace " + rel + ": " + ex.Message, log, status);
-                    }
-                }
+                folders.Add(Path.Combine(content, "depot_" + d[0]));
+                toCopy += FolderSize(Path.Combine(content, "depot_" + d[0]));
             }
-            // The exe, last. gotExe was checked as the right build above, so a
-            // failure here is the file being locked, not the wrong file.
-            if (exeSrc.Length > 0)
+            Progress(Percent(Depots.Length, Stages, 0, toCopy));
+            int shownAt = -1;
+            string took;
+            try
             {
-                string dest = Path.Combine(target, exeRel);
-                try
+                took = OwnGame.TakePinned(cfg, folders, delegate (long copied, long all)
                 {
-                    Directory.CreateDirectory(Path.GetDirectoryName(dest));
-                    if (File.Exists(dest)) OwnGame.DropName(dest);
-                    File.Copy(exeSrc, dest, false);
-                    copied += new FileInfo(exeSrc).Length; files++;
-                }
-                catch (Exception ex)
-                {
-                    return Stop("Could not replace " + exeRel + ": " + ex.Message, log, status);
-                }
+                    int mb = (int)(copied / 1048576);
+                    if (mb / 256 == shownAt) return;
+                    shownAt = mb / 256;
+                    status("Putting the 1.6.1170 files in place: " + mb.ToString("n0") + " of " + (all / 1048576).ToString("n0") + " MB");
+                    Progress(Percent(Depots.Length, Stages, copied, all));
+                }, log);
             }
-            log("Copied " + files + " files, " + (copied / 1048576).ToString("n0") + " MB, into " + target + "." +
-                (leftForMods > 0 ? " " + leftForMods + " that a mod replaces were left as the mod has them." : ""));
+            catch (Exception ex)
+            {
+                return Stop(ex.Message, log, status);
+            }
+            log(took);
 
             bool right = File.Exists(targetExe) && !Wrong(cfg, targetExe);
             if (!right)
@@ -601,15 +697,8 @@ namespace Thornswood
             }
 
             status("Cleaning up the downloaded copies...");
-            long freed = 0;
-            foreach (string[] d in Depots)
-            {
-                string folder = Path.Combine(content, "depot_" + d[0]);
-                try { freed += FolderSize(folder); Directory.Delete(folder, true); } catch (Exception ex) { Swallow.Note("Downgrade.Run, deleting depot folder", ex); }
-            }
-            try { if (Directory.Exists(content) && Directory.GetFileSystemEntries(content).Length == 0) Directory.Delete(content); } catch (Exception ex) { Swallow.Note("Downgrade.Run, deleting empty content folder", ex); }
-            log("Skyrim is on 1.6.1170. " + (freed / 1048576).ToString("n0") + " MB of downloaded copies removed from Steam's folder.");
-            log("Do not start Skyrim through Steam from here on: Steam would update it back, and you would be here again. Play from this launcher.");
+            ClearDownloads(cfg, log);
+            log("Skyrim in " + target + " is on 1.6.1170. The Steam copy of Skyrim was not changed, and it can be on any build.");
             status("Done. Skyrim is on 1.6.1170.");
             Progress(100);
             return true;
@@ -641,7 +730,7 @@ namespace Thornswood
         /// on 1.1.94). Keizaal Online's launcher opens the console on those
         /// machines, so it is possible, and this is how.
         /// </summary>
-        static bool AskSteam(string link, Action<string> log)
+        internal static bool AskSteam(string link, Action<string> log)
         {
             try
             {

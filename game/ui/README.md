@@ -5,14 +5,15 @@
 What the game's browser shows: the page Skyrim Platform opens over the game
 and the overlays drawn into it, plain JavaScript and HTML with nothing built.
 `index.html` is the page. It is the front's own page, whose `build.js` comes
-from `tools\thornswood-front.zip`, plus `thornswood-bridge.js`, which supplies
+from `local\thornswood-front.zip`, plus `thornswood-bridge.js`, which supplies
 what that page expects from a browser this one is not, and the character
 choice at the main menu, `thornswood-select.js`, which draws itself before any
 plugin runs. `thornswood-front.js` in `game\plugins` then fetches the
 overlays into that one page: the chat (`thornswood-chat.js`, which holds the
 one socket to the voice service), the emote wheel, voice, the character panel
 and character creation behind K (`thornswood-skills.js`), the party menu
-behind P, journals behind J, and the trade panel. `thornswood-theme.mp3` is
+behind P, journals behind J, the trade panel, and the "Are you still here?"
+window after 15 minutes idle (`thornswood-afk.js`). `thornswood-theme.mp3` is
 the theme the main menu plays, and the launcher plays it too while it is open.
 
 ## On your machine
@@ -20,10 +21,10 @@ the theme the main menu plays, and the launcher plays it too while it is open.
 From the repo folder, with the game closed:
 
 ```
-.\tools\Go.ps1 -SkipServer
+.\scripts\release\Go.ps1 -SkipServer
 ```
 
-unpacks the front from `tools\thornswood-front.zip` into
+unpacks the front from `local\thornswood-front.zip` into
 `C:\Thornswood\Game\Data\Platform\UI` (`-Game` names another game folder),
 copies every `.js`, every `.mp3` and `index.html` from here over it so ours
 wins, and copies the site's banner from `site\public` in as the
@@ -49,4 +50,4 @@ folder, Publish-Update packs what changed (and puts this `index.html` back
 first if another server's menu has replaced it), and each launcher unpacks the
 pack, keeps a copy and holds the files read only while the game runs. Every
 change goes to the dev build first, with
-`.\tools\Ship.ps1 -Channel dev "what changed"`.
+`.\scripts\release\Ship.ps1 -Channel dev "what changed"`.

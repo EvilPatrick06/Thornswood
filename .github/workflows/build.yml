@@ -1,4 +1,4 @@
-# Every pull request and every push to main gets the checks a release starts
+﻿# Every pull request and every push to main gets the checks a release starts
 # with: do all the PowerShell scripts parse, does every game script parse,
 # does the bot parse, do the test harnesses still pass, and does the launcher
 # compile with the .NET Framework 4 csc (C# 5). A red mark here means the
@@ -36,7 +36,7 @@
 # the checks that take seconds (secrets, every script and file parses, the
 # writing rules, the ownership page, the launcher window, the silent catch
 # count) and the launcher build, about two
-# minutes on the VPS. The ~190 test harnesses took over five minutes there
+# minutes on the VPS. The ~380 test harnesses in tests/ took over five minutes there
 # on their own, so they run every night instead, in nightly.yml, with the
 # rest of the security, file, GitHub and code checks (Patrick: "let's do
 # #1 and setup a nightly schedule"). A nightly failure opens an issue.
@@ -44,7 +44,9 @@
 # issue #752: it runs in a tenth of a second and what it guards, the page
 # naming where every credential lives, went wrong on a pull request that
 # nobody caught for days (#697, found in #750 and #751). A harness earns a
-# place here by being that fast and that cheap to be wrong about.
+# place here by being that fast and that cheap to be wrong about. Six more
+# joined it on 28 September (issue #875), under a minute between them, after
+# all six had sat red on main with this build green.
 #
 # ON AGAIN, ON THE VPS, 25 SEPTEMBER. It was off for part of that day while
 # no runner existed. Then Patrick: "I want it set so they can commit+merge
@@ -89,7 +91,7 @@ jobs:
         shell: pwsh
         run: |
           $bad = 0
-          Get-ChildItem -Path scripts, tools, tests -Filter *.ps1 -Recurse -File | ForEach-Object {
+          Get-ChildItem -Path scripts, tests, installer -Filter *.ps1 -Recurse -File | ForEach-Object {
             $tokens = $null; $errors = $null
             [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors)
             foreach ($e in $errors) {
@@ -103,11 +105,27 @@ jobs:
       - name: Check the writing rules
         shell: pwsh
         run: |
-          # The Words section of CLAUDE.md, over the files people read: no em
-          # dashes, never the word player, and the owner is Patrick. Written
-          # down since the start and never checked, and on 24 September eleven
-          # hits had gone out in those files. Each hit is marked on its line.
+          # The Words section of CONTRIBUTING.md, over every file people read
+          # (every Markdown file outside lore and the archive, the launcher's
+          # help and window, the bot's posts, the public pages, the installer's
+          # read me). Written down since the start and never checked, and on
+          # 24 September eleven hits had gone out in those files. Each hit is
+          # marked on its line with the rule it breaks.
+          #
+          # Issue #460: then the two harnesses that prove the checks catch what
+          # they should, this one and the release note check Ship runs
+          # (scripts\release\Note-Rules.ps1), by planting a break of every rule.
+          # A few seconds between them. They ran only at night before, and a
+          # name in a component README sat red there for a day (#1034).
           .\scripts\dev\Check-Words.ps1
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $failed = @()
+          foreach ($n in 'test-check-words.ps1', 'test-note-rules.ps1') {
+            Write-Host ("--- {0}" -f $n)
+            & pwsh -NoProfile -File (Join-Path 'tests' $n)
+            if ($LASTEXITCODE -ne 0) { $failed += $n; Write-Host ("::error file=tests/{0}::a writing check let a planted break through or reported an allowed line; the FAIL lines above say which" -f $n) }
+          }
+          if ($failed.Count) { exit 1 }
 
       - name: Check the ownership page
         shell: pwsh
@@ -133,6 +151,130 @@ jobs:
             exit 1
           }
 
+      - name: Check the old mod's name stays out
+        shell: pwsh
+        run: |
+          # Issue #497. The multiplayer mod this build replaced was taken out
+          # of the whole tree on 28 September, after weeks of clean ups that
+          # each found more because nothing failed when one came back. One
+          # read of every tracked file, a second or two, so it runs here.
+          if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+            Write-Host '::error file=tests/test-old-name-gone.js::no node on this runner, so the old name was not checked'
+            exit 1
+          }
+          node tests\test-old-name-gone.js
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=tests/test-old-name-gone.js::the old multiplayer mod is named again; the lines above say where'
+            exit 1
+          }
+
+      - name: Check the engine is one commit
+        shell: pwsh
+        run: |
+          # Issue #1200. The commit engine\skymp is pinned to, the commit
+          # records\client-build.json and records\server-build.json say the
+          # two halves were built from must be one fork commit. On 29
+          # September the server record was two days and several fixes behind
+          # the pin and nothing said so, so the servers ran old engine code.
+          # Reads only the checkout (the pin is the gitlink in HEAD's tree),
+          # well under a second. Fail closed, like the steps above.
+          if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+            Write-Host '::error file=tests/test-one-engine.js::no node on this runner, so the engine commit was not checked'
+            exit 1
+          }
+          node tests\test-one-engine.js
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=records/server-build.json::the engine pin and the client and server build records do not name one fork commit; the lines above say which'
+            exit 1
+          }
+
+      - name: Run the harnesses that went red unseen
+        shell: pwsh
+        run: |
+          # Issue #875. These six failed on main for days while this build
+          # stayed green, because it ran none of them and the nightly run that
+          # holds them was not finishing: the script index and the script paths
+          # falling behind a change, the architecture page naming methods that
+          # had moved file, and three launcher harnesses whose stand-ins no
+          # longer compiled against the code they lift. All six read only the
+          # checkout and a temp folder of their own, and together take under a
+          # minute, so they earn a place here the way test-ownership.js did.
+          # pwsh on purpose: test-script-paths.ps1 needs .NET's
+          # Path.GetRelativePath, and test-script-index.ps1 starts Windows
+          # PowerShell 5.1 itself to compare what the two write.
+          if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+            Write-Host '::error file=tests/test-architecture.js::no node on this runner, so the architecture page was not checked'
+            exit 1
+          }
+          # Issue #454 added the seventh: the new-box runbook read against the
+          # scripts it names, about twenty seconds, so a renamed script or
+          # parameter fails here rather than on the day the box is gone.
+          # Issue #1088 added three more, which ran only in the nightly, so a
+          # pull request that wrote the VPS address into a script again or
+          # broke a deploy artifact was green here and merged before anything
+          # said so: the VPS address and ssh user kept in scripts/vps/vps.json
+          # alone, a deploy artifact the same bytes for the same commit with
+          # its record matching, and the site and voice handing those records
+          # back. Each reads only the checkout and a temp folder, a few
+          # seconds to half a minute.
+          # Issues #1218 and #1217 added one: Thornswood's own folder follows
+          # Vortex whatever build the Steam copy is on, the Steam copy is never
+          # written, and a shared archive written over there is caught before
+          # Play. It compiles the launcher's OwnGame and Downgrade code and runs
+          # it on a pretend machine in a temp folder, a few seconds.
+          # Issue #1226 added one: with Thornswood's own folder chosen in the
+          # setup window, the installer, the launcher's first start, packs and
+          # Make never write into the Steam copy; not chosen, the folder turned
+          # on later takes Thornswood's files back out of it. It runs the real
+          # Setup-Thornswood.ps1 and the whole launcher on a pretend Steam in a
+          # temp folder, about twenty seconds.
+          # Issue #1359 widened test-deploy-records.js rather than adding a
+          # harness: it now starts a copy of the site in a temp folder on a
+          # spare port and asks /api/deploys as nobody, as a hub member and
+          # as an admin, so the door going back to open fails here. About a
+          # second on top of what it already took.
+          # Issue #1361 added one: Secrets.Protect logs and throws when DPAPI
+          # refuses, instead of handing the plain secret back to be written to
+          # disk, and Unprotect is left as it was. It reads the launcher's
+          # source, a moment, and goes red on the fail-open it replaced.
+          # Issue #1345: site auth (door key header, Discord cookie, OAuth state,
+          # gamemode refresh()) on every PR. ~2s; test-token-refresh.js does not
+          # exist on main — site-auth already drives the refresh() path.
+          # $six is a historical name: the gate list grew well past six (#1368).
+          $six = 'test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
+                 'test-docs-index.js',
+                 'test-hand-install-retired.ps1',
+                 'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
+                 'test-new-box-runbook.ps1',
+                 'test-vps-defaults.ps1', 'test-deploy-artifact.ps1', 'test-deploy-records.js',
+                 'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-npc-runtime.js',
+                 'test-npc-shared-runtime.js', 'test-npc-population-runtime.js',
+                 'test-shared-resource-stock.js', 'test-resource-stock-integration.js',
+                 'test-npc-death-policy.js', 'test-vortex-profile-state.ps1',
+                 'test-books.js', 'test-guild-ledger-safety.js', 'test-book-review-regressions.js',
+                 'test-npc-merchant-purses.js', 'test-merchant-ledger-storage.js', 'test-npc-merchant-startup.js',
+                 'test-dungeon-loot.js', 'test-dungeon-reward-safety.js', 'test-dungeon-reward-storage.js', 'test-one-mint.js',
+                 'test-secrets-fail-closed.js',
+                 'test-site-auth.js'
+          $failed = @()
+          foreach ($n in $six) {
+            $p = Join-Path 'tests' $n
+            $sw = [Diagnostics.Stopwatch]::StartNew()
+            Write-Host ("--- {0}" -f $n)
+            if ($n -like '*.js') { & node $p } else { & pwsh -NoProfile -File $p }
+            $code = $LASTEXITCODE
+            Write-Host ("--- {0}: exit {1}, {2}s" -f $n, $code, [Math]::Round($sw.Elapsed.TotalSeconds, 1))
+            if ($code -ne 0) { $failed += $n; Write-Host ("::error file=tests/{0}::harness failed, the FAIL lines above say what" -f $n) }
+          }
+          if ($failed.Count) { Write-Host ("{0} harness(es) failed: {1}" -f $failed.Count, ($failed -join ', ')); exit 1 }
+          Write-Host ('all {0} passed' -f $six.Count)
+
+      - name: Check NPC population policy
+        shell: pwsh
+        run: |
+          & python tests/test-npc-population.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Check the launcher window
         shell: powershell
         run: |
@@ -151,7 +293,8 @@ jobs:
           # game\ since the reorganisation's phase 6 (issue #440): the gamemode,
           # the plugins and the overlays.
           $files = @(Get-ChildItem -Path scripts -Filter *.js -File -Recurse) + @(Get-ChildItem -Path game -Filter *.js -File) +
-                   @(Get-ChildItem -Path game\plugins, game\ui -Filter *.js -File -ErrorAction SilentlyContinue)
+                   @(Get-ChildItem -Path game\plugins, game\ui -Filter *.js -File -ErrorAction SilentlyContinue) +
+                   @(Get-ChildItem -Path site\server.js, voice\voice-server.js, voice\public\voice.js -File)
           foreach ($f in $files) {
             & node --check $f.FullName 2>&1 | Out-Null
             if ($LASTEXITCODE -ne 0) {
@@ -197,6 +340,16 @@ jobs:
           .\scripts\release\Build-Launcher.ps1 -Root $root -NoPause
           if (-not (Test-Path (Join-Path $root 'Launcher\Thornswood.exe'))) { Write-Host '::error::no Thornswood.exe came out of the build'; exit 1 }
 
+      - name: Check the manifests in the built exes
+        shell: pwsh
+        run: |
+          # Issue #463. Reads the manifest embedded in the launcher and the
+          # setup program this build made: per-monitor DPI, asInvoker (neither
+          # ever asks for administrator), and an identity version equal to
+          # Updater.cs. Also runs the window fit at 100 to 200 percent.
+          & pwsh -NoProfile -File tests\test-app-manifest.ps1 -Exe (Join-Path $env:RUNNER_TEMP 'Thornswood\Launcher\Thornswood.exe') -Scratch (Join-Path $env:RUNNER_TEMP 'app-manifest')
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error file=tests/test-app-manifest.ps1::the built exes do not carry the manifest they should, see the lines above'; exit 1 }
+
       - name: Scan the built launcher for secrets
         shell: pwsh
         run: |
@@ -204,7 +357,7 @@ jobs:
           # so what this build made is read too, byte by byte: the launcher with
           # everything Build-Launcher embeds in it, and the setup stub.
           $built = @(Join-Path $env:RUNNER_TEMP 'Thornswood\Launcher\Thornswood.exe')
-          if (Test-Path tools\setup-stub.exe) { $built += (Resolve-Path tools\setup-stub.exe).Path }
+          if (Test-Path out\setup-stub.exe) { $built += (Resolve-Path out\setup-stub.exe).Path }
           .\scripts\dev\Check-Secrets.ps1 -Binary $built
           exit $LASTEXITCODE
 
@@ -215,13 +368,6 @@ jobs:
           path: ${{ runner.temp }}/Thornswood/Launcher/Thornswood.exe
           retention-days: 7
 
-      # Workflow artifact only (not a public release asset). The pdb carries
-      # absolute build-machine source paths; shipping it to customers needs a
-      # #dev decision (issue #462). Packs and the installer already skip *.pdb.
-      - name: Keep the pdb from this build
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: Thornswood.pdb
-          path: ${{ runner.temp }}/Thornswood/Launcher/Thornswood.pdb
-          if-no-files-found: warn
-          retention-days: 7
+      # No pdb artifact (#1356 / #462): the pdb carries absolute build-machine
+      # source paths. Packs and the installer already skip *.pdb. Keep the exe
+      # above; leave the pdb on the runner only.

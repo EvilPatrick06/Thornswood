@@ -7,6 +7,19 @@
   goes across is the built server plus the plugin files its load order names,
   with the absolute paths rewritten for where they will live on the VPS.
 
+  What goes, and nothing else (#1214):
+    every server file records\server-build.json lists, each held to its hash
+    first: scam_native.node, dist_back\skymp5-server.js and its map,
+    package.json, yarn.lock, launch_server.bat and data\scripts
+    (scripts\deploy\ServerBuild.ps1 says which and why)
+    gamemode.js and thornswood-build.json, ours
+    server-settings.json, rewritten below
+    server-build.json, the record itself, for the installer to hold them again
+  Whatever else sits in the build folder stays there and is named: an old
+  settings copy, a gamemode backup, a manifest the server wrote while it ran
+  here. Until #1214 everything in the folder went, so a binary or a
+  JavaScript half from any build went with it.
+
   Deliberately left out:
     scam_native.pdb        73 MB of debug symbols, useless on the VPS
     world/                 the save. The VPS starts with a fresh world; copying
@@ -24,24 +37,83 @@ param(
     [string]$Dist    = (& (Join-Path $PSScriptRoot 'Where.ps1') ServerDist),
     [string]$OutDir  = (& (Join-Path $PSScriptRoot 'Where.ps1') Payload),
     [string]$VpsRoot = 'C:\Thornswood-Server',
-    [string]$Zip     = (& (Join-Path $PSScriptRoot 'Where.ps1') ServerZip)
+    [string]$Zip     = (& (Join-Path $PSScriptRoot 'Where.ps1') ServerZip),
+    # Which server the payload is for (#1114). Dev's ports and name go into the
+    # staged settings only; the build's own server-settings.json is never
+    # written, so what a dev publish leaves behind is the live file it found.
+    [ValidateSet('main', 'dev')][string]$Channel = 'main',
+    # The build record the binary is held to and that goes into the payload as
+    # server-build.json, so the installer on the box holds it too (#1214).
+    [string]$Record = (Join-Path $PSScriptRoot '..\..\records\server-build.json')
 )
 
 $ErrorActionPreference = 'Stop'
 if (-not (Test-Path -LiteralPath $Dist)) { throw "server dist not found: $Dist" }
+. (Join-Path $PSScriptRoot '..\deploy\ServerSettings.ps1')
+. (Join-Path $PSScriptRoot '..\deploy\ServerBuild.ps1')
+
+# ---- settings no server should get, and the dev ones for live ----------------
+# Until #1114 a dev Publish-Server rewrote the build's own settings to port
+# 7787, voice 7789 and the name Thornswood Dev and never put them back, so the
+# next live publish packed them and live came up on the dev port. Nothing
+# writes dev settings into the build now, but a build left that way by an
+# older run, or by Deploy-DevGamemode pointed at the wrong folder, still stops
+# here, before anything is copied or zipped. So does an npcSettings "default"
+# key on either channel, which refuses every NPC (#1222): the installer keeps
+# the running server's own npcSettings, but a first install has none to keep.
+$liveWhy = @(Get-ThornswoodServerSettingsProblems (Get-Content -LiteralPath (Join-Path $Dist 'server-settings.json') -Raw | ConvertFrom-Json) $Channel)
+if ($liveWhy.Count) {
+    $whose = if ($Channel -eq 'main') { "is not the live server's" } else { 'is not fit for any server' }
+    throw ("server-settings.json in $Dist $($whose): " + ($liveWhy -join '; ') +
+           '. Run .\scripts\deploy\Deploy-Gamemode.ps1, which writes the live ones, then publish again. Nothing was packed.')
+}
+
+# ---- every server file is the recorded build (#1214) -------------------------
+# Deploy-Server refused a scam_native.node that is not the one
+# records\server-build.json names, and the installer on the box refused one
+# that is not its payload's record, but a payload carried no record, so a
+# publish sent whatever binary sat in the build, and whatever JavaScript half
+# beside it, which nothing recorded at all. Every file the record lists is
+# held here, and any server file it does not list refuses the payload, before
+# anything is copied; the record goes into the payload.
+if (-not (Test-Path -LiteralPath $Record)) { throw "there is no build record at $Record, so nothing says which build these server files are. Nothing was packed." }
+$rec = $null
+try { $rec = [IO.File]::ReadAllText($Record) | ConvertFrom-Json } catch { throw "$Record does not parse: $($_.Exception.Message). Nothing was packed." }
+$why = @(Get-ThornswoodServerBuildProblems $rec (Get-ThornswoodServerFolderSums $Dist) $Dist $Record)
+if ($why.Count) {
+    # Said a line each rather than inside the error, which Windows PowerShell
+    # wraps at the window's width, words cut in half.
+    Write-Host "the server files in $Dist are not the build $Record names:" -ForegroundColor Red
+    foreach ($w in $why) { Write-Host ('  ' + $w) -ForegroundColor Red }
+    Write-Host '  If it was rebuilt on purpose, record it with .\scripts\release\New-ServerBuildRecord.ps1 and commit that; if not, find out what changed.' -ForegroundColor Yellow
+    throw 'the server files are not the recorded build; the lines above say which. Nothing was packed.'
+}
+$recFiles = Get-ThornswoodServerRecordFiles $rec
+Write-Host ('every server file is the recorded build of ' + ([string]$rec.source.commit).Substring(0, 8) + ': ' + $recFiles.Count + ' files, scam_native.node ' + ([string]$rec.sha256).Substring(0, 12)) -ForegroundColor Cyan
 
 if (Test-Path -LiteralPath $OutDir) { Remove-Item -LiteralPath $OutDir -Recurse -Force }
 New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $OutDir 'plugins') -Force | Out-Null
 
 # ---- the server itself -----------------------------------------------------
-$skip = 'scam_native.pdb'
-foreach ($item in (Get-ChildItem -LiteralPath $Dist)) {
-    if ($item.Name -eq 'world')      { continue }
-    if ($skip -contains $item.Name)  { continue }
-    Copy-Item -LiteralPath $item.FullName -Destination $OutDir -Recurse -Force
+# The recorded files, then ours. server-settings.json is written below.
+$own = @('gamemode.js', 'thornswood-build.json')
+$taken = @{}
+foreach ($rel in @($recFiles.Keys) + $own) {
+    $from = Join-Path $Dist ($rel -replace '/', '\')
+    if (-not (Test-Path -LiteralPath $from)) { continue }
+    $to = Join-Path $OutDir ($rel -replace '/', '\')
+    New-Item -ItemType Directory -Path (Split-Path -Parent $to) -Force | Out-Null
+    Copy-Item -LiteralPath $from -Destination $to -Force
+    $taken[$rel] = $true
 }
-Write-Host "server files copied" -ForegroundColor Cyan
+# The record the files were just held to, for the installer to hold them again.
+Copy-Item -LiteralPath $Record -Destination (Join-Path $OutDir 'server-build.json') -Force
+$distFull = (Get-Item -LiteralPath $Dist).FullName.TrimEnd('\')
+$left = @(Get-ChildItem -LiteralPath $distFull -Recurse -File -Force | ForEach-Object { ConvertTo-ThornswoodServerRel ($_.FullName.Substring($distFull.Length)) } |
+          Where-Object { -not $taken.ContainsKey($_) -and $_ -ne 'server-settings.json' -and $_ -ne 'scam_native.pdb' -and $_ -notlike 'world/*' })
+Write-Host ("server files copied: the {0} recorded, {1}and the record" -f $recFiles.Count, (@($own | Where-Object { $taken.ContainsKey($_) } | ForEach-Object { $_ + ', ' }) -join '')) -ForegroundColor Cyan
+if ($left.Count) { Write-Host ('  left in the build, not part of a server release: ' + ($left -join ', ')) -ForegroundColor DarkGray }
 
 # ---- the plugins its load order names --------------------------------------
 $settingsPath = Join-Path $Dist 'server-settings.json'
@@ -71,6 +143,19 @@ if ($missing) {
 # with no translation step in between.
 $s.loadOrder = $newOrder
 $s | Add-Member -NotePropertyName dataDir -NotePropertyValue 'data' -Force
+# A dev payload: the dev server's port, voice port, name and which server a
+# join pass must name, into this staged copy only (#1114). vps-dev-instance.ps1
+# is where the numbers come from, the same ones Deploy-DevGamemode.ps1 checks
+# for. They matter for a first install: over a running server the installer
+# keeps that server's own settings and takes only the release's keys from here
+# (ServerSettings.ps1, #1222).
+if ($Channel -eq 'dev') {
+    $s | Add-Member -NotePropertyName port -NotePropertyValue 7787 -Force
+    if ($s.PSObject.Properties['name']) { $s.name = 'Thornswood Dev' }
+    $s | Add-Member -NotePropertyName thornswoodVoicePort -NotePropertyValue 7789 -Force
+    $s | Add-Member -NotePropertyName thornswoodServer -NotePropertyValue 'dev' -Force
+    Write-Host 'dev channel: port 7787, voice 7789, name Thornswood Dev, thornswoodServer dev, in the payload only' -ForegroundColor Cyan
+}
 # Set-Content -Encoding UTF8 writes a byte order mark under Windows PowerShell
 # 5.1 and does not under PowerShell 7, so the same line produces a different
 # file depending on which one happens to run it. A BOM is not JSON: node stops

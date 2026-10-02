@@ -33,7 +33,7 @@ param(
   # launcher is on another drive. -Game and -Vortex still win.
   [string] $Game   = 'C:\Thornswood\Game',
   [string] $Vps    = '',
-  [string] $User   = 'Administrator',
+  [string] $User   = '',
   [switch] $SkipServer,
   # Install into the Skyrim that Steam owns and Vortex deploys the collection
   # into, rather than into the launcher's own copy. Found the same way the
@@ -86,6 +86,7 @@ $ProgressPreference    = 'SilentlyContinue'
 
 $Here    = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ui      = Join-Path $Game 'Data\Platform\UI'
 $plugins = Join-Path $Game 'Data\Platform\Plugins'
@@ -171,9 +172,11 @@ function Update-KeptCopies([string]$GameDir, [string[]]$Installed, [string[]]$Re
 
 # ------------------------------------------------------------------- front --
 Head 'Front'
-$zip = Join-Path $Here '..\..\tools\thornswood-front.zip'
+# The front build, made outside the repository and kept in local\, which git
+# ignores (in tools\ until 29 September, issue #440 phase 10).
+$zip = Join-Path $Here '..\..\local\thornswood-front.zip'
 if (-not (Test-Path -LiteralPath $zip)) {
-  Bad 'thornswood-front.zip is not next to this script'
+  Bad 'thornswood-front.zip is not in local\ in the repository folder'
 } else {
   New-Item -ItemType Directory -Force -Path $ui | Out-Null
   Expand-Archive -LiteralPath $zip -DestinationPath $ui -Force
@@ -477,7 +480,7 @@ if (-not $SkipServer) {
   #>
   $vsrc = Join-Path $Here '..\..\voice\voice-server.js'
   if (Test-Path -LiteralPath $vsrc) {
-    & scp -o BatchMode=yes -o StrictHostKeyChecking=accept-new $vsrc "$User@${Vps}:C:/Thornswood-Voice/voice-server.js" 2>&1 | Out-Null
+    Invoke-ThornswoodNative { & scp -o BatchMode=yes -o StrictHostKeyChecking=yes $vsrc "$User@${Vps}:C:/Thornswood-Voice/voice-server.js" } 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0) {
       $restart = @'
 $ProgressPreference = 'SilentlyContinue'
@@ -501,7 +504,7 @@ try { (Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:7778/health' -T
 catch { 'voice did not answer its own health check' }
 '@
       $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($restart))
-      $r = & ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$User@$Vps" "powershell -NoProfile -EncodedCommand $e" 2>&1
+      $r = Invoke-ThornswoodNative { & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$User@$Vps" "powershell -NoProfile -EncodedCommand $e" } 2>&1
       Note ("voice: " + (($r | Where-Object { $_ }) -join ' '))
     } else {
       Bad 'could not copy the voice service to the VPS over ssh'
@@ -518,7 +521,7 @@ if (Test-Path 'C:\Thornswood-Server\server.log') {
 }
 '@
   $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($remote))
-  $out = & ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc" 2>&1
+  $out = Invoke-ThornswoodNative { & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc" } 2>&1
   $out | ForEach-Object { Note $_ }
 }
 

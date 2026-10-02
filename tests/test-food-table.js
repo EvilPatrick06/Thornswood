@@ -26,14 +26,14 @@
 //
 // Read only. The builder runs on a copy in a temporary folder and writes only
 // there.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const HERE = TOOLS_DIR;
-const SRC = process.env.GM || path.join(HERE, '..', 'game', 'gamemode.js');
+const REPO = REPO_DIR;
+const SRC = process.env.GM || path.join(REPO, 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -101,10 +101,8 @@ function plugin(headerFlags, masters, recs) {
 const FIVE = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm'];
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-food-'));
 const DATA = path.join(TMP, 'Game', 'Data');
-const TOOLS = path.join(TMP, 'tools');
 fs.mkdirSync(DATA, { recursive: true });
-fs.mkdirSync(TOOLS, { recursive: true });
-// The gamemode and its tables sit in game\ beside tools\ since phase 6 (issue #440).
+// The gamemode and its tables sit in game\ since phase 6 (issue #440).
 fs.mkdirSync(path.join(TMP, 'game', 'data'), { recursive: true });
 // And the table builders in scripts\dev since phase 8.
 fs.mkdirSync(path.join(TMP, 'scripts', 'dev'), { recursive: true });
@@ -149,16 +147,16 @@ fs.writeFileSync(path.join(DATA, 'Gourmet.esp'), plugin(0x200, FIVE, [
 ]));
 fs.writeFileSync(path.join(TMP, 'Profile', 'Default', 'plugins.txt'),
   ['*LowerCase.esp', '*Gourmet.esp', ''].join(String.fromCharCode(13, 10)));
-fs.copyFileSync(path.join(HERE, '..', 'scripts', 'dev', 'Build-FoodTable.js'), path.join(TOOLS, '..', 'scripts', 'dev', 'Build-FoodTable.js'));
-fs.writeFileSync(path.join(TOOLS, '..', 'game', 'gamemode.js'),
+fs.copyFileSync(path.join(REPO, 'scripts', 'dev', 'Build-FoodTable.js'), path.join(TMP, 'scripts', 'dev', 'Build-FoodTable.js'));
+fs.writeFileSync(path.join(TMP, 'game', 'gamemode.js'),
   ['const WARMTH = {"items":{}};', 'const FOODS = {"items":{}};', ''].join(String.fromCharCode(10)));
 
 function build() {
-  return spawnSync(process.execPath, [path.join(TOOLS, '..', 'scripts', 'dev', 'Build-FoodTable.js'), '--data', DATA],
+  return spawnSync(process.execPath, [path.join(TMP, 'scripts', 'dev', 'Build-FoodTable.js'), '--data', DATA],
                    { encoding: 'utf8' });
 }
 function installed() {
-  const m = /^const FOODS = (.*);$/m.exec(fs.readFileSync(path.join(TOOLS, '..', 'game', 'gamemode.js'), 'utf8'));
+  const m = /^const FOODS = (.*);$/m.exec(fs.readFileSync(path.join(TMP, 'game', 'gamemode.js'), 'utf8'));
   try { return m ? JSON.parse(m[1]).items : null; } catch (e) { return null; }
 }
 
@@ -167,7 +165,7 @@ if (run1.status !== 0) { console.log(run1.stdout + run1.stderr); }
 yes('A1 the builder runs on a load order of four plugins and exits 0', run1.status === 0);
 const got = installed() || {};
 const built = (function () {
-  try { return JSON.parse(fs.readFileSync(path.join(TOOLS, '..', 'game', 'data', 'food.json'), 'utf8')).items; }
+  try { return JSON.parse(fs.readFileSync(path.join(TMP, 'game', 'data', 'food.json'), 'utf8')).items; }
   catch (e) { return {}; }
 })();
 function linesFor(local) {
@@ -212,11 +210,35 @@ yes('A8 twenty one versions of eleven records make eleven lines (' + Object.keys
   which is what it did before 24 September whenever nothing had changed.
 */
 {
-  const before = fs.readFileSync(path.join(TOOLS, '..', 'game', 'gamemode.js'), 'utf8');
+  const before = fs.readFileSync(path.join(TMP, 'game', 'gamemode.js'), 'utf8');
   const run2 = build();
-  const after = fs.readFileSync(path.join(TOOLS, '..', 'game', 'gamemode.js'), 'utf8');
+  const after = fs.readFileSync(path.join(TMP, 'game', 'gamemode.js'), 'utf8');
   yes('A9 run again on the same plugins, it exits 0 and leaves the same line',
       run2.status === 0 && before === after);
+}
+
+/*
+  --plugins <file> (#1140). Same flag as the warmth / water / fire / weather
+  builders. Without Gourmet.esp the drink words never land, so Ale reads food.
+*/
+{
+  const alt = path.join(TMP, 'elsewhere', 'plugins.txt');
+  fs.mkdirSync(path.dirname(alt), { recursive: true });
+  fs.writeFileSync(alt, ['*LowerCase.esp', ''].join(String.fromCharCode(13, 10)));
+  fs.writeFileSync(path.join(TMP, 'game', 'gamemode.js'),
+    ['const WARMTH = {"items":{}};', 'const FOODS = {"items":{}};', ''].join(String.fromCharCode(10)));
+  const runAlt = spawnSync(process.execPath,
+    [path.join(TMP, 'scripts', 'dev', 'Build-FoodTable.js'), '--data', DATA, '--plugins', alt],
+    { encoding: 'utf8' });
+  if (runAlt.status !== 0) { console.log(runAlt.stdout + runAlt.stderr); }
+  yes('A10 --plugins reads an alternate list and exits 0', runAlt.status === 0);
+  const gotAlt = installed() || {};
+  yes('A10 without Gourmet.esp, Ale reads food (Skyrim.esm name is a strings id)',
+      !!gotAlt['34c5e:Skyrim.esm'] && gotAlt['34c5e:Skyrim.esm'].k === 'food');
+  yes('A10 Gourmet-only drinks are absent (919 Honningbrew Limited)',
+      !gotAlt['919:Gourmet.esp']);
+  yes('A10 LowerCase.esp still lands the potato on Skyrim.esm',
+      !!gotAlt['64b41:Skyrim.esm'] && gotAlt['64b41:Skyrim.esm'].k === 'food');
 }
 
 try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { }
@@ -377,7 +399,7 @@ if (block !== null && idOfSrc && FOODS) {
     of them was either food or a potion at the id the game reports.
   */
   let food = null;
-  try { food = JSON.parse(fs.readFileSync(path.join(HERE, '..', 'game', 'data', 'food.json'), 'utf8')); } catch (e) { food = null; }
+  try { food = JSON.parse(fs.readFileSync(path.join(REPO, 'game', 'data', 'food.json'), 'utf8')); } catch (e) { food = null; }
   const rows = (food && food.items) || {};
   const taken = Object.keys(rows).filter(function (d) {
     const r = rows[d];

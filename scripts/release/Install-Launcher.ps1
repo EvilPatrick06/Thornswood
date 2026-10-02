@@ -7,8 +7,7 @@
       .\scripts\release\Install-Launcher.ps1 -Root C:\Thornswood-DevBuild -From $env:TEMP\tsl -NoPause
 
   In order: closes a game and a launcher left running (Close-Launcher.ps1),
-  copies Thornswood.exe from -From into <Root>\Launcher, clears away the
-  SkyrimTogether.exe an install from before the rename still carries, writes
+  copies Thornswood.exe from -From into <Root>\Launcher, writes
   the icon file and the shortcuts, tells Explorer to redraw, and clears
   Explorer's icon cache when the artwork is new.
 
@@ -59,7 +58,6 @@ if (-not $icon) { Die 'app.ico was not found next to this script or in app' }
 
 $null = New-Item -ItemType Directory -Force -Path $outDir
 $exe = Join-Path $outDir 'Thornswood.exe'
-$oldExe = Join-Path $outDir 'SkyrimTogether.exe'
 
 # Shared with the other scripts that write into the build. Both match on the
 # full path, because the multiplayer client carries the same file name as the
@@ -95,14 +93,6 @@ if (-not $same) {
                  "It is probably still open. " + $_.Exception.Message) }
     Say ('  Thornswood.exe put in place from ' + $From) 'Green'
 }
-if (Test-Path -LiteralPath $oldExe) {
-    try {
-        Remove-Item -LiteralPath $oldExe -Force
-        Say '  removed the old SkyrimTogether.exe' 'DarkGray'
-    } catch {
-        Say '  could not remove the old SkyrimTogether.exe, it is probably still running' 'Yellow'
-    }
-}
 
 # ------------------------------------------------------------ shortcut
 Head 'Shortcut'
@@ -113,9 +103,37 @@ Head 'Shortcut'
 # a reboot does not clear it. Giving the icon its own file, named after its
 # own contents, changes the key the moment the artwork changes and leaves it
 # alone when it has not.
-$iconHash = (Get-FileHash -Path $icon -Algorithm SHA256).Hash.Substring(0, 8).ToLower()
+#
+# The name has to be the one the launcher itself writes (Icons.IconFile), or
+# the sweep below deletes the file the Start menu and pinned shortcuts name and
+# Windows draws them blank (issue #887). Measured 28 Sep: this took the repo's
+# app.ico, while the dev launcher uses app-dev.ico and a main Ship installs the
+# exe CI built from the tag, which can carry older art. So the bytes come out
+# of the exe being installed, the same resource the launcher picks; the repo
+# file is only the fallback.
+$iconBytes = $null
+$isDevArt = $Root.TrimEnd('\') -match '-DevBuild$'
+try {
+    $asm = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($exe))
+    $names = @($asm.GetManifestResourceNames())
+    foreach ($want in @($(if ($isDevArt) { 'app-dev.ico' }), 'app.ico')) {
+        if (-not $want) { continue }
+        $res = $names | Where-Object { $_.EndsWith($want, [StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1
+        if (-not $res) { continue }
+        $st = $asm.GetManifestResourceStream($res)
+        $ms = New-Object IO.MemoryStream
+        $st.CopyTo($ms); $st.Dispose()
+        if ($ms.Length -gt 0) { $iconBytes = $ms.ToArray(); break }
+    }
+} catch { Say ('  could not read the icon out of the exe, using ' + (Split-Path -Leaf $icon)) 'Yellow' }
+if (-not $iconBytes) {
+    $devIcon = Join-Path $Here '..\..\launcher\app-dev.ico'
+    $iconBytes = [IO.File]::ReadAllBytes($(if ($isDevArt -and (Test-Path $devIcon)) { $devIcon } else { $icon }))
+}
+$sha = [Security.Cryptography.SHA256]::Create()
+$iconHash = ([BitConverter]::ToString($sha.ComputeHash($iconBytes), 0, 4)).Replace('-', '').ToLower()
 $iconFile = Join-Path $outDir ("icon-$iconHash.ico")
-if (-not (Test-Path $iconFile)) { Copy-Item $icon $iconFile -Force }
+if (-not (Test-Path $iconFile) -or (Get-Item -LiteralPath $iconFile).Length -ne $iconBytes.Length) { [IO.File]::WriteAllBytes($iconFile, $iconBytes) }
 foreach ($old in @(Get-ChildItem $outDir -Filter 'icon-*.ico' -ErrorAction SilentlyContinue)) {
     if ($old.Name -ne "icon-$iconHash.ico") { Remove-Item $old.FullName -Force -ErrorAction SilentlyContinue }
 }
@@ -164,11 +182,6 @@ $isScratch = -not ($isDevRoot -or $playRoot)
 $ws = New-Object -ComObject WScript.Shell
 $places = if ($isScratch) { @($Root) } else { @([Environment]::GetFolderPath('Desktop'), $Root) }
 foreach ($dest in $places) {
-    # The old name, tidied away so nobody ends up with two shortcuts to the
-    # same launcher after the rename.
-    $was = Join-Path $dest 'Skyrim Together.lnk'
-    if (Test-Path $was) { Remove-Item $was -Force -ErrorAction SilentlyContinue }
-
     # A dev build that previously wrote the play install's name here left a
     # shortcut behind pointing at the dev exe. Take it away rather than leave
     # it lying, but only when it really does point into this dev root: a
@@ -259,9 +272,6 @@ if ($lastIcon -ne $iconHash -and -not $isScratch) {
     Set-Content -Path $stamp -Value $iconHash -Encoding ASCII
     Say '  Explorer restarted, icon is the new one' 'Green'
 }
-
-$stale = Join-Path $outDir 'SkyrimTogether-Launcher.ps1'
-if (Test-Path $stale) { Remove-Item $stale -Force; Say '  Removed the old script launcher' 'DarkGray' }
 
 Head 'Done'
 Say $exe 'Green'

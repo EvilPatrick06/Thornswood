@@ -2,10 +2,12 @@
 
 ## What you need
 
-**Skyrim Special Edition** on Steam, on build **1.6.1170**. Steam moves the
-game past that build on its own, so most copies are newer. The launcher has a
-**Downgrade** button that asks Steam for the right build under your own
-account. Nothing comes from anywhere but Steam.
+**Skyrim Special Edition** on Steam, on any build. The server runs build
+**1.6.1170**, and Thornswood keeps that build in a game folder of its own. If
+your Steam copy is on another build, the launcher's **Downgrade** button asks
+Steam for 1.6.1170's files under your own account and puts them in
+Thornswood's folder. Your Steam copy stays on the build it is on. Nothing
+comes from anywhere but Steam.
 
 **Anniversary Edition is not required** and never will be. If you own it,
 nothing breaks. If you do not, nothing is missing.
@@ -13,35 +15,53 @@ nothing breaks. If you do not, nothing is missing.
 **Vortex**, with a free Nexus Mods account. The mods come from a collection on
 Nexus, and a collection is a Vortex thing: Mod Organizer cannot install it.
 
-Thornswood leaves the Skyrim you already have alone. The launcher builds a
-game folder of its own, `C:\Thornswood\Game`, out of your Steam copy and what
-Vortex put into it. Most of it is hard links to your own files, which take no
-extra space, and the few files other programs rewrite are real copies. Vortex keeps the mods in a profile of their own, so
+Thornswood leaves the Skyrim you already have alone: you can update it,
+verify it and mod it as you like. The launcher builds a game folder of its
+own, `C:\Thornswood\Game`, out of your Steam copy and what Vortex put into it,
+and after that it only takes Vortex's files from there. The mods and Skyrim's
+archives are hard links, which take no extra space, and the launcher checks
+the archives before every Play; everything else is Thornswood's own copy. Vortex keeps the mods in a profile of their own, so
 switching back to your usual profile and running Purge Mods leaves your own
 Skyrim the way it was.
 
+<!-- alpha -->
 ## 1. Apply
 
 **Thornswood is eighteen and over.** Applying is you stating that you are. The
 [rules](/rules) say what that is about before they say anything else.
 
-**Thornswood is in alpha.** Anyone can download and install it. The world stays
-locked until you have applied in the Discord and been given the role, so
-applying is the first thing to do.
+**Thornswood is in alpha, and the world is open by application.** Anyone can
+download and install it. Play unlocks once you have applied in the Discord and
+been given the Playtester role, so applying is the first thing to do.
 
-Come into the Discord and open a ticket. Say who you are, roughly what you are
-after, and whether you have played on a server like this before. A few lines is
-plenty, it is not an essay and nobody is marking it.
+Read the [rules](/rules) first. Then come into the Discord, open a ticket in
+the applications channel and pick **Apply to be an alpha playtester**. It asks
+whether you are eighteen or over, whether you accept the rules, and a few lines
+about who you want to play and a bug you have run into. It is not an essay and
+nobody is marking it. Your answers, the rules one included, are kept against
+your Discord account.
 
-We are taking people in small numbers on purpose. A bug found by four people is
-a bug that gets fixed by the weekend. The same bug found by two hundred is a
-bad week for everybody, and a first impression nobody comes back from.
+Somebody reads every application and answers it. Once you are accepted, your
+Discord account is what lets you in. There is nothing else to sign up for, no
+second password, and no form on this site.
 
-If you are accepted, your Discord account is what lets you in. There is nothing
-else to sign up for, no second password, and no form on this site.
+You can do steps 2 and 3 while you wait. Step 4 works once you are accepted.
+It is an alpha, so things break: a bug found by four people is a bug that gets
+fixed by the weekend, so say when you find one.
+<!-- /alpha -->
+<!-- open -->
+## 1. Come into the Discord
 
-If you are not accepted yet, you are not being turned away. Stay in the Discord
-and you will be asked when there is room.
+**Thornswood is eighteen and over.** Joining is you stating that you are. The
+[rules](/rules) say what that is about before they say anything else.
+
+**Thornswood is open.** Anyone can download it and anyone in the Discord can
+play. Read the [rules](/rules), because being in the Discord and in the world
+means accepting them.
+
+Your Discord account is what lets you in. There is nothing else to sign up
+for, no second password, and no form on this site.
+<!-- /open -->
 
 ## 2. Take the installer
 
@@ -87,9 +107,13 @@ A new character arrives in a quiet hall and the race menu opens, and that is
 where you make your face. When you are done, a panel opens on its own for the
 three choices on the [Professions](/classes) page: your class, your
 profession and the half of it you will make your own, and the town you wake
-up in. Take them in any order; the last one sends you to your inn. You arrive
-in the clothes you stand in and nothing else. The same panel is behind **K**
-from then on, for your skill points.
+up in. Only the town has to be chosen before you leave the hall, and choosing
+it sends you to your inn; your class and profession can wait, and are picked
+later in the world from the same panel. Until you pick a profession you cannot
+make anything at a bench beyond smelting and tanning, so do not wait long if
+you mean to make things. You arrive in the clothes you stand in,
+with forty gold. The same panel is behind **K** from then on, for your skill
+points.
 
 There is no address to type and no password to remember.
 
@@ -112,5 +136,6 @@ expected, and what happened instead, or use the [report](/report) page.
 
 The launcher's own log is at `C:\Thornswood\Profile\launcher.log`. Crash logs,
 if the game closed itself, are in `C:\Thornswood\Profile\MyGames\SKSE`,
-because Thornswood keeps its own My Games folder. The launcher's Logs page
-lists them and opens them. Drag either straight into the channel.
+because Thornswood keeps its own My Games folder. In the launcher,
+**Diagnostics** then **Build the report** puts them in one zip and opens the
+folder it is in: drag that zip into your ticket in the Discord.

@@ -7,7 +7,7 @@
   so the launcher, the setup stub and the installer are all signed the same way
   or all left alone together.
 
-  It does nothing unless tools\signing.json exists. That file is gitignored and
+  It does nothing unless records\signing\signing.json exists. That file is gitignored and
   lives only on a machine that holds a certificate, so Djinn's machine and every
   pull request build keep working exactly as they do today. A build that cannot
   sign is not a failed build.
@@ -61,7 +61,7 @@
   filled in yet. For a real release.
 
   TO TURN SIGNING OFF while you are still setting it up, put "enabled": false in
-  tools\signing.json. The config stays where it is and the build stops trying.
+  records\signing\signing.json. The config stays where it is and the build stops trying.
   A metadata.json whose CertificateProfileName is still a placeholder does the
   same thing on its own, because that is not a mistake, it is the middle of
   setting this up.
@@ -80,26 +80,34 @@ param(
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-if (-not $ConfigPath) { $ConfigPath = Join-Path $Here '..\..\tools\signing.json' }
+if (-not $ConfigPath) { $ConfigPath = Join-Path $Here '..\..\records\signing\signing.json' }
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 
 # ------------------------------------------------------------------ config --
 if (-not (Test-Path -LiteralPath $ConfigPath)) {
     if ($Required) {
-        Say '  There is no tools\signing.json, so nothing can be signed.' 'Red'
+        Say '  There is no records\signing\signing.json, so nothing can be signed.' 'Red'
         Say '  A release has to be signed. See the header of this script.' 'Red'
         exit 1
     }
-    Say '  not signing: no tools\signing.json on this machine' 'DarkGray'
+    Say '  not signing: no records\signing\signing.json on this machine' 'DarkGray'
     exit 0
 }
 
 try {
     $cfg = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
 } catch {
-    Say ("  tools\signing.json is not valid JSON: " + $_.Exception.Message) 'Red'
+    Say ("  records\signing\signing.json is not valid JSON: " + $_.Exception.Message) 'Red'
     exit 1
+}
+
+# Every key read below is optional in the file, so each one missing is added
+# as $null here. Build-Launcher and Ship run this under Set-StrictMode -Version
+# Latest, where reading $cfg.enabled off a file without it throws "The property
+# 'enabled' cannot be found" instead of signing (#1072). No "enabled" is on.
+foreach ($k in 'enabled', 'method', 'dlib', 'metadata', 'thumbprint', 'timestampUrl') {
+    if ($null -eq $cfg.PSObject.Properties[$k]) { $cfg | Add-Member -NotePropertyName $k -NotePropertyValue $null }
 }
 
 # A dlib or metadata that is not a full path is the repository folder's, so the
@@ -138,7 +146,7 @@ function Skip($why) {
 }
 
 if ($null -ne $cfg.enabled -and -not $cfg.enabled) {
-    Skip ('tools' + [char]92 + 'signing.json has "enabled": false')
+    Skip ('records' + [char]92 + 'signing' + [char]92 + 'signing.json has "enabled": false')
 }
 
 $m = if ($cfg.metadata) { [string]$cfg.metadata } else { '' }
@@ -147,7 +155,7 @@ if ($m -and (Test-Path -LiteralPath $m)) {
     try { $meta = Get-Content -LiteralPath $m -Raw | ConvertFrom-Json } catch { $meta = $null }
     # Not $profile: that is an automatic variable holding the PowerShell
     # profile path, and writing to it here would be confusing at best.
-    $profName = if ($meta -and $meta.CertificateProfileName) { [string]$meta.CertificateProfileName } else { '' }
+    $profName = if ($meta -and $meta.PSObject.Properties['CertificateProfileName']) { [string]$meta.CertificateProfileName } else { '' }
     # Anything still carrying the words from the example, or nothing at all.
     # A real profile name is 5 to 100 characters and has no spaces in it.
     if (-not $profName -or $profName -match 'FILL THIS IN|YOUR_|<|\s') {

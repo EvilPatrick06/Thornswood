@@ -40,7 +40,7 @@ commit, push, pull request, merge, a dev Ship (`Ship.ps1 -Channel dev`),
 `Deploy-DevGamemode.ps1` and the other dev deploys, saying what goes out as
 above. Never ask Patrick to run something the person you work with can run.
 When their machine is missing something (the engine build, the VPS key, the
-dev webhook, access to Thornswood-Releases), DEVELOPING.md "Setting up a
+dev webhook), DEVELOPING.md "Setting up a
 machine" says how; do that with them, and put on the board only the one-time
 step that needs Patrick. It is not permission to ship on a hunch: a main Ship
 still needs Patrick to say so. Never start the launcher or the game.

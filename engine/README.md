@@ -10,22 +10,28 @@ each half, with the file and line for each step.
 `.gitmodules:11-15` names the fork, `https://github.com/EvilPatrick06/skymp.git`,
 on the branch `thornswood/engine-changes`, at `engine/skymp`. The repository
 pins a commit, not the branch: `git submodule status` prints
-`d00063515242e0ad1a9affb690c83194acf2c937`, the commit `records\client-build.json:6`
-and `records\server-build.json:10` now both name. The binary that server record
-hashes is the build of that commit, `e5d85ed8...`, built 2026-09-27T05:19:54Z
-and recorded after the Deploy-Server that sent it, so the client half and the
-server half are the same source now. `Deploy-Server.ps1` refuses a rebuilt
-`scam_native.node` until `New-ServerBuildRecord.ps1` records it (see
-"Rebuilding the same commit").
+`1ed42585db413ea40e34a0c1927ff3e05a9346d8`, the commit `records\client-build.json:6`
+and `records\server-build.json:10` both name (issue #1200, 29 September). The
+server record hashes every server file of the build of that commit (issue
+#1214): the binary, `de3256be...`, the JavaScript half the server runs,
+`dist_back\skymp5-server.js`, `9bd548da...`, its map, and the rest
+`scripts\deploy\ServerBuild.ps1` names, so the client half and the server half
+are the same source. `Deploy-Server.ps1`, `Export-ServerPayload.ps1`,
+`Publish-Server.ps1` and the installer on the box refuse any server file that is
+not the recorded one until `New-ServerBuildRecord.ps1` records it (see
+"Rebuilding the same commit"), and the build check refuses a pull request whose
+pin and two records do not name one commit, or whose server record leaves a
+file out or names another commit for one (see "One engine").
 
 `ignore = dirty` (`.gitmodules:15`) keeps a build inside the fork from showing
 as a change here. A different commit checked out in it still shows, and is
 committed here together with the new build records (`.gitmodules:7-10`).
 
-Scripts ask `scripts\release\Where.ps1` where things are: `Engine` is `engine\skymp`
-once it has a `CMakeLists.txt`, else the old `C:\Thornswood-Dev\skymp`
-(`Where.ps1:56-62`); `ServerDist` and `ClientDist` are `build\dist\server` and
-`build\dist\client` in it (`Where.ps1:74-75`); `Out` is the ignored `out`.
+Scripts ask `scripts\release\Where.ps1` where things are, and it reads
+`layout.json` at the repository root: `Engine` is `engine\skymp`, fetched or
+not (`layout.json:6`); `ServerDist` and `ClientDist` are `build\dist\server` and
+`build\dist\client` in it (`layout.json:10-11`); `Out` is the ignored `out`.
+The old `C:\Thornswood-Dev\skymp` is not looked at any more (issue #440).
 
 ## Fetching it
 
@@ -77,6 +83,19 @@ again. When it says the build is not the recorded one and you did not change
 the engine, the fork is not at the pinned commit; when you did, run
 `New-ClientBuildRecord.ps1` and put the record in your pull request.
 
+A fork in a folder whose path has an `&` in it (every worktree under
+`C:\ThornswoodTemps&Worktrees`, for one) builds too (issue #1025). vcpkg sets
+itself up through `bootstrap-vcpkg.bat`, and cmd.exe cuts a path at a bare
+`&`, so `Build-Engine.ps1 -Fork <that fork>` gives the fork's parent folder a
+free drive letter for the run (`subst`), configures and builds through it,
+and removes the letter when it ends, however it ends. It is the parent and not
+the fork itself because the fork's `CMakeLists.txt` compares the build folder
+with `<fork>/build`, and a drive root gives `J://build`. A build configured
+that way is built through the same letter next time; when that letter has
+become another drive, it stops and says to free it or delete the build
+folder. By hand, the same thing is `subst J: "C:\ThornswoodTemps&Worktrees\worktrees"`,
+then `-Fork J:\<name>`, then `subst J: /d`.
+
 ## Configuring
 
 `Build-Engine.ps1` runs this line. `Build-Server.ps1` never configures and
@@ -114,21 +133,34 @@ which is why the move to `engine\skymp` needed this configure again.
 - Reports the fork's branch and commit and any uncommitted file, and never
   changes the branch (`Build-Server.ps1:81-98`). On a detached HEAD it prints
   a NOTE that the branch is not `thornswood/engine-changes`.
-- Builds one project, `build\skymp5-server\skymp5-server.vcxproj`, in parallel
-  (`Build-Server.ps1:129`, `142`). Everything the addon needs builds as a
-  dependency; the client is not built here.
-- Checks that `build\dist\server\scam_native.node` came out and says whether
-  its sha256 differs from the one there before (`Build-Server.ps1:134-165`).
-- Without `-NoRecord` it runs `New-ServerBuildRecord.ps1`
-  (`Build-Server.ps1:171-188`). With it, `records\server-build.json` is left
-  alone, and `Deploy-Server.ps1` refuses the new binary until the record
-  names it (`Build-Server.ps1:167-170`). It sends nothing anywhere.
+- Installs `skymp5-server`'s packages from its `yarn.lock`
+  (`yarn install --frozen-lockfile`), because the JavaScript half bundles them.
+- Removes `dist_back\skymp5-server.js` and its map, then builds
+  `build\skymp5-server\skymp5-server.vcxproj`, which builds
+  `skymp5-server-ts` (the JavaScript half) first, and
+  `build\skymp5-scripts\skymp5-scripts.vcxproj` (the compiled Papyrus in
+  `data\scripts`). The fork's CMake runs the TypeScript build only when a
+  `.ts` file is newer than the bundle, never for a package or lockfile change,
+  so the bundle is always written again; esbuild writes the same bytes for the
+  same sources (issue #1214). Everything else builds as a dependency; the
+  client is not built here.
+- Lists every server file that came out, with its hash, and says which changed.
+- Without `-NoRecord` it runs `New-ServerBuildRecord.ps1` on the build and the
+  fork it just built. With it, `records\server-build.json` is left alone, and
+  every publish and deploy refuses the new files until the record names them.
+  It sends nothing anywhere.
 
-`scripts\release\New-ServerBuildRecord.ps1` writes `records\server-build.json`: the
-binary's sha256, size and build time, and the fork's origin, branch, commit,
-upstream and merge base (`New-ServerBuildRecord.ps1:98-112`). It warns when
-the fork has uncommitted changes (`:69-74`) or a source file under
-`skymp5-server\cpp` or `ts` is newer than the binary (`:80-97`).
+`scripts\release\New-ServerBuildRecord.ps1` writes `records\server-build.json`: every
+server file `scripts\deploy\ServerBuild.ps1` names, each with its sha256, size and
+the fork commit, the binary's sha256 and build time at the top, and the fork's
+origin, branch, commit, upstream and merge base. It records only files it can
+tie to the fork: every TypeScript source in the bundle's map is the fork's word
+for word (`scripts\release\server-bundle-sources.js`), the packages are the
+lockfile's (`yarn check --integrity`), `package.json`, `yarn.lock` and
+`data\scripts` are the fork's byte for byte, and `launch_server.bat` is the
+configure's. Anything else stops it and nothing is written. It warns when the
+fork has uncommitted changes or a source file under `skymp5-server\cpp` or `ts`
+is newer than the binary.
 
 ## The client
 
@@ -169,10 +201,11 @@ hashed `ecb029cb...`, not the recorded `de74c582...`. The recorded binary was
 put back from `local\engine-dist-c8832519`, so neither record changed and
 `Deploy-Server.ps1` still takes it (`docs\archive\todo-list-2026-09-25.md:2987`).
 
-Since 27 September both records name `d0006351` and both halves are built from
-it: `records\server-build.json` hashes `e5d85ed8...`, the build of that commit,
-recorded after the Deploy-Server of that morning, and the `c8832519` build above
-is history.
+From 27 September both records named `d0006351`. Then the client record and
+the pin moved on (#1016 to `44366c7e`, #898 to `c63fe637`) and the server record
+did not, so the servers ran the `d0006351` build while every later server fix
+sat in the fork unused (issue #1200). Since 29 September the pin and both
+records name `1ed42585` again, built together; "One engine" below keeps it so.
 
 So the recorded binaries stay unless the engine changed:
 
@@ -184,8 +217,41 @@ So the recorded binaries stay unless the engine changed:
   (Get-FileHash engine\skymp\build\dist\server\scam_native.node -Algorithm SHA256).Hash.ToLower() -eq (Get-Content records\server-build.json -Raw | ConvertFrom-Json).sha256
   ```
   It prints True when the recorded binary is back.
-- When the engine did change: commit and push on `thornswood/engine-changes`
-  in the fork, run `Build-Server.ps1` without `-NoRecord`, build the client
-  and run `New-ClientBuildRecord.ps1`, then commit the new submodule commit
-  and both records in one pull request here. The server then goes up with
-  `Deploy-Server.ps1`, and the client files with the next Ship.
+- When the engine did change: see "One engine" below.
+
+## One engine
+
+Decided by Patrick on 29 September (issue #1200): "we should always be using
+the new one ... What's the point in the changes if we aren't using them." There
+is one engine, the head of `thornswood/engine-changes` in the fork, and the pin
+here, `records\client-build.json` and `records\server-build.json` all name that
+one commit. No change to the engine lives anywhere else: not on a local branch
+of somebody's `engine\skymp`, not as an uncommitted edit, not in a build nobody
+recorded.
+
+A change to the engine goes like this:
+
+1. A branch in the fork, from the head of `thornswood/engine-changes`, in a
+   worktree of the fork, and a pull request in the fork, merged with a merge
+   commit. A merge commit has the same files as the branch it merges, so a
+   build of the branch's last commit is a build of the head.
+2. Build both halves from that commit: `Build-Engine.ps1 -Fork <that worktree>`,
+   then `Build-Server.ps1 -Fork <that worktree>`, which builds every server file
+   again from it (the JavaScript half included) and records them. A fork under
+   a path with an `&` in it is reached through the drive letter it was
+   configured through (`K:\<fork>`).
+3. `New-ClientBuildRecord.ps1 -Dist <fork>\build\dist\client -Clone <fork>`; the
+   server record came out of step 2.
+4. One pull request here with the new pin (`git -C engine/skymp checkout
+   <commit>`, then `git add engine/skymp`), both records, and the commit named
+   in `THIRD-PARTY.md` and `site\data\site\credits.md`.
+5. After it merges: the server to the dev server with `Publish-Server.ps1
+   -Channel dev`, the client with the next dev Ship.
+
+Two harnesses hold it. `tests\test-one-engine.js`, in the build check on every
+pull request, is red when the pin and the two records do not name one commit,
+or name another branch or fork than `.gitmodules`, or when the server record
+leaves out a server file or says one was built from another commit. `tests\test-engine-at-fork-head.js`,
+in the nightly checks, asks GitHub whether the pin is the head of the branch
+(or the head is only merge commits over it with the same files), and is red
+when a fork change has been merged and not pinned here.

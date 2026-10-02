@@ -26,13 +26,13 @@
 
   Read only.
 */
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const CR = String.fromCharCode(13);
 
-const SITE = process.env.SITE || path.join(TOOLS_DIR, '..', 'site', 'server.js');
-const GAME = process.env.GAMEMODE || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
+const SITE = process.env.SITE || path.join(REPO_DIR, 'site', 'server.js');
+const GAME = process.env.GAMEMODE || path.join(REPO_DIR, 'game', 'gamemode.js');
 const site = fs.readFileSync(SITE, 'utf8').split(CR).join('');
 const game = fs.readFileSync(GAME, 'utf8').split(CR).join('');
 
@@ -66,14 +66,32 @@ yes('the /api/allowed route is in server.js', route.indexOf('return sendJson(res
   maps a Discord id to what standingCached would return, or to an Error for
   one that throws. Resolves to the JSON the route would send.
 */
+// Since issue #415 the route asks standingsForDoor for everybody at once
+// (four at a time, inside the door's time); lifted out of server.js the same
+// way and run over the same pretend standingCached. A server.js from before
+// that (SITE=...) has no such function and its route never names it.
+const forDoorAt = site.indexOf('const DOOR_BUDGET_MS');
+const forDoorFn = forDoorAt < 0 ? -1 : site.indexOf('async function standingsForDoor(', forDoorAt);
+const forDoorEnd = forDoorFn < 0 ? -1 : toClose(site, forDoorFn);
+const forDoor = (forDoorFn >= 0 && forDoorEnd > forDoorFn) ? site.slice(forDoorAt, forDoorEnd) : '';
+
 async function ask(linked, standings, devDoor) {
   let sent = null;
+  const standingCached = async function (id) {
+    const s = standings[id];
+    if (s instanceof Error) throw s;
+    return s;
+  };
+  const standingsForDoor = forDoor
+    ? new Function('standingCached', 'discordQuietMs', forDoor + '\nreturn standingsForDoor;')(
+        standingCached, function () { return 0; })
+    : undefined;
   // The key comes in the X-Thornswood-Key header since entry 248, the way the
   // door sends it. keyInAddress is the route's note of doors that still put
   // it in the address; test-site-auth.js checks that side.
   const run = new Function(
     'route', 'devDoor', 'req', 'res', 'cfg', 'url', 'sameSecret', 'sendJson',
-    'jsonFile', 'LINKED', 'standingCached', 'keyInAddress',
+    'jsonFile', 'LINKED', 'standingCached', 'keyInAddress', 'standingsForDoor', 'activeBans', 'pkProfiles',
     'return (async function () {\n' + route + '\n})();');
   await run(
     devDoor ? '/dev/api/allowed' : '/api/allowed', !!devDoor,
@@ -82,11 +100,10 @@ async function ask(linked, standings, devDoor) {
     function (a, b) { return a === b; },
     function (res, code, body) { sent = { code: code, body: JSON.parse(JSON.stringify(body)) }; },
     function () { return linked; }, 'linked.json',
-    async function (id) {
-      const s = standings[id];
-      if (s instanceof Error) throw s;
-      return s;
-    }, new Set());
+    // No staff bans here (#412); test-staff-bans.js runs them.
+    standingCached, new Set(), standingsForDoor, function () { return []; },
+    // Nobody killed for good here (#1010); test-bans-pk.js runs that.
+    function () { return []; });
   return sent;
 }
 

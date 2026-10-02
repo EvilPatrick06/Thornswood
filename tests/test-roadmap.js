@@ -15,23 +15,24 @@
 // twice over: "B opens it" and "twenty four emotes". B is the plugin's fallback
 // for when the ini has no WheelKey line at all (thornswood-emotes.js,
 // key('WheelKey', 48)); the ini that ships says 34, which is G. Twenty four was
-// the count when the wheel was two rings of twelve; it is six categories and
-// thirty four emotes now. Both numbers had been copied out of a note rather
-// than out of the code, which is how a wrong one gets onto a page.
+// the count when the wheel was two rings of twelve, and again when it was
+// six categories and thirty four emotes. Both numbers had been copied out of
+// a note rather than out of the code, which is how a wrong one gets onto a
+// page. The wheel is one list now, with eight quick slots.
 //
 // So nothing below takes a key or a count on trust. The letter comes out of
 // launcher/Thornswood.ini, decoded with that file's own A to Z table, and
-// the count comes out of the plugin's CATEGORIES array. A key that moves or a
+// the count comes out of the plugin's EMOTES array. A key that moves or a
 // wheel that grows fails here until the words say so too.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const CR = String.fromCharCode(13);
 
 function read(rel) {
-  let t = fs.readFileSync(path.join(TOOLS_DIR, rel), 'utf8').split(CR).join('');
+  let t = fs.readFileSync(path.join(REPO_DIR, rel), 'utf8').split(CR).join('');
   if (t.charCodeAt(0) === 0xFEFF) { t = t.slice(1); }
   return t;
 }
@@ -42,7 +43,7 @@ function yes(what, cond) {
   else { fail++; console.log('FAIL  ' + what); }
 }
 
-/* Numbers as the site writes them: "thirty four", "thirty-four" or "34". */
+/* Numbers as the site writes them: "fifty nine", "fifty-nine" or "59". */
 const ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven',
   'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen',
   'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
@@ -58,7 +59,7 @@ function says(text, n) {
 
 // ------------------------------------------------------------- the board ----
 let board = null;
-try { board = JSON.parse(read('../site/data/board.json')); }
+try { board = JSON.parse(read('site/data/board.json')); }
 catch (e) { console.log('      board.json: ' + e.message); }
 yes('board.json parses', !!board);
 
@@ -126,7 +127,7 @@ yes('the row keeps done false like every other roadmap row, since Done is the se
     !!w && w.row.done === false);
 
 // -------------------------------------------------------------- the keys ----
-const ini = read('../launcher/Thornswood.ini');
+const ini = read('launcher/Thornswood.ini');
 function iniKey(name) {
   const m = ini.match(new RegExp('^\\s*' + name + '\\s*=\\s*(\\d+)', 'm'));
   return m ? parseInt(m[1], 10) : NaN;
@@ -159,30 +160,30 @@ yes('the row says Tab moves on, as the ini does', /\bTab\b/.test(text));
 yes('the row says ' + stopLetter + ' stops, as the ini does', !!stopLetter && stops(text, stopLetter));
 
 /* "The launcher's Controls page moves any of those keys" is a claim too. */
-const keys = read('../launcher/app/Keys.cs');
+const keys = read('launcher/app/Keys.cs');
 yes('the launcher\'s Controls page does list WheelKey, PageKey and StopKey, as the row says',
     ['WheelKey', 'PageKey', 'StopKey'].every(function (k) {
       return keys.indexOf('ThornIni, "' + k + '"') !== -1;
     }));
 
 // ------------------------------------------------------------ the emotes ----
-const plugin = read('../game/plugins/thornswood-emotes.js');
-const a = plugin.indexOf('const CATEGORIES = [');
+const plugin = read('game/plugins/thornswood-emotes.js');
+const a = plugin.indexOf('const EMOTES = [');
 const b = a < 0 ? -1 : plugin.indexOf('\n];', a);
-let cats = null;
+let list = null;
 try {
   if (a >= 0 && b >= 0) {
-    cats = new Function('return ' + plugin.slice(a + 'const CATEGORIES = '.length, b + 2) + ';')();
+    list = new Function('return ' + plugin.slice(a + 'const EMOTES = '.length, b + 2) + ';')();
   }
-} catch (e) { console.log('      CATEGORIES: ' + e.message); }
-yes('the plugin\'s CATEGORIES array evaluates', Array.isArray(cats) && cats.length > 0);
-const nCats = cats ? cats.length : 0;
-const nEmotes = cats ? cats.reduce(function (n, c) { return n + (c.items || []).length; }, 0) : 0;
+} catch (e) { console.log('      EMOTES: ' + e.message); }
+yes('the plugin\'s EMOTES array evaluates', Array.isArray(list) && list.length > 0);
+const nEmotes = list ? list.length : 0;
 const events = (a >= 0 && b >= 0) ? (plugin.slice(a, b).match(/event: '/g) || []).length : -1;
 yes('and it agrees with a plain count of its event lines, ' + nEmotes + ' and ' + events,
     nEmotes > 0 && nEmotes === events);
 yes('the row gives the plugin\'s count, ' + nEmotes + ' emotes', !!w && says(text, nEmotes));
-yes('and its ' + nCats + ' categories', !!w && says(text, nCats));
+yes('the row names the eight quick slots and the search',
+    !!w && says(text, 8) && /quick slots/.test(text) && /search/.test(text));
 
 // ----------------------------------------------------------------- words ----
 yes('the row has no em dash in it', text.indexOf(String.fromCharCode(0x2014)) === -1);
@@ -190,7 +191,7 @@ yes('the row never says player', !/\bplayers?\b/i.test(text));
 
 // -------------------------------------------------- the note in todo.md ----
 /* The note the wrong numbers were copied from, so the next copy is right. */
-const todo = read('../site/data/todo.md');
+const todo = read('site/data/todo.md');
 const t0 = todo.indexOf('- Emote wheel.');
 const t1 = t0 < 0 ? -1 : todo.indexOf('\n- ', t0 + 1);
 const note = t0 < 0 ? '' : todo.slice(t0, t1 < 0 ? todo.length : t1).replace(/\s+/g, ' ');

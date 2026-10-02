@@ -10,15 +10,24 @@ What it does:
            or not anybody was looking at Discord. #tickets is the staff only
            channel closed tickets are written down in, and where a ticket
            goes when its thread will not open
-  Watch    asks the site every five minutes over its public name, and says so
-           in #dev when it stops answering and when it comes back
-  Services reads the VPS watchdog's watch.log every minute and says in the
-           same channel when a service needs a look, could not be started,
-           or did not come back after a restart
+  Services posts in the staff channel what the VPS watchdog says has died
+           and when it is back, from its outbox, once each (issue #447)
   Reports  says each thing sent in on the site's public report page in the
            staff channel, the day it arrives
   Holds    a panel in #choose-your-hold where a Member picks their hold
            and which announcements ping them
+  Live smoke the living checklist in #test-tasks: /live-smoke start opens a
+           dated session thread with one message per row of the Live set, and
+           testers mark their own rows on it. /live-smoke refresh keeps the
+           same rows standing in the channel between sessions, and
+           /live-smoke report counts a session's marks back to staff. The
+           rows come out of live-smoke-discord-export.json beside this file,
+           and a mark is an edit to a Discord message and nothing else
+  Heartbeat writes heartbeat.json beside this file every minute, so the
+           watchdog can tell a bot that is running from one that is on
+           Discord (issue #449)
+  Uptime   pings an outside monitor every minute while it is on Discord, so
+           a bot or a VPS that stops is noticed from outside the box (#449)
 
 Everything it needs is in env:
 
@@ -30,18 +39,34 @@ Everything it needs is in env:
   TICKET_LOG       staff only channel closed tickets are recorded in, and where
                    a ticket goes when its thread will not open. Checked by its
                    permissions, never trusted by its name
-  STAFF_ROLES      comma separated, who gets pulled into every ticket thread
-  CREATOR_ROLES    comma separated, added to Apply: Content Creator only
+  STAFF_ROLES      comma separated role IDs (preferred) or names, who gets
+                   pulled into every ticket thread
+  CREATOR_ROLES    comma separated role IDs or names, added to Apply:
+                   Content Creator only
   TICKET_COOLDOWN  seconds between one person's tickets, default 300
-  WATCH_CHANNEL_ID id of the staff channel the site watcher speaks in,
+  WATCH_CHANNEL_ID id of the staff channel the watchdog's messages go in,
                    default whatever dev-channel.txt beside this file holds
-  WATCH_EVERY      seconds between checks, default 300
-  WATCH_MISSES     how many in a row before it says so, default 2
-  WATCH_LOG        the watchdog's log, default the one Watch-Services.ps1
-                   writes on the VPS
-  WATCH_LOG_EVERY  seconds between reads of it, default 60
+  WATCH_DIR        the watchdog's folder, default the one Watch-Services.ps1
+                   makes on the VPS
+  WATCH_READ_EVERY seconds between reads of its outbox, default 60
   HOLD_CHANNEL     channel the hold panel lives in, default choose-your-hold
-  MEMBER_ROLE      role that may pick a hold, default Member
+  MEMBER_ROLE      role ID (preferred) or name that may pick a hold, default Member
+  LIVE_SMOKE_EXPORT       the Live set, default live-smoke-discord-export.json
+                          beside this file
+  LIVE_SMOKE_CHANNEL      channel the sessions live in, default test-tasks
+  LIVE_SMOKE_ADMIN_ROLES  comma separated role IDs (preferred) or names, who
+                          may start, reset and refresh a session, default
+                          Owner,Dev,Lead GM,Lead Gamemaster
+  LIVE_SMOKE_DENY_USER_IDS comma separated account ids that may not mark a
+                          row, empty by default and set only on the VPS
+  HEARTBEAT_FILE   where the heartbeat goes, default heartbeat.json beside this
+                   file, which is where the watchdog reads it
+  HEARTBEAT_EVERY  seconds between heartbeats, default 60
+  PING_URL         the outside monitor's ping address. A secret, set only by
+                   Install-Bot.ps1 -SetPing and never written to the log. Not
+                   set means no ping
+  PING_EVERY       seconds between pings, default 60
+  PING_TIMEOUT     seconds one ping may take, default 10
 
 It is written to keep going when a piece of it fails. A card that will not
 draw still gets a greeting, a site that is down still gets a thread, and a
@@ -108,9 +133,11 @@ TICKET_LOG = [n.strip().lower() for n in
               os.environ.get('TICKET_LOG', 'tickets,ticket-log').split(',')
               if n.strip()]
 # Who gets pulled into every ticket thread.
-STAFF = [r.strip().lower() for r in
-         os.environ.get('STAFF_ROLES', 'Owner,Gamemaster,Dev,Loremaster,Moderator').split(',')
-         if r.strip()]
+# Tokens may be Discord role snowflake IDs (digits) or names. IDs survive a
+# rename; names are kept so an unmigrated bot.env.json still works.
+_STAFF_RAW = [r.strip() for r in
+              os.environ.get('STAFF_ROLES', 'Owner,Gamemaster,Dev,Loremaster,Moderator').split(',')
+              if r.strip()]
 
 # Roles that see one kind of ticket and not the rest.
 #
@@ -118,10 +145,42 @@ STAFF = [r.strip().lower() for r in
 # has no reason to be reading somebody's playtest application or a report about
 # another person. It does have every reason to read applications to join it,
 # so it is added to those threads and no others.
-CREATOR = [r.strip().lower() for r in
-           os.environ.get('CREATOR_ROLES', 'Content Creator').split(',')
-           if r.strip()]
+_CREATOR_RAW = [r.strip() for r in
+                os.environ.get('CREATOR_ROLES', 'Content Creator').split(',')
+                if r.strip()]
+
+def _role_tokens(raw):
+    ids, names = set(), set()
+    for t in raw:
+        t = (t or '').strip()
+        if not t:
+            continue
+        if t.isdigit():
+            ids.add(int(t))
+        else:
+            names.add(t.lower())
+    return ids, names
+
+def _role_hit(role, ids, names):
+    return getattr(role, 'id', None) in ids or role.name.lower() in names
+
+def _who_hits(who, ids, names):
+    for r in getattr(who, 'roles', None) or []:
+        if _role_hit(r, ids, names):
+            return True
+    return False
+
+def _guild_roles(guild, ids, names):
+    return [r for r in guild.roles if _role_hit(r, ids, names)]
+
+STAFF_IDS, STAFF_NAMES = _role_tokens(_STAFF_RAW)
+CREATOR_IDS, CREATOR_NAMES = _role_tokens(_CREATOR_RAW)
+# Name-only views kept for refusal text and older harnesses that read STAFF.
+STAFF = sorted(STAFF_NAMES) if STAFF_NAMES else [t.lower() for t in _STAFF_RAW if not t.isdigit()]
+CREATOR = sorted(CREATOR_NAMES) if CREATOR_NAMES else [t.lower() for t in _CREATOR_RAW if not t.isdigit()]
 EXTRA_STAFF = {'creator': CREATOR}
+EXTRA_STAFF_IDS = {'creator': (CREATOR_IDS, CREATOR_NAMES)}
+
 
 # Where the site watcher speaks. Staff, not public: an outage is something to
 # fix, not an announcement.
@@ -190,36 +249,47 @@ def _staff_channel_id():
 # staff-general up by name, which is what was wanted.
 TROUBLE_ID = _int_env('TROUBLE_CHANNEL_ID', _staff_channel_id())
 
+# The bot's own records, joins.json, open-tickets.json, heartbeat.json and
+# commands-synced.json, go in a folder of their own, data beside bot.py, and
+# so does bot.log, which the service writes (issue #1104). The service's
+# account may write there and nowhere else in the bot's folder: the code is
+# read only to it, so nothing that gets into the bot can rewrite bot.py or put
+# a module beside it for the next start to import. The service names the
+# folder in THORNSWOOD_BOT_DATA (BotService.cs). With no data folder yet, a
+# box whose full install has not run since, the records stay beside bot.py
+# where they were, so a code only deploy never starts the join numbers again;
+# the full install moves them across while the bot is stopped (Bot-Service.ps1).
+HERE = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.environ.get('THORNSWOOD_BOT_DATA') or (
+    os.path.join(HERE, 'data') if os.path.isdir(os.path.join(HERE, 'data')) else HERE)
+
 # Where the site writes the sessions that went wrong. The bot and the site run
 # on the same box, so this is a file rather than a request: no ticket, no port
-# and nothing to keep in step.
+# and nothing to keep in step. In for-bot, a folder of the site's data that
+# holds only what the site writes for the bot, so the bot's account is granted
+# read on that and never on the site's own records, sessions.json among them
+# (issue #1102).
 TROUBLE_FILE = os.environ.get(
-    'TROUBLE_FILE', r'C:\Thornswood-Docs\data\trouble.json')
+    'TROUBLE_FILE', r'C:\Thornswood-Docs\data\for-bot\trouble.json')
 TROUBLE_EVERY = _int_env('TROUBLE_EVERY', 120)
 
 # Where the site writes what people send in on its public report page, read
 # the same way as trouble.json and said in the same staff channel.
 REPORTS_FILE = os.environ.get(
-    'REPORTS_FILE', r'C:\Thornswood-Docs\data\inbox.json')
+    'REPORTS_FILE', r'C:\Thornswood-Docs\data\for-bot\inbox.json')
 REPORTS_EVERY = _int_env('REPORTS_EVERY', 120)
 # More than this many in one look is a script, not five people, because the
 # site takes five an hour from any one place. Then one line says how many.
 REPORTS_AT_ONCE = 5
 
 
-WATCH_EVERY = _int_env('WATCH_EVERY', 300)
-# Two in a row rather than one. A single timeout is a moment of packet loss and
-# nobody wants to read about it. Two, five minutes apart, is the site being
-# down. Caddy's own repeating trigger is five minutes as well, so anything that
-# clears by itself has had a go at clearing before this says a word.
-WATCH_MISSES = _int_env('WATCH_MISSES', 2)
-
-# What the watchdog Watch-Services.ps1 puts on the VPS writes down. The bot
-# runs on the same box as the same SYSTEM account, so it can read it.
-WATCH_LOG = os.environ.get('WATCH_LOG', r'C:\Thornswood-Watch\watch.log')
-# Once a minute. The watchdog itself runs every five, so this is never more
-# than a minute behind it, and the file is two thousand short lines at most.
-WATCH_LOG_EVERY = _int_env('WATCH_LOG_EVERY', 60)
+# The folder the watchdog Watch-Services.ps1 puts on the VPS. The bot runs on
+# the same box, as its own service account, which Install-Bot.ps1 grants read
+# on this folder and write on alerts-sent-bot.txt (Bot-Service.ps1).
+WATCH_DIR = os.environ.get('WATCH_DIR', r'C:\Thornswood-Watch')
+# Once a minute. The watchdog itself runs every five and gives this two and a
+# half minutes to post a message before it posts it through its webhook.
+WATCH_READ_EVERY = _int_env('WATCH_READ_EVERY', 60)
 
 if not TOKEN:
     raise SystemExit('No DISCORD_TOKEN. Install-Bot.ps1 sets it.')
@@ -243,9 +313,21 @@ class Thornswood(discord.Client):
         a second time is not free and is not meaningful, and the two lines
         were sitting in on_ready where every reconnect did it again.
         """
+        # First, so a site that is slow to answer below cannot delay it.
+        asyncio.create_task(heartbeat())      # for the watchdog, #449
+        asyncio.create_task(uptime_ping())    # for the outside monitor, #449
+        # The one switch (#428), before the panel is built from KINDS.
+        set_open(await asyncio.get_running_loop().run_in_executor(None, site_open))
+        log('the world is %s' % ('open to everybody' if OPEN else 'in alpha, open by application'))
         self.add_view(TicketPanel())          # so it keeps working after a restart
         self.add_view(TicketTools())          # and so does Close on every old ticket
         self.add_view(HoldPanel())            # and the hold and ping buttons
+        # One per row in the Live smoke export, so a session opened before the
+        # last restart can still be marked. A row dropped from the export is a
+        # row whose buttons go quiet, which is why a changed set gets a new
+        # session rather than the old one carried on.
+        for view in live_smoke_views():
+            self.add_view(view)
 
 
 client = Thornswood(intents=intents)
@@ -256,11 +338,36 @@ def log(*a):
     print('[thornswood-bot]', *a, flush=True)
 
 
+def as_typed(v, n=1000):
+    """
+    Words somebody else typed, as Discord will show them and no more.
+
+    Everything a stranger writes goes through this before it is posted: an
+    @everyone in it is text rather than a ping, a role id is text, and
+    markdown in it is shown as it was typed instead of being read as
+    formatting. It trims the ends and cuts at n characters first, so one long
+    answer cannot take a post over Discord's limit on its own.
+
+    The send that carries the text still switches mentions off (see the ticket
+    thread and report_say). This is the first of the two, not the only one: a
+    mention Discord learns to write differently tomorrow would get past the
+    escaping and still not ping anybody.
+    """
+    v = str(v or '').strip()[:n]
+    return discord.utils.escape_mentions(discord.utils.escape_markdown(v))
+
+
 # ------------------------------------------------------------------ site --
-def push(kind, title, detail, by, discord_id):
+def push(kind, title, detail, by, discord_id, rules=None):
     """Send a ticket to the site. Runs off the event loop, and a failure here
        is never allowed to lose the ticket: the thread in Discord is the
-       record, this is the convenience."""
+       record, this is the convenience.
+
+       rules is the application's answer to the rules question, as
+       {'said': their words, 'yes': whether it read as a yes}, or None on a
+       ticket that does not ask it. The site keeps the latest one against the
+       Discord id (#428), because the inbox is trimmed and the record of who
+       accepted the rules should not be."""
     if not KEY:
         # Silent for as long as this has existed, which means a bot with no key
         # set looked exactly like a working one: the thread appeared, the site
@@ -269,10 +376,13 @@ def push(kind, title, detail, by, discord_id):
             'inbox. The thread in Discord is the only copy. Install-Bot.ps1 '
             'sets the key in bot.env.json on the VPS.')
         return
-    body = json.dumps({
+    sent = {
         'key': KEY, 'kind': kind, 'title': title,
         'detail': detail, 'by': by, 'discordId': str(discord_id)
-    }).encode()
+    }
+    if rules is not None:
+        sent['rules'] = rules
+    body = json.dumps(sent).encode()
     req = urllib.request.Request(
         SITE + '/api/ticket', data=body,
         headers={'Content-Type': 'application/json'}, method='POST')
@@ -338,12 +448,11 @@ def private_channel_ok(guild, ch):
     about somebody in front of the person it is about.
     """
     try:
-        staff = set(STAFF)
         if ch.permissions_for(guild.default_role).view_channel:
             return False
         roles = list(guild.roles)
         for r in roles:
-            if r == guild.default_role or r.name.lower() in staff:
+            if r == guild.default_role or _role_hit(r, STAFF_IDS, STAFF_NAMES):
                 continue
             if getattr(r.permissions, 'administrator', False):
                 continue
@@ -354,8 +463,7 @@ def private_channel_ok(guild, ch):
         for who, ow in (getattr(ch, 'overwrites', None) or {}).items():
             if who in roles or getattr(who, 'bot', False):
                 continue
-            held = set(x.name.lower() for x in (getattr(who, 'roles', None) or []))
-            if ow.view_channel and not (held & staff):
+            if ow.view_channel and not _who_hits(who, STAFF_IDS, STAFF_NAMES):
                 return False
         return True
     except Exception:
@@ -423,7 +531,7 @@ async def log_channel(guild, make=True):
                                                   send_messages=True),
         }
         for r in guild.roles:
-            if r.name.lower() in set(STAFF):
+            if _role_hit(r, STAFF_IDS, STAFF_NAMES):
                 over[r] = discord.PermissionOverwrite(view_channel=True,
                                                       send_messages=True)
         where = by_name(guild, TICKETS)
@@ -489,7 +597,7 @@ def thread_block(guild, ch):
 # Install-Bot.ps1 sends a fixed list of files and deletes nothing in this
 # folder, so neither the full run nor -CodeOnly can overwrite or remove it,
 # and .gitignore keeps it out of the repo, like open-tickets.json.
-JOINS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'joins.json')
+JOINS = os.path.join(DATA_DIR, 'joins.json')
 JOIN_FLOOR = _int_env('JOIN_NUMBER_FLOOR', 28)
 
 
@@ -629,12 +737,15 @@ async def on_member_join(member):
 
 
 # --------------------------------------------------------------- tickets --
-# 'Apply to play' is not here on purpose. Everybody in the world right now is
-# a playtester, so that is the one application to be in it, and when the doors
-# open there will be no application to play at all. Leaving both up asked
-# people to guess which one they wanted and half of them guessed wrong.
+# 'Apply to play' is not here on purpose. Patrick, 28 Sep: "we are in alpha so
+# the world is open by application". Anyone can download it, and the one way
+# into the world is this application, which gives the Playtester role when it
+# is accepted. A second 'Apply to play' asked people to guess which one they
+# wanted and half of them guessed wrong. The key stays 'playtest' because the
+# site inbox and ROLE_FOR file it under that name.
 KINDS = [
-    ('playtest',    'Apply to playtest',    'How you get in. Break it on purpose and write down how.'),
+    ('playtest',    'Apply to be an alpha playtester',
+                    'How you get into the world. Anyone can apply. Break it and write down how.'),
     ('jarl',        'Apply: Jarl',          'A seat in a hold. In character, and the first ones come out of these.'),
     ('gamemaster',  'Apply: Gamemaster',    'Run events, settle disputes, hold the line in character.'),
     ('loremaster',  'Apply: Loremaster',    'Keep the history straight and write the rest of it.'),
@@ -679,6 +790,39 @@ def _job(what, examples):
 # Discord id, at a time, kept in the thread and in the site inbox.
 AGE_Q = ('Are you 18 or over?', 'Thornswood is an adult server. Yes or no.', False)
 AGE_KINDS = ('playtest',)
+
+# #428: before this, nobody ever accepted the rules. Somebody could join for the
+# invite, be let in, press Play and have agreed to nothing. Asked on the same
+# tickets as the age question, for the same reason and in the same way: their
+# own words against their Discord id, at a time, in the thread, the site inbox
+# and the site's record of who accepted (push, then /api/ticket on the site).
+# Anything that does not read as a yes goes at the top of the thread for staff,
+# and nobody is given the role without somebody reading it.
+RULES_Q = ('Do you accept the rules in #rules?',
+           'Read #rules and thornswood.net/rules first. Yes or no.', False)
+RULES_KINDS = AGE_KINDS
+
+_ACCEPT = ('yes', 'yep', 'yeah', 'yup', 'y ', 'ye', 'i do', 'i accept', 'accept',
+           'i agree', 'agree', 'i have', "i've", 'sure', 'of course', 'ok',
+           'okay', 'absolutely', 'definitely', 'read and', 'correct', 'affirmative')
+
+
+def accepted_rules(text):
+    """
+    Whether an answer to the rules question reads as a yes.
+
+    Generous, like said_yes, and it never refuses anybody by itself: a no only
+    puts a line at the top of the thread for a person to read. A no word
+    anywhere at the start wins, so "no, not yet" is never taken for a yes.
+    """
+    t = (text or '').strip().lower()
+    if not t:
+        return False
+    if t == 'n' or t.startswith(_NO) or t.startswith(("don't", 'dont', 'do not',
+                                                     'i do not', "i don't", 'i dont',
+                                                     'haven', 'have not', 'not yet')):
+        return False
+    return t == 'y' or t.startswith(_ACCEPT)
 
 _NO  = ('no', 'nope', 'nah', 'not ', 'under', 'minor')
 _YES = ('yes', 'yep', 'yeah', 'yup', 'y ', 'ye', 'i am', 'im ', "i'm ", 'sure',
@@ -746,10 +890,15 @@ QUESTIONS = {
     # because that is what somebody is here for, and about testing, because
     # that is what being in it means today. It does not ask who they are
     # outside the game: that is answered by them being in the Discord.
+    #
+    # Discord takes five questions on a form and no more, so the rules
+    # question (#428) took the place of "Have you roleplayed before", which
+    # now rides along in the character question's hint.
     'playtest': [
         AGE_Q,
-        ('Have you roleplayed before, and where?', 'No is a perfectly good answer.', True),
-        ('Who do you want to play?', 'A sentence about the character, not a biography.', True),
+        RULES_Q,
+        ('Who do you want to play?',
+         'A sentence about the character, and where you have roleplayed before, if anywhere.', True),
         ('How much time can you give it?', 'Hours a week, and which days.', True),
         ('Describe a bug you have run into', 'What you did, what happened, what should have happened. Short.', True),
     ],
@@ -824,42 +973,77 @@ class TicketModal(discord.ui.Modal):
         guild = interaction.guild
         who = interaction.user
 
-        lines = []
-        for item, (q, _, _) in zip(self.fields, QUESTIONS[self.kind]):
-            lines.append('**%s**\n%s' % (q, (item.value or '').strip() or 'nothing said'))
-        detail = '\n\n'.join(lines)
-
         asking = ROLE_FOR.get(self.kind)
-        if asking:
-            detail = '**Asking for:** ' + asking + '\n\n' + detail
 
-        # Anything that does not read as a yes says so at the top, in words, on
-        # the line staff read first. It never stops the ticket: losing somebody's
-        # application over how they phrased one answer would be worse than a
-        # person spending two seconds reading it.
-        if self.kind in AGE_KINDS:
-            gave = ''
+        def answered(want):
+            """What they typed in the question that reads exactly like this."""
             for item, (q, _, _) in zip(self.fields, QUESTIONS[self.kind]):
-                if q == AGE_Q[0]:
-                    gave = (item.value or '').strip()
-                    break
-            if not said_yes(gave):
-                detail = ('**CHECK THIS ONE.** Asked if they are 18 or over they '
-                          'said "%s".\n\n' % (gave or 'nothing')) + detail
+                if q == want:
+                    return (item.value or '').strip()
+            return ''
 
-        title = ('%s, %s' % (self.label_text, who.display_name))[:96]
+        age_said = answered(AGE_Q[0]) if self.kind in AGE_KINDS else ''
+
+        # The rules answer, kept for the site's record of who accepted them.
+        rules = None
+        rules_said = ''
+        if self.kind in RULES_KINDS:
+            rules_said = answered(RULES_Q[0])
+            rules = {'said': rules_said[:200], 'yes': accepted_rules(rules_said)}
+
+        def written(clean):
+            lines = []
+            for item, (q, _, _) in zip(self.fields, QUESTIONS[self.kind]):
+                lines.append('**%s**\n%s'
+                             % (q, clean((item.value or '').strip()) or 'nothing said'))
+            out = '\n\n'.join(lines)
+            if asking:
+                out = '**Asking for:** ' + asking + '\n\n' + out
+            # Anything that does not read as a yes says so at the top, in words,
+            # on the line staff read first. It never stops the ticket: losing
+            # somebody's application over how they phrased one answer would be
+            # worse than a person spending two seconds reading it.
+            if self.kind in AGE_KINDS and not said_yes(age_said):
+                out = ('**CHECK THIS ONE.** Asked if they are 18 or over they '
+                       'said "%s".\n\n' % (clean(age_said) or 'nothing')) + out
+            if rules is not None and not rules['yes']:
+                out = ('**CHECK THIS ONE.** Asked if they accept the rules they '
+                       'said "%s".\n\n' % (clean(rules_said) or 'nothing')) + out
+            return out
+
+        # Two copies of the same ticket, because the two places that take it
+        # protect themselves differently (#1354).
+        #
+        # detail is as they typed it, for the site, which escapes its own
+        # output and whose inbox is the record of what they really wrote.
+        #
+        # shown is what goes into Discord, where their words would otherwise be
+        # read as formatting and as mentions. Before this, an answer of
+        # "@everyone" pinged the server from inside a staff thread, a role
+        # mention pulled a role into it, and a few asterisks could hide the
+        # rest of the application behind a heading. The questions and the
+        # CHECK THIS ONE line are ours and stay bold; nothing of theirs does.
+        detail = written(lambda v: v)
+        shown = written(as_typed)
+
+        title =('%s, %s' % (self.label_text, who.display_name))[:96]
 
         # Mentioning a role does not put anybody in a private thread. Only
         # people who have been added to one can see it, so a ticket opened
         # without this was visible to the applicant and to nobody else, and the
         # @mention went into a room staff were not in. They are added one at a
         # time, which is the only way Discord offers.
-        want = set(STAFF) | set(EXTRA_STAFF.get(self.kind, []))
-        staff_roles = [r for r in guild.roles if r.name.lower() in want]
+        ids, names = set(STAFF_IDS), set(STAFF_NAMES)
+        extra = EXTRA_STAFF_IDS.get(self.kind)
+        if extra:
+            ids |= extra[0]
+            names |= extra[1]
+        staff_roles = [r for r in guild.roles if _role_hit(r, ids, names)]
         if not staff_roles:
-            log('no role matched %r, so nobody will be pulled into this ticket. '
-                'Set STAFF_ROLES in bot.env.json to the role names this server '
-                'actually uses.' % (sorted(want),))
+            log('no role matched ids %r or names %r, so nobody will be pulled '
+                'into this ticket. Set STAFF_ROLES in bot.env.json to the role '
+                'ids or names this server actually uses.'
+                % (sorted(ids), sorted(names)))
         head = '%s opened this. %s' % (who.mention,
                                        ' '.join(r.mention for r in staff_roles))
 
@@ -919,9 +1103,21 @@ class TicketModal(discord.ui.Modal):
                     % ([r.name for r in staff_roles], ch.name))
 
             try:
-                await opened.send(head[:1900], view=TicketTools())
-                for chunk in _chunks(detail, 1900):
-                    await opened.send(chunk)
+                # The head is ours and is the one post meant to ping: the
+                # person who opened the ticket, and each staff role, by id.
+                # Not @everyone, which nothing this bot writes ever says.
+                await opened.send(head[:1900], view=TicketTools(),
+                                  suppress_embeds=True,
+                                  allowed_mentions=discord.AllowedMentions(
+                                      everyone=False, users=True, roles=True))
+                # Their words. Escaped above, with every mention switched
+                # off here as well, and embeds suppressed so a bare link
+                # cannot draw its preview. Anything the escaping misses
+                # still pings nobody.
+                for chunk in _chunks(shown, 1900):
+                    await opened.send(chunk,
+                                      suppress_embeds=True,
+                                      allowed_mentions=discord.AllowedMentions.none())
                 posted = True
             except Exception as e:
                 why = 'the thread opened but nothing could be written in it (%s)' % e
@@ -963,9 +1159,18 @@ class TicketModal(discord.ui.Modal):
                 if why:
                     note = '\n_No private thread for this one: %s._' % why
                 try:
-                    await book.send(('**%s**\n%s%s' % (title, head, note))[:1900])
-                    for chunk in _chunks(detail, 1900):
-                        await book.send(chunk)
+                    # The display name in the title is theirs as well, so it
+                    # is escaped here the way the answers are. The thread name
+                    # above is a name rather than a post and keeps it as it is.
+                    await book.send(
+                        ('**%s**\n%s%s' % (as_typed(title, 96), head, note))[:1900],
+                        suppress_embeds=True,
+                        allowed_mentions=discord.AllowedMentions(
+                            everyone=False, users=True, roles=True))
+                    for chunk in _chunks(shown, 1900):
+                        await book.send(chunk,
+                                        suppress_embeds=True,
+                                        allowed_mentions=discord.AllowedMentions.none())
                     fell_back = True
                 except Exception:
                     log('the ticket could not be posted in #%s either:\n'
@@ -993,7 +1198,7 @@ class TicketModal(discord.ui.Modal):
         # push_async logs its own failure, so nothing is lost by not awaiting.
         task = asyncio.create_task(push_async(
             self.kind, '%s: %s' % (self.label_text, who.display_name),
-            detail, str(who), who.id))
+            detail, str(who), who.id, rules))
         _pushes.add(task)
         task.add_done_callback(_pushes.discard)
 
@@ -1028,8 +1233,8 @@ def _chunks(s, n):
 def is_staff(who, ch):
     """Staff, or anybody the channel itself trusts with threads."""
     try:
-        names = set(r.name.lower() for r in getattr(who, 'roles', []))
-        if names & (set(STAFF) | set(CREATOR)):
+        if (_who_hits(who, STAFF_IDS, STAFF_NAMES)
+                or _who_hits(who, CREATOR_IDS, CREATOR_NAMES)):
             return True
     except Exception:
         pass
@@ -1059,8 +1264,7 @@ _last_ticket = {}
 # that forgets on every restart is not a rule. The thread name cannot carry it,
 # because the name is the label and a display name, and a display name is
 # neither unique nor fixed.
-OPEN_TICKETS = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                            'open-tickets.json')
+OPEN_TICKETS = os.path.join(DATA_DIR, 'open-tickets.json')
 
 
 def _now():
@@ -1261,18 +1465,70 @@ class TicketPicker(discord.ui.Select):
         await interaction.response.send_modal(TicketModal(k, lab))
 
 
-PANEL = ('**Open a ticket**\n\n'
-         'Pick the one that fits. It asks a few questions, then opens a thread '
-         'only you and staff can see. Nothing here is public and nobody else in '
-         'the server can read it.\n\n'
-         '**Apply to playtest** is the one everybody starts with, and it is how '
-         'you get into the world. **Apply: Jarl** is '
-         'answered in character: the seats are empty, and the first people to '
-         'hold them are picked out of what is written there.\n\n'
-         'The jobs below that are open to anybody already in, and they are jobs '
-         'rather than titles: each one is work somebody is currently doing '
-         'instead of you.\n\n'
-         'Applying for one does not give you it. Somebody reads it and answers.')
+_PANEL_TOP = ('**Open a ticket**\n\n'
+              'Pick the one that fits. It asks a few questions, then opens a thread '
+              'only you and staff can see. Nothing here is public and nobody else in '
+              'the server can read it.\n\n')
+_PANEL_JOBS = ('**Apply: Jarl** is '
+               'answered in character: the seats are empty, and the first people to '
+               'hold them are picked out of what is written there.\n\n'
+               'The jobs below that are open to anybody already in, and they are jobs '
+               'rather than titles: each one is work somebody is currently doing '
+               'instead of you.\n\n'
+               'Applying for one does not give you it. Somebody reads it and answers.')
+PANEL_ALPHA = (_PANEL_TOP +
+               'Thornswood is in alpha, and the world is open by application. Anyone '
+               'can download it. **Apply to be an alpha playtester** is the one '
+               'everybody starts with: once it is accepted you get the Playtester '
+               'role, and that is what lets you press Play. It asks whether you are '
+               '18 or over and whether you accept the rules, so read #rules first. '
+               'Your answers are kept against your Discord account.\n\n' +
+               _PANEL_JOBS)
+PANEL_OPEN = (_PANEL_TOP +
+              'Thornswood is open: anyone in the Discord can play, so there is '
+              'nothing to apply for to get in. Read #rules, because being here '
+              'and in the world means accepting them.\n\n' +
+              _PANEL_JOBS)
+PANEL = PANEL_ALPHA
+
+# THE ONE SWITCH (#428), read off the site so there is one copy of it: the
+# site's config.json "open", which /api/public hands out. Off, which is today,
+# the panel is the alpha one above and the application asks the age and rules
+# questions. On, anybody in the Discord can play, so the application goes from
+# the panel, and with it the age and rules questions, which were only ever
+# asked on the way in. THORNSWOOD_OPEN in bot.env.json overrides the site, for
+# a dev bot or a site that is down. Read once, in setup_hook, before the panel
+# view is registered; flipping it means restarting the bot.
+KINDS_ALPHA = list(KINDS)
+OPEN = False
+
+
+def site_open():
+    """Whether the world is open to everybody, from THORNSWOOD_OPEN when it is
+       set and otherwise from the site. Anything that goes wrong answers no,
+       the alpha, which is what is true until somebody flips the switch."""
+    env = os.environ.get('THORNSWOOD_OPEN', '').strip().lower()
+    if env in ('1', 'true', 'yes', 'open'):
+        return True
+    if env in ('0', 'false', 'no', 'alpha', 'closed'):
+        return False
+    try:
+        with urllib.request.urlopen(SITE + '/api/public', timeout=8) as r:
+            return json.loads(r.read().decode('utf-8')).get('open') is True
+    except Exception as e:
+        log('could not ask the site whether the world is open, so the panel is '
+            'the alpha one:', e)
+        return False
+
+
+def set_open(on):
+    """Point the panel, its kinds and the age and rules questions at one mode."""
+    global OPEN, KINDS, AGE_KINDS, RULES_KINDS, PANEL
+    OPEN = on is True
+    KINDS = [k for k in KINDS_ALPHA if not (OPEN and k[0] == 'playtest')]
+    AGE_KINDS = () if OPEN else ('playtest',)
+    RULES_KINDS = AGE_KINDS
+    PANEL = PANEL_OPEN if OPEN else PANEL_ALPHA
 
 
 def _panel_options(msg):
@@ -1340,7 +1596,8 @@ async def ensure_panel(guild):
     try:
         blocked = []
         for r in guild.roles:
-            if r.name.lower() not in (set(STAFF) | set(CREATOR)):
+            if not (_role_hit(r, STAFF_IDS, STAFF_NAMES)
+                    or _role_hit(r, CREATOR_IDS, CREATOR_NAMES)):
                 continue
             if not getattr(ch.permissions_for(r), 'use_application_commands', True):
                 blocked.append(r.name)
@@ -1437,6 +1694,7 @@ HOLD_CHANNEL = [n.strip().lower() for n in
                 os.environ.get('HOLD_CHANNEL', 'choose-your-hold').split(',')
                 if n.strip()]
 MEMBER_ROLE = os.environ.get('MEMBER_ROLE', 'Member').strip().lower()
+MEMBER_IDS, MEMBER_NAMES = _role_tokens([MEMBER_ROLE] if MEMBER_ROLE else [])
 HOLDS = ['Whiterun', 'Solitude', 'Windhelm', 'Riften', 'Markarth',
          'Dawnstar', 'Morthal', 'Falkreath', 'Winterhold']
 # key, role name, button label
@@ -1466,8 +1724,8 @@ def _role(guild, name):
 
 
 def _may_pick(member):
-    names = set(r.name.lower() for r in getattr(member, 'roles', []))
-    return MEMBER_ROLE in names or bool(names & set(STAFF))
+    return (_who_hits(member, MEMBER_IDS, MEMBER_NAMES)
+            or _who_hits(member, STAFF_IDS, STAFF_NAMES))
 
 
 def _can_give(guild, role):
@@ -1634,62 +1892,989 @@ async def ensure_hold_panel(guild):
         log('hold panel failed:\n' + traceback.format_exc())
 
 
-# ----------------------------------------------------------- the watcher --
+# ------------------------------------------------------------ live smoke --
 #
-# WHY THE BOT DOES THIS AND NOT THE BOX.
+# The living Live smoke checklist in #test-tasks, decided on 1 October.
 #
-# On 21 September thornswood.net was down and stayed down. Caddy, which holds
-# 443, had stopped, and the task that runs it had one startup trigger, so
-# nothing restarted it and nothing ever looked again. It surfaced hours later
-# as two testers reporting launcher faults, because the launcher checks people
-# in through the site and voice runs on the same hostname. A site that is down
-# looks to everybody like the launcher being broken, which is the worst kind of
-# outage: the reports point at the wrong thing.
+# The criteria are not written here. They live in the vault, in
+# wiki/quality/playtest-acceptance.md, and Cynthia exports the Live slice of
+# them to live-smoke-discord-export.json, a copy of which is deployed beside
+# this file. The bot reads that file and nothing else: no request to the
+# vault, no request to the site, and nothing written back anywhere.
 #
-# Caddy restarts itself now. This is the other half, which is somebody being
-# told.
+# IT RUNS ONE WAY. Vault to Discord. A mark pressed here is an edit to the
+# Discord message the button sits on, and that is the whole of where it is
+# kept. Nothing in this section writes a mark, a name or a Discord id to the
+# site, to the bot's own records, to a database or to the log, and the two
+# places that would have done it by accident say so where they are: the mark
+# handler logs no traceback, because a Discord error carries the message it
+# refused and that message holds names and marks.
 #
-# It lives in the bot because the bot is already running on that box, already
-# authenticated, and already written to keep going when a piece of it fails. A
-# watcher anywhere else needs a webhook put somewhere new, and the webhook
-# files are kept out of git deliberately.
+# WHAT A REPORT IS. The same marks read back, not a second record of them.
+# /live-smoke report counts the rows in one session thread and says the total
+# to whoever ran it as an ephemeral, so a Fail is not missed halfway down a
+# session of twenty eight rows. It reads the messages Discord already holds,
+# names people by the display names those messages already carry, and posts
+# nothing in the thread. Keeping marks anywhere off Discord is a different
+# thing and needs the Privacy page changed first.
 #
-# WHAT IT CANNOT CATCH is the box itself going down, which takes this with it.
-# That needs something off the machine and is not this.
+# Marks are visible to everybody who can read the session thread. That is the
+# Owner's call rather than an accident. The channel itself is pathfind in
+# Build-Discord.py: testers and staff, never @everyone, plus the lead
+# gamemaster role on that channel's own line, because the admin list below is
+# not the same list as pathfind and somebody holding only that role could
+# otherwise run a session in a channel they cannot see.
+#
+# WHAT GOES ON DISCORD. The checklist rows, and nothing wrapped around them.
+# Djinn on 1 October, twice: testers have no GitHub, so no ticket number, no
+# issue number and no pull request number is ever appended to a row; and the
+# blocks of instructions that used to sit above and below the rows are gone,
+# because the rows say what to do and nobody read the rest. What is kept is
+# the versioning, which is the session title and one short line off the
+# export's own updated date.
+#
+# WHO MAY START ONE. Owner, Dev and Lead Gamemaster, which is wider than
+# Owner and Dev and narrower than STAFF: a Moderator alone does not start,
+# reset, refresh or report on a session. Roles were deleted and renamed in
+# the cleanup, so these are matched by name against whatever the server
+# carries today, and LIVE_SMOKE_ADMIN_ROLES in bot.env.json moves them
+# without a deploy. No snowflake is written down anywhere here.
+#
+# The default is in this file and not read out of the export, so content that
+# moves when Cynthia refreshes the Live set can never widen who may start a
+# session.
+LIVE_SMOKE_EXPORT = (os.environ.get('LIVE_SMOKE_EXPORT', '').strip() or
+                     os.path.join(HERE, 'live-smoke-discord-export.json'))
+LIVE_SMOKE_SCHEMA = 'thornswood.live-smoke.v1'
+LIVE_SMOKE_CHANNEL = [n.strip().lower() for n in
+                      os.environ.get('LIVE_SMOKE_CHANNEL', 'test-tasks').split(',')
+                      if n.strip()]
+# Lead Gamemaster and Lead GM are both here because the role has been written
+# both ways and the scrub is not finished. Matching is by name and ignores
+# case, the way STAFF_ROLES already works, so the order is only what a refusal
+# names first: Lead Gamemaster, which is the canonical spelling the export
+# carries, and Lead GM after it as the alias.
+LIVE_SMOKE_ADMIN_NAMES = [r.strip() for r in
+                          os.environ.get('LIVE_SMOKE_ADMIN_ROLES',
+                                         'Owner,Dev,Lead Gamemaster,Lead GM').split(',')
+                          if r.strip()]
+LIVE_SMOKE_ADMIN = [r.lower() for r in LIVE_SMOKE_ADMIN_NAMES]
+# The second lock on agents, after interaction.user.bot. Empty here on
+# purpose: an account that has to be named is named in bot.env.json on the
+# VPS, never in the repository.
+LIVE_SMOKE_DENY = set(int(i) for i in
+                      os.environ.get('LIVE_SMOKE_DENY_USER_IDS', '').split(',')
+                      if i.strip().isdigit())
+
+LIVE_SMOKE_MARKS = ('Pass', 'Fail', 'Skip', 'Fail-known')
+LIVE_SMOKE_TITLE = 'Live smoke'
+# The post the standing checklist hangs off, found again by these words.
+LIVE_SMOKE_CHECKLIST_HEAD = '**Live smoke checklist**'
+# The thread the standing rows sit in, off that post. The name must not start
+# with LIVE_SMOKE_TITLE: a reset archives and locks every thread under the
+# channel that does, and those are the session threads, never this one.
+LIVE_SMOKE_ROWS = 'Checklist rows'
+# What the marks on an item message sit under, so they can be found again and
+# one person's line replaced rather than a second one added.
+LIVE_SMOKE_MARKS_HEAD = '\n\nMarks:\n'
+# A Discord message holds 2000 characters. Well under it, so an item message
+# that is nearly full says so instead of being refused by Discord.
+LIVE_SMOKE_ROOM = 1900
 
 
-def site_answers():
+def _live_smoke_or(names):
+    """a, b or c, for a refusal that names the roles."""
+    names = [n for n in names if n]
+    if not names:
+        return 'nobody'
+    if len(names) == 1:
+        return names[0]
+    return ', '.join(names[:-1]) + ' or ' + names[-1]
+
+
+def live_smoke_items(export):
     """
-    Ask the site the way somebody's browser would.
+    Every item in the export, in the order it gives, each one a dict.
 
-    Over the public name and the certificate, deliberately, so this fails when
-    Caddy is down and not only when node is. Asking 127.0.0.1:3001 would have
-    said the site was perfectly fine all through the outage this was written
-    for.
-
-    HEAD rather than GET: the answer is the status code, and there is no reason
-    to pull the front page down every five minutes forever.
-
-    Blocking, so it is called through an executor. Never raises.
+    An item with no id or no line for Discord is dropped rather than posted
+    half built: the id is what its buttons are keyed by, and the line is the
+    whole of what a tester reads. An order that is not a number keeps the
+    place the file put it in.
     """
-    req = urllib.request.Request(
-        SITE + '/', method='HEAD',
-        headers={'User-Agent': 'thornswood-watch'})
+    out = []
+    for n, raw in enumerate((export or {}).get('items') or []):
+        if not isinstance(raw, dict):
+            continue
+        ident = str(raw.get('id') or '').strip()
+        line = str(raw.get('discord_line') or '').strip()
+        if not ident or not line:
+            continue
+        try:
+            order = int(raw.get('order'))
+        except (TypeError, ValueError):
+            order = n + 1
+        skip = raw.get('skip_rule')
+        out.append({
+            'id': ident,
+            'order': order,
+            'label': str(raw.get('label') or '').strip(),
+            'tickets': [str(t).strip() for t in (raw.get('tickets') or [])
+                        if str(t).strip()],
+            # null on every row of the Live set as it stands, and read anyway,
+            # because the export is what decides. When one does carry a rule it
+            # is shown on the message, so a tester knows Skip is the right mark
+            # without opening the vault.
+            'skip_rule': str(skip).strip() if skip else '',
+            'discord_line': line,
+        })
+    out.sort(key=lambda i: i['order'])
+    return out
+
+
+def live_smoke_load(path=None):
+    """
+    The export, read off the file beside this one.
+
+    Anything wrong with it raises ValueError carrying words a person can act
+    on, because every one of these is said back to whoever ran the command as
+    an ephemeral rather than left in a log nobody is reading at the time.
+
+    The schema is checked and not guessed. A later export shape with the same
+    file name would otherwise be posted as an empty session.
+    """
+    where = path or LIVE_SMOKE_EXPORT
     try:
-        with urllib.request.urlopen(req, timeout=15) as r:
-            code = r.getcode()
-            if 200 <= code < 400:
-                return True, 'HTTP %d' % code
-            return False, 'HTTP %d' % code
-    except Exception as ex:
-        # The class name matters when the message is empty, which is what a
-        # bare socket timeout gives you.
-        return False, str(ex) or ex.__class__.__name__
+        with open(where, encoding='utf-8') as f:
+            got = json.load(f)
+    except (IOError, OSError):
+        raise ValueError('There is no Live smoke export at %s. It is deployed '
+                         'beside bot.py by Install-Bot.ps1 -CodeOnly.' % where)
+    except ValueError:
+        raise ValueError('The Live smoke export at %s is not readable JSON.' % where)
+    if not isinstance(got, dict):
+        raise ValueError('The Live smoke export at %s is not what this reads.' % where)
+    if got.get('schema') != LIVE_SMOKE_SCHEMA:
+        raise ValueError('The Live smoke export at %s says schema %s, and this '
+                         'bot reads %s. Deploy the export that matches.'
+                         % (where, got.get('schema') or 'nothing',
+                            LIVE_SMOKE_SCHEMA))
+    items = live_smoke_items(got)
+    if not items:
+        raise ValueError('The Live smoke export at %s has no items in it.' % where)
+    # A custom_id is 100 characters, and an id too long for one is a session
+    # whose buttons Discord refuses halfway through posting it.
+    wide = [i['id'] for i in items
+            if len(live_smoke_custom_id(i['id'], 'Fail-known')) > 100]
+    if wide:
+        raise ValueError('These Live smoke item ids are too long to put on a '
+                         'button: %s.' % ', '.join(wide))
+    return got
+
+
+def live_smoke_custom_id(item_id, mark):
+    return 'ls:%s:%s' % (item_id, mark)
+
+
+def live_smoke_read_id(custom_id):
+    """
+    The item and the mark a button carries, or None when it is not one of
+    ours. Split from the right, so an item id with a colon in it still reads.
+    """
+    s = str(custom_id or '')
+    if not s.startswith('ls:') or ':' not in s[3:]:
+        return None
+    item_id, mark = s[3:].rsplit(':', 1)
+    if not item_id or mark not in LIVE_SMOKE_MARKS:
+        return None
+    return item_id, mark
+
+
+def live_smoke_title_of(export, settings_version, day=None):
+    """The session title: the format the export asks for, the date and the
+       version off the launcher's Settings window."""
+    fmt = str(((export or {}).get('session') or {}).get('title_format')
+              or 'Live smoke {YYYY-MM-DD} {settings_version}')
+    when = (day or datetime.date.today()).strftime('%Y-%m-%d')
+    return (fmt.replace('{YYYY-MM-DD}', when)
+               .replace('{settings_version}', str(settings_version or '').strip())
+               .strip())
+
+
+def live_smoke_show_tickets(export):
+    """
+    Whether the ticket numbers on a row may go on Discord. Off unless the
+    export asks for them in so many words.
+
+    Djinn's rule of 1 October: testers do not have GitHub, so an issue number
+    on a row is a thing they cannot open and a number they may write down as
+    if it meant something to them. The tickets stay in the export for the
+    staff map and for the harness.
+    """
+    return ((export or {}).get('rules') or {}).get('discord_show_tickets') is True
+
+
+def live_smoke_stamp(export):
+    """
+    The one short line that says which Live set this is, or nothing.
+
+    All that is left of the prose around the checklist: the set moves when
+    Cynthia refreshes it, and a tester reading a row has to be able to tell
+    which day's set they are marking.
+    """
+    export = export or {}
+    updated = str(export.get('updated') or '').strip()
+    if not updated:
+        return ''
+    fmt = str((export.get('session') or {}).get('version_stamp')
+              or 'Checklist updated: {updated}').strip()
+    return fmt.replace('{updated}', updated)
+
+
+def live_smoke_opener(title, live_channel, settings_version, stamp=''):
+    """
+    The message the session thread hangs off: the three things a session has
+    to record, and nothing else.
+
+    Djinn's layout call of 1 October. This used to carry a how to mark block
+    and a paragraph about where the marks go, above rows that each say what to
+    do. Testers read the rows and scrolled past the rest, so the rest is gone
+    and what is left is the session's own name.
+    """
+    out = ('**%s**\n'
+           'Live channel: %s\n'
+           'Settings version: %s'
+           % (title, str(live_channel).strip(), str(settings_version).strip()))
+    if stamp:
+        out += '\n' + stamp
+    return out
+
+
+def live_smoke_item_text(item, total=None, tickets=False):
+    """One row, as it is posted: what to do, and the skip rule when the export
+       gives one, which is what tells a tester that Skip is the honest mark.
+       Ticket numbers only when the export asks for them."""
+    head = 'Live %d' % item['order']
+    if total:
+        head += ' of %d' % total
+    if item['label']:
+        head += ': ' + item['label']
+    out = '**%s**' % head
+    if tickets and item['tickets']:
+        out += '  ' + ' '.join('#' + t for t in item['tickets'])
+    out += '\n' + item['discord_line']
+    if item['skip_rule']:
+        out += '\nSkip rule: ' + item['skip_rule']
+    if len(out) > LIVE_SMOKE_ROOM:
+        out = (out[:LIVE_SMOKE_ROOM].rstrip()
+               + '\n(the rest of this row is in the export)')
+    return out
+
+
+def live_smoke_mark(content, who, mark):
+    """
+    The item message with this person's mark on it, as words.
+
+    One line per person, keyed by the name shown in Discord, so marking twice
+    corrects the mark instead of adding a second one. Two people marking the
+    same row at the same moment is last write wins on the whole message, which
+    is worth less than it sounds: the loser presses it again.
+
+    A pure function of the message's own text, so the harness can check the
+    wording of it without a Discord to press buttons in.
+    """
+    text = str(content or '')
+    at = text.find(LIVE_SMOKE_MARKS_HEAD)
+    if at < 0:
+        body, lines = text.rstrip(), []
+    else:
+        body = text[:at].rstrip()
+        lines = [l for l in text[at + len(LIVE_SMOKE_MARKS_HEAD):].split('\n')
+                 if l.strip()]
+    name = str(who or '').strip() or 'Somebody'
+    line = '%s: %s' % (name, mark)
+    for i, had in enumerate(lines):
+        # Split off the end, not the front: a mark carries no colon and a name
+        # in Discord may.
+        if had.rsplit(': ', 1)[0].strip() == name:
+            lines[i] = line
+            break
+    else:
+        lines.append(line)
+    return body + LIVE_SMOKE_MARKS_HEAD + '\n'.join(lines)
+
+
+def live_smoke_read_marks(content):
+    """
+    Who marked this row what, in the order they marked it, off the message's
+    own words.
+
+    The other half of live_smoke_mark, and pure for the same reason: a report
+    is the rows in the thread counted up, so the harness can prove what a
+    session of marks reads as without a Discord to press buttons in.
+
+    A line under the heading that is not a name against one of the four marks
+    is left out rather than counted as something. Split off the end, the way
+    live_smoke_mark writes it, because a name in Discord may carry a colon.
+    """
+    text = str(content or '')
+    at = text.find(LIVE_SMOKE_MARKS_HEAD)
+    if at < 0:
+        return []
+    out = []
+    for line in text[at + len(LIVE_SMOKE_MARKS_HEAD):].split('\n'):
+        if ': ' not in line:
+            continue
+        who, mark = line.rsplit(': ', 1)
+        who, mark = who.strip(), mark.strip()
+        if not who or mark not in LIVE_SMOKE_MARKS:
+            continue
+        out.append((who, mark))
+    return out
+
+
+# The words a row's heading starts with, which is how a message in a session
+# thread is told from the opener above it and from anything anybody else
+# posted in it. live_smoke_item_text writes the heading.
+LIVE_SMOKE_ROW_HEAD = re.compile(r'^\*\*(Live \d+)')
+
+
+def live_smoke_row_name(content):
+    """
+    Live 13, off a row's own heading, or '' when this message is not a row.
+
+    Short on purpose: a report names every row of the set, and the number is
+    what a row is called in the thread, in the standing checklist and in the
+    export, so it is the one word that reaches all three.
+    """
+    got = LIVE_SMOKE_ROW_HEAD.match(str(content or '').lstrip())
+    return got.group(1) if got else ''
+
+
+def live_smoke_opener_stamp(content):
+    """
+    The stamp line off a session's opener, or ''.
+
+    Which Live set a session was opened against is the one thing a report has
+    to say that the thread's name does not. The opener's other lines are known,
+    because live_smoke_opener writes them, so the stamp is whatever is left and
+    this holds whatever wording the export's version_stamp gives it.
+    """
+    lines = [l.strip() for l in str(content or '').split('\n') if l.strip()]
+    for line in lines[1:]:
+        if line.startswith('Live channel:') or line.startswith('Settings version:'):
+            continue
+        return line
+    return ''
+
+
+def live_smoke_row_line(name, marks):
+    """
+    One row in a report: its name, then each mark somebody gave it with how
+    many gave it, and for a Fail or a Fail-known who they were.
+
+    Named for the two marks Dev acts on and counted for the other two. Eleven
+    names on a Pass are eleven names between whoever is reading and the one
+    Fail under it, and the thread itself still has them.
+    """
+    said = []
+    for mark in LIVE_SMOKE_MARKS:
+        who = [w for w, k in marks if k == mark]
+        if not who:
+            continue
+        if mark in ('Fail', 'Fail-known'):
+            said.append('%s %d (%s)' % (mark, len(who), ', '.join(who)))
+        else:
+            said.append('%s %d' % (mark, len(who)))
+    return '%s: %s' % (name, ', '.join(said))
+
+
+def live_smoke_report_text(title, stamp, rows):
+    """
+    What an admin reads instead of scrolling the whole session: the session's
+    own name, how many rows it has, which of them carry a Fail, which nobody
+    has marked, and then a line for each row that somebody marked.
+
+    rows is (name, marks) for every row in the thread, in the order the
+    session posted them, as live_smoke_row_name and live_smoke_read_marks read
+    them off each message.
+
+    Display names only, the same ones the rows themselves carry, and no
+    account id: this is the thread's own words counted up and said back to one
+    person. Pure, so the harness can read a session of marks without Discord.
+    """
+    head = ['**%s**' % (str(title or '').strip() or LIVE_SMOKE_TITLE)]
+    if stamp:
+        head.append(stamp)
+    if not rows:
+        head.append('There are no checklist rows in this thread to read.')
+        return '\n'.join(head)
+    marked = [(n, m) for n, m in rows if m]
+    blank = [n for n, m in rows if not m]
+    if not marked:
+        head.append('%d row(s), none of them marked yet.' % len(rows))
+    elif blank:
+        head.append('%d row(s). %d marked, %d not marked yet.'
+                    % (len(rows), len(marked), len(blank)))
+    else:
+        head.append('%d row(s), every one of them marked.' % len(rows))
+    for mark in ('Fail', 'Fail-known'):
+        named = [n for n, m in rows if any(k == mark for _w, k in m)]
+        if named:
+            head.append('%s on: %s.' % (mark, ', '.join(named)))
+    if blank:
+        head.append('Not marked: %s.' % ', '.join(blank))
+    body = [live_smoke_row_line(n, m) for n, m in marked]
+    said = '\n'.join(head + [''] + body) if body else '\n'.join(head)
+    # A Discord message holds what it holds, and the lines above the list name
+    # every Fail, so the list is what gives way when a session runs long.
+    while len(said) > LIVE_SMOKE_ROOM and body:
+        body.pop()
+        said = '\n'.join(head + [''] + body
+                         + ['(%d more marked row(s) are in the thread. Every '
+                            'Fail is named above.)' % (len(marked) - len(body))])
+    if len(said) > LIVE_SMOKE_ROOM:
+        said = said[:LIVE_SMOKE_ROOM].rstrip() + '\n(the rest is in the thread)'
+    return said
+
+
+def live_smoke_report_refusal(channel):
+    """
+    Why the marks cannot be counted here, or None.
+
+    A report is of one dated session, so it is read in that session's own
+    thread, while that session is the one open. The channel itself holds no
+    marks, and neither does the thread the standing checklist stands in: those
+    rows carry no buttons, because a mark belongs to a dated session.
+    """
+    if not live_smoke_in_session(channel):
+        return ('Run this in the session thread whose marks you want, under '
+                '#%s.' % LIVE_SMOKE_CHANNEL[0])
+    if not str(getattr(channel, 'name', '') or '').startswith(LIVE_SMOKE_TITLE):
+        return ('This is not a Live smoke session thread, so there are no '
+                'marks in it: the rows in %s carry no buttons. Run this in '
+                'the thread of the session you want.' % LIVE_SMOKE_ROWS)
+    if getattr(channel, 'archived', False) or getattr(channel, 'locked', False):
+        return ('That session is closed, so this reports on the session that '
+                'is open. Its rows are still in the thread, marks and all, '
+                'for anybody who can read it.')
+    return None
+
+
+def live_smoke_head(export):
+    """
+    The post the standing rows hang off: the heading refresh finds it by
+    again, and the day the set last changed, which is the versioning Djinn
+    asked to keep.
+
+    Nothing else. The rows are messages of their own in the thread off this
+    one, so each of them carries the whole of what a tester does.
+    """
+    out = LIVE_SMOKE_CHECKLIST_HEAD
+    stamp = live_smoke_stamp(export)
+    if stamp:
+        out += '\n' + stamp
+    return out
+
+
+def live_smoke_checklist(export, items):
+    """
+    Every message the standing checklist is made of: the post above, then one
+    message for each row, worded the way a session words it.
+
+    This is what somebody reading #test-tasks between sessions has in front of
+    them, so it is the line the vault wrote and not the label off the top of
+    it. Up to 2 October the post was one numbered list of labels, which named
+    every check in the set and said how to run none of them.
+
+    Humans only. No row here carries a button: a mark belongs to a dated
+    session, not to the copy that stands in the channel between them.
+    """
+    tickets = live_smoke_show_tickets(export)
+    return ([live_smoke_head(export)]
+            + [live_smoke_item_text(i, len(items), tickets) for i in items])
+
+
+def is_live_smoke_admin(who):
+    """Owner, Dev or Lead Gamemaster, by the ids or names
+       LIVE_SMOKE_ADMIN_ROLES carries. A Moderator alone is not one of them.
+       The one list behind start, reset, refresh and report."""
+    try:
+        ids, names = _role_tokens(LIVE_SMOKE_ADMIN_NAMES)
+        return _who_hits(who, ids, names)
+    except Exception:
+        return False
+
+
+def live_smoke_admin_missing(guild):
+    """Which of those role ids or names this server has not got. The scrub
+       renamed roles, so this is the difference between nobody being allowed
+       and nobody being able to be. Digit tokens match role.id; others match
+       name case-insensitively."""
+    try:
+        roles = list(getattr(guild, 'roles', None) or [])
+    except Exception:
+        return list(LIVE_SMOKE_ADMIN_NAMES)
+    missing = []
+    for token in LIVE_SMOKE_ADMIN_NAMES:
+        ids, names = _role_tokens([token])
+        if not any(_role_hit(r, ids, names) for r in roles):
+            missing.append(token)
+    return missing
+
+
+def live_smoke_admin_refusal(guild):
+    """
+    Why this person cannot start, reset, refresh or report, in words they can
+    do something about.
+
+    Only a server carrying none of the names at all is told about missing
+    roles. Lead GM and Lead Gamemaster are two spellings of one role, so one
+    of them is always missing and saying so every time would send somebody
+    looking for a role that was never meant to be there.
+    """
+    missing = live_smoke_admin_missing(guild)
+    if len(missing) == len(LIVE_SMOKE_ADMIN_NAMES):
+        return ('No role that may run this is on this server: %s. Set '
+                'LIVE_SMOKE_ADMIN_ROLES in bot.env.json to the ids or names '
+                'those roles carry now, and run Install-Bot.ps1 again.'
+                % ', '.join(missing))
+    return ('%s start, reset, refresh and report on a Live smoke session. Ask '
+            'one of them.' % _live_smoke_or(LIVE_SMOKE_ADMIN_NAMES))
+
+
+def live_smoke_tick_refusal(who):
+    """
+    Why this one cannot mark a row, or None.
+
+    Agents do not tick. The lock is what Discord itself says about the
+    account, so it holds for an agent nobody has heard of yet, and the id
+    list after it is only for an account that has to be named by hand.
+    """
+    if getattr(who, 'bot', False) or getattr(who, 'system', False):
+        return ('Agents do not mark these rows. A person marks their own, '
+                'from what they saw in the world.')
+    try:
+        if int(getattr(who, 'id', 0)) in LIVE_SMOKE_DENY:
+            return 'This account is not marking Live smoke rows. Ask staff.'
+    except (TypeError, ValueError):
+        pass
+    return None
+
+
+def live_smoke_in_session(channel):
+    """
+    True when this is a thread under the Live smoke channel.
+
+    Read off the channel rather than remembered in this process, so the
+    buttons on a session opened before the last restart still work, and a
+    button reached from anywhere else does nothing.
+    """
+    parent = getattr(channel, 'parent', None)
+    name = str(getattr(parent, 'name', '') or '').lower()
+    return bool(name) and name in LIVE_SMOKE_CHANNEL
+
+
+LIVE_SMOKE_STYLES = {
+    'Pass': discord.ButtonStyle.success,
+    'Fail': discord.ButtonStyle.danger,
+    'Skip': discord.ButtonStyle.secondary,
+    'Fail-known': discord.ButtonStyle.secondary,
+}
+
+
+class LiveSmokeMark(discord.ui.Button):
+    def __init__(self, item_id, mark):
+        super().__init__(label=mark,
+                         style=LIVE_SMOKE_STYLES.get(mark,
+                                                     discord.ButtonStyle.secondary),
+                         custom_id=live_smoke_custom_id(item_id, mark))
+        self.mark = mark
+
+    async def callback(self, interaction):
+        await live_smoke_tick(interaction, self.mark)
+
+
+class LiveSmokeItem(discord.ui.View):
+    """
+    The four buttons on one row. One view per row and not one view carrying
+    every row: the Live set runs to ten rows and forty buttons, and Discord
+    takes five to a line and twenty five to a message.
+
+    Persistent, like the ticket and hold panels, so a session outlives a
+    restart. setup_hook registers one of these per item in the export.
+    """
+    def __init__(self, item_id):
+        super().__init__(timeout=None)
+        for mark in LIVE_SMOKE_MARKS:
+            self.add_item(LiveSmokeMark(item_id, mark))
+
+
+def live_smoke_views():
+    """One view per item in the export, for setup_hook. An export that will
+       not load leaves the buttons to the commands to complain about, rather
+       than stopping the whole bot from starting."""
+    try:
+        items = live_smoke_items(live_smoke_load())
+    except ValueError as e:
+        log('live smoke: %s' % e)
+        return []
+    return [LiveSmokeItem(i['id']) for i in items]
+
+
+async def live_smoke_tick(interaction, mark):
+    """
+    Somebody pressed Pass, Fail, Skip or Fail-known.
+
+    The mark is an edit to the message the button is on, in the thread it was
+    posted in, and that is all of it. Nothing is written down anywhere else,
+    and nothing about who pressed what reaches this bot's log.
+    """
+    no = live_smoke_tick_refusal(interaction.user)
+    if no:
+        await _say(interaction, no)
+        return
+    if not live_smoke_in_session(interaction.channel):
+        await _say(interaction, 'Marks go on the rows in a session thread '
+                                'under #%s.' % LIVE_SMOKE_CHANNEL[0])
+        return
+    who = (getattr(interaction.user, 'display_name', None)
+           or getattr(interaction.user, 'name', ''))
+    said = live_smoke_mark(getattr(interaction.message, 'content', ''), who, mark)
+    if len(said) > LIVE_SMOKE_ROOM:
+        await _say(interaction, 'This row holds as many marks as a Discord '
+                                'message takes. Staff can open a fresh session '
+                                'with /live-smoke reset.')
+        return
+    try:
+        await interaction.response.edit_message(content=said)
+    except Exception:
+        # No traceback, and not a word of the message. Discord hands back what
+        # it refused, and what it refused is a list of names against marks.
+        log('live smoke: a mark did not go through')
+        try:
+            await _say(interaction, 'That did not go through. Press it again.')
+        except Exception:
+            pass
+
+
+live_smoke = discord.app_commands.Group(
+    name='live-smoke',
+    description='The living Live smoke checklist in #test-tasks.')
+tree.add_command(live_smoke)
+
+
+async def _live_smoke_ready(interaction):
+    """
+    The channel and the export, or None once the person has been told what is
+    wrong. The one gate on all four commands.
+    """
+    guild = interaction.guild
+    if guild is None:
+        await _say(interaction, 'This one works in the server, not in a '
+                                'message to the bot.')
+        return None
+    if not is_live_smoke_admin(interaction.user):
+        await _say(interaction, live_smoke_admin_refusal(guild))
+        return None
+    ch = by_name(guild, LIVE_SMOKE_CHANNEL)
+    if ch is None:
+        await _say(interaction, 'There is no #%s in this server. Build-Discord.py '
+                                'makes it, in Testing.' % LIVE_SMOKE_CHANNEL[0])
+        return None
+    try:
+        export = live_smoke_load()
+    except ValueError as e:
+        await _say(interaction, str(e))
+        return None
+    return ch, export
+
+
+async def live_smoke_close_old(ch):
+    """
+    Archive and lock any session thread still open under the channel, and say
+    how many. A reset is a new dated session rather than last week's ticks
+    rewritten, so the old one is closed where it stands and stays readable.
+    """
+    done = 0
+    for t in list(getattr(ch, 'threads', None) or []):
+        if getattr(t, 'archived', False) or getattr(t, 'locked', False):
+            continue
+        if not str(getattr(t, 'name', '')).startswith(LIVE_SMOKE_TITLE):
+            continue
+        try:
+            await t.edit(archived=True, locked=True)
+            done += 1
+        except Exception:
+            log('live smoke: a session thread could not be closed')
+    return done
+
+
+async def live_smoke_open(interaction, settings_version, live_channel, close_old):
+    """Start a session: the opener in the channel, a thread off it, and one
+       message per row in the thread. What start and reset both do."""
+    ready = await _live_smoke_ready(interaction)
+    if ready is None:
+        return
+    ch, export = ready
+    items = live_smoke_items(export)
+    title = live_smoke_title_of(export, settings_version)
+    # An opener, a thread and one message per row is more than the three
+    # seconds Discord gives a command to answer in.
+    await interaction.response.defer(ephemeral=True, thinking=True)
+    closed = await live_smoke_close_old(ch) if close_old else 0
+    try:
+        opener = await ch.send(live_smoke_opener(title, live_channel,
+                                                 settings_version,
+                                                 live_smoke_stamp(export)))
+        thread = await opener.create_thread(name=title[:100],
+                                            auto_archive_duration=10080)
+        tickets = live_smoke_show_tickets(export)
+        for item in items:
+            await thread.send(live_smoke_item_text(item, len(items), tickets),
+                              view=LiveSmokeItem(item['id']))
+    except Exception:
+        # Nothing is marked yet, so there is nothing here to keep off the log.
+        log('live smoke: the session could not be posted:\n'
+            + traceback.format_exc())
+        await interaction.followup.send(
+            'That did not go through. In #%s the bot needs View Channel, Send '
+            'Messages, Create Public Threads and Send Messages in Threads.'
+            % ch.name, ephemeral=True)
+        return
+    log('live smoke: a session is open in #%s, %d row(s)' % (ch.name, len(items)))
+    said = 'Session open: %s' % thread.mention
+    if closed:
+        said += ' The session before it is closed and locked.'
+    await interaction.followup.send(said, ephemeral=True)
+
+
+@live_smoke.command(name='start',
+                    description='Open a dated Live smoke session. Owner, Dev '
+                                'and Lead Gamemaster only.')
+@discord.app_commands.describe(
+    settings_version='The version in the launcher\u2019s Settings window.',
+    live_channel='The live channel being tested, named in the opener.')
+async def live_smoke_start(interaction: discord.Interaction,
+                           settings_version: str, live_channel: str):
+    await live_smoke_open(interaction, settings_version, live_channel, False)
+
+
+@live_smoke.command(name='reset',
+                    description='Close the session open now and start a fresh '
+                                'one. Owner, Dev and Lead Gamemaster only.')
+@discord.app_commands.describe(
+    settings_version='The version in the launcher\u2019s Settings window.',
+    live_channel='The live channel being tested, named in the opener.')
+async def live_smoke_reset(interaction: discord.Interaction,
+                           settings_version: str, live_channel: str):
+    await live_smoke_open(interaction, settings_version, live_channel, True)
+
+
+async def live_smoke_rows_thread(head):
+    """
+    The thread the standing rows sit in, made off the checklist post when it
+    is not there and woken when Discord has archived it.
+
+    A public thread wakes for anybody who may post in it, so this asks for no
+    permission the bot has not got already, and a refusal is said in the log
+    rather than stopping the refresh.
+
+    It is asked for twice before one is made. Discord drops an archived thread
+    out of the cache the message carries, and refreshes are weeks apart, so the
+    thread this wants is usually the one the message says it has not got; a
+    second thread on the same message is refused rather than made.
+    """
+    thread = getattr(head, 'thread', None)
+    if thread is None:
+        try:
+            thread = await head.fetch_thread()
+        except Exception:
+            thread = None
+    if thread is None:
+        return await head.create_thread(name=LIVE_SMOKE_ROWS,
+                                        auto_archive_duration=10080)
+    if getattr(thread, 'archived', False):
+        try:
+            await thread.edit(archived=False)
+        except Exception:
+            log('live smoke: the checklist rows thread would not wake')
+    return thread
+
+
+async def live_smoke_write_rows(thread, rows):
+    """
+    The rows in the thread, in the export's order: what is there already is
+    edited where the export moved it, what is missing is posted, and a row the
+    set no longer carries is taken down.
+
+    Edited rather than posted again, so a thread does not collect a copy of
+    the whole set every time Cynthia refreshes it. A message the bot posted is
+    its own to take down, which Discord allows without Manage Messages.
+    """
+    had = [m async for m in thread.history(limit=None, oldest_first=True)
+           if m.author.id == client.user.id]
+    for n, said in enumerate(rows):
+        if n >= len(had):
+            await thread.send(said)
+        elif had[n].content != said:
+            await had[n].edit(content=said)
+    for old in had[len(rows):]:
+        await old.delete()
+
+
+@live_smoke.command(name='refresh',
+                    description='Read the export again and rewrite the '
+                                'checklist. Owner, Dev and Lead '
+                                'Gamemaster only.')
+async def live_smoke_refresh(interaction: discord.Interaction):
+    """
+    What is run after Cynthia moves the Live set and the new export is
+    deployed. It rewrites the standing checklist humans read in the channel:
+    the post, and under it one message for each row carrying the whole of what
+    a tester does.
+
+    A session already open keeps the rows it was opened with, because
+    rewriting rows underneath somebody's ticks loses what they meant, so the
+    reply says where the new rows to mark come from, which is a reset.
+    """
+    ready = await _live_smoke_ready(interaction)
+    if ready is None:
+        return
+    ch, export = ready
+    await interaction.response.defer(ephemeral=True, thinking=True)
+    items = live_smoke_items(export)
+    said = live_smoke_checklist(export, items)
+    try:
+        head = None
+        async for m in ch.history(limit=50):
+            if m.author.id != client.user.id:
+                continue
+            if str(m.content or '').startswith(LIVE_SMOKE_CHECKLIST_HEAD):
+                head = m
+                break
+        if head is None:
+            head = await ch.send(said[0])
+            try:
+                await head.pin()
+            except Exception:
+                # The running bot asks for neither Manage Messages nor Pin
+                # Messages (Build-Discord.py, RUN_BITS), so Discord refusing
+                # this is ordinary. The post is found again by reading the
+                # channel, which is how the ticket and hold panels find
+                # themselves too.
+                pass
+        elif head.content != said[0]:
+            await head.edit(content=said[0])
+        await live_smoke_write_rows(await live_smoke_rows_thread(head), said[1:])
+    except Exception:
+        log('live smoke: the checklist could not be written:\n'
+            + traceback.format_exc())
+        await interaction.followup.send(
+            'That did not go through. In #%s the bot needs View Channel, Send '
+            'Messages, Read Message History, Create Public Threads and Send '
+            'Messages in Threads.' % ch.name, ephemeral=True)
+        return
+    await interaction.followup.send(
+        'The checklist in #%s now says what the export says: %d row(s), each '
+        'with the whole of what a tester does. A session already open keeps '
+        'the rows it started with, so open a new one with /live-smoke reset '
+        'when testers need these.' % (ch.name, len(items)), ephemeral=True)
+
+
+async def live_smoke_rows_marked(thread):
+    """
+    Every checklist row in a session thread with who marked it what, in the
+    order the session posted them.
+
+    The bot's own messages only, and of those the ones whose heading says they
+    are a row, so the opener and anything anybody else said in the thread are
+    not counted as rows with nobody on them.
+    """
+    out = []
+    async for m in thread.history(limit=None, oldest_first=True):
+        if m.author.id != client.user.id:
+            continue
+        said = str(m.content or '')
+        name = live_smoke_row_name(said)
+        if name:
+            out.append((name, live_smoke_read_marks(said)))
+    return out
+
+
+async def live_smoke_session_stamp(thread):
+    """
+    The stamp off the message a session thread hangs off, or ''.
+
+    Asked of the thread first and fetched after that, the way the standing
+    rows thread is found: Discord drops the starter message out of the cache,
+    and a session opened before the last restart is the ordinary case. A
+    report without the stamp is still a report, so a refusal here is '' rather
+    than a failure.
+    """
+    got = getattr(thread, 'starter_message', None)
+    if got is None:
+        try:
+            got = await thread.parent.fetch_message(thread.id)
+        except Exception:
+            return ''
+    return live_smoke_opener_stamp(getattr(got, 'content', ''))
+
+
+@live_smoke.command(name='report',
+                    description='Count the marks on the session thread this '
+                                'is run in. Owner, Dev and Lead Gamemaster '
+                                'only.')
+async def live_smoke_report(interaction: discord.Interaction):
+    """
+    What Dev reads after a session instead of scrolling every row: the counts,
+    who failed what, and the rows nobody has marked.
+
+    Run in the session thread itself, because that is where the marks are, and
+    answered only to whoever ran it. Nothing is posted in the thread and
+    nothing is written anywhere off Discord: this reads the messages Discord
+    already holds, counts them, and says the total back once.
+    """
+    ready = await _live_smoke_ready(interaction)
+    if ready is None:
+        return
+    no = live_smoke_report_refusal(interaction.channel)
+    if no:
+        await _say(interaction, no)
+        return
+    # Reading a session's worth of rows is more than the three seconds Discord
+    # gives a command to answer in.
+    await interaction.response.defer(ephemeral=True, thinking=True)
+    thread = interaction.channel
+    try:
+        rows = await live_smoke_rows_marked(thread)
+        stamp = await live_smoke_session_stamp(thread)
+    except Exception:
+        # No traceback and no count. What Discord hands back when it refuses
+        # to read a thread carries the messages it did read, and those are
+        # names against marks.
+        log('live smoke: a report could not be read')
+        await interaction.followup.send(
+            'That did not go through. In #%s the bot needs View Channel, Read '
+            'Message History and Send Messages in Threads.'
+            % LIVE_SMOKE_CHANNEL[0], ephemeral=True)
+        return
+    await interaction.followup.send(
+        live_smoke_report_text(getattr(thread, 'name', ''), stamp, rows),
+        ephemeral=True)
+
+
+# ----------------------------------------------------- the staff channel --
+#
+# Where the watchdog's messages are said. There used to be a site watcher here
+# as well, asking https://thornswood.net every five minutes since the Caddy
+# outage of 21 September. The watchdog on the VPS asks the same address (its
+# caddy check), so one outage was two messages from two watchers; since #447
+# the watchdog decides and this only delivers (watch_services, below).
 
 
 async def watch_say(text):
     """
-    Say it once, in the staff channel, found by id.
+    Say it once, in the staff channel, found by id. True when it was said.
 
     Nothing is guessed and nothing falls back to another channel. If that id is
     not a channel this bot can see, it says so in the bot log and stays quiet in
@@ -1700,68 +2885,19 @@ async def watch_say(text):
         log('watch: no channel id, so nothing was said. dev-channel.txt is '
             'missing or unreadable, or set WATCH_CHANNEL_ID in bot.env.json '
             'on the VPS.')
-        return
+        return False
     ch = client.get_channel(WATCH_ID)
     if ch is None:
         log('watch: channel %d is not one this bot can see, so nothing was '
             'said.' % WATCH_ID)
-        return
+        return False
     try:
         await ch.send(text)
+        return True
     except Exception:
         log('watch: could not post in #%s:\n' % getattr(ch, 'name', WATCH_ID)
             + traceback.format_exc())
-
-
-async def watch_site():
-    """
-    Ask every WATCH_EVERY seconds, and speak only when the answer changes.
-
-    SILENCE IS THE POINT. A line every five minutes saying the site is up is a
-    channel nobody reads, and a channel nobody reads is the same as no watcher
-    at all. So it says the site went down, once, and says it came back, once.
-
-    Nothing in here is allowed to end the loop. A watcher that dies quietly is
-    worse than no watcher, because from the outside it looks exactly like
-    everything being fine.
-    """
-    await client.wait_until_ready()
-    misses = 0
-    said_down = False
-    log('watch: asking %s every %ds, speaking up after %d miss(es), in channel '
-        '%d' % (SITE, WATCH_EVERY, WATCH_MISSES, WATCH_ID))
-
-    while not client.is_closed():
-        try:
-            ok, what = await asyncio.get_running_loop().run_in_executor(
-                None, site_answers)
-            if ok:
-                if said_down:
-                    said_down = False
-                    await watch_say('The site is answering again. %s' % what)
-                    log('watch: back up, %s' % what)
-                elif misses:
-                    log('watch: answered after %d miss(es), %s' % (misses, what))
-                misses = 0
-            else:
-                misses += 1
-                log('watch: no answer from %s, %d in a row: %s'
-                    % (SITE, misses, what))
-                if misses >= WATCH_MISSES and not said_down:
-                    said_down = True
-                    await watch_say(
-                        'The site is not answering. %d checks in a row, %d '
-                        'seconds apart, and the last one said: %s\n'
-                        'Caddy holds 443 and now restarts itself every five '
-                        'minutes, so if this does not clear on its own then it '
-                        'is the box, the certificate, or something in front of '
-                        'both. People will be told they could not be checked '
-                        'in, and voice will sit on connecting, until it does.'
-                        % (misses, WATCH_EVERY, what))
-        except Exception:
-            log('watch: the check itself failed, carrying on:\n'
-                + traceback.format_exc())
-        await asyncio.sleep(WATCH_EVERY)
+        return False
 
 
 def _clock(ms):
@@ -1952,247 +3088,131 @@ async def trouble_say(text):
 # ------------------------------------------------------ the box's watchdog --
 #
 # Watch-Services.ps1 puts a watchdog on the VPS that restarts whatever stops
-# answering, three times an hour at most, and then stops and writes that the
-# service needs a look. That sentence went to watch.log on the box and nowhere
-# else. From the To Do List: "the sentence it writes when it gives up
-# currently goes to a file on the box that may itself be the thing that is
-# gone". Nobody reads a log on the VPS until they already know something is
-# wrong, so the one line written for a person was the one line no person saw.
+# answering, and since issue #447 it also decides what is down: one message
+# when a thing dies and one when it is back, however long it stays down and
+# however often it flaps. It writes them to alerts.jsonl in its folder, one
+# JSON line each (id, at, service, kind, text). This says each one in the
+# staff channel, by id through watch_say, which has no public fallback, and
+# writes its id to alerts-sent-bot.txt, so it is said once across restarts of
+# the bot too.
 #
-# This reads that file and says the three lines that need a person, in the
-# staff channel the site watcher uses, found by id through watch_say. Never a
-# public channel: watch_say has no fallback to one.
+# When this bot is down, or up and not posting, the watchdog posts the message
+# itself through a webhook kept on the box and writes its id to
+# alerts-sent-webhook.txt. This reads that list too, so what the webhook said
+# is not said again when the bot comes back.
 #
-#   needs a look          restarted three times this hour and still down
-#   could not be started  Windows would not run the service's task
-#   did not come back     restarted, and still not answering afterwards
+# The watchdog decides and this only delivers, so there is no counting here.
+# It replaced a reader of watch.log that tried to work out outages from the
+# watchdog's sentences, and repeated "needs a look" every hour.
+# tests\test-watch-alerts.ps1 drives the watchdog, and test-watch-services.py
+# drives this against an outbox the real watchdog wrote.
 #
-# A file and not a webhook, for the same reason as watch_trouble: both run on
-# this box, so there is no new secret to make, place or keep out of git.
-#
-# WHAT IT CANNOT CATCH is the box going down, or the bot being the thing that
-# is down. Both take this with them. That needs something off the machine.
-
-# How long with no line about a service before its next line is a new outage
-# rather than more of the same one. The watchdog writes at least one line
-# about every service that is down on every run, five minutes apart, give or
-# take the minute or so a run spends restarting whatever it checks first. It
-# writes nothing about a service that is up, so a gap of ten minutes is one run
-# that found it answering, and seven and a half sits between the two.
-#
-# ONE CLEAN RUN IS ENOUGH, and it was twenty minutes until 24 September. A
-# reviewer traced a fix made by hand that held for one run and then fell over
-# again: the watchdog wrote "needs a look" ten minutes after its last line, the
-# outage had never ended, and nobody was told for as long as it stayed down.
-# The person who fixed it believed it was fixed. A fix by hand is the one way a
-# service comes back with nothing written, so one run finding it up is all the
-# evidence there will ever be.
-WATCH_LOG_QUIET = int(7.5 * 60)
-
-# How long "needs a look" stays said while the lines keep coming. A fix that
-# falls over again inside five minutes leaves no gap at all, and without this
-# it would be silent for as long as the service stayed down. Once an hour is a
-# reminder, where every five minutes was the noise this whole thing avoids.
-WATCH_LOG_REMIND = 60 * 60
-
-# The watchdog's own words, from its Note() lines in Watch-Services.ps1, tried
-# in this order. test-watch-services.py renders those lines out of that script
-# and checks each one lands here, so changing the wording there fails a
-# harness instead of quietly silencing this.
-_WATCH_LINE = re.compile(r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s+(\S.*?)\s*$')
-_WATCH_KINDS = [
-    ('look',    re.compile(r'^(.+?) is still down after (\d+) restarts this hour\..*needs a look')),
-    ('refused', re.compile(r'^(.+?) could not be started\.')),
-    ('stuck',   re.compile(r'^(.+?) did not come back in time')),
-    ('trying',  re.compile(r'^(.+?) is not answering\. Starting ')),
-    ('back',    re.compile(r'^(.+?) is back$')),
-]
+# WHAT IT CANNOT CATCH is the whole box going down, which takes the watchdog
+# with it. That needs something off the machine (issue #448).
+WATCH_ALERTS = os.path.join(WATCH_DIR, 'alerts.jsonl')
+WATCH_SENT_BOT = os.path.join(WATCH_DIR, 'alerts-sent-bot.txt')
+WATCH_SENT_HOOK = os.path.join(WATCH_DIR, 'alerts-sent-webhook.txt')
+# The watchdog's $alertMaxAge: a message a day late is noise, not news.
+WATCH_ALERT_MAX_AGE = 24 * 3600
 
 
-def _watch_log_message(kind, name, hit, line, since=None):
+def watch_alerts_due(lines, sent, now):
     """
-    What is said for one watchdog line, with the line itself under it.
+    The (id, text) of each message in the outbox still to be said, in order.
 
-    since is how many minutes ago "needs a look" was last said for this
-    service, when this is the hourly reminder of it, and None otherwise.
+    lines are the outbox's lines, sent every id already said by the bot or the
+    webhook, now the time in unix seconds. A line that is not a message is
+    skipped rather than stopping the rest, and so is one older than
+    WATCH_ALERT_MAX_AGE. An id twice in the outbox is said once.
     """
-    who = name[:1].upper() + name[1:]
-    if kind == 'look' and since is not None:
-        head = ('**%s still needs a look.** That was said here %d minutes ago, '
-                'and the watchdog has found it down on every run since and is '
-                'still leaving it. If somebody worked on it in that time, it '
-                'did not stay up. This is said again every hour it stays down.'
-                % (who, since))
-    elif kind == 'look':
-        head = ('**%s is down and the watchdog has stopped restarting it.** It '
-                'was restarted %s times this hour and would not stay up, so it '
-                'needs a person. The watchdog writes this to watch.log every '
-                'five minutes while it stays down, and it is said here again '
-                'every hour.'
-                % (who, hit.group(2)))
-    elif kind == 'refused':
-        head = ('**%s could not be started.** The watchdog on the VPS found it '
-                'not answering and Windows would not run its task, which '
-                'usually means the task is missing or was renamed.' % who)
-    else:
-        head = ('**%s did not come back after a restart.** The watchdog on the '
-                'VPS found it not answering, started it, and it was still not '
-                'answering when it looked again. It tries every five minutes, '
-                'three times an hour at most, and says so here if it gives up.'
-                % who)
-    return ('%s\n```\n%s\n```' % (head, line[:400]))[:1900]
-
-
-def watch_log_news(lines, state):
-    """
-    The messages to send for these new watch.log lines, in order.
-
-    state carries what has been said about each service from one call to the
-    next. Pass the same dict every time, starting from an empty one.
-
-    ONCE PER OUTAGE, per service and per kind of line. A service that will not
-    stay up gets "did not come back" on each of its three restarts an hour and
-    "needs a look" on every run after that, every five minutes. Said every
-    time, one broken service is twelve messages an hour and the channel stops
-    being read, which is the same as nobody being told. So each kind is said
-    the first time in an outage and not again until the outage ends. It ends
-    when the watchdog writes that the service is back, or when WATCH_LOG_QUIET
-    passes with no line about it at all, because the watchdog writes about a
-    service that is down on every run and writes nothing about one that is up.
-
-    AND "NEEDS A LOOK" AGAIN EVERY WATCH_LOG_REMIND while the lines keep
-    coming. A fix made by hand that falls over before the watchdog's next run
-    leaves no gap to end the outage on, so this is what stops that being
-    silence for as long as the service is down.
-
-    No file, no Discord, and no clock but the times in the log itself, so the
-    harness can drive it one line at a time.
-    """
-    last = state.setdefault('last', {})
-    # Per service, each kind already said in this outage and the log time it
-    # was said at.
-    said = state.setdefault('said', {})
     out = []
+    seen = set(sent)
     for raw in lines:
-        m = _WATCH_LINE.match(raw or '')
-        if not m:
-            continue
         try:
-            when = datetime.datetime.strptime(m.group(1), '%Y-%m-%d %H:%M:%S')
-        except ValueError:
+            a = json.loads(raw)
+            aid = str(a['id']).strip()
+            text = str(a['text'])
+            at = int(a['at'])
+        except Exception:
             continue
-        for kind, rx in _WATCH_KINDS:
-            hit = rx.match(m.group(2))
-            if hit:
-                break
-        else:
+        if not aid or not text.strip() or aid in seen:
             continue
-        name = hit.group(1)
-        before = last.get(name)
-        last[name] = when
-        # abs, because the only way a line is older than the one before it is
-        # the box's clock going back, and that is better said again than taken
-        # for the same outage with the reminder an hour further off.
-        if (kind == 'back' or before is None
-                or abs((when - before).total_seconds()) > WATCH_LOG_QUIET):
-            said[name] = {}
-        if kind not in ('look', 'refused', 'stuck'):
+        if now - at > WATCH_ALERT_MAX_AGE:
             continue
-        done = said.setdefault(name, {})
-        since = None
-        if kind in done:
-            if kind != 'look':
-                continue
-            gone = (when - done[kind]).total_seconds()
-            if gone < WATCH_LOG_REMIND:
-                continue
-            since = int(gone // 60)
-        done[kind] = when
-        out.append(_watch_log_message(kind, name, hit, raw.strip(), since))
+        seen.add(aid)
+        out.append((aid, text[:1900]))
     return out
 
 
-def _watch_log_lines():
+def _watch_lines(path):
     """
-    Every whole line in watch.log, or None when it could not be read.
+    Every whole, non-empty line of path, [] when there is no such file, and
+    None when it is there and cannot be read, so an unreadable outbox is never
+    taken for an empty one.
 
-    No file is an empty list, because that is the normal state of a quiet box:
-    the watchdog writes nothing until something goes down. Any other failure
-    is None, and the loop skips that round rather than reading an unreadable
-    file as an empty one.
-
-    A last line with no line ending is left for the next read. Add-Content may
-    be halfway through it, and half a line said now is the whole line said
-    again a minute later.
+    A last line with no line ending is left for the next read: the watchdog
+    may be halfway through writing it.
     """
     try:
-        with open(WATCH_LOG, 'rb') as f:
+        with open(path, 'rb') as f:
             data = f.read()
     except FileNotFoundError:
         return []
     except Exception:
         return None
-    # utf-8-sig because the watchdog trims the file with Set-Content -Encoding
-    # UTF8, which on Windows PowerShell puts a byte order mark first.
     parts = data.decode('utf-8-sig', errors='replace').split('\n')
-    return [p.rstrip('\r') for p in parts[:-1] if p.strip()]
+    return [p.strip() for p in parts[:-1] if p.strip()]
+
+
+def _watch_mark(aid):
+    """Write down that the bot said it. Blocking, so run through an executor."""
+    with open(WATCH_SENT_BOT, 'a', encoding='ascii', errors='replace') as f:
+        f.write(aid + '\r\n')
 
 
 async def watch_services():
     """
-    Read the watchdog's log every WATCH_LOG_EVERY seconds and say what needs a
-    person.
+    Every WATCH_READ_EVERY seconds, say what the watchdog's outbox holds that
+    nobody has said yet.
 
-    WHAT IT REMEMBERS AND WHY. The lines already in the file when this starts
-    are treated as said, the same as watch_trouble, or every restart of the
-    bot would say the last thousand again. They still go through
-    watch_log_news, so an outage that was already under way is known to be one
-    and its repeats stay quiet.
+    A message that could not be said is left unmarked and the rest of that
+    round waits, so they stay in order; the watchdog posts it through its
+    webhook once it has waited long enough.
 
-    Lines are remembered by their text, time and all, and not by where they
-    sit in the file, because the watchdog cuts the file to its last thousand
-    lines when it passes two thousand and every position moves.
-
-    Nothing in here may end the loop, for the same reason as the site watcher:
-    a watcher that dies quietly looks exactly like everything being fine.
+    Nothing in here may end the loop: a watcher that dies quietly looks
+    exactly like everything being fine.
     """
     await client.wait_until_ready()
     loop = asyncio.get_running_loop()
-    state = {}
-    seen = None
+    said = set()
     unreadable = False
-    log('services: reading %s every %ds, speaking in channel %d'
-        % (WATCH_LOG, WATCH_LOG_EVERY, WATCH_ID))
+    log('services: saying what %s holds, every %ds, in channel %d'
+        % (WATCH_ALERTS, WATCH_READ_EVERY, WATCH_ID))
 
     while not client.is_closed():
         try:
-            lines = await loop.run_in_executor(None, _watch_log_lines)
-            if lines is None:
+            lines = await loop.run_in_executor(None, _watch_lines, WATCH_ALERTS)
+            mine = await loop.run_in_executor(None, _watch_lines, WATCH_SENT_BOT)
+            hook = await loop.run_in_executor(None, _watch_lines, WATCH_SENT_HOOK)
+            if lines is None or mine is None or hook is None:
                 if not unreadable:
-                    log('services: could not read %s, trying again every %ds'
-                        % (WATCH_LOG, WATCH_LOG_EVERY))
+                    log('services: could not read the watchdog\'s files in %s, '
+                        'trying again every %ds' % (WATCH_DIR, WATCH_READ_EVERY))
                 unreadable = True
-            elif seen is None:
-                unreadable = False
-                seen = set(lines)
-                watch_log_news(lines, state)
-                log('services: %d line(s) already in the log, treated as said'
-                    % len(lines))
             else:
                 unreadable = False
-                new = [l for l in lines if l not in seen]
-                seen.update(new)
-                # The file never holds more than two thousand lines, so this
-                # only has to remember what could still be in it.
-                if len(seen) > 10000:
-                    seen = set(lines)
-                for text in watch_log_news(new, state):
-                    log('services: saying ' + text.split('\n', 1)[0])
-                    await watch_say(text)
+                due = watch_alerts_due(lines, said | set(mine) | set(hook),
+                                       int(time.time()))
+                for aid, text in due:
+                    if not await watch_say(text):
+                        break
+                    said.add(aid)
+                    log('services: said ' + aid)
+                    await loop.run_in_executor(None, _watch_mark, aid)
         except Exception:
             log('services: the check itself failed, carrying on:\n'
                 + traceback.format_exc())
-        await asyncio.sleep(WATCH_LOG_EVERY)
+        await asyncio.sleep(WATCH_READ_EVERY)
 
 
 def report_text(row):
@@ -2201,15 +3221,40 @@ def report_text(row):
 
     Every word of it was typed by a stranger with no account, so it is escaped
     before it goes anywhere near Discord: an @everyone in a title is text, not
-    a ping, and a masked link is shown as what it is.
+    a ping, and a masked link is shown as what it is. as_typed is the same
+    escaping the ticket threads use.
     """
-    def clean(v, n):
-        v = str(v or '').strip()[:n]
-        return discord.utils.escape_mentions(discord.utils.escape_markdown(v))
+    clean = as_typed
 
-    kind = 'An idea' if row.get('kind') == 'idea' else 'A problem'
     by = clean(row.get('by'), 40)
     detail = clean(row.get('detail'), 400)
+    kind = row.get('kind')
+
+    # From inside the game (#414): /helpme and /report. The profile ids in
+    # the detail are the client's claim, and the detail says so. A report
+    # about somebody never pings: the send switches every mention off.
+    if str(row.get('from') or '').startswith('in game'):
+        where = ' on the dev server' if 'dev' in str(row.get('from')) else ''
+        if kind == 'help':
+            head = '**%s asked for help in game%s**' % (by or 'Somebody', where)
+        else:
+            head = ('**%s reported %s in game%s**'
+                    % (by or 'Somebody', clean(row.get('about'), 60) or 'somebody',
+                       where))
+        return '%s\n%s%s' % (head, clean(row.get('title'), 300) or '(nothing said)',
+                             ('\n' + detail) if detail else '')
+
+    # A report about a person from the site, which the site only takes from
+    # somebody signed in with Discord, so it always has a name and an account.
+    if kind == 'report':
+        acct = str(row.get('discordId') or '')
+        return ('**%s reported %s on the site**%s.\n%s%s'
+                % (by or 'Somebody', clean(row.get('about'), 60) or 'somebody',
+                   (' (Discord <@%s>)' % acct) if acct.isdigit() else '',
+                   clean(row.get('title'), 200) or '(no title)',
+                   ('\n' + detail) if detail else ''))
+
+    kind = 'An idea' if kind == 'idea' else 'A problem'
     return ('**%s sent in on the public report page**, %s.\n%s%s'
             % (kind,
                ('from ' + by) if by else 'with no name left',
@@ -2287,7 +3332,7 @@ async def watch_reports():
                 said.add(r['id'])
             if len(fresh) > REPORTS_AT_ONCE:
                 await report_say(
-                    '**%d reports came in on the public report page** since the '
+                    '**%d reports came in, from the site and the game,** since the '
                     'last look, which is more than people send and more than '
                     'this channel should carry one at a time. They are in the '
                     'inbox on the site.' % len(fresh))
@@ -2301,6 +3346,391 @@ async def watch_reports():
         await asyncio.sleep(REPORTS_EVERY)
 
 
+# ------------------------------------------------------ staff in the world --
+#
+# What a moderator did in the game (#412): /kick, /freeze, /silence, /warn and
+# the rest. The gamemode appends one JSON line per action to
+# private\moderation.log beside each game server, on this same box, and this
+# says each new line once in the staff channel, so the record is outside the
+# game and in front of the rest of staff. A file rather than a request, for the
+# same reason as watch_trouble: no new secret, port or ticket.
+MODERATION_LOGS = [
+    ('live', os.environ.get('MODERATION_LOG',
+                            r'C:\Thornswood-Server\private\moderation.log')),
+    ('dev', os.environ.get('MODERATION_LOG_DEV',
+                           r'C:\Thornswood-Server-Dev\private\moderation.log')),
+    # Bans and notes made on the hub, which the site writes beside
+    # trouble.json. The game's own /ban and /note are in the two above.
+    ('site', os.environ.get('MODERATION_LOG_SITE',
+                            os.path.join(os.path.dirname(TROUBLE_FILE), 'moderation.log'))),
+]
+MODERATION_EVERY = _int_env('MODERATION_EVERY', 30)
+# More than this in one look from one server is said as a count, not a wall.
+MODERATION_AT_ONCE = 10
+
+_MOD_DID = {
+    'kick': 'removed %s from the world',
+    'freeze': 'froze %s in place',
+    'unfreeze': 'let %s move again',
+    'bring': 'brought %s to them',
+    'goto': 'went to %s',
+    'silence': 'silenced %s',
+    'unsilence': 'let %s speak again',
+    'warn': 'warned %s',
+    'give': 'gave %s',
+    'spawn': 'spawned beside %s',
+    'tp': 'sent %s',
+    # One character, or the whole account, and a character killed for good (#1010).
+    'ban': 'banned the character %s',
+    'unban': 'lifted the ban on the character %s',
+    'banaccount': 'banned the whole account of %s, every character on it',
+    'unbanaccount': 'lifted the ban on the account of %s',
+    'pk': 'killed %s for good (PK), quietly',
+    # An admin undoing a PK made by mistake (#1010, 29 September).
+    'unpk': 'undid the PK of %s, so the character can be played again',
+    'note': 'wrote a note on %s',
+    # Not staff: somebody's own /stuck (#414), said as its why reads.
+    'stuck': 'used /stuck',
+    # Not staff either: the server took somebody idle out of the world (#1142).
+    'idle': 'was moved out for being idle',
+}
+
+
+def moderation_text(where, row):
+    """
+    One line of moderation.log as the staff channel reads it, or None for a
+    line that is not one. Names and reasons were typed in the game, so they
+    are escaped: nothing in them can ping anybody or dress itself up.
+    """
+    if not isinstance(row, dict) or row.get('did') not in _MOD_DID:
+        return None
+
+    clean = as_typed
+
+    def person(name, pid):
+        try:
+            pid = int(pid)
+        except (TypeError, ValueError):
+            pid = 0
+        # The hub knows a person by account, not by profile.
+        if pid <= 0:
+            return clean(name, 40) or 'somebody'
+        return '%s (profile %d)' % (clean(name, 40) or 'somebody', pid)
+
+    # /stuck is not a staff action: the person did it to themselves, and the
+    # gamemode writes the whole sentence (from where, to where, the account).
+    if row['did'] == 'stuck':
+        why = clean(row.get('why'), 600) or 'used /stuck.'
+        return ('**/stuck on the %s server:** %s %s'
+                % (where, person(row.get('byName'), row.get('by')), why))[:1900]
+
+    # Moved out of the world for being idle (#1142): nobody did it to them, so
+    # it reads as what happened and why, which the gamemode writes.
+    if row['did'] == 'idle':
+        why = clean(row.get('why'), 600) or 'nothing from their game for too long'
+        return ('**Idle on the %s server:** %s was taken back to the character choice and put in line: %s'
+                % (where, person(row.get('whoName'), row.get('who')), why))[:1900]
+
+    did = _MOD_DID[row['did']] % person(row.get('whoName'), row.get('who'))
+    try:
+        minutes = int(row.get('minutes') or 0)
+    except (TypeError, ValueError):
+        minutes = 0
+    if row['did'] == 'silence' and minutes > 0:
+        did += ' for %d minute%s' % (minutes, '' if minutes == 1 else 's')
+    why = clean(row.get('why'), 300)
+    head = ('**Staff on the site:**' if where == 'site'
+            else '**Staff on the %s server:**' % where)
+    return ('%s %s %s%s'
+            % (head, person(row.get('byName'), row.get('by')), did,
+               (': ' + why) if why else '.'))[:1900]
+
+
+def _moderation_lines(path):
+    """
+    Every whole line in one moderation.log, [] when there is no file yet (no
+    staff action on that server so far), None when it could not be read. A
+    last line with no line ending is left for the next look, the same as
+    _watch_log_lines.
+    """
+    try:
+        with open(path, 'rb') as f:
+            data = f.read()
+    except FileNotFoundError:
+        return []
+    except Exception:
+        return None
+    parts = data.decode('utf-8-sig', errors='replace').split('\n')
+    return [p.rstrip('\r') for p in parts[:-1] if p.strip()]
+
+
+async def watch_moderation():
+    """
+    Say each new staff action from the game in the staff channel, once.
+
+    The lines already in each file when this starts are treated as said, as in
+    watch_trouble, or every restart of the bot would repeat the history. A
+    file that cannot be read is skipped for that look rather than read as
+    empty. Nothing in here may end the loop.
+    """
+    await client.wait_until_ready()
+    loop = asyncio.get_running_loop()
+    seen = {}
+    for where, path in MODERATION_LOGS:
+        lines = await loop.run_in_executor(None, _moderation_lines, path)
+        seen[where] = set(lines) if lines is not None else None
+    log('moderation: reading %s every %ds'
+        % (', '.join(p for _, p in MODERATION_LOGS), MODERATION_EVERY))
+
+    while not client.is_closed():
+        try:
+            for where, path in MODERATION_LOGS:
+                lines = await loop.run_in_executor(None, _moderation_lines, path)
+                if lines is None:
+                    continue
+                if seen.get(where) is None:
+                    seen[where] = set(lines)
+                    continue
+                new = [l for l in lines if l not in seen[where]]
+                seen[where].update(new)
+                texts = []
+                for l in new:
+                    try:
+                        text = moderation_text(where, json.loads(l))
+                    except ValueError:
+                        text = None
+                    if text:
+                        texts.append(text)
+                if len(texts) > MODERATION_AT_ONCE:
+                    await report_say(
+                        '**%d staff actions on %s** since the last look, more '
+                        'than this channel should carry one at a time. They '
+                        'are in %s on the VPS.'
+                        % (len(texts),
+                           'the site' if where == 'site' else 'the %s server' % where,
+                           path))
+                else:
+                    for text in texts:
+                        await report_say(text)
+        except Exception:
+            log('moderation: the check itself failed, carrying on:\n'
+                + traceback.format_exc())
+        await asyncio.sleep(MODERATION_EVERY)
+
+
+# ------------------------------------------------------------- heartbeat --
+# How the watchdog tells a running bot from a working one (issue #449).
+#
+# The watchdog on the VPS used to know one thing about the bot: whether a
+# python process with Thornswood-Bot in its command line was alive. A bot
+# stuck logging in, hung, or cut off from Discord and never getting back is
+# still that process, so the one outage the bot exists to tell staff about,
+# itself, looked fine. So this writes heartbeat.json beside this file every
+# HEARTBEAT_EVERY seconds: its pid, when it started, when it wrote it,
+# whether it is connected to Discord, when it last was, and when it last
+# handled something Discord sent it and what. The watchdog reads it
+# (BeatProblem in scripts\vps\Watch-Services.ps1) and treats ten quiet
+# minutes of any of those as the bot being down while its process runs.
+#
+# It is written from its own loop, so a hung event loop stops it, which is
+# the point. Written to a temporary file and renamed over the old one, so
+# the watchdog never reads half of one.
+HEARTBEAT_FILE = os.environ.get(
+    'HEARTBEAT_FILE',
+    os.path.join(DATA_DIR, 'heartbeat.json'))
+HEARTBEAT_EVERY = _int_env('HEARTBEAT_EVERY', 60)
+
+# The fields the watchdog reads. test-heartbeat.py checks the two agree.
+_beat = {
+    'pid': os.getpid(),
+    'started': int(time.time()),
+    'connected': False,
+    'connected_at': 0,
+    'last_event': 0,
+    'last_event_type': '',
+}
+_beat_failed = False
+
+
+def beat_record(now, closed=False):
+    """What heartbeat.json says at unix time now. closed is the client having
+       been closed, which no event says."""
+    if closed:
+        _beat['connected'] = False
+    if _beat['connected']:
+        _beat['connected_at'] = int(now)
+    rec = dict(_beat)
+    rec['written'] = int(now)
+    return rec
+
+
+def beat_write(rec, path=None):
+    """Put rec in heartbeat.json. True when it is there. A failure is said in
+       bot.log once, not every minute, and never stops the bot."""
+    global _beat_failed
+    path = path or HEARTBEAT_FILE
+    tmp = path + '.tmp'
+    try:
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(rec, f)
+        os.replace(tmp, path)
+        _beat_failed = False
+        return True
+    except Exception:
+        if not _beat_failed:
+            log('could not write ' + path + ', so the watchdog cannot tell '
+                'whether this bot is on Discord:\n' + traceback.format_exc())
+        _beat_failed = True
+        return False
+
+
+def beat_now():
+    return beat_write(beat_record(time.time(), client.is_closed()))
+
+
+async def heartbeat():
+    """Started once, in setup_hook. Runs until the process ends."""
+    while True:
+        beat_now()
+        await asyncio.sleep(HEARTBEAT_EVERY)
+
+
+def beat_connected(on):
+    _beat['connected'] = bool(on)
+    beat_now()
+
+
+@client.event
+async def on_connect():
+    beat_connected(True)
+
+
+@client.event
+async def on_resumed():
+    beat_connected(True)
+
+
+@client.event
+async def on_disconnect():
+    beat_connected(False)
+
+
+@client.event
+async def on_socket_event_type(event_type):
+    # Every event Discord sends, whether or not anything here handles it.
+    # Kept in memory only; the loop above writes it.
+    _beat['last_event'] = int(time.time())
+    _beat['last_event_type'] = str(event_type)
+
+
+# ----------------------------------------------------------- uptime ping --
+# The heartbeat above is read on the box, by the watchdog, and a box that is
+# off, frozen or cut off reads nothing and says nothing. So the bot also pings
+# an outside monitor (Patrick, 29 Sep: "I want the bot too as well"): one GET
+# to PING_URL every PING_EVERY seconds while it is on Discord. When the pings
+# stop for longer than the monitor's grace, the monitor sends its alert,
+# whether the bot hung, lost Discord or stopped, or the whole VPS went down,
+# and whether or not One is on.
+#
+# PING_URL lives only in bot.env.json on the VPS, put there by
+# .\scripts\deploy\Install-Bot.ps1 -SetPing on ssh's standard input. Whoever
+# has it can keep the monitor quiet, so it is never logged, not even in an
+# error. Each ping runs on a worker thread with its own timeout, so a slow or
+# dead monitor never holds up anything Discord sends, and a ping still in
+# flight is never doubled. It is sent from the event loop, so a hung bot stops
+# pinging, which is the point. A failure is said once per outage and once
+# when it works again; nothing here can stop the bot.
+PING_URL = os.environ.get('PING_URL', '').strip()
+PING_EVERY = _int_env('PING_EVERY', 60)
+PING_TIMEOUT = _int_env('PING_TIMEOUT', 10)
+# How often the loop looks, so the first ping follows connecting by seconds.
+PING_LOOK = 5
+
+_ping = {'down': False, 'ok_once': False}
+
+
+def ping_shape_ok(url):
+    """A web address, and nothing that could be a file or a command."""
+    return (url.lower().startswith(('https://', 'http://'))
+            and not any(c.isspace() for c in url))
+
+
+def _ping_scrub(text, url):
+    """text with the address, and its path, taken out."""
+    text = str(text)
+    for part in (url, url.split('://', 1)[-1]):
+        if part:
+            text = text.replace(part, 'the ping address')
+    tail = url.split('://', 1)[-1].split('/', 1)
+    if len(tail) == 2 and len(tail[1]) > 3:
+        text = text.replace(tail[1], 'the ping address')
+    return text
+
+
+def ping_once(url, timeout=None):
+    """One ping. True when the monitor answered 2xx. Never raises."""
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'thornswood-bot'})
+        with urllib.request.urlopen(req, timeout=timeout or PING_TIMEOUT) as r:
+            r.read(256)
+            code = r.status
+        ok = 200 <= code < 300
+        why = 'it answered %d' % code
+    except Exception as e:
+        ok = False
+        code = getattr(e, 'code', None)
+        if isinstance(code, int):
+            why = 'it answered %d' % code
+        else:
+            why = '%s: %s' % (type(e).__name__, getattr(e, 'reason', None) or e)
+    try:
+        if ok:
+            if _ping['down']:
+                log('uptime ping: the outside monitor hears from this bot again')
+            elif not _ping['ok_once']:
+                log('uptime ping: reached the outside monitor, and pings it every '
+                    '%ds while on Discord' % PING_EVERY)
+            _ping['down'] = False
+            _ping['ok_once'] = True
+        else:
+            if not _ping['down']:
+                log('uptime ping FAILED (%s). The outside monitor alerts if it '
+                    'hears nothing past its grace. Said once until it works '
+                    'again.' % _ping_scrub(why, url))
+            _ping['down'] = True
+    except Exception:
+        pass
+    return ok
+
+
+async def uptime_ping():
+    """Started once, in setup_hook. Runs until the process ends, or returns
+       at once when there is nothing to ping."""
+    if not PING_URL:
+        log('uptime ping: PING_URL is not set in bot.env.json, so no outside '
+            'monitor hears from this bot. Install-Bot.ps1 -SetPing sets it.')
+        return
+    if not ping_shape_ok(PING_URL):
+        log('uptime ping: PING_URL in bot.env.json is not a web address, so '
+            'nothing is sent. Install-Bot.ps1 -SetPing sets it again.')
+        return
+    loop = asyncio.get_running_loop()
+    inflight = None
+    last = None
+    while True:
+        try:
+            now = time.monotonic()
+            if (_beat['connected'] and not client.is_closed()
+                    and (inflight is None or inflight.done())
+                    and (last is None or now - last >= PING_EVERY)):
+                last = now
+                inflight = loop.run_in_executor(None, ping_once, PING_URL)
+        except Exception:
+            log('uptime ping: could not start one, carrying on:\n'
+                + _ping_scrub(traceback.format_exc(), PING_URL))
+        await asyncio.sleep(PING_LOOK)
+
+
 # on_ready fires again on every reconnect, and a second loop would double every
 # message this ever sends.
 _watching = False
@@ -2309,8 +3739,7 @@ _watching = False
 # What was last registered with Discord, so a restart does not do it all
 # again. Next to the code, because that folder is the bot's own and a deploy
 # that replaces it is a deploy that may have changed the commands anyway.
-STAMP = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                     'commands-synced.json')
+STAMP = os.path.join(DATA_DIR, 'commands-synced.json')
 
 # Set FORCE_COMMAND_SYNC=1 in bot.env.json to make the next start register them
 # whatever the stamp says. For the case where Discord has them and this file
@@ -2318,8 +3747,47 @@ STAMP = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 FORCE_SYNC = _int_env('FORCE_COMMAND_SYNC', 0)
 
 
+def _children_of(command):
+    """
+    A group's subcommands, and nothing at all for a plain command.
+
+    Read by attribute rather than by type, because the ready harness stands a
+    counting object in for the tree and never imports a real Group.
+    """
+    got = getattr(command, 'commands', None)
+    return list(got) if got else []
+
+
 def _command_names():
-    return sorted(c.name for c in tree.get_commands())
+    """
+    Every name Discord has to be told about, sorted: the groups, and their
+    children under them.
+
+    THE SCHEME. A child is written under its parent with a space between
+    them, the way a person types it in the picker: `live-smoke` is in the
+    list, and so are `live-smoke report` and the rest. Nested groups go on the
+    same way, `parent child grandchild`. The stamp still holds a sorted list
+    of plain strings, so a stamp written before this reads back fine; it is
+    missing every child, which is exactly why the next start syncs.
+
+    WHY IT IS NOT THE TOP LEVEL ALONE. It was, and adding a subcommand to a
+    group that was already registered left this list identical. `/live-smoke
+    report` was merged and deployed, the start said "slash commands already
+    registered", no sync went to Discord, and the picker kept offering the
+    three subcommands it had. It took FORCE_COMMAND_SYNC to put it there. A
+    child is a command as far as the picker is concerned, so it is a name
+    here.
+    """
+    out = []
+
+    def walk(commands, prefix):
+        for c in commands:
+            name = (prefix + ' ' + c.name) if prefix else c.name
+            out.append(name)
+            walk(_children_of(c), name)
+
+    walk(tree.get_commands(), '')
+    return sorted(out)
 
 
 def _stamp_read():
@@ -2380,16 +3848,20 @@ async def register_commands():
             await tree.sync(guild=g)
             if g.id not in synced:
                 synced.append(g.id)
-            log('/close is registered in "%s"' % g.name)
+            log('registered in "%s": %s'
+                % (g.name, ', '.join('/' + n for n in want) or 'nothing'))
         except Exception:
-            log('could not register /close in "%s", the Close button still '
-                'works:\n' % g.name + traceback.format_exc())
+            # Named rather than said as "the commands", because which ones
+            # they are is the first thing anybody asks when none appear.
+            log('could not register %s in "%s", the buttons still work:\n'
+                % (', '.join('/' + n for n in want), g.name)
+                + traceback.format_exc())
     try:
         tree.clear_commands(guild=None)
         await tree.sync()
     except Exception:
-        log('could not clear the global commands, so /close may appear twice '
-            'in the picker:\n' + traceback.format_exc())
+        log('could not clear the global commands, so a command may appear '
+            'twice in the picker:\n' + traceback.format_exc())
 
     _stamp_write(want, synced)
 
@@ -2399,10 +3871,10 @@ async def on_ready():
     global _watching
     if not _watching:
         _watching = True
-        asyncio.create_task(watch_site())
         asyncio.create_task(watch_trouble())
         asyncio.create_task(watch_services())
         asyncio.create_task(watch_reports())
+        asyncio.create_task(watch_moderation())
 
     log('up as %s' % client.user)
 
@@ -2456,6 +3928,9 @@ async def on_ready():
 # `python bot.py`, where __name__ is __main__, so this changes nothing about
 # how it runs on the VPS.
 if __name__ == '__main__':
+    # One heartbeat before anything can hang, so a bot stuck logging in has
+    # this run's pid in the file and the watchdog can say how long it has sat.
+    beat_now()
     try:
         client.run(TOKEN)
     except discord.PrivilegedIntentsRequired:

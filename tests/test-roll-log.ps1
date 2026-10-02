@@ -5,8 +5,8 @@
   folder. Entry 220: "Nothing rotates, so last night's crash is at the end of
   a file that grows forever."
 
-  WHY THE COMMAND LINES ARE RUN AND NOT JUST READ. server.log, voice.log and
-  bot.log are written by cmd's >> from a scheduled task, and on Windows a file
+  WHY THE COMMAND LINES ARE RUN AND NOT JUST READ. server.log and voice.log
+  are written by cmd's >> from a scheduled task, and on Windows a file
   held that way cannot be renamed or truncated while the service runs. So the
   roll has to happen in front of the service, inside the same cmd line, and a
   quoting mistake in that line is a game server that does not start. Each line
@@ -25,9 +25,10 @@
     the voice task line (Install-Voice.ps1): the same, and the environment it
       sets still reaches node
     the dev voice run file (vps-dev-instance.ps1): the same
-    the bot's run.ps1 loop (Install-Bot.ps1): rolls before python, carries on
-      when the roller is missing, and the read-back of what the bot said
-      still finds this start's lines after a roll made the file shorter
+    the bot: its service rolls bot.log itself (issue #465, BotService.cs,
+      tests\test-bot-service.ps1), so Install-Bot sends no roller; the
+      read-back of what the bot said still finds this start's lines after a
+      roll made the file shorter
     the server installer keeps the logs across the folder it deletes, and
       each installer sends the roller up
 
@@ -35,14 +36,14 @@
   its own temp folder.
 #>
 [CmdletBinding()]
-param([string]$ToolsPath)
+param([string]$RepoPath)
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $ToolsPath) { $ToolsPath = $Here }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $RepoPath) { $RepoPath = $Here }
 
 $script:pass = 0
 $script:fail = 0
@@ -51,7 +52,7 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
 
-$roller = Join-Path $ToolsPath '..\scripts\vps\Roll-Log.ps1'
+$roller = Join-Path $RepoPath 'scripts\vps\Roll-Log.ps1'
 $winps  = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 $cmdExe = Join-Path $env:SystemRoot 'System32\cmd.exe'
 $node   = $null
@@ -194,7 +195,7 @@ try {
     Yes 'once the holder is gone it rolls' ((Size ($held + '.1')) -gt 0 -and (Get ($held + '.1')) -ne 'OLDER' -and (Get ($held + '.2')) -eq 'OLDER')
 
     # ======================================================= the game server task
-    $inst = Get-Content -LiteralPath (Join-Path $ToolsPath '..\scripts\deploy\Install-ThornswoodServer.ps1') -Raw
+    $inst = Get-Content -LiteralPath (Join-Path $RepoPath 'scripts\deploy\Install-ThornswoodServer.ps1') -Raw
     $m = [regex]::Match($inst, '\$cmd = \(''(/c [^\r\n]*?skymp5-server\.js[^\r\n]*?)'' -f ([^\r\n]+)\)')
     Yes 'the server task line is in Install-ThornswoodServer.ps1' $m.Success
 
@@ -230,7 +231,7 @@ try {
     }
 
     # ============================================================ the voice task
-    $vtext = Get-Content -LiteralPath (Join-Path $ToolsPath '..\scripts\deploy\Install-Voice.ps1') -Raw
+    $vtext = Get-Content -LiteralPath (Join-Path $RepoPath 'scripts\deploy\Install-Voice.ps1') -Raw
     $m = [regex]::Match($vtext, '`\$cmd = \(''(/c "set THORNSWOOD_SITE=[^\r\n]*?)'' -f ([^\r\n]+)\)')
     Yes 'the voice task line is in Install-Voice.ps1' $m.Success
     if ($node -and $m.Success) {
@@ -255,12 +256,12 @@ try {
             Yes 'the command line still names the log, which is how the installer finds its own process' ($line -like ('*' + $vlog + '*'))
         }
     }
-    Yes 'Install-Voice sends the roller up beside the service' ($vtext -match 'Join-Path \$Here ''\.\.\\vps\\Roll-Log\.ps1''' -and $vtext -match '/roll-log\.ps1"')
+    Yes 'Install-Voice sends the roller up beside the service' ($vtext -match 'Join-Path \$Here ''\.\.\\vps\\Roll-Log\.ps1''' -and $vtext.Contains("`$send['roll-log.ps1']"))
     Yes 'Install-Voice rolls voice.log at install rather than deleting it' (
         $vtext -notmatch 'Remove-Item -LiteralPath `\$log\b' -and $vtext -match '& `\$roll -Path `\$log -Force')
 
     # ============================================================ the dev voice
-    $dtext = Get-Content -LiteralPath (Join-Path $ToolsPath '..\scripts\vps\vps-dev-instance.ps1') -Raw
+    $dtext = Get-Content -LiteralPath (Join-Path $RepoPath 'scripts\vps\vps-dev-instance.ps1') -Raw
     $lb = $dtext.IndexOf('$lines = @(')
     $le = if ($lb -ge 0) { $dtext.IndexOf("`n    )", $lb) } else { -1 }
     Yes 'the dev voice run file is in vps-dev-instance.ps1' ($lb -ge 0 -and $le -gt $lb)
@@ -277,43 +278,28 @@ try {
         [IO.File]::WriteAllLines($run, [string[]]$lines, (New-Object Text.ASCIIEncoding))
         $dlog = Join-Path $devVoice 'voice.log'
         Fill $dlog (4MB + 3)
-        [void](RunCmd ('/c "' + $run + '"') $devVoice)
+        # The task's own argument, lifted from the script and run the way the
+        # task runs it, so a path with an & in it (the temp folder here may be
+        # under C:\ThornswoodTemps&Worktrees) is proved to hold (#1042, #1115).
+        $ta = [regex]::Match($dtext, '\$taskArg = \((''/c [^'']*'') -f \$run\)')
+        Yes 'the dev voice task line is in vps-dev-instance.ps1' $ta.Success
+        $taskArg = if ($ta.Success) { ($ta.Groups[1].Value.Trim("'") -f $run) } else { '/c "' + $run + '"' }
+        [void](RunCmd $taskArg $devVoice)
         Yes 'the dev voice run file rolls voice.log before node' ((Size ($dlog + '.1')) -eq (4MB + 3))
         Yes 'and dev voice writes to a fresh one' ((Count (Get $dlog) 'stand-in dev voice up on 7989') -eq 1)
     }
+    # Every copy, the server's and voice's (program and page since #1083).
+    $copies = ([regex]::Matches($dtext, '& robocopy [^\r\n]*')).Count
     Yes 'the dev copies leave the rolled logs of live behind' (
-        ([regex]::Matches($dtext, '& robocopy [^\r\n]*/XF [^\r\n]*\*\.log\.\*')).Count -eq 2)
+        $copies -ge 2 -and ([regex]::Matches($dtext, '& robocopy [^\r\n]*/XF [^\r\n]*\*\.log\.\*')).Count -eq $copies)
 
     # ================================================================== the bot
-    $btext = Get-Content -LiteralPath (Join-Path $ToolsPath '..\scripts\deploy\Install-Bot.ps1') -Raw
-    $ra = $btext.IndexOf("`$run = @'")
-    $rb = if ($ra -ge 0) { $btext.IndexOf("`n'@", $ra) } else { -1 }
-    $runPs1 = if ($ra -ge 0 -and $rb -gt $ra) { $btext.Substring($ra, $rb - $ra) } else { '' }
-    $wa = $runPs1.IndexOf('while (`$true) {')
-    $wb = $runPs1.IndexOf('& cmd /c "python')
-    Yes 'run.ps1 and its loop are in Install-Bot.ps1' ($wa -ge 0 -and $wb -gt $wa)
-    if ($wa -ge 0 -and $wb -gt $wa) {
-        $ahead = $runPs1.Substring($wa + 'while (`$true) {'.Length, $wb - $wa - 'while (`$true) {'.Length)
-        Yes 'the loop rolls bot.log before it starts python' ($ahead -match 'roll-log\.ps1' -and $ahead -match 'bot\.log')
-
-        # The lines ahead of python in the loop, as run.ps1 has them once the
-        # outer here-string has been filled in, then a marker for python.
-        $bot = Join-Path $tmp 'bot'
-        New-Item -ItemType Directory -Force -Path $bot | Out-Null
-        $pre = $ahead.Replace('$rootWin', $bot).Replace('`$', '$')
-        $probe = Join-Path $bot 'probe.ps1'
-        Put $probe ("`$ErrorActionPreference = 'Continue'`n" + $pre + "`n'reached python'`n")
-        Copy-Item -LiteralPath $roller -Destination (Join-Path $bot 'roll-log.ps1')
-        $blog = Join-Path $bot 'bot.log'
-        Fill $blog (4MB + 1)
-        $o = (& $winps -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $probe 2>&1 | Out-String)
-        Yes 'the loop rolls a bot.log past 4 MB' ((Size ($blog + '.1')) -eq (4MB + 1) -and -not (Test-Path -LiteralPath $blog))
-        Yes 'and goes on to start python' ($o -match 'reached python')
-        Remove-Item -LiteralPath (Join-Path $bot 'roll-log.ps1') -Force
-        $o = (& $winps -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $probe 2>&1 | Out-String)
-        Yes 'with no roller it still starts python' ($o -match 'reached python')
-    }
-    Yes 'Install-Bot sends the roller up beside the bot' ($btext -match 'Join-Path \$Here ''\.\.\\vps\\Roll-Log\.ps1''' -and $btext -match '/roll-log\.ps1"')
+    $btext = Get-Content -LiteralPath (Join-Path $RepoPath 'scripts\deploy\Install-Bot.ps1') -Raw
+    # The bot is a Windows service since #465 and its program rolls bot.log
+    # by size while it runs, which tests\test-bot-service.ps1 drives. So there
+    # is no run.ps1 loop to roll it and no roller to send.
+    Yes 'Install-Bot writes no run.ps1 loop and sends no roller for the bot any more' (
+        $btext -notmatch '\$run = @''' -and $btext -notmatch '/roll-log\.ps1"')
 
     # What the bot said on the way up is read from a byte count taken before
     # the start. A roll makes the file shorter than that count, and without
@@ -340,7 +326,7 @@ try {
 
     # ===================================================== the server installer
     Yes 'Publish-Server sends the roller beside the installer' (
-        (Get-Content -LiteralPath (Join-Path $ToolsPath '..\scripts\release\Publish-Server.ps1') -Raw) -match 'scp \$rollLog "\$\{target\}:C:/Roll-Log\.ps1"')
+        (Get-Content -LiteralPath (Join-Path $RepoPath 'scripts\release\Publish-Server.ps1') -Raw) -match 'scp (@ssh )?\$rollLog "\$\{target\}:C:/Roll-Log\.ps1"')
     # Same folder first (Publish layout on C:\), then scripts\vps (repo layout).
     $besideAt = $inst.IndexOf("Join-Path `$here 'Roll-Log.ps1'")
     $vpsAt = $inst.IndexOf("Join-Path `$here '..\vps\Roll-Log.ps1'")
@@ -351,7 +337,7 @@ try {
 
     # Run the installer's own copy lines against both layouts and against neither.
     $copyFrom = $inst.IndexOf('$rollSrc = $null')
-    $copyTo = $inst.IndexOf('# ---- check the load order')
+    $copyTo = $inst.IndexOf('# ---- end of the roller copy')
     Yes 'the installer''s Roll-Log copy block is intact' ($copyFrom -ge 0 -and $copyTo -gt $copyFrom)
     if ($copyFrom -ge 0 -and $copyTo -gt $copyFrom) {
         $copyBody = $inst.Substring($copyFrom, $copyTo - $copyFrom)
@@ -389,44 +375,35 @@ try {
             $inst -match 'Write-Host "Roll-Log\.ps1 is not beside this installer, so server\.log will not be rolled at start\." -ForegroundColor Yellow')
     }
 
-    # The folder it deletes on every publish held both logs. Run the real
-    # set-aside and the real restore against a temp root.
-    $aside = Get-BlockText $inst 'if (Test-Path -LiteralPath $Root) {'
-    $back  = Get-BlockText $inst 'if ($logBak -and (Test-Path -LiteralPath $logBak)) {'
-    Yes 'the installer sets the logs aside and puts them back' ($null -ne $aside -and $null -ne $back -and $aside -match 'logBak')
-    if ($aside -and $back -and $aside -match 'logBak') {
+    # The folder every publish deleted held both logs. Since issue #446 the
+    # old folder is not deleted: it is renamed aside and Carry moves the logs
+    # into the new one. Run the real Carry against two temp roots.
+    $carry = Get-BlockText $inst 'function Carry('
+    $move  = Get-BlockText $inst 'function MoveDir('
+    $say   = Get-BlockText $inst 'function Say('
+    Yes 'the installer carries the logs from the old folder to the new one' (
+        $null -ne $carry -and $null -ne $move -and $null -ne $say -and $carry.Contains('.log(') -and $carry.Contains('Move-Item'))
+    if ($carry -and $move -and $say) {
+        $old = Join-Path $tmp 'srvroot.prev-test'
         $Root = Join-Path $tmp 'srvroot'
-        New-Item -ItemType Directory -Force -Path (Join-Path $Root 'dist_back') | Out-Null
-        Put (Join-Path $Root 'server.log') 'LIVE LOG'
-        Put (Join-Path $Root 'server.log.1') 'OLDER LOG'
-        Put (Join-Path $Root 'thornswood.log') 'OURS'
-        Put (Join-Path $Root 'thornswood.log.3') 'OURS OLDER'
-        Put (Join-Path $Root 'dist_back\skymp5-server.js') 'program'
-        $stamp = 'test'
-        $logBak = $null
-        $wasTemp = $env:TEMP
-        $env:TEMP = $tmp
-        try {
-            . ([scriptblock]::Create($aside)) 6>$null
-        } finally { $env:TEMP = $wasTemp }
-        Yes 'the old folder is gone' (-not (Test-Path -LiteralPath $Root))
-        Yes 'and every log went aside first' (
-            (Get (Join-Path $logBak 'server.log')) -eq 'LIVE LOG' -and
-            (Get (Join-Path $logBak 'server.log.1')) -eq 'OLDER LOG' -and
-            (Get (Join-Path $logBak 'thornswood.log')) -eq 'OURS' -and
-            (Get (Join-Path $logBak 'thornswood.log.3')) -eq 'OURS OLDER')
-        Yes 'and no program file with them' (-not (Test-Path -LiteralPath (Join-Path $logBak 'skymp5-server.js')))
-
-        # The unpack, then the restore.
-        New-Item -ItemType Directory -Force -Path $Root | Out-Null
+        New-Item -ItemType Directory -Force -Path (Join-Path $old 'dist_back'), $Root | Out-Null
+        Put (Join-Path $old 'server.log') 'LIVE LOG'
+        Put (Join-Path $old 'server.log.1') 'OLDER LOG'
+        Put (Join-Path $old 'thornswood.log') 'OURS'
+        Put (Join-Path $old 'thornswood.log.3') 'OURS OLDER'
+        Put (Join-Path $old 'dist_back\skymp5-server.js') 'program'
         Put (Join-Path $Root 'server-settings.json') '{}'
-        . ([scriptblock]::Create($back)) 6>$null
-        Yes 'the logs are back beside the new server' (
+        . ([scriptblock]::Create($say + "`n" + $move + "`n" + $carry))
+        Carry $old $Root $false 6>$null
+        Yes 'the logs are beside the new server' (
             (Get (Join-Path $Root 'server.log')) -eq 'LIVE LOG' -and
             (Get (Join-Path $Root 'server.log.1')) -eq 'OLDER LOG' -and
             (Get (Join-Path $Root 'thornswood.log')) -eq 'OURS' -and
             (Get (Join-Path $Root 'thornswood.log.3')) -eq 'OURS OLDER')
-        Yes 'and the empty set-aside is tidied away' (-not (Test-Path -LiteralPath $logBak))
+        Yes 'and no program file went with them' (-not (Test-Path -LiteralPath (Join-Path $Root 'dist_back')))
+        Yes 'and the old folder is kept, its program still in it, not deleted' (
+            (Get (Join-Path $old 'dist_back\skymp5-server.js')) -eq 'program' -and
+            -not (Test-Path -LiteralPath (Join-Path $old 'server.log')))
     }
 }
 catch {

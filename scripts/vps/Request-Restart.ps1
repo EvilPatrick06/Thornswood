@@ -52,7 +52,7 @@ param(
   # mode that kicks is refused outright.
   [switch]$RestartFollows,
   [string]$Vps  = '',
-  [string]$User = 'Administrator',
+  [string]$User = '',
   [string]$Data = 'C:/Thornswood-Server/data'
 )
 
@@ -60,9 +60,10 @@ param(
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here 'Vps.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
-$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
+$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 
 if ($ThenRestart -and $Cancel) { throw 'Use one or the other: -Cancel calls it off, -ThenRestart sees it through.' }
 if ($ThenRestart -and $Mode -ne 'restart') {
@@ -110,7 +111,7 @@ if (-not (Test-Path '$Data')) { New-Item -ItemType Directory -Path '$Data' -Forc
 "@
 $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($remote))
 
-$out = & ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc" 2>&1
+$out = Invoke-ThornswoodNative { & ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc" } 2>&1
 if ($LASTEXITCODE -ne 0) {
   Write-Host "  could not reach the server to announce it: $out" -ForegroundColor Yellow
   exit 1

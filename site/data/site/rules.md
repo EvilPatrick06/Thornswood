@@ -3,6 +3,15 @@
 Two lists, because they are two different jobs. The first is about being decent
 to each other. The second is about playing here.
 
+<!-- alpha -->
+Thornswood is in alpha, and the world is open by application. The application
+in the Discord asks whether you accept these rules, and your answer is kept
+against your Discord account.
+<!-- /alpha -->
+<!-- open -->
+Being in the Discord or in the world means accepting these rules.
+<!-- /open -->
+
 Before either of them, one condition.
 
 ---
@@ -104,6 +113,10 @@ person for good.
 
 If you go down in the world and nobody agreed to anything, you woke up in a
 temple. That happened. Move on.
+
+**Staff can end a character for good.** They do it for serious rule breaking,
+or in an event its owner agreed to. That character cannot be played again, and
+you can make a new one. Nobody else is told.
 
 ## 3. Fights start freely. What they cost does not
 
@@ -288,7 +301,9 @@ Because the point of this server is that it should be worth logging into.
 Somebody talks to you first. Almost every problem on a server this size is a
 misunderstanding and ends there.
 
-After that, a Moderator gets involved. After that, a Gamemaster.
+After that, a Gamemaster or a Moderator times you out in the Discord. After
+that, a Moderator removes you from it, and with it the world, because getting
+in is decided in the Discord. Nothing inside the game does either.
 
 Rules 8 and 9 skip to the end.
 

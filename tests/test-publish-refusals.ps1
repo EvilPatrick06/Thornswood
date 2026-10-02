@@ -28,10 +28,11 @@
   with the two files it dot-sources, and the third, Close-Launcher.ps1, is
   replaced by a stub: the real Stop-Game closes any Skyrim on the machine,
   whatever folder it runs from, and nothing here may do that. LOCALAPPDATA
-  points into the temp folder for pending notes; the baseline lives in the
-  stand-in releases clone under -ReleaseDir, so the real one is never read or written.
-  -NoUpload and -NoPush, no config.json and no gh, so it cannot reach GitHub
-  or a server. Every case stops before the pack is built.
+  points into the temp folder for pending notes; the feed and the baseline are
+  in a stand-in working folder under -ReleaseDir, so the real ones are never
+  read or written. -NoUpload and -NoPush with both files already there, so
+  Feed-Store.ps1 receives and sends nothing, and no config.json: it cannot
+  reach the VPS or a server. Every case stops before the pack is built.
 #>
 [CmdletBinding()]
 param([string]$PublishPath)
@@ -39,9 +40,9 @@ param([string]$PublishPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $PublishPath) { $PublishPath = Join-Path $Here '..\scripts\release\Publish-Update.ps1' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $PublishPath) { $PublishPath = Join-Path $Here 'scripts\release\Publish-Update.ps1' }
 $ToolsDir = Split-Path -Parent $PublishPath
 
 $script:pass = 0
@@ -67,7 +68,7 @@ function Hash([string]$path) {
 # One made up install per case, so nothing one case writes reaches the next.
 function New-Install([string]$name, [string[]]$record, [int64]$bytes) {
     $root = Join-Path $work $name
-    foreach ($d in 'Game\Data', 'Profile\OwnGame', 'rel', 'dist', 'appdata\Thornswood') {
+    foreach ($d in 'Game\Data\Platform\UI', 'Profile\OwnGame', 'rel', 'dist', 'appdata\Thornswood') {
         New-Item -ItemType Directory -Path (Join-Path $root $d) -Force | Out-Null
     }
     [IO.File]::WriteAllText((Join-Path $root 'rel\version.json'), '{"packs":[],"news":[]}')
@@ -77,8 +78,9 @@ function New-Install([string]$name, [string[]]$record, [int64]$bytes) {
     if ($null -ne $record) {
         [IO.File]::WriteAllLines((Join-Path $root 'Profile\OwnGame\files.txt'), $record)
     }
-    # One file of ours, the size the case asks for.
-    $fs = [IO.File]::Create((Join-Path $root 'Game\Data\ours.bsa'))
+    # One file of ours, the size the case asks for. Under Data\Platform\UI, since
+    # outside it only what Ship-Rules names is ours (#1178).
+    $fs = [IO.File]::Create((Join-Path $root 'Game\Data\Platform\UI\ours.bsa'))
     try { $fs.SetLength($bytes) } finally { $fs.Dispose() }
     return $root
 }
@@ -130,6 +132,9 @@ try {
     # Each where it is in the repository since phase 8 of issue #440.
     $repoRoot = Split-Path -Parent (Split-Path -Parent $ToolsDir)
     foreach ($f in 'scripts\release\Publish-Update.ps1', 'scripts\release\Ship-Rules.ps1', 'scripts\mods\LoadOrder.ps1',
+                   'scripts\release\Feed-Store.ps1', 'scripts\release\Source-Notice.ps1',
+                   'scripts\release\Release-Baseline.ps1', 'scripts\release\Release-Name.ps1',
+                   'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt',
                    'scripts\release\Where.ps1', 'records\client-build.json') {
         $from = Join-Path $repoRoot $f
         $to = Join-Path (Split-Path -Parent $tools) $f
@@ -163,7 +168,7 @@ try {
     Unchanged $r
 
     # ---- a record that names nothing from Vortex is no record ------------------
-    $r = Invoke-Publish (New-Install 'empty-record' @('F|O|4096|638000000000000000|Data\ours.bsa') $small) @()
+    $r = Invoke-Publish (New-Install 'empty-record' @('F|O|4096|638000000000000000|Data\Platform\UI\ours.bsa') $small) @()
     Yes 'with a files.txt that names nothing from Vortex the publisher stops' ($r.Code -eq 1)
     Yes '  and says the record lists nothing' ($r.Out -match 'lists nothing')
     Unchanged $r

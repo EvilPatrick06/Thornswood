@@ -1,0 +1,742 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const source = fs.readFileSync(path.join(__dirname, '../game/gamemode.js'), 'utf8');
+const begin = source.indexOf('// NPC SERVER RUNTIME BEGIN');
+const end = source.indexOf('// NPC SERVER RUNTIME END');
+assert.ok(begin >= 0 && end > begin, 'Test the production runtime block');
+const plain = value => JSON.parse(JSON.stringify(value));
+
+// Valid TES5 NVNM geometry; flags and reciprocal links are independent.
+function geometry(vertices, triangles, flags = [], reciprocal = true) {
+  const b = Buffer.alloc(24 + vertices.length * 12 + triangles.length * 16);
+  b.writeUInt32LE(12, 0);
+  b.writeUInt32LE(vertices.length, 16);
+  vertices.forEach((v, i) => v.forEach((n, j) => b.writeFloatLE(n, 20 + i * 12 + j * 4)));
+  const offset = 20 + vertices.length * 12;
+  b.writeUInt32LE(triangles.length, offset);
+  triangles.forEach((t, i) => {
+    const at = offset + 4 + i * 16;
+    t.forEach((n, j) => b.writeUInt16LE(n, at + j * 2));
+    for (let j = 0; j < 3; j++) {
+      const edge = [t[j], t[(j + 1) % 3]];
+      const neighbor = reciprocal ? triangles.findIndex((other, k) =>
+        k !== i && edge.every(v => other.includes(v))) : -1;
+      b.writeInt16LE(neighbor, at + 6 + j * 2);
+    }
+    b.writeUInt16LE(flags[i] || 0, at + 12);
+  });
+  return { data: b, vertices, triangles };
+}
+const square = () => geometry([[0,0,0],[600,0,0],[0,600,0],[600,600,0]], [[0,1,2],[1,3,2]]);
+const isolated = flags => geometry([[0,0,0],[300,0,0],[0,300,0]], [[0,1,2]], flags);
+function inside(points, p, lift = 0) {
+  const signs = points.map((a, i) => {
+    const b = points[(i + 1) % 3];
+    return (b[0]-a[0])*(p[1]-a[1])-(b[1]-a[1])*(p[0]-a[0]);
+  });
+  const [a,b,c] = points;
+  const area = (b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
+  if (Math.abs(area) < 0.01) return false;
+  const u = ((p[0]-a[0])*(c[1]-a[1])-(p[1]-a[1])*(c[0]-a[0]))/area;
+  const v = ((b[0]-a[0])*(p[1]-a[1])-(b[1]-a[1])*(p[0]-a[0]))/area;
+  const height = a[2]+u*(b[2]-a[2])+v*(c[2]-a[2]);
+  return Math.abs(p[2]-height-lift) < 0.01 &&
+    (signs.every(v => v >= -0.01) || signs.every(v => v <= 0.01));
+}
+function contains(mesh, p, lift = 0) {
+  if (Array.isArray(mesh)) return mesh.some(part => contains(part, p, lift));
+  return mesh.triangles.some(t => inside(t.map(i => mesh.vertices[i]), p, lift));
+}
+function actor(overrides = {}) {
+  return Object.assign({ pos:[10,10,0], rot:[0,0,0], cellOrWorld:60,
+    isDead:false, isDisabled:false, aggression:0, confidence:3,
+    factions:[], combatTarget:0, canSwim:false, canFly:false, immobile:false,
+    meleeReach:128,meleeAllowance:32 }, overrides);
+}
+
+function fixture(options = {}) {
+  const context = { Buffer, Math, Date, Number, Map, Set, JSON };
+  vm.createContext(context);
+  vm.runInContext(source.slice(begin, end), context);
+  assert.equal(typeof context.startSharedNpcServerRuntime, 'function',
+    'A shared production entry must replace the single-actor deployed entry');
+  let time = 0, sequence = 0, callback = null;
+  const pending = new Map(), states = new Map(), persisted = new Map();
+  const ids = options.ids || Array.from({length:options.count || 3}, (_, i) => i + 1);
+  ids.forEach(id => states.set(id, actor(options.npc && options.npc[id])));
+  const humanIds = options.humans || [];
+  humanIds.forEach(id => states.set(id, actor(options.human && options.human[id])));
+  let online = humanIds.slice();
+  const originalIds = [...states.keys()], moved = new Set(), controlled = new Set();
+  const moves = [], attacks = [], attackAttempts = [], logs = [], controlEvents = [], snapshots = [];
+  const meshes = options.meshes || new Map([[60, square()]]);
+  const navLookedUp = new Set();
+  const budgetViolations = [];
+  const mappingCalls = [], policyEvents = [];
+  let loadedLookups = 0;
+  let runtime;
+  function spend(key, amount = 1) {
+    assert.ok(callback, 'API work must run inside a scheduled callback');
+    callback[key] = (callback[key] || 0) + amount;
+    const limits = { load:8, prepare:4, background:64, near:32 };
+    const message = `${key} budget exceeded: ${callback[key]}`;
+    if (callback[key] > limits[key]) budgetViolations.push(message);
+    assert.ok(callback[key] <= limits[key], message);
+  }
+  const timers = {
+    setTimeout(fn, delay) {
+      assert.ok(Number.isFinite(delay) && delay >= 0);
+      const handle = ++sequence;
+      pending.set(handle, {fn, at:time + delay});
+      return handle;
+    },
+    clearTimeout(handle) { pending.delete(handle); }
+  };
+  const api = {
+    getLoadedNpcIds() { loadedLookups++; return ids.slice().sort((a,b) => a-b); },
+    loadNpcBatch(cursor, limit) {
+      assert.ok(Number.isInteger(limit) && limit > 0 && limit <= 8);
+      spend('load', Math.min(limit, ids.length - cursor));
+      return {nextCursor:Math.min(cursor + limit, ids.length), total:ids.length,
+        actorIds:ids.slice(cursor, cursor + limit)};
+    },
+    makeProperty() {},
+    getNpcAIState(id) {
+      if (options.badState === id) throw new Error('one malformed actor');
+      assert.ok(states.has(id), `unknown actor ${id}`);
+      return plain(states.get(id));
+    },
+    getFactionReactions() { return plain(options.reactions || []); },
+    get(id, prop) {
+      if (id === 0 && prop === 'onlinePlayers') return online.slice();
+      assert.ok(states.has(id), `unknown property actor ${id}`);
+      const state = states.get(id);
+      if (prop === 'locationalData') return {pos:state.pos.slice(), rot:state.rot.slice(),
+        cellOrWorldDesc:state.cellOrWorld.toString(16) + ':Skyrim.esm'};
+      if (prop === 'isDead' || prop === 'isDisabled') return state[prop];
+      if (options.badProfile === id) throw new Error('one corrupt routine profile');
+      return persisted.has(id + ':' + prop) ? plain(persisted.get(id + ':' + prop)) : null;
+    },
+    set(id, prop, value) { persisted.set(id + ':' + prop, plain(value)); },
+    getIdFromDesc(desc) { return parseInt(desc.split(':')[0], 16); },
+    getNavmeshRecords(cell) {
+      if (options.badNavCell === cell) throw new Error('one unreadable navmesh');
+      if (options.records) return [...options.records].filter(([,record]) => record.cell === cell)
+        .map(([id]) => id);
+      return meshes.has(cell) ? [cell + 1000000] : [];
+    },
+    lookupEspmRecordById(id) {
+      if (options.records) {
+        const record = options.records.get(id);
+        if (!record) throw new Error('missing mesh record');
+        navLookedUp.add(record.cell);
+        return {record:{fields:[{type:'NVNM',data:record.mesh.data}]},
+          toGlobalRecordId(local) {
+            mappingCalls.push({id,local});
+            return record.mapping.get(local) || 0;
+          }};
+      }
+      const mesh = meshes.get(id - 1000000);
+      if (!mesh) throw new Error('missing mesh record');
+      navLookedUp.add(id - 1000000);
+      return {record:{fields:[{type:'NVNM', data:mesh.data}]}};
+    },
+    setNpcServerControlled(id, on) {
+      assert.ok(ids.includes(id), 'Authority must preserve loaded NPC identities');
+      controlEvents.push({id, on, at:time});
+      policyEvents.push({kind:"control",id,on,at:time,spawnDelay:persisted.get(id+":spawnDelay")});
+      if (on) {
+        spend('prepare');
+        const state = states.get(id);
+        if (state.isHuman || state.profileId >= 0) throw new Error('Native authority rejects human identities');
+        controlled.add(id);
+      } else controlled.delete(id);
+    },
+    updateNpcMovement(id, pos, rot, speed) {
+      assert.ok(controlled.has(id), 'Movement requires server authority');
+      const state = states.get(id), mesh = meshes.get(state.cellOrWorld);
+      assert.ok(!state.isDead && !state.isDisabled && !state.immobile, 'Inactive NPCs pause');
+      assert.ok(pos.length === 3 && pos.every(Number.isFinite));
+      assert.ok(rot.length === 3 && rot.every(Number.isFinite));
+      assert.ok(Number.isFinite(speed) && speed >= 0 && speed <= 300);
+      const nearby = online.some(h => states.get(h).cellOrWorld === state.cellOrWorld &&
+        Math.hypot(...states.get(h).pos.map((v,i) => v-state.pos[i])) <= 4096);
+      spend(nearby ? 'near' : 'background');
+      const lift = options.lifts && options.lifts[id] || 0;
+      assert.ok(contains(mesh, pos, lift), 'Movement stays in a walkable triangle');
+      for (let fraction = 0; fraction <= 1; fraction += 0.1) {
+        assert.ok(contains(mesh, state.pos.map((v,i) => v+(pos[i]-v)*fraction), lift),
+          'Every movement segment must stay on the local surface');
+      }
+      if (Math.hypot(...pos.map((v,i) => v-state.pos[i])) > 0.001) moved.add(id);
+      moves.push({id, pos:pos.slice(), from:state.pos.slice(), at:time, speed});
+      snapshots.push({id,pos:pos.slice(),at:time,speed,
+        runMode:speed > 0 ? 'Walking' : 'Standing',reliable:false});
+      state.pos = pos.slice(); state.rot = rot.slice();
+    },
+    stopNpcMovement(id) {
+      assert.ok(controlled.has(id),'Stopping movement requires retained server authority');
+      const state = states.get(id);
+      snapshots.push({id,pos:state.pos.slice(),at:time,speed:0,runMode:'Standing',reliable:true});
+    },
+    serverNpcAttack(id, target) {
+      assert.ok(controlled.has(id));
+      const attacker = states.get(id),victim = states.get(target);
+      const attack = {id,target,at:time,distance:Math.hypot(...attacker.pos.map((v,i) =>
+        v-victim.pos[i]))};
+      attackAttempts.push(attack);
+      if(!Number.isFinite(attacker.meleeReach) || attacker.meleeReach <= 0 ||
+          attack.distance > Math.min(300,attacker.meleeReach+victim.meleeAllowance)) return false;
+      attacks.push(attack);
+      return true;
+    },
+    placeActor() { assert.fail('No new cast members'); },
+    destroyActor() { assert.fail('No cast removals'); }
+  };
+  const population = options.population ? {
+    configure(id,state) {
+      policyEvents.push({kind:"configure",id,at:time});
+      return options.population(id,plain(state),api);
+    }
+  } : undefined;
+  runtime = context.startSharedNpcServerRuntime(api, timers, () => time,
+    text => logs.push(text), population);
+  function advance(ms) {
+    const until = time + ms;
+    let runs = 0;
+    while (pending.size) {
+      const [handle, task] = [...pending].sort((a,b) => a[1].at-b[1].at || a[0]-b[0])[0];
+      if (task.at > until) break;
+      time = task.at; pending.delete(handle); callback = {};
+      try { task.fn(); } finally { callback = null; }
+      assert.ok(++runs < 30000, 'Each turn must yield rather than reschedule endlessly');
+    }
+    time = until;
+    // The runtime deliberately catches individual failures. It must not hide
+    // an exceeded scheduling budget by treating our assertion as an NPC fault.
+    assert.deepEqual(budgetViolations, [], 'No callback may exceed its budget');
+    assert.deepEqual([...states.keys()], originalIds, 'The current cast is preserved');
+  }
+  function stop() { runtime.stop(); assert.equal(pending.size, 0, 'Stop cancels every timer'); }
+  return {api, states, ids, moved, controlled, moves, attacks,attackAttempts,logs,controlEvents,mappingCalls,snapshots,
+    timers, policyEvents, loadedLookups:() => loadedLookups,
+    addNpc(id, overrides = {}) {
+      assert.ok(!states.has(id)); ids.push(id); states.set(id,actor(overrides));
+      originalIds.push(id);
+    },
+    time:() => time, status:() => plain(runtime.getStatus()),
+    advance, stop, disconnect(id) { online = online.filter(other => other !== id); }};
+}
+
+let failed = 0, passed = 0;
+function test(name, fn) {
+  try { fn(); console.log('PASS ' + name); passed++; }
+  catch (error) { console.error('FAIL ' + name + ': ' + error.message); failed++; }
+}
+
+test('All eligible loaded identities move unattended, with no cast changes', () => {
+  const f = fixture({ids:[11,42,103,9001]});
+  f.advance(30000);
+  assert.deepEqual([...f.moved].sort((a,b) => a-b), f.ids);
+  assert.equal(f.controlled.size, f.ids.length);
+  f.stop();
+});
+test('A single isolated triangle supports safe background activity', () => {
+  const f = fixture({count:2, meshes:new Map([[60, isolated()]])});
+  f.advance(15000); assert.equal(f.moved.size, 2); f.stop();
+});
+test('An external-edge flag does not prevent movement inside its own triangle', () => {
+  const f = fixture({count:2, meshes:new Map([[60, isolated([1])]])});
+  f.advance(15000); assert.equal(f.moved.size, 2); f.stop();
+});
+test('Dead and disabled actors pause and resume after becoming active', () => {
+  const f = fixture({count:3});
+  f.advance(3000);
+  const first = f.states.get(1), second = f.states.get(2);
+  first.isDead = true; second.isDisabled = true;
+  const paused = [first.pos.slice(), second.pos.slice()];
+  f.advance(3000);
+  assert.deepEqual([first.pos, second.pos], paused);
+  const count = f.moves.length;
+  first.isDead = false; second.isDisabled = false;
+  f.advance(15000);
+  assert.ok(f.moves.slice(count).some(m => m.id === 1 && m.speed > 0));
+  assert.ok(f.moves.slice(count).some(m => m.id === 2 && m.speed > 0));
+  f.stop();
+});
+for (const fault of ['badState', 'badProfile', 'badNavCell']) {
+  test('One ' + fault + ' does not stop healthy actors', () => {
+    const options = {count:3, [fault]:fault === 'badNavCell' ? 61 : 1,
+      npc:{1:{cellOrWorld:61}}, meshes:new Map([[60,square()],[61,square()]])};
+    const f = fixture(options);
+    f.advance(15000);
+    assert.ok(f.moved.has(2) && f.moved.has(3));
+    assert.ok(f.controlled.has(1),'An unavailable routine cannot return an existing NPC to client authority');
+    assert.ok(!f.moves.some(move => move.id === 1),'Faulted navigation or state must stay stationary');
+    const status = f.status();
+    assert.equal(status.controlled,3);
+    assert.equal(status.active,2);
+    assert.equal(status.unavailable,1);
+    assert.equal(status.active+status.unavailable,status.loaded);
+    assert.ok(f.logs.length, 'Individual failures must be observable');
+    f.stop();
+  });
+}
+for (const aggression of [0, 1]) {
+  test('Aggression ' + aggression + ' does not proximity-attack neutral humans', () => {
+    const f = fixture({count:1, humans:[100], npc:{1:{aggression}},
+      human:{100:{pos:[20,20,0]}}});
+    f.advance(15000); assert.equal(f.attacks.length, 0); assert.ok(f.moved.has(1)); f.stop();
+  });
+}
+test('Enemy reaction value 1 allows hostility and value 0 remains neutral', () => {
+  for (const reaction of [0,1,2,3]) {
+    const f = fixture({count:1, humans:[100], npc:{1:{aggression:1, factions:[{id:7,rank:0}]}},
+      human:{100:{pos:[20,20,0], factions:[{id:8,rank:0}]}},
+      reactions:[{source:7,target:8,reaction}]});
+    f.advance(15000);
+    assert.equal(f.attacks.length > 0, reaction === 1, 'reaction ' + reaction);
+    f.stop();
+  }
+});
+test('Negative-rank faction entries cannot introduce hostility', () => {
+  for (const negativeActor of ['npc','human']) {
+    const npc = {aggression:1,factions:[{id:7,rank:negativeActor === 'npc' ? -1 : 0}]};
+    const human = {pos:[20,20,0],factions:[{id:8,rank:negativeActor === 'human' ? -1 : 0}]};
+    const f = fixture({count:1,humans:[100],npc:{1:npc},human:{100:human},
+      reactions:[{source:7,target:8,reaction:1}]});
+    f.advance(15000); assert.equal(f.attacks.length,0); f.stop();
+  }
+});
+test('A live friendly faction change cancels spontaneous attacks before the observer snapshot refreshes', () => {
+  const f = fixture({count:1,humans:[100],
+    npc:{1:{aggression:1,factions:[{id:7,rank:0}]}},
+    human:{100:{pos:[20,20,0],factions:[{id:8,rank:0}]}},
+    reactions:[{source:7,target:8,reaction:1}]});
+  f.advance(1100);
+  assert.ok(f.attacks.length > 0,'The initial enemy relation must drive spontaneous combat');
+  f.attacks.length = 0;
+  f.states.get(100).factions = [{id:7,rank:0}];
+  f.advance(500);
+  assert.equal(f.attacks.length,0,'Fresh common faction membership must suppress cached hostility');
+  assert.ok(f.controlled.has(1)); f.stop();
+});
+test('Retaliation approaches a distant target through connected triangles before attacking', () => {
+  const f = fixture({count:1,humans:[100],npc:{1:{combatTarget:100}},
+    human:{100:{pos:[500,500,0]}}});
+  f.advance(30000);
+  assert.ok(f.attacks.length > 0, 'Received hits can drive server retaliation');
+  assert.ok(f.moves.some(m => m.id === 1 && m.pos[0]+m.pos[1] > 600),
+    'Chase reaches the target triangle through the shared local region');
+  assert.ok(f.attacks.every(a => a.distance <= 160), 'Attack requires approach, not distant hits');
+  f.stop();
+});
+test('A short melee reach approaches within native range before accepted attacks', () => {
+  const f = fixture({count:1,humans:[100],
+    npc:{1:{combatTarget:100,meleeReach:32}},
+    human:{100:{pos:[160,10,0],meleeAllowance:16}}});
+  f.advance(15000);
+  assert.ok(f.attacks.length > 0,'A target inside the old 160-unit threshold still requires a native-range approach');
+  assert.ok(f.attacks.every(attack => attack.distance <= 48));
+  assert.ok(f.moves.some(move => move.id === 1 &&
+    Math.hypot(...move.pos.map((v,i) => v-f.states.get(100).pos[i])) <= 48));
+  assert.ok(f.controlled.has(1)); f.stop();
+});
+test('A target above short melee reach cannot freeze ambient movement on the NPC surface', () => {
+  const f = fixture({count:1,humans:[100],
+    npc:{1:{combatTarget:100,meleeReach:32}},
+    human:{100:{pos:[30,30,60],meleeAllowance:16}}});
+  f.advance(15000);
+  assert.equal(f.attacks.length,0,'A 60-unit vertical gap exceeds the native 48-unit reach');
+  assert.ok(f.moves.some(move => move.id === 1 && move.at >= 10000 && move.speed > 0),
+    'An unreachable vertical target must leave ambient activity running');
+  assert.ok(f.moves.every(move => Math.abs(move.pos[2]) < 0.01),'NPC movement must stay on its own floor');
+  assert.ok(f.controlled.has(1)); f.stop();
+});
+test('An NPC with zero melee reach keeps ambient activity instead of waiting for rejected hits', () => {
+  const f = fixture({count:1,humans:[100],
+    npc:{1:{combatTarget:100,meleeReach:0}},human:{100:{pos:[20,20,0]}}});
+  f.advance(15000);
+  assert.equal(f.attackAttempts.length,0,'Invalid native melee reach cannot authorize an attack attempt');
+  assert.ok(f.moves.some(move => move.at >= 10000 && move.speed > 0));
+  assert.ok(f.controlled.has(1)); f.stop();
+});
+test('Confidence-zero retaliation can flee without any melee reach', () => {
+  const f = fixture({count:1,humans:[100],
+    npc:{1:{confidence:0,combatTarget:100,meleeReach:0}},human:{100:{pos:[20,20,0]}}});
+  f.advance(15000);
+  assert.equal(f.attackAttempts.length,0);
+  assert.ok(f.moves.some(move => move.at >= 10000 && move.speed > 0));
+  assert.ok(f.moves.some(move => Math.hypot(move.pos[0]-20,move.pos[1]-20) > 150),
+    'Melee capability cannot suppress confidence-driven flight');
+  assert.ok(f.controlled.has(1)); f.stop();
+});
+for (const invalid of ['disconnected','cross-cell','dead']) {
+  test('A ' + invalid + ' retaliation target clears and local activity resumes', () => {
+    const f = fixture({count:1,humans:[100],npc:{1:{combatTarget:100}},
+      human:{100:{pos:[500,500,0]}}});
+    if (invalid === 'disconnected') f.disconnect(100);
+    if (invalid === 'cross-cell') f.states.get(100).cellOrWorld = 61;
+    if (invalid === 'dead') f.states.get(100).isDead = true;
+    f.advance(15000);
+    assert.equal(f.attacks.length,0);
+    assert.ok(f.moved.has(1), 'Invalid target cannot freeze the NPC');
+    f.stop();
+  });
+}
+test('Nearby enemies separated by unlinked triangles cannot be attacked through a wall', () => {
+  const mesh = geometry([[0,0,0],[90,0,0],[0,90,0],[90,90,0]], [[0,1,2],[1,3,2]], [], false);
+  const f = fixture({count:1,humans:[100],meshes:new Map([[60,mesh]]),
+    npc:{1:{combatTarget:100}},human:{100:{pos:[80,80,0]}}});
+  f.advance(15000);
+  assert.equal(f.attacks.length,0);
+  assert.ok(f.moves.every(m => inside(mesh.triangles[0].map(i => mesh.vertices[i]),m.pos)),
+    'Shared vertices cannot replace reciprocal triangle links');
+  f.stop();
+});
+test('A reciprocal shared edge with tiny surface noise cannot freeze reachable combat', () => {
+  const mesh = geometry([[0,0,0],[600,0,0],[0,600,0],[600,600,30]],
+    [[0,1,2],[1,3,2]]);
+  // The point is within navigation's edge tolerance on both triangles. Their
+  // surface heights differ by 0.0001, so independent nearest-floor lookups
+  // choose different triangles although every route point is within 0.01.
+  const f = fixture({count:1,humans:[100],meshes:new Map([[60,mesh]]),
+    npc:{1:{pos:[300.001,300.001,0],combatTarget:100}},
+    human:{100:{pos:[300.001,300.001,0.0001]}}});
+  f.advance(15000);
+  assert.ok(f.attacks.length > 0 || f.moved.has(1),
+    'Coincident portal points must resolve reachable combat or make actual movement progress');
+  assert.ok(f.controlled.has(1),'Shared-edge precision cannot revoke server authority');
+  assert.ok(!f.logs.some(line => line.includes('Movement crossed an unverified navigation edge')));
+  f.stop();
+});
+test('An overlapping unlinked triangle cannot displace a verified movement neighbor', () => {
+  const mesh = geometry([[0,0,0],[600,0,0],[0,600,0],[600,600,0]],
+    [[0,1,2],[1,3,2],[1,3,2]],[],false);
+  const offset = 24+mesh.vertices.length*12;
+  mesh.data.writeInt16LE(2,offset+8);
+  mesh.data.writeInt16LE(0,offset+2*16+10);
+  const f = fixture({count:1,meshes:new Map([[60,mesh]])});
+  f.advance(15000);
+  assert.ok(f.moves.some(m => m.pos[0]+m.pos[1] > 600),
+    'Traversal must choose the reciprocal neighbor among overlapping surfaces');
+  assert.ok(f.controlled.has(1),'Overlapping unrelated navigation cannot revoke authority');
+  assert.ok(!f.logs.some(line => line.includes('Movement crossed an unverified navigation edge')));
+  f.stop();
+});
+test('Malformed geometry stays server owned and stationary while valid cast members remain active', () => {
+  const broken = square(); broken.data = broken.data.subarray(0,21);
+  const f = fixture({count:3,npc:{1:{cellOrWorld:61}},meshes:new Map([[60,square()],[61,broken]])});
+  f.advance(15000); assert.ok(f.controlled.has(1));
+  assert.ok(!f.moves.some(move => move.id === 1),'Malformed geometry cannot authorize movement');
+  assert.ok(f.moved.has(2) && f.moved.has(3)); f.stop();
+});
+test('An NPC with no local navigation remains stationary under server authority', () => {
+  const f = fixture({count:3,npc:{1:{cellOrWorld:61}},meshes:new Map([[60,square()]])});
+  f.advance(15000);
+  assert.equal(f.controlled.size,3,'The entire existing cast remains server owned');
+  assert.ok(!f.moves.some(move => move.id === 1),'No navigation means no movement');
+  assert.ok(f.moved.has(2) && f.moved.has(3));
+  const status = f.status();
+  assert.equal(status.active,2); assert.equal(status.unavailable,1);
+  assert.equal(status.active+status.unavailable,status.loaded); f.stop();
+});
+test('A displaced actor loses unsafe movement while retaining server ownership', () => {
+  const f = fixture({count:2});
+  f.advance(1000);
+  assert.ok(f.moved.has(1),'The displaced actor must have published walking movement first');
+  f.states.get(1).pos = [1000,1000,0];
+  const count = f.moves.length;
+  f.advance(3000);
+  assert.ok(f.controlled.has(1),'Movement failure cannot return authority to clients');
+  assert.ok(!f.moves.slice(count).some(move => move.id === 1));
+  assert.ok(f.moves.slice(count).some(move => move.id === 2));
+  const last = f.snapshots.filter(snapshot => snapshot.id === 1).at(-1);
+  assert.equal(last.speed,0,'Parking must overwrite the last walking speed');
+  assert.equal(last.runMode,'Standing');
+  assert.equal(last.reliable,true,'Observers must receive a reliable terminal movement snapshot');
+  assert.deepEqual(last.pos,[1000,1000,0],'Stopping cannot translate an actor onto assumed geometry');
+  assert.deepEqual(f.states.get(1).pos,[1000,1000,0]);
+  assert.equal(f.status().active,1); assert.equal(f.status().unavailable,1); f.stop();
+});
+for (const humanState of [{isHuman:true},{profileId:0}]) {
+  test('Native human authority guards reject identity ' + JSON.stringify(humanState), () => {
+    const f = fixture({count:2,npc:{1:humanState}});
+    f.advance(3000);
+    assert.ok(!f.controlled.has(1),'Human identities cannot become server controlled');
+    assert.ok(!f.moves.some(move => move.id === 1));
+    assert.ok(f.controlled.has(2) && f.moved.has(2)); f.stop();
+  });
+}
+for (const near of [false,true]) {
+  test('1200 ' + (near ? 'nearby' : 'background') + ' NPCs receive fair bounded activity within 30 seconds', () => {
+    const f = fixture({count:1200,humans:near ? [100000] : [],
+      human:{100000:{pos:[20,20,0]}}});
+    f.advance(30000);
+    assert.equal(f.moved.size,1200,'Every eligible identity must receive activity');
+    assert.equal(f.controlled.size,1200);
+    f.stop();
+  });
+}
+test('Confidence zero retaliation flees and keeps moving after the portal phase', () => {
+  const f = fixture({count:1,humans:[100],npc:{1:{confidence:0,combatTarget:100}},
+    human:{100:{pos:[20,20,0]}}});
+  f.advance(15000);
+  assert.equal(f.attacks.length,0,'Cowardly retaliation must not attack');
+  assert.ok(f.moves.some(m => m.at >= 10000 && m.speed > 0),
+    'A flee route must not stall at an already-reached portal');
+  assert.ok(f.moves.some(m => Math.hypot(m.pos[0]-20,m.pos[1]-20) > 150),
+    'Retaliation moves away from the aggressor');
+  assert.ok(f.controlled.has(1));
+  f.stop();
+});
+test('An elevated retaliation target is approached on the NPC floor without authority loss', () => {
+  const f = fixture({count:1,humans:[100],npc:{1:{combatTarget:100}},
+    human:{100:{pos:[500,500,40]}}});
+  f.advance(30000);
+  assert.ok(f.moves.some(m => m.pos[0]+m.pos[1] > 600));
+  assert.ok(f.moves.every(m => Math.abs(m.pos[2]) < 0.01));
+  assert.ok(f.controlled.has(1));
+  assert.ok(f.attacks.length > 0);
+  f.stop();
+});
+test('A live NPC target displaced across an unlinked wall is revalidated before attack', () => {
+  const mesh = geometry([[0,0,0],[90,0,0],[0,90,0],[90,90,0]],
+    [[0,1,2],[1,3,2]],[],false);
+  const f = fixture({count:2,meshes:new Map([[60,mesh]]),
+    npc:{1:{combatTarget:2},2:{pos:[20,20,0],immobile:true}}});
+  f.advance(100);
+  f.attacks.length = 0;
+  f.states.get(2).pos = [80,80,0];
+  f.advance(20);
+  assert.equal(f.attacks.length,0,'Cached target state cannot authorize a hit across the wall');
+  f.stop();
+});
+test('Immobile NPCs pause while other cast members move, then resume when mobile', () => {
+  const f = fixture({count:2,npc:{1:{immobile:true}}});
+  f.advance(5000);
+  assert.ok(!f.moved.has(1)); assert.ok(f.moved.has(2));
+  f.states.get(1).immobile = false;
+  f.advance(10000); assert.ok(f.moved.has(1)); f.stop();
+});
+test('A moving NPC becoming immobile publishes a reliable stop and resumes safely when mobile', () => {
+  const f = fixture({count:1});
+  f.advance(1000);
+  assert.ok(f.moved.has(1));
+  const position = f.states.get(1).pos.slice(),count = f.moves.length;
+  f.states.get(1).immobile = true;
+  f.advance(1000);
+  assert.ok(f.controlled.has(1));
+  assert.deepEqual(f.states.get(1).pos,position,'An immobile actor cannot translate');
+  assert.equal(f.moves.length,count,'An immobile actor cannot submit walking updates');
+  const last = f.snapshots.filter(snapshot => snapshot.id === 1).at(-1);
+  assert.equal(last.speed,0); assert.equal(last.runMode,'Standing'); assert.equal(last.reliable,true);
+  assert.deepEqual(last.pos,position);
+  f.states.get(1).immobile = false;
+  f.advance(10000);
+  assert.ok(f.moves.slice(count).some(move => move.id === 1 && move.speed > 0));
+  assert.ok(f.controlled.has(1)); f.stop();
+});
+for (const lift of [0,40]) {
+  test('Sloped navigation retains actor foot height with lift ' + lift, () => {
+    const mesh = geometry([[0,0,0],[600,0,120],[0,600,0],[600,600,120]],
+      [[0,1,2],[1,3,2]]);
+    const f = fixture({count:1,meshes:new Map([[60,mesh]]),lifts:{1:lift},
+      npc:{1:{pos:[10,10,2+lift]}}});
+    f.advance(15000); assert.ok(f.moved.has(1)); assert.ok(f.controlled.has(1));
+    assert.ok(f.moves.every(m => Math.abs(m.pos[2]-m.pos[0]*0.2-lift) < 0.01));
+    f.stop();
+  });
+}
+
+function externalPair(reciprocal) {
+  const a = geometry([[0,0,0],[600,0,0],[0,600,0]],[[0,1,2]],[2],false);
+  const b = geometry([[600,0,0],[600,600,0],[0,600,0]],[[0,1,2]],[4],false);
+  function append(mesh, edge, local) {
+    const links = Buffer.alloc(14);
+    links.writeUInt32LE(1,0); // one external connection, type 0
+    links.writeUInt32LE(0,4);
+    links.writeUInt32LE(local,8);
+    links.writeInt16LE(0,12);
+    mesh.data = Buffer.concat([mesh.data,links]);
+    mesh.data.writeInt16LE(0,24+mesh.vertices.length*12+6+edge*2);
+  }
+  append(a,1,0x102); append(b,2,0x101);
+  const records = new Map([
+    [1000060,{cell:60,mesh:a,mapping:new Map([[0x102,1000061]])}],
+    [1000061,{cell:60,mesh:b,mapping:new Map([[0x101,reciprocal ? 1000060 : 1000999]])}]
+  ]);
+  return {a,b,records};
+}
+for (const reciprocal of [true,false]) {
+  test('External mapped NAVM links ' + (reciprocal ? 'allow reciprocal traversal' : 'reject a missing return link'), () => {
+    const {a,b,records} = externalPair(reciprocal);
+    const f = fixture({count:1,humans:[100],records,meshes:new Map([[60,[a,b]]]),
+      npc:{1:{combatTarget:100}},human:{100:{pos:[500,500,0]}}});
+    f.advance(30000);
+    assert.ok(f.mappingCalls.some(call => call.id === 1000060 && call.local === 0x102));
+    assert.ok(f.mappingCalls.some(call => call.id === 1000061 && call.local === 0x101));
+    assert.equal(f.attacks.length > 0,reciprocal);
+    if (reciprocal) assert.ok(f.moves.some(m => m.pos[0]+m.pos[1] > 600));
+    else assert.ok(f.moves.every(m => inside(a.triangles[0].map(i => a.vertices[i]),m.pos)),
+      'A one-way external connection cannot cross the boundary');
+    assert.ok(f.controlled.has(1)); f.stop();
+  });
+}
+
+function largeMesh(corrupt) {
+  const mesh = geometry([[0,0,0],[300,0,0],[0,300,0]],
+    Array.from({length:2200},() => [0,1,2]),[],false);
+  if (corrupt) {
+    const lastTriangle = 24+mesh.vertices.length*12+(mesh.triangles.length-1)*16;
+    mesh.data.writeUInt16LE(65535,lastTriangle);
+  }
+  return mesh;
+}
+test('Large mesh preparation yields to marker and heartbeat callbacks before movement', () => {
+  const f = fixture({count:1,meshes:new Map([[60,largeMesh(false)]])});
+  let marker = false, heartbeats = 0;
+  f.timers.setTimeout(() => {
+    marker = true;
+    assert.equal(f.moves.length,0,'Geometry must finish before any movement');
+  },20);
+  function heartbeat() {
+    if (!f.moved.has(1)) {
+      heartbeats++; f.timers.setTimeout(heartbeat,5);
+    }
+  }
+  f.timers.setTimeout(heartbeat,5);
+  f.advance(1000);
+  assert.ok(marker); assert.ok(heartbeats >= 3,'Parsing must yield beyond a single callback');
+  assert.ok(f.controlled.has(1)); assert.ok(f.moved.has(1)); f.stop();
+});
+test('A late corrupt triangle preserves stationary ownership without movement on partial geometry', () => {
+  const f = fixture({count:1,meshes:new Map([[60,largeMesh(true)]])});
+  f.advance(1000);
+  assert.equal(f.controlled.size,1);
+  assert.ok(!f.controlEvents.some(event => !event.on),'A parse failure cannot relinquish server ownership');
+  assert.equal(f.moves.length,0);
+  assert.ok(f.logs.some(line => /rejected|unavailable/.test(line)));
+  f.stop();
+});
+test('An actor displaced outside navigation while its mesh is preparing remains stationary and server owned', () => {
+  const f = fixture({count:1,meshes:new Map([[60,largeMesh(false)]])});
+  f.timers.setTimeout(() => { f.states.get(1).pos = [1000,1000,0]; },20);
+  f.advance(1000);
+  assert.ok(f.controlled.has(1));
+  assert.equal(f.moves.length,0); f.stop();
+});
+test('An actor changing cells while waiting prepares its new cell before moving', () => {
+  const f = fixture({count:1,meshes:new Map([[60,largeMesh(false)],[61,isolated()]])});
+  f.timers.setTimeout(() => {
+    f.states.get(1).cellOrWorld = 61;
+    f.states.get(1).pos = [20,20,0];
+  },20);
+  f.advance(5000);
+  assert.ok(f.controlled.has(1)); assert.ok(f.moved.has(1));
+  assert.equal(f.states.get(1).cellOrWorld,61); f.stop();
+});
+
+
+const homePolicy = (home,cell,leash) => () => ({home:home.slice(),cell,leash});
+function checkLeash(moves,home,leash) {
+  assert.ok(moves.length > 0,'A home leash must still permit local activity');
+  assert.ok(moves.every(move => Math.hypot(...move.pos.map((v,i) => v-home[i])) <= leash+0.01),
+    'Every emitted movement endpoint remains within its authored home leash');
+}
+test('Population exclusion prevents preparation and movement for excluded identities', () => {
+  const f = fixture({ids:[1,2,3],population:(id,state) => id === 2 ? null :
+    {home:state.pos.slice(),cell:state.cellOrWorld,leash:80}});
+  f.advance(15000);
+  assert.ok(f.controlled.has(1) && f.controlled.has(3));
+  assert.ok(!f.controlEvents.some(event => event.id === 2),'Excluded IDs are never prepared');
+  assert.ok(!f.moves.some(move => move.id === 2));
+  assert.ok(f.policyEvents.some(event => event.kind === 'configure' && event.id === 2));
+  f.stop();
+});
+test('Population return interval is configured before native ownership', () => {
+  const f = fixture({count:1,population:(id,state,api) => {
+    api.set(id,'spawnDelay',1800);
+    return {home:state.pos.slice(),cell:state.cellOrWorld,leash:80};
+  }});
+  f.advance(1000);
+  const events = f.policyEvents.filter(event => event.id === 1);
+  assert.ok(events.findIndex(event => event.kind === 'configure') >= 0);
+  assert.ok(events.findIndex(event => event.kind === 'configure') <
+    events.findIndex(event => event.kind === 'control' && event.on));
+  assert.equal(events.find(event => event.kind === 'control' && event.on).spawnDelay,1800,
+    'The configured interval is already present when native ownership begins');
+  assert.equal(f.api.get(1,'spawnDelay'),1800);
+  f.stop();
+});
+test('Fresh loaded identities enroll after pagination without duplicate preparation', () => {
+  const f = fixture({count:1,population:homePolicy([100,100,0],60,80),
+    npc:{1:{pos:[100,100,0]}}});
+  f.advance(30000);
+  f.addNpc(9001,{pos:[100,100,0]});
+  f.advance(30000);
+  assert.ok(f.loadedLookups() > 1,'Periodic discovery uses the fresh native enumeration');
+  assert.ok(f.controlled.has(9001) && f.moved.has(9001));
+  for (const id of [1,9001]) {
+    assert.equal(f.controlEvents.filter(event => event.id === id && event.on).length,1,
+      'Previously enrolled IDs retain one native ownership preparation');
+  }
+  f.stop();
+});
+test('Ambient routine remains active inside a narrow authored home leash', () => {
+  const home = [300,300,0], leash = 25;
+  const f = fixture({count:1,npc:{1:{pos:home.slice()}},population:homePolicy(home,60,leash)});
+  f.advance(30000); checkLeash(f.moves,home,leash);
+  assert.ok(f.moved.has(1)); f.stop();
+});
+test('Retaliation cannot chase outside the authored home leash', () => {
+  const home = [100,100,0], leash = 40;
+  const f = fixture({count:1,npc:{1:{pos:home.slice(),combatTarget:100}},
+    humans:[100],human:{100:{pos:[500,500,0]}},population:homePolicy(home,60,leash)});
+  f.advance(30000); checkLeash(f.moves,home,leash);
+  assert.equal(f.attackAttempts.length,0); f.stop();
+});
+test('Cowardly retaliation flees without exceeding the authored home leash', () => {
+  const home = [300,300,0], leash = 35;
+  const f = fixture({count:1,npc:{1:{pos:home.slice(),combatTarget:100,confidence:0}},
+    humans:[100],human:{100:{pos:[310,300,0]}},population:homePolicy(home,60,leash)});
+  f.advance(15000); checkLeash(f.moves,home,leash);
+  assert.equal(f.attackAttempts.length,0); f.stop();
+});
+test('An actor displaced into another cell cannot run a routine outside its home cell', () => {
+  const home = [100,100,0];
+  const f = fixture({count:1,npc:{1:{pos:home.slice()}},population:homePolicy(home,60,80),
+    meshes:new Map([[60,square()],[61,square()]])});
+  f.advance(3000);
+  assert.ok(f.moved.has(1));
+  const before = f.moves.length;
+  f.states.get(1).cellOrWorld = 61;
+  f.advance(5000);
+  assert.equal(f.moves.length,before,'A cell change cannot silently replace the authored home');
+  assert.ok(f.controlled.has(1)); f.stop();
+});
+
+test('A within-home displacement onto an adjacent face cannot exhaust ambient movement', () => {
+  const home=[310,310,0],leash=50;
+  const f=fixture({count:1,npc:{1:{pos:[290,290,0]}},population:homePolicy(home,60,leash)});
+  f.advance(30000);f.moves.length=0;
+  f.advance(30000);
+  assert.ok(f.moves.some(m=>m.speed>0),'Unattended movement continues in the second activity window');
+  checkLeash(f.moves,home,leash);f.stop();
+});
+
+test('A sloped face keeps an in-home actor moving when vertical home projection exceeds its leash', () => {
+  const home=[1200,1200,0],leash=560;
+  const mesh=geometry([[0,0,0],[4800,0,2400],[0,4800,0]],[[0,1,2]]);
+  const f=fixture({count:1,meshes:new Map([[60,mesh]]),npc:{1:{pos:[960,1200,480]}},
+    population:homePolicy(home,60,leash)});
+  f.advance(30000);
+  assert.ok(f.moves.some(move=>move.speed>0),'An in-home actor must keep moving on slopes');
+  checkLeash(f.moves,home,leash);f.stop();
+});
+
+console.log(JSON.stringify({passed,failed}));
+process.exitCode = failed ? 1 : 0;

@@ -1,5 +1,9 @@
-﻿<#
+<#
   Add-SkyrimUnbound.ps1
+
+  RETIRED. DO NOT RUN. Issue #1179: installed Skyrim Unbound Reborn into the old build and published. The collection (or the settled load order) does this now. It refuses to run, and the rest of the file is kept for the history of how it was installed. Pattern from #405 Add-Bodies.
+
+  What it used to do, and what is left of it:
 
   Installs Skyrim Unbound Reborn and PapyrusUtil into the isolated build, so
   nobody has to sit through the Helgen cart ride. Five people triggering that
@@ -10,10 +14,12 @@
   command you run.
 
       .\tools\Add-SkyrimUnbound.ps1
-      .\tools\Add-SkyrimUnbound.ps1 -Password hunter2
+      .\tools\Add-SkyrimUnbound.ps1 -Password
 
   Options:
-      -Password xyz    set the server password first, so it ships with this
+      -Password        asks for the server password, not shown, and sets it
+                       first, so it ships with this; nothing typed clears it.
+                       Never typed on the command line (issue #1069).
       -Notes "..."     what the News page says about this release
       -NoShip          install only, publish nothing
 #>
@@ -21,11 +27,18 @@
 param(
     [string]$Root      = 'C:\Thornswood',
     [string]$Downloads = "$env:USERPROFILE\Downloads",
-    [string]$Password,
+    [switch]$Password,
     [string]$Notes = 'Skyrim Unbound. No more cart ride. New Game now asks where in Skyrim you wake up, and the launcher connects you to the server by itself once your save has loaded.',
     [switch]$NoShip,
     [switch]$NoPause
 )
+# The refusal comes before anything else, above the strict mode line and above
+# the dot source below it, so no part of the install can run by accident.
+throw ('STOP. Add-SkyrimUnbound.ps1 is retired and installs nothing (issue #1179). ' +
+       'Skyrim Unbound Reborn comes from the Nexus collection now, not a one-off hand install that Ships into Game\Data. ' +
+       'The file is kept for the history of how it was installed. Delete this line only if ' +
+       'hand installs are meant again, and read the header first.')
+
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -200,8 +213,15 @@ Say "  $($plugLines.Count) lines in plugins.txt, $($loLines.Count) in loadorder.
 # Set here rather than in the launcher, because the launcher that can show the
 # box is the one this run is about to build. Publish-Update copies it out of
 # config.json, so setting it before shipping is what gets it to everyone.
-if ($PSBoundParameters.ContainsKey('Password')) {
+if ($Password) {
     Head 'Server password'
+    $ss = Read-Host '  Server password (it is not shown; nothing clears it)' -AsSecureString
+    $newPassword = ''
+    if ($ss -and $ss.Length -gt 0) {
+        $b = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($ss)
+        try { $newPassword = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($b) }
+        finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($b) }
+    }
     $cfgPath = Join-Path $Root 'config.json'
     if (-not (Test-Path $cfgPath)) { Die "No config.json at $cfgPath." }
 
@@ -209,13 +229,14 @@ if ($PSBoundParameters.ContainsKey('Password')) {
     $skip = if ($raw.Length -ge 3 -and $raw[0] -eq 0xEF -and $raw[1] -eq 0xBB -and $raw[2] -eq 0xBF) { 3 } else { 0 }
     $cfg  = [Text.Encoding]::UTF8.GetString($raw, $skip, $raw.Length - $skip) | ConvertFrom-Json
 
-    if ($cfg.PSObject.Properties.Name -contains 'ServerPassword') { $cfg.ServerPassword = $Password }
-    else { $cfg | Add-Member -NotePropertyName 'ServerPassword' -NotePropertyValue $Password }
+    if ($cfg.PSObject.Properties.Name -contains 'ServerPassword') { $cfg.ServerPassword = $newPassword }
+    else { $cfg | Add-Member -NotePropertyName 'ServerPassword' -NotePropertyValue $newPassword }
 
     # No BOM. The launcher strips one, but nothing else that reads this does.
     $json = $cfg | ConvertTo-Json -Depth 6
     [IO.File]::WriteAllText($cfgPath, $json, (New-Object Text.UTF8Encoding($false)))
-    Say $(if ($Password) { "  set, and it ships with this release" } else { "  cleared" }) 'Green'
+    Say $(if ($newPassword) { "  set, and it ships with this release" } else { "  cleared" }) 'Green'
+    $newPassword = $null
 }
 
 # ---- publish --------------------------------------------------------------

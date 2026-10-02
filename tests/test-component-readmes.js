@@ -50,12 +50,12 @@
 // file in every pack.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const ROOT = path.join(TOOLS_DIR, '..');
+const ROOT = REPO_DIR;
 const CR = String.fromCharCode(13);
 // A backslash, built rather than typed, so no tool on the way can eat it.
 const BS = String.fromCharCode(92);
@@ -300,8 +300,8 @@ SIX.forEach(function (d) {
   yes('overlays: thornswood-front.js still has the OVERLAYS list a new overlay has to join',
       /const OVERLAYS = \[/.test(front) && t.indexOf('`OVERLAYS`') >= 0);
   yes('overlays: Go.ps1 still takes the front from thornswood-front.zip, as the README says',
-      go.indexOf("tools" + BS + "thornswood-front.zip'") >= 0 && t.indexOf('thornswood-front.zip') >= 0);
-  const zip = tracked('tools/thornswood-front.zip');
+      go.indexOf("local" + BS + "thornswood-front.zip'") >= 0 && t.indexOf('thornswood-front.zip') >= 0);
+  const zip = tracked('local/thornswood-front.zip');
   yes('overlays: and that zip is not in git, as the README says', zip === false);
 }
 
@@ -328,8 +328,11 @@ SIX.forEach(function (d) {
   const bl = read('scripts/release/Build-Launcher.ps1') || '';
   const boot = read('installer/setup/Bootstrap.cs') || '';
   const held = files('installer/setup').filter(function (f) { return f !== 'README.md'; });
-  yes('installer' + BS + 'setup: holds the one file its README says, Bootstrap.cs (' + held.join(', ') + ')',
-      held.length === 1 && held[0] === 'Bootstrap.cs');
+  // Setup.manifest since issue #463: the setup program's own application
+  // manifest (per-monitor DPI, asInvoker), embedded by Build-Launcher.ps1.
+  yes('installer' + BS + 'setup: holds the two files its README says, Bootstrap.cs and Setup.manifest (' + held.join(', ') + ')',
+      held.length === 2 && held.indexOf('Bootstrap.cs') >= 0 && held.indexOf('Setup.manifest') >= 0 &&
+      t.indexOf('`Bootstrap.cs`') >= 0 && t.indexOf('`Setup.manifest`') >= 0);
   yes('installer' + BS + 'setup: Build-Launcher.ps1 compiles Bootstrap.cs by name into setup-stub.exe',
       bl.indexOf("'.." + BS + ".." + BS + "installer" + BS + "setup" + BS + "Bootstrap.cs'") >= 0 && bl.indexOf("setup-stub.exe'") >= 0 &&
       t.indexOf('setup-stub.exe') >= 0);
@@ -376,8 +379,17 @@ SIX.forEach(function (d) {
 
   const iv = read('scripts/deploy/Install-Voice.ps1') || '';
   const sent = (/foreach \(\$f in ('[^)]*')\)/.exec(iv) || [])[1];
-  yes('Install-Voice.ps1 sends named files, with no wildcard (' + sent + ')',
-      !!sent && sent.indexOf('*') < 0 && !/README/i.test(sent) && !/Get-ChildItem/.test(iv));
+  // What goes up is the $send table since #1093 (staged, checked, swapped).
+  // The one Get-ChildItem it has lists the old .stage-* folders on the box to
+  // clear them, with -Directory; any listing of files would be a wildcard
+  // send, so only folder listings are let through.
+  const sendKeys = [];
+  iv.replace(/\$send\['([^']+)'\]\s*=/g, function (m, k) { sendKeys.push(k); return m; });
+  const fileLists = iv.split('\n').filter(function (l) { return /Get-ChildItem/.test(l) && !/-Directory\b/.test(l); });
+  yes('Install-Voice.ps1 sends named files, with no wildcard (' + sent + '; sends ' + sendKeys.join(', ') + ')',
+      !!sent && sent.indexOf('*') < 0 && !/README/i.test(sent) &&
+      sendKeys.length > 0 && sendKeys.every(function (k) { return k.indexOf('*') < 0 && !/README/i.test(k); }) &&
+      fileLists.length === 0);
 
   const bl = read('scripts/release/Build-Launcher.ps1') || '';
   yes('Build-Launcher.ps1 never lists launcher or installer' + BS + 'setup, so only the named file goes in',

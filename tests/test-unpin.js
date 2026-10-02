@@ -24,11 +24,11 @@
 //
 // Writes only to a scratch folder under the system temp directory, and
 // removes it.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
+const SRC = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -57,8 +57,8 @@ function number(re) {
 }
 
 // ------------------------------------------------------ the dead installer
-yes('tools/Add-NoticeBoards.ps1 is gone',
-    !fs.existsSync(path.join(TOOLS_DIR, 'Add-NoticeBoards.ps1')));
+yes('Add-NoticeBoards.ps1 is gone from scripts\\mods',
+    !fs.existsSync(path.join(REPO_DIR, 'scripts', 'mods', 'Add-NoticeBoards.ps1')));
 
 // ------------------------------------------------------------ the pieces
 const PIECES = {

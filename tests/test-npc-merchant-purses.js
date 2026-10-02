@@ -1,0 +1,51 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const source=fs.readFileSync(path.join(__dirname,'../game/gamemode.js'),'utf8');
+const start=source.indexOf('// NPC MERCHANT PURSES BEGIN'),end=source.indexOf('// NPC MERCHANT PURSES END');
+assert.ok(start>=0 && end>start,'The production merchant purse service must exist');
+const ctx={Map,Number,JSON};vm.createContext(ctx);vm.runInContext(source.slice(start,end),ctx);
+const saved=new Map(),writes=[];
+const ids={'1:Skyrim.esm':1,'2:Skyrim.esm':2,'a:Skyrim.esm':10};
+let human=false,brokenRead=false,brokenWrite=false;
+const api={makeProperty(){},getIdFromDesc:d=>ids[d],get:(id,p)=>{
+  if(brokenRead) throw new Error('unavailable');
+  if(p==='baseDesc') return 'a:Skyrim.esm';
+  return saved.get(id+':'+p);
+},set:(id,p,v)=>{
+  if(brokenWrite) throw new Error('save unavailable');
+  saved.set(id+':'+p,JSON.parse(JSON.stringify(v)));writes.push(id);
+},getNpcAIState:()=>({isHuman:human,profileId:human?1:0,isDead:false})};
+const data={keep:[['1:Skyrim.esm','a:Skyrim.esm',null,null,null,null,'trader'],
+  ['2:Skyrim.esm','a:Skyrim.esm',null,null,null,null,'enemy']]};
+let ledger={version:1,entries:{'1:Skyrim.esm':null}};
+const storage={load:()=>JSON.parse(JSON.stringify(ledger)),save:next=>{ledger=JSON.parse(JSON.stringify(next));}};
+function make(){return ctx.createNpcMerchantPurses(api,data,storage);}
+const service=make();
+const initial=service.prepare(1);
+assert.equal(initial.purse,250);assert.equal(initial.stock.length,0);
+assert.equal(writes.length,1);
+assert.equal(service.prepare(1).purse,250);assert.equal(writes.length,1,'repeated admission does not hand out another purse');
+ledger.entries['1:Skyrim.esm'].purse=0;
+saved.get('1:thornswoodMerchant').purse=0;
+assert.equal(make().prepare(1).purse,0,'a new service retains a depleted saved purse');
+assert.equal(writes.length,1,'restart does not top up the purse');
+saved.set('1:thornswoodMerchant',null);
+assert.equal(make().prepare(1).purse,0,'a missing native save restores the authoritative depleted balance');
+assert.equal(ledger.entries['1:Skyrim.esm'].purse,0);
+assert.equal(writes.length,2,'restoring the projection is not another grant');
+assert.equal(service.prepare(2),null,'an enemy never gets a merchant purse');
+assert.equal(service.prepare(0xff000001),null,'a dynamic copy never gets an authored merchant purse');
+human=true;assert.throws(()=>service.prepare(1),/human/i);human=false;
+brokenRead=true;assert.throws(()=>service.prepare(1),/unavailable/);brokenRead=false;
+saved.get('1:thornswoodMerchant').purse=-1;
+assert.throws(()=>service.prepare(1),/saved merchant/i,'bad saved state refuses service instead of resetting to 250');
+saved.delete('1:thornswoodMerchant');brokenWrite=true;
+assert.throws(()=>service.prepare(1),/save unavailable/);assert.equal(writes.length,2);brokenWrite=false;
+const current=make();
+const fresh=current.prepare(1);fresh.purse=999;
+assert.equal(current.prepare(1).purse,0,'returned state does not mutate the saved purse');
+saved.get('1:thornswoodMerchant').reference='other:Skyrim.esm';
+assert.throws(()=>current.prepare(1),/saved merchant/i,'saved identity must match the authored reference');
+const population=JSON.parse(fs.readFileSync(path.join(__dirname,'../game/data/npc-population.json'),'utf8'));
+assert.equal(population.npcs.filter(n=>n.keep && n.role==='trader').length,249);
+console.log('PASS NPC merchant purse initialization, depletion, reload, identity and failure checks');

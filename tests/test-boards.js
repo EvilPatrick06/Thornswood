@@ -20,10 +20,10 @@
 // So most of what is below is about the SAVED case, not the fresh one.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
-const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
+const SRC = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -226,8 +226,47 @@ if (block !== null) {
         flat.indexOf('-64263') !== -1);
     yes('S6 and the seeding number moved with it, or nothing in the world would change',
         /var BOARD_SEED = 3;/.test(src));
+    yes('the hold box is that town\'s notice board',
+        /function holdStanding\(actorId\) \{[\s\S]*?boardHere\(actorId\)/.test(src));
     yes('S6 and a steward placing a board marks it so a deploy cannot undo it',
         /placed: Date\.now\(\)/.test(src));
+  }
+
+  {
+    const front = fs.readFileSync(path.join(REPO_DIR, 'game', 'plugins', 'thornswood-front.js'), 'utf8');
+    const page = fs.readFileSync(path.join(REPO_DIR, 'game', 'ui', 'thornswood-board.js'), 'utf8');
+    const journal = fs.readFileSync(path.join(REPO_DIR, 'game', 'ui', 'thornswood-journal.js'), 'utf8');
+    yes('the board panel is what the server sends',
+        /function boardPanel\(actorId, profileId\)/.test(src) &&
+        src.indexOf('prop.boardPanel(actorId, mine)') !== -1 &&
+        src.indexOf('window.thornswoodBoard.setData') !== -1);
+    yes('clicking the board opens the panel, and only while you are there',
+        front.indexOf("'thornswood-board.js'") !== -1 &&
+        front.indexOf("e.userEventName !== 'Activate'") !== -1 &&
+        front.indexOf('dist > BOARD_REACH') !== -1 &&
+        page.indexOf('window.thornswoodBoard') !== -1);
+    yes('the message board object is put down at the spot',
+        front.indexOf('Thornswood-Content.esp') !== -1 &&
+        front.indexOf('0x593B') !== -1 &&
+        front.indexOf('placeAtMe(base, 1, false, false)') !== -1);
+    yes('the panel is how a notice, a job, and a price list go up',
+        page.indexOf("net('/notice ") !== -1 &&
+        page.indexOf("net('/job ") !== -1 &&
+        page.indexOf("net('/take ") !== -1 &&
+        page.indexOf("net('/unpin ") !== -1 &&
+        page.indexOf("net('/dropjob ") !== -1 &&
+        page.indexOf("net('/book submit ") !== -1);
+    yes('the list is left at the board, not from the journal',
+        journal.indexOf('Submit at the box') === -1);
+    const sites = rig(null).sites;
+    let missing = '';
+    for (const h in sites) {
+      const p = sites[h].pos;
+      if (front.indexOf(String(p[0])) === -1 || front.indexOf(String(p[1])) === -1) {
+        missing += ' ' + h;
+      }
+    }
+    yes('the click knows the nine spots' + missing, missing === '');
   }
 }
 

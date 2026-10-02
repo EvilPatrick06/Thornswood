@@ -45,6 +45,27 @@ var lastMode = {};       // peerId -> the last mode heard for them
   'muted' message. place() reads it before anything else.
 */
 var muted = {};
+/* Staff silence. The service tells every connection, and the position row
+   carries the same bit for a client that joins later. It closes this
+   microphone and sets their level to nothing. A personal mute is the map
+   above and is not this. */
+var hushed = {};
+function noteHush(pid, on) {
+  pid = Number(pid) || 0;
+  if (!pid) return;
+  if (on) { hushed[pid] = true; } else { delete hushed[pid]; }
+}
+function noteRows(who) {
+  for (var k in who) {
+    if (!Object.prototype.hasOwnProperty.call(who, k)) continue;
+    noteHush(k, !!(who[k] && who[k].hush));
+  }
+}
+function micLive() { return talking && !hushed[myProfile]; }
+function applyMicTrack() {
+  if (micTrack) micTrack.enabled = micLive();
+  host('talking', micLive() ? '1' : '0');
+}
 
 var UNITS_PER_METRE = 70;
 
@@ -111,6 +132,16 @@ function setGain(rec, value) {
   } catch (e) {
     try { rec.gain.gain.value = value; } catch (e2) { }
   }
+}
+
+/* The incoming track as well as the gain. A staff silence has to survive a
+   page that only listened to the gain. Turning it back on is what lifts it. */
+function hear(rec, on) {
+  try {
+    rec.pc.getReceivers().forEach(function (r) {
+      if (r.track && r.track.kind === 'audio') r.track.enabled = !!on;
+    });
+  } catch (e) { }
 }
 
 function host(kind, text) {
@@ -205,6 +236,75 @@ function voiceSocket() {
   return b + '/';
 }
 
+/*
+  HOW SOON TO TRY AGAIN, AND HOW TO TELL THE SERVER IS GONE. Issues #409, #519.
+
+  On 21 September this page opened the socket 592 times, every two seconds,
+  and launcher.log has both halves of why. From 19:09 the Wi-Fi was down and
+  the machine slept at 19:39: 425 tries that never opened. It woke at 20:06
+  holding a join token from 19:02, which had expired at 20:02; the service
+  refused it and closed, and this page never read the refusal, so it came
+  straight back with the same token every two seconds: 134 tries that opened
+  and were shut in the same second, until the launcher's own renewal got
+  through at 20:11. A two second retry has no reason to stop.
+
+  So each try waits longer than the one before, from two seconds to a minute,
+  and never exactly as long as anybody else's, so a service restart does not
+  bring every launcher back in the same instant. It goes back to two seconds
+  only once the service has let us in. A refusal is passed to the launcher,
+  which fetches a fresh token and hands it over (the 'token' message below),
+  and that is what the next try waits for rather than the clock.
+
+  And the page listens for the server. The service's own pings are answered
+  by the browser without this page seeing them, so a socket that went half
+  open during a sleep or a change of network looked exactly like a quiet
+  room. Every twenty five seconds this sends { t: 'ping' }, the service
+  answers { t: 'pong' }, and seventy seconds with nothing at all from it is a
+  lost connection, dealt with like any other.
+*/
+var RETRY_FIRST = 2000, RETRY_MOST = 60000;
+var PING_EVERY = 25000, SILENT_AFTER = 70000;
+var tries = 0, retry = null, heard = 0, deniedWhy = '';
+
+function retryIn() {
+  var cap = Math.min(RETRY_MOST, RETRY_FIRST * Math.pow(2, Math.min(tries, 10)));
+  tries++;
+  return Math.round(cap / 2 + Math.random() * cap / 2);
+}
+
+function later(ms) {
+  if (retry) { clearTimeout(retry); }
+  retry = setTimeout(function () { retry = null; connect(); }, ms);
+}
+
+setInterval(function () {
+  if (!ws || ws.readyState !== 1 || !myPeer) { return; }
+  if (Date.now() - heard > SILENT_AFTER) {
+    say('nothing from the voice server for ' + Math.round((Date.now() - heard) / 1000) +
+        ' s, so looking for it again');
+    var dead = ws;
+    ws = null;
+    dead.onopen = dead.onclose = dead.onerror = dead.onmessage = null;
+    try { dead.close(); } catch (e) { }
+    lost();
+    return;
+  }
+  send({ t: 'ping' });
+}, PING_EVERY);
+
+/* The socket is gone, however it went. */
+function lost() {
+  host('status', 'disconnected');
+  conns.forEach(function (rec, id) { drop(id); });
+  myPeer = 0;
+  var wait = retryIn();
+  if (deniedWhy) {
+    say('the voice server would not let this launcher in (' + deniedWhy +
+        '), so it is asking for a fresh token and trying again in ' + Math.round(wait / 1000) + ' s');
+  }
+  later(wait);
+}
+
 var ICE = [{ urls: 'stun:stun.l.google.com:19302' }];
 function refreshIce() {
   if (!cfg || !cfg.host) { return; }
@@ -223,6 +323,7 @@ function refreshIce() {
 }
 
 function connect() {
+  if (retry) { clearTimeout(retry); retry = null; }
   refreshIce();
   if (!cfg) return;
 
@@ -241,10 +342,11 @@ function connect() {
   }
 
   var url = voiceSocket();
-  say('connecting to ' + url);
-  try { ws = new WebSocket(url); } catch (e) { say('socket refused: ' + e); return; }
+  say('connecting to ' + url + (tries ? ' (try ' + (tries + 1) + ')' : ''));
+  try { ws = new WebSocket(url); } catch (e) { say('socket refused: ' + e); later(retryIn()); return; }
 
   ws.onopen = function () {
+    heard = Date.now();
     // The token is what says who we are. profileId goes with it only so an
     // older service that has never heard of tokens still works; the new one
     // reads the token and ignores the number.
@@ -252,17 +354,27 @@ function connect() {
            token: cfg.token || '' });
     host('status', 'connected');
   };
-  ws.onclose = function () {
-    host('status', 'disconnected');
-    conns.forEach(function (rec, id) { drop(id); });
-    setTimeout(connect, 2000);
-  };
+  ws.onclose = function () { ws = null; lost(); };
   ws.onerror = function () { };
   ws.onmessage = function (ev) {
+    heard = Date.now();
     var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
-    if (m.t === 'welcome') { myPeer = m.peer; myProfile = cfg.profileId; return; }
+    if (m.t === 'pong') { return; }
+    // In, so the next loss starts again from two seconds.
+    if (m.t === 'welcome') {
+      myPeer = m.peer; myProfile = cfg.profileId; tries = 0; deniedWhy = '';
+      send({ t: 'talk', on: talking });
+      return;
+    }
+    // Refused, and the service closes the socket next. The launcher fetches
+    // a fresh token; see the note over RETRY_FIRST.
+    if (m.t === 'denied') { deniedWhy = String(m.why || 'it did not say why'); host('denied', deniedWhy); return; }
     if (m.t === 'peers') { onPeers(m.peers || []); return; }
-    if (m.t === 'pos') { places = m.who || {}; place(); return; }
+    // The whole view on the first tick after a join, then only what moved
+    // and who left it (issue #482; the note over the tick in voice-server.js).
+    if (m.t === 'pos') { places = m.who || {}; noteRows(places); place(); applyMicTrack(); return; }
+    if (m.t === 'moved') { applyMoved(places, m); noteRows(m.who || {}); place(); applyMicTrack(); return; }
+    if (m.t === 'hush') { noteHush(m.profileId, m.on); place(); applyMicTrack(); return; }
     if (m.t === 'sdp') { onSdp(m); return; }
     if (m.t === 'ice') { onIce(m); return; }
     if (m.t === 'vmode') {
@@ -299,7 +411,7 @@ function open(id, info, initiator) {
   var gain = a.createGain();
   // A gain node starts at full level and the next position is up to a fifth
   // of a second away, so somebody already muted starts silent instead.
-  if (muted[info.profileId]) { gain.gain.value = 0; }
+  if (muted[info.profileId] || hushed[info.profileId]) { gain.gain.value = 0; }
   var panner = a.createPanner();
   panner.panningModel = 'HRTF';
   // Direction only. The distance is the gain node's job, above: with no
@@ -407,12 +519,25 @@ function drop(id) {
 }
 
 // ------------------------------------------------------------- positions --
+/* A 'moved' tick on top of the table the last 'pos' gave: the rows that
+   changed replace theirs, and the ids in gone are nobody this person can
+   hear any more. */
+function applyMoved(table, m) {
+  var who = m.who || {};
+  for (var k in who) {
+    if (Object.prototype.hasOwnProperty.call(who, k)) { table[k] = who[k]; }
+  }
+  (m.gone || []).forEach(function (id) { delete table[id]; });
+}
+
 function place() {
   var me = places[myProfile];
   if (!me || !me.pos) {
     // Nowhere to measure from, so distance is left as it was. A mute is not a
     // distance and does not wait for one.
-    conns.forEach(function (rec) { if (muted[rec.profileId]) { setGain(rec, 0); } });
+    conns.forEach(function (rec) {
+      if (muted[rec.profileId] || hushed[rec.profileId]) { setGain(rec, 0); hear(rec, false); }
+    });
     return;
   }
   var rad = (Number(me.angleZ) || 0) * Math.PI / 180;
@@ -420,8 +545,11 @@ function place() {
 
   conns.forEach(function (rec) {
     // Muted beats distance: somebody standing next to you and muted is silent.
-    if (muted[rec.profileId]) { setGain(rec, 0); return; }
     var them = places[rec.profileId];
+    if (muted[rec.profileId] || hushed[rec.profileId] || (them && them.hush)) {
+      setGain(rec, 0); hear(rec, false); return;
+    }
+    hear(rec, true);
     // A wall is not a distance. Another cell is silence whatever the maths says.
     if (!them || !them.pos || them.cell !== me.cell) { setGain(rec, 0); return; }
 
@@ -478,13 +606,17 @@ window.chrome.webview.addEventListener('message', function (e) {
   */
   if (m.t === 'token') {
     if (cfg) { cfg.token = String(m.token || ''); }
+    // Unless the last try was refused and the next is only waiting on the
+    // clock: a fresh token is what it was waiting for, so it goes now. The
+    // backoff is not reset, so a token that is refused too waits longer.
+    if (cfg && deniedWhy && retry && cfg.token) { later(0); }
     return;
   }
 
   if (m.t === 'ptt') {
     talking = !!m.on;
-    if (micTrack) micTrack.enabled = talking;
-    host('talking', talking ? '1' : '0');
+    applyMicTrack();
+    send({ t: 'talk', on: talking });
     return;
   }
 

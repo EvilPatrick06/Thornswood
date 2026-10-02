@@ -53,8 +53,10 @@ $og = [IO.File]::ReadAllText($ogPath)
 
 $rulesNum = [regex]::Match($og, '(?m)^\s*const int Rules = (\d+);')
 $rulesDoc = [regex]::Match($og, '(?m)^\s*/// (\d+): Vortex''s Data\\Platform\\Distribution redistributables')
-Yes 'OwnGame.Rules is 6 for the Distribution hard-link change' (
-    $rulesNum.Success -and [int]$rulesNum.Groups[1].Value -eq 6)
+# At least 6, not equal to it: rules 7 (Start On Save left out, #394) moved it
+# on past this change on purpose.
+Yes 'OwnGame.Rules is at least 6 for the Distribution hard-link change' (
+    $rulesNum.Success -and [int]$rulesNum.Groups[1].Value -ge 6)
 Yes 'and the history comment names Distribution redistributables under that number' (
     $rulesDoc.Success -and $rulesDoc.Groups[1].Value -eq '6')
 
@@ -136,6 +138,12 @@ $lifted = [ordered]@{
     'Generated'   = Get-CsMember $og 'static bool Generated(string rel)'
     'MustCopy'    = Get-CsMember $og 'public static bool MustCopy(string rel, HashSet<string> deployed)'
 }
+# MustCopy asks OwnGameShare.cs whether a file is one of Skyrim's archives
+# since #1218; taken from there where that file exists.
+$sharePath = Join-Path $AppPath 'OwnGameShare.cs'
+if (Test-Path -LiteralPath $sharePath) {
+    $lifted['IsArchive'] = Get-CsMember ([IO.File]::ReadAllText($sharePath)) 'public static bool IsArchive(string rel)'
+}
 foreach ($k in @($lifted.Keys)) {
     Yes "lifted $k from OwnGame.cs" ([bool]$lifted[$k])
 }
@@ -155,6 +163,7 @@ namespace $ns {
         $($lifted['Masters'])
         $($lifted['Generated'])
         $($lifted['MustCopy'])
+        $($lifted['IsArchive'])
     }
 }
 "@
@@ -217,6 +226,15 @@ Yes 'SkyrimPlatformCEF.exe.hidden stays copied even if Vortex listed it' ($T::Mu
 $otherStay = @($otherPlatform | Where-Object { $T::MustCopy($_, $deployed) })
 Yes ("everything else under Data\Platform stays copied ({0} of {1})" -f $otherStay.Count, $otherPlatform.Count) (
     $otherStay.Count -eq $otherPlatform.Count)
+
+# #1218: whatever Vortex did not deploy is the game's own and is copied, so
+# nothing done to the Steam copy reaches it; Skyrim's archives are the one
+# exception, linked only through Share (test-own-folder-alone.ps1).
+if ($lifted.Contains('IsArchive')) {
+    Yes 'a game file Vortex did not deploy is copied (#1218)' ($T::MustCopy('Data\meshes\clutter\bucket.nif', $deployed))
+    Yes 'the same file deployed by Vortex is linked' (-not $T::MustCopy('Data\meshes\clutter\bucket.nif', (New-Object 'System.Collections.Generic.HashSet[string]' (,[string[]]@('Data\meshes\clutter\bucket.nif')))))
+    Yes 'one of Skyrim''s archives is not copied: Share decides' (-not $T::MustCopy('Data\Skyrim - Textures0.bsa', $deployed))
+}
 
 # Real files.txt when present.
 if (Test-Path -LiteralPath $FilesList) {

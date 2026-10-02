@@ -1,6 +1,10 @@
 <#
   Fix-MaleBody.ps1
 
+  RETIRED. DO NOT RUN. Issue #1179: moved the collection's HIMBO male body aside by hand. The collection (or the settled load order) does this now. It refuses to run, and the rest of the file is kept for the history of how it was installed. Pattern from #405 Add-Bodies.
+
+  What it used to do, and what is left of it:
+
   The male body mesh in the game folder is a genital-slotted one, left behind
   when The New Gentleman was taken out. The plugin that supplied the part is
   gone, so the slot in the body renders as a hole you can see the sky through.
@@ -18,6 +22,13 @@ param(
     [string]$Data = 'C:\Thornswood\Game\Data',
     [switch]$Undo
 )
+# The refusal comes before anything else, above the strict mode line and above
+# the dot source below it, so no part of the install can run by accident.
+throw ('STOP. Fix-MaleBody.ps1 is retired and installs nothing (issue #1179). ' +
+       'The male body meshes come from the Nexus collection now. Moving HIMBO leftovers by hand writes into Game\Data and, where those files are Vortex links, into staging. ' +
+       'The file is kept for the history of how it was installed. Delete this line only if ' +
+       'hand installs are meant again, and read the header first.')
+
 
 $assets = Join-Path $Data 'meshes\actors\character\character assets'
 $stash  = Join-Path $Data '_removedBody\meshes\actors\character\character assets'

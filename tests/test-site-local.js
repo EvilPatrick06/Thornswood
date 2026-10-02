@@ -21,7 +21,8 @@
   So this starts real copies of server.js and asks them over HTTP.
 
     With no config.json, what server.js writes for itself is its defaults, and
-    config.example.json has to be exactly that with the cookie secret empty, so
+    config.example.json has to be exactly that with the cookie secret and the
+    join pass key empty, so
     the sample cannot drift from what the code reads.
 
     With config.example.json as config.json, as the README says, the door check
@@ -29,9 +30,11 @@
     copy's own secret gets a yes, because with no bot token every account is
     allowed in.
 
-    With a page made to throw, and a timer behind a page made to throw, the
-    door still answers. With a page made to hold the event loop for 1.5
-    seconds, the door waits for it. Measured on 24 September, four runs:
+    With a page made to throw, the door still answers (that throw is caught).
+    With a timer behind a page made to throw, the process exits after logging
+    so the process manager can start a clean one (#1358). With a page made to
+    hold the event loop for 1.5 seconds, the door waits for it. Measured on
+    24 September, four runs:
     1,478 to 1,491 ms for /api/play/who while the loop was held, against 3 or
     4 ms with nothing held. That is the half only a separate process fixes.
     When the door is split out of server.js this check fails, and the
@@ -43,7 +46,7 @@
   machine's own, and nothing asks Discord: the sample is checked for empty
   Discord settings before any copy that reads it is started.
 */
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -52,8 +55,8 @@ const http = require('http');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 
-const ROOT = path.join(TOOLS_DIR, '..');
-const APP = path.join(TOOLS_DIR, '..', 'site');
+const ROOT = REPO_DIR;
+const APP = path.join(REPO_DIR, 'site');
 const CR = String.fromCharCode(13);
 // A backslash, built rather than typed, so no tool on the way can eat it.
 const BS = String.fromCharCode(92);
@@ -328,7 +331,7 @@ function ask(port, method, route, body) {
       res.on('end', function () {
         let json = null;
         try { json = JSON.parse(buf); } catch (e) { json = null; }
-        ok({ status: res.statusCode, type: String(res.headers['content-type'] || ''), json: json, ms: Date.now() - t0 });
+        ok({ status: res.statusCode, type: String(res.headers['content-type'] || ''), headers: res.headers, json: json, ms: Date.now() - t0 });
       });
     });
     req.on('error', function (e) { ok({ status: 0, error: e.message, json: null, ms: Date.now() - t0 }); });
@@ -385,15 +388,19 @@ function breakPages(src) {
     try { wrote = JSON.parse(fs.readFileSync(path.join(dA, 'config.json'), 'utf8')); } catch (e) { wrote = null; }
     yes('and writes its own config.json, with a cookie secret it made',
         !!wrote && typeof wrote.secret === 'string' && wrote.secret.length >= 32);
+    // Since #937 server.js makes the join pass key the same way, once, on a
+    // first start, so the sample leaves it empty like the cookie secret.
+    yes('and a join pass key it made',
+        !!wrote && typeof wrote.passKey === 'string' && wrote.passKey.length >= 32);
     if (wrote && sample) {
-      const bare = Object.assign({}, wrote, { secret: '' });
+      const bare = Object.assign({}, wrote, { secret: '', passKey: '' });
       const off = uniq(Object.keys(bare).concat(Object.keys(sample))).filter(function (k) {
         return canon(bare[k]) !== canon(sample[k]);
       });
-      yes('config.example.json is exactly those defaults with the cookie secret left empty' +
+      yes('config.example.json is exactly those defaults with the cookie secret and pass key left empty' +
           (off.length ? ', differs in ' + off.join(', ') : ''), off.length === 0);
     } else {
-      yes('config.example.json is exactly those defaults with the cookie secret left empty', false);
+      yes('config.example.json is exactly those defaults with the cookie secret and pass key left empty', false);
     }
     await stop(a);
 
@@ -448,15 +455,11 @@ function breakPages(src) {
       const afterThrow = await ask(c.port, 'POST', '/api/play/who', '{}');
       yes('and the door still answers its 401 after it', linkOnly(afterThrow));
 
-      const world = await ask(c.port, 'GET', '/world');
-      await wait(300);
-      const afterTimer = await ask(c.port, 'POST', '/api/play/who', '{}');
-      yes('a timer behind a page that throws is carried on from, and the door still answers',
-          world.status === 200 && linkOnly(afterTimer) && !c.exited);
-      let log = '';
-      try { log = fs.readFileSync(path.join(dC, 'site.log'), 'utf8'); } catch (e) { log = ''; }
-      yes("the copy's site.log says what threw, both times",
-          log.indexOf('handler threw on "/rules"') >= 0 && log.indexOf('uncaught exception, carrying on') >= 0);
+      const home = await ask(c.port, 'GET', '/');
+      yes('the home page sent Content-Security-Policy with frame-ancestors self',
+          home.status === 200 && String((home.headers && home.headers['content-security-policy']) || '').indexOf("frame-ancestors 'self'") >= 0);
+      yes('the home page sent Referrer-Policy strict-origin-when-cross-origin',
+          String((home.headers && home.headers['referrer-policy']) || '') === 'strict-origin-when-cross-origin');
 
       const quick = await ask(c.port, 'POST', '/api/play/who', '{}');
       const holding = path.join(dC, 'holding');
@@ -469,6 +472,16 @@ function breakPages(src) {
           ' ms with nothing held. One process cannot keep these apart; a door of its own would',
           linkOnly(held) && linkOnly(quick) && quick.ms < 500 && held.ms >= HOLD - 500);
       yes('and the process that started is the one still answering', !c.exited);
+
+      // After the hold proof, an uncaught timer throw must exit (#1358).
+      const world = await ask(c.port, 'GET', '/world');
+      yes('the page that arms a timer throw still answers 200 first', world.status === 200);
+      await until(function () { return c.exited; }, 5000);
+      yes('a timer behind a page that throws exits so the manager can restart', c.exited);
+      let log = '';
+      try { log = fs.readFileSync(path.join(dC, 'site.log'), 'utf8'); } catch (e) { log = ''; }
+      yes("the copy's site.log says the handler threw and the uncaught exit",
+          log.indexOf('handler threw on "/rules"') >= 0 && log.indexOf('uncaught exception, exiting') >= 0);
       await stop(c);
     }
 

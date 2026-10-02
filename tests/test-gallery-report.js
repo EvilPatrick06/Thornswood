@@ -229,8 +229,8 @@ yes('Auto load / StartOnSaveInstalled row is gone from Checks',
       return checks.indexOf('StartOnSaveInstalled') < 0 &&
              checks.indexOf('Auto load') < 0;
     })());
-yes('WriteStartIni remains while DLL may still be in Data',
-    /static void WriteStartIni\(\)/.test(fs.readFileSync(path.join(APP, 'Chars.cs'), 'utf8')));
+yes('WriteStartIni is gone from Chars (#394; tests\\test-start-on-save-gone.js holds the rest)',
+    !/WriteStartIni/.test(fs.readFileSync(path.join(APP, 'Chars.cs'), 'utf8')));
 
 // reports inbox stays at the site
 const csFiles = fs.readdirSync(APP).filter(f => f.endsWith('.cs'));

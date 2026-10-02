@@ -1,28 +1,18 @@
-// test-offices.js
+﻿// test-offices.js
 //
 // The offices: a jarl names stewards, and a steward can end a claim.
 //
 // Patrick's design, 21 September. An admin gives an account the Jarl role, out
 // of character, as world setup, and that is the ONLY out of character grant in
-// the whole chain: nothing in the world can create the first office, so
-// somebody has to place it. After that admins never grant anything again,
-// because "admins only overlook the RP and not get involved on their admin
-// characters". A jarl names stewards. A steward is NOT an admin and the only
-// thing they can do that nobody else can is end a claim.
-//
-// WHAT ENDING A CLAIM MUST NOT DO is most of what is checked here. It does not
-// touch what is in the house, because the alternative is a server that deletes
-// people's possessions on somebody's say so. It does not take back a key,
-// because nothing in the engine can change which key a door wants, so an
-// evicted tenant who kept theirs can still walk in at night and the city's only
-// answer is to deal with them like a person. That is the squatter story, and it
-// falls out of the constraint rather than being written.
+// the whole chain. #397: Discord Jarl is eligibility; one named character holds
+// the office (thornswoodCharacter.office). /jarl seats it. A second character
+// on the same account cannot act as jarl.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..');
 const fs = require('fs');
 const path = require('path');
-const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
+const SRC = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -39,29 +29,38 @@ function lift(startsWith, endsWith) {
   return b < 0 ? null : src.slice(a, b + endsWith.length);
 }
 
-const cmdBlock = lift('  function stewardCmd(parts, profileId, toProfile) {', '\n  }\n');
+const cmdBlock = lift('  function stewardCmd(parts, actorId, profileId, toProfile) {', '\n  }\n');
+const jarlBlock = lift('  function jarlCmd(parts, actorId, profileId, toProfile) {', '\n  }\n');
+const isJarlBlock = lift('  function isJarl(profileId, actorId) {', '\n  }\n');
 const evictBlock = lift('  function evict(actorId, profileId, toProfile) {', '\n  }\n');
 
 yes('the steward command is in the gamemode', cmdBlock !== null);
 yes('and so is the eviction', evictBlock !== null);
+yes('and /jarl seats the office on a character', jarlBlock !== null);
+yes('isJarl is character-specific (profileId, actorId)', isJarlBlock !== null);
 
 const JARL = 1, ALICE = 101, BOB = 202;
+const JARL_ACTOR = 0x1001, OTHER_ACTOR = 0x1002;
 const HOUSE = 'breezehome';
 
-/** Drive /steward with a given list and caller. */
+/** Drive /steward with a given list and caller. isJarl(profileId, actorId). */
 function steward(opts) {
   const told = [];
   const stewards = (opts.stewards || []).slice();
   const saved = { n: 0 };
+  const actorId = opts.actorId != null ? opts.actorId : JARL_ACTOR;
+  const isJarlFn = opts.isJarl || function (pid, aid) {
+    return pid === JARL && aid === JARL_ACTOR;
+  };
   const fn = new Function(
-    'parts', 'profileId', 'toProfile', 'stewards', 'isJarl', 'save', 'plog',
+    'parts', 'actorId', 'profileId', 'toProfile', 'stewards', 'isJarl', 'save', 'plog',
     cmdBlock + '\nreturn stewardCmd;');
   const call = fn(
-    null, null, null, stewards,
-    function (pid) { return pid === JARL; },
+    null, null, null, null, stewards,
+    isJarlFn,
     function () { saved.n++; },
     function () { });
-  call(opts.parts || ['/steward'], opts.by,
+  call(opts.parts || ['/steward'], actorId, opts.by,
        function (pid, m) { told.push(m); });
   return { told: told, stewards: stewards, saves: saved.n };
 }
@@ -91,7 +90,6 @@ function evict(opts) {
 }
 
 if (cmdBlock !== null) {
-  // S1: anybody may ask who holds the office. A hold's steward is not a secret.
   {
     const r = steward({ by: BOB, stewards: [ALICE] });
     yes('S1 anybody may ask who the stewards are',
@@ -101,7 +99,6 @@ if (cmdBlock !== null) {
         none.told[0].indexOf('A jarl names one') !== -1);
   }
 
-  // S2: only a jarl names one. THE WHOLE POINT OF THE OFFICE.
   {
     const r = steward({ by: BOB, stewards: [], parts: ['/steward', String(ALICE)] });
     yes('S2 somebody who is not a jarl cannot name a steward',
@@ -109,7 +106,6 @@ if (cmdBlock !== null) {
     yes('S2 and is told why', r.told[0] === 'Only a jarl names a steward.');
   }
 
-  // S3: a jarl names one, and it is written down.
   {
     const r = steward({ by: JARL, stewards: [], parts: ['/steward', String(ALICE)] });
     yes('S3 a jarl names a steward', r.stewards.indexOf(ALICE) !== -1);
@@ -120,7 +116,6 @@ if (cmdBlock !== null) {
         again.stewards.length === 1 && again.saves === 0);
   }
 
-  // S4: and takes it back with a minus.
   {
     const r = steward({ by: JARL, stewards: [ALICE, BOB],
                         parts: ['/steward', '-' + ALICE] });
@@ -132,11 +127,32 @@ if (cmdBlock !== null) {
         missing.stewards.length === 1 && missing.saves === 0);
   }
 
-  // S5: a word that is not a number is not a profile id.
   {
     const r = steward({ by: JARL, stewards: [], parts: ['/steward', 'Alice'] });
     yes('S5 a name is refused, because two characters can share one',
         r.stewards.length === 0 && r.told[0].indexOf('not a profile id') !== -1);
+  }
+
+  // #397: Discord Jarl eligibility + character office, not admin.
+  {
+    const eligible = function (pid, aid) {
+      // Mimic isJarl: Discord jarl on profile JARL, office only on JARL_ACTOR.
+      return pid === JARL && aid === JARL_ACTOR;
+    };
+    const r = steward({
+      by: JARL, actorId: JARL_ACTOR, stewards: [],
+      parts: ['/steward', String(ALICE)], isJarl: eligible
+    });
+    yes('S10 a Jarl-role character holding the office can name a steward (no admin)',
+        r.stewards.indexOf(ALICE) !== -1 && r.saves === 1);
+
+    const other = steward({
+      by: JARL, actorId: OTHER_ACTOR, stewards: [],
+      parts: ['/steward', String(ALICE)], isJarl: eligible
+    });
+    yes('S10 a second character on the same Jarl-role account cannot',
+        other.stewards.length === 0 &&
+        other.told[0] === 'Only a jarl names a steward.');
   }
 }
 
@@ -144,7 +160,6 @@ if (evictBlock !== null) {
   const alicesHouse = { by: ALICE, name: 'Alice', at: 1, touched: 1,
                         locked: true, ground: 'the field' };
 
-  // S6: only a steward ends a claim.
   {
     const r = evict({ by: BOB, stewards: [], held: alicesHouse });
     yes('S6 somebody who is not a steward cannot end a claim',
@@ -152,7 +167,6 @@ if (evictBlock !== null) {
     yes('S6 and is told the rule', r.told[0] === 'Only a steward ends a claim.');
   }
 
-  // S7: a steward does, and the claim goes.
   {
     const r = evict({ by: BOB, stewards: [BOB], held: alicesHouse });
     yes('S7 a steward ends the claim', !r.claims[HOUSE]);
@@ -162,8 +176,6 @@ if (evictBlock !== null) {
         r.told[0].indexOf('Alice') !== -1);
   }
 
-  // S8: AND IT SAYS WHAT IT DID NOT DO. Both of these are promises to the
-  //     person being evicted as much as to the steward.
   {
     const r = evict({ by: BOB, stewards: [BOB], held: alicesHouse });
     yes('S8 it says belongings are untouched',
@@ -172,7 +184,6 @@ if (evictBlock !== null) {
         r.told[0].indexOf('key') !== -1 && r.told[0].indexOf('still works') !== -1);
   }
 
-  // S9: nothing to end, and nowhere to end it from.
   {
     yes('S9 a steward at a door nobody holds is told so',
         evict({ by: BOB, stewards: [BOB], held: null })
@@ -183,22 +194,27 @@ if (evictBlock !== null) {
   }
 }
 
-// ---------------------------------------------------------------- structure
 {
   const code = src
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .replace(/\/\/[^\n]*/g, ' ');
-  yes('both words are in the one list every command is registered in',
-      /'\/steward', '\/evict',/.test(code));
-  yes('and the dispatcher hands them to the property block',
-      /word === '\/steward' \|\| word === '\/evict'/.test(code));
+  yes('jarl, steward and evict are in the one list every command is registered in',
+      /'\/jarl', '\/steward', '\/evict'/.test(code));
+  yes('and the dispatcher hands steward and evict to the property block',
+      /word === '\/steward'/.test(code) && /word === '\/evict'/.test(code));
   yes('a jarl is read from outside and never set in here',
       /__thornswoodIsJarl/.test(code) && !/stewards\.push\(.*jarl/i.test(code));
-  // What matters is that the stewards go in the same file as the claims, not
-  // the exact shape of that object: the box, the funds and the notices joined
-  // it the same evening and an exact match broke on all three.
   yes('the stewards are written to the register beside the claims',
       /JSON\.stringify\(\{ claims: claims, stewards: stewards[,}]/.test(code));
+  // Would fail if __thornswoodIsJarl were never defined (#397).
+  yes('__thornswoodIsJarl is defined on the door loader (not only read)',
+      /__thornswoodIsJarl = function\s*\(/.test(code));
+  yes('the STILL OPEN office wording is gone',
+      !/STILL OPEN[\s\S]{0,80}Discord role/.test(src));
+  yes('office is on the character fresh state beside class and profession',
+      /office:\s*null/.test(code) && /office:\s*s\.office/.test(code));
+  yes('site door answer names jarlProfiles',
+      /jarlProfiles/.test(code));
 }
 
 console.log('');

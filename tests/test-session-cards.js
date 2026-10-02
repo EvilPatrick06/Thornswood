@@ -25,11 +25,11 @@
 
   Read only. It opens one file and runs no server.
 */
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 
-const PAGE = path.join(TOOLS_DIR, '..', 'site', 'public', 'index.html');
+const PAGE = path.join(REPO_DIR, 'site', 'public', 'index.html');
 const src = fs.readFileSync(PAGE, 'utf8');
 
 function grab(name) {

@@ -1,5 +1,9 @@
-﻿<#
+<#
   Add-Accuracy.ps1
+
+  RETIRED. DO NOT RUN. Issue #1179: hand-installed Core Impact Framework and Accuracy, then Ships. The collection (or the settled load order) does this now. It refuses to run, and the rest of the file is kept for the history of how it was installed. Pattern from #405 Add-Bodies.
+
+  What it used to do, and what is left of it:
 
   Localised combat damage. Where you hit somebody starts to matter, on top
   of what Precision already does for where your weapon actually is.
@@ -8,7 +12,7 @@
   order does not move and nobody has to start a new character.
 
   The one thing that matters in co-op: this is entirely client side, and
-  Skyrim Together works out damage on the machine of whoever swung. If one
+  damage is worked out on the machine of whoever swung. If one
   person has different numbers to everyone else, health bars disagree across
   screens and kills land at different times. So the config files ship with
   the build rather than being left to each person's MCM, and the optional
@@ -28,6 +32,13 @@ param(
     [switch]$NoShip,
     [switch]$NoPause
 )
+# The refusal comes before anything else, above the strict mode line and above
+# the dot source below it, so no part of the install can run by accident.
+throw ('STOP. Add-Accuracy.ps1 is retired and installs nothing (issue #1179). ' +
+       'Core Impact Framework and Accuracy come from the Nexus collection now, not a hand install that Ships into Game\Data. ' +
+       'The file is kept for the history of how it was installed. Delete this line only if ' +
+       'hand installs are meant again, and read the header first.')
+
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'

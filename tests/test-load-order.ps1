@@ -48,10 +48,10 @@ param([string]$LoadOrderPath, [string]$LauncherPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $LoadOrderPath) { $LoadOrderPath = Join-Path $Here '..\scripts\mods\LoadOrder.ps1' }
-if (-not $LauncherPath) { $LauncherPath = Join-Path $Here '..\launcher\app\LoadOrder.cs' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $LoadOrderPath) { $LoadOrderPath = Join-Path $Here 'scripts\mods\LoadOrder.ps1' }
+if (-not $LauncherPath) { $LauncherPath = Join-Path $Here 'launcher\app\LoadOrder.cs' }
 . $LoadOrderPath
 
 $script:pass = 0
@@ -235,6 +235,32 @@ try {
     $noCc = Get-LoadOrderGame $plain $isLightOrMissing @() $exists
     Same 'two Creation Club masters the list never names put it off from index 5' (Get-LoadOrderFirstMismatch $twoCc $noCc) 5
     Same 'and everything after Dragonborn.esm sits two places later' ("{0} {1}" -f [Array]::IndexOf($twoCc, 'Water for ENB.esm'), [Array]::IndexOf($noCc, 'Water for ENB.esm')) '7 5'
+
+    # #479, Patrick, 28 September: "Yes base only". Special Edition is all
+    # Thornswood needs, and somebody who owns the Anniversary upgrade still
+    # plays. Their list can switch on every Creation Club plugin they own. One
+    # the game gives no place (light, or not in Data, which is every one of them
+    # in Thornswood's own folder) moves nothing: the order is still the
+    # server's, and the launcher does not call it "not part of this build",
+    # which would stop Play. A full one that is in Data does take a place, and
+    # still counts.
+    foreach ($n in @('ccBGSSSE001-Fish.esm', 'ccQDRSSE001-SurvivalMode.esl', 'CCASVSSE001-ALMSIVI.ESM', 'ccKRTSSE001_Altar.esl', ' ccEEJSSE001-Hstead.esm ')) {
+        Yes "[$n] is a Creation Club plugin by its name" (Test-LoadOrderCreation $n)
+    }
+    foreach ($n in @('_ResourcePack.esl', 'Skyrim.esm', 'ccCustomMod.esp', 'CC Hunting.esp', 'Cutting Room Floor.esp', 'ccBGSSSE001-Fish.bsa', '')) {
+        Yes "[$n] is not" (-not (Test-LoadOrderCreation $n))
+    }
+    $refList = [string[]]$server[5..($server.Count - 1)]
+    $aeList = [string[]](@('ccASVSSE001-ALMSIVI.esm', 'ccQDRSSE001-SurvivalMode.esl') + $server[5..8] +
+                         @('ccBGSSSE002-ExoticArrows.esl', 'ccEEJSSE001-Hstead.esm') + $server[9..($server.Count - 1)])
+    Same 'an Anniversary owner''s list with Creation Club plugins switched on among the server''s still matches it position by position' (Get-LoadOrderFirstMismatch (Get-LoadOrderGame $aeList $isLightOrMissing @() $exists) $server) (-1)
+    Same '...and none of them is "not part of this build"' (Get-LoadOrderNotInBuild $aeList $refList $isLightOrMissing) ([string[]]@())
+    $withFull = [string[]]($aeList + @('ccBGSSSE025-AdvDSGS.esm'))
+    Same 'a full Creation Club master that is in Data still counts, because it takes a place' (Get-LoadOrderNotInBuild $withFull $refList $isLightOrMissing) ([string[]]@('ccBGSSSE025-AdvDSGS.esm'))
+    Yes '...and it does move the order' ((Get-LoadOrderFirstMismatch (Get-LoadOrderGame $withFull $isLightOrMissing @() $exists) $server) -ge 0)
+    $others = [string[]]@('Light Patch.esp', 'New Thing.esp', 'Gone.esp')
+    Same 'a plugin that is not Creation Club still counts, light, full or missing' (Get-LoadOrderNotInBuild $others $refList $isLightOrMissing) $others
+    Same 'each once, in list order, the reference read without case' (Get-LoadOrderNotInBuild ([string[]]@('New Thing.esp', 'WATER FOR ENB.ESM', 'new thing.esp')) $refList $isLightOrMissing) ([string[]]@('New Thing.esp'))
 
     $all = Get-LoadOrderGame ([string[]]@('Light Patch.esp', 'Gone.esp')) $null @() $null
     Same 'with no stubs every name is taken as it comes' $all ([string[]]@('Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm', 'Light Patch.esp', 'Gone.esp'))
@@ -527,6 +553,22 @@ try {
             $argv = New-Object object[] 2
             $argv[0] = $l; $argv[1] = $m
             Both ("the plugins not enabled, " + $k) (Cs 'NotEnabled' $argv) (Get-LoadOrderNotEnabled $l $m)
+        }
+
+        foreach ($n in @('ccBGSSSE001-Fish.esm', 'CCASVSSE001-ALMSIVI.ESM', ' ccKRTSSE001_Altar.esl ', '_ResourcePack.esl', 'ccCustomMod.esp', 'CC Hunting.esp', '')) {
+            Both ("whether [" + $n + "] is a Creation Club plugin") (Cs 'IsCreation' @(, $n)) (Test-LoadOrderCreation $n)
+        }
+        $nib = [ordered]@{
+            'an Anniversary owner''s list'          = $aeList
+            'a full Creation Club master in Data'   = $withFull
+            'plugins that are not Creation Club'    = $others
+            'one named twice and one of the build'  = [string[]]@('New Thing.esp', 'WATER FOR ENB.ESM', 'new thing.esp')
+            'an empty list'                         = [string[]]@()
+        }
+        foreach ($k in $nib.Keys) {
+            $argv = New-Object object[] 3
+            $argv[0] = $nib[$k]; $argv[1] = $refList; $argv[2] = $fLom
+            Both ("what is not part of this build, " + $k) (Cs 'NotInBuild' $argv) (Get-LoadOrderNotInBuild $nib[$k] $refList $isLightOrMissing)
         }
 
         foreach ($k in @('the measured drift', 'LOOT''s re-sort', 'already in order')) {

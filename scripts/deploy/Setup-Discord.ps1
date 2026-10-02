@@ -23,7 +23,18 @@
     2. Bot in the sidebar, then Reset Token, and copy what it gives you.
     3. Still under Bot, turn ON "Server Members Intent". Leave the rest off.
     4. OAuth2, URL Generator, tick "bot" and then "Administrator". Open the URL
-       it builds and add the bot to your server.
+       it builds and add the bot to your server. Administrator is for the build
+       only: it makes the Owner and Dev roles, which carry Administrator, and
+       Discord refuses that from a bot without it.
+
+  Two permission sets. Administrator for a build, and a smaller set for the
+  rest of the time, which is all the running bot needs. A build that finishes
+  with nothing failed ends on the invite link with that smaller set and a line
+  saying to untick Administrator on the bot's role. Tick it again before the
+  next build. To see that link without building anything, from the repository
+  folder, with the id from the developer portal's General Information page:
+
+    python bot\Build-Discord.py --invite <application id>
     5. Server Settings, Roles: drag the bot's own role to the TOP. It cannot
        make roles above itself.
     6. Server Settings, Enable Community, so forums, the announcement channel
@@ -79,6 +90,22 @@ if ($Posts) { $env:DISCORD_POSTS = '1' }
 if ($Check) { $env:DISCORD_CHECK = '1' }
 $tok = $null
 
+# The one switch (#428): the site's "open", read off its public page so the
+# posts say the same as the site. Anything that goes wrong is the alpha
+# wording, which is what is true until somebody flips it.
+$open = $false
+try {
+  $pub = Invoke-RestMethod -Uri 'https://thornswood.net/api/public' -TimeoutSec 15
+  $open = ($pub.open -eq $true)
+} catch {
+  Write-Host ('  Could not ask the site whether the world is open (' + $_.Exception.Message + '), so the posts use the alpha wording.') -ForegroundColor Yellow
+}
+$env:THORNSWOOD_OPEN = $(if ($open) { '1' } else { '0' })
+if ($Posts) {
+  if ($open) { Write-Host '  The site says the world is open to everybody, so the posts say so.' }
+  else { Write-Host '  The site says the world is in alpha, open by application, so the posts say so.' }
+}
+
 try {
   & $py $app
   $code = $LASTEXITCODE
@@ -87,6 +114,7 @@ try {
   $env:DISCORD_PRUNE = $null
   $env:DISCORD_POSTS = $null
   $env:DISCORD_CHECK = $null
+  $env:THORNSWOOD_OPEN = $null
 }
 
 # It used to say the webhook was ready whatever happened, including on the run
@@ -103,7 +131,8 @@ Write-Host ''
 if (Test-Path -LiteralPath $hook) {
   # Onto the VPS, where every machine that ships reads it (Discord-Hook.ps1); the
   # copy here is removed once the VPS has it.
-  & (Join-Path $Here '..\ops\Discord-Hook.ps1') -Name news -Save ((Get-Content -LiteralPath $hook -Raw).Trim())
+  # Handed over as a SecureString (issue #1069), read from the file here.
+  & (Join-Path $Here '..\ops\Discord-Hook.ps1') -Name news -Save -Url (ConvertTo-SecureString ((Get-Content -LiteralPath $hook -Raw).Trim()) -AsPlainText -Force)
   if ($LASTEXITCODE -eq 0) {
     Write-Host '  Release notes will post themselves into #news from now on.' -ForegroundColor Green
   } else {

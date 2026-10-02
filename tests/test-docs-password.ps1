@@ -30,9 +30,9 @@ param([string]$DeployPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $DeployPath) { $DeployPath = Join-Path $Here '..\scripts\deploy\Deploy-Docs.ps1' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $DeployPath) { $DeployPath = Join-Path $Here 'scripts\deploy\Deploy-Docs.ps1' }
 
 $script:pass = 0
 $script:fail = 0
@@ -54,8 +54,11 @@ Yes 'Deploy-Docs.ps1 parses' (@($errors).Count -eq 0)
 $ifs = @($ast.FindAll({
     param($n)
     $n -is [System.Management.Automation.Language.IfStatementAst] -and
-    $n.Clauses[0].Item1.Extent.Text -eq '$Password'
+    $n.Clauses[0].Item1.Extent.Text -eq '$Password' -and
+    $n.Clauses[0].Item2.Extent.Text -match 'Invoke-ThornswoodSecretRemote'
 }, $true))
+# The other if ($Password) is the hidden prompt near the top (#1069), which
+# asks before anything is sent; this is the branch that sends it.
 Yes 'the -Password branch is in Deploy-Docs.ps1' ($ifs.Count -eq 1)
 if ($ifs.Count -ne 1) { Done }
 $t = $ifs[0].Clauses[0].Item2.Extent.Text
@@ -68,6 +71,11 @@ $read  = $branch.IndexOf('ReadAllText')
 $write = $branch.IndexOf('WriteAllText')
 Yes 'the branch reads config.json before it writes it' ($read -ge 0 -and $write -gt $read)
 Yes 'no WriteAllBytes is left in Deploy-Docs.ps1' (-not ((Get-Content -LiteralPath $DeployPath -Raw) -match 'WriteAllBytes'))
+# -Password asks, hidden, before anything is sent, and is never a typed value
+# (#1069): typed, the password would stay in the shell's history file.
+$deployText = Get-Content -LiteralPath $DeployPath -Raw
+Yes '-Password is a switch, not a typed value' ($deployText -match '\[switch\]\$Password\b')
+Yes 'the branch sends the password the hidden prompt gave' ($branch -match '-Secret \$newPassword\b' -and $deployText -match '\$newPassword = Read-ThornswoodSecret ')
 
 # ---- what runs it -------------------------------------------------------------
 $ps51 = Get-Command powershell.exe -ErrorAction SilentlyContinue
@@ -77,17 +85,28 @@ if (-not $ps51 -or -not $node) {
     Done
 }
 
-# The same command line Remote builds, run here instead of over ssh.
-function Remote($script) {
-    $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-    return & $ps51.Source -NoProfile -NonInteractive -EncodedCommand $e 2>&1
+# The password goes through the real Send-Secret.ps1 (issue #451): on ssh's
+# standard input, the script alone on the command line. ssh is swapped for
+# one that runs that command line in Windows PowerShell 5.1 here, with the
+# same standard input, and keeps every command line it was handed so the
+# password can be looked for in them afterwards.
+. (Join-Path $Here 'scripts\vps\Send-Secret.ps1')
+$script:lines = New-Object System.Collections.ArrayList
+function ssh {
+    $a = @($args | ForEach-Object { [string]$_ })
+    [void]$script:lines.Add(($a -join ' '))
+    $m = [regex]::Match($a[-1], '-EncodedCommand (\S+)$')
+    if (-not $m.Success) { throw 'the fake ssh was handed no encoded command' }
+    [void]$script:lines.Add([Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[1].Value)))
+    @($input) | & $ps51.Source -NoProfile -NonInteractive -EncodedCommand $m.Groups[1].Value
 }
 
 # Runs the branch with the two things it takes from the rest of Deploy-Docs:
-# the site's folder and the password. Its own Write-Host lines are kept out of
-# the results; what the far side printed is handed back.
+# the site's folder and the password, which the script asked for with a
+# hidden prompt before it sent anything (#1069). Its own Write-Host lines are
+# kept out of the results; what the far side printed is handed back.
 function Run-Branch([string]$rootWin, [string]$pw) {
-    $Password = $pw
+    $newPassword = $pw
     function Write-Host { }
     return @(. ([ScriptBlock]::Create($branch)) | ForEach-Object { [string]$_ })
 }
@@ -194,6 +213,11 @@ try {
     }
     Yes 'a whole config: no byte order mark on it' ((First3 $f) -ne '239 187 191')
     Yes 'a whole config: it says it kept the rest' (($said -join ' ') -match 'set, 13 other setting')
+    $wire = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($newPw))
+    $sent = $script:lines -join "`n"
+    Yes 'the password went to ssh at all' ($script:lines.Count -ge 2)
+    Yes 'the password is on no command line handed to ssh, nor in the script, plain or base64 (#451)' (
+        -not $sent.Contains($newPw) -and -not $sent.Contains($wire))
 
     # ---- a config that already has a byte order mark, as anything written
     # with Set-Content -Encoding UTF8 in Windows PowerShell does

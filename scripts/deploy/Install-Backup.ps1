@@ -26,7 +26,7 @@
 [CmdletBinding()]
 param(
   [string]$VpsHost  = '',
-  [string]$VpsUser  = 'Administrator',
+  [string]$VpsUser  = '',
   [string]$Root     = 'C:\Thornswood-Backup',
   [string]$TaskName = 'Thornswood Backup',
   # Quarter past three in the morning, well clear of when anybody is playing.
@@ -45,6 +45,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
@@ -52,7 +53,7 @@ function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Ho
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
 
 $target = "$VpsUser@$VpsHost"
-$ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new')
+$ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
 foreach ($t in 'ssh', 'scp') {
   if (-not (Get-Command $t -ErrorAction SilentlyContinue)) {
     Die "$t is not on PATH. Windows ships it: Settings, Apps, Optional features, OpenSSH Client."
@@ -61,7 +62,7 @@ foreach ($t in 'ssh', 'scp') {
 
 function Remote($script) {
   $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-  & ssh @ssh $target "powershell -NoProfile -EncodedCommand $e" 2>&1
+  Invoke-ThornswoodNative { & ssh @ssh $target "powershell -NoProfile -EncodedCommand $e" } 2>&1
 }
 
 $script = Join-Path $Here '..\vps\vps-nightly-backup.ps1'
@@ -115,12 +116,48 @@ if ($errs -and $errs.Count) { $errs | Select-Object -First 5 | ForEach-Object { 
 Say '  vps-nightly-backup.ps1 parses' 'Green'
 
 Head 'Sending it up'
-Remote "if (-not (Test-Path '$Root')) { [void](New-Item -ItemType Directory -Path '$Root' -Force) }" | Out-Null
-& scp @ssh $script "${target}:$($Root.Replace('\','/'))/vps-nightly-backup.ps1"
+# The folder holds the passphrase and every backup, and the backups hold every
+# secret on the box. Made under C:\, it would inherit the rule that lets
+# BUILTIN\Users read it, and every service account there is in Users (issue
+# #1173). So it takes nothing from C:\: SYSTEM, which the backup task runs as,
+# Administrators, and whoever runs this (Administrator over ssh). Any other
+# rule set on it by name, a deny for the build runner, stays. Every run, so a
+# box set up before this is put right by the next one.
+$locked = Remote @"
+if (-not (Test-Path '$Root')) { [void](New-Item -ItemType Directory -Path '$Root' -Force) }
+try {
+  `$broad = @('S-1-1-0', 'S-1-5-11', 'S-1-5-32-545', 'S-1-3-0')
+  `$acl = Get-Acl -LiteralPath '$Root'
+  `$acl.SetAccessRuleProtection(`$true, `$false)
+  foreach (`$r in @(`$acl.GetAccessRules(`$true, `$false, [Security.Principal.SecurityIdentifier]))) {
+    if (`$broad -contains `$r.IdentityReference.Value) { [void]`$acl.RemoveAccessRuleSpecific(`$r) }
+  }
+  foreach (`$s in @('S-1-5-18', 'S-1-5-32-544', [Security.Principal.WindowsIdentity]::GetCurrent().User.Value)) {
+    `$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier(`$s)), 'FullControl', 'ContainerInherit, ObjectInherit', 'None', 'Allow')))
+  }
+  # Only the access rules are written back (issue #1120).
+  (Get-Item -LiteralPath '$Root' -Force).SetAccessControl(`$acl)
+  'LOCKED'
+} catch { 'COULD NOT LOCK: ' + `$_.Exception.Message }
+"@
+if ("$locked" -notmatch 'LOCKED') { Die ("could not lock $Root to SYSTEM and Administrators: " + "$locked" + '. Nothing was sent.') }
+Say "  $Root is SYSTEM's and Administrators' only" 'Green'
+Invoke-ThornswoodNative { & scp @ssh $script "${target}:$($Root.Replace('\','/'))/vps-nightly-backup.ps1" }
 if ($LASTEXITCODE -ne 0) { Die 'scp failed.' }
 Say "  $runner" 'Green'
 
 Head 'The passphrase'
+# A new box, and this machine already has the passphrase every backup so far
+# was made with: that one goes up, rather than the box making its own. A new
+# one there would leave this machine's copy unable to open anything the new
+# box takes, and the "already a copy here" below would keep it that way
+# without a word (issue #454). Sent as a file, never on a command line.
+$there = Remote "if (Test-Path '$keyFile') { 'KEY THERE' } else { 'KEY NONE' }"
+if ("$there" -match 'KEY NONE' -and (Test-Path -LiteralPath $KeyOut)) {
+  Invoke-ThornswoodNative { & scp @ssh $KeyOut "${target}:$($keyFile.Replace('\','/'))" }
+  if ($LASTEXITCODE -ne 0) { Die 'could not send the passphrase up. Nothing was registered.' }
+  Say "  sent this machine's copy up from $KeyOut, so every backup opens with the same file" 'Green'
+}
 $made = Remote @"
 if (Test-Path '$keyFile') {
   'already there, left alone'
@@ -138,7 +175,7 @@ $made | ForEach-Object { Say "  $_" }
 if (-not (Test-Path -LiteralPath $KeyOut)) {
   Say '  Copying it down to this machine, because a passphrase that only lives' 'DarkGray'
   Say '  on the box is no use the day the box is what you lost.' 'DarkGray'
-  & scp @ssh "${target}:$($keyFile.Replace('\','/'))" $KeyOut
+  Invoke-ThornswoodNative { & scp @ssh "${target}:$($keyFile.Replace('\','/'))" $KeyOut }
   if ($LASTEXITCODE -ne 0) { Say '  could not copy it down. Do that before you rely on any of this.' 'Red' }
   else { Say "  $KeyOut" 'Green' }
 } else {
@@ -168,8 +205,8 @@ Get-Content '$Root\backup.log' -Tail 20 -EA SilentlyContinue
 Head 'What is left to do'
 Say '  1. Put the passphrase where you keep the server password. It is at' 'DarkGray'
 Say "     $KeyOut on this machine. Losing it makes every backup noise." 'DarkGray'
-Say '  2. Run .\scripts\vps\Fetch-Backups.ps1 to bring them off the box. A backup' 'DarkGray'
-Say '     that only exists on the server is not a backup.' 'DarkGray'
+Say '  2. Run .\scripts\vps\Fetch-Backups.ps1 -Schedule once, so this machine pulls' 'DarkGray'
+Say '     them off the box every day. A backup only on the server is not a backup.' 'DarkGray'
 Say '  3. Restore one, once, following docs\RESTORING.md, and write the date' 'DarkGray'
 Say '     in it. Until that has been done none of this is known to work.' 'DarkGray'
 Write-Host ''

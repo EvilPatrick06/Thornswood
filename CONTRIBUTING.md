@@ -7,8 +7,8 @@ how a machine is set up. CLAUDE.md is only what applies to a Claude.
 
 ## What this is
 
-Thornswood: a modded co-op Skyrim roleplay server on SkyMP, in closed
-playtest. This repo is the launcher (launcher\app, C# 5, WPF, built with the
+Thornswood: a modded co-op Skyrim roleplay server on SkyMP, in alpha and
+open by application. This repo is the launcher (launcher\app, C# 5, WPF, built with the
 .NET Framework 4 csc), the game plugins (game\plugins, Skyrim Platform
 JavaScript), the site (site, node), the Discord bot (bot,
 Python) and every script that ships or runs it. Owner: Patrick (EvilPatrick06). The team is in the table below.
@@ -48,6 +48,39 @@ Never "player". No em dashes anywhere written for people. Plain, direct
 sentences, no filler, no placeholders. Secrets (server passwords, site keys,
 Discord tokens, the news webhook, anything out of a config.json or .env on the
 VPS) are named by location only; never printed, pasted, committed or logged.
+
+What checks these, since 29 Sep (issue #460). Every pull request's build
+(`Launcher builds`, step "Check the writing rules") runs
+`scripts\dev\Check-Words.ps1` over every Markdown file outside `lore\` and
+`docs\archive\`, the launcher's help and window, the bot's channel posts,
+the public pages of the site and the voice service, and the installer's read
+me. Each hit names the file, the line and the rule, and turns the build red:
+
+| Rule | What it refuses |
+| --- | --- |
+| `em-dash` | an em dash, typed or as an HTML entity |
+| `banned-word` | the word this section bans, any case; multiplayer and playtest pass |
+| `old-owner` | the old owner name |
+| `open-alpha` | calling the alpha a playtest that is closed; it is open by application |
+| `placeholder` | a marker left for later, in capitals (to do, to be decided, fix me), or filler Latin |
+| `names-person` | a person's name in README.md or the six component READMEs (launcher, site, voice, game\plugins, game\ui, installer\setup) |
+
+A line that has to say it anyway (this section naming the word it bans, a
+document quoting a note as it went out) goes in
+`scripts\dev\Check-Words.allow.txt` with its reason; an allowance that no
+longer matches anything is itself a hit. Release notes are not files, so
+`scripts\release\Note-Rules.ps1` checks them when Ship or Rollback-Feed runs,
+before anything is built. The same build step runs `tests\test-check-words.ps1`
+and `tests\test-note-rules.ps1`, which plant a break of every rule and fail
+if either check lets one through. Secrets are checked by
+`scripts\dev\Check-Secrets.ps1` in the same build.
+
+No machine checks these, so the person writing keeps them: plain, direct
+sentences with no filler; the text inside code (the launcher's messages, the
+game's chat lines, the bot's replies), because a word check there cannot
+tell a message from a name in the code or one of Skyrim's own record names;
+and names in the other documents, which record who decided something and
+who holds what on purpose.
 
 ## Everything we need to do goes on the board
 
@@ -115,6 +148,25 @@ How to use it:
   read. Scan names the folder, Fix and Settings point the launcher at it,
   and with no Steam copy on the machine it refuses (OwnGame.DeploysInto,
   Gather, tests\test-vortex-folder.ps1). Djinn to agree it in #staff-general.
+  Decided by Patrick on 29 Sep (#1218, #1226): the Steam copy is the
+  person's, to play vanilla at any build with their own mods, and Thornswood
+  runs entirely from its own folder. With the own folder chosen in the setup
+  window, first setup never writes into the Steam copy: the installer's
+  payload and everything the launcher writes before the folder exists go to
+  `Profile\Payload` (Paths.OwnFirst), and Make takes them in. Not chosen, the
+  install uses the Steam copy as it always did, and once the folder is turned
+  on and made the next start takes Thornswood's files back out of the Steam
+  copy, once (OwnGame.CleanSteamCopy); an existing own folder gets the same
+  from its next update. Steam's "Wait until I launch the game" is set only
+  until the folder exists (tests\test-own-folder-first.ps1).
+  Decided by Patrick on 29 Sep (#1232): `Thornswood\Game` takes only
+  Skyrim's own files (from the Steam copy when it is on the pinned build, or
+  the Downgrade's download), Vortex's deployed files by Vortex's own record,
+  and Thornswood's own files. Skyrim's own is the pinned build's file list,
+  `records\skyrim-files.json`, read out of the depot manifests the Downgrade
+  uses, never a guess by folder. A mod put into the Steam copy by hand stays
+  there, and a folder made before this loses such files at its next refresh,
+  logged (OwnGameKinds.cs, tests\test-own-folder-alone.ps1).
 - Whichever folder the game runs from, the launcher looks after its own
   files: Keep puts its files back before Play and parks any plugin in
   `Data\Platform\Plugins` that is not ours; Hold keeps its files open read
@@ -137,8 +189,11 @@ How to use it:
   output (packs, launcher, installer, server payload) is `out`, ignored by
   git; anything else that folder held and that never goes to GitHub is
   `local`, ignored too. Scripts ask `scripts\release\Where.ps1` where each of these is
-  rather than naming a path, and it falls back to `C:\Thornswood-Dev` on a
-  machine that still has it, so nothing breaks halfway through the move.
+  rather than naming a path. It no longer falls back to `C:\Thornswood-Dev`:
+  no machine has that folder any more, and the fallback went on 28 Sep
+  (issue #440), along with the forwarding copies in `tools\`. The files a
+  machine kept in `tools\` moved on 29 Sep (signing.json to `records\signing`,
+  the setup stub to `out`, the rest to `local`) and the folder is gone.
 - Launcher code is C# 5 only: no string interpolation, no ?., no nameof,
   no expression bodied members, no out var.
 - Every change goes out as one complete release: launcher, game files and
@@ -234,7 +289,7 @@ the team before code; nobody settles it alone, and a Claude never does.
   it does and what to do if anything. Ship refuses a title under three words
   or notes with no "- " line. Since 27 Sep it also refuses notes that say
   what only we would understand (scripts\release\Note-Rules.ps1): the word
-  player, an em dash, an issue or pull request number, "PR", a code file or
+  the Words section bans, an em dash, an issue or pull request number, "PR", a code file or
   a setting name (WEBVIEW2_LIKE_THIS), a name out of the code (PutInServerOrder,
   camelCase), our own words for how we work (demoting, worktree, squash, CI),
   and the same line twice. On 26 and 27 Sep all of those went out to the
@@ -276,20 +331,23 @@ the team before code; nobody settles it alone, and a Claude never does.
   is set, so every launcher from dev 1.1.101.17 on refuses an update that is
   not signed by that certificate. **Only a machine that signs may Ship, dev
   included.** `Ship.ps1` and `Publish-Installer.ps1` refuse (non-zero exit) when
-  `tools\signing.json` is missing or disabled, or when the launcher / Setup tip
+  `records\signing\signing.json` is missing or disabled, or when the launcher / Setup tip
   is not Authenticode Valid under `ExpectedSigner`. Local `Build-Launcher` /
   `Package -NoPublish` may still print "not signing" and leave an unsigned
   intermediate; that soft skip must not reach the site or the feed. The live main launcher,
   1.1.101, predates signing; the next main Ship is the first signed one.
 - Every pull request gets the build check (.github/workflows/build.yml, about
   two minutes: the secret scan, every script and file parses, the writing
-  rules, the ownership page (`tests\test-ownership.js`, the one harness fast
-  enough to run here, added by issue #752), the launcher window, the count of
+  rules and the two harnesses that prove the writing checks (see Words), the ownership page (`tests\test-ownership.js`, added by issue #752),
+  seven more harnesses that are just as quick (the script index, the script
+  paths, the architecture page and three launcher harnesses, issue #875, and
+  the new-box runbook read against its scripts, issue #454),
+  the launcher window, the count of
   silent catches in the launcher, and the launcher compiles with the .NET
   Framework csc). Red means the branch would stop Ship at the build step;
   fix that, and merge once it is green and you have said so in
   #staff-general. Run the test harnesses your change touches yourself. All
-  ~190 of them, the bot and voice ones, and a look for stray pull requests
+  ~410 of them (tests/, bot, and voice), and a look for stray pull requests
   and branches run every night on the VPS (.github/workflows/nightly.yml,
   03:00 Mountain); a failure there opens an issue on the board, "Nightly
   checks failed", and whoever broke it fixes it next. It runs on the VPS, on a runner

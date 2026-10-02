@@ -36,12 +36,37 @@
     .\Deploy-Server.ps1 -Minutes 3
     .\Deploy-Server.ps1 -Mode restart    counts down and empties the room
     .\Deploy-Server.ps1 -Now             no warning at all
+    .\Deploy-Server.ps1 -PutBack         the files the last deploy replaced go
+                                         back in, checked the same way
+
+  THE LIVE SERVER KEEPS ITS OWN SETTINGS (#1221, #1222). A build whose
+  server-settings.json is not the live server's (port 7777, not the dev voice
+  port or name, not thornswoodServer dev, no npcSettings "default" key) is
+  refused before anything is sent. The one that goes up is carried on the box
+  into the running server's own, taking from the build only what
+  Deploy-Gamemode.ps1 writes for live on purpose (ServerSettings.ps1 says
+  which and why), and the swap reads it back before the start: any other key
+  that is not what the server had puts the old files back.
+
+  EVERY SERVER FILE GOES, AND ONLY THE RECORDED BUILD (#1214). The binary,
+  the JavaScript half the server runs and the rest the fork builds
+  (ServerBuild.ps1) go up together with records\server-build.json, each held
+  to it here and again in the stage on the box. One that is not the recorded
+  build, or a server file the record does not list, stops the deploy before
+  anything is sent. Until then only the binary went, so the box could run a
+  binary of one build beside the JavaScript half of another.
+
+  The files a deploy replaced stay in $Root\.prev-<stamp>, the newest two.
+  -PutBack is the one command that puts the newest back: the same stop, renames,
+  start and check, and if the old files do not answer either, what was running
+  goes back in again. What it took out is kept in $Root\.undone-<stamp>.
+  Swap.ps1 holds the blocks that do all of it on the box (issue #446).
 #>
 [CmdletBinding()]
 param(
   [string]$Dist    = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ServerDist),
   [string]$Vps     = '',
-  [string]$User    = 'Administrator',
+  [string]$User    = '',
   [string]$Root    = 'C:/Thornswood-Server',
   [string]$Task    = 'Thornswood Server',
   [double]$Minutes = 1,
@@ -56,76 +81,49 @@ param(
   # How long the new server has to answer on its game port and its resources
   # port before the old files go back. Waiting longer costs nothing when it
   # comes up, because the check returns the moment both answer.
-  [int]$Wait       = 60
+  [int]$Wait       = 60,
+  # Put the files the last deploy replaced back in, and nothing else. Needs no
+  # build on this machine. See the header.
+  [switch]$PutBack
 )
 
 $ErrorActionPreference = 'Stop'
-$ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
+$ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+. (Join-Path $Here '..\vps\Send-Script.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
+. (Join-Path $Here 'Swap.ps1')
+. (Join-Path $Here 'Artifact.ps1')
+. (Join-Path $Here 'ServerSettings.ps1')
+. (Join-Path $Here 'ServerBuild.ps1')
 
 function Remote($script) {
-  $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-  $cmd = "powershell -NoProfile -EncodedCommand $e"
-
-  # A long script does not fit on a command line, and nothing says so.
-  #
-  # sshd on Windows hands the command to cmd.exe, which stops at 8,191
-  # characters. Base64 of UTF-16 is about 2.7 times the script, so a block of
-  # any size arrives cut in half and PowerShell then complains about a brace or
-  # a token in a script nobody can see. Deploy-Docs.ps1 hit this on 17 Sep and
-  # solved it; every other script here carried the short version that cannot,
-  # and on 20 Sep this one truncated at 10,252 characters and reported
-  # "Unexpected token '$?'" about a line fifteen above the one that was cut.
-  # This is that fix, copied across so the sixteen scripts that talk to the VPS
-  # all behave the same way.
-  #
-  # Under the limit it goes on the command line as before, because that is one
-  # round trip. Over it, the script is sent as a file and run from there, which
-  # has no length to run into.
-  if ($cmd.Length -le 6000) {
-    return & ssh @ssh "$User@$Vps" $cmd 2>&1
-  }
-
-  $far = 'C:/Windows/Temp/thornswood-remote.ps1'
-  $tmp = [IO.Path]::GetTempFileName()
-  try {
-    Set-Content -LiteralPath $tmp -Value $script -Encoding UTF8
-    & scp @ssh $tmp "$User@${Vps}:$far" 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "could not send a script to $Vps" }
-    # The path goes across as it is. Windows PowerShell takes forward
-    # slashes, and converting them was how this shipped with the slashes
-    # stripped out of it entirely: C:WindowsTempthornswood-remote.ps1.
-    # And bare, with no quotes round it; the path above is ours and has no
-    # spaces. Measured on this machine on 24 September, not on the VPS: bare
-    # runs whether cmd.exe or Windows PowerShell hands the line on, and the
-    # old form, the path in single quotes, fails under cmd.exe. The old form
-    # did run on the VPS on 20 and 21 September, so which shell sshd uses
-    # there is not known, and bare is the form that works under either.
-    & ssh @ssh "$User@$Vps" "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1
-    & ssh @ssh "$User@$Vps" "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
-  }
-  finally { Remove-Item -LiteralPath $tmp -Force -EA SilentlyContinue }
+  # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
+  # name, removed after, and the far side's exit code comes back.
+  return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script
 }
 
 # ==== thornswood live deploy warning ====
 # Shared with tests\test-deploy-gamemode-warning.ps1 and the OnlineNow harness.
 # Deploy-Gamemode.ps1 builds locally and never stops the live server; this is
-# the live half of issue #520 (count only: online.json has no names).
+# the live half of issue #520. The names come from private\online-names.json,
+# which the gamemode keeps beside online.json but outside the served folder.
 function Read-LiveOnline($lines) {
   # Online stays a courtesy count: unreadable or missing is nobody, not a gate.
   # Data is where restart.json must land so the gamemode sees it.
-  $room = @{ Data = ''; Online = 0; Up = $null; Said = @($lines) }
+  $room = @{ Data = ''; Online = 0; Up = $null; Names = @(); Said = @($lines) }
   foreach ($line in @($lines)) {
     $t = "$line".Trim()
     if ($t -match '^DATA (.+)$') { $room.Data = $Matches[1].Trim() }
+    elseif ($t -match '^NAME (.+)$') { $room.Names += $Matches[1].Trim() }
     elseif ($t -match '^ONLINE (\d+)$') { $room.Online = [int]$Matches[1] }
     elseif ($t -match '^UP (yes|no)$') { $room.Up = ($Matches[1] -eq 'yes') }
   }
   # Nothing on the game port is nobody on, whatever online.json still says.
-  if ($room.Up -eq $false) { $room.Online = 0 }
+  if ($room.Up -eq $false) { $room.Online = 0; $room.Names = @() }
   if (-not $room.Data) {
     $room.Data = (($Root -replace '\\', '/').TrimEnd('/') + '/data')
   }
@@ -137,10 +135,12 @@ function Get-LiveOnline {
 `$root = '$Root'.Replace('/','\')
 `$port = 0
 `$d = 'data'
+`$p = 'private'
 try {
   `$s = Get-Content (Join-Path `$root 'server-settings.json') -Raw -EA Stop | ConvertFrom-Json
   `$port = [int]`$s.port
   if (`$s.dataDir) { `$d = [string]`$s.dataDir }
+  if (`$s.privDir) { `$p = [string]`$s.privDir }
 } catch { }
 `$dataPath = [IO.Path]::Combine(`$root, `$d)
 'DATA ' + `$dataPath.Replace('\', '/')
@@ -159,8 +159,20 @@ else {
     if (`$null -eq `$j -or `$null -eq `$j.now) { throw 'no count' }
     'ONLINE ' + [int]`$j.now
   } catch { 'ONLINE 0' }
+  try {
+    `$n = Get-Content ([IO.Path]::Combine(`$root, `$p, 'online-names.json')) -Raw -EA Stop | ConvertFrom-Json
+    foreach (`$x in @(`$n.names)) { if (`$x) { 'NAME ' + `$x } }
+  } catch { }
 }
 "@)
+}
+
+function Format-Names($names) {
+  # Who, for the person running the deploy. A gamemode older than the names
+  # file writes none, and then the count is all there is to say.
+  $n = @($names | Where-Object { $_ })
+  if (-not $n.Count) { return '' }
+  return ': ' + ($n -join ', ')
 }
 
 function OnlineNow {
@@ -176,10 +188,11 @@ function Warn-LiveRoom {
   Write-Host ''
   $room = Get-LiveOnline
   $on = [int]$room.Online
+  $who = Format-Names $room.Names
 
   if ($Now) {
     if ($on -gt 0) {
-      Write-Host ("  -Now: {0} online and not warned. They respawn when it comes back." -f $on) -ForegroundColor Yellow
+      Write-Host ("  -Now: {0} online{1}, not warned. They respawn when it comes back." -f $on, $who) -ForegroundColor Yellow
     } else {
       Write-Host '  -Now: nobody is online'
     }
@@ -195,7 +208,7 @@ function Warn-LiveRoom {
     return
   }
 
-  Write-Host ("  $on online, $Mode, giving them $Minutes " +
+  Write-Host ("  $on online$who, $Mode, giving them $Minutes " +
               $(if ($Minutes -eq 1) { 'minute' } else { 'minutes' }))
   $ask = Join-Path $Here '..\vps\Request-Restart.ps1'
   if (-not (Test-Path -LiteralPath $ask)) {
@@ -264,285 +277,36 @@ function Warn-LiveRoom {
 }
 # ==== end thornswood live deploy warning ====
 
-# ==== deploy-server remote blocks ====
-#
-# THE TWO HALVES THAT RUN ON THE BOX, KEPT HERE SO A HARNESS CAN RUN THEM TOO.
-#
-# Entry 209 on the To Do List: "Upload to a staging path, verify there, the
-# shortest possible stop, an atomic rename, a real health check." And: "This
-# is the script that runs most often and has the least protection." Until
-# then it stopped the server, copied over the running folder, waited six
-# seconds, and printed SERVER IS NOT LISTENING without exiting non-zero,
-# putting anything back, asking the resources port or checking the load order
-# on the box.
-#
-# $checkBlock runs while the server is still up and touches nothing but the
-# stage. $swapBlock is the only part that stops anything, and it does the
-# stop, the renames, the start, the health check and the way back in one
-# script, so a connection that drops between two ssh calls cannot leave the
-# server stopped with half its files moved.
-#
-# Both are single quoted and take their values from the lines SwapVars puts in
-# front of them, so what goes to the box is plain PowerShell a person can read
-# and tests\test-deploy-server-swap.ps1 can run against a scratch folder. Each
-# ends with one line the caller reads: STAGE OK or STAGE REFUSED, and SWAP OK,
-# SWAP ROLLED BACK, SWAP REFUSED or SWAP FAILED. A line and not an exit code,
-# because Remote sends a long script as a file and the exit code left behind
-# is the one from deleting that file.
-#
-# Keep them ASCII. A laptop on PowerShell 7 writes that file without a byte
-# order mark, and Windows PowerShell 5.1 at the far end then reads it as ANSI.
-$checkBlock = @'
-$ProgressPreference = 'SilentlyContinue'
-$stageDir = Join-Path $Root $Stage
-$bad = @()
-# Every file the same as the one that left the laptop, by its hash. An exit
-# code from scp says a copy ended, not what arrived.
-$sums = @{}
-foreach ($rel in @($Want.Keys)) {
-  $p = Join-Path $stageDir ($rel -replace '/', '\')
-  if (-not (Test-Path -LiteralPath $p)) { $bad += ('did not arrive: ' + $rel); continue }
-  $sums[$rel] = (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToLowerInvariant()
-  if ($sums[$rel] -ne $Want[$rel]) { $bad += ('arrived different from what was sent: ' + $rel) }
-}
-$new = $null
-$sp = Join-Path $stageDir 'server-settings.json'
-if (Test-Path -LiteralPath $sp) {
-  $b = [IO.File]::ReadAllBytes($sp)
-  if ($b.Length -ge 3 -and $b[0] -eq 0xEF -and $b[1] -eq 0xBB -and $b[2] -eq 0xBF) {
-    $bad += 'server-settings.json starts with a byte order mark, and node will not parse it'
-  }
-  try { $new = [IO.File]::ReadAllText($sp) | ConvertFrom-Json }
-  catch { $bad += ('server-settings.json does not parse: ' + $_.Exception.Message) }
-} else { $bad += 'there is no server-settings.json in the stage' }
-# The port it runs on now and the port the new settings name must agree. The
-# stop picks its process by that port and the health check asks it, so a file
-# that moved it would stop one process and then ask about another.
-$now = $null
-try { $now = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { }
-if (-not $now) {
-  $bad += ('the settings in ' + $Root + ' cannot be read, so there is no telling which process is this server')
-} elseif ($new -and [int]$new.port -ne [int]$now.port) {
-  $bad += ('the new settings put this server on port ' + [int]$new.port + ' and it is on ' + [int]$now.port + ' now')
-}
-# The load order resolution Install-ThornswoodServer.ps1 does, against the
-# plugins already here plus the ones in the stage, because a shortened load
-# order shifts every index after the gap.
-$order = @()
-if ($new -and $new.loadOrder) { $order = @($new.loadOrder) }
-if ($new -and -not $order.Count) { $bad += 'server-settings.json has no loadOrder' }
-$plugins = Join-Path $Root 'plugins'
-foreach ($p in $order) {
-  $at = ([string]$p) -replace '/', '\'
-  if (-not $at) { $bad += 'the load order has an empty entry'; continue }
-  $leaf = [IO.Path]::GetFileName($at)
-  $staged = ((Split-Path -Parent $at) -eq $plugins) -and (Test-Path -LiteralPath (Join-Path $stageDir ('plugins\' + $leaf)))
-  if (-not $staged -and -not (Test-Path -LiteralPath $at)) { $bad += ('the load order names a plugin that is not on disk: ' + $p) }
-}
-$rp = Join-Path $stageDir 'server-build.json'
-if ($sums.ContainsKey('scam_native.node') -and (Test-Path -LiteralPath $rp)) {
+# The two halves that run on the box, the stage check and the swap, are in
+# Swap.ps1 beside this script, loaded at the top: $checkBlock, $swapBlock,
+# SwapVars and $putBackPick. Deploy-DevGamemode.ps1 uses the same ones.
+
+# ------------------------------------------------------------- -PutBack
+# The newest .prev folder back in, through the same swap as a deploy, after
+# the same warning. Nothing here needs the build, so it runs before the
+# checks that do, and sends no gamemode, so it has none to check.
+function Invoke-PutBack {
+  $script:rootWin   = $Root.Replace('/', '\')
+  # Warn-LiveRoom clears a stage by this name when the warning does not go
+  # out. A put-back has none, so it names one that is never there.
+  $script:stageName = '.stage-none'
+  Write-Host ''
+  Write-Host "Putting back the newest .prev folder in $rootWin..."
+  Warn-LiveRoom
+  $eap = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
   try {
-    $rec = [IO.File]::ReadAllText($rp) | ConvertFrom-Json
-    if ($sums['scam_native.node'] -ne ([string]$rec.sha256).ToLowerInvariant()) {
-      $bad += 'scam_native.node is not the build server-build.json records'
-    }
-  } catch { $bad += ('server-build.json does not parse: ' + $_.Exception.Message) }
+    $backOut = @(Remote ((SwapVars $Root $Task '.stage-none' '.undone-none' $Wait ([ordered]@{})) + $putBackPick + $swapBlock) |
+                 ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
+  } finally { $ErrorActionPreference = $eap }
+  if (-not (Show-SwapResult $backOut "$rootWin\.undone-<stamp>")) { exit 1 }
+  # The record that came back with the files is what the box says it runs.
+  Restore-SwapRecord "$User@$Vps" $ssh $Root $backOut "$Root/data/thornswood-deploy.json" 'gamemode'
+  Write-Host ''
+  Write-Host '  PASS. The previous files are back and the server is answering.' -ForegroundColor Green
+  exit 0
 }
-if ($bad.Count) {
-  foreach ($x in $bad) { 'REFUSED: ' + $x }
-  Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
-  'the stage is cleared and the server was not touched'
-  'STAGE REFUSED'
-} else {
-  'the stage checks out: {0} file(s) as sent, {1} plugins in the load order and all on disk, port {2}' -f $Want.Count, $order.Count, [int]$new.port
-  'STAGE OK'
-}
-'@
-
-$swapBlock = @'
-$ProgressPreference = 'SilentlyContinue'
-$stageDir = Join-Path $Root $Stage
-$prevDir  = Join-Path $Root $Prev
-$log      = Join-Path $Root 'server.log'
-$new      = [IO.File]::ReadAllText((Join-Path $stageDir 'server-settings.json')) | ConvertFrom-Json
-# The check has already refused a port that moves, so this is the port the
-# running server is on and the one the new one will be on.
-$port     = [int]$new.port
-# skymp5-server/ts/ui.ts: 3000 when the game port is 7777, the game port plus
-# one otherwise. The same rule Publish-Server and Install-ThornswoodServer use.
-$resPort  = if ($port -eq 7777) { 3000 } else { $port + 1 }
-$clean    = $true
-
-function Held { @(Get-NetUDPEndpoint -LocalPort $port -EA SilentlyContinue).Count -gt 0 }
-
-function StopOurs {
-  Stop-ScheduledTask -TaskName $Task -EA SilentlyContinue
-  # The process on this root's own port and nothing else. Matching every
-  # node.exe running skymp5-server took the dev server down with the live one
-  # and only started the live one back up.
-  'stopping whatever holds UDP ' + $port
-  $pids = @()
-  $pids += @(Get-NetUDPEndpoint -LocalPort $port -EA SilentlyContinue | Select-Object -ExpandProperty OwningProcess)
-  # Only the UDP port. The line that also stopped whatever listened on the TCP
-  # port one above it was copied from the dev script, where that port is the
-  # server's own HTTP and belongs to the same process. On the live root it is
-  # 7778, which is the voice service, a separate process that carries voice
-  # chat, the launcher's character choices and the chat command queue the
-  # lockpick fix rides on. Stopping the game server must never take that down.
-  foreach ($id in ($pids | Sort-Object -Unique)) {
-    if ($id -gt 0) { Stop-Process -Id $id -Force -EA SilentlyContinue; 'stopped pid ' + $id }
-  }
-  for ($i = 0; $i -lt 20 -and (Held); $i++) { Start-Sleep -Milliseconds 500 }
-  Start-Sleep -Seconds 2
-  # Once the process is gone, so is any restart.json it never read. The
-  # gamemode deletes that file when it reads it, and a process that is down,
-  # or whose gamemode failed at load, never does. The next one to start then
-  # finds it within a tick and a half and counts down on its own: under
-  # -Mode notice a "Pushing a server update in 1 minute" with nothing behind
-  # it, and under -Mode restart a kick a minute after boot with no restart
-  # behind it. Same gap Deploy-DevGamemode closed on 24 September.
-  $d = 'data'
-  try {
-    $s = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json
-    if ($s.dataDir) { $d = [string]$s.dataDir }
-  } catch { }
-  $rq = Join-Path ([IO.Path]::Combine($Root, $d)) 'restart.json'
-  if (Test-Path -LiteralPath $rq) {
-    try { Remove-Item -LiteralPath $rq -Force -EA Stop; 'removed a restart.json the old process never read' }
-    catch { 'COULD NOT REMOVE ' + $rq + ', so the new process will count down on its own: ' + $_.Exception.Message }
-  }
-}
-
-# Both ports, from the box itself. UDP alone is not enough: the resources port
-# is what the launcher and the client fetch from, and it only opens once the
-# native server has been built without throwing.
-function Answering {
-  $until = (Get-Date).AddSeconds($Wait)
-  while ($true) {
-    $tcp = $false
-    if (Held) {
-      try {
-        $c = New-Object Net.Sockets.TcpClient
-        $null = $c.BeginConnect('127.0.0.1', $resPort, $null, $null).AsyncWaitHandle.WaitOne(500)
-        $tcp = $c.Connected
-        $c.Close()
-      } catch { }
-    }
-    if ($tcp) { return $true }
-    if ((Get-Date) -gt $until) { return $false }
-    Start-Sleep -Milliseconds 700
-  }
-}
-
-# A rename on one volume, retried, because a process that has just been told
-# to stop does not always let go of its files the same instant.
-function Shift([string]$from, [string]$to) {
-  for ($i = 0; $i -lt 10; $i++) {
-    try {
-      $null = [IO.Directory]::CreateDirectory((Split-Path -Parent $to))
-      [IO.File]::Move($from, $to)
-      return $true
-    } catch { Start-Sleep -Milliseconds 500 }
-  }
-  return $false
-}
-
-function PutBack {
-  $rels = @($Want.Keys)
-  [array]::Reverse($rels)
-  foreach ($rel in $rels) {
-    $r = $rel -replace '/', '\'
-    $at = Join-Path $Root $r
-    if ($placed -contains $rel) {
-      if (-not (Shift $at (Join-Path $stageDir $r))) { 'COULD NOT TAKE THE NEW ' + $rel + ' BACK OUT'; $script:clean = $false; continue }
-    }
-    if ($aside -contains $rel) {
-      if (-not (Shift (Join-Path $prevDir $r) $at)) { 'COULD NOT PUT THE OLD ' + $rel + ' BACK'; $script:clean = $false }
-    }
-  }
-}
-
-if (-not $port) {
-  'the staged settings name no port, so nothing was stopped'
-  Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
-  'SWAP REFUSED'
-  exit 1
-}
-StopOurs
-if (Held) {
-  'UDP ' + $port + ' is still held by pid ' + @(Get-NetUDPEndpoint -LocalPort $port -EA SilentlyContinue)[0].OwningProcess + ' after the stop, so nothing was swapped'
-  Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
-  'SWAP REFUSED'
-  exit 1
-}
-
-$placed = @()
-$aside = @()
-$moved = $true
-foreach ($rel in @($Want.Keys)) {
-  $r = $rel -replace '/', '\'
-  $at = Join-Path $Root $r
-  if (Test-Path -LiteralPath $at) {
-    if (-not (Shift $at (Join-Path $prevDir $r))) { 'could not move the old ' + $rel + ' aside'; $moved = $false; break }
-    $aside += $rel
-  }
-  if (-not (Shift (Join-Path $stageDir $r) $at)) { 'could not move the new ' + $rel + ' into place'; $moved = $false; break }
-  $placed += $rel
-}
-
-if ($moved) {
-  'swapped in ' + $placed.Count + ' file(s), the ones they replaced are in ' + $prevDir
-  Start-ScheduledTask -TaskName $Task -EA SilentlyContinue
-  'started, giving it ' + $Wait + ' seconds to answer on UDP ' + $port + ' and on ' + $resPort
-  if (Answering) {
-    'PASS: the server is answering on ' + $resPort + ', game port ' + $port + ', pid ' + @(Get-NetUDPEndpoint -LocalPort $port -EA SilentlyContinue)[0].OwningProcess
-    Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
-    # The last three sets of replaced files stay, newest first by their stamp.
-    Get-ChildItem -LiteralPath $Root -Directory -Force -EA SilentlyContinue |
-      Where-Object { $_.Name -like '.prev-*' } | Sort-Object Name -Descending | Select-Object -Skip 3 |
-      ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -EA SilentlyContinue }
-    'SWAP OK'
-    exit 0
-  }
-  'FAIL: nothing answered on UDP ' + $port + ' and ' + $resPort + ' within ' + $Wait + ' seconds'
-  if (Test-Path -LiteralPath $log) { '--- server.log, last 30 ---'; Get-Content -LiteralPath $log -Tail 30 }
-  StopOurs
-}
-
-'putting the previous files back'
-PutBack
-Start-ScheduledTask -TaskName $Task -EA SilentlyContinue
-if (Answering) { 'the previous files are back and the server is answering on ' + $resPort + ' again' }
-else { 'THE PREVIOUS FILES ARE BACK AND THE SERVER STILL IS NOT ANSWERING on ' + $resPort }
-if ($clean) {
-  Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
-  Remove-Item -LiteralPath $prevDir -Recurse -Force -EA SilentlyContinue
-  'SWAP ROLLED BACK'
-} else {
-  'what it replaced is still in ' + $prevDir + ' and what it could not take out is in ' + $stageDir
-  'SWAP FAILED'
-}
-exit 1
-'@
-
-# The values the two blocks run with, as lines of PowerShell put in front of
-# them. Quoted here once, doubling any single quote, because a plugin name is
-# free text and one of them with an apostrophe in it would otherwise end the
-# string early on the far side.
-function SwapVars([string]$farRoot, [string]$taskName, [string]$stageName, [string]$prevName, [int]$waitSeconds, $sums) {
-  $q = { param($s) "'" + ([string]$s).Replace("'", "''") + "'" }
-  $lines = @(
-    ('$Root  = ' + (& $q $farRoot.Replace('/', '\'))),
-    ('$Task  = ' + (& $q $taskName)),
-    ('$Stage = ' + (& $q $stageName)),
-    ('$Prev  = ' + (& $q $prevName)),
-    ('$Wait  = ' + $waitSeconds),
-    '$Want  = [ordered]@{}'
-  )
-  foreach ($k in @($sums.Keys)) { $lines += ('$Want[' + (& $q $k) + '] = ' + (& $q $sums[$k])) }
-  return (($lines -join "`r`n") + "`r`n")
-}
-# ==== end deploy-server remote blocks ====
+if ($PutBack) { Invoke-PutBack }
 
 # game\gamemode.js is the source. The build output has a copy of it that cmake
 # writes during configure, and that copy is stale the moment the source is
@@ -567,16 +331,24 @@ if (-not (Test-Path -LiteralPath $Dist)) {
   )
 }
 
-$src = Join-Path $Here '..\..\game\gamemode.js'
+# And it goes up as the gamemode artifact (issue #459, Artifact.ps1):
+# game\gamemode.js as the commit holds it, in one zip named by commit and hash,
+# sent to the box's store before the stage. The copy in the build is made the
+# artifact's whenever the two differ, by hash and not by size as it was, since
+# an edit that kept the size used to stay behind.
+# Refused before the box is touched when gamemode.js, or anything else this
+# sends out of the repository (our plugin, the server build's record), has
+# uncommitted changes (#1121).
+. (Join-Path $Here 'Artifact.ps1')
+$artifact = New-ThornswoodArtifact -Component gamemode -RepoDir (Join-Path $Here '..\..') -Paths 'game/gamemode.js' `
+  -AlsoSends 'game/content/Thornswood-Content.esp', 'records/server-build.json'
+'{0,-22} {1}' -f 'artifact', (Format-ThornswoodArtifact $artifact) | Write-Host
+$src = Join-Path $artifact.Folder 'game\gamemode.js'
 $built = Join-Path $Dist 'gamemode.js'
-if (Test-Path -LiteralPath $src) {
-  $a = (Get-Item $src).Length
-  $b = if (Test-Path -LiteralPath $built) { (Get-Item $built).Length } else { -1 }
-  if ($a -ne $b) {
-    Copy-Item $src $built -Force
-    Write-Host ("  gamemode.js taken from game ({0:N0} bytes, build had {1})" -f `
-      $a, $(if ($b -lt 0) { 'none' } else { '{0:N0}' -f $b })) -ForegroundColor DarkGray
-  }
+if (-not (Test-Path -LiteralPath $built) -or
+    (Get-FileHash -LiteralPath $src).Hash -ne (Get-FileHash -LiteralPath $built).Hash) {
+  Copy-Item -LiteralPath $src -Destination $built -Force
+  Write-Host ("  gamemode.js taken from the artifact ({0:N0} bytes)" -f (Get-Item -LiteralPath $built).Length) -ForegroundColor DarkGray
 }
 
 # The file about to go up must parse, or the live server stops at start. The
@@ -589,26 +361,40 @@ if (Test-Path -LiteralPath $built) {
   Write-Host '  gamemode.js parses'
 }
 
-$files = 'scam_native.node', 'gamemode.js', 'server-settings.json'
-foreach ($f in $files) {
-  $p = Join-Path $Dist $f
-  if (-not (Test-Path -LiteralPath $p)) { throw "not built: $p" }
-  '{0,-22} {1:N0} bytes' -f $f, (Get-Item $p).Length | Write-Host
+foreach ($f in 'gamemode.js', 'server-settings.json') {
+  if (-not (Test-Path -LiteralPath (Join-Path $Dist $f))) { throw "not built: $(Join-Path $Dist $f)" }
+}
+
+# THE BUILD'S SETTINGS ARE THE LIVE SERVER'S, OR NOTHING GOES (#1221). This
+# sends server-settings.json from the build, and on 29 Sep the shared clone's
+# build held the dev server's (port 7787, the name Thornswood Dev), left by an
+# older dev publish. Sent, live would have come up where no launcher looks for
+# it. The same test Export-ServerPayload.ps1 makes for a live payload, and an
+# npcSettings "default" key, which refuses every NPC. Before the stamp is
+# written, the box is asked anything or the artifact is sent.
+$buildSettings = Get-Content -LiteralPath (Join-Path $Dist 'server-settings.json') -Raw | ConvertFrom-Json
+$notLive = @(Get-ThornswoodServerSettingsProblems $buildSettings 'main')
+if ($notLive.Count) {
+  Write-Host ''
+  Write-Host ("  server-settings.json in $Dist is not the live server's:") -ForegroundColor Red
+  foreach ($w in $notLive) { Write-Host ('    ' + $w) -ForegroundColor Red }
+  Write-Host '  Run .\scripts\deploy\Deploy-Gamemode.ps1, which writes the live ones, then deploy again.' -ForegroundColor Yellow
+  throw "server-settings.json in $Dist is not the live server's. Nothing was sent and the server was not touched."
 }
 
 # The build stamp Deploy-Gamemode.ps1 left beside gamemode.js goes up with it,
 # so the box can say which gamemode it runs. It is made again here when it does
 # not describe the gamemode about to be sent, which is what happens when the
-# copy above took the one in tools, because a stamp naming a different
-# gamemode is worse than none. From tools when that is the same file, so git
-# can say whether the commit holds it. See BuildStamp.ps1.
+# copy above came from the artifact's game\gamemode.js ($src), because a
+# stamp naming a different gamemode is worse than none. When it is the same
+# file, use it so git can say whether the commit holds it. See BuildStamp.ps1.
 . (Join-Path $Here '..\release\BuildStamp.ps1')
 $stampPath = Join-Path $Dist 'thornswood-build.json'
 if (-not (Test-ThornswoodBuildStamp -Path $stampPath -Gamemode $built)) {
   $stampFrom = $built
   if ((Test-Path -LiteralPath $src) -and
       (Get-FileHash -LiteralPath $src).Hash -eq (Get-FileHash -LiteralPath $built).Hash) { $stampFrom = $src }
-  $null = Save-ThornswoodBuildStamp -Gamemode $stampFrom -Channel main -RepoDir (Split-Path -Parent (Split-Path -Parent $Here)) -Path $stampPath
+  $null = Save-ThornswoodBuildStamp -Gamemode $stampFrom -Channel main -RepoDir (Split-Path -Parent (Split-Path -Parent $Here)) -Path $stampPath -Artifact $artifact
 }
 '{0,-22} {1}' -f 'thornswood-build.json', (Format-ThornswoodBuildStamp (Get-Content -LiteralPath $stampPath -Raw | ConvertFrom-Json)) | Write-Host
 
@@ -620,39 +406,41 @@ if (-not (Test-ThornswoodBuildStamp -Path $stampPath -Gamemode $built)) {
 # date was six minutes later than the last edit to ScampServer.cpp, which is an
 # argument rather than a proof.
 #
-# records\server-build.json is that proof: the hash of the binary a release was
-# tested with, and the commit it came from. Regenerate it with
+# records\server-build.json is that proof: the hash of every server file the
+# fork builds (the binary, the JavaScript half the server runs, and the rest
+# ServerBuild.ps1 names) and the one commit they came from. Regenerate it with
 # scripts\release\New-ServerBuildRecord.ps1 after every rebuild.
 #
-# No record yet means carry on with a warning, so a machine that has not made one
-# can still deploy. A record that disagrees is a stop: it means this binary is not
-# the one the release was built and tested against, and shipping it would put an
-# unknown server in front of everybody.
+# Every one of them goes up together, so the box never runs a binary of one
+# build beside the JavaScript half of another, and any of them that is not the
+# recorded build, or a server file the record does not list, stops the deploy
+# before anything is sent (#1214). Until then only the binary went and only
+# the binary was held, and a build with no record went with a warning.
 $recordPath = Join-Path $Here '..\..\records\server-build.json'
-$binPath = Join-Path $Dist 'scam_native.node'
-if (Test-Path -LiteralPath $recordPath) {
-  $rec = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
-  $have = (Get-FileHash -LiteralPath $binPath -Algorithm SHA256).Hash.ToLowerInvariant()
-  $want = "$($rec.sha256)".ToLowerInvariant()
-  if ($have -ne $want) {
-    Write-Host ''
-    Write-Host '  scam_native.node is not the build this release recorded.' -ForegroundColor Red
-    Write-Host ("    on disk   {0}" -f $have) -ForegroundColor Red
-    Write-Host ("    recorded  {0}" -f $want) -ForegroundColor Red
-    Write-Host ("    recorded build came from commit {0}" -f $rec.source.commit) -ForegroundColor Yellow
-    Write-Host ''
-    Write-Host '  If you rebuilt on purpose, record the new build and deploy again:' -ForegroundColor Yellow
-    Write-Host '    .\scripts\release\New-ServerBuildRecord.ps1' -ForegroundColor Yellow
-    Write-Host '  If you did not, find out what changed before this reaches the VPS.' -ForegroundColor Yellow
-    throw 'server binary does not match records\server-build.json'
-  }
-  Write-Host ('{0,-22} matches the record, commit {1}' -f 'build', $rec.source.commit.Substring(0, 8)) -ForegroundColor DarkGray
+if (-not (Test-Path -LiteralPath $recordPath)) {
+  throw 'there is no records\server-build.json, so nothing says which build these server files are. Nothing was sent and the server was not touched.'
 }
-else {
+$rec = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
+$notBuild = @(Get-ThornswoodServerBuildProblems $rec (Get-ThornswoodServerFolderSums $Dist) $Dist 'records\server-build.json')
+if ($notBuild.Count) {
   Write-Host ''
-  Write-Host '  No records\server-build.json, so nothing says which commit this binary is.' -ForegroundColor Yellow
-  Write-Host '  Make one with .\scripts\release\New-ServerBuildRecord.ps1 and commit it.' -ForegroundColor Yellow
+  Write-Host '  The server files are not the build this release recorded:' -ForegroundColor Red
+  foreach ($w in $notBuild) { Write-Host ('    ' + $w) -ForegroundColor Red }
+  Write-Host ("    recorded build came from commit {0}" -f $rec.source.commit) -ForegroundColor Yellow
   Write-Host ''
+  Write-Host '  If you rebuilt on purpose, record the new build and deploy again:' -ForegroundColor Yellow
+  Write-Host '    .\scripts\release\New-ServerBuildRecord.ps1' -ForegroundColor Yellow
+  Write-Host '  If you did not, find out what changed before this reaches the VPS.' -ForegroundColor Yellow
+  throw 'server files do not match records\server-build.json'
+}
+$serverFiles = @((Get-ThornswoodServerRecordFiles $rec).Keys)
+Write-Host ('{0,-22} every server file is the recorded build, commit {1}' -f 'build', $rec.source.commit.Substring(0, 8)) -ForegroundColor DarkGray
+
+$files = @($serverFiles) + @('gamemode.js', 'server-settings.json')
+foreach ($f in $files) {
+  $p = Join-Path $Dist ($f -replace '/', '\')
+  if (-not (Test-Path -LiteralPath $p)) { throw "not built: $p" }
+  '{0,-22} {1:N0} bytes' -f $f, (Get-Item $p).Length | Write-Host
 }
 
 # ------------------------------------------------------------- load order
@@ -767,15 +555,16 @@ $stageFar  = ($Root -replace '\\', '/') + '/' + $stageName
 $send = [ordered]@{}
 foreach ($p in $sendPlugins) { $send['plugins/' + (Split-Path $p -Leaf)] = $p }
 foreach ($f in $files) {
-  $src = Join-Path $Dist $f
+  $src = Join-Path $Dist ($f -replace '/', '\')
   if ($f -eq 'server-settings.json') { $src = $settingsForVps }
   $send[$f] = $src
 }
-# The record goes up with the binary, so the box itself answers what it is
-# running. Hash $Root/scam_native.node against it there and the two halves of
-# the question, what source and what binary, both have an answer on the machine
-# serving people rather than only on a developer's disk.
-if (Test-Path -LiteralPath $recordPath) { $send['server-build.json'] = $recordPath }
+# The record goes up with the server files, so the box itself answers what it
+# is running, and the stage is held to it there before anything stops: every
+# file it lists, by hash (ServerBuild.ps1, part of Swap.ps1's check). The
+# two halves of the question, what source and what files, both have an answer
+# on the machine serving people rather than only on a developer's disk.
+$send['server-build.json'] = $recordPath
 # The build stamp goes up in the stage with the gamemode it describes, so it
 # is hashed and checked with the rest, swapped in beside gamemode.js, and put
 # back with it on a rollback. Sent on its own straight into the live folder,
@@ -791,6 +580,10 @@ foreach ($rel in $send.Keys) {
 }
 
 Write-Host ''
+Write-Host 'The gamemode artifact, to the store on the box...'
+Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
+
+Write-Host ''
 Write-Host "Staging in $rootWin\$stageName..."
 # A stage left by a run that died part way is cleared first. It was never
 # swapped in, so nothing is lost with it.
@@ -801,12 +594,30 @@ Get-ChildItem -LiteralPath '$rootWin' -Directory -Force -EA SilentlyContinue |
 New-Item -ItemType Directory -Path '$rootWin\$stageName\plugins' -Force | Out-Null
 "@ | Out-Null
 foreach ($rel in $send.Keys) {
-  & scp @ssh $send[$rel] "$User@${Vps}:$stageFar/$rel"
+  Invoke-ThornswoodNative { & scp @ssh $send[$rel] "$User@${Vps}:$stageFar/$rel" }
   if ($LASTEXITCODE -ne 0) { throw "scp failed for $rel. The server has not been touched." }
   Write-Host "  $rel"
 }
 
-$checkOut = @(Remote ((SwapVars $Root $Task $stageName $prevName $Wait $hashes) + $checkBlock) |
+# The running server's own settings, carried into the staged file on the box,
+# with only the keys Deploy-Gamemode writes for live taken from the build
+# (#1222, ServerSettings.ps1). The file this rewrites is hashed there, so the
+# check below holds the stage to it like every file sent from here.
+Write-Host ''
+Write-Host 'Keeping the live server''s own settings...'
+$carryScript = [IO.File]::ReadAllText((Join-Path $Here 'ServerSettings.ps1')) + "`r`n" +
+               (SwapVars $Root $Task $stageName $prevName $Wait $hashes $ThornswoodGamemodeKeys) + $settingsCarryBlock
+$carryOut = @(Remote $carryScript | ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
+$carried = @($carryOut | Where-Object { $_ -match '^CARRIED [0-9a-f]{64}$' })
+if (-not $carried.Count) {
+  Write-Host ''
+  Write-Host '  THE SETTINGS COULD NOT BE CARRIED ACROSS, so nothing was stopped and nobody was warned.' -ForegroundColor Red
+  Write-Host '  The server is still running exactly as it was. The lines above say why.' -ForegroundColor Red
+  exit 1
+}
+$hashes['server-settings.json'] = $carried[0].Substring(8)
+
+$checkOut = @(Remote ((SwapVars $Root $Task $stageName $prevName $Wait $hashes $ThornswoodGamemodeKeys) + $checkBlock) |
               ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
 if ($checkOut -notcontains 'STAGE OK') {
   Write-Host ''
@@ -827,16 +638,16 @@ Write-Host 'Stopping, swapping in and starting...'
 $eap = $ErrorActionPreference
 $ErrorActionPreference = 'Continue'
 try {
-  $swapOut = @(Remote ((SwapVars $Root $Task $stageName $prevName $Wait $hashes) + $swapBlock) |
+  $swapOut = @(Remote ((SwapVars $Root $Task $stageName $prevName $Wait $hashes $ThornswoodGamemodeKeys) + $swapBlock) |
                ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
 } finally { $ErrorActionPreference = $eap }
 
 if ($swapOut -notcontains 'SWAP OK') {
   Write-Host ''
   if ($swapOut -contains 'SWAP ROLLED BACK') {
-    Write-Host '  FAIL. The new server did not answer, so the old files were put back and it' -ForegroundColor Red
-    Write-Host '  was started again. The lines above say whether it answered, and server.log' -ForegroundColor Red
-    Write-Host '  says why the new one did not come up.' -ForegroundColor Red
+    Write-Host '  FAIL. The new server did not answer, or its settings did not read back as the' -ForegroundColor Red
+    Write-Host '  server''s own, so the old files were put back and it was started again. The' -ForegroundColor Red
+    Write-Host '  lines above say which, and whether it answered.' -ForegroundColor Red
   } elseif ($swapOut -contains 'SWAP REFUSED') {
     Write-Host '  FAIL. Nothing was swapped. The lines above say why.' -ForegroundColor Red
   } else {
@@ -846,6 +657,12 @@ if ($swapOut -notcontains 'SWAP OK') {
   }
   exit 1
 }
+
+# Swapped in and answering on the box: it records that the live server runs
+# this gamemode artifact, and serves the record from its data folder, so
+# http://<box>:3000/thornswood-deploy.json says which commit is live.
+Save-SwapPreviousRecord "$User@$Vps" $ssh $Root $prevName "$Root/data/thornswood-deploy.json"
+$null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh -Root $Root -Beside "$Root/data/thornswood-deploy.json"
 
 # And from here, the shape Publish-Server.ps1 uses. The box answering itself
 # on 127.0.0.1 is not the same as it answering the rest of the world; this is

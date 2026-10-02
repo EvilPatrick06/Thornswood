@@ -1,7 +1,9 @@
 // test-one-mint.js
 //
-// Coin comes into the world in exactly one place. Everything else in the
-// server only moves it from one pack to another or takes it away.
+// Authorized coin sources are explicit and bounded. A character gets forty
+// once; dungeon rewards use fixed tier ranges and durable return reservations.
+// Merchant NPC starting purses are checked by test-npc-merchant-purses.js and
+// test-merchant-ledger-storage.js; buying and selling are not enabled yet.
 //
 // Entry 326 on the To Do List is the economy with a bottom: traders who start
 // with a purse and buy and sell against it, "so coin moves between people
@@ -40,11 +42,11 @@
 // runs again.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
-const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
-const RECIPES = process.env.RECIPES || path.join(TOOLS_DIR, '..', 'game', 'data', 'recipes.json');
+const SRC = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
+const RECIPES = process.env.RECIPES || path.join(REPO_DIR, 'game', 'data', 'recipes.json');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -321,10 +323,12 @@ if (first !== null) {
 */
 const WRITERS = {
   'outer/addItem': [1, 'adds by descriptor, and section 3 says no descriptor in this file is gold'],
+  'outer/addItemsAtomic': [1, 'adds verified fish, hanging-game and carcass descriptor bundles; the caller audit below pins those paths'],
   'outer/takeItem': [1, 'only takes things away'],
   'outer/takeItemById': [1, 'only takes things away'],
   'outer/giveShift': [1, 'the shift, out of CHARGEN.shift'],
   'outer/giveItems': [1, 'descriptor pairs, and nothing calls it (checked below)'],
+  'outer/packAsServerHasIt': [1, 'the take limit sends back the pack the server already holds, so it adds nothing'],
   'property/giveDeed': [1, 'one deed, DEED'],
   'property/giveNamed': [1, 'one named key or mold, KEY or MOLD'],
   'property/takeBlankMold': [1, 'only takes a mold away'],
@@ -399,6 +403,24 @@ for (const at of Object.keys(WRITERS)) {
   // today; the day something does, what it is handed has to be read.
   const calls = (code.match(/\bgiveItems\(/g) || []).length;
   yes('nothing calls giveItems', calls === 1);
+}
+
+{
+  const re = /\baddItemsAtomic\(/g;
+  const callers = [];
+  let match;
+  while ((match = re.exec(code)) !== null) {
+    if (/function\s+$/.test(code.slice(Math.max(0, match.index - 20), match.index))) { continue; }
+    callers.push(where(match.index));
+  }
+  callers.sort();
+  yes('atomic item bundles are only paid by the checked dungeon reward and three harvests',
+      callers.join(',') === 'dungeon loot/give,outer/fish,outer/game,outer/loot');
+  const reward=bodyOf('dungeon loot/give') || '';
+  yes('the dungeon reward bundles its fixed gold and rolled goods into one inventory write',
+      /if\(rolled\.gold>0\) goods\.push\(\{item:GOLD_DESC,count:rolled\.gold\}\)/.test(reward) &&
+      /addItemsAtomic\(actorId,goods\)/.test(reward) &&
+      /var GOLD_SPAN = \{ 1: \[5, 15\], 2: \[12, 35\], 3: \[25, 70\], 4: \[50, 120\] \};/.test(code));
 }
 
 {
@@ -490,7 +512,12 @@ function goldDescriptors(text) {
     return a < 0 || b < 0 ? null : text.slice(0, a) + text.slice(b + end.length);
   }
   const noItems = cut(src, '  // ==== ITEM_NAMES ====', '  // ==== end ITEM_NAMES ====');
-  const outside = noItems && cut(noItems, '  // ==== ADMIN_NAMES ====', '  // ==== end ADMIN_NAMES ====');
+  const noAdmin = noItems && cut(noItems, '  // ==== ADMIN_NAMES ====', '  // ==== end ADMIN_NAMES ====');
+  const outside = noAdmin && cut(noAdmin,'// ==== thornswood dungeon loot ====','// ==== end thornswood dungeon loot ====');
+  const dungeon=lift('// ==== thornswood dungeon loot ====','// ==== end thornswood dungeon loot ====');
+  const dungeonGold=goldDescriptors(dungeon || '');
+  yes('the checked dungeon reward names exactly one gold descriptor as GOLD_DESC',
+      dungeonGold.gold.length===1 && /var GOLD_DESC = 'f:Skyrim.esm';/.test(dungeon || ''));
   yes('the testers\' two tables were found and set aside', !!outside);
   const inside = goldDescriptors(src);
   yes('and they do name gold, so /give gold works for a tester', inside.gold.length > 0);
@@ -501,7 +528,7 @@ function goldDescriptors(text) {
       real.all.has('3ad74:Skyrim.esm') && real.all.has('5acdb:Skyrim.esm') &&
       real.all.has('34cdf:Skyrim.esm') && real.all.has('1be1a:Skyrim.esm') &&
       real.all.has('d62:Hothtrooper44_ArmorCompilation.esp'));
-  yes('and outside the testers\' tables not one of them is gold' +
+  yes('and outside the testers\' tables and checked dungeon reward not one of them is gold' +
       (real.gold.length ? ': ' + real.gold.slice(0, 5).join(', ') : ''),
       real.gold.length === 0);
   if (outside) {
@@ -536,6 +563,8 @@ function goldDescriptors(text) {
     'ITEMS.firewood': 'firewood, ITEMS',
     'ITEMS[grade]': 'charcoal, ITEMS',
     'ITEMS.butter': 'butter off the churn, ITEMS',
+    'ITEMS.milk': 'milk off a living cow, ITEMS (#396)',
+    'ITEMS.chickenEgg': 'an egg off a chicken nest, ITEMS (#628)',
     'plant.produce': 'a plant, HARVESTS_BY_BASE',
     'caught.produce': 'a fish, FISH_BY_BASE',
     'hung.produce': 'game, GAME_BY_BASE',

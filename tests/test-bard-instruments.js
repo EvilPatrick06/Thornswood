@@ -21,18 +21,18 @@
 //
 // Read only. The plugin half runs only where the game folder is, and says SKIP
 // anywhere else, because the build check on GitHub has no Skyrim.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const CR = String.fromCharCode(13);
 const read = (p) => fs.readFileSync(p, 'utf8').split(CR).join('');
 
-const TESTS = process.env.TESTS_MD || path.join(TOOLS_DIR, '..', 'site', 'data', 'tests.md');
-const KNOWN = path.join(TOOLS_DIR, '..', 'site', 'data', 'known.md');
-const EMOTES = path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-emotes.js');
-const INI = path.join(TOOLS_DIR, '..', 'launcher', 'Thornswood.ini');
-const GM = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
+const TESTS = process.env.TESTS_MD || path.join(REPO_DIR, 'site', 'data', 'tests.md');
+const KNOWN = path.join(REPO_DIR, 'site', 'data', 'known.md');
+const EMOTES = path.join(REPO_DIR, 'game', 'plugins', 'thornswood-emotes.js');
+const INI = path.join(REPO_DIR, 'launcher', 'Thornswood.ini');
+const GM = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
 const DATA = process.env.GAME_DATA || 'C:\\Thornswood\\Game\\Data';
 const PLUGIN = 'PlayFluteLuteDrum.esp';
 
@@ -57,8 +57,8 @@ yes('it says what the instruments do: look wrong and play nothing',
     /flute, lute or drum looks wrong when you equip it and plays nothing/.test(note));
 // Which letter it names is checked below, against the key the wheel is
 // actually on.
-const wheelSaid = /open the emote wheel with ([A-Z])\b[^.]*then pick Revelry/.exec(note);
-yes('it sends people to the wheel instead: a key, then Revelry', !!wheelSaid);
+const wheelSaid = /open the emote wheel with ([A-Z])\b[^.]*then search for Lute, Flute or Drum/.exec(note);
+yes('it sends people to the wheel instead: a key, then a search for the three', !!wheelSaid);
 yes('the rest of the list is still there',
     note.indexOf('Typing in another window') >= 0 &&
     note.indexOf('Mod settings menus reset') >= 0 &&
@@ -116,18 +116,28 @@ yes('the note names that letter for the wheel, ' + (wheelLetter || '?') +
     !!wheelSaid && wheelLetter !== '' && wheelSaid[1] === wheelLetter);
 
 /*
-  The instruments are in the Revelry category. The launcher's help used to
-  say Tab turns to a second ring; the wheel has had categories since the
-  1.1.36 source, so the note says Revelry.
+  Lute, Flute and Drum are names on the one list. The wheel used to keep
+  them in a Revelry category. The note now says to search for them.
 */
-const rv = emotes.indexOf("{ name: 'Revelry', items: [");
-const rvEnd = rv < 0 ? -1 : emotes.indexOf(']}', rv);
-const revelry = (rv >= 0 && rvEnd >= 0) ? emotes.slice(rv, rvEnd) : '';
-yes('the wheel has a Revelry category', revelry !== '');
-yes('Revelry holds Lute, Flute and Drum, played by Skyrim\'s own idles',
-    /name: 'Lute',\s*event: 'IdleLuteStart'/.test(revelry) &&
-    /name: 'Flute',\s*event: 'IdleFluteStart'/.test(revelry) &&
-    /name: 'Drum',\s*event: 'IdleDrumStart'/.test(revelry));
+const listAt = emotes.indexOf('const EMOTES = [');
+const listEnd = listAt < 0 ? -1 : emotes.indexOf('\n];', listAt);
+const list = (listAt >= 0 && listEnd >= 0) ? emotes.slice(listAt, listEnd) : '';
+yes('the wheel lists Lute, Flute and Drum, played by Skyrim\'s own idles',
+    /name: 'Lute',\s*event: 'IdleLuteStart'/.test(list) &&
+    /name: 'Flute',\s*event: 'IdleFluteStart'/.test(list) &&
+    /name: 'Drum',\s*event: 'IdleDrumStart'/.test(list));
+yes('those three ask for the made instrument before they play',
+    /lute:\s*\{\s*id:\s*0x1d9b/.test(emotes) &&
+    /flute:\s*\{\s*id:\s*0xd62/.test(emotes) &&
+    /drum:\s*\{\s*id:\s*0x287f/.test(emotes) &&
+    /getItemCount/.test(emotes) &&
+    /You need /.test(emotes));
+yes('an emote idle this character did not just ask for is dropped',
+    /ctx\.animEventName = ''/.test(emotes));
+yes('standing up still works while the wheel is open, and not while a name is being typed',
+    /__stand/.test(emotes) &&
+    /function standUp\(/.test(emotes) &&
+    /k\.toLowerCase\(\) === standChar/.test(read(path.join(REPO_DIR, 'game', 'ui', 'thornswood-emotes.js'))));
 
 /*
   The instruments a person can actually hold are the three this plugin adds,

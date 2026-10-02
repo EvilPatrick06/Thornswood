@@ -2,7 +2,7 @@
   test-client-by-hash.ps1
 
       pwsh -NoProfile -File .\tests\test-client-by-hash.ps1
-      pwsh -NoProfile -File .\tests\test-client-by-hash.ps1 -Tools <a copy of tools>
+      pwsh -NoProfile -File .\tests\test-client-by-hash.ps1 -Repo <a copy of the repository>
 
   Whether the six client runtime files in client-build.json leave this machine
   as ours only when their bytes are the recorded build. To Do entry 128.
@@ -34,7 +34,7 @@
        changed. The game folder is only read.
   And Checks.ClientPatched, the text search for our own name, is gone.
 
-  -Tools runs it against another copy of the scripts: Ship-Rules.ps1,
+  -Repo runs it against another copy of the repository: Ship-Rules.ps1,
   Publish-Update.ps1, Package-Thornswood.ps1, client-build.json and app\*.cs,
   unpacked from git archive. Pointed at 6851ed4, main before this change, it
   fails 15 of its checks on the machine that ships, 14 where there is no game
@@ -45,17 +45,19 @@
   Writes only to a temp folder of its own, and removes it.
 #>
 param(
-    [string]$Tools,
+    [string]$Repo,
     [string]$Game = 'C:\Thornswood\Game'
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-if (-not $Tools) { $Tools = $PSScriptRoot }
-if (-not $Tools) { $Tools = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\. Only when -Tools was not given.
-if (-not $PSBoundParameters.ContainsKey('Tools')) { $Tools = Join-Path (Split-Path -Parent $Tools) 'tools' }
+if (-not $Repo) {
+    # The tests are in tests\, the repository is one folder up.
+    $Repo = $PSScriptRoot
+    if (-not $Repo) { $Repo = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+    $Repo = Split-Path -Parent $Repo
+}
 
 $pass = 0; $fail = 0
 function Yes([string]$what, [bool]$cond) {
@@ -85,7 +87,7 @@ function Set-OneByteChanged([string]$p, [int]$at) {
 function Say($m, $c = 'Gray') { }
 function Die($m) { throw ('DIE ' + $m) }
 
-$realRecord = Join-Path $Tools '..\records\client-build.json'
+$realRecord = Join-Path $Repo 'records\client-build.json'
 $names = @((Get-Content -LiteralPath $realRecord -Raw | ConvertFrom-Json).files.PSObject.Properties.Name)
 $bundle = 'Data\Platform\Plugins\skymp5-client.js'
 $dll    = 'Data\SKSE\Plugins\MpClientPlugin.dll'
@@ -104,7 +106,7 @@ try {
     Write-Host 'The rule, against a made up game folder' -ForegroundColor Cyan
 
     $null = New-Item -ItemType Directory -Force -Path $fixTools, $fixRecords, $fixDev, $fixGame
-    Copy-Item -LiteralPath (Join-Path $Tools '..\scripts\release\Ship-Rules.ps1') -Destination $fixTools
+    Copy-Item -LiteralPath (Join-Path $Repo 'scripts\release\Ship-Rules.ps1') -Destination $fixTools
     $files = [ordered]@{}
     foreach ($n in $names) {
         $full = Join-Path $fixGame $n
@@ -157,7 +159,7 @@ try {
     Write-Host ''
     Write-Host 'Publish-Update.ps1: the scan and the removals' -ForegroundColor Cyan
 
-    $pub = Get-Content -LiteralPath (Join-Path $Tools '..\scripts\release\Publish-Update.ps1') -Raw
+    $pub = Get-Content -LiteralPath (Join-Path $Repo 'scripts\release\Publish-Update.ps1') -Raw
     $tm = [regex]::Match($pub, '(?m)^function Test-Machine\(.*$')
     $diff = [regex]::Match($pub, '(?ms)^\$changed = @\(\); \$removed = @\(\)\r?$.*?^\$removed\s+= @\(\$removed \| Where-Object \{[^\r\n]*Test-Machine[^\r\n]*\r?$')
     Yes 'Publish-Update.ps1 still defines Test-Machine on one line' $tm.Success
@@ -193,7 +195,7 @@ try {
     Write-Host 'Package-Thornswood.ps1: the listing and the refusal' -ForegroundColor Cyan
 
     $tok = $null; $err = $null
-    $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $Tools '..\scripts\release\Package-Thornswood.ps1'), [ref]$tok, [ref]$err)
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $Repo 'scripts\release\Package-Thornswood.ps1'), [ref]$tok, [ref]$err)
     Yes 'Package-Thornswood.ps1 parses' ($err.Count -eq 0)
     $loops = @($ast.FindAll({ param($n)
         $n -is [System.Management.Automation.Language.ForEachStatementAst] -and
@@ -253,7 +255,7 @@ function Invoke-Listing($all, $prefix) {
     Write-Host ''
     Write-Host 'Check-Secrets.ps1: a pack and an installer stage that carry the client' -ForegroundColor Cyan
 
-    $scanSrc = Join-Path $Tools '..\scripts\dev\Check-Secrets.ps1'
+    $scanSrc = Join-Path $Repo 'scripts\dev\Check-Secrets.ps1'
     if (-not (Test-Path -LiteralPath $scanSrc)) {
         Write-Host 'SKIP  no Check-Secrets.ps1 in these tools; it arrived with entry 236' -ForegroundColor Yellow
     } else {
@@ -303,7 +305,7 @@ function Invoke-Listing($all, $prefix) {
         Write-Host ("SKIP  no game folder at {0}; nothing on this machine to measure" -f $Game) -ForegroundColor Yellow
     } else {
         # The real record now, from the real tools folder.
-        . (Join-Path $Tools '..\scripts\release\Ship-Rules.ps1')
+        . (Join-Path $Repo 'scripts\release\Ship-Rules.ps1')
         $rec = Get-Content -LiteralPath $realRecord -Raw | ConvertFrom-Json
         $GameDir = $Game
         $recorded = 0
@@ -341,9 +343,9 @@ function Invoke-Listing($all, $prefix) {
     # ---- and the text search is gone ---------------------------------------------
     Write-Host ''
     Write-Host 'The launcher' -ForegroundColor Cyan
-    $checks = Get-Content -LiteralPath (Join-Path $Tools '..\launcher\app\Checks.cs') -Raw
+    $checks = Get-Content -LiteralPath (Join-Path $Repo 'launcher\app\Checks.cs') -Raw
     Yes 'Checks.ClientPatched, the text search for our own name, is gone' (-not ($checks -match 'static bool ClientPatched\s*\('))
-    $callers = @(Get-ChildItem -LiteralPath (Join-Path $Tools '..\launcher\app') -Filter '*.cs' -File |
+    $callers = @(Get-ChildItem -LiteralPath (Join-Path $Repo 'launcher\app') -Filter '*.cs' -File |
                  Where-Object { (Get-Content -LiteralPath $_.FullName -Raw) -match '(?<!bool\s+)ClientPatched\s*\(\s*\)' })
     Yes 'and nothing in the launcher calls it' ($callers.Count -eq 0)
 }

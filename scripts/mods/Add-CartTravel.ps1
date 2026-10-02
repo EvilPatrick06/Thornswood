@@ -1,15 +1,19 @@
-﻿<#
+<#
   Add-CartTravel.ps1
+
+  RETIRED. DO NOT RUN. Issue #1179: hand-installed CFTO and its patch, rewrote plugin lists, then Ships. The collection (or the settled load order) does this now. It refuses to run, and the rest of the file is kept for the history of how it was installed. Pattern from #405 Add-Bodies.
+
+  What it used to do, and what is left of it:
 
   Carriages and ferries between the holds, so turning fast travel off leaves
   people with a way to get about.
 
   This deliberately uses the dull kind of carriage. Touring Carriages gives
-  you a real animated ride, and under Skyrim Together that is the worst
+  you a real animated ride, and in multiplayer that is the worst
   possible shape: it parents you to a moving furniture actor that the mod
   does not sync, so everyone else watches you stand still or slide, and its
   own author warns that saves made during a ride will not reload. CFTO fades
-  instead. One position change, which is exactly what Skyrim Together already
+  instead. One position change, which is exactly what multiplayer already
   handles for ordinary fast travel.
 
       .\scripts\mods\Add-CartTravel.ps1
@@ -26,6 +30,13 @@ param(
     [switch]$NoShip,
     [switch]$NoPause
 )
+# The refusal comes before anything else, above the strict mode line and above
+# the dot source below it, so no part of the install can run by accident.
+throw ('STOP. Add-CartTravel.ps1 is retired and installs nothing (issue #1179). ' +
+       'CFTO and its JK patch come from the Nexus collection now. A hand install rewrites plugin lists and Ships a second copy into Game\Data. ' +
+       'The file is kept for the history of how it was installed. Delete this line only if ' +
+       'hand installs are meant again, and read the header first.')
+
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'

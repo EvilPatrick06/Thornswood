@@ -20,7 +20,10 @@
 //   3. home.html's own router, run against a stand-in page: a page the server
 //      filled is not fetched and drawn again on top of itself.
 //   4. The real server.js, run from a scratch copy on a spare loopback port:
-//      /rules arrives with its headings in it.
+//      /rules arrives with its headings in it, and an odd address (two
+//      slashes, a backslash, an encoded slash or null) is a 301 to one slash,
+//      a 404 or a 400, never a 500, and never a way to a file it should not
+//      reach (#929).
 //
 // The entry's own check, curl /rules and look for <h2, passes on the old
 // server too: the front page's sections are h2s, and they are in the file,
@@ -32,7 +35,7 @@
 //
 // Not strict, on purpose: the render block is eval'd here, and strict eval
 // would keep its two functions to itself.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -41,7 +44,7 @@ const crypto = require('crypto');
 const vm = require('vm');
 const { spawn } = require('child_process');
 
-const APP = path.join(TOOLS_DIR, '..', 'site');
+const APP = path.join(REPO_DIR, 'site');
 const PUBLIC = path.join(APP, 'public');
 const MARKED = 'marked-12.0.2.min.js';
 
@@ -129,6 +132,15 @@ const b = serverText.indexOf('// ==== end thornswood page render ====');
 yes('the page render block is in server.js between its markers', a >= 0 && b > a);
 if (!(a >= 0 && b > a) || markedText === null) { done(); }
 eval(serverText.slice(a, b));
+// The pages are served through the open switch (#428), which takes out the
+// <!-- alpha --> and <!-- open --> marker lines and the other mode's words,
+// so they are compared as served, in both modes.
+const sa = serverText.indexOf('// ==== thornswood open switch ====');
+const sb = serverText.indexOf('// ==== end thornswood open switch ====');
+yes('the open switch block is in server.js between its markers', sa >= 0 && sb > sa);
+const forMode = (sa >= 0 && sb > sa)
+  ? new Function('cfg', serverText.slice(sa, sb) + '\nreturn forMode;')({ open: false })
+  : function (md) { return md; };
 const lib = require(path.join(PUBLIC, MARKED));
 const render = makePageRenderer(lib);
 
@@ -246,12 +258,16 @@ try {
 ['help.md', 'known.md'].forEach(function (f) { pages.push(path.join(APP, 'data', f)); });
 yes('there are real pages to draw, ' + pages.length + ' of them', pages.length >= 9);
 pages.forEach(function (p) {
-  const md = read(p);
-  if (md === null) { yes(path.basename(p) + ' reads', false); return; }
-  const ours = render(md);
-  const theirs = plain.parse(md).replace(/<a id='([A-Za-z0-9_-]+)'><\/a>/g, '<a id="$1"></a>');
-  yes(path.basename(p) + ' comes out the same as the browser drew it, and safe',
-      ours === theirs && unsafe(ours).length === 0);
+  const raw = read(p);
+  if (raw === null) { yes(path.basename(p) + ' reads', false); return; }
+  [false, true].forEach(function (open) {
+    const md = forMode(raw, open);
+    const ours = render(md);
+    const theirs = plain.parse(md).replace(/<a id='([A-Za-z0-9_-]+)'><\/a>/g, '<a id="$1"></a>');
+    yes(path.basename(p) + ' comes out the same as the browser drew it, and safe' +
+        (open ? ', with the switch on' : ''),
+        ours === theirs && unsafe(ours).length === 0 && ours.indexOf('&lt;!--') < 0);
+  });
 });
 
 // fillPage against the real home.html.
@@ -415,7 +431,7 @@ const siteLog = function () { return read(path.join(work, 'site.log')) || ''; };
   const oldRun = runRouter('/rules', false, { '/api/page/rules': { md: '# Rules <b>' } });
   await tick();
   yes('from a server too old to draw it, the words come as escaped text',
-      oldRun.body.innerHTML === '<pre style="white-space:pre-wrap"># Rules &lt;b&gt;</pre>');
+      oldRun.body.innerHTML === '<pre class="pre-wrap"># Rules &lt;b&gt;</pre>');
   const roadRun = runRouter('/roadmap', false,
     { '/api/roadmap': { intro: '**x**', introHtml: '<p><strong>x</strong></p>', sections: [] } });
   await tick();
@@ -439,6 +455,11 @@ const siteLog = function () { return read(path.join(work, 'site.log')) || ''; };
   yes('named Rules in the tab', rules.text.indexOf('<title>Rules · Thornswood</title>') >= 0);
   yes('and nothing on the page reaches another company',
       !/cdnjs|fonts\.googleapis|fonts\.gstatic/i.test(rules.text));
+  // Patrick, 29 September (#1010): rule 2 says staff can end a character for good.
+  const rule2 = rules.text.slice(rules.text.indexOf('Nobody dies without agreeing to'),
+                                 rules.text.indexOf('Fights start freely'));
+  yes('rule 2 is drawn saying staff can end a character for good, for serious rule breaking or in an event its owner agreed to',
+      /<strong>Staff can end a character for good\.<\/strong> They do it for serious rule breaking,\s+or in an event its owner agreed to\./.test(rule2));
 
   const world = await get(port, '/world');
   yes('/world carries the anchor the footer points at', world.text.indexOf('<a id="accord"></a>') >= 0);
@@ -482,6 +503,70 @@ const siteLog = function () { return read(path.join(work, 'site.log')) || ''; };
   const woff = await get(port, faces.length ? faces[0].slice(4, -1) : '/cinzel.woff2');
   yes('a font file is served as font/woff2, cached', woff.status === 200 && /font\/woff2/.test(woff.type) && /max-age/.test(woff.cache));
 
+  // ------------------------------------------------------ odd addresses --
+  // #929: https://thornswood.net// answered 500. The handler read the address
+  // with new URL(req.url, base), which takes a leading // as the start of a
+  // host name: // and /// threw Invalid URL, and //rules, //config.json and
+  // ///x were all the front page. Asked over plain http with the path sent
+  // exactly as written, because fetch would tidy the backslashes first and
+  // follow the redirects.
+  console.log('');
+  console.log('ODD ADDRESSES');
+  const SHA = 'ab'.repeat(32);
+  fs.mkdirSync(path.join(work, 'feed', 'assets'), { recursive: true });
+  fs.writeFileSync(path.join(work, 'feed', 'version.json'), '{"launcherVersion":"1.0.0"}');
+  fs.writeFileSync(path.join(work, 'feed', 'assets', SHA), 'a pack');
+  const BS = String.fromCharCode(92);
+  function raw(p, method) {
+    return new Promise(function (resolve) {
+      const r = require('http').request({ host: '127.0.0.1', port: port, path: p, method: method || 'GET',
+        headers: { accept: 'text/html' } }, function (res) {
+        let text = '';
+        res.setEncoding('utf8');
+        res.on('data', function (d) { text += d; });
+        res.on('end', function () { resolve({ status: res.statusCode, where: res.headers.location || '', text: text }); });
+      });
+      r.on('error', function (e) { resolve({ status: 0, where: '', text: String(e.message) }); });
+      r.end();
+    });
+  }
+  const moved = [
+    ['//', '/'], ['///', '/'], ['///x', '/x'], ['//rules', '/rules'], ['//rules?a=b', '/rules?a=b'],
+    ['//fonts.css', '/fonts.css'], ['/feed//version.json', '/feed/version.json'],
+    ['/feed/assets//' + SHA, '/feed/assets/' + SHA], ['//config.json', '/config.json'],
+    ['//..//config.json', '/config.json'], ['/' + BS + 'example.com', '/example.com'], ['/' + BS + BS, '/']
+  ];
+  for (const m of moved) {
+    const r = await raw(m[0]);
+    yes(JSON.stringify(m[0]) + ' is a 301 to ' + m[1] + ' (was ' + r.status + ' ' + r.where + ')',
+        r.status === 301 && r.where === m[1]);
+  }
+  const head2 = await raw('//rules', 'HEAD');
+  yes('a HEAD for //rules is the same 301', head2.status === 301 && head2.where === '/rules');
+  const post2 = await raw('//api/hello', 'POST');
+  yes('a POST to //api/hello is not redirected, it is 404', post2.status === 404);
+
+  // Where each one lands, and the addresses that were already right.
+  const lands = [
+    ['/', 200], ['/rules', 200], ['/rules//', 200], ['/fonts.css', 200], ['/x', 404],
+    ['/feed/version.json', 200], ['/feed/assets/' + SHA, 200],
+    ['/config.json', 404], ['/example.com', 404], ['/data/board.json', 404], ['/server.js', 404],
+    ['/site.log', 404], ['/feed/assets/' + SHA.toUpperCase(), 404], ['/feed/assets/' + SHA + '0', 404],
+    ['/feed/assets/..%2Fversion.json', 404], ['/feed/assets/%2E%2E%2F..%2Fconfig.json', 404],
+    ['/feed/assets/' + SHA.slice(0, 60) + '%2F..', 404], ['/..%2Fconfig.json', 404], ['/%2E%2E/config.json', 404],
+    ['/%2Fexample.com', 404], ['/%00', 404], ['/rules%00', 404], ['/fonts.css%00', 404],
+    ['/%5C', 404], ['/%5Cconfig.json', 404], ['/%', 400], ['//%', 400], ['/%2F', 200]
+  ];
+  for (const l of lands) {
+    const r = await raw(l[0]);
+    yes(JSON.stringify(l[0]) + ' answers ' + l[1] + ' (was ' + r.status + ')', r.status === l[1]);
+  }
+  const pack = await raw('/feed/assets/' + SHA);
+  yes('and the pack by its 64 hex name is the pack', pack.text === 'a pack');
+  const cfgLeak = await raw('//config.json');
+  yes('nothing odd hands out config.json', cfgLeak.text.indexOf('a test secret') < 0);
+  yes('no odd address made the handler throw', siteLog().indexOf('handler threw') < 0);
+
   // A deploy that lost the library must not lose the rules with it.
   fs.unlinkSync(path.join(work, 'public', MARKED));
   const two = await boot();
@@ -490,7 +575,7 @@ const siteLog = function () { return read(path.join(work, 'site.log')) || ''; };
   const bare = await get(two.port, '/rules');
   yes('and /rules still carries its words, as escaped plain text',
       bare.status === 200 &&
-      bare.text.indexOf('<div class="wrap" id="pagebody"><pre style="white-space:pre-wrap"># Rules') >= 0);
+      bare.text.indexOf('<div class="wrap" id="pagebody"><pre class="pre-wrap"># Rules') >= 0);
 
   done();
 })().catch(function (e) {

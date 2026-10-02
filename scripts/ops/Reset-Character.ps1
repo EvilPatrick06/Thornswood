@@ -22,7 +22,7 @@
 [CmdletBinding()]
 param(
     [string]$VpsHost  = '',
-    [string]$VpsUser  = 'Administrator',
+    [string]$VpsUser  = '',
     [string]$VpsRoot  = 'C:\Thornswood-Server',
     [string]$TaskName = 'Thornswood Server',
     [string]$Local    = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ServerDist),
@@ -34,6 +34,7 @@ param(
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
@@ -87,11 +88,14 @@ else {
         }
     }
     $target = "$VpsUser@$VpsHost"
+    # Host key checking on (issue #450): ssh talks only to the box whose key
+    # Setup-SshKey.ps1 wrote into known_hosts, checked against vps.json.
+    $ssh = @('-o', 'StrictHostKeyChecking=yes')
 
     $tmp = Join-Path $env:TEMP 'thornswood-reset.ps1'
     Set-Content -LiteralPath $tmp -Value $body -Encoding UTF8
 
-    & scp $tmp "${target}:C:/thornswood-reset.ps1"
+    Invoke-ThornswoodNative { & scp @ssh $tmp "${target}:C:/thornswood-reset.ps1" }
     if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
     Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
 
@@ -104,7 +108,7 @@ else {
               "Start-ScheduledTask -TaskName '$TaskName'; " +
               "Start-Sleep -Seconds 3; " +
               "'server restarted'`""
-    & ssh $target $remote
+    Invoke-ThornswoodNative { & ssh @ssh $target $remote }
     if ($LASTEXITCODE -ne 0) { Die "the reset on the VPS exited with $LASTEXITCODE" }
 
     Head 'Checking it came back'

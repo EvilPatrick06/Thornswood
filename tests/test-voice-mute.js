@@ -26,10 +26,13 @@
 // Voice.cs is C# and is checked by text here and by the launcher compile.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+// The box's address from the one place that holds it (#459), which is what the
+// plugin's own list is kept equal to by Set-Vps.ps1.
+const OUR_ADDRESS = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'scripts', 'vps', 'vps.json'), 'utf8')).address;
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -39,7 +42,7 @@ function yes(what, cond) {
 
 const CR = String.fromCharCode(13);
 function read(rel) {
-  return fs.readFileSync(path.join(TOOLS_DIR, rel), 'utf8').split(CR).join('');
+  return fs.readFileSync(path.join(REPO_DIR, rel), 'utf8').split(CR).join('');
 }
 
 /* A gain node that records what it was set to, whether ramped or assigned. */
@@ -64,7 +67,7 @@ function pannerNode() {
   service sending one, gains lists every gain node the page made, in order.
 */
 function hostPage() {
-  const html = read('../launcher/voice-host.html');
+  const html = read('launcher/voice-host.html');
   const m = /<script>([\s\S]*)<\/script>/.exec(html);
   if (!m) { throw new Error('voice-host.html has no script'); }
 
@@ -209,7 +212,7 @@ function joined(others) {
   file on disk is not touched.
 */
 function gamePage() {
-  let src = read('../game/ui/thornswood-voice.js');
+  let src = read('game/ui/thornswood-voice.js');
   const end = src.lastIndexOf('})();');
   const hook = '  window.__t = { conns: conns, setWho: function (w) { lastWho = w; }, ' +
                'cfg: cfg, place: place, setCtx: function (c) { ctx = c; } };\n';
@@ -295,7 +298,7 @@ function mutedSent(sent) {
 function plugin() {
   const files = {};
   files['Data/Platform/Plugins/skymp5-client-settings.txt'] =
-    JSON.stringify({ 'server-ip': '192.135.112.23', gameData: { profileId: ME } });
+    JSON.stringify({ 'server-ip': OUR_ADDRESS, gameData: { profileId: ME } });
   files['Data/Platform/thornswood-session.txt'] = String(Date.now());
   const fakeFs = {
     readFileSync: function (p) {
@@ -318,7 +321,7 @@ function plugin() {
     Math: Math, Array: Array, Object: Object, RegExp: RegExp, isFinite: isFinite
   };
   vm.createContext(sandbox);
-  vm.runInContext(read('../game/plugins/thornswood-voice.js'), sandbox);
+  vm.runInContext(read('game/plugins/thornswood-voice.js'), sandbox);
   function page() {
     const args = [].slice.call(arguments);
     (handlers.browserMessage || []).forEach(function (fn) { fn({ arguments: args }); });
@@ -357,7 +360,7 @@ function plugin() {
 
 // ------------------------------------------------------ the launcher side
 {
-  const cs = read('../launcher/app/Voice.cs');
+  const cs = read('launcher/app/Voice.cs');
   yes('Voice.cs reads voice-muted.txt from the channel folders',
       /Path\.Combine\(d, "voice-muted\.txt"\)/.test(cs) && /foreach \(string d in dirs\)/.test(cs));
   yes('and hands the line to its page as a muted message',
@@ -367,7 +370,7 @@ function plugin() {
   yes('and again whenever the page loads, which starts it with nobody muted',
       /static void Configure\(Action<string> log\)\s*\{\s*\/\/[^\n]*\n\s*mutedSeen = null;/.test(cs));
 
-  const rules = read('../scripts/release/Ship-Rules.ps1');
+  const rules = read('scripts/release/Ship-Rules.ps1');
   const machine = /\$ShipMachineFiles = @\(([\s\S]*?)\n\)/.exec(rules);
   yes('and one person\'s mute list never rides in a pack',
       !!machine && machine[1].indexOf("'Data\\Platform\\voice-muted.txt'") >= 0);

@@ -38,7 +38,7 @@
 //   2. THE WORKING HEAT. A forge, a skyforge and a smelter are hot, which is
 //      Patrick's line above. Those are crafting furniture markers and have no
 //      flame model of their own, so they are matched by editor id, which is
-//      the only thing that identifies them. The list of prefixes is in
+//      the only thing that identifies them. The list of needles is in
 //      CRAFT_HEAT and each one is checked to exist.
 //
 //   3. NOT WHEN IT IS OUT. Campfire01LandOff, Campfire01Off,
@@ -48,7 +48,7 @@
 //      ends in Off or Out is dropped, and the count of what was dropped is
 //      printed so the rule can be seen working.
 //
-// Read only. It opens the plugins of the build and writes tools\fires.json.
+// Read only. It opens the plugins of the build and writes game\data\fires.json.
 // It touches nothing in the game folder and nothing on the VPS.
 //
 // Usage:
@@ -56,7 +56,7 @@
 //   node scripts\dev\Build-FireTable.js --data "C:\Thornswood\Game\Data"
 //   node scripts\dev\Build-FireTable.js --print
 //
-// Exit code 1 if a plugin will not parse, if any CRAFT_HEAT prefix matches
+// Exit code 1 if a plugin will not parse, if any CRAFT_HEAT needle matches
 // nothing, or if the table comes out empty. Nothing is written unless every
 // check passed.
 const fs = require('fs');
@@ -138,13 +138,22 @@ const FLAME_MODELS = [
 ];
 
 // Rule 2: the working heat, by editor id. Every one of these must match at
-// least one record or the build fails: a prefix that matches nothing is a
-// renamed record and a silently missing forge.
+// least one record or the build fails: a needle that matches nothing is a
+// renamed record and a silently missing forge. A needle matches when the
+// editor id begins with it (full editor ids listed when the shared words are not at the front).
 const CRAFT_HEAT = [
   'CraftingBlackSmithForge',
   'CraftingSmelterMarker',
   'CraftingBlacksmithForgeSTATIC',
-  'CraftingCookingFireSpit'
+  'CraftingCookingFireSpit',
+  // Prefix-start on the four short needles misses these. The shared words are not
+  // at the front (Dawnguard, Dragonborn, NKP, Thornswood), so the full
+  // editor id is the needle and each one still has to exist.
+  'DLC1DawnguardCraftingBlackSmithForge',
+  'DLC2CraftingBlackSmithForge',
+  'DLC2CraftingBlackSmithSkaalForge',
+  'CraftingNKPBlackSmithForge',
+  'ThornswoodCraftingCharcoalKilnMarker'
 ];
 
 // Rule 3: not when it is out.
@@ -296,12 +305,12 @@ for (const pl of PLUGINS) {
   walk(b, 24 + b.readUInt32LE(4), b.length);
 }
 
-// Every craft prefix has to have found something.
+// Every craft needle has to have found something.
 for (const pre of CRAFT_HEAT) {
   const hit = rows.some(function (r) {
     return r.edid.toLowerCase().indexOf(pre.toLowerCase()) === 0;
   });
-  if (!hit) { fail('nothing matched the craft heat prefix ' + pre); }
+  if (!hit) { fail('nothing matched the craft heat needle ' + pre); }
 }
 if (!rows.length) { fail('the table came out empty'); }
 

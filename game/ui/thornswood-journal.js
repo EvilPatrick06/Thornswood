@@ -23,6 +23,9 @@
 
   Everything it does goes out as the ordinary /journal command, the same lines
   a person could type. See the journalCommand note in gamemode.js.
+
+  A faction or a business is a separate tab on this same panel, drawn only
+  when the server says this character may see it. Those lines go out as /book.
 */
 (function () {
   if (window.thornswoodJournal) { return; }
@@ -35,6 +38,7 @@
   var openPage = '';     // which page inside it
   var editing = false;
   var readingShared = -1;
+  var openGroup = '';
 
   function tell(what) {
     try { window.skyrimPlatform.sendMessage('thornswood-front', 'journal:' + what); }
@@ -90,9 +94,9 @@
     '#' + ID + ' h2{margin:0;padding:18px 24px 14px;font-size:26px;font-weight:normal;line-height:1.1;',
     '  color:#f6e9c8;border-bottom:1px solid rgba(198,170,109,.22)}',
     '#' + ID + ' .cols{display:grid;grid-template-columns:280px 1fr;overflow:hidden}',
-    '#' + ID + ' .side{overflow:auto;border-right:1px solid rgba(198,170,109,.22);padding:14px;',
-    '  font-size:13.5px}',
-    '#' + ID + ' .main{overflow:auto;padding:16px 22px;font-size:14px}',
+    '#' + ID + ' .side{overflow:auto;border-right:1px solid rgba(198,170,109,.22);padding:16px 14px;',
+    '  font-size:15px}',
+    '#' + ID + ' .main{overflow:auto;padding:18px 24px;font-size:17px}',
     '#' + ID + ' .foot{padding:12px 24px;border-top:1px solid rgba(198,170,109,.22);display:flex;gap:10px;',
     '  align-items:center;font-size:13.5px;font-style:italic;color:rgba(217,207,180,.7)}',
     '#' + ID + ' h3{margin:14px 0 7px;padding-bottom:6px;font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;',
@@ -104,13 +108,13 @@
     // the text box down (measured in Edge at 1920 by 1080, 24 September).
     '#' + ID + ' button{font-family:inherit;font-style:normal;font-weight:normal;cursor:pointer;',
     '  border:1px solid rgba(198,170,109,.55);background:rgba(0,0,0,.25);color:#e9d19b;',
-    '  padding:5px 10px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}',
+    '  padding:6px 12px;font-size:14px;line-height:18px;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}',
     '#' + ID + ' button.go{background:#c6aa6d;border-color:#e9d19b;color:#1b1205}',
     // A journal in the list and a page tab are names rather than actions, so
     // they read as the K panel's cards and choices do, not as its buttons.
-    '#' + ID + ' .item{display:block;width:100%;text-align:left;margin-bottom:5px;',
-    '  padding:7px 9px;border:1px solid rgba(198,170,109,.30);background:rgba(0,0,0,.20);',
-    '  color:#f6e9c8;font-size:14px;letter-spacing:.02em;text-transform:none;white-space:normal}',
+    '#' + ID + ' .item{display:block;width:100%;text-align:left;margin-bottom:6px;',
+    '  padding:9px 12px;border:1px solid rgba(198,170,109,.30);background:rgba(0,0,0,.20);',
+    '  color:#f6e9c8;font-size:15px;letter-spacing:.02em;text-transform:none;white-space:normal}',
     '#' + ID + ' .item.sel{border-color:rgba(198,170,109,.55);background:rgba(120,94,44,.24);',
     '  box-shadow:inset 3px 0 0 0 #c6aa6d}',
     '#' + ID + ' .item.go{text-align:center;font-size:11px;letter-spacing:.14em;text-transform:uppercase;',
@@ -119,7 +123,7 @@
     '#' + ID + ' button[data-page]{font-size:13.5px;letter-spacing:.02em;text-transform:none;color:#d9cfb4;',
     '  border-color:rgba(198,170,109,.30);background:rgba(0,0,0,.20)}',
     '#' + ID + ' button[data-page].go{border-color:#e9d19b;background:rgba(201,162,75,.20);color:#f6e9c8}',
-    '#' + ID + ' input,#' + ID + ' textarea,#' + ID + ' select{font:inherit;color:#f6e9c8;',
+    '#' + ID + ' input,#' + ID + ' textarea,#' + ID + ' select{font-family:inherit;font-size:16px;color:#f6e9c8;',
     '  background:rgba(0,0,0,.35);border:1px solid rgba(198,170,109,.30);padding:8px 10px;width:100%}',
     '#' + ID + ' input:focus,#' + ID + ' textarea:focus,#' + ID + ' select:focus{border-color:rgba(198,170,109,.55)}',
     // the list the select drops down is drawn on its own, so it gets a solid
@@ -129,7 +133,7 @@
     '#' + ID + ' .bar{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}',
     '#' + ID + ' .bar .grow{flex:1}',
     '#' + ID + ' .none{color:rgba(217,207,180,.6);font-style:italic;padding:8px 2px;line-height:1.55}',
-    '#' + ID + ' .read{white-space:pre-wrap;line-height:1.6;font-size:15px;color:#d9cfb4}',
+    '#' + ID + ' .read{white-space:pre-wrap;line-height:1.65;font-size:17px;color:#d9cfb4}',
     '#' + ID + ' .from{color:rgba(217,207,180,.6);font-style:italic;font-size:12.5px;margin-bottom:10px}',
     '#' + ID + ' .main b{font-weight:normal;font-size:16.5px;color:#f6e9c8}',
     // The K panel's scrollbars, the same rules scoped to this panel, so the
@@ -141,6 +145,37 @@
     '#' + ID + ' ::-webkit-scrollbar-thumb:active{background:rgba(233,209,155,.55);background-clip:padding-box}',
     '#' + ID + ' ::-webkit-scrollbar-corner{background:transparent}'
   ].join('\n');
+
+  /*
+    SCALED TO THE SCREEN, THE K PANEL'S WAY. Issue 958.
+
+    Patrick on dev, 28 September: "it doesn't scale the menu size for bigger
+    screens or is just too small". The panel is a fixed 1040 by 660 box in
+    CSS pixels, and the game's browser is the size of the screen, so at his
+    3440 by 1440 it filled under a third of the width, and at 3840 by 2160 a
+    quarter. It is laid out for 1920 by 1080 and scaled up from there by the
+    smaller of the two ratios, exactly as fit() in thornswood-skills.js does:
+    1920 by 1080 draws it as is, 2560 by 1440 at 1.333, 3440 by 1440 at
+    1.333, 3840 by 2160 at 2. Never below 1, where max-width and max-height
+    already keep it on a smaller screen, and never above 2.4.
+    tests/test-journal-scale.js holds it at those sizes.
+  */
+  var BASE_W = 1920, BASE_H = 1080, MAX_SCALE = 2.4;
+
+  function scaleFor(w, h) {
+    var s = Math.min(w / BASE_W, h / BASE_H);
+    if (!isFinite(s) || s < 1) { s = 1; }
+    return Math.min(s, MAX_SCALE);
+  }
+
+  function fit() {
+    try {
+      var panel = root && root.querySelector('.panel');
+      if (!panel) { return; }
+      panel.style.transformOrigin = 'center center';
+      panel.style.transform = 'scale(' + scaleFor(window.innerWidth, window.innerHeight).toFixed(3) + ')';
+    } catch (e) { }
+  }
 
   function build() {
     if (root) { return root; }
@@ -161,6 +196,8 @@
       '</div>';
     document.body.appendChild(root);
     root.querySelector('#' + ID + '-close').onclick = close;
+    fit();
+    window.addEventListener('resize', fit);
     // The page answers its own Escape, and its own J; no plugin can see a key
     // while the browser holds the keyboard. See thornswood-bridge.js. The
     // footer has said "Escape or J closes this" since #288, and J reached
@@ -228,6 +265,26 @@
                 '<div style="color:rgba(217,207,180,.6);font-size:12px;font-style:italic">from ' + esc(shared[j].from) + '</div></button>';
       }
     }
+    var group = data && data.group;
+    if (group && group.show) {
+      html += '<h3>Group</h3>';
+      var gb = group.books || [];
+      if (!gb.length) { html += '<div class="none">No book yet.</div>'; }
+      for (var gi = 0; gi < gb.length; gi++) {
+        html += '<button class="item' + (gb[gi].id === openGroup ? ' sel' : '') +
+                '" data-group="' + esc(gb[gi].id) + '">' + esc(gb[gi].name) +
+                '<span class="c">' + esc(gb[gi].kind) + '</span></button>';
+      }
+      if (group.canBusiness || group.canFaction) {
+        html += '<input id="' + ID + '-gname" placeholder="A name">';
+        if (group.canBusiness) {
+          html += '<button class="item go" data-found="business">New business</button>';
+        }
+        if (group.canFaction) {
+          html += '<button class="item go" data-found="faction">New faction</button>';
+        }
+      }
+    }
     side.innerHTML = html;
 
     var items = side.querySelectorAll('button[data-book],button[data-new],button[data-shared]');
@@ -241,16 +298,37 @@
             renamed on the panel, which is one more click and cannot strand
             anybody.
           */
+          openGroup = '';
           net('/journal new Journal');
           return;
         }
         if (this.getAttribute('data-shared') !== null) {
           readingShared = Number(this.getAttribute('data-shared'));
-          openBook = ''; openPage = ''; editing = false;
+          openBook = ''; openPage = ''; editing = false; openGroup = '';
           draw();
           return;
         }
         openBook = this.getAttribute('data-book');
+        readingShared = -1;
+        openPage = '';
+        editing = false;
+        openGroup = '';
+        draw();
+      };
+    }
+    var groupBtns = side.querySelectorAll('button[data-group],button[data-found]');
+    for (var gbi = 0; gbi < groupBtns.length; gbi++) {
+      groupBtns[gbi].onclick = function () {
+        var found = this.getAttribute('data-found');
+        if (found) {
+          var nameEl = root.querySelector('#' + ID + '-gname');
+          var gname = nameEl ? String(nameEl.value || '').trim() : '';
+          if (!gname) { return; }
+          net('/book new ' + found + ' ' + gname);
+          return;
+        }
+        openGroup = this.getAttribute('data-group');
+        openBook = '';
         readingShared = -1;
         openPage = '';
         editing = false;
@@ -259,8 +337,181 @@
     }
   }
 
+  function groupBook() {
+    var g = data && data.group;
+    var rows = (g && g.books) || [];
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].id === openGroup) { return rows[i]; }
+    }
+    return null;
+  }
+
+  function leftWords(row) {
+    if (row.on) { return 'here'; }
+    if (!row.left) { return ''; }
+    try {
+      var d = new Date(row.left);
+      if (isNaN(d.getTime())) { return ''; }
+      return 'left ' + d.toLocaleString();
+    } catch (e) { return ''; }
+  }
+
+  function gold(n) { return n == null || n === '' ? '' : String(n); }
+
+  function drawGroup(main) {
+    var book = groupBook();
+    if (!book) { main.innerHTML = '<div class="none">Gone.</div>'; return; }
+    var out = '<div class="from">' + esc(book.name) + ', ' + esc(book.kind) + '</div>';
+    if (book.read) {
+      out += '<b>People</b>';
+      var people = book.people || [];
+      if (!people.length) { out += '<div class="none">Nobody in it.</div>'; }
+      for (var i = 0; i < people.length; i++) {
+        var when = leftWords(people[i]);
+        out += '<div class="read">' + esc(people[i].name) + ', ' + esc(people[i].role) +
+               (when ? ', ' + esc(when) : '') + '</div>';
+      }
+      out += '<b>Prices</b>';
+      if (book.submitted && book.submitted.length) {
+        out += '<div class="none">Submitted to ' + esc(book.submitted.join(', ')) + '.</div>';
+      }
+      if (book.canPrices) {
+        out += '<div class="none">Leave the list on the notice board while you are standing at it. The list stays in the book.</div>';
+      }
+      var list = book.priceList || [];
+      if (!list.length) { out += '<div class="none">No prices yet.</div>'; }
+      for (var p = 0; p < list.length; p++) {
+        out += '<div class="read">' + esc(list[p].name) +
+               ' buy ' + esc(gold(list[p].buy)) + ' sell ' + esc(gold(list[p].sell));
+        if (book.canPrices) {
+          out += ' <button data-g="drop" data-name="' + esc(list[p].name) + '">Remove</button>';
+        }
+        out += '</div>';
+      }
+      if (book.canPrices) {
+        out += '<div class="bar"><input id="' + ID + '-price-name" placeholder="what">' +
+               '<input id="' + ID + '-price-buy" placeholder="buy, blank if not">' +
+               '<input id="' + ID + '-price-sell" placeholder="sell, blank if not">' +
+               '<button data-g="price">Set price</button></div>';
+      }
+      out += '<b>Talk</b>';
+      var chat = book.chat || [];
+      if (!chat.length) { out += '<div class="none">Nothing said yet.</div>'; }
+      for (var c = 0; c < chat.length; c++) {
+        out += '<div class="read">(( ' + esc(chat[c].name) + ': ' + esc(chat[c].text) + ' ))</div>';
+      }
+    } else {
+      out += '<div class="none">You cannot read this book.</div>';
+    }
+    if (book.speak) {
+      out += '<div class="bar"><input id="' + ID + '-gline" placeholder="out of character">' +
+             '<button class="go" data-g="say">Say</button></div>';
+    }
+    if (book.invite) {
+      out += '<div class="bar"><input id="' + ID + '-ginvite" placeholder="who is here">' +
+             '<button data-g="invite">Invite</button></div>';
+    }
+    if (book.canRoles) {
+      out += '<div class="bar"><input id="' + ID + '-grole" placeholder="a role">' +
+             '<button data-g="rolenew">New role</button></div>';
+      out += '<div class="bar"><input id="' + ID + '-gwho" placeholder="who is in the book">' +
+             '<input id="' + ID + '-gset" placeholder="their role">' +
+             '<button data-g="setrole">Set role</button>' +
+             '<button data-g="remove">Remove</button></div>';
+    }
+    if (book.owner) {
+      out += '<div class="bar"><input id="' + ID + '-grename" placeholder="a new name">' +
+             '<button data-g="rename">Rename</button>' +
+             '<button data-g="disband">Disband</button></div>';
+    }
+    if (book.staff) {
+      out += '<div class="bar"><input id="' + ID + '-ghand" placeholder="who already belongs">' +
+             '<button data-g="give">Hand it on</button></div>';
+    }
+    if (book.leave) {
+      out += '<div class="bar"><button data-g="leave">Leave</button></div>';
+    }
+    main.innerHTML = out;
+    var actions = main.querySelectorAll('button[data-g]');
+    for (var a = 0; a < actions.length; a++) {
+      actions[a].onclick = onGroup;
+    }
+  }
+
+  function gval(id) {
+    var el = root.querySelector('#' + ID + '-' + id);
+    return el ? String(el.value || '').trim() : '';
+  }
+
+  function blankGold(id) {
+    var v = gval(id);
+    return v ? v : '-';
+  }
+
+  function onGroup() {
+    var book = groupBook();
+    if (!book) { return; }
+    var verb = this.getAttribute('data-g');
+    if (verb === 'say') {
+      var line = gval('gline');
+      if (!line) { return; }
+      net('/book say ' + book.id + ' ' + line);
+      return;
+    }
+    if (verb === 'invite') {
+      var who = gval('ginvite');
+      if (!who) { return; }
+      net('/book invite ' + book.id + ' ' + who);
+      return;
+    }
+    if (verb === 'leave') { net('/book leave ' + book.id); openGroup = ''; return; }
+    if (verb === 'rename') {
+      var next = gval('grename');
+      if (!next) { return; }
+      net('/book rename ' + book.id + ' ' + next);
+      return;
+    }
+    if (verb === 'disband') { net('/book disband ' + book.id); openGroup = ''; return; }
+    if (verb === 'price') {
+      var item = gval('price-name');
+      if (!item) { return; }
+      net('/book price ' + book.id + ' | ' + item + ' | ' + blankGold('price-buy') + ' | ' + blankGold('price-sell'));
+      return;
+    }
+    if (verb === 'drop') {
+      net('/book price ' + book.id + ' drop | ' + (this.getAttribute('data-name') || ''));
+      return;
+    }
+    if (verb === 'rolenew') {
+      var role = gval('grole');
+      if (!role) { return; }
+      net('/book role ' + book.id + ' new | ' + role);
+      return;
+    }
+    if (verb === 'setrole') {
+      var person = gval('gwho');
+      var set = gval('gset');
+      if (!person || !set) { return; }
+      net('/book member ' + book.id + ' role | ' + person + ' | ' + set);
+      return;
+    }
+    if (verb === 'remove') {
+      var gone = gval('gwho');
+      if (!gone) { return; }
+      net('/book member ' + book.id + ' remove | ' + gone);
+      return;
+    }
+    if (verb === 'give') {
+      var heir = gval('ghand');
+      if (!heir) { return; }
+      net('/book give ' + book.id + ' | ' + heir);
+    }
+  }
+
   function drawMain() {
     var main = root.querySelector('#' + ID + '-main');
+
+    if (openGroup) { drawGroup(main); return; }
 
     if (readingShared >= 0) {
       var sh = ((data && data.shared) || [])[readingShared];
@@ -284,20 +535,23 @@
     var friends = ((data && data.friends) || []).filter(function (f) { return true; });
     var pick = '<select id="' + ID + '-who"><option value="">a friend...</option>';
     for (var f = 0; f < friends.length; f++) {
-      pick += '<option value="' + esc(friends[f].name) + '">' + esc(friends[f].name) + '</option>';
+      var whoId = friends[f].p != null && friends[f].p !== '' ? String(friends[f].p) : friends[f].name;
+      pick += '<option value="' + esc(whoId) + '">' + esc(friends[f].name) + '</option>';
     }
     pick += '</select>';
 
     var html =
       '<div class="bar">' +
-      '<input id="' + ID + '-title" value="' + esc(book.title) + '" style="max-width:280px">' +
+      '<input id="' + ID + '-title" value="' + esc(book.title) + '" style="max-width:360px">' +
       '<button data-do="rename">Rename</button>' +
       '<span class="grow"></span>' +
-      '<span style="color:rgba(198,170,109,.85);font-size:11.5px;letter-spacing:.24em;text-transform:uppercase">share</span>' +
+      '<button data-do="dropbook">Throw away</button>' +
+      '</div>' +
+      '<div class="bar">' +
+      '<span style="color:rgba(198,170,109,.85);font-size:13px;letter-spacing:.18em;text-transform:uppercase">Share with</span>' +
       pick +
       '<button data-do="sharebook">Whole journal</button>' +
-      '<button data-do="unsharebook">Stop</button>' +
-      '<button data-do="dropbook">Throw away</button>' +
+      '<button data-do="unsharebook">Stop sharing</button>' +
       '</div>';
 
     html += '<div class="bar">';
@@ -338,6 +592,11 @@
     }
   }
 
+  function sayNeedFriend() {
+    var foot = root && root.querySelector('#' + ID + '-foot');
+    if (foot) { foot.textContent = 'Pick a friend first. Sharing only works with somebody on your list.'; }
+  }
+
   function val(id) {
     var el = root.querySelector('#' + ID + '-' + id);
     return el ? String(el.value || '') : '';
@@ -366,13 +625,14 @@
     }
     if (verb === 'dropbook') { net('/journal drop ' + book.id); openBook = ''; return; }
     if (verb === 'sharebook') {
-      if (!who) { return; }
+      if (!who) { sayNeedFriend(); return; }
       net('/journal share ' + book.id + ' - ' + who);
       return;
     }
     if (verb === 'unsharebook') { net('/journal unshare ' + book.id + ' -'); return; }
     if (verb === 'sharepage') {
-      if (!who || !openPage) { return; }
+      if (!openPage) { return; }
+      if (!who) { sayNeedFriend(); return; }
       net('/journal share ' + book.id + ' ' + openPage + ' ' + who);
       return;
     }
@@ -395,6 +655,7 @@
     if (shown) { return; }
     shown = true;
     root.className = 'on';
+    fit();
     draw();
     tell('opened');
   }
@@ -413,6 +674,7 @@
     close: close,
     toggle: toggle,
     isOpen: function () { return shown; },
+    scaleFor: scaleFor,
     setData: function (d) {
       data = d || null;
       /*
@@ -422,12 +684,16 @@
         while it has focus.
       */
       if (!shown) { return; }
-      var el = root && root.querySelector('#' + ID + '-text');
-      if (el && document.activeElement === el) { drawSide(); return; }
+      var el = document.activeElement;
+      if (el && root && root.contains && root.contains(el) && typing(el)) { return; }
       draw();
     }
   };
 
   build();
+  // Owner updates can precede this asynchronously loaded script (#1275).
+  if (window.thornswoodSocialView) {
+    window.thornswoodJournal.setData(window.thornswoodSocialView);
+  }
   tell('ready');
 })();

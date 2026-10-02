@@ -123,7 +123,7 @@ namespace Thornswood
             A("AnotherOakwood", 61007);
             A("aaaGraniteHill", 14658);
             A("OarsRest", 41812);
-            A("ElysiumEstateSSE", 4119);
+            A("ElysiumEstate", 4119);
             A("Populated Cities Towns Villages Legendary", 2005);
 
             // ---------------------------------------------------- looks
@@ -155,15 +155,6 @@ namespace Thornswood
             A("PriorityMod", 50129);
             A("imgui-vr-helper", 183466);
 
-            // ---------------------------------------------------- multiplayer
-            Map["SkyrimTogether"] = "https://github.com/tiltedphoques/TiltedEvolution";
-            A("SkyrimTogetherTweaks", 135782);
-            A("MorphSyncTogether", 188240);
-            A("TradeTogether", 188710);
-            A("TradeTogetherMCM", 188710);
-            A("STRPluginMessagingAPI", 188907);
-            A("STRPluginMessagingBridge", 188907);
-
             // Patch and add-on plugins are named after their parent mod.
             P("Gourmet", 96876);
             P("Skyrim Unbound", 27962);
@@ -174,8 +165,6 @@ namespace Thornswood
             P("Hothtrooper44", 3479);
             P("KhisartinBeards", 122879);
             P("RaceMenu", 19080);
-            P("TradeTogether", 188710);
-            P("STRPluginMessaging", 188907);
             P("AHZmoreHUD", 12688);
 
             None["Skyrim"] = true;

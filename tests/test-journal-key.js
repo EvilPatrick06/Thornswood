@@ -46,12 +46,22 @@
 // Run it against the code before the change with FRONT=<that file>: the J
 // scenarios fail there, because nothing shut the book.
 //
+// THE CLIENT (issue 1016). Patrick, 28 September: "Don't accept the flash
+// make the game client change." The fork's client has a list of keys the
+// game's menu opener does not see (setMenuOpenKeyBlocked, MenuOpenKeyBlocks in
+// platform_lib, its own unit test in the fork). opts.client runs the pretend
+// game with that list, kept the way the hook keeps it: a press on the list
+// never reaches the game's Journal control unless one of the entry's except
+// menus is open. C1 to C7 below run it, and there the book is never drawn at
+// all. S1 to S12 run a client without the list: the shut that is left for a
+// book that opens anyway.
+//
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const SRC = process.env.FRONT ||
-            path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-front.js');
+            path.join(REPO_DIR, 'game', 'plugins', 'thornswood-front.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -114,6 +124,8 @@ const J = 36, ESC = 1, U = 22;
   opts.notReady     the overlays are not in yet (T.ready false)
   opts.refuse       the game ignores its Journal control (controls off)
   opts.stubborn     how many of the plugin's closes the book ignores
+  opts.client       the client keeps listed keys from the game's menu opener
+                    (issue 1016)
 */
 function rig(opts) {
   opts = opts || {};
@@ -129,6 +141,9 @@ function rig(opts) {
     focus: false,
     cursorByFocus: false,
     stubborn: opts.stubborn || 0,
+    // The client's list, 'userEvent:code' -> except menus, and every call.
+    kept: {},
+    keptCalls: [],
     controls: Object.assign({ 36: 'Journal', 1: 'Pause', 22: '' }, opts.controls || {})
   };
   const page = { shown: false, pending: [], toggles: 0 };
@@ -157,6 +172,11 @@ function rig(opts) {
         return -1;
       }
     },
+    setMenuOpenKeyBlocked: opts.client ? function (userEvent, code, on, except) {
+      game.keptCalls.push({ userEvent: userEvent, code: code, on: on, except: except });
+      if (on) { game.kept[userEvent + ':' + code] = (except || []).slice(); }
+      else { delete game.kept[userEvent + ':' + code]; }
+    } : undefined,
     browser: {
       isFocused: function () { return game.focus; },
       setFocused: function (v) {
@@ -210,7 +230,9 @@ function rig(opts) {
     // crosshair it passes every key on, which is what this stands in for.
     'const MOLD_KEY = 22;\n' +
     'function moldPress() { return false; }\n' +
-    'const ESC = 1, CHAT_KEY = 28, SKILLS_KEY = 37, PARTY_KEY = 25,\n' +
+    'const LOCK_KEY = 45;\n' +
+    'function lockPress() { return false; }\n' +
+    'const COMMAND_KEY = 53;\nconst ESC = 1, CHAT_KEY = 28, SKILLS_KEY = 37, PARTY_KEY = 25,\n' +
     '      FRIEND_KEY = 34, TRADE_KEY = 35, MUTE_KEY = 38;\n';
   const make = new Function('sp', 'say', 'T', 'Date', 'guard', 'JOURNAL_KEY',
     prelude + arbiter + '\n' + jBlock + jStandIns + '\n' + keys + '\nreturn { claims: claims };');
@@ -291,7 +313,11 @@ function rig(opts) {
       }
       const control = game.controls[code] || '';
       const book = game.open[JOURNAL];
-      if (control === 'Journal' && !opts.refuse) {
+      // MenuOpenKeyBlockHook.cpp: a listed press is a no to the game's menu
+      // opener unless an except menu is up.
+      const except = game.kept[control + ':' + code];
+      const keptFromGame = !!except && !except.some(function (n) { return !!game.open[n]; });
+      if (control === 'Journal' && !opts.refuse && !keptFromGame) {
         queueUi({ menu: JOURNAL, type: book ? 'hide' : 'show', page: 'Quests' });
       }
       if (control === 'Pause') {
@@ -303,6 +329,8 @@ function rig(opts) {
     },
     /* Something other than a key opens the book, a quest script say. */
     scriptOpens: function () { game.ui.push({ menu: JOURNAL, type: 'show', page: 'Quests' }); },
+    /* One of the game's own menus, the inventory say, is up. */
+    menu: function (name, up) { if (up) { game.open[name] = true; } else { delete game.open[name]; } },
     run: function (n) { for (let i = 0; i < n; i++) { frame(); } },
     said: function (text) { return logs.some(function (l) { return l.indexOf(text) >= 0; }); }
   };
@@ -611,6 +639,145 @@ if (arbiter !== null && keys !== null) {
     h.run(150);
     yes('S12 and the System page it opened next stays, with nothing asked again',
         h.game.open[JOURNAL] === 'System' && h.game.shut.length === 1);
+  }
+
+  // ------------------------------------ C1: THE FLASH, with the new client
+  {
+    const variants = [];
+    [false, true].forEach(function (spFirst) {
+      [0, 1].forEach(function (openLag) {
+        [0, 1, 2, 4].forEach(function (pageDelay) {
+          variants.push({ client: true, spFirst: spFirst, openLag: openLag, pageDelay: pageDelay });
+        });
+      });
+    });
+    const bad = { kept: [], ours: [], drawn: [], shut: [], focus: [], after: [], threw: [] };
+    variants.forEach(function (v) {
+      const h = rig(v);
+      const name = JSON.stringify(v);
+      const k = h.game.kept['Journal:' + J];
+      if (!k || k.indexOf('InventoryMenu') < 0 || k.indexOf(JOURNAL) < 0) { bad.kept.push(name); }
+      h.press(J);
+      h.run(60);
+      if (!h.page.shown) { bad.ours.push(name); }
+      if (h.game.books.length !== 0) { bad.drawn.push(name); }
+      if (h.game.shut.length !== 0) { bad.shut.push(name); }
+      if (!h.game.focus || !h.game.open[CURSOR]) { bad.focus.push(name); }
+      h.press(ESC);
+      h.run(30);
+      if (h.page.shown || h.game.focus || h.game.open[CURSOR] || h.game.open[JOURNAL]) { bad.after.push(name); }
+      if (h.threw.length) { bad.threw.push(name + ' ' + h.threw[0]); }
+    });
+    const show = function (list) { list.slice(0, 3).forEach(function (n) { console.log('      ' + n); }); };
+    yes('C1 once our panel is in, the client is told to keep J (as Journal) from the game, ' +
+        'except over the game\'s own menus and its book', bad.kept.length === 0); show(bad.kept);
+    yes('C1 J opens our journal, in all ' + variants.length + ' orders', bad.ours.length === 0); show(bad.ours);
+    yes('C1 THE FLASH: the game\'s journal is never drawn, not for one frame',
+        bad.drawn.length === 0); show(bad.drawn);
+    yes('C1 so nothing is shut', bad.shut.length === 0); show(bad.shut);
+    yes('C1 our journal holds the keyboard, with a cursor, without F6', bad.focus.length === 0); show(bad.focus);
+    yes('C1 closing ours leaves no book, no cursor and the keyboard with the game',
+        bad.after.length === 0); show(bad.after);
+    yes('C1 nothing threw', bad.threw.length === 0); show(bad.threw);
+  }
+
+  // ------------------------------------------- C2: Escape is not on the list
+  {
+    let ok = true;
+    [false, true].forEach(function (spFirst) {
+      const h = rig({ client: true, spFirst: spFirst });
+      h.press(ESC);
+      h.run(120);
+      if (h.game.open[JOURNAL] !== 'System' || h.game.shut.length) { ok = false; }
+    });
+    yes('C2 Escape opens the game\'s System page and it stays', ok);
+  }
+
+  // ----------------------------- C3: J over the game's own menus is the game's
+  {
+    const h = rig({ client: true });
+    h.menu('InventoryMenu', true);
+    h.press(J);
+    h.run(60);
+    yes('C3 J in the inventory opens the game\'s quest log as it always did, and not ours',
+        h.game.open[JOURNAL] === 'Quests' && !h.page.shown && h.game.shut.length === 0);
+
+    const s = rig({ client: true });
+    s.press(ESC);
+    s.run(30);
+    s.press(J);
+    s.run(60);
+    yes('C3 J on the System page closes the book the game\'s way and opens ours',
+        !s.game.open[JOURNAL] && s.page.shown && s.game.shut.length === 0);
+  }
+
+  // --------------------------------------------- C4: rebinds on either side
+  {
+    const h = rig({ client: true, controls: { 36: '', 22: 'Journal' } });
+    h.press(J);
+    h.run(60);
+    yes('C4 with the game\'s journal on U, J opens ours and no book',
+        h.page.shown && h.game.books.length === 0);
+    h.press(ESC);
+    h.run(30);
+    h.press(U);
+    h.run(120);
+    yes('C4 and U still opens the game\'s journal, which stays',
+        h.game.open[JOURNAL] === 'Quests' && h.game.shut.length === 0);
+
+    const o = rig({ client: true, journalKey: U });
+    o.press(J);
+    o.run(120);
+    yes('C4 with ours on U, J opens the game\'s journal as before, and it stays',
+        o.game.open[JOURNAL] === 'Quests' && !o.page.shown && o.game.shut.length === 0);
+    o.press(ESC);
+    o.run(30);
+    o.press(U);
+    o.run(60);
+    yes('C4 and U opens ours with no second book drawn',
+        o.page.shown && o.game.books.length === 1 && !o.game.open[JOURNAL]);
+  }
+
+  // ------------------------------- C5: only while our panel is in and ready
+  {
+    const n = rig({ client: true, noPanel: true });
+    const keptBefore = !!n.game.kept['Journal:' + J];
+    n.press(J);
+    n.run(120);
+    yes('C5 our panel never mounted: J is not kept, the game\'s journal opens and stays',
+        !keptBefore && n.game.open[JOURNAL] === 'Quests');
+
+    const r = rig({ client: true, notReady: true });
+    yes('C5 before the overlays are ready, J is not kept', !r.game.kept['Journal:' + J]);
+
+    const p = rig({ client: true });
+    p.game.tasks.push(['browserMessage', { arguments: ['thornswood-front', 'bridge is up'] }]);
+    p.run(2);
+    yes('C5 a page that reloads takes J off the list', !p.game.kept['Journal:' + J]);
+    p.game.tasks.push(['browserMessage', { arguments: ['thornswood-front', 'journal:ready'] }]);
+    p.run(2);
+    yes('C5 and puts it back once our panel is in again', !!p.game.kept['Journal:' + J]);
+  }
+
+  // ---------------------------------- C6: the client is told only on a change
+  {
+    const h = rig({ client: true });
+    h.run(200);
+    h.press(J);
+    h.run(60);
+    const c = h.game.keptCalls.filter(function (entry) { return entry.userEvent === 'Journal'; });
+    yes('C6 in 263 frames and a J the client is told twice: off at load, on when the panel is in',
+        c.length === 2 && c[0].on === false && c[1].on === true &&
+        c[1].userEvent === 'Journal' && c[1].code === J);
+  }
+
+  // ------------------------------------------ C7: a client without the list
+  {
+    const h = rig();
+    h.run(100);
+    yes('C7 a client without the list is said in the log once, and nothing throws',
+        h.logs.filter(function (l) { return l.indexOf('could not keep J from the game') >= 0; }).length === 1 &&
+        h.threw.length === 0);
   }
 }
 

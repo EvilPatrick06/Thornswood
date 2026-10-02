@@ -75,8 +75,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
 
 $script:pass = 0
 $script:fail = 0
@@ -95,15 +95,14 @@ $name = 'thornswood-chargen.js'
 $rel  = 'Data\Platform\Plugins\' + $name
 
 # ---- 1. the file and every name of it ------------------------------------------
-Yes 'game\plugins no longer holds the retired dresser' (-not (Test-Path -LiteralPath (Join-Path $Here "..\game\plugins\$name")))
-Yes 'and tools\emotes no longer holds the unretired copy Install-Emotes and Revert installed' (-not (Test-Path -LiteralPath (Join-Path $Here "emotes\$name")))
+Yes 'game\plugins no longer holds the retired dresser' (-not (Test-Path -LiteralPath (Join-Path $Here "game\plugins\$name")))
 
 # The two files that name it to keep it out. Sections 3 and 4 check what they
 # say about it.
 # By path from the repository root. The scripts are in scripts\<area> and the
 # launcher in launcher\ since issue #440; scripts\oneoff is parked history and
 # still names the tools it once ran beside, so it is not read.
-$repoRoot = Split-Path -Parent $Here
+$repoRoot = $Here
 function RepoRel($f) { return $f.FullName.Substring($repoRoot.Length).TrimStart('\', '/').Replace('/', '\') }
 $keepsItOut = @('launcher\app\OwnGame.cs', 'scripts\release\Ship-Rules.ps1')
 $sources = @()
@@ -122,23 +121,23 @@ Yes ("no script, launcher source or plugin names it but the two rules that keep 
 foreach ($n in $naming) { Write-Host ('      still named in ' + (RepoRel $n)) }
 
 # Not $keep: the Go.ps1 block lifted below has a $keep of its own.
-$keepCs = [IO.File]::ReadAllText((Join-Path $Here '..\launcher\app\Keep.cs'))
+$keepCs = [IO.File]::ReadAllText((Join-Path $Here 'launcher\app\Keep.cs'))
 Yes 'Keep.cs still calls any thornswood-*.js in the plugin folder ours, so a copy not yet removed is never parked' ($keepCs.IndexOf('name.StartsWith("thornswood-"', [StringComparison]::Ordinal) -ge 0)
 
 # ---- 2. Go.ps1 takes a leftover copy out of the game folder ---------------------
-$go = [IO.File]::ReadAllText((Join-Path $Here '..\scripts\release\Go.ps1'))
+$go = [IO.File]::ReadAllText((Join-Path $Here 'scripts\release\Go.ps1'))
 $sweep = [regex]::Match($go, '(?ms)^\$keep = @\(''skymp5-client\.js''.*?^\}\r?$')
 Yes 'Go.ps1 still builds its keep list from game\plugins and sweeps the plugin folder against it' ($sweep.Success -and $sweep.Value.Contains('Remove-Item -LiteralPath $s.FullName'))
 
 $scratch = Join-Path ([IO.Path]::GetTempPath()) ('ts-chargen-gone-' + [Diagnostics.Process]::GetCurrentProcess().Id)
-$ours = @(Get-ChildItem -LiteralPath (Join-Path $Here '..\game\plugins') -Filter *.js -File | ForEach-Object { $_.Name })
+$ours = @(Get-ChildItem -LiteralPath (Join-Path $Here 'game\plugins') -Filter *.js -File | ForEach-Object { $_.Name })
 try {
     if ($sweep.Success) {
         $plugins = Join-Path $scratch 'Data\Platform\Plugins'
         New-Item -ItemType Directory -Force -Path $plugins | Out-Null
         $there = @('skymp5-client.js', 'skymp5-client-settings.txt', $name) + $ours
         foreach ($n in ($there | Select-Object -Unique)) { [IO.File]::WriteAllText((Join-Path $plugins $n), 'x') }
-        $plSrc = Join-Path $Here '..\game\plugins'
+        $plSrc = Join-Path $Here 'game\plugins'
         function Bad($t) { }
         . ([scriptblock]::Create($sweep.Value))
         $left = @(Get-ChildItem -LiteralPath $plugins -File | ForEach-Object { $_.Name })
@@ -152,13 +151,13 @@ try {
 }
 
 # ---- 3. every pack names it in delete.txt, and none carries it -------------------
-. (Join-Path $Here '..\scripts\release\Ship-Rules.ps1')
+. (Join-Path $Here 'scripts\release\Ship-Rules.ps1')
 Yes 'Ship-Rules calls it not ours, so no pack or installer carries it again' (Test-ShipOtherServer $rel)
 Yes 'and it is on the list every pack deletes, which is what gets it past that rule into delete.txt' (@(Get-ShipDeleteAlways) -contains $rel)
 Yes 'and it is not a runtime path' (-not (Test-ShipRuntime $rel))
 Yes 'our own plugins are still ours to ship' (@($ours | Where-Object { Test-ShipMachine ('Data\Platform\Plugins\' + $_) }).Count -eq 0)
 
-$pub = [IO.File]::ReadAllText((Join-Path $Here '..\scripts\release\Publish-Update.ps1'))
+$pub = [IO.File]::ReadAllText((Join-Path $Here 'scripts\release\Publish-Update.ps1'))
 $tm   = [regex]::Match($pub, '(?m)^function Test-Machine\(.*$')
 $fc   = [regex]::Match($pub, '(?ms)^function Test-FromCollection\(.*?^\}\r?$')
 $dso  = [regex]::Match($pub, '(?m)^\$DevShipsOurs = .*$')
@@ -212,7 +211,7 @@ Pack $false $true
 Yes 'a pack whose baseline never carried it still names it in delete.txt' ($removed -contains $rel)
 Yes 'and a copy still on the shipping machine does not go into the pack' ((-not $now.ContainsKey($rel)) -and ($changed -notcontains $rel))
 
-$upd = [IO.File]::ReadAllText((Join-Path $Here '..\launcher\app\Updater.cs'))
+$upd = [IO.File]::ReadAllText((Join-Path $Here 'launcher\app\Updater.cs'))
 Yes 'Updater deletes each delete.txt line from the game folder and remembers it as removed' (
     $upd.Contains('ar.GetEntry("delete.txt")') -and $upd.Contains('File.Delete(target)') -and $upd.Contains('removed.Add(rel);'))
 Yes 'and hands that list to Keep.Forget, so Keep does not put the file back at the next Play' ($upd.Contains('Keep.Forget(removed);'))
@@ -260,11 +259,19 @@ function Get-CsLine([string]$text, [string]$pattern) {
     return $null
 }
 
-$og = [IO.File]::ReadAllText((Join-Path $Here '..\launcher\app\OwnGame.cs'))
-$ck = [IO.File]::ReadAllText((Join-Path $Here '..\launcher\app\Checks.cs'))
+$og = [IO.File]::ReadAllText((Join-Path $Here 'launcher\app\OwnGame.cs'))
+$ck = [IO.File]::ReadAllText((Join-Path $Here 'launcher\app\Checks.cs'))
 $lifted = [ordered]@{
     'OwnGame.Skip'             = Get-CsMember $og 'static string Skip(string rel)'
     'OwnGame.CrashesUs'        = Get-CsMember $og 'static bool CrashesUs(string rel)'
+    'OwnGame.RetiredFiles'     = (Get-CsMember $og 'static readonly string[] RetiredFiles =') + ';'
+    'OwnGame.Retired'          = Get-CsMember $og 'static bool Retired(string rel)'
+    'OwnGame.BodyShapeFiles'   = (Get-CsMember $og 'static readonly string[] BodyShapeFiles =') + ';'
+    'OwnGame.BodyShape'        = Get-CsMember $og 'static bool BodyShape(string rel)'
+    'OwnGame.BethesdaToolDirs'  = (Get-CsMember $og 'static readonly string[] BethesdaToolDirs =') + ';'
+    'OwnGame.BethesdaToolFiles' = (Get-CsMember $og 'static readonly string[] BethesdaToolFiles =') + ';'
+    'OwnGame.BethesdaTool'      = Get-CsMember $og 'static bool BethesdaTool(string rel)'
+    'OwnGame.Parked'          = Get-CsMember $og 'static bool Parked(string rel)'
     'OwnGame.wantedPlugins'    = Get-CsLine $og '(?m)^\s*static HashSet<string> wantedPlugins = [^\r\n]*;'
     'OwnGame.UnwantedCreation' = Get-CsMember $og 'static bool UnwantedCreation(string rel)'
     'OwnGame.ClientFiles'      = (Get-CsMember $og 'public static readonly string[] ClientFiles =') + ';'
@@ -292,6 +299,10 @@ using System.Text.RegularExpressions;
 namespace $ns
 {
     public static class Paths { public static string PacksDir; public static string ProfileDir; public static string Game; }
+    // Stands in for launcher\app\Swallow.cs, which the lifted Keep.Forget
+    // calls from its catch blocks since the silent catches were given a log
+    // line (#461).
+    public static class Swallow { public static void Note(string where, Exception e) { } }
     public static class Checks
     {
         $($lifted['Checks.OffSuffix'])
@@ -300,6 +311,14 @@ namespace $ns
     {
         $($lifted['OwnGame.Skip'])
         $($lifted['OwnGame.CrashesUs'])
+        $($lifted['OwnGame.RetiredFiles'])
+        $($lifted['OwnGame.Retired'])
+        $($lifted['OwnGame.BodyShapeFiles'])
+        $($lifted['OwnGame.BodyShape'])
+        $($lifted['OwnGame.BethesdaToolDirs'])
+        $($lifted['OwnGame.BethesdaToolFiles'])
+        $($lifted['OwnGame.BethesdaTool'])
+        $($lifted['OwnGame.Parked'])
         $($lifted['OwnGame.wantedPlugins'])
         $($lifted['OwnGame.UnwantedCreation'])
         $($lifted['OwnGame.ClientFiles'])
@@ -337,8 +356,13 @@ Yes ('and still takes our {0} plugin(s)' -f $ours.Count) (@($ours | Where-Object
 # bundle is left out of this: Ship-Rules calls it ours by record, and OwnGame
 # answers it before Foreign as a ClientFile.
 $twins = @($rel, 'Data\Platform\Plugins\somebody-else.js', 'Data\Interface\map.swf',
+           # #690: Elysium Estate's old plugin is left out, the collection's is not.
+           'Data\ElysiumEstateSSE.esp', 'Data\ElysiumEstate.esp',
            'Data\Platform\UI\assets\app-1.js', 'Data\Platform\UI\thornswood-chat.js',
-           'Data\Platform\PluginsNoLoad\auth-data-no-load.js')
+           'Data\Platform\PluginsNoLoad\auth-data-no-load.js',
+           # #960: SkyUI 5.2's loose scripts are left out, MCM Recorder's are not.
+           'Data\Scripts\ski_main.pex', 'Data\Scripts\SKI_WidgetManager.pex',
+           'Data\Scripts\SKI_ConfigBase.pex', 'Data\Scripts\ski_configmanager.pex')
 $twins += @($ours | ForEach-Object { 'Data\Platform\Plugins\' + $_ })
 $apart = @($twins | Where-Object { [bool]$OwnGameT::Foreign($_) -ne [bool](Test-ShipOtherServer $_) })
 Yes ('OwnGame.Foreign and Test-ShipOtherServer agree on all {0} paths asked, the dresser among them' -f $twins.Count) ($apart.Count -eq 0)
@@ -346,13 +370,16 @@ foreach ($a in $apart) { Write-Host "      they disagree on $a" }
 
 $rulesNum = [regex]::Match($og, '(?m)^\s*const int Rules = (\d+);')
 $rulesDoc = [regex]::Match($og, '(?m)^\s*/// (\d+): the retired dresser, thornswood-chargen\.js')
+# At least the dresser's number, not equal to it: rules 5 and 6 (#640 and the
+# Distribution links) moved Rules on past it on purpose, and a folder made
+# under anything before 4 still refreshes once.
 Yes 'OwnGame.Rules moved for it, so every folder made under the old rules refreshes once and records it as left out' (
-    $rulesNum.Success -and $rulesDoc.Success -and $rulesNum.Groups[1].Value -eq $rulesDoc.Groups[1].Value)
+    $rulesNum.Success -and $rulesDoc.Success -and [int]$rulesNum.Groups[1].Value -ge [int]$rulesDoc.Groups[1].Value)
 
 # The model of Refresh below has two branches: a name Skip lets through that
 # the folder lacks is copied in, and one it holds is left alone. That is only
 # true while Refresh's own loop reads that way.
-$refresh = Get-CsMember $og 'public static string Refresh(Config cfg, Action<string> say)'
+$refresh = Get-CsMember $og 'static string RefreshNow(Config cfg, Action<string> say)'
 $order = @(
     'foreach (Found f in all)',
     'string skip = Skip(f.Rel);',
@@ -458,8 +485,9 @@ if (Test-Path -LiteralPath $steamFile) {
 } else {
     Write-Host ("SKIP  no {0} in the Steam copy at {1}" -f $name, $Steam)
 }
-$releasesMain = Join-Path (Split-Path -Parent $repoRoot) 'Thornswood-Releases'
-$releasesDev  = Join-Path (Split-Path -Parent $repoRoot) 'Thornswood-Releases-dev'
+# This machine's working copies of the baselines (Feed-Store.ps1, #907).
+$releasesMain = if ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'Thornswood\feed\main' } else { '' }
+$releasesDev  = if ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'Thornswood\feed\dev' } else { '' }
 $legacyDir = if ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'Thornswood' } else { '' }
 foreach ($ch in @(
     @{ Label = 'main'; Base = 'published.json'; Rel = $releasesMain; Legacy = 'published.json';     Root = $Root },

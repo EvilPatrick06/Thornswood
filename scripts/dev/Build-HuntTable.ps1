@@ -231,6 +231,10 @@ param(
     [string] $PluginList = 'C:\Thornswood\Profile\OwnGame\plugins.txt',
     [string] $Out        = '',
     [string] $JsOut      = '',
+    # Archives may be stored separately from a verified server plugin snapshot.
+    [string] $StringsData = '',
+    # Restrict dressing to the animal bases retained by the population policy.
+    [string] $Population = '',
     # Print the table and leave game\gamemode.js alone.
     [switch] $NoInstall
 )
@@ -339,6 +343,18 @@ $RANK_ORDER     = @('novice', 'advanced', 'expert', 'master')
 $ErrorActionPreference = 'Stop'
 
 if (-not $Out) { $Out = Join-Path $PSScriptRoot '..\..\game\data\hunts.json' }
+
+# Update.esm's own Creation Club records (#479). Every Special Edition has
+# them, but their art comes with the Creation Club files Thornswood leaves out,
+# so a creature that is one is left out of the table (and so out of /spawn) and
+# listed under skipped with the reason. scripts\mods\Check-CreationForms.js
+# --write keeps the list, and tests\test-special-edition-only.js holds the
+# gamemode to it.
+$creation = @{}
+$creationList = Join-Path $PSScriptRoot '..\..\records\update-creation-club.json'
+foreach ($c in ([IO.File]::ReadAllText($creationList) | ConvertFrom-Json).records.PSObject.Properties) {
+    $creation[[string]$c.Name + ':Update.esm'] = $true
+}
 
 $fail = 0
 function Ok  ($m) { Write-Host "  ok    $m" -ForegroundColor Green }
@@ -598,11 +614,12 @@ Write-Host 'names' -ForegroundColor Cyan
 $tables    = @{}
 $bsaCache  = @{}
 $localised = @{}
-$looseDir  = Join-Path $Data 'Strings'
+$stringsRoot = if ($StringsData) { $StringsData } else { $Data }
+$looseDir  = Join-Path $stringsRoot 'Strings'
 
 function Get-BsaCached([string]$name) {
     if ($bsaCache.ContainsKey($name)) { return $bsaCache[$name] }
-    $p = Join-Path $Data $name
+    $p = Join-Path $stringsRoot $name
     if (-not (Test-Path -LiteralPath $p)) { $bsaCache[$name] = $null; return $null }
     $got = $null
     try { $got = Get-BsaStringFiles $p } catch { Note ("could not read {0}: {1}" -f $name, $_.Exception.Message); $got = $null }
@@ -1184,6 +1201,10 @@ $namedByTemplate = 0
 $namedByEdid = New-Object 'System.Collections.Generic.List[string]'
 foreach ($d in $animals.Keys) {
     $a = $animals[$d]
+    if ($creation.ContainsKey([string]$d)) {
+        $skipped.Add([pscustomobject]@{ Desc = $d; Edid = $a.Npc.Edid; Why = 'a Creation Club creature: every Special Edition has the record, but its art comes with the Creation Club files Thornswood leaves out' })
+        continue
+    }
     $withItem = @($a.Pairs | Where-Object { [string]$_.Item -and $yieldOf.ContainsKey([string]$_.Item) })
     if ($withItem.Count -eq 0) {
         $skipped.Add([pscustomobject]@{ Desc = $d; Edid = $a.Npc.Edid; Why = 'nothing in its traits chain names a death item, so its body gives nothing' })
@@ -1444,6 +1465,20 @@ if ($moved.Count -gt 0) {
     Ok ("the game folder is untouched: {0} entries, same names, sizes and timestamps before and after" -f $fingerAfter.Count)
 }
 
+if ($Population) {
+    $populationData = Get-Content -LiteralPath $Population -Raw | ConvertFrom-Json
+    $retainedBases = @{}
+    foreach ($row in $populationData.npcs) {
+        if ($row.keep -and $row.role -eq 'animal') { $retainedBases[[string]$row.base] = $true }
+    }
+    foreach ($base in @($table.Keys)) {
+        if (-not $retainedBases.ContainsKey([string]$base)) { $table.Remove($base) }
+    }
+    if ($table.Count -eq 0) { throw 'The population policy retained no dressable animal bases' }
+    $noviceAnimals = @($table.Keys | Where-Object { $table[$_].Rank -eq 'novice' })
+    if ($noviceAnimals.Count -eq 0) { throw 'The retained population has no novice hunting source' }
+}
+
 # ------------------------------------------------------------- the writing -
 
 Write-Host ''
@@ -1464,7 +1499,7 @@ function Gives-Json($gives) {
 $docLines = New-Object 'System.Collections.Generic.List[string]'
 $docLines.Add('{')
 $docLines.Add('  "builtBy": ' + (JsonStr 'scripts\dev\Build-HuntTable.ps1') + ',')
-$docLines.Add('  "source": ' + (JsonStr ('the NPC_ records of ' + $order.Count + ' plugins, the 5 masters and what ' + $PluginList + ' enables')) + ',')
+$docLines.Add('  "source": ' + (JsonStr ('the winning NPC_ records of ' + $order.Count + ' plugins in the recorded load order')) + ',')
 $docLines.Add('  "language": ' + (JsonStr $LANGUAGE) + ',')
 $docLines.Add('  "animalsAre": ' + (JsonStr ('an NPC whose race, followed through the template while the Use Traits bit is set, carries the keyword ' +
     $ANIMAL_KEYWORD + '. No race in this build carries that and ' + $PERSON_KEYWORD + ' both. Reading RNAM straight off the record instead would call ' +
@@ -1555,7 +1590,7 @@ if ($fail -gt 0) {
 
 $lines = New-Object 'System.Collections.Generic.List[string]'
 $lines.Add('/* Built by scripts\dev\Build-HuntTable.ps1 out of the NPC_ records of this build.')
-$lines.Add('     ' + $table.Count + ' animals, the same table as tools\hunts.json.')
+$lines.Add('     ' + $table.Count + ' animals, the same table as game\data\hunts.json.')
 $lines.Add('     The key is the body''s base record, which is what mp.get(refrId, ''baseDesc'')')
 $lines.Add('     hands back for a dead actor. A base that is not in here is not an animal and')
 $lines.Add('     the hunter walks past it, the same as everybody else.')
@@ -1564,7 +1599,7 @@ $lines.Add('     body''s inventory: they come from a levelled list the client re
 $lines.Add('     server hands them over itself. yield is four pairs, novice first: the least and')
 $lines.Add('     the most of EACH of those things a hunter of that rank takes, and a pair of')
 $lines.Add('     zeroes is a rank that may not work that body at all.')
-$lines.Add('     Paste it between the HUNTS_BY_BASE markers in tools\gamemode.js. Do not hand edit. */')
+$lines.Add('     Paste it between the HUNTS_BY_BASE markers in game\gamemode.js. Do not hand edit. */')
 $lines.Add('  var HUNTS_BY_BASE = {')
 $n = 0
 foreach ($d in $table.Keys) {
@@ -1586,7 +1621,7 @@ $literal = $lines -join [Environment]::NewLine
 # ---------------------------------------------------------------- install --
 #
 # The gamemode carries the table, because the server is deployed as one file
-# and cannot read tools\hunts.json. Nothing hand edits that block: this writes
+# and cannot read game\data\hunts.json. Nothing hand edits that block: this writes
 # it between its own markers, the way the other generated blocks in this repo
 # are written. -NoInstall prints it and leaves the file alone.
 #

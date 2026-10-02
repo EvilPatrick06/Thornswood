@@ -6,26 +6,31 @@ Every `test-*.js` and `test-*.ps1` here checks one thing the scripts, the
 launcher, the plugins, the gamemode or the site promise, by reading the files
 or by running a piece of them against a scratch copy. None of them talks to
 the VPS or to GitHub unless it says so at the top (`test-branch-rules.js
---live` is the one that does). The nightly checks (`.github/workflows/nightly.yml`) run every one of them
+--live` is one that does; `test-collection-revision-2.ps1` reads both
+servers' manifests over plain HTTP unless given `-Offline`). The nightly checks (`.github/workflows/nightly.yml`) run every one of them
 on the VPS each night and open an issue when one fails; on a pull request,
 run the ones your change touches yourself.
 
-One of them runs on every pull request as well, in the build check
-(`.github/workflows/build.yml`): `test-ownership.js`, added there by issue
-#752 because a secret file reached main with no row on `docs\OWNERSHIP.md`
-and nothing said so for days. It takes a tenth of a second. The rest are
-minutes together, which is why they are nightly.
+A few of them run on every pull request as well, in the build check
+(`.github/workflows/build.yml`), because each one's failure once sat on main
+unseen: `test-ownership.js` (issue #752, a secret file reached main with no
+row on `docs\OWNERSHIP.md`), and the list in its step "Run the harnesses that
+went red unseen" (issues #875, #454 and #1088, the last three being the VPS
+address kept in one place and deploys that are the same bytes for the same
+commit). Each is under a minute. The rest are minutes together, which is why
+they are nightly.
 
 The voice service's own harnesses stay beside it in `voice\`, and the bot's in
 `bot\`, because they are run from there.
 
 ## Where they look
 
-They moved here from `tools\` on 25 September (issue #440, phase 5). What they
-test did not move, so each one finds `tools\` from here: a `.js` harness through
-`TOOLS_DIR`, declared at its top as `..\tools`, and a `.ps1` harness through the
-line after its `$Here = $PSScriptRoot` that points `$Here` at `..\tools`. A new
-harness does the same; copying the top of an existing one is the easy way.
+They moved here from `tools\` on 25 September (issue #440, phase 5), and
+`tools\` itself went on 29 September (phase 10). Each one finds the repository
+folder from here, one folder up: a `.js` harness through `REPO_DIR`, declared at
+its top as `path.join(__dirname, '..')`, and a `.ps1` harness through the line
+after its `$Here = $PSScriptRoot` that points `$Here` at the repository folder.
+A new harness does the same; copying the top of an existing one is the easy way.
 
 ## Running them
 

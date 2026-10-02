@@ -37,19 +37,21 @@ const crypto = require('crypto');
 
 const PORT = 7921;
 const BASE = 'http://127.0.0.1:' + PORT;
-const TOOLS = path.resolve(__dirname, '..', 'tools');
+const REPO = path.resolve(__dirname, '..');
 
 // What /ice answered, to the byte, before any of this. The STUN server the
 // pages had always had typed into them, and nothing else.
 const STUN_ONLY = '{"iceServers":[{"urls":"stun:stun.l.google.com:19302"}]}';
 // And /health's fields, in the order it wrote them. chatRange came in with
 // local chat (voice/test-local-chat.js), and the five from backed on
-// with the backpressure work (voice/test-backpressure.js), each
-// separately from the relay key.
-const HEALTH_FIELDS = ['ok', 'build', 'auth', 'uptimeSeconds', 'startedAt', 'bind', 'turn',
+// with the backpressure work (voice/test-backpressure.js), and closedSilent
+// with the keepalive's other half (voice/test-keepalive.js), each separately
+// from the relay key.
+// deploy is the artifact record Install-Voice.ps1 leaves beside the service (#459).
+const HEALTH_FIELDS = ['ok', 'build', 'deploy', 'auth', 'uptimeSeconds', 'startedAt', 'bind', 'turn',
                        'chatRange', 'peers', 'tracked', 'queuedCommands',
                        'backed', 'largestQueueBytes', 'droppedPositions', 'skippedRosters',
-                       'closedBacklogged'];
+                       'closedBacklogged', 'closedSilent'];
 // The two lines every start wrote, with nothing configured.
 const START_LOG = '[voice] listening on 0.0.0.0:' + PORT + '\n' +
                   '[voice] positions accepted from loopback at POST /positions\n';
@@ -71,6 +73,7 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 async function run(env, files) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'turnkey-'));
   fs.copyFileSync(path.join(__dirname, 'voice-server.js'), path.join(dir, 'voice-server.js'));
+  fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
   fs.writeFileSync(path.join(dir, 'token-key.txt'), 'a join token key for this test only');
   for (const name of Object.keys(files || {})) {
     if (files[name] === null) fs.mkdirSync(path.join(dir, name));
@@ -137,8 +140,8 @@ function leaks(r, key) {
   // Each page starts from its own list and swaps in whatever /ice answers, so
   // an unchanged answer leaves every page exactly where it started.
   const pages = [
-    ['the in-game page', path.join(TOOLS, '..', 'game', 'ui', 'thornswood-voice.js')],
-    ['the launcher overlay', path.join(TOOLS, '..', 'launcher', 'voice-host.html')],
+    ['the in-game page', path.join(REPO, 'game', 'ui', 'thornswood-voice.js')],
+    ['the launcher overlay', path.join(REPO, 'launcher', 'voice-host.html')],
     ['the plain page the service serves', path.join(__dirname, 'public', 'voice.js')]
   ];
   for (const p of pages) {

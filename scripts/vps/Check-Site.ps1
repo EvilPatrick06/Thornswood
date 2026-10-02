@@ -241,42 +241,16 @@ elseif (-not $Vps) { Say '  No box address in launcher\app\Config.cs, the box wa
 elseif (-not $User) { Say "  No Host entry for $Vps in ~\.ssh\config, so no ssh user. Run .\scripts\vps\Setup-SshKey.ps1 first. The box was not asked." 'DarkGray' }
 else {
   Head 'What the site holds, asked on the box'
-  $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
+  $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
   $rootWin = $Root.Replace('/','\')
 
+  . (Join-Path $PSScriptRoot 'Send-Script.ps1')
   function Remote($script) {
-    $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-    $cmd = "powershell -NoProfile -EncodedCommand $e"
-
-    # The one block this sends is 17,802 characters on the wire, measured 23
-    # September, against cmd.exe's limit of 8,191. It carries a node script
-    # base64 inside it, which is what makes it so large, so this whole section
-    # has never arrived whole and nothing said so: the far end sees a script
-    # cut in the middle and complains about a brace.
-    #
-    # Same fix as the sixteen scripts that got it on 20 September. Under the
-    # limit it goes on the command line as before; over it, the script is sent
-    # as a file and run from there, which has no length to run into.
-    if ($cmd.Length -le 6000) {
-      return & ssh @ssh "$User@$Vps" $cmd 2>&1
-    }
-
-    $far = 'C:/Windows/Temp/thornswood-check-site.ps1'
-    $tmp = [IO.Path]::GetTempFileName()
-    try {
-      Set-Content -LiteralPath $tmp -Value $script -Encoding UTF8
-      & scp @ssh $tmp "$User@${Vps}:$far" 2>&1 | Out-Null
-      if ($LASTEXITCODE -ne 0) { return "  could not send the check to $Vps" }
-      # The path goes bare, with no quotes round it; it is ours and has no
-      # spaces. Measured on this machine on 24 September, not on the VPS: bare
-      # runs whether cmd.exe or Windows PowerShell hands the line on, and the
-      # old form, the path in single quotes, fails under cmd.exe. The old form
-      # did run on the VPS on 20 and 21 September, so which shell sshd uses
-      # there is not known, and bare is the form that works under either.
-      & ssh @ssh "$User@$Vps" "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1
-      & ssh @ssh "$User@$Vps" "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
-    }
-    finally { Remove-Item -LiteralPath $tmp -Force -EA SilentlyContinue }
+    # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
+    # name, removed after, and the far side's exit code comes back. A copy
+    # that did not arrive is said here rather than stopping the whole check.
+    try { return (Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script) }
+    catch { return "  could not send the check to $Vps" }
   }
 
   # All of this runs up there in node, because node is what the site uses and a

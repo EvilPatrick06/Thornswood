@@ -27,11 +27,11 @@
 // fork does, and looks at what reached the corner of the screen.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const SRC = process.env.FRONT ||
-            path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-front.js');
+            path.join(REPO_DIR, 'game', 'plugins', 'thornswood-front.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -87,6 +87,7 @@ function harness(opts) {
   const refused = [];
   const logs = [];
   const quits = [];
+  const closed = [];
   const world = { __thornswoodInWorld: true };
   let pending = null;
 
@@ -107,6 +108,12 @@ function harness(opts) {
         quits.push(clock.t);
         if (opts.quitThrows) { throw new Error('the menu would not open'); }
       }
+    },
+    mpClientPlugin: {
+      destroyClient: function () {
+        if (ctx.where !== 'update') { refuse('mpClientPlugin.destroyClient'); }
+        closed.push(clock.t);
+      }
     }
   };
   const probe = { get: function (p, o, cb) { pending = cb; } };
@@ -126,6 +133,7 @@ function harness(opts) {
 
   const h = {
     clock: clock, screen: screen, refused: refused, logs: logs, quits: quits,
+    closed: closed,
     world: world, strikesToLeave: api.strikesToLeave, every: api.every,
     grace: api.grace, deadline: api.deadline,
     /* How the server answers the next probe. Up until a scenario says not. */
@@ -178,6 +186,8 @@ if (ready) {
     yes('S1 the probe did call the outage', h.left());
     yes('S1 and it went back to the main menu exactly once',
         h.quits.length === 1);
+    yes('S1 the game connection is closed before the menu, so a reconnect cannot put them back',
+        h.closed.length >= 1 && h.quits.length === 1 && h.closed[0] < h.quits[0]);
     const before = h.screen.filter(function (s) { return s.at < h.quits[0]; });
     yes('S1 THE BUG: something reached the screen before the quit',
         before.length > 0);

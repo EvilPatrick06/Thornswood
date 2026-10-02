@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 
 namespace Thornswood
 {
@@ -68,6 +69,53 @@ namespace Thornswood
                 seen.Add(n);
                 order.Add(n);
             }
+        }
+
+        /// <summary>
+        /// An official Creation Club plugin, by its name: cc, three letters for
+        /// who made it, SSE and three digits (ccBGSSSE001-Fish.esm,
+        /// ccQDRSSE001-SurvivalMode.esl, ccASVSSE001-ALMSIVI.esm). Every
+        /// Creation Club name an Anniversary Edition Skyrim.ccc lists has that
+        /// shape: 73 of its 74 lines on the shipping machine, the other being
+        /// _ResourcePack.esl, which is the base game's. Decided by Patrick on
+        /// 28 Sep (#479): Special Edition is all Thornswood needs, and somebody
+        /// who owns the Anniversary upgrade still plays.
+        /// </summary>
+        public static bool IsCreation(string name)
+        {
+            if (name == null) return false;
+            return Regex.IsMatch(name.Trim(), @"^cc[a-z]{3}sse\d{3}.*\.es[mlp]$", RegexOptions.IgnoreCase);
+        }
+
+        /// <summary>
+        /// What an enabled list switches on that the reference does not, in
+        /// list order, each once: the "is enabled but is not part of this
+        /// build" issues. An official Creation Club plugin that takes no place
+        /// in the game's order (light, or not in Data) is not counted. An
+        /// Anniversary owner's list can name every creation they own, and the
+        /// game's own rewrite of the list can add them, but one the game gives
+        /// no index moves nothing the server compares, and Thornswood's own
+        /// folder never has one in Data (OwnGame.UnwantedCreation). Stopping
+        /// Play over it would stop them for nothing. A full one that is in
+        /// Data still counts, because it takes a place and every plugin after
+        /// it is then out of position.
+        /// </summary>
+        public static List<string> NotInBuild(IList<string> enabled, IList<string> reference, Func<string, bool> isLightOrMissing)
+        {
+            var want = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (reference != null)
+                foreach (string r in reference) { string t = Norm(r); if (t.Length > 0) want.Add(t); }
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var result = new List<string>();
+            if (enabled == null) return result;
+            foreach (string raw in enabled)
+            {
+                string n = Norm(raw);
+                if (n.Length == 0 || want.Contains(n) || !seen.Add(n)) continue;
+                if (IsCreation(n) && (isLightOrMissing == null || isLightOrMissing(n))) continue;
+                result.Add(n);
+            }
+            return result;
         }
 
         /// <summary>

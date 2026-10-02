@@ -20,8 +20,8 @@ $ErrorActionPreference = 'Stop'
 
 $here = $PSScriptRoot
 if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$here = Join-Path (Split-Path -Parent $here) 'tools'
+# The tests are in tests\, the repository is one folder up.
+$here = Split-Path -Parent $here
 
 $pass = 0
 $fail = 0
@@ -35,7 +35,7 @@ function Done {
     if ($script:fail) { exit 1 } else { exit 0 }
 }
 
-$scan = Join-Path $here '..\scripts\dev\Check-Secrets.ps1'
+$scan = Join-Path $here 'scripts\dev\Check-Secrets.ps1'
 yes 'scripts\dev\Check-Secrets.ps1 is there' (Test-Path -LiteralPath $scan)
 if (-not (Test-Path -LiteralPath $scan)) { Done }
 
@@ -90,6 +90,23 @@ function New-Zip([string]$path, [hashtable]$entries) {
     } finally { $z.Dispose() }
 }
 
+function New-Sfx([string]$path, [hashtable]$entries) {
+    # A program with a zip concatenated after it, the shape of the Setup
+    # (copy /b stub+zip). The zip's offsets count from the zip, not from the
+    # first byte, which is what Check-Secrets used to miss.
+    $part = $path + '.zippart'
+    New-Zip $part $entries
+    $stub = New-Object byte[] 48
+    $stub[0] = 0x4D
+    $stub[1] = 0x5A
+    $zipBytes = [IO.File]::ReadAllBytes($part)
+    $all = New-Object byte[] ($stub.Length + $zipBytes.Length)
+    [System.Buffer]::BlockCopy($stub, 0, $all, 0, $stub.Length)
+    [System.Buffer]::BlockCopy($zipBytes, 0, $all, $stub.Length, $zipBytes.Length)
+    [IO.File]::WriteAllBytes($path, $all)
+    Remove-Item -LiteralPath $part -Force
+}
+
 function Get-Bytes([string]$text) { return ,([Text.Encoding]::UTF8.GetBytes($text)) }
 
 function Invoke-Git([string]$dir, [string[]]$argv) {
@@ -110,7 +127,7 @@ try {
     New-Item -ItemType Directory -Force -Path $tree | Out-Null
     Invoke-Git $tree @('-c', 'init.defaultBranch=main', 'init', '-q')
     Write-Utf8 (Join-Path $tree 'README.md') "A clean file.`nNothing here.`n"
-    Write-Utf8 (Join-Path $tree 'tools\thing.js') "const port = 3000;`n"
+    Write-Utf8 (Join-Path $tree 'scripts\thing.js') "const port = 3000;`n"
     Invoke-Git $tree @('add', '-A')
 
     $r = Invoke-Scan @{ Root = $tree; Allow = $noAllow }
@@ -154,7 +171,7 @@ try {
     foreach ($n in 'config.json', 'bot\news-webhook.txt', 'voice\token-key.txt', 'server-secret.txt', 'deploy\id_ed25519', 'bot.env.json') {
         Write-Utf8 (Join-Path $tree $n) "{}`n"
     }
-    Invoke-Git $tree @('add', '-A', '--', 'config.json', 'tools', 'bot', 'voice', 'server-secret.txt', 'deploy', 'bot.env.json')
+    Invoke-Git $tree @('add', '-A', '--', 'config.json', 'scripts', 'bot', 'voice', 'server-secret.txt', 'deploy', 'bot.env.json')
     $r = Invoke-Scan @{ Root = $tree; Allow = $noAllow }
     yes 'a tracked credential file fails by its name alone' ($r.Code -eq 1)
     foreach ($n in 'config.json', 'bot/news-webhook.txt', 'voice/token-key.txt', 'server-secret.txt', 'deploy/id_ed25519', 'bot.env.json') {
@@ -238,6 +255,25 @@ try {
     $r = Invoke-Scan @{ Zip = @($notzip); Allow = $noAllow }
     yes 'a zip that does not open is exit 2, not a pass' ($r.Code -eq 2)
 
+    # The Setup program: a small program with a zip appended. .NET reports no
+    # entries for that file. Reading it must see the planted token, and a clean
+    # one must pass with its real entry count, not "0 entries".
+    $sfx = Join-Path $work 'Thornswood-Setup.exe'
+    New-Sfx $sfx @{
+        'payload/Data/Platform/voice-token.txt' = (Get-Bytes ($fake['voice-join-token']))
+        'payload/Data/Platform/Plugins/thornswood-front.js' = (Get-Bytes "var a = 1;`n")
+    }
+    $r = Invoke-Scan @{ Zip = @($sfx); Allow = $noAllow }
+    yes 'a Setup program with an appended zip is read, not passed as empty' ($r.Code -eq 1 -and $r.Out -match 'Thornswood-Setup\.exe: 2 entries' -and $r.Out.Contains('voice-token.txt:1  voice-join-token'))
+    yes 'and that token is not in the output' (-not (Test-Leaks $r.Out))
+    $sfxClean = Join-Path $work 'Thornswood-Setup-clean.exe'
+    New-Sfx $sfxClean @{
+        'payload/Data/Platform/Plugins/thornswood-front.js' = (Get-Bytes "var a = 1;`n")
+    }
+    $r = Invoke-Scan @{ Zip = @($sfxClean); Allow = $noAllow }
+    yes 'a clean Setup program with an appended zip passes, and not as 0 entries' ($r.Code -eq 0 -and $r.Out -match 'Thornswood-Setup-clean\.exe: 1 entries' -and $r.Out -notmatch '0 entries')
+
+
     # ---------------------------------------------------------------- programs
     # A built program keeps its strings as UTF-16, at any alignment.
     $prog = Join-Path $work 'Thornswood.exe'
@@ -271,19 +307,19 @@ try {
     yes 'without any value' (-not (Test-Leaks $r.Out))
 
     # ---------------------------------------------------------------- the repo
-    $repo = Split-Path -Parent $here
+    $repo = $here
     $r = Invoke-Scan @{}
     yes 'this repository as it stands passes (exit 0)' ($r.Code -eq 0)
     if ($r.Code -ne 0) { Write-Host $r.Out }
 
     # Wired in before anything leaves: the upload in Publish-Update, the
     # compression in Package-Thornswood, both steps in the build check.
-    $pub = [IO.File]::ReadAllText((Join-Path $here '..\scripts\release\Publish-Update.ps1'))
+    $pub = [IO.File]::ReadAllText((Join-Path $here 'scripts\release\Publish-Update.ps1'))
     $a = $pub.IndexOf("Check-Secrets.ps1')")
-    $b = $pub.IndexOf('gh release create')
+    $b = $pub.IndexOf('# ==== thornswood site upload ====')
     yes 'Publish-Update runs the scan over what it built' ($a -ge 0 -and $pub.Contains('-Zip $scanZips'))
     yes 'and before the upload' ($a -ge 0 -and $b -gt $a)
-    $pkg = [IO.File]::ReadAllText((Join-Path $here '..\scripts\release\Package-Thornswood.ps1'))
+    $pkg = [IO.File]::ReadAllText((Join-Path $here 'scripts\release\Package-Thornswood.ps1'))
     $a = $pkg.IndexOf("Check-Secrets.ps1')")
     yes 'Package-Thornswood scans the stage' ($a -ge 0 -and $pkg.Contains('-Dir $stage'))
     yes 'before -NoArchive hands it over and before it is compressed' ($a -ge 0 -and $a -lt $pkg.IndexOf('if ($NoArchive)') -and $a -lt $pkg.IndexOf("Head 'Compressing'"))
@@ -303,9 +339,10 @@ try {
     function Head($m) { }
     # The two hooks run as if from their own folder, scripts\release, where
     # their Join-Path $Here reaches Check-Secrets.ps1 in scripts\dev.
-    $Here = Join-Path (Split-Path -Parent $here) (Join-Path 'scripts' 'release')
+    $Here = Join-Path $here (Join-Path 'scripts' 'release')
     $pubFrom = '# ---- nothing that must never ship, read off what was built'
-    $pubTo = 'if (-not $NoUpload -and $gh) {'
+    # The upload, which is the site one since #897 and the only one since #907.
+    $pubTo = "if (-not `$NoUpload) {"
     $Launcher = $false; $exePath = ''; $clientRel = $null
     $chunks = @([pscustomobject]@{ Path = $bad })
     $d = Invoke-Hook $pub $pubFrom $pubTo

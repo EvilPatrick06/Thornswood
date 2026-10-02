@@ -55,7 +55,10 @@ Yes 'Build-Launcher still leaves setup-stub unsigned' (
     $buildSrc -notmatch '\$toSign \+= \$stub')
 
 $frag = Get-ExpectedSignerFragment -RepoRoot $repo
-Yes 'ExpectedSigner fragment is Gavin Knotts' ($frag -eq 'Gavin Knotts')
+# Compared with Updater.cs read here, rather than with the name written out, so
+# the name stays in the one place it has to be (#1052).
+$pinned = [regex]::Match([IO.File]::ReadAllText((Join-Path $repo 'launcher\app\Updater.cs')), 'const string ExpectedSigner = "([^"]+)"').Groups[1].Value
+Yes 'ExpectedSigner fragment is the one Updater.cs pins' ($frag -and $frag -eq $pinned)
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-sign-gate-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 New-Item -ItemType Directory -Force -Path $work | Out-Null
@@ -89,6 +92,35 @@ try {
     } else {
         Yes 'Valid signature without ExpectedSigner is refused' $false
     }
+
+    # A signing.json with no "enabled" (#1072), the shape records\signing\README.md
+    # shows. Ship runs under Set-StrictMode -Version Latest and its children
+    # inherit it, so both are run that way, in a child, as Ship runs them.
+    $bare = Join-Path $work 'signing-bare.json'
+    [IO.File]::WriteAllText($bare, '{"method":"thumbprint","thumbprint":"ABC","timestampUrl":"http://timestamp.example"}', $Utf8)
+    $sh = (Get-Process -Id $PID).Path
+    function Q([string]$s) { return "'" + $s.Replace("'", "''") + "'" }
+    function Child([string]$cmd) {
+        $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        try { return (& $sh -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command $cmd 2>&1 | Out-String) }
+        finally { $ErrorActionPreference = $old }
+    }
+    $out = Child ("Set-StrictMode -Version Latest; `$ErrorActionPreference = 'Stop'; . $(Q $assert); " +
+                  "'GATE=[' + (Get-SigningConfigRefusal -ConfigPath $(Q $bare) -RepoRoot $(Q $repo)) + ']'")
+    Yes ('under strict mode, a signing.json with no "enabled" is ready, not an error' + $(if ($out -notmatch 'GATE=\[\]') { ': ' + $out.Trim() } else { '' })) (
+        $out -match 'GATE=\[\]' -and $out -notmatch 'cannot be found')
+    $meta = Join-Path $work 'metadata.json'
+    [IO.File]::WriteAllText($meta, '{"Endpoint":"https://example.invalid"}', $Utf8)
+    $noProfile = Join-Path $work 'signing-noprofile.json'
+    [IO.File]::WriteAllText($noProfile, ('{"method":"artifactsigning","metadata":' + ($meta | ConvertTo-Json) + '}'), $Utf8)
+    $out = Child ("Set-StrictMode -Version Latest; `$ErrorActionPreference = 'Stop'; . $(Q $assert); " +
+                  "'GATE=[' + (Get-SigningConfigRefusal -ConfigPath $(Q $noProfile) -RepoRoot $(Q $repo)) + ']'")
+    Yes '  and a metadata.json with no profile name gets the gate''s sentence, not an error' ($out -match 'GATE=\[the certificate profile' -and $out -notmatch 'cannot be found')
+
+    $signer = Join-Path $repo 'scripts\release\Sign-Artifact.ps1'
+    $out = Child ("Set-StrictMode -Version Latest; & $(Q $signer) -Path $(Q (Join-Path $work 'not-built.exe')) -ConfigPath $(Q $bare)")
+    Yes ('under strict mode, Sign-Artifact reads it and goes on to look for signtool' + $(if ($out -match 'cannot be found|not signing') { ': ' + $out.Trim() } else { '' })) (
+        $out -notmatch 'cannot be found on this object' -and $out -notmatch 'not signing' -and $out -match 'signtool')
 }
 finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue

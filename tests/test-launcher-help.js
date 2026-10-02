@@ -20,13 +20,13 @@
 // here.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const CR = String.fromCharCode(13);
 function read() {
   const bits = Array.prototype.slice.call(arguments);
-  return fs.readFileSync(path.join.apply(path, [TOOLS_DIR].concat(bits)), 'utf8').split(CR).join('');
+  return fs.readFileSync(path.join.apply(path, [REPO_DIR].concat(bits)), 'utf8').split(CR).join('');
 }
 
 let pass = 0, fail = 0;
@@ -37,18 +37,25 @@ function yes(what, cond) {
 
 const helpSrc = process.env.HELP
   ? fs.readFileSync(process.env.HELP, 'utf8').split(CR).join('')
-  : read('..', 'launcher', 'app', 'Help.cs');
-const gm      = read('..', 'game', 'gamemode.js');
-const emotes  = read('..', 'game', 'plugins', 'thornswood-emotes.js');
-const front   = read('..', 'game', 'plugins', 'thornswood-front.js');
-const vplug   = read('..', 'game', 'plugins', 'thornswood-voice.js');
-const vpage   = read('..', 'game', 'ui', 'thornswood-voice.js');
-const vserver = read('..', 'voice', 'voice-server.js');
-const vinstall = read('../scripts/deploy/Install-Voice.ps1');
-const keys    = read('..', 'launcher', 'app', 'Keys.cs');
-const shell   = read('..', 'launcher', 'app', 'Shell.cs');
-const enforce = read('..', 'launcher', 'app', 'Enforce.cs');
-const ini     = read('..', 'launcher', 'Thornswood.ini');
+  : read('launcher', 'app', 'Help.cs');
+const gm      = read('game', 'gamemode.js');
+const emotes  = read('game', 'plugins', 'thornswood-emotes.js');
+const front   = read('game', 'plugins', 'thornswood-front.js');
+const vplug   = read('game', 'plugins', 'thornswood-voice.js');
+const vpage   = read('game', 'ui', 'thornswood-voice.js');
+const vserver = read('voice', 'voice-server.js');
+const vinstall = read('scripts/deploy/Install-Voice.ps1');
+const keys    = read('launcher', 'app', 'Keys.cs');
+// Shell is one partial class across Shell.cs and the Shell*.cs files since
+// the split (#500), so the update code the address check reads is in
+// ShellUpdate.cs now. All of them, read as the one class they compile to.
+const shell   = fs.readdirSync(path.join(REPO_DIR, 'launcher', 'app'))
+  .filter(function (f) { return /^Shell\w*\.cs$/.test(f); })
+  .sort()
+  .map(function (f) { return read('launcher', 'app', f); })
+  .join('\n');
+const enforce = read('launcher', 'app', 'Enforce.cs');
+const ini     = read('launcher', 'Thornswood.ini');
 
 // ------------------------------------------------------------- the items
 /*
@@ -92,12 +99,12 @@ const page = all();
 
 // ------------------------------------------------ what the entry says went
 /*
-  The entry's own check is Select-String for 'Skyrim Together|192.135.119.166|
-  password you entered'. The rest are what the page still said on 24 September
+  The entry's own check is Select-String for the old multiplayer mod's name,
+  192.135.119.166 and 'password you entered'. The rest are what the page still said on 24 September
   once it was read against the code, each with the reason it is wrong.
 */
 const DEAD = [
-  [/Skyrim Together|\bTogether\b/, 'the old engine by name'],
+  [/Skyrim\s*Together|\bTogether\b/, 'the old engine by name'],
   [/192\.135\.119\.166|25565/, 'the old engine\'s address and port'],
   [/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/, 'any server address at all: it arrives with the update'],
   [/password you entered/i, 'a password error this client cannot raise'],
@@ -108,12 +115,15 @@ const DEAD = [
   [/Carried:|Plus what everyone gets/, 'the sixteen starting kits, gone on 20 September'],
   [/A, S, D, F/, 'a flute played on the keyboard'],
   [/two fifths of the gold/i, 'the death penalty of a mod that is out'],
-  [/twelve gestures|second ring/i, 'a wheel of twelve, when it is six groups'],
+  [/twelve gestures|second ring|six groups/i, 'an old wheel of twelve, or of six groups'],
   [/switch for it in Settings|change it in Settings/i, 'an address switch Settings no longer has'],
   [/every half minute/i, 'a reminder in the chat, which is silent now unless the panel failed'],
   [/after yourself/i, 'naming the character after yourself (entry 163)'],
   [/once every \d+ hours|hands you one/i, 'a free tool at the seam, which toolGate stopped handing over on 21 September'],
-  [/Profile\\+MyGames\\+Saves/i, 'a saves folder, when the character lives on the server']
+  [/Profile\\+MyGames\\+Saves/i, 'a saves folder, when the character lives on the server'],
+  // Issue #418, 28 September: the update feed is thornswood.net since #907,
+  // so GitHub's hourly limit and an access token are gone with it.
+  [/access token|too many update checks/i, 'a GitHub update token or rate limit, when updates come from thornswood.net']
 ];
 DEAD.forEach(function (d) {
   const hit = d[0].exec(page);
@@ -150,7 +160,7 @@ yes('gone: a "Playing together" section about parties that did not exist',
   }
   yes('every section is one run, so its heading is drawn once' +
       (broken ? ' ("' + broken + '" comes back)' : ''), !broken);
-  ['Joining', 'Character', 'Chat and commands', 'Emotes', 'The mods',
+  ['Joining', 'Character', 'Keys', 'Chat and commands', 'Emotes', 'The mods',
    'In game', 'If it breaks', 'Tips'].forEach(function (s) {
     yes('there is a "' + s + '" section', seen.indexOf(s) !== -1);
   });
@@ -237,7 +247,7 @@ yes('the gamemode\'s list of everybody\'s commands can be read', Array.isArray(e
       /\[string\]\$ChatRange = 'off'/.test(vinstall) &&
       /set THORNSWOOD_CHAT_RANGE=\$ChatRange/.test(vinstall));
   yes('the voice service still sends a plain chat line to every peer when the range is off',
-      /for \(const \[, p\] of peers\) p\.ws\.send\(out\);/.test(block));
+      /for \(const \[, p\] of peers\) \{/.test(block) && /p\.ws\.send\(out\)/.test(block));
   yes('so the page says a chat line goes to everybody connected',
       /goes to everybody connected/.test(item('Chat and commands', 'The chat box')));
   yes('and that a slash line is a command, which the voice service holds back',
@@ -334,6 +344,9 @@ function freshKey(name) {
   yes('the wheel key differs between the template (' + LETTER[t] + ') and the code (' + LETTER[f] +
       '), so the page names no letter for it and sends people to the Controls page',
       t !== f ? (/Controls page/.test(wheel) && !/\b[A-Z]\b/.test(wheel)) : true);
+  // Since #529 they agree (G), and then the page names it.
+  yes('and when they agree the wheel item names that key (' + LETTER[t] + ')',
+      t === f ? wheel.indexOf(LETTER[t] + ' opens a wheel') === 0 : true);
   const mode = num(vplug, /let MODE_KEY = (\d+);/);
   yes('the voice mode key is ' + LETTER[mode] + ' in the plugin, the template agrees, and the page says so',
       (templateKey('VoiceModeKey') === null || templateKey('VoiceModeKey') === mode) &&
@@ -342,19 +355,16 @@ function freshKey(name) {
 
 // --------------------------------------------------------------- the wheel
 {
-  const cats = [];
-  const cr = /\{ name: '([^']+)', items: \[/g;
-  let c;
-  while ((c = cr.exec(emotes)) !== null) { cats.push(c[1]); }
-  const count = (emotes.slice(emotes.indexOf('const CATEGORIES'), emotes.indexOf('];', emotes.indexOf('const CATEGORIES')))
-    .match(/event: '/g) || []).length;
+  const start = emotes.indexOf('const EMOTES = [');
+  const end = start < 0 ? -1 : emotes.indexOf('\n];', start);
+  const body = (start >= 0 && end >= 0) ? emotes.slice(start, end) : '';
+  const count = (body.match(/event: '/g) || []).length;
   const wheel = item('Emotes', 'The wheel');
-  yes('the wheel has groups (' + cats.join(', ') + ')', cats.length >= 4);
-  const unnamed = cats.filter(function (x) { return wheel.indexOf(x) === -1; });
-  yes('and the page names every one of them' + (unnamed.length ? ' (not: ' + unnamed.join(', ') + ')' : ''),
-      unnamed.length === 0);
+  yes('the wheel lists ' + count + ' emotes', count >= 8);
   yes('the page says ' + count + ' emotes, which is how many the wheel carries',
       count > 0 && wheel.indexOf(count + ' emotes') !== -1);
+  yes('the page names the quick slots and the search',
+      /quick slots/.test(wheel) && /search/.test(wheel));
 }
 
 // ---------------------------------------------------- classes, towns, purse
@@ -439,8 +449,9 @@ function tableNames(src, name) {
   const panel = item('Character', 'If the panel does not appear');
   yes('the panel comes back every ' + remind + ' seconds, and after ' + later + ' minutes once closed, as the page says',
       panel.indexOf('every ' + remind + ' seconds') !== -1 && panel.indexOf(later + ' minutes') !== -1);
+  // Said once since #416 (tellOnce, which calls say), so either is the chat.
   yes('and the server only says so in the chat when the panel did not open',
-      /if \(!openCreation\(actorId\)\) \{\s*say\(actorId, 'The starting panel did not open/.test(gm) &&
+      /if \(!openCreation\(actorId\)\) \{\s*(?:say\(actorId, |tellOnce\(actorId, 'choosing', )'The starting panel did not open/.test(gm) &&
       /only says so in the chat if it could not/.test(panel));
   yes('the town is the pick that ends creation, as the page says',
       /The home is the one pick that ends creation/.test(gm) &&
@@ -476,6 +487,171 @@ function tableNames(src, name) {
       /"bFavoritesMenu"/.test(enforce) && /"bTweenMenu"/.test(enforce) &&
       /OpenAnimationReplacer\.ini/.test(enforce) &&
       /favourites menu/.test(held) && /Tab menu/.test(held) && /animation replacer/.test(held));
+}
+
+// ================================================ issue #418, 28 September
+/*
+  The second rebuild: what somebody needs today to get in, find a key, reach
+  staff and send a log, read from the files that decide each of them.
+*/
+const xaml    = read('launcher', 'ui.xaml');
+const discord = read('launcher', 'app', 'Discord.cs');
+const verify  = read('launcher', 'app', 'Verify.cs');
+const diag    = read('launcher', 'app', 'Diag.cs');
+const paths   = read('launcher', 'app', 'Paths.cs');
+const site    = read('site', 'server.js');
+
+// ------------------------------------------------------------ getting in
+{
+  const alpha = item('Joining', 'Thornswood is in alpha');
+  yes('the launcher asks https://thornswood.net, and the page names thornswood.net',
+      /public const string Site = "https:\/\/thornswood\.net";/.test(discord) &&
+      /^thornswood\.net has the installer/.test(item('Joining', 'The site')));
+  const playAt = site.indexOf('play:   [');
+  const playList = playAt < 0 ? '' : site.slice(playAt, site.indexOf(']', playAt));
+  yes('the site lets the Playtester role in, and the page says that role unlocks Play',
+      /'Playtester'/.test(playList) && /Playtester role, and that role is what unlocks Play/.test(alpha));
+  yes('the page says to apply in a Discord ticket, as the join page does',
+      /open a ticket/.test(alpha) &&
+      /open a ticket/.test(read('site', 'data', 'site', 'join.md')));
+  yes('the site answers "no role that lets it in yet", and the page uses the same words',
+      /has no role that lets it in yet/.test(site) &&
+      /no role that lets it in yet/.test(item('Joining', 'Connect Discord once')));
+}
+
+// ------------------------------------------------------------------ keys
+/*
+  One item lists every Thornswood key a fresh install has. Each phrase below
+  is checked against the template and Keys.cs, the same way the per-item key
+  checks above are, so a key that moves fails here too.
+*/
+{
+  const all = item('Keys', 'The keys on a fresh install');
+  [
+    ['ChatKey', function (k) { return k + ' opens the chat'; }],
+    ['CommandKey', function (k) { return k + ' opens it with the slash already typed'; }],
+    ['SkillsKey', function (k) { return k + ' is your character panel'; }],
+    ['PartyKey', function (k) { return k + ' your friends and party'; }],
+    ['JournalKey', function (k) { return k + ' your journals'; }],
+    ['FriendKey', function (k) { return k + ' asks them to be friends'; }],
+    ['TradeWithKey', function (k) { return k + ' offers a trade'; }],
+    ['MuteThemKey', function (k) { return k + ' stops you hearing them'; }],
+    ['PushToTalk', function (k) { return 'Hold ' + k + ' to talk'; }],
+    ['VoiceLockKey', function (k) { return k + ' keeps the microphone open'; }],
+    ['VoiceModeKey', function (k) { return k + ' steps between a whisper'; }],
+    ['WheelKey', function (k) { return k + ' opens the emote wheel'; }],
+    ['StopKey', function (k) { return k + ' stands you up'; }],
+    ['MoldKey', function (k) { return k + ' presses a blank key mold into the lock'; }]
+  ].forEach(function (row) {
+    const t = templateKey(row[0]);
+    const f = keysFallback(row[0]);
+    const letter = LETTER[t !== null ? t : f];
+    yes('the key list: ' + row[0] + ' is ' + letter + ' in the template and on the Controls page, and the page says ' +
+        JSON.stringify(row[1](letter)),
+        !!letter && t !== null && f !== null && t === f && all.indexOf(row[1](letter)) !== -1);
+  });
+  yes('the Controls page item says keys are changed there', /Press Change/.test(item('Keys', 'The Controls page changes them')));
+}
+
+// ----------------------------------------------------------- asking staff
+{
+  const staff = item('Chat and commands', 'Getting staff: /helpme and /report');
+  yes('the gamemode answers /helpme and /report for everybody',
+      /if \(word === '\/helpme' \|\| word === '\/help-me' \|\| word === '\/report'\)/.test(gm) &&
+      (everybody || []).indexOf('/helpme') !== -1 && (everybody || []).indexOf('/report') !== -1);
+  yes('the page names both', /\/helpme\b/.test(staff) && /\/report\b/.test(staff));
+  yes('a report goes to staff and nobody else, as the page says',
+      /It goes to staff and nobody else\./.test(gm) && /reaches staff and nobody else/.test(staff));
+  yes('staff in the world are told and it goes to the staff channel, as the page says',
+      /in the staff channel in the Discord/.test(gm) &&
+      /staff in the world is told/.test(staff) && /staff channel in the Discord/.test(staff));
+  yes('and when it cannot get through the game says to open a ticket, as the page does',
+      /Open a ticket in the Discord/.test(gm) && /open a ticket in the Discord/.test(staff));
+}
+
+// -------------------------------------------------------- Scan, Fix, logs
+function between(src, from, to) {
+  const a = src.indexOf(from);
+  const b = a < 0 ? -1 : src.indexOf(to, a);
+  return (a >= 0 && b > a) ? src.slice(a, b) : '';
+}
+{
+  const diagPage = between(xaml, '<Grid x:Name="PageDiag"', '<Grid x:Name="PageGallery"');
+  const fixItem = item('If it breaks', 'What Scan and Fix do');
+  yes('Scan and Fix are buttons on the Diagnostics page, and the page sends people there',
+      /x:Name="BtnScan"/.test(diagPage) && /x:Name="BtnFix"/.test(diagPage) &&
+      /on the Diagnostics page/.test(fixItem) &&
+      /open Diagnostics, press Scan and then Fix/.test(item('If it breaks', '"LOAD ORDER ERROR", or Play is refused')));
+  const fix = between(verify, 'public static int Fix(Config cfg, Action<string> say)', '\n        }\n');
+  yes('Fix puts the list in the server\'s order, and the page says so',
+      /PutInServerOrder\(/.test(fix) && /in the server's order/.test(fixItem));
+  yes('Fix moves another server\'s files and Creation Club plugins aside, and the page says so',
+      /IsolateForeign\(/.test(fix) && /IsolateCreations\(/.test(fix) &&
+      /another server's files and stray Creation Club plugins aside, never deleting them/.test(fixItem));
+  yes('Fix puts missing plugins back from Vortex, and the page says so',
+      /restoring missing plugins from Vortex/.test(fix) && /puts back plugins Vortex has/.test(fixItem));
+  yes('Fix fetches the server\'s copy of a plugin whose bytes differ, and the page says so',
+      /The server's copy of every plugin whose bytes are not its own/.test(fix) &&
+      /downloads the server's copy of any plugin whose bytes differ/.test(fixItem));
+
+  const logs = item('If it breaks', 'Sending your logs');
+  yes('Build the report is on the Diagnostics page, and the page names it',
+      /x:Name="BtnDiagBundle"[^>]*Content="Build the report"/.test(diagPage) && /Build the report/.test(logs));
+  yes('the report carries the launcher log and the script extender log, as the page says',
+      /Grab\(work, Paths\.LogFile\)|Paths\.LogFile/.test(diag) && /skse64\.log/.test(diag) &&
+      /the launcher log/.test(logs) && /script extender log/.test(logs));
+  yes('the launcher log is Profile\\launcher.log, and the page gives that path',
+      /LogFile\s*= Path\.Combine\(ProfileDir, "launcher\.log"\);/.test(paths) &&
+      logs.indexOf('C:\\Thornswood\\Profile\\launcher.log') !== -1);
+  yes('Settings has Open log, as the page says',
+      /x:Name="BtnOpenLog"[^>]*Content="Open log"/.test(xaml) && /Settings, Open log/.test(logs));
+}
+
+// ----------------------------------------------- pages the rail no longer shows
+/*
+  Shell.cs hides five pages from the rail (#599). Sending somebody to one of
+  them is sending them nowhere, which is what the Logs, Server and Mods
+  mentions on this page were doing until 28 September.
+*/
+{
+  const hm = /int\[\] hiddenNav = \{([^}]*)\};/.exec(shell);
+  const hidden = hm ? hm[1].split(',').map(function (s) { return s.trim(); }) : [];
+  const LABEL = { PageSaves: 'Saves', PageServer: 'Server', PageMods: 'Mods', PageBuild: 'What is installed', PageLogs: 'Logs' };
+  yes('Shell.cs hides pages from the rail (' + hidden.join(', ') + ')', hidden.length > 0);
+  hidden.forEach(function (p) {
+    const label = LABEL[p];
+    if (!label) { yes('a hidden page this harness knows the name of: ' + p, false); return; }
+    const rx = new RegExp('(the|open|on the) ' + label + ' page\\b|\\b' + label + ', (then )?(Scan|Fix|Your own|Copy newest|Click)|in the launcher[^.]*\\b' + label + ' page', 'i');
+    const hit = rx.exec(page);
+    yes('the page sends nobody to the ' + label + ' page, which the rail no longer shows' +
+        (hit ? ' (says "' + hit[0] + '")' : ''), !hit);
+  });
+}
+
+// ------------------------------------------------ the site's help agrees
+/*
+  site/data/help.md is the same help on thornswood.net/help. It told people
+  to use the Logs page and that Fix only downloads a plugin; it has to say
+  what this page says about getting in, staff, Fix and the logs.
+*/
+{
+  const md = read('site', 'data', 'help.md').replace(/\*\*/g, '');
+  yes('help.md says the Playtester role unlocks Play', /Playtester role, and that role is what unlocks Play/.test(md));
+  yes('help.md names /helpme and /report', /\/helpme\b/.test(md) && /\/report\b/.test(md));
+  yes('help.md sends people to Diagnostics for Scan and Fix', /open Diagnostics in the launcher and press Scan/.test(md));
+  yes('help.md says what Fix does, in the same words as the page',
+      /puts your plugin list in the server's order/.test(md) &&
+      /downloads the server's copy of\s+any plugin whose bytes differ/.test(md));
+  yes('help.md says to send the logs with Build the report', /Diagnostics and press\s+Build the report/.test(md));
+  const logsPage = /\bLogs page\b|\bServer page\b/.exec(md);
+  yes('help.md sends nobody to a page the rail no longer shows' + (logsPage ? ' (says "' + logsPage[0] + '")' : ''), !logsPage);
+  const keysMd = /## Keys\n([\s\S]*?)\n## /.exec(md);
+  const k = keysMd ? keysMd[1].replace(/\s+/g, ' ') : '';
+  yes('help.md lists the same keys: / chat, K, P, J, Y, H, L, V, O, B, G, N, U',
+      ['/ opens it with the slash', 'K your character panel', 'P your friends and party', 'J your journals',
+       'Y asks them to be friends', 'H offers a trade', 'L stops you hearing them', 'V held to talk',
+       'O keeps the microphone open', 'B steps between a whisper', 'G opens the emote wheel',
+       'N stands you up', 'U presses a blank key mold'].every(function (p) { return k.indexOf(p) !== -1; }));
 }
 
 console.log('');

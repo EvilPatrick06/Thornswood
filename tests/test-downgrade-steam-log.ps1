@@ -40,9 +40,9 @@ param([string]$AppPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $AppPath) { $AppPath = Join-Path $Here '..\launcher\app' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $AppPath) { $AppPath = Join-Path $Here 'launcher\app' }
 
 $script:pass = 0
 $script:fail = 0
@@ -108,7 +108,7 @@ $wanted = [ordered]@{
     'Reason'           = 'static string Reason(string line)'
     'ByHand'           = 'static string ByHand(string cmd)'
     'DownloadedExe'    = 'static string DownloadedExe(string content)'
-    'Depots'           = 'static readonly string[][] Depots ='
+    'FallbackDepots'   = 'static readonly string[][] FallbackDepots ='
 }
 $lifted = [ordered]@{}
 foreach ($k in $wanted.Keys) {
@@ -131,7 +131,8 @@ Yes ('Run stops on Steam''s failure line in all three waits (found {0})' -f $ref
 Yes 'Run counts a folder that appeared after the command as the start' ($run -match '!hadFolder && Directory\.Exists\(folder\)')
 Yes 'Run waits for the finish on what Steam wrote since the command' ($run -match 'LogHasCompletion\(said, depot\)')
 $check = $run.IndexOf('DownloadedExe(content)')
-$firstCopy = $run.IndexOf('File.Copy(')
+# Since #1218 the copy is OwnGame.TakePinned, into Thornswood's own folder.
+$firstCopy = $run.IndexOf('OwnGame.TakePinned(')
 Yes 'Run checks the downloaded exe before it replaces anything' ($check -ge 0 -and $firstCopy -gt $check)
 Yes 'Run still checks the exe in the game folder after the copy' ($run.IndexOf('bool right = File.Exists(targetExe) && !Wrong(cfg, targetExe);') -gt $firstCopy)
 Yes 'nothing tells people Ctrl+Shift+D opens Steam''s console' ($text -notmatch 'Ctrl\+Shift\+D')
@@ -156,6 +157,8 @@ namespace Probe
     {
         const int AppId = 489830;
 __LIFTED__
+        // What Run sets from PinnedDepots; a feed with no pin leaves the fallback (#471).
+        static string[][] Depots = FallbackDepots;
         public static object NewLog(string steam) { return new SteamLog(steam); }
         public static string Since(object l) { return ((SteamLog)l).Since(); }
         public static string Tail(object l, int n) { return ((SteamLog)l).Tail(n); }

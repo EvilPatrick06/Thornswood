@@ -36,13 +36,14 @@ param(
     # Whose settings to read: the build on this machine, or a server's own.
     [ValidateSet('build', 'live', 'dev')][string]$From = 'build',
     [string]$Vps  = '',
-    [string]$User = 'Administrator'
+    [string]$User = ''
 )
 
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $fail = 0
 function Ok  ($m) { Write-Host "  ok    $m" -ForegroundColor Green }
@@ -62,7 +63,7 @@ if ($From -eq 'build') {
     $settingsPath = "$root\server-settings.json"
     $remote = "`$ProgressPreference='SilentlyContinue'; Get-Content -LiteralPath '$settingsPath' -Raw"
     $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($remote))
-    $text = & ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc" 2>&1
+    $text = Invoke-ThornswoodNative { & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc" } 2>&1
     $json = (@($text) -join "`n")
     # The warning ssh prints about key exchange arrives on the same stream as
     # the answer, so the JSON is taken from its first brace rather than from

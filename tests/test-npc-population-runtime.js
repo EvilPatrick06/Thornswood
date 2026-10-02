@@ -1,0 +1,83 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const source=fs.readFileSync(require('node:path').join(__dirname,'../game/gamemode.js'),'utf8');
+const begin=source.indexOf('// NPC POPULATION POLICY BEGIN'),end=source.indexOf('// NPC POPULATION POLICY END');
+assert.ok(begin>=0 && end>begin,'Production population policy must be present');
+const context={Map,Set,Math,Number,JSON};vm.createContext(context);vm.runInContext(source.slice(begin,end),context);
+const descriptors=new Map([['1:Skyrim.esm',1],['2:Skyrim.esm',2],['3:Skyrim.esm',3],['a:Skyrim.esm',10],['3c:Skyrim.esm',60]]);
+function fixture(){
+  const writes=[],props=new Map(),excluded=[];
+  const api={makeProperty(){},getIdFromDesc:d=>descriptors.get(d),
+    setNpcPlacementExclusions:ids=>excluded.push(...ids),
+    get:(id,p)=>p==='baseDesc' ? 'a:Skyrim.esm' : props.get(id+':'+p),
+    set:(id,p,v)=>{props.set(id+':'+p,v);writes.push({id,p,v});}};
+  const data={version:1,plugins:['Skyrim.esm'],cut:['2:Skyrim.esm'],keep:[
+    ['1:Skyrim.esm','a:Skyrim.esm','3c:Skyrim.esm',[10,20,30],100,45,'animal','farm',null,3,'farm1']]};
+  const policy=context.createNpcPopulation(api,data,['Skyrim.esm']);
+  return {api,policy,props,writes,excluded,data};
+}
+const plain=x=>JSON.parse(JSON.stringify(x));
+const state={pos:[10,20,30],cellOrWorld:60,isHuman:false};
+const f=fixture();assert.deepEqual(f.excluded,[2]);
+assert.deepEqual(plain(f.policy.configure(1,state)),{home:[10,20,30],cell:60,leash:100});
+assert.equal(f.props.get('1:spawnDelay'),2700);assert.equal(f.policy.returnMinutes(1),45);
+assert.equal(f.policy.configure(2,state),null);assert.equal(f.policy.configure(3,state),null);
+assert.equal(f.policy.configure(0xff000010,{...state,isHuman:true}),null);
+assert.equal(f.policy.configure(0xff000010,{...state,cellOrWorld:99}),null);
+const dyn=f.policy.configure(0xff000011,state);assert.ok(dyn);assert.equal(f.policy.returnMinutes(0xff000011),45);
+assert.deepEqual(plain(f.props.get(0xff000011+':spawnPoint')),
+  {cellOrWorldDesc:'3c:Skyrim.esm',pos:[10,20,30],rot:[0,0,0]});
+assert.ok(f.policy.configure(0xff000012,state));
+assert.equal(f.policy.configure(0xff000013,state),null,'Shared habitat cap includes authored and dynamic residents');
+assert.throws(()=>context.createNpcPopulation(f.api,{version:1,plugins:['Update.esm'],cut:[],keep:[]},['Skyrim.esm']));
+const restored=fixture(),dynamicId=0xff000020;
+assert.ok(restored.policy.configure(dynamicId,{...state,pos:[100,20,30]}));
+const next=context.createNpcPopulation(restored.api,restored.data,['Skyrim.esm']);
+assert.ok(next.configure(dynamicId,{...state,pos:[190,20,30]}),
+  'A restored NPC inside its accepted home leash remains enrolled after moving');
+console.log('NPC population runtime checks passed');
+
+const freed=fixture();
+assert.ok(freed.policy.configure(0xff000021,state));
+assert.ok(freed.policy.configure(0xff000022,state));
+assert.equal(freed.policy.configure(0xff000023,state),null);
+assert.equal(typeof freed.policy.reconcile,'function','Destroyed dynamic identities must release their habitat capacity');
+freed.policy.reconcile([1,0xff000022]);
+assert.ok(freed.policy.configure(0xff000024,state),'A destroyed actor releases one slot');
+assert.equal(freed.policy.configure(0xff000025,state),null,'A still-loaded dead actor retains its return slot');
+
+const place=source.match(/^function placeActors\([^\r\n]*\)[\s\S]*?^\}/m);
+assert.ok(place);
+function spawnFixture(allow) {
+  const events=[];
+  const ctx={Math,Number,globalThis:null,mp:{lookupEspmRecordById:()=>({record:{type:'NPC_'}}),
+    place:()=>0xff000010,set:(id,name)=>events.push(name),
+    getNpcAIState:()=>state,destroyActor:()=>events.push('destroy')},
+    __thornswoodNpcPopulation:{configure:()=>allow?{home:state.pos,cell:60,leash:100}:null,
+      admit:()=>{events.push('admit');return allow;},release:()=>events.push('release')},
+    __thornswoodNpcRuntime:{enroll:()=>events.push('enroll')}};
+  ctx.globalThis=ctx;vm.createContext(ctx);vm.runInContext(place[0],ctx);
+  const result=ctx.placeActors(10,{desc:'3c:Skyrim.esm',pos:state.pos,rot:[0,0,0]},1,0);
+  return {result,events};
+}
+const refused=spawnFixture(false);
+assert.equal(refused.result.made,0,'A habitat/cap refusal cannot count as a successful birth or encounter');
+assert.ok(refused.events.includes('destroy'));
+const admitted=spawnFixture(true);
+assert.equal(admitted.result.made,1);
+assert.ok(admitted.events.includes('admit') && admitted.events.includes('enroll'),
+  'A dynamic actor enters server authority before the successful spawn returns');
+console.log('Dynamic population lifecycle checks passed');
+
+const failedBirth=fixture(),failedId=0xff000030,write=failedBirth.api.set;
+failedBirth.api.set=(id,name,value)=>{
+  if(id===failedId && name==='spawnDelay') throw new Error('Delay persistence unavailable');
+  return write(id,name,value);
+};
+assert.throws(()=>failedBirth.policy.configure(failedId,state));
+failedBirth.policy.release(failedId);failedBirth.policy.reconcile([1]);
+assert.ok(failedBirth.policy.configure(0xff000031,state));
+assert.ok(failedBirth.policy.configure(0xff000032,state),
+  'An unsuccessful birth cannot permanently consume a habitat slot');
+assert.equal(failedBirth.policy.configure(0xff000033,state),null);
+console.log('Failed birth capacity recovery checks passed');

@@ -15,9 +15,9 @@ namespace Thornswood
     /// built from these, read out of the real files at the moment you look, so
     /// it can only ever show what is actually set.
     ///
-    /// Three families of key code, unfortunately. Skyrim Together and SKSE Menu
-    /// Framework use Windows virtual key codes; Trade Together, True Directional
-    /// Movement, SkyUI and Better Third Person Selection use DirectInput scan
+    /// Three families of key code, unfortunately. SKSE Menu Framework uses
+    /// Windows virtual key codes; True Directional Movement, SkyUI and Better
+    /// Third Person Selection use DirectInput scan
     /// codes, where the same letter is a different number; the minimap uses
     /// DirectInput too but writes it as a decimal. Each binding says which it
     /// speaks, and the translation happens by key name so a rebind cannot land
@@ -369,11 +369,12 @@ namespace Thornswood
             var l = new List<Binding>();
 
             /*
-              THE TWO SKYRIM TOGETHER ROWS THAT USED TO BE HERE ARE GONE.
+              THE TWO ROWS FROM THE OLD MULTIPLAYER MOD THAT USED TO BE HERE
+              ARE GONE.
 
-              "The party menu" and "The connection readout" wrote into
-              Data\SKSE\Plugins\SkyrimTogetherTweaks.ini, which is not in this
-              build and has not been for as long as anybody has looked. The
+              "The party menu" and "The connection readout" wrote into that
+              mod's own settings file under Data\SKSE\Plugins, which is not in
+              this build and has not been for as long as anybody has looked. The
               filter at the bottom of All() drops a binding whose file is
               missing, so neither row has appeared on the page; what they were
               costing was a reader's time and the belief that this server had
@@ -405,8 +406,9 @@ namespace Thornswood
               AND THE SIX TRADING ROWS, WHICH ARE WHY LOOKING AT SOMEBODY DID
               NOTHING.
 
-              They were TradeTogether's, a Skyrim Together mod, writing into
-              Data\SKSE\Plugins\TradeTogether.ini. Neither the ini nor the DLL
+              They were an old trade mod's, an add-on of the old multiplayer
+              mod, writing into its own ini under Data\SKSE\Plugins. Neither the
+              ini nor the DLL
               is in this build; checked 23 September. Patrick, 22 September:
               "Currently the looking at people doesnt have the trade menu and
               when it did you had to use youyr cursor and a bunch of other bs
@@ -487,10 +489,10 @@ namespace Thornswood
             // of the same file, in the same DirectInput numbering, so a rebind
             // here is a rebind in game with nothing to regenerate.
             l.Add(Dx("emotewheel", "ThornsWood", "The emote wheel",
-                     "Twelve gestures, and a second ring of working animations behind them. Everyone else sees what you play.",
+                     "Eight quick slots in the middle, and every emote in a list you can search. Everyone else sees what you play. The number keys 1 to 8 play a slot with the wheel shut.",
                      ThornIni, "WheelKey", 34));
-            l.Add(Dx("emotepage", "ThornsWood", "The other ring",
-                     "With the wheel open, turns between the gestures and the working animations.",
+            l.Add(Dx("emotepage", "ThornsWood", "Search the wheel",
+                     "With the wheel open, moves to the search so you can type a name.",
                      ThornIni, "PageKey", 15));
             l.Add(Dx("emoteclose", "ThornsWood", "Close the wheel",
                      "Shuts the wheel without playing anything.",
@@ -537,6 +539,9 @@ namespace Thornswood
             l.Add(Dx("moldkey", "ThornsWood", "Press a key mold into a lock",
                      "While you are looking at a building's door with a blank key mold in your pack, presses it into the lock so it becomes that building's mold. The holder has to be you or be standing there.",
                      ThornIni, "MoldKey", 22));
+            l.Add(Dx("lockkey", "ThornsWood", "Lock the door",
+                     "Locks the door you last opened, the same door /claim and /lock use. Logged to the server as /lock. Unlock is still /unlock.",
+                     ThornIni, "LockKey", 45));
 
             l.Add(Dx("cyclehold", "Reaching things", "Cycle modifier",
                      "Held down, the two keys below step through everything you could reach instead of the game picking for you.",

@@ -35,7 +35,9 @@
   are when neither price nor input cost can tell its rows apart. So every rung
   is now checked for whether anybody standing on it could gather for even one
   row of it, and a half where that fails and is not written down in the table
-  with a measured reason fails this script.
+  with a measured reason fails this script. (Patrick settled the Bladebinder on
+  28 September, issue #398: Heart Stone deposits are advanced mining now, set by
+  RANK_BY_ORE in Build-OreTable.ps1, so the staves line up with their stone.)
 
   It also follows a recipe to the class that produces its inputs, which it
   could not do until 21 September. game\data\recipes.json records WHICH items each
@@ -64,7 +66,9 @@
 
   Exit code 1 if any ladder has an empty rung below its top, or a rung nobody
   standing on it could gather for that the table has not already written down
-  with a reason. Those are the two shapes that are always wrong.
+  with a reason. Those are the two shapes that are always wrong. And, since
+  issue #398, if a recipe sits more than one rung from what its inputs cost
+  and is not kept on purpose: see FarReason.
 #>
 [CmdletBinding()]
 param(
@@ -368,8 +372,33 @@ Head 'The chain: what a recipe asks for against what it is ranked at'
 # Only the rows the server is asked about are counted, for the same reason the
 # ladder counts above skip tempering: a row the gate is never asked about
 # cannot be in step or out of it with anything.
+#
+# WHY A ROW IS MORE THAN ONE RUNG OUT, issue #398, whose done-when is that every
+# such row is one somebody looked at and kept. Every one falls under one of
+# two causes, each read off the row itself, or it is a new imbalance nobody
+# has looked at and this script fails on it:
+#   kept         its rank is named outright in RECIPE_RANK, with the reason on
+#                the row. The four charcoal grades: burnCharcoal hands coke to a
+#                master charburner alone, so the menu has to say the same.
+#   unproduced   ranked ABOVE what its inputs cost because something on its list
+#                is produced by no class (Dragon Bone, Linen Wrap and the like),
+#                so the price holds it up, and the row says it is kept on
+#                purpose: Patrick decided on 28 September that those stay dear.
+# There is no third. The Bladebinder's staves were one until 28 September,
+# ranked by the second rule below what a master miner's Heart Stone cost; Patrick
+# made the stone advanced mining (RANK_BY_ORE in Build-OreTable.ps1) and they
+# line up with it now, so a second rule row out of step is a new imbalance.
+function FarReason($row, [int]$gap) {
+    $rf = [string]$row.rankFrom
+    if ($rf.StartsWith('named outright in RECIPE_RANK')) { return 'kept' }
+    if ($gap -gt 0 -and [int]$row.inputsWithNoProducer -gt 0 -and $rf.Contains('held above what its placed inputs cost') -and
+        $rf.Contains('Kept on purpose')) { return 'unproduced' }
+    return 'nobody'
+}
 if ($recipes) {
     $inStep = 0; $outStep = 0; $noChain = 0; $far = @()
+    $farWhy = [ordered]@{ kept = 0; unproduced = 0; nobody = 0 }
+    $farNobody = @()
     $perHalf = @{}
     foreach ($k in $recipes.recipes.PSObject.Properties.Name) {
         $row = $recipes.recipes.$k
@@ -409,6 +438,8 @@ if ($recipes) {
             if ($gap -lt 0) { $which = 'below' }
             $far += ('{0}: {1} is ranked {2} and its dearest input, {3}, is {4} work for a {5}. {6} rung(s) {7} what it costs.' -f `
                      $half, [string]$row.name, [string]$row.rank, $dearest, $ir, [string]$row.inputRankWho, [Math]::Abs($gap), $which)
+            $farWhy[(FarReason $row $gap)] += 1
+            if ((FarReason $row $gap) -eq 'nobody') { $farNobody += $far[$far.Count - 1] }
         }
     }
 
@@ -435,14 +466,26 @@ if ($recipes) {
     # reaches a rank and the work it opens is either already in their pack or
     # still out of their reach.
     #
-    # It does NOT set the exit code. An empty rung is always wrong and this
-    # script exits 1 for it; a recipe out of step with its inputs is a thing
-    # somebody has to decide about, and a script that refused to finish over it
-    # would be refusing to report the rest.
+    # Being out of step does NOT set the exit code on its own. An empty rung is
+    # always wrong and this script exits 1 for it; a recipe out of step with
+    # its inputs is a thing somebody has to decide about. What does set it is a
+    # row out of step for none of the reasons FarReason knows, because that is
+    # one nobody has looked at, which is issue #398's done-when. It is still
+    # reported with everything else rather than stopping the run.
     if ($far.Count -gt 0) {
         Note ("{0} recipe(s) are more than one rung away from what their inputs cost" -f $far.Count)
         foreach ($f in ($far | Select-Object -First 10)) { Note ('  ' + $f) }
         if ($far.Count -gt 10) { Note ("  ... and {0} more, every one of them in game\data\recipes.json with its inputItems" -f ($far.Count - 10)) }
+        Say ''
+        Say '  Why each of them is out, read off the row (FarReason, issue #398):'
+        Say ('    {0,4}  kept on purpose: a rank named in RECIPE_RANK with its reason, the charcoal grades' -f $farWhy.kept)
+        Say ('    {0,4}  kept on purpose: held above its inputs because something on its list nobody gathers, Patrick 28 September' -f $farWhy.unproduced)
+        if ($farWhy.nobody -gt 0) {
+            Bad ("{0} recipe(s) are more than one rung out for none of those reasons, so nobody has looked at them:" -f $farWhy.nobody)
+            foreach ($f in ($farNobody | Select-Object -First 10)) { Write-Host ('          ' + $f) -ForegroundColor Red }
+        } else {
+            Ok 'every recipe more than one rung out is kept on purpose, and none is waiting on a decision'
+        }
     } else {
         Ok 'no recipe is more than one rung away from what its inputs cost'
     }

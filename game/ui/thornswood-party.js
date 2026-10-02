@@ -35,6 +35,7 @@
   var data = null;
   var shown = false;
   var root = null;
+  var askEl = null;
 
   function tell(what) {
     try { window.skyrimPlatform.sendMessage('thornswood-front', 'party:' + what); }
@@ -102,25 +103,41 @@
     '  color:#f6e9c8;border-bottom:1px solid rgba(198,170,109,.22);display:flex;align-items:baseline;gap:14px}',
     '#' + ID + ' h2 .sub{font-size:14px;color:rgba(217,207,180,.6);font-style:italic}',
     '#' + ID + ' .body{overflow:auto;padding:16px 24px;display:grid;gap:18px;',
-    '  align-content:start;font-size:14px}',
+    '  align-content:start;font-size:16px}',
     '#' + ID + ' .foot{padding:12px 24px;border-top:1px solid rgba(198,170,109,.22);',
     '  display:flex;gap:10px;align-items:center;font-size:13.5px;font-style:italic;color:rgba(217,207,180,.7)}',
     '#' + ID + ' h3{margin:0 0 8px;padding-bottom:6px;font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;',
     '  color:rgba(198,170,109,.85);font-weight:normal;border-bottom:1px solid rgba(198,170,109,.22)}',
-    '#' + ID + ' .row{display:flex;align-items:center;gap:10px;padding:8px 10px;',
-    '  border:1px solid rgba(198,170,109,.30);background:rgba(0,0,0,.20);margin-bottom:6px}',
-    '#' + ID + ' .row .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '#' + ID + ' .row{display:flex;align-items:center;gap:10px;padding:10px 12px;flex-wrap:wrap;',
+    '  border:1px solid rgba(198,170,109,.30);background:rgba(0,0,0,.20);margin-bottom:8px}',
+    '#' + ID + ' .row .nm{flex:1;min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:17px}',
+    '#' + ID + ' .tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;flex:1 1 220px}',
+    '#' + ID + ' .kicker{display:block;font-size:11px;letter-spacing:.24em;text-transform:uppercase;',
+    '  color:rgba(198,170,109,.85);margin-bottom:4px}',
     // online or not, drawn as the K panel draws a pip: a square with a gold
     // hairline, lit green (the K panel's colour for what is yours) when on
     '#' + ID + ' .dot{width:9px;height:9px;border:1px solid rgba(198,170,109,.55);background:rgba(0,0,0,.2);flex:none}',
     '#' + ID + ' .dot.on{background:#7fb877;border-color:#9fcf92}',
     '#' + ID + ' button{font-family:inherit;font-style:normal;font-weight:normal;cursor:pointer;',
     '  border:1px solid rgba(198,170,109,.55);background:rgba(0,0,0,.25);color:#e9d19b;',
-    '  padding:5px 11px;font-size:13px;line-height:17px;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}',
+    '  padding:6px 12px;font-size:15px;line-height:20px;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}',
     '#' + ID + ' button.go{background:#c6aa6d;border-color:#e9d19b;color:#1b1205}',
     '#' + ID + ' .none{color:rgba(217,207,180,.6);font-style:italic;padding:6px 2px}',
     '#' + ID + ' .ask{border:1px solid #e9d19b;background:rgba(201,162,75,.16);',
-    '  padding:12px 14px;display:flex;gap:10px;align-items:center}',
+    '  padding:14px 16px;display:flex;gap:12px;align-items:center}',
+    '#ts-ask{position:fixed;left:50%;top:16%;transform:translateX(-50%);z-index:2147483200;',
+    '  pointer-events:none;font-family:"Palatino Linotype",Palatino,Georgia,serif;color:#d9cfb4}',
+    '#ts-ask .card{pointer-events:auto;min-width:420px;max-width:calc(100vw - 48px);',
+    '  background:rgba(11,10,8,.94);border:1px solid rgba(198,170,109,.42);',
+    '  outline:1px solid rgba(198,170,109,.14);outline-offset:4px;',
+    '  box-shadow:0 24px 80px rgba(0,0,0,.7);padding:22px 26px;display:flex;gap:16px;align-items:center}',
+    '#ts-ask .who{flex:1;font-size:20px;line-height:1.35;color:#f6e9c8}',
+    '#ts-ask .kicker{display:block;font-size:11px;letter-spacing:.24em;text-transform:uppercase;',
+    '  color:rgba(198,170,109,.85);margin-bottom:6px}',
+    '#ts-ask button{font-family:inherit;font-style:normal;font-weight:normal;cursor:pointer;',
+    '  border:1px solid rgba(198,170,109,.55);background:rgba(0,0,0,.25);color:#e9d19b;',
+    '  padding:8px 18px;font-size:16px;line-height:22px;letter-spacing:.14em;text-transform:uppercase}',
+    '#ts-ask button.go{background:#c6aa6d;border-color:#e9d19b;color:#1b1205}',
     '#' + ID + ' .ask .who{flex:1}',
     '#' + ID + ' .ask b{font-weight:normal;font-size:16.5px;color:#f6e9c8}',
     '#' + ID + ' .note{color:rgba(217,207,180,.7);font-size:12.5px;line-height:1.5}',
@@ -269,9 +286,17 @@
         '</span>');
     }
 
-    stripEl.innerHTML = bits.join('');
-    stripEl.style.display = '';
+    /*
+      ONLY WHEN IT READS DIFFERENTLY (#963). This runs five times a second for
+      as long as somebody is in a party, and nobody standing still changes a
+      letter of it; every innerHTML write was a rebuilt node tree and a repaint
+      of the game's browser layer over the frame, for the same words.
+    */
+    var html = bits.join('');
+    if (html !== stripHtml) { stripHtml = html; stripEl.innerHTML = html; }
+    if (stripEl.style.display !== '') { stripEl.style.display = ''; }
   }
+  var stripHtml = null;
 
   var UNITS_PER_METRE = 70;   // the same seventy the voice page uses
 
@@ -309,6 +334,9 @@
       '<button id="' + ID + '-close">Close</button></div>' +
       '</div>';
     document.body.appendChild(root);
+    askEl = document.createElement('div');
+    askEl.id = 'ts-ask';
+    document.body.appendChild(askEl);
     root.querySelector('#' + ID + '-close').onclick = close;
 
     /*
@@ -350,10 +378,17 @@
       var what = data.offer.kind === 'friend' ? 'wants to be friends'
         : (data.offer.kind === 'party' ? 'is asking you to join their party'
                                        : 'is offering to trade');
-      html += '<div class="ask"><span class="who"><b>' + esc(data.offer.name) +
+      html += '<div class="ask"><span class="who"><span class="kicker">Request</span><b>' + esc(data.offer.name) +
               '</b> ' + what + '</span>' +
-              '<button class="go" data-do="yes">Yes</button>' +
-              '<button data-do="no">No</button></div>';
+              '<button class="go" data-do="yes">Accept</button>' +
+              '<button data-do="no">Refuse</button></div>';
+    }
+
+    var iLead = false;
+    if (data.party) {
+      for (var leadI = 0; leadI < data.party.length; leadI++) {
+        if (data.party[leadI].me && data.party[leadI].leader) { iLead = true; }
+      }
     }
 
     html += '<div><h3>Your party</h3>';
@@ -363,16 +398,24 @@
     } else {
       for (var i = 0; i < data.party.length; i++) {
         var m = data.party[i];
+        var whoId = m.p != null ? m.p : m.name;
         html += '<div class="row"><span class="dot' + (m.on ? ' on' : '') + '"></span>' +
                 '<span class="nm">' + esc(m.name) + (m.me ? ' (you)' : '') + '</span>' +
-                (m.leader ? '<span class="tag p">leader</span>' : '') + '</div>';
+                (m.leader ? '<span class="tag p">leader</span>' : '') +
+                (!m.me && iLead
+                  ? '<span class="tools"><button data-do="kick" data-who="' + esc(whoId) + '">Kick</button>' +
+                    '<button data-do="lead" data-who="' + esc(whoId) + '">Lead</button></span>'
+                  : '') +
+                '</div>';
       }
       html += '<div class="row" style="border:none;background:none;padding-left:2px">' +
               '<span class="nm">' + data.together +
               (data.together === 1 ? ' of them is here with you' : ' of them are here with you') +
               '. ' + (data.together ? ('Work counts ' + data.bonus + '% more.')
                                     : ('Be in the same place for ' + data.bonus + '% more from your work.')) +
-              '</span><button data-do="leave">Leave</button></div>';
+              '</span><span class="tools">' +
+              (iLead ? '<button data-do="disband">Disband</button>' : '') +
+              '<button data-do="leave">Leave</button></span></div>';
     }
     html += '</div>';
 
@@ -382,16 +425,25 @@
     } else {
       for (var j = 0; j < data.friends.length; j++) {
         var f = data.friends[j];
+        var friendId = f.p != null ? f.p : f.name;
         html += '<div class="row"><span class="dot' + (f.on ? ' on' : '') + '"></span>' +
                 '<span class="nm">' + esc(f.name) + '</span>' +
                 (f.party ? '<span class="tag p">party</span>' : '') +
                 (f.muted ? '<span class="tag m">muted</span>' : '') +
+                (f.textOff ? '<span class="tag m">text</span>' : '') +
+                (f.nameOff ? '<span class="tag m">name</span>' : '') +
+                '<span class="tools">' +
                 (f.on && !f.party ? '<button data-do="ask" data-who="' + esc(f.name) + '">Ask to party</button>' : '') +
                 '<button data-do="mute" data-who="' + esc(f.name) + '">' + (f.muted ? 'Unmute' : 'Mute') + '</button>' +
+                '<button data-do="mtext" data-who="' + esc(friendId) + '">' + (f.textOff ? 'Read' : 'Text') + '</button>' +
+                '<button data-do="mname" data-who="' + esc(friendId) + '">' + (f.nameOff ? 'Show' : 'Name') + '</button>' +
                 '<button data-do="drop" data-who="' + esc(f.name) + '">Remove</button>' +
-                '</div>';
+                '</span></div>';
       }
     }
+    html += '<div class="row" style="border:none;background:none;padding-left:2px">' +
+            '<span class="nm">' + (data.namesAll ? 'Every name above a head is hidden.' : 'Names above heads are shown.') +
+            '</span><button data-do="nameall">' + (data.namesAll ? 'Show names' : 'Hide every name') + '</button></div>';
     html += '</div>';
 
     /*
@@ -428,9 +480,37 @@
         if (verb === 'yes') { net('/yes'); }
         else if (verb === 'no') { net('/no'); }
         else if (verb === 'leave') { net('/party leave'); }
+        else if (verb === 'disband') { net('/party disband'); }
+        else if (verb === 'kick') { net('/party kick ' + who); }
+        else if (verb === 'lead') { net('/party lead ' + who); }
         else if (verb === 'ask') { net('/party ' + who); }
         else if (verb === 'mute') { net('/mute ' + who); }
+        else if (verb === 'mtext') { net('/mute text ' + who); }
+        else if (verb === 'mname') { net('/hidename ' + who); }
+        else if (verb === 'nameall') { net('/hidename all'); }
         else if (verb === 'drop') { net('/friend remove ' + who); }
+      };
+    }
+  }
+
+  function offerWords(kind) {
+    if (kind === 'friend') { return 'wants to be friends.'; }
+    if (kind === 'party') { return 'is asking you to join their party.'; }
+    return 'is offering to trade.';
+  }
+
+  function drawAsk() {
+    if (!askEl) { return; }
+    if (!data || !data.offer) { askEl.innerHTML = ''; return; }
+    askEl.innerHTML =
+      '<div class="card"><span class="who"><span class="kicker">Request</span><b>' + esc(data.offer.name) + '</b> ' +
+      offerWords(data.offer.kind) + '</span>' +
+      '<button class="go" data-do="yes">Accept</button>' +
+      '<button data-do="no">Refuse</button></div>';
+    var buttons = askEl.querySelectorAll('button[data-do]');
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].onclick = function () {
+        net(this.getAttribute('data-do') === 'yes' ? '/yes' : '/no');
       };
     }
   }
@@ -458,7 +538,12 @@
     close: close,
     toggle: toggle,
     isOpen: function () { return shown; },
-    setData: function (d) { data = d || null; if (shown) { draw(); } },
+    setData: function (d) {
+      data = d || null;
+      build();
+      drawAsk();
+      if (shown) { draw(); }
+    },
 
     /*
       Where your party is, handed over by thornswood-front.js.
@@ -479,5 +564,9 @@
   };
 
   build();
+  // Owner updates can precede this asynchronously loaded script (#1275).
+  if (window.thornswoodSocialView) {
+    window.thornswoodParty.setData(window.thornswoodSocialView);
+  }
   tell('ready');
 })();

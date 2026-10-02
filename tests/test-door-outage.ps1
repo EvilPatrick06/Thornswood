@@ -31,10 +31,10 @@ param([string]$DoorPath, [string]$DiscordPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $DoorPath) { $DoorPath = Join-Path $Here '..\launcher\app\Door.cs' }
-if (-not $DiscordPath) { $DiscordPath = Join-Path $Here '..\launcher\app\Discord.cs' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $DoorPath) { $DoorPath = Join-Path $Here 'launcher\app\Door.cs' }
+if (-not $DiscordPath) { $DiscordPath = Join-Path $Here 'launcher\app\Discord.cs' }
 
 $script:pass = 0
 $script:fail = 0
@@ -103,6 +103,14 @@ using System.Windows.Threading;
 namespace Thornswood
 {
     STANDING_GOES_HERE
+
+    // Stands in for launcher\app\Swallow.cs, which Door.cs calls from its
+    // catch blocks since the silent catches were given a log line (#461).
+    // The real one writes to Paths.LogFile, which this driver has no use for.
+    public static class Swallow
+    {
+        public static void Note(string where, Exception e) { }
+    }
 
     public static class Discord
     {

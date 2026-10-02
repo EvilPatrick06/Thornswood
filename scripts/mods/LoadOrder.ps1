@@ -542,6 +542,17 @@ function Get-VortexProfileDir([string]$Name = 'Thornswood') {
     $profilesRoot = Join-Path $env:APPDATA 'Vortex\skyrimse\profiles'
     if (-not (Test-Path -LiteralPath $profilesRoot)) { return $null }
     $st = Get-VortexStateDir
+    if (Test-Path -LiteralPath (Join-Path $st 'CURRENT')) {
+        # The current LevelDB metadata survives compaction; transition text does not.
+        if (-not ('Thornswood.VortexProfileState' -as [type])) {
+            $source = Join-Path $PSScriptRoot '..\..\launcher\app\VortexProfileState.cs'
+            if ($PSVersionTable.PSVersion.Major -le 5) {
+                Add-Type -Path $source -ReferencedAssemblies System.dll,System.Core.dll,System.Xml.dll,System.Runtime.Serialization.dll
+            } else { Add-Type -Path $source }
+        }
+        try { return [Thornswood.VortexProfileState]::Find($st, $profilesRoot, $Name) }
+        catch { throw 'Vortex profile metadata cannot be verified. Finish its deployment, close Vortex, then retry. Do not create another profile to work around unreadable state.' }
+    }
     $ids = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     if (Test-Path -LiteralPath $st) {
         $pairRe = '"profileId"\s*:\s*"([^"]+)"\s*,\s*"profileName"\s*:\s*"' + [regex]::Escape($Name) + '"'
@@ -667,6 +678,33 @@ function Get-LoadOrderGame([string[]]$Enabled, [scriptblock]$IsLightOrMissing, [
         }
     }
     return ,[string[]]$order.ToArray()
+}
+
+# An official Creation Club plugin, by its name: cc, three letters for who made
+# it, SSE and three digits (ccBGSSSE001-Fish.esm, ccQDRSSE001-SurvivalMode.esl).
+# LoadOrder.IsCreation in the launcher. #479: Special Edition is all Thornswood
+# needs, and somebody who owns the Anniversary upgrade still plays.
+function Test-LoadOrderCreation([string]$Name) {
+    # -match is case blind, the way the game reads names.
+    return ("$Name".Trim() -match '^cc[a-z]{3}sse\d{3}.*\.es[mlp]$')
+}
+
+# What an enabled list switches on that the reference does not, in list order,
+# each once: LoadOrder.NotInBuild. An official Creation Club plugin that takes
+# no place in the game's order (light, or not in Data) is not counted, because
+# it moves nothing the server compares. A full one that is in Data still is.
+function Get-LoadOrderNotInBuild([string[]]$Enabled, [string[]]$Reference, [scriptblock]$IsLightOrMissing) {
+    $want = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($r in @($Reference)) { $t = "$r".Trim(); if ($t.Length) { [void]$want.Add($t) } }
+    $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $out = New-Object Collections.Generic.List[string]
+    foreach ($raw in @($Enabled)) {
+        $n = "$raw".Trim()
+        if ($n.Length -eq 0 -or $want.Contains($n) -or -not $seen.Add($n)) { continue }
+        if ((Test-LoadOrderCreation $n) -and ($null -eq $IsLightOrMissing -or (& $IsLightOrMissing $n))) { continue }
+        [void]$out.Add($n)
+    }
+    return ,[string[]]$out.ToArray()
 }
 
 # The first position where the two lists name different plugins, or where one

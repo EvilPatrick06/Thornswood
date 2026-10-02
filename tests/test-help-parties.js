@@ -10,7 +10,7 @@
 //
 // Parties arrived on 23 September (#133), and the green names, the map
 // markers and the compass strip the same morning (#139). The Help item went on
-// saying "There is no party system", measured against Skyrim Together. It is
+// saying "There is no party system", measured against the old multiplayer mod. It is
 // copy, so nothing failed and nothing told anybody. This file reads the Help
 // items out of launcher\app\Help.cs and holds the party ones to the code they
 // describe: the cap, the bonus, how long an ask stands and the keys are read
@@ -19,19 +19,19 @@
 // lapse, the logout rule and the bonus do what the page says they do.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const CR = String.fromCharCode(13);
 function read(...bits) {
-  return fs.readFileSync(path.join(TOOLS_DIR, ...bits), 'utf8').split(CR).join('');
+  return fs.readFileSync(path.join(REPO_DIR, ...bits), 'utf8').split(CR).join('');
 }
-const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
+const SRC = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
-const helpCs = read('..', 'launcher', 'app', 'Help.cs');
-const keysCs = read('..', 'launcher', 'app', 'Keys.cs');
-const front = read('..', 'game', 'plugins', 'thornswood-front.js');
-const panel = read('..', 'game', 'ui', 'thornswood-party.js');
+const helpCs = read('launcher', 'app', 'Help.cs');
+const keysCs = read('launcher', 'app', 'Keys.cs');
+const front = read('game', 'plugins', 'thornswood-front.js');
+const panel = read('game', 'ui', 'thornswood-party.js');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -99,8 +99,8 @@ const aboutTogether = together.concat(partyItems)
       !items.some(function (h) {
         return /no party system|nobody to invite|adds none of it/i.test(h.title + ' ' + h.body);
       }));
-  yes('nothing about playing together is measured against Skyrim Together',
-      !/Skyrim Together/i.test(aboutTogether));
+  yes('nothing about playing together is measured against the old multiplayer mod',
+      !/Skyrim\s*Together/i.test(aboutTogether));
 }
 
 // ------------------------------------------------- the numbers are the code's
@@ -175,8 +175,10 @@ yes('and the page says ' + spoken(LAPSE) + ' seconds', says(text, LAPSE, '', ' s
   const named = (text.match(/\/[a-z]+/g) || []).filter(function (w, i, all) {
     return all.indexOf(w) === i;
   });
-  yes('the page names /party, /yes and /no',
-      named.indexOf('/party') !== -1 && named.indexOf('/yes') !== -1 && named.indexOf('/no') !== -1);
+  yes('the page names /party', named.indexOf('/party') !== -1);
+  yes('an ask is answered on the prompt, not by typing /yes or /no',
+      named.indexOf('/yes') === -1 && named.indexOf('/no') === -1 &&
+      /Accept or Refuse on the prompt/.test(text));
   const refused = named.filter(function (w) { return words.indexOf(w) === -1; });
   yes('every command the page names is one everybody may use' +
       (refused.length ? ' (not: ' + refused.join(', ') + ')' : ''), refused.length === 0);
@@ -196,10 +198,11 @@ yes('and the page says ' + spoken(LAPSE) + ' seconds', says(text, LAPSE, '', ' s
       /Ask to party beside a friend who is online/.test(text) &&
       /f\.on && !f\.party \? '<button data-do="ask"/.test(p) &&
       /verb === 'ask'\) \{ net\('\/party ' \+ who\); \}/.test(p));
-  yes('and the Yes and No buttons for an ask',
-      /press Yes or No on their own P panel/.test(text) &&
-      p.indexOf('data-do="yes">Yes</button>') !== -1 &&
-      p.indexOf('data-do="no">No</button>') !== -1);
+  yes('and Accept and Refuse, on the panel and on the prompt',
+      /Accept or Refuse on the prompt/.test(text) &&
+      p.indexOf('data-do="yes">Accept</button>') !== -1 &&
+      p.indexOf('data-do="no">Refuse</button>') !== -1 &&
+      p.indexOf("askEl.id = 'ts-ask'") !== -1);
 }
 
 // --------------------------------------------------- finding your party

@@ -35,12 +35,12 @@
 //
 // The --live read is a GET and changes nothing. CI does not pass it: the
 // token a workflow gets cannot read branch protection.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const ROOT = path.join(TOOLS_DIR, '..');
+const ROOT = REPO_DIR;
 const LIVE = process.argv.indexOf('--live') !== -1;
 
 let pass = 0, fail = 0;
@@ -130,11 +130,17 @@ yes('the check flags the three source writes Ship used to end with, and not the 
 const shipSrc = read('scripts/release/Ship.ps1');
 const ship = gitCalls(shipSrc);
 const shipReads = ship.filter(function (c) { return c.repo === '$RepoDir' && !WRITES.test(c.sub); });
-const shipFeed = ship.filter(function (c) { return WRITES.test(c.sub) && c.repo === '$devRel'; });
+const shipAnyWrite = ship.filter(function (c) { return WRITES.test(c.sub); });
 yes('Ship.ps1 reads the source repository before a main release (' + shipReads.length + ' git calls: branch, status, fetch, ahead and behind)',
     shipReads.length >= 4);
-yes('Ship.ps1 still writes the dev feed in the releases clone, so the check can see a write when there is one (' + shipFeed.length + ')',
-    shipFeed.length >= 3);
+// Until 28 September Ship also pushed the dev feed in a clone of the releases
+// repository, which this counted to show the parser sees a write when there is
+// one. That repository is gone and Ship records a release on the VPS
+// (Feed-Store.ps1), so Ship has no git write anywhere; the parser is shown the
+// old lines above instead.
+shipAnyWrite.forEach(function (c) { console.log('      Ship.ps1:' + c.line + '  ' + c.text); });
+yes('Ship.ps1 makes no git write in any repository, now that the releases clone is gone (' + shipAnyWrite.length + ')',
+    shipAnyWrite.length === 0);
 const shipBad = sourceWrites(ship);
 shipBad.forEach(function (c) { console.log('      Ship.ps1:' + c.line + '  ' + c.text); });
 yes('Ship.ps1 never adds, commits, pushes or moves a branch in the source repository', shipBad.length === 0);
@@ -148,10 +154,11 @@ yes('Ship.ps1 refuses a main release that is ahead of origin/main, and sends it 
     // naming whichever branch is shipping, main or hotfix/...
     /ahead of origin\/(main|\$branch)\. A release has to be buildable[\s\S]{0,300}?through a pull request/.test(shipSrc) &&
     !/ahead of origin\/(main|\$branch)\. Run git push first/.test(shipSrc));
-yes('Ship.ps1 refuses a main release with a file under tools that git does not know, which both documents now name',
+yes('Ship.ps1 refuses a main release with a file in a folder a release is built from that git does not know, which both documents now name',
     // Since phase 0 of the reorganisation (issue #440) the gate also looks at
-    // the other folders a release is built from, and says so.
-    /file\(s\) under tools(, or another folder a release is built from,)? that git does not know about/.test(shipSrc));
+    // the other folders a release is built from, and says so; since phase 10
+    // (#1151) tools\ is gone and the refusal names only those folders.
+    /file\(s\) in a folder a release is built from that git does not know about/.test(shipSrc));
 
 // ------------------------------------------------------------ Bump-Version.ps1
 const bump = gitCalls(read('scripts/release/Bump-Version.ps1'));

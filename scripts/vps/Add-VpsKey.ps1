@@ -22,13 +22,14 @@ param(
     [switch]$FromClipboard,
     [switch]$Remove,
     [string]$VpsHost = '',
-    [string]$VpsUser = 'Administrator',
+    [string]$VpsUser = '',
     [switch]$NoPause
 )
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here 'Vps.ps1')
+if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
@@ -93,7 +94,7 @@ icacls `$f /inheritance:r /grant 'Administrators:F' /grant 'SYSTEM:F' | Out-Null
 `$said
 "@
 $b64 = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($remote))
-$out = & ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$VpsUser@$VpsHost" "powershell -NoProfile -EncodedCommand $b64" 2>&1
+$out = Invoke-ThornswoodNative { & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$VpsUser@$VpsHost" "powershell -NoProfile -EncodedCommand $b64" } 2>&1
 if ($LASTEXITCODE -ne 0) { Die "ssh did not go through (exit $LASTEXITCODE): $out" }
 Say ("  " + ($out | Where-Object { $_ -notmatch '^#< CLIXML|^<Objs' } | Out-String).Trim()) 'Green'
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

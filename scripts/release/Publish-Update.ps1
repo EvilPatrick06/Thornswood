@@ -2,13 +2,15 @@
   Publish-Update.ps1
 
   Diffs the current build against the last published state, packs only what
-  changed, uploads it as a release asset, and updates version.json so everyone's
-  launcher picks it up.
+  changed, sends it to the site (thornswood.net/feed[-dev]/assets/<sha256>,
+  #897), and updates version.json so everyone's launcher picks it up.
 
   First time:   .\Publish-Update.ps1 -Baseline
   After that:   .\Publish-Update.ps1 -Notes "Swapped the map mod"
   Launcher:     .\Publish-Update.ps1 -Launcher -Notes "New launcher"
-  Host urls:    .\Publish-Update.ps1 -HostAssetUrls   # rewrite pack urls to thornswood.net (#649)
+
+  The feed and its baseline are received from the VPS at the start and sent
+  back at the end (Feed-Store.ps1, #907). Nothing here uses GitHub.
 #>
 [CmdletBinding()]
 param(
@@ -31,11 +33,11 @@ param(
     [int64]$MaxReleaseMB = 3072,
     [switch]$AcceptSize,
     [string]$RepoDir,
-    [string]$Repo,
-    # Releases live in their own PUBLIC repository now, holding version.json
-    # and the assets and nothing else. The source stays private. This is what
-    # lets a shipped launcher read updates with no credential on it, which is
-    # the only version of this that is not a credential handed to strangers.
+    # This machine's working folder for the channel's feed and baseline, not a
+    # git repository: %LOCALAPPDATA%\Thornswood\feed\main or ...\dev
+    # (Feed-Store.ps1). Both files are received from the VPS into it at the
+    # start and sent back at the end. Until #907 this was a clone of
+    # Thornswood-Releases beside the repository.
     [string]$ReleaseDir,
     [string]$Id,
     [string]$Notes   = '',
@@ -55,24 +57,30 @@ param(
     # the one written in app\Updater.cs. Ship uses it for dev builds, whose
     # number lives only in the exe.
     ,[string]$VersionOverride
-    # After uploading to GitHub, rewrite pack/launcher/clientRuntime urls in
-    # version.json to https://thornswood.net/feed/assets/<sha256> (or
-    # /feed-dev/assets/<sha256> on the dev channel) for the #649 host cutover.
-    # Uploads still go to Thornswood-Releases so rollback stays hot; Website
-    # must have mirrored the bytes at those paths. No secrets invented.
-    ,[switch]$HostAssetUrls
+    # With -Launcher: the fingerprint of what that exe is compiled from, which
+    # Ship works out (Get-LauncherInputHash). Written to the feed as
+    # launcherInputs, issue #921.
+    ,[string]$LauncherInputs
+    # Where launchers download what this release adds (#897): every pack, the
+    # launcher and the client runtime are sent to /feed[-dev]/assets/<sha256>
+    # on thornswood.net BEFORE version.json is written, and the feed names
+    # them there. The urls already on the feed move to the site too, each one
+    # only once the site answers for its bytes. The GitHub release path kept
+    # for rolling back went with Thornswood-Releases (#907).
+    #
+    # Where the site answers, for the check that moves old urls over and for
+    # main's feed on a dev publish. The tests point it at a copy of
+    # site\server.js on this machine.
+    ,[string]$SiteUrl = 'https://thornswood.net'
+    # A folder standing in for the site's root on the VPS (C:\Thornswood-Docs),
+    # passed to Remirror-Site-Feed.ps1 and Feed-Store.ps1 so nothing connects
+    # to the VPS. Tests only.
+    ,[string]$SiteDir
 )
 
 
-# The launcher was SkyrimTogether.exe and is Thornswood.exe now. It replaces
-# itself in place when it updates rather than being reinstalled, so an install
-# made before the rename still carries the old name and both have to be looked
-# for, newest first.
+# The launcher, Thornswood.exe in the launcher folder.
 function Get-LauncherExe([string]$dir) {
-    foreach ($n in 'Thornswood.exe', 'SkyrimTogether.exe') {
-        $p = Join-Path $dir $n
-        if (Test-Path -LiteralPath $p) { return $p }
-    }
     return (Join-Path $dir 'Thornswood.exe')
 }
 
@@ -112,66 +120,36 @@ if ($Dev -and -not (Test-Path (Join-Path $Root 'Launcher'))) {
     Die "No dev build at $Root. Install it from the main launcher's Settings page first."
 }
 
-# ------------------------------------------------------------ dev channel
-# The dev build follows the dev branch of the releases repo. That branch is
-# checked out as a git worktree beside the main clone, so both feeds sit on
-# disk at once and a publish to one cannot touch the other. Made on first use,
-# from main's tip, so the first dev version.json is exactly what main has.
-function Ensure-DevReleases([string]$mainRel) {
-    $devRel = Join-Path (Split-Path -Parent $mainRel) 'Thornswood-Releases-dev'
-    if (Test-Path (Join-Path $devRel 'version.json')) { return $devRel }
-    if (-not (Test-Path (Join-Path $mainRel '.git'))) {
-        Die "The dev channel needs the releases clone at $mainRel first."
-    }
-    Write-Host "  making the dev release worktree at $devRel" -ForegroundColor DarkGray
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    try {
-        & git -C $mainRel fetch origin 2>&1 | Out-Null
-        $remoteDev = & git -C $mainRel ls-remote --heads origin dev 2>$null
-        if ($remoteDev) {
-            & git -C $mainRel worktree add $devRel dev 2>&1 | Out-Host
-        } else {
-            & git -C $mainRel worktree add -b dev $devRel origin/main 2>&1 | Out-Host
-            & git -C $devRel push -u origin dev 2>&1 | Out-Host
-        }
-    } finally { $ErrorActionPreference = $old }
-    if (-not (Test-Path (Join-Path $devRel 'version.json'))) { Die "Could not make the dev release worktree at $devRel." }
-    return $devRel
-}
-
-if ($Dev -and -not $ReleaseDir) {
-    $ReleaseDir = Ensure-DevReleases (Join-Path (Split-Path -Parent $RepoDir) 'Thornswood-Releases')
-}
-
-# Where version.json is published from. A clone of the releases repo sitting
-# next to the source clone, by default. If it is not there yet, this falls back
-# to the old arrangement so nothing breaks before it is set up, and says so.
-if (-not $ReleaseDir) {
-    $guess = Join-Path (Split-Path -Parent $RepoDir) 'Thornswood-Releases'
-    if (Test-Path (Join-Path $guess '.git')) { $ReleaseDir = $guess }
-    else { $ReleaseDir = $RepoDir }
-}
-if ($ReleaseDir -eq $RepoDir) {
-    Write-Host ''
-    Write-Host '  Publishing from the source repo, the old way.' -ForegroundColor Yellow
-    Write-Host '  Every launcher that gets this needs a token to read it, and that token' -ForegroundColor Yellow
-    Write-Host '  ships to everybody. Clone the public releases repo next to this one:' -ForegroundColor Yellow
-    Write-Host ("    git clone https://github.com/EvilPatrick06/Thornswood-Releases " +
-                (Join-Path (Split-Path -Parent $RepoDir) 'Thornswood-Releases')) -ForegroundColor DarkGray
-    Write-Host ''
+# ------------------------------------------------------------ the feed store
+# THE FEED AND THE BASELINE COME FROM THE VPS (#907). Each channel keeps
+# version.json, published.json and their history beside the feed the site
+# serves (C:\Thornswood-Docs\feed and feed-dev); Feed-Store.ps1 says how and
+# why. They are received into this machine's working folder for the channel
+# before anything is read, so a release is packed against the baseline the
+# last Ship on ANY machine left, and sent back at the end. Until then they
+# were two clones of Thornswood-Releases beside the repository, and the
+# baseline was read off whatever this disk last pulled.
+#
+# A run that sends nothing (-NoPush, which is Ship -DryRun) and already has
+# both files here uses them as they are, so a dry run never needs the VPS.
+. (Join-Path $Here 'Feed-Store.ps1')
+# What a release is diffed against: file contents, and the feed's own record
+# of what its last release left installed (#441). Release-Baseline.ps1 says why.
+. (Join-Path $Here 'Release-Baseline.ps1')
+# The one name a release goes by, and what else it is known by (#444).
+. (Join-Path $Here 'Release-Name.ps1')
+if (-not $ReleaseDir) { $ReleaseDir = Get-FeedStoreDir $Channel }
+if (-not (Test-Path -LiteralPath $ReleaseDir)) { New-Item -ItemType Directory -Path $ReleaseDir -Force | Out-Null }
+$haveLocal = (Test-Path -LiteralPath (Join-Path $ReleaseDir 'version.json')) -and (Test-Path -LiteralPath (Join-Path $ReleaseDir 'published.json'))
+if (-not $NoPush -or -not $haveLocal) {
+    Write-Host "  receiving the $Channel feed and baseline from the VPS into $ReleaseDir" -ForegroundColor DarkGray
+    try { [void](Receive-FeedStore $Channel $ReleaseDir -SiteDir $SiteDir) }
+    catch { Die ("Could not receive the $Channel feed and baseline from the VPS, so nothing was built: " + $_.Exception.Message) }
+} else {
+    Write-Host "  -NoPush: using the feed and baseline last received into $ReleaseDir" -ForegroundColor DarkGray
 }
 if (-not (Test-Path (Join-Path $ReleaseDir 'version.json'))) {
-    if ($ReleaseDir -eq $RepoDir) { Die "No version.json in $RepoDir. Point -RepoDir at your clone." }
-    # First publish into a fresh releases clone. Seed it from the source repo so
-    # nothing about the current feed is lost.
-    $seed = Join-Path $RepoDir 'version.json'
-    if (Test-Path $seed) {
-        Copy-Item $seed (Join-Path $ReleaseDir 'version.json') -Force
-        Write-Host ''
-        Write-Host "  version.json copied into $ReleaseDir for the first publish." -ForegroundColor Green
-    } else {
-        Die "No version.json in either $ReleaseDir or $RepoDir."
-    }
+    Die "The VPS has no version.json for the $Channel channel. Nothing was built."
 }
 
 $GameDir    = Join-Path $Root 'Game'
@@ -218,39 +196,19 @@ if (Test-Path -LiteralPath $OldDist) {
 # run can pack the difference instead of everything.
 #
 # It used to live in _dist (cleared by uninstall), then under LOCALAPPDATA
-# (per machine, so a Dev Ship from a second machine started from nothing). It
-# now lives in the releases clone for this channel, beside version.json, and
-# is committed with the feed so every machine that ships reads the same
-# baseline. Pending notes stay under LOCALAPPDATA: they are about this
-# machine's unfinished push, not about the channel.
+# (per machine, so a Dev Ship from a second machine started from nothing),
+# then in the Thornswood-Releases clone for the channel (#437). Since #907 it
+# is on the VPS beside the channel's feed, received above into the working
+# folder, so every machine that ships reads the same baseline. Since #441 it is
+# a copy of the record the feed's last release names, and the block "what was
+# published" below reads that record from the site when this copy is missing
+# or is not it.
+# Pending notes stay under LOCALAPPDATA: they are about this machine's
+# unfinished send, not about the channel.
 $StateFile = Join-Path $ReleaseDir 'published.json'
 
-# Migrate without deleting. Prefer Releases; copy from LOCALAPPDATA or the
-# old DistDir spot the first time this machine runs the new layout. Dev still
-# starts from main's baseline when it has none of its own.
-$legacyDir = Join-Path $env:LOCALAPPDATA 'Thornswood'
-$legacyChannel = Join-Path $legacyDir $(if ($Dev) { 'published-dev.json' } else { 'published.json' })
-$legacyMain = Join-Path $legacyDir 'published.json'
-$oldDistState = Join-Path $DistDir 'published.json'
-if (-not (Test-Path -LiteralPath $StateFile)) {
-    $src = $null
-    if (Test-Path -LiteralPath $legacyChannel) { $src = $legacyChannel }
-    elseif ($Dev -and (Test-Path -LiteralPath $legacyMain)) { $src = $legacyMain }
-    elseif ($Dev) {
-        $mainRel = Join-Path (Split-Path -Parent $ReleaseDir) 'Thornswood-Releases'
-        $mainBase = Join-Path $mainRel 'published.json'
-        if (Test-Path -LiteralPath $mainBase) { $src = $mainBase }
-    }
-    if (-not $src -and (Test-Path -LiteralPath $oldDistState)) { $src = $oldDistState }
-    if ($src) {
-        try {
-            Copy-Item -LiteralPath $src -Destination $StateFile -Force
-            Write-Host "  baseline copied to $StateFile from $src (legacy left in place)" -ForegroundColor DarkGray
-        } catch { }
-    }
-}
-
 # Pending resume notes stay per-machine under LOCALAPPDATA.
+$legacyDir = Join-Path $env:LOCALAPPDATA 'Thornswood'
 $PendingDir = $legacyDir
 if (-not (Test-Path -LiteralPath $PendingDir)) { New-Item -ItemType Directory -Path $PendingDir -Force | Out-Null }
 $script:PendingFile = Join-Path $PendingDir $(if ($Dev) { 'published-dev-pending.json' } else { 'published-pending.json' })
@@ -291,6 +249,12 @@ function Get-SkyrimPath {
 # Package-Thornswood.ps1, so the installer follows exactly the same rules as
 # the packs (it did not, and shipped a token file).
 . (Join-Path $Here 'Ship-Rules.ps1')
+
+# Where the source of the SkyMP files is, and the GPL and AGPL texts, go inside
+# every pack that carries one and inside the client runtime zip (#421).
+. (Join-Path $Here 'Source-Notice.ps1')
+$sourceRecord   = Join-Path $Here '..\..\records\client-build.json'
+$sourceLicences = Join-Path $Here '..\..\installer\licences'
 
 # The reference plugin list ships in the server's order, not in whatever order
 # Vortex or LOOT last wrote it. The game compares its load order with the
@@ -487,7 +451,12 @@ $runtimeDirs = $ShipRuntimeDirs
 function Test-Vanilla([string]$rel) { return ((Test-ShipVanilla $rel) -or (Test-ShipForeignFramework $rel)) }
 function Test-Runtime([string]$rel) { return (Test-ShipRuntime $rel) }
 function Test-OtherServer([string]$rel) { return (Test-ShipOtherServer $rel) }
-function Test-Machine([string]$rel) { return (Test-ShipMachine $rel) }
+# Other people's loose files as well (#1178): never packed, never recorded,
+# never listed as removed. What waits for the collection is asked at the
+# revision this release is built against.
+$ShipCollectionRevision = Get-ShipCollectionRevision $Root
+Say ("  collection revision {0}: loose files held for the collection until then still ship" -f $ShipCollectionRevision) 'DarkGray'
+function Test-Machine([string]$rel) { return ((Test-ShipMachine $rel) -or (Test-ShipNotOurs $rel)) }
 
 # ---- another server's menu -------------------------------------------------
 #
@@ -513,6 +482,12 @@ if ((Test-Path -LiteralPath $menuLive) -and (Test-Path -LiteralPath $menuSrc)) {
 Say '  Scanning the build...'
 $prefix = $GameDir.TrimEnd('\') + '\'
 $now = @{}
+# Each file of ours is recorded by its bytes, '<size>:<sha256>', not by its
+# file time (#441): the same bytes are the same entry on any machine, after a
+# reinstall, and after something rewrites a file with what it already held.
+# Measured 24 September: 891 files, 661.9 MB, about 14 seconds to hash.
+$nowFile = @{}
+$hashWatch = [Diagnostics.Stopwatch]::StartNew()
 foreach ($f in (Get-ChildItem -LiteralPath $GameDir -Recurse -File -Force)) {
     $rel = $f.FullName.Substring($prefix.Length)
     if (Test-FromCollection $rel) { continue }
@@ -522,9 +497,10 @@ foreach ($f in (Get-ChildItem -LiteralPath $GameDir -Recurse -File -Force)) {
     # Dev only files ride in dev packs and never in a main one (Ship-Rules).
     if (-not $Dev -and (Test-ShipDevOnly $rel)) { continue }
     if ($f.Extension -in '.pdb', '.log') { continue }
-    $now[$rel] = ('{0}:{1}' -f $f.Length, $f.LastWriteTimeUtc.Ticks)
+    $now[$rel] = Get-BaselineEntry $f.FullName
+    $nowFile[$rel] = $f
 }
-Say ("  {0:n0} mod files" -f $now.Count) 'Green'
+Say ("  {0:n0} mod files, hashed in {1:n1} s" -f $now.Count, $hashWatch.Elapsed.TotalSeconds) 'Green'
 $others = @(Get-ChildItem -LiteralPath (Join-Path $GameDir 'Data\Platform') -Recurse -File -Force -ErrorAction SilentlyContinue |
             ForEach-Object { $_.FullName.Substring($prefix.Length) } | Where-Object { Test-OtherServer $_ })
 if ($others.Count) { Say ("  {0} of another server's file(s) in Data\Platform left alone: {1}" -f $others.Count, (($others | ForEach-Object { Split-Path $_ -Leaf }) -join ', ')) 'DarkGray' }
@@ -579,16 +555,10 @@ if (Test-Path $srcDir) {
     }
 }
 
-$prev = @{}
-if (Test-Path $StateFile) {
-    $obj = Get-Content $StateFile -Raw | ConvertFrom-Json
-    foreach ($p in $obj.PSObject.Properties) { $prev[$p.Name] = $p.Value }
-}
-
+# The same bytes as the baseline this release publishes on the site (the
+# release manifest block), so the store copy and the feed's record agree.
 function Save-State {
-    $o = [ordered]@{}
-    foreach ($k in ($now.Keys | Sort-Object)) { $o[$k] = $now[$k] }
-    $o | ConvertTo-Json -Depth 3 -Compress | Set-Content $StateFile -Encoding UTF8
+    [void](Write-BaselineFile $now $StateFile)
 }
 
 # ==== thornswood publish resume ====
@@ -603,18 +573,17 @@ function Save-State {
 # So the baseline only moves when the last step succeeded, and a failure is
 # written down beside it: the id, when, and what went wrong. The next run
 # reads that and FINISHES THAT RELEASE rather than minting a new id. Reusing
-# the id is the whole point. The assets for it are already uploaded, gh
-# release upload --clobber puts anything missing into the release that is
-# already there, and a new id would orphan a set of assets and grow the feed
-# by a release nobody can install.
+# the id is the whole point. The assets for it are already on the site, where
+# a second send skips every one already there, and a new id would grow the
+# feed by a release nobody can install.
 #
-# It lives under LOCALAPPDATA, not beside the shared baseline in Releases, for
-# the same reason: it is a note about this machine's unfinished push, not part
+# It lives under LOCALAPPDATA, not beside the shared baseline on the VPS, for
+# the same reason: it is a note about this machine's unfinished send, not part
 # of the channel, and the uninstaller cannot reach it. The dev channel has its
 # own note.
 function Get-PendingFile([string]$stateFile) {
     # Pending is machine-local under LOCALAPPDATA; the baseline ($stateFile) is
-    # in the releases clone and is shared.
+    # the channel's, received from the VPS and shared.
     if ($script:PendingFile) { return $script:PendingFile }
     if (-not $stateFile) { return '' }
     return ($stateFile -replace '\.json$', '') + '-pending.json'
@@ -652,20 +621,90 @@ function Clear-Pending([string]$stateFile) {
 }
 # ==== end thornswood publish resume ====
 
+# ==== thornswood baseline send ====
+#
+# THE BASELINE GOES BACK TO THE VPS WHEN IT MOVES (#907).
+#
+# Save-State writes published.json AFTER the feed is sent, on purpose, so it
+# only moves once the release is really out; this sends it to the VPS beside
+# the feed, through the same check the feed went through: nothing is replaced
+# if the baseline up there is not the one this run received. Until #907 it was
+# committed and pushed to Thornswood-Releases as "Baseline <id>".
+#
+# When it does not arrive the release is still out and nothing is broken: the
+# VPS keeps the older baseline, and the next Ship packs these files again on
+# top of it, a larger release carrying the same bytes. Said, not stopped on.
+function Send-Baseline([string]$id) {
+    if ($NoPush) { return }
+    try {
+        $r = Send-FeedStore $Channel $ReleaseDir @('published.json') -SiteDir $SiteDir
+        if (@($r.Sent).Count) { Say "  baseline $id sent to the VPS" 'DarkGray' }
+        else { Say '  baseline unchanged on the VPS' 'DarkGray' }
+    } catch {
+        Say "  the baseline did not reach the VPS: $($_.Exception.Message)" 'Yellow'
+        Say '  The release is out. The next Ship packs these files again on top of the older baseline.' 'Yellow'
+    }
+}
+# ==== end thornswood baseline send ====
+
+# ==== thornswood what was published ====
+# A RELEASE IS DIFFED AGAINST WHAT THE FEED LAST PUBLISHED (#441), not
+# against whatever baseline a disk holds. Since this change every release
+# names, in version.json, the record of what it left installed, sent to the
+# site beside its packs. Resolve-ReleaseBaseline (Release-Baseline.ps1) uses
+# the store's published.json only when it is that record, reads the record
+# from the site when the store copy is missing or is not it, and rebuilds
+# from the feed's own packs when the feed names none.
+$feedPtr = $null
+try { $feedPtr = Get-FeedBaselinePointer ((([IO.File]::ReadAllText($VersionFile)) -replace '^\uFEFF', '') | ConvertFrom-Json) }
+catch { Die $_.Exception.Message }
 if ($Baseline) {
+    # Recording this build as published is only for a feed that does not say
+    # what it published. One that does is the answer, whatever this build is.
+    if ($null -ne $feedPtr) {
+        Die ("-Baseline records this build as already published, and the $Channel feed already names what its last release left installed " +
+             "(release $([string]$feedPtr.id)). Nothing was recorded. Run the release without -Baseline; it is diffed against that.")
+    }
     Save-State
+    Send-Baseline 'from -Baseline'
     Head 'Done'
     Say "Baseline recorded: $($now.Count) files." 'Green'
     Say 'Future runs will pack only what changes from here.' 'Gray'
     Write-Host ''
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }; exit 0
 }
-if (-not $prev.Count) { Die "No baseline yet. Run this once with -Baseline first." }
+$prev = @{}
+$baselineFrom = ''
+try {
+    $resolved = Resolve-ReleaseBaseline $VersionFile $StateFile $DistDir (Get-FeedStoreSiteDir $SiteDir) $SiteUrl { param($m) Say $m 'Yellow' }
+    $prev = $resolved.Map
+    $baselineFrom = [string]$resolved.From
+    foreach ($l in @($resolved.Lines)) { Say $l $(if ($baselineFrom -eq 'store') { 'DarkGray' } else { 'Yellow' }) }
+} catch {
+    Die ("No baseline for the $Channel channel, so nothing was built: " + $_.Exception.Message + ' ' +
+         'The store has no published.json, the feed names no record of its last release, and its packs could not be read back. ' +
+         'Failing everything else, run this once with -Baseline, which records this build as already published.')
+}
+if (-not $prev.Count) {
+    Die ("No baseline for the $Channel channel: what was last published came back empty, so every file would look new. Nothing was built.")
+}
+# ==== end thornswood what was published ====
 
 # ------------------------------------------------------------ diff
 Head 'Changes'
 $changed = @(); $removed = @()
-foreach ($k in $now.Keys) { if (-not $prev.ContainsKey($k) -or $prev[$k] -ne $now[$k]) { $changed += $k } }
+# Test-BaselineSame also reads an entry written before #441, size and file
+# time, the way it was written, so the first release after the switch sends
+# only what really changed and records every entry as a hash from then on.
+$legacySame = 0
+foreach ($k in $now.Keys) {
+    if (-not $prev.ContainsKey($k)) { $changed += $k; continue }
+    if ($prev[$k] -eq $now[$k]) { continue }
+    $fk = if ($nowFile.ContainsKey($k)) { $nowFile[$k] } else { $null }
+    if (Test-BaselineSame ([string]$prev[$k]) ([string]$now[$k]) $fk) { $legacySame++; continue }
+    $changed += $k
+}
+if ($legacySame) { Say ("  {0:n0} file(s) compared by size and time, as the old baseline recorded them; recorded by hash from this release on" -f $legacySame) 'DarkGray' }
 foreach ($k in $prev.Keys) { if (-not $now.ContainsKey($k)) { $removed += $k } }
 
 $profileChanged = @($changed | Where-Object { $_ -like ':profile:*' })
@@ -675,8 +714,19 @@ $srcChanged     = @($changed | Where-Object { $_ -like ':src:*' })
 # arrived has nothing to compare, and saying "start over" then would be the
 # same false alarm this exists to stop. See Get-ActiveOrderKey.
 $orderMoved     = $prev.ContainsKey(':order:plugins') -and $now.ContainsKey(':order:plugins') -and ($prev[':order:plugins'] -ne $now[':order:plugins'])
-$changed        = @($changed | Where-Object { $_ -notlike ':profile:*' -and $_ -notlike ':src:*' -and $_ -notlike ':order:*' })
-$removed        = @($removed | Where-Object { $_ -notlike ':profile:*' -and $_ -notlike ':src:*' -and $_ -notlike ':order:*' -and -not (Test-Machine $_) })
+# Every key that starts with ':' is about the release, not a file in the game
+# folder: the plugin list, the launcher's source, and since #1050 what the
+# record says about itself (:record:), the plugin list as shipped (:golden:)
+# and what is gone (:gone:). None of them is ever packed or deleted.
+$changed        = @($changed | Where-Object { -not $_.StartsWith(':') })
+$removed        = @($removed | Where-Object { -not $_.StartsWith(':') -and -not (Test-Machine $_) })
+# ==== thornswood travels with ====
+# A page's own pictures ride in any pack that carries the page, changed or not:
+# see $ShipTravelsWith in Ship-Rules.ps1 (issue #883, the scroll's pictures).
+foreach ($w in @(Get-ShipTravelsWith $changed)) {
+    if ($now.ContainsKey($w)) { $changed += $w }
+}
+# ==== end thornswood travels with ====
 
 # ---- what a removal is allowed to be --------------------------------------
 #
@@ -715,6 +765,12 @@ if ($collectionRemovals) {
 #
 # Added AFTER the collection filter on purpose, so nothing here can be removed
 # by it. See $ShipDeleteAlways in Ship-Rules.ps1 for what may go on the list.
+#
+# The removals this build really made are counted first. The rule paths go in
+# every pack that goes out, but they are not a reason to send one: counted as
+# removals they made every run a release, twice in a row included, and the
+# "Nothing to do" checks below could never pass (#1012).
+$realRemoved = $removed.Count
 $alwaysGone = @(Get-ShipDeleteAlways)
 foreach ($d in $alwaysGone) {
     if ($removed -notcontains $d) { $removed += $d }
@@ -727,7 +783,7 @@ $changedBytes = 0
 foreach ($c in $changed) { $changedBytes += [int64](($now[$c] -split ':')[0]) }
 if ($profileChanged.Count) { Say '  the plugin list changed' 'Green' }
 Say ("  {0:n0} added or changed ({1:n1} MB)" -f $changed.Count, ($changedBytes / 1MB)) $(if ($changed.Count) { 'Green' } else { 'DarkGray' })
-Say ("  {0:n0} removed" -f $removed.Count) $(if ($removed.Count) { 'Yellow' } else { 'DarkGray' })
+Say ("  {0:n0} removed" -f $realRemoved) $(if ($realRemoved) { 'Yellow' } else { 'DarkGray' })
 if ($collectionRemovals) {
     Say ("  {0:n0} more were the collection's files, left alone" -f $collectionRemovals) 'DarkGray'
 }
@@ -802,7 +858,7 @@ if ($removed.Count -gt $MaxRemovals -and -not $AcceptRemovals) {
 
 
 
-if (-not $changed.Count -and -not $removed.Count -and -not $profileChanged.Count -and -not $Launcher) {
+if (-not $changed.Count -and -not $realRemoved -and -not $profileChanged.Count -and -not $Launcher) {
     Head 'Nothing to do'
     Say 'The build matches what is already published.' 'Gray'
     Write-Host ''
@@ -813,7 +869,7 @@ if (-not $changed.Count -and -not $removed.Count -and -not $profileChanged.Count
 # nothing: no mod files, no removals, no launcher source, just a higher
 # version number that everyone still had to download. Exit code 2 tells Ship
 # that happened so it can put the version number back.
-if (-not $changed.Count -and -not $removed.Count -and -not $profileChanged.Count -and -not $srcChanged.Count) {
+if (-not $changed.Count -and -not $realRemoved -and -not $profileChanged.Count -and -not $srcChanged.Count) {
     Head 'Nothing to do'
     Say 'No mod files changed and no launcher source changed since the last release.' 'Gray'
     Say 'Publishing now would hand everyone a new launcher that does nothing.' 'Gray'
@@ -821,6 +877,8 @@ if (-not $changed.Count -and -not $removed.Count -and -not $profileChanged.Count
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }; exit 2
 }
 
+# The feed as received, for the ids it already uses (#1057).
+$feedNow = if (Test-Path -LiteralPath $VersionFile) { (([IO.File]::ReadAllText($VersionFile)) -replace '^\uFEFF', '') | ConvertFrom-Json } else { $null }
 if (-not $Id) {
     # An unfinished release is finished, not replaced. See the block beside
     # Save-State for why the id matters more than the timestamp.
@@ -830,10 +888,16 @@ if (-not $Id) {
         Write-Host ''
         Say ("Finishing release $Id, which did not get out: " +
              $(if ($resume.PSObject.Properties['why']) { [string]$resume.why } else { 'the push failed' })) 'Yellow'
-        Say '  Its assets are already on GitHub, so this uploads into that release' 'DarkGray'
-        Say '  rather than making a second one.' 'DarkGray'
+        Say '  Its assets are already on the site, so this sends only what is missing' 'DarkGray'
+        Say '  rather than making a second release.' 'DarkGray'
     } else {
-        $Id = Get-Date -Format 'yyyyMMdd-HHmm'; if ($Dev) { $Id += '-dev' }
+        # Never one the feed already names (#1057): see New-ReleaseId.
+        $Id = New-ReleaseId $feedNow -Dev:$Dev
+    }
+} elseif ((Get-FeedTakenIds $feedNow).Contains($Id)) {
+    $resume = Read-Pending $StateFile
+    if (-not $resume -or [string]$resume.id -ne $Id) {
+        Die "The feed already has a release or pack named $Id. A launcher that took it would skip this one as applied. Leave -Id out and a free one is made."
     }
 }
 
@@ -851,6 +915,9 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 $ChunkCap = 1800MB
 
 $chunks = @()
+# The reference plugin list as a pack carries it, kept for the release record.
+$goldenDir = Join-Path $DistDir ('record-golden-' + $Id)
+if (Test-Path -LiteralPath $goldenDir) { Remove-Item -LiteralPath $goldenDir -Recurse -Force }
 if ($changed.Count -or $removed.Count -or $profileChanged.Count) {
     Head 'Building the pack'
 
@@ -889,6 +956,8 @@ if ($changed.Count -or $removed.Count -or $profileChanged.Count) {
                 $n++
                 if ($n % 500 -eq 0) { Write-Host ("    part $part  {0:n0}/{1:n0}" -f $n, $groups[$g].Count) -ForegroundColor DarkGray }
             }
+            $inPart = @($groups[$g] | Where-Object { Test-Path -LiteralPath (Join-Path $GameDir $_) })
+            Add-SourceNoticeToZip $zip (Get-SourceNoticeEntries $sourceRecord $inPart 'pack' $sourceLicences)
 
             # Removals go in the first part, so nothing is deleted after the
             # files that replace it have already arrived.
@@ -944,6 +1013,10 @@ if ($changed.Count -or $removed.Count -or $profileChanged.Count) {
                     # never written.
                     if ($f -eq 'plugins.txt') { $src = Get-ReferenceInServerOrder $src }
                     [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $src, "profile/$f", 'Optimal')
+                    # The same bytes go in the release record (#1050), so a
+                    # launcher that syncs to it gets the list the pack carries.
+                    New-Item -ItemType Directory -Force -Path $goldenDir | Out-Null
+                    Copy-Item -LiteralPath $src -Destination (Join-Path $goldenDir $f) -Force
                 }
             }
         } finally {
@@ -998,34 +1071,13 @@ function Val($o, [string]$k) {
     if ($null -ne $o -and $o.PSObject.Properties.Name -contains $k) { return [string]$o.$k }
     return ''
 }
-if (-not $Repo -and ($doc.PSObject.Properties.Name -contains 'repo')) { $Repo = $doc.repo }
+Say "  downloads go to $SiteUrl/$(if ($Dev) { 'feed-dev' } else { 'feed' })/assets/" 'DarkGray'
 
-# Without this the asset lookup builds a broken API path, version.json ends up
-# with an empty url, and everyone's launcher downloads nothing.
-if (-not $Repo) {
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    # The releases clone, not the source clone. Getting this wrong publishes
-    # assets somewhere no launcher is looking.
-    $remote = (& git -C $ReleaseDir remote get-url origin 2>$null) | Select-Object -First 1
-    $ErrorActionPreference = $old
-    if ($remote -and $remote -match 'github\.com[:/](.+?)(?:\.git)?\s*$') { $Repo = $Matches[1] }
-}
-if (-not $Repo) { Die 'Could not work out which repo to publish to. Pass -Repo owner/name.' }
-Say "  repo: $Repo" 'DarkGray'
-
-# Packs go only into the repository launchers read this feed from, because it
-# is the one they can download from with no token. On 24 September 164 packs
-# on the feed pointed at the private source repository and answered 404 to
-# every launcher; see Feed-Rules.ps1. Refused here, before a byte is uploaded
-# to the wrong place.
+# Which urls a launcher can download (Feed-Rules.ps1). Since #907 that is the
+# thornswood.net feed asset path: nothing is uploaded to GitHub any more, and
+# the feed block below refuses a new pack named anywhere else.
 . (Join-Path $Here 'Feed-Rules.ps1')
-$feedRepo = Get-FeedRepo $doc
-if (-not [string]::Equals($Repo, $feedRepo, [StringComparison]::OrdinalIgnoreCase)) {
-    Die ("This would upload to $Repo, but launchers read this feed from $feedRepo and cannot download a pack from anywhere else. " +
-         "Nothing was uploaded and version.json has not been touched. Pass -Repo $feedRepo, or point the origin of $ReleaseDir at it.")
-}
 
-$gh = Get-Command gh -EA SilentlyContinue
 $exeUrl = ''
 
 # ---- the client runtime, as an asset with an address ----------------------
@@ -1058,7 +1110,8 @@ try {
         if ($doc.PSObject.Properties['clientRuntime']) { $have = $doc.clientRuntime }
         $already = ($null -ne $have) -and ($have.PSObject.Properties['forkCommit']) -and
                    ([string]$have.forkCommit -eq $cbCommit) -and
-                   ($have.PSObject.Properties['url']) -and ([string]$have.url).Length -gt 0
+                   ($have.PSObject.Properties['url']) -and ([string]$have.url).Length -gt 0 -and
+                   ($have.PSObject.Properties['notice']) -and ([int]$have.notice -ge $SourceNoticeVersion)
         if ($already) {
             Say "  client runtime $cbCommit is already on the feed" 'DarkGray'
         } else {
@@ -1076,6 +1129,9 @@ try {
             if ($missingClient.Count) {
                 foreach ($m in $missingClient) { Say "  client runtime file missing from the build: $m" 'Red' }
                 Die 'The client runtime is incomplete in the game folder, so it was not published. Run scripts\release\Sync-Client.ps1 and ship again.'
+            }
+            foreach ($sn in @(Get-SourceNoticeEntries $cbPath $names 'runtime' $sourceLicences)) {
+                [IO.File]::WriteAllBytes((Join-Path $stage $sn.Name), $sn.Bytes)
             }
             $clientZip = Join-Path $DistDir ("client-runtime-" + $cbCommit + ".zip")
             if (Test-Path -LiteralPath $clientZip) { Remove-Item -LiteralPath $clientZip -Force }
@@ -1120,240 +1176,338 @@ if ($scanZips.Count -or $scanExes.Count) {
     if ($LASTEXITCODE -ne 0) { Die 'Something that must never ship is in what was just built. The lines above name each file and rule. Nothing was uploaded.' }
 }
 
-# Short source directions for GitHub release pages (partial #421). The installer
-# already carries SOURCE CODE.txt and the licence texts; update packs on
-# Thornswood-Releases did not point at source at all. This footer is plain words
-# read from the two build records and the live credits page. It invents no
-# licence claim of its own.
-function Get-ReleaseSourceFooter([string]$ClientRecord, [string]$ServerRecord) {
-    foreach ($p in @($ClientRecord, $ServerRecord)) {
-        if (-not (Test-Path -LiteralPath $p)) { throw "$p is missing" }
-    }
-    $c = (Get-Content -LiteralPath $ClientRecord -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json
-    $s = (Get-Content -LiteralPath $ServerRecord -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json
-    $fork  = ([string]$c.fork).TrimEnd('/')
-    $sRepo = ([string]$s.source.repo) -replace '\.git$', ''
-    if (-not $fork -or -not $c.forkCommit) { throw 'client-build.json names no fork or no commit' }
-    if (-not $sRepo -or -not $s.source.commit) { throw 'server-build.json names no repository or commit' }
-    $lines = @(
-        '',
-        '---',
-        'Source for the SkyMP files Thornswood ships',
-        '',
-        ('Client runtime: ' + $fork + '/tree/' + $c.forkCommit + ' (branch ' + $c.forkBranch + ')'),
-        ('Server engine:  ' + $sRepo + '/tree/' + $s.source.commit),
-        'Licences and file list: https://thornswood.net/credits#source',
-        'The installer puts SOURCE CODE.txt, GPL-3.0.txt, AGPL-3.0.txt and',
-        'WebView2-LICENSE.txt in the install folder.',
-        ''
-    )
-    return ($lines -join "`n")
-}
-if (-not $NoUpload -and $gh) {
-    Head 'Uploading'
-    $assets = @()
-    foreach ($c in $chunks) { $assets += $c.Path }
-    if ($Launcher) { $assets += $exePath }
-    if ($clientRel) { $assets += $clientRel.path }
-
-    $repoArg = @(); if ($Repo) { $repoArg = @('--repo', $Repo) }
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-
-    # ==== thornswood release upload ====
-    # A dev build goes up marked prerelease, so Latest on the public releases
-    # page is always a build everybody gets. Measured 24 Sep with gh release
-    # list on Thornswood-Releases: 156 releases, 59 of them dev, not one marked
-    # prerelease, and Latest was 20260923-2246-dev while the newest main
-    # release was 20260923-2137. Nothing that updates anybody reads Latest:
-    # the launcher, the site and the bot go by version.json and asset ids,
-    # which this does not change. It is what a person browsing the page is
-    # told is current.
-    $pre = @(); if ($Dev) { $pre = @('--prerelease') }
-
-    # Tried three times, because GitHub answers HTTP 500 to the release call
-    # often enough to be a nuisance rather than an event: it happened on 1.0.133
-    # and again on 1.0.135, and both times the identical command worked on the
-    # next run. There is nothing to fix at this end. What there was to fix is
-    # that one 500 cost a whole Ship, a burnt version number and a rebuild, so
-    # it is retried here instead of by hand.
+if (-not $NoUpload) {
+    # ==== thornswood site upload ====
+    # tests\test-site-assets.ps1 runs this block on its own. If the markers
+    # move, it stops rather than quietly testing nothing.
     #
-    # Creating is what fails; uploading into a release that already exists is
-    # the fallback, and it gets the same treatment.
-    $tries = 3
-    for ($try = 1; $try -le $tries; $try++) {
-                $clientRec = Join-Path $PSScriptRoot '..\..\records\client-build.json'
-        $serverRec = Join-Path $PSScriptRoot '..\..\records\server-build.json'
-        $releaseNotes = if ($Notes) { $Notes } else { "Update $Id" }
-        try {
-            $releaseNotes = ($releaseNotes.TrimEnd() + "`n" + (Get-ReleaseSourceFooter $clientRec $serverRec)).TrimEnd() + "`n"
-        } catch {
-            Say ("  source footer could not be built: " + $_.Exception.Message) 'Yellow'
-        }
-        & gh release create $Id @assets @repoArg @pre --title "Update $Id" --notes $releaseNotes 2>&1 | Out-Host
-        if ($LASTEXITCODE -eq 0) { break }
-
-        Say '  Release exists, uploading into it instead.' 'DarkGray'
-        & gh release upload $Id @assets @repoArg --clobber 2>&1 | Out-Host
-        if ($LASTEXITCODE -eq 0) {
-            # gh release upload has no --prerelease. Given one, gh 2.100.0
-            # stops with "unknown flag: --prerelease" and uploads nothing, so
-            # the flag goes on with an edit instead. This is the path a
-            # resumed release takes, and a create GitHub answered 500 after it
-            # had in fact made the release. A failed edit is said and passed:
-            # the assets are up, and the flag changes nothing a launcher reads.
-            if ($Dev) {
-                & gh release edit $Id @repoArg --prerelease 2>&1 | Out-Host
-                if ($LASTEXITCODE -ne 0) { Say "  $Id is up but could not be marked prerelease; mark it on GitHub." 'Yellow' }
-            }
-            break
-        }
-
-        if ($try -lt $tries) {
-            $wait = 5 * $try
-            Say ('  GitHub did not take it. Trying again in {0}s ({1} of {2}).' -f $wait, ($try + 1), $tries) 'Yellow'
-            Start-Sleep -Seconds $wait
+    # UPDATES COME FROM THE SITE (#897). Every asset this release adds goes to
+    # /feed[-dev]/assets/<sha256> on thornswood.net, the path site\server.js
+    # already serves with Range resume, and the feed names it there. It goes
+    # up BEFORE version.json is touched, the rule the GitHub path kept:
+    # nothing is written to the feed if an asset did not land, so nobody is
+    # sent a pack the site does not hold. Remirror-Site-Feed.ps1 -Send is the
+    # one way bytes reach the site, .part then rename, skipping any already up.
+    Head 'Sending to the site'
+    $siteFiles = @()
+    foreach ($c in $chunks) { $siteFiles += $c.Path }
+    $exeSite = ''
+    if ($Launcher -and (Test-Path -LiteralPath $exePath)) {
+        $siteFiles += $exePath
+        $exeSite = (Get-FileHash -LiteralPath $exePath -Algorithm SHA256).Hash.ToLower()
+    }
+    if ($clientRel) { $siteFiles += $clientRel.path }
+    if ($siteFiles.Count) {
+        $sendArgs = @{ Dev = $Dev; Send = $siteFiles }
+        if ($SiteDir) { $sendArgs['SiteDir'] = $SiteDir }
+        $global:LASTEXITCODE = 0
+        $sendWhy = ''
+        try { & (Join-Path $Here '..\deploy\Remirror-Site-Feed.ps1') @sendArgs }
+        catch { $sendWhy = $_.Exception.Message }
+        if (-not $sendWhy -and $LASTEXITCODE -ne 0) { $sendWhy = "Remirror-Site-Feed.ps1 -Send exited $LASTEXITCODE" }
+        if ($sendWhy) {
+            Say "  $sendWhy" 'Red'
+            Die ('Not every asset reached the site, so version.json has not been touched and nobody has been sent a half release. ' +
+                 'Check the ssh key with scripts\vps\Setup-SshKey.ps1 -Test, then run Ship again.')
         }
     }
-    # ==== end thornswood release upload ====
-
-    $json = & gh api ("repos/{0}/releases/tags/{1}" -f $Repo, $Id) 2>$null
-    $ErrorActionPreference = $old
-
-    # Strict mode throws on a missing property rather than giving back null,
-    # and a failed upload leaves exactly that, which is how one bad upload
-    # used to end in an unreadable error instead of a plain one.
-    $rel = $null
-    if ($json) { $rel = ($json -join '') | ConvertFrom-Json }
-    $relAssets = @()
-    if ($rel -and $rel.PSObject.Properties['assets'] -and $rel.assets) { $relAssets = @($rel.assets) }
-
-    # ==== thornswood asset urls ====
-    # The browser download address, not the api.github.com asset id one (#445).
-    #
-    # Both hand over the same bytes and both are on the launcher's allowed host
-    # list. The difference is the quota: api.github.com counts every request
-    # against sixty an hour per address for a launcher with no token, shared
-    # with every other launcher on the connection, so a house downloading a
-    # release spent the same allowance the update checks need. The
-    # github.com/<owner>/<name>/releases/download/<tag>/<name> address is a
-    # plain redirect to the asset CDN and counts against nothing.
-    #
-    # Only urls written from here on move. Feed-Rules.ps1 already accepts both
-    # shapes, and the packs already on the feed keep the addresses they were
-    # published with. -HostAssetUrls below still rewrites these to the site.
-    # The api address is the fallback for a gh that did not name one.
-    foreach ($a in $relAssets) {
-        $u = "https://api.github.com/repos/$Repo/releases/assets/$($a.id)"
-        if ($a.PSObject.Properties['browser_download_url'] -and $a.browser_download_url) {
-            $u = [string]$a.browser_download_url
-        }
-        if ($a.name -eq 'Thornswood.exe' -or $a.name -eq 'SkyrimTogether.exe') { $exeUrl = $u; continue }
-        if ($clientRel -and $a.name -eq $clientRel.name) { $clientRel.url = $u; continue }
-        foreach ($c in $chunks) {
-            if ($a.name -eq ('pack-' + $c.Id + '.zip')) { $c.Url = $u }
-        }
-    }
-    # ==== end thornswood asset urls ====
-
-    # The same refusal the packs and the launcher get. A clientRuntime line
-    # with no url is a launcher that downloads nothing and falls back to
-    # walking the feed, which is the thing this asset exists to replace, and it
-    # would do it silently.
-    if ($clientRel -and -not $clientRel.url) {
-        Write-Host ''
-        Say "  $($clientRel.name) did not upload" 'Red'
-        Die 'version.json has not been touched. The client runtime asset never reached GitHub; run Ship again.'
-    }
-    if ($clientRel) { Say "  client runtime asset ready" 'Green' }
-
-    $missing = @($chunks | Where-Object { -not $_.Url })
-    if ($missing.Count) {
-        Write-Host ''
-        foreach ($m in $missing) { Say "  pack-$($m.Id).zip did not upload" 'Red' }
-        Die 'Some parts never reached GitHub, so version.json has not been touched. Nobody has been sent a half release.'
-    }
-    if ($chunks.Count) { Say "  $($chunks.Count) pack asset$(if ($chunks.Count -eq 1) { '' } else { 's' }) ready" 'Green' }
-
-    # The same check for the launcher, which did not have one.
-    #
-    # The pack guard above only looks at $chunks, and a release with nothing
-    # to download has no chunks at all, so a run that changed no mod files and
-    # only rebuilt the exe sailed straight past it. GitHub answered HTTP 500 to
-    # the release call, $exeUrl came back empty, and version.json was written
-    # and pushed saying launcher 1.0.133 with no address to get it from.
-    #
-    # Nobody was hurt, because the launcher checks:
-    #
-    #     bool newLauncher = Updater.IsNewer(v.launcherVersion, Updater.Version)
-    #                        && !string.IsNullOrEmpty(v.launcherUrl);
-    #
-    # so an empty url offers nothing rather than downloading nothing. But it
-    # also means anybody on an older launcher is quietly stuck on it until the
-    # next release that uploads properly, with the feed insisting there is a
-    # newer one. Better to stop here, while the only copy is on this machine
-    # and git has not been touched.
+    foreach ($c in $chunks) { $c.Url = Get-HostFeedAssetUrl $c.Sha -Dev:$Dev }
+    if ($clientRel) { $clientRel.url = Get-HostFeedAssetUrl $clientRel.sha256 -Dev:$Dev }
+    if ($exeSite) { $exeUrl = Get-HostFeedAssetUrl $exeSite -Dev:$Dev }
     if ($Launcher -and -not $exeUrl) {
-        Write-Host ''
-        Say '  the launcher was built but never reached GitHub.' 'Red'
-        Die 'version.json has not been touched, so the feed still points at the last launcher that actually uploaded. Usually the token or a GitHub hiccup: run Ship again.'
+        Die 'The launcher was not found to send, so version.json has not been touched and the feed still points at the last launcher that went up.'
     }
-    if ($exeUrl)  { Say "  launcher asset ready" 'Green' }
+    if ($chunks.Count) { Say "  $($chunks.Count) pack asset$(if ($chunks.Count -eq 1) { '' } else { 's' }) on the site" 'Green' }
+    if ($clientRel) { Say '  client runtime on the site' 'Green' }
+    if ($exeUrl) { Say '  launcher on the site' 'Green' }
+    # ==== end thornswood site upload ====
+}
 
-# ==== thornswood host asset urls ====
-# Optional rewrite for the #649 site feed. GitHub release assets remain uploaded
-# above; this only changes the urls written into version.json. Website mirrors
-# the bytes to /feed/assets/<sha256> (or /feed-dev/...). Feed-Rules.ps1 already
-# accepts those urls. Without -HostAssetUrls the feed keeps GitHub asset urls.
-if ($HostAssetUrls) {
-    function Rewrite-HostUrl([string]$sha, [string]$was) {
-        $u = Get-HostFeedAssetUrl $sha -Dev:$Dev
-        if (-not $u) { return $was }
-        return $u
-    }
-    foreach ($c in $chunks) {
-        if ($c.Url -and $c.Sha) {
-            $was = $c.Url
-            $c.Url = Rewrite-HostUrl $c.Sha $c.Url
-            if ($c.Url -ne $was) { Say ("  pack {0} url -> host feed asset" -f $c.Id) 'Green' }
+# ==== thornswood record files ====
+# tests\test-record-sync.ps1 runs the real Publish-Update through this block.
+#
+# EVERY FILE OF THIS RELEASE IS ON THE SITE BY ITS OWN SHA256 (#1050), so a
+# launcher can sync the install to the record below instead of replaying the
+# packs: it compares each file of ours with the record and downloads only the
+# ones that differ, from /feed[-dev]/assets/<sha256>, beside the record. Every
+# file of ours goes up the first time (the dev record of 29 Sep: 2,515 files,
+# 463.5 MB, 449.0 MB once files with the same bytes are counted once, stored
+# as they are, not zipped); after that only what a release changes, because
+# the send skips any asset already there. Release-Baseline.ps1 says what each
+# key of the record means. The record says ':record:files' only once they are
+# all up, and a launcher takes the packs from a record that does not.
+#
+# The plugin list the pack carries goes in as ':golden:'. A release that built
+# no pack did not move it, so the last record's goes forward.
+$recordSend = @{}
+foreach ($f in 'plugins.txt', 'loadorder.txt') {
+    $gf = Join-Path $goldenDir $f
+    if (Test-Path -LiteralPath $gf) { $now[":golden:$f"] = Get-BaselineEntry $gf; $recordSend[":golden:$f"] = $gf }
+}
+$prevPtr = $null
+if (Get-Variable -Name resolved -Scope Script -ErrorAction SilentlyContinue) { $prevPtr = $resolved.Pointer }
+if (-not $recordSend.Count) {
+    foreach ($k in @($prev.Keys | Where-Object { $_ -like ':golden:*' })) {
+        $now[$k] = [string]$prev[$k]
+        if ($NoUpload) { continue }
+        # Its bytes, for a feed on another channel's folder (dev after a main Ship).
+        $gsha = ([string]$prev[$k]).Split(':')[1]
+        $gfile = Join-Path $goldenDir $k.Substring(8)
+        try {
+            if ($null -eq $prevPtr) { throw 'the last record is not on the site' }
+            [void](Get-FeedAssetFile (Get-RecordFileUrl ([string]$prevPtr.url) $gsha) $gsha $gfile (Get-FeedStoreSiteDir $SiteDir) $SiteUrl)
+            $recordSend[$k] = $gfile
+        } catch {
+            $now.Remove($k)
+            Say "  the plugin list of the last release could not be read back ($($_.Exception.Message)), so this record carries none" 'Yellow'
         }
     }
-    if ($clientRel -and $clientRel.url -and $clientRel.sha256) {
-        $was = $clientRel.url
-        $clientRel.url = Rewrite-HostUrl $clientRel.sha256 $clientRel.url
-        if ($clientRel.url -ne $was) { Say '  client runtime url -> host feed asset' 'Green' }
-    }
-    if ($exeUrl -and (Test-Path $exePath)) {
-        $exeSha = (Get-FileHash $exePath -Algorithm SHA256).Hash.ToLower()
-        $was = $exeUrl
-        $exeUrl = Rewrite-HostUrl $exeSha $exeUrl
-        if ($exeUrl -ne $was) { Say '  launcher url -> host feed asset' 'Green' }
-    }
-    Say '  host asset urls on (Thornswood-Releases upload kept for rollback)' 'DarkGray'
 }
-# ==== end thornswood host asset urls ====
-} elseif (-not $NoUpload) {
-    Say '  The GitHub CLI is not installed, so nothing was uploaded.' 'Yellow'
-    Say '  winget install GitHub.cli   then   gh auth login' 'Yellow'
+
+# What is gone: every file of ours a release has stopped shipping, carried from
+# record to record, so a launcher that never replayed the pack that deleted it
+# still takes it out. The first record on a channel starts the list from what
+# the packs already on the feed took out (read off each pack's delete.txt on the
+# site, not the whole pack). Anything back in the build, the collection's, or
+# not ours by Ship-Rules comes off the list, except Ship-Rules' own delete list,
+# which goes from every install whatever put it there.
+$gone = @{}
+foreach ($k in @($prev.Keys)) { if ($k.StartsWith(':gone:')) { $gone[$k.Substring(6)] = [string]$prev[$k] } }
+if (-not $prev.ContainsKey($RecordFilesKey) -and -not $gone.Count) {
+    try {
+        foreach ($d in @(Get-FeedPackDeletes $doc (Get-FeedStoreSiteDir $SiteDir) $SiteUrl { param($m) Say $m 'DarkGray' })) { $gone[$d] = 'removed' }
+    } catch {
+        Say "  what earlier packs took out could not be read: $($_.Exception.Message)" 'Yellow'
+        Say '  The record starts its list of removed files from this release; the packs stay on the feed for older installs.' 'Yellow'
+    }
 }
+foreach ($r in $removed) { $gone[$r] = 'removed' }
+foreach ($a in $alwaysGone) { $gone[$a] = 'always' }
+# #1261: other authors' files we once shipped leave as gone with their sha256,
+# so the launcher deletes them only when the bytes still match. The removals
+# filter above keeps them off $removed (Test-Machine), which is right for a
+# blind delete; here the previous record still names the bytes we put there.
+foreach ($k in @($prev.Keys)) {
+    if ($k.StartsWith(':')) { continue }
+    if ($now.ContainsKey($k)) { continue }
+    if (-not (Test-ShipNotOurs $k)) { continue }
+    # Bethesda's, one machine's and backups never become hash-gone: a delete
+    # must not reach Steam copies of those (#1152, #1239, #1261).
+    if ((Test-ShipBethesda $k) -or (Test-ShipOneMachine $k) -or (Test-ShipBackup $k)) { continue }
+    $m = [regex]::Match([string]$prev[$k], '^\d+:([0-9a-fA-F]{64})$')
+    if ($m.Success) { $gone[$k] = $m.Groups[1].Value.ToLowerInvariant() }
+}
+foreach ($k in @($gone.Keys)) {
+    if ($now.ContainsKey($k)) { $gone.Remove($k); continue }
+    if ($gone[$k] -eq 'always') { continue }
+    # A hash-matched gone entry stays (#1261): the launcher only deletes when
+    # the bytes still match what we shipped.
+    if ([string]$gone[$k] -match '^[0-9a-fA-F]{64}$') { continue }
+    # Test-ShipMachine, not Test-Machine: another author's file an earlier
+    # release already took out (the Lost Ark armour the dev record lists as
+    # removed) stays gone;
+    # the removals filter above keeps any new one of them off this list (#1178).
+    if ((Test-FromCollection $k) -or (Test-Vanilla $k) -or (Test-Runtime $k) -or (Test-ShipMachine $k) -or (Test-OtherServer $k)) { $gone.Remove($k) }
+}
+foreach ($k in @($gone.Keys)) { $now[':gone:' + $k] = [string]$gone[$k] }
+
+# ==== thornswood no bethesda in the record ====
+# tests\test-no-bethesda-files.ps1 runs this block on its own.
+#
+# Nothing of Bethesda's goes into the record, as a file or as gone (#1152): the
+# Creation Kit, a copy of one of the game's programs, the game itself, or a
+# backup. The scan leaves them out through Test-Machine; this stops the release
+# if a later change ever puts one back, before anything is sent to the site.
+# Bethesda's is Test-ShipBethesda, the question Check-Secrets asks, so
+# MarketplaceTextures.bsa is caught here too (#1229).
+$bethesdaInRecord = @(@($now.Keys) | ForEach-Object { if ($_.StartsWith(':gone:')) { $_.Substring(6) } elseif (-not $_.StartsWith(':')) { $_ } } |
+                      Where-Object { $_ -and ((Test-ShipBethesda $_) -or (Test-ShipBackup $_)) })
+if ($bethesdaInRecord.Count) {
+    Die ("The record of this release names {0} of Bethesda's files or backups, which Thornswood never hands out: {1}. Nothing was sent." -f
+         $bethesdaInRecord.Count, (($bethesdaInRecord | Select-Object -First 5) -join ', '))
+}
+# ==== end thornswood no bethesda in the record ====
+
+# ==== thornswood no one machine's files in the record ====
+# tests\test-no-machine-files.ps1 runs this block on its own.
+#
+# Nothing of one machine's goes into the record either (#1239): its runtime
+# state and tokens in Data\Platform, logs, Vortex's records, window layouts,
+# settings saved from a mod's menu, face exports, saves (Test-ShipOneMachine).
+# A launcher that syncs to the record fetches every file it names, so the dev
+# records of 28 and 29 September handed out the join pass and the mod menu
+# settings of the machine that ships. The scan leaves them out through
+# Test-Machine and Test-Runtime; this stops the release if a later change ever
+# puts one back. As gone they are allowed only on $ShipDeleteAlways, which every
+# release deletes on purpose (voice-token.txt).
+$machineInRecord = @(@($now.Keys) | ForEach-Object {
+                        if ($_.StartsWith(':gone:')) { $g = $_.Substring(6); if (@(Get-ShipDeleteAlways) -notcontains $g) { $g } }
+                        elseif (-not $_.StartsWith(':')) { $_ } } |
+                     Where-Object { $_ -and (Test-ShipOneMachine $_) })
+if ($machineInRecord.Count) {
+    Die ("The record of this release names {0} of one machine's own files, which never leave it: {1}. Nothing was sent." -f
+         $machineInRecord.Count, (($machineInRecord | Select-Object -First 5) -join ', '))
+}
+# ==== end thornswood no one machine's files in the record ====
+
+if (-not $NoUpload) {
+    $recordFiles = @()
+    foreach ($k in @($now.Keys)) {
+        if ($k.StartsWith(':')) { continue }
+        $recordFiles += (Join-Path $GameDir $k)
+    }
+    $recordFiles += @($recordSend.Values)
+    # Nothing that must never ship goes up loose either (Check-Secrets, entry
+    # 236). What this release changed is in its pack and was read above; the
+    # rest went up, and was read, with an earlier record. Only the first record
+    # on a channel sends files no pack carried, so only then is the rest read.
+    if (-not $prev.ContainsKey($RecordFilesKey)) {
+        Head 'Checking the files of this release for secrets'
+        $inPack = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+        foreach ($c in $changed) { [void]$inPack.Add([string]$c) }
+        $checkZip = Join-Path $DistDir ("record-check-$Id.zip")
+        if (Test-Path -LiteralPath $checkZip) { Remove-Item -LiteralPath $checkZip -Force }
+        $cz = [IO.Compression.ZipFile]::Open($checkZip, 'Create')
+        try {
+            foreach ($k in @($now.Keys)) {
+                if ($k.StartsWith(':') -or $inPack.Contains($k)) { continue }
+                [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($cz, (Join-Path $GameDir $k), ('game/' + ($k -replace '\\', '/')), 'NoCompression')
+            }
+        } finally { $cz.Dispose() }
+        & (Join-Path $Here '..\dev\Check-Secrets.ps1') -Zip @($checkZip)
+        $secretsRc = $LASTEXITCODE
+        Remove-Item -LiteralPath $checkZip -Force -ErrorAction SilentlyContinue
+        if ($secretsRc -ne 0) { Die 'Something that must never ship is among the files of this release. The lines above name each file and rule. Nothing was sent, and version.json has not been touched.' }
+    }
+    $sendArgs = @{ Dev = $Dev; Send = $recordFiles; Quiet = $true; WorkDir = $DistDir }
+    if ($SiteDir) { $sendArgs['SiteDir'] = $SiteDir }
+    $global:LASTEXITCODE = 0
+    $sendWhy = ''
+    try { & (Join-Path $Here '..\deploy\Remirror-Site-Feed.ps1') @sendArgs }
+    catch { $sendWhy = $_.Exception.Message }
+    if (-not $sendWhy -and $LASTEXITCODE -ne 0) { $sendWhy = "Remirror-Site-Feed.ps1 -Send exited $LASTEXITCODE" }
+    # And every one of them is there under the sha256 the record names: a file
+    # rewritten between the scan and the send would be up under another name.
+    if (-not $sendWhy) {
+        $haveArgs = @{ Dev = $Dev; Have = $true }
+        if ($SiteDir) { $haveArgs['SiteDir'] = $SiteDir }
+        try {
+            $there = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+            foreach ($h in @(& (Join-Path $Here '..\deploy\Remirror-Site-Feed.ps1') @haveArgs)) { [void]$there.Add([string]$h) }
+            $wanted = Get-RecordFileShas $now
+            $absent = @($wanted.Keys | Where-Object { -not $there.Contains($_) })
+            if ($absent.Count) { $sendWhy = ("{0} file(s) of this release are not on the site under the sha256 the record names; one changed while this ran?" -f $absent.Count) }
+            else {
+                $recordBytes = [int64]0; foreach ($v in $wanted.Values) { $recordBytes += $v }
+                Say ("  every file of this release is on the site by its sha256: {0:n0} file(s), {1:n1} MB" -f $wanted.Count, ($recordBytes / 1MB)) 'Green'
+            }
+        } catch { $sendWhy = $_.Exception.Message }
+    }
+    if ($sendWhy) {
+        Say "  $sendWhy" 'Red'
+        Die ('The files of this release did not all reach the site, so version.json has not been touched. ' +
+             'Check the ssh key with scripts\vps\Setup-SshKey.ps1 -Test, then run Ship again.')
+    }
+    $now[$RecordFilesKey] = '1'
+}
+# ==== end thornswood record files ====
+
+# ==== thornswood release manifest ====
+# tests\test-release-baseline.ps1 runs this block on its own. If the markers
+# move, it stops rather than quietly testing nothing.
+#
+# WHAT THIS RELEASE LEAVES INSTALLED, published beside its packs (#441): the
+# whole map, every file of ours with its size and sha256, the same bytes
+# Save-State writes into the store once the release is out. It goes to the
+# site like a pack, by its sha256, BEFORE version.json names it, and the feed
+# names it as "baseline", so the next release on any machine is diffed against
+# what this one really published. With -NoUpload it is only written here and
+# the feed names none; the next release then reads the store's copy rather
+# than a record the site does not hold. Two runs over the same tree write the
+# same bytes, which is how a dry run can be compared with a real one.
+$releaseBaseline = $null
+$manifestPath = Join-Path $DistDir ('manifest-' + $Id + '.json')
+$manifestSha = Write-BaselineFile $now $manifestPath
+Say ("  manifest-{0}.json: {1:n0} entries, sha256 {2}" -f $Id, $now.Count, $manifestSha) 'DarkGray'
+foreach ($old in @(Get-ChildItem -LiteralPath $DistDir -Filter 'manifest-*.json' -File -ErrorAction SilentlyContinue |
+                   Sort-Object Name -Descending | Select-Object -Skip 20)) {
+    Remove-Item -LiteralPath $old.FullName -Force -ErrorAction SilentlyContinue
+}
+if (-not $NoUpload) {
+    $sendArgs = @{ Dev = $Dev; Send = @($manifestPath); Quiet = $true }
+    if ($SiteDir) { $sendArgs['SiteDir'] = $SiteDir }
+    $global:LASTEXITCODE = 0
+    $sendWhy = ''
+    try { & (Join-Path $Here '..\deploy\Remirror-Site-Feed.ps1') @sendArgs }
+    catch { $sendWhy = $_.Exception.Message }
+    if (-not $sendWhy -and $LASTEXITCODE -ne 0) { $sendWhy = "Remirror-Site-Feed.ps1 -Send exited $LASTEXITCODE" }
+    if ($sendWhy) {
+        Say "  $sendWhy" 'Red'
+        Die ('The record of what this release installs did not reach the site, so version.json has not been touched. ' +
+             'Check the ssh key with scripts\vps\Setup-SshKey.ps1 -Test, then run Ship again.')
+    }
+    $releaseBaseline = New-FeedBaselinePointer $Id $manifestSha (Get-HostFeedAssetUrl $manifestSha -Dev:$Dev) $now.Count
+    Say '  what this release installs is on the site' 'Green'
+}
+# ==== end thornswood release manifest ====
 
 # ------------------------------------------------------------ version.json
-# Two people can ship from two machines. The feed is pulled before it is
-# edited so this release is added on top of whatever the other machine just
-# published, rather than on top of a copy from yesterday. A pull that fails
-# (offline, or a conflict somebody has to look at) stops here, before the
-# file is touched.
-if (-not $NoPush -and (Test-Path (Join-Path $ReleaseDir '.git'))) {
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    try {
-        $pulled = & git -C $ReleaseDir pull --rebase --quiet 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host ($pulled | Out-String) -ForegroundColor Red
-            Die "Could not pull the release feed in $ReleaseDir. Nothing was written. Sort the clone out and run Ship again."
-        }
+# ==== thornswood feed recheck ====
+# Two people can ship from two machines, and this run received the feed and
+# the baseline twenty minutes ago. So they are asked for again before the feed
+# is edited (#907):
+#   - the baseline moved: another Ship went out meanwhile, packed against the
+#     same baseline as this one. This release would undo half of it, so it
+#     stops here with nothing written; its assets are on the site, and Ship
+#     run again packs against the new baseline.
+#   - only the feed moved: somebody changed the server, the collection or the
+#     news. It is received again and this release is added on top of it, the
+#     way git pull --rebase used to.
+# The send at the end checks the same two again, in the same step that
+# replaces the file on the VPS.
+if (-not $NoPush) {
+    try { $nowThere = Get-FeedStoreThere $Channel -SiteDir $SiteDir }
+    catch { Die ("Could not ask the VPS for the $Channel feed before editing it, so nothing was written: " + $_.Exception.Message) }
+    $wasRead = Read-FeedStoreRead $ReleaseDir
+    if ($null -eq $wasRead) { $wasRead = @{} }
+    if ([string]$nowThere['published.json'] -ne [string]$wasRead['published.json']) {
+        Die ("Another Ship published on the $Channel channel while this one was building: the baseline on the VPS is not the one this run started from. " +
+             'Nothing was written to the feed. Run Ship again; it starts from that release.')
+    }
+    if ([string]$nowThere['version.json'] -ne [string]$wasRead['version.json']) {
+        Say '  the feed changed on the VPS since this run read it; received again, and this release goes on top' 'Yellow'
+        try { [void](Receive-FeedStore $Channel $ReleaseDir @('version.json') -SiteDir $SiteDir) }
+        catch { Die ("Could not receive the $Channel feed again, so nothing was written: " + $_.Exception.Message) }
         $doc = Get-Content $VersionFile -Raw | ConvertFrom-Json
-    } finally { $ErrorActionPreference = $old }
+    }
 }
+# ==== end thornswood feed recheck ====
+# ==== thornswood move feed urls ====
+# tests\test-site-assets.ps1 runs this block on its own.
+#
+# THE URLS ALREADY ON THE FEED MOVE TO THE SITE, a few at a time or all at
+# once, and only by a publish, never by editing the live feed by hand (#897).
+# Each GitHub url whose bytes the site already answers for, by sha256 and by
+# size where the feed gives one, is rewritten to /feed[-dev]/assets/<sha256>.
+# Any other stays where it is, so the feed never names a url that answers 404.
+# scripts\oneoff\Copy-ReleaseAssets-ToSite.ps1 is what puts the old bytes up.
+if (-not $NoUpload) {
+    $sitePrefix = if ($Dev) { 'feed-dev' } else { 'feed' }
+    $siteBase = $SiteUrl
+    $mv = Move-FeedUrlsToSite $doc -Dev:$Dev -OnSite { param($sha, $bytes) Test-SiteAsset $siteBase $sitePrefix $sha $bytes }
+    if ($mv.Moved.Count) { Say ("  {0} url(s) already on the feed now download from the site" -f $mv.Moved.Count) 'Green' }
+    $mvLeft = @($mv.Stayed | Where-Object { -not (Test-HostFeedAssetUrl $_.Url) })
+    if ($mvLeft.Count) {
+        Say ("  {0} url(s) on the feed still point off the site, because the site does not hold those bytes:" -f $mvLeft.Count) 'Yellow'
+        foreach ($mvOne in @($mvLeft | Select-Object -First 5)) { Say "    $($mvOne.What)" 'Yellow' }
+        Say '  Launchers cannot fetch them once Thornswood-Releases is gone. Send the bytes with' 'Yellow'
+        Say '  .\scripts\deploy\Remirror-Site-Feed.ps1 -Send <file>; the next publish moves the urls.' 'Yellow'
+    }
+}
+# ==== end thornswood move feed urls ====
 Head 'version.json'
+# Where the last release's packs end, for the release list block below.
+$lastPackBefore = Get-FeedLastPackId $doc
 # ==== thornswood feed append ====
 # tests\test-feed-rules.ps1 runs this block on its own. If the markers move,
 # it stops rather than quietly testing nothing.
@@ -1403,8 +1557,34 @@ if ($clientRel -and $clientRel.url) {
         sha256     = $clientRel.sha256
         bytes      = $clientRel.bytes
         forkCommit = $clientRel.forkCommit
+        notice     = $SourceNoticeVersion
     })
     Say "  client runtime $($clientRel.forkCommit) recorded" 'Green'
+}
+# ==== thornswood release list ====
+# tests\test-feed-rollback.ps1 runs this block on its own.
+#
+# EVERY RELEASE'S RECORD STAYS NAMED (#442). "baseline" below names only the
+# last one, so on its own the feed could never say what an earlier release
+# left installed, and the only way back from a bad release was another one
+# written by hand. This keeps each release's record in "releases", newest
+# first, with the last pack on the feed once it was out, and
+# Rollback-Feed.ps1 puts the channel back to any of them. Before "baseline"
+# moves, so a feed that names one and no list yet starts the list with it.
+if ($releaseBaseline) {
+    $releaseList = @(Add-FeedRelease $doc $releaseBaseline (Get-FeedLastPackId $doc) $lastPackBefore '')
+    Say ("  the feed names {0} release(s) this channel can be put back to (Rollback-Feed.ps1 -List)" -f $releaseList.Count) 'DarkGray'
+}
+# ==== end thornswood release list ====
+# What this release leaves installed (the release manifest block), which the
+# next release is diffed against. Taken out when it was not sent, so the feed
+# never names a record the site does not hold.
+if ($releaseBaseline) {
+    Set-Prop $doc 'baseline' $releaseBaseline
+    Say ("  baseline {0} recorded, {1:n0} entries" -f $Id, $now.Count) 'Green'
+} elseif ($doc.PSObject.Properties['baseline']) {
+    $doc.PSObject.Properties.Remove('baseline')
+    Say '  -NoUpload: the feed no longer names a baseline, so the next release reads the store''s copy' 'Yellow'
 }
 if ($Launcher -and (Test-Path $exePath)) {
     $wasVersion = Val $doc 'launcherVersion'
@@ -1414,6 +1594,10 @@ if ($Launcher -and (Test-Path $exePath)) {
     Set-Prop $doc 'launcherVersion' $launcherVersion
     Set-Prop $doc 'launcherUrl' $exeUrl
     Set-Prop $doc 'launcherSha256' $nowSha
+    # What that exe was compiled from, so the next Ship can keep it rather than
+    # rebuild and re-sign an identical one (issue #921). Cleared when nobody
+    # said, so a launcher published by hand never inherits the last fingerprint.
+    Set-Prop $doc 'launcherInputs' ([string]$LauncherInputs)
     Say "  launcher $launcherVersion recorded" 'Green'
 
     # The updater decides by version number alone. A changed exe under an
@@ -1428,6 +1612,22 @@ if ($Launcher -and (Test-Path $exePath)) {
         Write-Host ''
     }
 }
+
+# ==== thornswood min launcher ====
+# The launcher this feed offers is the oldest one allowed into the game (#937;
+# Patrick, 28 Sep: no older launcher is kept working in game). The site refuses
+# a join pass below minLauncher, so the game server ends that session, and the
+# launcher holds Play below it (FeedNotice.cs). Written on every publish from
+# the feed's own launcherVersion, so a Ship that keeps the launcher it had
+# (#921) keeps the minimum where it was. Updating needs no pass, so every
+# launcher still out there can read this feed and update itself.
+$minWas = Val $doc 'minLauncher'
+$minNow = Val $doc 'launcherVersion'
+if ($minNow) {
+    Set-Prop $doc 'minLauncher' $minNow
+    if ($minWas -ne $minNow) { Say "  minLauncher $minNow, so an older launcher updates before it can play" 'Green' }
+}
+# ==== end thornswood min launcher ====
 
 # Whatever this machine's launcher is pointed at becomes what everyone else is
 # pointed at. It is how the password reaches four other people without anyone
@@ -1460,27 +1660,31 @@ if (Test-Path $cfgPath) {
             Say 'If it has not, fix the address in the launcher first, or with:' 'Yellow'
             Say '    .\scripts\ops\Set-Server.ps1 -Address <ip> -Port <port>' 'Yellow'
             Write-Host ''
-            [void](Read-Host 'Enter to exit')
+            if (-not $NoPause) { [void](Read-Host 'Enter to exit') }
             exit 1
         }
 
-        # UpdateRepo and VoicePort ride along for the same reason the address
-        # does: they are facts about the server, not choices, and they used to
-        # be boxes on the Settings page that nobody should have been editing.
-        #
-        # UpdateRepo is the one that matters. A launcher too old to know the
-        # repository was renamed cannot be told, because telling it means
-        # reaching it through the repository it can no longer find. Publishing
-        # the new name under the OLD one, before renaming, is what lets a stale
-        # copy read it once and find its way home.
+        # VoicePort rides along for the same reason the address does: it is a
+        # fact about the server, not a choice, and it used to be a box on the
+        # Settings page that nobody should have been editing.
         # DiscordAppId, SiteUrl and PresenceImage feed the "Playing Thornswood"
         # card in Discord and its two buttons. Facts about the project, not
         # choices, so they travel the same way.
         foreach ($pair in @(@('ServerAddress', 'serverAddress'), @('ServerPort', 'serverPort'),
-                            @('UpdateRepo', 'updateRepo'), @('UpdateFeedUrl', 'updateFeedUrl'), @('VoicePort', 'voicePort'),
+                            @('UpdateFeedUrl', 'updateFeedUrl'), @('VoicePort', 'voicePort'),
                             @('DiscordAppId', 'discordAppId'), @('SiteUrl', 'siteUrl'),
                             @('PresenceImage', 'presenceImage'))) {
             if ($cfg.PSObject.Properties.Name -contains $pair[0]) { Set-Prop $doc $pair[1] ([string]$cfg.($pair[0])) }
+        }
+        # updateRepo named Thornswood-Releases, the GitHub repository a
+        # launcher asked when the site feed did not answer. That repository is
+        # going (#907) and the launcher no longer asks it, so the feed stops
+        # naming it. A launcher that still has the old fallback keeps the name
+        # it saved and asks it at most once every five minutes while the site
+        # is down; the site answering is all it needs.
+        if ($doc.PSObject.Properties.Name -contains 'updateRepo') {
+            $doc.PSObject.Properties.Remove('updateRepo')
+            Say '  the feed no longer names a GitHub repository (updateRepo)' 'DarkGray'
         }
 
         # VoiceUrl travels even when it is empty, which none of the above do.
@@ -1504,23 +1708,35 @@ if (Test-Path $cfgPath) {
             Set-Prop $doc 'voiceUrl' $vu
         }
 
-        # Site feed URL (#649). Same announce-a-rename pattern as updateRepo:
-        # ship the new URL under the old feed first. Default from channel when
+        # Site feed URL (#649). A move is announced by shipping the new URL
+        # under the old feed first. Default from channel when
         # the shipping machine's config.json has not set UpdateFeedUrl yet.
         $feedUrl = ''
         if ($cfg.PSObject.Properties.Name -contains 'UpdateFeedUrl') { $feedUrl = [string]$cfg.UpdateFeedUrl }
         if (-not $feedUrl) { $feedUrl = Get-HostFeedVersionUrl -Dev:$Dev }
+        # The feed names its own channel's feed, whatever the shipping
+        # machine's config.json says (Djinn, 2 Oct). On 1 Oct the dev feed
+        # went out naming the main feed, because this machine's UpdateFeedUrl
+        # is the main one, and every dev launcher that read it moved itself
+        # onto the main feed. Same rule as voiceUrl above.
+        $isDevUrl = $feedUrl -match '/feed-dev/'
+        if ([bool]$Dev -ne $isDevUrl) {
+            $was = $feedUrl
+            $feedUrl = Get-HostFeedVersionUrl -Dev:$Dev
+            Say "  updateFeedUrl $feedUrl (config.json said $was, which is the other channel's feed)" 'Yellow'
+        }
         Set-Prop $doc 'updateFeedUrl' $feedUrl
 
         # How many the room holds. A number, not a string, because the launcher
         # reads it as one and a quoted "25" comes back as zero, which reads as
         # no limit at all. It rides along for the same reason the address does:
-        # raising the cap should not need everybody to reinstall.
-        if ($cfg.PSObject.Properties.Name -contains 'MaxOnline') {
-            $mo = 0
-            [void][int]::TryParse([string]$cfg.MaxOnline, [ref]$mo)
-            if ($mo -gt 0) { Set-Prop $doc 'maxOnline' $mo }
-        }
+        # raising the cap should not need everybody to reinstall. From
+        # records\most-online.json, the one place the number lives, which the
+        # deploy scripts write into the servers too (#481); it used to be this
+        # machine's launcher config.json, which the launcher rewrites itself.
+        . (Join-Path $PSScriptRoot '..\deploy\MaxOnline.ps1')
+        $mo = (Get-MostOnline).Value
+        if ($mo -gt 0) { Set-Prop $doc 'maxOnline' $mo }
 
         # Which collection revision this release agrees with.
         #
@@ -1551,10 +1767,11 @@ if (Test-Path $cfgPath) {
 
         # The server password does NOT ride along, and it used to.
         #
-        # version.json is published into the PUBLIC releases repository, which
-        # is the whole reason a shipped launcher can read it without carrying a
-        # credential. Anything written into it is readable by anybody, and the
-        # password was being written into it every single publish.
+        # version.json is PUBLIC (then on the releases repository, now on
+        # thornswood.net), which is the whole reason a shipped launcher can
+        # read it without carrying a credential. Anything written into it is
+        # readable by anybody, and the password was being written into it
+        # every single publish.
         #
         # Nothing in the launcher ever read it back. Since 1.0.197 the password
         # comes from the site, handed over only after Discord has said who you
@@ -1578,10 +1795,41 @@ if (Test-Path $cfgPath) {
             Say '  took the server password out of version.json' 'Yellow'
         }
         Say "  server $(Val $cfg 'ServerAddress'):$(Val $cfg 'ServerPort')" 'Green'
-        Say "  updates from $(Val $cfg 'UpdateRepo'), voice on $(Val $cfg 'VoicePort')" 'Green'
+        Say "  updates from $(Val $doc 'updateFeedUrl'), voice on $(Val $cfg 'VoicePort')" 'Green'
     } catch {
         Say "  could not read config.json, left the server details alone: $($_.Exception.Message)" 'Yellow'
     }
+}
+
+# The Skyrim build this release is pinned to (issue #471): the exe size the
+# launcher's checks look for, the size of the newer build Steam hands out, and
+# the depot manifests the Downgrade button asks Steam for. Read from
+# records\skyrim-pin.json, the one record of the pin. A launcher older than
+# these fields ignores them; a newer one reading a feed without them keeps
+# what it was built with. Sizes are numbers and the ids strings, because the
+# launcher reads them that way and a manifest id can be larger than a long.
+# Left as the feed had it when the record cannot be read, never a guess.
+$pinPath = Join-Path $PSScriptRoot '..\..\records\skyrim-pin.json'
+try {
+    $pin = (Get-Content -LiteralPath $pinPath -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json
+    $pinExe = [long](Val $pin 'expectedExeBytes')
+    $pinNewer = [long](Val $pin 'newerExeBytes')
+    $pinDepots = @()
+    if ($pin.PSObject.Properties['depots']) {
+        foreach ($d in @($pin.depots)) {
+            $pinDepots += [pscustomobject][ordered]@{ id = (Val $d 'id'); manifest = (Val $d 'manifest') }
+        }
+    }
+    $bad = @($pinDepots | Where-Object { $_.id -notmatch '^\d+$' -or $_.manifest -notmatch '^\d+$' })
+    if ($pinExe -le 0 -or $pinNewer -le 0 -or $pinDepots.Count -ne 3 -or $bad.Count) {
+        throw 'it needs expectedExeBytes, newerExeBytes and three depots, each an id and a manifest in digits'
+    }
+    Set-Prop $doc 'expectedExeBytes' $pinExe
+    Set-Prop $doc 'newerExeBytes' $pinNewer
+    Set-Prop $doc 'depots' $pinDepots
+    Say "  Skyrim pin: SkyrimSE.exe $pinExe bytes, depots $((@($pinDepots | ForEach-Object { $_.id })) -join ', ')" 'Green'
+} catch {
+    Say "  could not read records\skyrim-pin.json, so the feed keeps the Skyrim pin it had: $($_.Exception.Message)" 'Yellow'
 }
 
 # The launcher's News page reads this. Without it the page sits empty however
@@ -1671,13 +1919,13 @@ $details = @($details | Where-Object {
 # The full path list. Eighty lines of SKSE ini paths is the ugliest thing that
 # could sit under a release note, and this feed is public now, so it is built
 # for the console while shipping and kept out of the entry itself. Anybody who
-# genuinely wants it has the GitHub release.
+# genuinely wants it has the pack itself, which lists every file.
 $Cap = 80
 $log = @()
 foreach ($c in @($changed | Sort-Object)) { $log += $c }
 foreach ($r in @($removed | Sort-Object)) { $log += '- ' + $r }
 foreach ($p in @($profileChanged | Sort-Object)) { $log += ($p -replace '^:profile:', '') + '  (load order)' }
-foreach ($p in @($srcChanged | Sort-Object)) { $log += 'tools\' + ($p -replace '^:src:', '') + '  (launcher)' }
+foreach ($p in @($srcChanged | Sort-Object)) { $log += 'launcher\' + ($p -replace '^:src:', '') + '  (launcher)' }
 if ($log.Count -gt $Cap) {
     $rest = $log.Count - $Cap
     $log  = @($log[0..($Cap - 1)]) + ('... and {0:n0} more file{1}' -f $rest, $(if ($rest -eq 1) { '' } else { 's' }))
@@ -1733,41 +1981,28 @@ if ($repeat) {
 if ($Dev) {
     $mainVer = ''
     $mainTitles = @{}
-    # Main's public releases clone, beside this repository. Pulled before it is
-    # read so mainVersion and the news marks are what main has published, not
-    # whatever this machine last fetched. Without the pull the Dev News tab
-    # kept showing main on 1.1.37 long after main had moved on (#546).
-    $mainRelDir = Join-Path (Split-Path -Parent $RepoDir) 'Thornswood-Releases'
-    $mainJson = Join-Path $mainRelDir 'version.json'
-    if (Test-Path -LiteralPath $mainJson) {
-        if (Test-Path -LiteralPath (Join-Path $mainRelDir '.git')) {
-            $oldPull = $ErrorActionPreference
-            $ErrorActionPreference = 'Continue'
-            $pulledMain = & git -C $mainRelDir pull --rebase --quiet 2>&1
-            $pullRc = $LASTEXITCODE
-            $ErrorActionPreference = $oldPull
-            if ($pullRc -ne 0) {
-                Say ("  could not pull main's feed, so the dev marks were left alone: " + ($pulledMain | Out-String).Trim()) 'Yellow'
-                $mainTitles = $null
-            }
-        }
+    # Main's feed as the site serves it, read fresh on every dev publish, so
+    # mainVersion and the news marks are what main has published, not whatever
+    # this machine last saw. A stale copy is how the Dev News tab kept showing
+    # main on 1.1.37 long after main had moved on (#546). Until #907 this was
+    # main's Thornswood-Releases clone, pulled first. A feed that cannot be
+    # read leaves the marks alone rather than shipping a stale mainVersion.
+    $mainDoc = $null
+    try { $mainDoc = Read-SiteFeed 'main' -SiteDir $SiteDir -SiteUrl $SiteUrl }
+    catch {
+        Say "  could not read main's feed, so the dev marks were left alone: $($_.Exception.Message)" 'Yellow'
+        $mainTitles = $null
     }
-    if (($null -ne $mainTitles) -and (Test-Path -LiteralPath $mainJson)) {
-        try {
-            $mainDoc = Get-Content -LiteralPath $mainJson -Raw | ConvertFrom-Json
-            $mainVer = Val $mainDoc 'launcherVersion'
-            if ($mainDoc.PSObject.Properties['news'] -and $mainDoc.news) {
-                foreach ($m in @($mainDoc.news)) {
-                    $k = (Val $m 'title').Trim()
-                    if ($k) { $mainTitles[$k] = $true }
-                }
+    if (($null -ne $mainTitles) -and ($null -ne $mainDoc)) {
+        $mainVer = Val $mainDoc 'launcherVersion'
+        if ($mainDoc.PSObject.Properties['news'] -and $mainDoc.news) {
+            foreach ($m in @($mainDoc.news)) {
+                $k = (Val $m 'title').Trim()
+                if ($k) { $mainTitles[$k] = $true }
             }
-        } catch {
-            Say "  could not read main's feed, so the dev marks were left alone: $($_.Exception.Message)" 'Yellow'
-            $mainTitles = $null
         }
-    } elseif (-not (Test-Path -LiteralPath $mainJson)) {
-        Say '  no main feed beside this one, so the dev marks were left alone' 'Yellow'
+    } elseif ($null -ne $mainTitles) {
+        Say '  the site has no main feed, so the dev marks were left alone' 'Yellow'
         $mainTitles = $null
     }
 
@@ -1795,6 +2030,22 @@ if ($Dev) {
     Set-Prop $doc 'mainVersion' ''
 }
 
+# ==== thornswood release record ====
+# tests\test-release-name.ps1 runs the real publisher and reads this back.
+#
+# ONE NAME FOR THIS RELEASE (#444): its id, which its packs and its baseline
+# record are already named by. Written with everything else it is known by:
+# the launcher the feed offers with it (unchanged by a Ship that keeps its
+# launcher, #921), its packs, its baseline, and the commit it was built from,
+# which Ship tags as release/<channel>/<id> once the feed is out.
+$relSource = Get-ReleaseSource $RepoDir
+$relBaseline = if ($releaseBaseline) { [string]$releaseBaseline.id } else { '' }
+$relRecord = New-ReleaseRecord $Id $Channel (Val $doc 'launcherVersion') @($chunks | ForEach-Object { [string]$_.Id }) `
+    $relBaseline $relSource.Commit $relSource.Branch $relSource.Uncommitted
+Set-Prop $doc 'release' $relRecord
+Say ("  release {0}{1}" -f $Id, $(if ($relRecord.commit) { ', built from ' + $relRecord.commit.Substring(0, 12) } else { ', not from a git checkout' })) 'Green'
+# ==== end thornswood release record ====
+
 # Set-Content -Encoding UTF8 writes a byte order mark on Windows PowerShell,
 # and a BOM is not JSON. The launcher's reader stops on it and reports an
 # unexpected character, which takes out the update check for everyone at once,
@@ -1805,19 +2056,27 @@ if ($Dev) {
 # for every person who takes it, because their launcher tries to download from
 # an empty address, fails, and treats a pack it cannot apply as one the server
 # is expecting. It locks out whoever would have to publish the fix as well.
-# So this stops here, before the push, while the only copy is the one on this
-# machine and git has not been touched.
+# So this stops here, before the send, while the only copy is the one on this
+# machine and the VPS has not been touched.
+#
+# Except on a run that neither uploads nor sends (-NoUpload -NoPush, what Ship
+# -DryRun passes): nothing went to the site, so every url is empty by design,
+# and this feed goes nowhere. It used to stop every dry run of a real change
+# with exit 1 and advice about the ssh key (#1056).
 $blank = @($chunks | Where-Object { -not $_.Url })
-if ($blank.Count) {
+if ($blank.Count -and $NoUpload -and $NoPush) {
+    Say ("  -NoUpload: {0} pack(s) have no url, because nothing was uploaded; this feed is not sent" -f $blank.Count) 'DarkGray'
+}
+elseif ($blank.Count) {
     Write-Host ''
     Say ("{0} pack(s) uploaded no asset, so their url is empty:" -f $blank.Count) 'Red'
     foreach ($b in $blank) { Say ("    " + $b.Id) 'Red' }
     Write-Host ''
-    Say 'version.json has been written but NOT pushed. Nobody has this yet.' 'Yellow'
-    Say 'The upload is what failed, usually the token or the release. Fix that and run Ship again.' 'Yellow'
-    Say ("If a bad one did go out, .\scripts\release\Repair-Manifest.ps1{0} takes it back out and pushes." -f $(if ($Dev) { ' -Channel dev' } else { '' })) 'Yellow'
+    Say 'version.json has been written here but NOT sent. Nobody has this yet.' 'Yellow'
+    Say 'The send to the site is what failed, usually the ssh key. Fix that and run Ship again.' 'Yellow'
+    Say ("If a bad one did go out, .\scripts\release\Repair-Manifest.ps1{0} takes it back out and sends the feed." -f $(if ($Dev) { ' -Channel dev' } else { '' })) 'Yellow'
     Write-Host ''
-    [void](Read-Host 'Enter to exit')
+    if (-not $NoPause) { [void](Read-Host 'Enter to exit') }
     exit 1
 }
 
@@ -1909,7 +2168,7 @@ if ($profileChanged.Count) {
 # Patrick plays from and come to 10.9 GB.
 #
 # Newest kept by name, which sorts correctly because every id is
-# pack-YYYYMMDD-HHMM. The one just built is the newest, so it is never the one
+# pack-YYYYMMDD-HHMMSS (HHMM before #1057). The one just built is the newest, so it is never the one
 # that goes. -KeepPacks 0 keeps everything, for a machine that wants them.
 if ($KeepPacks -gt 0) {
     try {
@@ -1937,7 +2196,7 @@ if ($KeepPacks -gt 0) {
                 Say ("  -NoClose: would remove {0} older pack(s) from $DistDir, {1:N1} MB; leaving them" -f $go.Count, $mb) 'Yellow'
             } else {
                 foreach ($f in $go) { Remove-Item -LiteralPath $f.FullName -Force -EA SilentlyContinue }
-                Say ("  {0} older pack(s) removed from $DistDir, {1:N1} MB. They are all on the releases repository." -f $go.Count, $mb) 'DarkGray'
+                Say ("  {0} older pack(s) removed from $DistDir, {1:N1} MB. They are all on the site." -f $go.Count, $mb) 'DarkGray'
             }
         }
     } catch {
@@ -1945,58 +2204,26 @@ if ($KeepPacks -gt 0) {
     }
 }
 
-# ------------------------------------------------------------ push
+# ------------------------------------------------------------ send
+# ==== thornswood feed send ====
+# THE FEED GOES TO THE VPS, and from that moment the site serves it (#907).
+# Every asset it names is on the site already: the new ones went up before the
+# feed was touched, and an old url was only moved once the site answered for
+# its bytes. Send-FeedStore replaces version.json up there only if the feed
+# and the baseline are still the ones this run received (or received again
+# above), .part then renamed, the old one kept in history. Until #907 this was
+# a git commit and push to Thornswood-Releases, and the site copy followed in
+# Publish-PostShip's remirror.
 $pushFailed = $null
 if (-not $NoPush) {
-    Head 'Pushing'
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    Push-Location $ReleaseDir
+    Head 'Sending the feed'
     try {
-        # git writes its progress to stderr, and Out-Host renders anything on
-        # stderr as a red error record even when the push succeeded. Flattening
-        # each line to a string first keeps the output honest about what it is.
-        function Relay { process { Write-Host ('  ' + $_.ToString()) -ForegroundColor DarkGray } }
-
-        # Git refuses to commit without a name and an email, and the clone this
-        # publishes from is usually a fresh one that has neither. It used to say
-        # "Please tell me who you are", carry on, and finish with "everyone's
-        # launcher will offer this update" while version.json sat uncommitted.
-        $who = (& git config user.email) 2>$null
-        if (-not $who) { $who = (& git config --global user.email) 2>$null }
-        if (-not $who) {
-            Write-Host ''
-            Say 'This clone has no git identity, so version.json cannot be committed.' 'Red'
-            Say 'The release assets ARE uploaded. Only the feed that points at them is not.' 'Yellow'
-            Write-Host ''
-            Say '  git config --global user.name "EvilPatrick06"' 'Green'
-            Say '  git config --global user.email "EvilPatrick06@users.noreply.github.com"' 'Green'
-            Write-Host ''
-            Say 'Then run Ship again, or just push this by hand:' 'Yellow'
-            Say ("  cd {0}" -f $ReleaseDir) 'Green'
-            Say '  git add version.json published.json; git commit -m "Update ' + $Id + '"; git push' 'Green'
-            $pushFailed = 'no git identity'
-        }
-        else {
-            & git add version.json
-            if (Test-Path -LiteralPath $StateFile) { & git add published.json }
-            # The title as the subject and the rest as the body, which is what
-            # a commit message is. A note has a body and bullets now, and
-            # flattening the lot onto the subject line gave the 1.1.80 release
-            # a subject four hundred characters long that no git tool will
-            # ever show whole. Two -m arguments is how git takes a body.
-            $noteTitle = if ($Notes) { ($Notes -split "`r?`n")[0].Trim() } else { '' }
-            $noteBody  = if ($Notes) { (($Notes -split "`r?`n") | Select-Object -Skip 1) -join "`n" } else { '' }
-            $subject = "Update $Id$(if ($noteTitle) { ": $noteTitle" })"
-            if ($noteBody.Trim()) { & git commit -m $subject -m $noteBody.Trim() 2>&1 | Relay }
-            else                  { & git commit -m $subject 2>&1 | Relay }
-            $rcCommit = $LASTEXITCODE
-            & git push -u origin HEAD 2>&1 | Relay
-            $rcPush = $LASTEXITCODE
-            # A commit that found nothing to do exits 1 and is fine. A push that
-            # fails is never fine, because the feed is then behind the assets.
-            if ($rcPush -ne 0) { $pushFailed = "git push exited with $rcPush" }
-        }
-    } finally { Pop-Location; $ErrorActionPreference = $old }
+        $sentFeed = Send-FeedStore $Channel $ReleaseDir @('version.json') -SiteDir $SiteDir
+        if (@($sentFeed.Sent).Count) { Say "  version.json for $Id is on the VPS, and the site serves it" 'Green' }
+        else { Say '  version.json on the VPS already matched this one' 'DarkGray' }
+    } catch {
+        $pushFailed = $_.Exception.Message
+    }
 }
 
 # THE BASELINE MOVES ONLY WHEN THE RELEASE IS REALLY OUT.
@@ -2005,18 +2232,34 @@ if ($pushFailed) {
 } else {
     Save-State
     Clear-Pending $StateFile
+    Send-Baseline $Id
+    # What Ship tags, and only once the feed is on the VPS (#444). Global, the
+    # way Publish-Discord hands back its result, because Ship runs this script
+    # in its own scope.
+    if (-not $NoPush) { $global:ThornswoodPublishedRelease = $Id }
 }
+# ==== end thornswood feed send ====
 
 Head 'Done'
 if ($pushFailed) {
     Say "NOT SHIPPED. $pushFailed" 'Red'
-    Say 'The assets are on GitHub but version.json is not, so no launcher will' 'Red'
-    Say 'see this update. Fix the line above and push, then it is live.' 'Red'
+    Say 'The assets are on the site but version.json is not, so no launcher' 'Red'
+    Say 'will see this update. Fix the line above and run Ship again.' 'Red'
     Say "The baseline was NOT moved, so the next run finishes $Id rather than" 'Yellow'
     Say 'starting a new one. Nothing here is lost by running it again.' 'Yellow'
+}
+elseif ($NoPush) {
+    Say "-NoPush: $Id was not sent, so no launcher will see it." 'Yellow'
 }
 else {
     Say "Everyone's launcher will offer update $Id on next start." 'Green'
 }
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+# Said with an exit code, not only in red (#1055). This used to run off the end
+# after NOT SHIPPED, so its exit code was whatever ran last, measured 0, and a
+# Ship that keeps its launcher reads nothing else: it went on to #news, the
+# Discord and the server's countdown for a release no launcher could see.
+# Anything but 0 or 2 makes Ship stop with "NOTHING was published".
+if ($pushFailed) { exit 1 }
+exit 0

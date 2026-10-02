@@ -44,11 +44,11 @@ param([string]$ChecksPath, [string]$ShellPath, [string]$UiPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $ChecksPath) { $ChecksPath = Join-Path $Here '..\launcher\app\Checks.cs' }
-if (-not $ShellPath)  { $ShellPath  = Join-Path $Here '..\launcher\app\Shell.cs' }
-if (-not $UiPath)     { $UiPath     = Join-Path $Here '..\launcher\ui.xaml' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $ChecksPath) { $ChecksPath = Join-Path $Here 'launcher\app\Checks.cs' }
+if (-not $ShellPath)  { $ShellPath  = Join-Path $Here 'launcher\app\Shell.cs' }
+if (-not $UiPath)     { $UiPath     = Join-Path $Here 'launcher\ui.xaml' }
 
 $pass = 0; $fail = 0
 function Yes($what, $cond) {
@@ -254,18 +254,23 @@ namespace TsTest264
 
   # ---- how the launcher uses it ---------------------------------------------
   $all = LiftAfter $checksSrc 'public static List<Check> All(Config cfg)'
+  # The game the row reads: Paths.Game, or before a folder chosen at install is made the Steam copy it is made from (#1226).
   Yes 'Checks.All adds the Address Library row, told whether the build is right' `
-      ($all -and $all.Contains('l.Add(AddressLibraryRow(Paths.Game, bytes == cfg.ExpectedExeBytes));'))
+      ($all -and $all.Contains('l.Add(AddressLibraryRow(game, bytes == cfg.ExpectedExeBytes));') -and $all.Contains('string game = Paths.OwnFirst ? Paths.SteamCopy : Paths.Game;'))
   Yes 'and the Game build row it follows asks the same question' `
       ($all -and $all.Contains('new Check("Game build", bytes == cfg.ExpectedExeBytes,'))
-  Yes 'Checks.All now has ten rows' `
-      ($all -and ([regex]::Matches($all, 'l\.Add\(')).Count -eq 10)
+  # Ten when this was written; nine since #772 took the Auto load row out.
+  Yes 'Checks.All has nine rows' `
+      ($all -and ([regex]::Matches($all, 'l\.Add\(')).Count -eq 9)
 
+  # Since #607 DrawStatus also counts the problems for the Play summary, and
+  # the colours moved into FillStatusRow, which fills each row in place.
   $draw = LiftAfter $shellSrc 'static bool DrawStatus()'
   Yes 'DrawStatus shuts Play on Blocks, so an advisory row leaves it alone' `
-      ($draw -and $draw.Contains('if (c.Blocks) all = false;') -and -not $draw.Contains('if (!c.Ok) all = false;'))
-  Yes 'DrawStatus draws a failing advisory row amber, not red' `
-      ($draw -and ([regex]::Matches($draw, 'c\.Advisory \? "Warn" : "Bad"')).Count -eq 2)
+      ($draw -and $draw -match 'if \(c\.Blocks\)\s*\{?\s*all = false;' -and $draw -notmatch 'if \(!c\.Ok\)')
+  $fill = LiftAfter $shellSrc 'static void FillStatusRow(Border back, Check c)'
+  Yes 'FillStatusRow draws a failing advisory row amber, not red, dot and text both' `
+      ($fill -and ([regex]::Matches($fill, 'c\.Advisory \? "Warn" : "Bad"')).Count -eq 2)
   Yes 'the Warn brush it uses exists in ui.xaml' `
       ($uiSrc.Contains('x:Key="Warn"'))
 

@@ -36,11 +36,11 @@ param(
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $InstallerPath) { $InstallerPath = Join-Path $Here '..\scripts\release\Publish-Installer.ps1' }
-if (-not $ServerPath)    { $ServerPath    = Join-Path $Here '..\site\server.js' }
-if (-not $BootstrapPath) { $BootstrapPath = Join-Path $Here '..\installer\setup\Bootstrap.cs' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $InstallerPath) { $InstallerPath = Join-Path $Here 'scripts\release\Publish-Installer.ps1' }
+if (-not $ServerPath)    { $ServerPath    = Join-Path $Here 'site\server.js' }
+if (-not $BootstrapPath) { $BootstrapPath = Join-Path $Here 'installer\setup\Bootstrap.cs' }
 
 $script:pass = 0
 $script:fail = 0
@@ -211,7 +211,7 @@ process.stdout.write(sent === null ? 'NOTHING SENT' : sent);
     Yes 'which is the hash Get-FileHash prints, ignoring case' ($siteSha -ieq $want)
 
     # A publish from before this wrote no hash. The route still answers, with
-    # an empty one, which the installer reads as nothing to check.
+    # an empty one, which the installer refuses to fetch anything against.
     $old = Join-Path $work 'files-old'
     New-Item -ItemType Directory -Path $old -Force | Out-Null
     Copy-Item -LiteralPath $zipPath -Destination (Join-Path $old $zipOut)
@@ -296,10 +296,12 @@ process.stdout.write(sent === null ? 'NOTHING SENT' : sent);
     $between  = Get-Method $bs 'static string Between('
     $matches_ = Get-Method $bs 'static bool PayloadMatches('
     $check    = Get-Method $bs 'static void CheckPayload('
+    $url      = Get-Method $bs 'static string PayloadUrl('
     $download = Get-Method $bs 'static string Download('
     Yes 'Between is in Bootstrap.cs' ($between.Length -gt 0)
     Yes 'PayloadMatches is in Bootstrap.cs' ($matches_.Length -gt 0)
     Yes 'CheckPayload is in Bootstrap.cs' ($check.Length -gt 0)
+    Yes 'PayloadUrl is in Bootstrap.cs' ($url.Length -gt 0)
     Yes 'Download is in Bootstrap.cs' ($download.Length -gt 0)
 
     # Download itself talks to the site and draws on a window, so its wiring
@@ -318,9 +320,19 @@ process.stdout.write(sent === null ? 'NOTHING SENT' : sent);
     Yes 'the hash is read streamed, never the whole file into memory' (
         $matches_.Length -gt 0 -and $matches_.Contains('ComputeHash(s)') -and -not $matches_.Contains('ReadAllBytes'))
 
+    # The address the site gives goes through PayloadUrl, and a reply with no
+    # hash on it stops the install before half a gigabyte is fetched rather
+    # than after, since there would be nothing to measure it against.
+    $urlAt   = $download.IndexOf('url = PayloadUrl(Site, url)')
+    $noSha   = $download.IndexOf('if (sha.Length == 0)')
+    $fetch   = $download.IndexOf('WebRequest.Create(url)')
+    Yes 'Download puts the site''s address through PayloadUrl' ($urlAt -ge 0)
+    Yes 'and refuses a reply with no hash on it' ($noSha -ge 0)
+    Yes 'before it fetches a byte' ($fetch -gt $noSha -and $noSha -gt $urlAt)
+
     $compiled = $false
-    if ($between -and $matches_ -and $check) {
-        $members = @($between, $matches_, $check) | ForEach-Object {
+    if ($between -and $matches_ -and $check -and $url) {
+        $members = @($between, $matches_, $check, $url) | ForEach-Object {
             $m = [string]$_
             'public ' + $m
         }
@@ -356,7 +368,13 @@ $($members -join "`n`n")
 
         Yes 'the published bytes match the published hash' ($T::PayloadMatches($good, $parsed))
         Yes 'in upper case too' ($T::PayloadMatches($good, $parsed.ToUpper()))
-        Yes 'an empty hash, an older site, passes' ($T::PayloadMatches($good, ''))
+        # Issue #1365. A hash the site did not give is not a hash that matched:
+        # the bytes behind it are unpacked and run, so no hash is a refusal.
+        Yes 'an empty hash does not pass' (-not $T::PayloadMatches($good, ''))
+        Yes 'nor a hash of nothing but spaces' (-not $T::PayloadMatches($good, "  `t "))
+        Yes 'nor no hash at all' (-not $T::PayloadMatches($good, $null))
+        # Padding either side of a real hash is still that hash.
+        Yes 'a hash with space around it is still the hash' ($T::PayloadMatches($good, ' ' + $parsed + ' '))
 
         $threw = $null
         try { $T::CheckPayload($good, $parsed) } catch { $threw = $_ }
@@ -383,11 +401,33 @@ $($members -join "`n`n")
         Yes 'in the house words' ($msg -notmatch 'player')
         Yes 'and no em dash' ($msg.IndexOf([char]0x2014) -lt 0)
 
-        # A new installer meeting a site from before this is not refused.
+        # A site that gives no hash is refused too, rather than passed through
+        # unmeasured. Download stops before it fetches anything in that case;
+        # this is the same answer from the other end.
         [IO.File]::WriteAllBytes($tampered, $evil)
         $threw = $null
         try { $T::CheckPayload($tampered, '') } catch { $threw = $_ }
-        Yes 'with no hash from the site there is nothing to check, as before' ($null -eq $threw -and (Test-Path -LiteralPath $tampered))
+        Yes 'with no hash from the site nothing is trusted' ($null -ne $threw)
+        Yes 'and the download is deleted rather than unpacked' (-not (Test-Path -LiteralPath $tampered))
+
+        # ---- the address the site gives -------------------------------------
+        #
+        # Issue #1365. The url out of /api/payload is what gets fetched,
+        # unpacked and run. A relative one is joined onto the site as it always
+        # was; an absolute one has to be https.
+        $S = 'https://thornswood.net'
+        Yes 'a relative address is joined onto the site' ($T::PayloadUrl($S, '/file/Thornswood-Setup.zip') -eq ($S + '/file/Thornswood-Setup.zip'))
+        Yes 'the real reply''s address is joined onto the site' ($T::PayloadUrl($S, [string](Field $got 'url')) -eq ($S + [string](Field $got 'url')))
+        Yes 'an https address is taken as it stands' ($T::PayloadUrl($S, 'https://thornswood.net/file/x.zip') -eq 'https://thornswood.net/file/x.zip')
+
+        function Refused([string]$u) {
+            try { $T::PayloadUrl($S, $u) | Out-Null; return $false } catch { return $true }
+        }
+        Yes 'plain http is refused' (Refused 'http://thornswood.net/file/x.zip')
+        Yes 'http anywhere else is refused' (Refused 'http://evil.example/x.zip')
+        Yes 'upper case HTTP is refused too' (Refused 'HTTP://thornswood.net/file/x.zip')
+        Yes 'a file address is refused' (Refused 'file://server/share/x.zip')
+        Yes 'and an ftp one' (Refused 'ftp://thornswood.net/x.zip')
     }
 }
 finally {

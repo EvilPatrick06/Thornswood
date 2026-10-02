@@ -128,7 +128,7 @@
     the planter sacks and the coin purses are. The cheese is nobody's, which is
     what Patrick asked for, and a base in no table falls through to the engine.
     The churn is the farmer's: Patrick, 21 September, "give milk and butter to
-    farmers", so churn() in tools\gamemode.js answers it with the farm verb as
+    farmers", so churn() in game\gamemode.js answers it with the farm verb as
     of 24 September, and Build-RecipeTable.ps1 reads that verb, so BUTTER, 46 OF
     THE COOK'S INPUTS, is a farmer's to supply.
 
@@ -159,9 +159,10 @@
   are the two props. So the crop rule is now the food rule with those three
   lists subtracted: a plant, of either record type, whose produce carries the
   food bit and which is not game, not a prop and not named as staying the
-  gatherer's. On this build that is 13 records, and two field crops give an
-  INGR rather than a food, so no rule reaches them and they are named one at a
-  time in CROP_BY_EDITOR_ID below: wheat and tundra cotton. 15 crops in all.
+  gatherer's. On this build that is 13 records, and one field crop gives an
+  INGR rather than a food, so no rule reaches it and it is named one at a
+  time in CROP_BY_EDITOR_ID below: wheat. Tundra cotton (#626) stays the
+  gatherer's, like the other flowers and mushrooms. 14 crops in all.
 
   The name in the table is the produce's name, the same as in the harvests
   table, because that is what somebody is handed. It is what the record says
@@ -183,6 +184,9 @@
     - then takes the food out of them, by the food bit, and routes each row to
       the farmer, to the hunter's game table or to the excluded list, except
       the ones named as staying the gatherer's
+    - then takes the farmyard out, by name (FARMYARD_BY_EDITOR_ID): a plant
+      whose produce is a reagent and which is still the farmer's, the chicken
+      nest (#628), which collectEgg() in game\gamemode.js answers
     - sorts each plant that is left into one of classes.md's four ranks by what
       its produce is worth (see the knobs below)
     - runs the crops pass over the rows it routed to the farmer, gives each one
@@ -228,7 +232,8 @@
   this build or has no Hunter rank set for it, if no game record is a novice's,
   if a row the food rule routed to the farmer did not reach the crops table, if
   a food row is left in the gatherer's table without being named as staying
-  there, if the first rung of the gatherer's ladder or the farmer's is empty,
+  there, if a name in FARMYARD_BY_EDITOR_ID is carried by no plant in this
+  build, if the first rung of the gatherer's ladder or the farmer's is empty,
   or if the game folder changed underneath it.
 #>
 param(
@@ -343,8 +348,9 @@ $ALCH_FLAG_FOOD = 0x00000002
 $PRODUCE_WITHOUT_A_PRICE = @('LVLI', 'FLST', 'LVLN')
 #
 # PRODUCE_NOT_GATHERED: kinds of record that are a real item with a real price
-# and still are not material anybody gathers. KEYM is the one this build has:
-# ElysiumEstateSSE.esp hangs the key to the house on a FLOR record. Rank
+# and still are not material anybody gathers. KEYM is the kind: Elysium
+# Estate 4.3.5 (ElysiumEstateSSE.esp, until #690) hung the key to the house on
+# a FLOR record, and 5.0.1 does not, but a key on flora is never gathering. Rank
 # decides who may work a source at all, so leaving that in the table would
 # mean only a gatherer could ever pick up their own front door key. They are
 # reported by name every run and listed in the json under 'unranked'.
@@ -585,6 +591,20 @@ $FOOD_PROP_BY_EDITOR_ID = @('MammothCheese01', 'BYOHButterChurn')
 # bit on it is the record saying it can be eaten rather than that it was farmed.
 $FOOD_STAYS_THE_GATHERERS = @('DLC01SoulHusk01', 'DLC01SoulHusk02')
 #
+# FARMYARD_BY_EDITOR_ID: plants whose produce is a reagent, so the food rule
+# above never sees them, and which are still not the gatherer's. Issue #628,
+# "Gather can get eggs": ChickenNest gives Chicken's Egg, which is an INGR, so
+# it was ranked into the gatherer's table like a flower, and a gatherer pressing
+# a nest in a farmyard was handed the egg the Cook's bread and pies ask for.
+# A nest is kept, not found in the wild: it is the farmer's, the same way the
+# churn and the living cow are. collectEgg() in game\gamemode.js answers it with
+# the farm verb, and Build-RecipeTable.ps1 reads that verb, so Chicken's Egg is
+# a farmer's to supply. It is not a crop either (nobody sows a nest), so it goes
+# in the json's unranked list with the reason, the way the churn does, and in no
+# table here. Wild bird nests (pine thrush, rock warbler, hawk) are found in the
+# wild and stay the gatherer's, which is why this is a name and not a rule.
+$FARMYARD_BY_EDITOR_ID = @('ChickenNest')
+#
 # ------------------------------------------------------ the crop knobs ------
 #
 # THERE IS NO CROP RULE OF ITS OWN ANY MORE, and that is the change of
@@ -608,15 +628,16 @@ $FOOD_STAYS_THE_GATHERERS = @('DLC01SoulHusk01', 'DLC01SoulHusk02')
 # carries the food bit and which is none of those three things. On this build
 # that is 13 records where the old rule found 9.
 #
-# CROP_BY_EDITOR_ID: the crops the rule cannot reach. Wheat and tundra cotton
-# are grown in fields all over Skyrim and are TREE records like the rest, but
-# their produce is an INGR and not a food, so no rule written on the record
-# types finds them. Naming two records is honest; widening the rule to INGR to
-# catch them would take in every mountain flower, mushroom and hanging moss in
-# the game, which is gathering and not farming. Matched on the editor id
-# exactly, so the HearthFires planter versions of the same two plants
-# (BYOHHouseIngrdWheat01, BYOHHouseIngrdCotton01) are not caught by it.
-$CROP_BY_EDITOR_ID = @('TreeFloraWheat01', 'TreeFloraTundraCotton01')
+# CROP_BY_EDITOR_ID: the crops the rule cannot reach. Wheat is grown in fields
+# all over Skyrim and is a TREE record like the rest, but its produce is an INGR
+# and not a food, so no rule written on the record types finds it. Naming one
+# record is honest; widening the rule to INGR to catch it would take in every
+# mountain flower, mushroom and hanging moss in the game, which is gathering and
+# not farming. Tundra cotton used to sit here too; #626 moved it to gatherers
+# (reagent flora with put-back), matching flowers and mushrooms. Matched on the
+# editor id exactly, so the HearthFires planter BYOHHouseIngrdWheat01 is not
+# caught by it.
+$CROP_BY_EDITOR_ID = @('TreeFloraWheat01')
 #
 # CROP_NOT_A_PLOT_PREFIX: the HearthFires planters. These are Skyrim's own
 # plant-and-grow system for a homestead garden: somebody puts a seed in the
@@ -677,7 +698,7 @@ $CROP_NOT_A_PLOT_PREFIX = @('BYOHHouseFlora', 'BYOHHouseIngrd')
 #             and on tables all over Skyrim, and a Novice can work them on their
 #             first day. This is the rung the whole ladder stands on: unless a
 #             beginner can both FIND and GROW something, farming cannot start.
-#   Advanced  the ones that take a season. Wheat, tundra cotton, ash yam, tomato.
+#   Advanced  the ones that take a season. Wheat, ash yam, tomato.
 #   Expert    the orchard. Apples, because a tree is the longest thing anybody
 #             here plants.
 #   Master    nothing yet. Left open on purpose for whatever is added next.
@@ -709,7 +730,6 @@ $CROP_RANK_BY_EDITOR_ID = @{
     'TreeFloraPotatoPlant01'      = 'novice'
     'TreeGourdCluster01'          = 'novice'
     'TreeFloraWheat01'            = 'advanced'
-    'TreeFloraTundraCotton01'     = 'advanced'
     'XJKWOTreeFloraTomatoPlant01' = 'advanced'
     'DLC2TreeFloraAshYam01'       = 'advanced'
     'XJKappleGreentree'           = 'expert'
@@ -725,6 +745,18 @@ $CROP_GROW_MINUTES_MAX      = 360
 $ErrorActionPreference = 'Stop'
 
 if (-not $Out) { $Out = Join-Path $PSScriptRoot '..\..\game\data\harvests.json' }
+
+# Update.esm's own Creation Club records (#479). Every Special Edition has
+# them, but their art comes with the Creation Club files Thornswood leaves out,
+# so a plant that is one, or whose produce is one, is nobody's to pick: it goes
+# in the unranked list with the reason. scripts\mods\Check-CreationForms.js
+# --write keeps the list, and tests\test-special-edition-only.js holds the
+# gamemode to it.
+$creation = @{}
+$creationList = Join-Path $PSScriptRoot '..\..\records\update-creation-club.json'
+foreach ($c in ([IO.File]::ReadAllText($creationList) | ConvertFrom-Json).records.PSObject.Properties) {
+    $creation[[string]$c.Name + ':Update.esm'] = $true
+}
 
 $fail = 0
 function Ok  ($m) { Write-Host "  ok    $m" -ForegroundColor Green }
@@ -1431,8 +1463,25 @@ foreach ($d in ($plants.Keys | Sort-Object)) {
         }
     }
 
+    # A farmyard plant whose produce is a reagent (issue #628): out before it
+    # is ranked, for the same reason as the fish and the food. The argument is
+    # over FARMYARD_BY_EDITOR_ID at the top.
+    if ($FARMYARD_BY_EDITOR_ID -contains [string]$p.Edid) {
+        $unranked[$d] = [ordered]@{
+            editorId    = $p.Edid
+            name        = $p.Full
+            produce     = $q.Desc
+            produceName = $q.Full
+            produceType = $q.Type
+            why         = 'it is kept in a farmyard rather than found in the wild, so it is the farmer''s and not the gatherer''s, and it is named in FARMYARD_BY_EDITOR_ID at the top of this script: collectEgg() in game\gamemode.js answers it with the farm verb, so it is in none of the tables this script writes'
+        }
+        continue
+    }
+
     $why = ''
-    if ($ourStations.Contains([string]$d)) {
+    if ($creation.ContainsKey([string]$d) -or $creation.ContainsKey([string]$q.Desc)) {
+        $why = 'it or its produce is a Creation Club record: every Special Edition has it, but its art comes with the Creation Club files Thornswood leaves out, so nobody is handed one'
+    } elseif ($ourStations.Contains([string]$d)) {
         $why = 'this server places this one itself and answers it with the station code written for it, so it is not a plant for this pass to rank'
     } elseif ($PRODUCE_WITHOUT_A_PRICE -contains $q.Type) {
         $why = 'its produce is a ' + $q.Type + ', which is a list of things rather than one thing, and carries no price'
@@ -1559,6 +1608,16 @@ foreach ($e in $FOOD_STAYS_THE_GATHERERS) {
     foreach ($d in $plants.Keys) { if ([string]$plants[$d].Edid -eq [string]$e) { $found = $true } }
     if (-not $found) { Bad ("{0} is named in FOOD_STAYS_THE_GATHERERS and no plant in this build carries that editor id" -f $e) }
 }
+# The farmyard list (#628) is checked the same way, and said out loud: a nest
+# renamed out from under it would drop back into the gatherer's table quietly.
+$farmyardRows = 0
+foreach ($e in $FARMYARD_BY_EDITOR_ID) {
+    $found = $false
+    foreach ($d in $plants.Keys) { if ([string]$plants[$d].Edid -eq [string]$e) { $found = $true } }
+    if (-not $found) { Bad ("{0} is named in FARMYARD_BY_EDITOR_ID and no plant in this build carries that editor id" -f $e) }
+    foreach ($d in $unranked.Keys) { if ([string]$unranked[$d].editorId -eq [string]$e) { $farmyardRows++ } }
+}
+Note ("{0,3} give a reagent and are the farmer's farmyard, in none of these tables: {1}" -f $farmyardRows, ($FARMYARD_BY_EDITOR_ID -join ', '))
 
 # --------------------------------------------------------------- the fish ---
 #
@@ -1932,10 +1991,11 @@ if ($oddGrow.Count -gt 0) {
 #
 # What still has to hold is the other direction, and it is the one that catches
 # a real fault: a crop whose produce is food must be OUT of the plant table, or
-# a gatherer could pick a cabbage after all. Wheat and tundra cotton give an
-# ingredient rather than a food, so the food rule never touches them and they
-# are in both tables on purpose; they are the two named in CROP_BY_EDITOR_ID and
-# the run says so by name rather than by a count.
+# a gatherer could pick a cabbage after all. Wheat gives an ingredient rather
+# than a food, so the food rule never touches it and it is in both tables on
+# purpose; it is the one named in CROP_BY_EDITOR_ID and the run says so by name
+# rather than by a count. Tundra cotton (#626) is gatherer-only and must NOT be
+# in the crops table.
 $bothTables = New-Object 'System.Collections.Generic.List[string]'
 $ingrCrops  = New-Object 'System.Collections.Generic.List[string]'
 foreach ($d in $crops.Keys) {
@@ -2052,7 +2112,8 @@ $docLines.Add('  "language": ' + (JsonStr $LANGUAGE) + ',')
 $docLines.Add('  "rankedBy": ' + (JsonStr 'the gold value of the produce, the thresholds in RANK_MAX_VALUE at the top of the script') + ',')
 $docLines.Add('  "harvestsAre": ' + (JsonStr ('the plants whose produce is an alchemy reagent. A plant whose produce is food is not the gatherer''s: ' +
     'food is bit 0x2 of an ALCH record''s ENIT flag word, proved in scripts\dev\Build-RecipeTable.ps1, and those rows are in crops, game or unranked instead, ' +
-    'but for the ones named in FOOD_STAYS_THE_GATHERERS at the top of the script')) + ',')
+    'but for the ones named in FOOD_STAYS_THE_GATHERERS at the top of the script. A plant named in FARMYARD_BY_EDITOR_ID (the chicken nest) gives a reagent ' +
+    'and is still the farmer''s, so it is in unranked and not here')) + ',')
 $docLines.Add('  "cropsRankedBy": ' + (JsonStr ('how hard the crop is to grow, named one at a time in CROP_RANK_BY_EDITOR_ID at the top of the script, ' +
     'because the gold value is the gatherer''s ladder and ranking a farm by it put every crop at advanced and left a new farmer nothing to sow')) + ',')
 $thr = New-Object 'System.Collections.Generic.List[string]'
@@ -2188,10 +2249,10 @@ if ($fail -gt 0) {
 
 $lines = New-Object 'System.Collections.Generic.List[string]'
 $lines.Add('/* Built by scripts\dev\Build-HarvestTable.ps1 out of the FLOR and TREE records of this build.')
-$lines.Add('     ' + $table.Count + ' plants, the same table as tools\harvests.json.')
+$lines.Add('     ' + $table.Count + ' plants, the same table as game\data\harvests.json.')
 $lines.Add('     The key is the plant''s base record. The server already picks a FLOR or TREE on')
 $lines.Add('     its own, so onActivate only has to look the base up here and decide.')
-$lines.Add('     Paste it between the HARVESTS_BY_BASE markers in tools\gamemode.js. Do not hand edit. */')
+$lines.Add('     Paste it between the HARVESTS_BY_BASE markers in game\gamemode.js. Do not hand edit. */')
 $lines.Add('  var HARVESTS_BY_BASE = {')
 $n = 0
 foreach ($d in $table.Keys) {
@@ -2212,16 +2273,16 @@ $literal = $lines -join [Environment]::NewLine
 
 $cropLines = New-Object 'System.Collections.Generic.List[string]'
 $cropLines.Add('/* Built by scripts\dev\Build-HarvestTable.ps1 out of the same records as the harvests.')
-$cropLines.Add('     ' + $crops.Count + ' farm crops, the same table as the crops map in tools\harvests.json.')
+$cropLines.Add('     ' + $crops.Count + ' farm crops, the same table as the crops map in game\data\harvests.json.')
 $cropLines.Add('     A crop is a plot somebody works rather than a plant anybody finds: a plant of')
 $cropLines.Add('     either record type whose produce carries the ALCH food bit and which is not')
-$cropLines.Add('     hanging game and not a prop, plus wheat and tundra cotton, which give an')
-$cropLines.Add('     ingredient and are named one at a time in the script.')
+$cropLines.Add('     hanging game and not a prop, plus wheat, which gives an')
+$cropLines.Add('     ingredient and is named one at a time in the script. Tundra cotton is gatherer flora (#626).')
 $cropLines.Add('     growMinutes is how long after a pick the server counts the plot as grown.')
 $cropLines.Add('     The engine reloots a FLOR or TREE an hour after a pick and the gamemode cannot')
 $cropLines.Add('     set isHarvested or a reloot time, so the plant looks ready before it is: the')
 $cropLines.Add('     server refuses the pick until growMinutes is up and says how long is left.')
-$cropLines.Add('     Paste it between the CROPS_BY_BASE markers in tools\gamemode.js. Do not hand edit. */')
+$cropLines.Add('     Paste it between the CROPS_BY_BASE markers in game\gamemode.js. Do not hand edit. */')
 $cropLines.Add('  var CROPS_BY_BASE = {')
 $n = 0
 foreach ($d in $crops.Keys) {
@@ -2240,13 +2301,13 @@ $cropLiteral = $cropLines -join [Environment]::NewLine
 
 $fishLines = New-Object 'System.Collections.Generic.List[string]'
 $fishLines.Add('/* Built by scripts\dev\Build-HarvestTable.ps1 out of the same records as the harvests.')
-$fishLines.Add('     ' + $fish.Count + ' water records, the same table as the fish map in tools\harvests.json.')
+$fishLines.Add('     ' + $fish.Count + ' water records, the same table as the fish map in game\data\harvests.json.')
 $fishLines.Add('     These are the fisher''s and not the gatherer''s, and they are named one at a time')
 $fishLines.Add('     in FISH_BY_EDITOR_ID at the top of the script because nothing in a salmon''s record')
 $fishLines.Add('     says water. "from" is what stands in the world, "name" is what it gives.')
 $fishLines.Add('     The rank is named one at a time too: every one of these produce records is priced')
 $fishLines.Add('     at 2 or 3 gold, so the gold rule that ranks a plant puts all of them on one rung.')
-$fishLines.Add('     Paste it between the FISH_BY_BASE markers in tools\gamemode.js. Do not hand edit. */')
+$fishLines.Add('     Paste it between the FISH_BY_BASE markers in game\gamemode.js. Do not hand edit. */')
 $fishLines.Add('  var FISH_BY_BASE = {')
 $n = 0
 foreach ($d in $fish.Keys) {
@@ -2265,7 +2326,7 @@ $fishLiteral = $fishLines -join [Environment]::NewLine
 
 $gameLines = New-Object 'System.Collections.Generic.List[string]'
 $gameLines.Add('/* Built by scripts\dev\Build-HarvestTable.ps1 out of the same records as the harvests.')
-$gameLines.Add('     ' + $game.Count + ' hanging game records, the same table as the game map in tools\harvests.json.')
+$gameLines.Add('     ' + $game.Count + ' hanging game records, the same table as the game map in game\data\harvests.json.')
 $gameLines.Add('     These are the hunter''s and not the gatherer''s. A plant whose produce is food is')
 $gameLines.Add('     not a thing a gatherer gathers, and these seven are the food rows that are an')
 $gameLines.Add('     animal somebody hung up rather than a crop somebody grew. They are not rows in')
@@ -2275,7 +2336,7 @@ $gameLines.Add('     "from" is what hangs in the world, "name" is what it gives.
 $gameLines.Add('     The rank is named one at a time in GAME_RANK_BY_EDITOR_ID in the script: the')
 $gameLines.Add('     three produce records are priced at 2, 3 and 4 gold, so the gold rule that ranks')
 $gameLines.Add('     a plant puts all seven on one rung and the ladder would do nothing.')
-$gameLines.Add('     Paste it between the GAME_BY_BASE markers in tools\gamemode.js. Do not hand edit. */')
+$gameLines.Add('     Paste it between the GAME_BY_BASE markers in game\gamemode.js. Do not hand edit. */')
 $gameLines.Add('  var GAME_BY_BASE = {')
 $n = 0
 foreach ($d in $game.Keys) {
@@ -2295,7 +2356,7 @@ $gameLiteral = $gameLines -join [Environment]::NewLine
 # ---------------------------------------------------------------- install --
 #
 # The gamemode carries the table, because the server is deployed as one file
-# and cannot read tools\harvests.json. Nothing hand edits that block: this
+# and cannot read game\data\harvests.json. Nothing hand edits that block: this
 # writes it between its own markers, the way the other generated blocks in
 # this repo are written. -NoInstall prints it and leaves the file alone.
 #

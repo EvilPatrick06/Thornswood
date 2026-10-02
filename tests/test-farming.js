@@ -1,13 +1,13 @@
 // Runs the real crop table and the real farming block out of game/gamemode.js
 // against a stubbed mp, so the fixes are measured rather than claimed.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 var fs = require('fs');
 var path = require('path');
 
 // The repo is wherever this file is, never a path off one machine: a test
 // that names somebody's home folder is a test only that machine can run,
 // which is what entry 196 is about and why this one sat in a scratchpad.
-var REPO = path.resolve(TOOLS_DIR, '..');
+var REPO = path.resolve(REPO_DIR);
 var text = fs.readFileSync(path.join(REPO, 'game', 'gamemode.js'), 'utf8');
 
 function slice(fromMark, toMark, includeTo) {
@@ -174,7 +174,8 @@ var over = Object.keys(CROPS).filter(function (d) { return CROPS[d].growMinutes 
 check('every wait is under the engine hour', over.length, '0');
 check('cabbage is a novice crop', CROPS[CABBAGE].rank, 'novice');
 check('the orchard is expert', CROPS[APPLE].rank, 'expert');
-check('crop count', Object.keys(CROPS).length, '15');
+check('crop count', Object.keys(CROPS).length, '14');
+check('tundra cotton is not a farm crop (#626)', own(CROPS, 'bb947:Skyrim.esm'), 'false');
 
 // 2. The rank gate is live (findings 8 and 14).
 addActor(100, 11, 'Brynja', 'farmer', 0, CELL, [4000, 0, 0]);

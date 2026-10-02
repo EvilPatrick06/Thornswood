@@ -6,7 +6,7 @@
 
   25 September: the installer went on the site straight after the pull that
   brought #340, the fix for old installer zips in the Downloads folder.
-  Package-Thornswood copies tools\setup-stub.exe and never compiles it;
+  Package-Thornswood copies out\setup-stub.exe and never compiles it;
   Build-Launcher.ps1 does, and had not run since the pull, so nothing could say
   which Bootstrap.cs the published setup program came from.
 
@@ -22,9 +22,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Here0 = $PSScriptRoot
 if (-not $Here0) { $Here0 = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here0 = Join-Path (Split-Path -Parent $Here0) 'tools'
-if (-not $PackagePath) { $PackagePath = Join-Path $Here0 '..\scripts\release\Package-Thornswood.ps1' }
+# The tests are in tests\, the repository is one folder up.
+$Here0 = Split-Path -Parent $Here0
+if (-not $PackagePath) { $PackagePath = Join-Path $Here0 'scripts\release\Package-Thornswood.ps1' }
 
 $script:pass = 0
 $script:fail = 0
@@ -55,11 +55,13 @@ $feed = $src.IndexOf('# ==== end thornswood release feed ====')
 Yes 'the check comes before the game is closed and anything is staged' ($staged -gt $b -and $closed -gt $b)
 Yes 'and after the release feed check' ($feed -ge 0 -and $feed -lt $a)
 Yes 'it stops the packager when there is a reason' ($block.Contains('if ($stubWhy) { Die $stubWhy }'))
-# The same two places, in the same order, as the copy further down, so the
-# stub that is checked is the stub that ships.
-$pick = "@((Join-Path `$Here '..\..\tools\setup-stub.exe'), (Join-Path `$OutDir 'setup-stub.exe'))"
-$late = "@((Join-Path `$here '..\..\tools\setup-stub.exe'), (Join-Path `$OutDir 'setup-stub.exe'))"
-Yes 'it checks the stub the installer is built from' ($block.Contains($pick) -and $src.Contains($late))
+# The stub that is checked is the stub that ships: the copy further down takes
+# the one found here rather than looking again (issue #932). -Stub, a main
+# Ship's from CI, comes first; without it, out\ and then the output folder.
+$pick = "@((Join-Path (& (Join-Path `$Here 'Where.ps1') Out) 'setup-stub.exe'), (Join-Path `$OutDir 'setup-stub.exe'))"
+Yes 'it checks the stub the installer is built from' ($block.Contains($pick) -and $src.Contains("`$stub = `$stubNow") -and
+    ([regex]::Matches($src, [regex]::Escape("Out) 'setup-stub.exe')"))).Count -eq 1)
+Yes 'a stub given with -Stub is the one, and one that is not there stops it' ($block -match '(?s)if \(\$Stub\) \{\s*if \(-not \(Test-Path -LiteralPath \$Stub\)\) \{ Die .*?\$stubNow = \(Resolve-Path -LiteralPath \$Stub\)\.Path\s*\} else \{')
 Yes 'against installer\setup\Bootstrap.cs' ($block.Contains("(Join-Path `$Here '..\..\installer\setup\Bootstrap.cs')"))
 
 $m = [regex]::Match($block, '(?s)function Get-StubRefusal\(.*?\n\}')

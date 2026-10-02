@@ -83,16 +83,12 @@
     'font-family:"Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;color:#e4d9bf;user-select:none;pointer-events:auto}',
     '#ts-select.gone{display:none}',
     '#ts-select *{box-sizing:border-box}',
-    // the painting behind everything. Issue #609: one zoomed animated
-    // backdrop from the first paint, not a still then a darker still then
-    // the loop. The loop starts already scaled (same drift as the site's
-    // hero), so there is no wide-then-zoom, and the still is only used when
-    // the loop is missing.
-    '#ts-select .bg{position:absolute;inset:0;z-index:0;overflow:hidden;background:#0b0907}',
-    '#ts-select .bg video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 25%;',
-    'transform-origin:center 25%;will-change:transform;',
-    'animation:tsPaintDrift 36s ease-in-out infinite alternate}',
-    '@keyframes tsPaintDrift{from{transform:scale(1.08) translateY(0)}to{transform:scale(1.14) translateY(-10px)}}',
+    // the painting behind everything: the loop when it plays, the still under it.
+    // Djinn, 1 October: shown at its own size and centred, no zoom or drift,
+    // so the art is never cropped or rescaled and the scroll on the ledge
+    // lines up with the painting (undoes the zoom added for #609).
+    '#ts-select .bg{position:absolute;inset:0;z-index:0;background:#0b0907 center/cover no-repeat}',
+    '#ts-select .bg video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}',
     '#ts-select .shade{position:absolute;inset:0;z-index:0;',
     'background:radial-gradient(ellipse at center,rgba(0,0,0,.40) 0%,rgba(0,0,0,.76) 100%)}',
     '#ts-select .panel{position:relative;z-index:1;width:960px;max-height:92vh;display:flex;flex-direction:column;transform-origin:center center;',
@@ -126,6 +122,10 @@
     '#ts-select .slot.empty.at{background:rgba(120,94,44,.22)}',
     '#ts-select .slotno{font-size:12px;letter-spacing:.3em;text-transform:uppercase;color:rgba(198,170,109,.7);margin-bottom:8px;display:flex;gap:14px}',
     '#ts-select .slotno .tag{color:#e9d19b}',
+    '#ts-select .slotno .tag.gone{color:#f6c9b0}',
+    '#ts-select .slot.gone{border-style:dashed}',
+    '#ts-select .slotno .tag.dead,#ts-select .slotno .tag.barred{color:#f0a89a}',
+    '#ts-select .slot.dead,#ts-select .slot.barred{border-style:dotted;opacity:.72}',
     '#ts-select .name{font-size:32px;color:#f6e9c8;line-height:1.1;padding-right:56px}',
     '#ts-select .name.faint{color:rgba(246,233,200,.62);font-style:italic}',
     '#ts-select .stats{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:18px;margin-top:14px}',
@@ -149,6 +149,21 @@
     '#ts-select .foot{padding:16px 44px 30px}',
     '#ts-select .status{font-size:15px;color:rgba(228,217,191,.7);min-height:1.5em;margin-bottom:12px;text-align:center}',
     '#ts-select .hint{font-size:13px;color:rgba(228,217,191,.45);margin-top:4px;text-align:center;letter-spacing:.06em}',
+    // The line at the menu while the world is full (#481): the place, big, in
+    // place of the slots, which cannot be played until it is their turn.
+    '#ts-select .line{display:none;text-align:center;padding:34px 44px 10px}',
+    '#ts-select .line .place{font-size:40px;color:#f6e9c8;line-height:1.15}',
+    '#ts-select .line .why{font-size:16px;line-height:1.55;color:rgba(228,217,191,.72);margin:14px auto 0;max-width:680px}',
+    '#ts-select.waiting .line{display:block}',
+    // Join now shows only when it is their turn (Patrick, 29 Sep: nothing to do while waiting,
+    // only at their turn, and a minute to do it).
+    '#ts-select .line .turnrow{display:none;justify-content:center;margin-top:20px}',
+    '#ts-select.turn .line .turnrow{display:flex}',
+    '#ts-select .line .turn{font-size:20px;padding:10px 30px}',
+    // Back from being idle (#1142): why they are here, and a way to the slots.
+    '#ts-select .line .away{font-size:16px;line-height:1.55;color:#c6aa6d;margin:0 auto 16px;max-width:680px}',
+    '#ts-select .line .otherrow{justify-content:center;margin-top:18px}',
+    '#ts-select.waiting .list,#ts-select.waiting .hint{display:none}',
     // Well below the hint and centred, so it is nowhere near the characters.
     '#ts-select .quitrow{display:flex;justify-content:center;margin-top:18px}',
     '#ts-select .quit{opacity:.72}',
@@ -191,11 +206,14 @@
     '#ts-select .intro .flash{position:absolute;left:29.881%;top:79.632%;width:3%;height:0;padding-bottom:3%;border-radius:50%;opacity:0;',
     'transform:translate(-50%,-50%) scale(0);pointer-events:none;',
     'background:radial-gradient(circle,#fff8e0 0%,rgba(243,211,143,.95) 22%,rgba(158,111,201,.55) 52%,transparent 72%)}',
-    '#ts-select .intro .open{position:absolute;left:50%;top:58%;width:44%;opacity:0;transform:translate(-50%,-50%) scale(.04,.12);pointer-events:none}',
+    // The open scroll, Djinn, 1 October: smaller than the painted
+    // THORNSWOOD title and sitting under it, with its lettering scaled to
+    // match so it still reads easily.
+    '#ts-select .intro .open{position:absolute;left:50%;top:62%;width:34%;opacity:0;transform:translate(-50%,-50%) scale(.04,.12);pointer-events:none}',
     '#ts-select .intro .open img{display:block;width:100%;height:auto}',
     '#ts-select .intro .words{position:absolute;left:17%;right:17%;top:20%;bottom:18%;display:flex;flex-direction:column;',
     'align-items:center;justify-content:center;text-align:center;opacity:0}',
-    '#ts-select .intro .said{font-style:italic;font-size:1.6vw;line-height:1.45;color:#2c1e10}',
+    '#ts-select .intro .said{font-style:italic;font-size:1.28vw;line-height:1.45;color:#2c1e10}',
     /*
       What is written on the open scroll, Djinn, 25 September: it has to read
       as ink on the parchment, not as a page's form. The tick box is a small
@@ -203,15 +221,15 @@
       Continue is lettered between two ink flourishes instead of sitting in a
       dark button. Still no hover, cursor or transition rules, as above.
     */
-    '#ts-select .intro .skip{margin-top:1.3vw;font-size:1.05vw;font-style:italic;color:#3a2714;display:flex;align-items:center;gap:.6vw;',
+    '#ts-select .intro .skip{margin-top:1.05vw;font-size:.88vw;font-style:italic;color:#3a2714;display:flex;align-items:center;gap:.6vw;',
     'text-shadow:0 1px 0 rgba(255,236,190,.35)}',
-    '#ts-select .intro .skip input{-webkit-appearance:none;appearance:none;flex:none;width:1.15vw;height:1.15vw;margin:0;position:relative;',
+    '#ts-select .intro .skip input{-webkit-appearance:none;appearance:none;flex:none;width:.95vw;height:.95vw;margin:0;position:relative;',
     'border:.13vw solid rgba(44,30,16,.78);border-radius:.12vw .22vw .1vw .25vw;background:rgba(255,238,196,.18);',
     'box-shadow:inset 0 0 .25vw rgba(90,60,25,.35),0 1px 0 rgba(255,236,190,.35)}',
     '#ts-select .intro .skip input:checked{background:rgba(255,238,196,.18) url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 20 20\'><path d=\'M3.5 10.5 C5.5 11.5 7 13.5 8.2 16 C10.5 10.5 13.5 6 17.5 2.5\' fill=\'none\' stroke=\'%232c1e10\' stroke-width=\'2.4\' stroke-linecap=\'round\' stroke-linejoin=\'round\'/></svg>") center/135% no-repeat}',
-    '#ts-select .intro .go{margin-top:1.3vw;padding:.35vw 0;border:0;background:none;display:flex;align-items:center;gap:.9vw;',
-    'font-size:1.2vw;letter-spacing:.32em;text-transform:uppercase;color:#2c1e10;text-shadow:0 1px 0 rgba(255,236,190,.4)}',
-    '#ts-select .intro .go::before,#ts-select .intro .go::after{content:"";width:3.2vw;height:.12vw;',
+    '#ts-select .intro .go{margin-top:1.05vw;padding:.3vw 0;border:0;background:none;display:flex;align-items:center;gap:.9vw;',
+    'font-size:1vw;letter-spacing:.32em;text-transform:uppercase;color:#2c1e10;text-shadow:0 1px 0 rgba(255,236,190,.4)}',
+    '#ts-select .intro .go::before,#ts-select .intro .go::after{content:"";width:2.6vw;height:.12vw;',
     'background:linear-gradient(90deg,transparent,rgba(44,30,16,.8))}',
     '#ts-select .intro .go::after{background:linear-gradient(270deg,transparent,rgba(44,30,16,.8))}',
     '#ts-select .intro.opening .flash{animation:tsFlash .7s ease-out forwards}',
@@ -222,7 +240,7 @@
     '@keyframes tsFade{to{opacity:0}}',
     '@keyframes tsShow{to{opacity:1}}',
     '@keyframes tsRise{0%{opacity:0;left:29.5%;top:81%;transform:translate(-50%,-50%) scale(.04,.12)}30%{opacity:1}',
-    '60%{transform:translate(-50%,-50%) scale(.3,1)}100%{opacity:1;left:50%;top:58%;transform:translate(-50%,-50%) scale(1,1)}}'
+    '60%{transform:translate(-50%,-50%) scale(.3,1)}100%{opacity:1;left:50%;top:62%;transform:translate(-50%,-50%) scale(1,1)}}'
   ].join('');
   var style = document.createElement('style');
   style.id = 'ts-select-css';
@@ -245,6 +263,9 @@
       '<div class="head"><div><div class="eyebrow">Thornswood</div><div class="title">Who are you today?</div></div>' +
       '<div class="count"></div></div>' +
       '<div class="list"></div>' +
+      '<div class="line"><div class="away" style="display:none"></div><div class="place"></div><div class="why"></div>' +
+        '<div class="turnrow"><button class="btn2 turn" type="button">Join now</button></div>' +
+        '<div class="otherrow" style="display:none"><button class="btn2 other" type="button">Choose another character</button></div></div>' +
       '<div class="foot"><div class="status"></div>' +
       '<div class="hint">Click a character to play. Click an empty slot for a new character. Delete forgets the one that is lit.</div>' +
       /*
@@ -269,38 +290,29 @@
   var elList = root.querySelector('.list');
 
   /*
-    The painting. Issue #609: when the loop is here, it is the only backdrop
-    from the first paint, already zoomed by tsPaintDrift, and the still is
-    not put behind it. A still under a late-starting loop was the lighter
-    then darker flash people saw before the animation arrived. The still is
-    kept only as the fallback when this browser cannot play the loop, so
-    what is behind the panel is the painting either way and never a black
-    box. Muted, because the music is its own element.
+    The painting. The still goes on as the background at once; the loop is
+    laid over it and plays if this browser decodes it, and is taken away
+    again if it cannot, so what is behind the panel is the painting either
+    way and never a black box. Muted, because the music is its own element.
+    Djinn, 1 October: the still stays under the loop on purpose. Skyrim and
+    the mods are still loading when the page comes up, so the still is what
+    shows until the loop can play. The loop plays at its own speed (not
+    sped up), the timing the animation was approved at.
   */
+  if (LIST.still) { try { elBg.style.backgroundImage = 'url("' + String(LIST.still) + '")'; } catch (e) { } }
   if (LIST.video) {
     try {
       var vid = document.createElement('video');
       vid.muted = true; vid.loop = true; vid.autoplay = true;
       vid.setAttribute('muted', ''); vid.setAttribute('playsinline', '');
       vid.preload = 'auto';
-      // A touch faster than the 24 s source loop so the motion reads smooth
-      // rather than sticky, without leaving the painting's own timing.
-      try { vid.playbackRate = 1.2; } catch (eRate) { }
-      vid.onerror = function () {
-        try { vid.remove(); } catch (e) { }
-        if (LIST.still) {
-          try { elBg.style.backgroundImage = 'url("' + String(LIST.still) + '")'; } catch (e2) { }
-        }
-        tell('painting: the loop would not play here, the still stays');
-      };
+      vid.onerror = function () { try { vid.remove(); } catch (e) { } tell('painting: the loop would not play here, the still stays'); };
       vid.onplaying = function () { tell('painting: the loop is playing'); };
       vid.src = String(LIST.video);
       elBg.appendChild(vid);
       var vp = vid.play();
       if (vp && typeof vp.catch === 'function') { vp.catch(function () { }); }
     } catch (e) { tell('painting: ' + e); }
-  } else if (LIST.still) {
-    try { elBg.style.backgroundImage = 'url("' + String(LIST.still) + '")'; } catch (e) { }
   }
   var elCount = root.querySelector('.count');
   var elStatus = root.querySelector('.status');
@@ -542,7 +554,11 @@
   function slots() {
     var held = {};
     var loose = [];
+    // Dead for good (#1010): in no slot, drawn last, never played, so the
+    // slot it held offers a new character.
+    var dead = [];
     chars.forEach(function (c) {
+      if (c.pk) { dead.push(c); return; }
       var n = Number(c.slot) || 0;
       if (n >= 1 && !held[n]) held[n] = c;
       else loose.push(c);
@@ -558,6 +574,7 @@
     beyond.sort(function (a, b) { return a - b; });
     beyond.forEach(function (m) { out.push({ n: m, id: Number(held[m].profileId) || 0, c: held[m] }); });
     loose.forEach(function (c) { out.push({ n: out.length + 1, id: Number(c.profileId) || 0, c: c }); });
+    dead.forEach(function (c) { out.push({ n: 0, id: Number(c.profileId) || 0, c: c }); });
     return out;
   }
 
@@ -597,18 +614,46 @@
     elList.textContent = '';
     var list = slots();
     if (at >= list.length) at = Math.max(0, list.length - 1);
-    var taken = list.filter(function (e) { return !!e.c; }).length;
+    var taken = list.filter(function (e) { return !!e.c && !e.c.pk; }).length;
     elCount.textContent = taken + ' of ' + SLOTS + ' slots';
     list.forEach(function (e, i) {
-      var card = el('div', 'slot' + (i === at ? ' at' : '') + (e.c ? '' : ' empty'));
-      var no = el('div', 'slotno', 'Slot ' + e.n);
-      if (e.c && e.id === last) no.appendChild(el('span', 'tag', 'last played'));
+      var card = el('div', 'slot' + (i === at ? ' at' : '') + (e.c ? '' : ' empty') + (e.c && e.c.gone ? ' gone' : '') +
+                    (e.c && e.c.pk ? ' dead' : '') + (e.c && e.c.banned ? ' barred' : ''));
+      var no = el('div', 'slotno', e.c && e.c.pk ? 'No slot' : 'Slot ' + e.n);
+      if (e.c && e.id === last && !e.c.pk) no.appendChild(el('span', 'tag', 'last played'));
+      if (e.c && e.c.pk) no.appendChild(el('span', 'tag dead', 'dead for good'));
+      else if (e.c && e.c.banned) no.appendChild(el('span', 'tag barred', 'banned'));
+      else if (e.c && e.c.gone) no.appendChild(el('span', 'tag gone', 'not on this server'));
       if (!e.c) no.appendChild(el('span', '', 'empty'));
       card.appendChild(no);
       if (e.c) {
         var c = e.c;
-        card.appendChild(el('div', 'name' + (c.name ? '' : ' faint'), c.name || 'Unnamed character'));
+        card.appendChild(el('div', 'name' + (c.name && !c.gone ? '' : ' faint'), c.name || 'Unnamed character'));
+        /*
+          THE SERVER SAID IT HAS NO CHARACTER UNDER THIS ID (#955). Its world
+          started over since this character was played, or it could not load
+          it. Picking the slot makes a new character on it, so the card says
+          that in place of the stats of a character that will not come back.
+          The bin stays, so the slot can be cleared.
+        */
+        /*
+          STAFF KILLED IT FOR GOOD, OR BANNED IT BY ITSELF (#1010). Neither
+          can be played; the join pass would refuse it and the server would
+          end the session. A dead one holds no slot, so an empty slot above
+          offers a new character. The bin stays, so it can be forgotten.
+        */
+        if (c.pk) {
+          card.appendChild(el('div', 'sub',
+            'This character has died for good and cannot be played again. Make a new character in an empty slot.'));
+        } else if (c.banned) {
+          card.appendChild(el('div', 'sub',
+            'Staff have banned this character for now. Play another character, or ask staff in the Discord.'));
+        } else if (c.gone) {
+          card.appendChild(el('div', 'sub',
+            'The server no longer has this character. Playing this slot makes a new character in the creation hall.'));
+        }
         var stats = el('div', 'stats');
+        if (c.gone || c.pk) stats.style.display = 'none';
         var s1 = el('div', 'stat'); s1.appendChild(el('div', 'k', 'Last location'));
         s1.appendChild(el('div', 'v' + (c.where ? '' : ' dim'), c.where || 'Not seen in the world yet'));
         var s2 = el('div', 'stat'); s2.appendChild(el('div', 'k', 'Hours played'));
@@ -690,27 +735,195 @@
     (SkyrimPlatform loads the page at start and its plugins fifteen seconds
     later), so a pick made in that gap would otherwise be lost. The client
     ignores the repeats once it has one.
+
+    BUT FIRST THE FRONT ASKS WHETHER THERE IS A SEAT (#481). Patrick, 29 Sep:
+    a full world lets people into the menu, where "they sit there until a
+    slot is free and it's their turn to join". So the pick goes to the front
+    as 'select:want <id>' until it answers: go() when a seat is free, and the
+    pick goes to the client as it always did; or line() when the world is
+    full, and this page shows the place in line the game server gives it
+    over the chat's relay, and goes by itself when the server says it is
+    their turn. The order is the server's: nothing here can move a place.
   */
   var acked = false;
   var picked = 0;
+  var cleared = false;   // the front or the server said go: the pick goes to the client
+  var waiting = false;   // waiting in line at the menu
+  var joinWords = '';
   function sendPick() {
     if (!picked || acked) return;
-    try { window.skyrimPlatform.sendMessage('thornswood', 'select', picked); } catch (err) { }
     if (introSay) tell(introSay);
+    if (!cleared) { tell('want ' + picked); return; }
+    try { window.skyrimPlatform.sendMessage('thornswood', 'select', picked); } catch (err) { }
+  }
+
+  /* 1st, 2nd, 3rd, 4th, 11th, 21st. */
+  function ordinal(n) {
+    var h = n % 100;
+    if (h >= 11 && h <= 13) return n + 'th';
+    var t = n % 10;
+    return n + (t === 1 ? 'st' : t === 2 ? 'nd' : t === 3 ? 'rd' : 'th');
+  }
+  var elPlace = root.querySelector('.line .place');
+  var elWhy = root.querySelector('.line .why');
+  var elTitle = root.querySelector('.title');
+  var KEEP_OPEN = 'You do not need to do anything while you wait: just keep the game open. ' +
+                  'When it is your turn, press Join now within a minute. Closing the game gives up your place.';
+  var elTurn = root.querySelector('.line .turn');
+  var turnUntil = 0, turnTimer = 0;
+  function turnOff() {
+    turnUntil = 0;
+    if (turnTimer) { clearInterval(turnTimer); turnTimer = 0; }
+    if (waiting) root.className = 'waiting';
+  }
+  /* Their turn: Join now, with the seconds the server holds the seat. */
+  function turn(secs) {
+    var until = Date.now() + Math.max(0, Number(secs) || 60) * 1000;
+    if (!turnUntil || until < turnUntil) turnUntil = until;   // the server's clock wins
+    root.className = 'waiting turn';
+    elPlace.textContent = 'It is your turn';
+    function tick() {
+      var left = Math.ceil((turnUntil - Date.now()) / 1000);
+      if (left <= 0) {
+        turnOff();
+        elPlace.textContent = 'Your turn passed';
+        elWhy.textContent = 'The seat went to the next in line, and you are back at the end of the line. ' + KEEP_OPEN;
+        tell('line: turn passed');
+        return;
+      }
+      elWhy.textContent = 'A seat is yours for ' + left + (left === 1 ? ' second' : ' seconds') +
+                          '. Press Join now, or it goes to the next in line.';
+    }
+    tick();
+    if (!turnTimer) turnTimer = setInterval(tick, 1000);
+  }
+  if (elTurn) elTurn.addEventListener('click', function () {
+    if (!turnUntil) return;
+    turnOff();
+    tell('line: joined on our turn');
+    go();
+  });
+  /* What the line says, from the front (finding, launcher) or the server (place, pass). */
+  function lineSays(what) {
+    what = what || {};
+    if (!waiting) {
+      waiting = true;
+      sent = true;
+      root.className = 'waiting';
+      if (elTitle) elTitle.textContent = away ? 'You were away' : 'The world is full';
+      elStatus.textContent = '';
+      tell('line shown');
+    }
+    if (Number(what.id) > 0 && !picked) picked = Number(what.id);
+    if (Number(what.place) > 0) {
+      if (turnUntil) turnOff();   // back in line: the turn is over
+      // Place against how many are waiting, both from the server, redrawn
+      // each time either moves (Patrick, 29 Sep: the place against the
+      // number in line, updated live).
+      var of = Math.max(Number(what.of) || 0, Number(what.place));
+      elPlace.textContent = 'You are ' + ordinal(Number(what.place)) + ' of ' + of + ' in line';
+      elWhy.textContent = (of === 1 ? 'Nobody is ahead of you. ' :
+                           (Number(what.place) - 1) + ' ahead of you, ' + (of - Number(what.place)) + ' behind. ') + KEEP_OPEN;
+    } else if (what.pass) {
+      elPlace.textContent = 'Waiting for your place in line';
+      elWhy.textContent = 'The launcher is still vouching for this character. Keep the launcher and the game open.';
+    } else if (what.phase === 'launcher') {
+      elPlace.textContent = 'Waiting for your place in line';
+      elWhy.textContent = 'Waiting for the launcher to get this character ready. Keep the launcher and the game open.';
+    } else if (!elPlace.textContent) {
+      elPlace.textContent = 'Finding your place in line';
+      elWhy.textContent = KEEP_OPEN;
+    }
+  }
+  /* The server's word, over the relay: a place, or that it is their turn. */
+  function onRelay(msg) {
+    if (!msg || msg.t !== 'line' || !waiting || cleared) return;
+    if (msg.go) { if (!turnUntil) tell('line: our turn'); turn(msg.secs); return; }
+    lineSays(msg);
+  }
+  /*
+    BACK FROM BEING AWAY (#1142). Patrick, 29 Sep: somebody who does not
+    answer "Are you still here?" is taken "to the main menu where they can
+    rechoose their character and they automatically rejoin the queue with the
+    same 1 minute to join rule". The front brings this page back with
+    LIST.away, the character they were, and the server has already put them
+    at the end of the line. So the page opens in that place, with the same
+    Join now on their turn, and Choose another character shows the slots:
+    the place is kept while they choose, and the one they pick takes it over
+    (the front hands it on).
+  */
+  var away = (LIST.away && Number(LIST.away.id) > 0) ? LIST.away : null;
+  var AWAY_WORDS = 'You were taken out of the world after 15 minutes with nothing from your keyboard, mouse or character. ' +
+                   'You have a place in line to come back in, as this character or any of your others.';
+  var elAway = root.querySelector('.line .away');
+  var elOtherRow = root.querySelector('.line .otherrow');
+  var elOther = root.querySelector('.line .other');
+  function chooseOther() {
+    if (!waiting || cleared) return;
+    turnOff();
+    waiting = false;
+    sent = false;
+    picked = 0;
+    root.className = '';
+    if (elTitle) elTitle.textContent = 'Who are you today?';
+    elStatus.textContent = 'Your place in line is kept while you choose. Click the character to wait with.';
+    draw();
+    tell('line: choosing another character');
+  }
+  if (elOther) elOther.addEventListener('click', chooseOther);
+
+  var hooked = false;
+  setInterval(function () {
+    if (hooked || !waiting) return;
+    if (window.thornswoodNet && window.thornswoodNet.on) {
+      hooked = true;
+      window.thornswoodNet.on(onRelay);
+    }
+  }, 500);
+  /* A seat: the pick goes to the client, and the world loads. */
+  function go() {
+    if (cleared || !picked) return;
+    cleared = true;
+    if (waiting) {
+      waiting = false;
+      root.className = '';
+      if (elTitle) elTitle.textContent = 'Who are you today?';
+      joinWords = 'A seat is free. ' + (joinWords || 'Joining. The world is loading.');
+    }
+    elStatus.textContent = joinWords || 'Joining. The world is loading.';
+    draw();
+    sendPick();
+    // Said again until the front hears it, as play() does; a page the front
+    // reloaded while it waited has no play() running.
+    var again = setInterval(function () {
+      if (acked) { clearInterval(again); return; }
+      sendPick();
+    }, 2000);
   }
   function play() {
     if (sent) return;
     var list = slots();
     var e = list[at];
     if (!e || !e.id) return;
+    // Never a character staff killed for good or banned by itself (#1010).
+    if (e.c && (e.c.pk || e.c.banned)) {
+      elStatus.textContent = e.c.pk
+        ? 'That character has died for good. Pick another, or make a new character in an empty slot.'
+        : 'Staff have banned that character for now. Pick another.';
+      return;
+    }
     sent = true;
     picked = e.id;
-    elStatus.textContent = e.c ? 'Joining as ' + (e.c.name || 'your character') + '. The world is loading.' : 'Off to the creation hall. The world is loading.';
+    joinWords = e.c && !e.c.gone ? 'Joining as ' + (e.c.name || 'your character') + '. The world is loading.' : 'Off to the creation hall. The world is loading.';
+    elStatus.textContent = 'Checking for a seat.';
     draw();
     sendPick();
     tell('picked');
+    // Until the front answers, and then until the client has the pick. Not
+    // while waiting in line: the front has the pick and the server the turn.
     var again = setInterval(function () {
       if (acked) { clearInterval(again); return; }
+      if (waiting && !cleared) return;
       sendPick();
     }, 2000);
   }
@@ -856,7 +1069,9 @@
   // the same ten seconds now, until a character is picked.
   var beats = 0;
   var beat = setInterval(function () {
-    if (sent || root.className === 'gone') { clearInterval(beat); return; }
+    // Until the pick is taken, not until it is made: a person waiting in line
+    // at the menu (#481) sits on this page for as long as the line takes.
+    if (acked || root.className === 'gone') { clearInterval(beat); return; }
     tell('alive ' + seen());
     if (LIST.intro !== false && beats % 5 === 0) {
       try { window.skyrimPlatform.sendMessage('thornswood', 'stay'); } catch (e) { }
@@ -873,10 +1088,21 @@
     // The front, once a second while this page is up: whether the game is the
     // window Windows is sending the keys to. See keysCount above.
     keys: function (on) { keysHere = !!on; keysSaidAt = Date.now(); },
-    close: function () { root.className = 'gone'; }
+    close: function () { root.className = 'gone'; },
+    // The front's answer to 'select:want' (#481): a seat, or wait in line.
+    go: go,
+    line: lineSays
   };
   fit();
   draw();
+  // Back from being away: straight into the place the server keeps (see chooseOther).
+  if (away) {
+    picked = Number(away.id);
+    if (elAway) { elAway.textContent = AWAY_WORDS; elAway.style.display = 'block'; }
+    if (elOtherRow) elOtherRow.style.display = 'flex';
+    lineSays({ id: picked });
+    tell('away: back at the choice in the place kept for profile ' + picked);
+  }
   // When the page itself started, so the front log shows how long it sat
   // drawn but hidden before the plugins ran and showed the browser.
   var startedAt = '';

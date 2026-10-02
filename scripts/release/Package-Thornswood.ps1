@@ -45,25 +45,25 @@ param(
     # payload was 14 GB, because Windows would not load an executable that big.
     # It is under a gigabyte now that the mods come from the collection.
     [switch]$OneFile,
-    # The public releases clone. Its version.json is how this build knows which
-    # packs it already has (applied.txt, further down). Left empty it is the
-    # Thornswood-Releases folder beside this repo, where Ship, Publish-Update
-    # and Check-ShipReady already look. It was a path into one home folder, so
-    # only one machine could build an installer that knew its own packs.
+    # The folder holding the live feed. Its version.json is how this build
+    # knows which packs it already has (applied.txt, further down). Left empty
+    # it is this machine's working copy of the live feed,
+    # %LOCALAPPDATA%\Thornswood\feed\main, which every Ship and feed edit
+    # receives from the VPS (Feed-Store.ps1, #907); until #907 it was the
+    # Thornswood-Releases clone beside this repo. It was once a path into one
+    # home folder, so only one machine could build an installer that knew its
+    # own packs.
     # Last in the list so no existing positional argument moves.
-    [string]$ReleaseDir = ''
+    [string]$ReleaseDir = '',
+    # The setup program to build the installer around, instead of the one
+    # the last Build-Launcher left in out\. A main Ship passes the one CI
+    # built for the tag it ships (issue #932); nothing else needs it.
+    [string]$Stub = ''
 )
 
 
-# The launcher was SkyrimTogether.exe and is Thornswood.exe now. It replaces
-# itself in place when it updates rather than being reinstalled, so an install
-# made before the rename still carries the old name and both have to be looked
-# for, newest first.
+# The launcher, Thornswood.exe in the launcher folder.
 function Get-LauncherExe([string]$dir) {
-    foreach ($n in 'Thornswood.exe', 'SkyrimTogether.exe') {
-        $p = Join-Path $dir $n
-        if (Test-Path -LiteralPath $p) { return $p }
-    }
     return (Join-Path $dir 'Thornswood.exe')
 }
 
@@ -148,18 +148,18 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # them all again. With neither file there it shipped no applied.txt at all:
 # every one of the 227 packs pending on first launch, and 164 of them point at
 # the private repository. So it stops and says where it looked.
-if (-not $ReleaseDir) { $ReleaseDir = Join-Path (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $Here))) 'Thornswood-Releases' }
+if (-not $ReleaseDir) { $ReleaseDir = Join-Path (Join-Path (Join-Path $env:LOCALAPPDATA 'Thornswood') 'feed') 'main' }
 $vLive = Join-Path $ReleaseDir 'version.json'
 if (-not (Test-Path -LiteralPath $vLive)) {
     Die ("No version.json in $ReleaseDir, so this installer cannot say which packs it already has, " +
          "and everybody who installs from it would be offered every pack ever published. " +
-         "Clone the feed there (git clone https://github.com/EvilPatrick06/Thornswood-Releases.git $ReleaseDir) " +
-         "or pass -ReleaseDir with the folder it is in.")
+         "Any Ship or feed edit on this machine receives the live feed there; or save " +
+         "https://thornswood.net/feed/version.json into a folder and pass -ReleaseDir with it.")
 }
 # ==== end thornswood release feed ====
 
 # ==== thornswood setup stub ====
-# The setup program is compiled by Build-Launcher.ps1 into tools\setup-stub.exe,
+# The setup program is compiled by Build-Launcher.ps1 into out\setup-stub.exe,
 # which git ignores, and this only copies it (Building the installer, below).
 # So it is as new as the last Build-Launcher on this machine, whatever
 # setup\Bootstrap.cs now says. On 25 September the installer went on the site
@@ -181,8 +181,16 @@ function Get-StubRefusal([string]$stub, [string]$src) {
             'with is left alone. From PowerShell 7 in the repo folder, the way Ship runs it: ' +
             '.\scripts\release\Build-Launcher.ps1 -Root "$env:TEMP\ts-build" -NoPause and then run this again.')
 }
-$stubNow = @((Join-Path $Here '..\..\tools\setup-stub.exe'), (Join-Path $OutDir 'setup-stub.exe')) |
-           Where-Object { Test-Path $_ } | Select-Object -First 1
+# Given one (-Stub, a main Ship's from CI, issue #932), that one and no other:
+# a file that is not there stops the build here rather than packing a
+# different stub found in out\.
+if ($Stub) {
+    if (-not (Test-Path -LiteralPath $Stub)) { Die ('The setup program given with -Stub is not there: ' + $Stub + '. Nothing was built.') }
+    $stubNow = (Resolve-Path -LiteralPath $Stub).Path
+} else {
+    $stubNow = @((Join-Path (& (Join-Path $Here 'Where.ps1') Out) 'setup-stub.exe'), (Join-Path $OutDir 'setup-stub.exe')) |
+               Where-Object { Test-Path $_ } | Select-Object -First 1
+}
 $stubWhy = Get-StubRefusal $stubNow (Join-Path $Here '..\..\installer\setup\Bootstrap.cs')
 if ($stubWhy) { Die $stubWhy }
 # ==== end thornswood setup stub ====
@@ -264,28 +272,52 @@ if ($optionalPrefixes.Count) {
 # there were another launcher's builds. So for somebody who is not Patrick
 # there are exactly two routes: this installer, and a pack.
 #
-# Ship-Rules.ps1 has read this record for packs all along, and Test-ShipOtherServer
-# calls a path in it ours when the file there is the recorded build, so a pack
-# carries all six. Nothing here did the same, and a brand new install arrived
-# with "skymp5-client.js is missing" and a Play button that would not press.
-# Same record, same rule, both ends.
+# Ship-Rules.ps1 has read the checkout record for packs all along, and
+# Test-ShipOtherServer calls a path in it ours when the file there is the
+# recorded build, so a pack carries all six. Nothing here did the same until
+# the listing below, and a brand new install arrived with "skymp5-client.js
+# is missing" and a Play button that would not press.
+#
+# WHICH RECORD (#1243). This used to pin those six files to
+# records\client-build.json in the checkout. Between main Ships that file
+# moves ahead of the launcher this installer packs. The installed launcher
+# carries its own client-build.json, embedded when it was built, and that is
+# the client it checks and, when they differ, the client it puts back
+# (ClientRuntime.Heal). Pinning the installer to the checkout then either
+# refuses the main play folder, whose client still matches that launcher, or
+# ships a client the launcher replaces on first launch.
+#
+# So there is one record: the one that launcher was built with. It is read
+# out of the exe being packed. When that exe has none, it is the main feed's
+# clientRuntime, the zip beside that feed when it is there, or the checkout
+# record only while its fork commit is still the one the feed names. The
+# checkout file on its own is not a record this installer is held to.
 #
 # This is a KEEP list, not a leave-out list: whatever the Vortex record or the
 # vanilla patterns in Ship-Rules.ps1 decide, the recorded build at a path in
 # the record ships. Anything else at one of those paths stops the build; see
-# the note over $clientWrong below.
-$clientRecordPath = Join-Path $PSScriptRoot '..\..\records\client-build.json'
-$shipClientFiles = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
-try {
-    if (Test-Path -LiteralPath $clientRecordPath) {
-        $rec = Get-Content -LiteralPath $clientRecordPath -Raw | ConvertFrom-Json
-        foreach ($p in $rec.files.PSObject.Properties.Name) { [void]$shipClientFiles.Add($p) }
-    }
-} catch { }
-if ($shipClientFiles.Count -gt 0) {
-    Say ("  {0} client runtime file(s) will ship whatever else leaves them out" -f $shipClientFiles.Count) 'Green'
+# the note over $clientWrong below. Apply-PackageClientRecord replaces the
+# hashes Ship-Rules just loaded from the checkout, so Test-ShipClientRecorded
+# answers the packed launcher's record and not the checkout's.
+. (Join-Path $Here 'Package-ClientRecord.ps1')
+$checkoutClientRecord = Join-Path $PSScriptRoot '..\..\records\client-build.json'
+$resolvedClient = Resolve-PackageClientRecord -LauncherExe (Get-LauncherExe $LaunchDir) -FeedVersion $vLive -CheckoutRecord $checkoutClientRecord
+if (-not $resolvedClient) {
+    Die ('The client runtime this installer carries is the one the launcher it packs was built with, ' +
+         'read from that launcher, or the main feed''s clientRuntime when the launcher has no record. ' +
+         'Neither could be read, and records\client-build.json in this checkout is not that client, so nothing was packaged.')
+}
+Apply-PackageClientRecord $resolvedClient.Record
+$clientRecordPath = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-package-client-' + [Guid]::NewGuid().ToString('N') + '.json')
+Save-PackageClientRecord $resolvedClient $clientRecordPath
+$clientFork = [string]$resolvedClient.Record.forkCommit
+if ($resolvedClient.Source -eq 'launcher') {
+    Say ("  {0} client runtime file(s) held to the record embedded in the launcher this installer packs ({1})" -f $shipClientFiles.Count, $clientFork) 'Green'
 } else {
-    Say '  records\client-build.json could not be read, so nothing protects the client runtime from the filters below' 'Yellow'
+    Say ("  {0} client runtime file(s) held to the main feed's clientRuntime ({1})" -f $shipClientFiles.Count, $clientFork) 'Green'
+}
+if ($resolvedClient.FeedFork -and $resolvedClient.FeedFork -ne $clientFork) {
+    Say ("  the main feed's clientRuntime is {0}; this installer follows the launcher it packs ({1})" -f $resolvedClient.FeedFork, $clientFork) 'Yellow'
 }
 
 # ---- what the collection provides: also left out --------------------------
@@ -366,6 +398,12 @@ $prefix = $GameDir.TrimEnd('\') + '\'
 
 $ship = @(); $skipBytes = 0; $shipBytes = 0; $optionalBytes = 0; $optionalCount = 0; $machineCount = 0
 $collectionBytes = 0; $collectionCount = 0
+$notOursBytes = 0; $notOursCount = 0
+# What waits for the collection (Ship-Rules, #1178) is asked at the revision
+# this machine's Vortex has installed. LoadOrder.ps1 is loaded only in here,
+# so its functions do not change anything else this script asks.
+$ShipCollectionRevision = & { . (Join-Path $Here '..\mods\LoadOrder.ps1'); Get-ShipCollectionRevision $Root }
+Say ("  collection revision {0}: loose files held for the collection until then still ship" -f $ShipCollectionRevision) 'DarkGray'
 $clientShipped = 0
 $clientWrong = @()
 foreach ($f in $all) {
@@ -389,6 +427,9 @@ foreach ($f in $all) {
     if (Test-ShipDevOnly $rel) { $skipBytes += $f.Length; continue }
     if (Test-Optional $rel) { $optionalBytes += $f.Length; $optionalCount++; continue }
     if (Test-FromCollection $rel) { $collectionBytes += $f.Length; $collectionCount++; continue }
+    # Other people's loose files (#1178), after the collection's so those are
+    # counted as the collection's.
+    if (Test-ShipNotOurs $rel) { $skipBytes += $f.Length; $notOursBytes += $f.Length; $notOursCount++; continue }
     if ($f.Extension -in '.pdb', '.log') { $skipBytes += $f.Length; continue }
     $ship += [pscustomobject]@{ Rel = $rel; Full = $f.FullName; Len = $f.Length; Time = $f.LastWriteTimeUtc }
     $shipBytes += $f.Length
@@ -415,12 +456,12 @@ if ($clientWrong.Count) {
     Say ("  STOP. {0} of the {1} client runtime files in {2} are not the recorded build:" -f `
         $clientWrong.Count, $shipClientFiles.Count, $GameDir) 'Red'
     foreach ($c in $clientWrong) { Say ("    " + $c) 'Red' }
-    if ([string]::Equals($GameDir.TrimEnd('\'), (Join-Path $Root 'Game').TrimEnd('\'), [StringComparison]::OrdinalIgnoreCase)) {
-        Say '  Run .\scripts\release\Sync-Client.ps1 to put the recorded build in place, then package again.' 'Red'
-    } else {
-        Say '  This is building out of the Steam copy, and the client there is not ours.' 'Red'
-        Say ('  Package from ' + (Join-Path $Root 'Game') + ' once .\scripts\release\Sync-Client.ps1 has put the recorded build in it.') 'Red'
-    }
+    Say '  The record is the one the launcher this installer packs was built with.' 'Red'
+    Say '  It is read from that launcher, or from the main feed''s clientRuntime,' 'Red'
+    Say '  not from records\client-build.json in the checkout.' 'Red'
+    Say '  Leave the main play folder''s client as it is. Package again from the' 'Red'
+    Say '  folder whose client matches that launcher, or pack a launcher built' 'Red'
+    Say '  with the client you mean to ship.' 'Red'
     Die 'the client runtime is not the recorded build, so this installer was not built'
 }
 
@@ -441,14 +482,15 @@ if ($shipClientFiles.Count -gt 0) {
         Say ("  STOP. {0} of the {1} client runtime files are not in this installer:" -f `
             ($shipClientFiles.Count - $clientShipped), $shipClientFiles.Count) 'Red'
         foreach ($c in $shipClientFiles) { if (-not $inShip.Contains($c)) { Say ("    " + $c) 'Red' } }
-        Say '  They are not in the game folder this is being built from. Run' 'Red'
-        Say '  scripts\release\Sync-Client.ps1 to put the recorded build in place, then package again.' 'Red'
+        Say '  They are not in the game folder this is being built from.' 'Red'
+        Say '  The record is the one in the launcher this installer packs, not the checkout.' 'Red'
         Say '  Shipping without them gives every new tester a Play button that will not press.' 'Red'
         Write-Host ''
         Die 'the client runtime is incomplete, so this installer was not built'
     }
 }
 if ($machineCount) { Say ("  {0:n0} of this machine's own files, other servers' files and sign in tokens left out" -f $machineCount) 'DarkGray' }
+if ($notOursCount) { Say ("  {0:n0} loose file(s) of other people's mods left out ({1:n1} MB), never ours to hand out" -f $notOursCount, ($notOursBytes / 1MB)) 'DarkGray' }
 if ($collectionCount) {
     Say ("  {0:n0} of the left out ({1:n1} GB) are files the collection provides." -f `
         $collectionCount, ($collectionBytes / 1GB)) 'Green'
@@ -588,7 +630,7 @@ if (Test-Path $lexe) {
 
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 foreach ($f in 'Setup-Thornswood.ps1', 'Install.bat', 'Setup.bat', 'READ ME FIRST.txt') {
-    # In installer\ beside tools\ since the reorganisation's phase 7 (issue #440).
+    # In installer\ since the reorganisation's phase 7 (issue #440).
     $s = Join-Path (Join-Path $here '..\..\installer') $f
     # All four are in the repository, so a missing one is a wrong path, and an
     # installer without it is broken for everybody (issue #440, phase 0).
@@ -613,7 +655,7 @@ foreach ($f in 'Setup-Thornswood.ps1', 'Install.bat', 'Setup.bat', 'READ ME FIRS
 #
 # Measured 24 September: git ls-remote against the public fork, with no
 # credentials, answers c8832519866e for thornswood/engine-changes, the commit
-# both records named that day. Both name d0006351 since 27 September, and this
+# both records named that day. Both name the pinned commit since #1200, and this
 # note reads them rather than repeating either. Which folder builds which file
 # was read off the fork's own build files at that commit, and each licence off
 # that folder's LICENSE.
@@ -748,6 +790,7 @@ $srcNote = Join-Path $stage 'SOURCE CODE.txt'
 try {
     $noteText = Get-SourceNotice $clientRecordPath (Join-Path $PSScriptRoot '..\..\records\server-build.json') $payloadDir
     [IO.File]::WriteAllText($srcNote, $noteText, (New-Object Text.UTF8Encoding($false)))
+    Remove-Item -LiteralPath $clientRecordPath -Force -ErrorAction SilentlyContinue
     Say '  SOURCE CODE.txt names the fork commit this build came from' 'Green'
 } catch {
     Die ("SOURCE CODE.txt could not be written: " + $_.Exception.Message + ". This installer carries SkyMP's GPL and AGPL files and has to say where their source is.")
@@ -1005,8 +1048,8 @@ $zip = Join-Path $OutDir 'Thornswood-Setup.zip'
 if (Test-Path $zip) { Remove-Item $zip -Force }
 Move-Item $blob $zip
 
-$stub = @((Join-Path $here '..\..\tools\setup-stub.exe'), (Join-Path $OutDir 'setup-stub.exe')) |
-        Where-Object { Test-Path $_ } | Select-Object -First 1
+# The one checked above, before anything was staged.
+$stub = $stubNow
 if (-not $stub) {
     Head 'Done, but incomplete'
     Say '  setup-stub.exe is missing, so THIS PACKAGE HAS NO INSTALLER.' 'Red'
@@ -1026,7 +1069,7 @@ Say "  stub: $stub" 'DarkGray'
 
 # A signed stub cannot take the OneFile payload. Build-Launcher leaves the stub
 # unsigned for that reason; strip here anyway so a hand-signed stub or an older
-# tools\setup-stub.exe does not break Package the way Main did on 27 September
+# out\setup-stub.exe does not break Package the way Main did on 27 September
 # (signtool 0x800700C1 after attach). Sign-Artifact below signs the final Setup.
 $preSig = Get-AuthenticodeSignature -LiteralPath $exe
 if ($preSig -and $preSig.Status -ne 'NotSigned' -and $preSig.SignerCertificate) {
@@ -1052,7 +1095,7 @@ if ($preSig -and $preSig.Status -ne 'NotSigned' -and $preSig.SignerCertificate) 
 }
 
 # ---- one file, payload attached -------------------------------------------
-# STSFX001, then the offset the payload starts at, then its length. Both are
+# TWSFX001, then the offset the payload starts at, then its length. Both are
 # 64 bit and little endian, which is what BinaryReader.ReadInt64 wants on the
 # other side. Written after the copy so a failure here leaves a plain stub
 # rather than a half attached one.
@@ -1065,7 +1108,7 @@ if ($OneFile) {
         try { $fsIn.CopyTo($fsOut, 4MB) } finally { $fsIn.Dispose() }
         $len = (Get-Item $zip).Length
         $bw = New-Object IO.BinaryWriter($fsOut)
-        $bw.Write([Text.Encoding]::ASCII.GetBytes('STSFX001'))
+        $bw.Write([Text.Encoding]::ASCII.GetBytes('TWSFX001'))
         $bw.Write([long]$off)
         $bw.Write([long]$len)
         $bw.Flush()
@@ -1077,10 +1120,10 @@ if ($OneFile) {
 #
 # After the payload is attached, not before. Bootstrap.cs:625-636 already
 # expects this: the certificate lands on the end after the trailer, which is
-# exactly why its loader scans backwards for STSFX001 rather than reading a
+# exactly why its loader scans backwards for TWSFX001 rather than reading a
 # fixed offset from the end.
 #
-# Does nothing without tools\signing.json, so a machine with no certificate
+# Does nothing without records\signing\signing.json, so a machine with no certificate
 # still produces a working, unsigned installer.
 $signer = Join-Path $here 'Sign-Artifact.ps1'
 if (Test-Path -LiteralPath $signer) {
@@ -1128,13 +1171,13 @@ $listing = & $7z l $zip 2>&1
 $ErrorActionPreference = $old
 # Four names, and they are the names this build actually uses.
 #
-# These were still looking for Install-SkyrimTogether.ps1 and
-# SkyrimTogether.exe, from before the rename. The first of those has not
+# These were still looking for the installer script and the launcher exe
+# under their names from before the rename. The first of those had not
 # existed for a long time, so the check failed on every run and reported a
 # missing installer script while the installer itself was fine.
 #
 # The launcher check was worse, because it passed. Somewhere in 22 GB of
-# game build there is a leftover SkyrimTogether.exe, and a bare substring
+# game build there was a leftover exe of the old name, and a bare substring
 # match found it and called it the launcher. A check that answers yes
 # whatever happens is not a check.
 #

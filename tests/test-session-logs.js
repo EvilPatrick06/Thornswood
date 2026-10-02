@@ -29,13 +29,13 @@
   This lifts the real functions out of server.js by text, so a rename fails
   loudly rather than testing a copy. Read only apart from its own temp folder.
 */
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
 
-const SRC = path.join(TOOLS_DIR, '..', 'site', 'server.js');
+const SRC = path.join(REPO_DIR, 'site', 'server.js');
 const src = fs.readFileSync(SRC, 'utf8');
 
 function grab(name) {
@@ -175,7 +175,7 @@ yes('a server log that is not on this box says so rather than throwing',
   real Roll-Log.ps1 the way the task line runs it, and asks again.
 */
 const { spawnSync } = require('child_process');
-const ROLLER = path.join(TOOLS_DIR, '..', 'scripts', 'vps', 'Roll-Log.ps1');
+const ROLLER = path.join(REPO_DIR, 'scripts', 'vps', 'Roll-Log.ps1');
 const WINPS = path.join(process.env.SystemRoot || 'C:\\Windows',
                         'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
 let rolledBy = 'Roll-Log.ps1';
@@ -296,7 +296,16 @@ function grabConst(name) {
 }
 const TROUBLE_BAD = eval(grabConst('TROUBLE_BAD'));
 const TROUBLE_WARN = eval(grabConst('TROUBLE_WARN'));
-eval([grab('lineAround'), grab('scanFor'), grab('readTrouble')].join('\n'));
+function grabLine(name) {
+  const m = src.match(new RegExp('^const ' + name + ' = [^\\n]*;$', 'm'));
+  if (!m) throw new Error('site/server.js has no one line const ' + name);
+  return m[0];
+}
+eval([grabLine('SESSION_START_MARK'), grab('thisSessionOf'), grab('serverRefusal'),
+      grab('lineAround'), grab('scanFor'), grab('readTrouble')].join('\n'));
+/* How Shell starts a session in launcher.log, which is where this session's
+   part of that log begins (#945). */
+const PLAY = '2026-09-22 09:59:00  Starting the game on launcher 1.1.101.34, pack 20260928-1512-dev, borderless.\n';
 
 yes('the red list and the yellow list are both real and separate',
     TROUBLE_BAD.length > 0 && TROUBLE_WARN.length > 0 &&
@@ -307,21 +316,139 @@ yes('a throw in a game log is red', crash && crash.level === 'bad');
 yes('and the line it sat on is kept',
     crash && crash.line.indexOf('Uncaught TypeError') >= 0);
 
-const upd = readTrouble({ 'launcher.log': 'fine\n2026-09-22 10:00:00  Update failed: the file was locked\n' });
+const upd = readTrouble({ 'launcher.log': 'fine\n' + PLAY + '2026-09-22 10:00:00  Update failed: the file was locked\n' });
 yes('an update that did not install is yellow, not red', upd && upd.level === 'warn');
 yes('it says what went wrong in plain words', upd && upd.why === 'an update did not install');
 
-const lo = readTrouble({ 'thornswood-front.log': 'LOAD ORDER ERROR\n' });
-yes('a load order refusal is yellow, not red', lo && lo.level === 'warn');
+/* The game's own check, as the client writes it to Skyrim Platform's log. */
+const lo = readTrouble({ 'skyrim-platform.log':
+  '[18:11:18:263] [Script] Server load order:\n' +
+  '[18:11:18:270] [Script] 21-th mod (numbered from 0) does not match.\n' +
+  '[18:11:18:271] [Script] Error: Load order check failed! Indices: [21]\n' });
+yes('the game finding its load order is not the server\'s is yellow, not red', lo && lo.level === 'warn');
+yes('and it says the game showed LOAD ORDER ERROR', lo && /the game showed LOAD ORDER ERROR/.test(lo.why));
 
 const both = readTrouble({
-  'launcher.log': 'Update failed: locked\n',
+  'launcher.log': PLAY + 'Update failed: locked\n',
   'thornswood-front.log': 'Unhandled exception in the plugin\n'
 });
 yes('a session that both crashed and had a load order complaint is RED',
     both && both.level === 'bad');
 
-yes('a clean session is neither', readTrouble({ 'launcher.log': 'started\nplayed\nclosed\n' }) === null);
+yes('a clean session is neither', readTrouble({ 'launcher.log': PLAY + 'played\nclosed\n' }) === null);
+
+// ---- only this session's part of launcher.log (#945) ------------------------
+/*
+  28 Sep: 42 of the 53 sessions from 25 Sep on were labelled "the game refused
+  them over the load order". Every one took the label from a Scan line in
+  launcher.log written half an hour to 65 hours BEFORE the session, which Fix
+  had put right; the Scan just before each Play said 0 issues, and the game's
+  own check passed in every session whose platform log still held it. These
+  are the three lines that did it, as they were written.
+*/
+const DJINN = '2026-09-24 12:31:43    blocks Play: Your load order is not the server\'s from position 52: you have Hothtrooper44_Armor_Ecksstra.esp there, the server has SkyHUD.esp. The game shows that as LOAD ORDER ERROR. Fix puts the server\'s order into this build\'s plugin list; nothing is downloaded.\n';
+const BLADE = '2026-09-24 22:23:00    blocks Play: ccBGSSSE001-Fish.esm is loaded by the game on its own, because Skyrim.ccc names it, and the server does not have it, so every plugin after it is out of place and the game shows LOAD ORDER ERROR. Fix moves it aside into Thornswood\'s Isolated folder and nothing is deleted.\n';
+const PATRICK = '2026-09-24 09:56:00    blocks Play: Thornswood-Content.esp is not the same file the server has (yours is 138.1 KB, the server\'s is 137.9 KB). The game shows that as LOAD ORDER ERROR and anything in it can mean something else here than on the server. Fix fetches the server\'s copy.\n';
+const FIXED = '2026-09-24 12:32:00  Fix put 3 things right. Restart the game for it to take effect.\n' +
+              '2026-09-24 12:32:01  Scan finished. 0 issues found.\n';
+const LATER = '2026-09-26 17:48:00  Starting the game on launcher 1.1.95.2, pack 20260926-1612, borderless.\n' +
+              '2026-09-26 17:53:00  Game closed after 5 minutes. Your Windows Skyrim folders are back to normal.\n';
+
+for (const [who, line] of [['Djinn\'s position 52', DJINN], ['Blade\'s Creation Club file', BLADE], ['Patrick\'s content plugin', PATRICK]]) {
+  yes(who + ': a Scan line from days before the session, put right by Fix, does not colour the session',
+      readTrouble({ 'launcher.log': line + FIXED + LATER }) === null);
+}
+yes('an update that failed days before the session does not colour it',
+    readTrouble({ 'launcher.log': '2026-09-19 03:23:00  Update failed: (404) Not Found\n' + LATER }) === null);
+yes('nor does a launcher exception from days before, which would have been red and said in Discord',
+    readTrouble({ 'launcher.log': '2026-09-20 10:00:00  Unhandled exception in Scan\n' + LATER }) === null);
+yes('only the LAST start is this session: a failure between two earlier games is not it',
+    readTrouble({ 'launcher.log': PLAY + 'Update failed: locked\n' + LATER }) === null);
+yes('a launcher.log with no start line has nothing to place in this session, so none of it is read',
+    readTrouble({ 'launcher.log': DJINN + 'Update failed: locked\n' }) === null);
+yes('the game logs are read whole: they start afresh every run',
+    readTrouble({ 'launcher.log': DJINN, 'thornswood-front.log': 'Uncaught TypeError: x\n' }).level === 'bad');
+
+const mid = readTrouble({ 'launcher.log': LATER + DJINN });
+yes('a launcher Scan during the session still says their load order did not match',
+    !!mid && mid.why === 'their load order did not match the server');
+yes('and never that the game showed LOAD ORDER ERROR, which only the game can say',
+    !!mid && !/the game showed/.test(mid.why));
+yes('the words LOAD ORDER ERROR are not a marker: they are in the launcher\'s own sentences',
+    !TROUBLE_WARN.some(w => w[0] === 'LOAD ORDER ERROR'));
+
+// ---- what the game server said (#945, #402, #873) ---------------------------
+const SRV = [
+  '[2026-09-28 20:00:01.000] [console] [info] [thornswood] load order of profile 7 matches the server\'s, 48 plugins',
+  '[2026-09-28 20:00:02.000] [console] [info] [thornswood] refusing profile 42: load order differs at 21, where the server has ElysiumEstateSSE.esp'
+];
+const refused = readTrouble({ 'launcher.log': LATER }, SRV, 42);
+yes('the server ending the session over the load order is said, from the server log',
+    !!refused && refused.file === 'server' && /the server ended the session: their load order/.test(refused.why));
+yes('and the line names the plugin', !!refused && refused.line.indexOf('ElysiumEstateSSE.esp') >= 0);
+yes('another profile\'s refusal is not this session\'s', readTrouble({ 'launcher.log': LATER }, SRV, 4) === null);
+yes('a profile that matched is clean', readTrouble({ 'launcher.log': LATER }, SRV, 7) === null);
+yes('profile 4 is not read as the start of 42',
+    serverRefusal(['[x] [thornswood] refusing profile 42: load order differs at 1'], 4) === null);
+const noReport = serverRefusal(['[x] [thornswood] refusing profile 42: no load order report in 300s online'], 42);
+yes('a refusal for never reporting says so, not that the order differed',
+    !!noReport && /never said which plugins/.test(noReport.why));
+const watched = serverRefusal(['[x] [thornswood] WOULD REFUSE profile 42: load order differs at 21, where the server has X.esp. Watching only, they stayed (thornswoodLoadOrderRefuse is not true).'], 42);
+yes('watching only says the server let them stay', !!watched && /let them stay/.test(watched.why));
+yes('the server failing to find the connection is not a refusal',
+    serverRefusal(['[x] [thornswood] could not refuse profile 42: gone'], 42) === null);
+yes('a crash still outranks the server',
+    readTrouble({ 'launcher.log': LATER, 'thornswood-front.log': 'Uncaught TypeError: x\n' }, SRV, 42).level === 'bad');
+yes('the server outranks the launcher\'s own Scan lines',
+    readTrouble({ 'launcher.log': LATER + DJINN }, SRV, 42).file === 'server');
+
+/* The words these read are other files' words. If one moves, this says so. */
+const GM = fs.readFileSync(path.join(REPO_DIR, 'game', 'gamemode.js'), 'utf8');
+yes('gamemode.js still logs a refusal as "refusing profile N: load order differs"',
+    GM.indexOf("'[thornswood] refusing profile ' + profileId + ': load order differs at '") >= 0);
+yes('and one for no report as "refusing profile N: no load order report"',
+    GM.indexOf("'[thornswood] refusing profile ' + pid + ': no load order report in '") >= 0);
+yes('and watching only as "WOULD REFUSE profile N:"',
+    GM.indexOf("'[thornswood] WOULD REFUSE profile ' + profileId + ': load order differs at '") >= 0);
+const SHELL = fs.readFileSync(path.join(REPO_DIR, 'launcher', 'app', 'Shell.cs'), 'utf8');
+yes('Shell.cs still starts a session in launcher.log with the line this cuts at',
+    SHELL.indexOf('Log("' + eval(grabLine('SESSION_START_MARK').replace(/^const SESSION_START_MARK = /, '')) + '" + Updater.Version') >= 0);
+const CLIENT = path.join(REPO_DIR, 'engine', 'skymp', 'skymp5-client', 'src', 'services', 'services', 'loadOrderVerificationService.ts');
+if (fs.existsSync(CLIENT)) {
+  const LOV = fs.readFileSync(CLIENT, 'utf8');
+  yes('the client still logs "Load order check failed" and "Missing some server mods"',
+      LOV.indexOf('Load order check failed!') >= 0 && LOV.indexOf('Missing some server mods') >= 0);
+} else {
+  console.log('SKIP  the engine is not checked out here, so the client\'s own words are not read');
+}
+
+// ---- the rows written before #945 are read again, once ---------------------
+const TROUBLE_RULES = Number(grabLine('TROUBLE_RULES').replace(/[^0-9]/g, ''));
+function putSessions(rows) { ROWS = rows; return true; }
+eval([grab('sessionKey'), grab('applyTrouble'), grab('rereadTrouble')].join('\n'));
+putSessionLogs('stale945stale945', '555', { 'launcher.log': DJINN + FIXED + LATER });
+putSessionLogs('crash945crash945', '555', { 'launcher.log': LATER, 'thornswood-front.log': 'Uncaught TypeError: x\n' });
+ROWS = [
+  { session: 'stale945stale945', who: '555', trouble: 'the game refused them over the load order',
+    troubleAt: 'warn', troubleFile: 'launcher.log', troubleLine: DJINN.trim() },
+  { session: 'crash945crash945', who: '555', trouble: 'a script threw and nothing caught it',
+    troubleAt: 'bad', troubleFile: 'thornswood-front.log', troubleLine: 'Uncaught TypeError: x' },
+  { session: 'nologs945nologs9', who: '555', trouble: 'the game refused them over the load order', troubleAt: 'warn' }
+];
+rereadTrouble();
+yes('a stored session labelled from a days old Scan line is clean once read again',
+    !ROWS[0].trouble && !ROWS[0].troubleAt && !ROWS[0].troubleLine);
+yes('a genuine crash stays red', ROWS[1].troubleAt === 'bad');
+yes('a session with no stored logs keeps what it had, there is nothing to read it against',
+    ROWS[2].trouble === 'the game refused them over the load order');
+yes('every row is marked read under these rules', ROWS.every(r => r.troubleRules === TROUBLE_RULES));
+ROWS[1].trouble = 'left alone';
+rereadTrouble();
+yes('and a row already read under these rules is not read again', ROWS[1].trouble === 'left alone');
+const withIssues = { issues: [{ text: 'x', blocking: true }] };
+applyTrouble(withIssues, null);
+yes('with no log line, the launcher\'s own blocking issues still colour the session',
+    withIssues.troubleAt === 'warn' && /would have stopped them connecting/.test(withIssues.trouble));
 yes('no logs at all is neither', readTrouble({}) === null);
 
 /* The thing that would make this useless: a marker so loose that ordinary
@@ -338,7 +465,7 @@ yes('the word error on its own does not colour a session',
   reading the launcher's list out of Discord.cs rather than keeping a copy of
   it here. The launcher's own half is test-log-upload.ps1.
 */
-const CS = fs.readFileSync(path.join(TOOLS_DIR, '..', 'launcher', 'app', 'Discord.cs'), 'utf8');
+const CS = fs.readFileSync(path.join(REPO_DIR, 'launcher', 'app', 'Discord.cs'), 'utf8');
 const sends = (function () {
   const at = CS.indexOf('public static void SessionLogs()');
   const end = at < 0 ? -1 : CS.indexOf('};', at);

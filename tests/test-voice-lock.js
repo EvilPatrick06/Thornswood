@@ -94,6 +94,23 @@ if (handler && letter && send && now) {
     yes('an o typed into the chat is a letter, not the lock', w.files.length === 0 && w.notes.length === 0);
   }
   {
+    // Issue 898: V held when the chat box takes the keyboard. The fork's
+    // DInputHook now hands the game V's key up (the game held V), so it
+    // reaches this handler while the box has the keyboard, and it has to
+    // close the microphone rather than be taken for typing.
+    const opt = {};
+    const w = rig(opt);
+    w.key(47, true);
+    yes('V held before the chat box opens is talking', w.talking());
+    opt.typing = true;
+    w.key(47, false);
+    yes('V let go while the chat box has the keyboard stops talking', !w.talking());
+    w.key(47, true);
+    yes('and a v typed into the box does not start it again', !w.talking());
+    w.key(47, false);
+    opt.typing = false;
+  }
+  {
     const w = rig({ lock: 59 });
     w.tap(59);
     yes('rebound to a key with no letter, the notice still reads', /Press the lock key again/.test(w.notes[0] || ''));

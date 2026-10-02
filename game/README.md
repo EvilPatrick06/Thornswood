@@ -29,7 +29,7 @@ scripts that build and ship it:
 
 ## On your machine
 
-`.\tools\Go.ps1 -SkipServer` copies the plugins, the overlays and the menu
+`.\scripts\release\Go.ps1 -SkipServer` copies the plugins, the overlays and the menu
 into the game folder, which is how a change here reaches your own game.
 Every harness in `tests\` that checks the gamemode reads `gamemode.js` from
 here.

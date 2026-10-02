@@ -1,4 +1,4 @@
-<#
+﻿<#
   Install-Runner.ps1
 
   Puts a GitHub Actions runner on the VPS, so the build check runs on every
@@ -25,8 +25,8 @@
     3. Denies that account every C:\Thornswood-* folder but its own, so a job
        cannot read the site's config, the bot's token or the backups, and
        cannot write into anything live.
-    4. Downloads the runner release GitHub calls latest, checked against the
-       SHA-256 GitHub publishes in that release's notes, and registers it as a
+    4. Downloads a pinned actions/runner win-x64 zip (version + SHA-256
+       hardcoded below, #1372), checked against that pin, and registers it as a
        service that runs as that account.
     5. Registers a task that keeps the runner at normal priority, never
        above it, so a build shares the five cores with the game server, the
@@ -46,7 +46,7 @@
 [CmdletBinding()]
 param(
   [string]$VpsHost    = '',
-  [string]$VpsUser    = 'Administrator',
+  [string]$VpsUser    = '',
   [string]$Repo       = 'EvilPatrick06/Thornswood',
   [string]$Root       = 'C:\Thornswood-Runner',
   [string]$Account    = 'thornswood-runner',
@@ -63,6 +63,9 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+. (Join-Path $Here '..\vps\Send-Script.ps1')
+. (Join-Path $Here '..\vps\Send-Secret.ps1')
+if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
@@ -71,7 +74,7 @@ function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if
 function Done() { Write-Host ''; if (-not $NoPause) { [void](Read-Host 'Enter to close') }; exit 0 }
 
 $target = "$VpsUser@$VpsHost"
-$ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new')
+$ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
 foreach ($t in 'ssh', 'scp', 'gh') {
   if (-not (Get-Command $t -ErrorAction SilentlyContinue)) {
     if ($t -ne 'gh') { Die "$t is not on PATH. Windows ships it: Settings, Apps, Optional features, OpenSSH Client." }
@@ -81,24 +84,12 @@ foreach ($t in 'ssh', 'scp', 'gh') {
 
 # Short scripts go on the command line; the install is longer than cmd.exe's
 # 8,191 characters once encoded, so it goes as a file and is deleted after,
-# the same way Setup-Domain.ps1 does it. The file carries the registration
-# token for the few seconds it exists; the account's password is never in it.
+# the same way Setup-Domain.ps1 does it. The registration token is never in
+# the file: it goes on ssh's standard input (Send-Secret.ps1, issue #451).
 function Remote($script) {
-  $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-  $cmd = "powershell -NoProfile -EncodedCommand $e"
-  if ($cmd.Length -le 6000) {
-    return & ssh @ssh $target $cmd 2>&1
-  }
-  $far = 'C:/Windows/Temp/thornswood-runner-install.ps1'
-  $tmp = [IO.Path]::GetTempFileName()
-  try {
-    Set-Content -LiteralPath $tmp -Value $script -Encoding UTF8
-    & scp @ssh $tmp "${target}:$far" 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "could not send a script to $VpsHost" }
-    & ssh @ssh $target "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1
-    & ssh @ssh $target "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
-  }
-  finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
+  # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
+  # name, removed after, and the far side's exit code comes back.
+  return Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script $script
 }
 # gh with its output kept apart from its errors, and a failure that says which
 # call it was. Named so it never shadows gh itself.
@@ -140,11 +131,16 @@ if ($Remove) {
   Head 'Removing the runner'
   $tok = $null
   try { $tok = (Invoke-Gh api -X POST "repos/$Repo/actions/runners/remove-token" --jq .token | Out-String).Trim() } catch { Say '  could not get a removal token; the box is cleaned and GitHub is left to forget it' 'Yellow' }
-  Remote @"
+  # The removal token goes on ssh's standard input and reaches config.cmd in
+  # its environment, never on a command line (Send-Secret.ps1, issue #451).
+  Invoke-ThornswoodSecretRemote -Target $target -SshArgs $ssh -Secret ([string]$tok) -Script @"
 `$ErrorActionPreference = 'Continue'
-if ((Test-Path '$Root\config.cmd') -and '$tok') {
+`$t = `$ThornswoodSecret; `$ThornswoodSecret = `$null
+if ((Test-Path '$Root\config.cmd') -and `$t) {
   Push-Location '$Root'
-  & .\config.cmd remove --token '$tok' 2>&1 | Select-Object -Last 3
+  `$env:ACTIONS_RUNNER_INPUT_TOKEN = `$t; `$t = `$null
+  & .\config.cmd remove 2>&1 | Select-Object -Last 3
+  Remove-Item Env:\ACTIONS_RUNNER_INPUT_TOKEN -EA SilentlyContinue
   Pop-Location
 }
 Stop-Service -Name '$service' -Force -EA SilentlyContinue
@@ -162,15 +158,16 @@ if (Test-Path '$Root') { 'the folder is still there, something holds a file in i
 
 # ----------------------------------------------------------------- install --
 Head 'The runner release'
-$rel = (Invoke-Gh api repos/actions/runner/releases/latest | Out-String) | ConvertFrom-Json
-$version = ([string]$rel.tag_name).TrimStart('v')
-if ($version -notmatch '^\d+\.\d+\.\d+$') { Die "GitHub's latest actions/runner release has a tag this does not understand: $($rel.tag_name)" }
-$m = [regex]::Match([string]$rel.body, '<!--\s*BEGIN SHA win-x64\s*-->\s*([0-9a-fA-F]{64})\s*<!--\s*END SHA win-x64\s*-->')
-if (-not $m.Success) { Die "The notes of actions/runner $version carry no SHA-256 for win-x64, so there is nothing to check the download against. Nothing was sent." }
-$sha = $m.Groups[1].Value.ToUpperInvariant()
+# Pin (#1372): do not follow releases/latest. Bump these two together after
+# checking https://github.com/actions/runner/releases and the win-x64 SHA in
+# that release's notes (<!-- BEGIN SHA win-x64 --> ... <!-- END SHA win-x64 -->).
+$version = '2.337.0'
+$sha = '1150692AFA94E71F872017E254EA55B6EECE1EECE3FE7E3A6D4C93D0A1B85CFC'
+if ($version -notmatch '^\d+\.\d+\.\d+$') { Die "Pinned actions/runner version is nonsense: $version" }
+if ($sha -notmatch '^[0-9A-F]{64}$') { Die "Pinned actions/runner SHA-256 is nonsense: $sha" }
 $zipName = "actions-runner-win-x64-$version.zip"
 $zipUrl = "https://github.com/actions/runner/releases/download/v$version/$zipName"
-Say "  actions/runner $version, SHA-256 $sha" 'Green'
+Say "  actions/runner $version (pinned), SHA-256 $sha" 'Green'
 
 Head 'What the build check needs, on the VPS'
 $need = Remote @"
@@ -199,8 +196,14 @@ if (-not $token) { Die "GitHub gave no registration token. gh has to be signed i
 Say '  got one, good for an hour, not shown' 'Green'
 
 Head 'Installing it on the VPS'
-$out = Remote @"
+# The token goes on ssh's standard input (Send-Secret.ps1, issue #451): on no
+# command line and in no file on either machine. Until then it was written
+# into this script, which is long enough to go up as a file, so it sat in
+# C:\Windows\Temp on the VPS while the install ran.
+$out = Invoke-ThornswoodSecretRemote -Target $target -SshArgs $ssh -Secret $token -Script @"
 `$ErrorActionPreference = 'Stop'
+`$regToken = `$ThornswoodSecret; `$ThornswoodSecret = `$null
+if (-not `$regToken) { throw 'NOTHING ARRIVED on standard input, so there is no registration token. Nothing was installed.' }
 `$root = '$Root'
 `$acct = '$Account'
 
@@ -251,7 +254,7 @@ if (-not (Test-Path `$root)) { New-Item -ItemType Directory -Path `$root -Force 
 
 # The runner itself, checked before it is unpacked.
 if (-not (Test-Path (Join-Path `$root 'bin\Runner.Listener.exe')) -or -not (Test-Path (Join-Path `$root 'version-$version.txt'))) {
-  [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+  [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
   `$zip = Join-Path `$env:TEMP '$zipName'
   Invoke-WebRequest -UseBasicParsing -Uri '$zipUrl' -OutFile `$zip
   `$got = (Get-FileHash -LiteralPath `$zip -Algorithm SHA256).Hash
@@ -276,11 +279,21 @@ try { Add-MpPreference -ExclusionPath `$root -EA Stop; 'Defender skips ' + `$roo
 # Its own folder is the one place it may write.
 & icacls.exe `$root /grant (`$acct + ':(OI)(CI)M') /T /C /Q 2>&1 | Out-Null
 
+# The token and the account's password reach config.cmd in its environment,
+# not its arguments, so neither is in the box's process list (issue #451).
+# The runner reads ACTIONS_RUNNER_INPUT_<argument> for any argument not given
+# and clears it once read (actions/runner, CommandSettings.cs).
 Push-Location `$root
-`$cfg = & .\config.cmd --unattended --url 'https://github.com/$Repo' --token '$token' --name '$RunnerName' --labels '$Label' --work '_work' --replace --runasservice --windowslogonaccount (".\" + `$acct) --windowslogonpassword `$pw 2>&1
-`$code = `$LASTEXITCODE
+`$env:ACTIONS_RUNNER_INPUT_TOKEN = `$regToken
+`$env:ACTIONS_RUNNER_INPUT_WINDOWSLOGONPASSWORD = `$pw
+try {
+  `$cfg = & .\config.cmd --unattended --url 'https://github.com/$Repo' --name '$RunnerName' --labels '$Label' --work '_work' --replace --runasservice --windowslogonaccount (".\" + `$acct) 2>&1
+  `$code = `$LASTEXITCODE
+} finally {
+  Remove-Item Env:\ACTIONS_RUNNER_INPUT_TOKEN, Env:\ACTIONS_RUNNER_INPUT_WINDOWSLOGONPASSWORD -EA SilentlyContinue
+}
 Pop-Location
-`$pw = `$null; `$sec = `$null
+`$pw = `$null; `$sec = `$null; `$regToken = `$null
 `$cfg | Where-Object { "`$_" -match 'Runner successfully|Settings Saved|Service .* started|error|Error|failed' } | ForEach-Object { '  config: ' + "`$_".Trim() }
 if (`$code -ne 0) { throw ('config.cmd stopped with ' + `$code) }
 

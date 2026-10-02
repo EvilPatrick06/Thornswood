@@ -96,6 +96,14 @@
 
     spells: { '<spell name>': true }     what the character actually holds
     spellPoints: <number>                what is left to spend
+
+    staff: { points: <number>, rank: '<Bladebinder rank>',
+             mine: [ '<spell desc>' ], spells: [ [ desc, name, rank ] ] }
+      An Enchanter's staff spells (#1128), sent to an Enchanter and nobody
+      else. Drawn like the spell book: a mark needs a staff spell point, the
+      rank, and a staff spell of the rank below already unlocked; Unlock
+      sends 'skills:pick staffspell <desc>' for each mark. A refusal comes
+      back as a note about 'staffspell'.
     tree: { '<sub-skill key>': <0..5> }  points in the tree, placed and spent
     points: <number>                     free tree points
     placed: { '<sub-skill key>': <0..5> } the part of tree that was placed at
@@ -239,6 +247,16 @@
       September: "don't be very specific because for like tailor there are
       hundreds of clothing items".
     */
+    /*
+      An Enchanter's staff spells (#1128). The list, the points and the rank
+      are all the server's, under mine.staff; this is the title and the one
+      sentence over the page.
+    */
+    staff: {
+      title: 'Staff spells',
+      lead: 'The spells you can bind into a staff, by rank. Unlocking one costs a staff spell point and needs no tome. Your Bladebinder rank decides how high you can go, and each rank above Novice needs a staff spell of the rank below first.',
+      rows: []   // the server sends the spells
+    },
     recipes: {
       title: 'Recipe book',
       /*
@@ -286,6 +304,7 @@
   var picked = {};         // section -> { row: key, subs: [keys] } chosen in the panel, not yet sent
   var later = {};          // section -> true when "Choose later" was clicked; this page's mark only
   var marked = {};         // spell name -> true, marked in the spell book; this page's mark only, nothing is sent
+  var markedStaff = {};    // staff spell desc -> true, marked on the staff page; the same, for an Enchanter
   var pending = [];        // picks sent and not yet answered, oldest first: [{ section, words, at }]
   var status = '';         // the line under the panel
   var statusKind = '';     // '' | 'ok' | 'no'
@@ -837,6 +856,99 @@
       });
     }
   }
+  /*
+    THE STAFF SPELL PAGE, an Enchanter's spell book (#1128). The same three
+    rules as the spell book above, over the Bladebinder rank the server sends
+    instead of a school's: a staff spell point, the rank, and a staff spell of
+    the rank below already unlocked or marked (Novice needs none). Everything
+    here is read off mine.staff; a shape this page does not know reads as no
+    page, and the section is not drawn.
+  */
+  function staffBook() {
+    var got = mine && mine.staff;
+    if (!got || typeof got !== 'object' || Array.isArray(got)) return null;
+    if (!Array.isArray(got.spells) || !Array.isArray(got.mine)) return null;
+    return got;
+  }
+  /* Every staff spell, flat, in the order the server sent them: [{ desc, name, rank }]. */
+  function staffRows() {
+    var book = staffBook();
+    var out = [];
+    if (!book) return out;
+    book.spells.forEach(function (r) {
+      if (Array.isArray(r) && r[0] && r[1] && RANK_NAMES[r[2]]) out.push({ desc: String(r[0]), name: String(r[1]), rank: String(r[2]) });
+    });
+    return out;
+  }
+  function staffMine() {
+    var out = {};
+    var book = staffBook();
+    if (book) book.mine.forEach(function (d) { out[String(d)] = true; });
+    return out;
+  }
+  /* Holds a staff spell of that rank, unlocked or marked. */
+  function holdsStaffRank(rankKey) {
+    var have = staffMine();
+    var list = staffRows();
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].rank === rankKey && (have[list[i].desc] || markedStaff[list[i].desc])) return true;
+    }
+    return false;
+  }
+  /* Empty when the rank is open, otherwise the short reason it is not. */
+  function staffLocked(rankKey) {
+    var want = rankIndex(rankKey);
+    if (want === 0) return '';
+    var book = staffBook();
+    if (want > rankIndex(book && book.rank)) return 'needs ' + (RANK_NAMES[rankKey] || cap(rankKey)) + ' Bladebinder';
+    var below = RANK_ORDER[want - 1];
+    if (!holdsStaffRank(below)) return 'needs a ' + (RANK_NAMES[below] || below).toLowerCase() + ' staff spell first';
+    return '';
+  }
+  /* The server's staff spell points, or null when it has said nothing. */
+  function staffPoints() {
+    var book = staffBook();
+    if (!book || book.points === undefined || book.points === null) return null;
+    return Number(book.points) || 0;
+  }
+  /* The marked staff spells, in the order the page draws them, which is the order they are sent in. */
+  function markedStaffDescs() {
+    var out = [];
+    staffRows().forEach(function (r) { if (markedStaff[r.desc] && out.indexOf(r.desc) < 0) out.push(r.desc); });
+    return out;
+  }
+  function staffLeft() {
+    var p = staffPoints();
+    if (p === null) return null;
+    return Math.max(0, p - markedStaffDescs().length);
+  }
+  function staffNameOf(desc) {
+    var list = staffRows();
+    for (var i = 0; i < list.length; i++) if (list[i].desc === desc) return list[i].name;
+    return desc;
+  }
+  /* Mark or unmark a staff spell; the same rules as toggleMark. True when something changed. */
+  function toggleStaff(desc, rankKey, name) {
+    if (staffMine()[desc]) { status = name + ' is unlocked already.'; statusKind = 'no'; return false; }
+    if (markedStaff[desc]) { markedStaff[desc] = false; tidyStaff(); return true; }
+    var why = staffLocked(rankKey);
+    if (why) { status = cap(name) + ' ' + why + '.'; statusKind = 'no'; return false; }
+    var left = staffLeft();
+    if (left !== null && left <= 0) { status = 'No staff spell points left. Unmark one to mark another.'; statusKind = 'no'; return false; }
+    markedStaff[desc] = true;
+    return true;
+  }
+  /* Drop any staff mark that is no longer open, until nothing more falls. */
+  function tidyStaff() {
+    var again = true;
+    while (again) {
+      again = false;
+      staffRows().forEach(function (r) {
+        if (markedStaff[r.desc] && staffLocked(r.rank)) { markedStaff[r.desc] = false; again = true; }
+      });
+    }
+  }
+
   function rows() { return DATA[section] ? DATA[section].rows : []; }
   function titleOf(sec) { return DATA[sec] ? DATA[sec].title : cap(sec); }
   function rowOf(sec, key) {
@@ -1000,6 +1112,7 @@
     if (section === 'home') return ((mine && mine.towns) || []).length;
     if (section === 'tree') return 15;
     if (section === 'spells') return bookRows().length;
+    if (section === 'staff') return staffRows().length;
     // Nothing in the recipe book is picked, marked or sent, so there is no
     // row for the arrow keys to walk. Left and right still move sections.
     if (section === 'recipes') return 0;
@@ -1036,7 +1149,7 @@
   function viewKey() {
     var v = null;
     if (mine) { v = {}; for (var k in mine) if (!NOT_DRAWN[k]) v[k] = mine[k]; }
-    return JSON.stringify([tableGen, sections, section, rowAt, picked, later, marked, v, progressShape()]);
+    return JSON.stringify([tableGen, sections, section, rowAt, picked, later, marked, markedStaff, v, progressShape()]);
   }
 
   function draw() {
@@ -1054,6 +1167,9 @@
       The server sends nothing while creating, so the section is the world's.
     */
     if (recipeBook()) sections.splice(isMage() ? 2 : 1, 0, 'recipes');
+    // An Enchanter's staff spells (#1128), right after the recipe book: the
+    // server sends the page to an Enchanter and nobody else.
+    if (staffBook()) sections.splice(sections.indexOf('recipes') + 1 || 1, 0, 'staff');
     /*
       Property, last, and only once there is something on it. Patrick,
       21 September: "once they claim a house or have a key to a house a property
@@ -1147,6 +1263,12 @@
       var m = markedCount();
       return { t: sp ? sp + ' to spend' : (m ? m + ' marked' : 'nothing yet'), c: sp ? 'need' : '' };
     }
+    if (sec === 'staff') {
+      var sl = staffLeft();
+      var sm = markedStaffDescs().length;
+      var su = staffBook() ? staffBook().mine.length : 0;
+      return { t: sl ? sl + ' to spend' : (sm ? sm + ' marked' : (su ? su + ' unlocked' : 'nothing yet')), c: sl ? 'need' : (su ? 'set' : '') };
+    }
     if (sec === 'property') {
       // Named pRows and pHeld rather than rows and mine on purpose: both of
       // those are the module's own, var is hoisted to the top of the function,
@@ -1210,6 +1332,7 @@
     else if (section === 'profession') drawProfession();
     else if (section === 'home') drawHome();
     else if (section === 'spells') drawSpells();
+    else if (section === 'staff') drawStaff();
     else if (section === 'recipes') drawRecipes();
     else if (section === 'property') drawProperty();
     else if (section === 'review') drawReview();
@@ -1299,6 +1422,59 @@
           };
           col.appendChild(row);
         });
+      });
+      cols.appendChild(col);
+    });
+    elBody.appendChild(cols);
+  }
+
+  /*
+    The staff spell page (#1128): one column per rank, the spells under it,
+    each with a mark that says unlocked, marked, or could take, the way the
+    spell book draws a school. Your Bladebinder rank, the server's, sits over
+    the page. A click marks; Unlock sends.
+  */
+  function drawStaff() {
+    var book = staffBook();
+    var list = staffRows();
+    if (!book || !list.length) {
+      elBody.appendChild(el('p', 'lead', 'The server has not sent the staff spells yet. Give it a moment.'));
+      return;
+    }
+    var pts = staffPoints();
+    var left = staffLeft();
+    var n = markedStaffDescs().length;
+    var have = staffMine();
+    var top = el('div', 'spellbar');
+    var bar = '';
+    if (left !== null) {
+      bar = left + ' of ' + pts + (pts === 1 ? ' staff spell point' : ' staff spell points') + ' left' + (n ? ', ' + n + ' marked' : '');
+    } else if (n) {
+      bar = n + ' marked';
+    }
+    top.appendChild(el('div', 'spellpts', bar));
+    top.appendChild(el('div', 'spellnote', 'You are ' + (RANK_NAMES[book.rank] || 'Novice') +
+      ' as a Bladebinder. Marked spells are unlocked when you press Unlock; then a staff enchanter can bind them.'));
+    elBody.appendChild(top);
+    var cols = el('div', 'cols spellcols');
+    var idx = 0;
+    RANK_ORDER.forEach(function (rk) {
+      var here = list.filter(function (r) { return r.rank === rk; });
+      if (!here.length) return;
+      var col = el('div', 'col');
+      col.appendChild(el('div', 'colhead', RANK_NAMES[rk]));
+      var why = staffLocked(rk);
+      here.forEach(function (r) {
+        var i = idx++;
+        var got = !!have[r.desc];
+        var shut = !got && !markedStaff[r.desc] && !!why;
+        var row = el('div', 'spell' + (i === rowAt ? ' at' : '') + (got ? ' mine' : '') +
+                     (markedStaff[r.desc] ? ' on' : '') + (shut ? ' shut' : ''));
+        row.appendChild(el('span', 'spellname', r.name));
+        row.appendChild(el('span', 'tag' + (got ? '' : (markedStaff[r.desc] ? ' gold' : ' dim')),
+                           got ? 'unlocked' : (markedStaff[r.desc] ? 'marked' : (shut ? why : 'could take'))));
+        row.onclick = function () { rowAt = i; toggleStaff(r.desc, r.rank, r.name); draw(); };
+        col.appendChild(row);
       });
       cols.appendChild(col);
     });
@@ -1690,7 +1866,7 @@
     var line = status || hint();
     // The spell book's own button says Learn, because what it sends is not a
     // choice about who you are: it is the spells you marked, one pick each.
-    var label = (!cr && section === 'spells') ? 'Learn' : 'Confirm';
+    var label = (!cr && section === 'spells') ? 'Learn' : ((!cr && section === 'staff') ? 'Unlock' : 'Confirm');
     // The recipe book sends nothing, the same way the tree's plus buttons are
     // the tree's own sending, so neither carries a Confirm.
     var showConfirm = cr ? section === 'review'
@@ -1733,6 +1909,13 @@
       var sp = spellPoints();
       if (sp !== null && sp <= 0) return 'No spell points to spend. More come with every rank.';
       return 'Mark the spells you want, then press Learn. One point each.';
+    }
+    if (section === 'staff') {
+      if (staffWaiting()) return 'Sent. The server is checking.';
+      if (markedStaffDescs().length) return 'Unlock sends the staff spells you marked, one staff spell point each.';
+      var stp = staffPoints();
+      if (stp !== null && stp <= 0) return 'No staff spell points to spend. More come with every Bladebinder rank.';
+      return 'Mark the staff spells you want, then press Unlock. One staff spell point each, no tome needed.';
     }
     if (section === 'review') {
       if (!(haveHome() || softHome())) return 'Pick a home first. Confirm sends everything you chose to the server.';
@@ -1799,9 +1982,41 @@
     return n > 0 && (p === null || n <= p);
   }
 
+  /*
+    The staff page's Unlock, the same as Learn: lit when something is marked
+    and the points cover it, dark from the moment it sends until the answers
+    are back or LEARN_WAIT_MS has passed.
+  */
+  var staffAt = 0;   // when Unlock last sent, 0 when it is not waiting on anything
+  function staffWaiting() {
+    if (!staffAt) return false;
+    if (Date.now() - staffAt >= LEARN_WAIT_MS) { staffAt = 0; return false; }
+    for (var i = 0; i < pending.length; i++) if (pending[i].section === 'staff') return true;
+    staffAt = 0;
+    return false;
+  }
+  function canUnlockStaff() {
+    if (staffWaiting()) return false;
+    var n = markedStaffDescs().length;
+    var p = staffPoints();
+    return n > 0 && (p === null || n <= p);
+  }
+  function unlockStaff() {
+    if (staffWaiting()) return;
+    var descs = markedStaffDescs();
+    if (!descs.length) return;
+    // The desc goes whole, spaces and all: the server reads the rest of the line.
+    descs.forEach(function (d) { send('staff', 'staffspell ' + d, d); });
+    staffAt = Date.now();
+    status = 'Sent. The server is checking.'; statusKind = '';
+    setTimeout(function () { if (!staffWaiting()) draw(); }, LEARN_WAIT_MS + 50);
+    draw();
+  }
+
   function canConfirm() {
     if (creating()) return section === 'review' && !!softHome();
     if (section === 'spells') return canLearn();
+    if (section === 'staff') return canUnlockStaff();
     var p = picked[section];
     if (!p || !p.row) return false;
     if (section === 'class') return !haveClass();
@@ -1853,6 +2068,7 @@
     if (!canConfirm()) return;
     if (creating()) { begin(); return; }
     if (section === 'spells') { learn(); return; }
+    if (section === 'staff') { unlockStaff(); return; }
     var p = picked[section];
     send(section, section === 'class' ? 'class ' + p.row : 'profession ' + p.row + ' ' + p.subs.join(','));
     status = 'Sent. The server is checking.'; statusKind = '';
@@ -2010,6 +2226,13 @@
         marked[p.spell] = false;
         cleared = true;
       }
+      else if (p.section === 'staff' && p.spell && staffUnlockedIn(after, p.spell) && !staffUnlockedIn(before, p.spell)) {
+        // The server unlocked it: the mark goes, and it reads as unlocked
+        // because the server says so.
+        status = staffNameOf(p.spell) + ' is unlocked for staves.'; statusKind = 'ok';
+        markedStaff[p.spell] = false;
+        cleared = true;
+      }
       else if (p.section === 'tree') { status = 'Spent.'; statusKind = 'ok'; }
       else done = false;
       if (done) picked[p.section] = null;
@@ -2018,7 +2241,12 @@
     pending = keep;
     // A granted spell can hold up a marked one above it; tidyMarks sees that
     // it does not, because a granted spell counts for the rank below.
-    if (cleared) tidyMarks();
+    if (cleared) { tidyMarks(); tidyStaff(); }
+  }
+  /* Is that staff spell desc unlocked in a view the server sent. */
+  function staffUnlockedIn(view, desc) {
+    var got = view && view.staff;
+    return !!(got && Array.isArray(got.mine) && got.mine.indexOf(desc) >= 0);
   }
 
   /*
@@ -2038,7 +2266,7 @@
     list on PENDING_MS. The card stays as it was picked either way, so it can
     be sent again or replaced.
   */
-  var ABOUT_SECTION = { 'class': 'class', 'profession': 'profession', 'spell': 'spells', 'town': 'home', 'spend': 'tree' };
+  var ABOUT_SECTION = { 'class': 'class', 'profession': 'profession', 'spell': 'spells', 'staffspell': 'staff', 'town': 'home', 'spend': 'tree' };
   function refused(text, about) {
     status = 'No: ' + text + '.'; statusKind = 'no';
     if (!pending.length) return;
@@ -2077,6 +2305,10 @@
         // the keyboard away from the second.
         var sr = bookRows()[rowAt];
         if (sr) { toggleMark(sr.school, sr.rank, sr.name); draw(); }
+      } else if (section === 'staff') {
+        // Enter marks the lit staff spell; Unlock is a press of its own.
+        var fr = staffRows()[rowAt];
+        if (fr) { toggleStaff(fr.desc, fr.rank, fr.name); draw(); }
       } else if (canConfirm()) { confirm(); }
       else {
         // Enter on a row picks it. While creating that is the choice, and

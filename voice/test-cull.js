@@ -188,10 +188,13 @@ function fakeRequire(name) {
   }
   return require(name);
 }
+// The gamemode wraps the feed's timer in guard() (a throw is logged and the
+// timer lives on); here guard hands the function straight back, so a throw
+// fails this harness instead of being swallowed.
 new Function('globalThis', 'mp', 'require', 'setInterval', 'clearInterval', 'console',
-             'voicePort', 'Buffer', feed)(
+             'voicePort', 'Buffer', 'guard', feed)(
   g, mp, fakeRequire, (fn, ms) => { timers.push({ fn: fn, ms: ms }); return timers.length; },
-  () => { }, { log: () => { } }, () => PORT, Buffer);
+  () => { }, { log: () => { } }, () => PORT, Buffer, (n, f) => f);
 const tick = timers.filter(t => t.ms === 200)[0];
 yes('the feed runs five times a second', !!tick);
 if (tick) { tick.fn(); }
@@ -210,6 +213,7 @@ yes('and somebody in no party carries none',
 // --------------------------------------------------------------- service
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-cull-'));
 fs.copyFileSync(SERVER, path.join(dir, 'voice-server.js'));
+fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
 const srv = spawn(process.execPath, ['voice-server.js'], {
   cwd: dir,
   env: Object.assign({}, process.env, {
@@ -274,7 +278,15 @@ function join(pid, name) {
       let m = null;
       try { m = JSON.parse(text); } catch (e) { return; }
       if (m.t === 'welcome') { me.welcome = true; clearTimeout(late); resolve(me); return; }
-      if (m.t === 'pos') { me.last = m; me.lastText = text; }
+      /* The whole view first, then only what moved (issue #482), kept the
+         way every client keeps it, so what is checked below is what a
+         client would hold. */
+      if (m.t === 'pos') { me.last = { at: m.at, who: m.who || {} }; me.lastText = text; }
+      if (m.t === 'moved' && me.last) {
+        for (const k of Object.keys(m.who || {})) { me.last.who[k] = m.who[k]; }
+        for (const id of (m.gone || [])) { delete me.last.who[id]; }
+        me.last.at = m.at;
+      }
     };
     ws.onerror = () => { clearTimeout(late); reject(new Error('socket for ' + pid + ' failed')); };
   });
@@ -300,13 +312,15 @@ function frameBytes(text) {
   const outsider = await join(9999, 'Nobody');
   console.log('      two hundred and one joined in ' + (Date.now() - started) + ' ms');
 
-  // The next tick after everybody is in, for everybody.
-  const mark = Date.now() + 50;
+  /* Everybody's whole view, and a tick after it, so any row that moved on
+     the way in has reached them. Nobody here moves, so after the whole view
+     the service sends nothing more, which is the point of issue #482. */
   for (let i = 0; i < 60; i++) {
     await wait(100);
-    if (joined.every(j => j.last && j.last.at > mark) && outsider.last && outsider.last.at > mark) { break; }
+    if (joined.every(j => j.last) && outsider.last) { break; }
   }
-  yes('every one of them was sent a tick', joined.every(j => j.last && j.last.at > mark));
+  await wait(400);
+  yes('every one of them was sent their view', joined.every(j => j.last) && !!outsider.last);
 
   let otherCell = 0, missingNear = 0, missingParty = 0, farKept = 0, noSelf = 0, leaked = 0;
   let rowsTotal = 0, rowsMost = 0, bytesAfter = 0;
@@ -317,7 +331,8 @@ function frameBytes(text) {
     const keys = Object.keys(who);
     rowsTotal += keys.length;
     rowsMost = Math.max(rowsMost, keys.length);
-    bytesAfter += frameBytes(j.lastText);
+    // What a whole view of it costs, the first tick after a join.
+    bytesAfter += frameBytes(JSON.stringify({ t: 'pos', at: j.last.at, who: who }));
     if (!who[j.pid]) { noSelf++; }
     for (const k of keys) {
       const them = byPid[k];

@@ -17,7 +17,7 @@
   Overhaul sends you to the Temple of Kynareth or the nearest Hall of the
   Dead instead, which is the closest thing Skyrim has to a soulslike bonfire.
 
-  Skyrim Together owns death by default and drops you a few feet from your
+  The old multiplayer server owned death by default and dropped you a few feet from your
   corpse, so this also turns the server's own death system off. There is no
   way to keep both: whichever one is on decides where you wake up.
 
@@ -205,7 +205,7 @@ Say "  $($plugLines.Count) lines in plugins.txt, $($loLines.Count) in loadorder.
 Write-Host ''
 Write-Host '  ONE THING LEFT, AND IT IS NOT OPTIONAL' -ForegroundColor Yellow
 Say '  In the BisectHosting panel, set  bEnableDeathSystem = false  and restart' 'Yellow'
-Say '  the server. Until you do, Skyrim Together keeps deciding where people' 'Yellow'
+Say '  the server. Until you do, the server keeps deciding where people' 'Yellow'
 Say '  wake up and this mod never gets a turn.' 'Yellow'
 Write-Host ''
 

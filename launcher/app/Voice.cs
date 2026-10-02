@@ -369,6 +369,21 @@ namespace Thornswood
             string profile = Path.Combine(Paths.ProfileDir, "VoiceBrowser");
             try { Directory.CreateDirectory(profile); } catch (Exception ex) { Swallow.Note("Voice.Begin, create profile", ex); }
 
+            // No mDNS responder in the voice browser, so nothing in it listens
+            // on the network and Windows Firewall has nothing to ask about,
+            // even on a WebView2 installed for one account, which comes with
+            // no rule (#911). The environment variable, not
+            // CoreWebView2EnvironmentOptions: see MenuMusic for why options
+            // made CreateAsync fault on the shipping machine. It is read when
+            // the environment is created, which is the next line.
+            try
+            {
+                string key = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS";
+                Environment.SetEnvironmentVariable(key,
+                    BrowserArgs.DisableFeature(Environment.GetEnvironmentVariable(key), BrowserArgs.NoMdns));
+            }
+            catch (Exception ex) { Swallow.Note("Voice.Begin, browser arguments", ex); }
+
             var envTask = Microsoft.Web.WebView2.Core.CoreWebView2Environment.CreateAsync(
                 null, profile, null);
 
@@ -414,8 +429,11 @@ namespace Thornswood
         /// reaches half the people it was built for.
         ///
         /// Microsoft's evergreen bootstrapper is a permanent link and a tiny
-        /// download that fetches the real thing itself. It may raise a UAC
-        /// prompt; nothing here can avoid that, and it happens once ever.
+        /// download that fetches the real thing itself. Its manifest asks for
+        /// asInvoker (read 28 Sep), and started from this launcher, which is
+        /// not elevated, it installs the runtime for this Windows account
+        /// only, with no administrator prompt. That copy comes without
+        /// Microsoft's mDNS firewall rule, which is why Begin turns mDNS off.
         ///
         /// Failure is not fatal anywhere. Voice stays off, the launcher is
         /// untouched, and it tries again next start.
@@ -688,21 +706,61 @@ namespace Thornswood
         /// </remarks>
         static void RenewToken()
         {
-            if (tokenGot == DateTime.MinValue) return;
-            if (tokenProfile <= 0 || tokenHost.Length == 0) return;
-            if ((DateTime.UtcNow - tokenGot).TotalMinutes < 30) return;
+            RenewToken(false);
+        }
 
-            string fresh = FetchToken(tokenHost, tokenPort, tokenProfile, null);
-            if (fresh.Length == 0)
+        /*
+          The token fields are read and written from three threads now: the
+          file channel's tick, the config sent when the page loads, and a
+          refusal passed up by the page. One at a time, and a caller that finds
+          another already fetching goes away rather than queueing a second
+          request behind it.
+        */
+        static readonly object tokenLock = new object();
+        static DateTime forcedAt = DateTime.MinValue;
+
+        /// <summary>
+        /// As above, or at once when the voice service has just refused the
+        /// page's token (force), at most every thirty seconds.
+        /// </summary>
+        /// <remarks>
+        /// Issue #409. On 21 September the machine woke at 20:06 with a token
+        /// from 19:02, an hour old and expired. The tick tried to renew it at
+        /// once, while the Wi-Fi was still coming back, failed, and dated
+        /// itself five minutes on, so for five minutes the page offered the
+        /// dead token every two seconds and was refused 134 times. A refusal
+        /// is now what asks for the new token, and the page waits for it.
+        /// </remarks>
+        static void RenewToken(bool force)
+        {
+            if (!Monitor.TryEnter(tokenLock)) return;
+            try
             {
-                // Try again on the next pass rather than every 100ms.
-                tokenGot = DateTime.UtcNow.AddMinutes(-25);
-                return;
+                if (tokenProfile <= 0 || tokenHost.Length == 0) return;
+                if (force)
+                {
+                    if ((DateTime.UtcNow - forcedAt).TotalSeconds < 30) return;
+                    forcedAt = DateTime.UtcNow;
+                }
+                else
+                {
+                    if (tokenGot == DateTime.MinValue) return;
+                    if ((DateTime.UtcNow - tokenGot).TotalMinutes < 30) return;
+                }
+
+                string fresh = FetchToken(tokenHost, tokenPort, tokenProfile, null);
+                if (fresh.Length == 0)
+                {
+                    // Try again on the next pass rather than every 100ms.
+                    tokenGot = DateTime.UtcNow.AddMinutes(-25);
+                    return;
+                }
+                tokenGot = DateTime.UtcNow;
+                try { WriteChannel("voice-token.txt", fresh); } catch (Exception ex) { Swallow.Note("Voice.RenewToken, write channel", ex); }
+                Post("{\"t\":\"token\",\"token\":\"" + JsonEscape(fresh) + "\"}");
+                Say("Voice: join token renewed");
             }
-            tokenGot = DateTime.UtcNow;
-            try { WriteChannel("voice-token.txt", fresh); } catch (Exception ex) { Swallow.Note("Voice.RenewToken, write channel", ex); }
-            Post("{\"t\":\"token\",\"token\":\"" + JsonEscape(fresh) + "\"}");
-            Say("Voice: join token renewed");
+            finally { Monitor.Exit(tokenLock); }
         }
 
         // The last config the page was given, as host, port and profile.
@@ -749,9 +807,32 @@ namespace Thornswood
             }
             lastConfig = want;
 
+            /*
+              The rest waits on a network, so it never runs on the window's
+              thread. The page's NavigationCompleted calls this on that thread,
+              and the token fetch below is a web request with five second
+              timeouts and a name lookup that can take fifteen seconds
+              whatever the timeout says, so a slow network at startup could
+              hold the launcher window that long (issue #409). Numbered, so
+              that when two configs are in flight only the newest reaches the
+              page.
+            */
+            int seq = Interlocked.Increment(ref configSeq);
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                try { SendConfig(seq, host, port, profile); }
+                catch (Exception ex) { Swallow.Note("Voice.Configure, send", ex); }
+            });
+        }
+
+        static int configSeq;
+
+        static void SendConfig(int seq, string host, string port, long profile)
+        {
             // Fetched here rather than in the page, because the ticket lives in
             // this process and has no business being handed to a browser.
             string token = FetchToken(host, port, profile, Say);
+            if (seq != Thread.VolatileRead(ref configSeq)) return;
 
             // What the renewal fetches for, whether or not this fetch worked.
             // These used to move only on success, so a config for a new id
@@ -759,10 +840,13 @@ namespace Thornswood
             // previous id, and voice-token.txt with them. A failed fetch is
             // dated so the renewal tries again in five minutes rather than
             // thirty.
-            tokenHost = host;
-            tokenPort = port;
-            tokenProfile = profile;
-            tokenGot = token.Length > 0 ? DateTime.UtcNow : DateTime.UtcNow.AddMinutes(-25);
+            lock (tokenLock)
+            {
+                tokenHost = host;
+                tokenPort = port;
+                tokenProfile = profile;
+                tokenGot = token.Length > 0 ? DateTime.UtcNow : DateTime.UtcNow.AddMinutes(-25);
+            }
 
             // The game's overlay joins the same room on its own socket and holds
             // no ticket, so it reads the token out of the folder the two already
@@ -828,6 +912,19 @@ namespace Thornswood
             if (kind == "talking") { talking = text == "1"; PublishStatus(); return; }
 
             if (kind == "debug") { Quiet("Voice: " + text); return; }
+
+            // The service refused the page's token. A fresh one, now and off
+            // this thread, which the page waits for before trying again. The
+            // page says what happened on the status line; this is the file.
+            if (kind == "denied")
+            {
+                Quiet("Voice: the voice server refused the join token (" + text + "), fetching a fresh one");
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    try { RenewToken(true); } catch (Exception ex) { Swallow.Note("Voice.OnPageMessage, renew", ex); }
+                });
+                return;
+            }
 
             if (kind == "peers")
             {
@@ -945,11 +1042,39 @@ namespace Thornswood
         }
 
         /// <summary>
+        /// The slow tick's half of PublishStatus: puts the line back in any
+        /// folder whose copy is missing or says something else, and writes
+        /// nothing when both already say it. It used to write both copies
+        /// every two seconds whatever they said (#963, #977); a read of an
+        /// eleven byte file is all an unchanged one costs now.
+        /// </summary>
+        static void RepublishIfLost()
+        {
+            string line = lastStatusLine;
+            if (string.IsNullOrEmpty(line)) { PublishStatus(); return; }
+            foreach (string d in ChannelDirs())
+            {
+                string f = Path.Combine(d, "voice-status.txt");
+                string there = null;
+                try { if (File.Exists(f)) there = File.ReadAllText(f).Trim(); }
+                catch (Exception ex) { Swallow.Note("Voice.RepublishIfLost, read", ex); there = null; }
+                if (there == line) continue;
+                try { File.WriteAllText(f, line); } catch (Exception ex) { Swallow.Note("Voice.RepublishIfLost, write", ex); }
+            }
+        }
+
+        /// <summary>
         /// The last mute line handed to the voice page, or null when the page
         /// has not been given one. Written from the UI thread when the page
         /// loads and from the file channel's thread, hence volatile.
         /// </summary>
         static volatile string mutedSeen;
+
+        /// <summary>
+        /// Set when a read of a file the game writes met it mid-write, so the
+        /// file channel looks again in 100 ms instead of waiting for a change.
+        /// </summary>
+        static volatile bool readAgain;
 
         /// <summary>
         /// Who this person has muted, from the game to the page that plays
@@ -972,7 +1097,7 @@ namespace Thornswood
                 string f = Path.Combine(d, "voice-muted.txt");
                 if (!File.Exists(f)) continue;
                 try { now = File.ReadAllText(f).Trim(); }
-                catch { now = null; }   // mid-write, try again in 100ms
+                catch { now = null; readAgain = true; }   // mid-write, try again in 100ms
                 if (now != null) break;
             }
             if (now == null || now == mutedSeen) return;
@@ -1001,29 +1126,39 @@ namespace Thornswood
 
                 lastStatusLine = "";
                 PublishStatus();
-                Say("Voice: talking to the game through " + string.Join(" and ", dirs));
+
+                // Woken by the game writing push to talk or the mute list,
+                // not by a 100 ms poll (#977). See ChannelWait.
+                ChannelWait wake = new ChannelWait(dirs, "voice-ptt.txt", "voice-muted.txt");
+                Say("Voice: talking to the game through " + string.Join(" and ", dirs) +
+                    (wake.Watching ? ", woken when the game writes" : ", read every " + ChannelWait.Poll + " ms"));
 
                 while (true)
                 {
                     try
                     {
-                        // 100ms is the whole latency budget this adds to push
-                        // to talk, and it is under the time it takes to get a
-                        // word out after pressing the key.
-                        Thread.Sleep(100);
+                        // Push to talk is read the moment Windows says the
+                        // file changed. The two second timeout is the slow
+                        // tick below; with no watcher this is the old 100 ms
+                        // sleep. A read that met the game mid-write is tried
+                        // again in 100 ms, as before, rather than waiting on
+                        // a change Windows has already reported.
+                        bool again = readAgain;
+                        readAgain = false;
+                        wake.Wait(again ? ChannelWait.Poll : 2000);
 
                         // Republished on a slow tick as well as on change,
                         // because the game may have started after the last
                         // change and a file it never sees is no better than no
-                        // file. Two seconds, not every pass: clearing the
-                        // change check each time round a 100ms loop rewrote
-                        // both copies of voice-status.txt ten times a second
-                        // for the whole life of the launcher, game or no game.
+                        // file. Two seconds, and only a copy that is missing
+                        // or says something else is written: this used to
+                        // rewrite both copies every two seconds, and before
+                        // that ten times a second, game or no game.
                         if ((DateTime.UtcNow - republished).TotalMilliseconds >= 2000)
                         {
                             republished = DateTime.UtcNow;
-                            lastStatusLine = "";
-                            // On the same slow tick, not the 100ms one.
+                            RepublishIfLost();
+                            // On the same slow tick, not on every wake.
                             RenewToken();
                         }
                         PublishStatus();
@@ -1040,7 +1175,7 @@ namespace Thornswood
                             string f = Path.Combine(d, "voice-ptt.txt");
                             if (!File.Exists(f)) continue;
                             try { now = File.ReadAllText(f).Trim(); }
-                            catch { now = null; }   // mid-write, try again in 100ms
+                            catch { now = null; readAgain = true; }   // mid-write, try again in 100ms
                             if (now != null) break;
                         }
                         if (now == null || now.Length == 0 || now == seen) continue;

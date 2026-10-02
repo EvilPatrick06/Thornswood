@@ -26,15 +26,15 @@
   never writes outside its own temp folder.
 #>
 [CmdletBinding()]
-param([string]$ToolsPath)
+param([string]$RepoPath)
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $ToolsPath) { $ToolsPath = $Here }
-$RepoRoot = Split-Path -Parent $ToolsPath
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $RepoPath) { $RepoPath = $Here }
+$RepoRoot = $RepoPath
 
 $script:pass = 0
 $script:fail = 0
@@ -108,7 +108,7 @@ function Start-Process {
 try {
 
 # ============================================================== caddy ======
-$sdPath = Join-Path $ToolsPath '..\scripts\deploy\Setup-Domain.ps1'
+$sdPath = Join-Path $RepoPath 'scripts\deploy\Setup-Domain.ps1'
 $sd = ParseOf $sdPath
 $sdText = Get-Content -LiteralPath $sdPath -Raw
 Yes 'Setup-Domain.ps1 parses' ($sd.Errors.Count -eq 0)
@@ -197,7 +197,7 @@ if ($caddyBlocks.Count -eq 1) {
 }
 
 # =============================================================== node ======
-$bvPath = Join-Path $ToolsPath '..\scripts\vps\Bootstrap-VPS.ps1'
+$bvPath = Join-Path $RepoPath 'scripts\vps\Bootstrap-VPS.ps1'
 $bv = ParseOf $bvPath
 $bvText = Get-Content -LiteralPath $bvPath -Raw
 Yes 'Bootstrap-VPS.ps1 parses' ($bv.Errors.Count -eq 0)
@@ -255,7 +255,7 @@ if ($fn.Count -eq 1) {
 }
 
 # ================================================================ bot ======
-$reqPath = Join-Path $ToolsPath '..\bot\requirements.txt'
+$reqPath = Join-Path $RepoPath 'bot\requirements.txt'
 Yes 'bot\requirements.txt exists' (Test-Path -LiteralPath $reqPath)
 $req = @()
 if (Test-Path -LiteralPath $reqPath) { $req = @(Get-Content -LiteralPath $reqPath | Where-Object { $_.Trim() }) }
@@ -267,7 +267,7 @@ foreach ($lib in 'discord.py', 'pillow', 'certifi') {
     Yes "  $lib is pinned" (@($req | Where-Object { $_ -like "$lib==*" }).Count -eq 1)
 }
 
-$ibPath = Join-Path $ToolsPath '..\scripts\deploy\Install-Bot.ps1'
+$ibPath = Join-Path $RepoPath 'scripts\deploy\Install-Bot.ps1'
 $ib = ParseOf $ibPath
 $ibText = Get-Content -LiteralPath $ibPath -Raw
 Yes 'Install-Bot.ps1 parses' ($ib.Errors.Count -eq 0)
@@ -276,11 +276,14 @@ Yes 'requirements.txt goes up to the VPS with the code' ($ibText -match "foreach
 $pipBlocks = @(HereStrings $ib.Ast | Where-Object { $_.Extent.Text -match 'pip install' })
 Yes 'there is exactly one remote block that runs pip install' ($pipBlocks.Count -eq 1)
 if ($pipBlocks.Count -eq 1) {
-    $sent = Expand $pipBlocks[0].Extent.Text @{ rootWin = 'C:\Thornswood-Bot' }
+    # Since #1093 every file goes up into a stage folder first (stage, check,
+    # swap), so pip installs from the requirements.txt staged beside the
+    # staged bot.py, which is what the swap then puts in place.
+    $sent = Expand $pipBlocks[0].Extent.Text @{ rootWin = 'C:\Thornswood-Bot'; stageName = '.stage-20260929-000000' }
     $errs = ParseErrors $sent
     Yes ('the pip block parses as it would be sent to the VPS' +
          $(if ($errs.Count) { ': ' + $errs[0].Message } else { '' })) ($errs.Count -eq 0)
-    Yes '  and installs from requirements.txt beside bot.py' ($sent -match "pip install [^\r\n]*-r 'C:\\Thornswood-Bot\\requirements\.txt'")
+    Yes '  and installs from the requirements.txt staged beside bot.py' ($sent -match "pip install [^\r\n]*-r 'C:\\Thornswood-Bot\\\.stage-20260929-000000\\requirements\.txt'")
     Yes '  and no longer installs any of the three by name' ($sent -notmatch 'pip install[^\r\n]*\b(discord\.py|pillow|certifi)\b')
 }
 

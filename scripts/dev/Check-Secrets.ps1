@@ -9,7 +9,9 @@
   read.
 
       .\scripts\dev\Check-Secrets.ps1                            every file git tracks here
-      .\scripts\dev\Check-Secrets.ps1 -Zip <pack or installer>   the entries of a zip
+      .\scripts\dev\Check-Secrets.ps1 -Zip <pack, installer zip, or Setup program>
+                                             the entries of a zip. A Setup program is a
+                                             program with a zip appended; that zip is read too.
       .\scripts\dev\Check-Secrets.ps1 -Dir <installer stage>     a staged folder
       .\scripts\dev\Check-Secrets.ps1 -Binary <Thornswood.exe>   a built program, byte by byte
 
@@ -301,8 +303,22 @@ function Test-ShipPath([string]$where, [string]$key, [string]$inner, $source) {
         if (-not (Test-ClientBytes $rel $source)) { Write-Hit $where $key '0' 'client-not-recorded-build' $false }
         return
     }
-    if (Test-ShipMachine $rel) { Write-Hit $where $key '0' 'never-ship-machine' $false; return }
-    if ($rel -like '*.log') { Write-Hit $where $key '0' 'never-ship-log' $false }
+    # Bethesda's game, its Creation Kit or a copy of one of its programs, and
+    # backups (#1152): named apart from the machine's own files, because they
+    # are never ours to give. The same question the record guard and the
+    # rollback filter ask (Test-ShipBethesda, #1229).
+    if (Test-ShipBethesda $rel) { Write-Hit $where $key '0' 'never-ship-bethesda' $false; return }
+    if (Test-ShipBackup $rel) { Write-Hit $where $key '0' 'never-ship-backup' $false; return }
+    # One machine's own by kind (#1239): its runtime state and tokens in
+    # Data\Platform, logs, Vortex's records, window layouts, settings saved from
+    # a mod's menu, saves. The question the record guard, the rollback filter
+    # and Scrub-Feed ask. Other servers' files and other people's frameworks
+    # are the rest of Test-ShipMachine.
+    if ((Test-ShipOneMachine $rel) -or (Test-ShipMachine $rel)) { Write-Hit $where $key '0' 'never-ship-machine' $false; return }
+    # Another author's loose file (#1178). What waits for the collection is
+    # not asked here: Ship-Rules holds it as ours until the revision that adds
+    # its mod.
+    if (Test-ShipNotOurs $rel) { Write-Hit $where $key '0' 'never-ship-not-ours' $false; return }
 }
 
 function Test-TextBytes([string]$where, [string]$key, [byte[]]$b) {
@@ -352,12 +368,242 @@ function Invoke-Tree([string]$root) {
     Write-Host ('  {0} tracked files, {1} read as text' -f $files.Count, $script:read)
 }
 
+# .NET ZipFile.OpenRead does not read a zip concatenated onto a program.
+# The Setup is that shape: the program first, then the zip, and the zip own
+# offsets count from the zip, not from the first byte of the file. Asked for
+# the central directory, Windows PowerShell throws because the entry count
+# does not match, and PowerShell 7 does not throw at all: Entries is empty,
+# every rule is skipped, and the scan says the file is clean. Python zipfile
+# finds the end-of-central-directory record at the end of the file and
+# corrects for the bytes in front. This does the same correction and reads
+# that zip. A real empty zip has no local-file header, so it still reports no
+# entries. A file that claims to be empty and still holds one is not a pass.
+
+if (-not ('ThornswoodZipWindow' -as [type])) {
+    # A view of the bytes from the zip start to the end, so ZipArchive can read
+    # a zip whose offsets count from there. C# 5, for the Framework compiler too.
+    Add-Type -Language CSharp -TypeDefinition @'
+
+using System;
+using System.IO;
+
+public class ThornswoodZipWindow : Stream {
+    Stream inner;
+    long start;
+    long length;
+
+    public ThornswoodZipWindow(Stream inner, long start) {
+        this.inner = inner;
+        this.start = start;
+        this.length = inner.Length - start;
+        if (this.length < 0) throw new ArgumentOutOfRangeException("start");
+        inner.Seek(start, SeekOrigin.Begin);
+    }
+
+    public override bool CanRead { get { return true; } }
+    public override bool CanSeek { get { return true; } }
+    public override bool CanWrite { get { return false; } }
+    public override long Length { get { return length; } }
+    public override long Position {
+        get { return inner.Position - start; }
+        set {
+            if (value < 0) throw new IOException("negative position");
+            inner.Position = start + value;
+        }
+    }
+
+    public override void Flush() { }
+
+    public override int Read(byte[] buffer, int offset, int count) {
+        long remain = length - Position;
+        if (remain <= 0) return 0;
+        if (count > remain) count = (int)remain;
+        return inner.Read(buffer, offset, count);
+    }
+
+    public override long Seek(long offset, SeekOrigin origin) {
+        long pos;
+        if (origin == SeekOrigin.Begin) pos = offset;
+        else if (origin == SeekOrigin.Current) pos = Position + offset;
+        else pos = length + offset;
+        Position = pos;
+        return pos;
+    }
+
+    public override void SetLength(long value) { throw new NotSupportedException(); }
+    public override void Write(byte[] buffer, int offset, int count) { throw new NotSupportedException(); }
+
+    protected override void Dispose(bool disposing) {
+        if (disposing && inner != null) {
+            inner.Dispose();
+            inner = null;
+        }
+        base.Dispose(disposing);
+    }
+}
+'@
+}
+
+# Where a concatenated zip starts, or 0 when the zip is the whole file, or -1
+# when there is no end-of-central-directory record we can trust. The record
+# sits at the end, with its comment reaching the last byte. Its offset of the
+# central directory counts from the zip, so the program in front is the
+# distance between that and where the record actually is.
+function Find-AppendedZipStart([string]$full) {
+    $fs = [IO.File]::Open($full, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    try {
+        $len = $fs.Length
+        if ($len -lt 22) { return -1 }
+        $want = [Math]::Min($len, [int64](65535 + 22))
+        $buf = New-Object byte[] ([int]$want)
+        [void]$fs.Seek($len - $want, [IO.SeekOrigin]::Begin)
+        $n = $fs.Read($buf, 0, $buf.Length)
+        for ($i = $n - 22; $i -ge 0; $i--) {
+            if ($buf[$i] -ne 80 -or $buf[$i + 1] -ne 75 -or $buf[$i + 2] -ne 5 -or $buf[$i + 3] -ne 6) { continue }
+            $comment = [int][BitConverter]::ToUInt16($buf, $i + 20)
+            if (($i + 22 + $comment) -ne $n) { continue }
+            $eocdPos = ($len - $n) + $i
+            $cdSize = [int64]0
+            $cdOff = [int64]0
+            $extra = [int64]0
+            $zip64 = Get-Zip64CentralDirectory $fs $eocdPos
+            if ($zip64) {
+                $cdSize = $zip64.Size
+                $cdOff = $zip64.Offset
+                $extra = $zip64.Extra
+            } else {
+                $cdSize = [int64][BitConverter]::ToUInt32($buf, $i + 12)
+                $cdOff = [int64][BitConverter]::ToUInt32($buf, $i + 16)
+                $entries = [int][BitConverter]::ToUInt16($buf, $i + 10)
+                if ($cdOff -eq 4294967295 -or $cdSize -eq 4294967295 -or $entries -eq 65535) { continue }
+            }
+            $prefix = $eocdPos - $cdSize - $cdOff - $extra
+            if ($prefix -lt 0 -or ($prefix + $cdOff) -ge $len) { continue }
+            if ($prefix -eq 0) { return 0 }
+            if (Test-CentralDirectoryAt $fs ($prefix + $cdOff)) { return $prefix }
+        }
+        return -1
+    } finally { $fs.Dispose() }
+}
+
+# Zip64 puts the real sizes in a record just before the locator, which sits
+# 20 bytes before the end-of-central-directory record. Null when this archive
+# is not zip64. The extra is those two blocks, which sit between the central
+# directory and the record at the end, so they count in the prefix too.
+function Get-Zip64CentralDirectory([IO.FileStream]$fs, [int64]$eocdPos) {
+    if ($eocdPos -lt 20) { return $null }
+    $loc = New-Object byte[] 20
+    [void]$fs.Seek(($eocdPos - 20), [IO.SeekOrigin]::Begin)
+    if ($fs.Read($loc, 0, 20) -ne 20) { return $null }
+    if ($loc[0] -ne 80 -or $loc[1] -ne 75 -or $loc[2] -ne 6 -or $loc[3] -ne 7) { return $null }
+    $back = [Math]::Min([int64]1024, ($eocdPos - 20))
+    $win = New-Object byte[] ([int]$back)
+    $winStart = $eocdPos - 20 - $back
+    [void]$fs.Seek($winStart, [IO.SeekOrigin]::Begin)
+    if ($fs.Read($win, 0, $win.Length) -ne $win.Length) { return $null }
+    for ($j = $win.Length - 56; $j -ge 0; $j--) {
+        if ($win[$j] -ne 80 -or $win[$j + 1] -ne 75 -or $win[$j + 2] -ne 6 -or $win[$j + 3] -ne 6) { continue }
+        $sizeField = [BitConverter]::ToUInt64($win, $j + 4)
+        if ($sizeField -gt 1000000) { continue }
+        $recordLen = [int64]12 + [int64]$sizeField
+        $recordPos = $winStart + $j
+        if (($recordPos + $recordLen) -ne ($eocdPos - 20)) { continue }
+        if (($j + 56) -gt $win.Length) { continue }
+        $cdSize = [BitConverter]::ToUInt64($win, $j + 40)
+        $cdOff = [BitConverter]::ToUInt64($win, $j + 48)
+        $limit = [uint64]9223372036854775807
+        if ($cdSize -gt $limit -or $cdOff -gt $limit) { continue }
+        return @{ Size = [int64]$cdSize; Offset = [int64]$cdOff; Extra = ($recordLen + 20) }
+    }
+    return $null
+}
+
+function Test-CentralDirectoryAt([IO.FileStream]$fs, [int64]$pos) {
+    if ($pos -lt 0 -or ($pos + 4) -gt $fs.Length) { return $false }
+    [void]$fs.Seek($pos, [IO.SeekOrigin]::Begin)
+    $sig = New-Object byte[] 4
+    if ($fs.Read($sig, 0, 4) -ne 4) { return $false }
+    return ($sig[0] -eq 80 -and $sig[1] -eq 75 -and $sig[2] -eq 1 -and $sig[3] -eq 2)
+}
+
+# A local-file header is an entry. An empty zip does not have one. Used only
+# when the archive reported no entries, so a miss here is the false pass.
+function Test-LocalFileHeader([string]$full) {
+    $fs = [IO.File]::Open($full, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    try {
+        $buf = New-Object byte[] 65536
+        $hold = New-Object byte[] 3
+        $held = 0
+        while (($n = $fs.Read($buf, 0, $buf.Length)) -gt 0) {
+            $scan = New-Object byte[] ($held + $n)
+            if ($held -gt 0) { [Array]::Copy($hold, $scan, $held) }
+            [Array]::Copy($buf, 0, $scan, $held, $n)
+            for ($i = 0; $i -le $scan.Length - 4; $i++) {
+                if ($scan[$i] -eq 80 -and $scan[$i + 1] -eq 75 -and $scan[$i + 2] -eq 3 -and $scan[$i + 3] -eq 4) { return $true }
+            }
+            $held = [Math]::Min(3, $scan.Length)
+            [Array]::Copy($scan, ($scan.Length - $held), $hold, 0, $held)
+        }
+        return $false
+    } finally { $fs.Dispose() }
+}
+
+function Open-ScanZip([string]$full, [int64]$start) {
+    $fs = $null
+    $window = $null
+    try {
+        $fs = [IO.File]::Open($full, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+        $base = $fs
+        if ($start -gt 0) {
+            $window = [ThornswoodZipWindow]::new($fs, $start)
+            $base = $window
+        }
+        $opened = [IO.Compression.ZipArchive]::new($base, [IO.Compression.ZipArchiveMode]::Read, $true)
+        return @{ Zip = $opened; Stream = $base }
+    } catch {
+        if ($window) { $window.Dispose() }
+        elseif ($fs) { $fs.Dispose() }
+        throw
+    }
+}
+
 function Invoke-Zip([string]$path) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { Write-Unread $path 'no such file'; return }
     $leaf = Split-Path $path -Leaf
-    try { $z = [IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $path).ProviderPath) }
-    catch { Write-Unread $leaf 'it does not open as a zip'; return }
+    $full = (Resolve-Path -LiteralPath $path).ProviderPath
+    $opened = $null
     try {
+        $bad = $true
+        try {
+            $opened = Open-ScanZip $full 0
+            try { $bad = ($opened.Zip.Entries.Count -eq 0) }
+            catch { $bad = $true }
+        } catch {
+            $opened = $null
+            $bad = $true
+        }
+        if ($bad) {
+            $start = Find-AppendedZipStart $full
+            if ($start -gt 0) {
+                if ($opened) {
+                    $opened.Zip.Dispose()
+                    $opened.Stream.Dispose()
+                    $opened = $null
+                }
+                try { $opened = Open-ScanZip $full $start }
+                catch { Write-Unread $leaf 'the zip appended to this program could not be opened'; return }
+                try { $appended = $opened.Zip.Entries.Count }
+                catch { Write-Unread $leaf 'the zip appended to this program could not be read'; return }
+                if ($appended -eq 0) { Write-Unread $leaf 'the zip appended to this program could not be read'; return }
+            } elseif (-not $opened) {
+                Write-Unread $leaf 'it does not open as a zip'
+                return
+            } elseif (Test-LocalFileHeader $full) {
+                Write-Unread $leaf 'it reports no zip entries but still holds a zip'
+                return
+            }
+        }
+        $z = $opened.Zip
         $n = 0
         foreach ($e in $z.Entries) {
             $inner = $e.FullName -replace '\\', '/'
@@ -380,7 +626,12 @@ function Invoke-Zip([string]$path) {
             Test-TextBytes $where $inner (Read-Entry $e)
         }
         Write-Host ('  {0}: {1} entries' -f $leaf, $n)
-    } finally { $z.Dispose() }
+    } finally {
+        if ($opened) {
+            $opened.Zip.Dispose()
+            $opened.Stream.Dispose()
+        }
+    }
 }
 
 function Invoke-Dir([string]$dir) {

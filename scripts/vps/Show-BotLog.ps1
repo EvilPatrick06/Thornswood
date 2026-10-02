@@ -17,7 +17,7 @@
 [CmdletBinding()]
 param(
   [string]$Vps  = '',
-  [string]$User = 'Administrator',
+  [string]$User = '',
   [string]$Root = 'C:/Thornswood-Bot',
   [int]$Lines = 40,
   [switch]$All,
@@ -28,9 +28,10 @@ param(
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here 'Vps.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
-$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=accept-new')
+$ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $rootWin = $Root.Replace('/','\')
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
@@ -43,8 +44,19 @@ $filter = if ($All) { '.' } else { '^\s*\[(thornswood-bot|run)\]' }
 
 $script = @"
 `$ErrorActionPreference = 'Continue'
-`$log = '$rootWin\bot.log'
-if (-not (Test-Path `$log)) { 'there is no bot.log on the VPS yet'; exit }
+# In the bot's data folder since #1104; beside the code on a box whose full
+# install is older; and the one written last when both are there, because
+# Install-Bot leaves an empty one in data on every run so that the path named
+# here and in the docs is always a file. Reading the empty one while the bot
+# writes the other is how this would show nothing about a bot that is fine.
+`$log = '$rootWin\data\bot.log'
+`$alt = '$rootWin\bot.log'
+`$a = Get-Item -LiteralPath `$alt -EA SilentlyContinue
+if (`$a) {
+  `$n = Get-Item -LiteralPath `$log -EA SilentlyContinue
+  if (-not `$n -or `$a.LastWriteTimeUtc -gt `$n.LastWriteTimeUtc) { `$log = `$alt }
+}
+if (-not (Test-Path `$log)) { 'there is no bot.log on the VPS yet, at ' + `$log; exit }
 
 `$p = Get-CimInstance Win32_Process |
      Where-Object { `$_.Name -eq 'python.exe' -and `$_.CommandLine -like '*Thornswood-Bot*' }
@@ -57,10 +69,10 @@ else     { '[state] the bot is NOT running' }
 # Read as UTF-8 rather than whatever the console codepage happens to be, or
 # every accented character in here comes back as a question mark.
 #
-# bot.log.1 first, when there is one. Entry 220 has run.ps1 roll bot.log to
-# bot.log.1 through roll-log.ps1 before a start once it passes 4 MB, so right
-# after a roll the lines that say why the bot restarted are in bot.log.1 and
-# the current file has only the new start. With no bot.log.1 this reads
+# bot.log.1 first, when there is one. The bot's service rolls bot.log to
+# bot.log.1 once it passes 4 MB, while the bot runs (issue #465,
+# BotService.cs), so right after a roll the lines just before it are in
+# bot.log.1 and the current file has only what came after. With no bot.log.1 this reads
 # bot.log alone, as it always did. tests\test-show-botlog.ps1 runs it.
 Get-Content -LiteralPath (`$log + '.1'), `$log -Encoding UTF8 -Tail 3000 -EA SilentlyContinue |
   Where-Object { `$_ -match '$filter' } |
@@ -68,7 +80,7 @@ Get-Content -LiteralPath (`$log + '.1'), `$log -Encoding UTF8 -Tail 3000 -EA Sil
 "@
 
 $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-$out = & ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $e" 2>&1
+$out = Invoke-ThornswoodNative { & ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $e" } 2>&1
 
 Head 'The VPS'
 foreach ($line in $out) {

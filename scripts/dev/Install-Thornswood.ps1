@@ -4,7 +4,8 @@
   Everything the client needs, in one run, in the order it has to happen in.
 
   This replaces the sequence you have been typing by hand: the content plugin,
-  the SkyMP client, the creation menus, the body fix, the
+  the SkyMP client (the recorded build only, through Sync-Client.ps1), the
+  creation menus, the body fix, the
   load order alignment, the gamemode, the preflight check and the launcher
   build. Each step names the files it must leave behind, and a step that exits
   cleanly without leaving them is treated as a failure, because those are the
@@ -29,10 +30,10 @@ param(
     [string[]]$Only = @(),
     [string[]]$Skip = @(),
     [switch]$SkipBody,
-    # Publishing is the default, not an extra step to remember. This is a test
-    # server: a build that is only on this machine cannot be tested by anybody
-    # else, and every round of "why is it not fixed" so far has ended at a fix
-    # that was built but never shipped.
+    # Publishing to the DEV channel is the default, not an extra step to remember.
+    # CONTRIBUTING.md: everything goes to the dev build first. A bare Ship.ps1 is
+    # the live release, so this always passes -Channel dev (never main).
+    # -NoShip skips publishing.
     [switch]$NoShip,
     [string]$Notes,
     [switch]$NoPause
@@ -88,7 +89,7 @@ $Skip = @($Skip | ForEach-Object { $_ -split ',' } | Where-Object { $_ } | ForEa
 if ($SkipBody) { $Skip += 'body' }
 
 # ---------------------------------------------------------------- the steps --
-$launcherBuild = Join-Path ([IO.Path]::GetTempPath()) ('Thornswood-launcher-' + (Split-Path -Leaf $Root.TrimEnd('\')))
+$launcherBuild = & (Join-Path $Here '..\release\Get-ScratchDir.ps1') ('Thornswood-launcher-' + (Split-Path -Leaf $Root.TrimEnd('\')))
 $steps = @(
     @{
         Key = 'content'; Name = 'ThornsWood content plugin'
@@ -97,20 +98,25 @@ $steps = @(
         Wants = @('Thornswood-Content.esp')
         Why = 'the books, the writs and the creation menus'
     },
+    # Sync-Client.ps1, the one way the client goes into the game folder: the
+    # six files records\client-build.json names, each checked by sha256, and
+    # a build that is not the recorded one stops the run with nothing copied.
+    # Until #1001 this step ran a script that copied the whole client build
+    # over Data with no look at the record, so this run could
+    # put in a client Ship then refused. The server address it also wrote is
+    # the launcher's to write, on every Play.
     @{
         Key = 'client'; Name = 'SkyMP client'
-        Script = '..\release\Install-SkyMPClient.ps1'
+        Script = '..\release\Sync-Client.ps1'
         Args = @{ Dist = $Client }
         Wants = @('SKSE\Plugins\MpClientPlugin.dll', 'Platform\Plugins\skymp5-client.js')
         Why = 'the multiplayer layer itself'
     },
-    @{
-        Key = 'body'; Name = 'Male body fix'
-        Script = '..\mods\Fix-MaleBody.ps1'
-        Args = @{}
-        Wants = @()
-        Why = 'the hole you could see the sky through'
-    },
+    # Male body fix (Fix-MaleBody.ps1) was a step here until issue #1179
+    # retired that script: the collection owns the body meshes now, and the
+    # hand move wrote into Game\Data (and Vortex staging where those files
+    # are hard links). Pass -SkipBody is kept so old shortcuts still parse.
+
     @{
         Key = 'loadorder'; Name = 'Load order alignment'
         Script = '..\mods\Align-LoadOrder.ps1'
@@ -205,9 +211,8 @@ foreach ($s in $steps) {
     if ($help.Parameters.ContainsKey('Root'))    { $splat['Root'] = $Root }
     if ($help.Parameters.ContainsKey('NoShip'))  { $splat['NoShip'] = $true }
 
-    # Install-SkyMPClient writes the address into the client settings itself.
-    # The launcher rewrites it on every Play anyway, but there is no reason to
-    # leave 127.0.0.1 sitting in the file in the meantime.
+    # Any step that writes the server address is handed the one this run is
+    # for. The launcher rewrites it on every Play anyway.
     if ($help.Parameters.ContainsKey('ServerIp'))   { $splat['ServerIp'] = $ServerIp }
     if ($help.Parameters.ContainsKey('ServerPort')) { $splat['ServerPort'] = $ServerPort }
 
@@ -271,7 +276,7 @@ if (-not $NoShip -and ($done -contains 'Launcher')) {
     if (Test-Path -LiteralPath $ship) {
         Head 'Publishing'
         if (-not $Notes) { $Notes = 'Build from ' + (Get-Date -Format 'd MMM HH:mm') }
-        Note 'so everyone else gets this too. -NoShip skips it.'
+        Note 'to the dev build, so others can try it. -NoShip skips it.'
 
         # Only parameters Ship actually has. Passing one it does not know is a
         # binding error, not an exit code, so $LASTEXITCODE stays 0 from the
@@ -281,6 +286,9 @@ if (-not $NoShip -and ($done -contains 'Launcher')) {
         $shipCmd = Get-Command $ship
         if ($shipCmd.Parameters.ContainsKey('Root'))    { $shipArgs['Root'] = $Root }
         if ($shipCmd.Parameters.ContainsKey('NoPause')) { $shipArgs['NoPause'] = $true }
+        # Never the live channel. Ship.ps1 defaults to main; CONTRIBUTING.md
+        # sends every ordinary change to the dev build first (#1171).
+        if ($shipCmd.Parameters.ContainsKey('Channel')) { $shipArgs['Channel'] = 'dev' }
 
         $global:LASTEXITCODE = 0
         try {
@@ -297,8 +305,8 @@ if (-not $NoShip -and ($done -contains 'Launcher')) {
 
 Write-Host ''
 Say 'Open the launcher and press Play.' 'Green'
-if ($shipped) { Note 'Published, so your friends get it on their next launcher start.' }
-elseif (-not $NoShip -and ($done -contains 'Launcher')) { Note 'Publishing did not finish. Run .\Ship.ps1 yourself.' }
+if ($shipped) { Note 'Published on the dev channel, so your friends on that build get it on their next launcher start.' }
+elseif (-not $NoShip -and ($done -contains 'Launcher')) { Note 'Publishing did not finish. Run .\scripts\release\Ship.ps1 -Channel dev "what changed" yourself.' }
 Write-Host ''
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

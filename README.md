@@ -1,40 +1,52 @@
 # Thornswood
 
-A modded co-op Skyrim roleplay server on SkyMP, in closed playtest. This
+A modded co-op Skyrim roleplay server on SkyMP, in alpha and open by
+application. This
 repository is everything behind it. It is not where the game is downloaded:
 people who want to join apply in the [Discord](https://thornswood.net/discord)
 and follow [thornswood.net/join](https://thornswood.net/join).
 
 ## What is in here
 
-- `launcher/app`: the launcher. C# 5 and WPF, compiled by
-  `scripts/release/Build-Launcher.ps1` with the .NET Framework 4 csc.
-- `launcher`: the window, the art and the voice page the launcher is
-  built with.
-- `installer`: what a new person runs first; `installer/setup` is the small
-  setup program people download.
-- `game/plugins`: the game plugins, in Skyrim Platform JavaScript.
-- `game/ui`: the overlays inside the game.
-- `game/gamemode.js`: the server's gamemode, with its tables in `game/data`.
-- `site`: the site. Its public pages are `site/data/site`.
-- `voice`: proximity voice.
-- `bot`: the Discord bot, in Python.
-- `records`: the client and server build records, and code signing.
-- `scripts`: what builds, ships and deploys it all, listed in
-  `scripts/README.md`; `tools` forwards the common commands there for now.
-- `tests`: the test harnesses; all of them run every night on the VPS.
-- `engine/skymp`: the SkyMP fork our engine changes live in, a git submodule.
-  `scripts/release/Build-Engine.ps1` fetches and builds it (engine/README.md).
-- `out` and `local`: the build output, and things kept beside the repository
-  that never go to GitHub. Both are ignored by git.
+- `launcher/`: launcher chrome (window, art, voice page). The C# app lives in
+  `launcher/app/` (C# 5 / WPF), built by `scripts/release/Build-Launcher.ps1`
+  with the .NET Framework 4 csc. See `launcher/app/ARCHITECTURE.md`.
+- `installer/`: what a new person runs first. `installer/setup/` is the small
+  setup program people download (one installer tree, not two products).
+- `game/`: everything that runs as the multiplayer game on the server and
+  clients:
+  - `game/gamemode.js`: the server's gamemode
+  - `game/data/`: gamemode tables
+  - `game/plugins/`: Skyrim Platform JavaScript plugins
+  - `game/ui/`: overlays inside the game
+  - `game/menu/`: in-game menu pieces
+  - `game/content/`: authored content
+  - `game/required-data/`: data the client/server must have beside the build
+- `site/`: the website. Public pages under `site/data/site`.
+- `voice/`: proximity voice.
+- `bot/`: the Discord bot (Python).
+- `records/`: client and server build records, and code signing
+  (`records/signing/`).
+- `scripts/`: build, ship, and deploy scripts (`scripts/README.md`).
+- `tests/`: harnesses; the nightly on the VPS runs them.
+- `docs/`: system map, update feed, glossary, and runbooks.
+- `engine/skymp/`: SkyMP fork submodule. Built by
+  `scripts/release/Build-Engine.ps1` (`engine/README.md`).
 - `lore/`: the world.
+- `out/` and `local/`: build output and machine-local files that never go to
+  GitHub (both gitignored).
+- `config.example.json`: launcher `config.json` example matching
+  `launcher/app/Config.cs` defaults (empty `UpdateToken`). Site example:
+  `site/config.example.json`.
 
-`bot`, `game`, `installer`, `records`, `scripts`, `site`, `tests`, `launcher`, `installer/setup`,
-`records/signing`, `game/plugins`, `game/ui` and `voice` each have
-a README of their own, which says what the folder is and how to change it.
+`bot`, `game`, `installer`, `records`, `scripts`, `site`, `tests`, `launcher`,
+`installer/setup`, `records/signing`, `game/plugins`, `game/ui` and `voice`
+each have a README of their own, which says what the folder is and how to
+change it.
 
 ## Before changing anything
 
+- [DEVELOPER-GUIDE.md](DEVELOPER-GUIDE.md): how to get the code onto your computer, reach the server, and open a pull request.
 - [CONTRIBUTING.md](CONTRIBUTING.md): the rules for everybody, with AI or
   without. Who is on the team, the words we use, the settled design, how work
   moves and what to run after a merge. Read it before your first change.

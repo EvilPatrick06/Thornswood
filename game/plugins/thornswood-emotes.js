@@ -132,71 +132,86 @@ const CHAT_KEY  = key('ChatKey', 28);    // Enter, owned by the front
 const STOP = 'IdleForceDefaultState';
 
 /*
- * Six categories, then the emotes inside one.
+ * One list, not categories.
  *
- * This was two flat rings of twelve, paged with Tab, and it had two problems.
- * Twenty four is not many, and finding one meant remembering which ring it was
- * on. Categories carry more without the ring getting denser, and "Revelry"
- * narrows to six things you can read at a glance.
+ * The wheel's middle is eight quick slots. Click a slot, or press 1 to 8
+ * with the wheel shut. The full list sits on the right of the wheel, with a
+ * search, in alphabetical order. Tab moves to that search.
  *
- * Every event below was pulled out of an IDLE record's ENAM field in this
- * setup's own Skyrim.esm and Dragonborn.esm, filtered to animations under
- * Actors\Character\Behaviors so they apply to a person, and checked against
- * that extract again before shipping. The name on the wheel is mine; the
- * string in `event` is the game's.
+ * Every event below is an IDLE record's ENAM from Skyrim.esm or Dragonborn.esm,
+ * an animation under Actors\Character\Behaviors. The name on the list is ours;
+ * the string in `event` is the game's. Chop wood, Drink, Eat, Hoe and Drink
+ * potion are the animation only. They do not perform the class verb.
  *
  * Three to avoid, from skymp5-client's send path: anything containing 'equip'
  * is rewritten to SkympFakeEquip, and SneakStart and SneakStop are swallowed
  * outright. Nothing here trips those.
  */
-const CATEGORIES = [
-  { name: 'Greeting', items: [
-    { name: 'Wave',        event: 'IdleWave' },
-    { name: 'Salute',      event: 'IdleSalute' },
-    { name: 'Bow',         event: 'IdleSilentBow' },
-    { name: 'At ease',     event: 'IdleHandsBehindBack' },
-    { name: 'Come here',   event: 'IdleComeThisWay' },
-  ]},
-  { name: 'Praise', items: [
-    { name: 'Applaud',     event: 'IdleApplaud2' },
-    { name: 'Ovation',     event: 'IdleApplaud4' },
-    { name: 'Slow clap',   event: 'IdleApplaudSarcastic' },
-    { name: 'Cheer',       event: 'IdleCivilWarCheer' },
-    { name: 'Laugh',       event: 'IdleLaugh' },
-  ]},
-  { name: 'Gesture', items: [
-    { name: 'Point',       event: 'IdlePointClose' },
-    { name: 'Point yonder',event: 'IdlePointFar_01' },
-    { name: 'Examine',     event: 'IdleExamine' },
-    { name: 'Lean',        event: 'IdleWallLeanStart' },
-    { name: 'Surrender',   event: 'IdleSurrender' },
-    { name: 'Nervous',     event: 'IdleNervous' },
-  ]},
-  { name: 'Devotion', items: [
-    { name: 'Pray',        event: 'IdlePray' },
-    { name: 'Kneel',       event: 'IdleKneelingEnter' },
-    { name: 'Blessing',    event: 'IdleBlessingKneelEnter' },
-  ]},
-  { name: 'Labour', items: [
-    { name: 'Warm hands',  event: 'IdleWarmHandsStanding' },
-    { name: 'Warm arms',   event: 'IdleWarmArms' },
-    { name: 'Sweep',       event: 'idleLooseSweepingStart' },
-    { name: 'Clean blade', event: 'IdleCleanSword' },
-    { name: 'Chop wood',   event: 'IdleWoodChopStart' },
-    { name: 'Write',       event: 'IdleWriteTableStandingEnter' },
-    { name: 'Read',        event: 'IdleNoteRead' },
-    { name: 'Drink',       event: 'idleDrinkingStandingStart' },
-    { name: 'Eat',         event: 'idleEatingStandingStart' },
-  ]},
-  { name: 'Revelry', items: [
-    { name: 'Dance',       event: 'IdleCiceroDance1' },
-    { name: 'Jig',         event: 'IdleCiceroDance2' },
-    { name: 'Reel',        event: 'IdleCiceroDance3' },
-    { name: 'Lute',        event: 'IdleLuteStart' },
-    { name: 'Flute',       event: 'IdleFluteStart' },
-    { name: 'Drum',        event: 'IdleDrumStart' },
-  ]},
+const EMOTES = [
+  { name: 'Ache', event: 'IdleBracedPain' },
+  { name: 'Agitated', event: 'IdleCiceroAgitated' },
+  { name: 'Applaud', event: 'IdleApplaud2' },
+  { name: 'Arms crossed', event: 'IdleOffsetArmsCrossedStart' },
+  { name: 'At ease', event: 'IdleHandsBehindBack' },
+  { name: 'Attention', event: 'IdleSnapToAttention' },
+  { name: 'Bar drink', event: 'IdleBarDrinkingStart' },
+  { name: 'Blessing', event: 'IdleBlessingKneelEnter' },
+  { name: 'Bow', event: 'IdleSilentBow' },
+  { name: 'Cheer', event: 'IdleCivilWarCheer' },
+  { name: 'Chop wood', event: 'IdleWoodChopStart' },
+  { name: 'Clean blade', event: 'IdleCleanSword' },
+  { name: 'Come here', event: 'IdleComeThisWay' },
+  { name: 'Crouch warm', event: 'IdleWarmHandsCrouched' },
+  { name: 'Dance', event: 'IdleCiceroDance1' },
+  { name: 'Drink', event: 'idleDrinkingStandingStart' },
+  { name: 'Drink potion', event: 'IdleDrinkPotion' },
+  { name: 'Drum', event: 'IdleDrumStart' },
+  { name: 'Eat', event: 'idleEatingStandingStart' },
+  { name: 'Examine', event: 'IdleExamine' },
+  { name: 'Flute', event: 'IdleFluteStart' },
+  { name: 'Get attention', event: 'IdleGetAttention' },
+  { name: 'Give', event: 'IdleGive' },
+  { name: 'Grave bow', event: 'IdleBowHeadAtGrave_01' },
+  { name: 'Hard clap', event: 'IdleApplaud3' },
+  { name: 'Hoe', event: 'IdleHoe' },
+  { name: 'Horn', event: 'IdleBlowHornStormcloak' },
+  { name: 'Jig', event: 'IdleCiceroDance2' },
+  { name: 'Kneel', event: 'IdleKneelingEnter' },
+  { name: 'Laugh', event: 'IdleLaugh' },
+  { name: 'Lean', event: 'IdleWallLeanStart' },
+  { name: 'Ledger', event: 'IdleWriteLedgerEnter' },
+  { name: 'Long clap', event: 'IdleApplaud5' },
+  { name: 'Look far', event: 'IdleLookFar' },
+  { name: 'Lute', event: 'IdleLuteStart' },
+  { name: 'Nervous', event: 'IdleNervous' },
+  { name: 'Oath', event: 'IdleHandCut' },
+  { name: 'Ovation', event: 'IdleApplaud4' },
+  { name: 'Pick up', event: 'IdlePickup_Ground' },
+  { name: 'Point', event: 'IdlePointClose' },
+  { name: 'Point farther', event: 'IdlePointFar_02' },
+  { name: 'Point yonder', event: 'IdlePointFar_01' },
+  { name: 'Pray', event: 'IdlePray' },
+  { name: 'Read', event: 'IdleNoteRead' },
+  { name: 'Read book', event: 'IdleBook_Reading' },
+  { name: 'Reel', event: 'IdleCiceroDance3' },
+  { name: 'Salute', event: 'IdleSalute' },
+  { name: 'Sit', event: 'IdleSitCrossLeggedEnter' },
+  { name: 'Slow clap', event: 'IdleApplaudSarcastic' },
+  { name: 'Study', event: 'IdleStudy' },
+  { name: 'Surrender', event: 'IdleSurrender' },
+  { name: 'Sweep', event: 'idleLooseSweepingStart' },
+  { name: 'Take', event: 'IdleTake' },
+  { name: 'Warm arms', event: 'IdleWarmArms' },
+  { name: 'Warm close', event: 'IdleWarmHands' },
+  { name: 'Warm hands', event: 'IdleWarmHandsStanding' },
+  { name: 'Wave', event: 'IdleWave' },
+  { name: 'Wipe brow', event: 'IdleWipeBrow' },
+  { name: 'Write', event: 'IdleWriteTableStandingEnter' },
 ];
+
+const SLOT_COUNT = 8;
+const SLOT_FILE = 'Data/Platform/thornswood-emote-slots.json';
+const DEFAULT_SLOTS = ['Wave', 'Bow', 'Laugh', 'Point', 'Pray', 'Dance', 'Lute', 'Drink'];
 /* The creation room. While you are standing in it the wheel refuses to open:
  * you are picking a face and a trade, not waving. Resolved through
  * getFormFromFile so it does not depend on a load order position. */
@@ -206,11 +221,30 @@ const HALL_PLUGIN = 'Skyrim Unbound.esp';
 let open = false;
 let hallId = null;
 
-/* Which level the wheel is showing, and which category is open on the second.
- * Held here rather than in the page: the page draws a list and says which
- * wedge was clicked, and everything about what that means lives on this side. */
-let level = 'cats';   // 'cats' | 'items'
-let at = 0;           // index into CATEGORIES while level is 'items'
+function emoteByName(name) {
+  const low = String(name || '').toLowerCase();
+  for (let i = 0; i < EMOTES.length; i++) {
+    if (EMOTES[i].name.toLowerCase() === low) { return EMOTES[i]; }
+  }
+  return null;
+}
+
+function readSlots() {
+  const out = DEFAULT_SLOTS.slice();
+  try {
+    const raw = fsm ? fsm.readFileSync(SLOT_FILE, 'utf8') : '';
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (parsed && Array.isArray(parsed)) {
+      for (let i = 0; i < SLOT_COUNT; i++) {
+        const item = emoteByName(parsed[i]);
+        out[i] = item ? item.name : '';
+      }
+    }
+  } catch (e) { }
+  return out;
+}
+
+let slots = DEFAULT_SLOTS.slice();
 
 // Not under Data/Platform/Plugins. SkyrimPlatform watches that folder and
 // reloads every plugin whenever anything in it changes, so a log written there
@@ -219,6 +253,7 @@ const LOG_FILE = 'Data/Platform/thornswood-emotes.log';
 
 let fsm = null;
 try { fsm = require('fs'); fsm.writeFileSync(LOG_FILE, ''); } catch (e) { fsm = null; }
+slots = readSlots();
 
 function log() {
   const line = '[emotes] ' + Array.prototype.slice.call(arguments).join(' ');
@@ -274,42 +309,80 @@ function js(src) {
   catch (e) { log('executeJavaScript failed:', e); return false; }
 }
 
-/** The list that should be on screen right now, given the level. */
-function showing() {
-  if (level === 'cats') {
-    return CATEGORIES.map(function (c) {
-      return { name: c.name + '  (' + c.items.length + ')' };
-    });
-  }
-  return CATEGORIES[at].items;
+function pushWheel() {
+  js('window.thornswoodSetWheel && window.thornswoodSetWheel(' +
+     JSON.stringify(EMOTES) + ',' +
+     JSON.stringify(slots) + ',' +
+     JSON.stringify(LETTERS[OPEN_KEY] || '') + ',' +
+     JSON.stringify(LETTERS[STOP_KEY] || 'n') + ')');
 }
 
-function pushRing() {
-  const cats = level === 'cats';
-  const title = cats ? 'Emotes' : CATEGORIES[at].name;
-  const hub = cats ? 'STOP' : 'BACK';
-  const hint = cats
-    ? 'click, or press 1\u20136 \u00b7 Esc to close'
-    : 'click, or press 1\u20139 \u00b7 Esc or the middle for the categories';
-
-  js('window.thornswoodSetRing && window.thornswoodSetRing(' +
-     JSON.stringify(showing()) + ',' +
-     JSON.stringify(title) + ',' +
-     JSON.stringify(hub) + ',' +
-     JSON.stringify(hint) + ',' +
-     JSON.stringify(LETTERS[OPEN_KEY] || '') + ')');
+function saveSlots() {
+  if (!fsm) { return; }
+  try { fsm.writeFileSync(SLOT_FILE, JSON.stringify(slots)); } catch (e) { }
 }
 
-/**
- * Up one level, or shut if there is nowhere up to go.
- *
- * The one thing this must never do is close the wheel from inside a category,
- * because then opening the wrong category costs you the whole wheel and four
- * more keypresses to get back to where you were.
- */
-function back() {
-  if (level === 'items') { level = 'cats'; pushRing(); return; }
+/* The name on the one line above the head. Not a chat line, and not
+   for standing up, which never calls this. */
+function sayEmote(name) {
+  js('try{window.thornswoodNet&&window.thornswoodNet.post({t:"emote",name:' +
+     JSON.stringify(String(name || '')) + '});}catch(e){}');
+}
+
+/*
+  The three a Woodwright can make. Skyrim's own lute, flute and drum are
+  clutter and cannot be held, so the wheel asks for these weapons. Local ids
+  in PlayFluteLuteDrum.esp.
+*/
+const INSTRUMENT_FILE = 'PlayFluteLuteDrum.esp';
+const INSTRUMENTS = {
+  lute: { id: 0x1d9b, word: 'a lute' },
+  flute: { id: 0xd62, word: 'a flute' },
+  drum: { id: 0x287f, word: 'a drum' }
+};
+
+function instrumentOf(name) {
+  return INSTRUMENTS[String(name || '').toLowerCase()] || null;
+}
+
+function carryingInstrument(need) {
+  const pc = player();
+  if (!pc || !need) { return false; }
+  try {
+    const form = sp.Game.getFormFromFile(need.id, INSTRUMENT_FILE);
+    if (!form) { return false; }
+    return pc.getItemCount(form) > 0;
+  } catch (e) { return false; }
+}
+
+/* True when this name is an instrument the person does not have. */
+function refuseInstrument(name) {
+  const need = instrumentOf(name);
+  if (!need) { return false; }
+  if (carryingInstrument(need)) { return false; }
+  try { sp.Debug.notification('You need ' + need.word + '.'); } catch (e) { }
+  log('refused', name, 'without', need.word);
+  return true;
+}
+
+function playNamed(name) {
+  const item = emoteByName(name);
+  if (!item) { return; }
+  if (refuseInstrument(item.name)) { setOpen(false); return; }
+  log('picked', item.name);
   setOpen(false);
+  sayEmote(item.name);
+  play(item.event);
+}
+
+function playSlot(n) {
+  const item = emoteByName(slots[n - 1]);
+  if (!item) { return; }
+  if (refuseInstrument(item.name)) { setOpen(false); return; }
+  log('slot', n, item.name);
+  setOpen(false);
+  sayEmote(item.name);
+  play(item.event);
 }
 
 /** True while the game is showing anything of its own: a menu, or a load screen. */
@@ -351,10 +424,7 @@ function setOpen(v) {
   log(v ? 'opening the wheel' : 'closing the wheel');
   if (v) {
     if (T.setTyping) { T.setTyping(false); }
-    // Always from the top. Reopening into whichever category was last used is
-    // a small convenience that costs you knowing where you are.
-    level = 'cats';
-    pushRing();
+    pushWheel();
     if (T.claimFocus) { T.claimFocus('wheel', true); }
   } else {
     js('window.thornswoodHideWheel && window.thornswoodHideWheel()');
@@ -394,6 +464,9 @@ function setOpen(v) {
  * where the VM is. The wait is at most one frame.
  */
 const queued = [];
+/* The one idle drain() is about to send. Anything else from this list, on
+   this character, is the game or a load or a door, and is dropped. */
+let permit = '';
 
 function play(event) {
   if (typeof event !== 'string' || !event.length) { return; }
@@ -444,11 +517,49 @@ function drain() {
   }
 
   try {
+    permit = event === STOP ? '' : event;
     sp.Debug.sendAnimationEvent(pc, event);
     log('played', event);
   } catch (e) {
     log('sendAnimationEvent threw on', event + ':', e);
   }
+  permit = '';
+}
+
+/*
+  A load and a door both play the last idle again, and the behaviour graph
+  will start a lute or a mug on its own. Those are the wheel's idles. On this
+  character they are kept only for the one drain() just asked for.
+
+  A potion, a meal, a chop and a hoe use the same names as four of the wheel's
+  rows, and the game sends those for the real action, so they are left alone.
+*/
+const emoteEvent = {};
+for (let i = 0; i < EMOTES.length; i++) {
+  emoteEvent[EMOTES[i].event.toLowerCase()] = true;
+}
+const gameplayEvent = {
+  idledrinkpotion: true,
+  idleeatingstandingstart: true,
+  idlewoodchopstart: true,
+  idlehoe: true
+};
+try {
+  sp.hooks.sendAnimationEvent.add({
+    enter: (ctx) => {
+      try {
+        const pc = player();
+        if (!pc || ctx.selfId !== pc.getFormID()) { return; }
+        const low = String(ctx.animEventName || '').toLowerCase();
+        if (!emoteEvent[low] || gameplayEvent[low]) { return; }
+        if (permit && permit.toLowerCase() === low) { return; }
+        ctx.animEventName = '';
+      } catch (e) { }
+    },
+    leave: () => {}
+  });
+} catch (e) {
+  log('could not watch emote idles:', e);
 }
 
 // The front closes the wheel for us in a menu, but only for focus. The overlay
@@ -466,46 +577,45 @@ sp.on('browserMessage', guard('browserMessage', (event) => {
 
   if (what === '__ready') { log('overlay is up'); return; }
   if (what === '__close') { log('the page asked to close'); setOpen(false); return; }
-  if (what === '__back') { back(); return; }
+  if (what === '__back') { setOpen(false); return; }
 
-  // The middle: stop whatever is playing while the categories are up, step
-  // back out of a category while one is open. One target, and it always means
-  // the least destructive thing available from where you are.
-  if (what === '__hub') {
-    if (level === 'items') { back(); return; }
+  // The middle stands you up. It does not change which list is showing.
+  if (what === '__hub' || what === '__stand') {
     setOpen(false);
-    play(STOP);
+    standUp();
     return;
   }
 
-  // Tab, kept as a way to walk the categories without going back up first.
-  if (what === '__next') {
-    if (level === 'items') { at = (at + 1) % CATEGORIES.length; pushRing(); }
+  if (what.indexOf('__assign ') === 0) {
+    const rest = what.slice(9);
+    const sp2 = rest.indexOf(' ');
+    const n = parseInt(sp2 === -1 ? rest : rest.slice(0, sp2), 10);
+    const name = sp2 === -1 ? '' : rest.slice(sp2 + 1);
+    const item = emoteByName(name);
+    if (!item || !(n >= 1 && n <= SLOT_COUNT)) { return; }
+    slots[n - 1] = item.name;
+    saveSlots();
+    log('assigned', n, item.name);
     return;
   }
 
+  if (what.indexOf('__slot ') === 0) {
+    const n = parseInt(what.slice(7), 10);
+    if (n >= 1 && n <= SLOT_COUNT) { playSlot(n); }
+    return;
+  }
+
+  if (what.indexOf('__play ') === 0) {
+    playNamed(what.slice(7));
+    return;
+  }
+
+  // A click from the older page, which sent an index and a name.
   if (what.indexOf('__pick ') === 0) {
     const rest = what.slice(7);
     const sp2 = rest.indexOf(' ');
-    const idx = parseInt(sp2 === -1 ? rest : rest.slice(0, sp2), 10);
     const name = sp2 === -1 ? '' : rest.slice(sp2 + 1);
-    if (isNaN(idx) || idx < 0) { return; }
-
-    if (level === 'cats') {
-      if (!CATEGORIES[idx]) { return; }
-      at = idx;
-      level = 'items';
-      log('opened', CATEGORIES[idx].name);
-      pushRing();
-      return;
-    }
-
-    const item = CATEGORIES[at].items[idx];
-    if (!item) { return; }
-    log('picked', name || item.name);
-    setOpen(false);
-    play(item.event);
-    return;
+    if (name) { playNamed(name); }
   }
 }));
 
@@ -527,67 +637,59 @@ sp.on('buttonEvent', guard('keys', (e) => {
     setOpen(true);
     return;
   }
-  if (!open) { return; }
-  if (e.code === CLOSE_KEY) { back(); return; }
-  if (e.code === PAGE_KEY) {
-    if (level === 'items') { at = (at + 1) % CATEGORIES.length; pushRing(); }
-    return;
-  }
-  // 1 to 9, then 0, into whichever list is showing.
-  const digits = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  // 1 to 8 play the quick slots with the wheel shut. While it is open the
+  // page owns those keys, so a digit typed into the search is not also an emote.
+  const digits = [2, 3, 4, 5, 6, 7, 8, 9];
   const pick = digits.indexOf(e.code);
-  if (pick < 0) { return; }
-
-  if (level === 'cats') {
-    if (!CATEGORIES[pick]) { return; }
-    at = pick;
-    level = 'items';
-    pushRing();
+  if (!open && pick >= 0) {
+    if (inCreationRoom()) { return; }
+    playSlot(pick + 1);
     return;
   }
-  const item = CATEGORIES[at].items[pick];
-  if (item) { setOpen(false); play(item.event); }
+  if (!open) { return; }
+  if (e.code === CLOSE_KEY) { setOpen(false); return; }
 }));
 
 // A way out of an idle that has no natural end. Works whether or not the wheel
 // is open, because the usual reason you want it is that you are stuck in one.
-sp.on('buttonEvent', guard('stopKey', (e) => {
-  if (e.isDown && !e.isUp && e.code === STOP_KEY && !open &&
-      !(T.isTyping && T.isTyping()) &&
-      !gameIsBusy() && !inCreationRoom()) {
-    play(STOP);
-
-    /*
-     * The same key also takes off a stuck weapon-drawn pin, because the two
-     * problems feel identical from the chair: you are locked into something
-     * and want out.
-     *
-     * skymp5-client turns any animation event with "equip" in its name into
-     * SkympFakeEquip, and whoever receives that calls
-     * TESModPlatform.setWeaponDrawnMode(actor, 1). That value is stored and
-     * never expires, and while it is 1 a Frida hook rewrites every sheathe
-     * into a draw, so the hands cannot go down again by any means the game
-     * offers. Putting clothes on is enough to trigger it.
-     *
-     * -1 is WEAP_DRAWN_MODE_DEFAULT, which means stop overriding rather than
-     * sheathe, so the sheathe below is what actually lowers the hands.
-     */
-    const pc = player();
-    if (pc) {
-      try {
-        sp.TESModPlatform.setWeaponDrawnMode(pc, -1);
-        if (pc.isWeaponDrawn && pc.isWeaponDrawn()) { pc.sheatheWeapon(); }
-        log('cleared the weapon-drawn pin');
-      } catch (err) {
-        log('could not clear the weapon-drawn pin:', err);
-      }
+// With the wheel open the page sends __stand, so a letter typed into the
+// search is not also a stand-up. With the wheel shut this key is the way.
+function standUp() {
+  if ((T.isTyping && T.isTyping()) || gameIsBusy() || inCreationRoom()) { return; }
+  play(STOP);
+  /*
+   * The same key also takes off a stuck weapon-drawn pin, because the two
+   * problems feel identical from the chair: you are locked into something
+   * and want out.
+   *
+   * skymp5-client turns any animation event with "equip" in its name into
+   * SkympFakeEquip, and whoever receives that calls
+   * TESModPlatform.setWeaponDrawnMode(actor, 1). That value is stored and
+   * never expires, and while it is 1 a Frida hook rewrites every sheathe
+   * into a draw, so the hands cannot go down again by any means the game
+   * offers. Putting clothes on is enough to trigger it.
+   *
+   * -1 is WEAP_DRAWN_MODE_DEFAULT, which means stop overriding rather than
+   * sheathe, so the sheathe below is what actually lowers the hands.
+   */
+  const pc = player();
+  if (pc) {
+    try {
+      sp.TESModPlatform.setWeaponDrawnMode(pc, -1);
+      if (pc.isWeaponDrawn && pc.isWeaponDrawn()) { pc.sheatheWeapon(); }
+      log('cleared the weapon-drawn pin');
+    } catch (err) {
+      log('could not clear the weapon-drawn pin:', err);
     }
   }
+}
+
+sp.on('buttonEvent', guard('stopKey', (e) => {
+  if (e.isDown && !e.isUp && e.code === STOP_KEY && !open) { standUp(); }
 }));
 
-log('plugin loaded,', CATEGORIES.length, 'categories,',
-    CATEGORIES.reduce(function (n, c) { return n + c.items.length; }, 0), 'emotes -',
-    '- wheel on scan code', OPEN_KEY, '(' + (LETTERS[OPEN_KEY] || '?') + ')',
+log('plugin loaded,', EMOTES.length, 'emotes,', SLOT_COUNT, 'quick slots -',
+    'wheel on scan code', OPEN_KEY, '(' + (LETTERS[OPEN_KEY] || '?') + ')',
     'stop on', STOP_KEY);
 
 })();

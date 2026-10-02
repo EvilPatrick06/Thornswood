@@ -13,17 +13,43 @@
   it would otherwise. The passphrase is the thing to keep carefully, and it is
   not in here.
 
-  Worth putting on a scheduled task on this machine, an hour or so after the
-  one on the VPS. Until something does this on its own, the backups are only
-  as good as somebody remembering.
+  ON ITS OWN, since issue #401:
+
+      .\scripts\vps\Fetch-Backups.ps1 -Schedule      every day at 04:15, an hour after the box takes one
+      .\scripts\vps\Fetch-Backups.ps1 -Unschedule    take that task off again
+      .\scripts\vps\Fetch-Backups.ps1 -PruneOnly     only the tidy below, no ssh
+
+  -Schedule copies this script, Restore-Backup.ps1, Vps.ps1 and vps.json to
+  %LOCALAPPDATA%\Thornswood\Backups-Fetch and points a task on this machine at
+  that copy, so the task does not break when a repo folder or worktree is
+  moved or removed. It runs as you, while you are signed in, and a run missed
+  because the machine was off happens at the next sign in. Run -Schedule
+  again after this script changes to refresh the copy.
+
+  The copy off the box goes over ssh (scp), with the key already used for the
+  VPS. Nothing is ever served over HTTPS for this.
+
+  KEPT HERE: everything from the last -KeepDays days (30 unless told), and the
+  newest seven whatever their age, so a VPS that stopped taking backups a
+  month ago does not quietly lose its last good ones here too. Only files
+  named the way the box names them are ever considered.
+
+  Every run adds to fetch.log in the -To folder, because a task that runs
+  unattended says nothing to anybody otherwise.
 #>
 [CmdletBinding()]
 param(
   [string]$VpsHost = '',
-  [string]$VpsUser = 'Administrator',
+  [string]$VpsUser = '',
   [string]$Remote  = 'C:/Thornswood-Backup',
   [string]$To      = "$env:USERPROFILE\Downloads\Thornswood-Backups",
   [string]$KeyFile = "$env:USERPROFILE\Documents\thornswood-backup-key.txt",
+  [int]$KeepDays   = 30,
+  [string]$At      = '04:15',
+  [string]$TaskName = 'Thornswood Fetch Backups',
+  [switch]$Schedule,
+  [switch]$Unschedule,
+  [switch]$PruneOnly,
   [switch]$All,
   [switch]$NoVerify,
   [switch]$NoPause
@@ -33,14 +59,86 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here 'Vps.ps1')
+
+function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c; Log $m }
+function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray; Log "-- $m" }
+function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; Log "STOP. $m"; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
+function Log($m) {
+  try {
+    if (Test-Path -LiteralPath $To) {
+      Add-Content -LiteralPath (Join-Path $To 'fetch.log') -Value ((Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + '  ' + $m) -Encoding UTF8
+    }
+  } catch { }
+}
+
+# Everything from the last $KeepDays days, and the newest seven whatever
+# their age. Matched by name, so nothing put here by hand is ever touched.
+function Prune {
+  if ($KeepDays -le 0) { return }
+  $mine = @(Get-ChildItem -LiteralPath $To -File -EA SilentlyContinue |
+            Where-Object { $_.Name -match '^thornswood-(\d{8})-(\d{6})\.zip(\.enc)?$' } |
+            Sort-Object Name -Descending)
+  $cut = (Get-Date).Date.AddDays(-$KeepDays)
+  $dropped = 0
+  for ($i = 7; $i -lt $mine.Count; $i++) {
+    $d = [datetime]::ParseExact($mine[$i].Name.Substring(11, 8), 'yyyyMMdd', $null)
+    if ($d -lt $cut) {
+      Remove-Item -LiteralPath $mine[$i].FullName -Force -EA SilentlyContinue
+      Say ("  dropped {0}, older than {1} days" -f $mine[$i].Name, $KeepDays) 'DarkGray'
+      $dropped++
+    }
+  }
+  Say ("  kept {0} backup(s) here" -f ($mine.Count - $dropped)) 'DarkGray'
+}
+
+if (-not (Test-Path -LiteralPath $To)) { [void](New-Item -ItemType Directory -Path $To -Force) }
+
+# ---------------------------------------------------------- the schedule ----
+if ($Unschedule) {
+  Head 'Taking the fetch task off this machine'
+  Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -EA SilentlyContinue
+  if (Get-ScheduledTask -TaskName $TaskName -EA SilentlyContinue) { Die "$TaskName is still registered." }
+  Say "  $TaskName removed. The backups already here are left alone." 'Green'
+  if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+  exit 0
+}
+if ($Schedule) {
+  Head 'Putting the fetch on a schedule on this machine'
+  $home2 = Join-Path $env:LOCALAPPDATA 'Thornswood\Backups-Fetch'
+  [void](New-Item -ItemType Directory -Path $home2 -Force)
+  foreach ($n in 'Fetch-Backups.ps1', 'Restore-Backup.ps1', 'Vps.ps1', 'vps.json') {
+    $from = Join-Path $Here $n
+    if (-not (Test-Path -LiteralPath $from)) { Die "$n is not beside this script, so the task would not run." }
+    Copy-Item -LiteralPath $from -Destination (Join-Path $home2 $n) -Force
+  }
+  Say "  copied the scripts to $home2" 'DarkGray'
+  $me = Join-Path $home2 'Fetch-Backups.ps1'
+  $argLine = ('-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -NoPause -To "{1}" -KeyFile "{2}" -KeepDays {3}' -f
+              $me, $To, $KeyFile, $KeepDays)
+  $a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $argLine -WorkingDirectory $home2
+  $t = New-ScheduledTaskTrigger -Daily -At $At
+  $p = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive
+  $s = New-ScheduledTaskSettingsSet -StartWhenAvailable -DontStopOnIdleEnd -ExecutionTimeLimit (New-TimeSpan -Hours 1)
+  Register-ScheduledTask -TaskName $TaskName -Action $a -Trigger $t -Principal $p -Settings $s -Force | Out-Null
+  $x = Get-ScheduledTask -TaskName $TaskName -EA SilentlyContinue
+  if (-not $x) { Die "Registering $TaskName failed." }
+  Say ("  {0} registered, next run {1}" -f $TaskName, (Get-ScheduledTaskInfo -TaskName $TaskName).NextRunTime) 'Green'
+  Say "  it writes what it did to $(Join-Path $To 'fetch.log')" 'DarkGray'
+  if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+  exit 0
+}
+if ($PruneOnly) {
+  Head "Tidying $To"
+  Prune
+  if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+  exit 0
+}
+
+if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
-
-function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
-function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
-function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
-
+Log "---- fetch from $VpsHost ----"
 $target = "$VpsUser@$VpsHost"
-$ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new')
+$ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
 foreach ($t in 'ssh', 'scp') {
   if (-not (Get-Command $t -ErrorAction SilentlyContinue)) { Die "$t is not on PATH." }
 }
@@ -51,7 +149,7 @@ Get-ChildItem '$($Remote.Replace('/','\'))' -File -EA SilentlyContinue |
   Where-Object { `$_.Name -match '^thornswood-\d{8}-\d{6}\.zip(\.enc)?`$' } |
   ForEach-Object { `$_.Name + '|' + `$_.Length }
 "@))
-$listing = & ssh @ssh $target "powershell -NoProfile -EncodedCommand $e" 2>&1
+$listing = Invoke-ThornswoodNative { & ssh @ssh $target "powershell -NoProfile -EncodedCommand $e" } 2>&1
 
 Head 'On the VPS'
 $onBox = @()
@@ -78,19 +176,24 @@ foreach ($b in ($onBox | Sort-Object Name)) {
 if (-not $want.Count) {
   Head 'Nothing new'
   Say "  Everything on the box is already in $To" 'Green'
+  Prune
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
   exit 0
 }
 
 Head ("Copying {0}" -f $want.Count)
 $got = @()
+# Counted so an unattended run ends non-zero, which is what the task
+# scheduler shows as its last result.
+$failed = 0
 foreach ($b in $want) {
-  & scp @ssh "${target}:$Remote/$($b.Name)" (Join-Path $To $b.Name)
-  if ($LASTEXITCODE -ne 0) { Say ("  FAILED  " + $b.Name) 'Red'; continue }
+  Invoke-ThornswoodNative { & scp @ssh "${target}:$Remote/$($b.Name)" (Join-Path $To $b.Name) }
+  if ($LASTEXITCODE -ne 0) { Say ("  FAILED  " + $b.Name) 'Red'; $failed++; continue }
   $local = Join-Path $To $b.Name
   $len = (Get-Item $local).Length
   if ($len -ne $b.Length) {
     Say ("  SHORT   {0}  got {1} of {2} bytes" -f $b.Name, $len, $b.Length) 'Red'
+    $failed++
     continue
   }
   Say ("  {0}  {1} MB" -f $b.Name, [math]::Round($len / 1MB, 2)) 'Green'
@@ -99,7 +202,9 @@ foreach ($b in $want) {
 
 if ($NoVerify -or -not $got.Count) {
   Write-Host ''
+  Prune
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+  if ($failed) { exit 1 }
   exit 0
 }
 
@@ -115,10 +220,14 @@ if (-not (Test-Path -LiteralPath $restore)) {
   Say "  No passphrase at $KeyFile, so it could not be opened. Pass -KeyFile." 'Yellow'
 } else {
   & $restore -Backup $newest -KeyFile $KeyFile -CheckOnly -NoPause
-  if ($LASTEXITCODE -ne 0) { Say '  THAT BACKUP DID NOT OPEN. Do not trust the rest until you know why.' 'Red' }
+  if ($LASTEXITCODE -ne 0) { Say '  THAT BACKUP DID NOT OPEN. Do not trust the rest until you know why.' 'Red'; $failed++ }
+  else { Say ("  {0} opens and its signature is good" -f (Split-Path -Leaf $newest)) 'Green' }
 }
 
+Prune
 Write-Host ''
 Say "  They are in $To" 'DarkGray'
 Say '  Restoring one for real is docs\RESTORING.md.' 'DarkGray'
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+if ($failed) { exit 1 }
+exit 0

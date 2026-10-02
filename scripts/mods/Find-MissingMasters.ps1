@@ -17,8 +17,8 @@ param(
 <#
   A CHECK THAT FINDS NOTHING MUST NOT SAY EVERYTHING IS FINE.
 
-  Until 23 September this defaulted to C:\SkyrimTogether\Game\Data, a folder
-  from the Skyrim Together days that has not existed on either machine for
+  Until 23 September this defaulted to the old build folder's Game\Data, a
+  folder from before the rename that has not existed on either machine for
   weeks. Run with no arguments it listed an empty folder, compared nothing
   against nothing, and printed "no missing masters. every plugin's dependencies
   are present." in green. Two errors scrolled past above it and the verdict

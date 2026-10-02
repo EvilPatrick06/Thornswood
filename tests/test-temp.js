@@ -22,13 +22,13 @@
 // clock, the way test-needs.js does.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
-const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
+const SRC = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
-const FRONT = fs.readFileSync(path.join(TOOLS_DIR, '..', 'game', 'plugins', 'thornswood-front.js'), 'utf8');
+const FRONT = fs.readFileSync(path.join(REPO_DIR, 'game', 'plugins', 'thornswood-front.js'), 'utf8');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -65,6 +65,7 @@ const WATERS = wetLine ? JSON.parse(wetLine[1]) : { items: {} };
 function rig() {
   const store = {};
   const worn = {};
+  const equipped = {};
   const cells = {};
   const pos = {};
   const props = {};
@@ -89,6 +90,10 @@ function rig() {
     get: function (id, key) {
       if (key === 'worldOrCellDesc') { return cells[id] || 'cell:X.esm'; }
       if (key === 'inventory') { return { entries: worn[id] || [] }; }
+      if (key === 'equipment') {
+        if (!Object.prototype.hasOwnProperty.call(equipped, id)) { return undefined; }
+        return { inv: { entries: equipped[id] || [] } };
+      }
       if (key === 'pos') { return pos[id] || [0, 0, 0]; }
       return store[id] ? store[id].v : undefined;
     },
@@ -124,17 +129,30 @@ function rig() {
   api.putAt = function (id, xyz) { pos[id] = xyz; if (!store[id]) { store[id] = {}; } };
   api.caught = function (id) { return props[id] || []; };
   api.burnTick = function () { if (ticker) { ticker(); } };
-  /** Put a set of descriptors on somebody's back. */
+  /** Put a set of descriptors on somebody's back (inventory + equipment). */
   api.dress = function (id, descs) {
-    worn[id] = descs.map(function (d) { return { baseId: idOf(d), worn: true }; });
+    const entries = descs.map(function (d) { return { baseId: idOf(d), worn: true }; });
+    worn[id] = entries;
+    equipped[id] = entries.slice();
   };
   /** The same things, in the pack rather than on. */
   api.carry = function (id, descs) {
     worn[id] = descs.map(function (d) { return { baseId: idOf(d), worn: false }; });
+    equipped[id] = [];
   };
   /** A worn thing by raw id, for the piece no table has heard of. */
   api.wearRaw = function (id, baseId) {
-    worn[id] = [{ baseId: baseId, worn: true }];
+    const entries = [{ baseId: baseId, worn: true }];
+    worn[id] = entries;
+    equipped[id] = entries.slice();
+  };
+  /**
+   * Inventory worn flags say one thing; equipment says another.
+   * #608: warmth must follow equipment when that record is readable.
+   */
+  api.dressDisagree = function (id, invDescs, eqDescs) {
+    worn[id] = (invDescs || []).map(function (d) { return { baseId: idOf(d), worn: true }; });
+    equipped[id] = (eqDescs || []).map(function (d) { return { baseId: idOf(d), worn: true }; });
   };
   api.minutes = function (m) { clock.now += m * 60000; };
   return api;
@@ -203,12 +221,23 @@ if (block) {
         /indoors \? 1 : 0/.test(where) && /pz \/ 500/.test(where));
     yes('and the server takes all five off the command',
         /pl\.place\(actorId, String\(parts\[1\] \|\| ''\), parts\[2\], parts\[3\],/.test(src));
+    /*
+      #841: night must follow GameHour (what paints the sky), not
+      Utility.getCurrentGameTime (GameDaysPassed). SkyMP TimeService writes
+      0x38 and never GameDaysPassed, so the old clock could disagree with
+      what is on screen.
+    */
+    yes('night reads GameHour 0x38 for what is on screen (#841)',
+        /GlobalVariable\.from\(sp\.Game\.getFormEx\(0x38\)\)/.test(where) &&
+        /hour < 6 \|\| hour >= 20/.test(where));
+    yes('night does not use getCurrentGameTime any more (#841)',
+        !/getCurrentGameTime\(\)/.test(where));
   }
 
   // ------------------------------------------------------ the fire table
   {
     let fires = null;
-    try { fires = JSON.parse(fs.readFileSync(path.join(TOOLS_DIR, '..', 'game', 'data', 'fires.json'), 'utf8')); }
+    try { fires = JSON.parse(fs.readFileSync(path.join(REPO_DIR, 'game', 'data', 'fires.json'), 'utf8')); }
     catch (e) { fires = null; }
     yes('the fire table has been built', !!fires && Array.isArray(fires.fires));
     if (fires) {
@@ -274,10 +303,15 @@ if (block) {
         yes('and it asks for the four form types the table is built from',
             /const CELL_TYPES = \[24, 34, 36, 42\];/.test(FRONT));
         yes('a fire somebody switched off is still skipped',
-            /found\[k\]\.ref\.isDisabled\(\)/.test(FRONT));
-        yes('and the walk happens once a cell rather than once a probe',
+            /off = !!r\.isDisabled\(\)/.test(FRONT));
+        yes('and a non-empty walk is kept for the cell rather than redone every probe',
             /if \(cellId !== fireCell\)/.test(FRONT) &&
-            /if \(fireHere\) \{ return fireHere; \}/.test(FRONT));
+            /if \(fireHere && fireHere\.length\)/.test(FRONT));
+        yes('an empty fire walk is retried, not cached forever',
+            /FIRE_EMPTY_RETRY/.test(FRONT) && /fireEmptyAt/.test(FRONT));
+        yes('using a forge furniture counts as standing in the heat',
+            /getFurnitureReference/.test(FRONT) &&
+            /function fireDistance/.test(FRONT));
       }
       // The unlit ones are the trap: a name match would have warmed people up
       // at a dead campfire.
@@ -515,6 +549,21 @@ if (block) {
         const vb = bare2.view(12);
         yes('somebody the server sees nothing on lists nothing',
             Array.isArray(vb.worn) && vb.worn.length === 0 && vb.cover === 0);
+        // Pack says fur is worn; equipment is empty: warmth must be bare (#608).
+        {
+          const apiD = rig();
+          apiD.view(920);
+          apiD.dressDisagree(920, [fur], []);
+          const vd = apiD.view(920);
+          yes('equipment empty wins over inventory worn flags',
+              vd.cover === 0 && Array.isArray(vd.worn) && vd.worn.length === 0);
+          // Pack flags clear; equipment has fur: warmth must count the coat.
+          apiD.view(921);
+          apiD.dressDisagree(921, [], [fur]);
+          const ve = apiD.view(921);
+          yes('equipment worn counts even when inventory flags are clear',
+              ve.cover > 0 && ve.worn.length === 1);
+        }
 
         // A worn thing the table has never heard of is said out loud rather
         // than counted as zero and forgotten, because that is the shape of a
@@ -614,7 +663,7 @@ if (block) {
   // --------------------------------------------- wind, night and altitude
   {
     let sky = null;
-    try { sky = JSON.parse(fs.readFileSync(path.join(TOOLS_DIR, '..', 'game', 'data', 'weather.json'), 'utf8')); }
+    try { sky = JSON.parse(fs.readFileSync(path.join(REPO_DIR, 'game', 'data', 'weather.json'), 'utf8')); }
     catch (e) { sky = null; }
     yes('the weather table has been built', !!sky && !!sky.items);
     yes('and is installed in the gamemode', !!skyLine);
@@ -705,7 +754,7 @@ if (block) {
   // ---------------------------------------------------------- water types
   {
     let wet = null;
-    try { wet = JSON.parse(fs.readFileSync(path.join(TOOLS_DIR, '..', 'game', 'data', 'waters.json'), 'utf8')); }
+    try { wet = JSON.parse(fs.readFileSync(path.join(REPO_DIR, 'game', 'data', 'waters.json'), 'utf8')); }
     catch (e) { wet = null; }
     yes('the water table has been built', !!wet && !!wet.waters);
     yes('and is installed in the gamemode', !!wetLine);
@@ -751,6 +800,11 @@ if (block) {
           swimIn('nowhere:X.esm', 'shallow') > swimIn('nowhere:X.esm', 'water'));
       yes('the client has a word for wading',
           /wading = /.test(FRONT) && /kind = 'shallow'/.test(FRONT));
+      // #608: actor root Z can sit a few units above a real cell plane.
+      yes('and feet slack covers temple near-misses (#608)',
+          /FEET_SLACK/.test(FRONT) && /deep > -FEET_SLACK/.test(FRONT));
+      yes('and the heartbeat names when slack decided wading',
+          /wading via feet slack/.test(FRONT));
       // And the water class only ever applies to somebody in the water.
       {
         const icy2 = Object.keys(WATERS.items).filter(function (d) { return WATERS.items[d] === 'ice'; })[0];

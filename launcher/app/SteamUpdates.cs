@@ -8,8 +8,9 @@ namespace Thornswood
 {
     /// <summary>
     /// Steam's Updates setting for Skyrim: read on every start so the log says
-    /// what it is, and changed only when a person says yes to a question that
-    /// says what the change is.
+    /// what it is, and set to "Wait until I launch the game" by the launcher
+    /// itself, with Steam closed (see "SO THE LAUNCHER WRITES THE SETTING
+    /// ITSELF" below).
     ///
     /// Why it matters. The downgrade puts the 1.6.1170 files in place, but
     /// Steam still believes the game is on the newest build, and unless the
@@ -46,7 +47,68 @@ namespace Thornswood
     /// the only one of twenty manifests there that does, which is what some
     /// downgrade guides tell people to do. Steam was running at the time.
     ///
-    /// So the write, when a person asks for it:
+    /// READ ONLY IS NOT HOW THE VERSION IS HELD (issue #493). Steam keeps
+    /// this file up to date with the game's state and writes it every few
+    /// seconds while it runs; a read-only file makes every one of those
+    /// writes fail. On Patrick's machine on 29 September Steam's
+    /// logs\content_log.txt held 11,568 lines of "Failed to write app state
+    /// file ... appmanifest_489830.acf (1156 bytes)", one every six seconds,
+    /// and nothing else Steam logs about Skyrim is findable among them. The
+    /// mark went on by hand or by another program on 10 September, before
+    /// any of this repository's tooling existed (nothing in its history sets
+    /// it). Until #493 Hold then put it back after every write, so the
+    /// launcher kept it there. The version is held by the setting above,
+    /// which is Steam's own way to hold it and survives Steam's writes, and
+    /// by starting Skyrim from the launcher. So Hold takes the mark off, and
+    /// the start line says when a file has it and how to take it off by hand.
+    ///
+    /// WHAT THE MARK WAS GUARDING, measured on Patrick's machine on
+    /// 29 September, read only, when he asked whether it should stay read only
+    /// so Steam does not update the game:
+    ///   - Thornswood does not run the Steam copy. It runs Thornswood\Game
+    ///     (OwnGame), and that folder's SkyrimSE.exe, masters and every file
+    ///     in the game's root are its own copies: fsutil gives them other file
+    ///     ids than the Steam copy's. Of the Steam copy's files in the root and
+    ///     in Data, 27 share a file with Thornswood's folder, and the only ones
+    ///     that are the game's own are five archives (_ResourcePack.bsa and
+    ///     four Creation Club ones); the rest are mods Vortex deployed.
+    ///   - Steam never writes an update into a file in place. It builds each
+    ///     changed file whole under steamapps\downloading\<app> and then moves
+    ///     it into the game folder: content_log.txt on 25 September has
+    ///     Echoes of Aincrad stage 8,850,941,379 bytes and "starting commit
+    ///     from ...\downloading\2244210 ... 10 updated" finish in the same
+    ///     second, which only a move can do. A move puts a new file under the
+    ///     Steam copy's name and leaves the file Thornswood's folder links to
+    ///     as it was. So a Steam update cannot reach the game Thornswood runs,
+    ///     and Play still checks that folder's exe (Checks "Game build").
+    ///   - What an update cost was the Steam copy: Thornswood's folder was
+    ///     brought up to date from it, OwnGame.WhyNot refused while it was on
+    ///     another build, and the Downgrade had to be run again. Since #1218 a
+    ///     folder that is made takes nothing but Vortex's files and never
+    ///     reads the Steam copy's game, so an update costs it nothing. The
+    ///     setting still saves a download before the folder is made, when
+    ///     the folder is made from the Steam copy only if that copy is on
+    ///     1.6.1170.
+    ///   - The mark itself was never put to the test. Steam's file says it
+    ///     holds build 24914197, taken on 10 September 11:06 (lastupdated),
+    ///     two hours before the mark went on, and neither content log has an
+    ///     "Update Required" for 489830: there has been no newer Skyrim since.
+    ///     What it did do is 43,739 "Failed to write app state file" lines in
+    ///     the two logs, and it would stop Steam saving this very setting if it
+    ///     were changed on Steam's Properties page.
+    ///
+    /// SO THE LAUNCHER WRITES THE SETTING ITSELF (Patrick on #493, 29 Sep:
+    /// "Our Repo should write this so it doesn't auto update the game and
+    /// people have to re do the downgrade again"). At every start until
+    /// Thornswood's own folder is made (LooksAtStart, #1226), while the
+    /// Steam copy is on the build the server runs and the file is not on 1 or
+    /// carries the mark (OnStart): with Steam closed it is written there and
+    /// then, with nothing to ask; with Steam open, a question whose Yes closes
+    /// Steam, writes it, and starts Steam again, and a No that is remembered.
+    /// It no longer follows a downgrade: the downgrade does not write the
+    /// Steam copy any more (#1218), so there is nothing there to hold.
+    ///
+    /// So the write:
     ///   - never while Steam is running. Steam keeps the setting in memory and
     ///     writes its own copy of the file when it closes, which undoes an edit
     ///     made underneath it without a sign;
@@ -56,7 +118,9 @@ namespace Thornswood
     ///     the way Steam writes it is left alone;
     ///   - goes through a temporary file and File.Replace, so a half-written
     ///     manifest can never be left behind;
-    ///   - keeps a read-only file read-only, since somebody chose that.
+    ///   - leaves the file writable, so Steam can keep saving the game's
+    ///     state in it (above). A file already on 1 that is only read only has
+    ///     just the mark taken off, its bytes untouched.
     /// </summary>
     static class SteamUpdates
     {
@@ -69,6 +133,14 @@ namespace Thornswood
         /// <summary>The same change made by hand, for every message that leaves the file alone.</summary>
         public const string How =
             "To change it in Steam yourself: right click The Elder Scrolls V: Skyrim Special Edition in the library, Properties, Updates, and under Automatic Updates pick \"" + OnLaunchWords + "\".";
+
+        /// <summary>The read-only mark taken off by hand, for the start line when the file has it.</summary>
+        public static string Writable(string manifest)
+        {
+            return "Steam's file for Skyrim, " + manifest + ", is marked read only, so Steam cannot save Skyrim's state in it and logs \"Failed to write app state file\" every few seconds. " +
+                   "The Updates setting is what keeps Skyrim on 1.6.1170, so the file does not need the mark. To take it off: exit Steam from its own menu (Steam, Exit), " +
+                   "right click that file in File Explorer, Properties, clear Read-only, OK, then start Steam again.";
+        }
 
         // Every byte maps to one char and back, so whatever else is in the
         // file, a UTF-8 path or a byte order mark, is written back exactly as
@@ -192,16 +264,144 @@ namespace Thornswood
             string manifest = ManifestFor(skyrimFolder);
             string v = Read(manifest);
             if (v == null) return null;
+            string mark = IsReadOnly(manifest) ? " " + Writable(manifest) : "";
             if (v == OnLaunchOnly)
-                return "Steam's Updates setting for Skyrim is \"" + Setting(v) + "\", so Steam leaves it on 1.6.1170 unless Skyrim is started from Steam.";
-            return "Steam's Updates setting for Skyrim is \"" + Setting(v) + "\", so Steam can update it by itself, and the next Skyrim update Steam takes moves it off 1.6.1170 and it has to be downgraded again. " + How;
+                return "Steam's Updates setting for Skyrim is \"" + Setting(v) + "\", so Steam leaves it on 1.6.1170 unless Skyrim is started from Steam." + mark;
+            return "Steam's Updates setting for Skyrim is \"" + Setting(v) + "\", so Steam can update it by itself. Thornswood's own game folder keeps its own 1.6.1170 files whatever Steam does, but until that folder is made, an update means the Downgrade button downloading 1.6.1170's files first. " + How + mark;
         }
 
-        /// <summary>True when the file is there, readable, and not already on 1. What the question after a downgrade is asked on.</summary>
+        /// <summary>True when the file carries the ReadOnly attribute. False when it is not there or cannot be read.</summary>
+        public static bool IsReadOnly(string manifest)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(manifest) || !File.Exists(manifest)) return false;
+                return (File.GetAttributes(manifest) & FileAttributes.ReadOnly) != 0;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// True when the file is there, readable, and either not already on 1
+        /// or marked read only (issue #493). What the question after a
+        /// downgrade is asked on.
+        /// </summary>
         public static bool NeedsHolding(string manifest)
         {
             string v = Read(manifest);
-            return v != null && v != OnLaunchOnly;
+            return v != null && (v != OnLaunchOnly || IsReadOnly(manifest));
+        }
+
+        /// <summary>What the launcher does on the way in, from OnStart.</summary>
+        public const string Nothing = "nothing", Write = "write", Ask = "ask";
+
+        /// <summary>
+        /// Whether the launcher looks at Steam's Updates setting for Skyrim at
+        /// all on the way in: only while the install has no folder of its own
+        /// and no downgrade is needed first.
+        ///
+        /// Patrick, 29 Sep (#1226): the launcher sets "Wait until I launch the
+        /// game" only before the own folder is made; after that "people's
+        /// Steam copy is theirs to update however they like". Before the folder
+        /// exists it is made from the Steam copy's game, so a Steam update then
+        /// costs a whole Downgrade; once it exists the folder holds the game
+        /// itself (#1218) and an update to the Steam copy costs Thornswood
+        /// nothing, so neither the setting nor a line about it is Thornswood's
+        /// business any more. <paramref name="ownFolder"/> is true once the game
+        /// runs from a folder of its own (Paths.Collection false).
+        /// </summary>
+        public static bool LooksAtStart(bool ownFolder, bool downgradeNeeded)
+        {
+            return !ownFolder && !downgradeNeeded;
+        }
+
+        /// <summary>
+        /// What the launcher does with the file on the way in. Nothing when it
+        /// is already held (or cannot be read). Write, with no question, when
+        /// Steam is closed: it is Steam's own setting, one value, the one
+        /// Patrick asked the launcher to write, and nothing is running to undo
+        /// it. Otherwise it needs Steam closed, which is the person's to agree
+        /// to: Ask, unless Skyrim is running (closing Steam under the game) or
+        /// the person already said No, and then Nothing, with the start line
+        /// saying how to do it by hand.
+        /// </summary>
+        public static string OnStart(bool needsHolding, bool steamRunning, bool gameRunning, bool declined)
+        {
+            if (!needsHolding) return Nothing;
+            if (!steamRunning) return Write;
+            if (gameRunning || declined) return Nothing;
+            return Ask;
+        }
+
+        /// <summary>
+        /// The question, for the file as it is now. Says what Yes changes and
+        /// where, and, when Steam is open, that Yes closes Steam for the change
+        /// and starts it again, because Steam writes its own copy back when it
+        /// closes and would undo a change made under it.
+        /// </summary>
+        public static string Question(string manifest, bool steamRunning)
+        {
+            string steam = steamRunning
+                ? "Steam has to be closed while the file changes, or it writes the old setting back when it closes. Yes closes Steam, makes the change and starts Steam again.\n\n"
+                : "";
+            if (Read(manifest) == OnLaunchOnly)
+                return "Steam's Updates setting for Skyrim is already \"" + OnLaunchWords + "\", which is what keeps Skyrim on 1.6.1170.\n\n" +
+                       "But Steam's file for Skyrim is marked read only, which stops Steam saving Skyrim's state in it, so Steam logs a failure every six seconds:\n\n    " + manifest + "\n\n" +
+                       "Yes takes that mark off and changes nothing in the file.\n\n" + steam +
+                       "No leaves it as it is.";
+            return "Steam can update its copy of Skyrim by itself. Thornswood's own game folder keeps its own 1.6.1170 files whatever Steam does, but until that folder is made, an update means downloading 1.6.1170's files for it first.\n\n" +
+                   "Yes changes Steam's Updates setting for Skyrim to \"" + OnLaunchWords + "\", the same as picking it under Automatic Updates on Steam's own Properties, Updates page. " +
+                   "Thornswood never starts Skyrim through Steam, so Steam then leaves it on 1.6.1170. " +
+                   "It changes that one value in Steam's file for Skyrim and nothing else:\n\n    " + manifest + "\n\n" +
+                   (IsReadOnly(manifest)
+                       ? "That file is marked read only, which stops Steam saving Skyrim's state in it. Yes also takes that mark off; the Updates setting is what keeps Skyrim on 1.6.1170.\n\n"
+                       : "") +
+                   steam +
+                   "No leaves it as it is.";
+        }
+
+        /// <summary>
+        /// Waits for every steam.exe to exit, up to <paramref name="seconds"/>.
+        /// True once none is left. Waits on the processes themselves, not on a
+        /// clock: Steam saves its files for every game on the way out, and
+        /// only once it has gone is the file safe to change.
+        /// </summary>
+        public static bool WaitClosed(int seconds)
+        {
+            DateTime until = DateTime.UtcNow.AddSeconds(seconds);
+            while (true)
+            {
+                Process[] found;
+                try { found = Process.GetProcessesByName("steam"); }
+                // Not knowing counts as still running, so nothing is written under it.
+                catch { return false; }
+                if (found.Length == 0) return true;
+                if (DateTime.UtcNow >= until)
+                {
+                    foreach (Process p in found) p.Dispose();
+                    return false;
+                }
+                // Each one waited on until it exits or time runs out, then the
+                // list is taken again, because the one that exits can have
+                // started another on its way out.
+                foreach (Process p in found)
+                {
+                    try
+                    {
+                        int left = (int)Math.Max(0, (until - DateTime.UtcNow).TotalMilliseconds);
+                        p.WaitForExit(left);
+                    }
+                    catch
+                    {
+                        // One this cannot wait on (it exited as it was asked,
+                        // or Windows refused): the next pass lists it again or
+                        // finds it gone, a quarter second from now rather than
+                        // at once, so this never spins.
+                        System.Threading.Thread.Sleep(250);
+                    }
+                    finally { p.Dispose(); }
+                }
+            }
         }
 
         public static bool SteamRunning()
@@ -218,8 +418,10 @@ namespace Thornswood
 
         /// <summary>
         /// Sets Skyrim's Updates setting to "Wait until I launch the game" in
-        /// Steam's file. Only ever called after a person has said yes.
-        /// Returns one line for the log saying what happened.
+        /// Steam's file, and takes off a read-only mark. Called on the way in
+        /// when Steam is closed (OnStart), or after a person said Yes to the
+        /// question. Never writes while Steam runs. Returns one line for the
+        /// log saying what happened.
         /// </summary>
         public static string Hold(string manifest) { return Hold(manifest, SteamRunning()); }
 
@@ -238,7 +440,16 @@ namespace Thornswood
             if (after == null || Value(after) != OnLaunchOnly)
                 return manifest + " is not laid out the way Steam writes it, so the launcher left it alone. " + How;
             if (after == before)
-                return "Steam's Updates setting for Skyrim is already \"" + Setting(OnLaunchOnly) + "\". Nothing was changed.";
+            {
+                if (!IsReadOnly(manifest))
+                    return "Steam's Updates setting for Skyrim is already \"" + Setting(OnLaunchOnly) + "\". Nothing was changed.";
+                // On 1 already and only read only: the mark comes off and not
+                // a byte of the file changes (issue #493).
+                try { File.SetAttributes(manifest, File.GetAttributes(manifest) & ~FileAttributes.ReadOnly); }
+                catch (Exception ex) { return "Steam's Updates setting for Skyrim is already \"" + Setting(OnLaunchOnly) + "\", but the read-only mark on " + manifest + " could not be taken off: " + ex.Message + " " + Writable(manifest); }
+                return "Steam's Updates setting for Skyrim is already \"" + Setting(OnLaunchOnly) + "\". " + manifest +
+                       " is no longer marked read only, so Steam can save Skyrim's state in it again. Nothing else in it changed.";
+            }
 
             string tmp = Path.Combine(Path.GetDirectoryName(manifest), "thornswood-" + AppId + ".tmp");
             FileAttributes attrs = FileAttributes.Normal;
@@ -270,21 +481,15 @@ namespace Thornswood
                 }
                 return "Could not change " + manifest + ": " + ex.Message + " It is as it was. " + How;
             }
-            if (readOnly)
-            {
-                try { File.SetAttributes(manifest, File.GetAttributes(manifest) | FileAttributes.ReadOnly); }
-                catch
-                {
-                    // The new setting is written, and the file is left writable.
-                    // Nothing here can log it, for the reason above.
-                }
-            }
+            // Left writable, not marked read only again (issue #493): the
+            // setting just written is what holds the version, and Steam has to
+            // be able to save the game's state here.
 
             string now = Read(manifest);
             if (now != OnLaunchOnly)
                 return "Wrote " + manifest + " but it " + (now == null ? "could not be read back" : "reads back as \"" + Setting(now) + "\"") + ". " + How;
             return "Steam's Updates setting for Skyrim is now \"" + Setting(OnLaunchOnly) + "\". Only that one value in " + manifest +
-                   " changed" + (readOnly ? ", and the file is read-only again, as it was." : ".") +
+                   " changed" + (readOnly ? ", and it is no longer marked read only, so Steam can save Skyrim's state in it again." : ".") +
                    " Steam's own Properties, Updates page shows it under Automatic Updates the next time Steam starts.";
         }
 

@@ -27,13 +27,13 @@
 [CmdletBinding()]
 param(
   [string]$Vps  = '',
-  [string]$User = 'Administrator',
+  [string]$User = '',
   [string]$Remote = 'C:\Thornswood-Server\gamemode.js',
   [switch]$NoPause
 )
 
 $ErrorActionPreference = 'Stop'
-$ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new')
+$ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) {
@@ -44,6 +44,7 @@ function Head($m) {
 
 $Here = $PSScriptRoot
 . (Join-Path $Here 'Vps.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $local = Join-Path $Here '..\..\game\gamemode.js'
 if (-not (Test-Path -LiteralPath $local)) { throw "not found: $local" }
@@ -67,7 +68,7 @@ if (Test-Path -LiteralPath '$Remote') {
 } else { 'MISSING||' }
 "@
 $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-$answer = (& ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc" 2>&1) -join ''
+$answer = (Invoke-ThornswoodNative { & ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc" } 2>&1) -join ''
 if ($LASTEXITCODE -ne 0) {
   Say "  could not reach the server: $answer" 'Yellow'
   if (-not $NoPause) { [void](Read-Host 'Enter to exit') }

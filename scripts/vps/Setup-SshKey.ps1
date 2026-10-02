@@ -26,11 +26,26 @@
                                     the public line for Patrick to add on the VPS.
                                     For a second developer who does not hold the
                                     VPS password.
+
+  THE BOX'S OWN KEY. Every script runs ssh and scp with StrictHostKeyChecking=yes
+  (issue #450): ssh talks only to a machine already in known_hosts and never
+  adds one by itself, so a machine answering in the box's place on a hostile
+  network gets refused rather than handed the scripts and their secrets. This
+  is the step that writes the box into known_hosts, and it writes only a key
+  whose fingerprint scripts\vps\vps.json pins (Add-ThornswoodKnownHost in
+  Vps.ps1). "Host key verification failed" from any script means this has not
+  run on the machine yet, or the box was rebuilt. -Test only reads, and says
+  which.
+
+  ONCE Harden-VPS.ps1 HAS RUN the box takes no password at all, so the
+  install step here (the one that asks for it) cannot get in. A new machine
+  uses -KeyOnly, and Patrick adds the line it prints with Add-VpsKey.ps1 from
+  a machine whose key already works.
 #>
 [CmdletBinding()]
 param(
     [string]$VpsHost = '',
-    [string]$VpsUser = 'Administrator',
+    [string]$VpsUser = '',
     [string]$KeyPath,
     [switch]$Test,
     [switch]$KeyOnly,
@@ -41,6 +56,7 @@ param(
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here 'Vps.ps1')
+if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
@@ -50,7 +66,7 @@ function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if
 $target = "$VpsUser@$VpsHost"
 if (-not $KeyPath) { $KeyPath = Join-Path $HOME '.ssh\thornswood_ed25519' }
 
-foreach ($t in 'ssh', 'ssh-keygen') {
+foreach ($t in 'ssh', 'ssh-keygen', 'ssh-keyscan') {
     if (-not (Get-Command $t -ErrorAction SilentlyContinue)) {
         Die "$t is not on PATH. Windows ships it: Settings, Apps, Optional features, OpenSSH Client."
     }
@@ -62,7 +78,7 @@ function Works {
     # a real answer about the key instead of a prompt.
     $old = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    $out = & ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8 $target 'echo THORNSWOOD_OK' 2>$null
+    $out = Invoke-ThornswoodNative { & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=8 $target 'echo THORNSWOOD_OK' } 2>$null
     $ErrorActionPreference = $old
     return ($out -join '') -match 'THORNSWOOD_OK'
 }
@@ -70,6 +86,24 @@ function Works {
 Write-Host ''
 Write-Host '  THORNSWOOD  -  stop asking for the password' -ForegroundColor White
 Say "  $target" 'DarkGray'
+
+# --------------------------------------------------------------- host key ---
+Head "The box's own key"
+$hk = Test-ThornswoodKnownHost -Address $VpsHost
+if ($hk.Status -eq 'trusted') {
+    Say ('  known_hosts holds the pinned key (' + ($hk.Pinned -join ', ') + ')') 'Green'
+} elseif ($hk.Status -eq 'wrong') {
+    Die ("known_hosts on this machine holds a key for $VpsHost that scripts\vps\vps.json does not pin (" + ($hk.Wrong -join ', ') + '). ' +
+         'Either the box was rebuilt, and its new fingerprints go in vps.json first, or something else answered in its place once. ' +
+         "Once you know which: ssh-keygen -R $VpsHost, then run this again.")
+} elseif ($Test) {
+    Say '  known_hosts has no key for the box yet, so every script will stop at "Host key verification failed".' 'Yellow'
+    Say '  Run .\Setup-SshKey.ps1 without -Test, on a network you trust, to write it.' 'Yellow'
+} else {
+    try { $n = Add-ThornswoodKnownHost -Address $VpsHost }
+    catch { Die $_.Exception.Message }
+    Say "  added $n pinned key line(s) to known_hosts" 'Green'
+}
 
 Head 'Checking whether it already works'
 if (Works) {
@@ -104,14 +138,14 @@ if (Test-Path -LiteralPath "$KeyPath.pub") {
         Remove-Item -LiteralPath "$KeyPath.pub" -Force -ErrorAction SilentlyContinue
         $old = $ErrorActionPreference
         $ErrorActionPreference = 'Continue'
-        & ssh-keygen -t ed25519 -N $empty -C 'thornswood' -f $KeyPath 2>&1 | Out-Null
+        Invoke-ThornswoodNative { & ssh-keygen -t ed25519 -N $empty -C 'thornswood' -f $KeyPath } 2>&1 | Out-Null
         $ErrorActionPreference = $old
         if (-not (Test-Path -LiteralPath "$KeyPath.pub")) { continue }
 
         # And prove it opens without one, because a key that needs a passphrase
         # would put the prompt back and look like this never worked.
         $ErrorActionPreference = 'Continue'
-        $null = & ssh-keygen -y -P '' -f $KeyPath 2>&1
+        $null = Invoke-ThornswoodNative { & ssh-keygen -y -P '' -f $KeyPath } 2>&1
         $ok = ($LASTEXITCODE -eq 0)
         $ErrorActionPreference = $old
         if ($ok) { $made = $true; break }
@@ -135,6 +169,7 @@ Host $VpsHost
     User $VpsUser
     IdentityFile $KeyPath
     IdentitiesOnly yes
+    StrictHostKeyChecking yes
 "@
     $text = ''
     if (Test-Path -LiteralPath $cfg) { $text = [IO.File]::ReadAllText($cfg) }
@@ -182,8 +217,8 @@ Restart-Service sshd
 "@
 
 $b64 = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($remote))
-& ssh -o StrictHostKeyChecking=accept-new $target "powershell -NoProfile -EncodedCommand $b64"
-if ($LASTEXITCODE -ne 0) { Die "that did not go through (ssh exited with $LASTEXITCODE). Nothing was changed here." }
+Invoke-ThornswoodNative { & ssh -o StrictHostKeyChecking=yes $target "powershell -NoProfile -EncodedCommand $b64" }
+if ($LASTEXITCODE -ne 0) { Die "that did not go through (ssh exited with $LASTEXITCODE). Nothing was changed here. If it said Permission denied (publickey), the box takes no password any more (Harden-VPS.ps1): run this with -KeyOnly and have Patrick add the line with Add-VpsKey.ps1." }
 
 # ----------------------------------------------------------------- config ---
 # So plain "ssh Administrator@..." uses the key too, and every script that
@@ -195,6 +230,7 @@ Host $VpsHost
     User $VpsUser
     IdentityFile $KeyPath
     IdentitiesOnly yes
+    StrictHostKeyChecking yes
 "@
 $text = ''
 if (Test-Path -LiteralPath $cfg) { $text = [IO.File]::ReadAllText($cfg) }

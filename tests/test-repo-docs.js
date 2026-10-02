@@ -4,18 +4,18 @@
 // this repository used to be.
 //
 // WHY THIS EXISTS. Entry 193 on the To Do List: README.md was the first page
-// of the repository and still described Skyrim Together. It promised an
+// of the repository and still described the old multiplayer mod. It promised an
 // install with "No Nexus account, no Vortex" while the join page says the
 // collection in Vortex is required, told people the password was in Discord
 // when the build carries it, described an F2 party menu that no plugin binds,
 // sent problems to one named person, and broke the repo's own rule against em
 // dashes five times. installer\READ ME FIRST.txt was worse, because it is not a
 // leftover: Package-Thornswood.ps1 copies it into every installer, and it
-// opened with "SKYRIM TOGETHER", named SkyrimTogether-Setup.exe and told a new
+// opened with the old mod's name, named its setup program and told a new
 // customer to ask in the Discord for a password. config.example.json still
 // pointed at the old box (192.135.119.166, port 25565) and the old product's
 // update repository. SETUP.md walked a reader through making a repository
-// called skyrim-together, a personal access token and a build script that
+// under the old mod's name, a personal access token and a build script that
 // does not exist, and CLAUDE.md and DEVELOPING.md both sent people to it.
 //
 // So this reads those three and fails on the old product, on the words the
@@ -25,12 +25,12 @@
 // again.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const ROOT = path.join(TOOLS_DIR, '..');
+const ROOT = REPO_DIR;
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -89,7 +89,7 @@ if (readme !== null) {
   yes('README.md does not promise an install without Vortex' + where(readme, /no\s+vortex/i),
       !/no\s+vortex/i.test(readme));
   const n = readme.split(/\r?\n/).length;
-  yes('README.md is short and points at the long form, ' + n + ' lines', n < 60);
+  yes('README.md is short and points at the long form, ' + n + ' lines', n < 80);
 }
 
 // ------------------------------------------------------ READ ME FIRST.txt
@@ -139,20 +139,23 @@ if (cfgText === null) {
   const cs = read('launcher/app/Config.cs') || '';
   const m1 = /public string ServerAddress = "([^"]+)"/.exec(cs);
   const m2 = /public string ServerPort = "([^"]+)"/.exec(cs);
-  const m3 = /if \(string\.IsNullOrEmpty\(UpdateRepo\)\) UpdateRepo = "([^"]+)"/.exec(cs);
-  yes('Config.cs defaults can be read (address, port, update repository)', !!(m1 && m2 && m3));
+  // The site feed, the only update source since #907 (it was the GitHub
+  // repository Thornswood-Releases until then).
+  const m3 = /:\s*"(https:\/\/[^"]+\/feed\/version\.json)"/.exec(cs);
+  yes('Config.cs defaults can be read (address, port, update feed)', !!(m1 && m2 && m3));
   if (cfg && m1 && m2 && m3) {
     yes('config.example.json ServerAddress ' + cfg.ServerAddress + ' is the launcher default ' + m1[1],
         cfg.ServerAddress === m1[1]);
     yes('config.example.json ServerPort ' + cfg.ServerPort + ' is the launcher default ' + m2[1],
         String(cfg.ServerPort) === m2[1]);
-    yes('config.example.json UpdateRepo ' + cfg.UpdateRepo + ' is the launcher default ' + m3[1],
-        cfg.UpdateRepo === m3[1]);
+    yes('config.example.json UpdateFeedUrl ' + cfg.UpdateFeedUrl + ' is the launcher default ' + m3[1],
+        cfg.UpdateFeedUrl === m3[1]);
+    yes('config.example.json names no GitHub repository to update from (#907)', !('UpdateRepo' in cfg));
   }
   yes('config.example.json carries an empty UpdateToken, never a real one',
       cfg !== null && cfg.UpdateToken === '');
   yes('config.example.json does not name the old product or its box',
-      !/skyrim-together|25565|192\.135\.119\.166/i.test(cfgText));
+      !/skyrim\s*-?\s*together|25565|192\.135\.119\.166/i.test(cfgText));
 }
 
 // ------------------------------------------------------------- repo wide

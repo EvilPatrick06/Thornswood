@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Runtime.Serialization;
@@ -11,7 +12,7 @@ namespace Thornswood
     public class Config
     {
         [DataMember] public string ServerAddress = "192.135.112.23";
-        // SkyMP's default. 25565 was Skyrim Together's, on the old box.
+        // SkyMP's default. 25565 was the old build's, on the old box.
         [DataMember] public string ServerPort = "7777";
 
         /*
@@ -117,6 +118,12 @@ namespace Thornswood
 
         [DataMember] public long ExpectedExeBytes = 37157144;
 
+        // The rest of the Skyrim pin, as the update feed last gave it (#471,
+        // Downgrade.AdoptPin). 0 and null mean the feed has not said, and
+        // Downgrade uses what it was built with.
+        [DataMember] public long NewerExeBytes;
+        [DataMember] public PinDepot[] SkyrimDepots = null;
+
         // Set these to turn on updates. Leave blank and the launcher never
         // talks to the network beyond a ping.
         // UpdateToken is a problem worth naming rather than leaving implicit.
@@ -126,17 +133,19 @@ namespace Thornswood
         // updates for all of them at once. A read-only fine-grained PAT limits
         // the damage without fixing the shape. The real fix is a release
         // channel that needs no credential, at which point this field goes.
+        // UpdateRepo and UpdateToken are read by nothing since #907, when the
+        // GitHub fallback went with Thornswood-Releases; they stay declared so
+        // a config.json that carries them still loads and saves unchanged.
         [DataMember] public string UpdateRepo = "";    // "owner/name"
         [DataMember] public string UpdateToken = "";   // read-only fine-grained PAT
         [DataMember] public string UpdateBranch = "main";
 
-        // Direct https URL for version.json on the site feed (#649). Empty
-        // means fall back to the GitHub Contents API on UpdateRepo (kept hot
-        // as rollback via Thornswood-Releases). Defaults in AfterLoad:
+        // Direct https URL for version.json on the site feed (#649), the only
+        // place updates are read from since #907. Defaults in AfterLoad:
         // main -> https://thornswood.net/feed/version.json ; Channel or
         // UpdateBranch "dev" -> https://thornswood.net/feed-dev/version.json.
-        // The feed can announce a move the way updateRepo announces a rename
-        // by shipping updateFeedUrl under the old URL first.
+        // The feed can announce a move by shipping updateFeedUrl under the old
+        // URL first.
         [DataMember] public string UpdateFeedUrl = "";
 
         [DataMember] public string Theme = "Forge";
@@ -194,6 +203,10 @@ namespace Thornswood
 
         [DataMember] public bool KeepLauncherOpen = false;
 
+        // Said No to setting Steam's Updates setting for Skyrim (ShellSteamUpdates.cs,
+        // #493), so the start does not ask again. The question after a downgrade still does.
+        [DataMember] public bool SteamUpdatesDeclined = false;
+
         // Ticked, the launcher stops matching the game's resolution to the
         // screen when you press Play. For anyone deliberately running the game
         // at something other than what the monitor is set to.
@@ -232,6 +245,21 @@ namespace Thornswood
         // made from (see OwnGame). Blank means the Steam copy. Set it when Vortex
         // has been moved to a folder of its own so the Steam copy can stay clean.
         [DataMember] public string VortexGame = "";
+
+        // Thornswood's own Skyrim folder was asked for when Thornswood was
+        // installed: the setup window's tick box, written here by
+        // Setup-Thornswood.ps1 -MakeOwnGame (issue #906). True, the launcher
+        // makes the folder without asking the moment it can (AskOwnGame in
+        // ShellOwnGame.cs). False or absent, which is every install before
+        // that and every install left unticked, it asks first as it always has.
+        [DataMember] public bool MakeOwnGame;
+
+        // Which in game browser the last Play left SkyrimPlatform.ini naming,
+        // "nirnlab" or "tilted", so the Settings page can say it after a
+        // restart and a report about the interface can quote it. Blank (or
+        // absent, which comes back null) means no Play has settled it yet.
+        // Written by StartPlay (ShellChars.cs) from Chars.BrowserBackend.
+        [DataMember] public string BrowserBackend = "";
 
         // These two default to ON, which a plain bool cannot express here: the
         // serializer skips field initialisers, and false and absent look the
@@ -277,7 +305,7 @@ namespace Thornswood
             VoiceUrl = VoiceUrl.Trim();
             while (VoiceUrl.EndsWith("/")) { VoiceUrl = VoiceUrl.Substring(0, VoiceUrl.Length - 1); }
 
-            // The old build ran Skyrim Together Reborn on 25565, on a different
+            // The old build ran the old multiplayer mod on 25565, on a different
             // box. SkyMP does not listen there and that machine is not running
             // anything, so a config carried over from then points everyone at
             // nothing and the launcher would report "not answering" forever
@@ -286,15 +314,14 @@ namespace Thornswood
             if (ServerPort == "25565") ServerPort = "7777";
             if (ServerAddress == "192.135.119.166") ServerAddress = "192.135.112.23";
             if (ExpectedExeBytes <= 0) ExpectedExeBytes = 37157144;
-            // The releases repo is public now, so there is a right answer here
-            // and no reason to make a fresh install go looking for it. A blank
-            // one used to mean a launcher that could never update itself and
-            // never said why.
-            if (string.IsNullOrEmpty(UpdateRepo)) UpdateRepo = "EvilPatrick06/Thornswood-Releases";
+            // UpdateRepo used to default to Thornswood-Releases, the GitHub
+            // fallback. That repository is gone (#907), so nothing fills it in.
+            if (UpdateRepo == null) UpdateRepo = "";
             if (UpdateToken == null) UpdateToken = "";
             if (string.IsNullOrEmpty(UpdateBranch)) UpdateBranch = "main";
-            // Site feed first (#649). GitHub Contents API on UpdateRepo stays
-            // as the fallback when the site does not answer.
+            // The site feed (#649), and since #907 the only one: a blank one
+            // used to mean a launcher that could never update itself and never
+            // said why, so there is always a right answer here.
             if (string.IsNullOrEmpty(UpdateFeedUrl))
             {
                 bool feedDev = string.Equals(Channel, "dev", StringComparison.OrdinalIgnoreCase)
@@ -384,6 +411,12 @@ namespace Thornswood
         [DataMember] public long bytes;
 
         public string Title { get { return string.IsNullOrEmpty(name) ? id : name; } }
+
+        // Set only on the entry Updater.Pending makes for a whole release the
+        // install syncs to (Sync.cs, #1050), never read from the feed: the
+        // record, and the feed it came in, whose packs it stands in for.
+        public RecordRef Record;
+        public VersionDoc Doc;
 
         public string Size
         {
@@ -485,6 +518,18 @@ namespace Thornswood
         [DataMember] public string forkCommit = "";
     }
 
+    /// <summary>
+    /// One of the depots the Downgrade button asks Steam for, with the manifest
+    /// that is the pinned build of it. Strings, because a manifest id can be
+    /// larger than a long.
+    /// </summary>
+    [DataContract]
+    public class PinDepot
+    {
+        [DataMember] public string id = "";
+        [DataMember] public string manifest = "";
+    }
+
     [DataContract]
     public class VersionDoc
     {
@@ -520,22 +565,33 @@ namespace Thornswood
         [DataMember] public string serverPort = "";
         [DataMember] public int maxOnline;
 
+        // The Skyrim build the release is pinned to (#471): the exe size the
+        // checks look for, the size of the newer build Steam hands out, and
+        // the depot manifests the Downgrade button asks for. Written by
+        // Publish-Update from records\skyrim-pin.json. Null on a feed written
+        // before these existed, which leaves the launcher on what it was built
+        // with; a launcher older than these ignores them. The sizes are
+        // strings for the reason maintenance is below: a long given null or a
+        // quoted number throws, and a throw is the whole document unread.
+        // Downgrade.AdoptPin reads them as numbers.
+        [DataMember] public string expectedExeBytes;
+        [DataMember] public string newerExeBytes;
+        [DataMember] public PinDepot[] depots = null;
+
         // Where updates come from, and where voice lives. These used to be
         // boxes on the Settings page, which was wrong twice over: they are not
         // choices anybody makes, and a launcher old enough to have the wrong
         // one is exactly the launcher that cannot be told. Shipping them in the
         // update means a rename or a moved port reaches every copy by itself.
         //
-        // updateRepo is the interesting one: publish it under the OLD name
-        // pointing at the new, then rename. Every stale copy reads it once and
-        // finds its way home.
+        // updateRepo named the GitHub repository of the fallback. It is read by
+        // nothing since #907 and kept only so an older feed still parses.
         [DataMember] public string updateRepo = "";
 
-        // Where version.json itself lives, when that is a direct https URL on
-        // the site rather than the GitHub Contents API. Same announce-a-rename
-        // pattern as updateRepo (#649): publish the new URL under the old feed
-        // first, then move. Null/empty on older feeds means keep whatever the
-        // launcher already has (including the AfterLoad default).
+        // Where version.json itself lives, a direct https URL on the site.
+        // Publish the new URL under the old feed first, then move (#649).
+        // Null/empty on older feeds means keep whatever the launcher already
+        // has (including the AfterLoad default).
         [DataMember] public string updateFeedUrl = "";
         [DataMember] public string voicePort = "";
 
@@ -597,6 +653,14 @@ namespace Thornswood
         [DataMember] public string mainVersion = "";
         [DataMember] public NewsItem[] news = new NewsItem[0];
 
+        /// <summary>
+        /// The record of the release the feed is on, its "baseline" (#1011),
+        /// which the launcher syncs the install to (#1050). Not a DataMember:
+        /// Parse reads it apart, so a "baseline" of any unexpected shape costs
+        /// that one field and never the whole feed. Null when there is none.
+        /// </summary>
+        public RecordRef record;
+
         public static VersionDoc Parse(byte[] raw)
         {
             // A UTF-8 byte order mark is not JSON. The serializer stops on it and
@@ -604,8 +668,195 @@ namespace Thornswood
             // check for everyone at once, and with it their route to a fix.
             int at = 0;
             if (raw.Length >= 3 && raw[0] == 0xEF && raw[1] == 0xBB && raw[2] == 0xBF) at = 3;
+            VersionDoc doc;
             using (var ms = new MemoryStream(raw, at, raw.Length - at))
-                return (VersionDoc)new DataContractJsonSerializer(typeof(VersionDoc)).ReadObject(ms);
+                doc = (VersionDoc)new DataContractJsonSerializer(typeof(VersionDoc)).ReadObject(ms);
+            if (doc != null) doc.record = RecordRef.FromFeed(raw, at);
+            return doc;
+        }
+    }
+
+    /// <summary>
+    /// The record of a release the feed names as "baseline" (#1011): what that
+    /// release left installed, every file of ours as "&lt;bytes&gt;:&lt;sha256&gt;",
+    /// itself an asset on the site named by its sha256.
+    ///
+    /// Not a DataMember on VersionDoc on purpose. A value of the wrong JSON
+    /// type makes the serializer throw, and a throw there is the whole feed
+    /// unread and Play shut on every launcher. So VersionDoc.Parse reads this
+    /// one field on its own, with Json below, and a feed whose "baseline" is
+    /// anything unexpected simply has no record: the launcher takes the packs.
+    /// </summary>
+    public class RecordRef
+    {
+        public string id = "";
+        public string sha256 = "";
+        public string url = "";
+
+        /// <summary>The "baseline" of a feed, or null when it names none or
+        /// names one this launcher cannot use. Never throws.</summary>
+        public static RecordRef FromFeed(byte[] raw, int at)
+        {
+            try
+            {
+                var root = Json.Parse(Encoding.UTF8.GetString(raw, at, raw.Length - at)) as Dictionary<string, object>;
+                if (root == null) return null;
+                object b;
+                if (!root.TryGetValue("baseline", out b)) return null;
+                var o = b as Dictionary<string, object>;
+                if (o == null) return null;
+                var r = new RecordRef();
+                r.id = Json.Str(o, "id");
+                r.sha256 = Json.Str(o, "sha256").ToLowerInvariant();
+                r.url = Json.Str(o, "url").Trim();
+                if (!IsSha(r.sha256) || r.url.Length == 0) return null;
+                if (r.id.Length == 0) r.id = r.sha256.Substring(0, 12);
+                return r;
+            }
+            catch (Exception)
+            {
+                // A feed whose "baseline" cannot be read has no record: the
+                // launcher takes the packs, and the rest of the feed stands.
+                return null;
+            }
+        }
+
+        /// <summary>64 lowercase hex characters.</summary>
+        public static bool IsSha(string s)
+        {
+            if (s == null || s.Length != 64) return false;
+            foreach (char c in s)
+                if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) return false;
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// A small JSON reader, for the two things the launcher reads that must
+    /// never stop the feed being read: the feed's "baseline" and the release
+    /// record itself (an object of a few thousand strings). Objects come back
+    /// as Dictionary&lt;string, object&gt;, arrays as List&lt;object&gt;, strings as
+    /// string, numbers as their text, true and false as bool, null as null.
+    /// Throws on anything that is not JSON.
+    /// </summary>
+    static class Json
+    {
+        public static object Parse(string s)
+        {
+            int i = 0;
+            object v = Value(s, ref i);
+            Space(s, ref i);
+            if (i != s.Length) throw new FormatException("JSON has more after its end");
+            return v;
+        }
+
+        public static string Str(Dictionary<string, object> o, string k)
+        {
+            object v;
+            if (o == null || !o.TryGetValue(k, out v) || v == null) return "";
+            var s = v as string;
+            return s == null ? "" : s;
+        }
+
+        static void Space(string s, ref int i)
+        {
+            while (i < s.Length && (s[i] == ' ' || s[i] == '\t' || s[i] == '\r' || s[i] == '\n' || s[i] == '﻿')) i++;
+        }
+
+        static object Value(string s, ref int i)
+        {
+            Space(s, ref i);
+            if (i >= s.Length) throw new FormatException("JSON ends early");
+            char c = s[i];
+            if (c == '{') return Obj(s, ref i);
+            if (c == '[') return Arr(s, ref i);
+            if (c == '"') return Text(s, ref i);
+            if (Word(s, ref i, "true")) return true;
+            if (Word(s, ref i, "false")) return false;
+            if (Word(s, ref i, "null")) return null;
+            int start = i;
+            while (i < s.Length && "+-0123456789.eE".IndexOf(s[i]) >= 0) i++;
+            if (i == start) throw new FormatException("JSON has an unexpected character at " + i);
+            return s.Substring(start, i - start);
+        }
+
+        static bool Word(string s, ref int i, string w)
+        {
+            if (string.CompareOrdinal(s, i, w, 0, w.Length) != 0) return false;
+            i += w.Length;
+            return true;
+        }
+
+        static Dictionary<string, object> Obj(string s, ref int i)
+        {
+            var o = new Dictionary<string, object>(StringComparer.Ordinal);
+            i++;
+            Space(s, ref i);
+            if (i < s.Length && s[i] == '}') { i++; return o; }
+            while (true)
+            {
+                Space(s, ref i);
+                if (i >= s.Length || s[i] != '"') throw new FormatException("JSON object key expected at " + i);
+                string k = Text(s, ref i);
+                Space(s, ref i);
+                if (i >= s.Length || s[i] != ':') throw new FormatException("JSON colon expected at " + i);
+                i++;
+                o[k] = Value(s, ref i);
+                Space(s, ref i);
+                if (i >= s.Length) throw new FormatException("JSON object not closed");
+                if (s[i] == ',') { i++; continue; }
+                if (s[i] == '}') { i++; return o; }
+                throw new FormatException("JSON comma expected at " + i);
+            }
+        }
+
+        static List<object> Arr(string s, ref int i)
+        {
+            var a = new List<object>();
+            i++;
+            Space(s, ref i);
+            if (i < s.Length && s[i] == ']') { i++; return a; }
+            while (true)
+            {
+                a.Add(Value(s, ref i));
+                Space(s, ref i);
+                if (i >= s.Length) throw new FormatException("JSON array not closed");
+                if (s[i] == ',') { i++; continue; }
+                if (s[i] == ']') { i++; return a; }
+                throw new FormatException("JSON comma expected at " + i);
+            }
+        }
+
+        static string Text(string s, ref int i)
+        {
+            i++;
+            var sb = new StringBuilder();
+            while (true)
+            {
+                if (i >= s.Length) throw new FormatException("JSON string not closed");
+                char c = s[i++];
+                if (c == '"') return sb.ToString();
+                if (c != '\\') { sb.Append(c); continue; }
+                if (i >= s.Length) throw new FormatException("JSON string not closed");
+                char e = s[i++];
+                switch (e)
+                {
+                    case '"': sb.Append('"'); break;
+                    case '\\': sb.Append('\\'); break;
+                    case '/': sb.Append('/'); break;
+                    case 'b': sb.Append('\b'); break;
+                    case 'f': sb.Append('\f'); break;
+                    case 'n': sb.Append('\n'); break;
+                    case 'r': sb.Append('\r'); break;
+                    case 't': sb.Append('\t'); break;
+                    case 'u':
+                        if (i + 4 > s.Length) throw new FormatException("JSON escape cut short");
+                        sb.Append((char)int.Parse(s.Substring(i, 4), NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+                        i += 4;
+                        break;
+                    default: throw new FormatException("JSON escape not known at " + i);
+                }
+            }
         }
     }
 }

@@ -46,7 +46,11 @@ $temp = $null
 
 if ($src.ToLower().EndsWith('.enc')) {
   if (-not $KeyFile) {
-    foreach ($guess in @((Join-Path $PSScriptRoot '..\..\tools\backup-key.txt'), 'C:\Thornswood-Backup\key.txt')) {
+    # Where Install-Backup.ps1 copies it down to first, then the older places.
+    $guesses = @()
+    if ($env:USERPROFILE) { $guesses += Join-Path $env:USERPROFILE 'Documents\thornswood-backup-key.txt' }
+    $guesses += (Join-Path $PSScriptRoot '..\..\local\backup-key.txt'), 'C:\Thornswood-Backup\key.txt'
+    foreach ($guess in $guesses) {
       if (Test-Path -LiteralPath $guess) { $KeyFile = $guess; break }
     }
   }
@@ -110,15 +114,16 @@ if ($src.ToLower().EndsWith('.enc')) {
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zf = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
 $entries = @($zf.Entries)
-$worldCount = @($entries | Where-Object { $_.FullName -match '^game/world/' }).Count
-$privCount  = @($entries | Where-Object { $_.FullName -match '^game/private/' }).Count
+# Either slash: which one ZipFile writes has depended on the .NET version.
+$worldCount = @($entries | Where-Object { $_.FullName -match '^game[/\\]world[/\\]' }).Count
+$privCount  = @($entries | Where-Object { $_.FullName -match '^game[/\\]private[/\\]' }).Count
 
 Head 'What is in it'
 Say ("  {0} entries" -f $entries.Count)
 Say ("  {0,-28} {1}" -f 'game/world (characters)', $(if ($worldCount) { "$worldCount files" } else { 'NOTHING. This backup has no characters in it.' })) $(if ($worldCount) { 'Green' } else { 'Red' })
 Say ("  {0,-28} {1} files" -f 'game/private', $privCount)
-foreach ($top in ($entries | ForEach-Object { ($_.FullName -split '/')[0] } | Sort-Object -Unique)) {
-  $n = @($entries | Where-Object { $_.FullName -like "$top/*" -or $_.FullName -eq $top }).Count
+foreach ($top in ($entries | ForEach-Object { ($_.FullName -split '[/\\]')[0] } | Sort-Object -Unique)) {
+  $n = @($entries | Where-Object { $_.FullName -like "$top/*" -or $_.FullName -like "$top\*" -or $_.FullName -eq $top }).Count
   Say ("  {0,-28} {1} entries" -f $top, $n) 'DarkGray'
 }
 $notes = $entries | Where-Object { $_.FullName -eq 'NOTES.txt' } | Select-Object -First 1
@@ -132,6 +137,12 @@ $zf.Dispose()
 
 if ($CheckOnly) {
   if ($temp) { Remove-Item -LiteralPath $temp -Force -EA SilentlyContinue }
+  # A backup that opens and holds no characters is the failure this exists
+  # to catch (the 15 September pair), so -CheckOnly calls it one, and
+  # Fetch-Backups.ps1 and its task see a non-zero result.
+  if (-not $worldCount) {
+    Die 'The backup opens, but there is nothing under game/world in it, so it holds no characters.'
+  }
   Head 'Checked only'
   Say '  The backup opens and its signature is good. Nothing was written.' 'Green'
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
@@ -152,6 +163,7 @@ if ($temp) { Remove-Item -LiteralPath $temp -Force -EA SilentlyContinue }
 Head 'Unpacked'
 Say "  $To" 'Green'
 Write-Host ''
-Say '  Putting this back onto a server is docs\RESTORING.md. It is deliberately' 'DarkGray'
-Say '  not something this script will do for you.' 'DarkGray'
+Say '  Putting this back into a server folder is Restore-Server.ps1, which' 'DarkGray'
+Say '  also checks the load order resolves; docs\RESTORING.md has the rest.' 'DarkGray'
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+exit 0

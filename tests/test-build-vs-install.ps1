@@ -28,9 +28,9 @@ $ErrorActionPreference = 'Stop'
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-$RepoDir = Split-Path -Parent $Here
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+$RepoDir = $Here
 
 $script:pass = 0
 $script:fail = 0
@@ -84,7 +84,6 @@ function Get-Ast([string]$path) {
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('ts-buildinstall-' + [Guid]::NewGuid().ToString('N'))
 $repo = Join-Path $work 'repo'
-$tools = Join-Path $repo 'tools'
 $tmp = Join-Path $work 'tmp'
 $closeLog = Join-Path $work 'close.log'
 $callLog = Join-Path $work 'calls.log'
@@ -150,15 +149,15 @@ $held = $null
 try {
     # Laid out like the repository: the scripts in scripts\release beside
     # scripts\dev, the launcher's files in launcher\, the client record in
-    # records\, and tools\ for the setup stub the build leaves (issue #440,
-    # phase 8). Since phase 0 Build-Launcher stops when any file the repository
+    # records\, and out\ for the setup stub the build leaves (issue #440,
+    # phase 10). Since phase 0 Build-Launcher stops when any file the repository
     # tracks is missing, so the art, the ini and the record are here too.
-    $fakeRepo = Split-Path -Parent $tools
-    foreach ($d in @($tools, (Join-Path $fakeRepo 'scripts\release'), (Join-Path $fakeRepo 'scripts\dev'), (Join-Path $fakeRepo 'launcher\app'),
+    $fakeRepo = $repo
+    foreach ($d in @((Join-Path $fakeRepo 'scripts\release'), (Join-Path $fakeRepo 'scripts\dev'), (Join-Path $fakeRepo 'launcher\app'),
                      (Join-Path $fakeRepo 'launcher\lib\webview2'), (Join-Path $fakeRepo 'records'), (Join-Path $fakeRepo 'installer\setup'), $tmp)) {
         New-Item -ItemType Directory -Force -Path $d | Out-Null
     }
-    $realRepo = Split-Path -Parent $Here
+    $realRepo = $Here
     Copy-Item -LiteralPath (Join-Path $realRepo 'scripts\release\Build-Launcher.ps1') -Destination (Join-Path $fakeRepo 'scripts\release')
     $haveInstall = Test-Path -LiteralPath (Join-Path $realRepo 'scripts\release\Install-Launcher.ps1')
     if ($haveInstall) { Copy-Item -LiteralPath (Join-Path $realRepo 'scripts\release\Install-Launcher.ps1') -Destination (Join-Path $fakeRepo 'scripts\release') }
@@ -166,11 +165,17 @@ try {
         $from = Join-Path $realRepo ('launcher\' + $f)
         if (Test-Path -LiteralPath $from) { Copy-Item -LiteralPath $from -Destination (Join-Path $fakeRepo 'launcher') }
     }
+    # The application manifest (PerMonitorV2, #463): Build-Launcher stops
+    # without it, since a launcher built without it has no DPI awareness.
+    Copy-Item -LiteralPath (Join-Path $realRepo 'launcher\app\Thornswood.manifest') -Destination (Join-Path $fakeRepo 'launcher\app')
+    # The setup program's manifest and the window fit it is compiled with (#463).
+    Copy-Item -LiteralPath (Join-Path $realRepo 'installer\setup\Setup.manifest') -Destination (Join-Path $fakeRepo 'installer\setup')
+    Copy-Item -LiteralPath (Join-Path $realRepo 'launcher\app\WindowFit.cs') -Destination (Join-Path $fakeRepo 'launcher\app')
     Copy-Item -Path (Join-Path $realRepo 'launcher\lib\webview2\*') -Destination (Join-Path $fakeRepo 'launcher\lib\webview2')
     Copy-Item -LiteralPath (Join-Path $realRepo 'records\client-build.json') -Destination (Join-Path $fakeRepo 'records')
-    Set-Content -LiteralPath (Join-Path $tools '..\launcher\app\Program.cs') -Value 'static class Program { [System.STAThread] static void Main() { } }' -Encoding ASCII
-    Set-Content -LiteralPath (Join-Path $tools '..\installer\setup\Bootstrap.cs') -Value 'static class Setup { [System.STAThread] static void Main() { } }' -Encoding ASCII
-    Set-Content -LiteralPath (Join-Path $tools '..\scripts\dev\Close-Launcher.ps1') -Value $fakeClose -Encoding ASCII
+    Set-Content -LiteralPath (Join-Path $repo 'launcher\app\Program.cs') -Value 'static class Program { [System.STAThread] static void Main() { } }' -Encoding ASCII
+    Set-Content -LiteralPath (Join-Path $repo 'installer\setup\Bootstrap.cs') -Value 'static class Setup { [System.STAThread] static void Main() { } }' -Encoding ASCII
+    Set-Content -LiteralPath (Join-Path $repo 'scripts\dev\Close-Launcher.ps1') -Value $fakeClose -Encoding ASCII
 
     $env:TEMP = $tmp
     $env:TMP = $tmp
@@ -219,7 +224,7 @@ try {
     Yes "B1 the CI step passes with this build (exit $($ci.Code))" ($ci.Code -eq 0)
     if ($ci.Code -ne 0) { Write-Host $ci.Out }
     Yes 'B2 Thornswood.exe is where CI uploads it from' (Test-Path -LiteralPath $ciExe)
-    Yes 'B3 the setup stub is still built by the build, beside the script, where packaging looks for it' (Test-Path -LiteralPath (Join-Path $tools 'setup-stub.exe'))
+    Yes 'B3 the setup stub is still built by the build, in out\, where packaging looks for it' (Test-Path -LiteralPath (Join-Path $repo 'out\setup-stub.exe'))
     $ciFiles = @(Get-ChildItem -LiteralPath $ciRoot -Recurse -Force -File -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName.Substring($ciRoot.Length + 1) })
     # Thornswood.pdb beside the exe is intentional since #462 (pdbonly symbols for
     # the shipping machine). Packs and the installer still leave it out.
@@ -231,7 +236,7 @@ try {
     # ---- 2. the build into a folder of its own, which is what Ship does --------
     $stage = Join-Path $work 'stage'
     $root2 = Join-Path $work 'root2'
-    $o = Invoke-Child $ps (Join-Path $tools '..\scripts\release\Build-Launcher.ps1') @('-Root', $root2, '-OutDir', $stage, '-NoPause')
+    $o = Invoke-Child $ps (Join-Path $repo 'scripts\release\Build-Launcher.ps1') @('-Root', $root2, '-OutDir', $stage, '-NoPause')
     Yes "O1 a build with -OutDir passes (exit $($o.Code))" ($o.Code -eq 0)
     if ($o.Code -ne 0) { Write-Host $o.Out }
     Yes 'O2 and the exe is in that folder' (Test-Path -LiteralPath (Join-Path $stage 'Thornswood.exe'))
@@ -244,7 +249,7 @@ try {
     if (Test-Path -LiteralPath $ciExe) {
         $wasTime = (Get-Item -LiteralPath $ciExe).LastWriteTimeUtc
         $held = [IO.File]::Open($ciExe, 'Open', 'Read', 'Read')
-        $l = Invoke-Child $ps (Join-Path $tools '..\scripts\release\Build-Launcher.ps1') @('-Root', $ciRoot, '-NoPause')
+        $l = Invoke-Child $ps (Join-Path $repo 'scripts\release\Build-Launcher.ps1') @('-Root', $ciRoot, '-NoPause')
         $held.Close(); $held = $null
         Yes "L1 a build over a launcher that is still open stops (exit $($l.Code))" ($l.Code -eq 1)
         Yes 'L2 and says to close it or use -OutDir, rather than a csc error' ($l.Out -match 'in use' -and $l.Out -match '-OutDir')
@@ -255,7 +260,7 @@ try {
     # ---- 4. the install, from the folder the build wrote -------------------------
     Yes 'I0 Install-Launcher.ps1 exists' $haveInstall
     $root3 = Join-Path $work 'root3'
-    $inst = Join-Path $tools '..\scripts\release\Install-Launcher.ps1'
+    $inst = Join-Path $repo 'scripts\release\Install-Launcher.ps1'
     if ($haveInstall -and (Test-Path -LiteralPath (Join-Path $stage 'Thornswood.exe'))) {
         $l3 = Join-Path $root3 'Launcher'
         New-Item -ItemType Directory -Force -Path $l3 | Out-Null
@@ -263,10 +268,7 @@ try {
         Set-Content -LiteralPath $staleExe -Value 'old' -Encoding ASCII -NoNewline
         $staleTime = [datetime]::new(2020, 1, 1, 0, 0, 0, [DateTimeKind]::Utc)
         (Get-Item -LiteralPath $staleExe).LastWriteTimeUtc = $staleTime
-        Set-Content -LiteralPath (Join-Path $l3 'SkyrimTogether.exe') -Value 'older' -Encoding ASCII
-        Set-Content -LiteralPath (Join-Path $l3 'SkyrimTogether-Launcher.ps1') -Value '# old' -Encoding ASCII
         Set-Content -LiteralPath (Join-Path $l3 'icon-00000000.ico') -Value 'x' -Encoding ASCII
-        Set-Content -LiteralPath (Join-Path $root3 'Skyrim Together.lnk') -Value 'x' -Encoding ASCII
 
         $in = Invoke-Child $ps $inst @('-Root', $root3, '-From', $stage, '-NoPause')
         Yes "I1 the install passes (exit $($in.Code))" ($in.Code -eq 0)
@@ -280,9 +282,7 @@ try {
         $same = (Get-FileHash -LiteralPath $staleExe).Hash -eq (Get-FileHash -LiteralPath (Join-Path $stage 'Thornswood.exe')).Hash
         Yes 'I5 the exe in the root is the one the build made' $same
         Yes 'I6 and it is newer than the one it replaced, which is what Ship checks' ((Get-Item -LiteralPath $staleExe).LastWriteTimeUtc -gt $staleTime)
-        Yes 'I7 the SkyrimTogether.exe from before the rename is gone' (-not (Test-Path -LiteralPath (Join-Path $l3 'SkyrimTogether.exe')))
-        Yes 'I8 and so is the old script launcher' (-not (Test-Path -LiteralPath (Join-Path $l3 'SkyrimTogether-Launcher.ps1')))
-        $hash = (Get-FileHash -LiteralPath (Join-Path $Here '..\launcher\app.ico') -Algorithm SHA256).Hash.Substring(0, 8).ToLower()
+        $hash = (Get-FileHash -LiteralPath (Join-Path $Here 'launcher\app.ico') -Algorithm SHA256).Hash.Substring(0, 8).ToLower()
         Yes "I9 the icon file named after the artwork is there (icon-$hash.ico)" (Test-Path -LiteralPath (Join-Path $l3 "icon-$hash.ico"))
         Yes 'I10 and an old one is cleared away' (-not (Test-Path -LiteralPath (Join-Path $l3 'icon-00000000.ico')))
         $lnk = Join-Path $root3 'Thornswood.lnk'
@@ -293,7 +293,6 @@ try {
         Yes 'I11 a scratch root gets its shortcut inside its own folder, pointing at its own exe' (
             ($target -like '*\root3\Launcher\Thornswood.exe') -and (Test-Path -LiteralPath $target) -and
             ((Get-FileHash -LiteralPath $target).Hash -eq (Get-FileHash -LiteralPath $staleExe).Hash))
-        Yes 'I12 the Skyrim Together.lnk from before the rename is gone' (-not (Test-Path -LiteralPath (Join-Path $root3 'Skyrim Together.lnk')))
         Yes 'I13 a scratch install never clears the icon cache or restarts Explorer (no .iconstamp)' (-not (Test-Path -LiteralPath (Join-Path $l3 '.iconstamp')))
         Yes 'I14 and does not ask Explorer to redraw either' ($in.Out -notmatch 'Explorer told to redraw' -and $in.Out -notmatch 'Icon cache asked to refresh')
 
@@ -324,7 +323,7 @@ try {
     # ---- 5. what the build script no longer does, read off its code ------------
     # The runs above take the scratch path. This reads every path, so a Desktop
     # write under a dev-root branch would still be caught. Comments are ignored.
-    $bAst = Get-Ast (Join-Path $Here '..\scripts\release\Build-Launcher.ps1')
+    $bAst = Get-Ast (Join-Path $Here 'scripts\release\Build-Launcher.ps1')
     $cmds = @($bAst.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true) | ForEach-Object { $_.GetCommandName() } | Where-Object { $_ })
     $members = @($bAst.FindAll({ param($n) $n -is [System.Management.Automation.Language.MemberExpressionAst] }, $true) | ForEach-Object { $_.Member.Extent.Text })
     $strings = @($bAst.FindAll({ param($n) $n -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true) | ForEach-Object { $_.Value })
@@ -339,16 +338,15 @@ try {
         @($bAst.ParamBlock.Parameters | Where-Object { $_.Attributes | Where-Object { $_.Extent.Text -match 'Mandatory' } }).Count -eq 0)
 
     if ($haveInstall) {
-        $iText = Get-Content -LiteralPath (Join-Path $Here '..\scripts\release\Install-Launcher.ps1') -Raw
+        $iText = Get-Content -LiteralPath (Join-Path $Here 'scripts\release\Install-Launcher.ps1') -Raw
         foreach ($s in 'Stop-Game -Root $Root', 'Stop-Launcher -Root $Root', 'CreateShortcut', 'SHChangeNotify', 'ie4uinit',
-                       "'Skyrim Together.lnk'", 'taskkill /f /im explorer.exe', 'if ($lastIcon -ne $iconHash -and -not $isScratch) {',
-                       "'SkyrimTogether-Launcher.ps1'") {
+                       'taskkill /f /im explorer.exe', 'if ($lastIcon -ne $iconHash -and -not $isScratch) {') {
             Yes "M1 the install half carries $s, moved rather than lost" ($iText.Contains($s))
         }
     }
 
     # ---- 6. Ship's build block, lifted out and run against stand-ins -----------
-    $shipPath = Join-Path $Here '..\scripts\release\Ship.ps1'
+    $shipPath = Join-Path $Here 'scripts\release\Ship.ps1'
     $sAst = Get-Ast $shipPath
     $ifs = @($sAst.FindAll({ param($n)
         $n -is [System.Management.Automation.Language.IfStatementAst] -and
@@ -359,10 +357,12 @@ try {
     if (($ifs.Count -eq 1) -and ($getExe.Count -eq 1)) {
         $body = $ifs[0].Clauses[0].Item2.Extent.Text
         $body = $body.Substring(1, $body.Length - 2)
-        $shipTools = Join-Path $work 'ship\tools'
+        $shipTools = Join-Path $work 'ship\scripts\release'
         New-Item -ItemType Directory -Force -Path $shipTools | Out-Null
         Set-Content -LiteralPath (Join-Path $shipTools 'Build-Launcher.ps1') -Value $stubBuild -Encoding ASCII
         Set-Content -LiteralPath (Join-Path $shipTools 'Install-Launcher.ps1') -Value $stubInstall -Encoding ASCII
+        # The block asks Where.ps1 for out\, where the setup stub's symbols are.
+        Set-Content -LiteralPath (Join-Path $shipTools 'Where.ps1') -Value "param([string]`$What) Join-Path (Split-Path -Parent (Split-Path -Parent `$PSScriptRoot)) 'out'" -Encoding ASCII
         $sb = [scriptblock]::Create(
             'param($Root, $Here) ' +
             '$ModsOnly = $false; $Dev = $true; $DryRun = $false; $target = "1.0.0"; $current = "1.0.0"; $updaterCs = ""; ' +
@@ -429,9 +429,9 @@ try {
         $itVps = Join-Path $work 'it\scripts\vps'
         $itRoot = Join-Path $work 'it\root'
         foreach ($d in @($itDev, $itRel, $itVps, $itRoot)) { New-Item -ItemType Directory -Force -Path $d | Out-Null }
-        Copy-Item -LiteralPath (Join-Path $Here '..\scripts\dev\Install-Thornswood.ps1') -Destination $itDev
-        Copy-Item -LiteralPath (Join-Path $Here '..\scripts\vps\Vps.ps1') -Destination $itVps
-        Copy-Item -LiteralPath (Join-Path $Here '..\scripts\vps\vps.json') -Destination $itVps
+        Copy-Item -LiteralPath (Join-Path $Here 'scripts\dev\Install-Thornswood.ps1') -Destination $itDev
+        Copy-Item -LiteralPath (Join-Path $Here 'scripts\vps\Vps.ps1') -Destination $itVps
+        Copy-Item -LiteralPath (Join-Path $Here 'scripts\vps\vps.json') -Destination $itVps
         Set-Content -LiteralPath (Join-Path $itRel 'Build-Launcher.ps1') -Value $stubBuild -Encoding ASCII
         Set-Content -LiteralPath (Join-Path $itRel 'Install-Launcher.ps1') -Value $stubInstall -Encoding ASCII
         $env:TS_TEST_BUILD_EXIT = '0'
@@ -463,12 +463,11 @@ try {
     # script a call names the file in a string; a .cmd or a workflow has no
     # comments worth the distinction.
     $callers = @()
-    # scripts\dev and scripts\release since the #440 move; tools\ only kept
-    # forwarding shims, and Install-Launcher callers live under scripts now.
+    # scripts\dev and scripts\release since the #440 move, where every
+    # Install-Launcher caller lives.
     $callerDirs = @(
         (Join-Path $RepoDir 'scripts\dev'),
-        (Join-Path $RepoDir 'scripts\release'),
-        $Here
+        (Join-Path $RepoDir 'scripts\release')
     )
     foreach ($dir in $callerDirs) {
         if (-not (Test-Path -LiteralPath $dir)) { continue }

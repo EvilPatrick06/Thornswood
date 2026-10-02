@@ -106,10 +106,10 @@ namespace Thornswood
         ///
         /// This replaces asking whether one named file exists, which is what
         /// decided "your collection is behind" until 22 September. That test
-        /// was wrong in both directions. It named po3_StartOnSave.dll, which
-        /// Add-Characters.ps1 puts into a build BY HAND and which the
-        /// collection has never carried, so anybody who installed the
-        /// collection correctly and never ran that script read as behind, and
+        /// was wrong in both directions. It named one mod's file, which a
+        /// script put into a build BY HAND and which the collection did not
+        /// carry then, so anybody who installed the collection correctly and
+        /// never ran that script read as behind, and
         /// anybody genuinely two revisions behind read as fine as long as the
         /// file was there.
         ///
@@ -117,7 +117,7 @@ namespace Thornswood
         /// 27 September. The first version read the revision out of the name
         /// Vortex gave the mod folder:
         ///
-        ///     %APPDATA%\Vortex\skyrimse\mods\collection_ombo2a_2_2026-09-15T21-08-00Z
+        ///     %APPDATA%\Vortex\skyrimse\mods\collection_7essxf_2_2026-09-15T21-08-00Z
         ///                                               slug  ^ revision
         ///
         /// Current Vortex does not name the folder that way any more. It names
@@ -155,17 +155,17 @@ namespace Thornswood
         /// ###, the same shape Get-CollectionNewest reads. For an installed
         /// collection the two keys that matter, under the mod's own id, are:
         ///
-        ///     persistent###mods###skyrimse###&lt;modId&gt;###attributes###collectionSlug -> "ombo2a"
+        ///     persistent###mods###skyrimse###&lt;modId&gt;###attributes###collectionSlug -> "7essxf"
         ///     persistent###mods###skyrimse###&lt;modId&gt;###attributes###revisionNumber -> 5
         ///
         /// LevelDB writes the key, a length byte (a control character), then
-        /// that many bytes of the value's JSON, so a string is "ombo2a" and a
+        /// that many bytes of the value's JSON, so a string is "7essxf" and a
         /// number is a bare 5. The slug and the number are separate keys tied
         /// together only by the &lt;modId&gt; both carry, so this reads both,
         /// matches the slug to its mod id, and takes the highest revision
         /// recorded against a mod id whose slug is the one asked for. A machine
-        /// can have two collections installed at once (ombo2a on main, 7essxf
-        /// on dev), and the numbers must not be mixed up between them.
+        /// can have two collections installed at once (an older slug beside 7essxf;
+        /// both tips have used 7essxf since 27 September), and the numbers must not be mixed up between them.
         ///
         /// When those two attributes are missing (ship PC after Set-Collection:
         /// a locally authored vortex_collection_* with no subscriber install
@@ -577,6 +577,8 @@ namespace Thornswood
                     "Vortex\\skyrimse\\profiles");
                 if (!Directory.Exists(profilesRoot)) return null;
                 string stateDir = VortexStateDir();
+                if (File.Exists(Path.Combine(stateDir, "CURRENT")))
+                    return VortexProfileState.Find(stateDir, profilesRoot, name);
                 var ids = new HashSet<string>(StringComparer.Ordinal);
                 if (Directory.Exists(stateDir))
                 {
@@ -1102,15 +1104,21 @@ namespace Thornswood
         }
         public static List<Check> All(Config cfg)
         {
+            // The game these rows are about. With the own folder chosen and not
+            // made yet (#1226) Paths.Game is Profile\Payload, Thornswood's own
+            // files only, and the game and the script extender it will be made
+            // with are the Steam copy's and Vortex's, so those are read there.
+            string game = Paths.OwnFirst ? Paths.SteamCopy : Paths.Game;
+            string exe = Path.Combine(game, "SkyrimSE.exe");
             long bytes = 0;
-            try { if (File.Exists(Paths.Exe)) bytes = new FileInfo(Paths.Exe).Length; } catch (Exception ex) { Swallow.Note("Checks.All, exe size", ex); }
+            try { if (File.Exists(exe)) bytes = new FileInfo(exe).Length; } catch (Exception ex) { Swallow.Note("Checks.All, exe size", ex); }
             int plugins = EnabledPlugins();
 
             var l = new List<Check>();
-            l.Add(new Check("Game build", bytes == cfg.ExpectedExeBytes, Downgrade.Describe(cfg)));
-            l.Add(new Check("Script Extender", File.Exists(Path.Combine(Paths.Game, "skse64_1_6_1170.dll")), "skse64 2.2.6"));
+            l.Add(new Check("Game build", bytes == cfg.ExpectedExeBytes, Downgrade.Describe(cfg, exe)));
+            l.Add(new Check("Script Extender", File.Exists(Path.Combine(game, "skse64_1_6_1170.dll")), "skse64 2.2.6"));
             // Advisory, so it warns and never shuts Play. See AddressLibraryRow.
-            l.Add(AddressLibraryRow(Paths.Game, bytes == cfg.ExpectedExeBytes));
+            l.Add(AddressLibraryRow(game, bytes == cfg.ExpectedExeBytes));
             l.Add(new Check("Multiplayer", File.Exists(Paths.MpClient), "SkyMP client"));
             // The other half of the client, and the half that connects.
             // See ClientRuntime: every row above this one asks whether a
@@ -1282,6 +1290,40 @@ l.Add(new Check("Steam", SteamRunning(), "running"));
         }
 
         /// <summary>
+        /// GameRunning for the launcher's two second tick while the game runs.
+        /// Asks the processes the last look found whether they are still up,
+        /// by the handle each already has, and lists the machine's processes
+        /// again only once none of them is (#978). See Watched. Called from
+        /// the window's thread only.
+        /// </summary>
+        public static bool GameStillRunning()
+        {
+            return inPlay.Any();
+        }
+
+        static bool stillAskRefused;
+
+        static readonly Watched<Process> inPlay = new Watched<Process>(
+            GameProcesses,
+            delegate (Process p)
+            {
+                // A process that cannot be asked (access refused) is not
+                // provably up, so the watch looks again, as GameRunning would.
+                // Said once a session: a game run as administrator refuses
+                // every tick, and one line says it as well as a thousand.
+                try { return !p.HasExited; }
+                catch (Exception ex)
+                {
+                    if (!stillAskRefused) { stillAskRefused = true; Swallow.Note("Checks.GameStillRunning, has exited", ex); }
+                    return false;
+                }
+            },
+            delegate (Process p)
+            {
+                try { p.Dispose(); } catch (Exception ex) { Swallow.Note("Checks.GameStillRunning, dispose", ex); }
+            });
+
+        /// <summary>
         /// The in game browser's helpers. Each one is started by Skyrim and
         /// usually dies with it, but after a crash they stay behind with no
         /// window, holding Data\Platform and Data\NirnLabUIPlatform open. Task
@@ -1297,8 +1339,8 @@ l.Add(new Check("Steam", SteamRunning(), "running"));
         /// what comes back and should pass it to Release when finished.
         ///
         /// The launcher's own name is not on the list any more. It was there
-        /// from the Skyrim Together days, when the multiplayer client was an exe
-        /// of that name; SkyMP has no client exe. Left on, another copy of this
+        /// from the old multiplayer mod's days, when its client was an exe of
+        /// the launcher's old name; SkyMP has no client exe. Left on, another copy of this
         /// launcher (the dev build beside the main one) counted as a running
         /// game, which blocked updates and deleting characters, and Clear then
         /// tried to close that launcher.
@@ -1310,12 +1352,28 @@ l.Add(new Check("Steam", SteamRunning(), "running"));
 
             var names = new List<string> { "SkyrimSE", "skse64_loader" };
             names.AddRange(Helpers);
+
+            // One list of the machine's processes, not one per name. Each
+            // GetProcessesByName lists them all and keeps the matches, so
+            // asking for four names was four lists (#978).
+            Process[] all;
+            try { all = Process.GetProcesses(); }
+            catch (Exception ex) { Swallow.Note("Checks.GameProcesses, list", ex); return l; }
+            var byName = new Dictionary<string, List<Process>>(StringComparer.OrdinalIgnoreCase);
+            foreach (string n in names) byName[n] = new List<Process>();
+            foreach (Process p in all)
+            {
+                string pn = null;
+                try { pn = p.ProcessName; } catch (Exception ex) { Swallow.Note("Checks.GameProcesses, name", ex); }
+                List<Process> into;
+                if (pn != null && byName.TryGetValue(pn, out into)) into.Add(p);
+                else { try { p.Dispose(); } catch (Exception ex) { Swallow.Note("Checks.GameProcesses, dispose other", ex); } }
+            }
+
             foreach (string n in names)
             {
                 bool helper = Array.IndexOf(Helpers, n) >= 0;
-                Process[] found;
-                try { found = Process.GetProcessesByName(n); } catch { continue; }
-                foreach (Process p in found)
+                foreach (Process p in byName[n])
                 {
                     bool skip = p.Id == mine;
                     // A helper only counts when it provably runs from this

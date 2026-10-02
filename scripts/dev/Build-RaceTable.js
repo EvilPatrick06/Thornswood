@@ -37,11 +37,12 @@
 // changes a race.
 //
 // Read only. It opens the plugins of the build, writes game\data\races.json, and
-// replaces one generated line in tools\gamemode.js.
+// replaces one generated line in game\gamemode.js.
 //
 // Usage:
 //   node scripts\dev\Build-RaceTable.js
 //   node scripts\dev\Build-RaceTable.js --print
+//   node scripts\dev\Build-RaceTable.js --plugins "C:\path\to\plugins.txt"
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
@@ -54,13 +55,19 @@ function opt(name, def) {
 const PRINT = args.indexOf('--print') !== -1;
 const DATA = opt('data', 'C:\\Thornswood\\Game\\Data');
 const OUT = opt('out', path.join(__dirname, '..', '..', 'game', 'data', 'races.json'));
+const PLUGINS_TXT = opt('plugins', '');
 
 /* The load order, the same way the other builders read it. */
 function loadOrder() {
-  const candidates = [
-    path.join(DATA, '..', '..', 'Profile', 'Default', 'plugins.txt'),
-    path.join(process.env.LOCALAPPDATA || '', 'Skyrim Special Edition', 'plugins.txt')
-  ];
+  // --plugins <file>, same flag as Build-WarmthTable.js / Build-WaterTable.js /
+  // Build-FireTable.js / Build-WeatherTable.js. Empty means today's default:
+  // Profile\\Default next to Data, then %LOCALAPPDATA%\\Skyrim Special Edition.
+  const candidates = PLUGINS_TXT
+    ? [PLUGINS_TXT]
+    : [
+        path.join(DATA, '..', '..', 'Profile', 'Default', 'plugins.txt'),
+        path.join(process.env.LOCALAPPDATA || '', 'Skyrim Special Edition', 'plugins.txt')
+      ];
   for (const f of candidates) {
     if (!fs.existsSync(f)) { continue; }
     const names = fs.readFileSync(f, 'utf8').split(/\r?\n/)

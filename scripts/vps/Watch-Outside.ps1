@@ -1,0 +1,871 @@
+<#
+  Watch-Outside.ps1
+
+  Watches, from outside the VPS, the things the project needs that the VPS
+  cannot watch for itself, and tells staff in Discord when one breaks and
+  again when it is fixed.
+
+      .\scripts\vps\Watch-Outside.ps1               look once and print it; remembers and posts nothing
+      .\scripts\vps\Watch-Outside.ps1 -SetWebhook   where the messages go (asked at a prompt, never shown)
+      .\scripts\vps\Watch-Outside.ps1 -TestPost     post one test message there
+      .\scripts\vps\Watch-Outside.ps1 -Install      run it every five minutes on this machine
+      .\scripts\vps\Watch-Outside.ps1 -Status       whether it is installed and what it said lately
+      .\scripts\vps\Watch-Outside.ps1 -Remove       take the task off this machine again
+
+  WHY (issue #448). Watch-Services.ps1 runs on the VPS and watches the
+  services there, and since #447 it tells staff when one dies. But a box
+  cannot see itself die: when the whole VPS or its network goes, the watcher
+  and the bot that posts for it go with it, and nothing says a word. And some
+  of what the project needs is not on the box at all. So this runs somewhere
+  else, on Patrick's PC (One), as a scheduled task, and asks what a stranger
+  on the internet would see.
+
+  WHAT IT ASKS, measured from One on 28 September:
+    site      https://thornswood.net/ answers over HTTPS with a certificate
+              Windows accepts (200 in 213 ms that day). Two runs in a row
+              before it counts, so one slow answer is not an outage.
+    feed      https://thornswood.net/feed/version.json and feed-dev answer
+              200 with a feed in them (a launcherUrl and packs, 76 and 83
+              that day), and the launcher each one names answers its first
+              byte. Every launcher reads these to update, and a new install
+              starts from them. The addresses are Updater.cs's own.
+    cert      the certificate on thornswood.net has more than 14 days left.
+              Let's Encrypt (issuer YE2), 13 December 2026 that day, 75.8
+              days. Caddy renews it about 30 days before, so under 14 means a
+              renewal has been failing for two weeks.
+    dns       thornswood.net resolves to the VPS in scripts\vps\vps.json and
+              nothing else. The name servers are Cloudflare's (brenna and
+              robert.ns.cloudflare.com) and the A record points straight at
+              the VPS itself, not through Cloudflare's proxy. If
+              the proxy is ever switched on, this is the line to change.
+    domain    the registration has more than 30 days left, once a day.
+              Registered 15 September 2026 through Cloudflare, runs out 15
+              September 2027 (RDAP, rdap.org).
+    runner    GitHub lists the build runner, thornswood-vps, as online (gh,
+              REST, Patrick's own sign in). Without it no pull request gets
+              Launcher builds and nothing may merge. Three runs in a row,
+              because it restarts itself when it updates.
+    signing   the Azure Artifact Signing account answers with the durable
+              identity the launcher pins (Signature.cs Identities). It asks
+              for the profile's usages with an Azure sign in taken from az on
+              this machine, the same sign in Ship signs with, so a lapsed
+              az login is also told about, because Ship cannot sign then
+              either. Account ThornswoodSigning in westus2, profile
+              ThornswoodRelease Active that day. Three runs in a row.
+    nexus     the Nexus collection still exists, once an hour. Nexus refuses
+              a plain page request (403), but its public GraphQL answers a
+              stranger: collection "Thornswood", revision 1, that day.
+
+  Also measured and not asked on every run: the VPS is BisectHosting
+  (NET-192-135-112-0-1, RDAP), which has no status page to ask, and the site
+  check above is what notices the box going. Discord's API answered 200 in
+  122 ms; it is the path the messages go out on, so there is nothing to tell
+  anybody through when it is down. A message that cannot be posted waits and
+  is tried again every run for a day.
+
+  THIS MACHINE OFFLINE. When neither GitHub nor Discord answers, the fault is
+  here, not out there: the run writes that to watch.log and changes nothing,
+  so a dropped connection on One is never an outage message.
+
+  HOW A PERSON IS TOLD: through the VPS watchdog's own message path (#447),
+  and straight to Discord only when the VPS cannot be reached. The first run
+  that finds something wrong (or the second or third, as above) writes ONE
+  message saying what is wrong and when it was first noticed; the message
+  saying it is fixed comes once it has been fine on two runs in a row, so a
+  thing that flaps is one outage and two messages. Each message is a line in
+  alerts.jsonl in this machine's folder, the VPS outbox's shape exactly (id,
+  at, service, kind, text; the ids start "outside-", so they never collide).
+
+  Then, for whatever has not gone yet:
+    1. over ssh, with the key this machine already uses for the VPS, the lines
+       are appended to C:\Thornswood-Watch\alerts.jsonl on the VPS, the
+       watchdog's outbox. From there the bot says them in the staff channel,
+       or the watchdog posts them through its webhook when the bot cannot,
+       exactly as it does its own, and marks them the same way. The ids go in
+       alerts-sent-vps.txt here. The lines go on ssh's standard input, so
+       nothing in them is on a command line.
+    2. when ssh cannot reach the VPS, which is the case this exists for, or
+       the watchdog is not installed there, they are posted from here through
+       the Discord webhook in alerts-webhook.txt beside this machine's
+       outbox: the same staff channel webhook the VPS keeps, set here with
+       -SetWebhook, never committed, printed or logged. The ids go in
+       alerts-sent-webhook.txt. No mentions, so nothing can ping anybody.
+  With neither, a message waits and is tried again every run for a day.
+
+  WHERE IT LIVES. -Install copies this script to
+  %LOCALAPPDATA%\Thornswood\Watch-Outside with what it read out of the
+  repository (watch-outside.json), so the task does not break when a worktree
+  is removed, and registers "Thornswood Watch Outside": every five minutes, as
+  you, while you are signed in, through a console that never opens a window,
+  so a game in full screen is never pulled out of focus. Run -Install again
+  after this script changes. When this machine is off nothing watches from
+  outside; an outside uptime service is the only cover for that.
+
+  tests\test-watch-outside.ps1 drives the real code below against fakes:
+  a certificate near its end, the site down, the runner offline, recovery,
+  the VPS taking the messages, the VPS unreachable, a webhook that fails, and
+  this machine offline.
+#>
+[CmdletBinding()]
+param(
+  [string]$Folder   = (Join-Path $env:LOCALAPPDATA 'Thornswood\Watch-Outside'),
+  [string]$TaskName = 'Thornswood Watch Outside',
+  [int]$Minutes     = 5,
+  [int]$Lines       = 25,
+  [switch]$Run,
+  [switch]$Install,
+  [switch]$Remove,
+  [switch]$Status,
+  [switch]$SetWebhook,
+  [switch]$TestPost,
+  [switch]$NoPause
+)
+
+$ErrorActionPreference = 'Stop'
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+
+# ------------------------------------------------------------ settings ---
+# What it asks is read out of the repository, so an address changed there is
+# changed here. The copy -Install makes has no repository beside it and reads
+# watch-outside.json, written from these at install time.
+function Read-Settings([string]$repo, [string]$saved) {
+  $s = @{
+    Site = 'https://thornswood.net/'; SiteHost = 'thornswood.net'
+    Feeds = @(); VpsAddress = ''; VpsUser = 'Administrator'; WatchRoot = 'C:\Thornswood-Watch'
+    Repo = 'EvilPatrick06/Thornswood'; RunnerName = 'thornswood-vps'
+    SignEndpoint = ''; SignAccount = ''; SignProfile = ''; Identities = @()
+    NexusGame = ''; NexusSlug = ''
+    CertDays = 14; DomainDays = 30; Minutes = $(if ($Minutes) { $Minutes } else { 5 })
+  }
+  $updater = Join-Path $repo 'launcher\app\Updater.cs'
+  if ($repo -and (Test-Path -LiteralPath $updater)) {
+    $u = Get-Content -LiteralPath $updater -Raw
+    $main = [regex]::Match($u, 'MainFeed\s*=\s*"([^"]+)"').Groups[1].Value
+    $dev  = [regex]::Match($u, 'DevFeed\s*=\s*"([^"]+)"').Groups[1].Value
+    $s.Feeds = @(@{ Name = 'feed'; Say = 'The live update feed'; Url = $main }, @{ Name = 'feed-dev'; Say = 'The dev update feed'; Url = $dev })
+    $s.SiteHost = ([uri]$main).Host
+    $s.Site = 'https://' + $s.SiteHost + '/'
+    $sig = Get-Content -LiteralPath (Join-Path $repo 'launcher\app\Signature.cs') -Raw
+    $block = [regex]::Match($sig, 'Identities\s*=\s*\{([^}]*)\}').Groups[1].Value
+    $s.Identities = @([regex]::Matches($block, '"([0-9.]+)"') | ForEach-Object { $_.Groups[1].Value })
+    $cfg = Get-Content -LiteralPath (Join-Path $repo 'launcher\app\Config.cs') -Raw
+    $m = [regex]::Match($cfg, 'nexusmods\.com/games/([A-Za-z0-9]+)/collections/([A-Za-z0-9]+)')
+    $s.NexusGame = $m.Groups[1].Value; $s.NexusSlug = $m.Groups[2].Value
+    $meta = Get-Content -LiteralPath (Join-Path $repo 'records\signing\metadata.json') -Raw | ConvertFrom-Json
+    $s.SignEndpoint = ('' + $meta.Endpoint).TrimEnd('/'); $s.SignAccount = '' + $meta.CodeSigningAccountName; $s.SignProfile = '' + $meta.CertificateProfileName
+    # Through Vps.ps1, so this machine's own VPS file and THORNSWOOD_VPS count (#459).
+    . (Join-Path $repo 'scripts\vps\Vps.ps1')
+    $s.VpsAddress = Get-ThornswoodVpsAddress
+    $s.VpsUser = Get-ThornswoodVpsUser
+    # The watchdog's folder on the VPS, where its outbox is: Watch-Services.ps1's own -Root.
+    $ws = Get-Content -LiteralPath (Join-Path $repo 'scripts\vps\Watch-Services.ps1') -Raw
+    $s.WatchRoot = [regex]::Match($ws, '\[string\]\$Root\s*=\s*''([^'']+)''').Groups[1].Value
+    return $s
+  }
+  if ($saved -and (Test-Path -LiteralPath $saved)) {
+    $j = Get-Content -LiteralPath $saved -Raw | ConvertFrom-Json
+    foreach ($p in $j.PSObject.Properties) { $s[$p.Name] = $p.Value }
+    $s.Feeds = @($j.Feeds | ForEach-Object { @{ Name = $_.Name; Say = $_.Say; Url = $_.Url } })
+    $s.Identities = @($j.Identities)
+    if ($Minutes) { $s.Minutes = $Minutes }
+    return $s
+  }
+  throw 'Neither the repository (launcher\app\Updater.cs) nor watch-outside.json is beside this script, so there is nothing to say what to ask.'
+}
+
+# -------------------------------------------------- asking the internet ---
+# Every request this script makes goes through the functions below, down to
+# Send-ToVps, and the harness replaces exactly these. None of them ever prints a token or the
+# webhook's address.
+
+function Get-Now { return (Get-Date) }
+
+# An HTTP answer: Code (0 when there was none), Body, and Error in words.
+# HttpWebRequest rather than Invoke-WebRequest because it behaves the same in
+# Windows PowerShell 5.1, which the task runs, and in pwsh 7, and because
+# Invoke-WebRequest in 5.1 refuses a Range header.
+function Get-Http([string]$url, [string]$method = 'GET', [string]$body = '', [hashtable]$headers = @{}, [switch]$FirstByte, [int]$timeout = 20) {
+  $r = @{ Code = 0; Body = ''; Error = '' }
+  $resp = $null
+  try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    $q = [Net.HttpWebRequest]::Create($url)
+    $q.Method = $(if ($method) { $method } else { 'GET' })
+    $q.Timeout = $timeout * 1000
+    $q.ReadWriteTimeout = $timeout * 1000
+    $q.UserAgent = 'Thornswood-Watch-Outside'
+    $q.AllowAutoRedirect = $true
+    foreach ($k in $headers.Keys) {
+      if ($k -eq 'Accept') { $q.Accept = $headers[$k] } else { $q.Headers[$k] = $headers[$k] }
+    }
+    if ($FirstByte) { $q.AddRange(0, 0) }
+    if ($body) {
+      $bytes = [Text.Encoding]::UTF8.GetBytes($body)
+      $q.ContentType = 'application/json; charset=utf-8'
+      $q.ContentLength = $bytes.Length
+      $st = $q.GetRequestStream(); $st.Write($bytes, 0, $bytes.Length); $st.Close()
+    }
+    $resp = $q.GetResponse()
+  } catch {
+    $e = $_.Exception
+    while ($e -and -not ($e -is [Net.WebException])) { $e = $e.InnerException }
+    if ($e -and $e.Response) { $resp = $e.Response }
+    else {
+      $st = ''
+      if ($e) { $st = '' + $e.Status }
+      switch ($st) {
+        'Timeout'               { $r.Error = ('did not answer within ' + $timeout + ' seconds') }
+        'NameResolutionFailure' { $r.Error = 'its name does not resolve' }
+        'ConnectFailure'        { $r.Error = 'refused the connection or could not be reached' }
+        'TrustFailure'          { $r.Error = 'its certificate was not accepted' }
+        'SecureChannelFailure'  { $r.Error = 'the secure connection could not be set up' }
+        default                 { $r.Error = $(if ($st) { 'could not be reached (' + $st + ')' } else { 'could not be reached' }) }
+      }
+      return $r
+    }
+  }
+  try {
+    $r.Code = [int]$resp.StatusCode
+    if (-not $FirstByte) {
+      $rd = New-Object IO.StreamReader($resp.GetResponseStream(), [Text.Encoding]::UTF8)
+      $r.Body = $rd.ReadToEnd()
+      $rd.Close()
+    }
+  } catch { $r.Error = 'the answer broke off' }
+  finally { $resp.Close() }
+  return $r
+}
+
+# The certificate the site presents: NotAfter (UTC), Problems (Windows' own
+# verdict, 'None' when it accepts it) and Error when there was no handshake.
+function Get-Cert([string]$hostName) {
+  $r = @{ NotAfter = $null; Problems = ''; Error = '' }
+  $c = $null; $s = $null
+  $box = @{ E = 'None' }
+  try {
+    $c = New-Object Net.Sockets.TcpClient
+    $ar = $c.BeginConnect($hostName, 443, $null, $null)
+    if (-not $ar.AsyncWaitHandle.WaitOne(15000)) { $r.Error = 'did not answer on 443 within 15 seconds'; return $r }
+    $c.EndConnect($ar)
+    $cb = { param($a, $b, $d, $e) $box.E = '' + $e; return $true }.GetNewClosure()
+    $s = New-Object Net.Security.SslStream($c.GetStream(), $false, [Net.Security.RemoteCertificateValidationCallback]$cb)
+    $s.ReadTimeout = 15000; $s.WriteTimeout = 15000
+    $s.AuthenticateAsClient($hostName)
+    $x = New-Object Security.Cryptography.X509Certificates.X509Certificate2($s.RemoteCertificate)
+    $r.NotAfter = $x.NotAfter.ToUniversalTime()
+    $r.Problems = $box.E
+  } catch { $r.Error = 'no TLS handshake on 443' }
+  finally {
+    if ($s) { $s.Dispose() }
+    if ($c) { $c.Close() }
+  }
+  return $r
+}
+
+# Addresses the name resolves to, through this machine's resolver.
+function Get-Dns([string]$name) {
+  try { return @{ Addresses = @([Net.Dns]::GetHostAddresses($name) | ForEach-Object { $_.IPAddressToString }); Error = '' } }
+  catch { return @{ Addresses = @(); Error = 'does not resolve' } }
+}
+
+# GitHub's list of the repository's runners, through gh with the sign in on
+# this machine. REST, not GraphQL, which is rate limited far sooner.
+function Get-Runners([string]$repo) {
+  $gh = Get-Command gh -EA SilentlyContinue
+  if (-not $gh) { return @{ Runners = @(); Error = 'gh is not on this machine, so GitHub could not be asked' } }
+  $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+  $out = & $gh.Source api ('repos/' + $repo + '/actions/runners') 2>&1
+  $code = $LASTEXITCODE
+  $ErrorActionPreference = $old
+  if ($code -ne 0) {
+    $first = @($out | ForEach-Object { "$_" } | Where-Object { $_.Trim() } | Select-Object -First 1)
+    return @{ Runners = @(); Error = ('gh could not ask GitHub: ' + $(if ($first.Count) { $first[0] } else { 'exit ' + $code })) }
+  }
+  try {
+    $j = (@($out | ForEach-Object { "$_" }) -join "`n") | ConvertFrom-Json
+    return @{ Runners = @($j.runners | ForEach-Object { @{ Name = '' + $_.name; Status = '' + $_.status; Busy = [bool]$_.busy } }); Error = '' }
+  } catch { return @{ Runners = @(); Error = 'GitHub''s answer was not the runner list' } }
+}
+
+# An Azure access token for the signing service, from az on this machine: the
+# sign in Ship signs with. Kept in memory for this run only, never written.
+function Get-AzureToken {
+  $az = Get-Command az -EA SilentlyContinue
+  if (-not $az) { return @{ Token = ''; Error = 'az is not on this machine' } }
+  $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+  $out = & $az.Source account get-access-token --resource https://codesigning.azure.net --query accessToken -o tsv 2>$null
+  $code = $LASTEXITCODE
+  $ErrorActionPreference = $old
+  $t = ('' + (@($out) | Select-Object -Last 1)).Trim()
+  if ($code -ne 0 -or $t -notmatch '^ey') { return @{ Token = ''; Error = 'az on this machine has no Azure sign in (az account get-access-token failed)' } }
+  return @{ Token = $t; Error = '' }
+}
+
+# '' when Discord took the message, else a short reason that never holds
+# the address. No mentions, so nothing in a message can ping anybody.
+function Send-Webhook([string]$url, [string]$text) {
+  $body = ConvertTo-Json @{ content = $text; allowed_mentions = @{ parse = @() } } -Compress
+  $a = Get-Http $url 'POST' $body @{} -timeout 15
+  if ($a.Code -ge 200 -and $a.Code -lt 300) { return '' }
+  if ($a.Code -gt 0) { return ('HTTP ' + $a.Code) }
+  return 'Discord could not be reached'
+}
+
+# Hands outbox lines to the VPS watchdog's outbox, the path #447 built:
+# appended to alerts.jsonl in its folder, where the bot or the watchdog's
+# webhook says them. '' when every line arrived, else a short reason. The
+# lines go base64 on ssh's standard input, one to a line, so nothing of them
+# is on a command line (which sshd hands to cmd.exe, and which stops at 8,191
+# characters). Only the remote script is on the command line, and it is ours.
+function Send-ToVps($S, [string[]]$rows) {
+  $ssh = Get-Command ssh -EA SilentlyContinue
+  if (-not $ssh) { return 'ssh is not on this machine' }
+  $remote = @'
+$ErrorActionPreference = 'Stop'
+$root = 'WATCHROOT'
+if (-not (Test-Path -LiteralPath (Join-Path $root 'watch.ps1'))) { 'NOWATCHER'; exit 0 }
+$enc = New-Object Text.UTF8Encoding($false)
+$n = 0
+while ($null -ne ($l = [Console]::In.ReadLine())) {
+  $l = $l.Trim()
+  if (-not $l) { continue }
+  $row = $enc.GetString([Convert]::FromBase64String($l))
+  [IO.File]::AppendAllText((Join-Path $root 'alerts.jsonl'), $row + "`r`n", $enc)
+  $n++
+}
+'APPENDED ' + $n
+'@
+  $remote = $remote.Replace('WATCHROOT', $S.WatchRoot)
+  $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($remote))
+  $in = @($rows | ForEach-Object { [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($_)) })
+  $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+  $out = @($in | & $ssh -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=yes ($S.VpsUser + '@' + $S.VpsAddress) ('powershell -NoProfile -NonInteractive -EncodedCommand ' + $e) 2>&1 | ForEach-Object { "$_".Trim() })
+  $code = $LASTEXITCODE
+  $ErrorActionPreference = $old
+  if ($out -contains 'NOWATCHER') { return ('the watchdog is not installed on the VPS (no ' + $S.WatchRoot + '\watch.ps1)') }
+  if ($out -contains ('APPENDED ' + $rows.Count)) { return '' }
+  if ($code -ne 0) { return ('ssh could not reach the VPS (exit ' + $code + ')') }
+  return 'the VPS did not say it took them'
+}
+
+# ------------------------------------------------------------ the checks ---
+# Each gives @{ Bad; Why; Line }: Why is what a message says is wrong, Line
+# what the printed table says either way.
+
+function Ok($line) { return @{ Bad = $false; Why = ''; Line = $line } }
+function Wrong($why) { return @{ Bad = $true; Why = $why; Line = $why } }
+
+function Check-Site($S) {
+  $a = Get-Http $S.Site -FirstByte
+  if ($a.Code -ge 200 -and $a.Code -lt 400) { return (Ok ('answered ' + $a.Code)) }
+  if ($a.Code -gt 0) { return (Wrong ($S.Site + ' answered HTTP ' + $a.Code)) }
+  return (Wrong ($S.Site + ' ' + $a.Error))
+}
+
+function Check-Feed($S, $feed) {
+  $a = Get-Http $feed.Url '' '' @{ Accept = 'application/json' }
+  if ($a.Code -ne 200) {
+    if ($a.Code -gt 0) { return (Wrong ($feed.Url + ' answered HTTP ' + $a.Code)) }
+    return (Wrong ($feed.Url + ' ' + $a.Error))
+  }
+  $j = $null
+  try { $j = $a.Body | ConvertFrom-Json } catch { }
+  if (-not $j -or -not $j.launcherUrl -or @($j.packs).Count -eq 0) {
+    return (Wrong ($feed.Url + ' answered, but not with a feed: no launcherUrl or no packs in it'))
+  }
+  $l = Get-Http ('' + $j.launcherUrl) -FirstByte
+  if ($l.Code -ne 200 -and $l.Code -ne 206) {
+    $said = $(if ($l.Code -gt 0) { 'answered HTTP ' + $l.Code } else { $l.Error })
+    return (Wrong ('the feed answers, but the launcher it names, ' + $j.launcherUrl + ', ' + $said))
+  }
+  return (Ok ('answered, ' + @($j.packs).Count + ' packs, launcher ' + $j.launcherVersion + ' downloads'))
+}
+
+function Check-Cert($S) {
+  $c = Get-Cert $S.SiteHost
+  if ($c.Error) { return (Wrong ($S.SiteHost + ' ' + $c.Error + ', so its certificate could not be read')) }
+  $left = ($c.NotAfter - (Get-Now).ToUniversalTime()).TotalDays
+  $when = $c.NotAfter.ToString('d MMMM yyyy HH:mm', [Globalization.CultureInfo]::InvariantCulture) + ' UTC'
+  if ($c.Problems -and $c.Problems -ne 'None') { return (Wrong ('Windows does not accept it (' + $c.Problems + '). It runs out ' + $when)) }
+  if ($left -le $S.CertDays) {
+    $d = [math]::Floor($left)
+    if ($left -le 0) { return (Wrong ('It ran out on ' + $when + '. Every visitor and every launcher is refused')) }
+    return (Wrong ('It runs out on ' + $when + ', in ' + $d + ' day' + $(if ($d -eq 1) { '' } else { 's' }) + ', and the line is ' + $S.CertDays))
+  }
+  return (Ok ('good until ' + $when + ', ' + [math]::Round($left, 1) + ' days'))
+}
+
+function Check-Dns($S) {
+  $d = Get-Dns $S.SiteHost
+  if ($d.Error -or @($d.Addresses).Count -eq 0) { return (Wrong ($S.SiteHost + ' does not resolve')) }
+  $v4 = @($d.Addresses | Where-Object { $_ -match '^\d+\.\d+\.\d+\.\d+$' })
+  $other = @($v4 | Where-Object { $_ -ne $S.VpsAddress })
+  if ($v4.Count -eq 0 -or $other.Count -gt 0) {
+    return (Wrong ($S.SiteHost + ' resolves to ' + (@($d.Addresses) -join ', ') + ', not only the VPS at ' + $S.VpsAddress))
+  }
+  return (Ok ('resolves to ' + ($v4 -join ', ')))
+}
+
+function Check-Domain($S) {
+  $a = Get-Http ('https://rdap.org/domain/' + $S.SiteHost) '' '' @{ Accept = 'application/rdap+json' }
+  if ($a.Code -ne 200) { return (Wrong ('the registry (RDAP) could not be asked: ' + $(if ($a.Code) { 'HTTP ' + $a.Code } else { $a.Error }))) }
+  $end = $null
+  try {
+    $j = $a.Body | ConvertFrom-Json
+    foreach ($ev in @($j.events)) { if ($ev.eventAction -eq 'expiration') { $end = ([datetime]$ev.eventDate).ToUniversalTime() } }
+  } catch { }
+  if (-not $end) { return (Wrong 'the registry answered without an expiry date') }
+  $left = ($end - (Get-Now).ToUniversalTime()).TotalDays
+  $when = $end.ToString('d MMMM yyyy', [Globalization.CultureInfo]::InvariantCulture)
+  if ($left -le $S.DomainDays) { return (Wrong ('It runs out on ' + $when + ', in ' + [math]::Floor($left) + ' days')) }
+  return (Ok ('registered until ' + $when))
+}
+
+function Check-Runner($S) {
+  $r = Get-Runners $S.Repo
+  if ($r.Error) { return (Wrong ('One could not ask GitHub: ' + $r.Error)) }
+  $mine = @($r.Runners | Where-Object { $_.Name -eq $S.RunnerName })
+  if ($mine.Count -eq 0) { return (Wrong ('GitHub lists no runner called ' + $S.RunnerName)) }
+  if ($mine[0].Status -ne 'online') { return (Wrong ('GitHub shows it ' + $mine[0].Status)) }
+  return (Ok ('online' + $(if ($mine[0].Busy) { ', running a job' } else { '' })))
+}
+
+function Check-Signing($S) {
+  $t = Get-AzureToken
+  if ($t.Error) { return (Wrong ($t.Error + '. Neither this check nor a Ship can sign until az login is run on One')) }
+  $url = $S.SignEndpoint + '/codesigningaccounts/' + $S.SignAccount + '/certificateprofiles/' + $S.SignProfile + '/sign/eku?api-version=2022-06-15-preview'
+  $a = Get-Http $url '' '' @{ Authorization = ('Bearer ' + $t.Token); Accept = 'application/json' }
+  $t = $null
+  if ($a.Code -eq 200) {
+    $ekus = @()
+    try { $ekus = @($a.Body | ConvertFrom-Json) } catch { }
+    $known = @($ekus | Where-Object { $S.Identities -contains $_ })
+    if ($known.Count) { return (Ok ('answered with the pinned identity, profile ' + $S.SignProfile)) }
+    return (Wrong ('It answered, but profile ' + $S.SignProfile + ' no longer carries the identity the launcher pins, so every installed launcher would refuse what it signs'))
+  }
+  if ($a.Code -eq 401 -or $a.Code -eq 403) { return (Wrong ('It refused the Azure sign in on One (HTTP ' + $a.Code + ')')) }
+  if ($a.Code -eq 404) { return (Wrong ('It says account ' + $S.SignAccount + ' or profile ' + $S.SignProfile + ' is not there (HTTP 404)')) }
+  if ($a.Code -gt 0) { return (Wrong ($S.SignEndpoint + ' answered HTTP ' + $a.Code)) }
+  return (Wrong ($S.SignEndpoint + ' ' + $a.Error))
+}
+
+function Check-Nexus($S) {
+  $q = '{ collection(slug: \"' + $S.NexusSlug + '\", domainName: \"' + $S.NexusGame + '\") { name latestPublishedRevision { revisionNumber } } }'
+  $a = Get-Http 'https://api.nexusmods.com/v2/graphql' 'POST' ('{"query":"' + $q + '"}') @{ Accept = 'application/json' }
+  if ($a.Code -ne 200) { return (Wrong ('Nexus ' + $(if ($a.Code) { 'answered HTTP ' + $a.Code } else { $a.Error }))) }
+  $c = $null
+  try { $c = ($a.Body | ConvertFrom-Json).data.collection } catch { }
+  if (-not $c -or -not $c.name) { return (Wrong ('Nexus says there is no collection ' + $S.NexusSlug + ' any more')) }
+  return (Ok ('"' + $c.name + '", revision ' + $c.latestPublishedRevision.revisionNumber))
+}
+
+# Everything it watches. Misses is how many runs in a row before it counts,
+# Back how many good runs before it is said to be fixed, Every how often it
+# is asked, in minutes (0 is every run). Say, Fails and Recovers make the
+# first words of a message; Fix is what it tells a person to do.
+function Get-Checks($S) {
+  $list = @(
+    @{ Name = 'site'; Say = ($S.Site.TrimEnd('/') + ', asked from outside the VPS,'); Fails = 'is down'; Recovers = 'is back'; Misses = 2; Back = 2; Every = 0
+       Fix = 'If the watchdog on the VPS has not said the same, the whole box or its network is down: look at the VPS in the BisectHosting panel.' }
+  )
+  foreach ($f in $S.Feeds) {
+    $list += @{ Name = $f.Name; Feed = $f; Say = ($f.Say + ' (' + $f.Url + ')'); Fails = 'is broken'; Recovers = 'is working again'; Misses = 2; Back = 2; Every = 0
+                Fix = 'Every launcher reads it to update and a new install starts from it, so until it answers nobody can update or install.' }
+  }
+  $list += @(
+    @{ Name = 'cert'; Say = ('The certificate for ' + $S.SiteHost); Fails = 'needs a look'; Recovers = 'is fine again'; Misses = 1; Back = 1; Every = 60
+       Fix = 'Caddy on the VPS renews it by itself about 30 days before the end, so a renewal has been failing: read Caddy''s log on the VPS.' },
+    @{ Name = 'dns'; Say = $S.SiteHost; Fails = 'does not point at the VPS'; Recovers = 'points at the VPS again'; Misses = 2; Back = 2; Every = 0
+       Fix = 'The name servers are Cloudflare''s: check the A record for it in the Cloudflare dashboard.' },
+    @{ Name = 'domain'; Say = ('The registration of ' + $S.SiteHost); Fails = 'runs out soon'; Recovers = 'was renewed'; Misses = 1; Back = 1; Every = 1440
+       Fix = 'It is registered through Cloudflare: renew it there, under Domain Registration.' },
+    @{ Name = 'runner'; Say = ('The build runner, ' + $S.RunnerName + ','); Fails = 'is offline on GitHub'; Recovers = 'is online again'; Misses = 3; Back = 2; Every = 0
+       Fix = 'Until it is back no pull request gets its Launcher builds check, so nothing can be merged. .\scripts\deploy\Install-Runner.ps1 -Status says what the VPS sees.' },
+    @{ Name = 'signing'; Say = ('Code signing (Azure Artifact Signing, account ' + $S.SignAccount + ')'); Fails = 'is not answering'; Recovers = 'answers again'; Misses = 3; Back = 2; Every = 0
+       Fix = 'Until it answers no Ship can sign, dev included.' },
+    @{ Name = 'nexus'; Say = 'The Nexus collection'; Fails = 'cannot be reached'; Recovers = 'is reachable again'; Misses = 2; Back = 2; Every = 60
+       Fix = 'A new install gets its mods through this collection.' }
+  )
+  return $list
+}
+
+function Invoke-Check($S, $c) {
+  switch ($c.Name) {
+    'site'    { return (Check-Site $S) }
+    'cert'    { return (Check-Cert $S) }
+    'dns'     { return (Check-Dns $S) }
+    'domain'  { return (Check-Domain $S) }
+    'runner'  { return (Check-Runner $S) }
+    'signing' { return (Check-Signing $S) }
+    'nexus'   { return (Check-Nexus $S) }
+    default   { return (Check-Feed $S $c.Feed) }
+  }
+}
+
+# When neither GitHub nor Discord answers at all, this machine is offline and
+# nothing it sees means anything.
+function Test-Online {
+  foreach ($u in 'https://api.github.com/', 'https://discord.com/api/v10/gateway') {
+    if ((Get-Http $u -timeout 10).Code -gt 0) { return $true }
+  }
+  return $false
+}
+
+# ------------------------------------------------------ telling a person ---
+# The same shape as the VPS watcher's (#447): outages.txt remembers what is
+# down, alerts.jsonl is the outbox, one message when it goes and one when it
+# is back.
+
+function Paths($dir) {
+  return @{
+    Outages = (Join-Path $dir 'outages.txt'); Due = (Join-Path $dir 'due.txt')
+    Alerts = (Join-Path $dir 'alerts.jsonl'); Sent = (Join-Path $dir 'alerts-sent-webhook.txt'); SentVps = (Join-Path $dir 'alerts-sent-vps.txt')
+    Hook = (Join-Path $dir 'alerts-webhook.txt'); Log = (Join-Path $dir 'watch.log')
+  }
+}
+$hookRx = '^https://((ptb|canary)\.)?discord(app)?\.com/api/webhooks/\d+/[A-Za-z0-9_-]+$'
+$alertMaxAge = 24 * 3600
+
+function UnixTime($t) { return ([DateTimeOffset]$t).ToUnixTimeSeconds() }
+
+function Note($P, $line) {
+  $stamp = (Get-Now).ToString('yyyy-MM-dd HH:mm:ss')
+  Add-Content -LiteralPath $P.Log -Value ($stamp + '  ' + $line) -Encoding UTF8
+}
+
+# name|down or up|bad runs|good runs|first bad|first good, as on the VPS.
+function Read-Outages($P) {
+  $o = @{}
+  if (-not (Test-Path -LiteralPath $P.Outages)) { return $o }
+  foreach ($line in (Get-Content -LiteralPath $P.Outages -EA SilentlyContinue)) {
+    $b = "$line" -split '\|'
+    if ($b.Count -ne 6) { continue }
+    try { $o[$b[0]] = @{ Down = ($b[1] -eq 'down'); Misses = [int]$b[2]; Clean = [int]$b[3]; Since = $b[4]; Good = $b[5] } } catch { continue }
+  }
+  return $o
+}
+
+function Save-Outages($P, $o) {
+  $lines = @()
+  foreach ($k in ($o.Keys | Sort-Object)) {
+    $s = $o[$k]
+    $lines += ($k + '|' + $(if ($s.Down) { 'down' } else { 'up' }) + '|' + $s.Misses + '|' + $s.Clean + '|' + $s.Since + '|' + $s.Good)
+  }
+  Set-Content -LiteralPath $P.Outages -Value $lines -Encoding ASCII
+}
+
+# When each check that is not asked every run was last asked.
+function Read-Due($P) {
+  $d = @{}
+  if (-not (Test-Path -LiteralPath $P.Due)) { return $d }
+  foreach ($line in (Get-Content -LiteralPath $P.Due -EA SilentlyContinue)) {
+    $b = "$line" -split '\|'
+    if ($b.Count -eq 2) { $d[$b[0]] = $b[1] }
+  }
+  return $d
+}
+
+function Save-Due($P, $d) {
+  Set-Content -LiteralPath $P.Due -Value @($d.Keys | Sort-Object | ForEach-Object { $_ + '|' + $d[$_] }) -Encoding ASCII
+}
+
+function Is-Due($c, $due, $now) {
+  if (-not $c.Every) { return $true }
+  if (-not $due.ContainsKey($c.Name)) { return $true }
+  try { $last = [datetime]::Parse($due[$c.Name], $null, 'RoundtripKind') } catch { return $true }
+  return (($now - $last).TotalMinutes -ge ($c.Every - 1))
+}
+
+function Shown($t, $discord) {
+  if ($discord) { return ('<t:' + (UnixTime $t) + ':f>') }
+  return ($t.ToString('yyyy-MM-dd HH:mm') + ' One time')
+}
+
+function Took($from, $to) {
+  $m = [math]::Round(($to - $from).TotalMinutes)
+  if ($m -lt 1) { return 'under a minute' }
+  if ($m -lt 120) { return ('about ' + $m + ' minutes') }
+  if ($m -lt 2880) { return ('about ' + [math]::Round($m / 60.0, 1) + ' hours') }
+  return ('about ' + [math]::Round($m / 1440.0, 1) + ' days')
+}
+
+# One message into the outbox, and the same sentence into watch.log.
+function Tell($P, $c, $kind, $head, $body, $plain) {
+  $now = Get-Now
+  $id = 'outside-' + $now.ToString('yyyyMMddHHmmss') + '-' + ($c.Name -replace '[^A-Za-z0-9]', '') + '-' + $kind
+  $text = '**' + $head + '** ' + $body
+  if ($text.Length -gt 1900) { $text = $text.Substring(0, 1900) }
+  $row = ConvertTo-Json @{ id = $id; at = (UnixTime $now); service = ('outside ' + $c.Name); kind = $kind; text = $text } -Compress
+  [IO.File]::AppendAllText($P.Alerts, $row + "`r`n", (New-Object Text.UTF8Encoding($false)))
+  Note $P ('told staff: ' + $head + ' ' + $plain)
+}
+
+# One run's verdict on one check.
+function Observe($P, $o, $c, $res, $S) {
+  if (-not $o.ContainsKey($c.Name)) { $o[$c.Name] = @{ Down = $false; Misses = 0; Clean = 0; Since = ''; Good = '' } }
+  $st = $o[$c.Name]
+  $now = Get-Now
+  $stamp = $now.ToString('o')
+  if ($res.Bad) {
+    $st.Clean = 0
+    $st.Good = ''
+    $st.Misses = $st.Misses + 1
+    if (-not $st.Since) { $st.Since = $stamp }
+    if (-not $st.Down -and $st.Misses -ge $c.Misses) {
+      $st.Down = $true
+      $since = [datetime]::Parse($st.Since, $null, 'RoundtripKind')
+      $why = $res.Why
+      if ($why -and $why -notmatch '^https?:') { $why = $why.Substring(0, 1).ToUpper() + $why.Substring(1) }
+      $rest = $why + '. First noticed '
+      $after = '. Checked from One, outside the VPS, every ' + $S.Minutes + ' minutes. ' + $c.Fix
+      Tell $P $c 'down' ($c.Say + ' ' + $c.Fails + '.') ($rest + (Shown $since $true) + $after) ($rest + (Shown $since $false) + $after)
+    }
+    return
+  }
+  $st.Misses = 0
+  if (-not $st.Down) { $st.Since = ''; return }
+  if (-not $st.Good) { $st.Good = $stamp }
+  $st.Clean = $st.Clean + 1
+  if ($st.Clean -lt $c.Back) { return }
+  $good  = [datetime]::Parse($st.Good, $null, 'RoundtripKind')
+  $since = $good
+  if ($st.Since) { $since = [datetime]::Parse($st.Since, $null, 'RoundtripKind') }
+  $gone = Took $since $good
+  Tell $P $c 'back' ($c.Say + ' ' + $c.Recovers + '.') ('Fine since ' + (Shown $good $true) + ', after ' + $gone + ' (first noticed ' + (Shown $since $true) + '). ' + $res.Line + '.') ('Fine since ' + (Shown $good $false) + ', after ' + $gone + ' (first noticed ' + (Shown $since $false) + '). ' + $res.Line + '.')
+  $st.Down = $false
+  $st.Clean = 0
+  $st.Since = ''
+  $st.Good = ''
+}
+
+# The webhook's address, or '' when there is none or it is not one.
+function Webhook-Url($P) {
+  if (-not (Test-Path -LiteralPath $P.Hook)) { return '' }
+  $u = ('' + (Get-Content -LiteralPath $P.Hook -TotalCount 1 -EA SilentlyContinue)).Trim()
+  if ($u -notmatch $hookRx) { return '' }
+  return $u
+}
+
+function Read-Ids($path, $into) {
+  if (Test-Path -LiteralPath $path) { foreach ($l in (Get-Content -LiteralPath $path -EA SilentlyContinue)) { if ("$l".Trim()) { $into["$l".Trim()] = $true } } }
+}
+
+# Send whatever has not gone and is under a day old: to the VPS watchdog's
+# outbox first, and through the webhook from here when the VPS cannot take
+# it. A failure is written to watch.log once, on the first run that tries.
+function Deliver($P, $S) {
+  if (-not (Test-Path -LiteralPath $P.Alerts)) { return }
+  $sent = @{}
+  Read-Ids $P.Sent $sent
+  Read-Ids $P.SentVps $sent
+  $nowUnix = UnixTime (Get-Now)
+  $due = @()
+  foreach ($line in (Get-Content -LiteralPath $P.Alerts -Encoding UTF8 -EA SilentlyContinue)) {
+    $a = $null
+    try { $a = ConvertFrom-Json $line } catch { continue }
+    if (-not $a -or -not $a.id -or -not $a.text) { continue }
+    if ($sent.ContainsKey($a.id)) { continue }
+    $age = $nowUnix - [int64]$a.at
+    if ($age -gt $alertMaxAge) { continue }
+    $sent[$a.id] = $true
+    $due += @{ Id = '' + $a.id; Text = '' + $a.text; Line = ('' + $line).Trim(); First = ($age -lt 60) }
+  }
+  if ($due.Count -eq 0) { return }
+  $fresh = @($due | Where-Object { $_.First }).Count -gt 0
+
+  $why = Send-ToVps $S @($due | ForEach-Object { $_.Line })
+  if ($why -eq '') {
+    Add-Content -LiteralPath $P.SentVps -Value @($due | ForEach-Object { $_.Id }) -Encoding ASCII
+    Note $P ('handed ' + $due.Count + ' message(s) to the watchdog''s outbox on the VPS: ' + (@($due | ForEach-Object { $_.Id }) -join ', '))
+    return
+  }
+  if ($fresh) { Note $P ('the VPS did not take ' + $due.Count + ' message(s): ' + $why + '. Posting from here instead.') }
+
+  $url = Webhook-Url $P
+  foreach ($a in $due) {
+    if (-not $url) {
+      if ($a.First) { Note $P ('no webhook in ' + $P.Hook + ', so ' + $a.Id + ' waits there. .\scripts\vps\Watch-Outside.ps1 -SetWebhook') }
+      continue
+    }
+    $w = Send-Webhook $url $a.Text
+    if ($w -eq '') {
+      Add-Content -LiteralPath $P.Sent -Value $a.Id -Encoding ASCII
+      Note $P ('posted ' + $a.Id + ' through the webhook, because the VPS could not take it')
+    } elseif ($a.First) {
+      Note $P ('could not post ' + $a.Id + ': ' + $w + '. It is tried again every run for a day.')
+    }
+  }
+}
+
+function Trim-Files($P) {
+  if (Test-Path -LiteralPath $P.Alerts) {
+    $all = @(Get-Content -LiteralPath $P.Alerts -Encoding UTF8 -EA SilentlyContinue)
+    $keep = @()
+    $nowUnix = UnixTime (Get-Now)
+    foreach ($line in $all) {
+      try { $a = ConvertFrom-Json $line } catch { continue }
+      if ($a -and ($nowUnix - [int64]$a.at) -le (2 * $alertMaxAge)) { $keep += $line }
+    }
+    if ($keep.Count -lt $all.Count) {
+      [IO.File]::WriteAllText($P.Alerts, $(if ($keep.Count) { ($keep -join "`r`n") + "`r`n" } else { '' }), (New-Object Text.UTF8Encoding($false)))
+    }
+  }
+  foreach ($f in @($P.Log, $P.Sent, $P.SentVps)) {
+    if (-not (Test-Path -LiteralPath $f)) { continue }
+    $all = @(Get-Content -LiteralPath $f -EA SilentlyContinue)
+    if ($all.Count -gt 2000) { Set-Content -LiteralPath $f -Value ($all[-1000..-1]) -Encoding UTF8 }
+  }
+}
+
+# One pass. With -Remember it keeps state, tells and posts (what the task
+# does); without, it only asks and returns what it saw. Returns the results,
+# name to @{ Bad; Why; Line }, or $null when this machine is offline.
+function Invoke-Watch($S, $P, [switch]$Remember) {
+  if ($Remember -and -not (Test-Path -LiteralPath $P.Log)) { $null = New-Item -ItemType Directory -Path (Split-Path -Parent $P.Log) -Force }
+  if (-not (Test-Online)) {
+    if ($Remember) { Note $P 'neither GitHub nor Discord answered, so this machine is offline. Nothing was judged or sent.' }
+    return $null
+  }
+  $now = Get-Now
+  $o = @{}; $due = @{}
+  if ($Remember) { $o = Read-Outages $P; $due = Read-Due $P }
+  $seen = [ordered]@{}
+  foreach ($c in (Get-Checks $S)) {
+    if ($Remember -and -not (Is-Due $c $due $now)) { continue }
+    $res = Invoke-Check $S $c
+    $seen[$c.Name] = $res
+    if ($Remember) {
+      if ($c.Every) { $due[$c.Name] = $now.ToString('o') }
+      Observe $P $o $c $res $S
+    }
+  }
+  if ($Remember) {
+    Save-Outages $P $o
+    Save-Due $P $due
+    Deliver $P $S
+    Trim-Files $P
+  }
+  return $seen
+}
+
+# Dot-sourced by tests\test-watch-outside.ps1, which wants the functions and
+# not a run against the internet.
+if ($MyInvocation.InvocationName -eq '.') { return }
+
+# ------------------------------------------------------------- the runs ---
+function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
+function Done([int]$code) { Write-Host ''; if (-not $NoPause -and -not $Run) { [void](Read-Host 'Enter to close') }; exit $code }
+
+$repo = Split-Path -Parent (Split-Path -Parent $Here)
+$saved = Join-Path $Here 'watch-outside.json'
+$S = Read-Settings $repo $saved
+$P = Paths $Folder
+
+if ($Run) {
+  $seen = Invoke-Watch $S $P -Remember
+  if ($null -eq $seen) { exit 0 }
+  foreach ($k in $seen.Keys) { if ($seen[$k].Bad) { exit 1 } }
+  exit 0
+}
+
+Write-Host ''
+Write-Host '  THORNSWOOD  -  watched from outside the VPS' -ForegroundColor White
+
+if ($SetWebhook) {
+  Say ''
+  Say '  Paste the staff alerts webhook address (Discord: the channel, Edit Channel, Integrations, Webhooks).' 'Cyan'
+  Say '  Use the same one the VPS watchdog posts through, so both land in one channel. It is not shown.' 'DarkGray'
+  $sec = Read-Host '  Webhook' -AsSecureString
+  $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
+  try { $url = ('' + [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)).Trim() }
+  finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+  if ($url -notmatch $hookRx) { $url = $null; Say '  STOP. That is not a Discord webhook address. Nothing was saved.' 'Red'; Done 1 }
+  $null = New-Item -ItemType Directory -Path $Folder -Force
+  [IO.File]::WriteAllText($P.Hook, $url, (New-Object Text.UTF8Encoding($false)))
+  $url = $null
+  Say ('  saved in ' + $P.Hook + ', on this machine only') 'Green'
+  Done 0
+}
+
+if ($TestPost) {
+  $url = Webhook-Url $P
+  if (-not $url) { Say ('  No webhook in ' + $P.Hook + '. Run this with -SetWebhook first.') 'Red'; Done 1 }
+  $why = Send-Webhook $url ('**Test from the outside watcher on One.** It asks the site, both update feeds, the certificate, the address, the build runner, code signing and the Nexus collection every ' + $Minutes + ' minutes, and posts here when one breaks and again when it is fixed.')
+  $url = $null
+  if ($why) { Say ('  Discord did not take it: ' + $why) 'Red'; Done 1 }
+  Say '  posted; look in the channel' 'Green'
+  Done 0
+}
+
+if ($Remove) {
+  Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -EA SilentlyContinue
+  if (Get-ScheduledTask -TaskName $TaskName -EA SilentlyContinue) { Say "  STOP. $TaskName is still registered." 'Red'; Done 1 }
+  Say "  $TaskName removed. $Folder and what it said are left alone." 'Green'
+  Done 0
+}
+
+if ($Status) {
+  $t = Get-ScheduledTask -TaskName $TaskName -EA SilentlyContinue
+  if ($t) {
+    $i = Get-ScheduledTaskInfo -TaskName $TaskName
+    Say ('  task      ' + $t.State + ', last run ' + $i.LastRunTime + ' (result ' + $i.LastTaskResult + '), next ' + $i.NextRunTime) 'Green'
+  } else { Say '  task      NOT installed. Run this with -Install' 'Red' }
+  Say ('  webhook   ' + $(if (Webhook-Url $P) { 'set, for when the VPS cannot be reached' } else { 'NOT set. Run this with -SetWebhook' })) $(if (Webhook-Url $P) { 'Green' } else { 'Red' })
+  # Read only: whether ssh reaches the box without a prompt and the watchdog
+  # whose outbox the messages go to is there.
+  $ssh = Get-Command ssh -EA SilentlyContinue
+  $said = ''
+  if ($ssh) {
+    $probe = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes("if (Test-Path -LiteralPath '" + $S.WatchRoot + "\watch.ps1') { 'WATCHER' } else { 'NOWATCHER' }"))
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    $said = (@(& $ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes ($S.VpsUser + '@' + $S.VpsAddress) ('powershell -NoProfile -NonInteractive -EncodedCommand ' + $probe) 2>&1) | ForEach-Object { "$_".Trim() }) -join ' '
+    $ErrorActionPreference = $old
+  }
+  if ($said -match '\bWATCHER\b') { Say ('  vps path  ssh reaches ' + $S.VpsAddress + ' and the watchdog''s outbox is there, so messages go through it') 'Green' }
+  elseif ($said -match 'NOWATCHER') { Say ('  vps path  the watchdog is not installed on the VPS, so messages go through the webhook from here') 'Yellow' }
+  else { Say ('  vps path  ssh does not reach ' + $S.VpsAddress + ' without a prompt, so messages go through the webhook from here') 'Yellow' }
+  foreach ($k in ((Read-Outages $P).GetEnumerator() | Where-Object { $_.Value.Down })) { Say ('  DOWN      ' + $k.Key + ' since ' + $k.Value.Since) 'Red' }
+  Say ''
+  Say "  Last $Lines lines of $($P.Log):" 'Cyan'
+  if (Test-Path -LiteralPath $P.Log) { Get-Content -LiteralPath $P.Log -Tail $Lines | ForEach-Object { Say "  $_" 'DarkGray' } } else { Say '  nothing yet' 'DarkGray' }
+  Done 0
+}
+
+if ($Install) {
+  if (-not (Webhook-Url $P)) { Say ('  STOP. No webhook in ' + $P.Hook + ', so nobody would be told. Run this with -SetWebhook first.') 'Red'; Done 1 }
+  $null = New-Item -ItemType Directory -Path $Folder -Force
+  Copy-Item -LiteralPath $MyInvocation.MyCommand.Path -Destination (Join-Path $Folder 'Watch-Outside.ps1') -Force
+  $keep = @{}
+  foreach ($k in $S.Keys) { if ($k -ne 'Minutes') { $keep[$k] = $S[$k] } }
+  Set-Content -LiteralPath (Join-Path $Folder 'watch-outside.json') -Value (ConvertTo-Json $keep -Depth 5) -Encoding UTF8
+  Say ('  copied the script and what it read from the repository to ' + $Folder) 'DarkGray'
+  # conhost --headless runs the console with no window at all, so a game in
+  # full screen is never pulled out of focus every five minutes, which
+  # -WindowStyle Hidden alone still does for a moment.
+  $argLine = '--headless powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + (Join-Path $Folder 'Watch-Outside.ps1') + '" -Run -Minutes ' + $Minutes
+  $a = New-ScheduledTaskAction -Execute 'conhost.exe' -Argument $argLine -WorkingDirectory $Folder
+  $t1 = New-ScheduledTaskTrigger -Once -At ((Get-Date).AddMinutes(1)) -RepetitionInterval (New-TimeSpan -Minutes $Minutes)
+  $t2 = New-ScheduledTaskTrigger -AtLogOn -User ([Security.Principal.WindowsIdentity]::GetCurrent().Name)
+  $who = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive
+  $set = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 4)
+  Register-ScheduledTask -TaskName $TaskName -Action $a -Trigger @($t1, $t2) -Principal $who -Settings $set -Force | Out-Null
+  if (-not (Get-ScheduledTask -TaskName $TaskName -EA SilentlyContinue)) { Say "  STOP. Registering $TaskName failed." 'Red'; Done 1 }
+  Say ("  {0} registered, every {1} minutes while you are signed in, next run {2}" -f $TaskName, $Minutes, (Get-ScheduledTaskInfo -TaskName $TaskName).NextRunTime) 'Green'
+  Say ('  it writes what it did to ' + $P.Log + '; -Status shows it') 'DarkGray'
+  Done 0
+}
+
+# No switch: look once, remember nothing, post nothing.
+Say ''
+$seen = Invoke-Watch $S $P
+if ($null -eq $seen) { Say '  Neither GitHub nor Discord answered, so this machine is offline and nothing was judged.' 'Yellow'; Done 0 }
+$bad = 0
+foreach ($k in $seen.Keys) {
+  $r = $seen[$k]
+  if ($r.Bad) { $bad++ }
+  Say ('  {0,-9} {1,-6} {2}' -f $k, $(if ($r.Bad) { 'WRONG' } else { 'ok' }), $r.Line) $(if ($r.Bad) { 'Red' } else { 'Green' })
+}
+Say ''
+if ($bad) { Say "  $bad of them need a look. Only -Run, which the task runs, remembers and posts." 'Red' } else { Say '  Everything outside answers.' 'Green' }
+Done $(if ($bad) { 1 } else { 0 })

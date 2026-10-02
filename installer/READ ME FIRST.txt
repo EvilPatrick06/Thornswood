@@ -1,8 +1,10 @@
 THORNSWOOD
 ==========
 
-Thornswood is a co-op Skyrim roleplay server, in closed playtest and for
-people eighteen and over. You apply in the Discord first:
+Thornswood is a co-op Skyrim roleplay server, in alpha and for people
+eighteen and over. Anyone can install it, and the world is open by
+application: you apply in the Discord, accept the rules, and the Playtester
+role lets you press Play:
 https://thornswood.net/discord
 
 The full guide is https://thornswood.net/join. It is kept up to date, so if
@@ -17,10 +19,14 @@ What you need
   Nexus, and only Vortex can install a collection.
 - Steam signed in and running.
 
-Thornswood leaves the Skyrim you already have alone. The launcher builds a game
-folder of its own, C:\Thornswood\Game, from your Steam copy and what Vortex
-put into it. Most of it is hard links to your own files, which take no extra
-space, and the few files other programs rewrite are real copies.
+Thornswood runs from a game folder of its own, C:\Thornswood\Game, which the
+launcher builds from your Steam copy and what Vortex put into it. Most of it is
+hard links to your own files, which take no extra space, and the few files
+other programs rewrite are real copies. Tick "Give Thornswood a Skyrim folder
+of its own" in the setup window and nothing is ever written into your Steam
+copy: you can keep playing it, on any build, with your own mods. Leave it off
+and Thornswood's own files go into your Steam copy until you turn the folder on
+in the launcher, which then takes them back out.
 
 
 Installing
@@ -35,7 +41,9 @@ Installing
 2. Open Thornswood from the desktop shortcut. The server runs Skyrim build
    1.6.1170 and most copies are newer. If yours is, a card on the launcher's
    front page says so. Press Downgrade and Steam downloads that build under
-   your own account. It is a few gigabytes, so give it a while.
+   your own account, for Thornswood's own game folder. Your Steam copy is
+   not changed, so you can keep it on any build and mod it as you like. It
+   is a few gigabytes, so give it a while.
 
 3. Install the collection in Vortex. The link is on
    https://thornswood.net/downloads and on the launcher's Add-ons page. This

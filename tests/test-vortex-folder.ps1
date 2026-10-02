@@ -51,14 +51,15 @@
   Steam, not Vortex, not C:\Thornswood, and nothing goes over the network.
 #>
 [CmdletBinding()]
-param([string]$AppPath)
+param([string]$AppPath, [string]$Scratch)
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $AppPath) { $AppPath = Join-Path $Here '..\launcher\app' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $AppPath) { $AppPath = Join-Path $Here 'launcher\app' }
+if (-not $Scratch) { $Scratch = [IO.Path]::GetTempPath() }
 
 $script:pass = 0
 $script:fail = 0
@@ -95,6 +96,19 @@ $real = @('Steam.cs', 'OwnGame.cs', 'Verify.cs', 'Paths.cs', 'Config.cs', 'Secre
 # cut from a live release.
 $swallow = Join-Path $AppPath 'Swallow.cs'
 if (Test-Path -LiteralPath $swallow) { $real += $swallow }
+# OwnGame and Verify report how far they have got to the Play button since
+# #1145; Progress.cs needs only Swallow. Taken only where it exists, as above.
+$progress = Join-Path $AppPath 'Progress.cs'
+if (Test-Path -LiteralPath $progress) { $real += $progress }
+# OwnGame's archive sharing and the Downgrade's files are its other half since
+# #1217 and #1218. Taken only where it exists, as above.
+$ownShare = Join-Path $AppPath 'OwnGameShare.cs'
+if (Test-Path -LiteralPath $ownShare) { $real += $ownShare }
+# And which kind of file each is, by the pinned build's list, since #1232.
+# Taken only where it exists, as above, with a list of the pretend game's own
+# files embedded the way Build-Launcher embeds records\skyrim-files.json.
+$ownKinds = Join-Path $AppPath 'OwnGameKinds.cs'
+if (Test-Path -LiteralPath $ownKinds) { $real += $ownKinds }
 foreach ($f in $real) {
     Yes "launcher\app\$([IO.Path]::GetFileName($f)) is there" (Test-Path -LiteralPath $f)
     if (-not (Test-Path -LiteralPath $f)) { Done }
@@ -115,18 +129,40 @@ namespace Thornswood
     {
         public const string OffSuffix = ".thornswood-off";
         public static string[] ForeignClients() { return new string[0]; }
+        // The light flag list: the hand list, and the overloads Verify calls
+        // with the list it works out from the manifest.
+        public static readonly string[] MustBeLight = { };
         public static List<string> NotLight() { return new List<string>(); }
+        public static List<string> NotLight(IEnumerable<string> mustBeLight) { return new List<string>(); }
         public static List<string> StrayCreations(ICollection<string> wanted) { return new List<string>(); }
         public static bool TakesNoPlace(string name) { return false; }
         public static int IsolateForeign(Action<string> say) { return 0; }
         public static int FlagLight(Action<string> say) { return 0; }
+        public static int FlagLight(IEnumerable<string> mustBeLight, Action<string> say) { return 0; }
+        // The real one reads the Vortex state under this account's AppData.
+        // No profile found is what OwnGame already handles: it leaves the
+        // plugin list alone.
+        public static string VortexProfileDir(string name) { return null; }
         public static int IsolateCreations(ICollection<string> wanted, Action<string> say) { return 0; }
     }
     static class Keep { public static List<string> Held() { return new List<string>(); } }
     static class Junction { public static bool IsLink(string p) { return false; } }
-    static class Downgrade { public static string Describe(Config cfg, string exe) { return "not 1.6.1170"; } }
+    static class Downgrade
+    {
+        public static string Describe(Config cfg, string exe) { return "not 1.6.1170"; }
+        // Nothing downloaded: the Steam copy is what a folder is made from.
+        public static List<string> Downloaded(Config cfg) { return null; }
+        public static void ClearDownloads(Config cfg, Action<string> say) { }
+    }
     static class SkyMp { public static int ResourcePortFor(Config cfg) { return 0; } }
-    static class Updater { public const string Version = "test"; }
+    // An install that never synced to a release record: every record of
+    // Thornswood's own files is its packs', Keep's and the installer's.
+    static class Updater
+    {
+        public const string Version = "test";
+        public static bool ReleaseFilesKnown() { return true; }
+        public static List<string> ReleaseFiles() { return new List<string>(); }
+    }
 }
 '@
 
@@ -525,7 +561,8 @@ namespace Thornswood
             string steam = SteamCopy(s, s.Steam, "STEAM");
             Staging(s);
             string k = Keizaal(s, s.Steam, "Keizaal Online", DateTime.UtcNow.AddMinutes(-5));
-            Paths.Game = steam;
+            // SteamCopy is what Paths.Init sets beside Game under the collection (#1226).
+            Paths.Game = Paths.SteamCopy = steam;
 
             Yes("Steam.SkyrimPath still answers the Steam copy", string.Equals(Steam.SkyrimPath(), steam, StringComparison.OrdinalIgnoreCase));
             Yes("the folder Vortex deploys into is found without being told: Keizaal Online", string.Equals(DeploysInto(s.Cfg), k, StringComparison.OrdinalIgnoreCase));
@@ -638,7 +675,7 @@ namespace Thornswood
             Put(Path.Combine(second, "Mods\\left-by-someone.txt"), "LIB2-OWN");
             Record(Path.Combine(second, "Data\\vortex.deployment.json"), s.Staging, Path.Combine(second, "Data"),
                    new string[][] { new string[] { "TsOne.esp", "ModA" }, new string[] { "TsTwo.esm", "ModA" } }, DateTime.UtcNow);
-            Paths.Game = first;
+            Paths.Game = Paths.SteamCopy = first;
             Yes("two Steam copies: SkyrimPath still answers the first", string.Equals(Steam.SkyrimPath(), first, StringComparison.OrdinalIgnoreCase));
             Yes("the one with Vortex's record is chosen", string.Equals(DeploysInto(s.Cfg), second, StringComparison.OrdinalIgnoreCase));
             Yes("and, being a Steam copy, the game comes from it too", string.Equals(OwnGame.Source(s.Cfg), second, StringComparison.OrdinalIgnoreCase));
@@ -648,8 +685,10 @@ namespace Thornswood
             string made = null;
             try { made = OwnGame.Make(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Make said: " + ex.Message); }
             Yes("the folder is made from it", made != null && Text(Path.Combine(OwnGame.Folder, "Data\\TsOne.esp")) == "LIB2-TSONE");
-            Yes("the way it always was for a Steam copy: everything in it, from it",
-                Text(Path.Combine(OwnGame.Folder, "Mods\\left-by-someone.txt")) == "LIB2-OWN" && Text(Path.Combine(OwnGame.Folder, "SkyrimSE.exe")) == "LIB2-EXE");
+            // Since #1232 only Skyrim's own files, Vortex's and Thornswood's
+            // come from a Steam copy; a file somebody left there by hand stays.
+            Yes("the game comes from it, and a file left in it by hand stays out of Thornswood's folder",
+                !File.Exists(Path.Combine(OwnGame.Folder, "Mods\\left-by-someone.txt")) && Text(Path.Combine(OwnGame.Folder, "SkyrimSE.exe")) == "LIB2-EXE");
         }
 
         // ---- an older deployment left in the Steam copy ----------------------
@@ -667,7 +706,7 @@ namespace Thornswood
             Staging(s);
             string k = Keizaal(s, s.Steam, "Keizaal Online", DateTime.UtcNow);
             s.Cfg.VortexGame = k;
-            Paths.Game = steam;
+            Paths.Game = Paths.SteamCopy = steam;
             string made = null;
             try { made = OwnGame.Make(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Make said: " + ex.Message); }
             string game = OwnGame.Folder;
@@ -732,7 +771,7 @@ namespace Thornswood
             Put(Path.Combine(k, "ModA\\TsTwo.esm"), "KEIZAAL-MODA-TWO");
             Record(Path.Combine(k, "Data\\vortex.deployment.json"), k, Path.Combine(k, "Data"),
                    new string[][] { new string[] { "TsOne.esp", "ModA" }, new string[] { "TsTwo.esm", "ModA" }, new string[] { "x.txt", "Mods" } }, DateTime.UtcNow);
-            Paths.Game = steam;
+            Paths.Game = Paths.SteamCopy = steam;
             string made = null;
             try { made = OwnGame.Make(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Make said: " + ex.Message); }
             string game = OwnGame.Folder;
@@ -757,21 +796,23 @@ namespace Thornswood
             Put(Path.Combine(steam, "Data\\Loose.esp"), "STEAM-LOOSE");
             Record(Path.Combine(steam, "Data\\vortex.deployment.json"), s.Staging, Path.Combine(steam, "Data"),
                    new string[][] { new string[] { "TsOne.esp", "ModA" }, new string[] { "TsTwo.esm", "ModA" } }, DateTime.UtcNow);
-            Paths.Game = steam;
+            Paths.Game = Paths.SteamCopy = steam;
             Yes("Vortex deploying into the Steam copy: it is the answer, as it always was", string.Equals(DeploysInto(s.Cfg), steam, StringComparison.Ordinal));
             Yes("Scan says nothing about another folder", DeploysElsewhere(s.Cfg) == "" && (Verify.Run(s.Cfg).Count == 0 || VortexFolderOf(Verify.Run(s.Cfg)[0]) == null));
             string made = null;
             try { made = OwnGame.Make(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Make said: " + ex.Message); }
             string game = OwnGame.Folder;
-            List<string> expect = new List<string> { "bink2w64.dll", "Data\\Loose.esp", "Data\\Scripts\\vanilla.pex", "Data\\Skyrim - Textures0.bsa",
+            // Since #1232 Skyrim's own files and Vortex's, and not the plugin
+            // somebody put into the Steam copy by hand (Data\Loose.esp).
+            List<string> expect = new List<string> { "bink2w64.dll", "Data\\Scripts\\vanilla.pex", "Data\\Skyrim - Textures0.bsa",
                                                      "Data\\Skyrim.esm", "Data\\TsOne.esp", "Data\\TsTwo.esm", "SkyrimSE.exe" };
             expect.Sort(StringComparer.OrdinalIgnoreCase);
-            Yes("the folder is every file of the Steam copy but Vortex's record, as before",
+            Yes("the folder is Skyrim's own files and Vortex's from the Steam copy, and a plugin put there by hand stays out",
                 made != null && string.Join("|", Rels(game).ToArray()) == string.Join("|", expect.ToArray()));
             Yes("taken from the Steam copy itself, not from staging",
                 Text(Path.Combine(game, "Data\\TsOne.esp")) == "DEPLOYED-TSONE" && Id(Path.Combine(game, "Data\\TsOne.esp")) == Id(Path.Combine(steam, "Data\\TsOne.esp")));
             Paths.Collection = false;
-            Paths.Game = game;
+            Paths.Game = Paths.SteamCopy = game;
             string again = null;
             try { again = OwnGame.Refresh(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Refresh said: " + ex.Message); }
             Yes("and a refresh with nothing new changes nothing", again != null && again.IndexOf("already matches", StringComparison.Ordinal) >= 0);
@@ -803,9 +844,16 @@ namespace Thornswood
             Put(Path.Combine(steam, "_Profile Switch\\Switch.ps1"), "SWITCH");
             Put(Path.Combine(steam, "Data\\_disabledByKzl\\ccParked.esm"), "PARKED-CC");
             Put(Path.Combine(steam, "Data\\_ResourcePack.esl"), "GAME-RESOURCEPACK");
+            // The behavior output is Thornswood's, from a pack, as the shipping
+            // machine's Nemesis output is: since #1232 a file in the Steam copy
+            // that no record names is not taken at all.
+            Put(Path.Combine(Paths.PacksDir, "20260926-0000.files"), "a|game\\" + beh + "\r\nb|game\\" + male + "\r\nc|game\\" + fnis + "\r\n");
+            // The animation is the collection's, deployed by Vortex. Since
+            // #1218 only Vortex's files are linked; the game's own are copies.
             Record(Path.Combine(steam, "Data\\vortex.deployment.json"), s.Staging, Path.Combine(steam, "Data"),
-                   new string[][] { new string[] { "TsOne.esp", "ModA" }, new string[] { "TsTwo.esm", "ModA" } }, DateTime.UtcNow);
-            Paths.Game = steam;
+                   new string[][] { new string[] { "TsOne.esp", "ModA" }, new string[] { "TsTwo.esm", "ModA" },
+                                    new string[] { "Meshes\\actors\\character\\animations\\walk.hkx", "ModA" } }, DateTime.UtcNow);
+            Paths.Game = Paths.SteamCopy = steam;
             string made = null;
             try { made = OwnGame.Make(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Make said: " + ex.Message); }
             string game = OwnGame.Folder;
@@ -843,7 +891,7 @@ namespace Thornswood
             foreach (string l in File.ReadAllLines(madeFile)) made4.Add(l.StartsWith("rules=") ? "rules=4" : l);
             File.WriteAllLines(madeFile, made4.ToArray());
             Paths.Collection = false;
-            Paths.Game = game;
+            Paths.Game = Paths.SteamCopy = game;
             Yes("a folder made under the old rules asks to refresh", OwnGame.NeedsRefresh(s.Cfg));
             string again = null;
             try { again = OwnGame.Refresh(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Refresh said: " + ex.Message); }
@@ -890,7 +938,7 @@ namespace Thornswood
             // Vortex's record lists a Thornswood plugin whose copy in Vortex's
             // mods folder is gone: the Thornswood profile is deployed, the
             // deployment is out of date. It must not say another profile.
-            Paths.Game = s.Common(s.Steam, "Skyrim Special Edition");
+            Paths.Game = Paths.SteamCopy = s.Common(s.Steam, "Skyrim Special Edition");
             File.Delete(Path.Combine(s.Staging, "ModA\\TsOne.esp"));
             string why = OwnGame.WhyNot(s.Cfg, k);
             Yes("a staged copy gone missing is called an out of date deployment, not another profile",
@@ -902,7 +950,7 @@ namespace Thornswood
         {
             Scene s = NewScene("nothing", true);
             string steam = SteamCopy(s, s.Steam, "STEAM");
-            Paths.Game = steam;
+            Paths.Game = Paths.SteamCopy = steam;
             string why = OwnGame.WhyNot(s.Cfg, DeploysInto(s.Cfg));
             Yes("with nothing deployed anywhere it still names the Steam copy", why != null && why.IndexOf("nothing deployed in " + steam, StringComparison.Ordinal) >= 0);
             Yes("and says how to find the folder Vortex deploys into", why != null && why.IndexOf("Open Game Folder", StringComparison.Ordinal) >= 0);
@@ -918,7 +966,7 @@ namespace Thornswood
             Scene s = NewScene("nosteam", true);
             Staging(s);
             string k = Keizaal(s, s.Steam, "Keizaal Online", DateTime.UtcNow);
-            Paths.Game = k;
+            Paths.Game = Paths.SteamCopy = k;
             Yes("with no Steam copy, Vortex's folder is still found", string.Equals(DeploysInto(s.Cfg), k, StringComparison.OrdinalIgnoreCase));
             Yes("but the game is never taken from it", OwnGame.Source(s.Cfg) == "");
             string why = OwnGame.WhyNot(s.Cfg, k);
@@ -938,7 +986,7 @@ namespace Thornswood
 }
 '@
 
-$work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-vortex-folder-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+$work = Join-Path $Scratch ('thornswood-vortex-folder-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Force -Path $work
 try {
     $utf8 = New-Object System.Text.UTF8Encoding($false)
@@ -952,6 +1000,14 @@ try {
     # own copies of the framework and a machine with the reference assemblies
     # installed stops on CS1703.
     $cscArgs = @('/noconfig', '/nologo', '/target:exe', '/warn:0', "/out:$exe")
+    if (Test-Path -LiteralPath $ownKinds) {
+        $skyrimList = Join-Path $work 'skyrim-files.json'
+        $listed = @('SkyrimSE.exe', 'bink2w64.dll', 'High.ini', 'installscript.vdf', 'Data\Skyrim.esm', 'Data\Skyrim - Textures0.bsa',
+                    'Data\_ResourcePack.esl', 'Data\Scripts\vanilla.pex') |
+            ForEach-Object { '    "{0}": {{ "bytes": 1, "sha1": "0", "depot": "1" }}' -f $_.Replace('\', '\') }
+        [IO.File]::WriteAllText($skyrimList, "{`n  ""build"": ""1.6.1170"",`n  ""files"": {`n" + ($listed -join ",`n") + "`n  }`n}`n", $utf8)
+        $cscArgs += "/resource:$skyrimList,skyrim-files.json"
+    }
     foreach ($r in $refs) { $cscArgs += "/reference:$r" }
     foreach ($f in $real) { $cscArgs += (Resolve-Path -LiteralPath $f).Path }
     $cscArgs += $stubFile
@@ -987,7 +1043,9 @@ try {
     Yes 'after Fix points it at the folder, the launcher makes the own folder the way Make it does (AskOwnGame)' `
         ($shell -match 'if\s*\(\s*Verify\.OwnFolderNext\s*\)\s*AskOwnGame\(\s*false\s*\)')
     Yes 'Scan keeps Fix pressable when the missing mods are in the folder Vortex deploys into' `
-        (($shell -match 'VortexFolder\s*!=\s*null') -and ($shell -match 'btnFix\.IsEnabled\s*=\s*blocking\s*>\s*0\s*&&\s*\(absent\s*==\s*0\s*\|\|\s*elsewhere\)'))
+        (($shell -match 'VortexFolder\s*!=\s*null') -and ($shell -match 'btnFix\.IsEnabled\s*=\s*blocking\s*>\s*0\s*&&\s*\(!onlyAbsent\s*\|\|\s*elsewhere\)'))
+    Yes 'Fix stays off only when every blocking problem is a mod that is not installed' `
+        ($shell -match 'bool onlyAbsent = absent > 0 && fixable == 0')
     Yes 'Settings has Choose Vortex''s folder and Forget the chosen folder' `
         (($xaml -match 'x:Name="BtnOwnGamePick"') -and ($xaml -match 'x:Name="BtnOwnGameForget"') -and
          ($own -match 'F<Button>\("BtnOwnGamePick"\)') -and ($own -match 'F<Button>\("BtnOwnGameForget"\)'))
@@ -995,8 +1053,11 @@ try {
         (($own -match 'OwnGame\.PointAt\(cfg,\s*chosen') -and ($own -match 'OwnGame\.PointAt\(cfg,\s*""'))
     Yes 'Make it, the offer and the Play refusal read the folder Vortex deploys into' `
         (([regex]::Matches($own, 'string src = OwnGame\.DeploysInto\(')).Count -ge 3)
-    Yes 'Downgrade still works on the Steam copy (OwnGame.Source), never the folder Vortex deploys into' `
-        (($down -match 'OwnGame\.Source\(cfg\)') -and ($down -notmatch 'DeploysInto'))
+    # Since #1218 the Downgrade writes into Thornswood's own folder
+    # (OwnGame.TakePinned), never into the Steam copy nor the folder Vortex
+    # deploys into; test-own-folder-alone.ps1 holds the rest of that.
+    Yes 'Downgrade writes neither the Steam copy (OwnGame.Source) nor the folder Vortex deploys into' `
+        (($down -match 'OwnGame\.TakePinned\(') -and ($down -notmatch 'OwnGame\.Source') -and ($down -notmatch 'DeploysInto'))
 
     # Review, 24 September: a pack removal read Vortex's record from the
     # Steam copy, which has none when Vortex deploys elsewhere.

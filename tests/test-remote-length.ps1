@@ -37,11 +37,10 @@ param([string]$ToolsPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-# The scripts are in scripts\<area> since phase 8 of issue #440; tools\ holds
-# only forwarding copies.
-if (-not $ToolsPath) { $ToolsPath = Join-Path (Split-Path -Parent $Here) 'scripts' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+# The scripts are in scripts\<area> since phase 8 of issue #440.
+if (-not $ToolsPath) { $ToolsPath = Join-Path $Here 'scripts' }
 
 $script:pass = 0
 $script:fail = 0
@@ -69,7 +68,10 @@ $overs = @()
 
 foreach ($f in $files) {
     $text = Get-Content -LiteralPath $f.FullName -Raw
-    if ($text -notmatch 'EncodedCommand') { continue }
+    # Since #1070 most send through Send-Script.ps1 (Invoke-ThornswoodRemote),
+    # which carries the guard for them.
+    $helped = $text -match 'Invoke-ThornswoodRemote -Target'
+    if ($text -notmatch 'EncodedCommand' -and -not $helped) { continue }
     $sending++
 
     # Every here-string body in the file, both quoting kinds.
@@ -84,7 +86,7 @@ foreach ($f in $files) {
     if ($wire -le $Limit) { continue }
 
     # It is too long to go on a command line. It must send a file instead.
-    $guarded = $text -match '\$cmd\.Length -le'
+    $guarded = ($text -match '\$cmd\.Length -le') -or $helped
     if (-not $guarded) {
         $overs += ('{0}: {1} characters on the wire, limit {2}, and no file fallback' -f
                    $f.Name, $wire, $Limit)
@@ -106,8 +108,11 @@ foreach ($name in @('Install-Voice.ps1', 'Check-Site.ps1')) {
     if (-not $p) { $p = Join-Path $ToolsPath $name }
     if (-not (Test-Path -LiteralPath $p)) { Yes "$name is there" $false; continue }
     $t = Get-Content -LiteralPath $p -Raw
-    Yes "$name still sends a long script as a file" ($t -match '\$cmd\.Length -le')
-    Yes "$name still cleans up what it sent" ($t -match 'Remove-Item -LiteralPath')
+    # Through Send-Script.ps1 since #1070, which sends a long script as a file
+    # and removes it (tests\test-send-script.ps1), or with a guard of its own.
+    $viaHelper = ($t -match 'Invoke-ThornswoodRemote -Target' -and $t -match "Send-Script\.ps1'\)")
+    Yes "$name still sends a long script as a file" ($viaHelper -or $t -match '\$cmd\.Length -le')
+    Yes "$name still cleans up what it sent" ($viaHelper -or $t -match 'Remove-Item -LiteralPath')
 }
 
 # ---- the guard has to be under the limit, not near it -----------------------
@@ -118,7 +123,9 @@ foreach ($name in @('Install-Voice.ps1', 'Check-Site.ps1')) {
 $guards = @()
 foreach ($f in $files) {
     $text = Get-Content -LiteralPath $f.FullName -Raw
-    foreach ($m in [regex]::Matches($text, '\$cmd\.Length -le (\d+)')) {
+    # Send-Script.ps1's guard is its -Limit, 6000 unless a caller says less.
+    foreach ($m in [regex]::Matches($text, '\$cmd\.Length -le (\d+)|\[int\]\$Limit = (\d+)')) {
+        if ($m.Groups[2].Success) { $guards += [int]$m.Groups[2].Value; continue }
         $guards += [int]$m.Groups[1].Value
     }
 }

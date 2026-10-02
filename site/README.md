@@ -22,12 +22,14 @@ else does.
 | `/api/play/join` | POST | the launcher, before every launch (`launcher\app\Discord.cs`) |
 | `/api/play/start`, `/api/play/end`, `/api/play/logs` | POST | the launcher, as a session starts, as it ends, and with the logs after (`launcher\app\Discord.cs`) |
 | `/api/play/roster` | POST | the launcher, for the names on the character cards (`launcher\app\Roster.cs`) |
+| `/api/play/pass` | POST | the launcher, when a character is picked at the game's menu and every four minutes while the game runs: a join pass the game server checks, or a plain no (#937, `launcher\app\Discord.cs`, which `launcher\app\JoinPass.cs` calls) |
 | `/auth/discord` | GET | the launcher's link button, through the browser; Discord sends the browser back to `/auth/discord/callback` (`launcher\app\Discord.cs`) |
 | `/api/allowed`, `/dev/api/allowed` | GET | each game server's door, every five minutes, with the bot's key; the dev server's `door.json` names the site with `/dev` on the end (`game\gamemode.js`) |
 | `/api/roster` | POST | the game server, with the bot's key, when its book of characters changes (`game\gamemode.js`) |
 | `/api/play/owns` | POST | the voice service, before it keeps a character creation choice (`voice\voice-server.js`) |
 | `/api/payload` | GET | the installer, which then downloads the zip it names from `/file/` (`installer\setup\Bootstrap.cs`) |
 | `/api/ticket` | POST | the Discord bot, for a support ticket (`bot\bot.py`) |
+| `/api/report/game`, `/dev/api/report/game` | POST | each game server, with the bot's key in a header, when somebody types /helpme or /report; the row goes into the inbox and the bot says it in the staff channel (`game\gamemode.js`, the asking staff block) |
 | `/api/play/who` | POST | nothing in the repo asks it now. It says who a ticket belongs to and writes nothing, which makes it the one to try by hand |
 
 ## On your machine
@@ -85,11 +87,25 @@ and the cookie secret, and is never in the repo. `.\scripts\deploy\Deploy-Docs.p
 sends `server.js` and everything in `public\` and restarts the task, and
 `-Site` also sends the public pages. A plain deploy never overwrites a
 document somebody has typed into on the site; `-Boards`, `-Docs` and
-`-SeedDocs` do, after a `.bak` of each. `-Password` reads the `config.json`
+`-SeedDocs` do, after a `.bak` of each. `-Password` asks for the new member
+password without showing it, never typed on the command line, where the
+shell's history would keep it. `-Password` reads the `config.json`
 on the VPS, changes the member password in it and keeps every other setting.
 A `config.json` there that will not read as JSON, an empty one included, is
 left exactly as it is and the password is not changed.
 `tests\test-docs-password.ps1` runs that part of the script against copies.
+
+`GET /api/deploys` says which commit, zip and hash each part on the box runs
+and when each last went out, read from the records the deploy scripts leave
+in `C:\Thornswood-Deploys\current` (`scripts\deploy\Artifact.ps1`;
+`THORNSWOOD_DEPLOYS_DIR` points a copy somewhere else). It is staff's, by the
+same `w.dev` the other staff doors ask (#1359): a caller with no cookie gets
+`401 sign in first` and a hub member who is not staff `403 staff only`, and
+no record is read before either refusal. It used to answer anybody, which
+told a stranger which source is live to the hour and when each part was last
+touched. Nothing in the repo fetches it and no page draws it, so the caller is
+a person asking what is deployed; sign into the hub first.
+`tests\test-deploy-records.js` asks a scratch copy as all three callers.
 
 The pages, the downloads, the hub and every route in the table above are one
 node process. A route that throws is answered 500 and the rest carry on, and a

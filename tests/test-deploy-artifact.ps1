@@ -1,0 +1,428 @@
+<#
+  test-deploy-artifact.ps1
+
+      pwsh -NoProfile -File .\tests\test-deploy-artifact.ps1
+
+  Issue #459: every deploy (gamemode, site, voice, bot) builds one versioned
+  artifact, a zip named by component, commit and sha256, sends that and
+  records it on the box, so the box can say exactly which commit each part
+  runs. scripts\deploy\Artifact.ps1 does it; this proves:
+
+    1. The same commit gives the same bytes: built twice, built from a second
+       clone that checks files out with CRLF, and built by the other
+       PowerShell (5.1 or 7, whichever this is not) all give one sha256.
+    2. The record matches: its sha256 and size are the zip's, its commit is
+       HEAD, and its file list is the zip's entries, each with the size and
+       sha256 of the commit's own bytes. The name carries the component, the
+       commit and the hash.
+    3. A deploy sends a commit or nothing (#1121, Patrick 29 Sep): a file
+       under the named paths that is changed, staged, deleted or untracked,
+       or one of the other files the deploy sends (-AlsoSends), refuses the
+       build, naming every such file; an ignored file does not count and
+       never goes in; there is no way to hand it a file from elsewhere; a
+       path the commit lacks stops the build.
+    4. Sending and recording, against a stand-in box (ssh and scp replaced by
+       functions that act on a temp folder): the store gets the zip and its
+       record, a zip the store already holds is not sent again, and
+       current\<part>.json, the copy beside the part and history.log all say
+       the artifact.
+    5. The five deploy scripts, read and never run: each builds its
+       component's artifact, sends it before anything is swapped, sends from
+       its folder, and records it once the files are in place; each names
+       the other repository files it sends so they are checked too, and
+       Publish-Server refuses before its first scp; and the site's reader,
+       Deploy-Docs' grant and Artifact.ps1 name one store.
+       tests\test-deploy-swaps.ps1 runs each of them against a dirty tree.
+
+  Read only apart from files under its own temp folder.
+#>
+[CmdletBinding()]
+param()
+
+$ErrorActionPreference = 'Stop'
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$Repo = Split-Path -Parent $Here
+
+$script:pass = 0
+$script:fail = 0
+function Yes([string]$what, [bool]$cond) {
+    if ($cond) { $script:pass++; Write-Host "PASS  $what" }
+    else { $script:fail++; Write-Host "FAIL  $what" }
+}
+function Done {
+    Write-Host ''
+    Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
+    if ($script:fail) { exit 1 }
+    exit 0
+}
+
+$helper = Join-Path $Repo 'scripts\deploy\Artifact.ps1'
+Yes 'scripts\deploy\Artifact.ps1 is there' (Test-Path -LiteralPath $helper)
+if (-not (Test-Path -LiteralPath $helper)) { Done }
+. $helper
+. (Join-Path $Repo 'scripts\release\BuildStamp.ps1')
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+$tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-artifact-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+$src = Join-Path $tmp 'repo'
+$utf8 = New-Object Text.UTF8Encoding($false)
+function Put([string]$path, [string]$text) {
+    $d = Split-Path -Parent $path
+    if (-not (Test-Path -LiteralPath $d)) { New-Item -ItemType Directory -Force -Path $d | Out-Null }
+    [IO.File]::WriteAllText($path, $text, $utf8)
+}
+# Not named Git: a function called git would be found before the program.
+function Run-Git { $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'; & git @args 2>&1 | Out-Null; $ErrorActionPreference = $old }
+function Head-Of([string]$dir) { return ((& git -C $dir rev-parse HEAD) | Out-String).Trim() }
+function Blob([string]$dir, [string]$spec) {
+    # The commit's own bytes, through a file, since a pipe would decode them.
+    $out = Join-Path $tmp ('blob-' + [Guid]::NewGuid().ToString('N'))
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    $p = Start-Process -FilePath 'git' -ArgumentList @('-C', ('"' + $dir + '"'), 'cat-file', 'blob', $spec) -NoNewWindow -Wait -PassThru -RedirectStandardOutput $out
+    $ErrorActionPreference = $old
+    $b = [IO.File]::ReadAllBytes($out)
+    Remove-Item -LiteralPath $out -Force
+    return ,$b
+}
+function Hex([byte[]]$b) { return (Get-ThornswoodSha256Hex $b) }
+
+$oldCeiling = $env:GIT_CEILING_DIRECTORIES
+$env:GIT_CEILING_DIRECTORIES = $tmp
+
+try {
+    # ---- a scratch repository, committed with LF ---------------------------
+    Put (Join-Path $src 'site\server.js') "'use strict';`nconsole.log('site');`n"
+    Put (Join-Path $src 'site\public\index.html') "<!doctype html>`n<p>hello</p>`n"
+    Put (Join-Path $src 'site\public\b.css') "p { color: red; }`n"
+    Put (Join-Path $src 'site\data\help.md') "# Help`n`nline`n"
+    Put (Join-Path $src 'site\README.md') "not sent`n"
+    Put (Join-Path $src 'game\gamemode.js') "'use strict';`nconsole.log('gamemode');`n"
+    Put (Join-Path $src '.gitignore') "site/public/*.tmp`n"
+    [IO.File]::WriteAllBytes((Join-Path $src 'site\public\logo.png'), [byte[]](0, 1, 2, 3, 255, 13, 10, 0))
+    Run-Git -C $src init -q
+    Run-Git -C $src config core.autocrlf false
+    Run-Git -C $src add -A
+    Run-Git -C $src -c user.name=test -c user.email=test@example.invalid -c commit.gpgsign=false commit -q -m one
+    $head = Head-Of $src
+    Yes "the scratch repository has a commit ($($head.Substring(0, 12)))" ($head -match '^[0-9a-f]{40}$')
+
+    $paths = @('site/server.js', 'site/public', 'site/data')
+
+    # ---- 1. the same commit, the same bytes --------------------------------
+    $a1 = New-ThornswoodArtifact -Component site -RepoDir $src -Paths $paths -OutDir (Join-Path $tmp 'out1')
+    $a2 = New-ThornswoodArtifact -Component site -RepoDir $src -Paths $paths -OutDir (Join-Path $tmp 'out2')
+    Yes 'built twice: one sha256' ($a1.Sha256 -eq $a2.Sha256)
+    Yes 'built twice: the same bytes on disk' ((Get-FileHash -LiteralPath $a1.Zip).Hash -eq (Get-FileHash -LiteralPath $a2.Zip).Hash)
+    Yes 'built twice: the same record' ((Get-Content -LiteralPath $a1.RecordPath -Raw) -eq (Get-Content -LiteralPath $a2.RecordPath -Raw))
+
+    # A second clone that checks text out with CRLF, as One's git does.
+    $crlf = Join-Path $tmp 'crlf'
+    Run-Git -c core.autocrlf=true clone -q $src $crlf
+    Run-Git -C $crlf config core.autocrlf true
+    $onDisk = [IO.File]::ReadAllText((Join-Path $crlf 'site\server.js'))
+    Yes 'the second clone has CRLF on disk' ($onDisk.Contains("`r`n"))
+    $a3 = New-ThornswoodArtifact -Component site -RepoDir $crlf -Paths $paths -OutDir (Join-Path $tmp 'out3')
+    Yes 'a CRLF checkout of the same commit builds the same bytes' ($a3.Sha256 -eq $a1.Sha256 -and $a3.Name -eq $a1.Name)
+    Yes 'and does not count line endings as uncommitted changes' ($a3.Sha256 -eq $a1.Sha256)
+
+    # The other PowerShell, whichever this is not.
+    $other = $(if ($PSVersionTable.PSEdition -eq 'Core') { 'powershell.exe' } else { 'pwsh' })
+    $otherCmd = Get-Command $other -ErrorAction SilentlyContinue
+    if ($otherCmd) {
+        $script = Join-Path $tmp 'other.ps1'
+        Put $script ('. ''' + $helper.Replace("'", "''") + "'`n" +
+                     '$a = New-ThornswoodArtifact -Component site -RepoDir ''' + $src.Replace("'", "''") + ''' -Paths ''site/server.js'', ''site/public'', ''site/data'' -OutDir ''' + (Join-Path $tmp 'out4').Replace("'", "''") + "'`n" +
+                     'Write-Output (''SHA '' + $a.Sha256)' + "`n")
+        $said = @(& $otherCmd.Source -NoProfile -ExecutionPolicy Bypass -File $script 2>&1 | ForEach-Object { "$_" })
+        $shaLine = @($said | Where-Object { $_ -like 'SHA *' }) | Select-Object -Last 1
+        Yes "$other builds the same bytes as PowerShell $($PSVersionTable.PSVersion.Major)" ($shaLine -eq ('SHA ' + $a1.Sha256))
+        if ($shaLine -ne ('SHA ' + $a1.Sha256)) { $said | Select-Object -Last 8 | ForEach-Object { Write-Host "  $_" } }
+    } else {
+        Write-Host "SKIP  $other is not on this machine, so only one PowerShell built it"
+    }
+
+    # ---- 2. the record matches ---------------------------------------------
+    $r = Get-Content -LiteralPath $a1.RecordPath -Raw | ConvertFrom-Json
+    Yes 'the name is component, commit and hash' ($a1.Name -eq ('site-' + $head.Substring(0, 12) + '-' + $a1.Sha256.Substring(0, 16) + '.zip'))
+    Yes 'the record sits beside the zip, named the same' ([IO.Path]::GetFileNameWithoutExtension($a1.RecordPath) -eq [IO.Path]::GetFileNameWithoutExtension($a1.Zip))
+    Yes "the record's sha256 is the zip's" ($r.sha256 -eq (Get-FileHash -LiteralPath $a1.Zip -Algorithm SHA256).Hash.ToLowerInvariant())
+    Yes "the record's size is the zip's" ([long]$r.size -eq (Get-Item -LiteralPath $a1.Zip).Length)
+    Yes "the record's commit is HEAD, in full" ($r.commit -eq $head)
+    Yes 'the record says component site, and nothing about edits, since there can be none' ($r.component -eq 'site' -and -not ($r.PSObject.Properties.Name -contains 'edited'))
+    Yes 'the record names the zip' ($r.name -eq $a1.Name)
+
+    $z = [IO.Compression.ZipFile]::OpenRead($a1.Zip)
+    try {
+        $entries = @($z.Entries | ForEach-Object { $_.FullName })
+        $bytes = @{}
+        foreach ($e in $z.Entries) {
+            $ms = New-Object IO.MemoryStream
+            $st = $e.Open(); $st.CopyTo($ms); $st.Dispose()
+            $bytes[$e.FullName] = $ms.ToArray()
+        }
+    } finally { $z.Dispose() }
+    $want = @('site/data/help.md', 'site/public/b.css', 'site/public/index.html', 'site/public/logo.png', 'site/server.js')
+    Yes 'the zip holds exactly the named paths, in ordinal order' (($entries -join '|') -eq ($want -join '|'))
+    Yes 'a file outside the named paths stays out' ($entries -notcontains 'site/README.md')
+    Yes "the record's file list is the zip's entries" ((@($r.files | ForEach-Object { $_.path }) -join '|') -eq ($entries -join '|'))
+    $allMatch = $true
+    foreach ($f in $r.files) {
+        $b = [byte[]]$bytes[$f.path]
+        $c = Blob $src ($head + ':' + $f.path)
+        if ($b.Length -ne [int]$f.size -or (Hex $b) -ne $f.sha256 -or (Hex $c) -ne $f.sha256) { $allMatch = $false; Write-Host "  differs: $($f.path)" }
+    }
+    Yes "every entry is the commit's own bytes, and the record's size and sha256 for it" $allMatch
+    Yes 'text went in as the commit holds it, LF, whatever the checkout' (-not ([Text.Encoding]::UTF8.GetString([byte[]]$bytes['site/server.js'])).Contains("`r"))
+    $folder = Join-Path $a3.Folder 'site\server.js'
+    Yes 'the folder the scripts send from is the zip expanded, laid out like the repository' (
+        (Test-Path -LiteralPath $folder) -and (Hex ([IO.File]::ReadAllBytes($folder))) -eq (Hex ([byte[]]$bytes['site/server.js'])))
+
+    # ---- 3. uncommitted is refused, ignored does not count, missing stops ---
+    # What a refused build said, or '' when it built.
+    function Refusal([scriptblock]$build) {
+        try { $null = & $build; return '' } catch { return $_.Exception.Message }
+    }
+    $out5 = Join-Path $tmp 'out5'
+    Put (Join-Path $src 'site\public\b.css') "p { color: blue; }`n"
+    $why = Refusal { New-ThornswoodArtifact -Component site -RepoDir $src -Paths $paths -OutDir $out5 }
+    Yes 'a changed file refuses the build' ($why -match '^Refused: the site deploy would send 1 file')
+    Yes '  naming the file and how, and saying the box was not touched' (
+        $why.Contains('site/public/b.css  (changed and not committed)') -and $why -match 'the box was not touched')
+    Yes '  and nothing is built' (-not (Test-Path -LiteralPath $out5) -or -not @(Get-ChildItem -LiteralPath $out5 -Filter '*.zip').Count)
+    Run-Git -C $src add -- site/public/b.css
+    $why = Refusal { New-ThornswoodArtifact -Component site -RepoDir $src -Paths $paths -OutDir $out5 }
+    Yes 'a staged change refuses it too' ($why.Contains('site/public/b.css  (changed and not committed)'))
+    Run-Git -C $src reset -q -- site/public/b.css
+    Run-Git -C $src checkout -q -- site/public/b.css
+    Put (Join-Path $src 'site\public\new.svg') "<svg/>`n"
+    Remove-Item -LiteralPath (Join-Path $src 'site\data\help.md') -Force
+    $why = Refusal { New-ThornswoodArtifact -Component site -RepoDir $src -Paths $paths -OutDir $out5 }
+    Yes 'an untracked file and a deleted one refuse it, each named' (
+        $why -match 'would send 2 file' -and $why.Contains('site/public/new.svg  (new and not committed)') -and
+        $why.Contains('site/data/help.md  (deleted and not committed)'))
+    Remove-Item -LiteralPath (Join-Path $src 'site\public\new.svg') -Force
+    Run-Git -C $src checkout -q -- site/data/help.md
+    Put (Join-Path $src 'site\public\scratch.tmp') "ignored`n"
+    $back = New-ThornswoodArtifact -Component site -RepoDir $src -Paths $paths -OutDir (Join-Path $tmp 'out6')
+    Yes 'an ignored file does not count, and never goes in' ($back.Sha256 -eq $a1.Sha256 -and -not (Test-Path -LiteralPath (Join-Path $back.Folder 'site\public\scratch.tmp')))
+    Yes 'with the changes gone it is the clean artifact again, byte for byte' ($back.Sha256 -eq $a1.Sha256)
+    Put (Join-Path $src 'site\README.md') "changed, and not sent`n"
+    Yes 'a change outside what the deploy sends does not stop it' ((Refusal { New-ThornswoodArtifact -Component site -RepoDir $src -Paths $paths -OutDir (Join-Path $tmp 'out6b') }) -eq '')
+    $why = Refusal { New-ThornswoodArtifact -Component site -RepoDir $src -Paths $paths -AlsoSends 'site/README.md' -OutDir (Join-Path $tmp 'out6c') }
+    Yes 'but one of the other files it sends (-AlsoSends) refuses it, named' ($why.Contains('site/README.md  (changed and not committed)'))
+    Run-Git -C $src checkout -q -- site/README.md
+    $why = Refusal { Assert-ThornswoodCommitted -RepoDir $src -Paths 'game/gamemode.js', 'site' -What 'this publish' }
+    Yes 'Assert-ThornswoodCommitted on its own passes a clean tree' ($why -eq '')
+    Put (Join-Path $src 'game\gamemode.js') "'use strict';`nconsole.log('changed');`n"
+    $why = Refusal { Assert-ThornswoodCommitted -RepoDir $src -Paths 'game/gamemode.js', 'site' -What 'this publish' }
+    Yes '  and refuses a dirty one, in the words the caller gave' ($why -match '^Refused: this publish would send 1 file' -and $why.Contains('game/gamemode.js'))
+    Run-Git -C $src checkout -q -- game/gamemode.js
+
+    $threw = $false
+    try { $null = New-ThornswoodArtifact -Component site -RepoDir $src -Paths 'site/nothing-here' -OutDir (Join-Path $tmp 'out7') } catch { $threw = $true }
+    Yes 'a path the commit lacks stops the build' $threw
+
+    $params = @((Get-Command New-ThornswoodArtifact).Parameters.Keys | Where-Object { [System.Management.Automation.PSCmdlet]::CommonParameters -notcontains $_ })
+    Yes 'New-ThornswoodArtifact takes no file from elsewhere and no switch past the refusal' (
+        ((($params | Sort-Object) -join ',') -eq 'AlsoSends,Component,OutDir,Paths,RepoDir'))
+
+    # A second commit is a second name.
+    Put (Join-Path $src 'site\server.js') "'use strict';`nconsole.log('site two');`n"
+    Run-Git -C $src add -A
+    Run-Git -C $src -c user.name=test -c user.email=test@example.invalid -c commit.gpgsign=false commit -q -m two
+    $head2 = Head-Of $src
+    $n2 = New-ThornswoodArtifact -Component site -RepoDir $src -Paths $paths -OutDir (Join-Path $tmp 'out9')
+    Yes 'the next commit gives another name and records that commit' ($n2.Name -like ('site-' + $head2.Substring(0, 12) + '-*.zip') -and $n2.Commit -eq $head2 -and $n2.Sha256 -ne $a1.Sha256)
+
+    # The gamemode stamp takes the artifact's word for the commit.
+    $g = New-ThornswoodArtifact -Component gamemode -RepoDir $src -Paths 'game/gamemode.js' -OutDir (Join-Path $tmp 'out10')
+    $stamp = New-ThornswoodBuildStamp -Gamemode (Join-Path $g.Folder 'game\gamemode.js') -Channel dev -RepoDir $src -Artifact $g
+    Yes "the build stamp names the artifact's commit, and that the commit holds it" ($stamp.commit -eq $g.Short -and $stamp.gamemodeMatchesCommit -eq $true)
+
+    # ---- 4. sending and recording, against a stand-in box ------------------
+    $box = Join-Path $tmp 'box'
+    $store = (Join-Path $box 'Thornswood-Deploys').Replace('\', '/')
+    $partRoot = (Join-Path $box 'Thornswood-Server-Dev').Replace('\', '/')
+    New-Item -ItemType Directory -Force -Path (Join-Path $partRoot 'data') | Out-Null
+    $global:tsScp = @()
+    $global:tsSsh = 0
+    function global:scp {
+        $far = [string]$args[-1]; $local = [string]$args[-2]
+        $path = $far.Substring($far.IndexOf(':', $far.IndexOf('@')) + 1)
+        $global:tsScp += $path
+        Copy-Item -LiteralPath $local -Destination $path -Force
+        $global:LASTEXITCODE = 0
+    }
+    function global:ssh {
+        $global:tsSsh++
+        $cmd = [string]$args[-1]
+        $b64 = ($cmd -split ' ')[-1]
+        $text = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($b64))
+        & ([ScriptBlock]::Create($text))
+        $global:LASTEXITCODE = 0
+    }
+    try {
+        Send-ThornswoodArtifact -Artifact $g -Target 'someone@box' -SshArgs @('-o', 'BatchMode=yes') -Store $store
+        $zipThere = Join-Path $store ('gamemode/' + $g.Name)
+        Yes 'the store on the box holds the zip' (Test-Path -LiteralPath $zipThere)
+        Yes 'as it was built' ((Test-Path -LiteralPath $zipThere) -and (Get-FileHash -LiteralPath $zipThere).Hash.ToLowerInvariant() -eq $g.Sha256)
+        Yes 'and its record beside it' (Test-Path -LiteralPath ([IO.Path]::ChangeExtension($zipThere, '.json')))
+        $before = @($global:tsScp | Where-Object { $_ -like '*.zip' }).Count
+        Send-ThornswoodArtifact -Artifact $g -Target 'someone@box' -Store $store
+        Yes 'a zip the store already holds is not sent again' (@($global:tsScp | Where-Object { $_ -like '*.zip' }).Count -eq $before)
+
+        $rec = Set-ThornswoodArtifactCurrent -Artifact $g -Target 'someone@box' -Root $partRoot -Beside "$partRoot/data/thornswood-deploy.json" -Store $store
+        $cur = Join-Path $store 'current/thornswood-server-dev.json'
+        Yes 'the part is named after the folder it runs from' ($rec.part -eq 'thornswood-server-dev')
+        Yes 'current\<part>.json is on the box' (Test-Path -LiteralPath $cur)
+        $c = Get-Content -LiteralPath $cur -Raw | ConvertFrom-Json
+        Yes 'and says the commit, the zip and its hash' ($c.commit -eq $g.Commit -and $c.name -eq $g.Name -and $c.sha256 -eq $g.Sha256 -and $c.component -eq 'gamemode' -and -not ($c.PSObject.Properties.Name -contains 'edited'))
+        # Read as text: PowerShell 7's ConvertFrom-Json turns a date into a DateTime.
+        Yes 'and when, and from which machine' ((Get-Content -LiteralPath $cur -Raw) -match '"deployedUtc":\s*"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ"' -and $c.from -eq $env:COMPUTERNAME)
+        $beside = Join-Path $partRoot 'data/thornswood-deploy.json'
+        Yes 'the same record is beside what the part runs' ((Test-Path -LiteralPath $beside) -and (Get-Content -LiteralPath $beside -Raw) -eq (Get-Content -LiteralPath $cur -Raw))
+        $bb = [IO.File]::ReadAllBytes($beside)
+        Yes 'with no byte order mark, so node reads it' ($bb.Length -gt 3 -and -not ($bb[0] -eq 0xEF -and $bb[1] -eq 0xBB))
+        $hist = @(Get-Content -LiteralPath (Join-Path $store 'history.log'))
+        Yes 'and history.log has a line for it' ($hist.Count -eq 1 -and $hist[0] -like ('* thornswood-server-dev ' + $g.Name + ' from *'))
+        New-Item -ItemType Directory -Force -Path (Join-Path $box 'Thornswood-Docs') | Out-Null
+        $rec2 = Set-ThornswoodArtifactCurrent -Artifact $n2 -Target 'someone@box' -Root "$box/Thornswood-Docs" -Store $store
+        Yes 'the default copy goes beside the root, and each part keeps its own record' (
+            (Test-Path -LiteralPath (Join-Path $box 'Thornswood-Docs/thornswood-deploy.json')) -and
+            (Test-Path -LiteralPath (Join-Path $store 'current/thornswood-docs.json')) -and
+            ((Get-Content -LiteralPath $cur -Raw | ConvertFrom-Json).name -eq $g.Name))
+    } finally {
+        Remove-Item -Path Function:\scp, Function:\ssh -ErrorAction SilentlyContinue
+    }
+} finally {
+    $env:GIT_CEILING_DIRECTORIES = $oldCeiling
+    Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# ---- 5. the deploy scripts, read and never run -----------------------------
+function Read-Ast([string]$rel) {
+    $p = Join-Path $Repo $rel
+    if (-not (Test-Path -LiteralPath $p)) { return $null }
+    $tokens = $null; $errors = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($p, [ref]$tokens, [ref]$errors)
+    if ($errors.Count) { return $null }
+    return $ast
+}
+function Commands($ast, [string]$name) {
+    if (-not $ast) { return @() }
+    return @($ast.FindAll({ param($n)
+        $n -is [System.Management.Automation.Language.CommandAst] -and $n.GetCommandName() -eq $name
+    }, $true))
+}
+function Arg($cmd, [string]$name) {
+    $els = $cmd.CommandElements
+    for ($i = 0; $i -lt $els.Count - 1; $i++) {
+        if ($els[$i] -is [System.Management.Automation.Language.CommandParameterAst] -and
+            $els[$i].ParameterName -eq $name) { return $els[$i + 1].Extent.Text }
+    }
+    return ''
+}
+function DotSources($ast, [string]$file) {
+    if (-not $ast) { return $false }
+    foreach ($h in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and
+            $n.InvocationOperator -eq [System.Management.Automation.Language.TokenKind]::Dot }, $true)) {
+        if ($h.Extent.Text -like "*$file*") { return $true }
+    }
+    return $false
+}
+function At($ast, [string]$text) { if (-not $ast) { return -1 }; return $ast.Extent.Text.IndexOf($text) }
+
+$wiring = @(
+    @{ File = 'scripts\deploy\Deploy-Docs.ps1';        Component = 'site';     SendsFrom = '$App = Join-Path $artifact.Folder ''site''' },
+    @{ File = 'scripts\deploy\Install-Voice.ps1';      Component = 'voice';    SendsFrom = '$src = Join-Path $artifact.Folder ''voice''' },
+    @{ File = 'scripts\deploy\Install-Bot.ps1';        Component = 'bot';      SendsFrom = '$Repo = $artifact.Folder' },
+    @{ File = 'scripts\deploy\Deploy-DevGamemode.ps1'; Component = 'gamemode'; SendsFrom = '$Gamemode = Join-Path $artifact.Folder ''game\gamemode.js''' },
+    @{ File = 'scripts\deploy\Deploy-Server.ps1';      Component = 'gamemode'; SendsFrom = '$src = Join-Path $artifact.Folder ''game\gamemode.js''' }
+)
+foreach ($w in $wiring) {
+    $n = Split-Path -Leaf $w.File
+    $ast = Read-Ast $w.File
+    Yes "$n parses" ($null -ne $ast)
+    if (-not $ast) { continue }
+    Yes "$n loads Artifact.ps1" (DotSources $ast 'Artifact.ps1')
+    $builds = @(Commands $ast 'New-ThornswoodArtifact')
+    Yes "$n builds the $($w.Component) artifact" ($builds.Count -ge 1 -and @($builds | Where-Object { (Arg $_ 'Component') -ne $w.Component }).Count -eq 0)
+    $sends = @(Commands $ast 'Send-ThornswoodArtifact')
+    $sets = @(Commands $ast 'Set-ThornswoodArtifactCurrent')
+    Yes "$n sends it to the store once" ($sends.Count -eq 1)
+    Yes "$n records it on the box once" ($sets.Count -eq 1)
+    $from = At $ast $w.SendsFrom
+    Yes "$n sends from the artifact's folder, not the working tree" ($from -ge 0)
+    if ($builds.Count -and $sends.Count -and $sets.Count) {
+        Yes "$n builds, then sends, then records" (
+            $builds[0].Extent.StartOffset -lt $sends[0].Extent.StartOffset -and $sends[0].Extent.StartOffset -lt $sets[0].Extent.StartOffset)
+    }
+}
+
+# The other repository files each sends, beside its artifact, are checked too.
+$also = @(
+    @{ File = 'scripts\deploy\Install-Voice.ps1';      Want = @('scripts/vps/Roll-Log.ps1') },
+    @{ File = 'scripts\deploy\Deploy-DevGamemode.ps1'; Want = @('records/most-online.json', 'game/content/Thornswood-Content.esp') },
+    @{ File = 'scripts\deploy\Deploy-Server.ps1';      Want = @('game/content/Thornswood-Content.esp', 'records/server-build.json') }
+)
+foreach ($w in $also) {
+    $t = Get-Content -LiteralPath (Join-Path $Repo $w.File) -Raw
+    $missing = @($w.Want | Where-Object { -not $t.Contains("'" + $_ + "'") })
+    Yes ((Split-Path -Leaf $w.File) + ' has the files it sends beside its artifact checked: ' + ($w.Want -join ', ')) (
+        $missing.Count -eq 0 -and $t -match '-AlsoSends')
+}
+$iv = Read-Ast 'scripts\deploy\Install-Voice.ps1'
+if ($iv) {
+    $build = @(Commands $iv 'New-ThornswoodArtifact')
+    Yes 'Install-Voice builds, so refuses, before it asks the box what is running' (
+        $build.Count -eq 1 -and $build[0].Extent.StartOffset -lt (At $iv "`$current = & (Join-Path `$Here '..\vps\Remote.ps1')"))
+}
+$ps = Read-Ast 'scripts\release\Publish-Server.ps1'
+Yes 'Publish-Server.ps1 parses' ($null -ne $ps)
+if ($ps) {
+    Yes 'Publish-Server loads Artifact.ps1' (DotSources $ps 'Artifact.ps1')
+    $as = @(Commands $ps 'Assert-ThornswoodCommitted')
+    $firstScp = @(Commands $ps 'scp' | Sort-Object { $_.Extent.StartOffset })
+    Yes 'Publish-Server refuses uncommitted files before its first scp' (
+        $as.Count -eq 1 -and $firstScp.Count -ge 1 -and $as[0].Extent.StartOffset -lt $firstScp[0].Extent.StartOffset)
+    $pt = $ps.Extent.Text
+    Yes '  and checks the installer, the log roller, the gamemode and the most online record' (
+        $pt.Contains("'scripts/deploy/Install-ThornswoodServer.ps1'") -and $pt.Contains("'scripts/vps/Roll-Log.ps1'") -and
+        $pt.Contains("'game/gamemode.js'") -and $pt.Contains("'records/most-online.json'"))
+}
+
+$ds = Read-Ast 'scripts\deploy\Deploy-Server.ps1'
+if ($ds) {
+    $send = @(Commands $ds 'Send-ThornswoodArtifact')
+    $set = @(Commands $ds 'Set-ThornswoodArtifactCurrent')
+    Yes 'Deploy-Server sends the artifact before anything is staged' ($send.Count -eq 1 -and $send[0].Extent.StartOffset -lt (At $ds 'Write-Host "Staging in'))
+    Yes 'and records it only once the swap has said SWAP OK' ($set.Count -eq 1 -and $set[0].Extent.StartOffset -gt (At $ds "if (`$swapOut -notcontains 'SWAP OK')"))
+    Yes 'and the live server serves the record from its data folder' ($set.Count -eq 1 -and (Arg $set[0] 'Beside') -eq '"$Root/data/thornswood-deploy.json"')
+    Yes 'the build copy of gamemode.js is compared by hash, not by size' ((At $ds '(Get-FileHash -LiteralPath $src).Hash -ne (Get-FileHash -LiteralPath $built).Hash') -ge 0)
+    $stamps = @(Commands $ds 'Save-ThornswoodBuildStamp')
+    Yes "the stamp takes the artifact's commit" ($stamps.Count -eq 1 -and (Arg $stamps[0] 'Artifact') -eq '$artifact')
+}
+$dd = Read-Ast 'scripts\deploy\Deploy-DevGamemode.ps1'
+if ($dd) {
+    $set = @(Commands $dd 'Set-ThornswoodArtifactCurrent')
+    # Since #446 the start is inside the swap, and the record waits for it to
+    # have said SWAP OK.
+    $okAt = At $dd 'if (-not $swapped) { exit 1 }'
+    Yes 'Deploy-DevGamemode records it only once the swap has answered' ($set.Count -eq 1 -and $okAt -gt 0 -and $set[0].Extent.StartOffset -gt $okAt)
+    Yes 'and the dev server serves the record from its data folder' ($set.Count -eq 1 -and (Arg $set[0] 'Beside') -eq '"$Root/data/thornswood-deploy.json"')
+    $stamps = @(Commands $dd 'Save-ThornswoodBuildStamp')
+    Yes "its stamp takes the artifact's commit" ($stamps.Count -eq 1 -and (Arg $stamps[0] 'Artifact') -eq '$artifact')
+    Yes 'its stamp is of the artifact copy, made after $Gamemode points at it' (
+        $stamps.Count -eq 1 -and $stamps[0].Extent.StartOffset -gt (At $dd '$Gamemode = Join-Path $artifact.Folder'))
+}
+
+# One store, named the same in the three places that name it.
+$storeLine = [regex]::Match((Get-Content -LiteralPath $helper -Raw), "\`$script:ThornswoodDeployStore = '([^']+)'").Groups[1].Value
+Yes "Artifact.ps1 names the store ($storeLine)" ($storeLine -eq 'C:/Thornswood-Deploys')
+$siteSrc = Get-Content -LiteralPath (Join-Path $Repo 'site\server.js') -Raw
+Yes "the site reads current\ in that store by default" ($siteSrc.Contains('process.env.THORNSWOOD_DEPLOYS_DIR || ''C:\\Thornswood-Deploys\\current'''))
+$docsSrc = Get-Content -LiteralPath (Join-Path $Repo 'scripts\deploy\Deploy-Docs.ps1') -Raw
+Yes "Deploy-Docs grants the site's account read on it" ($docsSrc.Contains("@('C:\Thornswood-Deploys\current', '(OI)(NP)R')"))
+
+Done

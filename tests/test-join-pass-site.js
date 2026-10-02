@@ -1,0 +1,283 @@
+// test-join-pass-site.js
+//
+//     node .\tests\test-join-pass-site.js
+//
+// The site issues a join pass only to a linked Discord account that may play,
+// for its own character, from a launcher the channel's feed still lets in, and
+// refuses everything else with a plain reason (#937). Patrick, 28 Sep: "People
+// should not be allowed in at all if they don't join from our launcher."
+//
+// The route and its helpers are lifted out of site\server.js by text and run
+// with stand-ins for Discord, linked.json and the reply, the way
+// test-play-join.js runs /api/play/join, because server.js opens a port when it
+// is required. The feed is a real version.json in a temp folder, read by the
+// real feedLaunchers.
+//
+// THE SHARED PASS. One pass is written out below in full. makePass must produce
+// exactly it, and tests\test-join-pass-game.js checks the gamemode accepts
+// exactly it, so the site and the game server cannot drift apart on the format.
+//
+// Read only: nothing here touches the real config.json or linked.json.
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const crypto = require('crypto');
+const CR = String.fromCharCode(13);
+const SRC = path.join(__dirname, '..', 'site', 'server.js');
+const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
+
+let pass = 0, fail = 0;
+function yes(what, cond) {
+  if (cond) { pass++; console.log('PASS  ' + what); }
+  else { fail++; console.log('FAIL  ' + what); }
+}
+
+function braceEnd(at) {
+  const b = src.indexOf('{', at);
+  let d = 0;
+  for (let i = b; i < src.length; i++) {
+    if (src[i] === '{') d++;
+    else if (src[i] === '}') { d--; if (d === 0) return i + 1; }
+  }
+  return -1;
+}
+function grab(head) {
+  const at = src.indexOf(head);
+  if (at < 0) return '';
+  const end = braceEnd(at);
+  return end > at ? src.slice(at, end) : '';
+}
+
+const HELPERS = [
+  src.slice(src.indexOf('const PASS_MS'), src.indexOf('\n', src.indexOf('const PASS_MS'))),
+  grab('function b64u('), grab('function makePass('), grab('function versionParts('),
+  grab('function versionCompare('),
+  src.slice(src.indexOf('const feedLaunchersSeen'), src.indexOf('\n', src.indexOf('const feedLaunchersSeen'))),
+  grab('function feedLaunchers('),
+  grab('async function hasLeft('), grab('async function departed('),
+  // What a refusal for want of a role says, alpha or open (#428).
+  grab('function notAcceptedYet('),
+  // One character banned by itself, or killed for good by staff (#1010).
+  grab('function banActive('), grab('function pkActive('), grab('function characterBar('), grab('function banUntilText('),
+  grab('function accountBanned('),
+  // Play's doors answer inside PLAY_ANSWER_MS (#1094).
+  src.slice(src.indexOf('const PLAY_ANSWER_MS'), src.indexOf('\n', src.indexOf('const PLAY_ANSWER_MS'))),
+  src.slice(src.indexOf('const PLAY_BODY_MS'), src.indexOf('\n', src.indexOf('const PLAY_BODY_MS'))),
+  grab('class BodyFailed'), grab('function passBodyFailure('), grab('function within('), grab('function standingLate(')
+];
+yes('the pass helpers are in server.js where this expects them', HELPERS.every(function (h) { return h.length > 10; }));
+const ROUTE = grab("  if (p === '/api/play/pass' && req.method === 'POST') {");
+yes('the /api/play/pass route is in server.js', ROUTE.length > 100);
+yes('the route sits before the signed in gate for /api/', src.indexOf("if (p === '/api/play/pass'") > 0 &&
+    src.indexOf("if (p === '/api/play/pass'") < src.indexOf("  if (p.startsWith('/api/')) {"));
+yes('config.json is where the key lives, made by the site and never a value in the repo',
+    /passKey: ''/.test(src) && /cfg\.passKey = crypto\.randomBytes\(32\)/.test(src));
+if (!ROUTE || !HELPERS.every(function (h) { return h.length > 10; })) {
+  console.log('');
+  console.log(pass + ' passed, ' + fail + ' failed');
+  process.exit(1);
+}
+
+// ------------------------------------------------------------ the shared pass
+const KEY = 'test-join-pass-key-not-a-real-one';
+const VECTOR = {
+  p: 700, s: 'dev', v: '1.1.102.3', d: '111', i: 1790000000000, x: 1790000600000
+};
+const VECTOR_PASS = 'jp1.eyJwIjo3MDAsInMiOiJkZXYiLCJ2IjoiMS4xLjEwMi4zIiwiZCI6IjExMSIsImkiOjE3OTAwMDAwMDAwMDAsIngiOjE3OTAwMDA2MDAwMDB9.OfS3TF2v5kDiiBwbLyy-VZHHSTv3YE4Zd0bOnAGove8';
+
+const lib = new Function('crypto', 'fs', 'path', 'ROOT', HELPERS.slice(0, 7).join('\n') +
+  '\nreturn { PASS_MS: PASS_MS, makePass: makePass, versionParts: versionParts, versionCompare: versionCompare, feedLaunchers: feedLaunchers };');
+const FEEDROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-pass-'));
+const L = lib(crypto, fs, path, FEEDROOT);
+
+yes('makePass writes the shared pass exactly', L.makePass(KEY, VECTOR) === VECTOR_PASS);
+yes('a pass lives ten minutes', L.PASS_MS === 600000);
+yes('1.1.102 is below 1.1.102.1', L.versionCompare(L.versionParts('1.1.102'), L.versionParts('1.1.102.1')) < 0);
+yes('1.1.102.0 is 1.1.102', L.versionCompare(L.versionParts('1.1.102.0'), L.versionParts('1.1.102')) === 0);
+yes('"latest" is not a version', L.versionParts('latest') === null);
+yes('a part too long for the launcher is not a version', L.versionParts('1.1.9999999999') === null);
+
+function feed(dir, doc) {
+  fs.mkdirSync(path.join(FEEDROOT, dir), { recursive: true });
+  const f = path.join(FEEDROOT, dir, 'version.json');
+  fs.writeFileSync(f, typeof doc === 'string' ? doc : JSON.stringify(doc));
+  // A new mtime and size every write, so the cache in feedLaunchers reads it again.
+  const t = new Date(Date.now() + Math.floor(Math.random() * 1e6));
+  fs.utimesSync(f, t, t);
+}
+
+// ------------------------------------------------------------ the route, run
+const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
+function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+async function ask(o) {
+  const env = {
+    p: '/api/play/pass', req: { method: 'POST' }, res: {},
+    body: async function () { return JSON.stringify(o.body); },
+    readTicket: function (s) { return s ? { d: String(s), n: 'name-' + s } : null; },
+    standingCached: async function (d) {
+      return Object.assign({ id: String(d), name: 'n', inGuild: true, banned: false, play: true,
+                             dev: false, admin: false, roles: ['Playtester'] },
+                           (o.standing && o.standing[String(d)]) || {});
+    },
+    discordGet: async function () { return { ok: false, status: 404, body: null, why: 'not found' }; },
+    cfg: { passKey: o.key === undefined ? KEY : o.key, access: { dev: ['Owner', 'Dev'] },
+           discord: { botToken: 'x', guildId: 'g' } },
+    andList: function (a) { return (a || []).join(' and '); },
+    jsonFile: function (f, fallback) {
+      if (f === 'linked.json') return clone(o.linked || {});
+      if (f === 'bans.json') return clone(o.bans || {});
+      if (f === 'pk.json') return clone(o.pk || {});
+      return fallback;
+    },
+    LINKED: 'linked.json', BANS: 'bans.json', PK: 'pk.json',
+    crypto: crypto, fs: fs, path: path, ROOT: FEEDROOT,
+    console: { log: function () { }, error: function () { } },
+    sendJson: null
+  };
+  let sent = null;
+  env.sendJson = function (r, c, obj) { sent = { code: c, obj: obj }; return sent; };
+  const names = Object.keys(env);
+  const fn = new AsyncFunction(names.join(','), HELPERS.join('\n') + '\n' + ROUTE + '\nreturn "fell through";');
+  const r = await fn.apply(null, names.map(function (n) { return env[n]; }));
+  return sent || { code: 0, obj: { fell: r } };
+}
+
+function readPass(s) {
+  const parts = String(s || '').split('.');
+  if (parts.length !== 3 || parts[0] !== 'jp1') return null;
+  const mac = crypto.createHmac('sha256', KEY).update('jp1.' + parts[1]).digest('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  if (mac !== parts[2]) return null;
+  return JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+}
+
+const MINE = { '111': { profiles: [700, 701] }, '222': { profiles: [900] } };
+
+async function main() {
+  feed('feed', { launcherVersion: '1.1.102', minLauncher: '1.1.102' });
+  feed('feed-dev', { launcherVersion: '1.1.102.3', minLauncher: '1.1.102.3' });
+
+  let r = await ask({ body: { ticket: '111', profileId: 700, channel: 'dev', version: '1.1.102.3' }, linked: MINE,
+                      standing: { '111': { dev: true } } });
+  yes('a current dev launcher, a dev account, its own character: 200 with a pass', r.code === 200 && !!r.obj.pass);
+  const got = r.obj && readPass(r.obj.pass);
+  yes('the pass is signed with the key and names the profile, the server, the launcher and the account',
+      !!got && got.p === 700 && got.s === 'dev' && got.v === '1.1.102.3' && got.d === '111');
+  yes('the pass runs out ten minutes after it was issued', !!got && got.x - got.i === 600000 &&
+      Math.abs(got.i - Date.now()) < 5000 && r.obj.until === got.x);
+
+  r = await ask({ body: { ticket: '111', profileId: 700, version: '1.1.102' }, linked: MINE });
+  yes('no channel is the main server', r.code === 200 && readPass(r.obj.pass).s === 'main');
+
+  r = await ask({ body: { ticket: '111', profileId: 700, version: '1.1.101' }, linked: MINE });
+  yes('a launcher below the feed\'s minimum is refused with why update', r.code === 403 && r.obj.why === 'update' && !r.obj.pass);
+  yes('and told which launcher it needs, in a sentence that says to update',
+      /1\.1\.101/.test(r.obj.message) && /1\.1\.102 or newer/.test(r.obj.message) && /Update the launcher/.test(r.obj.message));
+
+  r = await ask({ body: { ticket: '111', profileId: 700, channel: 'dev', version: '1.1.102.2' }, linked: MINE,
+                  standing: { '111': { dev: true } } });
+  yes('the dev feed has its own minimum: 1.1.102.2 is refused there', r.code === 403 && r.obj.why === 'update');
+
+  r = await ask({ body: { ticket: '111', profileId: 700 }, linked: MINE });
+  yes('a launcher that sends no version is refused', r.code === 403 && r.obj.why === 'update');
+
+  r = await ask({ body: { ticket: '111', profileId: 700, version: 'latest' }, linked: MINE });
+  yes('a version that is not a version is refused', r.code === 403 && r.obj.why === 'update');
+
+  r = await ask({ body: { ticket: '111', profileId: 700, version: '9.9.9' }, linked: MINE });
+  yes('a launcher newer than anything published is refused as one Thornswood never published',
+      r.code === 403 && r.obj.why === 'unknown launcher' && /never published/.test(r.obj.message));
+
+  feed('feed', { launcherVersion: '1.1.103' });
+  r = await ask({ body: { ticket: '111', profileId: 700, version: '1.1.102' }, linked: MINE });
+  yes('with no minLauncher the floor is the current launcher', r.code === 403 && r.obj.why === 'update' && r.obj.need === '1.1.103');
+  feed('feed', { launcherVersion: '1.1.103', minLauncher: '1.1.102' });
+  r = await ask({ body: { ticket: '111', profileId: 700, version: '1.1.102' }, linked: MINE });
+  yes('a minLauncher below the current launcher lets that launcher in', r.code === 200);
+  feed('feed', { launcherVersion: '1.1.103', minLauncher: 'soon' });
+  r = await ask({ body: { ticket: '111', profileId: 700, version: '1.1.102' }, linked: MINE });
+  yes('a minLauncher that is not a version is read as the current launcher', r.code === 403 && r.obj.need === '1.1.103');
+
+  feed('feed', '{ not json');
+  r = await ask({ body: { ticket: '111', profileId: 700, version: '1.1.103' }, linked: MINE });
+  yes('a feed the site cannot read refuses the pass (503), never issues one', r.code === 503 && r.obj.why === 'feed' && !r.obj.pass);
+  fs.unlinkSync(path.join(FEEDROOT, 'feed', 'version.json'));
+  r = await ask({ body: { ticket: '111', profileId: 700, version: '1.1.103' }, linked: MINE });
+  yes('no feed at all refuses too', r.code === 503 && r.obj.why === 'feed');
+  feed('feed', { launcherVersion: '1.1.102', minLauncher: '1.1.102' });
+
+  r = await ask({ body: { profileId: 700, version: '1.1.102' }, linked: MINE });
+  yes('no Discord ticket: 401 why link', r.code === 401 && r.obj.why === 'link');
+
+  r = await ask({ body: { ticket: '111', version: '1.1.102' }, linked: MINE });
+  yes('no character: 400', r.code === 400 && r.obj.why === 'profile');
+
+  r = await ask({ body: { ticket: '111', profileId: 700, version: '1.1.102' }, linked: MINE, key: '' });
+  yes('no key on the site: 503, never an unsigned pass', r.code === 503 && r.obj.why === 'no key' && !r.obj.pass);
+
+  r = await ask({ body: { ticket: '111', profileId: 700, version: '1.1.102' }, linked: MINE,
+                  standing: { '111': { lookupFailed: 'rate limited', inGuild: false, play: false } } });
+  yes('Discord not answering refuses the pass (503)', r.code === 503 && r.obj.why === 'could not ask Discord');
+
+  r = await ask({ body: { ticket: '111', profileId: 700, version: '1.1.102' }, linked: MINE,
+                  standing: { '111': { lookupFailed: 'rate limited', admin: true } } });
+  yes('except for the hand written admin list, as at /api/play/join', r.code === 200);
+
+  r = await ask({ body: { ticket: '111', profileId: 700, version: '1.1.102' }, linked: MINE,
+                  standing: { '111': { banned: true } } });
+  yes('a banned account is refused', r.code === 403 && r.obj.why === 'banned');
+
+  r = await ask({ body: { ticket: '111', profileId: 700, version: '1.1.102' }, linked: MINE,
+                  standing: { '111': { inGuild: false, play: false } } });
+  yes('an account not in the Discord is refused', r.code === 403 && r.obj.why === 'guild');
+
+  r = await ask({ body: { ticket: '111', profileId: 700, version: '1.1.102' }, linked: MINE,
+                  standing: { '111': { play: false } } });
+  yes('an account without the play role is refused', r.code === 403 && r.obj.why === 'role');
+
+  r = await ask({ body: { ticket: '111', profileId: 700, channel: 'dev', version: '1.1.102.3' }, linked: MINE });
+  yes('a dev pass for an account without the dev roles is refused', r.code === 403 && r.obj.why === 'dev');
+
+  r = await ask({ body: { ticket: '111', profileId: 900, version: '1.1.102' }, linked: MINE });
+  yes('somebody else\'s character is refused', r.code === 403 && r.obj.why === 'somebody else' && !r.obj.pass);
+
+  r = await ask({ body: { ticket: '111', profileId: 555, version: '1.1.102' }, linked: MINE });
+  yes('a character nobody holds yet is the caller\'s, as /api/play/owns has it', r.code === 200 && readPass(r.obj.pass).p === 555);
+
+  r = await ask({ body: { ticket: '333', profileId: 900, version: '1.1.102' }, linked: MINE,
+                  standing: { '222': { inGuild: false, play: false } } });
+  yes('a character held only by an account that has left the Discord is the caller\'s', r.code === 200);
+
+  // One character, not the account (#1010).
+  const P = { body: { ticket: '111', profileId: 700, version: '1.1.102' }, linked: MINE };
+  r = await ask(Object.assign({}, P, { pk: { 700: { at: 1, by: 'Aela', why: 'died in the siege' } } }));
+  yes('a character staff killed for good is refused with why pk, and no pass', r.code === 403 && r.obj.why === 'pk' && !r.obj.pass);
+  yes('and told it cannot be played again and to pick or make another, without staff\'s reason',
+      /died for good and cannot be played again/.test(r.obj.message) && /make a new one/.test(r.obj.message) &&
+      r.obj.message.indexOf('siege') < 0);
+  r = await ask(Object.assign({}, P, { body: { ticket: '111', profileId: 701, version: '1.1.102' },
+                                       pk: { 700: { at: 1 } } }));
+  yes('the same account\'s other character still gets a pass', r.code === 200 && readPass(r.obj.pass).p === 701);
+  r = await ask(Object.assign({}, P, { body: { ticket: '111', profileId: 556, version: '1.1.102' },
+                                       pk: { 700: { at: 1 } } }));
+  yes('and so does a new character on that account', r.code === 200 && readPass(r.obj.pass).p === 556);
+  r = await ask(Object.assign({}, P, { bans: { 'p:700': { until: Date.now() + 3600000, why: 'griefing' } } }));
+  yes('a character banned by itself is refused with why banned character, until and why',
+      r.code === 403 && r.obj.why === 'banned character' && !r.obj.pass &&
+      /banned that character until .* UTC: griefing/.test(r.obj.message));
+  r = await ask(Object.assign({}, P, { body: { ticket: '111', profileId: 701, version: '1.1.102' },
+                                       bans: { 'p:700': { until: 0, why: 'x' } } }));
+  yes('a character ban leaves the account\'s other characters alone', r.code === 200);
+  r = await ask(Object.assign({}, P, { bans: { 'p:700': { until: Date.now() - 1000, why: 'over' } } }));
+  yes('a character ban that has run out lets it back at once', r.code === 200);
+  r = await ask(Object.assign({}, P, { bans: { 'p:700': { until: 0, why: 'for good' } } }));
+  yes('a character ban for good holds', r.code === 403 && /for good/.test(r.obj.message));
+
+  try { fs.rmSync(FEEDROOT, { recursive: true, force: true }); } catch (e) { }
+  console.log('');
+  console.log(pass + ' passed, ' + fail + ' failed');
+  process.exit(fail ? 1 : 0);
+}
+
+main().catch(function (e) { console.log('FAIL  threw: ' + (e && e.stack ? e.stack : e)); process.exit(1); });

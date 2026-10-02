@@ -41,6 +41,11 @@ const DATA   = path.join(ROOT, 'data');
 const PUBLIC = path.join(ROOT, 'public');
 const FILES  = path.join(ROOT, 'files');
 const UP     = path.join(ROOT, 'uploads');
+/* What the site writes for the bot and nothing else: trouble.json, inbox.json
+   and moderation.log (issue #1102). The bot runs as its own account, which is
+   granted read on this folder only (scripts\vps\Bot-Service.ps1), so it never
+   reaches the site's own records beside it, sessions.json among them. */
+const FOR_BOT = path.join(DATA, 'for-bot');
 
 // ==== thornswood site log ====
 //
@@ -158,14 +163,21 @@ let cfg = {
   /* Discord roles decide everything. A role name here, not an id, because the
      names are what he maintains and the ids are what Discord hands back. */
   /*
-    Member is NOT on the play list, and that is the whole closed playtest.
-    Everybody who joins the Discord gets Member, so if Member let you into the
-    game then anybody who found the invite could walk in, and the application
-    would be decoration.
+    Patrick, 28 Sep: "we are in alpha so the world is open by application".
+    Anyone can download it; getting in is an application in the Discord, and
+    Playtester is what being accepted means. So Playtester is on the play
+    list and Member is NOT: the application, and the age and rules questions
+    it asks (#428), is the way into the world. Who gives Member, and when, is
+    #986.
 
-    Playtester is what being accepted means. When the server opens to
-    everybody, add 'Member' to this list and that is the entire change.
+    The day the world opens to everybody, "open": true in config.json is the
+    one switch (#428). It puts Member on the play list at load (playRoles),
+    tells the bot and the pages through /api/public, and they follow: the
+    bot drops the application from its panel, and the join, help, rules and
+    home wording change with it. Off unless config.json says true. It only
+    opens the world to everybody if everybody in the Discord has Member.
   */
+  open: false,
   access: {
     admin:  ['Owner', 'Dev'],
     play:   ['Owner', 'Dev', 'Moderator', 'Gamemaster', 'Loremaster',
@@ -174,7 +186,8 @@ let cfg = {
   },
   botKey: '',            // shared secret the Discord bot signs /api/ticket with
   admins: [],            // discord ids, an override for when the bot is down
-  secret: ''
+  secret: '',
+  passKey: ''            // signs join passes; the game servers hold a copy (#937)
 };
 /* The byte order mark matters. Windows PowerShell puts one on the front of
    anything it writes with -Encoding UTF8, JSON.parse refuses a string that
@@ -191,7 +204,13 @@ try {
 }
 cfg.discord = Object.assign({ clientId:'', clientSecret:'', botToken:'', guildId:'', invite:'' },
                             cfg.discord || {});
+// No jarl here: an empty list seeded here is an array, so the Jarl default
+// below never applied and a config.json without access.jarl let nobody hold
+// the office (#905). dev, jarl and slots3 get their defaults below.
 cfg.access  = Object.assign({ admin:[], play:[], banned:[] }, cfg.access || {});
+// The one switch (#428). Only a real true opens it: "true", 1 or a typo does not.
+cfg.open = cfg.open === true;
+cfg.access.play = playRoles(cfg.access.play, cfg.open);
 // Who may use the dev build and join the dev server. Left out of config.json
 // it is the Discord staff roles, the same set the bot's STAFF_ROLES names
 // (Owner, Dev, Gamemaster, Moderator, Loremaster; Content Creator is not
@@ -201,6 +220,11 @@ cfg.access  = Object.assign({ admin:[], play:[], banned:[] }, cfg.access || {});
 // Add role names here to widen it further.
 if (!Array.isArray(cfg.access.dev)) {
   cfg.access.dev = ['Owner', 'Dev', 'Gamemaster', 'Moderator', 'Loremaster'];
+}
+// Who may hold a Jarl office in the world. Discord role eligibility only;
+// the office itself sits on one named character (#397).
+if (!Array.isArray(cfg.access.jarl)) {
+  cfg.access.jarl = ['Jarl'];
 }
 // Who gets a third character slot at the game's main menu. Everybody gets
 // two; a Patreon tier or a Gamemaster gets three, and so do the admin roles.
@@ -239,9 +263,44 @@ if (cfgBroken) {
   cfg.secret = crypto.randomBytes(32).toString('hex');
   try { fs.writeFileSync(CFGFILE, JSON.stringify(cfg, null, 2), 'utf8'); } catch (e) { }
 }
+/* The join pass key (#937). Made here once and kept in config.json, never in
+   the repository; Set-Door.ps1 -Connect copies it into each game server's
+   door.json, which is how the two ends share it without anybody handling it.
+   A key that could not be kept is no key at all: a pass signed with one that
+   dies with this process would be refused by every game server, so /api/play/pass
+   answers 503 instead, which is the safe side. */
+if (cfgBroken) {
+  cfg.passKey = '';
+} else if (!cfg.passKey) {
+  cfg.passKey = crypto.randomBytes(32).toString('hex');
+  try { fs.writeFileSync(CFGFILE, JSON.stringify(cfg, null, 2), 'utf8'); }
+  catch (e) {
+    cfg.passKey = '';
+    console.error('[thornswood] could not keep a join pass key in config.json, so no join ' +
+                  'passes are issued: ' + e.message);
+  }
+}
 
-for (const dir of [DATA, PUBLIC, FILES, UP]) {
+for (const dir of [DATA, FOR_BOT, PUBLIC, FILES, UP]) {
   try { fs.mkdirSync(dir, { recursive: true }); } catch (e) { }
+}
+/* A site from before #1102 kept those three directly in data. Each is moved
+   into for-bot once: copied, so the copy takes that folder's rules rather
+   than keeping the old file's, then removed. One already in for-bot is never
+   written over, and the old one is then left where it is and said. */
+for (const n of ['trouble.json', 'inbox.json', 'moderation.log']) {
+  const from = path.join(DATA, n);
+  const to = path.join(FOR_BOT, n);
+  try {
+    if (!fs.existsSync(from)) continue;
+    if (fs.existsSync(to)) {
+      console.log('[thornswood-docs] ' + n + ' is in data and in data\\for-bot; the one in for-bot is used, the other is left for a look');
+      continue;
+    }
+    fs.copyFileSync(from, to);
+    fs.unlinkSync(from);
+    console.log('[thornswood-docs] moved ' + n + ' into data\\for-bot, where the bot reads it');
+  } catch (e) { console.log('[thornswood-docs] could not move ' + n + ' into data\\for-bot: ' + e.message); }
 }
 
 // --------------------------------------------------------------- content --
@@ -279,10 +338,12 @@ const BOARDS = {
    it calls asks for w.dev, so a Gamemaster, Moderator or Loremaster could
    approve and delete by API while the page that does it sent them back to the
    hub home, and the launcher's Manage on the site button opens this address.
-   The page now matches the doors behind it. The other three stay 'admin':
-   they are the linked accounts, the play sessions and the report inbox. */
+   The page now matches the doors behind it. The linked accounts are 'staff'
+   since #1010, because that page is where staff ban, PK and write notes, and
+   every staff role may. The other two stay 'admin': the play sessions and
+   the report inbox. */
 const LEVEL = {
-  uploads: 'staff', linked: 'admin', sessions: 'admin', inbox: 'admin'
+  uploads: 'staff', linked: 'staff', sessions: 'admin', inbox: 'admin'
 };
 
 /* The public front lives at / and needs no password. The working area moved
@@ -462,7 +523,7 @@ function pageHtml(md) {
       console.error('[thornswood-docs] a page would not render, sent as plain text: ' + e.message);
     }
   }
-  return '<pre style="white-space:pre-wrap">' + escAttr(md) + '</pre>';
+  return '<pre class="pre-wrap">' + escAttr(md) + '</pre>';
 }
 // A written page's markdown, or null. Known Issues and Help live in the data
 // folder with the other documents (Help is edited in the hub), not under site.
@@ -470,8 +531,52 @@ function pageMarkdown(name) {
   const dir = PUBLIC_DOCS.indexOf(name) >= 0 ? DATA : SITE;
   const file = path.join(dir, name + '.md');
   if (!file.startsWith(dir + path.sep) || !fs.existsSync(file)) return null;
-  try { return fs.readFileSync(file, 'utf8'); } catch (e) { return null; }
+  try { return forMode(fs.readFileSync(file, 'utf8'), cfg.open); } catch (e) { return null; }
 }
+
+// ==== thornswood open switch ====
+/* The one switch (#428), cfg.open, off unless config.json says true.
+
+   playRoles is the play list with Member added when the world is open to
+   everybody. That is the whole of opening the game, as long as everybody in
+   the Discord is given Member (#986); with the switch off the list is left
+   exactly as it was.
+
+   forMode is how the written pages follow the same switch. A page marks its
+   alpha wording with <!-- alpha --> ... <!-- /alpha --> lines and its open
+   wording with <!-- open --> ... <!-- /open -->, and only the one that
+   applies is served. bot/content.py reads join.md through the same markers
+   for #start-here, so the site and the Discord cannot disagree. */
+function playRoles(play, open) {
+  const list = Array.isArray(play) ? play.slice() : [];
+  if (open === true && list.indexOf('Member') < 0) list.push('Member');
+  return list;
+}
+
+function forMode(md, open) {
+  const drop = open === true ? 'alpha' : 'open';
+  return String(md)
+    .replace(new RegExp('^<!-- ' + drop + ' -->[ \\t]*\\r?\\n[\\s\\S]*?^<!-- /' + drop +
+                        ' -->[ \\t]*(?:\\r?\\n|$)', 'gm'), '')
+    .replace(/^<!-- \/?(?:alpha|open) -->[ \t]*(?:\r?\n|$)/gm, '');
+}
+/* What somebody in the Discord without a play role is told, by the launcher's
+   door, the join pass and the sign in page. In the alpha that is an
+   application; with the switch on it is only the Member role. With inner, the
+   words that follow "That account is in the Discord, but". */
+function notAcceptedYet(inner) {
+  const open = cfg.open === true;
+  const how = open
+    ? 'Ask in the Discord and somebody will sort it.'
+    : 'Apply in the Discord: open a ticket and pick Apply to be an alpha playtester.';
+  if (inner) {
+    return (open ? 'it does not have the Member role yet. '
+                 : 'it has not been accepted into the alpha yet. ') + how;
+  }
+  return (open ? 'That Discord account does not have the Member role yet. '
+               : 'That Discord account has not been accepted into the alpha yet. ') + how;
+}
+// ==== end thornswood open switch ====
 
 const PAGES = {
   '/hub':         'home',
@@ -499,7 +604,17 @@ const PAGES = {
   Checked every ten seconds rather than per request, because the front page is
   the most requested thing here and none of this changes that fast.
 */
-let gameStatus = { up: false, online: 0, at: 0 };
+/*
+  And the most the world holds at once (#481): the gamemode writes the
+  server's own number into the same file as max, so the page says "3 of 25"
+  and /api/play/join can say the world is full before the game starts.
+*/
+/*
+  And how many wait at the menu for a seat (line), and whether somebody
+  picking now would wait too (full), which the gamemode's seats block works
+  out and writes beside the count.
+*/
+let gameStatus = { up: false, online: 0, max: 0, line: 0, full: false, at: 0 };
 function pollGame() {
   const sock = new net.Socket();
   let done = false;
@@ -507,12 +622,16 @@ function pollGame() {
     if (done) return;
     done = true;
     try { sock.destroy(); } catch (e) { }
-    let online = 0;
+    let online = 0, max = 0, line = 0, full = false;
     try {
       const o = JSON.parse(fs.readFileSync(cfg.onlineFile, 'utf8'));
       if (o && typeof o.now === 'number') online = o.now;
+      if (o && typeof o.max === 'number' && o.max > 0) max = o.max;
+      if (o && typeof o.line === 'number' && o.line > 0) line = o.line;
+      if (o && o.full === true) full = true;
     } catch (e) { }
-    gameStatus = { up, online: up ? online : 0, at: Date.now() };
+    gameStatus = { up, online: up ? online : 0, max: up ? max : 0, line: up ? line : 0,
+                   full: up && full, at: Date.now() };
   };
   sock.setTimeout(1500);
   sock.once('connect', () => finish(true));
@@ -524,14 +643,85 @@ function pollGame() {
 pollGame();
 setInterval(pollGame, 10000).unref?.();
 
+/*
+  Whether somebody pressing Play now would wait for a seat, and what they are
+  told (#481). Nobody is refused for numbers any more: Patrick, 29 Sep, a
+  full world lets them into the game's menu, where they wait in line and join
+  by themselves when it is their turn. The gamemode keeps the line.
+*/
+function seatsFull(st) {
+  return !!(st && st.up && (st.full === true || (st.max > 0 && st.online >= st.max)));
+}
+function worldFull(max) {
+  return 'Thornswood is full right now: ' + max + ' people are in the world, the most it holds ' +
+    'at once during the alpha. Pick your character anyway: you will wait at the menu with your ' +
+    'place in line on screen, and join by yourself when a seat frees.';
+}
+
+/*
+  The most the world holds, for the home page and /api/public, when the
+  server has not said (#481). Patrick, 29 Sep: "I still want it to say N of
+  25 anyway". records\most-online.json is the one place the number lives:
+  read here when the site runs from the repository, and otherwise the main
+  feed's maxOnline, which Publish-Update.ps1 writes from that same file and
+  which the site on the VPS already serves. The server's own max still wins.
+*/
+const MOST_ONLINE_RECORD = path.join(ROOT, '..', 'records', 'most-online.json');
+let mostOnlineSeen = { file: '', mtime: -1, size: -1, v: 0 };
+function mostOnlineFallback() {
+  for (const file of [MOST_ONLINE_RECORD, path.join(ROOT, 'feed', 'version.json')]) {
+    let st;
+    try { st = fs.statSync(file); } catch (e) { continue; }
+    if (mostOnlineSeen.file === file && mostOnlineSeen.mtime === st.mtimeMs && mostOnlineSeen.size === st.size) {
+      if (mostOnlineSeen.v > 0) return mostOnlineSeen.v;
+      continue;
+    }
+    let v = 0;
+    try {
+      const doc = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, '')) || {};
+      const n = Number(file === MOST_ONLINE_RECORD ? doc.people : doc.maxOnline);
+      if (n > 0 && Math.floor(n) === n) v = n;
+    } catch (e) { v = 0; }
+    mostOnlineSeen = { file, mtime: st.mtimeMs, size: st.size, v };
+    if (v > 0) return v;
+  }
+  return 0;
+}
+
 const jsonFile = (p, fallback) => {
-  try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return fallback; }
+  try { return JSON.parse(fs.readFileSync(p, 'utf8')); }
+  catch (e) {
+    // A missing file is the normal empty case. A file that exists but will
+    // not parse usually means a crash mid-write left truncated JSON; shout
+    // so bans / linked / inbox do not silently become the empty fallback.
+    try {
+      if (fs.existsSync(p)) {
+        console.error('[thornswood-docs] JSON will not parse, using fallback for ' + p + ': ' + (e && e.message || e));
+      }
+    } catch (e2) { }
+    return fallback;
+  }
 };
 const putJson = (p, o) => {
-  try { fs.writeFileSync(p, JSON.stringify(o, null, 2), 'utf8'); return true; }
-  catch (e) { return false; }
+  // Same-folder temp + rename so a crash mid-write cannot leave truncated
+  // JSON that jsonFile would then quietly replace with the empty fallback
+  // (bans, linked accounts, inbox, and the rest of putJson callers).
+  try {
+    const body = JSON.stringify(o, null, 2);
+    const dir = path.dirname(p);
+    const tmp = path.join(dir, '.' + path.basename(p) + '.' + process.pid + '.tmp');
+    fs.writeFileSync(tmp, body, 'utf8');
+    try { fs.renameSync(tmp, p); }
+    catch (e) {
+      // Windows: rename onto an existing file can fail; replace then drop tmp.
+      try { fs.copyFileSync(tmp, p); } finally { try { fs.unlinkSync(tmp); } catch (e2) { } }
+    }
+    return true;
+  } catch (e) {
+    try { fs.unlinkSync(path.join(path.dirname(p), '.' + path.basename(p) + '.' + process.pid + '.tmp')); } catch (e2) { }
+    return false;
+  }
 };
-
 const docPath = (n) => Object.prototype.hasOwnProperty.call(DOCS, n)
   ? path.join(DATA, n + '.md') : null;
 
@@ -564,7 +754,43 @@ function writeBoardOne(name, value) {
 }
 
 const RESULTS = path.join(DATA, 'results.json');
-const INBOX   = path.join(DATA, 'inbox.json');
+const INBOX   = path.join(FOR_BOT, 'inbox.json');
+
+// ==== thornswood rules accepted ====
+/* Who accepted the rules, by Discord id (#428). Before this nobody ever did:
+   somebody could join for the invite, be let in and press Play having agreed
+   to nothing. The alpha application in the Discord asks, the bot sends the
+   answer with the ticket, and it is kept here rather than only in the inbox,
+   because the inbox is trimmed and this record should not be.
+
+   One row per Discord id: the latest answer, its time and their words, and
+   the time of their first yes, which a later answer never moves. A file that
+   is there and cannot be read is never written over, so a bad read cannot
+   throw everybody else's answers away. */
+const RULES_OK = path.join(DATA, 'rules-accepted.json');
+
+function noteRules(file, discordId, rules, by, now) {
+  const id = String(discordId || '').replace(/[^0-9]/g, '').slice(0, 20);
+  if (!id || !rules || typeof rules !== 'object') return false;
+  let book = {};
+  if (fs.existsSync(file)) {
+    try { book = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, '')); }
+    catch (e) { return false; }
+    if (!book || typeof book !== 'object' || Array.isArray(book)) return false;
+  }
+  const had = (book[id] && typeof book[id] === 'object') ? book[id] : {};
+  const yes = rules.yes === true;
+  book[id] = {
+    yes: yes,
+    at: now,
+    said: String(rules.said || '').slice(0, 200),
+    by: String(by || '').slice(0, 60),
+    firstYes: had.firstYes || (yes ? now : null)
+  };
+  return putJson(file, book);
+}
+// ==== end thornswood rules accepted ====
+
 /* Written by Publish-News.ps1 at the end of every release: the same feed the
    launcher shows, stripped of the server password before it leaves his
    machine. Nothing here writes it. */
@@ -630,7 +856,8 @@ function reportFrom(req) {
   return crypto.createHmac('sha256', reportSalt).update(addr).digest('hex').slice(0, 32);
 }
 
-function reportRefusal(key, now) {
+function reportRefusal(key, now, whose) {
+  const from = whose || 'your connection';
   const HOUR = 60 * 60 * 1000, DAY = 24 * HOUR;
   const at = Number(now) || Date.now();
   const day = (reportSeen.get(key) || []).filter((t) => t > at - DAY);
@@ -640,13 +867,13 @@ function reportRefusal(key, now) {
     : 'about ' + Math.max(1, Math.ceil(s / 60)) + (s > 60 ? ' minutes' : ' minute');
   if (hour.length >= REPORT_HOUR) {
     const s = wait(hour[0] + HOUR - at);
-    return { wait: s, error: 'That is five reports from your connection in the last hour, ' +
+    return { wait: s, error: 'That is five reports from ' + from + ' in the last hour, ' +
       'which is as many as this page takes. Try again in ' + said(s) +
       ', or open a ticket in the Discord if it cannot wait.' };
   }
   if (day.length >= REPORT_DAY) {
     const s = wait(day[0] + DAY - at);
-    return { wait: s, error: 'That is twenty reports from your connection today, ' +
+    return { wait: s, error: 'That is twenty reports from ' + from + ' today, ' +
       'which is as many as this page takes in a day. Try again in ' + said(s) +
       ', or open a ticket in the Discord if it cannot wait.' };
   }
@@ -807,15 +1034,31 @@ function receiveUpload(req, res, asked, cap, allow, saved) {
   while (fs.existsSync(path.join(UP, name))) { name = stamp + '-' + n + '-' + safe; n++; }
   const dest = path.join(UP, name);
 
-  let got = 0, over = false;
+  /* Over the cap or cut off partway, the half file goes (#1095). Over the cap
+     it destroyed the request, so the 413 went to a socket already closed, and
+     a sender that dropped partway never ended the pipe, so the half file sat
+     open on disk and the route never answered. Now too big is answered 413
+     and the rest read and thrown away, and a connection that went is closed
+     with nothing left to say. */
+  let got = 0, over = false, cut = false, broke = false;
   const out = fs.createWriteStream(dest);
-  req.on('data', (c) => { got += c.length; if (got > cap) { over = true; req.destroy(); out.destroy(); } });
-  req.on('error', () => { over = true; });
+  out.on('error', () => { broke = true; });
+  req.on('data', (c) => {
+    got += c.length;
+    if (got > cap && !over) { over = true; req.unpipe(out); out.destroy(); }
+  });
+  const drop = () => { if (!req.complete && !over && !cut) { cut = true; req.unpipe(out); out.destroy(); } };
+  req.on('error', drop);
+  req.on('aborted', drop);
+  req.on('close', drop);
   req.pipe(out);
   out.on('close', () => {
-    if (over) {
+    if (over || cut || broke) {
       try { fs.unlinkSync(dest); } catch (e) { }
-      return sendJson(res, 413, { error: 'that file is over ' + Math.round(cap / 1048576) + ' MB' });
+      if (over) return send(res, 413, JSON.stringify({ error: 'that file is over ' + Math.round(cap / 1048576) + ' MB' }),
+                            null, { Connection: 'close' });
+      if (cut) { try { res.destroy(); } catch (e) { } return; }
+      return sendJson(res, 500, { error: 'the site could not save that file. Try again in a minute.' });
     }
     saved(name);
   });
@@ -885,16 +1128,146 @@ function identity(req) {
 const standCache = new Map();
 async function standingCached(id) {
   const hit = standCache.get(id);
-  if (hit && Date.now() - hit.at < 60000) return hit.v;
+  // A staff ban (#412) is this site's own file, so a remembered one is asked
+  // again: one that ran out or was lifted lets them in now, not in a minute.
+  const stale = hit && hit.v && hit.v.byFile &&
+    !banActive(jsonFile(BANS, {})[String(id)] || null, Date.now());
+  if (hit && !stale && Date.now() - hit.at < 60000) return hit.v;
   const v = await standing(id);
   standCache.set(id, { at: Date.now(), v });
+  if (!v.lookupFailed) standGood.set(id, { at: Date.now(), v });
   return v;
 }
+/* The last answer Discord actually gave for each account, kept past the
+   minute above for STAND_STALE_MS so a page load can use it while Discord is
+   slow (#1096). Only page loads read it (who() with staleOk); a failed lookup
+   never lands here. */
+const standGood = new Map();
+const STAND_STALE_MS = 10 * 60000;
 
-async function who(req) {
+/* Every linked account's standing, for /api/allowed, inside the door's time.
+
+   The route asked one account at a time. The door gives up after ten
+   seconds (req.setTimeout in the gamemode's refresh), and when the bulk
+   member list is refused each account is its own request to Discord: at
+   100ms a call, a hundred linked accounts is ten seconds and the door never
+   hears an answer at all (issue #415).
+
+   So four at a time, and all of it inside DOOR_BUDGET_MS. An account not
+   answered by then, or not asked because Discord said to wait longer than
+   the time left, comes back as a failed lookup, which the route names in
+   failedProfiles and the door keeps exactly as it was. A wait that ends
+   inside the time left is waited out once, not once per account. */
+const DOOR_BUDGET_MS = 7000;
+const DOOR_LANES = 4;
+async function standingsForDoor(ids) {
+  const got = new Map();
+  const started = Date.now();
+  let timer = null;
+  const late = new Promise((r) => { timer = setTimeout(() => r(null), DOOR_BUDGET_MS); });
+  let next = 0;
+  async function lane() {
+    while (next < ids.length) {
+      const id = ids[next++];
+      const left = DOOR_BUDGET_MS - (Date.now() - started);
+      const quiet = discordQuietMs();
+      if (left <= 0) { got.set(id, { lookupFailed: 'ran out of time asking Discord' }); continue; }
+      if (quiet >= left) { got.set(id, { lookupFailed: 'rate limited by Discord' }); continue; }
+      if (quiet > 0) await new Promise((r) => setTimeout(r, quiet));
+      let st;
+      try { st = await Promise.race([standingCached(String(id)), late]); }
+      catch (e) { st = { lookupFailed: String(e) }; }
+      got.set(id, st || { lookupFailed: 'ran out of time asking Discord' });
+    }
+  }
+  const lanes = [];
+  for (let i = 0; i < Math.min(DOOR_LANES, ids.length); i++) lanes.push(lane());
+  await Promise.all(lanes);
+  clearTimeout(timer);
+  return got;
+}
+
+/*
+  How long a Submit waits on Discord before answering anyway (#467).
+
+  who() asks Discord who a signed in visitor is before any route looks at what
+  they sent, and discordGet gives Discord ten seconds a question, two
+  questions when the guild list is refused. So with Discord slow or not
+  answering, a signed in visitor pressing Send it on the report page watched
+  the button for ten to twenty seconds, and a report about a person was then
+  told to sign in, which they had.
+
+  On the doors below, who() now waits this long and no longer. The question
+  keeps going, one at a time per account (standAsking), and lands in
+  standCache as before, so the next press has the answer. Until then the
+  visitor counts as signed in with the lookup failed, which each door turns
+  into words: a problem or an idea goes anyway, and anything that needs
+  their roles says Discord could not be asked. A ban in the site's own file
+  and the hand written admin list need no Discord, so they still count.
+*/
+const SUBMIT_WAIT_MS = 700;
+/* Play's two doors, /api/play/join and /api/play/pass, answer inside
+   PLAY_ANSWER_MS of the question, well inside the launcher's fifteen seconds
+   (Discord.cs PostJson), with 503 "could not ask Discord" when Discord has
+   not answered by then, which the launcher treats as a site that could not
+   vouch (#1094). What the launcher sends is small and sent at once, so it
+   gets PLAY_BODY_MS of that. */
+const PLAY_ANSWER_MS = 10000;
+const PLAY_BODY_MS = 5000;
+const SUBMIT_DOORS = new Set(['/api/report', '/api/gallery/submit', '/api/gallery/report']);
+// Shared for at most STAND_ASKING_MS: three questions of ten seconds is the
+// longest a lookup should take, and one that never settles must not hold
+// every later request for that account behind it.
+const STAND_ASKING_MS = 35000;
+const standAsking = new Map();
+/* What an account counts as when Discord has not answered in time: the hand
+   written admin list, which needs no Discord, and otherwise signed in with
+   no roles and the lookup failed, which each door turns into words. */
+function standingLate(id) {
+  const listed = cfg.admins.indexOf(String(id)) >= 0;
+  return { id: String(id), inGuild: listed, banned: false, admin: listed, play: listed, dev: listed,
+           roles: [], name: '', lookupFailed: 'Discord did not answer in time' };
+}
+// p's answer, or late()'s once ms has passed without one.
+function within(p, ms, late) {
+  let timer = null;
+  const LATE = {};
+  const t = new Promise((r) => { timer = setTimeout(() => r(LATE), Math.max(0, ms)); });
+  return Promise.race([p, t]).then((v) => { clearTimeout(timer); return v === LATE ? late() : v; });
+}
+function standingSoon(id, waitMs, staleOk) {
+  let ask = standAsking.get(id);
+  if (!ask || Date.now() - ask.at > STAND_ASKING_MS) {
+    const mine = { p: standingCached(id), at: Date.now() };
+    standAsking.set(id, mine);
+    const done = () => { if (standAsking.get(id) === mine) standAsking.delete(id); };
+    mine.p.then(done, done);
+    ask = mine;
+  }
+  if (!(waitMs > 0)) return ask.p;
+  // A page load uses the last answer Discord gave when this one is late or
+  // failed, while the question above carries on and lands in the cache for
+  // the next one (#1096).
+  return within(ask.p, waitMs, () => standingLate(id)).then((st) => {
+    const good = staleOk && st.lookupFailed && standGood.get(id);
+    if (good && Date.now() - good.at < STAND_STALE_MS) return Object.assign({}, good.v, { stale: true });
+    return st;
+  });
+}
+
+/*
+  PAGE LOADS WAIT NO LONGER THAN A SUBMIT (#1096). A GET or HEAD from a
+  signed in visitor asked Discord in full before anything was sent back, so
+  with Discord slow the gallery, the report page's sign in check and the hub
+  took ten to twenty seconds to show. They get SUBMIT_WAIT_MS too, and then
+  the last answer Discord gave for that account (up to STAND_STALE_MS old)
+  or, with none, signed in with the lookup failed. Anything else that is not
+  a Submit door still waits for Discord, inside DISCORD_ASK_MS a question.
+*/
+async function who(req, waitMs, staleOk) {
   const me = identity(req);
   if (!me) return { member: isMember(req), admin: false, dev: false, name: '', id: '', play: false };
-  const st = await standingCached(me.id);
+  const st = await standingSoon(me.id, waitMs, staleOk);
   return {
     // "member" is now "may use the hub", and only staff may. Being allowed
     // into the GAME is st.play, and that is asked separately by the launcher.
@@ -907,9 +1280,29 @@ async function who(req) {
     play: st.play,
     banned: st.banned,
     inGuild: st.inGuild,
+    lookupFailed: st.lookupFailed || '',
     id: me.id,
     name: st.name || me.name
   };
+}
+
+/*
+  Why this visitor cannot report a person from the report page, or null when
+  they can. /api/report answers with it, and /api/gallery/who hands it to the
+  page, so the page says the same words before Send it as the site would
+  after (#1097). Signed in already is never told to sign in (#467), and
+  Discord not answering in time is said as that.
+*/
+function personReportRefusal(w) {
+  if (!w.id) return { code: 401, why: 'sign in', error: 'Sign in with Discord to report somebody, ' +
+    'so staff can come back to you about it.' };
+  if (w.banned) return { code: 403, why: 'banned', error: 'That Discord account is banned from Thornswood.' };
+  if (!w.play && w.lookupFailed) return { code: 503, why: 'could not ask Discord', error:
+    'Thornswood could not ask Discord who you are just now, so a report about a person cannot go yet. ' +
+    'Try again in a minute. A problem or an idea goes without it.' };
+  if (!w.play) return { code: 403, why: 'role', error: 'Your Discord account is not let into Thornswood ' +
+    'yet, so it cannot report somebody from here. Ask staff in the Discord instead.' };
+  return null;
 }
 
 /* 'staff' is w.dev, which already folds admin in, so widening access.dev
@@ -956,11 +1349,22 @@ async function galleryStaff(url, w) {
 }
 
 // ----------------------------------------------------------------- plumb --
+/* One CSP for every answer (#1474). home.html and the hub load CSS/JS as
+   same-origin files, so script-src and style-src need only 'self'. Keep this
+   string in one place so send(), Range replies, and the request-level
+   setHeader cannot drift. */
+const CSP_HEADER = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'";
 function send(res, code, payload, type, extra) {
+  // Defense in depth (#1366 / #1474): conservative CSP (this page and the hub
+  // load nothing from other sites; CSS and JS are external same-origin files),
+  // frame-ancestors self so the hub cannot be iframed for clickjacking, and a
+  // referrer policy that does not leak path on cross-origin navigations.
   res.writeHead(code, Object.assign({
     'Content-Type': type || 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
-    'X-Content-Type-Options': 'nosniff'
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Security-Policy': CSP_HEADER,
+    'Referrer-Policy': 'strict-origin-when-cross-origin'
   }, extra || {}));
   res.end(payload);
 }
@@ -1007,31 +1411,79 @@ function rangeReply(req, res, file, size, headers, head) {
       'content-range': 'bytes */' + size,
       'accept-ranges': 'bytes',
       'cache-control': 'no-store',
-      'x-content-type-options': 'nosniff'
+      'x-content-type-options': 'nosniff',
+      'content-security-policy': CSP_HEADER,
+      'referrer-policy': 'strict-origin-when-cross-origin'
     });
     res.end();
     return true;
   }
   end = Math.min(end, size - 1);
-  // send() puts the last two on every other answer; a range must not be the
-  // one reply that quietly goes out without them.
+  // send() puts the security headers on every other answer; a range must not
+  // be the one reply that quietly goes out without them.
   res.writeHead(206, Object.assign({}, headers, {
     'content-range': 'bytes ' + start + '-' + end + '/' + size,
     'content-length': (end - start) + 1,
     'accept-ranges': 'bytes',
     'cache-control': headers['cache-control'] || 'no-store',
-    'x-content-type-options': 'nosniff'
+    'x-content-type-options': 'nosniff',
+    'content-security-policy': CSP_HEADER,
+    'referrer-policy': 'strict-origin-when-cross-origin'
   }));
   if (head) { res.end(); return true; }
   fs.createReadStream(file, { start: start, end: end }).pipe(res);
   return true;
 }
 
-function body(req, cap) {
-  return new Promise((resolve) => {
-    let out = '';
-    req.on('data', (d) => { out += d; if (out.length > (cap || 4000000)) req.destroy(); });
-    req.on('end', () => resolve(out));
+/*
+  What was sent with a request, settled on every path (#1095).
+
+  It resolved on 'end' and nothing else. Over the cap it destroyed the
+  request, after which 'end' never came, and a connection that dropped or a
+  sender that stopped halfway left it waiting too, so the route never went
+  on and the visitor got a dropped connection instead of words.
+
+  Now it rejects with a BodyFailed, which failed() below turns into an
+  answer: 413 with the most the route takes when it is too big, 408 when it
+  took longer than waitMs to arrive (by default ten seconds, plus a second
+  for every 64 KB the route allows), and nothing when the connection has
+  already gone, because nobody is left to read it. Over the cap the rest is
+  read and thrown away rather than the socket cut, so the answer can reach
+  the sender. The routes pass a BodyFailed on (passBodyFailure) rather than
+  reading it as a body that was not JSON.
+*/
+class BodyFailed extends Error {
+  constructor(status, why, words) { super(why); this.status = status; this.why = why; this.words = words; }
+}
+function passBodyFailure(e) { if (e instanceof BodyFailed) throw e; }
+function body(req, cap, waitMs) {
+  const max = cap || 4000000;
+  const wait = waitMs > 0 ? waitMs : 10000 + Math.ceil(max / 65536) * 1000;
+  return new Promise((resolve, reject) => {
+    const parts = [];
+    let size = 0, settled = false;
+    const settle = (e, v) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (e) reject(e); else resolve(v);
+    };
+    const timer = setTimeout(() => settle(new BodyFailed(408, 'slow',
+      'That took too long to arrive, so it was not read. Try again.')), wait);
+    const gone = () => settle(new BodyFailed(0, 'closed', ''));
+    req.on('data', (d) => {
+      if (settled) return;
+      size += d.length;
+      if (size > max) {
+        return settle(new BodyFailed(413, 'too big', 'That was too big to send here: the most this takes is ' +
+          (max >= 1048576 ? Math.round(max / 1048576) + ' MB' : Math.max(1, Math.round(max / 1024)) + ' KB') + '.'));
+      }
+      parts.push(Buffer.isBuffer(d) ? d : Buffer.from(String(d)));
+    });
+    req.on('end', () => settle(null, Buffer.concat(parts).toString('utf8')));
+    req.on('error', gone);
+    req.on('aborted', gone);
+    req.on('close', () => { if (!req.complete) gone(); });
   });
 }
 
@@ -1131,35 +1583,93 @@ function post(url, form) {
    them they were not in the Discord. The one person that never affected was
    whoever is on the hand written admin list, because that is checked first, so
    it looked fine from the only account that could have noticed. */
+/* QUIET UNTIL. discordGet recognised a 429 and then asked again straight
+   away, for the next person on the list, so one rate limit became a run of
+   them. Discord says how long to wait: Retry-After or x-ratelimit-reset-after
+   on the 429, and x-ratelimit-remaining 0 with x-ratelimit-reset-after on the
+   last answer before one. That time is kept here, once for the whole site,
+   and until it passes discordGet answers "rate limited" without asking. It
+   is not a sleep: a sleep here would be paid once per linked account and
+   blow the door's ten seconds (issue #415). Capped at a minute, so a strange
+   header cannot shut the site out of Discord for longer than that. */
+let discordQuietUntil = 0;
+function discordQuietMs() { return Math.max(0, discordQuietUntil - Date.now()); }
+function discordWaitMs(headers, text) {
+  const h = headers || {};
+  let s = parseFloat(h['retry-after']);
+  if (!(s >= 0) && h['retry-after']) {
+    // Retry-After may also be a date (RFC 9110); Discord sends seconds.
+    const at = Date.parse(h['retry-after']);
+    if (at) s = (at - Date.now()) / 1000;
+  }
+  if (!(s >= 0)) s = parseFloat(h['x-ratelimit-reset-after']);
+  if (!(s >= 0)) { try { s = parseFloat(JSON.parse(text).retry_after); } catch (e) { } }
+  if (!(s >= 0)) return -1;
+  return Math.min(60000, Math.ceil(s * 1000));
+}
+/* TEN SECONDS FOR THE WHOLE ANSWER (#1094). The limit was req.setTimeout,
+   which only watches for a quiet socket and then destroys the request. When
+   Discord sent its headers and stalled, the response never ended, nothing
+   listened for it failing, and the promise never settled, so the visitor or
+   launcher waiting on it never heard back. Now one timer runs from the
+   question to the last byte, and a response that fails, is cut off or closes
+   before its end settles the question too, once. */
+const DISCORD_ASK_MS = 10000;
 function discordGet(path) {
   return new Promise((resolve) => {
     if (!cfg.discord.botToken) {
       return resolve({ ok: false, status: 0, body: null, why: 'no bot token set' });
     }
+    if (discordQuietMs() > 0) {
+      return resolve({ ok: false, status: 429, body: null, why: 'rate limited by Discord' });
+    }
+    let settled = false;
+    let timer = null;
+    const settle = (v) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (!v.ok && v.status === 0 && v.why) console.error('[thornswood] discord ' + path + ': ' + v.why);
+      resolve(v);
+    };
     const req = https.get({
       hostname: 'discord.com', path: '/api/v10' + path,
       headers: { Authorization: 'Bot ' + cfg.discord.botToken }
     }, (res) => {
       let out = '';
+      const cut = () => settle({ ok: false, status: 0, body: null, why: 'Discord stopped partway through its answer' });
       res.on('data', (d) => out += d);
+      res.on('error', cut);
+      res.on('aborted', cut);
+      res.on('close', () => { if (!res.complete) cut(); });
       res.on('end', () => {
+        const hdr = res.headers || {};
+        if (res.statusCode === 429 || String(hdr['x-ratelimit-remaining']) === '0') {
+          const wait = discordWaitMs(res.statusCode === 429 ? hdr : { 'x-ratelimit-reset-after': hdr['x-ratelimit-reset-after'] }, out);
+          // A 429 with no readable wait still backs off for a second.
+          const ms = wait >= 0 ? wait : (res.statusCode === 429 ? 1000 : 0);
+          discordQuietUntil = Math.max(discordQuietUntil, Date.now() + ms);
+        }
         if (res.statusCode === 200) {
-          try { return resolve({ ok: true, status: 200, body: JSON.parse(out) }); }
-          catch (e) { return resolve({ ok: false, status: 200, body: null, why: 'unreadable answer' }); }
+          try { return settle({ ok: true, status: 200, body: JSON.parse(out) }); }
+          catch (e) { return settle({ ok: false, status: 200, body: null, why: 'unreadable answer' }); }
         }
         if (res.statusCode === 404) {
-          return resolve({ ok: false, status: 404, body: null, why: 'not found' });
+          return settle({ ok: false, status: 404, body: null, why: 'not found' });
         }
         let msg = 'Discord answered ' + res.statusCode;
         if (res.statusCode === 401) msg = 'the bot token is wrong or has been reset';
         else if (res.statusCode === 403) msg = 'the bot is in the server but not allowed to read members';
         else if (res.statusCode === 429) msg = 'rate limited by Discord';
         console.error('[thornswood] discord ' + path + ': ' + msg);
-        resolve({ ok: false, status: res.statusCode, body: null, why: msg });
+        settle({ ok: false, status: res.statusCode, body: null, why: msg });
       });
     });
-    req.setTimeout(10000, () => { try { req.destroy(); } catch (e) { } });
-    req.on('error', (e) => resolve({ ok: false, status: 0, body: null, why: 'could not reach Discord: ' + e.message }));
+    timer = setTimeout(() => {
+      settle({ ok: false, status: 0, body: null, why: 'Discord did not answer inside ten seconds' });
+      try { req.destroy(); } catch (e) { }
+    }, DISCORD_ASK_MS);
+    req.on('error', (e) => settle({ ok: false, status: 0, body: null, why: 'could not reach Discord: ' + e.message }));
   });
 }
 
@@ -1194,14 +1704,307 @@ const LINKED = path.join(DATA, 'linked.json');
   which is the branch that used to hand play to everybody.
 
   Shape: {"<discord id>": {"at": <unix ms>, "by": "<id or name>", "why": "..."}}
-  Nothing here writes it yet. It is read on every standing() and a missing file
-  means nobody is banned, which is what an empty server looks like.
+  It is read on every standing() and a missing file means nobody is banned,
+  which is what an empty server looks like.
+
+  WRITTEN BY STAFF SINCE #412 (Patrick, 28 September: "put the bans and notes
+  on the site"), from the game's /ban and from the hub. A ban now also carries
+  until (unix ms, 0 or missing for good), byId, name and profiles, and one
+  made in the game against a profile no Discord account holds is kept under
+  "p:<profile>" instead of an id. An old row with no until is a ban for good,
+  as it always was.
+
+  ONE CHARACTER OR THE WHOLE ACCOUNT (#1010, Patrick, 28 September: "staff
+  can ban either one character or a whole account"). The key says which: a
+  Discord id is the account (every character on it, and any new one, because
+  standing() reads it and /api/play/join and /api/play/pass refuse the
+  account), and "p:<profile>" is that one character and nothing else. scope
+  on the row says the same in words. The game's /ban is a character now and
+  /banaccount the account; the hub offers both.
 */
 const BANS = path.join(DATA, 'bans.json');
+/*
+  Characters staff have killed for good (#1010, PK). Keyed by profile id:
+  {"<profile>": {"at", "by", "byId", "why", "name", "account", "from"}}.
+  Patrick, 28 September: the character "can never be played or selected
+  again, but it is kept, not deleted, so staff can run events with PKed
+  characters", it is quiet, and the account can make a new character. So
+  nothing here or in the game server deletes anything: the join pass refuses
+  the character, the door's lists leave it out, the launcher's menu shows it
+  as dead in no slot, and staff read the row.
+
+  UNDONE BY AN ADMIN (Patrick, 29 September: a PK made by mistake can be
+  undone, by the admin role only, from the hub and with the game's /unpk,
+  with a reason). The row is never deleted: undoing it adds "undone" {"at",
+  "by", "byId", "why", "from"}, and a row with "undone" is not a PK any more
+  (pkActive). A later PK of the same character moves the old row into
+  "history" first, so every PK and every undo stays readable. The character
+  comes back only into a free slot: undoPk refuses while every slot on the
+  account holds a living character, and says so.
+*/
+const PK = path.join(DATA, 'pk.json');
+// Staff notes against a person, keyed the same way as bans. Staff read them.
+const NOTES = path.join(DATA, 'notes.json');
+// What staff did on the hub, one JSON line each, for the bot's staff channel.
+// The game servers write their own (private\moderation.log).
+const MODLOG = path.join(FOR_BOT, 'moderation.log');
+const NOTES_KEEP = 200;
+const BAN_MOST_MIN = 10 * 365 * 24 * 60;
+
+/* Whose Discord account holds this profile, from linked.json, or ''. */
+function accountOf(pid) {
+  const n = Number(pid) || 0;
+  if (!(n > 0)) return '';
+  const linked = jsonFile(LINKED, {});
+  for (const d of Object.keys(linked)) {
+    const ps = Array.isArray((linked[d] || {}).profiles) ? linked[d].profiles : [];
+    if (ps.map(Number).indexOf(n) >= 0) return String(d);
+  }
+  return '';
+}
+/* Where a note about this profile is kept: the account, or the profile. */
+function recordKey(pid) { return accountOf(pid) || ('p:' + (Number(pid) || 0)); }
+function banActive(b, now) {
+  return !!b && typeof b === 'object' && (!(Number(b.until) > 0) || Number(b.until) > now);
+}
+/*
+  Why this one character may not be played, or null (#1010): killed for good
+  by staff (pk), or under a ban on the character itself. A ban on the whole
+  account is standing()'s, asked before this. Read from the files every time,
+  so a ban that runs out lets the character back at once.
+*/
+function characterBar(pid, now) {
+  const n = Number(pid) || 0;
+  if (!(n > 0)) return null;
+  const pk = jsonFile(PK, {});
+  if (pk && pkActive(pk[String(n)])) {
+    return { pk: true, at: Number((pk[String(n)] || {}).at) || 0 };
+  }
+  const byChar = jsonFile(BANS, {});
+  const b = byChar && byChar['p:' + n];
+  if (banActive(b, now)) return { pk: false, why: String(b.why || ''), until: Number(b.until) || 0 };
+  return null;
+}
+/* Whether a pk.json row is a PK that holds: there, and not undone by an admin. */
+function pkActive(row) {
+  return !!row && typeof row === 'object' && !row.undone;
+}
+/* Every profile staff have killed for good, as numbers. */
+function pkProfiles() {
+  const table = jsonFile(PK, {}) || {};
+  return Object.keys(table).filter((k) => pkActive(table[k])).map(Number).filter((n) => n > 0);
+}
+/* A ban's end in words, for the people told about it. */
+function banUntilText(until) {
+  return Number(until) > 0
+    ? 'until ' + new Date(Number(until)).toISOString().slice(0, 16).replace('T', ' ') + ' UTC'
+    : 'for good';
+}
+/* What a banned account is told at Play: until when and why for a staff ban
+   (the file), the plain sentence for the Banned role. */
+function accountBanned(st) {
+  return 'That Discord account is banned from Thornswood' +
+    (st && st.byFile ? ' ' + banUntilText(st.until) + (st.reason ? ': ' + st.reason : '') : '') + '.';
+}
+/* Every profile an active ban covers, with why and until, for the door. */
+function activeBans(now) {
+  const table = jsonFile(BANS, {});
+  const linked = jsonFile(LINKED, {});
+  const out = [];
+  for (const k of Object.keys(table || {})) {
+    const b = table[k];
+    if (!banActive(b, now)) continue;
+    const set = new Set((Array.isArray(b.profiles) ? b.profiles : []).map(Number).filter((n) => n > 0));
+    if (k.indexOf('p:') === 0) set.add(Number(k.slice(2)));
+    else for (const n of ((linked[k] || {}).profiles || [])) if (Number(n) > 0) set.add(Number(n));
+    set.delete(0);
+    // scope tells the game server what to say to them: one character, or the
+    // whole account (#1010).
+    if (set.size) out.push({ profiles: Array.from(set), why: String(b.why || ''), until: Number(b.until) || 0,
+                             scope: k.indexOf('p:') === 0 ? 'character' : 'account' });
+  }
+  return out;
+}
+/* A ban, made or replaced. The account's standing is asked again at once. */
+function putBan(key, row) {
+  const table = jsonFile(BANS, {});
+  const had = table[key] || {};
+  const profiles = new Set([].concat(had.profiles || [], row.profiles || []).map(Number).filter((n) => n > 0));
+  table[key] = Object.assign({}, row, { profiles: Array.from(profiles) });
+  const ok = putJson(BANS, table);
+  standCache.delete(key);
+  return ok;
+}
+function dropBan(keys) {
+  const table = jsonFile(BANS, {});
+  let was = false;
+  for (const k of keys) {
+    if (k && Object.prototype.hasOwnProperty.call(table, k)) { delete table[k]; was = true; standCache.delete(k); }
+  }
+  return { was, ok: !was || putJson(BANS, table) };
+}
+function putNote(key, row) {
+  const notes = jsonFile(NOTES, {});
+  const list = Array.isArray(notes[key]) ? notes[key] : [];
+  list.unshift(row);
+  notes[key] = list.slice(0, NOTES_KEEP);
+  return putJson(NOTES, notes);
+}
+function modLog(row) {
+  try { fs.appendFileSync(MODLOG, JSON.stringify(Object.assign({ at: new Date().toISOString(), server: 'site' }, row)) + '\n'); }
+  catch (e) { console.log('[thornswood-docs] could not write moderation.log: ' + e.message); }
+}
+/* A PK, kept for good. A row an admin undid goes into the new row's history. */
+function putPk(pid, row) {
+  const table = jsonFile(PK, {});
+  const had = table[String(Number(pid))];
+  if (had && typeof had === 'object') {
+    const old = Object.assign({}, had);
+    delete old.history;
+    row = Object.assign({}, row, { history: (Array.isArray(had.history) ? had.history : []).concat([old]) });
+  }
+  table[String(Number(pid))] = row;
+  return putJson(PK, table);
+}
+/*
+  How many character slots a Discord account has, for bringing a character
+  back (#1010): its standing's, or, when Discord cannot be asked, the roles
+  linked.json kept from its last Play.
+*/
+async function slotsOfAccount(account) {
+  let st = null;
+  try { st = await standingCached(String(account)); } catch (e) { st = null; }
+  if (st && !st.lookupFailed) return slotsFor(st);
+  const roles = (jsonFile(LINKED, {})[String(account)] || {}).roles;
+  const list = Array.isArray(roles) ? roles : [];
+  const has = (names) => (names || []).some((n) => list.indexOf(n) >= 0);
+  return slotsFor({ roles: list, admin: has(cfg.access.admin), dev: has(cfg.access.dev) });
+}
+/*
+  An admin undoes a PK made by mistake (#1010, Patrick, 29 September). The
+  row stays, with "undone" saying who, when and why. The character comes
+  back into a free slot: every other character on the account the game
+  server has a character for, that is not dead for good, holds one, and when
+  they fill the account's slots nothing changes and the answer says so.
+  Answers { status, body } for the route to send.
+*/
+async function undoPk(pid, by, byId, why, from) {
+  const table = jsonFile(PK, {});
+  const row = table[String(pid)];
+  if (!pkActive(row)) return { status: 200, body: { ok: true, was: false } };
+  const account = String(row.account || accountOf(pid) || '');
+  const name = String(row.name || '') || ('profile ' + pid);
+  if (account) {
+    const slots = await slotsOfAccount(account);
+    const who = (jsonFile(ROSTER, { who: {} }) || {}).who || {};
+    const held = ((jsonFile(LINKED, {})[account] || {}).profiles || []).map(Number)
+      .filter((n, i, a) => n > 0 && n !== Number(pid) && a.indexOf(n) === i && who[String(n)] && !pkActive(table[String(n)]));
+    if (held.length >= slots) {
+      return { status: 409, body: { ok: false, error: 'every slot is taken', slots, held: held.length,
+        message: 'Every character slot on that account is taken (' + held.length + ' of ' + slots + '), so ' +
+                 name + ' is still dead for good and nothing changed. Its owner can forget a character in ' +
+                 'the launcher to free a slot, then undo the PK again.' } };
+    }
+  }
+  // Read again after the wait above, so a write in between is not lost.
+  const now = jsonFile(PK, {});
+  const cur = now[String(pid)];
+  if (!pkActive(cur)) return { status: 200, body: { ok: true, was: false } };
+  cur.undone = { at: Date.now(), by, byId, why, from };
+  if (!putJson(PK, now)) return { status: 500, body: { error: 'could not save' } };
+  return { status: 200, body: { ok: true, was: true, name: String(cur.name || ''), account } };
+}
+/*
+  The dead character the game's /unpk names (#1010): o.profileId, exact; or
+  o.personProfileId, somebody in the world, whose account's one dead
+  character it is; or o.words, the start of a dead character's name, or of
+  the name of the account that holds it. Answers { pid, rest } or
+  { message } saying who it could not tell apart.
+*/
+function findDead(o) {
+  const table = jsonFile(PK, {}) || {};
+  const dead = Object.keys(table).filter((k) => pkActive(table[k])).map(Number).filter((n) => n > 0);
+  const linked = jsonFile(LINKED, {});
+  const nameOf = (n) => String((table[String(n)] || {}).name || '') || ('profile ' + n);
+  const listed = (ps) => ps.map((n) => nameOf(n) + ' (profile ' + n + ')').join(', ');
+  const ofAccount = (acc, label) => {
+    const ps = dead.filter((n) => String((table[String(n)] || {}).account || accountOf(n)) === String(acc));
+    if (ps.length === 1) return { pid: ps[0] };
+    if (!ps.length) return { message: label + ' has no character that is dead for good.' };
+    return { message: label + ' has ' + ps.length + ' characters dead for good: ' + listed(ps) +
+                      '. Name the character, or its profile number.' };
+  };
+  const words = (Array.isArray(o.words) ? o.words : []).map((w) => String(w || '').trim()).filter(Boolean).slice(0, 40);
+  const pid = Number(o.profileId) || 0;
+  if (pid > 0) {
+    if (pkActive(table[String(pid)])) return { pid, rest: words };
+    const acc = accountOf(pid);
+    if (!acc) return { message: 'Profile ' + pid + ' is not dead for good.' };
+    const r = ofAccount(acc, 'Profile ' + pid + '\'s account');
+    return r.pid ? { pid: r.pid, rest: words } : r;
+  }
+  const person = Number(o.personProfileId) || 0;
+  if (person > 0) {
+    if (pkActive(table[String(person)])) return { pid: person, rest: words };
+    const acc = accountOf(person);
+    if (!acc) return { message: 'Nobody\'s account holds profile ' + person + '.' };
+    const r = ofAccount(acc, String(o.personName || '').slice(0, 60) || ('Profile ' + person));
+    return r.pid ? { pid: r.pid, rest: words } : r;
+  }
+  for (let n = words.length; n >= 1; n--) {
+    const want = words.slice(0, n).join(' ').toLowerCase();
+    const exact = dead.filter((k) => nameOf(k).toLowerCase() === want);
+    const hits = exact.length ? exact : dead.filter((k) => nameOf(k).toLowerCase().indexOf(want) === 0);
+    if (hits.length === 1) return { pid: hits[0], rest: words.slice(n) };
+    if (hits.length > 1) {
+      return { message: 'More than one character dead for good starts with "' + words.slice(0, n).join(' ') +
+                        '": ' + listed(hits) + '. Name one, or its profile number.' };
+    }
+    const accs = Object.keys(linked).filter((d) => {
+      const u = linked[d] || {};
+      return [u.name, u.handle].some((s) => s && String(s).toLowerCase().indexOf(want) === 0);
+    });
+    if (accs.length === 1) {
+      const r = ofAccount(accs[0], String(linked[accs[0]].name || linked[accs[0]].handle || 'That account'));
+      return r.pid ? { pid: r.pid, rest: words.slice(n) } : r;
+    }
+  }
+  return { message: 'No character dead for good goes by that name. Use its name, its owner\'s name or its profile number.' };
+}
+/*
+  Every ban (with whether it still holds), every note and every PK, for staff,
+  and the character names the game server's roster has for every linked
+  profile, so the Linked accounts page can say which character is which.
+*/
+function staffRecords(now) {
+  const table = jsonFile(BANS, {});
+  const out = {};
+  for (const k of Object.keys(table || {})) {
+    out[k] = Object.assign({}, table[k] || {}, { active: banActive(table[k] || {}, now) });
+  }
+  const roster = (jsonFile(ROSTER, { who: {} }) || {}).who || {};
+  const names = {};
+  const linked = jsonFile(LINKED, {});
+  for (const d of Object.keys(linked || {})) {
+    for (const n of ((linked[d] || {}).profiles || [])) {
+      const r = roster[String(Number(n))];
+      if (r && r.name) names[String(Number(n))] = String(r.name);
+    }
+  }
+  return { bans: out, notes: jsonFile(NOTES, {}), pk: jsonFile(PK, {}), names };
+}
+/* Minutes as a ban length: 0 is for good, anything else is capped. */
+function banMinutes(v) {
+  const n = Math.floor(Number(v) || 0);
+  return n > 0 ? Math.min(n, BAN_MOST_MIN) : 0;
+}
 // The game server's character roster, pushed here by the gamemode with the
 // door key (POST /api/roster) and handed back per person (POST /api/play/roster).
 // Keyed by profile id; live and dev both push into it, their ids never meet.
 const ROSTER = path.join(DATA, 'roster.json');
+// How old a server's report of which characters it holds may be and still be
+// passed on (#955). It is sent every five minutes; an hour covers a restart.
+const ROSTER_HELD_FRESH_MS = 60 * 60 * 1000;
 
 /* How many character slots this person gets at the game's main menu. */
 function slotsFor(st) {
@@ -1513,10 +2316,19 @@ const TROUBLE_BAD = [
   ['FATAL',               'something fatal']
 ];
 
+/* The load order lines are the game's own check, as it writes them to Skyrim
+   Platform's log (loadOrderVerificationService in the client), not the words
+   LOAD ORDER ERROR. Those words are only ever painted on the game's screen,
+   never logged by the game; the one log that carries them is the launcher's,
+   inside its own Scan sentences ("The game shows that as LOAD ORDER ERROR"),
+   which say what WOULD happen and stop Play until Fix. Matching them labelled
+   42 of the 53 sessions from 25 to 28 Sep "refused over the load order" when
+   the game's check had passed in every one it could be read for (#945). */
 const TROUBLE_WARN = [
   ['Update failed',                 'an update did not install'],
   ['being used by another process', 'an update could not write a file something else had open'],
-  ['LOAD ORDER ERROR',              'the game refused them over the load order'],
+  ['Load order check failed',       'the game showed LOAD ORDER ERROR: its plugins are not the server\'s'],
+  ['Missing some server mods',      'the game showed LOAD ORDER ERROR: it has fewer plugins than the server'],
   ['load order is not the server',  'their load order did not match the server'],
   ['does not match the server',     'their load order did not match the server'],
   ['is missing, install it in Vortex', 'a mod is not installed'],
@@ -1545,10 +2357,141 @@ function scanFor(logs, marks, level) {
   return null;
 }
 
+/*
+  ONLY THIS SESSION'S PART OF launcher.log (#945).
+
+  The launcher sends the last 256 KB of its own log, which is days of it:
+  every Scan, Fix, update and game it has run. The game's logs start afresh
+  each run, so they are this session's; launcher.log is not. Read whole, a
+  line from two days earlier coloured every session after it. Measured on
+  28 Sep: all 42 sessions labelled "refused over the load order" since 25 Sep
+  took the label from a Scan line written half an hour to 65 hours BEFORE the
+  session started, which Fix had since put right, and the Scan just before
+  each Play said 0 issues. An "Update failed" from 19 Sep did the same.
+
+  So launcher.log is read from the last "Starting the game on launcher" line,
+  which Shell writes as it starts the game for this session, to its end. A
+  log with no such line has nothing that can be placed in this session, and
+  none of it is read.
+*/
+const SESSION_START_MARK = 'Starting the game on launcher ';
+
+function thisSessionOf(name, text) {
+  const s = String(text || '');
+  if (name !== 'launcher.log') return s;
+  const at = s.lastIndexOf(SESSION_START_MARK);
+  if (at < 0) return '';
+  return s.slice(s.lastIndexOf('\n', at) + 1);
+}
+
+/*
+  What the game server said about this person's load order in this session,
+  from its own log (the load order refusal block in gamemode.js, #402 and
+  #873). serverLines is the server log sliced to the session; the profile is
+  the character's, which the lines name. A refusal outranks anything the
+  client logs say about the load order, because it is the one that ended the
+  session.
+*/
+function serverRefusal(serverLines, profile) {
+  const p = Number(profile) || 0;
+  if (!p || !Array.isArray(serverLines)) return null;
+  const refused = 'refusing profile ' + p + ':';
+  const would = 'WOULD REFUSE profile ' + p + ':';
+  let watched = null;
+  for (const raw of serverLines) {
+    const line = String(raw);
+    if (line.indexOf(refused) >= 0) {
+      return {
+        level: 'warn', file: 'server', line: line.trim().slice(0, 300),
+        why: line.indexOf('no load order report') >= 0
+          ? 'the server ended the session: their game never said which plugins it loaded'
+          : 'the server ended the session: their load order is not the server\'s'
+      };
+    }
+    if (!watched && line.indexOf(would) >= 0) {
+      watched = {
+        level: 'warn', file: 'server', line: line.trim().slice(0, 300),
+        why: 'the server found their load order is not its own and let them stay'
+      };
+    }
+  }
+  return watched;
+}
+
 /* Red before yellow: a session that crashed AND complained about its load
-   order is a crash, and the crash is the thing worth waking somebody for. */
-function readTrouble(logs) {
-  return scanFor(logs, TROUBLE_BAD, 'bad') || scanFor(logs, TROUBLE_WARN, 'warn');
+   order is a crash, and the crash is the thing worth waking somebody for.
+   Then the server's word on the load order, then the rest. */
+function readTrouble(logs, serverLines, profile) {
+  const mine = {};
+  for (const name of Object.keys(logs || {})) mine[name] = thisSessionOf(name, logs[name]);
+  return scanFor(mine, TROUBLE_BAD, 'bad') ||
+         serverRefusal(serverLines, profile) ||
+         scanFor(mine, TROUBLE_WARN, 'warn');
+}
+
+/*
+  Sets the row's trouble from what readTrouble found, or from the launcher's
+  own issues when the logs said nothing, and clears it when neither says
+  anything. Returns true when the row changed.
+*/
+function applyTrouble(row, found) {
+  const before = [row.trouble, row.troubleAt, row.troubleFile, row.troubleLine].join('\u0001');
+  delete row.trouble; delete row.troubleAt; delete row.troubleFile; delete row.troubleLine;
+  if (found) {
+    row.trouble = found.why;
+    row.troubleAt = found.level;     /* 'bad' is red, 'warn' is yellow */
+    row.troubleFile = found.file;
+    row.troubleLine = found.line;
+  } else {
+    const issues = Array.isArray(row.issues) ? row.issues : [];
+    const checks = Array.isArray(row.checks) ? row.checks : [];
+    if (issues.length || checks.length) {
+      /* No crash, but the launcher was unhappy. Yellow, and never a message
+         in Discord: these are common, understood, and have a known fix. */
+      const blocking = issues.filter(i => i && i.blocking).length;
+      row.trouble = blocking
+        ? (blocking + ' thing(s) would have stopped them connecting')
+        : (issues.length + checks.length) + ' thing(s) the launcher was unhappy about';
+      row.troubleAt = 'warn';
+    }
+  }
+  return [row.trouble, row.troubleAt, row.troubleFile, row.troubleLine].join('\u0001') !== before;
+}
+
+/*
+  Every row read again once under the rules above, because the rows written
+  before #945 keep the label the whole launcher.log gave them, and the
+  sessions page counts those. Only the stored client logs are read, not the
+  server log (a session's server lines may have rolled away by now, and the
+  old rule never read them either). TROUBLE_RULES moves when the rules do, so
+  the next change reads them again too; a row already read under these rules
+  is left alone. Nothing is said in Discord: these are old sessions.
+*/
+const TROUBLE_RULES = 2;
+function rereadTrouble() {
+  try {
+    const rows = sessionRows();
+    let changed = 0, read = 0;
+    for (const row of rows) {
+      if (!row || row.troubleRules === TROUBLE_RULES) continue;
+      const key = sessionKey(row.session);
+      if (!key) continue;
+      let logs = null;
+      try {
+        const f = slogFile(key);
+        if (fs.existsSync(f)) logs = (JSON.parse(fs.readFileSync(f, 'utf8')) || {}).logs || null;
+      } catch (e) { logs = null; }
+      row.troubleRules = TROUBLE_RULES;
+      if (!logs) continue;
+      read++;
+      if (applyTrouble(row, readTrouble(logs))) changed++;
+    }
+    if (read || changed) putSessions(rows);
+    console.log('[thornswood-docs] read ' + read + ' stored session log sets again under the current trouble rules; ' +
+                changed + ' session(s) changed colour or reason');
+  } catch (e) {
+    console.log('[thornswood-docs] could not read the stored session logs again: ' + (e && e.message || e));
+  }
 }
 
 /*
@@ -1558,7 +2501,7 @@ function readTrouble(logs) {
   file needs no ticket, no port and nothing to keep in step. Newest last, the
   last 200, so it cannot grow without bound.
 */
-const TROUBLE_FILE = path.join(DATA, 'trouble.json');
+const TROUBLE_FILE = path.join(FOR_BOT, 'trouble.json');
 const TROUBLE_KEEP = 200;
 
 function noteTrouble(row, found) {
@@ -1615,6 +2558,40 @@ const SERVER_LOGS = {
   main: 'C:\\Thornswood-Server\\server.log',
   dev:  'C:\\Thornswood-Server-Dev\\server.log'
 };
+
+// ==== thornswood deploy records ====
+/* What each part on this box runs, for /api/deploys (#459). Every deploy
+   (scripts\deploy\Artifact.ps1) leaves one record per folder a part runs
+   from in DEPLOYS_DIR: which zip, which commit, whether it carried edits,
+   when. Only those fields go out; where it runs and which machine sent it
+   stay on the box. A record that will not read is named and skipped, so one
+   bad file does not hide the rest. Deploy-Docs grants the site's account
+   read on this folder. The door is staff only since #1359. */
+const DEPLOYS_DIR = process.env.THORNSWOOD_DEPLOYS_DIR || 'C:\\Thornswood-Deploys\\current';
+function readDeploys(dir) {
+  const parts = {};
+  let names = [];
+  try { names = fs.readdirSync(dir); } catch (e) { return parts; }
+  for (const n of names.sort()) {
+    if (!/^[a-z0-9][a-z0-9._-]*\.json$/.test(n)) continue;
+    const part = n.slice(0, -5);
+    try {
+      const r = JSON.parse(fs.readFileSync(path.join(dir, n), 'utf8').replace(/^\uFEFF/, ''));
+      parts[part] = {
+        component: String(r.component || ''),
+        name: String(r.name || ''),
+        commit: String(r.commit || ''),
+        edited: r.edited === true,
+        sha256: String(r.sha256 || ''),
+        deployedUtc: String(r.deployedUtc || '')
+      };
+    } catch (e) {
+      parts[part] = { unreadable: true };
+    }
+  }
+  return parts;
+}
+// ==== end thornswood deploy records ====
 
 /* Where the voice service writes what people said. Its folder, not this one:
    it owns the file and this only reads it, so there is one writer and no
@@ -1862,10 +2839,15 @@ async function standing(discordId) {
 
     So the list is read here, where nothing can route around it, and it wins.
   */
+  // A ban with an end (#412) stops counting once it has passed.
   const bans = jsonFile(BANS, {});
-  if (bans && Object.prototype.hasOwnProperty.call(bans, String(discordId))) {
+  if (bans && Object.prototype.hasOwnProperty.call(bans, String(discordId)) &&
+      !(Number((bans[String(discordId)] || {}).until) > 0 &&
+        Number((bans[String(discordId)] || {}).until) <= Date.now())) {
     out.banned = true;
     out.reason = String((bans[String(discordId)] || {}).why || '');
+    out.until = Number((bans[String(discordId)] || {}).until) || 0;
+    out.byFile = true;
     return out;
   }
 
@@ -1883,6 +2865,10 @@ async function standing(discordId) {
         if (me.user && me.user.avatar) out.avatar = String(me.user.avatar);
         const names = await roleNames();
         out.roles = (me.roles || []).map((id) => names[id]).filter(Boolean);
+        out.staffRole = holdsStaffRole(out.roles);
+        out.businessOwner = holdsNamedRole(out.roles, 'Business Owner');
+        out.factionOwner = holdsNamedRole(out.roles, 'Faction Owner');
+        out.devRole = holdsNamedRole(out.roles, 'Dev');
       } else if (r.status !== 404) {
         out.lookupFailed = r.why;
       }
@@ -1920,7 +2906,30 @@ async function standing(discordId) {
   if (has(cfg.access.admin)) out.admin = true;
   out.play = out.admin || has(cfg.access.play);
   out.dev = out.admin || has(cfg.access.dev);
+  out.jarl = out.admin || has(cfg.access.jarl);
+  out.staffRole = holdsStaffRole(out.roles);
+  out.businessOwner = holdsNamedRole(out.roles, 'Business Owner');
+  out.factionOwner = holdsNamedRole(out.roles, 'Faction Owner');
+  out.devRole = holdsNamedRole(out.roles, 'Dev');
   return out;
+}
+
+/*
+  Whether these Discord roles include a staff role (#481): access.admin or
+  access.dev, by name. For the staff seats over the most the world holds,
+  which Patrick keeps for "the discord roles" (29 Sep), so it reads the roles
+  alone. st.dev is not the same thing: the hand written admins list sets it
+  for an account that holds no role at all.
+*/
+function holdsStaffRole(roles) {
+  const mine = Array.isArray(roles) ? roles : [];
+  const staff = [].concat(cfg.access.admin || [], cfg.access.dev || []);
+  return staff.some((n) => mine.indexOf(n) >= 0);
+}
+
+function holdsNamedRole(roles, name) {
+  const mine = Array.isArray(roles) ? roles : [];
+  return mine.indexOf(name) >= 0;
 }
 
 /*
@@ -1974,7 +2983,7 @@ async function hasLeft(discordId) {
   and a wait between reading linked.json and writing it would write over
   whatever another launcher checked in meanwhile.
 */
-async function departed(linked, pid, caller) {
+async function departed(linked, pid, caller, by) {
   const out = new Set();
   const table = linked || {};
   const n = Number(pid) || 0;
@@ -1987,7 +2996,10 @@ async function departed(linked, pid, caller) {
     const theirs = (table[d] && Array.isArray(table[d].profiles))
       ? table[d].profiles.map(Number) : [];
     if (theirs.indexOf(n) < 0) continue;
-    if (await hasLeft(d)) out.add(String(d));
+    // Past the deadline (by, when the door has one) an account counts as
+    // still holding, the safe side (#1094).
+    const left = by ? await within(hasLeft(d), by - Date.now(), () => false) : await hasLeft(d);
+    if (left) out.add(String(d));
   }
   return out;
 }
@@ -2012,6 +3024,81 @@ function readTicket(t) {
   catch (e) { return null; }
   if (!o || !o.d || !o.x || o.x < Date.now()) return null;
   return o;
+}
+
+/*
+  THE JOIN PASS (#937). Patrick, 28 Sep: "People should not be allowed in at all
+  if they don't join from our launcher." The game server only ever sees a
+  profile number the client picked, so it cannot tell our launcher from Skyrim
+  started by hand, from another launcher, or from one of ours that is out of
+  date. The launcher asks /api/play/pass for this with the Discord ticket it
+  already holds, the game's front plugin hands it to the game server, and the
+  game server checks it with its own copy of the key (gamemode.js, the join pass
+  block) and ends a session that has none.
+
+      jp1.<body>.<mac>
+
+  body is base64url JSON: p the profile number, s the server ("main" or "dev"),
+  v the launcher version, d the Discord id, i when it was issued and x when it
+  runs out, both unix milliseconds. mac is base64url HMAC-SHA256 over "jp1." and
+  the body, keyed on cfg.passKey. tests\test-join-pass-site.js and
+  tests\test-join-pass-game.js hold one pass in common, so the two ends cannot
+  drift apart. Ten minutes: the launcher renews it every four while the game
+  runs, so a session that reconnects after a server restart still has one.
+*/
+const PASS_MS = 10 * 60000;
+
+function b64u(buf) {
+  return Buffer.from(buf).toString('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function makePass(key, o) {
+  const body = b64u(JSON.stringify({ p: o.p, s: o.s, v: o.v, d: o.d, i: o.i, x: o.x }));
+  const mac = b64u(crypto.createHmac('sha256', key).update('jp1.' + body).digest());
+  return 'jp1.' + body + '.' + mac;
+}
+
+/* Digits and dots, an optional leading v, nine digits a part at most: the
+   same rule FeedNotice.IsVersion keeps in the launcher. Null for anything else. */
+function versionParts(v) {
+  const t = String(v == null ? '' : v).trim().replace(/^v/i, '');
+  if (!/^\d{1,9}(\.\d{1,9})*$/.test(t)) return null;
+  return t.split('.').map(Number);
+}
+
+function versionCompare(a, b) {
+  const n = Math.max(a.length, b.length);
+  for (let i = 0; i < n; i++) {
+    const x = a[i] || 0, y = b[i] || 0;
+    if (x !== y) return x < y ? -1 : 1;
+  }
+  return 0;
+}
+
+/* Which launchers a channel lets into the game: from minLauncher (Publish-Update
+   writes it as the launcher it published) up to launcherVersion, both read from
+   this site's own copy of the feed. With no minLauncher the floor is the current
+   launcher. Null when the feed cannot be read, which refuses the pass. Read again
+   only when the file changes. */
+const feedLaunchersSeen = {};
+function feedLaunchers(server) {
+  const dir = server === 'dev' ? 'feed-dev' : 'feed';
+  const file = path.join(ROOT, dir, 'version.json');
+  let st;
+  try { st = fs.statSync(file); } catch (e) { return null; }
+  const hit = feedLaunchersSeen[dir];
+  if (hit && hit.mtime === st.mtimeMs && hit.size === st.size) return hit.v;
+  let doc = null;
+  try { doc = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, '')); } catch (e) { doc = null; }
+  let v = null;
+  if (doc && versionParts(doc.launcherVersion)) {
+    const current = String(doc.launcherVersion).trim().replace(/^v/i, '');
+    const min = versionParts(doc.minLauncher) ? String(doc.minLauncher).trim().replace(/^v/i, '') : current;
+    v = { current: current, min: min };
+  }
+  feedLaunchersSeen[dir] = { mtime: st.mtimeMs, size: st.size, v: v };
+  return v;
 }
 
 function getWithToken(url, token) {
@@ -2051,12 +3138,12 @@ function plainPage(title, lines) {
   const esc = (t) => String(t == null ? '' : t).replace(/[<>&]/g, '');
   return '<!doctype html><meta charset=utf-8><title>' + esc(title) + ' | Thornswood</title>' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-    '<body style="background:#12150F;color:#DDE3D5;font:15px/1.6 system-ui;' +
-    'display:grid;place-items:center;height:100vh;margin:0;text-align:center;padding:20px">' +
-    '<div style="max-width:32em">' +
-    '<h1 style="color:#C9A24B;font-weight:600">' + esc(title) + '</h1>' +
+    '<link rel="stylesheet" href="/door.css">' +
+    '<body class="door">' +
+    '<div class="door-box">' +
+    '<h1>' + esc(title) + '</h1>' +
     lines.map((t) => '<p>' + esc(t) + '</p>').join('') +
-    '<p><a style="color:#C9A24B" href="/">Back to Thornswood</a></p>' +
+    '<p><a href="/">Back to Thornswood</a></p>' +
     '</div>';
 }
 
@@ -2077,30 +3164,29 @@ function notAllowedPage(me, st) {
     // the Discord" here is how somebody who IS in it loses an evening.
     why = '<p>Thornswood could not ask Discord about that account, so it cannot ' +
           'let anybody in right now. This is the site, not you.</p>' +
-          '<p style="color:#8D9682;font-size:13px">' + esc(st.lookupFailed) + '</p>' +
+          '<p class="door-note">' + esc(st.lookupFailed) + '</p>' +
           '<p>Tell Patrick and try again in a minute.</p>';
   } else if (st.banned) {
     why = '<p>That account is banned from Thornswood.</p>';
   } else if (!st.inGuild) {
     why = '<p>That account is not in the Thornswood Discord.</p>' +
       (cfg.discord.invite
-        ? '<p><a style="color:#C9A24B" href="' + cfg.discord.invite + '">Join it here</a>, then try again.</p>'
+        ? '<p><a href="' + cfg.discord.invite + '">Join it here</a>, then try again.</p>'
         : '');
   } else {
-    why = '<p>That account is in the Discord but has no role that lets it in yet. ' +
-          'Ask in there and somebody will sort it.</p>' +
-          '<p style="color:#8D9682;font-size:13px">Roles Thornswood can see on it: ' +
+    why = '<p>That account is in the Discord, but ' + esc(notAcceptedYet(true)) + '</p>' +
+          '<p class="door-note">Roles Thornswood can see on it: ' +
           (st.roles && st.roles.length ? '<b>' + st.roles.map(esc).join(', ') + '</b>' : 'none') +
           '.<br>It needs one of: <b>' + (cfg.access.play || []).map(esc).join(', ') + '</b>.</p>';
   }
   return '<!doctype html><meta charset=utf-8><title>Not allowed in</title>' +
-    '<body style="background:#12150F;color:#DDE3D5;font:15px/1.6 system-ui;' +
-    'display:grid;place-items:center;height:100vh;margin:0;text-align:center;padding:20px">' +
-    '<div style="max-width:32em"><h1 style="color:#C9A24B;font-weight:600">Not allowed in</h1>' +
+    '<link rel="stylesheet" href="/door.css">' +
+    '<body class="door">' +
+    '<div class="door-box"><h1>Not allowed in</h1>' +
     why +
-    '<p style="color:#8D9682;font-size:13px">Signed in to Discord as <b>' + nm +
+    '<p class="door-note">Signed in to Discord as <b>' + nm +
     '</b>, id <code>' + id + '</code>. Quote that id if you ask about it.</p>' +
-    '<p><a href="/" style="color:#C9A24B">Back to the site</a></p></div></body>';
+    '<p><a href="/">Back to the site</a></p></div></body>';
 }
 
 // ------------------------------------------------------------------ serve --
@@ -2126,6 +3212,19 @@ function notAllowedPage(me, st) {
   500, logged with a stack so it can be fixed rather than quietly swallowed.
 */
 function failed(req, res, e) {
+  // What was sent could not be read (body() above, #1095): too big or too
+  // slow is answered in words, and a connection already gone gets nothing.
+  // Closed after, so the rest of a body too big is not read for nothing.
+  if (e instanceof BodyFailed) {
+    console.error('[thornswood-docs] body ' + e.why + ' on ' +
+                  JSON.stringify(String(req.url || '').split('?')[0].slice(0, 200)));
+    try {
+      if (!e.status || res.headersSent || res.destroyed) { if (!res.writableEnded) res.destroy(); return; }
+      send(res, e.status, JSON.stringify({ ok: false, why: e.why, error: e.words, message: e.words }),
+           null, { Connection: 'close' });
+    } catch (e2) { }
+    return;
+  }
   const bad = e instanceof URIError;
   // The path and never the query. A caller that puts a key or a ticket in the
   // address would have it copied into site.log, which Get-Logs brings down
@@ -2148,25 +3247,41 @@ function failed(req, res, e) {
   The last net, under everything rather than around one handler.
 
   A throw inside a setTimeout, or a promise nobody waited for, never reaches
-  the catch above and would end the process exactly the way a bad URL used to.
-  Logged and carried on with instead. A site answering most requests is worth
-  more than a site that is gone, and the log line is the thing that says
-  something here needs fixing.
+  the catch above. After an uncaught exception Node says the process is in an
+  unknown state, so carrying on can hand out corrupt answers or half-written
+  files (#1358). Log it, then exit, and let the process manager start a clean
+  one. How the process is hosted and the three restarts an hour are entry 105.
 
-  How the process is hosted and the three restarts an hour are entry 105; this
-  is only about not needing them.
+  An unhandled rejection is different: the process is still defined, so it is
+  logged and the site keeps answering.
 */
 process.on('unhandledRejection', (e) => {
   console.error('[thornswood-docs] unhandled rejection, carrying on: ' +
                 (e && e.stack ? e.stack : e));
 });
 process.on('uncaughtException', (e) => {
-  console.error('[thornswood-docs] uncaught exception, carrying on: ' +
+  console.error('[thornswood-docs] uncaught exception, exiting: ' +
                 (e && e.stack ? e.stack : e));
+  process.exit(1);
 });
 
 async function handle(req, res) {
-  const url = new URL(req.url, 'http://x');
+  /* The address is a path on this site, so it is read as one (#929).
+
+     new URL(req.url, 'http://x') read an address that starts with two slashes
+     as a scheme relative one, //host/path, so the first segment became a host
+     name rather than part of the path. // and /// have no host at all and
+     threw Invalid URL, which answered 500. //rules, //config.json and ///x
+     came out as the path "/" and were all answered with the front page. A
+     backslash counts as a slash there, so /\ did the same. Putting the origin
+     in front of a path keeps every slash of it in the path. An address that
+     is not a path (the absolute form a proxy sends, or *) is read as before,
+     and one that still cannot be read is the request's fault: 400, like a
+     bad percent sign, never 500. */
+  const raw = String(req.url || '/');
+  let url;
+  try { url = new URL(raw.charAt(0) === '/' ? 'http://x' + raw : raw, 'http://x'); }
+  catch (e) { return failed(req, res, new URIError('not an address: ' + e.message)); }
   const p = decodeURIComponent(url.pathname);
   const route = p.replace(/\/+$/, '').toLowerCase() || '/';
   // HEAD is GET without a body. Every route below asks for GET by name, so a
@@ -2183,15 +3298,41 @@ async function handle(req, res) {
      write their own headers and never go through it. Node keeps a setHeader
      value through a later writeHead, so one line covers every route.
 
+     CSP and Referrer-Policy (#1366) ride the same path so a Range answer or a
+     piped file is not the one reply without them. send() also sets them for
+     the ordinary answers.
+
      Only on an answer that came in over the certificate. Caddy holds 443 and
      the plain to secure redirect already works, so this is the part that stops
      a browser trying the plain one again. On plain HTTP it means nothing and
      is left off. */
+  try {
+    res.setHeader('Content-Security-Policy', CSP_HEADER);
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  } catch (e) { }
   if (secureHere(req)) {
     try { res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains'); } catch (e) { }
   }
 
-  const w = await who(req);
+  /* Two slashes together are one (#929). The site already reads /rules/ and
+     /rules// as /rules, so //rules, /feed//version.json and // itself are
+     sent to the same address with one slash, by the same 301 that sends
+     /download to /downloads. Slashes only at the end are left to the routes
+     below, exactly as before. The address sent is the one the URL parser
+     already read, with its dot segments resolved and every backslash made a
+     slash, and every run of slashes is one after this, so it always starts
+     with exactly one slash and can never name another site. Where it lands is
+     asked for again and goes through every check below, the /feed assets'
+     64 hex name included. Only GET and HEAD: a POST to //api/login is not a
+     door, and falls to the 404 at the bottom. */
+  if (req.method === 'GET' && (/\/\/(?!\/*$)/.test(url.pathname) || /^\/\/+$/.test(url.pathname))) {
+    return send(res, 301, '', 'text/plain', { Location: url.pathname.replace(/\/{2,}/g, '/') + url.search });
+  }
+
+  // A page load (GET, HEAD was made GET above) waits as long as a Submit and
+  // may use the last answer Discord gave (#1096).
+  const pageLoad = req.method === 'GET';
+  const w = await who(req, pageLoad || (req.method === 'POST' && SUBMIT_DOORS.has(route)) ? SUBMIT_WAIT_MS : 0, pageLoad);
 
   // ---------------------------------------------------------- member login
   if (p === '/api/login' && req.method === 'POST') {
@@ -2200,7 +3341,7 @@ async function handle(req, res) {
     }
     let given = '';
     try { given = (JSON.parse(await body(req, 4096)) || {}).password || ''; }
-    catch (e) { }
+    catch (e) { passBodyFailure(e); }
     if (!sameSecret(given, String(cfg.password || ''))) {
       return sendJson(res, 401, { error: 'wrong password' });
     }
@@ -2392,7 +3533,8 @@ async function handle(req, res) {
   // ---------------------------------------------------------- public front
   if (req.method === 'GET' && PUBLIC_PAGES.indexOf(route) >= 0) {
     try {
-      let html = fs.readFileSync(path.join(PUBLIC, 'home.html'), 'utf8');
+      // The one switch (#428): only the alpha or the open wording goes out.
+      let html = forMode(fs.readFileSync(path.join(PUBLIC, 'home.html'), 'utf8'), cfg.open);
       // One place holds the invite link, so it cannot go stale in nine.
       // /join, never /hub. Somebody clicking Apply wants to know how to apply,
       // and sending them to the admin panel is the worst possible answer.
@@ -2445,9 +3587,14 @@ async function handle(req, res) {
   if (route === '/api/public' && req.method === 'GET') {
     const feed = jsonFile(NEWS, { news: [] });
     return sendJson(res, 200, {
+      // The one switch (#428), for the pages and the Discord bot.
+      open: cfg.open === true,
       invite: cfg.discord.invite || '',
       patreon: cfg.patreon || '',
-      status: { up: gameStatus.up, online: gameStatus.online },
+      // max is always the number when one is known anywhere, so the page
+      // says "N of 25" whether or not the server has said it (#481).
+      status: { up: gameStatus.up, online: gameStatus.online, max: gameStatus.max || mostOnlineFallback(),
+                line: gameStatus.line, full: seatsFull(gameStatus) },
       gallery: jsonFile(GALLERY, []),
       launcher: feed.launcher || '',
       collection: feed.collection || '',
@@ -2489,9 +3636,11 @@ async function handle(req, res) {
     // The SHA-256 Publish-Installer measured on the zip it sent, kept in
     // files.json beside its name. best is built from a stat and has no hash on
     // it, so it is looked up here. Only a well formed one goes out: anything
-    // else would make every install delete a good download. An empty value
-    // tells the installer there is nothing to check, which is also what an
-    // installer from before this sees when the field is missing.
+    // else would make every install delete a good download. An empty value is
+    // what an installer from before this sees when the field is missing; an
+    // installer from #1365 on stops on it rather than fetching half a
+    // gigabyte it has no way to measure, so a publish without files.json
+    // beside the zip is an install nobody can run.
     const meta = jsonFile(path.join(FILES, 'files.json'), {});
     const sha = String((meta[best.name] || {}).sha256 || '');
     return sendJson(res, 200, {
@@ -2517,7 +3666,7 @@ async function handle(req, res) {
     if (early) return refuse(early);
     let o;
     try { o = JSON.parse(await body(req, 20000)); }
-    catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+    catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
     // The form's hidden field. A person never sees it, so anything in it was
     // put there by a script filling in every box it found. Answered as if it
     // worked, so the script has nothing to learn from, and nothing is kept.
@@ -2532,21 +3681,217 @@ async function handle(req, res) {
     // other request can run in between and each one sees the last one's count.
     const late = reportRefusal(sender, Date.now());
     if (late) return refuse(late);
+    /* A REPORT ABOUT A PERSON IS NEVER ANONYMOUS (#414). A problem or an idea
+       needs no account, because somebody whose install will not start cannot
+       sign in. A report naming somebody does: it is kept against the Discord
+       account that sent it, so staff can come back to the reporter and so a
+       made up grudge cannot fill the queue from a hundred browsers. It is
+       counted per account as well as per connection. */
+    let person = null;
+    if (o.kind === 'report') {
+      const no = personReportRefusal(w);
+      if (no) return sendJson(res, no.code, { error: no.error });
+      const about = String(o.about || '').trim().slice(0, 60);
+      if (!about) return sendJson(res, 400, { error: 'say who it is about in the Who box' });
+      const acct = 'acct:' + w.id;
+      const mine = reportRefusal(acct, Date.now(), 'your account');
+      if (mine) return refuse(mine);
+      person = { about, acct };
+    }
     const list = jsonFile(INBOX, []);
-    list.unshift({
+    list.unshift(Object.assign({
       id: 'i' + Date.now().toString(36) + crypto.randomBytes(2).toString('hex'),
-      kind: o.kind === 'idea' ? 'idea' : 'bug',
+      kind: person ? 'report' : (o.kind === 'idea' ? 'idea' : 'bug'),
       title,
       detail: String(o.detail || '').slice(0, 8000),
-      by: String(o.by || '').slice(0, 40),
+      by: person ? String(w.name || '').slice(0, 40) : String(o.by || '').slice(0, 40),
       at: Date.now(),
       state: 'new',
-      from: 'the public page'
-    });
+      from: person ? 'the public page, signed in' : 'the public page'
+    }, person ? { about: person.about, discordId: String(w.id) } : {}));
     if (!putJson(INBOX, trimInbox(list))) {
       return sendJson(res, 500, { error: 'could not save' });
     }
     reportTaken(sender, Date.now());
+    if (person) reportTaken(person.acct, Date.now());
+    return sendJson(res, 200, { ok: true });
+  }
+
+  /*
+    From inside the game: /helpme and /report (#414, gamemode.js, the asking
+    staff block). Keyed with the door's key in a header, the same key and the
+    same header /api/allowed takes, so nothing but a game server can write
+    one. The dev server's door.json names the site with /dev on the end, so
+    its reports come in on /dev/api/report/game and say so.
+
+    Counted per profile on the same limits as the public page, as a backstop
+    behind the game's own tighter ones. The profile id is what the game
+    server was told by the client, a claim rather than a proof, and the row
+    says so in words staff read.
+  */
+  if ((route === '/api/report/game' || route === '/dev/api/report/game') && req.method === 'POST') {
+    if (!cfg.botKey) return sendJson(res, 404, { error: 'not set up' });
+    if (!sameSecret(String(req.headers['x-thornswood-key'] || ''), String(cfg.botKey))) {
+      return sendJson(res, 401, { error: 'no' });
+    }
+    let o;
+    try { o = JSON.parse(await body(req, 8000)) || {}; }
+    catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
+    const dev = route.indexOf('/dev/') === 0;
+    const kind = o.kind === 'report' ? 'report' : (o.kind === 'help' ? 'help' : '');
+    const pid = Number(o.profileId) || 0;
+    if (!kind || !(pid > 0)) return sendJson(res, 400, { error: 'no kind or no profile' });
+    const key = 'game:' + (dev ? 'dev:' : '') + pid;
+    const no = reportRefusal(key, Date.now(), 'that profile');
+    if (no) return send(res, 429, JSON.stringify({ error: no.error }), null, { 'Retry-After': String(no.wait) });
+    const name = String(o.name || '').trim().slice(0, 60) || 'Somebody';
+    const about = String(o.about || '').trim().slice(0, 60);
+    if (kind === 'report' && !about) return sendJson(res, 400, { error: 'a report names somebody' });
+    const said = String(o.said || '').trim().slice(0, 300);
+    const cell = String(o.cell || '').slice(0, 120);
+    const pos = (Array.isArray(o.pos) ? o.pos : []).slice(0, 3).map((n) => Math.round((Number(n) || 0) * 10) / 10);
+    const aboutPid = Number(o.aboutProfileId) || 0;
+    const list = jsonFile(INBOX, []);
+    list.unshift({
+      id: 'i' + Date.now().toString(36) + crypto.randomBytes(2).toString('hex'),
+      kind,
+      title: kind === 'help' ? (said || 'Asked for help and said nothing more') : said,
+      about: kind === 'report' ? about : '',
+      aboutProfileId: kind === 'report' && aboutPid > 0 ? aboutPid : 0,
+      detail: 'At ' + (cell || 'an unknown place') + (pos.length === 3 ? ', ' + pos.join(', ') : '') + '. ' +
+        'Profile ' + pid + (kind === 'report' && aboutPid > 0 ? ', about profile ' + aboutPid : '') +
+        ': the game takes these numbers from the client, so they are a claim, not proof. ' +
+        (Number(o.staffTold) > 0 ? Number(o.staffTold) + ' of staff in the world were told in game.'
+                                 : 'Nobody from staff was in the world.'),
+      by: name,
+      profileId: pid,
+      cell,
+      pos,
+      at: Date.now(),
+      state: 'new',
+      from: dev ? 'in game on the dev server' : 'in game'
+    });
+    if (!putJson(INBOX, trimInbox(list))) {
+      return sendJson(res, 500, { error: 'could not save' });
+    }
+    reportTaken(key, Date.now());
+    return sendJson(res, 200, { ok: true });
+  }
+
+  /*
+    Bans and notes from staff in the game (#412): /ban, /unban and /note in
+    the gamemode's staff block. Keyed with the door's key in the header, like
+    /api/report/game above, and /dev on the front from the dev server.
+
+    The game server has already checked that the one asking holds a staff
+    role and proved who they are (join token and join pass). This checks the
+    role again here, on the Discord account that holds their profile, so a
+    game server cannot make somebody staff by saying so.
+
+    One character or the whole account (#1010): ban and unban are the one
+    character, kept under "p:<profile>"; banaccount and unbanaccount are the
+    Discord account holding the profile, so every character on it is covered,
+    and a new one too, and the door leaves them all out. A profile no account
+    holds has no account to ban, and says so. minutes 0 is for good. pk kills
+    the character for good (see PK): it is kept, never played again. Staff
+    may do any of these to staff; the game refuses only doing it to yourself.
+    unpk (/unpk) undoes a PK made by mistake, for the admin role only (see
+    PK); the character is found by findDead, and o.why is required.
+  */
+  const staffGame = /^(\/dev)?\/api\/staff\/game\/(ban|unban|banaccount|unbanaccount|pk|unpk|note)$/.exec(route);
+  if (staffGame && req.method === 'POST') {
+    if (!cfg.botKey) return sendJson(res, 404, { error: 'not set up' });
+    if (!sameSecret(String(req.headers['x-thornswood-key'] || ''), String(cfg.botKey))) {
+      return sendJson(res, 401, { error: 'no' });
+    }
+    let o;
+    try { o = JSON.parse(await body(req, 8000)) || {}; }
+    catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
+    const from = staffGame[1] ? 'the dev server' : 'the live server';
+    const byPid = Number(o.byProfileId) || 0;
+    if (staffGame[2] === 'unpk' && byPid > 0) {
+      const byIdU = accountOf(byPid);
+      if (!byIdU) return sendJson(res, 403, { error: 'the staff profile is not linked to a Discord account' });
+      const stU = await standingCached(byIdU);
+      if (stU.lookupFailed && !stU.admin) return sendJson(res, 503, { error: 'could not ask Discord' });
+      if (!stU.admin || stU.banned) {
+        return sendJson(res, 403, { error: 'admins only', message: 'Only an admin can undo a PK.' });
+      }
+      const hit = findDead(o);
+      if (!hit.pid) return sendJson(res, 404, { error: 'no such dead character', message: hit.message });
+      const whyU = String(o.why || (hit.rest || []).join(' ')).trim().slice(0, 500);
+      if (!whyU) {
+        return sendJson(res, 400, { error: 'an undo says why',
+          message: 'Say why: /unpk ' + (String((jsonFile(PK, {})[String(hit.pid)] || {}).name || '') || hit.pid) +
+                   ' made by mistake.' });
+      }
+      const byNameU = String(o.byName || stU.name || '').slice(0, 60);
+      const u = await undoPk(hit.pid, byNameU, byIdU, whyU, from);
+      return sendJson(res, u.status, Object.assign({ profileId: hit.pid, why: whyU }, u.body));
+    }
+    const pid = Number(o.profileId) || 0;
+    if (!(pid > 0) || !(byPid > 0)) return sendJson(res, 400, { error: 'no profile' });
+    const byId = accountOf(byPid);
+    if (!byId) return sendJson(res, 403, { error: 'the staff profile is not linked to a Discord account' });
+    const st = await standingCached(byId);
+    if (st.lookupFailed && !st.admin) return sendJson(res, 503, { error: 'could not ask Discord' });
+    if (!st.dev || st.banned) return sendJson(res, 403, { error: 'that Discord account holds no staff role' });
+    const byName = String(o.byName || st.name || '').slice(0, 60);
+    const name = String(o.name || '').slice(0, 60);
+    const key = recordKey(pid);
+    const account = accountOf(pid);
+    const now = Date.now();
+    const what = staffGame[2];
+
+    if (what === 'ban' || what === 'banaccount') {
+      const why = String(o.why || '').trim().slice(0, 500);
+      if (!why) return sendJson(res, 400, { error: 'a ban says why' });
+      if (what === 'banaccount' && !account) {
+        return sendJson(res, 404, { error: 'no Discord account holds that character, so ban the character' });
+      }
+      const minutes = banMinutes(o.minutes);
+      const until = minutes ? now + minutes * 60000 : 0;
+      const whole = what === 'banaccount';
+      const banKey = whole ? account : 'p:' + pid;
+      if (!putBan(banKey, { at: now, until, why, by: byName, byId, name, profiles: [pid], from,
+                            scope: whole ? 'account' : 'character', account })) {
+        return sendJson(res, 500, { error: 'could not save' });
+      }
+      // Every character the ban covers, so the game server can end each one
+      // that is online now rather than at its next list.
+      const covers = whole
+        ? Array.from(new Set([pid].concat(((jsonFile(LINKED, {})[account] || {}).profiles || [])
+                                            .map(Number).filter((n) => n > 0))))
+        : [pid];
+      return sendJson(res, 200, { ok: true, until, account: whole, profiles: covers });
+    }
+    if (what === 'unban' || what === 'unbanaccount') {
+      if (what === 'unbanaccount' && !account) {
+        return sendJson(res, 404, { error: 'no Discord account holds that character' });
+      }
+      const r = dropBan([what === 'unbanaccount' ? account : 'p:' + pid]);
+      if (!r.ok) return sendJson(res, 500, { error: 'could not save' });
+      const freed = what === 'unbanaccount'
+        ? Array.from(new Set([pid].concat(((jsonFile(LINKED, {})[account] || {}).profiles || [])
+                                            .map(Number).filter((n) => n > 0))))
+        : [pid];
+      return sendJson(res, 200, { ok: true, was: r.was, profiles: freed });
+    }
+    if (what === 'pk') {
+      const why = String(o.why || '').trim().slice(0, 500);
+      if (!why) return sendJson(res, 400, { error: 'a PK says why' });
+      const had = jsonFile(PK, {})[String(pid)];
+      if (pkActive(had)) return sendJson(res, 200, { ok: true, was: true, at: Number(had.at) || 0 });
+      if (!putPk(pid, { at: now, by: byName, byId, why, name, account, from })) {
+        return sendJson(res, 500, { error: 'could not save' });
+      }
+      return sendJson(res, 200, { ok: true, was: false, at: now });
+    }
+    const text = String(o.text || '').trim().slice(0, 1000);
+    if (!text) return sendJson(res, 400, { error: 'a note says something' });
+    if (!putNote(key, { at: now, by: byName, byId, text, profileId: pid, name, from })) {
+      return sendJson(res, 500, { error: 'could not save' });
+    }
     return sendJson(res, 200, { ok: true });
   }
 
@@ -2554,7 +3899,7 @@ async function handle(req, res) {
     if (!cfg.botKey) return sendJson(res, 404, { error: 'not set up' });
     let o;
     try { o = JSON.parse(await body(req, 40000)); }
-    catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+    catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
     if (!sameSecret(String(o.key || ''), String(cfg.botKey))) {
       return sendJson(res, 401, { error: 'no' });
     }
@@ -2575,6 +3920,13 @@ async function handle(req, res) {
     });
     if (!putJson(INBOX, trimInbox(list))) {
       return sendJson(res, 500, { error: 'could not save' });
+    }
+    // An application's answer to the rules question (#428), kept against the
+    // Discord id. The ticket is already saved, so a failure here is logged
+    // rather than handed back as a failed ticket.
+    if (o.rules && !noteRules(RULES_OK, o.discordId, o.rules, o.by, Date.now())) {
+      console.error('[thornswood-docs] could not write down the rules answer for ' +
+                    String(o.discordId || '').replace(/[^0-9]/g, '').slice(0, 20));
     }
     return sendJson(res, 200, { ok: true });
   }
@@ -2924,6 +4276,9 @@ async function handle(req, res) {
       discordId = w.id || '';
     } else {
       const t = readTicket(url.searchParams.get('ticket'));
+      // Signed in, and Discord did not answer in time (#467): say that.
+      if (!t && w.id && w.lookupFailed) return sendJson(res, 503, { ok: false, why: 'could not ask Discord', error:
+        'Thornswood could not ask Discord about your account just now. Try again in a minute.' });
       if (!t) return sendJson(res, 401, { ok: false, why: 'link', error:
         'Sign in to the hub, or send a valid launcher ticket.' });
       const st = await standing(t.d);
@@ -2978,7 +4333,7 @@ async function handle(req, res) {
     const gs = await galleryStaff(url, w);
     if (!gs.ok) return sendJson(res, gs.code, gs.body);
     let o = {};
-    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { passBodyFailure(e); }
     const name = String(o.name || '');
     if (!name) return sendJson(res, 400, { error: 'no name' });
 
@@ -3009,13 +4364,22 @@ async function handle(req, res) {
   // page needs to know whether to show Sign in, Submit, or the staff tools
   // without treating a play-capable signed-in person as signed out the way
   // /api/hello does for the hub.
+  /* Answered inside SUBMIT_WAIT_MS with Discord slow or silent (#1096), like
+     any page load. asked is false when Discord could not be asked and there
+     was no earlier answer to use, so a page says that rather than offering a
+     sign in to somebody who is signed in. personWhy is what the report page
+     shows under "about a person": /api/report's own words (#1097). */
   if (p === '/api/gallery/who' && req.method === 'GET') {
+    const no = personReportRefusal(w);
     return sendJson(res, 200, {
       signed: !!(w.id || w.member),
       canSubmit: !!(w.play || w.member),
       staff: !!w.dev,
       admin: !!w.admin,
-      name: w.name || ''
+      name: w.name || '',
+      asked: !(w.id && w.lookupFailed),
+      personWhy: no ? no.why : '',
+      personSays: no ? no.error : ''
     });
   }
 
@@ -3026,7 +4390,7 @@ async function handle(req, res) {
     const gs = await galleryStaff(url, w);
     if (!gs.ok) return sendJson(res, gs.code, gs.body);
     let o = {};
-    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { passBodyFailure(e); }
     const name = String(o.name || '');
     if (!name) return sendJson(res, 400, { error: 'no name' });
 
@@ -3074,6 +4438,9 @@ async function handle(req, res) {
       discordId = w.id || '';
     } else {
       const t = readTicket(url.searchParams.get('ticket'));
+      // Signed in, and Discord did not answer in time (#467): say that.
+      if (!t && w.id && w.lookupFailed) return sendJson(res, 503, { ok: false, why: 'could not ask Discord', error:
+        'Thornswood could not ask Discord about your account just now. Try again in a minute.' });
       if (!t) return sendJson(res, 401, { ok: false, why: 'link', error:
         'Sign in, or send a valid launcher ticket.' });
       const st = await standing(t.d);
@@ -3091,7 +4458,7 @@ async function handle(req, res) {
     }
 
     let o = {};
-    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { passBodyFailure(e); }
     const name = String(o.name || '');
     if (!name) return sendJson(res, 400, { error: 'no name' });
     const why = String(o.why || '').slice(0, 500);
@@ -3121,7 +4488,7 @@ async function handle(req, res) {
     const gs = await galleryStaff(url, w);
     if (!gs.ok) return sendJson(res, gs.code, gs.body);
     let o = {};
-    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { passBodyFailure(e); }
     const id = String(o.id || '');
     if (!id) return sendJson(res, 400, { error: 'no id' });
     const reports = jsonFile(GREPORTS, []);
@@ -3146,13 +4513,14 @@ async function handle(req, res) {
     role, stops the next launch working, with nothing to remember to do.
   */
   if (p === '/api/play/join' && req.method === 'POST') {
+    const by = Date.now() + PLAY_ANSWER_MS;
     let o = {};
-    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    try { o = JSON.parse(await body(req, 8192, PLAY_BODY_MS)) || {}; } catch (e) { passBodyFailure(e); }
     const t = readTicket(o.ticket);
     if (!t) return sendJson(res, 401, { ok:false, why:'link', message:
       'This copy is not linked to a Discord account yet.' });
 
-    const st = await standing(t.d);
+    const st = await within(standing(t.d), by - Date.now(), () => standingLate(t.d));
     standCache.delete(String(t.d));
     /*
       Could not ask Discord is not the same answer as not in the Discord.
@@ -3175,13 +4543,15 @@ async function handle(req, res) {
     */
     if (st.lookupFailed && !st.admin) return sendJson(res, 503, { ok:false, why:'could not ask Discord', message:
       'Thornswood could not ask Discord about your account just now. Try again in a minute.' });
+    // Banned before the guild (#1010): a staff ban answers from the file and
+    // says nothing about the guild, so asked the other way round a banned
+    // account was told it was not in the Discord.
+    if (st.banned) return sendJson(res, 403, { ok:false, why:'banned', message: accountBanned(st) });
     if (!st.inGuild) return sendJson(res, 403, { ok:false, why:'guild', message:
       'That Discord account is not in the Thornswood Discord.',
       invite: cfg.discord.invite || '' });
-    if (st.banned) return sendJson(res, 403, { ok:false, why:'banned', message:
-      'That Discord account is banned from Thornswood.' });
     if (!st.play) return sendJson(res, 403, { ok:false, why:'role', message:
-      'That Discord account has no role that lets it in yet.',
+      notAcceptedYet(),
       invite: cfg.discord.invite || '' });
     // The dev build checks in as channel dev. It is for the roles in
     // access.dev (the staff roles by default, Patrick 27 Sep #605, unless
@@ -3190,6 +4560,14 @@ async function handle(req, res) {
     const wantsDev = String(o.channel || '') === 'dev';
     if (wantsDev && !st.dev) return sendJson(res, 403, { ok:false, why:'dev', dev: false, message:
       'The dev build is for the ' + andList(cfg.access.dev) + ' roles. Play on the main build.' });
+    /*
+      The world is full (#481). Not a no any more: Patrick, 29 Sep, a full
+      world lets people into the game's menu to wait in line. The yes below
+      carries wait and a sentence saying so, and the launcher logs it on the
+      Play page. A Discord staff role is not told: the gamemode gives them a
+      staff seat ahead of the line. The dev build is staff only.
+    */
+    const wait = !wantsDev && seatsFull(gameStatus) && !st.staffRole;
 
     // The launcher sends the profile id it is about to play as. The game
     // server never sees a Discord account, only this number, so this is the
@@ -3200,7 +4578,7 @@ async function handle(req, res) {
     // Which accounts holding this id have left the Discord, asked off a copy
     // of the file before the one written back is read. Nothing may wait
     // between that read and putJson below; departed() says why.
-    const left = await departed(jsonFile(LINKED, {}), pid, t.d);
+    const left = await departed(jsonFile(LINKED, {}), pid, t.d, by);
     const linked = jsonFile(LINKED, {});
     const was = linked[t.d] || {};
     const profiles = Array.isArray(was.profiles) ? was.profiles.slice() : [];
@@ -3334,7 +4712,13 @@ async function handle(req, res) {
       // Whether the profile id sent is now against this account. False when
       // none was sent, and when another account already holds it, in which
       // case it was left off this one and the door still said yes.
-      claimed: claimed
+      claimed: claimed,
+      // The world is full: in, but there may be a wait at the menu (#481).
+      wait: wait,
+      message: wait ? worldFull(gameStatus.max || mostOnlineFallback()) : '',
+      online: gameStatus.online,
+      max: gameStatus.max || mostOnlineFallback(),
+      line: gameStatus.line
     });
   }
 
@@ -3355,7 +4739,7 @@ async function handle(req, res) {
   if ((p === '/api/play/start' || p === '/api/play/end') && req.method === 'POST') {
     const ending = (p === '/api/play/end');
     let o = {};
-    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { passBodyFailure(e); }
     const t = readTicket(o.ticket);
     if (!t) return sendJson(res, 401, { ok: false, why: 'link' });
     const key = sessionKey(o.session);
@@ -3448,7 +4832,7 @@ async function handle(req, res) {
   */
   if (p === '/api/play/logs' && req.method === 'POST') {
     let o = {};
-    try { o = JSON.parse(await body(req, SLOG_ALL + 64 * 1024)) || {}; } catch (e) { }
+    try { o = JSON.parse(await body(req, SLOG_ALL + 64 * 1024)) || {}; } catch (e) { passBodyFailure(e); }
     const t = readTicket(o.ticket);
     if (!t) return sendJson(res, 401, { ok: false, why: 'link' });
     const key = sessionKey(o.session);
@@ -3494,23 +4878,19 @@ async function handle(req, res) {
       if (issues.length) rows[at].issues = issues;
       if (checks.length) rows[at].checks = checks;
 
-      const found = readTrouble(logs);
-      if (found) {
-        rows[at].trouble = found.why;
-        rows[at].troubleAt = found.level;     /* 'bad' is red, 'warn' is yellow */
-        rows[at].troubleFile = found.file;
-        rows[at].troubleLine = found.line;
-      } else if (issues.length || checks.length) {
-        /* No crash, but the launcher was unhappy. Yellow, and never a message
-           in Discord: these are common, understood, and have a known fix. */
-        const blocking = issues.filter(i => i.blocking).length;
-        rows[at].trouble = blocking
-          ? (blocking + ' thing(s) would have stopped them connecting')
-          : (issues.length + checks.length) + ' thing(s) the launcher was unhappy about';
-        rows[at].troubleAt = 'warn';
-      }
+      /* The server's half of this session, the same window the View more
+         button reads, for what the server said about this person's load
+         order (#945). */
+      const row = rows[at];
+      const from = (Number(row.start) || Number(row.end) || 0) - 60000;
+      const to = (Number(row.end) || Date.now()) + 60000;
+      const server = serverLogSlice(row.channel, from, to);
 
-      if (rows[at].trouble) putSessions(rows);
+      const found = readTrouble(logs, server.lines, row.profile);
+      applyTrouble(row, found);
+      row.troubleRules = TROUBLE_RULES;
+
+      putSessions(rows);
       /* Only a crash is worth saying out loud. */
       if (found && found.level === 'bad') noteTrouble(rows[at], found);
     } catch (e) { }
@@ -3532,14 +4912,25 @@ async function handle(req, res) {
     characters.json off the resource port, which has been a 404 since the
     file moved into the private folder on the 18th.
   */
-  if (p === '/api/roster' && req.method === 'POST') {
+  // The dev server's door.json names the site as https://thornswood.net/dev,
+  // so its roster lands on /dev/api/roster (#955). Until that route was here
+  // the dev server's pushes had no door to come in by.
+  if ((route === '/api/roster' || route === '/dev/api/roster') && req.method === 'POST') {
     if (!cfg.botKey) return sendJson(res, 404, { error: 'not set up' });
     let o = {};
-    try { o = JSON.parse(await body(req, 4 * 1024 * 1024)) || {}; } catch (e) { }
+    try { o = JSON.parse(await body(req, 4 * 1024 * 1024)) || {}; } catch (e) { passBodyFailure(e); }
     if (!sameSecret(String(o.key || ''), String(cfg.botKey))) return sendJson(res, 401, { error: 'no' });
     const who = (o.who && typeof o.who === 'object') ? o.who : {};
     const store = jsonFile(ROSTER, { who: {} });
     if (!store.who || typeof store.who !== 'object') store.who = {};
+    // Which of the profiles it looked at that server holds a character for,
+    // kept per server (#955). /api/play/roster reads it back as "gone".
+    if (Array.isArray(o.checked) && Array.isArray(o.held)) {
+      const srv = (String(o.server || '') === 'dev' || route.indexOf('/dev/') === 0) ? 'dev' : 'main';
+      const ints = (a) => a.map(Number).filter((x) => x > 0 && Number.isInteger(x)).slice(0, 100000);
+      if (!store.servers || typeof store.servers !== 'object') store.servers = {};
+      store.servers[srv] = { at: Date.now(), checked: ints(o.checked), held: ints(o.held) };
+    }
     let n = 0;
     for (const pid of Object.keys(who)) {
       if (!/^\d+$/.test(pid)) continue;
@@ -3560,7 +4951,7 @@ async function handle(req, res) {
 
   if (p === '/api/play/roster' && req.method === 'POST') {
     let o = {};
-    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { passBodyFailure(e); }
     const t = readTicket(o.ticket);
     if (!t) return sendJson(res, 401, { ok: false, why: 'link' });
     const linked = jsonFile(LINKED, {});
@@ -3571,7 +4962,36 @@ async function handle(req, res) {
       const row = store.who && store.who[String(pid)];
       if (row) rows[String(pid)] = row;
     }
-    return sendJson(res, 200, { ok: true, rows });
+    /* This account's characters that the asking launcher's server looked up
+       and does not hold (#955), from its last report if that is recent. The
+       launcher marks them on the menu; it trusts the answer only for a
+       character last played before goneAt. */
+    const srv = String(o.channel || '') === 'dev' ? 'dev' : 'main';
+    const rep = store.servers && store.servers[srv];
+    let gone = [], goneAt = 0;
+    if (rep && Array.isArray(rep.checked) && Array.isArray(rep.held) &&
+        Date.now() - (Number(rep.at) || 0) < ROSTER_HELD_FRESH_MS) {
+      const looked = new Set(rep.checked.map(Number));
+      const held = new Set(rep.held.map(Number));
+      gone = mine.filter((pid) => looked.has(pid) && !held.has(pid));
+      goneAt = Number(rep.at) || 0;
+    }
+    /* This account's characters staff have killed for good, and the ones
+       under a ban of their own (#1010). The launcher's menu shows a dead one
+       in no slot, so the account can make a new character, and neither can
+       be picked. Only the ids: why and who are staff's. */
+    const now = Date.now();
+    const pk = [], barred = [];
+    for (const pid of mine) {
+      const bar = characterBar(pid, now);
+      if (bar && bar.pk) pk.push(pid);
+      else if (bar) barred.push(pid);
+    }
+    /* And the ones an admin brought back from a PK (#1010), so the launcher
+       puts a character it had moved out of its slots back into a free one. */
+    const pkRows = jsonFile(PK, {}) || {};
+    const revived = mine.filter((pid) => pkRows[String(pid)] && !pkActive(pkRows[String(pid)]));
+    return sendJson(res, 200, { ok: true, rows, gone, goneAt, pk, banned: barred, revived });
   }
 
   /*
@@ -3615,18 +5035,25 @@ async function handle(req, res) {
                   'September. The address form goes once no door says this.');
     }
     const linked = jsonFile(LINKED, {});
-    const out = { profiles: [], devProfiles: [], adminProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', failedProfiles: [], at: Date.now() };
+    const out = { profiles: [], devProfiles: [], adminProfiles: [], jarlProfiles: [], staffRoleProfiles: [], businessOwnerProfiles: [], factionOwnerProfiles: [], devRoleProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', failedProfiles: [], at: Date.now() };
     const seen = new Set();
     const seenDev = new Set();
     const seenAdmin = new Set();
+    const seenJarl = new Set();
+    const seenStaffRole = new Set();
+    const seenBusiness = new Set();
+    const seenFaction = new Set();
+    const seenDevRole = new Set();
     const seenFailed = new Set();
+    const hasProfiles = (d) => (Array.isArray((linked[d] || {}).profiles) ? linked[d].profiles : [])
+      .map(Number).some((n) => n > 0);
+    const answers = await standingsForDoor(Object.keys(linked).filter(hasProfiles));
     for (const d of Object.keys(linked)) {
       const row = linked[d] || {};
       const profiles = (Array.isArray(row.profiles) ? row.profiles : [])
         .map(Number).filter((n) => n > 0);
       if (!profiles.length) continue;
-      let st;
-      try { st = await standingCached(String(d)); } catch (e) { st = { lookupFailed: String(e) }; }
+      const st = answers.get(d) || { lookupFailed: 'not asked' };
       if (st.lookupFailed) {
         /* WHY, NOT JUST THAT. This reduced a specific reason to a boolean, so
            the game server could only ever say "the site could not reach
@@ -3660,7 +5087,46 @@ async function handle(req, res) {
       if (st.admin) {
         for (const n of profiles) if (!seenAdmin.has(n)) { seenAdmin.add(n); out.adminProfiles.push(n); }
       }
+      if (st.jarl) {
+        for (const n of profiles) if (!seenJarl.has(n)) { seenJarl.add(n); out.jarlProfiles.push(n); }
+      }
+      // A Discord staff role itself, not the hand written admins list, for
+      // the staff seats over the most the world holds (#481).
+      if (st.staffRole) {
+        for (const n of profiles) if (!seenStaffRole.has(n)) { seenStaffRole.add(n); out.staffRoleProfiles.push(n); }
+      }
+      if (st.businessOwner) {
+        for (const n of profiles) if (!seenBusiness.has(n)) { seenBusiness.add(n); out.businessOwnerProfiles.push(n); }
+      }
+      if (st.factionOwner) {
+        for (const n of profiles) if (!seenFaction.has(n)) { seenFaction.add(n); out.factionOwnerProfiles.push(n); }
+      }
+      if (st.devRole) {
+        for (const n of profiles) if (!seenDevRole.has(n)) { seenDevRole.add(n); out.devRoleProfiles.push(n); }
+      }
       out.people.push({ id: String(d), name: st.name || row.name || '', profiles });
+    }
+    /* STAFF BANS (#412), which are this site's own file and need no Discord.
+       Every profile under an active ban is left out of every list, including
+       a profile no account holds and one Discord could not be asked about,
+       and the bans go to the door with why and until, so the game server can
+       end the session of anybody banned who is online and tell them both. */
+    out.bans = activeBans(Date.now());
+    /* And every character staff have killed for good (#1010), left out the
+       same way and sent as pk, so the game server ends it quietly if it is
+       in the world. */
+    out.pk = pkProfiles();
+    const barred = new Set(out.pk);
+    for (const b of out.bans) for (const n of b.profiles) barred.add(Number(n));
+    if (barred.size) {
+      for (const k of ['profiles', 'devProfiles', 'adminProfiles', 'jarlProfiles', 'staffRoleProfiles', 'failedProfiles']) {
+        out[k] = out[k].filter((n) => !barred.has(Number(n)));
+      }
+      for (const k of ['businessOwnerProfiles', 'factionOwnerProfiles', 'devRoleProfiles']) {
+        out[k] = out[k].filter((n) => !barred.has(Number(n)));
+      }
+      out.people = out.people.map((p) => Object.assign({}, p, { profiles: p.profiles.filter((n) => !barred.has(Number(n))) }))
+        .filter((p) => p.profiles.length);
     }
     return sendJson(res, 200, out);
   }
@@ -3691,7 +5157,7 @@ async function handle(req, res) {
   */
   if (p === '/api/play/owns' && req.method === 'POST') {
     let o = {};
-    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { passBodyFailure(e); }
     const t = readTicket(o.ticket);
     if (!t) return sendJson(res, 200, { ok: false, why: 'ticket' });
     const pid = Number(o.profileId) || 0;
@@ -3741,11 +5207,108 @@ async function handle(req, res) {
     return sendJson(res, 200, { ok: true, why: 'unclaimed' });
   }
 
+  /*
+    A join pass for one character (#937; the format is over makePass).
+
+    The launcher asks when a character is picked at the game's menu and again
+    every four minutes while the game runs. Every no names what to do, because
+    the launcher shows the message as it stands.
+
+    REFUSED, NOT GUESSED, whenever this cannot be sure: no key, a feed it cannot
+    read, a launcher version that is not a version, or Discord not answering
+    (the hand written admin list aside, as at /api/play/join). A refusal here
+    means that session is ended by the game server, which is the point.
+
+    THE VERSION IS THE LAUNCHER'S OWN WORD, checked against the channel's feed
+    both ways: below minLauncher is an old launcher and is told to update, and
+    above launcherVersion is a number Thornswood never published. So an old
+    launcher cannot get in, and neither can a request that simply claims to be a
+    new one. A person who writes their own request with their own ticket gets a
+    pass only for their own characters, which is all the game server lets it
+    prove.
+
+    WHOSE CHARACTER, the rule /api/play/owns keeps: the caller's own, one that
+    nobody holds yet (the launcher checks every id in at Play), or one held only
+    by an account that has left the Discord. Somebody else's is refused.
+  */
+  if (p === '/api/play/pass' && req.method === 'POST') {
+    const by = Date.now() + PLAY_ANSWER_MS;
+    let o = {};
+    try { o = JSON.parse(await body(req, 8192, PLAY_BODY_MS)) || {}; } catch (e) { passBodyFailure(e); }
+    const t = readTicket(o.ticket);
+    if (!t) return sendJson(res, 401, { ok: false, why: 'link', message:
+      'This copy is not linked to a Discord account yet.' });
+    const pid = Number(o.profileId) || 0;
+    if (!(pid > 0) || Math.floor(pid) !== pid) return sendJson(res, 400, { ok: false, why: 'profile', message:
+      'No character was named.' });
+    const server = String(o.channel || '') === 'dev' ? 'dev' : 'main';
+    if (!cfg.passKey) return sendJson(res, 503, { ok: false, why: 'no key', message:
+      'Thornswood cannot let anybody into the game right now. Tell Patrick.' });
+
+    const feed = feedLaunchers(server);
+    if (!feed) return sendJson(res, 503, { ok: false, why: 'feed', message:
+      'Thornswood could not read its own update feed just now. Try again in a minute.' });
+    const said = String(o.version == null ? '' : o.version).trim().slice(0, 40);
+    const have = versionParts(said);
+    if (!have || versionCompare(have, versionParts(feed.min)) < 0) {
+      return sendJson(res, 403, { ok: false, why: 'update', need: feed.min, message:
+        'This launcher is ' + (said || 'too old to say') + ' and Thornswood needs ' + feed.min +
+        ' or newer. Update the launcher, then press Play again.' });
+    }
+    if (versionCompare(have, versionParts(feed.current)) > 0) {
+      return sendJson(res, 403, { ok: false, why: 'unknown launcher', need: feed.current, message:
+        'This launcher says it is ' + said + ', which Thornswood never published. ' +
+        'Install the launcher from thornswood.net, then press Play again.' });
+    }
+
+    const st = await within(standingCached(t.d), by - Date.now(), () => standingLate(t.d));
+    if (st.lookupFailed && !st.admin) return sendJson(res, 503, { ok: false, why: 'could not ask Discord', message:
+      'Thornswood could not ask Discord about your account just now. Try again in a minute.' });
+    // Banned before the guild, as at /api/play/join (#1010).
+    if (st.banned) return sendJson(res, 403, { ok: false, why: 'banned', message: accountBanned(st) });
+    if (!st.inGuild) return sendJson(res, 403, { ok: false, why: 'guild', message:
+      'That Discord account is not in the Thornswood Discord.' });
+    if (!st.play) return sendJson(res, 403, { ok: false, why: 'role', message:
+      notAcceptedYet() });
+    if (server === 'dev' && !st.dev) return sendJson(res, 403, { ok: false, why: 'dev', message:
+      'The dev build is for the ' + andList(cfg.access.dev) + ' roles. Play on the main build.' });
+
+    const linked = jsonFile(LINKED, {});
+    const mine = (linked[t.d] && Array.isArray(linked[t.d].profiles))
+      ? linked[t.d].profiles.map(Number) : [];
+    if (mine.indexOf(pid) < 0) {
+      const left = await departed(linked, pid, t.d, by);
+      for (const d of Object.keys(linked)) {
+        if (String(d) === String(t.d)) continue;
+        const theirs = (linked[d] && Array.isArray(linked[d].profiles))
+          ? linked[d].profiles.map(Number) : [];
+        if (theirs.indexOf(pid) < 0 || left.has(String(d))) continue;
+        console.log('[thornswood-docs] no join pass for profile ' + pid + ' to Discord ' + t.d +
+                    ': it is held by Discord ' + d);
+        return sendJson(res, 403, { ok: false, why: 'somebody else', message:
+          'That character belongs to another Discord account.' });
+      }
+    }
+
+    const now = Date.now();
+    /* This one character (#1010): killed for good by staff, or banned by
+       itself. The account is fine, so the answer says to pick another. */
+    const bar = characterBar(pid, now);
+    if (bar && bar.pk) return sendJson(res, 403, { ok: false, why: 'pk', message:
+      'That character has died for good and cannot be played again. ' +
+      'Pick another character at the menu, or make a new one.' });
+    if (bar) return sendJson(res, 403, { ok: false, why: 'banned character', until: bar.until, message:
+      'Staff have banned that character ' + banUntilText(bar.until) +
+      (bar.why ? ': ' + bar.why : '') + '. Pick another character at the menu.' });
+    const pass = makePass(cfg.passKey, { p: pid, s: server, v: said, d: String(t.d), i: now, x: now + PASS_MS });
+    return sendJson(res, 200, { ok: true, pass: pass, until: now + PASS_MS, server: server });
+  }
+
   // The same question without asking for the password, for the launcher to
   // show who it is linked as without pretending it is about to connect.
   if (p === '/api/play/who' && req.method === 'POST') {
     let o = {};
-    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { }
+    try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { passBodyFailure(e); }
     const t = readTicket(o.ticket);
     if (!t) return sendJson(res, 401, { ok:false, why:'link' });
     const st = await standingCached(t.d);
@@ -3780,7 +5343,13 @@ async function handle(req, res) {
         uploads: w.member ? listUploads() : [],
         news: jsonFile(NEWS, { launcher:'', news: [] }),
         invite: cfg.discord.invite || '',
-        linked: w.admin ? Object.values(jsonFile(LINKED, {})) : [],
+        // The Linked accounts page is every staff role's since #1010 (Patrick,
+        // 28 September: all staff can ban and PK, and the site's staff pages
+        // can do it), so the accounts and the records go to staff (w.dev,
+        // which folds admin in). Notes, bans and PKs are staff's to read and
+        // nobody else's: a hub member without a staff role gets none.
+        linked: w.dev ? Object.values(jsonFile(LINKED, {})) : [],
+        records: w.dev ? staffRecords(Date.now()) : { bans: {}, notes: {}, pk: {}, names: {} },
         sessions: w.admin ? sessionRows() : [],
         inbox: w.admin ? jsonFile(INBOX, []) : []
       });
@@ -3792,8 +5361,127 @@ async function handle(req, res) {
       if (!w.member) return sendJson(res, 403, { error: 'hub members only' });
       let obj;
       try { obj = JSON.parse(await body(req)); }
-      catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+      catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
       if (!putJson(RESULTS, obj)) return sendJson(res, 500, { error: 'could not save' });
+      return sendJson(res, 200, { ok: true });
+    }
+
+    /*
+      Bans and notes from the hub (#412), for staff (the access.dev roles).
+      Keyed by Discord id, the rows the Linked accounts page lists. Staff only
+      to read, because a note is staff's view of a person. What is done here
+      goes to moderation.log for the bot to say in the staff channel; the
+      game's /ban and /note are said from the game server's own log.
+    */
+    if (p === '/api/staff/records' && req.method === 'GET') {
+      if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+      return sendJson(res, 200, staffRecords(Date.now()));
+    }
+
+    /*
+      Which commit each part on this box runs (#459), for staff (#1359).
+
+      It sat above with /api/public, open to anybody, because a commit, a zip
+      name and a hash were read as telling a stranger nothing. They tell a
+      stranger plenty: the commit says which source is live to the hour, and
+      the stamp says when each part last went out, which is what somebody
+      looking for a way in reads first. Nothing in the repo fetches it and no
+      page draws it, so the only caller is a person asking what is deployed.
+      That person signs in.
+
+      The same gate as the other staff doors, so widening access.dev widens
+      this with them: the block above answers 401 'sign in first' to anybody
+      with neither cookie, and a hub member who is not staff gets the 403
+      'staff only' every staff door sends. No record is read before the
+      refusal, so nothing leaks in the body or the timing.
+    */
+    if (p === '/api/deploys' && req.method === 'GET') {
+      if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+      return sendJson(res, 200, { parts: readDeploys(DEPLOYS_DIR) });
+    }
+
+    /*
+      One character or the whole account (#1010). With a profileId (one of
+      this account's characters) ban and unban are that character alone and
+      pk kills it for good; without one, ban and unban are the account, every
+      character on it and any new one. Staff may do these to staff, but not
+      to their own account: a ban would lock them out of the page that lifts
+      it.
+    */
+    const staffHub = /^\/api\/staff\/(ban|unban|note|pk|unpk)$/.exec(p);
+    if (staffHub && req.method === 'POST') {
+      if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+      // Undoing a PK is the admin role's alone (Patrick, 29 September).
+      if (staffHub[1] === 'unpk' && !w.admin) {
+        return sendJson(res, 403, { error: 'admins only', message: 'Only an admin can undo a PK.' });
+      }
+      let o;
+      try { o = JSON.parse(await body(req, 8000)) || {}; }
+      catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
+      const id = String(o.id || '').trim();
+      const linked = jsonFile(LINKED, {});
+      if (!/^\d{5,25}$/.test(id) || !linked[id]) return sendJson(res, 404, { error: 'nobody linked with that id' });
+      const whoName = String(linked[id].name || linked[id].handle || '').slice(0, 60);
+      const profiles = (Array.isArray(linked[id].profiles) ? linked[id].profiles : []).map(Number).filter((n) => n > 0);
+      const now = Date.now();
+      const act = staffHub[1];
+      const pid = Number(o.profileId) || 0;
+      if (pid && profiles.indexOf(pid) < 0) return sendJson(res, 404, { error: 'that character is not on this account' });
+      if ((act === 'pk' || act === 'unpk') && !pid) return sendJson(res, 400, { error: 'a PK names the character' });
+      if ((act === 'ban' || act === 'pk') && String(w.id) === id) {
+        return sendJson(res, 400, { error: 'that is your own account' });
+      }
+      const charName = pid ? String(((jsonFile(ROSTER, { who: {} }).who || {})[String(pid)] || {}).name || '').slice(0, 60) : '';
+      const whoChar = pid ? (charName ? charName + ' (' + whoName + ')' : whoName) : whoName;
+      if (act === 'ban') {
+        const why = String(o.why || '').trim().slice(0, 500);
+        if (!why) return sendJson(res, 400, { error: 'a ban says why' });
+        const minutes = banMinutes(o.minutes);
+        const until = minutes ? now + minutes * 60000 : 0;
+        const row = { at: now, until, why, by: w.name, byId: w.id, from: 'the hub', account: id };
+        const ok = pid
+          ? putBan('p:' + pid, Object.assign(row, { name: charName || whoName, profiles: [pid], scope: 'character' }))
+          : putBan(id, Object.assign(row, { name: whoName, profiles, scope: 'account' }));
+        if (!ok) return sendJson(res, 500, { error: 'could not save' });
+        const said = banUntilText(until) + ': ' + why;
+        if (pid) modLog({ did: 'ban', byName: w.name, whoName: whoChar, who: pid, why: said });
+        else modLog({ did: 'banaccount', byName: w.name, whoName: whoChar, why: said });
+        return sendJson(res, 200, { ok: true, until, account: !pid });
+      }
+      if (act === 'unban') {
+        const r = dropBan([pid ? 'p:' + pid : id]);
+        if (!r.ok) return sendJson(res, 500, { error: 'could not save' });
+        if (r.was && pid) modLog({ did: 'unban', byName: w.name, whoName: whoChar, who: pid });
+        else if (r.was) modLog({ did: 'unbanaccount', byName: w.name, whoName: whoChar });
+        return sendJson(res, 200, { ok: true, was: r.was });
+      }
+      if (act === 'pk') {
+        const why = String(o.why || '').trim().slice(0, 500);
+        if (!why) return sendJson(res, 400, { error: 'a PK says why' });
+        const had = jsonFile(PK, {})[String(pid)];
+        if (pkActive(had)) return sendJson(res, 200, { ok: true, was: true, at: Number(had.at) || 0 });
+        if (!putPk(pid, { at: now, by: w.name, byId: w.id, why, name: charName, account: id, from: 'the hub' })) {
+          return sendJson(res, 500, { error: 'could not save' });
+        }
+        modLog({ did: 'pk', byName: w.name, whoName: whoChar, who: pid, why });
+        return sendJson(res, 200, { ok: true, was: false, at: now });
+      }
+      if (act === 'unpk') {
+        const why = String(o.why || '').trim().slice(0, 500);
+        if (!why) return sendJson(res, 400, { error: 'an undo says why', message: 'Say why the PK is undone.' });
+        const u = await undoPk(pid, w.name, w.id, why, 'the hub');
+        if (u.body.ok && u.body.was) {
+          const deadName = String(u.body.name || '') || charName;
+          modLog({ did: 'unpk', byName: w.name, whoName: deadName ? deadName + ' (' + whoName + ')' : whoName, who: pid, why });
+        }
+        return sendJson(res, u.status, u.body);
+      }
+      const text = String(o.text || '').trim().slice(0, 1000);
+      if (!text) return sendJson(res, 400, { error: 'a note says something' });
+      if (!putNote(id, { at: now, by: w.name, byId: w.id, text, profileId: 0, name: whoName, from: 'the hub' })) {
+        return sendJson(res, 500, { error: 'could not save' });
+      }
+      modLog({ did: 'note', byName: w.name, whoName, why: text });
       return sendJson(res, 200, { ok: true });
     }
 
@@ -3810,7 +5498,7 @@ async function handle(req, res) {
     if (mb && req.method === 'PUT') {
       let obj;
       try { obj = JSON.parse(await body(req)); }
-      catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+      catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
       if (!writeBoardOne(mb[1], obj)) return sendJson(res, 400, { error: 'no such board' });
       return sendJson(res, 200, { ok: true });
     }
@@ -3898,7 +5586,7 @@ async function handle(req, res) {
     if (p === '/api/session-keep' && req.method === 'PUT') {
       let obj;
       try { obj = JSON.parse(await body(req)); }
-      catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+      catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
       const key = sessionKey(obj && obj.session);
       const rows = sessionRows();
       const at = key ? findSession(rows, key, obj.who) : -1;
@@ -3920,7 +5608,7 @@ async function handle(req, res) {
     if (p === '/api/session-note' && req.method === 'PUT') {
       let obj;
       try { obj = JSON.parse(await body(req)); }
-      catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+      catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
       const key = sessionKey(obj && obj.session);
       const rows = sessionRows();
       const at = key ? findSession(rows, key, obj.who) : -1;
@@ -3935,7 +5623,7 @@ async function handle(req, res) {
     if (p === '/api/inbox' && req.method === 'PUT') {
       let obj;
       try { obj = JSON.parse(await body(req)); }
-      catch (e) { return sendJson(res, 400, { error: 'bad json' }); }
+      catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
       if (!putJson(INBOX, obj)) return sendJson(res, 500, { error: 'could not save' });
       return sendJson(res, 200, { ok: true });
     }
@@ -3967,6 +5655,7 @@ http.createServer((req, res) => {
   console.log('[thornswood-docs] writing this to ' + siteLog.file +
               ', rolled at 4 MB, five kept');
   console.log('[thornswood-docs] documents in ' + DATA);
+  rereadTrouble();
   console.log('[thornswood-docs] downloads in ' + FILES);
   console.log('[thornswood-docs] uploads in ' + UP);
   console.log('[thornswood-docs] watching the game on 127.0.0.1:' +

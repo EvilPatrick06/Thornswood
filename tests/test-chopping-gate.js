@@ -41,10 +41,10 @@
 // chopWood never ran: no Woodwright was paid and nobody was refused.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
-const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
+const SRC = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -169,6 +169,7 @@ function server() {
   const said = [];          // say
   const given = [];         // addItem
   const reads = [];         // mp.get keys
+  const kicks = [];         // swingEnd (#842 refuse kick)
   const G = {};
 
   function branch(name, answer) {
@@ -193,7 +194,7 @@ function server() {
     'kindIsContainer', 'mineSalt', 'burnCharcoal', 'SHRINES', 'bless',
     'isCrop', 'farmActivate', 'isFish', 'fish', 'isGame', 'game',
     'isPlant', 'harvest', 'putBack', 'isVein', 'mineOre',
-    'isCarcass', 'HUNTS_BY_BASE', 'classGate'
+    'isCarcass', 'HUNTS_BY_BASE', 'classGate', 'swingEnd'
   ];
   const body = allowM[0] + '\n' + halfGate + '\n' + gateHalf + '\n' + benchGate + '\n' +
     loot + '\n' + chopping + '\n' +
@@ -235,14 +236,15 @@ function server() {
     branch('isGame', false), branch('game', 'GAME'),
     branch('isPlant', false), branch('harvest', 'PLANT'), branch('putBack', undefined),
     branch('isVein', false), branch('mineOre', 'VEIN'),
-    branch('isCarcass', false), {}, branch('classGate', null)
+    branch('isCarcass', false), {}, branch('classGate', null),
+    function (id) { kicks.push(id); }
   );
 
   return {
-    api: api, clock: clock, trail: trail, told: told, said: said, given: given, reads: reads,
+    api: api, clock: clock, trail: trail, told: told, said: said, given: given, reads: reads, kicks: kicks,
     /* One press, and everything it did, as a record two presses can be compared by. */
     press: function (who, refrId) {
-      trail.length = 0; told.length = 0; said.length = 0; given.length = 0; reads.length = 0;
+      trail.length = 0; told.length = 0; said.length = 0; given.length = 0; reads.length = 0; kicks.length = 0;
       const actor = ACTOR[who];
       const ret = api.press(refrId, actor);
       return {
@@ -253,7 +255,9 @@ function server() {
         other: given.filter(function (g) { return g.desc !== ITEMS.firewood; }).length,
         session: !!api.CHOP_AT[actor] && api.CHOP_AT[actor].refrId === refrId,
         axeAsked: trail.indexOf('toolGate:woodworker') >= 0,
-        fellThrough: reads.indexOf('type') >= 0
+        fellThrough: reads.indexOf('type') >= 0,
+        kicked: kicks.indexOf(actor) >= 0,
+        kickCount: kicks.length
       };
     }
   };
@@ -264,8 +268,9 @@ function same(a, b) {
   return JSON.stringify(x) === JSON.stringify(y);
 }
 function show(r) {
-  return r.ret + ', firewood ' + r.firewood + (r.told.length ? ', told "' + r.told.join(' / ') + '"' : '') +
-    (r.fellThrough ? ', fell through to loot' : '');
+  return r.ret + ', firewood ' + r.firewood +
+    (r.told && r.told[0] ? ', told "' + r.told[0] + '"' : '') +
+    (r.kicked ? ', kicked' : ', no-kick');
 }
 
 if (chopping && handler && loot && benchGate && halfGate && gateHalf && allowM && noProfM &&
@@ -278,7 +283,7 @@ if (chopping && handler && loot && benchGate && halfGate && gateHalf && allowM &
     const common = s.press('wright', 0x000b3949);
     yes('G1 a Woodwright at the common block is paid and the press goes on (' + show(common) + ')',
         common.ret === 'let through' && common.firewood === 2 && common.told.length === 0 &&
-        common.session && common.axeAsked && !common.fellThrough);
+        common.session && common.axeAsked && !common.fellThrough && !common.kicked);
     ASH_REFS.forEach(function (ref) {
       const s2 = server();
       const ash = s2.press('wright', ref);
@@ -289,14 +294,15 @@ if (chopping && handler && loot && benchGate && halfGate && gateHalf && allowM &
 
   // G2: SOMEBODY WHO IS NOT A WOODWORKER. Refused at the common block with
   // the Woodwright line, before the axe is asked about, nothing handed over,
-  // and the press blocked so Skyrim does not sit them down. The same at ash.
+  // the press blocked, and swingEnd kicked so the local axe loop stops (#842).
+  // The same at ash.
   {
     const s = server();
     const common = s.press('smith', 0x000b3949);
     yes('G2 a Smith at the common block is refused with the Woodwright line (' + show(common) + ')',
         common.ret === 'blocked' && common.firewood === 0 && common.other === 0 &&
         common.told.length === 1 && /only a woodworker who took Woodwright/i.test(common.told[0]) &&
-        !common.session && !common.axeAsked);
+        !common.session && !common.axeAsked && common.kicked);
     ASH_REFS.forEach(function (ref) {
       const s2 = server();
       const ash = s2.press('smith', ref);
@@ -311,13 +317,13 @@ if (chopping && handler && loot && benchGate && halfGate && gateHalf && allowM &
     const c3 = server().press('fresh', 0x000b3949);
     const a3 = server().press('fresh', ASH_REFS[0]);
     yes('G3 no profession: told to press K at the common block (' + show(c3) + ')',
-        c3.ret === 'blocked' && c3.firewood === 0 && c3.told[0] === noProfM[1]);
+        c3.ret === 'blocked' && c3.firewood === 0 && c3.told[0] === noProfM[1] && c3.kicked);
     yes('G3 and exactly the same at the ash block (' + show(a3) + ')', same(a3, c3));
 
     const c4 = server().press('bare', 0x000b3949);
     const a4 = server().press('bare', ASH_REFS[0]);
     yes('G4 no axe: refused for the tool at the common block (' + show(c4) + ')',
-        c4.ret === 'blocked' && c4.firewood === 0 && /^You need a /.test(c4.told[0] || ''));
+        c4.ret === 'blocked' && c4.firewood === 0 && /^You need a /.test(c4.told[0] || '') && c4.kicked);
     yes('G4 and exactly the same at the ash block (' + show(a4) + ')', same(a4, c4));
   }
 
@@ -358,7 +364,34 @@ if (chopping && handler && loot && benchGate && halfGate && gateHalf && allowM &
         ASH_REFS.every(function (ref) { return s.api.blockIsOff(ref) === null; }));
     const off = s.press('wright', 0x000abf83);
     yes('G6 the Dragon Bridge block is still nobody\'s (' + show(off) + ')',
-        off.ret === 'blocked' && off.firewood === 0 && /^Nobody works this block/.test(off.told[0] || ''));
+        off.ret === 'blocked' && off.firewood === 0 && /^Nobody works this block/.test(off.told[0] || '') && off.kicked);
+  }
+}
+
+
+// G7: THE SOURCE SAYS THE KICK. chopWood must call swingEnd on every refuse
+// path (#842), and must not call it on a paid press.
+{
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
+  const fn = cut('function chopWood(actorId, refrId, fromSwing) {', '\n}\n') ||
+             (function () {
+               const a = src.indexOf('function chopWood(actorId, refrId, fromSwing)');
+               if (a < 0) return null;
+               let depth = 0, started = false;
+               for (let i = a; i < src.length; i++) {
+                 if (src[i] === '{') { depth++; started = true; }
+                 else if (src[i] === '}') {
+                   depth--;
+                   if (started && depth === 0) return src.slice(a, i + 1);
+                 }
+               }
+               return null;
+             })();
+  yes('G7 chopWood is still in the gamemode', !!fn);
+  if (fn) {
+    const ends = (fn.match(/swingEnd\s*\(/g) || []).length;
+    yes('G7 chopWood calls swingEnd on refuse paths (' + ends + ' times)', ends >= 4);
+    yes('G7 chopWood names the #842 kick', /#842/.test(fn));
   }
 }
 

@@ -597,8 +597,8 @@ if ($fail -gt 0) {
 
 $lines = New-Object 'System.Collections.Generic.List[string]'
 $lines.Add('/* Built by scripts\dev\Build-SpellTable.ps1 out of the game''s own SPEL records.')
-$lines.Add('     ' + $table.Count + ' spells, the same table as tools\spells.json.')
-$lines.Add('     Paste it between the SPELL_IDS markers in tools\gamemode.js. Do not hand edit. */')
+$lines.Add('     ' + $table.Count + ' spells, the same table as game\data\spells.json.')
+$lines.Add('     Paste it between the SPELL_IDS markers in game\gamemode.js. Do not hand edit. */')
 $lines.Add('  var SPELL_IDS = {')
 $n = 0
 foreach ($name in $table.Keys) {
@@ -614,7 +614,7 @@ $literal = $lines -join [Environment]::NewLine
 # ---------------------------------------------------------------- install --
 #
 # The gamemode carries the table, because the server is deployed as one file
-# and cannot read tools\spells.json. Nothing hand edits that block: this
+# and cannot read game\data\spells.json. Nothing hand edits that block: this
 # writes it between its own markers, the way the other generated blocks in
 # this repo are written. -NoInstall prints it and leaves the file alone.
 #

@@ -13,8 +13,8 @@ namespace Thornswood
     ///
     /// Windows draws a shortcut's icon once and then remembers the picture
     /// against the place it came from. Every build used to point the shortcut
-    /// at "SkyrimTogether.exe,0", so that address never changed and neither did
-    /// the remembered picture. New artwork could sit inside the exe for a week
+    /// at the launcher exe's own first icon, so that address never changed and
+    /// neither did the remembered picture. New artwork could sit inside the exe for a week
     /// while the desktop went on showing the old one, and a reboot does not
     /// clear it, which is what makes people think the update did not arrive.
     ///
@@ -28,7 +28,7 @@ namespace Thornswood
     ///
     /// The name under the icon and the label that appears when you hover come
     /// from the shortcut file rather than from the program, so this fixes
-    /// those too. A shortcut still called "Skyrim Together" goes on saying so
+    /// those too. A shortcut still carrying an old name goes on saying so
     /// forever otherwise, and the pinned taskbar copy is its own file in its
     /// own folder that no build script was ever looking at.
     /// </summary>
@@ -49,11 +49,9 @@ namespace Thornswood
         static extern void SHChangeNotify(int eventId, uint flags, string item1, string item2);
 
         /// <summary>
-        /// The running launcher, wherever it is and whatever it is called. It
-        /// was SkyrimTogether.exe and is Thornswood.exe now, and installs made
-        /// before the rename keep the old name because the launcher replaces
-        /// itself in place when it updates. Asking the assembly means the
-        /// shortcut points at the one that is actually there.
+        /// The running launcher, wherever it is and whatever it is called.
+        /// Asking the assembly means the shortcut points at the one that is
+        /// actually there.
         /// </summary>
         static string LauncherExe
         {
@@ -65,11 +63,6 @@ namespace Thornswood
                     if (!string.IsNullOrEmpty(me) && File.Exists(me)) return me;
                 }
                 catch (Exception ex) { Swallow.Note("Icons.LauncherExe", ex); }
-                foreach (string n in new[] { "Thornswood.exe", "SkyrimTogether.exe" })
-                {
-                    string p = Path.Combine(Paths.LauncherDir, n);
-                    if (File.Exists(p)) return p;
-                }
                 return Path.Combine(Paths.LauncherDir, "Thornswood.exe");
             }
         }
@@ -112,10 +105,55 @@ namespace Thornswood
                 if (!Directory.Exists(Paths.LauncherDir)) return null;
                 string want = Path.Combine(Paths.LauncherDir, "icon-" + hash + ".ico");
                 if (!File.Exists(want) || new FileInfo(want).Length != bytes.Length)
+                {
                     File.WriteAllBytes(want, bytes);
+                    // The shortcuts may have been drawn while it was gone, and
+                    // Windows keeps that blank against this same name (#887).
+                    iconWritten = true;
+                }
                 return want;
             }
             catch { return null; }
+        }
+
+        static bool iconWritten;
+
+        /// <summary>
+        /// Whether the shortcuts need redrawing even where IconLocation already
+        /// reads right, issue #887. A rebuild or a Ship copies a new exe over
+        /// the old one and leaves no .old, and Install-Launcher used to delete
+        /// the icon file the Start menu and pinned shortcuts name; Windows then
+        /// drew them blank and kept that. So Profile\icons.stamp remembers the
+        /// icon and the exe (size, write time) of the last redraw, and a start
+        /// where either differs, or where the icon file had to be written
+        /// again, redraws. An ordinary start matches and stays quiet.
+        /// </summary>
+        static bool Due(string exe, string want, bool wrote)
+        {
+            if (wrote) return true;
+            try
+            {
+                string stamp = Path.Combine(Paths.ProfileDir, "icons.stamp");
+                if (!File.Exists(stamp)) return true;
+                return !string.Equals(File.ReadAllText(stamp).Trim(), Mark(exe, want), StringComparison.OrdinalIgnoreCase);
+            }
+            catch (Exception ex) { Swallow.Note("Icons.Due", ex); return true; }
+        }
+
+        static void Remember(string exe, string want)
+        {
+            try
+            {
+                if (Directory.Exists(Paths.ProfileDir))
+                    File.WriteAllText(Path.Combine(Paths.ProfileDir, "icons.stamp"), Mark(exe, want));
+            }
+            catch (Exception ex) { Swallow.Note("Icons.Remember", ex); }
+        }
+
+        static string Mark(string exe, string want)
+        {
+            var fi = new FileInfo(exe);
+            return want + "|" + (fi.Exists ? fi.Length + "|" + fi.LastWriteTimeUtc.Ticks : "none");
         }
 
         static void Sweep(string keep)
@@ -177,7 +215,9 @@ namespace Thornswood
         /// a quiet Ensure then skips the notify that would redraw it. Force
         /// rewrites the same IconLocation, tells Explorer about each .lnk, and
         /// asks ie4uinit to refresh, without killing Explorer (Repair still does
-        /// that from Settings when somebody needs the heavy pass).
+        /// that from Settings when somebody needs the heavy pass). Ensure also
+        /// forces itself when the exe or the icon changed since the last pass
+        /// (Due), which covers a rebuild or a Ship that leaves no .old.
         /// </summary>
         public static int Ensure()
         {
@@ -187,6 +227,7 @@ namespace Thornswood
         /// <summary>See <see cref="Ensure()"/>.</summary>
         public static int Ensure(bool force)
         {
+            iconWritten = false;
             string icon = IconFile();
             string exe = LauncherExe;
             string want = (icon == null ? exe : icon) + ",0";
@@ -198,6 +239,8 @@ namespace Thornswood
             {
                 try { if (File.Exists(exe + ".old")) force = true; } catch { /* .old gone mid-check: treat as ordinary start */ }
             }
+            // A rebuild or a Ship leaves no .old; the stamp catches those.
+            if (!force && Due(exe, want, iconWritten)) force = true;
 
             int changed = 0;
             var touchedLinks = new List<string>();
@@ -238,7 +281,7 @@ namespace Thornswood
                             if (!string.Equals(Full(target), Full(exe),
                                                StringComparison.OrdinalIgnoreCase)) continue;
 
-                            // Wrong file name, which is where "Skyrim Together"
+                            // Wrong file name, which is where an old name
                             // survives: the label under a shortcut and the one
                             // that appears on hover are the file name, not
                             // anything inside the program.
@@ -312,6 +355,9 @@ namespace Thornswood
                         }
                     }
                 }
+                // Every shortcut has been walked, so the next start with the
+                // same exe and icon can stay quiet.
+                Remember(exe, want);
             }
             catch (Exception ex) { Swallow.Note("Icons.Ensure", ex); }
             finally
@@ -323,8 +369,11 @@ namespace Thornswood
 
             if (changed > 0 || force)
             {
-                // One .lnk at a time first: ASSOCCHANGED alone leaves blank
-                // shortcut icons after a self-update on some machines.
+                // The icon file first, since Windows keeps the picture against
+                // its path, then one .lnk at a time: ASSOCCHANGED alone leaves
+                // blank shortcut icons after a self-update on some machines.
+                if (icon != null)
+                    try { SHChangeNotify(SHCNE_UPDATEITEM, SHCNF_PATHW | SHCNF_FLUSH, icon, null); } catch (Exception ex) { Swallow.Note("Icons.Ensure, notify icon file", ex); }
                 foreach (string lnk in touchedLinks)
                     try { SHChangeNotify(SHCNE_UPDATEITEM, SHCNF_PATHW | SHCNF_FLUSH, lnk, null); } catch { /* shell notify is best-effort */ }
                 try { SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero); } catch { /* shell notify is best-effort */ }

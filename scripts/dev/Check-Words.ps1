@@ -1,40 +1,66 @@
 <#
   Check-Words.ps1
 
-  The Words section of CONTRIBUTING.md, checked instead of hoped for: no em dashes
-  anywhere written for people, never the word player, and the owner is
-  Patrick. Entry 237 on the To Do List: "it is the only way a rule about
-  writing survives two people and a deadline."
+  The writing rules in CONTRIBUTING.md, checked on every file people read instead of hoped for; each hit names the file, the line and the rule.
 
-  MEASURED 24 September, before the fixes that came with it: eleven hits over
-  the files below. Five em dashes in README.md (37, 55, 69, 72, 78) and one in
-  SETUP.md:46. The word at README.md:3, launcher/app/Help.cs:207, the rules page
-  at 295, and the Known Issues and Help pages (known.md:49, help.md:121),
-  which the site serves to anybody without a sign in. The old owner name had
-  none. Since then main deleted SETUP.md (#265) and rewrote README.md for
-  the people who work on the repository, so SETUP.md is off the list below
-  and SECURITY.md, the page GitHub shows anybody reporting a hole, is on it.
+  WHAT IT READS. Every file whose whole point is text for people:
+    - every Markdown file in the repository, apart from lore\ (in-world
+      writing, not operational text), docs\archive\ (dated snapshots, kept as
+      they were) and the engine submodule;
+    - the launcher's help (launcher/app/Help.cs) and window (launcher/ui.xaml),
+      the bot's channel posts (bot/content.py), the site's and the voice
+      service's public pages (site/public/*.html, voice/public/*.html) and the
+      read me every installer carries (installer/READ ME FIRST.txt).
+  Not the code files (the gamemode, the overlays, the rest of the launcher): a
+  word check there fires on identifiers, engine calls like player.moveto and
+  Skyrim's own record names, and those are not text for people.
+  CONTRIBUTING.md says which rules no machine checks.
 
-  What it reads is the files that are text for people from end to end: the
-  README and the security page, the launcher's help and window, the bot's
-  channel posts, the public site pages, and the two data pages the site
-  serves in public (PUBLIC_DOCS in site/server.js). Not lore\,
-  where in-world writing is not operational text. Not the code files either
-  (the gamemode, the overlays, the rest of the launcher): a word check there
-  fires on identifiers and engine names like player.moveto, and those are
-  not text for people.
+  THE RULES, each by the name a hit carries:
+    em-dash          no em dashes anywhere written for people (Words)
+    banned-word      never the word player (Words)
+    old-owner        the owner is Patrick, never the old name (Words)
+    open-alpha       never a closed playtest: an alpha, open by application (#428)
+    placeholder      no placeholders: TODO, TBD, FIXME, lorem ipsum (Words)
+    signer-name      the name on the code signing certificate is written in
+                     one place, ExpectedSigner in launcher\app\Updater.cs,
+                     which the launcher checks every update against. A page
+                     says "the name on the signing certificate", or names the
+                     profile, ThornswoodRelease (issue #1052)
+    names-person     README.md and the six component READMEs name nobody:
+                     operational documents are losing names, and problems go
+                     to the Discord or the report page, never to one person
+                     (tests\test-component-readmes.js, tests\test-repo-docs.js)
+
+  WHEN A LINE HAS TO SAY IT. CONTRIBUTING.md has to name the word it bans,
+  and a document that quotes something that went out quotes it as it was.
+  Those lines go in scripts\dev\Check-Words.allow.txt with the reason, one per
+  line. An allowance that matches nothing any more is itself a hit, so the
+  list cannot quietly grow stale.
+
+  MEASURED 24 September, when this was first written: eleven hits over the
+  first ten files it read. MEASURED 29 September (issue #460), when it grew to
+  every Markdown file and the public pages: six more, in the installer setup
+  README (a name, the one that had held test-component-readmes.js red since
+  #1017), the required data README, the script index, the site's gallery page
+  and CONTRIBUTING.md, plus two lines that quote on purpose.
 
   The em dash is built from its code point, [char]0x2014, plus its HTML
   entities, and never pasted in, so this file's own encoding cannot decide
-  whether the check works. Measured while writing it: the first draft spelled
-  it as a regex escape, the tool that wrote the file turned that escape into
-  the character itself, and Windows PowerShell 5.1, reading this file as
-  ANSI, then found none of the six em dashes that were there. So the pattern
-  has no escape to lose, and test-check-words.ps1 fails on any byte in this
-  file that is not plain ASCII. Each file is read as UTF-8 on purpose: Windows
-  PowerShell 5.1 reads a file with no byte order mark as ANSI, and would
-  never see an em dash in one. En dashes and hyphens are allowed. The word has
-  a boundary on each side, so multiplayer, playtest and getPlayer pass.
+  whether the check works. Measured while writing it first: the first draft
+  spelled it as a regex escape, the tool that wrote the file turned that
+  escape into the character itself, and Windows PowerShell 5.1, reading this
+  file as ANSI, then found none of the six em dashes that were there. So the
+  pattern has no escape to lose, and test-check-words.ps1 fails on any byte
+  in this file that is not plain ASCII. Each file is read as UTF-8 on
+  purpose: Windows PowerShell 5.1 reads a file with no byte order mark as
+  ANSI, and would never see an em dash in one. En dashes and hyphens are
+  allowed. The word has a boundary on each side, so multiplayer, playtest and
+  getPlayer pass.
+
+  Which files: git's own list when -Root is a checkout, so nothing untracked
+  on a machine is read; every file under -Root otherwise (the harness's temp
+  folder).
 
   Read only. Each hit prints as ::error file=,line= so GitHub marks the line
   on the pull request, and any hit exits 1. There is no fix mode, which is
@@ -46,44 +72,149 @@ param([string]$Root)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 if (-not $Root) { $Root = Split-Path -Parent (Split-Path -Parent $Here) }
+$Root = (Resolve-Path -LiteralPath $Root).Path
 
-$Paths = @(
-    'README.md', 'SECURITY.md', 'launcher/app/Help.cs', 'launcher/ui.xaml', 'bot/content.py',
-    'site/data/site/*.md', 'site/data/known.md', 'site/data/help.md',
-    'site/public/home.html'
+# Files that must be there. A missing one is said out loud, not dropped.
+$Named = @(
+    'README.md', 'SECURITY.md', 'CONTRIBUTING.md', 'launcher/app/Help.cs', 'launcher/ui.xaml',
+    'bot/content.py', 'site/public/home.html', 'installer/READ ME FIRST.txt'
+)
+# README.md and the component READMEs that tests\test-component-readmes.js reads.
+$NameFiles = @(
+    'README.md', 'launcher/README.md', 'site/README.md', 'voice/README.md',
+    'game/plugins/README.md', 'game/ui/README.md', 'installer/setup/README.md'
 )
 $Rules = @(
-    @{ Re = ([string][char]0x2014) + '|&mdash;|&#0*8212;|&#x0*2014;'; Say = 'an em dash. Use a comma, a colon or a full stop.' },
-    @{ Re = '\bplayers?\b'; Say = 'the word player. Say customers, clients, people, testers or partners.' },
-    # "Gavin Knotts" is the Authenticode certificate subject (Azure Artifact
-    # Signing). That string is what Windows shows as publisher, so Help and
-    # Downloads may name it. Lone "Gavin" is still the old owner name.
-    @{ Re = '\bgavin\b(?!\s+Knotts\b)'; Say = 'the old owner name. He is Patrick.' }
+    @{ Id = 'em-dash'; Case = 'IgnoreCase'; For = 'people'
+       Re = ([string][char]0x2014) + '|&mdash;|&#0*8212;|&#x0*2014;'
+       Say = 'an em dash. Use a comma, a colon or a full stop.' },
+    @{ Id = 'banned-word'; Case = 'IgnoreCase'; For = 'people'
+       Re = '\bplayers?\b'
+       Say = 'the word player. Say customers, clients, people, testers or partners.' },
+    # `gavin/` is a branch prefix from before 17 Sep, a name in git. Any other
+    # "Gavin" is the old owner name. Until #1052 the name on the signing
+    # certificate was let through here; no page names it now (signer-name).
+    @{ Id = 'old-owner'; Case = 'IgnoreCase'; For = 'people'
+       Re = '\bgavin\b(?!/)'
+       Say = 'the old owner name. He is Patrick.' },
+    # Issue #428. Patrick, 28 Sep: "we are in alpha so the world is open by
+    # application". Anybody can download it, so nothing people read may call
+    # it a closed playtest any more.
+    @{ Id = 'open-alpha'; Case = 'IgnoreCase'; For = 'people'
+       Re = '\bclosed[\s-]+playtest'
+       Say = 'closed playtest. It is an alpha, open by application.' },
+    # Upper case only, so a file called todo.md and the To Do board pass.
+    @{ Id = 'placeholder'; Case = 'None'; For = 'people'
+       Re = '\b(TODO|TBD|FIXME)\b|\b[Ll]orem ipsum\b'
+       Say = 'a placeholder. Say what is there, or leave the line out.' },
+    @{ Id = 'names-person'; Case = 'None'; For = 'names'
+       Re = '\b(Patrick|Djinn|Gavin|WiccanDjinn|Ataxayk)\b|(?<![/\w])EvilPatrick06(?![/\w])'
+       Say = 'a person by name. Say what was decided and when, or where to ask (the Discord, the report page).' }
 )
+# The name on the signing certificate, read from the one place it is written,
+# so this file does not carry it either (issue #1052). A root without the
+# launcher's source (the harness's temp folder, before it puts one there) has
+# no name to look for.
+$SignerUnread = $false
+$UpdaterRel = 'launcher/app/Updater.cs'
+$UpdaterPath = Join-Path $Root $UpdaterRel
+if (Test-Path -LiteralPath $UpdaterPath) {
+    $sm = [regex]::Match([System.IO.File]::ReadAllText($UpdaterPath, [System.Text.Encoding]::UTF8), 'const string ExpectedSigner = "([^"]+)"')
+    if ($sm.Success -and $sm.Groups[1].Value.Trim()) {
+        $Rules += @{ Id = 'signer-name'; Case = 'IgnoreCase'; For = 'people'
+            Re = '(?<![\w])' + [regex]::Escape($sm.Groups[1].Value.Trim()).Replace('\ ', '\s+') + '(?![\w])'
+            Say = 'the name on the signing certificate. Say "the name on the signing certificate", or the profile, ThornswoodRelease; the name itself is ExpectedSigner in launcher\app\Updater.cs.' }
+    } else { $SignerUnread = $true }
+}
+$RuleIds = @($Rules | ForEach-Object { $_.Id })
 
-$hits = 0; $read = 0
-foreach ($p in $Paths) {
-    $files = @(Get-ChildItem -Path (Join-Path $Root $p) -File -ErrorAction SilentlyContinue)
-    if (-not $files.Count) { Write-Host ("::warning::{0} is not there, so it was not checked" -f $p); continue }
-    foreach ($f in $files) {
-        $read++
-        $rel = $p
-        if ($p.Contains('*')) { $rel = $p.Substring(0, $p.LastIndexOf('/') + 1) + $f.Name }
-        $lines = [System.IO.File]::ReadAllLines($f.FullName, [System.Text.Encoding]::UTF8)
-        for ($i = 0; $i -lt $lines.Count; $i++) {
-            foreach ($r in $Rules) {
-                if ([regex]::IsMatch($lines[$i], $r.Re, 'IgnoreCase')) {
-                    $hits++
-                    Write-Host ("::error file={0},line={1}::{2}" -f $rel, ($i + 1), $r.Say)
-                }
-            }
+function Test-ForPeople([string]$rel) {
+    if ($rel -match '^(lore|engine|docs/archive)/' -or $rel -match '(^|/)node_modules/') { return $false }
+    if ($Named -contains $rel) { return $true }
+    if ($rel -match '\.md$') { return $true }
+    if ($rel -match '^(site|voice)/public/[^/]+\.html$') { return $true }
+    return $false
+}
+
+# git's list in a checkout, so an untracked note on a machine is not read.
+$all = $null
+if ((Test-Path -LiteralPath (Join-Path $Root '.git')) -and (Get-Command git -ErrorAction SilentlyContinue)) {
+    $listed = @(& git -C $Root -c core.quotepath=off ls-files 2>$null)
+    if ($LASTEXITCODE -eq 0) { $all = $listed }
+}
+if ($null -eq $all) {
+    $cut = $Root.TrimEnd('\', '/').Length + 1
+    $all = @(Get-ChildItem -LiteralPath $Root -Recurse -File -Force -ErrorAction SilentlyContinue |
+        ForEach-Object { $_.FullName.Substring($cut).Replace('\', '/') })
+}
+$files = @($all | Where-Object { Test-ForPeople $_ } | Sort-Object -Unique)
+
+$hits = 0
+if ($SignerUnread) {
+    $hits++
+    Write-Host ("::error file={0}::[signer-name] ExpectedSigner could not be read, so no page can be checked for it" -f $UpdaterRel)
+}
+foreach ($n in $Named) {
+    if ($files -notcontains $n -or -not (Test-Path -LiteralPath (Join-Path $Root $n))) {
+        Write-Host ("::warning::{0} is not there, so it was not checked" -f $n)
+    }
+}
+
+# The allowances: file | rule | why | the text on the line.
+$allow = @()
+$AllowRel = 'scripts/dev/Check-Words.allow.txt'
+$AllowPath = Join-Path $Root $AllowRel
+if (Test-Path -LiteralPath $AllowPath) {
+    $al = [System.IO.File]::ReadAllLines($AllowPath, [System.Text.Encoding]::UTF8)
+    for ($i = 0; $i -lt $al.Count; $i++) {
+        $t = $al[$i].Trim()
+        if (-not $t -or $t.StartsWith('#')) { continue }
+        $parts = @($t -split '\s+\|\s+', 4)
+        if ($parts.Count -lt 4 -or -not $parts[2].Trim() -or -not $parts[3].Trim()) {
+            $hits++
+            Write-Host ("::error file={0},line={1}::[allow] an allowance has four parts, file | rule | why | the text on the line" -f $AllowRel, ($i + 1))
+            continue
         }
+        if ($RuleIds -notcontains $parts[1].Trim()) {
+            $hits++
+            Write-Host ("::error file={0},line={1}::[allow] no rule is called {2}; the rules are {3}" -f $AllowRel, ($i + 1), $parts[1].Trim(), ($RuleIds -join ', '))
+            continue
+        }
+        $allow += @{ File = $parts[0].Trim(); Rule = $parts[1].Trim(); Text = $parts[3].Trim(); Line = $i + 1; Used = $false }
+    }
+}
+
+$read = 0; $allowed = 0
+foreach ($rel in $files) {
+    $full = Join-Path $Root $rel
+    if (-not (Test-Path -LiteralPath $full)) { continue }
+    $read++
+    $lines = [System.IO.File]::ReadAllLines($full, [System.Text.Encoding]::UTF8)
+    $isNames = $NameFiles -contains $rel
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        foreach ($r in $Rules) {
+            if ($r.For -eq 'names' -and -not $isNames) { continue }
+            if (-not [regex]::IsMatch($lines[$i], $r.Re, $r.Case)) { continue }
+            $ok = $false
+            foreach ($a in $allow) {
+                if ($a.File -eq $rel -and $a.Rule -eq $r.Id -and $lines[$i].Contains($a.Text)) { $a.Used = $true; $ok = $true }
+            }
+            if ($ok) { $allowed++; continue }
+            $hits++
+            Write-Host ("::error file={0},line={1}::[{2}] {3}" -f $rel, ($i + 1), $r.Id, $r.Say)
+        }
+    }
+}
+foreach ($a in $allow) {
+    if (-not $a.Used) {
+        $hits++
+        Write-Host ("::error file={0},line={1}::[allow] this allowance matched nothing in {2}, so it is out of date; take it out" -f $AllowRel, $a.Line, $a.File)
     }
 }
 
 if ($hits) {
-    Write-Host ("{0} hit(s) in the {1} file(s) read. The rules are the Words section of CONTRIBUTING.md." -f $hits, $read)
+    Write-Host ("{0} hit(s) in the {1} file(s) read. The rules are the Words section of CONTRIBUTING.md; a line that has to quote one goes in {2} with its reason." -f $hits, $read, $AllowRel)
     exit 1
 }
-Write-Host ("the writing rules hold in all {0} file(s) read" -f $read)
+Write-Host ("the writing rules hold in all {0} file(s) read ({1} line(s) allowed by {2})" -f $read, $allowed, $AllowRel)
 exit 0

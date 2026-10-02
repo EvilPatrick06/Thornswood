@@ -24,7 +24,8 @@
   removed. The rest of those scripts builds and uploads releases, so it never
   runs here.
 
-  -Tools <folder> runs it against another copy of the three scripts. Pointed
+  -Tools <folder> runs it against another copy of the three scripts, flat in
+  that folder or under its scripts\release (a repository). Pointed
   at c32b820, main just before the lists became one, it fails 29 of its checks.
   Entry 128 added three client runtime checks that fail there as well, because
   that code called any file at those paths ours. Run on the machine that ships
@@ -44,7 +45,7 @@
        and every file whose fate changed is listed by name.
 
   Read only. The game folder, the launcher's record and the baselines under
-  Thornswood-Releases (and legacy LOCALAPPDATA copies) are read and never written. -Before writes the old scripts and
+  this machine's working copies of the VPS store (%LOCALAPPDATA%\Thornswood\feed, #907) and legacy LOCALAPPDATA copies are read and never written. -Before writes the old scripts and
   client-build.json into a temp folder of its own and removes it.
 
   About a minute on the machine that ships, nearly all of it the installer's
@@ -61,10 +62,12 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-if (-not $Tools) { $Tools = $PSScriptRoot }
-if (-not $Tools) { $Tools = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\. Only when -Tools was not given.
-if (-not $PSBoundParameters.ContainsKey('Tools')) { $Tools = Join-Path (Split-Path -Parent $Tools) 'tools' }
+if (-not $Tools) {
+    # The tests are in tests\, the repository is one folder up.
+    $Tools = $PSScriptRoot
+    if (-not $Tools) { $Tools = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+    $Tools = Split-Path -Parent $Tools
+}
 
 $pass = 0; $fail = 0
 function Yes($what, $cond) {
@@ -116,7 +119,7 @@ function Quote([string]$s) { return "'" + $s.Replace("'", "''") + "'" }
 function Find-In([string]$toolsDir, [string]$name) {
     $flat = Join-Path $toolsDir $name
     if (Test-Path -LiteralPath $flat) { return $flat }
-    return (Join-Path $toolsDir ('..\scripts\release\' + $name))
+    return (Join-Path $toolsDir ('scripts\release\' + $name))
 }
 function New-Decider([string]$toolsDir, [string]$which) {
     $rules = Find-In $toolsDir 'Ship-Rules.ps1'
@@ -124,6 +127,12 @@ function New-Decider([string]$toolsDir, [string]$which) {
     [void]$sb.AppendLine('. ' + (Quote $rules))
     if ($which -eq 'pack') {
         $file = 'Publish-Update.ps1'
+        # Publish-Update's scan records each file by its bytes since #441,
+        # with Get-BaselineEntry from Release-Baseline.ps1. The paths here are
+        # made up and never on disk, and this asks only which of them ship,
+        # so the lifted loop gets a stand-in that records a path without
+        # opening it.
+        [void]$sb.AppendLine('function Get-BaselineEntry([string]$path) { return ''0:fake'' }')
         $ast = Read-Script (Find-In $toolsDir $file)
         $own = Get-OwnLists $ast
         foreach ($a in $own) { [void]$sb.AppendLine($a.Extent.Text) }
@@ -144,6 +153,7 @@ function Get-Shipped($files, $collection, $prefix, $optional) {
     $GameDir = $prefix.TrimEnd('\')
     $Dev = $false
     $now = @{}
+    $nowFile = @{}
     foreach ($f in $files)
 '@ + $body + @'
 
@@ -356,11 +366,18 @@ $rows = @(
     # The client runtime is ours only when its bytes are the recorded build
     # now (entry 128), which a made up file cannot be, so they have their own
     # checks below the removal side.
+    # Nemesis's output, generated from the collection's own patches (#1178).
+    @('Data\meshes\actors\character\behaviors\0_master.hkx', 'ship', 'ship', 'ship'),
+    @('Data\Scripts\FNIS.pex',                                'ship', 'ship', 'ship'),
     # The folder names count only straight under Data, and BStarData only at
-    # the top: a folder of the same name deeper down is anybody's.
-    @('Data\meshes\tools\anvil.nif',                          'ship', 'ship', 'ship'),
-    @('Data\textures\Docs\sign.dds',                          'ship', 'ship', 'ship'),
-    @('Data\BStarData\note.txt',                              'ship', 'ship', 'ship')
+    # the top: a folder of the same name deeper down is not those rules'. Until
+    # #1178 that made these three ours; they are loose files of somebody's
+    # mod, and outside Data\Platform only what Ship-Rules names is ours, so
+    # they are out of both now, like RaceMenu's loose menu the packs carried.
+    @('Data\meshes\tools\anvil.nif',                          'ship', 'ship', 'out'),
+    @('Data\textures\Docs\sign.dds',                          'ship', 'ship', 'out'),
+    @('Data\BStarData\note.txt',                              'ship', 'ship', 'out'),
+    @('Data\Interface\racesex_menu.swf',                      'ship', 'ship', 'out')
 )
 $fixtureCollection = Get-Set @('Data\Nemesis_Engine\Nemesis Unlimited Behavior Engine.exe', 'Data\SkyUI_SE.bsa')
 $paths = [string[]]@($rows | ForEach-Object { $_[0] })
@@ -378,7 +395,11 @@ foreach ($r in $rows) {
         Write-Host ("      pack says {0}, installer says {1}" -f $gotPack, $gotInst) -ForegroundColor Red
     }
 }
-Yes 'the installer does with every row what it did before' (@($rows | Where-Object { $_[2] -ne $_[3] }).Count -eq 0)
+# Other people's loose files left the installer too (#1178), and nothing else
+# changed for it.
+$notOursRows = @('Data\meshes\tools\anvil.nif', 'Data\textures\Docs\sign.dds', 'Data\BStarData\note.txt', 'Data\Interface\racesex_menu.swf')
+Yes 'the installer does with every row what it did before, other people''s loose files apart' (@($rows | Where-Object { $_[2] -ne $_[3] -and $notOursRows -notcontains $_[0] }).Count -eq 0)
+Yes '  and those went from the installer to nowhere' (@($rows | Where-Object { $notOursRows -contains $_[0] -and ($_[2] -ne 'ship' -or $_[3] -ne 'out') }).Count -eq 0)
 $changed = @($rows | Where-Object { $_[1] -ne $_[3] })
 Yes 'every row whose fate changed went from a pack to nowhere, none the other way' (@($changed | Where-Object { $_[1] -ne 'ship' -or $_[3] -ne 'out' }).Count -eq 0)
 Write-Host ("      {0} rows packs carried and no longer do" -f $changed.Count) -ForegroundColor DarkGray
@@ -429,8 +450,8 @@ if ($Before) {
         if ($LASTEXITCODE -ne 0) { throw "git archive of $Before failed" }
         Expand-Archive -LiteralPath $zip -DestinationPath $oldDir
         $old = [pscustomobject]@{
-            Pack = New-Decider (Join-Path $oldDir 'tools') 'pack'
-            Inst = New-Decider (Join-Path $oldDir 'tools') 'installer'
+            Pack = New-Decider $oldDir 'pack'
+            Inst = New-Decider $oldDir 'installer'
         }
         Write-Host ''
         Write-Host ("The fixed paths against {0}" -f $Before) -ForegroundColor Cyan
@@ -480,11 +501,11 @@ if (-not (Test-Path -LiteralPath (Join-Path $Game 'SkyrimSE.exe')) -or -not (Tes
     # filter. Anything that comes out the other side would be deleted from
     # every tester by the next release.
     $instVanilla = $inst.Module
-    $repoRoot = Split-Path -Parent $Tools
+    $repoRoot = $Tools
     $relSibling = Split-Path -Parent $repoRoot
     $baselinePaths = @(
-        @{ Name = 'main Releases'; Path = (Join-Path $relSibling 'Thornswood-Releases\published.json') },
-        @{ Name = 'dev Releases';  Path = (Join-Path $relSibling 'Thornswood-Releases-dev\published.json') },
+        @{ Name = 'main store';    Path = (Join-Path $env:LOCALAPPDATA 'Thornswood\feed\main\published.json') },
+        @{ Name = 'dev store';     Path = (Join-Path $env:LOCALAPPDATA 'Thornswood\feed\dev\published.json') },
         @{ Name = 'legacy main';   Path = (Join-Path $env:LOCALAPPDATA 'Thornswood\published.json') },
         @{ Name = 'legacy dev';    Path = (Join-Path $env:LOCALAPPDATA 'Thornswood\published-dev.json') }
     )

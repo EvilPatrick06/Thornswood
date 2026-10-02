@@ -112,71 +112,310 @@ and the Discord sign in all carry on.
 
 ## If it is a new machine, new address
 
-The Vortex switch this page used to say to do first is done: the mods come
-from the Nexus collection, and the installer on the site is a few hundred MB
-rather than 18 GB, so nothing big has to be copied to the new box.
+Checked against the scripts on 29 September 2026 (issue #454): every command
+below was read against the script it names, the parameters it passes and the
+order it needs, and `tests\test-new-box-runbook.ps1` checks the same on every
+pull request, so a renamed script or parameter fails the build rather than the
+day this is needed. It has not been followed on a real new box yet. Until it
+has, it is a plan checked on paper: write what the first real move finds back
+into it, with the date.
 
-Then, in this order:
+Run everything from Patrick's machine (One), in PowerShell 7, from the root of
+a worktree of the repository on a branch of its own, because step 3 changes
+files in it. Steps 1 to 9 leave the old box serving, so they can take as many
+days as they need.
 
-1. `.\scripts\vps\Backup-Server.ps1`
-2. Order the new box in the same datacenter as the old one, so nobody's ping
-   changes. Windows Server, same version as the old one, which is in
-   `notes.txt` inside the backup zip.
-3. `.\scripts\vps\Setup-SshKey.ps1` against the new address, so the rest of the
-   scripts can reach it without a password.
-4. `.\scripts\vps\Bootstrap-VPS.ps1` against the new address. Node, Python, git,
-   the folders.
-5. Restore from the backup, by hand, as `docs\RESTORING.md` says, into:
-   `C:\Thornswood-Docs\data`, `C:\Thornswood-Bot`, `C:\Thornswood-Voice`,
-   the game server's own folder and `C:\Thornswood-Caddy`. The dev roots
-   (`C:\Thornswood-Server-Dev`, `C:\Thornswood-Voice-Dev`) are made fresh,
-   and `C:\Thornswood-Watch` and `C:\Thornswood-Backup` by their own install
-   scripts (`Watch-Services.ps1 -Install`, `Install-Backup.ps1`). The website's `data` folder is the one that
-   matters. It has the linked Discord accounts, the boards and every document
-   anyone has typed into on the site.
-6. `.\scripts\deploy\Install-Bot.ps1`, `.\scripts\deploy\Install-Voice.ps1` and
-   `.\scripts\deploy\Install-ThornswoodServer.ps1` against the new address.
-7. `.\scripts\deploy\Deploy-Docs.ps1` against the new address. Not `-SeedDocs`. That
-   flattens every document with the repo copy and would throw away what people
-   have written.
-8. Open the ports. They are listed in `notes.txt` in the backup. The game is
-   UDP, which is the one people forget.
-9. Import the scheduled tasks from the `tasks` folder in the backup, so the
-   services come back after a reboot.
-10. Point the DNS A record for thornswood.net at the new address, then
-    `.\scripts\deploy\Setup-Domain.ps1 -Vps <new address>`. It installs Caddy and
-    sends `scripts\deploy\Caddyfile`, the tracked copy with the `/voice` and
-    `/voice-dev` routes; a Caddyfile restored from the backup is kept beside
-    it as `Caddyfile.before-<date>`. Wait for the certificate to reissue
-    before telling anyone, or the site shows a warning.
-11. Check the Discord application's redirect URI. If it names the domain there
-    is nothing to do. If it names an address, it has to be changed in the
-    Discord developer portal by hand.
-12. `.\scripts\vps\Set-Vps.ps1`. It asks for the new address and repoints all
-    twenty three files in the repo that carry the old one, and adds a line to
-    the launcher so copies already installed move themselves across.
-    The deploy scripts check the box's ssh host key (accept-new): the first
-    connection to a new address records its key, and a box rebuilt on the
-    same address is refused until the old key is taken out with
-    `ssh-keygen -R <address>` on each machine that deploys. That refusal is
-    the check working, so confirm the rebuild was yours before removing it.
-13. Commit what Set-Vps changed on a branch, open a pull request and merge
-    it, then `.\scripts\release\Bump-Version.ps1` through its own pull request, then a
-    main `.\scripts\release\Ship.ps1 "Server moved"` from Patrick's machine, so a
-    fresh install has the new address baked in. A move is one of the main
-    releases that does not wait for dev: the old address is going away.
-14. `.\scripts\ops\Set-Server.ps1` with the new address. This is the one that moves
-    everybody. It checks the new box answers before it publishes.
+```powershell
+git -C C:\Users\evilp\Downloads\Thornswood-Repo fetch origin
+git -C C:\Users\evilp\Downloads\Thornswood-Repo worktree add "C:\ThornswoodTemps&Worktrees\worktrees\move" -b patrick/move-to-new-box origin/main
+Set-Location "C:\ThornswoodTemps&Worktrees\worktrees\move"
+```
+
+The secrets a move needs, and where each one comes from. None of them is ever
+typed on a command line or written on this page.
+
+| Secret | Comes from | Used at |
+| --- | --- | --- |
+| The new box's Administrator password | the hosting provider's panel for the new box | typed once, at Setup-SshKey's prompt, step 4 |
+| The backup passphrase | `Documents\thornswood-backup-key.txt` on One | read there by Restore-Box at step 9, sent as a file by it at step 13 and by Install-Backup at step 23 |
+| The bot token, the Discord client secret, the site's keys, the door key | inside the backup: the site's `config.json`, the bot's `bot.env.json`, each server's `private\door.json` | put back by Restore-Box, step 13; Install-Bot runs with `-NoToken`, so nothing asks for them |
+| The staff channel webhook | Discord: the staff channel, Edit Channel, Integrations, Webhooks, Copy Webhook URL | pasted at Watch-Services' prompt, step 21 |
+| Patrick's GitHub sign in | `gh auth login` on One | the build runner's registration, step 24 |
+| The DNS records | Patrick's own Cloudflare login, which he signs in to with GitHub, where thornswood.net is registered | step 18 |
+| Code signing | `records\signing\signing.json` on One and the Azure account behind it | the installer, step 17, and the main Ship, step 29 |
+
+### Standing it up, while the old box still serves
+
+1. **Order the box.** In the same datacenter as the old one, so nobody's ping
+   changes, and Windows Server 2022 like the old one: the `windows` line of
+   the backup's NOTES.txt (10.0.20348 is Windows Server 2022), which
+   `.\scripts\vps\Restore-Backup.ps1 -Backup <newest backup> -CheckOnly -NoPause`
+   prints (the newest is in `Downloads\Thornswood-Backups`). Note the new
+   address, and leave the Administrator password in the panel.
+2. **Turn on its ssh server**, in the new box's own console, which the
+   provider's panel opens. A fresh Windows Server 2022 does not have one, and
+   every script here reaches the box over ssh:
+   ```powershell
+   Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
+   Set-Service -Name sshd -StartupType Automatic
+   Start-Service sshd
+   ```
+   Windows opens port 22 for it by itself, as the firewall rule
+   `OpenSSH-Server-In-TCP`. Then, in the same console and not over the
+   network, read the box's own key fingerprints for step 3:
+   ```powershell
+   Get-ChildItem C:\ProgramData\ssh\ssh_host_*_key.pub | ForEach-Object { ssh-keygen -lf $_.FullName }
+   ```
+   They are public; the private halves never leave the box.
+3. **Point this branch at the new box:**
+   `.\scripts\vps\Set-Vps.ps1 -Address <new address>`. It rewrites
+   `scripts\vps\vps.json` and every other file that carries the old address,
+   and adds a line to the launcher so installed copies move themselves across.
+   From here on every script talks to the new box without being told, and the
+   old box is reached only where a step says `-VpsHost <old address>`. Then
+   add the `SHA256:...` values from step 2 to `hostKeys` in
+   `scripts\vps\vps.json`, beside the old box's, which stay until the move is
+   done: every script runs ssh with StrictHostKeyChecking=yes (issue #450), so
+   a box whose key is not pinned there is refused. The changed files stay on
+   this branch until step 27.
+4. **This machine's key on the box:** `.\scripts\vps\Setup-SshKey.ps1`. It
+   writes the box into known_hosts only when it shows a key step 3 pinned,
+   then asks for the Administrator password once. Then
+   `.\scripts\vps\Setup-SshKey.ps1 -Test` says the key works. Another machine that deploys runs
+   `.\scripts\vps\Setup-SshKey.ps1 -KeyOnly` and Patrick adds the line it
+   prints with `.\scripts\vps\Add-VpsKey.ps1`.
+5. **PowerShell 7, Node and Git on the box**, and the firewall for the live
+   game:
+   `.\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeGit'`.
+   Bootstrap-VPS runs on the box and refuses to run anywhere else; Remote.ps1
+   carries it there. Git is for the build runner, step 24. Python comes with
+   the bot, step 15.
+6. **The live game server program**, built here from this branch and installed
+   there without being started. The world is not in it; that is step 13.
+   ```powershell
+   .\scripts\deploy\Deploy-Gamemode.ps1
+   .\scripts\release\Export-ServerPayload.ps1
+   scp (.\scripts\release\Where.ps1 ServerZip) Administrator@<new address>:C:/thornswood-server.zip
+   scp .\scripts\deploy\Install-ThornswoodServer.ps1 .\scripts\deploy\ServerSettings.ps1 .\scripts\vps\Roll-Log.ps1 Administrator@<new address>:C:/
+   ssh Administrator@<new address> "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Install-ThornswoodServer.ps1"
+   ```
+   The last one prints `load order: all <n> plugins present` and registers the
+   `Thornswood Server` task, which starts at boot; without `-StartNow` it does
+   not start now. If the box restarts before step 13, stop that task first.
+   The installer unpacks beside `C:\Thornswood-Server` and checks the payload
+   there before it touches anything (issue #446); on a box that already has a
+   server it keeps the one it replaces as `C:\Thornswood-Server.prev-<stamp>`,
+   and `.\scripts\release\Publish-Server.ps1 -PutBack` puts that back. On a
+   new box there is nothing to keep.
+   The gamemode that goes up is this branch's, which is main's; if main holds
+   gamemode changes that have not been tried on dev, tell Patrick before
+   step 16. Restore-Box says so too (step 13).
+7. **Live voice, set the way the old box runs it:**
+   `.\scripts\deploy\Install-Voice.ps1 -Auth on -Bind 127.0.0.1`. On
+   29 September `https://thornswood.net/voice/health` said auth on, bind
+   127.0.0.1, no relay and chat range off; read it again on the day and pass
+   what it says. On a new box there is nothing running for Install-Voice to
+   keep, so without those two it falls back to letting unproven joins in, on
+   every address.
+8. **The dev game server and dev voice**, copied from the live ones onto their
+   own ports, tasks and firewall rules, with nothing of live's private folder,
+   chat logs or keys, and dev voice starting with auth on, on 127.0.0.1 only
+   (#1082, #1083):
+   `.\scripts\vps\Remote.ps1 -File .\scripts\vps\vps-dev-instance.ps1`. Then dev
+   voice set the way `https://thornswood.net/voice-dev/health` says it runs
+   (auth on, bind 127.0.0.1 on 29 September), which is what the dev instance
+   already starts it with:
+   `.\scripts\deploy\Install-Voice.ps1 -Root C:\Thornswood-Voice-Dev -Port 7789 -TaskName 'Thornswood Dev Voice' -Auth on -Bind 127.0.0.1`.
+   The dev server is not started.
+9. **Is it ready for the restore:**
+   `.\scripts\vps\Restore-Box.ps1 -Backup <newest backup> -Check`. It opens the
+   backup here with the passphrase, and asks the new box whether both server
+   folders hold the program and whether anything the restore writes under is
+   running. It sends nothing, and should end `READY`.
+
+### Moving over
+
+The old box stops serving at step 11. Pick a quiet hour: nothing anybody does
+on the old box after that is carried across. If the old box is already gone,
+skip steps 10 to 12 and use the newest backup in `Downloads\Thornswood-Backups`,
+as docs\RESTORING.md "The box is gone" says.
+
+10. **Tell people** in Discord that the server is going down to move, and for
+    about how long.
+11. **Freeze the old box and take its last backup:**
+    `.\scripts\vps\Remote.ps1 -VpsHost <old address> -File .\scripts\vps\vps-freeze.ps1`.
+    It turns the watchdog off, stops both game servers, the site, the bot and
+    both voice services, runs the nightly backup once and names the file, and
+    says which account the site ran as. It should end `FROZEN`. If the move is
+    called off, the same line with `-Arguments '-Undo'` puts the old box back.
+12. **Bring that backup here:**
+    `.\scripts\vps\Fetch-Backups.ps1 -VpsHost <old address>`. It lands in
+    `Downloads\Thornswood-Backups` and is opened to check it.
+13. **Put it back:** `.\scripts\vps\Restore-Box.ps1 -Backup <the backup from step 12>`,
+    with `-Expect <a profile id>` for somebody known to have a character. It
+    carries the backup, the passphrase file and the restore scripts to the new
+    box; puts back both worlds (Restore-Server.ps1) and the site's data,
+    config, uploads and feed store, the bot's settings and join record and the
+    Caddyfile (vps-restore-services.ps1); and deletes its copy from the box
+    again. It should end `RESTORE BOX OK`. A `GAMEMODE DIFFERS` line means
+    step 6 installed a gamemode the old box was not running: ask Patrick
+    before step 16.
+14. **The site:** `.\scripts\deploy\Deploy-Docs.ps1`, with
+    `-RunAs 'LOCAL SERVICE'` when step 11 said the site ran as LOCAL SERVICE.
+    Never `-SeedDocs`, which flattens every document with the repo copy and
+    throws away what people have written. It starts the site on the restored
+    config, so nobody has to link Discord again. It also gives the site its
+    read on the servers' logs and the chat logs, so then lock the server and
+    voice folders to their own services (#1105):
+    `.\scripts\vps\Remote.ps1 -File .\scripts\vps\Lock-VpsFolders.ps1`.
+15. **The bot:** `.\scripts\deploy\Install-Bot.ps1 -NoToken`. Python, its
+    libraries and the task; the token and the site key are the restored ones,
+    so it asks for nothing. The old bot stopped at step 11, so only this one
+    answers in Discord.
+16. **The game servers, live first and alone:**
+    `.\scripts\vps\Remote.ps1 "Start-ScheduledTask -TaskName 'Thornswood Server'"`,
+    then `http://<new address>:3000/api/servers/thornswood/manifest.json`
+    answers when it is up, and `.\scripts\vps\Get-Logs.ps1` brings its logs
+    here to read. Then dev, the same way:
+    `.\scripts\vps\Remote.ps1 "Start-ScheduledTask -TaskName 'Thornswood Dev Server'"`
+    and the same page on port 7788.
+17. **The feed and the installer.** Every launcher updates from
+    `https://thornswood.net/feed`. Its store came back in step 13; its
+    downloads are in no backup, because they are the size of every release.
+    `.\scripts\deploy\Remirror-Site-Feed.ps1 -Check` and
+    `.\scripts\deploy\Remirror-Site-Feed.ps1 -Dev -Check` say what the new box
+    lacks and whether this machine has the bytes; the same two without `-Check`
+    send them. For any this machine does not have, bring the old box's copy
+    down first with
+    `scp -r Administrator@<old address>:C:/Thornswood-Docs/feed/assets "C:\ThornswoodTemps&Worktrees\temp\move\feed-assets"`
+    (and `feed-dev/assets` for the dev feed) and add
+    `-AssetDir "C:\ThornswoodTemps&Worktrees\temp\move\feed-assets"`. Then
+    `.\scripts\release\Publish-Installer.ps1` puts the installer from the last
+    package build back on the site.
+18. **The name:** in Patrick's Cloudflare login, point the A records for
+    `thornswood.net` and `www` at the new address, not proxied (Watch-Outside's
+    dns check expects them straight at the box). When the name resolves there,
+    `.\scripts\deploy\Setup-Domain.ps1`. It refuses until it does, then
+    installs Caddy and the `Thornswood Web` task, sends
+    `scripts\deploy\Caddyfile` (the restored one is kept beside it as
+    `Caddyfile.before-<date>`), moves the site onto loopback and asks for the
+    certificate. Discord sign in needs nothing: the site builds its redirect
+    from the name, not the address.
+19. **Check it from outside:** `.\scripts\vps\Check-Site.ps1 -NoSsh -NoPause`,
+    and `https://thornswood.net/voice/health` and `/voice-dev/health` answer.
+    Wait for the certificate before telling anybody, or the site shows a
+    warning.
+
+### Watching it
+
+20. **The watchdog, only now,** because it starts whatever is not running and
+    everything should be running by here:
+    `.\scripts\vps\Watch-Services.ps1 -Install`.
+21. **Where it posts when the bot is down:**
+    `.\scripts\vps\Watch-Services.ps1 -SetWebhook`. It asks for the webhook at
+    a prompt and posts a test message in the staff channel.
+22. **The load record:** `.\scripts\vps\Watch-Load.ps1 -Install`.
+23. **The nightly backup, and one now:**
+    `.\scripts\deploy\Install-Backup.ps1 -RunNow`. The box already has this
+    machine's passphrase from step 13; on a box without one, Install-Backup
+    sends this machine's copy up rather than making a new one.
+24. **The build runner:** `.\scripts\deploy\Install-Runner.ps1`. It replaces the
+    `thornswood-vps` runner the old box registered, so `Launcher builds` runs
+    on the new box from the next pull request.
+25. **Close it to all but ssh with a key**, once every machine that deploys
+    has passed `.\scripts\vps\Setup-SshKey.ps1 -Test` against it:
+    `.\scripts\vps\Harden-VPS.ps1`. It proves key login first, then turns ssh
+    password login and Remote Desktop off (issue #450). The provider's console
+    and the Administrator password stay the way back.
+
+### Moving everybody
+
+26. **Everybody's launcher:** `.\scripts\ops\Set-Server.ps1 -Address <new address>`.
+    It checks the new box answers, then moves this machine's launcher and the
+    feed every other launcher reads. Then tell people in Discord it is back.
+27. **The repository:** take the old box's fingerprints out of `hostKeys`,
+    then commit what Set-Vps and step 3 changed on this branch, push it, open
+    a pull request and merge it once `Launcher builds` is green.
+28. **The version:** `.\scripts\release\Bump-Version.ps1` through its own pull
+    request, merged on green.
+29. **A launcher with the new address built in**, so a fresh install is right:
+    a main Ship from Patrick's machine, as CONTRIBUTING.md says. A move is one
+    of the main releases that does not wait for dev, because the old address
+    is going away:
+    ```powershell
+    .\scripts\release\Ship.ps1 "Thornswood has moved to a new server
+    - The launcher finds the new server by itself after this update, so there is nothing to change on your side.
+    - If it cannot connect straight away, close the launcher and open it again so it picks up the new address."
+    ```
+30. **The watchers on this machine**, last, from a checkout of main that has
+    step 27 in it, because each keeps its own copy of the address:
+    `.\scripts\vps\Fetch-Backups.ps1 -Schedule` brings the new box's backups
+    here every day, and `.\scripts\vps\Watch-Outside.ps1 -Install` watches the
+    site, the feeds, the certificate, the name and the runner from outside it.
 
 ## Then leave the old box alone for a week
 
-Do not cancel it the same day. Two things still point at it: any launcher that
-has not checked for an update yet, and every Discord message anyone has ever
-posted with the old address in it. A week of the old box quietly running costs
-one month at the old price and saves a week of people asking why nothing works.
+Do not cancel it the same day. It is frozen from step 11 and serves nothing,
+but it is the way back if something on the new box turns out wrong
+(`vps-freeze.ps1 -Undo`, step 11), and its `C:\Thornswood-Backup` holds the
+last backups taken there. A week of it costs one month at the old price.
+Once the new box has run a week and Fetch-Backups has brought its backups
+here every night, cancel it.
 
-`.\scripts\vps\Check-Load.ps1` against the old address shows whether anyone is still
-landing there. When that is zero for a few days, cancel it.
+## Rehearsing the move on a throwaway server
+
+Everything above has only been checked on paper: `tests\test-new-box-runbook.ps1`
+proves every command and parameter is real and in the right order, but
+nobody has followed it on a real new box. A rehearsal is how to find the step
+that fails before the day it matters. Patrick, 29 September: "This a playtest
+server in alpha so everyone knows everything is throwaway rn, just add that
+all to the guide and I might do it eventually."
+
+**What it costs.** A small Windows Server 2022 VPS rented by the hour, for an
+afternoon. Nothing on the real box changes, and nobody playing notices.
+
+**During the alpha all world and character data is throwaway.** So a
+rehearsal that goes wrong costs nothing, and a real move that loses the world
+or the characters is acceptable too: tell people, and carry on.
+
+The steps, in order:
+
+1. **Rent it.** Any provider, the smallest Windows Server 2022 box it has,
+   billed by the hour. Note its address and leave its Administrator password
+   in the provider's panel.
+2. **Point only this rehearsal at it, never the real box.** Do not run
+   Set-Vps and do not edit `scripts\vps\vps.json`. Instead give it a
+   per-machine override (issue #1090, `scripts\vps\Vps.ps1`): a file holding
+   only `{"address": "<its address>", "hostKeys": ["SHA256:..."]}`, with the
+   fingerprints step 2 of "If it is a new machine" reads in its console.
+   Save it as `C:\ThornswoodTemps&Worktrees\temp\rehearsal\vps.json` and, in
+   the one PowerShell window the rehearsal runs in, set
+   `$env:THORNSWOOD_VPS_LOCAL = "C:\ThornswoodTemps&Worktrees\temp\rehearsal\vps.json"`.
+   Every script run from that window talks to the throwaway box, and every
+   other window and every lane on the machine still talks to the real one.
+   (`%LOCALAPPDATA%\Thornswood\vps.json` also works, but it points the whole
+   machine at the throwaway box, lanes included, so use it only on a machine
+   nothing else deploys from.)
+3. **Follow "If it is a new machine, new address" from start to finish** in
+   that window, including step 13, the restore from the newest backup in
+   `Downloads\Thornswood-Backups`. Skip only what would reach the real box or
+   the people on it: step 3 (the override stands in for it), steps 10 to 12
+   (they freeze the real box), step 18 (the name stays on the real box),
+   steps 20 to 22 and 24 (a second watchdog, alert poster and build runner
+   would answer for the real ones), and steps 26 to 30 (they move everybody).
+   Install the bot in step 15 to see it start, then stop it at once
+   (`.\scripts\vps\Remote.ps1 "Stop-Service ThornswoodBot"`): it holds the same
+   token as the real bot, and two of them answer everything twice. Check the
+   site by its address rather than by name, since the name still points at
+   the real box.
+4. **Write down every step that fails**, and every step whose wording did not
+   match what happened, on the issue for the rehearsal, with what was typed
+   and what came back. Fix the page from those notes in the same pull request
+   as anything a script needed.
+5. **Delete it all.** Cancel the server at the provider, delete the override
+   file, and remove the throwaway box's lines from `.ssh\known_hosts` (and
+   from `.ssh\config` if Setup-SshKey added one), so nothing is left pointing
+   at an address somebody else will be given next.
 
 ## The logs on the box, and how big they get
 
@@ -186,15 +425,17 @@ are kept. The oldest past five is the only thing that is ever removed. The
 watchdog's files and the door's log are kept a different way, or not at all,
 and are listed below.
 
-- `server.log` (game server, live and dev), `voice.log` (live and dev) and
-  `bot.log` are written by cmd's `>>` from the scheduled task, and Windows
-  will not move a file held that way while the service runs. So
-  `roll-log.ps1`, beside each service, rolls it just before the service
-  starts. A service that runs for days grows one file until its next restart.
-  An install of the game server or of voice rolls its log whatever the size,
-  so the run it starts has a file of its own and the one before is `.1`.
-- `thornswood.log` (the gamemode) and `site.log` (the website) roll
-  themselves.
+- `server.log` (game server, live and dev) and `voice.log` (live and dev)
+  are written by cmd's `>>` from the scheduled task, and Windows will not
+  move a file held that way while the service runs. So `roll-log.ps1`,
+  beside each service, rolls it just before the service starts. A service
+  that runs for days grows one file until its next restart. An install of
+  the game server or of voice rolls its log whatever the size, so the run it
+  starts has a file of its own and the one before is `.1`.
+- `thornswood.log` (the gamemode), `site.log` (the website) and `bot.log`
+  roll themselves. The bot's is written by its Windows service,
+  `ThornswoodBot` (`scripts\vps\BotService.cs`, issue #465), which rolls it
+  by size while the bot runs.
 - `C:\Thornswood-Watch\watch.log` and `restarts.txt` beside it are not
   rolled. Past 2,000 lines the watcher keeps the last 1,000 of each and the
   rest is gone.

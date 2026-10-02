@@ -2053,9 +2053,9 @@
   "34e548:WindhelmSSE.esp": [
    "2ed41a:WindhelmSSE.esp"
   ],
-  "34ef4:ElysiumEstateSSE.esp": [
-   "21e0c:ElysiumEstateSSE.esp",
-   "2f7ac:ElysiumEstateSSE.esp"
+  "34ef4:ElysiumEstate.esp": [
+   "21e0c:ElysiumEstate.esp",
+   "2f7ac:ElysiumEstate.esp"
   ],
   "34fd2:Dragonborn.esm": [
    "17546:Dragonborn.esm",
@@ -2084,12 +2084,11 @@
   "35a22:Dragonborn.esm": [
    "35a2b:Dragonborn.esm"
   ],
-  "35dec:ElysiumEstateSSE.esp": [
-   "1f288:ElysiumEstateSSE.esp",
-   "1f290:ElysiumEstateSSE.esp",
-   "1f293:ElysiumEstateSSE.esp",
-   "21e0f:ElysiumEstateSSE.esp",
-   "37665:ElysiumEstateSSE.esp"
+  "35dec:ElysiumEstate.esp": [
+   "1f288:ElysiumEstate.esp",
+   "1f290:ElysiumEstate.esp",
+   "1f293:ElysiumEstate.esp",
+   "224b95:ElysiumEstate.esp"
   ],
   "35f67:Dragonborn.esm": [
    "36106:Dragonborn.esm",
@@ -2143,9 +2142,6 @@
   "371de:Skyrim.esm": [
    "15da5:Skyrim.esm",
    "37b0c:Skyrim.esm"
-  ],
-  "373aa:ElysiumEstateSSE.esp": [
-   "3d831:ElysiumEstateSSE.esp"
   ],
   "37a22:AnotherOakwood.esp": [
    "2d7ad:AnotherOakwood.esp"
@@ -2826,9 +2822,6 @@
   "7614c:Skyrim.esm": [
    "62447:Skyrim.esm",
    "766dc:Skyrim.esm"
-  ],
-  "777de:ElysiumEstateSSE.esp": [
-   "79bfe:ElysiumEstateSSE.esp"
   ],
   "778f1:Skyrim.esm": [
    "789bc:Skyrim.esm",
@@ -6392,7 +6385,7 @@
    "interior": true,
    "name": "Windhelm Guard Armory"
   },
-  "34ef4:ElysiumEstateSSE.esp": {
+  "34ef4:ElysiumEstate.esp": {
    "edid": "00ElysiumEstateB",
    "interior": true,
    "name": "Elysium Estate Basement"
@@ -6440,8 +6433,8 @@
    "interior": true,
    "name": "Strange Vessel"
   },
-  "35dec:ElysiumEstateSSE.esp": {
-   "edid": "00ElysiumEstateint",
+  "35dec:ElysiumEstate.esp": {
+   "edid": "00ElysiumEstateInt",
    "interior": true,
    "name": "Elysium Estate"
   },
@@ -6508,11 +6501,6 @@
    "edid": "BleakFallsBarrow01",
    "interior": true,
    "name": "Bleak Falls Temple"
-  },
-  "373aa:ElysiumEstateSSE.esp": {
-   "edid": "00ElysiumEstateLoft",
-   "interior": true,
-   "name": "Elysium Estate Loft"
   },
   "373b:Dawnguard.esm": {
    "edid": "TestRSearsDLC01",
@@ -7639,11 +7627,6 @@
    "edid": "SolitudeCastleDourTower",
    "interior": true,
    "name": "Castle Dour, Tower"
-  },
-  "777de:ElysiumEstateSSE.esp": {
-   "edid": "00ElysiumEstateGuestHouse",
-   "interior": true,
-   "name": "Elysium Estate Guest House"
   },
   "778f1:Skyrim.esm": {
    "edid": "RobbersGorge01",
@@ -8910,14 +8893,14 @@
   }
  },
  "counts": {
-  "buildings": 852,
-  "doorBases": 362,
+  "buildings": 850,
+  "doorBases": 363,
   "failedToInflate": 0,
   "keyed": 335,
-  "lead": 2798,
+  "lead": 2794,
   "locked": 385,
-  "owned": 331,
-  "placed": 5658,
+  "owned": 330,
+  "placed": 5655,
   "unpaired": 0
  },
  "doors": {
@@ -11329,10 +11312,6 @@
   "151f2:HearthFires.esm": {
    "base": "c5893:Skyrim.esm",
    "cell": "15154:HearthFires.esm"
-  },
-  "1520a:ElysiumEstateSSE.esp": {
-   "base": "94192:Skyrim.esm",
-   "cell": "34ef4:ElysiumEstateSSE.esp"
   },
   "152cf:Skyrim.esm": {
    "base": "31897:Skyrim.esm",
@@ -15130,9 +15109,9 @@
    "cell": "142f9:Dragonborn.esm",
    "to": "186b4:Dragonborn.esm"
   },
-  "187baa:ElysiumEstateSSE.esp": {
+  "187baa:ElysiumEstate.esp": {
    "base": "94192:Skyrim.esm",
-   "cell": "35dec:ElysiumEstateSSE.esp"
+   "cell": "35dec:ElysiumEstate.esp"
   },
   "18834:Dawnguard.esm": {
    "base": "119f9:Dawnguard.esm",
@@ -16045,6 +16024,11 @@
    "cell": "142e2:Dragonborn.esm",
    "to": "1aa00:Dragonborn.esm"
   },
+  "1aa2c5:ElysiumEstate.esp": {
+   "base": "23226:ElysiumEstate.esp",
+   "cell": "34ef4:ElysiumEstate.esp",
+   "to": "2f7ac:ElysiumEstate.esp"
+  },
   "1aa6b:The Great City of Solitude.esp": {
    "base": "368ce:Skyrim.esm",
    "cell": "d74:Skyrim.esm",
@@ -16592,7 +16576,7 @@
    "base": "1c686:Dragonborn.esm",
    "cell": "142f1:Dragonborn.esm"
   },
-  "1c79c:ElysiumEstateSSE.esp": {
+  "1c79c:ElysiumEstate.esp": {
    "base": "10c00e:Skyrim.esm",
    "cell": "965b:Skyrim.esm"
   },
@@ -17127,28 +17111,28 @@
     "level": 100
    }
   },
-  "1f288:ElysiumEstateSSE.esp": {
+  "1f288:ElysiumEstate.esp": {
    "base": "252c7:Skyrim.esm",
    "cell": "d74:Skyrim.esm",
-   "to": "21e03:ElysiumEstateSSE.esp"
+   "to": "21e03:ElysiumEstate.esp"
   },
-  "1f290:ElysiumEstateSSE.esp": {
+  "1f290:ElysiumEstate.esp": {
    "base": "252c7:Skyrim.esm",
    "cell": "d74:Skyrim.esm",
    "lock": {
-    "key": "cf10:ElysiumEstateSSE.esp",
+    "key": "cf10:ElysiumEstate.esp",
     "level": 255
    },
-   "to": "35c71:ElysiumEstateSSE.esp"
+   "to": "35c71:ElysiumEstate.esp"
   },
-  "1f293:ElysiumEstateSSE.esp": {
+  "1f293:ElysiumEstate.esp": {
    "base": "252c7:Skyrim.esm",
    "cell": "d74:Skyrim.esm",
    "lock": {
-    "key": "cf10:ElysiumEstateSSE.esp",
+    "key": "cf10:ElysiumEstate.esp",
     "level": 255
    },
-   "to": "21e09:ElysiumEstateSSE.esp"
+   "to": "21e09:ElysiumEstate.esp"
   },
   "1f2c8:Skyrim.esm": {
    "base": "4203a:Skyrim.esm",
@@ -17593,29 +17577,24 @@
    "base": "74daf:Skyrim.esm",
    "cell": "cd4a:SkyrimSewers.esp"
   },
-  "21e03:ElysiumEstateSSE.esp": {
+  "21e03:ElysiumEstate.esp": {
    "base": "252c7:Skyrim.esm",
-   "cell": "35dec:ElysiumEstateSSE.esp",
+   "cell": "35dec:ElysiumEstate.esp",
    "lock": {
-    "key": "cf10:ElysiumEstateSSE.esp",
+    "key": "cf10:ElysiumEstate.esp",
     "level": 255
    },
-   "to": "1f288:ElysiumEstateSSE.esp"
+   "to": "1f288:ElysiumEstate.esp"
   },
-  "21e09:ElysiumEstateSSE.esp": {
+  "21e09:ElysiumEstate.esp": {
    "base": "252c7:Skyrim.esm",
-   "cell": "35dec:ElysiumEstateSSE.esp",
-   "to": "1f293:ElysiumEstateSSE.esp"
+   "cell": "35dec:ElysiumEstate.esp",
+   "to": "1f293:ElysiumEstate.esp"
   },
-  "21e0c:ElysiumEstateSSE.esp": {
+  "21e0c:ElysiumEstate.esp": {
    "base": "252c7:Skyrim.esm",
-   "cell": "35dec:ElysiumEstateSSE.esp",
-   "to": "21e0f:ElysiumEstateSSE.esp"
-  },
-  "21e0f:ElysiumEstateSSE.esp": {
-   "base": "252c7:Skyrim.esm",
-   "cell": "34ef4:ElysiumEstateSSE.esp",
-   "to": "21e0c:ElysiumEstateSSE.esp"
+   "cell": "35dec:ElysiumEstate.esp",
+   "to": "224b95:ElysiumEstate.esp"
   },
   "21f7:JKs Skyrim.esp": {
    "base": "2834e:Skyrim.esm",
@@ -17674,6 +17653,11 @@
    "base": "e3e3f:Skyrim.esm",
    "cell": "213a0:Skyrim.esm",
    "to": "25199:Skyrim.esm"
+  },
+  "224b95:ElysiumEstate.esp": {
+   "base": "252c7:Skyrim.esm",
+   "cell": "34ef4:ElysiumEstate.esp",
+   "to": "21e0c:ElysiumEstate.esp"
   },
   "225a:JKs Skyrim.esp": {
    "base": "24a5:JKs Skyrim.esp",
@@ -20294,19 +20278,14 @@
    "cell": "b1783:Skyrim.esm",
    "to": "2f72:Update.esm"
   },
-  "2f7ab:ElysiumEstateSSE.esp": {
-   "base": "23226:ElysiumEstateSSE.esp",
-   "cell": "34ef4:ElysiumEstateSSE.esp",
-   "to": "2f7ac:ElysiumEstateSSE.esp"
-  },
-  "2f7ac:ElysiumEstateSSE.esp": {
-   "base": "23227:ElysiumEstateSSE.esp",
+  "2f7ac:ElysiumEstate.esp": {
+   "base": "23227:ElysiumEstate.esp",
    "cell": "d74:Skyrim.esm",
    "lock": {
-    "key": "cf10:ElysiumEstateSSE.esp",
+    "key": "cf10:ElysiumEstate.esp",
     "level": 255
    },
-   "to": "2f7ab:ElysiumEstateSSE.esp"
+   "to": "1aa2c5:ElysiumEstate.esp"
   },
   "2f96:Update.esm": {
    "base": "2f3b:Update.esm",
@@ -20560,6 +20539,10 @@
   "3073:JKs Skyrim.esp": {
    "base": "99367:Skyrim.esm",
    "cell": "1a272:Skyrim.esm"
+  },
+  "3092a8:ElysiumEstate.esp": {
+   "base": "c5893:Skyrim.esm",
+   "cell": "34ef4:ElysiumEstate.esp"
   },
   "309a:HearthFires.esm": {
    "base": "94193:Skyrim.esm",
@@ -21025,6 +21008,10 @@
    "base": "64092:Skyrim.esm",
    "cell": "d74:Skyrim.esm",
    "to": "399d6:Skyrim.esm"
+  },
+  "32cacd:ElysiumEstate.esp": {
+   "base": "32cb0f:ElysiumEstate.esp",
+   "cell": "35dec:ElysiumEstate.esp"
   },
   "32cb0:Skyrim.esm": {
    "base": "64092:Skyrim.esm",
@@ -21857,10 +21844,10 @@
    "cell": "d74:Skyrim.esm",
    "to": "35a1b:Skyrim.esm"
   },
-  "35c71:ElysiumEstateSSE.esp": {
+  "35c71:ElysiumEstate.esp": {
    "base": "252c7:Skyrim.esm",
-   "cell": "35dec:ElysiumEstateSSE.esp",
-   "to": "1f290:ElysiumEstateSSE.esp"
+   "cell": "35dec:ElysiumEstate.esp",
+   "to": "1f290:ElysiumEstate.esp"
   },
   "35cb8:SkyrimSewers.esp": {
    "base": "d62:SkyrimSewers.esp",
@@ -22223,11 +22210,6 @@
    "base": "2e4c3:Skyrim.esm",
    "cell": "371de:Skyrim.esm",
    "to": "15da5:Skyrim.esm"
-  },
-  "37665:ElysiumEstateSSE.esp": {
-   "base": "23227:ElysiumEstateSSE.esp",
-   "cell": "373aa:ElysiumEstateSSE.esp",
-   "to": "3d831:ElysiumEstateSSE.esp"
   },
   "3782f:Skyrim.esm": {
    "base": "5ad3c:Skyrim.esm",
@@ -23404,11 +23386,6 @@
    "cell": "d74:Skyrim.esm",
    "to": "66657:JK's Whiterun's Outskirts.esp"
   },
-  "3d831:ElysiumEstateSSE.esp": {
-   "base": "23226:ElysiumEstateSSE.esp",
-   "cell": "35dec:ElysiumEstateSSE.esp",
-   "to": "37665:ElysiumEstateSSE.esp"
-  },
   "3d9b0:Skyrim.esm": {
    "base": "34451:Skyrim.esm",
    "cell": "1f358:Skyrim.esm",
@@ -23531,9 +23508,9 @@
    "base": "2c155:Skyrim.esm",
    "cell": "1528c:Skyrim.esm"
   },
-  "3e377:ElysiumEstateSSE.esp": {
+  "3e377:ElysiumEstate.esp": {
    "base": "10fcd9:Skyrim.esm",
-   "cell": "35dec:ElysiumEstateSSE.esp"
+   "cell": "35dec:ElysiumEstate.esp"
   },
   "3e39d:Skyrim.esm": {
    "base": "4203a:Skyrim.esm",
@@ -30074,12 +30051,6 @@
     "level": 50
    }
   },
-  "79ad4:ElysiumEstateSSE.esp": {
-   "base": "252c7:Skyrim.esm",
-   "cell": "777de:ElysiumEstateSSE.esp",
-   "owner": "93b19:Skyrim.esm",
-   "to": "79bfe:ElysiumEstateSSE.esp"
-  },
   "79af2:Skyrim.esm": {
    "base": "64092:Skyrim.esm",
    "cell": "16e00:Skyrim.esm",
@@ -30089,11 +30060,6 @@
    },
    "owner": "6566b:Skyrim.esm",
    "to": "7bdbe:Skyrim.esm"
-  },
-  "79bfe:ElysiumEstateSSE.esp": {
-   "base": "252c7:Skyrim.esm",
-   "cell": "d74:Skyrim.esm",
-   "to": "79ad4:ElysiumEstateSSE.esp"
   },
   "7a01d:Skyrim.esm": {
    "base": "37cfe:Skyrim.esm",
@@ -30153,13 +30119,13 @@
    "cell": "3bf0:Dawnguard.esm",
    "to": "7b24:Dawnguard.esm"
   },
-  "7b71d:ElysiumEstateSSE.esp": {
+  "7b71d:ElysiumEstate.esp": {
    "base": "94192:Skyrim.esm",
-   "cell": "35dec:ElysiumEstateSSE.esp"
+   "cell": "35dec:ElysiumEstate.esp"
   },
-  "7b720:ElysiumEstateSSE.esp": {
+  "7b720:ElysiumEstate.esp": {
    "base": "94192:Skyrim.esm",
-   "cell": "35dec:ElysiumEstateSSE.esp"
+   "cell": "35dec:ElysiumEstate.esp"
   },
   "7b8fa:Skyrim.esm": {
    "base": "31895:Skyrim.esm",
@@ -31219,7 +31185,7 @@
     "level": 255
    }
   },
-  "89b9d:ElysiumEstateSSE.esp": {
+  "89b9d:ElysiumEstate.esp": {
    "base": "10c00e:Skyrim.esm",
    "cell": "965b:Skyrim.esm"
   },
@@ -37013,13 +36979,13 @@
    "base": "64091:Skyrim.esm",
    "cell": "16dfa:Skyrim.esm"
   },
-  "d96a:ElysiumEstateSSE.esp": {
+  "d96a:ElysiumEstate.esp": {
    "base": "10c00e:Skyrim.esm",
    "cell": "965b:Skyrim.esm"
   },
-  "d98b:ElysiumEstateSSE.esp": {
+  "d98b:ElysiumEstate.esp": {
    "base": "10c00e:Skyrim.esm",
-   "cell": "963c:Skyrim.esm"
+   "cell": "965b:Skyrim.esm"
   },
   "d9d79:Skyrim.esm": {
    "base": "cc16a:Skyrim.esm",

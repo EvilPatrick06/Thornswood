@@ -16,10 +16,17 @@
 
   HOW. Sign-Artifact.ps1 is run for real with a signing.json in a temp folder
   whose metadata is "records\signing\metadata.json", from a working folder that
-  is not the repository. The tracked metadata.json still has no certificate
-  profile, so the script says so and signs nothing; that answer, naming the
-  repository's file, is the proof the relative path was read from the right
-  place. Nothing is signed and nothing outside the temp folder is written.
+  is not the repository. Since 27 September (#815) the tracked metadata.json
+  names the real certificate profile, so the working folder is given a
+  records\signing\metadata.json of its own whose profile is still the
+  placeholder. Read from the working folder, the script would say "not filled
+  in yet" and stop there; read from the repository, it goes on to look for
+  signtool. Going on is the proof the relative path was read from the right
+  place. The file it is asked to sign does not exist, so nothing is signed
+  either way. A signing.json naming that placeholder by full path then shows
+  that a half set up machine still signs nothing without failing the build,
+  and that -Required stops a release on it. Nothing outside the temp folder
+  is written.
 #>
 [CmdletBinding()]
 param()
@@ -27,9 +34,9 @@ param()
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-$repo = Split-Path -Parent $Here
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+$repo = $Here
 $shell = (Get-Process -Id $PID).Path
 
 $script:pass = 0
@@ -39,7 +46,7 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
 
-$meta = Join-Path $Here '..\records\signing\metadata.json'
+$meta = Join-Path $Here 'records\signing\metadata.json'
 Yes 'records\signing\metadata.json is in the repository' (Test-Path -LiteralPath $meta)
 $m = $null
 try { $m = Get-Content -LiteralPath $meta -Raw | ConvertFrom-Json } catch { }
@@ -54,13 +61,26 @@ $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-signing-' + [Guid]::Ne
 New-Item -ItemType Directory -Force -Path $work | Out-Null
 Push-Location $work
 try {
+    # The decoy: the same relative path under the working folder, with the
+    # placeholder profile the example carries.
+    $decoyDir = Join-Path $work 'records\signing'
+    New-Item -ItemType Directory -Force -Path $decoyDir | Out-Null
+    $decoy = Join-Path $decoyDir 'metadata.json'
+    [IO.File]::WriteAllText($decoy, '{"Endpoint":"https://wus2.codesigning.azure.net","CodeSigningAccountName":"ThornswoodSigning","CertificateProfileName":"FILL THIS IN"}')
+    $sign = Join-Path $Here 'scripts\release\Sign-Artifact.ps1'
+
     $cfg = Join-Path $work 'signing.json'
     [IO.File]::WriteAllText($cfg, '{"method":"artifactsigning","dlib":"records\\signing\\client\\Azure.CodeSigning.Dlib.dll","metadata":"records\\signing\\metadata.json"}')
-    $out = & $shell -NoProfile -File (Join-Path $Here '..\scripts\release\Sign-Artifact.ps1') -Path (Join-Path $work 'nothing.exe') -ConfigPath $cfg 2>&1 | Out-String
+    $out = & $shell -NoProfile -File $sign -Path (Join-Path $work 'nothing.exe') -ConfigPath $cfg 2>&1 | Out-String
+    Yes 'a relative metadata path is read from the repository, not from the working folder' (
+        $out -notmatch 'not filled in yet' -and $out -match 'signtool')
+
+    $half = Join-Path $work 'half.json'
+    [IO.File]::WriteAllText($half, ('{"method":"artifactsigning","dlib":"records\\signing\\client\\Azure.CodeSigning.Dlib.dll","metadata":' + (ConvertTo-Json $decoy) + '}'))
+    $out = & $shell -NoProfile -File $sign -Path (Join-Path $work 'nothing.exe') -ConfigPath $half 2>&1 | Out-String
     $code = $LASTEXITCODE
-    Yes 'a relative metadata path is read from the repository, not from the working folder' ($out -match 'not filled in yet' -and $out -match [regex]::Escape('signing'))
-    Yes 'and with no certificate profile yet it signs nothing and does not fail the build' ($code -eq 0)
-    $out = & $shell -NoProfile -File (Join-Path $Here '..\scripts\release\Sign-Artifact.ps1') -Path (Join-Path $work 'nothing.exe') -ConfigPath $cfg -Required 2>&1 | Out-String
+    Yes 'with no certificate profile yet it signs nothing and does not fail the build' ($code -eq 0 -and $out -match 'not filled in yet')
+    $out = & $shell -NoProfile -File $sign -Path (Join-Path $work 'nothing.exe') -ConfigPath $half -Required 2>&1 | Out-String
     Yes 'with -Required, the same missing profile stops a release' ($LASTEXITCODE -ne 0 -and $out -match 'not filled in yet')
 }
 finally {

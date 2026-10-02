@@ -10,8 +10,8 @@ SECOND-DEVELOPER.md until 25 September, when the team grew past two.
 ## What Thornswood is
 
 Thornswood is a modded co-op Skyrim roleplay server on SkyMP, the server
-authoritative multiplayer for Skyrim Special Edition. It is Patrick's, in a
-closed playtest with friends and testers, becoming an RP server of its own,
+authoritative multiplayer for Skyrim Special Edition. It is Patrick's, in an
+alpha that is open by application, becoming an RP server of its own,
 less strict than the big ones, with working NPCs, its own launcher, its own
 website and Discord, and a lore of its own (fifty years after the civil war,
 the Stormcloaks won, a High King over the Jarls, the Thalmor expelled, the
@@ -26,7 +26,8 @@ release, launcher, game files and server together, are in CONTRIBUTING.md.
 | Piece | Where | What it is |
 | --- | --- | --- |
 | Source repo | github.com/EvilPatrick06/Thornswood (private), clone at `C:\Users\<you>\Downloads\Thornswood-Repo` | Launcher source, plugins, site, bot, every script |
-| Releases repo | github.com/EvilPatrick06/Thornswood-Releases (public), clone beside the source repo as `Thornswood-Releases`, dev branch as a worktree `Thornswood-Releases-dev` | `version.json` and `published.json` (pack baseline) per branch (main, dev), and the release assets: packs and launcher exes |
+| Feed store | On the VPS beside the feed the site serves: `C:\Thornswood-Docs\feed\{version.json, published.json, launchers.txt, history\}` and the same under `feed-dev`. Each machine's working copy is `%LOCALAPPDATA%\Thornswood\feed\main` and `\dev` | `version.json` (the feed, served at `/feed[-dev]/version.json`), `published.json` (the pack baseline), every launcher version the channel published, and each replaced file, none of those three served. Ship receives and sends them through `scripts\release\Feed-Store.ps1` (#907). Until then they were the `Thornswood-Releases` GitHub repository and its two clones |
+| Downloads | On the VPS, `C:\Thornswood-Docs\feed\assets` and `feed-dev\assets`, served at `https://thornswood.net/feed[-dev]/assets/<sha256>` | Every pack, launcher exe and client runtime a feed names, one file per sha256, one folder per channel (`docs\FEED.md` "Downloads come from the site") |
 | Launcher | `launcher\app\*.cs` + `launcher\ui.xaml`, built by `scripts\release\Build-Launcher.ps1` with the .NET Framework 4 csc, C# 5 only | WPF app at `<drive>:\Thornswood\Launcher\Thornswood.exe` (C: on most machines); profile, config and packs under that folder. The scripts find the install on whichever fixed drive holds it; `-Root` overrides |
 | Dev build | `<drive>:\Thornswood-DevBuild`, beside the main install, put there by the main launcher's Play page Server dropdown | Same exe, `config.json` says `Channel: dev`, `UpdateBranch: dev`, port 7787, voice 7789. Staff roles only (Owner, Dev, Gamemaster, Moderator, Loremaster) |
 | Game | `<Root>\Game`, Thornswood's own folder, which the launcher builds from the Steam copy of Skyrim Special Edition and what Vortex deployed from the Nexus collection (see One Skyrim of its own) | The launcher will not Play from the Steam copy itself. Thornswood's own loose files live in `Data\Platform` (plugins in `Plugins\thornswood-*.js`, page in `UI\`) and `Data\SKSE\Plugins\Thornswood.ini` |
@@ -35,8 +36,8 @@ release, launcher, game files and server together, are in CONTRIBUTING.md.
 | Dev game server | `C:\Thornswood-Server-Dev`, 7787, resources 7788, task `Thornswood Dev Server` | Same binaries, fresh world, door list is the staff roles only (`https://thornswood.net/dev`) |
 | Voice | `C:\Thornswood-Voice` 7778 and `C:\Thornswood-Voice-Dev` 7789 | node, `voice\voice-server.js`; the launcher holds the microphone, the game plugin relays state through files in `Data\Platform` |
 | Site | `site`, on the VPS at `C:\Thornswood-Docs`, node on 127.0.0.1:3001 behind Caddy, https://thornswood.net | Public pages from `data\site\*.md`, admin hub, Discord login, the door API, uploads, news |
-| Bot | `bot`, on the VPS at `C:\Thornswood-Bot`, task `Thornswood Bot` | discord.py: tickets, join cards, staff tools |
-| Watchdog | `C:\Thornswood-Watch\watch.ps1`, every five minutes | Restarts any service that stops answering, three tries an hour |
+| Bot | `bot`, on the VPS at `C:\Thornswood-Bot`, the Windows service `ThornswoodBot` under its own account, `NT SERVICE\ThornswoodBot` | discord.py: tickets, join cards, staff tools |
+| Watchdog | `C:\Thornswood-Watch\watch.ps1`, every five minutes | Restarts any service that stops answering, three tries an hour, and tells the staff channel once when anything dies and once when it is back: the servers, voice, the site, the bot, the nightly backup, the build runner and the disk. Through the bot, or its own webhook when the bot is down |
 
 The server's SkyMP fork is on GitHub (github.com/EvilPatrick06/skymp, branch
 `thornswood/engine-changes`), so its source survives any one machine, and since
@@ -44,11 +45,22 @@ The server's SkyMP fork is on GitHub (github.com/EvilPatrick06/skymp, branch
 the commit the build records name: `git submodule update --init engine/skymp`
 fetches it into the repository folder. It is large and needs Visual Studio to
 build, so a machine that only copies server binaries can leave it unfetched.
-Its configured build tree and toolchain (`engine\skymp\build`, and
-`C:\Thornswood-Dev\skymp\build` until Patrick's machine has moved) are on
+Its configured build tree and toolchain (`engine\skymp\build`) are on
 Patrick's machine alone for now. The release output is `out` in the repository
 folder, ignored by git. `scripts\release\Where.ps1` says where each of these is on the
-machine it runs on. Who holds each thing Thornswood cannot run without, and who the
+machine it runs on.
+
+What one machine keeps and git never sees has a home of its own since
+29 September (issue #440, phase 10), when the last of it left `tools\` and that
+folder went:
+
+| File | Where | What it is | Read by |
+| --- | --- | --- | --- |
+| `signing.json` | `records\signing` | Whether this machine signs, and with what. No key in it | Sign-Artifact, Ship, Publish-Installer, Setup-ShipMachine |
+| `setup-stub.exe`, `setup-stub.pdb` | `out` | The setup program, compiled by Build-Launcher | Package-Thornswood, Ship |
+| `thornswood-front.zip` | `local` | The front build, made outside the repository | Go |
+| `mod-audit.json` | `local` | What Audit-Mods found last time | Audit-Mods |
+| `backup-key.txt` | `local` | A copy of the backup passphrase, a secret. Documents is where it really lives | Restore-Backup | Who holds each thing Thornswood cannot run without, and who the
 second holder is, is `docs\OWNERSHIP.md`.
 
 ## How a release goes out
@@ -62,8 +74,8 @@ untestable, or for work Patrick has said goes live, and it is his call.
 ```
 
 That is the dev release: version 1.1.36.1, .2, .3, pack ids ending `-dev`, the
-dev worktree and branch of the releases repo, the dev baseline
-(`published.json` in that worktree), the dev ports, and the dev server told. It runs from
+dev feed and the dev baseline (`feed-dev` in the VPS store), the dev ports,
+and the dev server told. It runs from
 any branch on any developer's machine. There is no installer for it, and it
 posts to the dev updates channel in Discord and the dev launcher's News tab,
 never #news. There is one dev feed and the last dev Ship wins, so say in #staff-general
@@ -102,9 +114,11 @@ launcher, checks that the game folder holds the recorded client build
 `scripts\release\Publish-Update.ps1`, which
 scans the game folder for loose files that are not Vortex's, not vanilla, not
 runtime and not per machine, diffs them against this channel's baseline
-(`published.json` in the releases clone), zips the difference as a pack,
-uploads pack and launcher as a GitHub release in the releases repo, rewrites
-`version.json` and pushes it.
+(`published.json`, received from the VPS store at the start), zips the
+difference as a pack, sends the pack, the launcher and the client runtime to
+the site's `/feed[-dev]/assets/<sha256>` (since #897), rewrites `version.json`
+and sends it and then the baseline back to the VPS store (since #907), which
+is the moment the site serves the release.
 
 The tip customers get is that `version.json`, and launchers poll the feed url in
 it. So two things follow the tip, both run by
@@ -112,16 +126,13 @@ it. So two things follow the tip, both run by
 the channel it shipped, and then the release is announced as it always was:
 
 1. **The host feed remirror**, the website lane's script, called as
-   `& (Join-Path $Here '..\deploy\Remirror-Site-Feed.ps1') -Dev:$Dev`. The
-   Thornswood-Releases tip goes to `https://thornswood.net/feed/` and the
-   Thornswood-Releases-dev tip to `https://thornswood.net/feed-dev/`, with the
-   assets each feed names. It has `-Check` for a dry run and `-Verify` to rehash
+   `& (Join-Path $Here '..\deploy\Remirror-Site-Feed.ps1') -Dev:$Dev`. It
+   checks every asset the channel's feed names is on `https://thornswood.net/feed/`
+   (or `/feed-dev/`) and finds `version.json` already there, because the
+   publisher sent it. It has `-Check` for a dry run and `-Verify` to rehash
    what is up there, and optional `-FeedDir` and `-AssetDir` that nothing here
-   passes: it works the clone out from the channel itself. That is the feed a
-   launcher polls since the #649 host cutover (`docs\FEED.md`), and a launcher
-   falls back to the GitHub feed only when the site feed does not answer at all,
-   so an unmirrored site feed offers people the release it last held rather than
-   this one.
+   passes: it works this machine's working copy out from the channel itself.
+   That is the only feed a launcher polls since #907 (`docs\FEED.md`).
 2. **The site news, the #news post and the server's countdown**, unchanged, the
    news main only as it always was. Those tell people to update, which is why
    the feed is mirrored before them.
@@ -221,12 +232,17 @@ Several people, several machines, one repo. The short rules are in
   team before code. Editing `Shell.cs`, `Checks.cs`, `Keep.cs`, `Hold.cs`,
   `Updater.cs` or `Publish-Update.ps1` gets a line in #staff-general too; every
   machine touches them.
-- **The publisher pulls the feed** before `version.json` is edited, so a
-  release is added on top of whatever another machine just published; a
-  refused push means NOT SHIPPED, pull and run Ship again.
-- **The baseline is per channel in Thornswood-Releases.** Every shipping machine
-  pulls the same published.json, so a Dev Ship from a second machine packs the
-  same difference. Pending unfinished-push notes stay per machine under LOCALAPPDATA.
+- **The publisher receives the feed and the baseline from the VPS** at the
+  start and asks again before `version.json` is edited: a feed somebody changed
+  meanwhile is received again and the release goes on top of it, and a
+  baseline another Ship moved stops the release with nothing written. Each send
+  replaces the file on the VPS only if it is still the one received
+  (`scripts\release\Feed-Store.ps1`), so a refused send means NOT SHIPPED; run
+  Ship again.
+- **The baseline is per channel on the VPS store.** Every shipping machine
+  receives the same published.json, so a Dev Ship from a second machine packs
+  the same difference. Pending unfinished-send notes stay per machine under
+  LOCALAPPDATA.
 - **Keep puts its kept copies back at every Play**, on every machine. Go.ps1,
   which Ship runs to put the plugins and overlays in, makes what it installs
   the kept copy, the way a pack does, so a Ship is never undone by the next
@@ -248,13 +264,13 @@ Needs: Windows 10 or 11, Skyrim Special Edition on Steam (any Steam library,
 any drive; the scripts find it through Steam) with the Thornswood collection
 deployed through Vortex, the Thornswood launcher installed on any drive and
 signed in, git, the GitHub CLI (`gh`) signed in to an account that is a
-collaborator on both repos, PowerShell 7, node, Python 3 with `discord.py`
-and `Pillow` for the bot scripts, and an SSH key the VPS knows.
+collaborator on the source repo, PowerShell 7, node, Python 3 with `discord.py`
+and `Pillow` for the bot scripts, and an SSH key the VPS knows. There is no
+releases clone any more: the feed and its baseline are on the VPS (#907).
 
 ```
 cd C:\Users\<you>\Downloads
 git clone https://github.com/EvilPatrick06/Thornswood.git Thornswood-Repo
-git clone https://github.com/EvilPatrick06/Thornswood-Releases.git Thornswood-Releases
 gh auth login
 gh auth status
 ```
@@ -278,9 +294,10 @@ Then in `Thornswood-Repo`:
 which makes a key for the VPS, points ssh at it, and prints the public line.
 Send that line to Patrick; he runs `.\scripts\vps\Add-VpsKey.ps1 -PublicKey '<the line>'`
 from his machine and the VPS knows you. `.\scripts\vps\Setup-SshKey.ps1 -Test`
-proves it. Until then the scripts that talk to the VPS (`Deploy-*`,
+proves it. Until then the scripts that talk to the VPS (`Ship`, `Deploy-*`,
 `Request-Restart`, `Install-Bot`, `Publish-Installer`, `Publish-News`) cannot
-reach it, and Ship still publishes but cannot warn the room.
+reach it, and Ship stops before it builds anything: the feed and its baseline
+are received from the VPS (#907).
 
 Every Ship, dev included, checks the SkyMP client against the record, so
 this machine builds the engine once (Visual Studio 2022 Build Tools with
@@ -291,16 +308,15 @@ missing):
 .\scripts\release\Build-Engine.ps1
 ```
 
-`engine\README.md` has the rest. Two more one-time things somebody already
-set up does for you: Patrick adds you as a collaborator on
-`EvilPatrick06/Thornswood-Releases`, which the publish pushes to, and gives
-you the dev news webhook privately, which `.\scripts\ops\Set-DevNews.ps1`
-stores on this machine (without it a dev Ship publishes and posts nothing).
+`engine\README.md` has the rest. A machine that only Ships does not need
+to build it: `.\scripts\release\Setup-ShipMachine.ps1` fetches the recorded
+client from the site instead (Shipping from another machine, below). The
+release webhooks are on the VPS (`scripts\ops\Discord-Hook.ps1`) and every
+Ship reads them from there, so there is nothing to hand over.
 
-The pack baseline lives in the releases clone. Pull `Thornswood-Releases` (and the
-dev worktree) before the first Ship so `published.json` is there. If this machine
-still has a legacy copy under `%LOCALAPPDATA%\Thornswood\`, the first Ship copies
-it into Releases and leaves the legacy file alone. To rebuild a baseline by hand:
+The pack baseline lives on the VPS beside the feed, and every Ship receives it
+first, so there is nothing to pull. If the VPS has none for a channel, Ship
+stops with "No baseline yet". To rebuild a baseline by hand:
 
 ```
 .\scripts\release\Publish-Update.ps1 -Baseline
@@ -310,36 +326,99 @@ which records what the game folder holds right now without shipping anything. Do
 straight after the launcher has brought the game up to date, so the baseline is the
 current release and the first real Ship carries only what you changed.
 
-`Publish-Discord.ps1` reads the #news webhook from `bot\news-webhook.txt`,
-which is not in the repo. Patrick gives it to you if you will ship main releases
-from your machine; without it Ship says so and carries on.
+`Publish-Discord.ps1` reads the #news webhook and the dev updates one from
+the VPS through `Discord-Hook.ps1`, and a copy in `bot\news-webhook.txt` or
+`bot\dev-webhook.txt` only when the VPS cannot be asked; without either, Ship
+says so and carries on.
+
+## Shipping from another machine
+
+Issue #458: if One (Patrick's machine) dies, the release process has to
+survive it. Measured on One on 29 September, this is everything a dev Ship
+reads that is not in a fresh clone, where it is on One, and where a second
+machine gets it or how it is rebuilt. Nothing in this list is copied from One
+by hand, and no secret is written into the repository.
+
+| What a Ship needs | On One | A second machine |
+| --- | --- | --- |
+| The source | the shared clone | `git clone https://github.com/EvilPatrick06/Thornswood.git` and `gh auth login` as a collaborator |
+| The feed, its baseline, the launcher list and history | the VPS store, with a working copy in `%LOCALAPPDATA%\Thornswood\feed\<channel>` | Nothing to copy: every Ship receives them from the VPS first (`scripts\release\Feed-Store.ps1`, #907). The working copy is made on the first Ship |
+| The release webhooks, dev and #news | the VPS, `C:\Thornswood-Bot\webhooks`; One has no local copy | Nothing to copy: Ship reads them over ssh (`scripts\ops\Discord-Hook.ps1`) |
+| VPS access | One's own key, `.ssh\thornswood_ed25519` | Its own key: `.\scripts\vps\Setup-SshKey.ps1 -KeyOnly`, and somebody the VPS already knows runs `.\scripts\vps\Add-VpsKey.ps1 -PublicKey '<the line>'`. With no such machine left, the BisectHosting panel is the way in (`docs\IT-IS-DOWN.md`) |
+| Signing: `records\signing\signing.json` | enabled, naming `C:\tools\metadata.json` and the client under `records\signing\client\client`, paths only One has. Never copy it | `.\scripts\release\Setup-ShipMachine.ps1` writes one from `records\signing\signing.template.json` (paths and "enabled": true, no key or password) |
+| Signing: Microsoft's signing client | `records\signing\client`, ignored by git | The same script fetches `Microsoft.ArtifactSigning.Client` 1.0.128 from nuget.org and refuses it unless its sha256 is the pinned one, which is the package One has |
+| Signing: the Azure sign in | `az login` on One, as Patrick | `az login` on the new machine, as Patrick. Only Patrick's Azure account has signing access (the Certificate Profile Signer role on the ThornswoodSigning account, profile ThornswoodRelease), so a second machine signs only while it is signed in as him (Patrick, 29 Sep). The script asks the signing service with that sign in and checks the profile answers with the identity the launcher pins. Signing in is the one step only Patrick can do |
+| The client runtime `records\client-build.json` names | only in the dev game folder, `C:\Thornswood-DevBuild\Game`. The build copies in `Downloads\Thornswood-ClientBuild-<commit>` are older builds, and the shared clone's `engine\skymp\build` does not match the record | The script fetches the zip of the recorded commit from the site's feed (`clientRuntime` in `/feed-dev/version.json` or `/feed/version.json`), checks it against the feed's sha256 and every file against the record, and puts the six files in the build folder. A commit on neither feed is built: `.\scripts\release\Setup-ShipMachine.ps1 -Rebuild`, or `.\scripts\release\Build-Engine.ps1` |
+| The game folder the Ship packs, `<root>-DevBuild\Game` | built by the dev launcher from what Vortex deployed | Skyrim Special Edition on Steam, Vortex with a profile named Thornswood and the Thornswood collection installed and deployed, the launcher from thornswood.net, then the dev build and its own game folder (Setting up a machine, above). A person does this; it needs a Nexus account, not Patrick's |
+| The collection itself | Nexus collection `7essxf`, curated from Patrick's Nexus account in his Vortex | Any machine installs it. Only publishing a new revision needs his account (`docs\OWNERSHIP.md`) |
+| Backups | the originals on the VPS, `C:\Thornswood-Backup`, and copies fetched to One's `Downloads\Thornswood-Backups`; the passphrase on the VPS and in One's Documents | Not needed to Ship. `.\scripts\vps\Fetch-Backups.ps1` brings them down to any machine the VPS knows |
+
+The whole of it, on the second machine, from the repository folder:
+
+```
+.\scripts\release\Setup-ShipMachine.ps1 -Check
+```
+
+says what the machine has and what it would fetch or write, and changes
+nothing.
+
+```
+.\scripts\release\Setup-ShipMachine.ps1
+```
+
+checks the tools a Ship calls (git, gh, PowerShell 7, node, ssh, the .NET
+Framework compiler, signtool, az, the .NET 8 runtime), fetches the signing
+client, writes `records\signing\signing.json`, checks the Azure sign in, fetches the
+recorded client, and then runs `.\scripts\release\Check-ShipReady.ps1 -Channel dev`
+for everything else Ship asks: the dev build, its game folder, the Vortex
+profile, the VPS and the feed store. Each gap prints the command that closes
+it and says when it is Patrick's. It never turns signing off, never edits a
+`records\signing\signing.json` that is there, and never ships. Signing needs Patrick in
+person: only his Azure account has signing access, so the `az login` on the
+second machine is his, and that machine signs only while it is signed in as
+him. When both say READY:
+
+```
+.\scripts\release\Ship.ps1 -Channel dev "what changed, in plain words
+- one line for each thing a person will notice"
+```
+
+A main Ship stays Patrick's (How work moves). The same script with
+`-Channel main` checks a machine for it and says so.
+
+`tests\test-ship-machine.ps1` walks this section: every script it names is
+in the repository with the parameters it is given, the template holds paths
+only, and the fetch refuses a signing client or a client runtime that is not
+the pinned or recorded bytes.
 
 ## Secrets, by name and place, never by value
 
 None of these is tracked by git. Four of them sit inside the repo folder on
 the machine that holds them and are kept out by `.gitignore`: the two webhooks,
-`tools\signing.json` and the retired `server-secret.txt`. The rest are on the VPS or in
+`records\signing\signing.json` and the retired `server-secret.txt`. The rest are on the VPS or in
 your own profile. Each row says what the thing actually protects today, and
 says **not enforced** where nothing checks it.
 
 | Secret | Where it lives | What it actually protects | Who reissues it |
 | --- | --- | --- | --- |
 | Server password, for joining the game server | Nowhere the game server looks. `serverPassword` in the site's `C:\Thornswood-Docs\config.json` on the VPS, where `Rotate-ServerPassword.ps1` writes it | **Not enforced.** Nothing reads it. SkyMP has no join password and the site's join reply stopped carrying one. The old four digit value was in the public `version.json` before 1.0.197, so treat it as known. | Nobody needs to. `Rotate-ServerPassword.ps1` still runs and changes a value nothing reads. |
-| Character register secret, retired | `server-secret.txt` at the repo root on Patrick's machine, and `C:\Thornswood-Voice\secret.txt` on the VPS if it is still there. Nothing removed that one when the register went, and `C:\Thornswood-Voice-Dev` may hold a copy, because `vps-dev-instance.ps1` copies the live voice folder whole | **Not enforced.** Nothing has read it since 23 September, when the voice service's character register (`/whoami`, `/claim`, `/owners`) was taken out and `Install-Voice.ps1` stopped sending it. It is not the join password: since 18 September it has been 32 random bytes. | Nobody. With no reader there is nothing to reissue. It is listed so nobody takes it for a live secret, or for the join password. |
+| Character register secret, retired | `server-secret.txt` at the repo root on Patrick's machine, and `C:\Thornswood-Voice\secret.txt` on the VPS if it is still there. Nothing removed that one when the register went, and `C:\Thornswood-Voice-Dev` may hold a copy, because `vps-dev-instance.ps1` copied the live voice folder whole until #1083; it copies only the program, its page and the log roller now | **Not enforced.** Nothing has read it since 23 September, when the voice service's character register (`/whoami`, `/claim`, `/owners`) was taken out and `Install-Voice.ps1` stopped sending it. It is not the join password: since 18 September it has been 32 random bytes. | Nobody. With no reader there is nothing to reissue. It is listed so nobody takes it for a live secret, or for the join password. |
 | Site member password | `password` in `C:\Thornswood-Docs\config.json`; without it the site falls back to a default written in `server.js` | **Not enforced** while Discord sign in is set up: `/api/login` refuses it and the member cookie is ignored. It is a way in only to a site with no Discord client id and secret. | Nobody needs to while Discord is set up. Otherwise anyone with VPS access edits that line and restarts the site. |
 | Site `botKey`, which is also the door key | `botKey` in `C:\Thornswood-Docs\config.json`. The same value is `THORNSWOOD_KEY` in `C:\Thornswood-Bot\bot.env.json`, and `key` in `C:\Thornswood-Server\private\door.json` and `C:\Thornswood-Server-Dev\private\door.json` | The site's `/api/ticket` (the bot filing tickets), `/api/roster` (the game server sending its character book) and `/api/allowed` and `/dev/api/allowed` (the door's list). Each answers 401 without it. Whoever holds it can read every allowed person's name and profile ids, the admins' included. | Anyone with VPS access: `Install-Bot.ps1 -RotateKey`, then `Deploy-Docs.ps1` so the site loads it, then `Set-Door.ps1 -Connect` and `Set-Door.ps1 -Connect -Root C:\Thornswood-Server-Dev -Site https://thornswood.net/dev`. Skip the last two and both doors are refused on their next fetch. |
 | Site `secret` | `secret` in `C:\Thornswood-Docs\config.json`. The site makes it on its first start. | Signs the site's Discord sign in cookie and the ticket every launcher keeps in `Profile\discord.txt`. Whoever holds it can pass as any Discord account, to the site and to the launcher's check in. | Anyone with VPS access, and there is no script: delete that line and restart the site with `Deploy-Docs.ps1`, which makes a new one. Everybody is signed out of the site and every launcher has to link Discord again. |
 | Discord client secret | `discord.clientSecret` in `C:\Thornswood-Docs\config.json` | Discord sign in on the site: with the client id it turns a sign in into who somebody is. | The Discord application's owner resets it in the developer portal (OAuth2). Then `Set-DiscordLogin.ps1` takes it at a prompt and restarts the site. |
-| Discord bot token | `discord.botToken` in `C:\Thornswood-Docs\config.json` and `DISCORD_TOKEN` in `C:\Thornswood-Bot\bot.env.json`, the same token in both | Everything the bot may do in the Discord, and the site's reading of who holds which role, which is what decides who may play. | The application's owner resets it in the developer portal (Bot, Reset Token). Then both `Set-DiscordLogin.ps1` and `Install-Bot.ps1`, each at its own prompt. Nothing ties the two together yet, so doing one leaves the other on a dead token. |
-| #news webhook | `bot\news-webhook.txt` on a machine that ships main | Posting in #news as the bot, for anybody holding the URL. | Delete the webhook called Thornswood in #news (Edit Channel, Integrations, Webhooks), make a new one, and put its URL in that file. |
-| Dev updates webhook | `bot\dev-webhook.txt` on a machine that ships dev | Posting in the dev updates channel as the bot, for anybody holding the URL. | Delete it in that channel's Integrations, Webhooks, make a new one, and give its URL to `Set-DevNews.ps1`, which checks it points at the dev channel before it saves anything. |
-| Voice join token key | `token-key.txt` in `C:\Thornswood-Voice` on the VPS. `C:\Thornswood-Voice-Dev` has its own; `vps-dev-instance.ps1` copies the whole live folder, this file included, when it makes the dev one | Signs the token that says which profile a voice connection belongs to. **Not enforced** unless the service runs with `-Auth on`: the default, `log`, lets an unproven connection in as whoever it claims and writes a line saying so. The `auth` field of the service's `/health` says which. | The service makes it itself. Delete the file and run `Install-Voice.ps1 -Restart`; tokens already issued stop working and the launcher fetches new ones on its next renewal. |
-| TURN relay key, not in use yet | `turn-key.txt` in `C:\Thornswood-Voice` on the VPS, put there by hand, and its own in `C:\Thornswood-Voice-Dev`; `vps-dev-instance.ps1` would copy the live one along with the rest of that folder. Neither is there yet: no relay has been stood up, so the service offers STUN only | Nothing yet. Once a relay is up, the voice service makes each browser a credential from it, and a credential lets whoever holds it send traffic through the relay until it expires. **Not enforced** as to who gets one: `/ice` answers anybody who asks. | Whoever runs the relay changes its shared secret there, puts the same value in `turn-key.txt`, and runs `Install-Voice.ps1 -Restart`. Credentials already handed out stop working at once. |
-| Backup passphrase | `C:\Thornswood-Backup\key.txt` on the VPS and `Documents\thornswood-backup-key.txt` on Patrick's machine, one copy in each on purpose | The nightly backups, which hold the site's `config.json`, `bot.env.json` and the live game server's `private` folder: every VPS secret above except the voice service's files. | `Install-Backup.ps1` makes one when `key.txt` is missing and copies it down when the Documents copy is missing. Keep the old one until the backups made with it have aged out. |
-| GitHub access | your own `gh auth login`, kept in Windows' credential store | Pushing branches and opening pull requests here, and every release: `Publish-Update.ps1` uploads to the releases repo with `gh`, and every launcher installs what that feed says. | You: `gh auth logout`, then `gh auth login`, or revoke it on GitHub under Settings, Applications. Collaborator access to both repos is Patrick's to give or take away. |
+| Discord bot token | `discord.botToken` in `C:\Thornswood-Docs\config.json` and `DISCORD_TOKEN` in `C:\Thornswood-Bot\bot.env.json`, the same token in both | Everything the bot may do in the Discord, and the site's reading of who holds which role, which is what decides who may play. | The application's owner resets it in the developer portal (Bot, Reset Token). Then `.\scripts\deploy\Rotate-BotToken.ps1`, one command: it asks at a prompt, writes both files or neither, restarts the bot and the site, and `-Check` afterwards says whether each file holds a token without showing it. `Install-Bot.ps1` and `Set-DiscordLogin.ps1` write it through the same writer, `scripts\vps\Write-BotToken.ps1`, so either one also updates both. Every backup made before the reset still holds the old token: the nightly ones in `C:\Thornswood-Backup` on the VPS and anything brought down to `Downloads\Thornswood-Backups`. |
+| #news webhook | `C:\Thornswood-Bot\webhooks\news.txt` on the VPS, read over ssh by every machine that ships (`Discord-Hook.ps1`); `bot\news-webhook.txt` on a machine only as the fallback when the VPS cannot be asked | Posting in #news as the bot, for anybody holding the URL. | Delete the webhook called Thornswood in #news (Edit Channel, Integrations, Webhooks), make a new one, and put its URL in that file. |
+| Dev updates webhook | `C:\Thornswood-Bot\webhooks\dev.txt` on the VPS, read the same way; `bot\dev-webhook.txt` only as the fallback | Posting in the dev updates channel as the bot, for anybody holding the URL. | Delete it in that channel's Integrations, Webhooks, make a new one, and give its URL to `Set-DevNews.ps1`, which checks it points at the dev channel before it saves anything. |
+| Watchdog alerts webhook | `C:\Thornswood-Watch\alerts-webhook.txt` on the VPS, readable by SYSTEM and Administrators only, and `%LOCALAPPDATA%\Thornswood\Watch-Outside\alerts-webhook.txt` on One | Posting in the staff channel, for anybody holding the URL. The watchdog uses it only when the bot is down or silent. | Delete it in the staff channel's Integrations, Webhooks, make a new one, and give its URL to `.\scripts\vps\Watch-Services.ps1 -SetWebhook`, which asks at a prompt and posts a test message, and on One to `.\scripts\vps\Watch-Outside.ps1 -SetWebhook`, which keeps its own copy for when the VPS cannot be reached (issue #448). |
+| Voice join token key | `token-key.txt` in `C:\Thornswood-Voice` on the VPS. `C:\Thornswood-Voice-Dev` has its own, which dev voice makes itself; `vps-dev-instance.ps1` never copies live's (#1083) | Signs the token that says which profile a voice connection belongs to. **Not enforced** unless the service runs with `-Auth on`: the default, `log`, lets an unproven connection in as whoever it claims and writes a line saying so. The `auth` field of the service's `/health` says which. | The service makes it itself. Delete the file and run `Install-Voice.ps1 -Restart`; tokens already issued stop working and the launcher fetches new ones on its next renewal. |
+| TURN relay key, not in use yet | `turn-key.txt` in `C:\Thornswood-Voice` on the VPS, put there by hand, and its own in `C:\Thornswood-Voice-Dev`, put there by hand too; `vps-dev-instance.ps1` never copies the live one (#1083). Neither is there yet: no relay has been stood up, so the service offers STUN only | Nothing yet. Once a relay is up, the voice service makes each browser a credential from it, and a credential lets whoever holds it send traffic through the relay until it expires. **Not enforced** as to who gets one: `/ice` answers anybody who asks. | Whoever runs the relay changes its shared secret there, puts the same value in `turn-key.txt`, and runs `Install-Voice.ps1 -Restart`. Credentials already handed out stop working at once. |
+| Backup passphrase | `C:\Thornswood-Backup\key.txt` on the VPS and `Documents\thornswood-backup-key.txt` on Patrick's machine, one copy in each on purpose | The nightly backups, which hold the site's `config.json`, `bot.env.json` and the live game server's `private` folder: every VPS secret above except the voice service's files. | `Install-Backup.ps1` sends the Documents copy up when the box has no `key.txt` (a new box, issue #454), makes one when neither has it, and copies it down when the Documents copy is missing. Keep the old one until the backups made with it have aged out. |
+| GitHub access | your own `gh auth login`, kept in Windows' credential store | Pushing branches and opening pull requests here, and a main Ship's download of the launcher CI built. Releases go to the VPS, not GitHub, since #897 and #907. | You: `gh auth logout`, then `gh auth login`, or revoke it on GitHub under Settings, Applications. Collaborator access to the source repo is Patrick's to give or take away. |
 | VPS access | your own key, `.ssh\thornswood_ed25519` in your profile, made by `Setup-SshKey.ps1`, and its public half in `C:\ProgramData\ssh\administrators_authorized_keys` on the VPS | Administrator on the VPS, and so every VPS row in this table: the site, the bot, both game servers, voice and the backups. None of the scripts needs the Administrator password; `Add-VpsKey.ps1` exists so nobody else has to hold it. | You. First move the old key aside: rename both `.ssh\thornswood_ed25519` and `.ssh\thornswood_ed25519.pub`, say by adding `.old`. While the old key still opens the VPS, `Setup-SshKey.ps1` says it already works and stops, and while the `.pub` is there it uses that one again rather than making a new one. Passing `-KeyPath` a new file does not get round this, because that first check goes through your ssh config, which still names the old key. Then `Setup-SshKey.ps1 -KeyOnly` makes a new key at the same path and prints its public line. Patrick adds it with `Add-VpsKey.ps1 -PublicKey '<the new line>'` and takes the old one off with `Add-VpsKey.ps1 -PublicKey '<the line in the .old .pub>' -Remove`. For his own key, Patrick runs `Setup-SshKey.ps1` without `-KeyOnly`, which asks for the Administrator password once and puts the new key on itself, and then removes the old line the same way. Delete the `.old` pair once `Setup-SshKey.ps1 -Test` passes and the old line is off. |
 | VirusTotal API key | the environment variable `VT_API_KEY` on the machine that runs the optional manual upload, and nowhere in this repository: `Publish-VirusTotal.ps1` reads it from there only, so it has no file to be committed in and no parameter to be typed on a command line | Reading and uploading under our VirusTotal account when somebody runs the manual tool. Publish, Package, and Ship do not call it (#802). | Whoever owns the VirusTotal account, in the account's own API key page, then sets the variable on that machine. A machine without it skips a manual run; publish does not need the key. |
-| Code signing | `tools\signing.json` on a machine that signs. It names the setup and holds no key: the credential is the Azure account behind Artifact Signing, or a certificate in that machine's own store | Whether Windows treats the launcher and the installer as ours rather than as an unknown download. | Whoever owns the Azure signing account, in Azure. Without the file `Sign-Artifact.ps1` signs nothing and a local build carries on unsigned. Ship and Publish-Installer refuse that soft skip before anything reaches the site or the feed. |
+| Code signing | `records\signing\signing.json` on a machine that signs, written from `records\signing\signing.template.json` by `Setup-ShipMachine.ps1`. It names the setup and holds no key: the credential is the `az login` on that machine, as Patrick, whose Azure account is the only one with signing access (the Certificate Profile Signer role on the Artifact Signing profile), or a certificate in that machine's own store | Whether Windows treats the launcher and the installer as ours rather than as an unknown download. | Patrick, in Azure: the signing account is his, and a second machine signs only while `az` on it is signed in as him. Without the file `Sign-Artifact.ps1` signs nothing and a local build carries on unsigned. Ship and Publish-Installer refuse that soft skip before anything reaches the site or the feed. |
+| The domain, thornswood.net | Registered at Cloudflare, in Patrick's own Cloudflare login, which he signs in to with GitHub (`docs\OWNERSHIP.md`). Nothing about it is kept on a machine or in this repository | The address everybody reaches the site, the feed and the launcher downloads at. Whoever holds the login can point it anywhere or let it lapse. | Patrick, in that Cloudflare login: renewing, moving or changing the records. Nobody else holds it. |
 
 **The rule for this table.** A control that does not exist is listed as
 **not enforced**, never left out and never left in as though it worked. The
@@ -436,7 +515,10 @@ produces which differ from upstream, by hash, against the fork commit, into
 build output into the game folder and refuses any file that is not the
 recorded one; `Go.ps1` runs it beside the overlays and the plugins. Ship runs
 `Sync-Client.ps1 -Check` and refuses a release whose client is not the recorded
-build. `OwnGame.Foreign` never takes those six paths from the Steam copy. The
+build. Ship never builds the engine: when the game folder already holds all
+six as recorded, Sync-Client copies nothing and does not need the build, so a
+checkout with no `engine\skymp` (a fresh Ship worktree) can still Ship, and
+`Check-ShipReady.ps1` does not ask for the fork (issue #946). `OwnGame.Foreign` never takes those six paths from the Steam copy. The
 launcher's Client row on the Play page compares all six with the same record
 (`ClientRuntime`), and `ClientRuntime.Heal` puts back any that is missing or
 not the recorded build.

@@ -26,10 +26,10 @@
 // clock, the way test-needs.js does.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
-const SRC = process.env.GM || path.join(TOOLS_DIR, '..', 'game', 'gamemode.js');
+const SRC = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 
@@ -148,8 +148,9 @@ if (block) {
   {
     const placed = 0x00012345;   // below 0xff000000: a plugin put it there
     const dropped = 0xff000123;  // above it: a person put it there
+    const swordNo = api.activate(1, placed, 'sword:Skyrim.esm');
     yes('a sword Bethesda left on a table does not come up',
-        /not off the ground/.test(api.activate(1, placed, 'sword:Skyrim.esm') || ''));
+        /not left here by a player/.test(swordNo || '') && /not off the ground/.test(swordNo || ''));
     yes('a sword somebody dropped does', api.activate(1, dropped, 'sword:Skyrim.esm') === null);
     yes('and bread on a table is still bread',
         api.activate(1, placed, 'bread:Skyrim.esm') === null);
@@ -176,7 +177,9 @@ if (block) {
     yes('a flower is not a purse and not a spoil', !!g5.isPurse && !g5.isPurse(flower) && !g5.isSpoil(flower));
 
     const no = g5.activate(7, placed, 'd790c:Skyrim.esm');
-    yes('a coin purse in the world does not come up', /coin purse/.test(no || '') && /not off the ground/.test(no || ''));
+    yes('a coin purse in the world does not come up',
+        /coin purse/.test(no || '') && /not left here by a player/.test(no || '') &&
+        /not off the ground/.test(no || ''));
     yes('and it is put back on the screen of the person who pressed it',
         g5.putBacks.length === 1 && g5.putBacks[0][0] === 7 && g5.putBacks[0][1] === placed);
     yes('a Thieves Guild purse does not come up either',
@@ -196,6 +199,62 @@ if (block) {
     let threw = false, ans = null;
     try { ans = bare.activate(7, placed, 'd790c:Skyrim.esm'); } catch (e) { threw = true; }
     yes('with no putBack about, a purse is still refused and nothing throws', !threw && /coin purse/.test(ans || ''));
+
+    // #627: idOf answering 0 on the first press must not freeze an empty map.
+    {
+      const placed2 = 0x0002c3d4;
+      const store = {};
+      const kinds = {};
+      const timers = [];
+      const putBacks = [];
+      const said = [];
+      const ids = {};
+      let nextId = 0x500;
+      let ready = false;
+      function realId(desc) {
+        if (!ids[desc]) { ids[desc] = nextId++; }
+        return ids[desc];
+      }
+      function lazyId(desc) {
+        if (!ready) { return 0; }
+        return realId(desc);
+      }
+      const Fake = {
+        makeProperty: function () { },
+        get: function (id, key) {
+          const row = store[id] || {};
+          if (key === 'inventory') { return { entries: (row.inventory || []).slice() }; }
+          return row[key];
+        },
+        set: function (id, key, v) {
+          if (!store[id]) { store[id] = {}; }
+          if (key === 'inventory') { store[id].inventory = (v && v.entries) || []; return; }
+          store[id][key] = v;
+        },
+        lookupEspmRecordById: function (baseId) {
+          const t = kinds[baseId];
+          return t ? { record: { type: t } } : null;
+        }
+      };
+      const lazy = new Function(
+        'globalThis', 'mp', 'console', 'idOf', 'TOOLS', 'setTimeout', 'putBack',
+        'Math', 'Number', 'String', 'Object', 'Array', 'Date',
+        block + '\nreturn globalThis.__thornswoodSpoils;')(
+        {}, Fake, { log: function (s) { said.push(String(s)); } },
+        lazyId,
+        { pick: { accept: ['pick:X.esm'] }, shovel: { accept: ['shovel:X.esm'] } },
+        function (f, ms) { timers.push({ f: f, ms: ms }); return timers.length; },
+        function (actorId, refrId) { putBacks.push([actorId, refrId]); },
+        Math, Number, String, Object, Array, Date);
+      const first = lazy.activate(3, placed2, 'd790c:Skyrim.esm');
+      yes('a purse pressed before the load order is ready is not yet known as a purse',
+          first === null);
+      ready = true;
+      for (const d of (lazy.PURSES || [])) { kinds[realId(d)] = 'FLOR'; }
+      const second = lazy.activate(3, placed2, 'd790c:Skyrim.esm');
+      yes('the same purse pressed after idOf works is refused as a player-less purse',
+          /coin purse/.test(second || '') && /not left here by a player/.test(second || ''));
+    }
   }
 
   /*

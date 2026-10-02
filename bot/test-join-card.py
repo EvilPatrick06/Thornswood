@@ -31,8 +31,7 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-TOOLS = os.path.join(os.path.dirname(HERE), 'tools')
-ROOT = os.path.dirname(TOOLS)
+ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 # bot.py refuses to load without one, and never uses it unless client.run is
 # called, which nothing here does.
@@ -298,23 +297,38 @@ for ln in lines:
     if re.search(r'&\s*scp\b', ln):
         m = re.search(r':(\$[^"\s]+)"', ln)
         dests.append(m.group(1) if m else ln.strip())
-# roll-log.ps1 is the log roller Install-Bot sends beside the bot (entry 220,
-# log rotation). It is a script, not the record, and I4 below still refuses
-# any write that names joins.json.
+# service/BotService.cs is the source of the Windows service the bot runs
+# under (issue #465), which replaced roll-log.ps1 here. It is a program, not
+# the record, and I4 below still refuses any write that names joins.json.
 allowed = ['$Root/$f', '$Root/staff-channel.txt', '$Root/assets/join-card.png',
-           '$Root/roll-log.ps1', '$far']
+           '$Root/service/BotService.cs', '$far']
+# Since #1093 the code goes up into a stage folder first ($Root/$stageName/$rel,
+# stage, check, swap), each file under its key in $send. So that destination is
+# a name Install-Bot chose only while every key it puts in $send is one of the
+# names above.
+send_keys = re.findall(r"\$send\[(?:'([^']+)'|\$f)\]\s*=", install)
+send_names = [k or '$f' for k in send_keys]
+staged_ok = bool(send_names) and all(
+    k == '$f' or ('$Root/' + k) in allowed for k in send_names)
+if staged_ok:
+    allowed.append('$Root/$stageName/$rel')
 yes('I2 every file Install-Bot copies up lands on a name it chose, none of '
-    'them joins.json (got %r)' % (dests,),
+    'them joins.json (got %r, staged under %r)' % (dests, send_names),
     bool(dests) and all(d in allowed for d in dests))
 
 gone = []
-for ln in lines:
+for i, ln in enumerate(lines):
     if re.search(r'Remove-Item', ln, re.I):
         m = re.search(r"Remove-Item\s+(?:-LiteralPath\s+)?(\S+)", ln, re.I)
-        gone.append(m.group(1).strip("'`") if m else ln.strip())
+        g = m.group(1).strip("'`") if m else ln.strip()
+        # The clearing of a stage an earlier run left behind: folders named
+        # .stage-* and nothing else, filtered on the line above.
+        if g.lstrip('`') == '$_.FullName' and ".Name -like '.stage-*'" in lines[i - 1]:
+            g = 'an old .stage-* folder'
+        gone.append(g)
 yes('I3 the only files Install-Bot deletes are its own temporary ones '
     '(got %r)' % (gone,),
-    bool(gone) and all(g.lstrip('`') in ('$far', '$tmp', '$exe') for g in gone))
+    bool(gone) and all(g.lstrip('`') in ('$far', '$tmp', '$exe', 'an old .stage-* folder') for g in gone))
 
 writes = [ln for ln in lines
           if re.search(r'scp|Remove-Item|WriteAllText|Set-Content|Out-File|'
@@ -356,7 +370,7 @@ yes('B3 it is the banner and not the starfield: the sunset is in the top '
 # than the machine that made the committed file, and a JPEG decoder or a
 # resize can move a pixel by one. Measured 0.000 on the same Pillow; the
 # starfield against the banner is 26.9.
-maker = os.path.join(HERE, 'make-join-card.py')
+maker = os.path.normpath(os.path.join(HERE, '..', 'scripts', 'oneoff', 'make-join-card.py'))
 built_path = os.path.join(tempfile.mkdtemp(prefix='ts-card-'), 'built.png')
 try:
     r = subprocess.run([sys.executable, maker, '--out', built_path],
@@ -371,7 +385,7 @@ try:
             b = bg.tobytes()
             diff = sum(abs(x - y) for x, y in zip(a, b)) / float(len(a))
     yes('B4 make-join-card.py builds the background that is committed, from '
-        'the banner beside it (mean difference %s)' % (
+        'the banner in bot/ (mean difference %s)' % (
             '%.3f' % diff if diff is not None else 'none, it did not build'),
         diff is not None and diff < 2.0)
 finally:

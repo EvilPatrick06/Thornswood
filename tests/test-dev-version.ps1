@@ -32,9 +32,9 @@ param([string]$ShipPath)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-if (-not $ShipPath) { $ShipPath = Join-Path $Here '..\scripts\release\Ship.ps1' }
+# The tests are in tests\, the repository is one folder up.
+$Here = Split-Path -Parent $Here
+if (-not $ShipPath) { $ShipPath = Join-Path $Here 'scripts\release\Ship.ps1' }
 
 $script:pass = 0
 $script:fail = 0
@@ -88,24 +88,48 @@ function IsNewer([string]$remote, [string]$local) {
 }
 
 <#
-  One run of the block, with two feeds on disk.
+  One run of the block, against the feeds as the real Feed-Store.ps1 reads
+  them. Since #907 (28 September) the block reads what is published through
+  Read-SiteFeed and Get-FeedStoreLaunchers, not the version.json files in a
+  releases clone, and Feed-Store.ps1 takes THORNSWOOD_TEST_SITE_DIR as the
+  VPS's feed folders on disk, so this runs exactly what Ship runs:
+    <site>\feed\version.json            what main has published
+    <site>\feed-dev\version.json        what dev has out now
+    <site>\feed-dev\launchers.txt       every dev number ever published
+  and the copy last received on this machine, which Read-Published falls back
+  to when the site has no answer, is LOCALAPPDATA\Thornswood\feed\<channel>,
+  pointed here at a folder of the harness's own so the machine's copy is
+  never read.
 
   $current is what the CHECKED OUT branch's Updater.cs says, which is the
-  value Ship reads before this block. Everything else the block touches is a
-  path to a version.json, so both are written fresh per case.
+  value Ship reads before this block. An empty feed argument leaves that file
+  out.
 #>
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('tsdevver-' + [Guid]::NewGuid().ToString('N'))
-function Run([string]$branchVersion, [string]$mainFeed, [string]$devFeed) {
-    $mainDir = Join-Path $tmp 'main'
-    $devDir = Join-Path $tmp 'dev'
-    foreach ($d in @($mainDir, $devDir)) { New-Item -ItemType Directory -Force -Path $d | Out-Null }
-    Set-Content -LiteralPath (Join-Path $mainDir 'version.json') -Value (@{ launcherVersion = $mainFeed } | ConvertTo-Json)
-    Set-Content -LiteralPath (Join-Path $devDir 'version.json') -Value (@{ launcherVersion = $devFeed } | ConvertTo-Json)
-
-    $sb = [scriptblock]::Create(
-        '$current = $args[0]; $MainReleaseDir = $args[1]; $ReleaseDir = $args[2];' +
-        'function Say($t, $c) { };' + $body + '; return $target')
-    return & $sb $branchVersion $mainDir $devDir
+. (Join-Path (Split-Path -Parent $ShipPath) 'Feed-Store.ps1')
+$oldSite = $env:THORNSWOOD_TEST_SITE_DIR
+$oldLocal = $env:LOCALAPPDATA
+$script:runN = 0
+function Put-Feed([string]$dir, [string]$v) {
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    Set-Content -LiteralPath (Join-Path $dir 'version.json') -Value (@{ launcherVersion = $v } | ConvertTo-Json)
+}
+function Run([string]$branchVersion, [string]$mainFeed, [string]$devFeed, [string[]]$devEver = @(), [string]$mainCopy = '') {
+    $script:runN++
+    $site = Join-Path $tmp ('site' + $script:runN)
+    $local = Join-Path $tmp ('local' + $script:runN)
+    New-Item -ItemType Directory -Force -Path (Join-Path $site 'feed'), (Join-Path $site 'feed-dev'), $local | Out-Null
+    if ($mainFeed) { Put-Feed (Join-Path $site 'feed') $mainFeed }
+    if ($devFeed) { Put-Feed (Join-Path $site 'feed-dev') $devFeed }
+    if ($devEver.Count) { Set-Content -LiteralPath (Join-Path $site 'feed-dev\launchers.txt') -Value $devEver -Encoding ASCII }
+    if ($mainCopy) { Put-Feed (Join-Path $local 'Thornswood\feed\main') $mainCopy }
+    $env:THORNSWOOD_TEST_SITE_DIR = $site
+    $env:LOCALAPPDATA = $local
+    try {
+        $sb = [scriptblock]::Create('$current = $args[0]; function Say($t, $c) { };' + $body + '; return $target')
+        return & $sb $branchVersion
+    }
+    finally { $env:THORNSWOOD_TEST_SITE_DIR = $oldSite; $env:LOCALAPPDATA = $oldLocal }
 }
 
 try {
@@ -121,55 +145,45 @@ try {
     Yes 'S2 and it outranks main' (IsNewer $t '1.1.77')
 
     # S3: the climb. A second and third dev build on the same base.
-    $t = Run '1.1.77' '1.1.77' '1.1.77.1'
+    $t = Run '1.1.77' '1.1.77' '1.1.77.1' @('1.1.77.1')
     Yes "S3 a second dev build climbs to $t" ($t -eq '1.1.77.2')
-    $t = Run '1.1.77' '1.1.77' '1.1.77.2'
+    $t = Run '1.1.77' '1.1.77' '1.1.77.2' @('1.1.77.1', '1.1.77.2')
     Yes "S3 and a third to $t" ($t -eq '1.1.77.3')
 
     # S4: main moving on restarts the count, which is the old behaviour kept.
-    $t = Run '1.1.78' '1.1.78' '1.1.77.3'
+    $t = Run '1.1.78' '1.1.78' '1.1.77.3' @('1.1.77.1', '1.1.77.2', '1.1.77.3')
     Yes "S4 main moving to 1.1.78 restarts dev at $t" ($t -eq '1.1.78.1')
     Yes 'S4 and a promoted main release still beats every dev build before it' (IsNewer '1.1.79' '1.1.78.9')
 
     # S5: a branch AHEAD of the published main is left alone. Ordinary work on
     #     a branch after a main release is exactly this shape.
-    $t = Run '1.1.80' '1.1.77' '1.1.77.1'
+    $t = Run '1.1.80' '1.1.77' '1.1.77.1' @('1.1.77.1')
     Yes "S5 a branch ahead of main keeps its own number: $t" ($t -eq '1.1.80.1')
 
     # S6: an unreadable main feed does not stop a dev release. Dev is where
-    #     things get tried, so it fails open on the branch's own number.
-    $sb = [scriptblock]::Create(
-        '$current = $args[0]; $MainReleaseDir = $args[1]; $ReleaseDir = $args[2];' +
-        'function Say($t, $c) { };' + $body + '; return $target')
-    $t = & $sb '1.1.76' (Join-Path $tmp 'nothing-here') (Join-Path $tmp 'dev')
+    #     things get tried, so it fails open on the branch's own number, and
+    #     still climbs past what dev has out.
+    $t = Run '1.1.76' '' '1.1.77.1' @('1.1.77.1')
     Yes "S6 an unreadable main feed still produces a version above what dev has out: $t" ($t -eq '1.1.77.2')
 
     # S7: 25 SEPTEMBER. Djinn's releases clone was days old and said 1.1.92,
     #     so his dev Ship went out as 1.1.92.3 while dev launchers were on
-    #     1.1.94.3. Both feeds are read off the origin now, and the number
-    #     climbs past everything the dev branch ever published.
-    $origin = Join-Path $tmp 'rel.git'; $seed = Join-Path $tmp 'relseed'; $stale = Join-Path $tmp 'relstale'
-    & git init -q --bare -b main $origin
-    & git init -q -b main $seed
-    & git -C $seed config user.email t@t; & git -C $seed config user.name t
-    function Put($v) { Set-Content -LiteralPath (Join-Path $seed 'version.json') -Value ('{' + [char]10 + '  "launcherVersion": "' + $v + '"' + [char]10 + '}'); & git -C $seed add -A; & git -C $seed commit -q -m $v }
-    Put '1.1.92'
-    & git -C $seed remote add origin $origin; & git -C $seed push -q origin main 2>$null
-    & git clone -q $origin $stale 2>$null
-    & git -C $seed checkout -q -b dev
-    foreach ($v in '1.1.94.1', '1.1.94.2', '1.1.94.3', '1.1.92.3') { Put $v }
-    & git -C $seed push -q origin dev 2>$null
-    & git -C $seed checkout -q main; Put '1.1.94'; & git -C $seed push -q origin main 2>$null
-    & git -C $stale fetch -q origin dev 2>$null
-    & git -C $stale worktree add -q (Join-Path $tmp 'relstale-dev') origin/dev 2>$null
-    $sb = [scriptblock]::Create(
-        '$current = $args[0]; $MainReleaseDir = $args[1]; $ReleaseDir = $args[2];' +
-        'function Say($t, $c) { };' + $body + '; return $target')
-    $t = & $sb '1.1.92' $stale (Join-Path $tmp 'relstale-dev')
-    Yes "S7 a stale releases clone and a dev feed that went back to 1.1.92.3 give $t" ($t -eq '1.1.94.4')
+    #     1.1.94.3. Main's number is the site's feed now, and the dev number
+    #     climbs past every one the dev store has ever published, even with
+    #     the dev feed itself gone back to 1.1.92.3 and this machine's last
+    #     copy of main still saying 1.1.92.
+    $t = Run '1.1.92' '1.1.94' '1.1.92.3' @('1.1.94.1', '1.1.94.2', '1.1.94.3', '1.1.92.3') '1.1.92'
+    Yes "S7 a stale copy here and a dev feed that went back to 1.1.92.3 give $t" ($t -eq '1.1.94.4')
     Yes 'S7 and a dev launcher on 1.1.94.3 is offered it' (IsNewer $t '1.1.94.3')
+
+    # S8: the site has no main feed to give, so the copy last received here is
+    #     used, and it still lifts a branch that is behind.
+    $t = Run '1.1.76' '' '1.1.77' @() '1.1.77'
+    Yes "S8 with no main feed on the site, the copy here (1.1.77) is the base: $t" ($t -eq '1.1.77.1')
 }
 finally {
+    $env:THORNSWOOD_TEST_SITE_DIR = $oldSite
+    $env:LOCALAPPDATA = $oldLocal
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
 }
 

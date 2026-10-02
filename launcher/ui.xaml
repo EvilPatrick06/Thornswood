@@ -265,6 +265,15 @@
           <ControlTemplate TargetType="Button">
             <Grid>
               <Border x:Name="b" Background="{DynamicResource Accent}" CornerRadius="2"/>
+              <!-- The Play button as a progress bar (#1145): how far an update,
+                   the game folder or a file check has got, left to right, the
+                   accent faded with a solid accent line along the bottom.
+                   Hidden unless ShellProgress.cs shows it; it sets the width,
+                   and slides a quarter width band while the total is unknown. -->
+              <Grid x:Name="fill" HorizontalAlignment="Left" Width="0" Visibility="Collapsed" IsHitTestVisible="False">
+                <Border Background="{DynamicResource Accent}" Opacity="0.4" CornerRadius="2"/>
+                <Border Height="3" VerticalAlignment="Bottom" Background="{DynamicResource Accent}" CornerRadius="0,0,2,2"/>
+              </Grid>
               <Rectangle Height="1" VerticalAlignment="Top" Margin="1,1,1,0" Fill="#33FFFFFF"/>
               <!-- The focus ring sits on top of the accent fill, drawn in the
                    ink that reads on it, and shows only when the button is
@@ -643,6 +652,14 @@
               <Grid>
                 <Rectangle Fill="{StaticResource Hatch}" Opacity="0.85"/>
                 <!-- The landscape behind the title, filled in from Art.Header().
+                     The band's height is the title row's, 100 and no taller, and
+                     the art never sets it: both layers are brushes on a Border,
+                     so neither can push the row open. Both fill the band and crop
+                     what does not fit (UniformToFill, centred), and both take the
+                     same part of the art, Art.HeaderCrop, so the still and the
+                     moving strip line up and the overlook keeps its approved
+                     framing at any window width. Nothing on this band zooms,
+                     drifts or runs fast.
                      Collapsed when the build carries no picture, which leaves the
                      pattern above exactly as it was. Every veil is the theme's own
                      panel colour, so a light theme washes the picture light and a
@@ -761,7 +778,7 @@
 
                   <!-- This card told a new person to name the character after
                        themselves and to save before connecting, both left over
-                       from Skyrim Together. The name is what everybody sees over
+                       from the old multiplayer mod. The name is what everybody sees over
                        your head in a roleplay world, so a person who followed the
                        card walked into Whiterun under their own name. And there is
                        no saving: the server holds the character. Help.cs gives the
@@ -812,7 +829,7 @@
                 <StackPanel Grid.Column="0">
                   <TextBlock x:Name="TxtDowngradeTitle" Style="{StaticResource H2}" Text="Skyrim is on the wrong build"/>
                   <TextBlock x:Name="TxtDowngradeNote" Style="{StaticResource Small}" Margin="0,2,0,0" TextWrapping="Wrap"
-                             Text="The server runs 1.6.1170 and this Skyrim is newer. Press the button: Steam downloads the 1.6.1170 files under your own account and the launcher puts them in place. About 11 GB, and Steam has to be signed in."/>
+                             Text="The server runs 1.6.1170. Press the button: Steam downloads the 1.6.1170 files under your own account and the launcher puts them into Thornswood's own game folder. Your Steam copy of Skyrim is not changed. About 11 GB, and Steam has to be signed in."/>
                   <!-- How far the downgrade is: each part of three by the size Steam
                        gives for it, then the copy. Set through Downgrade.OnProgress
                        by RunDowngrade in Shell.cs; hidden until a run starts. -->
@@ -1174,7 +1191,7 @@
                     <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
 
                     <TextBlock Style="{StaticResource H2}" Text="Repair"/>
-                    <TextBlock Style="{StaticResource Body}" Text="Puts this build's own files back: the settings and load order that shipped with it, the client and the overlays under Data, the mod settings this build pins, and the class preset names. Another server's launcher can replace any of those, and an install that has never taken an update has never had a spare copy of them. This is everything Play does on the way in, done on demand, and it is safe to press twice. Close Skyrim first."/>
+                    <TextBlock Style="{StaticResource Body}" Text="Puts this build's own files back: the settings and load order that shipped with it, the client and the overlays under Data, and the mod settings this build pins. Another server's launcher can replace any of those, and an install that has never taken an update has never had a spare copy of them. This is everything Play does on the way in, done on demand, and it is safe to press twice. Close Skyrim first."/>
                     <Button x:Name="BtnRepair" Style="{StaticResource Ghost}" Content="Repair" HorizontalAlignment="Left" Margin="0,13,0,0"/>
 
                     <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
@@ -1383,7 +1400,8 @@
 
 
                 <TextBlock Text="Folders" Style="{StaticResource Eyebrow}"/>
-                <StackPanel x:Name="PathRows" Margin="0,0,0,16"/>
+                <StackPanel x:Name="PathRows" Margin="0,0,0,8"/>
+                <TextBlock x:Name="TxtInGameBrowser" Style="{StaticResource Small}" Margin="0,0,0,16"/>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,30">
                   <Button x:Name="BtnFolder"  Style="{StaticResource Ghost}" Content="Open install folder" Margin="0,0,8,0"/>
                   <Button x:Name="BtnOpenLog" Style="{StaticResource Ghost}" Content="Open log" Margin="0,0,8,0"/>
@@ -1395,7 +1413,7 @@
                   <StackPanel>
                     <StackPanel x:Name="PnlOwnGame">
                       <TextBlock Style="{StaticResource H2}" Text="Thornswood's own Skyrim folder"/>
-                      <TextBlock Style="{StaticResource Body}" Text="Runs Thornswood from a Skyrim folder of its own, made from what Vortex has deployed while the Thornswood profile is on. Any other Vortex profile can then use the Steam copy without reaching Thornswood, and switching profiles in Vortex no longer takes Thornswood's mods away. The big files are links to Vortex's copies, so the collection is not on the disk twice. When Vortex deploys a newer Thornswood collection, the launcher brings it in by itself the next time it starts. Windows asks for administrator once while this is set up, to write a firewall rule for the game's browser: Skyrim Platform draws the interface in a second program, and a rule is tied to a program's path, so moving the game into its own folder is what makes Windows ask about it. The rule is a block, because that program only ever talks to the game on this machine. Saying no is fine and only means Windows asks you about the browser on the first launch instead."/>
+                      <TextBlock Style="{StaticResource Body}" Text="Runs Thornswood from a Skyrim folder of its own, made from what Vortex has deployed while the Thornswood profile is on. Any other Vortex profile can then use the Steam copy without reaching Thornswood, and switching profiles in Vortex no longer takes Thornswood's mods away. The big files are links to Vortex's copies, so the collection is not on the disk twice. When Vortex deploys a newer Thornswood collection, the launcher brings it in by itself the next time it starts."/>
                       <TextBlock x:Name="TxtOwnGameState" Style="{StaticResource Small}" Margin="0,8,0,0"/>
                       <StackPanel Orientation="Horizontal" Margin="0,13,0,0">
                         <Button x:Name="BtnOwnGameMake" Style="{StaticResource Ghost}" Content="Make it"/>

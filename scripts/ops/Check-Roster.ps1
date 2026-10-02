@@ -39,7 +39,7 @@
 [CmdletBinding()]
 param(
     [string]$Vps  = '',
-    [string]$User = 'Administrator',
+    [string]$User = '',
     # Both by default, because the interesting answer is usually the
     # difference between them.
     [string[]]$Root = @('C:\Thornswood-Server', 'C:\Thornswood-Server-Dev')
@@ -49,9 +49,10 @@ param(
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
-$ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new')
+$ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
 
 # The three the server actually uses. Anything else in there is listed too, so
 # a file nobody expected is visible rather than hidden by the filter.
@@ -84,7 +85,7 @@ if (-not (Test-Path -LiteralPath $p)) {
     $script = $script.Replace('@@ROOT@@', $r.TrimEnd('\'))
     $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
 
-    $out = & ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc" 2>&1
+    $out = Invoke-ThornswoodNative { & ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc" } 2>&1
     if ($LASTEXITCODE -ne 0) {
         Write-Host "  could not ask the VPS: $out" -ForegroundColor Red
         continue

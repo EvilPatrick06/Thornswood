@@ -5,13 +5,13 @@
 // publish puts a trademark mark or a registration claim on a name that is not
 // registered. Entry 319 on the To Do List.
 //
-// WHY THIS EXISTS. Entry 319 was "the README still says Skyrim Together, and
-// Thornswood is unregistered". The README half is done on main by entry 193
+// WHY THIS EXISTS. Entry 319 was "the README still names the old multiplayer
+// mod, and Thornswood is unregistered". The README half is done on main by entry 193
 // (#265, 7b5c73f), which rewrote README.md from scratch, and
 // test-repo-docs.js holds it there: the title, the old name, the em dashes and
 // the word the project never uses for people. Measured on main at 8d4fbdb on
-// 24 September: README.md line 1 is # Thornswood, it never says Skyrim
-// Together, it has no em dash, and the Bethesda search returns credits.md:12,
+// 24 September: README.md line 1 is # Thornswood, it never names the old
+// mod, it has no em dash, and the Bethesda search returns credits.md:12,
 // credits.md:13 and home.html:681.
 //
 // Nothing checked the other half of the entry. The disclaimer is, in the
@@ -25,11 +25,11 @@
 // public page.
 //
 // Read only.
-const TOOLS_DIR = require('path').join(__dirname, '..', 'tools'); // the tests are in tests\, what they test is in tools\
+const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 
-const ROOT = path.join(TOOLS_DIR, '..');
+const ROOT = REPO_DIR;
 const CR = String.fromCharCode(13);
 
 let pass = 0, fail = 0;

@@ -35,6 +35,11 @@
       start on a missing file puts up a "Windows cannot find" box and waits
       start leaves errorlevel as it found it when it works
 
+  Issue #497, 29 Sep: the launcher's name from before the rename is gone from
+  the update path too, so the new build always goes in at the running
+  launcher's own path and nothing renames or repoints anything.
+  tests\test-old-name-gone.js checks that no tracked file names it at all.
+
   Not driven: start failing on a file that is there (Defender blocking it, a
   file that is not a program). Windows puts up a box for those too, on the
   desktop of whoever runs this. The watch covers the same case without start's
@@ -49,9 +54,8 @@ param()
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# The tests are in tests\, what they test is in tools\.
-$Here = Join-Path (Split-Path -Parent $Here) 'tools'
-$App = Join-Path $Here '..\launcher\app'
+$Repo = Split-Path -Parent $Here
+$App = Join-Path $Repo 'launcher\app'
 
 $script:pass = 0
 $script:fail = 0
@@ -85,7 +89,20 @@ Yes 'SelfUpdate still starts it hidden' (($body -match 'WindowStyle = System\.Di
 Yes 'SelfUpdate no longer moves the new exe over the old one itself' ($upd -notmatch 'move /y')
 
 $shell = Get-Content -LiteralPath (Join-Path $App 'Shell.cs') -Raw
-Yes 'the launcher clears the kept copy once its window has drawn' ($shell -match '(?s)ContentRendered\s*\+=\s*delegate\s*\{[^}]*SelfSwap\.Settle\(')
+Yes 'the launcher clears the kept copy once its window has drawn' ($shell -match '(?s)ContentRendered\s*\+=\s*delegate\s*\{.{0,800}?SelfSwap\.Settle\(')
+
+# ---- issue #497: the update path renames nothing -----------------------------
+# Release 1 (#901) taught the update to rename an install still under the
+# launcher's name from before the rename, and Icons to repoint its shortcuts.
+# Patrick, 29 Sep: nobody has those old files any more, so both went. The
+# update puts the new build at the running exe's own path, as before #901.
+$icons = Get-Content -LiteralPath (Join-Path $App 'Icons.cs') -Raw
+$swapAll = ''
+if ($haveSwap) { $swapAll = Get-Content -LiteralPath $swapCs -Raw }
+Yes '#497: SelfSwap has no Target, AimsAtOld, OldName or NewName' ($swapAll -cnotmatch '\b(Target|AimsAtOld|OldName|NewName)\b')
+Yes '#497: SelfSwap names no exe file at all' ($swapAll -notmatch '"[^"]*\.exe"')
+Yes '#497: the updater asks SelfSwap for no other destination' ($upd -cnotmatch 'SelfSwap\.(Target|NewName)')
+Yes '#497: Icons repoints no shortcut aimed at another exe' ($icons -cnotmatch 'AimsAtOld|SelfSwap\.(OldName|NewName)')
 
 if (-not $haveSwap) { Finish }
 $swapSrc = Get-Content -LiteralPath $swapCs -Raw
@@ -315,7 +332,7 @@ function Update-Case {
     if ($before) { & $before $dir $exe }
     $closing = Start-Process -FilePath $exe -ArgumentList '--closing', '2000' -PassThru
     $script:started.Add($closing.Id)
-    $bat = Join-Path $dir 'st-update-test.cmd'
+    $bat = Join-Path $dir 'thornswood-update-test.cmd'
     $c = '-'
     if ($checks -gt 0) { $c = [string]$checks }
     & $driver $bat $exe $neu $closing.Id $c | Out-Null
@@ -335,7 +352,7 @@ try {
     $tdir = Join-Path $root 'text'
     New-Item -ItemType Directory -Force -Path $tdir | Out-Null
     $texe = Join-Path $tdir 'Thornswood.exe'
-    $tbat = Join-Path $tdir 'st-update-4242.cmd'
+    $tbat = Join-Path $tdir 'thornswood-update-4242.cmd'
     & $driver $tbat $texe ($texe + '.new') 4242 '-' '--write-only' | Out-Null
     $text = [IO.File]::ReadAllText($tbat)
     $lines = $text -split "`r`n"
@@ -350,6 +367,13 @@ try {
     while ($i -ge 0) { if ($i -eq 0 -or $text[$i - 1] -ne '"') { $bare++ }; $i = $text.IndexOf($tdir, $i + 1) }
     Yes 'every path in it is quoted' ($bare -eq 0)
     Yes 'it renames the old exe to .old before the new one goes in' ($text.IndexOf('move /y "' + $texe + '" "' + $texe + '.old"') -ge 0 -and $text.IndexOf('move /y "' + $texe + '" "' + $texe + '.old"') -lt $text.IndexOf('move /y "' + $texe + '.new" "' + $texe + '"'))
+    # Issue #497: the new build goes in at the running launcher's own path and
+    # nowhere else, so every move and start in the script names that exe, its
+    # .new, .old or .bad, and no other file.
+    $named = @([regex]::Matches($text, '"([^"]*\.exe[^"]*)"') | ForEach-Object { $_.Groups[1].Value } |
+        Where-Object { $_ -ne $texe -and $_ -ne ($texe + '.new') -and $_ -ne ($texe + '.old') -and $_ -ne ($texe + '.bad') })
+    Yes ('#497: the script names no exe but the running one and its .new, .old and .bad' + $(if ($named.Count) { ': ' + ($named -join ', ') } else { '' })) ($named.Count -eq 0)
+    Yes '#497: and has no second branch for starting another name' (-not $text.Contains(':runnew'))
 
     # ---- a good new launcher ------------------------------------------------
     $r = Update-Case 'good' 'new-good'

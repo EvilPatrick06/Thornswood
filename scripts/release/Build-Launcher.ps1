@@ -187,12 +187,7 @@ if (-not (Test-Path $headerVideo)) { Die "launcher-header.mp4 is not at $headerV
 Say "  $($cs.Count) source files" 'Green'
 
 $null = New-Item -ItemType Directory -Force -Path $outDir
-# Thornswood.exe since the move off Skyrim Together. An install made before the
-# rename still has the old name, because the launcher replaces itself in place
-# when it updates rather than being reinstalled, so the old one is cleared out
-# here to stop two launchers sitting in the same folder.
 $exe = Join-Path $outDir 'Thornswood.exe'
-$oldExe = Join-Path $outDir 'SkyrimTogether.exe'
 
 # Nothing is closed here any more; Install-Launcher.ps1 does that, after a
 # build that worked. So a launcher still running from this folder holds its own
@@ -219,6 +214,21 @@ if (Test-Path $updaterCs) {
 }
 $verFour = $ver
 while (($verFour -split '\.').Count -lt 4) { $verFour = "$verFour.0" }
+
+# The application manifests (issue #463) carry a placeholder version. The one
+# csc embeds is a copy with this build's four part version in assemblyIdentity,
+# so the identity cannot drift from Updater.cs the way a kept number did
+# (1.1.101.0 while the launcher was 1.1.102). Written before signing, because
+# csc embeds it and signing comes after the compile.
+function New-StampedManifest([string]$template, [string]$v4, [string]$leaf) {
+    if (-not (Test-Path -LiteralPath $template)) { Die "$([IO.Path]::GetFileName($template)) is not at $template. It is in the repository, so the path is wrong; the exe would ship without its per-monitor DPI manifest." }
+    $text = [IO.File]::ReadAllText($template)
+    $rx = [regex]'(<assemblyIdentity\b[^>]*?\bversion=")[0-9.]+(")'
+    if ($rx.Matches($text).Count -ne 1) { Die "$template does not have exactly one assemblyIdentity version to stamp." }
+    $out = Join-Path $env:TEMP $leaf
+    [IO.File]::WriteAllText($out, $rx.Replace($text, ('${1}' + $v4 + '${2}'), 1), (New-Object Text.UTF8Encoding($false)))
+    $out
+}
 
 # Product and company default to Thornswood, which is what the launcher wants.
 # The setup stub keeps its own Title/Product/Company/Copyright in Bootstrap.cs
@@ -268,10 +278,11 @@ Head 'Compiling'
 # Reference Assemblies, and csc stopped with CS1703, one identity imported
 # twice. Everything the launcher needs is in $refs by hand, so csc.rsp has
 # nothing to add.
-# Application manifest: PerMonitorV2 DPI, supportedOS through Win10/11, asInvoker.
+# Application manifest: PerMonitorV2 DPI, supportedOS through Win10/11, asInvoker,
+# identity version stamped from Updater.cs (New-StampedManifest above).
 # /win32icon can stay beside /win32manifest; /win32res would conflict (issue #463).
-$manifest = Join-Path $Src 'Thornswood.manifest'
-if (-not (Test-Path -LiteralPath $manifest)) { Die "Thornswood.manifest is not at $manifest. It is in the repository, so the path is wrong; the launcher would ship without per-monitor DPI awareness." }
+$manifest = New-StampedManifest (Join-Path $Src 'Thornswood.manifest') $verFour 'Thornswood.stamped.manifest'
+Say "  manifest identity Thornswood.Launcher.Thornswood $verFour" 'DarkGray'
 $cscArgs = @(
     '/noconfig', '/nologo', '/target:winexe', '/platform:anycpu', '/optimize+', '/debug:pdbonly',
     "/out:$exe",
@@ -332,6 +343,17 @@ if (Test-Path -LiteralPath $clientRecord) {
     Die "client-build.json is not at $clientRecord. It is in the repository, so the path is wrong; the launcher could not check or repair the client runtime."
 }
 
+# Every file of the pinned Skyrim build, from the depot manifests the Downgrade
+# asks Steam for (New-SkyrimFilesRecord.ps1, issue #1232). OwnGame reads it to
+# tell Skyrim's own files from mods put into the Steam copy by hand, and makes
+# and refreshes nothing without it.
+$skyrimRecord = Join-Path $Here '..\..\records\skyrim-files.json'
+if (Test-Path -LiteralPath $skyrimRecord) {
+    $cscArgs += "/resource:$((Resolve-Path $skyrimRecord).Path),skyrim-files.json"
+} else {
+    Die "skyrim-files.json is not at $skyrimRecord. It is in the repository, so the path is wrong; the launcher could not tell Skyrim's own files from mods put into the Steam copy by hand."
+}
+
 foreach ($r in $refs) { $cscArgs += "/reference:$r" }
 foreach ($f in $cs)   { $cscArgs += $f.FullName }
 if ($infoApp) { $cscArgs += $infoApp }
@@ -350,14 +372,6 @@ if (Test-Path -LiteralPath $pdb) {
 } else {
     Say '  Thornswood.pdb did not appear beside the exe' 'Yellow'
 }
-if (Test-Path -LiteralPath $oldExe) {
-    try {
-        Remove-Item -LiteralPath $oldExe -Force
-        Say '  removed the old SkyrimTogether.exe' 'DarkGray'
-    } catch {
-        Say '  could not remove the old SkyrimTogether.exe, it is probably still running' 'Yellow'
-    }
-}
 
 # ------------------------------------------------------------ setup stub
 $stubSrc = Join-Path $Here '..\..\installer\setup\Bootstrap.cs'
@@ -370,11 +384,15 @@ Head 'Setup stub'
 # The scratch name is the name it ships under, Thornswood-Setup.exe, not a
 # setup-stub name, because csc writes the exe's OriginalFilename and
 # InternalName version fields from the /out leaf. Package-Thornswood.ps1
-# copies tools\setup-stub.exe to Thornswood-Setup.exe without recompiling,
+# copies out\setup-stub.exe to Thornswood-Setup.exe without recompiling,
 # so if it were built as setup-stub.exe those two fields would read a name
 # nobody ever downloads. Built under the shipped name in %TEMP% and then
-# moved onto tools\setup-stub.exe, which is what packaging copies from.
-$stub = Join-Path $Here '..\..\tools\setup-stub.exe'
+# moved onto out\setup-stub.exe, which is what packaging copies from. out\ is
+# the build output, the folder Where.ps1 calls Out, ignored by git; until
+# 29 September the stub sat in tools\ (issue #440, phase 10).
+$stubDir = Join-Path $Here '..\..\out'
+New-Item -ItemType Directory -Force -Path $stubDir | Out-Null
+$stub = Join-Path $stubDir 'setup-stub.exe'
 $stubNew = Join-Path $env:TEMP 'Thornswood-Setup.exe'
 if (Test-Path $stubNew) { Remove-Item $stubNew -Force }
 $stubArgs = @('/noconfig', '/nologo', '/target:winexe', '/platform:anycpu', '/optimize+', '/debug:pdbonly',
@@ -396,6 +414,14 @@ using System.Reflection;
 Set-Content -Path $stubVerCs -Value $stubVerBody -Encoding ASCII
 $stubArgs += (Resolve-Path $stubSrc).Path
 $stubArgs += $stubVerCs
+# Its own manifest (issue #463): per-monitor DPI and asInvoker, identity
+# Thornswood.Installer.Setup at this version. Without it csc embedded its
+# default, MyApplication.app 1.0.0.0 with no DPI awareness. And the launcher's
+# WindowFit.cs, which keeps the window inside the screen at any scale; it uses
+# nothing else from launcher\app.
+$stubManifest = New-StampedManifest (Join-Path $Here '..\..\installer\setup\Setup.manifest') $verFour 'ThornswoodSetup.stamped.manifest'
+$stubArgs += "/win32manifest:$stubManifest"
+$stubArgs += (Resolve-Path (Join-Path $Src 'WindowFit.cs')).Path
 
 $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
 & $csc @stubArgs
@@ -434,9 +460,9 @@ else {
 # 0x800700C1). Measured 27 September on Main Package. The stub stays unsigned
 # on disk; Package signs the final Setup after attach, and the two-file path
 # signs the copied Setup the same way. A stranger still gets a signed installer
-# from the site; this machine's tools\setup-stub.exe is only a build input.
+# from the site; this machine's out\setup-stub.exe is only a build input.
 #
-# This does nothing at all unless tools\signing.json exists, so Djinn's machine
+# This does nothing at all unless records\signing\signing.json exists, so Djinn's machine
 # and the pull request build carry on exactly as before. See the header of
 # Sign-Artifact.ps1 for what that file holds, and Bootstrap.cs:112-121 for why
 # any of this matters.

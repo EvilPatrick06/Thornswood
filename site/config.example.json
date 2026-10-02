@@ -11,6 +11,7 @@
   "gamePort": 7777,
   "gameCheckPort": 3000,
   "onlineFile": "C:/Thornswood-Server/data/online.json",
+  "open": false,
   "access": {
     "admin": [
       "Owner",
@@ -40,9 +41,13 @@
       "Talos Worshiper",
       "Milk Drinker",
       "Gamemaster"
+    ],
+    "jarl": [
+      "Jarl"
     ]
   },
   "botKey": "",
   "admins": [],
-  "secret": ""
+  "secret": "",
+  "passKey": ""
 }
