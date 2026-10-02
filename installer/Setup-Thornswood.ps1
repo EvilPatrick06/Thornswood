@@ -23,6 +23,11 @@
   Without collection.txt, the old behaviour: a standalone copy under -Root
   built out of the Steam one, which is then only ever read.
 
+  A second run over a folder the launcher already made (Root\Game, with
+  Profile\OwnGame\files.txt beside it) does not park that folder. It writes
+  Thornswood's own files into it. A file there that is a hard link loses
+  that name first, so the write does not go through to the other name.
+
   Bethesda's own files are never renamed or deleted either way.
 #>
 [CmdletBinding()]
@@ -259,11 +264,25 @@ $Collection = Test-Path -LiteralPath (Join-Path $Here 'collection.txt')
 # Thornswood's own folder, chosen in the setup window (#1226). Its files go to
 # Profile\Payload and the Steam copy is only read. The launcher tells this
 # shape by that folder (Paths.OwnFirst) and makes Root\Game from it.
-$OwnFirst = $Collection -and $MakeOwnGame
+#
+# A folder the launcher has already made is not that first install (#1233).
+# Root\Game with Profile\OwnGame\files.txt beside it is the working folder.
+# Parking it as Game-old-<date> threw it aside and left the launcher to build
+# another one, and the parked one stayed on the disk. This run writes the
+# payload into the folder that is already there.
+$madeRecord = Join-Path $ProfileDir 'OwnGame\files.txt'
+$MadeOwn = $Collection -and (Test-Path -LiteralPath (Join-Path $Root 'Game')) -and (Test-Path -LiteralPath $madeRecord)
+$OwnFirst = $Collection -and $MakeOwnGame -and -not $MadeOwn
 $ExeDir = $GameDir
 
 if ($Collection) {
-    if ($OwnFirst) {
+    if ($MadeOwn) {
+        $GameDir = Join-Path $Root 'Game'
+        $ExeDir = $GameDir
+        Say '  Thornswood''s own Skyrim folder is already here.' 'DarkGray'
+        Say '  This updates Thornswood''s own files in it and does not move it.' 'DarkGray'
+        Say '  Your Steam copy stays yours.' 'DarkGray'
+    } elseif ($OwnFirst) {
         $GameDir = Join-Path $ProfileDir 'Payload'
         $ExeDir = $SteamGamePath
         Say '  Thornswood''s own Skyrim folder is chosen, so nothing is written into' 'DarkGray'
@@ -284,6 +303,10 @@ if ($Collection) {
     # Moved rather than deleted. It is twenty gigabytes of somebody's disk and
     # not this script's to throw away, and a rename is undone in a second if
     # any of this turns out to be wrong.
+    #
+    # Not a folder the launcher made. That one has Profile\OwnGame\files.txt
+    # and $MadeOwn above leaves it where it is (#1233).
+    if (-not $MadeOwn) {
     $oldGame = Join-Path $Root 'Game'
     if (Test-Path -LiteralPath $oldGame) {
         $parked = Join-Path $Root ('Game-old-' + (Get-Date).ToString('yyyyMMdd-HHmm'))
@@ -302,6 +325,7 @@ if ($Collection) {
             Die 'The old Game folder is in the way and the launcher will read it instead.'
         }
         Write-Host ''
+    }
     }
 
     # No downgrade in this shape: the exe belongs to Steam and is not ours to
@@ -373,7 +397,7 @@ $freeGB = [math]::Round((Get-PSDrive $dl).Free / 1GB, 1)
 Say "  Installing to $Root"
 Say "  $freeGB GB free on $dl`:"
 if ($freeGB -lt $needGB) { Die "You need about $needGB GB free on $dl`:. Close this, run the setup program again and pick a different drive." }
-if ($Collection -and -not $OwnFirst) {
+if ($Collection -and -not $OwnFirst -and -not $MadeOwn) {
     # The mods land on whichever drive Steam keeps Skyrim on, which is not
     # necessarily the one just checked. With the own folder chosen they land
     # under -Root, which is the drive just checked.
@@ -392,7 +416,8 @@ if ($Collection -and -not $OwnFirst) {
 # of writing a file over itself.
 if ($Collection) {
     Head 'The base game'
-    if ($OwnFirst) { Say '  Your Steam copy. Thornswood''s own folder is made from it by the launcher.' 'DarkGray' }
+    if ($MadeOwn) { Say '  Already made. Thornswood''s own files are updated in it.' 'DarkGray' }
+    elseif ($OwnFirst) { Say '  Your Steam copy. Thornswood''s own folder is made from it by the launcher.' 'DarkGray' }
     else { Say '  Already here, this is your Steam copy.' 'DarkGray' }
     $null = New-Item -ItemType Directory -Force -Path $ProfileDir, $LaunchDir
 } else {
@@ -569,7 +594,7 @@ Say '  Several thousand files, a few minutes. The window looks still while it wo
 # list an earlier install left stays as it is, because it is what the
 # launcher takes back out of the Steam copy once the folder is made
 # (OwnGame.CleanSteamCopy).
-if ($Collection -and -not $OwnFirst) {
+if ($Collection -and -not $OwnFirst -and -not $MadeOwn) {
     $listed = @()
     $pfx = $Payload.TrimEnd('\') + '\'
     foreach ($f in (Get-ChildItem -LiteralPath $Payload -Recurse -File -Force -EA SilentlyContinue)) {
@@ -586,6 +611,63 @@ if ($Collection -and -not $OwnFirst) {
 # instead of copying keeps peak disk use down and leaves nothing behind.
 # The else sits on the closing brace. PowerShell ends the statement at the
 # newline and then fails on a stray else.
+# A hard link is one file under two names. Robocopy writes into the file it
+# finds, so copying over a linked name in the made folder would change the
+# Steam copy or Vortex's staging as well. The name in this folder comes off
+# first. The other name keeps its bytes, and the copy that follows belongs
+# here alone. The launcher does the same before it writes (OwnGame.Detach).
+function Remove-SharedNames([string]$from, [string]$to) {
+    if (-not ('TsLinkCount' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+public static class TsLinkCount {
+    [StructLayout(LayoutKind.Sequential)]
+    struct Info {
+        public uint FileAttributes;
+        public System.Runtime.InteropServices.ComTypes.FILETIME CreationTime;
+        public System.Runtime.InteropServices.ComTypes.FILETIME LastAccessTime;
+        public System.Runtime.InteropServices.ComTypes.FILETIME LastWriteTime;
+        public uint VolumeSerialNumber;
+        public uint FileSizeHigh;
+        public uint FileSizeLow;
+        public uint NumberOfLinks;
+        public uint FileIndexHigh;
+        public uint FileIndexLow;
+    }
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool GetFileInformationByHandle(SafeFileHandle h, out Info info);
+    public static int Count(string path) {
+        using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete)) {
+            Info info;
+            if (!GetFileInformationByHandle(fs.SafeFileHandle, out info)) return 1;
+            return (int)info.NumberOfLinks;
+        }
+    }
+}
+'@
+    }
+    # Every name the payload is about to replace comes off first. A hard link
+    # would take the write through to its other name. A normal file of the
+    # same size and timestamp is one robocopy would leave alone, so the old
+    # bytes would stay. Either way the name is gone and the copy that follows
+    # is this folder's own file.
+    $pfx = $from.TrimEnd('\') + '\'
+    $n = 0
+    foreach ($f in @(Get-ChildItem -LiteralPath $from -Recurse -File -Force -ErrorAction SilentlyContinue)) {
+        $rel = $f.FullName.Substring($pfx.Length)
+        $dest = Join-Path $to $rel
+        if (-not (Test-Path -LiteralPath $dest -PathType Leaf)) { continue }
+        $linked = [TsLinkCount]::Count($dest) -gt 1
+        [IO.File]::SetAttributes($dest, [IO.FileAttributes]::Normal)
+        [IO.File]::Delete($dest)
+        if ($linked) { $n++ }
+    }
+    if ($n) { Say ("  {0} linked file(s) separated, so the copy does not write through them" -f $n) 'DarkGray' }
+}
+if ($MadeOwn) { Remove-SharedNames $Payload $GameDir }
 $code = if ($MovePayload) { Copy-Quietly $Payload $GameDir 'installing the mods' -Move } else { Copy-Quietly $Payload $GameDir 'installing the mods' }
 if ($code -ge 8) { Die "robocopy failed with code $code" }
 Say '  Done' 'Green'
@@ -868,8 +950,11 @@ if ($bad) {
             Say "Once Vortex has deployed it, the launcher makes Thornswood's own" 'DarkGray'
             Say 'Skyrim folder by itself and restarts.' 'DarkGray'
         }
-        if ($OwnFirst) {
+        if ($OwnFirst -or $MadeOwn) {
             Say 'Nothing was written into your Steam copy of Skyrim.' 'DarkGray'
+        }
+        if ($MadeOwn) {
+            Say 'Thornswood''s own folder was updated in place.' 'DarkGray'
         }
     } else {
         Say 'Your Steam copy of Skyrim was not modified.' 'DarkGray'
