@@ -82,7 +82,7 @@
   const UI_PATH = 'Data/Platform/UI/index.html';
   const OVERLAYS = ['thornswood-chat.js', 'thornswood-emotes.js', 'thornswood-voice.js',
                     'thornswood-skills.js', 'thornswood-party.js',
-                    'thornswood-journal.js', 'thornswood-trade.js', 'thornswood-afk.js'];
+                    'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-afk.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -1922,6 +1922,7 @@
   */
   const CAP_CLOSES = {
     skills: 'thornswoodSkills', party: 'thornswoodParty', journal: 'thornswoodJournal',
+    board: 'thornswoodBoard',
     trade: 'thornswoodTrade', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
     afk: 'thornswoodAfk'
   };
@@ -6727,6 +6728,101 @@
     wantTyping(true, '/');
   }
 
+  /*
+    THE NOTICE BOARD HAS NO MESH. A click is the Activate key while you are
+    at the spot and aimed at it. A crosshair on something else, a door or a
+    person, is left alone. The spot comes from the server, so a steward move
+    is the spot. The nine seeds cover the moment before the first view arrives.
+  */
+  const BOARD_REACH = 400;
+  const BOARD_SEEDS = [
+    { x: -64867, y: 104407.2, z: -8405.9 },
+    { x: 23139.4, y: -7891.7, z: -3494.4 },
+    { x: 174559.5, y: -94337, z: 11130.2 },
+    { x: 134265.1, y: 35842.3, z: -12397.5 },
+    { x: -173494.7, y: 5049.1, z: -3447.6 },
+    { x: -30342.2, y: -87022.7, z: -3119.1 },
+    { x: -38766.1, y: 64411.9, z: -13920.9 },
+    { x: 32216.4, y: 102314, z: -13263 },
+    { x: 109969.6, y: 100594.4, z: -9033 }
+  ];
+  let boardNear = null;
+  let boardWatchAt = 0;
+
+  function boardDist(px, py, pz, spot) {
+    const dx = px - spot.x, dy = py - spot.y, dz = pz - spot.z;
+    return Math.sqrt(dx * dx + dy * dy + dz * dz);
+  }
+
+  function boardAimSpot(px, py, pz) {
+    if (boardNear && boardDist(px, py, pz, boardNear) <= 1500) { return boardNear; }
+    let best = null;
+    let bestD = 1500;
+    for (let i = 0; i < BOARD_SEEDS.length; i++) {
+      const d = boardDist(px, py, pz, BOARD_SEEDS[i]);
+      if (d <= bestD) { bestD = d; best = BOARD_SEEDS[i]; }
+    }
+    return best;
+  }
+
+  function boardFacing(pc, px, py, spot) {
+    const dx = spot.x - px, dy = spot.y - py;
+    const horiz = Math.sqrt(dx * dx + dy * dy);
+    if (horiz < 1) { return true; }
+    const yaw = pc.getAngleZ() * Math.PI / 180;
+    return (Math.sin(yaw) * dx + Math.cos(yaw) * dy) / horiz > 0.5;
+  }
+
+  function boardPress(e) {
+    if (!e || e.userEventName !== 'Activate') { return false; }
+    for (const held in claims) {
+      if (Object.prototype.hasOwnProperty.call(claims, held) && claims[held]) { return false; }
+    }
+    if (busyMenuOpen()) { return false; }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (err) { pc = null; }
+    if (!pc) { return false; }
+    let px, py, pz;
+    try {
+      px = pc.getPositionX(); py = pc.getPositionY(); pz = pc.getPositionZ();
+    } catch (err) { return false; }
+    const spot = boardAimSpot(px, py, pz);
+    if (!spot) { return false; }
+    const dist = boardDist(px, py, pz, spot);
+    if (dist > BOARD_REACH) { return false; }
+    let ref = null;
+    try { ref = sp.Game.getCurrentCrosshairRef(); } catch (err) { ref = null; }
+    if (ref) {
+      let rd = 99999;
+      try {
+        rd = boardDist(ref.getPositionX(), ref.getPositionY(), ref.getPositionZ(), spot);
+      } catch (err) { rd = 99999; }
+      if (rd > 250) { return false; }
+    } else if (!(dist < 180 || boardFacing(pc, px, py, spot))) {
+      return false;
+    }
+    T.js('try{window.thornswoodBoard&&window.thornswoodBoard.open();}catch(e){}');
+    return true;
+  }
+
+  sp.on('update', guard('board distance', () => {
+    if (!T.hasFocus('board')) { return; }
+    const now = Date.now();
+    if (now - boardWatchAt < 250) { return; }
+    boardWatchAt = now;
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    if (!pc) { return; }
+    let dist = 99999;
+    try {
+      const spot = boardAimSpot(pc.getPositionX(), pc.getPositionY(), pc.getPositionZ());
+      if (spot) { dist = boardDist(pc.getPositionX(), pc.getPositionY(), pc.getPositionZ(), spot); }
+    } catch (e) { dist = 99999; }
+    if (dist > BOARD_REACH) {
+      T.js('try{window.thornswoodBoard&&window.thornswoodBoard.close();}catch(e){}');
+    }
+  }));
+
   sp.on('buttonEvent', guard('keys', (e) => {
     keysSeen++;
     // Before the isDown guard, not after it.
@@ -6764,6 +6860,8 @@
     }
 
     if (!T.ready) return;
+
+    if (boardPress(e)) return;
 
     // Reachable only while focus is down, which is the only time it is needed.
     if (e.code === ESC) { wantTyping(false); return; }
@@ -7681,14 +7779,25 @@
     if (what === 'social:unavailable') {
       note('The social connection is loading. Try again in a moment.'); return;
     }
-    if (what === 'party:opened' || what === 'journal:opened') { tellServer('/party refresh'); }
+    if (what === 'party:opened' || what === 'journal:opened' || what === 'board:opened') {
+      tellServer('/party refresh');
+    }
     if (what === 'party:opened') { T.claimFocus('party', true); return; }
     if (what === 'party:closed') { T.claimFocus('party', false); return; }
     if (what === 'journal:opened') { T.claimFocus('journal', true); return; }
     if (what === 'journal:closed') { T.claimFocus('journal', false); return; }
+    if (what === 'board:opened') { T.claimFocus('board', true); return; }
+    if (what === 'board:closed') { T.claimFocus('board', false); return; }
+    if (what.indexOf('board:near ') === 0) {
+      const bits = what.slice('board:near '.length).trim().split(/\s+/);
+      if (bits[0] === 'none' || bits.length < 3) { boardNear = null; return; }
+      const bx = Number(bits[0]), by = Number(bits[1]), bz = Number(bits[2]);
+      boardNear = (isFinite(bx) && isFinite(by) && isFinite(bz)) ? { x: bx, y: by, z: bz } : null;
+      return;
+    }
     if (what === 'trade:opened') { T.claimFocus('trade', true); return; }
     if (what === 'trade:closed') { T.claimFocus('trade', false); return; }
-    if (what === 'party:ready' || what === 'journal:ready' || what === 'trade:ready') {
+    if (what === 'party:ready' || what === 'journal:ready' || what === 'trade:ready' || what === 'board:ready') {
       tellServer(what === 'trade:ready' ? '/trade refresh' : '/party refresh');
       log('the ' + what.split(':')[0] + ' panel is in');
       return;
