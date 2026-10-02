@@ -33560,6 +33560,13 @@ log('gamemode loaded:',
     return null;
   }
 
+  /** The hold whose box this character just opened, or nothing. */
+  function holdStanding(actorId) {
+    var at = boxAt(actorId);
+    if (!at) { return ''; }
+    return holdOfBox(at) || '';
+  }
+
   /*
     /box whiterun      make the container you are at the hold's box
     /box               say which hold's box you are standing at
@@ -34522,6 +34529,7 @@ log('gamemode loaded:',
     claims: function () { return claims; },
     isJarl: isJarl, isSteward: isSteward,
     touchedBox: touchedBox, putIn: putIn, holdOfBox: holdOfBox,
+    holdStanding: holdStanding,
     rentDue: rentDue, funds: function () { return funds; },
     boxes: function () { return boxes; },
     notices: function () { return notices; }, takedown: takedown,
@@ -37037,6 +37045,7 @@ function thornswoodBooks(env) {
   var MAX_NAME = 60;
   var PERMS = ['Read', 'Prices', 'Invite', 'Roles', 'Speak'];
   var store = [];
+  var ledgers = {};
   var leftAt = {};
   var seen = {};
   var seeded = false;
@@ -37144,11 +37153,12 @@ function thornswoodBooks(env) {
   function loadStore() {
     var doc = readJson(booksFile(), null);
     store = (doc && Array.isArray(doc.books)) ? doc.books : [];
+    ledgers = (doc && doc.ledgers && typeof doc.ledgers === 'object' && !Array.isArray(doc.ledgers)) ? doc.ledgers : {};
     var left = readJson(leftFile(), null);
     leftAt = (left && typeof left === 'object' && !Array.isArray(left)) ? left : {};
   }
 
-  function save() { writeJson(booksFile(), { books: store }); }
+  function save() { writeJson(booksFile(), { books: store, ledgers: ledgers }); }
   function saveLeft() { writeJson(leftFile(), leftAt); }
 
   loadStore();
@@ -37590,9 +37600,121 @@ function thornswoodBooks(env) {
       if (store[i] !== book) { keep.push(store[i]); }
     }
     store = keep;
+    forgetLedger(book.id);
     save();
     refresh();
     return 'Disbanded ' + name + '.';
+  }
+
+  function standingHold(actorId) {
+    if (env.atBox) { return String(env.atBox(actorId) || ''); }
+    var prop = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodProperty;
+    if (prop && typeof prop.holdStanding === 'function') {
+      return String(prop.holdStanding(actorId) || '');
+    }
+    return '';
+  }
+
+  function copyPrices(book) {
+    var out = [];
+    var rows = (book && book.prices) || [];
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i] || {};
+      out.push({
+        name: row.name,
+        buy: (row.buy == null || row.buy === '') ? null : Number(row.buy),
+        sell: (row.sell == null || row.sell === '') ? null : Number(row.sell)
+      });
+    }
+    return out;
+  }
+
+  function forgetLedger(id) {
+    var want = String(id || '');
+    for (var hold in ledgers) {
+      if (!Object.prototype.hasOwnProperty.call(ledgers, hold)) { continue; }
+      if (ledgers[hold] && ledgers[hold][want]) { delete ledgers[hold][want]; }
+    }
+  }
+
+  function submittedHolds(id) {
+    var want = String(id || '');
+    var out = [];
+    for (var hold in ledgers) {
+      if (!Object.prototype.hasOwnProperty.call(ledgers, hold)) { continue; }
+      if (ledgers[hold] && ledgers[hold][want]) { out.push(hold); }
+    }
+    out.sort();
+    return out;
+  }
+
+  function roundGold(n) {
+    return Math.floor(Number(n) + 0.5);
+  }
+
+  function sideNumbers(hold, item, side) {
+    var bag = ledgers[hold];
+    var out = [];
+    if (!bag) { return out; }
+    var low = String(item || '').toLowerCase();
+    for (var id in bag) {
+      if (!Object.prototype.hasOwnProperty.call(bag, id)) { continue; }
+      var rows = (bag[id] && bag[id].prices) || [];
+      for (var i = 0; i < rows.length; i++) {
+        if (String(rows[i].name || '').toLowerCase() !== low) { continue; }
+        var v = rows[i][side];
+        if (v == null || v === '') { continue; }
+        out.push(Number(v));
+      }
+    }
+    return out;
+  }
+
+  function meanGold(nums) {
+    if (!nums.length) { return null; }
+    var sum = 0;
+    for (var i = 0; i < nums.length; i++) { sum += nums[i]; }
+    return roundGold(sum / nums.length);
+  }
+
+  function sidePrice(hold, item, side) {
+    var own = meanGold(sideNumbers(hold, item, side));
+    if (own !== null) { return own; }
+    var fromHolds = [];
+    for (var name in ledgers) {
+      if (!Object.prototype.hasOwnProperty.call(ledgers, name)) { continue; }
+      if (name === hold) { continue; }
+      var one = meanGold(sideNumbers(name, item, side));
+      if (one !== null) { fromHolds.push(one); }
+    }
+    return meanGold(fromHolds);
+  }
+
+  function guildPrice(hold, item) {
+    var name = String(hold || '').toLowerCase();
+    return {
+      buy: sidePrice(name, item, 'buy'),
+      sell: sidePrice(name, item, 'sell')
+    };
+  }
+
+  function submit(actorId, pid, words) {
+    var taken = splitBook(pid, words, function (b, p) { return hasPerm(b, p, 'Prices'); });
+    if (!taken.book) { return taken.why; }
+    if (!hasPerm(taken.book, pid, 'Prices')) { return 'You cannot set prices in that book.'; }
+    var hold = standingHold(actorId).toLowerCase();
+    if (!hold) { return 'Stand at the hold\'s drop box, then submit the list.'; }
+    if (!ledgers[hold]) { ledgers[hold] = {}; }
+    ledgers[hold][taken.book.id] = {
+      book: taken.book.id,
+      name: taken.book.name,
+      kind: taken.book.kind,
+      at: now(),
+      prices: copyPrices(taken.book)
+    };
+    save();
+    refresh();
+    return 'Submitted ' + taken.book.name + ' to ' + hold + '\'s box. The list stays in the book.';
   }
 
   function command(ctx) {
@@ -37605,9 +37727,7 @@ function thornswoodBooks(env) {
     if (sub === 'new') {
       return found(actorId, pid, String(parts[2] || '').toLowerCase(), parts.slice(3).join(' '));
     }
-    if (sub === 'submit') {
-      return 'The hold drop box is not there, so the list stays in the book.';
-    }
+    if (sub === 'submit') { return submit(actorId, pid, words); }
     if (sub === 'leave') { return leave(pid, words); }
     if (sub === 'invite') { return invite(actorId, pid, words); }
     if (sub === 'say') { return sayLine(pid, actorId, words); }
@@ -37697,6 +37817,7 @@ function thornswoodBooks(env) {
         people: people,
         chat: chat,
         priceList: prices,
+        submitted: read ? submittedHolds(b.id) : [],
         roleNames: roleNames
       });
     }
@@ -37738,7 +37859,9 @@ function thornswoodBooks(env) {
     decline: decline,
     view: view,
     noteTick: noteTick,
-    books: function () { return store; }
+    books: function () { return store; },
+    guildPrice: guildPrice,
+    ledgers: function () { return ledgers; }
   };
 }
 /* BOOKS-END */
