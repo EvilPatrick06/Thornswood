@@ -1,0 +1,8 @@
+/* Server-written door / notice pages.
+   External so CSP style-src 'self' works without unsafe-inline
+   (#1474 follow-up after #1479). */
+body.door{background:#12150F;color:#DDE3D5;font:15px/1.6 system-ui,sans-serif;display:grid;place-items:center;height:100vh;margin:0;text-align:center;padding:20px;box-sizing:border-box}
+.door-box{max-width:32em}
+.door h1{color:#C9A24B;font-weight:600}
+.door a{color:#C9A24B}
+.door-note{color:#8D9682;font-size:13px}

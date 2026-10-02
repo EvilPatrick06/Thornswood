@@ -523,7 +523,7 @@ function pageHtml(md) {
       console.error('[thornswood-docs] a page would not render, sent as plain text: ' + e.message);
     }
   }
-  return '<pre style="white-space:pre-wrap">' + escAttr(md) + '</pre>';
+  return '<pre class="pre-wrap">' + escAttr(md) + '</pre>';
 }
 // A written page's markdown, or null. Known Issues and Help live in the data
 // folder with the other documents (Help is edited in the hub), not under site.
@@ -3138,12 +3138,12 @@ function plainPage(title, lines) {
   const esc = (t) => String(t == null ? '' : t).replace(/[<>&]/g, '');
   return '<!doctype html><meta charset=utf-8><title>' + esc(title) + ' | Thornswood</title>' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-    '<body style="background:#12150F;color:#DDE3D5;font:15px/1.6 system-ui;' +
-    'display:grid;place-items:center;height:100vh;margin:0;text-align:center;padding:20px">' +
-    '<div style="max-width:32em">' +
-    '<h1 style="color:#C9A24B;font-weight:600">' + esc(title) + '</h1>' +
+    '<link rel="stylesheet" href="/door.css">' +
+    '<body class="door">' +
+    '<div class="door-box">' +
+    '<h1>' + esc(title) + '</h1>' +
     lines.map((t) => '<p>' + esc(t) + '</p>').join('') +
-    '<p><a style="color:#C9A24B" href="/">Back to Thornswood</a></p>' +
+    '<p><a href="/">Back to Thornswood</a></p>' +
     '</div>';
 }
 
@@ -3164,29 +3164,29 @@ function notAllowedPage(me, st) {
     // the Discord" here is how somebody who IS in it loses an evening.
     why = '<p>Thornswood could not ask Discord about that account, so it cannot ' +
           'let anybody in right now. This is the site, not you.</p>' +
-          '<p style="color:#8D9682;font-size:13px">' + esc(st.lookupFailed) + '</p>' +
+          '<p class="door-note">' + esc(st.lookupFailed) + '</p>' +
           '<p>Tell Patrick and try again in a minute.</p>';
   } else if (st.banned) {
     why = '<p>That account is banned from Thornswood.</p>';
   } else if (!st.inGuild) {
     why = '<p>That account is not in the Thornswood Discord.</p>' +
       (cfg.discord.invite
-        ? '<p><a style="color:#C9A24B" href="' + cfg.discord.invite + '">Join it here</a>, then try again.</p>'
+        ? '<p><a href="' + cfg.discord.invite + '">Join it here</a>, then try again.</p>'
         : '');
   } else {
     why = '<p>That account is in the Discord, but ' + esc(notAcceptedYet(true)) + '</p>' +
-          '<p style="color:#8D9682;font-size:13px">Roles Thornswood can see on it: ' +
+          '<p class="door-note">Roles Thornswood can see on it: ' +
           (st.roles && st.roles.length ? '<b>' + st.roles.map(esc).join(', ') + '</b>' : 'none') +
           '.<br>It needs one of: <b>' + (cfg.access.play || []).map(esc).join(', ') + '</b>.</p>';
   }
   return '<!doctype html><meta charset=utf-8><title>Not allowed in</title>' +
-    '<body style="background:#12150F;color:#DDE3D5;font:15px/1.6 system-ui;' +
-    'display:grid;place-items:center;height:100vh;margin:0;text-align:center;padding:20px">' +
-    '<div style="max-width:32em"><h1 style="color:#C9A24B;font-weight:600">Not allowed in</h1>' +
+    '<link rel="stylesheet" href="/door.css">' +
+    '<body class="door">' +
+    '<div class="door-box"><h1>Not allowed in</h1>' +
     why +
-    '<p style="color:#8D9682;font-size:13px">Signed in to Discord as <b>' + nm +
+    '<p class="door-note">Signed in to Discord as <b>' + nm +
     '</b>, id <code>' + id + '</code>. Quote that id if you ask about it.</p>' +
-    '<p><a href="/" style="color:#C9A24B">Back to the site</a></p></div></body>';
+    '<p><a href="/">Back to the site</a></p></div></body>';
 }
 
 // ------------------------------------------------------------------ serve --
