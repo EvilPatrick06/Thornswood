@@ -539,6 +539,9 @@ namespace Thornswood
             l.Add(Dx("moldkey", "ThornsWood", "Press a key mold into a lock",
                      "While you are looking at a building's door with a blank key mold in your pack, presses it into the lock so it becomes that building's mold. The holder has to be you or be standing there.",
                      ThornIni, "MoldKey", 22));
+            l.Add(Dx("lockkey", "ThornsWood", "Lock the door",
+                     "Locks the door you last opened, the same door /claim and /lock use. Logged to the server as /lock. Unlock is still /unlock.",
+                     ThornIni, "LockKey", 45));
 
             l.Add(Dx("cyclehold", "Reaching things", "Cycle modifier",
                      "Held down, the two keys below step through everything you could reach instead of the game picking for you.",

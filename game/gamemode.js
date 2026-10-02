@@ -32984,6 +32984,21 @@ log('gamemode loaded:',
     plog(nameOf(building), on ? 'locked' : 'unlocked', 'by', held.name);
     toProfile(profileId, 'You ' + (on ? 'lock' : 'unlock') + ' ' + nameOf(building) + '.' +
               (on ? ' Anybody without a key will have to pick it.' : ''));
+    /*
+      #615: after locking, say so for you and everyone so you and others know
+      it is for sure locked. pushAll already sends the shut list; this is the
+      spoken line. The locker already heard the You-line above.
+    */
+    var said = nameOf(building) + ' is ' + (on ? 'locked' : 'unlocked') + '.';
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
+    for (var oi = 0; oi < online.length; oi++) {
+      var oid = online[oi];
+      var opid = 0;
+      try { opid = Number(mp.get(oid, 'profileId')) || 0; } catch (e) { opid = 0; }
+      if (!opid || opid === profileId) { continue; }
+      toProfile(opid, said);
+    }
     return true;
   }
 
