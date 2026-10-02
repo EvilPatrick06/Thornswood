@@ -533,6 +533,11 @@
     So this remounts what is ALREADY worn: silent unequip+equip of each
     equipped Armor, then queueNiNodeUpdate. Race is matched by name
     (Riekling / Goblin), never by inventing outfit form ids.
+
+    Race-table confirm (game/data/races.json from Playable Rieklings.esp):
+    playable FULL NAMEs are only "Riekling Blue" and "Riekling Purple".
+    No playable race uses a bare Goblin FULL NAME. /riekling|goblin/i
+    covers both; no matcher widen.
   */
   function raceNeedsClothesRemount(ac) {
     if (!ac) { return false; }
