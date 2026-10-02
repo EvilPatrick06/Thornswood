@@ -1800,7 +1800,7 @@ async def ensure_hold_panel(guild):
 # wiki/quality/playtest-acceptance.md, and Cynthia exports the Live slice of
 # them to live-smoke-discord-export.json, a copy of which is deployed beside
 # this file. The bot reads that file and nothing else: no request to the
-# vault, no request to the site, and no copy of it anywhere on this box.
+# vault, no request to the site, and nothing written back anywhere.
 #
 # IT RUNS ONE WAY. Vault to Discord. A mark pressed here is an edit to the
 # Discord message the button sits on, and that is the whole of where it is
@@ -1938,11 +1938,11 @@ def live_smoke_load(path=None):
         raise ValueError('The Live smoke export at %s has no items in it.' % where)
     # A custom_id is 100 characters, and an id too long for one is a session
     # whose buttons Discord refuses halfway through posting it.
-    long = [i['id'] for i in items
+    wide = [i['id'] for i in items
             if len(live_smoke_custom_id(i['id'], 'Fail-known')) > 100]
-    if long:
+    if wide:
         raise ValueError('These Live smoke item ids are too long to put on a '
-                         'button: %s.' % ', '.join(long))
+                         'button: %s.' % ', '.join(wide))
     return got
 
 
@@ -1981,7 +1981,7 @@ def live_smoke_opener(title, live_channel, settings_version, total):
 
     It names the three things a session has to record, and it says out loud
     that the marks are visible in the thread and go nowhere else, so nobody
-    marks a row believing either the opposite.
+    marks a row believing otherwise.
     """
     return ('**%s**\n'
             'Live channel: %s\n'
@@ -3346,16 +3346,20 @@ async def register_commands():
             await tree.sync(guild=g)
             if g.id not in synced:
                 synced.append(g.id)
-            log('/close is registered in "%s"' % g.name)
+            log('registered in "%s": %s'
+                % (g.name, ', '.join('/' + n for n in want) or 'nothing'))
         except Exception:
-            log('could not register /close in "%s", the Close button still '
-                'works:\n' % g.name + traceback.format_exc())
+            # Named rather than said as "the commands", because which ones
+            # they are is the first thing anybody asks when none appear.
+            log('could not register %s in "%s", the buttons still work:\n'
+                % (', '.join('/' + n for n in want), g.name)
+                + traceback.format_exc())
     try:
         tree.clear_commands(guild=None)
         await tree.sync()
     except Exception:
-        log('could not clear the global commands, so /close may appear twice '
-            'in the picker:\n' + traceback.format_exc())
+        log('could not clear the global commands, so a command may appear '
+            'twice in the picker:\n' + traceback.format_exc())
 
     _stamp_write(want, synced)
 
