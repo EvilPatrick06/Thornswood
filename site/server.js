@@ -2525,7 +2525,7 @@ const SERVER_LOGS = {
    when. Only those fields go out; where it runs and which machine sent it
    stay on the box. A record that will not read is named and skipped, so one
    bad file does not hide the rest. Deploy-Docs grants the site's account
-   read on this folder. */
+   read on this folder. The door is staff only since #1359. */
 const DEPLOYS_DIR = process.env.THORNSWOOD_DEPLOYS_DIR || 'C:\\Thornswood-Deploys\\current';
 function readDeploys(dir) {
   const parts = {};
@@ -3525,12 +3525,6 @@ async function handle(req, res) {
       }
       return send(res, 200, html, TYPES['.html']);
     } catch (e) { return send(res, 500, 'no home.html', 'text/plain'); }
-  }
-
-  // Which commit each part on this box runs (#459). Public: a commit, a zip
-  // name and a hash say nothing that is anybody's business.
-  if (route === '/api/deploys' && req.method === 'GET') {
-    return sendJson(res, 200, { parts: readDeploys(DEPLOYS_DIR) });
   }
 
   // Two addresses people type, or paste out of an old message. Both mean the
@@ -5333,6 +5327,29 @@ async function handle(req, res) {
       if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
       return sendJson(res, 200, staffRecords(Date.now()));
     }
+
+    /*
+      Which commit each part on this box runs (#459), for staff (#1359).
+
+      It sat above with /api/public, open to anybody, because a commit, a zip
+      name and a hash were read as telling a stranger nothing. They tell a
+      stranger plenty: the commit says which source is live to the hour, and
+      the stamp says when each part last went out, which is what somebody
+      looking for a way in reads first. Nothing in the repo fetches it and no
+      page draws it, so the only caller is a person asking what is deployed.
+      That person signs in.
+
+      The same gate as the other staff doors, so widening access.dev widens
+      this with them: the block above answers 401 'sign in first' to anybody
+      with neither cookie, and a hub member who is not staff gets the 403
+      'staff only' every staff door sends. No record is read before the
+      refusal, so nothing leaks in the body or the timing.
+    */
+    if (p === '/api/deploys' && req.method === 'GET') {
+      if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+      return sendJson(res, 200, { parts: readDeploys(DEPLOYS_DIR) });
+    }
+
     /*
       One character or the whole account (#1010). With a profileId (one of
       this account's characters) ban and unban are that character alone and
