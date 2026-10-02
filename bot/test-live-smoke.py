@@ -527,44 +527,76 @@ yes('THE OPENER CARRIES NO BLOCK OF INSTRUCTIONS ABOVE OR BELOW THE ROWS, '
 yes('  and it is four lines at the most', len(opener.split('\n')) <= 4)
 yes('  and no ticket number reaches it', not re.search(r'#\d+', opener))
 
-card = bot.live_smoke_template(live, items)
-yes('the checklist post carries every row in the set',
-    all((i['label'] in card) for i in items) and card.count('\n%d. ' % N) == 1)
-yes('  and offers nobody a standing Skip, because no row has one',
-    'Skip rule' not in card)
-yes('  and the day the set last changed, which is how a tester tells one '
-    'set from the next', stamp in card)
-yes('  and fits in a Discord message', len(card) < 2000)
-yes('  and is found again by the words it starts with',
-    card.startswith(bot.LIVE_SMOKE_TEMPLATE_HEAD))
-yes('  and carries no ticket number', not re.search(r'#\d+', card))
-yes('  and no block of prose around the rows',
-    not any(w in card for w in ('This is what a session checks',
-                                'The marks are Pass',
-                                'Agents do not mark rows')))
-want = [bot.LIVE_SMOKE_TEMPLATE_HEAD, stamp]
-for i in items:
-    want.append('%d. %s' % (i['order'], i['label']))
-    if i['skip_rule']:
-        want.append('    Skip rule: ' + i['skip_rule'])
-yes('  so what is in it is the heading, the stamp and the rows, in that order '
-    'and with nothing else',
-    [l for l in card.split('\n') if l.strip()] == want)
+# ------------------------------------- the checklist that stands in the channel --
+#
+# What #test-tasks carries between sessions. Up to 2 October it was one post of
+# numbered labels: it named every check in the set and said how to run not one
+# of them, so Patrick refreshed to 2026-10-02r7 and got twenty eight titles
+# where twenty eight sets of instructions should have been. It is the rows now,
+# a message each, worded the way a session words them.
+sheet = bot.live_smoke_checklist(live, items)
+head, rows = sheet[0], sheet[1:]
 
-# A set big enough to overflow a message is cut rather than refused by Discord.
+yes('THE CHECKLIST CARRIES THE LINE THE VAULT WROTE FOR EVERY ROW, which is '
+    'what a tester does and what a list of labels left out',
+    len(rows) == N
+    and all(i['discord_line'] in rows[n] for n, i in enumerate(items)))
+yes('  under the heading and not instead of it, so the name of the row is '
+    'still the first thing read',
+    all(r.startswith('**Live %d of %d: %s**' % (i['order'], N, i['label']))
+        and i['discord_line'] in r.split('\n', 1)[1]
+        for i, r in zip(items, rows)))
+yes('  one message to a row, in the order the export gives them',
+    rows == [bot.live_smoke_item_text(i, N) for i in items])
+yes('  so what stands in the channel and what a session posts are the same '
+    'words, and nobody is reading two different checklists',
+    all(len(r) > len('%d. %s' % (i['order'], i['label']))
+        for i, r in zip(items, rows)))
+yes('the post the rows hang off is the heading and the day the set last '
+    'changed, which is how a tester tells one set from the next',
+    [l for l in head.split('\n') if l.strip()] ==
+    [bot.LIVE_SMOKE_CHECKLIST_HEAD, stamp])
+yes('  and is found again by the words it starts with',
+    head.startswith(bot.LIVE_SMOKE_CHECKLIST_HEAD))
+yes('every message of it fits in a Discord message',
+    all(len(s) < 2000 for s in sheet))
+yes('  and offers nobody a standing Skip, because no row has one',
+    not any('Skip rule' in s for s in sheet))
+yes('  and carries no ticket number', not any(re.search(r'#\d+', s) for s in sheet))
+yes('  and no block of prose around the rows',
+    not any(w in s for s in sheet
+            for w in ('This is what a session checks', 'The marks are Pass',
+                      'Agents do not mark rows')))
+
+# A set bigger than a message is a message to a row, so none of it is cut off
+# the end of a post that ran out of room.
 big = bot.live_smoke_items({'items': [
     {'id': 'live-%d' % n, 'order': n, 'label': 'A row with a long name ' * 5,
-     'discord_line': 'x'} for n in range(1, 40)]})
-yes('a Live set too big for one message is cut, not thrown away by Discord',
-    len(bot.live_smoke_template({}, big)) < 2000
-    and 'the rest is in the export' in bot.live_smoke_template({}, big))
+     'discord_line': 'What a tester does, said at length. ' * 10}
+    for n in range(1, 40)]})
+spread = bot.live_smoke_checklist({}, big)
+yes('a Live set too big for one message is a message to a row, not a post cut '
+    'off at the end',
+    len(spread) == len(big) + 1 and all(len(s) < 2000 for s in spread)
+    and all(i['discord_line'] in s for i, s in zip(big, spread[1:])))
+
+# One row longer than a Discord message is cut, rather than refused by Discord
+# part way through posting a session.
+huge = bot.live_smoke_items({'items': [
+    {'id': 'live-1', 'order': 1, 'label': 'A long one',
+     'discord_line': 'x' * 4000}]})[0]
+yes('and a row longer than a Discord message is cut rather than handed to '
+    'Discord to refuse',
+    len(bot.live_smoke_item_text(huge)) < 2000
+    and 'the rest of this row is in the export'
+    in bot.live_smoke_item_text(huge))
 
 # ------------------------------------------------------- the words rules --
 #
 # CONTRIBUTING.md: no em dashes, and never the word this bans, in anything
 # written for people. Check-Words.ps1 does not read bot.py, so it is read here.
-WORDS = [opener, card, bot.live_smoke_admin_refusal(here), gone,
-         bot.live_smoke_tick_refusal(Who([], bot=True))]
+WORDS = [opener, bot.live_smoke_admin_refusal(here), gone,
+         bot.live_smoke_tick_refusal(Who([], bot=True))] + sheet
 WORDS += [bot.live_smoke_item_text(i, N) for i in items]
 yes('nothing this says to anybody has an em dash in it',
     not any('\u2014' in w for w in WORDS))
@@ -621,14 +653,35 @@ class Message(object):
         self.content = content
         self.author = Who(uid=BOT_ID)
         self.thread = None
+        # What Discord has, next to what the message in hand remembers. An
+        # archived thread drops out of the cache behind Message.thread and is
+        # still there to be fetched, which is the state a refresh weeks later
+        # finds.
+        self.threaded = None
 
     async def create_thread(self, name=None, auto_archive_duration=None):
+        if self.threaded is not None:
+            raise RuntimeError('a message takes one thread, and Discord '
+                               'refuses a second')
         self.thread = Session(name, self.channel)
+        self.threaded = self.thread
         self.channel.threads.append(self.thread)
         return self.thread
 
+    async def fetch_thread(self):
+        if self.threaded is None:
+            raise RuntimeError('no thread on this message, which Discord '
+                               'answers as not found')
+        return self.threaded
+
     async def edit(self, content=None, view=None):
         self.content = content
+
+    async def delete(self):
+        # Its own message, which Discord lets a bot take down without Manage
+        # Messages.
+        self.channel.sent = [(m, v) for m, v in self.channel.sent
+                             if m is not self]
 
     async def pin(self):
         raise RuntimeError('no Manage Messages, which is on purpose')
@@ -647,8 +700,9 @@ class Posted(object):
         self.sent.append((m, view))
         return m
 
-    async def history(self, limit=50):
-        for m, _ in reversed(self.sent):
+    async def history(self, limit=50, oldest_first=False):
+        order = self.sent if oldest_first else reversed(self.sent)
+        for m, _ in list(order):
             yield m
 
 
@@ -794,29 +848,92 @@ yes('  and opens a new one rather than rewriting the old ticks',
 yes('  and says the one before it is closed',
     'closed and locked' in ask.response.said[0])
 
-# Refresh: the checklist post, made once and then edited.
+# Refresh: the standing checklist, made once and then edited. This is the one
+# Patrick ran on 2 October against 2026-10-02r7 and got the row names out of.
 fresh, guild2 = server()
 guild2.text_channels.append(fresh)
 ask = Ask(Who(['Dev']), guild2, fresh)
 ran(bot.live_smoke_refresh.callback(ask))
-yes('refresh posts the checklist when there is none',
+post = fresh.sent[0][0]
+standing = post.thread
+yes('refresh posts the checklist when there is none, and it is one post in '
+    'the channel',
     len(fresh.sent) == 1
-    and fresh.sent[0][0].content.startswith(bot.LIVE_SMOKE_TEMPLATE_HEAD))
+    and post.content.startswith(bot.LIVE_SMOKE_CHECKLIST_HEAD))
+yes('  carrying the day the set last changed', bot.live_smoke_stamp(live) in post.content)
+yes('  AND THE ROWS UNDER IT, each one the whole of what a tester does rather '
+    'than the name of it',
+    standing is not None and len(standing.sent) == N
+    and all(i['discord_line'] in standing.sent[n][0].content
+            for n, i in enumerate(items)))
+yes('  worded the way a session words them',
+    [m.content for m, _ in standing.sent] ==
+    [bot.live_smoke_item_text(i, N) for i in items])
+yes('  and not one of them carrying a button, because a mark belongs to a '
+    'dated session',
+    all(v is None for _, v in standing.sent))
+yes('  and whoever ran it is told how many rows went up, and that a session '
+    'already open keeps the ones it started with',
+    '%d row(s)' % N in ask.response.said[0]
+    and '/live-smoke reset' in ask.response.said[0])
 yes('  and a pin Discord refuses does not stop it, because the bot asks for '
     'neither Manage Messages nor Pin Messages',
-    'posted' in ask.response.said[0])
+    'now says what the export says' in ask.response.said[0])
 
-card_was = fresh.sent[0][0].content
+was_rows = [m.content for m, _ in standing.sent]
 ask = Ask(Who(['Dev']), guild2, fresh)
 ran(bot.live_smoke_refresh.callback(ask))
-yes('refresh again edits that post rather than adding a second one',
-    len(fresh.sent) == 1 and fresh.sent[0][0].content == card_was
-    and 'now says what the export says' in ask.response.said[0])
+yes('refresh again edits what is there rather than posting the set a second time',
+    len(fresh.sent) == 1 and post.content.startswith(bot.LIVE_SMOKE_CHECKLIST_HEAD)
+    and [m.content for m, _ in standing.sent] == was_rows)
+
+# Discord archives a quiet thread after a week and drops it out of the cache
+# the message carries, which is the state a refresh weeks later finds. The
+# thread is fetched and woken rather than a second one being asked for, which
+# Discord refuses.
+standing.archived = True
+post.thread = None
+ask = Ask(Who(['Dev']), guild2, fresh)
+ran(bot.live_smoke_refresh.callback(ask))
+yes('a thread Discord has archived is fetched and woken, so a refresh weeks '
+    'later still lands',
+    not standing.archived and len(standing.sent) == N
+    and len(fresh.threads) == 1)
+
+# Cynthia drops rows from the set. The ones that went are taken down rather
+# than left standing, telling testers to run a check nobody is asking for.
+short = tmp_json(dict(good, items=good['items'][:3]))
+was = bot.LIVE_SMOKE_EXPORT
+try:
+    bot.LIVE_SMOKE_EXPORT = short
+    ask = Ask(Who(['Dev']), guild2, fresh)
+    ran(bot.live_smoke_refresh.callback(ask))
+    yes('a row the export no longer carries is taken down',
+        len(standing.sent) == 3
+        and [m.content for m, _ in standing.sent] ==
+        [bot.live_smoke_item_text(i, 3) for i in items[:3]])
+finally:
+    bot.LIVE_SMOKE_EXPORT = was
+    os.unlink(short)
+
+ask = Ask(Who(['Dev']), guild2, fresh)
+ran(bot.live_smoke_refresh.callback(ask))
+yes('  and the whole set is back the next time the export carries it',
+    [m.content for m, _ in standing.sent] == was_rows)
 
 ask = Ask(Who(['Playtester']), guild2, fresh)
 ran(bot.live_smoke_refresh.callback(ask))
 yes('and a tester cannot refresh it', len(fresh.sent) == 1
     and 'start, reset and refresh' in ask.response.said[0])
+
+# A reset closes the session threads under the channel. The standing checklist
+# is not one of them, which is why its thread is not named for a session.
+ask = Ask(Who(['Owner']), guild2, fresh)
+ran(bot.live_smoke_open(ask, '1.1.102.0', 'thornswood-one', True))
+yes('a reset closes the sessions and leaves the standing checklist where it is',
+    not standing.archived and not standing.locked
+    and not bot.LIVE_SMOKE_ROWS.startswith(bot.LIVE_SMOKE_TITLE)
+    and len(standing.sent) == N)
 
 # No #test-tasks at all: said in words, nothing posted.
 ask = Ask(Who(['Owner']), Server(['Owner'], [Posted('general')]), None)
