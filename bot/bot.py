@@ -1811,12 +1811,19 @@ async def ensure_hold_panel(guild):
 # refused and that message holds names and marks.
 #
 # Marks are visible to everybody who can read the session thread. That is the
-# Owner's call rather than an accident, and the opener says so, so nobody
-# marks a row thinking it is private. The channel itself is pathfind in
+# Owner's call rather than an accident. The channel itself is pathfind in
 # Build-Discord.py: testers and staff, never @everyone, plus the lead
 # gamemaster role on that channel's own line, because the admin list below is
 # not the same list as pathfind and somebody holding only that role could
 # otherwise run a session in a channel they cannot see.
+#
+# WHAT GOES ON DISCORD. The checklist rows, and nothing wrapped around them.
+# Djinn on 1 October, twice: testers have no GitHub, so no ticket number, no
+# issue number and no pull request number is ever appended to a row; and the
+# blocks of instructions that used to sit above and below the rows are gone,
+# because the rows say what to do and nobody read the rest. What is kept is
+# the versioning, which is the session title and one short line off the
+# export's own updated date.
 #
 # WHO MAY START ONE. Owner, Dev and Lead Gamemaster, which is wider than
 # Owner and Dev and narrower than STAFF: a Moderator alone does not start,
@@ -1834,12 +1841,14 @@ LIVE_SMOKE_SCHEMA = 'thornswood.live-smoke.v1'
 LIVE_SMOKE_CHANNEL = [n.strip().lower() for n in
                       os.environ.get('LIVE_SMOKE_CHANNEL', 'test-tasks').split(',')
                       if n.strip()]
-# Lead GM and Lead Gamemaster are both here because the role has been written
+# Lead Gamemaster and Lead GM are both here because the role has been written
 # both ways and the scrub is not finished. Matching is by name and ignores
-# case, the way STAFF_ROLES already works.
+# case, the way STAFF_ROLES already works, so the order is only what a refusal
+# names first: Lead Gamemaster, which is the canonical spelling the export
+# carries, and Lead GM after it as the alias.
 LIVE_SMOKE_ADMIN_NAMES = [r.strip() for r in
                           os.environ.get('LIVE_SMOKE_ADMIN_ROLES',
-                                         'Owner,Dev,Lead GM,Lead Gamemaster').split(',')
+                                         'Owner,Dev,Lead Gamemaster,Lead GM').split(',')
                           if r.strip()]
 LIVE_SMOKE_ADMIN = [r.lower() for r in LIVE_SMOKE_ADMIN_NAMES]
 # The second lock on agents, after interaction.user.bot. Empty here on
@@ -1978,39 +1987,66 @@ def live_smoke_title_of(export, settings_version, day=None):
                .strip())
 
 
-def live_smoke_opener(title, live_channel, settings_version, total):
+def live_smoke_show_tickets(export):
     """
-    The message the session thread hangs off.
+    Whether the ticket numbers on a row may go on Discord. Off unless the
+    export asks for them in so many words.
 
-    It names the three things a session has to record, and it says out loud
-    that the marks are visible in the thread and go nowhere else, so nobody
-    marks a row believing otherwise.
+    Djinn's rule of 1 October: testers do not have GitHub, so an issue number
+    on a row is a thing they cannot open and a number they may write down as
+    if it meant something to them. The tickets stay in the export for the
+    staff map and for the harness.
     """
-    return ('**%s**\n'
-            'Live channel: %s\n'
-            'Settings version: %s\n'
-            '%d row%s to mark, from the Live set the vault keeps.\n\n'
-            'Mark your own rows in the thread under this message: Pass, Fail, '
-            'Skip or Fail-known. On a Fail or a Fail-known, say the issue '
-            'number in a reply in the thread.\n'
-            'Everybody who can read the thread can read the marks in it, and '
-            'they stay in Discord: nothing here is written to the site, to a '
-            'database or to a file. Agents do not mark rows.'
-            % (title, str(live_channel).strip(),
-               str(settings_version).strip(), total,
-               '' if total == 1 else 's'))
+    return ((export or {}).get('rules') or {}).get('discord_show_tickets') is True
 
 
-def live_smoke_item_text(item, total=None):
-    """One row, as it is posted. The skip rule is on it when the export gives
-       one, which is what tells a tester that Skip is the honest mark."""
+def live_smoke_stamp(export):
+    """
+    The one short line that says which Live set this is, or nothing.
+
+    All that is left of the prose around the checklist: the set moves when
+    Cynthia refreshes it, and a tester reading a row has to be able to tell
+    which day's set they are marking.
+    """
+    export = export or {}
+    updated = str(export.get('updated') or '').strip()
+    if not updated:
+        return ''
+    fmt = str((export.get('session') or {}).get('version_stamp')
+              or 'Checklist updated: {updated}').strip()
+    return fmt.replace('{updated}', updated)
+
+
+def live_smoke_opener(title, live_channel, settings_version, stamp=''):
+    """
+    The message the session thread hangs off: the three things a session has
+    to record, and nothing else.
+
+    Djinn's layout call of 1 October. This used to carry a how to mark block
+    and a paragraph about where the marks go, above seven rows that each say
+    what to do. Testers read the rows and scrolled past the rest, so the rest
+    is gone and what is left is the session's own name.
+    """
+    out = ('**%s**\n'
+           'Live channel: %s\n'
+           'Settings version: %s'
+           % (title, str(live_channel).strip(), str(settings_version).strip()))
+    if stamp:
+        out += '\n' + stamp
+    return out
+
+
+def live_smoke_item_text(item, total=None, tickets=False):
+    """One row, as it is posted: what to do, and the skip rule when the export
+       gives one, which is what tells a tester that Skip is the honest mark.
+       Ticket numbers only when the export asks for them."""
     head = 'Live %d' % item['order']
     if total:
         head += ' of %d' % total
     if item['label']:
         head += ': ' + item['label']
     out = '**%s**' % head
-    if item['tickets']:
+    if tickets and item['tickets']:
         out += '  ' + ' '.join('#' + t for t in item['tickets'])
     out += '\n' + item['discord_line']
     if item['skip_rule']:
@@ -2056,25 +2092,24 @@ def live_smoke_template(export, items):
     The post that sits in the channel between sessions, so somebody reading
     #test-tasks on a Tuesday can see what a session covers without one being
     open. Humans only: it carries no buttons and nobody is marked on it.
+
+    The rows and the day the set last changed. The heading is what refresh
+    finds the post by again, and the stamp is the versioning Djinn asked to
+    keep; the blocks that used to sit above and below the rows are gone.
     """
-    out = [LIVE_SMOKE_TEMPLATE_HEAD, '',
-           'This is what a session checks. Staff open one with /live-smoke '
-           'start, and the rows are marked in the thread under its opener.']
-    updated = str((export or {}).get('updated') or '').strip()
-    if updated:
-        out.append('The set last changed on %s.' % updated)
+    out = [LIVE_SMOKE_TEMPLATE_HEAD]
+    stamp = live_smoke_stamp(export)
+    if stamp:
+        out.append(stamp)
     out.append('')
+    tickets = live_smoke_show_tickets(export)
     for item in items:
         line = '%d. %s' % (item['order'], item['label'] or item['discord_line'])
-        if item['tickets']:
+        if tickets and item['tickets']:
             line += '  ' + ' '.join('#' + t for t in item['tickets'])
         out.append(line)
         if item['skip_rule']:
             out.append('    Skip rule: ' + item['skip_rule'])
-    out.append('')
-    out.append('The marks are Pass, Fail, Skip and Fail-known. They stay in '
-               'Discord, in the session thread, and are read by everybody who '
-               'can read it. Agents do not mark rows.')
     said = '\n'.join(out)
     if len(said) > LIVE_SMOKE_ROOM:
         said = said[:LIVE_SMOKE_ROOM].rstrip() + '\n(the rest is in the export)'
@@ -2304,11 +2339,13 @@ async def live_smoke_open(interaction, settings_version, live_channel, close_old
     closed = await live_smoke_close_old(ch) if close_old else 0
     try:
         opener = await ch.send(live_smoke_opener(title, live_channel,
-                                                 settings_version, len(items)))
+                                                 settings_version,
+                                                 live_smoke_stamp(export)))
         thread = await opener.create_thread(name=title[:100],
                                             auto_archive_duration=10080)
+        tickets = live_smoke_show_tickets(export)
         for item in items:
-            await thread.send(live_smoke_item_text(item, len(items)),
+            await thread.send(live_smoke_item_text(item, len(items), tickets),
                               view=LiveSmokeItem(item['id']))
     except Exception:
         # Nothing is marked yet, so there is nothing here to keep off the log.
