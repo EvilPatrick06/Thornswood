@@ -95,9 +95,12 @@ does not lift a silence.
 ## Where this is
 
 The three distances, V, O, B, and the voice mute are in the server.
-The microphone is the launcher's. The voice mute sets the level to
-nothing on your machine. It is not a mute the server enforces on the
-sound.
+The microphone is the launcher's. A voice mute sets the level to
+nothing on your machine. The sound goes from machine to machine, so
+the server cannot stop it for you alone without also stopping it for
+them, and a personal mute does not tell the other person. Staff
+silence is the moderation tool: the service tells every client to
+close that microphone and to hear nothing from them.
 
 Text mute is remembered on the character, and the chat service drops
 those lines for the person who turned them off. Hiding a name, and
