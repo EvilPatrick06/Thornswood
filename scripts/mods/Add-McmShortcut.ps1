@@ -1,5 +1,9 @@
-﻿<#
+<#
   Add-McmShortcut.ps1
+
+  RETIRED. DO NOT RUN. Issue #1179: hand-installed MCM Shortcut NG, then Ships. The collection (or the settled load order) does this now. It refuses to run, and the rest of the file is kept for the history of how it was installed. Pattern from #405 Add-Bodies.
+
+  What it used to do, and what is left of it:
 
   Installs MCM Shortcut NG, which is what lets Skyrim Unbound open its own
   config menu.
@@ -31,6 +35,13 @@ param(
     [switch]$NoShip,
     [switch]$NoPause
 )
+# The refusal comes before anything else, above the strict mode line and above
+# the dot source below it, so no part of the install can run by accident.
+throw ('STOP. Add-McmShortcut.ps1 is retired and installs nothing (issue #1179). ' +
+       'MCM Shortcut NG comes from the Nexus collection now, not a hand install that Ships into Game\Data. ' +
+       'The file is kept for the history of how it was installed. Delete this line only if ' +
+       'hand installs are meant again, and read the header first.')
+
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'

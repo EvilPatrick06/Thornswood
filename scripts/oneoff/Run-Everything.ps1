@@ -1,6 +1,10 @@
 <#
   Run-Everything.ps1
 
+  RETIRED. DO NOT RUN. Issue #1179: ran the old Add-* installers in one go and published once. The collection (or the settled load order) does this now. It refuses to run, and the rest of the file is kept for the history of how it was installed. Pattern from #405 Add-Bodies.
+
+  What it used to do, and what is left of it:
+
   One run that installs everything waiting, checks each piece actually landed,
   and publishes once at the end instead of once per mod.
 
@@ -16,6 +20,13 @@ param(
     [string]$Root = 'C:\Thornswood',
     [switch]$DryRun
 )
+# The refusal comes before anything else, above the strict mode line and above
+# the dot source below it, so no part of the install can run by accident.
+throw ('STOP. Run-Everything.ps1 is retired and installs nothing (issue #1179). ' +
+       'The collection installs the mods now. This orchestrator only ran the old Add-* hand installers and published once. ' +
+       'The file is kept for the history of how it was installed. Delete this line only if ' +
+       'hand installs are meant again, and read the header first.')
+
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'

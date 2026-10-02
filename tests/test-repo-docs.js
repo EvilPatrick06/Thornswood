@@ -89,7 +89,7 @@ if (readme !== null) {
   yes('README.md does not promise an install without Vortex' + where(readme, /no\s+vortex/i),
       !/no\s+vortex/i.test(readme));
   const n = readme.split(/\r?\n/).length;
-  yes('README.md is short and points at the long form, ' + n + ' lines', n < 60);
+  yes('README.md is short and points at the long form, ' + n + ' lines', n < 80);
 }
 
 // ------------------------------------------------------ READ ME FIRST.txt

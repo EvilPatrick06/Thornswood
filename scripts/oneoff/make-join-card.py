@@ -1,11 +1,14 @@
 """
 make-join-card.py
 
-Builds assets/join-card.png, the picture every join card is drawn on, from the
-Thornswood banner art beside this file.
+Builds bot/assets/join-card.png, the picture every join card is drawn on, from
+the Thornswood banner art in bot/.
 
-    python make-join-card.py              writes assets/join-card.png
-    python make-join-card.py --out FILE   writes FILE instead, to look at
+One-shot generator; lives under scripts/oneoff/ so bot tooling sweeps do not
+treat it as production bot code.
+
+    python scripts/oneoff/make-join-card.py              writes bot/assets/join-card.png
+    python scripts/oneoff/make-join-card.py --out FILE   writes FILE instead, to look at
 
 Patrick, 24 September, with a tester's note "make it a Thornswood banner":
 "the banner backgound needs changed to the thornswood". The card had been
@@ -23,7 +26,8 @@ The art is far brighter and busier than the starfield was, so the area under
 the words is darkened, and the ring round the avatar gets a darker patch to
 sit on. card.render still lays its own wash over the text side, so what these
 numbers are tuned for is what the words end up on, and
-bot/test-join-card.py measures that against the starfield card.
+bot/test-join-card.py measures that against the starfield card, and runs this
+script from scripts/oneoff/.
 Only the background changes: card.py draws the same size, layout, fonts and
 colours it always did.
 
@@ -35,8 +39,9 @@ import sys
 from PIL import Image, ImageDraw, ImageFilter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SOURCE = os.path.join(HERE, 'invite-splash-1920x1080.jpg')
-OUT = os.path.join(HERE, 'assets', 'join-card.png')
+BOT = os.path.normpath(os.path.join(HERE, '..', '..', 'bot'))
+SOURCE = os.path.join(BOT, 'invite-splash-1920x1080.jpg')
+OUT = os.path.join(BOT, 'assets', 'join-card.png')
 
 # The card, and where card.render puts things on it.
 W, H = 1000, 360

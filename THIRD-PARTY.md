@@ -405,6 +405,24 @@ with.
   Section 13 of the AGPL asks that everybody who connects to a modified server
   over a network be offered its source. The next section is that offer.
 
+## The Discord bot, on the VPS
+
+The bot in `bot\` runs on the VPS (`scripts\deploy\Install-Bot.ps1`). Its
+Python packages stay on the server; nobody downloads them with the game or
+the launcher. Versions are pinned in `bot\requirements.txt`. Transitive
+dependencies of discord.py (aiohttp and friends) come in through pip at those
+pin points and are not listed separately here.
+
+| Package | Version | Licence | Source |
+|---|---|---|---|
+| `discord.py` | 2.7.1 | MIT | https://pypi.org/project/discord.py/2.7.1/ |
+| `Pillow` | 12.3.0 | MIT-CMU | https://pypi.org/project/Pillow/12.3.0/ |
+| `certifi` | 2026.7.22 | MPL-2.0 | https://pypi.org/project/certifi/2026.7.22/ |
+
+discord.py is by Rapptz. Pillow is by Jeffrey A. Clark (Alex) and contributors
+(the Historical Permission Notice and Disclaimer / MIT-CMU text on PyPI).
+certifi is the Certifi project (Mozilla CA bundle as an MPL-2.0 package).
+
 ## Where the source is
 
 For the six client files and for the game server module running on the VPS, the
