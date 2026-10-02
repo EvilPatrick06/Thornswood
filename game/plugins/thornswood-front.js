@@ -3785,7 +3785,6 @@
     ['Dawnguard.esm', 0xf812],   // DLC1DawnguardCraftingBlackSmithForge
     ['Dragonborn.esm', 0x3cf6e],   // DLC2CraftingBlackSmithForge
     ['Dragonborn.esm', 0x2b074],   // DLC2CraftingBlackSmithSkaalForge
-    ['Dragonborn.esm', 0x18cae],   // testPhilCraftingSmelterMarker1
     ['Thornswood-Content.esp', 0x1547e],   // ThornswoodCraftingCharcoalKilnMarker
   ];
   // The plugins the list spans, for the log line when they are resolved.

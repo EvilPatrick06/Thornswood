@@ -140,7 +140,7 @@ const FLAME_MODELS = [
 // Rule 2: the working heat, by editor id. Every one of these must match at
 // least one record or the build fails: a needle that matches nothing is a
 // renamed record and a silently missing forge. A needle matches when the
-// editor id contains it, not only when the id begins with it.
+// editor id begins with it (full editor ids listed when the shared words are not at the front).
 const CRAFT_HEAT = [
   'CraftingBlackSmithForge',
   'CraftingSmelterMarker',
@@ -260,9 +260,9 @@ function walk(b, start, end) {
         }
         if (!kind) {
           for (let i = 0; i < CRAFT_HEAT.length; i++) {
-            if (s.EDID.toLowerCase().indexOf(CRAFT_HEAT[i].toLowerCase()) !== -1) {
+            if (s.EDID.toLowerCase().indexOf(CRAFT_HEAT[i].toLowerCase()) === 0) {
               kind = 'craft';
-              why = 'editor id contains ' + CRAFT_HEAT[i];
+              why = 'editor id begins ' + CRAFT_HEAT[i];
               break;
             }
           }
@@ -308,7 +308,7 @@ for (const pl of PLUGINS) {
 // Every craft needle has to have found something.
 for (const pre of CRAFT_HEAT) {
   const hit = rows.some(function (r) {
-    return r.edid.toLowerCase().indexOf(pre.toLowerCase()) !== -1;
+    return r.edid.toLowerCase().indexOf(pre.toLowerCase()) === 0;
   });
   if (!hit) { fail('nothing matched the craft heat needle ' + pre); }
 }
@@ -341,7 +341,7 @@ if (process.exitCode === 1) {
     reach: REACH,
     inside: INSIDE,
     rule: 'flame: the model is one of the fire effects or wood fires. ' +
-          'craft: the editor id contains one of ' + CRAFT_HEAT.join(', ') + '. ' +
+          'craft: the editor id begins one of ' + CRAFT_HEAT.join(', ') + '. ' +
           'Anything whose editor id or model ends Off or Out is dropped.',
     fires: rows,
     droppedForBeingOut: dropped.length
