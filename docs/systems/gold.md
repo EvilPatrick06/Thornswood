@@ -4,7 +4,7 @@ Coin enters the world as the 40, as a trader's 250, and as the set
 reward on a scene quest. The 40 and the 250 happen once. The scene
 reward is created each time that quest is finished, and the cooldown
 on the quest is what spaces it. A scene quest is a retrieval or a
-bounty. It does not buy goods. A supply quest does not create
+kill in the named place. It does not buy goods. A supply quest does not create
 coin. It pays from the trader's 250. A letter does not create coin
 either. The sender pays the courier. After that, coin moves, or it
 leaves.
@@ -43,18 +43,17 @@ Gold pays, when the system that asks for it exists:
 | The first purse | 40, once | The new character |
 | A guild trader's purse | 250, once | That trader, when they are first stood up |
 | A scene quest | The amount on that quest | The person who finished it. Created. Not the trader's purse |
-| A letter | 15, from the sender, plus a board fee of 20 or 10 | The 15 to the courier on delivery. The fee to the hold's ledger |
-| A notice | 20, or 10 for a guild member | The hold's ledger |
-| A job, including a haul's posting fee | 30, or 15 for a guild member | The hold's ledger |
+| A letter | 15, from the sender, plus a board fee of 20 | The 15 to the courier on delivery. The fee to the hold's ledger |
+| A notice | 20 | The hold's ledger |
+| A job, including a haul's posting fee | 30 | The hold's ledger |
 | A haul's pay | Whatever was posted | The hold's ledger, then out to the hauler minus the company's tenth |
-| Guild joining | 50 | That hold's ledger |
-| Guild dues | 10 per in-game week | That hold's ledger |
-| Rent | Whatever the steward set, every 7 real days | That hold's ledger, and it is paid before dues |
+| Rent | Whatever the steward set, every 7 real days | That hold's ledger |
 | A carriage | 20, or 40 if Raven Rock is either end | The departure hold's ledger |
 | A ferry | 10 | The departure hold's ledger |
 
 The rows that are not in the server yet are said at the bottom of the
-page they belong to. The amounts are the plan's amounts.
+page they belong to. The amounts are the plan's amounts. The Merchant's
+Guild is the NPC traders; people cannot join it and pay no guild dues.
 
 ## What gold does not buy
 
