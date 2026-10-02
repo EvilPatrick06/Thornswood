@@ -36308,9 +36308,24 @@ log('gamemode loaded:',
     another part of the file and a harness that runs these blocks in a
     different order would otherwise count an empty table once and cache it.
   */
-  var bookIndex = null;
-  function recipeIndex() {
-    if (bookIndex) { return bookIndex; }
+  var bookIndexes = {};
+
+  /* A race-locked output is not somebody's recipe. Keep the book on the
+     same gate as onCraft: level, half and race all have to agree before a
+     row contributes to the page. Unknown race data is left open so a
+     load-order read failure never hides ordinary work. */
+  function recipeRaceMatches(actorId, row) {
+    if (!row || !row.race) { return true; }
+    var mine = raceOf(actorId);
+    if (!mine) { return true; }
+    return mine.indexOf(String(row.race).toLowerCase()) !== -1;
+  }
+
+  function recipeIndex(actorId) {
+    var race = '';
+    try { race = raceOf(actorId); } catch (e) { race = ''; }
+    var cacheKey = race || '*';
+    if (bookIndexes[cacheKey]) { return bookIndexes[cacheKey]; }
     /*
       NO TABLE IS NO BOOK, and it is not an exception either. The recipe block
       is written into this file by tools\Build-RecipeTable.ps1 and lives
@@ -36331,6 +36346,7 @@ log('gamemode loaded:',
       if (!P.has(table, desc)) { continue; }
       var row = table[desc];
       if (!row || typeof row !== 'object') { continue; }
+      if (!recipeRaceMatches(actorId, row)) { continue; }
       var half = String(row.half || '').toLowerCase();
       if (!half) { continue; }
       if (!P.has(out, half)) { out[half] = { total: 0, byRank: {}, openByRank: {}, families: [], famAt: {} }; }
@@ -36381,7 +36397,7 @@ log('gamemode loaded:',
         f.openByRank[rk] = (P.has(f.openByRank, rk) ? f.openByRank[rk] : 0) + 1;
       }
     }
-    bookIndex = out;
+    bookIndexes[cacheKey] = out;
     return out;
   }
 
@@ -36424,8 +36440,8 @@ log('gamemode loaded:',
     it is still ahead. A half with nothing open at all carries why instead,
     so the page is a sentence rather than an empty box.
   */
-  function bookHalf(key, how, rank) {
-    var idx = recipeIndex() || {};
+  function bookHalf(key, how, rank, actorId) {
+    var idx = recipeIndex(actorId) || {};
     var got = P.has(idx, key) ? idx[key] : null;
     var out = { key: key, name: nameOf(key), how: how, rank: rank,
                 open: 0, locked: 0, total: got ? got.total : 0, families: [] };
@@ -36482,17 +36498,17 @@ log('gamemode loaded:',
     for later has to be told that is why the page is empty rather than shown
     a blank.
   */
-  function bookView(s) {
+  function bookView(s, actorId) {
     // No table, no book. See recipeIndex: this block names something another
     // block owns, and a build that shipped without the recipes draws no
     // recipe section rather than fourteen halves that all make nothing.
-    if (!recipeIndex()) { return null; }
+    if (!recipeIndex(actorId)) { return null; }
     var halves = [];
     var seen = {};
     var prof = s && s.prof;
     var own = s && s.half;
     if (own) {
-      halves.push(bookHalf(own, 'own', P.rankOf(s, own) || 'novice'));
+      halves.push(bookHalf(own, 'own', P.rankOf(s, own) || 'novice', actorId));
       seen[own] = true;
     }
     /*
@@ -36508,14 +36524,14 @@ log('gamemode loaded:',
     */
     var sister = (prof && own) ? P.sisterOf(prof, own) : null;
     if (sister && !P.has(seen, sister)) {
-      halves.push(bookHalf(sister, 'sister', P.rankOf(s, sister) || 'novice'));
+      halves.push(bookHalf(sister, 'sister', P.rankOf(s, sister) || 'novice', actorId));
       seen[sister] = true;
     }
     var taught = (s && s.taught) || [];
     for (var i = 0; i < taught.length; i++) {
       var t = taught[i];
       if (P.has(seen, t) || !isCraftHalf(t)) { continue; }
-      halves.push(bookHalf(t, 'taught', P.rankOf(s, t) || 'novice'));
+      halves.push(bookHalf(t, 'taught', P.rankOf(s, t) || 'novice', actorId));
       seen[t] = true;
     }
     if (!halves.length) {
@@ -36708,7 +36724,7 @@ log('gamemode loaded:',
       home is confirmed the panel redraws with it.
     */
     if (!creating) {
-      var book = bookView(s);
+      var book = bookView(s, actorId);
       if (book) { view.book = book; }
       /*
         An Enchanter's staff spells (#1128), drawn as a spell book of its own

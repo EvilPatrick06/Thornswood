@@ -53,6 +53,15 @@ yes('a skyforge recipe wants charcoal', wantsCharcoal({ benchName: 'CraftingSmit
 yes('a smelter recipe does not', wantsCharcoal({ benchName: 'CraftingSmelter' }) === false);
 yes('an armour table recipe does not', wantsCharcoal({ benchName: 'CraftingSmithingArmorTable' }) === false);
 yes('a missing row does not', wantsCharcoal(null) === false);
+yes('recipe book has a race-aware index', src.indexOf('function recipeRaceMatches(actorId, row)') >= 0 &&
+  src.indexOf('function recipeIndex(actorId)') >= 0);
+yes('race-locked rows are excluded from the recipe book index',
+  src.indexOf('if (!recipeRaceMatches(actorId, row)) { continue; }') >= 0);
+yes('recipe book cache is separated by race',
+  src.indexOf('var bookIndexes = {};') >= 0 && src.indexOf('bookIndexes[cacheKey] = out;') >= 0);
+yes('panel passes actor race into the recipe book',
+  src.indexOf('var book = bookView(s, actorId);') >= 0 &&
+  src.indexOf("bookHalf(own, 'own', P.rankOf(s, own) || 'novice', actorId)") >= 0);
 
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
