@@ -449,10 +449,11 @@ try:
         yes('  and no other pathfind channel was quietly widened with it',
             others and not any(s.get('extra_roles') for s in others))
 
-        # The role is not in ROLES, so it is found on the server by name, the
-        # way the hold staff are.
-        lead = Role('Lead Gamemaster', 8, 59)
-        g.roles.append(lead)
+        # Lead Gamemaster is in ROLES since 2 October, where the live role
+        # list has it, so the server carries it already and _named finds that
+        # one. It is still looked up by name rather than assumed, which is what
+        # lets the other spelling be passed over below.
+        lead = roles['Lead Gamemaster']
         boss = Member(8, [lead])
         named = dict(roles)
 
@@ -527,8 +528,6 @@ try:
             yes('-Check says it would let them in and changes nothing',
                 g.calls == [] and 'would change' in buf.getvalue())
 
-        g.roles.remove(lead)
-
         ch = Channel(g, 'say-hello', 'text', ow={g.default_role:
                      discord.PermissionOverwrite(add_reactions=False)})
         g.calls = []
@@ -596,12 +595,20 @@ try:
     yes('  and the run did not stop part way', 'stopped:' not in said)
 
     said = run(g, False)
-    writes = [c for c in g.calls if c[0] == 'set_permissions']
+    every_write = [c for c in g.calls if c[0] == 'set_permissions']
+    # The one write that is not the bot's is Lead Gamemaster on #test-tasks,
+    # the role that channel names on its own line. Everything about the bot is
+    # measured without it, and the block further down measures it on its own.
+    theirs = [c for c in every_write if c[2] is not me]
+    writes = [c for c in every_write if c[2] is me]
     wrote = [c[1] for c in writes]
     yes('the build did not stop part way', 'stopped:' not in said)
     yes('nothing was made, because everything was already there',
         not [c for c in g.calls if c[0].startswith('create_')])
-    yes('every write was the bot\'s own overwrite', all(c[2] is me for c in writes))
+    yes('every write was the bot\'s own overwrite, bar the one role a channel '
+        'names for itself',
+        [(c[1].name, c[2].name) for c in theirs] ==
+        [('test-tasks', 'Lead Gamemaster')])
 
     # Exactly the channels and categories the bot could not get into before,
     # measured off the server rather than off the plan's modes.
@@ -654,13 +661,13 @@ try:
 
     # ------------------------- the whole build, with a Lead Gamemaster --
     #
-    # The role is not in ROLES, so a server that carries it is the only place
-    # the extra roles do anything. Everything else about the run must be the
-    # same as above: one more write, on one channel, for one role.
+    # The channels on the live server were made before the role was named on
+    # any of them, so the extra roles are the only thing that reaches one.
+    # Everything else about the run must be the same as above: one more write,
+    # on one channel, for one role.
     g, roles, people, news, loose = live_server()
     me = g.me
-    lead = Role('Lead Gamemaster', 8, 59)
-    g.roles.append(lead)
+    lead = roles['Lead Gamemaster']
     boss = Member(8, [lead])
     by_name = dict((c.name, c) for c in g.categories + g.channels if c is not news)
     tasks = by_name['test-tasks']
@@ -681,10 +688,14 @@ try:
         len(theirs) == 1 and theirs[0][1] is tasks)
     yes('  and #test-results is not one of them, so pathfind is not widened '
         'everywhere', not resolve(g, boss, by_name['test-results']).view_channel)
-    yes('  nor is any staff channel, a hold or the one made by hand',
+    yes('  nor is any staff channel or the one made by hand, because the role '
+        'is not in STAFF',
         not resolve(g, boss, by_name['staff-general']).view_channel
-        and not resolve(g, boss, by_name['whiterun']).view_channel
         and not resolve(g, boss, news).view_channel)
+    yes('  and the holds it does see are HOLD_STAFF\'s doing, which is what '
+        'that list is for, and no hold was written to',
+        resolve(g, boss, by_name['whiterun']).view_channel
+        and not [c for c in theirs if c[1] is by_name['whiterun']])
     yes('  and every other write was still the bot\'s own overwrite',
         all(c[2] is me for c in writes if c[2] is not lead))
     yes('  and nobody else gained a thing: not a Member, not somebody not yet '
