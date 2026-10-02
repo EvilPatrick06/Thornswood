@@ -45,10 +45,18 @@ $filter = if ($All) { '.' } else { '^\s*\[(thornswood-bot|run)\]' }
 $script = @"
 `$ErrorActionPreference = 'Continue'
 # In the bot's data folder since #1104; beside the code on a box whose full
-# install is older.
+# install is older; and the one written last when both are there, because
+# Install-Bot leaves an empty one in data on every run so that the path named
+# here and in the docs is always a file. Reading the empty one while the bot
+# writes the other is how this would show nothing about a bot that is fine.
 `$log = '$rootWin\data\bot.log'
-if (-not (Test-Path `$log) -and (Test-Path '$rootWin\bot.log')) { `$log = '$rootWin\bot.log' }
-if (-not (Test-Path `$log)) { 'there is no bot.log on the VPS yet'; exit }
+`$alt = '$rootWin\bot.log'
+`$a = Get-Item -LiteralPath `$alt -EA SilentlyContinue
+if (`$a) {
+  `$n = Get-Item -LiteralPath `$log -EA SilentlyContinue
+  if (-not `$n -or `$a.LastWriteTimeUtc -gt `$n.LastWriteTimeUtc) { `$log = `$alt }
+}
+if (-not (Test-Path `$log)) { 'there is no bot.log on the VPS yet, at ' + `$log; exit }
 
 `$p = Get-CimInstance Win32_Process |
      Where-Object { `$_.Name -eq 'python.exe' -and `$_.CommandLine -like '*Thornswood-Bot*' }
