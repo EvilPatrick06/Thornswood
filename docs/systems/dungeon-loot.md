@@ -2,12 +2,13 @@
 
 A chest in a dungeon, a cave, or a sewer pays from the tier of that
 place. The tier is the place's, not the person's. Walking in with a
-stronger character does not raise it. Camps are not on this table.
-A bandit camp and a giant camp have no tier.
+stronger character does not raise it. Camps are not on the chest
+table. A bandit camp and a giant camp have no tier. A camp enemy
+carries a little on the body instead.
 
-The world's own coin, weapons, and armour are still taken out of the
-chest. What this pays is created by the server, the same way a scene
-quest creates its reward. See [Gold](gold.md).
+The world's own coin, weapons, and armour are still taken out of
+containers and off the world. What this pays is created by the server,
+the same way a scene quest creates its reward. See [Gold](gold.md).
 
 ## What opens
 
@@ -16,68 +17,117 @@ safe, or a knapsack. A barrel, a sack, a cupboard, a dresser, a
 shelf, or a crate does not pay. A container somebody placed does not
 pay. The world's copy of that container does.
 
-The same container pays once. It pays again after the place has
-rested. The rest is the population rest for that tier.
+The same container pays once, to the person who opens it. Everybody
+else shares that pile by handing it over themselves. It pays again
+after the place has rested. The rest is the population rest for that
+tier.
 
-| Tier | Gold | Rest | Tome | Exclusive | Tomes run up to |
+| Tier | Gold | Rest | Tome | Exclusive | Tomes |
 | --- | --- | --- | --- | --- | --- |
 | 1 | 5 to 15 | 30 minutes | 22 in 100 | 5 in 100 | novice |
-| 2 | 12 to 35 | 45 minutes | 32 in 100 | 9 in 100 | apprentice |
-| 3 | 25 to 70 | 60 minutes | 42 in 100 | 14 in 100 | adept |
-| 4 | 50 to 120 | 90 minutes | 55 in 100 | 22 in 100 | master |
+| 2 | 12 to 35 | 45 minutes | 32 in 100 | 9 in 100 | novice |
+| 3 | 25 to 70 | 60 minutes | 42 in 100 | 14 in 100 | novice, rarely master |
+| 4 | 50 to 120 | 90 minutes | 55 in 100 | 22 in 100 | novice, or master |
 
-Gold is always in the pile. Two draws are made for ordinary goods.
-The lower tier is mostly lockpicks, salt, bone meal, iron, leather,
-a petty soul gem, a weak healing potion, and deathbell. Higher tiers
-keep those and add steel, silver, gems, better soul gems, stronger
-potions, corundum, and, at the top, ebony, orichalcum, and a grand
-soul gem. The richer goods are the rarer ones.
+Gold is always in the chest pile, inside those spans. Two draws are
+made for ordinary goods. The pile is food, drink, potions, ore, gems,
+ingredients, soul gems, and ordinary weapons and armour. Lower tiers
+are mostly the common supplies and iron or hide. Higher tiers keep
+those and add steel, silver, better gems, stronger potions, and, at
+the top, ebony, glass, and a grand soul gem. The richer goods are the
+rarer ones.
 
 ## Spell tomes
 
-This is how a tome gets into a pack when nobody handed one over. A
-person who is not a mage can learn from a tome only after a master
+This is how a tome gets into a pack when nobody handed one over. The
+chest rolls novice tomes, and at tier 3 and tier 4 it can also roll a
+master tome. Apprentice, adept, and expert tomes are not in this roll.
+
+A person who is not a mage can learn from a tome only after a master
 has apprenticed them, and then only a novice spell, and only two, in
-one school. A tome past that stays in the pack. The three gates are
-unchanged. See [Magic and the College](magic.md).
+one school. A tome past that stays in the pack. See
+[Magic and the College](magic.md).
 
-A tier 1 chest rolls novice tomes only. A tier 4 chest can roll a
-master tome, and usually rolls something lower.
+A mage who picks a master spell on K needs that spell's master tome
+in the pack, master rank in that school, and a spell point. The tome
+is spent. Reading the tome is the other door, and that book is already
+in hand. The spell one rank below is still required.
 
-The tomes are the college spells from the base game. A mod spell is
-not in this pile.
+The tomes are the college spells from the base game, including
+Guardian Circle. A mod spell is not in this pile.
 
 ## Dungeon exclusive
 
-These are found here and nowhere else. They are not in the ordinary
-pile. They are not a craft result, and they are not a company ware.
-The company keeps its own goods the same way, from its own source.
-See [Free Skyrim Trading Company](trading-company.md).
+These are found on this table and nowhere else on it. They are not
+the ordinary weapon pile, and they are not a company ware. The
+company keeps its own goods the same way, from its own source. See
+[Free Skyrim Trading Company](trading-company.md).
 
 - Ancient Nord Amulet, from tier 1
-- Embalming Tool, Ancient Nord Sword, Ancient Nord War Axe, from tier 2
-- Ancient Nord Bow, Ancient Nord Helmet, Ancient Nord Armor, from tier 3
+- Ancient Nord Sword, Ancient Nord War Axe, Ancient Nord Arrow, from tier 2
+- Ancient Nord Bow, Ancient Nord Helmet, Ancient Nord Armor, Ancient Nord Boots, Ancient Nord Gauntlets, from tier 3
 - Ancient Nord Greatsword, Ancient Nord Battleaxe, Black Soul Gem, from tier 4
 
-One of them, when the exclusive roll hits. Weapons and armour still
-do not spawn in the world except these named pieces.
+One of them, when the exclusive roll hits. The world's own spawned
+weapons and armour are still stripped. Ordinary iron, steel, and the
+rest of the gear list above are created by the chest, and the burial
+set is created only from this list.
+
+## Mines
+
+A mine is on the chest table only when the population catalogue gives
+that place enemies. The mines that already have a dungeon tier all
+have enemies. Raven Rock Mine is tier 4. A wilderness mine with no
+dungeon tier stays off. A mine that is only a bandit camp is not a
+dungeon chest. Those enemies use the body pile.
+
+## Bodies
+
+Every dead body that is not a person, and not a hunter carcass, can
+be searched. The pile is rolled when that actor dies and stays on
+that life. The first person to search it takes what is there. If the
+death was missed, the search rolls it then. Standing back up clears
+it, so the next life is a new roll. An empty roll is still kept, so
+the body is not rolled again: the first search says there is nothing,
+and a later search is silence.
+
+A bandit camp enemy or a giant camp enemy carries a little:
+
+- 80 in 100, 1 to 6 gold
+- 65 in 100, one common supply
+- 8 in 100, one better supply
+- 15 in 1000, ordinary gear up to steel, or a novice tome
+- 2 in 1000, a master tome or a burial piece
+
+Any other dead body is stingy. Anything good on it is rare:
+
+- 20 in 100, 1 to 4 gold
+- 12 in 100, one common supply
+- 2 in 100, one better supply
+- 5 in 1000, ordinary gear up to steel, or a novice tome
+- 5 in 10000, a master tome or a burial piece
+
+A person is not searched. A hunter carcass stays on the hunter path
+and is not paid again here.
 
 ## Where this is
 
-The roll, the rest, and the pay into the pack on opening the
-container are in the server. The places are the interiors whose names
-match a dungeon, a cave, or a sewer in the population catalogue. A
-place the catalogue has not named does not pay. A camp does not pay.
+The roll, the rest, and the pay into the pack are in the server. The
+chest places are the interiors whose names match a dungeon, a cave,
+or a sewer in the population catalogue. A place the catalogue has not
+named does not pay a chest. A camp does not pay a chest.
 
 This reward service is enabled on Dev. A living human must be within 400
-units of the same container in the same known cell. Its return reservation
-is saved in the private ledger before the complete gold and goods bundle
-is queued into one inventory write. The return belongs to that container,
-shared by everyone, and survives reload or loss of the native cooldown.
-Missing or damaged private state refuses rewards.
+units. A chest return is saved in the private ledger before the complete
+gold and goods bundle is queued into one inventory write. The return
+belongs to that container, shared by everyone, and survives reload or
+loss of the native cooldown. A body return is the same ledger, marked
+as a body, with coin from 0 to 6. It is cleared when that actor stands
+up. Missing or damaged private state refuses rewards. A failed save
+mints nothing.
 On the first update, an existing valid native cooldown is saved into the
-private ledger before another reward is considered. It is never replaced
-over an existing private reservation.
+private ledger before another chest reward is considered. It is never
+replaced over an existing private reservation.
 
 The native inventory save is asynchronous. If that write fails or is lost
 in a crash after reservation, the reward can be missing. The reservation

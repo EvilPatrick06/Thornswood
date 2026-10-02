@@ -5474,6 +5474,13 @@ mp.onDeath = guard('onDeath', function (actorId, killerId) {
        leave lying and nothing to say about it */
   }
 
+  if (npcDeath) {
+    try {
+      var bodyLoot = globalThis.__thornswoodDungeonLoot;
+      if (bodyLoot && bodyLoot.onDeath) bodyLoot.onDeath(actorId);
+    } catch (eBody) { /* a body roll must not block the rest of death */ }
+  }
+
   /*
     AND THE WARRIOR'S WORK IS THE FIGHT.
 
@@ -5571,6 +5578,10 @@ mp.onRespawn = guard('onRespawn', function (actorId) {
   const sp = mp.get(actorId, 'spawnPoint');
   log('respawn', actorId, 'at', sp && sp.cellOrWorldDesc);
   if (!(Number(mp.get(actorId, 'profileId')) > 0)) {
+    try {
+      var bodyLoot = globalThis.__thornswoodDungeonLoot;
+      if (bodyLoot && bodyLoot.onStand) bodyLoot.onStand(actorId);
+    } catch (eBody) { /* standing up still happens if the pile cannot be cleared */ }
     // Native OnFireSuccess clears isDead after this event returns.
     setTimeout(function () {
       try {
@@ -7744,8 +7755,17 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
       message = milked;
     } else {
       const off = loot(casterRefrId, refrId, baseDesc);
-      if (off === null) return;
-      message = off;
+      if (off === null) {
+        let searched = null;
+        try {
+          const bodyLoot = globalThis.__thornswoodDungeonLoot;
+          if (bodyLoot && bodyLoot.onBody) searched = bodyLoot.onBody(casterRefrId, refrId);
+        } catch (eBody) { searched = null; }
+        if (!searched) return;
+        message = searched;
+      } else {
+        message = off;
+      }
     }
   }
 
@@ -30245,7 +30265,38 @@ log('gamemode loaded:',
     server's next step and not a rule; a spell with no form id yet is known
     here and simply not cast until it has one.
   */
-  function pickSpell(state, name) {
+  /*
+    The master spell tomes. A mage who picks a master spell off the book has
+    to be holding that spell's tome. The form ids are the books, not the spells.
+  */
+  var MASTER_TOMES = {
+    'Fire Storm': 'a270c:Skyrim.esm',
+    'Blizzard': 'a270d:Skyrim.esm',
+    'Lightning Storm': 'a270e:Skyrim.esm',
+    'Guardian Circle': 'fde7b:Skyrim.esm',
+    'Bane of the Undead': 'dd647:Skyrim.esm',
+    'Dragonhide': 'd2b4e:Skyrim.esm',
+    'Mass Paralysis': 'dd646:Skyrim.esm',
+    'Dead Thrall': 'a26f9:Skyrim.esm',
+    'Flame Thrall': 'a26fa:Skyrim.esm',
+    'Frost Thrall': 'a26fb:Skyrim.esm',
+    'Storm Thrall': 'a26fc:Skyrim.esm',
+    'Harmony': 'a271a:Skyrim.esm',
+    'Hysteria': 'a271c:Skyrim.esm',
+    'Mayhem': 'a2719:Skyrim.esm'
+  };
+
+  function masterTomeDesc(name) {
+    var want = String(name || '').toLowerCase();
+    for (var key in MASTER_TOMES) {
+      if (Object.prototype.hasOwnProperty.call(MASTER_TOMES, key) && key.toLowerCase() === want) {
+        return MASTER_TOMES[key];
+      }
+    }
+    return '';
+  }
+
+  function pickSpell(state, name, holdsTome) {
     var s = clone(state);
     var spell = spellAt(name);
     if (!spell) { return no('no such spell'); }
@@ -30269,6 +30320,14 @@ log('gamemode loaded:',
     var below = RANKS[rankIndex(spell.rank) - 1];
     if (below && !knowsRank(s, spell.school, below)) {
       return no('you need a ' + below + ' spell of ' + spell.school + ' first');
+    }
+    /*
+      A master spell is not chosen off the book alone. The tome has to be in
+      the pack, the rank has to be master, and a spell point has to be there.
+      Reading the tome is the other door, and that book is already in hand.
+    */
+    if (spell.rank === 'master' && !holdsTome) {
+      return no('a master spell needs its tome in the pack, master rank in that school, and a spell point');
     }
     return addToBook(s, spell);
   }
@@ -30650,7 +30709,7 @@ log('gamemode loaded:',
     creditWork: creditWork, workDone: workDone, workNeeded: workNeeded,
     nextRank: nextRank, rankOf: rankOf, treeApplies: treeApplies,
     placedIn: placedIn, has: own,
-    pickSpell: pickSpell, spellAt: spellAt, spellPoints: spellPoints,
+    pickSpell: pickSpell, masterTomeDesc: masterTomeDesc, spellAt: spellAt, spellPoints: spellPoints,
     knowsSpell: knowsSpell, schoolsOf: schoolsOf,
     rankForLevel: rankForLevel, spellByDesc: spellByDesc,
     tomeMissing: tomeMissing, learnFromTome: learnFromTome,
@@ -35109,9 +35168,14 @@ log('gamemode loaded:',
   apprenticed them. A tome they cannot read stays in the pack. The three
   gates are not changed here.
 
-  A short list is dungeon exclusive. It is not in the ordinary pile, the
-  way a company ware is not an ordinary good. Camps are not on this table.
-  They have no tier.
+  A short list is dungeon exclusive. It is not in the ordinary pile.
+  Ordinary weapons and armour are in that pile too. Camps are not on the
+  chest table. They have no tier. A camp enemy carries a little on the
+  body. Any other dead body can be searched, and anything good on it is
+  rare.
+
+  A mine is on the chest table only when the population catalogue gives
+  that place enemies. A wilderness mine with no dungeon tier stays off.
 
   The cell table below is the interiors whose names match a dungeon, a
   cave or a sewer in the population catalogue. Built 2 October 2026.
@@ -35127,9 +35191,9 @@ log('gamemode loaded:',
   var EXCL_CHANCE = { 1: 0.05, 2: 0.09, 3: 0.14, 4: 0.22 };
   var RANK_WEIGHT = {
     1: [['novice', 100]],
-    2: [['novice', 60], ['apprentice', 40]],
-    3: [['novice', 30], ['apprentice', 40], ['adept', 30]],
-    4: [['novice', 15], ['apprentice', 25], ['adept', 30], ['expert', 22], ['master', 8]]
+    2: [['novice', 100]],
+    3: [['novice', 92], ['master', 8]],
+    4: [['novice', 70], ['master', 30]]
   };
   var PROP = 'thornswoodDungeonLoot';
   var GOLD_DESC = 'f:Skyrim.esm';
@@ -35147,6 +35211,12 @@ log('gamemode loaded:',
         if(!/^[0-9a-f]{1,8}:[^:]+\.es[mpl]$/i.test(key)) throw new Error('Invalid dungeon reward identity');
         if(saved && saved.legacy===true && Number.isSafeInteger(saved.at) && saved.at>0 &&
             Object.keys(saved).length===2) continue;
+        if(saved && saved.kind==='body') {
+          if(!Number.isSafeInteger(saved.at) || saved.at<=0 || typeof saved.taken!=='boolean' ||
+            !Number.isInteger(saved.gold) || saved.gold<0 || saved.gold>6 ||
+            !Array.isArray(saved.items)) throw new Error('Invalid body reward reservation');
+          continue;
+        }
         if(!saved ||
           !Number.isSafeInteger(saved.at) || saved.at<=0 || !Number.isInteger(saved.actor) || saved.actor<=0 ||
           !Number.isInteger(saved.tier) || saved.tier<1 || saved.tier>4 ||
@@ -35358,7 +35428,76 @@ log('gamemode loaded:',
     { desc: '5ad9d:Skyrim.esm', name: 'ebony ingot', plural: 'ebony ingots', count: 1, weight: 3, tier: 4 },
     { desc: '2e4f4:Skyrim.esm', name: 'greater soul gem', plural: 'greater soul gems', count: 1, weight: 3, tier: 4 },
     { desc: '68521:Skyrim.esm', name: 'flawless garnet', plural: 'flawless garnets', count: 1, weight: 2, tier: 4 },
-    { desc: '2e4fc:Skyrim.esm', name: 'grand soul gem', plural: 'grand soul gems', count: 1, weight: 2, tier: 4 }
+    { desc: '2e4fc:Skyrim.esm', name: 'grand soul gem', plural: 'grand soul gems', count: 1, weight: 2, tier: 4 },
+    { desc: '3eae1:Skyrim.esm', name: 'potion of magicka', plural: 'potions of magicka', count: 1, weight: 6, tier: 2 },
+    { desc: '3eae0:Skyrim.esm', name: 'potion of minor magicka', plural: 'potions of minor magicka', count: 1, weight: 8, tier: 1 },
+    { desc: '39be8:Skyrim.esm', name: 'potion of stamina', plural: 'potions of stamina', count: 1, weight: 6, tier: 2 },
+    { desc: '3eae5:Skyrim.esm', name: 'potion of minor stamina', plural: 'potions of minor stamina', count: 1, weight: 8, tier: 1 },
+    { desc: '39b4a:Skyrim.esm', name: 'potion of resist fire', plural: 'potions of resist fire', count: 1, weight: 4, tier: 2 },
+    { desc: '39be1:Skyrim.esm', name: 'potion of resist shock', plural: 'potions of resist shock', count: 1, weight: 4, tier: 2 },
+    { desc: '3eadf:Skyrim.esm', name: 'potion of plentiful healing', plural: 'potions of plentiful healing', count: 1, weight: 4, tier: 3 },
+    { desc: '3eae3:Skyrim.esm', name: 'potion of vigorous healing', plural: 'potions of vigorous healing', count: 1, weight: 3, tier: 4 },
+    { desc: '34c5e:Skyrim.esm', name: 'ale', plural: 'ales', count: 1, weight: 8, tier: 1 },
+    { desc: '65c98:Skyrim.esm', name: 'bread', plural: 'loaves of bread', count: 1, weight: 8, tier: 1 },
+    { desc: '64b31:Skyrim.esm', name: 'goat cheese wedge', plural: 'goat cheese wedges', count: 1, weight: 6, tier: 1 },
+    { desc: '64b3f:Skyrim.esm', name: 'cabbage', plural: 'cabbages', count: 1, weight: 6, tier: 1 },
+    { desc: '64b41:Skyrim.esm', name: 'potato', plural: 'potatoes', count: 2, weight: 6, tier: 1 },
+    { desc: '669a2:Skyrim.esm', name: 'venison', plural: 'venison', count: 1, weight: 5, tier: 2 },
+    { desc: '64b38:Skyrim.esm', name: 'honey nut treat', plural: 'honey nut treats', count: 1, weight: 5, tier: 1 },
+    { desc: '64b3d:Skyrim.esm', name: 'sweet roll', plural: 'sweet rolls', count: 1, weight: 5, tier: 1 },
+    { desc: '64b32:Skyrim.esm', name: 'eidar cheese wedge', plural: 'eidar cheese wedges', count: 1, weight: 5, tier: 1 },
+    { desc: '64b3e:Skyrim.esm', name: 'grilled leeks', plural: 'grilled leeks', count: 1, weight: 4, tier: 2 },
+    { desc: '64b3a:Skyrim.esm', name: 'baked potatoes', plural: 'baked potatoes', count: 1, weight: 4, tier: 2 },
+    { desc: '64b30:Skyrim.esm', name: 'boiled creme treat', plural: 'boiled creme treats', count: 1, weight: 4, tier: 2 },
+    { desc: '71cf3:Skyrim.esm', name: 'iron ore', plural: 'iron ore', count: 2, weight: 8, tier: 1 },
+    { desc: '5acdf:Skyrim.esm', name: 'silver ore', plural: 'silver ore', count: 1, weight: 4, tier: 2 },
+    { desc: '5acde:Skyrim.esm', name: 'gold ore', plural: 'gold ore', count: 1, weight: 3, tier: 3 },
+    { desc: '5acdb:Skyrim.esm', name: 'corundum ore', plural: 'corundum ore', count: 1, weight: 4, tier: 2 },
+    { desc: '5acdc:Skyrim.esm', name: 'ebony ore', plural: 'ebony ore', count: 1, weight: 2, tier: 4 },
+    { desc: '63b42:Skyrim.esm', name: 'ruby', plural: 'rubies', count: 1, weight: 3, tier: 3 },
+    { desc: '63b44:Skyrim.esm', name: 'sapphire', plural: 'sapphires', count: 1, weight: 3, tier: 3 },
+    { desc: '63b43:Skyrim.esm', name: 'emerald', plural: 'emeralds', count: 1, weight: 3, tier: 3 },
+    { desc: '63b47:Skyrim.esm', name: 'diamond', plural: 'diamonds', count: 1, weight: 2, tier: 4 },
+    { desc: '6851f:Skyrim.esm', name: 'flawless diamond', plural: 'flawless diamonds', count: 1, weight: 1, tier: 4 },
+    { desc: '3ad5e:Skyrim.esm', name: 'fire salts', plural: 'fire salts', count: 1, weight: 4, tier: 2 },
+    { desc: '3ad5f:Skyrim.esm', name: 'frost salts', plural: 'frost salts', count: 1, weight: 4, tier: 2 },
+    { desc: '3ad60:Skyrim.esm', name: 'void salts', plural: 'void salts', count: 1, weight: 3, tier: 3 },
+    { desc: '34d22:Skyrim.esm', name: 'garlic', plural: 'garlic', count: 2, weight: 6, tier: 1 },
+    { desc: '45c28:Skyrim.esm', name: 'lavender', plural: 'lavender', count: 2, weight: 6, tier: 1 },
+    { desc: '77e1c:Skyrim.esm', name: 'blue mountain flower', plural: 'blue mountain flowers', count: 2, weight: 5, tier: 1 },
+    { desc: '4b0ba:Skyrim.esm', name: 'wheat', plural: 'wheat', count: 2, weight: 6, tier: 1 },
+    { desc: '669a5:Skyrim.esm', name: 'leek', plural: 'leeks', count: 2, weight: 6, tier: 1 },
+    { desc: '12eb7:Skyrim.esm', name: 'iron sword', plural: 'iron swords', count: 1, weight: 2, tier: 1, kind: 'gear' },
+    { desc: '13790:Skyrim.esm', name: 'iron war axe', plural: 'iron war axes', count: 1, weight: 2, tier: 1, kind: 'gear' },
+    { desc: '1397e:Skyrim.esm', name: 'iron dagger', plural: 'iron daggers', count: 1, weight: 2, tier: 1, kind: 'gear' },
+    { desc: '1359d:Skyrim.esm', name: 'iron greatsword', plural: 'iron greatswords', count: 1, weight: 2, tier: 1, kind: 'gear' },
+    { desc: '13982:Skyrim.esm', name: 'iron mace', plural: 'iron maces', count: 1, weight: 2, tier: 1, kind: 'gear' },
+    { desc: '12e4d:Skyrim.esm', name: 'iron helmet', plural: 'iron helmets', count: 1, weight: 2, tier: 1, kind: 'gear' },
+    { desc: '12e49:Skyrim.esm', name: 'iron armor', plural: 'iron armor', count: 1, weight: 2, tier: 1, kind: 'gear' },
+    { desc: '12e4b:Skyrim.esm', name: 'iron boots', plural: 'iron boots', count: 1, weight: 2, tier: 1, kind: 'gear' },
+    { desc: '12e46:Skyrim.esm', name: 'iron gauntlets', plural: 'iron gauntlets', count: 1, weight: 2, tier: 1, kind: 'gear' },
+    { desc: '12eb6:Skyrim.esm', name: 'iron shield', plural: 'iron shields', count: 1, weight: 2, tier: 1, kind: 'gear' },
+    { desc: '13985:Skyrim.esm', name: 'hunting bow', plural: 'hunting bows', count: 1, weight: 2, tier: 1, kind: 'gear' },
+    { desc: '3b562:Skyrim.esm', name: 'long bow', plural: 'long bows', count: 1, weight: 2, tier: 1, kind: 'gear' },
+    { desc: '1397d:Skyrim.esm', name: 'iron arrow', plural: 'iron arrows', count: 8, weight: 2, tier: 1, kind: 'gear' },
+    { desc: '13911:Skyrim.esm', name: 'hide armor', plural: 'hide armor', count: 1, weight: 2, tier: 1, kind: 'gear' },
+    { desc: '13913:Skyrim.esm', name: 'hide helmet', plural: 'hide helmets', count: 1, weight: 2, tier: 1, kind: 'gear' },
+    { desc: '13989:Skyrim.esm', name: 'steel sword', plural: 'steel swords', count: 1, weight: 2, tier: 2, kind: 'gear' },
+    { desc: '13983:Skyrim.esm', name: 'steel war axe', plural: 'steel war axes', count: 1, weight: 2, tier: 2, kind: 'gear' },
+    { desc: '13986:Skyrim.esm', name: 'steel dagger', plural: 'steel daggers', count: 1, weight: 2, tier: 2, kind: 'gear' },
+    { desc: '13954:Skyrim.esm', name: 'steel helmet', plural: 'steel helmets', count: 1, weight: 2, tier: 2, kind: 'gear' },
+    { desc: '13952:Skyrim.esm', name: 'steel armor', plural: 'steel armor', count: 1, weight: 2, tier: 2, kind: 'gear' },
+    { desc: '13955:Skyrim.esm', name: 'steel shield', plural: 'steel shields', count: 1, weight: 2, tier: 2, kind: 'gear' },
+    { desc: '1397f:Skyrim.esm', name: 'steel arrow', plural: 'steel arrows', count: 8, weight: 2, tier: 2, kind: 'gear' },
+    { desc: '3619e:Skyrim.esm', name: 'leather armor', plural: 'leather armor', count: 1, weight: 2, tier: 2, kind: 'gear' },
+    { desc: '13922:Skyrim.esm', name: 'leather helmet', plural: 'leather helmets', count: 1, weight: 2, tier: 2, kind: 'gear' },
+    { desc: '13991:Skyrim.esm', name: 'orcish sword', plural: 'orcish swords', count: 1, weight: 1, tier: 3, kind: 'gear' },
+    { desc: '13999:Skyrim.esm', name: 'dwarven sword', plural: 'dwarven swords', count: 1, weight: 1, tier: 3, kind: 'gear' },
+    { desc: '139a1:Skyrim.esm', name: 'elven sword', plural: 'elven swords', count: 1, weight: 1, tier: 3, kind: 'gear' },
+    { desc: '139b1:Skyrim.esm', name: 'ebony sword', plural: 'ebony swords', count: 1, weight: 1, tier: 4, kind: 'gear' },
+    { desc: '139a9:Skyrim.esm', name: 'glass sword', plural: 'glass swords', count: 1, weight: 1, tier: 4, kind: 'gear' },
+    { desc: '13961:Skyrim.esm', name: 'ebony armor', plural: 'ebony armor', count: 1, weight: 1, tier: 4, kind: 'gear' },
+    { desc: '13939:Skyrim.esm', name: 'glass armor', plural: 'glass armor', count: 1, weight: 1, tier: 4, kind: 'gear' }
   ];
 
   var TOMES = {
@@ -35441,6 +35580,7 @@ log('gamemode loaded:',
       { desc: 'a271c:Skyrim.esm', name: 'Spell Tome: Hysteria' },
       { desc: 'a271b:Skyrim.esm', name: 'Spell Tome: Call To Arms' },
       { desc: 'dd647:Skyrim.esm', name: 'Spell Tome: Bane of the Undead' },
+      { desc: 'fde7b:Skyrim.esm', name: 'Spell Tome: Guardian Circle' },
       { desc: 'a26f9:Skyrim.esm', name: 'Spell Tome: Dead Thrall' },
       { desc: 'a26fa:Skyrim.esm', name: 'Spell Tome: Flame Thrall' },
       { desc: 'a26fb:Skyrim.esm', name: 'Spell Tome: Frost Thrall' },
@@ -35450,17 +35590,20 @@ log('gamemode loaded:',
   };
 
   /*
-    Found in a dungeon and nowhere else on this server. Not a craft result
-    and not a company ware. Weapons and armour still do not spawn in the
-    world except these named pieces, and only from this table.
+    Found in a dungeon and nowhere else on this table. Not the ordinary
+    weapon pile above, and not a company ware. The world's own spawned
+    weapons, armour and coin are still stripped. What this list creates
+    is the burial set.
   */
   var EXCLUSIVE = [
     { desc: 'cc842:Skyrim.esm', name: 'Ancient Nord Amulet', tier: 1, weight: 8 },
-    { desc: '34cce:Skyrim.esm', name: 'Embalming Tool', tier: 2, weight: 6 },
     { desc: '2c66f:Skyrim.esm', name: 'Ancient Nord Sword', tier: 2, weight: 5 },
     { desc: '2c672:Skyrim.esm', name: 'Ancient Nord War Axe', tier: 2, weight: 5 },
+    { desc: '34182:Skyrim.esm', name: 'Ancient Nord Arrow', tier: 2, weight: 4, count: 8 },
     { desc: '302ca:Skyrim.esm', name: 'Ancient Nord Bow', tier: 3, weight: 4 },
     { desc: '56a9e:Skyrim.esm', name: 'Ancient Nord Helmet', tier: 3, weight: 4 },
+    { desc: '56a9d:Skyrim.esm', name: 'Ancient Nord Boots', tier: 3, weight: 3 },
+    { desc: '56b17:Skyrim.esm', name: 'Ancient Nord Gauntlets', tier: 3, weight: 3 },
     { desc: '18388:Skyrim.esm', name: 'Ancient Nord Armor', tier: 3, weight: 3 },
     { desc: '236a5:Skyrim.esm', name: 'Ancient Nord Greatsword', tier: 4, weight: 3 },
     { desc: '1cb64:Skyrim.esm', name: 'Ancient Nord Battleaxe', tier: 4, weight: 3 },
@@ -35583,7 +35726,7 @@ log('gamemode loaded:',
       if (excl) {
         items.push({
           desc: excl.desc, name: excl.name, plural: excl.name,
-          count: 1, exclusive: true
+          count: excl.count || 1, exclusive: true
         });
       }
     }
@@ -35636,8 +35779,12 @@ log('gamemode loaded:',
   }
 
   function give(actorId, rolled) {
-    var goods=[{item:GOLD_DESC,count:rolled.gold}];
-    for(var item of rolled.items) goods.push({item:item.desc,count:item.count});
+    var goods=[];
+    if(rolled.gold>0) goods.push({item:GOLD_DESC,count:rolled.gold});
+    for(var item of rolled.items) {
+      if(item && item.count>0) goods.push({item:item.desc,count:item.count});
+    }
+    if(!goods.length) return true;
     try {return addItemsAtomic(actorId,goods);} catch(error) {
       console.log('[dungeon] reserved reward inventory write failed: '+error);return false;
     }
@@ -35703,10 +35850,236 @@ log('gamemode loaded:',
     return rolled;
   }
 
+
+  /*
+    A body is not a chest. The pile is rolled when the actor dies and kept
+    on that life until somebody searches it or the actor stands back up.
+    A camp enemy carries a little. Anything good on any other body is rare.
+    A person is not searched. A hunter carcass stays on the hunter path.
+  */
+  var BODY_CAMP = { gold: 0.80, goldN: 6, minor: 0.65, decent: 0.08, good: 0.015, rare: 0.002 };
+  var BODY_WILD = { gold: 0.20, goldN: 4, minor: 0.12, decent: 0.02, good: 0.005, rare: 0.0005 };
+  var places = null;
+
+  function populationKeep() {
+    var data = null;
+    try {
+      if (typeof NPC_POPULATION_DATA !== 'undefined' && NPC_POPULATION_DATA && NPC_POPULATION_DATA.keep) {
+        data = NPC_POPULATION_DATA;
+      }
+    } catch (e) { data = null; }
+    if (!data && typeof globalThis !== 'undefined' && globalThis.NPC_POPULATION_DATA) {
+      data = globalThis.NPC_POPULATION_DATA;
+    }
+    return (data && data.keep) || [];
+  }
+
+  function placeMap() {
+    if (places) return places;
+    places = {};
+    var keep = populationKeep();
+    for (var i = 0; i < keep.length; i++) {
+      var row = keep[i];
+      if (!row || !row[0]) continue;
+      places[String(row[0]).toLowerCase()] = { role: row[6], habitat: row[7] };
+    }
+    return places;
+  }
+
+  function placeOf(actorId) {
+    var source = '';
+    try {
+      var home = mp.get(actorId, 'thornswoodNpcHome');
+      if (home && home.source) source = String(home.source);
+    } catch (e) { source = ''; }
+    if (!source) {
+      try { source = String(mp.getDescFromId(actorId) || ''); } catch (e2) { source = ''; }
+    }
+    return placeMap()[source.toLowerCase()] || null;
+  }
+
+  function isCampEnemy(actorId) {
+    var row = placeOf(actorId);
+    return !!(row && row.role === 'enemy' &&
+      (row.habitat === 'bandit-camp' || row.habitat === 'giant-camp'));
+  }
+
+  function supplyExact(tier) {
+    var out = [];
+    for (var i = 0; i < GOODS.length; i++) {
+      if (GOODS[i].kind === 'gear') continue;
+      if (GOODS[i].tier === tier) out.push(GOODS[i]);
+    }
+    return out;
+  }
+
+  function gearOrNovice() {
+    var out = [];
+    var i;
+    for (i = 0; i < GOODS.length; i++) {
+      if (GOODS[i].kind === 'gear' && GOODS[i].tier <= 2) out.push(GOODS[i]);
+    }
+    var books = TOMES.novice || [];
+    for (i = 0; i < books.length; i++) {
+      out.push({
+        desc: books[i].desc, name: books[i].name, plural: books[i].name,
+        count: 1, weight: 1, rank: 'novice'
+      });
+    }
+    return out;
+  }
+
+  function rarePile() {
+    var out = [];
+    var books = TOMES.master || [];
+    var i;
+    for (i = 0; i < books.length; i++) {
+      out.push({
+        desc: books[i].desc, name: books[i].name, plural: books[i].name,
+        count: 1, weight: 1, rank: 'master'
+      });
+    }
+    for (i = 0; i < EXCLUSIVE.length; i++) {
+      out.push({
+        desc: EXCLUSIVE[i].desc, name: EXCLUSIVE[i].name, plural: EXCLUSIVE[i].name,
+        count: EXCLUSIVE[i].count || 1, weight: EXCLUSIVE[i].weight, exclusive: true
+      });
+    }
+    return out;
+  }
+
+  function pushPick(items, row) {
+    if (!row) return;
+    items.push({
+      desc: row.desc, name: row.name, plural: row.plural || row.name,
+      count: row.count || 1, exclusive: !!row.exclusive, rank: row.rank || ''
+    });
+  }
+
+  function rollBody(camp, rng) {
+    if (typeof rng !== 'function') rng = Math.random;
+    var odds = camp ? BODY_CAMP : BODY_WILD;
+    var gold = 0;
+    var items = [];
+    if (rng() < odds.gold) gold = 1 + Math.floor(rng() * odds.goldN);
+    if (gold > 6) gold = 6;
+    if (rng() < odds.minor) pushPick(items, pickWeighted(supplyExact(1), rng));
+    if (rng() < odds.decent) pushPick(items, pickWeighted(supplyExact(2), rng));
+    if (rng() < odds.good) pushPick(items, pickWeighted(gearOrNovice(), rng));
+    if (rng() < odds.rare) pushPick(items, pickWeighted(rarePile(), rng));
+    return { gold: gold, items: mergeItems(items), camp: !!camp };
+  }
+
+  function bodyLine(rolled) {
+    var bits = [];
+    if (rolled.gold) bits.push(rolled.gold + ' gold');
+    var items = rolled.items || [];
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      if (it.count > 1) bits.push(it.count + ' ' + (it.plural || it.name));
+      else bits.push(article(it.name));
+    }
+    if (!bits.length) return '';
+    var body = bits.length === 1
+      ? bits[0]
+      : bits.slice(0, -1).join(', ') + ' and ' + bits[bits.length - 1];
+    return 'You take ' + body + ' off the body.';
+  }
+
+  function bodyKey(actorId) {
+    var reference = '';
+    try { reference = mp.getDescFromId(actorId); } catch (e) { return ''; }
+    if (typeof reference !== 'string' || !/^[0-9a-f]{1,8}:[^:]+\.es[mpl]$/i.test(reference)) return '';
+    return reference;
+  }
+
+  function onDeath(actorId) {
+    if (!active || !ledger || !actorId) return;
+    var baseDesc = '';
+    try { baseDesc = String(mp.get(actorId, 'baseDesc') || ''); } catch (e) { return; }
+    if (typeof isCarcass === 'function' && isCarcass(baseDesc)) return;
+    try {
+      if (Number(mp.get(actorId, 'profileId')) > 0) return;
+    } catch (e2) { return; }
+    var reference = bodyKey(actorId);
+    if (!reference || ledger.entries[reference]) return;
+    var camp = isCampEnemy(actorId);
+    var rolled = rollBody(camp, Math.random);
+    var next = JSON.parse(JSON.stringify(ledger));
+    next.entries[reference] = {
+      kind: 'body', at: Date.now(), taken: false,
+      gold: rolled.gold, items: rolled.items, camp: !!camp
+    };
+    try { storage.save(next); } catch (error) {
+      console.log('[dungeon] body reservation failed: ' + error);
+      return;
+    }
+    ledger = next;
+  }
+
+  function onStand(actorId) {
+    if (!active || !ledger || !actorId) return;
+    var reference = bodyKey(actorId);
+    if (!reference) return;
+    var prior = ledger.entries[reference];
+    if (!prior || prior.kind !== 'body') return;
+    var next = JSON.parse(JSON.stringify(ledger));
+    delete next.entries[reference];
+    try { storage.save(next); } catch (error) {
+      console.log('[dungeon] body clear failed: ' + error);
+      return;
+    }
+    ledger = next;
+  }
+
+  function onBody(actorId, refrId) {
+    if (!active || !ledger) return null;
+    if (!actorId || !refrId) return null;
+    try {
+      var actorState = mp.getNpcAIState(actorId);
+      if (!actorState || (!actorState.isHuman && !(actorState.profileId > 0)) || actorState.isDead ||
+        actorState.isDisabled || !withinResourceReach(actorId, refrId)) return null;
+    } catch (error) { return null; }
+    var bodyState = null;
+    try { bodyState = mp.getNpcAIState(refrId); } catch (e) { return null; }
+    if (!bodyState || !bodyState.isDead || bodyState.isDisabled) return null;
+    if (bodyState.profileId > 0) return null;
+    var baseDesc = '';
+    try { baseDesc = String(mp.get(refrId, 'baseDesc') || ''); } catch (e2) { return null; }
+    if (typeof isCarcass === 'function' && isCarcass(baseDesc)) return null;
+    var reference = bodyKey(refrId);
+    if (!reference) return null;
+    var prior = ledger.entries[reference];
+    if (!prior) {
+      onDeath(refrId);
+      prior = ledger.entries[reference];
+    }
+    if (!prior || prior.kind !== 'body' || prior.taken) return null;
+    var next = JSON.parse(JSON.stringify(ledger));
+    next.entries[reference].taken = true;
+    try { storage.save(next); } catch (error) {
+      console.log('[dungeon] body reservation failed: ' + error);
+      return null;
+    }
+    ledger = next;
+    var rolled = { gold: prior.gold, items: prior.items };
+    var empty = !(rolled.gold > 0) && !(rolled.items && rolled.items.length);
+    if (!empty && !give(actorId, rolled)) return null;
+    var line = empty ? 'There is nothing on this body.' : bodyLine(rolled);
+    if (line) {
+      try { say(actorId, line); } catch (e4) { /* the pile is already in the pack */ }
+    }
+    return line || null;
+  }
+
   g.__thornswoodDungeonLoot = {
     shutdown:function(){active=false;},
     roll: roll,
+    rollBody: rollBody,
     onChest: onChest,
+    onDeath: onDeath,
+    onBody: onBody,
+    onStand: onStand,
     tierOf: tierOf,
     ranksFor: ranksFor,
     goodsFor: goodsFor,
@@ -36887,7 +37260,36 @@ log('gamemode loaded:',
         // The name has spaces in it, so everything after the word is the
         // name: 'Ice Spike', 'Bane of the Undead'. Case does not matter.
         var wanted = parts.slice(2).join(' ');
-        r = P.pickSpell(s, wanted);
+        var bookWanted = P.spellAt(wanted);
+        var holdsTome = true;
+        if (bookWanted && bookWanted.rank === 'master') {
+          var tomeDesc = P.masterTomeDesc ? P.masterTomeDesc(bookWanted.name) : '';
+          var tomeId = tomeDesc ? idOf(tomeDesc) : 0;
+          var held = 0;
+          if (tomeId) {
+            try {
+              var tomeInv = mp.get(actorId, 'inventory');
+              var tomeEntries = (tomeInv && tomeInv.entries) || [];
+              for (var ti = 0; ti < tomeEntries.length; ti++) {
+                if (tomeEntries[ti] && tomeEntries[ti].baseId === tomeId) {
+                  held += (tomeEntries[ti].count || 1);
+                }
+              }
+            } catch (eHold) { held = 0; }
+          }
+          holdsTome = held > 0;
+        }
+        r = P.pickSpell(s, wanted, holdsTome);
+        if (r.ok && bookWanted && bookWanted.rank === 'master') {
+          var spentTome = false;
+          try {
+            spentTome = !!(typeof takeItemById === 'function' &&
+              takeItemById(actorId, idOf(P.masterTomeDesc(bookWanted.name)), 1));
+          } catch (eSpend) { spentTome = false; }
+          if (!spentTome) {
+            r = { ok: false, why: 'the master tome has to leave the pack, and it did not' };
+          }
+        }
         if (r.ok) {
           var book = P.spellAt(wanted);
           spellPicked = book ? book.name : null;
