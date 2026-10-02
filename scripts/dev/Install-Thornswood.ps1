@@ -112,13 +112,11 @@ $steps = @(
         Wants = @('SKSE\Plugins\MpClientPlugin.dll', 'Platform\Plugins\skymp5-client.js')
         Why = 'the multiplayer layer itself'
     },
-    @{
-        Key = 'body'; Name = 'Male body fix'
-        Script = '..\mods\Fix-MaleBody.ps1'
-        Args = @{}
-        Wants = @()
-        Why = 'the hole you could see the sky through'
-    },
+    # Male body fix (Fix-MaleBody.ps1) was a step here until issue #1179
+    # retired that script: the collection owns the body meshes now, and the
+    # hand move wrote into Game\Data (and Vortex staging where those files
+    # are hard links). Pass -SkipBody is kept so old shortcuts still parse.
+
     @{
         Key = 'loadorder'; Name = 'Load order alignment'
         Script = '..\mods\Align-LoadOrder.ps1'
