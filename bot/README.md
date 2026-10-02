@@ -162,6 +162,33 @@ way in, then picks a hold.
 again, and the posts are rewritten in place. It deletes what the bot wrote last
 time rather than adding a second copy, so the rules never end up posted twice.
 
+## Putting a bot change on the VPS
+
+From a checkout of main that has just been pulled, never from a copy of the
+repository that was downloaded earlier:
+
+    git checkout main
+    git pull
+    .\scripts\deploy\Install-Bot.ps1 -CodeOnly
+
+The pull comes first because a deploy sends what the commit holds. A stale
+folder sends the bot as it was before the change and says nothing about it,
+and the same folder builds the Discord as it was before the change if
+`Setup-Discord.ps1` is run from it. That is how a live smoke went out of a
+folder in Downloads that had not been pulled for days.
+
+`-CodeOnly` stages the code beside the running bot and checks it there, then
+stops the service, renames the new files in, starts it again by its name and
+waits for it to say it is watching the server. If it does not, the old files
+go back and it is started on those. Python, the libraries, the token and the
+service itself are left alone.
+
+The bot's log is `C:\Thornswood-Bot\data\bot.log`: in the data folder under
+the bot's folder, the one folder its account writes, rather than beside the
+code where it used to be. `.\scripts\vps\Show-BotLog.ps1` reads it without a
+deploy, and a box that has no log yet gets an empty one made for it at the
+next restart.
+
 ## Release notes posting themselves
 
 The build makes a webhook in `#news` and saves it to `news-webhook.txt` beside
