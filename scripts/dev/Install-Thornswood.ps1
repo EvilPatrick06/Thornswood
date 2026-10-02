@@ -30,10 +30,10 @@ param(
     [string[]]$Only = @(),
     [string[]]$Skip = @(),
     [switch]$SkipBody,
-    # Publishing is the default, not an extra step to remember. This is a test
-    # server: a build that is only on this machine cannot be tested by anybody
-    # else, and every round of "why is it not fixed" so far has ended at a fix
-    # that was built but never shipped.
+    # Publishing to the DEV channel is the default, not an extra step to remember.
+    # CONTRIBUTING.md: everything goes to the dev build first. A bare Ship.ps1 is
+    # the live release, so this always passes -Channel dev (never main).
+    # -NoShip skips publishing.
     [switch]$NoShip,
     [string]$Notes,
     [switch]$NoPause
@@ -278,7 +278,7 @@ if (-not $NoShip -and ($done -contains 'Launcher')) {
     if (Test-Path -LiteralPath $ship) {
         Head 'Publishing'
         if (-not $Notes) { $Notes = 'Build from ' + (Get-Date -Format 'd MMM HH:mm') }
-        Note 'so everyone else gets this too. -NoShip skips it.'
+        Note 'to the dev build, so others can try it. -NoShip skips it.'
 
         # Only parameters Ship actually has. Passing one it does not know is a
         # binding error, not an exit code, so $LASTEXITCODE stays 0 from the
@@ -288,6 +288,9 @@ if (-not $NoShip -and ($done -contains 'Launcher')) {
         $shipCmd = Get-Command $ship
         if ($shipCmd.Parameters.ContainsKey('Root'))    { $shipArgs['Root'] = $Root }
         if ($shipCmd.Parameters.ContainsKey('NoPause')) { $shipArgs['NoPause'] = $true }
+        # Never the live channel. Ship.ps1 defaults to main; CONTRIBUTING.md
+        # sends every ordinary change to the dev build first (#1171).
+        if ($shipCmd.Parameters.ContainsKey('Channel')) { $shipArgs['Channel'] = 'dev' }
 
         $global:LASTEXITCODE = 0
         try {
@@ -304,8 +307,8 @@ if (-not $NoShip -and ($done -contains 'Launcher')) {
 
 Write-Host ''
 Say 'Open the launcher and press Play.' 'Green'
-if ($shipped) { Note 'Published, so your friends get it on their next launcher start.' }
-elseif (-not $NoShip -and ($done -contains 'Launcher')) { Note 'Publishing did not finish. Run .\Ship.ps1 yourself.' }
+if ($shipped) { Note 'Published on the dev channel, so your friends on that build get it on their next launcher start.' }
+elseif (-not $NoShip -and ($done -contains 'Launcher')) { Note 'Publishing did not finish. Run .\scripts\release\Ship.ps1 -Channel dev "what changed" yourself.' }
 Write-Host ''
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
