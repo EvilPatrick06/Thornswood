@@ -27,6 +27,10 @@ What is worth pinning here, in the order the locks were given on 1 October:
   who may mark      a person, never an agent
   where a mark goes on the Discord message it was pressed on, and nowhere
                     else: not the site, not a file, not this bot's log
+  the report        the same marks read back and counted, in one session
+                    thread, to the one admin who asked for them: no post in
+                    the thread, no second record of a mark anywhere, and
+                    display names only, which is Djinn's option B of 2 October
 
 The real bot module is imported, so a rename or a reword fails here rather
 than in the channel, and the functions driven are pure: no Discord, no token,
@@ -591,15 +595,185 @@ yes('and a row longer than a Discord message is cut rather than handed to '
     and 'the rest of this row is in the export'
     in bot.live_smoke_item_text(huge))
 
+# -------------------------------------------- reading those marks back --
+#
+# Djinn's option B of 2 October: the missing piece was never per person
+# buttons, which the block above already proves. It was a Dev who had to
+# scroll twenty eight rows to find the one Fail. So the marks are read back
+# off the messages they were written on, by the other half of the function
+# that wrote them, and nothing else is kept anywhere.
+yes('A ROW\u2019S MARKS CAN BE READ BACK OFF THE ROW, which is what a report '
+    'is made of',
+    bot.live_smoke_read_marks(again) == [('Ataxayk', 'Fail-known'),
+                                         ('Djinn', 'Skip')])
+yes('  every one of them, with as many people on a row as marked it',
+    bot.live_smoke_read_marks(
+        bot.live_smoke_mark(bot.live_smoke_mark(bot.live_smoke_mark(
+            row, 'Ataxayk', 'Pass'), 'Djinn', 'Fail'), 'Cynthia', 'Skip'))
+    == [('Ataxayk', 'Pass'), ('Djinn', 'Fail'), ('Cynthia', 'Skip')])
+yes('  and a name with a colon in it is read back whole, the way it was '
+    'written',
+    bot.live_smoke_read_marks(bot.live_smoke_mark(row, 'a:b', 'Fail'))
+    == [('a:b', 'Fail')])
+yes('a row nobody has marked reads as nobody, not as a blank person',
+    bot.live_smoke_read_marks(row) == []
+    and bot.live_smoke_read_marks('') == []
+    and bot.live_smoke_read_marks(None) == [])
+yes('  and so does a row whose marks block is there with nothing under it, '
+    'which is what a row somebody cleared looks like',
+    bot.live_smoke_read_marks(row + bot.LIVE_SMOKE_MARKS_HEAD) == []
+    and bot.live_smoke_read_marks(row + bot.LIVE_SMOKE_MARKS_HEAD + '\n\n') == [])
+yes('a line under the heading that is not a name against one of the four '
+    'marks is not counted as one',
+    bot.live_smoke_read_marks(row + bot.LIVE_SMOKE_MARKS_HEAD
+                              + 'Ataxayk: Passed\nDjinn\n: Pass\nDjinn: Pass')
+    == [('Djinn', 'Pass')])
+
+# Which row a line of the report is about. The number, because that is what
+# the row is called in the thread, in the standing checklist and in the export.
+yes('a row names itself by its number, off its own heading',
+    bot.live_smoke_row_name(row) == 'Live %d' % forge['order']
+    and [bot.live_smoke_row_name(bot.live_smoke_item_text(i, N)) for i in items]
+    == ['Live %d' % i['order'] for i in items])
+yes('  and a marked row still names itself, because the marks go under it',
+    bot.live_smoke_row_name(again) == 'Live %d' % forge['order'])
+yes('the opener is not a row, and neither is the standing checklist post',
+    bot.live_smoke_row_name(opener) == ''
+    and bot.live_smoke_row_name(bot.live_smoke_head(live)) == '')
+yes('  nor is anything else somebody said in the thread',
+    bot.live_smoke_row_name('Live 3 passed for me') == ''
+    and bot.live_smoke_row_name('') == ''
+    and bot.live_smoke_row_name(None) == '')
+
+# Which Live set the session was opened against. The thread's name carries
+# the date and the version and not that, so it is read off the opener.
+yes('the stamp is read back off a session opener',
+    bot.live_smoke_opener_stamp(opener) == stamp)
+yes('  and an opener posted without one reads as none rather than as a line '
+    'of the session\u2019s own',
+    bot.live_smoke_opener_stamp(
+        bot.live_smoke_opener(title, 'thornswood-one', '1.1.101.17')) == ''
+    and bot.live_smoke_opener_stamp('') == ''
+    and bot.live_smoke_opener_stamp(None) == '')
+
+# -------------------------------------------------------- the report --
+#
+# What an admin reads instead of scrolling the session. Counts for every row,
+# names for the two marks Dev acts on, and the rows nobody has marked said
+# out loud rather than left to be noticed.
+R = bot.live_smoke_report_text
+session = [
+    ('Live 1', [('Ataxayk', 'Pass'), ('Djinn', 'Pass')]),
+    ('Live 2', []),
+    ('Live 3', [('Ataxayk', 'Fail'), ('Djinn', 'Pass'), ('Cynthia', 'Fail')]),
+    ('Live 4', [('Djinn', 'Skip')]),
+    ('Live 5', [('Ataxayk', 'Fail-known')]),
+]
+report = R(title, stamp, session)
+
+yes('THE REPORT COUNTS EVERY ROW AND NAMES THE SESSION IT IS OF, which is '
+    'what option B is for',
+    report.startswith('**%s**' % title) and stamp in report
+    and '5 row(s)' in report)
+yes('  per row, every mark that was given with how many gave it',
+    'Live 1: Pass 2' in report
+    and 'Live 3: Pass 1, Fail 2 (Ataxayk, Cynthia)' in report
+    and 'Live 4: Skip 1' in report
+    and 'Live 5: Fail-known 1 (Ataxayk)' in report)
+yes('  WHO FAILED IT, by the display name the row itself carries',
+    'Fail 2 (Ataxayk, Cynthia)' in report
+    and 'Fail-known 1 (Ataxayk)' in report)
+yes('  and the rows carrying one named where a reader cannot scroll past them',
+    'Fail on: Live 3.' in report and 'Fail-known on: Live 5.' in report)
+yes('  AND THE ROWS NOBODY HAS MARKED SAID OUT LOUD, which is the Fail that '
+    'is easiest to miss',
+    'Not marked: Live 2.' in report and '4 marked, 1 not marked yet' in report)
+yes('  and the counts are on the row, not a Pass list as long as the session',
+    'Pass 2' in report and 'Ataxayk, Djinn' not in report)
+yes('  and it fits in a Discord message', len(report) < 2000)
+
+yes('a session nobody has touched says so rather than listing nothing',
+    'none of them marked yet' in R(title, '', [('Live %d' % n, [])
+                                               for n in range(1, N + 1)]))
+yes('a session with every row marked says that instead of naming none',
+    'every one of them marked' in R(title, '', [('Live 1', [('Djinn', 'Pass')])])
+    and 'Not marked' not in R(title, '', [('Live 1', [('Djinn', 'Pass')])]))
+yes('a session with nothing failed names no fails',
+    'Fail' not in R(title, '', [('Live 1', [('Djinn', 'Pass')]),
+                                ('Live 2', [('Djinn', 'Skip')])]))
+yes('a thread with no rows in it says so rather than reading as a clean sweep',
+    'no checklist rows in this thread' in R(title, stamp, []))
+yes('a session opened without a stamp reports without one rather than an '
+    'empty line',
+    R(title, '', session).split('\n')[1].startswith('5 row(s)'))
+
+# The length risk the design note named: many testers, every row failed.
+crowd = [('Live %d' % n, [(who, 'Fail') for who in
+                          ('Ataxayk', 'Djinn', 'Cynthia', 'Harlan', 'Tophet',
+                           'Mosby', 'Patrick')])
+         for n in range(1, 29)]
+long_one = R('Live smoke 2026-10-02 1.1.101.17', stamp, crowd)
+yes('a session of twenty eight rows and seven testers still fits in a Discord '
+    'message',
+    len(long_one) < 2000)
+yes('  and what gives way is the list and not the fails, which are named above '
+    'it',
+    'more marked row(s) are in the thread' in long_one
+    and all(('Live %d' % n) in long_one.split('\n')[3] for n in (1, 28)))
+yes('and a report is nothing but words: no account id anywhere in one',
+    not re.search(r'\d{15,}', report + long_one))
+
+# Where a report may be read. A session thread, and not the standing rows.
+yes('A REPORT IS READ IN A SESSION THREAD, which is where the marks are',
+    bot.live_smoke_report_refusal(
+        Thread('Live smoke 2026-10-02 1.1.101.17', tasks)) is None)
+yes('THE STANDING CHECKLIST ROWS ARE REFUSED, because those rows carry no '
+    'buttons and so no marks',
+    bot.LIVE_SMOKE_ROWS in
+    bot.live_smoke_report_refusal(Thread(bot.LIVE_SMOKE_ROWS, tasks)))
+yes('  and so is any other thread under the channel',
+    bot.live_smoke_report_refusal(Thread('Something else', tasks)) is not None)
+yes('  and the channel itself, which holds the openers and not the rows',
+    'session thread' in bot.live_smoke_report_refusal(tasks))
+yes('  and a thread under some other channel',
+    bot.live_smoke_report_refusal(
+        Thread('Live smoke 2026-10-02', Channel('general'))) is not None
+    and bot.live_smoke_report_refusal(None) is not None)
+
+
+class Closed(Thread):
+    """A session a reset archived and locked where it stood."""
+
+    def __init__(self, name, parent):
+        Thread.__init__(self, name, parent)
+        self.archived = True
+        self.locked = True
+
+
+yes('a session a reset closed is not the one this reports on, and the refusal '
+    'says its marks are still in the thread',
+    'closed' in bot.live_smoke_report_refusal(
+        Closed('Live smoke 2026-10-01 1.1.101.16', tasks))
+    and 'still in the thread' in bot.live_smoke_report_refusal(
+        Closed('Live smoke 2026-10-01 1.1.101.16', tasks)))
+
 # ------------------------------------------------------- the words rules --
 #
 # CONTRIBUTING.md: no em dashes, and never the word this bans, in anything
 # written for people. Check-Words.ps1 does not read bot.py, so it is read here.
 WORDS = [opener, bot.live_smoke_admin_refusal(here), gone,
-         bot.live_smoke_tick_refusal(Who([], bot=True))] + sheet
+         bot.live_smoke_tick_refusal(Who([], bot=True)),
+         report, long_one, R(title, stamp, []),
+         bot.live_smoke_report_refusal(tasks),
+         bot.live_smoke_report_refusal(Thread(bot.LIVE_SMOKE_ROWS, tasks))]
+WORDS += sheet
 WORDS += [bot.live_smoke_item_text(i, N) for i in items]
 yes('nothing this says to anybody has an em dash in it',
     not any('\u2014' in w for w in WORDS))
+yes('and nothing a report says is a GitHub reference, because an admin reads '
+    'it in the same thread testers are in',
+    not any(re.search(r'#\d+', w) for w in (report, long_one))
+    and 'github' not in (report + long_one).lower())
 
 # ------------------------------------------- and the mark stays on Discord --
 #
@@ -632,11 +806,20 @@ yes('nothing in it logs a mark or a display name',
             for line in section.split('\n')))
 yes('the agent lock is what Discord says about the account, not a list of ids',
     'getattr(who, \'bot\', False)' in section)
-yes('start, reset and refresh all pass through the one admin gate',
-    section.count('await _live_smoke_ready(interaction)') == 2
+yes('start, reset, refresh and report all pass through the one admin gate',
+    section.count('await _live_smoke_ready(interaction)') == 3
     and 'async def _live_smoke_ready' in section
     and all(('await live_smoke_open(interaction' in section)
             for _ in ('start', 'reset')))
+tail = section[section.index('async def live_smoke_report('):]
+yes('the report writes no traceback either, for the same reason: what Discord '
+    'hands back when it will not read a thread carries the messages it did read',
+    'async def live_smoke_report(' in section and 'format_exc' not in tail)
+yes('  and it posts nothing anywhere: every word of it is said to the one '
+    'admin who ran it',
+    tail.count('ephemeral=True')
+    == tail.count('followup.send(') + tail.count('.defer(')
+    and 'thread.send' not in tail and 'channel.send' not in tail)
 
 # ------------------------------------------- a session, start to a mark --
 #
@@ -664,6 +847,9 @@ class Message(object):
             raise RuntimeError('a message takes one thread, and Discord '
                                'refuses a second')
         self.thread = Session(name, self.channel)
+        # What a report reads the session's stamp off: Discord hands a thread
+        # the message it hangs off.
+        self.thread.starter_message = self
         self.threaded = self.thread
         self.channel.threads.append(self.thread)
         return self.thread
@@ -780,7 +966,7 @@ ask = Ask(Who(['Moderator']), guild, tasks)
 ran(bot.live_smoke_open(ask, '1.1.101.17', 'thornswood-one', False))
 yes('/live-smoke start turns a Moderator away and posts nothing',
     tasks.sent == [] and ask.response.deferred == 0
-    and 'start, reset and refresh' in ask.response.said[0])
+    and 'start, reset, refresh and report' in ask.response.said[0])
 
 # The Lead Gamemaster, who may.
 ask = Ask(Who(['Lead Gamemaster']), guild, tasks)
@@ -837,6 +1023,55 @@ ran(press.callback(ask))
 yes('and so does pressing one outside a session thread',
     ask.response.edited == [] and 'session thread' in ask.response.said[0])
 
+# Two testers fail the row after it, so the report has something to name.
+hard, hard_view = thread.sent[2]
+fails = [c for c in hard_view.children if c.label == 'Fail'][0]
+for name in ('Ataxayk', 'Djinn'):
+    ask = Ask(Who(['Playtester'], uid=5, display_name=name), guild, thread, hard)
+    ran(fails.callback(ask))
+    hard.content = ask.response.edited[0]
+
+# The report, run in the session thread by somebody who may.
+ask = Ask(Who(['Dev']), guild, thread)
+ran(bot.live_smoke_report.callback(ask))
+told = ask.response.said[0]
+yes('/LIVE-SMOKE REPORT COUNTS THE SESSION IT IS RUN IN and says it to the '
+    'admin who ran it, posting nothing in the thread and nothing in the channel',
+    ask.response.deferred == 1 and len(ask.response.said) == 1
+    and len(thread.sent) == N and len(tasks.sent) == 1)
+yes('  naming the session and the Live set it was opened against',
+    told.startswith('**%s**' % thread.name)
+    and bot.live_smoke_stamp(live) in told)
+yes('  and every row of it, counted', '%d row(s)' % N in told)
+yes('  the marks read off the rows themselves, one line to a row',
+    'Live 2: Pass 1' in told and 'Live 3: Fail 2 (Ataxayk, Djinn)' in told)
+yes('  THE FAILED ROW NAMED WHERE IT CANNOT BE SCROLLED PAST, with who failed it',
+    'Fail on: Live 3.' in told and '(Ataxayk, Djinn)' in told)
+yes('  and the rows nobody has touched said out loud',
+    'Not marked: Live 1,' in told and ('Live %d' % N) in told
+    and '2 marked, %d not marked yet' % (N - 2) in told)
+yes('  and the opener is not counted as a row of its own',
+    told.count('row(s)') == 1 and 'Live smoke 2026' not in told.split('\n', 1)[1])
+
+# A tester, and a Moderator, at the report.
+ask = Ask(Who(['Playtester'], display_name='Ataxayk'), guild, thread)
+ran(bot.live_smoke_report.callback(ask))
+yes('A TESTER MAY NOT READ THE REPORT, which is the same gate start and reset '
+    'carry',
+    ask.response.deferred == 0
+    and 'start, reset, refresh and report' in ask.response.said[0])
+ask = Ask(Who(['Moderator']), guild, thread)
+ran(bot.live_smoke_report.callback(ask))
+yes('  nor may a Moderator alone', ask.response.deferred == 0
+    and 'start, reset, refresh and report' in ask.response.said[0])
+
+# The same command, run outside a session thread.
+ask = Ask(Who(['Dev']), guild, tasks)
+ran(bot.live_smoke_report.callback(ask))
+yes('AND IT IS REFUSED OUTSIDE A SESSION THREAD, in the channel the openers '
+    'sit in, rather than counting the openers',
+    ask.response.deferred == 0 and 'session thread' in ask.response.said[0])
+
 # Reset: the old session is closed and locked, a new one is opened.
 ask = Ask(Who(['Owner']), guild, tasks)
 ran(bot.live_smoke_open(ask, '1.1.102.0', 'thornswood-one', True))
@@ -847,6 +1082,11 @@ yes('  and opens a new one rather than rewriting the old ticks',
     and 'Ataxayk: Pass' in item.content)
 yes('  and says the one before it is closed',
     'closed and locked' in ask.response.said[0])
+
+ask = Ask(Who(['Owner']), guild, thread)
+ran(bot.live_smoke_report.callback(ask))
+yes('  and the session it closed is no longer the one a report counts',
+    ask.response.deferred == 0 and 'closed' in ask.response.said[0])
 
 # Refresh: the standing checklist, made once and then edited. This is the one
 # Patrick ran on 2 October against 2026-10-02r7 and got the row names out of.
@@ -924,7 +1164,16 @@ yes('  and the whole set is back the next time the export carries it',
 ask = Ask(Who(['Playtester']), guild2, fresh)
 ran(bot.live_smoke_refresh.callback(ask))
 yes('and a tester cannot refresh it', len(fresh.sent) == 1
-    and 'start, reset and refresh' in ask.response.said[0])
+    and 'start, reset, refresh and report' in ask.response.said[0])
+
+# A report asked of the standing rows. They carry no buttons, so there is
+# nothing in them to count, and the refusal says where the marks are instead.
+ask = Ask(Who(['Dev']), guild2, standing)
+ran(bot.live_smoke_report.callback(ask))
+yes('THE STANDING CHECKLIST ROWS THREAD IS REFUSED A REPORT, because a mark '
+    'belongs to a dated session and those rows carry no buttons',
+    ask.response.deferred == 0 and bot.LIVE_SMOKE_ROWS in ask.response.said[0]
+    and 'session' in ask.response.said[0])
 
 # A reset closes the session threads under the channel. The standing checklist
 # is not one of them, which is why its thread is not named for a session.
@@ -961,8 +1210,9 @@ finally:
 
 yes('startup registers one view per row, so a session outlives a restart',
     len(bot.live_smoke_views()) == N)
-yes('and the slash commands are one group of three',
-    sorted(c.name for c in bot.live_smoke.commands) == ['refresh', 'reset', 'start']
+yes('and the slash commands are one group of four',
+    sorted(c.name for c in bot.live_smoke.commands) ==
+    ['refresh', 'report', 'reset', 'start']
     and bot.live_smoke.name == 'live-smoke'
     and 'live-smoke' in [c.name for c in bot.tree.get_commands()])
 

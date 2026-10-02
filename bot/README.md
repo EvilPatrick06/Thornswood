@@ -124,18 +124,34 @@ each with Pass, Fail, Skip and Fail-known on it, in a thread off the opener:
     /live-smoke start    settings version and live channel, opens a session
     /live-smoke reset    closes the session open now and opens a fresh one
     /live-smoke refresh  reads the export again and rewrites the checklist
+    /live-smoke report   counts the marks on the session thread it is run in
 
-Those three are **Owner, Dev and Lead Gamemaster**, which is wider than Owner
+Those four are **Owner, Dev and Lead Gamemaster**, which is wider than Owner
 and Dev and narrower than the staff roles: a Moderator alone does not open or
 reset a session. They are matched by role name, never by id, so a renamed role
 is fixed by setting `LIVE_SMOKE_ADMIN_ROLES` in `bot.env.json` rather than by a
 deploy. Testers and staff mark their own rows. Agents do not.
 
-A mark is an edit to the Discord message it was pressed on. Nothing writes a
-mark, a name or an account id to the site, to a database, to a file or to the
-bot's log, and nothing posts a named fail anywhere outside the session thread.
-Everybody who can read the thread can read the marks in it. Going further than
-that, keeping marks anywhere off Discord, needs the Privacy page changed first.
+A mark is an edit to the Discord message it was pressed on, and it is one line
+per person: the row grows a `Marks:` block with a line for each display name,
+and marking again corrects that person's line rather than adding a second one.
+Nothing writes a mark, a name or an account id to the site, to a database, to a
+file or to the bot's log, and nothing posts a named fail anywhere outside the
+session thread. Everybody who can read the thread can read the marks in it.
+Going further than that, keeping marks anywhere off Discord, needs the Privacy
+page changed first.
+
+`/live-smoke report` is those marks read back, not a second record of them.
+Run in the session thread that is open, it counts every row the session posted
+and answers the one admin who ran it, as an ephemeral nobody else sees: the
+session name, the day the set was last changed, how many rows are marked and
+how many are not, which rows carry a Fail or a Fail-known and who gave it, and
+the rows nobody has marked at all. Pass and Skip are counted rather than named,
+because eleven names on a Pass are eleven names between a reader and the one
+Fail under it. It posts nothing in the thread, reads nothing but the messages
+Discord already holds, and names people by the display names those messages
+already carry. The standing checklist thread is refused one, because those rows
+carry no buttons and so no marks, and so is a session a reset has closed.
 
 What a session puts in the channel is the checklist rows and nothing wrapped
 around them, which is Djinn's layout call of 1 October. The opener is the
