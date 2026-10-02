@@ -8,16 +8,26 @@
 //
 //   site  /api/deploys lists every record in the store's current folder.
 //         readDeploys is lifted out of site\server.js by its markers and run
-//         against a temp folder, and the route is checked to be there, before
-//         the admin gate.
+//         against a temp folder, and the route is checked to be inside the
+//         sign in gate and to ask for staff.
 //   voice /health carries the record left beside voice-server.js. The real
 //         service is started from a temp copy, once without a record and
 //         once with one, and asked.
 //
+// Issue #1359: that site door was open to anybody, so a commit and the hour
+// each part last went out were there for the asking. It is staff's now, by
+// the same w.dev the other staff doors use, and a real copy of the site is
+// started in a temp folder and asked as three callers: nobody, a hub member
+// who is not staff, and an admin. The first two must get a refusal with no
+// commit, hash or stamp anywhere in it; the third must still get the record.
+//
 // Read only. Writes to temp folders and nowhere else.
 const fs = require('fs');
 const os = require('os');
+const net = require('net');
+const http = require('http');
 const path = require('path');
+const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const REPO = path.resolve(__dirname, '..');
@@ -33,6 +43,31 @@ function lift(src, from, to) {
   const a = src.indexOf(from);
   const b = src.indexOf(to, a);
   return (a >= 0 && b > a) ? src.slice(a, b) : '';
+}
+const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
+function freePort() {
+  return new Promise((ok) => {
+    const s = net.createServer();
+    s.listen(0, '127.0.0.1', () => { const n = s.address().port; s.close(() => ok(n)); });
+  });
+}
+// One GET against the scratch site, with whatever cookie the caller offers.
+function ask(port, where, cookie) {
+  return new Promise((done) => {
+    const req = http.request({ host: '127.0.0.1', port: port, method: 'GET', path: where,
+                               headers: cookie ? { cookie: cookie } : {}, agent: false }, (res) => {
+      let text = '';
+      res.on('data', (d) => { text += d; });
+      res.on('end', () => {
+        let json = null;
+        try { json = JSON.parse(text); } catch (e) { json = null; }
+        done({ status: res.statusCode, body: text, json: json });
+      });
+    });
+    req.on('error', (e) => done({ status: 0, body: String(e), json: null }));
+    req.setTimeout(10000, () => req.destroy(new Error('timed out')));
+    req.end();
+  });
 }
 
 const record = {
@@ -50,11 +85,17 @@ async function main() {
   yes('site/server.js has the deploy records block', !!block);
   yes('it reads the store the deploy scripts write, unless told otherwise',
     block.includes("process.env.THORNSWOOD_DEPLOYS_DIR || 'C:\\\\Thornswood-Deploys\\\\current'"));
-  const route = server.indexOf("route === '/api/deploys'");
+  const route = server.indexOf("p === '/api/deploys'");
   yes('/api/deploys is a route', route >= 0);
-  yes('and it answers with readDeploys of that store', /route === '\/api\/deploys'[^\n]*\n\s*return sendJson\(res, 200, \{ parts: readDeploys\(DEPLOYS_DIR\) \}\)/.test(server));
-  const publicRoute = server.indexOf("route === '/api/public'");
-  yes('it sits with /api/public, before anything asks anybody to sign in', route >= 0 && publicRoute > route && publicRoute - route < 2000);
+  // #1359: it used to sit with /api/public, above everything that asks
+  // anybody to sign in. Both halves are checked, because moving it back
+  // under that gate would be the whole of the leak again.
+  const gate = server.indexOf("if (p.startsWith('/api/'))");
+  yes('it sits inside the sign in gate, not out with the public routes',
+    route >= 0 && gate >= 0 && route > gate);
+  yes('and nothing answers it above that gate', server.indexOf("route === '/api/deploys'") < 0);
+  yes('it asks for staff and then answers with readDeploys of that store',
+    /p === '\/api\/deploys'[^\n]*\n\s*if \(!w\.dev\) return sendJson\(res, 403, \{ error: 'staff only' \}\);\n\s*return sendJson\(res, 200, \{ parts: readDeploys\(DEPLOYS_DIR\) \}\)/.test(server));
 
   const readDeploys = block ? new Function('fs', 'path', 'process', block + '\nreturn readDeploys;')(fs, path, process) : null;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-deploys-'));
@@ -74,6 +115,101 @@ async function main() {
     yes('a record that does not read is named, not dropped, and hides nothing else', (got['thornswood-bot'] || {}).unreadable === true);
     yes('no folder is an empty answer, not a failure', JSON.stringify(readDeploys ? readDeploys(path.join(dir, 'nope')) : null) === '{}');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+
+  // ------------------------------------------------- the site door (#1359)
+  /*
+    A real copy of site\server.js in a temp folder on a spare port, with one
+    record in its store, asked by three callers. The config written here has
+    no client id and no bot token, so the copy asks Discord nothing: the
+    password door is on, which is the hub member cookie, and standing() gives
+    the admin list its roles and everybody else an ordinary member.
+  */
+  const site = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-deploys-site-'));
+  try {
+    const store = path.join(site, 'deploys');
+    fs.mkdirSync(store, { recursive: true });
+    fs.writeFileSync(path.join(store, 'thornswood-docs.json'),
+      JSON.stringify(Object.assign({}, record, { part: 'thornswood-docs', component: 'site' })));
+
+    const SECRET = crypto.randomBytes(32).toString('hex');
+    const PASSWORD = crypto.randomBytes(12).toString('hex');
+    const ADMIN_ID = '111111111111111111';
+    fs.copyFileSync(path.join(REPO, 'site', 'server.js'), path.join(site, 'server.js'));
+    fs.mkdirSync(path.join(site, 'public'), { recursive: true });
+    try { fs.copyFileSync(path.join(REPO, 'site', 'public', 'home.html'), path.join(site, 'public', 'home.html')); } catch (e) { }
+    fs.mkdirSync(path.join(site, 'data'), { recursive: true });
+    fs.writeFileSync(path.join(site, 'config.json'), JSON.stringify({
+      password: PASSWORD,
+      discord: { clientId: '', clientSecret: '', botToken: '', guildId: '', invite: '' },
+      botKey: crypto.randomBytes(16).toString('hex'),
+      admins: [ADMIN_ID],
+      secret: SECRET,
+      gameCheckPort: 1,
+      onlineFile: path.join(site, 'online.json')
+    }, null, 2));
+
+    // The two cookies the site itself would mint (server.js: memberToken(),
+    // identity()), built with this copy's own password and secret.
+    const memberCookie = 'tw=' + crypto.createHash('sha256').update('thornswood:' + PASSWORD).digest('hex');
+    const at = Date.now();
+    const raw = ADMIN_ID + '|Admin|' + at + '|' +
+      crypto.createHmac('sha256', SECRET).update(ADMIN_ID + '|Admin|' + at).digest('hex').slice(0, 32);
+    const adminCookie = 'twa=' + encodeURIComponent(raw);
+
+    const port = await freePort();
+    const srv = spawn(process.execPath, ['server.js'], {
+      cwd: site,
+      env: Object.assign({}, process.env, {
+        THORNSWOOD_DOCS_PORT: String(port),
+        THORNSWOOD_DOCS_LOCAL: '1',
+        THORNSWOOD_DEPLOYS_DIR: store,
+        THORNSWOOD_CHAT_DIR: path.join(site, 'chat')
+      })
+    });
+    let out = '';
+    srv.stdout.on('data', (d) => { out += d; });
+    srv.stderr.on('data', (d) => { out += d; });
+    try {
+      let up = false;
+      for (let i = 0; i < 120 && !up; i++) {
+        if (out.indexOf('listening on ') >= 0) { up = true; break; }
+        if (srv.exitCode !== null) break;
+        await wait(50);
+      }
+      yes('a scratch copy of the site came up', up);
+      if (!up) throw new Error('the scratch site never came up:\n' + out);
+
+      // Nothing of the record may be in a refusal: the commit, the zip name,
+      // the hash and the hour it went out are each looked for by hand.
+      const leaks = (r) => [record.commit, record.name, record.sha256, record.deployedUtc]
+        .some((v) => r.body.indexOf(v) >= 0);
+
+      const anon = await ask(port, '/api/deploys', '');
+      yes('nobody signed in is refused 401 (' + anon.status + ')', anon.status === 401);
+      yes('and told nothing but to sign in', !leaks(anon) && !!anon.json && anon.json.error === 'sign in first');
+
+      const mem = await ask(port, '/api/deploys', memberCookie);
+      yes('a hub member who is not staff is refused 403 (' + mem.status + ')', mem.status === 403);
+      yes('and told nothing but that it is staff only', !leaks(mem) && !!mem.json && mem.json.error === 'staff only');
+
+      const staff = await ask(port, '/api/deploys', adminCookie);
+      const got = (staff.json && staff.json.parts && staff.json.parts['thornswood-docs']) || null;
+      yes('staff still get the records (' + staff.status + ')', staff.status === 200 && !!got);
+      yes('with the commit, zip, hash and when, as before',
+        !!got && got.commit === record.commit && got.name === record.name &&
+        got.sha256 === record.sha256 && got.deployedUtc === record.deployedUtc);
+
+      // The public front is untouched: the change is this door, not the site.
+      const pub = await ask(port, '/api/public', '');
+      yes('and /api/public still answers anybody, carrying no deploy record',
+        pub.status === 200 && !leaks(pub) && !!pub.json && !('parts' in pub.json));
+    } finally {
+      srv.kill();
+      await wait(300);
+    }
+  } finally {
+    try { fs.rmSync(site, { recursive: true, force: true }); } catch (e) { }
+  }
 
   // ----------------------------------------------------------------- voice
   const voice = read('voice/voice-server.js');
