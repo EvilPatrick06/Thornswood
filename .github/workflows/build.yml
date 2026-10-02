@@ -237,6 +237,9 @@ jobs:
           # refuses, instead of handing the plain secret back to be written to
           # disk, and Unprotect is left as it was. It reads the launcher's
           # source, a moment, and goes red on the fail-open it replaced.
+          # Issue #1345: site auth (door key header, Discord cookie, OAuth state,
+          # gamemode refresh()) on every PR. ~2s; test-token-refresh.js does not
+          # exist on main — site-auth already drives the refresh() path.
           $six = 'test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
                  'test-new-box-runbook.ps1',
@@ -248,7 +251,8 @@ jobs:
                  'test-books.js', 'test-guild-ledger-safety.js', 'test-book-review-regressions.js',
                  'test-npc-merchant-purses.js', 'test-merchant-ledger-storage.js', 'test-npc-merchant-startup.js',
                  'test-dungeon-loot.js', 'test-dungeon-reward-safety.js', 'test-dungeon-reward-storage.js', 'test-one-mint.js',
-                 'test-secrets-fail-closed.js'
+                 'test-secrets-fail-closed.js',
+                 'test-site-auth.js'
           $failed = @()
           foreach ($n in $six) {
             $p = Join-Path 'tests' $n
