@@ -418,10 +418,13 @@ namespace Thornswood
             // ---- and what the release says is gone --------------------------
             // "always" is a path taken out of every install whatever put it
             // there (Ship-Rules' delete list), like a line in a pack's
-            // delete.txt. Any other is a file of ours a release stopped
-            // shipping: left alone when Vortex has deployed that path since,
-            // the same rule RemovePack keeps, because then it is the
-            // collection's file and not ours.
+            // delete.txt. A 64-hex value is the sha256 of bytes we once
+            // shipped (#1261): delete only when the file still matches, so a
+            // copy a person installed themselves is never touched. Any other
+            // value is a file of ours a release stopped shipping: left alone
+            // when Vortex has deployed that path since, the same rule
+            // RemovePack keeps, because then it is the collection's file and
+            // not ours. Hash-matched paths also skip when Vortex deploys them.
             var removed = new List<string>();
             HashSet<string> deployed = null;
             int shared = 0;
@@ -432,10 +435,21 @@ namespace Thornswood
                 if (!Inside(full, Paths.Game)) continue;
                 string rel = full.Substring(Paths.Game.TrimEnd('\\', '/').Length).TrimStart('\\', '/');
                 if (listed.Contains(rel) || client.Contains(rel) || !File.Exists(full)) continue;
-                if (!string.Equals(g.Value, "always", StringComparison.OrdinalIgnoreCase))
+                bool always = string.Equals(g.Value, "always", StringComparison.OrdinalIgnoreCase);
+                bool byHash = IsSha(g.Value);
+                if (!always)
                 {
                     if (deployed == null) deployed = DeployedNow(cfg);
                     if (deployed.Contains(rel)) { shared++; continue; }
+                }
+                if (byHash)
+                {
+                    try
+                    {
+                        if (!string.Equals(Sha256(full), g.Value, StringComparison.OrdinalIgnoreCase))
+                            continue;
+                    }
+                    catch (Exception ex) { Swallow.Note("Updater.Sync, hash gone", ex); continue; }
                 }
                 try
                 {

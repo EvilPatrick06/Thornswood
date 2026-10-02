@@ -1283,9 +1283,26 @@ if (-not $prev.ContainsKey($RecordFilesKey) -and -not $gone.Count) {
 }
 foreach ($r in $removed) { $gone[$r] = 'removed' }
 foreach ($a in $alwaysGone) { $gone[$a] = 'always' }
+# #1261: other authors' files we once shipped leave as gone with their sha256,
+# so the launcher deletes them only when the bytes still match. The removals
+# filter above keeps them off $removed (Test-Machine), which is right for a
+# blind delete; here the previous record still names the bytes we put there.
+foreach ($k in @($prev.Keys)) {
+    if ($k.StartsWith(':')) { continue }
+    if ($now.ContainsKey($k)) { continue }
+    if (-not (Test-ShipNotOurs $k)) { continue }
+    # Bethesda's, one machine's and backups never become hash-gone: a delete
+    # must not reach Steam copies of those (#1152, #1239, #1261).
+    if ((Test-ShipBethesda $k) -or (Test-ShipOneMachine $k) -or (Test-ShipBackup $k)) { continue }
+    $m = [regex]::Match([string]$prev[$k], '^\d+:([0-9a-fA-F]{64})$')
+    if ($m.Success) { $gone[$k] = $m.Groups[1].Value.ToLowerInvariant() }
+}
 foreach ($k in @($gone.Keys)) {
     if ($now.ContainsKey($k)) { $gone.Remove($k); continue }
     if ($gone[$k] -eq 'always') { continue }
+    # A hash-matched gone entry stays (#1261): the launcher only deletes when
+    # the bytes still match what we shipped.
+    if ([string]$gone[$k] -match '^[0-9a-fA-F]{64}$') { continue }
     # Test-ShipMachine, not Test-Machine: another author's file an earlier
     # release already took out (the Lost Ark armour the dev record lists as
     # removed) stays gone;
