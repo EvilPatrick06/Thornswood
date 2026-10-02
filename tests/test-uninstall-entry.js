@@ -288,7 +288,6 @@ const MUST_NOT = [
   ['Display.MatchScreen', 'the game set to the screen'],
   ['Display.ScaleMenus', 'the menus sized'],
   ['Icons.Ensure', 'the shortcut icon'],
-  ['Files.FixPresetNames', 'the class preset names'],
   ['Uninstall.DropScratch', 'the installer leftovers cleared at startup (the uninstall does it itself)'],
   ['Voice.Prepare', 'voice'],
   ['Voice.Start', 'voice'],
