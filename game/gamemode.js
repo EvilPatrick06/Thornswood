@@ -33992,6 +33992,92 @@ log('gamemode loaded:',
     return null;
   }
 
+  /** The nearest board within reach of a click, or null. */
+  function nearestBoard(actorId, within) {
+    var cell = null, pos = null;
+    try { cell = mp.get(actorId, 'worldOrCellDesc'); } catch (e) { return null; }
+    try { pos = mp.get(actorId, 'pos'); } catch (e) { return null; }
+    if (!cell || !pos) { return null; }
+    var best = null;
+    var bestD = within;
+    for (var hold in boards) {
+      if (!Object.prototype.hasOwnProperty.call(boards, hold)) { continue; }
+      var b = boards[hold];
+      if (!b || b.cell !== cell || !b.pos) { continue; }
+      var dx = pos[0] - b.pos[0], dy = pos[1] - b.pos[1], dz = pos[2] - b.pos[2];
+      var d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (d <= bestD) { bestD = d; best = { hold: hold, board: b, dist: d }; }
+    }
+    return best;
+  }
+
+  function refreshPanel(actorId) {
+    try {
+      var soc = g.__thornswoodSocial;
+      if (soc && soc.push) { soc.push(actorId, true); }
+    } catch (e) { }
+  }
+
+  /** What the board panel draws. Null until they are near one. */
+  function boardPanel(actorId, profileId) {
+    var near = nearestBoard(actorId, 1500);
+    if (!near) { return null; }
+    var hold = near.hold;
+    var b = near.board;
+    var here = near.dist <= BOARD_REACH;
+    var wall = [];
+    var mine = [];
+    if (here) {
+      var list = notices[hold] || [];
+      var shown = 0;
+      for (var i = list.length - 1; i >= 0 && shown < 10; i--) {
+        var n = list[i];
+        if (n.down) { continue; }
+        shown++;
+        wall.push({
+          n: i + 1,
+          job: !!n.job,
+          name: n.name || 'somebody',
+          text: n.text || '',
+          taken: n.taken ? (n.takenName || 'somebody') : '',
+          mine: Number(n.by) === Number(profileId),
+          held: !!(n.job && Number(n.taken) === Number(profileId))
+        });
+      }
+      for (var h in notices) {
+        if (!Object.prototype.hasOwnProperty.call(notices, h)) { continue; }
+        var rows = notices[h];
+        for (var j = 0; j < rows.length; j++) {
+          var job = rows[j];
+          if (job.job && Number(job.taken) === Number(profileId) && !job.down) {
+            mine.push({ hold: h, n: j + 1, text: job.text || '', name: job.name || 'somebody' });
+          }
+        }
+      }
+    }
+    var submit = [];
+    if (here) {
+      try {
+        var books = g.__thornswoodBooks;
+        var view = books && books.view ? books.view(profileId, {}) : null;
+        var rows2 = (view && view.books) || [];
+        for (var s = 0; s < rows2.length; s++) {
+          if (rows2[s].canPrices) { submit.push({ id: rows2[s].id, name: rows2[s].name }); }
+        }
+      } catch (e2) { }
+    }
+    return {
+      hold: hold,
+      where: b.where || hold,
+      x: b.pos[0], y: b.pos[1], z: b.pos[2],
+      here: here,
+      paid: Number(funds[hold]) || 0,
+      wall: wall,
+      jobs: mine,
+      submit: submit
+    };
+  }
+
   /** A steward moves a hold's board to where they stand. */
   function moveBoard(hold, actorId, profileId, toProfile) {
     if (!isSteward(profileId)) {
@@ -34086,6 +34172,7 @@ log('gamemode loaded:',
     plog(who, isJob ? 'posted a job in' : 'posted a notice in', hold, 'for', fee, 'gold');
     toProfile(profileId, (isJob ? 'Your job is on the board in ' : 'Your notice is on the board in ') +
                          hold + '. That cost ' + fee + ' gold.');
+    refreshPanel(actorId);
     return true;
   }
 
@@ -34235,6 +34322,7 @@ log('gamemode loaded:',
     save();
     plog(who, 'took a job in', hold + ':', n.text);
     toProfile(profileId, 'You take it: ' + n.text + '. Go and see ' + n.name + ' about it.');
+    refreshPanel(actorId);
     return true;
   }
 
@@ -34280,6 +34368,7 @@ log('gamemode loaded:',
     save();
     plog(profileId, 'gave a job back in', hold);
     toProfile(profileId, 'You put it back on the board.');
+    refreshPanel(actorId);
     return true;
   }
 
@@ -34349,6 +34438,7 @@ log('gamemode loaded:',
     takedown(hold, at, profileId);
     plog(n.name, 'took down', n.job ? 'a job' : 'a notice', 'in', hold + ':', n.text);
     toProfile(profileId, 'You take it down. The fee stays with ' + hold + '.');
+    refreshPanel(actorId);
     return true;
   }
 
@@ -34540,7 +34630,7 @@ log('gamemode loaded:',
     rentDue: rentDue, funds: function () { return funds; },
     boxes: function () { return boxes; },
     notices: function () { return notices; }, takedown: takedown,
-    boards: function () { return boards; }, boardHere: boardHere,
+    boards: function () { return boards; }, boardHere: boardHere, boardPanel: boardPanel,
     stewards: function () { return stewards.slice(); }
   };
   plog('ready,', Object.keys(BUILDING_BY_DOOR).length, 'doors across',
@@ -37734,7 +37824,16 @@ function thornswoodBooks(env) {
     if (sub === 'new') {
       return found(actorId, pid, String(parts[2] || '').toLowerCase(), parts.slice(3).join(' '));
     }
-    if (sub === 'submit') { return submit(actorId, pid, words); }
+    if (sub === 'submit') {
+      var said = submit(actorId, pid, words);
+      if (String(said).indexOf('Submitted ') === 0) {
+        try {
+          var soc = g.__thornswoodSocial;
+          if (soc && soc.push && actorId) { soc.push(actorId, true); }
+        } catch (eSubmit) { }
+      }
+      return said;
+    }
     if (sub === 'leave') { return leave(pid, words); }
     if (sub === 'invite') { return invite(actorId, pid, words); }
     if (sub === 'say') { return sayLine(pid, actorId, words); }
@@ -44081,6 +44180,13 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
           if (!booksView || !booksView.view) { return { show: false }; }
           return booksView.view(mine, (s && s.textOff) || {});
         } catch (e) { return { show: false }; }
+      })(),
+      board: (function () {
+        try {
+          var prop = g.__thornswoodProperty;
+          if (!prop || !prop.boardPanel) { return null; }
+          return prop.boardPanel(actorId, mine);
+        } catch (eBoard) { return null; }
       })()
     };
   }
@@ -44105,6 +44211,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       '      "var d=" + body + ";window.thornswoodSocialView=d;" +',
       '      "if(window.thornswoodParty&&window.thornswoodParty.setData){window.thornswoodParty.setData(d);}" +',
       '      "if(window.thornswoodJournal&&window.thornswoodJournal.setData){window.thornswoodJournal.setData(d);}" +',
+      '      "if(window.thornswoodBoard&&window.thornswoodBoard.setData){window.thornswoodBoard.setData(d);}" +',
       // The voice page holds the gain nodes. Handing it the mute list is the
       // whole of muting; see toggleMute.
       '      "if(window.thornswoodVoice&&window.thornswoodVoice.setMuted){window.thornswoodVoice.setMuted(d.muted||{});}" +',
