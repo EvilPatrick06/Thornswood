@@ -20,6 +20,15 @@ download stopped and checking it against the SHA-256 the site gives, then
 unpacks it and runs the install script inside, the one `Setup.bat` runs, with
 the chosen folder.
 
+Since issue #1365 both halves of that check are refusals rather than
+allowances, the standard `Updater.cs` already holds the launcher to. The
+address the site gives is fetched only when it is a relative path, which is
+joined onto the site as before, or an absolute `https` one; plain `http`, and
+every other scheme, stops the install. And a reply with no SHA-256 on it stops
+it before a byte is fetched, where it used to install unmeasured so that a new
+installer still worked against a site from before the hash.
+`tests\test-payload-hash.ps1` holds all of that.
+
 Since issue #889 that script runs inside this window, not in a console of its
 own. It is started the way `Setup.bat` starts it (the same PowerShell, the same
 `-MovePayload -Root`), hidden, with `-NonInteractive`; every line it prints

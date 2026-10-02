@@ -3592,9 +3592,11 @@ async function handle(req, res) {
     // The SHA-256 Publish-Installer measured on the zip it sent, kept in
     // files.json beside its name. best is built from a stat and has no hash on
     // it, so it is looked up here. Only a well formed one goes out: anything
-    // else would make every install delete a good download. An empty value
-    // tells the installer there is nothing to check, which is also what an
-    // installer from before this sees when the field is missing.
+    // else would make every install delete a good download. An empty value is
+    // what an installer from before this sees when the field is missing; an
+    // installer from #1365 on stops on it rather than fetching half a
+    // gigabyte it has no way to measure, so a publish without files.json
+    // beside the zip is an install nobody can run.
     const meta = jsonFile(path.join(FILES, 'files.json'), {});
     const sha = String((meta[best.name] || {}).sha256 || '');
     return sendJson(res, 200, {
