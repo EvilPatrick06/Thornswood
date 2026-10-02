@@ -986,7 +986,7 @@ namespace Thornswood
                     byte[] raw = null;
                     try
                     {
-                        ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+                        ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12; // added, never replaced (#1360)
                         using (var wc = new System.Net.WebClient())
                         {
                             wc.Headers["User-Agent"] = "ThornswoodLauncher/" + Updater.Version;

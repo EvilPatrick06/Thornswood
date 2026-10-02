@@ -226,7 +226,7 @@ namespace Thornswood
         /// </summary>
         public static VersionDoc Check(Config cfg)
         {
-            ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072; // Tls12
+            ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; // Tls12 added, never replaced (#1360)
             LastNotModified = false;
 
             string feedUrl = FeedUrl(cfg);
@@ -662,7 +662,7 @@ namespace Thornswood
             if (string.IsNullOrEmpty(expectSha))
                 throw new Exception("That update arrived without a checksum, so it has not been downloaded. This is a publishing mistake, not something wrong with your install.");
 
-            ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
+            ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; // Tls12 added, never replaced (#1360)
             string tmp = Path.Combine(Path.GetTempPath(), "thornswood-" + Guid.NewGuid().ToString("N") + ".bin");
             // Read in pieces rather than DownloadFile, so the Play button can
             // show the bytes as they come (#1145, PlayProgress.Part).

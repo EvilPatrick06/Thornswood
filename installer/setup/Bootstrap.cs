@@ -862,7 +862,7 @@ namespace ThornswoodSetup
         /// <summary>The page's text as the site serves it now, or null.</summary>
         static string FetchPage(string name)
         {
-            ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072; // Tls12
+            ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; // Tls12 added, never replaced (#1360)
             var req = (HttpWebRequest)WebRequest.Create(Site + "/api/page/" + name);
             req.UserAgent = "ThornswoodSetup";
             req.Timeout = 15000;
@@ -1403,7 +1403,7 @@ namespace ThornswoodSetup
         /// </summary>
         static string Download(string intoDir)
         {
-            ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072; // Tls12
+            ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; // Tls12 added, never replaced (#1360)
 
             string name, url;
             string sha = "";
