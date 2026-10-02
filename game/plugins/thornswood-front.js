@@ -7167,6 +7167,19 @@
       somebody looking at a bare number.
     */
     if (leaving && now - leaving >= 0 && now - leaving <= 5000) {
+      /* Close the game connection on the first second, not after the quit.
+         skymp5-client reconnects the moment a connection drops and then
+         moves you to the last place the server had, which is a few feet
+         behind where you were walking, and that move wins over the menu.
+         The idle kick already closes it first for the same reason. */
+      if (!leftClosed) {
+        leftClosed = true;
+        try {
+          if (sp.mpClientPlugin && sp.mpClientPlugin.destroyClient) {
+            sp.mpClientPlugin.destroyClient();
+          }
+        } catch (e) { log('could not close the connection to the game server:', e); }
+      }
       const left = Math.max(1, Math.ceil((5000 - (now - leaving)) / 1000));
       if (left !== leavingSaid) {
         note((leavingSaid ? '' : 'the connection to the server was lost, ') +
@@ -7179,6 +7192,11 @@
       // No longer in the world, and said so before the quit rather than after,
       // because after it there is no tick to say it in.
       try { globalThis.__thornswoodInWorld = false; } catch (e) { }
+      try {
+        if (sp.mpClientPlugin && sp.mpClientPlugin.destroyClient) {
+          sp.mpClientPlugin.destroyClient();
+        }
+      } catch (e) { log('could not close the connection to the game server:', e); }
       try {
         sp.Game.quitToMainMenu();
       } catch (e) {
@@ -7324,6 +7342,9 @@
   let probeStartedAt = 0;
   let probeSeq = 0;
   let leaving = 0;
+  /* The game connection was closed for this outage, so a reconnect cannot
+     put them back where they were standing. See the countdown above. */
+  let leftClosed = false;
   /* The last whole second the way-out countdown put on screen, 0 before the
      first. See the quit in the tick above, the only place that can draw it. */
   let leavingSaid = 0;
