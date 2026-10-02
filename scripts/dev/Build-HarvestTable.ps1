@@ -426,7 +426,10 @@ $FISH_BY_EDITOR_ID = @(
     'Clam01', 'ClamThin01', 'ClamLarge01',
     'DLC2PearlOysterLarge01', 'DLC2PearlOysterThin01',
     'DLC2HorkerMeat01', 'SlaughterfishEggNest01',
-    'OR_Clam'
+    'OR_Clam',
+    'ThornswoodFishHistcarp', 'ThornswoodFishRiverBetty',
+    'ThornswoodFishSlaughterfishScales', 'ThornswoodFishSilversidePerch',
+    'ThornswoodFishCyrodilicSpadetail', 'ThornswoodFishAbeceanLongfin'
 )
 #
 # FISH_NOT_A_CATCH: the ones in that list that are water produce and still are
@@ -471,6 +474,12 @@ $FISH_RANK_BY_EDITOR_ID = @{
     'DLC2PearlOysterThin01'  = 'advanced'
     'DLC2PearlOysterLarge01' = 'expert'
     'SlaughterfishEggNest01' = 'master'
+    'ThornswoodFishHistcarp' = 'advanced'
+    'ThornswoodFishRiverBetty' = 'advanced'
+    'ThornswoodFishSlaughterfishScales' = 'advanced'
+    'ThornswoodFishSilversidePerch' = 'expert'
+    'ThornswoodFishCyrodilicSpadetail' = 'expert'
+    'ThornswoodFishAbeceanLongfin' = 'master'
 }
 #
 # ------------------------------------------------------ the food knobs ------
