@@ -147,14 +147,16 @@ all, for everybody.
 
 ## Where this is
 
-Personal journals, J, and sharing a page with a friend are in the
-server. This tab is not. There is no price list, no group role, and
-no group chat.
+The tab, the price list, the group role, and the group chat are in
+the server. The book is kept for the group and survives a restart.
+The time a character last left is kept too. J draws the tab only for
+a Discord account that holds Business Owner or Faction Owner, for a
+character who has accepted an invite, and for staff.
 
-The server already knows who is in the world, and a friend row
-already uses that. It does not store the time a character last left.
-Nothing submits a price list to a hold's drop box.
+Nothing submits a price list to a hold's drop box. Asking to submit
+one is refused, and the list stays in the book.
 
-Staff seats already read Owner, Gamemaster, Dev, Loremaster, and
-Moderator off the Discord account. Business Owner and Faction Owner
-are not roles that read looks for.
+Staff seats read Owner, Gamemaster, Dev, Loremaster, and Moderator
+off the Discord account. Business Owner and Faction Owner are read
+the same way, and founding one book of each kind is capped on the
+account.
