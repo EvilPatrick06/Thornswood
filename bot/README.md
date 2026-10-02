@@ -96,7 +96,10 @@ The support voice channel sits in Help, because that is what it is for.
 ### Testing
 
 `#test-tasks` and `#test-results`, visible to testers and staff and to nobody
-else.
+else. `#test-tasks` also lets in the lead gamemaster role, because that role
+may open a Live smoke session and the rest of that gate does not include it.
+It is on that channel's own line in the builder's plan, so no other channel
+moved.
 
 `#test-tasks` replaces `#test-these`, which was deleted in the channel cleanup.
 It is a new channel rather than that one renamed, and `#test-these` is in the

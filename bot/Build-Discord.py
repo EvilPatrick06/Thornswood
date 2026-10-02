@@ -274,6 +274,12 @@ STAFF = ('Owner', 'Dev', 'Moderator', 'Gamemaster')
 #
 # key is what the words in content.py point at, so a channel can be renamed
 # without every mention of it going stale.
+#
+# extra_roles is for one channel wanting somebody its mode does not give it.
+# Looked up by name on the server when the channel is made, so a role that is
+# not in ROLES still counts and a role that is not there is passed over. It
+# widens that channel and nothing else: changing a mode would widen every
+# channel using it.
 PLAN = [
  (None, [
    dict(kind='text',  name='welcome',     key='WELCOME',  mode='read',
@@ -358,8 +364,20 @@ PLAN = [
  # is a new channel, decided on 1 October, and the bot keeps the living Live
  # smoke checklist in it (bot.py, the live smoke section). Discord lower cases
  # a text channel name itself, so this is #test-tasks on the server.
+ #
+ # WHY THIS ONE HAS extra_roles AND THE OTHER PATHFIND CHANNEL DOES NOT.
+ # Patrick locked who may start, reset and refresh a Live smoke session on
+ # 1 October: Owner, Dev and Lead GM. pathfind grants the four STAFF roles
+ # and Playtester, and the lead gamemaster role is in neither list, so
+ # somebody holding only that one passed the bot's admin check and could not
+ # see the channel they were meant to run it in. Both spellings are named
+ # because the role has been written both ways and the scrub is not
+ # finished; _named looks each up on the server and passes over the one that
+ # is not there. Only this channel gets them: #test-results is pathfind for
+ # the same people it always was, and nothing else moves.
  ('Testing', [
    dict(kind='text',  name='Test-Tasks',   key='TESTS',   mode='pathfind',
+        extra_roles=('Lead Gamemaster', 'Lead GM'),
         topic='The living Live smoke checklist. Staff start a dated session '
               'and you mark your own rows in its thread.'),
    dict(kind='text',  name='test-results', key='RESULTS', mode='pathfind',
@@ -439,6 +457,10 @@ BOT_NEEDS = ('view_channel', 'send_messages', 'read_message_history')
 TICKET_BOT_NEEDS = BOT_NEEDS + ('create_private_threads',
                                 'send_messages_in_threads')
 
+# What a role named in a channel's extra_roles gets there: the same three the
+# talk overwrite below hands a staff role, and nothing else.
+TALK_NEEDS = ('view_channel', 'send_messages', 'read_message_history')
+
 
 def bot_needs(spec):
     return TICKET_BOT_NEEDS if spec.get('key') == 'TICKETS' else BOT_NEEDS
@@ -502,6 +524,44 @@ async def keep_bot(ch, needs=BOT_NEEDS):
         failed.append(what + ' (Discord refused it)')
 
 
+async def keep_extra(ch, spec, roles):
+    """
+    Give a channel's extra_roles their overwrite when the channel is already
+    there.
+
+    The same reason keep_bot exists: overwrites() only reaches a channel when
+    it is made, so a #test-tasks made by hand, or one made by a run from
+    before the role existed, would shut out the very people its extra_roles
+    name. Only those roles are touched, only the three permissions they need
+    are set, anything else already on them stays, and a role that has all
+    three is not written to at all, so a second run asks Discord for nothing.
+    """
+    names = spec.get('extra_roles') or ()
+    guild = getattr(ch, 'guild', None)
+    if ch is None or not names or guild is None:
+        return
+    for name in names:
+        r = _named(guild, roles, name)
+        if r is None:
+            continue
+        have = ch.overwrites_for(r)
+        need = dict((n, True) for n in TALK_NEEDS if getattr(have, n) is not True)
+        if not need:
+            continue
+        what = '#' + ch.name + ' lets ' + name + ' in'
+        if CHECK:
+            say('would change', what)
+            continue
+        have.update(**need)
+        try:
+            await ch.set_permissions(r, overwrite=have,
+                                     reason='Thornswood setup, the channel\'s '
+                                            'extra roles')
+            say('role', what)
+        except discord.HTTPException:
+            failed.append(what + ' (Discord refused it)')
+
+
 # Who can see every hold. Wider than STAFF: the gamemaster ranks and the
 # Loremaster run things in the holds too. Looked up by name, because only some
 # of these are in ROLES.
@@ -513,7 +573,28 @@ def _named(guild, roles, name):
     return roles.get(name) or discord.utils.get(guild.roles, name=name)
 
 
-def overwrites(guild, mode, roles, hold=None, needs=BOT_NEEDS):
+def _also(guild, roles, out, extra, talk):
+    """
+    The roles one channel wants on top of what its mode gives everybody.
+
+    A mode is the gate the whole server is built from, so widening one to
+    suit a single channel widens every channel that uses it. extra_roles on
+    that channel's own line in PLAN is the narrow way to do it: these are
+    looked up by name on the server, so a role that is not in ROLES is still
+    found, and one that is not there at all is passed over rather than
+    guessed at.
+
+    Nothing to add on a public channel, which has no overwrites at all,
+    because there is nothing being denied for this to get around.
+    """
+    for name in (extra or ()):
+        r = _named(guild, roles, name)
+        if r is not None:
+            out[r] = talk
+    return out
+
+
+def overwrites(guild, mode, roles, hold=None, needs=BOT_NEEDS, extra=None):
     ev = guild.default_role
     deny_all  = discord.PermissionOverwrite(view_channel=False)
     read_only = discord.PermissionOverwrite(send_messages=False,
@@ -536,7 +617,7 @@ def overwrites(guild, mode, roles, hold=None, needs=BOT_NEEDS):
         for r in STAFF:
             if roles.get(r):
                 out[roles[r]] = talk
-        return with_bot(guild, out, needs)
+        return with_bot(guild, _also(guild, roles, out, extra, talk), needs)
     if mode == 'hold':
         out = {ev: deny_all}
         names = list(HOLD_STAFF)
@@ -546,26 +627,26 @@ def overwrites(guild, mode, roles, hold=None, needs=BOT_NEEDS):
             r = _named(guild, roles, n)
             if r is not None:
                 out[r] = talk
-        return with_bot(guild, out, needs)
+        return with_bot(guild, _also(guild, roles, out, extra, talk), needs)
     if mode == 'read':
         out = {ev: read_only}
         for r in STAFF:
             if roles.get(r):
                 out[roles[r]] = discord.PermissionOverwrite(send_messages=True,
                                                             manage_messages=True)
-        return with_bot(guild, out, needs)
+        return with_bot(guild, _also(guild, roles, out, extra, talk), needs)
     if mode == 'staff':
         out = {ev: deny_all}
         for r in STAFF:
             if roles.get(r):
                 out[roles[r]] = talk
-        return with_bot(guild, out, needs)
+        return with_bot(guild, _also(guild, roles, out, extra, talk), needs)
     if mode == 'pathfind':
         out = {ev: deny_all}
         for r in list(STAFF) + ['Playtester']:
             if roles.get(r):
                 out[roles[r]] = talk
-        return with_bot(guild, out, needs)
+        return with_bot(guild, _also(guild, roles, out, extra, talk), needs)
     return {}
 
 
@@ -614,7 +695,7 @@ async def ensure_channel(guild, cat, spec, roles, found):
             existing = ch
             break
     ow = overwrites(guild, spec.get('mode', 'open'), roles, spec.get('hold'),
-                    bot_needs(spec))
+                    bot_needs(spec), spec.get('extra_roles'))
 
     if existing is None and CHECK:
         say('would make', ('voice ' if kind == 'voice' else '#') + want)
@@ -676,6 +757,7 @@ async def ensure_channel(guild, cat, spec, roles, found):
         except Exception:
             pass
         await keep_bot(existing, bot_needs(spec))
+        await keep_extra(existing, spec, roles)
 
     if kind == 'announce' and isinstance(existing, discord.TextChannel):
         try:

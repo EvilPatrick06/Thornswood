@@ -660,6 +660,48 @@ yes('and the slash commands are one group of three',
     and bot.live_smoke.name == 'live-smoke'
     and 'live-smoke' in [c.name for c in bot.tree.get_commands()])
 
+# --------------------------------- the channel and the commands agree --
+#
+# Two files have to say the same thing, and on 2 October they did not:
+# bot.py let a Lead Gamemaster run /live-smoke start, and the channel it ran
+# in was pathfind, which grants STAFF and Playtester. Somebody holding only
+# that role passed the admin check and could not see the channel. So the
+# builder's plan is read here and checked against this bot's admin list:
+# anybody who may run the commands can see the place they are run in.
+import importlib.util  # noqa: E402
+
+spec = importlib.util.spec_from_file_location(
+    'build_discord', os.path.join(HERE, 'Build-Discord.py'))
+B = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(B)
+
+plan = [s for _c, specs in B.PLAN for s in specs]
+tasks = [s for s in plan if s.get('key') == 'TESTS'][0]
+gated = set(n.lower() for n in B.STAFF) | set(['playtester'])
+gated |= set(str(n).lower() for n in (tasks.get('extra_roles') or ()))
+
+yes('the builder makes the channel this bot posts sessions in',
+    tasks['name'].lower() in bot.LIVE_SMOKE_CHANNEL)
+yes('and it is role gated, never @everyone', tasks['mode'] == 'pathfind')
+yes('EVERYBODY WHO MAY RUN THE COMMANDS CAN SEE THE CHANNEL, which is the '
+    'thing that was wrong',
+    not [n for n in bot.LIVE_SMOKE_ADMIN if n not in gated])
+yes('  and the lead gamemaster role is let in by that channel\u2019s own line, '
+    'not by widening the mode',
+    set(str(n).lower() for n in tasks['extra_roles']) ==
+    set(['lead gamemaster', 'lead gm']))
+yes('  so no other pathfind channel was widened with it',
+    not any(s.get('extra_roles') for s in plan
+            if s.get('mode') == 'pathfind' and s.get('key') != 'TESTS'))
+yes('  and the roles are named, never a snowflake',
+    not any(str(n).isdigit() for n in tasks['extra_roles']))
+
+yes('test-these is retired rather than renamed into it',
+    'test-these' in B.RETIRED
+    and not [s for s in plan if s['name'].lower() == 'test-these'])
+yes('and test-results is left where it was',
+    [s['mode'] for s in plan if s['name'] == 'test-results'] == ['pathfind'])
+
 print('')
 print('%d passed, %d failed' % (len(PASS), len(FAIL)))
 sys.exit(1 if FAIL else 0)

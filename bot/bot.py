@@ -1813,7 +1813,10 @@ async def ensure_hold_panel(guild):
 # Marks are visible to everybody who can read the session thread. That is the
 # Owner's call rather than an accident, and the opener says so, so nobody
 # marks a row thinking it is private. The channel itself is pathfind in
-# Build-Discord.py: testers and staff, never @everyone.
+# Build-Discord.py: testers and staff, never @everyone, plus the lead
+# gamemaster role on that channel's own line, because the admin list below is
+# not the same list as pathfind and somebody holding only that role could
+# otherwise run a session in a channel they cannot see.
 #
 # WHO MAY START ONE. Owner, Dev and Lead Gamemaster, which is wider than
 # Owner and Dev and narrower than STAFF: a Moderator alone does not start,
