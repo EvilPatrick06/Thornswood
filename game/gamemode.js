@@ -1970,6 +1970,16 @@ const TOOLS = {
     where: 'Skyrim has no hoe, so a shovel is the tool, and a smith forges them. ' +
            'The ones that used to lean against every farm wall are gone: see the spoils block.',
     broken: 'A smith can forge you another. There is nowhere else to get one now.'
+  },
+  // fisher.md: a new fisher is handed a crude pole. Fine and master also count.
+  // A fish trap is not in this list. It is not a pole.
+  fisher: {
+    give: '15498:Thornswood-Content.esp',
+    accept: ['15498:Thornswood-Content.esp', '15499:Thornswood-Content.esp',
+             '1549a:Thornswood-Content.esp'],
+    name: 'crude fishing pole',
+    where: 'A woodwright makes them from firewood, leather strips and tundra cotton.',
+    broken: 'A woodwright can make you another. The master pole does not take dragon bone.'
   }
 };
 
@@ -2019,6 +2029,9 @@ const TOOL_AGAIN_HOURS = 12;
 */
 const TOOL_USES = 100;
 const TOOL_WARN_AT = 15;
+// Poles are 50. fisher.md. The pick, the axe and the shovel stay on TOOL_USES.
+const POLE_USES = 50;
+const FISH_TRAP_MAX = 3;
 
 /*
   When each tool was last handed to this character, keyed the same way TOOLS is.
@@ -2270,6 +2283,7 @@ function heldToolId(actorId, tool) {
 function wearTool(actorId, key) {
   const tool = toolFor(key);
   if (!tool) { return null; }
+  const limit = key === 'fisher' ? POLE_USES : TOOL_USES;
   const baseId = heldToolId(actorId, tool);
   if (!baseId) { return null; }
 
@@ -2278,7 +2292,7 @@ function wearTool(actorId, key) {
   const used = (Object.prototype.hasOwnProperty.call(stamps, wearKey)
     ? (Number(stamps[wearKey]) || 0) : 0) + 1;
 
-  if (used < TOOL_USES) {
+  if (used < limit) {
     stamps[wearKey] = used;
     try {
       mp.set(actorId, TOOL_PROPERTY, stamps);
@@ -2288,7 +2302,7 @@ function wearTool(actorId, key) {
       log('could not record', key, 'tool wear for', actorId.toString(16) + ':', e);
       return null;
     }
-    const left = TOOL_USES - used;
+    const left = limit - used;
     if (left === TOOL_WARN_AT) {
       return 'Your ' + tool.name + ' is worn thin. It has a little work left in it.';
     }
@@ -2309,7 +2323,7 @@ function wearTool(actorId, key) {
   } catch (e) {
     log('could not record the broken', key, 'tool for', actorId.toString(16) + ':', e);
   }
-  log(actorId.toString(16), 'broke a', tool.name, 'after', TOOL_USES, 'uses');
+  log(actorId.toString(16), 'broke a', tool.name, 'after', limit, 'uses');
   return 'Your ' + tool.name + ' breaks. ' + tool.broken;
 }
 
@@ -6585,6 +6599,112 @@ function harvest(actorId, refrId, baseDesc) {
  * plant gets, and the count is the pair for the fisher's rank. There is no
  * second table of thresholds: the rank on the row is the whole gate.
  */
+
+const FISH_TRAP_DESC = '1549b:Thornswood-Content.esp';
+const TRAP_PROPERTY = 'thornswoodFishTraps';
+const POLE_COVERS = {
+  '15498:Thornswood-Content.esp': 0,
+  '15499:Thornswood-Content.esp': 2,
+  '1549a:Thornswood-Content.esp': 3
+};
+
+function bestPoleCovers(actorId) {
+  let best = -1;
+  let inv = null;
+  try { inv = mp.get(actorId, 'inventory'); } catch (e) { return 3; }
+  const entries = (inv && inv.entries) || [];
+  const keys = Object.keys(POLE_COVERS);
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (!e || !(e.count > 0)) { continue; }
+    for (let j = 0; j < keys.length; j++) {
+      const baseId = idOf(keys[j]);
+      if (baseId && e.baseId === baseId && POLE_COVERS[keys[j]] > best) {
+        best = POLE_COVERS[keys[j]];
+      }
+    }
+  }
+  return best;
+}
+
+function poleTooWeak(actorId, waterRank) {
+  const named = RANK_LADDER.indexOf(waterRank);
+  const want = named < 0 ? RANK_LADDER.length - 1 : named;
+  if (bestPoleCovers(actorId) < want) {
+    return 'That water takes a finer pole. A crude pole fishes novice water, ' +
+           'a fine pole fishes through expert, and a master pole fishes every water.';
+  }
+  return null;
+}
+
+function fishTrapsOf(actorId) {
+  let v = null;
+  try { v = mp.get(actorId, TRAP_PROPERTY); } catch (e) { v = null; }
+  return Array.isArray(v) ? v.filter(function (t) { return t && typeof t === 'object'; }) : [];
+}
+
+function holdsDesc(actorId, desc) {
+  const baseId = idOf(desc);
+  if (!baseId) { return false; }
+  let inv = null;
+  try { inv = mp.get(actorId, 'inventory'); } catch (e) { return false; }
+  const entries = (inv && inv.entries) || [];
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (e && e.count > 0 && e.baseId === baseId) { return true; }
+  }
+  return false;
+}
+
+function placeFishTrap(actorId, waterRank) {
+  const refusal = classGate(actorId, 'fish');
+  if (refusal) { return { ok: false, line: refusal }; }
+  if (!holdsDesc(actorId, FISH_TRAP_DESC)) {
+    return { ok: false, line: 'You need a fish trap in your pack. A woodwright makes them. A trap is not a pole.' };
+  }
+  const set = fishTrapsOf(actorId);
+  if (set.length >= FISH_TRAP_MAX) {
+    return { ok: false, line: 'You already have ' + FISH_TRAP_MAX + ' fish traps set. Collect one before you set another.' };
+  }
+  if (!takeItem(actorId, FISH_TRAP_DESC, 1)) {
+    return { ok: false, line: 'The trap did not leave your pack, so it was not set.' };
+  }
+  set.push({ at: Date.now(), rank: String(waterRank || '') });
+  try { mp.set(actorId, TRAP_PROPERTY, set); }
+  catch (e) {
+    addItem(actorId, FISH_TRAP_DESC, 1);
+    return { ok: false, line: 'The trap could not be written down, so it is back in your pack.' };
+  }
+  let raised = null;
+  try { raised = creditWork(actorId, 'fish'); } catch (e2) { raised = null; }
+  return {
+    ok: true,
+    count: set.length,
+    line: 'You set a fish trap. ' + set.length + ' of ' + FISH_TRAP_MAX + ' are out.' +
+          (raised ? ' ' + raised : '')
+  };
+}
+
+function setFishTrap(actorId, waterRank) {
+  return placeFishTrap(actorId, waterRank);
+}
+
+function collectFishTrap(actorId) {
+  const set = fishTrapsOf(actorId);
+  if (!set.length) { return { ok: false, line: 'You have no fish trap set.' }; }
+  const trap = set.shift();
+  try { mp.set(actorId, TRAP_PROPERTY, set); }
+  catch (e) { return { ok: false, line: 'The trap is still set. It could not be collected.' }; }
+  let raised = null;
+  try { raised = creditWork(actorId, 'fish'); } catch (e2) { raised = null; }
+  return {
+    ok: true,
+    count: set.length,
+    rank: trap && trap.rank,
+    line: 'You collect a fish trap.' + (raised ? ' ' + raised : '')
+  };
+}
+
 function fish(actorId, refrId, baseDesc) {
   if (!isFish(baseDesc)) return null;
   const caught = FISH_BY_BASE[baseDesc];
@@ -6598,6 +6718,14 @@ function fish(actorId, refrId, baseDesc) {
   // tells them the wrong thing about why nothing happened.
   const refusal = classGate(actorId, 'fish');
   if (refusal) return refusal;
+
+  // A pole, after the class and before the wait. A trap is not a pole.
+  const pole = toolGate(actorId, 'fisher');
+  if (pole) return pole;
+  if (typeof poleTooWeak === 'function') {
+    const weak = poleTooWeak(actorId, caught.rank);
+    if (weak) return weak;
+  }
 
   /*
     The record's rank. indexOf answers 0 for a novice record, so the eleven
@@ -6655,6 +6783,7 @@ function fish(actorId, refrId, baseDesc) {
            'put in your hands. Say so in the dev channel.';
   }
   const rank = creditWork(actorId, 'fish');
+  const worn = wearTool(actorId, 'fisher');
   /*
     One row in fifteen is called the same thing as what it gives: the butchered
     horker on Solstheim, DLC2HorkerMeat01, is named 'Horker meat' in the records
@@ -6665,7 +6794,7 @@ function fish(actorId, refrId, baseDesc) {
   const doubled = String(caught.from).toLowerCase() === String(caught.name).toLowerCase();
   const where = doubled ? 'the water' : 'the ' + caught.from;
   return 'You take ' + got + ' ' + caught.name + ' out of ' + where + '.' +
-         (rank ? ' ' + rank : '');
+         (rank ? ' ' + rank : '') + (worn ? ' ' + worn : '');
 }
 
 /**
@@ -9908,6 +10037,13 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   };
 
   // ==== end RECIPES_BY_ID ====
+
+// Poles and the trap. Not inside the generated recipe block, so a rebuild of
+// that block does not drop the gate. Ingredients live on the COBJ records.
+RECIPES_BY_ID['1549c:Thornswood-Content.esp'] = { out: '15498:Thornswood-Content.esp', name: 'Crude Fishing Pole', type: 'MISC', makes: 1, owner: 'Woodworker', half: 'Woodwright', race: '', rank: 'novice', family: 'Other goods', open: true };
+RECIPES_BY_ID['1549d:Thornswood-Content.esp'] = { out: '15499:Thornswood-Content.esp', name: 'Fine Fishing Pole', type: 'MISC', makes: 1, owner: 'Woodworker', half: 'Woodwright', race: '', rank: 'expert', family: 'Other goods', open: true };
+RECIPES_BY_ID['1549e:Thornswood-Content.esp'] = { out: '1549a:Thornswood-Content.esp', name: 'Master Fishing Pole', type: 'MISC', makes: 1, owner: 'Woodworker', half: 'Woodwright', race: '', rank: 'master', family: 'Other goods', open: true };
+RECIPES_BY_ID['1549f:Thornswood-Content.esp'] = { out: '1549b:Thornswood-Content.esp', name: 'Fish Trap', type: 'MISC', makes: 1, owner: 'Woodworker', half: 'Woodwright', race: '', rank: 'novice', family: 'Other goods', open: true };
 
   // ==== ITEM_NAMES ====
   /* Built by scripts\dev\Build-ItemNameTable.js out of game\data\recipes.json. Do not hand edit.
@@ -25944,6 +26080,15 @@ mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recip
 
   // A recipe nobody owns. 1,679 of them, and they are the stock every trade
   // needs: ingots, leather, tanning, smelting. Straight through.
+  if (desc === '1f24f:FishingInSkyrim.esp' ||
+      desc === '2180d:FishingInSkyrim.esp' ||
+      desc === '1f252:FishingInSkyrim.esp') {
+    const no = "That rod belongs to the fishing mod. A woodwright makes a crude, fine or master pole. The master pole does not take dragon bone.";
+    notify(actorId, no);
+    say(actorId, no);
+    return false;
+  }
+
   if (!isRecipe(desc)) { return; }
   const row = RECIPES_BY_ID[desc];
   if (!row || typeof row !== 'object') { return; }
