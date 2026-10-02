@@ -745,6 +745,16 @@ try {
     # (LIVE_SMOKE_EXPORT). It was on main and never on the box.
     Yes '  and the live smoke''s export went up beside bot.py' (
         (Get (Join-Path $botRoot 'live-smoke-discord-export.json')) -eq '{ "channels": [] }')
+    # And the run says so itself, asking the box for the full path under the
+    # root the swap moved the files to. A green run once left the export and
+    # data\bot.log reported missing from the install root with nothing in the
+    # run saying what that folder held, so there was no telling a swap that
+    # lost files from a Test-Path typed on the wrong machine.
+    Yes '  and the run proves it on the box, by full path, for every file it sent and for data\bot.log' (
+        $r.Said -match 'FILES ON THE BOX' -and
+        $r.Said -match ([regex]::Escape('Test-Path ' + (Join-Path $botRoot 'live-smoke-discord-export.json')) + '\s+True') -and
+        $r.Said -match ([regex]::Escape('Test-Path ' + $botLog) + '\s+True') -and
+        $r.Said -match 'Test-Path .*bot\.py\s+True')
     $prev = @(Kept $botRoot '.prev-*')
     Yes '  and the old bot.py is kept in .prev' ($prev.Count -eq 1 -and (Get (Join-Path $prev[0] 'bot.py')) -match 'bot v1')
     if ($script:fail -gt $failed) { Show }
@@ -798,7 +808,8 @@ try {
         $gone -and $r.Ok -and $r.Said -match 'SWAP OK' -and $r.Said -match 'made an empty .*data.bot\.log')
     Yes '  and the service was started, and the new bot says it is watching' (
         $r.Said -match 'started the service ThornswoodTestBot' -and (WaitFor { BotSays 'bot v5' }))
-    Yes '  and data\bot.log is on the box afterwards, which is the path the docs name' (Test-Path -LiteralPath $botLog)
+    Yes '  and data\bot.log is on the box afterwards, which is the path the docs name, and the run says True for it' (
+        (Test-Path -LiteralPath $botLog) -and $r.Said -match ([regex]::Escape('Test-Path ' + $botLog) + '\s+True'))
     if ($script:fail -gt $failed) { Show }
 
     # A bot.log beside the code and none in data, which is the layout of a box
