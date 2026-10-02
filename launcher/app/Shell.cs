@@ -2171,7 +2171,7 @@ namespace Thornswood
             if (btnDowngrade != null) btnDowngrade.Click += delegate { RunDowngrade(); };
             btnInstallNow.Click += delegate
             {
-                if (collectionBarUp)
+                if (collectionBarUp || (collectionNoteUp && !updatePending))
                 {
                     try { Process.Start(new ProcessStartInfo(cfg.CollectionUrl) { UseShellExecute = true }); }
                     catch (Exception ex) { Log("Could not open the collection: " + ex.Message); }
@@ -2873,6 +2873,49 @@ namespace Thornswood
                 btnInstallNow.Content = "Install now";
                 updateBar.Visibility = Visibility.Collapsed;
                 btnInstallNow.Visibility = Visibility.Collapsed;
+            }
+
+            // Mods that could not be confirmed (Djinn, 2 Oct). CollectionProblem
+            // answers "" when it cannot read the revision Vortex installed, which
+            // left no card and no way to the collection on this page at all.
+            // This is a note, not a hold: Play is not shut for it, because a
+            // revision that cannot be read is not proof the mods are wrong.
+            if (updateBar != null && btnInstallNow != null && !collectionBarUp && !updatePending &&
+                !wrongBuild && !playing && !playBar.Active)
+            {
+                bool unsure = CollectionUnconfirmed();
+                if (unsure && (collectionNoteUp || updateBar.Visibility != Visibility.Visible))
+                {
+                    txtUpdateTitle.Text = "Your mods could not be confirmed";
+                    txtUpdateNote.Text =
+                        "The launcher could not read which revision of the Thornswood collection " +
+                        "Vortex has installed. If you have not installed it, or are not sure, open " +
+                        "the collection and let Vortex install or update it. Play is not held for this.";
+                    btnInstallNow.Content = "Open the collection";
+                    btnInstallNow.IsEnabled = true;
+                    updateBar.Visibility = Visibility.Visible;
+                    btnInstallNow.Visibility = Visibility.Visible;
+                    collectionNoteUp = true;
+                }
+                else if (!unsure && collectionNoteUp)
+                {
+                    collectionNoteUp = false;
+                    btnInstallNow.Content = "Install now";
+                    updateBar.Visibility = Visibility.Collapsed;
+                    btnInstallNow.Visibility = Visibility.Collapsed;
+                }
+            }
+            else if (collectionNoteUp)
+            {
+                // An update or the collection card took the bar, or the game is
+                // running: the note steps aside and leaves the bar to them.
+                collectionNoteUp = false;
+                if (!collectionBarUp && !updatePending && updateBar != null && btnInstallNow != null)
+                {
+                    btnInstallNow.Content = "Install now";
+                    updateBar.Visibility = Visibility.Collapsed;
+                    btnInstallNow.Visibility = Visibility.Collapsed;
+                }
             }
 
             // Wrong Skyrim build: the one thing on this page with a button that
@@ -5742,6 +5785,24 @@ namespace Thornswood
         }
 
         static bool collectionBarUp = false;
+
+        /// <summary>The not-confirmed note is on the bar above Play (see DrawStatus).</summary>
+        static bool collectionNoteUp = false;
+
+        /// <summary>
+        /// True when CollectionProblem found nothing wrong only because it could
+        /// not read which collection revision Vortex installed (Djinn, 2 Oct).
+        /// </summary>
+        static bool CollectionUnconfirmed()
+        {
+            if (string.IsNullOrEmpty(cfg.CollectionUrl)) return false;
+            try
+            {
+                if (CollectionProblem().Length > 0) return false;
+                return Checks.CollectionRevision(cfg) <= 0;
+            }
+            catch (Exception ex) { Swallow.Note("Shell.CollectionUnconfirmed", ex); return false; }
+        }
 
         /// <summary>
         /// Turns the bar above Play into the one thing worth doing first. Same
