@@ -219,8 +219,13 @@ function Run {
         (Newer ' 1.1.93 ' '1.1.92') -eq $true -and (Newer '1.1.92 ' '1.1.92') -eq $false)
     Yes 'IsNewer: a feed with no launcher version offers nothing' (
         (Newer $null '1.1.92') -eq $false -and (Newer '' '1.1.92') -eq $false)
-    # "rather than refusing an update nobody can then install"
-    Yes 'IsNewer: a version it cannot read is still offered, rather than never installable' ((Newer '1.1.93-rc' '1.1.92') -eq $true)
+    # A version that does not parse is not an update just because the text
+    # differs. Older unreadable text used to install (#1329).
+    Yes 'IsNewer: a version it cannot read is not an update' ((Newer '1.1.93-rc' '1.1.92') -eq $false)
+    Yes 'IsNewer: an older unreadable version is not an update' ((Newer '1.1.91-rc' '1.1.92') -eq $false)
+    Yes 'IsNewer: a readable number does not beat an unreadable local' ((Newer '1.1.93' '1.1.92-rc') -eq $false)
+    Yes 'IsNewer: two different unreadable versions are not an update' ((Newer 'abc' 'def') -eq $false)
+    Yes 'IsNewer: the same unreadable text is not an update' ((Newer '1.1.91-rc' '1.1.91-rc') -eq $false)
 
     $version = [string]$U.GetField('Version', $flags).GetValue($null)
     Yes "IsNewer: this launcher's own version, $version, is one it can read" ((PartsText $version) -ne 'null')
@@ -413,7 +418,6 @@ function Run {
     # Measured here and written down, not asserted: each is a decision about
     # Updater.cs, which is one of the six shared files.
     Write-Host ''
-    Known ("IsNewer('1.1.91-rc', '1.1.92') is {0}. A number it cannot read falls back to ""different means newer"", the rule the comment above IsNewer retired because different includes older. Nothing this toolchain writes has letters in it (Build-Launcher.ps1 reads the version as [0-9.]+), so today's feed cannot reach it." -f (Newer '1.1.91-rc' '1.1.92'))
     Known ("Inside('C:\Thornswood\Game\..\..\Windows\x', 'C:\Thornswood\Game') is {0}, and Inside('C:\Thornswood\Game\x', 'C:/Thornswood/Game') is {1}. It compares text and resolves neither side. Every caller resolves the path with Path.GetFullPath first, which is why the resolved lines above stay out; a new caller that forgets gets the first answer, and a folder written with forward slashes would fence everything out." -f (Within 'C:\Thornswood\Game\..\..\Windows\x' 'C:\Thornswood\Game'), (Within 'C:\Thornswood\Game\x' 'C:/Thornswood/Game'))
     $other = Refusal 'https://github.com/someone-else/anything/releases/download/v1/a.zip'
     Known ("CheckUrl on another account's upload, github.com/someone-else/anything/releases/download/v1/a.zip, is {0}. The list pins the host and not the owner, the checksum comes from the same feed, and ExpectedSigner is empty, so a feed that names somebody else's file is fetched and run." -f $(if ($null -eq $other) { 'let through' } else { "refused ($other)" }))
