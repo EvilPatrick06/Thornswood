@@ -1,7 +1,9 @@
 // test-one-mint.js
 //
-// Coin comes into the world in exactly one place. Everything else in the
-// server only moves it from one pack to another or takes it away.
+// Authorized coin sources are explicit and bounded. A character gets forty
+// once; dungeon rewards use fixed tier ranges and durable return reservations.
+// Merchant NPC starting purses are checked by test-npc-merchant-purses.js and
+// test-merchant-ledger-storage.js; buying and selling are not enabled yet.
 //
 // Entry 326 on the To Do List is the economy with a bottom: traders who start
 // with a purse and buy and sell against it, "so coin moves between people
@@ -412,8 +414,13 @@ for (const at of Object.keys(WRITERS)) {
     callers.push(where(match.index));
   }
   callers.sort();
-  yes('atomic item bundles are only paid by fish, hanging game and carcass harvests',
-      callers.join(',') === 'outer/fish,outer/game,outer/loot');
+  yes('atomic item bundles are only paid by the checked dungeon reward and three harvests',
+      callers.join(',') === 'dungeon loot/give,outer/fish,outer/game,outer/loot');
+  const reward=bodyOf('dungeon loot/give') || '';
+  yes('the dungeon reward bundles its fixed gold and rolled goods into one inventory write',
+      /goods=\[\{item:GOLD_DESC,count:rolled.gold\}\]/.test(reward) &&
+      /addItemsAtomic\(actorId,goods\)/.test(reward) &&
+      /var GOLD_SPAN = \{ 1: \[5, 15\], 2: \[12, 35\], 3: \[25, 70\], 4: \[50, 120\] \};/.test(code));
 }
 
 {
@@ -505,7 +512,12 @@ function goldDescriptors(text) {
     return a < 0 || b < 0 ? null : text.slice(0, a) + text.slice(b + end.length);
   }
   const noItems = cut(src, '  // ==== ITEM_NAMES ====', '  // ==== end ITEM_NAMES ====');
-  const outside = noItems && cut(noItems, '  // ==== ADMIN_NAMES ====', '  // ==== end ADMIN_NAMES ====');
+  const noAdmin = noItems && cut(noItems, '  // ==== ADMIN_NAMES ====', '  // ==== end ADMIN_NAMES ====');
+  const outside = noAdmin && cut(noAdmin,'// ==== thornswood dungeon loot ====','// ==== end thornswood dungeon loot ====');
+  const dungeon=lift('// ==== thornswood dungeon loot ====','// ==== end thornswood dungeon loot ====');
+  const dungeonGold=goldDescriptors(dungeon || '');
+  yes('the checked dungeon reward names exactly one gold descriptor as GOLD_DESC',
+      dungeonGold.gold.length===1 && /var GOLD_DESC = 'f:Skyrim.esm';/.test(dungeon || ''));
   yes('the testers\' two tables were found and set aside', !!outside);
   const inside = goldDescriptors(src);
   yes('and they do name gold, so /give gold works for a tester', inside.gold.length > 0);
@@ -516,7 +528,7 @@ function goldDescriptors(text) {
       real.all.has('3ad74:Skyrim.esm') && real.all.has('5acdb:Skyrim.esm') &&
       real.all.has('34cdf:Skyrim.esm') && real.all.has('1be1a:Skyrim.esm') &&
       real.all.has('d62:Hothtrooper44_ArmorCompilation.esp'));
-  yes('and outside the testers\' tables not one of them is gold' +
+  yes('and outside the testers\' tables and checked dungeon reward not one of them is gold' +
       (real.gold.length ? ': ' + real.gold.slice(0, 5).join(', ') : ''),
       real.gold.length === 0);
   if (outside) {

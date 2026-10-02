@@ -35133,6 +35133,28 @@ log('gamemode loaded:',
   };
   var PROP = 'thornswoodDungeonLoot';
   var GOLD_DESC = 'f:Skyrim.esm';
+  if(g.__thornswoodDungeonLoot && g.__thornswoodDungeonLoot.shutdown) g.__thornswoodDungeonLoot.shutdown();
+  var active=true,storage=null,ledger=null;
+  try {
+    var cfgDungeon=mp.getServerSettings();
+    if(String(cfgDungeon.thornswoodServer || '').toLowerCase()==='dev') {
+      storage=createPrivateEconomyLedger(require('fs'),require('path'),cfgDungeon,'dungeon-rewards',[]);
+      ledger=storage.load();
+      if(!ledger || ledger.version!==1 || !ledger.entries || typeof ledger.entries!=='object' || Array.isArray(ledger.entries))
+        throw new Error('Invalid dungeon reward ledger');
+      for(var key of Object.keys(ledger.entries)) {
+        var saved=ledger.entries[key];
+        if(!/^[0-9a-f]{1,8}:[^:]+\.es[mpl]$/i.test(key)) throw new Error('Invalid dungeon reward identity');
+        if(saved && saved.legacy===true && Number.isSafeInteger(saved.at) && saved.at>0 &&
+            Object.keys(saved).length===2) continue;
+        if(!saved ||
+          !Number.isSafeInteger(saved.at) || saved.at<=0 || !Number.isInteger(saved.actor) || saved.actor<=0 ||
+          !Number.isInteger(saved.tier) || saved.tier<1 || saved.tier>4 ||
+          !Number.isInteger(saved.gold) || saved.gold<GOLD_SPAN[saved.tier][0] || saved.gold>GOLD_SPAN[saved.tier][1] ||
+          !Array.isArray(saved.items)) throw new Error('Invalid dungeon reward reservation');
+      }
+    }
+  } catch(error) { active=false;console.log('[dungeon] rewards unavailable: '+error); }
   var LOOT_WORD = new RegExp('chest|urn|coffin|sarcophag|strongbox|coffer|safe|knapsack', 'i');
   var SKIP_WORD = new RegExp('barrel|sack|cupboard|dresser|endtable|wardrobe|shelf|crate|basket|drawer|nightstand', 'i');
 
@@ -35614,17 +35636,11 @@ log('gamemode loaded:',
   }
 
   function give(actorId, rolled) {
-    var ok = false;
-    if (rolled.gold > 0) {
-      try { if (addItem(actorId, GOLD_DESC, rolled.gold)) ok = true; } catch (e) { ok = false; }
+    var goods=[{item:GOLD_DESC,count:rolled.gold}];
+    for(var item of rolled.items) goods.push({item:item.desc,count:item.count});
+    try {return addItemsAtomic(actorId,goods);} catch(error) {
+      console.log('[dungeon] reserved reward inventory write failed: '+error);return false;
     }
-    var items = rolled.items || [];
-    for (var i = 0; i < items.length; i++) {
-      try {
-        if (addItem(actorId, items[i].desc, items[i].count)) ok = true;
-      } catch (e2) { /* this one did not land; the rest still try */ }
-    }
-    return ok;
   }
 
   /*
@@ -35633,8 +35649,14 @@ log('gamemode loaded:',
     container, so the stripper cannot take the gold out again.
   */
   function onChest(actorId, refrId) {
+    if(!active || !ledger) return null;
     if (!actorId || !refrId) return null;
     if (refrId >= 0xff000000) return null;
+    try {
+      var actorState=mp.getNpcAIState(actorId);
+      if(!actorState || (!actorState.isHuman && !(actorState.profileId>0)) || actorState.isDead ||
+        actorState.isDisabled || !withinResourceReach(actorId,refrId)) return null;
+    } catch(error) {return null;}
     var cell = '';
     try { cell = String(mp.get(actorId, 'worldOrCellDesc') || ''); } catch (e) { return null; }
     var tier = tierOf(cell);
@@ -35645,13 +35667,32 @@ log('gamemode loaded:',
     try { baseId = idOf(baseDesc); } catch (e3) { return null; }
     if (!baseId || !isLootContainer(baseId)) return null;
     var now = Date.now();
-    var last = 0;
-    try { last = Number(mp.get(refrId, PROP)) || 0; } catch (e4) { return null; }
+    var reference='';
+    try {reference=mp.getDescFromId(refrId);} catch(error) {return null;}
+    if(typeof reference!=='string' || !/^[0-9a-f]{1,8}:[^:]+\.es[mpl]$/i.test(reference)) return null;
+    var prior=ledger.entries[reference],last=prior ? prior.at : 0;
+    if(!prior) {
+      var legacy=0;
+      try {legacy=mp.get(refrId,PROP);} catch(error) {return null;}
+      if(legacy!==null && legacy!==undefined && legacy!==0) {
+        if(!Number.isSafeInteger(legacy) || legacy<=0) return null;
+        var migrated=JSON.parse(JSON.stringify(ledger));
+        migrated.entries[reference]={at:legacy,legacy:true};
+        try {storage.save(migrated);} catch(error) {return null;}
+        ledger=migrated;last=legacy;
+      }
+    }
     var wait = RETURN_MIN[tier] * 60000;
     if (last && (now - last) < wait) return null;
     var rolled = roll(tier, Math.random);
+    var next=JSON.parse(JSON.stringify(ledger));
+    next.entries[reference]={at:now,actor:actorId,tier:rolled.tier,gold:rolled.gold,items:rolled.items};
+    // Reserve durably before touching inventory. An uncertain native write
+    // cannot be replayed by reopening, reload or loss of its cooldown mirror.
+    try {storage.save(next);} catch(error) {console.log('[dungeon] reservation failed: '+error);return null;}
+    ledger=next;
+    try {mp.set(refrId,PROP,now);} catch(error) {console.log('[dungeon] cooldown mirror failed: '+error);}
     if (!give(actorId, rolled)) return null;
-    try { mp.set(refrId, PROP, now); } catch (e5) { /* paid, and the mark missed; the log says so */ }
     var line = heldLine(rolled);
     if (line) {
       try { say(actorId, line); } catch (e6) { /* the pile is already in the pack */ }
@@ -35663,6 +35704,7 @@ log('gamemode loaded:',
   }
 
   g.__thornswoodDungeonLoot = {
+    shutdown:function(){active=false;},
     roll: roll,
     onChest: onChest,
     tierOf: tierOf,
@@ -47938,6 +47980,10 @@ catch(error) { log('Shared resource stock could not start: '+error); }
 
 // NPC MERCHANT PURSES BEGIN
 function createPrivateMerchantLedger(fs,path,settings,references) {
+  return createPrivateEconomyLedger(fs,path,settings,'merchant',references);
+}
+function createPrivateEconomyLedger(fs,path,settings,name,references) {
+  if(name!=='merchant' && name!=='dungeon-rewards') throw new Error('Unknown private economy ledger');
   const dir=path.resolve(settings.privDir || 'private'),served=path.resolve(settings.dataDir || 'data');
   function realPath(input) {
     let existing=input;const tail=[];
@@ -47954,7 +48000,7 @@ function createPrivateMerchantLedger(fs,path,settings,references) {
       throw new Error('Merchant ledger must be outside served resources');
   }
   checkPrivate();
-  const file=path.join(dir,'merchant-ledger.json'),marker=path.join(dir,'merchant-ledger.initialized');
+  const file=path.join(dir,name+'-ledger.json'),marker=path.join(dir,name+'-ledger.initialized');
   const checksum=doc=>require('crypto').createHash('sha256').update(JSON.stringify([doc.version,doc.entries])).digest('hex');
   function save(doc) {
     checkPrivate();
@@ -47969,7 +48015,7 @@ function createPrivateMerchantLedger(fs,path,settings,references) {
     checkPrivate();
     if(!fs.existsSync(file)) {
       if(fs.existsSync(marker)) throw new Error('Saved merchant ledger is missing');
-      if(!Array.isArray(references) || !references.length || new Set(references).size!==references.length)
+      if(!Array.isArray(references) || (name==='merchant' && !references.length) || new Set(references).size!==references.length)
         throw new Error('Merchant initialization manifest is required');
       const entries=Object.create(null);
       for(const reference of references) entries[reference]=null;
