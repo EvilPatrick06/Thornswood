@@ -2593,7 +2593,72 @@ function drawInbox() {
 }
 
 /* ---------------------------------------------------------------- open -- */
-marked.setOptions({ breaks:false, gfm:true });
+/* Hub markdown goes into innerHTML. Match site/server.js makePageRenderer:
+   no raw HTML tokens, and only http/https/mailto on links and images. (#1327) */
+(function hardenMarked() {
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function escOnce(s) {
+    return String(s == null ? '' : s)
+      .replace(/&(?!#\d{1,7};|#[Xx][0-9A-Fa-f]{1,6};|\w+;)/g, '&amp;')
+      .replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function address(href) {
+    var h;
+    try { h = encodeURI(String(href == null ? '' : href)).replace(/%25/g, '%'); }
+    catch (e) { return null; }
+    var scheme = /^([^:/?#]*):/.exec(h);
+    if (scheme && !/^(https?|mailto)$/i.test(scheme[1])) return null;
+    return esc(h);
+  }
+  function hrefOf(token, fallback) {
+    if (token && typeof token === 'object' && 'href' in token) return token.href;
+    return fallback;
+  }
+  function titleOf(token, fallback) {
+    if (token && typeof token === 'object' && 'title' in token) return token.title;
+    return fallback;
+  }
+  function textOf(token, fallback) {
+    if (token && typeof token === 'object' && 'text' in token) return token.text;
+    return fallback;
+  }
+  marked.setOptions({ breaks: false, gfm: true });
+  marked.use({
+    tokenizer: {
+      html: function () { return undefined; },
+      tag: function () { return undefined; }
+    },
+    renderer: {
+      html: function (token) {
+        var text = typeof token === 'string' ? token : textOf(token, '');
+        var block = token && typeof token === 'object' && token.block;
+        return block ? '<p>' + esc(text) + '</p>\n' : esc(text);
+      },
+      link: function (token, title, text) {
+        var href = hrefOf(token, token);
+        var tit = titleOf(token, title);
+        var body = textOf(token, text);
+        var to = address(href);
+        if (to === null) return body || '';
+        return '<a href="' + to + '"' + (tit ? ' title="' + escOnce(tit) + '"' : '') + '>' + (body || '') + '</a>';
+      },
+      image: function (token, title, text) {
+        var href = hrefOf(token, token);
+        var tit = titleOf(token, title);
+        var body = textOf(token, text);
+        var to = address(href);
+        if (to === null) return escOnce(body || '');
+        return '<img src="' + to + '" alt="' + escOnce(body || '') + '"' +
+               (tit ? ' title="' + escOnce(tit) + '"' : '') + '>';
+      }
+    }
+  });
+})();
 
 // Discord sends people back here with a word about how it went.
 (function () {
