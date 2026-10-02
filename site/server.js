@@ -1323,12 +1323,70 @@ async function galleryStaff(url, w) {
 }
 
 // ----------------------------------------------------------------- plumb --
+/*
+  What a browser is allowed to do with an answer from here (#1366).
+
+  Every answer carried Cache-Control and nosniff and nothing else, so nothing
+  said who may draw one of our pages inside a frame, where one of our
+  addresses may be sent as a referrer, or where a script running on one of
+  our pages may be fetched from. Three headers close all three, and none of
+  them asks for the pages to be rewritten first.
+
+  Referrer-Policy. A hub address says who is reading it (/uploads, the board
+  and document doors), and the public pages link out to Discord and Patreon,
+  which were handed the whole address somebody left from. strict-origin-when-
+  cross-origin sends another site https://thornswood.net and nothing after
+  it, keeps the full address on links within the site, and sends nothing at
+  all from a secure page to a plain one.
+
+  frame-ancestors, with X-Frame-Options beside it for anything that reads no
+  policy. Nobody may put the hub in a frame under their own buttons and take
+  a click on Approve, Reject or Delete that way.
+
+  The policy itself is the part that stops a script nobody agreed to. An
+  advertising tag reached every public page in September because a page may
+  load a script from anywhere and nothing here said otherwise; it was taken
+  out by hand. script-src 'self' is what makes that a blocked request rather
+  than a thing somebody has to notice.
+
+  WHY 'unsafe-inline' IS IN IT, and what it would take to drop. Both pages
+  are a single file each with their script and their styling written inside
+  them (two script blocks in home.html, one in index.html, a style block in
+  each, and style attributes in both, as well as in the small pages server.js
+  writes itself). A policy without it is a blank site, so holding the line at
+  'self' is what can go out today and a nonce in place of 'unsafe-inline' is
+  what the pages have to be rewritten for. Everything else is this site and
+  nothing else: no other host for a script, a style, a font, a picture, a
+  media file or an answer to a fetch, which is the half the tag came through.
+  data: and blob: pictures stay, because the gallery form draws what somebody
+  picked before it is sent (home.html) and the ridged backdrop is an svg
+  written into the stylesheet. object-src and base-uri close the two old ways
+  round a policy, and form-action keeps a form on the site.
+
+  tests\test-site-headers.js reads the pages for anything the policy would
+  block and asks a running copy for the headers themselves, so a page that
+  starts needing another host fails there rather than in somebody's browser.
+*/
+const GUARD = {
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'X-Frame-Options': 'SAMEORIGIN',
+  'Content-Security-Policy': [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'self'"
+  ].join('; ')
+};
 function send(res, code, payload, type, extra) {
   res.writeHead(code, Object.assign({
     'Content-Type': type || 'application/json; charset=utf-8',
-    'Cache-Control': 'no-store',
-    'X-Content-Type-Options': 'nosniff'
-  }, extra || {}));
+    'Cache-Control': 'no-store'
+  }, GUARD, extra || {}));
   res.end(payload);
 }
 const sendJson = (res, code, obj) => send(res, code, JSON.stringify(obj));
@@ -3224,6 +3282,17 @@ process.on('uncaughtException', (e) => {
 });
 
 async function handle(req, res) {
+  /* The guard headers above on every answer, not only the ones send() writes
+     (#1366). The streamed answers (a picture, the installer, a feed asset),
+     the 304s, a byte range and the 400 for an address that cannot be read
+     all write their own headers, and Node keeps a setHeader value through a
+     later writeHead, so this one line covers them. Set before anything else
+     happens, because the address is read next and a bad one is answered
+     straight away. */
+  try {
+    for (const name of Object.keys(GUARD)) { res.setHeader(name, GUARD[name]); }
+  } catch (e) { }
+
   /* The address is a path on this site, so it is read as one (#929).
 
      new URL(req.url, 'http://x') read an address that starts with two slashes
