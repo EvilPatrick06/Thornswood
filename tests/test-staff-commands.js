@@ -391,6 +391,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-staff-'));
 const KEY = crypto.randomBytes(32).toString('hex');
 fs.writeFileSync(path.join(dir, 'token-key.txt'), KEY);
 fs.copyFileSync(VOICE, path.join(dir, 'voice-server.js'));
+fs.copyFileSync(path.join(path.dirname(VOICE), 'headlines.js'), path.join(dir, 'headlines.js'));
 const srv = spawn(process.execPath, ['voice-server.js'], {
   cwd: dir,
   env: Object.assign({}, process.env, {
