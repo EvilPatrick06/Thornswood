@@ -27899,11 +27899,15 @@ log('gamemode loaded:',
   that is down, a site that would not issue a pass. Each leaves a session with
   no valid pass, and the log says which.
 
-  WATCHING UNTIL IT IS SWITCHED ON. thornswoodRequirePass true in
-  server-settings.json ends sessions; anything else writes WOULD REFUSE and
-  lets them stay, so the server can go out before a launcher that fetches the
-  pass does. Deploy-DevGamemode.ps1 -RequirePass on|off sets it on the dev box.
-  No older launcher or plugin is kept working once it is on (Patrick, 28 Sep).
+  THE SESSION IS ENDED EITHER WAY (#937). A profile with no valid pass
+  at the end of the grace is told one line and ended. thornswoodRequirePass
+  does not decide that. Absent, or any other value, used to write WOULD
+  REFUSE and let them stay. An older launcher never gets a pass, because the
+  site signs one only from the channel minLauncher up to that feed's current
+  launcher, so that session is the same refusal. The setting still decides
+  the hold (#410): with it on, nothing the session does counts until the pass
+  arrives. Deploy-DevGamemode.ps1 -RequirePass on|off sets the hold on the
+  dev box. No older launcher or plugin is kept working (Patrick, 28 Sep).
 */
 (function () {
   var g = globalThis;
@@ -28049,11 +28053,6 @@ log('gamemode loaded:',
       judged.push(pid);
       var why = passKey(now) ? 'no valid join pass in ' + Math.round((now - e.joined) / 1000) + 's online'
                              : 'this server has no join pass key in door.json';
-      if (!requiring()) {
-        console.log('[thornswood] WOULD REFUSE profile ' + pid + ': ' + why +
-                    '. Watching only, they stayed (thornswoodRequirePass is not true).');
-        continue;
-      }
       tell(pid, SENTENCE);
       console.log('[thornswood] refusing profile ' + pid + ': ' + why);
       refuseLater(pid, e.actorId);
