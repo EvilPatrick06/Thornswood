@@ -6,10 +6,8 @@ require standing there.
 
 ## Where a board is
 
-A board is a place: a cell and a point. It is not a placed record, so
-nothing has to be packed to every client to move one.
-
-You are at it when you are within 400 of that point.
+The object is the message board. One stands at each of the nine spots.
+You are at it when you are within 400 of that board. Click the board.
 
 A steward moves it. `/board move whiterun`, standing where it should
 be. `/board here` moves the one you are already at. A board a steward
@@ -98,7 +96,7 @@ somebody has taken stays up until they hand it back.
 
 ## Where this is
 
-The board is a panel. Stand at the spot and click it. Notices, jobs,
+The board is a panel. Stand at the message board and click it. Notices, jobs,
 taking one, taking your own down, handing a job back, and leaving a
 price list are on that panel. Walking away closes it. The panel sends
 the same words the server already answers. A steward still moves a
