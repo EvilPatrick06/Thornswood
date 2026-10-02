@@ -71,5 +71,16 @@ reference to that service. It does not start an empty ledger. Renaming a
 book or editing its prices keeps its earlier submitted copy valid.
 
 Posting is 20 and 30 for everybody. Rent is the only debt the box pays
-down. Traders do not yet buy and sell from a purse the server tracks.
-NPC purses, stock and custom quests remain the work to finish.
+down. The 249 retained, authored traders receive their one-time 250 balance
+and empty stock when admitted by the Dev server controller. The authoritative
+ledger is in the private folder, with atomic replacement, integrity checking
+and a record of references not yet initialized. The per-NPC property mirrors
+it. A lost NPC save restores the ledger balance, including zero, rather than
+handing out 250 again. Missing or damaged ledger state refuses service.
+The initial merchant total is 62,250 gold across those 249 references. The
+server's minute report lists the verified count and first-time grants.
+Failed startup revokes the new service; paths into served resources, including
+Windows junctions, are refused before any ledger is written.
+
+Buying, selling and quest payments are not enabled by that initialization.
+The verified transfer path, merchant panel and custom quests remain to finish.
