@@ -370,7 +370,7 @@ yes('B3 it is the banner and not the starfield: the sunset is in the top '
 # than the machine that made the committed file, and a JPEG decoder or a
 # resize can move a pixel by one. Measured 0.000 on the same Pillow; the
 # starfield against the banner is 26.9.
-maker = os.path.join(HERE, 'make-join-card.py')
+maker = os.path.normpath(os.path.join(HERE, '..', 'scripts', 'oneoff', 'make-join-card.py'))
 built_path = os.path.join(tempfile.mkdtemp(prefix='ts-card-'), 'built.png')
 try:
     r = subprocess.run([sys.executable, maker, '--out', built_path],
@@ -385,7 +385,7 @@ try:
             b = bg.tobytes()
             diff = sum(abs(x - y) for x, y in zip(a, b)) / float(len(a))
     yes('B4 make-join-card.py builds the background that is committed, from '
-        'the banner beside it (mean difference %s)' % (
+        'the banner in bot/ (mean difference %s)' % (
             '%.3f' % diff if diff is not None else 'none, it did not build'),
         diff is not None and diff < 2.0)
 finally:
