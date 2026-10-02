@@ -2017,7 +2017,7 @@ const TOOL_AGAIN_HOURS = 12;
   cannot be read, or the tool is not in it, the swing wears nothing rather than
   breaking something at random.
 */
-const TOOL_USES = 100;
+const TOOL_USES = 50;
 const TOOL_WARN_AT = 15;
 
 /*
