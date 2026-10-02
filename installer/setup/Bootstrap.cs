@@ -1421,10 +1421,10 @@ namespace ThornswoodSetup
                 string sz = Between(doc, "\"size\":", ",");
                 if (sz.Length == 0) sz = Between(doc, "\"size\":", "}");
                 long.TryParse(sz.Trim(), out size);
-                // What Publish-Installer measured on the zip it sent.
-                // A site from before this carries no such field and the string
-                // search comes back empty, which PayloadMatches reads as
-                // nothing to check.
+                // What Publish-Installer measured on the zip it sent. A site
+                // that carries no such field, or an empty one, leaves this
+                // empty, and nothing is fetched: the bytes behind this url are
+                // unpacked and run, so there is nothing to measure them with.
                 sha = Between(doc, "\"sha256\":\"", "\"").Trim();
             }
             catch (Exception e)
@@ -1433,7 +1433,10 @@ namespace ThornswoodSetup
                                     "connection and run this again. (" + e.Message + ")");
             }
             if (url.Length == 0) throw new Exception("The site is not offering a download right now. Try again in a bit.");
-            if (!url.StartsWith("http")) url = Site + url;
+            url = PayloadUrl(Site, url);
+            if (sha.Length == 0)
+                throw new Exception("The site is not saying what the download should measure, so nothing has been " +
+                                    "fetched and nothing was run. Try again in a bit.");
             if (name.Length == 0) name = "Thornswood-payload.zip";
 
             string target = Path.Combine(intoDir, name);
@@ -1446,7 +1449,7 @@ namespace ThornswoodSetup
             // rather than trusted for its size.
             if (size > 0 && have == size)
             {
-                if (sha.Length > 0) Say("Checking Thornswood's files");
+                Say("Checking Thornswood's files");
                 if (PayloadMatches(target, sha)) { Say("Already got Thornswood's files"); return target; }
                 try { File.Delete(target); } catch { }
                 have = 0;
@@ -1514,19 +1517,54 @@ namespace ThornswoodSetup
             // to a SHA-256 and deletes one that does not match (Updater.cs
             // Download); the installer, which is the first thing a stranger
             // runs, did not. Same standard now.
-            if (sha.Length > 0) Say("Checking Thornswood's files");
+            Say("Checking Thornswood's files");
             CheckPayload(target, sha);
             return target;
         }
 
         /// <summary>
-        /// Whether the file is the one the site published. An empty hash
-        /// means the site did not say, which is an older site, and that
-        /// passes, so a new installer against an old site still installs.
+        /// Where the payload may be fetched from. A relative url is joined
+        /// onto the site as it always was; an absolute one has to be https,
+        /// and http, or any other scheme, is refused rather than fetched,
+        /// because what comes down this url is unpacked and run on the
+        /// machine of somebody installing for the first time. Updater.cs
+        /// CheckUrl holds the launcher to the same.
+        /// </summary>
+        static string PayloadUrl(string site, string url)
+        {
+            // A scheme is the letters, digits, plus, minus and dots before the
+            // first colon. Read by hand rather than through Uri, which answers
+            // differently about a leading slash depending on the machine it
+            // runs on. A colon further along a path is part of the path.
+            int colon = url.IndexOf(':');
+            bool absolute = colon > 0;
+            for (int i = 0; i < colon; i++)
+            {
+                char c = url[i];
+                if (char.IsLetterOrDigit(c) || c == '+' || c == '-' || c == '.') continue;
+                absolute = false;
+                break;
+            }
+            if (!absolute) return site + url;
+            if (!url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                throw new Exception("The site offered the download over something other than https, so nothing " +
+                                    "has been fetched. Try again in a bit.");
+            return url;
+        }
+
+        /// <summary>
+        /// Whether the file is the one the site published. An empty hash is
+        /// not a pass. It used to be, so that a new installer against a site
+        /// from before the hash still installed, which made one blank field
+        /// on the site enough to unpack and run whatever came down. Nothing
+        /// here runs unmeasured now, the standard Updater.cs already holds
+        /// the launcher to.
         /// </summary>
         static bool PayloadMatches(string file, string sha)
         {
-            if (string.IsNullOrEmpty(sha)) return true;
+            if (sha == null) return false;
+            sha = sha.Trim();
+            if (sha.Length == 0) return false;
             // Streamed, never read whole. The payload is over half a gigabyte.
             using (var s = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20))
             using (var h = SHA256.Create())
@@ -1543,7 +1581,9 @@ namespace ThornswoodSetup
         /// <summary>
         /// Deletes a payload that is not the published one and stops, so the
         /// Setup.bat inside it never runs and the next run downloads it fresh
-        /// rather than carrying on from bad bytes.
+        /// rather than carrying on from bad bytes. A payload with no hash to
+        /// measure it against goes the same way, though Download stops before
+        /// it fetches anything when the site gives none.
         /// </summary>
         static void CheckPayload(string file, string sha)
         {
