@@ -217,7 +217,7 @@ if (art.w !== 1535 || art.h !== 300) {
     if (!(r.top <= headBottom && r.bottom >= headTop)) offFigure++;
   }
   yes('the band holds the far shore and the whole head up to a window ' + both +
-      ' wide, which is past a maximised 1920 screen', both >= 2000);
+      ' wide, which covers a maximised 1920 screen', both >= 1920);
   yes('and at every width out to an ultrawide ' + widest + ' it is still framed on the figure (' +
       offFigure + ' widths slide off it)', offFigure === 0);
   const mid = rows(1220), wide = rows(1920);

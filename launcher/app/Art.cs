@@ -52,28 +52,31 @@ namespace Thornswood
         /// <summary>
         /// Which part of the strip the title band shows, as fractions of the
         /// picture: the whole width, and the 70% of the height centred on the
-        /// overlook, rows 15 to 225 of the 300 the picture is tall.
+        /// overlook, rows 24 to 234 of the 300 the picture is tall.
         ///
         /// The band is as tall as the title row, 100, and as wide as the window
         /// less the side column, so it is between 8 and 17 times wider than it
         /// is tall while the picture itself is 5.1. Filling the band has to lose
-        /// height whatever we do; this says which height, and the approved
-        /// framing holds two things together: the sunrise and the far shore
-        /// across rows 60 to 85, and the figure at the overlook, whose head is
-        /// rows 126 to 160. Left to the middle of the picture, the band slides
-        /// down off the sunrise as the window widens: at the default width it
-        /// showed rows 74 to 226, which is the far shore in a sliver and 40 rows
-        /// of foreground rock, maximised it showed 105 to 195 with no horizon at
-        /// all, and on a very wide window the top edge came down onto the
-        /// figure's head. Centred on row 120 the sunrise and the figure stay in
-        /// frame together, and the slice is always narrower than the band, so
-        /// nothing is taken off the sides either.
+        /// height whatever we do; this says which height. The approved framing
+        /// holds two things together: the sunrise and the far shore, rows 60 to
+        /// 85, and the figure at the overlook, whose head is rows 126 to 160.
+        /// Left to the middle of the picture the band slides down off both as
+        /// the window widens. It showed rows 74 to 226 at the default width,
+        /// which is the far shore in a sliver and 40 rows of foreground rock;
+        /// 105 to 195 maximised, with no horizon left at all; and 126 to 174 on
+        /// an ultrawide, where the top edge sits on the figure's head. Centred
+        /// on row 129 it shows 53 to 205, 84 to 174 and 105 to 153: the far
+        /// shore and the whole head together up to a window 1950 wide, which
+        /// covers a maximised 1920 screen, and the figure still in frame out to
+        /// an ultrawide. The slice is also always narrower than the band, so
+        /// nothing is ever taken off the sides.
         ///
-        /// Shell.StartHeaderVideo paints the moving strip with this same
-        /// rectangle, so the picture underneath and the video over it show the
-        /// same crop and line up.
+        /// Fractions, not pixels, because the picture is 1535 wide and the
+        /// video 1536: read as fractions of whichever one is being painted, the
+        /// two crop to the same rows and the strip does not jump when the video
+        /// starts. Shell.StartHeaderVideo paints with this same rectangle.
         /// </summary>
-        public static readonly Rect HeaderCrop = new Rect(0, 0.05, 1, 0.70);
+        public static readonly Rect HeaderCrop = new Rect(0, 0.08, 1, 0.70);
 
         /// <summary>
         /// The strip of landscape behind the title on the Play page, as a brush
