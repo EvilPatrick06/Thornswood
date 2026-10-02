@@ -110,8 +110,18 @@ function Get-ClientRows([string]$SyncClient, [string]$Record, [string]$Game, [st
   # its whole listing lands in the middle of this report. The same
   # LASTEXITCODE trap Ship.ps1 records applies here: a child script's exit
   # lands in the global one.
+  # Do not pipe through Out-String: under Windows PowerShell 5.1 that wraps
+  # InformationRecord host text to the window width, so a long STOP. line
+  # splits and the Detail loses "N of M in place" (issue #1237). Read
+  # MessageData (and plain / error strings) instead, joined on newlines.
   $global:LASTEXITCODE = 0
-  $said = & $SyncClient -Check -NoPause -Game $Game -Dist $ClientDist -Record $Record 6>&1 2>&1 | Out-String
+  $chunks = & $SyncClient -Check -NoPause -Game $Game -Dist $ClientDist -Record $Record 6>&1 2>&1
+  $parts = foreach ($o in @($chunks)) {
+    if ($o -is [System.Management.Automation.InformationRecord]) { [string]$o.MessageData }
+    elseif ($o -is [System.Management.Automation.ErrorRecord]) { [string]$o }
+    else { [string]$o }
+  }
+  $said = $parts -join [Environment]::NewLine
   $code = $global:LASTEXITCODE
   $stop = [regex]::Match($said, '(?m)^STOP\. (.+)$')
   $detail = switch ($code) {
