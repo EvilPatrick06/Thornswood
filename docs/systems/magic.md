@@ -44,6 +44,13 @@ Three gates, all of them, whether you pick it on K or read a tome:
 Miss one and nothing is spent. You keep the tome. The line says which
 gate failed.
 
+A master spell picked on K needs the tome as well. The tome for that
+spell has to be in the pack, the rank in that school has to be master,
+and a spell point has to be there. The tome leaves the pack when the
+spell is learned. Reading the tome is the other door. That book is
+already in hand, so reading it does not ask for a second copy. The
+spell one rank below is still required.
+
 A spell learned is 5 work in its school. Casting the spell afterwards
 is not work and is not a rank.
 
@@ -104,8 +111,9 @@ yes as a death.
 ## Where this is
 
 The book, the points, the tomes, and the three gates are in the
-server. A dungeon chest can put a tome in the pack. Reading it still
-has to pass the three gates. See [Dungeon loot](dungeon-loot.md).
+server. A dungeon chest can put a novice or a master tome in the pack.
+Reading it still has to pass the three gates. Picking a master spell
+on K spends the tome. See [Dungeon loot](dungeon-loot.md).
 `collegeSemester` is 2 and `outsiderSemester` is 1, and
 neither is applied: there is no `/study` and no test that you are
 in the College.

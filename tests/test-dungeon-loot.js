@@ -32,7 +32,7 @@ function edidRecord(text) {
   return { record: { fields: [{ type: 'EDID', data: data }] } };
 }
 
-function rig() {
+function rig(random) {
   const store = {};
   const records = {};
   const given = [];
@@ -49,7 +49,9 @@ function rig() {
   }
   const mp = {
     getServerSettings:()=>({thornswoodServer:'dev'}),
-    getNpcAIState:()=>({isHuman:true,profileId:1,isDead:false,isDisabled:false}),
+    getNpcAIState: function (id) {
+      return (store[id] && store[id].ai) ? store[id].ai : {isHuman:true,profileId:1,isDead:false,isDisabled:false};
+    },
     getDescFromId:id=>id.toString(16)+':Skyrim.esm',
     get: function (id, key) {
       const row = store[id] || {};
@@ -77,11 +79,24 @@ function rig() {
     'globalThis', 'mp', 'console', 'idOf', 'addItem', 'say',
     'Math', 'Date', 'Number', 'String', 'Object', 'Array', 'RegExp',
     'require','createPrivateEconomyLedger','withinResourceReach','addItemsAtomic',
+    'function isCarcass(desc){ return String(desc).indexOf("wolf")>=0; }\n' +
     block + '\nreturn globalThis.__thornswoodDungeonLoot;');
-  const g = {};
+  const g = {
+    NPC_POPULATION_DATA: {
+      keep: [
+        ['20:Skyrim.esm', 'b:Skyrim.esm', 'c:Skyrim.esm', [0, 0, 0], 400, 30, 'enemy', 'bandit-camp', null, 4, '20:Skyrim.esm'],
+        ['21:Skyrim.esm', 'b:Skyrim.esm', 'c:Skyrim.esm', [0, 0, 0], 400, 30, 'enemy', 'dungeon', 2, 4, '21:Skyrim.esm'],
+        ['22:Skyrim.esm', 'wolf:Skyrim.esm', 'c:Skyrim.esm', [0, 0, 0], 400, 30, 'animal', 'wilderness', null, 4, '22:Skyrim.esm']
+      ]
+    }
+  };
+  const math = {
+    floor: Math.floor,
+    random: typeof random === 'function' ? random : Math.random
+  };
   const api = fn(
     g, mp, { log: function () { } }, idOf, addItem, say,
-    Math, FakeDate, Number, String, Object, Array, RegExp,
+    math, FakeDate, Number, String, Object, Array, RegExp,
     require,()=>storage,()=>true,addItemsAtomic);
   api.given = given;
   api.said = said;
@@ -90,6 +105,9 @@ function rig() {
   api.advance = function (ms) { clock += ms; };
   api.putActor = function (id, cell) {
     store[id] = { worldOrCellDesc: cell };
+  };
+  api.putBody = function (id, baseDesc, ai) {
+    store[id] = { baseDesc: baseDesc, ai: ai };
   };
   api.putChest = function (id, edid) {
     const desc = edid + ':Skyrim.esm';
@@ -112,12 +130,14 @@ if (block) {
   })());
 
   yes('tier 1 tomes are novice only', api.ranksFor(1).join(',') === 'novice');
-  yes('tier 2 stops at apprentice', api.ranksFor(2).join(',') === 'novice,apprentice');
-  yes('tier 3 stops at adept', api.ranksFor(3).join(',') === 'novice,apprentice,adept');
+  yes('tier 2 tomes are novice only', api.ranksFor(2).join(',') === 'novice');
+  yes('tier 3 is novice and master', api.ranksFor(3).join(',') === 'novice,master');
   yes('tier 4 reaches master', api.ranksFor(4).indexOf('master') >= 0);
+  yes('Raven Rock Mine is tier 4', api.tierOf('142fc:Dragonborn.esm') === 4);
 
   const low = api.goodsFor(1).map(function (g) { return g.name; });
   yes('a tier 1 chest can hold a lockpick', low.indexOf('lockpick') >= 0);
+  yes('a tier 1 chest can hold an iron sword', low.indexOf('iron sword') >= 0);
   yes('a tier 1 chest cannot hold ebony', low.indexOf('ebony ingot') < 0);
   const high = api.goodsFor(4).map(function (g) { return g.name; });
   yes('a tier 4 chest can hold ebony', high.indexOf('ebony ingot') >= 0);
@@ -129,6 +149,7 @@ if (block) {
   }));
   yes('tier 1 exclusive is only the amulet', api.exclusiveFor(1).length === 1
     && api.exclusiveFor(1)[0].name === 'Ancient Nord Amulet');
+  yes('the embalming tool is not a dungeon find', excl.indexOf('Embalming Tool') < 0);
   yes('a black soul gem waits for tier 4', api.exclusiveFor(3).every(function (g) {
     return g.name !== 'Black Soul Gem';
   }) && api.exclusiveFor(4).some(function (g) { return g.name === 'Black Soul Gem'; }));
@@ -206,6 +227,62 @@ if (block) {
                         src.indexOf('// ------------------------------------------------- where gold comes from --'));
   yes('opening a container asks the dungeon table',
     /dungeonLoot\.onChest\(actorId, refrId\)/.test(act));
+  yes('a press the hunter does not answer can search a body',
+    src.indexOf('bodyLoot.onBody') >= 0);
+
+  function seqRng(seq) {
+    let i = 0;
+    return function () { return seq[Math.min(i++, seq.length - 1)]; };
+  }
+  const campPile = api.rollBody(true, seqRng([0, 0, 0, 0, 0.99, 0.99, 0.99]));
+  yes('a camp body can carry a little coin and a common supply',
+    campPile.gold === 1 && campPile.items.length === 1 && campPile.items[0].name === 'lockpick');
+  const wildEmpty = api.rollBody(false, seqRng([0.99, 0.99, 0.99, 0.99, 0.99]));
+  yes('a wild body can be empty', wildEmpty.gold === 0 && wildEmpty.items.length === 0);
+  const wildGood = api.rollBody(false, seqRng([0.99, 0.99, 0.99, 0, 0, 0.99]));
+  yes('a good find on a body is ordinary gear',
+    wildGood.items.length === 1 && wildGood.items[0].name === 'iron sword');
+  const rare = api.rollBody(false, seqRng([0.99, 0.99, 0.99, 0.99, 0, 0]));
+  yes('a rare body find can be a master tome',
+    rare.items.length === 1 && rare.items[0].name === 'Spell Tome: Fire Storm');
+  yes('body coin stays under the chest minimum',
+    api.rollBody(true, seqRng([0, 0.99])).gold <= 6);
+
+  const dead = { isHuman: false, profileId: 0, isDead: true, isDisabled: false };
+  const campRig = rig(function () { return 0; });
+  campRig.putActor(1, '371de:Skyrim.esm');
+  campRig.putBody(0x20, 'bandit:Skyrim.esm', dead);
+  const taken = campRig.onBody(1, 0x20);
+  const handed = campRig.given.length;
+  yes('searching a camp enemy hands over what was on the body',
+    taken && taken.indexOf('You take ') === 0 && handed > 0);
+  yes('the same body does not pay a second time', campRig.onBody(1, 0x20) === null);
+  yes('the second search hands nothing more', campRig.given.length === handed);
+  campRig.onStand(0x20);
+  const stood = campRig.onBody(1, 0x20);
+  yes('standing up clears the body so the next life can be searched',
+    stood && stood.indexOf('You take ') === 0);
+
+  const wildRig = rig(function () { return 0.99; });
+  wildRig.putActor(1, '371de:Skyrim.esm');
+  wildRig.putBody(0x21, 'draugr:Skyrim.esm', dead);
+  yes('an empty body says there is nothing',
+    wildRig.onBody(1, 0x21) === 'There is nothing on this body.');
+  yes('an empty body hands nothing', wildRig.given.length === 0);
+  yes('a second search of an empty body is silence', wildRig.onBody(1, 0x21) === null);
+
+  const personRig = rig(function () { return 0; });
+  personRig.putActor(1, '371de:Skyrim.esm');
+  personRig.putBody(0x30, 'person:Skyrim.esm',
+    { isHuman: true, profileId: 7, isDead: true, isDisabled: false });
+  yes('a dead person is not looted', personRig.onBody(1, 0x30) === null);
+  yes('a dead person hands nothing', personRig.given.length === 0);
+
+  const wolfRig = rig(function () { return 0; });
+  wolfRig.putActor(1, '371de:Skyrim.esm');
+  wolfRig.putBody(0x22, 'wolf:Skyrim.esm', dead);
+  yes('a hunter carcass is not paid by the body table', wolfRig.onBody(1, 0x22) === null);
+  yes('a hunter carcass hands nothing', wolfRig.given.length === 0);
 }
 
 console.log(pass + ' passed, ' + fail + ' failed');
