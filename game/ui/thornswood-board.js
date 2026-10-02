@@ -238,7 +238,7 @@
       data = d || null;
       var b = data && data.board;
       if (b && isFinite(Number(b.x)) && isFinite(Number(b.y)) && isFinite(Number(b.z))) {
-        tell('near ' + Number(b.x) + ' ' + Number(b.y) + ' ' + Number(b.z) + ' ' + (b.here ? '1' : '0'));
+        tell('near ' + String(b.hold || 'board') + ' ' + Number(b.x) + ' ' + Number(b.y) + ' ' + Number(b.z));
       } else {
         tell('near none');
       }
