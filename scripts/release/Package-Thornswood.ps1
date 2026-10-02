@@ -272,28 +272,52 @@ if ($optionalPrefixes.Count) {
 # there were another launcher's builds. So for somebody who is not Patrick
 # there are exactly two routes: this installer, and a pack.
 #
-# Ship-Rules.ps1 has read this record for packs all along, and Test-ShipOtherServer
-# calls a path in it ours when the file there is the recorded build, so a pack
-# carries all six. Nothing here did the same, and a brand new install arrived
-# with "skymp5-client.js is missing" and a Play button that would not press.
-# Same record, same rule, both ends.
+# Ship-Rules.ps1 has read the checkout record for packs all along, and
+# Test-ShipOtherServer calls a path in it ours when the file there is the
+# recorded build, so a pack carries all six. Nothing here did the same until
+# the listing below, and a brand new install arrived with "skymp5-client.js
+# is missing" and a Play button that would not press.
+#
+# WHICH RECORD (#1243). This used to pin those six files to
+# records\client-build.json in the checkout. Between main Ships that file
+# moves ahead of the launcher this installer packs. The installed launcher
+# carries its own client-build.json, embedded when it was built, and that is
+# the client it checks and, when they differ, the client it puts back
+# (ClientRuntime.Heal). Pinning the installer to the checkout then either
+# refuses the main play folder, whose client still matches that launcher, or
+# ships a client the launcher replaces on first launch.
+#
+# So there is one record: the one that launcher was built with. It is read
+# out of the exe being packed. When that exe has none, it is the main feed's
+# clientRuntime, the zip beside that feed when it is there, or the checkout
+# record only while its fork commit is still the one the feed names. The
+# checkout file on its own is not a record this installer is held to.
 #
 # This is a KEEP list, not a leave-out list: whatever the Vortex record or the
 # vanilla patterns in Ship-Rules.ps1 decide, the recorded build at a path in
 # the record ships. Anything else at one of those paths stops the build; see
-# the note over $clientWrong below.
-$clientRecordPath = Join-Path $PSScriptRoot '..\..\records\client-build.json'
-$shipClientFiles = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
-try {
-    if (Test-Path -LiteralPath $clientRecordPath) {
-        $rec = Get-Content -LiteralPath $clientRecordPath -Raw | ConvertFrom-Json
-        foreach ($p in $rec.files.PSObject.Properties.Name) { [void]$shipClientFiles.Add($p) }
-    }
-} catch { }
-if ($shipClientFiles.Count -gt 0) {
-    Say ("  {0} client runtime file(s) will ship whatever else leaves them out" -f $shipClientFiles.Count) 'Green'
+# the note over $clientWrong below. Apply-PackageClientRecord replaces the
+# hashes Ship-Rules just loaded from the checkout, so Test-ShipClientRecorded
+# answers the packed launcher's record and not the checkout's.
+. (Join-Path $Here 'Package-ClientRecord.ps1')
+$checkoutClientRecord = Join-Path $PSScriptRoot '..\..\records\client-build.json'
+$resolvedClient = Resolve-PackageClientRecord -LauncherExe (Get-LauncherExe $LaunchDir) -FeedVersion $vLive -CheckoutRecord $checkoutClientRecord
+if (-not $resolvedClient) {
+    Die ('The client runtime this installer carries is the one the launcher it packs was built with, ' +
+         'read from that launcher, or the main feed''s clientRuntime when the launcher has no record. ' +
+         'Neither could be read, and records\client-build.json in this checkout is not that client, so nothing was packaged.')
+}
+Apply-PackageClientRecord $resolvedClient.Record
+$clientRecordPath = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-package-client-' + [Guid]::NewGuid().ToString('N') + '.json')
+Save-PackageClientRecord $resolvedClient $clientRecordPath
+$clientFork = [string]$resolvedClient.Record.forkCommit
+if ($resolvedClient.Source -eq 'launcher') {
+    Say ("  {0} client runtime file(s) held to the record embedded in the launcher this installer packs ({1})" -f $shipClientFiles.Count, $clientFork) 'Green'
 } else {
-    Say '  records\client-build.json could not be read, so nothing protects the client runtime from the filters below' 'Yellow'
+    Say ("  {0} client runtime file(s) held to the main feed's clientRuntime ({1})" -f $shipClientFiles.Count, $clientFork) 'Green'
+}
+if ($resolvedClient.FeedFork -and $resolvedClient.FeedFork -ne $clientFork) {
+    Say ("  the main feed's clientRuntime is {0}; this installer follows the launcher it packs ({1})" -f $resolvedClient.FeedFork, $clientFork) 'Yellow'
 }
 
 # ---- what the collection provides: also left out --------------------------
@@ -432,12 +456,12 @@ if ($clientWrong.Count) {
     Say ("  STOP. {0} of the {1} client runtime files in {2} are not the recorded build:" -f `
         $clientWrong.Count, $shipClientFiles.Count, $GameDir) 'Red'
     foreach ($c in $clientWrong) { Say ("    " + $c) 'Red' }
-    if ([string]::Equals($GameDir.TrimEnd('\'), (Join-Path $Root 'Game').TrimEnd('\'), [StringComparison]::OrdinalIgnoreCase)) {
-        Say '  Run .\scripts\release\Sync-Client.ps1 to put the recorded build in place, then package again.' 'Red'
-    } else {
-        Say '  This is building out of the Steam copy, and the client there is not ours.' 'Red'
-        Say ('  Package from ' + (Join-Path $Root 'Game') + ' once .\scripts\release\Sync-Client.ps1 has put the recorded build in it.') 'Red'
-    }
+    Say '  The record is the one the launcher this installer packs was built with.' 'Red'
+    Say '  It is read from that launcher, or from the main feed''s clientRuntime,' 'Red'
+    Say '  not from records\client-build.json in the checkout.' 'Red'
+    Say '  Leave the main play folder''s client as it is. Package again from the' 'Red'
+    Say '  folder whose client matches that launcher, or pack a launcher built' 'Red'
+    Say '  with the client you mean to ship.' 'Red'
     Die 'the client runtime is not the recorded build, so this installer was not built'
 }
 
@@ -458,8 +482,8 @@ if ($shipClientFiles.Count -gt 0) {
         Say ("  STOP. {0} of the {1} client runtime files are not in this installer:" -f `
             ($shipClientFiles.Count - $clientShipped), $shipClientFiles.Count) 'Red'
         foreach ($c in $shipClientFiles) { if (-not $inShip.Contains($c)) { Say ("    " + $c) 'Red' } }
-        Say '  They are not in the game folder this is being built from. Run' 'Red'
-        Say '  scripts\release\Sync-Client.ps1 to put the recorded build in place, then package again.' 'Red'
+        Say '  They are not in the game folder this is being built from.' 'Red'
+        Say '  The record is the one in the launcher this installer packs, not the checkout.' 'Red'
         Say '  Shipping without them gives every new tester a Play button that will not press.' 'Red'
         Write-Host ''
         Die 'the client runtime is incomplete, so this installer was not built'
@@ -766,6 +790,7 @@ $srcNote = Join-Path $stage 'SOURCE CODE.txt'
 try {
     $noteText = Get-SourceNotice $clientRecordPath (Join-Path $PSScriptRoot '..\..\records\server-build.json') $payloadDir
     [IO.File]::WriteAllText($srcNote, $noteText, (New-Object Text.UTF8Encoding($false)))
+    Remove-Item -LiteralPath $clientRecordPath -Force -ErrorAction SilentlyContinue
     Say '  SOURCE CODE.txt names the fork commit this build came from' 'Green'
 } catch {
     Die ("SOURCE CODE.txt could not be written: " + $_.Exception.Message + ". This installer carries SkyMP's GPL and AGPL files and has to say where their source is.")
