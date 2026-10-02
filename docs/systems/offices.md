@@ -27,8 +27,8 @@ role by itself. A steward is the only one who evicts, sets rent, names
 the hold's box, and moves the notice board. See [Property](property.md)
 and [Notice boards](noticeboards.md).
 
-A steward names the Merchant's Guild factor, on
-[Merchant's Guild](merchants-guild.md).
+The [Merchant's Guild](merchants-guild.md) is the merchant NPCs.
+It has no joinable roll or factor appointment for people.
 
 A steward is not staff. Staff are the Discord roles named on
 [Voice](voice.md): Owner, Gamemaster, Dev, Loremaster, Moderator.
@@ -65,7 +65,7 @@ server does not set their number, their pay, or their powers. A guard
 is not a bounty and is not staff.
 
 Jarl and steward stay the offices the server already runs. A hold does
-not turn eviction, rent, the box, the board, or naming the factor off.
+not turn eviction, rent, the box or the board off.
 
 ## What an office does not do
 

@@ -24,8 +24,7 @@ one of the ten towns. The rest is what the job says.
 
 The server takes two sums before the job goes up:
 
-- the job fee, 30 gold, or 15 if you are a member in good standing of
-  this hold's guild
+- the job fee, 30 gold
 - the pay, in full, which is never halved
 
 Both go onto this hold's ledger. If the pack cannot cover both,
@@ -52,8 +51,7 @@ crate.
 
 ## Confirming it
 
-At the destination hold's board, the poster, that hold's steward, or
-that hold's factor:
+At the destination hold's board, the poster or that hold's steward:
 
 `/haul done whiterun 4`
 
@@ -74,12 +72,9 @@ by what the hauler received. The tenth, and the job fee, stay.
 | 80 | 8 | 72 |
 | 100 | 10 | 90 |
 
-A member posting an 80 gold haul pays 15 plus 80, which is 95, onto
-the ledger. On delivery the hauler receives 72. The ledger keeps 23:
-the 15 fee and the 8 tenth.
-
-Somebody who is not a member pays 30 plus 80, which is 110. On
-delivery the ledger keeps 38.
+Posting an 80 gold haul costs 30 plus 80, which is 110, onto the
+ledger. On delivery the hauler receives 72. The ledger keeps 38:
+the 30 fee and the 8 tenth. There is no guild membership discount.
 
 The gold the hauler receives was the poster's. Creating it back into
 a pack and subtracting it from the ledger is the box paying out. It

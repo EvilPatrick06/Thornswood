@@ -6,7 +6,8 @@ journals, and it does not count toward the 12.
 
 It is not the [Free Skyrim Trading Company](trading-company.md) and
 it is not a hold's [Merchant's Guild](merchants-guild.md). Those have
-their own coin and their own rolls. This book is the group's prices,
+their own purposes. The Merchant's Guild is the NPC traders and cannot
+be joined. This book is the group's prices,
 its people, and a place to talk when they are not standing together.
 
 The book is kept by the server for the group. It is not stored on one
