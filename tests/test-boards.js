@@ -245,6 +245,10 @@ if (block !== null) {
         front.indexOf("e.userEventName !== 'Activate'") !== -1 &&
         front.indexOf('dist > BOARD_REACH') !== -1 &&
         page.indexOf('window.thornswoodBoard') !== -1);
+    yes('the message board object is put down at the spot',
+        front.indexOf('Thornswood-Content.esp') !== -1 &&
+        front.indexOf('0x593B') !== -1 &&
+        front.indexOf('placeAtMe(base, 1, false, false)') !== -1);
     yes('the panel is how a notice, a job, and a price list go up',
         page.indexOf("net('/notice ") !== -1 &&
         page.indexOf("net('/job ") !== -1 &&
