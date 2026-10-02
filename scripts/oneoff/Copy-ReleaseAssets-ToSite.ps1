@@ -119,7 +119,7 @@ foreach ($ch in $channels) {
 
     Head "The $ch feed, $feedUrl"
     $doc = $null
-    try { $doc = ((Get-Text $feedUrl) -replace '^﻿', '') | ConvertFrom-Json }
+    try { $doc = ((Get-Text $feedUrl) -replace ('^' + [char]0xFEFF), '') | ConvertFrom-Json }
     catch {
         [void]$problems.Add("the $ch feed could not be read: $($_.Exception.Message)")
         Say "  could not read it: $($_.Exception.Message)" 'Red'
