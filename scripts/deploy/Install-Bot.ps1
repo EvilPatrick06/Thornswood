@@ -32,6 +32,11 @@
        service starts it at boot, starts python again when it exits, and
        rolls bot.log by size while it runs. The first full run takes the old
        scheduled task and its run.ps1 loop off the box.
+    7. Asks the box, once the swap has answered, what is really at the bot's
+       folder there: one Test-Path line per file it sent, by full path, with
+       data\bot.log among them. A file that is not there turns the run red,
+       so a swap that said SWAP OK while something is missing from the
+       install root cannot read as a good deploy.
 
   Run it again any time to push a change. It stops the old one by the
   service's name only once the new code has checked out, and puts the old
@@ -589,6 +594,100 @@ function Invoke-BotSwap([bool]$noServiceOk) {
   return $out
 }
 
+# ==== what the box has ====
+#
+# WHAT IS REALLY AT THE INSTALL ROOT, ASKED OF THE BOX, AFTER THE SWAP.
+#
+# A run said artifact, 8 files, STAGE OK, SWAP OK and the bot watching, and
+# then Test-Path on C:\Thornswood-Bot\data\bot.log and on
+# C:\Thornswood-Bot\live-smoke-discord-export.json both answered False. Every
+# line the run printed was about the box; the two answers were about whatever
+# machine typed them, and C:\Thornswood-Bot is a folder on the VPS. Nothing
+# in the run itself had ever said what those paths hold on the box, so there
+# was no way to tell that apart from a swap that had left files behind, and
+# the whole deploy was stopped for a day over it.
+#
+# So the run answers it. This asks the box, in one line per file, for the
+# full path under the same root the swap moved the files to, and says which
+# machine it asked. It also makes data\bot.log once more, after the start
+# rather than before it: MakeLog in the hooks above makes it in front of the
+# start, and this is the same two things again at the end, so a green run
+# cannot finish with that path absent whatever the service did in between.
+#
+# A file that is not there turns the run red (FILES MISSING below), because a
+# run that ends green while the bot has no export to read is the failure this
+# whole block exists to stop.
+#
+# Single quoted and taking its values from the lines BotThereVars puts in
+# front of it, like Swap.ps1's blocks, so what goes up is plain PowerShell a
+# person can read and tests\test-bot-service.ps1 can run it against a scratch
+# folder, with and without the export, while tests\test-deploy-swaps.ps1 reads
+# its lines out of a whole -CodeOnly run. Keep it ASCII. Bot-Service.ps1 goes
+# in front of it for Repair-ThornswoodBotData.
+$botThereBlock = @'
+$ErrorActionPreference = 'Continue'
+'asked of ' + $env:COMPUTERNAME + ', where the bot runs from ' + $Root
+# The folder the service writes, then the log in it. Repair makes the folder
+# and grants the account what it needs when it had to make it; it says
+# nothing when there was nothing to do.
+Repair-ThornswoodBotData -Root $Root -Name $Service
+$log = Join-Path (Join-Path $Root 'data') 'bot.log'
+if (-not (Test-Path -LiteralPath $log)) {
+  try { [IO.File]::WriteAllText($log, ''); 'made an empty ' + $log + ', which is where the bot writes its log and where Show-BotLog.ps1 reads it' }
+  catch { 'COULD NOT MAKE ' + $log + ': ' + $_.Exception.Message }
+}
+# Test-Path by its own name, with the path it was given, because that is the
+# command whose two False answers started this. The log is checked as the
+# same path that was just made, rather than as a second spelling of it.
+$each = @()
+foreach ($rel in @($Must)) { if ($rel) { $each += (Join-Path $Root ($rel -replace '/', '\')) } }
+$each += $log
+$gone = @()
+foreach ($at in $each) {
+  if (Test-Path -LiteralPath $at) { 'Test-Path ' + $at + '  True' }
+  else { 'Test-Path ' + $at + '  False'; $gone += $at }
+}
+if ($gone.Count) {
+  'THE BOX DOES NOT HOLD ' + $gone.Count + ' of them: ' + ($gone -join ', ')
+  'FILES MISSING'
+} else {
+  'every file this run sent is at ' + $Root + ' on the box, and so is data\bot.log'
+  'FILES ON THE BOX'
+}
+'@
+# ==== end what the box has ====
+
+# The values that block runs with, quoted once here, every single quote
+# doubled, the way ServiceSwapVars does it.
+function BotThereVars([string]$farRoot, [string]$service, [string[]]$must) {
+  $q = { param($s) "'" + ([string]$s).Replace("'", "''") + "'" }
+  $lines = @(
+    ('$Root    = ' + (& $q $farRoot.Replace('/', '\'))),
+    ('$Service = ' + (& $q $service)),
+    ('$Must    = @(' + ((@($must | Where-Object { $_ }) | ForEach-Object { & $q $_ }) -join ', ') + ')')
+  )
+  return (($lines -join "`r`n") + "`r`n")
+}
+
+# Asks the box and prints what it said. $true only when every file is there.
+function Confirm-BotFiles([string[]]$must) {
+  $svcLib = Join-Path $Here '..\vps\Bot-Service.ps1'
+  if (-not (Test-Path -LiteralPath $svcLib)) { Die "missing: $svcLib" }
+  Head 'What the box has, at the folder the swap moved them to'
+  $out = @(Remote ((BotThereVars $Root $Service $must) + (Get-Content -LiteralPath $svcLib -Raw) + "`n" + $botThereBlock) |
+           ForEach-Object {
+             $s = "$_".Trim()
+             $c = 'Gray'
+             if ($s -match 'False$|MISSING|COULD NOT|DOES NOT HOLD') { $c = 'Red' }
+             elseif ($s -match 'True$|FILES ON THE BOX') { $c = 'Green' }
+             Say "  $s" $c
+             $s
+           })
+  Say '  Those are paths on the VPS. The same Test-Path typed on this machine answers for' 'DarkGray'
+  Say '  a folder this machine does not have, and is False whatever the box holds.' 'DarkGray'
+  return ($out -contains 'FILES ON THE BOX')
+}
+
 # The box records that the bot runs this artifact (Artifact.ps1), and only
 # once the service is running on it (issue #465) and the swap has answered
 # (issue #446): -CodeOnly after the swap, a full run after the service
@@ -612,6 +711,15 @@ function Save-BotRecord {
 if ($CodeOnly -or $PutBack) {
     if ($PutBack) { Head 'Putting the last files back' } else { Head 'Swapping it in' }
     $restart = Invoke-BotSwap $false
+
+    # The box is asked what is at the install root, and the run is red if
+    # anything this deploy sent is not there. In front of the record, so the
+    # box never records as the bot's code a set of files it does not hold.
+    # -PutBack sends nothing, so there is no list to hold the box to.
+    if (-not $PutBack -and -not (Confirm-BotFiles @($send.Keys))) {
+        Die 'the swap answered but the box does not hold every file this run sent. The lines above name each one, with the full path on the box. Run .\scripts\deploy\Install-Bot.ps1 -CodeOnly again, and if it says the same thing, look at that folder on the VPS.'
+    }
+
     if ($PutBack) { Restore-SwapRecord "$User@$Vps" $ssh $Root $restart '' 'bot' }
     elseif ($restart -contains 'SWAP OK') {
         if ("$restart" -match ('service ' + $Service + ' is Running')) { Save-BotRecord }
@@ -898,6 +1006,10 @@ if ("$running" -match 'BOT SERVICE NOT INSTALLED') {
   } else {
     Say 'The bot is NOT running. Fix what the lines above say, then run this again.' 'Red'
   }
+}
+
+if (-not (Confirm-BotFiles @($send.Keys))) {
+  Die 'the install finished but the box does not hold every file it sent. The lines above name each one, with the full path on the box.'
 }
 
 Write-Host ''
