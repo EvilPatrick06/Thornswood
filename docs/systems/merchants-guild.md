@@ -109,7 +109,21 @@ The hold's box is in the server, and the note beside it says guild
 ledgers belong in that box. The box takes gold. A price list is not
 an item in the chest. Someone with Prices stands at the box and
 submits a copy, and the average of those copies is kept for that
-hold. There is no roll, no 50, no dues, no factor, and no
+hold. A marked chest also requires the same known cell and a current
+distance of at most 400. Remembering a chest does not permit a remote
+submission. A failed save keeps both the previous saved file and the
+previous live prices. Failed book edits, disbands and membership saves
+also restore the previous live state. Empty buy and sell columns keep
+their positions; zero is a free offer. Prices must fit the server's
+whole-gold inventory range, from 0 through 2,147,483,647.
+
+An unreadable book, invalid permission relationship or submission without
+its matching book prevents the book service from loading. A reload revokes
+the old service before checking the saved state, including any retained
+reference to that service. It does not start an empty ledger. Renaming a
+book or editing its prices keeps its earlier submitted copy valid.
+
+There is no roll, no 50, no dues, no factor, and no
 half-fee. Posting is 20 and 30 for everybody. Rent is the only debt
 the box pays down. Traders do not buy and sell from a purse the
 server tracks.
