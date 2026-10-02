@@ -582,6 +582,10 @@ namespace Thornswood
 
             diagReadings.Children.Clear();
 
+            // The collection, first on the page (Djinn, 2 Oct): what the
+            // launcher found and the button to the collection.
+            diagReadings.Children.Add(CollectionStatusCard());
+
             string ping = pingHistory.Count > 0 && pingHistory[pingHistory.Count - 1] >= 0
                         ? pingHistory[pingHistory.Count - 1] + " ms" : "not measured";
 
