@@ -372,7 +372,13 @@
                (when ? ', ' + esc(when) : '') + '</div>';
       }
       out += '<b>Prices</b>';
-      out += '<div class="none">A hold drop box is not there. The list stays in the book.</div>';
+      if (book.submitted && book.submitted.length) {
+        out += '<div class="none">Submitted to ' + esc(book.submitted.join(', ')) + '.</div>';
+      }
+      if (book.canPrices) {
+        out += '<div class="none">Stand at the hold\'s drop box, then submit. The list stays in the book.</div>';
+        out += '<div class="bar"><button data-g="submit">Submit at the box</button></div>';
+      }
       var list = book.priceList || [];
       if (!list.length) { out += '<div class="none">No prices yet.</div>'; }
       for (var p = 0; p < list.length; p++) {
@@ -467,6 +473,7 @@
       return;
     }
     if (verb === 'disband') { net('/book disband ' + book.id); openGroup = ''; return; }
+    if (verb === 'submit') { net('/book submit ' + book.id); return; }
     if (verb === 'price') {
       var item = gval('price-name');
       if (!item) { return; }

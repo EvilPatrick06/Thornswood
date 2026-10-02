@@ -154,8 +154,12 @@ The time a character last left is kept too. J draws the tab only for
 a Discord account that holds Business Owner or Faction Owner, for a
 character who has accepted an invite, and for staff.
 
-Nothing submits a price list to a hold's drop box. Asking to submit
-one is refused, and the list stays in the book.
+Someone with the Prices permission stands at a hold's drop box and
+submits a copy of the list. The book stays in the journal. A later
+submission from the same book replaces the earlier one in that hold.
+Each hold keeps its own copy. The average of those copies is what
+that hold's traders would charge. Traders do not yet buy and sell
+from a purse the server tracks.
 
 Staff seats read Owner, Gamemaster, Dev, Loremaster, and Moderator
 off the Discord account. Business Owner and Faction Owner are read

@@ -63,7 +63,8 @@ function make(dir, extra) {
       },
       offer: function () { return ''; },
       refresh: function () { extra.pushes = (extra.pushes || 0) + 1; },
-      online: function () { return extra.online ? extra.online() : {}; }
+      online: function () { return extra.online ? extra.online() : {}; },
+      atBox: extra.atBox || function () { return ''; }
     }
   };
   box.globalThis = box;
@@ -201,8 +202,8 @@ if (block) {
     actorId: 1, profileId: 1, parts: parts('/book submit ' + bee.id)
   });
   const afterSubmit = api.books().filter(function (b) { return b.id === bee.id; })[0];
-  yes('a hold drop box is refused and the list stays',
-      /hold drop box is not there/.test(submitted) && afterSubmit.prices.length === 2);
+  yes('submitting away from a box is refused and the list stays',
+      /Stand at the hold/.test(submitted) && afterSubmit.prices.length === 2);
 
   for (let n = 0; n < 98; n++) {
     api.command({
@@ -318,6 +319,103 @@ if (block) {
   yes('the owner is told to disband rather than leave', /disbands/.test(ownerLeave));
 
   try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { }
+
+  const ledgerDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tw-books-'));
+  let hold = '';
+  const ledger = make(ledgerDir, {
+    roles: function (pid) {
+      if (Number(pid) === 1) {
+        return { business: true, faction: true, staff: false, account: 'ledger-a' };
+      }
+      if (Number(pid) === 2) {
+        return { business: true, faction: false, staff: false, account: 'ledger-b' };
+      }
+      if (Number(pid) === 4) {
+        return { business: false, faction: false, staff: false, account: 'ledger-c' };
+      }
+      return { business: false, faction: false, staff: false, account: 'p:' + pid };
+    },
+    atBox: function () { return hold; }
+  });
+  ledger.command({ actorId: 1, profileId: 1, parts: parts('/book new business The Bee') });
+  ledger.command({ actorId: 2, profileId: 2, parts: parts('/book new business The Other') });
+  const beeId = ledger.books().filter(function (b) { return b.name === 'The Bee'; })[0].id;
+  const otherId = ledger.books().filter(function (b) { return b.name === 'The Other'; })[0].id;
+  ledger.command({
+    actorId: 1, profileId: 1,
+    parts: parts('/book price ' + beeId + ' | Iron dagger | 10 | -')
+  });
+  ledger.command({
+    actorId: 1, profileId: 1,
+    parts: parts('/book price ' + beeId + ' | Water | 0 | 0')
+  });
+  ledger.command({
+    actorId: 2, profileId: 2,
+    parts: parts('/book price ' + otherId + ' | Iron dagger | 11 | 5')
+  });
+  const notThere = ledger.command({
+    actorId: 1, profileId: 1, parts: parts('/book submit ' + beeId)
+  });
+  yes('a list is not submitted until they are at the box', /Stand at the hold/.test(notThere));
+  hold = 'Whiterun';
+  const sent = ledger.command({
+    actorId: 1, profileId: 1, parts: parts('/book submit ' + beeId)
+  });
+  const bookAfter = ledger.books().filter(function (b) { return b.id === beeId; })[0];
+  yes('the box keeps a copy and the book still has its list',
+      /Submitted The Bee to whiterun/.test(sent) && bookAfter.prices.length === 2);
+  ledger.command({
+    actorId: 1, profileId: 1,
+    parts: parts('/book price ' + beeId + ' | Iron dagger | 99 | 99')
+  });
+  const held = ledger.ledgers().whiterun[beeId].prices.filter(function (p) {
+    return p.name === 'Iron dagger';
+  })[0];
+  yes('editing the book does not change the copy until they submit again',
+      held.buy === 10 && held.sell === null);
+  ledger.command({
+    actorId: 2, profileId: 2, parts: parts('/book submit ' + otherId)
+  });
+  const whiterun = ledger.guildPrice('whiterun', 'Iron dagger');
+  const waterPrice = ledger.guildPrice('whiterun', 'Water');
+  yes('a blank is not averaged, zero is, and a half rounds up',
+      whiterun.buy === 11 && whiterun.sell === 5 && waterPrice.buy === 0 && waterPrice.sell === 0);
+  ledger.command({ actorId: 1, profileId: 1, parts: parts('/book new faction The Gate') });
+  const gateId = ledger.books().filter(function (b) { return b.name === 'The Gate'; })[0].id;
+  ledger.command({
+    actorId: 1, profileId: 1,
+    parts: parts('/book price ' + gateId + ' | Iron dagger | 20 | 20')
+  });
+  hold = 'solitude';
+  ledger.command({ actorId: 1, profileId: 1, parts: parts('/book submit ' + gateId) });
+  const own = ledger.guildPrice('whiterun', 'Iron dagger');
+  const otherHold = ledger.guildPrice('riften', 'Iron dagger');
+  const none = ledger.guildPrice('whiterun', 'Mead');
+  yes('a hold keeps its own price, and a hold with none uses the others',
+      own.buy === 11 && otherHold.buy === 16 && none.buy === null && none.sell === null);
+  ledger.command({
+    actorId: 1, profileId: 1,
+    parts: parts('/book price ' + beeId + ' | Iron dagger | 12 | -')
+  });
+  hold = 'whiterun';
+  ledger.command({ actorId: 1, profileId: 1, parts: parts('/book submit ' + beeId) });
+  yes('a later submission from the same book replaces the earlier copy',
+      ledger.guildPrice('whiterun', 'Iron dagger').buy === 12);
+  ledger.command({ actorId: 1, profileId: 1, parts: parts('/book invite ' + beeId + ' 4') });
+  ledger.accept(4, 'Bjorn');
+  const memberSubmit = ledger.command({
+    actorId: 4, profileId: 4, parts: parts('/book submit ' + beeId)
+  });
+  yes('a member without prices cannot submit', /cannot set prices/.test(memberSubmit));
+  ledger.command({ actorId: 2, profileId: 2, parts: parts('/book disband ' + otherId) });
+  yes('disbanding drops that book\'s copy, and a missing sell uses another hold',
+      !ledger.ledgers().whiterun[otherId] &&
+      ledger.ledgers().whiterun[beeId].prices[0].buy === 12 &&
+      ledger.guildPrice('whiterun', 'Iron dagger').sell === 20);
+  const reloaded = make(ledgerDir, { atBox: function () { return 'whiterun'; } });
+  yes('the copy survives a new load',
+      reloaded.guildPrice('whiterun', 'Iron dagger').buy === 12);
+  try { fs.rmSync(ledgerDir, { recursive: true, force: true }); } catch (e2) { }
 }
 
 console.log('');

@@ -106,8 +106,10 @@ courier, on the notice board.
 ## Where this is
 
 The hold's box is in the server, and the note beside it says guild
-ledgers belong in that box. The box takes gold. It does not take a
-price list. There is no roll, no 50, no dues, no factor, and no
+ledgers belong in that box. The box takes gold. A price list is not
+an item in the chest. Someone with Prices stands at the box and
+submits a copy, and the average of those copies is kept for that
+hold. There is no roll, no 50, no dues, no factor, and no
 half-fee. Posting is 20 and 30 for everybody. Rent is the only debt
 the box pays down. Traders do not buy and sell from a purse the
 server tracks.

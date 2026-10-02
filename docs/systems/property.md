@@ -150,4 +150,6 @@ A holder cannot set a price for a night. `/bed` does not exist.
 Outhouses and pots stay unknown until the vote on
 [The body](body.md). The company payout that
 withdraws from the ledger is not built. The four house parts are
-already refused. The drop box does not accept a price list.
+already refused. A price list is not an item in the chest. Someone
+with Prices stands at the box and submits a copy. The book stays in
+the journal. The guild average of those copies is kept.
