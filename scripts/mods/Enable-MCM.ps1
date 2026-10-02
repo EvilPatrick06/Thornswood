@@ -1,5 +1,5 @@
 <#
-  Enable-MCM.ps1 - make MCM Helper work, on both sides, properly.
+  Enable-MCM.ps1
 
   RETIRED. DO NOT RUN. Issue #1179: patched SkyUI_SE.esp's light flag by hand. The collection (or the settled load order) does this now. It refuses to run, and the rest of the file is kept for the history of how it was installed. Pattern from #405 Add-Bodies.
 

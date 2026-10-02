@@ -1,5 +1,5 @@
 <#
-  Fix-QuickLoot.ps1 - turn MCMHelper.esp on, on both sides, in one go.
+  Fix-QuickLoot.ps1
 
   RETIRED. DO NOT RUN. Issue #1179: switched on MCMHelper.esp in server-settings.json and plugins.txt by hand. The collection (or the settled load order) does this now. It refuses to run, and the rest of the file is kept for the history of how it was installed. Pattern from #405 Add-Bodies.
 

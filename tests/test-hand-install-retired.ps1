@@ -88,7 +88,10 @@ Yes ("Add-Accuracy.ps1 run exits non-zero (exit $code)") ($code -ne 0)
 Yes 'and the run says STOP and #1179' ($out -match 'STOP\. Add-Accuracy\.ps1 is retired' -and $out -match '#1179')
 
 # Install-SkyMPClient gone; Sync-Client is the path.
-Yes 'Install-SkyMPClient.ps1 is gone from scripts\release' (-not (Test-Path -LiteralPath (Join-Path $Repo 'scripts\release\Install-SkyMPClient.ps1')))
+# Assert by Filter under scripts\, not Join-Path to the gone file: a path to a
+# file that is gone is what tests\test-script-paths.ps1 fails on (same pattern
+# as tests\test-install-client-step.ps1).
+Yes 'Install-SkyMPClient.ps1 is gone from scripts' (@(Get-ChildItem -LiteralPath (Join-Path $Repo 'scripts') -Recurse -File -Filter 'Install-SkyMPClient.*').Count -eq 0)
 Yes 'Sync-Client.ps1 is there instead' (Test-Path -LiteralPath (Join-Path $Repo 'scripts\release\Sync-Client.ps1'))
 
 # Legit deploy/dev paths stay runnable (no retirement STOP).
