@@ -11,13 +11,18 @@ because forty channels with nothing in them reads as abandoned rather than
 organised. This is the same skeleton with the empty rooms left out, and it
 grows by adding to a category rather than by rebuilding.
 
-### Top, no category
+### Start Here
 
 | Channel | Who writes | What it is |
 |---|---|---|
-| `#welcome` | staff | What this is and the three steps to get in |
 | `#rules` | staff | Seven rules, short on purpose |
+| `#welcome` | staff | What this is and the three steps to get in |
 | `#start-here` | staff | Installing, joining, where the logs are |
+| `#say-hello` | anybody | The one channel somebody who is not approved yet can talk in |
+
+These four and the Applications category are all somebody sees before staff
+give them Member. The category itself is open to everybody, and the three
+read only ones stay read only.
 
 ### Information
 
@@ -45,46 +50,51 @@ its name, and passes over a `#tickets` anybody else can read.
 
 | Channel | What it is |
 |---|---|
-| `Support` (voice) | Where a ticket goes when typing is slower than talking |
-| `#bugs` | A forum, one post per problem |
 | `#suggestions` | A forum, mods and features, Nexus link included |
-| `#logs-and-crashes` | Drag the file straight in |
+| `Support` (voice) | Where a ticket goes when typing is slower than talking |
 
 Installing and connecting problems are a ticket, not a public forum. Half of
 them involve somebody's machine, their paths, or their account, and none of
 that belongs in a channel everybody reads.
 
+`#bugs` and `#logs-and-crashes` were here and are gone. The builder still
+names both so that a prune never deletes a channel of either name, and never
+makes them again (`make=False`). A bug goes in a ticket or in `#general-chat`
+until somebody decides otherwise.
+
 ### Thornswood
 
-`#general`, `#screenshots`, `#clips`, `#bot-commands`.
+`#general-chat`, `#media`, `#welcome-travelers`, `#game-rules`,
+`#server-progression-and-economy`.
 
-One general. A second one only ever splits the same conversation in half.
+One general. A second one only ever splits the same conversation in half. It
+was `#general` until it was renamed, and the topic on it is written by hand,
+so the builder leaves the topic alone. `#welcome-travelers` is where the join
+cards go, and the server's system channel points at it.
+
+`#game-rules` sits here rather than in In Character, because that is where it
+was moved to. It carries the nine in-world rules, read out of the "In the
+World" part of `site\data\site\rules.md`, the /rules page, so the two cannot
+disagree.
 
 ### In Character
 
-`#character-introductions`, `#tales` (a forum, one story per post),
-`#graveyard`.
+`#character-introductions` (a forum, one post each), `#tales` (a forum, one
+story per post), `#lore`, `#rp-appreciation`, `#graveyard`.
 
 ### The Holds
 
-One channel per hold: `#whiterun` `#solitude` `#windhelm` `#riften` `#markarth`
+`#choose-your-hold` at the top, where the bot's buttons are, then one channel
+per hold: `#whiterun` `#solitude` `#windhelm` `#riften` `#markarth`
 `#dawnstar` `#morthal` `#falkreath` `#winterhold`.
 
 In character. What is said there is said in the hold. A hold with nowhere to
 talk is a line on a map, and it is what makes the onboarding question mean
 something.
 
-### In character, the rest
-
-`#game-rules` carries the nine in-world rules, read out of the "In the World"
-part of `site\data\site\rules.md`, the /rules page, so the two cannot
-disagree. `#lore` carries the setting.
-`#character-introductions`, `#tales` (a forum), `#rp-appreciation` and
-`#graveyard`.
-
 ### Voice
 
-**The Bannered Mare**, **The Road**, and **AFK**.
+**AFK** and **General**.
 
 Proximity voice is in the launcher, so these are for before, after, and
 whoever is not in the world. AFK is set as the server's real AFK channel, so
@@ -95,11 +105,11 @@ The support voice channel sits in Help, because that is what it is for.
 
 ### Testing
 
-`#test-tasks` and `#test-results`, visible to testers and staff and to nobody
-else. `#test-tasks` also lets in the lead gamemaster role, because that role
-may open a Live smoke session and the rest of that gate does not include it.
-It is on that channel's own line in the builder's plan, so no other channel
-moved.
+`test-results` (a forum), `#test-tasks` and **play-testing** (voice), visible
+to Playtesters and staff and to nobody else. `#test-tasks` also lets in the
+lead gamemaster role, because that role may open a Live smoke session and the
+rest of that gate does not include it. It is on that channel's own line in the
+builder's plan, so no other channel moved.
 
 `#test-tasks` replaces `#test-these`, which was deleted in the channel cleanup.
 It is a new channel rather than that one renamed, and `#test-these` is in the
@@ -136,8 +146,12 @@ keeps the rows it was opened with; the next `start` uses the new set.
 
 ### Staff
 
-`#staff-general`, `#dev-notes`, `#deploys`, `#reports`, and a Staff Room.
-Invisible to everybody else.
+A staff `#news` where the site watcher speaks, `dev-test-results` (a forum),
+`#staff-general` and a Staff Room. Invisible to everybody else.
+
+`#dev-notes`, `#deploys` and `#reports` were here and are gone, and like
+`#bugs` the builder keeps their names so that a prune cannot take a channel of
+that name and no run makes them again.
 
 ## Roles
 
@@ -148,16 +162,28 @@ different servers stitched together.
 | Role | Colour | What it means |
 |---|---|---|
 | Owner | gold | Runs the place. You |
+| Lead Gamemaster | deep blue | Runs the gamemasters, and opens a Live smoke session |
 | Dev | violet | Builds and deploys it |
-| Moderator | green | Moderates |
 | Gamemaster | blue | Runs things in world |
 | Loremaster | teal | Writes the world |
+| Trial Gamemaster | pale blue | A gamemaster on trial. Sees every hold, not the staff channels |
+| Moderator | green | Moderates |
 | Content Creator | rust | Makes videos about it |
+| Server Booster | pink | Boosted the server. Discord's own role, never made here |
 | Playtester | copper | Tests the builds |
 | Milk Drinker, Talos Worshiper, Thalmor Boot-Licker | | The three Patreon tiers |
 | Jarl of *hold* | bright gold | Holds that hold. Nine of them, one each |
 | Citizen of *hold* | slate | Where your character lives |
 | Member | grey | Everybody, handed out on the way in |
+| Banned | grey | What the site keys a ban off. No permissions, not hoisted |
+| Patreon, News Pings, Updates Pings | | Made by Patreon and by the bot, never here. They are in the builder's list for their place in the order and nothing else |
+
+Owner, Dev, Moderator and Gamemaster are staff as far as the channels are
+concerned: they see the staff channels and can post in the read only ones.
+Lead Gamemaster and Trial Gamemaster are not in that list, so neither opens
+`#reports`; both see every hold, and the lead gamemaster role is named on
+`#test-tasks` by that channel's own line in the plan. Loremaster sees every
+hold as well.
 
 Staff roles are job titles on purpose. Thane, Steward, Warden and Housecarl are
 all things somebody should be able to play, and a moderator wearing one makes
@@ -295,8 +321,8 @@ a bot.
 | Field | Now | After the build |
 |---|---|---|
 | Rules or guidelines channel | `#rules` | leave it |
-| Community Updates Channel | `#general`, because nothing else exists yet | `#staff-general` |
-| Safety Notifications Channel | `#general` | `#staff-general` |
+| Community Updates Channel | `#general-chat`, because nothing else exists yet | `#staff-general` |
+| Safety Notifications Channel | `#general-chat` | `#staff-general` |
 
 Both of the last two carry moderation and safety notices about your own server,
 some of it about specific people, so they do not belong in a channel everybody
@@ -342,6 +368,12 @@ What it sets:
   shows `#tales`, Just playing `#general`, I want to help test
   `#tickets-and-applications` (testing starts with an application), I make
   videos `#media`.
+
+`Build-Onboarding.py` still names `general` and `test-these`, which the server
+no longer has: they are `#general-chat` and `#test-tasks` now. It looks every
+channel up by name on the server, so `-Check` names both and sends nothing
+until the script is caught up. That is its own change and its own issue on the
+board.
 - **Which hold does your character call home?** Only with `-GrantMember`. Pick
   one, members must answer. Each hold gives Member and its own Citizen role,
   which opens that hold's channel; Not decided yet gives Member only. Off by
