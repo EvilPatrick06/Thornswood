@@ -23,6 +23,9 @@
 
   Everything it does goes out as the ordinary /journal command, the same lines
   a person could type. See the journalCommand note in gamemode.js.
+
+  A faction or a business is a separate tab on this same panel, drawn only
+  when the server says this character may see it. Those lines go out as /book.
 */
 (function () {
   if (window.thornswoodJournal) { return; }
@@ -35,6 +38,7 @@
   var openPage = '';     // which page inside it
   var editing = false;
   var readingShared = -1;
+  var openGroup = '';
 
   function tell(what) {
     try { window.skyrimPlatform.sendMessage('thornswood-front', 'journal:' + what); }
@@ -261,6 +265,26 @@
                 '<div style="color:rgba(217,207,180,.6);font-size:12px;font-style:italic">from ' + esc(shared[j].from) + '</div></button>';
       }
     }
+    var group = data && data.group;
+    if (group && group.show) {
+      html += '<h3>Group</h3>';
+      var gb = group.books || [];
+      if (!gb.length) { html += '<div class="none">No book yet.</div>'; }
+      for (var gi = 0; gi < gb.length; gi++) {
+        html += '<button class="item' + (gb[gi].id === openGroup ? ' sel' : '') +
+                '" data-group="' + esc(gb[gi].id) + '">' + esc(gb[gi].name) +
+                '<span class="c">' + esc(gb[gi].kind) + '</span></button>';
+      }
+      if (group.canBusiness || group.canFaction) {
+        html += '<input id="' + ID + '-gname" placeholder="A name">';
+        if (group.canBusiness) {
+          html += '<button class="item go" data-found="business">New business</button>';
+        }
+        if (group.canFaction) {
+          html += '<button class="item go" data-found="faction">New faction</button>';
+        }
+      }
+    }
     side.innerHTML = html;
 
     var items = side.querySelectorAll('button[data-book],button[data-new],button[data-shared]');
@@ -274,16 +298,37 @@
             renamed on the panel, which is one more click and cannot strand
             anybody.
           */
+          openGroup = '';
           net('/journal new Journal');
           return;
         }
         if (this.getAttribute('data-shared') !== null) {
           readingShared = Number(this.getAttribute('data-shared'));
-          openBook = ''; openPage = ''; editing = false;
+          openBook = ''; openPage = ''; editing = false; openGroup = '';
           draw();
           return;
         }
         openBook = this.getAttribute('data-book');
+        readingShared = -1;
+        openPage = '';
+        editing = false;
+        openGroup = '';
+        draw();
+      };
+    }
+    var groupBtns = side.querySelectorAll('button[data-group],button[data-found]');
+    for (var gbi = 0; gbi < groupBtns.length; gbi++) {
+      groupBtns[gbi].onclick = function () {
+        var found = this.getAttribute('data-found');
+        if (found) {
+          var nameEl = root.querySelector('#' + ID + '-gname');
+          var gname = nameEl ? String(nameEl.value || '').trim() : '';
+          if (!gname) { return; }
+          net('/book new ' + found + ' ' + gname);
+          return;
+        }
+        openGroup = this.getAttribute('data-group');
+        openBook = '';
         readingShared = -1;
         openPage = '';
         editing = false;
@@ -292,8 +337,176 @@
     }
   }
 
+  function groupBook() {
+    var g = data && data.group;
+    var rows = (g && g.books) || [];
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].id === openGroup) { return rows[i]; }
+    }
+    return null;
+  }
+
+  function leftWords(row) {
+    if (row.on) { return 'here'; }
+    if (!row.left) { return ''; }
+    try {
+      var d = new Date(row.left);
+      if (isNaN(d.getTime())) { return ''; }
+      return 'left ' + d.toLocaleString();
+    } catch (e) { return ''; }
+  }
+
+  function gold(n) { return n == null || n === '' ? '' : String(n); }
+
+  function drawGroup(main) {
+    var book = groupBook();
+    if (!book) { main.innerHTML = '<div class="none">Gone.</div>'; return; }
+    var out = '<div class="from">' + esc(book.name) + ', ' + esc(book.kind) + '</div>';
+    if (book.read) {
+      out += '<b>People</b>';
+      var people = book.people || [];
+      if (!people.length) { out += '<div class="none">Nobody in it.</div>'; }
+      for (var i = 0; i < people.length; i++) {
+        var when = leftWords(people[i]);
+        out += '<div class="read">' + esc(people[i].name) + ', ' + esc(people[i].role) +
+               (when ? ', ' + esc(when) : '') + '</div>';
+      }
+      out += '<b>Prices</b>';
+      out += '<div class="none">A hold drop box is not there. The list stays in the book.</div>';
+      var list = book.priceList || [];
+      if (!list.length) { out += '<div class="none">No prices yet.</div>'; }
+      for (var p = 0; p < list.length; p++) {
+        out += '<div class="read">' + esc(list[p].name) +
+               ' buy ' + esc(gold(list[p].buy)) + ' sell ' + esc(gold(list[p].sell));
+        if (book.canPrices) {
+          out += ' <button data-g="drop" data-name="' + esc(list[p].name) + '">Remove</button>';
+        }
+        out += '</div>';
+      }
+      if (book.canPrices) {
+        out += '<div class="bar"><input id="' + ID + '-price-name" placeholder="what">' +
+               '<input id="' + ID + '-price-buy" placeholder="buy, blank if not">' +
+               '<input id="' + ID + '-price-sell" placeholder="sell, blank if not">' +
+               '<button data-g="price">Set price</button></div>';
+      }
+      out += '<b>Talk</b>';
+      var chat = book.chat || [];
+      if (!chat.length) { out += '<div class="none">Nothing said yet.</div>'; }
+      for (var c = 0; c < chat.length; c++) {
+        out += '<div class="read">(( ' + esc(chat[c].name) + ': ' + esc(chat[c].text) + ' ))</div>';
+      }
+    } else {
+      out += '<div class="none">You cannot read this book.</div>';
+    }
+    if (book.speak) {
+      out += '<div class="bar"><input id="' + ID + '-gline" placeholder="out of character">' +
+             '<button class="go" data-g="say">Say</button></div>';
+    }
+    if (book.invite) {
+      out += '<div class="bar"><input id="' + ID + '-ginvite" placeholder="who is here">' +
+             '<button data-g="invite">Invite</button></div>';
+    }
+    if (book.canRoles) {
+      out += '<div class="bar"><input id="' + ID + '-grole" placeholder="a role">' +
+             '<button data-g="rolenew">New role</button></div>';
+      out += '<div class="bar"><input id="' + ID + '-gwho" placeholder="who is in the book">' +
+             '<input id="' + ID + '-gset" placeholder="their role">' +
+             '<button data-g="setrole">Set role</button>' +
+             '<button data-g="remove">Remove</button></div>';
+    }
+    if (book.owner) {
+      out += '<div class="bar"><input id="' + ID + '-grename" placeholder="a new name">' +
+             '<button data-g="rename">Rename</button>' +
+             '<button data-g="disband">Disband</button></div>';
+    }
+    if (book.staff) {
+      out += '<div class="bar"><input id="' + ID + '-ghand" placeholder="who already belongs">' +
+             '<button data-g="give">Hand it on</button></div>';
+    }
+    if (book.leave) {
+      out += '<div class="bar"><button data-g="leave">Leave</button></div>';
+    }
+    main.innerHTML = out;
+    var actions = main.querySelectorAll('button[data-g]');
+    for (var a = 0; a < actions.length; a++) {
+      actions[a].onclick = onGroup;
+    }
+  }
+
+  function gval(id) {
+    var el = root.querySelector('#' + ID + '-' + id);
+    return el ? String(el.value || '').trim() : '';
+  }
+
+  function blankGold(id) {
+    var v = gval(id);
+    return v ? v : '-';
+  }
+
+  function onGroup() {
+    var book = groupBook();
+    if (!book) { return; }
+    var verb = this.getAttribute('data-g');
+    if (verb === 'say') {
+      var line = gval('gline');
+      if (!line) { return; }
+      net('/book say ' + book.id + ' ' + line);
+      return;
+    }
+    if (verb === 'invite') {
+      var who = gval('ginvite');
+      if (!who) { return; }
+      net('/book invite ' + book.id + ' ' + who);
+      return;
+    }
+    if (verb === 'leave') { net('/book leave ' + book.id); openGroup = ''; return; }
+    if (verb === 'rename') {
+      var next = gval('grename');
+      if (!next) { return; }
+      net('/book rename ' + book.id + ' ' + next);
+      return;
+    }
+    if (verb === 'disband') { net('/book disband ' + book.id); openGroup = ''; return; }
+    if (verb === 'price') {
+      var item = gval('price-name');
+      if (!item) { return; }
+      net('/book price ' + book.id + ' | ' + item + ' | ' + blankGold('price-buy') + ' | ' + blankGold('price-sell'));
+      return;
+    }
+    if (verb === 'drop') {
+      net('/book price ' + book.id + ' drop | ' + (this.getAttribute('data-name') || ''));
+      return;
+    }
+    if (verb === 'rolenew') {
+      var role = gval('grole');
+      if (!role) { return; }
+      net('/book role ' + book.id + ' new | ' + role);
+      return;
+    }
+    if (verb === 'setrole') {
+      var person = gval('gwho');
+      var set = gval('gset');
+      if (!person || !set) { return; }
+      net('/book member ' + book.id + ' role | ' + person + ' | ' + set);
+      return;
+    }
+    if (verb === 'remove') {
+      var gone = gval('gwho');
+      if (!gone) { return; }
+      net('/book member ' + book.id + ' remove | ' + gone);
+      return;
+    }
+    if (verb === 'give') {
+      var heir = gval('ghand');
+      if (!heir) { return; }
+      net('/book give ' + book.id + ' | ' + heir);
+    }
+  }
+
   function drawMain() {
     var main = root.querySelector('#' + ID + '-main');
+
+    if (openGroup) { drawGroup(main); return; }
 
     if (readingShared >= 0) {
       var sh = ((data && data.shared) || [])[readingShared];
