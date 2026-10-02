@@ -165,10 +165,21 @@ if ($op -eq 'forget') {
     if ($now -ne [string]$expect[$k]) { $moved += ($k + ' was ' + ([string]$expect[$k]).Substring(0, 12) + ' and is ' + $(if ($now) { $now.Substring(0, 12) } else { 'absent' })) }
   }
   if ($moved.Count) { 'MOVED|' + ($moved -join '; '); return }
-  $said = ''
-  foreach ($f in @('feed\version.json', 'feed-dev\version.json', 'feed\published.json', 'feed-dev\published.json')) {
+  # Names that still count as live assets. version.json is scanned as text
+  # (pack and record sha256 fields). published.json is often a baseline
+  # record: only size:sha256 file entries name assets. A bare :gone: sha256
+  # (#1261) is a launcher instruction, not a live asset, so it must not keep
+  # the bytes on the site.
+  $said = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+  foreach ($f in @('feed\version.json', 'feed-dev\version.json')) {
     $p = Join-Path $root $f
-    if (Test-Path -LiteralPath $p -PathType Leaf) { $said += [IO.File]::ReadAllText($p) }
+    if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { continue }
+    foreach ($m in [regex]::Matches([IO.File]::ReadAllText($p), '[0-9a-fA-F]{64}')) { [void]$said.Add($m.Value.ToLowerInvariant()) }
+  }
+  foreach ($f in @('feed\published.json', 'feed-dev\published.json')) {
+    $p = Join-Path $root $f
+    if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { continue }
+    foreach ($m in [regex]::Matches([IO.File]::ReadAllText($p), '(?i)(\d+):([0-9a-f]{64})')) { [void]$said.Add($m.Groups[2].Value.ToLowerInvariant()) }
   }
   $assets = Join-Path $dir 'assets'
   foreach ($n in $names) {

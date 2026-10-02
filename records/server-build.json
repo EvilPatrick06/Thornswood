@@ -3,11 +3,11 @@
   "binary": "scam_native.node",
   "sha256": "37d5bc5de33de11086b1180dcb1e8b64638398bf18c502541025133548ecd8a9",
   "bytes": 5636608,
-  "builtUtc": "2026-10-02T01:39:16Z",
+  "builtUtc": "2026-10-02T21:19:11Z",
   "source": {
     "repo": "https://github.com/EvilPatrick06/skymp.git",
     "branch": "thornswood/engine-changes",
-    "commit": "6725fc778a99b2cf344426afb8158df500b7ad6f",
+    "commit": "df2ae1f185e84bf9119ffa15d2e3da1622ac77fd",
     "upstream": "https://github.com/skyrim-multiplayer/skymp.git",
     "upstreamBase": "f926944b18e3aed4bc3864ce668626c05ec2545f"
   },
@@ -15,38 +15,38 @@
     "data/scripts/ActiveMagicEffect.pex": {
       "sha256": "64786095c2c41dee014fb49f8d757319f359cfcdcc5ea2a5ff8a525fa7c22a80",
       "bytes": 614,
-      "commit": "6725fc778a99b2cf344426afb8158df500b7ad6f"
+      "commit": "df2ae1f185e84bf9119ffa15d2e3da1622ac77fd"
     },
     "dist_back/skymp5-server.js": {
       "sha256": "994cbd8cf5330553e79455704ef9d2e72abab4677cb4d009c08d8094f387c7ca",
       "bytes": 3156187,
-      "commit": "6725fc778a99b2cf344426afb8158df500b7ad6f"
+      "commit": "df2ae1f185e84bf9119ffa15d2e3da1622ac77fd"
     },
     "dist_back/skymp5-server.js.map": {
       "sha256": "81a51ecfd3bcb7e3a0f74114e4e98599edc0e6ed80e51f18c3ad7e7011685c14",
       "bytes": 10306594,
-      "commit": "6725fc778a99b2cf344426afb8158df500b7ad6f"
+      "commit": "df2ae1f185e84bf9119ffa15d2e3da1622ac77fd"
     },
     "launch_server.bat": {
       "sha256": "a8d8bb765faec67716588faf11d3b5f8770168f97f0d9dfd7cdfd703b9324d0c",
       "bytes": 40,
-      "commit": "6725fc778a99b2cf344426afb8158df500b7ad6f"
+      "commit": "df2ae1f185e84bf9119ffa15d2e3da1622ac77fd"
     },
     "package.json": {
       "sha256": "04582dda742a49798402b19dfacc0152fbe6664ac589ca126ea57a5a69e64ef0",
       "bytes": 1135,
-      "commit": "6725fc778a99b2cf344426afb8158df500b7ad6f"
+      "commit": "df2ae1f185e84bf9119ffa15d2e3da1622ac77fd"
     },
     "scam_native.node": {
       "sha256": "37d5bc5de33de11086b1180dcb1e8b64638398bf18c502541025133548ecd8a9",
       "bytes": 5636608,
-      "commit": "6725fc778a99b2cf344426afb8158df500b7ad6f"
+      "commit": "df2ae1f185e84bf9119ffa15d2e3da1622ac77fd"
     },
     "yarn.lock": {
       "sha256": "cc52ea2d25119d8b0ba5e7f567209cec9e65d13fab084799337f1315c21087ee",
       "bytes": 93274,
-      "commit": "6725fc778a99b2cf344426afb8158df500b7ad6f"
+      "commit": "df2ae1f185e84bf9119ffa15d2e3da1622ac77fd"
     }
   },
-  "recorded": "2026-10-01"
+  "recorded": "2026-10-02"
 }

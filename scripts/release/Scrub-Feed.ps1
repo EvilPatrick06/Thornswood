@@ -63,14 +63,15 @@
       published.json from before the feed named a baseline (main) is written
       again without them.
       A launcher that synced to the old record sees a record it has not synced
-      to, checks every file against it, finds nothing to fetch and nothing
-      gone, and writes the new one down. The files dropped from a record are
-      not listed as gone, on purpose: Ship-Rules never lists Bethesda's files
-      as removed, because a delete reaches Steam copies where they are the
-      person's own; the launcher takes them out of its own game folder itself
-      (OwnGame.BethesdaTool). One machine's files are the same: on every other
-      install that file is that person's own, their key binds, their Vortex,
-      their face export.
+      to, checks every file against it, and writes the new one down. Bethesda's
+      files and one machine's files dropped from a record are not listed as
+      gone, on purpose: Ship-Rules never lists them as removed, because a
+      delete reaches Steam copies where they are the person's own; the
+      launcher takes Bethesda tools out of its own game folder itself
+      (OwnGame.BethesdaTool). Other authors' loose files (#1178, #1261) that a
+      record drops become :gone: with the sha256 the record had for them, so
+      the launcher deletes only a copy whose bytes still match what we
+      shipped.
     - Rollback-Feed reads the new records and finds each file in the rebuilt
       packs by its size and sha256, which have not changed.
     - Nothing here is an exe or the installer, so nothing is signed: a pack
@@ -481,7 +482,17 @@ foreach ($ptr in $ptrs) {
             if ($m.Success) { $loose += $m.Groups[1].Value }
         }
     }
-    foreach ($k in $drop) { $map.Remove($k) }
+    foreach ($k in $drop) {
+        # #1261: another author's file we once shipped becomes gone with its
+        # sha256. Bethesda's and one machine's stay off the gone list
+        # (Test-ScrubMachinePath): a delete must never reach Steam copies of
+        # those.
+        if (-not $k.StartsWith(':') -and (Test-ShipNotOurs $k) -and -not (Test-ScrubMachinePath $k)) {
+            $m = [regex]::Match([string]$map[$k], '^\d+:([0-9a-fA-F]{64})$')
+            if ($m.Success) { $map[(':gone:' + $k)] = $m.Groups[1].Value.ToLowerInvariant() }
+        }
+        $map.Remove($k)
+    }
     $nf = Join-Path (Join-Path $WorkDir 'records') ($rsha + '-scrubbed.json')
     $nsha = Write-BaselineFile $map $nf
     $recSwap[$rsha] = [pscustomobject]@{ Id = [string]$ptr.id; Sha = $nsha; Entries = $map.Count; Prefix = $prefix; File = $nf; Loose = $loose }
@@ -626,6 +637,16 @@ else {
         foreach ($f in @('version.json', 'published.json')) {
             $pth = Join-Path $look $f
             if (-not (Test-Path -LiteralPath $pth)) { continue }
+            # published.json is often the baseline record itself. Its :gone:
+            # values may be sha256s of files we once shipped (#1261); those are
+            # instructions to the launcher, not assets the feed still hands
+            # out. Read them as a record so only real file entries count.
+            if ($f -eq 'published.json') {
+                foreach ($k in @((Get-RecordFileShas (Read-BaselineFile $pth)).Keys)) {
+                    [void]$named.Add($k)
+                }
+                continue
+            }
             foreach ($m in [regex]::Matches([IO.File]::ReadAllText($pth), '[0-9a-f]{64}')) { [void]$named.Add($m.Value) }
         }
         $d2 = (([IO.File]::ReadAllText((Join-Path $look 'version.json'))) -replace '^\uFEFF', '') | ConvertFrom-Json
