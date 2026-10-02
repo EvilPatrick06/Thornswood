@@ -1003,7 +1003,7 @@ function Unbump([string]$why) {
 $ciStub = ''
 if ($Package -and -not $Dev -and -not $DryRun) {
     Head 'The setup program from CI'
-    $stubDir = Join-Path ([IO.Path]::GetTempPath()) ('Thornswood-setup-' + (Split-Path -Leaf $Root.TrimEnd('\')))
+    $stubDir = & (Join-Path $Here 'Get-ScratchDir.ps1') ('Thornswood-setup-' + (Split-Path -Leaf $Root.TrimEnd('\')))
     $why = Get-ReleaseStub (Get-SourceRepo $RepoDir) $target $stubDir
     if ($why) {
         Unbump 'there is no verified setup program to package'
@@ -1027,7 +1027,7 @@ if (-not $ModsOnly) {
     # meets the launcher still running from the install, and Install-Launcher
     # then closes the game and the launcher, puts the exe in place and does
     # the shortcut and the icon, which is everything the build used to do.
-    $buildOut = Join-Path ([IO.Path]::GetTempPath()) ('Thornswood-launcher-' + (Split-Path -Leaf $Root.TrimEnd('\')))
+    $buildOut = & (Join-Path $Here 'Get-ScratchDir.ps1') ('Thornswood-launcher-' + (Split-Path -Leaf $Root.TrimEnd('\')))
 
     if (-not $Dev -and -not $DryRun) {
         # A MAIN RELEASE TAKES THE EXE CI BUILT, and verifies it, since issue

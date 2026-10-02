@@ -193,6 +193,7 @@ $oldTmp = $env:TMP
 $oldCalls = $env:TS_DRY_CALLS
 $oldGhDl = $env:TS_GH_DL
 $oldSite = $env:THORNSWOOD_TEST_SITE_DIR
+$oldScratch = $env:THORNSWOOD_SCRATCH_ROOT
 $ps = (Get-Process -Id $PID).Path
 
 function Invoke-Ship([string[]]$shipArgs) {
@@ -240,7 +241,7 @@ try {
     Copy-Item -LiteralPath $ShipPath -Destination (Join-Path $repo 'scripts\release\Ship.ps1') -Force
     # The real files Ship dot-sources, beside it, so it runs as it does for real.
     $realRel = Split-Path -Parent $ShipPath
-    foreach ($n in 'Ship-Rules.ps1', 'Assert-PublishSigned.ps1', 'Feed-Store.ps1', 'Release-Name.ps1', 'Note-Rules.ps1', 'Where.ps1') {
+    foreach ($n in 'Ship-Rules.ps1', 'Assert-PublishSigned.ps1', 'Feed-Store.ps1', 'Release-Name.ps1', 'Note-Rules.ps1', 'Where.ps1', 'Get-ScratchDir.ps1') {
         Copy-Item -LiteralPath (Join-Path $realRel $n) -Destination (Join-Path $repo ('scripts\release\' + $n)) -Force
     }
     Copy-Item -LiteralPath (Join-Path $realRel '..\..\layout.json') -Destination (Join-Path $repo 'layout.json') -Force
@@ -389,8 +390,12 @@ if ($dir) {
 
     $env:PATH = $bin + ';' + $oldPath
     $env:LOCALAPPDATA = $appdata
-    # Ship stages the launcher CI built under TEMP, and the gh stand-in writes
-    # it there, so TEMP is this run's own folder too.
+    # Ship stages the launcher under Get-ScratchDir (issue #1272), not %TEMP%.
+    # Point the scratch root at this run's own folder so the gh stand-in writes
+    # here and nothing lands under the real temps tree. TEMP stays sandboxed
+    # too for anything else that still reads it.
+    $env:THORNSWOOD_SCRATCH_ROOT = Join-Path $T 'scratch'
+    New-Item -ItemType Directory -Force -Path $env:THORNSWOOD_SCRATCH_ROOT | Out-Null
     $env:TEMP = Join-Path $T 'temp'
     $env:TMP = $env:TEMP
     New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null
@@ -548,6 +553,7 @@ finally {
     $env:TS_DRY_CALLS = $oldCalls
     $env:TS_GH_DL = $oldGhDl
     $env:THORNSWOOD_TEST_SITE_DIR = $oldSite
+    if ($null -eq $oldScratch) { Remove-Item Env:THORNSWOOD_SCRATCH_ROOT -ErrorAction SilentlyContinue } else { $env:THORNSWOOD_SCRATCH_ROOT = $oldScratch }
     Remove-Item -LiteralPath $T -Recurse -Force -ErrorAction SilentlyContinue
 }
 
