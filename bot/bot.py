@@ -39,8 +39,10 @@ Everything it needs is in env:
   TICKET_LOG       staff only channel closed tickets are recorded in, and where
                    a ticket goes when its thread will not open. Checked by its
                    permissions, never trusted by its name
-  STAFF_ROLES      comma separated, who gets pulled into every ticket thread
-  CREATOR_ROLES    comma separated, added to Apply: Content Creator only
+  STAFF_ROLES      comma separated role IDs (preferred) or names, who gets
+                   pulled into every ticket thread
+  CREATOR_ROLES    comma separated role IDs or names, added to Apply:
+                   Content Creator only
   TICKET_COOLDOWN  seconds between one person's tickets, default 300
   WATCH_CHANNEL_ID id of the staff channel the watchdog's messages go in,
                    default whatever dev-channel.txt beside this file holds
@@ -48,12 +50,13 @@ Everything it needs is in env:
                    makes on the VPS
   WATCH_READ_EVERY seconds between reads of its outbox, default 60
   HOLD_CHANNEL     channel the hold panel lives in, default choose-your-hold
-  MEMBER_ROLE      role that may pick a hold, default Member
+  MEMBER_ROLE      role ID (preferred) or name that may pick a hold, default Member
   LIVE_SMOKE_EXPORT       the Live set, default live-smoke-discord-export.json
                           beside this file
   LIVE_SMOKE_CHANNEL      channel the sessions live in, default test-tasks
-  LIVE_SMOKE_ADMIN_ROLES  comma separated, who may start, reset and refresh a
-                          session, default Owner,Dev,Lead GM,Lead Gamemaster
+  LIVE_SMOKE_ADMIN_ROLES  comma separated role IDs (preferred) or names, who
+                          may start, reset and refresh a session, default
+                          Owner,Dev,Lead GM,Lead Gamemaster
   LIVE_SMOKE_DENY_USER_IDS comma separated account ids that may not mark a
                           row, empty by default and set only on the VPS
   HEARTBEAT_FILE   where the heartbeat goes, default heartbeat.json beside this
@@ -130,9 +133,11 @@ TICKET_LOG = [n.strip().lower() for n in
               os.environ.get('TICKET_LOG', 'tickets,ticket-log').split(',')
               if n.strip()]
 # Who gets pulled into every ticket thread.
-STAFF = [r.strip().lower() for r in
-         os.environ.get('STAFF_ROLES', 'Owner,Gamemaster,Dev,Loremaster,Moderator').split(',')
-         if r.strip()]
+# Tokens may be Discord role snowflake IDs (digits) or names. IDs survive a
+# rename; names are kept so an unmigrated bot.env.json still works.
+_STAFF_RAW = [r.strip() for r in
+              os.environ.get('STAFF_ROLES', 'Owner,Gamemaster,Dev,Loremaster,Moderator').split(',')
+              if r.strip()]
 
 # Roles that see one kind of ticket and not the rest.
 #
@@ -140,10 +145,42 @@ STAFF = [r.strip().lower() for r in
 # has no reason to be reading somebody's playtest application or a report about
 # another person. It does have every reason to read applications to join it,
 # so it is added to those threads and no others.
-CREATOR = [r.strip().lower() for r in
-           os.environ.get('CREATOR_ROLES', 'Content Creator').split(',')
-           if r.strip()]
+_CREATOR_RAW = [r.strip() for r in
+                os.environ.get('CREATOR_ROLES', 'Content Creator').split(',')
+                if r.strip()]
+
+def _role_tokens(raw):
+    ids, names = set(), set()
+    for t in raw:
+        t = (t or '').strip()
+        if not t:
+            continue
+        if t.isdigit():
+            ids.add(int(t))
+        else:
+            names.add(t.lower())
+    return ids, names
+
+def _role_hit(role, ids, names):
+    return getattr(role, 'id', None) in ids or role.name.lower() in names
+
+def _who_hits(who, ids, names):
+    for r in getattr(who, 'roles', None) or []:
+        if _role_hit(r, ids, names):
+            return True
+    return False
+
+def _guild_roles(guild, ids, names):
+    return [r for r in guild.roles if _role_hit(r, ids, names)]
+
+STAFF_IDS, STAFF_NAMES = _role_tokens(_STAFF_RAW)
+CREATOR_IDS, CREATOR_NAMES = _role_tokens(_CREATOR_RAW)
+# Name-only views kept for refusal text and older harnesses that read STAFF.
+STAFF = sorted(STAFF_NAMES) if STAFF_NAMES else [t.lower() for t in _STAFF_RAW if not t.isdigit()]
+CREATOR = sorted(CREATOR_NAMES) if CREATOR_NAMES else [t.lower() for t in _CREATOR_RAW if not t.isdigit()]
 EXTRA_STAFF = {'creator': CREATOR}
+EXTRA_STAFF_IDS = {'creator': (CREATOR_IDS, CREATOR_NAMES)}
+
 
 # Where the site watcher speaks. Staff, not public: an outage is something to
 # fix, not an announcement.
@@ -411,12 +448,11 @@ def private_channel_ok(guild, ch):
     about somebody in front of the person it is about.
     """
     try:
-        staff = set(STAFF)
         if ch.permissions_for(guild.default_role).view_channel:
             return False
         roles = list(guild.roles)
         for r in roles:
-            if r == guild.default_role or r.name.lower() in staff:
+            if r == guild.default_role or _role_hit(r, STAFF_IDS, STAFF_NAMES):
                 continue
             if getattr(r.permissions, 'administrator', False):
                 continue
@@ -427,8 +463,7 @@ def private_channel_ok(guild, ch):
         for who, ow in (getattr(ch, 'overwrites', None) or {}).items():
             if who in roles or getattr(who, 'bot', False):
                 continue
-            held = set(x.name.lower() for x in (getattr(who, 'roles', None) or []))
-            if ow.view_channel and not (held & staff):
+            if ow.view_channel and not _who_hits(who, STAFF_IDS, STAFF_NAMES):
                 return False
         return True
     except Exception:
@@ -496,7 +531,7 @@ async def log_channel(guild, make=True):
                                                   send_messages=True),
         }
         for r in guild.roles:
-            if r.name.lower() in set(STAFF):
+            if _role_hit(r, STAFF_IDS, STAFF_NAMES):
                 over[r] = discord.PermissionOverwrite(view_channel=True,
                                                       send_messages=True)
         where = by_name(guild, TICKETS)
@@ -998,12 +1033,17 @@ class TicketModal(discord.ui.Modal):
         # without this was visible to the applicant and to nobody else, and the
         # @mention went into a room staff were not in. They are added one at a
         # time, which is the only way Discord offers.
-        want = set(STAFF) | set(EXTRA_STAFF.get(self.kind, []))
-        staff_roles = [r for r in guild.roles if r.name.lower() in want]
+        ids, names = set(STAFF_IDS), set(STAFF_NAMES)
+        extra = EXTRA_STAFF_IDS.get(self.kind)
+        if extra:
+            ids |= extra[0]
+            names |= extra[1]
+        staff_roles = [r for r in guild.roles if _role_hit(r, ids, names)]
         if not staff_roles:
-            log('no role matched %r, so nobody will be pulled into this ticket. '
-                'Set STAFF_ROLES in bot.env.json to the role names this server '
-                'actually uses.' % (sorted(want),))
+            log('no role matched ids %r or names %r, so nobody will be pulled '
+                'into this ticket. Set STAFF_ROLES in bot.env.json to the role '
+                'ids or names this server actually uses.'
+                % (sorted(ids), sorted(names)))
         head = '%s opened this. %s' % (who.mention,
                                        ' '.join(r.mention for r in staff_roles))
 
@@ -1188,8 +1228,8 @@ def _chunks(s, n):
 def is_staff(who, ch):
     """Staff, or anybody the channel itself trusts with threads."""
     try:
-        names = set(r.name.lower() for r in getattr(who, 'roles', []))
-        if names & (set(STAFF) | set(CREATOR)):
+        if (_who_hits(who, STAFF_IDS, STAFF_NAMES)
+                or _who_hits(who, CREATOR_IDS, CREATOR_NAMES)):
             return True
     except Exception:
         pass
@@ -1551,7 +1591,8 @@ async def ensure_panel(guild):
     try:
         blocked = []
         for r in guild.roles:
-            if r.name.lower() not in (set(STAFF) | set(CREATOR)):
+            if not (_role_hit(r, STAFF_IDS, STAFF_NAMES)
+                    or _role_hit(r, CREATOR_IDS, CREATOR_NAMES)):
                 continue
             if not getattr(ch.permissions_for(r), 'use_application_commands', True):
                 blocked.append(r.name)
@@ -1648,6 +1689,7 @@ HOLD_CHANNEL = [n.strip().lower() for n in
                 os.environ.get('HOLD_CHANNEL', 'choose-your-hold').split(',')
                 if n.strip()]
 MEMBER_ROLE = os.environ.get('MEMBER_ROLE', 'Member').strip().lower()
+MEMBER_IDS, MEMBER_NAMES = _role_tokens([MEMBER_ROLE] if MEMBER_ROLE else [])
 HOLDS = ['Whiterun', 'Solitude', 'Windhelm', 'Riften', 'Markarth',
          'Dawnstar', 'Morthal', 'Falkreath', 'Winterhold']
 # key, role name, button label
@@ -1677,8 +1719,8 @@ def _role(guild, name):
 
 
 def _may_pick(member):
-    names = set(r.name.lower() for r in getattr(member, 'roles', []))
-    return MEMBER_ROLE in names or bool(names & set(STAFF))
+    return (_who_hits(member, MEMBER_IDS, MEMBER_NAMES)
+            or _who_hits(member, STAFF_IDS, STAFF_NAMES))
 
 
 def _can_give(guild, role):
@@ -2348,25 +2390,31 @@ def live_smoke_checklist(export, items):
 
 
 def is_live_smoke_admin(who):
-    """Owner, Dev or Lead Gamemaster, by the names LIVE_SMOKE_ADMIN_ROLES
-       carries. A Moderator alone is not one of them. The one list behind
-       start, reset, refresh and report."""
+    """Owner, Dev or Lead Gamemaster, by the ids or names
+       LIVE_SMOKE_ADMIN_ROLES carries. A Moderator alone is not one of them.
+       The one list behind start, reset, refresh and report."""
     try:
-        names = set(r.name.lower() for r in getattr(who, 'roles', None) or [])
+        ids, names = _role_tokens(LIVE_SMOKE_ADMIN_NAMES)
+        return _who_hits(who, ids, names)
     except Exception:
         return False
-    return bool(names & set(LIVE_SMOKE_ADMIN))
 
 
 def live_smoke_admin_missing(guild):
-    """Which of those role names this server has not got, by name. The scrub
+    """Which of those role ids or names this server has not got. The scrub
        renamed roles, so this is the difference between nobody being allowed
-       and nobody being able to be."""
+       and nobody being able to be. Digit tokens match role.id; others match
+       name case-insensitively."""
     try:
-        have = set(str(r.name).lower() for r in getattr(guild, 'roles', None) or [])
+        roles = list(getattr(guild, 'roles', None) or [])
     except Exception:
         return list(LIVE_SMOKE_ADMIN_NAMES)
-    return [n for n in LIVE_SMOKE_ADMIN_NAMES if n.lower() not in have]
+    missing = []
+    for token in LIVE_SMOKE_ADMIN_NAMES:
+        ids, names = _role_tokens([token])
+        if not any(_role_hit(r, ids, names) for r in roles):
+            missing.append(token)
+    return missing
 
 
 def live_smoke_admin_refusal(guild):
@@ -2382,8 +2430,8 @@ def live_smoke_admin_refusal(guild):
     missing = live_smoke_admin_missing(guild)
     if len(missing) == len(LIVE_SMOKE_ADMIN_NAMES):
         return ('No role that may run this is on this server: %s. Set '
-                'LIVE_SMOKE_ADMIN_ROLES in bot.env.json to the names those '
-                'roles carry now, and run Install-Bot.ps1 again.'
+                'LIVE_SMOKE_ADMIN_ROLES in bot.env.json to the ids or names '
+                'those roles carry now, and run Install-Bot.ps1 again.'
                 % ', '.join(missing))
     return ('%s start, reset, refresh and report on a Live smoke session. Ask '
             'one of them.' % _live_smoke_or(LIVE_SMOKE_ADMIN_NAMES))
