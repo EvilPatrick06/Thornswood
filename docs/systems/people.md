@@ -56,9 +56,11 @@ not in the server at all. `/bard` for 5 minutes is in the server.
 The party cap of 6 is in the server. A friend request, a party
 invite, and a trade offer are answered on the prompt. The wheel's
 eight quick slots, the search, and the fifty nine emotes are in the
-server. Plain text chat still goes to everybody, because the local
-switch ships off. Text mute, hiding a name, hiding every name, and
-the leader's kick, lead, and disband are in the server. Staff
+server. Plain speech in the box is local on the dev voice service,
+same cell, about 57 metres. Left unset, a plain line still goes to
+everybody, which is how the live voice service is left. Text mute,
+hiding a name, hiding every name, and the leader's kick, lead, and
+disband are in the server. Staff
 silence is a staff command. It stops their voice, what they type, the
 words above the head, and the speaking mark. It does not hide a name.
 The mark, the words, and an emote's name are drawn above the head.

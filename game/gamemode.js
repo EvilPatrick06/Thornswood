@@ -45287,7 +45287,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     /unfreeze <person>            lets them go
     /bring <person>               moves them to you
     /goto <person>                moves you to them (/goto <place> is still the place teleport)
-    /silence <person> [minutes] [why]   nothing they type reaches anybody; 30 minutes unless said
+    /silence <person> [minutes] [why]   their voice, what they type, the words above their head, and the speaking mark stop; 30 minutes unless said
     /unsilence <person>           lets them speak again
     /warn <person> <why>          tells them, in their chat, that staff have warned them
     /give <person> <item> [count]         puts it in their pack
@@ -46132,7 +46132,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       pushSilenced();
       tell(them.pid, 'Staff have silenced you for ' + mins + ' minutes' +
                      (reason ? ': ' + reason + '.' : '.') +
-                     ' Nothing you type in the chat reaches anybody until then.');
+                     ' Your voice, what you type, the words above your head, and the speaking mark stop until then. Your name stays.');
       tell(pid, 'Silenced ' + them.name + ' for ' + mins + ' minutes. /unsilence ' +
                 them.name + ' ends it sooner.');
       record('silence', pid, me, them.pid, them.name, reason, mins);
