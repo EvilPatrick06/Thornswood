@@ -110,10 +110,13 @@ function Grab(`$from, `$asName) {
   if ((Get-Item `$from).PSIsContainer) {
     `$null = New-Item -ItemType Directory -Path `$to -Force -EA SilentlyContinue
     `$n = 0
-    foreach (`$f in (Get-ChildItem `$from -Recurse -File -EA SilentlyContinue)) {
+    # Listed from the long path. `$from may be a short 8.3 path, and
+    # FullName is not (issue #1156).
+    `$listed = (Get-Item -LiteralPath `$from).FullName
+    foreach (`$f in (Get-ChildItem -LiteralPath `$listed -Recurse -File -EA SilentlyContinue)) {
       if (`$f.FullName -like '*\node_modules\*') { continue }
       if (`$f.Length -gt 200MB) { continue }
-      `$rel = `$f.FullName.Substring(`$from.Length).TrimStart('\')
+      `$rel = `$f.FullName.Substring(`$listed.Length).TrimStart('\')
       `$dest = Join-Path `$to `$rel
       `$null = New-Item -ItemType Directory -Path (Split-Path -Parent `$dest) -Force -EA SilentlyContinue
       Copy-Item `$f.FullName `$dest -Force -EA SilentlyContinue
