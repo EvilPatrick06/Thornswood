@@ -3059,8 +3059,8 @@
     },
     "fe498:Skyrim.esm": {
       "name": "Imperial Quartermaster",
-      "hold": "no hold",
-      "bookHold": null,
+      "hold": "Haafingar",
+      "bookHold": "solitude",
       "locationName": "CWGuardTemplates",
       "cell": "1fa4c:Skyrim.esm",
       "world": null,
@@ -3124,8 +3124,8 @@
     },
     "fe4cb:Skyrim.esm": {
       "name": "Stormcloak Quartermaster",
-      "hold": "no hold",
-      "bookHold": null,
+      "hold": "Eastmarch",
+      "bookHold": "windhelm",
       "locationName": "CWGuardTemplates",
       "cell": "1fa4c:Skyrim.esm",
       "world": null,
