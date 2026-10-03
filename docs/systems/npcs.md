@@ -46,6 +46,8 @@ first stood up, once, and not again. Supply rewards debit this purse.
 Scene rewards create the amount named on the quest, subject to its
 cooldown. See [Gold](gold.md). Traders may wander within their hold for
 now. Exact guild relocation in each hold is deferred.
+The 249 traders, by hold and place, are listed in
+[Merchant trader counts](merchant-traders.md).
 
 Carriage and ferry drivers stay at stops outside city walls. They are
 the workers of the hold the stop sits in. The fare is that hold's. See

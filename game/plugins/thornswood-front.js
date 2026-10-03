@@ -82,7 +82,7 @@
   const UI_PATH = 'Data/Platform/UI/index.html';
   const OVERLAYS = ['thornswood-chat.js', 'thornswood-emotes.js', 'thornswood-voice.js',
                     'thornswood-skills.js', 'thornswood-party.js',
-                    'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-afk.js'];
+                    'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js', 'thornswood-afk.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -1930,7 +1930,7 @@
   const CAP_CLOSES = {
     skills: 'thornswoodSkills', party: 'thornswoodParty', journal: 'thornswoodJournal',
     board: 'thornswoodBoard',
-    trade: 'thornswoodTrade', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
+    trade: 'thornswoodTrade', merchant: 'thornswoodMerchant', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
     afk: 'thornswoodAfk'
   };
 
@@ -7938,6 +7938,12 @@
     }
     if (what === 'trade:opened') { T.claimFocus('trade', true); return; }
     if (what === 'trade:closed') { T.claimFocus('trade', false); return; }
+    if (what === 'merchant:opened') { T.claimFocus('merchant', true); return; }
+    if (what === 'merchant:closed') { T.claimFocus('merchant', false); return; }
+    if (what === 'merchant:ready') {
+      log('the merchant panel is in');
+      return;
+    }
     if (what === 'party:ready' || what === 'journal:ready' || what === 'trade:ready' || what === 'board:ready') {
       tellServer(what === 'trade:ready' ? '/trade refresh' : '/party refresh');
       log('the ' + what.split(':')[0] + ' panel is in');

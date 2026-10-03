@@ -393,6 +393,10 @@ if (block) {
   const none = ledger.guildPrice('whiterun', 'Mead');
   yes('a hold keeps its own price, and a hold with none uses the others',
       own.buy === 11 && otherHold.buy === 16 && none.buy === null && none.sell === null);
+  const listed = ledger.catalog('riften');
+  const listedDagger = listed.filter(function (row) { return row.name === 'Iron dagger'; })[0];
+  yes('the hold catalogue is the same submitted average',
+      listedDagger && listedDagger.buy === 16 && listed.every(function (row) { return row.buy !== null || row.sell !== null; }));
   ledger.command({
     actorId: 1, profileId: 1,
     parts: parts('/book price ' + beeId + ' | Iron dagger | 12 | -')

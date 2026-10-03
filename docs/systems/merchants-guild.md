@@ -82,5 +82,23 @@ server's minute report lists the verified count and first-time grants.
 Failed startup revokes the new service; paths into served resources, including
 Windows junctions, are refused before any ledger is written.
 
-Buying, selling and quest payments are not enabled by that initialization.
-The verified transfer path, merchant panel and custom quests remain to finish.
+Buying and selling use the hold's submitted price. The trader's purse
+falls when it buys and rises when it sells. Purchased goods stay on that
+trader's shelf. An empty purse refuses a buy. An empty shelf refuses a
+sale. A supply turn-in is five of an item at that same buy price, paid
+from the same purse, and it will not be offered again for six hours.
+Scene quests are not paid from the purse.
+
+The person must be the authenticated character and within 400 of that
+trader in the same place. The panel only sends /merchant. It does not
+move gold or goods. People cannot join, and there is no due or discount.
+
+Gold and goods move only through the native merchant transfer. Until
+that transfer is present the server refuses the trade and leaves the
+purse and the shelf as they were. A transfer that has started and is
+not yet durable stays on the trader and is not paid twice.
+
+Exact counts and places are in [Merchant trader counts](merchant-traders.md).
+Two authored traders have no hold and are not offered a price. Which key
+opens the panel, and where those two stand, stay deferred. Exact guild-site
+relocation stays deferred.
