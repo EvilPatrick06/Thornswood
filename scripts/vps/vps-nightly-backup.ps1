@@ -19,7 +19,7 @@
     the feed's store      each channel's version.json, published.json,
                           launchers.txt, releases.txt and history, not assets
     the site's data       linked Discord accounts, the boards, the documents
-    the bot's config      bot.env.json, and the voice service's choices.json
+    the bot's config      bot.env.json
     the bot's join record joins.json, which arrival each person was
     the Caddyfile         whatever is answering on 443 for thornswood.net
 
@@ -243,8 +243,6 @@ Grab $joins                                       'bot\joins.json'
 # for an hour anyway.
 # Whatever is terminating TLS. RESTORING.md needs it on a fresh box.
 Grab (Join-Path $CaddyRoot 'Caddyfile')           'web\Caddyfile'
-Grab (Join-Path $VoiceRoot 'choices.json')        'voice\choices.json'
-
 # What was running and how, so a restore onto a fresh box is not archaeology.
 $notes = @("taken    $stamp", "host     $env:COMPUTERNAME", "windows  $([Environment]::OSVersion.Version)", '', 'scheduled tasks:')
 foreach ($t in (Get-ScheduledTask -EA SilentlyContinue | Where-Object { $_.TaskName -match 'Thornswood' } | Sort-Object TaskName)) {
