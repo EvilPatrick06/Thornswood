@@ -3455,6 +3455,12 @@ process.on('uncaughtException', (e) => {
 });
 
 async function handle(req, res) {
+  // Apply before parsing the address, so streamed and malformed responses
+  // carry the same policy as ordinary pages.
+  res.setHeader('Content-Security-Policy', CSP_HEADER);
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   /* The address is a path on this site, so it is read as one (#929).
 
      new URL(req.url, 'http://x') read an address that starts with two slashes
@@ -3495,10 +3501,6 @@ async function handle(req, res) {
      the plain to secure redirect already works, so this is the part that stops
      a browser trying the plain one again. On plain HTTP it means nothing and
      is left off. */
-  try {
-    res.setHeader('Content-Security-Policy', CSP_HEADER);
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  } catch (e) { }
   if (secureHere(req)) {
     try { res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains'); } catch (e) { }
   }
