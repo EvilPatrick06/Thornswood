@@ -101,9 +101,10 @@ when it starts. If one differs it says so. See LOAD ORDER ERROR below.
 The game loads to its main menu and asks who you are today. Pick an empty slot
 to make a new character. Nothing about a character is chosen in the launcher.
 
-You arrive in a quiet stone hall and the race menu opens, and that is where you
-make your face. When you are done you are dressed in a plain tunic and boots,
-and the panel behind **K** opens by itself. That panel is where the rest is
+You arrive dressed in a plain tunic and boots in a quiet stone hall.
+The race menu opens there to make your face, with your clothes kept on as you
+change race. When you are done, the panel behind **K** opens by itself.
+That panel is where the rest is
 chosen: your profession and the half of it you will make your own, your class,
 and your Home, which is the town you wake up in. Those are the choices on the
 [Professions](/classes) page.
@@ -113,9 +114,10 @@ profession can wait, and can be picked later in the world from the same panel.
 Press **Confirm** on the Review page and you wake up at the inn in the town you
 chose.
 
-Nothing else is handed out at the start, except a tool to the three picks whose
+Nothing else is handed out at the start, except a tool to the four picks whose
 work needs one: a Miner is handed a pickaxe, a Woodworker a woodcutter's axe
-and a Farmer a shovel and seed to sow, at the moment each one is picked.
+and a Farmer a shovel and seed to sow. A Fisher is handed a crude fishing pole.
+Each tool is supplied at the moment its pick is made.
 
 ## Keys
 

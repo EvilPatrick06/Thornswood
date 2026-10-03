@@ -368,27 +368,28 @@ function refuseInstrument(name) {
 function playNamed(name) {
   const item = emoteByName(name);
   if (!item) { return; }
-  if (refuseInstrument(item.name)) { setOpen(false); return; }
   log('picked', item.name);
   setOpen(false);
-  sayEmote(item.name);
-  play(item.event);
+  play(item.event, item.name);
 }
 
 function playSlot(n) {
   const item = emoteByName(slots[n - 1]);
   if (!item) { return; }
-  if (refuseInstrument(item.name)) { setOpen(false); return; }
   log('slot', n, item.name);
   setOpen(false);
-  sayEmote(item.name);
-  play(item.event);
+  play(item.event, item.name);
 }
 
 /** True while the game is showing anything of its own: a menu, or a load screen. */
 function gameIsBusy() {
   try { return sp.Utility.isInMenuMode(); }
   catch (e) { return true; }   // cannot tell, so keep the wheel shut
+}
+
+function anotherPanelHasInput() {
+  try { return !open && sp.browser.isFocused(); }
+  catch (e) { return false; }
 }
 
 /** True while the person is still in character creation. */
@@ -467,13 +468,14 @@ const queued = [];
 /* The one idle drain() is about to send. Anything else from this list, on
    this character, is the game or a load or a door, and is dropped. */
 let permit = '';
+let inFlight = null;
 
-function play(event) {
+function play(event, name) {
   if (typeof event !== 'string' || !event.length) { return; }
   // One emote at a time. Holding a key or double clicking should not stack up
   // a dozen idles to fire on consecutive frames.
   if (queued.length) { queued.length = 0; }
-  queued.push(event);
+  queued.push({ event, name: name || '', resetDone: false });
 }
 
 /**
@@ -494,36 +496,63 @@ function play(event) {
  * puts the graph straight back.
  */
 function drain() {
+  if (inFlight) {
+    if (inFlight.accepted === undefined && Date.now() < inFlight.until) { return; }
+    if (inFlight.accepted) {
+      if (inFlight.name) { sayEmote(inFlight.name); }
+      log('played', inFlight.event);
+    } else {
+      log('animation graph refused or did not acknowledge', inFlight.event);
+      sp.Debug.notification('That gesture could not start.');
+    }
+    inFlight = null;
+    permit = '';
+  }
   if (!queued.length) { return; }
+  if (!T.ready || (T.isTyping && T.isTyping()) || anotherPanelHasInput() ||
+      gameIsBusy() || inCreationRoom()) { queued.length = 0; return; }
   const pc = player();
   if (!pc) { queued.length = 0; log('no character yet, nothing to animate'); return; }
 
-  const event = queued.shift();
+  const request = queued.shift();
+  const event = request.event;
+  if (refuseInstrument(request.name)) { return; }
 
-  if (event !== STOP) {
+  if (!request.resetDone) {
     try {
-      // Only when something is actually drawn. Sheathing an empty hand is
-      // harmless, but the animation it plays is not, and it would show up as
-      // a small hitch before every single emote.
+      // A relayed equipment event can leave the stance pinned. Stop alone
+      // does not clear that pin or sheathe, so the old queue never advanced.
+      sp.TESModPlatform.setWeaponDrawnMode(pc, -1);
       if (pc.isWeaponDrawn && pc.isWeaponDrawn()) {
-        sp.Debug.sendAnimationEvent(pc, STOP);
-        // Put it back at the front and take it next tick, once the graph has
-        // had a frame to leave the combat state.
-        queued.unshift(event);
-        log('dropping the ready stance first, then', event);
-        return;
+        pc.sheatheWeapon();
       }
-    } catch (e) { }
+      sp.Debug.sendAnimationEvent(pc, STOP);
+      if (event === STOP) { return; }
+      request.resetDone = true;
+      request.sheatheDeadline = Date.now() + 2000;
+      queued.unshift(request);
+      return;
+    } catch (e) { log('could not reset gesture stance:', e); return; }
+  }
+
+  if (pc.isWeaponDrawn && pc.isWeaponDrawn()) {
+    if (Date.now() < request.sheatheDeadline) { queued.unshift(request); }
+    else { log('sheathing did not finish, gesture cancelled'); }
+    return;
   }
 
   try {
     permit = event === STOP ? '' : event;
+    inFlight = request;
+    request.until = Date.now() + 2000;
+    // The native dispatch runs after this JS update. Keep the permit until
+    // the hook acknowledges that particular queued request.
     sp.Debug.sendAnimationEvent(pc, event);
-    log('played', event);
   } catch (e) {
+    inFlight = null;
+    permit = '';
     log('sendAnimationEvent threw on', event + ':', e);
   }
-  permit = '';
 }
 
 /*
@@ -548,15 +577,23 @@ try {
   sp.hooks.sendAnimationEvent.add({
     enter: (ctx) => {
       try {
-        const pc = player();
-        if (!pc || ctx.selfId !== pc.getFormID()) { return; }
+        if (ctx.selfId !== 0x14) { return; }
         const low = String(ctx.animEventName || '').toLowerCase();
+        if (permit && inFlight && permit.toLowerCase() === low) {
+          ctx.storage.set('thornswoodEmoteRequest', inFlight);
+          return;
+        }
         if (!emoteEvent[low] || gameplayEvent[low]) { return; }
-        if (permit && permit.toLowerCase() === low) { return; }
         ctx.animEventName = '';
       } catch (e) { }
     },
-    leave: () => {}
+    leave: (ctx) => {
+      if (ctx.selfId === 0x14 && inFlight &&
+          ctx.storage.get('thornswoodEmoteRequest') === inFlight) {
+        inFlight.accepted = !!ctx.animationSucceeded;
+        permit = '';
+      }
+    }
   });
 } catch (e) {
   log('could not watch emote idles:', e);
@@ -578,6 +615,7 @@ sp.on('browserMessage', guard('browserMessage', (event) => {
   if (what === '__ready') { log('overlay is up'); return; }
   if (what === '__close') { log('the page asked to close'); setOpen(false); return; }
   if (what === '__back') { setOpen(false); return; }
+  if (!open) { return; }
 
   // The middle stands you up. It does not change which list is showing.
   if (what === '__hub' || what === '__stand') {
@@ -620,10 +658,11 @@ sp.on('browserMessage', guard('browserMessage', (event) => {
 }));
 
 sp.on('buttonEvent', guard('keys', (e) => {
-  if (!e.isDown || e.isUp) { return; }
+  if (e.device !== 0 || !e.isDown || e.isUp || e.isRepeating || e.isHeld) { return; }
   if (!T.ready) { return; }
   // While somebody is typing, every key belongs to the chat box.
   if (T.isTyping && T.isTyping()) { return; }
+  if (anotherPanelHasInput()) { return; }
   if (e.code === CHAT_KEY && !open) { return; }
   if (!open && gameIsBusy()) { return; }
 
@@ -655,7 +694,6 @@ sp.on('buttonEvent', guard('keys', (e) => {
 // With the wheel open the page sends __stand, so a letter typed into the
 // search is not also a stand-up. With the wheel shut this key is the way.
 function standUp() {
-  if ((T.isTyping && T.isTyping()) || gameIsBusy() || inCreationRoom()) { return; }
   play(STOP);
   /*
    * The same key also takes off a stuck weapon-drawn pin, because the two
@@ -672,20 +710,12 @@ function standUp() {
    * -1 is WEAP_DRAWN_MODE_DEFAULT, which means stop overriding rather than
    * sheathe, so the sheathe below is what actually lowers the hands.
    */
-  const pc = player();
-  if (pc) {
-    try {
-      sp.TESModPlatform.setWeaponDrawnMode(pc, -1);
-      if (pc.isWeaponDrawn && pc.isWeaponDrawn()) { pc.sheatheWeapon(); }
-      log('cleared the weapon-drawn pin');
-    } catch (err) {
-      log('could not clear the weapon-drawn pin:', err);
-    }
-  }
+  // drain clears the pin and sheaths inside an update, where natives can run.
 }
 
 sp.on('buttonEvent', guard('stopKey', (e) => {
-  if (e.isDown && !e.isUp && e.code === STOP_KEY && !open) { standUp(); }
+  if (e.device === 0 && e.isDown && !e.isUp && !e.isRepeating && !e.isHeld &&
+      e.code === STOP_KEY && !open) { standUp(); }
 }));
 
 log('plugin loaded,', EMOTES.length, 'emotes,', SLOT_COUNT, 'quick slots -',

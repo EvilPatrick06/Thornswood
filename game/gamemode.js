@@ -2585,20 +2585,44 @@ function wearScript() {
     '    if (!v || !v.at || !v.ids || !v.ids.length) { return; }',
     '    var st = ctx.state;',
     '    if (!st) { return; }',
-    '    if (st.thornswoodWearAt === v.at) { return; }',
-    '    st.thornswoodWearAt = v.at;',
+    '    if (st.thornswoodWearAt === v.at && !v.creation) { return; }',
+    '    var now = Date.now();',
+    '    var pending = st.thornswoodWearPending;',
+    '    if (!pending || pending.at !== v.at) {',
+    '      pending = st.thornswoodWearPending = { at: v.at, until: now + 15000, next: 0, done: {}, tries: {} };',
+    '    }',
+    '    if (!v.creation && now >= pending.until) { st.thornswoodWearAt = v.at; return; }',
+    '    if (now < pending.next) { return; }',
+    '    pending.next = now + 250;',
     '    var sp = ctx.sp;',
     '    var pc = sp.Game.getPlayer();',
-    '    if (!pc) { return; }',
-    '    for (var i = 0; i < v.ids.length; i++) {',
-    '      try {',
-    '        var it = sp.Form.from(sp.Game.getFormEx(v.ids[i]));',
-    '        if (it) { pc.equipItem(it, false, true); }',
-    '      } catch (e) { }',
+    '    if (!pc || !pc.is3DLoaded()) { return; }',
+    '    if (!v.creation && sp.Ui.isMenuOpen("RaceSex Menu")) { return; }',
+    '    if (v.creation) {',
+    '      var race = pc.getRace();',
+    '      var raceId = race ? race.getFormID() : 0;',
+    '      if (raceId !== pending.race) { pending.race = raceId; pending.done = {}; pending.tries = {}; }',
     '    }',
+    '    var complete = true, changed = false;',
+    '    for (var i = 0; i < v.ids.length; i++) {',
+    '      var id = v.ids[i];',
+    '      if (pending.done[id] && !v.creation) { continue; }',
+    '      try {',
+    '        var it = sp.Form.from(sp.Game.getFormEx(id));',
+    '        if (!it || pc.getItemCount(it) <= 0) { complete = false; continue; }',
+    '        if (pc.isEquipped(it)) { pending.done[id] = true; continue; }',
+    '        if ((pending.tries[id] || 0) >= 3) { complete = false; continue; }',
+    '        pending.tries[id] = (pending.tries[id] || 0) + 1;',
+    '        pc.equipItem(it, false, true);',
+    '        changed = true;',
+    '        if (pc.isEquipped(it)) { pending.done[id] = true; }',
+    '        else { complete = false; }',
+    '      } catch (e) { complete = false; }',
+    '    }',
+    '    if (complete) { st.thornswoodWearAt = v.at; }',
     '    try {',
     '      var ac = sp.Actor.from(pc);',
-    '      if (ac) { ac.queueNiNodeUpdate(); }',
+    '      if (changed && ac) { ac.queueNiNodeUpdate(); }',
     '    } catch (e) { }',
     '  } catch (e) { }',
     '})();'
@@ -2747,10 +2771,18 @@ function wearThese(actorId, baseIds) {
     if (id) { ids.push(id); }
   }
   if (!ids.length) { return; }
-  try { mp.set(actorId, WEAR_PROPERTY, { ids: ids, at: Date.now() }); } catch (e) { return; }
+  const request = { ids: ids, at: Date.now() };
+  const creation = chargenOf(actorId);
+  if (creation && creation.stage === 'appearance') { request.creation = true; }
+  try { mp.set(actorId, WEAR_PROPERTY, request); } catch (e) { return; }
   setTimeout(function () {
+    try { if (mp.get(actorId, WEAR_PROPERTY).at !== request.at) { return; } } catch (e) { return; }
+    if (request.creation) {
+      const state = chargenOf(actorId);
+      if (state && state.stage === 'appearance') { return; }
+    }
     try { mp.set(actorId, WEAR_PROPERTY, { ids: [], at: 0 }); } catch (e) { }
-  }, 4000);
+  }, 16000);
 }
 
 /*
@@ -4191,9 +4223,8 @@ const HALL = {
 */
 const CHARGEN = {"shift":[["1be1a:Skyrim.esm",1],["1be1b:Skyrim.esm",1]],"towns":{"e80030:Thornswood-Content.esp":{"key":"whiterun","town":"Whiterun","arrival":{"cell":"WhiterunBanneredMare","desc":"1605e:Skyrim.esm","pos":[-113.6,-810,69.3],"rot":[0,0,3.7]}},"e80031:Thornswood-Content.esp":{"key":"riften","town":"Riften","arrival":{"cell":"RiftenBeeandBarb","desc":"16bdf:Skyrim.esm","pos":[-150.2,-598.2,64],"rot":[0,0,36.3]}},"e80032:Thornswood-Content.esp":{"key":"solitude","town":"Solitude","arrival":{"cell":"SolitudeWinkingSkeever","desc":"16a0e:Skyrim.esm","pos":[-293.9,-1450.6,0],"rot":[0,0,0]}},"e80033:Thornswood-Content.esp":{"key":"windhelm","town":"Windhelm","arrival":{"cell":"WindhelmCandlehearthHall","desc":"16789:Skyrim.esm","pos":[554.3,-3766.2,64],"rot":[0,0,91.9]}},"e80034:Thornswood-Content.esp":{"key":"markarth","town":"Markarth","arrival":{"cell":"MarkarthSilverBloodInn","desc":"16dfe:Skyrim.esm","pos":[-5588.5,-1925.8,-16.0],"rot":[0,0,180.0]}},"e80035:Thornswood-Content.esp":{"key":"falkreath","town":"Falkreath","arrival":{"cell":"FalkreathDeadMansDrink","desc":"3a184:Skyrim.esm","pos":[670.4,-443.1,0.5],"rot":[0,0,0]}},"e80036:Thornswood-Content.esp":{"key":"morthal","town":"Morthal","arrival":{"cell":"MorthalMoorsideInn","desc":"138ce:Skyrim.esm","pos":[1970.6,-160.2,0],"rot":[0,0,270.9]}},"e80037:Thornswood-Content.esp":{"key":"dawnstar","town":"Dawnstar","arrival":{"cell":"DawnstarWindpeakInn","desc":"13a7f:Skyrim.esm","pos":[1823.2,-534.7,0.5],"rot":[0,0,0]}},"e80038:Thornswood-Content.esp":{"key":"winterhold","town":"Winterhold","arrival":{"cell":"WinterholdTheFrozenHearth","desc":"13814:Skyrim.esm","pos":[1791.6,7.3,0],"rot":[0,0,88]}}}};
 
-/* Something to wear while choosing. The appearance menu hands you back with an
- * empty inventory, and choosing a life naked in a stone room is nobody's idea
- * of a first morning. */
+/* The plain outfit is supplied before a fresh character opens the face menu.
+ * Choosing reuses those same owned pieces after the body has settled. */
 const SHIFT = CHARGEN.shift;
 
 /* Nine towns, each with the inn a new arrival wakes up in. The one table left
@@ -4223,11 +4254,9 @@ function townsForPanel() {
 }
 
 /**
- * The shift, worn. Given the moment the face is made, which is the moment the
- * race menu has emptied the pack, and well before the teleport: an inventory
- * write and a teleport composed in the same tick reach the client as a load
- * and a set of item changes racing each other, which is how a bard once
- * arrived in Windhelm with everything but a shirt.
+ * The shift is supplied at the beginning of appearance creation and reused
+ * when choosing a home. The owner script waits for the body and owned items
+ * before equipping, including while the face menu is open.
  */
 function giveShift(actorId) {
   let inv = { entries: [] };
@@ -4298,11 +4327,11 @@ function giveShift(actorId) {
  * 20 September) or never came at all.
  */
 function beginChoosing(actorId, state, why) {
-  giveShift(actorId);
   state.stage = 'choosing';
   state.at = Date.now();
   state.remindAt = Date.now() + CHOOSE_REMIND_MS;
   setChargen(actorId, state);
+  giveShift(actorId);
   closeRaceMenu(actorId);
   const opened = openCreation(actorId);
   /*
@@ -4402,6 +4431,11 @@ function arriveAt(actorId, townKey) {
  * the global rather than the scope, the same way it reaches the rules, so the
  * sections stay separable. */
 globalThis.__thornswoodChargen = {
+  created: function (actorId) {
+    if (!CHARGEN_ENABLED || chargenOf(actorId)) { return; }
+    firstSeen.set(actorId, Date.now());
+    beginAppearance(actorId);
+  },
   towns: townsForPanel,
   hasTown: function (key) { return !!TOWN_BY_KEY[String(key || '').toLowerCase()]; },
   isChoosing: function (actorId) {
@@ -4697,6 +4731,11 @@ function beginAppearance(actorId) {
   }
 
   setChargen(actorId, state);
+  // Persist the stage first, so the supplied clothes cannot make a new
+  // character look like a returning character on the next creation tick.
+  const persisted = chargenOf(actorId);
+  if (!persisted || persisted.stage !== 'appearance' || persisted.at !== state.at) { return; }
+  giveShift(actorId);
   log('chargen', actorId.toString(16), '-> appearance',
       state.moved ? '(moving to the hall, menu to follow)' : '(already in the hall)');
   // Issue #416, once (tellOnce): the stone room, and the teleport into it. The

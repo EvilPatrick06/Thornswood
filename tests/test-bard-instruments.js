@@ -147,7 +147,7 @@ yes('standing up still works while the wheel is open, and not while a name is be
 const gm = read(GM);
 const made = {};
 gm.split('\n').forEach(function (line) {
-  const m = /"out": "([0-9a-f]+):PlayFluteLuteDrum\.esp", "name": "([^"]+)"/.exec(line);
+  const m = /"out"\s*:\s*"([0-9a-f]+):PlayFluteLuteDrum\.esp",\s*"name"\s*:\s*"([^"]+)"/.exec(line);
   if (m) made[m[2]] = m[1];
 });
 yes('a flute, a lute and a drum can be made, and all three are ' + PLUGIN + '\'s',
