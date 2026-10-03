@@ -147,7 +147,7 @@ const siteLog = makeLog(ROOT, 'site.log', 4 * 1024 * 1024, 5);
 
 const CFGFILE = path.join(ROOT, 'config.json');
 let cfg = {
-  password: 'thornswood',
+  password: '',
   discord: { clientId: '', clientSecret: '', botToken: '', guildId: '', invite: '' },
   patreon: '',           // the page link, once there is one to link at
   /* Both of these live on this same machine, so the site can just look. */
@@ -196,9 +196,15 @@ let cfg = {
    configured from the outside and holding nothing. Strip it, and remember
    whether the read actually worked. */
 let cfgBroken = null;
+let fileHadPassword = false;
 try {
-  cfg = Object.assign(cfg, JSON.parse(
-    fs.readFileSync(CFGFILE, 'utf8').replace(/^\uFEFF/, '')));
+  const parsedCfg = JSON.parse(
+    fs.readFileSync(CFGFILE, 'utf8').replace(/^\uFEFF/, ''));
+  if (parsedCfg && typeof parsedCfg === 'object' && !Array.isArray(parsedCfg) &&
+      typeof parsedCfg.password === 'string' && parsedCfg.password.length > 0) {
+    fileHadPassword = true;
+  }
+  cfg = Object.assign(cfg, parsedCfg);
 } catch (e) {
   if (fs.existsSync(CFGFILE)) cfgBroken = e;
 }
@@ -244,6 +250,19 @@ function andList(names) {
   return a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
 }
 
+/* The member password is a bootstrap for a site that has no Discord sign in
+   yet (#1305). It is not a word shipped in the repository. A config that
+   already has a password keeps it, and that password is not printed again.
+   A fresh config, or one with none, gets a random password. It is saved with
+   the other keys and printed once, for the operator. A file that will not
+   parse is left untouched; the password held in memory is still random, so
+   an empty one cannot sign in. */
+let tellPassword = false;
+if (!fileHadPassword) {
+  cfg.password = crypto.randomBytes(24).toString('hex');
+  tellPassword = !cfgBroken;
+}
+
 /* Signs the admin cookie. Kept apart from the password so changing the
    password does not sign everybody out of Discord, and made once rather than
    shipped, so it is never a value that exists in the repository. */
@@ -278,6 +297,16 @@ if (cfgBroken) {
     cfg.passKey = '';
     console.error('[thornswood] could not keep a join pass key in config.json, so no join ' +
                   'passes are issued: ' + e.message);
+  }
+}
+
+if (tellPassword) {
+  try {
+    fs.writeFileSync(CFGFILE, JSON.stringify(cfg, null, 2), 'utf8');
+    console.log('[thornswood] member bootstrap password (shown once): ' + cfg.password);
+  } catch (e) {
+    console.error('[thornswood] could not keep a member bootstrap password in config.json, ' +
+                  'so it was not printed: ' + e.message);
   }
 }
 
@@ -836,7 +865,7 @@ const INBOX_KEEP = 2000;
 const reportSalt = crypto.randomBytes(32);
 const reportSeen = new Map();
 
-function reportFrom(req) {
+function clientAddr(req) {
   const sock = String((req.socket && req.socket.remoteAddress) || '');
   let addr = sock;
   if (/^(127\.|::1$|::ffff:127\.)/i.test(sock)) {
@@ -853,7 +882,11 @@ function reportFrom(req) {
     addr = head.concat(new Array(gap).fill('0'), tail).slice(0, 4)
       .map((g) => (parseInt(g, 16) || 0).toString(16)).join(':') + '::/64';
   }
-  return crypto.createHmac('sha256', reportSalt).update(addr).digest('hex').slice(0, 32);
+  return addr;
+}
+
+function reportFrom(req) {
+  return crypto.createHmac('sha256', reportSalt).update(clientAddr(req)).digest('hex').slice(0, 32);
 }
 
 function reportRefusal(key, now, whose) {
@@ -901,6 +934,47 @@ function trimInbox(rows) {
 }
 // ==== end thornswood report limits ====
 setInterval(() => reportPrune(Date.now()), 10 * 60 * 1000).unref?.();
+
+// ==== thornswood login limits ====
+// POST /api/login only (#1305). The issue names no numbers, so this is a
+// small fixed window: eight attempts from one address in ten minutes, then
+// 429 until the oldest of those falls out of the window. Nothing else on
+// the site reads this table. The address rules are the report form's: the
+// last forwarded hop, and only when the socket is loopback (Caddy). The
+// address is hashed under a key made at this start and never written.
+const LOGIN_MAX = 8;
+const LOGIN_WINDOW_MS = 10 * 60 * 1000;
+const loginSalt = crypto.randomBytes(32);
+const loginSeen = new Map();
+
+function loginKey(req) {
+  return crypto.createHmac('sha256', loginSalt).update(clientAddr(req)).digest('hex').slice(0, 32);
+}
+
+function loginWait(key, now) {
+  const at = Number(now) || Date.now();
+  const list = (loginSeen.get(key) || []).filter((t) => t > at - LOGIN_WINDOW_MS);
+  if (list.length) loginSeen.set(key, list); else loginSeen.delete(key);
+  if (list.length < LOGIN_MAX) return 0;
+  return Math.max(1, Math.ceil((list[0] + LOGIN_WINDOW_MS - at) / 1000));
+}
+
+function loginNote(key, now) {
+  const at = Number(now) || Date.now();
+  const list = (loginSeen.get(key) || []).filter((t) => t > at - LOGIN_WINDOW_MS);
+  list.push(at);
+  loginSeen.set(key, list);
+}
+
+function loginPrune(now) {
+  const cut = (Number(now) || Date.now()) - LOGIN_WINDOW_MS;
+  for (const [key, list] of loginSeen) {
+    const kept = list.filter((t) => t > cut);
+    if (kept.length) loginSeen.set(key, kept); else loginSeen.delete(key);
+  }
+}
+setInterval(() => loginPrune(Date.now()), 10 * 60 * 1000).unref?.();
+// ==== end thornswood login limits ====
 
 // ------------------------------------------------------------- downloads --
 function listFiles() {
@@ -3350,13 +3424,21 @@ async function handle(req, res) {
 
   // ---------------------------------------------------------- member login
   if (p === '/api/login' && req.method === 'POST') {
+    const from = loginKey(req);
+    const wait = loginWait(from, Date.now());
+    if (wait) {
+      return send(res, 429, JSON.stringify({
+        error: 'Too many sign-in attempts from this connection. Try again in ' + wait + ' seconds.'
+      }), 'application/json; charset=utf-8', { 'Retry-After': String(wait) });
+    }
+    loginNote(from, Date.now());
     if (discordReady()) {
       return sendJson(res, 403, { error: 'Discord sign in only. The password is off.' });
     }
     let given = '';
     try { given = (JSON.parse(await body(req, 4096)) || {}).password || ''; }
     catch (e) { passBodyFailure(e); }
-    if (!sameSecret(given, String(cfg.password || ''))) {
+    if (!cfg.password || !sameSecret(given, String(cfg.password))) {
       return sendJson(res, 401, { error: 'wrong password' });
     }
     return send(res, 200, JSON.stringify({ ok: true }),
