@@ -15,7 +15,9 @@
 
   What it does:
 
-    1. Checks Python is on the VPS, and says how to get it if not.
+    1. Checks Python is on the VPS. If it is missing, downloads one pinned
+       python.org 3.12 installer, checks its SHA-256, and installs it only
+       when the file matches. A mismatch stops the run.
     2. Stages bot.py, card.py, the card artwork and the live smoke's export
        beside the running bot and checks them there, before anything is
        stopped (issue #446, FILES below).
@@ -92,7 +94,16 @@ param(
   # The outside monitor's ping address (issue #449), asked for hidden, into
   # bot.env.json as PING_URL on ssh's standard input, then the bot restarted
   # by name so it reads it. Typing off takes it out. Nothing else is sent.
-  [switch]$SetPing
+  [switch]$SetPing,
+  # The Windows installer fetched when the VPS has no Python. An exact
+  # python.org file, not a floating latest. 3.12.10 is the last 3.12 release
+  # python.org published a Windows installer for (3.12.11 and later, including
+  # 3.12.15, are source only). PythonSha256 is the SHA-256 of that exact
+  # python-3.12.10-amd64.exe, computed locally on 2 Oct 2026. python.org's
+  # release page publishes the MD5 5eddb0b6f12c852725de071ae681dde4 for the
+  # same file, and the downloaded file's MD5 matched it (size 26964224).
+  [string]$PythonVersion = '3.12.10',
+  [string]$PythonSha256  = '67b5635e80ea51072b87941312d00ec8927c4db9ba18938f7ad2d27b328b95fb'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -265,11 +276,19 @@ if ("$py" -match 'MISSING') {
   Remote @"
 `$ErrorActionPreference = 'Continue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-`$url = 'https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe'
-`$exe = Join-Path `$env:TEMP 'python-3.12.8-amd64.exe'
+`$url = 'https://www.python.org/ftp/python/$PythonVersion/python-$PythonVersion-amd64.exe'
+`$exe = Join-Path `$env:TEMP 'python-$PythonVersion-amd64.exe'
 'downloading ' + `$url
 try { Invoke-WebRequest -Uri `$url -OutFile `$exe -UseBasicParsing -TimeoutSec 300 }
-catch { 'DOWNLOAD FAILED: ' + `$_.Exception.Message; exit }
+catch { 'DOWNLOAD FAILED: ' + `$_.Exception.Message; exit 1 }
+# Checked before the installer runs. A file that does not match is deleted
+# and nothing is installed, rather than an installer nobody can vouch for.
+`$got = (Get-FileHash -LiteralPath `$exe -Algorithm SHA256).Hash
+if (`$got -ne '$PythonSha256') {
+  Remove-Item -LiteralPath `$exe -Force -EA SilentlyContinue
+  throw ('python $PythonVersion installer does not match the checksum recorded for it, so it was not installed. Got ' + `$got)
+}
+'checksum matched'
 'running the installer, quietly, for all users'
 `$p = Start-Process `$exe -ArgumentList '/quiet','InstallAllUsers=1','PrependPath=1','Include_pip=1','Include_test=0' -Wait -PassThru
 'installer exit code ' + `$p.ExitCode
@@ -280,6 +299,9 @@ Remove-Item `$exe -Force -EA SilentlyContinue
 `$c = Get-Command python -EA SilentlyContinue
 if (`$c) { 'FOUND ' + (& `$c.Source --version 2>&1) } else { 'STILL MISSING' }
 "@ | ForEach-Object { Say "  $_" }
+  # A checksum mismatch or a failed download exits non-zero on the VPS.
+  # Stop here rather than continuing a run that did not install Python.
+  if ($LASTEXITCODE -ne 0) { Die 'Python was not installed. Nothing was copied.' }
 
   $py = Remote @"
 `$env:PATH = [Environment]::GetEnvironmentVariable('PATH','Machine') + ';' + [Environment]::GetEnvironmentVariable('PATH','User')
