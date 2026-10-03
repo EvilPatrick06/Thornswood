@@ -191,7 +191,7 @@ function world(opts) {
     'burnCharcoal', 'isChoppingBlock', 'chopWood', 'SHRINES', 'bless', 'isCrop',
     'farmActivate', 'isFish', 'fish', 'isGame', 'game', 'isPlant', 'harvest', 'ALLOW',
     'isVein', 'mineOre', 'loot', 'milk', 'log', 'ITEMS', 'floraHanded', 'isChurn', 'churn',
-    'HARVESTS_BY_BASE', 'HARVESTS', 'isStation', 'GATHER_UNRANKED'];
+    'HARVESTS_BY_BASE', 'HARVESTS', 'isStation', 'GATHER_UNRANKED', 'isHive', 'hive'];
   const body = "'use strict';\n" +
     [parts.coolBlock, parts.waitLine, parts.nestsLine,
      parts.waitWord, parts.isChickenNest, parts.collectEgg, parts.plantAt].filter(Boolean).join('\n') + '\n' +
@@ -224,7 +224,9 @@ function world(opts) {
       HARVESTS_BY_BASE || {},
       {},
       never,
-      GATHER_UNRANKED || {}
+      GATHER_UNRANKED || {},
+      function () { return false; },
+      function () { return null; }
     ]);
   } catch (e) {
     console.log('      the world would not build: ' + e.message);
