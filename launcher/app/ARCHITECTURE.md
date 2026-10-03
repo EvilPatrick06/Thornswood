@@ -387,7 +387,11 @@ check against its release has kept that list (`made.txt` kinds=1 once sorted).
 The records are in `Profile\OwnGame`: `files.txt` (every file, linked
 or copied, and which kind it is, V Vortex's, O Skyrim's own, T Thornswood's;
 Publish-Update reads the V lines), `installed-kept.txt` (the installer's list,
-kept by the clean up before it empties it),
+kept by the clean up before it empties it), `generated.txt` (what
+`scripts\mods\Build-Generated.ps1` made in the folder on the machine that
+ships, the behavior files Pandora makes and the BodySlide bodies, #1247: Thornswood's
+own, kept as made by a refresh even where Vortex deploys a file of the same
+name (`Owned`), and forgotten when the folder is made anew),
 `shared.txt`, `differs.txt` and `changed.txt` (the archives, OwnGameShare.cs),
 `made.txt`, `left-out.txt`, `declined.txt`, and Vortex's `plugins.txt` and
 `loadorder.txt`. `OwnGame.cs:361 WhyNot()` names the one thing stopping the
