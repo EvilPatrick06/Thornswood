@@ -30,6 +30,7 @@
       Test-ShipOneMachine $rel     one machine's own by kind (runtime state, logs, session and token files, backups, face exports,
                                    Vortex's records, window layouts, settings saved from a mod's menu, saves); never packed, recorded or on the site
       Get-ShipOwnGameCollection    the collection's files in a Game folder the launcher made; never shipped
+      Get-ShipGeneratedFiles       what Build-Generated.ps1 made in that folder; shipped, even where Vortex deploys the same path
       Get-ShipLooseArt $files      loose textures and meshes an installer carries that are not ours, by folder
       Test-ShipNotOurs $rel        another author's loose file (outside Data\Platform, not named ours); never packed, recorded or listed as removed
       Test-ShipOurs $rel           ours outside Data\Platform: the named files, the client runtime, required data, the menu, Nemesis's output, the BodySlide builds until #1259
@@ -393,7 +394,9 @@ $ShipVanillaDataDirs     = @('Video', 'Strings')
 # first and were shipped to everybody as though they were ours.
 #
 # NirnLabUIPlatform is another roleplay server's user interface framework and
-# on its own it is 356 MB. Nemesis, FNIS, BodySlide and xEdit are tools that
+# on its own it is 356 MB. Nemesis, FNIS, BodySlide, xEdit and Pandora (the
+# behavior engine from collection revision 2, #1247, in the folder of its own
+# the collection gives it and its Pandora_Engine patch folder) are tools that
 # belong on the machine of somebody who builds mods, not in a folder handed to
 # somebody who plays. The rest is documentation, installer leftovers and a
 # shader cache that rebuilds itself on first launch. Data\Source, Papyrus script
@@ -418,6 +421,7 @@ $ShipVanillaDataDirs     = @('Video', 'Strings')
 $ShipForeignDataDirs = @(
     'NirnLabUIPlatform',
     'Nemesis_Engine', 'FNIS Behavior SE 7.6', 'CalienteTools', 'tools',
+    'Pandora Behaviour Engine', 'Pandora_Engine',
     'ModderResource', 'FOMod',
     'Docs', 'Docs and Screenshots', 'readmes',
     'ShaderCache'
@@ -827,6 +831,12 @@ function Test-ShipMachine([string]$rel) {
 # are the collection's files and stay out of packs and installers, the same way
 # the Vortex record keeps them out when the game is the Steam copy.
 #
+# Except what scripts\mods\Build-Generated.ps1 built in the folder (#1247):
+# the behavior files Pandora makes and the BodySlide bodies are Thornswood's and
+# ship, though several sit where Vortex deploys a file of the same name
+# (Vortex's 3BA body, a mod's own behavior file), and files.txt goes on
+# saying V for those paths. Get-ShipGeneratedFiles reads its record.
+#
 # Returns the set of paths, or $null when this build has no such record (the
 # game is the Steam copy, or Root\Game came from an installer before 1.1).
 function Get-ShipOwnGameCollection([string]$ProfileDir) {
@@ -837,7 +847,22 @@ function Get-ShipOwnGameCollection([string]$ProfileDir) {
         $p = $line.Split([char[]]'|', 5)
         if ($p.Count -eq 5 -and $p[1] -eq 'V') { [void]$set.Add($p[4]) }
     }
+    foreach ($rel in (Get-ShipGeneratedFiles $ProfileDir)) { [void]$set.Remove($rel) }
     return ,$set
+}
+
+# The files Build-Generated.ps1 made in Thornswood's own folder, by its record
+# Profile\OwnGame\generated.txt ("file <sha256> <path>" lines; the rest of the
+# record is scripts\mods\Generated.ps1's). None when it has never run here.
+function Get-ShipGeneratedFiles([string]$ProfileDir) {
+    $record = Join-Path $ProfileDir 'OwnGame\generated.txt'
+    $l = New-Object 'System.Collections.Generic.List[string]'
+    if (-not (Test-Path -LiteralPath $record)) { return ,$l }
+    foreach ($line in [IO.File]::ReadLines($record)) {
+        $m = [regex]::Match($line, '^file [0-9a-f]{64} (.+)$')
+        if ($m.Success) { $l.Add($m.Groups[1].Value) }
+    }
+    return ,$l
 }
 
 # LOOSE ART NOBODY HAS ACCOUNTED FOR, named so a build says what it carries.
@@ -850,10 +875,11 @@ function Get-ShipOwnGameCollection([string]$ProfileDir) {
 # installer leaves out what the collection provides and nothing else, so every
 # one of them went to everybody who installed, and nothing on screen said so.
 #
-# Since #1178 (29 September) Test-ShipNotOurs below keeps every such file out
-# of packs, records and the installer, so this report should name nothing. It
-# stays as the alarm: a row here means a file reached what is about to ship
-# that the rule did not stop.
+# Since #1178 (29 September) Test-ShipNotOurs below keeps unaccounted-for files
+# out of packs, records and the installer, so this report should name nothing.
+# It stays as the alarm: a row here means a file reached what is about to ship
+# that the rule did not stop. Generated behavior files and BodySlide bodies
+# are Thornswood's by their generated record (#1247), rather than loose art.
 #
 # Ours is the main menu backdrop: the three files Go.ps1 writes from
 # game\menu ($menuPairs there; change the two together).

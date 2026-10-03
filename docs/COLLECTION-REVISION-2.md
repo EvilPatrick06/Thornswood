@@ -1,4 +1,18 @@
-# Collection revision 2: the Vortex pass
+# Collection revision 2: installation and shipping
+
+Patrick published revision 2 on 3 October 2026. It uses Pandora Behaviour
+Engine+ 5.0.0-beta and Dynamic FNIS AA functions 3.1.1. Runtime stays 1.0.0.
+Styles of Skyrim Mashups is excluded. The remaining authoring history below
+is being replaced by the published revision's verification and release steps.
+
+Before either channel ships, close its launcher and game, refresh its own
+folder from the Thornswood Vortex profile, then run
+`scripts\\mods\\Build-Generated.ps1 -Root <own-install> -NoPause`.
+Pandora builds with Precision and the three True Directional Movement
+patches. BodySlide builds the women's NeverNude body, the men's Nevernude
+body, and the collection's burned Astrid body at their recorded defaults.
+The generated record must be current and `Check-CoveredBodies.ps1` must pass.
+The generator refuses a Vortex deployment folder; use a separate own folder.
 
 One pass in Vortex on the shipping machine, in the Thornswood profile, then
 one upload to Nexus. It carries the changes we made after revision 1 to the
