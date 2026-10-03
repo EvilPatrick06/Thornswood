@@ -114,6 +114,15 @@ not one wait for every quest.
 
 ## Where this is
 
-No custom quest exists. Traders do not offer work. The rare places
-are still the several veins the server has today. A scene reward is
-not created. Papyrus quests do not run.
+Scarce quests and scene quests from the tables above are in the
+server. The counts, the cooldowns, and the lineup are those tables.
+Supply is not. Scene gold is created when the quest is finished. It
+is not taken from a trader's purse. Walking away puts the goods back
+and does not start the cooldown. The rank on a scarce row still
+applies.
+
+The one place each scarce row opens, and the sack, shelf, chest, urn,
+strongbox, ruin, cell, and hold a scene row names, are not written on
+this page. They are not bound, so those places stay shut. Every rare
+vein stays shut with them. A dragon is not a bounty. Papyrus quests
+do not run.

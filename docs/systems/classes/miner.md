@@ -150,6 +150,6 @@ The server still has 581 veins, a deposit of 20, yields that climb
 from 1-2 up to 1-5, heart stone forced to advanced, and a pickaxe of
 100 uses. Iron, gold, corundum and silver all come back in 10
 minutes. Ebony is 6 veins, the gems are 3 each, stalhrim is 2, heart
-stone is 4. There is no custom quest on a single place, and a
-steward does not guard it. The table under
+stone is 4. A scarce quest is the only way in, and the one place is not
+bound, so every rare vein stays shut. A steward does not guard it. The table under
 Every record is that server book. The numbers above it are the plan.
