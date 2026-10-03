@@ -422,6 +422,15 @@ foreach ($f in (Get-ChildItem -Path (Join-Path $RepoPath 'scripts') -Filter *.ps
 }
 Yes 'the guarded helpers were found and sent to' ($helpers -ge 10)
 
+# Issue #1166: these three used to pass the block on the ssh command line.
+# The loop above sends a 10 KB script through every Remote that calls
+# Invoke-ThornswoodRemote, which is how they send now. Named here so a
+# later edit that drops one of them out of that loop fails this file.
+foreach ($rel in 'scripts\deploy\Install-Backup.ps1', 'scripts\vps\Restart-Server.ps1', 'scripts\vps\Restore-Box.ps1') {
+    $fn1166 = Get-FunctionText (Join-Path $RepoPath $rel) 'Remote'
+    Yes ("{0} calls Invoke-ThornswoodRemote, so a 10 KB script went through it above (#1166)" -f (Split-Path -Leaf $rel)) ($fn1166 -match 'Invoke-ThornswoodRemote -Target')
+}
+
 # ---- and the ones that are not a Remote function -------------------------------
 #
 # Install-Voice.ps1 sends its install inline in the script body, so nothing

@@ -45,6 +45,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+. (Join-Path $Here '..\vps\Send-Script.ps1')
 if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 
@@ -61,8 +62,10 @@ foreach ($t in 'ssh', 'scp') {
 }
 
 function Remote($script) {
-  $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-  Invoke-ThornswoodNative { & ssh @ssh $target "powershell -NoProfile -EncodedCommand $e" } 2>&1
+  # Send-Script.ps1 (issue #1166, the same way as #1070): a long script goes
+  # as a file of its own name, removed after, and the far side's exit code
+  # comes back.
+  return Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script $script
 }
 
 $script = Join-Path $Here '..\vps\vps-nightly-backup.ps1'

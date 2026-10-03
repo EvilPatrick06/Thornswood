@@ -62,6 +62,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here 'Vps.ps1')
+. (Join-Path $Here 'Send-Script.ps1')
 if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 
@@ -77,8 +78,11 @@ foreach ($t in 'ssh', 'scp') {
   }
 }
 function Remote($script) {
-  $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-  return Invoke-ThornswoodNative { & ssh @ssh $target "powershell -NoProfile -EncodedCommand $e" } 2>&1 | ForEach-Object { "$_" }
+  # Send-Script.ps1 (issue #1166, the same way as #1070): a long script goes
+  # as a file of its own name, removed after, and the far side's exit code
+  # comes back. Lines come back as strings, so a later -contains still matches.
+  $out = @(Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script $script | ForEach-Object { "$_" })
+  return $out
 }
 # A script on the box, run from its own file, the way Publish-Server.ps1 runs
 # the installer: every argument here is a path under C:\Thornswood-Restore or
