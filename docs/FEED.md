@@ -567,12 +567,14 @@ Now it is one command, and it goes the same way as every other update:
   the pack like the rest. `tests\test-record-sync.ps1` proves both kinds land
   on the same files, back and forward.
 - **Where the bytes come from.** The site's copy of each file beside its record
-  (#1050), then the packs already on the site, found by size
-  and sha256 and checked again as they are read. A file no pack ever carried
-  (it came with the installer and nothing changed it before the release being
-  undone) is not on the site; the rollback stops, names it, and sends nothing.
-  `-FilesFrom <folder>` points at a folder holding such files at their game
-  paths, and only a file of the right size and sha256 is taken.
+  (#1050), then the packs already on the site, found by size and sha256 and
+  checked again as they are read. A file only the installer ever carried is
+  restored from `/feed[-dev]/assets/<sha256>` the same way, so a rollback past
+  the release that first changed it needs no `-FilesFrom` (#1051). When that
+  asset is missing (a record from before #1050, or one scrubbed off the site),
+  the rollback stops, names the file, and sends nothing; `-FilesFrom <folder>`
+  points at a folder holding such files at their game paths, and only a file
+  of the right size and sha256 is taken.
 - **What does not go back.** The launcher, `launcherVersion`, `minLauncher`
   and `clientRuntime`, and the six client runtime files: a launcher never
   moves to a lower number, signed launchers refuse an update not signed by us,

@@ -30,11 +30,13 @@
   files. Putting the channel forward again is the same command pointed at the
   later release.
 
-  Each file is taken from the packs already on the site, found by its size and
-  sha256, and checked again when it is read. A file no pack ever carried (it
-  came with the installer and nothing changed it before the release being
-  undone) is not on the site; the rollback stops and names it, and -FilesFrom
-  points at a folder holding the right bytes, which are checked the same way.
+  Each file is taken first from the site's copy beside the release record
+  (/feed[-dev]/assets/<sha256>, #1050), then from the packs already on the
+  site, found by size and sha256, and checked again when it is read. A file
+  only the installer ever carried is restored the same way, so a rollback past
+  the release that first changed it needs no -FilesFrom (#1051). When that
+  asset is missing, the rollback stops and names it, and -FilesFrom points at
+  a folder holding the right bytes, which are checked the same way.
 
   WHAT STAYS. The launcher, its version and minLauncher: a launcher never moves
   to a lower number, signed launchers refuse an update not signed by us, and
