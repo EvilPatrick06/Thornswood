@@ -239,7 +239,7 @@ the water classes, the clothing table, the cap of 0.80, the heat factor
 of 0.5, the settle times, the on-fire damage, the spread, and `/needs`
 are in the server.
 
-Not in it: a season, the roll of the sky, the cold link into hunger and thirst, the 3 minutes of wet,
+In it: the season shift on an outdoor target, and the roll of the sky. Not in it: the cold link into hunger and thirst, the 3 minutes of wet,
 the master woodworker's 48, the master tailor's 4 degrees, the burn
 cutting clothing, and the meal's warmth. Every fire is 34. Clothing
 does not read tailor rank. A roof dries you the moment the client says

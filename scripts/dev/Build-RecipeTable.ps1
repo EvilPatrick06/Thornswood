@@ -808,11 +808,8 @@ $PRODUCER_TABLES = @(
 # it. Who it belongs to is the half that runs it, because the grade is the
 # charburner's rank: rankStep(actorId, 'charburner') is the index into the list.
 #
-# The beehive is NOT here, and that is still right. It is in STATIONS and has no
-# branch in onActivate at all, so nothing in gamemode.js gives an item for it and
-# there is nothing to read. No row of harvests.json produces Honey either, which
-# two recipes want. That is a gap in the harvest table rather than a ladder this
-# script can name, and it is named again in the hop's leftovers.
+# The placed hive is a farmer verb. hive() hands over one Honeycomb.
+# Honey, the jar, is still not a row of harvests.json.
 $STATION_VERBS = @(
     @{ Fn = 'mineSalt';     Who = 'miner';
        What = 'the salt quarry, STATIONS.saltQuarry, which is a miner''s verb: classGate(actorId, ''mine'')' },
@@ -839,7 +836,10 @@ $STATION_VERBS = @(
     # without this line the egg, which the Cook's breads and pies ask for, would
     # have no producer at all.
     @{ Fn = 'collectEgg';   Who = 'farmer';
-       What = 'the chicken nest, ChickenNest in Skyrim.esm, which is a farmer''s verb: classGate(actorId, ''farm'')' }
+       What = 'the chicken nest, ChickenNest in Skyrim.esm, which is a farmer''s verb: classGate(actorId, ''farm'')' },
+    # Placed hive, issue 1377. One Honeycomb, ten minutes, no rank gate.
+    @{ Fn = 'hive';         Who = 'farmer';
+       What = 'the placed hive, dbf8b3:Thornswood-Content.esp, which is a farmer''s verb: classGate(actorId, ''farm''), one Honeycomb, no rank gate' }
 )
 
 # WHERE THE STATIONS ARE READ FROM. The shipped gamemode, in this folder, which
