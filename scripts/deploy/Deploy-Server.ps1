@@ -106,6 +106,23 @@ function Remote($script) {
   return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script
 }
 
+function Get-StageDirectories([string]$stageRoot, [string[]]$relativePaths) {
+  $stagePath = [IO.Path]::GetFullPath($stageRoot).TrimEnd('\')
+  $prefix = $stagePath + '\'
+  $parents = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+  foreach ($relative in $relativePaths) {
+    if (-not $relative -or [IO.Path]::IsPathRooted($relative) -or $relative.Contains(':')) {
+      throw "Invalid stage destination: $relative"
+    }
+    $target = [IO.Path]::GetFullPath([IO.Path]::Combine($stagePath, $relative.Replace('/', '\')))
+    if (-not $target.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+      throw "Stage destination escapes its directory: $relative"
+    }
+    $null = $parents.Add([IO.Path]::GetDirectoryName($target))
+  }
+  return @($parents | Sort-Object)
+}
+
 # ==== thornswood live deploy warning ====
 # Shared with tests\test-deploy-gamemode-warning.ps1 and the OnlineNow harness.
 # Deploy-Gamemode.ps1 builds locally and never stops the live server; this is
@@ -587,12 +604,19 @@ Write-Host ''
 Write-Host "Staging in $rootWin\$stageName..."
 # A stage left by a run that died part way is cleared first. It was never
 # swapped in, so nothing is lost with it.
+# ==== thornswood staged directories ====
+$stageParents = @(Get-StageDirectories "$rootWin\$stageName" @($send.Keys))
+$parentLiterals = ($stageParents | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }) -join ','
 Remote @"
 Get-ChildItem -LiteralPath '$rootWin' -Directory -Force -EA SilentlyContinue |
   Where-Object { `$_.Name -like '.stage-*' } |
   ForEach-Object { Remove-Item -LiteralPath `$_.FullName -Recurse -Force -EA SilentlyContinue }
 New-Item -ItemType Directory -Path '$rootWin\$stageName\plugins' -Force | Out-Null
+foreach (`$parent in @($parentLiterals)) {
+  New-Item -ItemType Directory -Path `$parent -Force | Out-Null
+}
 "@ | Out-Null
+# ==== end thornswood staged directories ====
 foreach ($rel in $send.Keys) {
   Invoke-ThornswoodNative { & scp @ssh $send[$rel] "$User@${Vps}:$stageFar/$rel" }
   if ($LASTEXITCODE -ne 0) { throw "scp failed for $rel. The server has not been touched." }
