@@ -213,13 +213,6 @@ can't disagree.""" + ("" if OPEN else " Step 1 happens in <#TICKETS>.") + """ Lo
 
 """ + _JOIN_BODY + "\n"
 
-NEWS_FIRST = """\
-Release notes land here on their own whenever an update goes out, straight from
-the launcher, so this channel and the Play button can't disagree.
-
-Same list at **https://thornswood.net/news**.
-"""
-
 # THE RULES IN THE WORLD ARE READ OUT OF THE RULES PAGE, NOT WRITTEN HERE.
 #
 # Issue #430: #game-rules, lore\game-rules.md and site\data\site\rules.md
