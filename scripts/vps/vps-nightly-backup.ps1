@@ -110,10 +110,14 @@ function Grab($from, $to) {
     return
   }
   $n = 0
-  foreach ($f in (Get-ChildItem -LiteralPath $from -Recurse -File -EA SilentlyContinue)) {
+  # Listed from the long path. $from may be the short 8.3 form, and
+  # FullName is not: cutting by the short length takes the wrong relative
+  # path (issue #1156).
+  $listedFrom = $item.FullName
+  foreach ($f in (Get-ChildItem -LiteralPath $listedFrom -Recurse -File -EA SilentlyContinue)) {
     if ($f.FullName -match '\\node_modules\\') { continue }
     if ($f.Length -gt $cap) { $script:skipped++; continue }
-    $rel = $f.FullName.Substring($item.FullName.Length).TrimStart('\')
+    $rel = $f.FullName.Substring($listedFrom.Length).TrimStart('\')
     $d = Join-Path $dest $rel
     $parent = Split-Path -Parent $d
     if (-not (Test-Path $parent)) { [void](New-Item -ItemType Directory -Path $parent -Force) }
@@ -135,13 +139,17 @@ function Mend($from, $to) {
   $dest = Join-Path $stage $to
   if (-not (Test-Path -LiteralPath $dest)) { return }
   $bad = 0
-  foreach ($f in (Get-ChildItem -LiteralPath $dest -Recurse -File -Filter *.json -EA SilentlyContinue)) {
+  # $dest is under TEMP. TEMP is often the short 8.3 form, and the
+  # file's FullName is the long one. Cut off that long path, the string
+  # the files were listed from (issue #1156).
+  $destListed = (Get-Item -LiteralPath $dest).FullName
+  foreach ($f in (Get-ChildItem -LiteralPath $destListed -Recurse -File -Filter *.json -EA SilentlyContinue)) {
     $ok = $false
     for ($try = 0; $try -lt 3 -and -not $ok; $try++) {
       try { [void]((Get-Content -LiteralPath $f.FullName -Raw -Encoding UTF8) | ConvertFrom-Json); $ok = $true }
       catch {
         Start-Sleep -Milliseconds 400
-        $src = Join-Path $from $f.FullName.Substring($dest.Length).TrimStart('\')
+        $src = Join-Path $from $f.FullName.Substring($destListed.Length).TrimStart('\')
         try { Copy-Item -LiteralPath $src -Destination $f.FullName -Force } catch { }
       }
     }
@@ -194,12 +202,14 @@ Grab (Join-Path $SiteRoot 'config.json')          'site\config.json'
 # files are named in the log, rather than one night's backup growing past what
 # this box can encrypt in memory.
 $up = Join-Path $SiteRoot 'uploads'
-$upFiles = @(Get-ChildItem -LiteralPath $up -Recurse -File -EA SilentlyContinue)
+$upListed = $up
+if (Test-Path -LiteralPath $up) { $upListed = (Get-Item -LiteralPath $up).FullName }
+$upFiles = @(Get-ChildItem -LiteralPath $upListed -Recurse -File -EA SilentlyContinue)
 $upMB = [math]::Round((($upFiles | Measure-Object Length -Sum).Sum) / 1MB, 1)
 if (-not (Test-Path -LiteralPath $up) -or $upMB -le $MaxUploadsMB) { Grab $up 'site\uploads' }
 else {
   $small = @($upFiles | Where-Object { $_.Length -le 10MB })
-  foreach ($f in $small) { Grab $f.FullName ('site\uploads\' + $f.FullName.Substring($up.Length).TrimStart('\')) }
+  foreach ($f in $small) { Grab $f.FullName ('site\uploads\' + $f.FullName.Substring($upListed.Length).TrimStart('\')) }
   Note ("  site\uploads is {0} MB, over {1}: took the {2} file(s) of 10 MB or less, left out {3} bigger" -f $upMB, $MaxUploadsMB, $small.Count, ($upFiles.Count - $small.Count))
 }
 foreach ($feed in 'feed', 'feed-dev') {
