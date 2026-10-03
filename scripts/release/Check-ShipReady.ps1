@@ -231,7 +231,15 @@ if ($isClone) {
     Ready 'not behind origin/main' ($behind -eq 0) ("$behind behind") 'git pull' 'either'
   }
   if ($dirty.Count) {
-    Say ("  note  " + $dirty.Count + " uncommitted change(s). A main Ship builds from them and commits them when it is out.") 'DarkGray'
+    # A main Ship refuses a release with anything uncommitted and writes
+    # nothing (22 Sep, f917dd8). That is a gap: it would stop a Ship. A dev
+    # Ship builds from the working tree, so the same state is only a note.
+    if ($Dev) {
+      Say ("  note  " + $dirty.Count + " uncommitted change(s). A dev Ship builds from those changes as they are.") 'DarkGray'
+    } else {
+      Ready 'nothing uncommitted' $false ($dirty.Count.ToString() + ' uncommitted change(s). A main Ship refuses while anything is uncommitted.') `
+        'Commit them through a pull request, or put them back. A main Ship writes nothing to the repository.'
+    }
   }
 }
 
