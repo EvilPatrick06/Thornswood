@@ -51,7 +51,7 @@ function Done {
 $src = [IO.File]::ReadAllText($ShipPath)
 
 $tokens = $null; $errs = $null
-[void][System.Management.Automation.Language.Parser]::ParseFile($ShipPath, [ref]$tokens, [ref]$errs)
+$ast = [System.Management.Automation.Language.Parser]::ParseFile($ShipPath, [ref]$tokens, [ref]$errs)
 Yes 'Ship.ps1 parses' (@($errs).Count -eq 0)
 
 # ---- lift the two blocks out of the shipped script --------------------------
@@ -81,9 +81,11 @@ $ver = $src.Substring($verAt, $verEnd - $verAt)
 # Die is Ship's own exit; here it throws, so a refusal comes back as its words.
 $stubs = 'function Say($m, $c) { }; function Head($m) { }; function Die($m) { throw ("STOP. " + $m) };'
 $gateSb = [scriptblock]::Create('$RepoDir = $args[0]; $Dev = $args[1]; $DryRun = $false;' + $stubs + $gate)
+$versionGuard = $ast.Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Assert-DevVersionSelection' }, $true)
+$feedStubs = 'function Get-FeedStoreLaunchers($ch) { return @() }; function Get-FeedStoreDir($ch) { return "" }; function Get-PublishedLauncher($dir, $ch) { return $null };'
 $verSb = [scriptblock]::Create(
     '$current = $args[0]; $Version = $args[1]; $Dev = $args[2]; $ModsOnly = $args[3];' +
-    '$MainReleaseDir = $args[4]; $ReleaseDir = $args[4];' + $stubs + $ver + '; return $target')
+    '$MainReleaseDir = $args[4]; $ReleaseDir = $args[4]; $MainSourceAligned = $false;' + $stubs + $feedStubs + $versionGuard.Extent.Text + $ver + '; return $target')
 
 # '' when the gate lets the release through, the STOP line when it does not.
 function Gate([string]$repo, [bool]$dev) {
