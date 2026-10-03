@@ -49,13 +49,14 @@ function read(rel) {
 const doc = read('Developer-Guide.md');
 yes('Developer-Guide.md is there to read', doc.length > 0);
 
-const head = doc.match(/^## Secrets\b.*$/m);
+const head = doc.match(/^#{2,3} Secrets\b.*$/m);
 yes('there is a secrets section', !!head);
 let section = '';
 if (head) {
   const from = head.index;
+  const level = head[0].match(/^#+/)[0].length;
   const rest = doc.slice(from + head[0].length);
-  const next = rest.search(/^## /m);
+  const next = rest.search(new RegExp('^#{1,' + level + '} ', 'm'));
   section = head[0] + (next < 0 ? rest : rest.slice(0, next));
 }
 
