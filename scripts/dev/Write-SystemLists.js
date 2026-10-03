@@ -59,11 +59,14 @@ const ranks = ['novice', 'advanced', 'expert', 'master'];
 const byHalf = {};
 const anybody = [];
 const refused = [];
+const gated = [];
 const raceRows = [];
 
 Object.keys(recipes.recipes || {}).forEach(function (id) {
   const row = recipes.recipes[id];
   row._id = id;
+  if (row.book === 'cut') { return; }
+  if (row.roll) { gated.push(row); return; }
   if (row.race) { raceRows.push(row); }
   if (!row.owner || !row.half) { anybody.push(row); return; }
   const key = row.owner + '/' + row.half;
@@ -140,6 +143,15 @@ Object.keys(byHalf).sort().forEach(function (key) {
   index.push('- [' + key + '](' + file + ') (' + rows.length + ', ' + asked + ' reach the server)');
 });
 
+gated.sort(function (a, b) { return clean(a.name) < clean(b.name) ? -1 : 1; });
+let gatedBody = head('Embassy and remnant rolls', 'game/data/recipes.json',
+  gated.length + ' recipes are not a public bench. An embassy row needs the embassy roll. A thalmor row needs the remnant roll.');
+gatedBody += '| Item | Roll | Half | Rank | Id |\n| --- | --- | --- | --- | --- |\n';
+gated.forEach(function (row) {
+  gatedBody += '| ' + clean(row.name) + ' | ' + clean(row.roll) + ' | ' + clean(row.half) + ' | ' + clean(row.rank) + ' | `' + clean(row._id) + '` |\n';
+});
+write('roll-gates.md', gatedBody);
+index.push('- [Embassy and remnant rolls](roll-gates.md) (' + gated.length + ')');
 anybody.sort(function (a, b) { return clean(a.name) < clean(b.name) ? -1 : 1; });
 write('anybody.md', head('Anybody may make these', 'game/data/recipes.json',
   anybody.length + ' recipes with no profession. Smelting and tanning live here.') +

@@ -57,13 +57,13 @@ Stand at any forge, oven, tanning rack or workbench in Skyrim and what you are
 about to make is either your half's work or it is not. If it is not, it does not
 get made and you keep your materials.
 
-Some of it is nobody's work. Smelting ore into ingots and tanning a hide into
-leather belong to no half, because every trade needs them, and anybody can do
-them.
+Smelting ore into ingots and tanning a hide into leather are Platewright work
+at novice, so an Edgewright can do them as the novice of that sister half.
+They are not open to anybody else. One row per ingot stays, and the duplicate
+rows are cut.
 
 Until you pick a profession, you cannot make anything that is somebody's work.
-Every bench tells you so and to press K and choose one; only the smelting and
-tanning above stay open to you. Picking a profession is what gives you a half,
+Every bench tells you so and to press K and choose one. Picking a profession is what gives you a half,
 a rank to climb in it and work that is yours, and from then on the three
 answers below are the rule.
 
