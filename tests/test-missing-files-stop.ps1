@@ -61,14 +61,14 @@ foreach ($what in 'game\\ui\\index.html is missing', 'is not in site\\public', '
     Yes "  $($what -replace '\\\\', '\') is a Gone" ($g -match ('Gone [^\r\n]*' + $what))
 }
 Yes '  and exits 1 when anything is Gone' ($g -match 'if \(\$script:gone\.Count\) \{[^}]*exit 1' -and $g -match '(?m)^exit 0\s*$')
-Yes '  the front zip, which git never had, stays a warning' ($g -match "Bad 'thornswood-front\.zip is not next to this script'")
+Yes '  the front zip, which git never had, stays a warning' ($g -match "Bad 'thornswood-front\.zip is not in local\\ in the repository folder'")
 
 # ---- Ship.ps1 --------------------------------------------------------------------
 $s = Read 'Ship.ps1'
 $go = $s.IndexOf("& (Join-Path `$Here 'Go.ps1') @goArgs")
 $stop = $s.IndexOf('if ($LASTEXITCODE -ne 0) {', [Math]::Max($go, 0))
 Yes 'Ship stops when Go.ps1 fails' ($go -gt 0 -and $stop -gt $go -and ($stop - $go) -lt 400)
-Yes 'Ship''s untracked-file gate looks past tools' ($s -match "\`$moreRoots = @\(@\('scripts', 'records', 'site', 'game', 'launcher', 'installer'\)" -and $s -match 'ls-files --others --exclude-standard -- tools @moreRoots')
+Yes 'Ship''s untracked-file gate looks past tools' ($s -match "\`$moreRoots = @\(@\('scripts', 'records', 'site', 'game', 'launcher', 'installer'\)" -and $s -match 'ls-files --others --exclude-standard -- @moreRoots')
 
 # ---- every file these lines name is tracked --------------------------------------
 if (Get-Command git -ErrorAction SilentlyContinue) {
