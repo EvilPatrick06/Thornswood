@@ -111,6 +111,15 @@ try {
     $sha = ('a' * 64)
     $pub = [pscustomobject]@{ Version = '1.1.102'; Url = 'https://thornswood.net/feed/assets/x'; Sha = $sha; Inputs = $h5 }
     Yes 'same fingerprint, whole launcher on the feed: unchanged' (Test-LauncherUnchanged $pub $h5)
+    $reuse = $ast.Find({ param($n) $n -is [Management.Automation.Language.IfStatementAst] -and
+        $n.Clauses[0].Item1.Extent.Text.Contains('Test-LauncherUnchanged $pubLauncher') }, $true)
+    $condition = [scriptblock]::Create('return ' + $reuse.Clauses[0].Item1.Extent.Text)
+    $pubLauncher = $pub; $LauncherInputs = $h5; $current = '1.1.103'; $MainSourceAligned = $true
+    Yes 'identical inputs cannot retain a different version when source is aligned' (-not (& $condition))
+    $current = $pub.Version
+    Yes 'identical inputs and aligned version reuse the existing signed launcher' (& $condition)
+    $current = '1.1.103'; $MainSourceAligned = $false
+    Yes 'a separate Dev branch retains normal fingerprint reuse' (& $condition)
     Yes 'a different fingerprint: changed' (-not (Test-LauncherUnchanged $pub $h4))
     Yes 'no feed: changed' (-not (Test-LauncherUnchanged $null $h5))
     Yes 'no fingerprint worked out: changed' (-not (Test-LauncherUnchanged $pub ''))
@@ -150,7 +159,7 @@ finally {
 
 # ---- the wiring ---------------------------------------------------------------
 $iHash    = $src.IndexOf('$LauncherInputs = Get-LauncherInputHash $RepoDir')
-$iTest    = $src.IndexOf('if (Test-LauncherUnchanged $pubLauncher $LauncherInputs)')
+$iTest    = $src.IndexOf('if ((Test-LauncherUnchanged $pubLauncher $LauncherInputs)')
 $iSet     = $src.IndexOf('$ModsOnly = $true', [Math]::Max(0, $iTest))
 $iVersion = $src.IndexOf("if (`$ModsOnly) {`r`n    `$target = `$current")
 if ($iVersion -lt 0) { $iVersion = $src.IndexOf("if (`$ModsOnly) {`n    `$target = `$current") }
