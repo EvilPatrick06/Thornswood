@@ -105,7 +105,7 @@ Check: every full plugin matches this order; light plugins are not counted.
 | 19 | Hothtrooper44_ArmorCompilation.esp | Keep. |
 | 20 | AnotherOakwood.esp | Keep. |
 | 21 | aaaGraniteHill.esp | Keep. |
-| 22 | ElysiumEstate.esp | **Switch on** (step 5). Elysium Estate 5.0.1, as the collection installs it; loads after aaaGraniteHill.esp. The servers had ElysiumEstateSSE.esp here until the deploy. |
+| 22 | ElysiumEstate.esp | **Switch on** (step 4). Elysium Estate 5.0.1, as the collection installs it; loads after aaaGraniteHill.esp. The servers had ElysiumEstateSSE.esp here until the deploy. |
 | 23 | Triumvirate - Mage Archetypes.esp | **Change.** Loads after ElysiumEstate.esp. |
 | 24 | Apocalypse - Magic of Skyrim.esp | Keep. |
 | 25 | CommonClothes.esp | Keep. |
@@ -114,7 +114,7 @@ Check: every full plugin matches this order; light plugins are not counted.
 | 28 | chfshVariousActions.esp | Keep. |
 | 29 | Cathedral Weathers.esp | Keep. |
 | 30 | FishingInSkyrim.esp | Keep. |
-| 31 | Thornswood-Content.esp | **New file** (step 3). Same place. |
+| 31 | Thornswood-Content.esp | **New file** (step 5). Same place. |
 | 32 | Populated Cities Towns Villages Legendary.esp | Keep. |
 | 33 | SkyrimSewers.esp | Keep. |
 | 34 | Solitude Arena.esp | Keep. |
@@ -257,7 +257,7 @@ the new body recipe does not claim to rebuild those outfits.
 | Fitted vanilla hoods, and the fishing and apprentice robes (`clothes\robemythicdawn\`, `clothes\thalmor\`, `creationclub\bgssse001\clothes\`) | 14 | CBBE 3BA Vanilla Outfits Redone (109194), its prebuilt meshes | **Held**: revision 2 adds the mod |
 | Children's clothes (`clothes\childrenclothes\`, `_byoh\clothes\childrenclothesvariants\`) | 10 | Styles of Skyrim Mashups - Children Clothes Variations and Mesh Fixes (154063), Vanilla Mesh Fixes Standalone | **Held** historically; excluded from revision 2, so the collection's original children's meshes show |
 | A noble end table (`furniture\noble\nobleendtable04.nif`) | 1 | Assorted Mesh Fixes (32117) | **Held**: revision 2 adds the mod |
-| The message board Thornswood-Content.esp places (`olivar-messageboard\missiveboardcotnd.nif`, dev packs only) | 1 | No mod at this path; kept from the other server's kzolivar records | **Held**: the rebuilt Thornswood Content (step 3) must point its board at a mesh the collection installs first |
+| The message board Thornswood-Content.esp places (`olivar-messageboard\missiveboardcotnd.nif`, dev packs only) | 1 | No mod at this path; kept from the other server's kzolivar records | **Held**: the rebuilt Thornswood Content (step 5) must point its board at a mesh the collection installs first |
 | Travel clothes built in BodySlide | 120 | Built on some other machine from Common Clothes and Armors 3BA BodySlide (83980), for a body and preset nothing records | **Ours for now (#1259)**: still ships until Thornswood builds the outfits itself from the collection's BodySlide projects |
 | Bosmer armour built in BodySlide (`armor\bosmerarmormaty743\`) | 18 | Built from Immersive Armours SSE CBBE 3BA BodySlide (22382, in the collection) | **Ours for now (#1259)**, as above |
 | More Craftable Equipment's executioner built in BodySlide (`MCE\clothes\executioner\f\`) | 2 | Built from its CBBE BodySlide file (44666) | **Ours for now (#1259)**, as above |
