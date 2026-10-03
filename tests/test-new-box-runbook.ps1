@@ -524,7 +524,7 @@ try {
     Yes '  with the bot''s settings shut to all but SYSTEM, Administrators and whoever ran it' (
         $acl -and $acl.AreAccessRulesProtected -and @($who | Where-Object { @('S-1-5-18', 'S-1-5-32-544', $me) -notcontains $_ }).Count -eq 0)
     Yes '  the Caddyfile' (Test-Path -LiteralPath (Join-Path $nCaddy 'Caddyfile'))
-    Yes '  and not choices.json, which nothing reads' (Said 'left\s+voice\\choices.json')
+    Yes '  and not choices.json, which the nightly backup no longer takes (#1084)' ($names -notcontains 'voice/choices.json')
     Yes '  and says the live gamemode differs from the backup''s and the dev one does not' (
         (Said ('GAMEMODE DIFFERS\s+' + [regex]::Escape($nGame))) -and (Said ('gamemode\s+' + [regex]::Escape($nDev) + '\\gamemode.js is the one')))
 
