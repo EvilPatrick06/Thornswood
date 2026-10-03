@@ -1,0 +1,31 @@
+$ErrorActionPreference = 'Stop'
+$repo = Split-Path -Parent $PSScriptRoot
+$path = Join-Path $repo 'scripts\deploy\Deploy-Server.ps1'
+$source = [IO.File]::ReadAllText($path)
+$block = [regex]::Match($source, '(?s)# ==== thornswood staged directories ====\s*(.*?)# ==== end thornswood staged directories ====')
+if (-not $block.Success) { throw 'Missing production staging directory block' }
+$ast = [Management.Automation.Language.Parser]::ParseFile($path, [ref]$null, [ref]$null)
+$fn = $ast.Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Get-StageDirectories' }, $true)
+if (-not $fn) { throw 'Missing production staging directory resolver' }
+Invoke-Expression $fn.Extent.Text
+$rootWin = Join-Path ([IO.Path]::GetTempPath()) ('ts-server-stage-' + [guid]::NewGuid().ToString('N'))
+[IO.Directory]::CreateDirectory($rootWin) | Out-Null
+$stageName = '.stage-fixture'
+$send = [ordered]@{}
+$record = [IO.File]::ReadAllText((Join-Path $repo 'records\server-build.json')) | ConvertFrom-Json
+foreach ($file in $record.files.PSObject.Properties) { $send[$file.Name] = '' }
+$send['gamemode.js'] = ''; $send['plugins/Thornswood-Content.esp'] = ''
+function Remote([string]$script) { Invoke-Expression $script }
+Invoke-Expression $block.Groups[1].Value
+foreach ($relative in $send.Keys) {
+    $target = Join-Path "$rootWin\$stageName" ($relative -replace '/', '\')
+    [IO.File]::WriteAllText($target, 'staged')
+    if (-not [IO.File]::Exists($target)) { throw "Native payload could not stage $relative" }
+    Write-Host "PASS staging supports $relative"
+}
+foreach ($relative in '../outside.txt', 'data/../../outside.txt', 'C:\outside.txt') {
+    $refused = $false
+    try { $null = Get-StageDirectories "$rootWin\$stageName" @($relative) } catch { $refused = $true }
+    if (-not $refused) { throw "Unsafe stage destination accepted: $relative" }
+    Write-Host "PASS rejects $relative"
+}
