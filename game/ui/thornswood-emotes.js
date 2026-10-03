@@ -239,6 +239,7 @@
 
   document.addEventListener('keydown', function (e) {
     if (!open()) return;
+    if (e.repeat) return;
     if (e.repeat) { e.preventDefault(); return; }
     var k = e.key || '';
     if (searching() && k !== 'Escape' && k !== 'Tab') { return; }
