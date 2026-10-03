@@ -38,13 +38,11 @@ folder: the character cards in `characters.json`, the door's `door.json`,
 site's `uploads` (the gallery's pictures) and each feed's store
 (`version.json`, `published.json`, `launchers.txt`, `releases.txt` and
 `history`, for `feed` and `feed-dev`), the bot's config and its join record
-(`joins.json`, which arrival each person was), the voice service's
-`choices.json`, and the Caddyfile. `NOTES.txt` in it counts the characters in
-each world and names any private file that was missing. `choices.json` is
-still taken but is not put back: nothing has read it since the voice
-service's character choices went on 20 September. The voice service's
-`owners.json` and `secret.txt` stopped being taken on 23 September, when the
-character register they belonged to was retired. It does **not** hold
+(`joins.json`, which arrival each person was), and the Caddyfile. `NOTES.txt`
+in it counts the characters in each world and names any private file that was
+missing. The voice service's `owners.json` and `secret.txt` stopped being
+taken on 23 September, when the character register they belonged to was
+retired. It does **not** hold
 node_modules, the installer, the dev voice service, the feed's downloads
 (`feed\assets`, the size of every release; `Remirror-Site-Feed.ps1` sends them
 again from the machine that shipped), or the Skyrim data files. Those come
