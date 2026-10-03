@@ -193,3 +193,10 @@ for is recorded with an empty hash, and the install carries on: the boxes
 were ticked either way. Nothing about the person or the machine goes in it.
 `tests\test-setup-agreements.ps1` holds all of that, and with `-Live` also
 checks the three links answer and the hashes match the pages served now.
+
+An install made before that lock has no `Profile\accepted.json`, and nothing
+else in the install records the three. The launcher reads the same file
+(`launcher\app\Acceptance.cs`). When the file is missing, or a page's hash is
+not the one recorded, it shows the same three boxes and the same three links
+and writes the same record. Declining closes the launcher and writes nothing.
+`tests\test-prior-acceptance.ps1` holds that.
