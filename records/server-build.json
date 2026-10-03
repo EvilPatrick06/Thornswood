@@ -1,9 +1,9 @@
 {
   "_note": "What the server in this release is, and the source it was built from: every file the fork builds into it, by hash, and the one fork commit (scripts\\deploy\\ServerBuild.ps1 says which files). sha256 is the binary's. Export-ServerPayload, Publish-Server, Deploy-Server and the installer refuse any server file that is not this. Regenerate with scripts\\release\\New-ServerBuildRecord.ps1 after every rebuild.",
   "binary": "scam_native.node",
-  "sha256": "7a28ec9e539b33f3f58f129b5bd88fcfec50acd05a7c0ac9a3978b2075cae988",
+  "sha256": "77bdd06c2271308df172bf4d06b9cdc53c9514be5795b44a37df720acd47efdc",
   "bytes": 5715968,
-  "builtUtc": "2026-10-03T23:22:50Z",
+  "builtUtc": "2026-10-03T23:29:35Z",
   "source": {
     "repo": "https://github.com/EvilPatrick06/skymp.git",
     "branch": "thornswood/engine-changes",
@@ -38,7 +38,7 @@
       "commit": "ae054a7ab384e83634755a078c58baf4bd81d610"
     },
     "scam_native.node": {
-      "sha256": "7a28ec9e539b33f3f58f129b5bd88fcfec50acd05a7c0ac9a3978b2075cae988",
+      "sha256": "77bdd06c2271308df172bf4d06b9cdc53c9514be5795b44a37df720acd47efdc",
       "bytes": 5715968,
       "commit": "ae054a7ab384e83634755a078c58baf4bd81d610"
     },
