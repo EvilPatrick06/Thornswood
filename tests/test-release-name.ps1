@@ -212,7 +212,9 @@ try {
     Put (Join-Path $inst 'Profile\OwnGame\plugins.txt') "*ours.esp`r`n"
     $pluginHeader = [byte[]]::new(24)
     [Text.Encoding]::ASCII.GetBytes('TES4').CopyTo($pluginHeader, 0)
-    [IO.File]::WriteAllBytes((Join-Path $inst 'Game\Data\ours.esp'), $pluginHeader)
+    foreach ($plugin in 'Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm', 'ours.esp') {
+        [IO.File]::WriteAllBytes((Join-Path $inst "Game\Data\$plugin"), $pluginHeader)
+    }
     Put (Join-Path $inst 'Profile\OwnGame\loadorder.txt') "ours.esp`r`n"
     $port = Get-Random -Minimum 20000 -Maximum 40000
     Put (Join-Path $inst 'config.json') ('{"ServerAddress":"127.0.0.1","ServerPort":' + ($port - 1) + '}')
@@ -221,7 +223,7 @@ try {
     if ($null -eq $node) { Done }
     $serverJs = Join-Path $Scratch 'server.js'
     Put $serverJs ("require('http').createServer(function (q, s) { s.setHeader('Content-Type', 'application/json'); " +
-                   "s.end(JSON.stringify({ mods: [{ filename: 'ours.esp', size: 1, crc32: 1 }] })); }).listen($port, '127.0.0.1');")
+                   "s.end(JSON.stringify({ mods: ['Skyrim.esm','Update.esm','Dawnguard.esm','HearthFires.esm','Dragonborn.esm','ours.esp'].map(filename => ({ filename, size: 24, crc32: 1 })) })); }).listen($port, '127.0.0.1');")
     $script:gameServer = Start-Process -FilePath $node.Source -ArgumentList @($serverJs) -PassThru -WindowStyle Hidden
     Start-Sleep -Milliseconds 800
     Put (Join-Path $inst 'Game\Data\Platform\UI\ours.bsa') ('x' * 4096)
