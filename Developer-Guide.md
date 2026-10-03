@@ -2,7 +2,7 @@
 
 This is the one guide for working on Thornswood. A first day starts at section 1 and follows the numbers. A later day uses the table of contents, the glossary, or the outline in Visual Studio Code to open the heading you need. `CLAUDE.md` adds only what applies to a Claude.
 
-The outline has three depths. A part is a numbered section. A step or a topic inside it is a subsection. A smaller step inside that is a sub-subsection. The same nesting is in the table of contents.
+The outline nests, and the table of contents follows it. A part is a numbered section. A group inside it is a subsection. A step inside that is a sub-subsection.
 
 - Repository: https://github.com/EvilPatrick06/Thornswood
 - Board: https://github.com/users/EvilPatrick06/projects/1
@@ -14,38 +14,41 @@ The outline has three depths. A part is a numbered section. A step or a topic in
 
 - [Glossary](#glossary)
 - [1. First Time Setup](#1-first-time-setup)
-  - [Install the tools](#install-the-tools)
-    - [What each install is](#what-each-install-is)
-  - [Check that the tools open](#check-that-the-tools-open)
-  - [Install the OpenSSH client](#install-the-openssh-client)
-    - [When the class is not registered](#when-the-class-is-not-registered)
-  - [Sign the GitHub CLI into your account](#sign-the-github-cli-into-your-account)
-  - [Clone the repository](#clone-the-repository)
-  - [Open the folder in Visual Studio Code](#open-the-folder-in-visual-studio-code)
-  - [Reach the VPS](#reach-the-vps)
+  - [On every PC](#on-every-pc)
+    - [Install the tools](#install-the-tools)
+      - [What each install is](#what-each-install-is)
+    - [Check that the tools open](#check-that-the-tools-open)
+    - [Install the OpenSSH client](#install-the-openssh-client)
+      - [When the class is not registered](#when-the-class-is-not-registered)
+    - [Sign the GitHub CLI into your account](#sign-the-github-cli-into-your-account)
+    - [Clone the repository](#clone-the-repository)
+    - [Open the folder in Visual Studio Code](#open-the-folder-in-visual-studio-code)
+    - [Reach the VPS](#reach-the-vps)
   - [Setting up a machine](#setting-up-a-machine)
   - [Shipping from another machine](#shipping-from-another-machine)
 - [2. How to make changes](#2-how-to-make-changes)
-  - [Start from a current main](#start-from-a-current-main)
-  - [Save the work in a commit](#save-the-work-in-a-commit)
-  - [Switch between branches](#switch-between-branches)
-    - [Commit, then switch](#commit-then-switch)
-    - [Set the edits aside](#set-the-edits-aside)
-  - [Open the pull request](#open-the-pull-request)
-    - [A one-line body](#a-one-line-body)
-    - [A body of several lines](#a-body-of-several-lines)
-    - [When the pull request will not open](#when-the-pull-request-will-not-open)
-  - [Merge your own pull request](#merge-your-own-pull-request)
-  - [What this is](#what-this-is)
-  - [Words](#words)
-  - [Everything we need to do goes on the board](#everything-we-need-to-do-goes-on-the-board)
-  - [Settled design, not up for a quiet rewrite](#settled-design-not-up-for-a-quiet-rewrite)
-  - [How work moves](#how-work-moves)
-    - [Main, hotfixes, and merging](#main-hotfixes-and-merging)
-    - [Branch names](#branch-names)
-    - [Dev first, notes, and open branches](#dev-first-notes-and-open-branches)
-    - [Signing, the build check, and the six shared files](#signing-the-build-check-and-the-six-shared-files)
-  - [How work moves, the long form](#how-work-moves-the-long-form)
+  - [On your branch](#on-your-branch)
+    - [Start from a current main](#start-from-a-current-main)
+    - [Save the work in a commit](#save-the-work-in-a-commit)
+    - [Switch between branches](#switch-between-branches)
+      - [Commit, then switch](#commit-then-switch)
+      - [Set the edits aside](#set-the-edits-aside)
+    - [Open the pull request](#open-the-pull-request)
+      - [A one-line body](#a-one-line-body)
+      - [A body of several lines](#a-body-of-several-lines)
+      - [When the pull request will not open](#when-the-pull-request-will-not-open)
+    - [Merge your own pull request](#merge-your-own-pull-request)
+  - [The rules](#the-rules)
+    - [What this is](#what-this-is)
+    - [Words](#words)
+    - [Everything we need to do goes on the board](#everything-we-need-to-do-goes-on-the-board)
+    - [Settled design, not up for a quiet rewrite](#settled-design-not-up-for-a-quiet-rewrite)
+    - [How work moves](#how-work-moves)
+      - [Main, hotfixes, and merging](#main-hotfixes-and-merging)
+      - [Branch names](#branch-names)
+      - [Dev first, notes, and open branches](#dev-first-notes-and-open-branches)
+      - [Signing, the build check, and the six shared files](#signing-the-build-check-and-the-six-shared-files)
+    - [How work moves, the long form](#how-work-moves-the-long-form)
 - [3. How to release to dev](#3-how-to-release-to-dev)
   - [Say so, then write the note](#say-so-then-write-the-note)
   - [Put the gamemode on the dev server](#put-the-gamemode-on-the-dev-server)
@@ -58,57 +61,62 @@ The outline has three depths. A part is a numbered section. A step or a topic in
   - [A hotfix](#a-hotfix)
   - [How a release goes out](#how-a-release-goes-out)
   - [After a pull request is merged](#after-a-pull-request-is-merged)
-- [5. FAQ](#5-faq)
+- [5. The system](#5-the-system)
+  - [What Thornswood is](#what-thornswood-is)
+  - [The pieces](#the-pieces)
+  - [One Skyrim of its own](#one-skyrim-of-its-own)
+  - [Where things are written down](#where-things-are-written-down)
+- [6. FAQ](#6-faq)
   - [A. GitHub](#a-github)
     - [Sign in and look](#sign-in-and-look)
     - [Where your commits are](#where-your-commits-are)
-    - [Learn more](#learn-more)
+    - [Learn more about GitHub](#learn-more-about-github)
   - [B. Git](#b-git)
     - [See the branch and the edits](#see-the-branch-and-the-edits)
     - [The commands the rest of the guide uses](#the-commands-the-rest-of-the-guide-uses)
-    - [Learn more](#learn-more-1)
+    - [Learn more about Git](#learn-more-about-git)
   - [C. PowerShell](#c-powershell)
     - [Where you are](#where-you-are)
     - [Run a script from the repository folder](#run-a-script-from-the-repository-folder)
-    - [Learn more](#learn-more-2)
+    - [Learn more about PowerShell](#learn-more-about-powershell)
   - [D. Visual Studio Code](#d-visual-studio-code)
     - [Open this repository](#open-this-repository)
     - [The parts of the window](#the-parts-of-the-window)
     - [Where to click](#where-to-click)
-    - [Learn more](#learn-more-3)
+    - [Learn more about Visual Studio Code](#learn-more-about-visual-studio-code)
   - [E. VPS](#e-vps)
     - [Make a key and test it](#make-a-key-and-test-it)
     - [Two reads](#two-reads)
-    - [Learn more](#learn-more-4)
+    - [Learn more about VPS](#learn-more-about-vps)
   - [F. Website](#f-website)
     - [Deploy](#deploy)
-    - [Learn more](#learn-more-5)
+    - [Learn more about Website](#learn-more-about-website)
   - [G. Main Build](#g-main-build)
-    - [Learn more](#learn-more-6)
+    - [Learn more about Main Build](#learn-more-about-main-build)
   - [H. Dev Build](#h-dev-build)
     - [Install it from the main launcher](#install-it-from-the-main-launcher)
     - [The Play page](#the-play-page)
-    - [Learn more](#learn-more-7)
+    - [Learn more about Dev Build](#learn-more-about-dev-build)
   - [I. Bot](#i-bot)
     - [Deploy the code](#deploy-the-code)
-    - [Learn more](#learn-more-8)
+    - [Learn more about Bot](#learn-more-about-bot)
   - [J. Node](#j-node)
     - [See the version and run a test](#see-the-version-and-run-a-test)
-    - [Learn more](#learn-more-9)
+    - [Learn more about Node](#learn-more-about-node)
   - [K. Vortex](#k-vortex)
     - [Install the collection](#install-the-collection)
-    - [Learn more](#learn-more-10)
+    - [Learn more about Vortex](#learn-more-about-vortex)
   - [L. Pandora](#l-pandora)
-    - [Learn more](#learn-more-11)
+    - [Learn more about Pandora](#learn-more-about-pandora)
   - [M. Creation Kit](#m-creation-kit)
     - [Change a record](#change-a-record)
-    - [Learn more](#learn-more-12)
+    - [Learn more about Creation Kit](#learn-more-about-creation-kit)
   - [N. The repository map](#n-the-repository-map)
     - [Why it is split this way](#why-it-is-split-this-way)
     - [How to move around](#how-to-move-around)
     - [What each folder is](#what-each-folder-is)
     - [Files you will open often](#files-you-will-open-often)
-    - [Learn more](#learn-more-13)
+    - [Learn more about the repository](#learn-more-about-the-repository)
   - [O. Others](#o-others)
     - [Python](#python)
     - [The .NET Framework](#the-net-framework)
@@ -116,11 +124,7 @@ The outline has three depths. A part is a numbered section. A step or a topic in
     - [HTML](#html)
     - [CSS](#css)
     - [JavaScript](#javascript)
-    - [Learn more](#learn-more-14)
-    - [What Thornswood is](#what-thornswood-is)
-    - [The pieces](#the-pieces)
-    - [One Skyrim of its own](#one-skyrim-of-its-own)
-    - [Where things are written down](#where-things-are-written-down)
+    - [Learn more about the other tools](#learn-more-about-the-other-tools)
   - [P. Secrets, by name and place, never by value](#p-secrets-by-name-and-place-never-by-value)
 
 ## Glossary
@@ -157,11 +161,13 @@ The words this guide uses. The long alphabetical list, with file names, is [docs
 
 ## 1. First Time Setup
 
-Do this once on a new Windows PC. Stay in order. Each subsection is one step. The two subsections at the end are for a PC that will publish a release. You can read them after the clone works.
+Do this once on a new Windows PC. Stay in order. On every PC is the steps. Setting up a machine and Shipping from another machine are for a PC that will publish a release. You can read those two after the clone works.
 
 Use your own GitHub account. Patrick adds that account as a collaborator on the private repository before a clone will work. Say so in Discord and wait for that. Use your own clone. The shared folder `C:\Users\evilp\Downloads\Thornswood-Repo` on the shipping machine is for the lanes that build from it. Your clone can live at `C:\Dev\Thornswood`, or any empty folder you own.
 
-### Install the tools
+### On every PC
+
+#### Install the tools
 
 Open PowerShell. Paste this and let each install finish. If Windows asks for an administrator, allow it.
 
@@ -173,7 +179,7 @@ winget install --id Microsoft.PowerShell -e --accept-package-agreements --accept
 winget install --id Microsoft.VisualStudioCode -e --accept-package-agreements --accept-source-agreements
 ```
 
-#### What each install is
+##### What each install is
 
 | Program | What you use it for |
 | --- | --- |
@@ -183,7 +189,7 @@ winget install --id Microsoft.VisualStudioCode -e --accept-package-agreements --
 | PowerShell 7 | The terminal the scripts run in. [C. PowerShell](#c-powershell) |
 | Visual Studio Code | The window you edit in. [D. Visual Studio Code](#d-visual-studio-code) |
 
-### Check that the tools open
+#### Check that the tools open
 
 Close that window and open **PowerShell 7** from the Start menu. A new window is required because Windows only sees newly installed programs in a window opened afterwards.
 
@@ -203,7 +209,7 @@ $PSVersionTable.PSVersion
 
 The major number is 7 or higher when you are in PowerShell 7. If it prints 5, type `pwsh` and press Enter.
 
-### Install the OpenSSH client
+#### Install the OpenSSH client
 
 The VPS scripts need `ssh`. If `ssh -V` already printed a version, this step is done.
 
@@ -211,7 +217,7 @@ The VPS scripts need `ssh`. If `ssh -V` already printed a version, this step is 
 Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0
 ```
 
-#### When the class is not registered
+##### When the class is not registered
 
 Run the same install through DISM from an elevated PowerShell:
 
@@ -232,7 +238,7 @@ dism /Online /Add-Capability /CapabilityName:OpenSSH.Client~~~~0.0.1.0
 ssh -V
 ```
 
-### Sign the GitHub CLI into your account
+#### Sign the GitHub CLI into your account
 
 ```powershell
 gh auth login
@@ -241,7 +247,7 @@ gh auth status
 
 Choose GitHub.com, then HTTPS, then login with a browser, as the GitHub user that has access to the repository. `gh auth status` should name your account and say the token can see private repositories. More on the website is in [A. GitHub](#a-github).
 
-### Clone the repository
+#### Clone the repository
 
 ```powershell
 New-Item -ItemType Directory -Force -Path C:\Dev | Out-Null
@@ -255,7 +261,7 @@ git status
 
 From here on, the commands assume PowerShell is inside your clone. If you used another folder, `cd` there first.
 
-### Open the folder in Visual Studio Code
+#### Open the folder in Visual Studio Code
 
 ```powershell
 cd C:\Dev\Thornswood
@@ -266,7 +272,7 @@ code .
 
 The branch name is in the status bar at the bottom left. Open the terminal from the View menu, Terminal. It starts in the clone. The parts of the window are in [D. Visual Studio Code](#d-visual-studio-code). The folders, and the files a first change usually touches, are in [N. The repository map](#n-the-repository-map).
 
-### Reach the VPS
+#### Reach the VPS
 
 You do not get the server password. Your PC creates a key. You send the public line. Somebody who already has a key on the server adds yours.
 
@@ -411,9 +417,11 @@ the pinned or recorded bytes.
 
 ## 2. How to make changes
 
-One issue, one branch, one pull request. Your commits sit on that branch. `main` on GitHub gains them when the pull request is merged. The rules under the steps are the ones a review and the build check hold you to.
+One issue, one branch, one pull request. Your commits sit on that branch. `main` on GitHub gains them when the pull request is merged. On your branch is the steps. The rules are the next group. A review and the build check hold you to them.
 
-### Start from a current main
+### On your branch
+
+#### Start from a current main
 
 ```powershell
 git switch main
@@ -423,7 +431,7 @@ git switch -c yourname/short-name
 
 `yourname` is your name in lowercase. `short-name` is the job, with hyphens. Example: `alex/fix-door-list`. `git switch -c` creates the branch and puts the folder on it. `git checkout -b yourname/short-name` creates it the same way. Later sections use `git checkout` for that move.
 
-### Save the work in a commit
+#### Save the work in a commit
 
 Save the file in the editor first (`Ctrl+S`). A save writes the file into whichever branch is current.
 
@@ -442,7 +450,7 @@ git push -u origin HEAD
 
 The first push sets the upstream. It puts this branch on GitHub under the same name. `main` on GitHub stays as it is.
 
-### Switch between branches
+#### Switch between branches
 
 The folder shows one branch at a time. The files in Visual Studio Code are the branch named in the status bar. Every other local branch stays on this PC with its own commits.
 
@@ -453,7 +461,7 @@ git status
 
 A star marks the branch in the folder. `git branch -vv` also shows the GitHub branch each one tracks.
 
-#### Commit, then switch
+##### Commit, then switch
 
 ```powershell
 git add path\to\file
@@ -471,7 +479,7 @@ git pull
 git switch -c yourname/second-job
 ```
 
-#### Set the edits aside
+##### Set the edits aside
 
 ```powershell
 git stash
@@ -489,17 +497,17 @@ git stash pop
 
 When the switch stops, those uncommitted edits touch a file that differs on the branch you asked for. You are still on the current branch, and the edits are still in the folder. Commit them, or stash them, then switch.
 
-### Open the pull request
+#### Open the pull request
 
 `gh pr create` uses the branch you have checked out. A one-line body uses ordinary double quotes. PowerShell treats `@" ` as the start of a here-string, and a here-string needs a line break immediately after `@"`. Characters on that same line raise `No characters are allowed after a here-string header`.
 
-#### A one-line body
+##### A one-line body
 
 ```powershell
 gh pr create --title "Tools to 50" --body "Reduced tools from 100 to 50 on uses"
 ```
 
-#### A body of several lines
+##### A body of several lines
 
 ```powershell
 $body = @"
@@ -523,7 +531,7 @@ node tests\test-site-local.js
 
 Use the file in `tests\` whose name matches the area you touched. Pages, docs, and launcher help that a person will read go through `Check-Words.ps1`.
 
-#### When the pull request will not open
+##### When the pull request will not open
 
 **The push is not a fast-forward.** Your local branch is behind the same branch on GitHub. Bring the remote commits in, then create the pull request:
 
@@ -563,7 +571,7 @@ git commit -m "Resolve merge conflict in gamemode.js"
 
 If the stop was a rebase rather than a merge, the last step is `git rebase --continue` after the `git add`.
 
-### Merge your own pull request
+#### Merge your own pull request
 
 Wait until the check named `Launcher builds` is green on the commit you are merging. Pending means it is still running. A red check means the branch is not ready. Fix it on the same branch and push again.
 
@@ -578,7 +586,9 @@ When `Launcher builds` says pass, and you are confident in the change, merge it 
 
 What you run after the merge depends on what the pull request touched. A dev release is [section 3](#3-how-to-release-to-dev). A main release is [section 4](#4-how-to-release-to-main).
 
-### What this is
+### The rules
+
+#### What this is
 
 Thornswood: a modded co-op Skyrim roleplay server on SkyMP, in alpha and
 open by application. This repo is the launcher (launcher\app, C# 5, WPF, built with the
@@ -604,7 +614,7 @@ by all of them and sits detached at `origin/main`, because lanes build from
 it: branch work goes in a worktree beside it, removed with its branch once
 the pull request merges.
 
-### Words
+#### Words
 
 The people in the world are customers, clients, people, testers, partners.
 Never "player". No em dashes anywhere written for people. Plain, direct
@@ -645,7 +655,7 @@ tell a message from a name in the code or one of Skyrim's own record names;
 and names in the other documents, which record who decided something and
 who holds what on purpose.
 
-### Everything we need to do goes on the board
+#### Everything we need to do goes on the board
 
 The one record of outstanding work is the Thornswood To Do board:
 https://github.com/users/EvilPatrick06/projects/1
@@ -681,7 +691,7 @@ How to use it:
   it and the board moves it to Done. Say in the pull request, or in #staff-general,
   which issues moved.
 
-### Settled design, not up for a quiet rewrite
+#### Settled design, not up for a quiet rewrite
 
 - Decided by Patrick and Djinn on 17 Sep, after the three launchers kept
   getting into each other's files: Thornswood runs from its own game folder
@@ -774,11 +784,11 @@ Anything that changes one of these is a few lines in #staff-general first: the
 problem, the approach, what it touches. Agreed in #staff-general by
 the team before code; nobody settles it alone, and a Claude never does.
 
-### How work moves
+#### How work moves
 
 The short form of the rules. The same decisions, with the dates they were made, are in [How work moves, the long form](#how-work-moves-the-long-form).
 
-#### Main, hotfixes, and merging
+##### Main, hotfixes, and merging
 
 - main is what ships. Any developer may ship main from a machine that can sign, and Ship.ps1 refuses
   a main release that is not on main, is behind or ahead of origin, has
@@ -832,7 +842,7 @@ The short form of the rules. The same decisions, with the dates they were made, 
   Check which it is rather than assuming, because this paragraph was wrong
   for a day before anybody looked:
   `gh api repos/EvilPatrick06/Thornswood/branches/main/protection`
-#### Branch names
+##### Branch names
 
 - Everybody's work goes on a branch named for whoever did it:
   `git checkout -b <name>/what-it-is` (your name, then a slash, and
@@ -847,7 +857,7 @@ The short form of the rules. The same decisions, with the dates they were made, 
 - `git pull` before starting anything. If a pull conflicts, resolve it on
   your branch (`git fetch`, `git rebase origin/main`), never on main. If a
   push is rejected, pull, do not force.
-#### Dev first, notes, and open branches
+##### Dev first, notes, and open branches
 
 - Decided by Patrick on 23 Sep: **everything goes to the dev build first.**
   His words: "start puttin these on the dev build and not the main build
@@ -905,7 +915,7 @@ The short form of the rules. The same decisions, with the dates they were made, 
     decide on: ask them, and put it on the board if they cannot be asked.
     Check whether its work is already in main before deleting it; a
     squashed merge leaves the branch looking unmerged to git.
-#### Signing, the build check, and the six shared files
+##### Signing, the build check, and the six shared files
 
 - Code signing is on since 27 Sep (issue #390, closed): the launcher and the
   setup program are signed through Azure Artifact Signing
@@ -939,7 +949,7 @@ The short form of the rules. The same decisions, with the dates they were made, 
 - Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or
   Publish-Update.ps1 without a line in #staff-general first; every machine touches those.
 
-### How work moves, the long form
+#### How work moves, the long form
 
 Several people, several machines, one repo. The short rules are above;
 this is the long form.
@@ -1065,28 +1075,17 @@ The machine that runs `Ship.ps1` still has to sign the build. `records\signing\s
 | Dev gamemode | `.\scripts\deploy\Deploy-DevGamemode.ps1` | Dev server only |
 | Live gamemode | `.\scripts\deploy\Deploy-Gamemode.ps1`, then `.\scripts\deploy\Deploy-Server.ps1` | Live server |
 
-A dev release can run from any branch on any developer's machine. A main release runs from `main` after `git pull`, with a clean tree that matches GitHub. Details, note rules, and the restart warning are in How a release goes out and After a pull request is merged.
+A dev release can run from any branch on any developer's machine. A main release runs from `main` after `git pull`, with a clean tree that matches GitHub. The note shape is in [Say so, then write the note](#say-so-then-write-the-note). The command for each file is in [After a pull request is merged](#after-a-pull-request-is-merged). The restart warning is in [How a release goes out](#how-a-release-goes-out).
 
-`Set-DevNews.ps1 -Check` says whether the dev Discord webhook is set, and which channel it points at. It prints no secret.
+To post the current feed again:
 
 ```powershell
-.\scripts\ops\Set-DevNews.ps1 -Check
 .\scripts\ops\Publish-Discord.ps1 -DryRun
 .\scripts\ops\Publish-Discord.ps1 -Dev -DryRun
 .\scripts\ops\Publish-News.ps1 -OutFile news.json
 ```
 
 `-DryRun` and `-OutFile` send nothing. A real post remembers what it already announced and refuses to repeat it. `-Force` is how a deleted post is made again.
-
-The note is what people read. The first line is a title of three words or more, from the person's side. Then one line starting with `- ` for each thing they will notice. Ship refuses a title that is shorter, a note with no `- ` line, an issue number, a file name, a setting name, and the word the Words section bans.
-
-```powershell
-.\scripts\release\Ship.ps1 -Channel dev "The Downgrade button shows its progress and says why it stopped
-- A bar under the Downgrade button shows how far the downgrade has got.
-- When the downgrade stops, the line under the button says why and what to do next."
-```
-
-Everything still goes to the dev build first, including small changes. A main release is for a security fix, for something that leaves the game untestable, or for work the team has agreed goes live. Any developer who is confident may run that main release, then say so in #staff-general.
 
 ## 4. How to release to main
 
@@ -1257,44 +1256,20 @@ repository folder. Any developer may.
 
 1. `git checkout main`, then `git pull`. Ship.ps1 refuses a main release
    that is behind origin, so the pull comes first.
-2. Then one command for each part the pull request touched:
-   - The launcher (`launcher\app`, `launcher\ui.xaml`, the art and video that
-     Build-Launcher.ps1 embeds), the game plugins (`game\plugins`), or
-     anything else that goes out in a pack:
-     `.\scripts\release\Ship.ps1 -Channel dev "what changed"`. The dev build is where
-     it goes first, by the dev-first rule in How work moves. `.\scripts\release\Ship.ps1 "what changed"`
-     with no channel is the live one, and that is for a security fix, for
-     something that leaves the game untestable, or for work the team has
-     agreed goes live. Any developer who is confident may run it.
+2. Then one command for each part the pull request touched. The note on a Ship is the one in [Say so, then write the note](#say-so-then-write-the-note). A pull request that touches several of these gets every one of them, in the same sitting, so nothing goes out half done.
 
-     The note is the release post: #news, the launcher's News tab and the
-     site all show it. Asked for by Patrick on 25 September, after a one-line
-     dev note went out as a bare title: "what you gave for the news wasnt
-     detailed enough". So a Ship command written for him carries the whole
-     note. The first line is a title from the customer's side. Then one line
-     starting with `- ` for each thing a person will notice, a plain sentence
-     saying what it does for them and how to use it: the key, the button, the
-     place. Never one line, and never branch names, pull request numbers or
-     entry numbers. The dev post of 24 September 14:36 is the shape to copy.
-     Ship refuses notes that break this (see "Every release note has a title
-     and details" above), before it builds anything.
-   - The gamemode behind that dev release: `.\scripts\deploy\Deploy-DevGamemode.ps1`.
-     `Deploy-Gamemode.ps1` then `Deploy-Server.ps1` is the live pair.
-   - The site's app or `site\public`: `.\scripts\deploy\Deploy-Docs.ps1`.
-     The public pages (`site\data\site\*.md`) need
-     `.\scripts\deploy\Deploy-Docs.ps1 -Site`.
-   - The bot's code or join card art in `bot`:
-     `.\scripts\deploy\Install-Bot.ps1 -CodeOnly`.
-   - The bot's avatar (`bot\thornswood-bot-*.png`): no script
-     sends it. It is uploaded by hand in the Discord developer portal.
-   - `game\gamemode.js`: `.\scripts\deploy\Deploy-Gamemode.ps1`, then
-     `.\scripts\deploy\Deploy-Server.ps1`.
-   - The voice service (`voice\voice-server.js`, `voice\public`):
-     `.\scripts\deploy\Install-Voice.ps1`.
-   - Scripts that only change how a release is built (Ship.ps1, Publish-Update.ps1,
-     the Deploy scripts): nothing more. The pull is the change. Any developer may run them.
-   A pull request that touches several of these gets every one of them, in
-   the same sitting, so nothing goes out half done.
+| You changed | Run |
+| --- | --- |
+| The launcher (`launcher\app`, `launcher\ui.xaml`, the art and video that Build-Launcher.ps1 embeds), the game plugins (`game\plugins`), or anything else that goes out in a pack | `.\scripts\release\Ship.ps1 -Channel dev "what changed"`. The dev build is where it goes first, by the dev-first rule in How work moves. `.\scripts\release\Ship.ps1 "what changed"` with no channel is the live one, for a security fix, for something that leaves the game untestable, or for work the team has agreed goes live. |
+| The gamemode on the dev server | `.\scripts\deploy\Deploy-DevGamemode.ps1` |
+| The gamemode on the live server, including `game\gamemode.js` | `.\scripts\deploy\Deploy-Gamemode.ps1`, then `.\scripts\deploy\Deploy-Server.ps1` |
+| The site's app or `site\public` | `.\scripts\deploy\Deploy-Docs.ps1` |
+| The public pages, `site\data\site\*.md` | `.\scripts\deploy\Deploy-Docs.ps1 -Site` |
+| The bot's code or join card art in `bot` | `.\scripts\deploy\Install-Bot.ps1 -CodeOnly` |
+| The bot's avatar, `bot\thornswood-bot-*.png` | No script sends it. Upload it by hand in the Discord developer portal. |
+| The voice service, `voice\voice-server.js` or `voice\public` | `.\scripts\deploy\Install-Voice.ps1` |
+| Scripts that only change how a release is built (Ship.ps1, Publish-Update.ps1, the Deploy scripts) | Nothing more. The pull is the change. |
+
 3. Everybody else, once it is out, from the main folder: `git checkout main`, then
    `git pull`. If the branch had its own folder, `git worktree remove
    ..\<that folder>`. Then `git branch -D <name>/what-it-is`, after GitHub
@@ -1302,583 +1277,11 @@ repository folder. Any developer may.
    `git branch -d` refuses. A file the branch added that also sits untracked
    in the main folder stops the pull, so delete that copy first.
 
-## 5. FAQ
+## 5. The system
 
-Each letter stands on its own: what the thing is, then the commands. The numbered sections are the path. These letters are the pages you open when you already know the name.
+How the pieces fit together. Sections 1 to 4 are the path. The letters in the FAQ are the tools.
 
-### A. GitHub
-
-GitHub is the website copy of the repository, at https://github.com/EvilPatrick06/Thornswood. Your PC and GitHub each hold the history. `origin` is the name Git uses for the GitHub copy.
-
-#### Sign in and look
-
-Sign in on the website as the account that was added to the repository. The Code tab shows the files on the branch named in the dropdown. After a clone, that dropdown is `main`.
-
-```powershell
-gh auth status
-```
-
-It should print your login.
-
-#### Where your commits are
-
-After `git push -u origin HEAD`, refresh the Code tab and choose your branch in the dropdown. The files there are your branch. The `main` entry is still the shared line. Those commits join `main` when the pull request is merged.
-
-The Pull requests tab lists open pull requests. `gh pr create` adds yours. The steps are in [Open the pull request](#open-the-pull-request).
-
-#### Learn more
-
-- [Hello World on GitHub](https://docs.github.com/en/get-started/quickstart/hello-world), the first-time walkthrough
-- [About pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests)
-- [GitHub flow](https://docs.github.com/en/get-started/using-github/github-flow), the short version of branch, pull request, merge
-- This repository: https://github.com/EvilPatrick06/Thornswood
-- The board: https://github.com/users/EvilPatrick06/projects/1
-
-### B. Git
-
-Git is the history of this folder on your PC. A commit is one saved step. A branch is a named line of commits. The folder shows one branch at a time.
-
-#### See the branch and the edits
-
-```powershell
-git status
-git branch
-git diff
-git log -5 --oneline
-```
-
-`git status` names the branch and lists files that differ from the last commit. `git branch` lists the branches on this PC. The star is the one in the folder.
-
-#### The commands the rest of the guide uses
-
-| You want | Command |
-| --- | --- |
-| Move onto a branch | `git switch yourname/short-name` |
-| Create a branch and move onto it | `git switch -c yourname/short-name` |
-| Update `main` | `git switch main` then `git pull` |
-| Upload the branch you are on | `git push -u origin HEAD` |
-| The same move, the older spelling | `git checkout yourname/short-name` |
-
-The safe way to hold two jobs at once is [Switch between branches](#switch-between-branches).
-
-#### Learn more
-
-- [Git tutorial](https://git-scm.com/docs/gittutorial), the first commands, from the Git project
-- [What is Git, in pictures and video](https://git-scm.com/videos)
-- [The Git book](https://git-scm.com/book/en/v2)
-- [git-guides](https://github.com/git-guides), short pages from GitHub
-- The program itself: https://github.com/git/git
-
-### C. PowerShell
-
-PowerShell is the terminal. You type one line, press Enter, and Windows runs it. The prompt looks like `PS C:\Dev\Thornswood>`. The folder in the prompt is the folder the next command runs in.
-
-#### Where you are
-
-```powershell
-Get-Location
-Get-ChildItem
-Set-Location launcher
-Set-Location ..
-```
-
-`Get-Location` prints the folder. `Get-ChildItem` lists names. `cd launcher` and `cd ..` are the short forms this guide uses. Press Tab while you type a folder name and PowerShell finishes it.
-
-#### Run a script from the repository folder
-
-The `.\` means the file is in this folder:
-
-```powershell
-.\scripts\dev\Check-Words.ps1
-```
-
-The up arrow brings the previous command back. `Ctrl+C` stops a command that is still running. `Clear-Host` clears the text off the window.
-
-```powershell
-$PSVersionTable.PSVersion
-```
-
-Scripts in this repository run in PowerShell 7. If the major number is 5, type `pwsh`.
-
-#### Learn more
-
-- [PowerShell 101](https://learn.microsoft.com/en-us/powershell/scripting/learn/ps101/00-introduction), Microsoft's first course
-- [Install PowerShell on Windows](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows)
-- The source: https://github.com/PowerShell/PowerShell
-
-### D. Visual Studio Code
-
-Visual Studio Code is the window you work in. The folders sit on the left. The file you are reading sits in the middle. A terminal sits along the bottom.
-
-#### Open this repository
-
-```powershell
-cd C:\Dev\Thornswood
-code .
-code .\Developer-Guide.md
-code .\game\gamemode.js
-```
-
-#### The parts of the window
-
-Hover the icons on the far left and read the name.
-
-**Explorer** lists the folders and files. Click a triangle to open a folder. Click a file to open it. A dot on the file's tab means the editor still has unsaved changes. `Ctrl+S` saves. Git sees the saved file.
-
-`Ctrl+P` opens a file by name. Type `gamemode.js` and press Enter.
-
-`Ctrl+Shift+F` searches the words inside files. Click a result to open that line.
-
-**Source Control** lists the same changed files `git status` lists. This guide does the commit from PowerShell, so the message and the branch stay visible in one place.
-
-The branch name is in the status bar at the bottom left. Click it for a list of branches. Commit or stash first, as [Switch between branches](#switch-between-branches) says, so each job's files stay with its branch.
-
-**Terminal.** Open it from the View menu, Terminal. A new terminal starts in the clone. If the dropdown beside the plus sign says a PowerShell whose version is 5, type `pwsh`.
-
-#### Where to click
-
-Stay in `C:\Dev\Thornswood`. Each big folder has its own `README.md`. Open that file when you go into the folder. The long map is [The pieces](#the-pieces).
-
-| In Explorer | What it is | In PowerShell |
-| --- | --- | --- |
-| `README.md` | The short map of the repository | `code .\README.md` |
-| `Developer-Guide.md` | This guide | `code .\Developer-Guide.md` |
-| `launcher\app` | The launcher program | `Get-ChildItem launcher\app\*.cs` |
-| `launcher\ui.xaml` | The launcher window layout | `code .\launcher\ui.xaml` |
-| `game\gamemode.js` | The server rules | `code .\game\gamemode.js` |
-| `game\plugins` | Scripts that run in Skyrim | `Get-ChildItem game\plugins` |
-| `site\data\site` | The public website pages | `Get-ChildItem site\data\site` |
-| `bot` | The Discord bot | `Get-ChildItem bot` |
-| `voice` | Proximity voice | `code .\voice\voice-server.js` |
-| `scripts\release` | Build and ship | `Get-ChildItem scripts\release` |
-| `scripts\deploy` | Put a build on the server | `Get-ChildItem scripts\deploy` |
-| `scripts\vps` | The server key and log reads | `Get-ChildItem scripts\vps` |
-| `tests` | The test files | `Get-ChildItem tests` |
-| `docs` | The system notes | `code .\docs\SYSTEM.md` |
-
-`engine` is the SkyMP source. Leave it until a task tells you to build the server. `out` and `local` appear after a build. Git keeps them off GitHub.
-
-Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or Publish-Update.ps1 without a line in #staff-general. Those files sit in `launcher\app` and `scripts\release`.
-
-Search one file from PowerShell:
-
-```powershell
-Select-String -Path .\game\gamemode.js -Pattern "door"
-```
-
-For the whole repository, `Ctrl+Shift+F` is the search to use.
-
-#### Learn more
-
-- [Introductory videos](https://code.visualstudio.com/docs/getstarted/introvideos), from the Visual Studio Code team
-- [The user interface](https://code.visualstudio.com/docs/getstarted/userinterface), each part of the window
-- [Source Control](https://code.visualstudio.com/docs/sourcecontrol/overview)
-- The editor's repository: https://github.com/microsoft/vscode
-- The folders in this clone: [N. The repository map](#n-the-repository-map)
-
-### E. VPS
-
-The VPS is the remote Windows machine. The site, the bot, voice, and both game servers run there. You do not get the server password. Your PC has a key. The scripts connect with that key.
-
-#### Make a key and test it
-
-```powershell
-.\scripts\vps\Setup-SshKey.ps1 -KeyOnly
-```
-
-Copy the whole `ssh-ed25519` line into Discord. On a machine that already has a key, somebody runs:
-
-```powershell
-.\scripts\vps\Add-VpsKey.ps1 -PublicKey 'ssh-ed25519 AAAA... comment'
-```
-
-Then, on your machine:
-
-```powershell
-.\scripts\vps\Setup-SshKey.ps1 -Test
-```
-
-A good answer is that the key already works. `Host key verification failed` means this machine has not recorded the server yet. Run the same script without `-Test` only when the first run did not finish.
-
-#### Two reads
-
-```powershell
-.\scripts\vps\Check-Site.ps1
-.\scripts\vps\Get-Logs.ps1
-```
-
-`Check-Site.ps1` says whether the website answers. `Get-Logs.ps1` copies the tail of the site, bot, game server, and voice logs onto your machine and prints the folder. `-Lines 40000` pulls more.
-
-#### Learn more
-
-- [OpenSSH on Windows](https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse), Microsoft's install page
-- When the server is down: [docs/IT-IS-DOWN.md](docs/IT-IS-DOWN.md)
-- Moving the box: [docs/MOVING-THE-SERVER.md](docs/MOVING-THE-SERVER.md)
-
-### F. Website
-
-The website is the `site` folder. Public pages are `site\data\site`. On the VPS it runs under Node at `C:\Thornswood-Docs`, and https://thornswood.net answers it.
-
-#### Deploy
-
-From your clone, after the pull request that changed the site is merged:
-
-```powershell
-.\scripts\deploy\Deploy-Docs.ps1
-.\scripts\deploy\Deploy-Docs.ps1 -Site
-```
-
-The first command deploys the app. `-Site` deploys the public pages. News for a main release is [section 4](#4-how-to-release-to-main).
-
-#### Learn more
-
-- The site: https://thornswood.net
-- Staff pages: https://thornswood.net/hub
-- Join page: https://thornswood.net/join
-- How a feed is served: [docs/FEED.md](docs/FEED.md)
-- Node, which runs the site: [J. Node](#j-node)
-
-### G. Main Build
-
-The main build is the live launcher. People who join use this install. A main Ship publishes the live feed that this launcher reads. The steps to publish are [section 4](#4-how-to-release-to-main).
-
-The install folder is `<drive>:\Thornswood` on most machines. The launcher exe sits under that tree. Profile, config, and packs sit beside it. The map of ports and folders is [The pieces](#the-pieces). The Play page, with Main and Dev in the server list, is pictured in [H. Dev Build](#h-dev-build).
-
-#### Learn more
-
-- The live feed: https://thornswood.net/feed/version.json
-- The feed, in detail: [docs/FEED.md](docs/FEED.md)
-
-### H. Dev Build
-
-The dev build is a second launcher beside the main install, at `<drive>:\Thornswood-DevBuild`. Its config says the channel is dev. The game port is 7787 and voice is 7789. Staff roles use it. Every change is tried here before a main release.
-
-#### Install it from the main launcher
-
-In the main launcher, on the Play page, open the Server dropdown and choose Dev. It checks your Discord roles, then puts the dev build beside the main install. Open it once and let it make its own game folder. Settings, Maintenance has "Make it".
-
-```powershell
-.\scripts\release\Check-ShipReady.ps1 -Channel dev
-```
-
-That says whether the dev build and its game folder are in place, and ships nothing. Ship refuses `-Channel dev` without the dev build. The publish steps are [section 3](#3-how-to-release-to-dev).
-
-#### The Play page
-
-On the Play page, the server list is at the lower right, under the Play button. Main is the live server. Dev is the row under it. Choose Dev.
-
-![The Play page. The server list at the lower right shows Main and Dev, and Dev is circled.](docs/guide/launcher-play-dev.png)
-
-#### Learn more
-
-- The dev feed: https://thornswood.net/feed-dev/version.json
-- The same feed notes: [docs/FEED.md](docs/FEED.md)
-
-### I. Bot
-
-The bot is the `bot` folder, Python, on the VPS at `C:\Thornswood-Bot`. It posts tickets, join cards, and staff tools. The Windows service is `ThornswoodBot`.
-
-#### Deploy the code
-
-When a merged pull request changed the bot's code or the join card art:
-
-```powershell
-.\scripts\deploy\Install-Bot.ps1 -CodeOnly
-```
-
-The bot's avatar is uploaded by hand in the Discord developer portal. No script sends that file. The token and the door key are in [P. Secrets, by name and place, never by value](#p-secrets-by-name-and-place-never-by-value).
-
-#### Learn more
-
-- discord.py, the library the bot uses: https://discordpy.readthedocs.io/en/stable/
-- The library's repository: https://github.com/Rapptz/discord.py
-- Discord's developer docs: https://discord.com/developers/docs/intro
-- The developer portal, where the bot token and the avatar are set: https://discord.com/developers/applications
-
-### J. Node
-
-Node runs the website, the voice service, and the JavaScript tests. The install in [Install the tools](#install-the-tools) is the one this repository uses.
-
-#### See the version and run a test
-
-```powershell
-node --version
-node tests\test-site-local.js
-```
-
-A passing run ends without an error. Use the file in `tests\` whose name matches the area you touched. Voice is `voice\voice-server.js`, also Node. The site program is `site\server.js`.
-
-#### Learn more
-
-- [Introduction to Node](https://nodejs.org/en/learn/getting-started/introduction-to-nodejs)
-- Downloads: https://nodejs.org/en/download
-- The runtime's repository: https://github.com/nodejs/node
-
-### K. Vortex
-
-Vortex is the mod manager. Thornswood's collection is deployed through a Vortex profile named Thornswood. The collection id is `7essxf`. Any machine can install it. Publishing a new revision of the collection uses Patrick's Nexus account.
-
-The launcher builds `<Root>\Game` from the Steam copy of Skyrim Special Edition and from what that profile deployed. Play does not start the game out of the Steam copy. The full rules are [One Skyrim of its own](#one-skyrim-of-its-own).
-
-Leave Vortex's own files alone. A Ship packs Thornswood's files. It leaves Vortex's deployed files for Vortex to deploy.
-
-#### Install the collection
-
-1. Install Vortex from the Nexus page below, and sign Vortex into a Nexus account.
-2. Point Vortex at Skyrim Special Edition.
-3. Add the Thornswood collection. Its address is https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf
-4. Use a profile named Thornswood. Deploy that profile so the mods land on the Steam copy.
-5. Open the Thornswood launcher. On the Play page, the server list at the lower right has Dev. The picture is in [H. Dev Build](#h-dev-build). Choose Dev, then let that install make its game folder. Settings, Maintenance has "Make it".
-
-Publishing a new revision of the collection is done from Patrick's Nexus account. Installing a revision that is already published is any developer's Nexus account. The history of this choice is [docs/COLLECTION-METHOD.md](docs/COLLECTION-METHOD.md).
-
-#### Learn more
-
-- Vortex: https://www.nexusmods.com/site/mods/1
-- Vortex getting started: https://wiki.nexusmods.com/index.php/Vortex
-- The collection: https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf
-- How this project uses it: [docs/COLLECTION-METHOD.md](docs/COLLECTION-METHOD.md)
-
-### L. Pandora
-
-Pandora Behaviour Engine+ builds the behavior files a release carries. The collection carries Pandora from revision 2. Nemesis cannot generate those files from a command line, which is why the shipping machine uses Pandora.
-
-Before a Ship, on the machine that publishes:
-
-```powershell
-.\scripts\mods\Build-Generated.ps1
-```
-
-Ship stops while those files are not built for the current mod list. What the script builds is listed in `records\generated.json`. The behavior files are made in Thornswood's own folder, never in the Steam copy. The same rule is in [Settled design, not up for a quiet rewrite](#settled-design-not-up-for-a-quiet-rewrite).
-
-#### Learn more
-
-- Pandora Behaviour Engine+ on the Nexus, the file the collection carries: https://www.nexusmods.com/skyrimspecialedition/mods/133232
-- Which revision added it, and the other mods beside it: [docs/COLLECTION-REVISION-2.md](docs/COLLECTION-REVISION-2.md)
-- The command that runs it: [scripts/mods/Build-Generated.ps1](scripts/mods/Build-Generated.ps1)
-
-### M. Creation Kit
-
-The Creation Kit is Bethesda's tool for records inside a plugin. Steam installs it into the Steam copy of Skyrim. A Creation Kit sitting there belongs to the person whose Steam copy it is.
-
-A Thornswood release does not ship the Creation Kit, its script sources, or a copy of the game's own programs. Ship leaves those files out of the pack. Thornswood's own game folder drops them when it refreshes, and logs that it did. A plugin record that has to change is changed in the kit, then the plugin is rebuilt and that plugin is what the release carries.
-
-#### Change a record
-
-1. Install the Creation Kit from Steam into the Steam copy of Skyrim Special Edition. Steam lists it with that game's tools.
-2. Open the kit on that Steam copy. Load the plugin you are changing.
-3. Change the record and save the plugin.
-4. The saved plugin is the file the collection or `game\content` carries. The kit, `CreationKit.exe`, and its script sources stay on the Steam copy. A Ship does not pack them.
-
-#### Learn more
-
-- The Creation Kit wiki: https://ck.uesp.net/wiki/Main_Page
-- Getting started there: https://ck.uesp.net/wiki/Category:Getting_Started
-- Bethesda's older kit pages: https://www.creationkit.com/
-
-### N. The repository map
-
-One repository holds the launcher, the game, the website, the bot, voice, and the scripts that publish them. A release is those pieces together, so they live in one clone instead of six. You edit in the folder for the piece you are changing. You publish with a script from `scripts`. The long table of machines and ports is [The pieces](#the-pieces). This section is the map of the clone on your PC.
-
-#### Why it is split this way
-
-The game server, the launcher, and the site are different programs. Putting each in its own folder means a pull request that touches `game` is a game change, and a pull request that touches `scripts\release` is a change to how a release is built. `records` holds the build records a Ship checks against, kept apart from the code so a record and a code change are easy to tell apart. `engine\skymp` is a submodule because the SkyMP fork is its own repository and it is large. `out` and `local` are created on your PC when you build. Git leaves them off GitHub because they are output, not source.
-
-#### How to move around
-
-Open the clone with `code .`, as in [Open the folder in Visual Studio Code](#open-the-folder-in-visual-studio-code). In Explorer, click a triangle to open a folder. `Ctrl+P`, then the file name, opens a file without walking the tree. `Ctrl+Shift+F` searches the words inside files.
-
-From PowerShell, inside `C:\Dev\Thornswood`:
-
-```powershell
-Get-ChildItem
-Get-ChildItem scripts
-Set-Location game
-Set-Location ..
-code .\game\gamemode.js
-```
-
-`Get-ChildItem` lists the folder you are in. `Set-Location` moves you. `cd` is the short form. Each big folder has a `README.md`. Open that file when you enter the folder. It says what the folder is and how to change it.
-
-#### What each folder is
-
-```text
-Thornswood
-  launcher     the window and the C# program
-  game         the server rules, the plugins, the overlays
-  site         the website
-  bot          the Discord bot
-  voice        proximity voice
-  scripts      build, ship, deploy, and checks
-  tests        the harnesses
-  docs         the system notes
-  records      build records and signing setup
-  installer    the setup program a new person runs
-  engine       the SkyMP fork, as a submodule
-  lore         the world writing
-  .github      pull request template and the build check
-```
-
-| Folder | What it is for | Open this first |
-| --- | --- | --- |
-| `launcher` | The launcher window and the C# that runs it | [launcher/ui.xaml](launcher/ui.xaml), then [launcher/app/ARCHITECTURE.md](launcher/app/ARCHITECTURE.md) |
-| `game` | What the server and the Skyrim client run for Thornswood | [game/gamemode.js](game/gamemode.js) |
-| `site` | The website program and the public pages | [site/server.js](site/server.js), then `site\data\site` |
-| `bot` | The Discord bot | [bot/README.md](bot/README.md) |
-| `voice` | The proximity voice service | [voice/voice-server.js](voice/voice-server.js) |
-| `scripts` | Commands you run from the repository folder | [scripts/README.md](scripts/README.md) |
-| `tests` | One file per check. `node tests\the-name.js` runs it | the `tests` folder |
-| `docs` | How the feed, the gamemode, and the server fit | [docs/SYSTEM.md](docs/SYSTEM.md) |
-| `records` | What a Ship compares the build to, and signing | [records/README.md](records/README.md) |
-| `installer` | The small setup program people download first | [installer/setup/README.md](installer/setup/README.md) |
-| `engine` | SkyMP source. Leave it until you are building the server | [engine/README.md](engine/README.md) |
-| `lore` | The world. It is writing, not the server rules | the `lore` folder |
-
-Inside `scripts`, the folders you will use are `release` (build and Ship), `deploy` (put a built thing on the server), `vps` (the key and the log reads), `dev` (checks on your PC), `ops` (news and the door), and `mods` (the generated behavior files).
-
-Inside `game`, `gamemode.js` is the server. `plugins` is what runs inside Skyrim. `ui` is the overlays. `data` is the tables the gamemode reads. `content` is authored content. `menu` is the in-game menu pieces.
-
-#### Files you will open often
-
-Click a name to open the file. The line under it says what the file is for.
-
-| File | What it is for |
-| --- | --- |
-| [Developer-Guide.md](Developer-Guide.md) | This guide |
-| [README.md](README.md) | The short map of the repository |
-| [game/gamemode.js](game/gamemode.js) | The server's rules. Most game changes start here or in `game\data` |
-| [game/plugins/README.md](game/plugins/README.md) | The scripts that run inside Skyrim. The plugin files sit beside that README |
-| [launcher/ui.xaml](launcher/ui.xaml) | The launcher window: buttons, pages, and labels |
-| [launcher/app/ARCHITECTURE.md](launcher/app/ARCHITECTURE.md) | How the launcher starts, which class owns which job, and the path from Play to the game |
-| [site/server.js](site/server.js) | The website program |
-| [site/data/site](site/data/site) | The public pages, one markdown file each |
-| [bot/README.md](bot/README.md) | How the Discord bot is laid out and how to change it |
-| [voice/voice-server.js](voice/voice-server.js) | The proximity voice service |
-| [scripts/release/Ship.ps1](scripts/release/Ship.ps1) | Publishes a dev release or a main release |
-| [scripts/release/Bump-Version.ps1](scripts/release/Bump-Version.ps1) | Moves the version number before a main release |
-| [scripts/deploy/Deploy-DevGamemode.ps1](scripts/deploy/Deploy-DevGamemode.ps1) | Puts the gamemode on the dev server |
-| [scripts/deploy/Deploy-Gamemode.ps1](scripts/deploy/Deploy-Gamemode.ps1) | Puts the gamemode on the live server. The server deploy is the next script in that folder |
-| [docs/GLOSSARY.md](docs/GLOSSARY.md) | The long list of Thornswood words |
-
-Six files are shared by every machine. A line in #staff-general comes before an edit:
-
-| File | Where |
-| --- | --- |
-| [launcher/app/Shell.cs](launcher/app/Shell.cs) | The launcher's main flow |
-| [launcher/app/Checks.cs](launcher/app/Checks.cs) | Checks the launcher runs |
-| [launcher/app/Keep.cs](launcher/app/Keep.cs) | Thornswood's own files in the game folder |
-| [launcher/app/Hold.cs](launcher/app/Hold.cs) | Keeps those files from changing while the game is open |
-| [launcher/app/Updater.cs](launcher/app/Updater.cs) | The feed, the version, and applying a pack |
-| [scripts/release/Publish-Update.ps1](scripts/release/Publish-Update.ps1) | Builds the pack a Ship publishes |
-
-Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or Publish-Update.ps1 without a line in #staff-general.
-
-#### Learn more
-
-- The repository on GitHub: https://github.com/EvilPatrick06/Thornswood
-- The launcher folder: https://github.com/EvilPatrick06/Thornswood/tree/main/launcher
-- The game folder: https://github.com/EvilPatrick06/Thornswood/tree/main/game
-- The scripts folder: https://github.com/EvilPatrick06/Thornswood/tree/main/scripts
-- How the launcher is built: [launcher/app/ARCHITECTURE.md](launcher/app/ARCHITECTURE.md)
-
-### O. Others
-
-These are part of a normal week and do not each need a letter of their own. Python runs the bot. The launcher is C# on the .NET Framework. SkyMP is the multiplayer engine. HTML, CSS, and JavaScript are the website and the page drawn over the game. The four headings after those are the long reference: what Thornswood is, the pieces, one Skyrim of its own, and where the other documents are.
-
-#### Python
-
-The bot scripts need Python 3 with `discord.py` and `Pillow`. [Setting up a machine](#setting-up-a-machine) names that install. The bot deploy is [I. Bot](#i-bot).
-
-#### The .NET Framework
-
-Launcher code is C# 5, built with the .NET Framework 4 compiler. The window is `launcher\ui.xaml`. How the launcher starts is `launcher\app\ARCHITECTURE.md`. The six shared files in `launcher\app` are named in [D. Visual Studio Code](#d-visual-studio-code).
-
-#### SkyMP
-
-The game server is SkyMP. The fork's source is on GitHub at github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`, and it is the `engine\skymp` submodule of this repository. `git submodule update --init engine/skymp` fetches it. It is large. A machine that only copies server binaries can leave it unfetched. Building it needs Visual Studio, and [Setting up a machine](#setting-up-a-machine) gives that command.
-
-#### HTML
-
-HTML is the structure of a page. A tag wraps one part of it. The words on the browser tab, the text, and the links to the look and the scripts all live in that file.
-
-Open these in Visual Studio Code. `Ctrl+P`, then the file name.
-
-| File | What it is |
-| --- | --- |
-| [site/public/home.html](site/public/home.html) | The public page at https://thornswood.net |
-| [site/public/index.html](site/public/index.html) | The staff hub at https://thornswood.net/hub |
-| [game/ui/index.html](game/ui/index.html) | The page Skyrim Platform opens over the game |
-| [voice/public/index.html](voice/public/index.html) | The voice page |
-| [launcher/voice-host.html](launcher/voice-host.html) | The voice page as the launcher hosts it |
-
-In `home.html`, the `<title>` is the tab name. Two `<link>` tags pull in the stylesheets, `fonts.css` and `home.css`. The page loads nothing from another site. Keep it that way: a test fails if a `src`, a `url()`, or a stylesheet link points anywhere else.
-
-The public page and the hub go out with the site deploy in [F. Website](#f-website). The in-game page is different. With the game closed, from the repository folder:
-
-```powershell
-.\scripts\release\Go.ps1 -SkipServer
-```
-
-That copies `index.html` and the overlay scripts from `game\ui` into the game folder. `-SkipServer` matters: without it, the same script also copies the voice service onto the live one and restarts it. The notes for that folder are [game/ui/README.md](game/ui/README.md).
-
-#### CSS
-
-CSS is the look of a page: colour, type, and spacing. A rule names a part of the page, then lists what changes.
-
-| File | What it styles |
-| --- | --- |
-| [site/public/home.css](site/public/home.css) | The public page |
-| [site/public/hub.css](site/public/hub.css) | The staff hub |
-| [site/public/door.css](site/public/door.css) | The door page. `site\server.js` is what links it |
-| [site/public/fonts.css](site/public/fonts.css) | Spectral and Cinzel. The font files sit beside it |
-
-Open `home.css`. The `:root` block at the top names the colours and the fonts the rest of the file uses. `--night` is the ground. `--gold` is the warm colour. A change here shows on https://thornswood.net after the deploy in [F. Website](#f-website).
-
-The page over the game has its look in the JavaScript overlays under `game\ui`. There is no stylesheet in that folder.
-
-#### JavaScript
-
-JavaScript is the language of the site scripts, the checks in `tests`, the game server, and the overlays on the in-game page. Node is the program that runs it for the site, the voice service, and the tests. That install is [J. Node](#j-node). The in-game page runs in the browser Skyrim Platform opens, so those files do not go through Node.
-
-| File | What it does |
-| --- | --- |
-| [site/public/home.js](site/public/home.js) | The public page's script |
-| [site/public/hub.js](site/public/hub.js) | The staff hub's script |
-| [game/gamemode.js](game/gamemode.js) | The server. It is one long file. Read an overlay before you read this |
-| [game/ui/thornswood-chat.js](game/ui/thornswood-chat.js) | One overlay, the chat, and the one socket to the voice service |
-| [voice/public/voice.js](voice/public/voice.js) | The voice page's script |
-
-A file is a list of statements the program runs from the top. Open `home.js` beside `home.html` and you are looking at the page and the code that runs in it.
-
-Run one check from the repository folder:
-
-```powershell
-node tests\test-site-local.js
-```
-
-A passing run ends without an error. Use the file in `tests\` whose name matches the area you touched.
-
-An overlay change uses the same `Go.ps1 -SkipServer` as the HTML section, with the game closed. A new overlay is named `thornswood-*.js` and listed in the `OVERLAYS` list at the top of `game\plugins\thornswood-front.js`. That list is what loads it. There is no build step for these files.
-
-#### Learn more
-
-- HTML, from MDN: https://developer.mozilla.org/en-US/docs/Learn/HTML
-- CSS, from MDN: https://developer.mozilla.org/en-US/docs/Learn/CSS
-- JavaScript, from the first page, on MDN: https://developer.mozilla.org/en-US/docs/Learn/JavaScript
-- The three together, a first website: https://developer.mozilla.org/en-US/docs/Learn/Getting_started_with_the_web
-- HTML, the web.dev course: https://web.dev/learn/html
-- CSS, the web.dev course: https://web.dev/learn/css
-- JavaScript, the web.dev course: https://web.dev/learn/javascript
-- JavaScript, the long written guide: https://javascript.info/
-- The public pages in this repository: https://github.com/EvilPatrick06/Thornswood/tree/main/site/public
-- The in-game page in this repository: https://github.com/EvilPatrick06/Thornswood/tree/main/game/ui
-- Python's tutorial: https://docs.python.org/3/tutorial/
-- Python downloads: https://www.python.org/downloads/
-- C# on Microsoft Learn: https://learn.microsoft.com/en-us/dotnet/csharp/
-- The .NET Framework: https://learn.microsoft.com/en-us/dotnet/framework/
-- The SkyMP fork this server builds from: https://github.com/EvilPatrick06/skymp
-
-#### What Thornswood is
+### What Thornswood is
 
 Thornswood is a modded co-op Skyrim roleplay server on SkyMP, the server
 authoritative multiplayer for Skyrim Special Edition. It is Patrick's, in an
@@ -1892,7 +1295,7 @@ server, not in save files. During the playtest they are throwaway.
 The words we use, and the rule that every change ships as one complete
 release, launcher, game files and server together, are in How work moves.
 
-#### The pieces
+### The pieces
 
 | Piece | Where | What it is |
 | --- | --- | --- |
@@ -1934,7 +1337,7 @@ folder went:
 | `backup-key.txt` | `local` | A copy of the backup passphrase, a secret. Documents is where it really lives | Restore-Backup | Who holds each thing Thornswood cannot run without, and who the
 second holder is, is `docs\OWNERSHIP.md`.
 
-#### One Skyrim of its own
+### One Skyrim of its own
 
 Thornswood runs from its own game folder, `<Root>\Game`, and nothing here
 supports another server's install. Decided by Patrick on 20 September, after
@@ -2107,7 +1510,7 @@ not start the game out of the Steam copy.
 Skyrim reads its plugin list from one Windows folder per user. Thornswood swaps
 it per session and ignores which profile Vortex has on.
 
-#### Where things are written down
+### Where things are written down
 
 - This guide. The table at the top is the way in. `CLAUDE.md`: what applies to a
   Claude on top of these rules. The To Do board,
@@ -2129,6 +1532,582 @@ it per session and ignores which profile Vortex has on.
   (issue #433); where they disagree with the board, the board is right.
 - `docs\archive`: dated snapshots (HANDOFF, the 17 September audit,
   WORKING-NOTES and the old To Do List), history only.
+
+## 6. FAQ
+
+Each letter stands on its own: what the thing is, then the commands. The numbered sections are the path. These letters are the pages you open when you already know the name.
+
+### A. GitHub
+
+GitHub is the website copy of the repository, at https://github.com/EvilPatrick06/Thornswood. Your PC and GitHub each hold the history. `origin` is the name Git uses for the GitHub copy.
+
+#### Sign in and look
+
+Sign in on the website as the account that was added to the repository. The Code tab shows the files on the branch named in the dropdown. After a clone, that dropdown is `main`.
+
+```powershell
+gh auth status
+```
+
+It should print your login.
+
+#### Where your commits are
+
+After `git push -u origin HEAD`, refresh the Code tab and choose your branch in the dropdown. The files there are your branch. The `main` entry is still the shared line. Those commits join `main` when the pull request is merged.
+
+The Pull requests tab lists open pull requests. `gh pr create` adds yours. The steps are in [Open the pull request](#open-the-pull-request).
+
+#### Learn more about GitHub
+
+- [Hello World on GitHub](https://docs.github.com/en/get-started/quickstart/hello-world), the first-time walkthrough
+- [About pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests)
+- [GitHub flow](https://docs.github.com/en/get-started/using-github/github-flow), the short version of branch, pull request, merge
+- This repository: https://github.com/EvilPatrick06/Thornswood
+- The board: https://github.com/users/EvilPatrick06/projects/1
+
+### B. Git
+
+Git is the history of this folder on your PC. A commit is one saved step. A branch is a named line of commits. The folder shows one branch at a time.
+
+#### See the branch and the edits
+
+```powershell
+git status
+git branch
+git diff
+git log -5 --oneline
+```
+
+`git status` names the branch and lists files that differ from the last commit. `git branch` lists the branches on this PC. The star is the one in the folder.
+
+#### The commands the rest of the guide uses
+
+| You want | Command |
+| --- | --- |
+| Move onto a branch | `git switch yourname/short-name` |
+| Create a branch and move onto it | `git switch -c yourname/short-name` |
+| Update `main` | `git switch main` then `git pull` |
+| Upload the branch you are on | `git push -u origin HEAD` |
+| The same move, the older spelling | `git checkout yourname/short-name` |
+
+The safe way to hold two jobs at once is [Switch between branches](#switch-between-branches).
+
+#### Learn more about Git
+
+- [Git tutorial](https://git-scm.com/docs/gittutorial), the first commands, from the Git project
+- [What is Git, in pictures and video](https://git-scm.com/videos)
+- [The Git book](https://git-scm.com/book/en/v2)
+- [git-guides](https://github.com/git-guides), short pages from GitHub
+- The program itself: https://github.com/git/git
+
+### C. PowerShell
+
+PowerShell is the terminal. You type one line, press Enter, and Windows runs it. The prompt looks like `PS C:\Dev\Thornswood>`. The folder in the prompt is the folder the next command runs in.
+
+#### Where you are
+
+```powershell
+Get-Location
+Get-ChildItem
+Set-Location launcher
+Set-Location ..
+```
+
+`Get-Location` prints the folder. `Get-ChildItem` lists names. `cd launcher` and `cd ..` are the short forms this guide uses. Press Tab while you type a folder name and PowerShell finishes it.
+
+#### Run a script from the repository folder
+
+The `.\` means the file is in this folder:
+
+```powershell
+.\scripts\dev\Check-Words.ps1
+```
+
+The up arrow brings the previous command back. `Ctrl+C` stops a command that is still running. `Clear-Host` clears the text off the window.
+
+```powershell
+$PSVersionTable.PSVersion
+```
+
+Scripts in this repository run in PowerShell 7. If the major number is 5, type `pwsh`.
+
+#### Learn more about PowerShell
+
+- [PowerShell 101](https://learn.microsoft.com/en-us/powershell/scripting/learn/ps101/00-introduction), Microsoft's first course
+- [Install PowerShell on Windows](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows)
+- The source: https://github.com/PowerShell/PowerShell
+
+### D. Visual Studio Code
+
+Visual Studio Code is the window you work in. The folders sit on the left. The file you are reading sits in the middle. A terminal sits along the bottom.
+
+#### Open this repository
+
+```powershell
+cd C:\Dev\Thornswood
+code .
+code .\Developer-Guide.md
+code .\game\gamemode.js
+```
+
+#### The parts of the window
+
+Hover the icons on the far left and read the name.
+
+**Explorer** lists the folders and files. Click a triangle to open a folder. Click a file to open it. A dot on the file's tab means the editor still has unsaved changes. `Ctrl+S` saves. Git sees the saved file.
+
+`Ctrl+P` opens a file by name. Type `gamemode.js` and press Enter.
+
+`Ctrl+Shift+F` searches the words inside files. Click a result to open that line.
+
+**Source Control** lists the same changed files `git status` lists. This guide does the commit from PowerShell, so the message and the branch stay visible in one place.
+
+The branch name is in the status bar at the bottom left. Click it for a list of branches. Commit or stash first, as [Switch between branches](#switch-between-branches) says, so each job's files stay with its branch.
+
+**Terminal.** Open it from the View menu, Terminal. A new terminal starts in the clone. If the dropdown beside the plus sign says a PowerShell whose version is 5, type `pwsh`.
+
+#### Where to click
+
+Stay in `C:\Dev\Thornswood`. Each big folder has its own `README.md`. Open that file when you go into the folder. The long map is [The pieces](#the-pieces).
+
+| In Explorer | What it is | In PowerShell |
+| --- | --- | --- |
+| `README.md` | The short map of the repository | `code .\README.md` |
+| `Developer-Guide.md` | This guide | `code .\Developer-Guide.md` |
+| `launcher\app` | The launcher program | `Get-ChildItem launcher\app\*.cs` |
+| `launcher\ui.xaml` | The launcher window layout | `code .\launcher\ui.xaml` |
+| `game\gamemode.js` | The server rules | `code .\game\gamemode.js` |
+| `game\plugins` | Scripts that run in Skyrim | `Get-ChildItem game\plugins` |
+| `site\data\site` | The public website pages | `Get-ChildItem site\data\site` |
+| `bot` | The Discord bot | `Get-ChildItem bot` |
+| `voice` | Proximity voice | `code .\voice\voice-server.js` |
+| `scripts\release` | Build and ship | `Get-ChildItem scripts\release` |
+| `scripts\deploy` | Put a build on the server | `Get-ChildItem scripts\deploy` |
+| `scripts\vps` | The server key and log reads | `Get-ChildItem scripts\vps` |
+| `tests` | The test files | `Get-ChildItem tests` |
+| `docs` | The system notes | `code .\docs\SYSTEM.md` |
+
+`engine` is the SkyMP source. Leave it until a task tells you to build the server. `out` and `local` appear after a build. Git keeps them off GitHub.
+
+Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or Publish-Update.ps1 without a line in #staff-general. Those files sit in `launcher\app` and `scripts\release`.
+
+Search one file from PowerShell:
+
+```powershell
+Select-String -Path .\game\gamemode.js -Pattern "door"
+```
+
+For the whole repository, `Ctrl+Shift+F` is the search to use.
+
+#### Learn more about Visual Studio Code
+
+- [Introductory videos](https://code.visualstudio.com/docs/getstarted/introvideos), from the Visual Studio Code team
+- [The user interface](https://code.visualstudio.com/docs/getstarted/userinterface), each part of the window
+- [Source Control](https://code.visualstudio.com/docs/sourcecontrol/overview)
+- The editor's repository: https://github.com/microsoft/vscode
+- The folders in this clone: [N. The repository map](#n-the-repository-map)
+
+### E. VPS
+
+The VPS is the remote Windows machine. The site, the bot, voice, and both game servers run there. You do not get the server password. Your PC has a key. The scripts connect with that key.
+
+#### Make a key and test it
+
+```powershell
+.\scripts\vps\Setup-SshKey.ps1 -KeyOnly
+```
+
+Copy the whole `ssh-ed25519` line into Discord. On a machine that already has a key, somebody runs:
+
+```powershell
+.\scripts\vps\Add-VpsKey.ps1 -PublicKey 'ssh-ed25519 AAAA... comment'
+```
+
+Then, on your machine:
+
+```powershell
+.\scripts\vps\Setup-SshKey.ps1 -Test
+```
+
+A good answer is that the key already works. `Host key verification failed` means this machine has not recorded the server yet. Run the same script without `-Test` only when the first run did not finish.
+
+#### Two reads
+
+```powershell
+.\scripts\vps\Check-Site.ps1
+.\scripts\vps\Get-Logs.ps1
+```
+
+`Check-Site.ps1` says whether the website answers. `Get-Logs.ps1` copies the tail of the site, bot, game server, and voice logs onto your machine and prints the folder. `-Lines 40000` pulls more.
+
+#### Learn more about VPS
+
+- [OpenSSH on Windows](https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse), Microsoft's install page
+- When the server is down: [docs/IT-IS-DOWN.md](docs/IT-IS-DOWN.md)
+- Moving the box: [docs/MOVING-THE-SERVER.md](docs/MOVING-THE-SERVER.md)
+
+### F. Website
+
+The website is the `site` folder. Public pages are `site\data\site`. On the VPS it runs under Node at `C:\Thornswood-Docs`, and https://thornswood.net answers it.
+
+#### Deploy
+
+From your clone, after the pull request that changed the site is merged:
+
+```powershell
+.\scripts\deploy\Deploy-Docs.ps1
+.\scripts\deploy\Deploy-Docs.ps1 -Site
+```
+
+The first command deploys the app. `-Site` deploys the public pages. News for a main release is [section 4](#4-how-to-release-to-main).
+
+#### Learn more about Website
+
+- The site: https://thornswood.net
+- Staff pages: https://thornswood.net/hub
+- Join page: https://thornswood.net/join
+- How a feed is served: [docs/FEED.md](docs/FEED.md)
+- Node, which runs the site: [J. Node](#j-node)
+
+### G. Main Build
+
+The main build is the live launcher. People who join use this install. A main Ship publishes the live feed that this launcher reads. The steps to publish are [section 4](#4-how-to-release-to-main).
+
+The install folder is `<drive>:\Thornswood` on most machines. The launcher exe sits under that tree. Profile, config, and packs sit beside it. The map of ports and folders is [The pieces](#the-pieces). The Play page, with Main and Dev in the server list, is pictured in [H. Dev Build](#h-dev-build).
+
+#### Learn more about Main Build
+
+- The live feed: https://thornswood.net/feed/version.json
+- The feed, in detail: [docs/FEED.md](docs/FEED.md)
+
+### H. Dev Build
+
+The dev build is a second launcher beside the main install, at `<drive>:\Thornswood-DevBuild`. Its config says the channel is dev. The game port is 7787 and voice is 7789. Staff roles use it. Every change is tried here before a main release.
+
+#### Install it from the main launcher
+
+In the main launcher, on the Play page, open the Server dropdown and choose Dev. It checks your Discord roles, then puts the dev build beside the main install. Open it once and let it make its own game folder. Settings, Maintenance has "Make it".
+
+```powershell
+.\scripts\release\Check-ShipReady.ps1 -Channel dev
+```
+
+That says whether the dev build and its game folder are in place, and ships nothing. Ship refuses `-Channel dev` without the dev build. The publish steps are [section 3](#3-how-to-release-to-dev).
+
+#### The Play page
+
+On the Play page, the server list is at the lower right, under the Play button. Main is the live server. Dev is the row under it. Choose Dev.
+
+![The Play page. The server list at the lower right shows Main and Dev, and Dev is circled.](docs/guide/launcher-play-dev.png)
+
+#### Learn more about Dev Build
+
+- The dev feed: https://thornswood.net/feed-dev/version.json
+- The same feed notes: [docs/FEED.md](docs/FEED.md)
+
+### I. Bot
+
+The bot is the `bot` folder, Python, on the VPS at `C:\Thornswood-Bot`. It posts tickets, join cards, and staff tools. The Windows service is `ThornswoodBot`.
+
+#### Deploy the code
+
+When a merged pull request changed the bot's code or the join card art:
+
+```powershell
+.\scripts\deploy\Install-Bot.ps1 -CodeOnly
+```
+
+The bot's avatar is uploaded by hand in the Discord developer portal. No script sends that file. The token and the door key are in [P. Secrets, by name and place, never by value](#p-secrets-by-name-and-place-never-by-value).
+
+#### Learn more about Bot
+
+- discord.py, the library the bot uses: https://discordpy.readthedocs.io/en/stable/
+- The library's repository: https://github.com/Rapptz/discord.py
+- Discord's developer docs: https://discord.com/developers/docs/intro
+- The developer portal, where the bot token and the avatar are set: https://discord.com/developers/applications
+
+### J. Node
+
+Node runs the website, the voice service, and the JavaScript tests. The install in [Install the tools](#install-the-tools) is the one this repository uses.
+
+#### See the version and run a test
+
+```powershell
+node --version
+node tests\test-site-local.js
+```
+
+A passing run ends without an error. Use the file in `tests\` whose name matches the area you touched. Voice is `voice\voice-server.js`, also Node. The site program is `site\server.js`.
+
+#### Learn more about Node
+
+- [Introduction to Node](https://nodejs.org/en/learn/getting-started/introduction-to-nodejs)
+- Downloads: https://nodejs.org/en/download
+- The runtime's repository: https://github.com/nodejs/node
+
+### K. Vortex
+
+Vortex is the mod manager. Thornswood's collection is deployed through a Vortex profile named Thornswood. The collection id is `7essxf`. Any machine can install it. Publishing a new revision of the collection uses Patrick's Nexus account.
+
+The launcher builds `<Root>\Game` from the Steam copy of Skyrim Special Edition and from what that profile deployed. Play does not start the game out of the Steam copy. The full rules are [One Skyrim of its own](#one-skyrim-of-its-own).
+
+Leave Vortex's own files alone. A Ship packs Thornswood's files. It leaves Vortex's deployed files for Vortex to deploy.
+
+#### Install the collection
+
+1. Install Vortex from the Nexus page below, and sign Vortex into a Nexus account.
+2. Point Vortex at Skyrim Special Edition.
+3. Add the Thornswood collection. Its address is https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf
+4. Use a profile named Thornswood. Deploy that profile so the mods land on the Steam copy.
+5. Open the Thornswood launcher. On the Play page, the server list at the lower right has Dev. The picture is in [H. Dev Build](#h-dev-build). Choose Dev, then let that install make its game folder. Settings, Maintenance has "Make it".
+
+Publishing a new revision of the collection is done from Patrick's Nexus account. Installing a revision that is already published is any developer's Nexus account. The history of this choice is [docs/COLLECTION-METHOD.md](docs/COLLECTION-METHOD.md).
+
+#### Learn more about Vortex
+
+- Vortex: https://www.nexusmods.com/site/mods/1
+- Vortex getting started: https://wiki.nexusmods.com/index.php/Vortex
+- The collection: https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf
+- How this project uses it: [docs/COLLECTION-METHOD.md](docs/COLLECTION-METHOD.md)
+
+### L. Pandora
+
+Pandora Behaviour Engine+ builds the behavior files a release carries. The collection carries Pandora from revision 2. Nemesis cannot generate those files from a command line, which is why the shipping machine uses Pandora.
+
+Before a Ship, on the machine that publishes:
+
+```powershell
+.\scripts\mods\Build-Generated.ps1
+```
+
+Ship stops while those files are not built for the current mod list. What the script builds is listed in `records\generated.json`. The behavior files are made in Thornswood's own folder, never in the Steam copy. The same rule is in [Settled design, not up for a quiet rewrite](#settled-design-not-up-for-a-quiet-rewrite).
+
+#### Learn more about Pandora
+
+- Pandora Behaviour Engine+ on the Nexus, the file the collection carries: https://www.nexusmods.com/skyrimspecialedition/mods/133232
+- Which revision added it, and the other mods beside it: [docs/COLLECTION-REVISION-2.md](docs/COLLECTION-REVISION-2.md)
+- The command that runs it: [scripts/mods/Build-Generated.ps1](scripts/mods/Build-Generated.ps1)
+
+### M. Creation Kit
+
+The Creation Kit is Bethesda's tool for records inside a plugin. Steam installs it into the Steam copy of Skyrim. A Creation Kit sitting there belongs to the person whose Steam copy it is.
+
+A Thornswood release does not ship the Creation Kit, its script sources, or a copy of the game's own programs. Ship leaves those files out of the pack. Thornswood's own game folder drops them when it refreshes, and logs that it did. A plugin record that has to change is changed in the kit, then the plugin is rebuilt and that plugin is what the release carries.
+
+#### Change a record
+
+1. Install the Creation Kit from Steam into the Steam copy of Skyrim Special Edition. Steam lists it with that game's tools.
+2. Open the kit on that Steam copy. Load the plugin you are changing.
+3. Change the record and save the plugin.
+4. The saved plugin is the file the collection or `game\content` carries. The kit, `CreationKit.exe`, and its script sources stay on the Steam copy. A Ship does not pack them.
+
+#### Learn more about Creation Kit
+
+- The Creation Kit wiki: https://ck.uesp.net/wiki/Main_Page
+- Getting started there: https://ck.uesp.net/wiki/Category:Getting_Started
+- Bethesda's older kit pages: https://www.creationkit.com/
+
+### N. The repository map
+
+One repository holds the launcher, the game, the website, the bot, voice, and the scripts that publish them. A release is those pieces together, so they live in one clone instead of six. You edit in the folder for the piece you are changing. You publish with a script from `scripts`. The long table of machines and ports is [The pieces](#the-pieces). This section is the map of the clone on your PC.
+
+#### Why it is split this way
+
+The game server, the launcher, and the site are different programs. Putting each in its own folder means a pull request that touches `game` is a game change, and a pull request that touches `scripts\release` is a change to how a release is built. `records` holds the build records a Ship checks against, kept apart from the code so a record and a code change are easy to tell apart. `engine\skymp` is a submodule because the SkyMP fork is its own repository and it is large. `out` and `local` are created on your PC when you build. Git leaves them off GitHub because they are output, not source.
+
+#### How to move around
+
+Open the clone with `code .`, as in [Open the folder in Visual Studio Code](#open-the-folder-in-visual-studio-code). In Explorer, click a triangle to open a folder. `Ctrl+P`, then the file name, opens a file without walking the tree. `Ctrl+Shift+F` searches the words inside files.
+
+From PowerShell, inside `C:\Dev\Thornswood`:
+
+```powershell
+Get-ChildItem
+Get-ChildItem scripts
+Set-Location game
+Set-Location ..
+code .\game\gamemode.js
+```
+
+`Get-ChildItem` lists the folder you are in. `Set-Location` moves you. `cd` is the short form. Each big folder has a `README.md`. Open that file when you enter the folder. It says what the folder is and how to change it.
+
+#### What each folder is
+
+```text
+Thornswood
+  launcher     the window and the C# program
+  game         the server rules, the plugins, the overlays
+  site         the website
+  bot          the Discord bot
+  voice        proximity voice
+  scripts      build, ship, deploy, and checks
+  tests        the harnesses
+  docs         the system notes
+  records      build records and signing setup
+  installer    the setup program a new person runs
+  engine       the SkyMP fork, as a submodule
+  lore         the world writing
+  .github      pull request template and the build check
+```
+
+| Folder | What it is for | Open this first |
+| --- | --- | --- |
+| `launcher` | The launcher window and the C# that runs it | [launcher/ui.xaml](launcher/ui.xaml), then [launcher/app/ARCHITECTURE.md](launcher/app/ARCHITECTURE.md) |
+| `game` | What the server and the Skyrim client run for Thornswood | [game/gamemode.js](game/gamemode.js) |
+| `site` | The website program and the public pages | [site/server.js](site/server.js), then `site\data\site` |
+| `bot` | The Discord bot | [bot/README.md](bot/README.md) |
+| `voice` | The proximity voice service | [voice/voice-server.js](voice/voice-server.js) |
+| `scripts` | Commands you run from the repository folder | [scripts/README.md](scripts/README.md) |
+| `tests` | One file per check. `node tests\the-name.js` runs it | the `tests` folder |
+| `docs` | How the feed, the gamemode, and the server fit | [docs/SYSTEM.md](docs/SYSTEM.md) |
+| `records` | What a Ship compares the build to, and signing | [records/README.md](records/README.md) |
+| `installer` | The small setup program people download first | [installer/setup/README.md](installer/setup/README.md) |
+| `engine` | SkyMP source. Leave it until you are building the server | [engine/README.md](engine/README.md) |
+| `lore` | The world. It is writing, not the server rules | the `lore` folder |
+
+Inside `scripts`, the folders you will use are `release` (build and Ship), `deploy` (put a built thing on the server), `vps` (the key and the log reads), `dev` (checks on your PC), `ops` (news and the door), and `mods` (the generated behavior files).
+
+Inside `game`, `gamemode.js` is the server. `plugins` is what runs inside Skyrim. `ui` is the overlays. `data` is the tables the gamemode reads. `content` is authored content. `menu` is the in-game menu pieces.
+
+#### Files you will open often
+
+Click a name to open the file. The line under it says what the file is for.
+
+| File | What it is for |
+| --- | --- |
+| [Developer-Guide.md](Developer-Guide.md) | This guide |
+| [README.md](README.md) | The short map of the repository |
+| [game/gamemode.js](game/gamemode.js) | The server's rules. Most game changes start here or in `game\data` |
+| [game/plugins/README.md](game/plugins/README.md) | The scripts that run inside Skyrim. The plugin files sit beside that README |
+| [launcher/ui.xaml](launcher/ui.xaml) | The launcher window: buttons, pages, and labels |
+| [launcher/app/ARCHITECTURE.md](launcher/app/ARCHITECTURE.md) | How the launcher starts, which class owns which job, and the path from Play to the game |
+| [site/server.js](site/server.js) | The website program |
+| [site/data/site](site/data/site) | The public pages, one markdown file each |
+| [bot/README.md](bot/README.md) | How the Discord bot is laid out and how to change it |
+| [voice/voice-server.js](voice/voice-server.js) | The proximity voice service |
+| [scripts/release/Ship.ps1](scripts/release/Ship.ps1) | Publishes a dev release or a main release |
+| [scripts/release/Bump-Version.ps1](scripts/release/Bump-Version.ps1) | Moves the version number before a main release |
+| [scripts/deploy/Deploy-DevGamemode.ps1](scripts/deploy/Deploy-DevGamemode.ps1) | Puts the gamemode on the dev server |
+| [scripts/deploy/Deploy-Gamemode.ps1](scripts/deploy/Deploy-Gamemode.ps1) | Puts the gamemode on the live server. The server deploy is the next script in that folder |
+| [docs/GLOSSARY.md](docs/GLOSSARY.md) | The long list of Thornswood words |
+
+Six files are shared by every machine. A line in #staff-general comes before an edit:
+
+| File | Where |
+| --- | --- |
+| [launcher/app/Shell.cs](launcher/app/Shell.cs) | The launcher's main flow |
+| [launcher/app/Checks.cs](launcher/app/Checks.cs) | Checks the launcher runs |
+| [launcher/app/Keep.cs](launcher/app/Keep.cs) | Thornswood's own files in the game folder |
+| [launcher/app/Hold.cs](launcher/app/Hold.cs) | Keeps those files from changing while the game is open |
+| [launcher/app/Updater.cs](launcher/app/Updater.cs) | The feed, the version, and applying a pack |
+| [scripts/release/Publish-Update.ps1](scripts/release/Publish-Update.ps1) | Builds the pack a Ship publishes |
+
+Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or Publish-Update.ps1 without a line in #staff-general.
+
+#### Learn more about the repository
+
+- The repository on GitHub: https://github.com/EvilPatrick06/Thornswood
+- The launcher folder: https://github.com/EvilPatrick06/Thornswood/tree/main/launcher
+- The game folder: https://github.com/EvilPatrick06/Thornswood/tree/main/game
+- The scripts folder: https://github.com/EvilPatrick06/Thornswood/tree/main/scripts
+- How the launcher is built: [launcher/app/ARCHITECTURE.md](launcher/app/ARCHITECTURE.md)
+
+### O. Others
+
+These are part of a normal week and do not each need a letter of their own. Python runs the bot. The launcher is C# on the .NET Framework. SkyMP is the multiplayer engine. HTML, CSS, and JavaScript are the website and the page drawn over the game. How the pieces fit is [5. The system](#5-the-system).
+
+#### Python
+
+The bot scripts need Python 3 with `discord.py` and `Pillow`. [Setting up a machine](#setting-up-a-machine) names that install. The bot deploy is [I. Bot](#i-bot).
+
+#### The .NET Framework
+
+Launcher code is C# 5, built with the .NET Framework 4 compiler. The window is `launcher\ui.xaml`. How the launcher starts is `launcher\app\ARCHITECTURE.md`. The six shared files in `launcher\app` are named in [D. Visual Studio Code](#d-visual-studio-code).
+
+#### SkyMP
+
+The game server is SkyMP. The fork's source is on GitHub at github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`, and it is the `engine\skymp` submodule of this repository. `git submodule update --init engine/skymp` fetches it. It is large. A machine that only copies server binaries can leave it unfetched. Building it needs Visual Studio, and [Setting up a machine](#setting-up-a-machine) gives that command.
+
+#### HTML
+
+HTML is the structure of a page. A tag wraps one part of it. The words on the browser tab, the text, and the links to the look and the scripts all live in that file.
+
+Open these in Visual Studio Code. `Ctrl+P`, then the file name.
+
+| File | What it is |
+| --- | --- |
+| [site/public/home.html](site/public/home.html) | The public page at https://thornswood.net |
+| [site/public/index.html](site/public/index.html) | The staff hub at https://thornswood.net/hub |
+| [game/ui/index.html](game/ui/index.html) | The page Skyrim Platform opens over the game |
+| [voice/public/index.html](voice/public/index.html) | The voice page |
+| [launcher/voice-host.html](launcher/voice-host.html) | The voice page as the launcher hosts it |
+
+In `home.html`, the `<title>` is the tab name. Two `<link>` tags pull in the stylesheets, `fonts.css` and `home.css`. The page loads nothing from another site. Keep it that way: a test fails if a `src`, a `url()`, or a stylesheet link points anywhere else.
+
+The public page and the hub go out with the site deploy in [F. Website](#f-website). The in-game page is different. With the game closed, from the repository folder:
+
+```powershell
+.\scripts\release\Go.ps1 -SkipServer
+```
+
+That copies `index.html` and the overlay scripts from `game\ui` into the game folder. `-SkipServer` matters: without it, the same script also copies the voice service onto the live one and restarts it. The notes for that folder are [game/ui/README.md](game/ui/README.md).
+
+#### CSS
+
+CSS is the look of a page: colour, type, and spacing. A rule names a part of the page, then lists what changes.
+
+| File | What it styles |
+| --- | --- |
+| [site/public/home.css](site/public/home.css) | The public page |
+| [site/public/hub.css](site/public/hub.css) | The staff hub |
+| [site/public/door.css](site/public/door.css) | The door page. `site\server.js` is what links it |
+| [site/public/fonts.css](site/public/fonts.css) | Spectral and Cinzel. The font files sit beside it |
+
+Open `home.css`. The `:root` block at the top names the colours and the fonts the rest of the file uses. `--night` is the ground. `--gold` is the warm colour. A change here shows on https://thornswood.net after the deploy in [F. Website](#f-website).
+
+The page over the game has its look in the JavaScript overlays under `game\ui`. There is no stylesheet in that folder.
+
+#### JavaScript
+
+JavaScript is the language of the site scripts, the checks in `tests`, the game server, and the overlays on the in-game page. Node is the program that runs it for the site, the voice service, and the tests. That install is [J. Node](#j-node). The in-game page runs in the browser Skyrim Platform opens, so those files do not go through Node.
+
+| File | What it does |
+| --- | --- |
+| [site/public/home.js](site/public/home.js) | The public page's script |
+| [site/public/hub.js](site/public/hub.js) | The staff hub's script |
+| [game/gamemode.js](game/gamemode.js) | The server. It is one long file. Read an overlay before you read this |
+| [game/ui/thornswood-chat.js](game/ui/thornswood-chat.js) | One overlay, the chat, and the one socket to the voice service |
+| [voice/public/voice.js](voice/public/voice.js) | The voice page's script |
+
+A file is a list of statements the program runs from the top. Open `home.js` beside `home.html` and you are looking at the page and the code that runs in it.
+
+Run one check from the repository folder:
+
+```powershell
+node tests\test-site-local.js
+```
+
+A passing run ends without an error. Use the file in `tests\` whose name matches the area you touched.
+
+An overlay change uses the same `Go.ps1 -SkipServer` as the HTML section, with the game closed. A new overlay is named `thornswood-*.js` and listed in the `OVERLAYS` list at the top of `game\plugins\thornswood-front.js`. That list is what loads it. There is no build step for these files.
+
+#### Learn more about the other tools
+
+- HTML, from MDN: https://developer.mozilla.org/en-US/docs/Learn/HTML
+- CSS, from MDN: https://developer.mozilla.org/en-US/docs/Learn/CSS
+- JavaScript, from the first page, on MDN: https://developer.mozilla.org/en-US/docs/Learn/JavaScript
+- The three together, a first website: https://developer.mozilla.org/en-US/docs/Learn/Getting_started_with_the_web
+- HTML, the web.dev course: https://web.dev/learn/html
+- CSS, the web.dev course: https://web.dev/learn/css
+- JavaScript, the web.dev course: https://web.dev/learn/javascript
+- JavaScript, the long written guide: https://javascript.info/
+- The public pages in this repository: https://github.com/EvilPatrick06/Thornswood/tree/main/site/public
+- The in-game page in this repository: https://github.com/EvilPatrick06/Thornswood/tree/main/game/ui
+- Python's tutorial: https://docs.python.org/3/tutorial/
+- Python downloads: https://www.python.org/downloads/
+- C# on Microsoft Learn: https://learn.microsoft.com/en-us/dotnet/csharp/
+- The .NET Framework: https://learn.microsoft.com/en-us/dotnet/framework/
+- The SkyMP fork this server builds from: https://github.com/EvilPatrick06/skymp
 
 ### P. Secrets, by name and place, never by value
 
