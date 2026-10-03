@@ -426,6 +426,40 @@ namespace Thornswood
 
         static string Shares() { string f = Path.Combine(OwnGame.Dir, "shared.txt"); return File.Exists(f) ? File.ReadAllText(f) : ""; }
 
+
+        // A fake Steam copy, under this scene's temp folder, never a real
+        // Steam library. The exe is 1.6.1170's size and the master is the
+        // same length as the pinned one, so only the SHA-1 says it changed.
+        static void CleanedMaster()
+        {
+            Scene s = NewScene("cleaned-master", false);
+            Put(Path.Combine(s.Game, Master), "CLEANED-MA");
+            var before = Snap(s.Game);
+            string src = OwnGame.DeploysInto(s.Cfg);
+            string why = OwnGame.WhyNot(s.Cfg, src);
+            Yes("a same-size cleaned master is not the pinned build", why != null);
+            Yes("and the sentence says the Steam copy stays as it is and the Downgrade gets 1.6.1170's own files",
+                why != null && why.Contains("never changes that copy") && why.Contains("press Downgrade") && why.Contains("stays as it is") && why.Contains("cleaned master") && Clean(why));
+            if (why != null && !(why.Contains("stays as it is") && why.Contains("cleaned master"))) Console.WriteLine("      WhyNot said: " + why);
+            Yes("the Downgrade card is up (Downgrade.Needed)", Downgrade.Needed(s.Cfg));
+            bool threw = false;
+            try { OwnGame.Make(s.Cfg, null); } catch { threw = true; }
+            Yes("Make refuses, and the cleaned master never reaches the folder", threw && !Directory.Exists(OwnGame.Folder));
+            Yes("and wrote nothing into the Steam copy", Same(before, Snap(s.Game)));
+
+            Download(s);
+            Yes("once 1.6.1170's files are downloaded, the folder can be made", OwnGame.WhyNot(s.Cfg, src) == null && !Downgrade.Needed(s.Cfg));
+            string made = null;
+            try { made = OwnGame.Make(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Make said: " + ex.Message); }
+            string own = OwnGame.Folder;
+            Yes("Make works from the download", made != null && Clean(made));
+            Yes("and still wrote nothing into the Steam copy", Same(before, Snap(s.Game)));
+            Yes("the folder's master is the download's, not the cleaned one",
+                Text(Path.Combine(own, Master)) == "PIN-MASTER" && Id(Path.Combine(own, Master)) != Id(Path.Combine(s.Game, Master)));
+            Yes("the Steam copy still has the cleaned master", Text(Path.Combine(s.Game, Master)) == "CLEANED-MA");
+            Yes("the folder's line says the Steam copy was not changed", made != null && made.Contains("was not changed"));
+        }
+
         static int Main(string[] args)
         {
             T = args[0];
@@ -434,6 +468,7 @@ namespace Thornswood
                 OneGap();
                 SteamMovesOn();
                 FirstFromNewer();
+                CleanedMaster();
                 WrittenThrough();
                 MadeBefore();
                 UnreadableRecord();
@@ -787,11 +822,19 @@ try {
     [IO.File]::WriteAllText($stubFile, $stubs, $utf8)
     [IO.File]::WriteAllText($driverFile, $driver, $utf8)
     $exe = Join-Path $work 'own-alone-test.exe'
-    # The pretend build's list of Skyrim's own files, in records\skyrim-files.json's
-    # shape, embedded the way Build-Launcher embeds the real one (#1232).
+    # The pretend build's list, in records\skyrim-files.json's shape (#1232).
+    # Bytes and SHA-1 are what NewScene writes for 1.6.1170 (PIN-EXE at 4096,
+    # PIN-MASTER, the two archives, GAME-BINK, GAME-LOOSE), so a file edited
+    # in this fake Steam copy is not the pinned build's (#1246).
     $skyrimList = Join-Path $work 'skyrim-files.json'
-    $listed = @('SkyrimSE.exe', 'bink2w64.dll', 'Data\Skyrim.esm', 'Data\Skyrim - Textures0.bsa', 'Data\Skyrim - Meshes0.bsa', 'Data\Video\BGS_Logo.bik') |
-        ForEach-Object { '    "{0}": {{ "bytes": 1, "sha1": "0", "depot": "1" }}' -f $_.Replace('\', '\\') }
+    $listed = @(
+        '    "SkyrimSE.exe": { "bytes": 4096, "sha1": "c6b7bc36797a26fa409a0f7fb3333c7cfc990e36", "depot": "1" }',
+        '    "bink2w64.dll": { "bytes": 9, "sha1": "f9dcb7c51635e79d3438edc88a3848a2f25a85dd", "depot": "1" }',
+        '    "Data\\Skyrim.esm": { "bytes": 10, "sha1": "f02c4781bceef74eed7a337c528c1599d9edd739", "depot": "1" }',
+        '    "Data\\Skyrim - Textures0.bsa": { "bytes": 65536, "sha1": "8cf0fb06e3e8887913e498c016e1eed034a2a2a8", "depot": "1" }',
+        '    "Data\\Skyrim - Meshes0.bsa": { "bytes": 65536, "sha1": "5536cf0719bc8c69629f9add1a961b58807ce022", "depot": "1" }',
+        '    "Data\\Video\\BGS_Logo.bik": { "bytes": 10, "sha1": "b5c2432d19146126a033d65dcb4e3ce01d88cfff", "depot": "1" }'
+    )
     [IO.File]::WriteAllText($skyrimList, "{`n  ""build"": ""1.6.1170"",`n  ""files"": {`n" + ($listed -join ",`n") + "`n  }`n}`n", $utf8)
     $cscArgs = @('/noconfig', '/nologo', '/target:exe', '/warn:0', "/out:$exe", "/resource:$skyrimList,skyrim-files.json")
     foreach ($r in $refs) { $cscArgs += "/reference:$r" }
@@ -878,5 +921,7 @@ Yes 'and takes nothing out until every record of Thornswood''s own files is here
 Yes 'Make, Refresh and the Steam copy''s clean up run one at a time' `
     (($own -match 'lock \(folderWork\) return MakeNow\(') -and ($own -match 'lock \(folderWork\) return RefreshNow\(') -and ((& $read 'OwnGameClean.cs') -match 'lock \(folderWork\) return CleanSteamCopyNow\('))
 Yes 'the clean up keeps the installer''s list before it empties it' ((& $read 'OwnGameClean.cs') -match 'KeepInstalledList\(\);\s*\r?\n\s*\r?\n\s*string steam = Source\(cfg\);')
+Yes 'a listed file from the Steam copy is the pinned build''s by its size, and by SHA-1 when it is not an archive (#1246)' `
+    (($kinds -match 'fi.Length != info.Bytes') -and ($kinds -match 'return !rel.EndsWith\("\.bsa"') -and ($own -match 'return !ListedFilesArePinned\(game\);') -and ($down -match 'OwnGame.SteamCopyNotPinned\(cfg\)'))
 
 Done
