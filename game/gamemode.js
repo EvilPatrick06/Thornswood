@@ -36480,7 +36480,7 @@ log('gamemode loaded:',
   var active=true,storage=null,ledger=null;
   try {
     var cfgDungeon=mp.getServerSettings();
-    if(String(cfgDungeon.thornswoodServer || '').toLowerCase()==='dev') {
+    if(/^(main|dev)$/i.test(String(cfgDungeon.thornswoodServer || 'main'))) {
       storage=createPrivateEconomyLedger(require('fs'),require('path'),cfgDungeon,'dungeon-rewards',[]);
       ledger=storage.load();
       if(!ledger || ledger.version!==1 || !ledger.entries || typeof ledger.entries!=='object' || Array.isArray(ledger.entries))
@@ -51368,7 +51368,7 @@ return module.exports;
 
 try {
   const cfgNpc = mp.getServerSettings();
-  if (String(cfgNpc.thornswoodServer || '').toLowerCase() === 'dev') {
+  if (/^(main|dev)$/i.test(String(cfgNpc.thornswoodServer || 'main'))) {
     if (globalThis.__thornswoodNpcRuntime) globalThis.__thornswoodNpcRuntime.stop();
     if (globalThis.__thornswoodNpcMerchants) globalThis.__thornswoodNpcMerchants.shutdown();
     globalThis.__thornswoodNpcMerchants=null;

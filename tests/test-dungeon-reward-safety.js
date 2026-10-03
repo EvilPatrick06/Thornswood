@@ -2,6 +2,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const source=fs.readFileSync(path.join(__dirname,'../game/gamemode.js'),'utf8');
 const block=source.slice(source.indexOf('// ==== thornswood dungeon loot ===='),source.indexOf('// ==== end thornswood dungeon loot ===='));
+for (const channel of ['main', 'dev', undefined]) {
 let ledger={version:1,entries:{}},clock=1000000000000,brokenSave=false,brokenPay=false,payments=0;
 const storage={load:()=>JSON.parse(JSON.stringify(ledger)),save:next=>{
   if(brokenSave)throw new Error('disk unavailable');ledger=JSON.parse(JSON.stringify(next));}};
@@ -10,7 +11,7 @@ const ctx={require,Map,Set,Math,Date:{now:()=>clock},console:{log(){}},
   createPrivateEconomyLedger:()=>storage,idOf:()=>100,
   addItem(){payments++;return true;},addItemsAtomic(){if(brokenPay)throw new Error('inventory unavailable');payments++;return true;},
   withinResourceReach:()=>distance<=400,
-  mp:{getServerSettings:()=>({thornswoodServer:'dev'}),makeProperty(){},getDescFromId:id=>id.toString(16)+':Skyrim.esm',
+  mp:{getServerSettings:()=>({thornswoodServer:channel}),makeProperty(){},getDescFromId:id=>id.toString(16)+':Skyrim.esm',
     getNpcAIState:()=>({isHuman:human,profileId:human?1:0,isDead:dead,isDisabled:false}),
     get:(id,key)=>key==='worldOrCellDesc'?cell:key==='baseDesc'?'100:Skyrim.esm':key==='thornswoodDungeonLoot'?legacyMark:undefined,
     set(){throw new Error('native mirror unavailable');},
@@ -38,3 +39,4 @@ legacyMark=0;
 ledger.entries['2:Skyrim.esm'].at=-1;
 service=reload();assert.equal(service.onChest(1,2),null);assert.equal(payments,2,'Invalid saved cooldown refuses awards');
 console.log('PASS durable dungeon reward reservation, reload, uncertain writes and reach checks');
+}
