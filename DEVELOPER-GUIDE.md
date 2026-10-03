@@ -62,7 +62,7 @@ winget install --id Git.Git -e --accept-package-agreements --accept-source-agree
 winget install --id GitHub.cli -e --accept-package-agreements --accept-source-agreements
 winget install --id OpenJS.NodeJS.LTS -e --accept-package-agreements --accept-source-agreements
 winget install --id Microsoft.PowerShell -e --accept-package-agreements --accept-source-agreements
-Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0
+dism /Online /Add-Capability /CapabilityName:OpenSSH.Client~~~~0.0.1.0
 ```
 
 Close the window. Open **PowerShell 7** from the Start menu. A new window is required because Windows only sees newly installed programs in a window opened afterwards.
