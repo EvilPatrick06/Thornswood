@@ -28,7 +28,9 @@
   takes every update: nothing in the launcher changes, and a launcher that is
   several releases behind applies them and then this, and lands on the same
   files. Putting the channel forward again is the same command pointed at the
-  later release.
+  later release. The feed's "release" is rewritten for this rollback (#1058):
+  its own id, the launcher the feed keeps, its one pack, its baseline, and no
+  commit, so no tag. The store's releases.txt then gets a line for it.
 
   Each file is taken first from the site's copy beside the release record
   (/feed[-dev]/assets/<sha256>, #1050), then from the packs already on the
@@ -541,6 +543,14 @@ $packs = @($packs) + [pscustomobject][ordered]@{ id = $Id; url = $packUrl; sha25
 if ($doc.PSObject.Properties['packs']) { $doc.packs = $packs } else { $doc | Add-Member -NotePropertyName 'packs' -NotePropertyValue $packs }
 [void](Add-FeedRelease $doc $pointer $Id $lastPackBefore $tgtId)
 $doc.baseline = $pointer
+# A rollback is its own release (#1058). Left alone, "release" kept naming the
+# Ship this goes back from, Get-ReleaseDisagreements failed, and releases.txt
+# never gained a line. This id, the launcher the feed already offers, this one
+# pack, this baseline, and no commit, so no tag.
+$relRecord = New-ReleaseRecord $Id $Channel (Get-Prop $doc 'launcherVersion') @($Id) $Id '' '' 0
+if ($doc.PSObject.Properties['release']) { $doc.release = $relRecord }
+else { $doc | Add-Member -NotePropertyName 'release' -NotePropertyValue $relRecord }
+Say ("  release {0}, the launcher the feed keeps, no commit" -f $Id) 'DarkGray'
 
 $bullets = @($noteLines | Select-Object -Skip 1 | Where-Object { $_ -match '^[-*]\s*\S' } | ForEach-Object { ($_ -replace '^[-*]\s*', '').Trim() })
 $body = (@($noteLines | Select-Object -Skip 1 | Where-Object { $_ -notmatch '^[-*]\s*\S' }) -join ' ').Trim()
