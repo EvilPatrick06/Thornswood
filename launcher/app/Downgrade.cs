@@ -110,8 +110,8 @@ namespace Thornswood
         /// puts it right but a download. In Thornswood's own folder: its exe is
         /// another build, or archives it shared with the Steam copy were
         /// written over there (OwnGame.Changed). Before the folder is made: the
-        /// Steam copy it would be made from is on another build and 1.6.1170's
-        /// own files are not downloaded yet.
+        /// Steam copy's listed files are not all the pinned build's, and
+        /// 1.6.1170's own files are not downloaded yet.
         ///
         /// Until #1218 this also came up, as SourceNeeded, whenever the Steam
         /// copy alone had moved on, and the folder would not follow Vortex until
@@ -124,7 +124,7 @@ namespace Thornswood
             // because that is what Make takes the game from. Paths.Exe is not
             // it when the folder was chosen at install: Game is Profile\Payload
             // until the folder is made (#1226).
-            if (Paths.Collection) return Wrong(cfg, Path.Combine(Paths.SteamCopy, "SkyrimSE.exe")) && Downloaded(cfg) == null;
+            if (Paths.Collection) return OwnGame.SteamCopyNotPinned(cfg) && Downloaded(cfg) == null;
             return Wrong(cfg, Paths.Exe) || (OwnGame.Active && OwnGame.Changed().Count > 0);
         }
 
