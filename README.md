@@ -15,7 +15,7 @@ and follow [thornswood.net/join](https://thornswood.net/join).
   setup program people download (one installer tree, not two products).
 - `game/`: everything that runs as the multiplayer game on the server and
   clients:
-  - `game/gamemode.js`: the server's gamemode
+  - `game/gamemode.js`: the server's gamemode c:
   - `game/data/`: gamemode tables
   - `game/plugins/`: Skyrim Platform JavaScript plugins
   - `game/ui/`: overlays inside the game
