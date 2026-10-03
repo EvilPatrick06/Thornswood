@@ -309,9 +309,12 @@ try {
 
     # --------------------------------------------------------- 6. the runbook --
     $dev = [IO.File]::ReadAllText((Join-Path $Repo 'Developer-Guide.md'))
-    $m = [regex]::Match($dev, '(?ms)^## Shipping from another machine\s*$(.*?)(?=^## )')
+    $m = [regex]::Match($dev, '(?m)^(?<hashes>#{2,3}) Shipping from another machine\s*$')
     Yes '6. Developer-Guide.md has the section "Shipping from another machine"' ($m.Success)
-    $sec = $m.Groups[1].Value
+    $level = $m.Groups['hashes'].Value.Length
+    $rest = $dev.Substring($m.Index + $m.Length)
+    $end = [regex]::Match($rest, ('(?m)^#{1,' + $level + '} '))
+    $sec = if ($end.Success) { $rest.Substring(0, $end.Index) } else { $rest }
     foreach ($item in @('records\signing\signing.json', 'signing client', 'az login', 'Certificate Profile Signer', 'client runtime', 'game folder',
                         'Vortex', 'feed', 'webhooks', 'VPS access', 'Backups', 'records\signing\signing.template.json')) {
         Yes ("6. it covers " + $item) ($sec.IndexOf($item, [StringComparison]::OrdinalIgnoreCase) -ge 0)

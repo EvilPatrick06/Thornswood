@@ -1,6 +1,6 @@
 # Developer Guide
 
-This is the one guide for working on Thornswood. It covers a first day on Windows, how work moves, how a release goes out, and how a machine is set up to ship one. `CLAUDE.md` adds only what applies to a Claude. Read the Quick start before your first change. Use the table when you already know the job and need the section.
+This is the one guide for working on Thornswood. It covers a first day on Windows, how work moves, how a release goes out, and how a machine is set up to ship one. `CLAUDE.md` adds only what applies to a Claude. The outline has four parts: First day, Jobs, Rules, and The system. Read Quick start before your first change. Use the table when you already know the job and need the section.
 
 - Repository: https://github.com/EvilPatrick06/Thornswood
 - Board: https://github.com/users/EvilPatrick06/projects/1
@@ -16,17 +16,15 @@ This is the one guide for working on Thornswood. It covers a first day on Window
 | See which folder a file lives in | [Where the project lives](#where-the-project-lives) |
 | Keep two branches on this PC | [Switch between branches on your PC](#switch-between-branches-on-your-pc) |
 | Ship, post news, or deploy | [What any developer may do](#what-any-developer-may-do) |
+| Follow a dev or main release in full | [How a release goes out](#how-a-release-goes-out) |
 | Run the steps after a merge | [After a pull request is merged](#after-a-pull-request-is-merged) |
 | Check wording before a page or a note | [Words](#words) |
 | Read the branch and merge rules | [How work moves](#how-work-moves) |
-| Follow a dev or main release in full | [How a release goes out](#how-a-release-goes-out) |
 | Prepare a PC that can ship | [Setting up a machine](#setting-up-a-machine) |
 | Sign builds on a second PC | [Shipping from another machine](#shipping-from-another-machine) |
 | See where a secret lives | [Secrets, by name and place, never by value](#secrets-by-name-and-place-never-by-value) |
 | See what each part of Thornswood is | [The pieces](#the-pieces) |
 | Find another document | [Where things are written down](#where-things-are-written-down) |
-
-### Contents
 
 **First day**
 
@@ -48,13 +46,13 @@ This is the one guide for working on Thornswood. It covers a first day on Window
 - [When the pull request will not open](#when-the-pull-request-will-not-open)
 - [Merge your own pull request](#merge-your-own-pull-request)
 
-**The jobs**
+**Jobs**
 
 - [What any developer may do](#what-any-developer-may-do)
-- [After a pull request is merged](#after-a-pull-request-is-merged)
 - [How a release goes out](#how-a-release-goes-out)
+- [After a pull request is merged](#after-a-pull-request-is-merged)
 
-**The rules**
+**Rules**
 
 - [What this is](#what-this-is)
 - [Words](#words)
@@ -63,7 +61,7 @@ This is the one guide for working on Thornswood. It covers a first day on Window
 - [How work moves](#how-work-moves)
 - [How work moves, the long form](#how-work-moves-the-long-form)
 
-**The machine and the system**
+**The system**
 
 - [What Thornswood is](#what-thornswood-is)
 - [The pieces](#the-pieces)
@@ -73,7 +71,11 @@ This is the one guide for working on Thornswood. It covers a first day on Window
 - [One Skyrim of its own](#one-skyrim-of-its-own)
 - [Where things are written down](#where-things-are-written-down)
 
-## Quick start
+## First day
+
+A new Windows PC, through a merged pull request. Follow Quick start in order.
+
+### Quick start
 
 For a new person on Windows, including a first day with Visual Studio Code, PowerShell, Git, and GitHub. Later sections are the full rules. Do these in order:
 
@@ -92,7 +94,7 @@ For a new person on Windows, including a first day with Visual Studio Code, Powe
 
 Use your own GitHub account. Patrick adds that account as a collaborator on the private repository before a clone will work. Say so in Discord and wait for that. Use your own clone. The shared folder `C:\Users\evilp\Downloads\Thornswood-Repo` on the shipping machine is for the lanes that build from it. Your clone can live at `C:\Dev\Thornswood`, or any empty folder you own.
 
-### Install the tools
+#### Install the tools
 
 Open PowerShell. Paste this and let each install finish. If Windows asks for an administrator, allow it.
 
@@ -116,7 +118,7 @@ code --version
 
 Each line should print a version. `code --version` prints a few lines, and the first is the version. If one says the program is not recognized, you are still in the old window.
 
-### Install the OpenSSH client
+#### Install the OpenSSH client
 
 The VPS scripts need `ssh`. If `ssh -V` already printed a version, this step is done.
 
@@ -143,7 +145,7 @@ dism /Online /Add-Capability /CapabilityName:OpenSSH.Client~~~~0.0.1.0
 ssh -V
 ```
 
-### Sign the GitHub CLI into your account
+#### Sign the GitHub CLI into your account
 
 ```powershell
 gh auth login
@@ -152,7 +154,7 @@ gh auth status
 
 Choose GitHub.com, then HTTPS, then login with a browser, as the GitHub user that has access to the repository. `gh auth status` should name your account and say the token can see private repositories.
 
-### Clone the repository
+#### Clone the repository
 
 ```powershell
 New-Item -ItemType Directory -Force -Path C:\Dev | Out-Null
@@ -166,7 +168,7 @@ git status
 
 From here on, the commands assume PowerShell is inside your clone. If you used another folder, `cd` there first.
 
-### The four tools
+#### The four tools
 
 Visual Studio Code is the window you work in. The folders sit on the left. The file you are reading sits in the middle. A terminal sits along the bottom.
 
@@ -188,7 +190,7 @@ GitHub is the website copy of that history, at https://github.com/EvilPatrick06/
 | Pull request | The GitHub page that puts your branch's commits onto `main` when it is merged |
 | `origin` | The name Git uses for the GitHub copy |
 
-### Visual Studio Code
+#### Visual Studio Code
 
 Open the clone:
 
@@ -221,7 +223,7 @@ $PSVersionTable.PSVersion
 
 The major number is 7 or higher when you are in the right one.
 
-### PowerShell
+#### PowerShell
 
 You are always in one folder. Ask which:
 
@@ -269,7 +271,7 @@ code .\Developer-Guide.md
 code .\game\gamemode.js
 ```
 
-### Where the project lives
+#### Where the project lives
 
 Stay in `C:\Dev\Thornswood` for these. In Explorer, click the same path. Each big folder has its own `README.md`. Open that file when you go into the folder. The table in The pieces, later in this guide, is the long form of the same map.
 
@@ -311,7 +313,7 @@ For the whole repository, `Ctrl+Shift+F` in Visual Studio Code is the search to 
 
 Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or Publish-Update.ps1 without a line in #staff-general. Those files sit in `launcher\app` and `scripts\release`.
 
-### Git on your PC
+#### Git on your PC
 
 `git status` is the command to run whenever you are unsure. It names the branch and lists files that differ from the last commit.
 
@@ -348,7 +350,7 @@ List the branches on this PC. The star is the one in the folder:
 git branch
 ```
 
-### GitHub in the browser
+#### GitHub in the browser
 
 Sign in on the GitHub website as the account that was added to the repository. Open https://github.com/EvilPatrick06/Thornswood. The Code tab shows the files on the branch named in the dropdown. After a clone, that dropdown is `main`.
 
@@ -369,7 +371,7 @@ git switch main
 git pull
 ```
 
-### Reach the VPS
+#### Reach the VPS
 
 You do not get the server password. Your PC creates a key. You send the public line. Somebody who already has a key on the server adds yours. After that, the scripts connect without asking.
 
@@ -402,7 +404,7 @@ Two reads that do not change the box:
 
 `Check-Site.ps1` says whether the website answers. `Get-Logs.ps1` copies the tail of the site, bot, game server, and voice logs onto your machine and prints the folder. `-Lines 40000` pulls more.
 
-### Your first branch
+#### Your first branch
 
 One issue, one branch, one pull request. Start from a fresh `main`.
 
@@ -436,7 +438,7 @@ Use the file in `tests\` whose name matches the area you touched. A passing run 
 .\scripts\dev\Check-Words.ps1
 ```
 
-### Switch between branches on your PC
+#### Switch between branches on your PC
 
 The folder shows one branch at a time. The files in Visual Studio Code are the branch named in the status bar at the bottom left. Every other local branch stays on this PC with its own commits. Switching replaces the files in the folder with the branch you pick. Switching back brings the first branch's files back.
 
@@ -519,7 +521,7 @@ That branch appears on GitHub under its own name. `main` on GitHub does not gain
 
 In Visual Studio Code, Source Control lists the same files as `git status`. Commit from that panel, or from the terminal, while the status bar shows the right branch. Click the branch name in the status bar to switch. Commit or stash first, so each job's files stay with its branch.
 
-### Open the pull request from PowerShell
+#### Open the pull request from PowerShell
 
 `gh pr create` uses the branch you have checked out. Check that branch out first. A one-line body uses ordinary double quotes. PowerShell treats `@" ` as the start of a here-string, and a here-string needs a line break immediately after `@"`. Characters on that same line raise `No characters are allowed after a here-string header`.
 
@@ -544,7 +546,7 @@ gh pr create --title "Short title" --body $body
 
 The title says what changed. The body says how you tested it. If the work finishes an issue, put `Closes #123` in the body. The pull request targets `main`.
 
-### When the pull request will not open
+#### When the pull request will not open
 
 **The push is not a fast-forward.** Your local branch is behind the same branch on GitHub. `gh pr create` tries to push first, and Git refuses to overwrite the remote. Bring the remote commits in, then create the pull request:
 
@@ -591,7 +593,7 @@ gh pr create --title "Tools to 50" --body "Reduced tools from 100 to 50 on uses"
 
 If the stop was a rebase rather than a merge, the last step is `git rebase --continue` after the `git add`.
 
-### Merge your own pull request
+#### Merge your own pull request
 
 Wait until the check named `Launcher builds` is green on the commit you are merging. It is on the pull request, under Checks. Pending means it is still running. A red check means the branch is not ready. Fix it on the same branch and push again.
 
@@ -609,7 +611,11 @@ git pull
 
 GitHub deletes the branch after a squash merge. A green check is required. It does not replace reading your own diff. Merge a pull request you understand. Leave one you do not.
 
-## What any developer may do
+## Jobs
+
+Ship, post the news, deploy, and the steps after a merge.
+
+### What any developer may do
 
 Decided for the whole team: any developer may do every one of these. Confidence in the change, and a green `Launcher builds` check on the exact commit, are the gates for a merge. A release, a deploy, and a news post are the same people. Say what you are about to publish in #staff-general first. Dev and Main each have one shared feed and one shared server, and the last Ship on a channel wins.
 
@@ -648,476 +654,7 @@ The note is what people read. The first line is a title of three words or more, 
 
 Everything still goes to the dev build first, including small changes. A main release is for a security fix, for something that leaves the game untestable, or for work the team has agreed goes live. Any developer who is confident may run that main release, then say so in #staff-general.
 
-## What this is
-
-Thornswood: a modded co-op Skyrim roleplay server on SkyMP, in alpha and
-open by application. This repo is the launcher (launcher\app, C# 5, WPF, built with the
-.NET Framework 4 csc), the game plugins (game\plugins, Skyrim Platform
-JavaScript), the site (site, node), the Discord bot (bot,
-Python) and every script that ships or runs it. Owner: Patrick (EvilPatrick06).
-
-Nothing here assumes you use Claude: this file is the rules for everybody, and a Claude
-reads the same file. CLAUDE.md only adds what is about a Claude. A new developer
-is added as a collaborator on the repository, and on CODEOWNERS beside the
-shared files.
-
-Patrick's Grok Bot lanes (Smeagle, Launcher, Installer, Website, GitHub,
-Vortex) also work here, on the shipping machine, under his GitHub account.
-Every rule in this file binds them the same as a person. They share notes
-through an Obsidian vault at `C:\Thornswood Vault\Thornswood` on that machine
-(`wiki/status.md` is what is true now); the vault is for coordinating, and
-the board is still the one record of work. They mark what they are on with a
-`claimed: <lane>` label and the board card moved to In Progress. Their
-branches carry the lane's name (`launcher/`, `website/`, `github/` and so on).
-On the shipping machine `C:\Users\evilp\Downloads\Thornswood-Repo` is shared
-by all of them and sits detached at `origin/main`, because lanes build from
-it: branch work goes in a worktree beside it, removed with its branch once
-the pull request merges.
-
-
-## Words
-
-The people in the world are customers, clients, people, testers, partners.
-Never "player". No em dashes anywhere written for people. Plain, direct
-sentences, no filler, no placeholders. Secrets (server passwords, site keys,
-Discord tokens, the news webhook, anything out of a config.json or .env on the
-VPS) are named by location only; never printed, pasted, committed or logged.
-
-What checks these, since 29 Sep (issue #460). Every pull request's build
-(`Launcher builds`, step "Check the writing rules") runs
-`scripts\dev\Check-Words.ps1` over every Markdown file outside `lore\` and
-`docs\archive\`, the launcher's help and window, the bot's channel posts,
-the public pages of the site and the voice service, and the installer's read
-me. Each hit names the file, the line and the rule, and turns the build red:
-
-| Rule | What it refuses |
-| --- | --- |
-| `em-dash` | an em dash, typed or as an HTML entity |
-| `banned-word` | the word this section bans, any case; multiplayer and playtest pass |
-| `old-owner` | the old owner name |
-| `open-alpha` | calling the alpha a playtest that is closed; it is open by application |
-| `placeholder` | a marker left for later, in capitals (to do, to be decided, fix me), or filler Latin |
-| `names-person` | a person's name in README.md or the six component READMEs (launcher, site, voice, game\plugins, game\ui, installer\setup) |
-
-A line that has to say it anyway (this section naming the word it bans, a
-document quoting a note as it went out) goes in
-`scripts\dev\Check-Words.allow.txt` with its reason; an allowance that no
-longer matches anything is itself a hit. Release notes are not files, so
-`scripts\release\Note-Rules.ps1` checks them when Ship or Rollback-Feed runs,
-before anything is built. The same build step runs `tests\test-check-words.ps1`
-and `tests\test-note-rules.ps1`, which plant a break of every rule and fail
-if either check lets one through. Secrets are checked by
-`scripts\dev\Check-Secrets.ps1` in the same build.
-
-No machine checks these, so the person writing keeps them: plain, direct
-sentences with no filler; the text inside code (the launcher's messages, the
-game's chat lines, the bot's replies), because a word check there cannot
-tell a message from a name in the code or one of Skyrim's own record names;
-and names in the other documents, which record who decided something and
-who holds what on purpose.
-
-## Everything we need to do goes on the board
-
-The one record of outstanding work is the Thornswood To Do board:
-https://github.com/users/EvilPatrick06/projects/1
-
-Each piece of work is an issue on this repository, and every issue is on the
-board. Decided by Patrick on 25 Sep and approved in #staff-general: the list moved there
-from a claude.ai page that nobody without Claude could open. The 169 open
-entries became issues #368 to #536, each keeping its old number as its Order.
-`docs/archive/todo-list-2026-09-25.md` holds every entry as it stood that day,
-the finished ones included, so a comment in the code that says "entry 243 on
-the To Do List" means entry 243 in that file.
-
-Decided by Patrick on 17 Sep. Anything a session turns up goes on the board
-before the session ends. A defect, a decision, a correction to something
-already on there, or work started and not finished. Saying it in a chat or a
-reply is not recording it: that is gone when the window closes and the next
-person has no way to know it was ever found. What prompted this was a Google
-Ads tag added to the site whose only trace was a paragraph on a neighbouring
-entry, with no step telling anybody to deploy it.
-
-How to use it:
-
-- Order is the do-order. A new issue gets the Order of where it belongs, not
-  the end; a number between two others (52.5) is fine.
-- Work that fits an existing issue is an edit or a comment on it, not a
-  second issue. Write down what was measured and what is left.
-- Uncommitted changes sitting in the repo are outstanding work and belong on
-  the board too.
-- Labels: `wave:` is the stage, `area:` the part of the project, `needs:` who
-  or what it waits on, and `anyone can start` marks what needs nobody in
-  particular. Assign yourself when you start one.
-- A pull request that finishes an issue says `Closes #N`, so merging closes
-  it and the board moves it to Done. Say in the pull request, or in #staff-general,
-  which issues moved.
-
-## Settled design, not up for a quiet rewrite
-
-- Decided by Patrick and Djinn on 17 Sep, after the three launchers kept
-  getting into each other's files: Thornswood runs from its own game folder
-  (`Thornswood\Game`), built by the launcher from what Vortex has deployed
-  into the Steam copy, the big files as hard links so the collection is not
-  stored twice, and copies of everything another launcher rewrites in place
-  (settings, scripts, programs, the client folders, the master files and
-  whatever else rewrites a copied file in place). Decided by Patrick on
-  20 Sep: nothing here supports another server's install any more. The SkyMP
-  client runtime is built from the fork and recorded in
-  `records\client-build.json`; `Sync-Client.ps1` puts it in the game folder and
-  Ship refuses a release whose client is not the recorded build. Nothing is
-  taken from the Steam copy's `Data\Platform` or its SkyMP DLLs, because until
-  that day another launcher's builds of all of them were what shipped.
-  This is what ships now, corrected 18 Sep. The bullet used to say the Steam
-  copy shipped until `djinn/own-game-folder` reached main. That branch is on
-  main, `C:\Thornswood\Game` is built, and the launcher restarts into it:
-  Profile\launcher.log records "runs from the new folder". A session reading
-  the old wording would have believed the wrong layout was live, which is the
-  one thing this section exists to prevent.
-  Decided by Patrick on 24 Sep, for a tester whose Vortex deploys into
-  another server's copy of Skyrim (`steamapps\common\Keizaal Online`), in
-  his words "detcts and fixes this but doesnt have the servers bleed": when
-  Vortex deploys anywhere but the Steam copy, `Thornswood\Game` is the Steam
-  copy's game plus exactly the files Vortex's record in that folder lists,
-  taken from Vortex's own mods folder, and nothing else of that folder is
-  read. Scan names the folder, Fix and Settings point the launcher at it,
-  and with no Steam copy on the machine it refuses (OwnGame.DeploysInto,
-  Gather, tests\test-vortex-folder.ps1). Djinn to agree it in #staff-general.
-  Decided by Patrick on 29 Sep (#1218, #1226): the Steam copy is the
-  person's, to play vanilla at any build with their own mods, and Thornswood
-  runs entirely from its own folder. With the own folder chosen in the setup
-  window, first setup never writes into the Steam copy: the installer's
-  payload and everything the launcher writes before the folder exists go to
-  `Profile\Payload` (Paths.OwnFirst), and Make takes them in. Not chosen, the
-  install uses the Steam copy as it always did, and once the folder is turned
-  on and made the next start takes Thornswood's files back out of the Steam
-  copy, once (OwnGame.CleanSteamCopy); an existing own folder gets the same
-  from its next update. Steam's "Wait until I launch the game" is set only
-  until the folder exists (tests\test-own-folder-first.ps1).
-  Decided by Patrick on 29 Sep (#1232): `Thornswood\Game` takes only
-  Skyrim's own files (from the Steam copy when it is on the pinned build, or
-  the Downgrade's download), Vortex's deployed files by Vortex's own record,
-  and Thornswood's own files. Skyrim's own is the pinned build's file list,
-  `records\skyrim-files.json`, read out of the depot manifests the Downgrade
-  uses, never a guess by folder. A mod put into the Steam copy by hand stays
-  there, and a folder made before this loses such files at its next refresh,
-  logged (OwnGameKinds.cs, tests\test-own-folder-alone.ps1).
-  Decided by Patrick on 29 Sep (#1247): the behavior files and the BodySlide
-  bodies a release carries are made in Thornswood's own folder, as a step on
-  the shipping machine before a Ship (`scripts\mods\Build-Generated.ps1`,
-  what it builds in `records\generated.json`), never in the Steam copy. The
-  behavior files come from Pandora Behaviour Engine+, which the collection
-  carries from revision 2, because Nemesis cannot generate from a command
-  line. Ship stops while they are not built for the current mod list
-  (tests\test-build-generated.ps1).
-- Whichever folder the game runs from, the launcher looks after its own
-  files: Keep puts its files back before Play and parks any plugin in
-  `Data\Platform\Plugins` that is not ours; Hold keeps its files open read
-  only while the game runs; the plugins idle unless the client points at our
-  server and a fresh session note is there; Publish-Update packs what belongs
-  and nothing else (Ship-Rules.ps1, by what is ours rather than by whose
-  anything is). No wrapper scripts around the launcher, nothing moved by hand
-  in Data\Platform, nothing touches Vortex's own files.
-- The SkyMP client runtime is built from the fork, the `engine\skymp`
-  submodule of this repository on `thornswood/engine-changes`, and recorded
-  in `records\client-build.json` by `New-ClientBuildRecord.ps1`.
-  `Sync-Client.ps1` puts the six recorded files in the game folder and
-  refuses any that is not the recorded build; Ship refuses a release whose
-  client is not. Every change Patch-Client.ps1 used to make by text is in the
-  fork's source, and that script is gone.
-  Decided by Patrick and Djinn on 25 Sep, so the second machine has
-  everything and GitHub holds it: the fork, its build and the release output
-  live in the repository folder, not in `C:\Thornswood-Dev`. The fork is the
-  `engine\skymp` submodule, pinned to the commit the build records name; the
-  output (packs, launcher, installer, server payload) is `out`, ignored by
-  git; anything else that folder held and that never goes to GitHub is
-  `local`, ignored too. Scripts ask `scripts\release\Where.ps1` where each of these is
-  rather than naming a path. It no longer falls back to `C:\Thornswood-Dev`:
-  no machine has that folder any more, and the fallback went on 28 Sep
-  (issue #440), along with the forwarding copies in `tools\`. The files a
-  machine kept in `tools\` moved on 29 Sep (signing.json to `records\signing`,
-  the setup stub to `out`, the rest to `local`) and the folder is gone.
-- Launcher code is C# 5 only: no string interpolation, no ?., no nameof,
-  no expression bodied members, no out var.
-- Every change goes out as one complete release: launcher, game files and
-  server together, never a half.
-
-Anything that changes one of these is a few lines in #staff-general first: the
-problem, the approach, what it touches. Agreed in #staff-general by
-the team before code; nobody settles it alone, and a Claude never does.
-## How work moves
-
-The short form of the rules. The same decisions, with the dates they were made, are in [How work moves, the long form](#how-work-moves-the-long-form).
-
-### Main, hotfixes, and merging
-
-- main is what ships. Any developer may ship main from a machine that can sign, and Ship.ps1 refuses
-  a main release that is not on main, is behind or ahead of origin, has
-  anything uncommitted, has a file under `scripts` or another folder a release is built from that git does not know, or
-  asks for a new number with `-Version`. A main Ship writes nothing to the
-  repository: the version moves first through `Bump-Version.ps1` and its own
-  pull request, and Ship builds only what is already on GitHub, so every other
-  machine can `git pull` exactly what shipped. Corrected 24 Sep: this bullet
-  used to say a main Ship committed and pushed the source after the release,
-  which stopped being true on 22 Sep (f917dd8).
-- The one live release that does not come off main is a hotfix, decided by
-  Patrick on 24 Sep for a tester who could not get in while a day of dev work
-  sat on main: "the only thing that should be going to main now is the fix
-  for him". A branch named `hotfix/...` starts from the commit the live
-  release was built from, carries only the fix and its `Bump-Version.ps1`
-  commit, is pushed, and Ship runs from a checkout of it; every other gate
-  above still applies, and Ship refuses a hotfix branch that is not on
-  GitHub. A hotfix leaves the dev feed alone. The fix also goes to main
-  through its own pull request, or the next main release loses it. 1.1.93 was
-  the first, built from 55ac6ef. Any developer may ship a hotfix when they are confident in the fix and
-  Launcher builds is green, the same as any live release. Once it is live, its commit is kept as a tag, `live-<version>`,
-  and the branch is deleted, so no hotfix branch sits on GitHub: the next
-  hotfix starts with `git checkout -b hotfix/<name> live-<version>` from the
-  tag of the release that is live. 1.1.94 is `live-1.1.94` (25 Sep).
-- Nobody pushes to main any more, Patrick included. Everything goes through a
-  pull request. This replaces the 18 Sep decision that his own work went
-  straight to main, which held while `enforce_admins` was off and stopped
-  holding the moment it went on.
-- What branch protection on main actually enforces, since 25 Sep:
-  `enforce_admins` is **off**, there is no required check, required
-  approving reviews is **0**, and the code owner review is **off**.
-  Patrick, that day: "we don't need the required check/reviewer at all anymore for anyone as long as we give verbal agreement and the VPS check goes through". So the rule is ours, not a setting:
-  anybody on the team merges their own pull request once `Launcher builds`
-  (the build check, on the VPS) is green and they have said what it is in
-  #staff-general. Nobody waits for Patrick. Force pushes are refused.
-  Because nothing enforces it, it has to be kept by hand: on 25 Sep 35 pull
-  requests were merged with their VPS build red and 18 with no build at all,
-  and main went red with them. Wait for `Launcher builds` to say pass before
-  merging, every time, including your own and including a Claude's. The last
-  GitHub setting, "require branches to be up to date" with no check listed,
-  was removed on 27 Sep at Patrick's word ("we use the VPS's build checker"),
-  so GitHub requires nothing at all now.
-  What changed on 23 Sep, since 22 Sep: the review requirement was one
-  approving review, which Patrick could not give himself and had to override
-  with `--admin` on every one of his own pull requests, and it is now zero.
-  The code owner review on `.github/CODEOWNERS` is off. And `enforce_admins`,
-  which had to stay off while `Ship.ps1` pushed its own version commit
-  straight to main, went on, because Ship writes nothing to the repository now:
-  `Bump-Version.ps1` moves the number first, as an ordinary commit on a
-  branch, and Ship reads it.
-  Check which it is rather than assuming, because this paragraph was wrong
-  for a day before anybody looked:
-  `gh api repos/EvilPatrick06/Thornswood/branches/main/protection`
-### Branch names
-
-- Everybody's work goes on a branch named for whoever did it:
-  `git checkout -b <name>/what-it-is` (your name, then a slash, and
-  claude/ for a Claude's). Small commits, plain messages. Push the branch and
-  open a pull request, standing on the branch, not on main:
-  `git checkout <name>/what-it-is; git push -u origin <name>/what-it-is; gh pr create --fill`.
-  It is merged into main from GitHub, never pushed over main.
-  The branches opened before 17 Sep use a `gavin/` prefix; they are Djinn's
-  and were left alone rather than renamed under open pull requests.
-- One fix per commit, on a branch as much as anywhere: a commit that changes
-  eight things cannot be reverted when one of them is wrong.
-- `git pull` before starting anything. If a pull conflicts, resolve it on
-  your branch (`git fetch`, `git rebase origin/main`), never on main. If a
-  push is rejected, pull, do not force.
-### Dev first, notes, and open branches
-
-- Decided by Patrick on 23 Sep: **everything goes to the dev build first.**
-  His words: "start puttin these on the dev build and not the main build
-  launcher unless it's a security issue or can make the game untestable,
-  everything else even small changes go to the dev build launcher for
-  pretesting". Size is not a reason to skip it. A main Ship is for a
-  security fix or for something that leaves the game untestable, and he
-  says which.
-- The dev channel (`.\scripts\release\Ship.ps1 -Channel dev "what changed"`) may be
-  run from any branch, from any developer's machine, to try work on the dev server.
-  Say in #staff-general when you take it, because there is one dev feed and the last
-  dev Ship wins. A main Ship leaves the Dev feed and baseline unchanged.
-- Every release note has a title and details, dev included. Patrick, 25 Sep,
-  after two dev posts went out as "The scroll glows" and "Dev build: ...":
-  they must have details and be as good as the ones before them. The notes
-  are what people read in the launcher, on the site and in Discord, so write
-  them from the side of the person playing: a title that says what changed
-  for them, then one "- " line for each thing they will notice, saying what
-  it does and what to do if anything. Ship refuses a title under three words
-  or notes with no "- " line. Since 27 Sep it also refuses notes that say
-  what only we would understand (scripts\release\Note-Rules.ps1): the word
-  the Words section bans, an em dash, an issue or pull request number, "PR", a code file or
-  a setting name (WEBVIEW2_LIKE_THIS), a name out of the code (PutInServerOrder,
-  camelCase), our own words for how we work (demoting, worktree, squash, CI),
-  and the same line twice. On 26 and 27 Sep all of those went out to the
-  launcher, the site and Discord. And "The load order moved, so start a new
-  character" is added by Publish-Update only when the plugins that are on, or
-  their order, really changed; it used to follow any byte of plugins.txt and
-  told testers to start over three times in two days. The shape:
-
-  ```
-  .\scripts\release\Ship.ps1 -Channel dev "The Downgrade button shows its progress and says why it stopped
-  - A bar under the Downgrade button shows how far the downgrade has got: each of the three downloads with its size, then the copy into your game.
-  - When the downgrade stops for any reason, the line under the button says why and what to do next.
-  - If Windows will not open Steam's links, the launcher asks Steam directly, so Steam's console still opens."
-  ```
-- One fix per pull request. A branch that changes eight things is eight
-  reviews nobody has time for; split it.
-- No stray branches and no stray pull requests. Decided by Patrick on
-  25 Sep, after a count found 70 branches on GitHub, two of them holding
-  work that had never been merged and was nearly deleted with the rest:
-  "we need to make sure in the docs that we don't leave a bunch of stray
-  branches and PRs and fix+merge them everytime or delete if old".
-  - A branch is deleted once its pull request is merged. GitHub does that
-    by itself (the repository setting "Automatically delete head branches", on since 25 Sep);
-    delete it by hand if it was not.
-  - Work goes into a pull request the day it is done, never left on a
-    pushed branch without one. That is how the two above were lost track of.
-  - At the start of a session, and before anything is shipped, look at what
-    is open: `gh pr list --state open` and `git ls-remote --heads origin`.
-    Everything there other than main, the current `hotfix/` branch and work
-    somebody is doing today gets one of two things: fixed and merged, or,
-    when it is old or no longer wanted, its pull request closed with a line
-    saying why and its branch deleted. Somebody else's branch is theirs to
-    decide on: ask them, and put it on the board if they cannot be asked.
-    Check whether its work is already in main before deleting it; a
-    squashed merge leaves the branch looking unmerged to git.
-### Signing, the build check, and the six shared files
-
-- Code signing is on since 27 Sep (issue #390, closed): the launcher and the
-  setup program are signed through Azure Artifact Signing
-  (`records\signing\README.md`). `ExpectedSigner` in `launcher\app\Updater.cs`
-  is set, so every launcher from dev 1.1.101.17 on refuses an update that is
-  not signed by that certificate. **Only a machine that signs may Ship, dev
-  included.** `Ship.ps1` and `Publish-Installer.ps1` refuse (non-zero exit) when
-  `records\signing\signing.json` is missing or disabled, or when the launcher / Setup tip
-  is not Authenticode Valid under `ExpectedSigner`. Local `Build-Launcher` /
-  `Package -NoPublish` may still print "not signing" and leave an unsigned
-  intermediate; that soft skip must not reach the site or the feed. The live main launcher,
-  1.1.101, predates signing; the next main Ship is the first signed one.
-- Every pull request gets the build check (.github/workflows/build.yml, about
-  two minutes: the secret scan, every script and file parses, the writing
-  rules and the two harnesses that prove the writing checks (see Words), the ownership page (`tests\test-ownership.js`, added by issue #752),
-  seven more harnesses that are just as quick (the script index, the script
-  paths, the architecture page and three launcher harnesses, issue #875, and
-  the new-box runbook read against its scripts, issue #454),
-  the launcher window, the count of
-  silent catches in the launcher, and the launcher compiles with the .NET
-  Framework csc). Red means the branch would stop Ship at the build step;
-  fix that, and merge once it is green, you are confident in the change, and you have said so in
-  #staff-general. Run the test harnesses your change touches yourself. All
-  ~410 of them (tests/, bot, and voice), and a look for stray pull requests
-  and branches run every night on the VPS (.github/workflows/nightly.yml,
-  03:00 Mountain); a failure there opens an issue on the board, "Nightly
-  checks failed", and whoever broke it fixes it next. It runs on the VPS, on a runner
-  `.\scripts\deploy\Install-Runner.ps1` puts there (issue #437), because
-  GitHub's own runners were blocked on billing from 25 Sep.
-  `.\scripts\deploy\Install-Runner.ps1 -Status` says whether GitHub sees it.
-- Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or
-  Publish-Update.ps1 without a line in #staff-general first; every machine touches those.
-
-## After a pull request is merged
-
-Merging on GitHub changes nothing anybody sees. You run the rest from the
-repository folder. Any developer may.
-
-1. `git checkout main`, then `git pull`. Ship.ps1 refuses a main release
-   that is behind origin, so the pull comes first.
-2. Then one command for each part the pull request touched:
-   - The launcher (`launcher\app`, `launcher\ui.xaml`, the art and video that
-     Build-Launcher.ps1 embeds), the game plugins (`game\plugins`), or
-     anything else that goes out in a pack:
-     `.\scripts\release\Ship.ps1 -Channel dev "what changed"`. The dev build is where
-     it goes first, by the rule above. `.\scripts\release\Ship.ps1 "what changed"`
-     with no channel is the live one, and that is for a security fix, for
-     something that leaves the game untestable, or for work the team has
-     agreed goes live. Any developer who is confident may run it.
-
-     The note is the release post: #news, the launcher's News tab and the
-     site all show it. Asked for by Patrick on 25 September, after a one-line
-     dev note went out as a bare title: "what you gave for the news wasnt
-     detailed enough". So a Ship command written for him carries the whole
-     note. The first line is a title from the customer's side. Then one line
-     starting with `- ` for each thing a person will notice, a plain sentence
-     saying what it does for them and how to use it: the key, the button, the
-     place. Never one line, and never branch names, pull request numbers or
-     entry numbers. The dev post of 24 September 14:36 is the shape to copy.
-     Ship refuses notes that break this (see "Every release note has a title
-     and details" above), before it builds anything.
-   - The gamemode behind that dev release: `.\scripts\deploy\Deploy-DevGamemode.ps1`.
-     `Deploy-Gamemode.ps1` then `Deploy-Server.ps1` is the live pair.
-   - The site's app or `site\public`: `.\scripts\deploy\Deploy-Docs.ps1`.
-     The public pages (`site\data\site\*.md`) need
-     `.\scripts\deploy\Deploy-Docs.ps1 -Site`.
-   - The bot's code or join card art in `bot`:
-     `.\scripts\deploy\Install-Bot.ps1 -CodeOnly`.
-   - The bot's avatar (`bot\thornswood-bot-*.png`): no script
-     sends it. It is uploaded by hand in the Discord developer portal.
-   - `game\gamemode.js`: `.\scripts\deploy\Deploy-Gamemode.ps1`, then
-     `.\scripts\deploy\Deploy-Server.ps1`.
-   - The voice service (`voice\voice-server.js`, `voice\public`):
-     `.\scripts\deploy\Install-Voice.ps1`.
-   - Scripts that only change how a release is built (Ship.ps1, Publish-Update.ps1,
-     the Deploy scripts): nothing more. The pull is the change. Any developer may run them.
-   A pull request that touches several of these gets every one of them, in
-   the same sitting, so nothing goes out half done.
-3. Everybody else, once it is out, from the main folder: `git checkout main`, then
-   `git pull`. If the branch had its own folder, `git worktree remove
-   ..\<that folder>`. Then `git branch -D <name>/what-it-is`, after GitHub
-   shows the pull request as merged; GitHub squashes the merge, so
-   `git branch -d` refuses. A file the branch added that also sits untracked
-   in the main folder stops the pull, so delete that copy first.
-
-## What Thornswood is
-
-Thornswood is a modded co-op Skyrim roleplay server on SkyMP, the server
-authoritative multiplayer for Skyrim Special Edition. It is Patrick's, in an
-alpha that is open by application, becoming an RP server of its own,
-less strict than the big ones, with working NPCs, its own launcher, its own
-website and Discord, and a lore of its own (fifty years after the civil war,
-the Stormcloaks won, a High King over the Jarls, the Thalmor expelled, the
-Empire back under a trade treaty with one embassy). Characters live on the
-server, not in save files. During the playtest they are throwaway.
-
-The words we use, and the rule that every change ships as one complete
-release, launcher, game files and server together, are in How work moves.
-
-## The pieces
-
-| Piece | Where | What it is |
-| --- | --- | --- |
-| Source repo | github.com/EvilPatrick06/Thornswood (private), clone at `C:\Users\<you>\Downloads\Thornswood-Repo` | Launcher source, plugins, site, bot, every script |
-| Feed store | On the VPS beside the feed the site serves: `C:\Thornswood-Docs\feed\{version.json, published.json, launchers.txt, history\}` and the same under `feed-dev`. Each machine's working copy is `%LOCALAPPDATA%\Thornswood\feed\main` and `\dev` | `version.json` (the feed, served at `/feed[-dev]/version.json`), `published.json` (the pack baseline), every launcher version the channel published, and each replaced file, none of those three served. Ship receives and sends them through `scripts\release\Feed-Store.ps1` (#907). Until then they were the `Thornswood-Releases` GitHub repository and its two clones |
-| Downloads | On the VPS, `C:\Thornswood-Docs\feed\assets` and `feed-dev\assets`, served at `https://thornswood.net/feed[-dev]/assets/<sha256>` | Every pack, launcher exe and client runtime a feed names, one file per sha256, one folder per channel (`docs\FEED.md` "Downloads come from the site") |
-| Launcher | `launcher\app\*.cs` + `launcher\ui.xaml`, built by `scripts\release\Build-Launcher.ps1` with the .NET Framework 4 csc, C# 5 only | WPF app at `<drive>:\Thornswood\Launcher\Thornswood.exe` (C: on most machines); profile, config and packs under that folder. The scripts find the install on whichever fixed drive holds it; `-Root` overrides |
-| Dev build | `<drive>:\Thornswood-DevBuild`, beside the main install, put there by the main launcher's Play page Server dropdown | Same exe, `config.json` says `Channel: dev`, `UpdateBranch: dev`, port 7787, voice 7789. Staff roles only (Owner, Dev, Gamemaster, Moderator, Loremaster) |
-| Game | `<Root>\Game`, Thornswood's own folder, which the launcher builds from the Steam copy of Skyrim Special Edition and what Vortex deployed from the Nexus collection (see One Skyrim of its own) | The launcher will not Play from the Steam copy itself. Thornswood's own loose files live in `Data\Platform` (plugins in `Plugins\thornswood-*.js`, page in `UI\`) and `Data\SKSE\Plugins\Thornswood.ini` |
-| Plugins | `game\plugins\thornswood-{front,emotes,mark,voice}.js`, UI in `game\ui` | Skyrim Platform JavaScript. Idle unless the client points at our server and the launcher left a fresh session note |
-| Game server | VPS 192.135.112.23, `C:\Thornswood-Server`, UDP/TCP 7777, resources 3000, task `Thornswood Server` | skymp5-server with `gamemode.js`; the door reads its allowed list from the site |
-| Dev game server | `C:\Thornswood-Server-Dev`, 7787, resources 7788, task `Thornswood Dev Server` | Same binaries, fresh world, door list is the staff roles only (`https://thornswood.net/dev`) |
-| Voice | `C:\Thornswood-Voice` 7778 and `C:\Thornswood-Voice-Dev` 7789 | node, `voice\voice-server.js`; the launcher holds the microphone, the game plugin relays state through files in `Data\Platform` |
-| Site | `site`, on the VPS at `C:\Thornswood-Docs`, node on 127.0.0.1:3001 behind Caddy, https://thornswood.net | Public pages from `data\site\*.md`, admin hub, Discord login, the door API, uploads, news |
-| Bot | `bot`, on the VPS at `C:\Thornswood-Bot`, the Windows service `ThornswoodBot` under its own account, `NT SERVICE\ThornswoodBot` | discord.py: tickets, join cards, staff tools |
-| Watchdog | `C:\Thornswood-Watch\watch.ps1`, every five minutes | Restarts any service that stops answering, three tries an hour, and tells the staff channel once when anything dies and once when it is back: the servers, voice, the site, the bot, the nightly backup, the build runner and the disk. Through the bot, or its own webhook when the bot is down |
-
-The server's SkyMP fork is on GitHub (github.com/EvilPatrick06/skymp, branch
-`thornswood/engine-changes`), so its source survives any one machine, and since
-25 September it is the `engine\skymp` submodule of this repository, pinned to
-the commit the build records name: `git submodule update --init engine/skymp`
-fetches it into the repository folder. It is large and needs Visual Studio to
-build, so a machine that only copies server binaries can leave it unfetched.
-Its configured build tree and toolchain (`engine\skymp\build`) are on
-Patrick's machine alone for now. The release output is `out` in the repository
-folder, ignored by git. `scripts\release\Where.ps1` says where each of these is on the
-machine it runs on.
-
-What one machine keeps and git never sees has a home of its own since
-29 September (issue #440, phase 10), when the last of it left `tools\` and that
-folder went:
-
-| File | Where | What it is | Read by |
-| --- | --- | --- | --- |
-| `signing.json` | `records\signing` | Whether this machine signs, and with what. No key in it | Sign-Artifact, Ship, Publish-Installer, Setup-ShipMachine |
-| `setup-stub.exe`, `setup-stub.pdb` | `out` | The setup program, compiled by Build-Launcher | Package-Thornswood, Ship |
-| `thornswood-front.zip` | `local` | The front build, made outside the repository | Go |
-| `mod-audit.json` | `local` | What Audit-Mods found last time | Audit-Mods |
-| `backup-key.txt` | `local` | A copy of the backup passphrase, a secret. Documents is where it really lives | Restore-Backup | Who holds each thing Thornswood cannot run without, and who the
-second holder is, is `docs\OWNERSHIP.md`.
-
-## How a release goes out
+### How a release goes out
 
 **Everything goes to the dev build first** (decided 23 Sep).
 A main release is for a security fix, for something that leaves the game
@@ -1242,7 +779,424 @@ build, `Deploy-Gamemode.ps1` the gamemode (`Deploy-DevGamemode.ps1` for dev), `D
 password nothing checks any more; the secrets table below says why. Every
 script closes the launcher and Skyrim itself when it needs to.
 
-## How work moves, the long form
+### After a pull request is merged
+
+Merging on GitHub changes nothing anybody sees. You run the rest from the
+repository folder. Any developer may.
+
+1. `git checkout main`, then `git pull`. Ship.ps1 refuses a main release
+   that is behind origin, so the pull comes first.
+2. Then one command for each part the pull request touched:
+   - The launcher (`launcher\app`, `launcher\ui.xaml`, the art and video that
+     Build-Launcher.ps1 embeds), the game plugins (`game\plugins`), or
+     anything else that goes out in a pack:
+     `.\scripts\release\Ship.ps1 -Channel dev "what changed"`. The dev build is where
+     it goes first, by the dev-first rule in How work moves. `.\scripts\release\Ship.ps1 "what changed"`
+     with no channel is the live one, and that is for a security fix, for
+     something that leaves the game untestable, or for work the team has
+     agreed goes live. Any developer who is confident may run it.
+
+     The note is the release post: #news, the launcher's News tab and the
+     site all show it. Asked for by Patrick on 25 September, after a one-line
+     dev note went out as a bare title: "what you gave for the news wasnt
+     detailed enough". So a Ship command written for him carries the whole
+     note. The first line is a title from the customer's side. Then one line
+     starting with `- ` for each thing a person will notice, a plain sentence
+     saying what it does for them and how to use it: the key, the button, the
+     place. Never one line, and never branch names, pull request numbers or
+     entry numbers. The dev post of 24 September 14:36 is the shape to copy.
+     Ship refuses notes that break this (see "Every release note has a title
+     and details" above), before it builds anything.
+   - The gamemode behind that dev release: `.\scripts\deploy\Deploy-DevGamemode.ps1`.
+     `Deploy-Gamemode.ps1` then `Deploy-Server.ps1` is the live pair.
+   - The site's app or `site\public`: `.\scripts\deploy\Deploy-Docs.ps1`.
+     The public pages (`site\data\site\*.md`) need
+     `.\scripts\deploy\Deploy-Docs.ps1 -Site`.
+   - The bot's code or join card art in `bot`:
+     `.\scripts\deploy\Install-Bot.ps1 -CodeOnly`.
+   - The bot's avatar (`bot\thornswood-bot-*.png`): no script
+     sends it. It is uploaded by hand in the Discord developer portal.
+   - `game\gamemode.js`: `.\scripts\deploy\Deploy-Gamemode.ps1`, then
+     `.\scripts\deploy\Deploy-Server.ps1`.
+   - The voice service (`voice\voice-server.js`, `voice\public`):
+     `.\scripts\deploy\Install-Voice.ps1`.
+   - Scripts that only change how a release is built (Ship.ps1, Publish-Update.ps1,
+     the Deploy scripts): nothing more. The pull is the change. Any developer may run them.
+   A pull request that touches several of these gets every one of them, in
+   the same sitting, so nothing goes out half done.
+3. Everybody else, once it is out, from the main folder: `git checkout main`, then
+   `git pull`. If the branch had its own folder, `git worktree remove
+   ..\<that folder>`. Then `git branch -D <name>/what-it-is`, after GitHub
+   shows the pull request as merged; GitHub squashes the merge, so
+   `git branch -d` refuses. A file the branch added that also sits untracked
+   in the main folder stops the pull, so delete that copy first.
+
+## Rules
+
+Words, the board, settled design, and how a change moves.
+
+### What this is
+
+Thornswood: a modded co-op Skyrim roleplay server on SkyMP, in alpha and
+open by application. This repo is the launcher (launcher\app, C# 5, WPF, built with the
+.NET Framework 4 csc), the game plugins (game\plugins, Skyrim Platform
+JavaScript), the site (site, node), the Discord bot (bot,
+Python) and every script that ships or runs it. Owner: Patrick (EvilPatrick06).
+
+Nothing here assumes you use Claude: this file is the rules for everybody, and a Claude
+reads the same file. CLAUDE.md only adds what is about a Claude. A new developer
+is added as a collaborator on the repository, and on CODEOWNERS beside the
+shared files.
+
+Patrick's Grok Bot lanes (Smeagle, Launcher, Installer, Website, GitHub,
+Vortex) also work here, on the shipping machine, under his GitHub account.
+Every rule in this file binds them the same as a person. They share notes
+through an Obsidian vault at `C:\Thornswood Vault\Thornswood` on that machine
+(`wiki/status.md` is what is true now); the vault is for coordinating, and
+the board is still the one record of work. They mark what they are on with a
+`claimed: <lane>` label and the board card moved to In Progress. Their
+branches carry the lane's name (`launcher/`, `website/`, `github/` and so on).
+On the shipping machine `C:\Users\evilp\Downloads\Thornswood-Repo` is shared
+by all of them and sits detached at `origin/main`, because lanes build from
+it: branch work goes in a worktree beside it, removed with its branch once
+the pull request merges.
+
+### Words
+
+The people in the world are customers, clients, people, testers, partners.
+Never "player". No em dashes anywhere written for people. Plain, direct
+sentences, no filler, no placeholders. Secrets (server passwords, site keys,
+Discord tokens, the news webhook, anything out of a config.json or .env on the
+VPS) are named by location only; never printed, pasted, committed or logged.
+
+What checks these, since 29 Sep (issue #460). Every pull request's build
+(`Launcher builds`, step "Check the writing rules") runs
+`scripts\dev\Check-Words.ps1` over every Markdown file outside `lore\` and
+`docs\archive\`, the launcher's help and window, the bot's channel posts,
+the public pages of the site and the voice service, and the installer's read
+me. Each hit names the file, the line and the rule, and turns the build red:
+
+| Rule | What it refuses |
+| --- | --- |
+| `em-dash` | an em dash, typed or as an HTML entity |
+| `banned-word` | the word this section bans, any case; multiplayer and playtest pass |
+| `old-owner` | the old owner name |
+| `open-alpha` | calling the alpha a playtest that is closed; it is open by application |
+| `placeholder` | a marker left for later, in capitals (to do, to be decided, fix me), or filler Latin |
+| `names-person` | a person's name in README.md or the six component READMEs (launcher, site, voice, game\plugins, game\ui, installer\setup) |
+
+A line that has to say it anyway (this section naming the word it bans, a
+document quoting a note as it went out) goes in
+`scripts\dev\Check-Words.allow.txt` with its reason; an allowance that no
+longer matches anything is itself a hit. Release notes are not files, so
+`scripts\release\Note-Rules.ps1` checks them when Ship or Rollback-Feed runs,
+before anything is built. The same build step runs `tests\test-check-words.ps1`
+and `tests\test-note-rules.ps1`, which plant a break of every rule and fail
+if either check lets one through. Secrets are checked by
+`scripts\dev\Check-Secrets.ps1` in the same build.
+
+No machine checks these, so the person writing keeps them: plain, direct
+sentences with no filler; the text inside code (the launcher's messages, the
+game's chat lines, the bot's replies), because a word check there cannot
+tell a message from a name in the code or one of Skyrim's own record names;
+and names in the other documents, which record who decided something and
+who holds what on purpose.
+
+### Everything we need to do goes on the board
+
+The one record of outstanding work is the Thornswood To Do board:
+https://github.com/users/EvilPatrick06/projects/1
+
+Each piece of work is an issue on this repository, and every issue is on the
+board. Decided by Patrick on 25 Sep and approved in #staff-general: the list moved there
+from a claude.ai page that nobody without Claude could open. The 169 open
+entries became issues #368 to #536, each keeping its old number as its Order.
+`docs/archive/todo-list-2026-09-25.md` holds every entry as it stood that day,
+the finished ones included, so a comment in the code that says "entry 243 on
+the To Do List" means entry 243 in that file.
+
+Decided by Patrick on 17 Sep. Anything a session turns up goes on the board
+before the session ends. A defect, a decision, a correction to something
+already on there, or work started and not finished. Saying it in a chat or a
+reply is not recording it: that is gone when the window closes and the next
+person has no way to know it was ever found. What prompted this was a Google
+Ads tag added to the site whose only trace was a paragraph on a neighbouring
+entry, with no step telling anybody to deploy it.
+
+How to use it:
+
+- Order is the do-order. A new issue gets the Order of where it belongs, not
+  the end; a number between two others (52.5) is fine.
+- Work that fits an existing issue is an edit or a comment on it, not a
+  second issue. Write down what was measured and what is left.
+- Uncommitted changes sitting in the repo are outstanding work and belong on
+  the board too.
+- Labels: `wave:` is the stage, `area:` the part of the project, `needs:` who
+  or what it waits on, and `anyone can start` marks what needs nobody in
+  particular. Assign yourself when you start one.
+- A pull request that finishes an issue says `Closes #N`, so merging closes
+  it and the board moves it to Done. Say in the pull request, or in #staff-general,
+  which issues moved.
+
+### Settled design, not up for a quiet rewrite
+
+- Decided by Patrick and Djinn on 17 Sep, after the three launchers kept
+  getting into each other's files: Thornswood runs from its own game folder
+  (`Thornswood\Game`), built by the launcher from what Vortex has deployed
+  into the Steam copy, the big files as hard links so the collection is not
+  stored twice, and copies of everything another launcher rewrites in place
+  (settings, scripts, programs, the client folders, the master files and
+  whatever else rewrites a copied file in place). Decided by Patrick on
+  20 Sep: nothing here supports another server's install any more. The SkyMP
+  client runtime is built from the fork and recorded in
+  `records\client-build.json`; `Sync-Client.ps1` puts it in the game folder and
+  Ship refuses a release whose client is not the recorded build. Nothing is
+  taken from the Steam copy's `Data\Platform` or its SkyMP DLLs, because until
+  that day another launcher's builds of all of them were what shipped.
+  This is what ships now, corrected 18 Sep. The bullet used to say the Steam
+  copy shipped until `djinn/own-game-folder` reached main. That branch is on
+  main, `C:\Thornswood\Game` is built, and the launcher restarts into it:
+  Profile\launcher.log records "runs from the new folder". A session reading
+  the old wording would have believed the wrong layout was live, which is the
+  one thing this section exists to prevent.
+  Decided by Patrick on 24 Sep, for a tester whose Vortex deploys into
+  another server's copy of Skyrim (`steamapps\common\Keizaal Online`), in
+  his words "detcts and fixes this but doesnt have the servers bleed": when
+  Vortex deploys anywhere but the Steam copy, `Thornswood\Game` is the Steam
+  copy's game plus exactly the files Vortex's record in that folder lists,
+  taken from Vortex's own mods folder, and nothing else of that folder is
+  read. Scan names the folder, Fix and Settings point the launcher at it,
+  and with no Steam copy on the machine it refuses (OwnGame.DeploysInto,
+  Gather, tests\test-vortex-folder.ps1). Djinn to agree it in #staff-general.
+  Decided by Patrick on 29 Sep (#1218, #1226): the Steam copy is the
+  person's, to play vanilla at any build with their own mods, and Thornswood
+  runs entirely from its own folder. With the own folder chosen in the setup
+  window, first setup never writes into the Steam copy: the installer's
+  payload and everything the launcher writes before the folder exists go to
+  `Profile\Payload` (Paths.OwnFirst), and Make takes them in. Not chosen, the
+  install uses the Steam copy as it always did, and once the folder is turned
+  on and made the next start takes Thornswood's files back out of the Steam
+  copy, once (OwnGame.CleanSteamCopy); an existing own folder gets the same
+  from its next update. Steam's "Wait until I launch the game" is set only
+  until the folder exists (tests\test-own-folder-first.ps1).
+  Decided by Patrick on 29 Sep (#1232): `Thornswood\Game` takes only
+  Skyrim's own files (from the Steam copy when it is on the pinned build, or
+  the Downgrade's download), Vortex's deployed files by Vortex's own record,
+  and Thornswood's own files. Skyrim's own is the pinned build's file list,
+  `records\skyrim-files.json`, read out of the depot manifests the Downgrade
+  uses, never a guess by folder. A mod put into the Steam copy by hand stays
+  there, and a folder made before this loses such files at its next refresh,
+  logged (OwnGameKinds.cs, tests\test-own-folder-alone.ps1).
+  Decided by Patrick on 29 Sep (#1247): the behavior files and the BodySlide
+  bodies a release carries are made in Thornswood's own folder, as a step on
+  the shipping machine before a Ship (`scripts\mods\Build-Generated.ps1`,
+  what it builds in `records\generated.json`), never in the Steam copy. The
+  behavior files come from Pandora Behaviour Engine+, which the collection
+  carries from revision 2, because Nemesis cannot generate from a command
+  line. Ship stops while they are not built for the current mod list
+  (tests\test-build-generated.ps1).
+- Whichever folder the game runs from, the launcher looks after its own
+  files: Keep puts its files back before Play and parks any plugin in
+  `Data\Platform\Plugins` that is not ours; Hold keeps its files open read
+  only while the game runs; the plugins idle unless the client points at our
+  server and a fresh session note is there; Publish-Update packs what belongs
+  and nothing else (Ship-Rules.ps1, by what is ours rather than by whose
+  anything is). No wrapper scripts around the launcher, nothing moved by hand
+  in Data\Platform, nothing touches Vortex's own files.
+- The SkyMP client runtime is built from the fork, the `engine\skymp`
+  submodule of this repository on `thornswood/engine-changes`, and recorded
+  in `records\client-build.json` by `New-ClientBuildRecord.ps1`.
+  `Sync-Client.ps1` puts the six recorded files in the game folder and
+  refuses any that is not the recorded build; Ship refuses a release whose
+  client is not. Every change Patch-Client.ps1 used to make by text is in the
+  fork's source, and that script is gone.
+  Decided by Patrick and Djinn on 25 Sep, so the second machine has
+  everything and GitHub holds it: the fork, its build and the release output
+  live in the repository folder, not in `C:\Thornswood-Dev`. The fork is the
+  `engine\skymp` submodule, pinned to the commit the build records name; the
+  output (packs, launcher, installer, server payload) is `out`, ignored by
+  git; anything else that folder held and that never goes to GitHub is
+  `local`, ignored too. Scripts ask `scripts\release\Where.ps1` where each of these is
+  rather than naming a path. It no longer falls back to `C:\Thornswood-Dev`:
+  no machine has that folder any more, and the fallback went on 28 Sep
+  (issue #440), along with the forwarding copies in `tools\`. The files a
+  machine kept in `tools\` moved on 29 Sep (signing.json to `records\signing`,
+  the setup stub to `out`, the rest to `local`) and the folder is gone.
+- Launcher code is C# 5 only: no string interpolation, no ?., no nameof,
+  no expression bodied members, no out var.
+- Every change goes out as one complete release: launcher, game files and
+  server together, never a half.
+
+Anything that changes one of these is a few lines in #staff-general first: the
+problem, the approach, what it touches. Agreed in #staff-general by
+the team before code; nobody settles it alone, and a Claude never does.
+
+### How work moves
+
+The short form of the rules. The same decisions, with the dates they were made, are in [How work moves, the long form](#how-work-moves-the-long-form).
+
+#### Main, hotfixes, and merging
+
+- main is what ships. Any developer may ship main from a machine that can sign, and Ship.ps1 refuses
+  a main release that is not on main, is behind or ahead of origin, has
+  anything uncommitted, has a file under `scripts` or another folder a release is built from that git does not know, or
+  asks for a new number with `-Version`. A main Ship writes nothing to the
+  repository: the version moves first through `Bump-Version.ps1` and its own
+  pull request, and Ship builds only what is already on GitHub, so every other
+  machine can `git pull` exactly what shipped. Corrected 24 Sep: this bullet
+  used to say a main Ship committed and pushed the source after the release,
+  which stopped being true on 22 Sep (f917dd8).
+- The one live release that does not come off main is a hotfix, decided by
+  Patrick on 24 Sep for a tester who could not get in while a day of dev work
+  sat on main: "the only thing that should be going to main now is the fix
+  for him". A branch named `hotfix/...` starts from the commit the live
+  release was built from, carries only the fix and its `Bump-Version.ps1`
+  commit, is pushed, and Ship runs from a checkout of it; every other gate
+  above still applies, and Ship refuses a hotfix branch that is not on
+  GitHub. A hotfix leaves the dev feed alone. The fix also goes to main
+  through its own pull request, or the next main release loses it. 1.1.93 was
+  the first, built from 55ac6ef. Any developer may ship a hotfix when they are confident in the fix and
+  Launcher builds is green, the same as any live release. Once it is live, its commit is kept as a tag, `live-<version>`,
+  and the branch is deleted, so no hotfix branch sits on GitHub: the next
+  hotfix starts with `git checkout -b hotfix/<name> live-<version>` from the
+  tag of the release that is live. 1.1.94 is `live-1.1.94` (25 Sep).
+- Nobody pushes to main any more, Patrick included. Everything goes through a
+  pull request. This replaces the 18 Sep decision that his own work went
+  straight to main, which held while `enforce_admins` was off and stopped
+  holding the moment it went on.
+- What branch protection on main actually enforces, since 25 Sep:
+  `enforce_admins` is **off**, there is no required check, required
+  approving reviews is **0**, and the code owner review is **off**.
+  Patrick, that day: "we don't need the required check/reviewer at all anymore for anyone as long as we give verbal agreement and the VPS check goes through". So the rule is ours, not a setting:
+  anybody on the team merges their own pull request once `Launcher builds`
+  (the build check, on the VPS) is green and they have said what it is in
+  #staff-general. Nobody waits for Patrick. Force pushes are refused.
+  Because nothing enforces it, it has to be kept by hand: on 25 Sep 35 pull
+  requests were merged with their VPS build red and 18 with no build at all,
+  and main went red with them. Wait for `Launcher builds` to say pass before
+  merging, every time, including your own and including a Claude's. The last
+  GitHub setting, "require branches to be up to date" with no check listed,
+  was removed on 27 Sep at Patrick's word ("we use the VPS's build checker"),
+  so GitHub requires nothing at all now.
+  What changed on 23 Sep, since 22 Sep: the review requirement was one
+  approving review, which Patrick could not give himself and had to override
+  with `--admin` on every one of his own pull requests, and it is now zero.
+  The code owner review on `.github/CODEOWNERS` is off. And `enforce_admins`,
+  which had to stay off while `Ship.ps1` pushed its own version commit
+  straight to main, went on, because Ship writes nothing to the repository now:
+  `Bump-Version.ps1` moves the number first, as an ordinary commit on a
+  branch, and Ship reads it.
+  Check which it is rather than assuming, because this paragraph was wrong
+  for a day before anybody looked:
+  `gh api repos/EvilPatrick06/Thornswood/branches/main/protection`
+#### Branch names
+
+- Everybody's work goes on a branch named for whoever did it:
+  `git checkout -b <name>/what-it-is` (your name, then a slash, and
+  claude/ for a Claude's). Small commits, plain messages. Push the branch and
+  open a pull request, standing on the branch, not on main:
+  `git checkout <name>/what-it-is; git push -u origin <name>/what-it-is; gh pr create --fill`.
+  It is merged into main from GitHub, never pushed over main.
+  The branches opened before 17 Sep use a `gavin/` prefix; they are Djinn's
+  and were left alone rather than renamed under open pull requests.
+- One fix per commit, on a branch as much as anywhere: a commit that changes
+  eight things cannot be reverted when one of them is wrong.
+- `git pull` before starting anything. If a pull conflicts, resolve it on
+  your branch (`git fetch`, `git rebase origin/main`), never on main. If a
+  push is rejected, pull, do not force.
+#### Dev first, notes, and open branches
+
+- Decided by Patrick on 23 Sep: **everything goes to the dev build first.**
+  His words: "start puttin these on the dev build and not the main build
+  launcher unless it's a security issue or can make the game untestable,
+  everything else even small changes go to the dev build launcher for
+  pretesting". Size is not a reason to skip it. A main Ship is for a
+  security fix or for something that leaves the game untestable, and he
+  says which.
+- The dev channel (`.\scripts\release\Ship.ps1 -Channel dev "what changed"`) may be
+  run from any branch, from any developer's machine, to try work on the dev server.
+  Say in #staff-general when you take it, because there is one dev feed and the last
+  dev Ship wins. A main Ship leaves the Dev feed and baseline unchanged.
+- Every release note has a title and details, dev included. Patrick, 25 Sep,
+  after two dev posts went out as "The scroll glows" and "Dev build: ...":
+  they must have details and be as good as the ones before them. The notes
+  are what people read in the launcher, on the site and in Discord, so write
+  them from the side of the person playing: a title that says what changed
+  for them, then one "- " line for each thing they will notice, saying what
+  it does and what to do if anything. Ship refuses a title under three words
+  or notes with no "- " line. Since 27 Sep it also refuses notes that say
+  what only we would understand (scripts\release\Note-Rules.ps1): the word
+  the Words section bans, an em dash, an issue or pull request number, "PR", a code file or
+  a setting name (WEBVIEW2_LIKE_THIS), a name out of the code (PutInServerOrder,
+  camelCase), our own words for how we work (demoting, worktree, squash, CI),
+  and the same line twice. On 26 and 27 Sep all of those went out to the
+  launcher, the site and Discord. And "The load order moved, so start a new
+  character" is added by Publish-Update only when the plugins that are on, or
+  their order, really changed; it used to follow any byte of plugins.txt and
+  told testers to start over three times in two days. The shape:
+
+  ```
+  .\scripts\release\Ship.ps1 -Channel dev "The Downgrade button shows its progress and says why it stopped
+  - A bar under the Downgrade button shows how far the downgrade has got: each of the three downloads with its size, then the copy into your game.
+  - When the downgrade stops for any reason, the line under the button says why and what to do next.
+  - If Windows will not open Steam's links, the launcher asks Steam directly, so Steam's console still opens."
+  ```
+- One fix per pull request. A branch that changes eight things is eight
+  reviews nobody has time for; split it.
+- No stray branches and no stray pull requests. Decided by Patrick on
+  25 Sep, after a count found 70 branches on GitHub, two of them holding
+  work that had never been merged and was nearly deleted with the rest:
+  "we need to make sure in the docs that we don't leave a bunch of stray
+  branches and PRs and fix+merge them everytime or delete if old".
+  - A branch is deleted once its pull request is merged. GitHub does that
+    by itself (the repository setting "Automatically delete head branches", on since 25 Sep);
+    delete it by hand if it was not.
+  - Work goes into a pull request the day it is done, never left on a
+    pushed branch without one. That is how the two above were lost track of.
+  - At the start of a session, and before anything is shipped, look at what
+    is open: `gh pr list --state open` and `git ls-remote --heads origin`.
+    Everything there other than main, the current `hotfix/` branch and work
+    somebody is doing today gets one of two things: fixed and merged, or,
+    when it is old or no longer wanted, its pull request closed with a line
+    saying why and its branch deleted. Somebody else's branch is theirs to
+    decide on: ask them, and put it on the board if they cannot be asked.
+    Check whether its work is already in main before deleting it; a
+    squashed merge leaves the branch looking unmerged to git.
+#### Signing, the build check, and the six shared files
+
+- Code signing is on since 27 Sep (issue #390, closed): the launcher and the
+  setup program are signed through Azure Artifact Signing
+  (`records\signing\README.md`). `ExpectedSigner` in `launcher\app\Updater.cs`
+  is set, so every launcher from dev 1.1.101.17 on refuses an update that is
+  not signed by that certificate. **Only a machine that signs may Ship, dev
+  included.** `Ship.ps1` and `Publish-Installer.ps1` refuse (non-zero exit) when
+  `records\signing\signing.json` is missing or disabled, or when the launcher / Setup tip
+  is not Authenticode Valid under `ExpectedSigner`. Local `Build-Launcher` /
+  `Package -NoPublish` may still print "not signing" and leave an unsigned
+  intermediate; that soft skip must not reach the site or the feed. The live main launcher,
+  1.1.101, predates signing; the next main Ship is the first signed one.
+- Every pull request gets the build check (.github/workflows/build.yml, about
+  two minutes: the secret scan, every script and file parses, the writing
+  rules and the two harnesses that prove the writing checks (see Words), the ownership page (`tests\test-ownership.js`, added by issue #752),
+  seven more harnesses that are just as quick (the script index, the script
+  paths, the architecture page and three launcher harnesses, issue #875, and
+  the new-box runbook read against its scripts, issue #454),
+  the launcher window, the count of
+  silent catches in the launcher, and the launcher compiles with the .NET
+  Framework csc). Red means the branch would stop Ship at the build step;
+  fix that, and merge once it is green, you are confident in the change, and you have said so in
+  #staff-general. Run the test harnesses your change touches yourself. All
+  ~410 of them (tests/, bot, and voice), and a look for stray pull requests
+  and branches run every night on the VPS (.github/workflows/nightly.yml,
+  03:00 Mountain); a failure there opens an issue on the board, "Nightly
+  checks failed", and whoever broke it fixes it next. It runs on the VPS, on a runner
+  `.\scripts\deploy\Install-Runner.ps1` puts there (issue #437), because
+  GitHub's own runners were blocked on billing from 25 Sep.
+  `.\scripts\deploy\Install-Runner.ps1 -Status` says whether GitHub sees it.
+- Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or
+  Publish-Update.ps1 without a line in #staff-general first; every machine touches those.
+
+### How work moves, the long form
 
 Several people, several machines, one repo. The short rules are above;
 this is the long form.
@@ -1315,7 +1269,67 @@ this is the long form.
   copy from every install (Leaks.cs), matched by content so nobody's own
   sign in is touched.
 
-## Setting up a machine
+## The system
+
+What the pieces are, how a machine is set up to ship, where a secret lives, and which other document to open.
+
+### What Thornswood is
+
+Thornswood is a modded co-op Skyrim roleplay server on SkyMP, the server
+authoritative multiplayer for Skyrim Special Edition. It is Patrick's, in an
+alpha that is open by application, becoming an RP server of its own,
+less strict than the big ones, with working NPCs, its own launcher, its own
+website and Discord, and a lore of its own (fifty years after the civil war,
+the Stormcloaks won, a High King over the Jarls, the Thalmor expelled, the
+Empire back under a trade treaty with one embassy). Characters live on the
+server, not in save files. During the playtest they are throwaway.
+
+The words we use, and the rule that every change ships as one complete
+release, launcher, game files and server together, are in How work moves.
+
+### The pieces
+
+| Piece | Where | What it is |
+| --- | --- | --- |
+| Source repo | github.com/EvilPatrick06/Thornswood (private), clone at `C:\Users\<you>\Downloads\Thornswood-Repo` | Launcher source, plugins, site, bot, every script |
+| Feed store | On the VPS beside the feed the site serves: `C:\Thornswood-Docs\feed\{version.json, published.json, launchers.txt, history\}` and the same under `feed-dev`. Each machine's working copy is `%LOCALAPPDATA%\Thornswood\feed\main` and `\dev` | `version.json` (the feed, served at `/feed[-dev]/version.json`), `published.json` (the pack baseline), every launcher version the channel published, and each replaced file, none of those three served. Ship receives and sends them through `scripts\release\Feed-Store.ps1` (#907). Until then they were the `Thornswood-Releases` GitHub repository and its two clones |
+| Downloads | On the VPS, `C:\Thornswood-Docs\feed\assets` and `feed-dev\assets`, served at `https://thornswood.net/feed[-dev]/assets/<sha256>` | Every pack, launcher exe and client runtime a feed names, one file per sha256, one folder per channel (`docs\FEED.md` "Downloads come from the site") |
+| Launcher | `launcher\app\*.cs` + `launcher\ui.xaml`, built by `scripts\release\Build-Launcher.ps1` with the .NET Framework 4 csc, C# 5 only | WPF app at `<drive>:\Thornswood\Launcher\Thornswood.exe` (C: on most machines); profile, config and packs under that folder. The scripts find the install on whichever fixed drive holds it; `-Root` overrides |
+| Dev build | `<drive>:\Thornswood-DevBuild`, beside the main install, put there by the main launcher's Play page Server dropdown | Same exe, `config.json` says `Channel: dev`, `UpdateBranch: dev`, port 7787, voice 7789. Staff roles only (Owner, Dev, Gamemaster, Moderator, Loremaster) |
+| Game | `<Root>\Game`, Thornswood's own folder, which the launcher builds from the Steam copy of Skyrim Special Edition and what Vortex deployed from the Nexus collection (see One Skyrim of its own) | The launcher will not Play from the Steam copy itself. Thornswood's own loose files live in `Data\Platform` (plugins in `Plugins\thornswood-*.js`, page in `UI\`) and `Data\SKSE\Plugins\Thornswood.ini` |
+| Plugins | `game\plugins\thornswood-{front,emotes,mark,voice}.js`, UI in `game\ui` | Skyrim Platform JavaScript. Idle unless the client points at our server and the launcher left a fresh session note |
+| Game server | VPS 192.135.112.23, `C:\Thornswood-Server`, UDP/TCP 7777, resources 3000, task `Thornswood Server` | skymp5-server with `gamemode.js`; the door reads its allowed list from the site |
+| Dev game server | `C:\Thornswood-Server-Dev`, 7787, resources 7788, task `Thornswood Dev Server` | Same binaries, fresh world, door list is the staff roles only (`https://thornswood.net/dev`) |
+| Voice | `C:\Thornswood-Voice` 7778 and `C:\Thornswood-Voice-Dev` 7789 | node, `voice\voice-server.js`; the launcher holds the microphone, the game plugin relays state through files in `Data\Platform` |
+| Site | `site`, on the VPS at `C:\Thornswood-Docs`, node on 127.0.0.1:3001 behind Caddy, https://thornswood.net | Public pages from `data\site\*.md`, admin hub, Discord login, the door API, uploads, news |
+| Bot | `bot`, on the VPS at `C:\Thornswood-Bot`, the Windows service `ThornswoodBot` under its own account, `NT SERVICE\ThornswoodBot` | discord.py: tickets, join cards, staff tools |
+| Watchdog | `C:\Thornswood-Watch\watch.ps1`, every five minutes | Restarts any service that stops answering, three tries an hour, and tells the staff channel once when anything dies and once when it is back: the servers, voice, the site, the bot, the nightly backup, the build runner and the disk. Through the bot, or its own webhook when the bot is down |
+
+The server's SkyMP fork is on GitHub (github.com/EvilPatrick06/skymp, branch
+`thornswood/engine-changes`), so its source survives any one machine, and since
+25 September it is the `engine\skymp` submodule of this repository, pinned to
+the commit the build records name: `git submodule update --init engine/skymp`
+fetches it into the repository folder. It is large and needs Visual Studio to
+build, so a machine that only copies server binaries can leave it unfetched.
+Its configured build tree and toolchain (`engine\skymp\build`) are on
+Patrick's machine alone for now. The release output is `out` in the repository
+folder, ignored by git. `scripts\release\Where.ps1` says where each of these is on the
+machine it runs on.
+
+What one machine keeps and git never sees has a home of its own since
+29 September (issue #440, phase 10), when the last of it left `tools\` and that
+folder went:
+
+| File | Where | What it is | Read by |
+| --- | --- | --- | --- |
+| `signing.json` | `records\signing` | Whether this machine signs, and with what. No key in it | Sign-Artifact, Ship, Publish-Installer, Setup-ShipMachine |
+| `setup-stub.exe`, `setup-stub.pdb` | `out` | The setup program, compiled by Build-Launcher | Package-Thornswood, Ship |
+| `thornswood-front.zip` | `local` | The front build, made outside the repository | Go |
+| `mod-audit.json` | `local` | What Audit-Mods found last time | Audit-Mods |
+| `backup-key.txt` | `local` | A copy of the backup passphrase, a secret. Documents is where it really lives | Restore-Backup | Who holds each thing Thornswood cannot run without, and who the
+second holder is, is `docs\OWNERSHIP.md`.
+
+### Setting up a machine
 
 Needs: Windows 10 or 11, Skyrim Special Edition on Steam (any Steam library,
 any drive; the scripts find it through Steam) with the Thornswood collection
@@ -1388,7 +1402,7 @@ the VPS through `Discord-Hook.ps1`, and a copy in `bot\news-webhook.txt` or
 `bot\dev-webhook.txt` only when the VPS cannot be asked; without either, Ship
 says so and carries on.
 
-## Shipping from another machine
+### Shipping from another machine
 
 Issue #458: if One (Patrick's machine) dies, the release process has to
 survive it. Measured on One on 29 September, this is everything a dev Ship
@@ -1448,7 +1462,7 @@ in the repository with the parameters it is given, the template holds paths
 only, and the fetch refuses a signing client or a client runtime that is not
 the pinned or recorded bytes.
 
-## Secrets, by name and place, never by value
+### Secrets, by name and place, never by value
 
 None of these is tracked by git. Four of them sit inside the repo folder on
 the machine that holds them and are kept out by `.gitignore`: the two webhooks,
@@ -1526,7 +1540,7 @@ except the backup passphrase, in the clear.
 
 Never paste any of them into a chat, a commit, a Discord message or a doc.
 
-## One Skyrim of its own
+### One Skyrim of its own
 
 Thornswood runs from its own game folder, `<Root>\Game`, and nothing here
 supports another server's install. Decided by Patrick on 20 September, after
@@ -1699,7 +1713,7 @@ not start the game out of the Steam copy.
 Skyrim reads its plugin list from one Windows folder per user. Thornswood swaps
 it per session and ignores which profile Vortex has on.
 
-## Where things are written down
+### Where things are written down
 
 - This guide. The table at the top is the way in. `CLAUDE.md`: what applies to a
   Claude on top of these rules. The To Do board,
