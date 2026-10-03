@@ -75,8 +75,9 @@ Yes 'Refresh returns already-matches before WhyNot when stamp and rules match' (
     $og.IndexOf('DeploymentStamp(src) == Recorded("deployment")') -lt $og.IndexOf('string why = WhyNot(cfg, src);', $og.IndexOf('public static string Refresh')))
 
 # SettleSettings on Refresh must not overwrite Live plugins.txt with Golden.
-Yes 'SettleSettings on Refresh only copies Golden plugins.txt when Live is missing' (
-    $og.Contains('if (first || !File.Exists(dest)) File.Copy(shipped, dest, true);') -and
+Yes 'SettleSettings copies Golden plugins.txt only when the Profile list is missing' (
+    $og.Contains('if (!File.Exists(dest)) File.Copy(shipped, dest, true);') -and
+    -not $og.Contains('if (first || !File.Exists(dest))') -and
     $og.Contains('Thornswood-Content'))
 
 $shellOwn = [IO.File]::ReadAllText((Join-Path $AppPath 'ShellOwnGame.cs'))
