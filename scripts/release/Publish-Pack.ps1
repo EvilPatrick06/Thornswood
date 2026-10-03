@@ -133,7 +133,10 @@ foreach ($id in $order) {
         if (-not (Test-Path -LiteralPath $src)) { Say "  not in the build, skipped:  $rel" 'Yellow'; continue }
 
         $files = @(Get-ChildItem -LiteralPath $src -Recurse -File -Force)
-        $prefix = (Join-Path $GameDir '').TrimEnd('\') + '\'
+        # The long path, which is what FullName starts with. $GameDir
+        # itself is the short 8.3 form when the build sits under a short
+        # TEMP (issue #1156).
+        $prefix = (Get-Item -LiteralPath $GameDir).FullName.TrimEnd('\') + '\'
         foreach ($f in $files) {
             $r = $f.FullName.Substring($prefix.Length)
             $ext = $f.Extension.ToLowerInvariant()

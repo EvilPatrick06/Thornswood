@@ -480,7 +480,11 @@ if ((Test-Path -LiteralPath $menuLive) -and (Test-Path -LiteralPath $menuSrc)) {
 }
 
 Say '  Scanning the build...'
-$prefix = $GameDir.TrimEnd('\') + '\'
+# The long path, which is what FullName starts with. $GameDir itself
+# is the short 8.3 form when the build sits under a short TEMP
+# (issue #1156).
+$listedGame = (Get-Item -LiteralPath $GameDir).FullName
+$prefix = $listedGame.TrimEnd('\') + '\'
 $now = @{}
 # Each file of ours is recorded by its bytes, '<size>:<sha256>', not by its
 # file time (#441): the same bytes are the same entry on any machine, after a
@@ -488,7 +492,7 @@ $now = @{}
 # Measured 24 September: 891 files, 661.9 MB, about 14 seconds to hash.
 $nowFile = @{}
 $hashWatch = [Diagnostics.Stopwatch]::StartNew()
-foreach ($f in (Get-ChildItem -LiteralPath $GameDir -Recurse -File -Force)) {
+foreach ($f in (Get-ChildItem -LiteralPath $listedGame -Recurse -File -Force)) {
     $rel = $f.FullName.Substring($prefix.Length)
     if (Test-FromCollection $rel) { continue }
     if (Test-Vanilla $rel) { continue }
@@ -501,7 +505,7 @@ foreach ($f in (Get-ChildItem -LiteralPath $GameDir -Recurse -File -Force)) {
     $nowFile[$rel] = $f
 }
 Say ("  {0:n0} mod files, hashed in {1:n1} s" -f $now.Count, $hashWatch.Elapsed.TotalSeconds) 'Green'
-$others = @(Get-ChildItem -LiteralPath (Join-Path $GameDir 'Data\Platform') -Recurse -File -Force -ErrorAction SilentlyContinue |
+$others = @(Get-ChildItem -LiteralPath (Join-Path $listedGame 'Data\Platform') -Recurse -File -Force -ErrorAction SilentlyContinue |
             ForEach-Object { $_.FullName.Substring($prefix.Length) } | Where-Object { Test-OtherServer $_ })
 if ($others.Count) { Say ("  {0} of another server's file(s) in Data\Platform left alone: {1}" -f $others.Count, (($others | ForEach-Object { Split-Path $_ -Leaf }) -join ', ')) 'DarkGray' }
 
@@ -548,9 +552,10 @@ if (Test-Path $orderSrc) {
 # baseline written before the move still compares.
 $srcDir = Join-Path $RepoDir 'launcher'
 if (Test-Path $srcDir) {
-    foreach ($f in @(Get-ChildItem -LiteralPath $srcDir -Recurse -File -ErrorAction SilentlyContinue |
+    $srcListed = (Get-Item -LiteralPath $srcDir).FullName
+    foreach ($f in @(Get-ChildItem -LiteralPath $srcListed -Recurse -File -ErrorAction SilentlyContinue |
                      Where-Object { $_.Extension -in '.cs', '.xaml' })) {
-        $rel = $f.FullName.Substring($srcDir.Length).TrimStart('\')
+        $rel = $f.FullName.Substring($srcListed.Length).TrimStart('\')
         $now[":src:$rel"] = (Get-FileHash $f.FullName -Algorithm SHA256).Hash
     }
 }
