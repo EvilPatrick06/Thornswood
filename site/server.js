@@ -1697,21 +1697,68 @@ const attemptCookie = (req, attempt, value, seconds) =>
 const keyInAddress = new Set();
 
 // --------------------------------------------------------------- discord --
-function post(url, form) {
+/* THE SIGN-IN CALLBACK'S TWO QUESTIONS (#1163). post exchanges the
+   code and getWithToken reads who the person is. Both used to listen only
+   for data, end and the request's error. Discord sending its headers and
+   then stalling, never answering, or dropping halfway left the promise
+   unsettled, so the browser sat on a blank page and the launcher waited
+   out its two minutes. The same ten seconds as discordGet, and a response
+   that fails, is cut off or closes before its end settles the question
+   once. The callback turns that into words. */
+function discordSilent() {
+  const e = new Error('Discord did not answer');
+  e.discordSilent = true;
+  return e;
+}
+function readDiscordBody(res, h) {
+  let out = '';
+  res.on('data', (d) => out += d);
+  res.on('error', h.giveUp);
+  res.on('aborted', h.giveUp);
+  // complete is false until a whole answer has arrived. A stub that is not
+  // a real response leaves it unset, and that one is finished on end.
+  res.on('close', () => { if (res.complete === false) h.giveUp(); });
+  res.on('end', () => {
+    if (res.complete === false) return h.giveUp();
+    try { h.done(JSON.parse(out)); }
+    catch (e) { h.fail(e); }
+  });
+}
+function boundDiscord(open) {
   return new Promise((resolve, reject) => {
-    const u = new URL(url);
-    const data = new URLSearchParams(form).toString();
+    let settled = false;
+    let timer = null;
+    let req = null;
+    const finish = (fn, v) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      fn(v);
+    };
+    const giveUp = () => finish(reject, discordSilent());
+    timer = setTimeout(() => {
+      giveUp();
+      try { if (req) req.destroy(); } catch (e) { }
+    }, DISCORD_ASK_MS);
+    req = open({
+      giveUp: giveUp,
+      done: (v) => finish(resolve, v),
+      fail: (e) => finish(reject, e)
+    });
+    if (req && req.on) req.on('error', (e) => finish(reject, e));
+  });
+}
+function post(url, form) {
+  const u = new URL(url);
+  const data = new URLSearchParams(form).toString();
+  return boundDiscord((h) => {
     const r = https.request({
       hostname: u.hostname, path: u.pathname, method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded',
                  'Content-Length': Buffer.byteLength(data) }
-    }, (res) => {
-      let out = '';
-      res.on('data', (d) => out += d);
-      res.on('end', () => { try { resolve(JSON.parse(out)); } catch (e) { reject(e); } });
-    });
-    r.on('error', reject);
+    }, (res) => readDiscordBody(res, h));
     r.end(data);
+    return r;
   });
 }
 
@@ -3243,15 +3290,11 @@ function feedLaunchers(server) {
 }
 
 function getWithToken(url, token) {
-  return new Promise((resolve, reject) => {
-    const u = new URL(url);
-    https.get({ hostname: u.hostname, path: u.pathname,
-      headers: { Authorization: 'Bearer ' + token } }, (res) => {
-      let out = '';
-      res.on('data', (d) => out += d);
-      res.on('end', () => { try { resolve(JSON.parse(out)); } catch (e) { reject(e); } });
-    }).on('error', reject);
-  });
+  const u = new URL(url);
+  return boundDiscord((h) => https.get({
+    hostname: u.hostname, path: u.pathname,
+    headers: { Authorization: 'Bearer ' + token }
+  }, (res) => readDiscordBody(res, h)));
 }
 
 /* Refused at the door. It says which of the three reasons it was and what the
@@ -3615,6 +3658,14 @@ async function handle(req, res) {
       if (!tok || !tok.access_token) throw new Error('no token');
       me = await getWithToken('https://discord.com/api/users/@me', tok.access_token);
     } catch (e) {
+      // Discord never finished (#1163). Words on this answer, not a blank
+      // wait and not a redirect the page has to interpret.
+      if (e && e.discordSilent) {
+        return send(res, 200, plainPage('Discord did not answer', [
+          'Discord did not answer.',
+          'Try again.'
+        ]), TYPES['.html']);
+      }
       return send(res, 302, '', 'text/plain', { Location: '/?discord=failed' });
     }
     if (!me || !me.id) {
