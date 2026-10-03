@@ -29,6 +29,7 @@ const http = require('http');
 const CR = String.fromCharCode(13);
 const SRC = path.join(REPO_DIR, 'site', 'server.js');
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
+const CSP_HEADER = JSON.parse(src.match(/const CSP_HEADER = ("[^"\r\n]*");/)[1]);
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
