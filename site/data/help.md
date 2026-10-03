@@ -48,6 +48,25 @@ Skyrim the way it was.
    fix.
 <!-- /alpha -->
 
+## Updating to collection revision 2
+
+Close the game, select the Thornswood profile in Vortex, and update the
+collection to **revision 2**. Let Vortex finish installing and deploying it.
+Then open the Thornswood launcher and let its update finish before pressing
+Play. The collection supplies the mod baseline; the launcher supplies
+Thornswood's newer content and generated behavior and covered body files.
+
+Keep **CBBE.esp** and **RaceMenuMorphsCBBE.esp** switched off. In the 3BA
+installer use the Nevernude body, leave prebuilt meshes off, choose Full SMP
+and No SOS, and do not install the optional CBPC configuration. The mandatory
+base component can remain selected; the separate CBPC physics mod is absent
+from this revision.
+
+If the launcher reports a plugin mismatch, open **Diagnostics**, press
+**Scan**, then **Fix**. Use the Thornswood shortcut for the main world and the
+Dev shortcut for testing. Each has its own game folder and update source, so
+updating one keeps the other separate.
+
 <a id='defender'></a>
 
 ## Why does Windows or Defender warn about the installer?
