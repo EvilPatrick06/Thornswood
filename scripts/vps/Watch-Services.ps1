@@ -56,9 +56,10 @@
     game      answers on 3000, which is the resources the client pulls
     voice     answers on 7778
     bot       a python process is alive with the bot script in its command line.
-              And its heartbeat, heartbeat.json beside bot.py, says it is on
+              And its heartbeat, C:\Thornswood-Bot\data\heartbeat.json, says it is on
               Discord: a bot hung or off Discord for ten minutes while its
-              process runs is down too (issue #449). The bot is the Windows
+              process runs is down too (issue #449). That file is written once
+              Install-Bot.ps1 -NoToken has run. The bot is the Windows
               service ThornswoodBot (issue #465), so either way it is
               restarted by that name, under the same three an hour
     dev game  answers on 7788, the dev server's resources port
@@ -928,7 +929,7 @@ if (Test-Path `$hb) {
     `$ago = [math]::Round(([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() - [int64]`$b.written) / 60)
     'heartbeat ' + `$ago + ' min ago, ' + `$(if (`$b.connected) { 'on Discord' } else { 'OFF DISCORD' })
   } catch { 'heartbeat could not be read' }
-} else { 'heartbeat none. The bot writes one once Install-Bot.ps1 -CodeOnly has sent the version that does' }
+} else { 'heartbeat none. The bot writes C:\Thornswood-Bot\data\heartbeat.json once Install-Bot.ps1 -NoToken has run' }
 'dev game  ' + `$(if (Answers 7788) { 'up' } else { 'DOWN' })
 'dev voice ' + `$(if (Answers 7789) { 'up' } else { 'DOWN' })
 # Free space right now, and LOW or CRITICAL when the watcher's last run found
