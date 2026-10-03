@@ -16,7 +16,8 @@ A supply quest moves goods. The trader asks for a count of an item
 that hold already buys. The item is one on the price lists submitted
 to that hold's box. There is no second list. The count is 5. The
 cooldown is 6 hours. You bring it. The trader pays that hold's
-buy price for the count, out of the trader's own purse. If the purse
+buy price for the count, out of the trader's own purse, through the
+same transfer as a sale to that trader. If the purse
 cannot cover 5, the trader does not offer the quest. If no trader
 buys the item, there is no supply quest for it. Prices are on
 [Merchant's Guild](merchants-guild.md).
