@@ -980,9 +980,7 @@ function Get-ShipLooseArt($files) {
 # it until Patrick decides otherwise; published packs are scrubbed apart
 # (Scrub-Feed.ps1).
 $ShipOursFiles = @(
-    # Our plugin: dev packs carry the repo's copy until Nexus has it
-    # ($DevShipsOurs in Publish-Update.ps1); main packs leave it to the
-    # collection, which provides it.
+    # Our completed plugin ships on both channels beyond the collection base.
     'Data\Thornswood-Content.esp',
     # The SkyMP client's compiled script, from the engine fork.
     'Data\Scripts\MpClientPlugin.pex',
@@ -1343,7 +1341,13 @@ function Ensure-ShipRequiredData([string]$GameDir, [string]$RepoDir) {
         throw "game\required-data is missing under $RepoDir"
     }
     $placed = New-Object System.Collections.Generic.List[string]
-    foreach ($f in @(Get-ChildItem -LiteralPath $srcRoot -File -EA Stop)) {
+    $sources = @(Get-ChildItem -LiteralPath $srcRoot -File -EA Stop)
+    # Content is Thornswood's own plugin. A completed release can update it
+    # beyond the published collection base without changing anybody's staging
+    # copy. Packs and the installer place exactly this committed source.
+    $content = Join-Path $RepoDir 'game\content\Thornswood-Content.esp'
+    if (Test-Path -LiteralPath $content) { $sources += Get-Item -LiteralPath $content }
+    foreach ($f in $sources) {
         if ($f.Name -eq 'README.md') { continue }
         $rel = 'Data\' + $f.Name
         $dst = Join-Path $GameDir $rel
