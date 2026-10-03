@@ -7,9 +7,9 @@ strike command or membership discount. Corrected by Patrick on 2 October
 
 Each hold's traders use that hold's submitted price lists. A merchant
 has no profession verb and no recipes. The NPCs remain under server
-authority and may wander their own hold until their exact guild sites
-are chosen. Their current numbers and placements are on
-[People who are not people](npcs.md).
+authority. Each hold has one guild site, recorded below. A later walk
+can move a spot. Traders are not relocated by that record. Their current
+numbers and placements are on [People who are not people](npcs.md).
 
 A person's shop is a claim, as [Property](property.md) says. Anyone may
 post at the board or trade with an NPC. Notice and job fees stay 20 and
@@ -50,6 +50,26 @@ is created, at the amount written on that quest, and it does not
 run out. A letter is not a quest of theirs. The sender pays the
 courier, on the notice board.
 
+## Guild sites
+
+One spot a hold, taken from the notice-board seeds. Raven Rock has no
+seeded board coordinate. Its site is the town inn, at Geldis Sadri on
+the trader list, which is where that town's board starts. A later walk
+can move any of these. Traders are not relocated by this list.
+
+| Hold | Book hold | Spot |
+| --- | --- | --- |
+| Haafingar | solitude | Solitude, the notice board |
+| Whiterun | whiterun | Whiterun, the notice board |
+| the Rift | riften | Riften, the notice board |
+| Eastmarch | windhelm | Windhelm, the notice board |
+| the Reach | markarth | Markarth, the notice board |
+| Falkreath | falkreath | Falkreath, the notice board |
+| Hjaalmarch | morthal | Morthal, the notice board |
+| the Pale | dawnstar | Dawnstar, the notice board |
+| Winterhold | winterhold | Winterhold, the notice board |
+| Solstheim | ravenrock | Raven Rock, the town inn, at Geldis Sadri |
+
 ## Where this is
 
 The hold's box is in the server, and the note beside it says guild
@@ -82,5 +102,26 @@ server's minute report lists the verified count and first-time grants.
 Failed startup revokes the new service; paths into served resources, including
 Windows junctions, are refused before any ledger is written.
 
-Buying, selling and quest payments are not enabled by that initialization.
-The verified transfer path, merchant panel and custom quests remain to finish.
+Buying and selling use the hold's submitted price. The trader's purse
+falls when it buys and rises when it sells. Purchased goods stay on that
+trader's shelf. An empty purse refuses a buy. An empty shelf refuses a
+sale. A supply turn-in is five of an item at that same buy price, paid
+from the same purse, and it will not be offered again for six hours.
+Scene quests are not paid from the purse.
+
+The person must be the authenticated character and within 400 of that
+trader in the same place. Press E on the trader. /merchant and the
+trader's id still opens the same panel. The panel only sends /merchant.
+It does not move gold or goods. People cannot join, and there is no due
+or discount.
+
+Gold and goods move only through the native merchant transfer. Until
+that transfer is present the server refuses the trade and leaves the
+purse and the shelf as they were. A transfer that has started and is
+not yet durable stays on the trader and is not paid twice.
+
+Exact counts and places are in [Merchant trader counts](merchant-traders.md).
+Pressing E on a trader opens the panel. The two CWGuardTemplates
+quartermasters are priced: the Imperial one as Haafingar, the Stormcloak
+one as Eastmarch. Their cell is not in a hold. The guild site for each
+hold is below. A later walk can move a spot. Traders are not moved by it.
