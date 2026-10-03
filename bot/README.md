@@ -349,7 +349,10 @@ Once, on One:
    EvilPatrick06. If it offers a trial that asks for a card, pick the free
    plan instead; it needs none.
 2. Make a new monitor of the kind **Heartbeat**. Name it `Thornswood bot`.
-   Expected every **1 minute**, grace period **5 minutes**.
+   Expected every **5 minutes**, grace period **5 minutes**. Cronitor's
+   free Hacker plan lists its fastest check frequency as 5 minutes
+   (https://cronitor.io/pricing), so do not set this to 1 minute. The bot
+   still pings about once a minute, which is inside that window.
 3. Alerts: leave the default notification list, which emails the address on
    the account. To hear it in Discord as well, add a Discord webhook to that
    list; the monitor posts it itself, so it arrives even when the VPS is
@@ -361,15 +364,17 @@ Once, on One:
    merged and pulled:
 
    ```
-   .\scripts\deploy\Install-Bot.ps1 -CodeOnly
+   .\scripts\deploy\Install-Bot.ps1 -NoToken
    .\scripts\deploy\Install-Bot.ps1 -SetPing
    ```
 
-   The first puts the bot code that pings on the VPS. The second asks for the
-   address hidden, puts it in `C:\Thornswood-Bot\bot.env.json` as `PING_URL`
-   over ssh's standard input, restarts the bot by name, and prints the bot's
-   first line about it: `reached the outside monitor` is right. The
-   monitor's page then shows a ping a minute.
+   The first is the full run, which installs the service and sends the
+   bot code that pings. -CodeOnly refuses until that service exists. The
+   second asks for the address hidden, puts it in
+   `C:\Thornswood-Bot\bot.env.json` as `PING_URL` over ssh's standard
+   input, restarts the bot by name, and prints the bot's first line about
+   it: `reached the outside monitor` is right. The monitor's page then
+   shows a ping a minute.
 
 To stop it, run `-SetPing` again and type `off`, then pause or delete the
 check on the monitor, or it emails you that the bot went quiet. A full
