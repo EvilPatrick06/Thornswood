@@ -30,7 +30,7 @@
   write, and says which rows differ. The build check runs this through
   tests\test-script-index.ps1 on every pull request.
 
-.PARAMETER Tools
+.PARAMETER Scripts
   The folder whose scripts are listed, every area under it but oneoff:
   scripts\, the folder above this one, unless a test points it at a copy.
 
@@ -51,7 +51,7 @@
 [CmdletBinding()]
 param(
     [switch]$Check,
-    [string]$Tools,
+    [string]$Scripts,
     [string]$Out
 )
 
@@ -61,9 +61,9 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # scripts\, above this script's own scripts\dev, since phase 8 of issue #440.
-if (-not $Tools) { $Tools = Split-Path -Parent $Here }
-$Tools = (Resolve-Path -LiteralPath $Tools).Path
-if (-not $Out) { $Out = Join-Path $Tools 'README.md' }
+if (-not $Scripts) { $Scripts = Split-Path -Parent $Here }
+$Scripts = (Resolve-Path -LiteralPath $Scripts).Path
+if (-not $Out) { $Out = Join-Path $Scripts 'README.md' }
 
 # What a row says when a script has nothing at its top to read. The harness
 # looks for exactly this text, so the two have to agree.
@@ -219,7 +219,7 @@ function Get-IndexText([string]$dir) {
     return (($out -join "`r`n") + "`r`n")
 }
 
-$want = Get-IndexText $Tools
+$want = Get-IndexText $Scripts
 $rows = @(($want -split "`r`n") | Where-Object { $_ -match '^\| \[' })
 
 if (-not $Check) {

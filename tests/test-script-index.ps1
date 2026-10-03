@@ -212,7 +212,7 @@ try {
     if (-not (Test-Path -LiteralPath $Gen)) { throw 'no New-ScriptIndex.ps1, so the index was not checked' }
     Yes 'scripts\README.md is there' (Test-Path -LiteralPath $Readme)
     $global:LASTEXITCODE = 0
-    & $Gen -Tools $ToolsPath -Check
+    & $Gen -Scripts $ToolsPath -Check
     Yes 'scripts\README.md is what New-ScriptIndex.ps1 writes (if not, run it and commit the file)' ($LASTEXITCODE -eq 0)
 
     $rows = @()
@@ -261,36 +261,36 @@ try {
     $out = Join-Path $t 'README.md'
 
     $global:LASTEXITCODE = 0
-    & $Gen -Tools $t -Check 6>$null
+    & $Gen -Scripts $t -Check 6>$null
     Yes 'no index at all is red' ($LASTEXITCODE -eq 1)
 
-    & $Gen -Tools $t 6>$null
+    & $Gen -Scripts $t 6>$null
     Yes 'writing it is fine' ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $out))
-    & $Gen -Tools $t -Check 6>$null
+    & $Gen -Scripts $t -Check 6>$null
     Yes 'and then it is green' ($LASTEXITCODE -eq 0)
 
     [IO.File]::WriteAllText((Join-Path $t 'Add-Nothing.ps1'),
         "<#`r`n  Add-Nothing.ps1`r`n`r`n  Adds nothing, for the harness.`r`n#>`r`nparam()`r`n", $Utf8)
-    & $Gen -Tools $t -Check 6>$null
+    & $Gen -Scripts $t -Check 6>$null
     Yes 'a script added without running it is red' ($LASTEXITCODE -eq 1)
-    & $Gen -Tools $t 6>$null
-    & $Gen -Tools $t -Check 6>$null
+    & $Gen -Scripts $t 6>$null
+    & $Gen -Scripts $t -Check 6>$null
     $now = [IO.File]::ReadAllText($out, $Utf8)
     Yes 'and running it puts the new script in, with its purpose' (
         $LASTEXITCODE -eq 0 -and $now.Contains('| [Add-Nothing.ps1](Add-Nothing.ps1) | Adds nothing, for the harness. |'))
 
     [IO.File]::WriteAllText($out, ($now -replace 'Adds nothing, for the harness\.', 'Adds something.'), $Utf8)
-    & $Gen -Tools $t -Check 6>$null
+    & $Gen -Scripts $t -Check 6>$null
     Yes 'a row edited by hand is red' ($LASTEXITCODE -eq 1)
 
     # Git turns line endings either way on checkout, and that is not drift.
-    & $Gen -Tools $t 6>$null
+    & $Gen -Scripts $t 6>$null
     [IO.File]::WriteAllText($out, ([IO.File]::ReadAllText($out, $Utf8) -replace "\r\n", "`n"), $Utf8)
-    & $Gen -Tools $t -Check 6>$null
+    & $Gen -Scripts $t -Check 6>$null
     Yes 'the same index with other line endings is still green' ($LASTEXITCODE -eq 0)
 
     [IO.File]::WriteAllText((Join-Path $t 'Do-Something.ps1'), "param()`r`nWrite-Host 'hello'`r`n", $Utf8)
-    & $Gen -Tools $t 6>$null
+    & $Gen -Scripts $t 6>$null
     $now = [IO.File]::ReadAllText($out, $Utf8)
     Yes 'a script with no comment at its top gets a row that says so' (
         $now.Contains('| [Do-Something.ps1](Do-Something.ps1) | Nothing at the top of this script says what it is for. |'))
@@ -302,8 +302,8 @@ try {
     if ($env:SystemRoot -and (Test-Path -LiteralPath $ps51)) {
         $o51 = Join-Path $work 'README-51.md'
         $o7 = Join-Path $work 'README-7.md'
-        & $Gen -Tools $ToolsPath -Out $o7 6>$null
-        & $ps51 -NoProfile -ExecutionPolicy Bypass -File $Gen -Tools $ToolsPath -Out $o51 | Out-Null
+        & $Gen -Scripts $ToolsPath -Out $o7 6>$null
+        & $ps51 -NoProfile -ExecutionPolicy Bypass -File $Gen -Scripts $ToolsPath -Out $o51 | Out-Null
         $same = (Test-Path -LiteralPath $o51) -and (Test-Path -LiteralPath $o7) -and
                 ([IO.File]::ReadAllText($o51, $Utf8) -eq [IO.File]::ReadAllText($o7, $Utf8))
         Yes 'Windows PowerShell 5.1 writes the same index as this PowerShell' $same
