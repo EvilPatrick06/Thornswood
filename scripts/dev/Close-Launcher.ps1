@@ -5,8 +5,8 @@
 
       . (Join-Path $PSScriptRoot 'Close-Launcher.ps1')
 
-  The multiplayer client has carried the same name as the launcher, so everything here
-  matches on the full path. Killing by name takes the game down with it.
+  Get-GameProcesses asks for SkyrimSE and skse64_loader only. A Thornswood
+  process is the launcher, matched by full path in Get-LauncherProcesses.
 
   Stop-Game exists because Skyrim does not always let go. A crash, an Alt-F4,
   or one of the multiplayer client's browser helpers can leave a process behind
@@ -33,23 +33,11 @@ function Get-LauncherProcesses {
 function Get-GameProcesses {
     param([string]$Root)
 
-    $launcher = ''
-    if ($Root) {
-        $launcher = Join-Path $Root 'Launcher\Thornswood.exe'
-    }
+    # SkyrimSE and skse64_loader only. A Thornswood process is the launcher,
+    # not the game. Callers still pass Root; this list does not use it.
     $out = @()
-    foreach ($n in 'SkyrimSE', 'skse64_loader', 'Thornswood') {
+    foreach ($n in 'SkyrimSE', 'skse64_loader') {
         foreach ($p in @(Get-Process -Name $n -ErrorAction SilentlyContinue)) {
-            $path = $null
-            try { $path = $p.MainModule.FileName } catch { }
-            # The launcher shares its name with the multiplayer client. Only the
-            # full path tells them apart, so a path we cannot read is left alone
-            # rather than guessed at.
-            if ($n -eq 'Thornswood') {
-                if (-not $path) { continue }
-                if ($launcher -and ($path -eq $launcher)) { continue }
-                if ($path -like '*\Launcher\Thornswood.exe') { continue }
-            }
             $out += $p
         }
     }
