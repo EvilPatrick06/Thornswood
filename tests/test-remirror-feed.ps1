@@ -14,7 +14,8 @@
     the block that works out which assets the feed needs, run on its own
       between its markers: host assets are collected in feed order, a GitHub
       url is counted and not mirrored, a url for the other channel is named
-      and refused, the same sha named twice is one asset, and an entry with no
+      and refused, a dev run records a /feed/ url instead of warning,
+      the same sha named twice is one asset, and an entry with no
       url is skipped;
     the whole script with -Check, in a child PowerShell, against a scratch feed
       and a scratch asset folder: it says which assets it would send and which
@@ -128,10 +129,66 @@ $prefix = 'feed-dev'
 Invoke-Expression $block
 Yes 'read as the dev channel, the dev pack is the only one it would send' `
     ((@($need.Keys) -join ',') -eq $shaPackTwo)
-# The launcher, the client runtime, both host packs and the optional one: five
-# lines, one for each url, because each one is a line somebody has to read.
-Yes 'and every live url is named as belonging to the other channel' `
-    (@($wrongChannel).Count -eq 5)
+# The launcher, the client runtime, both host packs and the optional one.
+# A dev run does not warn about them here: they are recorded, and NOT MIRRORED
+# is decided later, only when the asset is neither on the site nor in main's store.
+Yes 'a dev run records each /feed/ url instead of calling it the wrong channel' `
+    (@($wrongChannel).Count -eq 0 -and @($mainNamed).Count -eq 5)
+Yes 'and none of those main packs is in the list to send' `
+    (@($need.Keys) -notcontains $shaLauncher -and @($need.Keys) -notcontains $shaClient -and @($need.Keys) -notcontains $shaPackOne)
+
+# --------------------------------------- dev run, main packs (#1271) -----
+# Local folders stand in for the site and for main's store. Nothing here
+# connects to thornswood.net or to either live feed.
+$stand = Join-Path ([IO.Path]::GetTempPath()) ('ts-remirror-main-' + [Guid]::NewGuid().ToString('N'))
+$site = Join-Path $stand 'site'
+$store = Join-Path $stand 'main-store'
+$devFeed = Join-Path $stand 'dev-feed'
+$devAssets = Join-Path $stand 'dev-assets'
+New-Item -ItemType Directory -Path (Join-Path (Join-Path $site 'feed') 'assets') -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $store 'assets') -Force | Out-Null
+New-Item -ItemType Directory -Path $devFeed -Force | Out-Null
+New-Item -ItemType Directory -Path $devAssets -Force | Out-Null
+try {
+    $shaOnSite = 'a' * 64
+    $shaInStore = 'b' * 64
+    $shaMissing = 'c' * 64
+    $shaDev = 'd' * 64
+    [IO.File]::WriteAllBytes((Join-Path (Join-Path (Join-Path $site 'feed') 'assets') $shaOnSite), [byte[]](1, 2, 3))
+    [IO.File]::WriteAllBytes((Join-Path (Join-Path $store 'assets') $shaInStore), [byte[]](4, 5, 6))
+    [IO.File]::WriteAllBytes((Join-Path $devAssets $shaDev), [byte[]](7, 8, 9))
+    $named = [ordered]@{
+        launcherVersion = '9.9.9'
+        launcherUrl     = (FeedUrl $shaOnSite 'feed')
+        launcherSha256  = $shaOnSite
+        packs           = @(
+            [ordered]@{ id = 'present-on-site'; url = (FeedUrl $shaOnSite 'feed'); sha256 = $shaOnSite },
+            [ordered]@{ id = 'present-in-store'; url = (FeedUrl $shaInStore 'feed'); sha256 = $shaInStore },
+            [ordered]@{ id = 'missing-both'; url = (FeedUrl $shaMissing 'feed'); sha256 = $shaMissing },
+            [ordered]@{ id = 'dev-pack'; url = (FeedUrl $shaDev 'feed-dev'); sha256 = $shaDev }
+        )
+    }
+    [IO.File]::WriteAllText((Join-Path $devFeed 'version.json'),
+        ($named | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
+    $shell = if ($PSVersionTable.PSEdition -eq 'Core') { 'pwsh' } else { 'powershell' }
+    $said = & $shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $mirror `
+        -Dev -Check -SiteDir $site -FeedDir $devFeed -AssetDir $devAssets -MainStore $store `
+        -Vps '127.0.0.1' -User 'thornswood-no-such-user' 2>&1
+    $code = $LASTEXITCODE
+    $text = (@($said) -join [Environment]::NewLine)
+    $warnings = @([regex]::Matches($text, 'NOT MIRRORED:'))
+    Yes 'the dev run against the stand-in finishes' ($code -eq 0)
+    Yes 'a main pack the site answers is not a NOT MIRRORED warning' ($text -notmatch 'NOT MIRRORED:.*present-on-site')
+    Yes 'a main pack in main''s store is not a NOT MIRRORED warning' ($text -notmatch 'NOT MIRRORED:.*present-in-store')
+    Yes 'a main pack in neither place is NOT MIRRORED' ($text -match 'NOT MIRRORED: pack missing-both is published under /feed/' -and $text -match 'not on the site and not in main''s store')
+    Yes 'and that is the only NOT MIRRORED line' ($warnings.Count -eq 1)
+    Yes 'those main packs are not uploaded by the dev run' (
+        $text -notmatch ('to send\s+' + $shaOnSite.Substring(0, 12)) -and
+        $text -notmatch ('to send\s+' + $shaInStore.Substring(0, 12)) -and
+        $text -notmatch ('to send\s+' + $shaMissing.Substring(0, 12)))
+    Yes 'the dev pack is still the one it would send' ($text -match ('to send\s+' + $shaDev.Substring(0, 12)))
+}
+finally { Remove-Item -LiteralPath $stand -Recurse -Force -ErrorAction SilentlyContinue }
 
 # ------------------------------------------------- the script, dry run -----
 if (-not (Get-Command ssh -ErrorAction SilentlyContinue)) {

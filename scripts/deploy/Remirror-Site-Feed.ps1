@@ -112,7 +112,12 @@ param(
   [string]$WorkDir,
   # A folder on this machine standing in for the site's feed root (the folder
   # holding feed\ and feed-dev\). Nothing connects to the VPS. For the tests.
-  [string]$SiteDir
+  [string]$SiteDir,
+  # Stand-in for this machine's main feed store. Left out, that store is
+  # %LOCALAPPDATA%\Thornswood\feed\main. Read only, and only so a dev run can
+  # tell a main pack that is already there from one that is really missing.
+  # The tests pass a scratch folder. It is never uploaded.
+  [string]$MainStore
 )
 
 $ErrorActionPreference = 'Stop'
@@ -427,16 +432,22 @@ Say ("  launcher {0}, {1} pack(s), for /{2}/ on the site" -f (Prop $doc 'launche
 # ==== thornswood feed assets wanted ====
 # tests\test-remirror-feed.ps1 runs this block on its own against a scratch
 # version.json. If the markers move, it stops rather than quietly testing
-# nothing. It reads $doc and $prefix and writes $need, $offSite and
-# $wrongChannel, and talks to nothing.
+# nothing. It reads $doc and $prefix and writes $need, $offSite, $wrongChannel and
+# $mainNamed, and talks to nothing.
 #
 # Every asset the feed names that the site is supposed to serve, in feed order,
 # keyed by the sha256 in its own url. A url off the site (an old GitHub one)
 # is counted and left alone: this cannot mirror what it does not name by
 # sha256, and Publish-Update moves such a url once the site holds its bytes.
+# A dev run records a url under /feed/assets/<sha> in $mainNamed instead of
+# $wrongChannel. The dev feed names those packs on purpose. The lines after
+# this block say NOT MIRRORED for one only when it is neither on the site nor
+# in main's store. A main run still records a /feed-dev/ url as the other
+# channel, and still does not upload it.
 $need = [ordered]@{}
 $script:offSite = 0
 $script:wrongChannel = @()
+$script:mainNamed = @()
 function Want([string]$url, [string]$what) {
   $u = ([string]$url).Trim()
   if (-not $u) { return }
@@ -445,6 +456,11 @@ function Want([string]$url, [string]$what) {
   if (-not $m.Success) { return }
   $channel = $m.Groups[1].Value.ToLowerInvariant()
   if ($channel -ne $prefix) {
+    if ($prefix -eq 'feed-dev' -and $channel -eq 'feed') {
+      $sha = $m.Groups[2].Value.ToLowerInvariant()
+      $script:mainNamed += ($sha + ' ' + $what)
+      return
+    }
     $script:wrongChannel += ("{0} is published under /{1}/" -f $what, $channel)
     return
   }
@@ -469,6 +485,45 @@ foreach ($p in (PropList $doc 'optional')) {
 Say ("  {0} asset(s) named on the site, {1} still named somewhere else" -f $need.Count, $script:offSite)
 foreach ($w in $script:wrongChannel) {
   Say "  NOT MIRRORED: $w, and this run is /$prefix/. Run it for that channel." 'Yellow'
+}
+
+# A dev feed names main packs under /feed/assets/<sha> on purpose: a main Ship
+# resets dev to main, and a dev launcher takes those packs from /feed/. They
+# are not uploaded by this run. NOT MIRRORED only when the named file is
+# neither on the site under /feed/assets/ nor in main's store. -SiteDir and
+# -MainStore are the stand-ins; with neither, the site check is one read of
+# the main assets folder and the store is this machine's main feed store.
+if (@($script:mainNamed).Count) {
+  $onSite = @{}
+  $shas = @($script:mainNamed | ForEach-Object { $_.Substring(0, 64) } | Select-Object -Unique)
+  if ($SiteDir) {
+    $mainAssets = Join-Path (Join-Path $SiteDir 'feed') 'assets'
+    foreach ($s in $shas) {
+      if (Test-Path -LiteralPath (Join-Path $mainAssets $s)) { $onSite[$s] = $true }
+    }
+  } else {
+    $quoted = ($shas | ForEach-Object { "'" + $_ + "'" }) -join ','
+    $look = @'
+$dir = '__ROOT__\feed\assets'
+foreach ($s in @(__LIST__)) {
+  if (Test-Path -LiteralPath (Join-Path $dir $s)) { $s }
+}
+'@
+    $look = $look.Replace('__ROOT__', $rootWin).Replace('__LIST__', $quoted)
+    foreach ($l in @(RemoteLines $look)) {
+      $t = ([string]$l).Trim().ToLowerInvariant()
+      if ($t -match '^[a-f0-9]{64}$') { $onSite[$t] = $true }
+    }
+  }
+  $storeRoot = if ($MainStore) { $MainStore } else { Get-FeedStoreDir 'main' }
+  $storeAssets = Join-Path $storeRoot 'assets'
+  foreach ($row in @($script:mainNamed)) {
+    $sha = $row.Substring(0, 64)
+    $what = $row.Substring(65)
+    $inStore = Test-Path -LiteralPath (Join-Path $storeAssets $sha)
+    if ($onSite.ContainsKey($sha) -or $inStore) { continue }
+    Say ("  NOT MIRRORED: {0} is published under /feed/, and this run is /{1}/. It is not on the site and not in main's store." -f $what, $prefix) 'Yellow'
+  }
 }
 
 # ------------------------------------------------------- what is up there --
