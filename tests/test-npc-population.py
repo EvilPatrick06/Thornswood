@@ -266,6 +266,14 @@ class PopulationTests(unittest.TestCase):
         self.classify("bear", "wild", True)
         self.classify("chief", "bandit", True)
 
+    def test_old_thalmor_titles_are_cut_without_a_unique_flag(self):
+        for name in ("Thalmor Justiciar", "Thalmor Soldier", "Thalmor Wizard"):
+            with self.subTest(name=name):
+                self.setUp()
+                self.catalogue.base("thalmor", "EncThalmor", "NordRace", ["BanditFaction"])
+                self.catalogue.tables[b"NPC_"][self.catalogue.bases["thalmor"]]["name"] = name
+                self.classify("thalmor", "wild", False)
+
     def test_unique_named_guild_traders_and_transport_are_preserved(self):
         self.catalogue.tables[b"NPC_"][self.catalogue.bases["vendor"]]["acbs"] = CAST.UNIQUE
         self.make_transport(unique=True)
