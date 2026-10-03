@@ -548,6 +548,22 @@ function Test-LauncherUnchanged($published, [string]$inputs) {
 }
 # ==== end thornswood release launcher ====
 
+function Assert-DevVersionSelection([string]$selected, [string]$current, [bool]$aligned, [string[]]$published) {
+    if ($aligned -and $selected -ne $current) {
+        Die "Main-equivalent source ships $current in both channels. Use a separate branch for a different Dev version."
+    }
+    function Normalized([string]$text) {
+        $v = [version]$text
+        return [version]::new($v.Major, $v.Minor, [Math]::Max(0, $v.Build), [Math]::Max(0, $v.Revision))
+    }
+    $candidate = Normalized $selected
+    foreach ($text in @($published)) {
+        if ($text -and (Normalized $text) -gt $candidate) {
+            Die "Dev cannot downgrade the published version $text to $selected. Bump Main above the published Dev version before shipping both channels."
+        }
+    }
+}
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -781,6 +797,13 @@ $src = Get-Content $updaterCs -Raw
 $m = [regex]::Match($src, 'Version\s*=\s*"([^"]+)"')
 if (-not $m.Success) { Die 'Could not read the version out of app\Updater.cs' }
 $current = $m.Groups[1].Value
+$MainSourceAligned = $false
+if (Test-Path -LiteralPath (Join-Path $RepoDir '.git')) {
+    $releaseSource = Get-ReleaseSource $RepoDir
+    $originMain = Invoke-ReleaseGit $RepoDir @('rev-parse', '--verify', 'refs/remotes/origin/main')
+    $MainSourceAligned = $releaseSource.Uncommitted -eq 0 -and $originMain.Code -eq 0 -and
+        $releaseSource.Commit -eq $originMain.First
+}
 
 # NO NEW LAUNCHER WHEN NOTHING LAUNCHER-SIDE CHANGED, issue #921. Patrick, 28
 # Sep: "it should be signed only when a new installer goes up on the website so
@@ -797,7 +820,8 @@ $LauncherInputs = Get-LauncherInputHash $RepoDir
 if (-not $ModsOnly -and -not $RebuildLauncher -and -not $Version) {
     $feedBranch = if ($Dev) { 'dev' } else { 'main' }
     $pubLauncher = Get-PublishedLauncher $ReleaseDir $feedBranch
-    if (Test-LauncherUnchanged $pubLauncher $LauncherInputs) {
+    if ((Test-LauncherUnchanged $pubLauncher $LauncherInputs) -and
+        (-not $MainSourceAligned -or $pubLauncher.Version -eq $current)) {
         Head 'The launcher'
         Say ("  nothing it is built from changed since $($pubLauncher.Version) went out, so that one stays: " +
              'no rebuild, no signing, only the packs. -RebuildLauncher to build one anyway.') 'Green'
@@ -823,7 +847,8 @@ elseif ($Version) {
     $target = $Version
 }
 elseif ($Dev) {
-    # A dev build is the main version with a fourth number: 1.1.35.1, .2, .3.
+    # Separate Dev work uses the main version with a fourth number.
+    # Clean Main-equivalent source is aligned below after the history check.
     # Read off the dev feed so it climbs from wherever dev is, and starts
     # again at .1 whenever main has moved on. The launcher compares numbers
     # part by part, so 1.1.36 beats every 1.1.35.x and a promoted main release
@@ -932,6 +957,12 @@ elseif ($Dev) {
         Say "  dev has already published $top, so this goes out as $next rather than $target" 'Yellow'
         $target = $next
     }
+    # The same clean source as Main gets the same version in both feeds.
+    # Separate branch builds retain the monotonic fourth number above.
+    # Never downgrade a Dev launcher when promoting: bump Main first.
+    if ($MainSourceAligned) {
+        $target = $current
+    }
 }
 else {
     # A MAIN RELEASE NO LONGER BUMPS THE VERSION, and this is the change that
@@ -952,6 +983,18 @@ else {
     # -NoBump is kept and means the same as it always did, so anything that
     # passed it keeps working; it is simply what every main release does now.
     $target = $current
+}
+
+if ($Dev -and -not $ModsOnly) {
+    # Applies to explicit -Version too; it cannot bypass the history check.
+    $publishedVersions = @()
+    if (-not $Version) { $publishedVersions += @($seen) + @($mainWas) }
+    try { $publishedVersions += @(Get-FeedStoreLaunchers 'dev') } catch { Say '  Dev version history could not be read; checking the current feeds' 'Yellow' }
+    foreach ($ch in 'main', 'dev') {
+        $liveLauncher = Get-PublishedLauncher (Get-FeedStoreDir $ch) $ch
+        if ($liveLauncher -and $liveLauncher.Version) { $publishedVersions += $liveLauncher.Version }
+    }
+    Assert-DevVersionSelection $target $current $MainSourceAligned $publishedVersions
 }
 
 if ($target -ne $current) {

@@ -129,6 +129,8 @@ function Get-ReleaseSource([string]$RepoDir) {
         $o.Commit = $g.First
         $o.Branch = (Invoke-ReleaseGit $RepoDir @('rev-parse', '--abbrev-ref', 'HEAD')).First
         $o.Uncommitted = @((Invoke-ReleaseGit $RepoDir @('status', '--porcelain', '--untracked-files=no')).Lines | Where-Object { $_ }).Count
+        $o.Uncommitted += @((Invoke-ReleaseGit $RepoDir @('ls-files', '--others', '--exclude-standard', '--',
+            'scripts', 'records', 'site', 'game', 'launcher', 'installer')).Lines | Where-Object { $_ }).Count
     } finally { $ErrorActionPreference = $old; $global:LASTEXITCODE = $rcWas }
     return $o
 }

@@ -271,6 +271,8 @@ jobs:
                  'test-site-auth.js',
                  'test-site-headers.js',
                  'test-content-release.ps1',
+                 'test-release-parity.ps1', 'test-dev-version.ps1', 'test-ship-launcher-reuse.ps1',
+                 'test-main-runtime-startup.js',
                  'test-spawn-reply.js',
                  'test-discord-callback-hang.js',
                  'test-member-role-wording.js'

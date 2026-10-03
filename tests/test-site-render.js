@@ -72,6 +72,7 @@ const read = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch (e) { ret
 // ------------------------------------------------------------------ files --
 console.log('THE FILES');
 const home = read(path.join(PUBLIC, 'home.html')) || '';
+const homeScript = read(path.join(PUBLIC, 'home.js')) || '';
 const hub = read(path.join(PUBLIC, 'index.html')) || '';
 const serverText = read(path.join(APP, 'server.js')) || '';
 
@@ -115,7 +116,7 @@ yes('the front page needs no markdown library, because the server renders',
 yes('the hub still has marked, from this site', hub.indexOf('<script src="/' + MARKED + '"></script>') >= 0);
 
 // The two lists of written pages are one list kept in two places.
-const clientPages = (/var PAGES = \{([^}]*)\}/.exec(home) || [])[1] || '';
+const clientPages = (/var PAGES = \{([^}]*)\}/.exec(homeScript) || [])[1] || '';
 const clientList = (clientPages.match(/'\/[a-z-]+'/g) || []).map(function (s) { return s.slice(1, -1); }).sort();
 const serverPages = (/const MD_PAGES = \[([^\]]*)\]/.exec(serverText) || [])[1] || '';
 const serverList = (serverPages.match(/'\/[a-z-]+'/g) || []).map(function (s) { return s.slice(1, -1); }).sort();
@@ -284,9 +285,7 @@ yes('a heading with emphasis is named as plain words',
 // home.html's router, run against a stand-in page. A page the server already
 // filled must not be fetched and drawn a second time over the top of itself.
 function runRouter(pathname, prefilled, answers) {
-  const re = /<script>([\s\S]*?)<\/script>/g;
-  let m, router = '';
-  while ((m = re.exec(home))) { if (m[1].indexOf('var PAGES') >= 0) router = m[1]; }
+  const router = homeScript;
   const els = {};
   const noop = function () { };
   function el(id) {
@@ -345,7 +344,7 @@ function copy(rel) {
   fs.copyFileSync(path.join(APP, rel), to);
 }
 copy('server.js');
-['home.html', 'index.html', MARKED, 'fonts.css'].forEach(function (f) { copy(path.join('public', f)); });
+['home.html', 'home.js', 'index.html', MARKED, 'fonts.css'].forEach(function (f) { copy(path.join('public', f)); });
 faces.forEach(function (u) { copy(path.join('public', u.slice(5, -1))); });
 fs.readdirSync(path.join(APP, 'data', 'site')).forEach(function (f) { copy(path.join('data', 'site', f)); });
 ['help.md', 'known.md'].forEach(function (f) { copy(path.join('data', f)); });
