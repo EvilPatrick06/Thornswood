@@ -26,8 +26,9 @@
        since the first, and a fresh install seeded like the installer seeds it
     3. the real Rollback-Feed.ps1 in a child Windows PowerShell against the
        scratch site (-SiteDir): -List, -DryRun, -Back 1, then -To the first
-       release (refused while a file only the installer ever had is wanted,
-       then done with -FilesFrom), then -To the last one again. After each,
+       release (a file only the installer ever had, restored from its sha256
+       beside the record with no -FilesFrom, #1051; refused when that asset is
+       missing), then -To the last one again. After each,
        every install takes what is pending and its game folder is compared
        file by file, by size and sha256, with the record of the release asked
        for; the client runtime stays with the launcher; launcherVersion,
@@ -172,10 +173,20 @@ function Publish-Scratch([string]$Id, [hashtable]$changes, [string[]]$deletes, [
     $lastPackBefore = Get-FeedLastPackId $doc
     $doc.packs = @(@($doc.packs) + [pscustomobject][ordered]@{ id = $Id; url = (Url $zsha); sha256 = $zsha; notes = "Release $Id" })
     $map = @{}
-    foreach ($k in $script:state.Keys) { $map[$k] = Entry $script:state[$k] }
+    # Every file of the release on the site by its sha256, the way Publish-Update
+    # does since #1050, so a rollback past the first change to an installer-only
+    # file can fetch those bytes without -FilesFrom (#1051).
+    foreach ($k in $script:state.Keys) {
+        $map[$k] = Entry $script:state[$k]
+        $tmp = Join-Path $T ('record-file-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+        [IO.File]::WriteAllText($tmp, [string]$script:state[$k], $ascii)
+        [void](Put-Asset $tmp)
+        Remove-Item -LiteralPath $tmp -Force
+    }
     $map[':profile:plugins.txt'] = (Entry $plugins).Split(':')[1].ToUpperInvariant()
     $map[':order:plugins'] = (Entry ($plugins.ToLowerInvariant())).Split(':')[1]
     $map[':src:app\Shell.cs'] = $src
+    $map[$RecordFilesKey] = '1'
     $mf = Join-Path $T "records\manifest-$Id.json"
     $msha = Write-BaselineFile $map $mf
     [void](Put-Asset $mf)
@@ -410,22 +421,30 @@ Yes 'a fresh install built at the third release takes only the rollback and land
 $vB = $mParse.Invoke($null, @(, [IO.File]::ReadAllBytes((Join-Path $feedDir 'version.json'))))
 Yes 'no launcher is offered: the version did not move' (-not [bool]$mNewer.Invoke($null, @([string]$vB.launcherVersion, '1.1.102.5')))
 
-# All the way back to the first: the installer's own files are in no pack.
+# All the way back to the first: the installer's own files are in no pack, but
+# since #1050 each release put them on the site by sha256 beside the record.
+$installerOnly = @('Data\Platform\UI\b.bsa', 'Data\Platform\Plugins\thornswood-ui.js')
+$held = Join-Path $T 'held-installer-only'
+New-Item -ItemType Directory -Force -Path $held | Out-Null
+foreach ($k in $installerOnly) {
+    $sha = ([string]$records[$R1][$k]).Split(':')[1]
+    $src = Join-Path $feedDir "assets\$sha"
+    if (Test-Path -LiteralPath $src) { Move-Item -LiteralPath $src -Destination (Join-Path $held $sha) -Force }
+}
 $before = Feed-Sha
 $r = Rollback @('-To', $R1, '-Id', '20260904-1100-dev')
-Yes 'going back to a file only the installer ever had is refused, naming it, and nothing is sent' (
+Yes 'going back without the installer-only file on the site is refused, naming it, and nothing is sent' (
     $r.Code -eq 1 -and $r.Out -match [regex]::Escape('Data\Platform\UI\b.bsa') -and $r.Out -match 'FilesFrom' -and (Feed-Sha) -eq $before)
-$from = Join-Path $T 'old-game'
-foreach ($k in 'Data\Platform\UI\b.bsa', 'Data\Platform\Plugins\thornswood-ui.js') {
-    $f = Join-Path $from $k; New-Item -ItemType Directory -Force -Path (Split-Path -Parent $f) | Out-Null
-    [IO.File]::WriteAllText($f, [string]$installer[$k], $ascii)
+# Put the bytes back beside the record. -FilesFrom remains the fallback when
+# they are not there; with them on the site, no -FilesFrom is needed (#1051).
+foreach ($f in @(Get-ChildItem -LiteralPath $held -File)) {
+    Move-Item -LiteralPath $f.FullName -Destination (Join-Path $feedDir ("assets\" + $f.Name)) -Force
 }
-# A wrong copy beside them is not taken.
-[IO.File]::WriteAllText((Join-Path $from 'Data\Platform\UI\a.esp'), 'not what the first release had', $ascii)
 $RA = '20260904-1200-dev'
-$r = Rollback @('-To', $R1, '-Id', $RA, '-FilesFrom', $from); Show $r
+$r = Rollback @('-To', $R1, '-Id', $RA); Show $r
 $d = Read-Feed
-Yes 'with -FilesFrom it goes back to the first release' ($r.Code -eq 0 -and [string]$d.baseline.id -eq $RA -and [string]$d.releases[0].to -eq $R1 -and (Test-Kept $d))
+Yes 'going back to a file only the installer ever had works from its sha256 on the site, with no -FilesFrom' (
+    $r.Code -eq 0 -and [string]$d.baseline.id -eq $RA -and [string]$d.releases[0].to -eq $R1 -and (Test-Kept $d))
 Yes '  the launcher lands on the first release''s files, the installer''s back and the later ones gone' ((Update-Install $A) -eq 1 -and (Test-Lands $A $records[$R1]))
 Yes '  with the first release''s plugin list' ((Plugins-Of $A) -eq "*a.esp`r`n*new1.esp`r`n")
 Yes '  and the client runtime still the launcher''s, not the first release''s' ((Client-Of $A) -eq (Entry 'client 2'))
@@ -447,9 +466,9 @@ $fwd = Read-BaselineFile (Join-Path $feedDir ("assets\" + [string]$d.baseline.sh
 $same = $true
 foreach ($k in @($records[$R3].Keys)) { if ([string]$fwd[$k] -ne [string]$records[$R3][$k]) { $same = $false } }
 foreach ($k in @($fwd.Keys)) { if (-not $k.StartsWith(':gone:') -and -not $k.StartsWith(':golden:') -and $k -ne ':record:files' -and -not $records[$R3].ContainsKey($k)) { $same = $false } }
-Yes '  the record it names is the third release''s, with the launcher''s own source, and what it takes out' (
+Yes '  the record it names is the third release''s, with the launcher''s own source, what it takes out, and :record:files' (
     (Get-BaselineFileSha (Join-Path $feedDir 'published.json')) -eq [string]$d.baseline.sha256 -and $same -and
-    [string]$fwd[':gone:Data\Platform\UI\new1.esp'] -eq 'removed' -and -not $fwd.ContainsKey(':record:files'))
+    [string]$fwd[':gone:Data\Platform\UI\new1.esp'] -eq 'removed' -and [string]$fwd[$RecordFilesKey] -eq '1')
 Yes 'the list names every step, newest first' ((@($d.releases | ForEach-Object { [string]$_.id }) -join ',') -eq "$RF,$RA,$RB,$R3,$R2,$R1")
 $r = Rollback @('-Back', '1', '-DryRun', '-Id', '20260904-1400-dev')
 Yes '-Back 1 from there is the release before it in the list' ($r.Code -eq 0 -and $r.Out -match ("going to " + [regex]::Escape($RA)))
