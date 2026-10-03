@@ -196,22 +196,25 @@ was online (`https://thornswood.net/api/public` said `online: 0`).
 **On Patrick's machine**, from a worktree, into
 `C:\ThornswoodTemps&Worktrees\temp\401\restore`. `Install-ThornswoodServer.ps1`
 refuses to run on a machine with `SkyrimSE.exe` in `C:\Thornswood\Game`, so the
-server program went in by unzipping the payload instead. `TEMP` is pointed at
-the task's temp folder so the decrypted copy never lands in `%TEMP%`.
+server program went in by unzipping the payload instead. On that day `TEMP`
+was pointed at the task's temp folder by hand, because both scripts decrypted
+into `%TEMP%`. They take `-Work` now, and the commands below pass it. Left
+out, `-Work` is still `%TEMP%`. The decrypted zip and the unpacked backup are
+deleted before either script exits, including when it refuses.
 
 ```powershell
-$env:TEMP = 'C:\ThornswoodTemps&Worktrees\temp\401\work'
+$W   = 'C:\ThornswoodTemps&Worktrees\temp\401\work'
 $key = "$env:USERPROFILE\Documents\thornswood-backup-key.txt"
 $bk  = (Get-ChildItem "$env:USERPROFILE\Downloads\Thornswood-Backups\thornswood-*.zip.enc" | Sort-Object Name -Descending | Select-Object -First 1).FullName
 $R   = 'C:\ThornswoodTemps&Worktrees\temp\401\restore'
-.\scripts\vps\Restore-Backup.ps1 -Backup $bk -KeyFile $key -CheckOnly -NoPause
-.\scripts\vps\Restore-Backup.ps1 -Backup $bk -KeyFile $key -To "$R\unpacked" -NoPause
+.\scripts\vps\Restore-Backup.ps1 -Backup $bk -KeyFile $key -CheckOnly -Work $W -NoPause
+.\scripts\vps\Restore-Backup.ps1 -Backup $bk -KeyFile $key -To "$R\unpacked" -Work $W -NoPause
 $payload = 'C:\Users\evilp\Downloads\Thornswood-Repo\out\thornswood-server.zip'
 Expand-Archive -LiteralPath $payload -DestinationPath "$R\server-live"
-.\scripts\vps\Restore-Server.ps1 -Backup $bk -Root "$R\server-live" -KeyFile $key -Expect <a profile id> -NoPause
+.\scripts\vps\Restore-Server.ps1 -Backup $bk -Root "$R\server-live" -KeyFile $key -Expect <a profile id> -Work $W -NoPause
 Expand-Archive -LiteralPath $payload -DestinationPath "$R\server-dev"
-.\scripts\vps\Restore-Server.ps1 -Backup $bk -Root "$R\server-dev" -Which dev -KeyFile $key -Expect <a profile id> -NoPause
-Remove-Item -LiteralPath $R -Recurse -Force
+.\scripts\vps\Restore-Server.ps1 -Backup $bk -Root "$R\server-dev" -Which dev -KeyFile $key -Expect <a profile id> -Work $W -NoPause
+Remove-Item -LiteralPath $R, $W -Recurse -Force
 ```
 
 | Step | Took |
@@ -236,7 +239,7 @@ and then, on the box:
 
 ```powershell
 C:\Thornswood-RestoreTest\scripts\deploy\Install-ThornswoodServer.ps1 -Zip C:\thornswood-server.zip -Root C:\Thornswood-RestoreTest\server -NoTask
-C:\Thornswood-RestoreTest\scripts\vps\Restore-Server.ps1 -Backup C:\Thornswood-Backup\<newest>.zip.enc -Root C:\Thornswood-RestoreTest\server -KeyFile C:\Thornswood-Backup\key.txt -Expect <a profile id> -NoPause
+C:\Thornswood-RestoreTest\scripts\vps\Restore-Server.ps1 -Backup C:\Thornswood-Backup\<newest>.zip.enc -Root C:\Thornswood-RestoreTest\server -KeyFile C:\Thornswood-Backup\key.txt -Expect <a profile id> -Work C:\Thornswood-RestoreTest\work -NoPause
 Remove-Item -LiteralPath C:\Thornswood-RestoreTest -Recurse -Force
 ```
 

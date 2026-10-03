@@ -7,6 +7,7 @@
       .\scripts\vps\Restore-Server.ps1 -Backup <file>.zip.enc -Root C:\Thornswood-Restore-Test
       .\scripts\vps\Restore-Server.ps1 -Backup <file>.zip.enc -Root C:\Thornswood-Server-Dev -Which dev
       .\scripts\vps\Restore-Server.ps1 -Backup <file>.zip.enc -Root <folder> -Expect 1234567
+      .\scripts\vps\Restore-Server.ps1 -Backup <file>.zip.enc -Root <folder> -Work C:\ThornswoodTemps&Worktrees\temp\restore
 
   Restore-Backup.ps1 checks the signature and unpacks; this is the step after
   it that docs\RESTORING.md used to leave to hand copying. It takes the
@@ -56,6 +57,12 @@
   world while it runs and would write straight back over the restore.
 
   Prints RESTORE OK and exits 0 only when every check above passed.
+
+  -Work is the folder the decrypted zip and the unpacked backup sit in while
+  this runs. Left out, that is %TEMP%. Restore-Backup.ps1 is given the same
+  folder, so the zip is not written to %TEMP% either. Both are deleted before
+  this exits, including when the run is refused: the unpacked backup holds
+  the bot token and the site keys.
 #>
 [CmdletBinding()]
 param(
@@ -64,12 +71,17 @@ param(
   [ValidateSet('live', 'dev')][string]$Which = 'live',
   [string]$KeyFile,
   [string]$Expect,
+  # Where the decrypted zip and the unpacked backup sit. Left out, %TEMP%.
+  [string]$Work,
   [switch]$NoPause
 )
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+# $work below is the unpacked backup. PowerShell does not distinguish it from
+# -Work, so copy the folder off under another name before that assignment.
+if ($Work) { $WorkRoot = $Work } else { $WorkRoot = $env:TEMP }
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
@@ -156,8 +168,12 @@ Say '  nothing is running from it' 'Green'
 
 # ---------------------------------------------------------------- unpack ---
 Head 'Opening the backup'
-$work = Join-Path $env:TEMP ('thornswood-restore-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
-$open = @{ Backup = $Backup; To = $work; NoPause = $true }
+if (-not $WorkRoot) { Die 'No folder for the unpacked backup: -Work was not passed and %TEMP% is not set.' }
+try { [void][IO.Directory]::CreateDirectory($WorkRoot) }
+catch { Die ("-Work is not a folder: " + $WorkRoot + " (" + $_.Exception.Message + ")") }
+try {
+$work = Join-Path $WorkRoot ('thornswood-restore-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+$open = @{ Backup = $Backup; To = $work; NoPause = $true; Work = $WorkRoot }
 if ($KeyFile) { $open['KeyFile'] = $KeyFile }
 $global:LASTEXITCODE = 0
 & (Join-Path $Here 'Restore-Backup.ps1') @open
@@ -328,3 +344,9 @@ Say '  Start it with its scheduled task, or: Set-Location <root>; node dist_back
 Say '  and watch thornswood.log until a character connects. docs\RESTORING.md has the rest.' 'DarkGray'
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
 exit 0
+
+} finally {
+  if ($script:work -and (Test-Path -LiteralPath $script:work)) {
+    Remove-Item -LiteralPath $script:work -Recurse -Force -EA SilentlyContinue
+  }
+}
