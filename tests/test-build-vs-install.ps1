@@ -173,6 +173,7 @@ try {
     Copy-Item -LiteralPath (Join-Path $realRepo 'launcher\app\WindowFit.cs') -Destination (Join-Path $fakeRepo 'launcher\app')
     Copy-Item -Path (Join-Path $realRepo 'launcher\lib\webview2\*') -Destination (Join-Path $fakeRepo 'launcher\lib\webview2')
     Copy-Item -LiteralPath (Join-Path $realRepo 'records\client-build.json') -Destination (Join-Path $fakeRepo 'records')
+    Copy-Item -LiteralPath (Join-Path $realRepo 'records\skyrim-files.json') -Destination (Join-Path $fakeRepo 'records')
     Set-Content -LiteralPath (Join-Path $repo 'launcher\app\Program.cs') -Value 'static class Program { [System.STAThread] static void Main() { } }' -Encoding ASCII
     Set-Content -LiteralPath (Join-Path $repo 'installer\setup\Bootstrap.cs') -Value 'static class Setup { [System.STAThread] static void Main() { } }' -Encoding ASCII
     Set-Content -LiteralPath (Join-Path $repo 'scripts\dev\Close-Launcher.ps1') -Value $fakeClose -Encoding ASCII
@@ -334,6 +335,10 @@ try {
         Yes "N2 Build-Launcher.ps1 does not use $m" ($members -notcontains $m)
     }
     Yes 'N3 Build-Launcher.ps1 does not dot-source Close-Launcher.ps1' (@($strings | Where-Object { $_ -eq 'Close-Launcher.ps1' }).Count -eq 0)
+    $closeSrc = Get-Content -LiteralPath (Join-Path $Here 'scripts\dev\Close-Launcher.ps1') -Raw
+    Yes 'G1 Get-GameProcesses asks for SkyrimSE and skse64_loader only' (
+        $closeSrc.Contains("foreach (`$n in 'SkyrimSE', 'skse64_loader')") -and
+        -not $closeSrc.Contains("'skse64_loader', 'Thornswood'"))
     Yes 'N4 Build-Launcher.ps1 has no parameter a caller must pass, so a bare hand build still binds' (
         @($bAst.ParamBlock.Parameters | Where-Object { $_.Attributes | Where-Object { $_.Extent.Text -match 'Mandatory' } }).Count -eq 0)
 
@@ -363,6 +368,7 @@ try {
         Set-Content -LiteralPath (Join-Path $shipTools 'Install-Launcher.ps1') -Value $stubInstall -Encoding ASCII
         # The block asks Where.ps1 for out\, where the setup stub's symbols are.
         Set-Content -LiteralPath (Join-Path $shipTools 'Where.ps1') -Value "param([string]`$What) Join-Path (Split-Path -Parent (Split-Path -Parent `$PSScriptRoot)) 'out'" -Encoding ASCII
+        Copy-Item -LiteralPath (Join-Path $Here 'scripts\release\Get-ScratchDir.ps1') -Destination $shipTools
         $sb = [scriptblock]::Create(
             'param($Root, $Here) ' +
             '$ModsOnly = $false; $Dev = $true; $DryRun = $false; $target = "1.0.0"; $current = "1.0.0"; $updaterCs = ""; ' +
@@ -434,6 +440,7 @@ try {
         Copy-Item -LiteralPath (Join-Path $Here 'scripts\vps\vps.json') -Destination $itVps
         Set-Content -LiteralPath (Join-Path $itRel 'Build-Launcher.ps1') -Value $stubBuild -Encoding ASCII
         Set-Content -LiteralPath (Join-Path $itRel 'Install-Launcher.ps1') -Value $stubInstall -Encoding ASCII
+        Copy-Item -LiteralPath (Join-Path $Here 'scripts\release\Get-ScratchDir.ps1') -Destination $itRel
         $env:TS_TEST_BUILD_EXIT = '0'
         $env:TS_TEST_INSTALL_EXIT = '0'
 
