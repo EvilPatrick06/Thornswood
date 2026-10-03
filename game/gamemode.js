@@ -36822,6 +36822,7 @@ log('gamemode loaded:',
     heldLine: heldLine,
     RETURN_MIN: RETURN_MIN,
     GOLD_SPAN: GOLD_SPAN,
+    GOLD_DESC: GOLD_DESC,
     TOME_CHANCE: TOME_CHANCE,
     EXCL_CHANCE: EXCL_CHANCE,
     GOODS_CHANCE: GOODS_CHANCE,
@@ -50165,6 +50166,7 @@ try {
 
   function createCustomQuests(deps) {
     deps = deps || {};
+    var GOLD_DESC = deps.goldDesc;
     var places = {};
     var people = new Map();
     var rankOf = deps.rankOf || function () { return ''; };
@@ -50330,14 +50332,14 @@ try {
           if (!place.handoffHold || hold !== place.handoffHold) return { ok: false, why: 'hold' };
         }
         if (!deps.takeItem(actor, open.itemDesc, 1)) return { ok: false, why: 'goods' };
-        if (!deps.addItem(actor, deps.goldDesc, row.gold)) {
+        if (!deps.addItem(actor, GOLD_DESC, row.gold)) {
           deps.addItem(actor, open.itemDesc, 1);
           open.drawn = 1;
           return { ok: false, why: 'gold' };
         }
       } else if (row.kind === 'kill') {
         if (open.kills < row.count) return { ok: false, why: 'short' };
-        if (!deps.addItem(actor, deps.goldDesc, row.gold)) return { ok: false, why: 'gold' };
+        if (!deps.addItem(actor, GOLD_DESC, row.gold)) return { ok: false, why: 'gold' };
       } else {
         return { ok: false, why: 'unknown' };
       }
@@ -50419,7 +50421,7 @@ try {
     try {
       globalThis.__thornswoodQuests = createCustomQuests({
         now: function () { return Date.now(); },
-        goldDesc: 'f:Skyrim.esm',
+        goldDesc: globalThis.__thornswoodDungeonLoot && globalThis.__thornswoodDungeonLoot.GOLD_DESC,
         addItem: addItem,
         takeItem: takeItem,
         rankOf: function (actor, key) {
