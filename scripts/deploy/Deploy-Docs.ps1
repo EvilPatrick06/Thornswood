@@ -139,7 +139,10 @@ foreach ($d in @($Docs)) {
 # What goes up is the site artifact (issue #459, Artifact.ps1): server.js,
 # public and data as the commit holds them, in one zip named by commit and
 # hash. Everything below sends from its folder, not from the working tree, and
-# the zip itself goes to the box's store first. The box is told the site runs
+# the zip itself goes to the box's store first, but only after the expanded
+# tree has been checked against the commit (Assert-ThornswoodSourceIntegrity,
+# issue #1335). A file that is not that commit stops the deploy here, and
+# nothing is sent. The box is told the site runs
 # it at the end, once the files are in place and answering (issue #446).
 # -PutBack builds and sends nothing.
 . (Join-Path $Here 'Artifact.ps1')
@@ -148,6 +151,7 @@ if (-not $PutBack) {
 $artifact = New-ThornswoodArtifact -Component site -RepoDir (Join-Path $Here '..\..') -Paths 'site/server.js', 'site/public', 'site/data'
 Write-Host ('Artifact ' + (Format-ThornswoodArtifact $artifact))
 $App = Join-Path $artifact.Folder 'site'
+Assert-ThornswoodSourceIntegrity -Artifact $artifact -RepoDir (Join-Path $Here '..\..')
 Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
 }
 
