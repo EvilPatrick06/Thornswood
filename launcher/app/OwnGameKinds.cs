@@ -41,7 +41,8 @@ namespace Thornswood
     /// (installed-into-game.txt), the copy of that list the Steam copy's clean
     /// up keeps before it empties it (InstalledKept), the game files of the
     /// release the install synced to (Updater.ReleaseFiles), Profile\Payload,
-    /// and the few files the launcher and the game plugins write under names
+    /// what scripts\mods\Build-Generated.ps1 made in the folder (#1247), and
+    /// the few files the launcher and the game plugins write under names
     /// that are Thornswood's. On the machine that ships, the release's files
     /// came from that machine's own folder and the release list is their only
     /// record, so nothing is sorted out while an install synced by an older
@@ -292,10 +293,50 @@ namespace Thornswood
         }
 
         /// <summary>
+        /// What scripts\mods\Build-Generated.ps1 made in this folder on the
+        /// machine that ships (#1247): the behavior files Pandora makes and the
+        /// BodySlide bodies. Patrick, 29 Sep: they are made in Thornswood's
+        /// own folder before a Ship, and the Steam copy stays the person's own.
+        /// One "file &lt;sha256&gt; &lt;path&gt;" line per file, among lines
+        /// that say what they were built from (scripts\mods\Generated.ps1).
+        /// </summary>
+        static string GeneratedFile { get { return Path.Combine(Dir, "generated.txt"); } }
+
+        /// <summary>
+        /// The paths on GeneratedFile, none when it has never run here. Read
+        /// without a catch, as every record of Thornswood's own is (Ours).
+        /// </summary>
+        static List<string> GeneratedFiles()
+        {
+            var l = new List<string>();
+            if (!File.Exists(GeneratedFile)) return l;
+            foreach (string line in File.ReadAllLines(GeneratedFile))
+            {
+                Match m = Regex.Match(line, "^file [0-9a-f]{64} (.+)$");
+                if (m.Success && Tidy(m.Groups[1].Value)) l.Add(m.Groups[1].Value);
+            }
+            return l;
+        }
+
+        /// <summary>
+        /// A folder made anew holds none of what Build-Generated made, only
+        /// Vortex's and Skyrim's own files, so its record goes with the old
+        /// folder (Make). Left, it would keep Vortex's files of those names
+        /// from ever being brought up to date, and the Ship check would stop
+        /// on the files it lists, which is how the machine that ships learns
+        /// to build them again.
+        /// </summary>
+        static void ForgetGenerated()
+        {
+            if (File.Exists(GeneratedFile)) File.Delete(GeneratedFile);
+        }
+
+        /// <summary>
         /// Thornswood's own files by its records: the same ones Owned reads
-        /// (the packs', Keep's and the installer's list), the installer's list
-        /// as the Steam copy's clean up kept it (InstalledKept), and the kept
-        /// list of the release's files (Updater.ReleaseFiles).
+        /// (the packs', Keep's, the installer's list and what Build-Generated
+        /// made), the installer's list as the Steam copy's clean up kept it
+        /// (InstalledKept), and the kept list of the release's files
+        /// (Updater.ReleaseFiles).
         /// </summary>
         static HashSet<string> Ours(HashSet<string> deployed)
         {
@@ -328,6 +369,9 @@ namespace Thornswood
             // on the machine that ships, the only record of the release's own
             // files that were already in the folder.
             foreach (string rel in Updater.ReleaseFiles()) add(rel);
+            // What Build-Generated made here, even where Vortex deploys a file
+            // of the same name: this folder's is Thornswood's (#1247).
+            foreach (string rel in GeneratedFiles()) set.Add(rel);
             return set;
         }
 
