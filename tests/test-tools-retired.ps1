@@ -100,6 +100,11 @@ Yes ("no tracked file names an old $T copy ($read files read)") ($hits.Count -eq
 # handed to Join-Path, (Split-Path -Parent $Here) 'tools', the harnesses' old
 # TOOLS_DIR, path.join(__dirname, '..', 'tools'), and a workflow that lists
 # the folder beside scripts.
+#
+# The folder name is matched as written, lowercase. Skyrim's Creation Kit
+# installs its own Tools\ into the game folder, and the lines that keep those
+# files out of a release (#1152) name it that way. A capital T is that game
+# folder, not this repository.
 $code = @(
     ("'(?:\.\.\\)*" + $T + "\\"),
     ("Join-Path \S+ '" + $T + "'"),
@@ -107,7 +112,16 @@ $code = @(
     ($T.ToUpper() + '_DIR'),
     ("scripts, " + $T + ", tests")
 )
-$codeRx = [regex]('(?i)' + ($code -join '|'))
+$codeRx = [regex]($code -join '|')
+# Proved on strings in this file, which the scan below skips. A real path into
+# this repository still matches. A Creation Kit path does not.
+$intoRepo = "'" + '..\..\' + $T + '\signing.json' + "'"
+$intoGame = "'Tools\Archive\Archive.exe'"
+Yes 'a path into this repository''s tools\ still matches' (
+    $codeRx.IsMatch($intoRepo) -and $codeRx.IsMatch(("'" + $T + '\signing.json' + "'")) -and
+    $codeRx.IsMatch(('Join-Path $Here ''' + $T + '''')))
+Yes 'a Creation Kit path under Tools\ is not a path into this repository' (
+    -not $codeRx.IsMatch($intoGame) -and -not $codeRx.IsMatch('$_ -like ''Tools\*'''))
 $codeSkip = '^(scripts/oneoff/|tests/test-tools-retired\.ps1$)'
 $codeHits = @()
 $codeRead = 0
