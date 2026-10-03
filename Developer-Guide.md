@@ -1,15 +1,94 @@
 # Developer Guide
 
-This is the one guide for working on Thornswood. It covers a first day on Windows, how work moves, how a release goes out, and how a machine is set up to ship one. `CLAUDE.md` adds only what applies to a Claude. Read this before your first change, and again when something here changes.
+This is the one guide for working on Thornswood. It covers a first day on Windows, how work moves, how a release goes out, and how a machine is set up to ship one. `CLAUDE.md` adds only what applies to a Claude. Read the Quick start before your first change. Use the table when you already know the job and need the section.
 
-Repository: https://github.com/EvilPatrick06/Thornswood
-Board: https://github.com/users/EvilPatrick06/projects/1
-Site: https://thornswood.net
-Staff pages: https://thornswood.net/hub
+- Repository: https://github.com/EvilPatrick06/Thornswood
+- Board: https://github.com/users/EvilPatrick06/projects/1
+- Site: https://thornswood.net
+- Staff pages: https://thornswood.net/hub
+
+## Find a section
+
+| You are here to | Go to |
+| --- | --- |
+| Install the tools, clone, and open a pull request | [Quick start](#quick-start) |
+| Learn Visual Studio Code, PowerShell, Git, and GitHub | [The four tools](#the-four-tools) |
+| See which folder a file lives in | [Where the project lives](#where-the-project-lives) |
+| Keep two branches on this PC | [Switch between branches on your PC](#switch-between-branches-on-your-pc) |
+| Ship, post news, or deploy | [What any developer may do](#what-any-developer-may-do) |
+| Run the steps after a merge | [After a pull request is merged](#after-a-pull-request-is-merged) |
+| Check wording before a page or a note | [Words](#words) |
+| Read the branch and merge rules | [How work moves](#how-work-moves) |
+| Follow a dev or main release in full | [How a release goes out](#how-a-release-goes-out) |
+| Prepare a PC that can ship | [Setting up a machine](#setting-up-a-machine) |
+| Sign builds on a second PC | [Shipping from another machine](#shipping-from-another-machine) |
+| See where a secret lives | [Secrets, by name and place, never by value](#secrets-by-name-and-place-never-by-value) |
+| See what each part of Thornswood is | [The pieces](#the-pieces) |
+| Find another document | [Where things are written down](#where-things-are-written-down) |
+
+### Contents
+
+**First day**
+
+- [Quick start](#quick-start)
+- [Install the tools](#install-the-tools)
+- [Install the OpenSSH client](#install-the-openssh-client)
+- [Sign the GitHub CLI into your account](#sign-the-github-cli-into-your-account)
+- [Clone the repository](#clone-the-repository)
+- [The four tools](#the-four-tools)
+- [Visual Studio Code](#visual-studio-code)
+- [PowerShell](#powershell)
+- [Where the project lives](#where-the-project-lives)
+- [Git on your PC](#git-on-your-pc)
+- [GitHub in the browser](#github-in-the-browser)
+- [Reach the VPS](#reach-the-vps)
+- [Your first branch](#your-first-branch)
+- [Switch between branches on your PC](#switch-between-branches-on-your-pc)
+- [Open the pull request from PowerShell](#open-the-pull-request-from-powershell)
+- [When the pull request will not open](#when-the-pull-request-will-not-open)
+- [Merge your own pull request](#merge-your-own-pull-request)
+
+**The jobs**
+
+- [What any developer may do](#what-any-developer-may-do)
+- [After a pull request is merged](#after-a-pull-request-is-merged)
+- [How a release goes out](#how-a-release-goes-out)
+
+**The rules**
+
+- [What this is](#what-this-is)
+- [Words](#words)
+- [Everything we need to do goes on the board](#everything-we-need-to-do-goes-on-the-board)
+- [Settled design, not up for a quiet rewrite](#settled-design-not-up-for-a-quiet-rewrite)
+- [How work moves](#how-work-moves)
+- [How work moves, the long form](#how-work-moves-the-long-form)
+
+**The machine and the system**
+
+- [What Thornswood is](#what-thornswood-is)
+- [The pieces](#the-pieces)
+- [Setting up a machine](#setting-up-a-machine)
+- [Shipping from another machine](#shipping-from-another-machine)
+- [Secrets, by name and place, never by value](#secrets-by-name-and-place-never-by-value)
+- [One Skyrim of its own](#one-skyrim-of-its-own)
+- [Where things are written down](#where-things-are-written-down)
 
 ## Quick start
 
-For a new person on Windows, including a first day with Visual Studio Code, PowerShell, Git, and GitHub. Later sections are the full rules. This section is the path that gets you to a merged pull request on the first day.
+For a new person on Windows, including a first day with Visual Studio Code, PowerShell, Git, and GitHub. Later sections are the full rules. Do these in order:
+
+1. [Install the tools](#install-the-tools)
+2. [Install the OpenSSH client](#install-the-openssh-client)
+3. [Sign the GitHub CLI into your account](#sign-the-github-cli-into-your-account)
+4. [Clone the repository](#clone-the-repository)
+5. [The four tools](#the-four-tools), then [Visual Studio Code](#visual-studio-code), [PowerShell](#powershell), [Where the project lives](#where-the-project-lives), [Git on your PC](#git-on-your-pc), and [GitHub in the browser](#github-in-the-browser)
+6. [Reach the VPS](#reach-the-vps)
+7. [Your first branch](#your-first-branch)
+8. [Switch between branches on your PC](#switch-between-branches-on-your-pc)
+9. [Open the pull request from PowerShell](#open-the-pull-request-from-powershell)
+10. [Merge your own pull request](#merge-your-own-pull-request)
+
+[When the pull request will not open](#when-the-pull-request-will-not-open) is the page for the errors in that sequence.
 
 Use your own GitHub account. Patrick adds that account as a collaborator on the private repository before a clone will work. Say so in Discord and wait for that. Use your own clone. The shared folder `C:\Users\you\Downloads\Thornswood-Repo` on the shipping machine is for the lanes that build from it. Your clone can live at `C:\Dev\Thornswood`, or any empty folder you own.
 
@@ -767,6 +846,10 @@ problem, the approach, what it touches. Agreed in #staff-general by
 the team before code; nobody settles it alone, and a Claude never does.
 ## How work moves
 
+The short form of the rules. The same decisions, with the dates they were made, are in [How work moves, the long form](#how-work-moves-the-long-form).
+
+### Main, hotfixes, and merging
+
 - main is what ships. Any developer may ship main from a machine that can sign, and Ship.ps1 refuses
   a main release that is not on main, is behind or ahead of origin, has
   anything uncommitted, has a file under `scripts` or another folder a release is built from that git does not know, or
@@ -819,6 +902,8 @@ the team before code; nobody settles it alone, and a Claude never does.
   Check which it is rather than assuming, because this paragraph was wrong
   for a day before anybody looked:
   `gh api repos/EvilPatrick06/Thornswood/branches/main/protection`
+### Branch names
+
 - Everybody's work goes on a branch named for whoever did it:
   `git checkout -b <name>/what-it-is` (your name, then a slash, and
   claude/ for a Claude's). Small commits, plain messages. Push the branch and
@@ -832,6 +917,8 @@ the team before code; nobody settles it alone, and a Claude never does.
 - `git pull` before starting anything. If a pull conflicts, resolve it on
   your branch (`git fetch`, `git rebase origin/main`), never on main. If a
   push is rejected, pull, do not force.
+### Dev first, notes, and open branches
+
 - Decided by Patrick on 23 Sep: **everything goes to the dev build first.**
   His words: "start puttin these on the dev build and not the main build
   launcher unless it's a security issue or can make the game untestable,
@@ -888,6 +975,8 @@ the team before code; nobody settles it alone, and a Claude never does.
     decide on: ask them, and put it on the board if they cannot be asked.
     Check whether its work is already in main before deleting it; a
     squashed merge leaves the branch looking unmerged to git.
+### Signing, the build check, and the six shared files
+
 - Code signing is on since 27 Sep (issue #390, closed): the launcher and the
   setup program are signed through Azure Artifact Signing
   (`records\signing\README.md`). `ExpectedSigner` in `launcher\app\Updater.cs`
@@ -919,6 +1008,7 @@ the team before code; nobody settles it alone, and a Claude never does.
   `.\scripts\deploy\Install-Runner.ps1 -Status` says whether GitHub sees it.
 - Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or
   Publish-Update.ps1 without a line in #staff-general first; every machine touches those.
+
 ## After a pull request is merged
 
 Merging on GitHub changes nothing anybody sees. You run the rest from the
@@ -1611,8 +1701,8 @@ it per session and ignores which profile Vortex has on.
 
 ## Where things are written down
 
-- This guide: the rules, the team, and how a release goes out. `CLAUDE.md`: what applies to a
-  Claude on top of them. The To Do board,
+- This guide. The table at the top is the way in. `CLAUDE.md`: what applies to a
+  Claude on top of these rules. The To Do board,
   https://github.com/users/EvilPatrick06/projects/1: all outstanding work.
 - `README.md`: what the repo is and where to start. A customer's install is
   the site's join page, `site\data\site\join.md`; setting up a
