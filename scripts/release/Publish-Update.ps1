@@ -811,9 +811,8 @@ if ($collectionRemovals) {
 # September, so a release of every file we own is a fifth of the cap and an
 # ordinary one is a few MB. The incident is 3.7 times over it.
 #
-# $ChunkCap below is not this and cannot be: it only splits a release into
-# parts GitHub will take, and the refusal of one oversized part further down
-# looks at one zip, never at the total.
+# This looks at the total, before anything is zipped. A release is one pack;
+# nothing later caps that zip or splits it.
 #
 # Kept between these markers so tests\test-release-size.ps1 can run the real
 # thing against the incident's own number.
@@ -907,17 +906,13 @@ if (-not $Id) {
 }
 
 # ------------------------------------------------------------ pack
-# GitHub refuses a release asset over 2 GiB, and a body mod release goes well
-# past that. So the pack is split into chunks that each stay under the limit,
-# and version.json lists each one separately. The launcher already applies
-# whatever packs it has not seen, in order, so nothing on that side had to
-# change: three packs simply look like three updates that arrive together.
+# One zip for the release. It goes to the site as
+# /feed[-dev]/assets/<sha256> by scp. Nothing on that path caps one asset,
+# so a release is not split into parts. version.json still lists the pack,
+# and a release that is only removals or a plugin-list change is one pack
+# with no game files. The release size gate above refuses a send the size
+# of the whole collection before this zips anything.
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-
-# Measured uncompressed. Zipping game data usually lands around 60 percent,
-# but textures and meshes are often already compressed and come out near 100,
-# so the cap is set where even no compression at all stays under the limit.
-$ChunkCap = 1800MB
 
 $chunks = @()
 # The reference plugin list as a pack carries it, kept for the release record.
@@ -926,24 +921,9 @@ if (Test-Path -LiteralPath $goldenDir) { Remove-Item -LiteralPath $goldenDir -Re
 if ($changed.Count -or $removed.Count -or $profileChanged.Count) {
     Head 'Building the pack'
 
-    # Work out the split first, so the number of parts is known before any
-    # zipping starts and the progress means something.
-    $groups = @()
-    $current = @()
-    $currentBytes = [int64]0
-    foreach ($rel in $changed) {
-        $size = [int64](($now[$rel] -split ':')[0])
-        if ($current.Count -and ($currentBytes + $size) -gt $ChunkCap) {
-            $groups += ,$current
-            $current = @()
-            $currentBytes = 0
-        }
-        $current += $rel
-        $currentBytes += $size
-    }
-    if ($current.Count -or -not $groups.Count) { $groups += ,$current }
-
-    if ($groups.Count -gt 1) { Say "  splitting into $($groups.Count) parts, GitHub will not take one over 2 GB" 'Yellow' }
+    # One part, whatever the release contains. The site takes the zip as a
+    # file and has no asset cap this used to split on.
+    $groups = @(,$changed)
 
     for ($g = 0; $g -lt $groups.Count; $g++) {
         $part   = $g + 1
@@ -1031,9 +1011,6 @@ if ($changed.Count -or $removed.Count -or $profileChanged.Count) {
 
         $bytes = (Get-Item $zipPath).Length
         $mb = [math]::Round($bytes / 1MB, 1)
-        if ($bytes -ge 2147483648) {
-            Die "pack-$partId.zip came to $mb MB, which GitHub will refuse. Lower `$ChunkCap in this script and run again."
-        }
         Say "  pack-$partId.zip  -  $mb MB" 'Green'
 
         $chunks += [pscustomobject]@{
