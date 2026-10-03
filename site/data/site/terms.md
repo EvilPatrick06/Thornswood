@@ -3,6 +3,8 @@
 The agreement between you and Thornswood, in the shortest form that is still
 honest.
 
+Last changed: 29 September 2026.
+
 Thornswood is a free fan project run by two people in their own time. Using the
 site, the launcher, the Discord or the server means you accept what is below.
 If you do not, do not use them, and nothing else happens.
