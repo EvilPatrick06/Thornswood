@@ -261,6 +261,7 @@ jobs:
                  'test-dungeon-loot.js', 'test-dungeon-reward-safety.js', 'test-dungeon-reward-storage.js', 'test-one-mint.js',
                  'test-secrets-fail-closed.js',
                  'test-site-auth.js'
+                 'test-page-changed.js'
           $failed = @()
           foreach ($n in $six) {
             $p = Join-Path 'tests' $n
