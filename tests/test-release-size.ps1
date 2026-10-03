@@ -6,16 +6,14 @@
   WHY THIS EXISTS. 17 September: an uninstall test removed Profile from the
   machine that ships, Profile\OwnGame\files.txt went with it, and the next
   release got as far as "29,063 added or changed (11,368.1 MB)" before it was
-  stopped by hand. Nothing in the publisher looked at the total. $ChunkCap
-  (1800 MB) only splits a release into parts GitHub will take, and the
-  refusal of a pack over 2 GB looks at one zip at a time. Entry 197 on the To
+  stopped by hand. Nothing in the publisher looked at the total. Entry 197 on the To
   Do List: "A size gate on the release, a dozen lines, so an 11.3 GB near-miss
   cannot happen again."
 
   This lifts the block between the release size markers out of
   Publish-Update.ps1 and feeds it the incident's own number, the way
   test-publish-resume.ps1 lifts the resume block, then reads where the gate is
-  called from. The rest of that script uploads to GitHub and pushes a feed, so
+  called from. The rest of that script uploads and pushes a feed, so
   it is not run here; test-publish-refusals.ps1 runs it whole against a temp
   install with a small cap.
 
