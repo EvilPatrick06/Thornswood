@@ -164,11 +164,12 @@ let cfg = {
      names are what he maintains and the ids are what Discord hands back. */
   /*
     Patrick, 28 Sep: "we are in alpha so the world is open by application".
-    Anyone can download it; getting in is an application in the Discord, and
-    Playtester is what being accepted means. So Playtester is on the play
-    list and Member is NOT: the application, and the age and rules questions
-    it asks (#428), is the way into the world. Who gives Member, and when, is
-    #986.
+    Anyone can download it; getting in is an application in the Discord.
+    Staff give Member after an application is accepted. Discord has no
+    default-role setting, so joining does not hand Member out. Playtester
+    (access.play) is what opens the game, and Member is not on that list.
+    The application, and the age and rules questions it asks (#428), is the
+    way into the world.
 
     The day the world opens to everybody, "open": true in config.json is the
     one switch (#428). It puts Member on the play list at load (playRoles),
@@ -599,8 +600,9 @@ function findPageVersion(sha) {
 /* The one switch (#428), cfg.open, off unless config.json says true.
 
    playRoles is the play list with Member added when the world is open to
-   everybody. That is the whole of opening the game, as long as everybody in
-   the Discord is given Member (#986); with the switch off the list is left
+   everybody. Staff give Member after an application is accepted. Discord
+   has no default-role setting. Playtester (access.play) is what opens the
+   game while the switch is off. With the switch off the list is left
    exactly as it was.
 
    forMode is how the written pages follow the same switch. A page marks its
