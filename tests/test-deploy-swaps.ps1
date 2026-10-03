@@ -520,7 +520,8 @@ try {
         @{ Name = 'Install-Bot.ps1'; File = 'bot/card.py'; How = 'staged'
            Args = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = (Join-Path $box 'Thornswood-Bot'); Service = 'ThornswoodTestBot'; CodeOnly = $true; NoPause = $true; Wait = 20 } },
         @{ Name = 'Deploy-DevGamemode.ps1'; File = 'game/gamemode.js'; How = 'changed'
-           Args = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = (Join-Path $box 'Thornswood-Server-Dev'); Task = 'Thornswood Test Dev Server'; Dist = (Join-Path $work 'dist'); Wait = 10; Now = $true } },
+           Args = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = (Join-Path $box 'Thornswood-Server-Dev'); Task = 'Thornswood Test Dev Server'; Dist = (Join-Path $work 'dist'); Wait = 10; Now = $true
+                     Note = "The gamemode deploy note test`n- This line is long enough for the shape check to pass." } },
         @{ Name = 'Deploy-Server.ps1'; File = 'game/content/Thornswood-Content.esp'; How = 'new'
            Args = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = (Join-Path $box 'Thornswood-Server'); Task = 'Thornswood Test Live Server'; Dist = (Join-Path $work 'dist'); Wait = 10 } },
         @{ Name = 'release\Publish-Server.ps1'; File = 'game/gamemode.js'; How = 'changed'
@@ -861,8 +862,9 @@ try {
     $gm = Join-Path $repo 'game\gamemode.js'
     $launcher = Join-Path $work 'launcher'
     $null = [IO.Directory]::CreateDirectory($launcher)
+    $devNote = "The dev gamemode deploy test`n- This line is long enough for the shape check to pass."
     $dev = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $devRoot; Task = 'Thornswood Test Dev Server'
-              Dist = (Join-Path $work 'dist'); Wait = 10 }
+              Dist = (Join-Path $work 'dist'); Wait = 10; Note = $devNote }
     function DevUp { return ((UdpOwner $devPort) -gt 0) -and ((Listener ($devPort + 1)) -gt 0) }
     Yes 'Deploy-DevGamemode: the stand-in dev server is up' (WaitFor { DevUp })
 

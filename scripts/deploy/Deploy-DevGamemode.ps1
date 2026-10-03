@@ -47,6 +47,16 @@
                                    the files the last run replaced go back in,
                                    after the same warning, checked the same way
 
+    .\Deploy-DevGamemode.ps1 "The door answers on the first knock"
+                                   - The door no longer needs a second try
+                                   before it opens.
+
+  -Note is required on every deploy except -PutBack. It is the same shape
+  Ship takes: a title, then "- " lines from the side of the person playing.
+  After a successful deploy it posts to the dev updates channel through
+  Publish-Discord.ps1 -Dev -GamemodeDeploy, the same embed style as a dev
+  Ship, with footer "dev server". Issue #594.
+
   STAGED, CHECKED, THEN SWAPPED (issue #446). Nothing is copied over the
   running dev server any more. The new files and an edited copy of the dev
   settings go into $Root\.stage-<stamp> while it runs, the box checks them
@@ -176,7 +186,11 @@ param(
   [int]$Wait = 60,
   # Put the files the last run replaced back in, and send nothing. See the
   # header.
-  [switch]$PutBack
+  [switch]$PutBack,
+  # What goes to the dev updates channel after a successful deploy. The same
+  # shape Ship takes: first line the title, "- " lines the details. Not taken
+  # on -PutBack, which sends nothing and posts nothing.
+  [string]$Note = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -189,6 +203,30 @@ if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 . (Join-Path $Here 'Swap.ps1')
 if ($PutBack -and $LoadOrder) { throw '-PutBack puts the last files back and sends nothing, so it does not take -LoadOrder.' }
+if (-not $PutBack) {
+  if (-not $Note.Trim()) {
+    Write-Host ''
+    Write-Host '  STOP. A dev gamemode deploy needs -Note so the dev updates channel' -ForegroundColor Red
+    Write-Host '  can be told what changed. Nothing was sent.' -ForegroundColor Red
+    Write-Host ''
+    Write-Host '  The shape, written from the side of the person playing:' -ForegroundColor DarkGray
+    Write-Host '      .\scripts\deploy\Deploy-DevGamemode.ps1 "The door answers on the first knock"' -ForegroundColor DarkGray
+    Write-Host '      - The door no longer needs a second try before it opens."' -ForegroundColor DarkGray
+    exit 1
+  }
+  . (Join-Path $Here '..\release\Note-Rules.ps1')
+  $noteProblems = @((Get-NoteShapeProblems $Note) + (Get-NoteProblems $Note))
+  if ($noteProblems.Count) {
+    Write-Host ''
+    Write-Host '  STOP. These notes are for the people who play, and they say things only' -ForegroundColor Red
+    Write-Host '  we would understand. Nothing was sent. Rewrite these:' -ForegroundColor Red
+    foreach ($p in $noteProblems) { Write-Host "    $p" -ForegroundColor Yellow }
+    Write-Host ''
+    Write-Host '  Say what somebody will notice in the game, in plain words.' -ForegroundColor DarkGray
+    exit 1
+  }
+  Write-Host "  $Note" -ForegroundColor DarkGray
+}
 $Gamemode = Join-Path $Here '..\..\game\gamemode.js'
 if (-not (Test-Path -LiteralPath $Gamemode)) { throw "There is no gamemode at $Gamemode" }
 
@@ -913,4 +951,22 @@ if ($PutBack) { Restore-SwapRecord "$User@$Vps" $ssh $Root $swapOut "$Root/data/
 else {
   Save-SwapPreviousRecord "$User@$Vps" $ssh $Root $prevName "$Root/data/thornswood-deploy.json"
   $null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh -Root $Root -Beside "$Root/data/thornswood-deploy.json"
+}
+
+if ($swapped -and -not $PutBack) {
+  $discord = Join-Path $Here '..\ops\Publish-Discord.ps1'
+  if (Test-Path -LiteralPath $discord) {
+    Write-Host ''
+    Write-Host 'Telling the dev updates channel...'
+    try {
+      & $discord -Dev -Note $Note -GamemodeDeploy
+    } catch {
+      Write-Host "  COULD NOT POST TO DISCORD: $_" -ForegroundColor Red
+      exit 1
+    }
+    if ($global:ThornswoodDiscordResult -eq 'failed') { exit 1 }
+  } else {
+    Write-Host '  Publish-Discord.ps1 is missing, the dev updates channel was not told.' -ForegroundColor Yellow
+    exit 1
+  }
 }

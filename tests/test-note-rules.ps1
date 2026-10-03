@@ -34,8 +34,11 @@ function Yes([string]$what, [bool]$cond) {
 
 . (Join-Path $Scripts 'Note-Rules.ps1')
 function Bad([string]$notes) { return @(Get-NoteProblems $notes).Count -gt 0 }
+function BadShape([string]$notes) { return @(Get-NoteShapeProblems $notes).Count -gt 0 }
 
 # ---- the real lines that went out ----------------------------------------------
+Yes 'a title alone is refused by shape' (BadShape "Only a title here")
+Yes 'a note with no detail line is refused by shape' (BadShape "A title with three words`nno dash line")
 Yes 'players is refused' (Bad "What arrived with launcher 1.1.95`n- This is what players actually got from demoting")
 Yes 'a pull request number is refused' (Bad "Place and fire distance work again`n- Place no longer throws walked is not defined (fireWalked / PR #239)")
 Yes 'an issue number run into a sentence is refused' (Bad "Downgrade bar and stop reasons`n- Bar covers whole run; every stop says why.#617 #618")
