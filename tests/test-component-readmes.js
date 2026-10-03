@@ -3,7 +3,7 @@
 //
 // Six folders under tools each say, in a README, what they hold, how to run or
 // change it on a machine, and where it runs. And the setup block in
-// DEVELOPING.md says the dev channel needs the dev build installed and
+// Developer-Guide.md says the dev channel needs the dev build installed and
 // run once.
 //
 // WHY THIS EXISTS. From the To Do List: "Four deployable components have no
@@ -398,13 +398,13 @@ SIX.forEach(function (d) {
       }));
 }
 
-// ------------------------------------------------------ DEVELOPING.md --
+// ------------------------------------------------------ Developer-Guide.md --
 {
-  const sd = read('DEVELOPING.md') || '';
+  const sd = read('Developer-Guide.md') || '';
   const lines = sd.split('\n');
   const hits = [];
   lines.forEach(function (l, i) { if (l.indexOf('Thornswood-DevBuild') >= 0) { hits.push(i); } });
-  yes('DEVELOPING.md names Thornswood-DevBuild in two places or more (' + hits.length + ')',
+  yes('Developer-Guide.md names Thornswood-DevBuild in two places or more (' + hits.length + ')',
       hits.length >= 2);
   yes('one of them is the pieces table row', hits.some(function (i) { return /^\| Dev build \|/.test(lines[i]); }));
 
@@ -452,7 +452,7 @@ SIX.forEach(function (d) {
   yes('Ship.ps1 refuses the dev channel without the dev build, as the paragraph says',
       /No dev build at \$Root\./.test(ship) && /refuses `-Channel dev`/.test(para));
   // If Ship stops falling back to the Steam copy, this fails, and the
-  // sentence in DEVELOPING.md that warns about it is what to change.
+  // sentence in Developer-Guide.md that warns about it is what to change.
   yes('Ship.ps1 still builds the dev release out of the Steam copy when the dev build has no game folder, ' +
       'which the paragraph warns about',
       ship.indexOf("$goArgs['Vortex'] = $true") >= 0 && /Steam\s+copy/.test(para));

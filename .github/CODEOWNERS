@@ -1,8 +1,8 @@
 # The files every machine touches.
 #
-# CONTRIBUTING.md and DEVELOPING.md both say these six need a word in
+# Developer-Guide.md says these six need a word in
 # #staff-general before they are edited, because a change in any of them lands on
-# everybody else's work without warning. Until now that rule was prose in two documents with nothing
+# everybody else's work without warning. Until now that rule was prose with nothing
 # behind it: nothing asked, nothing checked, and it was forgotten as often as
 # it was kept.
 #
@@ -13,9 +13,9 @@
 # WHAT THIS DOES AND DOES NOT DO. GitHub requests a review from the owner named
 # here when a pull request touches the file, and never asks a pull request's
 # own author. So a pull request one of the team opens on Shell.cs asks the
-# others, which is exactly the intent. The team is the table in
-# CONTRIBUTING.md; somebody added there is added here too, and
-# tests\test-branch-rules.js checks the two agree.
+# others, which is exactly the intent. The owners are the handles on the six
+# shared files below. The guide does not keep a separate list of people.
+# tests\test-branch-rules.js checks every other line stays inside that set.
 #
 # It is a request and nothing more. Branch protection on main, since 25
 # September: enforce_admins is off; there is no required check; required
@@ -38,15 +38,15 @@
 #
 #     gh api repos/EvilPatrick06/Thornswood/codeowners/errors
 
-/launcher/app/Shell.cs        @EvilPatrick06 @WiccanDjinn @Ture-Neko
-/launcher/app/Checks.cs       @EvilPatrick06 @WiccanDjinn @Ture-Neko
-/launcher/app/Keep.cs         @EvilPatrick06 @WiccanDjinn @Ture-Neko
-/launcher/app/Hold.cs         @EvilPatrick06 @WiccanDjinn @Ture-Neko
-/launcher/app/Updater.cs      @EvilPatrick06 @WiccanDjinn @Ture-Neko
-/scripts/release/Publish-Update.ps1  @EvilPatrick06 @WiccanDjinn @Ture-Neko
+/launcher/app/Shell.cs        @EvilPatrick06 @WiccanDjinn @Jhinswife
+/launcher/app/Checks.cs       @EvilPatrick06 @WiccanDjinn @Jhinswife
+/launcher/app/Keep.cs         @EvilPatrick06 @WiccanDjinn @Jhinswife
+/launcher/app/Hold.cs         @EvilPatrick06 @WiccanDjinn @Jhinswife
+/launcher/app/Updater.cs      @EvilPatrick06 @WiccanDjinn @Jhinswife
+/scripts/release/Publish-Update.ps1  @EvilPatrick06 @WiccanDjinn @Jhinswife
 
-# Not on CONTRIBUTING.md's list, and here because getting them wrong is the same
+# Not one of the six shared files, and here because getting them wrong is the same
 # shape of accident: they decide what leaves a machine and what a release is.
-/scripts/release/Ship.ps1            @EvilPatrick06 @WiccanDjinn @Ture-Neko
-/scripts/release/Ship-Rules.ps1      @EvilPatrick06 @WiccanDjinn @Ture-Neko
+/scripts/release/Ship.ps1            @EvilPatrick06 @WiccanDjinn @Jhinswife
+/scripts/release/Ship-Rules.ps1      @EvilPatrick06 @WiccanDjinn @Jhinswife
 /.github/                  @EvilPatrick06

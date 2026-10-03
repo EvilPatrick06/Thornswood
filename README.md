@@ -46,13 +46,10 @@ change it.
 
 ## Before changing anything
 
-- [DEVELOPER-GUIDE.md](DEVELOPER-GUIDE.md): how to get the code onto your computer, reach the server, and open a pull request.
-- [CONTRIBUTING.md](CONTRIBUTING.md): the rules for everybody, with AI or
-  without. Who is on the team, the words we use, the settled design, how work
-  moves and what to run after a merge. Read it before your first change.
-- [CLAUDE.md](CLAUDE.md): what applies to a Claude on top of those rules.
-- [DEVELOPING.md](DEVELOPING.md): the long form. What the pieces
-  are, how a release goes out, how a machine is set up.
+- [Developer-Guide.md](Developer-Guide.md): how to get the code onto your
+  computer, open a pull request, ship a dev or main release, deploy the site
+  and the gamemode, and post the news. Read it before your first change.
+- [CLAUDE.md](CLAUDE.md): what applies to a Claude on top of that guide.
 - [docs](docs): the system map, the update feed, the gamemode and a glossary.
   [engine/README.md](engine/README.md): building the SkyMP fork.
 - [docs/archive](docs/archive): dated snapshots kept for history, not current.
