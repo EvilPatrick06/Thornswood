@@ -878,6 +878,9 @@ namespace Thornswood
                 {
                     // Unchanged in Vortex, or Thornswood's own update wrote it.
                     // Recorded against what the source holds now either way.
+                    // L or C is what the disk holds, not the kind an older
+                    // record said (#1255). The kind kept here is only the
+                    // fallback when the file cannot be asked.
                     char kind = had ? r.Kind : 'C';
                     // Rules 5: a generated file this folder still shares with
                     // the Steam copy gets a copy of its own, as it is now.
@@ -892,7 +895,7 @@ namespace Thornswood
                         if (MustCopy(f.Rel, deployed) && Links(dest) > 1)
                         {
                             Separate(dest);
-                            if (Links(dest) <= 1) { kind = 'C'; separated++; }
+                            if (Links(dest) <= 1) separated++;
                         }
                         else if (!MustCopy(f.Rel, deployed) && origin == 'V' && Links(dest) <= 1
                                  && f.Rel.StartsWith("Data\\Platform\\Distribution\\", StringComparison.OrdinalIgnoreCase))
@@ -900,9 +903,10 @@ namespace Thornswood
                             bool nowLink;
                             DropName(dest);
                             Place(f.From, dest, false, out nowLink);
-                            if (nowLink) { kind = 'L'; relinked++; }
-                            else kind = 'C';
+                            if (nowLink) relinked++;
                         }
+                        // Same answer as the old-record loop: link count now.
+                        kind = Links(dest) > 1 ? 'L' : 'C';
                     }
                     catch { /* unreadable right now: left as it was */ }
                     lines.Add(kind + "|" + origin + "|" + f.Size + "|" + f.Ticks + "|" + f.Rel);

@@ -534,6 +534,13 @@ namespace Thornswood
                 OwnGame.CheckShared(OwnGame.Source(s.Cfg), null) == null && Text(Path.Combine(own, Tex)) == "PIN-TEX0");
             Yes("the folder asks to follow Vortex", OwnGame.NeedsRefresh(s.Cfg));
 
+            // A pack replaced the hard link to Vortex's TsOne.esp with this
+            // folder's own copy. Vortex's file is unchanged, so Refresh keeps
+            // it, and the record has to say C (#1255).
+            string packAt = Path.Combine(own, "Data\\TsOne.esp");
+            File.Delete(packAt);
+            Put(packAt, "TS-PACK");
+
             var steamNow = Snap(s.Game);
             string again = null;
             try { again = OwnGame.Refresh(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Refresh said: " + ex.Message); }
@@ -547,6 +554,11 @@ namespace Thornswood
                 !File.Exists(Path.Combine(own, "Data\\PersonsOwn.esp")) && !File.Exists(Path.Combine(own, "Data\\NewBuild.bsa")) && NoneIn(own, Hand));
             string files = File.ReadAllText(Path.Combine(OwnGame.Dir, "files.txt"));
             Yes("the game's own files are still on record after the refresh", files.Contains("|O|") && files.Contains("|" + Master) && files.Contains("|" + Loose));
+            bool packC = false;
+            foreach (string line in files.Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+                if (line.EndsWith("|Data\\TsOne.esp", StringComparison.OrdinalIgnoreCase)) packC = line.StartsWith("C|");
+            Yes("a pack's file over a Vortex name is on record as C after a refresh",
+                packC && Text(packAt) == "TS-PACK" && Id(packAt) != Id(Path.Combine(s.Staging, "ModA\\TsOne.esp")));
             Yes("the check before Play still passes", OwnGame.CheckShared(OwnGame.Source(s.Cfg), null) == null);
         }
 
