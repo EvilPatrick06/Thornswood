@@ -20,10 +20,11 @@
 
   So this starts real copies of server.js and asks them over HTTP.
 
-    With no config.json, what server.js writes for itself is its defaults, and
-    config.example.json has to be exactly that with the cookie secret and the
-    join pass key empty, so
-    the sample cannot drift from what the code reads.
+    With no config.json, what server.js writes for itself is its defaults,
+    except the cookie secret, the join pass key and the member password, which
+    it makes. The password is printed once on that first start and not on the
+    next. config.example.json leaves all three empty, so the sample cannot
+    drift from what the code reads.
 
     With config.example.json as config.json, as the README says, the door check
     the README gives answers 401 with why link, and a ticket signed with the
@@ -132,8 +133,8 @@ const quiet = ['clientId', 'clientSecret', 'botToken', 'guildId', 'invite'].ever
 }) && S.botKey === '' && S.secret === '' && Array.isArray(S.admins) && S.admins.length === 0;
 yes('every Discord setting, the bot key, the cookie secret and the admin ids are empty in the sample', quiet);
 const pw = (/\bpassword: '([^']*)'/.exec(server) || [])[1];
-yes('the member password in it is the one already written in server.js, not another',
-    typeof pw === 'string' && S.password === pw);
+yes('the sample leaves the member password empty, and server.js does not ship a shared one',
+    S.password === '' && pw === '' && server.indexOf("password: 'thornswood'") < 0);
 yes('Deploy-Docs.ps1 never names the sample, so it stays on the machine',
     deploy.length > 0 && deploy.indexOf('config.example') < 0);
 yes('site config template uses .example (same suffix as root config.example.json); .sample is gone',
@@ -317,13 +318,15 @@ function stop(run) {
     setTimeout(ok, 3000);
   });
 }
-function ask(port, method, route, body) {
+function ask(port, method, route, body, extra) {
   return new Promise(function (ok) {
     const t0 = Date.now();
     const data = body === undefined ? null : Buffer.from(body);
     const req = http.request({
       host: '127.0.0.1', port: port, method: method, path: route, agent: false,
-      headers: data ? { 'content-type': 'application/json', 'content-length': data.length } : {}
+      headers: Object.assign({},
+        data ? { 'content-type': 'application/json', 'content-length': data.length } : {},
+        extra || {})
     }, function (res) {
       let buf = '';
       res.setEncoding('utf8');
@@ -393,16 +396,75 @@ function breakPages(src) {
     yes('and a join pass key it made',
         !!wrote && typeof wrote.passKey === 'string' && wrote.passKey.length >= 32);
     if (wrote && sample) {
-      const bare = Object.assign({}, wrote, { secret: '', passKey: '' });
+      const bare = Object.assign({}, wrote, { secret: '', passKey: '', password: '' });
       const off = uniq(Object.keys(bare).concat(Object.keys(sample))).filter(function (k) {
         return canon(bare[k]) !== canon(sample[k]);
       });
-      yes('config.example.json is exactly those defaults with the cookie secret and pass key left empty' +
+      yes('config.example.json is exactly those defaults with the cookie secret, pass key and member password left empty' +
           (off.length ? ', differs in ' + off.join(', ') : ''), off.length === 0);
     } else {
-      yes('config.example.json is exactly those defaults with the cookie secret and pass key left empty', false);
+      yes('config.example.json is exactly those defaults with the cookie secret, pass key and member password left empty', false);
+    }
+    const freshPw = wrote && typeof wrote.password === 'string' ? wrote.password : '';
+    yes('a fresh config gets a random member password, printed once, not a shared one',
+        freshPw.length >= 32 && freshPw !== 'thornswood' &&
+        JSON.stringify(wrote).indexOf('thornswood') < 0 &&
+        a.out.split(freshPw).length - 1 === 1);
+    const loginMax = Number((/\bLOGIN_MAX = (\d+)/.exec(server) || [])[1]);
+    yes('POST /api/login has a small fixed attempt cap', loginMax >= 3 && loginMax <= 20);
+    if (a.up && loginMax && freshPw) {
+      const hdr = { 'x-forwarded-for': '203.0.113.10' };
+      const wrong = [];
+      for (let i = 0; i < loginMax; i++) {
+        wrong.push(await ask(a.port, 'POST', '/api/login',
+          JSON.stringify({ password: 'not-the-password' }), hdr));
+      }
+      yes('wrong passwords from one address are refused, up to the limit (' +
+          wrong.map(function (r) { return r.status; }).join(',') + ')',
+          wrong.length === loginMax && wrong.every(function (r) { return r.status === 401; }));
+      const blocked = await ask(a.port, 'POST', '/api/login',
+        JSON.stringify({ password: 'not-the-password' }), hdr);
+      yes('the next attempt from that address is limited (' + blocked.status + ')',
+          blocked.status === 429 && Number(blocked.headers['retry-after']) > 0);
+      const other = await ask(a.port, 'POST', '/api/login',
+        JSON.stringify({ password: 'not-the-password' }), { 'x-forwarded-for': '203.0.113.11' });
+      yes('a different address is not limited by that (' + other.status + ')', other.status === 401);
+      const page = await ask(a.port, 'GET', '/rules', undefined, hdr);
+      yes('the login limit does not apply to other routes (' + page.status + ')', page.status === 200);
+      const signed = await ask(a.port, 'POST', '/api/login',
+        JSON.stringify({ password: freshPw }), { 'x-forwarded-for': '203.0.113.12' });
+      yes('the generated password signs in from an address under the limit (' + signed.status + ')',
+          signed.status === 200 && !!signed.json && signed.json.ok === true);
     }
     await stop(a);
+    const a2 = await start(dA);
+    runs.push(a2);
+    yes('a second start does not print the member password',
+        a2.up && a2.out.indexOf(freshPw) < 0 && a2.out.indexOf('shown once') < 0);
+    let again = null;
+    try { again = JSON.parse(fs.readFileSync(path.join(dA, 'config.json'), 'utf8')); } catch (e) { again = null; }
+    yes('and keeps the same password on disk', !!again && again.password === freshPw && freshPw.length >= 32);
+    await stop(a2);
+
+    const dLegacy = copy('legacy', false);
+    const legacyPw = 'thornswood';
+    fs.writeFileSync(path.join(dLegacy, 'config.json'), JSON.stringify({
+      password: legacyPw,
+      secret: crypto.randomBytes(32).toString('hex'),
+      passKey: crypto.randomBytes(32).toString('hex'),
+      discord: { clientId: '', clientSecret: '', botToken: '', guildId: '', invite: '' }
+    }, null, 2));
+    const leg = await start(dLegacy);
+    runs.push(leg);
+    let legCfg = null;
+    try { legCfg = JSON.parse(fs.readFileSync(path.join(dLegacy, 'config.json'), 'utf8')); } catch (e) { legCfg = null; }
+    yes('a config that already has a password is left as it is and not printed again',
+        leg.up && !!legCfg && legCfg.password === legacyPw && leg.out.indexOf('shown once') < 0);
+    const legIn = await ask(leg.port, 'POST', '/api/login',
+      JSON.stringify({ password: legacyPw }), { 'x-forwarded-for': '203.0.113.20' });
+    yes('that existing password still signs in (' + legIn.status + ')',
+        legIn.status === 200 && !!legIn.json && legIn.json.ok === true);
+    await stop(leg);
 
     if (!quiet) {
       console.log('SKIP  the copies that read the sample were not started: it is missing, or holds a Discord setting or a secret');
