@@ -279,7 +279,7 @@ the team before code; nobody settles it alone, and a Claude never does.
 - The dev channel (`.\scripts\release\Ship.ps1 -Channel dev "what changed"`) may be
   run from any branch, from any developer's machine, to try work on the dev server.
   Say in #staff-general when you take it, because there is one dev feed and the last
-  dev Ship wins. A main Ship resets it.
+  dev Ship wins. A main Ship leaves the Dev feed and baseline unchanged.
 - Every release note has a title and details, dev included. Patrick, 25 Sep,
   after two dev posts went out as "The scroll glows" and "Dev build: ...":
   they must have details and be as good as the ones before them. The notes

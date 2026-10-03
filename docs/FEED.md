@@ -135,9 +135,8 @@ process write to both folders (#923), so only a publisher over ssh writes them.
   with nothing written), send `version.json`, then the baseline. Repair-Manifest,
   Set-Server, Set-Collection, Publish-Server's news entry and Publish-Pack
   receive, edit and send the feed the same way. Remirror-Site-Feed sends
-  `version.json` through it too. A main Ship's reset of dev receives the dev
-  store, writes main's feed and baseline into it and sends both, so the site's
-  dev feed is reset at once rather than at the next remirror.
+  `version.json` through it too. Main and Dev publish to their own stores.
+  A Main Ship never replaces the Dev feed or baseline.
 - **The dev number.** Ship climbs a dev build's fourth part past every
   version in `feed-dev\launchers.txt`, which every send of the dev feed adds
   to, and past main's feed as the site serves it. Until #907 it read the same
@@ -508,11 +507,10 @@ reader. That is the rest of #1050.
 - **dev** is written by `Ship.ps1 -Channel dev` from any branch on any
   developer's machine; the last dev Ship wins. Its launcher version is main's
   published number plus a fourth part, `.1`, `.2` (`Ship.ps1:487-552`).
-- **After a main Ship** (not a hotfix), Ship receives the dev store, copies the
-  main feed over the dev feed, keeping dev's `serverPort`, `voicePort` and
-  `voiceUrl`, copies the main baseline over the dev one, and sends both back
-  (Ship.ps1, "dev follows main"), so the site's dev feed is reset at once. Dev
-  launchers then take main's launcher and packs.
+- **After a main Ship**, the Dev feed, baseline, release identity and history
+  stay unchanged. Dev advances through its own Ship and keeps its own server
+  and voice addresses. Publish the same source to both channels when both
+  should carry it; their release records remain independent.
 - **Before editing**, every script that edits a feed receives it from the VPS
   store, and each send replaces it there only if it has not changed since
   (`Feed-Store.ps1`, #907). A refused send leaves the release marked NOT
