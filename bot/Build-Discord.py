@@ -912,6 +912,93 @@ async def post(channel, text, found):
     say('wrote', '#' + channel.name)
 
 
+def _flags_differ(guild, flags):
+    """True when the server's system-channel flags are not the ones wanted.
+
+    A flag this discord.py does not know is left out, so the older library
+    is compared on the flags it has.
+    """
+    cur = getattr(guild, 'system_channel_flags', None)
+    if cur is None:
+        return True
+    for name in ('join_notifications', 'join_notification_replies',
+                 'premium_subscriptions', 'guild_reminder_notifications'):
+        if not hasattr(flags, name):
+            continue
+        if getattr(cur, name, None) != getattr(flags, name):
+            return True
+    return False
+
+
+async def apply_welcome_and_afk(guild, found):
+    """Discord's plain join line, and where it moves people who go quiet.
+
+    The plain "Welcome X" line is a server setting, not a post, and it turns
+    #welcome into a list of names. The bot draws a card instead, so this
+    switches the plain one off and leaves boosts and the setup tips alone.
+    The system channel is set only when the server has none yet: it was set
+    by hand to #welcome-travelers, and a re-run must not move it back.
+
+    Discord moves people into AFK itself after five minutes of silence.
+
+    Under -Check this says would change only when the server is not already
+    that way, and it never says set.
+    """
+    try:
+        wel = found.get('WELCOME')
+        flags = discord.SystemChannelFlags(
+            join_notifications=False,
+            join_notification_replies=False,
+            premium_subscriptions=True,
+            guild_reminder_notifications=False)
+        # Only when the server has none yet. It was set by hand to
+        # #welcome-travelers, where the join cards go, and a re-run moving
+        # it back to #welcome would undo that.
+        if wel is not None and guild.system_channel is None:
+            if CHECK:
+                say('would change', 'a server or channel setting')
+            else:
+                await guild.edit(system_channel=wel, system_channel_flags=flags)
+        elif _flags_differ(guild, flags):
+            if CHECK:
+                say('would change', 'a server or channel setting')
+            else:
+                await guild.edit(system_channel_flags=flags)
+        if not CHECK:
+            say('set', "Discord's own join message is off, the bot's card replaces it")
+    except TypeError:
+        # Older discord.py has no join_notification_replies.
+        try:
+            flags = discord.SystemChannelFlags(
+                join_notifications=False,
+                premium_subscriptions=True,
+                guild_reminder_notifications=False)
+            if _flags_differ(guild, flags):
+                if CHECK:
+                    say('would change', 'a server or channel setting')
+                else:
+                    await guild.edit(system_channel_flags=flags)
+                    say('set', "Discord's own join message is off")
+            elif not CHECK:
+                await guild.edit(system_channel_flags=flags)
+                say('set', "Discord's own join message is off")
+        except Exception:
+            say('note', 'could not switch off the plain join message')
+    except Exception:
+        say('note', 'could not switch off the plain join message')
+
+    try:
+        afk = found.get('AFK')
+        if afk is not None and guild.afk_channel != afk:
+            if CHECK:
+                say('would change', 'a server or channel setting')
+            else:
+                await guild.edit(afk_channel=afk, afk_timeout=300)
+                say('set', 'AFK after five minutes goes to ' + afk.name)
+    except Exception:
+        say('note', 'could not set the AFK channel')
+
+
 @client.event
 async def on_ready():
     try:
@@ -1050,61 +1137,7 @@ async def on_ready():
             except discord.Forbidden:
                 failed.append('the news webhook (no permission)')
 
-        # Discord's own "Welcome X. Say hi!" line is a server setting, not
-        # anything a bot posts, and it turns #welcome into a list of names.
-        # The bot draws a proper card in #general instead, so this switches
-        # the plain one off and leaves boosts and the setup tips alone.
-        try:
-            wel = found.get('WELCOME')
-            flags = discord.SystemChannelFlags(
-                join_notifications=False,
-                join_notification_replies=False,
-                premium_subscriptions=True,
-                guild_reminder_notifications=False)
-            # Only when the server has none yet. It was set by hand to
-            # #welcome-travelers, where the join cards go, and a re-run moving
-            # it back to #welcome would undo that.
-            if wel is not None and guild.system_channel is None:
-                if CHECK:
-                    say('would change', 'a server or channel setting')
-                else:
-                    await guild.edit(system_channel=wel, system_channel_flags=flags)
-            else:
-                if CHECK:
-                    say('would change', 'a server or channel setting')
-                else:
-                    await guild.edit(system_channel_flags=flags)
-            if not CHECK:
-                say('set', "Discord's own join message is off, the bot's card replaces it")
-        except TypeError:
-            # Older discord.py has no join_notification_replies.
-            try:
-                flags = discord.SystemChannelFlags(
-                    join_notifications=False,
-                    premium_subscriptions=True,
-                    guild_reminder_notifications=False)
-                if CHECK:
-                    say('would change', 'a server or channel setting')
-                else:
-                    await guild.edit(system_channel_flags=flags)
-                say('set', "Discord's own join message is off")
-            except Exception:
-                say('note', 'could not switch off the plain join message')
-        except Exception:
-            say('note', 'could not switch off the plain join message')
-
-        # Discord moves people into AFK itself after five minutes of silence,
-        # which beats a channel called Away that everybody forgets to join.
-        try:
-            afk = found.get('AFK')
-            if afk is not None and guild.afk_channel != afk:
-                if CHECK:
-                    say('would change', 'a server or channel setting')
-                else:
-                    await guild.edit(afk_channel=afk, afk_timeout=300)
-                say('set', 'AFK after five minutes goes to ' + afk.name)
-        except Exception:
-            say('note', 'could not set the AFK channel')
+        await apply_welcome_and_afk(guild, found)
 
         print('\n  made %d, already there %d' % (len(made), len(kept)))
         if failed:
