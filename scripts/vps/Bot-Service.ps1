@@ -68,14 +68,23 @@ function Get-ThornswoodBotPython() {
 # start and fail on its first import. Install-Bot installs python for all
 # users and pip then installs beside it, but a python put on by hand, or a
 # pip that fell back to a user install, would not be.
-function Test-ThornswoodBotPython([string]$Python) {
+function Test-ThornswoodBotPython([string]$Python, [string]$LibDir) {
   # A native program's standard error is a line to read here, not a stop.
   $ErrorActionPreference = 'Continue'
   $bad = @()
   if (-not $Python -or -not (Test-Path -LiteralPath $Python)) { return @('python was not found on this box') }
   $users = '^[A-Za-z]:\\Users\\'
   if ($Python -match $users) { $bad += ('python is installed for one person, at ' + $Python + ', which the service''s account cannot read. Install it for all users.') }
-  $said = @(& $Python -c 'import discord, PIL, certifi; print(discord.__file__); print(PIL.__file__); print(certifi.where())' 2>&1 | ForEach-Object { "$_".Trim() })
+  $oldPyPath = $env:PYTHONPATH
+  if ($LibDir) { $env:PYTHONPATH = $LibDir }
+  try {
+    $said = @(& $Python -c 'import discord, PIL, certifi; print(discord.__file__); print(PIL.__file__); print(certifi.where())' 2>&1 | ForEach-Object { "$_".Trim() })
+  } finally {
+    if ($LibDir) {
+      if ($null -eq $oldPyPath) { Remove-Item Env:PYTHONPATH -EA SilentlyContinue }
+      else { $env:PYTHONPATH = $oldPyPath }
+    }
+  }
   if ($LASTEXITCODE -ne 0) { return ($bad + @('python cannot import discord, PIL and certifi, so the libraries did not install')) }
   foreach ($l in $said) {
     if ($l -match $users) { $bad += ('a library is installed for one person, at ' + $l + ', which the service''s account cannot read. Install requirements.txt as Administrator, for all users.') }
@@ -404,7 +413,7 @@ function Install-ThornswoodBotService {
   $sid = Get-ThornswoodServiceSid $Name
 
   if (-not $Python) { $Python = Get-ThornswoodBotPython }
-  $bad = @(Test-ThornswoodBotPython $Python)
+  $bad = @(Test-ThornswoodBotPython $Python (Join-Path $Root 'py-libs'))
   if ($bad.Count) {
     return @{ Ok = $false; Lines = @($bad | ForEach-Object { 'CANNOT SWITCH: ' + $_ }) + @('Nothing was stopped or changed.') }
   }

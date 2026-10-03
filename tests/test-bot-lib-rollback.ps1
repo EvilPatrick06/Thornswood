@@ -1,0 +1,172 @@
+<#
+  test-bot-lib-rollback.ps1
+
+  Issue #1076. A full Install-Bot run installs the bot libraries into
+  py-libs beside the code, and the swap puts that folder back with the code.
+  This bumps a library in a scratch folder, the new bot fails to start, and
+  the old version is what runs afterwards.
+
+  Nothing here is the live bot. The scratch folder is under the temp directory.
+  pip installs a local wheel with --target, not into the machine Python.
+#>
+[CmdletBinding()]
+param()
+
+$ErrorActionPreference = 'Stop'
+$script:pass = 0
+$script:fail = 0
+function Yes([string]$what, [bool]$cond) {
+    if ($cond) { $script:pass++; Write-Host "PASS  $what" }
+    else { $script:fail++; Write-Host "FAIL  $what" }
+}
+function Done {
+    Write-Host ''
+    Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
+    if ($script:fail) { exit 1 }
+    exit 0
+}
+
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$repo = (Resolve-Path (Join-Path $Here '..')).Path
+$install = [IO.File]::ReadAllText((Join-Path $repo 'scripts\deploy\Install-Bot.ps1'))
+$swap = [IO.File]::ReadAllText((Join-Path $repo 'scripts\deploy\Swap.ps1'))
+Yes 'Install-Bot installs into py-libs with pip --target, and the smoke export stays out' (
+    $install.Contains('--target ''$rootWin\$stageName\py-libs''') -and
+    $install.Contains('foreach ($f in ''bot.py'', ''card.py'', ''dev-channel.txt'', ''requirements.txt'')') -and
+    -not $install.Contains('''bot/live-smoke-discord-export.json'''))
+Yes 'the swap is told to put py-libs back with the code' ($install.Contains('$Dirs = @(''''py-libs'''')') -and $swap.Contains('$moveRels'))
+
+$py = (Get-Command py -EA SilentlyContinue | Select-Object -First 1).Source
+$ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+if (-not $py -or -not (Test-Path -LiteralPath $ps51)) {
+    Write-Host 'SKIP  needs py and Windows PowerShell 5.1'
+    Done
+}
+
+$work = Join-Path ([IO.Path]::GetTempPath()) ('ts-lib1076-' + [Guid]::NewGuid().ToString('N'))
+$rootBot = Join-Path $work 'bot'
+$stageName = '.stage-test'
+$stage = Join-Path $rootBot $stageName
+Yes 'the scratch folder is not the live bot' ($rootBot -notmatch 'Thornswood-Bot')
+New-Item -ItemType Directory -Force -Path $stage | Out-Null
+
+$maker = Join-Path $work 'make-wheel.py'
+$makerLines = @(
+    'import base64, hashlib, pathlib, sys, zipfile'
+    'ver, dest = sys.argv[1], sys.argv[2]'
+    'init = ("version = ''%s''\n" % ver).encode()'
+    'meta = ("Metadata-Version: 2.1\nName: thornslib\nVersion: %s\n" % ver).encode()'
+    'wheel = b"Wheel-Version: 1.0\nGenerator: thornswood-test\nRoot-Is-Purelib: true\nTag: py3-none-any\n"'
+    'name = "thornslib-%s" % ver'
+    'files = {'
+    '  "thornslib/__init__.py": init,'
+    '  name + ".dist-info/METADATA": meta,'
+    '  name + ".dist-info/WHEEL": wheel,'
+    '}'
+    'rec = []'
+    'for path, data in files.items():'
+    '    digest = base64.urlsafe_b64encode(hashlib.sha256(data).digest()).decode().rstrip("=")'
+    '    rec.append("%s,sha256=%s,%d" % (path, digest, len(data)))'
+    'rec.append(name + ".dist-info/RECORD,,")'
+    'files[name + ".dist-info/RECORD"] = ("\n".join(rec) + "\n").encode()'
+    'pathlib.Path(dest).parent.mkdir(parents=True, exist_ok=True)'
+    'with zipfile.ZipFile(dest, "w") as z:'
+    '    for path, data in files.items():'
+    '        z.writestr(path, data)'
+)
+[IO.File]::WriteAllLines($maker, $makerLines)
+function Wheel([string]$ver, [string]$dest) {
+    & $py -3.9 $maker $ver $dest
+    if ($LASTEXITCODE -ne 0) { throw "could not build wheel $ver" }
+}
+$w1 = Join-Path $work 'thornslib-1.0.0-py3-none-any.whl'
+$w2 = Join-Path $work 'thornslib-2.0.0-py3-none-any.whl'
+Wheel '1.0.0' $w1
+Wheel '2.0.0' $w2
+
+function PipTarget([string]$wheel, [string]$dest, [string]$req) {
+    New-Item -ItemType Directory -Force -Path $dest | Out-Null
+    [IO.File]::WriteAllText($req, ($wheel + "`r`n"))
+    & $py -3.9 -m pip install --quiet --disable-pip-version-check --upgrade --target $dest --no-index -r $req
+    if ($LASTEXITCODE -ne 0) { throw "pip --target failed for $dest" }
+}
+PipTarget $w1 (Join-Path $rootBot 'py-libs') (Join-Path $work 'req-old.txt')
+PipTarget $w2 (Join-Path $stage 'py-libs') (Join-Path $stage 'requirements.txt')
+
+$botLines = @(
+    'import thornslib, sys'
+    'print(''LIB '' + thornslib.version, flush=True)'
+    'if thornslib.version != ''1.0.0'':'
+    '    sys.exit(1)'
+    'print(''watching 1 server'', flush=True)'
+)
+[IO.File]::WriteAllLines((Join-Path $rootBot 'bot.py'), $botLines)
+[IO.File]::WriteAllLines((Join-Path $stage 'bot.py'), $botLines)
+$oldVer = [IO.File]::ReadAllText((Join-Path $rootBot 'py-libs\thornslib\__init__.py'))
+$newVer = [IO.File]::ReadAllText((Join-Path $stage 'py-libs\thornslib\__init__.py'))
+Yes 'the scratch bot was on 1.0.0 and the stage bumped it to 2.0.0' ($oldVer.Contains('1.0.0') -and $newVer.Contains('2.0.0'))
+
+$blockPath = Join-Path $work 'swap-block.ps1'
+$marker = "`$serviceSwapBlock = @'"
+$start = $swap.IndexOf($marker)
+if ($start -lt 0) { throw 'service swap block not found' }
+$start = $swap.IndexOf("`n", $start) + 1
+$end = $swap.IndexOf("`n'@", $start)
+if ($end -lt 0) { throw 'service swap block did not end' }
+$block = $swap.Substring($start, $end - $start)
+[IO.File]::WriteAllText($blockPath, $block)
+
+$child = Join-Path $work 'run-swap.ps1'
+$pyLit = $py.Replace("'", "''")
+$rootLit = $rootBot.Replace("'", "''")
+$blockLit = $blockPath.Replace("'", "''")
+$childLines = @(
+    '$ErrorActionPreference = ''Continue'''
+    '$Root = ''__ROOT__'''
+    '$Stage = ''.stage-test'''
+    '$Prev = ''.prev-test'''
+    '$Wait = 5'
+    '$KeepStage = $false'
+    '$Want = [ordered]@{}'
+    '$Want[''bot.py''] = ''unused'''
+    '$Dirs = @(''py-libs'')'
+    '$Parse = @()'
+    '$script:last = '''''
+    'function StopIt { ''stopped'' }'
+    'function StartIt {'
+    '  $env:PYTHONPATH = Join-Path $Root ''py-libs'''
+    '  $out = Join-Path $Root ''run-out.txt'''
+    '  $err = Join-Path $Root ''run-err.txt'''
+    '  $bot = Join-Path $Root ''bot.py'''
+    '  $p = Start-Process -FilePath ''__PY__'' -ArgumentList @(''-3.9'', $bot) -WorkingDirectory $Root -Wait -PassThru -NoNewWindow -RedirectStandardOutput $out -RedirectStandardError $err'
+    '  $text = '''''
+    '  if (Test-Path -LiteralPath $out) { $text = [IO.File]::ReadAllText($out) }'
+    '  if (Test-Path -LiteralPath $err) { $text += [IO.File]::ReadAllText($err) }'
+    '  $script:last = $text'
+    '  Add-Content -LiteralPath (Join-Path $Root ''runs.txt'') ("--- exit " + $p.ExitCode + "`r`n" + $text)'
+    '}'
+    'function Healthy { return [bool]($script:last -match ''watching 1 server'') }'
+    'function Answer { return $script:last.Trim() }'
+    'function Why { $script:last }'
+    '. ''__BLOCK__'''
+)
+$childText = ($childLines -join "`r`n").Replace('__ROOT__', $rootLit).Replace('__PY__', $pyLit).Replace('__BLOCK__', $blockLit)
+[IO.File]::WriteAllText($child, $childText)
+
+$said = & $ps51 -NoProfile -ExecutionPolicy Bypass -File $child 2>&1 | ForEach-Object { "$_" }
+$saidText = $said -join "`n"
+$runs = ''
+$runsPath = Join-Path $rootBot 'runs.txt'
+if (Test-Path -LiteralPath $runsPath) { $runs = [IO.File]::ReadAllText($runsPath) }
+$parts = @($runs -split '--- exit ' | Where-Object { $_.Trim() })
+Yes 'the bumped library started and did not stay up' ($parts.Count -ge 1 -and $parts[0].Contains('LIB 2.0.0') -and $parts[0] -notmatch 'watching 1 server')
+Yes 'after the rollback the old version is what runs' ($parts.Count -ge 2 -and $parts[1].Contains('LIB 1.0.0') -and $parts[1].Contains('watching 1 server'))
+Yes 'the swap says the previous files are back' ($saidText -match 'SWAP ROLLED BACK' -and $saidText -match 'answering again')
+$now = ''
+$nowPath = Join-Path $rootBot 'py-libs\thornslib\__init__.py'
+if (Test-Path -LiteralPath $nowPath) { $now = [IO.File]::ReadAllText($nowPath) }
+Yes 'py-libs beside the code is the old version again' ($now.Contains("version = '1.0.0'") -and -not $now.Contains('2.0.0'))
+
+Remove-Item -LiteralPath $work -Recurse -Force -EA SilentlyContinue
+Done
