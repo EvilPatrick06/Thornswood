@@ -53,8 +53,7 @@ Pirate Captain|Pirate Mage|Pit Wolf|Poacher|Poisonous Cloaked Spider|Rabbit|Reav
 Reaver Lord|Reaver Outlaw|Reaver Plunderer|Restless Draugr|Riekling|Riekling Hunter|
 Riekling Rider|Sabre Cat|Seeker|Shock Cloaked Spider|Skeever|Skeleton|Slaughterfish|
 Smuggler|Snow Bear|Snow Fox|Snowy Sabre Cat|Soul|Spectral Warhound|Spellsword|
-Spriggan|Spriggan Earth Mother|Spriggan Matron|Storm Thrall|Stray Dog|Thalmor Justiciar|
-Thalmor Soldier|Thalmor Wizard|Thief|Troll|Vaermina Devotee|Vale Deer|Vale Sabre Cat|
+Spriggan|Spriggan Earth Mother|Spriggan Matron|Storm Thrall|Stray Dog|Thief|Troll|Vaermina Devotee|Vale Deer|Vale Sabre Cat|
 Vampire Fledgling|Vampire's Thrall|Volkihar Countess|Volkihar Exile|Werewolf|
 Whispering Spirit|Wisp|Wispmother|Witch|Wolf|Wrathman'''.replace('\n', '').split('|'))
 
@@ -177,6 +176,8 @@ def classify(context, ref, actor):
                       'Authored exterior carriage or ferry stop; city ancestry is not a wall')
     if role == 'guards':
         return decide('cut', False, 'Bethesda town guard; law belongs to people')
+    if context.name_of(base) in {'Thalmor Justiciar', 'Thalmor Soldier', 'Thalmor Wizard'}:
+        return decide('cut', False, 'Old Thalmor actor; remnant patrols are not placed here')
     if race == 'ManakinRace' or not race:
         return decide('cut', False, 'Display actor or unresolved race')
     if context.unique(base) or not generic_name(context, base):
