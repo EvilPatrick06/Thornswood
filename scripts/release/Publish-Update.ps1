@@ -281,6 +281,12 @@ function Get-ReferenceInServerOrder([string]$src) {
     # and cannot see the functions dot-sourced above. It finds $refData by
     # PowerShell's dynamic scoping, through Get-LoadOrderReordered.
     $refData = Join-Path $GameDir 'Data'
+    $missing = @($file.Lines | ForEach-Object { Get-LoadOrderEnabledName $_ } |
+        Where-Object { $_ -and -not [IO.File]::Exists((Join-Path $refData $_)) } | Select-Object -Unique)
+    if ($missing.Count) {
+        Die ("The reference plugin list at $src enables missing files: " + ($missing -join ', ') +
+             '. Deploy the required mods, or switch off excluded plugins, before publishing either channel.')
+    }
     $isLight = { param($n) Test-LoadOrderLight (Join-Path $refData $n) }
     $ordered = Get-LoadOrderReordered $file.Lines $manifest $isLight
     if ($null -eq $ordered) {
@@ -490,8 +496,9 @@ if ($others.Count) { Say ("  {0} of another server's file(s) in Data\Platform le
 # The reference plugin list is part of what ships, so a load order change on its
 # own has to be enough to make a pack. Hashed rather than timestamped, because
 # rewriting the same list is not a change worth sending anyone.
+$shipReferenceDir = Get-ShipLoadOrderDir $Root $ProfileDir
 foreach ($f in 'plugins.txt', 'loadorder.txt') {
-    $src = Join-Path $ProfileDir "Default\$f"
+    $src = Join-Path $shipReferenceDir $f
     if (Test-Path $src) { $now[":profile:$f"] = (Get-FileHash $src -Algorithm SHA256).Hash }
 }
 
@@ -501,22 +508,23 @@ foreach ($f in 'plugins.txt', 'loadorder.txt') {
 # new character" under the release, and it went out on 1.1.95, 1.1.96 and dev
 # 1.1.101.6 in two days, telling testers to throw characters away. A save only
 # minds the plugins that are ON and the order they load in, so this key is that
-# list and nothing else: the starred lines of plugins.txt, in order, trimmed
-# and lower cased. The hash still decides whether a pack ships; this decides
-# whether people are told to start over.
-function Get-ActiveOrderKey([string]$path) {
+# list and nothing else: the installed starred lines, in order, trimmed
+# and lower cased. Absent plugins never loaded, so removing their references
+# cannot break a save. A new key avoids comparing with older keys that counted
+# absent files. The first release establishes that installed-only baseline.
+function Get-ActiveOrderKey([string]$path, [string]$data = '') {
     $on = @(Get-Content -LiteralPath $path -ErrorAction Stop |
             ForEach-Object { $_.Trim() } |
             Where-Object { $_.StartsWith('*') } |
             ForEach-Object { $_.Substring(1).Trim().ToLowerInvariant() } |
-            Where-Object { $_ })
+            Where-Object { $_ -and (-not $data -or [IO.File]::Exists((Join-Path $data $_))) })
     $sha = [Security.Cryptography.SHA256]::Create()
     try { return -join ($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($on -join "`n")) | ForEach-Object { $_.ToString('x2') }) }
     finally { $sha.Dispose() }
 }
-$orderSrc = Join-Path $ProfileDir 'Default\plugins.txt'
+$orderSrc = Join-Path $shipReferenceDir 'plugins.txt'
 if (Test-Path $orderSrc) {
-    try { $now[':order:plugins'] = Get-ActiveOrderKey $orderSrc }
+    try { $now[':order:installedPlugins'] = Get-ActiveOrderKey $orderSrc (Join-Path $GameDir 'Data') }
     catch { Say "  could not read the active plugin order from $orderSrc`: $($_.Exception.Message)" 'Yellow' }
 }
 
@@ -696,7 +704,7 @@ $srcChanged     = @($changed | Where-Object { $_ -like ':src:*' })
 # last release recorded one to compare with: the first Ship after this key
 # arrived has nothing to compare, and saying "start over" then would be the
 # same false alarm this exists to stop. See Get-ActiveOrderKey.
-$orderMoved     = $prev.ContainsKey(':order:plugins') -and $now.ContainsKey(':order:plugins') -and ($prev[':order:plugins'] -ne $now[':order:plugins'])
+$orderMoved     = $prev.ContainsKey(':order:installedPlugins') -and $now.ContainsKey(':order:installedPlugins') -and ($prev[':order:installedPlugins'] -ne $now[':order:installedPlugins'])
 # Every key that starts with ':' is about the release, not a file in the game
 # folder: the plugin list, the launcher's source, and since #1050 what the
 # record says about itself (:record:), the plugin list as shipped (:golden:)
@@ -1891,6 +1899,7 @@ if ($log.Count -gt $Cap) {
     $log  = @($log[0..($Cap - 1)]) + ('... and {0:n0} more file{1}' -f $rest, $(if ($rest -eq 1) { '' } else { 's' }))
 }
 
+$newsSource = Get-ReleaseSource $RepoDir
 $entry = [pscustomobject]@{
     # Month first, with the time on it, the same shape the site shows under
     # its download button. Entries written before this carry a bare date and
@@ -1900,6 +1909,7 @@ $entry = [pscustomobject]@{
     body    = $body
     details = @($details)
     channel = $(if ($Dev) { 'dev' } else { '' })
+    sourceCommit = $(if ($newsSource.Uncommitted -eq 0) { $newsSource.Commit } else { '' })
 }
 # Shipping twice in a row with the same note is a re-publish, not two pieces
 # of news. Only the first one is worth reading.
@@ -1924,6 +1934,35 @@ if ($repeat) {
 }
 
 # ------------------------------------------------------- dev or main
+function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
+    if ($null -eq $mainDoc) { return }
+    $mainRelease = $mainDoc.PSObject.Properties['release']
+    $mainCommit = if ($mainRelease) { Val $mainDoc.release 'commit' } else { '' }
+    $mainClean = $mainRelease -and $mainDoc.release.PSObject.Properties['uncommitted'] -and $mainDoc.release.uncommitted -eq 0
+    function Is-Published([string]$commit) {
+        if (-not $mainClean -or $commit -notmatch '^[0-9a-f]{40}$' -or $mainCommit -notmatch '^[0-9a-f]{40}$') { return $false }
+        $was = $global:LASTEXITCODE
+        try { return ((Invoke-ReleaseGit $sourceRepo @('merge-base', '--is-ancestor', $commit, $mainCommit)).Code -eq 0) }
+        finally { $global:LASTEXITCODE = $was }
+    }
+    # Before sourceCommit existed, the preceding Dev release is the only
+    # recorded source covering its historical notes. Dirty releases provide
+    # no such proof; matching a headline alone is never proof of promotion.
+    $legacyPublished = $false
+    if ($doc.PSObject.Properties['release'] -and $doc.release.PSObject.Properties['uncommitted'] -and $doc.release.uncommitted -eq 0) {
+        $legacyPublished = Is-Published (Val $doc.release 'commit')
+    }
+    $marked = 0
+    foreach ($n in @($news)) {
+        $commit = Val $n 'sourceCommit'
+        $published = if ($n.PSObject.Properties['sourceCommit']) { Is-Published $commit } else { $legacyPublished }
+        $want = if ($published) { '' } else { 'dev' }
+        Set-Prop $n 'channel' $want
+        if ($want -eq 'dev') { $marked++ }
+    }
+    Set-Prop $doc 'news' $news
+    return $marked
+}
 # Which of these notes the dev build has and main does not.
 #
 # The dev feed is a copy of main's, so it carries main's whole news list
@@ -1932,15 +1971,11 @@ if ($repeat) {
 # difference between the dev build and the build everybody plays, which is
 # the list of what wants testing before the two are made the same.
 #
-# Worked out by asking main's feed what it has rather than by remembering
-# what was marked last time, so it corrects itself. A note that was dev only
-# and has since gone out on main loses its mark on the next dev release, and
-# nobody edits any JSON by hand. It also fixes the notes already in the feed
-# the first time this runs, which is the only way the ones published before
-# today ever get marked.
+# Main's fresh release record proves which source commits have shipped.
+# Historical notes use the preceding clean Dev release as their source.
+# Headline changes therefore cannot leave completed work marked Dev-only.
 if ($Dev) {
     $mainVer = ''
-    $mainTitles = @{}
     # Main's feed as the site serves it, read fresh on every dev publish, so
     # mainVersion and the news marks are what main has published, not whatever
     # this machine last saw. A stale copy is how the Dev News tab kept showing
@@ -1951,35 +1986,16 @@ if ($Dev) {
     try { $mainDoc = Read-SiteFeed 'main' -SiteDir $SiteDir -SiteUrl $SiteUrl }
     catch {
         Say "  could not read main's feed, so the dev marks were left alone: $($_.Exception.Message)" 'Yellow'
-        $mainTitles = $null
     }
-    if (($null -ne $mainTitles) -and ($null -ne $mainDoc)) {
+    if ($null -ne $mainDoc) {
         $mainVer = Val $mainDoc 'launcherVersion'
-        if ($mainDoc.PSObject.Properties['news'] -and $mainDoc.news) {
-            foreach ($m in @($mainDoc.news)) {
-                $k = (Val $m 'title').Trim()
-                if ($k) { $mainTitles[$k] = $true }
-            }
-        }
-    } elseif ($null -ne $mainTitles) {
-        Say '  the site has no main feed, so the dev marks were left alone' 'Yellow'
-        $mainTitles = $null
-    }
-
-    if ($null -ne $mainTitles) {
-        $marked = 0
-        foreach ($n in @($news)) {
-            $k = (Val $n 'title').Trim()
-            $want = if ($k -and $mainTitles.ContainsKey($k)) { '' } else { 'dev' }
-            Set-Prop $n 'channel' $want
-            if ($want -eq 'dev') { $marked++ }
-        }
-        Set-Prop $doc 'news' $news
+        $marked = Update-DevNewsChannels $doc $news $mainDoc $RepoDir
         Say ("  {0} note{1} marked dev, the ones main has not had" -f $marked, $(if ($marked -eq 1) { '' } else { 's' })) 'DarkGray'
+        Set-Prop $doc 'mainVersion' $mainVer
+        if ($mainVer) { Say "  main is on $mainVer, this one is on $launcherVersion" 'DarkGray' }
+    } else {
+        Say '  the site has no main feed, so the dev marks were left alone' 'Yellow'
     }
-
-    Set-Prop $doc 'mainVersion' $mainVer
-    if ($mainVer) { Say "  main is on $mainVer, this one is on $launcherVersion" 'DarkGray' }
 } else {
     # A main release is the build everybody plays, so nothing in its feed is
     # dev only and nothing in it needs to know what main is on. Cleared
