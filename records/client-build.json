@@ -1,14 +1,14 @@
 {
-  "recordedUtc": "2026-10-03T18:36:04Z",
-  "builtUtc": "2026-10-03T18:36:02Z",
+  "recordedUtc": "2026-10-03T23:28:16Z",
+  "builtUtc": "2026-10-03T23:24:36Z",
   "fork": "https://github.com/EvilPatrick06/skymp",
   "forkBranch": "thornswood/engine-changes",
-  "forkCommit": "8ec73ca8",
+  "forkCommit": "ae054a7a",
   "upstreamBase": "f926944b",
   "thornswoodPatchBlocks": 18,
   "files": {
     "Data\\SKSE\\Plugins\\MpClientPlugin.dll": {
-      "sha256": "eb90185246f7d10905fdf409f6c13f7b7f2869b833d1cf45ae34831c7502b6de",
+      "sha256": "0e317e2544382e8577f03439e7a3de980aebf052ac4140cd0f283d79b7c56358",
       "bytes": 1479680
     },
     "Data\\SKSE\\Plugins\\SkyrimPlatform.dll": {
