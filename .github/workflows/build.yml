@@ -209,6 +209,9 @@ jobs:
           # Issue #454 added the seventh: the new-box runbook read against the
           # scripts it names, about twenty seconds, so a renamed script or
           # parameter fails here rather than on the day the box is gone.
+          # Issue #1085 added one: Remote.ps1's header examples against its
+          # param block, so a switch the script does not have fails here
+          # instead of when someone copies the line. It only reads the file.
           # Issue #1088 added three more, which ran only in the nightly, so a
           # pull request that wrote the VPS address into a script again or
           # broke a deploy artifact was green here and merged before anything
@@ -253,7 +256,7 @@ jobs:
                  'test-docs-index.js',
                  'test-hand-install-retired.ps1',
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
-                 'test-new-box-runbook.ps1',
+                 'test-new-box-runbook.ps1', 'test-remote-header.ps1',
                  'test-vps-defaults.ps1', 'test-deploy-artifact.ps1', 'test-deploy-records.js',
                  'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-own-folder-again.ps1', 'test-npc-runtime.js',
                  'test-npc-shared-runtime.js', 'test-npc-population-runtime.js',
