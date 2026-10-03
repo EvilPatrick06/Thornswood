@@ -25,6 +25,26 @@ function bookHoldOf(hold) {
   return BOOK_HOLD[hold] || null;
 }
 
+function loadGuildSites() {
+  var fs = require('fs');
+  var path = require('path');
+  var file = path.join(__dirname, 'data', 'guild-sites.json');
+  var doc = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
+  if (!doc || !Array.isArray(doc.sites) || doc.sites.length !== 10) {
+    throw new Error('Each hold needs one guild site.');
+  }
+  return doc.sites;
+}
+
+var GUILD_SITES = loadGuildSites();
+
+function guildSite(bookHold) {
+  for (var i = 0; i < GUILD_SITES.length; i++) {
+    if (GUILD_SITES[i].bookHold === bookHold) return GUILD_SITES[i];
+  }
+  return null;
+}
+
 function createNativeMerchantTransfer(api) {
   function ready() {
     return !!api &&
@@ -284,6 +304,13 @@ function createMerchantTrading(deps) {
     if (verb === 'scene') {
       return fail('Scene quests are not paid from a trader\'s purse.');
     }
+    if (verb === 'e') {
+      var pressed = parseInt(String(parts[2] || ''), 16);
+      if (!pressed || (typeof deps.isTrader === 'function' && !deps.isTrader(pressed))) {
+        return { text: '', view: null };
+      }
+      return command({ actorId: actorId, profileId: profileId, parts: ['/merchant', pressed.toString(16)] });
+    }
     if (verb === 'close') {
       sessions.delete(profileId);
       return { text: 'You step back from the trader.', view: { open: false } };
@@ -309,12 +336,14 @@ function createMerchantTrading(deps) {
       if (!place || !place.bookHold) {
         return fail('This trader has no hold price list.', { open: false });
       }
+      var prior = sessions.get(profileId);
+      var repeat = prior && prior.merchantId === merchantId && (now() - prior.at) < 3000;
       sessions.set(profileId, { merchantId: merchantId, at: now() });
       var opened = viewFor(merchantId, state, place);
       return {
-        text: opened.transfer
+        text: repeat ? '' : (opened.transfer
           ? ('Trading with ' + opened.trader + ' in ' + opened.place + '. Purse ' + opened.purse + '.')
-          : ('The list for ' + opened.trader + ' is open. ' + opened.note),
+          : ('The list for ' + opened.trader + ' is open. ' + opened.note)),
         view: opened
       };
     }
@@ -435,8 +464,20 @@ function createMerchantTrading(deps) {
     return fail((moved && moved.reason) || 'The transfer is waiting on the save.', viewFor(merchantId, purses.prepare(merchantId), place));
   }
 
+  function activate(actorId, merchantId) {
+    if (typeof deps.isTrader === 'function' && !deps.isTrader(merchantId)) return null;
+    var human = world.actor(actorId);
+    var profileId = human && Number(human.profileId) || 0;
+    return command({
+      actorId: actorId,
+      profileId: profileId,
+      parts: ['/merchant', (Number(merchantId) >>> 0).toString(16)]
+    });
+  }
+
   return {
     command: command,
+    activate: activate,
     recover: recover,
     nativeReady: function () { return !!(transfer && transfer.available && transfer.available()); },
     REACH: REACH,
@@ -454,6 +495,15 @@ function installMerchantTrading(env) {
   var root = typeof __dirname === 'string' ? __dirname : path.dirname(__filename);
   var file = path.join(root, 'data', 'merchant-traders.json');
   var doc = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
+  var traderIds = new Set();
+  if (doc.byRef) {
+    Object.keys(doc.byRef).forEach(function (ref) {
+      try {
+        var found = mp.getIdFromDesc(ref);
+        if (found) traderIds.add(Number(found) >>> 0);
+      } catch (e) {}
+    });
+  }
   var trading = createMerchantTrading({
     purses: env.purses,
     prices: {
@@ -508,7 +558,8 @@ function installMerchantTrading(env) {
       var fn = g.__thornswoodResolveItem;
       if (typeof fn !== 'function') return null;
       return fn(name);
-    }
+    },
+    isTrader: function (id) { return traderIds.has(Number(id) >>> 0); }
   });
   var property = 'thornswoodMerchantView';
   var script = [
@@ -540,16 +591,7 @@ function installMerchantTrading(env) {
     payload.at = Date.now();
     try { mp.set(actorId, property, payload); } catch (e) { log('merchant panel: ' + e); }
   };
-  var ids = [];
-  if (doc.byRef) {
-    Object.keys(doc.byRef).forEach(function (ref) {
-      try {
-        var id = mp.getIdFromDesc(ref);
-        if (id) ids.push(id);
-      } catch (e) {}
-    });
-  }
-  try { trading.recover(ids); } catch (e) { log('merchant recover: ' + e); }
+  try { trading.recover(Array.from(traderIds)); } catch (e) { log('merchant recover: ' + e); }
   return trading;
 }
 
@@ -558,6 +600,8 @@ module.exports = {
   createNativeMerchantTransfer: createNativeMerchantTransfer,
   installMerchantTrading: installMerchantTrading,
   bookHoldOf: bookHoldOf,
+  guildSite: guildSite,
+  GUILD_SITES: GUILD_SITES,
   BOOK_HOLD: BOOK_HOLD,
   GOLD_BASE: GOLD_BASE,
   REACH: REACH,
