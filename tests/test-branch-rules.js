@@ -9,7 +9,7 @@
 // 22 September, and each time the documents were a step behind. Read off GitHub
 // on 23 September: enforce_admins on, one required check "Launcher builds",
 // required approving reviews 0, code owner review off. CLAUDE.md was corrected
-// in #196. DEVELOPING.md still said a main Ship commits and pushes the
+// in #196. Developer-Guide.md still said a main Ship commits and pushes the
 // source when the release is out, and that the other person reads every pull
 // request. .github/CODEOWNERS still said Patrick's own work goes straight to
 // main and never becomes a pull request. CLAUDE.md itself still said a main
@@ -171,14 +171,7 @@ yes('Bump-Version.ps1 pushes nothing itself; it prints the push for a person to 
 
 // ------------------------------------------------------------ CODEOWNERS
 const coRaw = read('.github/CODEOWNERS');
-const claudeRaw = read('CONTRIBUTING.md');
-// The team, from the table in CONTRIBUTING.md: the GitHub column, as handles.
-const TEAM = [];
-((claudeRaw || '').split(/\r?\n/)).forEach(function (l) {
-  const m = /^\|\s*[^|]+\|\s*([A-Za-z0-9-]+)\s*\|/.exec(l);
-  if (m && m[1] !== 'GitHub' && !/^-+$/.test(m[1])) TEAM.push('@' + m[1]);
-});
-yes('CONTRIBUTING.md has a team table with GitHub handles (' + TEAM.join(' ') + ')', TEAM.length >= 3);
+const claudeRaw = read('Developer-Guide.md');
 const rules = coRaw.split(/\r?\n/).filter(function (l) { return l.trim() && !/^\s*#/.test(l); })
   .map(function (l) { const p = l.trim().split(/\s+/); return { path: p[0], owners: p.slice(1) }; });
 yes('CODEOWNERS has rules to read (' + rules.length + ')', rules.length >= 6);
@@ -187,17 +180,28 @@ const missing = rules.filter(function (r) {
 });
 missing.forEach(function (r) { console.log('      no such path: ' + r.path); });
 yes('every path CODEOWNERS names exists, since GitHub ignores a wrong one in silence', missing.length === 0);
+// The guide no longer lists people. The owners on the six shared files are the
+// set every other CODEOWNERS line has to stay inside.
+const sharedRuleNames = ['Shell.cs', 'Checks.cs', 'Keep.cs', 'Hold.cs', 'Updater.cs', 'Publish-Update.ps1'];
+const sharedRules = rules.filter(function (r) { return sharedRuleNames.indexOf(path.posix.basename(r.path)) >= 0; });
+const TEAM = sharedRules.length ? sharedRules[0].owners.filter(function (o) {
+  return sharedRules.every(function (r) { return r.owners.indexOf(o) >= 0; });
+}) : [];
+yes('the six shared files name one shared set of owners (' + TEAM.join(' ') + ')',
+    sharedRules.length === 6 && TEAM.length >= 1 && sharedRules.every(function (r) {
+      return r.owners.length === TEAM.length && TEAM.every(function (o) { return r.owners.indexOf(o) >= 0; });
+    }));
 const badOwner = [];
 rules.forEach(function (r) {
   if (!r.owners.length) badOwner.push(r.path + ' has no owner');
   r.owners.forEach(function (o) { if (TEAM.indexOf(o) < 0) badOwner.push(r.path + ' ' + o); });
 });
 badOwner.forEach(function (b) { console.log('      ' + b); });
-yes('every owner is somebody in CONTRIBUTING.md\'s team table, by GitHub handle', badOwner.length === 0);
+yes('every CODEOWNERS owner is one of the owners on the six shared files', badOwner.length === 0);
 
 const shared = /Do not edit ([\s\S]*?) without a line in #staff-general/.exec(claudeRaw);
 const sharedNames = shared ? shared[1].replace(/\s+/g, ' ').split(/,\s*|\s+or\s+/).map(function (s) { return s.trim(); }).filter(Boolean) : [];
-yes('CONTRIBUTING.md lists the six shared files (' + sharedNames.join(', ') + ')', sharedNames.length === 6);
+yes('Developer-Guide.md lists the six shared files (' + sharedNames.join(', ') + ')', sharedNames.length === 6);
 const uncovered = sharedNames.filter(function (n) {
   return !rules.some(function (r) { return path.posix.basename(r.path) === n && TEAM.every(function (o) { return r.owners.indexOf(o) >= 0; }); });
 });
@@ -206,8 +210,7 @@ yes('each of the six shared files has a CODEOWNERS line naming the whole team ('
 
 // ------------------------------------------------------------ the documents
 const docs = [
-  { name: 'CONTRIBUTING.md', text: flat(claudeRaw, false) },
-  { name: 'DEVELOPING.md', text: flat(read('DEVELOPING.md'), false) },
+  { name: 'Developer-Guide.md', text: flat(claudeRaw, false) },
   { name: '.github/CODEOWNERS', text: flat(coRaw, true) }
 ];
 const PROTECTION = 'gh api repos/EvilPatrick06/Thornswood/branches/main/protection';
@@ -229,16 +232,16 @@ docs.forEach(function (d) {
   yes(d.name + ' does not say a pull request merges itself', !/merges itself/i.test(t));
 });
 
-const sd = docs[1].text;
-yes('DEVELOPING.md does not say Ship bumps the version; Bump-Version.ps1 does, as its own commit',
+const sd = docs[0].text;
+yes('Developer-Guide.md does not say Ship bumps the version; Bump-Version.ps1 does, as its own commit',
     !/Ship bumps/i.test(sd) && /Bump-Version\.ps1/.test(sd));
-yes('DEVELOPING.md does not say Ship patches the client; it checks it with Sync-Client.ps1 -Check',
+yes('Developer-Guide.md does not say Ship patches the client; it checks it with Sync-Client.ps1 -Check',
     !/patches the client/i.test(sd) && /Sync-Client\.ps1 -Check/.test(sd));
-yes('DEVELOPING.md does not say the other person reads every pull request, which nothing enforces',
+yes('Developer-Guide.md does not say the other person reads every pull request, which nothing enforces',
     !/The other person reads the pull request/i.test(sd));
-yes('DEVELOPING.md says Patrick\'s own work goes through a pull request too',
+yes('Developer-Guide.md says Patrick\'s own work goes through a pull request too',
     /Every change goes through a pull request, Patrick's included/.test(sd));
-[docs[0], docs[1]].forEach(function (d) {
+[docs[0]].forEach(function (d) {
   // scripts\ and the other folders a release is built from since phase 8 of #440.
   yes(d.name + ' says a main release stops on a file git does not know, as Ship.ps1 does',
       /file under `?(tools|scripts)`?[\s\S]{0,80}?that git does not know/.test(d.text));

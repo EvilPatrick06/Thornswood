@@ -60,7 +60,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [dev/Check-Outside.ps1](dev/Check-Outside.ps1) | Walks the path a first install takes through the things this project does not run itself, and says which of them is broken or has moved. |
 | [dev/Check-Secrets.ps1](dev/Check-Secrets.ps1) | Read only. Looks for anything that must never leave a machine: in the files this repository tracks, in a pack or installer zip, in the installer's staged folder, or in a built program. |
 | [dev/Check-Swallow.ps1](dev/Check-Swallow.ps1) | Counts the silent catches in the launcher, file by file, and fails when any file has more than scripts\dev\swallow-baseline.txt allows, or fewer than it allows with its line not yet lowered. |
-| [dev/Check-Words.ps1](dev/Check-Words.ps1) | The writing rules in CONTRIBUTING.md, checked on every file people read instead of hoped for; each hit names the file, the line and the rule. |
+| [dev/Check-Words.ps1](dev/Check-Words.ps1) | The writing rules in Developer-Guide.md, checked on every file people read instead of hoped for; each hit names the file, the line and the rule. |
 | [dev/Close-Launcher.ps1](dev/Close-Launcher.ps1) | Shared by every script that writes into the build. |
 | [dev/Install-Thornswood.ps1](dev/Install-Thornswood.ps1) | Everything the client needs, in one run, in the order it has to happen in. |
 | [dev/Measure-Reclaim.ps1](dev/Measure-Reclaim.ps1) | How much disk deleting a folder would ACTUALLY free. |

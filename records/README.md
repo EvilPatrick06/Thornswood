@@ -51,7 +51,7 @@ read it (issue #440, phase 8):
   underwear off (#405), and Ship stops after a change until the files are
   built again.
 - `signing\`: the code signing setup, with its own README. On since
-  27 September: Ship refuses a launcher that is not signed (CONTRIBUTING.md).
+  27 September: Ship refuses a launcher that is not signed (Developer-Guide.md).
 
 Change a record only by running the script that writes it, in the same pull
 request as the build or the fork commit it describes.

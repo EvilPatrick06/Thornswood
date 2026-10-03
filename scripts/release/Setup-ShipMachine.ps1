@@ -52,8 +52,8 @@
   (Where.ps1 ClientDist), and its downloads under out\ship-machine, all
   ignored by git.
 
-  A main Ship stays Patrick's (CONTRIBUTING.md): -Channel main checks, and
-  says so.
+  Any developer may run a main Ship from a machine that can sign
+  (Developer-Guide.md): -Channel main checks that machine.
 
 .PARAMETER Channel
   dev (the default) or main: which channel Check-ShipReady asks about, and
@@ -361,7 +361,7 @@ function Plan([string]$what) { Say ('  would ' + $what) 'Yellow' }
 Write-Host ''
 Write-Host ('  THORNSWOOD  -  get this machine ready to Ship (' + $Channel + ' channel)' + $(if ($Check) { ', checking only' } else { '' })) -ForegroundColor White
 if ($Channel -eq 'main') {
-  Say '  A main Ship is Patrick''s call, from his machine (CONTRIBUTING.md). This checks; it does not make it anybody else''s.' 'Yellow'
+  Say '  A main Ship is any developer''s, from a machine that can sign (Developer-Guide.md). This checks that machine.' 'Yellow'
 }
 
 $Work = Join-Path (& (Join-Path $Here 'Where.ps1') Out) 'ship-machine'

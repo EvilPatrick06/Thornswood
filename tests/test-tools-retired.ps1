@@ -143,8 +143,8 @@ Yes ("no script, harness or workflow builds a path into $T ($codeRead files read
 
 # ---- 4. every file a machine kept there has its own home ---------------------
 # Its new path is ignored by git, the script that reads it names that path,
-# and DEVELOPING.md lists it.
-$dev = [IO.File]::ReadAllText((Join-Path $Repo 'DEVELOPING.md'))
+# and Developer-Guide.md lists it.
+$dev = [IO.File]::ReadAllText((Join-Path $Repo 'Developer-Guide.md'))
 function Read-Repo([string]$rel) { [IO.File]::ReadAllText((Join-Path $Repo $rel)) }
 $homes = @(
     @{ File = 'signing.json'; At = 'records/signing/signing.json'; Script = 'scripts\release\Sign-Artifact.ps1'; Says = "'..\..\records\signing\signing.json'" },
@@ -164,7 +164,7 @@ foreach ($h in $homes) {
     $text = Read-Repo $h.Script
     Yes ('  ' + $h.File + ' is at ' + $h.At + ', ignored by git, and ' + (Split-Path -Leaf $h.Script) + ' reads it there') (
         $ignored -and $text.Contains($h.Says))
-    Yes ('    and DEVELOPING.md lists ' + $h.File) ($dev.Contains('`' + $h.File + '`'))
+    Yes ('    and Developer-Guide.md lists ' + $h.File) ($dev.Contains('`' + $h.File + '`'))
 }
 # Where.ps1 is what Build-Launcher and Package ask for out\, so it has to say out.
 $out = [string](& (Join-Path $Repo 'scripts\release\Where.ps1') Out)

@@ -99,7 +99,7 @@ if (-not $BuildDir) { $BuildDir = Join-Path $Fork 'build' }
 Head 'Where the source is'
 
 if (-not (Test-Path -LiteralPath $Fork)) {
-    Die "there is no fork at $Fork. DEVELOPING.md says how a machine gets one."
+    Die "there is no fork at $Fork. Developer-Guide.md says how a machine gets one."
 }
 Say ("  fork        " + $Fork)
 

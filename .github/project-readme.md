@@ -29,7 +29,7 @@ is not going to get done.
   the issue and moves the card to Done.
 
 The rules behind all of this are in
-[CONTRIBUTING.md](https://github.com/EvilPatrick06/Thornswood/blob/main/CONTRIBUTING.md).
+[Developer-Guide.md](https://github.com/EvilPatrick06/Thornswood/blob/main/Developer-Guide.md).
 Every entry from before the board, finished ones included, is in
 [docs/archive/todo-list-2026-09-25.md](https://github.com/EvilPatrick06/Thornswood/blob/main/docs/archive/todo-list-2026-09-25.md);
 an "entry 243" in the code means entry 243 there.

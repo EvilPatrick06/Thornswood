@@ -1,7 +1,7 @@
 <#
   Check-Words.ps1
 
-  The writing rules in CONTRIBUTING.md, checked on every file people read instead of hoped for; each hit names the file, the line and the rule.
+  The writing rules in Developer-Guide.md, checked on every file people read instead of hoped for; each hit names the file, the line and the rule.
 
   WHAT IT READS. Every file whose whole point is text for people:
     - every Markdown file in the repository, apart from lore\ (in-world
@@ -14,7 +14,7 @@
   Not the code files (the gamemode, the overlays, the rest of the launcher): a
   word check there fires on identifiers, engine calls like player.moveto and
   Skyrim's own record names, and those are not text for people.
-  CONTRIBUTING.md says which rules no machine checks.
+  Developer-Guide.md says which rules no machine checks.
 
   THE RULES, each by the name a hit carries:
     em-dash          no em dashes anywhere written for people (Words)
@@ -32,7 +32,7 @@
                      to the Discord or the report page, never to one person
                      (tests\test-component-readmes.js, tests\test-repo-docs.js)
 
-  WHEN A LINE HAS TO SAY IT. CONTRIBUTING.md has to name the word it bans,
+  WHEN A LINE HAS TO SAY IT. Developer-Guide.md has to name the word it bans,
   and a document that quotes something that went out quotes it as it was.
   Those lines go in scripts\dev\Check-Words.allow.txt with the reason, one per
   line. An allowance that matches nothing any more is itself a hit, so the
@@ -43,7 +43,7 @@
   every Markdown file and the public pages: six more, in the installer setup
   README (a name, the one that had held test-component-readmes.js red since
   #1017), the required data README, the script index, the site's gallery page
-  and CONTRIBUTING.md, plus two lines that quote on purpose.
+  and Developer-Guide.md, plus two lines that quote on purpose.
 
   The em dash is built from its code point, [char]0x2014, plus its HTML
   entities, and never pasted in, so this file's own encoding cannot decide
@@ -76,7 +76,7 @@ $Root = (Resolve-Path -LiteralPath $Root).Path
 
 # Files that must be there. A missing one is said out loud, not dropped.
 $Named = @(
-    'README.md', 'SECURITY.md', 'CONTRIBUTING.md', 'launcher/app/Help.cs', 'launcher/ui.xaml',
+    'README.md', 'SECURITY.md', 'Developer-Guide.md', 'launcher/app/Help.cs', 'launcher/ui.xaml',
     'bot/content.py', 'site/public/home.html', 'installer/READ ME FIRST.txt'
 )
 # README.md and the component READMEs that tests\test-component-readmes.js reads.
@@ -213,7 +213,7 @@ foreach ($a in $allow) {
 }
 
 if ($hits) {
-    Write-Host ("{0} hit(s) in the {1} file(s) read. The rules are the Words section of CONTRIBUTING.md; a line that has to quote one goes in {2} with its reason." -f $hits, $read, $AllowRel)
+    Write-Host ("{0} hit(s) in the {1} file(s) read. The rules are the Words section of Developer-Guide.md; a line that has to quote one goes in {2} with its reason." -f $hits, $read, $AllowRel)
     exit 1
 }
 Write-Host ("the writing rules hold in all {0} file(s) read ({1} line(s) allowed by {2})" -f $read, $allowed, $AllowRel)
