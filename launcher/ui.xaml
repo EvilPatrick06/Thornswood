@@ -1404,8 +1404,7 @@
                 <TextBlock x:Name="TxtInGameBrowser" Style="{StaticResource Small}" Margin="0,0,0,16"/>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,30">
                   <Button x:Name="BtnFolder"  Style="{StaticResource Ghost}" Content="Open install folder" Margin="0,0,8,0"/>
-                  <Button x:Name="BtnOpenLog" Style="{StaticResource Ghost}" Content="Open log" Margin="0,0,8,0"/>
-                  <Button x:Name="BtnOpenSaves" Style="{StaticResource Ghost}" Content="Open saves"/>
+                  <Button x:Name="BtnOpenLog" Style="{StaticResource Ghost}" Content="Open log"/>
                 </StackPanel>
 
                 <TextBlock Text="Maintenance" Style="{StaticResource Eyebrow}"/>
