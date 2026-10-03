@@ -1534,6 +1534,20 @@ $NOBODY_MAKES = [ordered]@{
     'Iron Fittings' = 'house fittings, for a house nobody builds here. Property is claimed with a deed and opened with a key cut from a mold.'
 }
 
+# DUPLICATE DWARVEN SCRAP SMELTS (#613). Six Skyrim.esm RecipeIngotDwarvenScrap*
+# rows all make Dwarven Metal Ingot. cut-items keeps one (PlateMetalLarge) and
+# cuts the rest. Thornswood-Content.esp hides the five from the smelter menu by
+# dropping BNAM. This list refuses them on rebuild so the gate matches the menu.
+# Matched on the recipe's own editor id, not the output name, so the keeper stays.
+$COLLAPSED_SMELT_EDITOR_IDS = [ordered]@{
+    'RecipeIngotDwarvenScrapPlateMetalSmall' = 'duplicate Dwarven Metal Ingot scrap smelt. One scrap path stays (RecipeIngotDwarvenScrapPlateMetalLarge). The other five are hidden from the smelter menu in Thornswood-Content.esp and refused here so the gate matches the menu. No sale price; player-run economy.'
+    'RecipeIngotDwarvenScrapLarge03' = 'duplicate Dwarven Metal Ingot scrap smelt. One scrap path stays (RecipeIngotDwarvenScrapPlateMetalLarge). The other five are hidden from the smelter menu in Thornswood-Content.esp and refused here so the gate matches the menu. No sale price; player-run economy.'
+    'RecipeIngotDwarvenScrapLarge02' = 'duplicate Dwarven Metal Ingot scrap smelt. One scrap path stays (RecipeIngotDwarvenScrapPlateMetalLarge). The other five are hidden from the smelter menu in Thornswood-Content.esp and refused here so the gate matches the menu. No sale price; player-run economy.'
+    'RecipeIngotDwarvenScrapLarge' = 'duplicate Dwarven Metal Ingot scrap smelt. One scrap path stays (RecipeIngotDwarvenScrapPlateMetalLarge). The other five are hidden from the smelter menu in Thornswood-Content.esp and refused here so the gate matches the menu. No sale price; player-run economy.'
+    'RecipeIngotDwarvenScrapBent' = 'duplicate Dwarven Metal Ingot scrap smelt. One scrap path stays (RecipeIngotDwarvenScrapPlateMetalLarge). The other five are hidden from the smelter menu in Thornswood-Content.esp and refused here so the gate matches the menu. No sale price; player-run economy.'
+}
+
+
 # WHICH FOOD IS A DESSERT. This was expected to be a judgement and it is not,
 # on this build, which is worth writing down because the next person will
 # expect it to be a judgement too.
@@ -3393,6 +3407,15 @@ foreach ($desc in $recipes.Keys) {
             }
         }
         if ($refusedWhy) {
+            $refusedRows[$desc] = [pscustomobject]@{
+                Edid = $r.Edid; OutDesc = $o.Desc; OutName = $o.Name; OutType = $o.Type; BenchDesc = $r.BenchDesc; BenchName = $benchName
+                Why = $refusedWhy
+            }
+            continue
+        }
+
+        if (-not $refusedWhy -and $COLLAPSED_SMELT_EDITOR_IDS.Contains($r.Edid)) {
+            $refusedWhy = [string]$COLLAPSED_SMELT_EDITOR_IDS[$r.Edid]
             $refusedRows[$desc] = [pscustomobject]@{
                 Edid = $r.Edid; OutDesc = $o.Desc; OutName = $o.Name; OutType = $o.Type; BenchDesc = $r.BenchDesc; BenchName = $benchName
                 Why = $refusedWhy
