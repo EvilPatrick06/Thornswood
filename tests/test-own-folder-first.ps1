@@ -51,7 +51,11 @@
     5. The wiring: Shell starts the clean up and gates Steam's setting on the
        folder, Updater keeps the list only while the Steam copy is used, and
        nothing in the launcher decides Paths.Game but Paths.Init.
-    6. Issue #1232: in every case the person's own mods in the Steam copy (a
+    6. Issue #1234: before the own folder exists, a pack that carries a plugin
+     list and Fix's server-order write leave Windows' plugins.txt and
+     loadorder.txt alone. The order goes into Profile and is still there
+     when the folder is made. Chosen in the setup window, and not chosen.
+  7. Issue #1232: in every case the person's own mods in the Steam copy (a
        plugin, a loose mesh, a script extender plugin) never reach Root\Game,
        and the record says which kind each file is. A folder made before
        that, which took them, loses them at its next refresh, and still keeps
@@ -498,6 +502,63 @@ namespace Thornswood
             return zip;
         }
 
+
+        // A pack whose only payload is the reference plugin list (#1234).
+        static string ListZip(Scene s)
+        {
+            string zip = Path.Combine(s.Dir, "list-pack.zip");
+            if (File.Exists(zip)) File.Delete(zip);
+            using (ZipArchive z = ZipFile.Open(zip, ZipArchiveMode.Create))
+            {
+                string[][] entries = {
+                    new string[] { "profile/plugins.txt", "*FromPack.esp\r\n" },
+                    new string[] { "profile/loadorder.txt", "FromPack.esp\r\n" },
+                };
+                for (int i = 0; i < entries.Length; i++)
+                {
+                    ZipArchiveEntry en = z.CreateEntry(entries[i][0]);
+                    using (var w = new StreamWriter(en.Open(), new UTF8Encoding(false))) w.Write(entries[i][1]);
+                }
+            }
+            return zip;
+        }
+
+        // Before the own folder exists, the list must land in Profile and
+        // leave Windows' own Skyrim folder as it was (#1234).
+        static void SettleList(Scene s, string n)
+        {
+            string winP = Path.Combine(Paths.WinLocalAD, "plugins.txt");
+            string winO = Path.Combine(Paths.WinLocalAD, "loadorder.txt");
+            Put(winP, "*SteamOwn.esp\r\n");
+            Put(winO, "SteamOwn.esp\r\n");
+            string winPBefore = File.ReadAllText(winP);
+            string winOBefore = File.ReadAllText(winO);
+            var p = new Pack();
+            p.id = "listpack";
+            Updater.Install(ListZip(s), p, delegate(string m) { Say(s, m); });
+            Yes(n + "a pack's plugin list does not write Windows' plugins.txt", File.ReadAllText(winP) == winPBefore);
+            Yes(n + "and does not write Windows' loadorder.txt", File.ReadAllText(winO) == winOBefore);
+            Yes(n + "the order is in Profile\\Default", File.ReadAllText(Path.Combine(Paths.Golden, "plugins.txt")).IndexOf("FromPack.esp", StringComparison.Ordinal) >= 0);
+            Yes(n + "and in Profile\\LocalAppData, where it waits for the folder",
+                File.ReadAllText(Path.Combine(Paths.LocalAD, "plugins.txt")).IndexOf("FromPack.esp", StringComparison.Ordinal) >= 0 &&
+                File.ReadAllText(Path.Combine(Paths.LocalAD, "loadorder.txt")).IndexOf("FromPack.esp", StringComparison.Ordinal) >= 0);
+            Yes(n + "OrderFolder is Profile while there is no own folder",
+                Paths.Collection &&
+                string.Equals(Path.GetFullPath(Verify.OrderFolder), Path.GetFullPath(Paths.LocalAD), StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(Path.GetFullPath(Verify.OrderFolder), Path.GetFullPath(Paths.WinLocalAD), StringComparison.OrdinalIgnoreCase));
+            int ordered = Verify.PutInServerOrder(s.Cfg, delegate(string m) { Say(s, m); });
+            Yes(n + "Fix's server order, with no server to ask, leaves Windows' lists alone",
+                ordered == 0 && File.ReadAllText(winP) == winPBefore && File.ReadAllText(winO) == winOBefore);
+            if (Paths.OwnFirst)
+                Yes(n + "Fix before the folder exists still does not write Windows' plugin list",
+                    Verify.Fix(s.Cfg, null) == 1 && File.ReadAllText(winP) == winPBefore && File.ReadAllText(winO) == winOBefore);
+            // Make refuses a golden list whose plugins Vortex has not deployed.
+            // This pack's name is not one of them. The waiting copy in
+            // LocalAppData stays, and that is what the folder receives.
+            File.WriteAllText(Path.Combine(Paths.Golden, "plugins.txt"), "*TsOne.esp\r\n");
+            File.WriteAllText(Path.Combine(Paths.Golden, "loadorder.txt"), "TsOne.esp\r\n");
+        }
+
         // The part of a launcher start that writes game files, in Shell.Run's
         // order, then what else can write before Play: a pack, Fix's plugin
         // restore, and the checks and Scan the Play page runs.
@@ -575,6 +636,7 @@ namespace Thornswood
                 string.Equals(Path.GetFullPath(Paths.Game), Path.GetFullPath(s.Payload), StringComparison.OrdinalIgnoreCase) &&
                 Under(Paths.Exe, s.Payload) && Under(Paths.Loader, s.Payload) && Under(Paths.MpClient, s.Payload) && !Under(Paths.Game, s.Game));
             Yes(n + "Paths.SteamCopy is the Steam copy", string.Equals(Path.GetFullPath(Paths.SteamCopy), Path.GetFullPath(s.Game), StringComparison.OrdinalIgnoreCase));
+            SettleList(s, n);
             Deploy(s, DateTime.UtcNow.AddMinutes(-10));
             var before = Snap(s.Game);
 
@@ -598,6 +660,9 @@ namespace Thornswood
             string made = OwnGame.Make(s.Cfg, null);
             string own = OwnGame.Folder;
             Yes(n + "Make made Root\\Game", made != null && Directory.Exists(own) && Clean(made));
+            Yes(n + "the order that waited in Profile is the one the folder's game reads",
+                File.ReadAllText(Path.Combine(Paths.LocalAD, "plugins.txt")).IndexOf("FromPack.esp", StringComparison.Ordinal) >= 0 &&
+                File.ReadAllText(Path.Combine(Paths.WinLocalAD, "plugins.txt")).IndexOf("FromPack.esp", StringComparison.Ordinal) < 0);
             Yes(n + "Make wrote nothing into the Steam copy", Same(before, Snap(s.Game)));
             Yes(n + "Make says where Thornswood's own files came from", made != null && made.IndexOf("Profile\\Payload", StringComparison.Ordinal) >= 0);
             Yes(n + "Payload is gone once the folder has its files", !Directory.Exists(s.Payload));
@@ -624,6 +689,10 @@ namespace Thornswood
             Start(s);
             Yes(n + "after the restart it runs from Root\\Game", !Paths.Collection && !Paths.OwnFirst && OwnGame.Active &&
                 string.Equals(Path.GetFullPath(Paths.Game), Path.GetFullPath(own), StringComparison.OrdinalIgnoreCase));
+            Yes(n + "once the folder exists the list is written where the game reads it, not into Windows' folder",
+                !Paths.Collection &&
+                string.Equals(Path.GetFullPath(Verify.OrderFolder), Path.GetFullPath(Paths.Live), StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(Path.GetFullPath(Paths.Live), Path.GetFullPath(Paths.LocalAD), StringComparison.OrdinalIgnoreCase));
             Yes(n + "and Steam's Updates setting is left alone from now on", !SteamUpdates.LooksAtStart(!Paths.Collection, Downgrade.Needed(s.Cfg)));
             string c = OwnGame.CleanSteamCopy(s.Cfg);
             Yes(n + "the one-time clean up finds nothing of Thornswood's in the Steam copy", c == null);
@@ -697,6 +766,7 @@ namespace Thornswood
             string n = "not-chosen: ";
             Yes(n + "without the choice the launcher uses the Steam copy as it always has", Paths.Collection && !Paths.OwnFirst &&
                 string.Equals(Path.GetFullPath(Paths.Game), Path.GetFullPath(s.Game), StringComparison.OrdinalIgnoreCase));
+            SettleList(s, n);
             Deploy(s, DateTime.UtcNow.AddMinutes(-10));
             Yes(n + "and Steam's Updates setting is looked at", SteamUpdates.LooksAtStart(!Paths.Collection, Downgrade.Needed(s.Cfg)));
             StartWrites(s, "pack1");
@@ -718,6 +788,12 @@ namespace Thornswood
                 Text(Path.Combine(own, "Data\\Platform\\Plugins\\thornswood-front.js")) == "TS-FRONT");
             Start(s);
             Yes(n + "and the launcher runs from it", OwnGame.Active && !Paths.Collection);
+            Yes(n + "the waiting plugin list is still the folder's, and Windows' list was not the pack's",
+                File.ReadAllText(Path.Combine(Paths.LocalAD, "plugins.txt")).IndexOf("FromPack.esp", StringComparison.Ordinal) >= 0 &&
+                File.ReadAllText(Path.Combine(Paths.WinLocalAD, "plugins.txt")).IndexOf("FromPack.esp", StringComparison.Ordinal) < 0);
+            Yes(n + "once the folder exists OrderFolder is the file the game reads",
+                string.Equals(Path.GetFullPath(Verify.OrderFolder), Path.GetFullPath(Paths.Live), StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(Path.GetFullPath(Paths.Live), Path.GetFullPath(Paths.WinLocalAD), StringComparison.OrdinalIgnoreCase));
             Yes(n + "Steam's Updates setting is left alone from now on", !SteamUpdates.LooksAtStart(!Paths.Collection, Downgrade.Needed(s.Cfg)));
             Yes(n + "the person's mods in the Steam copy, the ones from before the install and the one put in later, stayed out of the folder",
                 NoneIn(own, Hand) && !File.Exists(Path.Combine(own, "Data\\MyLater.esp")) && AllIn(s.Game, Hand));
