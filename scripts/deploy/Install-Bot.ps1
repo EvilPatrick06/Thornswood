@@ -21,7 +21,8 @@
     2. Stages bot.py, card.py and the card artwork beside the running
        bot and checks them there, before anything is stopped (issue #446,
        FILES below).
-    3. Installs discord.py and Pillow there.
+    3. Installs discord.py and Pillow into py-libs beside the staged code,
+       which the swap puts back with the code.
     4. Asks for the bot token at a prompt, never on a command line, and puts
        it in the bot's bot.env.json and the site's config.json together
        (scripts\vps\Write-BotToken.ps1, the one writer of it).
@@ -604,7 +605,7 @@ function Invoke-BotSwap([bool]$noServiceOk) {
   if ($PutBack) { $pick = $putBackPick }
   $svcLib = Join-Path $Here '..\vps\Bot-Service.ps1'
   if (-not (Test-Path -LiteralPath $svcLib)) { Die "missing: $svcLib" }
-  $vars = (ServiceSwapVars $Root $stageName $prevName $Wait $hashes @()) + ('$NoServiceOk = $' + $noServiceOk + "`r`n")
+  $vars = (ServiceSwapVars $Root $stageName $prevName $Wait $hashes @()) + ('$NoServiceOk = $' + $noServiceOk + "`r`n") + ('$Dirs = @(''py-libs'')' + "`r`n")
   $out = @(Remote ($vars + (Get-Content -LiteralPath $svcLib -Raw) + "`n" + $botHooks + $pick + $serviceSwapBlock) |
            ForEach-Object { Say "  $_"; "$_".Trim() })
   if (-not (Show-SwapResult $out "$rootWin\.prev-<stamp>")) { Die 'the bot was not swapped in. The lines above say what is running.' }
@@ -763,7 +764,7 @@ if ($CodeOnly -or $PutBack) {
 
 # ---------------------------------------------------------------- deps ---
 Head 'Its two libraries'
-Remote @"
+$libs = @(Remote @"
 `$env:PATH = [Environment]::GetEnvironmentVariable('PATH','Machine') + ';' + [Environment]::GetEnvironmentVariable('PATH','User')
 Set-Location '$rootWin'
 # certifi as well as the other two. Windows Server ships with an empty root
@@ -777,11 +778,20 @@ Set-Location '$rootWin'
 # box would have taken the next major of any of the three, untried. The
 # build check installs the same file before it runs the bot harnesses, so the
 # versions tested are the versions run. Bump them there, on purpose.
-& python -m pip install --quiet --disable-pip-version-check -r '$rootWin\$stageName\requirements.txt' 2>&1 | Out-Null
-if (`$LASTEXITCODE -eq 0) { 'discord.py, pillow and certifi ready, at the versions in requirements.txt' } else { 'PIP FAILED with ' + `$LASTEXITCODE }
+#
+# Into py-libs in the stage, not into the machine's Python. The swap moves
+# that folder in with the code and puts the old one back when the bot does
+# not come up, so a bump that breaks the start does not leave the new
+# libraries under the old code (#1076).
+New-Item -ItemType Directory -Force -Path '$rootWin\$stageName\py-libs' | Out-Null
+& python -m pip install --quiet --disable-pip-version-check --upgrade --target '$rootWin\$stageName\py-libs' -r '$rootWin\$stageName\requirements.txt' 2>&1 | Out-Null
+if (`$LASTEXITCODE -eq 0) { 'discord.py, pillow and certifi ready, in py-libs, at the versions in requirements.txt' } else { 'PIP FAILED with ' + `$LASTEXITCODE }
+`$env:PYTHONPATH = '$rootWin\$stageName\py-libs'
 `$ca = (& python -c "import certifi; print(certifi.where())" 2>&1 | Select-Object -Last 1)
 if (`$ca -and (Test-Path `$ca)) { 'root certificates at ' + `$ca } else { 'COULD NOT FIND certifi, TLS will fail' }
-"@ | ForEach-Object { Say "  $_" }
+"@)
+$libs | ForEach-Object { Say "  $_" }
+if ("$libs" -match 'PIP FAILED') { Die 'the libraries did not install into py-libs, so the bot was not stopped or changed.' }
 
 # --------------------------------------------------------------- token ---
 $token = ''
@@ -853,6 +863,10 @@ if ('$KeyMode' -eq 'new' -or -not `$env2['THORNSWOOD_KEY']) {
 # an accent in it, came out of that as a screenful of question marks. Both ends
 # are told UTF-8 instead, here and by the service (BotService.cs).
 `$env2['PYTHONIOENCODING'] = 'utf-8'
+# The libraries folder beside the code. The service already running copies
+# this into python's environment on the restart the swap does, and the new
+# service program sets the same path itself.
+`$env2['PYTHONPATH'] = '$rootWin\py-libs'
 
 # Where Python looks for root certificates. ssl.set_default_verify_paths reads
 # this, and load_default_certs calls it on every platform, so pointing it at
