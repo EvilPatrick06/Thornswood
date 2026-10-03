@@ -42,6 +42,21 @@
 $NoteAllowedNames = @('SkyUI', 'SkyMP', 'SkyrimPlatform', 'GitHub', 'YouTube', 'TikTok', 'VirusTotal',
                       'WebView', 'NirnLab', 'SunHelm', 'RaceMenu', 'MaxOnline', 'PayPal', 'JContainers')
 
+function Get-NoteShapeProblems([string]$Notes) {
+    $problems = New-Object System.Collections.Generic.List[string]
+    $lines = @($Notes -split "`r?`n")
+    $noteTitle = (@($lines | Where-Object { $_.Trim() }) + @(''))[0].Trim()
+    $noteBullets = @($lines | Where-Object { $_ -match '^\s*-\s*\S' -and ($_ -replace '^\s*-\s*', '').Trim().Length -ge 12 })
+    $placeholder = $noteTitle -match '^[\W_]*$' -or $noteTitle -match '^(test|testing|wip|update|updates|fix|fixes|changes|stuff|dev|build|misc)\W*$'
+    if ($placeholder -or @($noteTitle -split '\s+' | Where-Object { $_ }).Count -lt 3) {
+        $problems.Add("the title '$noteTitle' is too short to say what changed.")
+    }
+    if ($noteBullets.Count -lt 1) {
+        $problems.Add('there is no detail line: at least one line starting with "- ".')
+    }
+    return $problems.ToArray()
+}
+
 function Get-NoteProblems([string]$Notes) {
     $problems = New-Object System.Collections.Generic.List[string]
     $seen = @{}
