@@ -437,6 +437,39 @@ $one = Get-ShipLooseArt @((Row 'Data\meshes\MCE\robe.nif' 29))
 Yes 'one folder is still a list of one' ($one.Count -eq 1 -and $one[0].Folder -eq 'Data\meshes\MCE' -and $one[0].Bytes -eq 29)
 Yes 'the three files Go.ps1 writes are the three called ours' ((@($ShipOwnArt) | Where-Object { (Get-Content -LiteralPath (Join-Path $Here 'scripts\release\Go.ps1') -Raw).Contains("'" + $_ + "'") }).Count -eq 3)
 
+# ---- our menu files ---------------------------------------------------------------
+# The four paths in $ShipOursFiles that are not the plugin or the client
+# script live in game\ours, and Go.ps1 writes those paths ($oursMenuFiles).
+# The files on disk, the paths Go.ps1 quotes, and the same paths in
+# $ShipOursFiles are one list. One side gaining or losing a path fails.
+$goText = Get-Content -LiteralPath (Join-Path $Here 'scripts\release\Go.ps1') -Raw
+$oursBlock = [regex]::Match($goText, '(?s)\$oursMenuFiles = @\((.*?)\)')
+$written = @()
+if ($oursBlock.Success) {
+    $written = @([regex]::Matches($oursBlock.Groups[1].Value, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
+}
+$diskRoot = Join-Path $Here 'game\ours'
+$onDisk = @()
+if (Test-Path -LiteralPath $diskRoot) {
+    $prefix = $diskRoot.TrimEnd('\') + '\'
+    $onDisk = @(Get-ChildItem -LiteralPath $diskRoot -Recurse -File | ForEach-Object {
+        $_.FullName.Substring($prefix.Length)
+    })
+}
+$inRules = @($ShipOursFiles | Where-Object {
+    $path = $_
+    (@($written | Where-Object { $_ -ceq $path }).Count -gt 0) -or (@($onDisk | Where-Object { $_ -ceq $path }).Count -gt 0)
+})
+function Same-List($left, $right) {
+    $x = @($left | Sort-Object)
+    $y = @($right | Sort-Object)
+    if ($x.Count -ne $y.Count -or $x.Count -eq 0) { return $false }
+    for ($i = 0; $i -lt $x.Count; $i++) { if ($x[$i] -cne $y[$i]) { return $false } }
+    return $true
+}
+Yes 'Go.ps1 writes each file kept in game\ours' (Same-List $written $onDisk)
+Yes 'and those paths are the ShipOursFiles entries, no more and no less' (Same-List $written $inRules)
+
 # ---- measured on this machine, where it can be ------------------------------------
 $baseline = $null
 foreach ($cand in @(
