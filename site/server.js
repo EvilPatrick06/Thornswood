@@ -970,8 +970,9 @@ setInterval(() => reportPrune(Date.now()), 10 * 60 * 1000).unref?.();
 // ==== thornswood login limits ====
 // POST /api/login only (#1305). The issue names no numbers, so this is a
 // small fixed window: eight attempts from one address in ten minutes, then
-// 429 until the oldest of those falls out of the window. Nothing else on
-// the site reads this table. The address rules are the report form's: the
+// 429 until the oldest of those falls out of the window. Past that window
+// a member-password guess waits longer each time (#1308). Nothing else on
+// the site reads these tables. The address rules are the report form's: the
 // last forwarded hop, and only when the socket is loopback (Caddy). The
 // address is hashed under a key made at this start and never written.
 const LOGIN_MAX = 8;
@@ -998,11 +999,34 @@ function loginNote(key, now) {
   loginSeen.set(key, list);
 }
 
+// Once the window is full, each further member-password guess waits longer
+// than the one before it (#1308). The extra starts at 30 seconds and doubles,
+// up to an hour. It is added only when Discord OAuth is not configured, which
+// is the only time this route reads a password. A correct password clears it.
+// An address that has been quiet for a whole window is dropped.
+const LOGIN_BACKOFF_CAP_S = 60 * 60;
+const loginBackoff = new Map();
+
+function loginBackoffBump(key, now, windowWait) {
+  const at = Number(now) || Date.now();
+  const prev = loginBackoff.get(key) || { n: 0 };
+  const n = (prev.n || 0) + 1;
+  const shift = Math.min(Math.max(n - 1, 0), 10);
+  const extra = Math.min(LOGIN_BACKOFF_CAP_S, 30 * (1 << shift));
+  const wait = Math.max(1, (Number(windowWait) || 0) + extra);
+  loginBackoff.set(key, { n, until: at + wait * 1000 });
+  return wait;
+}
+
 function loginPrune(now) {
-  const cut = (Number(now) || Date.now()) - LOGIN_WINDOW_MS;
+  const at = Number(now) || Date.now();
+  const cut = at - LOGIN_WINDOW_MS;
   for (const [key, list] of loginSeen) {
     const kept = list.filter((t) => t > cut);
     if (kept.length) loginSeen.set(key, kept); else loginSeen.delete(key);
+  }
+  for (const [key, rec] of loginBackoff) {
+    if (!rec || rec.until < cut) loginBackoff.delete(key);
   }
 }
 setInterval(() => loginPrune(Date.now()), 10 * 60 * 1000).unref?.();
@@ -3459,9 +3483,13 @@ async function handle(req, res) {
     const from = loginKey(req);
     const wait = loginWait(from, Date.now());
     if (wait) {
+      // The window above is the cap (#1305). While the member password is
+      // the door, each further guess waits longer than the last (#1308).
+      // Discord sign-in keeps the flat window and does not grow this wait.
+      const retry = discordReady() ? wait : loginBackoffBump(from, Date.now(), wait);
       return send(res, 429, JSON.stringify({
-        error: 'Too many sign-in attempts from this connection. Try again in ' + wait + ' seconds.'
-      }), 'application/json; charset=utf-8', { 'Retry-After': String(wait) });
+        error: 'Too many sign-in attempts from this connection. Try again in ' + retry + ' seconds.'
+      }), 'application/json; charset=utf-8', { 'Retry-After': String(retry) });
     }
     loginNote(from, Date.now());
     if (discordReady()) {
@@ -3473,6 +3501,7 @@ async function handle(req, res) {
     if (!cfg.password || !sameSecret(given, String(cfg.password))) {
       return sendJson(res, 401, { error: 'wrong password' });
     }
+    loginBackoff.delete(from);
     return send(res, 200, JSON.stringify({ ok: true }),
       'application/json; charset=utf-8',
       { 'Set-Cookie': setCookie(req, COOKIE, memberToken(), 365) });

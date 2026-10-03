@@ -426,6 +426,13 @@ function breakPages(src) {
         JSON.stringify({ password: 'not-the-password' }), hdr);
       yes('the next attempt from that address is limited (' + blocked.status + ')',
           blocked.status === 429 && Number(blocked.headers['retry-after']) > 0);
+      const longer = await ask(a.port, 'POST', '/api/login',
+        JSON.stringify({ password: 'not-the-password' }), hdr);
+      yes('a further guess from that address waits longer (' +
+          (blocked.headers && blocked.headers['retry-after']) + ', ' +
+          (longer.headers && longer.headers['retry-after']) + ')',
+          longer.status === 429 &&
+          Number(longer.headers['retry-after']) > Number(blocked.headers['retry-after']));
       const other = await ask(a.port, 'POST', '/api/login',
         JSON.stringify({ password: 'not-the-password' }), { 'x-forwarded-for': '203.0.113.11' });
       yes('a different address is not limited by that (' + other.status + ')', other.status === 401);
