@@ -3679,6 +3679,12 @@ async function handle(req, res) {
     return send(res, 301, '', 'text/plain', { Location: '/downloads' });
   }
 
+  // The template the front route fills in. Served as a file it still says
+  // DISCORD_URL and shows both the alpha wording and the open wording (#997).
+  if (route === '/home.html' && req.method === 'GET') {
+    return send(res, 301, '', 'text/plain', { Location: '/' });
+  }
+
   // Everything the front page needs and nothing that is anybody's business.
   if (route === '/api/public' && req.method === 'GET') {
     const feed = jsonFile(NEWS, { news: [] });
