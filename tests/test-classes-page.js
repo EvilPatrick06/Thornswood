@@ -313,10 +313,13 @@ const anyArmour = rows.some(function (r) {
 
 // Nobody's work: smelting and tanning are in no half.
 const nobodys = ['Iron Ingot', 'Steel Ingot', 'Leather', 'Leather Strips'];
-yes('smelting and tanning belong to no half (' + nobodys.join(', ') + ' are in no recipe row)',
-    nobodys.every(function (n) { return row(n) === null; }));
-yes('and the page says anybody can smelt and tan',
-    /Smelting ore into ingots and tanning a hide into leather belong to no half/i.test(text));
+yes('smelting and tanning are Platewright novice work (' + nobodys.join(', ') + ')',
+    nobodys.every(function (n) {
+      const r = row(n, 'Platewright');
+      return !!r && r.half === 'Platewright' && String(r.rank).toLowerCase() === 'novice' && !r.nobody;
+    }));
+yes('and the page says they are Platewright work, not anybody\'s',
+    /Smelting ore into ingots and tanning a hide into leather are Platewright work/i.test(text));
 
 // The two halves that gate nothing.
 ['bulwark', 'berserker'].forEach(function (h) {
@@ -372,8 +375,8 @@ yes('the page no longer promises the old grace',
     !/first evening/i.test(text));
 yes('and says the lab and the enchanter are shut to somebody with no profession',
     /Somebody who has not chosen a profession yet can use neither/i.test(text));
-yes('join.md says you cannot make anything at a bench before a profession, beyond smelting and tanning',
-    /Until you pick a profession you cannot make anything at a bench beyond smelting and tanning/i.test(flat(join)));
+yes('join.md says you cannot make anything at a bench before a profession, smelting and tanning included',
+    /Until you pick a profession you cannot make anything at a bench, smelting and tanning included/i.test(flat(join)));
 
 // Spell tomes (#1026): the page names the three rules learnFromTome runs.
 const tomes = section(page, '### Spell tomes');

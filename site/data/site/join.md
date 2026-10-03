@@ -110,7 +110,7 @@ profession and the half of it you will make your own, and the town you wake
 up in. Only the town has to be chosen before you leave the hall, and choosing
 it sends you to your inn; your class and profession can wait, and are picked
 later in the world from the same panel. Until you pick a profession you cannot
-make anything at a bench beyond smelting and tanning, so do not wait long if
+make anything at a bench, smelting and tanning included, so do not wait long if
 you mean to make things. You arrive in the clothes you stand in,
 with forty gold. The same panel is behind **K** from then on, for your skill
 points.

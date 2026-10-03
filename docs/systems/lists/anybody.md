@@ -1,6 +1,6 @@
 # Anybody may make these
 
-Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 832 recipes with no profession. Smelting and tanning live here.
+Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 588 recipes with no profession. Smelting and tanning live here.
 
 | Item | Makes | Rank | Kind | Bench | Asks for | Race | Server asked | Id |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -166,17 +166,6 @@ Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 8
 | Copper and Sapphire Circlet | 1 |  |  | SmithingForge |  |  | yes | `92f:MoreCraftableEquipment.esp` |
 | Corner Shelf | 1 |  |  | BYOHBuildingInteriorPart023ShelfCorner01 |  |  | yes | `5a84:HearthFires.esm` |
 | Corner Shelf | 1 |  |  | BYOHBuildingInteriorPart035ShelfCorner02 |  |  | yes | `5a85:HearthFires.esm` |
-| Corundum Ingot | 1 |  |  | Smelter |  |  | yes | `26d4d:Immersive Weapons.esp` |
-| Corundum Ingot | 1 |  |  | Smelter |  |  | yes | `272f2:Immersive Weapons.esp` |
-| Corundum Ingot | 1 |  |  | Smelter |  |  | yes | `272e7:Immersive Weapons.esp` |
-| Corundum Ingot | 1 |  |  | Smelter |  |  | yes | `272bf:Immersive Weapons.esp` |
-| Corundum Ingot | 1 |  |  | Smelter |  |  | yes | `2733c:Immersive Weapons.esp` |
-| Corundum Ingot | 1 |  |  | Smelter |  |  | yes | `2734a:Immersive Weapons.esp` |
-| Corundum Ingot | 1 |  |  | Smelter |  |  | yes | `27358:Immersive Weapons.esp` |
-| Corundum Ingot | 1 |  |  | Smelter |  |  | yes | `272cb:Immersive Weapons.esp` |
-| Corundum Ingot | 1 |  |  | Smelter |  |  | yes | `272d6:Immersive Weapons.esp` |
-| Corundum Ingot | 1 |  |  | Smelter |  |  | yes | `3ec84:Immersive Weapons.esp` |
-| Corundum Ingot | 1 |  |  | Smelter |  |  | yes | `a30cb:Skyrim.esm` |
 | Cow | 1 |  |  | BYOHBuildingTrophyBase2 |  |  | yes | `a349:HearthFires.esm` |
 | Cultist Gloves | 1 |  |  |  |  |  | yes | `3b3a6:Dragonborn.esm` |
 | Cultist Mask | 1 |  |  |  |  |  | yes | `38eac:Dragonborn.esm` |
@@ -197,17 +186,6 @@ Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 8
 | Display Case on Low Table | 1 |  |  | BYOHBuildingInteriorPart008DisplayTableLow01 |  |  | yes | `5a60:HearthFires.esm` |
 | Display Case on Low Table | 1 |  |  | BYOHBuildingInteriorPart055DisplayTableLow02 |  |  | yes | `5a6f:HearthFires.esm` |
 | Double Bed | 1 |  |  | BYOHBuildingInteriorPart045BedDouble01 |  |  | yes | `30f0:HearthFires.esm` |
-| Dragon Bone | 1 |  |  | Smelter |  |  | yes | `802:IA CBBE Patch.esp` |
-| Dragon Bone | 1 |  |  | Smelter |  |  | yes | `44847:Immersive Weapons.esp` |
-| Dragon Bone | 1 |  |  | Smelter |  |  | yes | `2731d:Immersive Weapons.esp` |
-| Dragon Bone | 1 |  |  | Smelter |  |  | yes | `2731f:Immersive Weapons.esp` |
-| Dragon Bone | 1 |  |  | Smelter |  |  | yes | `2731e:Immersive Weapons.esp` |
-| Dragon Bone | 1 |  |  | Smelter |  |  | yes | `27321:Immersive Weapons.esp` |
-| Dragon Bone | 1 |  |  | Smelter |  |  | yes | `27322:Immersive Weapons.esp` |
-| Dragon Bone | 1 |  |  | Smelter |  |  | yes | `27320:Immersive Weapons.esp` |
-| Dragon Bone | 1 |  |  | Smelter |  |  | yes | `27323:Immersive Weapons.esp` |
-| Dragon Bone | 1 |  |  | Smelter |  |  | yes | `27324:Immersive Weapons.esp` |
-| Dragon Bone | 1 |  |  | Smelter |  |  | yes | `27325:Immersive Weapons.esp` |
 | Dragon Skull | 1 |  |  | BYOHBuildingTrophyBase2 |  |  | yes | `a34c:HearthFires.esm` |
 | Draugr | 1 |  |  | BYOHBuildingTrophyBase1 |  |  | yes | `a34d:HearthFires.esm` |
 | Draugr | 1 |  |  | BYOHBuildingTrophyBase2 |  |  | yes | `15fcb:HearthFires.esm` |
@@ -218,72 +196,9 @@ Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 8
 | Dunmer Hood | 1 |  |  |  |  |  | yes | `956:MoreCraftableEquipment.esp` |
 | Dwarven "Fishin' Rod" | 1 |  |  | SmithingForge |  |  | yes | `8d6e:FishingInSkyrim.esp` |
 | Dwarven Depth Charge | 1 |  |  | SmithingForge |  |  | yes | `92d2:FishingInSkyrim.esp` |
-| Dwarven Metal Ingot | 1 |  |  | Smelter |  |  | yes | `2cef2:Immersive Weapons.esp` |
-| Dwarven Metal Ingot | 1 |  |  | Smelter |  |  | yes | `272cd:Immersive Weapons.esp` |
-| Dwarven Metal Ingot | 1 |  |  | Smelter |  |  | yes | `2733b:Immersive Weapons.esp` |
-| Dwarven Metal Ingot | 1 |  |  | Smelter |  |  | yes | `2730c:Immersive Weapons.esp` |
-| Dwarven Metal Ingot | 1 |  |  | Smelter |  |  | yes | `10dd2a:Skyrim.esm` |
-| Dwarven Metal Ingot | 1 |  |  | Smelter |  |  | yes | `10dd2b:Skyrim.esm` |
-| Dwarven Metal Ingot | 1 |  |  | Smelter |  |  | yes | `10dd2c:Skyrim.esm` |
-| Dwarven Metal Ingot | 1 |  |  | Smelter |  |  | yes | `10dd2d:Skyrim.esm` |
 | Dwarven Metal Ingot | 1 |  |  | Smelter |  |  | yes | `10dd28:Skyrim.esm` |
-| Dwarven Metal Ingot | 1 |  |  | Smelter |  |  | yes | `10fbd9:Skyrim.esm` |
 | Dwarven Sphere | 1 |  |  | BYOHBuildingTrophyBase2 |  |  | yes | `a334:HearthFires.esm` |
 | Dwarven Spider | 1 |  |  | BYOHBuildingTrophyBase1 |  |  | yes | `a32e:HearthFires.esm` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `272e6:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `27335:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `27331:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `27319:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `272f9:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `42290:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `3ec87:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `27318:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `27317:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `478d4:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `3ec88:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `2735b:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `2735a:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `272dd:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `27337:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `2731c:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `272bc:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `272c8:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `272cc:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `272d3:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `2cef6:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `3ec7e:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `3ec81:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `27338:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `272b4:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `272de:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `478dc:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `272d7:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `2734d:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `27326:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `2733e:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `272ce:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `2cef5:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `2734e:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `272fb:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `27315:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `27330:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `272e8:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `478e0:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `478e3:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `478e6:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `478e8:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `3ec8a:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `27340:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `27356:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `272ba:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `478ec:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `44dab:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `27316:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `478ef:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `2735e:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `2735f:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `272bd:Immersive Weapons.esp` |
-| Ebony Ingot | 1 |  |  | Smelter |  |  | yes | `a30d3:Skyrim.esm` |
 | Emerald | 1 |  |  | Smelter |  |  | yes | `46dfb:Immersive Weapons.esp` |
 | Enchanter's Tower - Remove Workbench | 1 |  |  | BYOHBuildingDrafting |  |  | yes | `3b38:HearthFires.esm` |
 | Enchanter's Tower - Workbench | 1 |  |  | BYOHBuildingDrafting |  |  | yes | `3b2e:HearthFires.esm` |
@@ -345,14 +260,11 @@ Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 8
 | Fur Plate | 1 |  |  | TanningRack |  |  | yes | `cc0625:Update.esm` |
 | Fur Plate | 1 |  |  | TanningRack |  |  | yes | `cc0621:Update.esm` |
 | Garden | 1 |  |  | BYOHBuildingCarpenter |  |  | yes | `7882:HearthFires.esm` |
-| Glacial Crystal Ingot | 1 |  |  | Smelter |  |  | yes | `da0c03:Update.esm` |
 | Goat | 1 |  |  | BYOHBuildingTrophyBase1 |  |  | yes | `15fca:HearthFires.esm` |
 | Gold Diamond Necklace | 1 |  |  | SmithingForge |  |  | yes | `f4322:Skyrim.esm` |
 | Gold Diamond Ring | 1 |  |  | SmithingForge |  |  | yes | `f432a:Skyrim.esm` |
 | Gold Earrings | 1 |  |  | SmithingForge |  |  | yes | `2869:Hothtrooper44_ArmorCompilation.esp` |
 | Gold Emerald Ring | 1 |  |  | SmithingForge |  |  | yes | `f432b:Skyrim.esm` |
-| Gold Ingot | 1 |  |  | Smelter |  |  | yes | `2734f:Immersive Weapons.esp` |
-| Gold Ingot | 1 |  |  | Smelter |  |  | yes | `a30d4:Skyrim.esm` |
 | Gold Jeweled Necklace | 1 |  |  | SmithingForge |  |  | yes | `f4323:Skyrim.esm` |
 | Gold Necklace | 1 |  |  | SmithingForge |  |  | yes | `f4321:Skyrim.esm` |
 | Gold Ore | 1 |  |  | Smelter |  |  | yes | `2731b:Immersive Weapons.esp` |
@@ -398,20 +310,6 @@ Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 8
 | House, Wall Framing | 1 |  |  | BYOHBuildingCarpenter |  |  | yes | `3016:HearthFires.esm` |
 | House, Walls | 1 |  |  | BYOHBuildingCarpenter |  |  | yes | `3081:HearthFires.esm` |
 | Ice Wolf | 1 |  |  | BYOHBuildingTrophyBase1 |  |  | yes | `a350:HearthFires.esm` |
-| Iron Ingot | 1 |  |  | Smelter |  |  | yes | `272eb:Immersive Weapons.esp` |
-| Iron Ingot | 1 |  |  | Smelter |  |  | yes | `42d57:Immersive Weapons.esp` |
-| Iron Ingot | 1 |  |  | Smelter |  |  | yes | `2732c:Immersive Weapons.esp` |
-| Iron Ingot | 1 |  |  | Smelter |  |  | yes | `272c4:Immersive Weapons.esp` |
-| Iron Ingot | 1 |  |  | Smelter |  |  | yes | `272c7:Immersive Weapons.esp` |
-| Iron Ingot | 1 |  |  | Smelter |  |  | yes | `2734b:Immersive Weapons.esp` |
-| Iron Ingot | 1 |  |  | Smelter |  |  | yes | `2b403:Immersive Weapons.esp` |
-| Iron Ingot | 1 |  |  | Smelter |  |  | yes | `272d9:Immersive Weapons.esp` |
-| Iron Ingot | 1 |  |  | Smelter |  |  | yes | `3ec7c:Immersive Weapons.esp` |
-| Iron Ingot | 1 |  |  | Smelter |  |  | yes | `3ec82:Immersive Weapons.esp` |
-| Iron Ingot | 1 |  |  | Smelter |  |  | yes | `272e3:Immersive Weapons.esp` |
-| Iron Ingot | 1 |  |  | Smelter |  |  | yes | `272e4:Immersive Weapons.esp` |
-| Iron Ingot | 1 |  |  | Smelter |  |  | yes | `a30c3:Skyrim.esm` |
-| Iron Ingot | 1 |  |  | testPhilCraftingBreakItDowner |  |  | yes | `18cb0:Dragonborn.esm` |
 | Jade and Emerald Circlet | 1 |  |  | SmithingForge |  |  | yes | `92c:MoreCraftableEquipment.esp` |
 | Jade and Sapphire Circlet | 1 |  |  | SmithingForge |  |  | yes | `932:MoreCraftableEquipment.esp` |
 | Jetty | 1 |  |  | BYOHBuildingCarpenter |  |  | yes | `4776d:CFTO.esp` |
@@ -440,26 +338,6 @@ Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 8
 | Large Planter | 1 |  |  | BYOHBuildingInteriorPart167PlanterLarge02 |  |  | yes | `dda8:HearthFires.esm` |
 | Large Planter | 1 |  |  | BYOHBuildingInteriorPart168PlanterLarge03 |  |  | yes | `dda9:HearthFires.esm` |
 | Large Table with Chest | 1 |  |  | BYOHBuildingInteriorPart130TableWithChest01 |  |  | yes | `c1f5:HearthFires.esm` |
-| Leather | 1 |  |  | TanningRack |  |  | yes | `14637:Dawnguard.esm` |
-| Leather | 1 |  |  | TanningRack |  |  | yes | `14636:Dawnguard.esm` |
-| Leather | 1 |  |  | TanningRack |  |  | yes | `da0c06:Update.esm` |
-| Leather | 1 |  |  | TanningRack |  |  | yes | `da0c07:Update.esm` |
-| Leather | 1 |  |  | TanningRack |  |  | yes | `da0c09:Update.esm` |
-| Leather | 1 |  |  | TanningRack |  |  | yes | `eb0ae:Skyrim.esm` |
-| Leather | 1 |  |  | TanningRack |  |  | yes | `eb0ad:Skyrim.esm` |
-| Leather | 1 |  |  | TanningRack |  |  | yes | `eb0af:Skyrim.esm` |
-| Leather | 1 |  |  | TanningRack |  |  | yes | `78b48:Skyrim.esm` |
-| Leather | 1 |  |  | TanningRack |  |  | yes | `78b49:Skyrim.esm` |
-| Leather | 1 |  |  | TanningRack |  |  | yes | `1033de:Skyrim.esm` |
-| Leather | 1 |  |  | TanningRack |  |  | yes | `10cc6b:Skyrim.esm` |
-| Leather | 1 |  |  | TanningRack |  |  | yes | `10d159:Skyrim.esm` |
-| Leather | 1 |  |  | TanningRack |  |  | yes | `7866b:Skyrim.esm` |
-| Leather | 1 |  |  | TanningRack |  |  | yes | `eb0b2:Skyrim.esm` |
-| Leather | 1 |  |  | TanningRack |  |  | yes | `eb0ac:Skyrim.esm` |
-| Leather | 1 |  |  | TanningRack |  |  | yes | `eb0b0:Skyrim.esm` |
-| Leather | 1 |  |  | TanningRack |  |  | yes | `eb0b1:Skyrim.esm` |
-| Leather | 1 |  |  | TanningRack |  |  | yes | `78b54:Skyrim.esm` |
-| Leather Strips | 1 |  |  | TanningRack |  |  | yes | `f7f43:Skyrim.esm` |
 | Library - Remove Workbench | 1 |  |  | BYOHBuildingDrafting |  |  | yes | `3b3e:HearthFires.esm` |
 | Library - Workbench | 1 |  |  | BYOHBuildingDrafting |  |  | yes | `3b34:HearthFires.esm` |
 | Library, Doors | 1 |  |  | BYOHBuildingCarpenter |  |  | yes | `3cf6:HearthFires.esm` |
@@ -550,81 +428,7 @@ Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 8
 | Night Table | 1 |  |  | BYOHBuildingInteriorPart205TableNight01 |  |  | yes | `b29:HearthFires.esm` |
 | Night Tables (2) | 1 |  |  | BYOHBuildingInteriorPart169TableNightx2_01 |  |  | yes | `ddaa:HearthFires.esm` |
 | Night Tables (2) | 1 |  |  | BYOHBuildingInteriorPart202TableNightx2_02 |  |  | yes | `a0d:HearthFires.esm` |
-| Orichalcum Ingot | 1 |  |  | Smelter |  |  | yes | `3ec89:Immersive Weapons.esp` |
-| Orichalcum Ingot | 1 |  |  | Smelter |  |  | yes | `2780f:Immersive Weapons.esp` |
-| Orichalcum Ingot | 1 |  |  | Smelter |  |  | yes | `27351:Immersive Weapons.esp` |
-| Orichalcum Ingot | 1 |  |  | Smelter |  |  | yes | `2b405:Immersive Weapons.esp` |
-| Orichalcum Ingot | 1 |  |  | Smelter |  |  | yes | `272cf:Immersive Weapons.esp` |
-| Orichalcum Ingot | 1 |  |  | Smelter |  |  | yes | `2cef1:Immersive Weapons.esp` |
-| Orichalcum Ingot | 1 |  |  | Smelter |  |  | yes | `27355:Immersive Weapons.esp` |
-| Orichalcum Ingot | 1 |  |  | Smelter |  |  | yes | `27313:Immersive Weapons.esp` |
-| Orichalcum Ingot | 1 |  |  | Smelter |  |  | yes | `27360:Immersive Weapons.esp` |
-| Orichalcum Ingot | 1 |  |  | Smelter |  |  | yes | `a30db:Skyrim.esm` |
 | Oven | 1 |  |  | BYOHBuildingInteriorPart171Oven01 |  |  | yes | `f378:HearthFires.esm` |
-| Quicksilver Ingot | 1 |  |  | Smelter |  |  | yes | `27310:Immersive Weapons.esp` |
-| Quicksilver Ingot | 1 |  |  | Smelter |  |  | yes | `272ed:Immersive Weapons.esp` |
-| Quicksilver Ingot | 1 |  |  | Smelter |  |  | yes | `272b0:Immersive Weapons.esp` |
-| Quicksilver Ingot | 1 |  |  | Smelter |  |  | yes | `272c2:Immersive Weapons.esp` |
-| Quicksilver Ingot | 1 |  |  | Smelter |  |  | yes | `272d0:Immersive Weapons.esp` |
-| Quicksilver Ingot | 1 |  |  | Smelter |  |  | yes | `272da:Immersive Weapons.esp` |
-| Quicksilver Ingot | 1 |  |  | Smelter |  |  | yes | `272c0:Immersive Weapons.esp` |
-| Quicksilver Ingot | 1 |  |  | Smelter |  |  | yes | `2730d:Immersive Weapons.esp` |
-| Quicksilver Ingot | 1 |  |  | Smelter |  |  | yes | `27349:Immersive Weapons.esp` |
-| Quicksilver Ingot | 1 |  |  | Smelter |  |  | yes | `27352:Immersive Weapons.esp` |
-| Quicksilver Ingot | 1 |  |  | Smelter |  |  | yes | `46dfe:Immersive Weapons.esp` |
-| Quicksilver Ingot | 1 |  |  | Smelter |  |  | yes | `27361:Immersive Weapons.esp` |
-| Quicksilver Ingot | 1 |  |  | Smelter |  |  | yes | `27363:Immersive Weapons.esp` |
-| Quicksilver Ingot | 1 |  |  | Smelter |  |  | yes | `27362:Immersive Weapons.esp` |
-| Quicksilver Ingot | 1 |  |  | Smelter |  |  | yes | `27364:Immersive Weapons.esp` |
-| Quicksilver Ingot | 1 |  |  | Smelter |  |  | yes | `27365:Immersive Weapons.esp` |
-| Quicksilver Ingot | 1 |  |  | Smelter |  |  | yes | `27366:Immersive Weapons.esp` |
-| Quicksilver Ingot | 1 |  |  | Smelter |  |  | yes | `a30dc:Skyrim.esm` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `27359:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `272ea:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `27314:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `27303:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `2731a:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `478d6:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `478d9:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `272b5:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `272b6:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `27328:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `27329:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `2732a:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `2732b:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `27339:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `272df:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `2732e:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `2cef4:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `272d8:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `2733f:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `2730e:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `2730f:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `27304:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `27300:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `3ec86:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `42292:Immersive Weapons.esp` |
-| Refined Malachite | 1 |  |  | Smelter |  |  | yes | `a30da:Skyrim.esm` |
-| Refined Moonstone | 1 |  |  | Smelter |  |  | yes | `272f8:Immersive Weapons.esp` |
-| Refined Moonstone | 1 |  |  | Smelter |  |  | yes | `27306:Immersive Weapons.esp` |
-| Refined Moonstone | 1 |  |  | Smelter |  |  | yes | `272fa:Immersive Weapons.esp` |
-| Refined Moonstone | 1 |  |  | Smelter |  |  | yes | `27327:Immersive Weapons.esp` |
-| Refined Moonstone | 1 |  |  | Smelter |  |  | yes | `44848:Immersive Weapons.esp` |
-| Refined Moonstone | 1 |  |  | Smelter |  |  | yes | `2cef3:Immersive Weapons.esp` |
-| Refined Moonstone | 1 |  |  | Smelter |  |  | yes | `272e9:Immersive Weapons.esp` |
-| Refined Moonstone | 1 |  |  | Smelter |  |  | yes | `2733a:Immersive Weapons.esp` |
-| Refined Moonstone | 1 |  |  | Smelter |  |  | yes | `4228f:Immersive Weapons.esp` |
-| Refined Moonstone | 1 |  |  | Smelter |  |  | yes | `42291:Immersive Weapons.esp` |
-| Refined Moonstone | 1 |  |  | Smelter |  |  | yes | `2730b:Immersive Weapons.esp` |
-| Refined Moonstone | 1 |  |  | Smelter |  |  | yes | `27309:Immersive Weapons.esp` |
-| Refined Moonstone | 1 |  |  | Smelter |  |  | yes | `2730a:Immersive Weapons.esp` |
-| Refined Moonstone | 1 |  |  | Smelter |  |  | yes | `272f1:Immersive Weapons.esp` |
-| Refined Moonstone | 1 |  |  | Smelter |  |  | yes | `272f0:Immersive Weapons.esp` |
-| Refined Moonstone | 1 |  |  | Smelter |  |  | yes | `3ec85:Immersive Weapons.esp` |
-| Refined Moonstone | 1 |  |  | Smelter |  |  | yes | `46dfd:Immersive Weapons.esp` |
-| Refined Moonstone | 1 |  |  | Smelter |  |  | yes | `3ec7d:Immersive Weapons.esp` |
-| Refined Moonstone | 1 |  |  | Smelter |  |  | yes | `272be:Immersive Weapons.esp` |
-| Refined Moonstone | 1 |  |  | Smelter |  |  | yes | `a30d9:Skyrim.esm` |
 | Remodel House into Entryway | 1 |  |  | BYOHBuildingDrafting |  |  | yes | `3125:HearthFires.esm` |
 | Remodel House into Entryway | 1 |  |  | BYOHBuildingDrafting |  |  | yes | `3b73:HearthFires.esm` |
 | Remodel House into Entryway | 1 |  |  | BYOHBuildingDrafting |  |  | yes | `3b74:HearthFires.esm` |
@@ -659,18 +463,6 @@ Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 8
 | Silver Amethyst Ring | 1 |  |  | SmithingForge |  |  | yes | `f432e:Skyrim.esm` |
 | Silver Emerald Necklace | 1 |  |  | SmithingForge |  |  | yes | `f4326:Skyrim.esm` |
 | Silver Garnet Ring | 1 |  |  | SmithingForge |  |  | yes | `f432f:Skyrim.esm` |
-| Silver Ingot | 1 |  |  | Smelter |  |  | yes | `272ee:Immersive Weapons.esp` |
-| Silver Ingot | 1 |  |  | Smelter |  |  | yes | `272e0:Immersive Weapons.esp` |
-| Silver Ingot | 1 |  |  | Smelter |  |  | yes | `272e1:Immersive Weapons.esp` |
-| Silver Ingot | 1 |  |  | Smelter |  |  | yes | `272c3:Immersive Weapons.esp` |
-| Silver Ingot | 1 |  |  | Smelter |  |  | yes | `272ca:Immersive Weapons.esp` |
-| Silver Ingot | 1 |  |  | Smelter |  |  | yes | `272d1:Immersive Weapons.esp` |
-| Silver Ingot | 1 |  |  | Smelter |  |  | yes | `272d5:Immersive Weapons.esp` |
-| Silver Ingot | 1 |  |  | Smelter |  |  | yes | `272db:Immersive Weapons.esp` |
-| Silver Ingot | 1 |  |  | Smelter |  |  | yes | `3ec7f:Immersive Weapons.esp` |
-| Silver Ingot | 1 |  |  | Smelter |  |  | yes | `3ec83:Immersive Weapons.esp` |
-| Silver Ingot | 1 |  |  | Smelter |  |  | yes | `272c1:Immersive Weapons.esp` |
-| Silver Ingot | 1 |  |  | Smelter |  |  | yes | `a30dd:Skyrim.esm` |
 | Silver Jeweled Necklace | 1 |  |  | SmithingForge |  |  | yes | `f4327:Skyrim.esm` |
 | Silver Necklace | 1 |  |  | SmithingForge |  |  | yes | `f4325:Skyrim.esm` |
 | Silver Ring | 1 |  |  | SmithingForge |  |  | yes | `f432d:Skyrim.esm` |
@@ -706,42 +498,6 @@ Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 8
 | Square Table and Chairs | 1 |  |  | BYOHBuildingInteriorPart005TableSquareChairs02 |  |  | yes | `5a5c:HearthFires.esm` |
 | Square Table and Chairs | 1 |  |  | BYOHBuildingInteriorPart012TableSquareChairs03 |  |  | yes | `5a5d:HearthFires.esm` |
 | Stable | 1 |  |  | BYOHBuildingCarpenter |  |  | yes | `7881:HearthFires.esm` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `27332:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `272ef:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `27333:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `26d4c:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `27334:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `27344:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `272b7:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `272b8:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `3a106:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `3abcd:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `272c9:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `272d4:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `2732f:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `27353:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `27354:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `272b3:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `27342:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `27343:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `272bb:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `3ec8b:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `27347:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `46dff:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `272e2:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `272c5:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `272e5:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `272d2:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `2b404:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `2cef0:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `272dc:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `3ec80:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `27341:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `2735c:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `27350:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `27348:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `2735d:Immersive Weapons.esp` |
-| Steel Ingot | 1 |  |  | Smelter |  |  | yes | `a30e4:Skyrim.esm` |
 | Storage Room - Remove Workbench | 1 |  |  | BYOHBuildingDrafting |  |  | yes | `3b39:HearthFires.esm` |
 | Storage Room - Workbench | 1 |  |  | BYOHBuildingDrafting |  |  | yes | `3b2f:HearthFires.esm` |
 | Storage Room, Doors | 1 |  |  | BYOHBuildingCarpenter |  |  | yes | `3c9e:HearthFires.esm` |
