@@ -1,8 +1,8 @@
 # Tailor/Liverywright
 
-Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 102 recipes, 102 of them reach the server. A row the server is not asked about is tempering: the armour table and the grindstone never call the server.
+Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 81 recipes, 81 of them reach the server. A row the server is not asked about is tempering: the armour table and the grindstone never call the server.
 
-By rank: novice 82, advanced 10, expert 6, master 4.
+By rank: novice 63, advanced 10, expert 5, master 3.
 
 | Item | Makes | Rank | Kind | Bench | Asks for | Race | Server asked | Id |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -24,17 +24,6 @@ By rank: novice 82, advanced 10, expert 6, master 4.
 | Novice Hood | 1 | novice | Hats and hoods | MCE_CraftingLoom | 2 Thread |  | yes | `938:MoreCraftableEquipment.esp` |
 | Psijic Hood | 1 | novice | Hats and hoods | MCE_CraftingLoom | 3 Thread |  | yes | `9bb:MoreCraftableEquipment.esp` |
 | Red Cowl | 1 | novice | Hats and hoods | MCE_CraftingLoom | 2 Thread |  | yes | `9a7:MoreCraftableEquipment.esp` |
-| Riekling Moth Priest Blindfold | 1 | novice | Hats and hoods | SmithingForge | 2 Leather Strips | riekling | yes | `bff03:Playable Rieklings.esp` |
-| Dark Brotherhood Cloak | 1 | novice | Other armour and clothing | MCE_CraftingLoom | 2 Thread |  | yes | `817:MoreCraftableEquipment_CloaksandCapes.esp` |
-| Dawngaurd Cloak | 1 | novice | Other armour and clothing | MCE_CraftingLoom | 2 Thread |  | yes | `815:MoreCraftableEquipment_CloaksandCapes.esp` |
-| Hjaalmarch Guard Cloak | 1 | novice | Other armour and clothing | MCE_CraftingLoom | 2 Thread |  | yes | `80e:MoreCraftableEquipment_CloaksandCapes.esp` |
-| Markarth Guard Cloak | 1 | novice | Other armour and clothing | MCE_CraftingLoom | 2 Thread |  | yes | `80f:MoreCraftableEquipment_CloaksandCapes.esp` |
-| Pale Guard Cloak | 1 | novice | Other armour and clothing | MCE_CraftingLoom | 2 Thread |  | yes | `80c:MoreCraftableEquipment_CloaksandCapes.esp` |
-| Riften Guard Cloak | 1 | novice | Other armour and clothing | MCE_CraftingLoom | 2 Thread |  | yes | `810:MoreCraftableEquipment_CloaksandCapes.esp` |
-| Solitude Guard Cloak | 1 | novice | Other armour and clothing | MCE_CraftingLoom | 2 Thread |  | yes | `811:MoreCraftableEquipment_CloaksandCapes.esp` |
-| Stormcloak Cloak | 1 | novice | Other armour and clothing | MCE_CraftingLoom | 2 Thread |  | yes | `813:MoreCraftableEquipment_CloaksandCapes.esp` |
-| Whiterun Guard Cloak | 1 | novice | Other armour and clothing | MCE_CraftingLoom | 2 Thread |  | yes | `812:MoreCraftableEquipment_CloaksandCapes.esp` |
-| Winterhold Guard Cloak | 1 | novice | Other armour and clothing | MCE_CraftingLoom | 2 Thread |  | yes | `814:MoreCraftableEquipment_CloaksandCapes.esp` |
 | Adept Robes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Leather Strips, 4 Thread |  | yes | `93d:MoreCraftableEquipment.esp` |
 | Archmage's Robes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 5 Thread |  | yes | `996:MoreCraftableEquipment.esp` |
 | Black Robes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 4 Thread |  | yes | `9c1:MoreCraftableEquipment.esp` |
@@ -56,7 +45,6 @@ By rank: novice 82, advanced 10, expert 6, master 4.
 | Hooded Monk Robes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 4 Thread |  | yes | `9aa:MoreCraftableEquipment.esp` |
 | Hooded Necromancer Robes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 4 Thread |  | yes | `9b5:MoreCraftableEquipment.esp` |
 | Hooded Red Robes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 4 Thread |  | yes | `9a8:MoreCraftableEquipment.esp` |
-| Hooded Thalmor Robes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Leather, 4 Thread |  | yes | `9ce:MoreCraftableEquipment.esp` |
 | Mage Robes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Leather Strips, 4 Thread |  | yes | `93c:MoreCraftableEquipment.esp` |
 | Master Robes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Leather Strips, 4 Thread |  | yes | `93f:MoreCraftableEquipment.esp` |
 | Monk Robes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 4 Thread |  | yes | `99c:MoreCraftableEquipment.esp` |
@@ -69,17 +57,10 @@ By rank: novice 82, advanced 10, expert 6, master 4.
 | Psijic Robes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 5 Thread |  | yes | `9bc:MoreCraftableEquipment.esp` |
 | Ragged Robes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Thread |  | yes | `924:MoreCraftableEquipment.esp` |
 | Red Robes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 4 Thread |  | yes | `9a6:MoreCraftableEquipment.esp` |
-| Riekling Embellished Robes | 1 | novice | Robes and body wear | SmithingForge | 2 Leather Strips | riekling | yes | `bfef1:Playable Rieklings.esp` |
-| Riekling Executioner's Robes | 1 | novice | Robes and body wear | SmithingForge | 2 Leather Strips | riekling | yes | `bfee4:Playable Rieklings.esp` |
-| Riekling Moth Priest Sandals | 1 | novice | Robes and body wear | SmithingForge | 2 Leather Strips | riekling | yes | `bff04:Playable Rieklings.esp` |
-| Riekling Ragged Robes | 1 | novice | Robes and body wear | SmithingForge | 2 Leather Strips | riekling | yes | `bfedf:Playable Rieklings.esp` |
-| Riekling Vampire Robes | 1 | novice | Robes and body wear | SmithingForge | 2 Leather Strips | riekling | yes | `bff02:Playable Rieklings.esp` |
 | Shrouded Robes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 5 Thread |  | yes | `949:MoreCraftableEquipment.esp` |
 | Telvanni Robes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Leather, 4 Thread | darkelf | yes | `9f4:MoreCraftableEquipment.esp` |
 | Telvanni Robes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Leather, 4 Thread | darkelf | yes | `962:MoreCraftableEquipment.esp` |
 | Temple Priest Robes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 5 Thread |  | yes | `966:MoreCraftableEquipment.esp` |
-| Thalmor Robes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Leather, 4 Thread |  | yes | `9cd:MoreCraftableEquipment.esp` |
-| Vaermina Robes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 4 Thread |  | yes | `9dc:MoreCraftableEquipment.esp` |
 | Vampire Robes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 4 Thread |  | yes | `94b:MoreCraftableEquipment.esp` |
 | Archmage's Boots | 1 | novice | Shoes and light boots | MCE_CraftingLoom | 2 Leather, 2 Thread |  | yes | `994:MoreCraftableEquipment.esp` |
 | Boots | 1 | novice | Shoes and light boots | MCE_CraftingLoom | 1 Leather, 1 Thread |  | yes | `99b:MoreCraftableEquipment.esp` |
@@ -99,12 +80,10 @@ By rank: novice 82, advanced 10, expert 6, master 4.
 | Whiterun Guard Cloak | 1 | advanced | Other armour and clothing | TanningRack | 2 Linen Wrap |  | yes | `2e0e:Cloaks&Capes.esp` |
 | Winterhold Guard Cloak | 1 | advanced | Other armour and clothing | TanningRack | 2 Linen Wrap |  | yes | `2e10:Cloaks&Capes.esp` |
 | Dwarven Mage Unarmored Robe | 1 | expert | Robes and body wear | SmithingForge | 1 Troll Fat, 3 Leather Strips, 3 Leather, 2 Dwarven Metal Ingot |  | yes | `37306:Hothtrooper44_ArmorCompilation.esp` |
-| Imperial Knight Cape | 1 | expert | Robes and body wear | SmithingForge | 2 Linen Wrap, 1 Corundum Ingot, 2 Leather Strips, 1 Leather |  | yes | `6aa09:Hothtrooper44_ArmorCompilation.esp` |
 | Shaman Unarmored Robe | 1 | expert | Robes and body wear | SmithingForge | 2 Linen Wrap, 3 Troll Fat, 2 Leather Strips, 3 Leather, 2 Fur Plate |  | yes | `82ec2:Hothtrooper44_ArmorCompilation.esp` |
 | Tribunal Unarmored Robe Black | 1 | expert | Robes and body wear | SmithingForge | 1 Common Soul Gem, 2 Linen Wrap, 5 Troll Fat, 3 Leather Strips, 9 Leather |  | yes | `231d5:Hothtrooper44_ArmorCompilation.esp` |
 | Tribunal Unarmored Robe Blue | 1 | expert | Robes and body wear | SmithingForge | 1 Common Soul Gem, 2 Linen Wrap, 5 Troll Fat, 3 Leather Strips, 9 Leather |  | yes | `231d6:Hothtrooper44_ArmorCompilation.esp` |
 | Tribunal Unarmored Robe Green | 1 | expert | Robes and body wear | SmithingForge | 1 Common Soul Gem, 2 Linen Wrap, 5 Troll Fat, 3 Leather Strips, 9 Leather |  | yes | `231d7:Hothtrooper44_ArmorCompilation.esp` |
-| Dragonhide Unarmored Robe | 1 | master | Robes and body wear | SmithingForge | 3 Troll Fat, 1 Dragon Scales, 1 Dragon Bone, 3 Leather Strips, 3 Leather |  | yes | `3730b:Hothtrooper44_ArmorCompilation.esp` |
 | Ebony Mage Unarmored Robe | 1 | master | Robes and body wear | SmithingForge | 4 Troll Fat, 2 Ebony Ingot, 3 Leather Strips, 6 Leather |  | yes | `37301:Hothtrooper44_ArmorCompilation.esp` |
 | Tribunal Unarmored Robe Red | 1 | master | Robes and body wear | SmithingForge | 1 Common Soul Gem, 2 Linen Wrap, 5 Troll Fat, 3 Leather Strips, 9 Leather |  | yes | `231d8:Hothtrooper44_ArmorCompilation.esp` |
 | Tribunal Unarmored Robe White | 1 | master | Robes and body wear | SmithingForge | 1 Common Soul Gem, 2 Linen Wrap, 5 Troll Fat, 3 Leather Strips, 9 Leather |  | yes | `231d9:Hothtrooper44_ArmorCompilation.esp` |
