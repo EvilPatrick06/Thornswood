@@ -206,7 +206,7 @@ different servers stitched together.
 | Milk Drinker, Talos Worshiper, Thalmor Boot-Licker | | The three Patreon tiers |
 | Jarl of *hold* | bright gold | Holds that hold. Nine of them, one each |
 | Citizen of *hold* | slate | Where your character lives |
-| Member | grey | Everybody, handed out on the way in |
+| Member | grey | Given by staff after an application is accepted |
 | Banned | grey | What the site keys a ban off. No permissions, not hoisted |
 | Patreon, News Pings, Updates Pings | | Made by Patreon and by the bot, never here. They are in the builder's list for their place in the order and nothing else |
 
@@ -232,8 +232,9 @@ ones stay invisible until they are not.
 Owner and Dev are administrators. Moderator can time out, kick, ban and delete.
 Gamemaster can time out and manage threads but not ban. The rest is ordinary.
 
-Give the people testing with you **Playtester**. Everyone gets **Member** on the
-way in, then picks a hold.
+Give the people testing with you **Playtester**. That role is access.play,
+and it is what opens the game. Staff give **Member** after an application is
+accepted. Discord has no default-role setting. Then the person picks a hold.
 
 ## The three things the bot cannot do
 
@@ -245,10 +246,10 @@ way in, then picks a hold.
 2. **Point the rules screen at the rules.** Community, then Safety Setup. That
    is what makes people accept the rules before they can type.
 
-3. **Hand out Member on join.** Server Settings, Roles, edit Member, and
-   turn on the default role option, or use whatever bot you like for it. A
-   rules screen plus an auto role means somebody who has not accepted the rules
-   cannot post anywhere.
+3. **Hand Member out on join.** It cannot. Discord has no default-role
+   setting, so there is nothing to turn on under Server Settings, Roles.
+   Staff give Member after an application is accepted. Playtester
+   (access.play) is what opens the game.
 
 ## Changing the words later
 
