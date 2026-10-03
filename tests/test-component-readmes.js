@@ -408,10 +408,12 @@ SIX.forEach(function (d) {
       hits.length >= 2);
   yes('one of them is the pieces table row', hits.some(function (i) { return /^\| Dev build \|/.test(lines[i]); }));
 
-  const setupAt = lines.indexOf('## Setting up a machine');
+  const setupAt = lines.findIndex(function (l) { return /^#{2,3} Setting up a machine$/.test(l); });
   let nextHead = lines.length;
+  const setupLevel = setupAt >= 0 ? lines[setupAt].match(/^#+/)[0].length : 2;
   for (let i = setupAt + 1; setupAt >= 0 && i < lines.length; i++) {
-    if (/^## /.test(lines[i])) { nextHead = i; break; }
+    const marks = lines[i].match(/^(#+)\s/);
+    if (marks && marks[1].length <= setupLevel) { nextHead = i; break; }
   }
   let ghAt = -1, baseAt = -1;
   for (let i = setupAt + 1; setupAt >= 0 && i < nextHead; i++) {
