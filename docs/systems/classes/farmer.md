@@ -172,6 +172,10 @@ Generated from the work tables by `scripts/dev/Write-SystemLists.js`. The same r
 Empty plots, the claim circle, the 14 days, the waits, the yields,
 and a shovel of 100 uses are in the server. The plan's shovel is 50.
 A farmer is handed 3 cabbage, 3 leek and 3 potato as seed. A cook
-is not handed a pack, in the plan or on the server. Nothing reads
-the weather before a crop grows,
-and there is no season. A beehive is not a farmer verb on the server.
+is not handed a pack, in the plan or on the server. The season is
+in the server: four of them, 7 real days each, starting in spring.
+Winter stops the crop clock and the plot stays sown. A placed hive
+is a farmer verb: 1 Honeycomb, 10 minutes, one piece of work, no rank
+gate. Spring, summer and autumn do not yet stop a crop for temperature.
+The page names that and gives no degree. The cold link into hunger
+and thirst is not here.
