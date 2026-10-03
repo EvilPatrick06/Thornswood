@@ -3,6 +3,8 @@
 Two lists, because they are two different jobs. The first is about being decent
 to each other. The second is about playing here.
 
+Last changed: 29 September 2026.
+
 <!-- alpha -->
 Thornswood is in alpha, and the world is open by application. The application
 in the Discord asks whether you accept these rules, and your answer is kept
