@@ -331,6 +331,8 @@ try {
     $ours = Join-Path $inst 'Game\Data\Platform\UI\ours.bsa'
     Put $ours ('x' * 4096)
     Put (Join-Path $inst 'Game\Data\Platform\UI\ours.esp') 'plugin'
+    Put (Join-Path $inst 'Profile\OwnGame\plugins.txt') "# This fixture enables no additional plugins.`r`n"
+    Put (Join-Path $inst 'Profile\OwnGame\loadorder.txt') ''
     $rel6 = Join-Path $inst 'rel'
     function Publish([string[]]$extra) {
         $oldA = $env:LOCALAPPDATA; $oldE = $ErrorActionPreference
@@ -401,6 +403,7 @@ try {
     Feed6 '{"packs":[],"news":[]}'
     $legacyMap = @{}
     foreach ($k in $recorded.Keys) {
+        if ($k.StartsWith(':')) { $legacyMap[$k] = $recorded[$k]; continue }
         $fi = Get-Item -LiteralPath (Join-Path (Join-Path $inst 'Game') $k)
         $legacyMap[$k] = ('{0}:{1}' -f $fi.Length, $fi.LastWriteTimeUtc.Ticks)
     }
