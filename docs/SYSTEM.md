@@ -200,6 +200,12 @@ A deploy sends a commit or nothing (issue #1121): `Deploy-Docs.ps1`,
 box, when a file they would send out of the repository has uncommitted
 changes or is untracked, and name each one (`Assert-ThornswoodCommitted` in
 `scripts\deploy\Artifact.ps1`). There is no switch past it.
+`Deploy-Docs.ps1` and `Install-Voice.ps1` then check the site or voice tree
+they are about to send, file by file, against that same commit
+(`Assert-ThornswoodSourceIntegrity`, issue #1335). The zip, the expanded
+tree and the commit's own bytes have to be the same hashes. If they are not,
+nothing is sent and the box is not touched. The hash compare Deploy-Docs
+already makes of server.js and the public files, on the box, is unchanged.
 
 How a deploy replaces what runs (issue #446): nothing is written over a
 running service any more. The new files go into `<folder>\.stage-<stamp>`

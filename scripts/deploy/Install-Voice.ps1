@@ -180,10 +180,14 @@ try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; `$t
 }
 
 # ---------------------------------------------------------------- files -----
-# The voice artifact built above goes to the box's store first. The copies
-# below are from its folder. -PutBack builds and sends nothing.
+# The voice artifact built above goes to the box's store first, and only
+# after its tree matches the commit (Assert-ThornswoodSourceIntegrity, issue
+# #1335). A file that is not that commit stops the install here, and nothing
+# is sent. The copies below are from its folder. -PutBack builds and sends
+# nothing.
 $src = Join-Path $Here '..\..\voice'
 if (-not $PutBack) {
+Assert-ThornswoodSourceIntegrity -Artifact $artifact -RepoDir (Join-Path $Here '..\..')
 Send-ThornswoodArtifact -Artifact $artifact -Target $target -SshArgs $ssh
 $src = Join-Path $artifact.Folder 'voice'
 }

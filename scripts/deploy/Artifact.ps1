@@ -31,6 +31,12 @@
   deploy went through and its record said "edited". Ignored files are never
   sent and do not count.
 
+  SITE AND VOICE, BEFORE ANYTHING IS SENT. Deploy-Docs.ps1 and
+  Install-Voice.ps1 call Assert-ThornswoodSourceIntegrity on the artifact
+  they just built. It checks the zip's hash and every file in the expanded
+  tree against the commit's own blobs. If any of that differs, it throws
+  and those scripts do not send. Issue #1335.
+
   The zip is expanded next to itself, laid out like the repository, and the
   deploy scripts send from that folder instead of from the working tree, so
   what goes up is exactly what the zip holds.
@@ -351,6 +357,144 @@ function New-ThornswoodArtifact {
     Short      = $short
     Sha256     = $sha
     Size       = $record.size
+  }
+}
+
+function Assert-ThornswoodSourceIntegrity {
+  param(
+    [Parameter(Mandatory = $true)]$Artifact,
+    [Parameter(Mandatory = $true)][string]$RepoDir
+  )
+  # Deploy-Docs (site) and Install-Voice (voice) call this after the artifact
+  # is built and before anything is sent. The tree that would go up has to be
+  # the commit's own bytes: the zip's hash, every expanded file's hash, and
+  # the blobs git has for that commit. A miss throws, and the caller must not
+  # send. This does not replace the hash compare those scripts already make
+  # of the files once they are on the box.
+  if (-not $Artifact -or -not $Artifact.Folder -or -not $Artifact.Zip -or -not $Artifact.Record) {
+    throw 'Refused: there is no site or voice artifact to check, so nothing was sent and the box was not touched.'
+  }
+  $component = [string]$Artifact.Component
+  if (-not $component) { $component = 'deploy' }
+  $RepoDir = (Resolve-Path -LiteralPath $RepoDir).ProviderPath.TrimEnd('\')
+  $commit = (Invoke-ThornswoodArtifactGit $RepoDir @('rev-parse', '--verify', 'HEAD^{commit}') | Select-Object -First 1).Trim()
+  if ($commit -notmatch '^[0-9a-f]{40}$' -or $commit -ne [string]$Artifact.Commit) {
+    $built = [string]$Artifact.Commit
+    throw "Refused: the $component artifact is not HEAD ($commit), it was built from $built, so nothing was sent and the box was not touched."
+  }
+  if (-not (Test-Path -LiteralPath $Artifact.Zip)) {
+    throw "Refused: the $component artifact zip is missing, so nothing was sent and the box was not touched."
+  }
+  $zipHash = (Get-FileHash -LiteralPath $Artifact.Zip -Algorithm SHA256).Hash.ToLowerInvariant()
+  if ($zipHash -ne ([string]$Artifact.Sha256).ToLowerInvariant()) {
+    throw "Refused: the $component artifact zip is not the bytes built from $($commit.Substring(0, 12)), so nothing was sent and the box was not touched."
+  }
+  if (-not (Test-Path -LiteralPath $Artifact.Folder)) {
+    throw "Refused: the $component artifact tree is missing, so nothing was sent and the box was not touched."
+  }
+
+  $reasons = [ordered]@{}
+  $want = @{}
+  foreach ($f in @($Artifact.Record.files)) {
+    $path = $null; $sha = $null; $sizeText = $null
+    if ($f -is [System.Collections.IDictionary]) {
+      $path = [string]$f['path']; $sha = [string]$f['sha256']; $sizeText = [string]$f['size']
+    } else {
+      $path = [string]$f.path; $sha = [string]$f.sha256; $sizeText = [string]$f.size
+    }
+    if (-not $path) { $path = '(no path)' }
+    $path = $path.Replace('\', '/').Trim('/')
+    if ($sha) { $sha = $sha.ToLowerInvariant() }
+    $size = 0L
+    $sizeOk = $false
+    try { $size = [int64]$sizeText; if ($size -ge 0) { $sizeOk = $true } } catch { $sizeOk = $false }
+    if ($want.ContainsKey($path)) {
+      $reasons[$path] = 'listed twice in the artifact record'
+      continue
+    }
+    if ($sha -notmatch '^[0-9a-f]{64}$' -or -not $sizeOk) {
+      $reasons[$path] = 'the artifact record has no usable size and sha256'
+      $want[$path] = @{ sha256 = ''; size = -1L }
+      continue
+    }
+    $want[$path] = @{ sha256 = $sha; size = $size }
+  }
+  if (-not $want.Count) {
+    throw "Refused: the $component artifact lists no files, so nothing was sent and the box was not touched."
+  }
+
+  $root = (Get-Item -LiteralPath $Artifact.Folder).FullName.TrimEnd('\')
+  $onDisk = @{}
+  foreach ($file in @(Get-ChildItem -LiteralPath $root -Recurse -File -Force)) {
+    if ($file.FullName.Length -le $root.Length -or ($file.FullName[$root.Length] -ne [char]92 -and $file.FullName[$root.Length] -ne '/')) {
+      throw "Refused: could not name a file under the $component artifact tree, so nothing was sent and the box was not touched."
+    }
+    $rel = $file.FullName.Substring($root.Length).TrimStart('\', '/').Replace('\', '/')
+    if ($onDisk.ContainsKey($rel)) { $reasons[$rel] = 'two files in the tree land on one path' }
+    $onDisk[$rel] = $file.FullName
+  }
+  foreach ($path in @($want.Keys)) {
+    if (-not $onDisk.ContainsKey($path)) { $reasons[$path] = 'missing from the tree that would be sent' }
+  }
+  foreach ($path in @($onDisk.Keys)) {
+    if (-not $want.ContainsKey($path) -and -not $reasons.Contains($path)) {
+      $reasons[$path] = 'in the tree that would be sent, but not in the commit artifact'
+    }
+  }
+
+  $diskSha = @{}
+  foreach ($path in @($want.Keys)) {
+    if (-not $onDisk.ContainsKey($path)) { continue }
+    if ($reasons.Contains($path)) { continue }
+    $bytes = [IO.File]::ReadAllBytes($onDisk[$path])
+    $hex = Get-ThornswoodSha256Hex $bytes
+    $diskSha[$path] = $hex
+    if ($bytes.LongLength -ne $want[$path].size -or $hex -ne $want[$path].sha256) {
+      $reasons[$path] = 'bytes are not the recorded source'
+    }
+  }
+
+  Initialize-ThornswoodArtifactType
+  $git = (Get-Command git -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+  $blobIds = @{}
+  $pathArgs = @($want.Keys)
+  foreach ($line in @(Invoke-ThornswoodArtifactGit $RepoDir (@('ls-tree', '-r', '--full-tree', $commit, '--') + $pathArgs))) {
+    if (-not $line) { continue }
+    $m = [regex]::Match($line, '^(\d{6}) (\w+) ([0-9a-f]{40})\t(.+)$')
+    if (-not $m.Success) { throw "Refused: git ls-tree said something this does not read ($line), so nothing was sent and the box was not touched." }
+    if ($m.Groups[2].Value -ne 'blob') { continue }
+    $p = $m.Groups[4].Value
+    if ($p.StartsWith('"')) { throw "Refused: a path git had to quote cannot be checked ($p), so nothing was sent and the box was not touched." }
+    $blobIds[$p] = $m.Groups[3].Value
+  }
+  $idNames = New-Object System.Collections.Generic.List[string]
+  $ids = New-Object System.Collections.Generic.List[string]
+  foreach ($path in @($want.Keys)) {
+    if (-not $blobIds.ContainsKey($path)) {
+      if (-not $reasons.Contains($path)) { $reasons[$path] = 'not in commit ' + $commit.Substring(0, 12) }
+      continue
+    }
+    if (-not $want[$path].sha256) { continue }
+    [void]$idNames.Add($path)
+    [void]$ids.Add($blobIds[$path])
+  }
+  if ($ids.Count) {
+    $datas = [ThornswoodArtifactZip]::ReadBlobs($git, $RepoDir, $ids.ToArray())
+    for ($i = 0; $i -lt $idNames.Count; $i++) {
+      $path = $idNames[$i]
+      $hex = Get-ThornswoodSha256Hex $datas[$i]
+      $recordSha = $want[$path].sha256
+      $diskOk = $diskSha.ContainsKey($path) -and $diskSha[$path] -eq $hex
+      if ($hex -ne $recordSha -or -not $diskOk) {
+        if (-not $reasons.Contains($path)) { $reasons[$path] = "not the commit's bytes" }
+      }
+    }
+  }
+
+  if ($reasons.Count) {
+    $nl = [Environment]::NewLine
+    $list = @($reasons.Keys | Sort-Object | ForEach-Object { '    ' + $_ + '  (' + $reasons[$_] + ')' }) -join $nl
+    throw ("Refused: the $component deploy would send " + $reasons.Count + " file(s) that are not the source at " + $commit.Substring(0, 12) + ", so nothing was sent and the box was not touched:" + $nl + $list)
   }
 }
 
