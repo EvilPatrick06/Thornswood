@@ -10,6 +10,7 @@
   guarded only by whether caddy.exe was already there. Bootstrap-VPS.ps1 read
   nodejs.org/dist/index.json and took the newest v24 with Select-Object
   -First 1. Install-Bot.ps1 ran pip install discord.py pillow certifi by name.
+  The same script fetched python-3.12.8 with no checksum (issue #1334).
   None of the three checked a checksum. In the entry's words: "The next full
   install otherwise takes whatever the next major release turns out to be."
 
@@ -285,6 +286,79 @@ if ($pipBlocks.Count -eq 1) {
          $(if ($errs.Count) { ': ' + $errs[0].Message } else { '' })) ($errs.Count -eq 0)
     Yes '  and installs from the requirements.txt staged beside bot.py' ($sent -match "pip install [^\r\n]*-r 'C:\\Thornswood-Bot\\\.stage-20260929-000000\\requirements\.txt'")
     Yes '  and no longer installs any of the three by name' ($sent -notmatch 'pip install[^\r\n]*\b(discord\.py|pillow|certifi)\b')
+}
+
+# ===================================================== python installer ======
+# Issue #1334. The only Python download is the remote block in Install-Bot.ps1
+# (there is no second downloader). It must be one exact python.org file, and a
+# file that does not match the recorded SHA-256 must exit non-zero without
+# starting the installer.
+$pyVersion = ParamDefault $ib.Ast 'PythonVersion'
+$pySha = ParamDefault $ib.Ast 'PythonSha256'
+Yes "Python is pinned to one 3.12 release ($pyVersion)" ("$pyVersion" -eq '3.12.10')
+Yes '  and carries a SHA-256, 64 hex digits' ("$pySha" -match '^[0-9a-fA-F]{64}$')
+Yes 'Install-Bot.ps1 no longer fetches python-3.12.8' ($ibText -notmatch '3\.12\.8')
+Yes 'a failed Python download stops the run' ($ibText -match "if \(\`$LASTEXITCODE -ne 0\) \{ Die 'Python was not installed")
+
+$pyBlocks = @(HereStrings $ib.Ast | Where-Object {
+    $_.Extent.Text -match 'python\.org/ftp/python' -and $_.Extent.Text -match 'Invoke-WebRequest' })
+Yes 'there is exactly one remote block that downloads the Python installer' ($pyBlocks.Count -eq 1)
+if ($pyBlocks.Count -eq 1) {
+    $pyHere = $pyBlocks[0].Extent.Text
+    $sent = Expand $pyHere @{ PythonVersion = $pyVersion; PythonSha256 = $pySha }
+    $errs = ParseErrors $sent
+    Yes ('the python block parses as it would be sent to the VPS' +
+         $(if ($errs.Count) { ': ' + $errs[0].Message } else { '' })) ($errs.Count -eq 0)
+    $asset = 'https://www.python.org/ftp/python/{0}/python-{0}-amd64.exe' -f $pyVersion
+    Yes 'it downloads that exact python.org file' ($sent.Contains($asset))
+    Yes 'it compares against the pinned SHA-256 before the installer runs' (
+        $sent.Contains("'$pySha'") -and $sent -match 'Get-FileHash[^\r\n]*-Algorithm SHA256' -and
+        $sent.IndexOf('Get-FileHash') -lt $sent.IndexOf('Start-Process'))
+
+    $fakeExe = Join-Path $work 'stand-in-python.exe'
+    Set-Content -LiteralPath $fakeExe -Value 'stand-in python' -NoNewline
+    $fakeSha = (Get-FileHash -LiteralPath $fakeExe -Algorithm SHA256).Hash
+    $runner = Join-Path $work 'run-python-pin.ps1'
+    $started = Join-Path $work 'python-installer-started.txt'
+    $landed = Join-Path $env:TEMP ('python-{0}-amd64.exe' -f $pyVersion)
+
+    function Write-PythonRunner([string]$sha) {
+        $text = Expand $pyHere @{ PythonVersion = $pyVersion; PythonSha256 = $sha }
+        $head = @"
+`$ErrorActionPreference = 'Continue'
+`$script:serve = '$($fakeExe.Replace("'", "''"))'
+function Invoke-WebRequest {
+    param([string]`$Uri, [string]`$OutFile, [switch]`$UseBasicParsing, [int]`$TimeoutSec)
+    Copy-Item -LiteralPath `$script:serve -Destination `$OutFile -Force
+}
+function Start-Process {
+    param([Parameter(Position = 0)][string]`$FilePath, [object[]]`$ArgumentList, [switch]`$Wait, [switch]`$PassThru)
+    Set-Content -LiteralPath '$($started.Replace("'", "''"))' -Value 'started' -Encoding ascii
+    return [pscustomobject]@{ ExitCode = 0 }
+}
+"@
+        [IO.File]::WriteAllText($runner, ($head + "`r`n" + $text), (New-Object Text.UTF8Encoding $false))
+    }
+
+    Remove-Item -LiteralPath $started -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $landed -Force -ErrorAction SilentlyContinue
+    Write-PythonRunner $pySha
+    $pinErr = Join-Path $work 'python-pin-err.txt'
+    $pref = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $said = @(& powershell.exe -NoProfile -File $runner 2>$pinErr)
+    $ErrorActionPreference = $pref
+    Yes 'a python installer that does not match the checksum exits non-zero' ($LASTEXITCODE -ne 0)
+    Yes '  and the installer is never started' (-not (Test-Path -LiteralPath $started))
+    Yes '  and the download is not left behind' (-not (Test-Path -LiteralPath $landed))
+
+    Remove-Item -LiteralPath $started -Force -ErrorAction SilentlyContinue
+    Write-PythonRunner $fakeSha
+    $said = @(& powershell.exe -NoProfile -File $runner)
+    Yes 'a python installer that matches exits 0 and is run' (
+        $LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $started))
+    Yes '  and it says the checksum matched' (($said -join ' ') -match 'checksum matched')
+    Yes '  and the download is removed after' (-not (Test-Path -LiteralPath $landed))
 }
 
 # The build check installs what the VPS installs, so what is tested is what runs.
