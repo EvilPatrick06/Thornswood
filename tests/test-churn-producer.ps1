@@ -112,7 +112,12 @@ Yes 'milking a cow gives the farmer Milk at novice' (
 $egg = @($res.Rows | Where-Object { $_.Fn -eq 'collectEgg' })
 Yes 'a chicken nest gives the farmer Chicken''s Egg at novice' (
     $egg.Count -eq 1 -and $egg[0].Key -eq 'chickenEgg' -and $egg[0].Who -eq 'farmer' -and $egg[0].At -eq 0)
-Yes 'and nothing but those six verbs is read' (
-    @($res.Rows | Where-Object { @('mineSalt', 'burnCharcoal', 'chopWood', 'churn', 'milk', 'collectEgg') -notcontains $_.Fn }).Count -eq 0)
+# hive() since #1377: a farmer takes one Honeycomb off a placed hive,
+# the seventh verb in STATION_VERBS. No rank gate.
+$hive = @($res.Rows | Where-Object { $_.Fn -eq 'hive' })
+Yes 'a placed hive gives the farmer Honeycomb at novice' (
+    $hive.Count -eq 1 -and $hive[0].Key -eq 'honeycomb' -and $hive[0].Who -eq 'farmer' -and $hive[0].At -eq 0)
+Yes 'and nothing but those seven verbs is read' (
+    @($res.Rows | Where-Object { @('mineSalt', 'burnCharcoal', 'chopWood', 'churn', 'milk', 'collectEgg', 'hive') -notcontains $_.Fn }).Count -eq 0)
 
 Done
