@@ -2478,23 +2478,39 @@ namespace Thornswood
         static HashSet<string> Owned(HashSet<string> deployed)
         {
             var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            try
+            // A record that cannot be read used to end this loop and be
+            // swallowed, so the files the rest of the records name were not
+            // Thornswood's, and a refresh put Vortex's copy back over them.
+            // The caller stops and says why instead (#1249). Ours already
+            // reads these the same way, without a catch.
+            if (Directory.Exists(Paths.PacksDir))
             {
-                if (Directory.Exists(Paths.PacksDir))
+                string[] recs;
+                try { recs = Directory.GetFiles(Paths.PacksDir, "*.files"); }
+                catch (Exception ex)
                 {
-                    foreach (string rec in Directory.GetFiles(Paths.PacksDir, "*.files"))
+                    throw new Exception("Could not read the pack lists in " + Paths.PacksDir +
+                        " (" + ex.Message.TrimEnd('.') + "). Nothing was changed. Close whatever has that folder open and try again.");
+                }
+                foreach (string rec in recs)
+                {
+                    string[] lines;
+                    try { lines = File.ReadAllLines(rec); }
+                    catch (Exception ex)
                     {
-                        foreach (string line in File.ReadAllLines(rec))
-                        {
-                            int bar = line.IndexOf('|');
-                            if (bar < 0) continue;
-                            string rel = line.Substring(bar + 1);
-                            if (rel.StartsWith("game\\", StringComparison.OrdinalIgnoreCase)) set.Add(rel.Substring(5));
-                        }
+                        throw new Exception("Could not read " + Path.GetFileName(rec) +
+                            ", a pack's list of the files it put into the game (" +
+                            ex.Message.TrimEnd('.') + "). Nothing was changed. Close whatever has that list open and try again.");
+                    }
+                    foreach (string line in lines)
+                    {
+                        int bar = line.IndexOf('|');
+                        if (bar < 0) continue;
+                        string rel = line.Substring(bar + 1);
+                        if (rel.StartsWith("game\\", StringComparison.OrdinalIgnoreCase)) set.Add(rel.Substring(5));
                     }
                 }
             }
-            catch (Exception ex) { Swallow.Note("OwnGame.Owned", ex); }
             try { foreach (string rel in Keep.Held()) set.Add(rel); } catch (Exception ex) { Swallow.Note("OwnGame.Owned, Keep.Held", ex); }
             try
             {
