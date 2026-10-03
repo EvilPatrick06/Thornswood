@@ -65,6 +65,7 @@ function fixture(options = {}) {
     'A shared production entry must replace the single-actor deployed entry');
   let time = 0, sequence = 0, callback = null;
   const pending = new Map(), states = new Map(), persisted = new Map();
+  for(const id of options.commanded || []) persisted.set(id+':thornswoodNpcCommanded',true);
   const ids = options.ids || Array.from({length:options.count || 3}, (_, i) => i + 1);
   ids.forEach(id => states.set(id, actor(options.npc && options.npc[id])));
   const humanIds = options.humans || [];
@@ -104,6 +105,7 @@ function fixture(options = {}) {
         actorIds:ids.slice(cursor, cursor + limit)};
     },
     makeProperty() {},
+    setNpcPlacementExclusions() {},
     getNpcAIState(id) {
       if (options.badState === id) throw new Error('one malformed actor');
       assert.ok(states.has(id), `unknown actor ${id}`);
@@ -117,11 +119,13 @@ function fixture(options = {}) {
       if (prop === 'locationalData') return {pos:state.pos.slice(), rot:state.rot.slice(),
         cellOrWorldDesc:state.cellOrWorld.toString(16) + ':Skyrim.esm'};
       if (prop === 'isDead' || prop === 'isDisabled') return state[prop];
+      if (prop === 'baseDesc') return 'a:Skyrim.esm';
       if (options.badProfile === id) throw new Error('one corrupt routine profile');
       return persisted.has(id + ':' + prop) ? plain(persisted.get(id + ':' + prop)) : null;
     },
     set(id, prop, value) { persisted.set(id + ':' + prop, plain(value)); },
     getIdFromDesc(desc) { return parseInt(desc.split(':')[0], 16); },
+    getDescFromId(id) { return id.toString(16)+':Skyrim.esm'; },
     getNavmeshRecords(cell) {
       if (options.badNavCell === cell) throw new Error('one unreadable navmesh');
       if (options.records) return [...options.records].filter(([,record]) => record.cell === cell)
@@ -196,12 +200,18 @@ function fixture(options = {}) {
     placeActor() { assert.fail('No new cast members'); },
     destroyActor() { assert.fail('No cast removals'); }
   };
-  const population = options.population ? {
+  let population = options.population ? {
     configure(id,state) {
       policyEvents.push({kind:"configure",id,at:time});
       return options.population(id,plain(state),api);
     }
   } : undefined;
+  if(options.populationData) {
+    const policyBegin=source.indexOf('// NPC POPULATION POLICY BEGIN');
+    const policyEnd=source.indexOf('// NPC POPULATION POLICY END');
+    vm.runInContext(source.slice(policyBegin,policyEnd),context);
+    population=context.createNpcPopulation(api,options.populationData,['Skyrim.esm']);
+  }
   runtime = context.startSharedNpcServerRuntime(api, timers, () => time,
     text => logs.push(text), population);
   function advance(ms) {
@@ -736,6 +746,20 @@ test('A sloped face keeps an in-home actor moving when vertical home projection 
   f.advance(30000);
   assert.ok(f.moves.some(move=>move.speed>0),'An in-home actor must keep moving on slopes');
   checkLeash(f.moves,home,leash);f.stop();
+});
+
+test('A commanded actor survives five-second discovery under the real population policy', () => {
+  const commanded=0xff000040,ordinary=0xff000041;
+  const f=fixture({ids:[commanded,ordinary],commanded:[commanded],
+    populationData:{version:1,plugins:['Skyrim.esm'],keep:[],cut:[]}});
+  f.advance(12000);
+  assert.ok(f.loadedLookups()>=2,'Exercise repeated native identity discovery');
+  assert.ok(f.controlled.has(commanded),'The commanded NPC retains authority');
+  assert.ok(!f.controlled.has(ordinary),'Uncommanded actors still need a habitat');
+  assert.ok(!f.api.get(commanded,'isDisabled'),'The command stays visible');
+  assert.ok(f.moves.some(move=>move.id===commanded && move.at>=5000),
+    'The actor remains active after delayed rediscovery');
+  f.stop();
 });
 
 console.log(JSON.stringify({passed,failed}));

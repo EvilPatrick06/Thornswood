@@ -44,6 +44,7 @@ const placed = [], moved = [], destroyed = [], created = [], said = [], logs = [
 let nextRef = 0xff000100;
 let placeThrows = '', setThrows = '';
 let settings = {};
+const properties = new Set();
 
 const mpBase = {
   get: function (id, prop) {
@@ -52,6 +53,7 @@ const mpBase = {
     return undefined;
   },
   set: function (id, prop, value) {
+    if(prop === 'thornswoodNpcCommanded' && !properties.has(prop)) throw new Error('Property '+prop+" doesn't exist");
     if (prop === 'locationalData') {
       if (setThrows) { throw new Error(setThrows); }
       moved.push({ id: id, to: value });
@@ -67,6 +69,7 @@ const mpBase = {
   place: function (baseId) {
     if (placeThrows) { throw new Error(placeThrows); }
     const ref = nextRef++;
+    actors[ref] = {baseDesc:baseId.toString(16)+':Skyrim.esm',profileId:-1};
     placed.push({ base: baseId, ref: ref });
     return ref;
   },
@@ -74,7 +77,7 @@ const mpBase = {
   // The engine's meaning: the id the NEW actor gets. Nothing here should call it.
   createActor: function (formId) { created.push(formId); return formId; },
   getServerSettings: function () { return settings; },
-  makeProperty: function () {},
+  makeProperty: function (name) { properties.add(name); },
   makeEventSource: function () {},
   clear: function () {},
 };
@@ -179,6 +182,8 @@ if (loaded && pollTimer) {
 
   r = send('/spawn troll');
   const trollId = r.placed.length ? r.placed[0].base : 0;
+  yes('Main spawn succeeds when the Dev-only private marker is unregistered',
+      !properties.has('thornswoodNpcCommanded') && r.destroyed.length === 0 && r.said.some(s => /placed|spawn|troll/i.test(s)));
   yes('/spawn troll places one actor from the troll record with mp.place: ' + JSON.stringify(r.placed),
       r.placed.length === 1 && r.placed[0].base === trollId && trollId > 0);
   yes('and never calls createActor, whose first argument is the new actor\'s own id',
@@ -228,6 +233,22 @@ if (loaded && pollTimer) {
   yes('one placed and then not moved is taken away again, and they are told: ' + one(r),
       r.destroyed.length === 1 && r.said.length === 1 && /^Nothing was spawned: no such cell\.$/.test(r.said[0]));
 
+  // #1413 ran every placeActors call through the habitat cap. admit refuses a
+  // dynamic actor that is not inside an authored habitat with a free slot, and
+  // the refusal destroyed the one just placed. /spawn and /spawnat are a
+  // tester or staff asking for a creature where they stand, not a world birth.
+  properties.add('thornswoodNpcCommanded');
+  let capAsks = 0;
+  box.__thornswoodNpcPopulation = {
+    admit: function (id) { capAsks++; return actors[id].thornswoodNpcCommanded === true; },
+    release: function () {}
+  };
+  r = send('/spawn troll');
+  yes('a habitat cap does not eat a tester spawn or swallow the reply: ' + one(r) + ' admits=' + capAsks,
+      capAsks === 1 && r.placed.length === 1 && r.moved.length === 1 && r.destroyed.length === 0 &&
+      r.created.length === 0 && r.said.length === 1 && /^Spawned 1 Troll\.$/.test(r.said[0]));
+  box.__thornswoodNpcPopulation = null;
+
   // Nothing went through a path that threw on the way to handle().
   yes('no command threw on the way', r.threw.length === 0);
 
@@ -241,12 +262,27 @@ if (loaded && pollTimer) {
   yes('/give of a name it cannot find says so: ' + one(r), r.said.length === 1 && /Nothing called that/.test(r.said[0]));
 
   // --------------------------------------------- the shared helper ---
+  // Dev population registers its private property. Admission must see the
+  // marker before checking habitat capacity; Main has no such property.
+  properties.add('thornswoodNpcCommanded');
+  let admittedMarker = false, enrolled = 0;
+  box.__thornswoodNpcRuntime = {enroll:function() {enrolled++;}};
+  box.__thornswoodNpcPopulation = {
+    admit: function(id) { admittedMarker = actors[id].thornswoodNpcCommanded === true; return admittedMarker; },
+    release: function() {}
+  };
+  settings = {thornswoodPlaytesters:[PID]};
+  const devSpawn = send('/spawn troll');
+  yes('Dev command marks its actor before population admission', admittedMarker && devSpawn.destroyed.length === 0 && devSpawn.placed.length === 1 && enrolled === 1);
+  delete box.__thornswoodNpcPopulation;
+  delete box.__thornswoodNpcRuntime;
+
   yes('placeActors is one function at the top of the file, for /spawn and /spawnat',
-      /\nfunction placeActors\(baseId, where, count, away\) \{/.test(src));
+      /\nfunction placeActors\(baseId, where, count, away, commanded\) \{/.test(src));
   yes('/spawn goes through it',
-      /var put = placeActors\(baseId, \{ desc: inCell, pos: at, rot: facing \|\| \[0, 0, 0\] \}, count, 150\);/.test(src));
+      /var put = placeActors\(baseId, \{ desc: inCell, pos: at, rot: facing \|\| \[0, 0, 0\] \}, count, 150, true\);/.test(src));
   yes('the staff block\'s spawnBeside goes through it too',
-      /function spawnBeside\(baseId, where, count\) \{[^}]*return placeActors\(baseId, where, count, SPAWN_AWAY\);/.test(src));
+      /function spawnBeside\(baseId, where, count\) \{[^}]*return placeActors\(baseId, where, count, SPAWN_AWAY, true\);/.test(src));
   yes('nothing in the file calls mp.createActor any more', !/mp\.createActor\(/.test(src));
 }
 

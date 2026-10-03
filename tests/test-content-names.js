@@ -106,26 +106,59 @@ function hedrCount(head) {
 
 // ------------------------------------------------------ 1. the committed --
 const shipped = fs.readFileSync(ESP);
-const before = readPlugin(shipped);
+const committed = readPlugin(shipped);
+let before = committed;
 yes('the committed plugin reads to its last byte (' + before.records.length + ' records)',
     before.ends && before.records.length > 300);
-const badIds = before.records.filter(r => OTHER.test(edid(r)));
+const badIds = committed.records.filter(r => OTHER.test(edid(r)));
 yes('no editor id in the committed plugin begins Kzl or kzolivar (' + before.records.length + ' read, compressed included)',
     badIds.length === 0);
 for (const r of badIds) { console.log('      ' + r.tag + ' 0x' + r.fid.toString(16) + ' ' + edid(r)); }
+yes('the shipped plugin no longer contains the execution block or its placement',
+    !committed.records.some(r => r.fid === BLOCK || r.fid === BLOCK_REF));
+
+// Restore the two historical records only in a temporary fixture, in their
+// original group paths. This keeps removal and reference-safety coverage after
+// the cleaned plugin has shipped. The fixture bytes are from dbbbbcc396f8.
+const fixtureRecords = require('./fixtures/content-execution-block.json');
+function restoreFixture(buf) {
+  const inserted = new Set();
+  function walk(start, end, groups) {
+    const parts = [];
+    let p = start;
+    while (p < end) {
+      const size = buf.readUInt32LE(p + 4);
+      if (buf.toString('latin1', p, p + 4) === 'GRUP') {
+        const groupPath = groups.concat([[buf.subarray(p + 8, p + 12).toString('hex'), buf.readUInt32LE(p + 12)]]);
+        const body = walk(p + 24, p + size, groupPath);
+        const header = Buffer.from(buf.subarray(p, p + 24));
+        header.writeUInt32LE(24 + body.length, 4);
+        parts.push(header, body); p += size;
+      } else { parts.push(buf.subarray(p, p + 24 + size)); p += 24 + size; }
+    }
+    fixtureRecords.forEach((r, i) => {
+      if (JSON.stringify(r.groups) === JSON.stringify(groups)) {
+        parts.push(Buffer.from(r.bytes, 'hex')); inserted.add(i);
+      }
+    });
+    return Buffer.concat(parts);
+  }
+  const head = Buffer.from(committed.head);
+  const body = walk(head.length, buf.length, []);
+  yes('both historical fixture records were restored in their original groups', inserted.size === 2);
+  const countAt = head.indexOf('HEDR', 0, 'latin1') + 10;
+  head.writeInt32LE(committed.records.length + inserted.size, countAt);
+  return Buffer.concat([head, body]);
+}
+const fixture = restoreFixture(shipped);
+before = readPlugin(fixture);
 const block = before.records.find(r => r.fid === BLOCK);
-yes('the Execution Block is FURN 0x05DF7B34', block && block.tag === 'FURN' &&
+yes('the fixture Execution Block is FURN 0x05DF7B34', block && block.tag === 'FURN' &&
     edid(block) === 'ThornswoodExecutionerChoppingBlock');
 const ref = before.records.find(r => r.fid === BLOCK_REF);
-yes('it is placed once, REFR 0x05DFCC75 names it', ref && ref.tag === 'REFR' &&
+yes('its fixture placement REFR 0x05DFCC75 names the base', ref && ref.tag === 'REFR' &&
     subs(ref).some(s => s.tag === 'NAME' && s.body.readUInt32LE(0) === BLOCK));
 const stillPlaced = !!ref;
-if (stillPlaced) {
-  console.log('NOTE  the committed plugin still places the block in Solitude. It is rebuilt by the tool');
-  console.log('      and committed with the collection upload, not before, because the deploy scripts');
-  console.log('      send this file to the servers and the launcher refuses Play until everybody');
-  console.log('      has the same one.');
-}
 const GONE = new Set([BLOCK, BLOCK_REF]);
 const mast = h => h.toString('latin1').split('MAST').slice(1).map(s => s.slice(2).split('\0')[0]);
 function names(rec, fid) {
@@ -159,14 +192,14 @@ const tmpRoot = process.env.TEST_TMP || os.tmpdir();
 fs.mkdirSync(tmpRoot, { recursive: true });
 const dir = fs.mkdtempSync(path.join(tmpRoot, 'ts-content-names-'));
 const copy = path.join(dir, 'Thornswood-Content.esp');
-fs.writeFileSync(copy, shipped);
+fs.writeFileSync(copy, fixture);
 try {
   const check = python([TOOL, '--data', dir, '--check']);
   yes('python is on this machine', check !== null);
   if (check) {
     yes('--check exits 0', check.status === 0);
     if (check.status !== 0) { console.log(check.stdout + check.stderr); }
-    yes('--check writes nothing', fs.readFileSync(copy).equals(shipped));
+    yes('--check writes nothing', fs.readFileSync(copy).equals(fixture));
     if (stillPlaced) {
       yes('--check says the placed block comes out', /REFR 0x5DFCC75 the Execution Block placed in Solitude/.test(check.stdout));
       yes('--check says its base comes out too', /FURN 0x5DF7B34 ThornswoodExecutionerChoppingBlock, its base, named by nothing else/.test(check.stdout));
@@ -221,7 +254,7 @@ try {
     // A recipe made to name the base: the base stays, its script comes off,
     // the placed block still goes.
     if (stillPlaced && block) {
-      const named = Buffer.from(shipped);
+      const named = Buffer.from(fixture);
       const recipe = readPlugin(named).records.find(r => edid(r) === 'ThornswoodRecipeToolHandle');
       yes('a copy where a recipe names the base could be made', recipe && patchField(named, recipe, 'CNAM', BLOCK));
       fs.writeFileSync(copy, named);
@@ -239,7 +272,7 @@ try {
       yes('and its header count is right (' + hedrCount(ka.head) + ')', hedrCount(ka.head) === ka.records.length);
 
       // A recipe made to name the placed block: nothing is written.
-      const pointed = Buffer.from(shipped);
+      const pointed = Buffer.from(fixture);
       const recipe2 = readPlugin(pointed).records.find(r => edid(r) === 'ThornswoodRecipeToolHandle');
       patchField(pointed, recipe2, 'CNAM', BLOCK_REF);
       fs.writeFileSync(copy, pointed);
