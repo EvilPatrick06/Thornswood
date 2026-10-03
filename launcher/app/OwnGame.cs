@@ -1280,11 +1280,9 @@ namespace Thornswood
         /// </summary>
         static void SettleSettings(bool first)
         {
-            // Seed the plugin list where Skyrim will read it. On Make (first),
-            // always lay Golden down. On Refresh, only fill a missing file:
-            // overwriting Live every time put Golden's order (Thornswood-Content
-            // near the end) over a Fix/PutInServerOrder list and Mod list went
-            // red after Bring it up to date said the folder already matched.
+            // Seed the plugin list where Skyrim will read it, under Profile.
+            // A file already there is kept. Overwriting it on every refresh
+            // put Golden's order back over a Fix/PutInServerOrder list.
             try
             {
                 Directory.CreateDirectory(Paths.LocalAD);
@@ -1293,7 +1291,12 @@ namespace Thornswood
                     string shipped = Path.Combine(Paths.Golden, n);
                     string dest = Path.Combine(Paths.LocalAD, n);
                     if (!File.Exists(shipped)) continue;
-                    if (first || !File.Exists(dest)) File.Copy(shipped, dest, true);
+                    // A pack or Fix before the folder existed already wrote
+                    // this Profile file (#1234). Make keeps it. Golden fills
+                    // only a missing file, on Make and on Refresh, so a
+                    // server order is not put back to the shipped list
+                    // (Thornswood-Content near the end).
+                    if (!File.Exists(dest)) File.Copy(shipped, dest, true);
                 }
             }
             catch (Exception ex) { Swallow.Note("OwnGame.SettleSettings, copy shipped ini", ex); }

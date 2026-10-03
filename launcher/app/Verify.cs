@@ -595,7 +595,9 @@ namespace Thornswood
             if (mods == null) return 0;
             List<string> manifest = Names(mods);
 
-            string live = Path.Combine(Paths.Live, "plugins.txt");
+            // OrderFolder, not Paths.Live. Before the own folder exists
+            // Live is Windows' own Skyrim folder (#1234).
+            string live = Path.Combine(OrderFolder, "plugins.txt");
             if (!File.Exists(live)) return 0;
             if (LoadOrder.FirstMismatch(LoadOrder.GameOrder(Enabled(live), LightOrMissing, Ccc(), InData), manifest) < 0) return 0;
 
@@ -781,16 +783,26 @@ namespace Thornswood
         /// <summary>
         /// Puts the shipped plugin list back, into the file that is actually
         /// read, then the server's order into it when the server can be asked
-        /// (PutInServerOrder). Same correction as Run: Paths.Live rather than
-        /// Paths.LocalAD.
+        /// (PutInServerOrder). The file is OrderFolder: Profile until the own
+        /// folder exists, and the file the game reads after that.
         ///
-        /// Under the collection this is Vortex's file. Writing it here is still
-        /// right, because the server refuses a mismatched list and this is what
-        /// it expects, but Vortex will write its own version again the next time
-        /// it deploys. The launcher says so rather than letting somebody fix the
-        /// same thing twice and wonder why.
+        /// Before the own folder exists this does not write Vortex's file in
+        /// Windows' own Skyrim folder. The order waits in Profile (#1234).
+        /// Once the folder exists, the file written is the one the game reads.
         /// </summary>
         public static int Fix() { return Fix(null, null); }
+
+        /// <summary>
+        /// Where plugins.txt and loadorder.txt are written. After the own
+        /// folder exists, Paths.Live, the file the game reads. Before it
+        /// exists, Paths.Live is Windows' own Skyrim folder, so the order
+        /// waits in Profile and reaches the game when the folder is made
+        /// (#1234).
+        /// </summary>
+        public static string OrderFolder
+        {
+            get { return Paths.Collection ? Paths.LocalAD : Paths.Live; }
+        }
 
         /// <summary>
         /// The reference plugin list into the file the game actually reads.
@@ -816,8 +828,12 @@ namespace Thornswood
             {
                 string src = Path.Combine(Paths.Golden, f);
                 if (!File.Exists(src)) continue;
-                Directory.CreateDirectory(Paths.Live);
-                File.Copy(src, Path.Combine(Paths.Live, f), true);
+                // Profile until the own folder exists. Paths.Live is then
+                // Windows' own plugins.txt, the person's Steam Skyrim and
+                // the active Vortex profile (#1234). SettleSettings carries
+                // a list already waiting in Profile into the folder.
+                Directory.CreateDirectory(OrderFolder);
+                File.Copy(src, Path.Combine(OrderFolder, f), true);
                 n++;
             }
             return n;
