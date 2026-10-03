@@ -3,7 +3,7 @@
 Generated from the winning records in the 48-plugin dev load order.
 This is the authored policy prepared for the next dev release; release proof is recorded separately.
 
-14,641 placements inspected; 5,087 retained; 9,554 excluded.
+14,641 placements inspected; 5,072 retained; 9,569 excluded.
 
 Named pets and named enemies are excluded even when their source record lacks the Unique flag.
 Merchant traders and exterior transport services remain available.
@@ -17,13 +17,13 @@ listed interval; the deadline persists through restart. A corpse yields one shar
 |---|---:|
 | Eastmarch | 512 |
 | Falkreath | 432 |
-| Haafingar | 344 |
-| Hjaalmarch | 397 |
+| Haafingar | 339 |
+| Hjaalmarch | 393 |
 | Solstheim | 462 |
 | Whiterun | 545 |
 | Winterhold | 504 |
 | no hold | 359 |
-| the Pale | 387 |
+| the Pale | 381 |
 | the Reach | 538 |
 | the Rift | 607 |
 
@@ -414,7 +414,6 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | Ramshackle Trading Post | Solstheim | wilderness |  | 1 | 360 |
 | Ironbind Barrow | no hold | dungeon | 1 | 8 | 30 |
 | Ebony Warrior's Camp | the Rift | wilderness |  | 1 | 30 |
-| Thalmor Embassy, Dungeon | Haafingar | dungeon | 1 | 1 | 30 |
 | Oars Rest | Falkreath | city |  | 4 | 360 |
 | SolitudeTemple | Haafingar | city |  | 3 | 360 |
 | Apocrypha | no hold | wilderness |  | 3 | 45 |
@@ -765,9 +764,7 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | open ground in Tamriel | Winterhold | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Winterhold | wilderness |  | 1 | 30 |
 | POISnowy24 | Winterhold | wilderness |  | 2 | 45 |
-| open ground in Tamriel | the Pale | wilderness |  | 2 | 45 |
 | open ground in Tamriel | Winterhold | wilderness |  | 1 | 20 |
-| open ground in Tamriel | the Pale | wilderness |  | 3 | 45 |
 | open ground in Tamriel | Hjaalmarch | wilderness |  | 2 | 20 |
 | open ground in Tamriel | Winterhold | wilderness |  | 1 | 30 |
 | open ground in Tamriel | Winterhold | wilderness |  | 1 | 20 |
@@ -952,7 +949,6 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | open ground in Tamriel | Hjaalmarch | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Hjaalmarch | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Haafingar | wilderness |  | 1 | 360 |
-| open ground in Tamriel | Haafingar | wilderness |  | 3 | 45 |
 | open ground in Tamriel | Haafingar | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Haafingar | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Hjaalmarch | wilderness |  | 2 | 30 |
@@ -1039,7 +1035,6 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | open ground in Tamriel | Hjaalmarch | wilderness |  | 3 | 20 |
 | open ground in Tamriel | Hjaalmarch | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Hjaalmarch | wilderness |  | 2 | 20 |
-| open ground in Tamriel | Hjaalmarch | wilderness |  | 3 | 45 |
 | open ground in Tamriel | Hjaalmarch | wilderness |  | 2 | 20 |
 | open ground in Tamriel | Hjaalmarch | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Hjaalmarch | wilderness |  | 1 | 20 |
@@ -1898,7 +1893,7 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | The Serpent Doomstone | Winterhold | wilderness |  | 2 | 20, 45 |
 | The Shadow Doomstone | the Rift | wilderness |  | 1 | 45 |
 | The Tower Doomstone | Winterhold | wilderness |  | 1 | 30 |
-| open ground in Tamriel | Falkreath | wilderness |  | 221 | 20, 30, 45, 60, 240 |
+| open ground in Tamriel | Falkreath | wilderness |  | 218 | 20, 30, 45, 60, 240 |
 | Solitude Catacombs | Haafingar | dungeon | 1 | 3 | 30 |
 | CWMission07ImperialCamp01 | Hjaalmarch | wilderness |  | 1 | 20 |
 | CWMission07SonsCamp02 | the Rift | wilderness |  | 3 | 20 |

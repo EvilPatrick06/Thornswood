@@ -4,10 +4,12 @@ The server owns the retained winning placed identities and their movement,
 combat, health and return timers. The population policy runs before loading,
 including later saved-form loads. Main does not start this controller.
 
-The 48-plugin catalogue contains 14,641 placements: 5,087 retained and 9,554
-excluded. Named pets and enemies are cut even without a Unique flag. Traders,
-outside transport services, ecological wildlife and generic hostile encounters
-remain under habitat caps. Authored corpses are excluded from live encounters.
+The 48-plugin catalogue contains 14,641 placements: 5,072 retained and 9,569
+excluded. Named pets and enemies are cut even without a Unique flag. Fourteen
+old Justiciars and the embassy soldier are excluded too. Remnant patrols are
+not placed by this catalogue. Traders, outside transport services, ecological
+wildlife and generic hostile encounters remain under habitat caps.
+Authored corpses are excluded from live encounters.
 The native eligibility filter excludes mannequins and permits retained vampires
 and their traders. Humans, profiles and connected identities are protected.
 
@@ -80,9 +82,11 @@ indivisible and has a separate 100 ms ceiling; it cannot accumulate into a batch
 No game or launcher is started by these checks. A real dev restart and a later
 two-person session are separate evidence for persistence and visible agreement.
 
-The original full-cast baseline contained 11,253 native identities. The final
-mannequin-only filter admits 11,388 before the cut; all 5,087 retained source
-identities are eligible. The policy excludes 6,301 native eligible identities
+The original full-cast baseline contained 11,253 native identities. The dev proof
+below is the run before the fifteen old Thalmor were removed from the catalogue.
+The mannequin-only filter admits 11,388 before the cut; all 5,087 retained source
+identities were eligible in that run.
+The policy excludes 6,301 native eligible identities
 and 9,554 catalogue identities overall. The recorded population run owned all
 5,087 before and after reload. After reload, 4,750 were active and 337 remained
 safely stationary. All 4,732 eligible identities moved during the final activity

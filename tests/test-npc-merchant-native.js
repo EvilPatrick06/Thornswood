@@ -38,7 +38,7 @@ while(cursor<total) {
     if(purse) {assert.equal(purse.purse,250);assert.equal(purse.stock.length,0);merchantIds.push(id);}
   }
 }
-assert.equal(loaded,5087);assert.equal(merchantIds.length,249);
+assert.equal(loaded,5072);assert.equal(merchantIds.length,249);
 assert.equal(merchants.stats().verified,249);assert.equal(merchants.stats().initialized,249);
 const chosen=merchantIds[0],reference=server.getDescFromId(chosen),doc=storage.load();
 doc.entries[reference].purse=0;doc.entries[reference].stock=[{baseId:0x12eb7,count:5}];storage.save(doc);
