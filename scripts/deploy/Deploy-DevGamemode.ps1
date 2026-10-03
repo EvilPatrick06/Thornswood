@@ -215,7 +215,7 @@ if (-not $PutBack) {
     exit 1
   }
   . (Join-Path $Here '..\release\Note-Rules.ps1')
-  $noteProblems = @((Get-NoteShapeProblems $Note) + (Get-NoteProblems $Note))
+  $noteProblems = @(Get-NoteShapeProblems $Note) + @(Get-NoteProblems $Note)
   if ($noteProblems.Count) {
     Write-Host ''
     Write-Host '  STOP. These notes are for the people who play, and they say things only' -ForegroundColor Red
