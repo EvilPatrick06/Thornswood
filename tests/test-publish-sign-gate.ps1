@@ -63,10 +63,9 @@ Yes 'ExpectedSigner fragment is the one Updater.cs pins' ($frag -and $frag -eq $
 # and nothing this harness prints may either. Say "the name on the signing
 # certificate" (#1176).
 $gatePath = $MyInvocation.MyCommand.Path
-if (-not $gatePath) { $gatePath = Join-Path $Here 'test-publish-sign-gate.ps1' }
-$gateSrc = [IO.File]::ReadAllText($gatePath, $Utf8)
 Yes 'this harness does not contain the name on the signing certificate' (
-    $pinned -and $gateSrc.IndexOf($pinned, [StringComparison]::Ordinal) -lt 0)
+    $gatePath -and $pinned -and
+    ([IO.File]::ReadAllText($gatePath, $Utf8)).IndexOf($pinned, [StringComparison]::Ordinal) -lt 0)
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-sign-gate-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 New-Item -ItemType Directory -Force -Path $work | Out-Null
