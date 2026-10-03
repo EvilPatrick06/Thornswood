@@ -1328,7 +1328,7 @@ The Pull requests tab lists open pull requests. `gh pr create` adds yours. The s
 
 #### Learn more
 
-- [Hello World on GitHub](https://docs.github.com/en/get-started/quickstart/hello-world), the first-time walkthrough, with pictures
+- [Hello World on GitHub](https://docs.github.com/en/get-started/quickstart/hello-world), the first-time walkthrough
 - [About pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests)
 - [GitHub flow](https://docs.github.com/en/get-started/using-github/github-flow), the short version of branch, pull request, merge
 - This repository: https://github.com/EvilPatrick06/Thornswood
@@ -1471,7 +1471,7 @@ For the whole repository, `Ctrl+Shift+F` is the search to use.
 #### Learn more
 
 - [Introductory videos](https://code.visualstudio.com/docs/getstarted/introvideos), from the Visual Studio Code team
-- [The user interface](https://code.visualstudio.com/docs/getstarted/userinterface), with pictures of each part of the window
+- [The user interface](https://code.visualstudio.com/docs/getstarted/userinterface), each part of the window
 - [Source Control](https://code.visualstudio.com/docs/sourcecontrol/overview)
 - The editor's repository: https://github.com/microsoft/vscode
 - The folders in this clone: [N. The repository map](#n-the-repository-map)
@@ -1862,8 +1862,8 @@ An overlay change uses the same `Go.ps1 -SkipServer` as the HTML section, with t
 
 #### Learn more
 
-- HTML, with pictures, from MDN: https://developer.mozilla.org/en-US/docs/Learn/HTML
-- CSS, with pictures, from MDN: https://developer.mozilla.org/en-US/docs/Learn/CSS
+- HTML, from MDN: https://developer.mozilla.org/en-US/docs/Learn/HTML
+- CSS, from MDN: https://developer.mozilla.org/en-US/docs/Learn/CSS
 - JavaScript, from the first page, on MDN: https://developer.mozilla.org/en-US/docs/Learn/JavaScript
 - The three together, a first website: https://developer.mozilla.org/en-US/docs/Learn/Getting_started_with_the_web
 - HTML, the web.dev course: https://web.dev/learn/html
