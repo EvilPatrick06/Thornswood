@@ -563,6 +563,38 @@ function pageMarkdown(name) {
   try { return forMode(fs.readFileSync(file, 'utf8'), cfg.open); } catch (e) { return null; }
 }
 
+
+// ==== thornswood page versions ====
+/* SHA-256 of a page's text as /api/page serves it, the same bytes the
+   installer writes into Profile\accepted.json. public/page-versions.json
+   lists every wording that has been on main, so a hash already accepted
+   can be read back to the day that wording last changed. */
+const PAGE_VERSIONS = path.join(PUBLIC, 'page-versions.json');
+function pageSha256(md) {
+  return crypto.createHash('sha256').update(String(md), 'utf8').digest('hex');
+}
+function pageVersionRows() {
+  try {
+    const doc = JSON.parse(fs.readFileSync(PAGE_VERSIONS, 'utf8'));
+    return doc && doc.pages && typeof doc.pages === 'object' ? doc.pages : {};
+  } catch (e) { return {}; }
+}
+function findPageVersion(sha) {
+  const want = String(sha || '').toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(want)) return null;
+  const pages = pageVersionRows();
+  for (const name of Object.keys(pages)) {
+    const rows = Array.isArray(pages[name]) ? pages[name] : [];
+    for (const row of rows) {
+      if (row && String(row.sha256 || '').toLowerCase() === want) {
+        return { page: name, sha256: want, changed: String(row.changed || '') };
+      }
+    }
+  }
+  return null;
+}
+// ==== end thornswood page versions ====
+
 // ==== thornswood open switch ====
 /* The one switch (#428), cfg.open, off unless config.json says true.
 
@@ -4061,13 +4093,26 @@ async function handle(req, res) {
     });
   }
 
+  const verRoute = route.match(/^\/api\/page-version\/([0-9a-fA-F]{64})$/);
+  if (verRoute && req.method === 'GET') {
+    const hit = findPageVersion(verRoute[1]);
+    if (!hit) return sendJson(res, 404, { error: 'no such version' });
+    return sendJson(res, 200, hit);
+  }
+
   const pg = route.match(/^\/api\/page\/([a-z-]+)$/);
   if (pg && req.method === 'GET') {
     // The same page the front route renders, for a home.html that was served
     // without it. html is the one to show; md is kept for anything reading it.
+    // sha256 is what the installer stores. changed is the day that wording last changed,
+    // or null when the list has no row for this text.
     const md = pageMarkdown(pg[1]);
     if (md === null) return sendJson(res, 404, { error: 'no such page' });
-    return sendJson(res, 200, { md: md, html: pageHtml(md) });
+    const sha = pageSha256(md);
+    const ver = findPageVersion(sha);
+    return sendJson(res, 200, {
+      md: md, html: pageHtml(md), sha256: sha, changed: ver ? ver.changed : null
+    });
   }
 
   // Pictures chosen for the gallery are public. Everything else in uploads is
