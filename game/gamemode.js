@@ -3334,6 +3334,11 @@ function mineOre(actorId, refrId, baseDesc) {
   const tool = toolGate(actorId, 'miner');
   if (tool) return tool;
 
+  const rareQuests = globalThis.__thornswoodQuests;
+  if (rareQuests && rareQuests.isRareSeam && rareQuests.isRareSeam(seam)) {
+    return rareQuests.mineRare(actorId, refrId, seam);
+  }
+
   const step = rankStep(actorId, 'miner');
   const pair = (seam.yield && seam.yield[step]) || [0, 0];
   if (pair[0] <= 0 && pair[1] <= 0) {
@@ -5493,6 +5498,13 @@ mp.onDeath = guard('onDeath', function (actorId, killerId) {
       var bodyLoot = globalThis.__thornswoodDungeonLoot;
       if (bodyLoot && bodyLoot.onDeath) bodyLoot.onDeath(actorId);
     } catch (eBody) { /* a body roll must not block the rest of death */ }
+  }
+
+  if (npcDeath && killerId) {
+    try {
+      var questKill = globalThis.__thornswoodQuests;
+      if (questKill && questKill.noteKill) questKill.noteKill(killerId, actorId);
+    } catch (eQuestKill) { /* a quest kill must not block death */ }
   }
 
   /*
@@ -7969,6 +7981,20 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
       }
     } catch (e) {
       log('the spoils rule threw, so the press goes on:', e);
+    }
+  }
+
+  const quests = globalThis.__thornswoodQuests;
+  if (quests && quests.onActivate) {
+    try {
+      const questLine = quests.onActivate(casterRefrId, refrId, baseDesc);
+      if (questLine) {
+        notify(casterRefrId, questLine);
+        say(casterRefrId, questLine);
+        return false;
+      }
+    } catch (e) {
+      log('the quest press threw, so the press goes on:', e);
     }
   }
 
@@ -50082,3 +50108,353 @@ try {
   globalThis.__thornswoodNpcRuntime=null;
   log('NPC server runtime failed to start: ' + e);
 }
+
+// ==== thornswood custom quests ====
+/*
+  Scarce quests and scene quests, from the two tables on
+  docs/systems/quests.md. Supply is not this block. Scene gold is created
+  with addItem. It is not taken from a trader purse.
+
+  The page does not name the one world reference a scarce place uses, or
+  the sack, shelf, chest, urn, cell, or hold a scene row names. Those stay
+  unbound. A rare vein stays shut until its one place is bound. Which gem
+  a trader names, among the four on the miner page, is likewise not said.
+*/
+(function () {
+  var HOUR = 60 * 60 * 1000;
+  var RANK = ['novice', 'advanced', 'expert', 'master'];
+  var GEMS = ['Amethyst', 'Emerald', 'Ruby', 'Sapphire'];
+  var RARE = {
+    'Ebony Ore': 'ebony',
+    'Amethyst': 'gem',
+    'Emerald': 'gem',
+    'Ruby': 'gem',
+    'Sapphire': 'gem',
+    'Stalhrim': 'stalhrim',
+    'Heart Stone': 'heartstone'
+  };
+  var SCARCE = [
+    { id: 'ebony', name: 'The ebony', who: 'Miner, master', classKey: 'miner', rank: 'master', ask: 4, holds: 12, hours: 24, scarce: true },
+    { id: 'gem', name: 'A gem', who: 'Miner, master', classKey: 'miner', rank: 'master', ask: 2, holds: 6, hours: 24, scarce: true, gems: GEMS },
+    { id: 'stalhrim', name: 'The stalhrim', who: 'Miner, master', classKey: 'miner', rank: 'master', ask: 3, holds: 8, hours: 24, scarce: true },
+    { id: 'heartstone', name: 'The heart stone', who: 'Miner, master', classKey: 'miner', rank: 'master', ask: 3, holds: 8, hours: 24, scarce: true },
+    { id: 'longfin', name: 'The longfin', who: 'Fisher', classKey: 'fisher', rank: '', ask: 2, holds: 8, hours: 12, scarce: true },
+    { id: 'pearl', name: 'The pearl bed', who: 'Fisher, expert', classKey: 'fisher', rank: 'expert', ask: 1, holds: 3, hours: 8, scarce: true },
+    { id: 'crimson', name: 'The crimson', who: 'Gatherer', classKey: 'gatherer', rank: '', ask: 3, holds: 8, hours: 12, scarce: true },
+    { id: 'mammoth', name: 'The mammoth ground', who: 'Hunter, master', classKey: 'hunter', rank: 'master', ask: 1, holds: 3, hours: 24, scarce: true },
+    { id: 'orchard', name: 'The orchard', who: 'Farmer, expert', classKey: 'farmer', rank: 'expert', ask: 4, holds: 10, hours: 12, scarce: true },
+    { id: 'geode', name: 'The geode', who: 'Enchanter', profession: 'enchanter', ask: 2, holds: 6, hours: 12, scarce: true }
+  ];
+  var SCENE = [
+    { id: 'satchel', name: 'The satchel', check: 'A satchel in a sack they name, by a road in this hold.', gold: 20, hours: 3, kind: 'retrieval', count: 0, match: null },
+    { id: 'ledger', name: 'The ledger', check: 'A book on a shelf they name. It grants no skill.', gold: 30, hours: 6, kind: 'retrieval', count: 0, match: null },
+    { id: 'signet', name: 'The signet', check: 'A ring in a chest they name.', gold: 40, hours: 8, kind: 'retrieval', count: 0, match: null },
+    { id: 'locket', name: 'The locket', check: 'A locket in an urn they name.', gold: 45, hours: 10, kind: 'retrieval', count: 0, match: null },
+    { id: 'case', name: 'The case', check: 'A sealed case in a strongbox they name. It does not open.', gold: 50, hours: 8, kind: 'retrieval', count: 0, match: null },
+    { id: 'dispatch', name: 'The dispatch', check: 'That same kind of case, in a chest in this hold, handed to the trader in a hold they name.', gold: 60, hours: 12, kind: 'retrieval', count: 0, match: null, handoff: true },
+    { id: 'seal', name: 'The seal', check: 'A stamp in a chest in a ruin they name.', gold: 70, hours: 14, kind: 'retrieval', count: 0, match: null },
+    { id: 'wolf', name: 'A wolf', check: 'You kill a wolf in the place they name in this hold.', gold: 25, hours: 3, kind: 'kill', count: 1, match: 'wolf' },
+    { id: 'sabre', name: 'A sabre cat', check: 'You kill a sabre cat in the place they name.', gold: 40, hours: 6, kind: 'kill', count: 1, match: 'sabre cat' },
+    { id: 'camp', name: 'The camp', check: 'You kill three bandits in the camp they name.', gold: 45, hours: 6, kind: 'kill', count: 3, match: 'bandit' },
+    { id: 'bear', name: 'A bear', check: 'You kill a bear in the place they name.', gold: 50, hours: 8, kind: 'kill', count: 1, match: 'bear' },
+    { id: 'barrow', name: 'The barrow', check: 'You kill a draugr in the barrow they name.', gold: 60, hours: 10, kind: 'kill', count: 1, match: 'draugr' },
+    { id: 'giant', name: 'A giant', check: 'You kill a giant in this hold.', gold: 100, hours: 18, kind: 'kill', count: 1, match: 'giant' }
+  ];
+  var byId = {};
+  SCARCE.concat(SCENE).forEach(function (row) { byId[row.id] = row; });
+
+  function createCustomQuests(deps) {
+    deps = deps || {};
+    var places = {};
+    var people = new Map();
+    var rankOf = deps.rankOf || function () { return ''; };
+    var traders = new Set();
+    try {
+      var data = (typeof NPC_POPULATION_DATA !== 'undefined') ? NPC_POPULATION_DATA : null;
+      if (data && data.keep) {
+        data.keep.forEach(function (row) {
+          if (row[6] === 'trader') traders.add(row[0]);
+        });
+      }
+    } catch (e) { /* the harness has no population table */ }
+
+    function bucket(actor) {
+      var found = people.get(actor);
+      if (!found) {
+        found = { open: {}, cool: {} };
+        people.set(actor, found);
+      }
+      return found;
+    }
+    function qualify(actor, row) {
+      if (row.kind === 'retrieval' || row.kind === 'kill') return { ok: true };
+      if (row.profession === 'enchanter') {
+        if (rankOf(actor, 'bladebinder') || rankOf(actor, 'wardweaver')) return { ok: true };
+        return { ok: false, why: 'class' };
+      }
+      var have = String(rankOf(actor, row.classKey) || '').toLowerCase();
+      if (!have) return { ok: false, why: 'class' };
+      if (row.rank && RANK.indexOf(have) < RANK.indexOf(row.rank)) return { ok: false, why: 'rank' };
+      return { ok: true };
+    }
+    function creatureOk(match, name) {
+      var n = String(name || '').toLowerCase().trim();
+      if (n.indexOf('dragon') >= 0) return false;
+      if (match === 'wolf') return /(?:^|\s)wolf(?:$|\s)/.test(n);
+      if (match === 'sabre cat') return n.indexOf('sabre cat') >= 0 || n.indexOf('sabrecat') >= 0;
+      if (match === 'bandit') return n.indexOf('bandit') >= 0;
+      if (match === 'bear') return /(?:^|\s)bear(?:$|\s)/.test(n);
+      if (match === 'draugr') return n.indexOf('draugr') >= 0;
+      if (match === 'giant') return /(?:^|\s)giant(?:$|\s)/.test(n) && n.indexOf('spider') < 0;
+      return false;
+    }
+    function lineup() {
+      return {
+        scarce: SCARCE.map(function (row) {
+          return { id: row.id, name: row.name, who: row.who, ask: row.ask, holds: row.holds, hours: row.hours };
+        }),
+        scene: SCENE.map(function (row) {
+          return {
+            id: row.id, name: row.name, check: row.check, gold: row.gold, hours: row.hours,
+            kind: row.kind, count: row.count, match: row.match
+          };
+        })
+      };
+    }
+    function offer(actor, id, opts) {
+      var row = byId[id];
+      if (!row) return { ok: false, why: 'unknown' };
+      var b = bucket(actor);
+      if (b.open[id]) return { ok: false, why: 'open' };
+      if ((b.cool[id] || 0) > deps.now()) return { ok: false, why: 'cooldown' };
+      var gate = qualify(actor, row);
+      if (!gate.ok) return { ok: false, why: gate.why };
+      if (row.gems) {
+        var gem = opts && opts.gem;
+        if (row.gems.indexOf(gem) < 0) return { ok: false, why: 'gem' };
+      }
+      b.open[id] = { drawn: 0, kills: 0, gem: opts && opts.gem, itemDesc: null };
+      return { ok: true };
+    }
+    function bindPlace(id, place) {
+      if (!byId[id]) return null;
+      places[id] = place || {};
+      return places[id];
+    }
+    function rareShut(actor, refrId, seam) {
+      var id = RARE[seam && seam.name];
+      if (!id) return null;
+      var row = byId[id];
+      var gate = qualify(actor, row);
+      if (!gate.ok) return row.name + ' takes ' + (row.rank ? row.rank.charAt(0).toUpperCase() + row.rank.slice(1) + ' ' : '') + row.classKey.charAt(0).toUpperCase() + row.classKey.slice(1) + '.';
+      var held = people.get(actor);
+      var open = held && held.open[id];
+      if (!open) return 'This place is shut.';
+      var place = places[id] || {};
+      if (row.gems) {
+        if (seam.name !== open.gem) return 'This place is shut.';
+        if (!place.refs || place.refs[open.gem] !== refrId) return 'This place is shut.';
+      } else if (place.ref !== refrId) {
+        return 'This place is shut.';
+      }
+      if (open.drawn >= row.holds) return 'This place has nothing left until you turn the work in.';
+      return null;
+    }
+    function giveRare(actor, refrId, seam) {
+      var shut = rareShut(actor, refrId, seam);
+      if (shut) return shut;
+      var id = RARE[seam.name];
+      var row = byId[id];
+      var open = bucket(actor).open[id];
+      if (!deps.addItem(actor, seam.ore, 1)) {
+        return 'The seam gives up ' + seam.name + ' and there is nothing in this load order to put in your hands.';
+      }
+      open.drawn += 1;
+      open.itemDesc = seam.ore;
+      if (open.drawn >= row.holds) return 'That is all this place will give you.';
+      return '';
+    }
+    function mineRare(actor, refrId, seam) {
+      var classGateFn = deps.classGate || classGate;
+      var toolGateFn = deps.toolGate || toolGate;
+      var miningFn = deps.mining || mining;
+      var stopMiningFn = deps.stopMining || stopMining;
+      var swingingFn = deps.swinging || swinging;
+      var toolIdFn = deps.toolIdIn || toolIdIn;
+      var swingFn = deps.swing || swing;
+      var notifyFn = deps.notify || notify;
+      var sayFn = deps.say || say;
+      var creditFn = deps.creditWork || creditWork;
+      var wearFn = deps.wearTool || wearTool;
+      var anim = deps.swingAnim || SWING_MINE;
+      var refused = classGateFn(actor, 'mine');
+      if (refused) return refused;
+      var tool = toolGateFn(actor, 'miner');
+      if (tool) return tool;
+      var shut = rareShut(actor, refrId, seam);
+      if (shut) return shut;
+      if (miningFn(actor)) { stopMiningFn(actor); return 'You put the pick down.'; }
+      if (swingingFn(actor)) return '';
+      var pick = toolIdFn(actor, 'miner');
+      swingFn(actor, anim, function () {
+        var line = giveRare(actor, refrId, seam);
+        if (line) { notifyFn(actor, line); sayFn(actor, line); }
+        try { creditFn(actor, 'mine'); } catch (e) {}
+        try { wearFn(actor, 'miner'); } catch (e) {}
+      }, { tool: pick });
+      return '';
+    }
+    function walkAway(actor, id) {
+      var b = bucket(actor);
+      var open = b.open[id];
+      if (!open) return { ok: false, why: 'none' };
+      if (open.drawn > 0) {
+        if (!deps.takeItem(actor, open.itemDesc, open.drawn)) return { ok: false, why: 'goods' };
+      }
+      delete b.open[id];
+      return { ok: true };
+    }
+    function turnIn(actor, id, traderRef) {
+      var row = byId[id];
+      var b = bucket(actor);
+      var open = row && b.open[id];
+      if (!row || !open) return { ok: false, why: 'none' };
+      if (row.scarce) {
+        if (open.drawn < row.ask) return { ok: false, why: 'short' };
+        if (!deps.takeItem(actor, open.itemDesc, row.ask)) return { ok: false, why: 'goods' };
+      } else if (row.kind === 'retrieval') {
+        if (open.drawn < 1) return { ok: false, why: 'short' };
+        var place = places[id] || {};
+        if (row.handoff) {
+          var hold = deps.traderHold ? deps.traderHold(traderRef) : '';
+          if (!place.handoffHold || hold !== place.handoffHold) return { ok: false, why: 'hold' };
+        }
+        if (!deps.takeItem(actor, open.itemDesc, 1)) return { ok: false, why: 'goods' };
+        if (!deps.addItem(actor, deps.goldDesc, row.gold)) {
+          deps.addItem(actor, open.itemDesc, 1);
+          open.drawn = 1;
+          return { ok: false, why: 'gold' };
+        }
+      } else if (row.kind === 'kill') {
+        if (open.kills < row.count) return { ok: false, why: 'short' };
+        if (!deps.addItem(actor, deps.goldDesc, row.gold)) return { ok: false, why: 'gold' };
+      } else {
+        return { ok: false, why: 'unknown' };
+      }
+      delete b.open[id];
+      b.cool[id] = deps.now() + row.hours * HOUR;
+      return { ok: true, gold: row.scarce ? 0 : row.gold };
+    }
+    function noteKill(killer, victim) {
+      var b = people.get(killer);
+      if (!b) return { ok: false, why: 'none' };
+      var watching = false;
+      Object.keys(b.open).forEach(function (id) {
+        if (byId[id] && byId[id].kind === 'kill') watching = true;
+      });
+      if (!watching) return { ok: false, why: 'none' };
+      var name = deps.creatureName ? deps.creatureName(victim) : '';
+      if (/dragon/i.test(name)) return { ok: false, why: 'dragon' };
+      var cell = deps.cellOf ? deps.cellOf(victim) : '';
+      SCENE.forEach(function (row) {
+        if (row.kind !== 'kill') return;
+        var open = b.open[row.id];
+        if (!open || open.kills >= row.count) return;
+        var place = places[row.id] || {};
+        if (!place.cell || cell !== place.cell) return;
+        if (!creatureOk(row.match, name)) return;
+        open.kills += 1;
+      });
+      return { ok: true };
+    }
+    function noteContainer(actor, ref, cell) {
+      var held = people.get(actor);
+      if (!held) return null;
+      var said = null;
+      SCENE.forEach(function (row) {
+        if (said || row.kind !== 'retrieval') return;
+        var open = held.open[row.id];
+        if (!open || open.drawn) return;
+        var place = places[row.id] || {};
+        if (!place.ref || place.ref !== ref || !place.item) return;
+        if (place.cell && cell !== place.cell) return;
+        if (!deps.addItem(actor, place.item, 1)) return;
+        open.drawn = 1;
+        open.itemDesc = place.item;
+        said = 'You take it.';
+      });
+      return said;
+    }
+    function descOf(refrId) {
+      if (deps.descOf) return deps.descOf(refrId);
+      try { return mp.getDescFromId(refrId); } catch (e) { return ''; }
+    }
+    function isTrader(refrId) {
+      return traders.has(descOf(refrId));
+    }
+    function speak(actor, refrId) {
+      if (!isTrader(refrId)) return null;
+      return null;
+    }
+    function onActivate(actor, refrId) {
+      var held = people.get(actor);
+      if (!held) return null;
+      var retrieval = false;
+      Object.keys(held.open).forEach(function (id) {
+        if (byId[id] && byId[id].kind === 'retrieval' && held.open[id].drawn < 1) retrieval = true;
+      });
+      if (!retrieval) return null;
+      var cell = deps.cellOf ? (deps.cellOf(refrId) || '') : '';
+      return noteContainer(actor, refrId, cell);
+    }
+    return {
+      lineup: lineup, offer: offer, bindPlace: bindPlace, walkAway: walkAway,
+      turnIn: turnIn, noteKill: noteKill, noteContainer: noteContainer,
+      mineRare: mineRare, isRareSeam: function (seam) { return !!RARE[seam && seam.name]; },
+      onActivate: onActivate, speak: speak
+    };
+  }
+
+  if (typeof mp !== 'undefined' && mp && typeof addItem === 'function') {
+    try {
+      globalThis.__thornswoodQuests = createCustomQuests({
+        now: function () { return Date.now(); },
+        goldDesc: 'f:Skyrim.esm',
+        addItem: addItem,
+        takeItem: takeItem,
+        rankOf: function (actor, key) {
+          var c = globalThis.__thornswoodCharacter;
+          if (!c || !c.rankOf) return '';
+          try { return c.rankOf(actor, key) || ''; } catch (e) { return ''; }
+        },
+        creatureName: function (id) {
+          try {
+            var desc = mp.get(id, 'baseDesc');
+            var baseId = idOf(desc);
+            var rec = mp.lookupEspmRecordById(baseId);
+            var fields = (rec && rec.record && rec.record.fields) || [];
+            for (var i = 0; i < fields.length; i++) {
+              if (fields[i].type === 'FULL') {
+                var data = fields[i].data;
+                if (typeof data === 'string') return data.replace(/\0+$/, '');
+                if (data && data.length) return Buffer.from(data).toString('utf8').replace(/\0+$/, '');
+              }
+            }
+            return String(desc || '');
+          } catch (e) { return ''; }
+        },
+        cellOf: function (id) {
+          try {
+            var loc = mp.get(id, 'locationalData');
+            return (loc && loc.cellOrWorldDesc) || '';
+          } catch (e) { return ''; }
+        },
+        traderHold: function () { return ''; }
+      });
+    } catch (e) {
+      try { log('custom quests failed to start:', e); } catch (e2) {}
+    }
+  }
+  globalThis.__thornswoodCustomQuestsCreate = createCustomQuests;
+})();
+// ==== end thornswood custom quests ====
