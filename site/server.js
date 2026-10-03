@@ -1482,10 +1482,13 @@ async function galleryStaff(url, w) {
   const st = await within(standing(t.d), PLAY_ANSWER_MS, () => standingLate(t.d));
   standCache.delete(String(t.d));
   if (st.lookupFailed && !st.admin) return { ok: false, code: 503, body: discordUnasked() };
-  if (!st.inGuild) return { ok: false, code: 403, body: { ok: false, why: 'guild', error:
-    'That Discord account is not in the Thornswood Discord.' } };
+  // A bans.json hit returns before Discord is asked, with inGuild left false
+  // (#1022). Banned has to be said first, or the door claims they are not in
+  // the Discord.
   if (st.banned) return { ok: false, code: 403, body: { ok: false, why: 'banned', error:
     'That Discord account is banned from Thornswood.' } };
+  if (!st.inGuild) return { ok: false, code: 403, body: { ok: false, why: 'guild', error:
+    'That Discord account is not in the Thornswood Discord.' } };
   if (!st.dev) return { ok: false, code: 403, body: { ok: false, why: 'role', error:
     'That Discord account has no staff role, so it cannot work the gallery queue.' } };
   return { ok: true, from: 'launcher', discordId: String(t.d) };
@@ -4513,10 +4516,12 @@ async function handle(req, res) {
       const st = await within(standing(t.d), PLAY_ANSWER_MS, () => standingLate(t.d));
       standCache.delete(String(t.d));
       if (st.lookupFailed && !st.admin) return sendJson(res, 503, discordUnasked());
-      if (!st.inGuild) return sendJson(res, 403, { ok: false, why: 'guild', error:
-        'That Discord account is not in the Thornswood Discord.' });
+      // Banned before the guild check (#1022). standing() leaves inGuild false
+      // when bans.json already refused the account.
       if (st.banned) return sendJson(res, 403, { ok: false, why: 'banned', error:
         'That Discord account is banned from Thornswood.' });
+      if (!st.inGuild) return sendJson(res, 403, { ok: false, why: 'guild', error:
+        'That Discord account is not in the Thornswood Discord.' });
       if (!st.play) return sendJson(res, 403, { ok: false, why: 'role', error:
         'That Discord account has no role that lets it in yet.' });
       from = 'launcher';
@@ -4674,10 +4679,11 @@ async function handle(req, res) {
       const st = await within(standing(t.d), PLAY_ANSWER_MS, () => standingLate(t.d));
       standCache.delete(String(t.d));
       if (st.lookupFailed && !st.admin) return sendJson(res, 503, discordUnasked());
-      if (!st.inGuild) return sendJson(res, 403, { ok: false, why: 'guild', error:
-        'That Discord account is not in the Thornswood Discord.' });
+      // Same order as submit (#1022): a file ban is not "not in the Discord".
       if (st.banned) return sendJson(res, 403, { ok: false, why: 'banned', error:
         'That Discord account is banned from Thornswood.' });
+      if (!st.inGuild) return sendJson(res, 403, { ok: false, why: 'guild', error:
+        'That Discord account is not in the Thornswood Discord.' });
       if (!st.play) return sendJson(res, 403, { ok: false, why: 'role', error:
         'That Discord account has no role that lets it in yet.' });
       from = 'launcher';
