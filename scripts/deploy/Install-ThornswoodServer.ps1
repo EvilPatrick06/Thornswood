@@ -276,8 +276,11 @@ function Carry([string]$from, [string]$to, [bool]$skipWorld) {
             foreach ($l in [IO.File]::ReadAllLines($list)) { if ($l) { [void]$shipped.Add($l) } }
         }
         $kept = 0
-        foreach ($f in @(Get-ChildItem -LiteralPath $a -Recurse -File -Force -ErrorAction SilentlyContinue)) {
-            $rel = $f.FullName.Substring($a.Length).TrimStart('\')
+        # Listed from the long path. $a follows $from, which can be a
+        # short 8.3 path, and FullName is the long one (issue #1156).
+        $listedA = (Get-Item -LiteralPath $a).FullName
+        foreach ($f in @(Get-ChildItem -LiteralPath $listedA -Recurse -File -Force -ErrorAction SilentlyContinue)) {
+            $rel = $f.FullName.Substring($listedA.Length).TrimStart('\')
             $dest = Join-Path $b $rel
             if ($shipped) { if ($shipped.Contains($rel)) { continue } }
             elseif (Test-Path -LiteralPath $dest) { continue }
@@ -328,7 +331,8 @@ if (-not $PutBack) {
     $sd = Join-Path $stageDir 'data'
     $shippedData = @()
     if (Test-Path -LiteralPath $sd) {
-        $shippedData = @(Get-ChildItem -LiteralPath $sd -Recurse -File -Force | ForEach-Object { $_.FullName.Substring($sd.Length).TrimStart('\') })
+        $listedSd = (Get-Item -LiteralPath $sd).FullName
+        $shippedData = @(Get-ChildItem -LiteralPath $listedSd -Recurse -File -Force | ForEach-Object { $_.FullName.Substring($listedSd.Length).TrimStart('\') })
     }
     [IO.File]::WriteAllLines((Join-Path $stageDir '.payload-data.txt'), [string[]]$shippedData)
 

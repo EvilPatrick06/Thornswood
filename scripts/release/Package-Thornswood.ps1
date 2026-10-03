@@ -393,8 +393,13 @@ try {
     Die ("Could not place game\required-data into $GameDir : " + $_.Exception.Message)
 }
 
-$all = @(Get-ChildItem -LiteralPath $GameDir -Recurse -File -Force)
-$prefix = $GameDir.TrimEnd('\') + '\'
+# Listed from the long path. $GameDir is whatever was passed, and that is
+# the short 8.3 form when the folder sits under a short TEMP. FullName is
+# the long one, so cutting by $GameDir's length takes the wrong relative
+# path (issue #1156).
+$listedGame = (Get-Item -LiteralPath $GameDir).FullName
+$all = @(Get-ChildItem -LiteralPath $listedGame -Recurse -File -Force)
+$prefix = $listedGame.TrimEnd('\') + '\'
 
 $ship = @(); $skipBytes = 0; $shipBytes = 0; $optionalBytes = 0; $optionalCount = 0; $machineCount = 0
 $collectionBytes = 0; $collectionCount = 0
@@ -541,8 +546,9 @@ if ($reuse) {
     # same speed when nothing moved, correct when something did.
     Say '  Checking the staged copy against the build...' 'Yellow'
     $have = @{}
-    foreach ($f in (Get-ChildItem -LiteralPath $payload -Recurse -File -Force)) {
-        $have[$f.FullName.Substring($payload.TrimEnd('\').Length + 1)] = $f
+    $listedPayload = (Get-Item -LiteralPath $payload).FullName
+    foreach ($f in (Get-ChildItem -LiteralPath $listedPayload -Recurse -File -Force)) {
+        $have[$f.FullName.Substring($listedPayload.TrimEnd('\').Length + 1)] = $f
     }
 
     $new = 0; $changed = 0; $gone = 0
