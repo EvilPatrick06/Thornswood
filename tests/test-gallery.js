@@ -224,10 +224,11 @@ const readJson = (f) => { try { return JSON.parse(fs.readFileSync(path.join(dir,
     yes('a broken ticket is refused 401 why link', r.status === 401 && r.json && r.json.why === 'link');
     r = await ask('POST', upQ('banned.png') + '&ticket=' + encodeURIComponent(ticket(BANNED_ID, 'Nope')),
                   { 'content-type': 'image/png' }, PNG);
-    // A bans.json entry leaves inGuild false, so the door and this both refuse
-    // it at the guild check before the banned one, the same as /api/play/join.
-    yes('a banned account is refused 403, the way the door refuses it',
-        r.status === 403 && r.json && (r.json.why === 'guild' || r.json.why === 'banned'));
+    // A bans.json entry leaves inGuild false. The door asks banned first
+    // (#1022), so the reason is the ban and not "not in the Discord".
+    yes('a banned account is refused 403 why banned',
+        r.status === 403 && r.json && r.json.why === 'banned' &&
+        /banned/i.test(String(r.json.error || '')));
 
     // ---- only images ---------------------------------------------------------
     r = await ask('POST', upQ('notes.txt') + '&ticket=' + encodeURIComponent(ticket(MEMBER_ID, 'Ataxayk')),
@@ -316,6 +317,12 @@ const readJson = (f) => { try { return JSON.parse(fs.readFileSync(path.join(dir,
     const playWebName = r.json ? r.json.name : '';
 
     // ---- report / list / dismiss --------------------------------------------
+    r = await ask('POST', '/api/gallery/report?ticket=' + encodeURIComponent(ticket(BANNED_ID, 'Nope')),
+                  { 'content-type': 'application/json' },
+                  JSON.stringify({ name: webName, why: 'from a ban' }));
+    yes('a banned account reporting a shot is refused 403 why banned',
+        r.status === 403 && r.json && r.json.why === 'banned' &&
+        /banned/i.test(String(r.json.error || '')));
     r = await ask('POST', '/api/gallery/report', { cookie: playCookie(), 'content-type': 'application/json' },
                   JSON.stringify({ name: webName, why: 'looks wrong' }));
     yes('a play member can report an approved shot (' + r.status + ')',
@@ -384,8 +391,9 @@ const readJson = (f) => { try { return JSON.parse(fs.readFileSync(path.join(dir,
     yes('a ticket for somebody who may only play cannot read the queue (' + r.status + ')',
         r.status === 403 && r.json && r.json.why === 'role');
     r = await ask('GET', '/api/gallery/pending?ticket=' + encodeURIComponent(ticket(BANNED_ID, 'Nope')));
-    yes('a banned account is refused at the queue too (' + r.status + ')',
-        r.status === 403 && r.json && (r.json.why === 'guild' || r.json.why === 'banned'));
+    yes('a banned account is refused at the queue too, and the reason says banned (' + r.status + ')',
+        r.status === 403 && r.json && r.json.why === 'banned' &&
+        /banned/i.test(String(r.json.error || '')));
     r = await ask('GET', '/api/gallery/pending' + staffT);
     yes('a staff ticket reads the pending queue (' + r.status + ')',
         r.status === 200 && r.json && Array.isArray(r.json.pending) &&
