@@ -1304,9 +1304,12 @@ function Get-ShipRequiredDataRoot([string]$RepoDir) {
 }
 
 # Places every file under game\required-data (except README.md) at Data\<name>
-# in $GameDir. Breaks an existing hard link first so a write never goes through
-# into Vortex staging. Returns the relative paths placed. Throws when the
-# folder is missing a file that was expected to be tracked, or when copy fails.
+# in $GameDir when that path is missing or the bytes differ. A file the game
+# folder already holds, same bytes, is left where it is and is not returned:
+# callers print this list, and an empty list must stay empty (#1119). Breaks
+# an existing hard link before replacing different bytes, so a write never
+# goes through into Vortex staging. Throws when the folder is missing, or
+# when copy fails.
 function Ensure-ShipRequiredData([string]$GameDir, [string]$RepoDir) {
     $srcRoot = Get-ShipRequiredDataRoot $RepoDir
     if (-not (Test-Path -LiteralPath $srcRoot)) {
@@ -1321,9 +1324,12 @@ function Ensure-ShipRequiredData([string]$GameDir, [string]$RepoDir) {
         if (-not (Test-Path -LiteralPath $dir)) {
             $null = New-Item -ItemType Directory -Force -Path $dir
         }
-        # OwnGame.Unshare pattern: drop the name if it is a hard link so the
-        # copy is this folder's own bytes, not Vortex's.
         if (Test-Path -LiteralPath $dst) {
+            $same = (Get-FileHash -LiteralPath $dst -Algorithm SHA256).Hash -eq `
+                    (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash
+            if ($same) { continue }
+            # OwnGame.Unshare pattern: drop the name if it is a hard link so the
+            # copy is this folder's own bytes, not Vortex's.
             try { Remove-Item -LiteralPath $dst -Force -EA Stop } catch {
                 throw ("Could not replace $rel in the game folder (is the game open?): " + $_.Exception.Message)
             }
@@ -1331,7 +1337,10 @@ function Ensure-ShipRequiredData([string]$GameDir, [string]$RepoDir) {
         Copy-Item -LiteralPath $f.FullName -Destination $dst -Force -EA Stop
         $placed.Add($rel)
     }
-    return ,$placed.ToArray()
+    # No leading comma. `return ,$array` is one pipeline object, and both
+    # callers wrap that in @(), so Count was always 1 and the log said
+    # System.String[] whether or not a file was placed (#1119).
+    return $placed.ToArray()
 }
 
 # ------------------------------------------------------------ launcher symbols
