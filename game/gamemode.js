@@ -7885,6 +7885,23 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     // Living cows for a farmer, before loot(). milk() returns null for
     // everybody else and for a dead cow, so loot() and the fall through stay
     // exactly as they were for those presses.
+    /*
+      E ON A GUILD TRADER OPENS THE PANEL. /merchant with the id still works.
+      A press on anything else falls through, the same as before.
+    */
+    const merchants = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodMerchantTrade;
+    if (merchants && merchants.activate) {
+      let opened = null;
+      try { opened = merchants.activate(casterRefrId, refrId); } catch (eOpen) { opened = null; }
+      if (opened) {
+        if (opened.text) {
+          notify(casterRefrId, opened.text);
+          say(casterRefrId, opened.text);
+        }
+        return false;
+      }
+    }
+
     const milked = milk(casterRefrId, refrId, baseDesc);
     if (milked !== null) {
       message = milked;

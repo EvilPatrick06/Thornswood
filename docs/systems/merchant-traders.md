@@ -1,11 +1,12 @@
 # Merchant trader counts
 
-249 authored guild traders. People cannot join. Exact guild-site relocation stays deferred.
-A trader uses the book hold of the hold it stands in. Two records have no hold
-(CWGuardTemplates) and are not offered a price until a hold is named.
+249 authored guild traders. People cannot join. Each hold has one guild site in [Merchant's Guild](merchants-guild.md). A later walk can move a spot.
+A trader uses the book hold of the hold it stands in. The two CWGuardTemplates
+quartermasters are priced: Imperial as Haafingar, Stormcloak as Eastmarch.
 
 | Hold | Place | Traders | Book hold |
 | --- | --- | ---: | --- |
+| Eastmarch | CWGuardTemplates | 1 | windhelm |
 | Eastmarch | Imperial Military Camp | 1 | windhelm |
 | Eastmarch | Kynesgrove | 3 | windhelm |
 | Eastmarch | Narzulbur | 2 | windhelm |
@@ -26,6 +27,7 @@ A trader uses the book hold of the hold it stands in. Two records have no hold
 | Falkreath | Sons of Skyrim Military Camp | 1 | falkreath |
 | Falkreath | The Estates' Edge | 1 | falkreath |
 | Falkreath | open ground in Tamriel | 1 | falkreath |
+| Haafingar | CWGuardTemplates | 1 | solitude |
 | Haafingar | Solitude | 19 | solitude |
 | Haafingar | Solitude Sewers | 1 | solitude |
 | Haafingar | SolitudeRow | 2 | solitude |
@@ -56,7 +58,6 @@ A trader uses the book hold of the hold it stands in. Two records have no hold
 | Winterhold | Imperial Military Camp | 1 | winterhold |
 | Winterhold | Winterhold | 5 | winterhold |
 | Winterhold | Winterhold College | 7 | winterhold |
-| no hold | CWGuardTemplates | 2 |  |
 | the Pale | Dawnstar | 7 | dawnstar |
 | the Pale | Imperial Military Camp | 1 | dawnstar |
 | the Pale | Nightgate Inn | 1 | dawnstar |

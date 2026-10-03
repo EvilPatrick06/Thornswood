@@ -89,6 +89,7 @@ function service(native, purse) {
   }]]);
   const api = trading.createMerchantTrading({
     purses, prices, transfer: world.transfer, world, places, resolve,
+    isTrader: function (id) { return id === 1 || id === 2; },
     now: () => 1_700_000_000_000
   });
   return { api, world, purses };
@@ -215,5 +216,22 @@ assert.match(absent.move({}).reason, /not on this server/);
 assert.equal(trading.bookHoldOf('Whiterun'), 'whiterun');
 assert.equal(trading.bookHoldOf('no hold'), null);
 assert.equal(trading.bookHoldOf('Solstheim'), 'ravenrock');
+
+let ebox = service({ on: false }, 250);
+let keyed = ebox.api.activate(10, 1);
+assert.equal(keyed.view.open, true);
+assert.match(keyed.text, /open|Trading/);
+let repeat = ebox.api.activate(10, 1);
+assert.equal(repeat.text, '');
+assert.equal(repeat.view.open, true);
+assert.equal(ebox.api.activate(10, 99), null);
+let quiet = ebox.api.command({ actorId: 10, profileId: 7, parts: ['/merchant', 'e', '63'] });
+assert.equal(quiet.text, '');
+assert.equal(quiet.view, null);
+const seen = new Set(trading.GUILD_SITES.map(function (site) { return site.bookHold; }));
+for (const hold of Object.values(trading.BOOK_HOLD)) {
+  assert.equal(seen.has(hold), true);
+  assert.ok(trading.guildSite(hold).place);
+}
 
 console.log('PASS merchant trading quotes, stock, depletion, supply, reach and native gate');
