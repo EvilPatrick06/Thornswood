@@ -78,8 +78,10 @@ if (-not $SkipInstall) {
 }
 
 $ss = Read-Host 'Bot token (paste it, it will not be shown)' -AsSecureString
-$tok = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
-         [Runtime.InteropServices.Marshal]::SecureStringToBSTR($ss))
+$bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($ss)
+try { $tok = [Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr) }
+finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+$ss = $null
 if (-not $tok) { throw 'No token given.' }
 
 # Only for this process. Nothing is written down and nothing outlives the run.
