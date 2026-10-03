@@ -243,7 +243,7 @@ function Compare-Order([string]$label, [string[]]$truth) {
         $o = if ($at -lt $order.Count) { $order[$at] } else { '(nothing)' }
         $why = " (they part at position $($at + 1): $label has $t, the page has $o)"
     }
-    Yes ("the page's order is $label's order, {0} plugins{1}" -f $truth.Count, $why) ($at -lt 0)
+    Yes ("the page's order is $label's order, {0} plugins{1}" -f $truth.Count, $why) ($at -lt 0 -and $p.Waiting.Count -eq 0)
 }
 
 $sources = 0
