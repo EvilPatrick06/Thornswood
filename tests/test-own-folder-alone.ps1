@@ -436,6 +436,7 @@ namespace Thornswood
                 FirstFromNewer();
                 WrittenThrough();
                 MadeBefore();
+                UnreadableRecord();
             }
             catch (Exception ex)
             {
@@ -725,6 +726,53 @@ namespace Thornswood
             try { third = OwnGame.Refresh(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Refresh said: " + ex.Message); }
             Yes("a refresh after that takes nothing more out", third != null && third.Contains("already matches") && !third.Contains("Took"));
             Yes("the check before Play still passes", OwnGame.CheckShared(OwnGame.Source(s.Cfg), null) == null);
+        }
+
+        // A pack list held open must stop the refresh, not be skipped (#1249).
+        static void UnreadableRecord()
+        {
+            Scene s = NewScene("unread", false);
+            string made = null;
+            try { made = OwnGame.Make(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Make said: " + ex.Message); }
+            string own = OwnGame.Folder;
+            MadeNowRuns(s);
+            Yes("(made, for an unreadable pack list)", made != null);
+
+            string esp = Path.Combine(own, "Data\\TsOne.esp");
+            File.Delete(esp);
+            Put(esp, "TS-UPDATE");
+            Put(Path.Combine(Paths.PacksDir, "good.files"), "a|game\\Data\\TsOne.esp\r\n");
+            string bad = Path.Combine(Paths.PacksDir, "held.files");
+            Put(bad, "b|game\\Data\\textures\\ts\\wood.dds\r\n");
+            string madeTxt = Path.Combine(OwnGame.Dir, "made.txt");
+            var made12 = new List<string>();
+            foreach (string l in File.ReadAllLines(madeTxt)) made12.Add(l.StartsWith("rules=") ? "rules=12" : l);
+            File.WriteAllLines(madeTxt, made12.ToArray());
+
+            string said = null;
+            using (new FileStream(bad, FileMode.Open, FileAccess.Read, FileShare.None))
+            {
+                try { OwnGame.Refresh(s.Cfg, null); }
+                catch (Exception ex) { said = ex.Message; }
+            }
+            Yes("a pack record that cannot be read stops the refresh and names the list",
+                said != null && said.Contains("held.files") && said.Contains("Nothing was changed") && Clean(said));
+            if (said != null) Console.WriteLine("      Refresh said: " + said);
+            Yes("and Thornswood's update of the Vortex file is still its own copy",
+                Text(esp) == "TS-UPDATE" && Text(Path.Combine(s.Staging, "ModA\\TsOne.esp")) == "VORTEX-TSONE");
+
+            List<string> depots = Download(s);
+            string marker = Path.Combine(depots[0], "Data\\FromDepot.esp");
+            Put(marker, "DEPOT-ONLY");
+            string pinned = null;
+            using (new FileStream(bad, FileMode.Open, FileAccess.Read, FileShare.None))
+            {
+                try { OwnGame.TakePinned(s.Cfg, depots, null, null); }
+                catch (Exception ex) { pinned = ex.Message; }
+            }
+            Yes("and the Downgrade's copy stops on the same list, before it writes",
+                pinned != null && pinned.Contains("held.files") && Clean(pinned) &&
+                !File.Exists(Path.Combine(own, "Data\\FromDepot.esp")));
         }
     }
 }
