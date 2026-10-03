@@ -6,7 +6,7 @@
       .\scripts\vps\Remote.ps1 "Get-Content 'C:\Thornswood-Voice\voice.log' -Tail 20"
       .\scripts\vps\Remote.ps1 -File .\scripts\vps\some-check.ps1
       .\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeGit'
-      .\scripts\vps\Remote.ps1 "Restart-Service W32Time" -Dev
+      .\scripts\vps\Remote.ps1 "Restart-Service W32Time" -Show
 
   WHY THIS EXISTS. Every other way of doing it goes wrong, and it goes wrong
   quietly enough to waste an hour.
