@@ -366,6 +366,46 @@ try:
     yes('staff with a ticket open, inside the cooldown, still get the form',
         len(pick(G, mo).response.modals) == 1)
 
+    # Content Creator stays on EXTRA_STAFF, the thread auto-add. It is not
+    # staff for /close or for the ticket limits. Issue #1324.
+    ids, names = bot.EXTRA_STAFF_IDS['creator']
+    yes('Content Creator is still on the thread auto-add list',
+        'content creator' in bot.EXTRA_STAFF.get('creator', [])
+        or 'content creator' in names)
+    cam = Person(108, 'Cam', [Role('Content Creator')])
+    key = '1:%s' % cam.id
+    bot._last_ticket[key] = CLOCK[0]
+    cooled = pick(G, cam)
+    yes('a Content Creator does not skip the 5 minute cooldown',
+        not cooled.response.modals
+        and any('only just sent a ticket' in text for text, _ in cooled.response.said))
+    bot._last_ticket.pop(key, None)
+    send(G, cam)
+    bot._last_ticket.pop(key, None)
+    held = pick(G, cam)
+    yes('a Content Creator does not skip the one open ticket rule',
+        not held.response.modals
+        and any('already have a ticket open' in text for text, _ in held.response.said))
+
+    import discord
+
+    class TicketThread(discord.Thread):
+        def __init__(self):
+            self.edited = []
+
+        async def edit(self, **k):
+            self.edited.append(k)
+
+    thread = TicketThread()
+    close = Interaction(G, cam)
+    close.channel = thread
+    asyncio.run(bot.close_here(close))
+    yes('a Content Creator cannot /close',
+        close.response.said
+        and 'Staff close these' in close.response.said[0][0]
+        and not thread.edited)
+
+
     # -------------------------------------------- and it fails the open way
     #
     # A file somebody broke, or a person the check cannot read, is a person let

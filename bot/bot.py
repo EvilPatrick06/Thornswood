@@ -1231,10 +1231,15 @@ def _chunks(s, n):
 
 
 def is_staff(who, ch):
-    """Staff, or anybody the channel itself trusts with threads."""
+    """
+    Staff, or anybody the channel itself trusts with threads.
+
+    Content Creator is not staff. That role is added to creator application
+    threads through EXTRA_STAFF and nowhere else. It does not close tickets,
+    and it does not skip the one open ticket rule or the five minute cooldown.
+    """
     try:
-        if (_who_hits(who, STAFF_IDS, STAFF_NAMES)
-                or _who_hits(who, CREATOR_IDS, CREATOR_NAMES)):
+        if _who_hits(who, STAFF_IDS, STAFF_NAMES):
             return True
     except Exception:
         pass
