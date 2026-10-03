@@ -126,6 +126,12 @@ it says a pool thread.
 | 26 | `Shell.cs:505 app.Run` | The message loop. Run does not return until the window closes. |
 | 27 | `ShellOwnGame.cs:43 ContentRendered` | Once the window is on screen: `ShellOwnGame.cs:62 OwnGameAtStart()` refreshes the game folder by itself when Vortex has deployed since it was made (`OwnGame.cs:431 NeedsRefresh()`), or offers to make it in the shared shape. |
 
+An install made before the terms lock has no Profile\accepted.json. Run asks
+before it reads config, unless it was started to uninstall, and returns
+without opening when the three boxes are not ticked. A record already on disk
+is checked again from a pool thread once the window can show the same boxes,
+and declining that change closes the launcher.
+
 ### Threads
 
 There is one window thread. Anything that waits on the network or a large file
@@ -166,6 +172,14 @@ menu this session. Writes `Profile\launcher.log` through Log and
 install is; `OwnFirst` that its own folder was chosen at install and is not
 made yet, when `Game` is `Profile\Payload` (#1226); `SteamCopy` is the Steam
 copy, read for the game's build before the folder exists. Owns no files.
+
+**Acceptance** (Acceptance.cs). `Profile\accepted.json`, the same file the
+setup program writes when the terms, the privacy policy and the rules are
+ticked. `Acceptance.cs:108 Ensure()` asks when that file has no complete
+record, which is an install made before the lock, and writes that file only
+after all three are ticked. `Acceptance.cs:119 Recheck()` asks again when a
+page's hash is no longer the one in the file, and writes the file again only
+after the three are ticked.
 
 **Config** (Config.cs). `<Root>\config.json`, read by `Config.cs:289 Load()`
 and written by Save, which encrypts the update token with Windows' DPAPI and

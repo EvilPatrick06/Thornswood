@@ -295,6 +295,12 @@ namespace Thornswood
                 if (args[i].Equals("-uninstall", StringComparison.OrdinalIgnoreCase)) askedToUninstall = true;
 
             Paths.Init(root);
+            // Profile\accepted.json is the setup program's record of the terms,
+            // the privacy policy and the rules (issue #1009). An install made
+            // before that has no file, and silence is not a yes. Ask before
+            // anything else is opened. Uninstall must still be reachable.
+            bool termsOnFile = !Acceptance.NeedsAsk(Acceptance.Read(Paths.ProfileDir), null);
+            if (!askedToUninstall && !termsOnFile && !Acceptance.Ensure(Paths.ProfileDir)) return;
             cfg = Config.Load(Paths.CfgFile);
             Stats.Load();
             Keep.BuildName = cfg.BuildName;
@@ -610,6 +616,30 @@ namespace Thornswood
                 fault.Handled = true;
             };
             StartStallWatch();
+            if (!askedToUninstall && termsOnFile)
+            {
+                // The record is already there. A page whose text has changed
+                // is asked again, off this thread so startup does not wait
+                // on the site. Declining closes the launcher.
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    try
+                    {
+                        bool ok = Acceptance.Recheck(Paths.ProfileDir, delegate
+                        {
+                            bool ticked = false;
+                            win.Dispatcher.Invoke((Action)delegate { ticked = Acceptance.Ask(true); });
+                            return ticked;
+                        });
+                        if (!ok)
+                        {
+                            try { win.Dispatcher.Invoke((Action)delegate { if (Application.Current != null) Application.Current.Shutdown(); }); }
+                            catch (Exception ex) { Swallow.Note("Shell.Run, closing after the terms were declined", ex); }
+                        }
+                    }
+                    catch (Exception ex) { Swallow.Note("Shell.Run, terms recheck", ex); }
+                });
+            }
             app.Run(win);
         }
 
