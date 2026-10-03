@@ -237,14 +237,15 @@ if (loaded && pollTimer) {
   // dynamic actor that is not inside an authored habitat with a free slot, and
   // the refusal destroyed the one just placed. /spawn and /spawnat are a
   // tester or staff asking for a creature where they stand, not a world birth.
+  properties.add('thornswoodNpcCommanded');
   let capAsks = 0;
   box.__thornswoodNpcPopulation = {
-    admit: function () { capAsks++; return false; },
+    admit: function (id) { capAsks++; return actors[id].thornswoodNpcCommanded === true; },
     release: function () {}
   };
   r = send('/spawn troll');
   yes('a habitat cap does not eat a tester spawn or swallow the reply: ' + one(r) + ' admits=' + capAsks,
-      capAsks === 0 && r.placed.length === 1 && r.moved.length === 1 && r.destroyed.length === 0 &&
+      capAsks === 1 && r.placed.length === 1 && r.moved.length === 1 && r.destroyed.length === 0 &&
       r.created.length === 0 && r.said.length === 1 && /^Spawned 1 Troll\.$/.test(r.said[0]));
   box.__thornswoodNpcPopulation = null;
 
@@ -264,15 +265,17 @@ if (loaded && pollTimer) {
   // Dev population registers its private property. Admission must see the
   // marker before checking habitat capacity; Main has no such property.
   properties.add('thornswoodNpcCommanded');
-  let admittedMarker = false;
+  let admittedMarker = false, enrolled = 0;
+  box.__thornswoodNpcRuntime = {enroll:function() {enrolled++;}};
   box.__thornswoodNpcPopulation = {
     admit: function(id) { admittedMarker = actors[id].thornswoodNpcCommanded === true; return admittedMarker; },
     release: function() {}
   };
   settings = {thornswoodPlaytesters:[PID]};
   const devSpawn = send('/spawn troll');
-  yes('Dev command marks its actor before population admission', admittedMarker && devSpawn.destroyed.length === 0 && devSpawn.placed.length === 1);
+  yes('Dev command marks its actor before population admission', admittedMarker && devSpawn.destroyed.length === 0 && devSpawn.placed.length === 1 && enrolled === 1);
   delete box.__thornswoodNpcPopulation;
+  delete box.__thornswoodNpcRuntime;
 
   yes('placeActors is one function at the top of the file, for /spawn and /spawnat',
       /\nfunction placeActors\(baseId, where, count, away, commanded\) \{/.test(src));

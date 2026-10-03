@@ -1617,11 +1617,9 @@ function addItemsAtomic(actorId,goods) {
   Anything that is not an NPC record is refused before it is placed, since a
   placed object cannot be moved and would stay at the middle of Tamriel.
 
-  A fifth argument, commanded, is true for /spawn and /spawnat. Those are a
-  person asking for a creature where they stand. The habitat cap is for the
-  world's own births: admit refuses a dynamic actor that is not inside an
-  authored habitat with a free slot, then this destroys the one just placed.
-  That is why /spawn put nothing in front of you after #1413 (#959).
+  A fifth argument, commanded, is true for tester and staff spawn commands.
+  The private population marker exempts these actors from habitat capacity,
+  while admission and native runtime enrollment still establish authority.
 */
 function placeActors(baseId, where, count, away, commanded) {
   let rec = null;
@@ -1650,6 +1648,7 @@ function placeActors(baseId, where, count, away, commanded) {
       if(population && !population.admit(ref,mp.getNpcAIState(ref))) {
         throw new Error('This species has no available population slot in this habitat');
       }
+      if(globalThis.__thornswoodNpcRuntime) globalThis.__thornswoodNpcRuntime.enroll(ref);
       made++;
     } catch (e) {
       why = String(e && e.message ? e.message : e);
