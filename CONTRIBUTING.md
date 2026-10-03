@@ -167,6 +167,14 @@ How to use it:
   uses, never a guess by folder. A mod put into the Steam copy by hand stays
   there, and a folder made before this loses such files at its next refresh,
   logged (OwnGameKinds.cs, tests\test-own-folder-alone.ps1).
+  Decided by Patrick on 29 Sep (#1247): the behavior files and the BodySlide
+  bodies a release carries are made in Thornswood's own folder, as a step on
+  the shipping machine before a Ship (`scripts\mods\Build-Generated.ps1`,
+  what it builds in `records\generated.json`), never in the Steam copy. The
+  behavior files come from Pandora Behaviour Engine+, which the collection
+  carries from revision 2, because Nemesis cannot generate from a command
+  line. Ship stops while they are not built for the current mod list
+  (tests\test-build-generated.ps1).
 - Whichever folder the game runs from, the launcher looks after its own
   files: Keep puts its files back before Play and parks any plugin in
   `Data\Platform\Plugins` that is not ours; Hold keeps its files open read
