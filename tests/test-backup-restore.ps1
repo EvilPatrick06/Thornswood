@@ -16,8 +16,10 @@
       entries under game/world and is far larger than the 195 KB of the
       15 September pair
     - retention keeps seven daily and leaves a file put there by hand alone
-    - Restore-Backup.ps1 -CheckOnly opens it, refuses a wrong passphrase, and
-      calls a backup with nothing under game/world a failure
+    - Restore-Backup.ps1 -CheckOnly opens it, refuses a wrong passphrase,
+      calls a backup with nothing under game/world a failure, and fails a
+      world whose numbered change forms have no profile id above 0 that is
+      not deleted (#1047)
     - Restore-Server.ps1 puts a character back byte for byte into a folder
       whose load order pointed at another server's plugins, points it at its
       own, and says RESTORE OK, with the original server folder deleted first
@@ -319,6 +321,9 @@ try {
     Settings $deadBack $deadBack 45837
     $code = if ($deadZip.Count) { Run $Restore @('-Backup', $deadZip[0].FullName, '-Root', $deadBack, '-NoPause') } else { 0 }
     Yes 'a backup whose world holds only deleted characters is refused' ($code -ne 0 -and (Said 'holds no characters'))
+    $code = if ($deadZip.Count) { Run $Unpack @('-Backup', $deadZip[0].FullName, '-CheckOnly', '-NoPause') } else { 0 }
+    Yes '-CheckOnly fails a backup whose numbered change forms are only deleted characters' (
+        $code -ne 0 -and (Said 'numbered change form') -and (Said 'profile id above 0'))
 
     $node = Get-Command node -EA SilentlyContinue
     if ($node) {
