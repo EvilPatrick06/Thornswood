@@ -280,6 +280,33 @@ foreach ($pair in $menuPairs) {
   Note $pair[1]
 }
 
+# ------------------------------------------------ our own menu files --
+# The main menu with no Bethesda logo, the empty loading spinner, the
+# silent stand-in for the game's theme, and SkyHUD's settings as
+# Thornswood set them. From game\ours, beside game\menu. Each path is
+# the path in the game folder, so the destination is the name itself
+# (Ship-Rules $ShipOursFiles; change the two together). The destination
+# is removed before the copy: in an own game folder these can be hard
+# links into the Steam copy, and writing through a link would change
+# the Steam copy too.
+Head 'Our menu files'
+$oursSrc = Join-Path $Here '..\..\game\ours'
+$oursMenuFiles = @(
+  'Data\Interface\startmenu.swf',
+  'Data\Interface\loadwaitspinner.swf',
+  'Data\music\special\mus_maintheme.xwm',
+  'Data\Interface\skyhud\skyhud.txt'
+)
+foreach ($rel in $oursMenuFiles) {
+  $src = Join-Path $oursSrc $rel
+  $dst = Join-Path $Game $rel
+  if (-not (Test-Path -LiteralPath $src)) { Gone ($rel + ' is not in game\ours'); continue }
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
+  if (Test-Path -LiteralPath $dst) { Remove-Item -LiteralPath $dst -Force }
+  Copy-Item -LiteralPath $src -Destination $dst -Force
+  Note $rel
+}
+
 # ---------------------------------------------------------- required data --
 # Plugins the load order names that Vortex does not yet deploy under that
 # exact filename. Ship packs and the installer also place these (Ship-Rules

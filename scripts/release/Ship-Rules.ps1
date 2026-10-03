@@ -962,7 +962,8 @@ $ShipOursFiles = @(
     'Data\Scripts\MpClientPlugin.pex',
     # Our main menu: no Bethesda logo and no button list, an empty loading
     # spinner (Checks.cs, since 16 September), and the menu music's silent
-    # stand in for the game's theme.
+    # stand in for the game's theme. Go.ps1 writes these four from
+    # game\ours ($oursMenuFiles there; change the two together).
     'Data\Interface\startmenu.swf',
     'Data\Interface\loadwaitspinner.swf',
     'Data\music\special\mus_maintheme.xwm',
