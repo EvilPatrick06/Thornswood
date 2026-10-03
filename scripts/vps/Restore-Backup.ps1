@@ -14,8 +14,13 @@
   -KeyFile to point at your copy of it. It is never printed and never written
   anywhere by this script.
 
-  -CheckOnly verifies the signature and stops. That is worth running on a
-  schedule: it is the difference between having backups and believing you do.
+  -CheckOnly verifies the signature, then reads the numbered change forms
+  under game/world in the zip (0.json, 1.json, ...: a slot, not a profile id).
+  It fails when none of them has a profile id above 0 that is not deleted, the
+  same question Restore-Server.ps1 asks of a world (#1047). A world of only
+  deleted slots, or only change forms that are not characters, is not a backup
+  of anyone. That is worth running on a schedule: it is the difference between
+  having backups and believing you do.
 
   Putting what comes out back onto the server is docs\RESTORING.md. This
   script deliberately does not do that part. Writing over a live world folder
@@ -158,15 +163,42 @@ if ($notes) {
   $sr.ReadToEnd() -split "`r?`n" | ForEach-Object { Say "  $_" 'DarkGray' }
   $sr.Close()
 }
+
+# A character is a numbered change form (0.json, 1.json, ...) whose profile id
+# is above 0 and which is not deleted. Counting every file under game/world
+# called a world of only deleted slots, or only forms that are not characters,
+# a good backup (#1047). Read here, before the zip is closed, and only for
+# -CheckOnly: unpacking still does not decide that, Restore-Server.ps1 does.
+$living = 0
+if ($CheckOnly) {
+  foreach ($en in $entries) {
+    if ($en.FullName -notmatch '^game[/\\]world[/\\]changeForms[/\\][0-9]+\.json$') { continue }
+    $sr = $null
+    $o = $null
+    try {
+      $sr = New-Object System.IO.StreamReader($en.Open())
+      $o = (($sr.ReadToEnd()) -replace '^\uFEFF', '') | ConvertFrom-Json
+    } catch { $o = $null }
+    finally { if ($null -ne $sr) { $sr.Dispose() } }
+    $id = 0L
+    if ($null -ne $o -and $null -ne $o.profileId) { try { $id = [long]$o.profileId } catch { $id = 0L } }
+    if ($id -gt 0 -and -not ($null -ne $o -and $o.isDeleted -eq $true)) { $living++ }
+  }
+}
 $zf.Dispose()
 
 if ($CheckOnly) {
   # A backup that opens and holds no characters is the failure this exists
   # to catch (the 15 September pair), so -CheckOnly calls it one, and
-  # Fetch-Backups.ps1 and its task see a non-zero result.
+  # Fetch-Backups.ps1 and its task see a non-zero result. Files under
+  # game/world are not enough: none of them may be a living character.
   if (-not $worldCount) {
     Die 'The backup opens, but there is nothing under game/world in it, so it holds no characters.'
   }
+  if ($living -lt 1) {
+    Die 'The backup opens, but none of the numbered change forms under game/world has a profile id above 0 that is not deleted, so it holds no characters.'
+  }
+  Say ("  {0} numbered change form(s) name a character" -f $living) 'Green'
   Head 'Checked only'
   Say '  The backup opens and its signature is good. Nothing was written.' 'Green'
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
