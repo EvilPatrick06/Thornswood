@@ -44,8 +44,10 @@ they have bought. See [Merchant's Guild](merchants-guild.md) and
 [Custom quests](quests.md). A guild trader is handed 250 when they are
 first stood up, once, and not again. Supply rewards debit this purse.
 Scene rewards create the amount named on the quest, subject to its
-cooldown. See [Gold](gold.md). Traders may wander within their hold for
-now. Exact guild relocation in each hold is deferred.
+cooldown. See [Gold](gold.md). Each hold has one recorded guild site. A later walk can move it.
+Traders are not relocated by that record. See [Merchant's Guild](merchants-guild.md).
+The 249 traders, by hold and place, are listed in
+[Merchant trader counts](merchant-traders.md).
 
 Carriage and ferry drivers stay at stops outside city walls. They are
 the workers of the hold the stop sits in. The fare is that hold's. See
@@ -107,7 +109,7 @@ something, take a good thing, leave the rest.
 Patrick changed this policy on 1 October: preserve hostile camps,
 encounters and wildlife in natural habitats, cut town fillers, limit city
 animals, and implement merchant quests. The earlier instruction to remove
-bandit camps is superseded. Exact Merchant's Guild relocation is deferred.
+bandit camps is superseded. Guild sites are recorded and can move later.
 
 Dev currently runs the first authored inn routine. The broader shared
 controller, population catalogue, habitat limits, difficulty tiers, stock
