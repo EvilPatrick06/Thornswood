@@ -518,18 +518,44 @@ namespace Thornswood
         {
             if (!FirstBuildWrong(cfg, game)) return null;
             if (Downgrade.Downloaded(cfg) != null) return null;
+            long exeBytes = -1;
+            try { exeBytes = new FileInfo(Path.Combine(game, "SkyrimSE.exe")).Length; } catch { }
+            // The exe is 1.6.1170's size and some other listed file is not:
+            // a cleaned master, an edited Skyrim.ccc. Describe would call the
+            // whole folder 1.6.1170, which is the thing that is wrong.
+            if (exeBytes == cfg.ExpectedExeBytes)
+                return "Skyrim in " + game + " has 1.6.1170's exe, but one of its own files is not that build's (a cleaned master, or a file edited in that folder). Thornswood never changes that copy, and it can stay as it is: " +
+                       "press Downgrade on the Play page and Steam downloads 1.6.1170's own files under your account, and Thornswood makes its own folder from them. " +
+                       "Your Steam copy stays as it is.";
             return "Skyrim in " + game + " is " + Downgrade.Describe(cfg, Path.Combine(game, "SkyrimSE.exe")) + ". Thornswood never changes that copy, and it can stay on any build: " +
                    "press Downgrade on the Play page and Steam downloads 1.6.1170's own files under your account, and Thornswood makes its own folder from them. " +
                    "Your Steam copy stays on the build it is on.";
         }
 
-        /// <summary>The Steam copy's exe is there, readable, and not 1.6.1170's size.</summary>
+        /// <summary>
+        /// The Steam copy is there and readable, and it is not the pinned
+        /// build: the exe is not 1.6.1170's size, or a listed file is missing
+        /// or not that build's (its size, and its SHA-1 for a master or a
+        /// loose file). An unreadable exe skips the check, as it always did.
+        /// </summary>
         static bool FirstBuildWrong(Config cfg, string game)
         {
             if (string.IsNullOrEmpty(game)) return false;
             long exeBytes = -1;
             try { exeBytes = new FileInfo(Path.Combine(game, "SkyrimSE.exe")).Length; } catch { /* unreadable: -1, and the build check is skipped as it always was */ }
-            return exeBytes >= 0 && exeBytes != cfg.ExpectedExeBytes;
+            if (exeBytes < 0) return false;
+            if (exeBytes != cfg.ExpectedExeBytes) return true;
+            return !ListedFilesArePinned(game);
+        }
+
+        /// <summary>
+        /// The Steam copy's listed files are not all the pinned build's, so
+        /// the Downgrade card is the way to 1.6.1170's own files. Same answer
+        /// as FirstBuildWrong, on Paths.SteamCopy.
+        /// </summary>
+        public static bool SteamCopyNotPinned(Config cfg)
+        {
+            return FirstBuildWrong(cfg, Paths.SteamCopy);
         }
 
         /// <summary>
@@ -714,8 +740,8 @@ namespace Thornswood
             HashSet<string> ours = Ours(deployed);
             wantedPlugins = new HashSet<string>(ShippedPlugins(), StringComparer.OrdinalIgnoreCase);
             var left = new List<string>();
-            // The Steam copy on another build: the game comes from the files
-            // the Downgrade downloaded (FirstBuild let it through only then).
+            // The Steam copy is not the pinned build: the game comes from the
+            // files the Downgrade downloaded (FirstBuild let it through only then).
             string game = GameFor(src);
             List<string> pinned = FirstBuildWrong(cfg, game) ? Downgrade.Downloaded(cfg) : null;
             int byHand = 0;
@@ -2065,6 +2091,7 @@ namespace Thornswood
                 // there: the collection's files stay the collection's.
                 var withPinned = new Dictionary<string, Found>(StringComparer.OrdinalIgnoreCase);
                 foreach (Found f in walked) withPinned[f.Rel] = f;
+                DropChangedGame(withPinned, game);
                 Pin(withPinned, pinned, deployed);
                 return new List<Found>(withPinned.Values);
             }
@@ -2082,7 +2109,7 @@ namespace Thornswood
                 notStale.Add(f);
             }
             foreach (Found f in OnlyThree(notStale, null, ours, left, ref byHand)) byRel[f.Rel] = f;
-            if (pinned != null) Pin(byRel, pinned, null);
+            if (pinned != null) { DropChangedGame(byRel, game); Pin(byRel, pinned, null); }
 
             Record rec = Staged(src);
             left.AddRange(rec.Refused);
@@ -2119,6 +2146,21 @@ namespace Thornswood
         /// folder is made. A path in <paramref name="keep"/> is the
         /// collection's and is left to it.
         /// </summary>
+        /// <summary>
+        /// A listed file that is not the pinned build's does not come from
+        /// the Steam copy. Pin puts the Downgrade's copy of it in its place,
+        /// and a changed master never reaches the folder.
+        /// </summary>
+        static void DropChangedGame(Dictionary<string, Found> byRel, string game)
+        {
+            SkyrimFiles();
+            if (!skyrimPinsBytes) return;
+            var drop = new List<string>();
+            foreach (string rel in byRel.Keys)
+                if (SkyrimOwn(rel) && !OneFilePinned(game, rel)) drop.Add(rel);
+            foreach (string rel in drop) byRel.Remove(rel);
+        }
+
         static void Pin(Dictionary<string, Found> byRel, List<string> pinned, HashSet<string> keep)
         {
             foreach (string dir in pinned)

@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Thornswood
@@ -67,6 +69,22 @@ namespace Thornswood
         static readonly object skyrimLock = new object();
         static HashSet<string> skyrimFiles;
         static string skyrimBuild = "";
+        // Bytes and SHA-1 beside the path (#1246). A listed file from the
+        // Steam copy is the pinned build's only when those match. An archive
+        // is the size alone: hashing one is most of a gigabyte.
+        class PinFile
+        {
+            public long Bytes;
+            public string Sha1;
+        }
+        static Dictionary<string, PinFile> skyrimInfo;
+        // True when the embedded list carries a real SHA-1 (40 hex digits).
+        // A harness that only names the paths still writes "sha1": "0", and
+        // then the exe's size stays the only build check, as it was.
+        static bool skyrimPinsBytes;
+        // path|length|write-time to a SHA-1 already computed this run, so a
+        // card that asks every few seconds does not hash the masters again.
+        static Dictionary<string, string> sha1Seen;
 
         /// <summary>
         /// Every file of the pinned build, relative to the game folder, from
@@ -79,6 +97,8 @@ namespace Thornswood
             {
                 if (skyrimFiles != null) return skyrimFiles;
                 var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var info = new Dictionary<string, PinFile>(StringComparer.OrdinalIgnoreCase);
+                bool pins = false;
                 try
                 {
                     string text = null;
@@ -93,16 +113,26 @@ namespace Thornswood
                         // Read by pattern, as ClientRuntime reads client-build.json:
                         // the files object is keyed by path, so there is no class
                         // to bind it to, and the shape is the generator's own.
-                        foreach (Match m in Regex.Matches(text, "\"((?:[^\"\\\\]|\\\\.)+)\"\\s*:\\s*\\{\\s*\"bytes\"\\s*:\\s*[0-9]+"))
+                        foreach (Match m in Regex.Matches(text, "\"((?:[^\"\\\\]|\\\\.)+)\"\\s*:\\s*\\{\\s*\"bytes\"\\s*:\\s*([0-9]+)\\s*,\\s*\"sha1\"\\s*:\\s*\"([^\"]*)\""))
                         {
                             string rel = m.Groups[1].Value.Replace("\\\\", "\\");
-                            if (Tidy(rel)) set.Add(rel);
+                            if (!Tidy(rel)) continue;
+                            long bytes;
+                            if (!long.TryParse(m.Groups[2].Value, out bytes)) continue;
+                            set.Add(rel);
+                            var pf = new PinFile();
+                            pf.Bytes = bytes;
+                            pf.Sha1 = m.Groups[3].Value;
+                            info[rel] = pf;
+                            if (pf.Sha1 != null && pf.Sha1.Length == 40) pins = true;
                         }
                         Match b = Regex.Match(text, "\"build\"\\s*:\\s*\"([^\"]+)\"");
                         if (b.Success) skyrimBuild = b.Groups[1].Value;
                     }
                 }
                 catch (Exception ex) { Swallow.Note("OwnGame.SkyrimFiles, reading the embedded list", ex); }
+                skyrimInfo = info;
+                skyrimPinsBytes = pins;
                 skyrimFiles = set;
                 return skyrimFiles;
             }
@@ -124,6 +154,74 @@ namespace Thornswood
             if (SkyrimFiles().Contains("SkyrimSE.exe")) return null;
             return "This launcher was built without the list of Skyrim's own files (records\\skyrim-files.json), so it cannot tell Skyrim's files from mods put into the Steam copy by hand, " +
                    "and Thornswood's own folder is not made or brought up to date. Update the launcher, or tell staff it said this.";
+        }
+
+        /// <summary>
+        /// An archive is the big file, so its size is the whole check. A
+        /// master or a loose file is small enough to hash: those are the ones
+        /// a person edits in place, a cleaned master or an edited Skyrim.ccc,
+        /// without the exe's size moving.
+        /// </summary>
+        static bool HashThis(string rel)
+        {
+            return !rel.EndsWith(".bsa", StringComparison.OrdinalIgnoreCase);
+        }
+
+        static string Sha1Of(string path, long length, long ticks)
+        {
+            string key = path + "|" + length.ToString() + "|" + ticks.ToString();
+            lock (skyrimLock)
+            {
+                if (sha1Seen == null) sha1Seen = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                string hit;
+                if (sha1Seen.TryGetValue(key, out hit)) return hit;
+            }
+            string hex;
+            using (var sha = SHA1.Create())
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                byte[] h = sha.ComputeHash(fs);
+                var sb = new StringBuilder(h.Length * 2);
+                for (int i = 0; i < h.Length; i++) sb.Append(h[i].ToString("x2"));
+                hex = sb.ToString();
+            }
+            lock (skyrimLock) { sha1Seen[key] = hex; }
+            return hex;
+        }
+
+        /// <summary>
+        /// This one listed file in <paramref name="game"/> is the pinned
+        /// build's: the size on the list, and the SHA-1 when it is a master
+        /// or a loose file.
+        /// </summary>
+        static bool OneFilePinned(string game, string rel)
+        {
+            SkyrimFiles();
+            PinFile info;
+            if (skyrimInfo == null || !skyrimInfo.TryGetValue(rel, out info)) return false;
+            try
+            {
+                var fi = new FileInfo(Path.Combine(game, rel));
+                if (!fi.Exists || fi.Length != info.Bytes) return false;
+                if (!HashThis(rel)) return true;
+                if (info.Sha1 == null || info.Sha1.Length != 40) return true;
+                return string.Equals(Sha1Of(fi.FullName, fi.Length, fi.LastWriteTimeUtc.Ticks), info.Sha1, StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// Every listed file in this folder is the pinned build's. A list
+        /// that does not carry real SHA-1s does not say, and the exe's size
+        /// stays the check (FirstBuildWrong).
+        /// </summary>
+        static bool ListedFilesArePinned(string game)
+        {
+            SkyrimFiles();
+            if (!skyrimPinsBytes) return true;
+            foreach (string rel in SkyrimFiles())
+                if (!OneFilePinned(game, rel)) return false;
+            return true;
         }
 
         // ------------------------------------------------------------ Thornswood's own
