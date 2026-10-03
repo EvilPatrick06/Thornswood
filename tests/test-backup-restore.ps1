@@ -30,6 +30,8 @@
     - a folder missing one plugin is refused and the plugin is named
     - -Which dev restores the dev character and not the live one
     - a second restore keeps what it replaced, and a running server is refused
+    - -Work (default still %TEMP%) is where the decrypted zip and the unpacked
+      backup sit, and nothing is left in that folder after a run or a refusal
     - Fetch-Backups.ps1 -PruneOnly keeps the last -KeepDays days and never
       fewer than the newest seven
 
@@ -327,6 +329,49 @@ try {
             Yes 'a folder whose server is running is refused' ($code -ne 0 -and (Said 'is running'))
         } finally { Stop-Process -Id $p.Id -Force -EA SilentlyContinue }
     } else { Write-Host 'SKIP  no node here to stand in for a running server' }
+
+    # ---- where the decrypted backup sits (#1048) -----------------------------
+    # -Work defaults to %TEMP%. A folder named here must be empty again after
+    # a run and after a refusal: the zip and the unpacked backup hold the bot
+    # token and the site keys.
+    $scratch = Join-Path $work 'decrypt-scratch'
+    [void](New-Item -ItemType Directory -Path $scratch -Force)
+    function Scratch-Clear { return (@(Get-ChildItem -LiteralPath $scratch -Force -EA SilentlyContinue).Count -eq 0) }
+
+    $code = Run $Unpack @('-Backup', $encPath, '-KeyFile', $key, '-CheckOnly', '-Work', $scratch, '-NoPause')
+    Yes "Restore-Backup.ps1 -Work -CheckOnly leaves nothing in that folder (exit $code)" ($code -eq 0 -and (Scratch-Clear))
+    if (-not (Scratch-Clear)) { foreach ($f in @(Get-ChildItem -LiteralPath $scratch -Force)) { Write-Host ('        left: ' + $f.FullName) } }
+
+    $code = Run $Unpack @('-Backup', $encPath, '-KeyFile', (Join-Path $work 'wrong-key.txt'), '-CheckOnly', '-Work', $scratch, '-NoPause')
+    Yes '  a refused passphrase leaves nothing in -Work' ($code -ne 0 -and (Said 'Nothing was decrypted') -and (Scratch-Clear))
+
+    $busy = Join-Path $work 'busy-to'
+    [void](New-Item -ItemType Directory -Path $busy -Force)
+    Put (Join-Path $busy 'already.txt') 'x'
+    $code = Run $Unpack @('-Backup', $encPath, '-KeyFile', $key, '-To', $busy, '-Work', $scratch, '-NoPause')
+    Yes '  a refusal to write over a folder leaves nothing in -Work' (
+        $code -ne 0 -and (Said 'already has things') -and (Scratch-Clear) -and
+        ([IO.File]::ReadAllText((Join-Path $busy 'already.txt')) -eq 'x'))
+    if ($code -eq 0 -or -not (Scratch-Clear)) { Show }
+
+    $unpackedTo = Join-Path $work 'unpacked-work'
+    $code = Run $Unpack @('-Backup', $encPath, '-KeyFile', $key, '-To', $unpackedTo, '-Work', $scratch, '-NoPause')
+    Yes '  an unpack through -Work leaves the backup in -To and nothing in -Work' (
+        $code -eq 0 -and (Test-Path -LiteralPath (Join-Path $unpackedTo 'game\world')) -and (Scratch-Clear))
+    if ($code -ne 0) { Show }
+
+    $srv = Join-Path $work 'restore-work-root'
+    Plugins $srv $plugins
+    Settings $srv $srv 45847
+    $code = Run $Restore @('-Backup', $encPath, '-KeyFile', $key, '-Root', $srv, '-Work', $scratch, '-NoPause')
+    Yes "Restore-Server.ps1 -Work puts the world back and leaves nothing in -Work (exit $code)" (
+        $code -eq 0 -and (Said 'RESTORE OK') -and (Scratch-Clear) -and
+        (Test-Path -LiteralPath (Join-Path $srv 'world\changeForms\0.json')))
+    if ($code -ne 0 -or -not (Scratch-Clear)) { Show; foreach ($f in @(Get-ChildItem -LiteralPath $scratch -Force -EA SilentlyContinue)) { Write-Host ('        left: ' + $f.FullName) } }
+
+    $code = Run $Restore @('-Backup', $encPath, '-KeyFile', $key, '-Root', $broken, '-Work', $scratch, '-NoPause')
+    Yes '  a refused restore leaves nothing in -Work' ($code -ne 0 -and (Said 'load order does not resolve') -and (Scratch-Clear))
+    if (-not (Scratch-Clear)) { foreach ($f in @(Get-ChildItem -LiteralPath $scratch -Force)) { Write-Host ('        left: ' + $f.FullName) } }
 
     # ---- the copy on this machine --------------------------------------------
     $here = Join-Path $work 'fetched'

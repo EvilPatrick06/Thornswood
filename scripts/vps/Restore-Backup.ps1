@@ -7,7 +7,7 @@
   whether the backups are real.
 
       .\scripts\vps\Restore-Backup.ps1 -Backup ...\thornswood-20260918-030000.zip.enc
-      .\scripts\vps\Restore-Backup.ps1 -Backup ...\thornswood-...enc -To C:\test-restore
+      .\scripts\vps\Restore-Backup.ps1 -Backup ...\thornswood-...enc -To C:\test-restore -Work C:\ThornswoodTemps&Worktrees\temp\restore
       .\scripts\vps\Restore-Backup.ps1 -Backup ...\thornswood-...enc -CheckOnly
 
   The passphrase is the one in the key file that Install-Backup.ps1 made. Pass
@@ -20,12 +20,19 @@
   Putting what comes out back onto the server is docs\RESTORING.md. This
   script deliberately does not do that part. Writing over a live world folder
   is not something a script should be able to do by accident.
+
+  -Work is where the decrypted zip is written while this runs. Left out, that
+  is %TEMP%. The zip holds the bot token and the site keys, so it is deleted
+  before this exits, whether the backup was unpacked or the run was refused.
+  -To is the folder the backup is unpacked into, and is not -Work.
 #>
 [CmdletBinding()]
 param(
   [Parameter(Mandatory = $true)][string]$Backup,
   [string]$To,
   [string]$KeyFile,
+  # Where the decrypted zip is written. Left out, %TEMP%. Deleted before exit.
+  [string]$Work,
   [switch]$CheckOnly,
   [switch]$NoPause
 )
@@ -33,8 +40,26 @@ param(
 $ErrorActionPreference = 'Stop'
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
-function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
+$script:temp = $null
+function Clear-RestoreZip {
+  if ($script:temp -and (Test-Path -LiteralPath $script:temp)) {
+    Remove-Item -LiteralPath $script:temp -Force -EA SilentlyContinue
+  }
+}
+function Die($m) {
+  Clear-RestoreZip
+  Write-Host ''
+  Write-Host "STOP. $m" -ForegroundColor Red
+  if (-not $NoPause) { [void](Read-Host 'Enter to exit') }
+  exit 1
+}
 
+if (-not $Work) { $Work = $env:TEMP }
+if (-not $Work) { Die 'No folder for the decrypted backup: -Work was not passed and %TEMP% is not set.' }
+try { [void][IO.Directory]::CreateDirectory($Work) }
+catch { Die ("-Work is not a folder: " + $Work + " (" + $_.Exception.Message + ")") }
+
+try {
 if (-not (Test-Path -LiteralPath $Backup)) { Die "There is no file at $Backup" }
 $src = (Resolve-Path -LiteralPath $Backup).Path
 Head 'The backup'
@@ -42,7 +67,6 @@ Say ("  {0}" -f (Split-Path -Leaf $src))
 Say ("  {0} MB, written {1}" -f [math]::Round((Get-Item $src).Length / 1MB, 2), (Get-Item $src).LastWriteTime) 'DarkGray'
 
 $zipPath = $null
-$temp = $null
 
 if ($src.ToLower().EndsWith('.enc')) {
   if (-not $KeyFile) {
@@ -102,7 +126,8 @@ if ($src.ToLower().EndsWith('.enc')) {
   $plain = $aes.CreateDecryptor().TransformFinalBlock($cipher, 0, $cipher.Length)
   $aes.Dispose(); $kdf.Dispose(); $hmac.Dispose()
 
-  $temp = Join-Path $env:TEMP ('thornswood-restore-' + [Guid]::NewGuid().ToString('N').Substring(0, 8) + '.zip')
+  $temp = Join-Path $Work ('thornswood-restore-' + [Guid]::NewGuid().ToString('N').Substring(0, 8) + '.zip')
+  $script:temp = $temp
   [System.IO.File]::WriteAllBytes($temp, $plain)
   $zipPath = $temp
   Say ("  decrypted to a zip of {0} MB" -f [math]::Round($plain.Length / 1MB, 2)) 'DarkGray'
@@ -136,7 +161,6 @@ if ($notes) {
 $zf.Dispose()
 
 if ($CheckOnly) {
-  if ($temp) { Remove-Item -LiteralPath $temp -Force -EA SilentlyContinue }
   # A backup that opens and holds no characters is the failure this exists
   # to catch (the 15 September pair), so -CheckOnly calls it one, and
   # Fetch-Backups.ps1 and its task see a non-zero result.
@@ -158,7 +182,6 @@ if (Test-Path -LiteralPath $To) {
   [void](New-Item -ItemType Directory -Path $To -Force)
 }
 [System.IO.Compression.ZipFile]::ExtractToDirectory($zipPath, $To)
-if ($temp) { Remove-Item -LiteralPath $temp -Force -EA SilentlyContinue }
 
 Head 'Unpacked'
 Say "  $To" 'Green'
@@ -167,3 +190,7 @@ Say '  Putting this back into a server folder is Restore-Server.ps1, which' 'Dar
 Say '  also checks the load order resolves; docs\RESTORING.md has the rest.' 'DarkGray'
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
 exit 0
+
+} finally {
+  Clear-RestoreZip
+}
