@@ -11,8 +11,15 @@
     .\Publish-Discord.ps1 -Quiet
     .\Publish-Discord.ps1 -Dev
     .\Publish-Discord.ps1 -DryRun
+    .\Publish-Discord.ps1 -Dev -Note "..." -GamemodeDeploy
 
   -DryRun prints what it would post and sends nothing.
+
+  -Note posts the text given, instead of reading the newest release from a
+  feed. Deploy-DevGamemode.ps1 uses this after a gamemode-only change, which
+  has no release for Ship to announce. -GamemodeDeploy goes with -Dev -Note:
+  the footer is "dev server", the title is not prefixed, and announced.json
+  is not consulted, because every deploy is its own announcement.
 
   IT REMEMBERS WHAT IT POSTED. Until 23 September this script always posted
   whatever was newest in the feed and had no idea it had posted it before, so
@@ -69,7 +76,13 @@ param(
   # received from the VPS and sent back (Feed-Store.ps1).
   [string]$ReleaseDir = (Join-Path $env:LOCALAPPDATA 'Thornswood\feed\main'),
   [string]$Site = 'https://thornswood.net',
-  [switch]$Quiet
+  [switch]$Quiet,
+  # Post this note instead of reading a feed. The first line is the title, "- "
+  # lines are details, and the rest is the body, the same shape Ship takes.
+  [string]$Note = '',
+  # A gamemode-only dev deploy: footer "dev server", no "Dev build:" prefix,
+  # and no announced.json check. Issue #594.
+  [switch]$GamemodeDeploy
 )
 
 $ErrorActionPreference = 'Stop'
@@ -92,6 +105,97 @@ function PropList($obj, $name) {
   $p = $obj.PSObject.Properties[$name]
   if ($null -eq $p) { return @() }
   return @($p.Value)
+}
+
+function Get-ThornswoodDiscordNoise {
+  return @(
+    '^\s*Launcher rebuilt\s*:',
+    '^\s*Launcher \d+\.\d+',
+    'files? to download',
+    '[\\/](SKSE|Data|tools)[\\/]',
+    '^\s*Load order\s*:',
+    '^\s*The gamemode was rebuilt\b'
+  )
+}
+
+function Split-ThornswoodNote([string]$Notes) {
+  $lines = @($Notes -split "`r?`n")
+  $title = (@($lines | Where-Object { $_.Trim() }) + @(''))[0].Trim()
+  $details = @($lines | Where-Object { $_ -match '^\s*-\s*\S' } | ForEach-Object { ($_ -replace '^\s*-\s*', '').Trim() })
+  $bodyLines = New-Object System.Collections.Generic.List[string]
+  $seenTitle = $false
+  foreach ($line in $lines) {
+    if (-not $line.Trim()) { continue }
+    if (-not $seenTitle) { $seenTitle = $true; continue }
+    if ($line -match '^\s*-\s*\S') { continue }
+    $bodyLines.Add($line)
+  }
+  return @{
+    Title   = $title
+    Details = $details
+    Body    = ($bodyLines -join "`n").Trim()
+  }
+}
+
+function Format-ThornswoodDiscordText([string[]]$detailLines, [string]$body, [string[]]$noise) {
+  $lines = @()
+  foreach ($d in @($detailLines)) {
+    $line = ([string]$d).TrimEnd()
+    if (-not $line.Trim()) { $lines += ''; continue }
+    if ($noise | Where-Object { $line -match $_ }) { continue }
+    $lines += $line
+  }
+
+  $sb = New-Object Text.StringBuilder
+  $prevBlank = $true
+  foreach ($line in $lines) {
+    if (-not $line.Trim()) {
+      if (-not $prevBlank) { [void]$sb.Append("`n") }
+      $prevBlank = $true
+      continue
+    }
+    $prevBlank = $false
+
+    if ($line -cmatch '^[A-Z][A-Z0-9 ,''&.\-]{3,}$') {
+      [void]$sb.Append("`n**" + $line.TrimEnd('.') + "**`n")
+      continue
+    }
+    $m = [regex]::Match($line, '^([A-Z][A-Z0-9 ,''&\-]{3,})\.\s+(.*)$')
+    if ($m.Success) {
+      [void]$sb.Append("`n**" + $m.Groups[1].Value + "**`n" + $m.Groups[2].Value + "`n")
+      continue
+    }
+    [void]$sb.Append('- ' + $line + "`n")
+  }
+
+  $text = ($sb.ToString() -replace "`n{3,}", "`n`n").Trim()
+  if (-not $text) { $text = $body.Trim() }
+  return $text
+}
+
+function Split-ThornswoodDiscordDescription([string]$text) {
+  $first = ''
+  $second = ''
+  $over = $false
+  if ($text.Length -le 3900) {
+    $first = $text
+  } else {
+    $cut = $text.Substring(0, 3900)
+    $at = $cut.LastIndexOf("`n")
+    if ($at -gt 500) { $cut = $cut.Substring(0, $at) }
+    $first = $cut.TrimEnd()
+    $rest = $text.Substring($first.Length).TrimStart()
+    if ($rest.Length -le 1900) {
+      $second = $rest
+    } else {
+      $cut2 = $rest.Substring(0, 1900)
+      $at2 = $cut2.LastIndexOf("`n")
+      if ($at2 -gt 300) { $cut2 = $cut2.Substring(0, $at2) }
+      $second = $cut2.TrimEnd()
+      $over = $true
+    }
+  }
+  return @{ First = $first; Second = $second; Over = $over }
 }
 
 $Here = $PSScriptRoot
@@ -121,110 +225,60 @@ if (-not $Webhook) {
   return
 }
 
-# The dev build has its own feed, in its own working folder beside the live
-# one. Reading the live one here would announce main's last release into the
-# dev channel every time a dev build went out.
-if ($Dev -and -not $PSBoundParameters.ContainsKey('ReleaseDir')) {
-  $ReleaseDir = Join-Path (Split-Path -Parent $ReleaseDir) 'dev'
-}
-
-# The live feed only. This repository's own version.json, the stale copy this
-# used to fall back to, was deleted on 25 September.
-$vf = Join-Path $ReleaseDir 'version.json'
-if (-not (Test-Path -LiteralPath $vf)) {
-  if (-not $Quiet) { Write-Host "  no version.json in $ReleaseDir, nothing posted" -ForegroundColor DarkGray }
-  return
-}
-
-# A byte order mark is not JSON and ConvertFrom-Json stops on the first
-# character, which is the trap that has bitten every other reader of this file.
-$v = ((Get-Content $vf -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json
-$n = @(PropList $v 'news')[0]
-if (-not $n) { if (-not $Quiet) { Write-Host '  nothing to post' }; return }
+if ($GamemodeDeploy -and -not $Note) { throw '-GamemodeDeploy needs -Note.' }
+if ($GamemodeDeploy -and -not $Dev) { throw '-GamemodeDeploy is only for the dev updates channel.' }
 
 $logo = "$Site/logo.png"
 # Who the post is from. Said once, used in three places.
 $devName = if ($Dev) { 'Thornswood dev' } else { 'Thornswood' }
+$noise = @(Get-ThornswoodDiscordNoise)
+$v = $null
+$n = $null
+$title = ''
+$body = ''
+$detailLines = @()
+$count = 0
+$date = ''
 
-# ------------------------------------------------------------------ cleaning
-# The same list Publish-News.ps1 strips on the way to the website. Lines that
-# mean something to you and nothing to anybody reading the channel.
-$noise = @(
-  '^\s*Launcher rebuilt\s*:',
-  '^\s*Launcher \d+\.\d+',
-  'files? to download',
-  '[\\/](SKSE|Data|tools)[\\/]',
-  '^\s*Load order\s*:',
-  '^\s*The gamemode was rebuilt\b'
-)
-
-$lines = @()
-foreach ($d in @(PropList $n 'details')) {
-  $line = ([string]$d).TrimEnd()
-  # Blank lines are the section breaks in a hand written release and they are
-  # worth keeping, so they survive the filter that drops everything else empty.
-  if (-not $line.Trim()) { $lines += ''; continue }
-  if ($noise | Where-Object { $line -match $_ }) { continue }
-  $lines += $line
-}
-
-# ------------------------------------------------------------------- shaping
-# A release is written as run on prose with bare capitalised headings in it.
-# Discord will not do anything with that on its own, so the headings are found
-# and made headings, and everything else becomes a bullet.
-$sb = New-Object Text.StringBuilder
-$prevBlank = $true
-foreach ($line in $lines) {
-  if (-not $line.Trim()) {
-    if (-not $prevBlank) { [void]$sb.Append("`n") }
-    $prevBlank = $true
-    continue
-  }
-  $prevBlank = $false
-
-  # A whole line in capitals is a section on its own: MODS ADDED, LAUNCHER.
-  if ($line -cmatch '^[A-Z][A-Z0-9 ,''&.\-]{3,}$') {
-    [void]$sb.Append("`n**" + $line.TrimEnd('.') + "**`n")
-    continue
-  }
-  # A capitalised run then a full stop then prose: "THE COLLECTION. Thornswood's
-  # mod list is published on Nexus now, ..."
-  $m = [regex]::Match($line, '^([A-Z][A-Z0-9 ,''&\-]{3,})\.\s+(.*)$')
-  if ($m.Success) {
-    [void]$sb.Append("`n**" + $m.Groups[1].Value + "**`n" + $m.Groups[2].Value + "`n")
-    continue
-  }
-  [void]$sb.Append('- ' + $line + "`n")
-}
-
-$text = ($sb.ToString() -replace "`n{3,}", "`n`n").Trim()
-if (-not $text) { $text = (Prop $n 'body').Trim() }
-
-# Discord takes 4096 characters in one description and 6000 across a whole
-# message, so a release the size of 1.1 does not fit in one and is not meant
-# to. Two embeds carry almost six thousand of it between them, split on a line
-# break rather than mid sentence, and whatever is left is on the website.
-$first = ''
-$second = ''
-$over = $false
-if ($text.Length -le 3900) {
-  $first = $text
+if ($Note) {
+  $parts = Split-ThornswoodNote $Note
+  $title = $parts.Title
+  $body = $parts.Body
+  $detailLines = @($parts.Details)
 } else {
-  $cut = $text.Substring(0, 3900)
-  $at = $cut.LastIndexOf("`n")
-  if ($at -gt 500) { $cut = $cut.Substring(0, $at) }
-  $first = $cut.TrimEnd()
-  $rest = $text.Substring($first.Length).TrimStart()
-  if ($rest.Length -le 1900) {
-    $second = $rest
-  } else {
-    $cut2 = $rest.Substring(0, 1900)
-    $at2 = $cut2.LastIndexOf("`n")
-    if ($at2 -gt 300) { $cut2 = $cut2.Substring(0, $at2) }
-    $second = $cut2.TrimEnd()
-    $over = $true
+  # The dev build has its own feed, in its own working folder beside the live
+  # one. Reading the live one here would announce main's last release into the
+  # dev channel every time a dev build went out.
+  if ($Dev -and -not $PSBoundParameters.ContainsKey('ReleaseDir')) {
+    $ReleaseDir = Join-Path (Split-Path -Parent $ReleaseDir) 'dev'
   }
+
+  # The live feed only. This repository's own version.json, the stale copy this
+  # used to fall back to, was deleted on 25 September.
+  $vf = Join-Path $ReleaseDir 'version.json'
+  if (-not (Test-Path -LiteralPath $vf)) {
+    if (-not $Quiet) { Write-Host "  no version.json in $ReleaseDir, nothing posted" -ForegroundColor DarkGray }
+    return
+  }
+
+  # A byte order mark is not JSON and ConvertFrom-Json stops on the first
+  # character, which is the trap that has bitten every other reader of this file.
+  $v = ((Get-Content $vf -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json
+  $n = @(PropList $v 'news')[0]
+  if (-not $n) { if (-not $Quiet) { Write-Host '  nothing to post' }; return }
+
+  $title = Prop $n 'title'
+  $body = (Prop $n 'body').Trim()
+  $detailLines = @(PropList $n 'details')
+  $count = @(PropList $n 'files').Count
+  $date = Prop $n 'date'
 }
+
+$text = Format-ThornswoodDiscordText $detailLines $body $noise
+$split = Split-ThornswoodDiscordDescription $text
+$first = $split.First
+$second = $split.Second
+$over = $split.Over
 
 # The else has to sit on the closing brace. PowerShell treats a newline in
 # front of it as the end of the statement and then fails on a stray else.
@@ -236,20 +290,22 @@ $tail = if ($Dev) {
   else { "`n`n[Every release]($Site/news)" }
 if ($second) { $second += $tail } else { $first += $tail }
 
-$count = @(PropList $n 'files').Count
 # Built from a char code rather than typed in, because a .ps1 saved without a
 # byte order mark is read as ANSI by Windows PowerShell and a middle dot typed
 # straight into the file comes out the other end as something else.
-$dot   = [string][char]0x00B7
-$foot  = $(if ($Dev) { 'dev build ' } else { 'launcher ' }) + (Prop $v 'launcherVersion')
-$date  = Prop $n 'date'
-if ($date)    { $foot += "  $dot  $date" }
-if ($count)   { $foot += "  $dot  $count file$(if ($count -ne 1) {'s'}) changed" }
+$dot = [string][char]0x00B7
+if ($GamemodeDeploy) {
+  $foot = 'dev server'
+} else {
+  $foot = $(if ($Dev) { 'dev build ' } else { 'launcher ' }) + (Prop $v 'launcherVersion')
+  if ($date)  { $foot += "  $dot  $date" }
+  if ($count) { $foot += "  $dot  $count file$(if ($count -ne 1) {'s'}) changed" }
+}
 
-$title = Prop $n 'title'
 # Said in the title as well as the footer. The dev channel is the one place
-# the two builds' notes could ever be taken for each other.
-if ($Dev) { $title = 'Dev build: ' + $title }
+# the two builds' notes could ever be taken for each other. A gamemode-only
+# deploy is not a dev build release, so it keeps the title as written.
+if ($Dev -and -not $GamemodeDeploy) { $title = 'Dev build: ' + $title }
 if ($title.Length -gt 250) { $title = $title.Substring(0, 247) + '...' }
 
 # ------------------------------------------------------------- said before?
@@ -257,31 +313,34 @@ if ($title.Length -gt 250) { $title = $title.Substring(0, 247) + '...' }
 # announcements of different versions and the dev feed is shared between both
 # machines. The version alone is not enough on its own: a dev build can be
 # reshipped under the same number with a different note, and that note is
-# worth saying. The pair is what gets remembered.
-$stateFile = Join-Path $Here '..\..\bot\announced.json'
-$stateKey = if ($Dev) { 'dev' } else { 'main' }
-$said = @{}
-if (Test-Path -LiteralPath $stateFile) {
-  # A file that will not parse is treated as no file at all. It is a note to
-  # ourselves about what was posted, and refusing to ship over a corrupted
-  # note would be the tail wagging the dog.
-  try {
-    $raw = ((Get-Content $stateFile -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json
-    foreach ($p in $raw.PSObject.Properties) { $said[$p.Name] = $p.Value }
-  } catch {
-    if (-not $Quiet) { Write-Host '  announced.json will not parse, treating it as empty' -ForegroundColor DarkGray }
+# worth saying. The pair is what gets remembered. Gamemode deploys are not
+# releases and are never deduped here.
+if (-not $GamemodeDeploy) {
+  $stateFile = Join-Path $Here '..\..\bot\announced.json'
+  $stateKey = if ($Dev) { 'dev' } else { 'main' }
+  $said = @{}
+  if (Test-Path -LiteralPath $stateFile) {
+    # A file that will not parse is treated as no file at all. It is a note to
+    # ourselves about what was posted, and refusing to ship over a corrupted
+    # note would be the tail wagging the dog.
+    try {
+      $raw = ((Get-Content $stateFile -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json
+      foreach ($p in $raw.PSObject.Properties) { $said[$p.Name] = $p.Value }
+    } catch {
+      if (-not $Quiet) { Write-Host '  announced.json will not parse, treating it as empty' -ForegroundColor DarkGray }
+    }
   }
-}
-$stamp = (Prop $v 'launcherVersion') + '|' + $title
-if ($said.ContainsKey($stateKey) -and (Prop $said[$stateKey] 'stamp') -eq $stamp -and -not $Force) {
-  if (-not $Quiet) {
-    Write-Host ('  already announced ' + (Prop $v 'launcherVersion') + ' in ' +
-                $(if ($Dev) { 'the dev updates channel' } else { '#news' }) +
-                ', nothing posted') -ForegroundColor DarkGray
-    Write-Host '  -Force says it again anyway' -ForegroundColor DarkGray
+  $stamp = (Prop $v 'launcherVersion') + '|' + $title
+  if ($said.ContainsKey($stateKey) -and (Prop $said[$stateKey] 'stamp') -eq $stamp -and -not $Force) {
+    if (-not $Quiet) {
+      Write-Host ('  already announced ' + (Prop $v 'launcherVersion') + ' in ' +
+                  $(if ($Dev) { 'the dev updates channel' } else { '#news' }) +
+                  ', nothing posted') -ForegroundColor DarkGray
+      Write-Host '  -Force says it again anyway' -ForegroundColor DarkGray
+    }
+    $global:ThornswoodDiscordResult = 'already'
+    return
   }
-  $global:ThornswoodDiscordResult = 'already'
-  return
 }
 
 $last = @{
@@ -342,13 +401,16 @@ try {
   $global:ThornswoodDiscordResult = 'posted'
   # AFTER the post returns and never before. A file written first turns a
   # failed post into a release nobody is ever told about, because the next
-  # run would read it and refuse.
-  try {
-    $said[$stateKey] = @{ stamp = $stamp; version = (Prop $v 'launcherVersion')
-                          title = $title; at = (Get-Date).ToUniversalTime().ToString('s') + 'Z' }
-    ($said | ConvertTo-Json -Depth 5) | Set-Content -LiteralPath $stateFile -Encoding UTF8
-  } catch {
-    if (-not $Quiet) { Write-Host "  posted, but could not write announced.json: $_" -ForegroundColor Yellow }
+  # run would read it and refuse. Gamemode deploys are not releases and are
+  # not remembered here.
+  if (-not $GamemodeDeploy) {
+    try {
+      $said[$stateKey] = @{ stamp = $stamp; version = (Prop $v 'launcherVersion')
+                            title = $title; at = (Get-Date).ToUniversalTime().ToString('s') + 'Z' }
+      ($said | ConvertTo-Json -Depth 5) | Set-Content -LiteralPath $stateFile -Encoding UTF8
+    } catch {
+      if (-not $Quiet) { Write-Host "  posted, but could not write announced.json: $_" -ForegroundColor Yellow }
+    }
   }
 } catch {
   # Said in colour and said again by Ship at the end. A release whose

@@ -210,8 +210,12 @@ function Noise-List($path) {
     $t = $null; $e = $null
     $a = [System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$t, [ref]$e)
     $as = $a.Find({ param($x) $x -is [System.Management.Automation.Language.AssignmentStatementAst] -and $x.Left.Extent.Text -eq '$noise' }, $true)
-    if (-not $as) { return @() }
-    return @($as.Right.FindAll({ param($x) $x -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true) | ForEach-Object { $_.Value })
+    if ($as) {
+        return @($as.Right.FindAll({ param($x) $x -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true) | ForEach-Object { $_.Value })
+    }
+    $fn = $a.Find({ param($x) $x -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $x.Name -eq 'Get-ThornswoodDiscordNoise' }, $true)
+    if (-not $fn) { return @() }
+    return @($fn.Body.FindAll({ param($x) $x -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true) | ForEach-Object { $_.Value })
 }
 $newsNoise = @(Noise-List $newsScript)
 $discordNoise = @(Noise-List (Join-Path $Repo 'scripts\ops\Publish-Discord.ps1'))

@@ -38,6 +38,11 @@
   the live half of issue #520. online.json carries a count and no names, so the
   warning says how many are on, not who.
 
+  It does not post to #news. A gamemode change that goes live is announced when
+  Ship.ps1 runs and calls Publish-Discord.ps1 on the release note. This script
+  only prepares the build tree; Deploy-Server.ps1 carries it up, and Ship tells
+  people. Issue #594.
+
 #>
 param(
     [string]$Gamemode,
