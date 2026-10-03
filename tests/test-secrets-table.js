@@ -1,6 +1,6 @@
 // test-secrets-table.js
 //
-// The secrets table in DEVELOPING.md says what each credential actually
+// The secrets table in Developer-Guide.md says what each credential actually
 // protects, and says not enforced where nothing checks it.
 //
 // WHY THIS EXISTS. The table's first row said the game server had a password,
@@ -46,8 +46,8 @@ function read(rel) {
 }
 
 // ------------------------------------------------------------ the section ---
-const doc = read('DEVELOPING.md');
-yes('DEVELOPING.md is there to read', doc.length > 0);
+const doc = read('Developer-Guide.md');
+yes('Developer-Guide.md is there to read', doc.length > 0);
 
 const head = doc.match(/^## Secrets\b.*$/m);
 yes('there is a secrets section', !!head);

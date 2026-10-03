@@ -105,7 +105,7 @@ jobs:
       - name: Check the writing rules
         shell: pwsh
         run: |
-          # The Words section of CONTRIBUTING.md, over every file people read
+          # The Words section of Developer-Guide.md, over every file people read
           # (every Markdown file outside lore and the archive, the launcher's
           # help and window, the bot's posts, the public pages, the installer's
           # read me). Written down since the start and never checked, and on

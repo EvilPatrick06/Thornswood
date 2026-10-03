@@ -1,11 +1,975 @@
-# Developing Thornswood
+# Developer Guide
 
-The long form, for everybody on the team, with AI or without.
-CONTRIBUTING.md has the rules and the team; this says what Thornswood is, how
-the pieces fit, how a release goes out, and what has to be true on a machine
-before it can ship one. Nothing in here is a secret; the secrets are listed by
-name near the end with where each one lives. It was called
-SECOND-DEVELOPER.md until 25 September, when the team grew past two.
+This is the one guide for working on Thornswood. It covers a first day on Windows, how work moves, how a release goes out, and how a machine is set up to ship one. `CLAUDE.md` adds only what applies to a Claude. Read this before your first change, and again when something here changes.
+
+Repository: https://github.com/EvilPatrick06/Thornswood
+Board: https://github.com/users/EvilPatrick06/projects/1
+Site: https://thornswood.net
+Staff pages: https://thornswood.net/hub
+
+## Quick start
+
+For a new person on Windows, including a first day with Visual Studio Code, PowerShell, Git, and GitHub. Later sections are the full rules. This section is the path that gets you to a merged pull request on the first day.
+
+Use your own GitHub account. Patrick adds that account as a collaborator on the private repository before a clone will work. Say so in Discord and wait for that. Use your own clone. The shared folder `C:\Users\you\Downloads\Thornswood-Repo` on the shipping machine is for the lanes that build from it. Your clone can live at `C:\Dev\Thornswood`, or any empty folder you own.
+
+### Install the tools
+
+Open PowerShell. Paste this and let each install finish. If Windows asks for an administrator, allow it.
+
+```powershell
+winget install --id Git.Git -e --accept-package-agreements --accept-source-agreements
+winget install --id GitHub.cli -e --accept-package-agreements --accept-source-agreements
+winget install --id OpenJS.NodeJS.LTS -e --accept-package-agreements --accept-source-agreements
+winget install --id Microsoft.PowerShell -e --accept-package-agreements --accept-source-agreements
+winget install --id Microsoft.VisualStudioCode -e --accept-package-agreements --accept-source-agreements
+```
+
+Close that window and open **PowerShell 7** from the Start menu. A new window is required because Windows only sees newly installed programs in a window opened afterwards.
+
+```powershell
+git --version
+gh --version
+node --version
+ssh -V
+code --version
+```
+
+Each line should print a version. `code --version` prints a few lines, and the first is the version. If one says the program is not recognized, you are still in the old window.
+
+### Install the OpenSSH client
+
+The VPS scripts need `ssh`. If `ssh -V` already printed a version, this step is done.
+
+```powershell
+Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0
+```
+
+When that reports that the class is not registered, run the same install through DISM from an elevated PowerShell:
+
+```powershell
+dism /Online /Add-Capability /CapabilityName:OpenSSH.Client~~~~0.0.1.0
+```
+
+When DISM still fails, start Windows Update and run the DISM line again:
+
+```powershell
+Start-Service wuauserv
+dism /Online /Add-Capability /CapabilityName:OpenSSH.Client~~~~0.0.1.0
+```
+
+`The operation completed successfully` means the client is installed. Check it:
+
+```powershell
+ssh -V
+```
+
+### Sign the GitHub CLI into your account
+
+```powershell
+gh auth login
+gh auth status
+```
+
+Choose GitHub.com, then HTTPS, then login with a browser, as the GitHub user that has access to the repository. `gh auth status` should name your account and say the token can see private repositories.
+
+### Clone the repository
+
+```powershell
+New-Item -ItemType Directory -Force -Path C:\Dev | Out-Null
+cd C:\Dev
+git clone https://github.com/EvilPatrick06/Thornswood.git
+cd C:\Dev\Thornswood
+git status
+```
+
+`git status` should say you are on `main` and the working tree is clean. If the clone asks for a login and then fails, you are not a collaborator yet. Stop and say so in Discord.
+
+From here on, the commands assume PowerShell is inside your clone. If you used another folder, `cd` there first.
+
+### The four tools
+
+Visual Studio Code is the window you work in. The folders sit on the left. The file you are reading sits in the middle. A terminal sits along the bottom.
+
+PowerShell is that terminal. You type one line, press Enter, and Windows runs it. The line is a command. The text waiting for the next command is the prompt. It looks like `PS C:\Dev\Thornswood>`. The folder in the prompt is the folder the next command runs in.
+
+Git is the history of this folder on your PC. A commit is one saved step in that history, with a message you write. A branch is a named line of commits. The folder shows one branch at a time.
+
+GitHub is the website copy of that history, at https://github.com/EvilPatrick06/Thornswood. Your PC and GitHub each hold the repository. `main` on GitHub is the shared branch. A push uploads the branch you are on. Your commits join `main` when a pull request is merged. Until that merge, `main` on GitHub is the shared line, and your work is the branch you pushed.
+
+| Word | What it means |
+| --- | --- |
+| Repository | This project folder plus the history Git keeps for it |
+| Clone | The copy of the repository on your PC |
+| Commit | One saved step, with a message, on the branch you are on |
+| Branch | A named line of commits. The folder shows one at a time |
+| `main` | The shared branch. A release is built from it |
+| Push | Upload this branch's new commits to GitHub |
+| Pull | Download new commits from GitHub onto the branch you are on |
+| Pull request | The GitHub page that puts your branch's commits onto `main` when it is merged |
+| `origin` | The name Git uses for the GitHub copy |
+
+### Visual Studio Code
+
+Open the clone:
+
+```powershell
+cd C:\Dev\Thornswood
+code .
+```
+
+`code .` opens the folder you are in. The window title shows Thornswood. If `code` is not recognized, close PowerShell, open PowerShell 7 again, `cd C:\Dev\Thornswood`, and run `code .` again.
+
+The far left is a strip of icons. Hover each one and read the name.
+
+**Explorer** lists the folders and files. Click a triangle to open a folder. Click a file to open it in the middle. A dot on the file's tab means the editor has changes that are still unsaved. `Ctrl+S` saves the file. Git sees the saved file.
+
+The bar just above the editor shows the folders that lead to this file. Click a folder in that bar to open it.
+
+`Ctrl+P` opens a file by name. Type `gamemode.js` and press Enter.
+
+`Ctrl+Shift+F` searches the words inside files. Type a word from the task and press Enter. Click a result to open that line.
+
+**Source Control** lists the same changed files `git status` will list. The message box at the top is the commit message. The rest of this guide does the commit from PowerShell, so the message and the branch stay visible in one place.
+
+The branch name is in the status bar at the bottom left. Click it for a list of branches. The section Switch between branches on your PC is the safe way to change that name.
+
+**Terminal.** Open it from the View menu, Terminal. A new terminal starts in the clone. If the dropdown beside the plus sign says a PowerShell whose version is 5, type `pwsh` and press Enter. Scripts in this repository run in PowerShell 7.
+
+```powershell
+$PSVersionTable.PSVersion
+```
+
+The major number is 7 or higher when you are in the right one.
+
+### PowerShell
+
+You are always in one folder. Ask which:
+
+```powershell
+Get-Location
+```
+
+A clone opened as above prints `C:\Dev\Thornswood`.
+
+List the names in that folder:
+
+```powershell
+Get-ChildItem
+```
+
+`ls` and `dir` are the same list. `Get-ChildItem scripts` lists what is inside `scripts` and stays where you are.
+
+Move into a folder:
+
+```powershell
+Set-Location launcher
+Get-Location
+```
+
+Move back to the repository folder:
+
+```powershell
+Set-Location ..
+```
+
+`cd launcher` and `cd ..` are the short forms. The rest of this guide uses `cd`. Press Tab while you type a folder name and PowerShell finishes it.
+
+Run a script from the repository folder. The `.\` means "the file is in this folder":
+
+```powershell
+.\scripts\dev\Check-Words.ps1
+```
+
+The up arrow brings the previous command back so you can run it again. `Ctrl+C` stops a command that is still running. `Clear-Host` clears the text off the window. Your files stay as they were.
+
+Open a file in Visual Studio Code from the terminal:
+
+```powershell
+code .\Developer-Guide.md
+code .\game\gamemode.js
+```
+
+### Where the project lives
+
+Stay in `C:\Dev\Thornswood` for these. In Explorer, click the same path. Each big folder has its own `README.md`. Open that file when you go into the folder. The table in The pieces, later in this guide, is the long form of the same map.
+
+| In Explorer | What it is | In PowerShell |
+| --- | --- | --- |
+| `README.md` | The short map of the repository | `code .\README.md` |
+| `Developer-Guide.md` | This guide | `code .\Developer-Guide.md` |
+| `launcher\app` | The launcher program, one `.cs` file per piece | `Get-ChildItem launcher\app\*.cs` |
+| `launcher\ui.xaml` | The launcher window layout | `code .\launcher\ui.xaml` |
+| `game\gamemode.js` | The server rules | `code .\game\gamemode.js` |
+| `game\plugins` | Scripts that run in Skyrim | `Get-ChildItem game\plugins` |
+| `game\ui` | Overlays in the game | `Get-ChildItem game\ui` |
+| `site\data\site` | The public website pages | `Get-ChildItem site\data\site` |
+| `site\server.js` | The website program | `code .\site\server.js` |
+| `bot` | The Discord bot | `Get-ChildItem bot` |
+| `voice` | Proximity voice | `code .\voice\voice-server.js` |
+| `scripts\release` | Build and ship | `Get-ChildItem scripts\release` |
+| `scripts\deploy` | Put a build on the server | `Get-ChildItem scripts\deploy` |
+| `scripts\vps` | The server key and log reads | `Get-ChildItem scripts\vps` |
+| `scripts\dev` | Checks you run on your PC | `Get-ChildItem scripts\dev` |
+| `tests` | The test files | `Get-ChildItem tests` |
+| `docs` | The system notes | `code .\docs\SYSTEM.md` |
+
+`engine` is the SkyMP source. Leave it until a task tells you to build the server. `out` and `local` appear after a build. Git keeps them off GitHub.
+
+Search for a file by name with `Ctrl+P`. From PowerShell, this walks the tree and can take a while:
+
+```powershell
+Get-ChildItem -Recurse -Filter gamemode.js
+```
+
+Search for a word inside one file:
+
+```powershell
+Select-String -Path .\game\gamemode.js -Pattern "door"
+```
+
+For the whole repository, `Ctrl+Shift+F` in Visual Studio Code is the search to use.
+
+Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or Publish-Update.ps1 without a line in #staff-general. Those files sit in `launcher\app` and `scripts\release`.
+
+### Git on your PC
+
+`git status` is the command to run whenever you are unsure. It names the branch and lists files that differ from the last commit.
+
+```powershell
+git status
+```
+
+`nothing to commit, working tree clean` means the saved files match the branch. A list of files means those saved edits are in the folder and become part of the branch when you commit them.
+
+See the line changes:
+
+```powershell
+git diff
+```
+
+See the latest commits on this branch:
+
+```powershell
+git log -5 --oneline
+```
+
+A commit has two steps. Name the files, then save the step with a message. Save in the editor first (`Ctrl+S`).
+
+```powershell
+git add path\to\file
+git commit -m "Say what this step does, in one sentence."
+```
+
+That commit is on this PC, on the branch in the status bar. `git log -5 --oneline` shows it. GitHub learns it at the push, in Your first branch, below.
+
+List the branches on this PC. The star is the one in the folder:
+
+```powershell
+git branch
+```
+
+### GitHub in the browser
+
+Sign in on the GitHub website as the account that was added to the repository. Open https://github.com/EvilPatrick06/Thornswood. The Code tab shows the files on the branch named in the dropdown. After a clone, that dropdown is `main`.
+
+`gh` is the command-line window onto the same site:
+
+```powershell
+gh auth status
+```
+
+It should print your login. Your first branch, below, is the first push. After that push, refresh the Code tab, open the branch dropdown, and choose your branch. The files there are your branch. The `main` entry in that dropdown is still the shared line, without those commits.
+
+The Pull requests tab lists open pull requests. `gh pr create` adds yours. Merging that page is what writes the commits onto `main`. The sections below are the commands for the push, the pull request, and the merge.
+
+`git pull`, while you are on `main`, downloads commits other people have merged:
+
+```powershell
+git switch main
+git pull
+```
+
+### Reach the VPS
+
+You do not get the server password. Your PC creates a key. You send the public line. Somebody who already has a key on the server adds yours. After that, the scripts connect without asking.
+
+```powershell
+.\scripts\vps\Setup-SshKey.ps1 -KeyOnly
+```
+
+The script prints one line that starts with `ssh-ed25519`. Copy that whole line into Discord. Leave the private key file where the script put it, under your user folder in `.ssh`. Send no file whose name ends in a private key, and no line that does not start with `ssh-ed25519`.
+
+On a machine that already has a key, from the repository folder:
+
+```powershell
+.\scripts\vps\Add-VpsKey.ps1 -PublicKey 'ssh-ed25519 AAAA... comment'
+```
+
+When the key is on the server, on your machine:
+
+```powershell
+.\scripts\vps\Setup-SshKey.ps1 -Test
+```
+
+A good answer is that the key already works. `Host key verification failed` means this machine has not recorded the server yet. Run the same script without `-Test` only when the first run did not finish. Do not type the server password into a script.
+
+Two reads that do not change the box:
+
+```powershell
+.\scripts\vps\Check-Site.ps1
+.\scripts\vps\Get-Logs.ps1
+```
+
+`Check-Site.ps1` says whether the website answers. `Get-Logs.ps1` copies the tail of the site, bot, game server, and voice logs onto your machine and prints the folder. `-Lines 40000` pulls more.
+
+### Your first branch
+
+One issue, one branch, one pull request. Start from a fresh `main`.
+
+```powershell
+git checkout main
+git pull
+git checkout -b yourname/short-name
+```
+
+`yourname` is your name in lowercase. `short-name` is the job, with hyphens. Example: `alex/fix-door-list`.
+
+```powershell
+git status
+git diff
+git add path\to\file
+git commit -m "Fix the door list so a staff role still gets in."
+git push -u origin HEAD
+```
+
+The first push sets the upstream. It puts this branch on GitHub under the same name. `main` on GitHub stays as it is. Your commits join `main` when the pull request is merged.
+
+Run the test that covers your change before you open the pull request. A node test looks like this:
+
+```powershell
+node tests\test-site-local.js
+```
+
+Use the file in `tests\` whose name matches the area you touched. A passing run ends without an error. Pages, docs, and launcher help that a person will read:
+
+```powershell
+.\scripts\dev\Check-Words.ps1
+```
+
+### Switch between branches on your PC
+
+The folder shows one branch at a time. The files in Visual Studio Code are the branch named in the status bar at the bottom left. Every other local branch stays on this PC with its own commits. Switching replaces the files in the folder with the branch you pick. Switching back brings the first branch's files back.
+
+Open the terminal from the Terminal menu, New Terminal. It starts in your clone. These commands are the same there and in PowerShell.
+
+List the branches on this PC. A star marks the one in the folder:
+
+```powershell
+git branch
+```
+
+`git branch -vv` also shows the GitHub branch each one tracks, and whether yours is ahead of it or behind it.
+
+Look at uncommitted work before you switch:
+
+```powershell
+git status
+```
+
+`nothing to commit, working tree clean` means the folder matches this branch. When `git status` lists files, those edits are in the folder and belong to a branch only after you commit them. Commit while the status bar still shows the branch they belong on:
+
+```powershell
+git add path\to\file
+git commit -m "Save the door list work on this branch."
+```
+
+That commit stays on this branch. Then switch:
+
+```powershell
+git switch yourname/other-job
+```
+
+The folder now matches `yourname/other-job`. Come back the same way:
+
+```powershell
+git switch yourname/short-name
+```
+
+The door-list commit is in the folder again. `git switch -` returns to the branch you were on before this one.
+
+Save editor tabs before you switch. A save writes the file into whichever branch is current. Commit that save on the branch named in the status bar, and the work stays with that branch.
+
+Start a second job from a current `main`. The first branch keeps the commits you already made:
+
+```powershell
+git switch main
+git pull
+git switch -c yourname/second-job
+```
+
+`git switch -c` creates the branch and puts the folder on it. `git branch` lists both. Each commit stays on the branch where you made it.
+
+To set the edits aside and look at another branch:
+
+```powershell
+git stash
+git switch yourname/other-job
+```
+
+The folder is clean and shows the other branch. The stashed edits remain on this PC. Return to the branch you stashed from and put them back in the folder:
+
+```powershell
+git switch yourname/short-name
+git stash pop
+```
+
+`git stash list` shows what is still set aside. Pop on the branch you stashed from, so the edits land on that job.
+
+When the switch stops, those uncommitted edits touch a file that differs on the branch you asked for. You are still on the current branch, and the edits are still in the folder. Commit them, or stash them, then switch.
+
+`git checkout yourname/other-job` moves you the same way `git switch` does. Later sections use `git checkout` for that move.
+
+Push sends the branch you are standing on:
+
+```powershell
+git push -u origin HEAD
+```
+
+That branch appears on GitHub under its own name. `main` on GitHub does not gain those commits. They join `main` when the pull request is merged. Until then, the site, the dev build, and everyone else's `git pull` of `main` are still the shared line.
+
+In Visual Studio Code, Source Control lists the same files as `git status`. Commit from that panel, or from the terminal, while the status bar shows the right branch. Click the branch name in the status bar to switch. Commit or stash first, so each job's files stay with its branch.
+
+### Open the pull request from PowerShell
+
+`gh pr create` uses the branch you have checked out. Check that branch out first. A one-line body uses ordinary double quotes. PowerShell treats `@" ` as the start of a here-string, and a here-string needs a line break immediately after `@"`. Characters on that same line raise `No characters are allowed after a here-string header`.
+
+A one-line body:
+
+```powershell
+gh pr create --title "Tools to 50" --body "Reduced tools from 100 to 50 on uses"
+```
+
+A body of several lines, saved first:
+
+```powershell
+$body = @"
+What changed.
+
+How you tested it.
+
+Closes #123
+"@
+gh pr create --title "Short title" --body $body
+```
+
+The title says what changed. The body says how you tested it. If the work finishes an issue, put `Closes #123` in the body. The pull request targets `main`.
+
+### When the pull request will not open
+
+**The push is not a fast-forward.** Your local branch is behind the same branch on GitHub. `gh pr create` tries to push first, and Git refuses to overwrite the remote. Bring the remote commits in, then create the pull request:
+
+```powershell
+git pull
+gh pr create --title "Tools to 50" --body "Reduced tools from 100 to 50 on uses"
+```
+
+If `git pull` says there is no tracking information, name the remote and the branch. This example uses the branch from that session. Use the name `git status` prints for yours.
+
+```powershell
+git pull origin 1381-tools-to-50-uses---MP
+```
+
+To make later pulls work without the name:
+
+```powershell
+git branch --set-upstream-to=origin/1381-tools-to-50-uses---MP 1381-tools-to-50-uses---MP
+git pull
+```
+
+**You rewrote the branch on purpose** (`git commit --amend` or `git rebase`) and you mean to replace the remote copy of that same branch:
+
+```powershell
+git push --force
+gh pr create --title "Tools to 50" --body "Reduced tools from 100 to 50 on uses"
+```
+
+Force push replaces the remote branch. Use it on your own branch after you rewrote that branch. Main refuses a force push. If `main` moved while you were working, replay your commits on the new main instead:
+
+```powershell
+git fetch origin
+git rebase origin/main
+git push
+```
+
+**The pull stopped on a conflict.** Git will not commit while a file is unmerged. Open the file it names, often `game\gamemode.js`. Find the markers `<<<<<<<`, `=======`, and `>>>>>>>`. Keep the code you want and delete the marker lines. Save the file.
+
+```powershell
+git add game\gamemode.js
+git commit -m "Resolve merge conflict in gamemode.js"
+gh pr create --title "Tools to 50" --body "Reduced tools from 100 to 50 on uses"
+```
+
+If the stop was a rebase rather than a merge, the last step is `git rebase --continue` after the `git add`.
+
+### Merge your own pull request
+
+Wait until the check named `Launcher builds` is green on the commit you are merging. It is on the pull request, under Checks. Pending means it is still running. A red check means the branch is not ready. Fix it on the same branch and push again.
+
+```powershell
+gh pr checks
+```
+
+When `Launcher builds` says pass, and you are confident in the change, merge it yourself. Say what you merged in #staff-general. On the website the button is **Squash and merge**.
+
+```powershell
+gh pr merge --squash
+git checkout main
+git pull
+```
+
+GitHub deletes the branch after a squash merge. A green check is required. It does not replace reading your own diff. Merge a pull request you understand. Leave one you do not.
+
+## What any developer may do
+
+Decided for the whole team: any developer may do every one of these. Confidence in the change, and a green `Launcher builds` check on the exact commit, are the gates for a merge. A release, a deploy, and a news post are the same people. Say what you are about to publish in #staff-general first. Dev and Main each have one shared feed and one shared server, and the last Ship on a channel wins.
+
+The machine that runs `Ship.ps1` still has to sign the build. `records\signing\signing.json` has to be present and enabled, and the launcher tip has to be signed by the certificate the launcher already trusts. `.\scripts\release\Setup-ShipMachine.ps1` is how a machine gets there. Shipping from another machine, below, says which Azure sign-in can sign.
+
+| Job | Command | Where it shows up |
+| --- | --- | --- |
+| Dev release | `.\scripts\release\Ship.ps1 -Channel dev` plus the note | Dev feed, dev launcher News tab, dev updates channel in Discord |
+| Main release | `.\scripts\release\Bump-Version.ps1`, then after that pull request is merged, `.\scripts\release\Ship.ps1` plus the note | Live feed, launcher News tab, the site news page, Discord #news |
+| Discord news | Ship posts it. To post the current feed again: `.\scripts\ops\Publish-Discord.ps1` or `.\scripts\ops\Publish-Discord.ps1 -Dev` | #news for main, the dev updates channel for dev |
+| Game news | The same note. The launcher News tab reads the feed. The site news page is `.\scripts\ops\Publish-News.ps1`, which a main Ship already runs | Launcher News tab, and https://thornswood.net for main |
+| Docs site | `.\scripts\deploy\Deploy-Docs.ps1` for the app. `.\scripts\deploy\Deploy-Docs.ps1 -Site` for the public pages | https://thornswood.net |
+| Dev gamemode | `.\scripts\deploy\Deploy-DevGamemode.ps1` | Dev server only |
+| Live gamemode | `.\scripts\deploy\Deploy-Gamemode.ps1`, then `.\scripts\deploy\Deploy-Server.ps1` | Live server |
+
+A dev release can run from any branch on any developer's machine. A main release runs from `main` after `git pull`, with a clean tree that matches GitHub. Details, note rules, and the restart warning are in How a release goes out and After a pull request is merged.
+
+`Set-DevNews.ps1 -Check` says whether the dev Discord webhook is set, and which channel it points at. It prints no secret.
+
+```powershell
+.\scripts\ops\Set-DevNews.ps1 -Check
+.\scripts\ops\Publish-Discord.ps1 -DryRun
+.\scripts\ops\Publish-Discord.ps1 -Dev -DryRun
+.\scripts\ops\Publish-News.ps1 -OutFile news.json
+```
+
+`-DryRun` and `-OutFile` send nothing. A real post remembers what it already announced and refuses to repeat it. `-Force` is how a deleted post is made again.
+
+The note is what people read. The first line is a title of three words or more, from the person's side. Then one line starting with `- ` for each thing they will notice. Ship refuses a title that is shorter, a note with no `- ` line, an issue number, a file name, a setting name, and the word the Words section bans.
+
+```powershell
+.\scripts\release\Ship.ps1 -Channel dev "The Downgrade button shows its progress and says why it stopped
+- A bar under the Downgrade button shows how far the downgrade has got.
+- When the downgrade stops, the line under the button says why and what to do next."
+```
+
+Everything still goes to the dev build first, including small changes. A main release is for a security fix, for something that leaves the game untestable, or for work the team has agreed goes live. Any developer who is confident may run that main release, then say so in #staff-general.
+
+## What this is
+
+Thornswood: a modded co-op Skyrim roleplay server on SkyMP, in alpha and
+open by application. This repo is the launcher (launcher\app, C# 5, WPF, built with the
+.NET Framework 4 csc), the game plugins (game\plugins, Skyrim Platform
+JavaScript), the site (site, node), the Discord bot (bot,
+Python) and every script that ships or runs it. Owner: Patrick (EvilPatrick06).
+
+Nothing here assumes you use Claude: this file is the rules for everybody, and a Claude
+reads the same file. CLAUDE.md only adds what is about a Claude. A new developer
+is added as a collaborator on the repository, and on CODEOWNERS beside the
+shared files.
+
+Patrick's Grok Bot lanes (Smeagle, Launcher, Installer, Website, GitHub,
+Vortex) also work here, on the shipping machine, under his GitHub account.
+Every rule in this file binds them the same as a person. They share notes
+through an Obsidian vault at `C:\Thornswood Vault\Thornswood` on that machine
+(`wiki/status.md` is what is true now); the vault is for coordinating, and
+the board is still the one record of work. They mark what they are on with a
+`claimed: <lane>` label and the board card moved to In Progress. Their
+branches carry the lane's name (`launcher/`, `website/`, `github/` and so on).
+On the shipping machine `C:\Users\you\Downloads\Thornswood-Repo` is shared
+by all of them and sits detached at `origin/main`, because lanes build from
+it: branch work goes in a worktree beside it, removed with its branch once
+the pull request merges.
+
+
+## Words
+
+The people in the world are customers, clients, people, testers, partners.
+Never "player". No em dashes anywhere written for people. Plain, direct
+sentences, no filler, no placeholders. Secrets (server passwords, site keys,
+Discord tokens, the news webhook, anything out of a config.json or .env on the
+VPS) are named by location only; never printed, pasted, committed or logged.
+
+What checks these, since 29 Sep (issue #460). Every pull request's build
+(`Launcher builds`, step "Check the writing rules") runs
+`scripts\dev\Check-Words.ps1` over every Markdown file outside `lore\` and
+`docs\archive\`, the launcher's help and window, the bot's channel posts,
+the public pages of the site and the voice service, and the installer's read
+me. Each hit names the file, the line and the rule, and turns the build red:
+
+| Rule | What it refuses |
+| --- | --- |
+| `em-dash` | an em dash, typed or as an HTML entity |
+| `banned-word` | the word this section bans, any case; multiplayer and playtest pass |
+| `old-owner` | the old owner name |
+| `open-alpha` | calling the alpha a playtest that is closed; it is open by application |
+| `placeholder` | a marker left for later, in capitals (to do, to be decided, fix me), or filler Latin |
+| `names-person` | a person's name in README.md or the six component READMEs (launcher, site, voice, game\plugins, game\ui, installer\setup) |
+
+A line that has to say it anyway (this section naming the word it bans, a
+document quoting a note as it went out) goes in
+`scripts\dev\Check-Words.allow.txt` with its reason; an allowance that no
+longer matches anything is itself a hit. Release notes are not files, so
+`scripts\release\Note-Rules.ps1` checks them when Ship or Rollback-Feed runs,
+before anything is built. The same build step runs `tests\test-check-words.ps1`
+and `tests\test-note-rules.ps1`, which plant a break of every rule and fail
+if either check lets one through. Secrets are checked by
+`scripts\dev\Check-Secrets.ps1` in the same build.
+
+No machine checks these, so the person writing keeps them: plain, direct
+sentences with no filler; the text inside code (the launcher's messages, the
+game's chat lines, the bot's replies), because a word check there cannot
+tell a message from a name in the code or one of Skyrim's own record names;
+and names in the other documents, which record who decided something and
+who holds what on purpose.
+
+## Everything we need to do goes on the board
+
+The one record of outstanding work is the Thornswood To Do board:
+https://github.com/users/EvilPatrick06/projects/1
+
+Each piece of work is an issue on this repository, and every issue is on the
+board. Decided by Patrick on 25 Sep and approved in #staff-general: the list moved there
+from a claude.ai page that nobody without Claude could open. The 169 open
+entries became issues #368 to #536, each keeping its old number as its Order.
+`docs/archive/todo-list-2026-09-25.md` holds every entry as it stood that day,
+the finished ones included, so a comment in the code that says "entry 243 on
+the To Do List" means entry 243 in that file.
+
+Decided by Patrick on 17 Sep. Anything a session turns up goes on the board
+before the session ends. A defect, a decision, a correction to something
+already on there, or work started and not finished. Saying it in a chat or a
+reply is not recording it: that is gone when the window closes and the next
+person has no way to know it was ever found. What prompted this was a Google
+Ads tag added to the site whose only trace was a paragraph on a neighbouring
+entry, with no step telling anybody to deploy it.
+
+How to use it:
+
+- Order is the do-order. A new issue gets the Order of where it belongs, not
+  the end; a number between two others (52.5) is fine.
+- Work that fits an existing issue is an edit or a comment on it, not a
+  second issue. Write down what was measured and what is left.
+- Uncommitted changes sitting in the repo are outstanding work and belong on
+  the board too.
+- Labels: `wave:` is the stage, `area:` the part of the project, `needs:` who
+  or what it waits on, and `anyone can start` marks what needs nobody in
+  particular. Assign yourself when you start one.
+- A pull request that finishes an issue says `Closes #N`, so merging closes
+  it and the board moves it to Done. Say in the pull request, or in #staff-general,
+  which issues moved.
+
+## Settled design, not up for a quiet rewrite
+
+- Decided by Patrick and Djinn on 17 Sep, after the three launchers kept
+  getting into each other's files: Thornswood runs from its own game folder
+  (`Thornswood\Game`), built by the launcher from what Vortex has deployed
+  into the Steam copy, the big files as hard links so the collection is not
+  stored twice, and copies of everything another launcher rewrites in place
+  (settings, scripts, programs, the client folders, the master files and
+  whatever else rewrites a copied file in place). Decided by Patrick on
+  20 Sep: nothing here supports another server's install any more. The SkyMP
+  client runtime is built from the fork and recorded in
+  `records\client-build.json`; `Sync-Client.ps1` puts it in the game folder and
+  Ship refuses a release whose client is not the recorded build. Nothing is
+  taken from the Steam copy's `Data\Platform` or its SkyMP DLLs, because until
+  that day another launcher's builds of all of them were what shipped.
+  This is what ships now, corrected 18 Sep. The bullet used to say the Steam
+  copy shipped until `djinn/own-game-folder` reached main. That branch is on
+  main, `C:\Thornswood\Game` is built, and the launcher restarts into it:
+  Profile\launcher.log records "runs from the new folder". A session reading
+  the old wording would have believed the wrong layout was live, which is the
+  one thing this section exists to prevent.
+  Decided by Patrick on 24 Sep, for a tester whose Vortex deploys into
+  another server's copy of Skyrim (`steamapps\common\Keizaal Online`), in
+  his words "detcts and fixes this but doesnt have the servers bleed": when
+  Vortex deploys anywhere but the Steam copy, `Thornswood\Game` is the Steam
+  copy's game plus exactly the files Vortex's record in that folder lists,
+  taken from Vortex's own mods folder, and nothing else of that folder is
+  read. Scan names the folder, Fix and Settings point the launcher at it,
+  and with no Steam copy on the machine it refuses (OwnGame.DeploysInto,
+  Gather, tests\test-vortex-folder.ps1). Djinn to agree it in #staff-general.
+  Decided by Patrick on 29 Sep (#1218, #1226): the Steam copy is the
+  person's, to play vanilla at any build with their own mods, and Thornswood
+  runs entirely from its own folder. With the own folder chosen in the setup
+  window, first setup never writes into the Steam copy: the installer's
+  payload and everything the launcher writes before the folder exists go to
+  `Profile\Payload` (Paths.OwnFirst), and Make takes them in. Not chosen, the
+  install uses the Steam copy as it always did, and once the folder is turned
+  on and made the next start takes Thornswood's files back out of the Steam
+  copy, once (OwnGame.CleanSteamCopy); an existing own folder gets the same
+  from its next update. Steam's "Wait until I launch the game" is set only
+  until the folder exists (tests\test-own-folder-first.ps1).
+  Decided by Patrick on 29 Sep (#1232): `Thornswood\Game` takes only
+  Skyrim's own files (from the Steam copy when it is on the pinned build, or
+  the Downgrade's download), Vortex's deployed files by Vortex's own record,
+  and Thornswood's own files. Skyrim's own is the pinned build's file list,
+  `records\skyrim-files.json`, read out of the depot manifests the Downgrade
+  uses, never a guess by folder. A mod put into the Steam copy by hand stays
+  there, and a folder made before this loses such files at its next refresh,
+  logged (OwnGameKinds.cs, tests\test-own-folder-alone.ps1).
+  Decided by Patrick on 29 Sep (#1247): the behavior files and the BodySlide
+  bodies a release carries are made in Thornswood's own folder, as a step on
+  the shipping machine before a Ship (`scripts\mods\Build-Generated.ps1`,
+  what it builds in `records\generated.json`), never in the Steam copy. The
+  behavior files come from Pandora Behaviour Engine+, which the collection
+  carries from revision 2, because Nemesis cannot generate from a command
+  line. Ship stops while they are not built for the current mod list
+  (tests\test-build-generated.ps1).
+- Whichever folder the game runs from, the launcher looks after its own
+  files: Keep puts its files back before Play and parks any plugin in
+  `Data\Platform\Plugins` that is not ours; Hold keeps its files open read
+  only while the game runs; the plugins idle unless the client points at our
+  server and a fresh session note is there; Publish-Update packs what belongs
+  and nothing else (Ship-Rules.ps1, by what is ours rather than by whose
+  anything is). No wrapper scripts around the launcher, nothing moved by hand
+  in Data\Platform, nothing touches Vortex's own files.
+- The SkyMP client runtime is built from the fork, the `engine\skymp`
+  submodule of this repository on `thornswood/engine-changes`, and recorded
+  in `records\client-build.json` by `New-ClientBuildRecord.ps1`.
+  `Sync-Client.ps1` puts the six recorded files in the game folder and
+  refuses any that is not the recorded build; Ship refuses a release whose
+  client is not. Every change Patch-Client.ps1 used to make by text is in the
+  fork's source, and that script is gone.
+  Decided by Patrick and Djinn on 25 Sep, so the second machine has
+  everything and GitHub holds it: the fork, its build and the release output
+  live in the repository folder, not in `C:\Thornswood-Dev`. The fork is the
+  `engine\skymp` submodule, pinned to the commit the build records name; the
+  output (packs, launcher, installer, server payload) is `out`, ignored by
+  git; anything else that folder held and that never goes to GitHub is
+  `local`, ignored too. Scripts ask `scripts\release\Where.ps1` where each of these is
+  rather than naming a path. It no longer falls back to `C:\Thornswood-Dev`:
+  no machine has that folder any more, and the fallback went on 28 Sep
+  (issue #440), along with the forwarding copies in `tools\`. The files a
+  machine kept in `tools\` moved on 29 Sep (signing.json to `records\signing`,
+  the setup stub to `out`, the rest to `local`) and the folder is gone.
+- Launcher code is C# 5 only: no string interpolation, no ?., no nameof,
+  no expression bodied members, no out var.
+- Every change goes out as one complete release: launcher, game files and
+  server together, never a half.
+
+Anything that changes one of these is a few lines in #staff-general first: the
+problem, the approach, what it touches. Agreed in #staff-general by
+the team before code; nobody settles it alone, and a Claude never does.
+## How work moves
+
+- main is what ships. Any developer may ship main from a machine that can sign, and Ship.ps1 refuses
+  a main release that is not on main, is behind or ahead of origin, has
+  anything uncommitted, has a file under `scripts` or another folder a release is built from that git does not know, or
+  asks for a new number with `-Version`. A main Ship writes nothing to the
+  repository: the version moves first through `Bump-Version.ps1` and its own
+  pull request, and Ship builds only what is already on GitHub, so every other
+  machine can `git pull` exactly what shipped. Corrected 24 Sep: this bullet
+  used to say a main Ship committed and pushed the source after the release,
+  which stopped being true on 22 Sep (f917dd8).
+- The one live release that does not come off main is a hotfix, decided by
+  Patrick on 24 Sep for a tester who could not get in while a day of dev work
+  sat on main: "the only thing that should be going to main now is the fix
+  for him". A branch named `hotfix/...` starts from the commit the live
+  release was built from, carries only the fix and its `Bump-Version.ps1`
+  commit, is pushed, and Ship runs from a checkout of it; every other gate
+  above still applies, and Ship refuses a hotfix branch that is not on
+  GitHub. A hotfix leaves the dev feed alone. The fix also goes to main
+  through its own pull request, or the next main release loses it. 1.1.93 was
+  the first, built from 55ac6ef. Any developer may ship a hotfix when they are confident in the fix and
+  Launcher builds is green, the same as any live release. Once it is live, its commit is kept as a tag, `live-<version>`,
+  and the branch is deleted, so no hotfix branch sits on GitHub: the next
+  hotfix starts with `git checkout -b hotfix/<name> live-<version>` from the
+  tag of the release that is live. 1.1.94 is `live-1.1.94` (25 Sep).
+- Nobody pushes to main any more, Patrick included. Everything goes through a
+  pull request. This replaces the 18 Sep decision that his own work went
+  straight to main, which held while `enforce_admins` was off and stopped
+  holding the moment it went on.
+- What branch protection on main actually enforces, since 25 Sep:
+  `enforce_admins` is **off**, there is no required check, required
+  approving reviews is **0**, and the code owner review is **off**.
+  Patrick, that day: "we don't need the required check/reviewer at all anymore for anyone as long as we give verbal agreement and the VPS check goes through". So the rule is ours, not a setting:
+  anybody on the team merges their own pull request once `Launcher builds`
+  (the build check, on the VPS) is green and they have said what it is in
+  #staff-general. Nobody waits for Patrick. Force pushes are refused.
+  Because nothing enforces it, it has to be kept by hand: on 25 Sep 35 pull
+  requests were merged with their VPS build red and 18 with no build at all,
+  and main went red with them. Wait for `Launcher builds` to say pass before
+  merging, every time, including your own and including a Claude's. The last
+  GitHub setting, "require branches to be up to date" with no check listed,
+  was removed on 27 Sep at Patrick's word ("we use the VPS's build checker"),
+  so GitHub requires nothing at all now.
+  What changed on 23 Sep, since 22 Sep: the review requirement was one
+  approving review, which Patrick could not give himself and had to override
+  with `--admin` on every one of his own pull requests, and it is now zero.
+  The code owner review on `.github/CODEOWNERS` is off. And `enforce_admins`,
+  which had to stay off while `Ship.ps1` pushed its own version commit
+  straight to main, went on, because Ship writes nothing to the repository now:
+  `Bump-Version.ps1` moves the number first, as an ordinary commit on a
+  branch, and Ship reads it.
+  Check which it is rather than assuming, because this paragraph was wrong
+  for a day before anybody looked:
+  `gh api repos/EvilPatrick06/Thornswood/branches/main/protection`
+- Everybody's work goes on a branch named for whoever did it:
+  `git checkout -b <name>/what-it-is` (your name, then a slash, and
+  claude/ for a Claude's). Small commits, plain messages. Push the branch and
+  open a pull request, standing on the branch, not on main:
+  `git checkout <name>/what-it-is; git push -u origin <name>/what-it-is; gh pr create --fill`.
+  It is merged into main from GitHub, never pushed over main.
+  The branches opened before 17 Sep use a `gavin/` prefix; they are Djinn's
+  and were left alone rather than renamed under open pull requests.
+- One fix per commit, on a branch as much as anywhere: a commit that changes
+  eight things cannot be reverted when one of them is wrong.
+- `git pull` before starting anything. If a pull conflicts, resolve it on
+  your branch (`git fetch`, `git rebase origin/main`), never on main. If a
+  push is rejected, pull, do not force.
+- Decided by Patrick on 23 Sep: **everything goes to the dev build first.**
+  His words: "start puttin these on the dev build and not the main build
+  launcher unless it's a security issue or can make the game untestable,
+  everything else even small changes go to the dev build launcher for
+  pretesting". Size is not a reason to skip it. A main Ship is for a
+  security fix or for something that leaves the game untestable, and he
+  says which.
+- The dev channel (`.\scripts\release\Ship.ps1 -Channel dev "what changed"`) may be
+  run from any branch, from any developer's machine, to try work on the dev server.
+  Say in #staff-general when you take it, because there is one dev feed and the last
+  dev Ship wins. A main Ship leaves the Dev feed and baseline unchanged.
+- Every release note has a title and details, dev included. Patrick, 25 Sep,
+  after two dev posts went out as "The scroll glows" and "Dev build: ...":
+  they must have details and be as good as the ones before them. The notes
+  are what people read in the launcher, on the site and in Discord, so write
+  them from the side of the person playing: a title that says what changed
+  for them, then one "- " line for each thing they will notice, saying what
+  it does and what to do if anything. Ship refuses a title under three words
+  or notes with no "- " line. Since 27 Sep it also refuses notes that say
+  what only we would understand (scripts\release\Note-Rules.ps1): the word
+  the Words section bans, an em dash, an issue or pull request number, "PR", a code file or
+  a setting name (WEBVIEW2_LIKE_THIS), a name out of the code (PutInServerOrder,
+  camelCase), our own words for how we work (demoting, worktree, squash, CI),
+  and the same line twice. On 26 and 27 Sep all of those went out to the
+  launcher, the site and Discord. And "The load order moved, so start a new
+  character" is added by Publish-Update only when the plugins that are on, or
+  their order, really changed; it used to follow any byte of plugins.txt and
+  told testers to start over three times in two days. The shape:
+
+  ```
+  .\scripts\release\Ship.ps1 -Channel dev "The Downgrade button shows its progress and says why it stopped
+  - A bar under the Downgrade button shows how far the downgrade has got: each of the three downloads with its size, then the copy into your game.
+  - When the downgrade stops for any reason, the line under the button says why and what to do next.
+  - If Windows will not open Steam's links, the launcher asks Steam directly, so Steam's console still opens."
+  ```
+- One fix per pull request. A branch that changes eight things is eight
+  reviews nobody has time for; split it.
+- No stray branches and no stray pull requests. Decided by Patrick on
+  25 Sep, after a count found 70 branches on GitHub, two of them holding
+  work that had never been merged and was nearly deleted with the rest:
+  "we need to make sure in the docs that we don't leave a bunch of stray
+  branches and PRs and fix+merge them everytime or delete if old".
+  - A branch is deleted once its pull request is merged. GitHub does that
+    by itself (the repository setting "Automatically delete head branches", on since 25 Sep);
+    delete it by hand if it was not.
+  - Work goes into a pull request the day it is done, never left on a
+    pushed branch without one. That is how the two above were lost track of.
+  - At the start of a session, and before anything is shipped, look at what
+    is open: `gh pr list --state open` and `git ls-remote --heads origin`.
+    Everything there other than main, the current `hotfix/` branch and work
+    somebody is doing today gets one of two things: fixed and merged, or,
+    when it is old or no longer wanted, its pull request closed with a line
+    saying why and its branch deleted. Somebody else's branch is theirs to
+    decide on: ask them, and put it on the board if they cannot be asked.
+    Check whether its work is already in main before deleting it; a
+    squashed merge leaves the branch looking unmerged to git.
+- Code signing is on since 27 Sep (issue #390, closed): the launcher and the
+  setup program are signed through Azure Artifact Signing
+  (`records\signing\README.md`). `ExpectedSigner` in `launcher\app\Updater.cs`
+  is set, so every launcher from dev 1.1.101.17 on refuses an update that is
+  not signed by that certificate. **Only a machine that signs may Ship, dev
+  included.** `Ship.ps1` and `Publish-Installer.ps1` refuse (non-zero exit) when
+  `records\signing\signing.json` is missing or disabled, or when the launcher / Setup tip
+  is not Authenticode Valid under `ExpectedSigner`. Local `Build-Launcher` /
+  `Package -NoPublish` may still print "not signing" and leave an unsigned
+  intermediate; that soft skip must not reach the site or the feed. The live main launcher,
+  1.1.101, predates signing; the next main Ship is the first signed one.
+- Every pull request gets the build check (.github/workflows/build.yml, about
+  two minutes: the secret scan, every script and file parses, the writing
+  rules and the two harnesses that prove the writing checks (see Words), the ownership page (`tests\test-ownership.js`, added by issue #752),
+  seven more harnesses that are just as quick (the script index, the script
+  paths, the architecture page and three launcher harnesses, issue #875, and
+  the new-box runbook read against its scripts, issue #454),
+  the launcher window, the count of
+  silent catches in the launcher, and the launcher compiles with the .NET
+  Framework csc). Red means the branch would stop Ship at the build step;
+  fix that, and merge once it is green, you are confident in the change, and you have said so in
+  #staff-general. Run the test harnesses your change touches yourself. All
+  ~410 of them (tests/, bot, and voice), and a look for stray pull requests
+  and branches run every night on the VPS (.github/workflows/nightly.yml,
+  03:00 Mountain); a failure there opens an issue on the board, "Nightly
+  checks failed", and whoever broke it fixes it next. It runs on the VPS, on a runner
+  `.\scripts\deploy\Install-Runner.ps1` puts there (issue #437), because
+  GitHub's own runners were blocked on billing from 25 Sep.
+  `.\scripts\deploy\Install-Runner.ps1 -Status` says whether GitHub sees it.
+- Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or
+  Publish-Update.ps1 without a line in #staff-general first; every machine touches those.
+## After a pull request is merged
+
+Merging on GitHub changes nothing anybody sees. You run the rest from the
+repository folder. Any developer may.
+
+1. `git checkout main`, then `git pull`. Ship.ps1 refuses a main release
+   that is behind origin, so the pull comes first.
+2. Then one command for each part the pull request touched:
+   - The launcher (`launcher\app`, `launcher\ui.xaml`, the art and video that
+     Build-Launcher.ps1 embeds), the game plugins (`game\plugins`), or
+     anything else that goes out in a pack:
+     `.\scripts\release\Ship.ps1 -Channel dev "what changed"`. The dev build is where
+     it goes first, by the rule above. `.\scripts\release\Ship.ps1 "what changed"`
+     with no channel is the live one, and that is for a security fix, for
+     something that leaves the game untestable, or for work the team has
+     agreed goes live. Any developer who is confident may run it.
+
+     The note is the release post: #news, the launcher's News tab and the
+     site all show it. Asked for by Patrick on 25 September, after a one-line
+     dev note went out as a bare title: "what you gave for the news wasnt
+     detailed enough". So a Ship command written for him carries the whole
+     note. The first line is a title from the customer's side. Then one line
+     starting with `- ` for each thing a person will notice, a plain sentence
+     saying what it does for them and how to use it: the key, the button, the
+     place. Never one line, and never branch names, pull request numbers or
+     entry numbers. The dev post of 24 September 14:36 is the shape to copy.
+     Ship refuses notes that break this (see "Every release note has a title
+     and details" above), before it builds anything.
+   - The gamemode behind that dev release: `.\scripts\deploy\Deploy-DevGamemode.ps1`.
+     `Deploy-Gamemode.ps1` then `Deploy-Server.ps1` is the live pair.
+   - The site's app or `site\public`: `.\scripts\deploy\Deploy-Docs.ps1`.
+     The public pages (`site\data\site\*.md`) need
+     `.\scripts\deploy\Deploy-Docs.ps1 -Site`.
+   - The bot's code or join card art in `bot`:
+     `.\scripts\deploy\Install-Bot.ps1 -CodeOnly`.
+   - The bot's avatar (`bot\thornswood-bot-*.png`): no script
+     sends it. It is uploaded by hand in the Discord developer portal.
+   - `game\gamemode.js`: `.\scripts\deploy\Deploy-Gamemode.ps1`, then
+     `.\scripts\deploy\Deploy-Server.ps1`.
+   - The voice service (`voice\voice-server.js`, `voice\public`):
+     `.\scripts\deploy\Install-Voice.ps1`.
+   - Scripts that only change how a release is built (Ship.ps1, Publish-Update.ps1,
+     the Deploy scripts): nothing more. The pull is the change. Any developer may run them.
+   A pull request that touches several of these gets every one of them, in
+   the same sitting, so nothing goes out half done.
+3. Everybody else, once it is out, from the main folder: `git checkout main`, then
+   `git pull`. If the branch had its own folder, `git worktree remove
+   ..\<that folder>`. Then `git branch -D <name>/what-it-is`, after GitHub
+   shows the pull request as merged; GitHub squashes the merge, so
+   `git branch -d` refuses. A file the branch added that also sits untracked
+   in the main folder stops the pull, so delete that copy first.
 
 ## What Thornswood is
 
@@ -19,7 +983,7 @@ Empire back under a trade treaty with one embassy). Characters live on the
 server, not in save files. During the playtest they are throwaway.
 
 The words we use, and the rule that every change ships as one complete
-release, launcher, game files and server together, are in CONTRIBUTING.md.
+release, launcher, game files and server together, are in How work moves.
 
 ## The pieces
 
@@ -65,9 +1029,10 @@ second holder is, is `docs\OWNERSHIP.md`.
 
 ## How a release goes out
 
-**Everything goes to the dev build first** (CONTRIBUTING.md, decided 23 Sep).
+**Everything goes to the dev build first** (decided 23 Sep).
 A main release is for a security fix, for something that leaves the game
-untestable, or for work Patrick has said goes live, and it is his call.
+untestable, or for work the team has agreed goes live. Any developer who
+is confident may run it.
 
 ```
 .\scripts\release\Ship.ps1 -Channel dev "what changed, in plain words"
@@ -82,7 +1047,7 @@ never #news. There is one dev feed and the last dev Ship wins, so say in #staff-
 when you take it. Main and Dev have independent feeds and baselines. A Main
 Ship leaves Dev unchanged; advance Dev through its own Ship.
 
-A main release, on Patrick's machine:
+A main release, from your clone, on a machine that can sign:
 
 ```
 cd C:\Users\<you>\Downloads\Thornswood-Repo
@@ -181,7 +1146,7 @@ is tagged `live-<version>` and the branch deleted; the next hotfix starts
 from that tag (`git checkout -b hotfix/<name> live-1.1.94` today).
 
 Everything else, and which one each change needs, is the list under "After a
-pull request is merged" in CONTRIBUTING.md: `Deploy-Server.ps1` pushes a server
+pull request is merged" below: `Deploy-Server.ps1` pushes a server
 build, `Deploy-Gamemode.ps1` the gamemode (`Deploy-DevGamemode.ps1` for dev), `Deploy-Docs.ps1` the site, `Install-Bot.ps1` the bot,
 `Request-Restart.ps1` an announcement. `Rotate-ServerPassword.ps1` changes a
 password nothing checks any more; the secrets table below says why. Every
@@ -189,10 +1154,10 @@ script closes the launcher and Skyrim itself when it needs to.
 
 ## How work moves, the long form
 
-Several people, several machines, one repo. The short rules are in
-`CONTRIBUTING.md`; this is the long form.
+Several people, several machines, one repo. The short rules are above;
+this is the long form.
 
-- **main is what ships.** Only Patrick's machine ships main. `Ship.ps1`
+- **main is what ships.** Any developer may ship main from a machine that can sign. `Ship.ps1`
   refuses a main release that is not on the `main` branch, is behind or
   ahead of `origin/main`, has anything uncommitted, or has a file under
   `scripts` or another folder a release is built from that git does not know. It commits and pushes nothing, so what
@@ -200,8 +1165,8 @@ Several people, several machines, one repo. The short rules are in
   that.
 - **Every change goes through a pull request, Patrick's included.** Nobody
   pushes to main from any machine; GitHub refuses it. `git checkout -b
-  <name>/what-it-is` (`patrick/`, `djinn/`, `ataxayk/`, `claude/`; Djinn's
-  older ones `gavin/`), small
+  <name>/what-it-is` (your name, then a slash; a Claude uses `claude/`; older
+  branches use `gavin/`), small
   commits with plain messages, `git push -u origin <branch>`, then
   `gh pr create --fill` standing on the branch. Nothing is force pushed.
 - **What GitHub enforces on main, and what it does not.** Since 25 Sep:
@@ -209,7 +1174,7 @@ Several people, several machines, one repo. The short rules are in
   reviews is 0; the code owner review is off. The build check,
   `Launcher builds` in `.github/workflows/build.yml`, runs on every pull
   request on the VPS runner, and the rule is ours rather than a setting:
-  merge your own pull request once it is green and you have said so in
+  merge your own pull request once it is green, you are confident in the change, and you have said so in
   #staff-general. Nothing merges by itself: auto-merge is off on the repository, so
   somebody presses merge or runs `gh pr merge --squash`. Each of us merges
   our own. Somebody else on the team reading a pull request first is a habit,
@@ -385,8 +1350,8 @@ him. When both say READY:
 - one line for each thing a person will notice"
 ```
 
-A main Ship stays Patrick's (How work moves). The same script with
-`-Channel main` checks a machine for it and says so.
+Any developer may run a main Ship from a machine that can sign (How work moves). The same script with
+`-Channel main` checks a machine for it.
 
 `tests\test-ship-machine.ps1` walks this section: every script it names is
 in the repository with the parameters it is given, the template holds paths
@@ -646,7 +1611,7 @@ it per session and ignores which profile Vortex has on.
 
 ## Where things are written down
 
-- `CONTRIBUTING.md`: the rules and the team. `CLAUDE.md`: what applies to a
+- This guide: the rules, the team, and how a release goes out. `CLAUDE.md`: what applies to a
   Claude on top of them. The To Do board,
   https://github.com/users/EvilPatrick06/projects/1: all outstanding work.
 - `README.md`: what the repo is and where to start. A customer's install is

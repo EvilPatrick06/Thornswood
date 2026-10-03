@@ -759,7 +759,7 @@ yes('a session a reset closed is not the one this reports on, and the refusal '
 
 # ------------------------------------------------------- the words rules --
 #
-# CONTRIBUTING.md: no em dashes, and never the word this bans, in anything
+# Developer-Guide.md: no em dashes, and never the word this bans, in anything
 # written for people. Check-Words.ps1 does not read bot.py, so it is read here.
 WORDS = [opener, bot.live_smoke_admin_refusal(here), gone,
          bot.live_smoke_tick_refusal(Who([], bot=True)),

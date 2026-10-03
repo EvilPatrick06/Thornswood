@@ -1,7 +1,7 @@
 # docs
 
 Pages about how Thornswood works, for everybody on the team. The rules are
-CONTRIBUTING.md at the root; the long form is DEVELOPING.md.
+Developer-Guide.md at the root; the long form is Developer-Guide.md.
 
 | Page | What it answers |
 | --- | --- |

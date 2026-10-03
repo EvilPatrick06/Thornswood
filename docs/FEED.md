@@ -490,7 +490,7 @@ reader. That is the rest of #1050.
   upload, and `version.json` is written without a byte order mark.
 - **Signing.** On since 27 Sep: `Ship.ps1` and `Publish-Installer.ps1` refuse
   a launcher or setup program that is not Authenticode Valid under
-  `ExpectedSigner` (CONTRIBUTING.md, `records\signing\README.md`), or that
+  `ExpectedSigner` (Developer-Guide.md, `records\signing\README.md`), or that
   the launcher's own `Signature.cs` check refuses (#912).
 - **Optional packs go to the site too.** `Publish-Pack.ps1` sends each zip to
   `/feed/assets/<sha256>` with `Remirror-Site-Feed.ps1 -Send` before

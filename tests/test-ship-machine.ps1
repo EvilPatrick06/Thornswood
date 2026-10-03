@@ -11,7 +11,7 @@
   One has, and the az sign in behind it) and the client runtime the record
   names (held only in One's dev game folder) were the two things a Ship needs
   that no other machine could get. scripts\release\Setup-ShipMachine.ps1
-  fetches or writes them, and DEVELOPING.md "Shipping from another machine"
+  fetches or writes them, and Developer-Guide.md "Shipping from another machine"
   says the rest. This proves both do what they say.
 
   What it runs. The helpers out of Setup-ShipMachine.ps1 and Get-SigningRows
@@ -308,9 +308,9 @@ try {
     Yes 'the identity the launcher pins is read out of Signature.cs' ($ids -contains '1.3.6.1.4.1.311.97.203948530.216998690.847558466.123546472')
 
     # --------------------------------------------------------- 6. the runbook --
-    $dev = [IO.File]::ReadAllText((Join-Path $Repo 'DEVELOPING.md'))
+    $dev = [IO.File]::ReadAllText((Join-Path $Repo 'Developer-Guide.md'))
     $m = [regex]::Match($dev, '(?ms)^## Shipping from another machine\s*$(.*?)(?=^## )')
-    Yes '6. DEVELOPING.md has the section "Shipping from another machine"' ($m.Success)
+    Yes '6. Developer-Guide.md has the section "Shipping from another machine"' ($m.Success)
     $sec = $m.Groups[1].Value
     foreach ($item in @('records\signing\signing.json', 'signing client', 'az login', 'Certificate Profile Signer', 'client runtime', 'game folder',
                         'Vortex', 'feed', 'webhooks', 'VPS access', 'Backups', 'records\signing\signing.template.json')) {
@@ -332,7 +332,7 @@ try {
         $signRow -match 'the only one with signing access' -and $signRow -match 'signed in as Patrick')
     Yes 'OWNERSHIP.md: the domain is in Patrick''s own Cloudflare login, signed in with GitHub, with no gap left' (
         $domainRow -match "Patrick: it is registered in his own Cloudflare login, which he signs in to with GitHub" -and $domainRow -notmatch 'fill in|is the gap')
-    Yes 'DEVELOPING.md secrets table has the domain row and signing as Patrick' (
+    Yes 'Developer-Guide.md secrets table has the domain row and signing as Patrick' (
         $dev -match '(?m)^\| The domain, thornswood\.net \| Registered at Cloudflare, in Patrick''s own Cloudflare login, which he signs in to with GitHub' -and
         $dev -match '(?m)^\| Code signing \|.*as Patrick, whose Azure account is the only one with signing access')
     Yes '6. it names this harness' ($sec -match 'tests\\test-ship-machine\.ps1')
