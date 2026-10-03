@@ -305,14 +305,6 @@ namespace Thornswood
             VoiceUrl = VoiceUrl.Trim();
             while (VoiceUrl.EndsWith("/")) { VoiceUrl = VoiceUrl.Substring(0, VoiceUrl.Length - 1); }
 
-            // The old build ran the old multiplayer mod on 25565, on a different
-            // box. SkyMP does not listen there and that machine is not running
-            // anything, so a config carried over from then points everyone at
-            // nothing and the launcher would report "not answering" forever
-            // without ever saying why. Only these two exact values are moved:
-            // anything else is a choice somebody made.
-            if (ServerPort == "25565") ServerPort = "7777";
-            if (ServerAddress == "192.135.119.166") ServerAddress = "192.135.112.23";
             if (ExpectedExeBytes <= 0) ExpectedExeBytes = 37157144;
             // UpdateRepo used to default to Thornswood-Releases, the GitHub
             // fallback. That repository is gone (#907), so nothing fills it in.
