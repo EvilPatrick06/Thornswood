@@ -42,6 +42,7 @@ param(
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here 'Vps.ps1')
+. (Join-Path $Here 'Send-Script.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
@@ -60,12 +61,13 @@ function Die($m) {
   exit 1
 }
 
-# Base64 rather than nested quotes. A quoted command re-parses on the far end:
-# on 17 September that returned the right answer and then tried to run it.
+# Progress stays quiet, or a bar from the far side comes back as lines mixed
+# in with the state this prints. The send itself is Send-Script.ps1 (issue
+# #1166, the same way as #1070): a long script goes as a file of its own
+# name, removed after, and the far side's exit code comes back.
 function Remote($script) {
-  $s = "`$ProgressPreference = 'SilentlyContinue'`r`n" + $script
-  $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($s))
-  Invoke-ThornswoodNative { & ssh @ssh "$User@$Vps" "powershell -NoProfile -EncodedCommand $e" } 2>&1
+  $script = "`$ProgressPreference = 'SilentlyContinue'`r`n" + $script
+  return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script
 }
 
 $map = @{
