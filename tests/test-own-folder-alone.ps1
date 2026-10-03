@@ -472,6 +472,7 @@ namespace Thornswood
                 WrittenThrough();
                 MadeBefore();
                 UnreadableRecord();
+                GeneratedStays();
             }
             catch (Exception ex)
             {
@@ -808,6 +809,83 @@ namespace Thornswood
             Yes("and the Downgrade's copy stops on the same list, before it writes",
                 pinned != null && pinned.Contains("held.files") && Clean(pinned) &&
                 !File.Exists(Path.Combine(own, "Data\\FromDepot.esp")));
+        }
+        // ---- 7: what Build-Generated.ps1 made in the folder (#1247) ------------
+        static void GeneratedStays()
+        {
+            Scene s = NewScene("generated", false);
+            string made = null;
+            try { made = OwnGame.Make(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Make said: " + ex.Message); }
+            string own = OwnGame.Folder;
+            MadeNowRuns(s);
+            Yes("(made)", made != null);
+
+            // Build-Generated puts a new file of the folder's own where Vortex
+            // deploys one (as a body over Vortex's), and makes one that came in
+            // from the Steam copy when the folder was made (the Steam copy's own
+            // Nemesis output, on record as O the way Make used to record it).
+            string body = "Data\\textures\\ts\\wood.dds";
+            string behavior = "Data\\meshes\\actors\\character\\behaviors\\0_master.hkx";
+            string atBody = Path.Combine(own, body), atBehavior = Path.Combine(own, behavior);
+            File.Delete(atBody);
+            Put(atBody, "GENERATED-BODY");
+            Put(atBehavior, "GENERATED-BEHAVIOR");
+            string filesTxt = Path.Combine(OwnGame.Dir, "files.txt");
+            File.AppendAllText(filesTxt, "C|O|18|1|" + behavior + "\r\n");
+            string record = Path.Combine(OwnGame.Dir, "generated.txt");
+            string recordText = "generated 1\r\ngame " + own + "\r\nfile " + new string('a', 64) + " " + body + "\r\nfile " + new string('b', 64) + " " + behavior + "\r\n";
+            Put(record, recordText);
+
+            // Vortex brings out a new version of the file the body sits over.
+            string staged = Path.Combine(s.Staging, "ModA\\textures\\ts\\wood.dds");
+            string steamLink = Path.Combine(s.Game, "Data\\textures\\ts\\wood.dds");
+            // Each deployment a minute after the one before, so Vortex's record
+            // reads as a new one.
+            int deployed = 0;
+            Action<string> vortexBringsOut = delegate (string bytes)
+            {
+                File.Delete(steamLink);
+                File.Delete(staged);
+                Put(staged, bytes);
+                CreateHardLink(steamLink, staged, IntPtr.Zero);
+                deployed++;
+                Deploy(s, new string[][] { new string[] { "TsOne.esp", "ModA", "VORTEX-TSONE" },
+                                           new string[] { "textures\\ts\\wood.dds", "ModA", bytes } }, DateTime.UtcNow.AddMinutes(deployed));
+            };
+            vortexBringsOut("VORTEX-DDS-TWO");
+            Yes("(the folder asks to follow Vortex)", OwnGame.NeedsRefresh(s.Cfg));
+            var steamNow = Snap(s.Game);
+            string first = null;
+            try { first = OwnGame.Refresh(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Refresh said: " + ex.Message); }
+            Yes("the refresh works", first != null && Clean(first));
+            Yes("the file Build-Generated made where Vortex deploys one stays as it was made, though Vortex brought out a new one of that name",
+                Text(atBody) == "GENERATED-BODY");
+            Yes("and Vortex's own copy of that name was not written", Text(staged) == "VORTEX-DDS-TWO");
+            Yes("the one that came in from the Steam copy stays, on record as Thornswood's (T), not taken out as a mod put there by hand",
+                Text(atBehavior) == "GENERATED-BEHAVIOR" && FilesTxt().Contains("|T|18|1|" + behavior));
+            Yes("the Steam copy was not touched", Same(steamNow, Snap(s.Game)));
+
+            // The same again without the record: it is the record that keeps them.
+            File.Delete(record);
+            vortexBringsOut("VORTEX-DDS-THREE");
+            string second = null;
+            try { second = OwnGame.Refresh(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Refresh said: " + ex.Message); }
+            Yes("without the record, a refresh puts Vortex's new file in its place", second != null && Text(atBody) == "VORTEX-DDS-THREE");
+            Yes("and takes out the one from the Steam copy as none of the three kinds", second != null && !File.Exists(atBehavior));
+
+            // A folder made anew holds nothing Build-Generated made, so the
+            // record goes with the old one, before Make reads it.
+            Put(record, recordText);
+            Directory.Delete(own, true);
+            Paths.Collection = true;
+            Paths.Game = s.Game;
+            Paths.Live = Paths.WinLocalAD;
+            Paths.LiveMyGames = Paths.WinMyGames;
+            string again = null;
+            try { again = OwnGame.Make(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Make said: " + ex.Message); }
+            Yes("a folder made anew forgets what Build-Generated made in the old one", again != null && !File.Exists(record));
+            Yes("and has Vortex's file of that name, as a link to Vortex's own copy",
+                Text(Path.Combine(own, body)) == "VORTEX-DDS-THREE" && Id(Path.Combine(own, body)) == Id(staged));
         }
     }
 }
