@@ -1,6 +1,7 @@
 'use strict';
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const source=fs.readFileSync(path.join(__dirname,'../game/plugins/thornswood-emotes.js'),'utf8');
+const serverAddress=JSON.parse(fs.readFileSync(path.join(__dirname,'../scripts/vps/vps.json'),'utf8')).address;
 function fixture() {
   const handlers={},hooks=[],sent=[],labels=[],pins=[],nativeTasks=[];
   let drawn=true,accepted=true,focused=false,delay=0,waiting=false,inUpdate=false;
@@ -8,7 +9,7 @@ function fixture() {
   const actor={getFormID:()=>0x14,isWeaponDrawn:()=>drawn,sheatheWeapon:()=>{waiting=true;if(!delay)drawn=false;},getParentCell:()=>null};
   actor.getItemCount=()=>native(()=>1);
   const io={readFileSync(file){
-    if(file.endsWith('skymp5-client-settings.txt'))return '{"server-ip":"192.135.112.23"}';
+    if(file.endsWith('skymp5-client-settings.txt'))return JSON.stringify({'server-ip':serverAddress});
     if(file.endsWith('thornswood-session.txt'))return String(Date.now());
     throw new Error('absent');
   },appendFileSync(){},writeFileSync(){}};
