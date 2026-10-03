@@ -1253,6 +1253,34 @@ if ($LASTEXITCODE -ne 0) {
     Die 'Sync-Client.ps1 refused. Rebuild the client, run .\scripts\release\New-ClientBuildRecord.ps1, and Ship again.'
 }
 
+# ------------------------------------------------------------ generated files
+# Issue #1247, Patrick 29 Sep: the behavior files (Pandora) and BodySlide's bodies
+# are made in Thornswood's own folder on this machine, by
+# scripts\mods\Build-Generated.ps1, as a step before a Ship; the Steam copy is
+# the person's own. A release carries what is in the folder, so a folder whose
+# files were built for another mod list, from other files, or never, would
+# send everybody animations and bodies that do not match the collection.
+# Get-GeneratedState reads the record Build-Generated wrote against this
+# machine now (scripts\mods\Generated.ps1). Both channels stop: the files ship
+# on both. Before the covered bodies, which read what it built.
+Head 'Generated files'
+if ($GameDir) {
+    . (Join-Path $Here '..\mods\Generated.ps1')
+    $genState = $null
+    try { $genState = Get-GeneratedState $Root (Join-Path $RepoDir 'records\generated.json') }
+    catch {
+        Unbump 'the generated files could not be checked'
+        Die ($_.Exception.Message + ' Nothing was published.')
+    }
+    if (-not $genState.Current) {
+        Unbump 'the generated files are out of date'
+        Die (Get-GeneratedStaleSays $genState $Channel)
+    }
+    Say ("  {0} file(s) Build-Generated made for this mod list, as it made them" -f $genState.Record.Files.Count) 'Green'
+} else {
+    Say '  no own game folder here, so there are none to check' 'DarkGray'
+}
+
 # ------------------------------------------------------------ covered bodies
 # Issue #405, Patrick 28 Sep: "no nudity in players or NPCs for both males and
 # females". The bodies come from the Nexus collection, and a release tells every

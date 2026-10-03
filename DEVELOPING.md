@@ -110,7 +110,9 @@ is built from that git does not know, with
 a `-Version` other than the number already on main, or with main here behind
 or ahead of `origin/main`, so what ships is what is on GitHub. It builds the
 launcher, checks that the game folder holds the recorded client build
-(`Sync-Client.ps1 -Check`), then runs
+(`Sync-Client.ps1 -Check`) and that the behavior files and bodies in it were
+built for this mod list (`scripts\mods\Build-Generated.ps1`, run before a Ship;
+see One Skyrim of its own), then runs
 `scripts\release\Publish-Update.ps1`, which
 scans the game folder for loose files that are not Vortex's, not vanilla, not
 runtime and not per machine, diffs them against this channel's baseline
@@ -575,6 +577,54 @@ on if the list is empty. `Profile\OwnGame\plugins.txt` and `loadorder.txt` are
 the Vortex profile's lists as of the folder's last update, and are the
 reference load order a release carries (`Get-ShipLoadOrderDir`). Ship checks
 the client in `<Root>\Game` against `records\client-build.json`.
+
+**The behavior files and the bodies, before a Ship.** Every release carries
+the behavior files (the animations for the mod list, Nemesis' output until
+29 September) and the bodies BodySlide builds. Decided by Patrick on
+29 September (issue #1247): they are made in
+Thornswood's own folder, as a step on the shipping machine before a Ship, and
+never in the Steam copy, which stays the person's own. Since #1232 nothing run
+into the Steam copy reaches Thornswood's folder or a release. With the game and
+the launcher closed, on the machine that ships:
+
+```
+.\scripts\mods\Build-Generated.ps1 -Channel dev      C:\Thornswood-DevBuild\Game
+.\scripts\mods\Build-Generated.ps1 -Channel main     C:\Thornswood\Game
+```
+
+It runs two tools the collection installs, with what `records\generated.json`
+names. The behavior files come from Pandora Behaviour Engine+ (Nexus 133232,
+in the collection from revision 2), with exactly the four patches the list
+names and every other patch off. Nemesis cannot do it: its `-generate` never
+starts its work (in its own source, the command line connects to a slot that
+does not exist), which is why it leaves the collection in the same revision.
+Pandora's output for the current mod list was compared with Nemesis' on
+29 September: the same 20 behavior and character files with the same names in
+them. The script runs a copy of Pandora in its work folder, with a
+`Settings.json` beside it naming only that folder's Data and a work output
+folder: Pandora 4.4.0 ignores `-o` and without that file would take the
+registry's Skyrim, the Steam copy. It refuses if Pandora changed anything in
+the game folder or its log has an error, and needs the .NET 10 runtime on the
+machine. The bodies come from BodySlide's sets (the women's 3BA NeverNude body
+and the men's HIMBO body with boxers, issue #405). Each body is built at its set's own
+slider defaults and never with RaceMenu morph files; it refuses a set or a
+slider move that would shape the breasts, the seat, the genitals or the
+nipples (issue #1004) or take the underwear off, and reads every body it built
+with `Check-CoveredBodies.ps1` before one goes in. First it gives the folder
+its own copy of every file BodySlide writes in place, because the folder is
+mostly hard links to Vortex's copies and a write through one lands in Vortex's
+copy and the Steam copy too; it refuses, and records nothing, if a tool wrote
+through a link anyway. A tool that sits using no processor time and writing
+nothing for three minutes is stopped. It refuses while Skyrim or a launcher
+runs from that install, and in any folder Vortex deploys into. `-DryRun` checks all of it and
+changes nothing. What it made goes in `Profile\OwnGame\generated.txt`, with a
+sha256 each and what it was built from (`scripts\mods\Generated.ps1`): the
+launcher keeps those files as Thornswood's through every refresh
+(`OwnGameKinds.cs`), and `Ship-Rules.ps1` lets the release carry them, though
+Vortex deploys files of the same names. Ship and `Check-ShipReady.ps1` stop
+when that record is missing or stale: the mod list, a file either tool reads,
+`records\generated.json`, or a built file changed since. The fix is to run it
+again.
 
 **The Skyrim build.** Steam updates the Steam copy by itself. With Thornswood's
 own folder, the Downgrade button works on the Steam copy the folder is made
