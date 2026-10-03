@@ -518,6 +518,12 @@ function goldDescriptors(text) {
   const dungeonGold=goldDescriptors(dungeon || '');
   yes('the checked dungeon reward names exactly one gold descriptor as GOLD_DESC',
       dungeonGold.gold.length===1 && /var GOLD_DESC = 'f:Skyrim.esm';/.test(dungeon || ''));
+  const sceneQuest = lift('// ==== thornswood custom quests ====','// ==== end thornswood custom quests ====');
+  const sceneGold = goldDescriptors(sceneQuest || '');
+  yes('scene finish gold is the named GOLD_DESC row, and those lines stay in the scan',
+      !!sceneQuest && sceneGold.gold.length === 0 &&
+      (sceneQuest.match(/addItem\(actor, GOLD_DESC, row\.gold\)/g) || []).length === 2 &&
+      /var GOLD_DESC = deps\.goldDesc;/.test(sceneQuest));
   yes('the testers\' two tables were found and set aside', !!outside);
   const inside = goldDescriptors(src);
   yes('and they do name gold, so /give gold works for a tester', inside.gold.length > 0);
@@ -572,7 +578,10 @@ function goldDescriptors(text) {
     'g.item': 'what a body gives, HUNTS_BY_BASE',
     'crop.produce': 'a crop, CROPS',
     'CROPS[d].produce': 'starting seeds, CROPS',
-    'hit.desc': 'the testers\' /give, out of the index built from these same tables'
+    'hit.desc': 'the testers\' /give, out of the index built from these same tables',
+    'GOLD_DESC': 'scene finish gold, the same named GOLD_DESC row the checked dungeon reward uses',
+    'open.itemDesc': 'puts back the retrieval good the place row already handed over; not a coin',
+    'place.item': 'the unbound scene container good on the place row; not a coin'
   };
   const re = /\baddItem\(\s*[^,()]+,\s*([^,]+?),/g;
   const unknown = [];
