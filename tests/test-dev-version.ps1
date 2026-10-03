@@ -58,6 +58,10 @@ for ($i = $b; $i -lt $src.Length; $i++) {
     elseif ($c -eq '}') { $depth--; if ($depth -eq 0) { $end = $i; break } }
 }
 $body = $src.Substring($b + 1, $end - $b - 1)
+$ast = [Management.Automation.Language.Parser]::ParseFile($ShipPath, [ref]$null, [ref]$null)
+$guard = $ast.Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Assert-DevVersionSelection' }, $true)
+Invoke-Expression $guard.Extent.Text
+function Die($text) { throw $text }
 
 <#
   The launcher's own comparison, ported from Updater.cs IsNewer. This is the
@@ -114,7 +118,7 @@ function Put-Feed([string]$dir, [string]$v) {
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
     Set-Content -LiteralPath (Join-Path $dir 'version.json') -Value (@{ launcherVersion = $v } | ConvertTo-Json)
 }
-function Run([string]$branchVersion, [string]$mainFeed, [string]$devFeed, [string[]]$devEver = @(), [string]$mainCopy = '') {
+function Run([string]$branchVersion, [string]$mainFeed, [string]$devFeed, [string[]]$devEver = @(), [string]$mainCopy = '', [bool]$aligned = $false, [string]$devCopy = '') {
     $script:runN++
     $site = Join-Path $tmp ('site' + $script:runN)
     $local = Join-Path $tmp ('local' + $script:runN)
@@ -123,11 +127,12 @@ function Run([string]$branchVersion, [string]$mainFeed, [string]$devFeed, [strin
     if ($devFeed) { Put-Feed (Join-Path $site 'feed-dev') $devFeed }
     if ($devEver.Count) { Set-Content -LiteralPath (Join-Path $site 'feed-dev\launchers.txt') -Value $devEver -Encoding ASCII }
     if ($mainCopy) { Put-Feed (Join-Path $local 'Thornswood\feed\main') $mainCopy }
+    if ($devCopy) { Put-Feed (Join-Path $local 'Thornswood\feed\dev') $devCopy }
     $env:THORNSWOOD_TEST_SITE_DIR = $site
     $env:LOCALAPPDATA = $local
     try {
-        $sb = [scriptblock]::Create('$current = $args[0]; function Say($t, $c) { };' + $body + '; return $target')
-        return & $sb $branchVersion
+        $sb = [scriptblock]::Create('$current = $args[0]; $MainSourceAligned = $args[1]; function Say($t, $c) { }; function Die($t) { throw $t };' + $body + '; Assert-DevVersionSelection $target $current $MainSourceAligned (@($seen) + @($mainWas)); return $target')
+        return & $sb $branchVersion $aligned
     }
     finally { $env:THORNSWOOD_TEST_SITE_DIR = $oldSite; $env:LOCALAPPDATA = $oldLocal }
 }
@@ -139,10 +144,31 @@ try {
     Yes 'S1 and a launcher already on 1.1.77 is offered it' (IsNewer $t '1.1.77')
     Yes 'S1 and a launcher on the old 1.1.76 is offered it too' (IsNewer $t '1.1.76')
 
-    # S2: the ordinary case, dev shipped from main, must not change.
+    # S2: clean Main-equivalent code keeps the same version in both feeds.
+    $t = Run '1.1.105' '1.1.105' '1.1.104.1' @('1.1.104.1') '' $true
+    Yes "S2 clean Main source aligns Dev on $t" ($t -eq '1.1.105')
+    Yes 'S2 an older Dev launcher is offered the aligned version' (IsNewer $t '1.1.104.1')
+    $t = Run '1.1.105' '1.1.105' '1.1.105' @('1.1.105') '' $true
+    Yes 'S2 another pack from identical Main source retains 1.1.105' ($t -eq '1.1.105')
+    $refused = $false
+    try { $null = Run '1.1.104' '1.1.104' '1.1.104.1' @('1.1.104.1') '' $true } catch { $refused = $true }
+    Yes 'S2 alignment refuses a downgrade and requires a higher Main version' $refused
+    $refused = $false
+    try { Assert-DevVersionSelection '1.1.104' '1.1.104' $true @('1.1.104.1') } catch { $refused = $true }
+    Yes 'S2 an explicit version cannot bypass the published Dev floor' $refused
+    $refused = $false
+    try { Assert-DevVersionSelection '1.1.105.1' '1.1.105' $true @('1.1.104.1') } catch { $refused = $true }
+    Yes 'S2 an explicit suffix cannot split a Main-equivalent release' $refused
+    $refused = $false
+    try { $null = Run '1.1.105' '' '' @() '1.1.106' $true } catch { $refused = $true }
+    Yes 'S2 cached higher Main evidence still prevents downgrade when the site is unreadable' $refused
+    $refused = $false
+    try { $null = Run '1.1.105' '' '' @() '' $true '1.1.106.1' } catch { $refused = $true }
+    Yes 'S2 cached higher Dev evidence still prevents downgrade when the site is unreadable' $refused
+    # A genuinely separate Dev branch still uses the fourth number.
     $t = Run '1.1.77' '1.1.77' '1.1.77'
-    Yes "S2 dev off main gives $t" ($t -eq '1.1.77.1')
-    Yes 'S2 and it outranks main' (IsNewer $t '1.1.77')
+    Yes "S2 separate Dev work gives $t" ($t -eq '1.1.77.1')
+    Yes 'S2 separate Dev work outranks its Main base' (IsNewer $t '1.1.77')
 
     # S3: the climb. A second and third dev build on the same base.
     $t = Run '1.1.77' '1.1.77' '1.1.77.1' @('1.1.77.1')

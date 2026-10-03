@@ -239,6 +239,23 @@ Main and Dev retain distinct releases even when they use the same source.
 Check: Main has its own new release; Dev's feed remains the independently
 published Dev release.
 
+When both channels ship the same clean Main commit, both use the committed
+three-part launcher version. Ship Main first, then Dev so Dev reads Main's
+published version and source. A separate Dev branch retains its fourth-part
+version; promotion must bump Main above every published Dev version.
+
+Revision 2 enables FNIS.esp and disables CBBE.esp, RaceMenuMorphsCBBE.esp and
+the three plugins from the excluded Default 3BA Vanilla Outfits package.
+Keep Profile/OwnGame, Profile/Default and the live profile aligned. The
+publisher refuses enabled plugin references whose files are absent from Data.
+Both channels must pass the launcher's Scan and the 48-position server check.
+
+The NPC runtime and durable dungeon rewards run on Main and Dev, using each
+server's own private ledgers and world. Merchant quotes are available;
+buying and selling remains disabled because native transfers are unfinished.
+Dev news promotion is checked against Main's published source ancestry rather
+than matching headlines. A failed Main feed read preserves the prior status.
+
 ## 15. Keep the historical loose-file audit
 
 The table below records 424 files measured on 29 September. Held files stop

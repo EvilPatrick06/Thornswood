@@ -210,6 +210,9 @@ try {
     # read from its manifest on the resources port. A stand-in server on this
     # machine answers for it, and config.json points there.
     Put (Join-Path $inst 'Profile\OwnGame\plugins.txt') "*ours.esp`r`n"
+    $pluginHeader = [byte[]]::new(24)
+    [Text.Encoding]::ASCII.GetBytes('TES4').CopyTo($pluginHeader, 0)
+    [IO.File]::WriteAllBytes((Join-Path $inst 'Game\Data\ours.esp'), $pluginHeader)
     Put (Join-Path $inst 'Profile\OwnGame\loadorder.txt') "ours.esp`r`n"
     $port = Get-Random -Minimum 20000 -Maximum 40000
     Put (Join-Path $inst 'config.json') ('{"ServerAddress":"127.0.0.1","ServerPort":' + ($port - 1) + '}')
