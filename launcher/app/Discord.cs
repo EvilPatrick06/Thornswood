@@ -237,6 +237,18 @@ namespace Thornswood
             try { if (File.Exists(TicketFile)) File.Delete(TicketFile); } catch (Exception ex) { Swallow.Note("Discord.Forget, TicketFile", ex); }
             try { if (File.Exists(NameFile)) File.Delete(NameFile); } catch (Exception ex) { Swallow.Note("Discord.Forget, NameFile", ex); }
             try { if (File.Exists(AvatarFile)) File.Delete(AvatarFile); } catch (Exception ex) { Swallow.Note("Discord.Forget", ex); }
+            // The site's last staff answer for this account. Left on disk,
+            // DevAllowed stays true for the next account until that account's
+            // first check-in, and the staff queue can show in between (#1208).
+            try { if (File.Exists(DevFile)) File.Delete(DevFile); } catch (Exception ex) { Swallow.Note("Discord.Forget, DevFile", ex); }
+            // door.txt is the last yes or no the site gave for this ticket
+            // (Door.AnswerFile, kept beside the ticket). It goes with the account.
+            try
+            {
+                string door = Path.Combine(Folder, "door.txt");
+                if (File.Exists(door)) File.Delete(door);
+            }
+            catch (Exception ex) { Swallow.Note("Discord.Forget, door.txt", ex); }
             ticket = ""; name = ""; avatar = "";
         }
 
