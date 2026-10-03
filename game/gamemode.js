@@ -39122,6 +39122,43 @@ function thornswoodBooks(env) {
     return meanGold(fromHolds);
   }
 
+  function catalog(hold) {
+    var name = String(hold || '').toLowerCase();
+    if (!active || !validHold(name)) { return []; }
+    var seen = Object.create(null);
+    var order = [];
+    function take(rows) {
+      for (var i = 0; i < rows.length; i++) {
+        var label = String((rows[i] && rows[i].name) || '').trim();
+        var key = label.toLowerCase();
+        if (!key || seen[key]) { continue; }
+        seen[key] = label;
+        order.push(key);
+      }
+    }
+    var bag = ledgers[name];
+    if (bag) {
+      for (var id in bag) {
+        if (Object.prototype.hasOwnProperty.call(bag, id)) { take((bag[id] && bag[id].prices) || []); }
+      }
+    }
+    for (var other in ledgers) {
+      if (!Object.prototype.hasOwnProperty.call(ledgers, other) || other === name) { continue; }
+      var otherBag = ledgers[other];
+      for (var id2 in otherBag) {
+        if (Object.prototype.hasOwnProperty.call(otherBag, id2)) { take((otherBag[id2] && otherBag[id2].prices) || []); }
+      }
+    }
+    var out = [];
+    for (var k = 0; k < order.length; k++) {
+      var item = seen[order[k]];
+      var price = guildPrice(name, item);
+      if (price.buy === null && price.sell === null) { continue; }
+      out.push({ name: item, buy: price.buy, sell: price.sell });
+    }
+    return out;
+  }
+
   function guildPrice(hold, item) {
     var name = String(hold || '').toLowerCase();
     if (!active || !validHold(name)) { return { buy: null, sell: null }; }
@@ -39333,6 +39370,7 @@ function thornswoodBooks(env) {
     shutdown: function () { active = false; pending = {}; },
     books: function () { return active ? JSON.parse(JSON.stringify(store)) : []; },
     guildPrice: guildPrice,
+    catalog: catalog,
     ledgers: function () { return active ? JSON.parse(JSON.stringify(ledgers)) : {}; }
   };
 }
@@ -39445,7 +39483,7 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/loadorder',
                // Friends, parties, mutes, trade and journals. See the
                // social block at the end of this file.
-               '/friend', '/party', '/mute', '/trade', '/journal', '/book',
+               '/friend', '/party', '/mute', '/trade', '/journal', '/book', '/merchant',
                '/yes', '/no',
                // The dice. Rolled here now rather than on the roller's own
                // machine; see the branch for why that matters.
@@ -39481,7 +39519,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       '/helpme', '/report', '/stuck',
                       // Everybody's, and they have to be findable: a key
                       // prompt nobody sees is a feature nobody has.
-                      '/friend', '/party', '/mute', '/hidename', '/trade', '/journal', '/book',
+                      '/friend', '/party', '/mute', '/hidename', '/trade', '/journal', '/book', '/merchant',
                       '/yes', '/no', '/roll'];
 
 // ---------------------------------------------------------------------------
@@ -40123,6 +40161,15 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     }
     return hit;
   }
+  (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodResolveItem = function (name) {
+    var hit = findThing(name);
+    if (!hit || !hit.desc) { return { error: (hit && hit.why) || 'That item is not known.' }; }
+    var id = 0;
+    try { id = idOf(hit.desc); } catch (e) { id = 0; }
+    if (!id || id === 15) { return { error: 'That item is not known.' }; }
+    return { name: hit.name || String(name), baseId: id };
+  };
+
   function findBeast(want) { return findIn(buildBeasts(), want, 'creatures'); }
 
   /*
@@ -40525,6 +40572,18 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       They are in PLAYER_WORDS on purpose, unlike /place and /burn: a key
       prompt nobody has been told about is a feature nobody has.
     */
+    if (word === '/merchant') {
+      var merchants = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodMerchantTrade;
+      if (!merchants) { toProfile(profileId, 'That is not running on this server.'); return true; }
+      if (!actorId) { toProfile(profileId, 'You are not in the world yet.'); return true; }
+      var merchantAnswer = merchants.command({ actorId: actorId, profileId: profileId, parts: parts });
+      if (merchantAnswer && merchantAnswer.view && merchants.push) {
+        try { merchants.push(actorId, merchantAnswer.view); } catch (eMerchant) { }
+      }
+      if (merchantAnswer && merchantAnswer.text) { toProfile(profileId, merchantAnswer.text); }
+      return true;
+    }
+
     if (word === '/book') {
       var booksApi = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodBooks;
       if (!booksApi) { toProfile(profileId, 'That is not running on this server.'); return true; }
@@ -48676,7 +48735,23 @@ function createNpcMerchantPurses(api,data,storage) {
     verified.add(id);
     return JSON.parse(JSON.stringify(state));
   }
-  return {prepare,shutdown:()=>{active=false;},stats:()=>({catalogue:catalogue.size,verified:verified.size,initialized})};
+  function commit(id, nextState) {
+    if(!active) throw new Error('Merchant purse service is unavailable');
+    const identity=catalogue.get(id);
+    if(!identity) throw new Error('That is not a guild trader');
+    const actor=api.getNpcAIState(id);
+    if(!actor || actor.isHuman || actor.profileId>0) throw new Error('A human cannot receive an NPC merchant purse');
+    if(!valid(nextState, identity)) throw new Error('Merchant state cannot be verified');
+    const previous=ledger.entries[identity.reference];
+    if(previous===null || previous===undefined) throw new Error('Merchant initialization record is missing');
+    const next=JSON.parse(JSON.stringify(ledger));
+    next.entries[identity.reference]=JSON.parse(JSON.stringify(nextState));
+    storage.save(next);
+    ledger=next;
+    api.set(id, property, JSON.parse(JSON.stringify(nextState)));
+    return JSON.parse(JSON.stringify(nextState));
+  }
+  return {prepare,commit,shutdown:()=>{active=false;},stats:()=>({catalogue:catalogue.size,verified:verified.size,initialized})};
 }
 // NPC MERCHANT PURSES END
 
@@ -49495,7 +49570,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population) {
         'background work continues without connections');
       const merchantStatus=population && population.merchantStats && population.merchantStats();
       if(merchantStatus) report('NPC merchant purses: '+merchantStatus.verified+'/'+merchantStatus.catalogue+
-        ' verified; '+merchantStatus.initialized+' first-time purses; trading disabled');
+        ' verified; '+merchantStatus.initialized+' first-time purses; '+((globalThis.__thornswoodMerchantTrade&&globalThis.__thornswoodMerchantTrade.nativeReady())?'native transfer present':'native transfer absent'));
       moved=0;attacks=0;lastReport=now();
     }
     schedule(backgroundTick,20);
@@ -49531,6 +49606,17 @@ try {
     globalThis.__thornswoodNpcMerchants=createNpcMerchantPurses(mp,NPC_POPULATION_DATA,
       createPrivateMerchantLedger(require('fs'),require('path'),cfgNpc,
         NPC_POPULATION_DATA.keep.filter(row=>row[6]==='trader').map(row=>row[0])));
+    try {
+      globalThis.__thornswoodMerchantTrade = require(require('path').join(__dirname, 'merchant-trading.js')).installMerchantTrading({
+        mp: mp,
+        g: globalThis,
+        purses: globalThis.__thornswoodNpcMerchants,
+        log: function (line) { log(line); }
+      });
+    } catch (eTrade) {
+      globalThis.__thornswoodMerchantTrade = null;
+      log('merchant trading did not start: ' + eTrade);
+    }
     globalThis.__thornswoodNpcPopulation=createNpcPopulation(mp,NPC_POPULATION_DATA,plugins,globalThis.__thornswoodNpcMerchants);
     globalThis.__thornswoodNpcRuntime = startSharedNpcServerRuntime(
       mp, {setTimeout, clearTimeout}, Date.now, text=>log(text),globalThis.__thornswoodNpcPopulation);
