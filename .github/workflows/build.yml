@@ -269,6 +269,9 @@ jobs:
                  'test-1378-shared-gather.js',
                  'test-secrets-fail-closed.js',
                  'test-site-auth.js',
+                 'test-site-headers.js',
+                 'test-content-release.ps1',
+                 'test-spawn-reply.js',
                  'test-discord-callback-hang.js',
                  'test-member-role-wording.js'
                  'test-page-changed.js'

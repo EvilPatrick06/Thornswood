@@ -377,6 +377,7 @@ elseif (-not $NoVortex) {
 
 function Test-FromCollection([string]$rel) {
     if ($null -eq $vortexFiles) { return $false }
+    if ($rel -ieq 'Data\Thornswood-Content.esp') { return $false }
     return $vortexFiles.Contains($rel)
 }
 

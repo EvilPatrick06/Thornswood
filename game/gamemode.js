@@ -1616,8 +1616,12 @@ function addItemsAtomic(actorId,goods) {
   Tamriel, and the locationalData set moves it here, the way PlaceAtMe does.
   Anything that is not an NPC record is refused before it is placed, since a
   placed object cannot be moved and would stay at the middle of Tamriel.
+
+  A fifth argument, commanded, is true for tester and staff spawn commands.
+  The private population marker exempts these actors from habitat capacity,
+  while admission and native runtime enrollment still establish authority.
 */
-function placeActors(baseId, where, count, away) {
+function placeActors(baseId, where, count, away, commanded) {
   let rec = null;
   try { rec = (mp.lookupEspmRecordById(baseId) || {}).record || null; } catch (e) { rec = null; }
   if (rec && rec.type && rec.type !== 'NPC_') {
@@ -1637,7 +1641,10 @@ function placeActors(baseId, where, count, away) {
         // Turned to face the person who asked for it.
         rot: [0, 0, (facing + 180) % 360]
       });
+      // Persist the exemption before admission: the five-second discovery
+      // pass and a later gamemode reload must recognize the same command.
       const population=globalThis.__thornswoodNpcPopulation;
+      if(commanded && population) mp.set(ref,'thornswoodNpcCommanded',true);
       if(population && !population.admit(ref,mp.getNpcAIState(ref))) {
         throw new Error('This species has no available population slot in this habitat');
       }
@@ -42331,7 +42338,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         toProfile(profileId, 'The server cannot tell where you are standing.');
         return;
       }
-      var put = placeActors(baseId, { desc: inCell, pos: at, rot: facing || [0, 0, 0] }, count, 150);
+      var put = placeActors(baseId, { desc: inCell, pos: at, rot: facing || [0, 0, 0] }, count, 150, true);
       var made = put.made;
       if (!made) {
         log('/spawn failed on', hit.name + ':', put.why);
@@ -49095,7 +49102,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
      argument is the id the NEW actor gets, not the record to make it from. */
   function spawnBeside(baseId, where, count) {
     // The one placing /spawn uses too, so a fix to it reaches both (#959).
-    return placeActors(baseId, where, count, SPAWN_AWAY);
+    return placeActors(baseId, where, count, SPAWN_AWAY, true);
   }
 
   function doAimed(a, pid, actorId, me, look) {
@@ -49916,6 +49923,7 @@ function createNpcPopulation(api,data,plugins,merchants) {
     counts.set(rule.bucket,(counts.get(rule.bucket)||0)+1);
   }
   api.makeProperty('thornswoodNpcHome',{isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
+  api.makeProperty('thornswoodNpcCommanded',{isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
   api.setNpcPlacementExclusions(excluded);
   function configure(id,state) {
     if(state.isHuman) return null;
@@ -49927,15 +49935,21 @@ function createNpcPopulation(api,data,plugins,merchants) {
       const validHome=saved && Number.isInteger(saved.cell) && Array.isArray(saved.home) &&
         saved.home.length===3 && saved.home.every(Number.isFinite);
       const anchor=validHome ? saved.home : state.pos,cell=validHome ? saved.cell : state.cellOrWorld;
-      rule=(byBase.get(base)||[]).filter(r=>r.cell===cell &&
+      const commanded=api.get(id,'thornswoodNpcCommanded')===true;
+      if(commanded && Number.isInteger(cell) && cell>0 && Array.isArray(anchor) &&
+          anchor.length===3 && anchor.every(Number.isFinite)) {
+        // Only trusted spawn commands set this private marker. They keep
+        // authority and a saved home without joining a natural habitat cap.
+        rule={cell,commanded:true,row:[null,base,api.getDescFromId(cell),anchor,1024,45,null,null,0]};
+      } else if(!commanded) rule=(byBase.get(base)||[]).filter(r=>r.cell===cell &&
         (!saved || !saved.source || saved.source===r.row[0]) &&
         Math.hypot(...r.row[3].map((v,j)=>v-anchor[j]))<=r.row[4])
         .sort((a,b)=>Math.hypot(...a.row[3].map((v,j)=>v-anchor[j]))-
           Math.hypot(...b.row[3].map((v,j)=>v-anchor[j])))[0];
-      if(rule && (counts.get(rule.bucket)||0)>=(rule.row[9]||4)) rule=null;
+      if(rule && !rule.commanded && (counts.get(rule.bucket)||0)>=(rule.row[9]||4)) rule=null;
       if(rule) {
         home=validHome ? saved.home.slice() : state.pos.slice();
-        api.set(id,'thornswoodNpcHome',{home,cell:rule.cell,source:rule.row[0]});
+        api.set(id,'thornswoodNpcHome',{home,cell:rule.cell,source:rule.commanded ? 'command' : rule.row[0]});
         api.set(id,'spawnPoint',{cellOrWorldDesc:rule.row[2],pos:home,rot:[0,0,0]});
       }
     }
@@ -49947,7 +49961,7 @@ function createNpcPopulation(api,data,plugins,merchants) {
     }
     api.set(id,'spawnDelay',rule.row[5]*60);
     const policy={home:home || rule.row[3].slice(),cell:rule.cell,leash:rule.row[4]};
-    if(id>=0xff000000) counts.set(rule.bucket,(counts.get(rule.bucket)||0)+1);
+    if(id>=0xff000000 && !rule.commanded) counts.set(rule.bucket,(counts.get(rule.bucket)||0)+1);
     configured.set(id,{policy,rule});
     return policy;
   }
@@ -49959,7 +49973,7 @@ function createNpcPopulation(api,data,plugins,merchants) {
   function release(id) {
     const entry=configured.get(id);
     if(id>=0xff000000 && entry) {
-      counts.set(entry.rule.bucket,Math.max(0,(counts.get(entry.rule.bucket)||0)-1));
+      if(!entry.rule.commanded) counts.set(entry.rule.bucket,Math.max(0,(counts.get(entry.rule.bucket)||0)-1));
       configured.delete(id);
     }
   }

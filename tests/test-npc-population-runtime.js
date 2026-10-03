@@ -8,6 +8,7 @@ const descriptors=new Map([['1:Skyrim.esm',1],['2:Skyrim.esm',2],['3:Skyrim.esm'
 function fixture(){
   const writes=[],props=new Map(),excluded=[];
   const api={makeProperty(){},getIdFromDesc:d=>descriptors.get(d),
+    getDescFromId:id=>id.toString(16)+':Skyrim.esm',
     setNpcPlacementExclusions:ids=>excluded.push(...ids),
     get:(id,p)=>p==='baseDesc' ? 'a:Skyrim.esm' : props.get(id+':'+p),
     set:(id,p,v)=>{props.set(id+':'+p,v);writes.push({id,p,v});}};
@@ -81,3 +82,25 @@ assert.ok(failedBirth.policy.configure(0xff000032,state),
   'An unsuccessful birth cannot permanently consume a habitat slot');
 assert.equal(failedBirth.policy.configure(0xff000033,state),null);
 console.log('Failed birth capacity recovery checks passed');
+
+const commanded=fixture(),commandedId=0xff000040;
+commanded.props.set(commandedId+':thornswoodNpcCommanded',true);
+const away={...state,pos:[9000,8000,30],cellOrWorld:99};
+const explicit=commanded.policy.configure(commandedId,away);
+assert.ok(explicit,'An explicit command is accepted outside authored habitats');
+assert.deepEqual(plain(explicit.home),away.pos);
+assert.equal(explicit.cell,99);
+assert.notEqual(commanded.props.get(commandedId+':isDisabled'),true);
+const reloaded=context.createNpcPopulation(commanded.api,commanded.data,['Skyrim.esm']);
+assert.ok(reloaded.configure(commandedId,{...away,pos:[9200,8000,30]}),
+  'The persisted command marker survives rediscovery and gamemode reload');
+assert.deepEqual(plain(reloaded.configure(commandedId,away).home),away.pos,
+  'Rediscovery retains the command location as its home');
+assert.ok(commanded.policy.configure(0xff000041,state));
+assert.ok(commanded.policy.configure(0xff000042,state));
+assert.equal(commanded.policy.configure(0xff000043,state),null,
+  'Explicit commands do not consume or remove ordinary habitat caps');
+commanded.props.set(0xff000044+':thornswoodNpcCommanded',true);
+assert.equal(commanded.policy.configure(0xff000044,{...away,isHuman:true}),null,
+  'The command marker cannot enroll a human');
+console.log('Commanded spawn persistence and habitat isolation checks passed');
