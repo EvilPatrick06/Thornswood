@@ -18,9 +18,9 @@
     1. Checks Python is on the VPS. If it is missing, downloads one pinned
        python.org 3.12 installer, checks its SHA-256, and installs it only
        when the file matches. A mismatch stops the run.
-    2. Stages bot.py, card.py, the card artwork and the live smoke's export
-       beside the running bot and checks them there, before anything is
-       stopped (issue #446, FILES below).
+    2. Stages bot.py, card.py and the card artwork beside the running
+       bot and checks them there, before anything is stopped (issue #446,
+       FILES below).
     3. Installs discord.py and Pillow there.
     4. Asks for the bot token at a prompt, never on a command line, and puts
        it in the bot's bot.env.json and the site's config.json together
@@ -135,7 +135,7 @@ $docsWin = $DocsRoot.Replace('/','\')
 . (Join-Path $Here 'Artifact.ps1')
 $artifact = $null
 if (-not $PutBack -and -not $SetPing) {
-$artifact = New-ThornswoodArtifact -Component bot -RepoDir $Repo -Paths 'bot/bot.py', 'bot/card.py', 'bot/dev-channel.txt', 'bot/live-smoke-discord-export.json', 'bot/requirements.txt', 'bot/staff-channel.txt', 'bot/assets/join-card.png', 'scripts/vps/BotService.cs'
+$artifact = New-ThornswoodArtifact -Component bot -RepoDir $Repo -Paths 'bot/bot.py', 'bot/card.py', 'bot/dev-channel.txt', 'bot/requirements.txt', 'bot/staff-channel.txt', 'bot/assets/join-card.png', 'scripts/vps/BotService.cs'
 Write-Host ('artifact ' + (Format-ThornswoodArtifact $artifact)) -ForegroundColor DarkGray
 Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
 $Repo = $artifact.Folder
@@ -351,16 +351,11 @@ Head 'Staging it'
 #
 # requirements.txt too, because the full run installs the libraries from it.
 #
-# And live-smoke-discord-export.json, which bot.py reads from beside itself
-# (LIVE_SMOKE_EXPORT). It was not in this list, so the file was on main and
-# never on the box: the bot found nothing at C:\Thornswood-Bot and the live
-# smoke had no export to read. Required, like bot.py: a checkout without it
-# stops the run here rather than sending a bot that cannot do the smoke. The
-# stage check parses it on the box before anything is stopped, so an export
-# that is not JSON, or that carries a byte order mark, is refused by name with
-# the running bot untouched.
+# live-smoke-discord-export.json is a smoke export, not part of the installed
+# bot, so it is not in this list and it is not in the artifact. The bot can
+# still read one that is already beside it; this run does not copy it up.
 $send = [ordered]@{}
-foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt', 'live-smoke-discord-export.json', 'requirements.txt') {
+foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt', 'requirements.txt') {
   $src = Join-Path $Repo "bot\$f"
   if (-not (Test-Path $src)) { Die "missing: $src" }
   $send[$f] = $src

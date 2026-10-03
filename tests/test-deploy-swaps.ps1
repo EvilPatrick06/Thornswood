@@ -758,10 +758,10 @@ try {
     $failed = $script:fail
     Yes 'Install-Bot -CodeOnly: good code is SWAP OK and the new bot says it is watching' ($r.Ok -and $r.Said -match 'SWAP OK' -and (BotSays 'bot v2'))
     Yes '  and only then the box records the bot artifact' ((Current 'thornswood-bot').name -like 'bot-*')
-    # bot.py reads this from beside itself, so it goes up with the code
-    # (LIVE_SMOKE_EXPORT). It was on main and never on the box.
-    Yes '  and the live smoke''s export went up beside bot.py' (
-        (Get (Join-Path $botRoot 'live-smoke-discord-export.json')) -eq '{ "channels": [] }')
+    # The live smoke export is not part of the installed bot, so this run
+    # does not copy it up beside bot.py.
+    Yes '  and the live smoke export was not copied up beside bot.py' (
+        -not (Test-Path -LiteralPath (Join-Path $botRoot 'live-smoke-discord-export.json')))
     # And the run says so itself, asking the box for the full path under the
     # root the swap moved the files to. A green run once left the export and
     # data\bot.log reported missing from the install root with nothing in the
@@ -769,7 +769,6 @@ try {
     # lost files from a Test-Path typed on the wrong machine.
     Yes '  and the run proves it on the box, by full path, for every file it sent and for data\bot.log' (
         $r.Said -match 'FILES ON THE BOX' -and
-        $r.Said -match ([regex]::Escape('Test-Path ' + (Join-Path $botRoot 'live-smoke-discord-export.json')) + '\s+True') -and
         $r.Said -match ([regex]::Escape('Test-Path ' + $botLog) + '\s+True') -and
         $r.Said -match 'Test-Path .*bot\.py\s+True')
     $prev = @(Kept $botRoot '.prev-*')
