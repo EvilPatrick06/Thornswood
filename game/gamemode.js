@@ -6163,6 +6163,57 @@ function isStation(baseDesc) {
   return false;
 }
 
+
+/*
+  WORLD RECORDS FILED WITH NO RANK.
+
+  docs/systems/lists/unranked.md is what the harvest pass left over.
+  The ranks under "What you cannot do" on the gatherer page are the
+  ones applied here. A produce already on the generated ladder keeps
+  that rank, and the row hands that ladder ingredient, one of it,
+  rather than the sack a Papyrus script would have opened. Rot scale,
+  screaming maw and thorn hook are not on the ladder, so they keep
+  their own produce.
+
+  Cabbage, carrot, gourds, leek, potato and wheat stay the farmer's.
+  A clam and a fish stay the fisher's. A coin purse and an estate key
+  are not a harvest. Mammoth cheese and a mead barrel stay off every
+  ladder. The beehive, the chickens' nest and the churn are farmer
+  verbs and are not here. A horker is not on the gatherer page. No
+  row carries a gold price.
+*/
+const GATHER_UNRANKED = {
+  "10466:HearthFires.esm": { "produce": "6ac4a:Skyrim.esm", "name": "Jazbay Grapes", "rank": "novice" },
+  "10467:HearthFires.esm": { "produce": "5076e:Skyrim.esm", "name": "Juniper Berries", "rank": "novice" },
+  "10468:HearthFires.esm": { "produce": "45c28:Skyrim.esm", "name": "Lavender", "rank": "novice" },
+  "110bb:HearthFires.esm": { "produce": "3f7f8:Skyrim.esm", "name": "Tundra Cotton", "rank": "novice" },
+  "110bc:HearthFires.esm": { "produce": "b2183:Skyrim.esm", "name": "Creep Cluster", "rank": "novice" },
+  "110c4:HearthFires.esm": { "produce": "4da22:Skyrim.esm", "name": "White Cap", "rank": "novice" },
+  "110c5:HearthFires.esm": { "produce": "4da23:Skyrim.esm", "name": "Imp Stool", "rank": "novice" },
+  "110c6:HearthFires.esm": { "produce": "4da24:Skyrim.esm", "name": "Namira's Rot", "rank": "novice" },
+  "110cb:HearthFires.esm": { "produce": "83e64:Skyrim.esm", "name": "Grass Pod", "rank": "novice" },
+  "110cc:HearthFires.esm": { "produce": "134aa:Skyrim.esm", "name": "Thistle Branch", "rank": "novice" },
+  "10461:HearthFires.esm": { "produce": "6abcb:Skyrim.esm", "name": "Canis Root", "rank": "advanced" },
+  "10462:HearthFires.esm": { "produce": "516c8:Skyrim.esm", "name": "Deathbell", "rank": "advanced" },
+  "10463:HearthFires.esm": { "produce": "889a2:Skyrim.esm", "name": "Dragon's Tongue", "rank": "advanced" },
+  "10464:HearthFires.esm": { "produce": "7e8c1:Skyrim.esm", "name": "Giant Lichen", "rank": "advanced" },
+  "10465:HearthFires.esm": { "produce": "7ee01:Skyrim.esm", "name": "Glowing Mushroom", "rank": "advanced" },
+  "110bd:HearthFires.esm": { "produce": "7e8b7:Skyrim.esm", "name": "Swamp Fungal Pod", "rank": "advanced" },
+  "110be:HearthFires.esm": { "produce": "ec870:Skyrim.esm", "name": "Mora Tapinella", "rank": "advanced" },
+  "110bf:HearthFires.esm": { "produce": "77e1c:Skyrim.esm", "name": "Blue Mountain Flower", "rank": "advanced" },
+  "110c0:HearthFires.esm": { "produce": "77e1e:Skyrim.esm", "name": "Purple Mountain Flower", "rank": "advanced" },
+  "110c1:HearthFires.esm": { "produce": "77e1d:Skyrim.esm", "name": "Red Mountain Flower", "rank": "advanced" },
+  "110c2:HearthFires.esm": { "produce": "4da00:Skyrim.esm", "name": "Fly Amanita", "rank": "advanced" },
+  "110c9:HearthFires.esm": { "produce": "6f950:Skyrim.esm", "name": "Scaly Pholiota", "rank": "advanced" },
+  "110ca:HearthFires.esm": { "produce": "1b3bd:Skyrim.esm", "name": "Snowberries", "rank": "advanced" },
+  "306b:Update.esm": { "produce": "306d:Update.esm", "name": "Rot Scale", "rank": "advanced" },
+  "10469:HearthFires.esm": { "produce": "2f44c:Skyrim.esm", "name": "Nightshade", "rank": "expert" },
+  "110c3:HearthFires.esm": { "produce": "4da20:Skyrim.esm", "name": "Bleeding Crown", "rank": "expert" },
+  "110c7:HearthFires.esm": { "produce": "4da25:Skyrim.esm", "name": "Blisterwort", "rank": "expert" },
+  "306a:Update.esm": { "produce": "306e:Update.esm", "name": "Screaming Maw", "rank": "expert" },
+  "306c:Update.esm": { "produce": "306f:Update.esm", "name": "Thorn Hook", "rank": "expert" }
+};
+
 /** The row for a base, out of the generated table or the hand list beside it,
  *  or null when this base is not a plant at all. Own-property checks on both,
  *  for the reason own() in the progression block was written: '__proto__'
@@ -6205,6 +6256,9 @@ function plantAt(baseDesc) {
   }
   if (Object.prototype.hasOwnProperty.call(HARVESTS, baseDesc)) {
     return HARVESTS[baseDesc];
+  }
+  if (Object.prototype.hasOwnProperty.call(GATHER_UNRANKED, baseDesc)) {
+    return GATHER_UNRANKED[baseDesc];
   }
   return null;
 }
@@ -6588,12 +6642,15 @@ function harvest(actorId, refrId, baseDesc) {
            ' Gatherer. Pick what you can until you are one.';
   }
 
-  const prev = lastUse.get(actorId + ':' + refrId) || 0;
+  // One wait for this plant, shared. The key is the plant, not the person,
+  // so the next person cannot take it early. stampCooldown stores
+  // actor:ref, and the actor half of a shared plant is the word plant.
+  const prev = lastUse.get('plant:' + refrId) || 0;
   if (Date.now() - prev < HARVEST_COOLDOWN_MS) {
     return 'This one has already been picked.';
   }
   if (!addItem(actorId, plant.produce, 1)) return null;
-  stampCooldown(actorId, refrId);
+  stampCooldown('plant', refrId);
   const rank = creditWork(actorId, 'harvest');
   return 'You pick the ' + plant.name + '.' + (rank ? ' ' + rank : '');
 }
@@ -8229,6 +8286,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     // The yield is right and the sentence on the screen is the wrong one,
     // which is the hardest kind of fault to be shown a bug report for.
     for (var plantBase in HARVESTS_BY_BASE) { add(plantBase); }
+    for (var unrankedPlant in GATHER_UNRANKED) { add(unrankedPlant); }
     for (var veinBase in ORES_BY_BASE) { add(veinBase); }
     // And the water produce, which is on this list today only because every one
     // of those fifteen bases is still a row in the plant table above. The next
