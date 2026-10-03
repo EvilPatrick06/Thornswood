@@ -39,9 +39,10 @@
   Get-ReleaseDisagreements says whether a feed's names for its release agree
   with each other, and with "releases", the list Rollback-Feed.ps1 puts a
   channel back from (#442): the newest entry there is this release, by the same
-  id, ending on its last pack. Rollback-Feed does not rewrite "release" yet, so
-  after a rollback the feed's "release" still names the last Ship until the
-  next one. tests\test-release-name.ps1 drives all of it.
+  id, ending on its last pack. A rollback writes "release" for itself (#1058):
+  its own id, the launcher the feed keeps, its one pack, its baseline, and no
+  commit, so no tag. tests\test-release-name.ps1 drives the names;
+  tests\test-feed-rollback.ps1 drives a rolled-back feed.
 #>
 
 # ==== thornswood release id ====

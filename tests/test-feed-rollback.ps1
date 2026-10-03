@@ -33,7 +33,10 @@
        file by file, by size and sha256, with the record of the release asked
        for; the client runtime stays with the launcher; launcherVersion,
        launcherUrl, launcherSha256, minLauncher and clientRuntime do not move;
-       the store's baseline is the new record; the note passes Note-Rules
+       the store's baseline is the new record; the note passes Note-Rules;
+       "release" names the rollback itself (the launcher the feed keeps, its
+       one pack, its baseline, no commit and no tag) and
+       Get-ReleaseDisagreements finds nothing (#1058)
     4. refusals that change nothing: an id the feed does not name, the release
        the feed is already on, -To with -Back, a note with a word the notes may
        not carry, and a feed that names no releases
@@ -80,6 +83,7 @@ if (-not (Test-Path -LiteralPath $rollback)) { Done }
 . (Join-Path $repo 'scripts\release\Release-Baseline.ps1')
 . (Join-Path $repo 'scripts\release\Feed-Store.ps1')
 . (Join-Path $repo 'scripts\release\Note-Rules.ps1')
+. (Join-Path $repo 'scripts\release\Release-Name.ps1')
 Add-Type -AssemblyName System.IO.Compression -ErrorAction SilentlyContinue
 Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
 
@@ -193,6 +197,10 @@ function Publish-Scratch([string]$Id, [hashtable]$changes, [string[]]$deletes, [
     $releaseBaseline = New-FeedBaselinePointer $Id $msha (Url $msha) $map.Count
     Invoke-Expression $listBlock
     if ($doc.PSObject.Properties['baseline']) { $doc.baseline = $releaseBaseline } else { $doc | Add-Member -NotePropertyName baseline -NotePropertyValue $releaseBaseline }
+    # What a Ship writes into "release", so a rollback has something to replace (#1058).
+    $relRec = New-ReleaseRecord $Id 'dev' ([string]$doc.launcherVersion) @($Id) $Id ('a' * 40) 'scratch' 0
+    if ($doc.PSObject.Properties['release']) { $doc.release = $relRec }
+    else { $doc | Add-Member -NotePropertyName 'release' -NotePropertyValue $relRec }
     Write-Feed $doc
     Copy-Item -LiteralPath $mf -Destination (Join-Path $feedDir 'published.json') -Force
     $script:records[$Id] = $map
@@ -410,6 +418,16 @@ Yes '  as one more pack on the end of the feed, at its own sha256 on the site' (
 Yes '  the launcher, minLauncher and the client runtime on the feed do not move' (Test-Kept $d)
 Yes '  the store''s baseline is the record the feed now names' ((Get-BaselineFileSha (Join-Path $feedDir 'published.json')) -eq [string]$d.baseline.sha256)
 Yes '  the note says what happened and passes the note rules' ([string]$d.news[0].title -match '^The game files go back' -and @(Get-NoteProblems ([string]@($d.packs)[-1].notes)).Count -eq 0)
+$bad = @(Get-ReleaseDisagreements $d)
+Yes '  "release" names the rollback: its id, the launcher the feed keeps, its one pack, its baseline, no commit and no tag' (
+    [string]$d.release.id -eq $RB -and [string]$d.release.channel -eq 'dev' -and [string]$d.release.launcherVersion -eq '1.1.102.5' -and
+    (@($d.release.packs | ForEach-Object { [string]$_ }) -join ',') -eq $RB -and [string]$d.release.baseline -eq $RB -and
+    [string]$d.release.commit -eq '' -and [string]$d.release.tag -eq '' -and [string]$d.release.branch -eq '')
+Yes '  Get-ReleaseDisagreements finds nothing on that feed' ($bad.Count -eq 0)
+$relTxt = @(if (Test-Path -LiteralPath (Join-Path $feedDir 'releases.txt')) { Get-Content -LiteralPath (Join-Path $feedDir 'releases.txt') })
+Yes '  the store''s releases.txt has a line for the rollback, not the Ship it left' (
+    @($relTxt | Where-Object { ($_ -split "`t")[0] -eq $RB }).Count -eq 1 -and
+    @($relTxt | Where-Object { ($_ -split "`t")[0] -eq $R3 }).Count -eq 0)
 $wantB = $records[$R2]
 Yes 'the launcher that had everything lands on exactly the second release''s files' ((Update-Install $A) -eq 1 -and (Test-Lands $A $wantB))
 Yes '  its plugin list is the one the second release shipped' ((Plugins-Of $A) -eq "*a.esp`r`n*new2.esp`r`n")
@@ -455,6 +473,10 @@ $RF = '20260904-1300-dev'
 $r = Rollback @('-To', $R3, '-Id', $RF); Show $r
 $d = Read-Feed
 Yes '-To the third release puts the feed forward again' ($r.Code -eq 0 -and [string]$d.releases[0].to -eq $R3 -and (Test-Kept $d))
+Yes '  and "release" names that rollback, with nothing disagreeing' (
+    [string]$d.release.id -eq $RF -and [string]$d.release.launcherVersion -eq '1.1.102.5' -and
+    (@($d.release.packs | ForEach-Object { [string]$_ }) -join ',') -eq $RF -and [string]$d.release.baseline -eq $RF -and
+    [string]$d.release.commit -eq '' -and [string]$d.release.tag -eq '' -and @(Get-ReleaseDisagreements $d).Count -eq 0)
 Yes '  every launcher lands on the third release''s files' (
     (Update-Install $A) -eq 1 -and (Test-Lands $A $records[$R3]) -and (Update-Install $B) -eq 1 -and (Test-Lands $B $records[$R3]) -and
     (Update-Install $C) -eq 2 -and (Test-Lands $C $records[$R3]))
