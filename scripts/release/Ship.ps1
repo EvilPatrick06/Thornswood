@@ -1826,52 +1826,8 @@ if (-not $DryRun -and -not $NoAnnounce) {
     }
 }
 
-# ------------------------------------------------------- dev follows main
-# Everything on dev was in this release, because a main pack is the difference
-# from main's last release and the dev changes are part of that. So the dev
-# feed is set to exactly what main now has, with the dev ports and the dev
-# voice address kept, and the dev baseline becomes main's. Dev launchers take the main pack and the main
-# launcher version, and the next Ship -Channel dev starts at .1 again.
-#
-# NOT AFTER A HOTFIX. A hotfix is the live build plus one fix, and the work
-# sitting on dev was not in it, so "everything on dev was in this release" is
-# false and the reset would take dev testers back to the hotfix until the next
-# dev Ship. Dev is left as it was; its next Ship still climbs from the hotfix's
-# number, because the dev version is read off main's published feed.
-#
-# THROUGH THE STORE (#907). The dev feed and baseline are received from the
-# VPS, rewritten from main's as this release left them, and sent back with the
-# same check a Ship makes, so the site serves the reset dev feed at once. Until
-# #907 this committed and pushed the Thornswood-Releases dev branch, and the
-# site's copy stayed on the old dev tip until somebody remirrored it.
-if (-not $DryRun -and -not $Dev -and -not $hotfix) {
-    Head 'Resetting dev to match'
-    try {
-        $devRel = Get-FeedStoreDir 'dev'
-        [void](Receive-FeedStore 'dev' $devRel)
-        $mainDoc = Get-Content (Join-Path $MainReleaseDir 'version.json') -Raw | ConvertFrom-Json
-        $devDoc  = Get-Content (Join-Path $devRel 'version.json') -Raw | ConvertFrom-Json
-        foreach ($keep in 'serverPort', 'voicePort', 'voiceUrl') {
-            if ($devDoc.PSObject.Properties[$keep]) {
-                if ($mainDoc.PSObject.Properties[$keep]) { $mainDoc.$keep = $devDoc.$keep }
-                else { $mainDoc | Add-Member -NotePropertyName $keep -NotePropertyValue $devDoc.$keep }
-            }
-        }
-        [IO.File]::WriteAllText((Join-Path $devRel 'version.json'), ($mainDoc | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
-        $toSend = @('version.json')
-        $mainState = Join-Path $MainReleaseDir 'published.json'
-        if (Test-Path -LiteralPath $mainState) {
-            Copy-Item -LiteralPath $mainState -Destination (Join-Path $devRel 'published.json') -Force
-            $toSend += 'published.json'
-        }
-        [void](Send-FeedStore 'dev' $devRel $toSend)
-        Say "  dev feed now matches main $target, dev ports kept, and the site serves it" 'Green'
-        if ($toSend -contains 'published.json') { Say '  dev baseline is now main''s' 'Green' }
-    } catch {
-        Say "  could not reset the dev feed: $($_.Exception.Message)" 'Yellow'
-        Say '  Ship -Channel dev once puts dev on top of this release.' 'Yellow'
-    }
-}
+# Main and Dev are independent releases. Publishing Main must preserve Dev's
+# feed, baseline, release identity and history. Advance Dev with its own Ship.
 
 # SHIP NO LONGER COMMITS OR PUSHES ANYTHING.
 #

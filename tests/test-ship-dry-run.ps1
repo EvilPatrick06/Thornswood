@@ -455,6 +455,8 @@ if ($dir) {
     Yes '  and Updater.cs is on the version it had' ((Read-Version $updaterCs) -eq '1.1.93')
 
     # ---- R: a real Ship -Package on main ----------------------------------------------
+    $devBeforeMain = Hash $siteDevFeed
+    $devBaselineBeforeMain = Hash $siteDevBase
     $r = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Package', '-Root', $root, '-DistRoot', $dist, '-NoPause')
     Yes ("R a real main Ship -Package runs to the end (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Out -match 'Everyone in the world has')
     # When it stops, what it said and what it called, so the FAIL says why.
@@ -513,9 +515,8 @@ if ($dir) {
         $at.ContainsKey('Request-Restart') -and $at['tag'] -gt $at['Request-Restart'])
     Yes 'R and it says so' ($r.Out -match 'release/main/20990101-0000 marks ab12ab12ab12, and it is on GitHub')
     $devNow = [IO.File]::ReadAllText($siteDevFeed) | ConvertFrom-Json
-    Yes 'R dev follows main through the store: the site''s dev feed is main''s, dev port kept' (
-        $devNow.launcherVersion -eq '1.1.93' -and [string]$devNow.serverPort -eq '7001')
-    Yes '  and the dev baseline on the VPS is main''s' ((Hash $siteDevBase) -eq (Hash $siteBase))
+    Yes 'R a main ship preserves the independently published dev feed' ((Hash $siteDevFeed) -eq $devBeforeMain)
+    Yes '  and the independently published dev baseline' ((Hash $siteDevBase) -eq $devBaselineBeforeMain)
 
     # ---- E: a dev dry run numbers itself from the site store, not from git ------------
     # launchers.txt on the dev store says 1.1.93.2 went out, main's feed on the
