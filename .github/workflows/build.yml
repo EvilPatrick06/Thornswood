@@ -297,6 +297,25 @@ jobs:
           & powershell -NoProfile -File scripts\dev\Check-Controls.ps1 -NoPause
           if ($LASTEXITCODE -ne 0) { Write-Host '::error file=launcher/ui.xaml::the launcher window does not line up with the C#, see the lines above'; exit 1 }
 
+      - name: Check the launcher UI thread
+        shell: pwsh
+        run: |
+          # Issue #1216. A Log() from a background thread throws on the
+          # window, and the catch then reports a success as a failure.
+          # This follows calls out of ThreadPool and Thread delegates in
+          # launcher\app. No arguments: the script finds launcher\app from
+          # where it lives. A finding exits 1. No python is a check that
+          # did not happen, so it is red.
+          if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
+            Write-Host '::error file=scripts/dev/Check-UiThread.py::no python on this runner, so the UI thread check did not run'
+            exit 1
+          }
+          & python scripts/dev/Check-UiThread.py
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=scripts/dev/Check-UiThread.py::the launcher touches the window from a background thread; the lines above say where'
+            exit 1
+          }
+
       - name: Parse every game script
         shell: pwsh
         run: |
