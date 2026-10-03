@@ -33,6 +33,10 @@
        Publish-Server refuses before its first scp; and the site's reader,
        Deploy-Docs' grant and Artifact.ps1 name one store.
        tests\test-deploy-swaps.ps1 runs each of them against a dirty tree.
+    6. Site and voice, before anything would be sent (#1335): the expanded
+       tree and the zip have to match the commit's own bytes. A flipped
+       file, an extra file, a flipped zip or an artifact from another
+       commit is refused, and the refusal happens before a send.
 
   Read only apart from files under its own temp folder.
 #>
@@ -100,6 +104,10 @@ try {
     Put (Join-Path $src 'game\gamemode.js') "'use strict';`nconsole.log('gamemode');`n"
     Put (Join-Path $src '.gitignore') "site/public/*.tmp`n"
     [IO.File]::WriteAllBytes((Join-Path $src 'site\public\logo.png'), [byte[]](0, 1, 2, 3, 255, 13, 10, 0))
+    Put (Join-Path $src 'voice\voice-server.js') "'use strict';`nconst BUILD = 'test';`n"
+    Put (Join-Path $src 'voice\headlines.js') "'use strict';`nconsole.log('headlines');`n"
+    Put (Join-Path $src 'voice\public\index.html') "<!doctype html>`n<p>voice</p>`n"
+    Put (Join-Path $src 'voice\public\voice.js') "'use strict';`nconsole.log('voice');`n"
     Run-Git -C $src init -q
     Run-Git -C $src config core.autocrlf false
     Run-Git -C $src add -A
@@ -239,6 +247,72 @@ try {
     $g = New-ThornswoodArtifact -Component gamemode -RepoDir $src -Paths 'game/gamemode.js' -OutDir (Join-Path $tmp 'out10')
     $stamp = New-ThornswoodBuildStamp -Gamemode (Join-Path $g.Folder 'game\gamemode.js') -Channel dev -RepoDir $src -Artifact $g
     Yes "the build stamp names the artifact's commit, and that the commit holds it" ($stamp.commit -eq $g.Short -and $stamp.gamemodeMatchesCommit -eq $true)
+
+    # ---- 3b. site and voice source integrity, before anything is sent ------
+    # Issue #1335. The check has to pass on the tree that would be sent, and
+    # a failure has to stop short of sending.
+    function Flip-Last([string]$path) {
+        $b = [IO.File]::ReadAllBytes($path)
+        $b[$b.Length - 1] = ($b[$b.Length - 1] -bxor 0x5A)
+        [IO.File]::WriteAllBytes($path, $b)
+    }
+    $shipped = $false
+    try {
+        Assert-ThornswoodSourceIntegrity -Artifact $n2 -RepoDir $src
+        $shipped = $true
+    } catch { $shipped = $false }
+    Yes 'a site tree that matches the commit may be sent' $shipped
+
+    $why = Refusal { Assert-ThornswoodSourceIntegrity -Artifact $a1 -RepoDir $src }
+    Yes 'an artifact built from an older commit is refused, and nothing is sent' (
+        $why -match 'not HEAD' -and $why -match 'nothing was sent' -and $why -match 'the box was not touched')
+
+    $siteFile = Join-Path $n2.Folder 'site\server.js'
+    Flip-Last $siteFile
+    $shipped = $false
+    $why = Refusal {
+        Assert-ThornswoodSourceIntegrity -Artifact $n2 -RepoDir $src
+        $shipped = $true
+    }
+    Yes 'a tampered site file is refused before a send' (
+        -not $shipped -and $why.Contains('site/server.js') -and $why -match 'nothing was sent' -and $why -match 'the box was not touched')
+    Flip-Last $siteFile
+    Yes 'the site tree is accepted again once the file matches the commit' (
+        (Refusal { Assert-ThornswoodSourceIntegrity -Artifact $n2 -RepoDir $src }) -eq '')
+
+    $extra = Join-Path $n2.Folder 'site\public\evil.html'
+    Put $extra "no`n"
+    $why = Refusal { Assert-ThornswoodSourceIntegrity -Artifact $n2 -RepoDir $src }
+    Yes 'a file added to the site tree is refused' ($why.Contains('site/public/evil.html') -and $why -match 'nothing was sent')
+    Remove-Item -LiteralPath $extra -Force
+    Yes 'removing that file lets the site tree pass' ((Refusal { Assert-ThornswoodSourceIntegrity -Artifact $n2 -RepoDir $src }) -eq '')
+
+    Flip-Last $n2.Zip
+    $why = Refusal { Assert-ThornswoodSourceIntegrity -Artifact $n2 -RepoDir $src }
+    Yes 'a tampered site zip is refused before a send' ($why -match 'zip is not the bytes' -and $why -match 'nothing was sent')
+    Flip-Last $n2.Zip
+    Yes 'the site zip is accepted again once its hash matches' ((Refusal { Assert-ThornswoodSourceIntegrity -Artifact $n2 -RepoDir $src }) -eq '')
+
+    $voicePaths = @('voice/voice-server.js', 'voice/headlines.js', 'voice/public')
+    $v = New-ThornswoodArtifact -Component voice -RepoDir $src -Paths $voicePaths -OutDir (Join-Path $tmp 'out-voice')
+    $shipped = $false
+    try {
+        Assert-ThornswoodSourceIntegrity -Artifact $v -RepoDir $src
+        $shipped = $true
+    } catch { $shipped = $false }
+    Yes 'a voice tree that matches the commit may be sent' $shipped
+    $voiceFile = Join-Path $v.Folder 'voice\public\voice.js'
+    Flip-Last $voiceFile
+    $shipped = $false
+    $why = Refusal {
+        Assert-ThornswoodSourceIntegrity -Artifact $v -RepoDir $src
+        $shipped = $true
+    }
+    Yes 'a tampered voice file is refused before a send' (
+        -not $shipped -and $why.Contains('voice/public/voice.js') -and $why -match 'nothing was sent' -and $why -match 'the box was not touched')
+    Flip-Last $voiceFile
+    Yes 'the voice tree is accepted again once the file matches the commit' (
+        (Refusal { Assert-ThornswoodSourceIntegrity -Artifact $v -RepoDir $src }) -eq '')
 
     # ---- 4. sending and recording, against a stand-in box ------------------
     $box = Join-Path $tmp 'box'
@@ -424,5 +498,21 @@ $siteSrc = Get-Content -LiteralPath (Join-Path $Repo 'site\server.js') -Raw
 Yes "the site reads current\ in that store by default" ($siteSrc.Contains('process.env.THORNSWOOD_DEPLOYS_DIR || ''C:\\Thornswood-Deploys\\current'''))
 $docsSrc = Get-Content -LiteralPath (Join-Path $Repo 'scripts\deploy\Deploy-Docs.ps1') -Raw
 Yes "Deploy-Docs grants the site's account read on it" ($docsSrc.Contains("@('C:\Thornswood-Deploys\current', '(OI)(NP)R')"))
+
+
+foreach ($rel in @('scripts\deploy\Deploy-Docs.ps1', 'scripts\deploy\Install-Voice.ps1')) {
+    $ast = Read-Ast $rel
+    $n = Split-Path -Leaf $rel
+    $checks = @(Commands $ast 'Assert-ThornswoodSourceIntegrity')
+    $sends = @(Commands $ast 'Send-ThornswoodArtifact')
+    Yes "$n checks source integrity before it sends" (
+        $null -ne $ast -and $checks.Count -ge 1 -and $sends.Count -eq 1 -and
+        $checks[0].Extent.StartOffset -lt $sends[0].Extent.StartOffset)
+}
+$docsText = Get-Content -LiteralPath (Join-Path $Repo 'scripts\deploy\Deploy-Docs.ps1') -Raw
+Yes 'Deploy-Docs still hash-compares server.js and the public files on the box' (
+    $docsText.Contains('(Get-FileHash -LiteralPath ''$rootWin\server.js'' -Algorithm SHA256 -EA SilentlyContinue).Hash') -and
+    $docsText.Contains('(Get-FileHash -LiteralPath `$_.FullName -Algorithm SHA256 -EA SilentlyContinue).Hash') -and
+    $docsText.Contains('if ($publicThere[$_.Name] -eq (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash)'))
 
 Done
