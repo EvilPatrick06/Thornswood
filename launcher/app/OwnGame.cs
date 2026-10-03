@@ -519,7 +519,7 @@ namespace Thornswood
             if (!FirstBuildWrong(cfg, game)) return null;
             if (Downgrade.Downloaded(cfg) != null) return null;
             long exeBytes = -1;
-            try { exeBytes = new FileInfo(Path.Combine(game, "SkyrimSE.exe")).Length; } catch { }
+            try { exeBytes = new FileInfo(Path.Combine(game, "SkyrimSE.exe")).Length; } catch { /* unreadable: -1, and Describe says the build */ }
             // The exe is 1.6.1170's size and some other listed file is not:
             // a cleaned master, an edited Skyrim.ccc. Describe would call the
             // whole folder 1.6.1170, which is the thing that is wrong.
