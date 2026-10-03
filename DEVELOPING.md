@@ -79,8 +79,8 @@ and the dev server told. It runs from
 any branch on any developer's machine. There is no installer for it, and it
 posts to the dev updates channel in Discord and the dev launcher's News tab,
 never #news. There is one dev feed and the last dev Ship wins, so say in #staff-general
-when you take it. A main Ship afterwards resets the dev feed and baseline to
-match main, so dev starts at .1 again.
+when you take it. Main and Dev have independent feeds and baselines. A Main
+Ship leaves Dev unchanged; advance Dev through its own Ship.
 
 A main release, on Patrick's machine:
 
@@ -224,7 +224,7 @@ Several people, several machines, one repo. The short rules are in
 - **The dev channel is for trying.** `.\scripts\release\Ship.ps1 -Channel dev "..."`
   runs from any branch on any machine and puts that build on the dev
   server. There is one dev feed and the last dev Ship wins, so say in #staff-general
-  when you take it. A main Ship resets dev to match main.
+  when you take it. A main Ship preserves the Dev feed and baseline.
 - **Settled design is a proposal first.** Where the game runs from (its own
   folder, see One Skyrim of its own), Keep and Hold for Data\Platform, the
   client built from the fork and recorded, C# 5 only, one complete release at
