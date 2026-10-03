@@ -143,6 +143,8 @@ Generated from the work tables by `scripts/dev/Write-SystemLists.js`. The same r
 ## Where this is
 
 The verb, the ranks, the ten minutes, and the list are in the server.
-The wait is still per person: someone else can take the same flower
-while you wait. A press from someone who is not a gatherer is not
-specially refused before the plant is consumed.
+The wait is the plant, for everybody: the next person cannot take it
+early. A press from someone who is not a gatherer is refused before
+the plant is consumed, and a gatherer below the plant's rank takes
+nothing either. World records filed with no rank take the ranks under
+"What you cannot do" when the record is a gatherer's plant.

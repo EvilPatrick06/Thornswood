@@ -128,6 +128,14 @@ function harvestsBlock() {
   catch (e) { return null; }
 }
 const HARVESTS_BY_BASE = harvestsBlock();
+function gatherUnrankedBlock() {
+  const a = src.indexOf('\nconst GATHER_UNRANKED = {');
+  const b = src.indexOf('\n};', a);
+  if (a < 0 || b < 0) { return {}; }
+  try { return new Function('return ' + src.slice(a + '\nconst GATHER_UNRANKED = '.length, b + 2) + ';')(); }
+  catch (e) { return {}; }
+}
+const GATHER_UNRANKED = gatherUnrankedBlock();
 yes('the generated HARVESTS_BY_BASE block lifts', !!HARVESTS_BY_BASE && Object.keys(HARVESTS_BY_BASE).length > 50);
 yes('and carries no chicken nest, so no plant path can hand a gatherer the egg',
     !!HARVESTS_BY_BASE && !Object.prototype.hasOwnProperty.call(HARVESTS_BY_BASE, NEST));
@@ -183,7 +191,7 @@ function world(opts) {
     'burnCharcoal', 'isChoppingBlock', 'chopWood', 'SHRINES', 'bless', 'isCrop',
     'farmActivate', 'isFish', 'fish', 'isGame', 'game', 'isPlant', 'harvest', 'ALLOW',
     'isVein', 'mineOre', 'loot', 'milk', 'log', 'ITEMS', 'floraHanded', 'isChurn', 'churn',
-    'HARVESTS_BY_BASE', 'HARVESTS', 'isStation'];
+    'HARVESTS_BY_BASE', 'HARVESTS', 'isStation', 'GATHER_UNRANKED'];
   const body = "'use strict';\n" +
     [parts.coolBlock, parts.waitLine, parts.nestsLine,
      parts.waitWord, parts.isChickenNest, parts.collectEgg, parts.plantAt].filter(Boolean).join('\n') + '\n' +
@@ -215,7 +223,8 @@ function world(opts) {
       never, function () { return null; },
       HARVESTS_BY_BASE || {},
       {},
-      never
+      never,
+      GATHER_UNRANKED || {}
     ]);
   } catch (e) {
     console.log('      the world would not build: ' + e.message);
