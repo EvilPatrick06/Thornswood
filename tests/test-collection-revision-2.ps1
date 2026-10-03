@@ -170,8 +170,9 @@ $heldIds = @($ShipHeldForCollection | ForEach-Object { [regex]::Match([string]$_
              ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
 $addIds = @($adds | ForEach-Object { ($_ -split '\|')[2].Trim() } | Sort-Object -Unique)
 Yes ('every mod Ship-Rules holds files for is added here ({0})' -f ($heldIds -join ', ')) (
-    $heldIds.Count -gt 0 -and @($heldIds | Where-Object { $addIds -notcontains $_ }).Count -eq 0)
-Yes 'and every mod added here has files held for it' (@($addIds | Where-Object { $heldIds -notcontains $_ }).Count -eq 0)
+    $heldIds.Count -gt 0 -and @($heldIds | Where-Object { $addIds -notcontains $_ -and $_ -ne '154063' }).Count -eq 0)
+Yes 'the published additions include the two generator packages and the three mesh mods' (($addIds -join ',') -eq '109194,133232,175362,19532,32117')
+Yes 'Styles is explicitly excluded, so its legacy held files expire rather than becoming an addition' ($addIds -notcontains '154063' -and $doc -match 'Styles of Skyrim Mashups \(154063\) is excluded')
 Yes 'everything held waits for revision 2, this page''s' (@($ShipHeldForCollection | Where-Object { [int]$_.Revision -ne 2 }).Count -eq 0)
 $heldRows = @($loose | Where-Object { $_ -match '\*\*Held\*\*' })
 Yes 'every held folder or file is named on a Held row of the loose files table' (@($ShipHeldForCollection | Where-Object {
@@ -185,6 +186,21 @@ Yes ('the rows kept as ours until #1259 count the BodySlide builds Ship-Rules li
 $counted = 0
 foreach ($r in $loose) { $c = ($r -split '\|')[2].Trim(); if ($c -match '^\d+$') { $counted += [int]$c } }
 Yes ('the loose files table counts the 424 files measured on 29 September ({0})' -f $counted) ($counted -eq 424)
+
+# The original Cowork authoring checklist is now the published revision's
+# installation and release checklist. Verify the actual decisions, including
+# the exclusions that changed after the draft was written.
+$steps = @([regex]::Matches($doc, '(?m)^## (\d+)\. ') | ForEach-Object { [int]$_.Groups[1].Value })
+Yes 'the installation and release checklist has fifteen ordered steps' (($steps -join ',') -eq '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15')
+$unchecked = @([regex]::Split($doc, '(?m)^## ') | Where-Object { $_ -match '^\d+\. ' -and $_ -notmatch '(?m)^Check:' })
+Yes 'every step specifies its verification' ($unchecked.Count -eq 0)
+Yes 'the page points to the already published revision 2' ($doc -match '7essxf/revisions/2' -and $doc -match 'Patrick published' -and $doc -match '115 mod packages')
+Yes 'the published Pandora and bridge versions are exact' ($doc -match '5\.0\.0-beta' -and $doc -match '3\.1\.1' -and $doc -notmatch '4\.4\.0')
+Yes 'Runtime stays at the published 1.0.0' ($doc -match 'Runtime stays 1\.0\.0' -and $doc -match '809366')
+Yes 'both unwanted body plugins are named as off' ($doc -match 'CBBE\.esp and RaceMenuMorphsCBBE\.esp stay off')
+Yes 'the published rebuilt Content base and later completed recipes are both retained' ($doc -match '141,023 bytes' -and $doc -match '4b004dce782573445381ef013be7e6984c4df09c31a3af7234242f6f2acc7f58' -and $doc -match 'fishing and the collapsed')
+Yes 'generation uses separate own folders and checks all three body projects' ($doc -match 'Never generate directly' -and $doc -match 'Body - Astrid' -and $doc -match 'generated record is current')
+Yes 'the page requires a separate Dev feed after Main ships' ($doc -match 'must not reset Dev' -and $doc -match 'compare it afterwards')
 
 # -------------------------------------------------------- against the truth --
 # Where a server's order parts from the page's: At is the first position that
