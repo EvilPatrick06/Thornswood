@@ -140,7 +140,7 @@ Start menu.
 | --- | --- | --- | --- | --- |
 | 1 | Start the virtual machine from the `clean` checkpoint and sign in to Windows. Write down the version `winver` shows. | | | |
 | 2 | Measure the free space on C: before anything is installed (M1). | | | |
-| 3 | Open https://thornswood.net/join in Edge and read it once, through. Under Seen, write the steps the tester now believes they have to take, in their order, before taking any. | | | |
+| 3 | Open https://thornswood.net/join in Edge and read it once, through. Under Seen, write the steps the tester now believes they have to take, in their order, before taking any. The page says the Steam copy can stay on any build: the launcher's Downgrade button asks Steam for 1.6.1170's files and puts them in Thornswood's own folder, and leaves the Skyrim you already have alone. | | | |
 
 ### Steam and Skyrim
 
@@ -174,10 +174,10 @@ Start menu.
 | --- | --- | --- | --- | --- |
 | 15 | Open https://thornswood.net/downloads and download the installer. Write down the file name, its size, the SHA-256 the page prints under it, and every warning the browser shows. Then measure the downloaded file's SHA-256 (M8) and write down whether the two match. | | | |
 | 16 | Run it. Write down the Windows warning word for word, and what had to be pressed to get past it. | | | |
-| 17 | Read the setup window before pressing anything. Write down the folder it offers, the free space line under the drives, and the Installing from box. | | | |
+| 17 | Read the setup window before pressing anything. Write down the folder it offers, the free space line under the drives, and the Installing from box. Also copy what it says about the Steam copy when Thornswood's own Skyrim folder is chosen: it does not install into the Skyrim you already have on Steam, and that copy is left as it is. | | | |
 | 18 | Leave the folder at `C:\Thornswood`, tick the box that says 18 or over, and press Install. Write down the download's size, its speed and when it finished. | | | |
 | 19 | Write down the unpacking count, and when the black setup console opened. | | | |
-| 20 | Write down the console's first lines, up to the heading The base game, including whether it says Thornswood installs into this copy. If it says this Skyrim is not build 1.6.1170, write down what it says to do about it (the launcher's Downgrade button), and do not change anything in Steam. | | | |
+| 20 | Write down the console's first lines, up to the heading The base game, including whether it says Thornswood installs into this copy. If it says this Skyrim is not build 1.6.1170, write down what it says to do: open the launcher and press Downgrade, so Steam downloads 1.6.1170's files and Thornswood makes its own game folder from them, while the Steam copy stays on the build it is on. Do not change anything in Steam. | | | |
 | 21 | Screenshot the console once it prints Checking, before it can close, and copy every line marked ok, next or MISS. | | | |
 | 22 | Write down how the console ended: whether it opened the launcher itself or waited for Enter, and its last lines. | | | |
 
@@ -193,9 +193,9 @@ Start menu.
 
 | # | Step | Clock | Seen, word for word | A stranger would instead |
 | --- | --- | --- | --- | --- |
-| 26 | Press Downgrade on the card. Copy the question it asks before anything starts, word for word, and what the tester chose. Then write down every window that opened, and whether the tester had to touch Steam at all. | | | |
+| 26 | Press Downgrade on the card. Copy the question it asks before anything starts, word for word, and what the tester chose. The question says the Steam copy of Skyrim is not changed and can stay on any build, and that the files go into Thornswood's own game folder. Then write down every window that opened, the log line that says it is getting Skyrim 1.6.1170, and whether the tester had to touch Steam at all. | | | |
 | 27 | When the launcher says it is done, measure the build again (M2) and write down the build the Play page shows. | | | |
-| 28 | Copy the question the launcher asks once the downgrade has worked, about Steam updating Skyrim by itself, and write down what the tester did with it. With Steam running, write down what Skyrim's Properties, Updates page shows under Automatic Updates, and whether Steam's Downloads page has Skyrim queued for an update again. | | | |
+| 28 | The launcher does not ask about Steam's Updates after Downgrade, because the downgrade never changes the Steam copy. The question is asked on the way in, and only when Skyrim is already on 1.6.1170, Thornswood has no folder of its own yet, and Steam is open. If it appeared, copy it word for word and write down what the tester did with it. If a downgrade was needed first, write that the question did not appear. With Steam running, write down what Skyrim's Properties, Updates page shows under Automatic Updates, and whether Steam's Downloads page has Skyrim queued for an update again. | | | |
 
 ### Discord in the launcher
 
@@ -384,16 +384,17 @@ tester confused by a list that no longer matches.
 | Row | Text | In |
 | --- | --- | --- |
 | 3 | `Anniversary Edition is not required` | `site\data\site\join.md` |
-| 3 | `Thornswood leaves the Skyrim you already have alone.` | `site\data\site\join.md` |
-| 17 | `This puts the launcher, the script extender and Thornswood's own content into a folder of its own.` | `installer\setup\Bootstrap.cs` |
-| 17 | `that copy is left as it is.` | `installer\setup\Bootstrap.cs` |
+| 3 | `Thornswood leaves the Skyrim you already have alone: you can update it, verify it and mod it as you like.` | `site\data\site\join.md` |
+| 17 | `This puts the launcher and Thornswood's own content on your PC.` | `installer\setup\Bootstrap.cs` |
+| 17 | `that copy is left as it is, for you to play and mod however you like.` | `installer\setup\Bootstrap.cs` |
 | 17 | `Nothing to unpack yet.` | `installer\setup\Bootstrap.cs` |
 | 17 | `C:\Thornswood` | `installer\setup\Bootstrap.cs` |
 | 18 | `I am 18 or over. Thornswood is an adult server.` | `installer\setup\Bootstrap.cs` |
 | 18 | `Getting Thornswood's own files` | `installer\setup\Bootstrap.cs` |
 | 20 | `Thornswood installs into this copy.` | `installer\Setup-Thornswood.ps1` |
 | 20 | `This Skyrim is not build 1.6.1170, which is the one the server runs.` | `installer\Setup-Thornswood.ps1` |
-| 20 | `Thornswood installs anyway. Open the launcher and press Downgrade;` | `installer\Setup-Thornswood.ps1` |
+| 20 | `Thornswood installs anyway. Open the launcher and press Downgrade:` | `installer\Setup-Thornswood.ps1` |
+| 20 | `Your Steam copy stays on the build it is on.` | `installer\Setup-Thornswood.ps1` |
 | 21 | `the collection installs this` | `installer\Setup-Thornswood.ps1` |
 | 22 | `checks failed. Send staff a screenshot of this window in the Discord.` | `installer\Setup-Thornswood.ps1` |
 | 22 | `Opening Thornswood now.` | `installer\Setup-Thornswood.ps1` |
@@ -405,9 +406,9 @@ tester confused by a list that no longer matches.
 | 25 | `MB the installer left behind on your drive.` | `launcher\app\Shell.cs` |
 | 26 | `Downgrade Skyrim to 1.6.1170?` | `launcher\app\Shell.cs` |
 | 26 | `Do not type or click while Steam's window is in front, or the keys go to the wrong place.` | `launcher\app\Shell.cs` |
-| 26 | `Downgrading Skyrim to 1.6.1170.` | `launcher\app\Downgrade.cs` |
-| 28 | `Skyrim is on 1.6.1170 now, but Steam can still update it by itself` | `launcher\app\ShellSteamUpdates.cs` |
-| 28 | `Exit Steam from its own menu (Steam, Exit), then press Yes.` | `launcher\app\ShellSteamUpdates.cs` |
+| 26 | `Getting Skyrim 1.6.1170.` | `launcher\app\Downgrade.cs` |
+| 28 | `Steam can update its copy of Skyrim by itself.` | `launcher\app\SteamUpdates.cs` |
+| 28 | `Yes closes Steam, makes the change and starts Steam again.` | `launcher\app\SteamUpdates.cs` |
 | 28 | `Wait until I launch the game` | `launcher\app\SteamUpdates.cs` |
 | 29 | `Your mods are not installed yet` | `launcher\app\Shell.cs` |
 | 29 | `Open the collection` | `launcher\app\Shell.cs` |
