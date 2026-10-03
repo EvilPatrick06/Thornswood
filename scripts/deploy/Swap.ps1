@@ -22,7 +22,8 @@
        machine, the settings parsed, the program parsed (node --check, or
        Python's own parser). A refusal clears the stage and stops nothing.
     3. Only then the stop, one rename per file (what it replaces goes into
-       <root>\.prev-<stamp>), the start, and a check that it answers.
+       <root>\.prev-<stamp>), and the same for a directory named in $Dirs,
+       the start, and a check that it answers.
     4. If a rename fails, or it does not answer, the old files go back, the
        old one is started again, and the run says SWAP ROLLED BACK and exits 1.
 
@@ -516,10 +517,12 @@ $Rolling  = $false
 # A rename on one volume, retried, because a process that has just been told
 # to stop does not always let go of its files the same instant.
 function Shift([string]$from, [string]$to) {
+  $dir = Test-Path -LiteralPath $from -PathType Container
   for ($i = 0; $i -lt 10; $i++) {
     try {
       $null = [IO.Directory]::CreateDirectory((Split-Path -Parent $to))
-      [IO.File]::Move($from, $to)
+      if ($dir) { [IO.Directory]::Move($from, $to) }
+      else { [IO.File]::Move($from, $to) }
       return $true
     } catch { Start-Sleep -Milliseconds 500 }
   }
@@ -527,7 +530,7 @@ function Shift([string]$from, [string]$to) {
 }
 
 function PutBack {
-  $rels = @($Want.Keys)
+  $rels = @($moveRels)
   [array]::Reverse($rels)
   foreach ($rel in $rels) {
     $r = $rel -replace '/', '\'
@@ -541,11 +544,22 @@ function PutBack {
   }
 }
 
+# A directory named in $Dirs (the bot's py-libs) moves with the files, so the
+# old one is what .prev puts back. A deploy that did not stage that directory
+# leaves the one already at the root alone.
+if (-not (Test-Path variable:Dirs)) { $Dirs = @() }
+$moveRels = @($Want.Keys)
+foreach ($rel in @($Dirs)) {
+  if (-not $rel) { continue }
+  $atDir = Join-Path $stageDir ($rel -replace '/', '\')
+  if (Test-Path -LiteralPath $atDir -PathType Container) { $moveRels += $rel }
+}
+
 StopIt
 $placed = @()
 $aside = @()
 $moved = $true
-foreach ($rel in @($Want.Keys)) {
+foreach ($rel in @($moveRels)) {
   $r = $rel -replace '/', '\'
   $at = Join-Path $Root $r
   if (Test-Path -LiteralPath $at) {

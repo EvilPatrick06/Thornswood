@@ -428,6 +428,9 @@ namespace Thornswood
             foreach (KeyValuePair<string, string> kv in env) psi.EnvironmentVariables[kv.Key] = kv.Value;
             psi.EnvironmentVariables["THORNSWOOD_BOT_DATA"] = s.Data;
             if (String.IsNullOrEmpty(psi.EnvironmentVariables["PYTHONIOENCODING"])) psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
+            // The libraries Install-Bot put beside the code. The swap puts this folder
+            // back with the code, so a rollback runs the old versions.
+            psi.EnvironmentVariables["PYTHONPATH"] = Path.Combine(s.Root, "py-libs");
             // Python's own folders first, then the machine's PATH as it is
             // now rather than as it was when the box booted.
             string pyDir = Path.GetDirectoryName(s.Python);
