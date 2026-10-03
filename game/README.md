@@ -26,11 +26,15 @@ scripts that build and ship it:
   Its own README says when to take one out.
 - `menu\`: the two logo meshes and the wallpaper behind Skyrim's main menu,
   which `Go.ps1` copies into the game folder.
+- `ours\`: the main menu with no Bethesda logo, the empty loading spinner,
+  the silent stand-in for the game's theme, and SkyHUD's settings. Each
+  file keeps its path under `Data\`, beside `menu\`, and `Go.ps1` copies
+  that path into the game folder.
 
 ## On your machine
 
-`.\scripts\release\Go.ps1 -SkipServer` copies the plugins, the overlays and the menu
-into the game folder, which is how a change here reaches your own game.
+`.\scripts\release\Go.ps1 -SkipServer` copies the plugins, the overlays, the menu
+and our menu files into the game folder, which is how a change here reaches your own game.
 Every harness in `tests\` that checks the gamemode reads `gamemode.js` from
 here.
 
