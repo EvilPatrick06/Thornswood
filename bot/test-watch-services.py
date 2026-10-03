@@ -152,7 +152,8 @@ class Channel(object):
         self._box = box
         self._fail = fail
 
-    async def send(self, text):
+    async def send(self, text, **kwargs):
+        self.last_kwargs = kwargs
         if self._fail and self._fail[0]:
             raise RuntimeError('Discord said no')
         self._box.append((self.id, text))
@@ -341,6 +342,44 @@ _start = src.index('async def watch_services():')
 body = src[_start:src.index('\ndef ', _start)]
 yes('W7 it speaks only through watch_say, which has no public fallback',
     'watch_say(' in body and '.send(' not in body and 'by_name' not in body)
+
+# ------------------------------------------------ mentions stay off ---------
+# Issue #1353. The watchdog's sentence can carry a name or a line from
+# somewhere else. watch_say must hand Discord allowed_mentions with every
+# kind switched off, which Discord honors even when the text still says
+# @everyone. This inspects the call. It does not post.
+
+class RecordingChannel(object):
+    def __init__(self):
+        self.sent = []
+
+    async def send(self, text, **kwargs):
+        self.sent.append((text, kwargs))
+
+
+class RecordingClient(object):
+    def __init__(self, ch):
+        self._ch = ch
+
+    def get_channel(self, _id):
+        return self._ch
+
+
+rec = RecordingChannel()
+keep_c, keep_id = bot.client, bot.WATCH_ID
+bot.client = RecordingClient(rec)
+bot.WATCH_ID = STAFF_ID
+try:
+    planted = 'caddy DOWN @everyone @here <@&123>'
+    ok = asyncio.run(bot.watch_say(planted))
+    mentions = rec.sent[0][1].get('allowed_mentions') if rec.sent else None
+    yes('W8 an alert that says @everyone is sent with every mention switched off',
+        ok is True and len(rec.sent) == 1 and rec.sent[0][0] == planted
+        and mentions is not None
+        and mentions.everyone is False and mentions.users is False
+        and mentions.roles is False and mentions.replied_user is False)
+finally:
+    bot.client, bot.WATCH_ID = keep_c, keep_id
 
 shutil.rmtree(TMP, ignore_errors=True)
 done()

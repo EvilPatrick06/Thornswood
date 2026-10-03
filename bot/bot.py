@@ -2892,7 +2892,11 @@ async def watch_say(text):
             'said.' % WATCH_ID)
         return False
     try:
-        await ch.send(text)
+        # The text is the watchdog's own sentence, which can carry a name
+        # or a line from somewhere else. Mentions stay off, so @everyone
+        # in it is text and not a ping. Discord honors allowed_mentions
+        # even when the text still says @everyone.
+        await ch.send(text, allowed_mentions=discord.AllowedMentions.none())
         return True
     except Exception:
         log('watch: could not post in #%s:\n' % getattr(ch, 'name', WATCH_ID)
