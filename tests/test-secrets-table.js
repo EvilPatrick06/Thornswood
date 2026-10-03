@@ -49,7 +49,7 @@ function read(rel) {
 const doc = read('Developer-Guide.md');
 yes('Developer-Guide.md is there to read', doc.length > 0);
 
-const head = doc.match(/^#{2,3} Secrets\b.*$/m);
+const head = doc.match(/^#{2,4} (?:[A-Z]\. )?Secrets\b.*$/m);
 yes('there is a secrets section', !!head);
 let section = '';
 if (head) {
