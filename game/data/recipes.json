@@ -248795,7 +248795,7 @@
       "name": "Dwarven Metal Ingot",
       "type": "MISC",
       "benchName": "CraftingSmelter",
-      "why": "a smelter makes ingots, which are stock rather than a finished good. Both halves of the Smith need them, and a Miner who could not smelt his own ore would have nothing to sell. Left open to everybody on purpose."
+      "why": "a smelter makes ingots, which are stock rather than a finished good. Both halves of the Smith need them, and a Miner who could not smelt his own ore would have nothing to sell. Smith work at novice, so both smith halves can do it. Not open to anybody."
     },
     "108ff5:Skyrim.esm": {
       "editorId": "TemperArmorDA03Masque",

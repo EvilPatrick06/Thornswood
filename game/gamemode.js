@@ -8344,9 +8344,9 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   gate anything.
 
   A RECIPE ID THIS TABLE DOES NOT CARRY IS ONE NOBODY OWNS, AND ANYBODY MAY MAKE
-  IT. 1,679 of the recipes in the load order are in that state: smelting, tanning,
-  ingots, the stock everybody's trade needs. Refusing those would be far worse
-  than this gate is worth, so they fall straight through.
+  IT, except the one dwarven smelt craftRow keeps. Smelting an ingot and tanning
+  a hide into leather are in this table, one row each, and they do not fall
+  through. The duplicate ingot rows are in here too, marked so nobody makes them.
 
   NOTHING ABOVE MAY SPELL EITHER MARKER OUT. The install half of the script takes
   the first match of each in the whole file, so one quotation in a comment turns
@@ -25681,8 +25681,29 @@ RECIPES_BY_ID['1549f:Thornswood-Content.esp'] = { out: '1549b:Thornswood-Content
  * '__proto__' finds something on Object.prototype that a truth test cannot tell
  * from a recipe row.
  */
+/*
+  The one dwarven smelt #613 kept out of the owned bucket so the five
+  duplicate scrap rows could be cut. It is still a smelt. Novice
+  Platewright work, the same rank the other ingot rows ask, so both smith
+  halves can do it and nobody else can. It is not a second public recipe.
+*/
+const KEPT_SMELT = {
+  "10dd28:Skyrim.esm": {"out":"db8a2:Skyrim.esm","name":"Dwarven Metal Ingot","type":"MISC","makes":1,"owner":"Smith","half":"Platewright","race":"","rank":"novice","family":"Ingots","open":true}
+};
+
+function craftRow(recipeDesc) {
+  if (Object.prototype.hasOwnProperty.call(RECIPES_BY_ID, recipeDesc)) {
+    return RECIPES_BY_ID[recipeDesc];
+  }
+  if (Object.prototype.hasOwnProperty.call(KEPT_SMELT, recipeDesc)) {
+    return KEPT_SMELT[recipeDesc];
+  }
+  return null;
+}
+
 function isRecipe(recipeDesc) {
-  return Object.prototype.hasOwnProperty.call(RECIPES_BY_ID, recipeDesc);
+  const row = craftRow(recipeDesc);
+  return !!row && typeof row === 'object';
 }
 
 /*
@@ -25697,9 +25718,9 @@ function isRecipe(recipeDesc) {
   (recipelessCraft) all refuse somebody with no profession, with this one
   sentence, because the answer is the same key wherever they are standing.
 
-  WHAT IS STILL NOBODY'S WORK is unchanged: a recipe no half owns (smelting
-  ore into ingots, tanning a hide into leather, the 1,679 in recipes.json that
-  every trade needs) never reaches craftAnswer, and a bench whose BENCH_ACCESS
+  WHAT IS STILL NOBODY'S WORK is a recipe no half owns. Smelting an ingot
+  and tanning a hide into leather are not in that set: the staying row has
+  a half and a rank, and craftAnswer refuses anyone who cannot work it. A bench whose BENCH_ACCESS
   row says anyone (the smelter, the tanning rack, the forge) still opens. What
   such a bench holds that IS somebody's work is then refused here.
 */
@@ -26637,8 +26658,9 @@ mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recip
     return;
   }
 
-  // A recipe nobody owns. 1,679 of them, and they are the stock every trade
-  // needs: ingots, leather, tanning, smelting. Straight through.
+  // A recipe nobody owns still goes through. An ingot smelt and the leather
+  // row do not: they are in the table, or in KEPT_SMELT, and craftRow
+  // hands them to the same half and rank check as every other owned row.
   if (desc === '1f24f:FishingInSkyrim.esp' ||
       desc === '2180d:FishingInSkyrim.esp' ||
       desc === '1f252:FishingInSkyrim.esp') {
@@ -26648,8 +26670,7 @@ mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recip
     return false;
   }
 
-  if (!isRecipe(desc)) { return; }
-  const row = RECIPES_BY_ID[desc];
+  const row = craftRow(desc);
   if (!row || typeof row !== 'object') { return; }
 
   const answer = craftAnswer(actorId, row);
