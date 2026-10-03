@@ -177,7 +177,7 @@ namespace Thornswood
         static TextBlock labelDiscord;
         static Ellipse discordAvatar;
         static Button btnPlay, btnCopy, btnUpdate, btnMin, btnMax, btnClose,
-                      btnSaveServer, btnCheckNow, btnFolder, btnOpenLog, btnOpenSaves,
+                      btnSaveServer, btnCheckNow, btnFolder, btnOpenLog,
                       btnRepair, btnRestore, btnIcons, tabPlugins, tabSkse, tabMine, tabAddons,
                       btnRefreshAddons,
                       btnScan, btnFix, btnOpenMine, btnRefreshMine, btnInstallNow,
@@ -733,7 +733,7 @@ namespace Thornswood
             btnClose = F<Button>("BtnClose"); btnSaveServer = F<Button>("BtnSaveServer");
             btnCheckNow = F<Button>("BtnCheckNow"); btnInstallNow = F<Button>("BtnInstallNow");
             btnFolder = F<Button>("BtnFolder");
-            btnOpenLog = F<Button>("BtnOpenLog"); btnOpenSaves = F<Button>("BtnOpenSaves");
+            btnOpenLog = F<Button>("BtnOpenLog");
             btnRepair = F<Button>("BtnRepair"); btnRestore = F<Button>("BtnRestore");
             btnIcons = F<Button>("BtnIcons");
             btnServerMain = F<Button>("BtnServerMain"); btnServerDev = F<Button>("BtnServerDev");
@@ -2419,7 +2419,6 @@ namespace Thornswood
             {
                 if (File.Exists(Paths.LogFile)) Open(Paths.LogFile); else Log("Nothing has been logged yet.");
             };
-            btnOpenSaves.Click += delegate { Open(Path.Combine(Paths.LiveMyGames, "Saves")); };
             btnRepair.Click += delegate
             {
                 // Everything a Play does to put this build's files back, on
@@ -4031,7 +4030,10 @@ namespace Thornswood
             pathRows.Children.Clear();
             AddPathRow("Install", Paths.Root);
             AddPathRow("Game", Paths.Game);
-            AddPathRow("Saves", Path.Combine(Paths.LiveMyGames, "Saves"));
+            // No Saves row. Characters live on the server, and listing
+            // Profile\MyGames\Saves told people their character was in a
+            // folder it is not (#984, the same reason the Saves page is
+            // hidden, #599).
             AddPathRow("Settings", Paths.LiveMyGames);
             DrawInGameBrowser();
         }
