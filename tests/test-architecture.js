@@ -6,7 +6,7 @@
 //
 // WHY THIS EXISTS. To Do List entry 256: "There is no launcher architecture
 // document, because the one that is pointed at is a finished to-do note".
-// CLAUDE.md and DEVELOPING.md both sent a newcomer to
+// CLAUDE.md and Developer-Guide.md both sent a newcomer to
 // launcher\app\HOOKUP.md for "how the launcher classes hang together", and that
 // file was 108 lines titled "Wiring Discord.cs into the launcher": finished
 // work. Play, the flow every person hits, could not be followed from the
@@ -15,7 +15,7 @@
 //
 // What it checks:
 //   1. the page is there and the old note is gone;
-//   2. CLAUDE.md and DEVELOPING.md point at the page, and no tracked
+//   2. CLAUDE.md and Developer-Guide.md point at the page, and no tracked
 //      document still points at the old note (docs/archive is exempt:
 //      it is the dated 17 September audit, a record of what was true then);
 //   3. Shell.cs carries a class summary that names the page;
@@ -63,7 +63,7 @@ yes('launcher/app/HOOKUP.md, the finished Discord wiring note, is gone',
     !fs.existsSync(path.join(APP, 'HOOKUP.md')));
 
 // ------------------------------------------------------------ 2. the pointers
-['CLAUDE.md', 'DEVELOPING.md'].forEach(function (doc) {
+['CLAUDE.md', 'Developer-Guide.md'].forEach(function (doc) {
   const t = read(path.join(ROOT, doc)) || '';
   yes(doc + ' points at launcher\\app\\ARCHITECTURE.md', t.indexOf('launcher\\app\\ARCHITECTURE.md') >= 0);
   yes(doc + ' no longer names HOOKUP.md', !/HOOKUP/i.test(t));
@@ -469,15 +469,15 @@ yes('the steps the page lists inside each method are in the order the code runs 
   else console.log('      every .cs file in launcher/app is named on the page');
 }
 
-// The six shared files, as CONTRIBUTING.md names them today.
+// The six shared files, as Developer-Guide.md names them today.
 {
-  const claude = (read(path.join(ROOT, 'CONTRIBUTING.md')) || '').replace(/\s+/g, ' ');
+  const claude = (read(path.join(ROOT, 'Developer-Guide.md')) || '').replace(/\s+/g, ' ');
   const m = claude.match(/Do not edit (.+?) without a line in #staff-general/);
   const s4 = page.slice(Math.max(0, page.indexOf('## 4. The six shared files')));
-  if (!m) note('CONTRIBUTING.md no longer words its #dev rule as "Do not edit ... without a line in #staff-general", so section 4 was not compared with it');
+  if (!m) note('Developer-Guide.md no longer words its #dev rule as "Do not edit ... without a line in #staff-general", so section 4 was not compared with it');
   else {
     const named = m[1].match(/[\w-]+\.(?:cs|ps1)/g) || [];
-    yes('CONTRIBUTING.md\'s #dev rule names files, ' + named.length + ' of them', named.length > 0);
+    yes('Developer-Guide.md\'s #dev rule names files, ' + named.length + ' of them', named.length > 0);
     named.forEach(function (f) { yes('section 4 lists ' + f, s4.indexOf(f) >= 0); });
   }
 }

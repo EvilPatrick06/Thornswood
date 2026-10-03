@@ -118,7 +118,7 @@ check once when it comes online; it is on unless it is `false`.
 key in `private\door.json` (`gamemode.js:11364`) and refreshed on a timer
 (`gamemode.js:11497-11503`). It turns somebody away only when that file says
 `"enforce": true`; otherwise it writes WOULD TURN AWAY in `private\door.log`
-(`gamemode.js:11060`). `scripts\ops\Set-Door.ps1` sets both. DEVELOPING.md,
+(`gamemode.js:11060`). `scripts\ops\Set-Door.ps1` sets both. Developer-Guide.md,
 "Who gets into the game", says what it can and cannot keep out.
 
 ## Professions, benches and BENCH_ACCESS

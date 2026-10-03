@@ -4,14 +4,14 @@ One page, for somebody new, with or without AI. What runs where, what talks
 to what, and which script puts each piece in place. Every port, folder and
 task name here is read off a script; the file and line are beside it. If a
 script and this page disagree, the script is right and this page needs a fix.
-DEVELOPING.md is the long form; CONTRIBUTING.md has the rules.
+Developer-Guide.md is the long form and the rules.
 
 ## The three places things run
 
 | Where | What runs there | Who touches it |
 | --- | --- | --- |
 | A tester's PC | The launcher, Skyrim from Thornswood's own game folder, Vortex, Steam | The person playing; the launcher looks after its own files |
-| Patrick's machine (and any developer's, for dev) | The repo, the SkyMP fork build, `Ship.ps1`, `Publish-*`, `Deploy-*`, `Install-*` | Developers. Only Patrick's machine ships main (CONTRIBUTING.md) |
+| Any developer's machine that can sign | The repo, the SkyMP fork build, `Ship.ps1`, `Publish-*`, `Deploy-*`, `Install-*` | Developers. Any of them may ship dev and main (Developer-Guide.md) |
 | The VPS, 192.135.112.23, Windows, user Administrator | Both game servers, both voice services, the site, Caddy, the bot, the watchdog, the nightly backup | Reached over ssh by the scripts; nobody edits it by hand |
 
 <!-- VPS address: Deploy-Server.ps1:39, Deploy-Docs.ps1:41, Install-Bot.ps1:26, Install-Voice.ps1:32, launcher/app/Config.cs:256 -->
@@ -73,13 +73,13 @@ the exe (`launcher/app/Paths.cs:42`):
 | Folder or file | What it is | From |
 | --- | --- | --- |
 | `Thornswood\Launcher` | The exe, the WebView2 loader, the voice host page | `Paths.cs:53`, `DevBuild.cs:72` |
-| `Thornswood\Game` | Thornswood's own Skyrim, built by the launcher from the Steam copy and what Vortex deployed; big files are hard links, anything rewritten in place is a copy | `Paths.cs:44`, DEVELOPING.md "One Skyrim of its own" |
+| `Thornswood\Game` | Thornswood's own Skyrim, built by the launcher from the Steam copy and what Vortex deployed; big files are hard links, anything rewritten in place is a copy | `Paths.cs:44`, Developer-Guide.md "One Skyrim of its own" |
 | `Thornswood\Profile` | `launcher.log`, `applied.txt` (packs already in), `Packs\*.files` (what each pack wrote), `Default` (reference plugin list), `Keep` | `Paths.cs:54-66` |
 | `Thornswood\config.json` | The launcher's settings. Server address, ports, update repo and branch; several are overwritten from the feed (see FEED.md) | `Paths.cs:66`, `Config.cs:133-147` |
 | `Thornswood-DevBuild\` | The dev build: same exe, `Channel` and `UpdateBranch` set to `dev`, server port 7787, voice port 7789, voice address with `-dev` on the end. Installed from the main launcher's Play page Server card; staff roles only | `DevBuild.cs:26-27,49-52,126-130` |
 
 With no `Game` folder the launcher reads the Steam copy (`Paths.cs:51`), but
-Play will not start from it (DEVELOPING.md:32).
+Play will not start from it (Developer-Guide.md:32).
 
 **Vortex and the Nexus collection.** The mods come from the Nexus collection
 (`collectionUrl` in the feed,
@@ -132,13 +132,13 @@ packs and as its own asset named in the feed's `clientRuntime`
 ## The door
 
 No password decides who gets into the game; the server runs in offline mode
-(DEVELOPING.md:279-290). Each game server's `gamemode.js` reads
+(Developer-Guide.md:279-290). Each game server's `gamemode.js` reads
 `private\door.json` (the site address and the site's `botKey`, named here by
 location only) and fetches the allowed list every five minutes into
 `private\allowed.json` (`gamemode.js:11270-11276,11392`). The live server
 asks `https://thornswood.net/api/allowed`; the dev server's `door.json` names
 `https://thornswood.net/dev`, so it asks `/dev/api/allowed`, which lists Owner
-and Dev only (`server.js:2921-2922`, DEVELOPING.md:35). The door turns
+and Dev only (`server.js:2921-2922`, Developer-Guide.md:35). The door turns
 somebody away only when `allowed.json` says `"enforce": true`
 (`gamemode.js:11008-11010`), which `Set-Door.ps1 -Enforce` sets.
 
@@ -258,7 +258,7 @@ says where (`Where.ps1:71-82`). The feed and its baseline are received from
 the VPS into `%LOCALAPPDATA%\Thornswood\feed\main` and `\dev`, working copies
 with a backup of the last twenty of each, not git clones (`Feed-Store.ps1`,
 #907). Which command each
-change needs after a merge: CONTRIBUTING.md, "After a pull request is merged".
+change needs after a merge: Developer-Guide.md, "After a pull request is merged".
 
 ## Where the sources disagree
 
@@ -270,6 +270,6 @@ change needs after a merge: CONTRIBUTING.md, "After a pull request is merged".
 - `Install-Backup.ps1:32` says 03:15 is "after the nightly restart". No script
   in `tools` registers a nightly restart task.
 - `DevBuild.cs:21-22` says both launchers share the one Skyrim, and
-  `DevBuild.cs:92` copies `developer.flag`. DEVELOPING.md:431-435 says the dev
-  build makes its own `<Root>-DevBuild\Game`, and DEVELOPING.md:180-182 says
+  `DevBuild.cs:92` copies `developer.flag`. Developer-Guide.md:431-435 says the dev
+  build makes its own `<Root>-DevBuild\Game`, and Developer-Guide.md:180-182 says
   nothing writes `developer.flag` since 25 September.

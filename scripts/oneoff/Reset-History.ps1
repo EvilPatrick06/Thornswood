@@ -27,7 +27,7 @@
        branch protection is written back as it was read.
     6. Pushes the new hotfix commit, deletes every other branch on GitHub, and
        turns on "Automatically delete head branches" so merged branches stop
-       piling up (CONTRIBUTING.md, How work moves).
+       piling up (Developer-Guide.md, How work moves).
     7. Moves this checkout onto the new main. Your local branches are listed,
        not deleted: some may hold work that was never pushed.
 
@@ -37,8 +37,8 @@
   (EvilPatrick06/skymp) and Thornswood-Releases are other repositories and are
   not touched; the engine\skymp pin is part of the tree and stays.
 
-  AFTER IT. Every other clone is on history that no longer exists. Djinn and
-  Ataxayk each run, in their checkout, on main:
+  AFTER IT. Every other clone is on history that no longer exists. Each other
+  developer runs, in their checkout, on main:
       git fetch origin --prune
       git reset --hard origin/main
   or clone again. Their engine\skymp submodule is unaffected.
@@ -224,5 +224,5 @@ if ($locals.Count) {
     Say '  delete each with git branch -D <name> once you know it holds nothing unpushed.' 'Gray'
 }
 Say ''
-Say 'Done. Djinn and Ataxayk: git fetch origin --prune, then git reset --hard origin/main, on main.' 'Cyan'
+Say 'Done. Every other clone: git fetch origin --prune, then git reset --hard origin/main, on main.' 'Cyan'
 exit 0

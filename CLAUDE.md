@@ -1,19 +1,20 @@
 # Working in this repo, for a Claude
 
-CONTRIBUTING.md holds the rules for everybody who works here, with AI or
+Developer-Guide.md holds the rules for everybody who works here, with AI or
 without: the team, the words, the To Do List, the settled design, how work
 moves and what to run after a merge. Read it first, every session, whoever
 you are working with; every rule in it binds a Claude. This file adds only
 what is about a Claude.
 
 Decided by Patrick on 25 Sep and approved in #staff-general: the rules moved from this
-file to CONTRIBUTING.md, because the team grew past two people and not all of
-them use AI, and one copy of the rules is the only copy that stays true.
+file into the guide everybody reads, because the team grew past two people and not all of
+them use AI, and one copy of the rules is the only copy that stays true. On 3 Oct
+that copy became Developer-Guide.md.
 
 ## Recording what a session finds
 
 Everything a session turns up goes on the board as an issue, or on the issue
-it belongs to, before the session ends (CONTRIBUTING.md says where the board
+it belongs to, before the session ends (Developer-Guide.md says where the board
 is and how its order works). Saying it in a reply is not recording it: a
 reply is gone when the window closes. Say in the reply which issues moved.
 
@@ -35,15 +36,17 @@ went out.
 Extended by Patrick on 25 Sep to everybody on the team, after Djinn's Claude
 kept handing him the steps: "I want to fix it so Djinn can do all of that
 ... I should not be the only one doing everything they have VPS access". A
-Claude working with Djinn or Ataxayk runs the same chain for their work:
+Claude working with any other developer runs the same chain for their work:
 commit, push, pull request, merge, a dev Ship (`Ship.ps1 -Channel dev`),
 `Deploy-DevGamemode.ps1` and the other dev deploys, saying what goes out as
 above. Never ask Patrick to run something the person you work with can run.
 When their machine is missing something (the engine build, the VPS key, the
-dev webhook), DEVELOPING.md "Setting up a
+dev webhook), Developer-Guide.md "Setting up a
 machine" says how; do that with them, and put on the board only the one-time
-step that needs Patrick. It is not permission to ship on a hunch: a main Ship
-still needs Patrick to say so. Never start the launcher or the game.
+step that still needs an account holder. Any developer may merge their own
+pull request when they are confident in it and `Launcher builds` is green,
+and may Ship dev, Ship main, deploy the docs, deploy the gamemode, and post
+the Discord news and the game news. Never start the launcher or the game.
 Measure before claiming a cause: read Profile\launcher.log, look at the file,
 check timestamps, say what you saw. When the doc and the machine disagree,
 say so and ask.
@@ -86,6 +89,10 @@ this section exists for.
 - `gh pr create --fill` also warns about uncommitted changes and carries on.
   `Claude outputs\` and `art-latest.txt` are untracked here and show up in
   that warning every time; they are not part of the pull request.
+- In PowerShell a one-line `--body` uses ordinary double quotes. `@" ` starts
+  a here-string, and the next character has to be a line break. A body of
+  several lines goes in a variable first, then `--body $body`. Developer-Guide.md
+  Quick start has the lines.
 
 ## On the shipping machine
 
@@ -112,13 +119,13 @@ worktrees in the shared clone and read a session-start snapshot as the truth.
   (`wiki/status.md` for what is true now, rewritten in place). Anything a
   session changes about tips, standing orders or what waits on Patrick goes
   there as well as on the board.
-- Merge only once `Launcher builds` (the VPS runner) says pass. Nothing on
-  GitHub enforces it; see CONTRIBUTING.md.
+- Merge only once `Launcher builds` (the VPS runner) says pass and you are
+  confident in the change. Nothing on GitHub enforces it; see Developer-Guide.md.
 
 ## Where things are
 
-CONTRIBUTING.md (the rules, for everybody), the board for open work,
-DEVELOPING.md (the long form), README.md,
+Developer-Guide.md (the rules and the long form, for everybody), the board for open work,
+README.md,
 launcher\app\ARCHITECTURE.md (the launcher: startup, what each class owns, and
 the Play sequence), docs\MOVING-THE-SERVER.md (the VPS), lore\ (the world),
 site\data\site\*.md (public pages), scripts\release\Ship-Rules.ps1 (what

@@ -339,7 +339,7 @@ as docs\RESTORING.md "The box is gone" says.
 28. **The version:** `.\scripts\release\Bump-Version.ps1` through its own pull
     request, merged on green.
 29. **A launcher with the new address built in**, so a fresh install is right:
-    a main Ship from Patrick's machine, as CONTRIBUTING.md says. A move is one
+    a main Ship from a machine that can sign, as Developer-Guide.md says. A move is one
     of the main releases that does not wait for dev, because the old address
     is going away:
     ```powershell
