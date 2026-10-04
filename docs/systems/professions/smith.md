@@ -72,5 +72,6 @@ the cheapest grade in the pack, Poor Charcoal first, and it does not
 read the table above. The ingredient column on
 the recipe pages still omits the handle, because the plugin record
 does. A drum, a flute, and a lute are asked for a handle by that same
-check. Mastercraft is not applied to a temper, because the temper
-never arrives.
+check. A temper is refused at the grindstone and the armour table, and
+it is not counted as work. The 120% repair waits on the Weapon Kit and
+the Armor Kit, which are not records in the plugin yet.

@@ -49,9 +49,10 @@ uses the hit rule above, not this clock.
 
 Tempering, the armour table and the sharpening wheel, is not how a
 piece is repaired. Those 1809 rows are in
-[Cut items](cut-items.md). The recipe book still lists them. The
-server is not asked about them. They are held so a temper can come
-back for an event. `recipes.json` is not edited by that list.
+[Cut items](cut-items.md). The recipe book still lists them. A temper
+at either bench is refused, the ingot stays in the pack, and it is not
+counted as work. They are held so a temper can come back for an
+event. `recipes.json` is not edited by that list.
 
 Mastercraft was the smith's master perk for tempering past the metal.
 The 120% repair is that idea now: the right half can put a piece past
@@ -59,7 +60,35 @@ a plain repair. The perk is not a second system on top of the kit.
 
 ## Where this is
 
-Not in the server. Nothing tracks a condition on a piece, and no kit
-exists as a recipe. The grindstone and the armour table still appear
-in the crafting menu. A temper does not reach the server, so it is
-not refused and it is not counted as work.
+In the server. A piece's condition is written on its name when it is
+not 100%: Iron Sword (85%). A plain piece is at 100%, and so is every
+piece as it is made. Rings, amulets and circlets carry no condition.
+The pickaxe, the woodcutter's axe and the shovel wear out by use
+instead.
+
+`/repair` lists what you carry that is not at 100%, and the kits you
+hold. `/repair <name>` mends one piece with the kit that fits it, to
+120% for the half that makes that kit and to 100% for anyone else, and
+the kit is used up. A piece already at or above that number is not
+touched.
+
+At 0%, a worn piece has the 10% chance on each hit: armour and
+clothing on the person hit, and the weapon the hit was landed with. A
+broken piece is gone.
+
+A chest or container in a claimed building keeps its own day from the
+first time it is opened. Each day that turns takes 5% off everything
+in it with a condition, and the loss is written when it is next
+opened. Opening it does not move its day.
+
+A temper at the grindstone or the armour table is refused, and it is
+not counted as work.
+
+Not yet. The three kits are not records in the plugin, so no kit can
+be made, and `/repair` says so. The 5% more damage and armour at 120%
+is not applied, because the engine works damage out on its own.
+Nothing on this page lowers the condition of worn gear, except the
+chest it sat in before. A trade hands a piece over at 100% (issue
+#1594). A piece that is not at 100% cannot be enchanted, because the
+engine takes a plain piece for an enchantment. The grindstone and the
+armour table still appear in the crafting menu.
