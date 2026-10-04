@@ -76,7 +76,7 @@ flour and butter.
 You cannot fish, hunt, or farm because you cook. The meat and the
 vegetables come from those classes. See [Classes](../../classes.md).
 
-Grand Chef's second serving is not in the server.
+Grand Chef's second serving is in the server.
 
 <!-- detail:begin -->
 
