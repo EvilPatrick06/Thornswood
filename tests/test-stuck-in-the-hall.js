@@ -88,15 +88,19 @@ function tick(opts) {
   const setChargen = (id, s) => { out.state = s; };
   const faceMark = (ap) => (ap && ap.mark) ? String(ap.mark) : '';
   const beginChoosing = (id, s, why) => { out.chose = why; };
+  // Same check the gamemode uses. A stored appearance is an object; a blank
+  // name still counts. The stage now refuses to publish without one.
+  const hasStoredAppearance = (a) => !!(a && typeof a === 'object');
 
   const fn = new Function(
     'actorId', 'now', 'firstSeen', 'appearance', 'state', 'mp', 'log',
-    'setChargen', 'faceMark', 'beginChoosing',
+    'setChargen', 'faceMark', 'beginChoosing', 'hasStoredAppearance',
     'NUDGE_MS', 'GIVEUP_MS', 'MOVED_ENOUGH_MS', 'MOVED_UNITS', 'MOVED_DEGREES',
     'FACE_SEEN_MS', 'FACE_CAP_MS',
     'do {\n' + stage + '\n} while (false);');
   fn(actorId, now, firstSeen, appearance, state, mp, log, setChargen, faceMark,
-     beginChoosing, NUDGE_MS, GIVEUP_MS, MOVED_ENOUGH_MS, MOVED_UNITS, MOVED_DEGREES,
+     beginChoosing, hasStoredAppearance,
+     NUDGE_MS, GIVEUP_MS, MOVED_ENOUGH_MS, MOVED_UNITS, MOVED_DEGREES,
      FACE_SEEN_MS, FACE_CAP_MS);
   return out;
 }
@@ -115,8 +119,10 @@ function stuck(at) {
 console.log('nudge at ' + (NUDGE_MS / 1000) + 's, give up at ' + (GIVEUP_MS / 1000) + 's');
 console.log('');
 
-// S1: THE ONE THE LOG SHOWED. Never moves, no face, and the clock runs past
-//     the give up. They must be let out.
+// S1: THE ONE THE LOG SHOWED, and the 3 Oct 2026 session. Never moves, no
+//     face, and the clock runs past the give up. Publishing them then put
+//     an empty actor in the world (profile 598737699). They stay unpublished
+//     and the race menu is asked for again.
 {
   const t0 = 1000000;
   let st = stuck(t0);
@@ -124,9 +130,12 @@ console.log('');
   yes('S1 a second in, nothing happens yet', out.chose === null);
 
   out = tick({ state: st, now: t0 + GIVEUP_MS + 1000 });
-  yes('S1 past the give up they are moved on', out.chose !== null);
+  yes('S1 past the give up they stay unpublished', out.chose === null);
   yes('S1 and the log says the face never arrived',
       out.log.join(' ').indexOf('never arrived') !== -1);
+  yes('S1 and that they are staying unpublished',
+      out.log.join(' ').indexOf('staying unpublished') !== -1);
+  yes('S1 and the race menu is asked for', out.nudged);
   console.log('S1   ' + (out.log[0] || '(nothing logged)'));
 }
 
@@ -142,25 +151,33 @@ console.log('');
   yes('S2 and is not moved on before the give up either', out.chose === null);
 }
 
-// S3: somebody who IS on their feet is moved on almost at once, and is NOT
-//     nudged, because the walking branch ends the stage after MOVED_ENOUGH_MS.
-//
-//     This is what showed the nudge to be unreachable by anybody. It needs
-//     liveSince and 120 seconds; a character with liveSince has been gone for
-//     119 and a half of them. Not moving is guarded out. There is no path to
-//     it, and the gamemode says so over the code now rather than leaving it
-//     reading like a rescue that runs.
+// S3: somebody who IS on their feet with no stored face stays unpublished.
+//     Walking is how 598737699 was published in half a second. The walking
+//     branch now asks for the race menu instead of calling beginChoosing.
 {
   const t0 = 3000000;
   const st = stuck(t0);
   st.liveSince = t0;
   const out = tick({ state: st, now: t0 + MOVED_ENOUGH_MS + 100 });
-  yes('S3 a walking character is moved on within a second', out.chose !== null);
-  yes('S3 and is never nudged, because they have already gone', !out.nudged);
+  yes('S3 a walking character with no face stays unpublished', out.chose === null);
+  yes('S3 and is asked for the race menu', out.nudged);
+  yes('S3 and the log says staying unpublished',
+      out.log.join(' ').indexOf('Staying unpublished') !== -1);
 
   const late = tick({ state: stuck(t0), now: t0 + NUDGE_MS + 1000 });
   yes('S3 and a still character has not been nudged at the nudge time either',
       !late.nudged);
+
+  const withFace = stuck(t0);
+  withFace.liveSince = t0;
+  const gone = tick({
+    state: withFace, now: t0 + MOVED_ENOUGH_MS + 100,
+    appearance: { mark: 'a-stored-face', name: '' }
+  });
+  yes('S3 a walking character with a stored face (blank name included) is moved on',
+      gone.chose !== null);
+  yes('S3 and is not asked for a second race menu once the face is there',
+      !gone.nudged);
 }
 
 // S4: the face arriving is still the ordinary way out, whatever the clock says.
@@ -172,13 +189,27 @@ console.log('');
   yes('S4 and nothing was nudged to get it', !out.nudged);
 }
 
-// S5: and so is the plugin saying the race menu closed.
+// S5: the plugin saying the race menu closed is only a way out when a face
+//     was actually stored. A close without a store is how 598737699 left
+//     the hall as a placeholder.
 {
   const t0 = 5000000;
   const st = stuck(t0);
   st.faceDone = true;
   const out = tick({ state: st, now: t0 + 2000 });
-  yes('S5 the race menu closing ends the stage', out.chose !== null);
+  yes('S5 the race menu closing without a stored appearance does not end the stage',
+      out.chose === null);
+  yes('S5 and the log says staying unpublished',
+      out.log.join(' ').indexOf('staying unpublished') !== -1);
+
+  const stored = stuck(t0);
+  stored.faceDone = true;
+  const done = tick({
+    state: stored, now: t0 + 2000,
+    appearance: { mark: 'closed-with-a-face' }
+  });
+  yes('S5 the race menu closing with a stored appearance ends the stage',
+      done.chose !== null);
 }
 
 // S6: the guard is gone from the give up, in the shipped text. A check that
@@ -248,27 +279,49 @@ function inRaceMenu(t0, opened, lastSeen) {
 }
 
 // S9: the reports stopped. The client crashed, quit, or its race menu closed
-//     and the /face done line was lost. The give up runs as it always did.
+//     and the /face done line was lost. The give up used to publish them
+//     anyway. Without a stored face they stay unpublished.
 {
   const t0 = 9000000;
   const at = t0 + GIVEUP_MS + 1000;
   const st = inRaceMenu(t0, t0 + 5000, at - FACE_SEEN_MS - 1000);
   const out = tick({ state: st, now: at });
-  yes('S9 a race menu report older than the freshness window does not hold anybody',
-      out.chose !== null);
+  yes('S9 a stale race menu report without a stored face does not publish them',
+      out.chose === null);
+  yes('S9 and the log says staying unpublished',
+      out.log.join(' ').indexOf('staying unpublished') !== -1);
+
+  const stored = inRaceMenu(t0, t0 + 5000, at - FACE_SEEN_MS - 1000);
+  const gone = tick({
+    state: stored, now: at,
+    appearance: { mark: 'stale-but-stored' }
+  });
+  yes('S9 a stale report with a stored face still lets the give up move them on',
+      gone.chose !== null);
 }
 
 // S10: the race menu has been reported for longer than the cap. It is up and
-//      wedged, and the panel is the only way out left, so they go on.
+//      wedged. Without a stored face they still stay unpublished: the panel
+//      is not a way out of a missing appearance.
 {
   const t0 = 10000000;
   const at = t0 + FACE_CAP_MS + 60000;
   const st = inRaceMenu(t0, t0 + 5000, at - 10000);
   const out = tick({ state: st, now: at });
-  yes('S10 past the cap the give up goes on even with the race menu reported',
-      out.chose !== null);
+  yes('S10 past the cap without a stored face they stay unpublished',
+      out.chose === null);
   yes('S10 and the log says how long it was up',
       out.log.join(' ').indexOf('race menu has been up for') !== -1);
+  yes('S10 and that they are staying unpublished',
+      out.log.join(' ').indexOf('staying unpublished') !== -1);
+
+  const stored = inRaceMenu(t0, t0 + 5000, at - 10000);
+  const gone = tick({
+    state: stored, now: at,
+    appearance: { mark: 'capped-but-stored' }
+  });
+  yes('S10 past the cap with a stored face the give up moves them on',
+      gone.chose !== null);
 }
 
 // S11: a race menu that was never reported is the case the five minutes were
@@ -312,7 +365,7 @@ function tickAs(state, now, cameOn) {
   };
   const fn = new Function(
     'actorId', 'now', 'firstSeen', 'appearance', 'state', 'mp', 'log',
-    'setChargen', 'faceMark', 'beginChoosing',
+    'setChargen', 'faceMark', 'beginChoosing', 'hasStoredAppearance',
     'NUDGE_MS', 'GIVEUP_MS', 'MOVED_ENOUGH_MS', 'MOVED_UNITS', 'MOVED_DEGREES',
     'FACE_SEEN_MS', 'FACE_CAP_MS',
     'do {\n' + stage + '\n} while (false);');
@@ -320,6 +373,7 @@ function tickAs(state, now, cameOn) {
      function () { out.log.push(Array.prototype.join.call(arguments, ' ')); },
      function (id, s) { out.state = s; }, function () { return ''; },
      function (id, s, why) { out.chose = why; },
+     function (a) { return !!(a && typeof a === 'object'); },
      NUDGE_MS, GIVEUP_MS, MOVED_ENOUGH_MS, MOVED_UNITS, MOVED_DEGREES,
      FACE_SEEN_MS, FACE_CAP_MS);
   return out;

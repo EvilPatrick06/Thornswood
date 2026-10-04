@@ -21,8 +21,9 @@
 // the step functions by hand and count one call: it lifts the REAL chargenTick
 // and runs it at the real CHARGEN_TICK_MS, hundreds of ticks in every stage,
 // through reconnects, a hot reload, the panel that did not open and its
-// reminder, the stuck-in-the-hall give up, and a record write that does not
-// stick, and counts every line each person was sent.
+// reminder, the stuck-in-the-hall give up (which no longer publishes a
+// missing face), and a record write that does not stick, and counts every
+// line each person was sent.
 //
 // Everything that decides anything is the real text lifted out of gamemode.js
 // by name. Stubbed: mp, the clock, say/notify/log (recorded), and the helpers
@@ -60,6 +61,7 @@ function num(name) {
 }
 const FNS = {
   faceMark: fnOf('function faceMark(a) {'),
+  hasStoredAppearance: fnOf('function hasStoredAppearance(a) {'),
   chargenOf: fnOf('function chargenOf(actorId) {'),
   setChargen: fnOf('function setChargen(actorId, state) {'),
   tellOnce: fnOf('function tellOnce(actorId, step, text) {'),
@@ -341,12 +343,13 @@ function clean(line) {
   S.join(ME, HALL.desc, 14, []);
   const GIVEUP_TICKS = Math.ceil(K.GIVEUP_MS / TICK) + SETTLE_TICKS + 20;
   S.run(GIVEUP_TICKS);
-  yes('the give up moved them on after ' + Math.round(K.GIVEUP_MS / 1000) + ' s standing still',
-      S.stage(ME) === 'choosing' &&
-      S.logs.some(function (l) { return /appearance never arrived after/.test(l); }));
+  yes('the give up does not publish them after ' + Math.round(K.GIVEUP_MS / 1000) + ' s standing still',
+      S.stage(ME) === 'appearance' &&
+      S.logs.some(function (l) { return /appearance never arrived after/.test(l); }) &&
+      S.logs.some(function (l) { return /staying unpublished/.test(l); }));
   S.run(400);
-  yes('stuck in the hall: ' + (GIVEUP_TICKS + 400) + ' ticks, one hall line and one clothes line',
-      S.to(ME, HALL_LINE).length === 1 && S.to(ME, CLOTHES_LINE).length === 1 && S.to(ME).length === 2);
+  yes('stuck in the hall: ' + (GIVEUP_TICKS + 400) + ' ticks, one hall line and no clothes line',
+      S.to(ME, HALL_LINE).length === 1 && S.to(ME, CLOTHES_LINE).length === 0 && S.to(ME).length === 1);
 }
 
 // ------------------------------------------- somebody who has played before
