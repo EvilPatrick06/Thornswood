@@ -8145,6 +8145,19 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     try { prop.touchedBox(casterRefrId, refrId); } catch (e) { }
   }
 
+  /*
+    THE DULL CLOCK, AND A DROPPED PIECE PICKED UP AGAIN (#1384). See the
+    durability block. A container in a held building loses what its days
+    have taken before the engine sends what is in it, and a piece somebody
+    dropped gets the condition it went down with. It refuses nothing.
+  */
+  const wear = globalThis.__thornswoodDurability;
+  if (wear && wear.pressed) {
+    try { wear.pressed(casterRefrId, refrId, baseDesc); } catch (e) {
+      log('the durability press threw, so the press goes on:', e);
+    }
+  }
+
   if (prop && prop.touchedBench) {
     // Which bench they just pressed, for /key. Costs one hash lookup and is
     // passed over inside touchedBench for anything that is not a bench.
@@ -8455,7 +8468,9 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
 // never fires the event. Those rows carry "fires": false in tools\recipes.json
 // and are not in the table below. Nothing here can gate tempering, and the
 // Smith's Mastercraft perk on the public page is about tempering, so that perk
-// is not enforced by this gate and cannot be.
+// is not enforced by this gate and cannot be. A temper does reach the server
+// now, with no recipe, and recipelessCraft refuses it (#1384): repair is a
+// kit, and Mastercraft is the 120% repair (docs/systems/durability.md).
 // ---------------------------------------------------------------------------
 
 /*
@@ -26610,6 +26625,29 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
       benchKey = '';
     }
     var tempering = benchKey === '88108:Skyrim.esm' || benchKey === 'adb78:Skyrim.esm';
+    /*
+      A TEMPER IS REFUSED, AND IT IS NOT WORK (#1384). Tempering at the
+      sharpening wheel and the armour table is cut: its 1809 rows are in
+      docs/systems/cut-items.md, held so an event can bring one back, and a
+      piece is mended with a kit (the durability block, /repair). Every craft
+      that reaches this line at one of those two benches is a temper, because
+      every recipe either of them carries is one.
+
+      It used to be let through, and it did nothing for anybody: the engine
+      then took the plain piece and the ingot and handed a plain piece back
+      (CraftEvent::OnFireSuccess carries no temper level), so the person lost
+      an ingot, and a piece whose condition is in its name was not found at
+      all. Refused here, they keep the ingot, and nothing is credited.
+    */
+    if (tempering) {
+      var noTemper = 'Tempering is not done here. A piece is mended with a repair kit: ' +
+                     '/repair says what you carry and how it stands.';
+      notify(actorId, noTemper);
+      say(actorId, noTemper);
+      log(actorId.toString(16), 'was refused a temper of', craftedItemBaseId.toString(16),
+          'at bench', benchKey);
+      return false;
+    }
     var outDesc = null;
     if (benchKey && !tempering) {
       try { outDesc = mp.getDescFromId(craftedItemBaseId); } catch (e) { outDesc = null; }
@@ -40617,6 +40655,9 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // of this file; the numbers there are invented and meant to be
                // argued with.
                '/needs', '/rest', '/eat', '/drink', '/bard',
+               // Condition and the repair kits (#1384). See the durability
+               // block, after the take limit.
+               '/repair',
                // The client's weather report and its "I am on fire". Never typed; see
                // the branches.
                '/place', '/burn', '/ate',
@@ -40664,6 +40705,9 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // Everybody's, and they need to be findable: a meter
                       // nobody knows how to act on is only a penalty.
                       '/needs', '/rest', '/eat', '/drink', '/bard',
+                      // Everybody's: what you carry and how it stands, and
+                      // the kit that mends it (#1384).
+                      '/repair',
                       // Everybody's, and the one thing a person in trouble
                       // must be able to find: asking staff, and getting
                       // out of a wedged spot (#414).
@@ -42575,6 +42619,16 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       the unknown-command reply below did not: it advertised /tp to
       everybody and then refused them. Both read the same list now.
     */
+    // Condition and the repair kits (#1384). The work is in the durability
+    // block; this only hands it the character and the rest of the line.
+    if (word === '/repair') {
+      if (!needCharacter()) { return; }
+      var wear = g.__thornswoodDurability;
+      if (!wear) { toProfile(profileId, 'That is not running on this server.'); return; }
+      toProfile(profileId, wear.command(actorId, parts.slice(1).join(' ')));
+      return;
+    }
+
     // Out of a wedged spot (#414). The work is in the stuck block at the end
     // of this file; this only hands it the character.
     if (word === '/stuck') {
@@ -42647,7 +42701,9 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         toProfile(profileId,
           'K opens your profession, your class and your skill tree. Work at what ' +
           'you chose and the rank climbs on its own. /plot says what is in the ' +
-          'ground in front of you and whose farm it is, /plant sows it.');
+          'ground in front of you and whose farm it is, /plant sows it. /repair ' +
+          'says how your weapons, armour and clothing stand, and /repair <name> ' +
+          'mends one with its kit.');
         return;
       }
       if (topic === 'land' || topic === 'home' || topic === 'deed') {
@@ -43372,8 +43428,9 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
                   handle in the pack; a brew or an enchantment by somebody
                   whose trade is not that bench's; and a craft that matched no
                   recipe but makes an item a recipe here owns, asked the same
-                  race, profession and rank question (tempering still comes
-                  through). A refusal keeps their materials.
+                  race, profession and rank question; and a temper at the
+                  sharpening wheel or the armour table (#1384). A refusal
+                  keeps their materials.
     onPutItem     Putting into a container. mp.onPutItem refuses anything but
                   coin into a hold's box, and says nothing about any other
                   container.
@@ -43389,8 +43446,9 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
     onDeath       Anything dying. mp.onDeath never refuses. It logs a person's
                   death with the killer's id, and that line is the only record
                   of a fight this file keeps. The hits before it do raise an
-                  event, onPapyrusEvent:OnHit, but nothing here listens to it
-                  yet (THE PAPYRUS FAMILY, below).
+                  event, onPapyrusEvent:OnHit, and the durability block hears
+                  it for the break chance at 0% and nothing else (THE PAPYRUS
+                  FAMILY, below).
     onRespawn     Logged by mp.onRespawn, never refused.
     onEatItem     Eating or drinking something in the pack. No handler: the
                   engine applies a potion's effects. The needs block hears
@@ -43468,9 +43526,10 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   the world's Papyrus scripts. So on a false the hit still lands, the spell
   was already cast and the item was already added, and all that is stopped is
   the event reaching a lever's or a quest's own script. That is why nothing
-  here may ever return false to this family. Nothing here listens to any of
-  it yet, and the engine does not build the arguments for a name mp has no
-  function for, so the family costs this file nothing today.
+  here may ever return false to this family. The one name this file listens
+  to is OnHit, for the break chance in the durability block (#1384). The
+  engine does not build the arguments for a name mp has no function for, so
+  the rest of the family costs this file nothing.
 
   WHAT THE ENGINE ANSWERS WITH NO EVENT AT ALL. Movement, animation, animation
   variables, health, magicka and stamina, bow shots (one arrow is taken),
@@ -43520,7 +43579,8 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   everybody at once, so every other take is watched and let through.
 
   Hits are a different case: nothing here can refuse one, only hear it,
-  through onPapyrusEvent:OnHit. Nothing listens to it yet. It is raised for
+  through onPapyrusEvent:OnHit. The durability block listens, for the break
+  chance and nothing else, and writes no line about the fight. It is raised for
   every blow the engine takes, a hosted bandit's as much as a person's, so
   which blows are worth a line, one person hitting another being the obvious
   one, belongs to the same decision.
@@ -43614,6 +43674,14 @@ mp.onTakeItem = guard('onTakeItem', function (sourceRefrId, actorId, baseId, cou
 mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
   log('drop:', auditPerson(actorId), 'dropped', Number(count) || 0, auditItem(baseId),
       'in', auditCell(actorId));
+  // A piece's condition is in its name and the ground keeps no name, so the
+  // durability block remembers it for the pickup (#1384).
+  var wear = globalThis.__thornswoodDurability;
+  if (wear && wear.dropped) {
+    try { wear.dropped(actorId, Number(baseId) || 0, count); } catch (e) {
+      log('durability: the drop threw:', e);
+    }
+  }
 });
 
 /*
@@ -43949,6 +44017,807 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   };
 })();
 // end of the take limit
+
+// ==== thornswood durability ====
+/*
+  CONDITION, REPAIR KITS AND THE DULL CLOCK (#1384).
+
+  docs/systems/durability.md is the design and the Dull section of
+  docs/systems/gold.md is the clock. In short: a worn piece runs from 0% to
+  120%. A kit mends it, to 120% when the half that makes that kit does the
+  work and to 100% for anybody else. At 0% a piece that is being worn has a
+  10% chance to break on a hit. A piece sitting in a shop chest or a house
+  container loses 5% of its condition per real day; a pack does not, and
+  worn gear does not.
+
+  WHAT HAS A CONDITION. A weapon, a piece of armour and a piece of clothing:
+  a WEAP record, and an ARMO record that is not jewellery. Those are the
+  three things the three kits mend. A ring, an amulet or a circlet is on no
+  kit's list, so it carries none. The pickaxe, the woodcutter's axe and the
+  shovel wear out by use in the tool block (wearTool) and carry none either,
+  because two clocks on one pickaxe is one too many. Ammunition is not a
+  piece. Armour or clothing is the record's own armour type in BOD2 (light
+  and heavy are armour, clothing is clothing), read once per base and kept.
+
+  WHERE THE NUMBER LIVES: ON THE ITEM, IN ITS NAME. An entry in a pack or a
+  chest is a base and a count and whatever extra the engine keeps beside
+  them (Inventory.h in the fork: health, enchantment, name, worn and the
+  rest). Two entries that differ in any of those are two stacks, and the
+  engine carries that extra wherever the entry goes: into a chest, out of
+  it, onto a body, and across a restart. So a piece at 100% is plain, and
+  any other condition is written on the end of its name, "Iron Sword (85%)".
+  The person sees it in their own inventory, two swords at different
+  conditions are two lines they can tell apart, and nothing here has to
+  follow an item from place to place. A deed, a mold and a key already carry
+  which house they belong to the same way (the property block).
+
+  Not the health extra, which looks like the obvious home. The client rounds
+  it to a tenth and throws 1.0 away (inventory.ts in the fork), so 95% could
+  not be kept, and Skyrim reads health as the temper level, so 120% would
+  show as "Superior" and hit as one. And not a table in this file keyed by
+  pack and base: two identical swords are one stack to the engine, so a
+  table could never say which of the two left when one was put in a chest.
+
+  THREE THINGS IN THE ENGINE MAKE A FRESH, PLAIN ENTRY, and a plain entry
+  reads as 100%, so each of them would be a free repair:
+    a drop. MpActor::DropItem places the bare record, so the name is lost.
+          dropped() remembers the condition that went down and the pickup
+          puts it back on (pressed()).
+    a trade. moveById in the trade block writes a base and a count and
+          nothing else. That is #1594, its own issue, because it drops
+          every name, a key's and a deed's included.
+    a craft. CraftEvent::OnFireSuccess takes away plain entries and adds a
+          plain one. A temper is refused (recipelessCraft), so it is not a
+          way round this. Enchanting a piece that is not at 100% fails in
+          the engine, because the plain piece it asks to take is not there.
+
+  THE DULL CLOCK IS THE CHEST'S, NOT THE ITEM'S. A container in a building
+  somebody holds (a shop is a claimed building, and so is a house) starts a
+  clock the first time it is opened, written on the reference so it
+  survives a restart. Every real day after that, everything with a
+  condition inside it loses 5%. The loss is applied when the chest is
+  opened, before the engine sends what is in it, so a person sees the right
+  number; a chest nobody opens does not need to be right until somebody
+  does. Opening it never moves the clock, so it does not reset the day, and
+  taking a piece out and putting it back does not either: whatever is in
+  the chest when its day turns loses the 5%.
+
+  THE BREAK CHANCE, read as: on each hit, every worn piece of armour or
+  clothing on the person hit that is at 0% rolls once, and so does the
+  weapon a person lands the hit with when it is at 0%. A broken piece is
+  gone. Only people's gear rolls: nothing here gives a bandit's sword a
+  condition. The hit arrives through onPapyrusEvent:OnHit, registered below.
+
+  THE KITS ARE NOT IN THE WORLD YET. A kit is a MISC record and a recipe in
+  Thornswood-Content.esp, and neither exists. KITS says what each one mends
+  and whose it is; item is the kit's record and stays null until the plugin
+  carries it. With item null, /repair says no kit has been made yet.
+  repairTo and repairWithKit are what the rest of the file uses, so the fuel
+  and master work (#1398) can rely on them: repairTo is the number a kit
+  mends to for this person, and repairWithKit is the whole repair.
+
+  NOTHING HERE TOUCHES A NUMBER ON THE PAGE. 120% does not yet add 5% to a
+  weapon's damage or an armour piece's rating: the server works damage out
+  in the fork's TES5DamageFormula, which this file cannot reach.
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+
+  var CONDITION = {
+    // The bottom. A worn piece here can break on a hit.
+    lowest: 0,
+    // A sound piece: every piece as it is made, and a repair by anybody.
+    sound: 100,
+    // The repair of the half that makes the kit.
+    highest: 120
+  };
+  // gold.md, Dull: 5% of its condition per real day.
+  var DULL_PER_DAY = 5;
+  var DAY_MS = 24 * 60 * 60 * 1000;
+  // durability.md: at 0%, a worn piece has a 10% chance to break on a hit.
+  var BREAK_CHANCE = 0.10;
+  /*
+    A dropped thing lies on the ground two minutes before the engine deletes
+    it (MpActor::DropItem, kDeletionTimeSeconds), so its condition is kept a
+    little longer than that and no longer.
+  */
+  var DROP_KEEP_MS = 3 * 60 * 1000;
+  // The pickup is added after onActivate returns. Same wait a fresh key is
+  // named after (KEY_NAME_DELAY).
+  var PICKUP_DELAY_MS = 250;
+  // MpForm::IsEspmForm: below this a reference was placed by a plugin, above
+  // it the server made it, which is what a drop makes.
+  var RUNTIME = 0xff000000;
+  // Where a container's dull clock is written, on the reference itself.
+  var CLOCK_PROPERTY = 'thornswoodDull';
+
+  /*
+    THE THREE KITS, by what they mend. half is the half that makes it and
+    repairs to 120%; maker is that half as a person reads it. item is the
+    kit's MISC record in Thornswood-Content.esp, null until the plugin
+    carries it (see the block comment).
+  */
+  var KITS = {
+    weapon:   { name: 'Weapon Kit', half: 'edgewright',  maker: 'Edgewright',  item: null },
+    armour:   { name: 'Armor Kit',  half: 'platewright', maker: 'Platewright', item: null },
+    clothing: { name: 'Sewing Kit', half: 'haberdasher', maker: 'Haberdasher', item: null }
+  };
+
+  // " (85%)" on the end of a name.
+  var SUFFIX = / \((\d{1,3})%\)$/;
+
+  /*
+    Jewellery, by the keywords Skyrim.esm gives it: ArmorJewelry,
+    VendorItemJewelry, ClothingRing, ClothingNecklace and ClothingCirclet. A
+    keyword in KWDA is the id as the plugin wrote it, and Skyrim.esm is
+    master 0 in every plugin that names it, so these are the same number in
+    any plugin. A piece whose only slots are the amulet, the ring and the
+    circlet is jewellery too, for a mod that forgot the keyword.
+  */
+  var JEWELLERY_KEYWORDS = [0x6bbe9, 0x8f95a, 0x10cd09, 0x10cd0a, 0x10cd08];
+  var JEWELLERY_SLOTS = (1 << 5) | (1 << 6) | (1 << 12);
+
+  function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+
+  function u32(bytes, at) {
+    if (!bytes || bytes.length < at + 4) { return -1; }
+    return ((bytes[at] | (bytes[at + 1] << 8) | (bytes[at + 2] << 16)) >>> 0) +
+           (bytes[at + 3] * 0x1000000);
+  }
+
+  function clamp(n) {
+    n = Math.round(Number(n) || 0);
+    if (n < CONDITION.lowest) { return CONDITION.lowest; }
+    if (n > CONDITION.highest) { return CONDITION.highest; }
+    return n;
+  }
+
+  /** The condition written on an entry, or 100 for a plain one. */
+  function conditionOf(entry) {
+    var m = SUFFIX.exec(String((entry && entry.name) || ''));
+    return m ? clamp(m[1]) : CONDITION.sound;
+  }
+
+  /*
+    Two entries the engine counts as one stack: the same base and the same
+    extra (Inventory::Entry::EqualExceptCount). worn and wornLeft read false
+    when they are missing, as the engine reads them.
+  */
+  var EXTRA = ['health', 'enchantmentId', 'maxCharge', 'removeEnchantmentOnUnequip',
+               'chargePercent', 'name', 'soul', 'poisonId', 'poisonCount'];
+  function sameStack(a, b) {
+    if (!a || !b || a.baseId !== b.baseId) { return false; }
+    for (var i = 0; i < EXTRA.length; i++) {
+      if (a[EXTRA[i]] !== b[EXTRA[i]]) { return false; }
+    }
+    return !!a.worn === !!b.worn && !!a.wornLeft === !!b.wornLeft;
+  }
+
+  function copy(entry) {
+    var out = {};
+    for (var k in entry) { if (own(entry, k)) { out[k] = entry[k]; } }
+    return out;
+  }
+
+  /** Stacks that have become the same stack folded into one, empties dropped. */
+  function folded(entries) {
+    var out = [];
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (!e || !(Number(e.count) > 0)) { continue; }
+      var into = -1;
+      for (var j = 0; j < out.length; j++) {
+        if (sameStack(out[j], e)) { into = j; break; }
+      }
+      if (into >= 0) { out[into].count += e.count; } else { out.push(e); }
+    }
+    return out;
+  }
+
+  function aWord(name) {
+    return (/^[aeiou]/i.test(String(name)) ? 'an ' : 'a ') + name;
+  }
+
+  function create(api) {
+    var kits = api.kits || KITS;
+    var kinds = {};
+    var names = {};
+    // Pieces that went onto the ground and what they were at, oldest first.
+    var drops = [];
+
+    /*
+      What kind of piece a base is: 'weapon', 'armour', 'clothing', or ''
+      for a thing that has no condition. Asked once per base. A record that
+      cannot be read has none, because not knowing what a thing is has to
+      mean not touching it.
+    */
+    function pieceKind(baseId) {
+      if (!baseId) { return ''; }
+      if (own(kinds, baseId)) { return kinds[baseId]; }
+      var kind = '';
+      try { kind = readKind(baseId); } catch (e) { kind = ''; }
+      kinds[baseId] = kind;
+      return kind;
+    }
+
+    function readKind(baseId) {
+      if (api.isTool && api.isTool(baseId)) { return ''; }
+      var rec = api.recordOf(baseId);
+      if (!rec || !rec.type) { return ''; }
+      var type = String(rec.type);
+      if (type === 'WEAP') { return 'weapon'; }
+      if (type !== 'ARMO') { return ''; }
+      var fields = rec.fields || [];
+      var slots = -1, armourType = -1, keywords = [];
+      for (var i = 0; i < fields.length; i++) {
+        var f = fields[i];
+        if (!f) { continue; }
+        var t = String(f.type);
+        if (t === 'BOD2') {
+          slots = u32(f.data, 0);
+          armourType = u32(f.data, 4);
+        } else if (t === 'BODT' && slots < 0) {
+          slots = u32(f.data, 0);
+          armourType = u32(f.data, 8);
+        } else if (t === 'KWDA') {
+          for (var k = 0; k + 4 <= (f.data || []).length; k += 4) { keywords.push(u32(f.data, k)); }
+        }
+      }
+      for (var j = 0; j < keywords.length; j++) {
+        if (JEWELLERY_KEYWORDS.indexOf(keywords[j]) !== -1) { return ''; }
+      }
+      if (slots > 0 && (slots & ~JEWELLERY_SLOTS) === 0) { return ''; }
+      if (armourType === 0 || armourType === 1) { return 'armour'; }
+      if (armourType === 2) { return 'clothing'; }
+      return '';
+    }
+
+    /*
+      What a piece is called with nothing written on it. The recipe table
+      first, which holds the names Skyrim's own string files give; then the
+      record's FULL when it is real text; then its editor id, spaced out.
+    */
+    function baseName(baseId) {
+      if (own(names, baseId)) { return names[baseId]; }
+      var name = '';
+      try { name = String(api.nameOf(baseId) || ''); } catch (e) { name = ''; }
+      if (!name) {
+        var rec = null;
+        try { rec = api.recordOf(baseId); } catch (e) { rec = null; }
+        var fields = (rec && rec.fields) || [];
+        var edid = '';
+        for (var i = 0; i < fields.length; i++) {
+          var f = fields[i];
+          if (!f) { continue; }
+          var text = '';
+          var data = f.data || [];
+          for (var b = 0; b < data.length; b++) {
+            var c = Number(data[b]);
+            if (!c) { break; }
+            if (c < 32 || c > 126) { text = ''; break; }
+            text += String.fromCharCode(c);
+          }
+          if (!/[A-Za-z]/.test(text)) { continue; }
+          if (f.type === 'FULL' && !name) { name = text; }
+          if (f.type === 'EDID' && !edid) { edid = text; }
+        }
+        if (!name && edid) { name = edid.replace(/([a-z0-9])([A-Z])/g, '$1 $2'); }
+      }
+      names[baseId] = name || 'Piece';
+      return names[baseId];
+    }
+
+    /** The name a person reads for this entry, without the condition. */
+    function bareName(entry) {
+      var bare = String((entry && entry.name) || '').replace(SUFFIX, '');
+      return bare || baseName(entry.baseId);
+    }
+
+    /** A copy of the entry at that condition, its name written to match. */
+    function withCondition(entry, cond) {
+      var out = copy(entry);
+      var bare = String(entry.name || '').replace(SUFFIX, '');
+      cond = clamp(cond);
+      if (cond === CONDITION.sound) {
+        if (!bare || bare === baseName(entry.baseId)) { delete out.name; } else { out.name = bare; }
+      } else {
+        out.name = (bare || baseName(entry.baseId)) + ' (' + cond + '%)';
+      }
+      return out;
+    }
+
+    /** The entries with n units of entries[i] set to that condition. */
+    function setUnits(entries, i, n, cond) {
+      var out = entries.map(copy);
+      var e = out[i];
+      n = Math.min(n, Number(e.count) || 0);
+      if (n <= 0) { return out; }
+      var changed = withCondition(e, cond);
+      changed.count = n;
+      e.count -= n;
+      out.push(changed);
+      return folded(out);
+    }
+
+    /** The entries with one unit of entries[i] taken away. */
+    function takeUnit(entries, i) {
+      var out = entries.map(copy);
+      out[i].count -= 1;
+      return folded(out);
+    }
+
+    function piecesIn(entries) {
+      var out = [];
+      for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        if (!e || !(Number(e.count) > 0)) { continue; }
+        var kind = pieceKind(e.baseId);
+        if (!kind) { continue; }
+        out.push({ i: i, entry: e, kind: kind, cond: conditionOf(e), name: bareName(e) });
+      }
+      return out;
+    }
+
+    function kitId(key) {
+      var kit = kits[key];
+      if (!kit || !kit.item) { return 0; }
+      try { return api.idOf(kit.item) || 0; } catch (e) { return 0; }
+    }
+
+    /*
+      THE NUMBER A KIT MENDS TO, for this person. The half that makes that
+      kit mends to 120; anybody else, the other half of the same profession
+      included, mends to 100. The half is the one they picked, so a sister
+      half held at novice is not it.
+    */
+    function repairTo(state, key) {
+      var kit = kits[key];
+      if (!kit) { return CONDITION.sound; }
+      return (state && state.half === kit.half) ? CONDITION.highest : CONDITION.sound;
+    }
+
+    /*
+      A REPAIR. The piece is the one in the pack whose name matches what was
+      asked for; of several, the one in the worst condition. One kit of the
+      kind that mends it is used up, and one unit of the piece comes out at
+      repairTo. Answers { ok, line } and, when it worked, from, to, kit and
+      baseId. Nothing is taken when anything is refused.
+    */
+    function repairWithKit(actorId, asked) {
+      function no(line) { return { ok: false, line: line }; }
+      var entries = api.inventory(actorId);
+      if (!entries) { return no('The server cannot read your pack right now. Try again in a moment.'); }
+      var want = String(asked || '').toLowerCase().replace(/\s+/g, ' ').trim();
+      if (!want) { return no('Say which piece: /repair <name>. /repair on its own lists what you carry.'); }
+      var all = piecesIn(entries);
+      var exact = all.filter(function (p) { return p.name.toLowerCase() === want; });
+      var found = exact.length ? exact : all.filter(function (p) {
+        return p.name.toLowerCase().indexOf(want) !== -1;
+      });
+      if (!found.length) {
+        return no('You are not carrying a weapon, armour or clothing called ' + asked +
+                  '. /repair on its own lists what you carry.');
+      }
+      found.sort(function (a, b) { return a.cond - b.cond; });
+      var p = found[0];
+      var kit = kits[p.kind];
+      var id = kitId(p.kind);
+      if (!id) {
+        return no('Your ' + p.name + ' is mended with ' + aWord(kit.name) +
+                  ', and no ' + kit.name + ' has been made in the world yet.');
+      }
+      var k = -1;
+      for (var i = 0; i < entries.length; i++) {
+        if (entries[i] && entries[i].baseId === id && Number(entries[i].count) > 0) { k = i; break; }
+      }
+      if (k < 0) {
+        var maker = aWord(kit.maker);
+        return no('Your ' + p.name + ' is mended with ' + aWord(kit.name) + ', and you have none. ' +
+                  maker.charAt(0).toUpperCase() + maker.slice(1) + ' makes them.');
+      }
+      var state = null;
+      try { state = api.stateOf(actorId); } catch (e) { state = null; }
+      var to = repairTo(state, p.kind);
+      if (p.cond >= to) {
+        return no('Your ' + p.name + ' is at ' + p.cond + '%. A repair by you would not raise it.');
+      }
+      // One kit out, then one unit of the piece mended. The kit is never the
+      // piece (a kit is a MISC), so p.i still points at the piece.
+      var next = entries.map(copy);
+      next[k].count -= 1;
+      next = setUnits(next, p.i, 1, to);
+      if (!api.setInventory(actorId, next)) {
+        return no('The repair could not be written. Nothing was used. Try again in a moment.');
+      }
+      api.log('durability:', actorId.toString(16), 'mended', p.name, 'from', p.cond + '%', 'to',
+              to + '%', 'with', aWord(kit.name));
+      return { ok: true, from: p.cond, to: to, kit: p.kind, baseId: p.entry.baseId,
+               line: 'Your ' + p.name + ' is at ' + to + '% now. The ' + kit.name + ' is used up.' };
+    }
+
+    /** /repair on its own: what you carry that is not at 100%, and your kits. */
+    function describe(actorId) {
+      var entries = api.inventory(actorId);
+      if (!entries) { return 'The server cannot read your pack right now. Try again in a moment.'; }
+      var pieces = piecesIn(entries);
+      var off = pieces.filter(function (p) { return p.cond !== CONDITION.sound; });
+      off.sort(function (a, b) { return a.cond - b.cond; });
+      var sound = 0;
+      for (var i = 0; i < pieces.length; i++) {
+        if (pieces[i].cond === CONDITION.sound) { sound += Number(pieces[i].entry.count) || 0; }
+      }
+      var line;
+      if (!pieces.length) {
+        line = 'You are carrying no weapon, armour or clothing.';
+      } else if (!off.length) {
+        line = 'Everything you carry is at 100%.';
+      } else {
+        line = off.slice(0, 12).map(function (p) {
+          var n = Number(p.entry.count) || 1;
+          return p.name + ' ' + p.cond + '%' + (n > 1 ? ' (' + n + ')' : '');
+        }).join(', ') + (off.length > 12 ? ', and ' + (off.length - 12) + ' more' : '') + '.';
+        if (sound) { line += ' ' + sound + (sound === 1 ? ' more piece is' : ' more pieces are') + ' at 100%.'; }
+      }
+      var held = [];
+      for (var key in kits) {
+        if (!own(kits, key)) { continue; }
+        var id = kitId(key);
+        if (!id) { continue; }
+        var n = 0;
+        for (var j = 0; j < entries.length; j++) {
+          if (entries[j] && entries[j].baseId === id) { n += Number(entries[j].count) || 0; }
+        }
+        if (n) { held.push(n + ' ' + kits[key].name + (n === 1 ? '' : 's')); }
+      }
+      return line + ' ' + (held.length ? 'Kits: ' + held.join(', ') + '.' : 'You carry no repair kit.') +
+             ' /repair <name> mends a piece with its kit.';
+    }
+
+    /** The chat command. Answers the line to say. */
+    function command(actorId, rest) {
+      var asked = String(rest || '').trim();
+      return asked ? repairWithKit(actorId, asked).line : describe(actorId);
+    }
+
+    /*
+      A CONTAINER WAS OPENED. If it stands in a building somebody holds, its
+      clock is read and whatever days have turned since it was last applied
+      come off everything in it with a condition. A container in no held
+      building has no clock: a chest in a cave is not a shop.
+    */
+    function opened(containerId) {
+      var held = false;
+      try { held = !!api.held(containerId); } catch (e) { held = false; }
+      var clock = null;
+      try { clock = api.clockOf(containerId); } catch (e) { clock = null; }
+      if (!held) {
+        if (clock && Number(clock.at) > 0) { api.setClock(containerId, null); }
+        return 0;
+      }
+      var t = api.now();
+      if (!clock || !(Number(clock.at) > 0)) {
+        api.setClock(containerId, { at: t, days: 0 });
+        return 0;
+      }
+      var days = Math.floor((t - Number(clock.at)) / DAY_MS);
+      var turned = days - (Number(clock.days) || 0);
+      if (turned <= 0) { return 0; }
+      var lose = turned * DULL_PER_DAY;
+      var entries = api.inventory(containerId) || [];
+      var next = [];
+      var dulled = 0;
+      for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        if (!e || !(Number(e.count) > 0)) { continue; }
+        var cond = pieceKind(e.baseId) ? conditionOf(e) : -1;
+        if (cond <= CONDITION.lowest) { next.push(copy(e)); continue; }
+        next.push(withCondition(e, Math.max(CONDITION.lowest, cond - lose)));
+        dulled += Number(e.count) || 0;
+      }
+      if (dulled && !api.setInventory(containerId, folded(next))) {
+        // Not written, so the clock stays where it was and the next opening tries again.
+        return 0;
+      }
+      api.setClock(containerId, { at: Number(clock.at), days: days });
+      if (dulled) {
+        api.log('durability:', dulled, 'piece(s) in container', containerId.toString(16),
+                'lost', lose + '%', 'over', turned, 'day(s)');
+      }
+      return dulled;
+    }
+
+    /*
+      A HIT LANDED. targetId was hit, by aggressorId, with the weapon sourceId
+      (a base id, or 0 for a fist or a spell). Nothing here can stop the hit;
+      it only decides whether a piece at 0% breaks.
+    */
+    function hit(targetId, aggressorId, sourceId) {
+      var said = [];
+      if (aggressorId && sourceId && api.isPerson(aggressorId)) {
+        said = said.concat(breaks(aggressorId, function (e) {
+          return e.baseId === sourceId && pieceKind(e.baseId) === 'weapon';
+        }));
+      }
+      if (targetId && api.isPerson(targetId)) {
+        said = said.concat(breaks(targetId, function (e) {
+          var kind = pieceKind(e.baseId);
+          return kind === 'armour' || kind === 'clothing';
+        }));
+      }
+      return said;
+    }
+
+    /*
+      The pack's entry for a worn thing. What is worn is read off the
+      equipment, which is what the client dresses from, and the condition off
+      the pack. When the worn thing names itself, that name; when it does
+      not, the stack of that base the pack has flagged worn, else the first.
+    */
+    function packEntryFor(entries, w) {
+      var at = -1;
+      var named = typeof w.name === 'string';
+      for (var k = 0; k < entries.length; k++) {
+        var e = entries[k];
+        if (!e || e.baseId !== w.baseId || !(Number(e.count) > 0)) { continue; }
+        if (named && String(e.name || '') !== w.name) { continue; }
+        if (at < 0 || ((e.worn || e.wornLeft) && !(entries[at].worn || entries[at].wornLeft))) { at = k; }
+      }
+      return at;
+    }
+
+    function breaks(actorId, which) {
+      var worn = [];
+      try { worn = api.worn(actorId) || []; } catch (e) { worn = []; }
+      var due = worn.filter(function (w) { return w && w.baseId && which(w); });
+      if (!due.length) { return []; }
+      var entries = api.inventory(actorId);
+      if (!entries) { return []; }
+      var gone = [];
+      for (var j = 0; j < due.length; j++) {
+        var at = packEntryFor(entries, due[j]);
+        if (at < 0 || conditionOf(entries[at]) > CONDITION.lowest) { continue; }
+        if (!(api.random() < BREAK_CHANCE)) { continue; }
+        var name = bareName(entries[at]);
+        entries = takeUnit(entries, at);
+        gone.push(name);
+      }
+      if (!gone.length) { return []; }
+      if (!api.setInventory(actorId, entries)) { return []; }
+      for (var n = 0; n < gone.length; n++) {
+        api.say(actorId, 'Your ' + gone[n] + ' broke. It was at 0%, and a kit would have mended it.');
+      }
+      api.log('durability:', actorId.toString(16), 'broke', gone.join(', '), 'on a hit at 0%');
+      return gone;
+    }
+
+    function forgetOldDrops() {
+      var t = api.now();
+      while (drops.length && t - drops[0].at > DROP_KEEP_MS) { drops.shift(); }
+    }
+
+    function remember(cell, baseId, cond, n) {
+      if (cond === CONDITION.sound || !(n > 0)) { return; }
+      forgetOldDrops();
+      drops.push({ cell: cell, baseId: baseId, cond: cond, n: n, at: api.now() });
+    }
+
+    /*
+      A PIECE IS GOING ONTO THE GROUND. Called before the engine takes it
+      out of the pack. When every stack of that base is at one condition,
+      that is what went down. When they differ, the pack is read again once
+      the drop is done, and the stack that got smaller is the one.
+    */
+    function dropped(actorId, baseId, count) {
+      if (!pieceKind(baseId)) { return; }
+      var entries = api.inventory(actorId) || [];
+      var stacks = entries.filter(function (e) { return e && e.baseId === baseId && Number(e.count) > 0; });
+      if (!stacks.length) { return; }
+      var cell = api.cellOf(actorId);
+      var n = Math.max(1, Number(count) || 1);
+      var first = conditionOf(stacks[0]);
+      var one = stacks.every(function (e) { return conditionOf(e) === first; });
+      if (one) { remember(cell, baseId, first, n); return; }
+      var before = stacks.map(function (e) { return { entry: copy(e), count: Number(e.count) || 0 }; });
+      api.later(function () {
+        var after = api.inventory(actorId) || [];
+        for (var i = 0; i < before.length; i++) {
+          var left = 0;
+          for (var j = 0; j < after.length; j++) {
+            if (sameStack(after[j], before[i].entry)) { left += Number(after[j].count) || 0; }
+          }
+          if (left < before[i].count) {
+            remember(cell, baseId, conditionOf(before[i].entry), before[i].count - left);
+            return;
+          }
+        }
+      }, 0);
+    }
+
+    function plainCount(entries, baseId) {
+      var n = 0;
+      for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        if (e && e.baseId === baseId && !e.name && !e.worn && !e.wornLeft) { n += Number(e.count) || 0; }
+      }
+      return n;
+    }
+
+    /*
+      SOMETHING WAS PRESSED. A container is the dull clock. A piece lying on
+      the ground that the server made, which is what a drop makes, is
+      matched to the drop that left it there, and once it is in the pack its
+      condition goes back on. Only as many as the pickup added: a plain
+      sword that was already in the pack is not touched.
+    */
+    function pressed(actorId, refrId, baseDesc) {
+      if (api.isContainer(baseDesc)) { return opened(refrId); }
+      if (!(Number(refrId) >= RUNTIME) || !drops.length) { return 0; }
+      var baseId = api.idOf(baseDesc);
+      if (!pieceKind(baseId)) { return 0; }
+      forgetOldDrops();
+      var cell = api.cellOf(refrId);
+      var at = -1;
+      for (var i = 0; i < drops.length; i++) {
+        if (drops[i].baseId === baseId && drops[i].cell === cell) { at = i; break; }
+      }
+      if (at < 0) { return 0; }
+      var rec = drops.splice(at, 1)[0];
+      var before = plainCount(api.inventory(actorId) || [], baseId);
+      api.later(function () {
+        var entries = api.inventory(actorId);
+        if (!entries) { return; }
+        var gained = plainCount(entries, baseId) - before;
+        var n = Math.min(rec.n, gained);
+        if (n <= 0) { return; }
+        for (var j = 0; j < entries.length; j++) {
+          var e = entries[j];
+          if (e && e.baseId === baseId && !e.name && !e.worn && !e.wornLeft && Number(e.count) > 0) {
+            if (api.setInventory(actorId, setUnits(entries, j, n, rec.cond))) {
+              api.log('durability:', actorId.toString(16), 'picked up', n, bareName(e),
+                      'and it is back at', rec.cond + '%');
+            }
+            return;
+          }
+        }
+      }, PICKUP_DELAY_MS);
+      return 0;
+    }
+
+    return {
+      CONDITION: CONDITION, DULL_PER_DAY: DULL_PER_DAY, DAY_MS: DAY_MS,
+      BREAK_CHANCE: BREAK_CHANCE, KITS: kits,
+      pieceKind: pieceKind, conditionOf: conditionOf, withCondition: withCondition,
+      repairTo: repairTo, repairWithKit: repairWithKit, describe: describe, command: command,
+      opened: opened, hit: hit, dropped: dropped, pressed: pressed
+    };
+  }
+
+  g.__thornswoodDurabilityCreate = create;
+  g.__thornswoodDurabilityKits = KITS;
+  if (typeof mp === 'undefined' || !mp) { return; }
+
+  try {
+    mp.makeProperty(CLOCK_PROPERTY, {
+      isVisibleByOwner: false, isVisibleByNeighbors: false,
+      updateOwner: '', updateNeighbor: ''
+    });
+  } catch (e) { /* made by an earlier load. harmless. */ }
+
+  /*
+    Display names by record, out of the recipe table, built once: every
+    weapon, armour and garment anybody can make is the output of a row
+    there, under the name Skyrim's own string files give it. Not the two
+    names tables /give reads: they name gold too, and test-one-mint.js keeps
+    them to /give alone.
+  */
+  var displayNames = null;
+  function displayName(baseId) {
+    if (!displayNames) {
+      displayNames = {};
+      var rows = (typeof RECIPES_BY_ID !== 'undefined' && RECIPES_BY_ID) ? RECIPES_BY_ID : {};
+      for (var k in rows) {
+        if (!own(rows, k)) { continue; }
+        var row = rows[k];
+        if (row && row.out && row.name && !own(displayNames, row.out)) { displayNames[row.out] = row.name; }
+      }
+    }
+    var desc = '';
+    try { desc = String(mp.getDescFromId(baseId) || ''); } catch (e) { desc = ''; }
+    return desc && own(displayNames, desc) ? displayNames[desc] : '';
+  }
+
+  /*
+    The one write into a pack or a chest. Every caller hands back entries it
+    has just read from the same pack or chest: a stack renamed for its
+    condition, or a kit or a broken piece taken away. No base is added and
+    no count grows.
+  */
+  function writePack(id, entries) {
+    try { mp.set(id, 'inventory', { entries: entries }); return true; } catch (e) {
+      log('durability: could not write the inventory of', Number(id).toString(16) + ':', e);
+      return false;
+    }
+  }
+
+  function entriesOf(id) {
+    try {
+      var inv = mp.get(id, 'inventory');
+      return ((inv && inv.entries) || []).map(copy);
+    } catch (e) { return null; }
+  }
+
+  g.__thornswoodDurability = create({
+    now: function () { return Date.now(); },
+    random: Math.random,
+    later: function (fn, ms) { setTimeout(fn, ms); },
+    inventory: entriesOf,
+    setInventory: writePack,
+    worn: function (id) {
+      try {
+        var eq = mp.get(id, 'equipment');
+        var ee = eq && ((eq.inv && eq.inv.entries) || eq.entries);
+        if (ee) { return ee.filter(function (e) { return e && (e.worn || e.wornLeft); }); }
+      } catch (e) { }
+      return (entriesOf(id) || []).filter(function (e) { return e && (e.worn || e.wornLeft); });
+    },
+    recordOf: function (baseId) {
+      var res = mp.lookupEspmRecordById(baseId);
+      return (res && res.record) || null;
+    },
+    nameOf: displayName,
+    idOf: idOf,
+    stateOf: function (actorId) {
+      var C = g.__thornswoodCharacter;
+      return (C && C.stateOf) ? C.stateOf(actorId) : null;
+    },
+    isPerson: function (id) {
+      try { return (Number(mp.get(id, 'profileId')) || 0) > 0; } catch (e) { return false; }
+    },
+    isTool: function (baseId) {
+      var sp = g.__thornswoodSpoils;
+      return !!(sp && sp.isTool && sp.isTool(baseId));
+    },
+    held: function (containerId) {
+      var prop = g.__thornswoodProperty;
+      if (!prop || !prop.holderOf) { return false; }
+      var cell = String(mp.get(containerId, 'worldOrCellDesc') || '');
+      var by = cell ? prop.holderOf(cell) : null;
+      return !!(by && Number(by.by) > 0);
+    },
+    isContainer: kindIsContainer,
+    cellOf: function (id) {
+      try { return String(mp.get(id, 'worldOrCellDesc') || ''); } catch (e) { return ''; }
+    },
+    clockOf: function (id) { return mp.get(id, CLOCK_PROPERTY) || null; },
+    // No clock is written as a clock that never started, rather than as null.
+    setClock: function (id, clock) {
+      try { mp.set(id, CLOCK_PROPERTY, clock || { at: 0, days: 0 }); } catch (e) {
+        log('durability: could not write the clock of container', Number(id).toString(16) + ':', e);
+      }
+    },
+    say: say,
+    log: log
+  });
+})();
+
+/*
+  A HIT, heard for the break chance and nothing else. See the durability
+  block above, and THE PAPYRUS FAMILY over mp.onTakeItem for what arrives:
+  the target, then the aggressor and the weapon or spell as { type, desc }.
+  Nothing here may return false to this family, and nothing does.
+*/
+mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, aggressor, source) {
+  var wear = globalThis.__thornswoodDurability;
+  if (!wear || !wear.hit) { return; }
+  function idFrom(v) {
+    if (typeof v === 'number') { return v; }
+    if (v && v.desc) { return idOf(v.desc); }
+    return 0;
+  }
+  wear.hit(Number(targetId) || 0, idFrom(aggressor), idFrom(source));
+});
+// ==== end thornswood durability ====
 
 
 // ==== thornswood needs: hunger, thirst and exhaustion ====

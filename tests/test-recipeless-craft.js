@@ -28,8 +28,13 @@
 // helmet arrived that way listing thirteen entries. So at any bench but the two
 // tempering benches, an item a recipe row makes now goes to the real
 // craftAnswer, and S9 to S16 below drive it beside the real function, with the
-// helmet's own row out of the generated table. Tempering, an item no row
-// makes, and a bench nobody has classified are all still let through.
+// helmet's own row out of the generated table. An item no row makes, and a
+// bench nobody has classified, are still let through.
+//
+// A TEMPER IS REFUSED NOW (#1384). Tempering is cut and a piece is mended
+// with a kit (docs/systems/durability.md), so a craft at the sharpening wheel
+// or the armour table is refused to everybody, says /repair, and is not
+// credited. S9 and S16 drive it.
 //
 // Read only.
 const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
@@ -396,10 +401,12 @@ if (block !== null) {
         r.logs.some(function (l) { return l.indexOf('was refused') !== -1 && l.indexOf(helmDesc) !== -1; }));
     yes('S9 a riekling smith is let through',
         !run(Object.assign({}, nord, { race: 'dlc2rieklingrace' })).refused);
-    yes('S9 and tempering that helmet at the armour table is still anybody\'s',
+    yes('S9 and tempering that helmet at the armour table is refused, riekling or not (#1384)',
         ARMOUR_TABLES.every(function (b) {
           const t = run(Object.assign({}, nord, { benchBase: b }));
-          return !t.refused && t.said.length === 0;
+          const r2 = run(Object.assign({}, nord, { benchBase: b, race: 'dlc2rieklingrace' }));
+          return t.refused && r2.refused && t.spoken.length === 1 &&
+                 t.spoken[0].indexOf('/repair') !== -1 && t.credited.length === 0;
         }));
   }
 
@@ -479,9 +486,10 @@ if (block !== null) {
     yes('S15 and somebody with the profession still makes it', !c.refused);
   }
 
-  // S16: EVERYTHING ELSE IS AS IT WAS. Tempering, an item no row makes, and a
-  //      bench that cannot be read are let through with nothing said, and the
-  //      note is not touched, which shows craftAnswer was never asked.
+  // S16: EVERYTHING ELSE IS AS IT WAS. An item no row makes, and a bench that
+  //      cannot be read, are let through with nothing said, and the note is
+  //      not touched, which shows craftAnswer was never asked. A temper is
+  //      refused to everybody, says the kit, and is not credited (#1384).
   {
     function asToday(what, extra) {
       const told = {};
@@ -492,8 +500,23 @@ if (block !== null) {
           !r2.refused && r2.said.length === 0 &&
           r2.logs.some(function (l) { return l.indexOf('no recipe matched the inputs') !== -1; }));
     }
-    WHEELS.forEach(function (b) { asToday('tempering at the sharpening wheel ' + b, { benchBase: b }); });
-    ARMOUR_TABLES.forEach(function (b) { asToday('tempering at the armour table ' + b, { benchBase: b }); });
+    function aTemper(what, extra) {
+      const told = {};
+      const r = run(atForge(nobodyYet, STEEL.out, Object.assign({ told: told }, extra)));
+      const r2 = run(atForge(cook, STEEL.out, extra));
+      const smithing = run(atForge({ prof: 'smith', half: 'edgewright', ranks: { edgewright: 'master' }, taught: [] },
+                                   STEEL.out, extra));
+      yes('S16 ' + what + ' is refused to everybody, a master smith included, and says the kit',
+          r.refused && r2.refused && smithing.refused &&
+          smithing.spoken.length === 1 && /repair kit/.test(smithing.spoken[0]) &&
+          smithing.spoken[0].indexOf('/repair') !== -1 &&
+          Object.keys(told).length === 0 &&
+          smithing.logs.some(function (l) { return l.indexOf('was refused a temper') !== -1; }));
+      yes('S16 ' + what + ' is not counted as work', r.credited.length === 0 &&
+          r2.credited.length === 0 && smithing.credited.length === 0);
+    }
+    WHEELS.forEach(function (b) { aTemper('tempering at the sharpening wheel ' + b, { benchBase: b }); });
+    ARMOUR_TABLES.forEach(function (b) { aTemper('tempering at the armour table ' + b, { benchBase: b }); });
     asToday('an item no row makes, at a forge', { outDesc: 'nothing:Made.esp' });
     asToday('a bench the table does not know', { benchBase: 'abc:Nowhere.esp' });
     asToday('a bench whose base cannot be read', { baseThrows: true });

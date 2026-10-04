@@ -336,7 +336,8 @@ const WRITERS = {
   'property/takeGold': [1, 'takes a notice or job fee out and never puts any in (checked below)'],
   'spoils/strip': [1, 'only takes things out of a container the world stocked'],
   'spoils/purse': [1, 'THE MINT: forty gold, once per character'],
-  'trade/moveById': [2, 'moves a pile from one pack to the other, one write each (section 4)']
+  'trade/moveById': [2, 'moves a pile from one pack to the other, one write each (section 4)'],
+  'durability/writePack': [1, 'writes back a pack or chest it has just read: a stack renamed for its condition, or a kit or a broken piece taken away. No base is added and no count grows (test-1384-condition.js)']
 };
 
 const writes = {};
