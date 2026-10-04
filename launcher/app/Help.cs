@@ -168,7 +168,7 @@ namespace Thornswood
             // The needs run on the server. tools\test-sunhelm-gone.js checks
             // every bar, command and source of warmth here against the gamemode.
             new HelpItem("In game", "You will get hungry, thirsty and cold",
-                "Eat, drink, rest and stay warm. Cold bites hardest in the north, up high and at night. A fire warms you and standing in one burns you, a roof keeps the weather off, and what you wear counts: fur is the warmest thing there is and metal the worst. The four bars in the bottom left corner are Hunger, Thirst, Rest and Temp, and /needs gives the numbers. /eat and /drink when you have something, /rest sit, /rest campfire, /rest inn or /rest bed, and /rest up to get going again."),
+                "Eat, drink, rest and stay warm. Cold bites hardest in the north, up high and at night. A fire warms you and standing in one burns you, a roof keeps the weather off, and what you wear counts: fur is the warmest thing there is and metal the worst. The four bars in the bottom left corner are Hunger, Thirst, Rest and Temp, and /needs gives the numbers. /eat and /drink when you have something. Sit down or lie down and the rest counts by itself: a seat by a fire beats a bare one, a bedroll by a fire beats both, and your own bed is best. A bed in somebody else's building counts when they let you sleep there or you carry its key."),
 
             new HelpItem("In game", "When you die",
                 "You wake at the temple of the hold you died in. A hold with no temple of its own sends you to the nearest temple or Hall of the Dead, and anywhere on Solstheim sends you to Raven Rock."),

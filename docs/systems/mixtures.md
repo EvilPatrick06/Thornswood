@@ -55,7 +55,15 @@ A bottle is not a meal. It does not fill hunger.
 
 ## Where this is
 
-The lab is closed to the two alchemy halves. The menu still brews
-whatever the ingredients share. The server does not read the effect,
-so it cannot refuse one that is off this list, and a batch is not yet
-a piece of work.
+The lab is closed to the two alchemy halves. A batch is one piece of
+work, counted the way every other piece is. Master Chemist puts a
+second bottle on the same stack once the first is in the pack.
+
+This list is in the server (`MIXTURES` in `game/gamemode.js`), keyed
+by the game's alchemy effects, with the rank of each. The server
+refuses a brew carrying an effect that is off it, or one above the
+rank, as soon as the engine says which effects the brew carries. The
+engine does not say yet: the craft message from the client names the
+bottle and not its effects, so the menu still brews whatever the
+ingredients share. [#1389](https://github.com/EvilPatrick06/Thornswood/issues/1389)
+says what the engine has to pass.

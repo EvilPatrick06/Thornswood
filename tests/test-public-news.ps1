@@ -209,13 +209,16 @@ Yes 'no body it sets carries the VPS address or says it was reinstalled' (-not (
 function Noise-List($path) {
     $t = $null; $e = $null
     $a = [System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$t, [ref]$e)
-    $as = $a.Find({ param($x) $x -is [System.Management.Automation.Language.AssignmentStatementAst] -and $x.Left.Extent.Text -eq '$noise' }, $true)
-    if ($as) {
-        return @($as.Right.FindAll({ param($x) $x -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true) | ForEach-Object { $_.Value })
-    }
+    # Publish-Discord keeps its list in Get-ThornswoodDiscordNoise and assigns
+    # $noise from a call to it, so the function is read first: the assignment
+    # there has no strings of its own. Publish-News assigns the list directly.
     $fn = $a.Find({ param($x) $x -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $x.Name -eq 'Get-ThornswoodDiscordNoise' }, $true)
-    if (-not $fn) { return @() }
-    return @($fn.Body.FindAll({ param($x) $x -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true) | ForEach-Object { $_.Value })
+    if ($fn) {
+        return @($fn.Body.FindAll({ param($x) $x -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true) | ForEach-Object { $_.Value })
+    }
+    $as = $a.Find({ param($x) $x -is [System.Management.Automation.Language.AssignmentStatementAst] -and $x.Left.Extent.Text -eq '$noise' }, $true)
+    if (-not $as) { return @() }
+    return @($as.Right.FindAll({ param($x) $x -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true) | ForEach-Object { $_.Value })
 }
 $newsNoise = @(Noise-List $newsScript)
 $discordNoise = @(Noise-List (Join-Path $Repo 'scripts\ops\Publish-Discord.ps1'))

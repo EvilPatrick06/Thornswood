@@ -31,6 +31,6 @@ You have no recipe list.
 
 ## Where this is
 
-The lab gate is in the server. Disease, remedies, and the double
-batch are not. Toughness on the tree already writes disease
+The lab gate and the double batch are in the server. Disease and
+remedies are not. Toughness on the tree already writes disease
 resistance. This half's Clarity point already lands.
