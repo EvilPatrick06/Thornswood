@@ -393,10 +393,12 @@ with.
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `46970a336d5ca91b843a8cf3d06b6f0bd37c90b2` on the public fork. The server executable and
-  its dependencies are unchanged from the preceding recorded source; its
-  SHA256 remains `77bdd06c2271308df172bf4d06b9cdc53c9514be5795b44a37df720acd47efdc`,
-  built 2026-10-03T23:29:35Z. The record retains that actual build time.
+  name `ac044a49760cf7ee85f6ac1547cc244657509e78` on the public fork. The server executable was
+  rebuilt from that commit, which reads every plugin into memory when the
+  server starts; its SHA256 is
+  `7477e037a3050d37619c4643d6fbe1a7d877b5248fbda8d64af142ddcdacce10`, built
+  2026-10-04T20:50:16Z. The six client files keep the bytes recorded before,
+  because that commit changes no client source.
   Main remains on `8ec73ca86d47936d46ddbbcfb905dca234fb9df6` until its next release.
   Section 13 of the AGPL asks that everybody who connects to a modified server
   over a network be offered its source. The next section is that offer.
@@ -425,7 +427,7 @@ For the six client files and for the game server module running on the VPS, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, both built from one commit:
 
-https://github.com/EvilPatrick06/skymp/tree/46970a336d5ca91b843a8cf3d06b6f0bd37c90b2
+https://github.com/EvilPatrick06/skymp/tree/ac044a49760cf7ee85f6ac1547cc244657509e78
 
 The game server module the live server runs until its next server release:
 
