@@ -429,7 +429,7 @@ For the six client files and for the game server module running on the VPS, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, both built from one commit:
 
-https://github.com/EvilPatrick06/skymp/tree/df2ae1f185e84bf9119ffa15d2e3da1622ac77fd
+https://github.com/EvilPatrick06/skymp/tree/bd0f57a97874d8eb1be1ae56f914fb0ae0bbb5de
 
 The game server module the live server runs until its next server release:
 
