@@ -285,6 +285,10 @@ function client(opt) {
     'const SLEEP_KEY = MOLD_KEY;',
     'function sleepPress() { return false; }',
     'function repairPress() { return false; }',
+    // A warrior's maneuver key (#1386), 9, scan code 10, asked ahead of K.
+    // No press here is 9; test-1386-warrior.js has what it does.
+    'const MANEUVER_KEY = iniNumber(iniText, "ManeuverKey", 10);',
+    'function maneuverKeyPressed() {}',
     PIECES_FRONT.keys,
     'return { MOLD_KEY: MOLD_KEY, MOLD_NAME: MOLD_NAME, moldPress: moldPress };'
   ].join('\n');
