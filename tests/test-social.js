@@ -502,9 +502,9 @@ if (social && trade) {
     yes('the bonus is banked rather than rolled for',
         /PARTY_BANK\[actorId\] >= 1/.test(src) && !/Math\.random\(\) < over/.test(src));
     yes('and it is paid through the one place all work passes',
-        /function creditWork\(actorId, key\)/.test(src) &&
-        src.slice(src.indexOf('function creditWork(actorId, key)'),
-                  src.indexOf('function creditWork(actorId, key)') + 3000)
+        /function creditWork\(actorId, key(, n)?\)/.test(src) &&
+        src.slice(src.indexOf('function creditWork(actorId, key'),
+                  src.indexOf('function creditWork(actorId, key') + 3000)
            .indexOf('workBonus') !== -1);
   }
 }
