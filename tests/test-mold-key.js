@@ -264,7 +264,27 @@ function client(opt) {
     // on J. What they do is test-journal-key.js's business, not this one's.
     'function journalKeyDown() {}',
     'function journalKeyPressed() {}',
+    // The board, ride and merchant presses, which the key handler asks
+    // before anything else since #1430 and #1394. Each answers only the
+    // game's Activate event (E on something), and no press here is one.
+    // What they do is test-1374-letters.js's, test-1394-fares.js's and
+    // test-merchant-traders.js's business.
+    'function boardPress() { return false; }',
+    'function driverPress() { return false; }',
+    'function merchantPress() { return false; }',
+    // The lock key, X, since #1472. It is asked only for its own scan code,
+    // and what it does is test-lock-keypress.js's business.
+    'const LOCK_KEY = iniNumber(iniText, "LockKey", 45);',
+    'function lockPress() { return false; }',
     PIECES_FRONT.mold,
+    // The same key after the mold says no: sleeping on a person inside a
+    // building you hold (#1603, SLEEP_KEY is MOLD_KEY in the plugin) and a
+    // repair kit in the inventory (#1384). Nobody is looked at and no
+    // inventory is open here; test-1603-beds.js and test-1384-condition.js
+    // have what they do.
+    'const SLEEP_KEY = MOLD_KEY;',
+    'function sleepPress() { return false; }',
+    'function repairPress() { return false; }',
     PIECES_FRONT.keys,
     'return { MOLD_KEY: MOLD_KEY, MOLD_NAME: MOLD_NAME, moldPress: moldPress };'
   ].join('\n');
