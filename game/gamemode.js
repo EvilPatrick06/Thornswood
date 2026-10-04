@@ -26640,8 +26640,8 @@ function craftAnswer(actorId, row) {
     roll is refused before profession and rank, because the bench is not
     where these are found. The roll is read off the character when it has
     one, or off __thornswoodRolls.has(actorId, roll) when a roll list is
-    installed. Neither list exists yet, so the public bench makes none of
-    them.
+    installed. The embassy and remnant block installs it (#1390), and an
+    admin writes both rolls, so the public bench makes none of them.
   */
   if (row && row.roll) {
     const roll = String(row.roll);
@@ -34143,6 +34143,11 @@ log('gamemode loaded:',
     try { mine = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { mine = 0; }
     push(actorId, mine);
 
+    // The embassy is held by its office, not by a claim, so a deed presented
+    // at its door is paper (#1390, see the embassy and remnant block).
+    var accordHeld = globalThis.__thornswoodEmbassy;
+    if (accordHeld && accordHeld.holds(building)) { return; }
+
     var held = holderOf(building);
     try { mine = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { mine = 0; }
 
@@ -34268,6 +34273,12 @@ log('gamemode loaded:',
     if (!building) {
       toProfile(profileId, 'Stand at a door and open it, then say /claim. That is how ' +
                            'the server knows which building you mean.');
+      return true;
+    }
+    // embassy.md: "/claim on them answers that the embassy is held" (#1390).
+    var accordClaim = globalThis.__thornswoodEmbassy;
+    if (accordClaim && accordClaim.holds(building)) {
+      toProfile(profileId, accordClaim.CLAIM_REFUSED);
       return true;
     }
     var held = holderOf(building);
@@ -37242,6 +37253,12 @@ log('gamemode loaded:',
       toProfile(profileId, 'Stand at the door and open it, then say that again.');
       return true;
     }
+    // embassy.md: "A steward of Haafingar does not evict the Accord" (#1390).
+    var accordEvict = globalThis.__thornswoodEmbassy;
+    if (accordEvict && accordEvict.holds(building)) {
+      toProfile(profileId, accordEvict.EVICT_REFUSED);
+      return true;
+    }
     var held = holderOf(building);
     if (!held) {
       toProfile(profileId, 'Nobody holds ' + nameOf(building) + '.');
@@ -37290,6 +37307,503 @@ log('gamemode loaded:',
        Object.keys(claims).length, 'claim(s)');
 })();
 // ==== end thornswood property ====
+
+// ==== thornswood embassy and remnant ====
+/*
+  THE EMBASSY, THE TWO ROLLS AND THE THALMOR MARKER (#1390).
+
+  docs/systems/embassy.md, thalmor.md, npcs.md and cut-items.md are the
+  design. Every number here is one of theirs.
+
+  THE BUILDING. "The embassy doors start held by the Ambassador's office.
+  /claim on them answers that the embassy is held. A steward of Haafingar
+  does not evict the Accord." The pages do not say which building in
+  Solitude it is, so an admin opens its door and says /embassy here, and from
+  then on that building is the embassy. The property block asks holds()
+  before a claim, an eviction, and a deed presented at the door. It is not a
+  hold: nothing here makes a box, a board, a ledger or a mint, and
+  Solitude's box and board stay Haafingar's.
+
+  THE EMBASSY ROLL. "20 persons in service, no more. Of those, 6 may be
+  marked armed, and those 6 bear arms inside the walls only. Naming a 21st
+  person is refused. Marking a 7th as armed is refused." Armed is what the
+  roll says. Nothing here looks in a pack or takes a sword at the gate. The
+  Ambassador is a title and not a command (offices.md), so an admin writes
+  the roll, the same way an admin places the Jarl role.
+
+  THE REMNANT ROLL. "The roll is an application, the same kind as a Jarl,
+  not a button on K." An admin writes that one too. The page puts no number
+  on it.
+
+  Both rolls are who may craft what the cut file marks embassy and remnant:
+  craftAnswer asks onCraftRoll, and onCraftRoll asks has() below. Nobody else
+  makes those at a public bench, and the spoils block already keeps the
+  world from handing them out.
+
+  THE MARKER. "Wearing Justiciar robes, Thalmor armour, or carrying a
+  Dominion flag in a hold is a hostile marker." marked() reads what a
+  character has on against what the remnant rows of the recipe table make
+  and the game's own two Thalmor robes. The robes are not race locked:
+  races.md says Thalmor robes are a faction, not a people.
+
+  THE PATROLS ARE NOT HERE. "A patrol is 2 to 4. They are on the roads
+  between holds. At most 3 patrols in the province at once, and only one on
+  a given road." Every actor the server stands up goes through the NPC
+  population policy and the shared NPC runtime: placeActors admits and
+  enrolls what it places, and the policy switches off any runtime actor it
+  has no rule for. Those are the NPC lane's, so the patrols wait on it.
+  What a patrol needs from it is written on issue #1390.
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+  function elog() {
+    var a = Array.prototype.slice.call(arguments);
+    a.unshift('[embassy]');
+    console.log(a.join(' '));
+  }
+
+  // ------------------------------------------------------------ the numbers --
+
+  var ROLL_MOST = 20;     // embassy.md: 20 persons in service, no more
+  var ARMED_MOST = 6;     // embassy.md: of those, 6 may be marked armed
+
+  var ROLL_NAME = { embassy: 'the embassy roll', remnant: 'the Thalmor remnant roll' };
+
+  var CLAIM_REFUSED = 'The embassy is held by the Ambassador\'s office under the Accord. ' +
+                      'It cannot be claimed.';
+  var EVICT_REFUSED = 'The embassy is not a house of the hold. A steward of Haafingar ' +
+                      'does not evict the Accord.';
+  var NOT_ADMIN = {
+    embassy: 'Only an admin writes the embassy roll.',
+    remnant: 'The remnant roll is an application. Only an admin writes it.'
+  };
+
+  // ------------------------------------------------------------- the file --
+
+  var ROLL_FILE = 'embassy.json';
+
+  /* In the private folder, beside property.json, because every row names a
+     profile and the data folder is served to anybody who asks (#541). */
+  function privatePath(name) {
+    var path = require('path');
+    var privDir = 'private';
+    try {
+      var cfg = JSON.parse(require('fs').readFileSync('server-settings.json', 'utf8'));
+      if (cfg && cfg.privDir) { privDir = String(cfg.privDir); }
+    } catch (e) { }
+    return path.join(privDir, name);
+  }
+
+  function readJson(name) {
+    try {
+      return JSON.parse(String(require('fs').readFileSync(privatePath(name), 'utf8'))
+                        .replace(/^\uFEFF/, ''));
+    } catch (e) { return null; }
+  }
+
+  function writeJson(name, doc) {
+    var fs = require('fs');
+    var file = privatePath(name);
+    try {
+      fs.mkdirSync(require('path').dirname(file), { recursive: true });
+      fs.writeFileSync(file + '.tmp', JSON.stringify(doc, null, 1));
+      fs.renameSync(file + '.tmp', file);
+      return true;
+    } catch (e) {
+      elog('could not write', file + ':', e);
+      return false;
+    }
+  }
+
+  /*
+    The rolls off disk, rebuilt row by row rather than trusted whole, the
+    same discipline as the property register. And the caps hold whatever the
+    file says: a 21st row is dropped and a 7th armed mark comes off, with a
+    line in the log saying so, because a hand edit is not a way round the
+    Accord.
+  */
+  function cleanRow(r, roll) {
+    if (!r || typeof r !== 'object') { return null; }
+    var actor = Number(r.actor) || 0;
+    if (!(actor > 0)) { return null; }
+    var row = { actor: actor, profile: Number(r.profile) || 0,
+                name: String(r.name || 'somebody').slice(0, 64), at: Number(r.at) || 0 };
+    if (roll === 'embassy') { row.armed = r.armed === true; }
+    return row;
+  }
+
+  function loadRolls() {
+    var raw = readJson(ROLL_FILE);
+    var out = { buildings: [], embassy: [], remnant: [] };
+    if (!raw || typeof raw !== 'object') { return out; }
+    var b = Array.isArray(raw.buildings) ? raw.buildings : [];
+    for (var i = 0; i < b.length; i++) {
+      var key = String(b[i] || '');
+      if (!key || key === '__proto__' || key.length > 128) { continue; }
+      if (out.buildings.indexOf(key) === -1) { out.buildings.push(key); }
+    }
+    var dropped = 0, disarmed = 0;
+    ['embassy', 'remnant'].forEach(function (roll) {
+      var list = Array.isArray(raw[roll]) ? raw[roll] : [];
+      var armed = 0;
+      for (var j = 0; j < list.length; j++) {
+        var row = cleanRow(list[j], roll);
+        if (!row || rowIn(out[roll], row.actor)) { dropped++; continue; }
+        if (roll === 'embassy') {
+          if (out.embassy.length >= ROLL_MOST) { dropped++; continue; }
+          if (row.armed) {
+            if (armed >= ARMED_MOST) { row.armed = false; disarmed++; } else { armed++; }
+          }
+        }
+        out[roll].push(row);
+      }
+    });
+    if (dropped || disarmed) {
+      elog('the roll file asked for more than the Accord allows or held rows that were not ' +
+           'people:', dropped, 'row(s) left off and', disarmed, 'armed mark(s) taken off');
+    }
+    return out;
+  }
+
+  function rowIn(list, actor) {
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].actor === actor) { return list[i]; }
+    }
+    return null;
+  }
+
+  var reg = loadRolls();
+
+  function save() {
+    return writeJson(ROLL_FILE, { buildings: reg.buildings, embassy: reg.embassy,
+                                  remnant: reg.remnant });
+  }
+
+  /* A change that could not be written is taken back, so what the server
+     enforces is always what a restart will read. */
+  var NOT_WRITTEN = 'The roll could not be written, so nothing changed. Say so in the dev channel.';
+  function kept(undo) {
+    if (save()) { return true; }
+    undo();
+    return false;
+  }
+
+  // ------------------------------------------------------- what is asked --
+
+  /** True when this building is the embassy. Asked by the property block. */
+  function holds(building) {
+    return !!building && reg.buildings.indexOf(String(building)) !== -1;
+  }
+
+  /** True when this character is on that roll. onCraftRoll asks this. */
+  function has(actorId, roll) {
+    if (roll !== 'embassy' && roll !== 'remnant') { return false; }
+    return !!rowIn(reg[roll], Number(actorId) || 0);
+  }
+
+  function armedCount() {
+    var n = 0;
+    for (var i = 0; i < reg.embassy.length; i++) { if (reg.embassy[i].armed) { n++; } }
+    return n;
+  }
+
+  function counts() {
+    return reg.embassy.length + ' of ' + ROLL_MOST + ' on the roll, ' + armedCount() +
+           ' of ' + ARMED_MOST + ' marked armed.';
+  }
+
+  // ------------------------------------------------- writing the rolls --
+
+  /*
+    One person onto a roll. who is { actor, profile, name }. Answers
+    { ok, line } and changes nothing when it refuses. The two refusals the
+    page names are here and nowhere else, so no other road onto the roll
+    can step round them.
+  */
+  function enter(roll, who, armed) {
+    var list = reg[roll];
+    var already = rowIn(list, who.actor);
+    if (already) {
+      return { ok: false, line: already.name + ' is already on ' + ROLL_NAME[roll] + '.' };
+    }
+    if (roll === 'embassy') {
+      if (list.length >= ROLL_MOST) {
+        return { ok: false, line: 'The embassy roll is full: ' + ROLL_MOST + ' persons in ' +
+                 'service, no more. Take somebody off it first.' };
+      }
+      if (armed && armedCount() >= ARMED_MOST) {
+        return { ok: false, line: ARMED_MOST + ' on the roll are already marked armed, which ' +
+                 'is all the Accord allows. Nobody was added. Disarm one first.' };
+      }
+    }
+    var row = { actor: who.actor, profile: who.profile || 0,
+                name: String(who.name || 'somebody').slice(0, 64), at: Date.now() };
+    if (roll === 'embassy') { row.armed = !!armed; }
+    list.push(row);
+    if (!kept(function () { list.splice(list.indexOf(row), 1); })) {
+      return { ok: false, line: NOT_WRITTEN };
+    }
+    elog(row.name, 'is on', ROLL_NAME[roll] + (row.armed ? ', marked armed' : ''));
+    return { ok: true, row: row,
+             line: row.name + ' is on ' + ROLL_NAME[roll] + (row.armed ? ', marked armed' : '') +
+                   '.' + (roll === 'embassy' ? ' ' + counts() : '') };
+  }
+
+  function setArmed(row, armed) {
+    if (!!row.armed === !!armed) {
+      return { ok: false, line: row.name + (armed ? ' is already marked armed.' : ' is not marked armed.') };
+    }
+    if (armed && armedCount() >= ARMED_MOST) {
+      return { ok: false, line: ARMED_MOST + ' on the roll are already marked armed, which is ' +
+               'all the Accord allows. Disarm one first.' };
+    }
+    var was = !!row.armed;
+    row.armed = !!armed;
+    if (!kept(function () { row.armed = was; })) { return { ok: false, line: NOT_WRITTEN }; }
+    elog(row.name, armed ? 'is marked armed' : 'is no longer marked armed');
+    return { ok: true, line: row.name + (armed ? ' is marked armed. Inside the walls only.'
+                                               : ' is no longer marked armed.') + ' ' + counts() };
+  }
+
+  function leave(roll, row) {
+    var list = reg[roll];
+    var at = list.indexOf(row);
+    if (at === -1) { return { ok: false, line: row.name + ' is not on ' + ROLL_NAME[roll] + '.' }; }
+    list.splice(at, 1);
+    if (!kept(function () { list.splice(at, 0, row); })) { return { ok: false, line: NOT_WRITTEN }; }
+    elog(row.name, 'is off', ROLL_NAME[roll]);
+    return { ok: true, line: row.name + ' is off ' + ROLL_NAME[roll] + '.' +
+                             (roll === 'embassy' ? ' ' + counts() : '') };
+  }
+
+  // ---------------------------------------------------- finding a person --
+
+  /* Somebody in the world, by name or by the form id the crosshair gives. */
+  function inWorld(words) {
+    var soc = g.__thornswoodSocial;
+    if (!soc || !soc.findPerson) { return { why: 'That is not running on this server.' }; }
+    var f = soc.findPerson(words);
+    if (!f || !f.actorId) { return { why: (f && f.why) || 'Nobody here by that name.' }; }
+    var name = '';
+    var pid = 0;
+    try { name = String(soc.nameOfPerson(f.actorId) || ''); } catch (e) { name = ''; }
+    try { pid = Number(soc.profileOf(f.actorId)) || 0; } catch (e2) { pid = 0; }
+    return { actor: f.actorId, profile: pid, name: name || words };
+  }
+
+  /*
+    A row already on the roll, by its name or profile number, so somebody who
+    is not in the world can still be taken off or disarmed. Then the world.
+  */
+  function onRollBy(roll, words) {
+    var list = reg[roll];
+    var low = String(words || '').toLowerCase();
+    var asNumber = Number(words) || 0;
+    var exact = [], part = [];
+    for (var i = 0; i < list.length; i++) {
+      var n = String(list[i].name).toLowerCase();
+      if (n === low || (asNumber && list[i].profile === asNumber)) { exact.push(list[i]); }
+      else if (low && n.indexOf(low) === 0) { part.push(list[i]); }
+    }
+    var hit = exact.length ? exact : part;
+    if (hit.length === 1) { return { row: hit[0] }; }
+    if (hit.length > 1) { return { why: 'More than one on ' + ROLL_NAME[roll] + ' answers to that. Say more of the name.' }; }
+    var w = inWorld(words);
+    if (!w.actor) { return { why: w.why }; }
+    var row = rowIn(list, w.actor);
+    return row ? { row: row } : { why: w.name + ' is not on ' + ROLL_NAME[roll] + '.' };
+  }
+
+  // --------------------------------------------------------- the words --
+
+  /*
+        /embassy                      where you stand; an admin sees the roll
+        /embassy here                 the building of the door you just opened is the embassy
+        /embassy here off             it is not
+        /embassy add <person>         onto the roll
+        /embassy add <person> armed   onto the roll, marked armed
+        /embassy arm <person>         marked armed
+        /embassy disarm <person>      no longer marked armed
+        /embassy remove <person>      off the roll
+        /remnant                      where you stand; an admin sees the roll
+        /remnant add <person>         onto the remnant roll, after the application
+        /remnant remove <person>      off it
+  */
+  function command(word, parts, actorId, profileId, toProfile) {
+    var roll = word === '/remnant' ? 'remnant' : 'embassy';
+    var verb = String((parts && parts[1]) || '').toLowerCase();
+    var rest = (parts || []).slice(2);
+    var adm = g.__thornswoodIsAdmin;
+    var admin = false;
+    try { admin = typeof adm === 'function' && !!adm(profileId); } catch (e) { admin = false; }
+
+    if (!verb) {
+      if (admin) { toProfile(profileId, listing(roll)); return true; }
+      var mine = actorId ? rowIn(reg[roll], actorId) : null;
+      // thalmor.md: what you have on is the marker, roll or no roll.
+      var reads = roll === 'remnant' && actorId && marked(actorId)
+        ? ' What you have on reads Thalmor. In a hold that is a hostile marker, and a guard ' +
+          'may start a fight on sight.'
+        : '';
+      toProfile(profileId, (mine
+        ? 'You are on ' + ROLL_NAME[roll] + (mine.armed ? ', marked armed. You bear arms inside the walls only.' : '.')
+        : 'You are not on ' + ROLL_NAME[roll] + '. ' + NOT_ADMIN[roll]) + reads);
+      return true;
+    }
+    if (!admin) { toProfile(profileId, NOT_ADMIN[roll]); return true; }
+
+    if (roll === 'embassy' && verb === 'here') {
+      toProfile(profileId, designate(actorId, String(rest[0] || '').toLowerCase() === 'off'));
+      return true;
+    }
+
+    var armed = false;
+    if (roll === 'embassy' && verb === 'add' && rest.length > 1 &&
+        String(rest[rest.length - 1]).toLowerCase() === 'armed') {
+      armed = true;
+      rest = rest.slice(0, -1);
+    }
+    var words = rest.join(' ').trim();
+    var usage = roll === 'embassy'
+      ? '/embassy add, arm, disarm or remove, and a name. /embassy here at its door.'
+      : '/remnant add or remove, and a name.';
+    if (!words) { toProfile(profileId, usage); return true; }
+
+    if (verb === 'add') {
+      var w = inWorld(words);
+      if (!w.actor) { toProfile(profileId, w.why); return true; }
+      var put = enter(roll, w, armed);
+      toProfile(profileId, put.line);
+      if (put.ok && w.actor !== actorId) {
+        try {
+          say(w.actor, 'You are on ' + ROLL_NAME[roll] +
+              (put.row.armed ? ', marked armed. You bear arms inside the walls only.' : '.'));
+        } catch (eSay) { }
+      }
+      return true;
+    }
+    if (verb === 'remove' || (roll === 'embassy' && (verb === 'arm' || verb === 'disarm'))) {
+      var found = onRollBy(roll, words);
+      if (!found.row) { toProfile(profileId, found.why); return true; }
+      var done = verb === 'remove' ? leave(roll, found.row) : setArmed(found.row, verb === 'arm');
+      toProfile(profileId, done.line);
+      return true;
+    }
+    toProfile(profileId, usage);
+    return true;
+  }
+
+  function listing(roll) {
+    var list = reg[roll];
+    var names = [];
+    for (var i = 0; i < list.length; i++) {
+      names.push(list[i].name + (list[i].armed ? ' (armed)' : ''));
+    }
+    var head = roll === 'embassy' ? 'The embassy roll: ' + counts() : 'The Thalmor remnant roll: ' + list.length + '.';
+    var doors = '';
+    if (roll === 'embassy') {
+      var P = g.__thornswoodProperty;
+      var called = [];
+      for (var j = 0; j < reg.buildings.length; j++) {
+        called.push(P && P.nameOf ? P.nameOf(reg.buildings[j]) : reg.buildings[j]);
+      }
+      doors = called.length ? ' The embassy is ' + called.join(', ') + '.'
+                            : ' No building is the embassy yet. Open its door and say /embassy here.';
+    }
+    return head + (names.length ? ' ' + names.join(', ') + '.' : '') + doors;
+  }
+
+  /*
+    The building at the door the admin just opened becomes the embassy, or
+    stops being it. Refused while somebody holds a claim on it: the steward
+    of Haafingar ends that claim first with /evict, before the Accord holds
+    the door, so nobody's claim vanishes without the person who can end it
+    doing so.
+  */
+  function designate(actorId, off) {
+    var P = g.__thornswoodProperty;
+    if (!P || !P.here) { return 'Property is not running on this server.'; }
+    var building = actorId ? P.here(actorId) : null;
+    if (!building) { return 'Open the embassy\'s door, then say that again.'; }
+    var called = P.nameOf ? P.nameOf(building) : building;
+    var at = reg.buildings.indexOf(building);
+    if (off) {
+      if (at === -1) { return called + ' is not the embassy.'; }
+      reg.buildings.splice(at, 1);
+      if (!kept(function () { reg.buildings.splice(at, 0, building); })) { return NOT_WRITTEN; }
+      elog(called, 'is no longer the embassy');
+      return called + ' is no longer the embassy. It can be claimed like any other door.';
+    }
+    if (at !== -1) { return called + ' is already the embassy.'; }
+    var held = P.holderOf ? P.holderOf(building) : null;
+    if (held) {
+      return called + ' is held by ' + held.name + '. A steward of Haafingar ends that claim ' +
+             'with /evict first, then say this again.';
+    }
+    reg.buildings.push(building);
+    if (!kept(function () { reg.buildings.pop(); })) { return NOT_WRITTEN; }
+    if (P.pushAll) { try { P.pushAll(); } catch (e) { } }
+    elog(called, 'is the embassy');
+    return called + ' is the embassy. Its doors are held by the Ambassador\'s office and ' +
+           'cannot be claimed.';
+  }
+
+  // -------------------------------------------------------- the marker --
+
+  /*
+    The pieces that read Thalmor: what the remnant rows of the recipe table
+    make, and the game's own Thalmor Robes and Hooded Thalmor Robes, which
+    those rows do not make (the /give table names both; it is read by /give
+    and nothing else, so they are written here). Built once, by base id, and
+    a piece whose plugin is not loaded is left out.
+  */
+  var GAME_THALMOR = ['65bbf:Skyrim.esm', '10c698:Skyrim.esm'];
+  var gearIds = null;
+  function thalmorGear() {
+    if (gearIds) { return gearIds; }
+    var out = {};
+    try {
+      for (var k in RECIPES_BY_ID) {
+        if (!Object.prototype.hasOwnProperty.call(RECIPES_BY_ID, k)) { continue; }
+        var row = RECIPES_BY_ID[k];
+        if (!row || row.roll !== 'remnant') { continue; }
+        var id = idOf(row.out);
+        if (id) { out[id] = true; }
+      }
+    } catch (e) { }
+    for (var i = 0; i < GAME_THALMOR.length; i++) {
+      var id2 = idOf(GAME_THALMOR[i]);
+      if (id2) { out[id2] = true; }
+    }
+    gearIds = out;
+    return out;
+  }
+
+  /** True when this character has on something that reads Thalmor. */
+  function marked(actorId) {
+    var on = null;
+    try { on = wornNow(actorId); } catch (e) { on = null; }
+    if (!on || !on.length) { return false; }
+    var gear = thalmorGear();
+    for (var i = 0; i < on.length; i++) {
+      if (Object.prototype.hasOwnProperty.call(gear, on[i])) { return true; }
+    }
+    return false;
+  }
+
+  g.__thornswoodEmbassy = {
+    holds: holds, command: command, enter: enter, setArmed: setArmed, leave: leave,
+    designate: designate, listing: listing, rolls: function () { return reg; },
+    CLAIM_REFUSED: CLAIM_REFUSED, EVICT_REFUSED: EVICT_REFUSED,
+    ROLL_MOST: ROLL_MOST, ARMED_MOST: ARMED_MOST
+  };
+  g.__thornswoodRolls = { has: has };
+  g.__thornswoodThalmor = { marked: marked, gear: thalmorGear };
+  elog('ready,', reg.buildings.length, 'embassy building(s),', reg.embassy.length,
+       'on the embassy roll,', reg.remnant.length, 'on the remnant roll');
+})();
+// ==== end thornswood embassy and remnant ====
 
 // ==== thornswood carriages ====
 /*
@@ -43269,6 +43783,9 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/stuck',
                // A carriage or ferry, at the driver (#1394). See the carriages block.
                '/ride',
+               // The embassy roll and the Thalmor remnant roll, written by an
+               // admin (#1390). See the embassy and remnant block.
+               '/embassy', '/remnant',
                '/pick', '/spend',
                // The maneuvers of a warrior; see the maneuvers block.
                '/maneuver',
@@ -44423,6 +44940,21 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       if (!rides) { toProfile(profileId, 'That is not running on this server.'); return true; }
       try { rides.command(parts, actorId, profileId, toProfile); } catch (eRide) {
         log('/ride threw:', eRide);
+        toProfile(profileId, 'That did not work. Say so in the dev channel.');
+      }
+      return true;
+    }
+
+    /*
+      The embassy roll, the remnant roll and the embassy doors (#1390). An
+      admin writes them; anybody may ask where they stand. The embassy and
+      remnant block, after the property block, answers.
+    */
+    if (word === '/embassy' || word === '/remnant') {
+      var accord = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodEmbassy;
+      if (!accord) { toProfile(profileId, 'That is not running on this server.'); return true; }
+      try { accord.command(word, parts, actorId, profileId, toProfile); } catch (eAccord) {
+        log(word + ' threw:', eAccord);
         toProfile(profileId, 'That did not work. Say so in the dev channel.');
       }
       return true;
