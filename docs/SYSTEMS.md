@@ -116,7 +116,7 @@ end it.
 
 [Durability](systems/durability.md). Weapon Kit, Armor Kit, Sewing
 Kit. The right half repairs to 120%. Anyone else repairs to 100%.
-At 0%, a worn piece can break.
+Worn gear loses 1% a hit. At 0%, a worn piece can break.
 
 [Cut items](systems/cut-items.md). What leaves the open book, and the
 references kept so a row can come back. The recipe file is not

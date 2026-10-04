@@ -120,6 +120,39 @@ It will not touch a compressed record, and it refuses to add a record whose
 editor id is already in the file, because two records with one name is the kind
 of thing that is found months later.
 
+THE THREE REPAIR KITS (issue #1384)
+
+docs/systems/durability.md: a worn piece is mended with a kit, not at the
+grindstone and not at the armour table. Patrick, 4 October, asked for a
+suggested recipe for each, written on that page. Cheap, every input from
+Skyrim.esm, and every input something a class already supplies at novice,
+so the half that makes the kit can get its makings on day one:
+
+    ThornswoodMiscWeaponKit       the Weapon Kit, a MISC.
+    ThornswoodMiscArmorKit        the Armor Kit, a MISC.
+    ThornswoodMiscSewingKit       the Sewing Kit, a MISC.
+    ThornswoodRecipeWeaponKit     1 iron ingot and 1 leather strips, at a forge.
+                                  Smith, Edgewright.
+    ThornswoodRecipeArmorKit      1 iron ingot and 1 leather, at a forge.
+                                  Smith, Platewright.
+    ThornswoodRecipeSewingKit     1 tundra cotton and 1 leather strips, at a
+                                  tanning rack. Tailor, Haberdasher.
+
+The owner and the half are not readable off a MISC at a forge or a tanning
+rack, so all three are named in $RECIPE_OWNER in
+scripts/dev/Build-RecipeTable.ps1, the same as the key mold. The rank is the
+dearest input, which is novice for all three.
+
+The Sewing Kit was offered as linen wrap and leather strips. Linen wrap is
+supplied by no class in this world (game/data/recipes.json says suppliedBy
+null for it, measured 4 October), so a Haberdasher could never get one.
+Tundra cotton is a gatherer's at novice and is already on the crude pole.
+The tanning rack, not the loom, because the loom's keyword is a mod's record
+(MCE_CraftingLoom, 6ce000:Update.esm) and these recipes name only Skyrim.esm.
+
+All three MISC records are cloned from the charcoal, like the handle, so no
+new mesh has to ship.
+
 THIS IS A SHIPPED FILE, so its size changing means a release and every client
 downloading it again.
 
@@ -207,6 +240,16 @@ CATCH_PERCH = 0x50154A3
 CATCH_SPADETAIL = 0x50154A4
 CATCH_LONGFIN = 0x50154A5
 
+# The three repair kits and the recipes that make them (#1384). After a gap
+# from the catches, so somebody else adding the next record after 0x50154A5
+# does not land on these.
+WEAPON_KIT = 0x50154B0
+ARMOR_KIT = 0x50154B1
+SEWING_KIT = 0x50154B2
+RECIPE_WEAPON_KIT = 0x50154B3
+RECIPE_ARMOR_KIT = 0x50154B4
+RECIPE_SEWING_KIT = 0x50154B5
+
 LEATHER_STRIPS = 0x000800E4
 TUNDRA_COTTON = 0x0003F7F8
 STEEL_INGOT = 0x0005ACE5
@@ -217,6 +260,8 @@ SLAUGHTERFISH_SCALES = 0x00003AD70
 SILVERSIDE_PERCH = 0x000106E1C
 CYRODILIC_SPADETAIL = 0x000106E19
 ABECEAN_LONGFIN = 0x000106E1B
+LEATHER = 0x000DB5D2         # Leather01, what the tanning rack makes from a hide
+TANNING_KEYWORD = 0x007866A  # CraftingTanningRack
 
 DEED_WORDS = (
     '<p align="center"><font size="30">Deed</font></p>'
@@ -240,6 +285,14 @@ FORGE_KEYWORD = 0x0088105    # the BNAM of the pickaxe and axe recipes
 # same as a charcoal stick. Nothing in the rulebook sets either number.
 HANDLE_VALUE = 5
 HANDLE_WEIGHT = 0.5
+
+# What a kit is worth and weighs. Nothing in the rulebook sets either number;
+# an item has no gold price here, and these are cheap so the rank stays the
+# dearest input's.
+METAL_KIT_VALUE = 15
+METAL_KIT_WEIGHT = 1.0
+SEWING_KIT_VALUE = 10
+SEWING_KIT_WEIGHT = 0.5
 
 
 def cnto(base, count):
@@ -525,7 +578,13 @@ def main():
                       ('ThornswoodFishSlaughterfishScales', CATCH_SCALES),
                       ('ThornswoodFishSilversidePerch', CATCH_PERCH),
                       ('ThornswoodFishCyrodilicSpadetail', CATCH_SPADETAIL),
-                      ('ThornswoodFishAbeceanLongfin', CATCH_LONGFIN)):
+                      ('ThornswoodFishAbeceanLongfin', CATCH_LONGFIN),
+                      ('ThornswoodMiscWeaponKit', WEAPON_KIT),
+                      ('ThornswoodMiscArmorKit', ARMOR_KIT),
+                      ('ThornswoodMiscSewingKit', SEWING_KIT),
+                      ('ThornswoodRecipeWeaponKit', RECIPE_WEAPON_KIT),
+                      ('ThornswoodRecipeArmorKit', RECIPE_ARMOR_KIT),
+                      ('ThornswoodRecipeSewingKit', RECIPE_SEWING_KIT)):
         here_already = name in by_edid
         if here_already and by_edid[name].fid != fid:
             print('')
@@ -715,6 +774,35 @@ def main():
     catch_spadetail = catch(CATCH_SPADETAIL, 'ThornswoodFishCyrodilicSpadetail', 'Cyrodilic Spadetail', CYRODILIC_SPADETAIL)
     catch_longfin = catch(CATCH_LONGFIN, 'ThornswoodFishAbeceanLongfin', 'Abecean Longfin', ABECEAN_LONGFIN)
 
+    # The three repair kits (#1384), and what makes each. See the top.
+    weapon_kit = clone(misc_src, WEAPON_KIT, 'ThornswoodMiscWeaponKit', sets={
+        b'FULL': zstr('Weapon Kit'),
+        b'DATA': struct.pack('<If', METAL_KIT_VALUE, METAL_KIT_WEIGHT),
+    })
+    armor_kit = clone(misc_src, ARMOR_KIT, 'ThornswoodMiscArmorKit', sets={
+        b'FULL': zstr('Armor Kit'),
+        b'DATA': struct.pack('<If', METAL_KIT_VALUE, METAL_KIT_WEIGHT),
+    })
+    sewing_kit = clone(misc_src, SEWING_KIT, 'ThornswoodMiscSewingKit', sets={
+        b'FULL': zstr('Sewing Kit'),
+        b'DATA': struct.pack('<If', SEWING_KIT_VALUE, SEWING_KIT_WEIGHT),
+    })
+    make_weapon_kit = clone(cobj_charcoal, RECIPE_WEAPON_KIT, 'ThornswoodRecipeWeaponKit', sets={
+        b'CNAM': struct.pack('<I', WEAPON_KIT),
+        b'BNAM': struct.pack('<I', FORGE_KEYWORD),
+    })
+    set_inputs(make_weapon_kit, [(IRON_INGOT, 1), (LEATHER_STRIPS, 1)])
+    make_armor_kit = clone(cobj_charcoal, RECIPE_ARMOR_KIT, 'ThornswoodRecipeArmorKit', sets={
+        b'CNAM': struct.pack('<I', ARMOR_KIT),
+        b'BNAM': struct.pack('<I', FORGE_KEYWORD),
+    })
+    set_inputs(make_armor_kit, [(IRON_INGOT, 1), (LEATHER, 1)])
+    make_sewing_kit = clone(cobj_charcoal, RECIPE_SEWING_KIT, 'ThornswoodRecipeSewingKit', sets={
+        b'CNAM': struct.pack('<I', SEWING_KIT),
+        b'BNAM': struct.pack('<I', TANNING_KEYWORD),
+    })
+    set_inputs(make_sewing_kit, [(TUNDRA_COTTON, 1), (LEATHER_STRIPS, 1)])
+
     print('')
     print('What goes in')
     print('  MISC 0x%07X ThornswoodMiscToolHandle      Tool Handle, %d gold, %s weight'
@@ -741,6 +829,18 @@ def main():
     print('  FLOR ThornswoodFishSilversidePerch')
     print('  FLOR ThornswoodFishCyrodilicSpadetail')
     print('  FLOR ThornswoodFishAbeceanLongfin')
+    print('  MISC 0x%07X ThornswoodMiscWeaponKit       Weapon Kit, %d gold, %s weight'
+          % (WEAPON_KIT, METAL_KIT_VALUE, METAL_KIT_WEIGHT))
+    print('  MISC 0x%07X ThornswoodMiscArmorKit        Armor Kit, %d gold, %s weight'
+          % (ARMOR_KIT, METAL_KIT_VALUE, METAL_KIT_WEIGHT))
+    print('  MISC 0x%07X ThornswoodMiscSewingKit       Sewing Kit, %d gold, %s weight'
+          % (SEWING_KIT, SEWING_KIT_VALUE, SEWING_KIT_WEIGHT))
+    print('  COBJ 0x%07X ThornswoodRecipeWeaponKit     1 iron ingot + 1 leather strips -> 1 Weapon Kit, at a forge'
+          % RECIPE_WEAPON_KIT)
+    print('  COBJ 0x%07X ThornswoodRecipeArmorKit      1 iron ingot + 1 leather -> 1 Armor Kit, at a forge'
+          % RECIPE_ARMOR_KIT)
+    print('  COBJ 0x%07X ThornswoodRecipeSewingKit     1 tundra cotton + 1 leather strips -> 1 Sewing Kit, '
+          'at a tanning rack' % RECIPE_SEWING_KIT)
     print('')
     print('What changes')
     print('  COBJ 0x%07X ThornswoodRecipeWeaponPickaxe now wants a handle as well as the ingot'
@@ -772,7 +872,9 @@ def main():
                          pole_crude, pole_fine, pole_master, fish_trap,
                          make_pole_crude, make_pole_fine, make_pole_master, make_trap,
                          catch_histcarp, catch_betty, catch_scales, catch_perch,
-                         catch_spadetail, catch_longfin)
+                         catch_spadetail, catch_longfin,
+                         weapon_kit, armor_kit, sewing_kit,
+                         make_weapon_kit, make_armor_kit, make_sewing_kit)
              if r.editor_id() not in already]
     # An edit that has already been made is not made twice. A recipe that already
     # asks for a handle would otherwise gain a second one on every run.
