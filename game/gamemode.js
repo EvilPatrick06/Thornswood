@@ -38761,8 +38761,11 @@ log('gamemode loaded:',
                         'and the ranks you earn stay yours if it ends.',
                master: name + ' is your apprentice in ' + nameOf(half) + '. /apprentice end ' + name + ' ends it.' };
     }
-    return { learner: who.name + ' taught you novice ' + nameOf(half) + '. It is in your recipe book on K, and it ' +
-                      'never climbs past novice. It is one of your two outside trades.',
+    var school = P.TABLE.schools.indexOf(half) !== -1;
+    return { learner: who.name + ' taught you novice ' + nameOf(half) + '. ' +
+                      (school ? 'You can learn ' + P.TABLE.limits.outsiderSpells + ' novice spells of it, each from its tome'
+                              : 'It is in your recipe book on K') +
+                      ', and it never climbs past novice. It is one of your two outside trades.',
              master: 'You taught ' + name + ' novice ' + nameOf(half) + '. /apprentice end ' + name + ' ends it.' };
   }
 
