@@ -28238,6 +28238,15 @@ log('gamemode loaded:',
           if (dvid) devRoleIds[dvid] = true;
         }
       }
+      // The trading company's Discord role (#1393), from the same answer.
+      // An application like a Jarl's: asked for in Discord, given by a person.
+      var companyIds = {};
+      if (Array.isArray(doc.companyProfiles)) {
+        for (var co = 0; co < doc.companyProfiles.length; co++) {
+          var coid = Number(doc.companyProfiles[co]);
+          if (coid) companyIds[coid] = true;
+        }
+      }
       var accounts = {};
       if (Array.isArray(doc.people)) {
         for (var pe = 0; pe < doc.people.length; pe++) {
@@ -28249,7 +28258,7 @@ log('gamemode loaded:',
           }
         }
       }
-      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, jarlIds: jarlIds, staffRoleIds: staffRoleIds, devRoleIds: devRoleIds, businessIds: businessIds, factionIds: factionIds, accounts: accounts, count: Object.keys(ids).length };
+      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, jarlIds: jarlIds, staffRoleIds: staffRoleIds, devRoleIds: devRoleIds, businessIds: businessIds, factionIds: factionIds, companyIds: companyIds, accounts: accounts, count: Object.keys(ids).length };
     } catch (e) {
       list = null;
     }
@@ -28312,6 +28321,16 @@ log('gamemode loaded:',
 (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodIsJarl = function (profileId) {
     var l = load();
     return passProved(profileId) && !!(l && l.jarlIds && l.jarlIds[Number(profileId)]);
+  };
+
+  /*
+    The Free Skyrim Trading Company's Discord role on the account (#1393).
+    Accepted on an application in Discord, the same shape as a Jarl's. It is
+    what lets a character handle a company sale, in the property block.
+  */
+  (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodIsCompany = function (profileId) {
+    var l = load();
+    return passProved(profileId) && !!(l && l.companyIds && l.companyIds[Number(profileId)]);
   };
 
   /*
@@ -28552,6 +28571,7 @@ log('gamemode loaded:',
       businessOwnerProfiles: merged(doc.businessOwnerProfiles, had.businessOwnerProfiles),
       factionOwnerProfiles: merged(doc.factionOwnerProfiles, had.factionOwnerProfiles),
       devRoleProfiles: merged(doc.devRoleProfiles, had.devRoleProfiles),
+      companyProfiles: merged(doc.companyProfiles, had.companyProfiles),
       people: people
     };
   }
@@ -28664,6 +28684,7 @@ log('gamemode loaded:',
             doc.businessOwnerProfiles = kept.businessOwnerProfiles;
             doc.factionOwnerProfiles = kept.factionOwnerProfiles;
             doc.devRoleProfiles = kept.devRoleProfiles;
+            doc.companyProfiles = kept.companyProfiles;
             doc.people = kept.people;
             note(doc.failedProfiles.length + ' profiles could not be checked with Discord ' +
                  'and keep the standing they had' +
@@ -28682,6 +28703,10 @@ log('gamemode loaded:',
               businessOwnerProfiles: Array.isArray(doc.businessOwnerProfiles) ? doc.businessOwnerProfiles : [],
               factionOwnerProfiles: Array.isArray(doc.factionOwnerProfiles) ? doc.factionOwnerProfiles : [],
               devRoleProfiles: Array.isArray(doc.devRoleProfiles) ? doc.devRoleProfiles : [],
+              // The Free Skyrim Trading Company's role (#1393), for a
+              // company sale. Without this line the door read a list it
+              // never wrote.
+              companyProfiles: Array.isArray(doc.companyProfiles) ? doc.companyProfiles : [],
               people: doc.people || [],
               // Staff bans with why and until (#412), from the site's own
               // file rather than Discord, so they are fresh even when the
@@ -35686,6 +35711,74 @@ log('gamemode loaded:',
   }
 
   /*
+    COIN OFF A HOLD'S LEDGER (#1393), deposit's other half.
+
+    Only the payouts docs/systems/trading-company.md names take coin off a
+    ledger: a haul's pay to its hauler, and a haul's pay back to its poster.
+    A letter's 15 is the other, and payHeld pays that. The caller puts the
+    same count back into a pack in the same step (payOut), so the coin was
+    already in the world: this counts it off, and creates nothing.
+
+    HELD PAY STAYS ON THE LEDGER. An open letter's 15 (#1374: letter, not
+    down, pay above 0) and an open haul's pay are counted here until they
+    are paid or handed back, and so is a haul's gold owed to somebody who was
+    away when it came down (owed, see handHaul). A withdrawal never takes
+    them: what is left after it is never less than what is still held, so a
+    courier or a hauler is never refused because the ledger was spent.
+    `releasing` is the one letter or haul on this hold's board whose own held
+    gold this is, so paying a haul out of its own pay is not refused for
+    being held, and never more than it holds.
+
+    mayWithdraw answers why not, or '' when it may. withdraw takes it off
+    and answers true, or false with nothing changed.
+  */
+  /** What one notice holds on its ledger: an open letter's or haul's pay, or a haul's owed gold. */
+  function noticeHolds(x) {
+    if (!x || !(x.letter || x.haul)) { return 0; }
+    var owed = x.haul ? (Math.floor(Number(x.owed)) || 0) : 0;
+    if (owed > 0) { return owed; }
+    if (x.down) { return 0; }
+    var pay = Math.floor(Number(x.pay)) || 0;
+    return pay > 0 ? pay : 0;
+  }
+
+  function heldOn(hold, releasing) {
+    var list = notices[hold] || [];
+    var held = 0;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] !== releasing) { held += noticeHolds(list[i]); }
+    }
+    return held;
+  }
+
+  function mayWithdraw(hold, amount, releasing) {
+    var key = String(hold || '').toLowerCase();
+    var n = Number(amount);
+    if (LEDGER_HOLDS.indexOf(key) < 0) { return 'that is not one of the ten ledgers.'; }
+    if (!Number.isInteger(n) || n <= 0) { return 'that is not a whole number of gold.'; }
+    if (releasing) {
+      if ((notices[key] || []).indexOf(releasing) < 0 || !noticeHolds(releasing)) { return 'that is not held on ' + key + '\'s ledger.'; }
+      if (n > noticeHolds(releasing)) { return 'that is more than it holds.'; }
+    }
+    var have = Number(funds[key]) || 0;
+    var held = heldOn(key, releasing || null);
+    if (have - n < held) {
+      return key + '\'s ledger has ' + have + ' gold, and ' + held + ' of it is held for letters and hauls.';
+    }
+    return '';
+  }
+
+  function withdraw(hold, amount, reason, releasing) {
+    if (mayWithdraw(hold, amount, releasing)) { return false; }
+    var key = String(hold).toLowerCase();
+    var n = Number(amount);
+    funds[key] = (Number(funds[key]) || 0) - n;
+    save();
+    plog(n, 'gold off', key + '\'s ledger:', String(reason || 'no reason given'));
+    return true;
+  }
+
+  /*
     ------------------------------------------------------------------- rent
 
     A rented property is the same claim with an amount and a clock. The server
@@ -36619,10 +36712,11 @@ log('gamemode loaded:',
           job: !!n.job,
           letter: !!n.letter,
           name: n.name || 'somebody',
-          text: n.letter ? sealed(n) : (n.text || ''),
+          text: n.letter ? sealed(n) : (n.haul ? haulText(n) : (n.text || '')),
           taken: n.taken ? (n.takenName || 'somebody') : '',
           mine: Number(n.by) === Number(profileId),
-          held: !!(n.job && Number(n.taken) === Number(profileId))
+          held: !!(n.job && Number(n.taken) === Number(profileId)),
+          haul: !!n.haul
         });
       }
       for (var h in notices) {
@@ -36631,9 +36725,40 @@ log('gamemode loaded:',
         for (var j = 0; j < rows.length; j++) {
           var job = rows[j];
           if (job.job && Number(job.taken) === Number(profileId) && !job.down) {
-            mine.push({ hold: h, n: j + 1, text: job.letter ? sealed(job) : (job.text || ''),
+            mine.push({ hold: h, n: j + 1, text: job.letter ? sealed(job) : (job.haul ? haulText(job) : (job.text || '')),
                         name: job.name || 'somebody' });
           }
+        }
+      }
+    }
+    /*
+      THE HAUL'S TWO BUTTONS (#1393). Send a haul needs the towns it can go
+      to, every board but this one. Confirm needs the hauls that came here:
+      taken, not down, and for the person who posted it or a steward, the
+      two confirmHaul lets through. A steward also takes a haul down from
+      the wall, which unpin lets them do.
+    */
+    var steward = here && isSteward(profileId, actorId);
+    var dests = [];
+    var arrivals = [];
+    if (here) {
+      for (var d = 0; d < LEDGER_HOLDS.length; d++) {
+        var to = LEDGER_HOLDS[d];
+        if (to === hold || !Object.prototype.hasOwnProperty.call(boards, to)) { continue; }
+        dests.push({ hold: to, where: (boards[to] && boards[to].where) || to });
+      }
+      for (var f = 0; f < LEDGER_HOLDS.length; f++) {
+        var from = LEDGER_HOLDS[f];
+        var sent = notices[from] || [];
+        for (var a = 0; a < sent.length; a++) {
+          var hl = sent[a];
+          if (!hl || !hl.haul || hl.down || hl.dest !== hold || !hl.taken) { continue; }
+          if (Number(hl.by) !== Number(profileId) && !steward) { continue; }
+          if (Number(hl.taken) === Number(profileId)) { continue; }
+          var hp = Math.floor(Number(hl.pay)) || 0;
+          arrivals.push({ from: from, where: (boards[from] && boards[from].where) || from,
+                          n: a + 1, name: hl.name || 'somebody', text: hl.text || '',
+                          hauler: hl.takenName || 'somebody', pay: hp, kept: haulTenth(hp) });
         }
       }
     }
@@ -36656,7 +36781,10 @@ log('gamemode loaded:',
       paid: Number(funds[hold]) || 0,
       wall: wall,
       jobs: mine,
-      submit: submit
+      submit: submit,
+      steward: steward,
+      dests: dests,
+      arrivals: arrivals
     };
   }
 
@@ -36910,7 +37038,7 @@ log('gamemode loaded:',
       if (n.down) { continue; }
       lines.push('[' + (i + 1) + '] ' + (n.letter
         ? 'letter for ' + n.to + ', from ' + n.name + (n.taken ? ', taken by ' + n.takenName : '')
-        : (n.job ? (n.taken ? 'job, taken: ' : 'job: ') : '') + n.name + ': ' + n.text));
+        : (n.job ? (n.taken ? 'job, taken: ' : 'job: ') : '') + n.name + ': ' + (n.haul ? haulText(n) : n.text)));
       shown++;
     }
     var more = up > shown
@@ -36983,6 +37111,15 @@ log('gamemode loaded:',
       refreshPanel(actorId);
       return true;
     }
+    if (n.haul) {
+      var tenth = haulTenth(n.pay);
+      plog(who, 'took a haul in', hold, 'to', n.dest + ':', n.text);
+      toProfile(profileId, 'You take the haul to ' + n.dest + ': ' + n.text + '. At ' + n.dest + '\'s board, ' +
+                n.name + ' or a steward confirms it on the board, and ' +
+                (n.pay - tenth) + ' gold is yours. The company keeps ' + tenth + '.');
+      refreshPanel(actorId);
+      return true;
+    }
     plog(who, 'took a job in', hold + ':', n.text);
     toProfile(profileId, 'You take it: ' + n.text + '. Go and see ' + n.name + ' about it.');
     refreshPanel(actorId);
@@ -36999,7 +37136,8 @@ log('gamemode loaded:',
         var n = list[i];
         if (n.job && n.taken === profileId && !n.down) {
           lines.push(hold + ': ' + (n.letter ? sealed(n) + ', from ' + n.name
-                                             : n.text + ' (for ' + n.name + ')'));
+                                             : (n.haul ? '[' + (i + 1) + '] ' + haulText(n) : n.text) +
+                                               ' (for ' + n.name + ')'));
         }
       }
     }
@@ -37027,6 +37165,13 @@ log('gamemode loaded:',
       toProfile(profileId, 'That is not one of yours.');
       return true;
     }
+    /*
+      A HAUL DROPPED IS A HAUL ENDED, #1393. docs/systems/trading-company.md:
+      on a drop the pay returns to the poster's pack and the ledger goes down
+      by that pay, and the fee stays. A haul with its pay gone cannot sit on
+      the board for somebody else, so it comes down.
+    */
+    if (n.haul) { return cancelHaul(hold, at, n, 'drop', actorId, profileId, toProfile); }
     n.taken = 0;
     n.takenName = null;
     save();
@@ -37091,13 +37236,23 @@ log('gamemode loaded:',
       toProfile(profileId, 'That one is already down.');
       return true;
     }
-    if (n.by !== profileId) {
+    /*
+      A STEWARD CANCELS A HAUL, #1393, open or taken, at the board it was
+      posted on. The pay goes back to the poster and the fee stays, the same
+      as the poster's own /unpin before anybody has taken it.
+    */
+    var stewardHaul = !!n.haul && isSteward(profileId, actorId);
+    if (n.by !== profileId && !stewardHaul) {
       toProfile(profileId, 'That is not yours to take down.');
       return true;
     }
-    if (n.job && n.taken) {
+    if (n.job && n.taken && !stewardHaul) {
       toProfile(profileId, n.takenName + ' has taken that job. It can come down once they hand it back.');
       return true;
+    }
+    if (n.haul) {
+      return cancelHaul(hold, at, n, Number(n.by) === Number(profileId) ? 'own' : 'steward',
+                        actorId, profileId, toProfile);
     }
     /*
       A LETTER'S PAY COMES BACK, #1374. The board fee stays, like any
@@ -37303,6 +37458,391 @@ log('gamemode loaded:',
     } catch (e2) { return false; }
   }
 
+  /*
+    ------------------------------------------------------------- a haul
+
+    NOBODY TYPES THESE. Patrick, 4 Oct: no chat commands for anything people
+    do, only buttons and GUI. The board panel (game/ui/thornswood-board.js)
+    sends them, the way it sends /job and /take:
+
+        /haul 80 riften a crate of iron ingots    Send a haul, at the board it leaves from
+        /haul done whiterun 4                     Confirm, at the board it went to
+
+    so /haul is in WORDS and kept out of PLAYER_WORDS, and nothing a person
+    reads names it.
+
+    #1393, as docs/systems/trading-company.md has it. A haul is a job on a
+    board with a pay and a destination hold. Posting it takes the job fee,
+    30, and the pay in full, never halved, and both go onto the posting
+    hold's ledger. The pay is held there the way a letter's 15 is, until the
+    haul is confirmed or taken down.
+
+    /take and /jobs treat it as any job. It comes down before it is delivered
+    three ways, and each hands the pay back out of the ledger to the poster
+    and keeps the fee (cancelHaul): the hauler's /dropjob, the poster's /unpin
+    before anybody has taken it, and a steward's /unpin at the posting board,
+    open or taken. Nothing was delivered, so the company keeps no tenth.
+
+    On a confirm, by the poster or a steward, standing at the board the haul
+    named, the company keeps a tenth of the pay, rounded down, and nothing
+    under 10 gold. The hauler is handed the rest out of the ledger, so the
+    ledger drops by what the hauler received and keeps the fee and the tenth.
+    It is the poster's gold moving, never new gold.
+
+    AN ORDINARY JOB IS NOT A HAUL. A confirm answers only a job posted as a
+    haul, and the taker of an ordinary job is still paid nothing by the
+    server.
+
+    SOMEBODY AWAY IS PAID WHEN THEY ARE BACK. The server hands gold to a pack,
+    and a pack is written only while its owner is in the world. When the
+    hauler on a confirm, or the poster on a drop or a steward's cancel, is
+    away, the haul still comes down, and what is theirs stays held on the
+    ledger as owed to them (handHaul). haulTick hands it over the next time
+    they are in the world, the way a bed's takings wait for a holder who is
+    away (#1392). Nothing else can spend it in the meantime.
+  */
+  var HAUL_TENTH_FROM = 10;
+  var HAUL_EVERY_MS = 5000;
+
+  /** The company's tenth of a pay: rounded down, and nothing under 10. */
+  function haulTenth(pay) {
+    var p = Math.floor(Number(pay)) || 0;
+    return p < HAUL_TENTH_FROM ? 0 : Math.floor(p / 10);
+  }
+
+  /** A haul's line on the wall, the panel and /jobs: where it goes and the pay. */
+  function haulText(n) {
+    return 'haul to ' + n.dest + ' for ' + (Math.floor(Number(n.pay)) || 0) + ' gold: ' + (n.text || '');
+  }
+
+  /* What a person is told when the panel's line is short of something. */
+  var HAUL_HOW = 'A haul is sent from the notice board: click the board, and fill in Send a haul. ' +
+                 'It is confirmed on the board of the hold it went to.';
+
+  function haulCmd(parts, actorId, profileId, toProfile) {
+    var first = (parts && parts.length > 1) ? String(parts[1]).trim().toLowerCase() : '';
+    if (first === 'done') { return confirmHaul(parts, actorId, profileId, toProfile); }
+    if (!first) {
+      toProfile(profileId, HAUL_HOW);
+      return true;
+    }
+    return postHaul(parts, actorId, profileId, toProfile);
+  }
+
+  function postHaul(parts, actorId, profileId, toProfile) {
+    var hold = boardHere(actorId);
+    if (!hold) {
+      toProfile(profileId, 'Stand at the board of the hold you are sending from to post a haul.');
+      return true;
+    }
+    var word = String(parts[1] || '').trim();
+    var pay = /^\d+$/.test(word) ? Number(word) : 0;
+    if (!(pay > 0) || !Number.isSafeInteger(pay)) {
+      toProfile(profileId, 'The pay is a whole number of gold, above nothing. ' + HAUL_HOW);
+      return true;
+    }
+    var dest = String(parts[2] || '').trim().toLowerCase();
+    if (LEDGER_HOLDS.indexOf(dest) < 0 || !Object.prototype.hasOwnProperty.call(boards, dest)) {
+      toProfile(profileId, 'A haul goes to one of the ten towns: ' + LEDGER_HOLDS.join(', ') + '.');
+      return true;
+    }
+    if (dest === hold) {
+      toProfile(profileId, 'A haul goes from one hold to another, and this is ' + hold + '\'s board.');
+      return true;
+    }
+    var text = parts.slice(3).join(' ').trim();
+    if (!text) {
+      toProfile(profileId, 'Say what it carries. ' + HAUL_HOW);
+      return true;
+    }
+    var cost = JOB_FEE + pay;
+    if (!Number.isSafeInteger(cost) || !takeGold(actorId, cost)) {
+      toProfile(profileId, 'That costs ' + cost + ' gold, ' + JOB_FEE + ' for the board and the ' + pay +
+                ' pay, and you do not have it. Nothing was taken.');
+      return true;
+    }
+    var who = 'somebody';
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      if (ap && ap.name) { who = String(ap.name); }
+    } catch (e) { }
+    if (!notices[hold]) { notices[hold] = []; }
+    notices[hold].push({ by: profileId, name: who, text: text, at: Date.now(),
+                         job: true, haul: true, dest: dest, pay: pay, taken: 0 });
+    // deposit saves the notice with the coin, so the two cannot part.
+    if (!deposit(hold, cost, 'a haul to ' + dest + ': the ' + JOB_FEE + ' fee, and ' + pay + ' pay held')) {
+      notices[hold].pop();
+      payOut(actorId, cost);
+      toProfile(profileId, 'That did not work. Nothing was taken.');
+      return true;
+    }
+    plog(who, 'posted a haul in', hold, 'to', dest, 'for', pay, 'gold and the', JOB_FEE, 'fee');
+    toProfile(profileId, 'Your haul to ' + dest + ' is on the board in ' + hold + ', number ' +
+              notices[hold].length + '. That cost ' + cost + ' gold: ' + JOB_FEE + ' for the board, and the ' +
+              pay + ' pay, held until it is confirmed at ' + dest + '.');
+    refreshPanel(actorId);
+    return true;
+  }
+
+  function confirmHaul(parts, actorId, profileId, toProfile) {
+    var standing = boardHere(actorId);
+    if (!standing) {
+      toProfile(profileId, 'Stand at the board of the hold the haul went to.');
+      return true;
+    }
+    var from = String(parts[2] || '').trim().toLowerCase();
+    var num = Number(parts[3] || 0);
+    if (LEDGER_HOLDS.indexOf(from) < 0 || !Number.isInteger(num) || num < 1) {
+      toProfile(profileId, 'That haul is not on any board. ' + HAUL_HOW);
+      return true;
+    }
+    var at = num - 1;
+    var n = (notices[from] || [])[at];
+    if (!n) {
+      toProfile(profileId, 'There is no number ' + num + ' on ' + from + '\'s board.');
+      return true;
+    }
+    if (!n.haul) {
+      toProfile(profileId, 'That is not a haul. What an ordinary job is worth is between the two people, ' +
+                'and the server pays nothing for it.');
+      return true;
+    }
+    if (n.down) {
+      toProfile(profileId, 'That haul is already paid or taken down.');
+      return true;
+    }
+    if (standing !== n.dest) {
+      toProfile(profileId, 'That haul goes to ' + n.dest + '. It is confirmed at ' + n.dest + '\'s board.');
+      return true;
+    }
+    if (Number(n.by) !== Number(profileId) && !isSteward(profileId, actorId)) {
+      toProfile(profileId, 'Only the person who posted it, or a steward, confirms a haul.');
+      return true;
+    }
+    if (!n.taken) {
+      toProfile(profileId, 'Nobody has taken that haul.');
+      return true;
+    }
+    if (Number(n.taken) === Number(profileId)) {
+      toProfile(profileId, 'The hauler does not confirm their own haul. The person who posted it, or a steward, does.');
+      return true;
+    }
+    var pay = Math.floor(Number(n.pay)) || 0;
+    var tenth = haulTenth(pay);
+    var got = pay - tenth;
+    var r = handHaul(from, n, Number(n.taken), got,
+                     'haul ' + num + ' to ' + n.dest + ' delivered, ' + tenth + ' kept for the company', 'hauled');
+    if (r.why) {
+      plog('a haul in', from, 'could not be paid:', r.why);
+      toProfile(profileId, 'That did not work: ' + r.why + ' Nothing was paid.');
+      return true;
+    }
+    n.paid = got;
+    n.kept = tenth;
+    n.done = Date.now();
+    n.doneBy = profileId;
+    takedown(from, at, profileId);
+    var hauled = n.takenName || 'The hauler';
+    var kept = tenth ? ', and the company keeps ' + tenth + '.' : '. Under 10 gold, the company keeps nothing.';
+    if (r.owed) {
+      plog(hauled, 'is owed', got, 'for a haul from', from, 'to', n.dest, 'and the company kept', tenth);
+      toProfile(profileId, 'The haul from ' + from + ' is in: ' + n.text + '. ' + hauled + ' is away, so the ' + got +
+                ' gold is held on ' + from + '\'s ledger for them until they are next in the world' + kept);
+    } else {
+      plog(hauled, 'was paid', got, 'for a haul from', from, 'to', n.dest, 'and the company kept', tenth);
+      toProfile(profileId, 'The haul from ' + from + ' is in: ' + n.text + '. ' + hauled + ' is paid ' + got +
+                ' gold out of ' + from + '\'s ledger' + kept);
+      toProfile(n.taken, 'Your haul to ' + n.dest + ' is confirmed. ' + got + ' gold is in your pack.' +
+                (tenth ? ' The company kept ' + tenth + '.' : ''));
+    }
+    if (Number(n.by) !== Number(profileId)) {
+      toProfile(n.by, 'Your haul to ' + n.dest + ' was confirmed by a steward. ' + hauled + ' ' +
+                (r.owed ? 'is owed ' : 'was paid ') + got + '.');
+    }
+    refreshPanel(actorId);
+    if (r.to) { refreshPanel(r.to); }
+    return true;
+  }
+
+  /*
+    A haul's held gold to one person: `amount` of what n holds on `hold`'s
+    ledger, to the profile `toPid`. In the world, it goes into their pack now
+    and the same comes off the ledger. Away, nothing leaves the ledger: n holds
+    it as owed to them, and haulTick hands it over when they are next in the
+    world. Either way n.pay is 0 after, so the haul is paid once. `owedFor` is
+    'hauled' or 'back', for the line they read then.
+
+    Answers { why } with nothing changed when it cannot, otherwise { owed } and
+    the actor it was paid to, { to }.
+  */
+  function handHaul(hold, n, toPid, amount, reason, owedFor) {
+    var why = mayWithdraw(hold, amount, n);
+    if (why) { return { why: why }; }
+    var to = onlineActorOf(toPid);
+    if (!to) {
+      n.pay = 0;
+      n.owed = amount;
+      n.owedTo = toPid;
+      n.owedFor = owedFor;
+      save();
+      plog(amount, 'gold held on', hold + '\'s ledger for', toPid, 'until they are in the world:', reason);
+      return { owed: true, to: 0 };
+    }
+    if (!payOut(to, amount)) { return { why: 'their pack could not be written.' }; }
+    withdraw(hold, amount, reason, n);
+    n.pay = 0;
+    return { owed: false, to: to };
+  }
+
+  /*
+    What a haul owes somebody who was away, into their pack now they are in
+    the world, and off the ledger it was held on. A ledger that cannot pay it
+    is written to the log once a boot, and the gold stays held.
+  */
+  var haulShort = {};
+  function haulTick() {
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
+    if (!online.length) { return; }
+    var here = {};
+    for (var i = 0; i < online.length; i++) {
+      var pid = profileOf(online[i]);
+      if (pid) { here[pid] = online[i]; }
+    }
+    for (var h = 0; h < LEDGER_HOLDS.length; h++) {
+      var hold = LEDGER_HOLDS[h];
+      var list = notices[hold] || [];
+      for (var j = 0; j < list.length; j++) {
+        var n = list[j];
+        var owed = (n && n.haul) ? (Math.floor(Number(n.owed)) || 0) : 0;
+        if (!(owed > 0) || !here[Number(n.owedTo)]) { continue; }
+        var to = here[Number(n.owedTo)];
+        var why = mayWithdraw(hold, owed, n);
+        if (why) {
+          if (!haulShort[hold + ':' + j]) {
+            haulShort[hold + ':' + j] = true;
+            plog('haul', j + 1, 'in', hold, 'owes', owed, 'and cannot pay it:', why);
+          }
+          continue;
+        }
+        if (!payOut(to, owed)) { continue; }
+        withdraw(hold, owed, 'haul ' + (j + 1) + ' to ' + n.dest + ', held for somebody who was away', n);
+        n.owed = 0;
+        save();
+        var line = n.owedFor === 'hauled'
+          ? 'While you were away, your haul to ' + n.dest + ' was confirmed. ' + owed + ' gold is in your pack.' +
+            ((Number(n.kept) || 0) ? ' The company kept ' + n.kept + '.' : '')
+          : 'While you were away, your haul to ' + n.dest + ' came down. The ' + owed +
+            ' gold pay is back in your pack. The fee stays with ' + hold + '.';
+        plog('handed', owed, 'gold of a haul in', hold, 'to', personName(to));
+        try { notify(to, line); } catch (e2) { }
+        try { say(to, line); } catch (e3) { }
+      }
+    }
+  }
+
+  if (g.__thornswoodHaulTimer) { try { clearInterval(g.__thornswoodHaulTimer); } catch (e) { } }
+  g.__thornswoodHaulTimer = setInterval(
+    (typeof guard === 'function') ? guard('haulTick', haulTick) : haulTick, HAUL_EVERY_MS);
+
+  /*
+    A haul comes down before it is delivered: the hauler's /dropjob, the
+    poster's /unpin before anybody has taken it, or a steward's /unpin at the
+    posting board, open or taken. `how` is 'drop', 'own' or 'steward'. The
+    pay goes back out of the ledger to the poster, held for them while they
+    are away (handHaul), and the fee stays. Nothing was delivered, so the
+    company's tenth is not taken. Who may has been settled by the caller.
+  */
+  function cancelHaul(hold, at, n, how, actorId, profileId, toProfile) {
+    var pay = Math.floor(Number(n.pay)) || 0;
+    var owed = false;
+    if (pay > 0) {
+      var r = handHaul(hold, n, Number(n.by), pay,
+                       'a haul to ' + n.dest + ' taken down, the pay back to ' + n.name, 'back');
+      if (r.why) {
+        toProfile(profileId, 'That did not work: ' + r.why + ' The haul is still up' +
+                  (how === 'drop' ? ', and still yours.' : '.'));
+        return true;
+      }
+      owed = r.owed;
+    }
+    n.back = pay;
+    takedown(hold, at, profileId);
+    var later = owed ? ' when they are next in the world' : '';
+    var fee = 'The fee stays with ' + hold + '.';
+    plog(how === 'drop' ? (n.takenName || 'the hauler') + ' dropped' : (how === 'own' ? n.name : 'a steward') + ' took down',
+         'a haul to', n.dest, 'in', hold, 'and', pay, owed ? 'is held for' : 'went back to', n.name);
+    if (how === 'own') {
+      toProfile(profileId, 'You take the haul down. The ' + pay + ' gold pay comes back to you. ' + fee);
+    } else if (how === 'drop') {
+      toProfile(profileId, 'You hand the haul to ' + n.dest + ' back. It comes down, and the ' + pay +
+                ' gold pay goes back to ' + n.name + later + '. ' + fee);
+      if (!owed) {
+        toProfile(n.by, (n.takenName || 'The hauler') + ' handed your haul to ' + n.dest + ' back. The ' + pay +
+                  ' gold pay is back in your pack. ' + fee);
+      }
+    } else {
+      toProfile(profileId, 'You take ' + n.name + '\'s haul to ' + n.dest + ' down. The ' + pay +
+                ' gold pay goes back to them' + later + '. ' + fee);
+      if (!owed) {
+        toProfile(n.by, 'A steward took your haul to ' + n.dest + ' down. The ' + pay +
+                  ' gold pay is back in your pack. ' + fee);
+      }
+    }
+    if (how !== 'drop' && n.taken && Number(n.taken) !== Number(profileId)) {
+      toProfile(n.taken, 'The haul to ' + n.dest + ' you took was taken down by a steward. It is off your list.');
+    }
+    refreshPanel(actorId);
+    return true;
+  }
+
+  /*
+    ------------------------------------------- a sale out of Skyrim
+
+    #1393, docs/systems/trading-company.md "Sales that leave the world". At a
+    company event somebody sells a thing out of Skyrim. The company buys it
+    through the worker who handles the sale, and the thing leaves the world.
+    It does not come back into a chest.
+
+    IT IS A TRADE, ON THE TRADE PANEL. Patrick, 4 Oct: no chat commands for
+    anything people do. The worker and the seller open an ordinary trade with
+    the key on the look prompt, and the worker presses Buy for the company on
+    the panel. The trade block moves it (saleSwap there). These two are the
+    company's half of it: the cuts, and who may.
+
+    AN ITEM HAS NO GOLD PRICE OF ITS OWN. The price is the gold the worker
+    puts up and the two of them agree to on the panel, the way any trade is
+    agreed. Any change to either side takes both agreements back.
+
+    THE CUTS. The worker takes 10% of the price, rounded down, and another 10%
+    leaves the server. The seller receives the rest. Under 10 gold neither cut
+    is taken and the seller receives the whole price. The price comes out of
+    the worker's pack, the company's coin in their hands, and the worker's own
+    10% is never taken from it, so the worker pays the price less their cut.
+    No coin is created and none goes onto a ledger: the 10% that leaves is
+    destroyed. Where the price comes from is asked on #1393.
+
+    WHO MAY. A character on an account the company has taken on: the Discord
+    role an application in Discord leads to (__thornswoodIsCompany), or an
+    admin testing the chain, the same as a Jarl.
+  */
+  var SALE_CUT_FROM = 10;
+
+  /** A price split: the worker's 10%, the 10% that leaves, and the seller's rest. */
+  function saleCuts(price) {
+    var p = Math.floor(Number(price)) || 0;
+    if (p < SALE_CUT_FROM) { return { price: p, worker: 0, gone: 0, seller: p }; }
+    var tenth = Math.floor(p / 10);
+    return { price: p, worker: tenth, gone: tenth, seller: p - tenth - tenth };
+  }
+
+  function inCompany(profileId) {
+    var adm = g['__thornswoodIsAdmin'];
+    try { if (typeof adm === 'function' && adm(profileId)) { return true; } } catch (e) { }
+    var fn = g['__thornswoodIsCompany'];
+    try { return typeof fn === 'function' && !!fn(profileId); } catch (e2) { return false; }
+  }
+
   function command(word, parts, actorId, profileId, toProfile) {
     if (word === '/deed' || word === '/deeds') {
       return deeds(actorId, profileId, toProfile);
@@ -37334,6 +37874,7 @@ log('gamemode loaded:',
     if (word === '/unpin') { return unpin(parts, actorId, profileId, toProfile); }
     if (word === '/letter') { return postLetter(parts, actorId, profileId, toProfile); }
     if (word === '/deliver') { return deliver(parts, actorId, profileId, toProfile); }
+    if (word === '/haul') { return haulCmd(parts, actorId, profileId, toProfile); }
     return false;
   }
 
@@ -37491,6 +38032,8 @@ log('gamemode loaded:',
     isJarl: isJarl, isSteward: isSteward,
     touchedBox: touchedBox, putIn: putIn, holdOfBox: holdOfBox,
     deposit: deposit, takeGold: takeGold, LEDGER_HOLDS: LEDGER_HOLDS,
+    withdraw: withdraw, mayWithdraw: mayWithdraw, heldOn: heldOn,
+    haulTenth: haulTenth, haulTick: haulTick, saleCuts: saleCuts, inCompany: inCompany,
     holdStanding: holdStanding,
     rentDue: rentDue, funds: function () { return funds; },
     boxes: function () { return boxes; },
@@ -40778,6 +41321,7 @@ log('gamemode loaded:',
         word === '/steward' || word === '/evict' || word === '/box' ||
         word === '/rent' || word === '/bed' || word === '/notice' || word === '/job' ||
         word === '/board' || word === '/take' || word === '/jobs' ||
+        word === '/haul' ||
         word === '/letter' || word === '/deliver' ||
         word === '/dropjob' || word === '/unpin') {
       if (!actorId) {
@@ -44418,6 +44962,10 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/jarl', '/steward', '/evict', '/box', '/rent', '/bed',
                '/notice', '/job', '/board', '/take', '/jobs', '/dropjob', '/unpin',
                '/letter', '/deliver',
+               // A haul (#1393). Sent by the board panel's Send a haul and
+               // Confirm buttons, never typed, and so deliberately NOT in
+               // PLAYER_WORDS. See the property block.
+               '/haul',
                '/tp', '/goto', '/face', '/restart', '/shutdown', '/tspicks',
                // Playtesters', like /tp, and gated the same way. Deliberately
                // absent from PLAYER_WORDS: naming them in /help would be an
@@ -45820,12 +46368,14 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         var live = tr2.tradeOf(actorId);
         var verb = String(parts[1] || '').toLowerCase();
         if (live || verb === 'cancel' || verb === 'ok' || verb === 'add' ||
-            verb === 'remove' || verb === 'gold' || verb === 'pack') {
+            verb === 'remove' || verb === 'gold' || verb === 'pack' || verb === 'sale') {
           if (!live) { toProfile(profileId, 'You are not trading.'); return true; }
           var out = '';
           if (verb === 'cancel') { out = tr2.cancel(actorId); }
           else if (verb === 'ok') { out = tr2.confirm(actorId); }
           else if (verb === 'gold') { out = tr2.gold(actorId, parts[2]); }
+          // The panel's Buy for the company (#1393). Never typed.
+          else if (verb === 'sale') { out = tr2.sale(actorId); }
           else if (verb === 'remove') {
             var rbits = parts.slice(2);
             var rn = 0;
@@ -51871,7 +52421,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var t = {
       a: aActor, b: bActor,
       offerA: [], offerB: [], goldA: 0, goldB: 0,
-      okA: false, okB: false, at: Date.now()
+      okA: false, okB: false, at: Date.now(),
+      // The company worker buying, when it is a sale out of Skyrim (#1393).
+      sale: 0
     };
     open[aActor] = t; open[bActor] = t;
     trades.push(t);
@@ -52098,6 +52650,60 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     return '';
   }
 
+  /*
+    A SALE OUT OF SKYRIM, #1393, docs/systems/trading-company.md. At a company
+    event somebody sells a thing out of Skyrim, and the company buys it
+    through a worker. Patrick, 4 Oct: no chat commands for anything people
+    do. So it is this panel: the two open an ordinary trade with the key, and
+    the worker presses Buy for the company. Then what the other person puts
+    up leaves the world instead of crossing, and the gold the worker puts up
+    is the price the two of them agree, split by the property block's
+    saleCuts (saleSwap). Pressing it again makes it an ordinary trade. Either
+    way both agreements are taken back, the same as any change to a pile.
+
+    Only a worker the company has taken on presses it: the property block's
+    inCompany, the Discord role an application leads to, or an admin testing
+    the chain.
+  */
+  function companyOf(actorId) {
+    var pr = g.__thornswoodProperty;
+    var pid = 0;
+    try { pid = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pid = 0; }
+    return !!(pid && pr && pr.inCompany && pr.inCompany(pid));
+  }
+
+  function sale(actorId) {
+    var t = tradeOf(actorId);
+    if (!t) { return 'You are not trading.'; }
+    if (t.sale === actorId) {
+      t.sale = 0;
+      unconfirm(t); push(t);
+      try { say(other(t, actorId), nameOf(actorId) + ' is not buying for the company now. It is an ordinary trade.'); }
+      catch (e) { }
+      return '';
+    }
+    if (t.sale) { return nameOf(t.sale) + ' is already buying for the company.'; }
+    if (!companyOf(actorId)) {
+      return 'Only somebody the Free Skyrim Trading Company has taken on buys for it. It is an application, in Discord.';
+    }
+    t.sale = actorId;
+    unconfirm(t); push(t);
+    try {
+      say(other(t, actorId), nameOf(actorId) + ' is buying for the Free Skyrim Trading Company. ' +
+          'What you put up leaves Skyrim and does not come back.');
+    } catch (e2) { }
+    return '';
+  }
+
+  /* The split of the price as the panel shows it to either side. */
+  function saleView(t, actorId) {
+    var pr = g.__thornswoodProperty;
+    var price = t.sale === t.a ? t.goldA : t.goldB;
+    var cuts = (pr && pr.saleCuts) ? pr.saleCuts(price) : { price: price, worker: 0, gone: 0, seller: price };
+    return { mine: t.sale === actorId, worker: nameOf(t.sale), price: cuts.price,
+             cut: cuts.worker, gone: cuts.gone, seller: cuts.seller };
+  }
+
   function confirm(actorId) {
     var t = tradeOf(actorId);
     if (!t) { return 'You are not trading.'; }
@@ -52126,6 +52732,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       unconfirm(t); push(t);
       return 'You have moved too far apart.';
     }
+    if (t.sale) { return saleSwap(t); }
     var GOLD = (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F;
 
     var sides = [
@@ -52178,6 +52785,125 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     tlog(nameOf(t.a), 'and', nameOf(t.b), 'traded:', whatA, 'for', whatB);
     close(t, '');
     return '';
+  }
+
+  /*
+    The company's swap (#1393). Everything is asked again here, the same as
+    swap: the worker still buys for the company, the worker's side is gold
+    and nothing else, the seller's side is things and no gold, and each
+    still holds what they put up. Then one write each (saleById): the things
+    out of the seller's pack and out of the world with the seller's share
+    in, and the price less the worker's own cut out of the worker's pack.
+    The 10% that leaves is in neither pack. Never half.
+  */
+  function saleSwap(t) {
+    var GOLD = (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F;
+    var pr = g.__thornswoodProperty;
+    var worker = t.sale;
+    var seller = other(t, worker);
+    var price = worker === t.a ? t.goldA : t.goldB;
+    var asked = seller === t.a ? t.goldA : t.goldB;
+    var things = sideOf(t, seller);
+    function refuse(why) { unconfirm(t); push(t); return why; }
+    if (!pr || !pr.saleCuts) { return refuse('That is not running on this server.'); }
+    if (!companyOf(worker)) { return refuse(nameOf(worker) + ' cannot buy for the company now.'); }
+    if (sideOf(t, worker).length) {
+      return refuse('The company pays in gold. ' + nameOf(worker) + ' takes their things off the table.');
+    }
+    if (asked > 0) { return refuse('Only the company pays in a sale. ' + nameOf(seller) + ' takes their gold off the table.'); }
+    if (!things.length) { return refuse(nameOf(seller) + ' has put up nothing to sell.'); }
+    if (!(price > 0)) { return refuse(nameOf(worker) + ' has put up no gold for it.'); }
+    if (price > holding(worker, GOLD)) { return refuse(nameOf(worker) + ' does not have that gold any more.'); }
+    for (var i = 0; i < things.length; i++) {
+      if (things[i].c > holding(seller, things[i].id)) {
+        return refuse(nameOf(seller) + ' does not have the ' + things[i].n + ' any more.');
+      }
+    }
+    var cuts = pr.saleCuts(price);
+    var cost = cuts.price - cuts.worker;
+    if (!saleById(seller, worker, things, cuts.seller, cost)) {
+      return refuse('Something went wrong moving it. Nothing was taken.');
+    }
+    var what = describe(things, 0);
+    var me = nameOf(worker), them = nameOf(seller);
+    try {
+      say(seller, 'Sold to the Free Skyrim Trading Company for ' + cuts.price + ' gold. ' + what +
+          ' left Skyrim. ' + (cuts.worker
+            ? 'You receive ' + cuts.seller + ': ' + cuts.worker + ' went to ' + me + ' for handling it, and ' +
+              cuts.gone + ' left the world.'
+            : 'Under 10 gold nothing is cut, and you receive the whole ' + cuts.price + '.'));
+      say(worker, 'Bought for the company at ' + cuts.price + ' gold. ' + what + ' left Skyrim. ' + (cuts.worker
+            ? 'It cost you ' + cost + ': your ' + cuts.worker + ' for handling it stays with you, ' + cuts.gone +
+              ' left the world, and ' + them + ' received ' + cuts.seller + '.'
+            : 'Under 10 gold nothing is cut: ' + them + ' received the whole ' + cuts.price + '.'));
+    } catch (e) { }
+    tlog(me, 'bought', them + '\'s', what, 'for the company at', cuts.price, 'gold:', cuts.seller, 'to the seller,',
+         cuts.worker, 'to the worker,', cuts.gone, 'destroyed, and the things left the world');
+    close(t, '');
+    return '';
+  }
+
+  /*
+    A pack's entries less [baseId, count] pairs, or null when they are not
+    all there. An entry that is only partly taken keeps everything else it
+    had.
+  */
+  function withoutPairs(entries, pairs) {
+    var out = entries.slice();
+    for (var i = 0; i < pairs.length; i++) {
+      var baseId = pairs[i][0], left = pairs[i][1];
+      for (var k = 0; k < out.length && left > 0; k++) {
+        if (!out[k] || out[k].baseId !== baseId) { continue; }
+        var had = out[k].count || 1;
+        var take = Math.min(left, had);
+        var rest = {};
+        for (var f in out[k]) { if (Object.prototype.hasOwnProperty.call(out[k], f)) { rest[f] = out[k][f]; } }
+        rest.count = had - take;
+        out[k] = rest;
+        left -= take;
+      }
+      if (left > 0) { return null; }
+    }
+    var keep = [];
+    for (var j = 0; j < out.length; j++) {
+      if (out[j] && (out[j].count || 0) > 0) { keep.push(out[j]); }
+    }
+    return keep;
+  }
+
+  /*
+    A company sale's two packs, one write each, or nothing at all (#1393).
+    The seller's: the things out, and out of the world, and their share in.
+    The worker's: the price less their own cut out. Gold in the seller's
+    pack goes up by less than the worker's goes down; the difference is the
+    10% that leaves the server.
+  */
+  function saleById(sellerActor, workerActor, things, share, cost) {
+    var GOLD = (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F;
+    var sellerInv, workerInv;
+    try {
+      sellerInv = mp.get(sellerActor, 'inventory') || { entries: [] };
+      workerInv = mp.get(workerActor, 'inventory') || { entries: [] };
+    } catch (e) { return false; }
+    var pairs = [];
+    for (var i = 0; i < things.length; i++) { pairs.push([things[i].id, things[i].c]); }
+    var gone = withoutPairs((sellerInv.entries || []).slice(), pairs);
+    var paid = withoutPairs((workerInv.entries || []).slice(), [[GOLD, cost]]);
+    if (!gone || !paid || !(share > 0) || !(cost >= share)) { return false; }
+    var landed = false;
+    for (var k = 0; k < gone.length; k++) {
+      if (gone[k] && gone[k].baseId === GOLD && !gone[k].worn) {
+        gone[k] = { baseId: GOLD, count: (gone[k].count || 1) + share };
+        landed = true;
+        break;
+      }
+    }
+    if (!landed) { gone.push({ baseId: GOLD, count: share }); }
+    try {
+      mp.set(sellerActor, 'inventory', { entries: gone });
+      mp.set(workerActor, 'inventory', { entries: paid });
+    } catch (e2) { return false; }
+    return true;
   }
 
   function describe(items, goldN) {
@@ -52253,6 +52979,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       theyAgreed: meA ? t.okB : t.okA,
       pack: carrying(actorId),
       heldGold: holding(actorId, (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F),
+      // A sale out of Skyrim (#1393): the split, and whether this side may
+      // press Buy for the company.
+      sale: t.sale ? saleView(t, actorId) : null,
+      canBuy: (!t.sale || t.sale === actorId) && companyOf(actorId),
       at: Date.now()
     };
   }
@@ -52328,7 +53058,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
   g.__thornswoodTrade = {
     TRADE: TRADE,
-    begin: begin, add: add, remove: remove, gold: gold,
+    begin: begin, add: add, remove: remove, gold: gold, sale: sale, saleById: saleById,
     confirm: confirm, cancel: cancel, tradeOf: tradeOf,
     carrying: carrying, labelOf: labelOf, within: within,
     view: view, push: push, refresh: refresh, tick: tick, swap: swap, moveById: moveById,

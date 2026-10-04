@@ -747,6 +747,7 @@ KINDS = [
     ('playtest',    'Apply to be an alpha playtester',
                     'How you get into the world. Anyone can apply. Break it and write down how.'),
     ('jarl',        'Apply: Jarl',          'A seat in a hold. In character, and the first ones come out of these.'),
+    ('company',     'Apply: Trading Company', 'Haul, make, sell and buy for the Free Skyrim Trading Company. In character.'),
     ('gamemaster',  'Apply: Gamemaster',    'Run events, settle disputes, hold the line in character.'),
     ('loremaster',  'Apply: Loremaster',    'Keep the history straight and write the rest of it.'),
     ('moderator',   'Apply: Moderator',     'The unglamorous one. Tickets, reports, difficult people.'),
@@ -762,6 +763,7 @@ KINDS = [
 ROLE_FOR = {
     'playtest':   'Playtester',
     'jarl':       'Jarl of the hold named below',
+    'company':    'Trading Company',
     'gamemaster': 'Gamemaster',
     'loremaster': 'Loremaster',
     'moderator':  'Moderator',
@@ -918,6 +920,16 @@ QUESTIONS = {
          'What they actually do with it. Answer as them, not as you.', True),
         ('What happens if they lose the seat?',
          'A seat that cannot be lost is not a seat. Say how you play that.', True),
+    ],
+    # The Free Skyrim Trading Company (#1393, docs/systems/trading-company.md).
+    # The same shape as a Jarl's: answered in character, and the role it
+    # leads to is what lets a character handle a company sale in the game.
+    'company': [
+        ('Who is your character?',
+         'Name, where they come from, what they have been doing until now. In character.', True),
+        ('What would they do for the company?',
+         'Haul, make, sell or buy, and what goods. Answer as them, not as you.', True),
+        ('How much time can you give it?', 'Hours a week, and which days.', True),
     ],
     'gamemaster': _job('running events',
         'Events you have run, groups you have led, tables you have DMed.'),
