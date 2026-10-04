@@ -8,7 +8,15 @@
 // do. The numbers are read off docs/systems/professions/warrior.md and held
 // against the code, so a change to either side shows here.
 //
-// Read only. Drives the real blocks out of gamemode.js over a fake mp.
+// And Patrick's answers of 4 October: every body neither table names has a
+// line, and every race in the load order is on one; the strength table wins
+// over the hunter list; Break and Wreck wait 8 seconds; the stamina is a
+// share of the person's real most, the skill tree's Endurance included; and
+// nobody types a maneuver: the maneuver key opens a panel (the front plugin
+// and game/ui/thornswood-maneuvers.js) that sends the line.
+//
+// Read only. Drives the real blocks out of gamemode.js over a fake mp, and
+// the page over a fake document.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -35,7 +43,7 @@ function cut(head) { return slice(gm, head, '\n}\n'); }
 const progression = slice(gm, '// ==== thornswood progression ====', '// ==== end thornswood progression ====');
 const maneuvers = slice(gm, '// ==== thornswood warrior maneuvers ====', '// ==== end thornswood warrior maneuvers ====');
 const killTable = slice(gm, 'const WARRIOR_KILL = {', '\n};');
-const kills = ['function warriorPieces(', 'function raceEdidOf(', 'function killPieces('].map(cut);
+const kills = ['function warriorRaceBand(', 'function warriorPieces(', 'function raceEdidOf(', 'function killPieces('].map(cut);
 const hunts = slice(gm, 'var HUNTS_BY_BASE = {', '\n};');
 const racesLine = /^const RACES = (\{.*\});$/m.exec(gm);
 const onDeath = slice(gm, "mp.onDeath = guard('onDeath', function (actorId, killerId) {", '\n});');
@@ -100,32 +108,105 @@ Object.keys(RACE_OF).forEach(function (w) {
 
 const chicken = '10929f:Skyrim.esm';
 const karhu = '291791:WindhelmSSE.esp';
+function onList(name) {
+  for (const k in K.HUNTS_BY_BASE) { if (K.HUNTS_BY_BASE[k].name === name) { return k; } }
+  return null;
+}
 yes('the chicken and Karhu are rows on the hunter list',
   K.HUNTS_BY_BASE[chicken] && K.HUNTS_BY_BASE[chicken].rank === 'novice' &&
   K.HUNTS_BY_BASE[karhu] && K.HUNTS_BY_BASE[karhu].rank === 'master');
-yes('a chicken is 1 piece', K.warriorPieces(chicken, '') === 1);
-yes('Karhu uses his own row, master, so 8, though a bear is 4', K.warriorPieces(karhu, '') === 8 &&
-  K.warriorPieces('', 'BearBrownRace') === 4);
-yes('a base on the hunter list is its row even when the race would say more',
-  K.warriorPieces(chicken, 'DragonRace') === 1);
-const anyRank = function (rank) {
-  for (const k in K.HUNTS_BY_BASE) { if (K.HUNTS_BY_BASE[k].rank === rank) { return k; } }
-  return null;
-};
-yes('an advanced body on the list is 2, an expert 4, a master 8',
-  K.warriorPieces(anyRank('advanced'), '') === 2 && K.warriorPieces(anyRank('expert'), '') === 4 &&
-  K.warriorPieces(anyRank('master'), '') === 8);
-yes('a chicken and a dragon are not the same piece', K.warriorPieces(chicken, '') !== K.warriorPieces('', 'DragonRace') &&
+yes('a chicken is 1 piece', K.warriorPieces(chicken, 'ChickenRace') === 1);
+yes('a chicken and a dragon are not the same piece', K.warriorPieces(chicken, 'ChickenRace') !== K.warriorPieces('', 'DragonRace') &&
   K.warriorPieces('', 'DragonRace') === 16);
-yes('off the list, an animal uses its kind: a sabre cat 2, a mammoth 8, a grown netch 8, a netch calf 2',
-  K.warriorPieces('', 'SabreCatRace') === 2 && K.warriorPieces('', 'MammothRace') === 8 &&
-  K.warriorPieces('', 'DLC2NetchRace') === 8 && K.warriorPieces('', 'DLC2NetchCalfRace') === 2);
+
+// Patrick's answer 2: the strength table wins over the hunter list.
+const bull = onList('Bull Netch'), betty = onList('Betty Netch'), vale = onList('Vale Sabre Cat');
+const snowy = onList('Snowy Sabre Cat'), ice = onList('Ice Wolf');
+yes('the rows the two lists disagree on are on the hunter list (bull and betty netch advanced, vale sabre cat novice, ' +
+    'snowy sabre cat expert, ice wolf advanced, Karhu master)',
+  bull && K.HUNTS_BY_BASE[bull].rank === 'advanced' && betty && K.HUNTS_BY_BASE[betty].rank === 'advanced' &&
+  vale && K.HUNTS_BY_BASE[vale].rank === 'novice' && snowy && K.HUNTS_BY_BASE[snowy].rank === 'expert' &&
+  ice && K.HUNTS_BY_BASE[ice].rank === 'advanced');
+yes('a bull netch and a betty netch are grown netch, 8, not their advanced row',
+  K.warriorPieces(bull, 'DLC2NetchRace') === 8 && K.warriorPieces(betty, 'DLC2NetchRace') === 8);
+yes('a sabre cat is 2, and a vale sabre cat is at least that: a sabre cat, 2, not its novice row',
+  K.warriorPieces('', 'SabreCatRace') === 2 && K.warriorPieces(vale, 'SabreCatRace') === 2);
+yes('a snowy sabre cat is a sabre cat, 2, and an ice wolf a wolf, 1',
+  K.warriorPieces(snowy, 'SabreCatSnowyRace') === 2 && K.warriorPieces(ice, 'WolfRace') === 1);
+yes('Karhu is a bear, 4: the strength table wins over his master row', K.warriorPieces(karhu, 'BearBrownRace') === 4);
+yes('a body on the hunter list whose race no line names counts its hunter rank',
+  K.warriorPieces(karhu, 'SomeRaceNoPluginHasYet') === 8 && K.warriorPieces(karhu, '') === 8 &&
+  K.warriorPieces(bull, '') === 2);
+yes('a race no line names, off the hunter list, is the novice line, 1, and so is a race nobody can read',
+  K.warriorPieces('', 'SomeRaceNoPluginHasYet') === 1 && K.warriorPieces('', '') === 1);
+
+// The page's strength table and person-shaped table, word for word against
+// the code's kinds.
+const kindBand = {};
+K.WARRIOR_KILL.kinds.forEach(function (row) {
+  row[0].split(',').forEach(function (w) { kindBand[w.trim().toLowerCase()] = row[1]; });
+});
+const strengthWords = {};
+page.split('\n').forEach(function (line) {
+  const m = /^\| (Novice|Advanced|Expert|Master animal) \| ([^|]+) \| (\d+) \|$/.exec(line);
+  if (m) { m[2].split(',').forEach(function (w) { strengthWords[w.trim().toLowerCase()] = Number(m[3]); }); }
+});
+const pageKinds = Object.assign({}, strengthWords, shaped);
+yes('every word on the two tables is a kind in the code, at the page\'s pieces (' + Object.keys(pageKinds).length + ' words)',
+  Object.keys(pageKinds).length >= 30 &&
+  Object.keys(pageKinds).every(function (w) { return kindBand[w] === pageKinds[w]; }));
+yes('and the code has no kind the page does not name',
+  Object.keys(kindBand).every(function (w) { return Object.prototype.hasOwnProperty.call(pageKinds, w); }));
+
+// Patrick's answer 1: the bodies neither table names, on the page and in the code.
+const unnamedPage = {};
+page.split('\n').forEach(function (line) {
+  const m = /^\| (\d+), [^|]+ \| ([^|]+) \|$/.exec(line);
+  if (m) { m[2].split(',').forEach(function (w) { unnamedPage[w.trim().toLowerCase()] = Number(m[1]); }); }
+});
+const unnamedCode = {};
+K.WARRIOR_KILL.unnamed.forEach(function (row) { unnamedCode[row[0].toLowerCase()] = row; });
+yes('the page lists the bodies neither table names (' + Object.keys(unnamedPage).length + ' words)', Object.keys(unnamedPage).length >= 30);
+yes('each one is in the code at the page\'s pieces',
+  Object.keys(unnamedPage).every(function (w) { return unnamedCode[w] && unnamedCode[w][1] === unnamedPage[w]; }));
+yes('and every one in the code is on the page, but the conjured creatures and the races that are not creatures, which the page says in a sentence',
+  Object.keys(unnamedCode).every(function (w) {
+    return Object.prototype.hasOwnProperty.call(unnamedPage, w) ||
+      (w === 'a creature a spell conjures' && /A creature a spell\s+conjures, from any of the magic mods, is 1/.test(page)) ||
+      (w === 'a race that is not a creature' && unnamedCode[w][1] === 1);
+  }));
+[['rieklings of Solstheim', 'DLC2RieklingRace', 1], ['an ash hopper', 'DLC2AshHopperRace', 1],
+ ['a spriggan', 'SprigganRace', 2], ['a dwarven spider', 'DwarvenSpiderRace', 2], ['an ice wraith', 'IceWraithRace', 2],
+ ['ash spawn', 'DLC2AshSpawnRace', 2], ['a riekling of the riekling people', '1RieklingBlueRace', 2],
+ ['a flame atronach', 'AtronachFlameRace', 4], ['a dwarven sphere', 'DwarvenSphereRace', 4],
+ ['a gargoyle', 'DLC1GargoyleRace', 4], ['a dremora', 'DremoraRace', 4], ['a snow elf', 'SnowElfRace', 4],
+ ['a werewolf', 'WerewolfBeastRace', 8], ['a vampire lord', 'DLC1VampireBeastRace', 8], ['a werebear', 'DLC2WerebearBeastRace', 8]
+].forEach(function (c) {
+  yes(c[0] + ' (' + c[1] + ') is ' + c[2], !!raceDesc(c[1]) && K.warriorPieces('', c[1]) === c[2]);
+});
+yes('the riekling people sit with the people\'s line, beside a bandit', K.warriorPieces('', '1RieklingPurpleRace') === K.warriorPieces('', 'NordRace'));
+yes('snow elves sit with the falmer, and werewolves and vampire lords with the giants',
+  K.warriorPieces('', 'SnowElfRace') === K.warriorPieces('', 'FalmerRace') &&
+  K.warriorPieces('', 'WerewolfBeastRace') === K.warriorPieces('', 'GiantRace') &&
+  K.warriorPieces('', 'DLC1VampireBeastRace') === K.warriorPieces('', 'GiantRace'));
 yes('a giant frostbite spider is a spider, 2, not a giant', K.warriorPieces('', 'FrostbiteSpiderRaceGiant') === 2);
-yes('a werebear and a dwarven spider are not a bear or a spider: the novice line, 1',
-  K.warriorPieces('', 'DLC2WerebearBeastRace') === 1 && K.warriorPieces('', 'DwarvenSpiderRace') === 1);
-yes('an atronach, which the page does not name, is 1, and so is a race nobody can read',
-  K.warriorPieces('', 'AtronachFlameRace') === 1 && K.warriorPieces('', '') === 1);
 yes('a vampire of the people is still the people line, 2', K.warriorPieces('', 'ImperialRaceVampire') === 2);
+yes('the race is matched whatever its case', K.warriorPieces('', 'dragonrace') === 16 && K.warriorPieces('', 'DLC2ASHSPAWNRACE') === 2);
+{
+  const placed = {};
+  const all = K.WARRIOR_KILL.kinds.concat(K.WARRIOR_KILL.unnamed);
+  let twice = [];
+  all.forEach(function (row) { row[2].forEach(function (e) { const k = e.toLowerCase(); if (placed[k]) { twice.push(e); } placed[k] = row[1]; }); });
+  const races = {};
+  Object.keys(RACES.items).forEach(function (k) { races[RACES.items[k].e.toLowerCase()] = RACES.items[k].e; });
+  const missing = Object.keys(races).filter(function (e) { return !placed[e]; }).map(function (e) { return races[e]; });
+  const stray = Object.keys(placed).filter(function (e) { return !races[e]; });
+  yes('every race in the load order (' + Object.keys(races).length + ') is on a line' + (missing.length ? ': not ' + missing.join(', ') : ''), missing.length === 0);
+  yes('no line names a race the load order does not have' + (stray.length ? ': ' + stray.join(', ') : ''), stray.length === 0);
+  yes('no race is on two lines' + (twice.length ? ': ' + twice.join(', ') : ''), twice.length === 0);
+  yes('every line is one of the page\'s pieces, 1, 2, 4, 8 or 16',
+    all.every(function (row) { return [1, 2, 4, 8, 16].indexOf(row[1]) !== -1; }));
+}
 
 // The engine read: the race comes from Actor.GetRace on the dead actor.
 function engine(base, raceAnswer) {
@@ -148,10 +229,13 @@ function engine(base, raceAnswer) {
     dragon.pieces === 16 && dragon.asked.join() === 'Actor.GetRace');
   const padded = engine('x:Skyrim.esm', { type: 'espm', desc: '00' + raceDesc('DraugrRace') });
   yes('a race descriptor written with leading zeroes is still found (a draugr, 4)', padded.pieces === 4);
-  const wolf = engine(chicken, { type: 'espm', desc: raceDesc('DragonRace') });
-  yes('a body on the hunter list never asks the engine', wolf.pieces === 1 && wolf.asked.length === 0);
+  const bear = engine(karhu, { type: 'espm', desc: raceDesc('BearBrownRace') });
+  yes('a body on the hunter list asks the engine too, and its race wins: Karhu is 4',
+    bear.pieces === 4 && bear.asked.join() === 'Actor.GetRace');
+  const blind = engine(karhu, new Error('no race'));
+  yes('a body on the hunter list whose race the engine cannot give counts its row: Karhu 8', blind.pieces === 8);
   const broken = engine('x:Skyrim.esm', new Error('no race'));
-  yes('a race the engine cannot give is the novice line, 1', broken.pieces === 1);
+  yes('a body off the list whose race the engine cannot give is the novice line, 1', broken.pieces === 1);
 }
 
 // ------------------------------------------------------------ mp.onDeath --
@@ -191,7 +275,7 @@ function deathBox(opts) {
   d.box.mp.onDeath(NPC, HUMAN);
   yes('a warrior killing a dragon is credited 16 pieces, on the half they hold',
     d.credits.length === 1 && d.credits[0].id === HUMAN && d.credits[0].half === 'berserker' && d.credits[0].n === 16);
-  const c = deathBox({ base: chicken });
+  const c = deathBox({ base: chicken, race: 'ChickenRace' });
   c.box.mp.onDeath(NPC, HUMAN);
   yes('a warrior killing a chicken is credited 1 piece', c.credits.length === 1 && c.credits[0].n === 1);
   const p = deathBox({});
@@ -248,10 +332,26 @@ const world = { actors: new Map(), calls: [], staggers: [], writes: [], timers: 
 function desc(id) { return id.toString(16) + ':run'; }
 function actor(id, o) {
   world.actors.set(id, Object.assign({ pid: id > 0xff000000 && id < 0xff001000 ? id - 0xff000000 : -1, dead: false,
-    p: { health: 1, magicka: 1, stamina: 1 }, max: 100, pos: [0, 0, 0], cell: 'cell:Skyrim.esm', anim: null }, o || {}));
+    p: { health: 1, magicka: 1, stamina: 1 }, max: 100, pos: [0, 0, 0], cell: 'cell:Skyrim.esm', anim: null,
+    race: '13746:Skyrim.esm', base: '7:Skyrim.esm', online: true }, o || {}));
   return id;
 }
 const SPELL = 0x5ee;
+/*
+  The records the engine works the most stamina out of (GetBaseActorValues):
+  a race whose DATA starts it at 50 at byte 44, and a base whose ACBS adds 50
+  at byte 6, so 100, the way a person starts. And a race and a base whose two
+  numbers come to nothing, which the engine makes 100.
+*/
+const NORD = 0x13746, PERSON_BASE = 0x7, ZERO_RACE = 0x99001, ZERO_BASE = 0x99002;
+function raceData(start) { const b = Buffer.alloc(104); b.writeFloatLE(start, 44); return new Uint8Array(b); }
+function acbs(offset) { const b = Buffer.alloc(24); b.writeInt16LE(offset, 6); return new Uint8Array(b); }
+const RECORDS = {};
+RECORDS[NORD] = { type: 'RACE', fields: [{ type: 'EDID', data: new Uint8Array(4) }, { type: 'DATA', data: raceData(50) }] };
+RECORDS[PERSON_BASE] = { type: 'NPC_', fields: [{ type: 'ACBS', data: acbs(50) }] };
+RECORDS[ZERO_RACE] = { type: 'RACE', fields: [{ type: 'DATA', data: raceData(0) }] };
+RECORDS[ZERO_BASE] = { type: 'NPC_', fields: [{ type: 'ACBS', data: acbs(0) }] };
+const effectsMaps = new Map();
 const mpFake = {
   get: function (id, prop) {
     if (id === 0 && prop === 'onlinePlayers') {
@@ -265,20 +365,28 @@ const mpFake = {
     if (prop === 'isDead') { return a.dead; }
     if (prop === 'profileId') { return a.pid; }
     if (prop === 'lastAnimEvent') { return a.anim; }
+    if (prop === 'baseDesc') { return a.base; }
+    if (prop === 'isOnline') { return a.online; }
     throw new Error('no ' + prop);
   },
   set: function (id, prop, v) {
     const a = world.actors.get(id);
     if (prop === 'percentages') {
+      world.calls.push('set percentages ' + id.toString(16));
       a.p = { health: v.health, magicka: v.magicka, stamina: v.stamina };
       if (v.health === 0) { a.dead = true; }
     }
   },
   getDescFromId: desc,
   getIdFromDesc: function (d) { return parseInt(String(d).split(':')[0], 16); },
-  lookupEspmRecordById: function (id) { return { record: { type: id === SPELL ? 'SPEL' : 'WEAP' } }; },
+  lookupEspmRecordById: function (id) {
+    if (Object.prototype.hasOwnProperty.call(RECORDS, id)) { return { record: RECORDS[id] }; }
+    if (id === 0x55555) { return {}; }
+    return { record: { type: id === SPELL ? 'SPEL' : 'WEAP', fields: [] } };
+  },
   callPapyrusFunction: function (type, cls, fn, self, args) {
     world.calls.push(cls + '.' + fn);
+    if (fn === 'GetRace') { return { type: 'espm', desc: world.actors.get(parseInt(self.desc, 16)).race }; }
     if (fn === 'DamageActorValue') {
       const a = world.actors.get(parseInt(self.desc, 16));
       a.p.stamina = Math.max(0, a.p.stamina - args[1] / a.max);
@@ -291,6 +399,7 @@ const states = new Map();
 const party = { leader: 1, members: [] };
 const box = {
   console: { log: function () {} },
+  Buffer: Buffer,
   mp: mpFake,
   guard: function (n, fn) { return fn; },
   setTimeout: function (fn, ms) { world.timers.push({ fn: fn, at: clock.t + (ms || 0) }); return world.timers.length; },
@@ -298,7 +407,12 @@ const box = {
   clearInterval: function () {},
   __thornswoodCharacter: {
     stateOf: function (id) { return states.get(id) || null; },
-    writeState: function (id, s, redraw) { world.writes.push({ id: id, redraw: redraw, effects: box.__thornswoodManeuvers.effects(id) }); return s; }
+    writeState: function (id, s, redraw) {
+      world.writes.push({ id: id, redraw: redraw, effects: box.__thornswoodManeuvers.effects(id),
+                          view: box.__thornswoodManeuvers.view(id, s) });
+      return s;
+    },
+    effectsOf: function (id) { return effectsMaps.get(id) || {}; }
   },
   __thornswoodSocial: {
     profileOf: function (id) { const a = world.actors.get(id); return a && a.pid > 0 ? a.pid : 0; },
@@ -404,7 +518,8 @@ function settle() { later(0); }
 function health(id) { return Math.round(world.actors.get(id).p.health * 10000) / 10000; }
 function heal(id) { const a = world.actors.get(id); a.p.health = 1; a.dead = false; }
 
-yes('/maneuver on its own lists what you hold', /^Your maneuvers: Rush \(15 stamina, ready\)/.test(M.use(BER, '')));
+yes('/maneuver on its own lists what you hold, and tells nobody to type anything', /^Your maneuvers: Rush \(15 stamina, ready\)/.test(M.use(BER, '')) &&
+  !/\//.test(M.use(BER, '')));
 yes('a name that is not a maneuver is refused by name', /no maneuver by that name/.test(M.use(BER, 'fireball')));
 yes('a cook taught Berserker is refused Heavy, and told the novice row is the whole of it',
   /outside trade, and that is its novice row and no further: Rush/.test(M.use(COOK, 'heavy')));
@@ -419,13 +534,15 @@ world.actors.get(BER).p.stamina = 0.1;
 const callsBefore = world.calls.length;
 const tooTired = M.use(BER, 'rush');
 yes('without 15 stamina Rush does not start, and says so', /takes 15 stamina, and you do not have it\. Nothing happens\./.test(tooTired));
-yes('and the stamina is put back exactly as it was', world.actors.get(BER).p.stamina === 0.1);
-yes('and nothing is armed and no wait starts', !M.effects(BER) && /Rush \(15 stamina, ready\)/.test(M.use(BER, '')) &&
-  world.calls.slice(callsBefore).indexOf('Actor.DamageActorValue') !== -1);
+yes('and nothing is written to the stamina: it is not taken and put back, it is never taken',
+  world.actors.get(BER).p.stamina === 0.1 && world.calls.slice(callsBefore).indexOf('set percentages ' + BER.toString(16)) === -1 &&
+  world.calls.slice(callsBefore).indexOf('Actor.DamageActorValue') === -1);
+yes('and nothing is armed and no wait starts', !M.effects(BER) && /Rush \(15 stamina, ready\)/.test(M.use(BER, '')));
 world.actors.get(BER).p.stamina = 1;
 const rush = M.use(BER, 'rush');
 yes('Rush starts: +4 speed for 5 seconds', rush === 'Rush: +4 speed for 5 seconds.');
-yes('Rush spent 15 stamina through the engine', Math.abs(world.actors.get(BER).p.stamina - 0.85) < 1e-9);
+yes('Rush spent 15 of the 100 the engine works out from the race and the base, as a share written back',
+  Math.abs(world.actors.get(BER).p.stamina - 0.85) < 1e-6 && M.mostStamina(BER) === 100);
 yes('Rush puts +4 speed on the map the client sets, and redraws to send it',
   M.effects(BER) && M.effects(BER).speedMult === 4 && world.writes.length === 1 && world.writes[0].redraw === true &&
   world.writes[0].effects.speedMult === 4);
@@ -480,7 +597,7 @@ heal(WOLF);
 
 // Wreck and Break, and the stagger.
 world.actors.get(BER).p.stamina = 1;
-yes('Wreck starts', /^Wreck\. Your next power attack deals 50% more/.test(M.use(BER, 'wreck')));
+yes('Wreck starts', /^Wreck\. Your next power attack in the next 8 seconds deals 50% more/.test(M.use(BER, 'wreck')));
 strike(BER, STRANGER, 0.2, { power: true });
 settle();
 yes('the Wreck power attack takes a half again: 0.2 becomes 0.3', health(STRANGER) === 0.7);
@@ -599,6 +716,127 @@ yes('and Heavy, past the novice row, does not',
 delete box.__thornswoodCharacter.masterFor;
 later(6000);
 
+// Patrick's answer 3: Break and Wreck wait 8 seconds for their blow.
+later(200000);
+world.actors.get(BER).p.stamina = 1;
+yes('Break says its 8 seconds', /^Break\. Your next hit in the next 8 seconds staggers a person/.test(M.use(BER, 'break')));
+later(8100);
+{
+  const before = world.staggers.length;
+  strike(BER, STRANGER, 0.1, {});
+  settle();
+  yes('a hit 8 seconds after Break is only a hit: no stagger', world.staggers.length === before);
+}
+heal(STRANGER);
+world.actors.get(BER).p.stamina = 1;
+yes('Wreck says its 8 seconds', /^Wreck\. Your next power attack in the next 8 seconds deals 50% more/.test(M.use(BER, 'wreck')));
+later(8100);
+{
+  const before = world.staggers.length;
+  strike(BER, STRANGER, 0.2, { power: true });
+  settle();
+  yes('a power attack 8 seconds after Wreck is only itself: 0.2 stays 0.2, and no stagger',
+    health(STRANGER) === 0.8 && world.staggers.length === before);
+}
+heal(STRANGER);
+later(200000);
+world.actors.get(BER).p.stamina = 1;
+M.use(BER, 'break');
+strike(BER, WOLF, 0, {});
+settle();
+later(3000);
+world.actors.get(BER).p.stamina = 1;
+M.use(BER, 'wreck');
+strike(BER, STRANGER, 0, { power: true });
+settle();
+strike(BER, STRANGER, 0.2, { power: true });
+settle();
+yes('a Wreck blow the engine threw away leaves Wreck armed inside its window', health(STRANGER) === 0.7);
+heal(STRANGER);
+later(200000);
+world.actors.get(BER).p.stamina = 1;
+M.use(BER, 'wreck');
+strike(BER, STRANGER, 0, { power: true });
+later(8100);
+strike(BER, STRANGER, 0.2, { power: true });
+settle();
+yes('and not once the window has shut', health(STRANGER) === 0.8);
+heal(STRANGER);
+
+// Patrick's answer 5: the stamina scales with the skill tree.
+later(200000);
+effectsMaps.set(BER, { stamina: 30, speedMult: 2 });
+world.actors.get(BER).p.stamina = 1;
+yes('with 3 points in Endurance the most is 130: the engine\'s 100 and the tree\'s 30', M.mostStamina(BER) === 130);
+M.use(BER, 'rush');
+yes('so Rush takes 15 of 130, a smaller share of a bigger bar', Math.abs(world.actors.get(BER).p.stamina - (1 - 15 / 130)) < 1e-6);
+later(200000);
+world.actors.get(BER).p.stamina = 20 / 130;
+yes('20 of 130 left is enough for Rush', M.use(BER, 'rush') === 'Rush: +4 speed for 5 seconds.' &&
+  Math.abs(world.actors.get(BER).p.stamina - 5 / 130) < 1e-6);
+later(200000);
+world.actors.get(BER).p.stamina = 14 / 130;
+yes('14 of 130 is not', /takes 15 stamina, and you do not have it/.test(M.use(BER, 'rush')) &&
+  Math.abs(world.actors.get(BER).p.stamina - 14 / 130) < 1e-9);
+effectsMaps.set(BER, { stamina: 30 - 40 });
+world.actors.get(BER).p.stamina = 1;
+yes('what hunger, thirst, tiredness and cold take off is off the most too: 100 + 30 - 40 is 90', M.mostStamina(BER) === 90);
+M.use(BER, 'rush');
+yes('and Rush takes 15 of 90', Math.abs(world.actors.get(BER).p.stamina - (1 - 15 / 90)) < 1e-6);
+later(200000);
+effectsMaps.set(BER, { stamina: -100 });
+world.actors.get(BER).p.stamina = 1;
+yes('a most the needs have taken all of has nothing to spend', /takes 15 stamina, and you do not have it/.test(M.use(BER, 'rush')) &&
+  world.actors.get(BER).p.stamina === 1);
+effectsMaps.delete(BER);
+{
+  const z = actor(0xff000009, { pos: [30000, 0, 0], race: ZERO_RACE.toString(16) + ':Skyrim.esm', base: ZERO_BASE.toString(16) + ':Skyrim.esm' });
+  states.set(z, warrior('berserker', 'novice'));
+  yes('a race and base that come to nothing are 100, the way the engine floors them', M.mostStamina(z) === 100);
+  const lost = actor(0xff00000a, { pos: [40000, 0, 0], race: '55555:Skyrim.esm' });
+  states.set(lost, warrior('berserker', 'novice'));
+  const callsBefore2 = world.calls.length;
+  yes('a race record that cannot be read starts nothing, says so, and writes nothing',
+    /^Your stamina could not be read just now, so Rush did not start\./.test(M.use(lost, 'rush')) &&
+    world.calls.slice(callsBefore2).indexOf('set percentages ' + lost.toString(16)) === -1 &&
+    !M.effects(lost) && /Rush \(15 stamina, ready\)/.test(M.use(lost, '')));
+}
+yes('the stamina is never taken through Actor.DamageActorValue any more', world.calls.indexOf('Actor.DamageActorValue') === -1);
+
+// The panel the maneuver key opens: the view.
+later(200000);
+{
+  const v = M.view(BER, states.get(BER));
+  yes('a master Berserker\'s panel lists Rush, Heavy, Break and Wreck, in the page\'s order, with their stamina',
+    !!v && v.map(function (r) { return r.key + ':' + r.stamina; }).join() === 'rush:15,heavy:20,break:25,wreck:40' &&
+    v.every(function (r) { return r.ready === true && typeof r.name === 'string'; }));
+  yes('somebody who holds none has no rows', M.view(FRIEND, states.get(FRIEND)) === null && M.view(1, null) === null);
+  yes('a cook taught Berserker has the novice row', M.view(COOK, states.get(COOK)).map(function (r) { return r.key; }).join() === 'rush');
+  world.actors.get(BER).p.stamina = 1;
+  const writes = world.writes.length;
+  M.use(BER, 'heavy');
+  const after = world.writes.slice(writes);
+  yes('starting one redraws the panel, and that row shows waiting',
+    after.length === 1 && after[0].redraw === true &&
+    after[0].view.filter(function (r) { return r.key === 'heavy'; })[0].ready === false &&
+    after[0].view.filter(function (r) { return r.key === 'rush'; })[0].ready === true);
+  later(44000);
+  yes('nothing redraws while the wait runs', world.writes.length === writes + 1);
+  later(1100);
+  const end = world.writes.slice(writes + 1);
+  yes('the end of the 45 second wait redraws it once, ready again',
+    end.length === 1 && end[0].id === BER && end[0].view.filter(function (r) { return r.key === 'heavy'; })[0].ready === true);
+  later(1000);
+  yes('and then nothing more', world.writes.length === writes + 2);
+  world.actors.get(BER).p.stamina = 1;
+  M.use(BER, 'heavy');
+  world.actors.get(BER).online = false;
+  const gone = world.writes.length;
+  later(46000);
+  yes('a wait that ends after somebody left redraws nothing for them', world.writes.length === gone);
+  world.actors.get(BER).online = true;
+}
+
 // ------------------------------------------------ the panel's effects map --
 {
   const fn = new Function('g', withManeuvers + '\nreturn withManeuvers;')({ __thornswoodManeuvers: { effects: function (id) { return id === 1 ? { speedMult: 4 } : null; } } });
@@ -608,14 +846,149 @@ later(6000);
   yes('the panel view folds the maneuvers in', /effects: withManeuvers\(actorId, withNeeds\(actorId, P\.treeApplies\(s\)\)\),/.test(gm));
 }
 
+// ------------------------------------------- the view and the stamina map --
+{
+  yes('the panel view carries the maneuver rows', /\n      maneuvers: maneuversView\(actorId, s\),\n/.test(gm));
+  yes('the character block hands out the map the client applies, for the real most',
+    /acceptApprentice: acceptApprentice, masterFor: masterFor, effectsOf: effectsOf,/.test(gm));
+  const effectsOf = slice(gm, '  function effectsOf(actorId) {', '\n  }\n');
+  const maneuversView = slice(gm, '  function maneuversView(actorId, s) {', '\n  }\n');
+  const logged = [];
+  const fn = new Function('g', 'P', 'stateOf', 'withNeeds', 'withManeuvers', 'clog',
+    effectsOf + '\n' + maneuversView + '\nreturn { effectsOf: effectsOf, maneuversView: maneuversView };');
+  const C = fn({ __thornswoodManeuvers: { view: function (id, s) { if (id === 9) { throw new Error('boom'); } return id === 1 ? [{ key: 'rush' }] : null; } } },
+    { treeApplies: function (s) { return { stamina: 10 * s.endurance }; } },
+    function (id) { return { endurance: id }; },
+    function (id, base) { return Object.assign({}, base, { stamina: base.stamina - 20 }); },
+    function (id, base) { return base; },
+    function () { logged.push(Array.prototype.slice.call(arguments).join(' ')); });
+  yes('the map is the tree, less the needs, the same fold forPanel makes', C.effectsOf(3).stamina === 10);
+  yes('the rows come from the maneuvers block, absent for somebody who holds none',
+    C.maneuversView(1, {})[0].key === 'rush' && C.maneuversView(2, {}) === null);
+  yes('a view that throws is logged, not hidden', C.maneuversView(9, {}) === null && logged.length === 1 && /maneuvers view threw/.test(logged[0]));
+}
+
+// ------------------------------------------------- the front plugin's half --
+const front = fs.readFileSync(path.join(root, 'game', 'plugins', 'thornswood-front.js'), 'utf8').replace(/\r/g, '');
+const overlay = fs.readFileSync(path.join(root, 'game', 'ui', 'thornswood-maneuvers.js'), 'utf8').replace(/\r/g, '');
+const ini = fs.readFileSync(path.join(root, 'launcher', 'Thornswood.ini'), 'utf8').replace(/\r/g, '');
+const keysCs = fs.readFileSync(path.join(root, 'launcher', 'app', 'Keys.cs'), 'utf8').replace(/\r/g, '');
+{
+  yes('the maneuver key is 9, scan code 10, in the plugin, the template and the Controls page',
+    /const MANEUVER_KEY = iniNumber\(ini, 'ManeuverKey', 10\);/.test(front) && /^ManeuverKey = 10$/m.test(ini) &&
+    /ThornIni, "ManeuverKey", 10\)\);/.test(keysCs));
+  const overlays = /const OVERLAYS = (\[[\s\S]*?\]);/.exec(front);
+  yes('the front fetches the maneuver panel with the other overlays',
+    !!overlays && new Function('return ' + overlays[1])().indexOf('thornswood-maneuvers.js') !== -1);
+  yes('the cap closes it like every other panel', /maneuvers: 'thornswoodManeuvers'/.test(slice(front, 'const CAP_CLOSES = {', '};') || ''));
+  yes('the key is heard in the world, and the panel\'s open and close move the claim',
+    /if \(e\.code === MANEUVER_KEY\) \{ maneuverKeyPressed\(\); return; \}/.test(front) &&
+    /if \(what === 'maneuvers:opened'\) \{ T\.claimFocus\('maneuvers', true\); return; \}/.test(front) &&
+    /if \(what === 'maneuvers:closed'\) \{ T\.claimFocus\('maneuvers', false\); return; \}/.test(front));
+  yes('the rows are read off the same view the tree hand reads',
+    /treeFromView\(what\.slice\(12\)\);\n\s+maneuversFromView\(what\.slice\(12\)\);/.test(front));
+  yes('the front sends no /maneuver line of its own: the page does, on a pick',
+    front.indexOf("'/maneuver") === -1 && front.indexOf('"/maneuver') === -1);
+
+  const parts = ['  function maneuversToPage() {', '  function maneuversFromView(json) {', '  function maneuverKeyPressed() {']
+    .map(function (h) { return slice(front, h, '\n  }\n'); });
+  yes('the front\'s three maneuver functions are there', parts.every(Boolean));
+  const env = { js: [], notes: [], busy: '', creating: false, claims: {} };
+  const F = new Function('T', 'MANEUVER_NAME', 'claims', 'busyMenuOpen', 'note', 'say', 'env',
+    'var skillsCreating = false;\n' + parts.join('\n') +
+    '\nreturn { fromView: maneuversFromView, key: function () { skillsCreating = env.creating; return maneuverKeyPressed(); }, rows: function () { return maneuverRows; } };'
+    .replace('return {', 'var maneuverRows = [];\nreturn {'))(
+    { js: function (src) { env.js.push(src); return true; } }, '9', env.claims,
+    function () { return env.busy; }, function (t) { env.notes.push(t); }, function () {}, env);
+  F.key();
+  yes('with no rows the key says there are none and opens nothing', env.notes.length === 1 && /no maneuvers/.test(env.notes[0]) && env.js.length === 0);
+  F.fromView(JSON.stringify({ v: 1, panel: { maneuvers: [{ key: 'rush', name: 'Rush', stamina: 15, cooldown: 30, ready: true },
+    { key: 'bad key', name: 'x' }, null] } }));
+  yes('a view\'s rows are kept, the malformed ones dropped, and handed to the page with the key\'s name',
+    F.rows().length === 1 && F.rows()[0].key === 'rush' && env.js.length === 1 &&
+    /thornswoodManeuvers\.setRows\(\[\{"key":"rush"/.test(env.js[0]) && /,"9"\);/.test(env.js[0]));
+  F.fromView(JSON.stringify({ v: 1, panel: { maneuvers: [{ key: 'rush', name: 'Rush', stamina: 15, cooldown: 30, ready: true }] } }));
+  yes('the same rows again are not sent again', env.js.length === 1);
+  F.key();
+  yes('with rows the key opens the panel', /thornswoodManeuvers\.open\(\)/.test(env.js[env.js.length - 1]));
+  const n = env.js.length;
+  env.claims.chat = true; F.key(); env.claims.chat = false;
+  env.busy = 'InventoryMenu'; F.key(); env.busy = '';
+  env.creating = true; F.key(); env.creating = false;
+  yes('not while typing, over a game menu, or while the character is being made', env.js.length === n);
+}
+
+// ----------------------------------------------------- the page's half --
+{
+  function el(tag) {
+    return { tag: tag, style: {}, children: [], className: '', innerHTML: '', id: '', attrs: {}, parentNode: null,
+      appendChild: function (c) { this.children.push(c); c.parentNode = this; return c; },
+      addEventListener: function (t, f) { this.on = this.on || {}; this.on[t] = f; },
+      getAttribute: function (k) { return Object.prototype.hasOwnProperty.call(this.attrs, k) ? this.attrs[k] : null; } };
+  }
+  const docOn = {};
+  const told = [], said = [];
+  const win = { skyrimPlatform: { sendMessage: function (a, b) { if (a === 'thornswood-front') { told.push(b); } } },
+                thornswoodNet: { say: function (l) { said.push(l); } } };
+  const doc = { head: el('head'), body: el('body'), createElement: el, addEventListener: function (t, f) { docOn[t] = f; } };
+  const pageBox = { window: win, document: doc };
+  vm.createContext(pageBox);
+  vm.runInContext(overlay, pageBox);
+  const W = win.thornswoodManeuvers;
+  yes('the page says it is in', !!W && told[0] === 'maneuvers:ready');
+  W.open();
+  yes('with no rows it does not open', !W.isOpen() && told.length === 1);
+  W.setRows([{ key: 'set', name: 'Set', stamina: 15, cooldown: 45, ready: true },
+             { key: 'plant', name: 'Plant', stamina: 20, cooldown: 60, ready: false }], '9');
+  W.open();
+  const box2 = doc.body.children[0];
+  yes('it opens and says so, and draws each row with its number, its stamina and whether it is ready',
+    W.isOpen() && told[1] === 'maneuvers:opened' && /<span class="key">1<\/span><span class="name">Set<\/span><span class="cost">15 stamina<\/span><span class="ready">ready/.test(box2.innerHTML) &&
+    /<span class="key">2<\/span><span class="name">Plant<\/span><span class="cost">20 stamina<\/span><span class="wait">waiting/.test(box2.innerHTML));
+  yes('and names the keys that close it', /9 or Escape closes this/.test(box2.innerHTML));
+  let prevented = 0;
+  docOn.keydown({ key: '2', preventDefault: function () { prevented++; } });
+  yes('a number sends that row as the panel\'s line and closes the panel',
+    said.length === 1 && said[0] === '/maneuver plant' && !W.isOpen() && told[2] === 'maneuvers:closed' && prevented === 1);
+  docOn.keydown({ key: '1', preventDefault: function () { prevented++; } });
+  yes('with the panel shut a number is left alone', said.length === 1 && prevented === 1);
+  W.toggle();
+  docOn.keydown({ key: '7', preventDefault: function () {} });
+  yes('a number with no row sends nothing', said.length === 1 && W.isOpen());
+  docOn.keydown({ key: '9', preventDefault: function () {} });
+  yes('the maneuver key closes it', !W.isOpen() && said.length === 1);
+  W.open();
+  docOn.keydown({ key: 'Escape', preventDefault: function () {} });
+  yes('Escape closes it', !W.isOpen() && said.length === 1);
+  W.open();
+  const row = el('div'); row.attrs['data-n'] = '0'; row.parentNode = box2;
+  const inner = el('span'); inner.parentNode = row;
+  box2.on.click({ target: inner });
+  yes('a click on a row sends it', said.length === 2 && said[1] === '/maneuver set' && !W.isOpen());
+  W.open();
+  W.setRows([], '9');
+  yes('rows taken away close an open panel', !W.isOpen());
+  W.setRows([{ key: 'set', name: 'Set', stamina: 15, cooldown: 45, ready: true }], '9');
+  W.open();
+  delete win.thornswoodNet;
+  docOn.keydown({ key: '1', preventDefault: function () {} });
+  yes('with the chat\'s socket not up it sends nothing and says so', said.length === 2 && told[told.length - 2] === 'social:unavailable');
+  yes('the page sends only /maneuver lines', (overlay.match(/thornswoodNet\.say\(/g) || []).length === 1 &&
+    /thornswoodNet\.say\('\/maneuver ' \+ r\.key\)/.test(overlay));
+}
+
 // ------------------------------------------------------ words and handlers --
 {
   const words = /^const WORDS = (\[[\s\S]*?\]);$/m.exec(gm);
   const W = words ? new Function('return ' + words[1])() : [];
-  yes('/maneuver is a word the server answers', W.indexOf('/maneuver') !== -1);
+  yes('/maneuver is a word the server answers, for the panel to send', W.indexOf('/maneuver') !== -1);
   const pw = /const PLAYER_WORDS = (\[[\s\S]*?\]);/.exec(gm);
   const PW = pw ? new Function('return ' + pw[1])() : [];
-  yes('and one everybody is told about', PW.indexOf('/maneuver') !== -1);
+  yes('and not one anybody is told about (Patrick, 4 October: no chat commands for what people do)',
+    !!pw && PW.indexOf('/maneuver') === -1);
+  const helpWork = slice(gm, "if (topic === 'work' || topic === 'trade' || topic === 'class') {", 'return;');
+  yes('the help names the maneuver key, not the line it sends',
+    !!helpWork && helpWork.indexOf('/maneuver') === -1 && /maneuvers open on the maneuver key/.test(helpWork));
   yes('the chat router hands /maneuver to the maneuvers block', /if \(word === '\/maneuver'\) \{[\s\S]{0,400}mvs\.use\(actorId, parts\[1\]\)/.test(gm));
   const reg = gm.split('\n').filter(function (l) { return /^mp\['onPapyrusEvent:OnHit'\]\s*=/.test(l); });
   yes('OnHit is registered once, through guard()', reg.length === 1 && reg[0].indexOf("guard('onPapyrusEvent:OnHit', function") !== -1);
