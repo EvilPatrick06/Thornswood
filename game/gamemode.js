@@ -6465,9 +6465,14 @@ function isStation(baseDesc) {
   The ranks under "What you cannot do" on the gatherer page are the
   ones applied here. A produce already on the generated ladder keeps
   that rank, and the row hands that ladder ingredient, one of it,
-  rather than the sack a Papyrus script would have opened. Rot scale,
-  screaming maw and thorn hook are not on the ladder, so they keep
-  their own produce.
+  rather than the sack a Papyrus script would have opened.
+
+  Rot scale, screaming maw and thorn hook are not here. They are
+  Update.esm's Creation Club records (306a to 306f), harvests.json files
+  them as left out for that reason, and Thornswood is Special Edition
+  only (#479, Patrick, 4 Oct: it still stands), so nobody is handed one.
+  records/update-creation-club.json names them and
+  tests/test-special-edition-only.js holds this table to it.
 
   Cabbage, carrot, gourds, leek, potato and wheat stay the farmer's.
   A clam and a fish stay the fisher's. A coin purse and an estate key
@@ -6500,12 +6505,9 @@ const GATHER_UNRANKED = {
   "110c2:HearthFires.esm": { "produce": "4da00:Skyrim.esm", "name": "Fly Amanita", "rank": "advanced" },
   "110c9:HearthFires.esm": { "produce": "6f950:Skyrim.esm", "name": "Scaly Pholiota", "rank": "advanced" },
   "110ca:HearthFires.esm": { "produce": "1b3bd:Skyrim.esm", "name": "Snowberries", "rank": "advanced" },
-  "306b:Update.esm": { "produce": "306d:Update.esm", "name": "Rot Scale", "rank": "advanced" },
   "10469:HearthFires.esm": { "produce": "2f44c:Skyrim.esm", "name": "Nightshade", "rank": "expert" },
   "110c3:HearthFires.esm": { "produce": "4da20:Skyrim.esm", "name": "Bleeding Crown", "rank": "expert" },
-  "110c7:HearthFires.esm": { "produce": "4da25:Skyrim.esm", "name": "Blisterwort", "rank": "expert" },
-  "306a:Update.esm": { "produce": "306e:Update.esm", "name": "Screaming Maw", "rank": "expert" },
-  "306c:Update.esm": { "produce": "306f:Update.esm", "name": "Thorn Hook", "rank": "expert" }
+  "110c7:HearthFires.esm": { "produce": "4da25:Skyrim.esm", "name": "Blisterwort", "rank": "expert" }
 };
 
 /** The row for a base, out of the generated table or the hand list beside it,
