@@ -3263,35 +3263,42 @@ const DEPOSIT_UNWRITABLE = {};
 /*
   How long a worked out seam takes to come back, by what it gives.
 
-  Patrick's two numbers, and the ores he named for each. Anything the list does
-  not name falls to the LONGER one, because a seam nobody has classified being
-  the cheapest tap in the province is the failure that matters.
-*/
-const DEPOSIT_BACK_MS = { quick: 10 * 60000, slow: 30 * 60000 };
-const DEPOSIT_QUICK = ['iron', 'gold', 'corundum', 'silver'];
-/*
-  THE SLOW LIST IS CHECKED FIRST, AND QUICKSILVER IS WHY.
+  The miner page's own table (docs/systems/classes/miner.md, "The seam"),
+  issue #1380: iron fifteen minutes, gold twenty, corundum and silver ten, and
+  thirty for clay, quarried stone, orichalcum, quicksilver, moonstone,
+  malachite and shellbug chitin. Until then it was Patrick's two numbers of
+  21 September, ten for iron, gold, corundum and silver and thirty for the
+  rest. Ebony, the gems, stalhrim and heart stone are not on it: each is one
+  place, opened by a scarce quest, and never reaches the deposit.
 
-  'Quicksilver' CONTAINS 'silver'. Matching the quick list first put a
-  quicksilver seam on the ten minute clock, which is one of the five Patrick
-  named for thirty. Caught by the harness on the first run, which is the only
-  reason it is not live: it reads perfectly and is wrong.
-
-  So the long list wins any tie, and the default is long too. Both point the
-  same way on purpose: a seam nobody has classified being the cheapest tap in
-  the province is the failure that matters.
+  BY THE WHOLE NAME, NEVER A PIECE OF ONE. 'Quicksilver Ore' contains
+  'silver', and matching pieces of names once put quicksilver on silver's ten
+  minutes. A name this table does not carry takes the LONGEST wait in it,
+  because a seam nobody has classified being the cheapest tap in the province
+  is the failure that matters.
 */
-const DEPOSIT_SLOW = ['moonstone', 'quicksilver', 'orichalcum', 'ebony', 'malachite'];
+const DEPOSIT_BACK_MIN = {
+  'iron ore': 15,
+  'gold ore': 20,
+  'corundum ore': 10,
+  'silver ore': 10,
+  'clay': 30,
+  'quarried stone': 30,
+  'orichalcum ore': 30,
+  'quicksilver ore': 30,
+  'moonstone ore': 30,
+  'malachite ore': 30,
+  'shellbug chitin': 30
+};
+const DEPOSIT_BACK_LONGEST = Math.max.apply(null, Object.keys(DEPOSIT_BACK_MIN).map(function (k) {
+  return DEPOSIT_BACK_MIN[k];
+}));
 
 function depositBackMs(name) {
-  const n = String(name || '').toLowerCase();
-  for (let i = 0; i < DEPOSIT_SLOW.length; i++) {
-    if (n.indexOf(DEPOSIT_SLOW[i]) !== -1) { return DEPOSIT_BACK_MS.slow; }
-  }
-  for (let j = 0; j < DEPOSIT_QUICK.length; j++) {
-    if (n.indexOf(DEPOSIT_QUICK[j]) !== -1) { return DEPOSIT_BACK_MS.quick; }
-  }
-  return DEPOSIT_BACK_MS.slow;
+  const n = String(name || '').toLowerCase().trim();
+  const min = Object.prototype.hasOwnProperty.call(DEPOSIT_BACK_MIN, n)
+    ? DEPOSIT_BACK_MIN[n] : DEPOSIT_BACK_LONGEST;
+  return min * 60000;
 }
 
 /**
@@ -3356,6 +3363,98 @@ function depositBackIn(refrId, backMs) {
   return 'It comes back in about ' + mins + (mins === 1 ? ' minute.' : ' minutes.');
 }
 
+/*
+  THE CHANCE OF ONE MORE. docs/systems/classes/miner.md, issue #1380.
+
+  A swing takes 1 ore of its seam and has a chance of one more. The chance
+  grows with the rank, and from advanced the extra can be the next tier up,
+  from expert two tiers up. One roll decides it, the three chances laid end to
+  end, so a swing never drops more than one extra:
+
+    rank      same ore   next tier   two tiers up
+    novice    5%
+    advanced  10%        2%
+    expert    15%        5%          1%
+    master    20%        8%          2%
+
+  The tiers are iron, clay and quarried stone; then corundum, silver,
+  orichalcum and quicksilver; then gold, moonstone and malachite. Inside a tier
+  each name is an equal chance. Ebony, the gems, stalhrim and heart stone are
+  never an extra, so a roll that would go past the third tier gives nothing,
+  and the same-ore roll still stands. Shellbug chitin is in no tier: its own
+  seam can give a second one, and no other seam ever gives it.
+
+  The extra comes out of the same seam of twenty, so a seam still holds twenty
+  ore in all, and it is the same swing and the same one piece of work.
+*/
+const ORE_EXTRA_PCT = [
+  [5, 0, 0],
+  [10, 2, 0],
+  [15, 5, 1],
+  [20, 8, 2]
+];
+const ORE_TIERS = [
+  ['Iron Ore', 'Clay', 'Quarried Stone'],
+  ['Corundum Ore', 'Silver Ore', 'Orichalcum Ore', 'Quicksilver Ore'],
+  ['Gold Ore', 'Moonstone Ore', 'Malachite Ore']
+];
+/*
+  ONE PLACE EACH, AND SHUT WITHOUT THE QUEST.
+
+  These seams are the scarce quest's, in the custom quests block at the foot
+  of this file. If that block ever fails to start, these answer shut rather
+  than falling through to the ordinary deposit, because a seam of twenty ebony
+  at every vein in the province is the one thing the plan rules out.
+*/
+const ORE_ONE_PLACE = ['Ebony Ore', 'Amethyst', 'Emerald', 'Ruby', 'Sapphire', 'Stalhrim', 'Heart Stone'];
+let ORE_DESC_BY_NAME = null;
+
+/* The ore a name gives, read off the seam table once, so no form id is typed here. */
+function oreDescByName(name) {
+  if (!ORE_DESC_BY_NAME) {
+    const found = {};
+    Object.keys(ORES_BY_BASE).forEach(function (base) {
+      const row = ORES_BY_BASE[base];
+      if (row && row.name && row.ore && !found[row.name]) { found[row.name] = row.ore; }
+    });
+    ORE_DESC_BY_NAME = found;
+  }
+  return ORE_DESC_BY_NAME[name] || '';
+}
+
+/**
+ * The extra ore of one swing, as { ore, name }, or null for none.
+ *
+ * roll is one number from 0 up to 1. Where it lands inside a tier's slice
+ * picks the name, so one roll is also the equal chance among that tier.
+ */
+function oreExtra(seam, step, roll) {
+  if (!seam || !seam.name || !seam.ore) { return null; }
+  if (ORE_ONE_PLACE.indexOf(seam.name) !== -1) { return null; }
+  const pct = ORE_EXTRA_PCT[step] || ORE_EXTRA_PCT[0];
+  const r = Number(roll) * 100;
+  if (!(r >= 0)) { return null; }
+  if (r < pct[0]) { return { ore: seam.ore, name: seam.name }; }
+  let tier = -1;
+  for (let t = 0; t < ORE_TIERS.length; t++) {
+    if (ORE_TIERS[t].indexOf(seam.name) !== -1) { tier = t; }
+  }
+  if (tier < 0) { return null; }
+  let lo = pct[0];
+  for (let up = 1; up <= 2; up++) {
+    const hi = lo + pct[up];
+    if (r < hi) {
+      const names = ORE_TIERS[tier + up];
+      if (!names) { return null; }
+      const name = names[Math.min(names.length - 1, Math.floor(((r - lo) / (hi - lo)) * names.length))];
+      const ore = oreDescByName(name);
+      return ore ? { ore: ore, name: name } : null;
+    }
+    lo = hi;
+  }
+  return null;
+}
+
 function mineOre(actorId, refrId, baseDesc) {
   if (!isVein(baseDesc)) return null;
   const seam = ORES_BY_BASE[baseDesc];
@@ -3375,8 +3474,10 @@ function mineOre(actorId, refrId, baseDesc) {
   if (tool) return tool;
 
   const rareQuests = globalThis.__thornswoodQuests;
-  if (rareQuests && rareQuests.isRareSeam && rareQuests.isRareSeam(seam)) {
-    return rareQuests.mineRare(actorId, refrId, seam);
+  const onePlace = ORE_ONE_PLACE.indexOf(seam.name) !== -1;
+  if (onePlace || (rareQuests && rareQuests.isRareSeam && rareQuests.isRareSeam(seam))) {
+    if (rareQuests && rareQuests.mineRare) { return rareQuests.mineRare(actorId, refrId, seam); }
+    return 'This place is shut.';
   }
 
   const step = rankStep(actorId, 'miner');
@@ -3512,6 +3613,15 @@ function mineOre(actorId, refrId, baseDesc) {
       notify(actorId, broken);
       say(actorId, broken);
       return;
+    }
+    /*
+      The chance of one more, out of the same seam. Given before it is taken,
+      so an extra the load order cannot hand over leaves the seam as it was.
+      If it was the last one there, this swing is the one that ends the seam.
+    */
+    const extra = oreExtra(seam, rankStep(actorId, 'miner'), Math.random());
+    if (extra && depositLeft(refrId, backMs) > 0 && addItem(actorId, extra.ore, 1)) {
+      if (takeFromDeposit(refrId, backMs) === 1) { took = 1; }
     }
     const rank = creditWork(actorId, 'mine');
     const worn = wearTool(actorId, 'miner');
