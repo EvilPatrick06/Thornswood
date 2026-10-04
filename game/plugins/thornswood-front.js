@@ -905,7 +905,9 @@
         try { vis = !!sp.browser.isVisible(); } catch (e) { }
         try { foc = !!sp.browser.isFocused(); } catch (e) { }
         if (!vis) {
-          try { sp.browser.setVisible(true); } catch (e) { }
+          // NirnLab hiding also drops its real focus, while SkyrimPlatform's
+          // getter still reports the requested focus. Restore both together.
+          try { sp.browser.setVisible(true); sp.browser.setFocused(true); } catch (e) { }
           if (!menuHidTold) { menuHidTold = true; log('menu: something hid the browser while the choice was up; shown again'); }
         }
         if (!foc) {
