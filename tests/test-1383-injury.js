@@ -115,6 +115,8 @@ function rig() {
     writeState: function (id) { (extra[id] = extra[id] || {}).redrawn = (extra[id].redrawn || 0) + 1; }
   };
   G.__thornswoodStuck = { TEMPLES: [{ key: 'whiterun', desc: TEMPLE_CELL }] };
+  // The perks block's answer, the way it reads it: the perks over the tree.
+  G.__thornswoodPerks = { holds: function (id, key) { return P.perks(state[id] || P.fresh()).indexOf(key) !== -1; } };
   return {
     G: G, mp: mp, H: G.__thornswoodHurt, N: G.__thornswoodNeeds, clock: clock, dice: dice,
     said: said, damage: damage, state: state, idOf: idOf, timers: timers,
@@ -331,6 +333,16 @@ if (NEEDS_SRC && HURT_SRC && P) {
     r.minutes(1); r.tick();
     yes('a bed clears a chill, and in its caught window it never showed', !ill(r, me, 'chill') &&
       !r.lines(me).some(function (l) { return /bed shakes/.test(l); }));
+    r.H.staff(me, ['chill'], 'staff');
+    r.minutes(12); r.tick();
+    r.needs(me, { resting: 'rough', roof: false, place: 'outdoors', temp: 50, fire: -1 });
+    r.tick();
+    yes('so does a bedroll nobody lends you, the ladder\'s rough', !ill(r, me, 'chill') &&
+      r.lines(me).some(function (l) { return /bed shakes/.test(l); }));
+    const seat = r.person(0x54);
+    r.needs(seat, { resting: 'campfire', roof: false, place: 'outdoors', temp: 50, fire: 100 });
+    r.tick(); r.minutes(70); r.tick();
+    yes('an hour on a seat at a fire is not open ground', !ill(r, seat, 'chill'));
     r.H.staff(me, ['chill'], 'staff');
     r.needs(me, { resting: '', roof: false, place: 'outdoors', temp: 50, fire: -1 });
     r.minutes(20); r.tick();
@@ -623,8 +635,10 @@ if (NEEDS_SRC && HURT_SRC && P) {
     const staffWords = /var WORDS_STAFF = \[([\s\S]*?)\];/.exec(src);
     yes('the staff block gates /hurt on the staff roles', !!staffWords && staffWords[1].indexOf("'/hurt'") !== -1 &&
       /if \(word === '\/hurt'\) \{[\s\S]{0,200}g\.__thornswoodHurt/.test(src));
-    yes('the look prompt draws an agreed scar', /row\.s \?/.test(FRONT) && /\|' \+ \(row\.s \|\| ''\)/.test(FRONT));
-    yes('the near list carries the scar', /w\[them\.id\.toString\(16\)\]\.s = them\.scar/.test(src));
+    yes('the look prompt draws an agreed scar, and redraws when it changes',
+      /\(row\.c \? '<div/.test(FRONT) && /\|' \+ \(row\.c \|\| ''\)/.test(FRONT));
+    yes('the near list carries the scar as c, never over the sleep key s',
+      /w\[them\.id\.toString\(16\)\]\.c = them\.scar/.test(src) && !/\]\.s = them\.scar/.test(src));
     yes('no line the block says calls anybody a player', !/player/i.test(HURT_SRC.replace(/getOnlinePlayers/g, '')));
     yes('no em dash in the block', HURT_SRC.indexOf('—') === -1);
   }

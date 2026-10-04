@@ -12,6 +12,45 @@ them.
 The item lists sit in [systems/lists](systems/lists/README.md). They are
 generated from the recipe, harvest, ore and hunt tables.
 
+## Buttons, not commands
+
+Decided by Patrick on 4 Oct: "can we stop with the commands, I want
+things to be buttons, it's nicer and more immersive", and "no more
+commands for things [people] do, only for dev and staff commands;
+everything else takes buttons and GUI, so whatever isn't needs fixed
+as well".
+
+Every page here follows this. Anything a person does in the world is
+done in the game, never by typing a line in the chat. That means one
+of these:
+
+- a key named on the look prompt, the panel that names who or what is
+  under the crosshair: Y for a friend, H to trade, L to mute, U to
+  press a key mold into a door;
+- a key of its own, the way X locks the door you just opened;
+- the prompt that answers an offer with Accept and Refuse, and the P
+  panel of friends and the party;
+- a panel: K for the profession, the class and the skill tree, J for
+  journals and group books, the notice board, the trade window, a
+  trader's wares;
+- activating the thing itself in the world: E on a board, a driver or
+  a trader, lying down in a bed.
+
+Staff and dev commands stay commands: moderation (`/kick`,
+`/silence`, `/ban` and the rest), and the testers' `/tp`, `/give`
+and `/spawn`.
+
+A panel or a key may send the server the same line a command used to
+be. The look prompt already sends `/trade` and the id of the person
+under the crosshair. Nobody is told to type that line, and help text
+never lists it.
+
+A page below that still tells people to type something is out of date
+on that point. [Chat commands](systems/commands.md) lists every
+command the game answers today, who may use it, and the issue that
+turns each one for people into buttons. A new system is written with
+its buttons from the start.
+
 ## A person arrives
 
 [Creation](systems/creation.md). A new character is made in a stone hall.
@@ -36,8 +75,9 @@ separate page.
 as hunger. Ale and potions are drinks, with their own pages.
 
 [Exhaustion](systems/exhaustion.md). Called rest on the bar. Empties in 8
-hours. Sit, campfire, inn and bed recover at 20, 35, 50 and 80 an hour.
-Crafting stops under 15.
+hours. A seat recovers 20 an hour, a bed nobody can lend you 25, a seat
+by a fire 35, that bed by a fire 45, a bed you are allowed in 50, and
+your own bed 80. Crafting stops under 15.
 
 [Food](systems/food.md). Raw, burnt, cooked, and a feast. Eating takes
 time. A full stomach refuses another meal's help.

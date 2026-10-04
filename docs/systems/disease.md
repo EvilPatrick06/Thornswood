@@ -69,8 +69,8 @@ A bad one refuses every craft. A potion of cure disease clears one, the
 one furthest along, and is still the sip of 5. A shrine pressed inside
 one of the temples the wake uses clears them all. A fire, a bed, warmth
 back to fine after being cold, or 2 hours clears a chill. An hour asleep
-on open ground (resting at the sitting rate with no roof over you) or
-an hour at spent cold starts one. Toughness takes 10% off each chance a
+on open ground (on a seat, with no roof over you and no fire in reach)
+or an hour at spent cold starts one. Toughness takes 10% off each chance a
 point, and Purified Blood stops every one. The old disease mod is out
 on purpose.
 

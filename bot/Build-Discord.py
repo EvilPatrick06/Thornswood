@@ -243,6 +243,13 @@ for _h in HOLDS:
 for _h in HOLDS:
     ROLES.append(('Citizen of ' + _h, 0x8FA9B8, True, PLAIN))
 
+# The Free Skyrim Trading Company (#1393, docs/systems/trading-company.md).
+# Applied for in Discord, the same shape as a Jarl, and given by a person.
+# The site's access.company names it, and the game lets a character on an
+# account that holds it buy for the company. Made here because a role the
+# site reads and nothing creates is the Banned mistake below.
+ROLES.append(('Trading Company', 0xB08D57, True, PLAIN))
+
 ROLES.append(('Member', 0x8D9682, False, PLAIN))   # everybody, on the way in
 
 # THE ONE A BAN DEPENDS ON, and it was never created.

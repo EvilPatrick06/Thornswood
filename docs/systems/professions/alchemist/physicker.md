@@ -31,7 +31,8 @@ You have no recipe list.
 
 ## Where this is
 
-The lab gate and the disease list are in the server. A cure disease
-potion you brew is still only the sip, because the server cannot read
-what a brewed potion does. Remedies and the double batch are not in. Toughness on the tree already writes disease
+The lab gate, the double batch and the disease list are in the
+server. A cure disease potion you brew is still only the sip, because
+the server cannot read what a brewed potion does. Remedies are not in.
+Toughness on the tree already writes disease
 resistance. This half's Clarity point already lands.

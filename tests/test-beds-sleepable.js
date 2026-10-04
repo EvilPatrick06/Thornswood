@@ -4,7 +4,8 @@
 //
 // Vanilla Owned beds refuse Sleep/Wait. Under SkyMP that ownership has no
 // host, so the front clears it on a bed press and re-activates, and when
-// somebody lies down it tells the server /rest bed for exhaustion recovery.
+// somebody lies down it tells the server /rest bed for exhaustion recovery,
+// and /rest sit at any other furniture, which the server sorts (#1603).
 //
 //   node tests/test-beds-sleepable.js
 'use strict';
@@ -31,7 +32,8 @@ yes('front has clearBedOwnership', /function clearBedOwnership\(ref\)/.test(fron
 yes('front clears actor and faction owners', /setActorOwner\(null\)/.test(front) && /setFactionOwner\(null\)/.test(front));
 yes('front handles furniture type 40 on activate', /type === 40/.test(front) && /Clear Owned so Sleep\/Wait works/.test(front));
 yes('front re-activates after clearing owned beds', /cleared ownership on/.test(front) && /activate\(pc, false\)/.test(front));
-yes('front watches furnitureEnter for beds', /furnitureEnter/.test(front) && /tellServer\('\/rest bed'\)/.test(front));
+yes('front watches furnitureEnter: a bed is /rest bed, any other furniture /rest sit (#1603)',
+    /furnitureEnter/.test(front) && /tellServer\(bed \? '\/rest bed' : '\/rest sit'\)/.test(front));
 yes('front watches furnitureExit to stop rest', /furnitureExit/.test(front) && /tellServer\('\/rest up'\)/.test(front));
 yes('front ignores non-player furniture events', /actorId !== 0x14/.test(front));
 

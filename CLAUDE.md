@@ -71,6 +71,10 @@ band-aids" is the rule for everybody. For a Claude it also means:
 - When your own earlier change turns out to be a band-aid, say so plainly,
   close or revert it, and record that on its issue.
 
+### Buttons, not chat commands
+
+Decided by Patrick on 4 Oct: never add a chat command for something people do in the world, only for staff and dev; docs\SYSTEMS.md "Buttons, not commands" is the rule and what counts as a button.
+
 ### Every reply ends with the commands, in order, and what each one is for
 
 Asked for by Patrick on 19 Sep, after four pushes went out and not one pull
