@@ -163,8 +163,9 @@ two outside trades. A master takes someone on in the sister half or
 in an outside trade with `/apprentice <name>`, and ends it with
 `/apprentice end <name>`. See [Masters and apprentices](apprenticeship.md).
 
-Not in the world yet: a warrior's master maneuvers as a mechanic,
-the repair kits on [Durability](durability.md), Twin Souls as a second
+Not in the world yet: the parts of a warrior's maneuvers the game
+has to do itself (see [Warrior](professions/warrior.md)), the repair
+kits on [Durability](durability.md), Twin Souls as a second
 enchantment, Master Weaver's hidden armour, Master Carver's hotter
 fire, and the vanilla perk lines that still hide some recipes in the
 crafting menu even when the server would allow them. Each profession

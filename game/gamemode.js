@@ -1763,8 +1763,14 @@ function halfGate(actorId, half, rank, refusal) {
  * A yield has been handed out: count the work, and hand back the line about a
  * new rank when one was reached. Anything going wrong here costs a count, not
  * somebody's salt, so it is swallowed.
+ *
+ * n is how many pieces this one piece of work is, one when it is not given. A
+ * warrior's kill is the one caller that passes it (#1386): a dragon is 16
+ * pieces. It is still one swing for tiredness, the page's "the same rest cost
+ * as a swing of a pick", and the party bonus is 15% of the whole count.
  */
-function creditWork(actorId, key) {
+function creditWork(actorId, key, n) {
+  const pieces = (typeof n === 'number' && n >= 1) ? Math.floor(n) : 1;
   /*
     Every piece of work is also a piece of tiredness.
 
@@ -1816,14 +1822,14 @@ function creditWork(actorId, key) {
     listed together is a checkbox everybody ticks once and never thinks about
     again.
   */
-  let extra = false;
+  let extra = 0;
   try {
     const soc = globalThis.__thornswoodSocial;
     if (soc && soc.workBonus) {
       const over = soc.workBonus(actorId) - 1;
       if (over > 0) {
-        PARTY_BANK[actorId] = (PARTY_BANK[actorId] || 0) + over;
-        if (PARTY_BANK[actorId] >= 1) { PARTY_BANK[actorId] -= 1; extra = true; }
+        PARTY_BANK[actorId] = (PARTY_BANK[actorId] || 0) + over * pieces;
+        while (PARTY_BANK[actorId] >= 1) { PARTY_BANK[actorId] -= 1; extra++; }
       }
     }
   } catch (e) { }
@@ -1832,9 +1838,10 @@ function creditWork(actorId, key) {
   if (!c || !c.credit) { return null; }
   try {
     let line = c.credit(actorId, key);
-    if (extra) {
-      // The second piece's answer wins when it has one, because a rank raised
-      // by the bonus piece is the thing worth saying.
+    // Every piece after the first, and then the bonus pieces. A later
+    // piece's answer wins when it has one, because a rank raised by the last
+    // piece is the thing worth saying.
+    for (let i = 1; i < pieces + extra; i++) {
       const more = c.credit(actorId, key);
       if (more) { line = more; }
     }
@@ -5591,6 +5598,116 @@ function startChargenTimer() {
 ensureProperties();
 startChargenTimer();
 
+/*
+  HOW MANY PIECES ONE KILL IS WORTH TO A WARRIOR (#1386).
+
+  docs/systems/professions/warrior.md, "How much one kill is worth": a chicken
+  and a dragon are not the same fight, so the piece count follows how hard the
+  thing was. Until this, every kill was one piece.
+
+  THE HUNTER LIST FIRST. When the body's base is on the hunter list
+  (HUNTS_BY_BASE), the pieces are that row's own hunter rank: novice 1,
+  advanced 2, expert 4, master 8. A named body uses its own row, so Karhu, who
+  is master on that list, is 8 although a bear is 4. The page says so in those
+  words, and it is why a base on the list never reaches the race lines below.
+
+  EVERYTHING ELSE BY THE RACE THE ENGINE SAYS IT IS. A bandit, a draugr and a
+  dragon are not on the hunter list, and their base is often a levelled
+  template, so the race on the record itself is not the answer (the hunt
+  table's build script measured over a thousand people whose own RNAM says
+  fox). Actor.GetRace in the fork follows the actor's own template chain, the
+  one the engine rolled when it spawned, so it names the race the body really
+  has. The race's editor id is read out of RACES, the table of every RACE
+  record in the load order, and matched against the lines on the page, first
+  match winning, so a dragon priest is read before a dragon:
+
+    Bandit, guard, forsworn, skeleton           2   the people's races and
+                                                    every skeleton race
+    Draugr, falmer, hagraven                    4
+    Giant, dragon priest, centurion, lurker     8
+    Dragon                                     16
+
+  and, for an animal that is not on the hunter list, the strength table's own
+  kinds: sabre cat, troll, frostbite spider, horse, horker and netch calf 2,
+  bear and chaurus 4, mammoth and a grown netch 8. A named animal off the list
+  uses its kind, which is what the race is. Anything the page does not name
+  (an atronach, a spriggan, a dwarven sphere) is the novice line, 1, which is
+  what every kill was before, and that choice is a question on the issue.
+
+  A PERSON KILLED BY A PERSON IS STILL NOTHING. That test is in mp.onDeath and
+  is not this function's: nothing here is asked about a person's body.
+*/
+const WARRIOR_KILL = {
+  byRank: { novice: 1, advanced: 2, expert: 4, master: 8 },
+  byRace: [
+    [/dragonpriest/, 8],
+    [/dragon|alduin/, 16],
+    [/^(c00)?giant|frostgiant/, 8],
+    [/centurion/, 8],
+    [/lurker/, 8],
+    [/draugr|falmer|hagraven/, 4],
+    [/skeleton/, 2],
+    [/^(dlc1)?(nord|imperial|breton|redguard|orc|argonian|khajiit|woodelf|highelf|darkelf|elder)race/, 2],
+    [/mammoth|^dlc2netchrace$/, 8],
+    [/^bear|chaurus/, 4],
+    [/sabrecat|troll|frostbitespider|horse|horker|netchcalf/, 2]
+  ],
+  fallback: 1
+};
+
+/** The pieces one kill is worth: the hunter list's rank for a base on it, else
+ *  the race's line. Pure, so the harness can ask it about any body. */
+function warriorPieces(baseDesc, raceEdid) {
+  const base = String(baseDesc || '');
+  if (base && Object.prototype.hasOwnProperty.call(HUNTS_BY_BASE, base)) {
+    const rank = HUNTS_BY_BASE[base].rank;
+    if (Object.prototype.hasOwnProperty.call(WARRIOR_KILL.byRank, rank)) {
+      return WARRIOR_KILL.byRank[rank];
+    }
+  }
+  const race = String(raceEdid || '').toLowerCase();
+  if (race) {
+    for (let i = 0; i < WARRIOR_KILL.byRace.length; i++) {
+      if (WARRIOR_KILL.byRace[i][0].test(race)) { return WARRIOR_KILL.byRace[i][1]; }
+    }
+  }
+  return WARRIOR_KILL.fallback;
+}
+
+/** The editor id of the race the engine says this actor is, or '' when it
+ *  cannot say. The descriptor is read as the engine writes it and, failing
+ *  that, with its hex put the way RACES writes it. */
+function raceEdidOf(actorId) {
+  let desc = '';
+  try {
+    const r = mp.callPapyrusFunction('method', 'Actor', 'GetRace',
+      { type: 'form', desc: mp.getDescFromId(actorId) }, []);
+    desc = (r && r.desc) ? String(r.desc) : '';
+  } catch (e) {
+    return '';
+  }
+  const items = (typeof RACES !== 'undefined' && RACES && RACES.items) ? RACES.items : null;
+  if (!desc || !items) { return ''; }
+  let row = Object.prototype.hasOwnProperty.call(items, desc) ? items[desc] : null;
+  if (!row) {
+    const at = desc.indexOf(':');
+    const hex = at > 0 ? parseInt(desc.slice(0, at), 16) : NaN;
+    const again = isNaN(hex) ? '' : hex.toString(16) + desc.slice(at);
+    row = (again && Object.prototype.hasOwnProperty.call(items, again)) ? items[again] : null;
+  }
+  return row ? String(row.e || '') : '';
+}
+
+/** How many pieces killing this actor is worth to a warrior. */
+function killPieces(actorId) {
+  let base = '';
+  try { base = String(mp.get(actorId, 'baseDesc') || ''); } catch (e) { base = ''; }
+  if (base && Object.prototype.hasOwnProperty.call(HUNTS_BY_BASE, base)) {
+    return warriorPieces(base, '');
+  }
+  return warriorPieces(base, raceEdidOf(actorId));
+}
+
 /**
  * Set the arrival point at the moment of death, while we still know where the
  * body fell. The engine reads spawnPoint when the respawn timer expires.
@@ -5601,6 +5718,20 @@ startChargenTimer();
  * a person.
  */
 mp.onDeath = guard('onDeath', function (actorId, killerId) {
+  /*
+    A BLOW THE SERVER LANDED ITSELF STILL HAS A KILLER (#1386). The extra
+    damage of a warrior's Heavy or Wreck is written by the maneuvers block
+    after the engine's own hit, and the engine kills with no killer when a
+    write takes health to nothing. The maneuvers block remembers whose blow
+    that was for a moment, and it is asked here, before anything reads the
+    killer.
+  */
+  if (!killerId) {
+    try {
+      var blowBy = globalThis.__thornswoodManeuvers;
+      if (blowBy && blowBy.killerOf) { killerId = blowBy.killerOf(actorId) || killerId; }
+    } catch (eBlow) { }
+  }
   let npcDeath = false;
   try { npcDeath = !(Number(mp.get(actorId, 'profileId')) > 0); } catch (e) { return; }
   /*
@@ -5709,7 +5840,10 @@ mp.onDeath = guard('onDeath', function (actorId, killerId) {
         var ch = globalThis.__thornswoodCharacter;
         var st = (ch && ch.stateOf) ? ch.stateOf(kid) : null;
         if (st && st.prof === 'warrior' && st.half) {
-          var raised = creditWork(kid, st.half);
+          // As many pieces as the body was hard (killPieces, over this
+          // handler, #1386): a chicken is 1 and a dragon 16. Whatever the
+          // body carried staying in the pack is the hunt, not a piece more.
+          var raised = creditWork(kid, st.half, killPieces(actorId));
           if (raised) {
             notify(kid, raised);
             say(kid, raised);
@@ -38934,6 +39068,30 @@ log('gamemode loaded:',
     return out;
   }
 
+  /*
+    And what a warrior's maneuver adds while it lasts (#1386): Rush's +4
+    speed for five seconds. Folded into the same map for the same reason the
+    needs are: the client SETS each value to the total it is given, so a
+    second map would overwrite the first. The maneuvers block loads after
+    this one and is asked at write time.
+  */
+  function withManeuvers(actorId, base) {
+    var mv = g.__thornswoodManeuvers;
+    if (!mv || !mv.effects || !actorId) { return base; }
+    var add = null;
+    try { add = mv.effects(actorId); } catch (e) { return base; }
+    if (!add) { return base; }
+    var out = {};
+    for (var k in base) {
+      if (Object.prototype.hasOwnProperty.call(base, k)) { out[k] = base[k]; }
+    }
+    for (var av in add) {
+      if (!Object.prototype.hasOwnProperty.call(add, av)) { continue; }
+      out[av] = (Object.prototype.hasOwnProperty.call(out, av) ? out[av] : 0) + add[av];
+    }
+    return out;
+  }
+
   function needsView(actorId) {
     var n = g.__thornswoodNeeds;
     if (!n || !actorId) { return null; }
@@ -38981,7 +39139,7 @@ log('gamemode loaded:',
         that counted. One map, one total, and a penalty is simply a negative
         number in it. See the needs block at the end of this file.
       */
-      effects: withNeeds(actorId, P.treeApplies(s)),
+      effects: withManeuvers(actorId, withNeeds(actorId, P.treeApplies(s))),
       /*
         The three meters, for the panel to draw. Absent entirely when there is
         no character in hand or the needs block is not loaded, so a page from
@@ -40135,6 +40293,612 @@ log('gamemode loaded:',
   clog('ready');
 })();
 // ==== end thornswood character ====
+
+// ==== thornswood warrior maneuvers ====
+/*
+  A WARRIOR'S MANEUVERS (#1386).
+
+  docs/systems/professions/warrior.md, "Maneuvers", is the table, and the two
+  half pages name the rows: Set, Plant, Cover and Wall hold a line, Rush,
+  Heavy, Break and Wreck break one. Until this nothing in combat read the word
+  Bulwark or Berserker at all. The rows here are the page's rows and no more:
+  the stamina, how long each lasts and the wait before it again.
+
+  WHO HOLDS WHICH ROW. The page: "You have the rows at your rank and below, on
+  your half." The sister half has its novice row only, and only once a Warlord
+  has taken you on. An outside trade, novice combat a Warlord taught somebody
+  who is not a warrior, is the novice row and no further. held() is that, and
+  nothing else decides it.
+
+  STAMINA IS SPENT WHEN THE MANEUVER STARTS, AND WITHOUT IT NOTHING HAPPENS.
+  spend() takes it through the engine's own Actor.DamageActorValue.
+
+  WHAT THE SERVER APPLIES, AND WHAT IT CANNOT. Everything here is the server's
+  own: the stamina, the clocks, the refusals, and health through the engine's
+  percentages. Some of the rows are the game's to do on somebody's own machine
+  and the server cannot reach them from here. Each start line says which, so
+  nobody is told an effect is on when it is not, and the issue lists them:
+    Set     halving what a block costs. The game works that cost out on the
+            blocker's machine. Only the stamina and the clocks are real.
+    Plant   not being staggered. A stagger is an animation on the machine that
+            animates you; the server refuses the staggers it sends itself
+            (Break and Wreck), and no other.
+    Cover   20% less damage for one person while you block. Applied here, by
+            giving back a fifth of what each hit took. The block is read from
+            the animation events the engine is sent (blockStart, blockStop),
+            sampled ten times a second.
+    Wall    20% less damage for you and your party within 3 metres. Applied
+            here, the same way.
+    Rush    +4 speed for 5 seconds. Sent through the map the client's skill
+            tree hand already sets (thornswood-front.js, treeApplyNow), so no
+            client change is needed for it.
+    Heavy   25% more on the next power attack within 8 seconds. Applied here,
+            by taking a quarter again of what that hit took.
+    Break   the next hit staggers. Sent to a person's own game with
+            Debug.SendAnimationEvent; a creature is animated by whoever hosts
+            it and the server cannot reach that machine, so a creature takes
+            no stagger yet.
+    Wreck   50% more on the next power attack, and it staggers, both as above.
+
+  A BLOW THAT KILLS OUTRIGHT IS NOT SOFTENED. The engine applies a hit's
+  damage after the OnHit event and kills on the spot when that takes health
+  to nothing, so a fifth cannot be given back to somebody already dead. Exact
+  damage would need the engine's damage formula to ask, which is an engine
+  change.
+
+  THE CLOCKS LIVE IN MEMORY, on globalThis so a hot reload keeps them. A
+  restart clears every wait and every armed blow, which at three minutes at
+  most is nothing worth a property write.
+*/
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+  var P = g.__thornswoodProgression;
+  if (!P) { console.log('[thornswood maneuvers] the rules block is missing, nothing registered'); return; }
+
+  function mlog() {
+    var a = Array.prototype.slice.call(arguments);
+    console.log('[thornswood maneuvers] ' + a.join(' '));
+  }
+
+  var RANKS = ['novice', 'advanced', 'expert', 'master'];
+
+  /*
+    The table on the page, row for row. seconds is how long it lasts. Break
+    and Wreck have no length on the page: each waits for the blow it names,
+    and that is what 0 means here.
+  */
+  var MANEUVERS = {
+    set:     { name: 'Set',   half: 'bulwark',   rank: 'novice',   stamina: 15, cooldown: 45,  seconds: 8 },
+    plant:   { name: 'Plant', half: 'bulwark',   rank: 'advanced', stamina: 20, cooldown: 60,  seconds: 8 },
+    cover:   { name: 'Cover', half: 'bulwark',   rank: 'expert',   stamina: 25, cooldown: 90,  seconds: 8,  less: 0.2, metres: 3 },
+    wall:    { name: 'Wall',  half: 'bulwark',   rank: 'master',   stamina: 40, cooldown: 180, seconds: 10, less: 0.2, metres: 3 },
+    rush:    { name: 'Rush',  half: 'berserker', rank: 'novice',   stamina: 15, cooldown: 30,  seconds: 5,  speed: 4 },
+    heavy:   { name: 'Heavy', half: 'berserker', rank: 'advanced', stamina: 20, cooldown: 45,  seconds: 8,  more: 0.25 },
+    'break': { name: 'Break', half: 'berserker', rank: 'expert',   stamina: 25, cooldown: 60,  seconds: 0 },
+    wreck:   { name: 'Wreck', half: 'berserker', rank: 'master',   stamina: 40, cooldown: 120, seconds: 0,  more: 0.5 }
+  };
+  var ORDER = ['set', 'plant', 'cover', 'wall', 'rush', 'heavy', 'break', 'wreck'];
+  var HALF_NAME = { bulwark: 'Bulwark', berserker: 'Berserker' };
+
+  // Seventy units to a metre, the party strip's measure (see MOLD_REACH).
+  var UNITS_PER_METRE = 70;
+
+  function has(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
+  function rankAt(r) { return RANKS.indexOf(r); }
+  function aRank(r) {
+    var w = String(r || 'novice');
+    return (/^[aeiou]/.test(w) ? 'an ' : 'a ') + w;
+  }
+  function noviceOf(half) {
+    for (var i = 0; i < ORDER.length; i++) {
+      var m = MANEUVERS[ORDER[i]];
+      if (m.half === half && m.rank === 'novice') { return m.name; }
+    }
+    return '';
+  }
+
+  // -------------------------------------------------------------- the rules --
+  /*
+    HAS A WARLORD TAKEN YOU ON FOR YOUR SISTER HALF. /apprentice records it
+    (#1388), and the character block's masterFor says whether that Master's
+    own record still stands. A sister half already past novice counts as
+    well: rankUp only lets it climb under a Master of it, and the ranks
+    earned under one stay after it ends (apprenticeship.md).
+  */
+  function takenOn(s, actorId) {
+    if (!s || s.prof !== 'warrior' || !s.half) { return false; }
+    var sister = P.sisterOf('warrior', s.half);
+    if (!sister) { return false; }
+    var r = P.rankOf(s, sister);
+    if (r && rankAt(r) > 0) { return true; }
+    var ch = g.__thornswoodCharacter;
+    try { return !!(actorId && ch && ch.masterFor && ch.masterFor(actorId, s, sister)); } catch (e) { return false; }
+  }
+
+  /** Every row this character holds, as { key: true }. Pure. */
+  function held(s, sisterTaken) {
+    var out = {};
+    if (!s) { return out; }
+    for (var i = 0; i < ORDER.length; i++) {
+      var key = ORDER[i];
+      var m = MANEUVERS[key];
+      var rank = P.rankOf(s, m.half);
+      if (!rank) { continue; }
+      if (s.prof === 'warrior' && s.half === m.half) {
+        if (rankAt(m.rank) <= rankAt(rank)) { out[key] = true; }
+        continue;
+      }
+      if (m.rank !== 'novice') { continue; }
+      if (s.prof === 'warrior' && P.sisterOf('warrior', s.half) === m.half) {
+        if (sisterTaken) { out[key] = true; }
+        continue;
+      }
+      if ((s.taught || []).indexOf(m.half) !== -1) { out[key] = true; }
+    }
+    return out;
+  }
+
+  /** Why this character does not hold that row, in one sentence. */
+  function whyNot(s, key) {
+    var m = MANEUVERS[key];
+    var halfName = HALF_NAME[m.half];
+    var rank = s ? P.rankOf(s, m.half) : null;
+    if (s && s.prof === 'warrior' && s.half === m.half) {
+      return m.name + ' is for ' + aRank(m.rank) + ' ' + halfName + '. You are ' +
+             aRank(rank) + ' ' + halfName + '.';
+    }
+    if (s && s.prof === 'warrior' && s.half && P.sisterOf('warrior', s.half) === m.half) {
+      if (m.rank !== 'novice') {
+        return halfName + ' is your sister half, and a sister half has its novice row and no more: ' +
+               noviceOf(m.half) + '.';
+      }
+      return halfName + ' is your sister half. Its novice maneuver opens when a Warlord takes you on.';
+    }
+    if (rank && s && (s.taught || []).indexOf(m.half) !== -1) {
+      return halfName + ' was taught to you as an outside trade, and that is its novice row and no further: ' +
+             noviceOf(m.half) + '.';
+    }
+    return m.name + ' is a ' + halfName + ' maneuver. It belongs to a warrior, and a Warlord can teach ' +
+           'novice combat to somebody who is not one.';
+  }
+
+  // ------------------------------------------------------------ the world --
+  /*
+    cool  actor -> { key: when it is ready again }
+    on    actor -> what is running or armed: a window's end for set, plant,
+          wall, rush and heavy; { until, who } for cover; true for break and
+          wreck, which wait for their blow
+    block actor -> whether that bulwark is blocking, as last seen
+    blow  actor -> { by, at }: who landed the server's own last blow on it
+  */
+  var ST = g.__thornswoodManeuverState;
+  if (!ST || typeof ST !== 'object') {
+    ST = g.__thornswoodManeuverState = { cool: {}, on: {}, block: {}, blow: {} };
+  }
+
+  function now() { return Date.now(); }
+  function selfOf(id) { return { type: 'form', desc: mp.getDescFromId(id) }; }
+  function personOf(id) {
+    try { return Number(mp.get(id, 'profileId')) > 0; } catch (e) { return false; }
+  }
+  function deadOf(id) {
+    try { return !!mp.get(id, 'isDead'); } catch (e) { return true; }
+  }
+  function share(id, which) {
+    try {
+      var p = mp.get(id, 'percentages');
+      var v = p ? Number(p[which]) : NaN;
+      return isNaN(v) ? -1 : v;
+    } catch (e) { return -1; }
+  }
+  function near(a, b, metres) {
+    try {
+      if (String(mp.get(a, 'worldOrCellDesc') || '') !== String(mp.get(b, 'worldOrCellDesc') || '')) { return false; }
+      var p = mp.get(a, 'pos');
+      var q = mp.get(b, 'pos');
+      var dx = p[0] - q[0], dy = p[1] - q[1], dz = p[2] - q[2];
+      var r = metres * UNITS_PER_METRE;
+      return dx * dx + dy * dy + dz * dz <= r * r;
+    } catch (e) { return false; }
+  }
+  function onOf(id, make) {
+    if (!has(ST.on, id)) {
+      if (!make) { return null; }
+      ST.on[id] = {};
+    }
+    return ST.on[id];
+  }
+  function readyAt(id, key) {
+    return (has(ST.cool, id) && has(ST.cool[id], key)) ? ST.cool[id][key] : 0;
+  }
+  function seconds(ms) {
+    var n = Math.max(1, Math.ceil(ms / 1000));
+    return n + (n === 1 ? ' second' : ' seconds');
+  }
+  function nameOf(id) {
+    var soc = g.__thornswoodSocial;
+    try { if (soc && soc.nameOfPerson) { return soc.nameOfPerson(id) || 'them'; } } catch (e) { }
+    return 'them';
+  }
+
+  /*
+    STAMINA, SPENT WHEN THE MANEUVER STARTS. The engine holds stamina as a
+    share of the most there is and does not hand that most to this file.
+    Actor.DamageActorValue knows it, and takes the amount off as a share of
+    the engine's own maximum (MpActor::DamageActorValue). So the amount is
+    taken, and a share that hit the floor means there was not that much: it
+    is put back exactly as it was, and the maneuver does not start. The
+    engine's maximum is worked out from the race record, so stamina the skill
+    tree adds on the client is not in it.
+  */
+  function spend(actorId, amount) {
+    var before = share(actorId, 'stamina');
+    if (!(before > 0)) { return false; }
+    try {
+      mp.callPapyrusFunction('method', 'Actor', 'DamageActorValue', selfOf(actorId), ['Stamina', amount]);
+    } catch (e) {
+      mlog('could not take stamina from', actorId.toString(16) + ':', e);
+      return false;
+    }
+    if (share(actorId, 'stamina') > 0) { return true; }
+    try {
+      var p = mp.get(actorId, 'percentages');
+      mp.set(actorId, 'percentages', { health: Number(p.health), magicka: Number(p.magicka), stamina: before });
+    } catch (e2) {
+      mlog('could not put the stamina back on', actorId.toString(16) + ':', e2);
+    }
+    return false;
+  }
+
+  /* The one person Cover is for: the nearest within 3 metres, not yourself. */
+  function coverWho(actorId) {
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return 0; }
+    var best = 0, bestD = Infinity;
+    var mine = null;
+    try { mine = mp.get(actorId, 'pos'); } catch (e) { return 0; }
+    for (var i = 0; i < online.length; i++) {
+      var id = online[i];
+      if (id === actorId || deadOf(id) || !near(actorId, id, MANEUVERS.cover.metres)) { continue; }
+      var q = null;
+      try { q = mp.get(id, 'pos'); } catch (e) { continue; }
+      var d = (q[0] - mine[0]) * (q[0] - mine[0]) + (q[1] - mine[1]) * (q[1] - mine[1]) + (q[2] - mine[2]) * (q[2] - mine[2]);
+      if (d < bestD) { bestD = d; best = id; }
+    }
+    return best;
+  }
+
+  /*
+    The client's skill tree hand sets the effects map on the panel view, and
+    the map is rebuilt from the state on every write. A redraw is the one way
+    to send Rush's speed and to take it off again.
+  */
+  function push(actorId) {
+    var ch = g.__thornswoodCharacter;
+    if (!ch || !ch.writeState || !ch.stateOf) { return; }
+    try { ch.writeState(actorId, ch.stateOf(actorId), true); } catch (e) { mlog('could not redraw', actorId.toString(16) + ':', e); }
+  }
+
+  /** What a running maneuver adds to the client's map: Rush's speed. */
+  function effects(actorId) {
+    var rec = onOf(actorId, false);
+    if (!rec || !rec.rush || rec.rush <= now()) { return null; }
+    return { speedMult: MANEUVERS.rush.speed };
+  }
+
+  var STARTED = {
+    set: 'Set, for 8 seconds. Halving what a block costs is not in the game yet, so for now this spends the stamina and starts the wait.',
+    plant: 'Plant, for 8 seconds. A Break or a Wreck does not stagger you. Other staggers still land: stopping those is not in the game yet.',
+    wall: 'Wall, for 10 seconds. You, and your party within 3 metres of you, take 20% less damage.',
+    rush: 'Rush: +4 speed for 5 seconds.',
+    heavy: 'Heavy. Your next power attack in the next 8 seconds deals 25% more.',
+    'break': 'Break. Your next hit staggers a person. Staggering a creature is not in the game yet.',
+    wreck: 'Wreck. Your next power attack deals 50% more, and staggers a person. Staggering a creature is not in the game yet.'
+  };
+
+  /** /maneuver with nothing after it: what you hold and when each is ready. */
+  function listLine(actorId, mine) {
+    var bits = [];
+    var t = now();
+    for (var i = 0; i < ORDER.length; i++) {
+      var key = ORDER[i];
+      if (!mine[key]) { continue; }
+      var m = MANEUVERS[key];
+      var ready = readyAt(actorId, key);
+      bits.push(m.name + ' (' + m.stamina + ' stamina, ' + (ready > t ? 'ready in ' + seconds(ready - t) : 'ready') + ')');
+    }
+    if (!bits.length) {
+      return 'You have no maneuvers. They are a warrior\'s, on the half you picked, at your rank and below. ' +
+             'A Warlord can teach the novice row to somebody who is not a warrior.';
+    }
+    return 'Your maneuvers: ' + bits.join(', ') + '. /maneuver <name> starts one.';
+  }
+
+  /** /maneuver <name>. Answers the line to say, always. */
+  function use(actorId, word) {
+    var key = String(word || '').trim().toLowerCase();
+    var ch = g.__thornswoodCharacter;
+    if (!ch || !ch.stateOf) { return 'Maneuvers are not running on this server right now. Say so in the dev channel.'; }
+    var s = ch.stateOf(actorId);
+    var mine = held(s, takenOn(s, actorId));
+    if (!key || key === 'list') { return listLine(actorId, mine); }
+    if (!has(MANEUVERS, key)) {
+      return 'There is no maneuver by that name. There are eight: Set, Plant, Cover, Wall, Rush, Heavy, Break and Wreck.';
+    }
+    var m = MANEUVERS[key];
+    if (!mine[key]) { return whyNot(s, key); }
+    if (deadOf(actorId)) { return 'Not while you are down.'; }
+    var t = now();
+    var ready = readyAt(actorId, key);
+    if (ready > t) { return m.name + ' is ready again in ' + seconds(ready - t) + '.'; }
+    var who = 0;
+    if (key === 'cover') {
+      who = coverWho(actorId);
+      if (!who) { return 'Cover is for one person within 3 metres of you, and nobody is.'; }
+    }
+    if (!spend(actorId, m.stamina)) {
+      return m.name + ' takes ' + m.stamina + ' stamina, and you do not have it. Nothing happens.';
+    }
+    if (!has(ST.cool, actorId)) { ST.cool[actorId] = {}; }
+    ST.cool[actorId][key] = t + m.cooldown * 1000;
+    var rec = onOf(actorId, true);
+    if (key === 'cover') {
+      rec.cover = { until: t + m.seconds * 1000, who: who };
+      ST.block[actorId] = false;
+      mlog(actorId.toString(16), 'Cover on', who.toString(16));
+      return 'Cover on ' + nameOf(who) + ', for 8 seconds. While you block within 3 metres of them, they take 20% less damage.';
+    }
+    rec[key] = m.seconds ? t + m.seconds * 1000 : true;
+    mlog(actorId.toString(16), m.name);
+    if (key === 'rush') {
+      push(actorId);
+      setTimeout(function () { push(actorId); }, m.seconds * 1000 + 50);
+    }
+    return STARTED[key];
+  }
+
+  // -------------------------------------------------------------- the hits --
+  /*
+    WHAT A HIT TOOK, MEASURED RATHER THAN GUESSED. OnHit fires before the
+    engine works out the damage (ActionListener::OnWeaponHit sends it first,
+    then CalculateDamage and NetSetPercentages, in the same call). So the
+    target's health is read at the event, and read again once the engine is
+    done: at the next hit on the same target, or on the next turn of the event
+    loop, whichever is first. The difference is what that one hit took, and
+    the maneuver works on that: a fifth given back, a quarter or a half taken
+    again. A hit the engine then threw away (too fast, a splash) took nothing,
+    so nothing is changed and a Heavy or a Wreck it would have spent is armed
+    again.
+  */
+  var pending = {};
+  var queued = false;
+
+  function idOfForm(v) {
+    if (typeof v === 'number') { return v; }
+    if (v && v.desc) {
+      try { return Number(mp.getIdFromDesc(String(v.desc))) || 0; } catch (e) { return 0; }
+    }
+    return 0;
+  }
+  function isSpell(v) {
+    if (!v || !v.desc) { return false; }
+    try {
+      var r = mp.lookupEspmRecordById(mp.getIdFromDesc(String(v.desc)));
+      return !!(r && r.record && String(r.record.type) === 'SPEL');
+    } catch (e) { return false; }
+  }
+
+  /* Whether that bulwark is blocking, from the last animation event the
+     engine was sent. Moving clears that event, so what was last seen holds. */
+  function blocking(holder) {
+    var ev = '';
+    try { ev = String(mp.get(holder, 'lastAnimEvent') || '').toLowerCase(); } catch (e) { ev = ''; }
+    if (ev === 'blockstart') { ST.block[holder] = true; }
+    else if (ev === 'blockstop') { ST.block[holder] = false; }
+    return !!ST.block[holder];
+  }
+
+  function samePartyNear(holder, target) {
+    var soc = g.__thornswoodSocial;
+    if (!soc || !soc.partyOf || !soc.profileOf) { return false; }
+    var mine = soc.profileOf(holder);
+    var theirs = soc.profileOf(target);
+    if (!mine || !theirs) { return false; }
+    var p = soc.partyOf(mine);
+    if (!p || !p.members || p.members.indexOf(theirs) === -1) { return false; }
+    return near(holder, target, MANEUVERS.wall.metres);
+  }
+
+  /* 20% less for this target, from a Wall or a Cover. Two of them on one
+     person is still 20%: the rows say less damage, not less again. */
+  function shielded(target, t) {
+    for (var k in ST.on) {
+      if (!has(ST.on, k)) { continue; }
+      var holder = Number(k);
+      var rec = ST.on[k];
+      if (rec.wall && rec.wall > t && !deadOf(holder)) {
+        if (holder === target || samePartyNear(holder, target)) { return MANEUVERS.wall.less; }
+      }
+      if (rec.cover && rec.cover.until > t && rec.cover.who === target && !deadOf(holder) &&
+          blocking(holder) && near(holder, target, MANEUVERS.cover.metres)) {
+        return MANEUVERS.cover.less;
+      }
+    }
+    return 0;
+  }
+
+  function anyOn() {
+    for (var k in ST.on) { if (has(ST.on, k)) { return true; } }
+    return false;
+  }
+
+  function hit(targetId, aggressor, source, power, blocked) {
+    var target = Number(targetId) || 0;
+    if (!target) { return; }
+    // A hit on a target with a blow still open closes that blow first.
+    var open = pending[target];
+    if (open && open.length && open[open.length - 1].after === null) {
+      open[open.length - 1].after = share(target, 'health');
+    }
+    if (!anyOn()) { return; }
+    var t = now();
+    var by = idOfForm(aggressor);
+    // A bulwark's own blocked hit is a block seen.
+    if (blocked && has(ST.on, target) && ST.on[target].cover) { ST.block[target] = true; }
+
+    var e = { before: -1, after: null, by: by, more: 0, less: 0, stagger: false, used: [] };
+    var a = (by && has(ST.on, by)) ? ST.on[by] : null;
+    if (a && !isSpell(source)) {
+      if (power && a.wreck) {
+        e.more = MANEUVERS.wreck.more; e.stagger = true;
+        e.used.push({ key: 'wreck', v: a.wreck }); delete a.wreck;
+      } else if (power && a.heavy && a.heavy > t) {
+        e.more = MANEUVERS.heavy.more;
+        e.used.push({ key: 'heavy', v: a.heavy }); delete a.heavy;
+      }
+      if (!e.stagger && a['break']) {
+        e.stagger = true;
+        e.used.push({ key: 'break', v: a['break'] }); delete a['break'];
+      }
+    }
+    e.less = shielded(target, t);
+    if (!e.more && !e.less && !e.stagger) { return; }
+    e.before = share(target, 'health');
+    if (!(e.before > 0)) { rearm(e); return; }
+    if (!pending[target]) { pending[target] = []; }
+    pending[target].push(e);
+    if (!queued) {
+      queued = true;
+      setTimeout(guard('maneuverHits', flush), 0);
+    }
+  }
+
+  /* A blow that took nothing gives back what it would have spent. */
+  function rearm(e) {
+    if (!e.by || !e.used.length) { return; }
+    var rec = onOf(e.by, true);
+    for (var i = 0; i < e.used.length; i++) {
+      var u = e.used[i];
+      if (u.key === 'heavy' && u.v <= now()) { continue; }
+      if (!rec[u.key]) { rec[u.key] = u.v; }
+    }
+  }
+
+  function setHealth(target, h, change, killer) {
+    var next = h + change;
+    if (next > 1) { next = 1; }
+    if (next <= 0) {
+      next = 0;
+      // The engine kills on this write with nobody named; mp.onDeath asks.
+      if (killer) { ST.blow[target] = { by: killer, at: now() }; }
+    }
+    try {
+      var p = mp.get(target, 'percentages');
+      mp.set(target, 'percentages', { health: next, magicka: Number(p.magicka), stamina: Number(p.stamina) });
+    } catch (e) {
+      mlog('could not write the health of', target.toString(16) + ':', e);
+    }
+  }
+
+  /*
+    A STAGGER IS AN ANIMATION, AND THE SERVER CAN SEND ONE ONLY TO A PERSON.
+    Debug.SendAnimationEvent in the fork runs on the machine of the actor it
+    names, and only when that actor is somebody's own character
+    (SpSnippet::Execute returns for anything else). A person hit by Break or
+    Wreck staggers in their own game; a creature does not yet. Plant refuses
+    this stagger.
+  */
+  function staggerOf(target) {
+    if (!personOf(target) || deadOf(target)) { return; }
+    var rec = onOf(target, false);
+    if (rec && rec.plant && rec.plant > now()) { return; }
+    try {
+      mp.callPapyrusFunction('global', 'Debug', 'SendAnimationEvent', null, [selfOf(target), 'staggerStart']);
+    } catch (e) {
+      mlog('could not stagger', target.toString(16) + ':', e);
+    }
+  }
+
+  function flush() {
+    queued = false;
+    var all = pending;
+    pending = {};
+    for (var k in all) {
+      if (!has(all, k)) { continue; }
+      var target = Number(k);
+      var list = all[k];
+      var h = share(target, 'health');
+      if (list.length && list[list.length - 1].after === null) { list[list.length - 1].after = h; }
+      var change = 0, killer = 0, stagger = false;
+      for (var i = 0; i < list.length; i++) {
+        var e = list[i];
+        var took = e.before - e.after;
+        if (!(e.after >= 0) || !(took > 0)) { rearm(e); continue; }
+        if (e.less) { change += took * e.less; }
+        if (e.more) { change -= took * e.more; killer = e.by; }
+        if (e.stagger) { stagger = true; }
+      }
+      if (h > 0 && change !== 0) { setHealth(target, h, change, killer); }
+      if (stagger) { staggerOf(target); }
+    }
+  }
+
+  /** Whose blow it was, when the server's own write was the killing one. */
+  function killerOf(target) {
+    var b = has(ST.blow, target) ? ST.blow[target] : null;
+    if (!b) { return 0; }
+    delete ST.blow[target];
+    return (now() - b.at) < 2000 ? b.by : 0;
+  }
+
+  // -------------------------------------------------------------- the tick --
+  /* Ten times a second while anything runs: a Cover's block is watched, and
+     what has run out is taken off. Nothing to do costs one empty loop. */
+  function tick() {
+    var t = now();
+    for (var k in ST.on) {
+      if (!has(ST.on, k)) { continue; }
+      var holder = Number(k);
+      var rec = ST.on[k];
+      if (rec.cover && rec.cover.until > t) { blocking(holder); }
+      if (rec.cover && rec.cover.until <= t) { delete rec.cover; delete ST.block[holder]; }
+      var timed = ['set', 'plant', 'wall', 'rush', 'heavy'];
+      for (var i = 0; i < timed.length; i++) {
+        if (rec[timed[i]] && rec[timed[i]] <= t) { delete rec[timed[i]]; }
+      }
+      var left = false;
+      for (var f in rec) { if (has(rec, f)) { left = true; break; } }
+      if (!left) { delete ST.on[k]; }
+    }
+    for (var b in ST.blow) {
+      if (has(ST.blow, b) && t - ST.blow[b].at > 5000) { delete ST.blow[b]; }
+    }
+  }
+
+  if (g.__thornswoodManeuverTimer) { try { clearInterval(g.__thornswoodManeuverTimer); } catch (e) { } }
+  g.__thornswoodManeuverTimer = setInterval(guard('maneuverTick', tick), 100);
+
+  g.__thornswoodManeuvers = {
+    MANEUVERS: MANEUVERS, ORDER: ORDER,
+    held: held, takenOn: takenOn, whyNot: whyNot,
+    use: use, effects: effects, hit: hit, flush: flush, killerOf: killerOf, tick: tick,
+    state: ST
+  };
+  mlog('ready:', ORDER.length, 'maneuvers');
+})();
+
+/*
+  Every hit the engine takes, heard for the maneuvers above (#1386). It never
+  answers false: the engine does not read what this family answers, and the
+  list over mp.onTakeItem says why nothing here may try.
+*/
+mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, aggressor, source, projectile, power, sneak, bash, blocked) {
+  var mv = globalThis.__thornswoodManeuvers;
+  if (mv && mv.hit) { mv.hit(targetId, aggressor, source, power, blocked); }
+});
+// ==== end thornswood warrior maneuvers ====
+
 
 // ==== thornswood spell tomes ====
 /*
@@ -41908,6 +42672,8 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // A carriage or ferry, at the driver (#1394). See the carriages block.
                '/ride',
                '/pick', '/spend',
+               // The maneuvers of a warrior; see the maneuvers block.
+               '/maneuver',
                // A Master taking somebody on, and ending it (#1388). See the
                // character block.
                '/apprentice',
@@ -41991,6 +42757,8 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // Everybody's, and they need to be findable: a meter
                       // nobody knows how to act on is only a penalty.
                       '/needs', '/rest', '/eat', '/drink', '/bard',
+                      // For a warrior, and named so a warrior can find them.
+                      '/maneuver',
                       // Everybody's, and the one thing a person in trouble
                       // must be able to find: asking staff, and getting
                       // out of a wedged spot (#414).
@@ -43378,6 +44146,19 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       return true;
     }
 
+    // A warrior's maneuvers (#1386). See the maneuvers block, after the
+    // character block, for what each one does and what the server cannot.
+    if (word === '/maneuver') {
+      var mvs = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodManeuvers;
+      if (!mvs || !mvs.use) {
+        toProfile(profileId, 'Maneuvers are not running on this server right now. Say so in the dev channel.');
+        return true;
+      }
+      if (!needCharacter()) { return true; }
+      toProfile(profileId, mvs.use(actorId, parts[1]));
+      return true;
+    }
+
     if (word === '/needs' || word === '/rest' || word === '/eat' ||
         word === '/drink' || word === '/bard') {
       var needs = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodNeeds;
@@ -44005,7 +44786,8 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           'novice until a Master of it takes you on: a Master types /apprentice ' +
           '<name>, and /apprentice end <name> ends it. /apprentice on its own ' +
           'says who took you on. /plot says what is in the ' +
-          'ground in front of you and whose farm it is, /plant sows it.');
+          'ground in front of you and whose farm it is, /plant sows it. A ' +
+          'warrior\'s maneuvers: /maneuver lists yours, /maneuver rush starts one.');
         return;
       }
       if (topic === 'land' || topic === 'home' || topic === 'deed') {
@@ -44746,9 +45528,9 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
                   the event is raised for Gold001.
     onDeath       Anything dying. mp.onDeath never refuses. It logs a person's
                   death with the killer's id, and that line is the only record
-                  of a fight this file keeps. The hits before it do raise an
-                  event, onPapyrusEvent:OnHit, but nothing here listens to it
-                  yet (THE PAPYRUS FAMILY, below).
+                  of a fight this file keeps. The hits before it raise
+                  onPapyrusEvent:OnHit, which only the warrior maneuvers
+                  listen to (THE PAPYRUS FAMILY, below).
     onRespawn     Logged by mp.onRespawn, never refused.
     onEatItem     Eating or drinking something in the pack. No handler: the
                   engine applies a potion's effects. The needs block hears
@@ -44826,9 +45608,10 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   the world's Papyrus scripts. So on a false the hit still lands, the spell
   was already cast and the item was already added, and all that is stopped is
   the event reaching a lever's or a quest's own script. That is why nothing
-  here may ever return false to this family. Nothing here listens to any of
-  it yet, and the engine does not build the arguments for a name mp has no
-  function for, so the family costs this file nothing today.
+  here may ever return false to this family. OnHit is the one name this
+  file listens to, for the warrior maneuvers (#1386), and the engine does
+  not build the arguments for a name mp has no function for, so the rest of
+  the family costs this file nothing.
 
   WHAT THE ENGINE ANSWERS WITH NO EVENT AT ALL. Movement, animation, animation
   variables, health, magicka and stamina, bow shots (one arrow is taken),
@@ -44878,10 +45661,11 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   everybody at once, so every other take is watched and let through.
 
   Hits are a different case: nothing here can refuse one, only hear it,
-  through onPapyrusEvent:OnHit. Nothing listens to it yet. It is raised for
-  every blow the engine takes, a hosted bandit's as much as a person's, so
-  which blows are worth a line, one person hitting another being the obvious
-  one, belongs to the same decision.
+  through onPapyrusEvent:OnHit. The warrior maneuvers listen to it (#1386)
+  and change what a hit took only after the engine has applied it; they log
+  no blow. It is raised for every blow the engine takes, a hosted bandit's as
+  much as a person's, so which blows are worth a line, one person hitting
+  another being the obvious one, belongs to the same decision.
 */
 
 /*
