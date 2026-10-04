@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Thornswood
 {
-    // Read-only profile metadata from LevelDB's current manifest, tables and WAL.
+    // Read-only metadata from LevelDB's current manifest, tables and WAL.
     // No database handle, lock or write is opened. Formats:
     // https://github.com/google/leveldb/blob/main/doc/table_format.md
     // https://github.com/google/snappy/blob/main/format_description.txt
@@ -55,11 +55,17 @@ namespace Thornswood
             for (int i = 0; i < length; i++) crc = CrcByte(crc, data[at + i]);
             return ~crc;
         }
-        static uint CrcByte(uint crc, byte value) {
-            crc ^= value;
-            for (int j = 0; j < 8; j++) crc = (crc >> 1) ^ ((crc & 1) != 0 ? 0x82f63b78U : 0);
-            return crc;
+        static readonly uint[] CrcTable = MakeCrcTable();
+        static uint[] MakeCrcTable() {
+            var table = new uint[256];
+            for (uint i = 0; i < 256; i++) {
+                uint value = i;
+                for (int j = 0; j < 8; j++) value = (value >> 1) ^ ((value & 1) != 0 ? 0x82f63b78U : 0);
+                table[i] = value;
+            }
+            return table;
         }
+        static uint CrcByte(uint crc, byte value) { return (crc >> 8) ^ CrcTable[(crc ^ value) & 255]; }
         static uint Mask(uint crc) { return unchecked(((crc >> 15) | (crc << 17)) + 0xa282ead8U); }
         static byte[] Unsnappy(byte[] input)
         {
@@ -149,11 +155,10 @@ namespace Thornswood
             if (assembling) throw new InvalidDataException("Incomplete fragmented record");
             for (; at < file.Length; at++) if (file[at] != 0) throw new InvalidDataException("Incomplete log header");
         }
-        static void Keep(Dictionary<string, Value> values, byte[] key, byte[] data, ulong sequence, int kind) {
+        static void Keep(Dictionary<string, Value> values, byte[] key, byte[] data, ulong sequence, int kind, Func<string, bool> include) {
             if (kind != 0 && kind != 1) throw new InvalidDataException("Unknown table value kind");
             string name = Encoding.UTF8.GetString(key);
-            if (!name.StartsWith("persistent###profiles###", StringComparison.Ordinal) ||
-                !(name.EndsWith("###name", StringComparison.Ordinal) || name.EndsWith("###gameId", StringComparison.Ordinal))) return;
+            if (!include(name)) return;
             Value old;
             string text = kind == 1 ? Encoding.UTF8.GetString(data) : null;
             if (values.TryGetValue(name, out old) && sequence == old.Sequence && text != old.Text)
@@ -161,9 +166,9 @@ namespace Thornswood
             if (!values.TryGetValue(name, out old) || sequence > old.Sequence)
                 values[name] = new Value { Sequence = sequence, Text = text };
         }
-        public static string Find(string stateDir, string profilesRoot, string name)
+        static Dictionary<string, Value> CurrentValues(string stateDir, Func<string, bool> include)
         {
-            if (!File.Exists(Path.Combine(stateDir, "CURRENT"))) return null;
+            if (!File.Exists(Path.Combine(stateDir, "CURRENT"))) return new Dictionary<string, Value>(StringComparer.Ordinal);
             string current = Encoding.ASCII.GetString(Read(Path.Combine(stateDir, "CURRENT")));
             if (!current.EndsWith("\n", StringComparison.Ordinal)) throw new InvalidDataException("Incomplete current manifest pointer");
             string manifest = current.Trim();
@@ -199,7 +204,7 @@ namespace Thornswood
                     foreach (Entry row in Entries(Block(file, offset, size))) {
                         if (row.Key.Length < 8) throw new InvalidDataException("Invalid internal key");
                         ulong tag = BitConverter.ToUInt64(row.Key, row.Key.Length - 8); at = 0;
-                        Keep(values, Slice(row.Key, ref at, row.Key.Length - 8), row.Data, tag >> 8, (int)(tag & 255));
+                        Keep(values, Slice(row.Key, ref at, row.Key.Length - 8), row.Data, tag >> 8, (int)(tag & 255), include);
                     }
                 }
             }
@@ -214,11 +219,19 @@ namespace Thornswood
                         int kind = batch[at++]; byte[] key = Bytes(batch, ref at);
                         byte[] data = kind == 1 ? Bytes(batch, ref at) : new byte[0];
                         if (kind != 0 && kind != 1) throw new InvalidDataException("Unknown write kind");
-                        Keep(values, key, data, checked(sequence + i), kind);
+                        Keep(values, key, data, checked(sequence + i), kind, include);
                     }
                     if (at != batch.Length) throw new InvalidDataException("Write batch trailing bytes");
                 }
             }
+            return values;
+        }
+        public static string Find(string stateDir, string profilesRoot, string name)
+        {
+            var values = CurrentValues(stateDir, delegate(string key) {
+                return key.StartsWith("persistent###profiles###", StringComparison.Ordinal) &&
+                    (key.EndsWith("###name", StringComparison.Ordinal) || key.EndsWith("###gameId", StringComparison.Ordinal));
+            });
             string found = null;
             foreach (var pair in values) {
                 if (!pair.Key.EndsWith("###name", StringComparison.Ordinal) || pair.Value.Text == null) continue;
@@ -234,6 +247,63 @@ namespace Thornswood
                 found = dir;
             }
             return found != null && File.Exists(Path.Combine(found, "plugins.txt")) ? found : null;
+        }
+        const string Mods = "persistent###mods###skyrimse###";
+        const string Revisions = "collections###revisions###";
+        static string Text(Dictionary<string, Value> values, string key) {
+            Value value;
+            return values.TryGetValue(key, out value) ? value.Text : null;
+        }
+        static int Positive(string json) {
+            int value;
+            return json != null && System.Text.RegularExpressions.Regex.IsMatch(json.Trim(), "\\A[1-9][0-9]{0,9}\\z") &&
+                int.TryParse(json.Trim(), out value) ? value : 0;
+        }
+        static string StringValue(string json) { return json == null ? null : JsonString(json); }
+        static bool CollectionKey(string key) {
+            bool mod = key.StartsWith(Mods, StringComparison.Ordinal);
+            if (!mod && !key.StartsWith(Revisions, StringComparison.Ordinal)) return false;
+            int start = mod ? Mods.Length : Revisions.Length;
+            int end = key.IndexOf("###", start, StringComparison.Ordinal);
+            if (end <= start || key.Substring(start, end - start).IndexOf('#') >= 0) return false;
+            string field = key.Substring(end + 3);
+            return mod ? field == "attributes###collectionSlug" || field == "attributes###revisionNumber" ||
+                field == "attributes###newestFileId" || field == "attributes###newestVersion" :
+                field == "info###collection###slug" || field == "info###revisionNumber";
+        }
+        public static int CollectionRevision(string stateDir, string slug)
+        {
+            if (string.IsNullOrEmpty(slug)) return 0;
+            var values = CurrentValues(stateDir, CollectionKey);
+            int best = 0;
+            foreach (var pair in values) {
+                if (!pair.Key.StartsWith(Mods, StringComparison.Ordinal) ||
+                    !pair.Key.EndsWith("###collectionSlug", StringComparison.Ordinal) || pair.Value.Text == null) continue;
+                if (StringValue(pair.Value.Text) != slug) continue;
+                string prefix = pair.Key.Substring(0, pair.Key.Length - "collectionSlug".Length);
+                best = Math.Max(best, Positive(Text(values, prefix + "revisionNumber")));
+            }
+            if (best > 0) return best;
+            // Locally authored collections lack subscriber attributes. Only their
+            // explicit cache link counts, never an ordinary mod or cached download.
+            foreach (var pair in values) {
+                if (!pair.Key.StartsWith(Mods + "vortex_collection_", StringComparison.Ordinal) ||
+                    !pair.Key.EndsWith("###newestFileId", StringComparison.Ordinal) || pair.Value.Text == null) continue;
+                string prefix = pair.Key.Substring(0, pair.Key.Length - "newestFileId".Length);
+                if (Text(values, prefix + "collectionSlug") != null) continue;
+                int id = Positive(pair.Value.Text);
+                if (id <= 0) continue;
+                string revision = Revisions + id.ToString(System.Globalization.CultureInfo.InvariantCulture) + "###info###";
+                if (StringValue(Text(values, revision + "collection###slug")) != slug) continue;
+                int number = Positive(Text(values, revision + "revisionNumber"));
+                if (number <= 0) {
+                    string version = Text(values, prefix + "newestVersion");
+                    number = Positive(version);
+                    if (number <= 0) number = Positive(StringValue(version));
+                }
+                best = Math.Max(best, number);
+            }
+            return best;
         }
         static string JsonString(string json) {
             json = json.Trim();

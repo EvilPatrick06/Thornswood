@@ -114,7 +114,7 @@ if (noneM && modsM && !Number.isNaN(value)) {
 }
 
 // ---- the doc comment above CollectionProblem -------------------------------
-const at = SHELL.indexOf('static string CollectionProblem()');
+const at = SHELL.indexOf('static string CollectionProblem(int revision = -1)');
 yes('CollectionProblem is still there to read', at > 0);
 const before = SHELL.slice(0, at).split(/\r?\n/);
 before.pop(); // the indentation in front of the signature
