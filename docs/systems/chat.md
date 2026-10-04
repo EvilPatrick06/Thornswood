@@ -85,10 +85,11 @@ It is not this text.
 `/w`, and `/s` are local too, whether or not the plain-line switch is
 on. They are not sent on to the game server.
 
-Plain speech in the box is local on the dev voice service: the same
-cell, 4000 units, the same reach as the line above the head. The
-switch still exists. Left unset, a plain line still goes to
-everybody, which is how the live voice service is left.
+Plain speech in the box is local on both servers: the same cell,
+4000 units, the same reach as the line above the head.
+`Install-Voice.ps1` sets the switch on for live and dev, and keeps
+whatever range is running when it is not told one. Left unset, a
+plain line still goes to everybody.
 
 The line above the head is local either way: 4000 units for a
 plain line, a `/me`, a `/do`, and an `/ooc`, 1000 for a whisper, and
