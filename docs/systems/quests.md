@@ -124,10 +124,10 @@ not one wait for every quest.
 Scarce quests and scene quests from the tables above are in the
 server. The counts, the cooldowns, and the lineup are those tables.
 No trader offers one in the game yet: speaking to a trader does not
-bring up the offer. Supply is not. Scene gold is created when the quest is finished. It
-is not taken from a trader's purse. Walking away puts the goods back
-and does not start the cooldown. The rank on a scarce row still
-applies.
+bring up the offer. Supply is not. Scene gold is created when the
+quest is finished. It is not taken from a trader's purse. Walking
+away puts the goods back and does not start the cooldown. The rank on
+a scarce row still applies.
 
 The four miner rows are bound to the buildings named above, by each
 building's cell, and every other vein of those seams is shut. The
