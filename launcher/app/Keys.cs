@@ -537,11 +537,14 @@ namespace Thornswood
                      "While you are looking at somebody, stops hearing them. Yours only: they are not told, and nobody else is affected. Press again to hear them.",
                      ThornIni, "MuteThemKey", 38));
             l.Add(Dx("moldkey", "ThornsWood", "Press a key mold into a lock",
-                     "While you are looking at a building's door with a blank key mold in your pack, presses it into the lock so it becomes that building's mold. The holder has to be you or be standing there. The same key, while you are looking at somebody inside a building you hold, lets them sleep there for a night, or ends their night.",
+                     "While you are looking at a building's door with a blank key mold in your pack, presses it into the lock so it becomes that building's mold. The holder has to be you or be standing there. The same key, while you are looking at somebody inside a building you hold, lets them sleep there for a night, or ends their night. In your inventory, with a repair kit in your pack, the same key opens the repair panel.",
                      ThornIni, "MoldKey", 22));
             l.Add(Dx("lockkey", "ThornsWood", "Lock the door",
                      "Locks the door you last opened, the same door /claim and /lock use. Logged to the server as /lock. Unlock is still /unlock.",
                      ThornIni, "LockKey", 45));
+            l.Add(Dx("maneuvers", "ThornsWood", "A warrior's maneuvers",
+                     "Opens a small panel with the maneuvers you hold. Press a number or click one to start it. This key or Escape closes the panel.",
+                     ThornIni, "ManeuverKey", 10));
 
             l.Add(Dx("cyclehold", "Reaching things", "Cycle modifier",
                      "Held down, the two keys below step through everything you could reach instead of the game picking for you.",

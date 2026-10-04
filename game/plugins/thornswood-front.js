@@ -82,7 +82,8 @@
   const UI_PATH = 'Data/Platform/UI/index.html';
   const OVERLAYS = ['thornswood-chat.js', 'thornswood-emotes.js', 'thornswood-voice.js',
                     'thornswood-skills.js', 'thornswood-party.js',
-                    'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js', 'thornswood-afk.js'];
+                    'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js',
+                    'thornswood-repair.js', 'thornswood-maneuvers.js', 'thornswood-afk.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -359,6 +360,12 @@
     both, and its Controls row says so.
   */
   const SLEEP_KEY   = MOLD_KEY;
+  /*
+    A warrior's maneuvers (#1386): opens the maneuver panel. 9, scan code 10:
+    1 to 8 are the emote slots and the game's own hotkeys, and every letter is
+    already one of ours or the game's.
+  */
+  const MANEUVER_KEY = iniNumber(ini, 'ManeuverKey', 10);  // 9
   /* What the prompt calls them. Read off the scan code so a rebind in the ini
      changes the letter on the screen as well as the key that works. */
   function keyName(code) {
@@ -366,7 +373,8 @@
       16: 'Q', 17: 'W', 18: 'E', 19: 'R', 20: 'T', 21: 'Y', 22: 'U', 23: 'I',
       24: 'O', 25: 'P', 30: 'A', 31: 'S', 32: 'D', 33: 'F', 34: 'G', 35: 'H',
       36: 'J', 37: 'K', 38: 'L', 44: 'Z', 45: 'X', 46: 'C', 47: 'V', 48: 'B',
-      49: 'N', 50: 'M'
+      49: 'N', 50: 'M',
+      2: '1', 3: '2', 4: '3', 5: '4', 6: '5', 7: '6', 8: '7', 9: '8', 10: '9', 11: '0'
     };
     return letters[code] || ('#' + code);
   }
@@ -377,6 +385,7 @@
   const MOLD_NAME = keyName(MOLD_KEY);
   const SLEEP_NAME = keyName(SLEEP_KEY);
   const LOCK_NAME = keyName(LOCK_KEY);
+  const MANEUVER_NAME = keyName(MANEUVER_KEY);
 
   const ESC = 1;
 
@@ -1952,9 +1961,9 @@
   */
   const CAP_CLOSES = {
     skills: 'thornswoodSkills', party: 'thornswoodParty', journal: 'thornswoodJournal',
-    board: 'thornswoodBoard',
+    board: 'thornswoodBoard', repair: 'thornswoodRepair',
     trade: 'thornswoodTrade', merchant: 'thornswoodMerchant', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
-    afk: 'thornswoodAfk'
+    afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers'
   };
 
   T.claimFocus = function (who, on) {
@@ -4928,6 +4937,139 @@
   }));
 
   /*
+    ------------------------------------- a repair kit, used from the inventory
+
+    #1384, and Patrick's rule of 4 October: commands only for dev and staff,
+    and everything people do takes buttons and GUI. A kit mends a
+    piece (docs/systems/durability.md), and a kit is a MISC, which Skyrim's
+    inventory cannot use: E on one does nothing and tells nobody. So while
+    the inventory is open and a repair kit is in the pack, one line at the
+    bottom names a key, and that key shuts the inventory and asks the server
+    for the repair panel (game/ui/thornswood-repair.js). The server answers
+    with the rows on the panel's own property, and the panel's buttons send
+    the rest. /repair is that ask; nobody is told to type it.
+
+    THE KEY IS THE MOLD KEY, U. Every letter is taken by Skyrim or by us, and
+    U only means anything while its own line is up. The mold's line needs
+    the world with no menu open and a door under the crosshair, and the
+    sleep key's (SLEEP_KEY, the same U) a person under it with no menu open;
+    this one needs the inventory open. None of them is up with another, and
+    moldPress and sleepPress have already said no before this is asked.
+
+    ONLY WITH THE PLUGIN THAT HAS KITS. The three kits are 0x154b0, 0x154b1
+    and 0x154b2 in Thornswood-Content.esp (scripts/mods/Add-ContentRecords.py).
+    A build without them has no kit to carry, so nothing is drawn and nothing
+    is sent. Asked once, when the world is up, and remembered as runtime ids,
+    for the reason under THE IDS, RESOLVED ONCE.
+  */
+  const KIT_FILE = 'Thornswood-Content.esp';
+  const KIT_ITEMS = [0x154b0, 0x154b1, 0x154b2];   // MISC Weapon Kit, Armor Kit, Sewing Kit
+  const INVENTORY_MENU = 'InventoryMenu';
+  let kitBases = null;     // null not asked yet, [] none in this build, else runtime ids
+  let repairShown = false;
+
+  /** Whether this build has repair kits, found out once the world is up. */
+  function kitsReady() {
+    if (kitBases) { return kitBases.length > 0; }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    if (!pc) { return false; }
+    const found = [];
+    try {
+      for (const local of KIT_ITEMS) {
+        const form = sp.Game.getFormFromFile(local, KIT_FILE);
+        const id = form ? (form.getFormID() >>> 0) : 0;
+        if (id) { found.push(id); }
+      }
+    } catch (e) {
+      // Not remembered. A throw is not an answer, so it is asked again.
+      return false;
+    }
+    kitBases = found;
+    log(found.length ? 'repair kits: this build has them, so the inventory offers ' + MOLD_NAME
+                     : 'repair kits: no kit records in ' + KIT_FILE + ', so no line in the inventory');
+    return found.length > 0;
+  }
+
+  /** How many repair kits the pack holds, of the three. */
+  function kitsCarried() {
+    if (!kitsReady()) { return 0; }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    if (!pc) { return 0; }
+    let n = 0;
+    for (const id of kitBases) {
+      try {
+        const form = sp.Game.getFormEx(id);
+        n += form ? (Number(pc.getItemCount(form)) || 0) : 0;
+      } catch (e) { }
+    }
+    return n;
+  }
+
+  // At the bottom of the inventory, in the mold line's colours.
+  const REPAIR_CSS =
+    'position:fixed;left:50%;bottom:12%;transform:translateX(-50%);z-index:2147482900;' +
+    'pointer-events:none;white-space:nowrap;' +
+    'font-family:"Palatino Linotype",Palatino,Georgia,serif;font-size:19px;letter-spacing:.03em;' +
+    'color:#d9cfb4;background:rgba(11,10,8,.72);border:1px solid rgba(198,170,109,.42);' +
+    'padding:8px 16px 9px;text-shadow:0 2px 4px rgba(0,0,0,.95)';
+
+  /** The line up or down. Only remembered once the page has taken it. */
+  function drawRepairLine(on) {
+    if (on === repairShown) { return; }
+    if (!on) {
+      if (T.js('try{var d=document.getElementById("ts-repair-line");if(d){d.style.display="none";}}catch(e){}')) {
+        repairShown = false;
+      }
+      return;
+    }
+    const html =
+      '<span style="display:inline-block;min-width:26px;text-align:center;margin-right:12px;' +
+      'padding:1px 7px;border:1px solid rgba(233,209,155,.55);border-bottom-width:2px;' +
+      'border-radius:3px;background:rgba(0,0,0,.35);color:#e9d19b">' + MOLD_NAME + '</span>' +
+      'Mend a piece with your repair kit';
+    if (T.js('(function(){try{' +
+             'var d=document.getElementById("ts-repair-line");' +
+             'if(!d){d=document.createElement("div");d.id="ts-repair-line";' +
+             'd.style.cssText=' + JSON.stringify(REPAIR_CSS) + ';' +
+             'document.body.appendChild(d);}' +
+             'd.innerHTML=' + JSON.stringify(html) + ';' +
+             'd.style.display="";' +
+             '}catch(e){}})();')) {
+      repairShown = true;
+    }
+  }
+
+  sp.on('menuOpen', guard('repair line up', (e) => {
+    if (!e || e.name !== INVENTORY_MENU) { return; }
+    drawRepairLine(!!T.ready && kitsCarried() > 0);
+  }));
+  sp.on('menuClose', guard('repair line down', (e) => {
+    if (!e || e.name !== INVENTORY_MENU) { return; }
+    drawRepairLine(false);
+  }));
+
+  /*
+    The key, in the inventory. Asked again at the press: the inventory open,
+    nothing typing, a kit in the pack. Answers whether it was used, so the
+    key falls through when it was not.
+  */
+  function repairPress() {
+    if (!T.ready || claims.chat) { return false; }
+    let open = false;
+    try { open = !!sp.Ui.isMenuOpen(INVENTORY_MENU); } catch (e) { open = false; }
+    if (!open) { return false; }
+    if (!(kitsCarried() > 0)) { drawRepairLine(false); return false; }
+    drawRepairLine(false);
+    try { sp.TESModPlatform.closeMenu(INVENTORY_MENU); }
+    catch (err) { say('repair: closeMenu threw on the inventory: ' + err); }
+    tellServer('/repair');
+    say('pressed ' + MOLD_NAME + ' in the inventory with a repair kit, asked the server for the repair panel');
+    return true;
+  }
+
+  /*
     ------------------------------------- your party: the name, the map, the way
 
     Patrick, 22 September, asked the party menu to let people "see their name
@@ -7168,6 +7310,8 @@
     if (e.code === MOLD_KEY && moldPress()) { return; }
     // The same key on a person inside a building you hold. See SLEEP_KEY.
     if (e.code === SLEEP_KEY && sleepPress()) { return; }
+    // The same key in the inventory, with a repair kit in the pack (#1384).
+    if (e.code === MOLD_KEY && repairPress()) { return; }
     if (e.code === LOCK_KEY && lockPress()) { return; }
     /*
       The five social keys work in the open world, and P and J can always
@@ -7218,6 +7362,8 @@
       journalKeyPressed(e);
       return;
     }
+
+    if (e.code === MANEUVER_KEY) { maneuverKeyPressed(); return; }
 
     if (e.code === SKILLS_KEY) {
       if (claims.chat) { return; }
@@ -8102,8 +8248,14 @@
       }
       return;
     }
+    if (what === 'maneuvers:opened') { T.claimFocus('maneuvers', true); return; }
+    if (what === 'maneuvers:closed') { T.claimFocus('maneuvers', false); return; }
+    if (what === 'maneuvers:ready') { log('the maneuver panel is in'); maneuversToPage(); return; }
     if (what === 'trade:opened') { T.claimFocus('trade', true); return; }
     if (what === 'trade:closed') { T.claimFocus('trade', false); return; }
+    if (what === 'repair:opened') { T.claimFocus('repair', true); return; }
+    if (what === 'repair:closed') { T.claimFocus('repair', false); return; }
+    if (what === 'repair:ready') { log('the repair panel is in'); return; }
     if (what === 'merchant:opened') { T.claimFocus('merchant', true); return; }
     if (what === 'merchant:closed') { T.claimFocus('merchant', false); return; }
     if (what === 'merchant:ready') {
@@ -8170,7 +8322,12 @@
       own can send the map by itself. The same numbers arriving twice cost
       nothing; an unchanged map is never applied twice.
     */
-    if (what.indexOf('skills:view ') === 0) { skillsCreatingFrom(what.slice(12)); treeFromView(what.slice(12)); return; }
+    if (what.indexOf('skills:view ') === 0) {
+      skillsCreatingFrom(what.slice(12));
+      treeFromView(what.slice(12));
+      maneuversFromView(what.slice(12));
+      return;
+    }
     if (what.indexOf('skills:effects ') === 0) { treeFromMap(what.slice(15)); return; }
 
     if (what === 'typing') { beat = Date.now(); return; }
@@ -8450,6 +8607,72 @@
   }));
 
   // <<< tree apply: end <<<
+
+  // ------------------------------------------------- a warrior's maneuvers --
+  /*
+    #1386. Patrick, 4 October: no chat commands for anything people do. So a
+    warrior's maneuver is a key and a panel, not /maneuver typed into the
+    chat. The maneuver key (ManeuverKey in Thornswood.ini, 9 by default,
+    because 1 to 8 are the emote slots and every letter is somebody's) opens
+    game/ui/thornswood-maneuvers.js, which lists the rows this character
+    holds; a number or a click there sends /maneuver <name> to the server
+    through the chat's socket, the way the trade and party keys do, and the
+    server's answer comes back in the chat. The relay is collected every one
+    and a half seconds (the chat commands block in the gamemode), so a
+    maneuver starts within a second or two of the press.
+
+    THE ROWS come off the character panel's view, the same view the tree
+    hand reads (skills:view, see treeFromView), as v.panel.maneuvers: the
+    name, the stamina and whether its wait is over. The server redraws that
+    view when one starts and when its wait ends, so nothing here keeps a
+    clock. A character who holds none has no rows, and the key says so.
+
+    The panel holds the keyboard while it is up, under the 'maneuvers' claim,
+    so 1 to 8 reach the panel and not the emote slots or the game's own
+    hotkeys. It says when it opens and closes, the same as every other panel,
+    and the cap closes it like the rest (CAP_CLOSES).
+  */
+  let maneuverRows = [];
+
+  function maneuversToPage() {
+    T.js('try{window.thornswoodManeuvers&&window.thornswoodManeuvers.setRows(' +
+         JSON.stringify(maneuverRows) + ',' + JSON.stringify(MANEUVER_NAME) + ');}catch(e){}');
+  }
+
+  /* The whole panel view, as treeFromView takes it. Only v.panel.maneuvers
+     is read. */
+  function maneuversFromView(json) {
+    let v = null;
+    try { v = JSON.parse(String(json)); } catch (e) { return; }
+    if (!v || typeof v !== 'object') { return; }
+    const view = (v.panel && typeof v.panel === 'object') ? v.panel : v;
+    const list = Array.isArray(view.maneuvers) ? view.maneuvers : [];
+    const rows = [];
+    for (let i = 0; i < list.length; i++) {
+      const r = list[i];
+      if (!r || typeof r.key !== 'string' || !/^[a-z]+$/.test(r.key)) { continue; }
+      rows.push({ key: r.key, name: String(r.name || r.key), stamina: Number(r.stamina) || 0,
+                  cooldown: Number(r.cooldown) || 0, ready: !!r.ready });
+    }
+    const was = JSON.stringify(maneuverRows);
+    maneuverRows = rows;
+    if (JSON.stringify(rows) !== was) { maneuversToPage(); }
+  }
+
+  /* The maneuver key, with the panel shut: a panel up holds the keyboard, and
+     then the page hears the key and closes itself. */
+  function maneuverKeyPressed() {
+    if (claims.chat) { return; }
+    const busyNow = busyMenuOpen();
+    if (busyNow) { say('maneuver key seen, but ' + busyNow + ' is open'); return; }
+    if (skillsCreating) { return; }
+    if (!maneuverRows.length) {
+      note('You have no maneuvers. They are a warrior\'s, on the half you picked.');
+      return;
+    }
+    maneuversToPage();
+    T.js('try{window.thornswoodManeuvers&&window.thornswoodManeuvers.open();}catch(e){}');
+  }
 
   /*
     Write the game's real load order to disk, once, on the first update.

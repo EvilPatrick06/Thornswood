@@ -33,8 +33,9 @@
 //
 // A TEMPER IS REFUSED NOW (#1384). Tempering is cut and a piece is mended
 // with a kit (docs/systems/durability.md), so a craft at the sharpening wheel
-// or the armour table is refused to everybody, says /repair, and is not
-// credited. S9 and S16 drive it.
+// or the armour table is refused to everybody, points at the kit in the
+// inventory and never at a command (no chat commands for what people do,
+// Patrick, 4 October), and is not credited. S9 and S16 drive it.
 //
 // Read only.
 const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
@@ -388,12 +389,20 @@ if (block !== null) {
 
   // S9: THE CRAFT THAT FOUND IT. The Riekling helmet of 23 September, by its
   //     own form id out of the log and its own row out of the generated table.
+  //     The open book was cut on 2 October (#1511) and that helmet went with
+  //     it: its row is still riekling, and nobody makes it, so the gate answers
+  //     the cut row's own sentence to everybody, a riekling smith included.
+  //     What the helmet first proved (a riekling row refuses a Nord smith in
+  //     the riekling words and lets a riekling smith through) is driven on the
+  //     Riekling Horned Helmet, a riekling helmet the cut kept, as S9b.
   {
     const HELM = 0x38019f67;
     const helmDesc = '19f67:Playable Rieklings.esp';
     const rows = Object.keys(REAL_TABLE).filter(function (k) { return REAL_TABLE[k].out === helmDesc; });
     yes('S9 the helmet has a row in the generated table, and it is riekling work',
         rows.length > 0 && rows.every(function (k) { return REAL_TABLE[k].race === 'riekling'; }));
+    yes('S9 and since the cut nobody makes it, with the reason on the row',
+        rows.length > 0 && rows.every(function (k) { return typeof REAL_TABLE[k].nobody === 'string' && REAL_TABLE[k].nobody.length > 0; }));
     const nord = { made: HELM, benchBase: FORGE, outDesc: helmDesc, table: REAL_TABLE,
                    state: nordSmith, race: 'nordrace' };
     const r = run(nord);
@@ -401,18 +410,43 @@ if (block !== null) {
     yes('S9 and is told in the words the recipe gate uses for that row',
         rows.length > 0 && r.spoken.length === 1 &&
         r.spoken[0] === expected(nord, REAL_TABLE[rows[0]]).refusal &&
-        r.spoken[0].indexOf('Riekling') !== -1);
+        r.spoken[0].indexOf('Nobody makes that here.') === 0);
     yes('S9 and the log says who was refused what',
         r.logs.some(function (l) { return l.indexOf('was refused') !== -1 && l.indexOf(helmDesc) !== -1; }));
-    yes('S9 a riekling smith is let through',
-        !run(Object.assign({}, nord, { race: 'dlc2rieklingrace' })).refused);
+    const rk = run(Object.assign({}, nord, { race: 'dlc2rieklingrace' }));
+    yes('S9 a riekling smith is refused it too, with the same sentence',
+        rk.refused && rk.spoken.length === 1 && rk.spoken[0] === r.spoken[0]);
     yes('S9 and tempering that helmet at the armour table is refused, riekling or not (#1384)',
         ARMOUR_TABLES.every(function (b) {
           const t = run(Object.assign({}, nord, { benchBase: b }));
           const r2 = run(Object.assign({}, nord, { benchBase: b, race: 'dlc2rieklingrace' }));
           return t.refused && r2.refused && t.spoken.length === 1 &&
-                 t.spoken[0].indexOf('/repair') !== -1 && t.credited.length === 0;
+                 t.spoken[0].indexOf('/repair') === -1 && /inventory/.test(t.spoken[0]) &&
+                 t.credited.length === 0;
         }));
+  }
+
+  // S9b: A RIEKLING HELMET THE CUT KEPT, the Riekling Horned Helmet, novice
+  //      Platewright work for a riekling.
+  {
+    const HORNED = 0x38019f62;
+    const hornedDesc = '19f62:Playable Rieklings.esp';
+    const rows = Object.keys(REAL_TABLE).filter(function (k) { return REAL_TABLE[k].out === hornedDesc; });
+    yes('S9b the Riekling Horned Helmet has a row, riekling Platewright work nobody has cut',
+        rows.length > 0 && rows.every(function (k) {
+          const row = REAL_TABLE[k];
+          return row.race === 'riekling' && row.half === 'Platewright' && !row.nobody;
+        }));
+    const nord = { made: HORNED, benchBase: FORGE, outDesc: hornedDesc, table: REAL_TABLE,
+                   state: nordSmith, race: 'nordrace' };
+    const r = run(nord);
+    yes('S9b a Nord smith is refused it at a forge', r.refused);
+    yes('S9b and is told in the words the recipe gate uses for that row',
+        rows.length > 0 && r.spoken.length === 1 &&
+        r.spoken[0] === expected(nord, REAL_TABLE[rows[0]]).refusal &&
+        r.spoken[0].indexOf('Riekling') !== -1);
+    yes('S9b a riekling smith is let through',
+        !run(Object.assign({}, nord, { race: 'dlc2rieklingrace' })).refused);
   }
 
   // S10: NOBODY MAKES IT, asked first, as it is for a matched recipe.
@@ -514,7 +548,7 @@ if (block !== null) {
       yes('S16 ' + what + ' is refused to everybody, a master smith included, and says the kit',
           r.refused && r2.refused && smithing.refused &&
           smithing.spoken.length === 1 && /repair kit/.test(smithing.spoken[0]) &&
-          smithing.spoken[0].indexOf('/repair') !== -1 &&
+          smithing.spoken[0].indexOf('/repair') === -1 && /inventory/.test(smithing.spoken[0]) &&
           Object.keys(told).length === 0 &&
           smithing.logs.some(function (l) { return l.indexOf('was refused a temper') !== -1; }));
       yes('S16 ' + what + ' is not counted as work', r.credited.length === 0 &&

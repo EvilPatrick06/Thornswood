@@ -39,16 +39,24 @@ function yes(what, cond) {
 }
 
 /*
-  One function out of the file, by its whole first line, and only if that line
-  is there exactly once. There are three functions called command and two
-  called post in gamemode.js; lifting the wrong one would test nothing.
+  One function out of the property block, by its whole first line, and only
+  if that line is there exactly once in the block. There are three functions
+  called command and two called post in gamemode.js, and since the book and
+  ledger blocks came in (#1417 and later) three called save, so the block is
+  cut out first, the way test-1374-letters.js does, and the lift is inside it.
+  Lifting the wrong one would test nothing.
 */
+const P0 = src.indexOf('// ==== thornswood property ====');
+const P1 = P0 < 0 ? -1 : src.indexOf('// ==== end thornswood property ====', P0);
+const prop = (P0 < 0 || P1 < 0) ? null : src.slice(P0, P1);
+yes('the property block is in the gamemode, between its markers', prop !== null);
 function lift(first) {
+  if (prop === null) { return null; }
   const from = '\n  ' + first;
-  const a = src.indexOf(from);
-  if (a < 0 || src.indexOf(from, a + 1) >= 0) { return null; }
-  const b = src.indexOf('\n  }\n', a + 1);
-  return b < 0 ? null : src.slice(a + 1, b + 4);
+  const a = prop.indexOf(from);
+  if (a < 0 || prop.indexOf(from, a + 1) >= 0) { return null; }
+  const b = prop.indexOf('\n  }\n', a + 1);
+  return b < 0 ? null : prop.slice(a + 1, b + 4);
 }
 
 function number(re) {
@@ -70,7 +78,10 @@ const PIECES = {
   take: 'function take(parts, actorId, profileId, toProfile) {',
   dropJob: 'function dropJob(parts, actorId, profileId, toProfile) {',
   takedown: 'function takedown(hold, at, byWhom) {',
-  unpin: 'function unpin(parts, actorId, profileId, toProfile) {'
+  unpin: 'function unpin(parts, actorId, profileId, toProfile) {',
+  // Every board word ends by asking the social block to draw the panel
+  // again (#1374). The real one, against a social block that keeps a list.
+  refreshPanel: 'function refreshPanel(actorId) {'
 };
 const lifted = {};
 const missing = [];
@@ -138,17 +149,20 @@ function boot(dir, eng) {
     'var boards = loadPart(\'boards\', { whiterun: { where: \'Whiterun\' }, riften: { where: \'Riften\' } });',
     'var GOLD_ID = ' + GOLD + ';',
     'var NOTICE_FEE = ' + NOTICE_FEE + ';',
-    'var JOB_FEE = ' + JOB_FEE + ';'
+    'var JOB_FEE = ' + JOB_FEE + ';',
+    'var g = { __thornswoodSocial: { push: function (actorId, now) { pushed.push(actorId); } } };'
   ];
   for (const k in lifted) { body.push(lifted[k]); }
   body.push('return { post: post, board: board, take: take, dropJob: dropJob, ' +
             'unpin: unpin, takedown: takedown, save: save, ' +
             'notices: function () { return notices; }, ' +
             'funds: function () { return funds; } };');
-  const fn = new Function('require', 'registerPath', 'mp', 'plog', 'boardHere',
+  const pushed = [];
+  const fn = new Function('require', 'registerPath', 'mp', 'plog', 'boardHere', 'pushed',
                           body.join('\n'));
   const api = fn(require, function () { return path.join(dir, 'property.json'); },
-                 eng.mp, function () { }, eng.boardHere);
+                 eng.mp, function () { }, eng.boardHere, pushed);
+  api.pushed = pushed;
 
   /* Say something at the board as somebody, and hear what they are told. */
   function say(p, word, rest) {
@@ -184,6 +198,7 @@ try {
           said.indexOf(NOTICE_FEE + ' gold') !== -1);
       yes('U1 the coin was taken from the pack', eng.gold(ALICE) === 200 - NOTICE_FEE);
       yes('U1 and the fee went to the hold', s1.funds().whiterun === NOTICE_FEE);
+      yes('U1 and the poster\'s board panel is drawn again', s1.pushed.indexOf(ALICE.actor) !== -1);
 
       const s2 = boot(dir, eng);
       const read = s2.say(BOB, '/board');

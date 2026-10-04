@@ -233,6 +233,9 @@ function rig(opts) {
     // The sleep key is the mold's, on a person (#1603). Nobody is looked at here.
     'const SLEEP_KEY = 22;\n' +
     'function sleepPress() { return false; }\n' +
+    // The same key's check in the inventory (#1384). No inventory is open
+    // here, so it passes every key on as well.
+    "function repairPress() { return false; }\n" +
     'const LOCK_KEY = 45;\n' +
     'function lockPress() { return false; }\n' +
     'const COMMAND_KEY = 53;\nconst ESC = 1, CHAT_KEY = 28, SKILLS_KEY = 37, PARTY_KEY = 25,\n' +

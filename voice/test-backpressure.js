@@ -291,7 +291,10 @@ async function until(what, cond, ms) {
   that same line and a merge could carry it somewhere it does not belong.
 */
 const SRC = fs.readFileSync(SERVER, 'utf8');
-const TICK = /setInterval\(\(\) => \{\s*if \(peers\.size === 0\) return;[\s\S]*?\}, 200\);/.exec(SRC);
+// The tick may do other work before it looks at the room (#1409 sweeps the
+// silences that ran out there first), so it is found by its room check and
+// its 200, not by the room check being its first line.
+const TICK = /setInterval\(\(\) => \{(?:(?!setInterval\()[\s\S])*?if \(peers\.size === 0\) return;[\s\S]*?\}, 200\);/.exec(SRC);
 yes('only the 200 ms position tick uses the dropping send',
     SRC.split('.sendLossy(').length - 1 === 1 && !!TICK && TICK[0].indexOf('.sendLossy(') !== -1);
 /* And only the roster keeps just its newest while backed: each one is the
