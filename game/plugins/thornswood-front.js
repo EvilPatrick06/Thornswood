@@ -118,6 +118,16 @@
     if (fsm) { try { fsm.appendFileSync(LOG_FILE, line + '\n'); } catch (e) { fsm = null; } }
   }
 
+  let lastOwnerOutfitNote = '';
+  function logOwnerOutfitTransition() {
+    try {
+      const note = sp.storage && sp.storage.ownerOutfitDiagnostic;
+      if (typeof note !== 'string' || note === lastOwnerOutfitNote) { return; }
+      lastOwnerOutfitNote = note;
+      log('native outfit:', note);
+    } catch (e) { }
+  }
+
   /*
     WHERE THE FRAME GOES, because nobody has ever been able to say.
 
@@ -6044,6 +6054,7 @@
   }));
 
   sp.on('update', guard('pulse', () => {
+    logOwnerOutfitTransition();
     // One pass through the handlers is one frame. See frameWent above.
     frameWent();
 
