@@ -8,6 +8,12 @@ labels: ''
 
 <!-- What was seen or measured, and where. Quote the log line or the file and line. -->
 
+## What causes it
+
+<!-- The cause and how it was measured. If it is not known yet, say so: finding it
+is the work, and nothing ships for it until then. No band-aids (Developer-Guide.md,
+"Fix the cause, no band-aids"). -->
+
 ## Where it lives
 
 <!-- Files, scripts, VPS folders. -->
