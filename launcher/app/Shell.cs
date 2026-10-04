@@ -2083,12 +2083,14 @@ namespace Thornswood
             PaintServerBoxes();
             chkAutoUpdate.IsChecked = cfg.AutoUpdate;
             txtVersion.Text = "launcher " + Updater.Version;
-            // Channel is already on the sidebar brand (Thornswood Dev). Do not
-            // also tag the version line; that leftover truncated as "dev bu".
+            // Channel is already on the sidebar brand (Thornswood over Dev).
+            // Do not also tag the version line; that leftover truncated as
+            // "dev bu". The one-line "Thornswood Dev" ran past the emblem in
+            // the 208 column; two lines keep the name and Dev both visible.
             if (cfg.IsDev)
             {
                 txtServer.Text = "Thornswood Dev";
-                if (txtBrandSmall != null) txtBrandSmall.Text = "Thornswood Dev";
+                if (txtBrandSmall != null) txtBrandSmall.Text = "Thornswood\nDev";
                 if (txtBrandBig != null) txtBrandBig.Text = "Thornswood Dev";
                 try { win.Title = "Thornswood Dev"; } catch (Exception ex) { Swallow.Note("Shell.ApplyConfig", ex); }
             }
