@@ -23,7 +23,10 @@ The weather half is 4 degrees of exposure ignored, on
 Hidden armour is a rating on that garment, not a warmth rule, and not
 extra weight.
 
-Neither is read off tailor rank today.
+The weather half is in the server. A garment a master tailor makes
+comes out named Master-Woven, and wearing one is what the warmth reads.
+One is enough. Two do not ignore 8. The hidden armour is not in the
+server: no rating is set for it yet.
 
 ## What you are handed
 
@@ -32,5 +35,5 @@ schools you hold). The half places one more.
 
 ## Where this is
 
-The recipe gates are in the server. Master Weaver is not wired into
-warmth or into armour.
+The recipe gates are in the server. Master Weaver's weather half is.
+The hidden armour is not.

@@ -18,7 +18,9 @@ At master. Fires and kilns they build or work are the hottest the
 warmth rules allow: +48 at your feet, and still 0 at 300. An ordinary
 fire is +34. See [Temperature and weather](../temperature.md).
 
-Not wired. Every fire is +34.
+The server cannot see who lit a fire. A fire counts as a Master
+Carver's while one is working it: a master woodworker within reach of
+a fire, and you within 300 of them in the same cell.
 
 ## What you are handed
 
@@ -27,5 +29,5 @@ places one more.
 
 ## Where this is
 
-The kiln, the axe, the chop, and the recipe gates are in the server.
-The hotter fire is not.
+The kiln, the axe, the chop, the recipe gates, and the hotter fire
+are in the server.

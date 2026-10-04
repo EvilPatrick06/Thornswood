@@ -340,6 +340,7 @@ const WRITERS = {
   'spoils/strip': [1, 'only takes things out of a container the world stocked'],
   'spoils/purse': [1, 'THE MINT: forty gold, once per character'],
   'trade/moveById': [2, 'moves a pile from one pack to the other, one write each (section 4)'],
+  'outer/markWoven': [1, 'names a garment a Master Weaver just made: units split off a plain stack of the same base, so no base is added and the count is the same after (#1398, test-1398-fuel.js)'],
   'durability/writePack': [1, 'writes back a pack or chest it has just read: a stack renamed for its condition, or a kit or a broken piece taken away. No base is added and no count grows (test-1384-condition.js)']
 };
 
@@ -757,7 +758,8 @@ function goldDescriptors(text) {
     'hit.desc': 'the testers\' /give, out of the index built from these same tables',
     'GOLD_DESC': 'scene finish gold, the same named GOLD_DESC row the checked dungeon reward uses',
     'open.itemDesc': 'puts back the retrieval good the place row already handed over; not a coin',
-    'place.item': 'the unbound scene container good on the place row; not a coin'
+    'place.item': 'the unbound scene container good on the place row; not a coin',
+    'row.out': 'Grand Chef\'s second batch, the output of a Cook row of RECIPES_BY_ID (#1398), and section 5 says no recipe makes gold'
   };
   const re = /\baddItem\(\s*[^,()]+,\s*([^,]+?),/g;
   const unknown = [];
