@@ -52138,9 +52138,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     fever: 'Wound fever', bite: 'Bite sickness'
   };
 
-  /* The short lines the corner of the screen draws. A disease still in its
-     caught window is not one of them: "a cure in that window and it never
-     shows". */
+  /* The short lines the left edge of the screen draws. A disease still in
+     its caught window is not one of them: "a cure in that window and it
+     never shows". */
   function lines(rec, now) {
     var out = [];
     var bleeding = 0, slowed = true;
@@ -52763,13 +52763,15 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   // ------------------------------------------------------- the screen --
 
   /*
-    WHAT YOU HAVE, IN THE CORNER, above the needs bars. An updateOwner script,
-    like the bars, so it ships with the gamemode and needs no release. Edge
-    triggered on the lines, because updateOwner runs every frame. Nothing is
-    drawn while there is nothing to say.
+    WHAT YOU HAVE, ON THE LEFT EDGE. An updateOwner script, like the needs
+    bars, so it ships with the gamemode and needs no release. Edge triggered
+    on the lines, because updateOwner runs every frame. Nothing is drawn while
+    there is nothing to say. Left of the middle of the screen, because the
+    corners are taken: the game's notifications top left, the chat and the
+    needs bars bottom left, the voice mark top right.
   */
   function hudScript() {
-    var CSS = 'position:fixed;left:18px;bottom:226px;z-index:2147483500;' +
+    var CSS = 'position:fixed;left:18px;top:40%;z-index:2147483500;' +
               'pointer-events:none;font-family:Georgia,serif;font-size:20px;' +
               'letter-spacing:.04em;color:#e0a98f;' +
               'background:rgba(12,10,8,.62);border:2px solid rgba(0,0,0,.65);' +

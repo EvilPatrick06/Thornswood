@@ -75,9 +75,10 @@ function rig() {
   function idOf(desc) { if (!ids[desc]) { ids[desc] = nextId++; } return ids[desc]; }
   const M = Object.create(Math);
   M.random = function () { return dice.next.length ? dice.next.shift() : 0.999; };
+  const made = {};
   const mp = {
     getOnlinePlayers: function () { return Object.keys(extra).map(Number); },
-    makeProperty: function () { },
+    makeProperty: function (name, opts) { made[name] = opts; },
     getDescFromId: function (id) { return 'ff' + id.toString(16) + ':Runtime'; },
     get: function (id, key) {
       const e = extra[id] || {};
@@ -118,7 +119,7 @@ function rig() {
   // The perks block's answer, the way it reads it: the perks over the tree.
   G.__thornswoodPerks = { holds: function (id, key) { return P.perks(state[id] || P.fresh()).indexOf(key) !== -1; } };
   return {
-    G: G, mp: mp, H: G.__thornswoodHurt, N: G.__thornswoodNeeds, clock: clock, dice: dice,
+    G: G, mp: mp, made: made, H: G.__thornswoodHurt, N: G.__thornswoodNeeds, clock: clock, dice: dice,
     said: said, damage: damage, state: state, idOf: idOf, timers: timers,
     person: function (id, pid) { extra[id] = extra[id] || {}; extra[id].pid = pid || id; return id; },
     set: function (id, k, v) { extra[id] = extra[id] || {}; extra[id][k] = v; },
@@ -200,7 +201,7 @@ if (NEEDS_SRC && HURT_SRC && P) {
     r.minutes(10); r.tick();
     yes('at 10 minutes it is ill and says so once', r.H.stageOf(ill(r, me, 'fever'), r.clock.now) === 'ill' &&
       r.lines(me).filter(function (l) { return /Wound fever\./.test(l); }).length === 1);
-    yes('and the corner of the screen shows it', r.rec(me).show.indexOf('Wound fever') !== -1);
+    yes('and the screen shows it', r.rec(me).show.indexOf('Wound fever') !== -1);
     yes('and the character panel was asked to redraw', r.redrawn(me) > 0);
     r.tick();
     yes('a second tick does not say it again', r.lines(me).filter(function (l) { return /Wound fever\./.test(l); }).length === 1);
@@ -478,7 +479,7 @@ if (NEEDS_SRC && HURT_SRC && P) {
     r.clock.now += 2000;
     const said = r.H.burning(me, false);
     yes('five seconds (35) is a bad burn, and says so', /burnt you badly/.test(said) && woundOf(r, me, 'burn').dealt === 35);
-    yes('the corner says Bad burn', r.rec(me).show.indexOf('Bad burn') !== -1);
+    yes('the screen says Bad burn', r.rec(me).show.indexOf('Bad burn') !== -1);
     yes('it halves what is worn', JSON.stringify(r.H.burntWear(me)) === JSON.stringify({ all: true, counts: 0.5 }));
     r.H.burning(me, true);
     r.clock.now += 60000;
@@ -602,6 +603,26 @@ if (NEEDS_SRC && HURT_SRC && P) {
     const back = r.rec(me);
     yes('a record rebuilt from somebody else\'s JSON keeps only what it knows', back.wounds.length === 0 &&
       back.ills.length === 0 && !('junk' in back));
+  }
+
+  // ------------------------------------------------------- the screen
+  {
+    const r = rig();
+    const opts = r.made.thornswoodHurt;
+    yes('the record is a property its owner sees and nobody else does',
+      !!opts && opts.isVisibleByOwner === true && opts.isVisibleByNeighbors === false);
+    const sent = [];
+    const ctx = { value: { show: ['Bleeding', 'Broken arm'] }, state: {},
+                  sp: { browser: { executeJavaScript: function (js) { sent.push(js); } } } };
+    const draw = new Function('ctx', opts.updateOwner);
+    draw(ctx); draw(ctx);
+    let parses = false;
+    try { new Function(sent[0]); parses = true; } catch (e) { parses = false; }
+    yes('the screen script draws the lines once, and the page script it sends parses',
+      sent.length === 1 && parses && sent[0].indexOf('Broken arm') !== -1 && sent[0].indexOf('ts-hurt') !== -1);
+    ctx.value = { show: [] };
+    draw(ctx);
+    yes('and hides itself when there is nothing to say', sent.length === 2 && /display=\\?"none\\?"|display="none"|\"none\"/.test(sent[1]));
   }
 
   // --------------------------------------------------- joined up in the file
