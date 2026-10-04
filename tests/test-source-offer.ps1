@@ -79,7 +79,7 @@ $serverPath  = Join-Path $Here 'records\server-build.json'
 $packagePath = Join-Path $Here 'scripts\release\Package-Thornswood.ps1'
 $setupPath   = Join-Path $Here 'installer\Setup-Thornswood.ps1'
 $creditsPath = Join-Path $Here 'site\data\site\credits.md'
-$homePath    = Join-Path $Here 'site\public\home.html'
+$homeJsPath  = Join-Path $Here 'site\public\home.js'
 
 $client = Read-Json $clientPath
 $server = Read-Json $serverPath
@@ -379,7 +379,10 @@ foreach ($r in $pageRows) {
 }
 Yes 'the page and the note agree on every folder and licence' ($disagree.Count -eq 0)
 
-$homeHtml = Get-Content -LiteralPath $homePath -Raw
+# The downloads page is drawn by the home page's script, which moved out of
+# home.html into home.js in #1479 (no inline script under the content security
+# policy).
+$homeHtml = Get-Content -LiteralPath $homeJsPath -Raw
 $dl = $homeHtml.IndexOf("here === '/downloads'")
 $dlEnd = if ($dl -ge 0) { $homeHtml.IndexOf("here === '/report'", $dl) } else { -1 }
 $dlCode = if ($dl -ge 0 -and $dlEnd -gt $dl) { $homeHtml.Substring($dl, $dlEnd - $dl) } else { '' }
