@@ -15,12 +15,14 @@ Carriages and ferries move people. They are not the company. See
 
 ## Posting a haul
 
-At the board of the hold you are sending from:
+At the board of the hold you are sending from, click the board and
+fill in Send a haul: the pay, the town it goes to, and what it
+carries. The town is one of the ten, and not this one. What it
+carries is what the job says.
 
-`/haul 80 riften a crate of iron ingots`
-
-The first number is the pay. The next word is the destination hold,
-one of the ten towns. The rest is what the job says.
+Decided by Patrick on 4 Oct: nothing a person does in the world is a
+chat command. A haul is the board's buttons, the same as a notice
+or a job.
 
 The server takes two sums before the job goes up:
 
@@ -35,29 +37,27 @@ in the line.
 
 ## Taking it
 
-`/take` at that board, the same as any job. One taker. `/dropjob`
-hands it back.
+Take, on that board, the same as any job. One taker. Hand it back,
+on the board, hands it back, and the haul comes down.
 
-On a drop or on the poster's `/unpin` before anybody has taken it, the
-pay returns to the poster's pack and the ledger goes down by that
+On a hand back, or on the poster's Take down before anybody has
+taken it, the pay returns to the poster's pack and the ledger goes down by that
 pay. The job fee stays. The company's tenth is not taken, because
 nothing was delivered.
 
-A steward of the posting hold can cancel an open or a taken haul the
-same way: the pay returns, the fee stays. There is no clock. A haul
+A steward at the posting board can take down an open or a taken haul
+the same way: the pay returns, the fee stays. There is no clock. A haul
 sits until a person confirms it or cancels it. The server does not
 watch the road, and it does not look in the hauler's pack for the
 crate.
 
 ## Confirming it
 
-At the destination hold's board, the poster or that hold's steward:
-
-`/haul done whiterun 4`
-
-The hold named is the one that posted it. The number is the job's
-number on that board. You have to be standing at the destination the
-job named. Saying it at the posting board does nothing.
+At the destination hold's board, the poster or a steward presses
+Confirm on the haul, under Hauls that came here. A haul shows there
+only at the board of the town it named, once somebody has taken it.
+At the posting board there is nothing to confirm. The person who took
+it does not confirm their own haul.
 
 On confirm, the company keeps a tenth of the pay, rounded down to a
 whole gold. A pay under 10 gold keeps nothing, and the hauler receives
@@ -80,6 +80,11 @@ The gold the hauler receives was the poster's. Creating it back into
 a pack and subtracting it from the ledger is the box paying out. It
 is not a new mint. See [Gold](gold.md).
 
+Somebody who is away when gold is theirs, the hauler on a confirm or
+the poster on a hand back or a take down, is handed it the next time
+they are in the world. Until then it stays on the ledger, held for
+them, and nothing else can spend it.
+
 ## Who runs it
 
 An application, the same shape as a Jarl. It is asked for in Discord.
@@ -97,6 +102,14 @@ Sometimes there is an event where someone sells a thing out of
 Skyrim. The thing leaves the game. That is the point: it is gone, and
 it does not come back into a chest.
 
+It is a trade. The worker and the seller open an ordinary trade, with
+the key on the prompt that appears when you look at somebody, and the
+worker presses Buy for the company on the trade panel. Only somebody
+the company has taken on sees that button. The seller puts up the
+thing. The worker puts up the price as gold. An item has no gold
+price of its own: the price is the one the two of them agree to on
+the panel, and both see the split before they agree.
+
 When the company buys, the worker who handled the sale takes 10% of
 the price, rounded down to a whole gold. Another 10% leaves the
 server. The seller receives what is left. A price under 10 gold pays
@@ -107,39 +120,32 @@ the seller the whole price, and neither cut is taken. See
 
 A sale across a counter in the same town is a trade. Rent is rent. A
 notice is a notice. A carriage fare is a fare. None of those pay the
-tenth, and none of them are posted with `/haul`.
+tenth, and none of them are sent with Send a haul.
 
 ## Where this is
 
-`/haul` is in the server. At the board it leaves from,
-`/haul 80 riften a crate of iron ingots` takes the 30 fee and the pay,
-and both go onto that hold's ledger. The board, the panel and `/jobs`
-show the pay and the destination. `/take` and `/jobs` are the same as
-for any job.
-
-The hauler's `/dropjob`, the poster's `/unpin` before anybody has taken
-it, and a steward's `/unpin` at the posting board, open or taken, each
-take the haul down and hand the pay back to the poster. The fee stays.
-`/haul done whiterun 4`, by the poster or a steward at the
-destination's board, pays the hauler out of the ledger and keeps the
-tenth. The person who took the haul does not confirm it. An ordinary
-job is not a haul, and `/haul done` refuses one.
-
-Somebody paid who is away, the hauler on a confirm or the poster on a
-drop or a steward's `/unpin`, is handed the gold the next time they are
-in the world. Until then it stays on the ledger, held for them.
+Hauls are in the server, on the board's panel: Send a haul takes the
+30 fee and the pay, and both go onto that hold's ledger. The wall
+shows a haul with its pay and its town. Take, Hand it back and Take
+down are the board's buttons, the same as for any job, and a steward
+sees Take down on every haul at that board. Confirm, under Hauls that
+came here at the destination's board, pays the hauler out of the
+ledger and keeps the tenth. A confirm answers only a haul, never an
+ordinary job, and the server still pays nothing for an ordinary job.
+Gold for somebody who is away waits on the ledger, held for them.
 
 The ledger goes down only for these payouts and a letter's 15. A
 withdrawal never leaves less on the ledger than the open letters and
 hauls still hold, and what a haul holds for somebody away.
 
 The application is a ticket in Discord, Apply: Trading Company. The
-role it leads to is Trading Company, given by a person in Discord, and
-`access.company` in the site's config names it. `/company` says
-whether a character can handle a sale.
-`/company buy 120 Lydia Iron Sword`, standing with the seller,
-offers the price the two agreed, and the seller accepts on the prompt.
-The thing leaves the seller's pack and the world. The worker pays the
-price less their 10%, another 10% is destroyed, and the seller
-receives the rest. Under 10 gold the seller receives the whole price.
-One thing is sold at a time. No ledger is touched by a sale.
+role it leads to is Trading Company, given by a person in Discord.
+`bot/Build-Discord.py` makes the role, and `access.company` in the
+site's config names it. A sale out of Skyrim is the trade panel's Buy
+for the company, as above. The things the seller put up leave the
+seller's pack and the world. The worker pays the price less their
+10%, another 10% is destroyed, and the seller receives the rest.
+Under 10 gold the seller receives the whole price. No ledger is
+touched by a sale. Where the price comes from, the worker's pack or a
+ledger, is asked on issue #1393; the server takes it from the
+worker's pack.

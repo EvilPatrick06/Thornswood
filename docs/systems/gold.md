@@ -113,7 +113,8 @@ container in a claimed building loses 5% a day, written when the chest
 is next opened. See [Durability](durability.md). Notice fees, job fees, letter fees, a haul's fee and pay, rent, and
 carriage and ferry fares are counted on the ledger. The payouts are a
 letter's 15, to the courier on delivery or back to the sender on an
-`/unpin`, and a haul's pay, to the hauler less the company's tenth on
-`/haul done` or back to the poster when it comes down. A company sale
-pays the seller from the worker's pack, destroys its 10%, and the
-thing sold leaves the world.
+`/unpin`, and a haul's pay, to the hauler less the company's tenth
+when it is confirmed, or back to the poster when it comes down. A
+company sale, the trade panel's Buy for the company, pays the seller
+from the worker's pack, destroys its 10%, and the thing sold leaves
+the world.

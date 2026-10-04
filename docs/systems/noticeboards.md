@@ -116,11 +116,12 @@ id the crosshair gives, the same as `/trade`. There is no key for it
 on the prompt that appears when you look at somebody. A letter is
 written with `/letter`, not on the panel.
 
-Hauls are in the server: `/haul`, the 30 fee and the pay on the
-ledger, the pay and the destination on the wall and the panel, and
-`/haul done` at the destination. A haul handed back with `/dropjob`
-is not open again: it comes down, and its pay goes back to the poster.
-See [Free Skyrim Trading Company](trading-company.md).
+Hauls are in the server, on the panel: Send a haul, the 30 fee and
+the pay on the ledger, the pay and the destination on the wall, and
+Confirm under Hauls that came here at the destination. A haul handed
+back is not open again: it comes down, and its pay goes back to the
+poster. A steward sees Take down on every haul. There is no command
+for any of it. See [Free Skyrim Trading Company](trading-company.md).
 
 Ten boards are seeded, and each one is that hold's drop box. Raven
 Rock's is at The Retching Netch, where Geldis Sadri stands. It has no
