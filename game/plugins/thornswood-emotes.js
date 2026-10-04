@@ -490,10 +490,9 @@ function play(event, name) {
  * in a combat state that has no transition to IdleWave, so the event arrives,
  * is refused, and nobody is told.
  *
- * So the stance is dropped first and the emote follows on the next tick.
- * IdleForceDefaultState is the vanilla way out of any of those states and is
- * what the stop key already used. Sheathing as well, because a drawn weapon
- * puts the graph straight back.
+ * Request sheathing and observe it finish before resetting the graph.
+ * Sending IdleForceDefaultState during that transition can interrupt it.
+ * Reset and the chosen idle then run on separate updates.
  */
 function drain() {
   if (inFlight) {
@@ -518,7 +517,7 @@ function drain() {
   const event = request.event;
   if (refuseInstrument(request.name)) { return; }
 
-  if (!request.resetDone) {
+  if (!request.sheatheStarted) {
     try {
       // A relayed equipment event can leave the stance pinned. Stop alone
       // does not clear that pin or sheathe, so the old queue never advanced.
@@ -526,10 +525,8 @@ function drain() {
       if (pc.isWeaponDrawn && pc.isWeaponDrawn()) {
         pc.sheatheWeapon();
       }
-      sp.Debug.sendAnimationEvent(pc, STOP);
-      if (event === STOP) { return; }
-      request.resetDone = true;
-      request.sheatheDeadline = Date.now() + 2000;
+      request.sheatheStarted = true;
+      request.sheatheDeadline = Date.now() + 5000;
       queued.unshift(request);
       return;
     } catch (e) { log('could not reset gesture stance:', e); return; }
@@ -537,7 +534,20 @@ function drain() {
 
   if (pc.isWeaponDrawn && pc.isWeaponDrawn()) {
     if (Date.now() < request.sheatheDeadline) { queued.unshift(request); }
-    else { log('sheathing did not finish, gesture cancelled'); }
+    else {
+      log('sheathing did not finish, gesture cancelled');
+      sp.Debug.notification('Your gear could not be stowed. Try again once it is lowered.');
+    }
+    return;
+  }
+
+  if (!request.resetDone) {
+    try {
+      sp.Debug.sendAnimationEvent(pc, STOP);
+      if (event === STOP) { return; }
+      request.resetDone = true;
+      queued.unshift(request);
+    } catch (e) { log('could not reset gesture stance:', e); }
     return;
   }
 
