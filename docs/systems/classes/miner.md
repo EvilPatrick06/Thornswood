@@ -78,13 +78,36 @@ The seam comes back for everybody at once, not per person.
 | Gold | 20 minutes |
 | Corundum, silver | 10 minutes |
 | Clay, quarried stone, orichalcum, quicksilver, moonstone, malachite, shellbug | 30 minutes |
-| Ebony, the gems, stalhrim, heart stone | One place each. A scarce quest opens it. The counts and the cooldown are on [Custom quests](../quests.md). The rank on the seam still applies. A steward does not grant it. |
+| Ebony, the gems, stalhrim, heart stone | One place each, below. A scarce quest opens it. The counts and the cooldown are on [Custom quests](../quests.md). The rank on the seam still applies. |
 
 Clicking again while the pick is still in the air is not a second
 swing. Nothing is said. The ore is not given twice.
 
 Smelting the ore into an ingot is anybody's work, at a forge, and the
 forge burns a charcoal. See [Smith](../professions/smith.md).
+
+## The one place
+
+Each rare seam is one building. Every vein of that seam inside it is
+the place. The same seam anywhere else, in another building or on open
+ground, stays shut.
+
+| Seam | The one place |
+| --- | --- |
+| Ebony | Raven Rock Mine |
+| Stalhrim | Kolbjorn Barrow |
+| Heart stone | Coldcinder Cave |
+| Ruby | White Ridge Sanctum |
+| Sapphire | Highpoint Tower |
+| Emerald | Kolbjorn Barrow |
+| Amethyst | Highpoint Tower |
+
+A guild trader gives the scarce quest that opens it. Nothing else
+opens it. The place holds the count on [Custom quests](../quests.md),
+across all of its veins of that seam. Once you turn the quest in, the
+place is shut to you until that quest's cooldown ends. The cooldown
+is kept by the server and it is yours: another person holding the
+same quest still works the place.
 
 ## The salt quarry
 
@@ -149,9 +172,13 @@ Generated from the work tables by `scripts/dev/Write-SystemLists.js`. The same r
 The server has 581 veins and a deposit of 20. A swing takes 1, and
 the chance of one more is the rank table above, out of the same 20.
 The common seams come back on the clock above. Heart stone is master.
-The pickaxe still has 100 uses. Ebony is 6 veins, the gems are 3
-each, stalhrim is 2, heart stone is 4. A scarce quest is the only way
-in, and the one place is not bound, so every rare vein stays shut. A
-swing at a scarce place gives 1, without the chance of one more. A
-steward does not guard it. The table under Every record is that
-server book. The numbers above it are the plan.
+The pickaxe still has 100 uses. Each rare seam is bound to the
+building in the table under The one place, by that building's cell in
+`game/data/mine-buildings.json`, and every other vein of that seam is
+shut. A scarce quest is the only way in, and its cooldown starts at
+the turn-in. A swing at a scarce place gives 1, without the chance of
+one more. The open quest and the cooldown are kept in memory, so a
+restart of the server clears them. No trader offers the quest in the
+game yet, so every rare vein still answers shut in play. The table
+under Every record is that server book. The numbers above it are the
+plan.
