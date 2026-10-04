@@ -10,13 +10,13 @@ each half, with the file and line for each step.
 `.gitmodules:11-15` names the fork, `https://github.com/EvilPatrick06/skymp.git`,
 on the branch `thornswood/engine-changes`, at `engine/skymp`. The repository
 pins a commit, not the branch: `git submodule status` prints
-`e63065114ee1c439db3757043b00c4ba4749e5a6`, the source commit named by both
-`records\client-build.json` and `records\server-build.json`. The client DLL
-and JavaScript were rebuilt for creation-save inventory. The server
-executable, JavaScript and all seven recorded artifacts retain their
-preceding bytes because server source and dependencies are unchanged;
-`builtUtc` remains 2026-10-03T23:29:35Z. The server native SHA256 is
-`77bdd06c2271308df172bf4d06b9cdc53c9514be5795b44a37df720acd47efdc`.
+`0dd0590bb7703c467c1a8adaffbfaabcdde75046`, the source commit named by both
+`records\client-build.json` and `records\server-build.json`. The server
+executable was rebuilt from it to read every plugin into memory when the
+server starts (issue #1602); its SHA256 is
+`7477e037a3050d37619c4643d6fbe1a7d877b5248fbda8d64af142ddcdacce10`, built
+2026-10-04T20:50:16Z. The six client files keep their recorded bytes, because
+that commit changes no client source.
 `Deploy-Server.ps1`, `Export-ServerPayload.ps1`, `Publish-Server.ps1` and the
 installer refuse server files that differ from the record. The build check
 requires the pin and both records to name one source commit and the server

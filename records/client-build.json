@@ -1,9 +1,9 @@
 {
-  "recordedUtc": "2026-10-04T18:39:50Z",
+  "recordedUtc": "2026-10-04T20:50:39Z",
   "builtUtc": "2026-10-04T18:38:32Z",
   "fork": "https://github.com/EvilPatrick06/skymp",
   "forkBranch": "thornswood/engine-changes",
-  "forkCommit": "e6306511",
+  "forkCommit": "0dd0590b",
   "upstreamBase": "f926944b",
   "thornswoodPatchBlocks": 18,
   "files": {
