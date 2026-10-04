@@ -8,8 +8,7 @@ there is nothing at a workbench for either of them to own.
 
 The sister half is still novice and no further, unless a Warlord
 teaches it. There is no recipe for that teaching to unlock. What it
-changes is the placed point and, when the maneuvers exist, which
-maneuvers you are allowed.
+changes is the placed point and which maneuvers you are allowed.
 
 ## How a warrior climbs
 
@@ -54,6 +53,7 @@ warrior, on their own line:
 | Dragon | 16 |
 
 A named animal uses the rank of its kind. A pit wolf is still a wolf.
+A body neither table names, such as an atronach or a spriggan, is 1.
 One kill is that many pieces, all on the half you hold. The party
 bonus is 15% of that total, banked the same way as any other work, and
 only if somebody from the party is in the same cell.
@@ -84,6 +84,30 @@ trade is the same: the novice row, and no further.
 You have the rows at your rank and below, on your half. Stamina is
 spent when the maneuver starts. If you do not have it, nothing happens.
 
+`/maneuver` lists yours and when each is ready again. `/maneuver rush`
+starts one. Set, Plant, Cover, Wall, Rush and Heavy last as long as
+the row says. Break and Wreck wait for the blow they name. Cover is for
+the one person nearest you, within 3 metres, when you start it.
+
+What the server does with each, and what the game still has to do on
+somebody's own machine:
+
+| Maneuver | In the server | Not yet |
+| --- | --- | --- |
+| Set | The stamina and the wait | Halving what a block costs. The game works that out on the blocker's machine |
+| Plant | The stamina and the wait. A Break or a Wreck does not stagger you | Any other stagger |
+| Cover | While you block and they stay within 3 metres, a fifth of what each hit took is given back | A hit that kills outright is not softened |
+| Wall | You, and your party within 3 metres of you, get a fifth of what each hit took back | A hit that kills outright is not softened |
+| Rush | +4 speed, through the same hand that puts your skill tree on your character | Nothing |
+| Heavy | The power attack takes a quarter again of what it took | Nothing |
+| Break | The hit staggers a person | Staggering a creature |
+| Wreck | The power attack takes a half again of what it took, and staggers a person | Staggering a creature |
+
+Two of them on one person is still 20% less, not 40%. The stamina is
+taken as a share of the most your race has, which is the number the
+server knows. Stamina the skill tree adds is not in that share. The
+waits are kept in memory, so a restart of the server clears them.
+
 ## Warlord
 
 At master. Master-tier combat maneuvers, and you can teach novice
@@ -91,13 +115,15 @@ combat to people who are not warriors. That teaching is one of their
 two outside apprenticeships. It never goes past novice, and it does
 not make them a warrior.
 
-The maneuvers are the table above. They are not in the server. Until
-they are, master is the rank, the teaching, and the placed points.
+The maneuvers are the table above. At master you hold all four rows
+of your half.
 
 ## Where this is
 
-The profession, the two halves, the placed points, and a kill that
-counts as one piece are in the server. A kill between people already
-counts for nothing. The strength table above is not applied: a
-chicken and a dragon are both one piece. The maneuver table is not
-applied.
+The profession, the two halves, the placed points, the strength
+table and the maneuver table are in the server. A chicken is 1 piece
+and a dragon is 16. A kill between people counts for nothing. What
+the game still has to do for the maneuvers is the second table under
+Maneuvers. A Warlord taking somebody on is not recorded yet (see
+[Masters and apprentices](../apprenticeship.md)), so a sister half's
+novice maneuver opens once that half is past novice.

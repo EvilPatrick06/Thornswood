@@ -31,9 +31,12 @@ trades.
 You cannot be credited for killing a person.
 
 The maneuvers for this half are Set, Plant, Cover, and Wall. The
-numbers are on [Warrior](../warrior.md). They are not in the server.
+numbers, and what the server does with each, are on
+[Warrior](../warrior.md).
 
 ## Where this is
 
-The half can be picked, the Resilience point lands, and kills of
-world creatures credit the half. No maneuver checks the word Bulwark.
+The half can be picked, the Resilience point lands, kills of world
+creatures credit the half by how hard they were, and its four
+maneuvers are in. Halving what a block costs, and refusing a stagger
+the server did not send, are still the game's to do.

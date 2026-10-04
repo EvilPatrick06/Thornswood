@@ -120,7 +120,7 @@ See [Enchanter](professions/enchanter.md).
 
 | Master of | What the teaching is |
 | --- | --- |
-| Bulwark or Berserker | Novice combat for someone who is not a warrior. There is no recipe. The maneuvers a Warlord is supposed to open are not a list yet. |
+| Bulwark or Berserker | Novice combat for someone who is not a warrior: that half's novice maneuver, Set or Rush. There is no recipe. |
 | One school | Novice spells of that school, for someone who is not a mage. Two spells, from the tome. |
 | Blightbrewer or Physicker | Novice brewing of that half. The lab has no recipe rows, so novice is the bench, not a list. |
 | Hearthcook or Confectioner | The novice meals of that half. |
