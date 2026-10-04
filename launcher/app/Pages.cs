@@ -19,7 +19,7 @@ namespace Thornswood
     {
         static TextBlock txtSrvAddress, txtSrvState, txtSrvPingNote,
                          txtBuildHead, txtBuildSummary, txtDiagNote, txtThemeNote;
-        static StackPanel srvPingBars, srvRows, buildBars, buildRows, controlsList, diagReadings;
+        static StackPanel srvPingBars, srvRows, buildBars, buildRows, controlsList, diagReadings, diagCollection;
         static Button btnSrvCopy, btnSrvRetest, btnBuildRefresh, btnDiagBundle, btnDiagOpen;
 
         // -1 marks a test that got no answer, which is worth drawing as a gap
@@ -37,6 +37,7 @@ namespace Thornswood
             srvPingBars = F<StackPanel>("SrvPingBars"); srvRows = F<StackPanel>("SrvRows");
             buildBars = F<StackPanel>("BuildBars"); buildRows = F<StackPanel>("BuildRows");
             controlsList = F<StackPanel>("ControlsList"); diagReadings = F<StackPanel>("DiagReadings");
+            diagCollection = F<StackPanel>("DiagCollection");
             btnSrvCopy = F<Button>("BtnSrvCopy"); btnSrvRetest = F<Button>("BtnSrvRetest");
             btnBuildRefresh = F<Button>("BtnBuildRefresh");
             btnDiagBundle = F<Button>("BtnDiagBundle"); btnDiagOpen = F<Button>("BtnDiagOpen");
@@ -580,11 +581,17 @@ namespace Thornswood
             else
                 RunScan();
 
-            diagReadings.Children.Clear();
+            if (diagCollection != null)
+            {
+                diagCollection.Children.Clear();
+                // After the last Ready to launch row, before Bring it up to
+                // date from Vortex. Used to sit in DiagReadings under What the
+                // launcher can see right now, which put it under the Vortex
+                // section.
+                diagCollection.Children.Add(CollectionStatusCard());
+            }
 
-            // The collection, first on the page (Djinn, 2 Oct): what the
-            // launcher found and the button to the collection.
-            diagReadings.Children.Add(CollectionStatusCard());
+            diagReadings.Children.Clear();
 
             string ping = pingHistory.Count > 0 && pingHistory[pingHistory.Count - 1] >= 0
                         ? pingHistory[pingHistory.Count - 1] + " ms" : "not measured";

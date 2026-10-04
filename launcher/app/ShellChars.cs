@@ -41,6 +41,9 @@ namespace Thornswood
             // an install this supports any more. OwnGameRequired says why and
             // offers the folder when it can be made. See ShellOwnGame.cs.
             if (!OwnGameRequired()) return;
+            // Same path as Diagnostics, Bring it up to date from Vortex. Play
+            // used to walk past a folder that NeededRefresh and launch it.
+            if (OwnGameRefreshIfDue()) return;
 
             // Discord decides who gets in, and it is asked here rather than
             // inside Play() because Play() is also the path a game already

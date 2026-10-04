@@ -1182,6 +1182,11 @@
                 <TextBlock Text="Ready to launch" Style="{StaticResource Eyebrow}" Margin="0,30,0,11"/>
                 <StackPanel x:Name="StatusList"/>
 
+                <!-- Collection line: after the last Ready to launch row (Steam),
+                     before Bring it up to date from Vortex. Built in C# so a
+                     missing named control cannot take the page with it. -->
+                <StackPanel x:Name="DiagCollection" Margin="0,8,0,0"/>
+
                 <Border Style="{StaticResource Slab}" Padding="20,18" Margin="0,16,0,0">
                   <StackPanel>
                     <TextBlock Style="{StaticResource H2}" Text="Bring it up to date from Vortex"/>

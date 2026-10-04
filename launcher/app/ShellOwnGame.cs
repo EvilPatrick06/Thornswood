@@ -133,6 +133,35 @@ namespace Thornswood
         }
 
         /// <summary>
+        /// The same bring-up-to-date Diagnostics runs (BtnOwnGameRefresh,
+        /// StartOwnGame(false)). True when Play must stop for that work.
+        ///
+        /// OwnGameAtStart does this once when the window is first shown.
+        /// Play never asked, so a collection Vortex had already deployed
+        /// while the launcher was open went into the game from the last
+        /// refresh. That is the cause: StartPlay and Play() checked
+        /// ownGameBusy and then launched, and never called NeedsRefresh.
+        /// </summary>
+        static bool OwnGameRefreshIfDue()
+        {
+            if (!OwnGame.Active || ownGameBusy) return false;
+            if (playing || Checks.GameRunning()) return false;
+            bool due = false;
+            try
+            {
+                Waiting(delegate { due = OwnGame.NeedsRefresh(cfg); });
+            }
+            catch (Exception ex)
+            {
+                Swallow.Note("ShellOwnGame.OwnGameRefreshIfDue", ex);
+                return false;
+            }
+            if (!due) return false;
+            StartOwnGame(false, true);
+            return true;
+        }
+
+        /// <summary>
         /// Refuse to start out of a shared Skyrim. True when Play may go on.
         ///
         /// "nothing here supports another server's install any more", decided by
