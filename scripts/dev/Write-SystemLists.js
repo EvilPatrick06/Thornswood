@@ -270,7 +270,7 @@ function harvestWorld(id) {
 
 const classFiles = [
   ['miner.md', 'Miner', 'game/data/ores.json', ores.ores,
-    'A pair of zeroes means that rank cannot work the seam. Yield is least-most per swing. An ore has no gold price. Heart stone is advanced in this file. The plan ranks it master.',
+    'A pair of zeroes means that rank cannot work the seam. Yield is least-most per swing: 1, and a chance of one more. An ore has no gold price.',
     {}],
   ['gatherer.md', 'Gatherer', 'game/data/harvests.json', harvests.harvests,
     'Reagents. One pick is one of the produce. The rank is the rank on the row. A plant has no gold price. Wheat is in this table and is a crop: the server treats it as the farmer\'s.',
