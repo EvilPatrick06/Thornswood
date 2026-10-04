@@ -277,6 +277,7 @@ jobs:
                  'test-1385-perks.js',
                  'test-1386-warrior.js',
                  'test-1388-apprentice.js',
+                 'test-launcher-help.js', 'test-classes-page.js',
                  'test-1389-lists.js',
                  'test-1603-beds.js',
                  'test-1394-fares.js',
