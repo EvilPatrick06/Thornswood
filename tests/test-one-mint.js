@@ -430,8 +430,10 @@ for (const at of Object.keys(WRITERS)) {
     case is there more gold afterwards than before.
 
     It does not refuse a negative amount, and a negative amount would add.
-    Nothing hands it one: its one caller passes a fee that is one of two
-    positive constants, which is checked here rather than trusted.
+    Nothing hands it one: the board passes a fee that is one of two positive
+    constants, and a ride (#1394) passes its fare, which is one of three and
+    is refused at 0 or less before takeGold is reached. Both are checked here
+    rather than trusted.
   */
   const take = lift('  function takeGold(actorId, amount) {', '\n  }\n');
   yes('the fee taker is in the gamemode', take !== null);
@@ -460,9 +462,16 @@ for (const at of Object.keys(WRITERS)) {
   }
   const notice = /\bvar NOTICE_FEE = (\d+);/.exec(code);
   const job = /\bvar JOB_FEE = (\d+);/.exec(code);
-  yes('its one caller passes the fee, and the fee is NOTICE_FEE or JOB_FEE',
-      callers.join(',') === 'fee' &&
+  yes('its two callers pass the fee and the fare, and the fee is NOTICE_FEE or JOB_FEE',
+      callers.slice().sort().join(',') === 'fee,price' &&
       /\bvar fee = isJob \? JOB_FEE : NOTICE_FEE;/.test(code));
+  const fares = ['FARE_FERRY', 'FARE_CARRIAGE', 'FARE_RAVEN_ROCK'].map(function (n) {
+    const m = new RegExp('\\bvar ' + n + ' = (\\d+);').exec(code);
+    return m ? Number(m[1]) : 0;
+  });
+  yes('the fare is fare(), refused at 0 or less, and all three fares are more than nothing',
+      /\bvar price = fare\(from, to\);\s*\n(\s*\/\/[^\n]*\n)*\s*if \(!\(price > 0\)\) \{ return /.test(code) &&
+      fares.every(function (n) { return n > 0; }));
   yes('and both fees are more than nothing',
       !!notice && !!job && Number(notice[1]) > 0 && Number(job[1]) > 0);
 }

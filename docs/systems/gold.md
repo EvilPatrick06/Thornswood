@@ -110,4 +110,5 @@ server. A dungeon chest pays its tier's gold on that place's rest.
 A guild trader's 250 is not. A scene quest creates its gold when it is finished, and that
 gold is not taken from a trader's purse. Rank is not for sale. Nothing loses 5% a day for sitting
 in a chest. The ledger only goes up: notice fees,
-job fees and rent are counted, and nothing pays back out.
+job fees, rent, and carriage and ferry fares are counted, and nothing
+pays back out.
