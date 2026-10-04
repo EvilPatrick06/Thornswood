@@ -81,7 +81,7 @@ crosshair. Nobody is told to type it, and help text never lists it.
 | `/me`, `/do`, `/whisper`, `/w`, `/shout`, `/s`, `/yell`, `/y` | Anybody | How a line is said, and how far it carries | `voice/voice-server.js:427`, `voice/headlines.js:28` | [Text chat](chat.md), [People beside you](people.md), [Emotes](emotes.md); the voice service's usage lines | None. To come: buttons on the chat box. | #1639 |
 | `/ooc`, `/o` | Anybody | Out of character, to whoever is near | `gamemode.js:45334` | The list; `/help talking`; Help page; [Text chat](chat.md), [Factions](factions.md), [Notice boards](noticeboards.md); `site/data/site/rules.md` | None. To come: a button on the chat box. | #1639 |
 | `/roll`, `/r` | Anybody | Dice, rolled on the server | `game/ui/thornswood-chat.js:334`, `gamemode.js:45419` | The list; `/help talking`; Help page "Dice" | None. To come: a dice button. | #1639 |
-| `/repair`, `/repair <name>` | Anybody | Condition, and mending with a kit | `gamemode.js:45512` | The list; `/help work`; [Durability](durability.md) | In hand. | #1384 |
+| `/repair`, `/repair mend <base> <condition> <name>` | Anybody with a repair kit | Opens the repair panel; a row's Mend button mends that piece with a kit | The `/repair` branch of `handle`, then `panel` in the durability block | Nowhere. [Durability](durability.md) names the key and the panel | U in the inventory, with a kit in the pack, opens the panel, and Mend sends `mend`. Never in the list or the help. | #1384 |
 | `/maneuver`, `/maneuver <name>` | A warrior | A warrior's maneuvers | `gamemode.js:44929` | The list; `/help work`; [Warrior](professions/warrior.md) | In hand. | #1386 |
 
 `/pick` and `/spend` are the K panel's lines (`gamemode.js:40783`):

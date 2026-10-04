@@ -9,8 +9,17 @@
 // is not counted as work (test-recipeless-craft.js drives the refusal; this
 // checks it is wired). Glass, ebony and stalhrim take the same kits as iron.
 //
+// Patrick's answers of 4 October: a recipe for each kit, written on the page
+// and carried by Thornswood-Content.esp; one kit per repair; 120% only for
+// the half the person picked, never the sister half; worn gear loses 1% a
+// hit; a weapon wears when it lands a hit or blocks one, not when its holder
+// is hit. And no chat commands for what people do: the repair is a panel,
+// opened by a key in the inventory, and /repair is only what the key and the
+// panel send.
+//
 // The durability block is cut out of the gamemode as it is and run against a
-// small world: packs, chests, records and a clock this file controls.
+// small world: packs, chests, records and a clock this file controls. The
+// plugin is read as bytes, the client plugin and the panel as text.
 //
 // Read only.
 'use strict';
@@ -58,6 +67,7 @@ if (typeof create !== 'function') {
 function le32(n) { return [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255]; }
 function text(s) { return s.split('').map(function (c) { return c.charCodeAt(0); }).concat([0]); }
 function weapon(edid) { return { type: 'WEAP', fields: [{ type: 'EDID', data: text(edid) }] }; }
+const SHIELD_SLOT = 1 << 9;
 function armo(edid, slots, armourType, keywords) {
   const f = [{ type: 'EDID', data: text(edid) }, { type: 'BOD2', data: le32(slots).concat(le32(armourType)) }];
   if (keywords) { f.push({ type: 'KWDA', data: [].concat.apply([], keywords.map(le32)) }); }
@@ -66,7 +76,7 @@ function armo(edid, slots, armourType, keywords) {
 const BODY = 1 << 2, HANDS = 1 << 3, RING = 1 << 6, AMULET = 1 << 5, HEAD = 1;
 
 const IRON_SWORD = 0x12eb7, GLASS_SWORD = 0x139a0, EBONY_ARMOR = 0x13961, STALHRIM = 0x2b6a6;
-const STEEL_ARMOR = 0x13952, LEATHER = 0x3619e, ROBES = 0x10cee3, GLOVES = 0x261c1;
+const STEEL_ARMOR = 0x13952, LEATHER = 0x3619e, ROBES = 0x10cee3, GLOVES = 0x261c1, SHIELD = 0x12eb6;
 const GOLD_RING = 0x1cf2b, AMULET_OF = 0x9171b, PLAIN_RING = 0x5000001;
 const PICKAXE = 0xe3c16, BREAD = 0x65c97, ARROW = 0x1397d;
 const WEAPON_KIT = 0x5100001, ARMOR_KIT = 0x5100002, SEWING_KIT = 0x5100003;
@@ -80,6 +90,7 @@ RECORDS[STEEL_ARMOR] = armo('ArmorSteelCuirassA', BODY, 1);
 RECORDS[LEATHER] = armo('ArmorLeatherCuirass', BODY, 0);
 RECORDS[ROBES] = armo('ClothesMGRobesAdept', BODY, 2);
 RECORDS[GLOVES] = armo('ClothesFineGloves', HANDS, 2);
+RECORDS[SHIELD] = armo('ArmorIronShield', SHIELD_SLOT, 1);
 RECORDS[GOLD_RING] = armo('JewelryRingGold', RING, 2, [0x6bbe9, 0x10cd09]);
 RECORDS[AMULET_OF] = armo('AmuletMara', AMULET, 2, [0x8f95a]);
 RECORDS[PLAIN_RING] = armo('ModRing', RING, 2);
@@ -92,6 +103,7 @@ const NAMES = {};
 NAMES[IRON_SWORD] = 'Iron Sword'; NAMES[GLASS_SWORD] = 'Glass Sword';
 NAMES[EBONY_ARMOR] = 'Ebony Armor'; NAMES[STALHRIM] = 'Stalhrim Armor';
 NAMES[STEEL_ARMOR] = 'Steel Armor'; NAMES[ROBES] = 'Adept Robes'; NAMES[GLOVES] = 'Fine Gloves';
+NAMES[SHIELD] = 'Iron Shield';
 
 const KIT_DESC = { 'weapon-kit:Test.esp': WEAPON_KIT, 'armor-kit:Test.esp': ARMOR_KIT, 'sewing-kit:Test.esp': SEWING_KIT,
                    'iron-sword': IRON_SWORD };
@@ -117,7 +129,8 @@ function world(opts) {
   const w = {
     t: opts.t || 1000000,
     packs: {}, worn: {}, held: {}, clocks: {}, states: {}, cells: {},
-    rolls: (opts.rolls || []).slice(), said: [], logs: [], queue: [], writes: 0, refuseWrite: false
+    rolls: (opts.rolls || []).slice(), said: [], logs: [], queue: [], writes: 0, refuseWrite: false,
+    shown: []
   };
   w.api = create({
     kits: testKits(opts.kitsMade !== false),
@@ -148,6 +161,7 @@ function world(opts) {
     cellOf: function (id) { return w.cells[id] || 'WhiterunBreezehome'; },
     clockOf: function (id) { return w.clocks[id] || null; },
     setClock: function (id, c) { if (c) { w.clocks[id] = Object.assign({}, c); } else { delete w.clocks[id]; } },
+    show: function (id, v) { w.shown.push({ id: id, view: JSON.parse(JSON.stringify(v)) }); },
     say: function (id, m) { w.said.push(m); },
     log: function () { w.logs.push(Array.prototype.join.call(arguments, ' ')); }
   });
@@ -219,8 +233,83 @@ function pageKits() {
       rows['Sewing Kit'] === KITS.clothing.maker &&
       KITS.weapon.half === 'edgewright' && KITS.armour.half === 'platewright' &&
       KITS.clothing.half === 'haberdasher');
-  yes('no kit has a record yet: the plugin does not carry one',
-      KITS.weapon.item === null && KITS.armour.item === null && KITS.clothing.item === null);
+  yes('each kit names its record in Thornswood-Content.esp',
+      KITS.weapon.item === '154b0:Thornswood-Content.esp' &&
+      KITS.armour.item === '154b1:Thornswood-Content.esp' &&
+      KITS.clothing.item === '154b2:Thornswood-Content.esp');
+}
+
+// ---------------------------------------------------------- the plugin -----
+//
+// Read as bytes: every record in Thornswood-Content.esp is uncompressed, and
+// the three kits and their three recipes have to be there, with the inputs,
+// the bench and the output the page names.
+
+function readPlugin(buf) {
+  const recs = {};
+  function walk(at, end) {
+    while (at + 24 <= end) {
+      const tag = buf.toString('latin1', at, at + 4);
+      const size = buf.readUInt32LE(at + 4);
+      if (tag === 'GRUP') { walk(at + 24, at + size); at += size; continue; }
+      const flags = buf.readUInt32LE(at + 8), fid = buf.readUInt32LE(at + 12);
+      const subs = [];
+      let p = at + 24;
+      const stop = at + 24 + size;
+      while (!(flags & 0x40000) && p + 6 <= stop) {
+        const st = buf.toString('latin1', p, p + 4), ss = buf.readUInt16LE(p + 4);
+        subs.push({ tag: st, data: buf.slice(p + 6, p + 6 + ss) });
+        p += 6 + ss;
+      }
+      recs[fid] = { tag: tag, subs: subs };
+      at = stop;
+    }
+  }
+  const headSize = buf.readUInt32LE(4);
+  walk(24 + headSize, buf.length);
+  return recs;
+}
+function sub(rec, tag) { const s = rec.subs.filter(function (x) { return x.tag === tag; }); return s; }
+function zs(b) { return b.toString('latin1').replace(/\0+$/, ''); }
+const plugin = readPlugin(fs.readFileSync(path.join(REPO_DIR, 'game', 'content', 'Thornswood-Content.esp')));
+// The plugin's own records are 0x05 in front of the local id: five masters.
+function own05(desc) { return (0x05000000 | parseInt(desc.split(':')[0], 16)) >>> 0; }
+const IRON_INGOT_ID = 0x5ace4, LEATHER_STRIPS_ID = 0x800e4, LEATHER_ID = 0xdb5d2, TUNDRA_COTTON_ID = 0x3f7f8;
+const FORGE = 0x88105, TANNING_RACK = 0x7866a;
+const KIT_RECIPES = [
+  { kit: 'weapon', name: 'Weapon Kit', recipe: 0x50154b3, edid: 'ThornswoodRecipeWeaponKit', bench: FORGE,
+    inputs: [[IRON_INGOT_ID, 1], [LEATHER_STRIPS_ID, 1]], words: '| Weapon Kit | 1 Iron Ingot, 1 Leather Strips | Forge | Smith, Edgewright |' },
+  { kit: 'armour', name: 'Armor Kit', recipe: 0x50154b4, edid: 'ThornswoodRecipeArmorKit', bench: FORGE,
+    inputs: [[IRON_INGOT_ID, 1], [LEATHER_ID, 1]], words: '| Armor Kit | 1 Iron Ingot, 1 Leather | Forge | Smith, Platewright |' },
+  { kit: 'clothing', name: 'Sewing Kit', recipe: 0x50154b5, edid: 'ThornswoodRecipeSewingKit', bench: TANNING_RACK,
+    inputs: [[TUNDRA_COTTON_ID, 1], [LEATHER_STRIPS_ID, 1]], words: '| Sewing Kit | 1 Tundra Cotton, 1 Leather Strips | Tanning rack | Tailor, Haberdasher |' }
+];
+KIT_RECIPES.forEach(function (k) {
+  const fid = own05(KITS[k.kit].item);
+  const misc = plugin[fid];
+  yes('the plugin carries the ' + k.name + ' as a MISC under that name',
+      !!misc && misc.tag === 'MISC' && sub(misc, 'FULL').length === 1 && zs(sub(misc, 'FULL')[0].data) === k.name);
+  const cobj = plugin[k.recipe];
+  const ins = cobj ? sub(cobj, 'CNTO').map(function (c) { return [c.data.readUInt32LE(0), c.data.readUInt32LE(4)]; }) : [];
+  yes('and ' + k.edid + ' makes one out of exactly what the page says, at that bench',
+      !!cobj && cobj.tag === 'COBJ' && zs(sub(cobj, 'EDID')[0].data) === k.edid &&
+      sub(cobj, 'CNAM')[0].data.readUInt32LE(0) === fid &&
+      sub(cobj, 'BNAM')[0].data.readUInt32LE(0) === k.bench &&
+      sub(cobj, 'COCT')[0].data.readUInt32LE(0) === k.inputs.length &&
+      JSON.stringify(ins) === JSON.stringify(k.inputs) && page.indexOf(k.words) !== -1);
+});
+{
+  const rt = fs.readFileSync(path.join(REPO_DIR, 'scripts', 'dev', 'Build-RecipeTable.ps1'), 'utf8');
+  yes('the three recipes are named to their halves in $RECIPE_OWNER, so the rebuilt table gates them',
+      /'ThornswoodRecipeWeaponKit'\s*=\s*@\{ Owner = 'Smith'; Half = 'Edgewright'/.test(rt) &&
+      /'ThornswoodRecipeArmorKit'\s*=\s*@\{ Owner = 'Smith'; Half = 'Platewright'/.test(rt) &&
+      /'ThornswoodRecipeSewingKit'\s*=\s*@\{ Owner = 'Tailor'; Half = 'Haberdasher'/.test(rt));
+  const add = fs.readFileSync(path.join(REPO_DIR, 'scripts', 'mods', 'Add-ContentRecords.py'), 'utf8');
+  yes('and Add-ContentRecords.py is what adds the six records',
+      ['ThornswoodMiscWeaponKit', 'ThornswoodMiscArmorKit', 'ThornswoodMiscSewingKit',
+       'ThornswoodRecipeWeaponKit', 'ThornswoodRecipeArmorKit', 'ThornswoodRecipeSewingKit'].every(function (e) {
+        return add.indexOf("('" + e + "', ") !== -1;
+      }));
 }
 
 const EDGE = { prof: 'smith', half: 'edgewright', ranks: { edgewright: 'novice', platewright: 'novice' } };
@@ -235,15 +324,19 @@ yes('the Platewright, the other half of the same profession, to 100%, even at ma
 yes('the Platewright mends with an Armor Kit to 120%', D.repairTo(PLATE, 'armour') === 120);
 yes('the Haberdasher mends with a Sewing Kit to 120%, the Liverywright to 100%',
     D.repairTo(HABER, 'clothing') === 120 && D.repairTo(LIVERY, 'clothing') === 100);
+yes('a Liverywright with the sister half at master under a master still mends to 100% (Patrick, 4 October)',
+    D.repairTo({ prof: 'tailor', half: 'liverywright', ranks: { liverywright: 'novice', haberdasher: 'master' },
+                 masters: { haberdasher: 0xff000077 } }, 'clothing') === 100);
 yes('anybody else, and somebody with no profession, to 100%',
     D.repairTo(COOK, 'weapon') === 100 && D.repairTo(null, 'armour') === 100 && D.repairTo({}, 'clothing') === 100);
 
-// A repair, end to end.
+// A repair, end to end. The panel's button names the row: base, condition, name.
+function row(baseId, cond, name) { return { baseId: baseId, cond: cond, name: name }; }
 {
   const w = world({ kitsMade: false });
   w.packs[PERSON] = [{ baseId: IRON_SWORD, count: 1, name: 'Iron Sword (40%)' }];
   w.states[PERSON] = EDGE;
-  const r = w.api.repairWithKit(PERSON, 'iron sword');
+  const r = w.api.repairWithKit(PERSON, row(IRON_SWORD, 40, 'Iron Sword'));
   yes('with no kit record in the plugin, a repair is refused and says no kit has been made',
       !r.ok && /no Weapon Kit has been made/.test(r.line) && w.writes === 0);
 }
@@ -251,7 +344,7 @@ yes('anybody else, and somebody with no profession, to 100%',
   const w = world();
   w.packs[PERSON] = [{ baseId: IRON_SWORD, count: 1, name: 'Iron Sword (40%)' }];
   w.states[PERSON] = EDGE;
-  const r = w.api.repairWithKit(PERSON, 'iron sword');
+  const r = w.api.repairWithKit(PERSON, row(IRON_SWORD, 40, 'Iron Sword'));
   yes('without the kit in the pack it is refused, and says who makes them',
       !r.ok && /Weapon Kit, and you have none\. An Edgewright makes them\./.test(r.line) && w.writes === 0);
 }
@@ -260,7 +353,7 @@ yes('anybody else, and somebody with no profession, to 100%',
   w.packs[PERSON] = [{ baseId: IRON_SWORD, count: 1, name: 'Iron Sword (40%)' },
                      { baseId: WEAPON_KIT, count: 2 }];
   w.states[PERSON] = EDGE;
-  const r = w.api.repairWithKit(PERSON, 'Iron Sword');
+  const r = w.api.repairWithKit(PERSON, row(IRON_SWORD, 40, 'Iron Sword'));
   yes('an Edgewright\'s Weapon Kit puts an iron sword at 120%',
       r.ok && r.to === 120 && r.from === 40 && w.count(PERSON, IRON_SWORD, 'Iron Sword (120%)') === 1 &&
       w.count(PERSON, IRON_SWORD, 'Iron Sword (40%)') === 0);
@@ -272,7 +365,7 @@ yes('anybody else, and somebody with no profession, to 100%',
                      { baseId: IRON_SWORD, count: 2 },
                      { baseId: WEAPON_KIT, count: 1 }];
   w.states[PERSON] = PLATE;
-  const r = w.api.repairWithKit(PERSON, 'iron');
+  const r = w.api.repairWithKit(PERSON, row(IRON_SWORD, 40, 'Iron Sword'));
   yes('a Platewright\'s repair with the same kit is 100%, and the sword stacks with the plain ones',
       r.ok && r.to === 100 && w.count(PERSON, IRON_SWORD, '') === 3 && w.packs[PERSON].length === 1);
   yes('and the last kit is gone from the pack', w.count(PERSON, WEAPON_KIT) === 0);
@@ -282,7 +375,7 @@ yes('anybody else, and somebody with no profession, to 100%',
   w.packs[PERSON] = [{ baseId: IRON_SWORD, count: 1, name: 'Iron Sword (120%)' },
                      { baseId: WEAPON_KIT, count: 1 }];
   w.states[PERSON] = COOK;
-  const r = w.api.repairWithKit(PERSON, 'iron sword');
+  const r = w.api.repairWithKit(PERSON, row(IRON_SWORD, 120, 'Iron Sword'));
   yes('a piece at 120% is not pulled down to 100% by somebody else\'s repair, and no kit is used',
       !r.ok && /at 120%/.test(r.line) && w.writes === 0);
 }
@@ -292,8 +385,8 @@ yes('anybody else, and somebody with no profession, to 100%',
                      { baseId: GLASS_SWORD, count: 2, name: 'Glass Sword (10%)' },
                      { baseId: WEAPON_KIT, count: 1 }];
   w.states[PERSON] = EDGE;
-  const r = w.api.repairWithKit(PERSON, 'glass sword');
-  yes('of several, the worst is mended first, one unit of the stack',
+  const r = w.api.repairWithKit(PERSON, row(GLASS_SWORD, 10, 'Glass Sword'));
+  yes('the row the button names is the one mended, one unit of its stack',
       r.ok && r.from === 10 && w.count(PERSON, GLASS_SWORD, 'Glass Sword (10%)') === 1 &&
       w.count(PERSON, GLASS_SWORD, 'Glass Sword (120%)') === 1 &&
       w.count(PERSON, GLASS_SWORD, 'Glass Sword (75%)') === 1);
@@ -304,11 +397,11 @@ yes('anybody else, and somebody with no profession, to 100%',
   w.packs[PERSON] = [{ baseId: EBONY_ARMOR, count: 1, name: 'Ebony Armor (30%)', worn: true },
                      { baseId: WEAPON_KIT, count: 3 }];
   w.states[PERSON] = PLATE;
-  const r = w.api.repairWithKit(PERSON, 'ebony armor');
+  const r = w.api.repairWithKit(PERSON, row(EBONY_ARMOR, 30, 'Ebony Armor'));
   yes('armour is not mended with a Weapon Kit', !r.ok && /Armor Kit, and you have none/.test(r.line) &&
       w.count(PERSON, WEAPON_KIT) === 3);
   w.packs[PERSON].push({ baseId: ARMOR_KIT, count: 1 });
-  const r2 = w.api.repairWithKit(PERSON, 'ebony armor');
+  const r2 = w.api.repairWithKit(PERSON, row(EBONY_ARMOR, 30, 'Ebony Armor'));
   const piece = w.packs[PERSON].filter(function (e) { return e.baseId === EBONY_ARMOR; })[0];
   yes('ebony takes the Armor Kit like iron, and the Platewright puts it at 120%',
       r2.ok && r2.to === 120 && piece && piece.name === 'Ebony Armor (120%)');
@@ -319,7 +412,7 @@ yes('anybody else, and somebody with no profession, to 100%',
   w.packs[PERSON] = [{ baseId: ROBES, count: 1, name: 'Adept Robes (55%)' },
                      { baseId: SEWING_KIT, count: 1 }];
   w.states[PERSON] = LIVERY;
-  const r = w.api.repairWithKit(PERSON, 'robes');
+  const r = w.api.repairWithKit(PERSON, row(ROBES, 55, 'Adept Robes'));
   yes('robes take the Sewing Kit; the Liverywright mends them to 100%',
       r.ok && r.kit === 'clothing' && r.to === 100 && w.count(PERSON, ROBES, '') === 1);
 }
@@ -329,24 +422,67 @@ yes('anybody else, and somebody with no profession, to 100%',
                      { baseId: WEAPON_KIT, count: 1 }];
   w.states[PERSON] = EDGE;
   w.refuseWrite = true;
-  const r = w.api.repairWithKit(PERSON, 'iron sword');
+  const r = w.api.repairWithKit(PERSON, row(IRON_SWORD, 40, 'Iron Sword'));
   yes('a repair that cannot be written takes nothing and says so',
       !r.ok && /Nothing was used/.test(r.line) && w.count(PERSON, WEAPON_KIT) === 1);
   w.refuseWrite = false;
-  const r2 = w.api.repairWithKit(PERSON, 'gold ring');
-  yes('a ring is not something a kit mends', !r2.ok && /not carrying a weapon, armour or clothing called/.test(r2.line));
+  const r2 = w.api.repairWithKit(PERSON, row(GOLD_RING, 100, 'Gold Ring'));
+  yes('a ring is not something a kit mends', !r2.ok && /not in your pack any more/.test(r2.line) && w.writes === 0);
+  const r3 = w.api.repairWithKit(PERSON, row(IRON_SWORD, 55, 'Iron Sword'));
+  yes('a row whose piece has changed since the panel was drawn mends nothing',
+      !r3.ok && /not in your pack any more/.test(r3.line) && w.count(PERSON, WEAPON_KIT) === 1);
 }
+// ---------------------------------------------------------- the panel -----
+
 {
   const w = world();
   w.packs[PERSON] = [{ baseId: IRON_SWORD, count: 2, name: 'Iron Sword (40%)' },
                      { baseId: STEEL_ARMOR, count: 1 },
                      { baseId: ROBES, count: 1, name: 'Adept Robes (120%)' },
+                     { baseId: GLOVES, count: 1, name: 'Fine Gloves (70%)', worn: true },
                      { baseId: GOLD_RING, count: 1 },
                      { baseId: WEAPON_KIT, count: 2 }];
-  const line = w.api.command(PERSON, '');
-  yes('/repair on its own lists what is not at 100%, worst first, and the kits carried',
-      line.indexOf('Iron Sword 40% (2), Adept Robes 120%.') === 0 &&
-      /1 more piece is at 100%/.test(line) && /Kits: 2 Weapon Kits\./.test(line) && line.indexOf('Gold') === -1);
+  w.states[PERSON] = COOK;
+  const said = w.api.panel(PERSON, []);
+  const v = w.shown.length === 1 && w.shown[0].id === PERSON ? w.shown[0].view : null;
+  yes('the inventory key draws the panel on the owner\'s own view, and says nothing in the chat',
+      !!v && v.open === true && said === '' && w.said.length === 0);
+  const names = v ? v.rows.map(function (r) { return r.name + ' ' + r.cond; }) : [];
+  yes('the panel lists what is not at 100%, worst first, and no ring and no sound piece',
+      JSON.stringify(names) === JSON.stringify(['Iron Sword 40', 'Fine Gloves 70', 'Adept Robes 120']));
+  const sword = v && v.rows[0];
+  yes('a row says its count, its kit, what a repair by this person comes out at, and the base to send back',
+      sword.count === 2 && sword.kit === 'Weapon Kit' && sword.to === 100 && sword.can === true &&
+      sword.base === IRON_SWORD.toString(16));
+  yes('a row whose kit is not carried has no button, and one already past the number has none either',
+      v.rows[1].can === false && v.rows[1].worn === true && v.rows[2].can === false && v.rows[2].to === 100);
+  const kits = v ? v.kits : [];
+  yes('the kits are listed, with how many are carried and that the world has them',
+      kits.length === 3 && kits[0].name === 'Weapon Kit' && kits[0].count === 2 && kits[0].made &&
+      kits[1].count === 0 && kits[2].maker === 'Haberdasher');
+}
+{
+  const w = world();
+  w.packs[PERSON] = [{ baseId: IRON_SWORD, count: 1 }, { baseId: STEEL_ARMOR, count: 1 },
+                     { baseId: WEAPON_KIT, count: 1 }];
+  w.states[PERSON] = EDGE;
+  w.api.panel(PERSON, []);
+  const rows = w.shown[0].view.rows;
+  yes('for the half that makes a kit, a sound piece that kit would raise to 120% is a row too',
+      rows.length === 1 && rows[0].name === 'Iron Sword' && rows[0].cond === 100 && rows[0].to === 120 && rows[0].can);
+  const said = w.api.panel(PERSON, ['mend', IRON_SWORD.toString(16), '100', 'Iron', 'Sword']);
+  yes('the button mends that row, says so in the chat, and draws the panel again',
+      /Iron Sword is at 120% now/.test(said) && w.count(PERSON, IRON_SWORD, 'Iron Sword (120%)') === 1 &&
+      w.count(PERSON, WEAPON_KIT) === 0 && w.shown.length === 2 && w.shown[1].view.rows.length === 1 &&
+      w.shown[1].view.rows[0].cond === 120 && w.shown[1].view.rows[0].can === false);
+}
+{
+  const w = world({ kitsMade: false });
+  w.packs[PERSON] = [{ baseId: IRON_SWORD, count: 1, name: 'Iron Sword (40%)' }];
+  w.api.panel(PERSON, []);
+  const v = w.shown[0].view;
+  yes('on a server whose plugin has no kits, the panel knows none has been made',
+      v.kits.every(function (k) { return !k.made && k.count === 0; }) && v.rows[0].can === false);
 }
 
 // ---------------------------------------------------------- the dull clock --
@@ -473,8 +609,9 @@ function w0BreakChance() { return D.BREAK_CHANCE; }
   w.packs[PERSON] = [{ baseId: STEEL_ARMOR, count: 1, name: 'Steel Armor (1%)', worn: true },
                      { baseId: ROBES, count: 1, name: 'Adept Robes (0%)' }];
   w.api.hit(PERSON, NPC, IRON_SWORD);
-  yes('a worn piece above 0% never breaks, and a piece at 0% in the pack and not worn never rolls',
-      w.writes === 0 && w.rolls.length === 4);
+  yes('a worn piece above 0% never breaks, it loses 1%; and a piece at 0% in the pack and not worn never rolls',
+      w.count(PERSON, STEEL_ARMOR, 'Steel Armor (0%)') === 1 && w.count(PERSON, ROBES, 'Adept Robes (0%)') === 1 &&
+      w.writes === 1 && w.rolls.length === 4);
 }
 {
   const w = world({ rolls: [0, 0] });
@@ -514,6 +651,114 @@ function w0BreakChance() { return D.BREAK_CHANCE; }
   w.api.onHit(PERSON, { type: 'form', desc: 'ff000059' }, { type: 'espm', desc: 'iron-sword' });
   yes('a hit as the engine sends it, the aggressor and weapon as descriptors, is read the same way',
       w.count(OTHER, IRON_SWORD) === 0);
+}
+
+// ---------------------------------------------------------- wear per hit --
+
+yes('the page and the block agree: worn gear loses 1% a hit',
+    D.WEAR_PER_HIT === 1 && /loses 1% of its condition on each hit that reaches it/.test(page));
+{
+  const w = world();
+  w.packs[PERSON] = [{ baseId: STEEL_ARMOR, count: 1, worn: true },
+                     { baseId: GLOVES, count: 1, name: 'Fine Gloves (120%)', worn: true },
+                     { baseId: IRON_SWORD, count: 1, name: 'Iron Sword (50%)', worn: true },
+                     { baseId: ROBES, count: 1, name: 'Adept Robes (60%)' },
+                     { baseId: GOLD_RING, count: 1, worn: true }];
+  w.api.hit(PERSON, NPC, IRON_SWORD);
+  yes('a hit takes 1% off the armour and the clothing the person hit wears, 120% included',
+      w.count(PERSON, STEEL_ARMOR, 'Steel Armor (99%)') === 1 && w.count(PERSON, GLOVES, 'Fine Gloves (119%)') === 1);
+  yes('and not off their weapon, nor what they carry and do not wear, nor a ring',
+      w.count(PERSON, IRON_SWORD, 'Iron Sword (50%)') === 1 && w.count(PERSON, ROBES, 'Adept Robes (60%)') === 1 &&
+      w.count(PERSON, GOLD_RING, '') === 1);
+  yes('all in one write, and nothing said in the chat for a scratch', w.writes === 1 && w.said.length === 0);
+  yes('worn pieces stay worn when their number changes',
+      w.packs[PERSON].filter(function (e) { return e.baseId === STEEL_ARMOR; })[0].worn === true);
+}
+{
+  const w = world();
+  w.packs[PERSON] = [{ baseId: IRON_SWORD, count: 1, name: 'Iron Sword (50%)', worn: true },
+                     { baseId: IRON_SWORD, count: 1, name: 'Iron Sword (50%)', wornLeft: true }];
+  w.packs[OTHER] = [];
+  w.api.hit(OTHER, PERSON, IRON_SWORD);
+  yes('the weapon a hit is landed with loses 1%, one of two identical swords and not both',
+      w.count(PERSON, IRON_SWORD, 'Iron Sword (49%)') === 1 && w.count(PERSON, IRON_SWORD, 'Iron Sword (50%)') === 1 &&
+      w.packs[PERSON].filter(function (e) { return e.name === 'Iron Sword (49%)'; })[0].worn === true);
+  w.api.hit(OTHER, PERSON, 0);
+  w.api.hit(OTHER, PERSON, GOLD_RING);
+  yes('a fist or a spell wears nothing of the one who threw it', w.writes === 1);
+}
+{
+  const w = world();
+  w.packs[PERSON] = [{ baseId: GLASS_SWORD, count: 1, name: 'Glass Sword (80%)', worn: true },
+                     { baseId: LEATHER, count: 1, worn: true }];
+  w.api.hit(PERSON, NPC, IRON_SWORD, true);
+  yes('a blocked hit wears the weapon that blocked it, as well as what the person hit wears',
+      w.count(PERSON, GLASS_SWORD, 'Glass Sword (79%)') === 1 && w.count(PERSON, LEATHER, 'Armor Leather Cuirass (99%)') === 1);
+  w.api.hit(PERSON, NPC, IRON_SWORD, false);
+  yes('a hit that was not blocked does not wear the weapon of the person hit',
+      w.count(PERSON, GLASS_SWORD, 'Glass Sword (79%)') === 1 && w.count(PERSON, LEATHER, 'Armor Leather Cuirass (98%)') === 1);
+}
+{
+  const w = world();
+  w.packs[PERSON] = [{ baseId: GLASS_SWORD, count: 1, name: 'Glass Sword (80%)', worn: true },
+                     { baseId: SHIELD, count: 1, worn: true }];
+  w.api.hit(PERSON, NPC, IRON_SWORD, true);
+  yes('with a shield worn, the shield took the block: it wears, and the sword does not',
+      w.count(PERSON, SHIELD, 'Iron Shield (99%)') === 1 && w.count(PERSON, GLASS_SWORD, 'Glass Sword (80%)') === 1);
+}
+{
+  const w = world({ rolls: [0.5] });
+  w.packs[PERSON] = [{ baseId: STEEL_ARMOR, count: 1, name: 'Steel Armor (1%)', worn: true }];
+  w.api.hit(PERSON, NPC, 0);
+  w.api.hit(PERSON, NPC, 0);
+  yes('a piece worn down to 0% stops there, and the next hit rolls the break chance instead',
+      w.count(PERSON, STEEL_ARMOR, 'Steel Armor (0%)') === 1 && w.rolls.length === 0);
+}
+{
+  const w = world({ rolls: [0.01] });
+  w.packs[PERSON] = [{ baseId: GLASS_SWORD, count: 1, name: 'Glass Sword (0%)', worn: true }];
+  w.api.hit(PERSON, NPC, IRON_SWORD, true);
+  yes('a weapon at 0% that blocks a hit rolls the break chance', w.count(PERSON, GLASS_SWORD) === 0);
+}
+{
+  const w = world();
+  w.packs[PERSON] = [{ baseId: STEEL_ARMOR, count: 1, name: 'Steel Armor (84%)', worn: true }];
+  // The client still names it as it was when it reached the pack: its
+  // namesEqual drops the "(...)" and never takes a new number in.
+  w.worn[PERSON] = [{ baseId: STEEL_ARMOR, count: 1, worn: true, name: 'Steel Armor (90%)' }];
+  w.api.hit(PERSON, NPC, 0);
+  yes('the equipment the client sends, with the old number on the name, is still matched to the piece',
+      w.count(PERSON, STEEL_ARMOR, 'Steel Armor (83%)') === 1);
+  w.packs[PERSON] = [{ baseId: STEEL_ARMOR, count: 1, worn: true }];
+  w.worn[PERSON] = [{ baseId: STEEL_ARMOR, count: 1, worn: true, name: 'Steel Armor' }];
+  w.api.hit(PERSON, NPC, 0);
+  yes('and a plain piece the client names by its own name is the same piece',
+      w.count(PERSON, STEEL_ARMOR, 'Steel Armor (99%)') === 1);
+  w.packs[PERSON] = [{ baseId: STEEL_ARMOR, count: 1, worn: true, name: 'Shard of Winter (50%)' }];
+  w.worn[PERSON] = [{ baseId: STEEL_ARMOR, count: 1, worn: true, name: 'Steel Armor' }];
+  w.api.hit(PERSON, NPC, 0);
+  yes('but a piece somebody named is not mistaken for a plain one', w.count(PERSON, STEEL_ARMOR, 'Shard of Winter (50%)') === 1);
+}
+{
+  const w = world();
+  w.packs[NPC] = [{ baseId: STEEL_ARMOR, count: 1, worn: true }];
+  w.api.hit(NPC, PERSON, 0, true);
+  yes('nothing an NPC wears wears down', w.writes === 0);
+}
+{
+  const w = world();
+  w.packs[PERSON] = [{ baseId: STEEL_ARMOR, count: 1, worn: true }];
+  w.refuseWrite = true;
+  w.api.hit(PERSON, NPC, 0);
+  yes('a hit whose wear cannot be written says and logs nothing', w.said.length === 0 && w.logs.length === 0);
+}
+{
+  const w = world();
+  w.packs[OTHER] = [{ baseId: IRON_SWORD, count: 1, worn: true }];
+  w.packs[PERSON] = [{ baseId: IRON_SWORD, count: 1, worn: true }];
+  w.api.onHit(PERSON, { type: 'form', desc: 'ff000059' }, { type: 'espm', desc: 'iron-sword' }, true);
+  yes('the engine\'s blocked flag is read off the hit as it arrives',
+      w.count(OTHER, IRON_SWORD, 'Iron Sword (99%)') === 1 && w.count(PERSON, IRON_SWORD, 'Iron Sword (99%)') === 1);
 }
 
 // ---------------------------------------------------------- a drop ---------
@@ -586,9 +831,9 @@ yes('a press reaches the durability block, after the box is remembered',
 yes('a drop reaches it, and the drop watcher still returns nothing',
     /wear\.dropped\(actorId, Number\(baseId\) \|\| 0, count\)/.test(onDrop) && !/\breturn\b/.test(onDrop));
 const onHitLines = gm.split('\n').filter(function (l) { return /^mp\['onPapyrusEvent:OnHit'\] = guard\('onPapyrusEvent:OnHit', function/.test(l); });
-yes('a hit reaches it through the one OnHit handler, under guard(), beside the warrior maneuvers',
+yes('a hit reaches it through the one OnHit handler, under guard(), beside the warrior maneuvers, with the blocked flag',
     onHitLines.length === 1 &&
-    /wear\.onHit\(targetId, aggressor, source\)/.test(between(code, "mp['onPapyrusEvent:OnHit']", '\n});')));
+    /wear\.onHit\(targetId, aggressor, source, blocked\)/.test(between(code, "mp['onPapyrusEvent:OnHit']", '\n});')));
 const temper = recipeless.indexOf('if (tempering) {');
 yes('a temper at the wheel or the armour table is refused before anything is credited',
     temper !== -1 && /if \(tempering\) \{[\s\S]*?return false;\s*\}/.test(recipeless) &&
@@ -597,9 +842,43 @@ const wordsLine = /^const WORDS = (\[[\s\S]*?\]);$/m.exec(gm);
 const playerLine = /^const PLAYER_WORDS = (\[[\s\S]*?\]);$/m.exec(gm);
 let WORDS = [], PLAYER = [];
 try { WORDS = new Function('return ' + wordsLine[1])(); PLAYER = new Function('return ' + playerLine[1])(); } catch (e) { }
-yes('/repair is a word the server answers, and everybody is told about it',
-    WORDS.indexOf('/repair') !== -1 && PLAYER.indexOf('/repair') !== -1 &&
-    /if \(word === '\/repair'\) \{[\s\S]*?wear\.command\(actorId, parts\.slice\(1\)\.join\(' '\)\)/.test(code));
+yes('/repair is a word the server answers for the key and the panel, and nobody is told about it',
+    WORDS.indexOf('/repair') !== -1 && PLAYER.indexOf('/repair') === -1 &&
+    /if \(word === '\/repair'\) \{[\s\S]*?wear\.panel\(actorId, parts\.slice\(1\)\)/.test(code));
+{
+  // Every string literal in the gamemode that a person could read: none of
+  // them names /repair. The WORDS list and the router compare against it.
+  const lits = (gm.match(/'(?:[^'\\\n]|\\.)*'/g) || []).filter(function (l) { return l.indexOf('/repair') !== -1; });
+  yes('no line a person reads tells them to type /repair', lits.length === 2 &&
+      lits.every(function (l) { return l === "'/repair'"; }));
+}
+{
+  const front = fs.readFileSync(path.join(REPO_DIR, 'game', 'plugins', 'thornswood-front.js'), 'utf8');
+  const panelPage = fs.readFileSync(path.join(REPO_DIR, 'game', 'ui', 'thornswood-repair.js'), 'utf8');
+  const kitItems = /const KIT_ITEMS = \[(0x[0-9a-f]+), (0x[0-9a-f]+), (0x[0-9a-f]+)\];/.exec(front);
+  yes('the client asks for the same three kit records the server names',
+      !!kitItems && ['weapon', 'armour', 'clothing'].every(function (k, i) {
+        return parseInt(kitItems[i + 1], 16) === parseInt(KITS[k].item.split(':')[0], 16);
+      }) && /const KIT_FILE = 'Thornswood-Content\.esp';/.test(front));
+  yes('the inventory key sends /repair, shuts the inventory and is armed only with the inventory open',
+      /if \(e\.code === MOLD_KEY && repairPress\(\)\) \{ return; \}/.test(front) &&
+      /function repairPress\(\) \{[\s\S]*?isMenuOpen\(INVENTORY_MENU\)[\s\S]*?closeMenu\(INVENTORY_MENU\)[\s\S]*?tellServer\('\/repair'\)/.test(front));
+  yes('the panel is loaded, claims the keyboard while it is open, and the cap can close it',
+      front.indexOf("'thornswood-repair.js'") !== -1 && /repair: 'thornswoodRepair'/.test(front) &&
+      /'repair:opened'\) \{ T\.claimFocus\('repair', true\)/.test(front) &&
+      /'repair:closed'\) \{ T\.claimFocus\('repair', false\)/.test(front));
+  yes('the panel\'s button sends the row back as /repair mend, and the server publishes the view the page reads',
+      /net\('\/repair mend ' \+ row\.base \+ ' ' \+ row\.cond \+ ' ' \+ row\.name\)/.test(panelPage) &&
+      /window\.thornswoodRepair = \{/.test(panelPage) &&
+      /var PANEL_PROPERTY = 'thornswoodRepairView';/.test(block) &&
+      /window\.thornswoodRepair\.setData\(d\)/.test(block));
+}
+{
+  const ap = fs.readFileSync(path.join(REPO_DIR, 'docs', 'systems', 'apprenticeship.md'), 'utf8').split(CR).join('');
+  yes('the apprenticeship page agrees: the sister half never repairs to 120%, at any rank',
+      /The\s+sister\s+half\s+never\s+gives\s+it,\s+at\s+any\s+rank/.test(ap) && !/taken the sister half\s+on far enough to be that half/.test(ap) &&
+      /The\s+sister\s+half\s+is\s+never\s+it,\s+at\s+any\s+rank/.test(page));
+}
 yes('the cut list still holds the temper rows, so an event can bring one back',
     /Tempering rows, the grindstone and the armour table, are in this file/.test(
       fs.readFileSync(path.join(REPO_DIR, 'docs', 'systems', 'cut-items.md'), 'utf8')));
