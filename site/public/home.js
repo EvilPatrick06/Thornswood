@@ -18,17 +18,34 @@ try {
   }
 } catch (e) { }
 
+var bannerVideo = document.querySelector('video.art'), bannerMotion = document.getElementById('bannerMotion');
+if (bannerVideo && bannerMotion) {
+  bannerMotion.hidden = false;
+  function motionLabel() { bannerMotion.textContent = bannerVideo.paused ? 'Play background animation' : 'Pause background animation'; }
+  bannerVideo.addEventListener('play', motionLabel);
+  bannerVideo.addEventListener('pause', motionLabel);
+  bannerMotion.addEventListener('click', function () {
+    if (bannerVideo.paused) bannerVideo.play().catch(motionLabel);
+    else bannerVideo.pause();
+  });
+  if (!(m && m.matches)) bannerVideo.play().catch(motionLabel);
+  motionLabel();
+}
+
 var burger = document.getElementById('burger'), nav = document.getElementById('nav');
 function narrow(){ return window.matchMedia('(max-width:900px)').matches; }
-function shut(){ if (narrow()) { nav.hidden = true; burger.setAttribute('aria-expanded','false'); } else { nav.hidden = false; } }
+function shut(){ if (narrow()) { nav.hidden = true; burger.setAttribute('aria-expanded','false'); burger.setAttribute('aria-label','Open menu'); } else { nav.hidden = false; } }
 shut();
 window.addEventListener('resize', shut);
 burger.onclick = function(){
   nav.hidden = !nav.hidden;
   burger.setAttribute('aria-expanded', String(!nav.hidden));
+  burger.setAttribute('aria-label', nav.hidden ? 'Open menu' : 'Close menu');
 };
 document.addEventListener('keydown', function (e) {
-  if (e.key === 'Escape' && burger.getAttribute('aria-expanded') === 'true') shut();
+  if (e.key === 'Escape' && burger.getAttribute('aria-expanded') === 'true') {
+    shut(); if (burger.focus) burger.focus();
+  }
 });
 Array.prototype.forEach.call(nav.querySelectorAll('a'), function(a){ a.onclick = shut; });
 
@@ -91,12 +108,58 @@ function jumpToHash() {
   else setTimeout(go, 60);
 }
 
+// A deadline covers the response body too. Never retry a submission silently.
+function request(url, options) {
+  options = options || {};
+  var ctl = window.AbortController && !options.signal ? new AbortController() : null;
+  var opts = Object.assign({}, options);
+  if (ctl) opts.signal = ctl.signal;
+  var duration = options.body && typeof options.body.size === 'number' ? 120000 : 15000;
+  return new Promise(function (resolve, reject) {
+    var timer = setTimeout(function () {
+      if (ctl) ctl.abort();
+      reject(new Error('The site did not answer in time.'));
+    }, duration);
+    fetch(url, opts).then(function (r) {
+      return r.json().catch(function (e) { if (!r.ok) return {}; throw e; }).then(function (data) {
+        if (!r.ok && (!opts.method || opts.method === 'GET')) throw new Error('The site could not load this information.');
+        return {ok:r.ok, status:r.status, json:function () { return Promise.resolve(data); }};
+      });
+    }).then(function (r) { clearTimeout(timer); resolve(r); }, function (e) { clearTimeout(timer); reject(e); });
+  });
+}
+// Reduce large still pictures before uploading. Animated GIFs stay intact.
+function preparePicture(file) {
+  if (file.size > 25 * 1024 * 1024) return Promise.reject(new Error('Pictures must be 25 MB or smaller.'));
+  if (file.size <= 2 * 1024 * 1024 || /\.gif$/i.test(file.name) ||
+      !window.createImageBitmap || !window.File) return Promise.resolve(file);
+  return createImageBitmap(file).then(function (image) {
+    var scale = Math.min(1, 2560 / Math.max(image.width, image.height));
+    var canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.width * scale));
+    canvas.height = Math.max(1, Math.round(image.height * scale));
+    var context = canvas.getContext('2d');
+    if (!context) { image.close(); return file; }
+    context.drawImage(image, 0, 0, canvas.width, canvas.height); image.close();
+    return new Promise(function (resolve) {
+      canvas.toBlob(function (blob) {
+        resolve(blob && blob.type === 'image/webp' && blob.size < file.size
+          ? new File([blob], file.name.replace(/\.[^.]+$/, '') + '.webp', {type:'image/webp'}) : file);
+      }, 'image/webp', 0.85);
+    });
+  }).catch(function () { return file; });
+}
 function show(html) {
+  var headingSeen = false;
+  html = html.replace(/<h1\b([^>]*)>([\s\S]*?)<\/h1>/gi, function (all, attrs, text) {
+    if (!headingSeen) { headingSeen = true; return all; }
+    return '<h2' + attrs + '>' + text + '</h2>';
+  });
   document.getElementById('landing').hidden = true;
   var page = document.getElementById('page');
   page.hidden = false;
   document.getElementById('pagebody').innerHTML = html;
-  document.title = (document.querySelector('#pagebody h1') || {}).textContent
+  document.title = BLURB[here] ? BLURB[here][0] + ' \u00b7 Thornswood' : (document.querySelector('#pagebody h1') || {}).textContent
     ? document.querySelector('#pagebody h1').textContent + ' \u00b7 Thornswood'
     : 'Thornswood';
 }
@@ -152,7 +215,7 @@ if (AGE_PATHS[here] && !ageOk()) {
      has not been restarted since this file went up. html is the server's
      render; one that old sends only the markdown, and the words are still
      worth showing unformatted for the minute that lasts. */
-  fetch('/api/page/' + here.slice(1))
+  request('/api/page/' + here.slice(1))
     .then(function (r) { if (!r.ok) throw 0; return r.json(); })
     .then(function (d) {
       show(d.html || '<pre class="pre-wrap">' + esc(d.md) + '</pre>');
@@ -165,7 +228,7 @@ if (AGE_PATHS[here] && !ageOk()) {
     })
     .catch(function () { show('<h1>Not here</h1><p>That page does not exist yet.</p>'); });
 } else if (here === '/roadmap') {
-  fetch('/api/roadmap').then(function (r) { return r.json(); }).then(function (b) {
+  request('/api/roadmap').then(function (r) { return r.json(); }).then(function (b) {
     var out = '<h1>Roadmap</h1>';
     // Rendered by the server, like the written pages.
     if (b.introHtml) out += b.introHtml;
@@ -196,10 +259,10 @@ if (AGE_PATHS[here] && !ageOk()) {
     show(out);
   }).catch(function () { show('<h1>Roadmap</h1><p>Could not load it.</p>'); });
 } else if (here === '/news') {
-  fetch('/api/releases').then(function (r) { return r.json(); }).then(function (d) {
+  request('/api/releases').then(function (r) { return r.json(); }).then(function (d) {
     var out = '<h1>Every release</h1>';
     if (d.launcher) out += '<p>Launcher <b>' + esc(d.launcher) + '</b> is current.</p>';
-    if (!(d.news || []).length) out += '<p>Nothing shipped yet.</p>';
+    if (!(d.news || []).length) out += '<p>No release notes are available yet.</p>';
     (d.news || []).forEach(function (n) {
       /* An entry whose details were written as one line came through as a
          string, .map threw on it, and because the catch below sits on the same
@@ -207,7 +270,7 @@ if (AGE_PATHS[here] && !ageOk()) {
          loaded fine. Take a list or a line. */
       var det = Array.isArray(n.details) ? n.details : (n.details ? [n.details] : []);
       out += '<div class="rel"><div class="when">' + esc(n.date || '') + '</div>' +
-             '<h3>' + esc(n.title || '') + '</h3>' +
+             '<h2>' + esc(n.title || '') + '</h2>' +
              (n.body ? '<p>' + esc(n.body) + '</p>' : '') +
              (det.length
                ? '<ul>' + det.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') +
@@ -226,11 +289,11 @@ if (AGE_PATHS[here] && !ageOk()) {
      asking (#1096). They used to wait for both, so a signed in visitor saw
      nothing while the site asked Discord who they were. */
   var galData = null, galWho = null;
-  fetch('/api/gallery/who', { credentials: 'same-origin' })
+  request('/api/gallery/who', { credentials: 'same-origin' })
     .then(function (r) { return r.json(); })
     .catch(function () { return {}; })
     .then(function (w) { galWho = w || {}; if (galData) drawGallery(); });
-  fetch('/api/public').then(function (r) { return r.json(); }).then(function (d) {
+  request('/api/public?galleryLimit=24').then(function (r) { return r.json(); }).then(function (d) {
     galData = d || {};
     drawGallery();
   }).catch(function () { show('<h1>From the world</h1><p>Could not load it.</p>'); });
@@ -245,7 +308,7 @@ if (AGE_PATHS[here] && !ageOk()) {
     if (who.canSubmit) {
       out += '<div class="gal-box" id="galSubmit">' +
         '<h2>Send a picture</h2>' +
-        '<p class="hint">png, jpg, webp or gif, up to 25 MB each. They go to the queue, not live.</p>' +
+        '<p class="hint">png, jpg, webp or gif, up to 25 MB each. Large still pictures are reduced to at most 2560 pixels and converted to WebP when that makes them smaller. Animated GIFs stay unchanged. They go to the queue, not live.</p>' +
         '<div class="form">' +
         '<div class="gal-field">' +
         '<span class="gal-label">Pictures</span>' +
@@ -266,8 +329,10 @@ if (AGE_PATHS[here] && !ageOk()) {
         '<label class="gal-label" for="galNote">Note<span class="gal-opt">optional</span></label>' +
         '<input type="text" id="galNote" maxlength="300" placeholder="a short note for staff">' +
         '</div>' +
-        '<div><button class="btn first" type="button" id="galSend">Send it</button></div>' +
-        '<p class="said" id="galSaid" hidden></p>' +
+        '<p class="hint">Submit only pictures you have permission to share. Staff review them before publication. ' +
+        'Avoid personal information. <a href="/terms">Submission terms</a> and <a href="/privacy">privacy details</a>.</p>' +
+        '<div><button class="btn first" type="button" id="galSend">Send pictures</button></div>' +
+        '<p class="said" id="galSaid" role="status" aria-live="polite" hidden></p>' +
         '</div></div>';
     } else if (waiting) {
       out += '<div class="gal-box"><p class="hint">Checking who you are.</p></div>';
@@ -284,13 +349,14 @@ if (AGE_PATHS[here] && !ageOk()) {
         '">Sign in with Discord</a></p></div>';
     }
 
-    if (!shots.length) {
-      out += '<p class="faint-mt-28">Nothing here yet. The first ' +
-             'pictures come from the first week.</p>';
-    } else {
-      out += '<div class="gallery">' + shots.map(function (g) {
-        var card = '<div class="shot-card"><div class="shot"><img src="' + esc(g.url) +
-          '" alt="' + esc(g.by || 'Gallery image') + '" loading="lazy"></div>';
+    function galleryCards(items) {
+      return items.map(function (g) {
+        var description = esc(g.alt || 'Skyrim scene shared by ' + (g.by || 'the Thornswood community'));
+        var recording = /\.(mp4|webm)$/i.test(g.name || '');
+        var media = recording
+          ? '<video controls preload="metadata" aria-label="' + description + '"><source src="' + esc(g.url) + '"></video>'
+          : '<img src="' + esc(g.url) + '" alt="' + description + '" loading="lazy">';
+        var card = '<div class="shot-card"><div class="shot">' + media + '</div>';
         if (g.by) card += '<div class="also faintly">' + esc(g.by) + '</div>';
         // Per-image report for live public shots only. No staff inbox here.
         if (who.signed || who.canSubmit) {
@@ -300,9 +366,35 @@ if (AGE_PATHS[here] && !ageOk()) {
         }
         card += '</div>';
         return card;
-      }).join('') + '</div>';
+      }).join('');
+    }
+    if (!shots.length) out += '<p class="faint-mt-28">No approved pictures are available yet.</p>';
+    out += '<div class="gallery" id="galleryCards">' + galleryCards(shots) + '</div>';
+    if (d.galleryNext !== null && d.galleryNext !== undefined) {
+      out += '<p><button class="btn ghost" type="button" id="galMore">Load more pictures</button></p>' +
+        '<p id="galMoreStatus" role="status" aria-live="polite"></p>';
     }
     show(out);
+    var more = document.getElementById('galMore');
+    if (more && d.galleryNext !== null && d.galleryNext !== undefined) more.addEventListener('click', function () {
+      if (more.disabled) return;
+      more.disabled = true; more.textContent = 'Loading pictures';
+      request('/api/gallery?offset=' + d.galleryNext).then(function (r) { return r.json(); }).then(function (page) {
+        galData.gallery = galData.gallery.concat(page.gallery || []);
+        galData.galleryNext = page.next;
+        document.getElementById('galleryCards').insertAdjacentHTML('beforeend', galleryCards(page.gallery || []));
+        bindGalleryReports();
+        more.disabled = false; more.textContent = 'Load more pictures';
+        var status = document.getElementById('galMoreStatus');
+        status.textContent = 'Loaded ' + (page.gallery || []).length + ' more pictures.';
+        if (page.next === null || page.next === undefined) {
+          more.hidden = true; status.tabIndex = -1; status.focus();
+        }
+      }).catch(function () {
+        more.disabled = false; more.textContent = 'Load more pictures';
+        document.getElementById('galMoreStatus').textContent = 'Could not load more pictures. Try again.';
+      });
+    });
 
     function said(msg, bad) {
       var el = document.getElementById('galSaid');
@@ -441,6 +533,7 @@ if (AGE_PATHS[here] && !ageOk()) {
     var send = document.getElementById('galSend');
     if (send) {
       send.addEventListener('click', function () {
+        if (send.disabled) return;
         var list = picked.length ? picked.slice() :
           (f && f.files ? Array.prototype.slice.call(f.files) : []);
         if (!list.length) { said('Choose a picture first.', true); return; }
@@ -461,16 +554,17 @@ if (AGE_PATHS[here] && !ageOk()) {
               if (f) f.value = '';
               showPicked();
             }
-            send.disabled = false; send.textContent = 'Send it';
+            send.disabled = false; send.textContent = 'Send pictures';
             return;
           }
-          var file = list[i++];
-          var q = '/api/gallery/submit?name=' + encodeURIComponent(file.name) +
+          preparePicture(list[i++]).then(function (file) {
+            var q = '/api/gallery/submit?name=' + encodeURIComponent(file.name) +
             (by ? '&by=' + encodeURIComponent(by) : '') +
             (note ? '&note=' + encodeURIComponent(note) : '');
-          fetch(q, { method: 'POST', credentials: 'same-origin',
+            return request(q, { method: 'POST', credentials: 'same-origin',
             headers: { 'content-type': file.type || 'application/octet-stream' },
-            body: file })
+            body: file });
+          })
             .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
             .then(function (x) {
               if (x.ok && x.j && x.j.ok) { names.push(x.j.name); next(); }
@@ -480,8 +574,8 @@ if (AGE_PATHS[here] && !ageOk()) {
                 next();
               }
             })
-            .catch(function () {
-              fail = 'Could not send it.';
+            .catch(function (e) {
+              fail = e.message || 'Could not send it.';
               if (names.length) fail = 'Sent ' + names.length + ', then stopped: ' + fail;
               next();
             });
@@ -490,12 +584,14 @@ if (AGE_PATHS[here] && !ageOk()) {
       });
     }
 
-    document.querySelectorAll('[data-galreport]').forEach(function (b) {
+    function bindGalleryReports() {
+    document.querySelectorAll('[data-galreport]:not([data-report-bound])').forEach(function (b) {
+      b.setAttribute('data-report-bound', 'true');
       b.addEventListener('click', function () {
         var why = window.prompt('Why are you reporting this picture?', '');
         if (why === null) return;
         b.disabled = true;
-        fetch('/api/gallery/report', {
+        request('/api/gallery/report', {
           method: 'POST', credentials: 'same-origin',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ name: b.getAttribute('data-galreport'), why: why })
@@ -507,13 +603,15 @@ if (AGE_PATHS[here] && !ageOk()) {
           .catch(function () { b.disabled = false; window.alert('Could not report it.'); });
       });
     });
+    }
+    bindGalleryReports();
   }
 } else if (here === '/downloads') {
   /* This is the How to join section off the front page. It lived there and on
      this page in two different shapes, which meant two places to keep right
      and a front page that would not end. It is one place now, and this is the
      page the front page points at. */
-  fetch('/api/public').then(function (r) { return r.json(); }).then(function (d) {
+  request('/api/public?galleryLimit=24').then(function (r) { return r.json(); }).then(function (d) {
     var files = d.files || [];
 
     // The stamp under the download button, read the way a clock is read.
@@ -749,8 +847,11 @@ if (AGE_PATHS[here] && !ageOk()) {
       'can come back to you about it. <a href="/auth/discord?back=/report">Sign in with ' +
       'Discord</a>. In the game, /report does the same.</p>' +
       '<p id="rNo" class="hint" hidden></p></div>' +
-    '<div><button class="btn first" type="submit">Send it</button></div>' +
-    '<p id="rSaid" class="said" hidden></p>' +
+    '<p class="hint">We use what you send to investigate and respond. Your Discord name is optional for game faults and ideas. ' +
+      'Do not send passwords, access tokens, payment details, or unrelated personal information. ' +
+      '<a href="/privacy">How reports are stored and used</a>. Staff work in their own time; there is no guaranteed response time.</p>' +
+    '<div><button class="btn first" type="submit">Send report</button></div>' +
+    '<p id="rSaid" class="said" role="status" aria-live="polite" hidden></p>' +
     '</form>');
   var form = document.getElementById('rep');
   /* Who is asking, told apart (#1097): not signed in gets the sign in link;
@@ -759,7 +860,7 @@ if (AGE_PATHS[here] && !ageOk()) {
      link, because they are signed in already. letIn is null until the site
      answers, and the button waits for it. */
   var letIn = null, personSays = '', needsSignIn = true;
-  fetch('/api/gallery/who', { credentials: 'same-origin' })
+  request('/api/gallery/who', { credentials: 'same-origin' })
     .then(function (r) { return r.json(); })
     .then(function (d) {
       d = d || {};
@@ -801,12 +902,12 @@ if (AGE_PATHS[here] && !ageOk()) {
       clearTimeout(timer);
       said.hidden = false;
       said.textContent = text;
-      btn.textContent = 'Send it';
+      btn.textContent = 'Send report';
       btn.disabled = false;
       personBox();
     }
     var aboutPerson = document.getElementById('rPerson').checked;
-    fetch('/api/report', {
+    request('/api/report', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin', signal: ctl ? ctl.signal : undefined,
       body: JSON.stringify({
@@ -845,7 +946,7 @@ if (AGE_PATHS[here] && !ageOk()) {
 
 /* The three live things on the front page, all of them honest about being
    empty rather than filled with something invented. */
-fetch('/api/public', { credentials:'same-origin' })
+request('/api/public?galleryLimit=24', { credentials:'same-origin' })
   .then(function(r){ return r.json(); })
   .then(function(d){
     /* Both Patreon links are written into the markup, so they work before
@@ -926,14 +1027,14 @@ fetch('/api/public', { credentials:'same-origin' })
     var show = document.getElementById('galleryShow');
     var dots = document.getElementById('galleryDots');
     var band = document.getElementById('gallerySection');
-    var shots = d.gallery || [];
+    var shots = (d.gallery || []).filter(function (shot) { return !/\.(mp4|webm)$/i.test(shot.name || ''); });
     if (show && band && shots.length) {
       band.hidden = false;
       var i = 0;
       shots.forEach(function (s, n) {
         var img = document.createElement('img');
         img.src = s.url;
-        img.alt = s.by || 'Gallery image';
+        img.alt = s.alt || 'Skyrim scene shared by ' + (s.by || 'the Thornswood community');
         img.loading = n === 0 ? 'eager' : 'lazy';
         if (n === 0) img.className = 'on';
         show.appendChild(img);
