@@ -26644,26 +26644,50 @@ function markWoven(actorId, outDesc, name, n) {
   return 0;
 }
 
+/*
+  WHEN THE OUTPUT IS IN THE PACK. The gamemode is asked before the engine does
+  anything: CraftEvent::Fire runs mp.onCraft, and only when it was not refused
+  does OnFireSuccess take the inputs and add the output, in the same
+  server.tick() call (the fork's CraftEvent.cpp, and index.ts, which awaits a
+  timer between ticks). So a timer set here runs after the engine has finished,
+  whatever its length, and nothing about it is a race; 0 says that.
+
+  What the timer cannot assume is that the engine succeeded. RemoveItems throws
+  when the server does not hold what the client said went in ("Source
+  inventory doesn't have enough", seen on the dev server on 23 September),
+  after the gamemode already said yes. So the count of the output is taken now,
+  and the second batch and the mark are given only if the craft's own n
+  arrived. Otherwise a craft the engine refused would hand a Grand Chef a free
+  batch, or name a garment the master did not make.
+*/
+const MASTER_CRAFT_AFTER_MS = 0;
+
 /** After an allowed craft: Grand Chef's second batch and Master Weaver's mark. */
 function masterCraft(actorId, row, count) {
   if (!row || typeof row !== 'object' || !row.out) { return; }
   const n = Number(count) > 0 ? Math.floor(Number(count)) : (Number(row.makes) || 1);
-  if (row.owner === 'Cook' && holdsPerk(actorId, 'grandchef')) {
-    setTimeout(function () {
+  const chef = row.owner === 'Cook' && holdsPerk(actorId, 'grandchef');
+  const weaver = row.owner === 'Tailor' && row.type === 'ARMO' && holdsPerk(actorId, 'masterweaver');
+  if (!chef && !weaver) { return; }
+  const before = packCount(actorId, row.out);
+  setTimeout(function () {
+    if (packCount(actorId, row.out) < before + n) {
+      log(actorId.toString(16), 'made no', row.name, 'after all (the engine refused the craft), so no master work is added');
+      return;
+    }
+    if (chef) {
       try {
         addItem(actorId, row.out, n);
         log(actorId.toString(16), 'is a Grand Chef: a second batch of', n, row.name);
       } catch (e) { log('the second batch of', row.name, 'was not handed over:', e); }
-    }, KEY_NAME_DELAY);
-  }
-  if (row.owner === 'Tailor' && row.type === 'ARMO' && holdsPerk(actorId, 'masterweaver')) {
-    setTimeout(function () {
+    }
+    if (weaver) {
       try {
         const done = markWoven(actorId, row.out, row.name, n);
         log(actorId.toString(16), 'is a Master Weaver:', done, row.name, 'woven');
       } catch (e) { log('the woven garment', row.name, 'was not named:', e); }
-    }, KEY_NAME_DELAY);
-  }
+    }
+  }, MASTER_CRAFT_AFTER_MS);
 }
 
 function onCraftRoll(actorId, roll) {

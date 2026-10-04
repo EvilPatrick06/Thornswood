@@ -136,6 +136,7 @@ const pieces = {
   tools: slice(gm, 'const TOOLS = {', '\n};'),
   key: lineOf(/^const KEY_RECIPE = .*$/m),
   delay: lineOf(/^const KEY_NAME_DELAY = .*$/m),
+  after: lineOf(/^const MASTER_CRAFT_AFTER_MS = .*$/m),
   fns: ['function idOf(descriptor)', 'function takeItem(actorId, itemDesc, count)', 'function addItem(actorId, itemDesc, count)',
         'function craftRow(recipeDesc)', 'function fuelFor(recipeDesc)', 'function packCount(actorId, itemDesc)',
         'function charcoalHeld(actorId, grade)', 'function fuelRefusal(fuel)', 'function wantsAHandle(row)',
@@ -144,7 +145,7 @@ const pieces = {
   onCraft: slice(gm, "mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId) {", '\n});\n')
 };
 yes('the craft pieces are all in the gamemode',
-    !!pieces.grades && !!pieces.hafted && !!pieces.handle && !!pieces.tools && !!pieces.key && !!pieces.delay &&
+    !!pieces.grades && !!pieces.hafted && !!pieces.handle && !!pieces.tools && !!pieces.key && !!pieces.delay && !!pieces.after &&
     pieces.fns.every(function (f) { return !!f; }) && !!pieces.onCraft);
 
 /*
@@ -172,7 +173,7 @@ function craftRig(state) {
     __thornswoodCharacter: { stateOf: function () { return state; } },
     __thornswoodNeeds: { NEEDS: { wear: { woven: { degrees: 4, mark: 'Master-Woven ' } } } }
   };
-  const body = [pieces.grades, fuelLine[0], pieces.hafted, pieces.handle, pieces.tools, pieces.key, pieces.delay]
+  const body = [pieces.grades, fuelLine[0], pieces.hafted, pieces.handle, pieces.tools, pieces.key, pieces.delay, pieces.after]
     .concat(pieces.fns).join('\n') + '\n' + pieces.onCraft + '\nreturn mp.onCraft;';
   const onCraft = new Function('mp', 'globalThis', 'ITEMS', 'RECIPES_BY_ID', 'KEPT_SMELT', 'guard', 'notify', 'say', 'log',
     'setTimeout', 'recipelessCraft', 'craftAnswer', 'creditWork', body)(
@@ -195,6 +196,12 @@ function craftRig(state) {
       const r = onCraft(A, id(row.out), made || 1, id(recipe), 0);
       if (r !== false) { (packs[A] = packs[A] || []).push({ baseId: id(row.out), count: made || 1 }); }
       return r;
+    },
+    // The gamemode said yes and then the engine's RemoveItems threw, because
+    // the server did not hold what the client said went in: nothing lands.
+    craftThatFails: function (recipe, made) {
+      const row = RECIPES[recipe] || KEPT[recipe];
+      return onCraft(A, id(row.out), made || 1, id(recipe), 0);
     },
     later: function () { while (timers.length) { timers.shift()(); } }
   };
@@ -304,6 +311,17 @@ if (RECIPES && KEPT && pieces.onCraft && P) {
     notCook.craft(iron);
     notCook.later();
     yes('and a master smith\'s sword is not doubled', notCook.count(RECIPES[iron].out) === 1);
+    const refused = craftRig(chef);
+    refused.craftThatFails(cookRow, 1);
+    refused.later();
+    yes('a craft the engine refuses after the gamemode said yes hands a Grand Chef nothing', refused.count(row.out) === 0);
+    const behind = craftRig(chef);
+    behind.give(row.out, 3);
+    behind.craftThatFails(cookRow, 1);
+    behind.later();
+    yes('and the food already in the pack is not doubled either', behind.count(row.out) === 3);
+    yes('the timer that hands it over waits for nothing but the end of the engine\'s call (0)',
+        /^const MASTER_CRAFT_AFTER_MS = 0;$/.test(pieces.after));
   });
 
   attempt('Master Weaver, the mark', function () {
@@ -324,6 +342,13 @@ if (RECIPES && KEPT && pieces.onCraft && P) {
     plain.craft(hood, 1);
     plain.later();
     yes('an expert tailor\'s garment is not', plain.entries(RECIPES[hood].out).every(function (e) { return !e.name; }));
+    const refused = craftRig(weaver);
+    refused.give(T1, 1);
+    refused.give(RECIPES[hood].out, 1);
+    refused.craftThatFails(hood, 1);
+    refused.later();
+    yes('a craft the engine refuses does not name a hood the master already had',
+        refused.entries(RECIPES[hood].out).every(function (e) { return !e.name; }) && refused.count(RECIPES[hood].out) === 1);
     yes('Mastercraft is read nowhere outside the rules: a smith\'s master perk is not a temper bonus',
         (gm.match(/'mastercraft'/g) || []).length === 1 && /key: 'mastercraft'/.test(gm));
   });
