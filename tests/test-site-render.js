@@ -311,6 +311,7 @@ function runRouter(pathname, prefilled, answers) {
                : new Promise(noop);
     },
     setTimeout: setTimeout,
+    clearTimeout: clearTimeout,
     requestAnimationFrame: function (f) { f(); },
     matchMedia: function () { return { matches: false }; },
     addEventListener: noop
@@ -477,8 +478,8 @@ const siteLog = function () { return read(path.join(work, 'site.log')) || ''; };
       front.text.indexOf('<div id="landing">') >= 0 &&
       front.text.indexOf('<div class="page" id="page" hidden><div class="wrap" id="pagebody"></div></div>') >= 0);
   const roadmap = await get(port, '/roadmap');
-  yes('the roadmap is still built by the page, not filled in here',
-      roadmap.text.indexOf('<div class="wrap" id="pagebody"></div>') >= 0);
+  yes('the roadmap has useful initial HTML before the API responds',
+      roadmap.text.indexOf('<div class="wrap" id="pagebody"><h1>Roadmap</h1>') >= 0);
   yes('an async public page does not flash the home landing while it loads',
       roadmap.text.indexOf('<div id="landing" hidden>') >= 0);
 
@@ -574,7 +575,7 @@ const siteLog = function () { return read(path.join(work, 'site.log')) || ''; };
   const bare = await get(two.port, '/rules');
   yes('and /rules still carries its words, as escaped plain text',
       bare.status === 200 &&
-      bare.text.indexOf('<div class="wrap" id="pagebody"><pre class="pre-wrap"># Rules') >= 0);
+      bare.text.indexOf('<div class="wrap" id="pagebody"><h1>Rules</h1><pre class="pre-wrap"># Rules') >= 0);
 
   done();
 })().catch(function (e) {

@@ -13,7 +13,7 @@ const ROOT = path.join(__dirname, '..');
 const PAGES = ['terms', 'privacy', 'rules'];
 const EXPECT = {
   terms: '2026-09-29',
-  privacy: '2026-09-28',
+  privacy: '2026-10-03',
   rules: '2026-09-29'
 };
 const MONTHS = [null, 'January', 'February', 'March', 'April', 'May', 'June',
