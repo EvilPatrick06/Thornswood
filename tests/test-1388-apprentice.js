@@ -416,6 +416,17 @@ yes('C7: a Master mage teaches a Smith one school through the same command, and 
     g2.taught.indexOf('destruction') !== -1 && P.schoolsOf(g2).join() === 'destruction' &&
     P.spellPoints(g2) === L.outsiderSpells);
 
+// #1147's own case: a Master Bladebinder teaching a Smith, through the command.
+const BINDER = 0xff000118, SMITH4 = 0xff000119;
+person(srv, BINDER, 'Enthir', 118, 'gatherer', 'enchanter', 'bladebinder', function (s) { s.ranks.bladebinder = 'master'; });
+person(srv, SMITH4, 'Hilde', 119, 'miner', 'smith', 'edgewright');
+lines = srv.type(BINDER, '/apprentice Hilde');
+srv.answer(SMITH4, '/yes');
+const h4 = st(srv, SMITH4);
+yes('C9: a Master Bladebinder teaches a Smith Bladebinder through /apprentice: novice, taught, and the non-Enchanter staff places',
+    h4.taught.indexOf('bladebinder') !== -1 && P.rankOf(h4, 'bladebinder') === 'novice' &&
+    P.staffTaught(h4) && P.staffPoints(h4) === L.outsiderSpells && h4.masters.bladebinder.id === BINDER);
+
 // The answer is checked again when it lands.
 const SMITH3 = 0xff000117;
 person(srv, SMITH3, 'Ulla', 117, 'miner', 'smith', 'platewright');
