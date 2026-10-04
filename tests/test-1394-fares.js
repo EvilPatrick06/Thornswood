@@ -51,7 +51,9 @@ function ledger(mp) {
 function world() {
   const forms = {};
   const sets = [];
+  const refs = {};
   const mp = {
+    getIdFromDesc: function (desc) { return refs[desc] || 0; },
     get: function (id, key) {
       const f = forms[id];
       if (!f) { throw new Error('no form ' + id); }
@@ -76,7 +78,7 @@ function world() {
       throw new Error('set ' + key);
     }
   };
-  return { forms: forms, sets: sets, mp: mp };
+  return { forms: forms, sets: sets, mp: mp, refs: refs };
 }
 
 function gold(f) {
@@ -321,6 +323,23 @@ if (C0) {
     say(r3, '/ride e ' + DRIVER.toString(16));
     clock += r3.C.DRIVER_MEMORY_MS + 1;
     yes('a press over a minute old no longer counts', /Stand at a carriage/.test(say(r3, '/ride solitude')) && moves(r3).length === 0);
+  }
+
+  // A driver standing off his spot, on his own placed reference.
+  {
+    const r = rig();
+    const t = by('carriage:whiterun');
+    const REF = 0x123456;
+    r.w.refs[t.ref] = REF;
+    r.w.forms[REF] = { cell: t.world, pos: [t.pos[0] + 450, t.pos[1], t.pos[2]], base: t.base, inv: [] };
+    const me = person(r, t, 60, 750);
+    yes('a driver off his spot is found where he stands now, without a press',
+      /ride to Solitude/.test(say(r, '/ride solitude')) && r.L.funds.whiterun === 20 && gold(me) === 40);
+    const r2 = rig();
+    r2.w.refs[t.ref] = REF;
+    r2.w.forms[REF] = { cell: t.world, pos: [t.pos[0] + 450, t.pos[1], t.pos[2]], base: t.base, inv: [] };
+    person(r2, t, 60, 900);
+    yes('and 450 from him is still too far', /Stand at a carriage/.test(say(r2, '/ride solitude')) && moves(r2).length === 0);
   }
 
   // The move fails.

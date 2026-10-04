@@ -36164,7 +36164,7 @@ log('gamemode loaded:',
   short does not move and loses nothing. Fast travel stays off: nothing here
   offers the map, and there is no word that skips the driver.
 
-  THE MOD'S OWN RIDE DOES NOT LAND, MEASURED IN THE FORK. MovementValidation
+  THE MOD'S OWN RIDE DOES NOT LAND, READ IN THE FORK. MovementValidation
   in skymp5-server refuses any move a client reports that changes the cell or
   the world, or covers 4096 units or more, and sends the person back to where
   the server had them. The carriage mod's fade moves the person on their own
@@ -36420,14 +36420,27 @@ log('gamemode loaded:',
         return s;
       }
     }
+    /*
+      Otherwise the driver himself, or his spot. The population block keeps a
+      kept driver on his own placed reference, so the server can read where he
+      stands now; a driver it cannot read is measured from his spot.
+    */
     var best = null, bestD = RIDE_REACH;
     for (var i = 0; i < RIDE_STOPS.length; i++) {
       var stop = RIDE_STOPS[i];
       if (!stop.driver || stop.world !== me.cell) { continue; }
       var d = apart(me.pos, stop.pos);
+      var live = driverNow(stop);
+      if (live && live.cell === me.cell) { d = Math.min(d, apart(me.pos, live.pos)); }
       if (d <= bestD) { bestD = d; best = stop; }
     }
     return best;
+  }
+
+  function driverNow(stop) {
+    var id = 0;
+    try { id = Number(mp.getIdFromDesc(stop.ref)) || 0; } catch (e) { id = 0; }
+    return id > 0 ? placeOf(id) : null;
   }
 
   function simple(text) {
