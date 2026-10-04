@@ -86,8 +86,9 @@ crosshair. Nobody is told to type it, and help text never lists it.
 | `/maneuver`, `/maneuver <name>` | A warrior | A warrior's maneuvers | `gamemode.js:44929` | The list; `/help work`; [Warrior](professions/warrior.md) | In hand. | #1386 |
 
 `/pick` and `/spend` are the K panel's lines (`gamemode.js:40783`):
-profession, class, town, spells and points. K sends them and nothing
-tells anybody to type them, so there is nothing to turn.
+profession, class, town, spells and points, and `/pick perk fontofmagic`
+from the Use button beside Font of Magic. K sends them and nothing tells
+anybody to type them, so there is nothing to turn.
 
 ## Staff and dev commands
 
