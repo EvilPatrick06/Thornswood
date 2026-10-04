@@ -233,6 +233,12 @@ if (!Array.isArray(cfg.access.dev)) {
 if (!Array.isArray(cfg.access.jarl)) {
   cfg.access.jarl = ['Jarl'];
 }
+// Who the Free Skyrim Trading Company has taken on (#1393): an application in
+// Discord, the same shape as a Jarl's, and a person gives the role. The game
+// lets them handle a company sale.
+if (!Array.isArray(cfg.access.company)) {
+  cfg.access.company = ['Trading Company'];
+}
 // Who gets a third character slot at the game's main menu. Everybody gets
 // two; a Patreon tier or a Gamemaster gets three, and so do the admin roles.
 // Decided by Patrick on 20 September. The tier names are Build-Discord.py's.
@@ -3295,6 +3301,7 @@ async function standing(discordId) {
   out.play = out.admin || has(cfg.access.play);
   out.dev = out.admin || has(cfg.access.dev);
   out.jarl = out.admin || has(cfg.access.jarl);
+  out.company = has(cfg.access.company);
   out.staffRole = holdsStaffRole(out.roles);
   out.businessOwner = holdsNamedRole(out.roles, 'Business Owner');
   out.factionOwner = holdsNamedRole(out.roles, 'Faction Owner');
@@ -5508,7 +5515,7 @@ async function handle(req, res) {
                   'September. The address form goes once no door says this.');
     }
     const linked = jsonFile(LINKED, {});
-    const out = { profiles: [], devProfiles: [], adminProfiles: [], jarlProfiles: [], staffRoleProfiles: [], businessOwnerProfiles: [], factionOwnerProfiles: [], devRoleProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', failedProfiles: [], at: Date.now() };
+    const out = { profiles: [], devProfiles: [], adminProfiles: [], jarlProfiles: [], staffRoleProfiles: [], businessOwnerProfiles: [], factionOwnerProfiles: [], devRoleProfiles: [], companyProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', failedProfiles: [], at: Date.now() };
     const seen = new Set();
     const seenDev = new Set();
     const seenAdmin = new Set();
@@ -5517,6 +5524,7 @@ async function handle(req, res) {
     const seenBusiness = new Set();
     const seenFaction = new Set();
     const seenDevRole = new Set();
+    const seenCompany = new Set();
     const seenFailed = new Set();
     const hasProfiles = (d) => (Array.isArray((linked[d] || {}).profiles) ? linked[d].profiles : [])
       .map(Number).some((n) => n > 0);
@@ -5577,6 +5585,10 @@ async function handle(req, res) {
       if (st.devRole) {
         for (const n of profiles) if (!seenDevRole.has(n)) { seenDevRole.add(n); out.devRoleProfiles.push(n); }
       }
+      // The trading company's role (#1393), for a company sale in the game.
+      if (st.company) {
+        for (const n of profiles) if (!seenCompany.has(n)) { seenCompany.add(n); out.companyProfiles.push(n); }
+      }
       out.people.push({ id: String(d), name: st.name || row.name || '', profiles });
     }
     /* STAFF BANS (#412), which are this site's own file and need no Discord.
@@ -5595,7 +5607,7 @@ async function handle(req, res) {
       for (const k of ['profiles', 'devProfiles', 'adminProfiles', 'jarlProfiles', 'staffRoleProfiles', 'failedProfiles']) {
         out[k] = out[k].filter((n) => !barred.has(Number(n)));
       }
-      for (const k of ['businessOwnerProfiles', 'factionOwnerProfiles', 'devRoleProfiles']) {
+      for (const k of ['businessOwnerProfiles', 'factionOwnerProfiles', 'devRoleProfiles', 'companyProfiles']) {
         out[k] = out[k].filter((n) => !barred.has(Number(n)));
       }
       out.people = out.people.map((p) => Object.assign({}, p, { profiles: p.profiles.filter((n) => !barred.has(Number(n))) }))
