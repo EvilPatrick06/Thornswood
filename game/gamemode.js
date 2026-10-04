@@ -26534,9 +26534,15 @@ function craftAnswer(actorId, row) {
   // a conversation rather than a menu.'
   const sister = s.half ? P.sisterOf(s.prof, s.half) : null;
   if (sister && sister === half) {
-    out.refusal = 'A ' + made + ' is ' + halfName + ' work past novice, and ' + halfName +
-                  ' is your sister half. You get the novice of it for nothing and no ' +
-                  'further. A Master ' + halfName + ' can take you on.';
+    // Taken on by a Master who still stands (#1388): the rank is the wall now.
+    const climbing = !!(C.masterFor && C.masterFor(actorId, s, half));
+    out.refusal = climbing
+      ? 'A ' + made + ' is ' + rankWord(rank) + ' ' + halfName + '\'s work and you are ' +
+        rankWord(P.rankOf(s, half) || 'novice') + ' ' + halfName + '. A Master took you on in it, ' +
+        'so rank comes from doing the work.'
+      : 'A ' + made + ' is ' + halfName + ' work past novice, and ' + halfName +
+        ' is your sister half. You get the novice of it for nothing and no ' +
+        'further. A Master ' + halfName + ' can take you on with /apprentice.';
     return out;
   }
 
@@ -30648,6 +30654,15 @@ log('gamemode loaded:',
                  The sister half is added at novice the moment half is chosen.
       taught     ['hearthcook']                 halves learned from a Master
                  of another profession, novice only, at most LIMITS.secondaries
+      untaught   ['hearthcook']                 outside trades a Master ended.
+                 Still counted: two in a life, and ending one does not open a
+                 third (#1388)
+      masters    { platewright: { id, name, at } }  who took this character
+                 on, by the half: the sister half past novice, or an outside
+                 trade they taught. id is the Master's actor (#1388)
+      apprentices [{ id, name, half, kind, at }]  the people this Master took
+                 on, a row per person and half; kind is 'sister' or
+                 'outside' (#1388)
       spells     { points: 2, known: [...] }    a mage's spell points and spells
       staffSpells ['12fcd:Skyrim.esm', ...]     the staff spells unlocked, by the
                  spell's form id desc: what a staff may bind (#967, #1128)
@@ -30919,26 +30934,98 @@ log('gamemode loaded:',
 
   /**
     A Master of a half teaches somebody from ANOTHER profession that half, at
-    novice, and never further. At most LIMITS.secondaries times. The sister
-    half does not count and cannot be taught this way, because it is already
-    known; going past novice in it is rankUp under a Master of it, below.
+    novice, and never further: an outside trade (apprenticeship.md). At most
+    LIMITS.secondaries in a life. An outside trade a Master ended stays
+    counted in untaught, so ending one never opens a third. The sister half
+    does not count and cannot be taught this way, because it is already
+    known; going past novice in it is takeOn below, and then rankUp.
+
+    The reasons are written to the Master, because the Master is the one who
+    asked: they are what /apprentice says back (#1388). who, when it is
+    given, is the Master as the server records them, { id, name, at }, so the
+    Master who taught it is the one who can end it.
   */
-  function teach(state, teacherState, half) {
+  function teach(state, teacherState, half, who) {
     var s = clone(state);
-    if (!s.prof) { return no('choose your own profession before learning anybody else’s'); }
+    if (!s.taught) { s.taught = []; }
+    if (!s.prof) { return no('they have not picked a profession of their own yet, so there is nothing to teach onto'); }
     var tp = teacherState && teacherState.prof;
-    if (!tp || halvesOf(tp).indexOf(half) === -1) { return no('the teacher does not work that half'); }
-    if (rankOf(teacherState, half) !== 'master') { return no('only a Master can teach, and they are not one in that half'); }
+    if (!tp || halvesOf(tp).indexOf(half) === -1) { return no('you do not work that half'); }
+    if (rankOf(teacherState, half) !== 'master') { return no('only a Master can teach, and you are not one in that half'); }
     if (halvesOf(s.prof).indexOf(half) !== -1) {
-      return no('that is your own profession; a Master of it can raise your rank, not teach you the basics');
+      return no('that is in their own profession, so it is not an outside trade: a Master of their own profession cannot use the outside trade rules on them');
     }
-    if (s.taught.indexOf(half) !== -1) { return no('you already know that'); }
-    if (s.taught.length >= LIMITS.secondaries) {
-      return no('you may only learn ' + LIMITS.secondaries + ' other trades, and you have');
+    if (s.taught.indexOf(half) !== -1) { return no('they already know that'); }
+    if (s.taught.length + (s.untaught || []).length >= LIMITS.secondaries) {
+      return no('they have had their ' + LIMITS.secondaries + ' outside trades, and that is all there is in a life');
     }
     s.taught.push(half);
     s.ranks[half] = 'novice';
+    if (who) {
+      if (!s.masters) { s.masters = {}; }
+      s.masters[half] = who;
+    }
     return yes(s);
+  }
+
+  /**
+    A Master takes somebody on in their sister half (apprenticeship.md, "The
+    sister half"). It costs nothing and it is not one of the two outside
+    trades. Until it is recorded, work in that half counts and waits at the
+    next threshold; while it stands, creditWork is handed the Master and the
+    half climbs the whole ladder through rankUp. who is the Master as the
+    server records them, { id, name, at }. The reasons are written to the
+    Master, as teach's are.
+  */
+  function takeOn(state, masterState, half, who) {
+    var s = clone(state);
+    if (!s.prof) { return no('they have not picked a profession of their own yet'); }
+    if (s.half === half || (s.schools || []).indexOf(half) !== -1) {
+      return no('that is their own ' + (s.half === half ? 'half' : 'school') + ', and it climbs on their own work');
+    }
+    var sister = s.half ? sisterOf(s.prof, s.half) : null;
+    if (!sister || sister !== half) { return no('that is not their sister half'); }
+    if (rankOf(masterState, half) !== 'master') {
+      return no('only a Master of that half can take somebody on in it, and you are not one');
+    }
+    if (rankOf(s, half) === 'master') { return no('they are a Master of it already'); }
+    if (s.masters && own(s.masters, half)) { return no('they already have a Master in that'); }
+    if (!s.masters) { s.masters = {}; }
+    s.masters[half] = who || {};
+    return yes(s);
+  }
+
+  /**
+    The Master ends it (apprenticeship.md). The sister half keeps every rank
+    already earned; further ranks stop and the count waits at the next
+    threshold again, because creditWork is no longer handed a Master. An
+    outside trade loses its novice list, and stays counted in untaught, so
+    ending one does not open a third. masterId is whoever is ending it: only
+    the Master on the record can. The answer carries ended, 'sister' or
+    'outside', so the caller can say which.
+  */
+  function release(state, half, masterId) {
+    var s = clone(state);
+    var rec = (s.masters && own(s.masters, half)) ? s.masters[half] : null;
+    if (!rec || (masterId !== undefined && masterId !== null && rec.id !== masterId)) {
+      return no('they are not your apprentice in that');
+    }
+    delete s.masters[half];
+    var out;
+    var at = (s.taught || []).indexOf(half);
+    if (at !== -1) {
+      s.taught.splice(at, 1);
+      if (own(s.ranks, half)) { delete s.ranks[half]; }
+      if (s.work && own(s.work, half)) { delete s.work[half]; }
+      if (!s.untaught) { s.untaught = []; }
+      s.untaught.push(half);
+      out = yes(s);
+      out.ended = 'outside';
+      return out;
+    }
+    out = yes(s);
+    out.ended = 'sister';
+    return out;
   }
 
   /**
@@ -31695,6 +31782,7 @@ log('gamemode loaded:',
     TABLE: TABLE, SPELLS: SPELLS, SPELL_IDS: SPELL_IDS, TUNING: TUNING,
     fresh: fresh, clone: clone,
     pickClass: pickClass, pickProfession: pickProfession, teach: teach,
+    takeOn: takeOn, release: release,
     rankUp: rankUp, pickThirdSchool: pickThirdSchool, spendPoint: spendPoint,
     perks: perks, canWork: canWork, canDo: canDo,
     halvesOf: halvesOf, sisterOf: sisterOf, classFor: classFor,
@@ -34994,6 +35082,22 @@ log('gamemode loaded:',
   var GOLD_ID = 0x0000000F;
   var NOTICE_FEE = 20;
   var JOB_FEE = 30;
+  /*
+    A LETTER, #1374. 35 gold up front, the same for everybody. LETTER_FEE is
+    the board's and stays on the hold's ledger like a notice's. LETTER_PAY is
+    the courier's: it is counted on the same ledger while the letter is up and
+    paid back out of it, to the courier on delivery or to the sender on an
+    /unpin. It is the sender's gold moved, never new gold. There is no
+    courier cooldown; the sender's gold is the limit.
+
+    LETTER_REACH is the trade's 700 units, about 10 metres, which is the reach
+    the page gives a delivery. deliver reads the trade block's own number when
+    that block is loaded, so the two cannot drift apart.
+  */
+  var LETTER_FEE = 20;
+  var LETTER_PAY = 15;
+  var LETTER_CHARS = 300;
+  var LETTER_REACH = 700;
 
   function loadPart(key, fallback) {
     try {
@@ -35392,6 +35496,28 @@ log('gamemode loaded:',
   };
 
   /*
+    RAVEN ROCK, THE TENTH BOARD, #1374. The page: "Raven Rock's board starts
+    at that town's inn until a steward walks it somewhere better."
+
+    Vanilla Skyrim has one inn in Raven Rock, The Retching Netch, in
+    Dragonborn.esm. Its interior cell is 17ec0:Dragonborn.esm
+    (DLC2RRTheRetchingNetch in game/data/doors.json). The point is where its
+    innkeeper, Geldis Sadri, is placed (ref 18291:Dragonborn.esm in
+    game/data/merchant-traders.json), which is the spot
+    game/data/guild-sites.json already gives Raven Rock's guild site and
+    docs/systems/merchants-guild.md calls where that town's board starts.
+
+    Raven Rock is not in the chargen table, so the inn fallback in
+    seededBoards never found it and only nine boards were ever seeded. A town
+    in here is seeded only when that table did not already give it a board.
+    A steward's /board move takes it over for good, the same as any other
+    board, because seedBoards keeps a placed board whatever the seeding says.
+  */
+  var BOARD_INNS = {
+    ravenrock: { cell: '17ec0:Dragonborn.esm', pos: [-39, -178.2, 0], where: 'Raven Rock' }
+  };
+
+  /*
     WHICH SEEDING A BOARD IS STANDING ON, AND WHY A NUMBER RATHER THAN A FLAG.
 
     boards is SAVED, in the register beside the claims and the notices, and it
@@ -35484,6 +35610,12 @@ log('gamemode loaded:',
     } catch (e) {
       plog('could not seed the boards from the town table:', e);
     }
+    for (var inn in BOARD_INNS) {
+      if (!Object.prototype.hasOwnProperty.call(BOARD_INNS, inn) || out[inn]) { continue; }
+      var at = BOARD_INNS[inn];
+      out[inn] = { cell: at.cell, pos: [at.pos[0], at.pos[1], at.pos[2]],
+                   where: at.where || inn, seed: BOARD_SEED };
+    }
     return out;
   }
 
@@ -35548,8 +35680,9 @@ log('gamemode loaded:',
         wall.push({
           n: i + 1,
           job: !!n.job,
+          letter: !!n.letter,
           name: n.name || 'somebody',
-          text: n.text || '',
+          text: n.letter ? sealed(n) : (n.text || ''),
           taken: n.taken ? (n.takenName || 'somebody') : '',
           mine: Number(n.by) === Number(profileId),
           held: !!(n.job && Number(n.taken) === Number(profileId))
@@ -35561,7 +35694,8 @@ log('gamemode loaded:',
         for (var j = 0; j < rows.length; j++) {
           var job = rows[j];
           if (job.job && Number(job.taken) === Number(profileId) && !job.down) {
-            mine.push({ hold: h, n: j + 1, text: job.text || '', name: job.name || 'somebody' });
+            mine.push({ hold: h, n: j + 1, text: job.letter ? sealed(job) : (job.text || ''),
+                        name: job.name || 'somebody' });
           }
         }
       }
@@ -35593,6 +35727,16 @@ log('gamemode loaded:',
   function moveBoard(hold, actorId, profileId, toProfile) {
     if (!isSteward(profileId)) {
       toProfile(profileId, 'Only a steward moves a board.');
+      return true;
+    }
+    /*
+      ONLY A BOARD THAT IS THERE, #1374. One board a town, ten towns. This
+      took any word, so '/board move whiterum' saved an eleventh board that no
+      hold's ledger knows about.
+    */
+    if (!Object.prototype.hasOwnProperty.call(boards, hold)) {
+      toProfile(profileId, 'No board in ' + hold + '. The boards are ' +
+                Object.keys(boards).join(', ') + '.');
       return true;
     }
     var cell = null, pos = null;
@@ -35645,6 +35789,67 @@ log('gamemode loaded:',
       }
     }
     return false;
+  }
+
+  /*
+    THE LEDGER PAYING OUT, and only a letter's held courier pay, #1374.
+
+    takeGold destroys a fee from a pack and the fee is counted on the hold's
+    ledger. This is the other half docs/systems/gold.md describes: it creates
+    the same count back into a pack, and payHeld takes it off that ledger in
+    the same step, so the coin was already in the world and packs plus ledger
+    add up to the same after. payHeld is its one caller, and it pays a
+    letter's own `pay`, which postLetter took from the sender, never more
+    than the ledger holds.
+  */
+  function payOut(actorId, amount) {
+    var count = Math.floor(Number(amount) || 0);
+    if (!(count > 0)) { return false; }
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return false; }
+    var entries = (inv && inv.entries) || [];
+    var put = false;
+    for (var i = 0; i < entries.length && !put; i++) {
+      var e = entries[i];
+      if (e && e.baseId === GOLD_ID) { e.count = (Number(e.count) || 0) + count; put = true; }
+    }
+    if (!put) { entries.push({ baseId: GOLD_ID, count: count }); }
+    try { mp.set(actorId, 'inventory', { entries: entries }); } catch (e2) { return false; }
+    return true;
+  }
+
+  /*
+    A letter's held pay, out of its hold's ledger into one pack. Answers what
+    was paid, 0 when nothing is held, or -1 when it could not be paid and
+    nothing changed. n.pay goes to 0 once paid, so it is paid once.
+  */
+  function payHeld(hold, n, actorId) {
+    var amount = (n && n.letter) ? (Math.floor(Number(n.pay)) || 0) : 0;
+    if (!(amount > 0)) { return 0; }
+    if ((Number(funds[hold]) || 0) < amount) {
+      plog('a letter in', hold, 'holds', amount, 'and the ledger has only', funds[hold], '; nothing paid');
+      return -1;
+    }
+    if (!payOut(actorId, amount)) { return -1; }
+    funds[hold] = (Number(funds[hold]) || 0) - amount;
+    n.pay = 0;
+    return amount;
+  }
+
+  /* What anybody but the person it is for reads of a letter: who it is for. */
+  function sealed(n) {
+    return 'A sealed letter for ' + (n.to || 'somebody');
+  }
+
+  /*
+    The letter's name against a character's. The whole name, or its first
+    words, so 'Lydia' reaches Lydia Stormblade and 'Ly' reaches nobody.
+  */
+  function nameIs(to, name) {
+    var a = String(to || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    var b = String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    if (!a || !b) { return false; }
+    return b === a || b.indexOf(a + ' ') === 0;
   }
 
   function post(parts, actorId, profileId, toProfile, isJob) {
@@ -35764,9 +35969,9 @@ log('gamemode loaded:',
     for (var i = list.length - 1; i >= 0 && shown < 10; i--) {
       var n = list[i];
       if (n.down) { continue; }
-      lines.push('[' + (i + 1) + '] ' +
-                 (n.job ? (n.taken ? 'job, taken: ' : 'job: ') : '') +
-                 n.name + ': ' + n.text);
+      lines.push('[' + (i + 1) + '] ' + (n.letter
+        ? 'letter for ' + n.to + ', from ' + n.name + (n.taken ? ', taken by ' + n.takenName : '')
+        : (n.job ? (n.taken ? 'job, taken: ' : 'job: ') : '') + n.name + ': ' + n.text));
       shown++;
     }
     var more = up > shown
@@ -35831,6 +36036,14 @@ log('gamemode loaded:',
     n.takenName = who;
     n.takenAt = Date.now();
     save();
+    if (n.letter) {
+      plog(who, 'took a letter for', n.to, 'in', hold);
+      toProfile(profileId, 'You take the letter for ' + n.to + ', from ' + n.name + '. It is sealed. ' +
+                'Find ' + n.to + ' and /deliver it within about 10 metres, and the ' +
+                (Number(n.pay) || 0) + ' gold is yours.');
+      refreshPanel(actorId);
+      return true;
+    }
     plog(who, 'took a job in', hold + ':', n.text);
     toProfile(profileId, 'You take it: ' + n.text + '. Go and see ' + n.name + ' about it.');
     refreshPanel(actorId);
@@ -35845,8 +36058,9 @@ log('gamemode loaded:',
       var list = notices[hold];
       for (var i = 0; i < list.length; i++) {
         var n = list[i];
-        if (n.job && n.taken === profileId) {
-          lines.push(hold + ': ' + n.text + ' (for ' + n.name + ')');
+        if (n.job && n.taken === profileId && !n.down) {
+          lines.push(hold + ': ' + (n.letter ? sealed(n) + ', from ' + n.name
+                                             : n.text + ' (for ' + n.name + ')'));
         }
       }
     }
@@ -35870,7 +36084,7 @@ log('gamemode loaded:',
       return true;
     }
     var n = list[at];
-    if (!n.job || n.taken !== profileId) {
+    if (!n.job || n.taken !== profileId || n.down) {
       toProfile(profileId, 'That is not one of yours.');
       return true;
     }
@@ -35946,11 +36160,208 @@ log('gamemode loaded:',
       toProfile(profileId, n.takenName + ' has taken that job. It can come down once they hand it back.');
       return true;
     }
+    /*
+      A LETTER'S PAY COMES BACK, #1374. The board fee stays, like any
+      notice's. The courier's 15 was only held, and with nobody to carry it
+      it is the sender's again. Paid before it comes down, so a pack that
+      cannot be written leaves the letter up and the 15 still held.
+    */
+    var back = n.letter ? payHeld(hold, n, actorId) : 0;
+    if (back < 0) {
+      toProfile(profileId, 'That did not work. The letter is still up.');
+      return true;
+    }
     takedown(hold, at, profileId);
+    if (n.letter) {
+      plog(n.name, 'took down a letter for', n.to, 'in', hold, 'and had', back, 'back');
+      toProfile(profileId, 'You take the letter down. The ' + back + ' gold for the courier comes back ' +
+                'to you. The fee stays with ' + hold + '.');
+      refreshPanel(actorId);
+      return true;
+    }
     plog(n.name, 'took down', n.job ? 'a job' : 'a notice', 'in', hold + ':', n.text);
     toProfile(profileId, 'You take it down. The fee stays with ' + hold + '.');
     refreshPanel(actorId);
     return true;
+  }
+
+  /*
+    ------------------------------------------------------------- a letter
+
+        /letter Lydia Meet me at the Drunken Huntsman at dusk.
+        /letter "Lydia Stormblade" Meet me at the Drunken Huntsman at dusk.
+
+    #1374, as docs/systems/noticeboards.md has it. A letter is a job with a
+    named person at the other end, written standing at the board. The words
+    are up to 300 characters, the same cap as /ooc; a longer one is refused
+    before any gold is taken rather than cut, because the sender paid for the
+    whole letter. The name is one word, or several in double quotes.
+
+    THE WORDS ARE SEALED. Only /deliver hands them to anybody. The wall, the
+    panel, /jobs and the taking line say who it is for and from whom, and the
+    log does not record them either.
+  */
+  function postLetter(parts, actorId, profileId, toProfile) {
+    var hold = boardHere(actorId);
+    if (!hold) {
+      toProfile(profileId, 'Stand at a hold\'s notice board to write a letter there.');
+      return true;
+    }
+    var rest = (parts && parts.length > 1) ? parts.slice(1).join(' ').trim() : '';
+    var to = '', words = '';
+    if (rest.charAt(0) === '"') {
+      var shut = rest.indexOf('"', 1);
+      if (shut > 1) { to = rest.slice(1, shut).trim(); words = rest.slice(shut + 1).trim(); }
+    } else {
+      var gap = rest.indexOf(' ');
+      to = gap < 0 ? rest : rest.slice(0, gap);
+      words = gap < 0 ? '' : rest.slice(gap + 1).trim();
+    }
+    if (!to) {
+      toProfile(profileId, 'Say who it is for, then what it says: /letter <name> <words>.');
+      return true;
+    }
+    if (!words) {
+      toProfile(profileId, 'Say what the letter says.');
+      return true;
+    }
+    if (words.length > LETTER_CHARS) {
+      toProfile(profileId, 'A letter is up to ' + LETTER_CHARS + ' characters. That one is ' +
+                words.length + '. Nothing was taken.');
+      return true;
+    }
+    var cost = LETTER_FEE + LETTER_PAY;
+    if (!takeGold(actorId, cost)) {
+      toProfile(profileId, 'A letter costs ' + cost + ' gold and you do not have it.');
+      return true;
+    }
+    var who = 'somebody';
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      if (ap && ap.name) { who = String(ap.name); }
+    } catch (e) { }
+    if (!notices[hold]) { notices[hold] = []; }
+    notices[hold].push({ by: profileId, name: who, text: words, at: Date.now(),
+                         job: true, letter: true, to: to, pay: LETTER_PAY, taken: 0 });
+    funds[hold] = (Number(funds[hold]) || 0) + cost;
+    save();
+    plog(who, 'posted a letter for', to, 'in', hold, 'for', cost, 'gold');
+    toProfile(profileId, 'Your letter for ' + to + ' is on the board in ' + hold + '. That cost ' + cost +
+              ' gold: ' + LETTER_FEE + ' for the board, and ' + LETTER_PAY +
+              ' held for whoever carries it.');
+    refreshPanel(actorId);
+    return true;
+  }
+
+  /*
+        /deliver Lydia      or the form id the crosshair gives, as /trade takes
+
+    Every letter the courier carries for that person goes over at once,
+    within the trade reach. The name is what is checked and nothing else: the
+    server does not judge what a letter says, and a wrong person is refused
+    with the letter still in the courier's hands. The person it is for is told
+    the words, who wrote them and who brought them. The courier is paid each
+    letter's held 15 out of the ledger it was counted on, and the letter comes
+    off the wall the way an /unpin does, keeping its number.
+  */
+  function deliver(parts, actorId, profileId, toProfile) {
+    var carried = [];
+    for (var h in notices) {
+      if (!Object.prototype.hasOwnProperty.call(notices, h)) { continue; }
+      var list = notices[h] || [];
+      for (var i = 0; i < list.length; i++) {
+        var n = list[i];
+        if (n && n.letter && !n.down && Number(n.taken) === Number(profileId)) {
+          carried.push({ hold: h, at: i, n: n });
+        }
+      }
+    }
+    if (!carried.length) {
+      toProfile(profileId, 'You are not carrying a letter. Take one off a board first.');
+      return true;
+    }
+    var want = (parts && parts.length > 1) ? parts.slice(1).join(' ').trim() : '';
+    if (!want) {
+      toProfile(profileId, 'Say who you are handing it to: /deliver and their name, standing with them.');
+      return true;
+    }
+    var soc = g.__thornswoodSocial;
+    if (!soc || !soc.findPerson || !soc.nameOfPerson || !soc.profileOf) {
+      toProfile(profileId, 'That is not running on this server.');
+      return true;
+    }
+    var found = soc.findPerson(want);
+    if (!found || !found.actorId) {
+      toProfile(profileId, (found && found.why) || 'Nobody here by that name.');
+      return true;
+    }
+    var them = found.actorId;
+    if (them === actorId) { toProfile(profileId, 'That is you.'); return true; }
+    if (!letterReach(actorId, them)) {
+      toProfile(profileId, 'Stand closer. A letter is handed over within about 10 metres.');
+      return true;
+    }
+    var theirName = soc.nameOfPerson(them);
+    var theirPid = Number(soc.profileOf(them)) || 0;
+    if (!theirPid) {
+      // Nobody to hand the words to, so nothing is paid and nothing comes down.
+      toProfile(profileId, 'The server cannot tell who that is right now. Try again in a moment.');
+      return true;
+    }
+    var mine = [];
+    var fors = [];
+    for (var k = 0; k < carried.length; k++) {
+      if (nameIs(carried[k].n.to, theirName)) { mine.push(carried[k]); }
+      else if (fors.indexOf(carried[k].n.to) === -1) { fors.push(carried[k].n.to); }
+    }
+    if (!mine.length) {
+      toProfile(profileId, 'That is ' + theirName + '. What you carry is for ' + fors.join(', ') + '.');
+      return true;
+    }
+    var courier = soc.nameOfPerson(actorId);
+    var paid = 0;
+    var handed = 0;
+    for (var m = 0; m < mine.length; m++) {
+      var c = mine[m];
+      var got = payHeld(c.hold, c.n, actorId);
+      if (got < 0) {
+        toProfile(profileId, 'That did not work. You still have the letter for ' + c.n.to + '.');
+        continue;
+      }
+      paid += got;
+      c.n.delivered = Date.now();
+      c.n.deliveredTo = theirPid;
+      takedown(c.hold, c.at, profileId);
+      handed++;
+      plog(courier, 'handed', theirName, 'a letter from', c.n.name, 'off the board in', c.hold,
+           'and was paid', got);
+      toProfile(theirPid, 'A letter from ' + c.n.name + ', handed to you by ' + courier + ':\n' + c.n.text);
+    }
+    if (handed) {
+      toProfile(profileId, 'You hand ' + theirName + (handed === 1 ? ' the letter. ' : ' ' + handed +
+                ' letters. ') + paid + ' gold is yours.');
+      refreshPanel(actorId);
+      refreshPanel(them);
+    }
+    return true;
+  }
+
+  /* Within the trade's reach of each other, in the same cell. */
+  function letterReach(a, b) {
+    var reach = LETTER_REACH;
+    try {
+      var tr = g.__thornswoodTrade;
+      if (tr && tr.TRADE && Number(tr.TRADE.reach) > 0) { reach = Number(tr.TRADE.reach); }
+    } catch (e) { }
+    try {
+      var ca = String(mp.get(a, 'worldOrCellDesc') || '');
+      var cb = String(mp.get(b, 'worldOrCellDesc') || '');
+      if (!ca || ca !== cb) { return false; }
+      var pa = mp.get(a, 'pos'), pb = mp.get(b, 'pos');
+      if (!pa || !pb) { return false; }
+      var dx = pa[0] - pb[0], dy = pa[1] - pb[1], dz = pa[2] - pb[2];
+      return (dx * dx + dy * dy + dz * dz) <= reach * reach;
+    } catch (e2) { return false; }
   }
 
   function command(word, parts, actorId, profileId, toProfile) {
@@ -35981,6 +36392,8 @@ log('gamemode loaded:',
     if (word === '/jobs') { return jobs(profileId, toProfile); }
     if (word === '/dropjob') { return dropJob(parts, actorId, profileId, toProfile); }
     if (word === '/unpin') { return unpin(parts, actorId, profileId, toProfile); }
+    if (word === '/letter') { return postLetter(parts, actorId, profileId, toProfile); }
+    if (word === '/deliver') { return deliver(parts, actorId, profileId, toProfile); }
     return false;
   }
 
@@ -38913,7 +39326,9 @@ log('gamemode loaded:',
 
   function credit(actorId, key) {
     var s = stateOf(actorId);
-    var r = P.creditWork(s, key);
+    // The Master who took them on in this half, when one still stands, so a
+    // sister half's count rises past the threshold it waits at (#1388).
+    var r = P.creditWork(s, key, masterFor(actorId, s, P.classFor(key) || key));
     if (!r.ok) { return null; }
     writeState(actorId, r.state);
     return raiseLines(actorId, r);
@@ -38997,6 +39412,338 @@ log('gamemode loaded:',
   }
 
   /*
+    MASTERS AND APPRENTICES (#1388, #1147). docs/systems/apprenticeship.md.
+
+      /apprentice                       who you took on, and who took you on
+      /apprentice <name> [half]         a Master offers to take somebody on
+      /apprentice end <name> [half]     the Master ends it
+
+    The name can be the form id the crosshair hands over, the same as /party
+    and /trade. The half is needed only when the Master could take that
+    person on in more than one.
+
+    The Master offers and the person answers, the way a party or a trade is
+    asked: the offer stands in the social block's offers for its seconds, and
+    /yes or Accept on the prompt lands it in acceptApprentice below. Taking
+    somebody on is the Master's decision and nobody is owed it. The person
+    saying yes is the other half of the agreement, and it matters most for an
+    outside trade, which is one of only two in a life.
+
+    WHICH ARRANGEMENT is read off the person, never chosen: the other half of
+    their own profession is the sister half (P.takeOn), and a half or school
+    of another profession is an outside trade (P.teach). Their own half, and
+    anything else inside their own profession, the rules refuse and say why.
+
+    WHAT IS RECORDED, on both sides, so either can be read with the other
+    offline. The person carries masters[half] = { id, name, at }, the Master's
+    actor. The Master carries apprentices, a row per person and half. Work is
+    counted against the Master's own record: credit() hands the rules the
+    Master only while that Master is still a Master of the half and still
+    lists the person. Ending it takes the row off both, and nothing else
+    raises a rank: there is no fee, and no gold buys one.
+  */
+
+  /** A half or a school by what somebody typed, its key, its name or the launcher's word for it, or null. */
+  function halfKey(word) {
+    var w = mapHalf(word);
+    if (!w) { return null; }
+    var T = P.TABLE;
+    if (T.schools.indexOf(w) !== -1) { return w; }
+    for (var prof in T.professions) {
+      if (!P.has(T.professions, prof)) { continue; }
+      if (P.has(T.professions[prof].halves, w)) { return w; }
+    }
+    return null;
+  }
+
+  /** The name over somebody's head, through the social block when it is loaded. */
+  function personName(actorId) {
+    var soc = g.__thornswoodSocial;
+    try { if (soc && soc.nameOfPerson) { return soc.nameOfPerson(actorId); } } catch (e) { }
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      if (ap && ap.name) { return String(ap.name); }
+    } catch (e2) { }
+    return 'somebody';
+  }
+
+  /** Does this Master's own record still list that person in that half. */
+  function lists(masterState, learnerId, half) {
+    var rows = (masterState && masterState.apprentices) || [];
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i] && rows[i].id === learnerId && rows[i].half === half) { return true; }
+    }
+    return false;
+  }
+
+  /*
+    The Master to hand the rules when work in a half is counted, or null.
+
+    Read off the Master's own record every time, online or not: a Master who
+    ended it, or whose character is gone, hands nothing, and the count waits
+    at the threshold again. Ranks already earned are in the person's own
+    record and are not touched.
+  */
+  function masterFor(actorId, s, key) {
+    var rec = (s && s.masters && P.has(s.masters, key)) ? s.masters[key] : null;
+    if (!rec || !rec.id || rec.id === actorId) { return null; }
+    var ms = readState(rec.id);
+    if (!ms || P.rankOf(ms, key) !== 'master' || !lists(ms, actorId, key)) { return null; }
+    return ms;
+  }
+
+  /** Every half and school somebody holds at Master. A class is not taught. */
+  function mastered(ms) {
+    var out = [];
+    var ranks = (ms && ms.ranks) || {};
+    for (var k in ranks) {
+      if (!P.has(ranks, k) || ranks[k] !== 'master') { continue; }
+      if (P.has(P.TABLE.classes, k)) { continue; }
+      out.push(k);
+    }
+    return out;
+  }
+
+  /*
+    The rules' answer for one half, as the arrangement it is for that person.
+    A record of a Master that no longer stands (ended on their side, or the
+    character gone) is not in the way of a new one.
+  */
+  function arrange(learnerId, ls, ms, half, who) {
+    var own = ls && (ls.half === half || (ls.schools || []).indexOf(half) !== -1);
+    var sister = (ls && ls.half) ? P.sisterOf(ls.prof, ls.half) : null;
+    var r;
+    if (own || (sister && sister === half)) {
+      var s = ls;
+      if (s && s.masters && P.has(s.masters, half) && !masterFor(learnerId, s, half)) {
+        s = P.clone(s);
+        delete s.masters[half];
+      }
+      r = P.takeOn(s, ms, half, who);
+      r.kind = 'sister';
+      return r;
+    }
+    r = P.teach(ls, ms, half, who);
+    r.kind = 'outside';
+    return r;
+  }
+
+  /** What /apprentice on its own says: both sides of every arrangement this character is in. */
+  function standing(actorId) {
+    var s = stateOf(actorId);
+    var out = [];
+    var rows = s.apprentices || [];
+    if (rows.length) {
+      var took = [];
+      for (var i = 0; i < rows.length; i++) { took.push(rows[i].name + ' in ' + nameOf(rows[i].half)); }
+      out.push('You have taken on ' + took.join(', ') + '.');
+    }
+    var masters = s.masters || {};
+    var sister = s.half ? P.sisterOf(s.prof, s.half) : null;
+    for (var half in masters) {
+      if (!P.has(masters, half)) { continue; }
+      var who = (masters[half] && masters[half].name) || 'somebody';
+      if ((s.taught || []).indexOf(half) !== -1) {
+        out.push(who + ' taught you novice ' + nameOf(half) + '.');
+      } else {
+        out.push(who + ' has taken you on in ' + nameOf(half) +
+                 (masterFor(actorId, s, half) ? ', your sister half.' : ', and that no longer stands.'));
+      }
+    }
+    if (sister && !(P.has(masters, sister) && masterFor(actorId, s, sister)) && P.rankOf(s, sister) !== 'master') {
+      out.push(nameOf(sister) + ', your sister half, waits at ' + (P.rankOf(s, sister) || 'novice') +
+               ' until a Master of it takes you on.');
+    }
+    if (s.prof) {
+      var used = (s.taught || []).length + (s.untaught || []).length;
+      out.push(used + ' of your ' + P.TABLE.limits.secondaries + ' outside trades used in this life.');
+    }
+    out.push('A Master takes somebody on with /apprentice <name>, and ends it with /apprentice end <name>.');
+    return out.join(' ');
+  }
+
+  /** A Master offers. Returns the line for the Master. */
+  function offerIt(actorId, words) {
+    var half = null;
+    if (words.length > 1) {
+      half = halfKey(words[words.length - 1]);
+      if (half) { words = words.slice(0, -1); }
+    }
+    var soc = g.__thornswoodSocial;
+    if (!soc || !soc.findPerson || !soc.offer) {
+      return 'Asking somebody is not running on this server right now. Say so in the dev channel.';
+    }
+    var found = soc.findPerson(words.join(' '));
+    if (!found.actorId) { return found.why; }
+    var them = found.actorId;
+    if (them === actorId) { return 'That is you.'; }
+    var ms = stateOf(actorId);
+    var ls = stateOf(them);
+    var name = personName(them);
+    var mine = mastered(ms);
+    if (!mine.length) { return 'Only a Master takes anybody on, and you are not a Master of any half or school yet.'; }
+    if (!half) {
+      var can = [];
+      for (var i = 0; i < mine.length; i++) {
+        if (arrange(them, ls, ms, mine[i], null).ok) { can.push(mine[i]); }
+      }
+      if (can.length > 1) {
+        var named = [];
+        for (var j = 0; j < can.length; j++) { named.push(nameOf(can[j])); }
+        return 'You could take ' + name + ' on in ' + named.join(' or ') + '. Say which: /apprentice ' +
+               name + ' ' + can[0] + '.';
+      }
+      // One that works, or none, in which case the rules say why about the
+      // first half they hold at Master.
+      half = can.length ? can[0] : mine[0];
+    }
+    var r = arrange(them, ls, ms, half, null);
+    if (!r.ok) { return 'No: ' + r.why + '.'; }
+    var refused = soc.offer('apprentice', actorId, them);
+    if (refused) { return refused; }
+    var pid = soc.profileOf ? soc.profileOf(them) : 0;
+    var o = (soc.offers && pid) ? soc.offers[pid] : null;
+    if (o) { o.master = actorId; o.half = half; }
+    var me = personName(actorId);
+    var asked = (r.kind === 'sister')
+      ? me + ' offers to take you on in ' + nameOf(half) + ', your sister half, so it can climb past novice. ' +
+        'It costs nothing and it is not one of your two outside trades.'
+      : me + ' offers to teach you novice ' + nameOf(half) + '. It is one of your two outside trades for life, ' +
+        'it never climbs past novice, and if it is ended the place does not come back.';
+    try { if (typeof say === 'function') { say(them, asked + ' Accept or refuse on the prompt.'); } } catch (e) { }
+    try { if (typeof notify === 'function') { notify(them, me + ' offers to take you on'); } } catch (e2) { }
+    try { if (soc.push) { soc.push(them); soc.push(actorId); } } catch (e3) { }
+    var secs = (soc.SOCIAL && soc.SOCIAL.offerFor) ? Math.round(soc.SOCIAL.offerFor / 1000) : 45;
+    return 'Asked ' + name + ' to be your apprentice in ' + nameOf(half) + '. They have ' + secs + ' seconds.';
+  }
+
+  /*
+    The person said yes. The offer is checked again from the start, because
+    anything can have moved in the seconds it stood, and only then is either
+    side written. Returns { learner, master }: the line for each.
+  */
+  function acceptApprentice(actorId, masterId, o) {
+    var half = o && o.half;
+    if (!half || !o.master || o.master !== masterId) {
+      return { learner: 'That offer came from another of their characters, and it has gone.', master: '' };
+    }
+    var ls = stateOf(actorId);
+    var ms = stateOf(masterId);
+    var who = { id: masterId, name: personName(masterId), at: Date.now() };
+    var r = arrange(actorId, ls, ms, half, who);
+    if (!r.ok) {
+      return { learner: 'That cannot be done now, and ' + who.name + ' has been told why.',
+               master: 'No: ' + r.why + '.' };
+    }
+    var name = personName(actorId);
+    writeState(actorId, r.state);
+    var m2 = P.clone(ms);
+    var rows = [];
+    var had = m2.apprentices || [];
+    for (var i = 0; i < had.length; i++) {
+      if (had[i] && !(had[i].id === actorId && had[i].half === half)) { rows.push(had[i]); }
+    }
+    rows.push({ id: actorId, name: name, half: half, kind: r.kind, at: who.at });
+    m2.apprentices = rows;
+    writeState(masterId, m2);
+    clog(masterId.toString(16), 'took', actorId.toString(16), 'on in', half, '(' + r.kind + ')');
+    if (r.kind === 'sister') {
+      return { learner: who.name + ' has taken you on in ' + nameOf(half) + '. Work in it climbs past novice now, ' +
+                        'and the ranks you earn stay yours if it ends.',
+               master: name + ' is your apprentice in ' + nameOf(half) + '. /apprentice end ' + name + ' ends it.' };
+    }
+    var school = P.TABLE.schools.indexOf(half) !== -1;
+    return { learner: who.name + ' taught you novice ' + nameOf(half) + '. ' +
+                      (school ? 'You can learn ' + P.TABLE.limits.outsiderSpells + ' novice spells of it, each from its tome'
+                              : 'It is in your recipe book on K') +
+                      ', and it never climbs past novice. It is one of your two outside trades.',
+             master: 'You taught ' + name + ' novice ' + nameOf(half) + '. /apprentice end ' + name + ' ends it.' };
+  }
+
+  /** The Master ends it. Returns the line for the Master. */
+  function endIt(actorId, words) {
+    var ms = stateOf(actorId);
+    var rows = ms.apprentices || [];
+    if (!rows.length) { return 'You have taken nobody on.'; }
+    var half = null;
+    if (words.length > 1) {
+      half = halfKey(words[words.length - 1]);
+      if (half) { words = words.slice(0, -1); }
+    }
+    var want = words.join(' ').trim().toLowerCase();
+    if (!want) { return 'End whose? /apprentice end <name>, and the half when they are with you in two.'; }
+    var asId = parseInt(want, 16);
+    var exact = [], part = [];
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      if (!row || (half && row.half !== half)) { continue; }
+      var n = String(row.name || '').toLowerCase();
+      if ((isFinite(asId) && row.id === asId) || n === want) { exact.push(row); }
+      else if (n.indexOf(want) === 0) { part.push(row); }
+    }
+    var hit = exact.length ? exact : part;
+    if (!hit.length) { return 'Nobody you have taken on answers to that.'; }
+    for (var j = 1; j < hit.length; j++) {
+      if (hit[j].id !== hit[0].id) { return 'More than one of yours answers to that. Use more of the name.'; }
+    }
+    if (hit.length > 1) {
+      var named = [];
+      for (var k = 0; k < hit.length; k++) { named.push(nameOf(hit[k].half)); }
+      return hit[0].name + ' is with you in ' + named.join(' and ') + '. Say which: /apprentice end ' +
+             hit[0].name + ' ' + hit[0].half + '.';
+    }
+    var end = hit[0];
+    var ended = null;
+    var ls = readState(end.id);
+    if (ls) {
+      var r = P.release(ls, end.half, actorId);
+      if (r.ok) {
+        writeState(end.id, r.state);
+        ended = r.ended;
+      }
+    }
+    var m2 = P.clone(ms);
+    var keep = [];
+    for (var m = 0; m < rows.length; m++) {
+      if (rows[m] && !(rows[m].id === end.id && rows[m].half === end.half)) { keep.push(rows[m]); }
+    }
+    m2.apprentices = keep;
+    writeState(actorId, m2);
+    clog(actorId.toString(16), 'ended', end.id.toString(16), 'in', end.half, '(' + (ended || 'their side was already gone') + ')');
+    var me = personName(actorId);
+    var told = (ended === 'outside')
+      ? me + ' has ended your teaching in ' + nameOf(end.half) + ', and its novice list is gone. It still counts as ' +
+        'one of your two outside trades.'
+      : me + ' has ended your apprenticeship in ' + nameOf(end.half) + '. The ranks you earned in it stay; past them ' +
+        'the count waits again until a Master takes you on.';
+    if (!ended) {
+      // Their own record no longer named this Master in that half, or their
+      // character is gone: there was nothing on their side to end.
+      return 'You took ' + end.name + ' off your list. Their side no longer named you in ' +
+             nameOf(end.half) + ', so nothing else changed.';
+    }
+    try { if (typeof say === 'function') { say(end.id, told); } } catch (e) { }
+    if (ended === 'outside') {
+      return 'You ended ' + end.name + '\'s novice ' + nameOf(end.half) + '. It is gone from their book, and it ' +
+             'still counts as one of their two outside trades.';
+    }
+    return 'You ended ' + end.name + '\'s apprenticeship in ' + nameOf(end.half) + '. The ranks they earned stay.';
+  }
+
+  /** /apprentice, every form of it. Answers through toProfile and always handles the word. */
+  function apprenticeCommand(parts, actorId, profileId, toProfile) {
+    if (!actorId) {
+      toProfile(profileId, 'The server cannot find your character right now. Give it a moment and try again.');
+      return;
+    }
+    var words = parts.slice(1);
+    var first = String(words[0] || '').toLowerCase();
+    if (!words.length || first === 'list') { toProfile(profileId, standing(actorId)); return; }
+    if (first === 'end') { toProfile(profileId, endIt(actorId, words.slice(1))); return; }
+    toProfile(profileId, offerIt(actorId, words));
+  }
+
+  /*
     The commands. Called from handle() in the chat block with the same
     arguments it has, so the profile id is the one the voice service stamped
     from the connection and not a number in the text.
@@ -39035,6 +39782,7 @@ log('gamemode loaded:',
         word === '/steward' || word === '/evict' || word === '/box' ||
         word === '/rent' || word === '/notice' || word === '/job' ||
         word === '/board' || word === '/take' || word === '/jobs' ||
+        word === '/letter' || word === '/deliver' ||
         word === '/dropjob' || word === '/unpin') {
       if (!actorId) {
         toProfile(profileId, 'The server cannot find your character right now. Give it a moment and try again.');
@@ -39081,6 +39829,12 @@ log('gamemode loaded:',
         clog('the farming word', word, 'threw:', eFarm);
         toProfile(profileId, 'That did not work. Say what you were standing next to in the dev channel.');
       }
+      return true;
+    }
+
+    // Masters and apprentices (#1388): see apprenticeCommand above.
+    if (word === '/apprentice') {
+      apprenticeCommand(parts, actorId, profileId, toProfile);
       return true;
     }
 
@@ -39375,6 +40129,7 @@ log('gamemode loaded:',
     beginCreation: beginCreation, updateOwnerScript: updateOwnerScript,
     gate: gate, gateHalf: gateHalf, credit: credit,
     grantSpell: grantSpell, grantKnown: grantKnown, nameOf: nameOf, raiseLines: raiseLines,
+    acceptApprentice: acceptApprentice, masterFor: masterFor,
     rankOf: function (actorId, key) { return P.rankOf(stateOf(actorId), key); }
   };
   clog('ready');
@@ -41153,10 +41908,14 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // A carriage or ferry, at the driver (#1394). See the carriages block.
                '/ride',
                '/pick', '/spend',
+               // A Master taking somebody on, and ending it (#1388). See the
+               // character block.
+               '/apprentice',
                '/plant', '/claim', '/plot',
                '/deed', '/deeds', '/lock', '/unlock', '/mold', '/key',
                '/jarl', '/steward', '/evict', '/box', '/rent',
                '/notice', '/job', '/board', '/take', '/jobs', '/dropjob', '/unpin',
+               '/letter', '/deliver',
                '/tp', '/goto', '/face', '/restart', '/shutdown', '/tspicks',
                // Playtesters', like /tp, and gated the same way. Deliberately
                // absent from PLAYER_WORDS: naming them in /help would be an
@@ -41228,7 +41987,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // the steward half answers "only a steward sets rent"
                       // to everybody else.
                       '/box', '/rent', '/notice', '/job', '/board',
-                      '/take', '/jobs', '/dropjob', '/unpin', '/help',
+                      '/take', '/jobs', '/dropjob', '/unpin', '/letter', '/deliver', '/help',
                       // Everybody's, and they need to be findable: a meter
                       // nobody knows how to act on is only a penalty.
                       '/needs', '/rest', '/eat', '/drink', '/bard',
@@ -41241,6 +42000,9 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // Everybody's, and they have to be findable: a key
                       // prompt nobody sees is a feature nobody has.
                       '/friend', '/party', '/mute', '/hidename', '/trade', '/journal', '/book', '/merchant',
+                      // Everybody's: a Master takes somebody on with it, and
+                      // anybody can ask who took them on (#1388).
+                      '/apprentice',
                       '/yes', '/no', '/roll'];
 
 // ---------------------------------------------------------------------------
@@ -42387,6 +43149,14 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           if (!tr || !tr.begin) { toProfile(profileId, 'Trading is not running on this server.'); return true; }
           var started = tr.begin(themActor, actorId);
           if (started) { toProfile(profileId, started); return true; }
+        } else if (o.kind === 'apprentice') {
+          /* A Master offered to take this person on (#1388). The character
+             block holds the record, so it checks again and writes both. */
+          var chAp = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodCharacter;
+          if (!chAp || !chAp.acceptApprentice) { toProfile(profileId, 'That is not running on this server.'); return true; }
+          var tookOn = chAp.acceptApprentice(actorId, themActor, o);
+          toProfile(profileId, tookOn.learner);
+          if (tookOn.master) { say(themActor, tookOn.master); }
         }
         soc.push(actorId);
         if (themActor) { soc.push(themActor); }
@@ -43231,7 +44001,10 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       if (topic === 'work' || topic === 'trade' || topic === 'class') {
         toProfile(profileId,
           'K opens your profession, your class and your skill tree. Work at what ' +
-          'you chose and the rank climbs on its own. /plot says what is in the ' +
+          'you chose and the rank climbs on its own. Your sister half stops at ' +
+          'novice until a Master of it takes you on: a Master types /apprentice ' +
+          '<name>, and /apprentice end <name> ends it. /apprentice on its own ' +
+          'says who took you on. /plot says what is in the ' +
           'ground in front of you and whose farm it is, /plant sows it.');
         return;
       }
