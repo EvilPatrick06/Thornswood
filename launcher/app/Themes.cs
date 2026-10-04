@@ -138,6 +138,14 @@ namespace Thornswood
                 "AccentInk","#F2F8FC", "Ok","#3C7D4E", "Warn","#8A6A20",
                 "Bad","#A33A2E" }, "#FFFFFF"),
 
+            Make("Black Wine", "Black and dark wine.", false, new string[] {
+                "Bg","#070406", "Panel","#12080C", "Card","#1C0C12",
+                "CardHover","#2A1018", "Deep","#030102", "Line","#3A1824",
+                "Edge","#5A2434", "Ink","#F3E4E8", "Muted","#C49AA6",
+                "Faint","#8A6672", "Accent","#6E2438", "AccentSoft","#3C6E2438",
+                "AccentInk","#F6E8EA", "Ok","#5C9C66", "Warn","#B9903F",
+                "Bad","#B8483C" }),
+
         };
 
         public static Theme Find(string name)
