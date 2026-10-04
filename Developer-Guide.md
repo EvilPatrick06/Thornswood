@@ -41,6 +41,8 @@ The outline nests, and the table of contents follows it. A part is a numbered se
   - [The rules](#the-rules)
     - [What this is](#what-this-is)
     - [Words](#words)
+    - [Fix the cause, no band-aids](#fix-the-cause-no-band-aids)
+    - [Buttons, not chat commands](#buttons-not-chat-commands)
     - [Everything we need to do goes on the board](#everything-we-need-to-do-goes-on-the-board)
     - [Settled design, not up for a quiet rewrite](#settled-design-not-up-for-a-quiet-rewrite)
     - [How work moves](#how-work-moves)
@@ -654,6 +656,63 @@ game's chat lines, the bot's replies), because a word check there cannot
 tell a message from a name in the code or one of Skyrim's own record names;
 and names in the other documents, which record who decided something and
 who holds what on purpose.
+
+#### Fix the cause, no band-aids
+
+Decided by Patrick on 4 Oct: "lets ban patching or bandaids for fixes and
+actually fix things", and in the same conversation, no band-aids and no patch
+work at all. What prompted it: a Riekling lost its clothes walking out of the
+Bannered Mare to the remount added for #614, code that existed to cover a
+neck fault nobody had found, and the first fix offered for that was a second
+layer that made the remount retry (#1601, closed unmerged).
+
+A fix finds why something goes wrong and changes that. None of these is a
+fix, whoever writes it and however small:
+
+- code that notices the damage and undoes it: re-equip loops, putting
+  something back when it is found off, a watcher on a timer that repairs
+  state, a second ask in case the first one was ignored;
+- a retry, a wait or a delay that hopes a race comes out right, instead of
+  putting the steps in order;
+- taking something off and putting it back, or reloading it, so the engine
+  draws it again;
+- a layer over an earlier band-aid to cover what that one broke;
+- catching an error and carrying on, hiding a message, or turning a check off
+  so the symptom stops showing.
+
+Before a fix is written, its issue says what causes the problem and how that
+was measured: the log line and its time, the file, the record, the steps that
+make it happen. While the cause is not known, finding it is the work: write
+on the issue what was measured and what is still unknown, and ship nothing for
+it in the meantime. A cause in the engine is fixed in the fork
+(`engine\skymp`), not worked around in a plugin or the gamemode.
+
+The band-aids already in the tree are defects, and each one goes on the
+board. Taking one out means finding the cause it covered and fixing that in
+the same pull request. Known on 4 Oct: the Riekling and Goblin clothes remount
+in `game\plugins\thornswood-front.js` (#614), and in `game\gamemode.js` the
+`dressIfBare` watch (#1604), the `wearWhatIsWorn` ask at login and the wear
+script's retries.
+
+A retry is allowed only where failing is outside our control and expected:
+a request over the network, a file another program has open. The reason is
+written beside it, and it stops and says so instead of looping.
+
+Every pull request says, under What changed, what the cause was and how it
+was found. One that cannot say it is not merged.
+
+#### Buttons, not chat commands
+
+Decided by Patrick on 4 Oct: "no more commands for things [people] do,
+only for dev and staff commands; everything else takes buttons and GUI".
+Anything a person does in the world is a key, a prompt, a panel or the
+thing itself activated, never a line typed in the chat. Staff and dev
+commands stay commands. Never add a chat command for people. A panel may
+send the server a line, but no person is told to type it and help text
+never lists it. [docs/SYSTEMS.md](docs/SYSTEMS.md), "Buttons, not
+commands", is the rule and what counts as a button;
+[docs/systems/commands.md](docs/systems/commands.md) lists every command
+there is today and the issue that converts each one.
 
 #### Everything we need to do goes on the board
 

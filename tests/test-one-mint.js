@@ -333,10 +333,13 @@ const WRITERS = {
   'property/giveNamed': [1, 'one named key or mold, KEY or MOLD'],
   'property/takeBlankMold': [1, 'only takes a mold away'],
   'property/nameFreshKey': [1, 'names one key off a stack, and the count is the same after'],
-  'property/takeGold': [1, 'takes a notice or job fee out and never puts any in (checked below)'],
+  'property/takeGold': [1, 'takes a notice, job or letter fee or a fare out and never puts any in (checked below)'],
+  'property/payOut': [1, 'a letter\'s held 15 back out of the ledger it was counted on, to its courier or its sender; payHeld is its one caller and takes the same off that ledger (#1374, checked below)'],
   'spoils/strip': [1, 'only takes things out of a container the world stocked'],
   'spoils/purse': [1, 'THE MINT: forty gold, once per character'],
-  'trade/moveById': [2, 'moves a pile from one pack to the other, one write each (section 4)']
+  'trade/moveById': [2, 'moves a pile from one pack to the other, one write each (section 4)'],
+  'outer/markWoven': [1, 'names a garment a Master Weaver just made: units split off a plain stack of the same base, so no base is added and the count is the same after (#1398, test-1398-fuel.js)'],
+  'durability/writePack': [1, 'writes back a pack or chest it has just read: a stack renamed for its condition, or a kit or a broken piece taken away. No base is added and no count grows (test-1384-condition.js)']
 };
 
 const writes = {};
@@ -383,9 +386,10 @@ for (const at of Object.keys(WRITERS)) {
 }
 
 {
-  // Of all the writers, only two name gold: the mint that hands it out and
-  // the fee that takes it. A third one naming gold is a second mint until
-  // somebody has read it.
+  // Of all the writers, only three name gold: the mint that hands it out,
+  // the fee that takes it, and the ledger paying a letter's held pay back
+  // out (#1374). A fourth one naming gold is a second mint until somebody
+  // has read it.
   const namesGold = /\b(GOLD|GOLD_ID|goldId)\b|\b0x0*[fF]\b/;
   const naming = [];
   for (const at of Object.keys(WRITERS)) {
@@ -393,9 +397,9 @@ for (const at of Object.keys(WRITERS)) {
     if (body !== null && namesGold.test(body)) { naming.push(at); }
   }
   naming.sort();
-  yes('of the writers, only purse and takeGold name gold' +
+  yes('of the writers, only purse, takeGold and payOut name gold' +
       (naming.length ? ' (' + naming.join(', ') + ')' : ''),
-      naming.join(',') === 'property/takeGold,spoils/purse');
+      naming.join(',') === 'property/payOut,property/takeGold,spoils/purse');
 }
 
 {
@@ -430,8 +434,10 @@ for (const at of Object.keys(WRITERS)) {
     case is there more gold afterwards than before.
 
     It does not refuse a negative amount, and a negative amount would add.
-    Nothing hands it one: its one caller passes a fee that is one of two
-    positive constants, which is checked here rather than trusted.
+    Nothing hands it one: the board passes a fee that is one of two positive
+    constants, a letter passes its fee and pay, and a ride (#1394) passes its
+    fare, which is one of three and is refused at 0 or less before takeGold is
+    reached. All are checked here rather than trusted.
   */
   const take = lift('  function takeGold(actorId, amount) {', '\n  }\n');
   yes('the fee taker is in the gamemode', take !== null);
@@ -460,11 +466,96 @@ for (const at of Object.keys(WRITERS)) {
   }
   const notice = /\bvar NOTICE_FEE = (\d+);/.exec(code);
   const job = /\bvar JOB_FEE = (\d+);/.exec(code);
-  yes('its one caller passes the fee, and the fee is NOTICE_FEE or JOB_FEE',
-      callers.join(',') === 'fee' &&
-      /\bvar fee = isJob \? JOB_FEE : NOTICE_FEE;/.test(code));
-  yes('and both fees are more than nothing',
-      !!notice && !!job && Number(notice[1]) > 0 && Number(job[1]) > 0);
+  const letterFee = /\bvar LETTER_FEE = (\d+);/.exec(code);
+  const letterPay = /\bvar LETTER_PAY = (\d+);/.exec(code);
+  yes('its four callers pass the fee, NOTICE_FEE or JOB_FEE, a letter\'s cost, LETTER_FEE and LETTER_PAY, a ride\'s fare and a night\'s price',
+      callers.slice().sort().join(',') === 'cost,fee,price,price' &&
+      /\bvar fee = isJob \? JOB_FEE : NOTICE_FEE;/.test(code) &&
+      /\bvar cost = LETTER_FEE \+ LETTER_PAY;/.test(code));
+  const fares = ['FARE_FERRY', 'FARE_CARRIAGE', 'FARE_RAVEN_ROCK'].map(function (n) {
+    const m = new RegExp('\\bvar ' + n + ' = (\\d+);').exec(code);
+    return m ? Number(m[1]) : 0;
+  });
+  yes('the fare is fare(), refused at 0 or less, and all three fares are more than nothing',
+      /\bvar price = fare\(from, to\);\s*\n(\s*\/\/[^\n]*\n)*\s*if \(!\(price > 0\)\) \{ return /.test(code) &&
+      fares.every(function (n) { return n > 0; }));
+  yes('and every one of those is more than nothing',
+      !!notice && !!job && Number(notice[1]) > 0 && Number(job[1]) > 0 &&
+      !!letterFee && !!letterPay && Number(letterFee[1]) > 0 && Number(letterPay[1]) > 0);
+  /*
+    A NIGHT IN A BED (#1392) takes the holder's price and hands the same
+    number to the holder through payOut, so it moves coin and makes none. The
+    price is a whole number above nothing, both where /bed sets it and where
+    the book is read back, so a negative amount never reaches takeGold.
+  */
+  const night = lift('  function payNight(actorId, profileId, building, held, price) {', '\n  }\n');
+  const cmd = lift('  function bedCmd(parts, actorId, profileId, toProfile) {', '\n  }\n');
+  const load = lift('  function loadBedBook() {', '\n  }\n');
+  yes('a night takes its price before anything is handed over, and refuses when it cannot',
+      night !== null && /^\s+if \(!takeGold\(actorId, price\)\) \{ return false; \}$/m.test(night) &&
+      night.indexOf('takeGold(actorId, price)') < night.indexOf('payOut('));
+  yes('the price is set as a whole number above nothing, and read back as one',
+      cmd !== null && /var amount = \/\^\\d\+\$\/\.test\(arg\) \? Number\(arg\) : 0;/.test(cmd) &&
+      /if \(!\(amount > 0\) \|\|/.test(cmd) &&
+      load !== null && /if \(by > 0 && price > 0 && Math\.floor\(price\) === price\)/.test(load));
+  const kept = lift('  function payTakings(online) {', '\n  }\n');
+  yes('the kept takings only ever grow by a night\'s price that was taken',
+      night !== null && /bedBook\.takings\[held\.by\] = \(Number\(bedBook\.takings\[held\.by\]\) \|\| 0\) \+ price;/.test(night) &&
+      (code.match(/bedBook\.takings\[[^\]]+\] = /g) || []).length === 1 &&
+      kept !== null && /delete bedBook\.takings\[pid\];/.test(kept));
+  yes('and a night hands over the price it took, and the takings what was kept',
+      night !== null && /payOut\(to, price\)/.test(night) &&
+      kept !== null && /payOut\(online\[i\], gold\)/.test(kept));
+}
+
+{
+  /*
+    payOut puts gold in a pack, so it is read the way takeGold is (#1374).
+    Its one caller is payHeld, which pays a letter's own held pay, never more
+    than that hold's ledger holds, takes the same count off the ledger, and
+    zeroes the pay so it is paid once. Driven here: packs plus ledger add up
+    to the same after a payout, and a ledger short of the pay pays nothing.
+  */
+  const calls = [];
+  const re = /\bpayOut\(/g;
+  let m2;
+  while ((m2 = re.exec(code)) !== null) {
+    if (code.slice(Math.max(0, m2.index - 9), m2.index) === 'function ') { continue; }
+    calls.push(where(m2.index));
+  }
+  yes('payOut\'s callers are payHeld, and a night in a bed and its kept takings (#1392)',
+      calls.slice().sort().join(',') === 'property/payHeld,property/payNight,property/payTakings');
+  const pay = lift('  function payOut(actorId, amount) {', '\n  }\n');
+  const held = lift('  function payHeld(hold, n, actorId) {', '\n  }\n');
+  yes('the payout and the held pay are in the gamemode', pay !== null && held !== null);
+  if (pay !== null && held !== null) {
+    attempt('driving payHeld', function () {
+      const A = 0xff000058;
+      const store = {};
+      store[A] = { inventory: { entries: [{ baseId: GOLD, count: 5 }] } };
+      const ledger = { riften: 35 };
+      const api = new Function('mp', 'GOLD_ID', 'funds', 'plog',
+        pay + '\n' + held + '\nreturn { payHeld: payHeld, payOut: payOut };')(
+        fakeMp(store), GOLD, ledger, function () { });
+      const api2 = api.payHeld;
+      const letter = { letter: true, pay: 15 };
+      const before = goldIn(store[A].inventory) + ledger.riften;
+      yes('a letter\'s 15 goes from the ledger to the pack, and the total is the same',
+          api2('riften', letter, A) === 15 && goldIn(store[A].inventory) === 20 &&
+          ledger.riften === 20 && goldIn(store[A].inventory) + ledger.riften === before);
+      yes('and it is paid once', api2('riften', letter, A) === 0 && goldIn(store[A].inventory) === 20);
+      const short = { riften: 10 };
+      const api3 = new Function('mp', 'GOLD_ID', 'funds', 'plog',
+        pay + '\n' + held + '\nreturn payHeld;')(fakeMp(store), GOLD, short, function () { });
+      yes('a ledger short of the pay pays nothing',
+          api3('riften', { letter: true, pay: 15 }, A) === -1 &&
+          goldIn(store[A].inventory) === 20 && short.riften === 10);
+      yes('a notice holds nothing to pay', api2('riften', { pay: 15 }, A) === 0 &&
+          goldIn(store[A].inventory) === 20);
+      yes('payOut refuses a count that is not more than nothing',
+          api.payOut(A, 0) === false && api.payOut(A, -5) === false && goldIn(store[A].inventory) === 20);
+    });
+  }
 }
 
 // ------------------------------------- 3. no descriptor in the file is gold
@@ -583,7 +674,8 @@ function goldDescriptors(text) {
     'hit.desc': 'the testers\' /give, out of the index built from these same tables',
     'GOLD_DESC': 'scene finish gold, the same named GOLD_DESC row the checked dungeon reward uses',
     'open.itemDesc': 'puts back the retrieval good the place row already handed over; not a coin',
-    'place.item': 'the unbound scene container good on the place row; not a coin'
+    'place.item': 'the unbound scene container good on the place row; not a coin',
+    'row.out': 'Grand Chef\'s second batch, the output of a Cook row of RECIPES_BY_ID (#1398), and section 5 says no recipe makes gold'
   };
   const re = /\baddItem\(\s*[^,()]+,\s*([^,]+?),/g;
   const unknown = [];

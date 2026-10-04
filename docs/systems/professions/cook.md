@@ -32,6 +32,6 @@ apply.
 
 ## Where this is
 
-Both lists, the oven, the mill, and the cookpot's recipe gate are in
-the server. Grand Chef's second portion is not. The food effects
+Both lists, the oven, the mill, the cookpot's recipe gate, and Grand
+Chef's second portion are in the server. The food effects
 beyond the current hunger numbers are the plan on the food page.

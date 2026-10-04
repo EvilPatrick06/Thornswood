@@ -332,9 +332,10 @@ foreach ($f in $files) {
 Yes ('no script names C:/Windows/Temp/thornswood-remote.ps1 (' + ($shared -join ', ') + ')') ($shared.Count -eq 0)
 
 # A function that copies a script up and runs it by file itself, rather than
-# through Send-Script.ps1, names the file afresh each run. Two do on purpose:
-# Harden-VPS.ps1 sends a file of the repository with its own arguments, and
-# Feed-Store.ps1 is part of Ship; both already used a guid before #1070.
+# through Send-Script.ps1, names the file afresh each run. Harden-VPS.ps1
+# does that on purpose: it sends a file of the repository with its own
+# arguments, and it already used a guid before #1070. Feed-Store.ps1 used to
+# be the other one; since #1167 Invoke-FeedStoreOp sends through the helper.
 $own = @()
 foreach ($f in $files) {
     if ($f.Name -eq 'Send-Script.ps1') { continue }
@@ -376,5 +377,35 @@ Yes 'Remote.ps1, Send-Secret.ps1 and Artifact.ps1 send through it too' (
 $helperText = [IO.File]::ReadAllText($sendScript)
 Yes 'Send-Script.ps1 turns host key checking on with =yes and never anything weaker (#1078)' (
     $helperText -match "'StrictHostKeyChecking=yes'" -and $helperText -notmatch 'StrictHostKeyChecking=(no|accept-new)')
+
+# ---- Feed-Store.ps1, through the helper, against the same stand-in (#1167) --
+Reset
+$feedStore = Join-Path $repo 'scripts\release\Feed-Store.ps1'
+Yes 'Feed-Store.ps1 is there' (Test-Path -LiteralPath $feedStore)
+. $feedStore
+$feedSite = Join-Path $script:work 'feed-site'
+New-Item -ItemType Directory -Path $feedSite -Force | Out-Null
+$oldSite = $env:THORNSWOOD_TEST_SITE_DIR
+Remove-Item Env:THORNSWOOD_TEST_SITE_DIR -ErrorAction SilentlyContinue
+try {
+    $feedOut = @(Invoke-FeedStoreOp 'main' 'look' @('version.json') @{} @{} '' @{ Vps = 'box.invalid'; User = 'tester'; Root = ($feedSite.Replace('\', '/')) })
+} finally {
+    if ($null -ne $oldSite) { $env:THORNSWOOD_TEST_SITE_DIR = $oldSite }
+}
+$feedRc = $LASTEXITCODE
+$feedScp = Calls 'scp'
+$feedDest = ''
+if ($feedScp.Count) { $feedDest = $feedScp[0].Command.Substring($feedScp[0].Command.IndexOf(':') + 1) }
+Yes 'Feed-Store Invoke-FeedStoreOp sends a long script through Invoke-ThornswoodRemote (#1167)' ($feedDest -match $nameShape)
+Yes '  not under its old thornswood-feed-store name' ($feedDest -notmatch 'thornswood-feed-store')
+Yes '  the stand-in ran it and it said DONE' ($feedOut -contains 'DONE')
+Yes '  and NONE for a file the scratch store does not have' ($feedOut -contains 'NONE|version.json')
+Yes '  the file is removed afterwards' ((Left) -eq 0)
+Yes '  and the far side''s exit code comes back, not a dropped one' ($feedRc -eq 0)
+$feedFn = ''
+$ft = $null; $fe = $null
+$fast = [System.Management.Automation.Language.Parser]::ParseFile($feedStore, [ref]$ft, [ref]$fe)
+foreach ($fn in @($fast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Invoke-FeedStoreOp' }, $true))) { $feedFn = $fn.Extent.Text }
+Yes '  and Invoke-FeedStoreOp no longer copies a script up itself' ($feedFn -match 'Invoke-ThornswoodRemote -Target' -and $feedFn -notmatch '&\s*scp\b')
 
 Done

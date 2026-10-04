@@ -40,6 +40,8 @@ function fixture(options = {}) {
   HUNT_TUNING:{bodySeconds:300},
   isCarcass(desc) { return desc === 'wolf:Skyrim.esm'; },
   creditWork(id,half) { credits.push({id,half});return 'Warrior rank increased'; },
+  // How many pieces a kill is (#1386); its own harness is test-1386-warrior.js.
+  killPieces() { return 1; },
   notify(id,message) { notices.push({id,message}); },
   say() {},log(...args) { logs.push(args); },
   resolveArrival(site) { arrivals.push(plain(site));return options.noArrival ? null : plain(temple); },

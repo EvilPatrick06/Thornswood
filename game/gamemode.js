@@ -1763,8 +1763,14 @@ function halfGate(actorId, half, rank, refusal) {
  * A yield has been handed out: count the work, and hand back the line about a
  * new rank when one was reached. Anything going wrong here costs a count, not
  * somebody's salt, so it is swallowed.
+ *
+ * n is how many pieces this one piece of work is, one when it is not given. A
+ * warrior's kill is the one caller that passes it (#1386): a dragon is 16
+ * pieces. It is still one swing for tiredness, the page's "the same rest cost
+ * as a swing of a pick", and the party bonus is 15% of the whole count.
  */
-function creditWork(actorId, key) {
+function creditWork(actorId, key, n) {
+  const pieces = (typeof n === 'number' && n >= 1) ? Math.floor(n) : 1;
   /*
     Every piece of work is also a piece of tiredness.
 
@@ -1816,14 +1822,14 @@ function creditWork(actorId, key) {
     listed together is a checkbox everybody ticks once and never thinks about
     again.
   */
-  let extra = false;
+  let extra = 0;
   try {
     const soc = globalThis.__thornswoodSocial;
     if (soc && soc.workBonus) {
       const over = soc.workBonus(actorId) - 1;
       if (over > 0) {
-        PARTY_BANK[actorId] = (PARTY_BANK[actorId] || 0) + over;
-        if (PARTY_BANK[actorId] >= 1) { PARTY_BANK[actorId] -= 1; extra = true; }
+        PARTY_BANK[actorId] = (PARTY_BANK[actorId] || 0) + over * pieces;
+        while (PARTY_BANK[actorId] >= 1) { PARTY_BANK[actorId] -= 1; extra++; }
       }
     }
   } catch (e) { }
@@ -1832,9 +1838,10 @@ function creditWork(actorId, key) {
   if (!c || !c.credit) { return null; }
   try {
     let line = c.credit(actorId, key);
-    if (extra) {
-      // The second piece's answer wins when it has one, because a rank raised
-      // by the bonus piece is the thing worth saying.
+    // Every piece after the first, and then the bonus pieces. A later
+    // piece's answer wins when it has one, because a rank raised by the last
+    // piece is the thing worth saying.
+    for (let i = 1; i < pieces + extra; i++) {
       const more = c.credit(actorId, key);
       if (more) { line = more; }
     }
@@ -5591,6 +5598,116 @@ function startChargenTimer() {
 ensureProperties();
 startChargenTimer();
 
+/*
+  HOW MANY PIECES ONE KILL IS WORTH TO A WARRIOR (#1386).
+
+  docs/systems/professions/warrior.md, "How much one kill is worth": a chicken
+  and a dragon are not the same fight, so the piece count follows how hard the
+  thing was. Until this, every kill was one piece.
+
+  THE HUNTER LIST FIRST. When the body's base is on the hunter list
+  (HUNTS_BY_BASE), the pieces are that row's own hunter rank: novice 1,
+  advanced 2, expert 4, master 8. A named body uses its own row, so Karhu, who
+  is master on that list, is 8 although a bear is 4. The page says so in those
+  words, and it is why a base on the list never reaches the race lines below.
+
+  EVERYTHING ELSE BY THE RACE THE ENGINE SAYS IT IS. A bandit, a draugr and a
+  dragon are not on the hunter list, and their base is often a levelled
+  template, so the race on the record itself is not the answer (the hunt
+  table's build script measured over a thousand people whose own RNAM says
+  fox). Actor.GetRace in the fork follows the actor's own template chain, the
+  one the engine rolled when it spawned, so it names the race the body really
+  has. The race's editor id is read out of RACES, the table of every RACE
+  record in the load order, and matched against the lines on the page, first
+  match winning, so a dragon priest is read before a dragon:
+
+    Bandit, guard, forsworn, skeleton           2   the people's races and
+                                                    every skeleton race
+    Draugr, falmer, hagraven                    4
+    Giant, dragon priest, centurion, lurker     8
+    Dragon                                     16
+
+  and, for an animal that is not on the hunter list, the strength table's own
+  kinds: sabre cat, troll, frostbite spider, horse, horker and netch calf 2,
+  bear and chaurus 4, mammoth and a grown netch 8. A named animal off the list
+  uses its kind, which is what the race is. Anything the page does not name
+  (an atronach, a spriggan, a dwarven sphere) is the novice line, 1, which is
+  what every kill was before, and that choice is a question on the issue.
+
+  A PERSON KILLED BY A PERSON IS STILL NOTHING. That test is in mp.onDeath and
+  is not this function's: nothing here is asked about a person's body.
+*/
+const WARRIOR_KILL = {
+  byRank: { novice: 1, advanced: 2, expert: 4, master: 8 },
+  byRace: [
+    [/dragonpriest/, 8],
+    [/dragon|alduin/, 16],
+    [/^(c00)?giant|frostgiant/, 8],
+    [/centurion/, 8],
+    [/lurker/, 8],
+    [/draugr|falmer|hagraven/, 4],
+    [/skeleton/, 2],
+    [/^(dlc1)?(nord|imperial|breton|redguard|orc|argonian|khajiit|woodelf|highelf|darkelf|elder)race/, 2],
+    [/mammoth|^dlc2netchrace$/, 8],
+    [/^bear|chaurus/, 4],
+    [/sabrecat|troll|frostbitespider|horse|horker|netchcalf/, 2]
+  ],
+  fallback: 1
+};
+
+/** The pieces one kill is worth: the hunter list's rank for a base on it, else
+ *  the race's line. Pure, so the harness can ask it about any body. */
+function warriorPieces(baseDesc, raceEdid) {
+  const base = String(baseDesc || '');
+  if (base && Object.prototype.hasOwnProperty.call(HUNTS_BY_BASE, base)) {
+    const rank = HUNTS_BY_BASE[base].rank;
+    if (Object.prototype.hasOwnProperty.call(WARRIOR_KILL.byRank, rank)) {
+      return WARRIOR_KILL.byRank[rank];
+    }
+  }
+  const race = String(raceEdid || '').toLowerCase();
+  if (race) {
+    for (let i = 0; i < WARRIOR_KILL.byRace.length; i++) {
+      if (WARRIOR_KILL.byRace[i][0].test(race)) { return WARRIOR_KILL.byRace[i][1]; }
+    }
+  }
+  return WARRIOR_KILL.fallback;
+}
+
+/** The editor id of the race the engine says this actor is, or '' when it
+ *  cannot say. The descriptor is read as the engine writes it and, failing
+ *  that, with its hex put the way RACES writes it. */
+function raceEdidOf(actorId) {
+  let desc = '';
+  try {
+    const r = mp.callPapyrusFunction('method', 'Actor', 'GetRace',
+      { type: 'form', desc: mp.getDescFromId(actorId) }, []);
+    desc = (r && r.desc) ? String(r.desc) : '';
+  } catch (e) {
+    return '';
+  }
+  const items = (typeof RACES !== 'undefined' && RACES && RACES.items) ? RACES.items : null;
+  if (!desc || !items) { return ''; }
+  let row = Object.prototype.hasOwnProperty.call(items, desc) ? items[desc] : null;
+  if (!row) {
+    const at = desc.indexOf(':');
+    const hex = at > 0 ? parseInt(desc.slice(0, at), 16) : NaN;
+    const again = isNaN(hex) ? '' : hex.toString(16) + desc.slice(at);
+    row = (again && Object.prototype.hasOwnProperty.call(items, again)) ? items[again] : null;
+  }
+  return row ? String(row.e || '') : '';
+}
+
+/** How many pieces killing this actor is worth to a warrior. */
+function killPieces(actorId) {
+  let base = '';
+  try { base = String(mp.get(actorId, 'baseDesc') || ''); } catch (e) { base = ''; }
+  if (base && Object.prototype.hasOwnProperty.call(HUNTS_BY_BASE, base)) {
+    return warriorPieces(base, '');
+  }
+  return warriorPieces(base, raceEdidOf(actorId));
+}
+
 /**
  * Set the arrival point at the moment of death, while we still know where the
  * body fell. The engine reads spawnPoint when the respawn timer expires.
@@ -5601,6 +5718,23 @@ startChargenTimer();
  * a person.
  */
 mp.onDeath = guard('onDeath', function (actorId, killerId) {
+  /*
+    A BLOW THE SERVER LANDED ITSELF STILL HAS A KILLER (#1386). The extra
+    damage of a warrior's Heavy or Wreck is written by the maneuvers block
+    after the engine's own hit, and the engine kills with no killer when a
+    write takes health to nothing. The maneuvers block remembers whose blow
+    that was for a moment, and it is asked here, before anything reads the
+    killer.
+  */
+  if (!killerId) {
+    try {
+      var blowBy = globalThis.__thornswoodManeuvers;
+      if (blowBy && blowBy.killerOf) { killerId = blowBy.killerOf(actorId) || killerId; }
+      // The same for a skill perk's extra blow (#1385).
+      var perkBy = globalThis.__thornswoodPerks;
+      if (!killerId && perkBy && perkBy.killerOf) { killerId = perkBy.killerOf(actorId) || killerId; }
+    } catch (eBlow) { }
+  }
   let npcDeath = false;
   try { npcDeath = !(Number(mp.get(actorId, 'profileId')) > 0); } catch (e) { return; }
   /*
@@ -5709,7 +5843,10 @@ mp.onDeath = guard('onDeath', function (actorId, killerId) {
         var ch = globalThis.__thornswoodCharacter;
         var st = (ch && ch.stateOf) ? ch.stateOf(kid) : null;
         if (st && st.prof === 'warrior' && st.half) {
-          var raised = creditWork(kid, st.half);
+          // As many pieces as the body was hard (killPieces, over this
+          // handler, #1386): a chicken is 1 and a dragon 16. Whatever the
+          // body carried staying in the pack is the hunt, not a piece more.
+          var raised = creditWork(kid, st.half, killPieces(actorId));
           if (raised) {
             notify(kid, raised);
             say(kid, raised);
@@ -8255,10 +8392,34 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     try { prop.touchedBox(casterRefrId, refrId); } catch (e) { }
   }
 
+  /*
+    THE DULL CLOCK, AND A DROPPED PIECE PICKED UP AGAIN (#1384). See the
+    durability block. A container in a held building loses what its days
+    have taken before the engine sends what is in it, and a piece somebody
+    dropped gets the condition it went down with. It refuses nothing.
+  */
+  const wear = globalThis.__thornswoodDurability;
+  if (wear && wear.pressed) {
+    try { wear.pressed(casterRefrId, refrId, baseDesc); } catch (e) {
+      log('the durability press threw, so the press goes on:', e);
+    }
+  }
+
   if (prop && prop.touchedBench) {
     // Which bench they just pressed, for /key. Costs one hash lookup and is
     // passed over inside touchedBench for anything that is not a bench.
     try { prop.touchedBench(casterRefrId, baseDesc); } catch (e) { }
+  }
+
+  /*
+    WHICH BED THEY JUST PRESSED, for /rest bed (#1392). The bed is the one the
+    engine handed over here, never the word somebody types. One remembered
+    lookup per base, and nothing is written for a press on anything that is
+    not a bed. The press goes on, so the engine still lays them down.
+  */
+  const beds = globalThis.__thornswoodBeds;
+  if (beds && beds.touched) {
+    try { beds.touched(casterRefrId, refrId, baseDesc); } catch (e) { }
   }
 
   let message = null;
@@ -8565,7 +8726,9 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
 // never fires the event. Those rows carry "fires": false in tools\recipes.json
 // and are not in the table below. Nothing here can gate tempering, and the
 // Smith's Mastercraft perk on the public page is about tempering, so that perk
-// is not enforced by this gate and cannot be.
+// is not enforced by this gate and cannot be. A temper does reach the server
+// now, with no recipe, and recipelessCraft refuses it (#1384): repair is a
+// kit, and Mastercraft is the 120% repair (docs/systems/durability.md).
 // ---------------------------------------------------------------------------
 
 /*
@@ -26314,47 +26477,105 @@ function benchGate(actorId, baseDesc) {
 
   Keyed off the family the recipe table already puts on every owned row, so this
   list is checked against real data rather than against a memory of what Skyrim
-  contains: crafttest.js counts the rows in each of these families and fails if
+  contains: tests\test-1398-fuel.js counts the rows in each of these families and fails if
   a family here matches nothing, because a family name that has been renamed
   under it would turn this rule off without a word.
 */
 const HANDLE_DESC = '15490:Thornswood-Content.esp';
 /*
-  Charcoal for the forge fire. Same shape as the handle rule: not a CNTO on the
-  COBJ (that would couple us to every smithing plugin), taken here when the
-  craft is allowed. Ordered cheapest grade first so a novice Charburner's Poor
-  Charcoal is what goes, and vanilla charcoal is last as a fallback.
+  CHARCOAL FOR THE FIRE, BY GRADE (#1398).
+
+  docs/systems/professions/smith.md: "Every forge and every skyforge burns one
+  charcoal. No charcoal of the grade the metal asks for, the piece is not
+  made." Then the grade table, the smelter at the same grade as its metal, and
+  the skyforge one grade poorer. Which grade each recipe asks for is
+  FUEL_BY_RECIPE below, worked out of game\data\recipes.json by
+  scripts\dev\Build-FuelTable.js, because the rows the server carries name
+  neither their bench nor their metal. The rule before this read a bench off
+  the row, no installed row carries one, and so no forge took any charcoal.
+
+  The same shape as the handle: not an ingredient on the record, which would
+  couple this to every smithing plugin, but taken here once the craft is
+  allowed.
+
+  THE GRADE THE TABLE NAMES, AND ONLY THAT GRADE. It used to burn the cheapest
+  piece in the pack, Poor Charcoal first, whatever the metal. A hotter grade
+  is not burned in place of the one asked for: the page says no charcoal of
+  that grade, no piece. Skyrim's own Charcoal is the Charcoal grade, by its
+  name, as it was always taken here.
 */
-const CHARCOAL_DESCS = [
-  ITEMS.charcoalT1,
-  ITEMS.charcoalT2,
-  ITEMS.charcoalT3,
-  ITEMS.charcoalT4,
-  ITEMS.charcoal
+const CHARCOAL_GRADES = [
+  null,
+  { name: 'Poor Charcoal', descs: [ITEMS.charcoalT1] },
+  { name: 'Charcoal', descs: [ITEMS.charcoalT2, ITEMS.charcoal] },
+  { name: 'Charcoal Briquette', descs: [ITEMS.charcoalT3] },
+  { name: 'Coke', descs: [ITEMS.charcoalT4] }
 ];
-const CHARCOAL_BENCHES = {
-  CraftingSmithingForge: true,
-  CraftingSmithingSkyforge: true
-};
 
-/** True when this recipe is beaten out at a forge that burns charcoal. */
-function wantsCharcoal(row) {
-  if (!row || typeof row !== 'object') { return false; }
-  return !!CHARCOAL_BENCHES[String(row.benchName || '')];
+// ==== FUEL_BY_RECIPE, generated ====
+/* Built by scripts\dev\Build-FuelTable.js out of game\data\recipes.json. Do not hand edit.
+   329 recipes at a forge, a skyforge or a smelter, out of 3706.
+   177 burn Poor Charcoal, 74 Charcoal, 60 Charcoal Briquette and 18 Coke.
+   Recipe desc -> [grade 1 to 4, the metal that asks for it or nothing, the bench]. */
+const FUEL_BY_RECIPE = {"108cf8:Skyrim.esm":[2,"dwarven","forge"],"108cf9:Skyrim.esm":[3,"ebony","forge"],"108cfa:Skyrim.esm":[2,"elven","forge"],"108cfb:Skyrim.esm":[3,"glass","forge"],"108cfc:Skyrim.esm":[2,"orcish","forge"],"10dd28:Skyrim.esm":[2,"dwarven","smelter"],"1548d:Thornswood-Content.esp":[1,"iron","forge"],"1548e:Thornswood-Content.esp":[1,"iron","forge"],"15492:Thornswood-Content.esp":[1,"iron","forge"],"15496:Thornswood-Content.esp":[1,"iron","forge"],"15497:Thornswood-Content.esp":[1,"iron","forge"],"1838:PlayFluteLuteDrum.esp":[1,"","forge"],"19f8c:Playable Rieklings.esp":[1,"","forge"],"19f8d:Playable Rieklings.esp":[1,"","forge"],"19f8e:Playable Rieklings.esp":[1,"","forge"],"19f8f:Playable Rieklings.esp":[1,"iron","forge"],"19f97:Playable Rieklings.esp":[1,"iron","forge"],"19f9d:Playable Rieklings.esp":[1,"iron","forge"],"19fb4:Playable Rieklings.esp":[1,"steel","forge"],"19fb7:Playable Rieklings.esp":[1,"steel","forge"],"19fb8:Playable Rieklings.esp":[1,"steel","forge"],"1d90:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"1f24f:FishingInSkyrim.esp":[1,"iron","forge"],"1f252:FishingInSkyrim.esp":[3,"ebony","forge"],"214aa:Hothtrooper44_ArmorCompilation.esp":[1,"steel","skyforge"],"2180d:FishingInSkyrim.esp":[1,"steel","forge"],"22fe:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23062:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23063:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23190:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"23195:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"2319a:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"2319f:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"231a9:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231ae:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231b3:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231b8:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231c6:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c8:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c9:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231ca:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cb:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cc:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cd:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231ce:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cf:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d0:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d1:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d2:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d3:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d4:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d5:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d6:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d8:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d9:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"238fd:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"238fe:Hothtrooper44_ArmorCompilation.esp":[2,"silver","forge"],"23900:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"23907:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23908:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"2390e:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"23918:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23919:Hothtrooper44_ArmorCompilation.esp":[2,"silver","forge"],"23a0a:Playable Rieklings.esp":[1,"","forge"],"286a:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"2b04f:Dragonborn.esm":[1,"iron","forge"],"2b050:Dragonborn.esm":[1,"iron","forge"],"2b051:Dragonborn.esm":[1,"iron","forge"],"2b052:Dragonborn.esm":[1,"","forge"],"2b053:Dragonborn.esm":[1,"iron","forge"],"2b054:Dragonborn.esm":[1,"iron","forge"],"2b055:Dragonborn.esm":[1,"","forge"],"2b056:Dragonborn.esm":[1,"","forge"],"2b057:Dragonborn.esm":[1,"","forge"],"2b058:Dragonborn.esm":[1,"iron","forge"],"2b05a:Dragonborn.esm":[1,"iron","forge"],"2b05b:Dragonborn.esm":[1,"iron","forge"],"2b05c:Dragonborn.esm":[1,"iron","forge"],"2b065:Dragonborn.esm":[3,"nordic","forge"],"2b066:Dragonborn.esm":[3,"nordic","forge"],"2b067:Dragonborn.esm":[3,"nordic","forge"],"2b068:Dragonborn.esm":[3,"nordic","forge"],"2b069:Dragonborn.esm":[3,"nordic","forge"],"2b06a:Dragonborn.esm":[4,"stalhrim","forge"],"2b06c:Dragonborn.esm":[4,"stalhrim","forge"],"2b06d:Dragonborn.esm":[4,"stalhrim","forge"],"2b06e:Dragonborn.esm":[4,"stalhrim","forge"],"2b06f:Dragonborn.esm":[4,"stalhrim","forge"],"2b070:Dragonborn.esm":[4,"stalhrim","forge"],"2b071:Dragonborn.esm":[4,"stalhrim","forge"],"2b072:Dragonborn.esm":[4,"stalhrim","forge"],"2b075:Dragonborn.esm":[4,"stalhrim","forge"],"2b076:Dragonborn.esm":[4,"stalhrim","forge"],"2b077:Dragonborn.esm":[4,"stalhrim","forge"],"2b078:Dragonborn.esm":[4,"stalhrim","forge"],"2b079:Dragonborn.esm":[4,"stalhrim","forge"],"2b07a:Dragonborn.esm":[4,"stalhrim","forge"],"2b07b:Dragonborn.esm":[4,"stalhrim","forge"],"2b07c:Dragonborn.esm":[4,"stalhrim","forge"],"2b07d:Dragonborn.esm":[4,"stalhrim","forge"],"2b07e:Dragonborn.esm":[3,"nordic","forge"],"2b07f:Dragonborn.esm":[3,"nordic","forge"],"2b080:Dragonborn.esm":[3,"nordic","forge"],"2b081:Dragonborn.esm":[3,"nordic","forge"],"2b082:Dragonborn.esm":[3,"nordic","forge"],"2b083:Dragonborn.esm":[3,"nordic","forge"],"2b084:Dragonborn.esm":[3,"nordic","forge"],"2b085:Dragonborn.esm":[3,"nordic","forge"],"2dd7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"2de4:PlayFluteLuteDrum.esp":[1,"","forge"],"2de5:PlayFluteLuteDrum.esp":[1,"","forge"],"372fe:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"372ff:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37300:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37301:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37306:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37307:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37308:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37309:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"3cf53:Dragonborn.esm":[3,"nordic","forge"],"3cf54:Dragonborn.esm":[4,"stalhrim","forge"],"3d2dd:Dragonborn.esm":[1,"iron","forge"],"490d86:Immersive Weapons.esp":[1,"","forge"],"491dc0:Immersive Weapons.esp":[3,"glass","forge"],"491dc4:Immersive Weapons.esp":[3,"glass","forge"],"53b3:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"53b5:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"53b7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"6aa09:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"77100a:Immersive Weapons.esp":[1,"steel","forge"],"82ebf:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec0:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec1:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec2:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"844:MoreCraftableEquipment.esp":[1,"","forge"],"848:MoreCraftableEquipment.esp":[1,"","forge"],"849:MoreCraftableEquipment.esp":[1,"","forge"],"855:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"856:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"857:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"858:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"85f:MoreCraftableEquipment.esp":[1,"steel","forge"],"860:MoreCraftableEquipment.esp":[1,"steel","forge"],"861:MoreCraftableEquipment.esp":[1,"steel","forge"],"863:MoreCraftableEquipment.esp":[1,"steel","forge"],"866:MoreCraftableEquipment.esp":[1,"steel","forge"],"867:MoreCraftableEquipment.esp":[1,"steel","forge"],"868:MoreCraftableEquipment.esp":[1,"iron","forge"],"869:MoreCraftableEquipment.esp":[1,"iron","forge"],"874:MoreCraftableEquipment.esp":[2,"falmer","forge"],"87b:MoreCraftableEquipment.esp":[2,"falmer","forge"],"87c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88d:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88e:MoreCraftableEquipment.esp":[2,"falmer","forge"],"897:MoreCraftableEquipment.esp":[2,"falmer","forge"],"89c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8a9:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8aa:MoreCraftableEquipment.esp":[1,"","forge"],"8ab:MoreCraftableEquipment.esp":[1,"","forge"],"8ac:MoreCraftableEquipment.esp":[1,"","forge"],"8ad:MoreCraftableEquipment.esp":[1,"","forge"],"8d0:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d1:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d2:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d3:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d4:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d5:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d6:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d7:MoreCraftableEquipment.esp":[1,"","forge"],"8d8:MoreCraftableEquipment.esp":[1,"","forge"],"8d9:MoreCraftableEquipment.esp":[1,"","forge"],"8db:MoreCraftableEquipment.esp":[1,"iron","forge"],"8f0:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f7:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f8:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f9:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8fa:MoreCraftableEquipment.esp":[1,"steel","forge"],"8fc:MoreCraftableEquipment.esp":[1,"iron","forge"],"900:MoreCraftableEquipment.esp":[2,"silver","forge"],"901:MoreCraftableEquipment.esp":[2,"silver","forge"],"94185a:Immersive Weapons.esp":[3,"glass","forge"],"9cf:Update.esm":[1,"steel","forge"],"9d0:Update.esm":[1,"steel","forge"],"9d1:Update.esm":[1,"steel","forge"],"9d2:Update.esm":[1,"steel","forge"],"9d3:Update.esm":[1,"steel","forge"],"9e775:Playable Rieklings.esp":[1,"","forge"],"a30c3:Skyrim.esm":[1,"iron","smelter"],"a30cb:Skyrim.esm":[1,"","smelter"],"a30d3:Skyrim.esm":[3,"ebony","smelter"],"a30d4:Skyrim.esm":[1,"","smelter"],"a30d9:Skyrim.esm":[2,"elven","smelter"],"a30da:Skyrim.esm":[3,"glass","smelter"],"a30db:Skyrim.esm":[2,"orcish","smelter"],"a30dc:Skyrim.esm":[1,"","smelter"],"a30dd:Skyrim.esm":[2,"silver","smelter"],"a30e4:Skyrim.esm":[1,"steel","smelter"],"a5cd6:Skyrim.esm":[1,"steel","forge"],"ab72:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab73:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab74:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab75:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"b64f:Dawnguard.esm":[1,"iron","forge"],"b650:Dawnguard.esm":[1,"steel","forge"],"b651:Dawnguard.esm":[3,"ebony","forge"],"b652:Dawnguard.esm":[2,"dwarven","forge"],"b653:Dawnguard.esm":[3,"glass","forge"],"b654:Dawnguard.esm":[2,"orcish","forge"],"b655:Dawnguard.esm":[2,"elven","forge"],"bc99a:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"c74736:Immersive Weapons.esp":[2,"silver","forge"],"c74737:Immersive Weapons.esp":[2,"silver","forge"],"da0c03:Update.esm":[1,"","smelter"],"da769:Skyrim.esm":[1,"iron","forge"],"da76a:Skyrim.esm":[1,"iron","forge"],"da76b:Skyrim.esm":[1,"iron","forge"],"da76c:Skyrim.esm":[1,"iron","forge"],"da76d:Skyrim.esm":[1,"iron","forge"],"da76e:Skyrim.esm":[1,"iron","forge"],"da76f:Skyrim.esm":[1,"iron","forge"],"db28e:Skyrim.esm":[1,"","forge"],"db28f:Skyrim.esm":[1,"iron","forge"],"db290:Skyrim.esm":[1,"iron","forge"],"db291:Skyrim.esm":[1,"iron","forge"],"db292:Skyrim.esm":[1,"iron","forge"],"db293:Skyrim.esm":[1,"iron","forge"],"db5d3:Skyrim.esm":[1,"","forge"],"db5d4:Skyrim.esm":[1,"","forge"],"db5d5:Skyrim.esm":[1,"","forge"],"db5d6:Skyrim.esm":[1,"","forge"],"db5d7:Skyrim.esm":[1,"steel","forge"],"db896:Skyrim.esm":[1,"steel","forge"],"db897:Skyrim.esm":[1,"steel","forge"],"db898:Skyrim.esm":[1,"steel","forge"],"db899:Skyrim.esm":[2,"orcish","forge"],"db89a:Skyrim.esm":[2,"orcish","forge"],"db89b:Skyrim.esm":[1,"steel","forge"],"db89c:Skyrim.esm":[2,"orcish","forge"],"db89d:Skyrim.esm":[2,"orcish","forge"],"db89e:Skyrim.esm":[1,"steel","forge"],"db89f:Skyrim.esm":[2,"orcish","forge"],"db8a0:Skyrim.esm":[2,"orcish","forge"],"db8a1:Skyrim.esm":[2,"orcish","forge"],"db8a3:Skyrim.esm":[2,"dwarven","forge"],"db8a4:Skyrim.esm":[2,"dwarven","forge"],"db8a5:Skyrim.esm":[2,"dwarven","forge"],"db8a6:Skyrim.esm":[2,"dwarven","forge"],"db8a7:Skyrim.esm":[2,"dwarven","forge"],"db8a8:Skyrim.esm":[2,"dwarven","forge"],"db8a9:Skyrim.esm":[2,"dwarven","forge"],"db8aa:Skyrim.esm":[2,"elven","forge"],"db8ab:Skyrim.esm":[2,"elven","forge"],"db8ac:Skyrim.esm":[2,"elven","forge"],"db8ad:Skyrim.esm":[2,"elven","forge"],"db8ae:Skyrim.esm":[2,"elven","forge"],"db8af:Skyrim.esm":[2,"elven","forge"],"db8b0:Skyrim.esm":[2,"elven","forge"],"db8b1:Skyrim.esm":[3,"glass","forge"],"db8b2:Skyrim.esm":[3,"glass","forge"],"db8b3:Skyrim.esm":[3,"glass","forge"],"db8b4:Skyrim.esm":[3,"glass","forge"],"db8b5:Skyrim.esm":[3,"glass","forge"],"db8b6:Skyrim.esm":[3,"glass","forge"],"db8b7:Skyrim.esm":[3,"glass","forge"],"db8b8:Skyrim.esm":[3,"ebony","forge"],"db8b9:Skyrim.esm":[3,"ebony","forge"],"db8ba:Skyrim.esm":[3,"ebony","forge"],"db8bb:Skyrim.esm":[3,"ebony","forge"],"db8bc:Skyrim.esm":[3,"ebony","forge"],"db8bd:Skyrim.esm":[3,"ebony","forge"],"db8be:Skyrim.esm":[3,"ebony","forge"],"dc9f5:Skyrim.esm":[1,"steel","forge"],"dc9f6:Skyrim.esm":[1,"steel","forge"],"dc9f7:Skyrim.esm":[1,"steel","forge"],"dc9f8:Skyrim.esm":[1,"steel","forge"],"dc9f9:Skyrim.esm":[1,"steel","forge"],"dc9fa:Skyrim.esm":[2,"elven","forge"],"dc9fb:Skyrim.esm":[2,"elven","forge"],"dc9fc:Skyrim.esm":[2,"elven","forge"],"dc9fd:Skyrim.esm":[2,"elven","forge"],"dc9fe:Skyrim.esm":[2,"elven","forge"],"dc9ff:Skyrim.esm":[1,"iron","forge"],"dca00:Skyrim.esm":[1,"iron","forge"],"dca01:Skyrim.esm":[1,"","forge"],"dca02:Skyrim.esm":[1,"","forge"],"dca03:Skyrim.esm":[1,"","forge"],"dca04:Skyrim.esm":[1,"","forge"],"dca05:Skyrim.esm":[1,"steel","forge"],"dca06:Skyrim.esm":[1,"steel","forge"],"dca07:Skyrim.esm":[1,"steel","forge"],"dca08:Skyrim.esm":[1,"steel","forge"],"dca0e:Skyrim.esm":[3,"glass","forge"],"dca0f:Skyrim.esm":[3,"glass","forge"],"dca10:Skyrim.esm":[3,"glass","forge"],"dca11:Skyrim.esm":[3,"glass","forge"],"dca12:Skyrim.esm":[3,"glass","forge"],"dd975:Skyrim.esm":[1,"steel","forge"],"dd977:Skyrim.esm":[1,"steel","forge"],"dd978:Skyrim.esm":[1,"steel","forge"],"dd979:Skyrim.esm":[2,"dwarven","forge"],"dd97a:Skyrim.esm":[2,"dwarven","forge"],"dd97b:Skyrim.esm":[2,"dwarven","forge"],"dd97c:Skyrim.esm":[2,"dwarven","forge"],"dd97d:Skyrim.esm":[2,"dwarven","forge"],"dd97e:Skyrim.esm":[1,"steel","forge"],"dd97f:Skyrim.esm":[1,"steel","forge"],"dd980:Skyrim.esm":[1,"steel","forge"],"dd981:Skyrim.esm":[1,"steel","forge"],"dd983:Skyrim.esm":[2,"orcish","forge"],"dd984:Skyrim.esm":[2,"orcish","forge"],"dd985:Skyrim.esm":[2,"orcish","forge"],"dd986:Skyrim.esm":[2,"orcish","forge"],"dd987:Skyrim.esm":[2,"orcish","forge"],"dd988:Skyrim.esm":[3,"ebony","forge"],"dd989:Skyrim.esm":[3,"ebony","forge"],"dd98a:Skyrim.esm":[3,"ebony","forge"],"dd98b:Skyrim.esm":[3,"ebony","forge"],"dd98c:Skyrim.esm":[3,"ebony","forge"],"f46cc:Skyrim.esm":[1,"ancient nord","skyforge"],"f46cd:Skyrim.esm":[1,"ancient nord","skyforge"],"f46cf:Skyrim.esm":[1,"ancient nord","skyforge"],"f46d0:Skyrim.esm":[1,"ancient nord","skyforge"],"f6f2a:Skyrim.esm":[1,"steel","forge"],"f74d:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"f813:Dawnguard.esm":[1,"steel","forge"],"f814:Dawnguard.esm":[2,"dwarven","forge"]};
+// ==== end FUEL_BY_RECIPE ====
+
+/** The fuel a recipe burns, { grade, metal, bench }, or null when it burns none. */
+function fuelFor(recipeDesc) {
+  if (!Object.prototype.hasOwnProperty.call(FUEL_BY_RECIPE, recipeDesc)) { return null; }
+  const f = FUEL_BY_RECIPE[recipeDesc];
+  const grade = Number(f && f[0]);
+  if (!CHARCOAL_GRADES[grade]) { return null; }
+  return { grade: grade, metal: String(f[1] || ''), bench: String(f[2] || 'forge') };
 }
 
-/** Take one piece of any charcoal grade. Returns true when something went. */
-function takeCharcoal(actorId) {
-  for (let i = 0; i < CHARCOAL_DESCS.length; i++) {
-    const desc = CHARCOAL_DESCS[i];
-    if (!desc) { continue; }
-    if (takeItem(actorId, desc, 1)) { return true; }
+/** How many of one item a pack holds, every stack of it counted. */
+function packCount(actorId, itemDesc) {
+  const baseId = idOf(itemDesc);
+  if (!baseId) { return 0; }
+  let inv = null;
+  try { inv = mp.get(actorId, 'inventory'); } catch (e) { return 0; }
+  const entries = (inv && inv.entries) || [];
+  let n = 0;
+  for (let i = 0; i < entries.length; i++) {
+    if (entries[i] && entries[i].baseId === baseId) { n += Number(entries[i].count) || 0; }
   }
-  return false;
+  return n;
 }
 
+/** The charcoal of exactly that grade in this pack, or '' when there is none. */
+function charcoalHeld(actorId, grade) {
+  const g = CHARCOAL_GRADES[grade];
+  if (!g) { return ''; }
+  for (let i = 0; i < g.descs.length; i++) {
+    if (g.descs[i] && packCount(actorId, g.descs[i]) > 0) { return g.descs[i]; }
+  }
+  return '';
+}
 
-const HAFTED_FAMILIES = ['War axes', 'Battleaxes', 'Warhammers', 'Maces', 'Other weapons'];
+/** What is said when the grade a piece asks for is not in the pack. */
+function fuelRefusal(fuel) {
+  const grade = CHARCOAL_GRADES[fuel.grade].name;
+  const metal = fuel.metal.replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); });
+  let first;
+  if (fuel.bench === 'smelter') {
+    first = metal ? 'Smelting ' + metal + ' burns ' + grade : 'A smelter burns ' + grade;
+  } else {
+    const at = fuel.bench === 'skyforge' ? 'the skyforge' : 'a forge';
+    first = metal ? metal + ' at ' + at + ' burns ' + grade
+                  : (fuel.bench === 'skyforge' ? 'The skyforge' : 'A forge') + ' burns ' + grade;
+  }
+  return first + ', and you have none. A Charburner makes it from firewood at a kiln.';
+}
+
+/*
+  The four hafted families on the smith page: a war axe, a battleaxe, a
+  warhammer and a mace are a metal head on a wooden haft. Other weapons was
+  on this list too, and in the table that family is the woodcutter's axe and
+  the drum, the flute and the lute, so the instruments were asked for a
+  handle (#1398). An instrument is not a haft.
+*/
+const HAFTED_FAMILIES = ['War axes', 'Battleaxes', 'Warhammers', 'Maces'];
 
 /** True when this recipe makes something fitted to a wooden handle. */
 function wantsAHandle(row) {
@@ -26371,6 +26592,105 @@ function wantsAHandle(row) {
     if (HAFTED_FAMILIES[i] === family) { return true; }
   }
   return false;
+}
+
+/*
+  WHAT A MASTER'S CRAFT GIVES ON TOP (#1398).
+
+  Grand Chef, docs/systems/professions/cook.md: "At master, either half. Every
+  batch yields two instead of one. The craft is still one piece of work toward
+  the next rank." So a Cook row made by somebody holding the perk hands over
+  the batch a second time, once the engine has added the first, and the work
+  is credited once, by the caller, as before.
+
+  Master Weaver, docs/systems/professions/tailor.md: clothing a master tailor
+  makes keeps the weather off. Which garment is one is written on it, the way
+  durability writes a condition and a key its house: the fresh garment is
+  named with the needs block's mark in front, and the needs block reads the
+  mark off what is worn. The hidden armour half is not here: the page gives
+  it no rating, and the server cannot reach a garment's armour (see the note
+  over the durability block).
+
+  The perk is the progression block's own answer (perks), so it is held at
+  master in the half somebody picked and nowhere else.
+*/
+function holdsPerk(actorId, key) {
+  const P = globalThis.__thornswoodProgression;
+  const C = globalThis.__thornswoodCharacter;
+  if (!P || !P.perks || !C || !C.stateOf) { return false; }
+  try { return P.perks(C.stateOf(actorId)).indexOf(key) !== -1; } catch (e) { return false; }
+}
+
+/** Name n plain units of a garment just made as a master weaver's. Answers how many. */
+function markWoven(actorId, outDesc, name, n) {
+  const N = globalThis.__thornswoodNeeds;
+  const mark = N && N.NEEDS && N.NEEDS.wear && N.NEEDS.wear.woven ? N.NEEDS.wear.woven.mark : '';
+  const baseId = idOf(outDesc);
+  if (!mark || !baseId || !(n > 0)) { return 0; }
+  let inv = null;
+  try { inv = mp.get(actorId, 'inventory'); } catch (e) { return 0; }
+  const entries = (inv && inv.entries) || [];
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (!e || e.baseId !== baseId || e.name || e.worn || e.wornLeft || !(e.count > 0)) { continue; }
+    const take = Math.min(n, e.count);
+    const named = {};
+    for (const k in e) { if (Object.prototype.hasOwnProperty.call(e, k)) { named[k] = e[k]; } }
+    named.count = take;
+    named.name = mark + String(name || 'Garment');
+    e.count -= take;
+    if (e.count <= 0) { entries.splice(i, 1); }
+    entries.push(named);
+    try { mp.set(actorId, 'inventory', { entries: entries }); } catch (e2) { return 0; }
+    return take;
+  }
+  return 0;
+}
+
+/*
+  WHEN THE OUTPUT IS IN THE PACK. The gamemode is asked before the engine does
+  anything: CraftEvent::Fire runs mp.onCraft, and only when it was not refused
+  does OnFireSuccess take the inputs and add the output, in the same
+  server.tick() call (the fork's CraftEvent.cpp, and index.ts, which awaits a
+  timer between ticks). So a timer set here runs after the engine has finished,
+  whatever its length, and nothing about it is a race; 0 says that.
+
+  What the timer cannot assume is that the engine succeeded. RemoveItems throws
+  when the server does not hold what the client said went in ("Source
+  inventory doesn't have enough", seen on the dev server on 23 September),
+  after the gamemode already said yes. So the count of the output is taken now,
+  and the second batch and the mark are given only if the craft's own n
+  arrived. Otherwise a craft the engine refused would hand a Grand Chef a free
+  batch, or name a garment the master did not make.
+*/
+const MASTER_CRAFT_AFTER_MS = 0;
+
+/** After an allowed craft: Grand Chef's second batch and Master Weaver's mark. */
+function masterCraft(actorId, row, count) {
+  if (!row || typeof row !== 'object' || !row.out) { return; }
+  const n = Number(count) > 0 ? Math.floor(Number(count)) : (Number(row.makes) || 1);
+  const chef = row.owner === 'Cook' && holdsPerk(actorId, 'grandchef');
+  const weaver = row.owner === 'Tailor' && row.type === 'ARMO' && holdsPerk(actorId, 'masterweaver');
+  if (!chef && !weaver) { return; }
+  const before = packCount(actorId, row.out);
+  setTimeout(function () {
+    if (packCount(actorId, row.out) < before + n) {
+      log(actorId.toString(16), 'made no', row.name, 'after all (the engine refused the craft), so no master work is added');
+      return;
+    }
+    if (chef) {
+      try {
+        addItem(actorId, row.out, n);
+        log(actorId.toString(16), 'is a Grand Chef: a second batch of', n, row.name);
+      } catch (e) { log('the second batch of', row.name, 'was not handed over:', e); }
+    }
+    if (weaver) {
+      try {
+        const done = markWoven(actorId, row.out, row.name, n);
+        log(actorId.toString(16), 'is a Master Weaver:', done, row.name, 'woven');
+      } catch (e) { log('the woven garment', row.name, 'was not named:', e); }
+    }
+  }, MASTER_CRAFT_AFTER_MS);
 }
 
 function onCraftRoll(actorId, roll) {
@@ -26534,9 +26854,15 @@ function craftAnswer(actorId, row) {
   // a conversation rather than a menu.'
   const sister = s.half ? P.sisterOf(s.prof, s.half) : null;
   if (sister && sister === half) {
-    out.refusal = 'A ' + made + ' is ' + halfName + ' work past novice, and ' + halfName +
-                  ' is your sister half. You get the novice of it for nothing and no ' +
-                  'further. A Master ' + halfName + ' can take you on.';
+    // Taken on by a Master who still stands (#1388): the rank is the wall now.
+    const climbing = !!(C.masterFor && C.masterFor(actorId, s, half));
+    out.refusal = climbing
+      ? 'A ' + made + ' is ' + rankWord(rank) + ' ' + halfName + '\'s work and you are ' +
+        rankWord(P.rankOf(s, half) || 'novice') + ' ' + halfName + '. A Master took you on in it, ' +
+        'so rank comes from doing the work.'
+      : 'A ' + made + ' is ' + halfName + ' work past novice, and ' + halfName +
+        ' is your sister half. You get the novice of it for nothing and no ' +
+        'further. A Master ' + halfName + ' can take you on with /apprentice.';
     return out;
   }
 
@@ -26720,6 +27046,29 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
       benchKey = '';
     }
     var tempering = benchKey === '88108:Skyrim.esm' || benchKey === 'adb78:Skyrim.esm';
+    /*
+      A TEMPER IS REFUSED, AND IT IS NOT WORK (#1384). Tempering at the
+      sharpening wheel and the armour table is cut: its 1809 rows are in
+      docs/systems/cut-items.md, held so an event can bring one back, and a
+      piece is mended with a kit (the durability block, /repair). Every craft
+      that reaches this line at one of those two benches is a temper, because
+      every recipe either of them carries is one.
+
+      It used to be let through, and it did nothing for anybody: the engine
+      then took the plain piece and the ingot and handed a plain piece back
+      (CraftEvent::OnFireSuccess carries no temper level), so the person lost
+      an ingot, and a piece whose condition is in its name was not found at
+      all. Refused here, they keep the ingot, and nothing is credited.
+    */
+    if (tempering) {
+      var noTemper = 'Tempering is not done here. A piece is mended with a repair kit: ' +
+                     '/repair says what you carry and how it stands.';
+      notify(actorId, noTemper);
+      say(actorId, noTemper);
+      log(actorId.toString(16), 'was refused a temper of', craftedItemBaseId.toString(16),
+          'at bench', benchKey);
+      return false;
+    }
     var outDesc = null;
     if (benchKey && !tempering) {
       try { outDesc = mp.getDescFromId(craftedItemBaseId); } catch (e) { outDesc = null; }
@@ -26954,6 +27303,30 @@ mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recip
   }
 
   /*
+    THE FUEL AND THE HANDLE ARE ASKED FOR BEFORE ANYTHING IS TAKEN (#1398), so
+    a refusal for one never costs the other, and a key is never named for a
+    craft that did not happen. They are taken below, once nothing can refuse.
+  */
+  const fuel = fuelFor(desc);
+  const coal = fuel ? charcoalHeld(actorId, fuel.grade) : '';
+  if (fuel && !coal) {
+    const no = fuelRefusal(fuel);
+    notify(actorId, no);
+    say(actorId, no);
+    log(actorId.toString(16), 'was refused', desc, '(' + row.name + '): no', CHARCOAL_GRADES[fuel.grade].name);
+    return false;
+  }
+  const hafted = wantsAHandle(row);
+  if (hafted && packCount(actorId, HANDLE_DESC) < 1) {
+    const no = 'A ' + String(row.name || 'that') + ' is fitted to a wooden handle and you ' +
+               'have none. A woodworker cuts them from firewood at a kiln.';
+    notify(actorId, no);
+    say(actorId, no);
+    log(actorId.toString(16), 'was refused', desc, '(' + row.name + '): no handle');
+    return false;
+  }
+
+  /*
     A KEY COMES OUT NAMED FOR THE HOUSE ITS MOLD WAS STAMPED AT.
 
     Patrick, 23 September, giving the whole shape at once: "you make a mold,
@@ -27022,33 +27395,23 @@ ecipes.json are hafted, and 126 of those are rows the server is
     handle were free. It is worth five gold and a novice woodworker's minute, so
     the error is small, but it is an error and not a rounding.
 
-    THE FIVE FAMILIES. A haft is a shaft you hold in two hands or one, with the
-    weight at the end: war axes, battleaxes, warhammers, maces, and the eight
-    rows the table files under Other weapons, which is where the woodcutter's
-    axe lives. Swords, greatswords and daggers are a tang and a grip rather than
-    a haft. Bows and staves are wooden through and through, which is a different
-    thing from having a handle fitted to them, and a bow that wanted a handle
-    would read as a mistake to anybody holding one.
+    THE FOUR FAMILIES. A haft is a shaft you hold in two hands or one, with the
+    weight at the end: war axes, battleaxes, warhammers and maces, the four the
+    smith page names. Other weapons was a fifth, and in the table it is the
+    woodcutter's axe, which names its handle in its own record, and the drum,
+    the flute and the lute, which are not hafted (#1398). Swords, greatswords
+    and daggers are a tang and a grip rather than a haft. Bows and staves are
+    wooden through and through, which is a different thing from having a
+    handle fitted to them, and a bow that wanted a handle would read as a
+    mistake to anybody holding one.
   */
-  if (!answer.refusal && wantsCharcoal(row)) {
-    if (!takeCharcoal(actorId)) {
-      const no = 'A forge burns charcoal, and you have none. A Charburner makes it from firewood at a kiln.';
-      notify(actorId, no);
-      say(actorId, no);
-      log(actorId.toString(16), 'was refused', desc, '(' + row.name + '): no charcoal');
-      return false;
-    }
+  if (coal && !takeItem(actorId, coal, 1)) {
+    log(actorId.toString(16), 'was refused', desc, '(' + row.name + '): the charcoal could not be taken');
+    return false;
   }
-
-  if (!answer.refusal && wantsAHandle(row)) {
-    if (!takeItem(actorId, HANDLE_DESC, 1)) {
-      const no = 'A ' + String(row.name || 'that') + ' is fitted to a wooden handle and you ' +
-                 'have none. A woodworker cuts them from firewood at a kiln.';
-      notify(actorId, no);
-      say(actorId, no);
-      log(actorId.toString(16), 'was refused', desc, '(' + row.name + '): no handle');
-      return false;
-    }
+  if (hafted && !takeItem(actorId, HANDLE_DESC, 1)) {
+    log(actorId.toString(16), 'was refused', desc, '(' + row.name + '): the handle could not be taken');
+    return false;
   }
 
   if (answer.credit) {
@@ -27058,6 +27421,7 @@ ecipes.json are hafted, and 126 of those are rows the server is
       say(actorId, raised);
     }
   }
+  masterCraft(actorId, row, count);
   return;
 });
 
@@ -30531,6 +30895,32 @@ log('gamemode loaded:',
     },
 
     /*
+      WHAT A FILLED PERK PUTS ON THE SAME MAP (#1385). docs/systems/skill-tree.md.
+
+      Two of the fifteen perks are a number the client already knows how to
+      set, so they ride the totals treeApplies sends, on top of the points that
+      filled them. Everything else a filled perk does is in the skill perks
+      block, after the character block, because it is something that happens
+      rather than a number that stands. Font of Magic rides the same map for
+      its 15 seconds, but out of that block (withPerks in the character
+      block), because it is a number that stands only while it runs.
+
+        windwalker     Windwalker, +4 speed. add: on top of Agility's own.
+        purifiedblood  Purified Blood: disease does not take, and poison deals
+                       25%. The game's own resistances, brought UP TO what the
+                       page says: DiseaseResist 100 is no disease at all, and
+                       PoisonResist 75 is poison dealing a quarter. upTo, not
+                       add, so Toughness's own five points are not counted a
+                       second time and the per point numbers above stay the
+                       only per point numbers. What the race already resists
+                       still comes on top, as far as the game lets it.
+    */
+    perkApplies: {
+      windwalker:    { add: { speedMult: 4 } },
+      purifiedblood: { upTo: { diseaseResist: 100, poisonResist: 75 } }
+    },
+
+    /*
       FARMING, AND EVERY ONE OF THESE NUMBERS IS INVENTED.
 
       Patrick, 20 September: 'there is no system for claiming plots for farming,
@@ -30648,6 +31038,15 @@ log('gamemode loaded:',
                  The sister half is added at novice the moment half is chosen.
       taught     ['hearthcook']                 halves learned from a Master
                  of another profession, novice only, at most LIMITS.secondaries
+      untaught   ['hearthcook']                 outside trades a Master ended.
+                 Still counted: two in a life, and ending one does not open a
+                 third (#1388)
+      masters    { platewright: { id, name, at } }  who took this character
+                 on, by the half: the sister half past novice, or an outside
+                 trade they taught. id is the Master's actor (#1388)
+      apprentices [{ id, name, half, kind, at }]  the people this Master took
+                 on, a row per person and half; kind is 'sister' or
+                 'outside' (#1388)
       spells     { points: 2, known: [...] }    a mage's spell points and spells
       staffSpells ['12fcd:Skyrim.esm', ...]     the staff spells unlocked, by the
                  spell's form id desc: what a staff may bind (#967, #1128)
@@ -30823,6 +31222,19 @@ log('gamemode loaded:',
       }
     }
 
+    // What a filled perk adds (#1385), out of TUNING.perkApplies.
+    var filled = perks(s);
+    for (var f = 0; f < filled.length; f++) {
+      var pa = own(TUNING.perkApplies, filled[f]) ? TUNING.perkApplies[filled[f]] : null;
+      if (!pa) { continue; }
+      for (var ak in (pa.add || {})) {
+        if (own(pa.add, ak)) { out[ak] = (own(out, ak) ? out[ak] : 0) + pa.add[ak]; }
+      }
+      for (var uk in (pa.upTo || {})) {
+        if (own(pa.upTo, uk) && !(out[uk] >= pa.upTo[uk])) { out[uk] = pa.upTo[uk]; }
+      }
+    }
+
     var held = schoolsOf(s);
     for (var name in TUNING.spreadOverSchools) {
       if (!own(TUNING.spreadOverSchools, name) || !own(out, name)) { continue; }
@@ -30919,26 +31331,98 @@ log('gamemode loaded:',
 
   /**
     A Master of a half teaches somebody from ANOTHER profession that half, at
-    novice, and never further. At most LIMITS.secondaries times. The sister
-    half does not count and cannot be taught this way, because it is already
-    known; going past novice in it is rankUp under a Master of it, below.
+    novice, and never further: an outside trade (apprenticeship.md). At most
+    LIMITS.secondaries in a life. An outside trade a Master ended stays
+    counted in untaught, so ending one never opens a third. The sister half
+    does not count and cannot be taught this way, because it is already
+    known; going past novice in it is takeOn below, and then rankUp.
+
+    The reasons are written to the Master, because the Master is the one who
+    asked: they are what /apprentice says back (#1388). who, when it is
+    given, is the Master as the server records them, { id, name, at }, so the
+    Master who taught it is the one who can end it.
   */
-  function teach(state, teacherState, half) {
+  function teach(state, teacherState, half, who) {
     var s = clone(state);
-    if (!s.prof) { return no('choose your own profession before learning anybody else’s'); }
+    if (!s.taught) { s.taught = []; }
+    if (!s.prof) { return no('they have not picked a profession of their own yet, so there is nothing to teach onto'); }
     var tp = teacherState && teacherState.prof;
-    if (!tp || halvesOf(tp).indexOf(half) === -1) { return no('the teacher does not work that half'); }
-    if (rankOf(teacherState, half) !== 'master') { return no('only a Master can teach, and they are not one in that half'); }
+    if (!tp || halvesOf(tp).indexOf(half) === -1) { return no('you do not work that half'); }
+    if (rankOf(teacherState, half) !== 'master') { return no('only a Master can teach, and you are not one in that half'); }
     if (halvesOf(s.prof).indexOf(half) !== -1) {
-      return no('that is your own profession; a Master of it can raise your rank, not teach you the basics');
+      return no('that is in their own profession, so it is not an outside trade: a Master of their own profession cannot use the outside trade rules on them');
     }
-    if (s.taught.indexOf(half) !== -1) { return no('you already know that'); }
-    if (s.taught.length >= LIMITS.secondaries) {
-      return no('you may only learn ' + LIMITS.secondaries + ' other trades, and you have');
+    if (s.taught.indexOf(half) !== -1) { return no('they already know that'); }
+    if (s.taught.length + (s.untaught || []).length >= LIMITS.secondaries) {
+      return no('they have had their ' + LIMITS.secondaries + ' outside trades, and that is all there is in a life');
     }
     s.taught.push(half);
     s.ranks[half] = 'novice';
+    if (who) {
+      if (!s.masters) { s.masters = {}; }
+      s.masters[half] = who;
+    }
     return yes(s);
+  }
+
+  /**
+    A Master takes somebody on in their sister half (apprenticeship.md, "The
+    sister half"). It costs nothing and it is not one of the two outside
+    trades. Until it is recorded, work in that half counts and waits at the
+    next threshold; while it stands, creditWork is handed the Master and the
+    half climbs the whole ladder through rankUp. who is the Master as the
+    server records them, { id, name, at }. The reasons are written to the
+    Master, as teach's are.
+  */
+  function takeOn(state, masterState, half, who) {
+    var s = clone(state);
+    if (!s.prof) { return no('they have not picked a profession of their own yet'); }
+    if (s.half === half || (s.schools || []).indexOf(half) !== -1) {
+      return no('that is their own ' + (s.half === half ? 'half' : 'school') + ', and it climbs on their own work');
+    }
+    var sister = s.half ? sisterOf(s.prof, s.half) : null;
+    if (!sister || sister !== half) { return no('that is not their sister half'); }
+    if (rankOf(masterState, half) !== 'master') {
+      return no('only a Master of that half can take somebody on in it, and you are not one');
+    }
+    if (rankOf(s, half) === 'master') { return no('they are a Master of it already'); }
+    if (s.masters && own(s.masters, half)) { return no('they already have a Master in that'); }
+    if (!s.masters) { s.masters = {}; }
+    s.masters[half] = who || {};
+    return yes(s);
+  }
+
+  /**
+    The Master ends it (apprenticeship.md). The sister half keeps every rank
+    already earned; further ranks stop and the count waits at the next
+    threshold again, because creditWork is no longer handed a Master. An
+    outside trade loses its novice list, and stays counted in untaught, so
+    ending one does not open a third. masterId is whoever is ending it: only
+    the Master on the record can. The answer carries ended, 'sister' or
+    'outside', so the caller can say which.
+  */
+  function release(state, half, masterId) {
+    var s = clone(state);
+    var rec = (s.masters && own(s.masters, half)) ? s.masters[half] : null;
+    if (!rec || (masterId !== undefined && masterId !== null && rec.id !== masterId)) {
+      return no('they are not your apprentice in that');
+    }
+    delete s.masters[half];
+    var out;
+    var at = (s.taught || []).indexOf(half);
+    if (at !== -1) {
+      s.taught.splice(at, 1);
+      if (own(s.ranks, half)) { delete s.ranks[half]; }
+      if (s.work && own(s.work, half)) { delete s.work[half]; }
+      if (!s.untaught) { s.untaught = []; }
+      s.untaught.push(half);
+      out = yes(s);
+      out.ended = 'outside';
+      return out;
+    }
+    out = yes(s);
+    out.ended = 'sister';
+    return out;
   }
 
   /**
@@ -31695,6 +32179,7 @@ log('gamemode loaded:',
     TABLE: TABLE, SPELLS: SPELLS, SPELL_IDS: SPELL_IDS, TUNING: TUNING,
     fresh: fresh, clone: clone,
     pickClass: pickClass, pickProfession: pickProfession, teach: teach,
+    takeOn: takeOn, release: release,
     rankUp: rankUp, pickThirdSchool: pickThirdSchool, spendPoint: spendPoint,
     perks: perks, canWork: canWork, canDo: canDo,
     halvesOf: halvesOf, sisterOf: sisterOf, classFor: classFor,
@@ -34994,6 +35479,22 @@ log('gamemode loaded:',
   var GOLD_ID = 0x0000000F;
   var NOTICE_FEE = 20;
   var JOB_FEE = 30;
+  /*
+    A LETTER, #1374. 35 gold up front, the same for everybody. LETTER_FEE is
+    the board's and stays on the hold's ledger like a notice's. LETTER_PAY is
+    the courier's: it is counted on the same ledger while the letter is up and
+    paid back out of it, to the courier on delivery or to the sender on an
+    /unpin. It is the sender's gold moved, never new gold. There is no
+    courier cooldown; the sender's gold is the limit.
+
+    LETTER_REACH is the trade's 700 units, about 10 metres, which is the reach
+    the page gives a delivery. deliver reads the trade block's own number when
+    that block is loaded, so the two cannot drift apart.
+  */
+  var LETTER_FEE = 20;
+  var LETTER_PAY = 15;
+  var LETTER_CHARS = 300;
+  var LETTER_REACH = 700;
 
   function loadPart(key, fallback) {
     try {
@@ -35156,6 +35657,35 @@ log('gamemode loaded:',
   }
 
   /*
+    COIN ONTO A HOLD'S LEDGER, FROM WHATEVER TOOK IT (#1394).
+
+    The notice and job fees count themselves where they are taken, in post
+    below. A carriage or ferry fare is taken by the carriages block, and the
+    company's haul (#1393) will be another, so the counting is one function
+    with a reason rather than each of them reaching into funds. The coin has
+    already left a pack when this is called: this counts it, the way a
+    notice fee is counted, and creates nothing.
+
+    The ten holds are the ten every ledger in this file uses. Any other name
+    is refused rather than opened, so a slip in a caller cannot start a
+    treasury nobody can find. So is anything but a whole number above 0:
+    taking coin back off a ledger is a payout, and that is its own word.
+  */
+  var LEDGER_HOLDS = ['whiterun', 'solitude', 'riften', 'markarth', 'windhelm',
+                      'falkreath', 'morthal', 'dawnstar', 'winterhold', 'ravenrock'];
+
+  function deposit(hold, amount, reason) {
+    var key = String(hold || '').toLowerCase();
+    var n = Number(amount);
+    if (LEDGER_HOLDS.indexOf(key) < 0) { return false; }
+    if (!Number.isInteger(n) || n <= 0) { return false; }
+    funds[key] = (Number(funds[key]) || 0) + n;
+    save();
+    plog(n, 'gold onto', key + '\'s ledger:', String(reason || 'no reason given'));
+    return true;
+  }
+
+  /*
     ------------------------------------------------------------------- rent
 
     A rented property is the same claim with an amount and a clock. The server
@@ -35248,6 +35778,546 @@ log('gamemode loaded:',
     toProfile(profileId, nameOf(building) + ' pays ' + amount + ' gold every 7 days now.');
     return true;
   }
+
+  /*
+    ------------------------------------------------------------------- beds
+
+    THE NIGHT IS THE HOLDER'S PRICE, AND A BED IS ONE THE SERVER SAW (#1392).
+
+    docs/systems/property.md, "What a home is for": the holder sets who may
+    sleep there and what the night costs. /bed 20 at the building sets the
+    gold for one night, /bed - makes a night free for the people the holder
+    allows and sells it to nobody else, and /bed alone says the price. An inn
+    is the same rule, and there is no server inn price.
+
+    docs/systems/exhaustion.md: a bed you own, rent or were allowed is 80 rest
+    an hour, an inn room once the holder's price is paid is 50, a bedroll is
+    the campfire's 35, and saying the word in the street does not count. Those
+    are the three kinds this hands the needs block (bed, inn, bedroll), and
+    the numbers stay in NEEDS.recover there.
+
+    HOW THE SERVER KNOWS A BED. mp.onActivate is handed the bed when somebody
+    presses it, the same way it is handed a door, and the base's own record
+    says what it is: a FURN whose editor id names a bed, read once per base
+    through mp.lookupEspmRecordById and remembered. /rest bed then asks two
+    things the server measures itself: which bed this person last pressed, and
+    whether they are still within BED_REACH of it in the same cell. The typed
+    word is not asked, and neither is the client's own guess at furniture. The
+    building is the bed's own cell, the same way the take limit finds whose a
+    chest is, because a building here is its interior cell.
+
+    WHILE THE PLACE IS TRUE. Every BED_EVERY_MS the beds people are resting in
+    are measured again: walk away, lose the key, or let the night run out, and
+    the rest stops. Somebody who comes into the world already resting in a bed
+    the server did not see them lie down in stops too, and lies down again. A
+    restart forgets who lay down where, and that is the case it catches.
+
+    THE GOLD MOVES AND IS NEVER MADE. The price comes out of the sleeper's
+    pack through takeGold and goes into the holder's through payOut, the
+    letters' payout. A holder who is not in the world has it kept on the
+    book below, and it goes into their pack the next time they are.
+
+    TWO THINGS THE PAGE DOES NOT SAY, asked on #1392. ALLOWED is carrying a
+    key to the building or its deed, the two things that already open a locked
+    door (mayPass), because that is the one way the server knows a holder has
+    let somebody in. A NIGHT is NIGHT_MS of real time from paying, at that
+    building. Paying is /rest bed said twice inside PAY_AGAIN_MS: the first
+    says the price, the second pays it, so lying down never spends gold on its
+    own.
+
+    The book is beds.json beside the register rather than a field on a claim,
+    so the register's own reader and writer are untouched. A price names the
+    holder who set it, so a building that changes hands does not keep the last
+    holder's price.
+  */
+  // INVENTED: far enough to stand beside a double bed and press it, near
+  // enough that the next room's bed is not this one.
+  var BED_REACH = 200;
+  // INVENTED: one night is the eight hours the Rest clock takes to empty.
+  var NIGHT_MS = 8 * 3600000;
+  var PAY_AGAIN_MS = 60000;
+  var BED_EVERY_MS = 5000;
+  var LYING_FORGET_MS = 48 * 3600000;
+  /* A bed by its editor id. Bedrolls first, since they say bed too. The
+     others are words that hold the letters and are not beds. */
+  var BEDROLL_EDID = /bedroll/i;
+  var BED_EDID = /bed/i;
+  var NOT_BED_EDID = /bedside|embed|riverbed|flowerbed/i;
+  var BED_KINDS = { bed: true, inn: true, bedroll: true };
+
+  function bedHas(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
+
+  /* Who pressed which bed, who is lying in one, who was told a price, and who
+     has been seen since coming in. On globalThis, so a hot reload keeps them. */
+  if (!g.__thornswoodBedState) {
+    g.__thornswoodBedState = { pressed: {}, lying: {}, offers: {}, seen: {} };
+  }
+  var bedState = g.__thornswoodBedState;
+
+  // ------------------------------------------------------------ the book --
+
+  function bedBookPath() {
+    var path = require('path');
+    return path.join(path.dirname(registerPath()), 'beds.json');
+  }
+
+  /* Rebuilt field by field, the same discipline as the register: a price is
+     a holder and a whole number, a night is a time, and takings are gold. */
+  function loadBedBook() {
+    var out = { prices: {}, nights: {}, takings: {} };
+    var raw = null;
+    try { raw = JSON.parse(require('fs').readFileSync(bedBookPath(), 'utf8')); }
+    catch (e) { return out; }
+    if (!raw || typeof raw !== 'object') { return out; }
+    var now = Date.now();
+    var prices = (raw.prices && typeof raw.prices === 'object') ? raw.prices : {};
+    for (var b in prices) {
+      if (!bedHas(prices, b) || b === '__proto__' || !prices[b]) { continue; }
+      var by = Number(prices[b].by) || 0;
+      var price = Number(prices[b].price) || 0;
+      if (by > 0 && price > 0 && Math.floor(price) === price) {
+        out.prices[b] = { by: by, price: price };
+      }
+    }
+    var nights = (raw.nights && typeof raw.nights === 'object') ? raw.nights : {};
+    for (var nb in nights) {
+      if (!bedHas(nights, nb) || nb === '__proto__' || !nights[nb] ||
+          typeof nights[nb] !== 'object') { continue; }
+      for (var who in nights[nb]) {
+        if (!bedHas(nights[nb], who) || who === '__proto__') { continue; }
+        var at = Number(nights[nb][who]) || 0;
+        if ((Number(who) || 0) > 0 && at > 0 && (now - at) < NIGHT_MS) {
+          if (!bedHas(out.nights, nb)) { out.nights[nb] = {}; }
+          out.nights[nb][who] = at;
+        }
+      }
+    }
+    var takings = (raw.takings && typeof raw.takings === 'object') ? raw.takings : {};
+    for (var tp in takings) {
+      if (!bedHas(takings, tp) || tp === '__proto__') { continue; }
+      var gold = Number(takings[tp]) || 0;
+      if ((Number(tp) || 0) > 0 && gold > 0 && Math.floor(gold) === gold) {
+        out.takings[tp] = gold;
+      }
+    }
+    return out;
+  }
+
+  function saveBedBook() {
+    var now = Date.now();
+    for (var b in bedBook.nights) {
+      if (!bedHas(bedBook.nights, b)) { continue; }
+      var row = bedBook.nights[b];
+      for (var who in row) {
+        if (bedHas(row, who) && (now - row[who]) >= NIGHT_MS) { delete row[who]; }
+      }
+      if (!Object.keys(row).length) { delete bedBook.nights[b]; }
+    }
+    try {
+      var fs = require('fs');
+      var file = bedBookPath();
+      try { fs.mkdirSync(require('path').dirname(file), { recursive: true }); } catch (e) { }
+      fs.writeFileSync(file, JSON.stringify(bedBook, null, 1));
+    } catch (e) {
+      plog('could not write the bed book:', e);
+    }
+  }
+
+  var bedBook = loadBedBook();
+
+  // ------------------------------------------------------------ the beds --
+
+  function textOf(v) {
+    if (typeof v === 'string') { return v; }
+    var out = '';
+    if (v && typeof v.length === 'number') {
+      for (var i = 0; i < v.length && v[i]; i++) { out += String.fromCharCode(v[i]); }
+    }
+    return out;
+  }
+
+  /* 'bed', 'roll' or '' for a base, asked of the engine once and kept. An
+     answer the engine could not give is '', not a bed. */
+  var bedKinds = {};
+  function bedKind(baseDesc) {
+    baseDesc = String(baseDesc || '');
+    if (!baseDesc) { return ''; }
+    if (bedHas(bedKinds, baseDesc)) { return bedKinds[baseDesc]; }
+    var kind = '';
+    try {
+      var res = mp.lookupEspmRecordById(idOf(baseDesc));
+      var rec = res && res.record;
+      if (rec && String(rec.type) === 'FURN') {
+        var edid = textOf(rec.editorId);
+        var fields = rec.fields || [];
+        for (var i = 0; !edid && i < fields.length; i++) {
+          if (fields[i] && String(fields[i].type) === 'EDID') { edid = textOf(fields[i].data); }
+        }
+        if (BEDROLL_EDID.test(edid)) { kind = 'roll'; }
+        else if (BED_EDID.test(edid) && !NOT_BED_EDID.test(edid)) { kind = 'bed'; }
+      }
+    } catch (e) { kind = ''; }
+    bedKinds[baseDesc] = kind;
+    return kind;
+  }
+
+  /* Called from onActivate for every press. Writes only for a bed. */
+  function bedTouched(actorId, refrId, baseDesc) {
+    var kind = bedKind(baseDesc);
+    if (!kind || !actorId || !refrId) { return; }
+    bedState.pressed[actorId] = { ref: refrId, roll: kind === 'roll', at: Date.now() };
+  }
+
+  function stillAt(actorId, refrId) {
+    var d = distanceTo(actorId, refrId);
+    return d >= 0 && d <= BED_REACH;
+  }
+
+  function isBuilding(cell) {
+    return !!cell && (bedHas(BUILDING_NAME, cell) || bedHas(claims, cell));
+  }
+
+  /* The building a bed stands in, which is its cell when that is one. */
+  function bedBuilding(refrId) {
+    var cell = '';
+    try { cell = String(mp.get(refrId, 'worldOrCellDesc') || ''); } catch (e) { cell = ''; }
+    return isBuilding(cell) ? cell : '';
+  }
+
+  /* The building /bed means: the door opened in the last minute, or the
+     building they are standing in. */
+  function bedBuildingHere(actorId) {
+    var b = here(actorId);
+    if (b) { return b; }
+    var cell = '';
+    try { cell = String(mp.get(actorId, 'worldOrCellDesc') || ''); } catch (e) { cell = ''; }
+    return isBuilding(cell) ? cell : null;
+  }
+
+  /* The holder, or somebody carrying its key or its deed. See the block. */
+  function allowedIn(actorId, profileId, building, held) {
+    if (!held) { return false; }
+    if (profileId && held.by === profileId) { return true; }
+    if (holdsKey(actorId, building)) { return true; }
+    if (holdsDeed(actorId, building)) { return true; }
+    return false;
+  }
+
+  function priceOf(building, held) {
+    var p = bedHas(bedBook.prices, building) ? bedBook.prices[building] : null;
+    return (p && held && p.by === held.by) ? p.price : 0;
+  }
+
+  function nightPaid(building, profileId) {
+    if (!profileId || !bedHas(bedBook.nights, building)) { return false; }
+    var at = Number(bedBook.nights[building][profileId]) || 0;
+    return at > 0 && (Date.now() - at) < NIGHT_MS;
+  }
+
+  /*
+    What this bed is to this person: a kind of rest, a refusal, or a price
+    still to pay. Asked when they lie down and again on every tick.
+  */
+  function bedVerdict(actorId, profileId, ref, roll) {
+    var building = bedBuilding(ref);
+    var held = building ? holderOf(building) : null;
+    var out = { building: building, held: held, kind: '', line: '', price: 0, paid: false };
+    if (!held) {
+      if (roll) { out.kind = 'bedroll'; return out; }
+      out.line = building
+        ? ('Nobody holds ' + nameOf(building) + ', so nobody can let you sleep in its beds.')
+        : 'This bed is nobody\'s to lend, so it does not count as a bed.';
+      return out;
+    }
+    if (allowedIn(actorId, profileId, building, held)) {
+      out.kind = roll ? 'bedroll' : 'bed';
+      return out;
+    }
+    if (nightPaid(building, profileId)) {
+      out.kind = roll ? 'bedroll' : 'inn';
+      out.paid = true;
+      return out;
+    }
+    var price = priceOf(building, held);
+    if (!price) {
+      out.line = nameOf(building) + ' is ' + held.name + '\'s, and they have not let you ' +
+                 'sleep there. Nights there are not for sale.';
+      return out;
+    }
+    out.price = price;
+    return out;
+  }
+
+  function personName(actorId) {
+    try {
+      var a = mp.get(actorId, 'appearance');
+      if (a && a.name) { return String(a.name); }
+    } catch (e) { }
+    return 'somebody';
+  }
+
+  function profileOf(actorId) {
+    try { return Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { return 0; }
+  }
+
+  function onlineActorOf(profileId) {
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return 0; }
+    for (var i = 0; i < online.length; i++) {
+      if (profileOf(online[i]) === profileId) { return online[i]; }
+    }
+    return 0;
+  }
+
+  function tellBed(actorId, line) {
+    try { notify(actorId, line); } catch (e) { }
+    try { say(actorId, line); } catch (e) { }
+  }
+
+  /* The night's gold from the sleeper's pack to the holder's, and the night
+     written down. False when the sleeper does not have it. */
+  function payNight(actorId, profileId, building, held, price) {
+    if (!takeGold(actorId, price)) { return false; }
+    var to = onlineActorOf(held.by);
+    var handed = to ? payOut(to, price) : false;
+    if (!handed) {
+      bedBook.takings[held.by] = (Number(bedBook.takings[held.by]) || 0) + price;
+    }
+    if (!bedHas(bedBook.nights, building)) { bedBook.nights[building] = {}; }
+    bedBook.nights[building][profileId] = Date.now();
+    saveBedBook();
+    var who = personName(actorId);
+    plog(who, 'paid', price, 'gold for a night at', nameOf(building),
+         handed ? 'into ' + held.name + '\'s pack' : 'kept for ' + held.name + ' until they are in');
+    if (handed) {
+      tellBed(to, who + ' paid you ' + price + ' gold for a night at ' + nameOf(building) + '.');
+    }
+    return true;
+  }
+
+  /*
+    /rest bed, /rest inn and /rest bedroll. Answers the line to say. The kind
+    of rest is the server's answer, not the word: /rest inn in your own bed is
+    your own bed, and /rest bed in somebody else's paid room is the inn room.
+  */
+  function bedRest(actorId, profileId) {
+    var needs = g.__thornswoodNeeds;
+    if (!needs || !needs.resting) { return 'That is not running on this server.'; }
+    if (!actorId || !profileId) {
+      return 'The server cannot find your character right now. Give it a moment and try again.';
+    }
+    var bed = bedHas(bedState.pressed, actorId) ? bedState.pressed[actorId] : null;
+    if (!bed || !stillAt(actorId, bed.ref)) {
+      return 'There is no bed here. Lie down in a real one and it counts; saying the word does not.';
+    }
+    var v = bedVerdict(actorId, profileId, bed.ref, bed.roll);
+    if (v.line) { return v.line; }
+    var paidLine = '';
+    if (v.price) {
+      var name = nameOf(v.building);
+      var now = Date.now();
+      var offer = bedHas(bedState.offers, actorId) ? bedState.offers[actorId] : null;
+      if (!offer || offer.building !== v.building || offer.price !== v.price ||
+          (now - offer.at) > PAY_AGAIN_MS) {
+        bedState.offers[actorId] = { building: v.building, price: v.price, at: now };
+        return 'A night at ' + name + ' is ' + v.price + ' gold, handed to ' + v.held.name +
+               '. Say /rest bed again within a minute to pay it.';
+      }
+      delete bedState.offers[actorId];
+      if (!payNight(actorId, profileId, v.building, v.held, v.price)) {
+        return 'A night at ' + name + ' is ' + v.price + ' gold, and you are not carrying that much.';
+      }
+      paidLine = 'You pay ' + v.price + ' gold to ' + v.held.name + ' for a night at ' + name + '. ';
+      v.kind = bed.roll ? 'bedroll' : 'inn';
+      v.paid = true;
+    }
+    bedState.lying[actorId] = { ref: bed.ref, roll: !!bed.roll, kind: v.kind, paid: !!v.paid,
+                                at: Date.now() };
+    var line = needs.resting(actorId, v.kind);
+    return paidLine + (line || 'You are resting.');
+  }
+
+  /* They got up, or rest somewhere else now. */
+  function bedOff(actorId) {
+    delete bedState.lying[actorId];
+    delete bedState.offers[actorId];
+  }
+
+  /* Out of a bed the server no longer counts, without touching any other
+     kind of rest they may have started since. */
+  function getUp(actorId, needs) {
+    delete bedState.lying[actorId];
+    if (!needs || !needs.settle || !needs.resting) { return false; }
+    var n = null;
+    try { n = needs.settle(actorId); } catch (e) { return false; }
+    if (!n || !BED_KINDS[n.resting]) { return false; }
+    try { needs.resting(actorId, ''); } catch (e) { return false; }
+    return true;
+  }
+
+  /* '' while the bed still counts as it did, otherwise the line to say. */
+  function stillLying(actorId, e, needs) {
+    if (!stillAt(actorId, e.ref)) { return 'You have left the bed, so you are not resting in it now.'; }
+    var v = bedVerdict(actorId, profileOf(actorId), e.ref, e.roll);
+    if (v.kind) {
+      e.paid = !!v.paid;
+      if (v.kind === e.kind) { return ''; }
+      // Still a bed they may use, at another rate: a key handed over in the
+      // night, or a key lost with the night still paid.
+      e.kind = v.kind;
+      try { needs.resting(actorId, v.kind); } catch (err) { }
+      return '';
+    }
+    if (e.paid && v.building) {
+      return 'Your night at ' + nameOf(v.building) + ' is over.' +
+             (v.price ? ' /bed says what another costs.' : '');
+    }
+    return v.line || 'That bed does not count for you now.';
+  }
+
+  /* Gold paid while the holder was away, into their pack now they are here. */
+  function payTakings(online) {
+    var owed = false;
+    for (var k in bedBook.takings) { if (bedHas(bedBook.takings, k)) { owed = true; break; } }
+    if (!owed) { return; }
+    var changed = false;
+    for (var i = 0; i < online.length; i++) {
+      var pid = profileOf(online[i]);
+      if (!pid || !bedHas(bedBook.takings, pid)) { continue; }
+      var gold = Number(bedBook.takings[pid]) || 0;
+      if (gold > 0 && !payOut(online[i], gold)) { continue; }
+      delete bedBook.takings[pid];
+      changed = true;
+      if (gold > 0) {
+        plog('handed', gold, 'gold of nights to', personName(online[i]));
+        tellBed(online[i], 'While you were away, ' + gold + ' gold was paid for nights in your beds. ' +
+                           'It is in your pack.');
+      }
+    }
+    if (changed) { saveBedBook(); }
+  }
+
+  function bedTick() {
+    var needs = g.__thornswoodNeeds;
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
+    var on = {};
+    for (var i = 0; i < online.length; i++) { on[online[i]] = true; }
+    for (var s in bedState.seen) {
+      if (bedHas(bedState.seen, s) && !on[s]) { delete bedState.seen[s]; }
+    }
+    for (var o in bedState.offers) {
+      if (bedHas(bedState.offers, o) && !on[o]) { delete bedState.offers[o]; }
+    }
+    for (var p in bedState.pressed) {
+      if (bedHas(bedState.pressed, p) && !on[p] && !bedHas(bedState.lying, p)) {
+        delete bedState.pressed[p];
+      }
+    }
+    // Come into the world resting in a bed nobody saw them lie down in.
+    for (var j = 0; j < online.length; j++) {
+      var id = online[j];
+      if (bedState.seen[id]) { continue; }
+      bedState.seen[id] = true;
+      if (bedHas(bedState.lying, id)) { continue; }
+      if (getUp(id, needs)) {
+        plog(personName(id), 'came in resting in a bed the server did not see, so they are up');
+      }
+    }
+    var now = Date.now();
+    for (var k in bedState.lying) {
+      if (!bedHas(bedState.lying, k)) { continue; }
+      var e = bedState.lying[k];
+      var who = Number(k);
+      if (!on[k]) {
+        if ((now - e.at) > LYING_FORGET_MS) { delete bedState.lying[k]; }
+        continue;
+      }
+      var why = stillLying(who, e, needs);
+      if (why) {
+        getUp(who, needs);
+        tellBed(who, why);
+      }
+    }
+    payTakings(online);
+  }
+
+  /*
+    /bed           what a night here costs
+    /bed 20        the holder sets the gold for one night
+    /bed -         the holder makes it free for the people they allow, and
+                   sells it to nobody else
+  */
+  function bedCmd(parts, actorId, profileId, toProfile) {
+    var building = bedBuildingHere(actorId);
+    if (!building) {
+      toProfile(profileId, 'Stand in the building, or open its door, then say that again.');
+      return true;
+    }
+    var name = nameOf(building);
+    var held = holderOf(building);
+    var arg = (parts && parts.length > 1) ? String(parts[1]).trim() : '';
+    if (!held) {
+      toProfile(profileId, 'Nobody holds ' + name + ', so nobody sets a night there.');
+      return true;
+    }
+    var mine = !!profileId && held.by === profileId;
+    var price = priceOf(building, held);
+
+    if (!arg) {
+      if (mine) {
+        toProfile(profileId, price
+          ? ('A night at ' + name + ' is ' + price + ' gold, and it comes to you. ' +
+             '/bed - makes it free for the people you allow and sold to nobody else.')
+          : ('Nights at ' + name + ' are not for sale, and the people you allow sleep free. ' +
+             '/bed 20 sets the gold for one night.'));
+        return true;
+      }
+      var line = price
+        ? ('A night at ' + name + ' is ' + price + ' gold, handed to ' + held.name + '.')
+        : ('Nights at ' + name + ' are not for sale. ' + held.name +
+           ' lets only the people they allow sleep there.');
+      if (allowedIn(actorId, profileId, building, held)) { line += ' You are allowed, so yours is free.'; }
+      else if (nightPaid(building, profileId)) { line += ' Your night there is paid.'; }
+      toProfile(profileId, line);
+      return true;
+    }
+
+    if (!mine) {
+      toProfile(profileId, 'Only whoever holds ' + name + ' sets what a night there costs.');
+      return true;
+    }
+    if (arg === '-') {
+      delete bedBook.prices[building];
+      saveBedBook();
+      plog(held.name, 'made a night at', name, 'free for the people they allow');
+      toProfile(profileId, 'A night at ' + name + ' is free for the people you allow, ' +
+                           'and not for sale to anybody else.');
+      return true;
+    }
+    var amount = /^\d+$/.test(arg) ? Number(arg) : 0;
+    if (!(amount > 0) || amount > Number.MAX_SAFE_INTEGER) {
+      toProfile(profileId, 'Give a whole number of gold, or - to make a night free for the people you allow.');
+      return true;
+    }
+    bedBook.prices[building] = { by: held.by, price: amount };
+    saveBedBook();
+    plog(held.name, 'set a night at', name, 'to', amount, 'gold');
+    toProfile(profileId, 'A night at ' + name + ' is ' + amount + ' gold now, handed to you. ' +
+                         'The people you allow still sleep free.');
+    return true;
+  }
+
+  if (g.__thornswoodBedTimer) { try { clearInterval(g.__thornswoodBedTimer); } catch (e) { } }
+  g.__thornswoodBedTimer = setInterval(
+    (typeof guard === 'function') ? guard('bedTick', bedTick) : bedTick, BED_EVERY_MS);
+
+  g.__thornswoodBeds = {
+    touched: bedTouched, rest: bedRest, off: bedOff, command: bedCmd, tick: bedTick,
+    kindOf: bedKind, verdict: bedVerdict, book: function () { return bedBook; },
+    state: bedState, BED_REACH: BED_REACH, NIGHT_MS: NIGHT_MS, PAY_AGAIN_MS: PAY_AGAIN_MS,
+    BED_EVERY_MS: BED_EVERY_MS
+  };
 
 
   /*
@@ -35363,6 +36433,28 @@ log('gamemode loaded:',
   };
 
   /*
+    RAVEN ROCK, THE TENTH BOARD, #1374. The page: "Raven Rock's board starts
+    at that town's inn until a steward walks it somewhere better."
+
+    Vanilla Skyrim has one inn in Raven Rock, The Retching Netch, in
+    Dragonborn.esm. Its interior cell is 17ec0:Dragonborn.esm
+    (DLC2RRTheRetchingNetch in game/data/doors.json). The point is where its
+    innkeeper, Geldis Sadri, is placed (ref 18291:Dragonborn.esm in
+    game/data/merchant-traders.json), which is the spot
+    game/data/guild-sites.json already gives Raven Rock's guild site and
+    docs/systems/merchants-guild.md calls where that town's board starts.
+
+    Raven Rock is not in the chargen table, so the inn fallback in
+    seededBoards never found it and only nine boards were ever seeded. A town
+    in here is seeded only when that table did not already give it a board.
+    A steward's /board move takes it over for good, the same as any other
+    board, because seedBoards keeps a placed board whatever the seeding says.
+  */
+  var BOARD_INNS = {
+    ravenrock: { cell: '17ec0:Dragonborn.esm', pos: [-39, -178.2, 0], where: 'Raven Rock' }
+  };
+
+  /*
     WHICH SEEDING A BOARD IS STANDING ON, AND WHY A NUMBER RATHER THAN A FLAG.
 
     boards is SAVED, in the register beside the claims and the notices, and it
@@ -35455,6 +36547,12 @@ log('gamemode loaded:',
     } catch (e) {
       plog('could not seed the boards from the town table:', e);
     }
+    for (var inn in BOARD_INNS) {
+      if (!Object.prototype.hasOwnProperty.call(BOARD_INNS, inn) || out[inn]) { continue; }
+      var at = BOARD_INNS[inn];
+      out[inn] = { cell: at.cell, pos: [at.pos[0], at.pos[1], at.pos[2]],
+                   where: at.where || inn, seed: BOARD_SEED };
+    }
     return out;
   }
 
@@ -35519,8 +36617,9 @@ log('gamemode loaded:',
         wall.push({
           n: i + 1,
           job: !!n.job,
+          letter: !!n.letter,
           name: n.name || 'somebody',
-          text: n.text || '',
+          text: n.letter ? sealed(n) : (n.text || ''),
           taken: n.taken ? (n.takenName || 'somebody') : '',
           mine: Number(n.by) === Number(profileId),
           held: !!(n.job && Number(n.taken) === Number(profileId))
@@ -35532,7 +36631,8 @@ log('gamemode loaded:',
         for (var j = 0; j < rows.length; j++) {
           var job = rows[j];
           if (job.job && Number(job.taken) === Number(profileId) && !job.down) {
-            mine.push({ hold: h, n: j + 1, text: job.text || '', name: job.name || 'somebody' });
+            mine.push({ hold: h, n: j + 1, text: job.letter ? sealed(job) : (job.text || ''),
+                        name: job.name || 'somebody' });
           }
         }
       }
@@ -35564,6 +36664,16 @@ log('gamemode loaded:',
   function moveBoard(hold, actorId, profileId, toProfile) {
     if (!isSteward(profileId)) {
       toProfile(profileId, 'Only a steward moves a board.');
+      return true;
+    }
+    /*
+      ONLY A BOARD THAT IS THERE, #1374. One board a town, ten towns. This
+      took any word, so '/board move whiterum' saved an eleventh board that no
+      hold's ledger knows about.
+    */
+    if (!Object.prototype.hasOwnProperty.call(boards, hold)) {
+      toProfile(profileId, 'No board in ' + hold + '. The boards are ' +
+                Object.keys(boards).join(', ') + '.');
       return true;
     }
     var cell = null, pos = null;
@@ -35616,6 +36726,69 @@ log('gamemode loaded:',
       }
     }
     return false;
+  }
+
+  /*
+    THE LEDGER PAYING OUT, and only a letter's held courier pay, #1374.
+
+    takeGold destroys a fee from a pack and the fee is counted on the hold's
+    ledger. This is the other half docs/systems/gold.md describes: it creates
+    the same count back into a pack, and payHeld takes it off that ledger in
+    the same step, so the coin was already in the world and packs plus ledger
+    add up to the same after. payHeld pays a letter's own `pay`, which
+    postLetter took from the sender, never more than the ledger holds. A
+    night in a bed (#1392) is its other caller: payNight hands the holder
+    the price it has just taken from the sleeper, and payTakings what was
+    kept for a holder who was away.
+  */
+  function payOut(actorId, amount) {
+    var count = Math.floor(Number(amount) || 0);
+    if (!(count > 0)) { return false; }
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return false; }
+    var entries = (inv && inv.entries) || [];
+    var put = false;
+    for (var i = 0; i < entries.length && !put; i++) {
+      var e = entries[i];
+      if (e && e.baseId === GOLD_ID) { e.count = (Number(e.count) || 0) + count; put = true; }
+    }
+    if (!put) { entries.push({ baseId: GOLD_ID, count: count }); }
+    try { mp.set(actorId, 'inventory', { entries: entries }); } catch (e2) { return false; }
+    return true;
+  }
+
+  /*
+    A letter's held pay, out of its hold's ledger into one pack. Answers what
+    was paid, 0 when nothing is held, or -1 when it could not be paid and
+    nothing changed. n.pay goes to 0 once paid, so it is paid once.
+  */
+  function payHeld(hold, n, actorId) {
+    var amount = (n && n.letter) ? (Math.floor(Number(n.pay)) || 0) : 0;
+    if (!(amount > 0)) { return 0; }
+    if ((Number(funds[hold]) || 0) < amount) {
+      plog('a letter in', hold, 'holds', amount, 'and the ledger has only', funds[hold], '; nothing paid');
+      return -1;
+    }
+    if (!payOut(actorId, amount)) { return -1; }
+    funds[hold] = (Number(funds[hold]) || 0) - amount;
+    n.pay = 0;
+    return amount;
+  }
+
+  /* What anybody but the person it is for reads of a letter: who it is for. */
+  function sealed(n) {
+    return 'A sealed letter for ' + (n.to || 'somebody');
+  }
+
+  /*
+    The letter's name against a character's. The whole name, or its first
+    words, so 'Lydia' reaches Lydia Stormblade and 'Ly' reaches nobody.
+  */
+  function nameIs(to, name) {
+    var a = String(to || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    var b = String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    if (!a || !b) { return false; }
+    return b === a || b.indexOf(a + ' ') === 0;
   }
 
   function post(parts, actorId, profileId, toProfile, isJob) {
@@ -35735,9 +36908,9 @@ log('gamemode loaded:',
     for (var i = list.length - 1; i >= 0 && shown < 10; i--) {
       var n = list[i];
       if (n.down) { continue; }
-      lines.push('[' + (i + 1) + '] ' +
-                 (n.job ? (n.taken ? 'job, taken: ' : 'job: ') : '') +
-                 n.name + ': ' + n.text);
+      lines.push('[' + (i + 1) + '] ' + (n.letter
+        ? 'letter for ' + n.to + ', from ' + n.name + (n.taken ? ', taken by ' + n.takenName : '')
+        : (n.job ? (n.taken ? 'job, taken: ' : 'job: ') : '') + n.name + ': ' + n.text));
       shown++;
     }
     var more = up > shown
@@ -35802,6 +36975,14 @@ log('gamemode loaded:',
     n.takenName = who;
     n.takenAt = Date.now();
     save();
+    if (n.letter) {
+      plog(who, 'took a letter for', n.to, 'in', hold);
+      toProfile(profileId, 'You take the letter for ' + n.to + ', from ' + n.name + '. It is sealed. ' +
+                'Find ' + n.to + ' and /deliver it within about 10 metres, and the ' +
+                (Number(n.pay) || 0) + ' gold is yours.');
+      refreshPanel(actorId);
+      return true;
+    }
     plog(who, 'took a job in', hold + ':', n.text);
     toProfile(profileId, 'You take it: ' + n.text + '. Go and see ' + n.name + ' about it.');
     refreshPanel(actorId);
@@ -35816,8 +36997,9 @@ log('gamemode loaded:',
       var list = notices[hold];
       for (var i = 0; i < list.length; i++) {
         var n = list[i];
-        if (n.job && n.taken === profileId) {
-          lines.push(hold + ': ' + n.text + ' (for ' + n.name + ')');
+        if (n.job && n.taken === profileId && !n.down) {
+          lines.push(hold + ': ' + (n.letter ? sealed(n) + ', from ' + n.name
+                                             : n.text + ' (for ' + n.name + ')'));
         }
       }
     }
@@ -35841,7 +37023,7 @@ log('gamemode loaded:',
       return true;
     }
     var n = list[at];
-    if (!n.job || n.taken !== profileId) {
+    if (!n.job || n.taken !== profileId || n.down) {
       toProfile(profileId, 'That is not one of yours.');
       return true;
     }
@@ -35917,11 +37099,208 @@ log('gamemode loaded:',
       toProfile(profileId, n.takenName + ' has taken that job. It can come down once they hand it back.');
       return true;
     }
+    /*
+      A LETTER'S PAY COMES BACK, #1374. The board fee stays, like any
+      notice's. The courier's 15 was only held, and with nobody to carry it
+      it is the sender's again. Paid before it comes down, so a pack that
+      cannot be written leaves the letter up and the 15 still held.
+    */
+    var back = n.letter ? payHeld(hold, n, actorId) : 0;
+    if (back < 0) {
+      toProfile(profileId, 'That did not work. The letter is still up.');
+      return true;
+    }
     takedown(hold, at, profileId);
+    if (n.letter) {
+      plog(n.name, 'took down a letter for', n.to, 'in', hold, 'and had', back, 'back');
+      toProfile(profileId, 'You take the letter down. The ' + back + ' gold for the courier comes back ' +
+                'to you. The fee stays with ' + hold + '.');
+      refreshPanel(actorId);
+      return true;
+    }
     plog(n.name, 'took down', n.job ? 'a job' : 'a notice', 'in', hold + ':', n.text);
     toProfile(profileId, 'You take it down. The fee stays with ' + hold + '.');
     refreshPanel(actorId);
     return true;
+  }
+
+  /*
+    ------------------------------------------------------------- a letter
+
+        /letter Lydia Meet me at the Drunken Huntsman at dusk.
+        /letter "Lydia Stormblade" Meet me at the Drunken Huntsman at dusk.
+
+    #1374, as docs/systems/noticeboards.md has it. A letter is a job with a
+    named person at the other end, written standing at the board. The words
+    are up to 300 characters, the same cap as /ooc; a longer one is refused
+    before any gold is taken rather than cut, because the sender paid for the
+    whole letter. The name is one word, or several in double quotes.
+
+    THE WORDS ARE SEALED. Only /deliver hands them to anybody. The wall, the
+    panel, /jobs and the taking line say who it is for and from whom, and the
+    log does not record them either.
+  */
+  function postLetter(parts, actorId, profileId, toProfile) {
+    var hold = boardHere(actorId);
+    if (!hold) {
+      toProfile(profileId, 'Stand at a hold\'s notice board to write a letter there.');
+      return true;
+    }
+    var rest = (parts && parts.length > 1) ? parts.slice(1).join(' ').trim() : '';
+    var to = '', words = '';
+    if (rest.charAt(0) === '"') {
+      var shut = rest.indexOf('"', 1);
+      if (shut > 1) { to = rest.slice(1, shut).trim(); words = rest.slice(shut + 1).trim(); }
+    } else {
+      var gap = rest.indexOf(' ');
+      to = gap < 0 ? rest : rest.slice(0, gap);
+      words = gap < 0 ? '' : rest.slice(gap + 1).trim();
+    }
+    if (!to) {
+      toProfile(profileId, 'Say who it is for, then what it says: /letter <name> <words>.');
+      return true;
+    }
+    if (!words) {
+      toProfile(profileId, 'Say what the letter says.');
+      return true;
+    }
+    if (words.length > LETTER_CHARS) {
+      toProfile(profileId, 'A letter is up to ' + LETTER_CHARS + ' characters. That one is ' +
+                words.length + '. Nothing was taken.');
+      return true;
+    }
+    var cost = LETTER_FEE + LETTER_PAY;
+    if (!takeGold(actorId, cost)) {
+      toProfile(profileId, 'A letter costs ' + cost + ' gold and you do not have it.');
+      return true;
+    }
+    var who = 'somebody';
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      if (ap && ap.name) { who = String(ap.name); }
+    } catch (e) { }
+    if (!notices[hold]) { notices[hold] = []; }
+    notices[hold].push({ by: profileId, name: who, text: words, at: Date.now(),
+                         job: true, letter: true, to: to, pay: LETTER_PAY, taken: 0 });
+    funds[hold] = (Number(funds[hold]) || 0) + cost;
+    save();
+    plog(who, 'posted a letter for', to, 'in', hold, 'for', cost, 'gold');
+    toProfile(profileId, 'Your letter for ' + to + ' is on the board in ' + hold + '. That cost ' + cost +
+              ' gold: ' + LETTER_FEE + ' for the board, and ' + LETTER_PAY +
+              ' held for whoever carries it.');
+    refreshPanel(actorId);
+    return true;
+  }
+
+  /*
+        /deliver Lydia      or the form id the crosshair gives, as /trade takes
+
+    Every letter the courier carries for that person goes over at once,
+    within the trade reach. The name is what is checked and nothing else: the
+    server does not judge what a letter says, and a wrong person is refused
+    with the letter still in the courier's hands. The person it is for is told
+    the words, who wrote them and who brought them. The courier is paid each
+    letter's held 15 out of the ledger it was counted on, and the letter comes
+    off the wall the way an /unpin does, keeping its number.
+  */
+  function deliver(parts, actorId, profileId, toProfile) {
+    var carried = [];
+    for (var h in notices) {
+      if (!Object.prototype.hasOwnProperty.call(notices, h)) { continue; }
+      var list = notices[h] || [];
+      for (var i = 0; i < list.length; i++) {
+        var n = list[i];
+        if (n && n.letter && !n.down && Number(n.taken) === Number(profileId)) {
+          carried.push({ hold: h, at: i, n: n });
+        }
+      }
+    }
+    if (!carried.length) {
+      toProfile(profileId, 'You are not carrying a letter. Take one off a board first.');
+      return true;
+    }
+    var want = (parts && parts.length > 1) ? parts.slice(1).join(' ').trim() : '';
+    if (!want) {
+      toProfile(profileId, 'Say who you are handing it to: /deliver and their name, standing with them.');
+      return true;
+    }
+    var soc = g.__thornswoodSocial;
+    if (!soc || !soc.findPerson || !soc.nameOfPerson || !soc.profileOf) {
+      toProfile(profileId, 'That is not running on this server.');
+      return true;
+    }
+    var found = soc.findPerson(want);
+    if (!found || !found.actorId) {
+      toProfile(profileId, (found && found.why) || 'Nobody here by that name.');
+      return true;
+    }
+    var them = found.actorId;
+    if (them === actorId) { toProfile(profileId, 'That is you.'); return true; }
+    if (!letterReach(actorId, them)) {
+      toProfile(profileId, 'Stand closer. A letter is handed over within about 10 metres.');
+      return true;
+    }
+    var theirName = soc.nameOfPerson(them);
+    var theirPid = Number(soc.profileOf(them)) || 0;
+    if (!theirPid) {
+      // Nobody to hand the words to, so nothing is paid and nothing comes down.
+      toProfile(profileId, 'The server cannot tell who that is right now. Try again in a moment.');
+      return true;
+    }
+    var mine = [];
+    var fors = [];
+    for (var k = 0; k < carried.length; k++) {
+      if (nameIs(carried[k].n.to, theirName)) { mine.push(carried[k]); }
+      else if (fors.indexOf(carried[k].n.to) === -1) { fors.push(carried[k].n.to); }
+    }
+    if (!mine.length) {
+      toProfile(profileId, 'That is ' + theirName + '. What you carry is for ' + fors.join(', ') + '.');
+      return true;
+    }
+    var courier = soc.nameOfPerson(actorId);
+    var paid = 0;
+    var handed = 0;
+    for (var m = 0; m < mine.length; m++) {
+      var c = mine[m];
+      var got = payHeld(c.hold, c.n, actorId);
+      if (got < 0) {
+        toProfile(profileId, 'That did not work. You still have the letter for ' + c.n.to + '.');
+        continue;
+      }
+      paid += got;
+      c.n.delivered = Date.now();
+      c.n.deliveredTo = theirPid;
+      takedown(c.hold, c.at, profileId);
+      handed++;
+      plog(courier, 'handed', theirName, 'a letter from', c.n.name, 'off the board in', c.hold,
+           'and was paid', got);
+      toProfile(theirPid, 'A letter from ' + c.n.name + ', handed to you by ' + courier + ':\n' + c.n.text);
+    }
+    if (handed) {
+      toProfile(profileId, 'You hand ' + theirName + (handed === 1 ? ' the letter. ' : ' ' + handed +
+                ' letters. ') + paid + ' gold is yours.');
+      refreshPanel(actorId);
+      refreshPanel(them);
+    }
+    return true;
+  }
+
+  /* Within the trade's reach of each other, in the same cell. */
+  function letterReach(a, b) {
+    var reach = LETTER_REACH;
+    try {
+      var tr = g.__thornswoodTrade;
+      if (tr && tr.TRADE && Number(tr.TRADE.reach) > 0) { reach = Number(tr.TRADE.reach); }
+    } catch (e) { }
+    try {
+      var ca = String(mp.get(a, 'worldOrCellDesc') || '');
+      var cb = String(mp.get(b, 'worldOrCellDesc') || '');
+      if (!ca || ca !== cb) { return false; }
+      var pa = mp.get(a, 'pos'), pb = mp.get(b, 'pos');
+      if (!pa || !pb) { return false; }
+      var dx = pa[0] - pb[0], dy = pa[1] - pb[1], dz = pa[2] - pb[2];
+      return (dx * dx + dy * dy + dz * dz) <= reach * reach;
+    } catch (e2) { return false; }
   }
 
   function command(word, parts, actorId, profileId, toProfile) {
@@ -35945,6 +37324,7 @@ log('gamemode loaded:',
     if (word === '/evict') { return evict(actorId, profileId, toProfile); }
     if (word === '/box') { return boxCmd(parts, actorId, profileId, toProfile); }
     if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile); }
+    if (word === '/bed') { return bedCmd(parts, actorId, profileId, toProfile); }
     if (word === '/notice') { return post(parts, actorId, profileId, toProfile, false); }
     if (word === '/job') { return post(parts, actorId, profileId, toProfile, true); }
     if (word === '/board') { return board(parts, actorId, profileId, toProfile); }
@@ -35952,6 +37332,8 @@ log('gamemode loaded:',
     if (word === '/jobs') { return jobs(profileId, toProfile); }
     if (word === '/dropjob') { return dropJob(parts, actorId, profileId, toProfile); }
     if (word === '/unpin') { return unpin(parts, actorId, profileId, toProfile); }
+    if (word === '/letter') { return postLetter(parts, actorId, profileId, toProfile); }
+    if (word === '/deliver') { return deliver(parts, actorId, profileId, toProfile); }
     return false;
   }
 
@@ -36108,6 +37490,7 @@ log('gamemode loaded:',
     claims: function () { return claims; },
     isJarl: isJarl, isSteward: isSteward,
     touchedBox: touchedBox, putIn: putIn, holdOfBox: holdOfBox,
+    deposit: deposit, takeGold: takeGold, LEDGER_HOLDS: LEDGER_HOLDS,
     holdStanding: holdStanding,
     rentDue: rentDue, funds: function () { return funds; },
     boxes: function () { return boxes; },
@@ -36121,6 +37504,432 @@ log('gamemode loaded:',
        Object.keys(claims).length, 'claim(s)');
 })();
 // ==== end thornswood property ====
+
+// ==== thornswood carriages ====
+/*
+  CARRIAGES AND FERRIES: THE ROUTE LIST, THE FARE, AND THE ONE MOVE (#1394).
+
+  docs/systems/carriages.md is the design and every number here is from it.
+  You stand within 400 of the driver and name the stop. A ferry is 10 gold, a
+  carriage 20, and either one is 40 when Raven Rock is at either end. The fare
+  goes onto the ledger of the hold the stop you leave from is in, counted the
+  way a notice fee is counted (deposit, in the property block). A pack that is
+  short does not move and loses nothing. Fast travel stays off: nothing here
+  offers the map, and there is no word that skips the driver.
+
+  THE MOD'S OWN RIDE DOES NOT LAND, READ IN THE FORK. MovementValidation
+  in skymp5-server refuses any move a client reports that changes the cell or
+  the world, or covers 4096 units or more, and sends the person back to where
+  the server had them. The carriage mod's fade moves the person on their own
+  machine and nowhere else, so on this server its ride ends where it began.
+  So the move is the server's: one locationalData set, the call /tp and
+  arriving from creation make. That is the one position change the page asks
+  for, and nothing moves anybody a second time on top of it.
+
+  WHERE THE STOPS COME FROM. The driver at every stop is a placed person in
+  game/data/npc-population.json with the role transport: the collection's own
+  carriage and ferry workers, read out of the plugins by
+  scripts/dev/Build-NpcPopulation.py. Each row below is one of those, with its
+  reference, base, world, spot and hold copied across, and
+  tests/test-1394-fares.js fails when the two drift apart. You land on the
+  driver's own spot at the other end, the way MoveTo onto an actor lands.
+  Which water a ferryman works is the mod's: KmodFerryRoute1 to 4 in
+  cast.json, which the mod's own page calls the North Coast, Lake Honrich,
+  Lake Ilinalta and Solstheim, and a ferryman there goes to any stop on his
+  water. Gjalund Salt-Sage is Dragonborn's ship between Windhelm and Raven
+  Rock, the Northern Maiden.
+
+  TWO WITH NO FACTION IN THE REPO. Thors is the one carriage driver in
+  Winterhold town, from the mod's fix that "adds a carriage to Winterhold".
+  Rolf is the Dragon Bridge ferryman the same fix added "beneath the bridge,
+  on the Karth River", and the Karth is North Coast water. Both are on the
+  issue to check against their factions in the plugin.
+
+  WHAT IS NOT HERE. The mod also puts people down where nobody drives from:
+  the villages, the Hearthfire homes, the Thalmor Embassy, the small ferry
+  landings. Landing there needs the mod's own markers, the repo does not have
+  their positions, and so those are not on this list yet. A ride to one is
+  refused before any gold moves.
+
+  THE HOLD IS THE STOP'S, written on the row. It is never worked out from
+  where the person came from, so Solitude's carriage is Solitude's whoever
+  walks up to it, a ride that started at the embassy included: the embassy
+  is not a hold and has no ledger (docs/systems/embassy.md).
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+  function plog() {
+    var a = Array.prototype.slice.call(arguments);
+    a.unshift('[carriages]');
+    console.log(a.join(' '));
+  }
+
+  var FARE_FERRY = 10;
+  var FARE_CARRIAGE = 20;
+  var FARE_RAVEN_ROCK = 40;
+
+  /* The same reach as a notice board. */
+  var RIDE_REACH = 400;
+
+  /*
+    How long after pressing E on a driver /ride still means that driver. A
+    minute, the same as a door for /claim (DOOR_MEMORY_MS). It only matters
+    for a driver who has wandered off his spot, because a person within reach
+    of the spot itself is at the stop whether they pressed anything or not.
+  */
+  var DRIVER_MEMORY_MS = 60000;
+
+  var RIDE_LINES = {
+    carriage: { kind: 'carriage', what: 'the carriage' },
+    coast: { kind: 'ferry', what: 'the North Coast ferry' },
+    honrich: { kind: 'ferry', what: 'the Lake Honrich ferry' },
+    ilinalta: { kind: 'ferry', what: 'the Lake Ilinalta ferry' },
+    solstheim: { kind: 'ferry', what: 'the Solstheim ferry' },
+    maiden: { kind: 'ferry', what: 'the Northern Maiden' }
+  };
+
+  var RIDE_STOPS = [
+    // The carriage, one in every hold.
+    { key: 'carriage:whiterun', line: 'carriage', name: 'Whiterun', hold: 'whiterun', driver: 'Bjorlam',
+      ref: 'bbf6d:CFTO.esp', base: '6ae98:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [17527.8, -12395.6, -4753.2], rot: 108.9 },
+    { key: 'carriage:solitude', line: 'carriage', name: 'Solitude', hold: 'solitude', driver: 'Thaer',
+      ref: 'bbf76:CFTO.esp', base: '6ae97:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-73260.4, 99388.7, -10910], rot: 60 },
+    { key: 'carriage:windhelm', line: 'carriage', name: 'Windhelm', hold: 'windhelm', driver: 'Alfarinn',
+      ref: 'bbf6e:CFTO.esp', base: '6ae99:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [136396.2, 25084.2, -12805.3], rot: 199.6 },
+    { key: 'carriage:riften', line: 'carriage', name: 'Riften', hold: 'riften', driver: 'Sigaar',
+      ref: 'bbf7f:CFTO.esp', base: '6ae96:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [173633.8, -91556.8, 11131.7], rot: 319.9 },
+    { key: 'carriage:markarth', line: 'carriage', name: 'Markarth', hold: 'markarth', driver: 'Kibell',
+      ref: '9d8bf:CFTO.esp', base: '6ae95:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-169393.6, 4767.4, -4098.1], rot: 0 },
+    { key: 'carriage:falkreath', line: 'carriage', name: 'Falkreath', hold: 'falkreath', driver: 'Tulinn',
+      ref: 'bbf90:CFTO.esp', base: 'bbf8f:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-34633, -90053, -2987.1], rot: 177.6 },
+    { key: 'carriage:morthal', line: 'carriage', name: 'Morthal', hold: 'morthal', driver: 'Wilhod',
+      ref: 'bbf8e:CFTO.esp', base: 'bbf8c:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-39903.4, 71131.3, -13872], rot: 0 },
+    { key: 'carriage:dawnstar', line: 'carriage', name: 'Dawnstar', hold: 'dawnstar', driver: 'Berud',
+      ref: 'bbf91:CFTO.esp', base: 'bbf8d:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [26827, 101305.6, -13255.7], rot: 97.4 },
+    { key: 'carriage:winterhold', line: 'carriage', name: 'Winterhold', hold: 'winterhold', driver: 'Thors',
+      ref: '1c355d:CFTO.esp', base: '1be45a:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [110568, 99564.5, -9024], rot: 54.4 },
+    // The North Coast ferry. Dragon Bridge is the fix's ferryman on the Karth.
+    { key: 'coast:solitudelighthouse', line: 'coast', name: 'Solitude Lighthouse', hold: 'solitude', driver: 'Perius',
+      ref: '14c5b:CFTO.esp', base: '14c5a:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-48717.7, 126815.7, -13954.9], rot: 165.2 },
+    { key: 'coast:solitude', line: 'coast', name: 'Solitude', hold: 'solitude', driver: 'Jolf',
+      ref: 'fb18:CFTO.esp', base: 'aa08:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-63395.9, 94449.8, -13886], rot: 63 },
+    { key: 'coast:dragonbridge', line: 'coast', name: 'Dragon Bridge', hold: 'solitude', driver: 'Rolf',
+      ref: '2d4c0a:CFTO.esp', base: '2d4c09:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-98560.9, 79317.5, -13937.9], rot: 319.9 },
+    { key: 'coast:morthal', line: 'coast', name: 'Morthal', hold: 'morthal', driver: 'Radding',
+      ref: 'aa0c:CFTO.esp', base: 'aa0b:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-36760.3, 65864.9, -13940.7], rot: 85.9 },
+    { key: 'coast:dawnstar', line: 'coast', name: 'Dawnstar', hold: 'dawnstar', driver: 'Harlaug',
+      ref: '14ca2:CFTO.esp', base: 'aa07:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [31426.5, 105934.5, -13955.6], rot: 159.5 },
+    { key: 'coast:winterhold', line: 'coast', name: 'Winterhold', hold: 'winterhold', driver: 'Jollsen',
+      ref: '153f0c:CFTO.esp', base: '158ffc:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [102132.8, 113494, -13955], rot: 149 },
+    { key: 'coast:windhelm', line: 'coast', name: 'Windhelm', hold: 'windhelm', driver: 'Gort',
+      ref: 'fb1b:CFTO.esp', base: 'aa09:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [140249.9, 34021.2, -13934.7], rot: 225 },
+    // The Lake Honrich ferry.
+    { key: 'honrich:riften', line: 'honrich', name: 'Riften', hold: 'riften', driver: 'Heirmir',
+      ref: 'fb29:CFTO.esp', base: 'fb28:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [167248.5, -96459.3, 10688], rot: 270 },
+    { key: 'honrich:heartwoodmill', line: 'honrich', name: 'Heartwood Mill', hold: 'riften', driver: 'Thalldar',
+      ref: 'fb25:CFTO.esp', base: 'fb24:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [134591.4, -95769.6, 10668.8], rot: 90 },
+    { key: 'honrich:ivarstead', line: 'honrich', name: 'Ivarstead', hold: 'riften', driver: 'Haennr',
+      ref: '14c53:CFTO.esp', base: '14c52:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [78620.3, -68798.6, 10638.9], rot: 291.2 },
+    // The Lake Ilinalta ferry.
+    { key: 'ilinalta:brittleshinpass', line: 'ilinalta', name: 'Brittleshin Pass', hold: 'falkreath', driver: 'Rinlen',
+      ref: '2e1e7:CFTO.esp', base: '2e1e6:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-19319.6, -54007.7, 637.1], rot: 137.5 },
+    { key: 'ilinalta:guardianstones', line: 'ilinalta', name: 'Guardian Stones', hold: 'falkreath', driver: 'Bryst',
+      ref: '332f6:CFTO.esp', base: '332f5:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [124.1, -60292.9, 608], rot: 143.2 },
+    { key: 'ilinalta:halfmoonmill', line: 'ilinalta', name: 'Half-Moon Mill', hold: 'falkreath', driver: 'Hisygg',
+      ref: '332ef:CFTO.esp', base: '332ed:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-40803.1, -57902.2, 814.6], rot: 97.4 },
+    // The Solstheim ferry.
+    { key: 'solstheim:ravenrock', line: 'solstheim', name: 'Raven Rock', hold: 'ravenrock', driver: 'Maslyn', ravenRock: true,
+      ref: '14c6f:CFTO.esp', base: '14c6e:CFTO.esp', world: '800:Dragonborn.esm',
+      pos: [28344.6, 34630.7, 306.5], rot: 122.2 },
+    { key: 'solstheim:telmithryn', line: 'solstheim', name: 'Tel Mithryn', hold: 'ravenrock', driver: 'Bildul',
+      ref: '14c79:CFTO.esp', base: '14c78:CFTO.esp', world: '800:Dragonborn.esm',
+      pos: [72037.3, 20210.9, 305.7], rot: 182.4 },
+    { key: 'solstheim:skaalvillage', line: 'solstheim', name: 'Skaal Village', hold: 'ravenrock', driver: 'Gauldis',
+      ref: '14c6d:CFTO.esp', base: '14c6c:CFTO.esp', world: '800:Dragonborn.esm',
+      pos: [79945.4, 70832.3, 308], rot: 91.7 },
+    // The Northern Maiden, Gjalund Salt-Sage's ship.
+    { key: 'maiden:windhelm', line: 'maiden', name: 'Windhelm', hold: 'windhelm', driver: 'Gjalund Salt-Sage',
+      ref: '182af:Dragonborn.esm', base: '182ae:Dragonborn.esm', world: '3c:Skyrim.esm',
+      pos: [141310, 34083.7, -13995.5], rot: 353.4 },
+    { key: 'maiden:ravenrock', line: 'maiden', name: 'Raven Rock', hold: 'ravenrock', driver: 'Gjalund Salt-Sage', ravenRock: true,
+      ref: '2582c:Dragonborn.esm', base: '2582b:Dragonborn.esm', world: '800:Dragonborn.esm',
+      pos: [28928.7, 33144.2, 309.9], rot: 73.1 }
+  ];
+
+  var HOLD_NAMES = {
+    whiterun: 'Whiterun', solitude: 'Solitude', riften: 'Riften', markarth: 'Markarth',
+    windhelm: 'Windhelm', falkreath: 'Falkreath', morthal: 'Morthal', dawnstar: 'Dawnstar',
+    winterhold: 'Winterhold', ravenrock: 'Raven Rock'
+  };
+
+  function stopByKey(key) {
+    for (var i = 0; i < RIDE_STOPS.length; i++) {
+      if (RIDE_STOPS[i].key === key) { return RIDE_STOPS[i]; }
+    }
+    return null;
+  }
+
+  function stopByBase(base) {
+    var want = String(base || '').toLowerCase();
+    if (!want) { return null; }
+    for (var i = 0; i < RIDE_STOPS.length; i++) {
+      if (RIDE_STOPS[i].base && RIDE_STOPS[i].base.toLowerCase() === want) { return RIDE_STOPS[i]; }
+    }
+    return null;
+  }
+
+  /** The gold for a ride, or 0 when the list has no such ride. */
+  function fare(from, to) {
+    if (!from || !to || from === to || from.line !== to.line) { return 0; }
+    // Nobody drives from a stop with no driver standing at it.
+    if (!from.driver) { return 0; }
+    var line = Object.prototype.hasOwnProperty.call(RIDE_LINES, from.line) ? RIDE_LINES[from.line] : null;
+    if (!line) { return 0; }
+    if (from.ravenRock || to.ravenRock) { return FARE_RAVEN_ROCK; }
+    return line.kind === 'ferry' ? FARE_FERRY : FARE_CARRIAGE;
+  }
+
+  /** Every stop this one's driver goes to. */
+  function destinations(from) {
+    var out = [];
+    for (var i = 0; i < RIDE_STOPS.length; i++) {
+      if (fare(from, RIDE_STOPS[i]) > 0) { out.push(RIDE_STOPS[i]); }
+    }
+    return out;
+  }
+
+  /** Where something is: its cell or world and its point, or null. */
+  function placeOf(id) {
+    var cell = null, pos = null;
+    try { cell = mp.get(id, 'worldOrCellDesc'); } catch (e) { return null; }
+    try { pos = mp.get(id, 'pos'); } catch (e) { return null; }
+    if (typeof cell !== 'string' || !cell || !pos || pos.length !== 3) { return null; }
+    var p = [Number(pos[0]), Number(pos[1]), Number(pos[2])];
+    if (!p.every(Number.isFinite)) { return null; }
+    return { cell: cell, pos: p };
+  }
+
+  function apart(a, b) {
+    var dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
+    return Math.sqrt(dx * dx + dy * dy + dz * dz);
+  }
+
+  /*
+    Somebody pressed E on a driver, and the front plugin said which one.
+    Believed only as far as the server can check it: the actor has to be one
+    of the drivers on the list, by its base, and the person has to be within
+    reach of where that actor is now. Null when it is not a driver at all.
+  */
+  var pressedBy = {};
+
+  function pressDriver(actorId, driverId) {
+    var base = '';
+    try { base = String(mp.get(driverId, 'baseDesc') || ''); } catch (e) { base = ''; }
+    var stop = stopByBase(base);
+    if (!stop) { return null; }
+    var me = placeOf(actorId), them = placeOf(driverId);
+    if (!me || !them || me.cell !== them.cell || apart(me.pos, them.pos) > RIDE_REACH) {
+      return { stop: stop, far: true };
+    }
+    pressedBy[actorId] = { stop: stop.key, driver: driverId, at: Date.now() };
+    return { stop: stop, far: false };
+  }
+
+  /** The stop this person is standing at, or null. */
+  function stopHere(actorId) {
+    var me = placeOf(actorId);
+    if (!me) { return null; }
+    var p = Object.prototype.hasOwnProperty.call(pressedBy, actorId) ? pressedBy[actorId] : null;
+    if (p && Date.now() - p.at <= DRIVER_MEMORY_MS) {
+      var s = stopByKey(p.stop);
+      var them = placeOf(p.driver);
+      var base = '';
+      try { base = String(mp.get(p.driver, 'baseDesc') || ''); } catch (e) { base = ''; }
+      if (s && them && stopByBase(base) === s && them.cell === me.cell &&
+          apart(me.pos, them.pos) <= RIDE_REACH) {
+        return s;
+      }
+    }
+    /*
+      Otherwise the driver himself, or his spot. The population block keeps a
+      kept driver on his own placed reference, so the server can read where he
+      stands now; a driver it cannot read is measured from his spot.
+    */
+    var best = null, bestD = RIDE_REACH;
+    for (var i = 0; i < RIDE_STOPS.length; i++) {
+      var stop = RIDE_STOPS[i];
+      if (!stop.driver || stop.world !== me.cell) { continue; }
+      var d = apart(me.pos, stop.pos);
+      var live = driverNow(stop);
+      if (live && live.cell === me.cell) { d = Math.min(d, apart(me.pos, live.pos)); }
+      if (d <= bestD) { bestD = d; best = stop; }
+    }
+    return best;
+  }
+
+  function driverNow(stop) {
+    var id = 0;
+    try { id = Number(mp.getIdFromDesc(stop.ref)) || 0; } catch (e) { id = 0; }
+    return id > 0 ? placeOf(id) : null;
+  }
+
+  function simple(text) {
+    return String(text || '').toLowerCase().replace(/[^a-z]/g, '');
+  }
+
+  /* The stop they named, out of the ones this driver goes to: the whole name,
+     or the start of exactly one. */
+  function pick(list, wanted) {
+    var w = simple(wanted);
+    if (!w) { return null; }
+    var i;
+    for (i = 0; i < list.length; i++) {
+      if (simple(list[i].name) === w) { return list[i]; }
+    }
+    var hits = [];
+    for (i = 0; i < list.length; i++) {
+      if (simple(list[i].name).indexOf(w) === 0) { hits.push(list[i]); }
+    }
+    return hits.length === 1 ? hits[0] : null;
+  }
+
+  function offer(from) {
+    var list = destinations(from);
+    var bits = [];
+    for (var i = 0; i < list.length; i++) { bits.push(list[i].name + ' ' + fare(from, list[i])); }
+    return from.driver + ' runs ' + RIDE_LINES[from.line].what + ' from ' + from.name +
+      '. Say /ride and the stop: ' + bits.join(', ') + ' gold. The fare goes to ' +
+      (HOLD_NAMES[from.hold] || from.hold) + '\'s ledger.';
+  }
+
+  /* Whether the pack can pay, by the same test takeGold makes: one stack of
+     coin with the whole fare in it. Read only. */
+  function canPay(actorId, amount) {
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return false; }
+    var entries = (inv && inv.entries) || [];
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (e && e.baseId === 0x0000000F && (Number(e.count) || 0) >= amount) { return true; }
+    }
+    return false;
+  }
+
+  function moveTo(actorId, stop) {
+    mp.set(actorId, 'locationalData', {
+      cellOrWorldDesc: stop.world,
+      pos: [stop.pos[0], stop.pos[1], stop.pos[2]],
+      rot: [0, 0, stop.rot]
+    });
+  }
+
+  /** A ride: the line to say back, and the move when it goes. */
+  function ride(actorId, profileId, wanted) {
+    var from = stopHere(actorId);
+    if (!from) {
+      return 'Stand at a carriage or ferry driver, then say /ride and where you are going.';
+    }
+    if (!wanted) { return offer(from); }
+    var to = pick(destinations(from), wanted);
+    if (!to) { return 'No ride to ' + wanted + ' from here. ' + offer(from); }
+    var price = fare(from, to);
+    // Never 0 or less: destinations() offers only rides with a fare, and an
+    // amount below 1 would make takeGold add rather than take.
+    if (!(price > 0)) { return 'No ride to ' + wanted + ' from here. ' + offer(from); }
+    var prop = g.__thornswoodProperty;
+    if (!prop || typeof prop.takeGold !== 'function' || typeof prop.deposit !== 'function') {
+      plog('a ride was asked for and the hold ledger is not loaded');
+      return 'The hold\'s ledger is not running on this server, so nobody rides. Say so in the dev channel.';
+    }
+    // A pack that is short keeps all of it and stays where it is.
+    if (!canPay(actorId, price)) {
+      return 'The ride to ' + to.name + ' is ' + price + ' gold and you do not have it. Nothing was taken.';
+    }
+    /*
+      THE MOVE, THEN THE FARE, so a move the server could not make costs
+      nothing and no coin ever has to go back into a pack. The pack was read a
+      line ago and nothing between here and there touches it, so takeGold
+      finds what canPay found. If writing the pack fails all the same, there
+      is no fare and so no ride: they go back to the stop they left.
+    */
+    try {
+      moveTo(actorId, to);
+    } catch (e) {
+      plog('profile', profileId, 'could not be moved from', from.key, 'to', to.key + ':', e);
+      return 'The ride did not go, and nothing was taken. Say so in the dev channel.';
+    }
+    if (!prop.takeGold(actorId, price)) {
+      try { moveTo(actorId, from); } catch (e2) { }
+      plog('profile', profileId, 'rode from', from.key, 'to', to.key,
+           'and the fare could not be taken, so they were put back');
+      return 'The fare could not be taken, so the ride did not go. Nothing was taken.';
+    }
+    delete pressedBy[actorId];
+    var what = RIDE_LINES[from.line].what;
+    if (!prop.deposit(from.hold, price, 'fare, ' + from.name + ' to ' + to.name + ' by ' + what +
+                      ', profile ' + profileId)) {
+      plog('profile', profileId, 'paid', price, 'at', from.key, 'and', from.hold, 'took no deposit');
+    }
+    plog('profile', profileId, 'rode', what, 'from', from.name, 'to', to.name, 'for', price,
+         'gold, onto', from.hold + '\'s ledger');
+    return 'You pay the ' + price + ' gold fare and ride to ' + to.name + '.';
+  }
+
+  /*
+    /ride                 at a driver: where this driver goes, and the fares
+    /ride <stop>          at a driver: pay and go
+    /ride e <id>          the front plugin, when somebody presses E on a driver
+  */
+  function command(parts, actorId, profileId, toProfile) {
+    if (!actorId) {
+      toProfile(profileId, 'You are not in the world yet.');
+      return true;
+    }
+    var first = String((parts && parts[1]) || '').toLowerCase();
+    if (first === 'e' && parts.length === 3 && /^[0-9a-f]+$/i.test(String(parts[2]))) {
+      var pressed = pressDriver(actorId, parseInt(parts[2], 16) >>> 0);
+      // Not a driver: the press was for something else, so nothing to say.
+      if (!pressed) { return true; }
+      toProfile(profileId, pressed.far ? 'Walk up to ' + pressed.stop.driver + ' first.' : offer(pressed.stop));
+      return true;
+    }
+    toProfile(profileId, ride(actorId, profileId, (parts || []).slice(1).join(' ').trim()));
+    return true;
+  }
+
+  g.__thornswoodCarriages = {
+    STOPS: RIDE_STOPS, LINES: RIDE_LINES, REACH: RIDE_REACH,
+    FARE_FERRY: FARE_FERRY, FARE_CARRIAGE: FARE_CARRIAGE, FARE_RAVEN_ROCK: FARE_RAVEN_ROCK,
+    DRIVER_MEMORY_MS: DRIVER_MEMORY_MS,
+    stopByKey: stopByKey, stopByBase: stopByBase, fare: fare, destinations: destinations,
+    stopHere: stopHere, pressDriver: pressDriver, ride: ride, command: command
+  };
+  plog('ready,', RIDE_STOPS.length, 'stops on', Object.keys(RIDE_LINES).length, 'lines');
+})();
+// ==== end thornswood carriages ====
 
 // ==== thornswood spoils ====
 /*
@@ -38065,6 +39874,52 @@ log('gamemode loaded:',
     return out;
   }
 
+  /*
+    And what a warrior's maneuver adds while it lasts (#1386): Rush's +4
+    speed for five seconds. Folded into the same map for the same reason the
+    needs are: the client SETS each value to the total it is given, so a
+    second map would overwrite the first. The maneuvers block loads after
+    this one and is asked at write time.
+  */
+  function withManeuvers(actorId, base) {
+    var mv = g.__thornswoodManeuvers;
+    if (!mv || !mv.effects || !actorId) { return base; }
+    var add = null;
+    try { add = mv.effects(actorId); } catch (e) { return base; }
+    if (!add) { return base; }
+    var out = {};
+    for (var k in base) {
+      if (Object.prototype.hasOwnProperty.call(base, k)) { out[k] = base[k]; }
+    }
+    for (var av in add) {
+      if (!Object.prototype.hasOwnProperty.call(add, av)) { continue; }
+      out[av] = (Object.prototype.hasOwnProperty.call(out, av) ? out[av] : 0) + add[av];
+    }
+    return out;
+  }
+
+  /*
+    And what a running skill perk adds while it lasts (#1385): Font of
+    Magic's 15 seconds of free spells, on each school's cost value. Folded in
+    for the same reason as the maneuvers, and asked at write time because the
+    skill perks block loads after this one.
+  */
+  function withPerks(actorId, base) {
+    var pk = g.__thornswoodPerks;
+    if (!pk || !pk.effects || !actorId) { return base; }
+    var add = pk.effects(actorId);
+    if (!add) { return base; }
+    var out = {};
+    for (var k in base) {
+      if (Object.prototype.hasOwnProperty.call(base, k)) { out[k] = base[k]; }
+    }
+    for (var av in add) {
+      if (!Object.prototype.hasOwnProperty.call(add, av)) { continue; }
+      out[av] = (Object.prototype.hasOwnProperty.call(out, av) ? out[av] : 0) + add[av];
+    }
+    return out;
+  }
+
   function needsView(actorId) {
     var n = g.__thornswoodNeeds;
     if (!n || !actorId) { return null; }
@@ -38112,7 +39967,7 @@ log('gamemode loaded:',
         that counted. One map, one total, and a penalty is simply a negative
         number in it. See the needs block at the end of this file.
       */
-      effects: withNeeds(actorId, P.treeApplies(s)),
+      effects: withManeuvers(actorId, withNeeds(actorId, P.treeApplies(s))),
       /*
         The three meters, for the panel to draw. Absent entirely when there is
         no character in hand or the needs block is not loaded, so a page from
@@ -38134,6 +39989,8 @@ log('gamemode loaded:',
       creating: !!creating,
       towns: (creating && chargen) ? chargen.towns() : []
     };
+    // And a running skill perk on top of all of that (#1385): see withPerks.
+    view.effects = withPerks(actorId, view.effects);
     /*
       The recipe book, and only in the world. Creation is about choosing who
       you are, and a page counting what a half you have not picked yet could
@@ -38151,6 +40008,14 @@ log('gamemode loaded:',
       var SS = g.__thornswoodStaffSpells;
       var staff = (SS && SS.view) ? SS.view(P, s) : null;
       if (staff) { view.staff = staff; }
+      /*
+        When each filled perk that waits is ready again, and Font of Magic
+        while it runs (#1385), so the K panel can say so beside the perk. The
+        skill perks block owns the clocks and loads after this one.
+      */
+      var PKV = g.__thornswoodPerks;
+      var perkClocks = (PKV && PKV.clocks && actorId) ? PKV.clocks(actorId, s) : null;
+      if (perkClocks) { view.perkClocks = perkClocks; }
     }
     // Left out entirely when there is nothing to say, per the contract.
     var climbing = progressView(s);
@@ -38457,7 +40322,9 @@ log('gamemode loaded:',
 
   function credit(actorId, key) {
     var s = stateOf(actorId);
-    var r = P.creditWork(s, key);
+    // The Master who took them on in this half, when one still stands, so a
+    // sister half's count rises past the threshold it waits at (#1388).
+    var r = P.creditWork(s, key, masterFor(actorId, s, P.classFor(key) || key));
     if (!r.ok) { return null; }
     writeState(actorId, r.state);
     return raiseLines(actorId, r);
@@ -38541,6 +40408,338 @@ log('gamemode loaded:',
   }
 
   /*
+    MASTERS AND APPRENTICES (#1388, #1147). docs/systems/apprenticeship.md.
+
+      /apprentice                       who you took on, and who took you on
+      /apprentice <name> [half]         a Master offers to take somebody on
+      /apprentice end <name> [half]     the Master ends it
+
+    The name can be the form id the crosshair hands over, the same as /party
+    and /trade. The half is needed only when the Master could take that
+    person on in more than one.
+
+    The Master offers and the person answers, the way a party or a trade is
+    asked: the offer stands in the social block's offers for its seconds, and
+    /yes or Accept on the prompt lands it in acceptApprentice below. Taking
+    somebody on is the Master's decision and nobody is owed it. The person
+    saying yes is the other half of the agreement, and it matters most for an
+    outside trade, which is one of only two in a life.
+
+    WHICH ARRANGEMENT is read off the person, never chosen: the other half of
+    their own profession is the sister half (P.takeOn), and a half or school
+    of another profession is an outside trade (P.teach). Their own half, and
+    anything else inside their own profession, the rules refuse and say why.
+
+    WHAT IS RECORDED, on both sides, so either can be read with the other
+    offline. The person carries masters[half] = { id, name, at }, the Master's
+    actor. The Master carries apprentices, a row per person and half. Work is
+    counted against the Master's own record: credit() hands the rules the
+    Master only while that Master is still a Master of the half and still
+    lists the person. Ending it takes the row off both, and nothing else
+    raises a rank: there is no fee, and no gold buys one.
+  */
+
+  /** A half or a school by what somebody typed, its key, its name or the launcher's word for it, or null. */
+  function halfKey(word) {
+    var w = mapHalf(word);
+    if (!w) { return null; }
+    var T = P.TABLE;
+    if (T.schools.indexOf(w) !== -1) { return w; }
+    for (var prof in T.professions) {
+      if (!P.has(T.professions, prof)) { continue; }
+      if (P.has(T.professions[prof].halves, w)) { return w; }
+    }
+    return null;
+  }
+
+  /** The name over somebody's head, through the social block when it is loaded. */
+  function personName(actorId) {
+    var soc = g.__thornswoodSocial;
+    try { if (soc && soc.nameOfPerson) { return soc.nameOfPerson(actorId); } } catch (e) { }
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      if (ap && ap.name) { return String(ap.name); }
+    } catch (e2) { }
+    return 'somebody';
+  }
+
+  /** Does this Master's own record still list that person in that half. */
+  function lists(masterState, learnerId, half) {
+    var rows = (masterState && masterState.apprentices) || [];
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i] && rows[i].id === learnerId && rows[i].half === half) { return true; }
+    }
+    return false;
+  }
+
+  /*
+    The Master to hand the rules when work in a half is counted, or null.
+
+    Read off the Master's own record every time, online or not: a Master who
+    ended it, or whose character is gone, hands nothing, and the count waits
+    at the threshold again. Ranks already earned are in the person's own
+    record and are not touched.
+  */
+  function masterFor(actorId, s, key) {
+    var rec = (s && s.masters && P.has(s.masters, key)) ? s.masters[key] : null;
+    if (!rec || !rec.id || rec.id === actorId) { return null; }
+    var ms = readState(rec.id);
+    if (!ms || P.rankOf(ms, key) !== 'master' || !lists(ms, actorId, key)) { return null; }
+    return ms;
+  }
+
+  /** Every half and school somebody holds at Master. A class is not taught. */
+  function mastered(ms) {
+    var out = [];
+    var ranks = (ms && ms.ranks) || {};
+    for (var k in ranks) {
+      if (!P.has(ranks, k) || ranks[k] !== 'master') { continue; }
+      if (P.has(P.TABLE.classes, k)) { continue; }
+      out.push(k);
+    }
+    return out;
+  }
+
+  /*
+    The rules' answer for one half, as the arrangement it is for that person.
+    A record of a Master that no longer stands (ended on their side, or the
+    character gone) is not in the way of a new one.
+  */
+  function arrange(learnerId, ls, ms, half, who) {
+    var own = ls && (ls.half === half || (ls.schools || []).indexOf(half) !== -1);
+    var sister = (ls && ls.half) ? P.sisterOf(ls.prof, ls.half) : null;
+    var r;
+    if (own || (sister && sister === half)) {
+      var s = ls;
+      if (s && s.masters && P.has(s.masters, half) && !masterFor(learnerId, s, half)) {
+        s = P.clone(s);
+        delete s.masters[half];
+      }
+      r = P.takeOn(s, ms, half, who);
+      r.kind = 'sister';
+      return r;
+    }
+    r = P.teach(ls, ms, half, who);
+    r.kind = 'outside';
+    return r;
+  }
+
+  /** What /apprentice on its own says: both sides of every arrangement this character is in. */
+  function standing(actorId) {
+    var s = stateOf(actorId);
+    var out = [];
+    var rows = s.apprentices || [];
+    if (rows.length) {
+      var took = [];
+      for (var i = 0; i < rows.length; i++) { took.push(rows[i].name + ' in ' + nameOf(rows[i].half)); }
+      out.push('You have taken on ' + took.join(', ') + '.');
+    }
+    var masters = s.masters || {};
+    var sister = s.half ? P.sisterOf(s.prof, s.half) : null;
+    for (var half in masters) {
+      if (!P.has(masters, half)) { continue; }
+      var who = (masters[half] && masters[half].name) || 'somebody';
+      if ((s.taught || []).indexOf(half) !== -1) {
+        out.push(who + ' taught you novice ' + nameOf(half) + '.');
+      } else {
+        out.push(who + ' has taken you on in ' + nameOf(half) +
+                 (masterFor(actorId, s, half) ? ', your sister half.' : ', and that no longer stands.'));
+      }
+    }
+    if (sister && !(P.has(masters, sister) && masterFor(actorId, s, sister)) && P.rankOf(s, sister) !== 'master') {
+      out.push(nameOf(sister) + ', your sister half, waits at ' + (P.rankOf(s, sister) || 'novice') +
+               ' until a Master of it takes you on.');
+    }
+    if (s.prof) {
+      var used = (s.taught || []).length + (s.untaught || []).length;
+      out.push(used + ' of your ' + P.TABLE.limits.secondaries + ' outside trades used in this life.');
+    }
+    out.push('A Master takes somebody on with /apprentice <name>, and ends it with /apprentice end <name>.');
+    return out.join(' ');
+  }
+
+  /** A Master offers. Returns the line for the Master. */
+  function offerIt(actorId, words) {
+    var half = null;
+    if (words.length > 1) {
+      half = halfKey(words[words.length - 1]);
+      if (half) { words = words.slice(0, -1); }
+    }
+    var soc = g.__thornswoodSocial;
+    if (!soc || !soc.findPerson || !soc.offer) {
+      return 'Asking somebody is not running on this server right now. Say so in the dev channel.';
+    }
+    var found = soc.findPerson(words.join(' '));
+    if (!found.actorId) { return found.why; }
+    var them = found.actorId;
+    if (them === actorId) { return 'That is you.'; }
+    var ms = stateOf(actorId);
+    var ls = stateOf(them);
+    var name = personName(them);
+    var mine = mastered(ms);
+    if (!mine.length) { return 'Only a Master takes anybody on, and you are not a Master of any half or school yet.'; }
+    if (!half) {
+      var can = [];
+      for (var i = 0; i < mine.length; i++) {
+        if (arrange(them, ls, ms, mine[i], null).ok) { can.push(mine[i]); }
+      }
+      if (can.length > 1) {
+        var named = [];
+        for (var j = 0; j < can.length; j++) { named.push(nameOf(can[j])); }
+        return 'You could take ' + name + ' on in ' + named.join(' or ') + '. Say which: /apprentice ' +
+               name + ' ' + can[0] + '.';
+      }
+      // One that works, or none, in which case the rules say why about the
+      // first half they hold at Master.
+      half = can.length ? can[0] : mine[0];
+    }
+    var r = arrange(them, ls, ms, half, null);
+    if (!r.ok) { return 'No: ' + r.why + '.'; }
+    var refused = soc.offer('apprentice', actorId, them);
+    if (refused) { return refused; }
+    var pid = soc.profileOf ? soc.profileOf(them) : 0;
+    var o = (soc.offers && pid) ? soc.offers[pid] : null;
+    if (o) { o.master = actorId; o.half = half; }
+    var me = personName(actorId);
+    var asked = (r.kind === 'sister')
+      ? me + ' offers to take you on in ' + nameOf(half) + ', your sister half, so it can climb past novice. ' +
+        'It costs nothing and it is not one of your two outside trades.'
+      : me + ' offers to teach you novice ' + nameOf(half) + '. It is one of your two outside trades for life, ' +
+        'it never climbs past novice, and if it is ended the place does not come back.';
+    try { if (typeof say === 'function') { say(them, asked + ' Accept or refuse on the prompt.'); } } catch (e) { }
+    try { if (typeof notify === 'function') { notify(them, me + ' offers to take you on'); } } catch (e2) { }
+    try { if (soc.push) { soc.push(them); soc.push(actorId); } } catch (e3) { }
+    var secs = (soc.SOCIAL && soc.SOCIAL.offerFor) ? Math.round(soc.SOCIAL.offerFor / 1000) : 45;
+    return 'Asked ' + name + ' to be your apprentice in ' + nameOf(half) + '. They have ' + secs + ' seconds.';
+  }
+
+  /*
+    The person said yes. The offer is checked again from the start, because
+    anything can have moved in the seconds it stood, and only then is either
+    side written. Returns { learner, master }: the line for each.
+  */
+  function acceptApprentice(actorId, masterId, o) {
+    var half = o && o.half;
+    if (!half || !o.master || o.master !== masterId) {
+      return { learner: 'That offer came from another of their characters, and it has gone.', master: '' };
+    }
+    var ls = stateOf(actorId);
+    var ms = stateOf(masterId);
+    var who = { id: masterId, name: personName(masterId), at: Date.now() };
+    var r = arrange(actorId, ls, ms, half, who);
+    if (!r.ok) {
+      return { learner: 'That cannot be done now, and ' + who.name + ' has been told why.',
+               master: 'No: ' + r.why + '.' };
+    }
+    var name = personName(actorId);
+    writeState(actorId, r.state);
+    var m2 = P.clone(ms);
+    var rows = [];
+    var had = m2.apprentices || [];
+    for (var i = 0; i < had.length; i++) {
+      if (had[i] && !(had[i].id === actorId && had[i].half === half)) { rows.push(had[i]); }
+    }
+    rows.push({ id: actorId, name: name, half: half, kind: r.kind, at: who.at });
+    m2.apprentices = rows;
+    writeState(masterId, m2);
+    clog(masterId.toString(16), 'took', actorId.toString(16), 'on in', half, '(' + r.kind + ')');
+    if (r.kind === 'sister') {
+      return { learner: who.name + ' has taken you on in ' + nameOf(half) + '. Work in it climbs past novice now, ' +
+                        'and the ranks you earn stay yours if it ends.',
+               master: name + ' is your apprentice in ' + nameOf(half) + '. /apprentice end ' + name + ' ends it.' };
+    }
+    var school = P.TABLE.schools.indexOf(half) !== -1;
+    return { learner: who.name + ' taught you novice ' + nameOf(half) + '. ' +
+                      (school ? 'You can learn ' + P.TABLE.limits.outsiderSpells + ' novice spells of it, each from its tome'
+                              : 'It is in your recipe book on K') +
+                      ', and it never climbs past novice. It is one of your two outside trades.',
+             master: 'You taught ' + name + ' novice ' + nameOf(half) + '. /apprentice end ' + name + ' ends it.' };
+  }
+
+  /** The Master ends it. Returns the line for the Master. */
+  function endIt(actorId, words) {
+    var ms = stateOf(actorId);
+    var rows = ms.apprentices || [];
+    if (!rows.length) { return 'You have taken nobody on.'; }
+    var half = null;
+    if (words.length > 1) {
+      half = halfKey(words[words.length - 1]);
+      if (half) { words = words.slice(0, -1); }
+    }
+    var want = words.join(' ').trim().toLowerCase();
+    if (!want) { return 'End whose? /apprentice end <name>, and the half when they are with you in two.'; }
+    var asId = parseInt(want, 16);
+    var exact = [], part = [];
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      if (!row || (half && row.half !== half)) { continue; }
+      var n = String(row.name || '').toLowerCase();
+      if ((isFinite(asId) && row.id === asId) || n === want) { exact.push(row); }
+      else if (n.indexOf(want) === 0) { part.push(row); }
+    }
+    var hit = exact.length ? exact : part;
+    if (!hit.length) { return 'Nobody you have taken on answers to that.'; }
+    for (var j = 1; j < hit.length; j++) {
+      if (hit[j].id !== hit[0].id) { return 'More than one of yours answers to that. Use more of the name.'; }
+    }
+    if (hit.length > 1) {
+      var named = [];
+      for (var k = 0; k < hit.length; k++) { named.push(nameOf(hit[k].half)); }
+      return hit[0].name + ' is with you in ' + named.join(' and ') + '. Say which: /apprentice end ' +
+             hit[0].name + ' ' + hit[0].half + '.';
+    }
+    var end = hit[0];
+    var ended = null;
+    var ls = readState(end.id);
+    if (ls) {
+      var r = P.release(ls, end.half, actorId);
+      if (r.ok) {
+        writeState(end.id, r.state);
+        ended = r.ended;
+      }
+    }
+    var m2 = P.clone(ms);
+    var keep = [];
+    for (var m = 0; m < rows.length; m++) {
+      if (rows[m] && !(rows[m].id === end.id && rows[m].half === end.half)) { keep.push(rows[m]); }
+    }
+    m2.apprentices = keep;
+    writeState(actorId, m2);
+    clog(actorId.toString(16), 'ended', end.id.toString(16), 'in', end.half, '(' + (ended || 'their side was already gone') + ')');
+    var me = personName(actorId);
+    var told = (ended === 'outside')
+      ? me + ' has ended your teaching in ' + nameOf(end.half) + ', and its novice list is gone. It still counts as ' +
+        'one of your two outside trades.'
+      : me + ' has ended your apprenticeship in ' + nameOf(end.half) + '. The ranks you earned in it stay; past them ' +
+        'the count waits again until a Master takes you on.';
+    if (!ended) {
+      // Their own record no longer named this Master in that half, or their
+      // character is gone: there was nothing on their side to end.
+      return 'You took ' + end.name + ' off your list. Their side no longer named you in ' +
+             nameOf(end.half) + ', so nothing else changed.';
+    }
+    try { if (typeof say === 'function') { say(end.id, told); } } catch (e) { }
+    if (ended === 'outside') {
+      return 'You ended ' + end.name + '\'s novice ' + nameOf(end.half) + '. It is gone from their book, and it ' +
+             'still counts as one of their two outside trades.';
+    }
+    return 'You ended ' + end.name + '\'s apprenticeship in ' + nameOf(end.half) + '. The ranks they earned stay.';
+  }
+
+  /** /apprentice, every form of it. Answers through toProfile and always handles the word. */
+  function apprenticeCommand(parts, actorId, profileId, toProfile) {
+    if (!actorId) {
+      toProfile(profileId, 'The server cannot find your character right now. Give it a moment and try again.');
+      return;
+    }
+    var words = parts.slice(1);
+    var first = String(words[0] || '').toLowerCase();
+    if (!words.length || first === 'list') { toProfile(profileId, standing(actorId)); return; }
+    if (first === 'end') { toProfile(profileId, endIt(actorId, words.slice(1))); return; }
+    toProfile(profileId, offerIt(actorId, words));
+  }
+
+  /*
     The commands. Called from handle() in the chat block with the same
     arguments it has, so the profile id is the one the voice service stamped
     from the connection and not a number in the text.
@@ -38577,8 +40776,9 @@ log('gamemode loaded:',
         word === '/deed' || word === '/deeds' || word === '/lock' ||
         word === '/unlock' || word === '/mold' || word === '/moldhere' || word === '/key' ||
         word === '/steward' || word === '/evict' || word === '/box' ||
-        word === '/rent' || word === '/notice' || word === '/job' ||
+        word === '/rent' || word === '/bed' || word === '/notice' || word === '/job' ||
         word === '/board' || word === '/take' || word === '/jobs' ||
+        word === '/letter' || word === '/deliver' ||
         word === '/dropjob' || word === '/unpin') {
       if (!actorId) {
         toProfile(profileId, 'The server cannot find your character right now. Give it a moment and try again.');
@@ -38625,6 +40825,12 @@ log('gamemode loaded:',
         clog('the farming word', word, 'threw:', eFarm);
         toProfile(profileId, 'That did not work. Say what you were standing next to in the dev channel.');
       }
+      return true;
+    }
+
+    // Masters and apprentices (#1388): see apprenticeCommand above.
+    if (word === '/apprentice') {
+      apprenticeCommand(parts, actorId, profileId, toProfile);
       return true;
     }
 
@@ -38678,6 +40884,29 @@ log('gamemode loaded:',
         toProfile(profileId, pushed
           ? 'Closed. Press K when you want it back; nothing has been chosen.'
           : 'Closed. Press K to open it again.');
+        return true;
+      }
+      /*
+        A filled perk's Use button on the K panel (#1385): Font of Magic. The
+        skill perks block decides and keeps the clock, so nothing about the
+        character changes here. A refusal is answered like any other pick, as
+        a note about 'perk' and the same line in the chat.
+      */
+      if (what === 'perk') {
+        var PKU = g.__thornswoodPerks;
+        var used = (PKU && PKU.use) ? PKU.use(actorId, s, parts[2])
+          : { ok: false, why: 'perks are not running on this server right now' };
+        if (!used.ok) {
+          toProfile(profileId, 'No: ' + used.why + '.');
+          s.note = { text: used.why, at: Date.now(), about: 'perk' };
+          writeState(actorId, s, true);
+          clog(word, parts.slice(1).join(' '), 'for', actorId.toString(16), 'refused:', used.why);
+          return true;
+        }
+        // An earlier refusal is answered now, as an accepted pick clears it.
+        if (s.note) { s.note = null; writeState(actorId, s, true); }
+        toProfile(profileId, used.line);
+        clog(word, parts.slice(1).join(' '), 'for', actorId.toString(16), 'accepted');
         return true;
       }
       if (what === 'class') {
@@ -38782,6 +41011,18 @@ log('gamemode loaded:',
     r.state.note = null;
     var st = writeState(actorId, r.state);
     clog(word, parts.slice(1).join(' '), 'for', actorId.toString(16), 'accepted');
+
+    /*
+      A point spent says what it did when that is more than the panel shows
+      (#1385): the perk, the moment a sub-skill fills, and for Precision, that
+      the game ignores critical chance. The skill perks block words both.
+    */
+    if (about === 'spend') {
+      var PK = g.__thornswoodPerks;
+      var spentIn = String((word === '/pick' ? parts[2] : parts[1]) || '').toLowerCase();
+      var spentLine = (PK && PK.spendLine) ? PK.spendLine(st, spentIn) : '';
+      if (spentLine) { toProfile(profileId, spentLine); }
+    }
 
     /*
       A NEW FARMER GETS SEED. Patrick, 20 September: 'to make it so they can
@@ -38919,11 +41160,1481 @@ log('gamemode loaded:',
     beginCreation: beginCreation, updateOwnerScript: updateOwnerScript,
     gate: gate, gateHalf: gateHalf, credit: credit,
     grantSpell: grantSpell, grantKnown: grantKnown, nameOf: nameOf, raiseLines: raiseLines,
+    acceptApprentice: acceptApprentice, masterFor: masterFor,
     rankOf: function (actorId, key) { return P.rankOf(stateOf(actorId), key); }
   };
   clog('ready');
 })();
 // ==== end thornswood character ====
+
+// ==== thornswood skill perks ====
+/*
+  THE FILLED PERKS OF THE SKILL TREE (#1385).
+
+  docs/systems/skill-tree.md is the table. Five points fill a sub-skill and a
+  filled one grants its perk. Which perks somebody holds is never stored: it
+  is P.perks over the tree, so the points are the whole of it. What is stored
+  is when a perk that waits may fire again, and that is this block's.
+
+  WHAT EACH ONE DOES HERE, AND WHAT THE SERVER CANNOT DO.
+    Cheat Death        NOT IN THE GAME YET. The engine ends somebody the
+                       moment a write takes health to nothing
+                       (MpActor::SetPercentages calls Kill), and Kill sends
+                       the death to every machine before mp.onDeath is asked
+                       (SendAndSetDeathState, then DeathEvent). So by the time
+                       the server hears of it you are already dead, and
+                       standing the body back up would be a death undone,
+                       which is a band-aid (Developer-Guide.md, "Fix the
+                       cause"). The engine has to ask before it kills.
+                       cheatDeath() is the answer it will get, and the clock
+                       is kept now, so that engine change is all that is left.
+    Troll's Blood      During a fight, 2 health a second, through the engine's
+                       own Actor.RestoreActorValue, so in the engine's own
+                       units, the ones every blow is dealt in. A fight is a hit
+                       landed or taken, or health falling, in the last 15
+                       seconds: the signs and the 15 seconds /stuck reads.
+    Devastating Blow   A power attack takes a quarter again of what it took,
+                       measured the way the maneuvers measure a Heavy blow.
+    Unshakeable        NOT HERE. A block that staggers you is an animation on
+                       your own machine. The server sends no such stagger and
+                       cannot stop one. It needs the client plugin.
+    Purified Blood     The game's own disease and poison resistance, through
+                       the tree's totals (TUNING.perkApplies). A disease the
+                       server itself gives asks holds(actorId, 'purifiedblood').
+    Archmage's Vessel  Once a day, magicka under a tenth is set to half.
+    Leyline Attunement While magicka is falling, which is the one sign of a
+                       cast the server holds, it comes back at half the usual
+                       rate: the race's own rate (RACE DATA, as the engine
+                       reads it) raised by the tree's Clarity, as the client
+                       raises it.
+    Overcharge         Every fifth spell of yours that takes health takes as
+                       much again. The other half, a spell that holds twice as
+                       long, is a magic effect on the machine that runs it and
+                       is NOT HERE.
+    Spellbreaker       A spell that hits you gives you a fifth of what it
+                       costs, its SPIT cost as the record carries it. A
+                       concentration spell's cost is a second of it, so it
+                       counts once a second.
+    Font of Magic      Once a day, from the Use button beside it on the K
+                       panel: for 15 seconds each school's cost value (<School>Mod, the value the game's own
+                       Fortify <School> enchantments raise, a percent off what
+                       a spell costs) is 100 more, which is the game itself
+                       making a spell free. It rides the totals map the client
+                       already applies, the way a warrior's Rush does, through
+                       effects() below and withPerks in the character block.
+                       So the game never takes the magicka at all, and a spell
+                       you could not have afforded can be cast.
+    Tireless           NOT HERE. What running and a swing cost is worked out
+                       on your own machine. It needs the client plugin.
+    Second Wind        Stamina that reaches nothing fills, once every 5
+                       minutes.
+    Windwalker         +4 speed, through the tree's totals. The fall half is
+                       NOT HERE: a fall is taken on your own machine.
+    Pack Mule          NOT HERE. Being slowed by weight is the game's own, on
+                       your machine. It needs the client plugin.
+    Lethal Aim         An arrow or a bolt takes what it would have taken
+                       against half the armour: the engine's own armour sum
+                       (TES5DamageFormula, worn ARMO and their enchantments),
+                       worked again with half of it.
+
+  PRECISION. The client puts critical chance on the character and nothing
+  reads it. The server works out every blow in TES5DamageFormula, and there is
+  no critical hit in that sum at all. So the answer to a point put in
+  Precision says so, and nothing here calls a hit a critical one.
+
+  NOTHING HERE IS A COMMAND (Patrick, 4 Oct: things people do are buttons and
+  GUI, not chat commands). Font of Magic, the one perk a person starts, is the
+  Use button beside it on the K panel. The panel sends 'skills:pick perk
+  fontofmagic', which reaches the server as /pick perk fontofmagic, the route
+  every other press on that panel travels, and no person is told to type it.
+  What a waiting perk's clock says is on the panel too: perkClocks in the
+  character block's view, out of clocks() below.
+
+  THE CLOCKS LIVE ON THE CHARACTER, in PERK_PROPERTY, and the clock is written
+  before the perk fires. A restart or a relog reads the same clock, and a
+  clock that cannot be written does not fire, so nothing fires twice. A day is
+  24 real hours from the moment it fired. Font of Magic's 15 seconds are
+  not kept: its end is a timer in memory. The day it spent is still spent.
+  The view the client last got is kept on the character, so a restart inside
+  those 15 seconds leaves the free spells on until the panel is next sent
+  (issue #1642, the same for a warrior's Rush).
+
+  EVERY TIME ONE FIRES it is a line in thornswood.log, "perks: <name> fired
+  for <actor>", which is the record the page asks for. Troll's Blood and
+  Leyline Attunement say it once a fight and once a cast, not every second.
+
+  STACKING. A Devastating Blow and a warrior's Heavy on one blow each take
+  their quarter of what the blow took before them, so they multiply. The two
+  blocks measure the same blow one after the other.
+*/
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+  var P = g.__thornswoodProgression;
+  if (!P) { console.log('[thornswood perks] the rules block is missing, nothing registered'); return; }
+
+  var PERK_PROPERTY = 'thornswoodPerks';
+  var SECOND = 1000;
+  var MINUTE = 60 * SECOND;
+  var DAY = 24 * 60 * MINUTE;
+  var FIGHT_MS = 15 * SECOND;     // the 15 seconds /stuck counts as a fight
+  var TICK_MS = 250;
+  var HELD_MS = 2000;             // how long who holds what is trusted
+
+  /*
+    The page's table, one row a perk. say is the page's own sentence; not is
+    what of it the game does not do yet, said wherever the perk is named, and
+    none marks a perk of which nothing is in the game yet.
+  */
+  var PERKS = {
+    cheatdeath:        { name: 'Cheat Death', skill: 'vitality', every: DAY, health: 1, none: true,
+                         say: 'Once a day, the blow that would kill you leaves you at 1 health.',
+                         not: 'That is not in the game yet: the engine ends you the moment health reaches nothing, before the server is asked.' },
+    trollsblood:       { name: 'Troll\'s Blood', skill: 'fortitude', perSecond: 2,
+                         say: 'During a fight, health returns at 2 a second.' },
+    devastatingblow:   { name: 'Devastating Blow', skill: 'might', more: 0.25,
+                         say: 'A power attack deals 25% more.' },
+    unshakeable:       { name: 'Unshakeable', skill: 'resilience', none: true,
+                         say: 'A block cannot stagger you.',
+                         not: 'That is not in the game yet: the stagger is played on your own machine, where the server cannot stop it.' },
+    purifiedblood:     { name: 'Purified Blood', skill: 'toughness',
+                         say: 'Disease does not take. Poison deals 25%.' },
+    archmagesvessel:   { name: 'Archmage\'s Vessel', skill: 'capacity', every: DAY, below: 0.1, to: 0.5,
+                         say: 'Drop below a tenth of magicka and it returns to half, once a day.' },
+    leylineattunement: { name: 'Leyline Attunement', skill: 'clarity', rate: 0.5,
+                         say: 'Magicka still returns while you cast, at half the usual rate.' },
+    overcharge:        { name: 'Overcharge', skill: 'potency', inEvery: 5, more: 1,
+                         say: 'One spell in five deals double, or holds twice as long.',
+                         not: 'Holding twice as long is not in the game yet: only the damage is doubled.' },
+    spellbreaker:      { name: 'Spellbreaker', skill: 'ward', share: 0.2,
+                         say: '20% of the magicka in a spell that hits you is added to yours.' },
+    fontofmagic:       { name: 'Font of Magic', skill: 'efficiency', every: DAY, seconds: 15, costOff: 100,
+                         say: 'Once a day, 15 seconds where a spell costs nothing. Press Use beside it on the K panel to start it.' },
+    tireless:          { name: 'Tireless', skill: 'endurance', none: true,
+                         say: 'Running and swinging cost half stamina.',
+                         not: 'That is not in the game yet: what running and a swing cost is worked out on your own machine.' },
+    secondwind:        { name: 'Second Wind', skill: 'vigor', every: 5 * MINUTE,
+                         say: 'When stamina hits 0 it fills, once every 5 minutes.' },
+    windwalker:        { name: 'Windwalker', skill: 'agility',
+                         say: '+4 speed, and a fall deals no damage.',
+                         not: 'The speed is yours. A fall still hurts for now: it is taken on your own machine.' },
+    packmule:          { name: 'Pack Mule', skill: 'burden', none: true,
+                         say: 'Being overloaded does not slow you.',
+                         not: 'That is not in the game yet: the slowing is the game\'s own, on your machine.' },
+    lethalaim:         { name: 'Lethal Aim', skill: 'precision', armour: 0.5,
+                         say: 'An arrow ignores half the armour it hits.' }
+  };
+  var ORDER = ['cheatdeath', 'trollsblood', 'devastatingblow', 'unshakeable', 'purifiedblood',
+               'archmagesvessel', 'leylineattunement', 'overcharge', 'spellbreaker', 'fontofmagic',
+               'tireless', 'secondwind', 'windwalker', 'packmule', 'lethalaim'];
+
+  var CRIT_LINE = 'Critical chance is put on your character, and the game ignores it: the server ' +
+                  'works out what every blow deals and there is no critical hit in that.';
+
+  function plog() {
+    var a = Array.prototype.slice.call(arguments);
+    var line = 'perks: ' + a.join(' ');
+    if (typeof log === 'function') { log(line); } else { console.log('[thornswood] ' + line); }
+  }
+  // say() is the file's own: it finds the profile and posts the line, and
+  // answers nothing when there is nobody to tell.
+  function tell(actorId, text) { say(actorId, text); }
+  function has(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
+  function hex(id) { return (Number(id) >>> 0).toString(16); }
+  function now() { return Date.now(); }
+  function selfOf(id) { return { type: 'form', desc: mp.getDescFromId(id) }; }
+  function personOf(id) {
+    try { return Number(mp.get(id, 'profileId')) > 0; } catch (e) { return false; }
+  }
+  function deadOf(id) {
+    try { return !!mp.get(id, 'isDead'); } catch (e) { return true; }
+  }
+  function pct(id) {
+    try {
+      var p = mp.get(id, 'percentages');
+      if (!p) { return null; }
+      var out = { health: Number(p.health), magicka: Number(p.magicka), stamina: Number(p.stamina) };
+      return (isNaN(out.health) || isNaN(out.magicka) || isNaN(out.stamina)) ? null : out;
+    } catch (e) { return null; }
+  }
+  function setPct(id, health, magicka, stamina) {
+    try {
+      mp.set(id, 'percentages', { health: health, magicka: magicka, stamina: stamina });
+      return true;
+    } catch (e) {
+      plog('could not write the percentages of', hex(id) + ':', e);
+      return false;
+    }
+  }
+  /* The engine's own Actor.RestoreActorValue: an amount in the engine's units. */
+  function restore(id, what, amount) {
+    try {
+      mp.callPapyrusFunction('method', 'Actor', 'RestoreActorValue', selfOf(id), [what, amount]);
+      return true;
+    } catch (e) {
+      plog('could not restore', what, 'on', hex(id) + ':', e);
+      return false;
+    }
+  }
+  function wait(ms) {
+    var s = Math.max(1, Math.ceil(ms / 1000));
+    if (s < 120) { return s + (s === 1 ? ' second' : ' seconds'); }
+    var m = Math.ceil(s / 60);
+    if (m < 120) { return m + ' minutes'; }
+    return Math.ceil(m / 60) + ' hours';
+  }
+
+  // ------------------------------------------------------ who holds what --
+  function stateOf(id) {
+    var ch = g.__thornswoodCharacter;
+    return (ch && ch.stateOf) ? ch.stateOf(id) : null;
+  }
+  function heldIn(s) {
+    var out = {};
+    if (!s) { return out; }
+    var list = P.perks(s);
+    for (var i = 0; i < list.length; i++) { if (has(PERKS, list[i])) { out[list[i]] = true; } }
+    return out;
+  }
+
+  /*
+    The runtime half, on globalThis so a hot reload keeps it. Nothing in here
+    is a clock that matters across a restart: those are on the character.
+      held   actor -> { at, keys, rate }   who holds what, read every HELD_MS
+      last   actor -> { h, m, at }         the shares last seen, for the tick
+      fight  actor -> when they last hit, were hit, or lost health
+      font   actor -> { until }            a Font of Magic that is running
+      troll  actor -> { at, said }         Troll's Blood's second, and its fight
+      ley    actor -> when Leyline Attunement last gave
+      spells actor -> how many spells of theirs have landed towards Overcharge
+      sb     'target:caster:spell' -> when a concentration spell last gave
+      blow   actor -> { by, at }           whose blow, when this block's write killed
+  */
+  var ST = g.__thornswoodPerkState;
+  if (!ST || typeof ST !== 'object') {
+    ST = g.__thornswoodPerkState = { held: {}, last: {}, fight: {}, font: {}, troll: {}, ley: {},
+                                     spells: {}, sb: {}, blow: {} };
+  }
+
+  function heldOf(id, t) {
+    var c = ST.held[id];
+    if (c && t - c.at < HELD_MS) { return c.keys; }
+    var s = personOf(id) ? stateOf(id) : null;
+    var keys = heldIn(s);
+    var rate = 0;
+    if (keys.leylineattunement) { rate = Number(P.treeApplies(s).magickaRateMult) || 0; }
+    ST.held[id] = { at: t, keys: keys, rate: rate };
+    return keys;
+  }
+
+  /** Does this character hold that perk right now. Read fresh, for any block. */
+  function holds(actorId, key) {
+    if (!actorId || !has(PERKS, key) || !personOf(actorId)) { return false; }
+    return !!heldIn(stateOf(actorId))[key];
+  }
+
+  // ------------------------------------------------------------- the clocks --
+  try {
+    mp.makeProperty(PERK_PROPERTY, {
+      isVisibleByOwner: false, isVisibleByNeighbors: false,
+      updateOwner: '', updateNeighbor: ''
+    });
+  } catch (e) { /* made by an earlier load. harmless. */ }
+
+  /*
+    One character's clocks. Never set reads as null and is an empty record.
+    A read that throws is null here: a clock that cannot be read does not
+    fire, the same as one that cannot be written, because an empty record in
+    its place would hand the day back.
+  */
+  function record(id) {
+    var v = null;
+    try {
+      v = mp.get(id, PERK_PROPERTY);
+    } catch (e) {
+      plog('could not read the clocks of', hex(id) + ':', e);
+      return null;
+    }
+    if (!v || typeof v !== 'object' || v.v !== 1) { v = { v: 1 }; }
+    if (!v.ready || typeof v.ready !== 'object') { v.ready = {}; }
+    if (!v.fired || typeof v.fired !== 'object') { v.fired = {}; }
+    return v;
+  }
+  function readyAt(id, key) {
+    var rec = record(id);
+    return rec ? (Number(rec.ready[key]) || 0) : 0;
+  }
+
+  /* Take the clock. Written first; the perk fires only once it is written. */
+  function take(id, key, t) {
+    var rec = record(id);
+    if (!rec || (Number(rec.ready[key]) || 0) > t) { return false; }
+    rec.ready[key] = t + PERKS[key].every;
+    rec.fired[key] = (Number(rec.fired[key]) || 0) + 1;
+    try {
+      mp.set(id, PERK_PROPERTY, rec);
+    } catch (e) {
+      plog('could not write the', PERKS[key].name, 'clock of', hex(id) + ', so it does not fire:', e);
+      return false;
+    }
+    return true;
+  }
+
+  function fired(id, key, more) {
+    plog(PERKS[key].name, 'fired for', hex(id) + (more ? ' ' + more : ''));
+  }
+
+  // ------------------------------------------------------------ Cheat Death --
+  /*
+    THE ONE CHECK THE ENGINE'S DEATH WILL ASK, once the engine asks before it
+    kills (see Cheat Death at the top of this block). True when Cheat Death
+    takes this death: the clock is written first and the person is told, and
+    the engine is to leave them at 1 health instead of killing them. False is
+    an ordinary death. Nothing calls it yet, and mp.onDeath must not: by then
+    the death has been sent.
+  */
+  function cheatDeath(actorId) {
+    if (!actorId || !personOf(actorId)) { return false; }
+    if (!heldIn(stateOf(actorId)).cheatdeath) { return false; }
+    if (!take(actorId, 'cheatdeath', now())) { return false; }
+    fired(actorId, 'cheatdeath');
+    tell(actorId, 'Cheat Death. The blow that would have killed you leaves you at ' +
+                  PERKS.cheatdeath.health + ' health. It comes back in 24 hours.');
+    return true;
+  }
+
+  // -------------------------------------------------------------- the hits --
+  var kinds = {};
+  var records = {};
+  var gmst = null;
+
+  function lookup(id) {
+    if (!id) { return null; }
+    if (has(records, id)) { return records[id]; }
+    var r = null;
+    try { r = mp.lookupEspmRecordById(id) || null; } catch (e) { r = null; }
+    records[id] = r;
+    return r;
+  }
+  function typeOf(r) { return (r && r.record) ? String(r.record.type || '') : ''; }
+  function fieldOf(r, type) {
+    var fields = (r && r.record && r.record.fields) || [];
+    for (var i = 0; i < fields.length; i++) {
+      if (fields[i] && String(fields[i].type) === type) { return fields[i].data || []; }
+    }
+    return null;
+  }
+  function u32(b, at) {
+    if (!b || b.length < at + 4) { return null; }
+    return (b[at] | (b[at + 1] << 8) | (b[at + 2] << 16)) + b[at + 3] * 0x1000000;
+  }
+  function f32(b, at) {
+    if (!b || b.length < at + 4) { return NaN; }
+    var view = new DataView(new ArrayBuffer(4));
+    for (var i = 0; i < 4; i++) { view.setUint8(i, b[at + i]); }
+    return view.getFloat32(0, true);
+  }
+  function globalOf(r, local) {
+    if (!r || typeof r.toGlobalRecordId !== 'function') { return local || 0; }
+    try { return Number(r.toGlobalRecordId(local)) || 0; } catch (e) { return 0; }
+  }
+  function idOfForm(v) {
+    if (typeof v === 'number') { return v; }
+    if (v && v.desc) {
+      try { return Number(mp.getIdFromDesc(String(v.desc))) || 0; } catch (e) { return 0; }
+    }
+    return 0;
+  }
+
+  /* What landed the hit: 'spell', 'bow' (a bow or a crossbow), 'melee', or ''. */
+  function kindOf(id) {
+    if (!id) { return ''; }
+    if (has(kinds, id)) { return kinds[id]; }
+    var kind = '';
+    if (id === 0x1f4) {
+      kind = 'melee';
+    } else {
+      var r = lookup(id);
+      var type = typeOf(r);
+      if (type === 'SPEL') { kind = 'spell'; }
+      else if (type === 'WEAP') {
+        // WEAP DNAM: the animation type is the first byte. Bow 7, crossbow 9.
+        var dnam = fieldOf(r, 'DNAM');
+        var anim = dnam && dnam.length ? dnam[0] : -1;
+        kind = (anim === 7 || anim === 9) ? 'bow' : 'melee';
+      }
+    }
+    kinds[id] = kind;
+    return kind;
+  }
+
+  /*
+    WHAT A SPELL COSTS, as the record carries it: SPIT's first four bytes. All
+    85 spells in the book carry one (game/data/spells.json, built from the
+    same field). The cast type is at 16, and 2 is concentration.
+  */
+  var spellCosts = {};
+  function spellOf(id) {
+    if (has(spellCosts, id)) { return spellCosts[id]; }
+    var spit = fieldOf(lookup(id), 'SPIT');
+    var cost = u32(spit, 0);
+    var info = { id: id, cost: cost || 0, concentration: u32(spit, 16) === 2 };
+    if (!info.cost) { plog('the spell', hex(id), 'carries no cost, so Spellbreaker gives nothing for it'); }
+    spellCosts[id] = info;
+    return info;
+  }
+
+  /*
+    THE ARMOUR, the way the engine sums it (TES5DamageFormula,
+    CalcOpponentArmorRating): each worn ARMO's DNAM rating over 100, and each
+    of its enchantment's effects whose primary value is DamageResist (39, MGEF
+    DATA at 0x44) by its magnitude. The penalty is the engine's too, out of
+    the two game settings it reads.
+  */
+  var DAMAGE_RESIST = 39;
+  function settings() {
+    if (gmst) { return gmst; }
+    var cap = f32(fieldOf(lookup(0x37deb), 'DATA'), 0);     // fMaxArmorRating
+    var scale = f32(fieldOf(lookup(0x21a72), 'DATA'), 0);   // fArmorScalingFactor
+    gmst = (isFinite(cap) && isFinite(scale) && scale > 0) ? { cap: cap, scale: scale } : { broken: true };
+    if (gmst.broken) { plog('the two armour settings could not be read, so Lethal Aim adds nothing'); }
+    return gmst;
+  }
+  function enchantArmour(enchId) {
+    var r = lookup(enchId);
+    var fields = (r && r.record && r.record.fields) || [];
+    var total = 0, av = -1;
+    for (var i = 0; i < fields.length; i++) {
+      var f = fields[i];
+      if (!f) { continue; }
+      if (String(f.type) === 'EFID') {
+        var mgef = lookup(globalOf(r, u32(f.data, 0)));
+        var data = fieldOf(mgef, 'DATA');
+        var n = u32(data, 0x44);
+        av = n === null ? -1 : (n | 0);
+      } else if (String(f.type) === 'EFIT') {
+        var mag = f32(f.data, 0);
+        if (av === DAMAGE_RESIST && isFinite(mag)) { total += mag; }
+        av = -1;
+      }
+    }
+    return total;
+  }
+  function armourOf(target) {
+    var eq = null;
+    try { eq = mp.get(target, 'equipment'); } catch (e) { return 0; }
+    var entries = (eq && eq.inv && eq.inv.entries) || (eq && eq.entries) || [];
+    var total = 0;
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (!e || !e.baseId || !(e.worn || e.wornLeft)) { continue; }
+      var r = lookup(e.baseId);
+      if (typeOf(r) !== 'ARMO') { continue; }
+      var rating = u32(fieldOf(r, 'DNAM'), 0);
+      if (rating !== null) { total += rating / 100; }
+      var ench = u32(fieldOf(r, 'EITM'), 0);
+      if (ench) { total += enchantArmour(globalOf(r, ench)); }
+    }
+    return total;
+  }
+  /* What a blow against this much armour keeps, out of 1. */
+  function penalty(armour, set) {
+    return (100 - Math.min(armour * set.scale, set.cap)) / 100;
+  }
+  /* What Lethal Aim adds to a bow hit that took this much. */
+  function lethalExtra(target, took) {
+    var set = settings();
+    if (set.broken) { return 0; }
+    var armour = armourOf(target);
+    if (!(armour > 0)) { return 0; }
+    var full = penalty(armour, set);
+    var half = penalty(armour * PERKS.lethalaim.armour, set);
+    if (!(full > 0)) { return 0; }
+    return took * (half / full - 1);
+  }
+
+  /*
+    WHAT A HIT TOOK, MEASURED. The same way the maneuvers measure it: OnHit
+    comes before the engine's damage, so health is read at the event and again
+    on the next turn, and the difference is the blow. A hit the engine threw
+    away took nothing and changes nothing.
+  */
+  var pending = {};
+  var queued = false;
+
+  function hit(targetId, aggressor, source, power, bash) {
+    var target = Number(targetId) || 0;
+    if (!target) { return; }
+    var t = now();
+    var by = idOfForm(aggressor);
+    if (personOf(target)) { ST.fight[target] = t; }
+    if (by && by !== target && personOf(by)) { ST.fight[by] = t; }
+    var open = pending[target];
+    if (open && open.length && open[open.length - 1].after === null) {
+      open[open.length - 1].after = (pct(target) || { health: -1 }).health;
+    }
+    var kind = kindOf(idOfForm(source));
+
+    // Spellbreaker is on the one hit, now.
+    if (kind === 'spell' && heldOf(target, t).spellbreaker) { breakSpell(target, by, idOfForm(source), t); }
+
+    if (!by || by === target || !personOf(by)) { return; }
+    var mine = heldOf(by, t);
+    var e = { before: -1, after: null, by: by, more: 0, overcharge: false, aim: false };
+    if (kind === 'melee' && power && !bash && mine.devastatingblow) { e.more = PERKS.devastatingblow.more; }
+    if (kind === 'spell' && mine.overcharge) { e.overcharge = true; }
+    if (kind === 'bow' && mine.lethalaim) { e.aim = true; }
+    if (!e.more && !e.overcharge && !e.aim) { return; }
+    var p = pct(target);
+    e.before = p ? p.health : -1;
+    if (!(e.before > 0)) { return; }
+    if (!pending[target]) { pending[target] = []; }
+    pending[target].push(e);
+    if (!queued) {
+      queued = true;
+      setTimeout((typeof guard === 'function') ? guard('perkHits', flush) : flush, 0);
+    }
+  }
+
+  function breakSpell(target, by, spellId, t) {
+    var info = spellOf(spellId);
+    if (!(info.cost > 0)) { return; }
+    if (info.concentration) {
+      var key = target + ':' + by + ':' + spellId;
+      if (t - (ST.sb[key] || 0) < SECOND) { return; }
+      ST.sb[key] = t;
+    }
+    var gain = info.cost * PERKS.spellbreaker.share;
+    if (restore(target, 'Magicka', gain)) {
+      fired(target, 'spellbreaker', '(' + (Math.round(gain * 10) / 10) + ' magicka from ' + hex(spellId) + ')');
+    }
+  }
+
+  function setHealth(target, h, change, killer) {
+    var next = h + change;
+    if (next > 1) { next = 1; }
+    if (next <= 0) {
+      next = 0;
+      // The engine kills on this write with nobody named; mp.onDeath asks.
+      if (killer) { ST.blow[target] = { by: killer, at: now() }; }
+    }
+    var p = pct(target);
+    if (!p) { return; }
+    setPct(target, next, p.magicka, p.stamina);
+  }
+
+  function flush() {
+    queued = false;
+    var all = pending;
+    pending = {};
+    for (var k in all) {
+      if (!has(all, k)) { continue; }
+      var target = Number(k);
+      var list = all[k];
+      var p = pct(target);
+      var h = p ? p.health : -1;
+      if (list.length && list[list.length - 1].after === null) { list[list.length - 1].after = h; }
+      var change = 0, killer = 0;
+      for (var i = 0; i < list.length; i++) {
+        var e = list[i];
+        var took = e.before - e.after;
+        if (!(e.after >= 0) || !(took > 0)) { continue; }
+        if (e.more) {
+          change -= took * e.more;
+          killer = e.by;
+          fired(e.by, 'devastatingblow');
+        }
+        if (e.aim) {
+          var extra = lethalExtra(target, took);
+          if (extra > 0) {
+            change -= extra;
+            killer = e.by;
+            fired(e.by, 'lethalaim');
+          }
+        }
+        if (e.overcharge) {
+          var n = (ST.spells[e.by] || 0) + 1;
+          if (n >= PERKS.overcharge.inEvery) {
+            n = 0;
+            change -= took * PERKS.overcharge.more;
+            killer = e.by;
+            fired(e.by, 'overcharge');
+            tell(e.by, 'Overcharge: that spell lands double.');
+          }
+          ST.spells[e.by] = n;
+        }
+      }
+      if (h > 0 && change !== 0) { setHealth(target, h, change, killer); }
+    }
+  }
+
+  /** Whose blow it was, when this block's own write was the killing one. */
+  function killerOf(target) {
+    var b = has(ST.blow, target) ? ST.blow[target] : null;
+    if (!b) { return 0; }
+    delete ST.blow[target];
+    return (now() - b.at) < 2000 ? b.by : 0;
+  }
+
+  // -------------------------------------------------------------- the tick --
+  /*
+    THE MAGICKA, THE STAMINA AND THE HEALTH, four times a second, for the
+    people who hold a perk that watches them. The client reports both and the server keeps
+    the share; this reads that share and writes it back up. RACE DATA at 88 is
+    the race's own magicka rate, a percent of the most there is each second.
+  */
+  var raceRates = {};
+  function raceRate(id) {
+    var raceId = 0;
+    try { raceId = Number((mp.get(id, 'appearance') || {}).raceId) || 0; } catch (e) { raceId = 0; }
+    if (!raceId) { return 0; }
+    if (!has(raceRates, raceId)) {
+      var rate = f32(fieldOf(lookup(raceId), 'DATA'), 88);
+      raceRates[raceId] = (isFinite(rate) && rate > 0) ? rate : 0;
+      if (!raceRates[raceId]) { plog('the race', hex(raceId), 'has no magicka rate to read, so Leyline Attunement gives nothing'); }
+    }
+    return raceRates[raceId];
+  }
+
+  function inFight(id, t) { return has(ST.fight, id) && t - ST.fight[id] < FIGHT_MS; }
+
+  function one(id, t) {
+    var mine = heldOf(id, t);
+    if (!mine.trollsblood && !mine.archmagesvessel && !mine.leylineattunement && !mine.secondwind) {
+      delete ST.last[id];
+      return;
+    }
+    if (deadOf(id)) { delete ST.last[id]; return; }
+    var p = pct(id);
+    if (!p) { return; }
+    var last = has(ST.last, id) ? ST.last[id] : null;
+    if (last && p.health < last.h - 0.0001) { ST.fight[id] = t; }
+    var m = p.magicka, st = p.stamina, changed = false, clocked = false;
+
+    if (mine.secondwind && st <= 0.001 && take(id, 'secondwind', t)) {
+      st = 1;
+      changed = true;
+      clocked = true;
+      fired(id, 'secondwind');
+      tell(id, 'Second Wind: your stamina fills. It comes back in 5 minutes.');
+    }
+    if (mine.archmagesvessel && m < PERKS.archmagesvessel.below && take(id, 'archmagesvessel', t)) {
+      m = PERKS.archmagesvessel.to;
+      changed = true;
+      clocked = true;
+      fired(id, 'archmagesvessel');
+      tell(id, 'Archmage\'s Vessel: your magicka returns to half. It comes back in 24 hours.');
+    }
+    if (mine.leylineattunement && last && m < last.m - 0.0005 && m < 1) {
+      var rate = raceRate(id) * (100 + ((ST.held[id] && ST.held[id].rate) || 0)) / 100;
+      var add = PERKS.leylineattunement.rate * (rate / 100) * Math.min(t - last.at, SECOND) / 1000;
+      if (add > 0) {
+        m = Math.min(1, m + add);
+        changed = true;
+        if (t - (ST.ley[id] || 0) > 2 * SECOND) { fired(id, 'leylineattunement'); }
+        ST.ley[id] = t;
+      }
+    }
+    if (changed) { setPct(id, p.health, m, st); }
+    // A clock that moved is on the K panel, so the panel is sent it now.
+    if (clocked) { push(id); }
+    ST.last[id] = { h: p.health, m: m, at: t };
+
+    if (mine.trollsblood && inFight(id, t) && p.health < 1) {
+      var tr = has(ST.troll, id) ? ST.troll[id] : (ST.troll[id] = { at: 0, said: 0 });
+      if (t - tr.at >= SECOND) {
+        tr.at = t;
+        if (restore(id, 'Health', PERKS.trollsblood.perSecond) && t - tr.said > FIGHT_MS) {
+          fired(id, 'trollsblood');
+        }
+        tr.said = t;
+      }
+    }
+  }
+
+  function tick() {
+    var t = now();
+    var online = [];
+    online = mp.get(0, 'onlinePlayers') || [];
+    var here = {};
+    for (var i = 0; i < online.length; i++) {
+      here[online[i]] = true;
+      try { one(online[i], t); } catch (e) { plog('the tick threw for', hex(online[i]) + ':', e); }
+    }
+    var maps = [ST.held, ST.last, ST.font, ST.troll, ST.ley, ST.fight];
+    for (var j = 0; j < maps.length; j++) {
+      for (var k in maps[j]) { if (has(maps[j], k) && !here[k]) { delete maps[j][k]; } }
+    }
+    for (var key in ST.sb) { if (has(ST.sb, key) && t - ST.sb[key] > 5 * SECOND) { delete ST.sb[key]; } }
+    for (var b in ST.blow) { if (has(ST.blow, b) && t - ST.blow[b].at > 5 * SECOND) { delete ST.blow[b]; } }
+  }
+
+  // ------------------------------------------------------------- the words --
+  function about(key) {
+    var p = PERKS[key];
+    return p.name + ': ' + p.say + (p.not ? ' ' + p.not : '');
+  }
+
+  /*
+    FONT OF MAGIC, from the Use button on the K panel. Answers { ok, why } the
+    way every pick on that panel is answered: why is the refusal in plain
+    words, said as 'No: <why>.' in the chat and under the panel, and line is
+    what to say when it starts. The day is spent only once the redraw that
+    carries the free spells can be sent.
+  */
+  function startFont(actorId, s) {
+    var key = 'fontofmagic';
+    if (!heldIn(s)[key]) { return { ok: false, why: 'Font of Magic comes with five points in Efficiency' }; }
+    if (deadOf(actorId)) { return { ok: false, why: 'not while you are down' }; }
+    var t = now();
+    if (has(ST.font, actorId) && ST.font[actorId].until > t) {
+      return { ok: false, why: 'Font of Magic is running, ' + wait(ST.font[actorId].until - t) + ' left' };
+    }
+    var at = readyAt(actorId, key);
+    if (at > t) { return { ok: false, why: 'Font of Magic comes back in ' + wait(at - t) }; }
+    if (!canPush()) { return { ok: false, why: 'Font of Magic cannot reach your character right now' }; }
+    if (!take(actorId, key, t)) { return { ok: false, why: 'Font of Magic could not be started' }; }
+    var ms = PERKS.fontofmagic.seconds * SECOND;
+    var until = t + ms;
+    ST.font[actorId] = { until: until };
+    push(actorId);
+    var end = function () {
+      // Only this start's own end: a later start keeps its own 15 seconds.
+      if (has(ST.font, actorId) && ST.font[actorId].until !== until) { return; }
+      delete ST.font[actorId];
+      push(actorId);
+      tell(actorId, 'Font of Magic has run out.');
+    };
+    setTimeout((typeof guard === 'function') ? guard('fontOfMagicEnd', end) : end, ms + 50);
+    fired(actorId, key);
+    return { ok: true, line: 'Font of Magic: for 15 seconds, a spell costs nothing. It comes back in 24 hours.' };
+  }
+
+  /*
+    A press of a perk's button on the K panel: /pick perk <key>. Font of Magic
+    is the one perk the page has somebody start; every other perk fires by
+    itself, so its key is refused.
+  */
+  function use(actorId, s, word) {
+    var key = String(word || '').toLowerCase();
+    if (key === 'fontofmagic') { return startFont(actorId, s); }
+    return { ok: false, why: has(PERKS, key) ? PERKS[key].name + ' fires by itself' : 'there is no perk by that name' };
+  }
+
+  /*
+    WHAT THE K PANEL SHOWS OF THE CLOCKS, for the perks this character holds
+    that wait between firings: { <key>: { ready: <ms> } }, and until: <ms> on
+    Font of Magic while it runs. ready is when it may fire again, 0 for never
+    fired. Times, not time left, so the view is the same until a perk fires
+    and the panel counts down against its own clock. Cheat Death is left out:
+    nothing in the game fires it yet. null when there is nothing to show.
+  */
+  function clocks(actorId, s) {
+    var mine = heldIn(s);
+    var out = null;
+    for (var i = 0; i < ORDER.length; i++) {
+      var k = ORDER[i];
+      if (!mine[k] || !PERKS[k].every || PERKS[k].none) { continue; }
+      out = out || {};
+      out[k] = { ready: readyAt(actorId, k) };
+      if (k === 'fontofmagic' && has(ST.font, actorId) && ST.font[actorId].until > now()) {
+        out[k].until = ST.font[actorId].until;
+      }
+    }
+    return out;
+  }
+
+  /*
+    WHAT A RUNNING PERK ADDS TO THE CLIENT'S MAP: Font of Magic's 15 seconds,
+    100 on every school's cost value. The character block folds this into the
+    totals it sends (withPerks), beside a warrior's Rush, because the client
+    SETS each value to the total it is given. Every school, not only the ones
+    held: the page says a spell costs nothing, whichever school it is. The
+    names are the progression block's own, TUNING.schoolValues.
+  */
+  function effects(actorId) {
+    var f = has(ST.font, actorId) ? ST.font[actorId] : null;
+    if (!f || !(f.until > now())) { return null; }
+    var schools = (P.TUNING && P.TUNING.schoolValues) || {};
+    var out = null;
+    for (var school in schools) {
+      if (!has(schools, school) || !schools[school].cost) { continue; }
+      out = out || {};
+      out[schools[school].cost] = PERKS.fontofmagic.costOff;
+    }
+    return out;
+  }
+
+  /*
+    The client's skill tree hand sets the totals map on the panel view, and
+    the map is rebuilt from the state on every write, so a redraw is the one
+    way to send Font of Magic and to take it off again. The same as Rush.
+  */
+  function canPush() {
+    var ch = g.__thornswoodCharacter;
+    return !!(ch && ch.writeState && ch.stateOf);
+  }
+  function push(actorId) {
+    if (!canPush()) { return; }
+    var ch = g.__thornswoodCharacter;
+    try { ch.writeState(actorId, ch.stateOf(actorId), true); } catch (e) { plog('could not redraw', hex(actorId) + ':', e); }
+  }
+
+  function treeOf(skill) {
+    for (var attr in P.TABLE.tree) {
+      if (has(P.TABLE.tree, attr) && has(P.TABLE.tree[attr].skills, skill)) { return attr; }
+    }
+    return '';
+  }
+
+  /*
+    What a point spent says once it is in: the perk the moment a sub-skill
+    fills, and, for Precision, every time, that the game ignores critical
+    chance. Nothing for any other point: the panel shows those.
+  */
+  function spendLine(s, skill) {
+    var key = '';
+    for (var i = 0; i < ORDER.length; i++) { if (PERKS[ORDER[i]].skill === skill) { key = ORDER[i]; } }
+    if (!key || !s || !s.tree) { return ''; }
+    var bits = [];
+    if ((s.tree[skill] || 0) >= P.TABLE.limits.skillCap) {
+      var attr = treeOf(skill);
+      bits.push(P.TABLE.tree[attr].skills[skill].name + ' is full. ' + about(key));
+    }
+    if (skill === 'precision') { bits.push(CRIT_LINE); }
+    return bits.join(' ');
+  }
+
+  if (g.__thornswoodPerkTimer) { clearInterval(g.__thornswoodPerkTimer); }
+  g.__thornswoodPerkTimer = setInterval((typeof guard === 'function') ? guard('perkTick', tick) : tick, TICK_MS);
+
+  g.__thornswoodPerks = {
+    PERKS: PERKS, ORDER: ORDER, PROPERTY: PERK_PROPERTY, CRIT_LINE: CRIT_LINE, FIGHT_MS: FIGHT_MS,
+    holds: holds, cheatDeath: cheatDeath, hit: hit, flush: flush, killerOf: killerOf, tick: tick,
+    use: use, clocks: clocks, spendLine: spendLine, effects: effects, armourOf: armourOf,
+    lethalExtra: lethalExtra, readyAt: readyAt, state: ST
+  };
+  console.log('[thornswood perks] ready: ' + ORDER.length + ' perks');
+})();
+// ==== end thornswood skill perks ====
+
+// ==== thornswood warrior maneuvers ====
+/*
+  A WARRIOR'S MANEUVERS (#1386).
+
+  docs/systems/professions/warrior.md, "Maneuvers", is the table, and the two
+  half pages name the rows: Set, Plant, Cover and Wall hold a line, Rush,
+  Heavy, Break and Wreck break one. Until this nothing in combat read the word
+  Bulwark or Berserker at all. The rows here are the page's rows and no more:
+  the stamina, how long each lasts and the wait before it again.
+
+  WHO HOLDS WHICH ROW. The page: "You have the rows at your rank and below, on
+  your half." The sister half has its novice row only, and only once a Warlord
+  has taken you on. An outside trade, novice combat a Warlord taught somebody
+  who is not a warrior, is the novice row and no further. held() is that, and
+  nothing else decides it.
+
+  STAMINA IS SPENT WHEN THE MANEUVER STARTS, AND WITHOUT IT NOTHING HAPPENS.
+  spend() takes it through the engine's own Actor.DamageActorValue.
+
+  WHAT THE SERVER APPLIES, AND WHAT IT CANNOT. Everything here is the server's
+  own: the stamina, the clocks, the refusals, and health through the engine's
+  percentages. Some of the rows are the game's to do on somebody's own machine
+  and the server cannot reach them from here. Each start line says which, so
+  nobody is told an effect is on when it is not, and the issue lists them:
+    Set     halving what a block costs. The game works that cost out on the
+            blocker's machine. Only the stamina and the clocks are real.
+    Plant   not being staggered. A stagger is an animation on the machine that
+            animates you; the server refuses the staggers it sends itself
+            (Break and Wreck), and no other.
+    Cover   20% less damage for one person while you block. Applied here, by
+            giving back a fifth of what each hit took. The block is read from
+            the animation events the engine is sent (blockStart, blockStop),
+            sampled ten times a second.
+    Wall    20% less damage for you and your party within 3 metres. Applied
+            here, the same way.
+    Rush    +4 speed for 5 seconds. Sent through the map the client's skill
+            tree hand already sets (thornswood-front.js, treeApplyNow), so no
+            client change is needed for it.
+    Heavy   25% more on the next power attack within 8 seconds. Applied here,
+            by taking a quarter again of what that hit took.
+    Break   the next hit staggers. Sent to a person's own game with
+            Debug.SendAnimationEvent; a creature is animated by whoever hosts
+            it and the server cannot reach that machine, so a creature takes
+            no stagger yet.
+    Wreck   50% more on the next power attack, and it staggers, both as above.
+
+  A BLOW THAT KILLS OUTRIGHT IS NOT SOFTENED. The engine applies a hit's
+  damage after the OnHit event and kills on the spot when that takes health
+  to nothing, so a fifth cannot be given back to somebody already dead. Exact
+  damage would need the engine's damage formula to ask, which is an engine
+  change.
+
+  THE CLOCKS LIVE IN MEMORY, on globalThis so a hot reload keeps them. A
+  restart clears every wait and every armed blow, which at three minutes at
+  most is nothing worth a property write.
+*/
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+  var P = g.__thornswoodProgression;
+  if (!P) { console.log('[thornswood maneuvers] the rules block is missing, nothing registered'); return; }
+
+  function mlog() {
+    var a = Array.prototype.slice.call(arguments);
+    console.log('[thornswood maneuvers] ' + a.join(' '));
+  }
+
+  var RANKS = ['novice', 'advanced', 'expert', 'master'];
+
+  /*
+    The table on the page, row for row. seconds is how long it lasts. Break
+    and Wreck have no length on the page: each waits for the blow it names,
+    and that is what 0 means here.
+  */
+  var MANEUVERS = {
+    set:     { name: 'Set',   half: 'bulwark',   rank: 'novice',   stamina: 15, cooldown: 45,  seconds: 8 },
+    plant:   { name: 'Plant', half: 'bulwark',   rank: 'advanced', stamina: 20, cooldown: 60,  seconds: 8 },
+    cover:   { name: 'Cover', half: 'bulwark',   rank: 'expert',   stamina: 25, cooldown: 90,  seconds: 8,  less: 0.2, metres: 3 },
+    wall:    { name: 'Wall',  half: 'bulwark',   rank: 'master',   stamina: 40, cooldown: 180, seconds: 10, less: 0.2, metres: 3 },
+    rush:    { name: 'Rush',  half: 'berserker', rank: 'novice',   stamina: 15, cooldown: 30,  seconds: 5,  speed: 4 },
+    heavy:   { name: 'Heavy', half: 'berserker', rank: 'advanced', stamina: 20, cooldown: 45,  seconds: 8,  more: 0.25 },
+    'break': { name: 'Break', half: 'berserker', rank: 'expert',   stamina: 25, cooldown: 60,  seconds: 0 },
+    wreck:   { name: 'Wreck', half: 'berserker', rank: 'master',   stamina: 40, cooldown: 120, seconds: 0,  more: 0.5 }
+  };
+  var ORDER = ['set', 'plant', 'cover', 'wall', 'rush', 'heavy', 'break', 'wreck'];
+  var HALF_NAME = { bulwark: 'Bulwark', berserker: 'Berserker' };
+
+  // Seventy units to a metre, the party strip's measure (see MOLD_REACH).
+  var UNITS_PER_METRE = 70;
+
+  function has(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
+  function rankAt(r) { return RANKS.indexOf(r); }
+  function aRank(r) {
+    var w = String(r || 'novice');
+    return (/^[aeiou]/.test(w) ? 'an ' : 'a ') + w;
+  }
+  function noviceOf(half) {
+    for (var i = 0; i < ORDER.length; i++) {
+      var m = MANEUVERS[ORDER[i]];
+      if (m.half === half && m.rank === 'novice') { return m.name; }
+    }
+    return '';
+  }
+
+  // -------------------------------------------------------------- the rules --
+  /*
+    HAS A WARLORD TAKEN YOU ON FOR YOUR SISTER HALF. /apprentice records it
+    (#1388), and the character block's masterFor says whether that Master's
+    own record still stands. A sister half already past novice counts as
+    well: rankUp only lets it climb under a Master of it, and the ranks
+    earned under one stay after it ends (apprenticeship.md).
+  */
+  function takenOn(s, actorId) {
+    if (!s || s.prof !== 'warrior' || !s.half) { return false; }
+    var sister = P.sisterOf('warrior', s.half);
+    if (!sister) { return false; }
+    var r = P.rankOf(s, sister);
+    if (r && rankAt(r) > 0) { return true; }
+    var ch = g.__thornswoodCharacter;
+    try { return !!(actorId && ch && ch.masterFor && ch.masterFor(actorId, s, sister)); } catch (e) { return false; }
+  }
+
+  /** Every row this character holds, as { key: true }. Pure. */
+  function held(s, sisterTaken) {
+    var out = {};
+    if (!s) { return out; }
+    for (var i = 0; i < ORDER.length; i++) {
+      var key = ORDER[i];
+      var m = MANEUVERS[key];
+      var rank = P.rankOf(s, m.half);
+      if (!rank) { continue; }
+      if (s.prof === 'warrior' && s.half === m.half) {
+        if (rankAt(m.rank) <= rankAt(rank)) { out[key] = true; }
+        continue;
+      }
+      if (m.rank !== 'novice') { continue; }
+      if (s.prof === 'warrior' && P.sisterOf('warrior', s.half) === m.half) {
+        if (sisterTaken) { out[key] = true; }
+        continue;
+      }
+      if ((s.taught || []).indexOf(m.half) !== -1) { out[key] = true; }
+    }
+    return out;
+  }
+
+  /** Why this character does not hold that row, in one sentence. */
+  function whyNot(s, key) {
+    var m = MANEUVERS[key];
+    var halfName = HALF_NAME[m.half];
+    var rank = s ? P.rankOf(s, m.half) : null;
+    if (s && s.prof === 'warrior' && s.half === m.half) {
+      return m.name + ' is for ' + aRank(m.rank) + ' ' + halfName + '. You are ' +
+             aRank(rank) + ' ' + halfName + '.';
+    }
+    if (s && s.prof === 'warrior' && s.half && P.sisterOf('warrior', s.half) === m.half) {
+      if (m.rank !== 'novice') {
+        return halfName + ' is your sister half, and a sister half has its novice row and no more: ' +
+               noviceOf(m.half) + '.';
+      }
+      return halfName + ' is your sister half. Its novice maneuver opens when a Warlord takes you on.';
+    }
+    if (rank && s && (s.taught || []).indexOf(m.half) !== -1) {
+      return halfName + ' was taught to you as an outside trade, and that is its novice row and no further: ' +
+             noviceOf(m.half) + '.';
+    }
+    return m.name + ' is a ' + halfName + ' maneuver. It belongs to a warrior, and a Warlord can teach ' +
+           'novice combat to somebody who is not one.';
+  }
+
+  // ------------------------------------------------------------ the world --
+  /*
+    cool  actor -> { key: when it is ready again }
+    on    actor -> what is running or armed: a window's end for set, plant,
+          wall, rush and heavy; { until, who } for cover; true for break and
+          wreck, which wait for their blow
+    block actor -> whether that bulwark is blocking, as last seen
+    blow  actor -> { by, at }: who landed the server's own last blow on it
+  */
+  var ST = g.__thornswoodManeuverState;
+  if (!ST || typeof ST !== 'object') {
+    ST = g.__thornswoodManeuverState = { cool: {}, on: {}, block: {}, blow: {} };
+  }
+
+  function now() { return Date.now(); }
+  function selfOf(id) { return { type: 'form', desc: mp.getDescFromId(id) }; }
+  function personOf(id) {
+    try { return Number(mp.get(id, 'profileId')) > 0; } catch (e) { return false; }
+  }
+  function deadOf(id) {
+    try { return !!mp.get(id, 'isDead'); } catch (e) { return true; }
+  }
+  function share(id, which) {
+    try {
+      var p = mp.get(id, 'percentages');
+      var v = p ? Number(p[which]) : NaN;
+      return isNaN(v) ? -1 : v;
+    } catch (e) { return -1; }
+  }
+  function near(a, b, metres) {
+    try {
+      if (String(mp.get(a, 'worldOrCellDesc') || '') !== String(mp.get(b, 'worldOrCellDesc') || '')) { return false; }
+      var p = mp.get(a, 'pos');
+      var q = mp.get(b, 'pos');
+      var dx = p[0] - q[0], dy = p[1] - q[1], dz = p[2] - q[2];
+      var r = metres * UNITS_PER_METRE;
+      return dx * dx + dy * dy + dz * dz <= r * r;
+    } catch (e) { return false; }
+  }
+  function onOf(id, make) {
+    if (!has(ST.on, id)) {
+      if (!make) { return null; }
+      ST.on[id] = {};
+    }
+    return ST.on[id];
+  }
+  function readyAt(id, key) {
+    return (has(ST.cool, id) && has(ST.cool[id], key)) ? ST.cool[id][key] : 0;
+  }
+  function seconds(ms) {
+    var n = Math.max(1, Math.ceil(ms / 1000));
+    return n + (n === 1 ? ' second' : ' seconds');
+  }
+  function nameOf(id) {
+    var soc = g.__thornswoodSocial;
+    try { if (soc && soc.nameOfPerson) { return soc.nameOfPerson(id) || 'them'; } } catch (e) { }
+    return 'them';
+  }
+
+  /*
+    STAMINA, SPENT WHEN THE MANEUVER STARTS. The engine holds stamina as a
+    share of the most there is and does not hand that most to this file.
+    Actor.DamageActorValue knows it, and takes the amount off as a share of
+    the engine's own maximum (MpActor::DamageActorValue). So the amount is
+    taken, and a share that hit the floor means there was not that much: it
+    is put back exactly as it was, and the maneuver does not start. The
+    engine's maximum is worked out from the race record, so stamina the skill
+    tree adds on the client is not in it.
+  */
+  function spend(actorId, amount) {
+    var before = share(actorId, 'stamina');
+    if (!(before > 0)) { return false; }
+    try {
+      mp.callPapyrusFunction('method', 'Actor', 'DamageActorValue', selfOf(actorId), ['Stamina', amount]);
+    } catch (e) {
+      mlog('could not take stamina from', actorId.toString(16) + ':', e);
+      return false;
+    }
+    if (share(actorId, 'stamina') > 0) { return true; }
+    try {
+      var p = mp.get(actorId, 'percentages');
+      mp.set(actorId, 'percentages', { health: Number(p.health), magicka: Number(p.magicka), stamina: before });
+    } catch (e2) {
+      mlog('could not put the stamina back on', actorId.toString(16) + ':', e2);
+    }
+    return false;
+  }
+
+  /* The one person Cover is for: the nearest within 3 metres, not yourself. */
+  function coverWho(actorId) {
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return 0; }
+    var best = 0, bestD = Infinity;
+    var mine = null;
+    try { mine = mp.get(actorId, 'pos'); } catch (e) { return 0; }
+    for (var i = 0; i < online.length; i++) {
+      var id = online[i];
+      if (id === actorId || deadOf(id) || !near(actorId, id, MANEUVERS.cover.metres)) { continue; }
+      var q = null;
+      try { q = mp.get(id, 'pos'); } catch (e) { continue; }
+      var d = (q[0] - mine[0]) * (q[0] - mine[0]) + (q[1] - mine[1]) * (q[1] - mine[1]) + (q[2] - mine[2]) * (q[2] - mine[2]);
+      if (d < bestD) { bestD = d; best = id; }
+    }
+    return best;
+  }
+
+  /*
+    The client's skill tree hand sets the effects map on the panel view, and
+    the map is rebuilt from the state on every write. A redraw is the one way
+    to send Rush's speed and to take it off again.
+  */
+  function push(actorId) {
+    var ch = g.__thornswoodCharacter;
+    if (!ch || !ch.writeState || !ch.stateOf) { return; }
+    try { ch.writeState(actorId, ch.stateOf(actorId), true); } catch (e) { mlog('could not redraw', actorId.toString(16) + ':', e); }
+  }
+
+  /** What a running maneuver adds to the client's map: Rush's speed. */
+  function effects(actorId) {
+    var rec = onOf(actorId, false);
+    if (!rec || !rec.rush || rec.rush <= now()) { return null; }
+    return { speedMult: MANEUVERS.rush.speed };
+  }
+
+  var STARTED = {
+    set: 'Set, for 8 seconds. Halving what a block costs is not in the game yet, so for now this spends the stamina and starts the wait.',
+    plant: 'Plant, for 8 seconds. A Break or a Wreck does not stagger you. Other staggers still land: stopping those is not in the game yet.',
+    wall: 'Wall, for 10 seconds. You, and your party within 3 metres of you, take 20% less damage.',
+    rush: 'Rush: +4 speed for 5 seconds.',
+    heavy: 'Heavy. Your next power attack in the next 8 seconds deals 25% more.',
+    'break': 'Break. Your next hit staggers a person. Staggering a creature is not in the game yet.',
+    wreck: 'Wreck. Your next power attack deals 50% more, and staggers a person. Staggering a creature is not in the game yet.'
+  };
+
+  /** /maneuver with nothing after it: what you hold and when each is ready. */
+  function listLine(actorId, mine) {
+    var bits = [];
+    var t = now();
+    for (var i = 0; i < ORDER.length; i++) {
+      var key = ORDER[i];
+      if (!mine[key]) { continue; }
+      var m = MANEUVERS[key];
+      var ready = readyAt(actorId, key);
+      bits.push(m.name + ' (' + m.stamina + ' stamina, ' + (ready > t ? 'ready in ' + seconds(ready - t) : 'ready') + ')');
+    }
+    if (!bits.length) {
+      return 'You have no maneuvers. They are a warrior\'s, on the half you picked, at your rank and below. ' +
+             'A Warlord can teach the novice row to somebody who is not a warrior.';
+    }
+    return 'Your maneuvers: ' + bits.join(', ') + '. /maneuver <name> starts one.';
+  }
+
+  /** /maneuver <name>. Answers the line to say, always. */
+  function use(actorId, word) {
+    var key = String(word || '').trim().toLowerCase();
+    var ch = g.__thornswoodCharacter;
+    if (!ch || !ch.stateOf) { return 'Maneuvers are not running on this server right now. Say so in the dev channel.'; }
+    var s = ch.stateOf(actorId);
+    var mine = held(s, takenOn(s, actorId));
+    if (!key || key === 'list') { return listLine(actorId, mine); }
+    if (!has(MANEUVERS, key)) {
+      return 'There is no maneuver by that name. There are eight: Set, Plant, Cover, Wall, Rush, Heavy, Break and Wreck.';
+    }
+    var m = MANEUVERS[key];
+    if (!mine[key]) { return whyNot(s, key); }
+    if (deadOf(actorId)) { return 'Not while you are down.'; }
+    var t = now();
+    var ready = readyAt(actorId, key);
+    if (ready > t) { return m.name + ' is ready again in ' + seconds(ready - t) + '.'; }
+    var who = 0;
+    if (key === 'cover') {
+      who = coverWho(actorId);
+      if (!who) { return 'Cover is for one person within 3 metres of you, and nobody is.'; }
+    }
+    if (!spend(actorId, m.stamina)) {
+      return m.name + ' takes ' + m.stamina + ' stamina, and you do not have it. Nothing happens.';
+    }
+    if (!has(ST.cool, actorId)) { ST.cool[actorId] = {}; }
+    ST.cool[actorId][key] = t + m.cooldown * 1000;
+    var rec = onOf(actorId, true);
+    if (key === 'cover') {
+      rec.cover = { until: t + m.seconds * 1000, who: who };
+      ST.block[actorId] = false;
+      mlog(actorId.toString(16), 'Cover on', who.toString(16));
+      return 'Cover on ' + nameOf(who) + ', for 8 seconds. While you block within 3 metres of them, they take 20% less damage.';
+    }
+    rec[key] = m.seconds ? t + m.seconds * 1000 : true;
+    mlog(actorId.toString(16), m.name);
+    if (key === 'rush') {
+      push(actorId);
+      setTimeout(function () { push(actorId); }, m.seconds * 1000 + 50);
+    }
+    return STARTED[key];
+  }
+
+  // -------------------------------------------------------------- the hits --
+  /*
+    WHAT A HIT TOOK, MEASURED RATHER THAN GUESSED. OnHit fires before the
+    engine works out the damage (ActionListener::OnWeaponHit sends it first,
+    then CalculateDamage and NetSetPercentages, in the same call). So the
+    target's health is read at the event, and read again once the engine is
+    done: at the next hit on the same target, or on the next turn of the event
+    loop, whichever is first. The difference is what that one hit took, and
+    the maneuver works on that: a fifth given back, a quarter or a half taken
+    again. A hit the engine then threw away (too fast, a splash) took nothing,
+    so nothing is changed and a Heavy or a Wreck it would have spent is armed
+    again.
+  */
+  var pending = {};
+  var queued = false;
+
+  function idOfForm(v) {
+    if (typeof v === 'number') { return v; }
+    if (v && v.desc) {
+      try { return Number(mp.getIdFromDesc(String(v.desc))) || 0; } catch (e) { return 0; }
+    }
+    return 0;
+  }
+  function isSpell(v) {
+    if (!v || !v.desc) { return false; }
+    try {
+      var r = mp.lookupEspmRecordById(mp.getIdFromDesc(String(v.desc)));
+      return !!(r && r.record && String(r.record.type) === 'SPEL');
+    } catch (e) { return false; }
+  }
+
+  /* Whether that bulwark is blocking, from the last animation event the
+     engine was sent. Moving clears that event, so what was last seen holds. */
+  function blocking(holder) {
+    var ev = '';
+    try { ev = String(mp.get(holder, 'lastAnimEvent') || '').toLowerCase(); } catch (e) { ev = ''; }
+    if (ev === 'blockstart') { ST.block[holder] = true; }
+    else if (ev === 'blockstop') { ST.block[holder] = false; }
+    return !!ST.block[holder];
+  }
+
+  function samePartyNear(holder, target) {
+    var soc = g.__thornswoodSocial;
+    if (!soc || !soc.partyOf || !soc.profileOf) { return false; }
+    var mine = soc.profileOf(holder);
+    var theirs = soc.profileOf(target);
+    if (!mine || !theirs) { return false; }
+    var p = soc.partyOf(mine);
+    if (!p || !p.members || p.members.indexOf(theirs) === -1) { return false; }
+    return near(holder, target, MANEUVERS.wall.metres);
+  }
+
+  /* 20% less for this target, from a Wall or a Cover. Two of them on one
+     person is still 20%: the rows say less damage, not less again. */
+  function shielded(target, t) {
+    for (var k in ST.on) {
+      if (!has(ST.on, k)) { continue; }
+      var holder = Number(k);
+      var rec = ST.on[k];
+      if (rec.wall && rec.wall > t && !deadOf(holder)) {
+        if (holder === target || samePartyNear(holder, target)) { return MANEUVERS.wall.less; }
+      }
+      if (rec.cover && rec.cover.until > t && rec.cover.who === target && !deadOf(holder) &&
+          blocking(holder) && near(holder, target, MANEUVERS.cover.metres)) {
+        return MANEUVERS.cover.less;
+      }
+    }
+    return 0;
+  }
+
+  function anyOn() {
+    for (var k in ST.on) { if (has(ST.on, k)) { return true; } }
+    return false;
+  }
+
+  function hit(targetId, aggressor, source, power, blocked) {
+    var target = Number(targetId) || 0;
+    if (!target) { return; }
+    // A hit on a target with a blow still open closes that blow first.
+    var open = pending[target];
+    if (open && open.length && open[open.length - 1].after === null) {
+      open[open.length - 1].after = share(target, 'health');
+    }
+    if (!anyOn()) { return; }
+    var t = now();
+    var by = idOfForm(aggressor);
+    // A bulwark's own blocked hit is a block seen.
+    if (blocked && has(ST.on, target) && ST.on[target].cover) { ST.block[target] = true; }
+
+    var e = { before: -1, after: null, by: by, more: 0, less: 0, stagger: false, used: [] };
+    var a = (by && has(ST.on, by)) ? ST.on[by] : null;
+    if (a && !isSpell(source)) {
+      if (power && a.wreck) {
+        e.more = MANEUVERS.wreck.more; e.stagger = true;
+        e.used.push({ key: 'wreck', v: a.wreck }); delete a.wreck;
+      } else if (power && a.heavy && a.heavy > t) {
+        e.more = MANEUVERS.heavy.more;
+        e.used.push({ key: 'heavy', v: a.heavy }); delete a.heavy;
+      }
+      if (!e.stagger && a['break']) {
+        e.stagger = true;
+        e.used.push({ key: 'break', v: a['break'] }); delete a['break'];
+      }
+    }
+    e.less = shielded(target, t);
+    if (!e.more && !e.less && !e.stagger) { return; }
+    e.before = share(target, 'health');
+    if (!(e.before > 0)) { rearm(e); return; }
+    if (!pending[target]) { pending[target] = []; }
+    pending[target].push(e);
+    if (!queued) {
+      queued = true;
+      setTimeout(guard('maneuverHits', flush), 0);
+    }
+  }
+
+  /* A blow that took nothing gives back what it would have spent. */
+  function rearm(e) {
+    if (!e.by || !e.used.length) { return; }
+    var rec = onOf(e.by, true);
+    for (var i = 0; i < e.used.length; i++) {
+      var u = e.used[i];
+      if (u.key === 'heavy' && u.v <= now()) { continue; }
+      if (!rec[u.key]) { rec[u.key] = u.v; }
+    }
+  }
+
+  function setHealth(target, h, change, killer) {
+    var next = h + change;
+    if (next > 1) { next = 1; }
+    if (next <= 0) {
+      next = 0;
+      // The engine kills on this write with nobody named; mp.onDeath asks.
+      if (killer) { ST.blow[target] = { by: killer, at: now() }; }
+    }
+    try {
+      var p = mp.get(target, 'percentages');
+      mp.set(target, 'percentages', { health: next, magicka: Number(p.magicka), stamina: Number(p.stamina) });
+    } catch (e) {
+      mlog('could not write the health of', target.toString(16) + ':', e);
+    }
+  }
+
+  /*
+    A STAGGER IS AN ANIMATION, AND THE SERVER CAN SEND ONE ONLY TO A PERSON.
+    Debug.SendAnimationEvent in the fork runs on the machine of the actor it
+    names, and only when that actor is somebody's own character
+    (SpSnippet::Execute returns for anything else). A person hit by Break or
+    Wreck staggers in their own game; a creature does not yet. Plant refuses
+    this stagger.
+  */
+  function staggerOf(target) {
+    if (!personOf(target) || deadOf(target)) { return; }
+    var rec = onOf(target, false);
+    if (rec && rec.plant && rec.plant > now()) { return; }
+    try {
+      mp.callPapyrusFunction('global', 'Debug', 'SendAnimationEvent', null, [selfOf(target), 'staggerStart']);
+    } catch (e) {
+      mlog('could not stagger', target.toString(16) + ':', e);
+    }
+  }
+
+  function flush() {
+    queued = false;
+    var all = pending;
+    pending = {};
+    for (var k in all) {
+      if (!has(all, k)) { continue; }
+      var target = Number(k);
+      var list = all[k];
+      var h = share(target, 'health');
+      if (list.length && list[list.length - 1].after === null) { list[list.length - 1].after = h; }
+      var change = 0, killer = 0, stagger = false;
+      for (var i = 0; i < list.length; i++) {
+        var e = list[i];
+        var took = e.before - e.after;
+        if (!(e.after >= 0) || !(took > 0)) { rearm(e); continue; }
+        if (e.less) { change += took * e.less; }
+        if (e.more) { change -= took * e.more; killer = e.by; }
+        if (e.stagger) { stagger = true; }
+      }
+      if (h > 0 && change !== 0) { setHealth(target, h, change, killer); }
+      if (stagger) { staggerOf(target); }
+    }
+  }
+
+  /** Whose blow it was, when the server's own write was the killing one. */
+  function killerOf(target) {
+    var b = has(ST.blow, target) ? ST.blow[target] : null;
+    if (!b) { return 0; }
+    delete ST.blow[target];
+    return (now() - b.at) < 2000 ? b.by : 0;
+  }
+
+  // -------------------------------------------------------------- the tick --
+  /* Ten times a second while anything runs: a Cover's block is watched, and
+     what has run out is taken off. Nothing to do costs one empty loop. */
+  function tick() {
+    var t = now();
+    for (var k in ST.on) {
+      if (!has(ST.on, k)) { continue; }
+      var holder = Number(k);
+      var rec = ST.on[k];
+      if (rec.cover && rec.cover.until > t) { blocking(holder); }
+      if (rec.cover && rec.cover.until <= t) { delete rec.cover; delete ST.block[holder]; }
+      var timed = ['set', 'plant', 'wall', 'rush', 'heavy'];
+      for (var i = 0; i < timed.length; i++) {
+        if (rec[timed[i]] && rec[timed[i]] <= t) { delete rec[timed[i]]; }
+      }
+      var left = false;
+      for (var f in rec) { if (has(rec, f)) { left = true; break; } }
+      if (!left) { delete ST.on[k]; }
+    }
+    for (var b in ST.blow) {
+      if (has(ST.blow, b) && t - ST.blow[b].at > 5000) { delete ST.blow[b]; }
+    }
+  }
+
+  if (g.__thornswoodManeuverTimer) { try { clearInterval(g.__thornswoodManeuverTimer); } catch (e) { } }
+  g.__thornswoodManeuverTimer = setInterval(guard('maneuverTick', tick), 100);
+
+  g.__thornswoodManeuvers = {
+    MANEUVERS: MANEUVERS, ORDER: ORDER,
+    held: held, takenOn: takenOn, whyNot: whyNot,
+    use: use, effects: effects, hit: hit, flush: flush, killerOf: killerOf, tick: tick,
+    state: ST
+  };
+  mlog('ready:', ORDER.length, 'maneuvers');
+})();
+
+/*
+  Every hit the engine takes, heard for the maneuvers above (#1386). It never
+  answers false: the engine does not read what this family answers, and the
+  list over mp.onTakeItem says why nothing here may try.
+*/
+mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, aggressor, source, projectile, power, sneak, bash, blocked) {
+  // The break chance at 0% (#1384), in the durability block. First and on
+  // its own, so neither half can stop the other.
+  var wear = globalThis.__thornswoodDurability;
+  if (wear && wear.onHit) {
+    try { wear.onHit(targetId, aggressor, source); } catch (e) { log('durability: the hit threw:', e); }
+  }
+  // The filled skill perks (#1385), before the maneuvers: each measures the
+  // blow on the next turn, and this way round the perks block reads it first.
+  var pk = globalThis.__thornswoodPerks;
+  if (pk && pk.hit) {
+    try { pk.hit(targetId, aggressor, source, power, bash); } catch (e) { log('perks: the hit threw:', e); }
+  }
+  var mv = globalThis.__thornswoodManeuvers;
+  if (mv && mv.hit) { mv.hit(targetId, aggressor, source, power, blocked); }
+});
+// ==== end thornswood warrior maneuvers ====
+
 
 // ==== thornswood spell tomes ====
 /*
@@ -40694,11 +44405,19 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/helpme', '/help-me', '/report',
                // Out of a wedged spot; see the stuck block after it.
                '/stuck',
+               // A carriage or ferry, at the driver (#1394). See the carriages block.
+               '/ride',
                '/pick', '/spend',
+               // The maneuvers of a warrior; see the maneuvers block.
+               '/maneuver',
+               // A Master taking somebody on, and ending it (#1388). See the
+               // character block.
+               '/apprentice',
                '/plant', '/claim', '/plot',
                '/deed', '/deeds', '/lock', '/unlock', '/mold', '/key',
-               '/jarl', '/steward', '/evict', '/box', '/rent',
+               '/jarl', '/steward', '/evict', '/box', '/rent', '/bed',
                '/notice', '/job', '/board', '/take', '/jobs', '/dropjob', '/unpin',
+               '/letter', '/deliver',
                '/tp', '/goto', '/face', '/restart', '/shutdown', '/tspicks',
                // Playtesters', like /tp, and gated the same way. Deliberately
                // absent from PLAYER_WORDS: naming them in /help would be an
@@ -40727,6 +44446,9 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // of this file; the numbers there are invented and meant to be
                // argued with.
                '/needs', '/rest', '/eat', '/drink', '/bard',
+               // Condition and the repair kits (#1384). See the durability
+               // block, after the take limit.
+               '/repair',
                // The client's weather report and its "I am on fire". Never typed; see
                // the branches.
                '/place', '/burn', '/ate',
@@ -40768,19 +44490,30 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // argument says what a place costs, which is the first
                       // thing somebody standing at a door wants to know, and
                       // the steward half answers "only a steward sets rent"
-                      // to everybody else.
-                      '/box', '/rent', '/notice', '/job', '/board',
-                      '/take', '/jobs', '/dropjob', '/unpin', '/help',
+                      // to everybody else. /bed with no amount says what a
+                      // night costs, the same way, and only a holder sets it.
+                      '/box', '/rent', '/bed', '/notice', '/job', '/board',
+                      '/take', '/jobs', '/dropjob', '/unpin', '/letter', '/deliver', '/help',
                       // Everybody's, and they need to be findable: a meter
                       // nobody knows how to act on is only a penalty.
                       '/needs', '/rest', '/eat', '/drink', '/bard',
+                      // Everybody's: what you carry and how it stands, and
+                      // the kit that mends it (#1384).
+                      '/repair',
+                      // For a warrior, and named so a warrior can find them.
+                      '/maneuver',
                       // Everybody's, and the one thing a person in trouble
                       // must be able to find: asking staff, and getting
                       // out of a wedged spot (#414).
                       '/helpme', '/report', '/stuck',
+                      // Everybody's: the way between holds is a driver (#1394).
+                      '/ride',
                       // Everybody's, and they have to be findable: a key
                       // prompt nobody sees is a feature nobody has.
                       '/friend', '/party', '/mute', '/hidename', '/trade', '/journal', '/book', '/merchant',
+                      // Everybody's: a Master takes somebody on with it, and
+                      // anybody can ask who took them on (#1388).
+                      '/apprentice',
                       '/yes', '/no', '/roll'];
 
 // ---------------------------------------------------------------------------
@@ -41751,7 +45484,8 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       and the world hooks replace them rather than joining them.
 
       /needs   what the three meters say
-      /rest    sit, campfire, inn or bed; /rest up to stop
+      /rest    sit, campfire, inn or bed; /rest up to stop. A bed is one the
+               server saw them press; see "beds" in the property block.
       /eat     a meal; /drink water; /drink ale for the good and the bad of it
       /bard    say you are playing, which helps everyone resting near you
     */
@@ -41813,6 +45547,21 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       var bn = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodNeeds;
       if (bn && bn.setBurning && actorId) {
         try { bn.setBurning(actorId, String(parts[1] || '') === '1'); } catch (e) { }
+      }
+      return true;
+    }
+
+    /*
+      A carriage or ferry (#1394), said at the driver, or sent by the front
+      plugin as /ride e <id> when somebody presses E on one. The carriages
+      block answers it, and takes the fare onto the hold's ledger.
+    */
+    if (word === '/ride') {
+      var rides = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodCarriages;
+      if (!rides) { toProfile(profileId, 'That is not running on this server.'); return true; }
+      try { rides.command(parts, actorId, profileId, toProfile); } catch (eRide) {
+        log('/ride threw:', eRide);
+        toProfile(profileId, 'That did not work. Say so in the dev channel.');
       }
       return true;
     }
@@ -41912,6 +45661,14 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           if (!tr || !tr.begin) { toProfile(profileId, 'Trading is not running on this server.'); return true; }
           var started = tr.begin(themActor, actorId);
           if (started) { toProfile(profileId, started); return true; }
+        } else if (o.kind === 'apprentice') {
+          /* A Master offered to take this person on (#1388). The character
+             block holds the record, so it checks again and writes both. */
+          var chAp = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodCharacter;
+          if (!chAp || !chAp.acceptApprentice) { toProfile(profileId, 'That is not running on this server.'); return true; }
+          var tookOn = chAp.acceptApprentice(actorId, themActor, o);
+          toProfile(profileId, tookOn.learner);
+          if (tookOn.master) { say(themActor, tookOn.master); }
         }
         soc.push(actorId);
         if (themActor) { soc.push(themActor); }
@@ -42133,6 +45890,19 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       return true;
     }
 
+    // A warrior's maneuvers (#1386). See the maneuvers block, after the
+    // character block, for what each one does and what the server cannot.
+    if (word === '/maneuver') {
+      var mvs = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodManeuvers;
+      if (!mvs || !mvs.use) {
+        toProfile(profileId, 'Maneuvers are not running on this server right now. Say so in the dev channel.');
+        return true;
+      }
+      if (!needCharacter()) { return true; }
+      toProfile(profileId, mvs.use(actorId, parts[1]));
+      return true;
+    }
+
     if (word === '/needs' || word === '/rest' || word === '/eat' ||
         word === '/drink' || word === '/bard') {
       var needs = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodNeeds;
@@ -42189,7 +45959,9 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       if (word === '/bard') { toProfile(profileId, needs.bard(actorId)); return true; }
       if (word === '/rest') {
         var where = String(parts[1] || '').toLowerCase();
+        var beds = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodBeds;
         if (where === 'up' || where === 'stop') {
+          if (beds && beds.off) { beds.off(actorId); }
           needs.resting(actorId, '');
           toProfile(profileId, 'You get up.');
           return true;
@@ -42198,7 +45970,23 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           toProfile(profileId, 'Rest where? sit, campfire, inn or bed. /rest up to get going again.');
           return true;
         }
+        /*
+          A BED IS ONE THE SERVER SAW (#1392). bed, inn and bedroll go to the
+          beds in the property block, which asks which bed this person pressed
+          and whether they are still at it, whose it is, and whether the night
+          is paid, and answers the kind of rest itself. The word only says that
+          they want a bed. See "beds" in the property block.
+        */
+        if (where === 'bed' || where === 'inn' || where === 'bedroll') {
+          if (!beds || !beds.rest) {
+            toProfile(profileId, 'Beds are not running on this server right now. Say so in the dev channel.');
+            return true;
+          }
+          toProfile(profileId, beds.rest(actorId, Number(profileId) || 0));
+          return true;
+        }
         var said = needs.resting(actorId, where);
+        if (said && beds && beds.off) { beds.off(actorId); }
         toProfile(profileId, said || ('There is no resting at a ' + where + '. Try sit, campfire, inn or bed.'));
         return true;
       }
@@ -42685,6 +46473,16 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       the unknown-command reply below did not: it advertised /tp to
       everybody and then refused them. Both read the same list now.
     */
+    // Condition and the repair kits (#1384). The work is in the durability
+    // block; this only hands it the character and the rest of the line.
+    if (word === '/repair') {
+      if (!needCharacter()) { return; }
+      var wear = g.__thornswoodDurability;
+      if (!wear) { toProfile(profileId, 'That is not running on this server.'); return; }
+      toProfile(profileId, wear.command(actorId, parts.slice(1).join(' ')));
+      return;
+    }
+
     // Out of a wedged spot (#414). The work is in the stuck block at the end
     // of this file; this only hands it the character.
     if (word === '/stuck') {
@@ -42747,8 +46545,9 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       if (topic === 'living' || topic === 'needs' || topic === 'food') {
         toProfile(profileId,
           'The four bars are food, water, rest and how warm you are. /eat and ' +
-          '/drink when you have something, /rest sit, /rest campfire, /rest inn ' +
-          'or /rest bed, and /rest up to get going again. Fires warm you and ' +
+          '/drink when you have something, /rest sit, /rest campfire, or lie down ' +
+          'in a bed and /rest bed, and /rest up to get going again. A bed counts ' +
+          'when it is yours, you carry its key, or you paid the night. Fires warm you and ' +
           'standing in one burns you. What you are wearing matters: fur is the ' +
           'warmest thing there is and metal is the worst.');
         return;
@@ -42756,8 +46555,13 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       if (topic === 'work' || topic === 'trade' || topic === 'class') {
         toProfile(profileId,
           'K opens your profession, your class and your skill tree. Work at what ' +
-          'you chose and the rank climbs on its own. /plot says what is in the ' +
-          'ground in front of you and whose farm it is, /plant sows it.');
+          'you chose and the rank climbs on its own. Your sister half stops at ' +
+          'novice until a Master of it takes you on: a Master types /apprentice ' +
+          '<name>, and /apprentice end <name> ends it. /apprentice on its own ' +
+          'says who took you on. /plot says what is in the ' +
+          'ground in front of you and whose farm it is, /plant sows it. A ' +
+          'warrior\'s maneuvers: /maneuver lists yours, /maneuver rush starts one. ' +
+          '/repair <name> mends a piece with a kit.');
         return;
       }
       if (topic === 'land' || topic === 'home' || topic === 'deed') {
@@ -42765,7 +46569,8 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           '/claim at a plot takes the farm around it; /claim at a door you have ' +
           'just opened takes the building and hands you the deed. /deed lists ' +
           'what you hold, /lock and /unlock turn the lock, /rent says what a ' +
-          'place costs. A smith says /mold at a door with the holder standing ' +
+          'place costs, and /bed says or sets what a night in its beds costs. ' +
+          'A smith says /mold at a door with the holder standing ' +
           'there, and /key at a forge with the mold in hand.');
         return;
       }
@@ -43482,8 +47287,9 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
                   handle in the pack; a brew or an enchantment by somebody
                   whose trade is not that bench's; and a craft that matched no
                   recipe but makes an item a recipe here owns, asked the same
-                  race, profession and rank question (tempering still comes
-                  through). A refusal keeps their materials.
+                  race, profession and rank question; and a temper at the
+                  sharpening wheel or the armour table (#1384). A refusal
+                  keeps their materials.
     onPutItem     Putting into a container. mp.onPutItem refuses anything but
                   coin into a hold's box, and says nothing about any other
                   container.
@@ -43498,9 +47304,10 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
                   the event is raised for Gold001.
     onDeath       Anything dying. mp.onDeath never refuses. It logs a person's
                   death with the killer's id, and that line is the only record
-                  of a fight this file keeps. The hits before it do raise an
-                  event, onPapyrusEvent:OnHit, but nothing here listens to it
-                  yet (THE PAPYRUS FAMILY, below).
+                  of a fight this file keeps. The hits before it raise
+                  onPapyrusEvent:OnHit, which only the warrior maneuvers and
+                  the break chance in the durability block listen to (THE
+                  PAPYRUS FAMILY, below).
     onRespawn     Logged by mp.onRespawn, never refused.
     onEatItem     Eating or drinking something in the pack. No handler: the
                   engine applies a potion's effects. The needs block hears
@@ -43578,9 +47385,11 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   the world's Papyrus scripts. So on a false the hit still lands, the spell
   was already cast and the item was already added, and all that is stopped is
   the event reaching a lever's or a quest's own script. That is why nothing
-  here may ever return false to this family. Nothing here listens to any of
-  it yet, and the engine does not build the arguments for a name mp has no
-  function for, so the family costs this file nothing today.
+  here may ever return false to this family. OnHit is the one name this
+  file listens to, for the warrior maneuvers (#1386) and the break chance at
+  0% in the durability block (#1384), and the engine does not build the
+  arguments for a name mp has no function for, so the rest of the family
+  costs this file nothing.
 
   WHAT THE ENGINE ANSWERS WITH NO EVENT AT ALL. Movement, animation, animation
   variables, health, magicka and stamina, bow shots (one arrow is taken),
@@ -43630,10 +47439,12 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   everybody at once, so every other take is watched and let through.
 
   Hits are a different case: nothing here can refuse one, only hear it,
-  through onPapyrusEvent:OnHit. Nothing listens to it yet. It is raised for
-  every blow the engine takes, a hosted bandit's as much as a person's, so
-  which blows are worth a line, one person hitting another being the obvious
-  one, belongs to the same decision.
+  through onPapyrusEvent:OnHit. The warrior maneuvers listen to it (#1386)
+  and change what a hit took only after the engine has applied it, and the
+  durability block hears it for the break chance at 0% (#1384); neither logs
+  a blow. It is raised for every blow the engine takes, a hosted bandit's as
+  much as a person's, so which blows are worth a line, one person hitting
+  another being the obvious one, belongs to the same decision.
 */
 
 /*
@@ -43724,6 +47535,14 @@ mp.onTakeItem = guard('onTakeItem', function (sourceRefrId, actorId, baseId, cou
 mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
   log('drop:', auditPerson(actorId), 'dropped', Number(count) || 0, auditItem(baseId),
       'in', auditCell(actorId));
+  // A piece's condition is in its name and the ground keeps no name, so the
+  // durability block remembers it for the pickup (#1384).
+  var wear = globalThis.__thornswoodDurability;
+  if (wear && wear.dropped) {
+    try { wear.dropped(actorId, Number(baseId) || 0, count); } catch (e) {
+      log('durability: the drop threw:', e);
+    }
+  }
 });
 
 /*
@@ -44060,6 +47879,806 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 })();
 // end of the take limit
 
+// ==== thornswood durability ====
+/*
+  CONDITION, REPAIR KITS AND THE DULL CLOCK (#1384).
+
+  docs/systems/durability.md is the design and the Dull section of
+  docs/systems/gold.md is the clock. In short: a worn piece runs from 0% to
+  120%. A kit mends it, to 120% when the half that makes that kit does the
+  work and to 100% for anybody else. At 0% a piece that is being worn has a
+  10% chance to break on a hit. A piece sitting in a shop chest or a house
+  container loses 5% of its condition per real day; a pack does not, and
+  worn gear does not.
+
+  WHAT HAS A CONDITION. A weapon, a piece of armour and a piece of clothing:
+  a WEAP record, and an ARMO record that is not jewellery. Those are the
+  three things the three kits mend. A ring, an amulet or a circlet is on no
+  kit's list, so it carries none. The pickaxe, the woodcutter's axe and the
+  shovel wear out by use in the tool block (wearTool) and carry none either,
+  because two clocks on one pickaxe is one too many. Ammunition is not a
+  piece. Armour or clothing is the record's own armour type in BOD2 (light
+  and heavy are armour, clothing is clothing), read once per base and kept.
+
+  WHERE THE NUMBER LIVES: ON THE ITEM, IN ITS NAME. An entry in a pack or a
+  chest is a base and a count and whatever extra the engine keeps beside
+  them (Inventory.h in the fork: health, enchantment, name, worn and the
+  rest). Two entries that differ in any of those are two stacks, and the
+  engine carries that extra wherever the entry goes: into a chest, out of
+  it, onto a body, and across a restart. So a piece at 100% is plain, and
+  any other condition is written on the end of its name, "Iron Sword (85%)".
+  The person sees it in their own inventory, two swords at different
+  conditions are two lines they can tell apart, and nothing here has to
+  follow an item from place to place. A deed, a mold and a key already carry
+  which house they belong to the same way (the property block).
+
+  Not the health extra, which looks like the obvious home. The client rounds
+  it to a tenth and throws 1.0 away (inventory.ts in the fork), so 95% could
+  not be kept, and Skyrim reads health as the temper level, so 120% would
+  show as "Superior" and hit as one. And not a table in this file keyed by
+  pack and base: two identical swords are one stack to the engine, so a
+  table could never say which of the two left when one was put in a chest.
+
+  THREE THINGS IN THE ENGINE MAKE A FRESH, PLAIN ENTRY, and a plain entry
+  reads as 100%, so each of them would be a free repair:
+    a drop. MpActor::DropItem places the bare record, so the name is lost.
+          dropped() remembers the condition that went down and the pickup
+          puts it back on (pressed()).
+    a trade. moveById in the trade block writes a base and a count and
+          nothing else. That is #1594, its own issue, because it drops
+          every name, a key's and a deed's included.
+    a craft. CraftEvent::OnFireSuccess takes away plain entries and adds a
+          plain one. A temper is refused (recipelessCraft), so it is not a
+          way round this. Enchanting a piece that is not at 100% fails in
+          the engine, because the plain piece it asks to take is not there.
+
+  THE DULL CLOCK IS THE CHEST'S, NOT THE ITEM'S. A container in a building
+  somebody holds (a shop is a claimed building, and so is a house) starts a
+  clock the first time it is opened, written on the reference so it
+  survives a restart. Every real day after that, everything with a
+  condition inside it loses 5%. The loss is applied when the chest is
+  opened, before the engine sends what is in it, so a person sees the right
+  number; a chest nobody opens does not need to be right until somebody
+  does. Opening it never moves the clock, so it does not reset the day, and
+  taking a piece out and putting it back does not either: whatever is in
+  the chest when its day turns loses the 5%.
+
+  THE BREAK CHANCE, read as: on each hit, every worn piece of armour or
+  clothing on the person hit that is at 0% rolls once, and so does the
+  weapon a person lands the hit with when it is at 0%. A broken piece is
+  gone. Only people's gear rolls: nothing here gives a bandit's sword a
+  condition. The hit arrives through onPapyrusEvent:OnHit, whose one handler
+  is at the end of the warrior maneuvers block and hands it to onHit here.
+
+  THE KITS ARE NOT IN THE WORLD YET. A kit is a MISC record and a recipe in
+  Thornswood-Content.esp, and neither exists. KITS says what each one mends
+  and whose it is; item is the kit's record and stays null until the plugin
+  carries it. With item null, /repair says no kit has been made yet.
+  repairTo and repairWithKit are what the rest of the file uses, so the fuel
+  and master work (#1398) can rely on them: repairTo is the number a kit
+  mends to for this person, and repairWithKit is the whole repair.
+
+  NOTHING HERE TOUCHES A NUMBER ON THE PAGE. 120% does not yet add 5% to a
+  weapon's damage or an armour piece's rating: the server works damage out
+  in the fork's TES5DamageFormula, which this file cannot reach.
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+
+  var CONDITION = {
+    // The bottom. A worn piece here can break on a hit.
+    lowest: 0,
+    // A sound piece: every piece as it is made, and a repair by anybody.
+    sound: 100,
+    // The repair of the half that makes the kit.
+    highest: 120
+  };
+  // gold.md, Dull: 5% of its condition per real day.
+  var DULL_PER_DAY = 5;
+  var DAY_MS = 24 * 60 * 60 * 1000;
+  // durability.md: at 0%, a worn piece has a 10% chance to break on a hit.
+  var BREAK_CHANCE = 0.10;
+  /*
+    A dropped thing lies on the ground two minutes before the engine deletes
+    it (MpActor::DropItem, kDeletionTimeSeconds), so its condition is kept a
+    little longer than that and no longer.
+  */
+  var DROP_KEEP_MS = 3 * 60 * 1000;
+  // The pickup is added after onActivate returns. Same wait a fresh key is
+  // named after (KEY_NAME_DELAY).
+  var PICKUP_DELAY_MS = 250;
+  // MpForm::IsEspmForm: below this a reference was placed by a plugin, above
+  // it the server made it, which is what a drop makes.
+  var RUNTIME = 0xff000000;
+  // Where a container's dull clock is written, on the reference itself.
+  var CLOCK_PROPERTY = 'thornswoodDull';
+
+  /*
+    THE THREE KITS, by what they mend. half is the half that makes it and
+    repairs to 120%; maker is that half as a person reads it. item is the
+    kit's MISC record in Thornswood-Content.esp, null until the plugin
+    carries it (see the block comment).
+  */
+  var KITS = {
+    weapon:   { name: 'Weapon Kit', half: 'edgewright',  maker: 'Edgewright',  item: null },
+    armour:   { name: 'Armor Kit',  half: 'platewright', maker: 'Platewright', item: null },
+    clothing: { name: 'Sewing Kit', half: 'haberdasher', maker: 'Haberdasher', item: null }
+  };
+
+  // " (85%)" on the end of a name.
+  var SUFFIX = / \((\d{1,3})%\)$/;
+
+  /*
+    Jewellery, by the keywords Skyrim.esm gives it: ArmorJewelry,
+    VendorItemJewelry, ClothingRing, ClothingNecklace and ClothingCirclet. A
+    keyword in KWDA is the id as the plugin wrote it, and Skyrim.esm is
+    master 0 in every plugin that names it, so these are the same number in
+    any plugin. A piece whose only slots are the amulet, the ring and the
+    circlet is jewellery too, for a mod that forgot the keyword.
+  */
+  var JEWELLERY_KEYWORDS = [0x6bbe9, 0x8f95a, 0x10cd09, 0x10cd0a, 0x10cd08];
+  var JEWELLERY_SLOTS = (1 << 5) | (1 << 6) | (1 << 12);
+
+  function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+
+  function u32(bytes, at) {
+    if (!bytes || bytes.length < at + 4) { return -1; }
+    return ((bytes[at] | (bytes[at + 1] << 8) | (bytes[at + 2] << 16)) >>> 0) +
+           (bytes[at + 3] * 0x1000000);
+  }
+
+  function clamp(n) {
+    n = Math.round(Number(n) || 0);
+    if (n < CONDITION.lowest) { return CONDITION.lowest; }
+    if (n > CONDITION.highest) { return CONDITION.highest; }
+    return n;
+  }
+
+  /** The condition written on an entry, or 100 for a plain one. */
+  function conditionOf(entry) {
+    var m = SUFFIX.exec(String((entry && entry.name) || ''));
+    return m ? clamp(m[1]) : CONDITION.sound;
+  }
+
+  /*
+    Two entries the engine counts as one stack: the same base and the same
+    extra (Inventory::Entry::EqualExceptCount). worn and wornLeft read false
+    when they are missing, as the engine reads them.
+  */
+  var EXTRA = ['health', 'enchantmentId', 'maxCharge', 'removeEnchantmentOnUnequip',
+               'chargePercent', 'name', 'soul', 'poisonId', 'poisonCount'];
+  function sameStack(a, b) {
+    if (!a || !b || a.baseId !== b.baseId) { return false; }
+    for (var i = 0; i < EXTRA.length; i++) {
+      if (a[EXTRA[i]] !== b[EXTRA[i]]) { return false; }
+    }
+    return !!a.worn === !!b.worn && !!a.wornLeft === !!b.wornLeft;
+  }
+
+  function copy(entry) {
+    var out = {};
+    for (var k in entry) { if (own(entry, k)) { out[k] = entry[k]; } }
+    return out;
+  }
+
+  /** Stacks that have become the same stack folded into one, empties dropped. */
+  function folded(entries) {
+    var out = [];
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (!e || !(Number(e.count) > 0)) { continue; }
+      var into = -1;
+      for (var j = 0; j < out.length; j++) {
+        if (sameStack(out[j], e)) { into = j; break; }
+      }
+      if (into >= 0) { out[into].count += e.count; } else { out.push(e); }
+    }
+    return out;
+  }
+
+  function aWord(name) {
+    return (/^[aeiou]/i.test(String(name)) ? 'an ' : 'a ') + name;
+  }
+
+  function create(api) {
+    var kits = api.kits || KITS;
+    var kinds = {};
+    var names = {};
+    // Pieces that went onto the ground and what they were at, oldest first.
+    var drops = [];
+
+    /*
+      What kind of piece a base is: 'weapon', 'armour', 'clothing', or ''
+      for a thing that has no condition. Asked once per base. A record that
+      cannot be read has none, because not knowing what a thing is has to
+      mean not touching it.
+    */
+    function pieceKind(baseId) {
+      if (!baseId) { return ''; }
+      if (own(kinds, baseId)) { return kinds[baseId]; }
+      var kind = '';
+      try { kind = readKind(baseId); } catch (e) { kind = ''; }
+      kinds[baseId] = kind;
+      return kind;
+    }
+
+    function readKind(baseId) {
+      if (api.isTool && api.isTool(baseId)) { return ''; }
+      var rec = api.recordOf(baseId);
+      if (!rec || !rec.type) { return ''; }
+      var type = String(rec.type);
+      if (type === 'WEAP') { return 'weapon'; }
+      if (type !== 'ARMO') { return ''; }
+      var fields = rec.fields || [];
+      var slots = -1, armourType = -1, keywords = [];
+      for (var i = 0; i < fields.length; i++) {
+        var f = fields[i];
+        if (!f) { continue; }
+        var t = String(f.type);
+        if (t === 'BOD2') {
+          slots = u32(f.data, 0);
+          armourType = u32(f.data, 4);
+        } else if (t === 'BODT' && slots < 0) {
+          slots = u32(f.data, 0);
+          armourType = u32(f.data, 8);
+        } else if (t === 'KWDA') {
+          for (var k = 0; k + 4 <= (f.data || []).length; k += 4) { keywords.push(u32(f.data, k)); }
+        }
+      }
+      for (var j = 0; j < keywords.length; j++) {
+        if (JEWELLERY_KEYWORDS.indexOf(keywords[j]) !== -1) { return ''; }
+      }
+      if (slots > 0 && (slots & ~JEWELLERY_SLOTS) === 0) { return ''; }
+      if (armourType === 0 || armourType === 1) { return 'armour'; }
+      if (armourType === 2) { return 'clothing'; }
+      return '';
+    }
+
+    /*
+      What a piece is called with nothing written on it. The recipe table
+      first, which holds the names Skyrim's own string files give; then the
+      record's FULL when it is real text; then its editor id, spaced out.
+    */
+    function baseName(baseId) {
+      if (own(names, baseId)) { return names[baseId]; }
+      var name = '';
+      try { name = String(api.nameOf(baseId) || ''); } catch (e) { name = ''; }
+      if (!name) {
+        var rec = null;
+        try { rec = api.recordOf(baseId); } catch (e) { rec = null; }
+        var fields = (rec && rec.fields) || [];
+        var edid = '';
+        for (var i = 0; i < fields.length; i++) {
+          var f = fields[i];
+          if (!f) { continue; }
+          var text = '';
+          var data = f.data || [];
+          for (var b = 0; b < data.length; b++) {
+            var c = Number(data[b]);
+            if (!c) { break; }
+            if (c < 32 || c > 126) { text = ''; break; }
+            text += String.fromCharCode(c);
+          }
+          if (!/[A-Za-z]/.test(text)) { continue; }
+          if (f.type === 'FULL' && !name) { name = text; }
+          if (f.type === 'EDID' && !edid) { edid = text; }
+        }
+        if (!name && edid) { name = edid.replace(/([a-z0-9])([A-Z])/g, '$1 $2'); }
+      }
+      names[baseId] = name || 'Piece';
+      return names[baseId];
+    }
+
+    /** The name a person reads for this entry, without the condition. */
+    function bareName(entry) {
+      var bare = String((entry && entry.name) || '').replace(SUFFIX, '');
+      return bare || baseName(entry.baseId);
+    }
+
+    /** A copy of the entry at that condition, its name written to match. */
+    function withCondition(entry, cond) {
+      var out = copy(entry);
+      var bare = String(entry.name || '').replace(SUFFIX, '');
+      cond = clamp(cond);
+      if (cond === CONDITION.sound) {
+        if (!bare || bare === baseName(entry.baseId)) { delete out.name; } else { out.name = bare; }
+      } else {
+        out.name = (bare || baseName(entry.baseId)) + ' (' + cond + '%)';
+      }
+      return out;
+    }
+
+    /** The entries with n units of entries[i] set to that condition. */
+    function setUnits(entries, i, n, cond) {
+      var out = entries.map(copy);
+      var e = out[i];
+      n = Math.min(n, Number(e.count) || 0);
+      if (n <= 0) { return out; }
+      var changed = withCondition(e, cond);
+      changed.count = n;
+      e.count -= n;
+      out.push(changed);
+      return folded(out);
+    }
+
+    /** The entries with one unit of entries[i] taken away. */
+    function takeUnit(entries, i) {
+      var out = entries.map(copy);
+      out[i].count -= 1;
+      return folded(out);
+    }
+
+    function piecesIn(entries) {
+      var out = [];
+      for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        if (!e || !(Number(e.count) > 0)) { continue; }
+        var kind = pieceKind(e.baseId);
+        if (!kind) { continue; }
+        out.push({ i: i, entry: e, kind: kind, cond: conditionOf(e), name: bareName(e) });
+      }
+      return out;
+    }
+
+    function kitId(key) {
+      var kit = kits[key];
+      if (!kit || !kit.item) { return 0; }
+      try { return api.idOf(kit.item) || 0; } catch (e) { return 0; }
+    }
+
+    /*
+      THE NUMBER A KIT MENDS TO, for this person. The half that makes that
+      kit mends to 120; anybody else, the other half of the same profession
+      included, mends to 100. The half is the one they picked, so a sister
+      half held at novice is not it.
+    */
+    function repairTo(state, key) {
+      var kit = kits[key];
+      if (!kit) { return CONDITION.sound; }
+      return (state && state.half === kit.half) ? CONDITION.highest : CONDITION.sound;
+    }
+
+    /*
+      A REPAIR. The piece is the one in the pack whose name matches what was
+      asked for; of several, the one in the worst condition. One kit of the
+      kind that mends it is used up, and one unit of the piece comes out at
+      repairTo. Answers { ok, line } and, when it worked, from, to, kit and
+      baseId. Nothing is taken when anything is refused.
+    */
+    function repairWithKit(actorId, asked) {
+      function no(line) { return { ok: false, line: line }; }
+      var entries = api.inventory(actorId);
+      if (!entries) { return no('The server cannot read your pack right now. Try again in a moment.'); }
+      var want = String(asked || '').toLowerCase().replace(/\s+/g, ' ').trim();
+      if (!want) { return no('Say which piece: /repair <name>. /repair on its own lists what you carry.'); }
+      var all = piecesIn(entries);
+      var exact = all.filter(function (p) { return p.name.toLowerCase() === want; });
+      var found = exact.length ? exact : all.filter(function (p) {
+        return p.name.toLowerCase().indexOf(want) !== -1;
+      });
+      if (!found.length) {
+        return no('You are not carrying a weapon, armour or clothing called ' + asked +
+                  '. /repair on its own lists what you carry.');
+      }
+      found.sort(function (a, b) { return a.cond - b.cond; });
+      var p = found[0];
+      var kit = kits[p.kind];
+      var id = kitId(p.kind);
+      if (!id) {
+        return no('Your ' + p.name + ' is mended with ' + aWord(kit.name) +
+                  ', and no ' + kit.name + ' has been made in the world yet.');
+      }
+      var k = -1;
+      for (var i = 0; i < entries.length; i++) {
+        if (entries[i] && entries[i].baseId === id && Number(entries[i].count) > 0) { k = i; break; }
+      }
+      if (k < 0) {
+        var maker = aWord(kit.maker);
+        return no('Your ' + p.name + ' is mended with ' + aWord(kit.name) + ', and you have none. ' +
+                  maker.charAt(0).toUpperCase() + maker.slice(1) + ' makes them.');
+      }
+      var state = null;
+      try { state = api.stateOf(actorId); } catch (e) { state = null; }
+      var to = repairTo(state, p.kind);
+      if (p.cond >= to) {
+        return no('Your ' + p.name + ' is at ' + p.cond + '%. A repair by you would not raise it.');
+      }
+      // One kit out, then one unit of the piece mended. The kit is never the
+      // piece (a kit is a MISC), so p.i still points at the piece.
+      var next = entries.map(copy);
+      next[k].count -= 1;
+      next = setUnits(next, p.i, 1, to);
+      if (!api.setInventory(actorId, next)) {
+        return no('The repair could not be written. Nothing was used. Try again in a moment.');
+      }
+      api.log('durability:', actorId.toString(16), 'mended', p.name, 'from', p.cond + '%', 'to',
+              to + '%', 'with', aWord(kit.name));
+      return { ok: true, from: p.cond, to: to, kit: p.kind, baseId: p.entry.baseId,
+               line: 'Your ' + p.name + ' is at ' + to + '% now. The ' + kit.name + ' is used up.' };
+    }
+
+    /** /repair on its own: what you carry that is not at 100%, and your kits. */
+    function describe(actorId) {
+      var entries = api.inventory(actorId);
+      if (!entries) { return 'The server cannot read your pack right now. Try again in a moment.'; }
+      var pieces = piecesIn(entries);
+      var off = pieces.filter(function (p) { return p.cond !== CONDITION.sound; });
+      off.sort(function (a, b) { return a.cond - b.cond; });
+      var sound = 0;
+      for (var i = 0; i < pieces.length; i++) {
+        if (pieces[i].cond === CONDITION.sound) { sound += Number(pieces[i].entry.count) || 0; }
+      }
+      var line;
+      if (!pieces.length) {
+        line = 'You are carrying no weapon, armour or clothing.';
+      } else if (!off.length) {
+        line = 'Everything you carry is at 100%.';
+      } else {
+        line = off.slice(0, 12).map(function (p) {
+          var n = Number(p.entry.count) || 1;
+          return p.name + ' ' + p.cond + '%' + (n > 1 ? ' (' + n + ')' : '');
+        }).join(', ') + (off.length > 12 ? ', and ' + (off.length - 12) + ' more' : '') + '.';
+        if (sound) { line += ' ' + sound + (sound === 1 ? ' more piece is' : ' more pieces are') + ' at 100%.'; }
+      }
+      var held = [];
+      for (var key in kits) {
+        if (!own(kits, key)) { continue; }
+        var id = kitId(key);
+        if (!id) { continue; }
+        var n = 0;
+        for (var j = 0; j < entries.length; j++) {
+          if (entries[j] && entries[j].baseId === id) { n += Number(entries[j].count) || 0; }
+        }
+        if (n) { held.push(n + ' ' + kits[key].name + (n === 1 ? '' : 's')); }
+      }
+      return line + ' ' + (held.length ? 'Kits: ' + held.join(', ') + '.' : 'You carry no repair kit.') +
+             ' /repair <name> mends a piece with its kit.';
+    }
+
+    /** The chat command. Answers the line to say. */
+    function command(actorId, rest) {
+      var asked = String(rest || '').trim();
+      return asked ? repairWithKit(actorId, asked).line : describe(actorId);
+    }
+
+    /*
+      A CONTAINER WAS OPENED. If it stands in a building somebody holds, its
+      clock is read and whatever days have turned since it was last applied
+      come off everything in it with a condition. A container in no held
+      building has no clock: a chest in a cave is not a shop.
+    */
+    function opened(containerId) {
+      var held = false;
+      try { held = !!api.held(containerId); } catch (e) { held = false; }
+      var clock = null;
+      try { clock = api.clockOf(containerId); } catch (e) { clock = null; }
+      if (!held) {
+        if (clock && Number(clock.at) > 0) { api.setClock(containerId, null); }
+        return 0;
+      }
+      var t = api.now();
+      if (!clock || !(Number(clock.at) > 0)) {
+        api.setClock(containerId, { at: t, days: 0 });
+        return 0;
+      }
+      var days = Math.floor((t - Number(clock.at)) / DAY_MS);
+      var turned = days - (Number(clock.days) || 0);
+      if (turned <= 0) { return 0; }
+      var lose = turned * DULL_PER_DAY;
+      var entries = api.inventory(containerId) || [];
+      var next = [];
+      var dulled = 0;
+      for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        if (!e || !(Number(e.count) > 0)) { continue; }
+        var cond = pieceKind(e.baseId) ? conditionOf(e) : -1;
+        if (cond <= CONDITION.lowest) { next.push(copy(e)); continue; }
+        next.push(withCondition(e, Math.max(CONDITION.lowest, cond - lose)));
+        dulled += Number(e.count) || 0;
+      }
+      if (dulled && !api.setInventory(containerId, folded(next))) {
+        // Not written, so the clock stays where it was and the next opening tries again.
+        return 0;
+      }
+      api.setClock(containerId, { at: Number(clock.at), days: days });
+      if (dulled) {
+        api.log('durability:', dulled, 'piece(s) in container', containerId.toString(16),
+                'lost', lose + '%', 'over', turned, 'day(s)');
+      }
+      return dulled;
+    }
+
+    /*
+      A HIT LANDED. targetId was hit, by aggressorId, with the weapon sourceId
+      (a base id, or 0 for a fist or a spell). Nothing here can stop the hit;
+      it only decides whether a piece at 0% breaks.
+    */
+    function hit(targetId, aggressorId, sourceId) {
+      var said = [];
+      if (aggressorId && sourceId && api.isPerson(aggressorId)) {
+        said = said.concat(breaks(aggressorId, function (e) {
+          return e.baseId === sourceId && pieceKind(e.baseId) === 'weapon';
+        }));
+      }
+      if (targetId && api.isPerson(targetId)) {
+        said = said.concat(breaks(targetId, function (e) {
+          var kind = pieceKind(e.baseId);
+          return kind === 'armour' || kind === 'clothing';
+        }));
+      }
+      return said;
+    }
+
+    /*
+      The pack's entry for a worn thing. What is worn is read off the
+      equipment, which is what the client dresses from, and the condition off
+      the pack. When the worn thing names itself, that name; when it does
+      not, the stack of that base the pack has flagged worn, else the first.
+    */
+    function packEntryFor(entries, w) {
+      var at = -1;
+      var named = typeof w.name === 'string';
+      for (var k = 0; k < entries.length; k++) {
+        var e = entries[k];
+        if (!e || e.baseId !== w.baseId || !(Number(e.count) > 0)) { continue; }
+        if (named && String(e.name || '') !== w.name) { continue; }
+        if (at < 0 || ((e.worn || e.wornLeft) && !(entries[at].worn || entries[at].wornLeft))) { at = k; }
+      }
+      return at;
+    }
+
+    function breaks(actorId, which) {
+      var worn = [];
+      try { worn = api.worn(actorId) || []; } catch (e) { worn = []; }
+      var due = worn.filter(function (w) { return w && w.baseId && which(w); });
+      if (!due.length) { return []; }
+      var entries = api.inventory(actorId);
+      if (!entries) { return []; }
+      var gone = [];
+      for (var j = 0; j < due.length; j++) {
+        var at = packEntryFor(entries, due[j]);
+        if (at < 0 || conditionOf(entries[at]) > CONDITION.lowest) { continue; }
+        if (!(api.random() < BREAK_CHANCE)) { continue; }
+        var name = bareName(entries[at]);
+        entries = takeUnit(entries, at);
+        gone.push(name);
+      }
+      if (!gone.length) { return []; }
+      if (!api.setInventory(actorId, entries)) { return []; }
+      for (var n = 0; n < gone.length; n++) {
+        api.say(actorId, 'Your ' + gone[n] + ' broke. It was at 0%, and a kit would have mended it.');
+      }
+      api.log('durability:', actorId.toString(16), 'broke', gone.join(', '), 'on a hit at 0%');
+      return gone;
+    }
+
+    /*
+      A hit as the engine sends it: the target's id, then the aggressor and
+      the weapon or spell as { type, desc } (THE PAPYRUS FAMILY, over
+      mp.onTakeItem). The one OnHit handler, in the warrior maneuvers block,
+      hands it here.
+    */
+    function onHit(targetId, aggressor, source) {
+      function idFrom(v) {
+        if (typeof v === 'number') { return v; }
+        if (v && v.desc) { return api.idOf(v.desc) || 0; }
+        return 0;
+      }
+      return hit(Number(targetId) || 0, idFrom(aggressor), idFrom(source));
+    }
+
+    function forgetOldDrops() {
+      var t = api.now();
+      while (drops.length && t - drops[0].at > DROP_KEEP_MS) { drops.shift(); }
+    }
+
+    function remember(cell, baseId, cond, n) {
+      if (cond === CONDITION.sound || !(n > 0)) { return; }
+      forgetOldDrops();
+      drops.push({ cell: cell, baseId: baseId, cond: cond, n: n, at: api.now() });
+    }
+
+    /*
+      A PIECE IS GOING ONTO THE GROUND. Called before the engine takes it
+      out of the pack. When every stack of that base is at one condition,
+      that is what went down. When they differ, the pack is read again once
+      the drop is done, and the stack that got smaller is the one.
+    */
+    function dropped(actorId, baseId, count) {
+      if (!pieceKind(baseId)) { return; }
+      var entries = api.inventory(actorId) || [];
+      var stacks = entries.filter(function (e) { return e && e.baseId === baseId && Number(e.count) > 0; });
+      if (!stacks.length) { return; }
+      var cell = api.cellOf(actorId);
+      var n = Math.max(1, Number(count) || 1);
+      var first = conditionOf(stacks[0]);
+      var one = stacks.every(function (e) { return conditionOf(e) === first; });
+      if (one) { remember(cell, baseId, first, n); return; }
+      var before = stacks.map(function (e) { return { entry: copy(e), count: Number(e.count) || 0 }; });
+      api.later(function () {
+        var after = api.inventory(actorId) || [];
+        for (var i = 0; i < before.length; i++) {
+          var left = 0;
+          for (var j = 0; j < after.length; j++) {
+            if (sameStack(after[j], before[i].entry)) { left += Number(after[j].count) || 0; }
+          }
+          if (left < before[i].count) {
+            remember(cell, baseId, conditionOf(before[i].entry), before[i].count - left);
+            return;
+          }
+        }
+      }, 0);
+    }
+
+    function plainCount(entries, baseId) {
+      var n = 0;
+      for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        if (e && e.baseId === baseId && !e.name && !e.worn && !e.wornLeft) { n += Number(e.count) || 0; }
+      }
+      return n;
+    }
+
+    /*
+      SOMETHING WAS PRESSED. A container is the dull clock. A piece lying on
+      the ground that the server made, which is what a drop makes, is
+      matched to the drop that left it there, and once it is in the pack its
+      condition goes back on. Only as many as the pickup added: a plain
+      sword that was already in the pack is not touched.
+    */
+    function pressed(actorId, refrId, baseDesc) {
+      if (api.isContainer(baseDesc)) { return opened(refrId); }
+      if (!(Number(refrId) >= RUNTIME) || !drops.length) { return 0; }
+      var baseId = api.idOf(baseDesc);
+      if (!pieceKind(baseId)) { return 0; }
+      forgetOldDrops();
+      var cell = api.cellOf(refrId);
+      var at = -1;
+      for (var i = 0; i < drops.length; i++) {
+        if (drops[i].baseId === baseId && drops[i].cell === cell) { at = i; break; }
+      }
+      if (at < 0) { return 0; }
+      var rec = drops.splice(at, 1)[0];
+      var before = plainCount(api.inventory(actorId) || [], baseId);
+      api.later(function () {
+        var entries = api.inventory(actorId);
+        if (!entries) { return; }
+        var gained = plainCount(entries, baseId) - before;
+        var n = Math.min(rec.n, gained);
+        if (n <= 0) { return; }
+        for (var j = 0; j < entries.length; j++) {
+          var e = entries[j];
+          if (e && e.baseId === baseId && !e.name && !e.worn && !e.wornLeft && Number(e.count) > 0) {
+            if (api.setInventory(actorId, setUnits(entries, j, n, rec.cond))) {
+              api.log('durability:', actorId.toString(16), 'picked up', n, bareName(e),
+                      'and it is back at', rec.cond + '%');
+            }
+            return;
+          }
+        }
+      }, PICKUP_DELAY_MS);
+      return 0;
+    }
+
+    return {
+      CONDITION: CONDITION, DULL_PER_DAY: DULL_PER_DAY, DAY_MS: DAY_MS,
+      BREAK_CHANCE: BREAK_CHANCE, KITS: kits,
+      pieceKind: pieceKind, conditionOf: conditionOf, withCondition: withCondition,
+      repairTo: repairTo, repairWithKit: repairWithKit, describe: describe, command: command,
+      opened: opened, hit: hit, onHit: onHit, dropped: dropped, pressed: pressed
+    };
+  }
+
+  g.__thornswoodDurabilityCreate = create;
+  g.__thornswoodDurabilityKits = KITS;
+  if (typeof mp === 'undefined' || !mp) { return; }
+
+  try {
+    mp.makeProperty(CLOCK_PROPERTY, {
+      isVisibleByOwner: false, isVisibleByNeighbors: false,
+      updateOwner: '', updateNeighbor: ''
+    });
+  } catch (e) { /* made by an earlier load. harmless. */ }
+
+  /*
+    Display names by record, out of the recipe table, built once: every
+    weapon, armour and garment anybody can make is the output of a row
+    there, under the name Skyrim's own string files give it. Not the two
+    names tables /give reads: they name gold too, and test-one-mint.js keeps
+    them to /give alone.
+  */
+  var displayNames = null;
+  function displayName(baseId) {
+    if (!displayNames) {
+      displayNames = {};
+      var rows = (typeof RECIPES_BY_ID !== 'undefined' && RECIPES_BY_ID) ? RECIPES_BY_ID : {};
+      for (var k in rows) {
+        if (!own(rows, k)) { continue; }
+        var row = rows[k];
+        if (row && row.out && row.name && !own(displayNames, row.out)) { displayNames[row.out] = row.name; }
+      }
+    }
+    var desc = '';
+    try { desc = String(mp.getDescFromId(baseId) || ''); } catch (e) { desc = ''; }
+    return desc && own(displayNames, desc) ? displayNames[desc] : '';
+  }
+
+  /*
+    The one write into a pack or a chest. Every caller hands back entries it
+    has just read from the same pack or chest: a stack renamed for its
+    condition, or a kit or a broken piece taken away. No base is added and
+    no count grows.
+  */
+  function writePack(id, entries) {
+    try { mp.set(id, 'inventory', { entries: entries }); return true; } catch (e) {
+      log('durability: could not write the inventory of', Number(id).toString(16) + ':', e);
+      return false;
+    }
+  }
+
+  function entriesOf(id) {
+    try {
+      var inv = mp.get(id, 'inventory');
+      return ((inv && inv.entries) || []).map(copy);
+    } catch (e) { return null; }
+  }
+
+  g.__thornswoodDurability = create({
+    now: function () { return Date.now(); },
+    random: Math.random,
+    later: function (fn, ms) { setTimeout(fn, ms); },
+    inventory: entriesOf,
+    setInventory: writePack,
+    worn: function (id) {
+      try {
+        var eq = mp.get(id, 'equipment');
+        var ee = eq && ((eq.inv && eq.inv.entries) || eq.entries);
+        if (ee) { return ee.filter(function (e) { return e && (e.worn || e.wornLeft); }); }
+      } catch (e) { }
+      return (entriesOf(id) || []).filter(function (e) { return e && (e.worn || e.wornLeft); });
+    },
+    recordOf: function (baseId) {
+      var res = mp.lookupEspmRecordById(baseId);
+      return (res && res.record) || null;
+    },
+    nameOf: displayName,
+    idOf: idOf,
+    stateOf: function (actorId) {
+      var C = g.__thornswoodCharacter;
+      return (C && C.stateOf) ? C.stateOf(actorId) : null;
+    },
+    isPerson: function (id) {
+      try { return (Number(mp.get(id, 'profileId')) || 0) > 0; } catch (e) { return false; }
+    },
+    isTool: function (baseId) {
+      var sp = g.__thornswoodSpoils;
+      return !!(sp && sp.isTool && sp.isTool(baseId));
+    },
+    held: function (containerId) {
+      var prop = g.__thornswoodProperty;
+      if (!prop || !prop.holderOf) { return false; }
+      var cell = String(mp.get(containerId, 'worldOrCellDesc') || '');
+      var by = cell ? prop.holderOf(cell) : null;
+      return !!(by && Number(by.by) > 0);
+    },
+    isContainer: kindIsContainer,
+    cellOf: function (id) {
+      try { return String(mp.get(id, 'worldOrCellDesc') || ''); } catch (e) { return ''; }
+    },
+    clockOf: function (id) { return mp.get(id, CLOCK_PROPERTY) || null; },
+    // No clock is written as a clock that never started, rather than as null.
+    setClock: function (id, clock) {
+      try { mp.set(id, CLOCK_PROPERTY, clock || { at: 0, days: 0 }); } catch (e) {
+        log('durability: could not write the clock of container', Number(id).toString(16) + ':', e);
+      }
+    },
+    say: say,
+    log: log
+  });
+})();
+// ==== end thornswood durability ====
+
 
 // ==== thornswood needs: hunger, thirst and exhaustion ====
 /*
@@ -44276,7 +48895,12 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       and every one of them slides down to the place's own number as you walk
       away.
     */
-    fire: { at: 34, reach: 300 },
+    /*
+      master is a Master Carver's fire or kiln (#1398):
+      docs/systems/professions/woodworker.md, "the hottest the warmth rules
+      allow: +48 at your feet, and still 0 at 300". See carverFire().
+    */
+    fire: { at: 34, master: 48, reach: 300 },
 
     /*
       AND IT SPREADS.
@@ -44348,7 +48972,14 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       material: { fur: 1.0, leather: 0.75, light: 0.55, cloth: 0.5,
                   heavy: 0.45, none: 0 },
       most: 0.8,
-      heat: 0.5
+      heat: 0.5,
+      /*
+        A Master Weaver's garment (#1398): "ignores 4 degrees of exposure on
+        top of the table", docs/systems/temperature.md. mark is what the craft
+        writes in front of its name, which is how a worn one is known. See
+        weathered().
+      */
+      woven: { degrees: 4, mark: 'Master-Woven ' }
     },
 
     /*
@@ -44413,8 +49044,12 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       the walk. The bard is added on top of whatever the place already gives,
       so a bard in an inn is 75 an hour and is the best rest in the game, which
       is the point Grim was making.
+
+      bedroll is the campfire's number, which docs/systems/property.md gives
+      it. Which of inn, bed and bedroll somebody gets is the beds' answer in
+      the property block, never the word they typed (#1392).
     */
-    recover: { sit: 20, campfire: 35, inn: 50, bed: 80 },
+    recover: { sit: 20, campfire: 35, bedroll: 35, inn: 50, bed: 80 },
     bard: 25,
 
     /*
@@ -44772,7 +49407,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   function warmthTarget(actorId, n) {
     var raw = NEEDS.place[n.place];
     if (typeof raw !== 'number') { raw = NEEDS.comfort; }
-    raw = raw + outdoorSeason(n) + exposure(n) + fireWarmth(n) + waterKind(actorId, n);
+    raw = raw + outdoorSeason(n) + weathered(actorId, n) + fireWarmth(n, actorId) + waterKind(actorId, n);
     if (raw < 0) { raw = 0; }
     if (raw > 100) { raw = 100; }
     if (raw === NEEDS.comfort) { return raw; }
@@ -44824,13 +49459,67 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     A fire is not gated on the roof, because a campfire in a blizzard is the
     whole point of a campfire.
   */
-  function fireWarmth(n) {
+  function fireWarmth(n, actorId) {
     if (!n) { return 0; }
     var d = Number(n.fire);
     if (!isFinite(d) || d < 0) { return 0; }
     var reach = NEEDS.fire.reach || 1;
     if (d >= reach) { return 0; }
-    return NEEDS.fire.at * (1 - (d / reach));
+    var at = (actorId && carverFire(actorId)) ? NEEDS.fire.master : NEEDS.fire.at;
+    return at * (1 - (d / reach));
+  }
+
+  /*
+    MASTER CARVER'S FIRE (#1398).
+
+    docs/systems/professions/woodworker.md: fires and kilns a master
+    woodworker builds or works are the hottest the warmth rules allow, 48 at
+    your feet and still nothing at 300, where any other fire is 34.
+
+    The server cannot see which fire is which: the client says only how far
+    the nearest one is. So a fire is a Master Carver's while one is working
+    it: a master woodworker who is within reach of a fire, and you within
+    reach of them in the same cell. That is the master's own fire, the kiln
+    they burn at, and whoever is standing at it with them. Nobody builds a
+    fire in this world yet, so working one is the whole of it today.
+
+    The perk is the progression block's own answer, held at master in the
+    half somebody picked. Nothing loaded answers no, which is an ordinary fire.
+  */
+  function perkHeld(actorId, key) {
+    var P = g.__thornswoodProgression;
+    var C = g.__thornswoodCharacter;
+    if (!P || !P.perks || !C || !C.stateOf) { return false; }
+    try { return P.perks(C.stateOf(actorId)).indexOf(key) !== -1; } catch (e) { return false; }
+  }
+
+  function carverFire(actorId) {
+    if (perkHeld(actorId, 'mastercarver')) { return true; }
+    var reach = NEEDS.fire.reach || 1;
+    var online = [];
+    try { online = mp.getOnlinePlayers() || []; } catch (e) { return false; }
+    if (online.length < 2) { return false; }
+    var here = null, cell = '';
+    try {
+      here = mp.get(actorId, 'pos');
+      cell = String(mp.get(actorId, 'worldOrCellDesc') || '');
+    } catch (e) { return false; }
+    if (!here || !cell) { return false; }
+    for (var i = 0; i < online.length; i++) {
+      var them = online[i];
+      if (them === actorId) { continue; }
+      try {
+        if (String(mp.get(them, 'worldOrCellDesc') || '') !== cell) { continue; }
+        var p = mp.get(them, 'pos');
+        if (!p) { continue; }
+        var dx = p[0] - here[0], dy = p[1] - here[1], dz = p[2] - here[2];
+        if ((dx * dx + dy * dy + dz * dz) >= reach * reach) { continue; }
+      } catch (e) { continue; }
+      var theirs = read(them);
+      if (!theirs || !(theirs.fire >= 0) || theirs.fire >= reach) { continue; }
+      if (perkHeld(them, 'mastercarver')) { return true; }
+    }
+    return false;
   }
 
   /*
@@ -45154,6 +49843,38 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     return out;
   }
 
+  /*
+    MASTER WEAVER'S HALF OF THE WEATHER (#1398).
+
+    docs/systems/professions/tailor.md: clothing a master tailor makes keeps
+    the weather off, and temperature.md says how much: 4 degrees of exposure
+    ignored, on top of the clothing table. It does not become fur, so
+    insulation() is not touched; the 4 come off what the weather, the wind,
+    the night and the height are taking, and never turn them into warmth.
+
+    A woven garment is one whose name starts with NEEDS.wear.woven.mark, which
+    the craft writes on it (markWoven, beside mp.onCraft). One worn is enough
+    and two do not ignore 8. A piece with an enchantment on it is not one: the
+    enchanting table lets anybody name a piece, and the engine only enchants a
+    plain one, which a woven garment is not.
+  */
+  function wovenWorn(actorId) {
+    var mark = NEEDS.wear.woven.mark;
+    var entries = wornEntries(actorId);
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (!e || !e.worn || e.enchantmentId) { continue; }
+      if (typeof e.name === 'string' && e.name.indexOf(mark) === 0) { return true; }
+    }
+    return false;
+  }
+
+  function weathered(actorId, n) {
+    var off = exposure(n);
+    if (!(off < 0) || !wovenWorn(actorId)) { return off; }
+    return Math.min(0, off + NEEDS.wear.woven.degrees);
+  }
+
   function insulation(actorId) {
     var total = 0;
     try {
@@ -45293,8 +50014,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       tempTarget: Math.round(warmthTarget(actorId, n)),
       roof: !!n.roof, night: !!n.night,
       fireAway: (typeof n.fire === 'number' && n.fire >= 0) ? Math.round(n.fire) : -1,
-      fireWorth: Math.round(fireWarmth(n)),
-      exposure: Math.round(exposure(n)),
+      fireWorth: Math.round(fireWarmth(n, actorId)),
+      exposure: Math.round(weathered(actorId, n)),
       cover: Math.round(insulation(actorId) * 100),
       worn: wornList(actorId)
     };
@@ -51592,9 +56313,10 @@ try {
   docs/systems/quests.md. Supply is not this block. Scene gold is created
   with addItem. It is not taken from a trader purse.
 
-  The page does not name the one world reference a scarce place uses, or
-  the sack, shelf, chest, urn, cell, or hold a scene row names. Those stay
-  unbound. A rare vein stays shut until its one place is bound. Which gem
+  The rare mine is bound: RARE_PLACES below is the one building each rare
+  seam is, and every vein of that seam anywhere else stays shut. The page
+  does not name the place the other scarce rows use, or the sack, shelf,
+  chest, urn, cell, or hold a scene row names. Those stay unbound. Which gem
   a trader names, among the four on the miner page, is likewise not said.
 */
 (function () {
@@ -51609,6 +56331,32 @@ try {
     'Sapphire': 'gem',
     'Stalhrim': 'stalhrim',
     'Heart Stone': 'heartstone'
+  };
+  /*
+    THE ONE PLACE EACH RARE SEAM IS (#1380).
+
+    Patrick, 4 Oct: ebony is Raven Rock Mine, stalhrim Kolbjorn Barrow, heart
+    stone Coldcinder Cave, ruby White Ridge Sanctum, sapphire Highpoint Tower,
+    emerald Kolbjorn Barrow, amethyst Highpoint Tower. A place is the
+    building, keyed by its cell as game/data/mine-buildings.json keys it, so
+    every vein of that seam inside it is the place (thirteen ebony in Raven
+    Rock Mine) and the same seam in any other building or on open ground is
+    shut. The trader's scarce quest is the only way in. Once it is turned in
+    the place is shut to that person until the quest's cooldown ends, which
+    turnIn stamps below. No steward has any part in it.
+  */
+  var RARE_PLACES = {
+    ebony: { cell: '142fc:Dragonborn.esm' },
+    stalhrim: { cell: '142ee:Dragonborn.esm' },
+    heartstone: { cell: '3929e:Dragonborn.esm' },
+    gem: {
+      cells: {
+        Ruby: '3c7f5:Dragonborn.esm',
+        Sapphire: '184f0:Dragonborn.esm',
+        Emerald: '142ee:Dragonborn.esm',
+        Amethyst: '184f0:Dragonborn.esm'
+      }
+    }
   };
   var SCARCE = [
     { id: 'ebony', name: 'The ebony', who: 'Miner, master', classKey: 'miner', rank: 'master', ask: 4, holds: 12, hours: 24, scarce: true },
@@ -51729,12 +56477,10 @@ try {
       var open = held && held.open[id];
       if (!open) return 'This place is shut.';
       var place = places[id] || {};
-      if (row.gems) {
-        if (seam.name !== open.gem) return 'This place is shut.';
-        if (!place.refs || place.refs[open.gem] !== refrId) return 'This place is shut.';
-      } else if (place.ref !== refrId) {
-        return 'This place is shut.';
-      }
+      if (row.gems && seam.name !== open.gem) return 'This place is shut.';
+      var cell = row.gems ? (place.cells && place.cells[open.gem]) : place.cell;
+      var veinCell = deps.cellOf ? deps.cellOf(refrId) : '';
+      if (!cell || veinCell !== cell) return 'This place is shut.';
       if (open.drawn >= row.holds) return 'This place has nothing left until you turn the work in.';
       return null;
     }
@@ -51928,6 +56674,9 @@ try {
           } catch (e) { return ''; }
         },
         traderHold: function () { return ''; }
+      });
+      Object.keys(RARE_PLACES).forEach(function (id) {
+        globalThis.__thornswoodQuests.bindPlace(id, RARE_PLACES[id]);
       });
     } catch (e) {
       try { log('custom quests failed to start:', e); } catch (e2) {}

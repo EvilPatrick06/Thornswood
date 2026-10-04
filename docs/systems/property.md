@@ -74,9 +74,9 @@ box pays rent owed by that person first. What is left is the hold's.
 
 Each hold has one box, and it is that hold's notice board. The nine
 mainland towns already have a spot each, the coordinates given for
-the boards. You are at the box when you are within 400 of that spot.
-A steward who moves the board moves the box with it. See
-[Notice boards](noticeboards.md).
+the boards, and Raven Rock's is at its inn. You are at the box when
+you are within 400 of that spot. A steward who moves the board moves
+the box with it. See [Notice boards](noticeboards.md).
 
 A price list is not dropped in as an item. Someone with the Prices
 permission on a faction or business book stands at the board and
@@ -92,7 +92,8 @@ The number `/box` reports is a ledger of what has been paid in. Gold
 dropped in the chest is also in the chest. A fee taken for a notice is
 counted on the ledger and is not sitting in the chest. Nothing
 withdraws from the ledger except the payouts named on
-[Free Skyrim Trading Company](trading-company.md).
+[Free Skyrim Trading Company](trading-company.md), and a letter's 15,
+which goes to its courier or back to its sender.
 
 Notice fees, job fees, rent and company
 payment all use this box. There is no second treasury.
@@ -151,8 +152,18 @@ Claims, deeds, the 14 day lapse, locks, molds, keys, stewards,
 eviction, rent, and the gold-only box are in the server. The register
 is `private/property.json`.
 
-`/rest bed` still believes the word. It does not look for a bed.
-A holder cannot set a price for a night. `/bed` does not exist.
+`/bed` sets, clears and says the price of a night, and the gold
+goes from the sleeper's pack to the holder's. A holder who is away
+is handed it the next time they are in the world. `/rest bed`
+counts a bed only when the server saw the person press it and they
+are still beside it, and the rest stops when they leave it or the
+night runs out. The holder, and anybody carrying its key or its
+deed, sleeps free at the bed rate. Anybody else says `/rest bed`
+once to hear the price and again within a minute to pay it. A paid
+night lasts 8 real hours. A bed in a building nobody holds is
+nobody's to lend. Who counts as allowed and how long a night is
+are asked on issue #1392. Prices and paid nights are in
+`private/beds.json`.
 Outhouses and pots stay unknown until the vote on
 [The body](body.md). The company payout that
 withdraws from the ledger is not built. The four house parts are

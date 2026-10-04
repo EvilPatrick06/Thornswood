@@ -51,6 +51,30 @@ Measure before claiming a cause: read Profile\launcher.log, look at the file,
 check timestamps, say what you saw. When the doc and the machine disagree,
 say so and ask.
 
+### No band-aids, ever
+
+Decided by Patrick on 4 Oct, after a Claude answered a band-aid with a second
+one: the Riekling clothes remount took the clothes off at every door, and the
+fix offered was to make the remount retry for four seconds instead of finding
+the neck fault it covered. His words: "lets ban patching or bandaids for
+fixes and actually fix things". Developer-Guide.md "Fix the cause, no
+band-aids" is the rule for everybody. For a Claude it also means:
+
+- Never offer a band-aid: not as a stopgap, not to unblock a test session,
+  not "for now", not in a reply and not on a branch.
+- When the cause is not known, say so, say what was measured, and say which
+  measurement is missing and who can take it (a log off the VPS, a session in
+  the game). Then get that measurement. Do not fill the gap with a guess and
+  a retry.
+- Read the code around what is being fixed for the band-aids already there.
+  A fix that leaves one in place, or leans on one, is not finished.
+- When your own earlier change turns out to be a band-aid, say so plainly,
+  close or revert it, and record that on its issue.
+
+### Buttons, not chat commands
+
+Decided by Patrick on 4 Oct: never add a chat command for something people do in the world, only for staff and dev; docs\SYSTEMS.md "Buttons, not commands" is the rule and what counts as a button.
+
 ### Every reply ends with the commands, in order, and what each one is for
 
 Asked for by Patrick on 19 Sep, after four pushes went out and not one pull

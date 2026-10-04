@@ -34,16 +34,16 @@ the branch `thornswood/engine-changes`. Anybody can read it or download it,
 with no account.
 
 The server's engine, `scam_native.node`, is built from one commit,
-[`46970a33`](https://github.com/EvilPatrick06/skymp/tree/46970a336d5ca91b843a8cf3d06b6f0bd37c90b2).
+[`ac044a49`](https://github.com/EvilPatrick06/skymp/tree/ac044a49760cf7ee85f6ac1547cc244657509e78).
 That commit starts from
 [SkyMP](https://github.com/skyrim-multiplayer/skymp) at `f926944b`, and
-[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/f926944b...46970a33)
+[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/f926944b...ac044a49)
 is the difference between the two.
 
 The server's engine goes to our test server first. Main remains on
-`8ec73ca8` until its next release. The current Dev change affects the client;
-the Dev server executable and its dependencies retain their preceding bytes
-and original build time.
+`8ec73ca8` until its next release. The current Dev change is to the server:
+it reads every plugin into memory when it starts. The six client files keep
+the bytes they had.
 
 The six client files are built from the commit named by the feed a person
 got them from (`clientRuntime.forkCommit` in that channel's `version.json`).
