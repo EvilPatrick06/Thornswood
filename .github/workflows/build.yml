@@ -282,6 +282,7 @@ jobs:
                  'test-1384-condition.js',
                  'test-1385-perks.js',
                  'test-1386-warrior.js',
+                 'test-python-defaults.js',
                  'test-1388-apprentice.js',
                  'test-1389-lists.js',
                  'test-1603-beds.js',
