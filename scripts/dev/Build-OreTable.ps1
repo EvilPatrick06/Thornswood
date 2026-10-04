@@ -123,26 +123,29 @@ $RANK_BANDS = @(
 # by name when the table is built. An ore named here that the load order does
 # not carry fails the build, so an entry cannot outlive its ore quietly.
 #
-# DLC2HeartStone: Patrick, 28 September, issue #398. Worth 100 gold, so master
-# by value, and 160 of the Bladebinder's 161 staves want one, which put the
-# whole half's cost on master while its rungs spread over all four ranks. At
-# advanced the staves line up with what they cost (measured: novice 66,
-# advanced 55, expert 39, master 1, none more than a rung out) and the miner
-# keeps 20 of his 24 master deposits.
+# DLC2HeartStone: master, by its price, the rank the miner page gives it
+# (docs/systems/classes/miner.md, issue #1380). From 28 September (issue
+# #398) it was advanced, because 160 of the Bladebinder's 161 staves wanted
+# one and the whole half's cost sat on master. The book now keeps only the
+# staves whose spell is in the college book, and the Bladebinder page says it
+# in so many words: "Heart stone is master mining, one place, because the book
+# no longer needs a novice to pull it." It stays named here so the change of
+# mind is one line and its reason is printed with every build.
 $RANK_BY_ORE = [ordered]@{
-    'DLC2HeartStone' = @{ Rank = 'advanced'; Why = 'decided by Patrick on 28 September (issue #398) so the Bladebinder''s staves line up with what their stone costs; by value it would be master' }
+    'DLC2HeartStone' = @{ Rank = 'master'; Why = 'the miner page ranks it master, by its price (issue #1380); it was advanced from 28 September (issue #398) while the Bladebinder book still needed a novice to pull it' }
 }
 #
-# WHAT A VEIN GIVES. The salt quarry is the shape already in the game:
-# mineSalt hands out randInt(1, 1 + tier) with tier 1 at novice through 4 at
-# master, so the floor is one and the ceiling climbs a rank at a time. A vein
-# is the same, with one difference the quarry does not have: a vein has a rank
-# of its own, and below it the vein gives nothing at all, because classes.md
-# says rank decides which source somebody may work AT ALL. So each row carries
-# four pairs, novice first, and a pair of zeroes means that rank cannot work
-# that seam.
+# WHAT A VEIN GIVES. The miner page: one swing takes 1 ore, and a chance of
+# one more, at every rank that may work the seam. The chance grows with the
+# rank (the table on that page, which mineOre rolls); the most a swing gives
+# does not. Below the vein's own rank it gives nothing at all, because rank
+# decides which source somebody may work AT ALL. So each row carries four
+# pairs, novice first, the least and the most one swing gives, and a pair of
+# zeroes means that rank cannot work that seam. Until issue #1380 the ceiling
+# climbed a rank at a time, 1-2 at novice to 1-5 at master, the salt quarry's
+# shape, which the plan does not use for a seam.
 $YIELD_FLOOR   = 1
-$YIELD_PER_RANK = 1     # the ceiling is $YIELD_FLOOR + tier * $YIELD_PER_RANK
+$YIELD_EXTRA   = 1     # the most one swing gives is $YIELD_FLOOR + $YIELD_EXTRA
 $RANK_ORDER    = @('novice', 'advanced', 'expert', 'master')
 
 $ErrorActionPreference = 'Stop'
@@ -650,7 +653,7 @@ function YieldFor([string]$rank) {
         if ($t -lt $need) { $pairs.Add('[0, 0]') }
         # the whole -f goes in brackets of its own: inside .Add(...) a comma is
         # the next argument to Add, not the next thing to format
-        else { $pairs.Add(('[{0}, {1}]' -f $YIELD_FLOOR, ($YIELD_FLOOR + ($t + 1) * $YIELD_PER_RANK))) }
+        else { $pairs.Add(('[{0}, {1}]' -f $YIELD_FLOOR, ($YIELD_FLOOR + $YIELD_EXTRA))) }
     }
     return '[' + ($pairs -join ', ') + ']'
 }
@@ -816,7 +819,7 @@ $docLines.Add('  "builtBy": ' + (JsonStr 'scripts\dev\Build-OreTable.ps1') + ','
 $docLines.Add('  "source": ' + (JsonStr ('the ' + ($VEIN_TYPES -join ' and ') + ' records carrying ' + $VEIN_SCRIPT + ', across ' + $order.Count + ' plugins in load order, and the MISC records their ' + $ORE_PROPERTY + ' property points at')) + ',')
 $docLines.Add('  "language": ' + (JsonStr $LANGUAGE) + ',')
 $docLines.Add('  "readFrom": ' + (JsonStr ('the VMAD subrecord of each vein: script ' + $VEIN_SCRIPT + ', object property ' + $ORE_PROPERTY)) + ',')
-$docLines.Add('  "yield": ' + (JsonStr 'four pairs, novice first: the least and the most a vein gives at that rank. A pair of zeroes means that rank cannot work that seam. The same shape as the salt quarry, which gives randInt(1, 1 + tier).') + ',')
+$docLines.Add('  "yield": ' + (JsonStr 'four pairs, novice first: the least and the most one swing gives at that rank, 1 and a chance of one more. A pair of zeroes means that rank cannot work that seam.') + ',')
 $docLines.Add('  "count": ' + $table.Count + ',')
 $docLines.Add('  "ranks": {')
 $rn = 0
