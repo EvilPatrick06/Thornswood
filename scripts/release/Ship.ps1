@@ -688,7 +688,31 @@ if ($noteProblems.Count) {
 }
 Write-Host "  $Notes" -ForegroundColor DarkGray
 
+# The words in the files people read, not only the notes. Note-Rules above
+# reads the release notes. Check-Words reads the launcher help and window,
+# and every other page a Ship sends out (issue #1081). A dev Ship may be run
+# from any branch, including one whose pull request build never ran or went
+# red, so this runs here, before anything is built, and on a dry run too.
+# Each hit names its file, its line and its rule. exit in that script ends
+# the process it runs in, so it runs in a child: a clean tree comes back
+# here and the Ship goes on, and a hit stops the Ship.
+$wordsScript = Join-Path $RepoDir 'scripts\dev\Check-Words.ps1'
+if (-not (Test-Path -LiteralPath $wordsScript)) {
+    Die 'scripts\dev\Check-Words.ps1 is not there, so the words people read cannot be checked. Nothing was built.'
+}
+$wordsHost = (Get-Process -Id $PID).Path
+$global:LASTEXITCODE = 0
+$wordsText = [string](& $wordsHost -NoProfile -ExecutionPolicy Bypass -File $wordsScript -Root $RepoDir 2>&1 | Out-String)
+$wordsCode = $LASTEXITCODE
+if ($wordsText.Trim()) { Write-Host $wordsText.TrimEnd() }
+$hitLines = @($wordsText -split "`r?`n" | Where-Object { $_ -match '::error ' } | ForEach-Object { $_.Trim() })
+if ($wordsCode -ne 0 -or $hitLines.Count -gt 0) {
+    $named = if ($hitLines.Count) { $hitLines -join ' | ' } else { 'Check-Words.ps1 exited ' + $wordsCode + ' and named no hit' }
+    Die ('The writing rules do not hold. Nothing was built. ' + $named)
+}
+
 # ------------------------------------------------------------ git
+
 # Two people ship from two machines. A main release is what everybody gets,
 # so it comes off main, with nothing uncommitted and nothing unpulled: the
 # other machine's last push has to be in this build or the release loses it.
