@@ -73,7 +73,7 @@ function between(start, end) {
 const arbiter = between('  const claims = {};', '  /*\n    WHEN EACH CLAIM WENT UP');
 // The top of the key handler, which is what buttonEvent reaches first.
 const keys = between('    // Reachable only while focus is down', '    /*\n      The skills panel.');
-const hideLine = /const hide = ([^;]+);/.exec(src);
+const hideLine = /^      const hide = ([^;]+);/m.exec(src);
 
 yes('the focus arbiter is in the plugin', arbiter !== null);
 yes('the top of the key handler is in the plugin', keys !== null);

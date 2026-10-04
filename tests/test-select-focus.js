@@ -131,7 +131,7 @@ function rig(opts) {
     systemPage: false,
     loadingAt: 0
   };
-  const browser = { focused: false, visible: false, pendingUrl: null, drops: 0, raises: 0 };
+  const browser = { focused: false, actualFocused: false, visible: false, pendingUrl: null, drops: 0, raises: 0 };
   const page = {
     list: !opts.world, choice: !opts.world, picked: 0, acked: false, ackAt: 0,
     beatAt: start, panels: {}
@@ -154,9 +154,15 @@ function rig(opts) {
         if (browser.focused && !v) { browser.drops++; }
         if (!browser.focused && v) { browser.raises++; }
         browser.focused = v;
+        browser.actualFocused = v;
       },
       isVisible: function () { return browser.visible; },
-      setVisible: function (v) { browser.visible = !!v; },
+      setVisible: function (v) {
+        browser.visible = !!v;
+        // NirnLab hides also remove native focus. SkyrimPlatform's getter
+        // continues returning its separate wantedIsFocused value.
+        if (opts.nirnlab && !v) { browser.actualFocused = false; }
+      },
       loadUrl: function (u) { browser.pendingUrl = u; return true; }
     }
   };
@@ -377,12 +383,28 @@ function rig(opts) {
       tell(['thornswood-front', p + ':opened']);
     },
     /* The arbiter's own entry point, the one every plugin claims through. */
-    claim: function (who, on) { T.claimFocus(who, on); }
+    claim: function (who, on) { T.claimFocus(who, on); },
+    hideByClient: function () { sp.browser.setVisible(false); }
   };
   return h;
 }
 
 if (ARBITER !== null && MENU !== null && CAP !== null && WORLD !== null) {
+  {
+    const h = rig({ nirnlab: true });
+    h.run(1000);
+    h.hideByClient();
+    yes('NirnLab startup hide drops real mouse focus while the getter stays true',
+        !h.browser.actualFocused && h.browser.focused && !h.browser.visible);
+    h.run(500);
+    yes('the choice restores real mouse focus when it restores visibility',
+        h.browser.visible && h.browser.actualFocused && h.api.claims.select);
+    h.pick(PICK);
+    h.run(10000);
+    yes('after entry the choice releases native mouse focus',
+        h.game.stage === 'world' && !h.browser.actualFocused && !h.api.claims.select);
+    yes('the NirnLab startup sequence throws nothing', h.threw.length === 0);
+  }
   // ---------------------------------------------------- S1: THE BUG, Djinn's
   {
     const h = rig({ fallback: LAST });
