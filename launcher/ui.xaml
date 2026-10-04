@@ -540,7 +540,8 @@
                          RenderOptions.BitmapScalingMode="HighQuality" Visibility="Collapsed"/>
                   <TextBlock x:Name="TxtBrandSmall" Text="Thornswood" FontFamily="Constantia, Georgia" FontSize="17"
                              Typography.Capitals="SmallCaps" TextOptions.TextFormattingMode="Ideal"
-                             TextWrapping="Wrap" Foreground="{DynamicResource Ink}" VerticalAlignment="Center"/>
+                             TextWrapping="Wrap" TextAlignment="Center"
+                             Foreground="{DynamicResource Ink}" VerticalAlignment="Center"/>
                 </StackPanel>
                 <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="22,16,18,0"/>
                 <TextBlock Text="Session" Style="{StaticResource NavGroup}"/>

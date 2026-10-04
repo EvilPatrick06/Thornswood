@@ -12,6 +12,10 @@
 //     size are the ones that leave the text its gap;
 //   - TxtBrandSmall's live text is still the one-line word Thornswood, same
 //     type, same ink, wrapping allowed so a newline can break;
+//   - that TextBlock is only as wide as its longest line (no Width or
+//     MaxWidth), so Thornswood stays left of the remaining gap next to the
+//     icon, and TextAlignment Center puts Dev under the word, not under the
+//     icon and not against the T;
 //   - Wire() writes Thornswood, then a newline, then Dev, only onto
 //     TxtBrandSmall, and only when this build is the dev channel;
 //   - the window title and TxtBrandBig stay the one-line "Thornswood Dev".
@@ -19,7 +23,8 @@
 // The two-line string fits because its first line is the live label in the
 // same TextBlock, same type and same column, and that live label is already
 // the one-line word that sits there. Dev is shorter than Thornswood, so the
-// second line cannot be the one that runs out.
+// second line cannot be the one that runs out. Centered Dev is still inside
+// that first-line width.
 //
 // Read only. It reads launcher\ui.xaml and launcher\app\Shell.cs.
 'use strict';
@@ -130,8 +135,12 @@ yes('and it still uses Constantia at 17 with small capitals and the ink brush',
     attr(brandTag[0], 'FontSize') === '17' &&
     attr(brandTag[0], 'Typography.Capitals') === 'SmallCaps' &&
     attr(brandTag[0], 'Foreground') === '{DynamicResource Ink}');
-yes('it wraps, so a newline can put Dev under the name, and it has no MaxWidth that would break Thornswood',
-    attr(brandTag[0], 'TextWrapping') === 'Wrap' && !/\bMaxWidth=/.test(brandTag[0]));
+yes('it wraps, so a newline can put Dev under the name, and it has no width that would break Thornswood',
+    attr(brandTag[0], 'TextWrapping') === 'Wrap' &&
+    !/\bWidth=/.test(brandTag[0]) && !/\bMinWidth=/.test(brandTag[0]) && !/\bMaxWidth=/.test(brandTag[0]));
+yes('lines are centered inside that block, so Dev sits under the word, not under the icon',
+    attr(brandTag[0], 'TextAlignment') === 'Center' &&
+    !/\bHorizontalAlignment=/.test(brandTag[0]));
 
 // ---- Wire() sets the two-line dev name only on the small brand -------------
 const wire = method(SHELL, 'static void Wire()');
