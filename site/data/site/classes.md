@@ -158,8 +158,10 @@ That is a scene between two people, and the master gets to say no.
 A spell tome teaches its spell only to somebody who could have picked that
 spell anyway, mage or not, Enchanter or not. Reading one asks three things:
 
-- **A spell point** to spend. A mage earns them by rank; anybody else has only
-  the places a Master mage's teaching gave them.
+- **A spell point** to spend. A mage earns them by rank, and two more with
+  each semester at the College of Winterhold, one a day. Anybody a Master
+  mage taught earns one with each semester there, and holds two spells at
+  most.
 - **The rank** the spell asks for in its school. Apprentice and Adept spells
   are Advanced here, Expert spells Expert, Master spells Master.
 - **A spell from the rank below**, of the same school, already known. A
