@@ -79,7 +79,7 @@ if ($Status) {
 `$ErrorActionPreference = 'SilentlyContinue'
 if (Test-Path '$runner') { 'script    ' + (Get-Item '$runner').LastWriteTime } else { 'script    NOT THERE' }
 # Length only. The passphrase itself is never printed by anything here.
-if (Test-Path '$keyFile') { 'passphrase present, ' + (Get-Item '$keyFile').Length + ' bytes' } else { 'passphrase NOT THERE, so backups would be left in the clear' }
+if (Test-Path '$keyFile') { 'passphrase present, ' + (Get-Item '$keyFile').Length + ' bytes' } else { 'passphrase NOT THERE, so encrypted backups cannot run' }
 `$t = Get-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue
 if (`$t) {
   `$i = Get-ScheduledTaskInfo -TaskName '$TaskName'

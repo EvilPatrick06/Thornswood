@@ -23,6 +23,7 @@ start the restored server and connect to it; see the end of that section.
 | `scripts\vps\Restore-Box.ps1` | run on Patrick's machine: carries one to a new box and puts all of it back there, both worlds with Restore-Server.ps1 and the rest with `vps-restore-services.ps1`, then deletes its copy (issue #454) |
 | `scripts\vps\vps-freeze.ps1` | run on the old box through Remote.ps1 on the day of a move: stops everything and takes the last backup |
 | `tests\test-backup-restore.ps1` | backs up a scratch server, restores it into another, and checks it, every night in the build checks |
+| `tests\test-backup-streaming.ps1` | verifies large uploads, old archive compatibility, tampering, stream failures and publication collisions with disposable data |
 | the passphrase | `Documents\thornswood-backup-key.txt` here, `C:\Thornswood-Backup\key.txt` on the box |
 
 The copy off the box is pulled to Patrick's machine over ssh. It is never
@@ -47,6 +48,29 @@ node_modules, the installer, the dev voice service, the feed's downloads
 (`feed\assets`, the size of every release; `Remirror-Site-Feed.ps1` sends them
 again from the machine that shipped), or the Skyrim data files. Those come
 back from the repo and from Patrick's machine.
+
+Every website upload is included, including recordings above the general
+per-file cap. `MaxUploadsMB` now warns when the total grows; it does not
+discard files. An unreadable or changing upload fails the run rather than
+publishing an archive that silently omits it. Check free disk space as the
+gallery grows: staging, the clear zip and encrypted output still need space.
+Encryption and decryption use bounded buffers rather than loading the whole
+archive into memory. The authenticated `TSBK1` format is unchanged, so existing
+encrypted archives still open. A missing or empty key prevents an encrypted
+backup from being created. Only an explicit `-Plain` creates an unencrypted
+archive, for a local rehearsal.
+
+Temporary backup data is restricted to the account running the backup,
+SYSTEM and Administrators. Failure cleanup closes every stream even if
+another stream's cleanup fails. Publication refuses to overwrite a backup
+with the same timestamp. Neither a failed run nor retention considers an
+unrelated file for deletion.
+
+Before restoring a website backup into service, reapply any completed
+account or gallery deletion requests made after that backup. Restrict the
+rehearsal destination to the operators: an unpacked archive contains
+credentials and private records. A restore rehearsal must use a disposable
+destination, never the live service folder.
 
 Before 18 September it held none of it. The world was never in the backup at
 all.
