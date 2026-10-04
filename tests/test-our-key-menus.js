@@ -169,6 +169,9 @@ function rig(opts) {
     'function log() { }\n' +
     'const MOLD_KEY = 22;\n' +
     'function moldPress() { return false; }\n' +
+    // The sleep key is the mold's, on a person (#1603). Nobody is looked at here.
+    'const SLEEP_KEY = 22;\n' +
+    'function sleepPress() { return false; }\n' +
     'const ESC = 1, CHAT_KEY = 28, SKILLS_KEY = 37, PARTY_KEY = 25, JOURNAL_KEY = 36,\n' +
     '      FRIEND_KEY = 21, TRADE_KEY = 35, MUTE_KEY = 38, COMMAND_KEY = 53;\n';
   const api = new Function('sp', 'say', 'T', 'Date', 'guard', 'typed',

@@ -75,8 +75,9 @@ separate page.
 as hunger. Ale and potions are drinks, with their own pages.
 
 [Exhaustion](systems/exhaustion.md). Called rest on the bar. Empties in 8
-hours. Sit, campfire, inn and bed recover at 20, 35, 50 and 80 an hour.
-Crafting stops under 15.
+hours. A seat recovers 20 an hour, a bed nobody can lend you 25, a seat
+by a fire 35, that bed by a fire 45, a bed you are allowed in 50, and
+your own bed 80. Crafting stops under 15.
 
 [Food](systems/food.md). Raw, burnt, cooked, and a feast. Eating takes
 time. A full stomach refuses another meal's help.

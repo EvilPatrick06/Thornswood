@@ -384,6 +384,8 @@
     '#ts-skills .card .name{font-size:16.5px;color:#f6e9c8;display:flex;align-items:baseline;gap:12px}',
     '#ts-skills .card .desc{font-size:13px;line-height:1.5;color:rgba(217,207,180,.78);margin-top:4px}',
     '#ts-skills .card .inn{font-size:12.5px;color:rgba(217,207,180,.6);font-style:italic;margin-top:3px}',
+    '#ts-skills .card .guest{display:flex;align-items:center;gap:12px;font-size:13px;color:#d9cfb4;margin-top:5px}',
+    '#ts-skills .card .guest .stop{border:1px solid rgba(198,170,109,.55);color:#e9d19b;padding:1px 9px;font-size:11.5px;cursor:pointer}',
     '#ts-skills .tag{margin-left:auto;font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:#9fcf92;white-space:nowrap}',
     '#ts-skills .tag.gold{color:#e9d19b}',
     '#ts-skills .tag.dim{color:rgba(217,207,180,.5)}',
@@ -1525,6 +1527,13 @@
     when somebody holds nothing and carries no key, and the button in the nav is
     drawn from whether the list arrived. There is nothing here that can put an
     empty page in front of anybody.
+
+    ONE THING IS SENT, AND IT IS A STOP (#1603). Under each place you hold are
+    the people you let sleep there tonight, and a Stop beside each name ends
+    that night: /sleephere stop <profile> <building>, through the same chat
+    line every panel uses. The server checks that the place is yours and draws
+    the page again. Letting somebody sleep there is the look prompt's key,
+    pressed while looking at them inside it.
   */
   function propertyRows() {
     var rows = DATA && DATA.property;
@@ -1565,9 +1574,33 @@
         : (r.by ? 'Held by ' + r.by + '. ' : 'Nobody holds it. ') +
           (r.locked ? 'Your key opens the door.'
                     : 'It is not locked, so your key is not needed yet.')));
+      if (r.mine) drawGuests(card, r);
       wrap.appendChild(card);
     });
     elBody.appendChild(wrap);
+  }
+
+  /* Who may sleep in a place you hold tonight, and a Stop for each. */
+  function drawGuests(card, r) {
+    var guests = Array.isArray(r.sleep) ? r.sleep : [];
+    card.appendChild(el('div', 'inn', guests.length
+      ? 'May sleep here tonight, for 8 hours from when you let them:'
+      : 'Nobody else may sleep here tonight. Look at somebody inside and press ' +
+        'the key the prompt shows to let them, for one night.'));
+    guests.forEach(function (gst) {
+      var row = el('div', 'guest');
+      row.appendChild(el('span', '', String(gst.name || 'somebody')));
+      var stop = el('span', 'stop', 'Stop');
+      stop.title = 'Stop letting ' + String(gst.name || 'them') + ' sleep at ' + String(r.name || 'this place');
+      stop.onclick = function (ev) {
+        ev.stopPropagation();
+        if (window.thornswoodNet && window.thornswoodNet.say) {
+          window.thornswoodNet.say('/sleephere stop ' + Number(gst.pid) + ' ' + String(r.b || ''));
+        }
+      };
+      row.appendChild(stop);
+      card.appendChild(row);
+    });
   }
 
   function drawRecipes() {
