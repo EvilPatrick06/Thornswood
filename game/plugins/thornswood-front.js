@@ -559,16 +559,55 @@
     return /riekling|goblin/i.test(name);
   }
 
-  function remountWornClothes(why) {
-    let pc = null;
-    try { pc = sp.Game.getPlayer(); } catch (e) { return 0; }
-    if (!pc) { return 0; }
-    const ac = sp.Actor.from(pc);
-    if (!ac) { return 0; }
-    if (!raceNeedsClothesRemount(ac)) { return 0; }
+  /*
+    OFF IN ONE FRAME, BACK ON IN A LATER ONE, AND LOOKED AT BOTH TIMES (#1560).
+
+    Patrick, 4 October, on a Riekling on dev: out of creation with no clothes
+    on, dressed again about fifteen seconds later, and then "I just walked
+    out a door and it unequipped my clothes". The dev client log of that
+    session has this remount at both moments. "remounted 2 worn armour for
+    spawn+2500" a second after the race menu closed, and every look after it
+    found nothing worn: the spawn+6000 remount and the cell remount on
+    arriving at the inn both had nothing to do and said nothing. Then
+    "remounted 2 worn armour for cell" right after the Bannered Mare door,
+    and the clothes were off again.
+
+    It took each piece off and put it back on inside the same call. The log
+    cannot say what the engine did with that pair, only that the piece ended
+    up off each time, and that nothing in the remount looked.
+
+    So the two halves are now separate and each one is checked. Everything
+    worn comes off; only once the game says a piece is off is it put back on,
+    in a later frame; then it is looked at until the game says it is on, and
+    asked again every half second, for up to four seconds. Only what this
+    took off is put back, only while it is still in the pack, and a piece
+    that has been seen back on is left alone after that, so somebody taking
+    their boots off a moment later keeps them off. One remount at a time: a
+    door while the spawn one is still running is done once it has finished.
+    The wait is asked for before anything comes off, so a game that cannot
+    wait right now is left dressed. Each remount says in the log how it went.
+  */
+  const REMOUNT_STEP = 0.1;          // seconds between looks
+  const REMOUNT_OFF_LOOKS = 20;      // up to two seconds for it all to come off
+  const REMOUNT_ON_LOOKS = 40;       // up to four seconds to see it back on
+  const REMOUNT_ASK_EVERY = 5;       // and asked again every half second
+  let remountRunning = false;
+  let remountNext = '';
+
+  function remountLater(name, fn) {
+    try {
+      sp.Utility.wait(REMOUNT_STEP).then(guard(name, fn));
+      return true;
+    } catch (e) {
+      log("could not wait during the clothes remount: " + e);
+      return false;
+    }
+  }
+
+  function wornArmour(pc, ac) {
+    const worn = [];
     let nItems = 0;
-    try { nItems = pc.getNumItems(); } catch (e) { return 0; }
-    let put = 0;
+    try { nItems = pc.getNumItems(); } catch (e) { return worn; }
     for (let i = 0; i < nItems; i++) {
       let form = null;
       try { form = pc.getNthForm(i); } catch (e) { continue; }
@@ -578,20 +617,128 @@
       if (!armo) { continue; }
       let on = false;
       try { on = ac.isEquipped(form); } catch (e) { on = false; }
-      if (!on) { continue; }
-      try {
-        ac.unequipItem(form, false, true);
-        ac.equipItem(form, false, true);
-        put++;
-      } catch (e) {
-        log("could not remount clothes item: " + e);
+      if (on) { worn.push(form); }
+    }
+    return worn;
+  }
+
+  function remountIds(forms) {
+    const out = [];
+    for (let i = 0; i < forms.length; i++) {
+      let id = 0;
+      try { id = forms[i].getFormID(); } catch (e) { id = 0; }
+      out.push(id ? id.toString(16) : '?');
+    }
+    return out.join(' ');
+  }
+
+  function remountWornClothes(why) {
+    why = why || "race";
+    if (remountRunning) { remountNext = why; return 0; }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { return 0; }
+    if (!pc) { return 0; }
+    const ac = sp.Actor.from(pc);
+    if (!ac) { return 0; }
+    if (!raceNeedsClothesRemount(ac)) { return 0; }
+    const worn = wornArmour(pc, ac);
+    if (!worn.length) { return 0; }
+
+    function isOn(form) {
+      try { return !!ac.isEquipped(form); } catch (e) { return false; }
+    }
+    // A count that cannot be read is not an empty pack.
+    function inPack(form) {
+      try { return pc.getItemCount(form) > 0; } catch (e) { return true; }
+    }
+    function putOn(form) {
+      try { ac.equipItem(form, false, true); }
+      catch (e) { log("could not remount clothes item: " + e); }
+    }
+
+    const back = [];       // true once a piece is seen on again, or never came off
+    let looks = 0;
+    let offLooks = 0;
+    let asks = 0;
+
+    function finish(said) {
+      try { ac.queueNiNodeUpdate(); } catch (e) {
+        log("could not queueNiNodeUpdate after clothes remount: " + e);
+      }
+      log(said);
+      remountRunning = false;
+      if (remountNext) {
+        const again = remountNext;
+        remountNext = '';
+        remountWornClothes(again);
       }
     }
-    try { ac.queueNiNodeUpdate(); } catch (e) {
-      log("could not queueNiNodeUpdate after clothes remount: " + e);
+
+    function waiting() {
+      const off = [];
+      for (let i = 0; i < worn.length; i++) {
+        if (back[i]) { continue; }
+        if (isOn(worn[i])) { back[i] = true; continue; }
+        if (!inPack(worn[i])) { back[i] = true; continue; }
+        off.push(i);
+      }
+      return off;
     }
-    if (put) { log("remounted " + put + " worn armour for " + (why || "race")); }
-    return put;
+
+    function waitOn() {
+      looks++;
+      const off = waiting();
+      if (!off.length) {
+        finish("remounted " + worn.length + " worn armour for " + why +
+               ": off after " + offLooks + " look(s), back on after " + looks +
+               " look(s), " + asks + " ask(s)");
+        return;
+      }
+      if (looks >= REMOUNT_ON_LOOKS) {
+        const left = off.map(function (i) { return worn[i]; });
+        finish("clothes remount for " + why + ": " + left.length + " of " + worn.length +
+               " still off after " + (looks * REMOUNT_STEP).toFixed(1) + "s (" +
+               remountIds(left) + "), left in the pack");
+        return;
+      }
+      if (looks % REMOUNT_ASK_EVERY === 0) {
+        for (let k = 0; k < off.length; k++) { putOn(worn[off[k]]); asks++; }
+      }
+      if (!remountLater("clothes remount on", waitOn)) {
+        finish("clothes remount for " + why + " stopped waiting with " + off.length + " piece(s) off");
+      }
+    }
+
+    function waitOff() {
+      offLooks++;
+      let still = 0;
+      for (let i = 0; i < worn.length; i++) { if (isOn(worn[i])) { still++; } }
+      if (still && offLooks < REMOUNT_OFF_LOOKS && remountLater("clothes remount off", waitOff)) {
+        return;
+      }
+      // What never came off is still on and needs nothing more.
+      for (let i = 0; i < worn.length; i++) {
+        if (isOn(worn[i])) { back[i] = true; continue; }
+        if (!inPack(worn[i])) { back[i] = true; continue; }
+        putOn(worn[i]);
+        asks++;
+      }
+      if (!remountLater("clothes remount on", waitOn)) {
+        finish("clothes remount for " + why + " could not wait to see the clothes back on");
+      }
+    }
+
+    remountRunning = true;
+    if (!remountLater("clothes remount off", waitOff)) {
+      remountRunning = false;
+      return 0;
+    }
+    for (let i = 0; i < worn.length; i++) {
+      const form = worn[i];
+      try { ac.unequipItem(form, false, true); }
+      catch (e) { log("could not take off clothes item to remount it: " + e); }
+    }
+    return worn.length;
   }
 
   let clothesRemountCell = -1;

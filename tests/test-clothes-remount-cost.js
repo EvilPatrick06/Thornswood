@@ -34,7 +34,7 @@ yes('the plugin still has its clothes remount watcher', a >= 0 && b > a);
 function world(raceName) {
   const clock = { now: 1700000000000 };
   let calls = 0;
-  const state = { cell: 0x1000, remounts: 0 };
+  const state = { cell: 0x1000, remounts: 0, on: true };
   const race = { getName: function () { calls++; return raceName; } };
   const shirt = { id: 1 };
   const pc = {
@@ -42,8 +42,12 @@ function world(raceName) {
     getParentCell: function () { calls++; return { getFormID: function () { calls++; return state.cell; } }; },
     getNumItems: function () { return 1; },
     getNthForm: function () { return shirt; },
-    isEquipped: function () { return true; },
-    unequipItem: function () { }, equipItem: function () { state.remounts++; },
+    // Worn until the remount takes it off, and on again once it is put back
+    // (#1560: the remount now looks at both before it is done).
+    isEquipped: function () { return state.on; },
+    getItemCount: function () { return 1; },
+    unequipItem: function () { state.on = false; },
+    equipItem: function () { state.on = true; state.remounts++; },
     queueNiNodeUpdate: function () { }
   };
   const waits = [];
