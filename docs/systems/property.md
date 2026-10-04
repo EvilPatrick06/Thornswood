@@ -178,8 +178,11 @@ away. The prices are gone. A night already paid runs to its end as a
 guest. Kept gold is handed to its holder once, the next time they are
 in the world, and that is the last gold the book holds.
 Outhouses and pots stay unknown until the vote on
-[The body](body.md). The company payout that
-withdraws from the ledger is not built. The four house parts are
+[The body](body.md). The company payouts that
+withdraw from the ledger are built: a haul's pay to its hauler, less
+the company's tenth, or back to its poster. A withdrawal never leaves
+less on the ledger than the open letters and hauls still hold, and
+what a haul holds for somebody away. The four house parts are
 already refused. The drop box is the notice board. Standing at the
 board and clicking it opens the panel. A price list is left from that
 panel. The book stays in the journal. The guild average of those

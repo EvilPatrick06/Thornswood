@@ -579,7 +579,7 @@ const code = gm.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
 function between(src, start, end) { return slice(src, start, end) || ''; }
 const onActivate = between(code, "mp.onActivate = guard('onActivate'", '\n});');
 const onDrop = between(code, "mp.onDropItem = guard('onDropItem'", '\n});');
-const recipeless = between(code, 'function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {', '\n}\n');
+const recipeless = between(code, 'function recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects) {', '\n}\n');
 yes('a press reaches the durability block, after the box is remembered',
     /wear\.pressed\(casterRefrId, refrId, baseDesc\)/.test(onActivate) &&
     onActivate.indexOf('touchedBox(casterRefrId, refrId)') < onActivate.indexOf('wear.pressed('));

@@ -81,7 +81,7 @@
       left out when there is nothing to say.
 
     note: { text: '<the refusal, in plain words>', at: <ms>,
-            about: '<class|profession|spell|town|spend>' }
+            about: '<class|profession|spell|town|spend|perk>' }
       about says which pick the refusal answers, so the panel clears that
       pick and only that one. A note with no about is still shown.
 
@@ -108,6 +108,13 @@
     points: <number>                     free tree points
     placed: { '<sub-skill key>': <0..5> } the part of tree that was placed at
                                           creation and cannot be moved
+    perkClocks: { '<perk key>': { ready: <ms>, until: <ms> } }
+      The filled perks that wait between firings (#1385), only in the world.
+      ready is when it may fire again by the server's clock, 0 for never;
+      until is there on Font of Magic while it runs. Drawn beside the perk.
+      Font of Magic is the one perk a person starts: its Use button sends
+      'skills:pick perk fontofmagic', and a refusal comes back as a note
+      about 'perk'.
 */
 
 (function () {
@@ -178,23 +185,23 @@
       lead: 'Fifteen skills across health, magicka and stamina. A point goes in one at a time, and filling one grants its perk.',
       rows: [
         { key: 'health', name: 'Health', subs: [
-            { key: 'vitality', name: 'Vitality', desc: 'Most health', perk: 'Cheat Death: once a day a killing blow leaves you at one point of health.' },
-            { key: 'fortitude', name: 'Fortitude', desc: 'Regeneration', perk: 'Troll’s Blood: regeneration carries on in combat.' },
-            { key: 'might', name: 'Might', desc: 'Melee damage', perk: 'Devastating Blow: power attacks often stagger or knock down.' },
-            { key: 'resilience', name: 'Resilience', desc: 'Armour', perk: 'Unshakeable: no stagger while blocking.' },
-            { key: 'toughness', name: 'Toughness', desc: 'Poison and disease', perk: 'Purified Blood: no disease, and three quarters of poison shrugged off.' }] },
+            { key: 'vitality', name: 'Vitality', desc: 'Most health', perk: 'Cheat Death: once a day, the blow that would kill you leaves you at 1 health. Not in the game yet.' },
+            { key: 'fortitude', name: 'Fortitude', desc: 'Regeneration', perk: 'Troll’s Blood: during a fight, health returns at 2 a second.' },
+            { key: 'might', name: 'Might', desc: 'Melee damage', perk: 'Devastating Blow: a power attack deals 25% more.' },
+            { key: 'resilience', name: 'Resilience', desc: 'Armour', perk: 'Unshakeable: a block cannot stagger you. Not in the game yet.' },
+            { key: 'toughness', name: 'Toughness', desc: 'Poison and disease', perk: 'Purified Blood: disease does not take, and poison deals 25%.' }] },
         { key: 'magicka', name: 'Magicka', subs: [
-            { key: 'capacity', name: 'Capacity', desc: 'Most magicka', perk: 'Archmage’s Vessel: a burst of regeneration when nearly empty.' },
-            { key: 'clarity', name: 'Clarity', desc: 'Regeneration', perk: 'Leyline Attunement: full regeneration while casting.' },
-            { key: 'potency', name: 'Potency', desc: 'Spell effect, in the schools you hold', perk: 'Overcharge: one spell in seven lands double.' },
-            { key: 'ward', name: 'Ward', desc: 'Magic resistance', perk: 'Spellbreaker: one spell in four is absorbed and refills you.' },
-            { key: 'efficiency', name: 'Efficiency', desc: 'Cost, in the schools you hold', perk: 'Font of Magic: once a day, fifteen seconds of free casting.' }] },
+            { key: 'capacity', name: 'Capacity', desc: 'Most magicka', perk: 'Archmage’s Vessel: drop below a tenth of magicka and it returns to half, once a day.' },
+            { key: 'clarity', name: 'Clarity', desc: 'Regeneration', perk: 'Leyline Attunement: magicka still returns while you cast, at half the usual rate.' },
+            { key: 'potency', name: 'Potency', desc: 'Spell effect, in the schools you hold', perk: 'Overcharge: one spell in five deals double. Holding twice as long is not in the game yet.' },
+            { key: 'ward', name: 'Ward', desc: 'Magic resistance', perk: 'Spellbreaker: 20% of the magicka in a spell that hits you is added to yours.' },
+            { key: 'efficiency', name: 'Efficiency', desc: 'Cost, in the schools you hold', perk: 'Font of Magic: once a day, 15 seconds where a spell costs nothing. Use starts it.' }] },
         { key: 'stamina', name: 'Stamina', subs: [
-            { key: 'endurance', name: 'Endurance', desc: 'Most stamina', perk: 'Tireless: sprinting and power attacks cost half.' },
-            { key: 'vigor', name: 'Vigor', desc: 'Regeneration', perk: 'Second Wind: full stamina the instant it empties, once in five minutes.' },
-            { key: 'agility', name: 'Agility', desc: 'Speed', perk: 'Windwalker: a tenth faster, and no fall damage.' },
-            { key: 'burden', name: 'Burden', desc: 'Carry weight', perk: 'Pack Mule: no slowing until fifty pounds over.' },
-            { key: 'precision', name: 'Precision', desc: 'Critical and ranged', perk: 'Lethal Aim: ranged attacks ignore half of physical armour.' }] }
+            { key: 'endurance', name: 'Endurance', desc: 'Most stamina', perk: 'Tireless: running and swinging cost half stamina. Not in the game yet.' },
+            { key: 'vigor', name: 'Vigor', desc: 'Regeneration', perk: 'Second Wind: when stamina hits 0 it fills, once every 5 minutes.' },
+            { key: 'agility', name: 'Agility', desc: 'Speed', perk: 'Windwalker: +4 speed. A fall still hurts for now.' },
+            { key: 'burden', name: 'Burden', desc: 'Carry weight', perk: 'Pack Mule: being overloaded does not slow you. Not in the game yet.' },
+            { key: 'precision', name: 'Precision', desc: 'Critical chance, which the game ignores', perk: 'Lethal Aim: an arrow ignores half the armour it hits.' }] }
       ]
     },
     /*
@@ -420,6 +427,10 @@
     '#ts-skills .plus{width:26px;height:26px;border:1px solid rgba(198,170,109,.55);color:#e9d19b;display:grid;place-items:center;',
     'font-size:18px;line-height:1;background:rgba(0,0,0,.25);cursor:pointer}',
     '#ts-skills .plus.off{opacity:.25;pointer-events:none}',
+    // A filled perk a person starts (Font of Magic): under the perk's words.
+    '#ts-skills .skill .use{grid-column:1/4;justify-self:start;margin-top:6px;padding:3px 14px;border:1px solid rgba(198,170,109,.55);',
+    'color:#e9d19b;background:rgba(0,0,0,.25);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer}',
+    '#ts-skills .skill .use.off{opacity:.35;pointer-events:none}',
     // foot: the hint on the left takes what is left and wraps; the buttons never shrink
     '#ts-skills .foot{grid-column:1/3;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:24px;',
     'padding:14px 32px;border-top:1px solid rgba(198,170,109,.22)}',
@@ -1864,7 +1875,14 @@
                      (given ? '. ' + given + ' of these came with what you chose and do not move.' : '');
         plus.onclick = function (ev) { ev.stopPropagation(); spend(s.key); };
         row.appendChild(plus);
-        row.appendChild(el('div', 'sd' + (full ? ' lit' : ''), full ? s.perk : s.desc + '. ' + s.perk));
+        var clock = full ? perkClock(PERK_OF[s.key]) : '';
+        row.appendChild(el('div', 'sd' + (full ? ' lit' : ''), full ? s.perk + (clock ? ' ' + clock : '') : s.desc + '. ' + s.perk));
+        if (full && PERK_OF[s.key] === 'fontofmagic') {
+          var use = el('div', 'use' + (perkReady('fontofmagic') && !perkWaiting() ? '' : ' off'), 'Use');
+          use.title = 'Start Font of Magic';
+          use.onclick = function (ev) { ev.stopPropagation(); usePerk('fontofmagic'); };
+          row.appendChild(use);
+        }
         row.onclick = function () { rowAt = idx; draw(); };
         col.appendChild(row);
       });
@@ -2135,6 +2153,46 @@
     draw();
   }
 
+  /*
+    THE FILLED PERKS THAT WAIT (#1385). The server sends perkClocks: when each
+    one may fire again, by its clock, and until on Font of Magic while it
+    runs. Counted here against this machine's clock, which is near enough for
+    a day or five minutes, and redrawn whenever the server sends anything,
+    which it does the moment a perk fires and every time the panel opens.
+  */
+  var PERK_OF = { vitality: 'cheatdeath', capacity: 'archmagesvessel', efficiency: 'fontofmagic', vigor: 'secondwind' };
+  function clockOf(key) { return (key && mine && mine.perkClocks && mine.perkClocks[key]) || null; }
+  function waitWords(ms) {
+    var s = Math.max(1, Math.ceil(ms / 1000));
+    if (s < 120) return s + (s === 1 ? ' second' : ' seconds');
+    var m = Math.ceil(s / 60);
+    if (m < 120) return m + ' minutes';
+    return Math.ceil(m / 60) + ' hours';
+  }
+  function perkRunning(key) { var c = clockOf(key); return !!(c && Number(c.until) > Date.now()); }
+  function perkReady(key) {
+    var c = clockOf(key);
+    return !!c && !perkRunning(key) && !(Number(c.ready) > Date.now());
+  }
+  function perkClock(key) {
+    var c = clockOf(key);
+    if (!c) return '';
+    if (perkRunning(key)) return 'Running now.';
+    if (Number(c.ready) > Date.now()) return 'Back in ' + waitWords(Number(c.ready) - Date.now()) + '.';
+    return 'Ready.';
+  }
+  function perkWaiting() {
+    for (var i = 0; i < pending.length; i++) if (pending[i].section === 'perk') return true;
+    return false;
+  }
+  /* Use, on Font of Magic. The server decides; this only asks. */
+  function usePerk(key) {
+    if (perkWaiting() || !perkReady(key)) return;
+    send('perk', 'perk ' + key);
+    status = 'Sent.'; statusKind = '';
+    draw();
+  }
+
   /* Creation is over: the panel shuts and forgets its marks. */
   function leave() { closing = false; status = ''; statusKind = ''; later = {}; api.close(); }
 
@@ -2267,6 +2325,7 @@
         cleared = true;
       }
       else if (p.section === 'tree') { status = 'Spent.'; statusKind = 'ok'; }
+      else if (p.section === 'perk' && perkRunning('fontofmagic')) { status = 'Font of Magic: for 15 seconds, a spell costs nothing.'; statusKind = 'ok'; }
       else done = false;
       if (done) picked[p.section] = null;
       else if (now - p.at < PENDING_MS) keep.push(p);
@@ -2299,7 +2358,7 @@
     list on PENDING_MS. The card stays as it was picked either way, so it can
     be sent again or replaced.
   */
-  var ABOUT_SECTION = { 'class': 'class', 'profession': 'profession', 'spell': 'spells', 'staffspell': 'staff', 'town': 'home', 'spend': 'tree' };
+  var ABOUT_SECTION = { 'class': 'class', 'profession': 'profession', 'spell': 'spells', 'staffspell': 'staff', 'town': 'home', 'spend': 'tree', 'perk': 'perk' };
   function refused(text, about) {
     status = 'No: ' + text + '.'; statusKind = 'no';
     if (!pending.length) return;

@@ -25,11 +25,11 @@ strength of this half.
 You cannot name a poison the server does not have a row for and have
 it counted as a recipe. There are zero alchemy recipes in the table.
 
-Master Chemist, at master, is two bottles from one batch. It is not
-in the server.
+Master Chemist, at master, is two bottles from one batch.
 
 ## Where this is
 
-The lab accepts this half from novice. A batch is not yet a piece of
-work, because the menu never tells the server what was made. The
-climb for this half is the gap on [Alchemist](../alchemist.md).
+The lab accepts this half from novice. A batch is one piece of work.
+Which poison it was is not checked yet, because the engine does not
+tell the server the effect (see [Mixtures](../../mixtures.md)). The
+ladder for this half is on [Alchemist](../alchemist.md).
