@@ -293,6 +293,7 @@ jobs:
                  'test-dev-gamemode-notes.ps1',
                  'test-main-runtime-startup.js',
                  'test-spawn-reply.js',
+                 'test-nightly-stray.ps1',
                  'test-discord-callback-hang.js',
                  'test-member-role-wording.js'
                  'test-page-changed.js'
