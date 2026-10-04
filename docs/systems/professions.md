@@ -157,10 +157,11 @@ grant no recipe, no verb and no rank. Bardic rest is on
 
 The eight professions, the halves, the ladder with the count resetting,
 the sister half at novice, the bench table, the charcoal and the
-handle, and the recipe lists are in the server. Smelting and tanning
-are still open to anybody. Taking a sister half past novice, and the
-two outside trades, are rules with no command. See
-[Masters and apprentices](apprenticeship.md).
+handle, and the recipe lists are in the server. Smelting is a smith's
+and tanning is the Platewright's, as above, and neither is one of the
+two outside trades. A master takes someone on in the sister half or
+in an outside trade with `/apprentice <name>`, and ends it with
+`/apprentice end <name>`. See [Masters and apprentices](apprenticeship.md).
 
 Not in the world yet: a warrior's master maneuvers as a mechanic,
 the repair kits on [Durability](durability.md), Twin Souls as a second
