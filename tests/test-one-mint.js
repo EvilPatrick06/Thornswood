@@ -567,6 +567,7 @@ function goldDescriptors(text) {
     'ITEMS.fishTrap': 'a fish trap refund, ITEMS',
     'rare': 'fire, frost or void salts, ITEMS',
     'seam.ore': 'ore, ORES_BY_BASE',
+    'extra.ore': 'the chance of one more ore off a swing, a row of ORES_BY_BASE (#1380)',
     'ITEMS.firewood': 'firewood, ITEMS',
     'ITEMS[grade]': 'charcoal, ITEMS',
     'ITEMS.butter': 'butter off the churn, ITEMS',
