@@ -60,7 +60,26 @@ Purified Blood means no disease takes. See [Skill tree](skill-tree.md).
 
 ## Where this is
 
-Not in the server. The old disease mod is out on purpose. Cure disease
-potions exist as items and currently count only as a sip of thirst.
-Toughness writes disease resistance onto the actor. Nothing in the
-needs block reads a disease.
+The five are in the server, on the character, with the chances, the
+caught window, ill, bad and the durations above. Food sickness and
+fouled water last their 30 and 45 minutes from when they show. While a
+disease shows, its meter counts as at least weary, or at least bad, so
+a hungry person with food sickness does not pay the same penalty twice.
+A bad one refuses every craft. A potion of cure disease clears one, the
+one furthest along, and is still the sip of 5. A shrine pressed inside
+one of the temples the wake uses clears them all. A fire, a bed, warmth
+back to fine after being cold, or 2 hours clears a chill. An hour asleep
+on open ground (resting at the sitting rate with no roof over you) or
+an hour at spent cold starts one. Toughness takes 10% off each chance a
+point, and Purified Blood stops every one. The old disease mod is out
+on purpose.
+
+Not in yet:
+
+- Raw meat, a full stomach and the water sources start nothing until
+  the meal and drink work (#1382) reports them. The chances are in the
+  server, waiting for that.
+- A potion of cure disease somebody brews is only the sip, because the
+  server cannot read what a brewed potion does.
+- The physicker's remedy is not an item, and a cooked meal's help
+  against disease is not in.

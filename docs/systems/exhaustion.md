@@ -67,6 +67,7 @@ recover rates, the bard's +25, and the logout bonus are in the server.
 `/rest bed` counts only a bed the server saw the person press and that
 they are still beside, and whose bed it is decides the rate. See
 [Property](property.md). Tea and skooma are not items the needs block
-knows. Open-ground sleep is not a chill.
+knows. An hour resting at the sitting rate with no roof over you starts
+a chill. See [Disease](disease.md).
 The craft gate has not been extended to mining or chopping, and this
 plan does not extend it.
