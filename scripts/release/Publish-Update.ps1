@@ -389,9 +389,12 @@ elseif ($null -ne $ownCollection) {
 # 3 October. Revision 2 supplies the baseline; our packs supply subsequent
 # fishing and crafting records. Updater unshares each destination before
 # extraction, preserving Vortex staging and the independently updated channel.
+$shipGeneratedFiles = Get-ShipGeneratedFiles $ProfileDir
+Assert-ShipGeneratedBodies $GameDir $ProfileDir
 function Test-FromCollection([string]$rel) {
     if ($null -eq $vortexFiles) { return $false }
     if ($rel -ieq 'Data\Thornswood-Content.esp') { return $false }
+    if ($shipGeneratedFiles -contains $rel) { return $false }
     return $vortexFiles.Contains($rel)
 }
 # Place plugins the load order names that Vortex does not deploy under that
