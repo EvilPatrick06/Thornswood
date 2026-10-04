@@ -368,6 +368,10 @@ namespace Thornswood
                             " and is not the recorded build; leaving it.");
                         continue;
                     }
+                    // Pack synchronization skips runtime files. Refresh the
+                    // retained script only after checking the extracted bytes,
+                    // or Keep.Restore can roll this repair back before Play.
+                    Keep.Remember(new[] { rel });
                     log("  " + Path.GetFileName(rel) + " restored from " + where + ".");
                     want.RemoveAt(i);
                     took++;

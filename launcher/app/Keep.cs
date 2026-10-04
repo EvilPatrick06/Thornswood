@@ -333,8 +333,24 @@ namespace Thornswood
                 {
                     string kept = Path.Combine(Dir, rel);
                     string live = Path.Combine(Paths.Game, rel);
+                    // Runtime repair and pack sync have separate sources. An
+                    // older retained client must never undo a verified repair
+                    // at startup or immediately before Play.
+                    ClientRuntime.Entry runtime = ClientRuntime.Recorded().Find(
+                        delegate(ClientRuntime.Entry e) { return e.Rel.Equals(rel, StringComparison.OrdinalIgnoreCase); });
+                    // A broken build record is not permission to treat the
+                    // client as an ordinary UI script and restore any bytes.
+                    if (runtime == null && rel.Equals("Data\\Platform\\Plugins\\skymp5-client.js", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (runtime != null && !runtime.Sha.Equals(ClientRuntime.Sha256Of(kept), StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (runtime.Sha.Equals(ClientRuntime.Sha256Of(live), StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (Remember(new[] { rel }) > 0) taken.Add(Path.GetFileName(rel));
+                        }
+                        continue;
+                    }
                     if (File.Exists(live) && Same(kept, live)) continue;
-                    if (developer && File.Exists(live) &&
+                    if (runtime == null && developer && File.Exists(live) &&
                         File.GetLastWriteTimeUtc(live) > File.GetLastWriteTimeUtc(kept))
                     {
                         // On the machine that builds releases, a newer file in
@@ -383,8 +399,8 @@ namespace Thornswood
             if (back.Count == 0 && aside.Count == 0 && taken.Count == 0) return null;
             string said = "";
             if (taken.Count > 0)
-                said = "Took " + taken.Count + " edited game " + (taken.Count == 1 ? "file" : "files") +
-                       " as " + Build() + "'s own, this being the machine that ships: " + string.Join(", ", taken.ToArray()) + ".";
+                said = "Refreshed " + taken.Count + " of " + Build() + "'s kept " + (taken.Count == 1 ? "file" : "files") +
+                       " from the verified runtime or this machine's edits: " + string.Join(", ", taken.ToArray()) + ".";
             if (back.Count > 0)
                 said += (said.Length > 0 ? " " : "") +
                         "Put back " + back.Count + " of " + Build() + "'s own game " +
