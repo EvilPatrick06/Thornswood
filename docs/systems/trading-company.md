@@ -111,8 +111,33 @@ tenth, and none of them are posted with `/haul`.
 
 ## Where this is
 
-Not built. The box exists, and the note beside it says company
-payment belongs in that box. Jobs exist, and the server does not pay
-the taker of an ordinary job. There is no `/haul`, no tenth, and no
-withdrawal from the ledger. There is no application, no event that
-deletes an item, and no gold destroyed for a sale.
+`/haul` is in the server. At the board it leaves from,
+`/haul 80 riften a crate of iron ingots` takes the 30 fee and the pay,
+and both go onto that hold's ledger. The board, the panel and `/jobs`
+show the pay and the destination. `/take` and `/jobs` are the same as
+for any job. `/dropjob` puts the haul back on the board, open, with
+its pay still held.
+
+The poster's `/unpin` before anybody has taken it hands the pay back.
+A steward's `/unpin` at the posting board does the same, open or
+taken. The fee stays. `/haul done whiterun 4`, by the poster or a
+steward at the destination's board, pays the hauler out of the ledger
+and keeps the tenth. The person who took the haul does not confirm it.
+The person paid has to be in the world: the hauler on a confirm, the
+poster on a steward's `/unpin`. Otherwise nothing moves and the pay
+stays held. An ordinary job is not a haul, and `/haul done` refuses
+one.
+
+The ledger goes down only for these payouts and a letter's 15. A
+withdrawal never leaves less on the ledger than the open letters and
+hauls still hold.
+
+The application is a ticket in Discord, Apply: Trading Company. The
+role it leads to is Trading Company, and `access.company` in the
+site's config names it. `/company` says whether a character can handle
+a sale. `/company buy 120 Lydia Iron Sword`, standing with the seller,
+offers the price the two agreed, and the seller accepts on the prompt.
+The thing leaves the seller's pack and the world. The worker pays the
+price less their 10%, another 10% is destroyed, and the seller
+receives the rest. Under 10 gold the seller receives the whole price.
+One thing is sold at a time. No ledger is touched by a sale.

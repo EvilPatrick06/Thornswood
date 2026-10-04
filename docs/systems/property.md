@@ -165,8 +165,10 @@ nobody's to lend. Who counts as allowed and how long a night is
 are asked on issue #1392. Prices and paid nights are in
 `private/beds.json`.
 Outhouses and pots stay unknown until the vote on
-[The body](body.md). The company payout that
-withdraws from the ledger is not built. The four house parts are
+[The body](body.md). The company payouts that
+withdraw from the ledger are built: a haul's pay to its hauler, less
+the company's tenth, or back to its poster. A withdrawal never leaves
+less on the ledger than the open letters and hauls still hold. The four house parts are
 already refused. The drop box is the notice board. Standing at the
 board and clicking it opens the panel. A price list is left from that
 panel. The book stays in the journal. The guild average of those
