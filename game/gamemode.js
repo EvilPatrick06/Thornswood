@@ -35378,8 +35378,8 @@ log('gamemode loaded:',
     docs/systems/exhaustion.md: a bed you own, rent or were allowed is 80 rest
     an hour, an inn room once the holder's price is paid is 50, a bedroll is
     the campfire's 35, and saying the word in the street does not count. Those
-    are the four kinds handed to the needs block (bed, inn, bedroll), and the
-    numbers stay in NEEDS.recover there.
+    are the three kinds this hands the needs block (bed, inn, bedroll), and
+    the numbers stay in NEEDS.recover there.
 
     HOW THE SERVER KNOWS A BED. mp.onActivate is handed the bed when somebody
     presses it, the same way it is handed a door, and the base's own record
