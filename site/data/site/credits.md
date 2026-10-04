@@ -34,15 +34,16 @@ the branch `thornswood/engine-changes`. Anybody can read it or download it,
 with no account.
 
 The server's engine, `scam_native.node`, is built from one commit,
-[`bb72cd82`](https://github.com/EvilPatrick06/skymp/tree/bb72cd82c4c8eed8629f0a677d0b3eb559ac773f).
+[`5be4687f`](https://github.com/EvilPatrick06/skymp/tree/5be4687fceb3d73b5d8a6ab0886cad60a7556fe4).
 That commit starts from
 [SkyMP](https://github.com/skyrim-multiplayer/skymp) at `f926944b`, and
-[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/f926944b...bb72cd82)
+[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/f926944b...5be4687f)
 is the difference between the two.
 
-The server's engine goes to our test server first. Until it reaches the main
-server, that one runs a build of an earlier commit on the same branch, sent on
-27 September.
+The server's engine goes to our test server first. Main remains on
+`8cab23e6` until its next release. The current Dev change affects the client;
+the Dev server executable and its dependencies retain their preceding bytes
+and original build time.
 
 The six client files are built from the commit named by the feed a person
 got them from (`clientRuntime.forkCommit` in that channel's `version.json`).
@@ -52,8 +53,8 @@ the same public branch:
 
 | Channel | Feed | The six client files are built from |
 |---|---|---|
-| Public | `feed/version.json` | [`e0135f5a`](https://github.com/EvilPatrick06/skymp/tree/e0135f5a) |
-| Dev | `feed-dev/version.json` | [`bb72cd82`](https://github.com/EvilPatrick06/skymp/tree/bb72cd82) |
+| Public | `feed/version.json` | [`8cab23e6`](https://github.com/EvilPatrick06/skymp/tree/8cab23e6) |
+| Dev | `feed-dev/version.json` | [`5be4687f`](https://github.com/EvilPatrick06/skymp/tree/5be4687f) |
 
 | File | Built from | Licence |
 |---|---|---|

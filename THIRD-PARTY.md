@@ -392,16 +392,12 @@ with.
 ## On our servers
 
 - The game server's native module, `scam_native.node`, recorded in
-  `records\server-build.json`. That record names `skymp5-server` in the fork at
-  `d6c99400f680784da6b6f0a14851b0f0aa35524d`, the same commit
-  `records\client-build.json` names and the repository pins (issue #1200), and
-  it is AGPL-3.0. The record hashes the build of that commit as
-  `37d5bc5de33de11086b1180dcb1e8b64638398bf18c502541025133548ecd8a9`, built 2026-10-02T01:39:16Z, and `Deploy-Server.ps1` refuses any module
-  whose sha256 the record does not name. It goes to the dev server first. Until
-  a live server release sends it, the live server runs the build of the
-  earlier commit `5c54e8b92fea2db1d2c1414c53bcb757fd4dd8df` on the same branch,
-  sha256 `e5d85ed8038b5bfc8e896ab6addc757709d5f272765fba7c418374ca2aedd53f`,
-  built 2026-09-27T05:19:54Z.
+  `records\server-build.json`, is AGPL-3.0. That record and the client record
+  name `5be4687fceb3d73b5d8a6ab0886cad60a7556fe4` on the public fork. The server executable and
+  its dependencies are unchanged from the preceding recorded source; its
+  SHA256 remains `77bdd06c2271308df172bf4d06b9cdc53c9514be5795b44a37df720acd47efdc`,
+  built 2026-10-03T23:29:35Z. The record retains that actual build time.
+  Main remains on `8cab23e6b86609181a4ec212818b56199db9061e` until its next release.
   Section 13 of the AGPL asks that everybody who connects to a modified server
   over a network be offered its source. The next section is that offer.
 
@@ -429,11 +425,11 @@ For the six client files and for the game server module running on the VPS, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, both built from one commit:
 
-https://github.com/EvilPatrick06/skymp/tree/bb72cd82c4c8eed8629f0a677d0b3eb559ac773f
+https://github.com/EvilPatrick06/skymp/tree/5be4687fceb3d73b5d8a6ab0886cad60a7556fe4
 
 The game server module the live server runs until its next server release:
 
-https://github.com/EvilPatrick06/skymp/tree/5c54e8b92fea2db1d2c1414c53bcb757fd4dd8df
+https://github.com/EvilPatrick06/skymp/tree/8cab23e6b86609181a4ec212818b56199db9061e
 
 It is on the branch `thornswood/engine-changes`, it is public, and the branch
 answered an anonymous request on 24 September. It builds with CMake and
