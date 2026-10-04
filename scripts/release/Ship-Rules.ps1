@@ -860,7 +860,7 @@ function Get-ShipGeneratedFiles([string]$ProfileDir) {
     if (-not (Test-Path -LiteralPath $record)) { return ,$l }
     foreach ($line in [IO.File]::ReadLines($record)) {
         $m = [regex]::Match($line, '^file [0-9a-f]{64} (.+)$')
-        if ($m.Success) { $l.Add($m.Groups[1].Value) }
+        if ($m.Success) { $l.Add($m.Groups[1].Value.Replace('/', '\')) }
     }
     return ,$l
 }
@@ -1009,7 +1009,16 @@ $ShipOursFiles = @(
 # collection can run a generator, so nobody gets these but from us. A file at
 # one of these paths from anywhere else would be Vortex's (the collection's) and
 # is left out before this is asked.
-$ShipGeneratedPatterns = @(
+$ShipGeneratedBodyFiles = @(
+    # Exact body outputs from the committed covered-body recipe.
+    'Data\meshes\actors\character\character assets\femalebody_0.nif',
+    'Data\meshes\actors\character\character assets\femalebody_1.nif',
+    'Data\meshes\actors\character\character assets\femalebodyastrid_0.nif',
+    'Data\meshes\actors\character\character assets\femalebodyastrid_1.nif',
+    'Data\meshes\actors\character\character assets\malebody_0.nif',
+    'Data\meshes\actors\character\character assets\malebody_1.nif'
+)
+$ShipGeneratedPatterns = $ShipGeneratedBodyFiles + @(
     'Data\meshes\animationdatasinglefile.txt',
     'Data\meshes\animationsetdatasinglefile.txt',
     'Data\meshes\actors\*\behaviors\*.hkx',
@@ -1118,6 +1127,44 @@ foreach ($ShipBuiltLine in @(& {
 function Test-ShipGenerated([string]$rel) {
     foreach ($p in $ShipGeneratedPatterns) { if ($rel -like $p) { return $true } }
     return $false
+}
+
+# Both entry points can be called without Ship, so check the actual body
+# bytes here too. A partial receipt must not turn loose defaults into ours.
+function Assert-ShipGeneratedBodies([string]$GameDir, [string]$ProfileDir) {
+    Assert-ShipGeneratedBodyFiles $GameDir $ProfileDir
+    $root = Split-Path -Parent $ProfileDir
+    $expectedGame = [IO.Path]::GetFullPath((Join-Path $root 'Game')).TrimEnd('\')
+    if ([IO.Path]::GetFullPath($GameDir).TrimEnd('\') -ine $expectedGame) { throw 'Publish the generated bodies from their own game folder, rather than a Steam or Vortex fallback.' }
+    $gameRows = @([IO.File]::ReadLines((Join-Path $ProfileDir 'OwnGame\generated.txt')) | Where-Object { $_ -match '^game (.+)$' })
+    if ($gameRows.Count -ne 1) { throw 'The generated receipt must name exactly one source game folder.' }
+    $recordedGame = [IO.Path]::GetFullPath($gameRows[0].Substring(5)).TrimEnd('\')
+    if ($recordedGame -ine $expectedGame) { throw 'The generated receipt names a different source game folder.' }
+    $state = & {
+        . (Join-Path $PSScriptRoot '..\mods\Generated.ps1')
+        Get-GeneratedState $root (Join-Path $PSScriptRoot '..\..\records\generated.json')
+    }
+    if (-not $state.Current) { throw ('Generated files are stale: ' + ($state.Why -join '; ')) }
+}
+
+function Assert-ShipGeneratedBodyFiles([string]$GameDir, [string]$ProfileDir) {
+    $record = Join-Path $ProfileDir 'OwnGame\generated.txt'
+    if (-not (Test-Path -LiteralPath $record)) { throw 'The generated body record is missing. Build the covered bodies before publishing.' }
+    $rows = @([IO.File]::ReadLines($record) | ForEach-Object {
+        if ($_ -match '^file ([0-9a-f]{64}) (.+)$') {
+            [pscustomobject]@{ Sha=$matches[1]; Rel=$matches[2].Replace('/', '\'); Destination=[IO.Path]::GetFullPath((Join-Path $GameDir $matches[2])) }
+        }
+    })
+    foreach ($rel in $ShipGeneratedBodyFiles) {
+        $file = Join-Path $GameDir $rel
+        $destination = [IO.Path]::GetFullPath($file)
+        $matching = @($rows | Where-Object { $_.Destination -ieq $destination })
+        if ($matching.Count -ne 1) { throw "The generated body record must list exactly one build of $rel." }
+        if ($matching[0].Rel -ine $rel) { throw "The generated body path must use its canonical destination: $rel." }
+        $sha = $matching[0].Sha
+        if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "The generated body is missing: $rel." }
+        if ((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash -ine $sha) { throw "The generated body is not as built: $rel. Rebuild before publishing." }
+    }
 }
 
 # Whether a loose file waits for the collection, at this revision.
