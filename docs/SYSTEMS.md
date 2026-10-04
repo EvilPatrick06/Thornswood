@@ -40,16 +40,22 @@ Staff and dev commands stay commands: moderation (`/kick`,
 `/silence`, `/ban` and the rest), and the testers' `/tp`, `/give`
 and `/spawn`.
 
+Getting help stays a command too. Decided by Patrick later on 4 Oct:
+"change it to except the /stuck and the ones for getting help from
+GMs". `/stuck`, and the lines that reach staff, `/helpme` (and
+`/help-me`) and `/report`, are typed in the chat, and the help in the
+game, the launcher's Help and the site name them.
+
 A panel or a key may send the server the same line a command used to
 be. The look prompt already sends `/trade` and the id of the person
 under the crosshair. Nobody is told to type that line, and help text
 never lists it.
 
-A page below that still tells people to type something is out of date
-on that point. [Chat commands](systems/commands.md) lists every
-command the game answers today, who may use it, and the issue that
-turns each one for people into buttons. A new system is written with
-its buttons from the start.
+A page below that still tells people to type something other than
+those three is out of date on that point. [Chat commands](systems/commands.md)
+lists every command the game answers today, who may use it, and the
+issue that turns each one for people into buttons. A new system is
+written with its buttons from the start.
 
 ## A person arrives
 
