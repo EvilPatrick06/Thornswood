@@ -17,10 +17,10 @@ The full table: [lists/woodworker-charburner.md](../../lists/woodworker-charburn
 A forge and a skyforge burn one charcoal per piece. The four grades
 are how hot the fire is. A higher metal needs a hotter grade. The
 table is on [Smith](../smith.md). A skyforge asks for one grade
-poorer, and Poor Charcoal does not get poorer. The server still
-burns the cheapest grade in the pack first, and Poor Charcoal is
-what it eats if you have it. No charcoal of the grade the metal asks
-for, the forge refuses the piece, including a smith's.
+poorer, and Poor Charcoal does not get poorer. The server burns the
+grade the metal asks for and no other, whatever else is in the pack.
+No charcoal of the grade the metal asks for, the forge refuses the
+piece, including a smith's.
 
 A hafted weapon takes one tool handle on top of its own ingredients.
 The handle was not in those ingredients when the weapon's rank was
@@ -34,8 +34,9 @@ resistance), on top of the woodworker's Endurance and Burden.
 ## Fire
 
 Master Carver's +48 is this half's kiln as well as a Woodwright's
-fire. It is not applied. The kiln warms like any other fire: +34 at
-your feet.
+fire. A kiln or a fire a master woodworker is standing at gives +48
+at your feet, to them and to anybody at it with them. Any other kiln
+warms like any other fire: +34 at your feet.
 
 ## What you cannot do
 
@@ -75,4 +76,4 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 ## Where this is
 
 All five rows and the closed kiln are in the server. The forge's
-charcoal take is in the server. The hotter kiln is not.
+charcoal take, by grade, is in the server. So is the hotter kiln.

@@ -90,4 +90,5 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 ## Where this is
 
 The 28 rows and the oven gate are in the server. The vanilla perk
-lines on the menu are still there. Grand Chef's second portion is not.
+lines on the menu are still there. Grand Chef's second portion is in
+the server.

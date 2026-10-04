@@ -26474,47 +26474,105 @@ function benchGate(actorId, baseDesc) {
 
   Keyed off the family the recipe table already puts on every owned row, so this
   list is checked against real data rather than against a memory of what Skyrim
-  contains: crafttest.js counts the rows in each of these families and fails if
+  contains: tests\test-1398-fuel.js counts the rows in each of these families and fails if
   a family here matches nothing, because a family name that has been renamed
   under it would turn this rule off without a word.
 */
 const HANDLE_DESC = '15490:Thornswood-Content.esp';
 /*
-  Charcoal for the forge fire. Same shape as the handle rule: not a CNTO on the
-  COBJ (that would couple us to every smithing plugin), taken here when the
-  craft is allowed. Ordered cheapest grade first so a novice Charburner's Poor
-  Charcoal is what goes, and vanilla charcoal is last as a fallback.
+  CHARCOAL FOR THE FIRE, BY GRADE (#1398).
+
+  docs/systems/professions/smith.md: "Every forge and every skyforge burns one
+  charcoal. No charcoal of the grade the metal asks for, the piece is not
+  made." Then the grade table, the smelter at the same grade as its metal, and
+  the skyforge one grade poorer. Which grade each recipe asks for is
+  FUEL_BY_RECIPE below, worked out of game\data\recipes.json by
+  scripts\dev\Build-FuelTable.js, because the rows the server carries name
+  neither their bench nor their metal. The rule before this read a bench off
+  the row, no installed row carries one, and so no forge took any charcoal.
+
+  The same shape as the handle: not an ingredient on the record, which would
+  couple this to every smithing plugin, but taken here once the craft is
+  allowed.
+
+  THE GRADE THE TABLE NAMES, AND ONLY THAT GRADE. It used to burn the cheapest
+  piece in the pack, Poor Charcoal first, whatever the metal. A hotter grade
+  is not burned in place of the one asked for: the page says no charcoal of
+  that grade, no piece. Skyrim's own Charcoal is the Charcoal grade, by its
+  name, as it was always taken here.
 */
-const CHARCOAL_DESCS = [
-  ITEMS.charcoalT1,
-  ITEMS.charcoalT2,
-  ITEMS.charcoalT3,
-  ITEMS.charcoalT4,
-  ITEMS.charcoal
+const CHARCOAL_GRADES = [
+  null,
+  { name: 'Poor Charcoal', descs: [ITEMS.charcoalT1] },
+  { name: 'Charcoal', descs: [ITEMS.charcoalT2, ITEMS.charcoal] },
+  { name: 'Charcoal Briquette', descs: [ITEMS.charcoalT3] },
+  { name: 'Coke', descs: [ITEMS.charcoalT4] }
 ];
-const CHARCOAL_BENCHES = {
-  CraftingSmithingForge: true,
-  CraftingSmithingSkyforge: true
-};
 
-/** True when this recipe is beaten out at a forge that burns charcoal. */
-function wantsCharcoal(row) {
-  if (!row || typeof row !== 'object') { return false; }
-  return !!CHARCOAL_BENCHES[String(row.benchName || '')];
+// ==== FUEL_BY_RECIPE, generated ====
+/* Built by scripts\dev\Build-FuelTable.js out of game\data\recipes.json. Do not hand edit.
+   329 recipes at a forge, a skyforge or a smelter, out of 3706.
+   177 burn Poor Charcoal, 74 Charcoal, 60 Charcoal Briquette and 18 Coke.
+   Recipe desc -> [grade 1 to 4, the metal that asks for it or nothing, the bench]. */
+const FUEL_BY_RECIPE = {"108cf8:Skyrim.esm":[2,"dwarven","forge"],"108cf9:Skyrim.esm":[3,"ebony","forge"],"108cfa:Skyrim.esm":[2,"elven","forge"],"108cfb:Skyrim.esm":[3,"glass","forge"],"108cfc:Skyrim.esm":[2,"orcish","forge"],"10dd28:Skyrim.esm":[2,"dwarven","smelter"],"1548d:Thornswood-Content.esp":[1,"iron","forge"],"1548e:Thornswood-Content.esp":[1,"iron","forge"],"15492:Thornswood-Content.esp":[1,"iron","forge"],"15496:Thornswood-Content.esp":[1,"iron","forge"],"15497:Thornswood-Content.esp":[1,"iron","forge"],"1838:PlayFluteLuteDrum.esp":[1,"","forge"],"19f8c:Playable Rieklings.esp":[1,"","forge"],"19f8d:Playable Rieklings.esp":[1,"","forge"],"19f8e:Playable Rieklings.esp":[1,"","forge"],"19f8f:Playable Rieklings.esp":[1,"iron","forge"],"19f97:Playable Rieklings.esp":[1,"iron","forge"],"19f9d:Playable Rieklings.esp":[1,"iron","forge"],"19fb4:Playable Rieklings.esp":[1,"steel","forge"],"19fb7:Playable Rieklings.esp":[1,"steel","forge"],"19fb8:Playable Rieklings.esp":[1,"steel","forge"],"1d90:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"1f24f:FishingInSkyrim.esp":[1,"iron","forge"],"1f252:FishingInSkyrim.esp":[3,"ebony","forge"],"214aa:Hothtrooper44_ArmorCompilation.esp":[1,"steel","skyforge"],"2180d:FishingInSkyrim.esp":[1,"steel","forge"],"22fe:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23062:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23063:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23190:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"23195:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"2319a:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"2319f:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"231a9:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231ae:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231b3:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231b8:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231c6:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c8:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c9:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231ca:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cb:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cc:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cd:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231ce:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cf:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d0:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d1:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d2:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d3:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d4:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d5:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d6:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d8:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d9:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"238fd:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"238fe:Hothtrooper44_ArmorCompilation.esp":[2,"silver","forge"],"23900:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"23907:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23908:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"2390e:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"23918:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23919:Hothtrooper44_ArmorCompilation.esp":[2,"silver","forge"],"23a0a:Playable Rieklings.esp":[1,"","forge"],"286a:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"2b04f:Dragonborn.esm":[1,"iron","forge"],"2b050:Dragonborn.esm":[1,"iron","forge"],"2b051:Dragonborn.esm":[1,"iron","forge"],"2b052:Dragonborn.esm":[1,"","forge"],"2b053:Dragonborn.esm":[1,"iron","forge"],"2b054:Dragonborn.esm":[1,"iron","forge"],"2b055:Dragonborn.esm":[1,"","forge"],"2b056:Dragonborn.esm":[1,"","forge"],"2b057:Dragonborn.esm":[1,"","forge"],"2b058:Dragonborn.esm":[1,"iron","forge"],"2b05a:Dragonborn.esm":[1,"iron","forge"],"2b05b:Dragonborn.esm":[1,"iron","forge"],"2b05c:Dragonborn.esm":[1,"iron","forge"],"2b065:Dragonborn.esm":[3,"nordic","forge"],"2b066:Dragonborn.esm":[3,"nordic","forge"],"2b067:Dragonborn.esm":[3,"nordic","forge"],"2b068:Dragonborn.esm":[3,"nordic","forge"],"2b069:Dragonborn.esm":[3,"nordic","forge"],"2b06a:Dragonborn.esm":[4,"stalhrim","forge"],"2b06c:Dragonborn.esm":[4,"stalhrim","forge"],"2b06d:Dragonborn.esm":[4,"stalhrim","forge"],"2b06e:Dragonborn.esm":[4,"stalhrim","forge"],"2b06f:Dragonborn.esm":[4,"stalhrim","forge"],"2b070:Dragonborn.esm":[4,"stalhrim","forge"],"2b071:Dragonborn.esm":[4,"stalhrim","forge"],"2b072:Dragonborn.esm":[4,"stalhrim","forge"],"2b075:Dragonborn.esm":[4,"stalhrim","forge"],"2b076:Dragonborn.esm":[4,"stalhrim","forge"],"2b077:Dragonborn.esm":[4,"stalhrim","forge"],"2b078:Dragonborn.esm":[4,"stalhrim","forge"],"2b079:Dragonborn.esm":[4,"stalhrim","forge"],"2b07a:Dragonborn.esm":[4,"stalhrim","forge"],"2b07b:Dragonborn.esm":[4,"stalhrim","forge"],"2b07c:Dragonborn.esm":[4,"stalhrim","forge"],"2b07d:Dragonborn.esm":[4,"stalhrim","forge"],"2b07e:Dragonborn.esm":[3,"nordic","forge"],"2b07f:Dragonborn.esm":[3,"nordic","forge"],"2b080:Dragonborn.esm":[3,"nordic","forge"],"2b081:Dragonborn.esm":[3,"nordic","forge"],"2b082:Dragonborn.esm":[3,"nordic","forge"],"2b083:Dragonborn.esm":[3,"nordic","forge"],"2b084:Dragonborn.esm":[3,"nordic","forge"],"2b085:Dragonborn.esm":[3,"nordic","forge"],"2dd7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"2de4:PlayFluteLuteDrum.esp":[1,"","forge"],"2de5:PlayFluteLuteDrum.esp":[1,"","forge"],"372fe:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"372ff:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37300:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37301:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37306:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37307:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37308:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37309:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"3cf53:Dragonborn.esm":[3,"nordic","forge"],"3cf54:Dragonborn.esm":[4,"stalhrim","forge"],"3d2dd:Dragonborn.esm":[1,"iron","forge"],"490d86:Immersive Weapons.esp":[1,"","forge"],"491dc0:Immersive Weapons.esp":[3,"glass","forge"],"491dc4:Immersive Weapons.esp":[3,"glass","forge"],"53b3:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"53b5:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"53b7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"6aa09:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"77100a:Immersive Weapons.esp":[1,"steel","forge"],"82ebf:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec0:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec1:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec2:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"844:MoreCraftableEquipment.esp":[1,"","forge"],"848:MoreCraftableEquipment.esp":[1,"","forge"],"849:MoreCraftableEquipment.esp":[1,"","forge"],"855:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"856:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"857:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"858:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"85f:MoreCraftableEquipment.esp":[1,"steel","forge"],"860:MoreCraftableEquipment.esp":[1,"steel","forge"],"861:MoreCraftableEquipment.esp":[1,"steel","forge"],"863:MoreCraftableEquipment.esp":[1,"steel","forge"],"866:MoreCraftableEquipment.esp":[1,"steel","forge"],"867:MoreCraftableEquipment.esp":[1,"steel","forge"],"868:MoreCraftableEquipment.esp":[1,"iron","forge"],"869:MoreCraftableEquipment.esp":[1,"iron","forge"],"874:MoreCraftableEquipment.esp":[2,"falmer","forge"],"87b:MoreCraftableEquipment.esp":[2,"falmer","forge"],"87c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88d:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88e:MoreCraftableEquipment.esp":[2,"falmer","forge"],"897:MoreCraftableEquipment.esp":[2,"falmer","forge"],"89c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8a9:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8aa:MoreCraftableEquipment.esp":[1,"","forge"],"8ab:MoreCraftableEquipment.esp":[1,"","forge"],"8ac:MoreCraftableEquipment.esp":[1,"","forge"],"8ad:MoreCraftableEquipment.esp":[1,"","forge"],"8d0:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d1:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d2:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d3:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d4:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d5:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d6:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d7:MoreCraftableEquipment.esp":[1,"","forge"],"8d8:MoreCraftableEquipment.esp":[1,"","forge"],"8d9:MoreCraftableEquipment.esp":[1,"","forge"],"8db:MoreCraftableEquipment.esp":[1,"iron","forge"],"8f0:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f7:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f8:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f9:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8fa:MoreCraftableEquipment.esp":[1,"steel","forge"],"8fc:MoreCraftableEquipment.esp":[1,"iron","forge"],"900:MoreCraftableEquipment.esp":[2,"silver","forge"],"901:MoreCraftableEquipment.esp":[2,"silver","forge"],"94185a:Immersive Weapons.esp":[3,"glass","forge"],"9cf:Update.esm":[1,"steel","forge"],"9d0:Update.esm":[1,"steel","forge"],"9d1:Update.esm":[1,"steel","forge"],"9d2:Update.esm":[1,"steel","forge"],"9d3:Update.esm":[1,"steel","forge"],"9e775:Playable Rieklings.esp":[1,"","forge"],"a30c3:Skyrim.esm":[1,"iron","smelter"],"a30cb:Skyrim.esm":[1,"","smelter"],"a30d3:Skyrim.esm":[3,"ebony","smelter"],"a30d4:Skyrim.esm":[1,"","smelter"],"a30d9:Skyrim.esm":[2,"elven","smelter"],"a30da:Skyrim.esm":[3,"glass","smelter"],"a30db:Skyrim.esm":[2,"orcish","smelter"],"a30dc:Skyrim.esm":[1,"","smelter"],"a30dd:Skyrim.esm":[2,"silver","smelter"],"a30e4:Skyrim.esm":[1,"steel","smelter"],"a5cd6:Skyrim.esm":[1,"steel","forge"],"ab72:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab73:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab74:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab75:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"b64f:Dawnguard.esm":[1,"iron","forge"],"b650:Dawnguard.esm":[1,"steel","forge"],"b651:Dawnguard.esm":[3,"ebony","forge"],"b652:Dawnguard.esm":[2,"dwarven","forge"],"b653:Dawnguard.esm":[3,"glass","forge"],"b654:Dawnguard.esm":[2,"orcish","forge"],"b655:Dawnguard.esm":[2,"elven","forge"],"bc99a:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"c74736:Immersive Weapons.esp":[2,"silver","forge"],"c74737:Immersive Weapons.esp":[2,"silver","forge"],"da0c03:Update.esm":[1,"","smelter"],"da769:Skyrim.esm":[1,"iron","forge"],"da76a:Skyrim.esm":[1,"iron","forge"],"da76b:Skyrim.esm":[1,"iron","forge"],"da76c:Skyrim.esm":[1,"iron","forge"],"da76d:Skyrim.esm":[1,"iron","forge"],"da76e:Skyrim.esm":[1,"iron","forge"],"da76f:Skyrim.esm":[1,"iron","forge"],"db28e:Skyrim.esm":[1,"","forge"],"db28f:Skyrim.esm":[1,"iron","forge"],"db290:Skyrim.esm":[1,"iron","forge"],"db291:Skyrim.esm":[1,"iron","forge"],"db292:Skyrim.esm":[1,"iron","forge"],"db293:Skyrim.esm":[1,"iron","forge"],"db5d3:Skyrim.esm":[1,"","forge"],"db5d4:Skyrim.esm":[1,"","forge"],"db5d5:Skyrim.esm":[1,"","forge"],"db5d6:Skyrim.esm":[1,"","forge"],"db5d7:Skyrim.esm":[1,"steel","forge"],"db896:Skyrim.esm":[1,"steel","forge"],"db897:Skyrim.esm":[1,"steel","forge"],"db898:Skyrim.esm":[1,"steel","forge"],"db899:Skyrim.esm":[2,"orcish","forge"],"db89a:Skyrim.esm":[2,"orcish","forge"],"db89b:Skyrim.esm":[1,"steel","forge"],"db89c:Skyrim.esm":[2,"orcish","forge"],"db89d:Skyrim.esm":[2,"orcish","forge"],"db89e:Skyrim.esm":[1,"steel","forge"],"db89f:Skyrim.esm":[2,"orcish","forge"],"db8a0:Skyrim.esm":[2,"orcish","forge"],"db8a1:Skyrim.esm":[2,"orcish","forge"],"db8a3:Skyrim.esm":[2,"dwarven","forge"],"db8a4:Skyrim.esm":[2,"dwarven","forge"],"db8a5:Skyrim.esm":[2,"dwarven","forge"],"db8a6:Skyrim.esm":[2,"dwarven","forge"],"db8a7:Skyrim.esm":[2,"dwarven","forge"],"db8a8:Skyrim.esm":[2,"dwarven","forge"],"db8a9:Skyrim.esm":[2,"dwarven","forge"],"db8aa:Skyrim.esm":[2,"elven","forge"],"db8ab:Skyrim.esm":[2,"elven","forge"],"db8ac:Skyrim.esm":[2,"elven","forge"],"db8ad:Skyrim.esm":[2,"elven","forge"],"db8ae:Skyrim.esm":[2,"elven","forge"],"db8af:Skyrim.esm":[2,"elven","forge"],"db8b0:Skyrim.esm":[2,"elven","forge"],"db8b1:Skyrim.esm":[3,"glass","forge"],"db8b2:Skyrim.esm":[3,"glass","forge"],"db8b3:Skyrim.esm":[3,"glass","forge"],"db8b4:Skyrim.esm":[3,"glass","forge"],"db8b5:Skyrim.esm":[3,"glass","forge"],"db8b6:Skyrim.esm":[3,"glass","forge"],"db8b7:Skyrim.esm":[3,"glass","forge"],"db8b8:Skyrim.esm":[3,"ebony","forge"],"db8b9:Skyrim.esm":[3,"ebony","forge"],"db8ba:Skyrim.esm":[3,"ebony","forge"],"db8bb:Skyrim.esm":[3,"ebony","forge"],"db8bc:Skyrim.esm":[3,"ebony","forge"],"db8bd:Skyrim.esm":[3,"ebony","forge"],"db8be:Skyrim.esm":[3,"ebony","forge"],"dc9f5:Skyrim.esm":[1,"steel","forge"],"dc9f6:Skyrim.esm":[1,"steel","forge"],"dc9f7:Skyrim.esm":[1,"steel","forge"],"dc9f8:Skyrim.esm":[1,"steel","forge"],"dc9f9:Skyrim.esm":[1,"steel","forge"],"dc9fa:Skyrim.esm":[2,"elven","forge"],"dc9fb:Skyrim.esm":[2,"elven","forge"],"dc9fc:Skyrim.esm":[2,"elven","forge"],"dc9fd:Skyrim.esm":[2,"elven","forge"],"dc9fe:Skyrim.esm":[2,"elven","forge"],"dc9ff:Skyrim.esm":[1,"iron","forge"],"dca00:Skyrim.esm":[1,"iron","forge"],"dca01:Skyrim.esm":[1,"","forge"],"dca02:Skyrim.esm":[1,"","forge"],"dca03:Skyrim.esm":[1,"","forge"],"dca04:Skyrim.esm":[1,"","forge"],"dca05:Skyrim.esm":[1,"steel","forge"],"dca06:Skyrim.esm":[1,"steel","forge"],"dca07:Skyrim.esm":[1,"steel","forge"],"dca08:Skyrim.esm":[1,"steel","forge"],"dca0e:Skyrim.esm":[3,"glass","forge"],"dca0f:Skyrim.esm":[3,"glass","forge"],"dca10:Skyrim.esm":[3,"glass","forge"],"dca11:Skyrim.esm":[3,"glass","forge"],"dca12:Skyrim.esm":[3,"glass","forge"],"dd975:Skyrim.esm":[1,"steel","forge"],"dd977:Skyrim.esm":[1,"steel","forge"],"dd978:Skyrim.esm":[1,"steel","forge"],"dd979:Skyrim.esm":[2,"dwarven","forge"],"dd97a:Skyrim.esm":[2,"dwarven","forge"],"dd97b:Skyrim.esm":[2,"dwarven","forge"],"dd97c:Skyrim.esm":[2,"dwarven","forge"],"dd97d:Skyrim.esm":[2,"dwarven","forge"],"dd97e:Skyrim.esm":[1,"steel","forge"],"dd97f:Skyrim.esm":[1,"steel","forge"],"dd980:Skyrim.esm":[1,"steel","forge"],"dd981:Skyrim.esm":[1,"steel","forge"],"dd983:Skyrim.esm":[2,"orcish","forge"],"dd984:Skyrim.esm":[2,"orcish","forge"],"dd985:Skyrim.esm":[2,"orcish","forge"],"dd986:Skyrim.esm":[2,"orcish","forge"],"dd987:Skyrim.esm":[2,"orcish","forge"],"dd988:Skyrim.esm":[3,"ebony","forge"],"dd989:Skyrim.esm":[3,"ebony","forge"],"dd98a:Skyrim.esm":[3,"ebony","forge"],"dd98b:Skyrim.esm":[3,"ebony","forge"],"dd98c:Skyrim.esm":[3,"ebony","forge"],"f46cc:Skyrim.esm":[1,"ancient nord","skyforge"],"f46cd:Skyrim.esm":[1,"ancient nord","skyforge"],"f46cf:Skyrim.esm":[1,"ancient nord","skyforge"],"f46d0:Skyrim.esm":[1,"ancient nord","skyforge"],"f6f2a:Skyrim.esm":[1,"steel","forge"],"f74d:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"f813:Dawnguard.esm":[1,"steel","forge"],"f814:Dawnguard.esm":[2,"dwarven","forge"]};
+// ==== end FUEL_BY_RECIPE ====
+
+/** The fuel a recipe burns, { grade, metal, bench }, or null when it burns none. */
+function fuelFor(recipeDesc) {
+  if (!Object.prototype.hasOwnProperty.call(FUEL_BY_RECIPE, recipeDesc)) { return null; }
+  const f = FUEL_BY_RECIPE[recipeDesc];
+  const grade = Number(f && f[0]);
+  if (!CHARCOAL_GRADES[grade]) { return null; }
+  return { grade: grade, metal: String(f[1] || ''), bench: String(f[2] || 'forge') };
 }
 
-/** Take one piece of any charcoal grade. Returns true when something went. */
-function takeCharcoal(actorId) {
-  for (let i = 0; i < CHARCOAL_DESCS.length; i++) {
-    const desc = CHARCOAL_DESCS[i];
-    if (!desc) { continue; }
-    if (takeItem(actorId, desc, 1)) { return true; }
+/** How many of one item a pack holds, every stack of it counted. */
+function packCount(actorId, itemDesc) {
+  const baseId = idOf(itemDesc);
+  if (!baseId) { return 0; }
+  let inv = null;
+  try { inv = mp.get(actorId, 'inventory'); } catch (e) { return 0; }
+  const entries = (inv && inv.entries) || [];
+  let n = 0;
+  for (let i = 0; i < entries.length; i++) {
+    if (entries[i] && entries[i].baseId === baseId) { n += Number(entries[i].count) || 0; }
   }
-  return false;
+  return n;
 }
 
+/** The charcoal of exactly that grade in this pack, or '' when there is none. */
+function charcoalHeld(actorId, grade) {
+  const g = CHARCOAL_GRADES[grade];
+  if (!g) { return ''; }
+  for (let i = 0; i < g.descs.length; i++) {
+    if (g.descs[i] && packCount(actorId, g.descs[i]) > 0) { return g.descs[i]; }
+  }
+  return '';
+}
 
-const HAFTED_FAMILIES = ['War axes', 'Battleaxes', 'Warhammers', 'Maces', 'Other weapons'];
+/** What is said when the grade a piece asks for is not in the pack. */
+function fuelRefusal(fuel) {
+  const grade = CHARCOAL_GRADES[fuel.grade].name;
+  const metal = fuel.metal.replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); });
+  let first;
+  if (fuel.bench === 'smelter') {
+    first = metal ? 'Smelting ' + metal + ' burns ' + grade : 'A smelter burns ' + grade;
+  } else {
+    const at = fuel.bench === 'skyforge' ? 'the skyforge' : 'a forge';
+    first = metal ? metal + ' at ' + at + ' burns ' + grade
+                  : (fuel.bench === 'skyforge' ? 'The skyforge' : 'A forge') + ' burns ' + grade;
+  }
+  return first + ', and you have none. A Charburner makes it from firewood at a kiln.';
+}
+
+/*
+  The four hafted families on the smith page: a war axe, a battleaxe, a
+  warhammer and a mace are a metal head on a wooden haft. Other weapons was
+  on this list too, and in the table that family is the woodcutter's axe and
+  the drum, the flute and the lute, so the instruments were asked for a
+  handle (#1398). An instrument is not a haft.
+*/
+const HAFTED_FAMILIES = ['War axes', 'Battleaxes', 'Warhammers', 'Maces'];
 
 /** True when this recipe makes something fitted to a wooden handle. */
 function wantsAHandle(row) {
@@ -26531,6 +26589,105 @@ function wantsAHandle(row) {
     if (HAFTED_FAMILIES[i] === family) { return true; }
   }
   return false;
+}
+
+/*
+  WHAT A MASTER'S CRAFT GIVES ON TOP (#1398).
+
+  Grand Chef, docs/systems/professions/cook.md: "At master, either half. Every
+  batch yields two instead of one. The craft is still one piece of work toward
+  the next rank." So a Cook row made by somebody holding the perk hands over
+  the batch a second time, once the engine has added the first, and the work
+  is credited once, by the caller, as before.
+
+  Master Weaver, docs/systems/professions/tailor.md: clothing a master tailor
+  makes keeps the weather off. Which garment is one is written on it, the way
+  durability writes a condition and a key its house: the fresh garment is
+  named with the needs block's mark in front, and the needs block reads the
+  mark off what is worn. The hidden armour half is not here: the page gives
+  it no rating, and the server cannot reach a garment's armour (see the note
+  over the durability block).
+
+  The perk is the progression block's own answer (perks), so it is held at
+  master in the half somebody picked and nowhere else.
+*/
+function holdsPerk(actorId, key) {
+  const P = globalThis.__thornswoodProgression;
+  const C = globalThis.__thornswoodCharacter;
+  if (!P || !P.perks || !C || !C.stateOf) { return false; }
+  try { return P.perks(C.stateOf(actorId)).indexOf(key) !== -1; } catch (e) { return false; }
+}
+
+/** Name n plain units of a garment just made as a master weaver's. Answers how many. */
+function markWoven(actorId, outDesc, name, n) {
+  const N = globalThis.__thornswoodNeeds;
+  const mark = N && N.NEEDS && N.NEEDS.wear && N.NEEDS.wear.woven ? N.NEEDS.wear.woven.mark : '';
+  const baseId = idOf(outDesc);
+  if (!mark || !baseId || !(n > 0)) { return 0; }
+  let inv = null;
+  try { inv = mp.get(actorId, 'inventory'); } catch (e) { return 0; }
+  const entries = (inv && inv.entries) || [];
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (!e || e.baseId !== baseId || e.name || e.worn || e.wornLeft || !(e.count > 0)) { continue; }
+    const take = Math.min(n, e.count);
+    const named = {};
+    for (const k in e) { if (Object.prototype.hasOwnProperty.call(e, k)) { named[k] = e[k]; } }
+    named.count = take;
+    named.name = mark + String(name || 'Garment');
+    e.count -= take;
+    if (e.count <= 0) { entries.splice(i, 1); }
+    entries.push(named);
+    try { mp.set(actorId, 'inventory', { entries: entries }); } catch (e2) { return 0; }
+    return take;
+  }
+  return 0;
+}
+
+/*
+  WHEN THE OUTPUT IS IN THE PACK. The gamemode is asked before the engine does
+  anything: CraftEvent::Fire runs mp.onCraft, and only when it was not refused
+  does OnFireSuccess take the inputs and add the output, in the same
+  server.tick() call (the fork's CraftEvent.cpp, and index.ts, which awaits a
+  timer between ticks). So a timer set here runs after the engine has finished,
+  whatever its length, and nothing about it is a race; 0 says that.
+
+  What the timer cannot assume is that the engine succeeded. RemoveItems throws
+  when the server does not hold what the client said went in ("Source
+  inventory doesn't have enough", seen on the dev server on 23 September),
+  after the gamemode already said yes. So the count of the output is taken now,
+  and the second batch and the mark are given only if the craft's own n
+  arrived. Otherwise a craft the engine refused would hand a Grand Chef a free
+  batch, or name a garment the master did not make.
+*/
+const MASTER_CRAFT_AFTER_MS = 0;
+
+/** After an allowed craft: Grand Chef's second batch and Master Weaver's mark. */
+function masterCraft(actorId, row, count) {
+  if (!row || typeof row !== 'object' || !row.out) { return; }
+  const n = Number(count) > 0 ? Math.floor(Number(count)) : (Number(row.makes) || 1);
+  const chef = row.owner === 'Cook' && holdsPerk(actorId, 'grandchef');
+  const weaver = row.owner === 'Tailor' && row.type === 'ARMO' && holdsPerk(actorId, 'masterweaver');
+  if (!chef && !weaver) { return; }
+  const before = packCount(actorId, row.out);
+  setTimeout(function () {
+    if (packCount(actorId, row.out) < before + n) {
+      log(actorId.toString(16), 'made no', row.name, 'after all (the engine refused the craft), so no master work is added');
+      return;
+    }
+    if (chef) {
+      try {
+        addItem(actorId, row.out, n);
+        log(actorId.toString(16), 'is a Grand Chef: a second batch of', n, row.name);
+      } catch (e) { log('the second batch of', row.name, 'was not handed over:', e); }
+    }
+    if (weaver) {
+      try {
+        const done = markWoven(actorId, row.out, row.name, n);
+        log(actorId.toString(16), 'is a Master Weaver:', done, row.name, 'woven');
+      } catch (e) { log('the woven garment', row.name, 'was not named:', e); }
+    }
+  }, MASTER_CRAFT_AFTER_MS);
 }
 
 function onCraftRoll(actorId, roll) {
@@ -27143,6 +27300,30 @@ mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recip
   }
 
   /*
+    THE FUEL AND THE HANDLE ARE ASKED FOR BEFORE ANYTHING IS TAKEN (#1398), so
+    a refusal for one never costs the other, and a key is never named for a
+    craft that did not happen. They are taken below, once nothing can refuse.
+  */
+  const fuel = fuelFor(desc);
+  const coal = fuel ? charcoalHeld(actorId, fuel.grade) : '';
+  if (fuel && !coal) {
+    const no = fuelRefusal(fuel);
+    notify(actorId, no);
+    say(actorId, no);
+    log(actorId.toString(16), 'was refused', desc, '(' + row.name + '): no', CHARCOAL_GRADES[fuel.grade].name);
+    return false;
+  }
+  const hafted = wantsAHandle(row);
+  if (hafted && packCount(actorId, HANDLE_DESC) < 1) {
+    const no = 'A ' + String(row.name || 'that') + ' is fitted to a wooden handle and you ' +
+               'have none. A woodworker cuts them from firewood at a kiln.';
+    notify(actorId, no);
+    say(actorId, no);
+    log(actorId.toString(16), 'was refused', desc, '(' + row.name + '): no handle');
+    return false;
+  }
+
+  /*
     A KEY COMES OUT NAMED FOR THE HOUSE ITS MOLD WAS STAMPED AT.
 
     Patrick, 23 September, giving the whole shape at once: "you make a mold,
@@ -27211,33 +27392,23 @@ ecipes.json are hafted, and 126 of those are rows the server is
     handle were free. It is worth five gold and a novice woodworker's minute, so
     the error is small, but it is an error and not a rounding.
 
-    THE FIVE FAMILIES. A haft is a shaft you hold in two hands or one, with the
-    weight at the end: war axes, battleaxes, warhammers, maces, and the eight
-    rows the table files under Other weapons, which is where the woodcutter's
-    axe lives. Swords, greatswords and daggers are a tang and a grip rather than
-    a haft. Bows and staves are wooden through and through, which is a different
-    thing from having a handle fitted to them, and a bow that wanted a handle
-    would read as a mistake to anybody holding one.
+    THE FOUR FAMILIES. A haft is a shaft you hold in two hands or one, with the
+    weight at the end: war axes, battleaxes, warhammers and maces, the four the
+    smith page names. Other weapons was a fifth, and in the table it is the
+    woodcutter's axe, which names its handle in its own record, and the drum,
+    the flute and the lute, which are not hafted (#1398). Swords, greatswords
+    and daggers are a tang and a grip rather than a haft. Bows and staves are
+    wooden through and through, which is a different thing from having a
+    handle fitted to them, and a bow that wanted a handle would read as a
+    mistake to anybody holding one.
   */
-  if (!answer.refusal && wantsCharcoal(row)) {
-    if (!takeCharcoal(actorId)) {
-      const no = 'A forge burns charcoal, and you have none. A Charburner makes it from firewood at a kiln.';
-      notify(actorId, no);
-      say(actorId, no);
-      log(actorId.toString(16), 'was refused', desc, '(' + row.name + '): no charcoal');
-      return false;
-    }
+  if (coal && !takeItem(actorId, coal, 1)) {
+    log(actorId.toString(16), 'was refused', desc, '(' + row.name + '): the charcoal could not be taken');
+    return false;
   }
-
-  if (!answer.refusal && wantsAHandle(row)) {
-    if (!takeItem(actorId, HANDLE_DESC, 1)) {
-      const no = 'A ' + String(row.name || 'that') + ' is fitted to a wooden handle and you ' +
-                 'have none. A woodworker cuts them from firewood at a kiln.';
-      notify(actorId, no);
-      say(actorId, no);
-      log(actorId.toString(16), 'was refused', desc, '(' + row.name + '): no handle');
-      return false;
-    }
+  if (hafted && !takeItem(actorId, HANDLE_DESC, 1)) {
+    log(actorId.toString(16), 'was refused', desc, '(' + row.name + '): the handle could not be taken');
+    return false;
   }
 
   if (answer.credit) {
@@ -27247,6 +27418,7 @@ ecipes.json are hafted, and 126 of those are rows the server is
       say(actorId, raised);
     }
   }
+  masterCraft(actorId, row, count);
   return;
 });
 
@@ -47757,7 +47929,12 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       and every one of them slides down to the place's own number as you walk
       away.
     */
-    fire: { at: 34, reach: 300 },
+    /*
+      master is a Master Carver's fire or kiln (#1398):
+      docs/systems/professions/woodworker.md, "the hottest the warmth rules
+      allow: +48 at your feet, and still 0 at 300". See carverFire().
+    */
+    fire: { at: 34, master: 48, reach: 300 },
 
     /*
       AND IT SPREADS.
@@ -47829,7 +48006,14 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       material: { fur: 1.0, leather: 0.75, light: 0.55, cloth: 0.5,
                   heavy: 0.45, none: 0 },
       most: 0.8,
-      heat: 0.5
+      heat: 0.5,
+      /*
+        A Master Weaver's garment (#1398): "ignores 4 degrees of exposure on
+        top of the table", docs/systems/temperature.md. mark is what the craft
+        writes in front of its name, which is how a worn one is known. See
+        weathered().
+      */
+      woven: { degrees: 4, mark: 'Master-Woven ' }
     },
 
     /*
@@ -48257,7 +48441,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   function warmthTarget(actorId, n) {
     var raw = NEEDS.place[n.place];
     if (typeof raw !== 'number') { raw = NEEDS.comfort; }
-    raw = raw + outdoorSeason(n) + exposure(n) + fireWarmth(n) + waterKind(actorId, n);
+    raw = raw + outdoorSeason(n) + weathered(actorId, n) + fireWarmth(n, actorId) + waterKind(actorId, n);
     if (raw < 0) { raw = 0; }
     if (raw > 100) { raw = 100; }
     if (raw === NEEDS.comfort) { return raw; }
@@ -48309,13 +48493,67 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     A fire is not gated on the roof, because a campfire in a blizzard is the
     whole point of a campfire.
   */
-  function fireWarmth(n) {
+  function fireWarmth(n, actorId) {
     if (!n) { return 0; }
     var d = Number(n.fire);
     if (!isFinite(d) || d < 0) { return 0; }
     var reach = NEEDS.fire.reach || 1;
     if (d >= reach) { return 0; }
-    return NEEDS.fire.at * (1 - (d / reach));
+    var at = (actorId && carverFire(actorId)) ? NEEDS.fire.master : NEEDS.fire.at;
+    return at * (1 - (d / reach));
+  }
+
+  /*
+    MASTER CARVER'S FIRE (#1398).
+
+    docs/systems/professions/woodworker.md: fires and kilns a master
+    woodworker builds or works are the hottest the warmth rules allow, 48 at
+    your feet and still nothing at 300, where any other fire is 34.
+
+    The server cannot see which fire is which: the client says only how far
+    the nearest one is. So a fire is a Master Carver's while one is working
+    it: a master woodworker who is within reach of a fire, and you within
+    reach of them in the same cell. That is the master's own fire, the kiln
+    they burn at, and whoever is standing at it with them. Nobody builds a
+    fire in this world yet, so working one is the whole of it today.
+
+    The perk is the progression block's own answer, held at master in the
+    half somebody picked. Nothing loaded answers no, which is an ordinary fire.
+  */
+  function perkHeld(actorId, key) {
+    var P = g.__thornswoodProgression;
+    var C = g.__thornswoodCharacter;
+    if (!P || !P.perks || !C || !C.stateOf) { return false; }
+    try { return P.perks(C.stateOf(actorId)).indexOf(key) !== -1; } catch (e) { return false; }
+  }
+
+  function carverFire(actorId) {
+    if (perkHeld(actorId, 'mastercarver')) { return true; }
+    var reach = NEEDS.fire.reach || 1;
+    var online = [];
+    try { online = mp.getOnlinePlayers() || []; } catch (e) { return false; }
+    if (online.length < 2) { return false; }
+    var here = null, cell = '';
+    try {
+      here = mp.get(actorId, 'pos');
+      cell = String(mp.get(actorId, 'worldOrCellDesc') || '');
+    } catch (e) { return false; }
+    if (!here || !cell) { return false; }
+    for (var i = 0; i < online.length; i++) {
+      var them = online[i];
+      if (them === actorId) { continue; }
+      try {
+        if (String(mp.get(them, 'worldOrCellDesc') || '') !== cell) { continue; }
+        var p = mp.get(them, 'pos');
+        if (!p) { continue; }
+        var dx = p[0] - here[0], dy = p[1] - here[1], dz = p[2] - here[2];
+        if ((dx * dx + dy * dy + dz * dz) >= reach * reach) { continue; }
+      } catch (e) { continue; }
+      var theirs = read(them);
+      if (!theirs || !(theirs.fire >= 0) || theirs.fire >= reach) { continue; }
+      if (perkHeld(them, 'mastercarver')) { return true; }
+    }
+    return false;
   }
 
   /*
@@ -48639,6 +48877,38 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     return out;
   }
 
+  /*
+    MASTER WEAVER'S HALF OF THE WEATHER (#1398).
+
+    docs/systems/professions/tailor.md: clothing a master tailor makes keeps
+    the weather off, and temperature.md says how much: 4 degrees of exposure
+    ignored, on top of the clothing table. It does not become fur, so
+    insulation() is not touched; the 4 come off what the weather, the wind,
+    the night and the height are taking, and never turn them into warmth.
+
+    A woven garment is one whose name starts with NEEDS.wear.woven.mark, which
+    the craft writes on it (markWoven, beside mp.onCraft). One worn is enough
+    and two do not ignore 8. A piece with an enchantment on it is not one: the
+    enchanting table lets anybody name a piece, and the engine only enchants a
+    plain one, which a woven garment is not.
+  */
+  function wovenWorn(actorId) {
+    var mark = NEEDS.wear.woven.mark;
+    var entries = wornEntries(actorId);
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (!e || !e.worn || e.enchantmentId) { continue; }
+      if (typeof e.name === 'string' && e.name.indexOf(mark) === 0) { return true; }
+    }
+    return false;
+  }
+
+  function weathered(actorId, n) {
+    var off = exposure(n);
+    if (!(off < 0) || !wovenWorn(actorId)) { return off; }
+    return Math.min(0, off + NEEDS.wear.woven.degrees);
+  }
+
   function insulation(actorId) {
     var total = 0;
     try {
@@ -48778,8 +49048,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       tempTarget: Math.round(warmthTarget(actorId, n)),
       roof: !!n.roof, night: !!n.night,
       fireAway: (typeof n.fire === 'number' && n.fire >= 0) ? Math.round(n.fire) : -1,
-      fireWorth: Math.round(fireWarmth(n)),
-      exposure: Math.round(exposure(n)),
+      fireWorth: Math.round(fireWarmth(n, actorId)),
+      exposure: Math.round(weathered(actorId, n)),
       cover: Math.round(insulation(actorId) * 100),
       worn: wornList(actorId)
     };
