@@ -25,6 +25,9 @@ is not going to get done.
 - Something that fits an existing issue goes on that issue as an edit or a
   comment, not a second issue.
 - Write down what was measured and what is left, not just that you looked.
+- A fix changes the cause. No band-aids: nothing that notices the damage and
+  undoes it, and no retry that hopes a race comes out right. Until the cause
+  is found, finding it is the work.
 - A pull request that finishes an issue says `Closes #N`; merging it closes
   the issue and moves the card to Done.
 
