@@ -6947,6 +6947,15 @@
     if (ref && boardObjectHere(ref)) {
       /* The object itself. Standing at it is the only other rule. */
     } else if (ref) {
+      /*
+        SOMEBODY UNDER THE CROSSHAIR IS NOT THE BOARD (#1374). Raven Rock's
+        board starts where its innkeeper, Geldis Sadri, stands, and he is a
+        guild trader: without this, E on him opened the board and never his
+        wares. A person or an NPC answers E themselves.
+      */
+      let type = 0;
+      try { type = ref.getBaseObject().getType(); } catch (err) { type = 0; }
+      if (type === 43) { return false; }
       let rd = 99999;
       try {
         rd = boardDist(ref.getPositionX(), ref.getPositionY(), ref.getPositionZ(), spot);

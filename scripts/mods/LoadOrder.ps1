@@ -83,124 +83,29 @@ function Get-CollectionRevision([string]$Slug) {
 }
 
 <#
-  The installed revision as Vortex records it in state.v2, or 0.
-
-  Vortex keeps the redux state flattened into LevelDB keys joined by ###, the
-  same shape Get-CollectionNewest reads. For an installed collection the two
-  keys that matter are, under the mod's own id:
-
-      persistent###mods###skyrimse###<modId>###attributes###collectionSlug -> "ombo2a"
-      persistent###mods###skyrimse###<modId>###attributes###revisionNumber -> 5
-
-  LevelDB writes the key, then a length byte (a control character), then that
-  many bytes of the value's JSON, so a string value is "ombo2a" and a number
-  value is a bare 5. The slug and the number are separate keys, tied together
-  only by the <modId> that both carry, so this reads both, matches the slug
-  to its mod id, and takes the highest revision recorded against a mod id
-  whose slug is the one asked for. That last part matters: a machine can have
-  two collections installed at once (ombo2a on main, 7essxf on dev), and the
-  revision numbers must not be mixed up between them.
-
-  The length byte is [\x00-\x1F], a bounded class rather than a wildcard, for
-  the reason Get-CollectionNewest gives: a wildcard would step over a quote
-  and read a number out of a neighbouring key.
-
-  When those two attributes are missing (the ship PC after Set-Collection:
-  a locally authored vortex_collection_* with no subscriber install metadata),
-  fall back through newestFileId to collections###revisions###<id> for the
-  same slug. That is the shape live state.v2 actually has for 7essxf on One.
+  Installed revision from Vortex's current compressed LevelDB metadata, or 0.
+  The shared C# reader honors CURRENT, sequences, tombstones and CRCs, matching
+  collectionSlug and revisionNumber to one installed mod. Locally authored
+  vortex_collection_* mods may link through newestFileId to a cached matching
+  slug. An unrelated cached revision never establishes what is installed.
 #>
 function Get-CollectionRevisionFromState([string]$Slug) {
     if (-not $Slug) { return 0 }
     $st = Get-VortexStateDir
     if (-not (Test-Path -LiteralPath $st)) { return 0 }
-    $slugRe = 'mods###skyrimse###([^#]+)###attributes###collectionSlug[\x00-\x1F]{1,4}"' + [regex]::Escape($Slug) + '"'
-    $revRe = 'mods###skyrimse###([^#]+)###attributes###revisionNumber[\x00-\x1F]{1,4}(\d+)'
-    $mine = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-    $rev = [Collections.Generic.Dictionary[string, int]]::new([StringComparer]::Ordinal)
-    foreach ($f in (Get-ChildItem -LiteralPath $st -File -EA SilentlyContinue)) {
-        try {
-            $txt = Get-VortexStateText $f.FullName
-            foreach ($m in [regex]::Matches($txt, $slugRe)) { [void]$mine.Add($m.Groups[1].Value) }
-            foreach ($m in [regex]::Matches($txt, $revRe)) {
-                $id = $m.Groups[1].Value
-                $n = 0
-                if ([int]::TryParse($m.Groups[2].Value, [ref]$n)) {
-                    if (-not $rev.ContainsKey($id) -or $n -gt $rev[$id]) { $rev[$id] = $n }
-                }
-            }
-        } catch { }
-    }
-    $best = 0
-    foreach ($id in $mine) { if ($rev.ContainsKey($id) -and $rev[$id] -gt $best) { $best = $rev[$id] } }
-    if ($best -gt 0) { return $best }
-
-    # Authoring / own-collection shape (ship PC after Set-Collection): Vortex
-    # does not write collectionSlug or revisionNumber on the local
-    # vortex_collection_* mod. It does write newestFileId (the
-    # collections###revisions id) and newestVersion, and the revisions table
-    # carries the slug and the revisionNumber. Tie them the same way
-    # Get-CollectionNewest already ties revisions to a slug, but only count a
-    # revision that an installed collection mod actually points at so a
-    # second collection on the machine cannot inflate Have.
-    $revSlugRe = 'collections###revisions###([^#]+)###info###collection###slug[\x00-\x1F]{1,4}"' + [regex]::Escape($Slug) + '"'
-    $fileIdRe = 'mods###skyrimse###([^#]+)###attributes###newestFileId[\x00-\x1F]{1,4}(\d+)'
-    $verRe = 'mods###skyrimse###([^#]+)###attributes###newestVersion[\x00-\x1F]{1,4}"(\d+)"'
-    $revIds = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-    $fileIdMods = [Collections.Generic.Dictionary[string, Collections.Generic.List[string]]]::new([StringComparer]::Ordinal)
-    $modVer = [Collections.Generic.Dictionary[string, int]]::new([StringComparer]::Ordinal)
-    $files = @(Get-ChildItem -LiteralPath $st -File -EA SilentlyContinue)
-    foreach ($f in $files) {
-        try {
-            $txt = Get-VortexStateText $f.FullName
-            foreach ($m in [regex]::Matches($txt, $revSlugRe)) { [void]$revIds.Add($m.Groups[1].Value) }
-            foreach ($m in [regex]::Matches($txt, $fileIdRe)) {
-                $fid = $m.Groups[2].Value
-                if (-not $fileIdMods.ContainsKey($fid)) {
-                    $fileIdMods[$fid] = New-Object Collections.Generic.List[string]
-                }
-                if (-not $fileIdMods[$fid].Contains($m.Groups[1].Value)) {
-                    [void]$fileIdMods[$fid].Add($m.Groups[1].Value)
-                }
-            }
-            foreach ($m in [regex]::Matches($txt, $verRe)) {
-                $n = 0
-                if ([int]::TryParse($m.Groups[2].Value, [ref]$n)) {
-                    $id = $m.Groups[1].Value
-                    if (-not $modVer.ContainsKey($id) -or $n -gt $modVer[$id]) { $modVer[$id] = $n }
-                }
-            }
-        } catch { }
-    }
-    if ($revIds.Count -eq 0) { return 0 }
-    $revNum = [Collections.Generic.Dictionary[string, int]]::new([StringComparer]::Ordinal)
-    foreach ($f in $files) {
-        try {
-            $txt = Get-VortexStateText $f.FullName
-            foreach ($rid in $revIds) {
-                foreach ($m in [regex]::Matches($txt, ('collections###revisions###' + [regex]::Escape($rid) + '###info###revisionNumber[\x00-\x1F]{1,4}(\d+)'))) {
-                    $n = 0
-                    if ([int]::TryParse($m.Groups[1].Value, [ref]$n)) {
-                        if (-not $revNum.ContainsKey($rid) -or $n -gt $revNum[$rid]) { $revNum[$rid] = $n }
-                    }
-                }
-            }
-        } catch { }
-    }
-    foreach ($rid in $revIds) {
-        if (-not $fileIdMods.ContainsKey($rid)) { continue }
-        $n = 0
-        if ($revNum.ContainsKey($rid)) { $n = $revNum[$rid] }
-        if ($n -le 0) {
-            foreach ($mid in $fileIdMods[$rid]) {
-                if ($modVer.ContainsKey($mid) -and $modVer[$mid] -gt $n) { $n = $modVer[$mid] }
-            }
-        }
-        if ($n -gt $best) { $best = $n }
-    }
-    return $best
+    try {
+        Import-VortexStateReader
+        return [Thornswood.VortexProfileState]::CollectionRevision($st, $Slug)
+    } catch { return 0 }
 }
 
+function Import-VortexStateReader {
+    if ('Thornswood.VortexProfileState' -as [type]) { return }
+    $source = Join-Path $PSScriptRoot '..\..\launcher\app\VortexProfileState.cs'
+    if ($PSVersionTable.PSVersion.Major -le 5) {
+        Add-Type -Path $source -ReferencedAssemblies System.dll,System.Core.dll,System.Xml.dll,System.Runtime.Serialization.dll
+    } else { Add-Type -Path $source }
+}
 <#
   The legacy fallback: the revision out of the old folder name, or 0. Kept for
   a machine that still has collection_<slug>_<rev>_<when> folders and no state
@@ -544,12 +449,7 @@ function Get-VortexProfileDir([string]$Name = 'Thornswood') {
     $st = Get-VortexStateDir
     if (Test-Path -LiteralPath (Join-Path $st 'CURRENT')) {
         # The current LevelDB metadata survives compaction; transition text does not.
-        if (-not ('Thornswood.VortexProfileState' -as [type])) {
-            $source = Join-Path $PSScriptRoot '..\..\launcher\app\VortexProfileState.cs'
-            if ($PSVersionTable.PSVersion.Major -le 5) {
-                Add-Type -Path $source -ReferencedAssemblies System.dll,System.Core.dll,System.Xml.dll,System.Runtime.Serialization.dll
-            } else { Add-Type -Path $source }
-        }
+        Import-VortexStateReader
         try { return [Thornswood.VortexProfileState]::Find($st, $profilesRoot, $Name) }
         catch { throw 'Vortex profile metadata cannot be verified. Finish its deployment, close Vortex, then retry. Do not create another profile to work around unreadable state.' }
     }

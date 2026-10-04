@@ -377,7 +377,8 @@
     if (data.offer) {
       var what = data.offer.kind === 'friend' ? 'wants to be friends'
         : (data.offer.kind === 'party' ? 'is asking you to join their party'
-                                       : 'is offering to trade');
+        : (data.offer.kind === 'apprentice' ? 'offers to take you on as an apprentice'
+                                            : 'is offering to trade'));
       html += '<div class="ask"><span class="who"><span class="kicker">Request</span><b>' + esc(data.offer.name) +
               '</b> ' + what + '</span>' +
               '<button class="go" data-do="yes">Accept</button>' +
@@ -496,6 +497,7 @@
   function offerWords(kind) {
     if (kind === 'friend') { return 'wants to be friends.'; }
     if (kind === 'party') { return 'is asking you to join their party.'; }
+    if (kind === 'apprentice') { return 'offers to take you on as an apprentice.'; }
     return 'is offering to trade.';
   }
 
