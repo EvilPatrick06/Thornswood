@@ -52,7 +52,10 @@ const { spawn } = require('child_process');
 const ROOT = path.join(__dirname, '..');
 const APP = path.join(ROOT, 'site');
 const SITE_SRC = process.argv[2] || path.join(APP, 'server.js');
-const HUB = fs.readFileSync(path.join(APP, 'public', 'index.html'), 'utf8');
+// The hub as it reaches the browser: index.html and hub.js, where its script
+// moved in #1479 (no inline script under the content security policy).
+const HUB = fs.readFileSync(path.join(APP, 'public', 'index.html'), 'utf8') + '\n' +
+            fs.readFileSync(path.join(APP, 'public', 'hub.js'), 'utf8');
 const SERVER = fs.readFileSync(SITE_SRC, 'utf8');
 const GALLERY_CS = fs.readFileSync(path.join(ROOT, 'launcher', 'app', 'Gallery.cs'), 'utf8');
 

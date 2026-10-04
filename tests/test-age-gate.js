@@ -5,7 +5,9 @@
 const fs = require('fs');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
-const HOME = path.join(ROOT, 'site', 'public', 'home.html');
+// The gate is in the home page's script, which moved out of home.html into
+// home.js in #1479 (no inline script under the content security policy).
+const HOME = path.join(ROOT, 'site', 'public', 'home.js');
 const RULES = path.join(ROOT, 'site', 'data', 'site', 'rules.md');
 const TERMS = path.join(ROOT, 'site', 'data', 'site', 'terms.md');
 const CR = String.fromCharCode(13);

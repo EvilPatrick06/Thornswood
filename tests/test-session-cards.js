@@ -29,12 +29,18 @@ const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in test
 const fs = require('fs');
 const path = require('path');
 
-const PAGE = path.join(REPO_DIR, 'site', 'public', 'index.html');
-const src = fs.readFileSync(PAGE, 'utf8');
+// The hub as it reaches the browser. Its script and style moved out of
+// index.html into hub.js and hub.css in #1479 (no inline script or style
+// under the content security policy), so its functions are read in hub.js and
+// its rules in hub.css.
+const PAGE = path.join(REPO_DIR, 'site', 'public', 'hub.js');
+const src = ['index.html', 'hub.css', 'hub.js'].map(function (f) {
+  return fs.readFileSync(path.join(REPO_DIR, 'site', 'public', f), 'utf8');
+}).join('\n');
 
 function grab(name) {
   const at = src.indexOf('function ' + name);
-  if (at < 0) throw new Error('site/public/index.html has no function ' + name);
+  if (at < 0) throw new Error('site/public/hub.js has no function ' + name);
   const b = src.indexOf('{', at);
   let d = 0;
   for (let i = b; i < src.length; i++) {
