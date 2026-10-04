@@ -82,7 +82,8 @@
   const UI_PATH = 'Data/Platform/UI/index.html';
   const OVERLAYS = ['thornswood-chat.js', 'thornswood-emotes.js', 'thornswood-voice.js',
                     'thornswood-skills.js', 'thornswood-party.js',
-                    'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js', 'thornswood-afk.js'];
+                    'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js',
+                    'thornswood-repair.js', 'thornswood-afk.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -1941,7 +1942,7 @@
   */
   const CAP_CLOSES = {
     skills: 'thornswoodSkills', party: 'thornswoodParty', journal: 'thornswoodJournal',
-    board: 'thornswoodBoard',
+    board: 'thornswoodBoard', repair: 'thornswoodRepair',
     trade: 'thornswoodTrade', merchant: 'thornswoodMerchant', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
     afk: 'thornswoodAfk'
   };
@@ -4885,6 +4886,138 @@
   }));
 
   /*
+    ------------------------------------- a repair kit, used from the inventory
+
+    #1384, and Patrick's rule of 4 October: commands only for dev and staff,
+    and everything people do takes buttons and GUI. A kit mends a
+    piece (docs/systems/durability.md), and a kit is a MISC, which Skyrim's
+    inventory cannot use: E on one does nothing and tells nobody. So while
+    the inventory is open and a repair kit is in the pack, one line at the
+    bottom names a key, and that key shuts the inventory and asks the server
+    for the repair panel (game/ui/thornswood-repair.js). The server answers
+    with the rows on the panel's own property, and the panel's buttons send
+    the rest. /repair is that ask; nobody is told to type it.
+
+    THE KEY IS THE MOLD KEY, U. Every letter is taken by Skyrim or by us, and
+    U only means anything while its own line is up. The mold's line needs
+    the world with no menu open and a door under the crosshair; this one
+    needs the inventory open. They are never up together, and moldPress has
+    already said no before this is asked.
+
+    ONLY WITH THE PLUGIN THAT HAS KITS. The three kits are 0x154b0, 0x154b1
+    and 0x154b2 in Thornswood-Content.esp (scripts/mods/Add-ContentRecords.py).
+    A build without them has no kit to carry, so nothing is drawn and nothing
+    is sent. Asked once, when the world is up, and remembered as runtime ids,
+    for the reason under THE IDS, RESOLVED ONCE.
+  */
+  const KIT_FILE = 'Thornswood-Content.esp';
+  const KIT_ITEMS = [0x154b0, 0x154b1, 0x154b2];   // MISC Weapon Kit, Armor Kit, Sewing Kit
+  const INVENTORY_MENU = 'InventoryMenu';
+  let kitBases = null;     // null not asked yet, [] none in this build, else runtime ids
+  let repairShown = false;
+
+  /** Whether this build has repair kits, found out once the world is up. */
+  function kitsReady() {
+    if (kitBases) { return kitBases.length > 0; }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    if (!pc) { return false; }
+    const found = [];
+    try {
+      for (const local of KIT_ITEMS) {
+        const form = sp.Game.getFormFromFile(local, KIT_FILE);
+        const id = form ? (form.getFormID() >>> 0) : 0;
+        if (id) { found.push(id); }
+      }
+    } catch (e) {
+      // Not remembered. A throw is not an answer, so it is asked again.
+      return false;
+    }
+    kitBases = found;
+    log(found.length ? 'repair kits: this build has them, so the inventory offers ' + MOLD_NAME
+                     : 'repair kits: no kit records in ' + KIT_FILE + ', so no line in the inventory');
+    return found.length > 0;
+  }
+
+  /** How many repair kits the pack holds, of the three. */
+  function kitsCarried() {
+    if (!kitsReady()) { return 0; }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    if (!pc) { return 0; }
+    let n = 0;
+    for (const id of kitBases) {
+      try {
+        const form = sp.Game.getFormEx(id);
+        n += form ? (Number(pc.getItemCount(form)) || 0) : 0;
+      } catch (e) { }
+    }
+    return n;
+  }
+
+  // At the bottom of the inventory, in the mold line's colours.
+  const REPAIR_CSS =
+    'position:fixed;left:50%;bottom:12%;transform:translateX(-50%);z-index:2147482900;' +
+    'pointer-events:none;white-space:nowrap;' +
+    'font-family:"Palatino Linotype",Palatino,Georgia,serif;font-size:19px;letter-spacing:.03em;' +
+    'color:#d9cfb4;background:rgba(11,10,8,.72);border:1px solid rgba(198,170,109,.42);' +
+    'padding:8px 16px 9px;text-shadow:0 2px 4px rgba(0,0,0,.95)';
+
+  /** The line up or down. Only remembered once the page has taken it. */
+  function drawRepairLine(on) {
+    if (on === repairShown) { return; }
+    if (!on) {
+      if (T.js('try{var d=document.getElementById("ts-repair-line");if(d){d.style.display="none";}}catch(e){}')) {
+        repairShown = false;
+      }
+      return;
+    }
+    const html =
+      '<span style="display:inline-block;min-width:26px;text-align:center;margin-right:12px;' +
+      'padding:1px 7px;border:1px solid rgba(233,209,155,.55);border-bottom-width:2px;' +
+      'border-radius:3px;background:rgba(0,0,0,.35);color:#e9d19b">' + MOLD_NAME + '</span>' +
+      'Mend a piece with your repair kit';
+    if (T.js('(function(){try{' +
+             'var d=document.getElementById("ts-repair-line");' +
+             'if(!d){d=document.createElement("div");d.id="ts-repair-line";' +
+             'd.style.cssText=' + JSON.stringify(REPAIR_CSS) + ';' +
+             'document.body.appendChild(d);}' +
+             'd.innerHTML=' + JSON.stringify(html) + ';' +
+             'd.style.display="";' +
+             '}catch(e){}})();')) {
+      repairShown = true;
+    }
+  }
+
+  sp.on('menuOpen', guard('repair line up', (e) => {
+    if (!e || e.name !== INVENTORY_MENU) { return; }
+    drawRepairLine(!!T.ready && kitsCarried() > 0);
+  }));
+  sp.on('menuClose', guard('repair line down', (e) => {
+    if (!e || e.name !== INVENTORY_MENU) { return; }
+    drawRepairLine(false);
+  }));
+
+  /*
+    The key, in the inventory. Asked again at the press: the inventory open,
+    nothing typing, a kit in the pack. Answers whether it was used, so the
+    key falls through when it was not.
+  */
+  function repairPress() {
+    if (!T.ready || claims.chat) { return false; }
+    let open = false;
+    try { open = !!sp.Ui.isMenuOpen(INVENTORY_MENU); } catch (e) { open = false; }
+    if (!open) { return false; }
+    if (!(kitsCarried() > 0)) { drawRepairLine(false); return false; }
+    drawRepairLine(false);
+    try { sp.TESModPlatform.closeMenu(INVENTORY_MENU); }
+    catch (err) { say('repair: closeMenu threw on the inventory: ' + err); }
+    tellServer('/repair');
+    say('pressed ' + MOLD_NAME + ' in the inventory with a repair kit, asked the server for the repair panel');
+    return true;
+  }
+
+  /*
     ------------------------------------- your party: the name, the map, the way
 
     Patrick, 22 September, asked the party menu to let people "see their name
@@ -7123,6 +7256,8 @@
     // The mold key, and only while a door is under the crosshair and a Key
     // Mold is in the pack. Otherwise it is not used and goes on down the list.
     if (e.code === MOLD_KEY && moldPress()) { return; }
+    // The same key in the inventory, with a repair kit in the pack (#1384).
+    if (e.code === MOLD_KEY && repairPress()) { return; }
     if (e.code === LOCK_KEY && lockPress()) { return; }
     /*
       The five social keys work in the open world, and P and J can always
@@ -8059,6 +8194,9 @@
     }
     if (what === 'trade:opened') { T.claimFocus('trade', true); return; }
     if (what === 'trade:closed') { T.claimFocus('trade', false); return; }
+    if (what === 'repair:opened') { T.claimFocus('repair', true); return; }
+    if (what === 'repair:closed') { T.claimFocus('repair', false); return; }
+    if (what === 'repair:ready') { log('the repair panel is in'); return; }
     if (what === 'merchant:opened') { T.claimFocus('merchant', true); return; }
     if (what === 'merchant:closed') { T.claimFocus('merchant', false); return; }
     if (what === 'merchant:ready') {

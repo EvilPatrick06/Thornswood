@@ -33,8 +33,9 @@
 //
 // A TEMPER IS REFUSED NOW (#1384). Tempering is cut and a piece is mended
 // with a kit (docs/systems/durability.md), so a craft at the sharpening wheel
-// or the armour table is refused to everybody, says /repair, and is not
-// credited. S9 and S16 drive it.
+// or the armour table is refused to everybody, points at the kit in the
+// inventory and never at a command (no chat commands for what people do,
+// Patrick, 4 October), and is not credited. S9 and S16 drive it.
 //
 // Read only.
 const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
@@ -406,7 +407,8 @@ if (block !== null) {
           const t = run(Object.assign({}, nord, { benchBase: b }));
           const r2 = run(Object.assign({}, nord, { benchBase: b, race: 'dlc2rieklingrace' }));
           return t.refused && r2.refused && t.spoken.length === 1 &&
-                 t.spoken[0].indexOf('/repair') !== -1 && t.credited.length === 0;
+                 t.spoken[0].indexOf('/repair') === -1 && /inventory/.test(t.spoken[0]) &&
+                 t.credited.length === 0;
         }));
   }
 
@@ -509,7 +511,7 @@ if (block !== null) {
       yes('S16 ' + what + ' is refused to everybody, a master smith included, and says the kit',
           r.refused && r2.refused && smithing.refused &&
           smithing.spoken.length === 1 && /repair kit/.test(smithing.spoken[0]) &&
-          smithing.spoken[0].indexOf('/repair') !== -1 &&
+          smithing.spoken[0].indexOf('/repair') === -1 && /inventory/.test(smithing.spoken[0]) &&
           Object.keys(told).length === 0 &&
           smithing.logs.some(function (l) { return l.indexOf('was refused a temper') !== -1; }));
       yes('S16 ' + what + ' is not counted as work', r.credited.length === 0 &&

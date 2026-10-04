@@ -537,7 +537,7 @@ namespace Thornswood
                      "While you are looking at somebody, stops hearing them. Yours only: they are not told, and nobody else is affected. Press again to hear them.",
                      ThornIni, "MuteThemKey", 38));
             l.Add(Dx("moldkey", "ThornsWood", "Press a key mold into a lock",
-                     "While you are looking at a building's door with a blank key mold in your pack, presses it into the lock so it becomes that building's mold. The holder has to be you or be standing there.",
+                     "While you are looking at a building's door with a blank key mold in your pack, presses it into the lock so it becomes that building's mold. The holder has to be you or be standing there. In your inventory, with a repair kit in your pack, the same key opens the repair panel.",
                      ThornIni, "MoldKey", 22));
             l.Add(Dx("lockkey", "ThornsWood", "Lock the door",
                      "Locks the door you last opened, the same door /claim and /lock use. Logged to the server as /lock. Unlock is still /unlock.",
