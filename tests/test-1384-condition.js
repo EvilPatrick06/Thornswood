@@ -40,10 +40,9 @@ yes('the durability block is in the gamemode', block !== null);
 const box = { console: { log: function () {} } };
 box.globalThis = box;
 if (block) {
-  // The block registers its OnHit handler on mp at the end; without mp it
-  // stops after handing over the factory, which is all this needs.
-  const factoryOnly = block.slice(0, block.indexOf("mp['onPapyrusEvent:OnHit']"));
-  vm.runInNewContext(factoryOnly, box);
+  // Without mp the block stops after handing over the factory, which is all
+  // this needs.
+  vm.runInNewContext(block, box);
 }
 const create = box.__thornswoodDurabilityCreate;
 const KITS = box.__thornswoodDurabilityKits;
@@ -509,6 +508,14 @@ function w0BreakChance() { return D.BREAK_CHANCE; }
       w.count(PERSON, STEEL_ARMOR, '') === 1 && w.count(PERSON, STEEL_ARMOR, 'Steel Armor (0%)') === 0);
 }
 
+{
+  const w = world({ rolls: [0.01] });
+  w.packs[OTHER] = [{ baseId: IRON_SWORD, count: 1, name: 'Iron Sword (0%)', worn: true }];
+  w.api.onHit(PERSON, { type: 'form', desc: 'ff000059' }, { type: 'espm', desc: 'iron-sword' });
+  yes('a hit as the engine sends it, the aggressor and weapon as descriptors, is read the same way',
+      w.count(OTHER, IRON_SWORD) === 0);
+}
+
 // ---------------------------------------------------------- a drop ---------
 
 const DROPPED = 0xff00a001;
@@ -578,9 +585,10 @@ yes('a press reaches the durability block, after the box is remembered',
     onActivate.indexOf('touchedBox(casterRefrId, refrId)') < onActivate.indexOf('wear.pressed('));
 yes('a drop reaches it, and the drop watcher still returns nothing',
     /wear\.dropped\(actorId, Number\(baseId\) \|\| 0, count\)/.test(onDrop) && !/\breturn\b/.test(onDrop));
-yes('a hit reaches it through the Papyrus family, under guard()',
-    /^mp\['onPapyrusEvent:OnHit'\] = guard\('onPapyrusEvent:OnHit', function \(targetId, aggressor, source\) \{/m.test(gm) &&
-    /wear\.hit\(/.test(between(code, "mp['onPapyrusEvent:OnHit']", '\n});')));
+const onHitLines = gm.split('\n').filter(function (l) { return /^mp\['onPapyrusEvent:OnHit'\] = guard\('onPapyrusEvent:OnHit', function/.test(l); });
+yes('a hit reaches it through the one OnHit handler, under guard(), beside the warrior maneuvers',
+    onHitLines.length === 1 &&
+    /wear\.onHit\(targetId, aggressor, source\)/.test(between(code, "mp['onPapyrusEvent:OnHit']", '\n});')));
 const temper = recipeless.indexOf('if (tempering) {');
 yes('a temper at the wheel or the armour table is refused before anything is credited',
     temper !== -1 && /if \(tempering\) \{[\s\S]*?return false;\s*\}/.test(recipeless) &&

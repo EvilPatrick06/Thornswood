@@ -1763,8 +1763,14 @@ function halfGate(actorId, half, rank, refusal) {
  * A yield has been handed out: count the work, and hand back the line about a
  * new rank when one was reached. Anything going wrong here costs a count, not
  * somebody's salt, so it is swallowed.
+ *
+ * n is how many pieces this one piece of work is, one when it is not given. A
+ * warrior's kill is the one caller that passes it (#1386): a dragon is 16
+ * pieces. It is still one swing for tiredness, the page's "the same rest cost
+ * as a swing of a pick", and the party bonus is 15% of the whole count.
  */
-function creditWork(actorId, key) {
+function creditWork(actorId, key, n) {
+  const pieces = (typeof n === 'number' && n >= 1) ? Math.floor(n) : 1;
   /*
     Every piece of work is also a piece of tiredness.
 
@@ -1816,14 +1822,14 @@ function creditWork(actorId, key) {
     listed together is a checkbox everybody ticks once and never thinks about
     again.
   */
-  let extra = false;
+  let extra = 0;
   try {
     const soc = globalThis.__thornswoodSocial;
     if (soc && soc.workBonus) {
       const over = soc.workBonus(actorId) - 1;
       if (over > 0) {
-        PARTY_BANK[actorId] = (PARTY_BANK[actorId] || 0) + over;
-        if (PARTY_BANK[actorId] >= 1) { PARTY_BANK[actorId] -= 1; extra = true; }
+        PARTY_BANK[actorId] = (PARTY_BANK[actorId] || 0) + over * pieces;
+        while (PARTY_BANK[actorId] >= 1) { PARTY_BANK[actorId] -= 1; extra++; }
       }
     }
   } catch (e) { }
@@ -1832,9 +1838,10 @@ function creditWork(actorId, key) {
   if (!c || !c.credit) { return null; }
   try {
     let line = c.credit(actorId, key);
-    if (extra) {
-      // The second piece's answer wins when it has one, because a rank raised
-      // by the bonus piece is the thing worth saying.
+    // Every piece after the first, and then the bonus pieces. A later
+    // piece's answer wins when it has one, because a rank raised by the last
+    // piece is the thing worth saying.
+    for (let i = 1; i < pieces + extra; i++) {
       const more = c.credit(actorId, key);
       if (more) { line = more; }
     }
@@ -5591,6 +5598,116 @@ function startChargenTimer() {
 ensureProperties();
 startChargenTimer();
 
+/*
+  HOW MANY PIECES ONE KILL IS WORTH TO A WARRIOR (#1386).
+
+  docs/systems/professions/warrior.md, "How much one kill is worth": a chicken
+  and a dragon are not the same fight, so the piece count follows how hard the
+  thing was. Until this, every kill was one piece.
+
+  THE HUNTER LIST FIRST. When the body's base is on the hunter list
+  (HUNTS_BY_BASE), the pieces are that row's own hunter rank: novice 1,
+  advanced 2, expert 4, master 8. A named body uses its own row, so Karhu, who
+  is master on that list, is 8 although a bear is 4. The page says so in those
+  words, and it is why a base on the list never reaches the race lines below.
+
+  EVERYTHING ELSE BY THE RACE THE ENGINE SAYS IT IS. A bandit, a draugr and a
+  dragon are not on the hunter list, and their base is often a levelled
+  template, so the race on the record itself is not the answer (the hunt
+  table's build script measured over a thousand people whose own RNAM says
+  fox). Actor.GetRace in the fork follows the actor's own template chain, the
+  one the engine rolled when it spawned, so it names the race the body really
+  has. The race's editor id is read out of RACES, the table of every RACE
+  record in the load order, and matched against the lines on the page, first
+  match winning, so a dragon priest is read before a dragon:
+
+    Bandit, guard, forsworn, skeleton           2   the people's races and
+                                                    every skeleton race
+    Draugr, falmer, hagraven                    4
+    Giant, dragon priest, centurion, lurker     8
+    Dragon                                     16
+
+  and, for an animal that is not on the hunter list, the strength table's own
+  kinds: sabre cat, troll, frostbite spider, horse, horker and netch calf 2,
+  bear and chaurus 4, mammoth and a grown netch 8. A named animal off the list
+  uses its kind, which is what the race is. Anything the page does not name
+  (an atronach, a spriggan, a dwarven sphere) is the novice line, 1, which is
+  what every kill was before, and that choice is a question on the issue.
+
+  A PERSON KILLED BY A PERSON IS STILL NOTHING. That test is in mp.onDeath and
+  is not this function's: nothing here is asked about a person's body.
+*/
+const WARRIOR_KILL = {
+  byRank: { novice: 1, advanced: 2, expert: 4, master: 8 },
+  byRace: [
+    [/dragonpriest/, 8],
+    [/dragon|alduin/, 16],
+    [/^(c00)?giant|frostgiant/, 8],
+    [/centurion/, 8],
+    [/lurker/, 8],
+    [/draugr|falmer|hagraven/, 4],
+    [/skeleton/, 2],
+    [/^(dlc1)?(nord|imperial|breton|redguard|orc|argonian|khajiit|woodelf|highelf|darkelf|elder)race/, 2],
+    [/mammoth|^dlc2netchrace$/, 8],
+    [/^bear|chaurus/, 4],
+    [/sabrecat|troll|frostbitespider|horse|horker|netchcalf/, 2]
+  ],
+  fallback: 1
+};
+
+/** The pieces one kill is worth: the hunter list's rank for a base on it, else
+ *  the race's line. Pure, so the harness can ask it about any body. */
+function warriorPieces(baseDesc, raceEdid) {
+  const base = String(baseDesc || '');
+  if (base && Object.prototype.hasOwnProperty.call(HUNTS_BY_BASE, base)) {
+    const rank = HUNTS_BY_BASE[base].rank;
+    if (Object.prototype.hasOwnProperty.call(WARRIOR_KILL.byRank, rank)) {
+      return WARRIOR_KILL.byRank[rank];
+    }
+  }
+  const race = String(raceEdid || '').toLowerCase();
+  if (race) {
+    for (let i = 0; i < WARRIOR_KILL.byRace.length; i++) {
+      if (WARRIOR_KILL.byRace[i][0].test(race)) { return WARRIOR_KILL.byRace[i][1]; }
+    }
+  }
+  return WARRIOR_KILL.fallback;
+}
+
+/** The editor id of the race the engine says this actor is, or '' when it
+ *  cannot say. The descriptor is read as the engine writes it and, failing
+ *  that, with its hex put the way RACES writes it. */
+function raceEdidOf(actorId) {
+  let desc = '';
+  try {
+    const r = mp.callPapyrusFunction('method', 'Actor', 'GetRace',
+      { type: 'form', desc: mp.getDescFromId(actorId) }, []);
+    desc = (r && r.desc) ? String(r.desc) : '';
+  } catch (e) {
+    return '';
+  }
+  const items = (typeof RACES !== 'undefined' && RACES && RACES.items) ? RACES.items : null;
+  if (!desc || !items) { return ''; }
+  let row = Object.prototype.hasOwnProperty.call(items, desc) ? items[desc] : null;
+  if (!row) {
+    const at = desc.indexOf(':');
+    const hex = at > 0 ? parseInt(desc.slice(0, at), 16) : NaN;
+    const again = isNaN(hex) ? '' : hex.toString(16) + desc.slice(at);
+    row = (again && Object.prototype.hasOwnProperty.call(items, again)) ? items[again] : null;
+  }
+  return row ? String(row.e || '') : '';
+}
+
+/** How many pieces killing this actor is worth to a warrior. */
+function killPieces(actorId) {
+  let base = '';
+  try { base = String(mp.get(actorId, 'baseDesc') || ''); } catch (e) { base = ''; }
+  if (base && Object.prototype.hasOwnProperty.call(HUNTS_BY_BASE, base)) {
+    return warriorPieces(base, '');
+  }
+  return warriorPieces(base, raceEdidOf(actorId));
+}
+
 /**
  * Set the arrival point at the moment of death, while we still know where the
  * body fell. The engine reads spawnPoint when the respawn timer expires.
@@ -5601,6 +5718,20 @@ startChargenTimer();
  * a person.
  */
 mp.onDeath = guard('onDeath', function (actorId, killerId) {
+  /*
+    A BLOW THE SERVER LANDED ITSELF STILL HAS A KILLER (#1386). The extra
+    damage of a warrior's Heavy or Wreck is written by the maneuvers block
+    after the engine's own hit, and the engine kills with no killer when a
+    write takes health to nothing. The maneuvers block remembers whose blow
+    that was for a moment, and it is asked here, before anything reads the
+    killer.
+  */
+  if (!killerId) {
+    try {
+      var blowBy = globalThis.__thornswoodManeuvers;
+      if (blowBy && blowBy.killerOf) { killerId = blowBy.killerOf(actorId) || killerId; }
+    } catch (eBlow) { }
+  }
   let npcDeath = false;
   try { npcDeath = !(Number(mp.get(actorId, 'profileId')) > 0); } catch (e) { return; }
   /*
@@ -5709,7 +5840,10 @@ mp.onDeath = guard('onDeath', function (actorId, killerId) {
         var ch = globalThis.__thornswoodCharacter;
         var st = (ch && ch.stateOf) ? ch.stateOf(kid) : null;
         if (st && st.prof === 'warrior' && st.half) {
-          var raised = creditWork(kid, st.half);
+          // As many pieces as the body was hard (killPieces, over this
+          // handler, #1386): a chicken is 1 and a dragon 16. Whatever the
+          // body carried staying in the pack is the hunt, not a piece more.
+          var raised = creditWork(kid, st.half, killPieces(actorId));
           if (raised) {
             notify(kid, raised);
             say(kid, raised);
@@ -8272,6 +8406,17 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     // Which bench they just pressed, for /key. Costs one hash lookup and is
     // passed over inside touchedBench for anything that is not a bench.
     try { prop.touchedBench(casterRefrId, baseDesc); } catch (e) { }
+  }
+
+  /*
+    WHICH BED THEY JUST PRESSED, for /rest bed (#1392). The bed is the one the
+    engine handed over here, never the word somebody types. One remembered
+    lookup per base, and nothing is written for a press on anything that is
+    not a bed. The press goes on, so the engine still lays them down.
+  */
+  const beds = globalThis.__thornswoodBeds;
+  if (beds && beds.touched) {
+    try { beds.touched(casterRefrId, refrId, baseDesc); } catch (e) { }
   }
 
   let message = null;
@@ -35420,6 +35565,546 @@ log('gamemode loaded:',
     return true;
   }
 
+  /*
+    ------------------------------------------------------------------- beds
+
+    THE NIGHT IS THE HOLDER'S PRICE, AND A BED IS ONE THE SERVER SAW (#1392).
+
+    docs/systems/property.md, "What a home is for": the holder sets who may
+    sleep there and what the night costs. /bed 20 at the building sets the
+    gold for one night, /bed - makes a night free for the people the holder
+    allows and sells it to nobody else, and /bed alone says the price. An inn
+    is the same rule, and there is no server inn price.
+
+    docs/systems/exhaustion.md: a bed you own, rent or were allowed is 80 rest
+    an hour, an inn room once the holder's price is paid is 50, a bedroll is
+    the campfire's 35, and saying the word in the street does not count. Those
+    are the three kinds this hands the needs block (bed, inn, bedroll), and
+    the numbers stay in NEEDS.recover there.
+
+    HOW THE SERVER KNOWS A BED. mp.onActivate is handed the bed when somebody
+    presses it, the same way it is handed a door, and the base's own record
+    says what it is: a FURN whose editor id names a bed, read once per base
+    through mp.lookupEspmRecordById and remembered. /rest bed then asks two
+    things the server measures itself: which bed this person last pressed, and
+    whether they are still within BED_REACH of it in the same cell. The typed
+    word is not asked, and neither is the client's own guess at furniture. The
+    building is the bed's own cell, the same way the take limit finds whose a
+    chest is, because a building here is its interior cell.
+
+    WHILE THE PLACE IS TRUE. Every BED_EVERY_MS the beds people are resting in
+    are measured again: walk away, lose the key, or let the night run out, and
+    the rest stops. Somebody who comes into the world already resting in a bed
+    the server did not see them lie down in stops too, and lies down again. A
+    restart forgets who lay down where, and that is the case it catches.
+
+    THE GOLD MOVES AND IS NEVER MADE. The price comes out of the sleeper's
+    pack through takeGold and goes into the holder's through payOut, the
+    letters' payout. A holder who is not in the world has it kept on the
+    book below, and it goes into their pack the next time they are.
+
+    TWO THINGS THE PAGE DOES NOT SAY, asked on #1392. ALLOWED is carrying a
+    key to the building or its deed, the two things that already open a locked
+    door (mayPass), because that is the one way the server knows a holder has
+    let somebody in. A NIGHT is NIGHT_MS of real time from paying, at that
+    building. Paying is /rest bed said twice inside PAY_AGAIN_MS: the first
+    says the price, the second pays it, so lying down never spends gold on its
+    own.
+
+    The book is beds.json beside the register rather than a field on a claim,
+    so the register's own reader and writer are untouched. A price names the
+    holder who set it, so a building that changes hands does not keep the last
+    holder's price.
+  */
+  // INVENTED: far enough to stand beside a double bed and press it, near
+  // enough that the next room's bed is not this one.
+  var BED_REACH = 200;
+  // INVENTED: one night is the eight hours the Rest clock takes to empty.
+  var NIGHT_MS = 8 * 3600000;
+  var PAY_AGAIN_MS = 60000;
+  var BED_EVERY_MS = 5000;
+  var LYING_FORGET_MS = 48 * 3600000;
+  /* A bed by its editor id. Bedrolls first, since they say bed too. The
+     others are words that hold the letters and are not beds. */
+  var BEDROLL_EDID = /bedroll/i;
+  var BED_EDID = /bed/i;
+  var NOT_BED_EDID = /bedside|embed|riverbed|flowerbed/i;
+  var BED_KINDS = { bed: true, inn: true, bedroll: true };
+
+  function bedHas(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
+
+  /* Who pressed which bed, who is lying in one, who was told a price, and who
+     has been seen since coming in. On globalThis, so a hot reload keeps them. */
+  if (!g.__thornswoodBedState) {
+    g.__thornswoodBedState = { pressed: {}, lying: {}, offers: {}, seen: {} };
+  }
+  var bedState = g.__thornswoodBedState;
+
+  // ------------------------------------------------------------ the book --
+
+  function bedBookPath() {
+    var path = require('path');
+    return path.join(path.dirname(registerPath()), 'beds.json');
+  }
+
+  /* Rebuilt field by field, the same discipline as the register: a price is
+     a holder and a whole number, a night is a time, and takings are gold. */
+  function loadBedBook() {
+    var out = { prices: {}, nights: {}, takings: {} };
+    var raw = null;
+    try { raw = JSON.parse(require('fs').readFileSync(bedBookPath(), 'utf8')); }
+    catch (e) { return out; }
+    if (!raw || typeof raw !== 'object') { return out; }
+    var now = Date.now();
+    var prices = (raw.prices && typeof raw.prices === 'object') ? raw.prices : {};
+    for (var b in prices) {
+      if (!bedHas(prices, b) || b === '__proto__' || !prices[b]) { continue; }
+      var by = Number(prices[b].by) || 0;
+      var price = Number(prices[b].price) || 0;
+      if (by > 0 && price > 0 && Math.floor(price) === price) {
+        out.prices[b] = { by: by, price: price };
+      }
+    }
+    var nights = (raw.nights && typeof raw.nights === 'object') ? raw.nights : {};
+    for (var nb in nights) {
+      if (!bedHas(nights, nb) || nb === '__proto__' || !nights[nb] ||
+          typeof nights[nb] !== 'object') { continue; }
+      for (var who in nights[nb]) {
+        if (!bedHas(nights[nb], who) || who === '__proto__') { continue; }
+        var at = Number(nights[nb][who]) || 0;
+        if ((Number(who) || 0) > 0 && at > 0 && (now - at) < NIGHT_MS) {
+          if (!bedHas(out.nights, nb)) { out.nights[nb] = {}; }
+          out.nights[nb][who] = at;
+        }
+      }
+    }
+    var takings = (raw.takings && typeof raw.takings === 'object') ? raw.takings : {};
+    for (var tp in takings) {
+      if (!bedHas(takings, tp) || tp === '__proto__') { continue; }
+      var gold = Number(takings[tp]) || 0;
+      if ((Number(tp) || 0) > 0 && gold > 0 && Math.floor(gold) === gold) {
+        out.takings[tp] = gold;
+      }
+    }
+    return out;
+  }
+
+  function saveBedBook() {
+    var now = Date.now();
+    for (var b in bedBook.nights) {
+      if (!bedHas(bedBook.nights, b)) { continue; }
+      var row = bedBook.nights[b];
+      for (var who in row) {
+        if (bedHas(row, who) && (now - row[who]) >= NIGHT_MS) { delete row[who]; }
+      }
+      if (!Object.keys(row).length) { delete bedBook.nights[b]; }
+    }
+    try {
+      var fs = require('fs');
+      var file = bedBookPath();
+      try { fs.mkdirSync(require('path').dirname(file), { recursive: true }); } catch (e) { }
+      fs.writeFileSync(file, JSON.stringify(bedBook, null, 1));
+    } catch (e) {
+      plog('could not write the bed book:', e);
+    }
+  }
+
+  var bedBook = loadBedBook();
+
+  // ------------------------------------------------------------ the beds --
+
+  function textOf(v) {
+    if (typeof v === 'string') { return v; }
+    var out = '';
+    if (v && typeof v.length === 'number') {
+      for (var i = 0; i < v.length && v[i]; i++) { out += String.fromCharCode(v[i]); }
+    }
+    return out;
+  }
+
+  /* 'bed', 'roll' or '' for a base, asked of the engine once and kept. An
+     answer the engine could not give is '', not a bed. */
+  var bedKinds = {};
+  function bedKind(baseDesc) {
+    baseDesc = String(baseDesc || '');
+    if (!baseDesc) { return ''; }
+    if (bedHas(bedKinds, baseDesc)) { return bedKinds[baseDesc]; }
+    var kind = '';
+    try {
+      var res = mp.lookupEspmRecordById(idOf(baseDesc));
+      var rec = res && res.record;
+      if (rec && String(rec.type) === 'FURN') {
+        var edid = textOf(rec.editorId);
+        var fields = rec.fields || [];
+        for (var i = 0; !edid && i < fields.length; i++) {
+          if (fields[i] && String(fields[i].type) === 'EDID') { edid = textOf(fields[i].data); }
+        }
+        if (BEDROLL_EDID.test(edid)) { kind = 'roll'; }
+        else if (BED_EDID.test(edid) && !NOT_BED_EDID.test(edid)) { kind = 'bed'; }
+      }
+    } catch (e) { kind = ''; }
+    bedKinds[baseDesc] = kind;
+    return kind;
+  }
+
+  /* Called from onActivate for every press. Writes only for a bed. */
+  function bedTouched(actorId, refrId, baseDesc) {
+    var kind = bedKind(baseDesc);
+    if (!kind || !actorId || !refrId) { return; }
+    bedState.pressed[actorId] = { ref: refrId, roll: kind === 'roll', at: Date.now() };
+  }
+
+  function stillAt(actorId, refrId) {
+    var d = distanceTo(actorId, refrId);
+    return d >= 0 && d <= BED_REACH;
+  }
+
+  function isBuilding(cell) {
+    return !!cell && (bedHas(BUILDING_NAME, cell) || bedHas(claims, cell));
+  }
+
+  /* The building a bed stands in, which is its cell when that is one. */
+  function bedBuilding(refrId) {
+    var cell = '';
+    try { cell = String(mp.get(refrId, 'worldOrCellDesc') || ''); } catch (e) { cell = ''; }
+    return isBuilding(cell) ? cell : '';
+  }
+
+  /* The building /bed means: the door opened in the last minute, or the
+     building they are standing in. */
+  function bedBuildingHere(actorId) {
+    var b = here(actorId);
+    if (b) { return b; }
+    var cell = '';
+    try { cell = String(mp.get(actorId, 'worldOrCellDesc') || ''); } catch (e) { cell = ''; }
+    return isBuilding(cell) ? cell : null;
+  }
+
+  /* The holder, or somebody carrying its key or its deed. See the block. */
+  function allowedIn(actorId, profileId, building, held) {
+    if (!held) { return false; }
+    if (profileId && held.by === profileId) { return true; }
+    if (holdsKey(actorId, building)) { return true; }
+    if (holdsDeed(actorId, building)) { return true; }
+    return false;
+  }
+
+  function priceOf(building, held) {
+    var p = bedHas(bedBook.prices, building) ? bedBook.prices[building] : null;
+    return (p && held && p.by === held.by) ? p.price : 0;
+  }
+
+  function nightPaid(building, profileId) {
+    if (!profileId || !bedHas(bedBook.nights, building)) { return false; }
+    var at = Number(bedBook.nights[building][profileId]) || 0;
+    return at > 0 && (Date.now() - at) < NIGHT_MS;
+  }
+
+  /*
+    What this bed is to this person: a kind of rest, a refusal, or a price
+    still to pay. Asked when they lie down and again on every tick.
+  */
+  function bedVerdict(actorId, profileId, ref, roll) {
+    var building = bedBuilding(ref);
+    var held = building ? holderOf(building) : null;
+    var out = { building: building, held: held, kind: '', line: '', price: 0, paid: false };
+    if (!held) {
+      if (roll) { out.kind = 'bedroll'; return out; }
+      out.line = building
+        ? ('Nobody holds ' + nameOf(building) + ', so nobody can let you sleep in its beds.')
+        : 'This bed is nobody\'s to lend, so it does not count as a bed.';
+      return out;
+    }
+    if (allowedIn(actorId, profileId, building, held)) {
+      out.kind = roll ? 'bedroll' : 'bed';
+      return out;
+    }
+    if (nightPaid(building, profileId)) {
+      out.kind = roll ? 'bedroll' : 'inn';
+      out.paid = true;
+      return out;
+    }
+    var price = priceOf(building, held);
+    if (!price) {
+      out.line = nameOf(building) + ' is ' + held.name + '\'s, and they have not let you ' +
+                 'sleep there. Nights there are not for sale.';
+      return out;
+    }
+    out.price = price;
+    return out;
+  }
+
+  function personName(actorId) {
+    try {
+      var a = mp.get(actorId, 'appearance');
+      if (a && a.name) { return String(a.name); }
+    } catch (e) { }
+    return 'somebody';
+  }
+
+  function profileOf(actorId) {
+    try { return Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { return 0; }
+  }
+
+  function onlineActorOf(profileId) {
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return 0; }
+    for (var i = 0; i < online.length; i++) {
+      if (profileOf(online[i]) === profileId) { return online[i]; }
+    }
+    return 0;
+  }
+
+  function tellBed(actorId, line) {
+    try { notify(actorId, line); } catch (e) { }
+    try { say(actorId, line); } catch (e) { }
+  }
+
+  /* The night's gold from the sleeper's pack to the holder's, and the night
+     written down. False when the sleeper does not have it. */
+  function payNight(actorId, profileId, building, held, price) {
+    if (!takeGold(actorId, price)) { return false; }
+    var to = onlineActorOf(held.by);
+    var handed = to ? payOut(to, price) : false;
+    if (!handed) {
+      bedBook.takings[held.by] = (Number(bedBook.takings[held.by]) || 0) + price;
+    }
+    if (!bedHas(bedBook.nights, building)) { bedBook.nights[building] = {}; }
+    bedBook.nights[building][profileId] = Date.now();
+    saveBedBook();
+    var who = personName(actorId);
+    plog(who, 'paid', price, 'gold for a night at', nameOf(building),
+         handed ? 'into ' + held.name + '\'s pack' : 'kept for ' + held.name + ' until they are in');
+    if (handed) {
+      tellBed(to, who + ' paid you ' + price + ' gold for a night at ' + nameOf(building) + '.');
+    }
+    return true;
+  }
+
+  /*
+    /rest bed, /rest inn and /rest bedroll. Answers the line to say. The kind
+    of rest is the server's answer, not the word: /rest inn in your own bed is
+    your own bed, and /rest bed in somebody else's paid room is the inn room.
+  */
+  function bedRest(actorId, profileId) {
+    var needs = g.__thornswoodNeeds;
+    if (!needs || !needs.resting) { return 'That is not running on this server.'; }
+    if (!actorId || !profileId) {
+      return 'The server cannot find your character right now. Give it a moment and try again.';
+    }
+    var bed = bedHas(bedState.pressed, actorId) ? bedState.pressed[actorId] : null;
+    if (!bed || !stillAt(actorId, bed.ref)) {
+      return 'There is no bed here. Lie down in a real one and it counts; saying the word does not.';
+    }
+    var v = bedVerdict(actorId, profileId, bed.ref, bed.roll);
+    if (v.line) { return v.line; }
+    var paidLine = '';
+    if (v.price) {
+      var name = nameOf(v.building);
+      var now = Date.now();
+      var offer = bedHas(bedState.offers, actorId) ? bedState.offers[actorId] : null;
+      if (!offer || offer.building !== v.building || offer.price !== v.price ||
+          (now - offer.at) > PAY_AGAIN_MS) {
+        bedState.offers[actorId] = { building: v.building, price: v.price, at: now };
+        return 'A night at ' + name + ' is ' + v.price + ' gold, handed to ' + v.held.name +
+               '. Say /rest bed again within a minute to pay it.';
+      }
+      delete bedState.offers[actorId];
+      if (!payNight(actorId, profileId, v.building, v.held, v.price)) {
+        return 'A night at ' + name + ' is ' + v.price + ' gold, and you are not carrying that much.';
+      }
+      paidLine = 'You pay ' + v.price + ' gold to ' + v.held.name + ' for a night at ' + name + '. ';
+      v.kind = bed.roll ? 'bedroll' : 'inn';
+      v.paid = true;
+    }
+    bedState.lying[actorId] = { ref: bed.ref, roll: !!bed.roll, kind: v.kind, paid: !!v.paid,
+                                at: Date.now() };
+    var line = needs.resting(actorId, v.kind);
+    return paidLine + (line || 'You are resting.');
+  }
+
+  /* They got up, or rest somewhere else now. */
+  function bedOff(actorId) {
+    delete bedState.lying[actorId];
+    delete bedState.offers[actorId];
+  }
+
+  /* Out of a bed the server no longer counts, without touching any other
+     kind of rest they may have started since. */
+  function getUp(actorId, needs) {
+    delete bedState.lying[actorId];
+    if (!needs || !needs.settle || !needs.resting) { return false; }
+    var n = null;
+    try { n = needs.settle(actorId); } catch (e) { return false; }
+    if (!n || !BED_KINDS[n.resting]) { return false; }
+    try { needs.resting(actorId, ''); } catch (e) { return false; }
+    return true;
+  }
+
+  /* '' while the bed still counts as it did, otherwise the line to say. */
+  function stillLying(actorId, e, needs) {
+    if (!stillAt(actorId, e.ref)) { return 'You have left the bed, so you are not resting in it now.'; }
+    var v = bedVerdict(actorId, profileOf(actorId), e.ref, e.roll);
+    if (v.kind) {
+      e.paid = !!v.paid;
+      if (v.kind === e.kind) { return ''; }
+      // Still a bed they may use, at another rate: a key handed over in the
+      // night, or a key lost with the night still paid.
+      e.kind = v.kind;
+      try { needs.resting(actorId, v.kind); } catch (err) { }
+      return '';
+    }
+    if (e.paid && v.building) {
+      return 'Your night at ' + nameOf(v.building) + ' is over.' +
+             (v.price ? ' /bed says what another costs.' : '');
+    }
+    return v.line || 'That bed does not count for you now.';
+  }
+
+  /* Gold paid while the holder was away, into their pack now they are here. */
+  function payTakings(online) {
+    var owed = false;
+    for (var k in bedBook.takings) { if (bedHas(bedBook.takings, k)) { owed = true; break; } }
+    if (!owed) { return; }
+    var changed = false;
+    for (var i = 0; i < online.length; i++) {
+      var pid = profileOf(online[i]);
+      if (!pid || !bedHas(bedBook.takings, pid)) { continue; }
+      var gold = Number(bedBook.takings[pid]) || 0;
+      if (gold > 0 && !payOut(online[i], gold)) { continue; }
+      delete bedBook.takings[pid];
+      changed = true;
+      if (gold > 0) {
+        plog('handed', gold, 'gold of nights to', personName(online[i]));
+        tellBed(online[i], 'While you were away, ' + gold + ' gold was paid for nights in your beds. ' +
+                           'It is in your pack.');
+      }
+    }
+    if (changed) { saveBedBook(); }
+  }
+
+  function bedTick() {
+    var needs = g.__thornswoodNeeds;
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
+    var on = {};
+    for (var i = 0; i < online.length; i++) { on[online[i]] = true; }
+    for (var s in bedState.seen) {
+      if (bedHas(bedState.seen, s) && !on[s]) { delete bedState.seen[s]; }
+    }
+    for (var o in bedState.offers) {
+      if (bedHas(bedState.offers, o) && !on[o]) { delete bedState.offers[o]; }
+    }
+    for (var p in bedState.pressed) {
+      if (bedHas(bedState.pressed, p) && !on[p] && !bedHas(bedState.lying, p)) {
+        delete bedState.pressed[p];
+      }
+    }
+    // Come into the world resting in a bed nobody saw them lie down in.
+    for (var j = 0; j < online.length; j++) {
+      var id = online[j];
+      if (bedState.seen[id]) { continue; }
+      bedState.seen[id] = true;
+      if (bedHas(bedState.lying, id)) { continue; }
+      if (getUp(id, needs)) {
+        plog(personName(id), 'came in resting in a bed the server did not see, so they are up');
+      }
+    }
+    var now = Date.now();
+    for (var k in bedState.lying) {
+      if (!bedHas(bedState.lying, k)) { continue; }
+      var e = bedState.lying[k];
+      var who = Number(k);
+      if (!on[k]) {
+        if ((now - e.at) > LYING_FORGET_MS) { delete bedState.lying[k]; }
+        continue;
+      }
+      var why = stillLying(who, e, needs);
+      if (why) {
+        getUp(who, needs);
+        tellBed(who, why);
+      }
+    }
+    payTakings(online);
+  }
+
+  /*
+    /bed           what a night here costs
+    /bed 20        the holder sets the gold for one night
+    /bed -         the holder makes it free for the people they allow, and
+                   sells it to nobody else
+  */
+  function bedCmd(parts, actorId, profileId, toProfile) {
+    var building = bedBuildingHere(actorId);
+    if (!building) {
+      toProfile(profileId, 'Stand in the building, or open its door, then say that again.');
+      return true;
+    }
+    var name = nameOf(building);
+    var held = holderOf(building);
+    var arg = (parts && parts.length > 1) ? String(parts[1]).trim() : '';
+    if (!held) {
+      toProfile(profileId, 'Nobody holds ' + name + ', so nobody sets a night there.');
+      return true;
+    }
+    var mine = !!profileId && held.by === profileId;
+    var price = priceOf(building, held);
+
+    if (!arg) {
+      if (mine) {
+        toProfile(profileId, price
+          ? ('A night at ' + name + ' is ' + price + ' gold, and it comes to you. ' +
+             '/bed - makes it free for the people you allow and sold to nobody else.')
+          : ('Nights at ' + name + ' are not for sale, and the people you allow sleep free. ' +
+             '/bed 20 sets the gold for one night.'));
+        return true;
+      }
+      var line = price
+        ? ('A night at ' + name + ' is ' + price + ' gold, handed to ' + held.name + '.')
+        : ('Nights at ' + name + ' are not for sale. ' + held.name +
+           ' lets only the people they allow sleep there.');
+      if (allowedIn(actorId, profileId, building, held)) { line += ' You are allowed, so yours is free.'; }
+      else if (nightPaid(building, profileId)) { line += ' Your night there is paid.'; }
+      toProfile(profileId, line);
+      return true;
+    }
+
+    if (!mine) {
+      toProfile(profileId, 'Only whoever holds ' + name + ' sets what a night there costs.');
+      return true;
+    }
+    if (arg === '-') {
+      delete bedBook.prices[building];
+      saveBedBook();
+      plog(held.name, 'made a night at', name, 'free for the people they allow');
+      toProfile(profileId, 'A night at ' + name + ' is free for the people you allow, ' +
+                           'and not for sale to anybody else.');
+      return true;
+    }
+    var amount = /^\d+$/.test(arg) ? Number(arg) : 0;
+    if (!(amount > 0) || amount > Number.MAX_SAFE_INTEGER) {
+      toProfile(profileId, 'Give a whole number of gold, or - to make a night free for the people you allow.');
+      return true;
+    }
+    bedBook.prices[building] = { by: held.by, price: amount };
+    saveBedBook();
+    plog(held.name, 'set a night at', name, 'to', amount, 'gold');
+    toProfile(profileId, 'A night at ' + name + ' is ' + amount + ' gold now, handed to you. ' +
+                         'The people you allow still sleep free.');
+    return true;
+  }
+
+  if (g.__thornswoodBedTimer) { try { clearInterval(g.__thornswoodBedTimer); } catch (e) { } }
+  g.__thornswoodBedTimer = setInterval(
+    (typeof guard === 'function') ? guard('bedTick', bedTick) : bedTick, BED_EVERY_MS);
+
+  g.__thornswoodBeds = {
+    touched: bedTouched, rest: bedRest, off: bedOff, command: bedCmd, tick: bedTick,
+    kindOf: bedKind, verdict: bedVerdict, book: function () { return bedBook; },
+    state: bedState, BED_REACH: BED_REACH, NIGHT_MS: NIGHT_MS, PAY_AGAIN_MS: PAY_AGAIN_MS,
+    BED_EVERY_MS: BED_EVERY_MS
+  };
+
 
   /*
     ------------------------------------------------------- where a board is
@@ -35836,9 +36521,11 @@ log('gamemode loaded:',
     ledger. This is the other half docs/systems/gold.md describes: it creates
     the same count back into a pack, and payHeld takes it off that ledger in
     the same step, so the coin was already in the world and packs plus ledger
-    add up to the same after. payHeld is its one caller, and it pays a
-    letter's own `pay`, which postLetter took from the sender, never more
-    than the ledger holds.
+    add up to the same after. payHeld pays a letter's own `pay`, which
+    postLetter took from the sender, never more than the ledger holds. A
+    night in a bed (#1392) is its other caller: payNight hands the holder
+    the price it has just taken from the sleeper, and payTakings what was
+    kept for a holder who was away.
   */
   function payOut(actorId, amount) {
     var count = Math.floor(Number(amount) || 0);
@@ -36423,6 +37110,7 @@ log('gamemode loaded:',
     if (word === '/evict') { return evict(actorId, profileId, toProfile); }
     if (word === '/box') { return boxCmd(parts, actorId, profileId, toProfile); }
     if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile); }
+    if (word === '/bed') { return bedCmd(parts, actorId, profileId, toProfile); }
     if (word === '/notice') { return post(parts, actorId, profileId, toProfile, false); }
     if (word === '/job') { return post(parts, actorId, profileId, toProfile, true); }
     if (word === '/board') { return board(parts, actorId, profileId, toProfile); }
@@ -38972,6 +39660,30 @@ log('gamemode loaded:',
     return out;
   }
 
+  /*
+    And what a warrior's maneuver adds while it lasts (#1386): Rush's +4
+    speed for five seconds. Folded into the same map for the same reason the
+    needs are: the client SETS each value to the total it is given, so a
+    second map would overwrite the first. The maneuvers block loads after
+    this one and is asked at write time.
+  */
+  function withManeuvers(actorId, base) {
+    var mv = g.__thornswoodManeuvers;
+    if (!mv || !mv.effects || !actorId) { return base; }
+    var add = null;
+    try { add = mv.effects(actorId); } catch (e) { return base; }
+    if (!add) { return base; }
+    var out = {};
+    for (var k in base) {
+      if (Object.prototype.hasOwnProperty.call(base, k)) { out[k] = base[k]; }
+    }
+    for (var av in add) {
+      if (!Object.prototype.hasOwnProperty.call(add, av)) { continue; }
+      out[av] = (Object.prototype.hasOwnProperty.call(out, av) ? out[av] : 0) + add[av];
+    }
+    return out;
+  }
+
   function needsView(actorId) {
     var n = g.__thornswoodNeeds;
     if (!n || !actorId) { return null; }
@@ -39019,7 +39731,7 @@ log('gamemode loaded:',
         that counted. One map, one total, and a penalty is simply a negative
         number in it. See the needs block at the end of this file.
       */
-      effects: withNeeds(actorId, P.treeApplies(s)),
+      effects: withManeuvers(actorId, withNeeds(actorId, P.treeApplies(s))),
       /*
         The three meters, for the panel to draw. Absent entirely when there is
         no character in hand or the needs block is not loaded, so a page from
@@ -39818,7 +40530,7 @@ log('gamemode loaded:',
         word === '/deed' || word === '/deeds' || word === '/lock' ||
         word === '/unlock' || word === '/mold' || word === '/moldhere' || word === '/key' ||
         word === '/steward' || word === '/evict' || word === '/box' ||
-        word === '/rent' || word === '/notice' || word === '/job' ||
+        word === '/rent' || word === '/bed' || word === '/notice' || word === '/job' ||
         word === '/board' || word === '/take' || word === '/jobs' ||
         word === '/letter' || word === '/deliver' ||
         word === '/dropjob' || word === '/unpin') {
@@ -40173,6 +40885,618 @@ log('gamemode loaded:',
   clog('ready');
 })();
 // ==== end thornswood character ====
+
+// ==== thornswood warrior maneuvers ====
+/*
+  A WARRIOR'S MANEUVERS (#1386).
+
+  docs/systems/professions/warrior.md, "Maneuvers", is the table, and the two
+  half pages name the rows: Set, Plant, Cover and Wall hold a line, Rush,
+  Heavy, Break and Wreck break one. Until this nothing in combat read the word
+  Bulwark or Berserker at all. The rows here are the page's rows and no more:
+  the stamina, how long each lasts and the wait before it again.
+
+  WHO HOLDS WHICH ROW. The page: "You have the rows at your rank and below, on
+  your half." The sister half has its novice row only, and only once a Warlord
+  has taken you on. An outside trade, novice combat a Warlord taught somebody
+  who is not a warrior, is the novice row and no further. held() is that, and
+  nothing else decides it.
+
+  STAMINA IS SPENT WHEN THE MANEUVER STARTS, AND WITHOUT IT NOTHING HAPPENS.
+  spend() takes it through the engine's own Actor.DamageActorValue.
+
+  WHAT THE SERVER APPLIES, AND WHAT IT CANNOT. Everything here is the server's
+  own: the stamina, the clocks, the refusals, and health through the engine's
+  percentages. Some of the rows are the game's to do on somebody's own machine
+  and the server cannot reach them from here. Each start line says which, so
+  nobody is told an effect is on when it is not, and the issue lists them:
+    Set     halving what a block costs. The game works that cost out on the
+            blocker's machine. Only the stamina and the clocks are real.
+    Plant   not being staggered. A stagger is an animation on the machine that
+            animates you; the server refuses the staggers it sends itself
+            (Break and Wreck), and no other.
+    Cover   20% less damage for one person while you block. Applied here, by
+            giving back a fifth of what each hit took. The block is read from
+            the animation events the engine is sent (blockStart, blockStop),
+            sampled ten times a second.
+    Wall    20% less damage for you and your party within 3 metres. Applied
+            here, the same way.
+    Rush    +4 speed for 5 seconds. Sent through the map the client's skill
+            tree hand already sets (thornswood-front.js, treeApplyNow), so no
+            client change is needed for it.
+    Heavy   25% more on the next power attack within 8 seconds. Applied here,
+            by taking a quarter again of what that hit took.
+    Break   the next hit staggers. Sent to a person's own game with
+            Debug.SendAnimationEvent; a creature is animated by whoever hosts
+            it and the server cannot reach that machine, so a creature takes
+            no stagger yet.
+    Wreck   50% more on the next power attack, and it staggers, both as above.
+
+  A BLOW THAT KILLS OUTRIGHT IS NOT SOFTENED. The engine applies a hit's
+  damage after the OnHit event and kills on the spot when that takes health
+  to nothing, so a fifth cannot be given back to somebody already dead. Exact
+  damage would need the engine's damage formula to ask, which is an engine
+  change.
+
+  THE CLOCKS LIVE IN MEMORY, on globalThis so a hot reload keeps them. A
+  restart clears every wait and every armed blow, which at three minutes at
+  most is nothing worth a property write.
+*/
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+  var P = g.__thornswoodProgression;
+  if (!P) { console.log('[thornswood maneuvers] the rules block is missing, nothing registered'); return; }
+
+  function mlog() {
+    var a = Array.prototype.slice.call(arguments);
+    console.log('[thornswood maneuvers] ' + a.join(' '));
+  }
+
+  var RANKS = ['novice', 'advanced', 'expert', 'master'];
+
+  /*
+    The table on the page, row for row. seconds is how long it lasts. Break
+    and Wreck have no length on the page: each waits for the blow it names,
+    and that is what 0 means here.
+  */
+  var MANEUVERS = {
+    set:     { name: 'Set',   half: 'bulwark',   rank: 'novice',   stamina: 15, cooldown: 45,  seconds: 8 },
+    plant:   { name: 'Plant', half: 'bulwark',   rank: 'advanced', stamina: 20, cooldown: 60,  seconds: 8 },
+    cover:   { name: 'Cover', half: 'bulwark',   rank: 'expert',   stamina: 25, cooldown: 90,  seconds: 8,  less: 0.2, metres: 3 },
+    wall:    { name: 'Wall',  half: 'bulwark',   rank: 'master',   stamina: 40, cooldown: 180, seconds: 10, less: 0.2, metres: 3 },
+    rush:    { name: 'Rush',  half: 'berserker', rank: 'novice',   stamina: 15, cooldown: 30,  seconds: 5,  speed: 4 },
+    heavy:   { name: 'Heavy', half: 'berserker', rank: 'advanced', stamina: 20, cooldown: 45,  seconds: 8,  more: 0.25 },
+    'break': { name: 'Break', half: 'berserker', rank: 'expert',   stamina: 25, cooldown: 60,  seconds: 0 },
+    wreck:   { name: 'Wreck', half: 'berserker', rank: 'master',   stamina: 40, cooldown: 120, seconds: 0,  more: 0.5 }
+  };
+  var ORDER = ['set', 'plant', 'cover', 'wall', 'rush', 'heavy', 'break', 'wreck'];
+  var HALF_NAME = { bulwark: 'Bulwark', berserker: 'Berserker' };
+
+  // Seventy units to a metre, the party strip's measure (see MOLD_REACH).
+  var UNITS_PER_METRE = 70;
+
+  function has(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
+  function rankAt(r) { return RANKS.indexOf(r); }
+  function aRank(r) {
+    var w = String(r || 'novice');
+    return (/^[aeiou]/.test(w) ? 'an ' : 'a ') + w;
+  }
+  function noviceOf(half) {
+    for (var i = 0; i < ORDER.length; i++) {
+      var m = MANEUVERS[ORDER[i]];
+      if (m.half === half && m.rank === 'novice') { return m.name; }
+    }
+    return '';
+  }
+
+  // -------------------------------------------------------------- the rules --
+  /*
+    HAS A WARLORD TAKEN YOU ON FOR YOUR SISTER HALF. /apprentice records it
+    (#1388), and the character block's masterFor says whether that Master's
+    own record still stands. A sister half already past novice counts as
+    well: rankUp only lets it climb under a Master of it, and the ranks
+    earned under one stay after it ends (apprenticeship.md).
+  */
+  function takenOn(s, actorId) {
+    if (!s || s.prof !== 'warrior' || !s.half) { return false; }
+    var sister = P.sisterOf('warrior', s.half);
+    if (!sister) { return false; }
+    var r = P.rankOf(s, sister);
+    if (r && rankAt(r) > 0) { return true; }
+    var ch = g.__thornswoodCharacter;
+    try { return !!(actorId && ch && ch.masterFor && ch.masterFor(actorId, s, sister)); } catch (e) { return false; }
+  }
+
+  /** Every row this character holds, as { key: true }. Pure. */
+  function held(s, sisterTaken) {
+    var out = {};
+    if (!s) { return out; }
+    for (var i = 0; i < ORDER.length; i++) {
+      var key = ORDER[i];
+      var m = MANEUVERS[key];
+      var rank = P.rankOf(s, m.half);
+      if (!rank) { continue; }
+      if (s.prof === 'warrior' && s.half === m.half) {
+        if (rankAt(m.rank) <= rankAt(rank)) { out[key] = true; }
+        continue;
+      }
+      if (m.rank !== 'novice') { continue; }
+      if (s.prof === 'warrior' && P.sisterOf('warrior', s.half) === m.half) {
+        if (sisterTaken) { out[key] = true; }
+        continue;
+      }
+      if ((s.taught || []).indexOf(m.half) !== -1) { out[key] = true; }
+    }
+    return out;
+  }
+
+  /** Why this character does not hold that row, in one sentence. */
+  function whyNot(s, key) {
+    var m = MANEUVERS[key];
+    var halfName = HALF_NAME[m.half];
+    var rank = s ? P.rankOf(s, m.half) : null;
+    if (s && s.prof === 'warrior' && s.half === m.half) {
+      return m.name + ' is for ' + aRank(m.rank) + ' ' + halfName + '. You are ' +
+             aRank(rank) + ' ' + halfName + '.';
+    }
+    if (s && s.prof === 'warrior' && s.half && P.sisterOf('warrior', s.half) === m.half) {
+      if (m.rank !== 'novice') {
+        return halfName + ' is your sister half, and a sister half has its novice row and no more: ' +
+               noviceOf(m.half) + '.';
+      }
+      return halfName + ' is your sister half. Its novice maneuver opens when a Warlord takes you on.';
+    }
+    if (rank && s && (s.taught || []).indexOf(m.half) !== -1) {
+      return halfName + ' was taught to you as an outside trade, and that is its novice row and no further: ' +
+             noviceOf(m.half) + '.';
+    }
+    return m.name + ' is a ' + halfName + ' maneuver. It belongs to a warrior, and a Warlord can teach ' +
+           'novice combat to somebody who is not one.';
+  }
+
+  // ------------------------------------------------------------ the world --
+  /*
+    cool  actor -> { key: when it is ready again }
+    on    actor -> what is running or armed: a window's end for set, plant,
+          wall, rush and heavy; { until, who } for cover; true for break and
+          wreck, which wait for their blow
+    block actor -> whether that bulwark is blocking, as last seen
+    blow  actor -> { by, at }: who landed the server's own last blow on it
+  */
+  var ST = g.__thornswoodManeuverState;
+  if (!ST || typeof ST !== 'object') {
+    ST = g.__thornswoodManeuverState = { cool: {}, on: {}, block: {}, blow: {} };
+  }
+
+  function now() { return Date.now(); }
+  function selfOf(id) { return { type: 'form', desc: mp.getDescFromId(id) }; }
+  function personOf(id) {
+    try { return Number(mp.get(id, 'profileId')) > 0; } catch (e) { return false; }
+  }
+  function deadOf(id) {
+    try { return !!mp.get(id, 'isDead'); } catch (e) { return true; }
+  }
+  function share(id, which) {
+    try {
+      var p = mp.get(id, 'percentages');
+      var v = p ? Number(p[which]) : NaN;
+      return isNaN(v) ? -1 : v;
+    } catch (e) { return -1; }
+  }
+  function near(a, b, metres) {
+    try {
+      if (String(mp.get(a, 'worldOrCellDesc') || '') !== String(mp.get(b, 'worldOrCellDesc') || '')) { return false; }
+      var p = mp.get(a, 'pos');
+      var q = mp.get(b, 'pos');
+      var dx = p[0] - q[0], dy = p[1] - q[1], dz = p[2] - q[2];
+      var r = metres * UNITS_PER_METRE;
+      return dx * dx + dy * dy + dz * dz <= r * r;
+    } catch (e) { return false; }
+  }
+  function onOf(id, make) {
+    if (!has(ST.on, id)) {
+      if (!make) { return null; }
+      ST.on[id] = {};
+    }
+    return ST.on[id];
+  }
+  function readyAt(id, key) {
+    return (has(ST.cool, id) && has(ST.cool[id], key)) ? ST.cool[id][key] : 0;
+  }
+  function seconds(ms) {
+    var n = Math.max(1, Math.ceil(ms / 1000));
+    return n + (n === 1 ? ' second' : ' seconds');
+  }
+  function nameOf(id) {
+    var soc = g.__thornswoodSocial;
+    try { if (soc && soc.nameOfPerson) { return soc.nameOfPerson(id) || 'them'; } } catch (e) { }
+    return 'them';
+  }
+
+  /*
+    STAMINA, SPENT WHEN THE MANEUVER STARTS. The engine holds stamina as a
+    share of the most there is and does not hand that most to this file.
+    Actor.DamageActorValue knows it, and takes the amount off as a share of
+    the engine's own maximum (MpActor::DamageActorValue). So the amount is
+    taken, and a share that hit the floor means there was not that much: it
+    is put back exactly as it was, and the maneuver does not start. The
+    engine's maximum is worked out from the race record, so stamina the skill
+    tree adds on the client is not in it.
+  */
+  function spend(actorId, amount) {
+    var before = share(actorId, 'stamina');
+    if (!(before > 0)) { return false; }
+    try {
+      mp.callPapyrusFunction('method', 'Actor', 'DamageActorValue', selfOf(actorId), ['Stamina', amount]);
+    } catch (e) {
+      mlog('could not take stamina from', actorId.toString(16) + ':', e);
+      return false;
+    }
+    if (share(actorId, 'stamina') > 0) { return true; }
+    try {
+      var p = mp.get(actorId, 'percentages');
+      mp.set(actorId, 'percentages', { health: Number(p.health), magicka: Number(p.magicka), stamina: before });
+    } catch (e2) {
+      mlog('could not put the stamina back on', actorId.toString(16) + ':', e2);
+    }
+    return false;
+  }
+
+  /* The one person Cover is for: the nearest within 3 metres, not yourself. */
+  function coverWho(actorId) {
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return 0; }
+    var best = 0, bestD = Infinity;
+    var mine = null;
+    try { mine = mp.get(actorId, 'pos'); } catch (e) { return 0; }
+    for (var i = 0; i < online.length; i++) {
+      var id = online[i];
+      if (id === actorId || deadOf(id) || !near(actorId, id, MANEUVERS.cover.metres)) { continue; }
+      var q = null;
+      try { q = mp.get(id, 'pos'); } catch (e) { continue; }
+      var d = (q[0] - mine[0]) * (q[0] - mine[0]) + (q[1] - mine[1]) * (q[1] - mine[1]) + (q[2] - mine[2]) * (q[2] - mine[2]);
+      if (d < bestD) { bestD = d; best = id; }
+    }
+    return best;
+  }
+
+  /*
+    The client's skill tree hand sets the effects map on the panel view, and
+    the map is rebuilt from the state on every write. A redraw is the one way
+    to send Rush's speed and to take it off again.
+  */
+  function push(actorId) {
+    var ch = g.__thornswoodCharacter;
+    if (!ch || !ch.writeState || !ch.stateOf) { return; }
+    try { ch.writeState(actorId, ch.stateOf(actorId), true); } catch (e) { mlog('could not redraw', actorId.toString(16) + ':', e); }
+  }
+
+  /** What a running maneuver adds to the client's map: Rush's speed. */
+  function effects(actorId) {
+    var rec = onOf(actorId, false);
+    if (!rec || !rec.rush || rec.rush <= now()) { return null; }
+    return { speedMult: MANEUVERS.rush.speed };
+  }
+
+  var STARTED = {
+    set: 'Set, for 8 seconds. Halving what a block costs is not in the game yet, so for now this spends the stamina and starts the wait.',
+    plant: 'Plant, for 8 seconds. A Break or a Wreck does not stagger you. Other staggers still land: stopping those is not in the game yet.',
+    wall: 'Wall, for 10 seconds. You, and your party within 3 metres of you, take 20% less damage.',
+    rush: 'Rush: +4 speed for 5 seconds.',
+    heavy: 'Heavy. Your next power attack in the next 8 seconds deals 25% more.',
+    'break': 'Break. Your next hit staggers a person. Staggering a creature is not in the game yet.',
+    wreck: 'Wreck. Your next power attack deals 50% more, and staggers a person. Staggering a creature is not in the game yet.'
+  };
+
+  /** /maneuver with nothing after it: what you hold and when each is ready. */
+  function listLine(actorId, mine) {
+    var bits = [];
+    var t = now();
+    for (var i = 0; i < ORDER.length; i++) {
+      var key = ORDER[i];
+      if (!mine[key]) { continue; }
+      var m = MANEUVERS[key];
+      var ready = readyAt(actorId, key);
+      bits.push(m.name + ' (' + m.stamina + ' stamina, ' + (ready > t ? 'ready in ' + seconds(ready - t) : 'ready') + ')');
+    }
+    if (!bits.length) {
+      return 'You have no maneuvers. They are a warrior\'s, on the half you picked, at your rank and below. ' +
+             'A Warlord can teach the novice row to somebody who is not a warrior.';
+    }
+    return 'Your maneuvers: ' + bits.join(', ') + '. /maneuver <name> starts one.';
+  }
+
+  /** /maneuver <name>. Answers the line to say, always. */
+  function use(actorId, word) {
+    var key = String(word || '').trim().toLowerCase();
+    var ch = g.__thornswoodCharacter;
+    if (!ch || !ch.stateOf) { return 'Maneuvers are not running on this server right now. Say so in the dev channel.'; }
+    var s = ch.stateOf(actorId);
+    var mine = held(s, takenOn(s, actorId));
+    if (!key || key === 'list') { return listLine(actorId, mine); }
+    if (!has(MANEUVERS, key)) {
+      return 'There is no maneuver by that name. There are eight: Set, Plant, Cover, Wall, Rush, Heavy, Break and Wreck.';
+    }
+    var m = MANEUVERS[key];
+    if (!mine[key]) { return whyNot(s, key); }
+    if (deadOf(actorId)) { return 'Not while you are down.'; }
+    var t = now();
+    var ready = readyAt(actorId, key);
+    if (ready > t) { return m.name + ' is ready again in ' + seconds(ready - t) + '.'; }
+    var who = 0;
+    if (key === 'cover') {
+      who = coverWho(actorId);
+      if (!who) { return 'Cover is for one person within 3 metres of you, and nobody is.'; }
+    }
+    if (!spend(actorId, m.stamina)) {
+      return m.name + ' takes ' + m.stamina + ' stamina, and you do not have it. Nothing happens.';
+    }
+    if (!has(ST.cool, actorId)) { ST.cool[actorId] = {}; }
+    ST.cool[actorId][key] = t + m.cooldown * 1000;
+    var rec = onOf(actorId, true);
+    if (key === 'cover') {
+      rec.cover = { until: t + m.seconds * 1000, who: who };
+      ST.block[actorId] = false;
+      mlog(actorId.toString(16), 'Cover on', who.toString(16));
+      return 'Cover on ' + nameOf(who) + ', for 8 seconds. While you block within 3 metres of them, they take 20% less damage.';
+    }
+    rec[key] = m.seconds ? t + m.seconds * 1000 : true;
+    mlog(actorId.toString(16), m.name);
+    if (key === 'rush') {
+      push(actorId);
+      setTimeout(function () { push(actorId); }, m.seconds * 1000 + 50);
+    }
+    return STARTED[key];
+  }
+
+  // -------------------------------------------------------------- the hits --
+  /*
+    WHAT A HIT TOOK, MEASURED RATHER THAN GUESSED. OnHit fires before the
+    engine works out the damage (ActionListener::OnWeaponHit sends it first,
+    then CalculateDamage and NetSetPercentages, in the same call). So the
+    target's health is read at the event, and read again once the engine is
+    done: at the next hit on the same target, or on the next turn of the event
+    loop, whichever is first. The difference is what that one hit took, and
+    the maneuver works on that: a fifth given back, a quarter or a half taken
+    again. A hit the engine then threw away (too fast, a splash) took nothing,
+    so nothing is changed and a Heavy or a Wreck it would have spent is armed
+    again.
+  */
+  var pending = {};
+  var queued = false;
+
+  function idOfForm(v) {
+    if (typeof v === 'number') { return v; }
+    if (v && v.desc) {
+      try { return Number(mp.getIdFromDesc(String(v.desc))) || 0; } catch (e) { return 0; }
+    }
+    return 0;
+  }
+  function isSpell(v) {
+    if (!v || !v.desc) { return false; }
+    try {
+      var r = mp.lookupEspmRecordById(mp.getIdFromDesc(String(v.desc)));
+      return !!(r && r.record && String(r.record.type) === 'SPEL');
+    } catch (e) { return false; }
+  }
+
+  /* Whether that bulwark is blocking, from the last animation event the
+     engine was sent. Moving clears that event, so what was last seen holds. */
+  function blocking(holder) {
+    var ev = '';
+    try { ev = String(mp.get(holder, 'lastAnimEvent') || '').toLowerCase(); } catch (e) { ev = ''; }
+    if (ev === 'blockstart') { ST.block[holder] = true; }
+    else if (ev === 'blockstop') { ST.block[holder] = false; }
+    return !!ST.block[holder];
+  }
+
+  function samePartyNear(holder, target) {
+    var soc = g.__thornswoodSocial;
+    if (!soc || !soc.partyOf || !soc.profileOf) { return false; }
+    var mine = soc.profileOf(holder);
+    var theirs = soc.profileOf(target);
+    if (!mine || !theirs) { return false; }
+    var p = soc.partyOf(mine);
+    if (!p || !p.members || p.members.indexOf(theirs) === -1) { return false; }
+    return near(holder, target, MANEUVERS.wall.metres);
+  }
+
+  /* 20% less for this target, from a Wall or a Cover. Two of them on one
+     person is still 20%: the rows say less damage, not less again. */
+  function shielded(target, t) {
+    for (var k in ST.on) {
+      if (!has(ST.on, k)) { continue; }
+      var holder = Number(k);
+      var rec = ST.on[k];
+      if (rec.wall && rec.wall > t && !deadOf(holder)) {
+        if (holder === target || samePartyNear(holder, target)) { return MANEUVERS.wall.less; }
+      }
+      if (rec.cover && rec.cover.until > t && rec.cover.who === target && !deadOf(holder) &&
+          blocking(holder) && near(holder, target, MANEUVERS.cover.metres)) {
+        return MANEUVERS.cover.less;
+      }
+    }
+    return 0;
+  }
+
+  function anyOn() {
+    for (var k in ST.on) { if (has(ST.on, k)) { return true; } }
+    return false;
+  }
+
+  function hit(targetId, aggressor, source, power, blocked) {
+    var target = Number(targetId) || 0;
+    if (!target) { return; }
+    // A hit on a target with a blow still open closes that blow first.
+    var open = pending[target];
+    if (open && open.length && open[open.length - 1].after === null) {
+      open[open.length - 1].after = share(target, 'health');
+    }
+    if (!anyOn()) { return; }
+    var t = now();
+    var by = idOfForm(aggressor);
+    // A bulwark's own blocked hit is a block seen.
+    if (blocked && has(ST.on, target) && ST.on[target].cover) { ST.block[target] = true; }
+
+    var e = { before: -1, after: null, by: by, more: 0, less: 0, stagger: false, used: [] };
+    var a = (by && has(ST.on, by)) ? ST.on[by] : null;
+    if (a && !isSpell(source)) {
+      if (power && a.wreck) {
+        e.more = MANEUVERS.wreck.more; e.stagger = true;
+        e.used.push({ key: 'wreck', v: a.wreck }); delete a.wreck;
+      } else if (power && a.heavy && a.heavy > t) {
+        e.more = MANEUVERS.heavy.more;
+        e.used.push({ key: 'heavy', v: a.heavy }); delete a.heavy;
+      }
+      if (!e.stagger && a['break']) {
+        e.stagger = true;
+        e.used.push({ key: 'break', v: a['break'] }); delete a['break'];
+      }
+    }
+    e.less = shielded(target, t);
+    if (!e.more && !e.less && !e.stagger) { return; }
+    e.before = share(target, 'health');
+    if (!(e.before > 0)) { rearm(e); return; }
+    if (!pending[target]) { pending[target] = []; }
+    pending[target].push(e);
+    if (!queued) {
+      queued = true;
+      setTimeout(guard('maneuverHits', flush), 0);
+    }
+  }
+
+  /* A blow that took nothing gives back what it would have spent. */
+  function rearm(e) {
+    if (!e.by || !e.used.length) { return; }
+    var rec = onOf(e.by, true);
+    for (var i = 0; i < e.used.length; i++) {
+      var u = e.used[i];
+      if (u.key === 'heavy' && u.v <= now()) { continue; }
+      if (!rec[u.key]) { rec[u.key] = u.v; }
+    }
+  }
+
+  function setHealth(target, h, change, killer) {
+    var next = h + change;
+    if (next > 1) { next = 1; }
+    if (next <= 0) {
+      next = 0;
+      // The engine kills on this write with nobody named; mp.onDeath asks.
+      if (killer) { ST.blow[target] = { by: killer, at: now() }; }
+    }
+    try {
+      var p = mp.get(target, 'percentages');
+      mp.set(target, 'percentages', { health: next, magicka: Number(p.magicka), stamina: Number(p.stamina) });
+    } catch (e) {
+      mlog('could not write the health of', target.toString(16) + ':', e);
+    }
+  }
+
+  /*
+    A STAGGER IS AN ANIMATION, AND THE SERVER CAN SEND ONE ONLY TO A PERSON.
+    Debug.SendAnimationEvent in the fork runs on the machine of the actor it
+    names, and only when that actor is somebody's own character
+    (SpSnippet::Execute returns for anything else). A person hit by Break or
+    Wreck staggers in their own game; a creature does not yet. Plant refuses
+    this stagger.
+  */
+  function staggerOf(target) {
+    if (!personOf(target) || deadOf(target)) { return; }
+    var rec = onOf(target, false);
+    if (rec && rec.plant && rec.plant > now()) { return; }
+    try {
+      mp.callPapyrusFunction('global', 'Debug', 'SendAnimationEvent', null, [selfOf(target), 'staggerStart']);
+    } catch (e) {
+      mlog('could not stagger', target.toString(16) + ':', e);
+    }
+  }
+
+  function flush() {
+    queued = false;
+    var all = pending;
+    pending = {};
+    for (var k in all) {
+      if (!has(all, k)) { continue; }
+      var target = Number(k);
+      var list = all[k];
+      var h = share(target, 'health');
+      if (list.length && list[list.length - 1].after === null) { list[list.length - 1].after = h; }
+      var change = 0, killer = 0, stagger = false;
+      for (var i = 0; i < list.length; i++) {
+        var e = list[i];
+        var took = e.before - e.after;
+        if (!(e.after >= 0) || !(took > 0)) { rearm(e); continue; }
+        if (e.less) { change += took * e.less; }
+        if (e.more) { change -= took * e.more; killer = e.by; }
+        if (e.stagger) { stagger = true; }
+      }
+      if (h > 0 && change !== 0) { setHealth(target, h, change, killer); }
+      if (stagger) { staggerOf(target); }
+    }
+  }
+
+  /** Whose blow it was, when the server's own write was the killing one. */
+  function killerOf(target) {
+    var b = has(ST.blow, target) ? ST.blow[target] : null;
+    if (!b) { return 0; }
+    delete ST.blow[target];
+    return (now() - b.at) < 2000 ? b.by : 0;
+  }
+
+  // -------------------------------------------------------------- the tick --
+  /* Ten times a second while anything runs: a Cover's block is watched, and
+     what has run out is taken off. Nothing to do costs one empty loop. */
+  function tick() {
+    var t = now();
+    for (var k in ST.on) {
+      if (!has(ST.on, k)) { continue; }
+      var holder = Number(k);
+      var rec = ST.on[k];
+      if (rec.cover && rec.cover.until > t) { blocking(holder); }
+      if (rec.cover && rec.cover.until <= t) { delete rec.cover; delete ST.block[holder]; }
+      var timed = ['set', 'plant', 'wall', 'rush', 'heavy'];
+      for (var i = 0; i < timed.length; i++) {
+        if (rec[timed[i]] && rec[timed[i]] <= t) { delete rec[timed[i]]; }
+      }
+      var left = false;
+      for (var f in rec) { if (has(rec, f)) { left = true; break; } }
+      if (!left) { delete ST.on[k]; }
+    }
+    for (var b in ST.blow) {
+      if (has(ST.blow, b) && t - ST.blow[b].at > 5000) { delete ST.blow[b]; }
+    }
+  }
+
+  if (g.__thornswoodManeuverTimer) { try { clearInterval(g.__thornswoodManeuverTimer); } catch (e) { } }
+  g.__thornswoodManeuverTimer = setInterval(guard('maneuverTick', tick), 100);
+
+  g.__thornswoodManeuvers = {
+    MANEUVERS: MANEUVERS, ORDER: ORDER,
+    held: held, takenOn: takenOn, whyNot: whyNot,
+    use: use, effects: effects, hit: hit, flush: flush, killerOf: killerOf, tick: tick,
+    state: ST
+  };
+  mlog('ready:', ORDER.length, 'maneuvers');
+})();
+
+/*
+  Every hit the engine takes, heard for the maneuvers above (#1386). It never
+  answers false: the engine does not read what this family answers, and the
+  list over mp.onTakeItem says why nothing here may try.
+*/
+mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, aggressor, source, projectile, power, sneak, bash, blocked) {
+  // The break chance at 0% (#1384), in the durability block. First and on
+  // its own, so neither half can stop the other.
+  var wear = globalThis.__thornswoodDurability;
+  if (wear && wear.onHit) {
+    try { wear.onHit(targetId, aggressor, source); } catch (e) { log('durability: the hit threw:', e); }
+  }
+  var mv = globalThis.__thornswoodManeuvers;
+  if (mv && mv.hit) { mv.hit(targetId, aggressor, source, power, blocked); }
+});
+// ==== end thornswood warrior maneuvers ====
+
 
 // ==== thornswood spell tomes ====
 /*
@@ -41946,12 +43270,14 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // A carriage or ferry, at the driver (#1394). See the carriages block.
                '/ride',
                '/pick', '/spend',
+               // The maneuvers of a warrior; see the maneuvers block.
+               '/maneuver',
                // A Master taking somebody on, and ending it (#1388). See the
                // character block.
                '/apprentice',
                '/plant', '/claim', '/plot',
                '/deed', '/deeds', '/lock', '/unlock', '/mold', '/key',
-               '/jarl', '/steward', '/evict', '/box', '/rent',
+               '/jarl', '/steward', '/evict', '/box', '/rent', '/bed',
                '/notice', '/job', '/board', '/take', '/jobs', '/dropjob', '/unpin',
                '/letter', '/deliver',
                '/tp', '/goto', '/face', '/restart', '/shutdown', '/tspicks',
@@ -42026,8 +43352,9 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // argument says what a place costs, which is the first
                       // thing somebody standing at a door wants to know, and
                       // the steward half answers "only a steward sets rent"
-                      // to everybody else.
-                      '/box', '/rent', '/notice', '/job', '/board',
+                      // to everybody else. /bed with no amount says what a
+                      // night costs, the same way, and only a holder sets it.
+                      '/box', '/rent', '/bed', '/notice', '/job', '/board',
                       '/take', '/jobs', '/dropjob', '/unpin', '/letter', '/deliver', '/help',
                       // Everybody's, and they need to be findable: a meter
                       // nobody knows how to act on is only a penalty.
@@ -42035,6 +43362,8 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // Everybody's: what you carry and how it stands, and
                       // the kit that mends it (#1384).
                       '/repair',
+                      // For a warrior, and named so a warrior can find them.
+                      '/maneuver',
                       // Everybody's, and the one thing a person in trouble
                       // must be able to find: asking staff, and getting
                       // out of a wedged spot (#414).
@@ -43017,7 +44346,8 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       and the world hooks replace them rather than joining them.
 
       /needs   what the three meters say
-      /rest    sit, campfire, inn or bed; /rest up to stop
+      /rest    sit, campfire, inn or bed; /rest up to stop. A bed is one the
+               server saw them press; see "beds" in the property block.
       /eat     a meal; /drink water; /drink ale for the good and the bad of it
       /bard    say you are playing, which helps everyone resting near you
     */
@@ -43422,6 +44752,19 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       return true;
     }
 
+    // A warrior's maneuvers (#1386). See the maneuvers block, after the
+    // character block, for what each one does and what the server cannot.
+    if (word === '/maneuver') {
+      var mvs = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodManeuvers;
+      if (!mvs || !mvs.use) {
+        toProfile(profileId, 'Maneuvers are not running on this server right now. Say so in the dev channel.');
+        return true;
+      }
+      if (!needCharacter()) { return true; }
+      toProfile(profileId, mvs.use(actorId, parts[1]));
+      return true;
+    }
+
     if (word === '/needs' || word === '/rest' || word === '/eat' ||
         word === '/drink' || word === '/bard') {
       var needs = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodNeeds;
@@ -43478,7 +44821,9 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       if (word === '/bard') { toProfile(profileId, needs.bard(actorId)); return true; }
       if (word === '/rest') {
         var where = String(parts[1] || '').toLowerCase();
+        var beds = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodBeds;
         if (where === 'up' || where === 'stop') {
+          if (beds && beds.off) { beds.off(actorId); }
           needs.resting(actorId, '');
           toProfile(profileId, 'You get up.');
           return true;
@@ -43487,7 +44832,23 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           toProfile(profileId, 'Rest where? sit, campfire, inn or bed. /rest up to get going again.');
           return true;
         }
+        /*
+          A BED IS ONE THE SERVER SAW (#1392). bed, inn and bedroll go to the
+          beds in the property block, which asks which bed this person pressed
+          and whether they are still at it, whose it is, and whether the night
+          is paid, and answers the kind of rest itself. The word only says that
+          they want a bed. See "beds" in the property block.
+        */
+        if (where === 'bed' || where === 'inn' || where === 'bedroll') {
+          if (!beds || !beds.rest) {
+            toProfile(profileId, 'Beds are not running on this server right now. Say so in the dev channel.');
+            return true;
+          }
+          toProfile(profileId, beds.rest(actorId, Number(profileId) || 0));
+          return true;
+        }
         var said = needs.resting(actorId, where);
+        if (said && beds && beds.off) { beds.off(actorId); }
         toProfile(profileId, said || ('There is no resting at a ' + where + '. Try sit, campfire, inn or bed.'));
         return true;
       }
@@ -44046,8 +45407,9 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       if (topic === 'living' || topic === 'needs' || topic === 'food') {
         toProfile(profileId,
           'The four bars are food, water, rest and how warm you are. /eat and ' +
-          '/drink when you have something, /rest sit, /rest campfire, /rest inn ' +
-          'or /rest bed, and /rest up to get going again. Fires warm you and ' +
+          '/drink when you have something, /rest sit, /rest campfire, or lie down ' +
+          'in a bed and /rest bed, and /rest up to get going again. A bed counts ' +
+          'when it is yours, you carry its key, or you paid the night. Fires warm you and ' +
           'standing in one burns you. What you are wearing matters: fur is the ' +
           'warmest thing there is and metal is the worst.');
         return;
@@ -44059,9 +45421,9 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           'novice until a Master of it takes you on: a Master types /apprentice ' +
           '<name>, and /apprentice end <name> ends it. /apprentice on its own ' +
           'says who took you on. /plot says what is in the ' +
-          'ground in front of you and whose farm it is, /plant sows it. /repair ' +
-          'says how your weapons, armour and clothing stand, and /repair <name> ' +
-          'mends one with its kit.');
+          'ground in front of you and whose farm it is, /plant sows it. A ' +
+          'warrior\'s maneuvers: /maneuver lists yours, /maneuver rush starts one. ' +
+          '/repair <name> mends a piece with a kit.');
         return;
       }
       if (topic === 'land' || topic === 'home' || topic === 'deed') {
@@ -44069,7 +45431,8 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           '/claim at a plot takes the farm around it; /claim at a door you have ' +
           'just opened takes the building and hands you the deed. /deed lists ' +
           'what you hold, /lock and /unlock turn the lock, /rent says what a ' +
-          'place costs. A smith says /mold at a door with the holder standing ' +
+          'place costs, and /bed says or sets what a night in its beds costs. ' +
+          'A smith says /mold at a door with the holder standing ' +
           'there, and /key at a forge with the mold in hand.');
         return;
       }
@@ -44803,10 +46166,10 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
                   the event is raised for Gold001.
     onDeath       Anything dying. mp.onDeath never refuses. It logs a person's
                   death with the killer's id, and that line is the only record
-                  of a fight this file keeps. The hits before it do raise an
-                  event, onPapyrusEvent:OnHit, and the durability block hears
-                  it for the break chance at 0% and nothing else (THE PAPYRUS
-                  FAMILY, below).
+                  of a fight this file keeps. The hits before it raise
+                  onPapyrusEvent:OnHit, which only the warrior maneuvers and
+                  the break chance in the durability block listen to (THE
+                  PAPYRUS FAMILY, below).
     onRespawn     Logged by mp.onRespawn, never refused.
     onEatItem     Eating or drinking something in the pack. No handler: the
                   engine applies a potion's effects. The needs block hears
@@ -44884,10 +46247,11 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   the world's Papyrus scripts. So on a false the hit still lands, the spell
   was already cast and the item was already added, and all that is stopped is
   the event reaching a lever's or a quest's own script. That is why nothing
-  here may ever return false to this family. The one name this file listens
-  to is OnHit, for the break chance in the durability block (#1384). The
-  engine does not build the arguments for a name mp has no function for, so
-  the rest of the family costs this file nothing.
+  here may ever return false to this family. OnHit is the one name this
+  file listens to, for the warrior maneuvers (#1386) and the break chance at
+  0% in the durability block (#1384), and the engine does not build the
+  arguments for a name mp has no function for, so the rest of the family
+  costs this file nothing.
 
   WHAT THE ENGINE ANSWERS WITH NO EVENT AT ALL. Movement, animation, animation
   variables, health, magicka and stamina, bow shots (one arrow is taken),
@@ -44937,11 +46301,12 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   everybody at once, so every other take is watched and let through.
 
   Hits are a different case: nothing here can refuse one, only hear it,
-  through onPapyrusEvent:OnHit. The durability block listens, for the break
-  chance and nothing else, and writes no line about the fight. It is raised for
-  every blow the engine takes, a hosted bandit's as much as a person's, so
-  which blows are worth a line, one person hitting another being the obvious
-  one, belongs to the same decision.
+  through onPapyrusEvent:OnHit. The warrior maneuvers listen to it (#1386)
+  and change what a hit took only after the engine has applied it, and the
+  durability block hears it for the break chance at 0% (#1384); neither logs
+  a blow. It is raised for every blow the engine takes, a hosted bandit's as
+  much as a person's, so which blows are worth a line, one person hitting
+  another being the obvious one, belongs to the same decision.
 */
 
 /*
@@ -45444,7 +46809,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   clothing on the person hit that is at 0% rolls once, and so does the
   weapon a person lands the hit with when it is at 0%. A broken piece is
   gone. Only people's gear rolls: nothing here gives a bandit's sword a
-  condition. The hit arrives through onPapyrusEvent:OnHit, registered below.
+  condition. The hit arrives through onPapyrusEvent:OnHit, whose one handler
+  is at the end of the warrior maneuvers block and hands it to onHit here.
 
   THE KITS ARE NOT IN THE WORLD YET. A kit is a MISC record and a recipe in
   Thornswood-Content.esp, and neither exists. KITS says what each one mends
@@ -45949,6 +47315,21 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       return gone;
     }
 
+    /*
+      A hit as the engine sends it: the target's id, then the aggressor and
+      the weapon or spell as { type, desc } (THE PAPYRUS FAMILY, over
+      mp.onTakeItem). The one OnHit handler, in the warrior maneuvers block,
+      hands it here.
+    */
+    function onHit(targetId, aggressor, source) {
+      function idFrom(v) {
+        if (typeof v === 'number') { return v; }
+        if (v && v.desc) { return api.idOf(v.desc) || 0; }
+        return 0;
+      }
+      return hit(Number(targetId) || 0, idFrom(aggressor), idFrom(source));
+    }
+
     function forgetOldDrops() {
       var t = api.now();
       while (drops.length && t - drops[0].at > DROP_KEEP_MS) { drops.shift(); }
@@ -46047,7 +47428,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       BREAK_CHANCE: BREAK_CHANCE, KITS: kits,
       pieceKind: pieceKind, conditionOf: conditionOf, withCondition: withCondition,
       repairTo: repairTo, repairWithKit: repairWithKit, describe: describe, command: command,
-      opened: opened, hit: hit, dropped: dropped, pressed: pressed
+      opened: opened, hit: hit, onHit: onHit, dropped: dropped, pressed: pressed
     };
   }
 
@@ -46158,23 +47539,6 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     log: log
   });
 })();
-
-/*
-  A HIT, heard for the break chance and nothing else. See the durability
-  block above, and THE PAPYRUS FAMILY over mp.onTakeItem for what arrives:
-  the target, then the aggressor and the weapon or spell as { type, desc }.
-  Nothing here may return false to this family, and nothing does.
-*/
-mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, aggressor, source) {
-  var wear = globalThis.__thornswoodDurability;
-  if (!wear || !wear.hit) { return; }
-  function idFrom(v) {
-    if (typeof v === 'number') { return v; }
-    if (v && v.desc) { return idOf(v.desc); }
-    return 0;
-  }
-  wear.hit(Number(targetId) || 0, idFrom(aggressor), idFrom(source));
-});
 // ==== end thornswood durability ====
 
 
@@ -46530,8 +47894,12 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
       the walk. The bard is added on top of whatever the place already gives,
       so a bard in an inn is 75 an hour and is the best rest in the game, which
       is the point Grim was making.
+
+      bedroll is the campfire's number, which docs/systems/property.md gives
+      it. Which of inn, bed and bedroll somebody gets is the beds' answer in
+      the property block, never the word they typed (#1392).
     */
-    recover: { sit: 20, campfire: 35, inn: 50, bed: 80 },
+    recover: { sit: 20, campfire: 35, bedroll: 35, inn: 50, bed: 80 },
     bard: 25,
 
     /*
