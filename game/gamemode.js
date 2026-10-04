@@ -35260,6 +35260,35 @@ log('gamemode loaded:',
   }
 
   /*
+    COIN ONTO A HOLD'S LEDGER, FROM WHATEVER TOOK IT (#1394).
+
+    The notice and job fees count themselves where they are taken, in post
+    below. A carriage or ferry fare is taken by the carriages block, and the
+    company's haul (#1393) will be another, so the counting is one function
+    with a reason rather than each of them reaching into funds. The coin has
+    already left a pack when this is called: this counts it, the way a
+    notice fee is counted, and creates nothing.
+
+    The ten holds are the ten every ledger in this file uses. Any other name
+    is refused rather than opened, so a slip in a caller cannot start a
+    treasury nobody can find. So is anything but a whole number above 0:
+    taking coin back off a ledger is a payout, and that is its own word.
+  */
+  var LEDGER_HOLDS = ['whiterun', 'solitude', 'riften', 'markarth', 'windhelm',
+                      'falkreath', 'morthal', 'dawnstar', 'winterhold', 'ravenrock'];
+
+  function deposit(hold, amount, reason) {
+    var key = String(hold || '').toLowerCase();
+    var n = Number(amount);
+    if (LEDGER_HOLDS.indexOf(key) < 0) { return false; }
+    if (!Number.isInteger(n) || n <= 0) { return false; }
+    funds[key] = (Number(funds[key]) || 0) + n;
+    save();
+    plog(n, 'gold onto', key + '\'s ledger:', String(reason || 'no reason given'));
+    return true;
+  }
+
+  /*
     ------------------------------------------------------------------- rent
 
     A rented property is the same claim with an amount and a clock. The server
@@ -36521,6 +36550,7 @@ log('gamemode loaded:',
     claims: function () { return claims; },
     isJarl: isJarl, isSteward: isSteward,
     touchedBox: touchedBox, putIn: putIn, holdOfBox: holdOfBox,
+    deposit: deposit, takeGold: takeGold, LEDGER_HOLDS: LEDGER_HOLDS,
     holdStanding: holdStanding,
     rentDue: rentDue, funds: function () { return funds; },
     boxes: function () { return boxes; },
@@ -36534,6 +36564,432 @@ log('gamemode loaded:',
        Object.keys(claims).length, 'claim(s)');
 })();
 // ==== end thornswood property ====
+
+// ==== thornswood carriages ====
+/*
+  CARRIAGES AND FERRIES: THE ROUTE LIST, THE FARE, AND THE ONE MOVE (#1394).
+
+  docs/systems/carriages.md is the design and every number here is from it.
+  You stand within 400 of the driver and name the stop. A ferry is 10 gold, a
+  carriage 20, and either one is 40 when Raven Rock is at either end. The fare
+  goes onto the ledger of the hold the stop you leave from is in, counted the
+  way a notice fee is counted (deposit, in the property block). A pack that is
+  short does not move and loses nothing. Fast travel stays off: nothing here
+  offers the map, and there is no word that skips the driver.
+
+  THE MOD'S OWN RIDE DOES NOT LAND, READ IN THE FORK. MovementValidation
+  in skymp5-server refuses any move a client reports that changes the cell or
+  the world, or covers 4096 units or more, and sends the person back to where
+  the server had them. The carriage mod's fade moves the person on their own
+  machine and nowhere else, so on this server its ride ends where it began.
+  So the move is the server's: one locationalData set, the call /tp and
+  arriving from creation make. That is the one position change the page asks
+  for, and nothing moves anybody a second time on top of it.
+
+  WHERE THE STOPS COME FROM. The driver at every stop is a placed person in
+  game/data/npc-population.json with the role transport: the collection's own
+  carriage and ferry workers, read out of the plugins by
+  scripts/dev/Build-NpcPopulation.py. Each row below is one of those, with its
+  reference, base, world, spot and hold copied across, and
+  tests/test-1394-fares.js fails when the two drift apart. You land on the
+  driver's own spot at the other end, the way MoveTo onto an actor lands.
+  Which water a ferryman works is the mod's: KmodFerryRoute1 to 4 in
+  cast.json, which the mod's own page calls the North Coast, Lake Honrich,
+  Lake Ilinalta and Solstheim, and a ferryman there goes to any stop on his
+  water. Gjalund Salt-Sage is Dragonborn's ship between Windhelm and Raven
+  Rock, the Northern Maiden.
+
+  TWO WITH NO FACTION IN THE REPO. Thors is the one carriage driver in
+  Winterhold town, from the mod's fix that "adds a carriage to Winterhold".
+  Rolf is the Dragon Bridge ferryman the same fix added "beneath the bridge,
+  on the Karth River", and the Karth is North Coast water. Both are on the
+  issue to check against their factions in the plugin.
+
+  WHAT IS NOT HERE. The mod also puts people down where nobody drives from:
+  the villages, the Hearthfire homes, the Thalmor Embassy, the small ferry
+  landings. Landing there needs the mod's own markers, the repo does not have
+  their positions, and so those are not on this list yet. A ride to one is
+  refused before any gold moves.
+
+  THE HOLD IS THE STOP'S, written on the row. It is never worked out from
+  where the person came from, so Solitude's carriage is Solitude's whoever
+  walks up to it, a ride that started at the embassy included: the embassy
+  is not a hold and has no ledger (docs/systems/embassy.md).
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+  function plog() {
+    var a = Array.prototype.slice.call(arguments);
+    a.unshift('[carriages]');
+    console.log(a.join(' '));
+  }
+
+  var FARE_FERRY = 10;
+  var FARE_CARRIAGE = 20;
+  var FARE_RAVEN_ROCK = 40;
+
+  /* The same reach as a notice board. */
+  var RIDE_REACH = 400;
+
+  /*
+    How long after pressing E on a driver /ride still means that driver. A
+    minute, the same as a door for /claim (DOOR_MEMORY_MS). It only matters
+    for a driver who has wandered off his spot, because a person within reach
+    of the spot itself is at the stop whether they pressed anything or not.
+  */
+  var DRIVER_MEMORY_MS = 60000;
+
+  var RIDE_LINES = {
+    carriage: { kind: 'carriage', what: 'the carriage' },
+    coast: { kind: 'ferry', what: 'the North Coast ferry' },
+    honrich: { kind: 'ferry', what: 'the Lake Honrich ferry' },
+    ilinalta: { kind: 'ferry', what: 'the Lake Ilinalta ferry' },
+    solstheim: { kind: 'ferry', what: 'the Solstheim ferry' },
+    maiden: { kind: 'ferry', what: 'the Northern Maiden' }
+  };
+
+  var RIDE_STOPS = [
+    // The carriage, one in every hold.
+    { key: 'carriage:whiterun', line: 'carriage', name: 'Whiterun', hold: 'whiterun', driver: 'Bjorlam',
+      ref: 'bbf6d:CFTO.esp', base: '6ae98:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [17527.8, -12395.6, -4753.2], rot: 108.9 },
+    { key: 'carriage:solitude', line: 'carriage', name: 'Solitude', hold: 'solitude', driver: 'Thaer',
+      ref: 'bbf76:CFTO.esp', base: '6ae97:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-73260.4, 99388.7, -10910], rot: 60 },
+    { key: 'carriage:windhelm', line: 'carriage', name: 'Windhelm', hold: 'windhelm', driver: 'Alfarinn',
+      ref: 'bbf6e:CFTO.esp', base: '6ae99:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [136396.2, 25084.2, -12805.3], rot: 199.6 },
+    { key: 'carriage:riften', line: 'carriage', name: 'Riften', hold: 'riften', driver: 'Sigaar',
+      ref: 'bbf7f:CFTO.esp', base: '6ae96:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [173633.8, -91556.8, 11131.7], rot: 319.9 },
+    { key: 'carriage:markarth', line: 'carriage', name: 'Markarth', hold: 'markarth', driver: 'Kibell',
+      ref: '9d8bf:CFTO.esp', base: '6ae95:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-169393.6, 4767.4, -4098.1], rot: 0 },
+    { key: 'carriage:falkreath', line: 'carriage', name: 'Falkreath', hold: 'falkreath', driver: 'Tulinn',
+      ref: 'bbf90:CFTO.esp', base: 'bbf8f:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-34633, -90053, -2987.1], rot: 177.6 },
+    { key: 'carriage:morthal', line: 'carriage', name: 'Morthal', hold: 'morthal', driver: 'Wilhod',
+      ref: 'bbf8e:CFTO.esp', base: 'bbf8c:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-39903.4, 71131.3, -13872], rot: 0 },
+    { key: 'carriage:dawnstar', line: 'carriage', name: 'Dawnstar', hold: 'dawnstar', driver: 'Berud',
+      ref: 'bbf91:CFTO.esp', base: 'bbf8d:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [26827, 101305.6, -13255.7], rot: 97.4 },
+    { key: 'carriage:winterhold', line: 'carriage', name: 'Winterhold', hold: 'winterhold', driver: 'Thors',
+      ref: '1c355d:CFTO.esp', base: '1be45a:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [110568, 99564.5, -9024], rot: 54.4 },
+    // The North Coast ferry. Dragon Bridge is the fix's ferryman on the Karth.
+    { key: 'coast:solitudelighthouse', line: 'coast', name: 'Solitude Lighthouse', hold: 'solitude', driver: 'Perius',
+      ref: '14c5b:CFTO.esp', base: '14c5a:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-48717.7, 126815.7, -13954.9], rot: 165.2 },
+    { key: 'coast:solitude', line: 'coast', name: 'Solitude', hold: 'solitude', driver: 'Jolf',
+      ref: 'fb18:CFTO.esp', base: 'aa08:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-63395.9, 94449.8, -13886], rot: 63 },
+    { key: 'coast:dragonbridge', line: 'coast', name: 'Dragon Bridge', hold: 'solitude', driver: 'Rolf',
+      ref: '2d4c0a:CFTO.esp', base: '2d4c09:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-98560.9, 79317.5, -13937.9], rot: 319.9 },
+    { key: 'coast:morthal', line: 'coast', name: 'Morthal', hold: 'morthal', driver: 'Radding',
+      ref: 'aa0c:CFTO.esp', base: 'aa0b:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-36760.3, 65864.9, -13940.7], rot: 85.9 },
+    { key: 'coast:dawnstar', line: 'coast', name: 'Dawnstar', hold: 'dawnstar', driver: 'Harlaug',
+      ref: '14ca2:CFTO.esp', base: 'aa07:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [31426.5, 105934.5, -13955.6], rot: 159.5 },
+    { key: 'coast:winterhold', line: 'coast', name: 'Winterhold', hold: 'winterhold', driver: 'Jollsen',
+      ref: '153f0c:CFTO.esp', base: '158ffc:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [102132.8, 113494, -13955], rot: 149 },
+    { key: 'coast:windhelm', line: 'coast', name: 'Windhelm', hold: 'windhelm', driver: 'Gort',
+      ref: 'fb1b:CFTO.esp', base: 'aa09:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [140249.9, 34021.2, -13934.7], rot: 225 },
+    // The Lake Honrich ferry.
+    { key: 'honrich:riften', line: 'honrich', name: 'Riften', hold: 'riften', driver: 'Heirmir',
+      ref: 'fb29:CFTO.esp', base: 'fb28:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [167248.5, -96459.3, 10688], rot: 270 },
+    { key: 'honrich:heartwoodmill', line: 'honrich', name: 'Heartwood Mill', hold: 'riften', driver: 'Thalldar',
+      ref: 'fb25:CFTO.esp', base: 'fb24:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [134591.4, -95769.6, 10668.8], rot: 90 },
+    { key: 'honrich:ivarstead', line: 'honrich', name: 'Ivarstead', hold: 'riften', driver: 'Haennr',
+      ref: '14c53:CFTO.esp', base: '14c52:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [78620.3, -68798.6, 10638.9], rot: 291.2 },
+    // The Lake Ilinalta ferry.
+    { key: 'ilinalta:brittleshinpass', line: 'ilinalta', name: 'Brittleshin Pass', hold: 'falkreath', driver: 'Rinlen',
+      ref: '2e1e7:CFTO.esp', base: '2e1e6:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-19319.6, -54007.7, 637.1], rot: 137.5 },
+    { key: 'ilinalta:guardianstones', line: 'ilinalta', name: 'Guardian Stones', hold: 'falkreath', driver: 'Bryst',
+      ref: '332f6:CFTO.esp', base: '332f5:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [124.1, -60292.9, 608], rot: 143.2 },
+    { key: 'ilinalta:halfmoonmill', line: 'ilinalta', name: 'Half-Moon Mill', hold: 'falkreath', driver: 'Hisygg',
+      ref: '332ef:CFTO.esp', base: '332ed:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-40803.1, -57902.2, 814.6], rot: 97.4 },
+    // The Solstheim ferry.
+    { key: 'solstheim:ravenrock', line: 'solstheim', name: 'Raven Rock', hold: 'ravenrock', driver: 'Maslyn', ravenRock: true,
+      ref: '14c6f:CFTO.esp', base: '14c6e:CFTO.esp', world: '800:Dragonborn.esm',
+      pos: [28344.6, 34630.7, 306.5], rot: 122.2 },
+    { key: 'solstheim:telmithryn', line: 'solstheim', name: 'Tel Mithryn', hold: 'ravenrock', driver: 'Bildul',
+      ref: '14c79:CFTO.esp', base: '14c78:CFTO.esp', world: '800:Dragonborn.esm',
+      pos: [72037.3, 20210.9, 305.7], rot: 182.4 },
+    { key: 'solstheim:skaalvillage', line: 'solstheim', name: 'Skaal Village', hold: 'ravenrock', driver: 'Gauldis',
+      ref: '14c6d:CFTO.esp', base: '14c6c:CFTO.esp', world: '800:Dragonborn.esm',
+      pos: [79945.4, 70832.3, 308], rot: 91.7 },
+    // The Northern Maiden, Gjalund Salt-Sage's ship.
+    { key: 'maiden:windhelm', line: 'maiden', name: 'Windhelm', hold: 'windhelm', driver: 'Gjalund Salt-Sage',
+      ref: '182af:Dragonborn.esm', base: '182ae:Dragonborn.esm', world: '3c:Skyrim.esm',
+      pos: [141310, 34083.7, -13995.5], rot: 353.4 },
+    { key: 'maiden:ravenrock', line: 'maiden', name: 'Raven Rock', hold: 'ravenrock', driver: 'Gjalund Salt-Sage', ravenRock: true,
+      ref: '2582c:Dragonborn.esm', base: '2582b:Dragonborn.esm', world: '800:Dragonborn.esm',
+      pos: [28928.7, 33144.2, 309.9], rot: 73.1 }
+  ];
+
+  var HOLD_NAMES = {
+    whiterun: 'Whiterun', solitude: 'Solitude', riften: 'Riften', markarth: 'Markarth',
+    windhelm: 'Windhelm', falkreath: 'Falkreath', morthal: 'Morthal', dawnstar: 'Dawnstar',
+    winterhold: 'Winterhold', ravenrock: 'Raven Rock'
+  };
+
+  function stopByKey(key) {
+    for (var i = 0; i < RIDE_STOPS.length; i++) {
+      if (RIDE_STOPS[i].key === key) { return RIDE_STOPS[i]; }
+    }
+    return null;
+  }
+
+  function stopByBase(base) {
+    var want = String(base || '').toLowerCase();
+    if (!want) { return null; }
+    for (var i = 0; i < RIDE_STOPS.length; i++) {
+      if (RIDE_STOPS[i].base && RIDE_STOPS[i].base.toLowerCase() === want) { return RIDE_STOPS[i]; }
+    }
+    return null;
+  }
+
+  /** The gold for a ride, or 0 when the list has no such ride. */
+  function fare(from, to) {
+    if (!from || !to || from === to || from.line !== to.line) { return 0; }
+    // Nobody drives from a stop with no driver standing at it.
+    if (!from.driver) { return 0; }
+    var line = Object.prototype.hasOwnProperty.call(RIDE_LINES, from.line) ? RIDE_LINES[from.line] : null;
+    if (!line) { return 0; }
+    if (from.ravenRock || to.ravenRock) { return FARE_RAVEN_ROCK; }
+    return line.kind === 'ferry' ? FARE_FERRY : FARE_CARRIAGE;
+  }
+
+  /** Every stop this one's driver goes to. */
+  function destinations(from) {
+    var out = [];
+    for (var i = 0; i < RIDE_STOPS.length; i++) {
+      if (fare(from, RIDE_STOPS[i]) > 0) { out.push(RIDE_STOPS[i]); }
+    }
+    return out;
+  }
+
+  /** Where something is: its cell or world and its point, or null. */
+  function placeOf(id) {
+    var cell = null, pos = null;
+    try { cell = mp.get(id, 'worldOrCellDesc'); } catch (e) { return null; }
+    try { pos = mp.get(id, 'pos'); } catch (e) { return null; }
+    if (typeof cell !== 'string' || !cell || !pos || pos.length !== 3) { return null; }
+    var p = [Number(pos[0]), Number(pos[1]), Number(pos[2])];
+    if (!p.every(Number.isFinite)) { return null; }
+    return { cell: cell, pos: p };
+  }
+
+  function apart(a, b) {
+    var dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
+    return Math.sqrt(dx * dx + dy * dy + dz * dz);
+  }
+
+  /*
+    Somebody pressed E on a driver, and the front plugin said which one.
+    Believed only as far as the server can check it: the actor has to be one
+    of the drivers on the list, by its base, and the person has to be within
+    reach of where that actor is now. Null when it is not a driver at all.
+  */
+  var pressedBy = {};
+
+  function pressDriver(actorId, driverId) {
+    var base = '';
+    try { base = String(mp.get(driverId, 'baseDesc') || ''); } catch (e) { base = ''; }
+    var stop = stopByBase(base);
+    if (!stop) { return null; }
+    var me = placeOf(actorId), them = placeOf(driverId);
+    if (!me || !them || me.cell !== them.cell || apart(me.pos, them.pos) > RIDE_REACH) {
+      return { stop: stop, far: true };
+    }
+    pressedBy[actorId] = { stop: stop.key, driver: driverId, at: Date.now() };
+    return { stop: stop, far: false };
+  }
+
+  /** The stop this person is standing at, or null. */
+  function stopHere(actorId) {
+    var me = placeOf(actorId);
+    if (!me) { return null; }
+    var p = Object.prototype.hasOwnProperty.call(pressedBy, actorId) ? pressedBy[actorId] : null;
+    if (p && Date.now() - p.at <= DRIVER_MEMORY_MS) {
+      var s = stopByKey(p.stop);
+      var them = placeOf(p.driver);
+      var base = '';
+      try { base = String(mp.get(p.driver, 'baseDesc') || ''); } catch (e) { base = ''; }
+      if (s && them && stopByBase(base) === s && them.cell === me.cell &&
+          apart(me.pos, them.pos) <= RIDE_REACH) {
+        return s;
+      }
+    }
+    /*
+      Otherwise the driver himself, or his spot. The population block keeps a
+      kept driver on his own placed reference, so the server can read where he
+      stands now; a driver it cannot read is measured from his spot.
+    */
+    var best = null, bestD = RIDE_REACH;
+    for (var i = 0; i < RIDE_STOPS.length; i++) {
+      var stop = RIDE_STOPS[i];
+      if (!stop.driver || stop.world !== me.cell) { continue; }
+      var d = apart(me.pos, stop.pos);
+      var live = driverNow(stop);
+      if (live && live.cell === me.cell) { d = Math.min(d, apart(me.pos, live.pos)); }
+      if (d <= bestD) { bestD = d; best = stop; }
+    }
+    return best;
+  }
+
+  function driverNow(stop) {
+    var id = 0;
+    try { id = Number(mp.getIdFromDesc(stop.ref)) || 0; } catch (e) { id = 0; }
+    return id > 0 ? placeOf(id) : null;
+  }
+
+  function simple(text) {
+    return String(text || '').toLowerCase().replace(/[^a-z]/g, '');
+  }
+
+  /* The stop they named, out of the ones this driver goes to: the whole name,
+     or the start of exactly one. */
+  function pick(list, wanted) {
+    var w = simple(wanted);
+    if (!w) { return null; }
+    var i;
+    for (i = 0; i < list.length; i++) {
+      if (simple(list[i].name) === w) { return list[i]; }
+    }
+    var hits = [];
+    for (i = 0; i < list.length; i++) {
+      if (simple(list[i].name).indexOf(w) === 0) { hits.push(list[i]); }
+    }
+    return hits.length === 1 ? hits[0] : null;
+  }
+
+  function offer(from) {
+    var list = destinations(from);
+    var bits = [];
+    for (var i = 0; i < list.length; i++) { bits.push(list[i].name + ' ' + fare(from, list[i])); }
+    return from.driver + ' runs ' + RIDE_LINES[from.line].what + ' from ' + from.name +
+      '. Say /ride and the stop: ' + bits.join(', ') + ' gold. The fare goes to ' +
+      (HOLD_NAMES[from.hold] || from.hold) + '\'s ledger.';
+  }
+
+  /* Whether the pack can pay, by the same test takeGold makes: one stack of
+     coin with the whole fare in it. Read only. */
+  function canPay(actorId, amount) {
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return false; }
+    var entries = (inv && inv.entries) || [];
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (e && e.baseId === 0x0000000F && (Number(e.count) || 0) >= amount) { return true; }
+    }
+    return false;
+  }
+
+  function moveTo(actorId, stop) {
+    mp.set(actorId, 'locationalData', {
+      cellOrWorldDesc: stop.world,
+      pos: [stop.pos[0], stop.pos[1], stop.pos[2]],
+      rot: [0, 0, stop.rot]
+    });
+  }
+
+  /** A ride: the line to say back, and the move when it goes. */
+  function ride(actorId, profileId, wanted) {
+    var from = stopHere(actorId);
+    if (!from) {
+      return 'Stand at a carriage or ferry driver, then say /ride and where you are going.';
+    }
+    if (!wanted) { return offer(from); }
+    var to = pick(destinations(from), wanted);
+    if (!to) { return 'No ride to ' + wanted + ' from here. ' + offer(from); }
+    var price = fare(from, to);
+    // Never 0 or less: destinations() offers only rides with a fare, and an
+    // amount below 1 would make takeGold add rather than take.
+    if (!(price > 0)) { return 'No ride to ' + wanted + ' from here. ' + offer(from); }
+    var prop = g.__thornswoodProperty;
+    if (!prop || typeof prop.takeGold !== 'function' || typeof prop.deposit !== 'function') {
+      plog('a ride was asked for and the hold ledger is not loaded');
+      return 'The hold\'s ledger is not running on this server, so nobody rides. Say so in the dev channel.';
+    }
+    // A pack that is short keeps all of it and stays where it is.
+    if (!canPay(actorId, price)) {
+      return 'The ride to ' + to.name + ' is ' + price + ' gold and you do not have it. Nothing was taken.';
+    }
+    /*
+      THE MOVE, THEN THE FARE, so a move the server could not make costs
+      nothing and no coin ever has to go back into a pack. The pack was read a
+      line ago and nothing between here and there touches it, so takeGold
+      finds what canPay found. If writing the pack fails all the same, there
+      is no fare and so no ride: they go back to the stop they left.
+    */
+    try {
+      moveTo(actorId, to);
+    } catch (e) {
+      plog('profile', profileId, 'could not be moved from', from.key, 'to', to.key + ':', e);
+      return 'The ride did not go, and nothing was taken. Say so in the dev channel.';
+    }
+    if (!prop.takeGold(actorId, price)) {
+      try { moveTo(actorId, from); } catch (e2) { }
+      plog('profile', profileId, 'rode from', from.key, 'to', to.key,
+           'and the fare could not be taken, so they were put back');
+      return 'The fare could not be taken, so the ride did not go. Nothing was taken.';
+    }
+    delete pressedBy[actorId];
+    var what = RIDE_LINES[from.line].what;
+    if (!prop.deposit(from.hold, price, 'fare, ' + from.name + ' to ' + to.name + ' by ' + what +
+                      ', profile ' + profileId)) {
+      plog('profile', profileId, 'paid', price, 'at', from.key, 'and', from.hold, 'took no deposit');
+    }
+    plog('profile', profileId, 'rode', what, 'from', from.name, 'to', to.name, 'for', price,
+         'gold, onto', from.hold + '\'s ledger');
+    return 'You pay the ' + price + ' gold fare and ride to ' + to.name + '.';
+  }
+
+  /*
+    /ride                 at a driver: where this driver goes, and the fares
+    /ride <stop>          at a driver: pay and go
+    /ride e <id>          the front plugin, when somebody presses E on a driver
+  */
+  function command(parts, actorId, profileId, toProfile) {
+    if (!actorId) {
+      toProfile(profileId, 'You are not in the world yet.');
+      return true;
+    }
+    var first = String((parts && parts[1]) || '').toLowerCase();
+    if (first === 'e' && parts.length === 3 && /^[0-9a-f]+$/i.test(String(parts[2]))) {
+      var pressed = pressDriver(actorId, parseInt(parts[2], 16) >>> 0);
+      // Not a driver: the press was for something else, so nothing to say.
+      if (!pressed) { return true; }
+      toProfile(profileId, pressed.far ? 'Walk up to ' + pressed.stop.driver + ' first.' : offer(pressed.stop));
+      return true;
+    }
+    toProfile(profileId, ride(actorId, profileId, (parts || []).slice(1).join(' ').trim()));
+    return true;
+  }
+
+  g.__thornswoodCarriages = {
+    STOPS: RIDE_STOPS, LINES: RIDE_LINES, REACH: RIDE_REACH,
+    FARE_FERRY: FARE_FERRY, FARE_CARRIAGE: FARE_CARRIAGE, FARE_RAVEN_ROCK: FARE_RAVEN_ROCK,
+    DRIVER_MEMORY_MS: DRIVER_MEMORY_MS,
+    stopByKey: stopByKey, stopByBase: stopByBase, fare: fare, destinations: destinations,
+    stopHere: stopHere, pressDriver: pressDriver, ride: ride, command: command
+  };
+  plog('ready,', RIDE_STOPS.length, 'stops on', Object.keys(RIDE_LINES).length, 'lines');
+})();
+// ==== end thornswood carriages ====
 
 // ==== thornswood spoils ====
 /*
@@ -41449,6 +41905,8 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/helpme', '/help-me', '/report',
                // Out of a wedged spot; see the stuck block after it.
                '/stuck',
+               // A carriage or ferry, at the driver (#1394). See the carriages block.
+               '/ride',
                '/pick', '/spend',
                // A Master taking somebody on, and ending it (#1388). See the
                // character block.
@@ -41537,6 +41995,8 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // must be able to find: asking staff, and getting
                       // out of a wedged spot (#414).
                       '/helpme', '/report', '/stuck',
+                      // Everybody's: the way between holds is a driver (#1394).
+                      '/ride',
                       // Everybody's, and they have to be findable: a key
                       // prompt nobody sees is a feature nobody has.
                       '/friend', '/party', '/mute', '/hidename', '/trade', '/journal', '/book', '/merchant',
@@ -42575,6 +43035,21 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       var bn = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodNeeds;
       if (bn && bn.setBurning && actorId) {
         try { bn.setBurning(actorId, String(parts[1] || '') === '1'); } catch (e) { }
+      }
+      return true;
+    }
+
+    /*
+      A carriage or ferry (#1394), said at the driver, or sent by the front
+      plugin as /ride e <id> when somebody presses E on one. The carriages
+      block answers it, and takes the fare onto the hold's ledger.
+    */
+    if (word === '/ride') {
+      var rides = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodCarriages;
+      if (!rides) { toProfile(profileId, 'That is not running on this server.'); return true; }
+      try { rides.command(parts, actorId, profileId, toProfile); } catch (eRide) {
+        log('/ride threw:', eRide);
+        toProfile(profileId, 'That did not work. Say so in the dev channel.');
       }
       return true;
     }
