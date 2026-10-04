@@ -90,6 +90,8 @@ function rig(opts) {
     // The sleep key is the mold's, on a person inside a building you hold
     // (#1603), and nobody here holds one.
     'const SLEEP_KEY = 22; function sleepPress() { return false; }\n' +
+    // The same key in the inventory (#1384); no inventory is open here.
+    'function repairPress() { return false; }\n' +
     'const COMMAND_KEY = 53; function commandKeyPressed() { }\n' +
     // The / and P watchers on the game's own menus are test-our-key-menus.js's.
     'const OFF_MENU = { openedBy: function () { return ""; }, shutFor: function () { }, keyDown: function () { } };\n' +

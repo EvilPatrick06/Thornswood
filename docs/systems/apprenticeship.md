@@ -132,10 +132,11 @@ See [Enchanter](professions/enchanter.md).
 
 Repair kits follow the same halves. A Platewright's kit, an
 Edgewright's kit, and a Haberdasher's kit are the three repairs on
-[Durability](durability.md). The 120% repair is the correct half
-doing the work, which includes a master who has taken the sister half
-on far enough to be that half, and does not include an outside trade
-that is still only novice of the wrong half.
+[Durability](durability.md). The 120% repair is the half the person
+picked doing the work. The sister half never gives it, at any rank,
+even once a master has taken that half past novice, and neither does
+an outside trade (Patrick, 4 October). Everybody else repairs to
+100%.
 
 ## What teaching does not do
 
