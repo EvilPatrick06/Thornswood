@@ -255,6 +255,9 @@ jobs:
           # seconds when the token exchange or the profile lookup stalls,
           # never answers, or drops halfway, and the page says to try again.
           # $six is a historical name: the gate list grew well past six (#1368).
+          # Issue #1589: a line here with no comma after it ends the list, and
+          # every name below it only prints itself. test-gate-list.ps1 parses
+          # this step and fails on any harness named outside the list.
           $six = 'test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -294,8 +297,9 @@ jobs:
                  'test-main-runtime-startup.js',
                  'test-spawn-reply.js',
                  'test-discord-callback-hang.js',
-                 'test-member-role-wording.js'
-                 'test-page-changed.js'
+                 'test-member-role-wording.js',
+                 'test-page-changed.js',
+                 'test-gate-list.ps1'
           $failed = @()
           foreach ($n in $six) {
             $p = Join-Path 'tests' $n
