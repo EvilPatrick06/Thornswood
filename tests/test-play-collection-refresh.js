@@ -17,7 +17,13 @@
       nothing for those;
     - OwnGameRefreshIfDue is StartOwnGame(false, true), the same call as
       BtnOwnGameRefresh, not a second refresh;
-    - when NeedsRefresh is false, StartPlay still reaches Play().
+    - when NeedsRefresh is false, StartPlay still reaches Play();
+    - when the bring-up-to-date succeeds, StartPlay runs again, so one press
+      ends in the game, and only once, so a folder that still does not match
+      cannot send it round again;
+    - ownGameBusy is read again after the wait, because a bring-up-to-date
+      OwnGameAtStart queued can start inside it;
+    - a NeedsRefresh that throws is said in the log, not only noted.
 
   Read only. It reads source files and nothing else.
 */
@@ -62,8 +68,8 @@ const wire = body(own, 'static void WireOwnGame()');
 yes('OwnGameRefreshIfDue exists', due.length > 0);
 yes('it asks OwnGame.NeedsRefresh, the same test Diagnostics refresh uses',
     due.indexOf('OwnGame.NeedsRefresh(cfg)') >= 0);
-yes('it runs StartOwnGame(false, true), the same call as the Diagnostics button',
-    /StartOwnGame\(\s*false\s*,\s*true\s*\)/.test(due));
+yes('it runs StartOwnGame(false, true, ...), the same bring-up-to-date as the Diagnostics button',
+    /StartOwnGame\(\s*false\s*,\s*true\s*,/.test(due));
 yes('the Diagnostics button is still that same StartOwnGame(false, true)',
     /btnOwnGameRefresh\.Click \+= delegate \{ StartOwnGame\(false, true\); \}/.test(wire));
 yes('it does not start a second refresh of its own',
@@ -72,6 +78,35 @@ yes('it leaves a running game alone',
     /playing \|\| Checks\.GameRunning\(\)/.test(due));
 yes('it does nothing when the folder is not due',
     /if \(!due\) return false;/.test(due));
+
+// ---- After the bring-up-to-date -------------------------------------------
+const startOwn = body(own, 'static void StartOwnGame(bool make, bool loud, Action then)');
+const startOwn2 = body(own, 'static void StartOwnGame(bool make, bool loud)');
+yes('StartOwnGame(make, loud) is StartOwnGame(make, loud, null), so the button and startup are unchanged',
+    /^\{\s*StartOwnGame\(make, loud, null\);\s*\}$/.test(startOwn2));
+yes('StartOwnGame runs what comes after only when it worked, and never after a make',
+    /if \(fail == null && !make && then != null\) then\(\);/.test(startOwn));
+yes('that line is inside the finish on the window\'s thread, after the status is drawn again',
+    startOwn.indexOf('then();') > startOwn.lastIndexOf('DrawOwnGame();') &&
+    startOwn.lastIndexOf('win.Dispatcher.BeginInvoke') < startOwn.indexOf('then();'));
+const cont = due.slice(due.indexOf('StartOwnGame(false, true,'));
+yes('what comes after is StartPlay from the top, not Play(), so Discord and the character list are not skipped',
+    /StartPlay\(\);/.test(cont) && !/[^t]Play\(\);/.test(cont.replace(/StartPlay\(\);/g, '')));
+yes('it marks that StartPlay as the one after a bring-up-to-date, and clears the mark however it ends',
+    /ownGameRefreshedForPlay = true;\s*try \{ StartPlay\(\); \}\s*finally \{ ownGameRefreshedForPlay = false; \}/.test(cont));
+const guardAt = due.indexOf('if (ownGameRefreshedForPlay)');
+yes('a folder still due straight after its bring-up-to-date is said, and not started again',
+    guardAt > 0 && guardAt < due.indexOf('StartOwnGame(false, true,') &&
+    /if \(ownGameRefreshedForPlay\)\s*\{[\s\S]*?Log\([\s\S]*?return true;\s*\}/.test(due));
+const waitAt = due.indexOf('Waiting(');
+const busyAfter = due.indexOf('if (ownGameBusy)', waitAt);
+yes('ownGameBusy is read again after the wait, before anything is started',
+    waitAt > 0 && busyAfter > waitAt && busyAfter < due.indexOf('if (!due) return false;'));
+yes('a busy folder stops Play with a line saying so, before the wait and after it',
+    (due.match(/if \(ownGameBusy\)\s*\{\s*Log\([^;]*\);\s*return true;\s*\}/g) || []).length === 2);
+const catchBody = due.slice(due.indexOf('catch (Exception ex)'), due.indexOf('return false;', due.indexOf('catch (Exception ex)')));
+yes('a NeedsRefresh that throws is noted and said in the log, and Play goes on from the folder as it is',
+    catchBody.indexOf('Swallow.Note(') >= 0 && catchBody.indexOf('Log(') >= 0);
 
 const requiredAt = startPlay.indexOf('if (!OwnGameRequired()) return;');
 const dueAt = startPlay.indexOf('if (OwnGameRefreshIfDue()) return;');
