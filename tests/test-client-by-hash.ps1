@@ -165,9 +165,13 @@ try {
     Yes 'Publish-Update.ps1 still defines Test-Machine on one line' $tm.Success
     Yes 'and still filters its removals by Test-Machine' $diff.Success
     Yes 'and its scan leaves out what Test-Machine claims' ($pub -match 'if \(Test-Machine \$rel\) \{ continue \}')
-    # Ship-Rules finds the file through $GameDir; if the scan stops calling its
-    # folder that, the client would go back to being judged without its bytes.
-    Yes 'and its scan walks the folder it calls $GameDir' ($pub -match 'Get-ChildItem -LiteralPath \$GameDir -Recurse -File -Force')
+    # Ship-Rules finds the file through $GameDir; if the scan stops walking that
+    # folder, the client would go back to being judged without its bytes. Since
+    # #1517 (#1156) it walks $listedGame, the long name of the same folder, so
+    # a short 8.3 TEMP does not cut the relative paths wrong.
+    Yes 'and its scan walks the folder it calls $GameDir, by its long name' (
+        ($pub -match '\$listedGame = \(Get-Item -LiteralPath \$GameDir\)\.FullName') -and
+        ($pub -match 'Get-ChildItem -LiteralPath \$listedGame -Recurse -File -Force'))
     if ($tm.Success -and $diff.Success) {
         . ([scriptblock]::Create($tm.Value))
         # The last pack carried all six and an overlay of ours that has gone.

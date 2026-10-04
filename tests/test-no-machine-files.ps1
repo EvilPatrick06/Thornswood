@@ -204,8 +204,15 @@ try {
 } finally { $z.Dispose() }
 $allow = Join-Path $T 'no-allow.txt'; [IO.File]::WriteAllText($allow, "# nothing allowed`n")
 $global:LASTEXITCODE = 0
-$out = (@(& (Join-Path $repo 'scripts\dev\Check-Secrets.ps1') -Zip @($zip) -Allow $allow *>&1 | ForEach-Object { [string]$_ }) -join "`n")
-$code = $LASTEXITCODE
+# Check-Secrets writes a hit as a GitHub annotation when GITHUB_ACTIONS is
+# true, which it is under the nightly on the VPS, and these lines read the
+# form a person sees. test-check-secrets.ps1 checks the annotation form.
+$savedActions = $env:GITHUB_ACTIONS
+$env:GITHUB_ACTIONS = ''
+try {
+    $out = (@(& (Join-Path $repo 'scripts\dev\Check-Secrets.ps1') -Zip @($zip) -Allow $allow *>&1 | ForEach-Object { [string]$_ }) -join "`n")
+    $code = $LASTEXITCODE
+} finally { $env:GITHUB_ACTIONS = $savedActions }
 Yes 'a pack carrying the join pass, mod menu settings and a window layout fails' ($code -eq 1)
 foreach ($n in 'thornswood-pass.txt', 'Precision.ini', 'CommunityShaders_ImGui.ini') { Yes "  $n by Ship-Rules" ($out.Contains("$n`:0  never-ship-machine")) }
 Yes '  and our own overlay beside them is not named' (-not $out.Contains('thornswood-front.js'))
