@@ -29,11 +29,20 @@ function yes(what, cond) {
   else { fail++; console.log('FAIL  ' + what); }
 }
 
+/*
+  Out of the property block only, cut first the way test-1374-letters.js does:
+  gamemode.js has more than one post and take since the book and ledger
+  blocks came in, and the first one in the file is not always the board's.
+*/
+const P0 = src.indexOf('// ==== thornswood property ====');
+const P1 = P0 < 0 ? -1 : src.indexOf('// ==== end thornswood property ====', P0);
+const prop = (P0 < 0 || P1 < 0) ? '' : src.slice(P0, P1);
+yes('the property block is in the gamemode, between its markers', prop.length > 0);
 function lift(from, to) {
-  const a = src.indexOf(from);
-  if (a < 0) { return null; }
-  const b = src.indexOf(to, a);
-  return b < 0 ? null : src.slice(a, b + to.length);
+  const a = prop.indexOf(from);
+  if (a < 0 || prop.indexOf(from, a + 1) >= 0) { return null; }
+  const b = prop.indexOf(to, a);
+  return b < 0 ? null : prop.slice(a, b + to.length);
 }
 
 const putBlock = lift('  function putIn(containerRefrId, actorId, baseId, count) {', '\n  }\n');
@@ -147,7 +156,7 @@ if (postBlock !== null) {
     const fn = new Function(
       'parts', 'actorId', 'profileId', 'toProfile', 'isJob',
       'boxes', 'notices', 'funds', 'takeGold', 'save', 'plog', 'mp',
-      'NOTICE_FEE', 'JOB_FEE', 'Number', 'boardHere',
+      'NOTICE_FEE', 'JOB_FEE', 'Number', 'boardHere', 'refreshPanel',
       postBlock + '\nreturn post;');
     const call = fn(
       null, null, null, null, null,
@@ -162,10 +171,14 @@ if (postBlock !== null) {
       20, 30, Number,
       // Standing at Whiterun's board unless the test says otherwise. The
       // board is what makes /notice a board rather than a command.
-      function () { return opts.noBoard ? null : 'whiterun'; });
+      function () { return opts.noBoard ? null : 'whiterun'; },
+      // Every board word ends by drawing the panel again (#1374);
+      // test-unpin.js drives the real one.
+      function (actorId) { drawn.push(actorId); });
+    const drawn = [];
     call(opts.parts, 0xff000058, ALICE,
          function (pid, m) { told.push(m); }, !!opts.isJob);
-    return { told: told, notices: notices, funds: funds, took: took.n };
+    return { told: told, notices: notices, funds: funds, took: took.n, drawn: drawn };
   }
 
   // S6: a notice costs twenty and lands on the board.
@@ -173,6 +186,7 @@ if (postBlock !== null) {
     const r = posting({ parts: ['/notice', 'Room', 'to', 'let'] });
     yes('S6 a notice costs twenty gold', r.took === 20);
     yes('S6 and it is on the board', r.notices.whiterun.length === 1);
+    yes('S6 and the poster\'s board panel is drawn again', r.drawn.length === 1 && r.drawn[0] === 0xff000058);
     yes('S6 with the words that were said',
         r.notices.whiterun[0].text === 'Room to let');
     yes('S6 and the fee goes to the hold', r.funds.whiterun === 20);
@@ -228,14 +242,14 @@ if (postBlock !== null) {
     const notices = { whiterun: opts.list };
     const fn = new Function(
       'parts', 'actorId', 'profileId', 'toProfile',
-      'boardHere', 'notices', 'save', 'plog', 'mp', 'Number',
+      'boardHere', 'notices', 'save', 'plog', 'mp', 'Number', 'refreshPanel',
       takeBlock + '\nreturn take;');
     const call = fn(
       null, null, null, null,
       function () { return opts.noBoard ? null : 'whiterun'; },
       notices, function () { }, function () { },
       { get: function () { return { name: opts.who || 'Bob' }; } },
-      Number);
+      Number, function () { });
     call(opts.parts, 0xff000058, opts.by,
          function (pid, m) { told.push(m); });
     return { told: told, list: notices.whiterun };
