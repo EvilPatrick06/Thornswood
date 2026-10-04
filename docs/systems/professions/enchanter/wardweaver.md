@@ -35,8 +35,8 @@ recipes, they belong on this page and in a list beside the staves.
 ## Where this is
 
 The bench gate is in the server. Twin Souls is the second slot in the
-menu. An enchantment the server is told about is one piece of work.
-Which enchantment it was is still the menu's: the engine does not
-tell the server, so the list and its ranks wait on that (see
+menu. Which enchantment went on a piece is still the menu's: the
+engine does not tell the server, so the list, its ranks and the
+count of the work wait on that (see
 [Enchantments](../../enchantments.md)). The server does not see the
 learned list.

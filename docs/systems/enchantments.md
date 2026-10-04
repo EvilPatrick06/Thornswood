@@ -65,14 +65,14 @@ sell one. See [Gold](gold.md).
 The arcane enchanter is closed to the two enchanter halves. Twin Souls
 is the second slot: a master Enchanter is handed the game's Extra
 Effect perk, so the menu offers a second enchantment, and it is put
-back on every spawn. An enchantment the server is told about is one
-piece of work for the half that owns it.
+back on every spawn.
 
 This list is in the server (`ENCHANTMENTS` in `game/gamemode.js`),
-keyed by the game's enchanting effects, with the rank of each. The
-server refuses an enchantment that is off it, one above the rank,
-and a second one without Twin Souls, as soon as the engine says what
-went on the piece. The engine does not say yet: the craft message
+keyed by the game's enchanting effects, with the rank of each. As
+soon as the engine says what went on a piece, the server refuses an
+enchantment that is off it, one above the rank, and a second one
+without Twin Souls, and counts the rest as one piece of work for the
+half that owns it. The engine does not say yet: the craft message
 from the client names the piece and not its enchantment, so the menu
 still applies whatever Skyrim would. [#1389](https://github.com/EvilPatrick06/Thornswood/issues/1389)
 says what the engine has to pass.
