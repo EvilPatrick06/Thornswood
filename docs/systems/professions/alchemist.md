@@ -54,10 +54,13 @@ craft is still one piece of work.
 
 100, then 250, then 600, the count resetting. A successful batch is
 one piece. There is no recipe list to climb by, so the work has to be
-the batch the server sees. Today the server sees the bench and not
-the batch. See the bottom of each half.
+the batch the server sees. See the bottom of each half.
 
 ## Where this is
 
-The lab gate is in the server. The double batch is not. There is no
-item list, because there are no recipe rows.
+The lab gate is in the server. A batch is one piece of work, and
+Master Chemist's second bottle goes on the same stack once the first
+is in the pack. The mixtures list is in the server and is asked once
+the engine says which effects a brew carries, which it does not yet
+(see [Mixtures](../mixtures.md)). There is no item list, because
+there are no recipe rows.

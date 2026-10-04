@@ -5,8 +5,7 @@ enchanter is the bench, closed to anyone who is not an enchanter of
 either half.
 
 The work is the menu: learn an enchantment by breaking an item down,
-then put it on a piece. The server does not see the learned list and
-does not see the result, except that it let you stand at the bench.
+then put it on a piece.
 
 ## What you are handed
 
@@ -22,7 +21,7 @@ trades.
 ## Twin Souls
 
 At master this is the perk that matters here. Two enchantments on one
-item. It is not applied. One enchantment is what the menu does.
+item. Below master, one.
 
 ## What you cannot do
 
@@ -35,5 +34,9 @@ recipes, they belong on this page and in a list beside the staves.
 
 ## Where this is
 
-The bench gate is in the server. The enchantment itself is the menu,
-ungated beyond the bench. Twin Souls is not in the world.
+The bench gate is in the server. Twin Souls is the second slot in the
+menu. An enchantment the server is told about is one piece of work.
+Which enchantment it was is still the menu's: the engine does not
+tell the server, so the list and its ranks wait on that (see
+[Enchantments](../../enchantments.md)). The server does not see the
+learned list.
