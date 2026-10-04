@@ -3834,7 +3834,9 @@
   // is the engine's own "this thing is burning", the one fire damage uses.
   const FIRE_SHADER = 0x1b212;
   // Per second in the coals. Survivable for a few seconds, fatal if somebody
-  // walks in and makes a cup of tea, which is the point.
+  // walks in and makes a cup of tea, which is the point. The server times each
+  // fire by the /burn reports and multiplies by this same number to tell a bad
+  // burn (HURT.burn.perSecond in gamemode.js, #1383): change both together.
   const BURN_PER_SECOND = 7;
 
   let placeAt = 0;
@@ -4543,7 +4545,7 @@
 
   /** Draw or clear the little panel that names them and the three keys. */
   function drawPrompt(row) {
-    const sig = row ? (row.n + '|' + row.f + '|' + row.m + '|' + row.y) : '';
+    const sig = row ? (row.n + '|' + row.f + '|' + row.m + '|' + row.y + '|' + (row.s || '')) : '';
     if (sig === lookingSig) { return; }
     lookingSig = sig;
     if (!row) {
@@ -4566,6 +4568,13 @@
       '<div style="font-size:26px;color:#efe4cc;margin-bottom:4px">' + row.n +
       (row.y ? '<span style="color:#8fb85e;font-size:18px"> &middot; your party</span>' : '') +
       '</div>' +
+      /*
+        A scar they agreed to (#1383): injury.md, "a line other people can be
+        told when they look at you". The server writes it with no markup in
+        it, and nothing that could be markup is let through here either.
+      */
+      (row.s ? '<div style="font-size:16px;font-style:italic;color:#c9b99a;margin-bottom:4px;' +
+               'max-width:420px;white-space:normal">' + String(row.s).replace(/[<>&"]/g, '') + '</div>' : '') +
       keyRow(FRIEND_NAME, row.f ? 'Remove friend' : 'Add friend', !!row.f) +
       keyRow(TRADE_NAME, 'Trade', false) +
       keyRow(MUTE_NAME, row.m ? 'Unmute' : 'Mute', !!row.m) +

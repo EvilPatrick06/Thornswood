@@ -273,6 +273,7 @@ jobs:
                  'test-1378-shared-gather.js',
                  'test-1374-letters.js',
                  'test-1380-rare-mines.js',
+                 'test-1383-injury.js',
                  'test-1384-condition.js',
                  'test-1386-warrior.js',
                  'test-1388-apprentice.js',
