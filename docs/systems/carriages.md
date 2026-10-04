@@ -53,11 +53,22 @@ that word exists for a driver, the mod's placement is the placement.
 
 ## Where this is
 
-Fast travel is off. The carriage and ferry mod is in the collection,
-and the ride is its fade. The patch that keeps drivers out of the
-rebuilt gates is in the collection with it.
+Fast travel is off. The carriage and ferry mod is in the collection.
+The patch that keeps drivers out of the rebuilt gates is in the
+collection with it.
 
-The server does not take a fare, does not keep a route list, and does
-not refuse the ride when the pack is short. Saying where you are going
-to the driver is the mod's own conversation, and it does not ask the
-ledger first.
+The server keeps the route list: the 27 drivers the collection
+places. That is nine carriages, the North Coast, Lake Honrich, Lake
+Ilinalta and Solstheim ferries, and the Northern Maiden between
+Windhelm and Raven Rock. `/ride` at a driver says where that driver
+goes and what each stop costs. `/ride` and the stop takes the fare
+onto the departure hold's ledger and moves you, once. A short pack is
+refused and keeps its gold. Pressing E on a driver asks the server the
+same question.
+
+The mod's own conversation still opens, and it does not ask the
+ledger. Its fade does not land: the server refuses a move it did not
+make and puts you back where you were. The stops nobody drives from
+are not on the server's list yet: the villages, the Hearthfire homes,
+the Thalmor Embassy and the small ferry landings. Their positions are
+not in the repo.

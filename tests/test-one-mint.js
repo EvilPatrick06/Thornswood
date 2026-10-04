@@ -333,7 +333,7 @@ const WRITERS = {
   'property/giveNamed': [1, 'one named key or mold, KEY or MOLD'],
   'property/takeBlankMold': [1, 'only takes a mold away'],
   'property/nameFreshKey': [1, 'names one key off a stack, and the count is the same after'],
-  'property/takeGold': [1, 'takes a notice, job or letter fee out and never puts any in (checked below)'],
+  'property/takeGold': [1, 'takes a notice, job or letter fee or a fare out and never puts any in (checked below)'],
   'property/payOut': [1, 'a letter\'s held 15 back out of the ledger it was counted on, to its courier or its sender; payHeld is its one caller and takes the same off that ledger (#1374, checked below)'],
   'spoils/strip': [1, 'only takes things out of a container the world stocked'],
   'spoils/purse': [1, 'THE MINT: forty gold, once per character'],
@@ -432,8 +432,10 @@ for (const at of Object.keys(WRITERS)) {
     case is there more gold afterwards than before.
 
     It does not refuse a negative amount, and a negative amount would add.
-    Nothing hands it one: its one caller passes a fee that is one of two
-    positive constants, which is checked here rather than trusted.
+    Nothing hands it one: the board passes a fee that is one of two positive
+    constants, a letter passes its fee and pay, and a ride (#1394) passes its
+    fare, which is one of three and is refused at 0 or less before takeGold is
+    reached. All are checked here rather than trusted.
   */
   const take = lift('  function takeGold(actorId, amount) {', '\n  }\n');
   yes('the fee taker is in the gamemode', take !== null);
@@ -464,10 +466,17 @@ for (const at of Object.keys(WRITERS)) {
   const job = /\bvar JOB_FEE = (\d+);/.exec(code);
   const letterFee = /\bvar LETTER_FEE = (\d+);/.exec(code);
   const letterPay = /\bvar LETTER_PAY = (\d+);/.exec(code);
-  yes('its callers pass the fee, NOTICE_FEE or JOB_FEE, a letter\'s cost, LETTER_FEE and LETTER_PAY, and a night\'s price',
-      callers.slice().sort().join(',') === 'cost,fee,price' &&
+  yes('its four callers pass the fee, NOTICE_FEE or JOB_FEE, a letter\'s cost, LETTER_FEE and LETTER_PAY, a ride\'s fare and a night\'s price',
+      callers.slice().sort().join(',') === 'cost,fee,price,price' &&
       /\bvar fee = isJob \? JOB_FEE : NOTICE_FEE;/.test(code) &&
       /\bvar cost = LETTER_FEE \+ LETTER_PAY;/.test(code));
+  const fares = ['FARE_FERRY', 'FARE_CARRIAGE', 'FARE_RAVEN_ROCK'].map(function (n) {
+    const m = new RegExp('\\bvar ' + n + ' = (\\d+);').exec(code);
+    return m ? Number(m[1]) : 0;
+  });
+  yes('the fare is fare(), refused at 0 or less, and all three fares are more than nothing',
+      /\bvar price = fare\(from, to\);\s*\n(\s*\/\/[^\n]*\n)*\s*if \(!\(price > 0\)\) \{ return /.test(code) &&
+      fares.every(function (n) { return n > 0; }));
   yes('and every one of those is more than nothing',
       !!notice && !!job && Number(notice[1]) > 0 && Number(job[1]) > 0 &&
       !!letterFee && !!letterPay && Number(letterFee[1]) > 0 && Number(letterPay[1]) > 0);
