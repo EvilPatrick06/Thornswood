@@ -56281,9 +56281,10 @@ try {
   docs/systems/quests.md. Supply is not this block. Scene gold is created
   with addItem. It is not taken from a trader purse.
 
-  The page does not name the one world reference a scarce place uses, or
-  the sack, shelf, chest, urn, cell, or hold a scene row names. Those stay
-  unbound. A rare vein stays shut until its one place is bound. Which gem
+  The rare mine is bound: RARE_PLACES below is the one building each rare
+  seam is, and every vein of that seam anywhere else stays shut. The page
+  does not name the place the other scarce rows use, or the sack, shelf,
+  chest, urn, cell, or hold a scene row names. Those stay unbound. Which gem
   a trader names, among the four on the miner page, is likewise not said.
 */
 (function () {
@@ -56298,6 +56299,32 @@ try {
     'Sapphire': 'gem',
     'Stalhrim': 'stalhrim',
     'Heart Stone': 'heartstone'
+  };
+  /*
+    THE ONE PLACE EACH RARE SEAM IS (#1380).
+
+    Patrick, 4 Oct: ebony is Raven Rock Mine, stalhrim Kolbjorn Barrow, heart
+    stone Coldcinder Cave, ruby White Ridge Sanctum, sapphire Highpoint Tower,
+    emerald Kolbjorn Barrow, amethyst Highpoint Tower. A place is the
+    building, keyed by its cell as game/data/mine-buildings.json keys it, so
+    every vein of that seam inside it is the place (thirteen ebony in Raven
+    Rock Mine) and the same seam in any other building or on open ground is
+    shut. The trader's scarce quest is the only way in. Once it is turned in
+    the place is shut to that person until the quest's cooldown ends, which
+    turnIn stamps below. No steward has any part in it.
+  */
+  var RARE_PLACES = {
+    ebony: { cell: '142fc:Dragonborn.esm' },
+    stalhrim: { cell: '142ee:Dragonborn.esm' },
+    heartstone: { cell: '3929e:Dragonborn.esm' },
+    gem: {
+      cells: {
+        Ruby: '3c7f5:Dragonborn.esm',
+        Sapphire: '184f0:Dragonborn.esm',
+        Emerald: '142ee:Dragonborn.esm',
+        Amethyst: '184f0:Dragonborn.esm'
+      }
+    }
   };
   var SCARCE = [
     { id: 'ebony', name: 'The ebony', who: 'Miner, master', classKey: 'miner', rank: 'master', ask: 4, holds: 12, hours: 24, scarce: true },
@@ -56418,12 +56445,10 @@ try {
       var open = held && held.open[id];
       if (!open) return 'This place is shut.';
       var place = places[id] || {};
-      if (row.gems) {
-        if (seam.name !== open.gem) return 'This place is shut.';
-        if (!place.refs || place.refs[open.gem] !== refrId) return 'This place is shut.';
-      } else if (place.ref !== refrId) {
-        return 'This place is shut.';
-      }
+      if (row.gems && seam.name !== open.gem) return 'This place is shut.';
+      var cell = row.gems ? (place.cells && place.cells[open.gem]) : place.cell;
+      var veinCell = deps.cellOf ? deps.cellOf(refrId) : '';
+      if (!cell || veinCell !== cell) return 'This place is shut.';
       if (open.drawn >= row.holds) return 'This place has nothing left until you turn the work in.';
       return null;
     }
@@ -56617,6 +56642,9 @@ try {
           } catch (e) { return ''; }
         },
         traderHold: function () { return ''; }
+      });
+      Object.keys(RARE_PLACES).forEach(function (id) {
+        globalThis.__thornswoodQuests.bindPlace(id, RARE_PLACES[id]);
       });
     } catch (e) {
       try { log('custom quests failed to start:', e); } catch (e2) {}
