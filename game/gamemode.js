@@ -36168,75 +36168,105 @@ log('gamemode loaded:',
   /*
     ------------------------------------------------------------------- beds
 
-    THE NIGHT IS THE HOLDER'S PRICE, AND A BED IS ONE THE SERVER SAW (#1392).
+    WHOSE BED IT IS DECIDES THE REST, AND A BED IS ONE THE SERVER SAW
+    (#1392, #1603).
 
-    docs/systems/property.md, "What a home is for": the holder sets who may
-    sleep there and what the night costs. /bed 20 at the building sets the
-    gold for one night, /bed - makes a night free for the people the holder
-    allows and sells it to nobody else, and /bed alone says the price. An inn
-    is the same rule, and there is no server inn price.
+    Patrick's answers on #1603, 4 Oct. The holder names who may sleep there,
+    with buttons and not commands. A night is 8 hours. Nobody sells a night
+    through the server: "they pay from a regular trade and then the owner can
+    grant bed access". And the rest goes by common sense, up to your own bed:
 
-    docs/systems/exhaustion.md: a bed you own, rent or were allowed is 80 rest
-    an hour, an inn room once the holder's price is paid is 50, a bedroll is
-    the campfire's 35, and saying the word in the street does not count. Those
-    are the three kinds this hands the needs block (bed, inn, bedroll), and
-    the numbers stay in NEEDS.recover there.
+      what you are resting on                            an hour   kind
+      a seat                                               20      sit
+      a bed or bedroll nobody can lend you                 25      rough
+      a seat with a fire in reach                          35      campfire
+      a bed or bedroll nobody can lend you, by a fire      45      camp
+      a bed you are allowed in: a guest, a key, a deed     50      inn
+      your own bed                                         80      bed
 
-    HOW THE SERVER KNOWS A BED. mp.onActivate is handed the bed when somebody
-    presses it, the same way it is handed a door, and the base's own record
-    says what it is: a FURN whose editor id names a bed, read once per base
-    through mp.lookupEspmRecordById and remembered. /rest bed then asks two
-    things the server measures itself: which bed this person last pressed, and
-    whether they are still within BED_REACH of it in the same cell. The typed
-    word is not asked, and neither is the client's own guess at furniture. The
-    building is the bed's own cell, the same way the take limit finds whose a
-    chest is, because a building here is its interior cell.
+    The numbers live in NEEDS.recover in the needs block, and this hands it
+    the kind. docs/systems/exhaustion.md has the same table.
 
-    WHILE THE PLACE IS TRUE. Every BED_EVERY_MS the beds people are resting in
-    are measured again: walk away, lose the key, or let the night run out, and
-    the rest stops. Somebody who comes into the world already resting in a bed
-    the server did not see them lie down in stops too, and lies down again. A
-    restart forgets who lay down where, and that is the case it catches.
+    WHO IS ALLOWED. The holder sleeps in their own bed. A guest is somebody
+    the holder looked at inside the building and let sleep there with the
+    look prompt's key (sleepHere, below), for one night. Anybody carrying the
+    building's key or its deed is allowed too, the two things that already
+    open its locked door (mayPass). A bed in a building somebody else holds,
+    who has let you do none of those, is refused. A bed in a building nobody
+    holds, or out of doors, is nobody's to lend, and that is the 25, or the
+    45 by a fire. A bedroll is a bed here: whose it is decides the rate, not
+    what it is made of.
 
-    THE GOLD MOVES AND IS NEVER MADE. The price comes out of the sleeper's
-    pack through takeGold and goes into the holder's through payOut, the
-    letters' payout. A holder who is not in the world has it kept on the
-    book below, and it goes into their pack the next time they are.
+    A GUEST IS ONE NIGHT, NIGHT_MS from when the holder pressed the key, in
+    every bed of that building. One night rather than until taken back,
+    because a night is what was paid for in the trade, and the holder does
+    not have to remember to end it. Somebody who lives there carries a key.
+    The holder can end a night sooner, from the look prompt or from the
+    property page in the K panel. A guest names the holder who let them in,
+    so a building that changes hands does not keep the last holder's guests.
 
-    TWO THINGS THE PAGE DOES NOT SAY, asked on #1392. ALLOWED is carrying a
-    key to the building or its deed, the two things that already open a locked
-    door (mayPass), because that is the one way the server knows a holder has
-    let somebody in. A NIGHT is NIGHT_MS of real time from paying, at that
-    building. Paying is /rest bed said twice inside PAY_AGAIN_MS: the first
-    says the price, the second pays it, so lying down never spends gold on its
-    own.
+    HOW THE SERVER KNOWS A BED OR A SEAT. mp.onActivate is handed the
+    furniture when somebody presses it, the same way it is handed a door, and
+    the base's own record says what it is: a FURN whose editor id names a
+    bed, a bedroll, or a chair, bench, stool or throne, read once per base
+    through mp.lookupEspmRecordById and remembered. Any other FURN is
+    furniture and nothing more: a forge, a chopping block, a lean. /rest then
+    asks what this person last pressed and whether they are still within
+    BED_REACH of it in the same cell. The word after /rest is not asked, and
+    neither is the client's own guess at furniture: the plugin says /rest bed
+    when somebody lies down and /rest sit when they sit, and the server
+    answers by what was pressed. The building is the bed's own cell, the same
+    way the take limit finds whose a chest is, because a building here is its
+    interior cell.
 
-    The book is beds.json beside the register rather than a field on a claim,
-    so the register's own reader and writer are untouched. A price names the
-    holder who set it, so a building that changes hands does not keep the last
-    holder's price.
+    A FIRE IN REACH is the distance the client already reports for warmth,
+    the needs block's own n.fire (docs/systems/temperature.md): a fire close
+    enough to warm you is close enough to rest by.
+
+    WHILE THE PLACE IS TRUE. Every BED_EVERY_MS the places people are resting
+    in are measured again: walk away, lose the key, let the night run out,
+    move off from the fire, and the rest stops or changes rate. Somebody who
+    comes into the world already resting in a place the server did not see
+    them take stops too, and sits or lies down again. A restart forgets who
+    lay down where, and that is the case it catches.
+
+    NO GOLD MOVES FOR A NIGHT. It is paid in a trade between two people, and
+    the server keeps no price. The book is beds.json beside the register
+    rather than a field on a claim, so the register's own reader and writer
+    are untouched. #1392's book held prices, paid nights and gold kept for a
+    holder who was away. The prices are gone. A night already paid is carried
+    over as a guest of whoever held the building, to the end of that night.
+    Kept gold is handed to its holder once, the next time they are in the
+    world, and leaves the book then. Nothing adds to it any more.
   */
   // INVENTED: far enough to stand beside a double bed and press it, near
   // enough that the next room's bed is not this one.
   var BED_REACH = 200;
-  // INVENTED: one night is the eight hours the Rest clock takes to empty.
+  // Patrick, #1603: a night is 8 hours, the time the Rest clock takes to empty.
   var NIGHT_MS = 8 * 3600000;
-  var PAY_AGAIN_MS = 60000;
   var BED_EVERY_MS = 5000;
   var LYING_FORGET_MS = 48 * 3600000;
+  var GUEST_NAME_MAX = 64;
   /* A bed by its editor id. Bedrolls first, since they say bed too. The
      others are words that hold the letters and are not beds. */
   var BEDROLL_EDID = /bedroll/i;
   var BED_EDID = /bed/i;
   var NOT_BED_EDID = /bedside|embed|riverbed|flowerbed/i;
-  var BED_KINDS = { bed: true, inn: true, bedroll: true };
+  /* A seat by its editor id, the same way. A workbench is a bench to the
+     letters and a crafting station to everybody else. */
+  var SEAT_EDID = /chair|bench|stool|throne/i;
+  var NOT_SEAT_EDID = /workbench|crafting/i;
+  /* Every kind of rest this hands the needs block, and 'bedroll', the kind
+     #1392 handed out, so somebody still resting at it is got up the same way. */
+  var REST_KINDS = { sit: true, rough: true, campfire: true, camp: true, inn: true, bed: true,
+                     bedroll: true };
 
   function bedHas(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
 
-  /* Who pressed which bed, who is lying in one, who was told a price, and who
-     has been seen since coming in. On globalThis, so a hot reload keeps them. */
+  /* Who pressed which furniture, who is resting on what, and who has been
+     seen since coming in. On globalThis, so a hot reload keeps them. */
   if (!g.__thornswoodBedState) {
-    g.__thornswoodBedState = { pressed: {}, lying: {}, offers: {}, seen: {} };
+    g.__thornswoodBedState = { pressed: {}, lying: {}, seen: {} };
   }
   var bedState = g.__thornswoodBedState;
 
@@ -36247,35 +36277,41 @@ log('gamemode loaded:',
     return path.join(path.dirname(registerPath()), 'beds.json');
   }
 
-  /* Rebuilt field by field, the same discipline as the register: a price is
-     a holder and a whole number, a night is a time, and takings are gold. */
+  /* Rebuilt field by field, the same discipline as the register: a guest is
+     a holder, a time and a name, and kept takings are gold. */
   function loadBedBook() {
-    var out = { prices: {}, nights: {}, takings: {} };
+    var out = { guests: {}, takings: {} };
     var raw = null;
     try { raw = JSON.parse(require('fs').readFileSync(bedBookPath(), 'utf8')); }
     catch (e) { return out; }
     if (!raw || typeof raw !== 'object') { return out; }
     var now = Date.now();
-    var prices = (raw.prices && typeof raw.prices === 'object') ? raw.prices : {};
-    for (var b in prices) {
-      if (!bedHas(prices, b) || b === '__proto__' || !prices[b]) { continue; }
-      var by = Number(prices[b].by) || 0;
-      var price = Number(prices[b].price) || 0;
-      if (by > 0 && price > 0 && Math.floor(price) === price) {
-        out.prices[b] = { by: by, price: price };
+    var carried = 0;
+    function add(b, who, by, at, name) {
+      if (!b || b === '__proto__' || who === '__proto__') { return false; }
+      if (!((Number(who) || 0) > 0) || !(by > 0) || !(at > 0) || (now - at) >= NIGHT_MS) { return false; }
+      if (!bedHas(out.guests, b)) { out.guests[b] = {}; }
+      if (bedHas(out.guests[b], who)) { return false; }
+      out.guests[b][who] = { by: by, at: at, name: String(name || '').slice(0, GUEST_NAME_MAX) };
+      return true;
+    }
+    var guests = (raw.guests && typeof raw.guests === 'object') ? raw.guests : {};
+    for (var b in guests) {
+      if (!bedHas(guests, b) || !guests[b] || typeof guests[b] !== 'object') { continue; }
+      for (var who in guests[b]) {
+        var gst = bedHas(guests[b], who) ? guests[b][who] : null;
+        if (!gst || typeof gst !== 'object') { continue; }
+        add(b, who, Number(gst.by) || 0, Number(gst.at) || 0, gst.name);
       }
     }
+    // #1392's paid nights, to their end, as guests of whoever held the building.
     var nights = (raw.nights && typeof raw.nights === 'object') ? raw.nights : {};
     for (var nb in nights) {
-      if (!bedHas(nights, nb) || nb === '__proto__' || !nights[nb] ||
-          typeof nights[nb] !== 'object') { continue; }
-      for (var who in nights[nb]) {
-        if (!bedHas(nights[nb], who) || who === '__proto__') { continue; }
-        var at = Number(nights[nb][who]) || 0;
-        if ((Number(who) || 0) > 0 && at > 0 && (now - at) < NIGHT_MS) {
-          if (!bedHas(out.nights, nb)) { out.nights[nb] = {}; }
-          out.nights[nb][who] = at;
-        }
+      if (!bedHas(nights, nb) || !nights[nb] || typeof nights[nb] !== 'object' ||
+          !bedHas(claims, nb)) { continue; }
+      for (var nw in nights[nb]) {
+        if (bedHas(nights[nb], nw) &&
+            add(nb, nw, Number(claims[nb].by) || 0, Number(nights[nb][nw]) || 0, '')) { carried++; }
       }
     }
     var takings = (raw.takings && typeof raw.takings === 'object') ? raw.takings : {};
@@ -36286,30 +36322,47 @@ log('gamemode loaded:',
         out.takings[tp] = gold;
       }
     }
+    if (raw.prices || raw.nights) {
+      plog('the bed book from before #1603: night prices dropped,', carried,
+           'paid nights carried over as guests, kept gold waits for its holders');
+      out.old = true;
+    }
     return out;
   }
 
-  function saveBedBook() {
+  /* Nights that have run out leave the book. Answers the holders whose
+     guests changed, so their property page can be drawn again. */
+  function pruneGuests() {
     var now = Date.now();
-    for (var b in bedBook.nights) {
-      if (!bedHas(bedBook.nights, b)) { continue; }
-      var row = bedBook.nights[b];
+    var gone = {};
+    for (var b in bedBook.guests) {
+      if (!bedHas(bedBook.guests, b)) { continue; }
+      var row = bedBook.guests[b];
       for (var who in row) {
-        if (bedHas(row, who) && (now - row[who]) >= NIGHT_MS) { delete row[who]; }
+        if (bedHas(row, who) && (now - row[who].at) >= NIGHT_MS) {
+          gone[row[who].by] = true;
+          delete row[who];
+        }
       }
-      if (!Object.keys(row).length) { delete bedBook.nights[b]; }
+      if (!Object.keys(row).length) { delete bedBook.guests[b]; }
     }
+    return gone;
+  }
+
+  function saveBedBook() {
     try {
       var fs = require('fs');
       var file = bedBookPath();
       try { fs.mkdirSync(require('path').dirname(file), { recursive: true }); } catch (e) { }
-      fs.writeFileSync(file, JSON.stringify(bedBook, null, 1));
+      fs.writeFileSync(file, JSON.stringify({ guests: bedBook.guests, takings: bedBook.takings }, null, 1));
     } catch (e) {
       plog('could not write the bed book:', e);
     }
   }
 
   var bedBook = loadBedBook();
+  // The old shape is written over once, so the file says what the server does.
+  if (bedBook.old) { delete bedBook.old; saveBedBook(); }
 
   // ------------------------------------------------------------ the beds --
 
@@ -36322,8 +36375,9 @@ log('gamemode loaded:',
     return out;
   }
 
-  /* 'bed', 'roll' or '' for a base, asked of the engine once and kept. An
-     answer the engine could not give is '', not a bed. */
+  /* 'bed', 'roll', 'seat', 'furn' for any other furniture, or '' for
+     anything that is not furniture, asked of the engine once per base and
+     kept. An answer the engine could not give is '', not a bed. */
   var bedKinds = {};
   function bedKind(baseDesc) {
     baseDesc = String(baseDesc || '');
@@ -36339,19 +36393,21 @@ log('gamemode loaded:',
         for (var i = 0; !edid && i < fields.length; i++) {
           if (fields[i] && String(fields[i].type) === 'EDID') { edid = textOf(fields[i].data); }
         }
+        kind = 'furn';
         if (BEDROLL_EDID.test(edid)) { kind = 'roll'; }
         else if (BED_EDID.test(edid) && !NOT_BED_EDID.test(edid)) { kind = 'bed'; }
+        else if (SEAT_EDID.test(edid) && !NOT_SEAT_EDID.test(edid)) { kind = 'seat'; }
       }
     } catch (e) { kind = ''; }
     bedKinds[baseDesc] = kind;
     return kind;
   }
 
-  /* Called from onActivate for every press. Writes only for a bed. */
+  /* Called from onActivate for every press. Writes only for furniture. */
   function bedTouched(actorId, refrId, baseDesc) {
     var kind = bedKind(baseDesc);
     if (!kind || !actorId || !refrId) { return; }
-    bedState.pressed[actorId] = { ref: refrId, roll: kind === 'roll', at: Date.now() };
+    bedState.pressed[actorId] = { ref: refrId, roll: kind === 'roll', what: kind, at: Date.now() };
   }
 
   function stillAt(actorId, refrId) {
@@ -36370,67 +36426,58 @@ log('gamemode loaded:',
     return isBuilding(cell) ? cell : '';
   }
 
-  /* The building /bed means: the door opened in the last minute, or the
-     building they are standing in. */
-  function bedBuildingHere(actorId) {
-    var b = here(actorId);
-    if (b) { return b; }
-    var cell = '';
-    try { cell = String(mp.get(actorId, 'worldOrCellDesc') || ''); } catch (e) { cell = ''; }
-    return isBuilding(cell) ? cell : null;
+  /* This person's night at this building, or null. See the block. */
+  function guestOf(building, held, profileId) {
+    if (!held || !profileId || !bedHas(bedBook.guests, building)) { return null; }
+    var row = bedBook.guests[building];
+    var gst = bedHas(row, profileId) ? row[profileId] : null;
+    if (!gst || gst.by !== held.by || (Date.now() - gst.at) >= NIGHT_MS) { return null; }
+    return gst;
   }
 
-  /* The holder, or somebody carrying its key or its deed. See the block. */
+  /* The holder, a guest tonight, or somebody carrying its key or its deed. */
   function allowedIn(actorId, profileId, building, held) {
     if (!held) { return false; }
     if (profileId && held.by === profileId) { return true; }
+    if (guestOf(building, held, profileId)) { return true; }
     if (holdsKey(actorId, building)) { return true; }
     if (holdsDeed(actorId, building)) { return true; }
     return false;
   }
 
-  function priceOf(building, held) {
-    var p = bedHas(bedBook.prices, building) ? bedBook.prices[building] : null;
-    return (p && held && p.by === held.by) ? p.price : 0;
-  }
-
-  function nightPaid(building, profileId) {
-    if (!profileId || !bedHas(bedBook.nights, building)) { return false; }
-    var at = Number(bedBook.nights[building][profileId]) || 0;
-    return at > 0 && (Date.now() - at) < NIGHT_MS;
+  /* A fire close enough to warm this person, by the distance their client
+     reports for warmth. See the block. */
+  function fireNear(actorId) {
+    var needs = g.__thornswoodNeeds;
+    if (!needs || !needs.settle) { return false; }
+    var n = null;
+    try { n = needs.settle(actorId); } catch (e) { return false; }
+    return !!n && typeof n.fire === 'number' && n.fire >= 0;
   }
 
   /*
-    What this bed is to this person: a kind of rest, a refusal, or a price
-    still to pay. Asked when they lie down and again on every tick.
+    What this bed is to this person: a kind of rest, or a refusal. Asked
+    when they lie down and again on every tick. See the table in the block.
   */
-  function bedVerdict(actorId, profileId, ref, roll) {
+  function bedVerdict(actorId, profileId, ref) {
     var building = bedBuilding(ref);
     var held = building ? holderOf(building) : null;
-    var out = { building: building, held: held, kind: '', line: '', price: 0, paid: false };
+    var out = { building: building, held: held, kind: '', line: '', guest: null };
     if (!held) {
-      if (roll) { out.kind = 'bedroll'; return out; }
-      out.line = building
-        ? ('Nobody holds ' + nameOf(building) + ', so nobody can let you sleep in its beds.')
-        : 'This bed is nobody\'s to lend, so it does not count as a bed.';
+      out.kind = fireNear(actorId) ? 'camp' : 'rough';
+      return out;
+    }
+    if (profileId && held.by === profileId) {
+      out.kind = 'bed';
       return out;
     }
     if (allowedIn(actorId, profileId, building, held)) {
-      out.kind = roll ? 'bedroll' : 'bed';
+      out.kind = 'inn';
+      out.guest = guestOf(building, held, profileId);
       return out;
     }
-    if (nightPaid(building, profileId)) {
-      out.kind = roll ? 'bedroll' : 'inn';
-      out.paid = true;
-      return out;
-    }
-    var price = priceOf(building, held);
-    if (!price) {
-      out.line = nameOf(building) + ' is ' + held.name + '\'s, and they have not let you ' +
-                 'sleep there. Nights there are not for sale.';
-      return out;
-    }
-    out.price = price;
+    out.line = nameOf(building) + ' is ' + held.name + '\'s, and they have not let you ' +
+               'sleep there. A night there is theirs to give.';
     return out;
   }
 
@@ -36460,31 +36507,14 @@ log('gamemode loaded:',
     try { say(actorId, line); } catch (e) { }
   }
 
-  /* The night's gold from the sleeper's pack to the holder's, and the night
-     written down. False when the sleeper does not have it. */
-  function payNight(actorId, profileId, building, held, price) {
-    if (!takeGold(actorId, price)) { return false; }
-    var to = onlineActorOf(held.by);
-    var handed = to ? payOut(to, price) : false;
-    if (!handed) {
-      bedBook.takings[held.by] = (Number(bedBook.takings[held.by]) || 0) + price;
-    }
-    if (!bedHas(bedBook.nights, building)) { bedBook.nights[building] = {}; }
-    bedBook.nights[building][profileId] = Date.now();
-    saveBedBook();
-    var who = personName(actorId);
-    plog(who, 'paid', price, 'gold for a night at', nameOf(building),
-         handed ? 'into ' + held.name + '\'s pack' : 'kept for ' + held.name + ' until they are in');
-    if (handed) {
-      tellBed(to, who + ' paid you ' + price + ' gold for a night at ' + nameOf(building) + '.');
-    }
-    return true;
-  }
-
   /*
-    /rest bed, /rest inn and /rest bedroll. Answers the line to say. The kind
-    of rest is the server's answer, not the word: /rest inn in your own bed is
-    your own bed, and /rest bed in somebody else's paid room is the inn room.
+    /rest, whatever word follows it. Answers the line to say, or '' for
+    nothing. The plugin says /rest bed when somebody lies down and /rest sit
+    when they sit on any other furniture, and this answers by what they
+    pressed: a bed or a bedroll is the bed's verdict, a seat is a seat, and
+    other furniture (a forge, a chopping block) is not a rest and is answered
+    with nothing, because the plugin says sit at every piece of furniture that
+    is not a bed and the server is what tells them apart.
   */
   function bedRest(actorId, profileId) {
     var needs = g.__thornswoodNeeds;
@@ -36492,76 +36522,86 @@ log('gamemode loaded:',
     if (!actorId || !profileId) {
       return 'The server cannot find your character right now. Give it a moment and try again.';
     }
-    var bed = bedHas(bedState.pressed, actorId) ? bedState.pressed[actorId] : null;
-    if (!bed || !stillAt(actorId, bed.ref)) {
-      return 'There is no bed here. Lie down in a real one and it counts; saying the word does not.';
+    var p = bedHas(bedState.pressed, actorId) ? bedState.pressed[actorId] : null;
+    if (!p || !stillAt(actorId, p.ref)) {
+      return 'There is nothing here to rest on. Sit down or lie down and it counts; saying the word does not.';
     }
-    var v = bedVerdict(actorId, profileId, bed.ref, bed.roll);
-    if (v.line) { return v.line; }
-    var paidLine = '';
-    if (v.price) {
-      var name = nameOf(v.building);
-      var now = Date.now();
-      var offer = bedHas(bedState.offers, actorId) ? bedState.offers[actorId] : null;
-      if (!offer || offer.building !== v.building || offer.price !== v.price ||
-          (now - offer.at) > PAY_AGAIN_MS) {
-        bedState.offers[actorId] = { building: v.building, price: v.price, at: now };
-        return 'A night at ' + name + ' is ' + v.price + ' gold, handed to ' + v.held.name +
-               '. Say /rest bed again within a minute to pay it.';
-      }
-      delete bedState.offers[actorId];
-      if (!payNight(actorId, profileId, v.building, v.held, v.price)) {
-        return 'A night at ' + name + ' is ' + v.price + ' gold, and you are not carrying that much.';
-      }
-      paidLine = 'You pay ' + v.price + ' gold to ' + v.held.name + ' for a night at ' + name + '. ';
-      v.kind = bed.roll ? 'bedroll' : 'inn';
-      v.paid = true;
+    if (p.what === 'furn') { return ''; }
+    var e = { ref: p.ref, roll: !!p.roll, seat: p.what === 'seat', kind: '', guestAt: 0,
+              at: Date.now() };
+    if (e.seat) {
+      e.kind = fireNear(actorId) ? 'campfire' : 'sit';
+    } else {
+      var v = bedVerdict(actorId, profileId, p.ref);
+      if (v.line) { return v.line; }
+      e.kind = v.kind;
+      e.guestAt = v.guest ? v.guest.at : 0;
     }
-    bedState.lying[actorId] = { ref: bed.ref, roll: !!bed.roll, kind: v.kind, paid: !!v.paid,
-                                at: Date.now() };
-    var line = needs.resting(actorId, v.kind);
-    return paidLine + (line || 'You are resting.');
+    bedState.lying[actorId] = e;
+    var line = needs.resting(actorId, e.kind);
+    // Sitting down says nothing: people sit at every table in every inn, and
+    // the Rest bar is what shows it counting.
+    if (e.seat) { return ''; }
+    return line || 'You are resting.';
   }
 
-  /* They got up, or rest somewhere else now. */
+  /* They got up, or rest somewhere else now. Answers 'seat' when it was a
+     seat they got off, so getting up from one is not said either. */
   function bedOff(actorId) {
+    var e = bedHas(bedState.lying, actorId) ? bedState.lying[actorId] : null;
     delete bedState.lying[actorId];
-    delete bedState.offers[actorId];
+    return (e && e.seat) ? 'seat' : '';
   }
 
-  /* Out of a bed the server no longer counts, without touching any other
+  /* Off a place the server no longer counts, without touching any other
      kind of rest they may have started since. */
   function getUp(actorId, needs) {
     delete bedState.lying[actorId];
     if (!needs || !needs.settle || !needs.resting) { return false; }
     var n = null;
     try { n = needs.settle(actorId); } catch (e) { return false; }
-    if (!n || !BED_KINDS[n.resting]) { return false; }
+    if (!n || !REST_KINDS[n.resting]) { return false; }
     try { needs.resting(actorId, ''); } catch (e) { return false; }
     return true;
   }
 
-  /* '' while the bed still counts as it did, otherwise the line to say. */
+  /* '' while the place still counts, at whatever rate it counts now,
+     otherwise the line to say. */
   function stillLying(actorId, e, needs) {
-    if (!stillAt(actorId, e.ref)) { return 'You have left the bed, so you are not resting in it now.'; }
-    var v = bedVerdict(actorId, profileOf(actorId), e.ref, e.roll);
-    if (v.kind) {
-      e.paid = !!v.paid;
-      if (v.kind === e.kind) { return ''; }
-      // Still a bed they may use, at another rate: a key handed over in the
-      // night, or a key lost with the night still paid.
-      e.kind = v.kind;
-      try { needs.resting(actorId, v.kind); } catch (err) { }
+    if (!stillAt(actorId, e.ref)) {
+      return e.seat ? 'You have left the seat, so you are not resting on it now.'
+                    : 'You have left the bed, so you are not resting in it now.';
+    }
+    var v = null;
+    var kind = '';
+    if (e.seat) {
+      kind = fireNear(actorId) ? 'campfire' : 'sit';
+    } else {
+      v = bedVerdict(actorId, profileOf(actorId), e.ref);
+      kind = v.kind;
+    }
+    if (kind) {
+      if (v) { e.guestAt = v.guest ? v.guest.at : 0; }
+      if (kind === e.kind) { return ''; }
+      // Still a place they may rest, at another rate: a key handed over in the
+      // night, a key lost with the night still given, a fire reached or left.
+      e.kind = kind;
+      try { needs.resting(actorId, kind); } catch (err) { }
       return '';
     }
-    if (e.paid && v.building) {
-      return 'Your night at ' + nameOf(v.building) + ' is over.' +
-             (v.price ? ' /bed says what another costs.' : '');
+    if (e.guestAt && v.building && v.held) {
+      return (Date.now() - e.guestAt) >= NIGHT_MS
+        ? ('Your night at ' + nameOf(v.building) + ' is over.')
+        : (v.held.name + ' has stopped letting you sleep at ' + nameOf(v.building) + '.');
     }
     return v.line || 'That bed does not count for you now.';
   }
 
-  /* Gold paid while the holder was away, into their pack now they are here. */
+  /*
+    Gold #1392 kept for a holder who was away, into their pack now they are
+    here. Once: it leaves the book as it is handed over, and nothing adds to
+    the book any more.
+  */
   function payTakings(online) {
     var owed = false;
     for (var k in bedBook.takings) { if (bedHas(bedBook.takings, k)) { owed = true; break; } }
@@ -36583,6 +36623,14 @@ log('gamemode loaded:',
     if (changed) { saveBedBook(); }
   }
 
+  /* The holder's K panel again, so its property page shows tonight's guests. */
+  function redrawPanel(actorId) {
+    var c = g.__thornswoodCharacter;
+    if (!actorId || !c || !c.stateOf || !c.writeState) { return; }
+    var s = c.stateOf(actorId);
+    if (s) { c.writeState(actorId, s); }
+  }
+
   function bedTick() {
     var needs = g.__thornswoodNeeds;
     var online = [];
@@ -36592,22 +36640,19 @@ log('gamemode loaded:',
     for (var s in bedState.seen) {
       if (bedHas(bedState.seen, s) && !on[s]) { delete bedState.seen[s]; }
     }
-    for (var o in bedState.offers) {
-      if (bedHas(bedState.offers, o) && !on[o]) { delete bedState.offers[o]; }
-    }
     for (var p in bedState.pressed) {
       if (bedHas(bedState.pressed, p) && !on[p] && !bedHas(bedState.lying, p)) {
         delete bedState.pressed[p];
       }
     }
-    // Come into the world resting in a bed nobody saw them lie down in.
+    // Come into the world resting in a place nobody saw them take.
     for (var j = 0; j < online.length; j++) {
       var id = online[j];
       if (bedState.seen[id]) { continue; }
       bedState.seen[id] = true;
       if (bedHas(bedState.lying, id)) { continue; }
       if (getUp(id, needs)) {
-        plog(personName(id), 'came in resting in a bed the server did not see, so they are up');
+        plog(personName(id), 'came in resting in a place the server did not see, so they are up');
       }
     }
     var now = Date.now();
@@ -36626,71 +36671,139 @@ log('gamemode loaded:',
       }
     }
     payTakings(online);
+    // A night that ran out leaves the book and the holder's property page.
+    var ended = pruneGuests();
+    var changed = false;
+    for (var h in ended) {
+      if (bedHas(ended, h)) { changed = true; redrawPanel(onlineActorOf(Number(h))); }
+    }
+    if (changed) { saveBedBook(); }
+  }
+
+  // ---------------------------------------------------------- the guests --
+
+  /* The guests of a building tonight, by name, for the property page. */
+  function guestsOf(building) {
+    var held = holderOf(building);
+    var out = [];
+    if (!held || !bedHas(bedBook.guests, building)) { return out; }
+    var row = bedBook.guests[building];
+    for (var who in row) {
+      if (!bedHas(row, who) || !guestOf(building, held, Number(who))) { continue; }
+      out.push({ pid: Number(who), name: row[who].name || 'somebody who paid for the night' });
+    }
+    out.sort(function (a, b) { return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0); });
+    return out;
   }
 
   /*
-    /bed           what a night here costs
-    /bed 20        the holder sets the gold for one night
-    /bed -         the holder makes it free for the people they allow, and
-                   sells it to nobody else
+    For the look prompt, asked by the social block's near list for each two
+    people in the same cell: 0 when the first cannot let the second sleep
+    there, 1 when they can, 2 when they already have.
   */
-  function bedCmd(parts, actorId, profileId, toProfile) {
-    var building = bedBuildingHere(actorId);
-    if (!building) {
-      toProfile(profileId, 'Stand in the building, or open its door, then say that again.');
+  function sleepMark(holderPid, guestPid, cell) {
+    if (!holderPid || !guestPid || holderPid === guestPid || !bedHas(claims, cell)) { return 0; }
+    var held = holderOf(cell);
+    if (!held || held.by !== holderPid) { return 0; }
+    return guestOf(cell, held, guestPid) ? 2 : 1;
+  }
+
+  /* The night ends now. The guest is told, and got up if they are lying in
+     one of its beds and nothing else lets them stay. */
+  function endGuest(building, pid, line) {
+    if (bedHas(bedBook.guests, building)) { delete bedBook.guests[building][pid]; }
+    saveBedBook();
+    var guest = onlineActorOf(pid);
+    if (!guest) { return; }
+    var needs = g.__thornswoodNeeds;
+    var e = bedHas(bedState.lying, guest) ? bedState.lying[guest] : null;
+    var why = (e && !e.seat && bedBuilding(e.ref) === building) ? stillLying(guest, e, needs) : '';
+    if (why) { getUp(guest, needs); }
+    tellBed(guest, why || line);
+  }
+
+  /*
+    THE HOLDER LETS SOMEBODY SLEEP THERE, OR STOPS (#1603).
+
+    Patrick: the holder names who may sleep there, "with buttons and GUI, not
+    commands". The look prompt draws "Let sleep here" while a holder looks at
+    somebody inside a building they hold, and its key sends /sleephere with
+    that person's form id, the way the trade key sends /trade. Pressed on a
+    guest, it ends their night. The property page in the K panel sends
+    /sleephere stop <profile> <building> beside each guest's name. Nobody
+    types either, and help never names them.
+
+    Everything is measured here: the building is the cell the holder stands
+    in, the holder is the register's, and the guest is in that same cell.
+  */
+  function sleepHere(parts, actorId, profileId, toProfile) {
+    var raw = String((parts && parts[1]) || '');
+    if (raw === 'stop') { return stopGuest(parts, actorId, profileId, toProfile); }
+    var them = /^[0-9a-f]{1,8}$/i.test(raw) ? parseInt(raw, 16) : 0;
+    var cell = '';
+    try { cell = String(mp.get(actorId, 'worldOrCellDesc') || ''); } catch (e) { cell = ''; }
+    var building = isBuilding(cell) ? cell : '';
+    var held = building ? holderOf(building) : null;
+    if (!held || !profileId || held.by !== profileId) {
+      toProfile(profileId, building
+        ? ('Only whoever holds ' + nameOf(building) + ' lets people sleep there.')
+        : 'Stand inside a building you hold to let somebody sleep there.');
+      return true;
+    }
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
+    var theirs = '';
+    if (them && them !== actorId && online.indexOf(them) !== -1) {
+      try { theirs = String(mp.get(them, 'worldOrCellDesc') || ''); } catch (e) { theirs = ''; }
+    }
+    var pid = (theirs === cell) ? profileOf(them) : 0;
+    var name = nameOf(building);
+    if (!pid || pid === profileId) {
+      toProfile(profileId, 'Look at somebody inside ' + name + ' with you, then press the key.');
+      return true;
+    }
+    var who = personName(them);
+    if (guestOf(building, held, pid)) {
+      endGuest(building, pid, held.name + ' has stopped letting you sleep at ' + name + '.');
+      plog(held.name, 'stopped letting', who, 'sleep at', name);
+      toProfile(profileId, who + ' may no longer sleep at ' + name + '.');
+      redrawPanel(actorId);
+      return true;
+    }
+    if (!bedHas(bedBook.guests, building)) { bedBook.guests[building] = {}; }
+    bedBook.guests[building][pid] = { by: held.by, at: Date.now(), name: who.slice(0, GUEST_NAME_MAX) };
+    saveBedBook();
+    plog(held.name, 'let', who, 'sleep at', name, 'for a night');
+    toProfile(profileId, who + ' may sleep at ' + name + ' for one night, 8 hours from now. ' +
+                         'Look at them and press the same key to end it sooner.');
+    tellBed(them, held.name + ' lets you sleep at ' + name + ' tonight. Lie down in any of its beds.');
+    redrawPanel(actorId);
+    return true;
+  }
+
+  /* /sleephere stop <profile> <building>, from the property page. */
+  function stopGuest(parts, actorId, profileId, toProfile) {
+    var pid = Number((parts && parts[2]) || 0) || 0;
+    var building = (parts && parts.length > 3) ? parts.slice(3).join(' ') : '';
+    var held = building ? holderOf(building) : null;
+    if (!held || !profileId || held.by !== profileId) {
+      toProfile(profileId, building && isBuilding(building)
+        ? ('Only whoever holds ' + nameOf(building) + ' lets people sleep there.')
+        : 'That is not a building you hold.');
       return true;
     }
     var name = nameOf(building);
-    var held = holderOf(building);
-    var arg = (parts && parts.length > 1) ? String(parts[1]).trim() : '';
-    if (!held) {
-      toProfile(profileId, 'Nobody holds ' + name + ', so nobody sets a night there.');
+    var gst = guestOf(building, held, pid);
+    if (!gst) {
+      toProfile(profileId, 'Nobody by that name is sleeping at ' + name + ' tonight.');
+      redrawPanel(actorId);
       return true;
     }
-    var mine = !!profileId && held.by === profileId;
-    var price = priceOf(building, held);
-
-    if (!arg) {
-      if (mine) {
-        toProfile(profileId, price
-          ? ('A night at ' + name + ' is ' + price + ' gold, and it comes to you. ' +
-             '/bed - makes it free for the people you allow and sold to nobody else.')
-          : ('Nights at ' + name + ' are not for sale, and the people you allow sleep free. ' +
-             '/bed 20 sets the gold for one night.'));
-        return true;
-      }
-      var line = price
-        ? ('A night at ' + name + ' is ' + price + ' gold, handed to ' + held.name + '.')
-        : ('Nights at ' + name + ' are not for sale. ' + held.name +
-           ' lets only the people they allow sleep there.');
-      if (allowedIn(actorId, profileId, building, held)) { line += ' You are allowed, so yours is free.'; }
-      else if (nightPaid(building, profileId)) { line += ' Your night there is paid.'; }
-      toProfile(profileId, line);
-      return true;
-    }
-
-    if (!mine) {
-      toProfile(profileId, 'Only whoever holds ' + name + ' sets what a night there costs.');
-      return true;
-    }
-    if (arg === '-') {
-      delete bedBook.prices[building];
-      saveBedBook();
-      plog(held.name, 'made a night at', name, 'free for the people they allow');
-      toProfile(profileId, 'A night at ' + name + ' is free for the people you allow, ' +
-                           'and not for sale to anybody else.');
-      return true;
-    }
-    var amount = /^\d+$/.test(arg) ? Number(arg) : 0;
-    if (!(amount > 0) || amount > Number.MAX_SAFE_INTEGER) {
-      toProfile(profileId, 'Give a whole number of gold, or - to make a night free for the people you allow.');
-      return true;
-    }
-    bedBook.prices[building] = { by: held.by, price: amount };
-    saveBedBook();
-    plog(held.name, 'set a night at', name, 'to', amount, 'gold');
-    toProfile(profileId, 'A night at ' + name + ' is ' + amount + ' gold now, handed to you. ' +
-                         'The people you allow still sleep free.');
+    var who = gst.name || 'Your guest';
+    endGuest(building, pid, held.name + ' has stopped letting you sleep at ' + name + '.');
+    plog(held.name, 'stopped letting', who, 'sleep at', name);
+    toProfile(profileId, who + ' may no longer sleep at ' + name + '.');
+    redrawPanel(actorId);
     return true;
   }
 
@@ -36699,10 +36812,10 @@ log('gamemode loaded:',
     (typeof guard === 'function') ? guard('bedTick', bedTick) : bedTick, BED_EVERY_MS);
 
   g.__thornswoodBeds = {
-    touched: bedTouched, rest: bedRest, off: bedOff, command: bedCmd, tick: bedTick,
+    touched: bedTouched, rest: bedRest, off: bedOff, tick: bedTick,
+    sleepHere: sleepHere, mark: sleepMark, guestsOf: guestsOf,
     kindOf: bedKind, verdict: bedVerdict, book: function () { return bedBook; },
-    state: bedState, BED_REACH: BED_REACH, NIGHT_MS: NIGHT_MS, PAY_AGAIN_MS: PAY_AGAIN_MS,
-    BED_EVERY_MS: BED_EVERY_MS
+    state: bedState, BED_REACH: BED_REACH, NIGHT_MS: NIGHT_MS, BED_EVERY_MS: BED_EVERY_MS
   };
 
 
@@ -37157,10 +37270,9 @@ log('gamemode loaded:',
     the same count back into a pack, and payHeld takes it off that ledger in
     the same step, so the coin was already in the world and packs plus ledger
     add up to the same after. payHeld pays a letter's own `pay`, which
-    postLetter took from the sender, never more than the ledger holds. A
-    night in a bed (#1392) is its other caller: payNight hands the holder
-    the price it has just taken from the sleeper, and payTakings what was
-    kept for a holder who was away.
+    postLetter took from the sender, never more than the ledger holds. Its
+    other caller is payTakings in the beds, which hands a holder the gold
+    #1392 kept for them while they were away, once (#1603).
   */
   function payOut(actorId, amount) {
     var count = Math.floor(Number(amount) || 0);
@@ -38157,7 +38269,7 @@ log('gamemode loaded:',
     if (word === '/evict') { return evict(actorId, profileId, toProfile); }
     if (word === '/box') { return boxCmd(parts, actorId, profileId, toProfile); }
     if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile); }
-    if (word === '/bed') { return bedCmd(parts, actorId, profileId, toProfile); }
+    if (word === '/sleephere') { return sleepHere(parts, actorId, profileId, toProfile); }
     if (word === '/notice') { return post(parts, actorId, profileId, toProfile, false); }
     if (word === '/job') { return post(parts, actorId, profileId, toProfile, true); }
     if (word === '/board') { return board(parts, actorId, profileId, toProfile); }
@@ -40634,6 +40746,9 @@ log('gamemode loaded:',
   function propertyView(actorId, profileId) {
     var W = g.__thornswoodProperty;
     if (!W || !W.holderOf) { return null; }
+    // Who may sleep in each place you hold tonight, with a Stop beside each
+    // name (#1603). See guestsOf in the beds, in the property block.
+    var B = g.__thornswoodBeds;
     var rows = [], seen = {};
     try {
       var claims = W.claims();
@@ -40643,7 +40758,8 @@ log('gamemode loaded:',
         if (!held || held.by !== profileId) { continue; }
         seen[b] = true;
         rows.push({ name: W.nameOf(b), mine: true, locked: !!held.locked,
-                    keyed: W.holdsKey(actorId, b) });
+                    keyed: W.holdsKey(actorId, b), b: b,
+                    sleep: (B && B.guestsOf) ? B.guestsOf(b) : [] });
       }
       // Then the places somebody let you into. A key to a building you already
       // hold is not a second row: it is the same house and the row above says
@@ -41618,7 +41734,7 @@ log('gamemode loaded:',
         word === '/deed' || word === '/deeds' || word === '/lock' ||
         word === '/unlock' || word === '/mold' || word === '/moldhere' || word === '/key' ||
         word === '/steward' || word === '/evict' || word === '/box' ||
-        word === '/rent' || word === '/bed' || word === '/notice' || word === '/job' ||
+        word === '/rent' || word === '/sleephere' || word === '/notice' || word === '/job' ||
         word === '/board' || word === '/take' || word === '/jobs' ||
         word === '/haul' ||
         word === '/letter' || word === '/deliver' ||
@@ -45258,7 +45374,7 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/apprentice',
                '/plant', '/claim', '/plot',
                '/deed', '/deeds', '/lock', '/unlock', '/mold', '/key',
-               '/jarl', '/steward', '/evict', '/box', '/rent', '/bed',
+               '/jarl', '/steward', '/evict', '/box', '/rent',
                '/notice', '/job', '/board', '/take', '/jobs', '/dropjob', '/unpin',
                '/letter', '/deliver',
                // A haul (#1393). Sent by the board panel's Send a haul and
@@ -45291,7 +45407,8 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/chopped',
                // Hunger, thirst and exhaustion. See the needs block at the end
                // of this file; the numbers there are invented and meant to be
-               // argued with.
+               // argued with. /rest is the plugin's, sent when somebody sits
+               // or lies down, and never typed (#1603); see bedRest.
                '/needs', '/rest', '/eat', '/drink', '/bard',
                // The repair panel (#1384): sent by the inventory key and by
                // the panel's buttons, never typed. See the durability block,
@@ -45310,6 +45427,10 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // The mold key: a blank pressed into the door under the
                // crosshair. Sent by the plugin, not typed; see moldHere.
                '/moldhere',
+               // A holder letting the person under the crosshair sleep there,
+               // or the property page ending a guest's night (#1603). Sent by
+               // the plugin and the K panel, never typed; see sleepHere.
+               '/sleephere',
                // The client's load order, every two minutes. Sent by the front
                // plugin, never typed; see the load order refusal block.
                '/loadorder',
@@ -45339,13 +45460,13 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // argument says what a place costs, which is the first
                       // thing somebody standing at a door wants to know, and
                       // the steward half answers "only a steward sets rent"
-                      // to everybody else. /bed with no amount says what a
-                      // night costs, the same way, and only a holder sets it.
-                      '/box', '/rent', '/bed', '/notice', '/job', '/board',
+                      // to everybody else.
+                      '/box', '/rent', '/notice', '/job', '/board',
                       '/take', '/jobs', '/dropjob', '/unpin', '/letter', '/deliver', '/help',
                       // Everybody's, and they need to be findable: a meter
-                      // nobody knows how to act on is only a penalty.
-                      '/needs', '/rest', '/eat', '/drink', '/bard',
+                      // nobody knows how to act on is only a penalty. Not
+                      // /rest: sitting or lying down is how you rest (#1603).
+                      '/needs', '/eat', '/drink', '/bard',
                       // For a warrior, and named so a warrior can find them.
                       '/maneuver',
                       // Everybody's, and the one thing a person in trouble
@@ -46330,8 +46451,10 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       and the world hooks replace them rather than joining them.
 
       /needs   what the three meters say
-      /rest    sit, campfire, inn or bed; /rest up to stop. A bed is one the
-               server saw them press; see "beds" in the property block.
+      /rest    sent by the plugin when somebody sits or lies down, and
+               /rest up when they get off; never typed (#1603). What counts
+               is what the server saw them press; see "beds" in the property
+               block.
       /eat     a meal; /drink water; /drink ale for the good and the bad of it
       /bard    say you are playing, which helps everyone resting near you
     */
@@ -46809,33 +46932,29 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         var where = String(parts[1] || '').toLowerCase();
         var beds = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodBeds;
         if (where === 'up' || where === 'stop') {
-          if (beds && beds.off) { beds.off(actorId); }
+          var was = String(needs.settle(actorId).resting || '');
+          var off = (beds && beds.off) ? beds.off(actorId) : '';
           needs.resting(actorId, '');
-          toProfile(profileId, 'You get up.');
-          return true;
-        }
-        if (!where) {
-          toProfile(profileId, 'Rest where? sit, campfire, inn or bed. /rest up to get going again.');
+          // Said only when there was a rest to get up from, and not off a
+          // seat: the plugin sends this at every piece of furniture it gets
+          // off, and people sit at every table (#1603).
+          if (was && off !== 'seat') { toProfile(profileId, 'You get up.'); }
           return true;
         }
         /*
-          A BED IS ONE THE SERVER SAW (#1392). bed, inn and bedroll go to the
-          beds in the property block, which asks which bed this person pressed
-          and whether they are still at it, whose it is, and whether the night
-          is paid, and answers the kind of rest itself. The word only says that
-          they want a bed. See "beds" in the property block.
+          WHAT WAS PRESSED, NEVER THE WORD (#1392, #1607, #1603). The plugin
+          says /rest bed when somebody lies down and /rest sit when they sit,
+          and the beds in the property block answer by the furniture the server
+          saw them press and whether they are still at it: a seat, a seat by a
+          fire, a bed by whose it is. Nobody types this, and help never names
+          it. See "beds" in the property block.
         */
-        if (where === 'bed' || where === 'inn' || where === 'bedroll') {
-          if (!beds || !beds.rest) {
-            toProfile(profileId, 'Beds are not running on this server right now. Say so in the dev channel.');
-            return true;
-          }
-          toProfile(profileId, beds.rest(actorId, Number(profileId) || 0));
+        if (!beds || !beds.rest) {
+          toProfile(profileId, 'Beds are not running on this server right now. Say so in the dev channel.');
           return true;
         }
-        var said = needs.resting(actorId, where);
-        if (said && beds && beds.off) { beds.off(actorId); }
-        toProfile(profileId, said || ('There is no resting at a ' + where + '. Try sit, campfire, inn or bed.'));
+        var restSaid = beds.rest(actorId, Number(profileId) || 0);
+        if (restSaid) { toProfile(profileId, restSaid); }
         return true;
       }
       // /eat and /drink
@@ -47395,9 +47514,10 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       if (topic === 'living' || topic === 'needs' || topic === 'food') {
         toProfile(profileId,
           'The four bars are food, water, rest and how warm you are. /eat and ' +
-          '/drink when you have something, /rest sit, /rest campfire, or lie down ' +
-          'in a bed and /rest bed, and /rest up to get going again. A bed counts ' +
-          'when it is yours, you carry its key, or you paid the night. Fires warm you and ' +
+          '/drink when you have something. Sit down or lie down and you rest: a ' +
+          'seat by a fire is better than a bare one, a bedroll by a fire better ' +
+          'still, and your own bed best of all. A bed in somebody else\'s building ' +
+          'counts when they have let you sleep there or you carry its key. Fires warm you and ' +
           'standing in one burns you. What you are wearing matters: fur is the ' +
           'warmest thing there is and metal is the worst.');
         return;
@@ -47419,7 +47539,8 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           '/claim at a plot takes the farm around it; /claim at a door you have ' +
           'just opened takes the building and hands you the deed. /deed lists ' +
           'what you hold, /lock and /unlock turn the lock, /rent says what a ' +
-          'place costs, and /bed says or sets what a night in its beds costs. ' +
+          'place costs. To let somebody sleep in a building you hold, look at ' +
+          'them inside it and press the key the prompt shows. ' +
           'A smith says /mold at a door with the holder standing ' +
           'there, and /key at a forge with the mold in hand.');
         return;
@@ -50037,16 +50158,19 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     /*
       Recovery, per real hour, by where somebody is resting.
 
-      A bed is four times a chair, which is what makes going to an inn worth
-      the walk. The bard is added on top of whatever the place already gives,
-      so a bard in an inn is 75 an hour and is the best rest in the game, which
-      is the point Grim was making.
+      Patrick's ladder on #1603, "use some common sense": a bed is better than
+      a campfire, a bed or bedroll nobody lends you is a little better than
+      sitting, a campfire with a bedroll is better than a campfire alone, and
+      so on up to your own bed. So: a seat 20, a bed or bedroll nobody can lend
+      you 25 (rough), a seat with a fire in reach 35 (campfire), rough with a
+      fire in reach 45 (camp), a bed you are allowed in 50 (inn: a guest, or a
+      key or deed carried), your own bed 80. The bard is added on top of
+      whatever the place already gives.
 
-      bedroll is the campfire's number, which docs/systems/property.md gives
-      it. Which of inn, bed and bedroll somebody gets is the beds' answer in
-      the property block, never the word they typed (#1392).
+      Which kind somebody gets is the beds' answer in the property block, by
+      what the server saw them press, never the word after /rest (#1392, #1607).
     */
-    recover: { sit: 20, campfire: 35, bedroll: 35, inn: 50, bed: 80 },
+    recover: { sit: 20, rough: 25, campfire: 35, camp: 45, inn: 50, bed: 80 },
     bard: 25,
 
     /*
@@ -51963,6 +52087,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     }
 
     var reach = SOCIAL.nearReach * SOCIAL.nearReach;
+    // Whether the look prompt offers "Let sleep here" (#1603). See sleepMark
+    // in the beds, in the property block.
+    var beds = g.__thornswoodBeds;
     for (var a = 0; a < at.length; a++) {
       var me = at[a];
       var s = read(me.id) || fresh();
@@ -51982,7 +52109,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
           f: s.friends[them.pid] ? 1 : 0,
           m: s.muted[them.pid] ? 1 : 0,
           h: (s.namesAll || (s.namesOff && s.namesOff[them.pid])) ? 1 : 0,
-          y: (party && party.members.indexOf(them.pid) !== -1) ? 1 : 0
+          y: (party && party.members.indexOf(them.pid) !== -1) ? 1 : 0,
+          s: (beds && beds.mark) ? beds.mark(me.pid, them.pid, me.cell) : 0
         };
       }
       var sig = JSON.stringify(w) + (s.namesAll ? ':all' : '');

@@ -87,6 +87,9 @@ function rig(opts) {
     'function journalKeyDown() { }\n' +
     'function journalKeyPressed() { }\n' +
     'function moldPress() { return false; }\n' +
+    // The sleep key is the mold's, on a person inside a building you hold
+    // (#1603), and nobody here holds one.
+    'const SLEEP_KEY = 22; function sleepPress() { return false; }\n' +
     // The same key in the inventory (#1384); no inventory is open here.
     'function repairPress() { return false; }\n' +
     'const COMMAND_KEY = 53; function commandKeyPressed() { }\n' +
