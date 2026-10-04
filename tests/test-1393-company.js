@@ -3,11 +3,16 @@
 // #1393. The Free Skyrim Trading Company, as docs/systems/trading-company.md,
 // gold.md and property.md have it.
 //
+// Patrick, 4 Oct: no chat commands for anything people do. A haul is sent
+// and confirmed on the notice board panel, whose buttons send /haul lines
+// nobody is told to type, and a sale is the trade panel's Buy for the
+// company. These checks drive the lines the panels send.
+//
 // A haul is a job on a board with a pay and a destination hold. Posting it
 // takes the 30 job fee and the pay in full onto the posting hold's ledger.
-// At the destination's board the poster or a steward says /haul done <hold>
-// <number>: the company keeps a tenth of the pay, rounded down, nothing under
-// 10, and the hauler is handed the rest out of the ledger. The ledger keeps
+// At the destination's board the poster or a steward presses Confirm: the
+// company keeps a tenth of the pay, rounded down, nothing under 10, and the
+// hauler is handed the rest out of the ledger. The ledger keeps
 // the fee and the tenth. An ordinary job is not a haul, and its taker is paid
 // nothing. The hauler's /dropjob, the poster's /unpin before anybody has
 // taken it, or a steward's, hands the pay back and keeps the fee. Somebody
@@ -18,9 +23,10 @@
 // held for open letters (#1374), open hauls and hauls owed to somebody away.
 //
 // A company sale: a worker the company has taken on (a Discord role, the
-// application) offers the price the two people agreed, the seller says yes,
-// and the thing leaves the world. The worker takes 10%, another 10% is
-// destroyed, the seller receives the rest. Under 10 gold neither cut is taken.
+// application) opens an ordinary trade, presses Buy for the company, and puts
+// up the price the two of them agree. The seller's things leave the world.
+// The worker takes 10%, another 10% is destroyed, the seller receives the
+// rest. Under 10 gold neither cut is taken.
 //
 // The real functions, lifted out of the property block, over the real social
 // and trade blocks and the chat block's real /yes branch, on a pretend engine.
@@ -80,7 +86,7 @@ const NAMES = ['takeGold', 'payOut', 'payHeld', 'sealed', 'nameIs', 'post', 'boa
                'boardHere', 'nearestBoard', 'boardPanel', 'moveBoard', 'command',
                'noticeHolds', 'heldOn', 'mayWithdraw', 'withdraw',
                'haulTenth', 'haulText', 'haulCmd', 'postHaul', 'confirmHaul', 'handHaul', 'haulTick', 'cancelHaul',
-               'saleCuts', 'inCompany', 'goldHeld', 'itemIn', 'takeOne', 'putOneBack', 'companyCmd', 'acceptSale',
+               'saleCuts', 'inCompany',
                'personName', 'profileOf', 'onlineActorOf'];
 const lifted = {};
 const missing = [];
@@ -89,6 +95,7 @@ yes('every piece of the haul, the ledger and the sale is in the property block, 
     (missing.length ? ' (missing: ' + missing.join(', ') + ')' : ''), missing.length === 0);
 
 const fees = slice(prop, '  var NOTICE_FEE = ', 'var LETTER_REACH = 700;');
+const HAUL_HOW = slice(prop, '  var HAUL_HOW = ', ';\n');
 const ledger = slice(prop, '  var LEDGER_HOLDS = [', '\n  }\n');
 const seeding = (function () {
   const a = prop.indexOf('  var BOARD_REACH = 400;');
@@ -96,7 +103,7 @@ const seeding = (function () {
   return (a < 0 || b < 0) ? null : prop.slice(a, b);
 })();
 yes('the fees, the ten ledgers with deposit, and the board seeding are in the property block',
-    !!fees && !!ledger && ledger.indexOf('function deposit(') > 0 && !!seeding);
+    !!fees && !!ledger && ledger.indexOf('function deposit(') > 0 && !!seeding && !!HAUL_HOW);
 const chargenLine = gm.split('\n').find(function (l) { return l.indexOf('const CHARGEN = ') === 0; });
 const PASSAGES = chargenLine ? JSON.parse(chargenLine.slice('const CHARGEN = '.length).replace(/;$/, '')).towns : null;
 yes('the chargen town table reads', !!PASSAGES);
@@ -203,6 +210,7 @@ function boot(reg, w, opts) {
     'var HAUL_TENTH_FROM = ' + HAUL_FROM + ';',
     'var SALE_CUT_FROM = ' + SALE_FROM + ';',
     'var haulShort = {};',
+    HAUL_HOW,
     fees,
     ledger,
     seeding,
@@ -215,7 +223,7 @@ function boot(reg, w, opts) {
   NAMES.forEach(function (n) { body.push(lifted[n]); });
   body.push('return { boards: boards, funds: function () { return funds; }, notices: function () { return notices; }, ' +
             'command: command, boardPanel: boardPanel, deposit: deposit, withdraw: withdraw, mayWithdraw: mayWithdraw, ' +
-            'heldOn: heldOn, haulTenth: haulTenth, haulTick: haulTick, saleCuts: saleCuts, acceptSale: acceptSale };');
+            'heldOn: heldOn, haulTenth: haulTenth, haulTick: haulTick, saleCuts: saleCuts, inCompany: inCompany };');
   const make = new Function('reg', 'mp', 'plog', 'loadPart', 'PASSAGES', 'g', 'isSteward', 'say', 'notify', body.join('\n'));
   const api = make(reg, w.mp, function () { },
                    function (key, fallback) {
@@ -224,7 +232,7 @@ function boot(reg, w, opts) {
                    },
                    PASSAGES, ctx, function (pid) { return (opts.stewards || []).indexOf(pid) !== -1; },
                    ctx.say, ctx.notify);
-  ctx.__thornswoodProperty = { acceptSale: api.acceptSale };
+  ctx.__thornswoodProperty = { saleCuts: api.saleCuts, inCompany: api.inCompany };
   api.ctx = ctx;
   api.told = {};
   api.say = function (p, line) {
@@ -232,6 +240,7 @@ function boot(reg, w, opts) {
     const said = [];
     const to = function (pid, m) {
       (api.told[pid] = api.told[pid] || []).push(m);
+      EVERY_LINE.push(m);
       if (pid === p.pid) { said.push(m); }
     };
     const answered = api.command(parts[0].toLowerCase(), parts, p.actor, p.pid, to);
@@ -255,6 +264,9 @@ function boot(reg, w, opts) {
   };
   return api;
 }
+
+/* Every line a person was told, through the board or the trade. */
+const EVERY_LINE = [];
 
 const ALICE = { actor: 0xff000101, pid: 101, name: 'Alice', gold: 200 };
 const BOB = { actor: 0xff000102, pid: 102, name: 'Bob', gold: 10 };
@@ -326,11 +338,11 @@ attempt('a haul, start to finish', function () {
       /Stand at the board of the hold you are sending from/.test(said) && w.gold(ALICE) === 200);
   w.at(ALICE, 'whiterun', s);
   said = s.say(ALICE, '/haul riften ' + CRATE);
-  yes('H2 no pay is refused', /Say the pay first/.test(said) && w.gold(ALICE) === 200);
+  yes('H2 no pay is refused', /The pay is a whole number of gold/.test(said) && w.gold(ALICE) === 200);
   said = s.say(ALICE, '/haul 0 riften ' + CRATE);
-  yes('H2 a pay of 0 is refused', /Say the pay first/.test(said) && w.gold(ALICE) === 200);
+  yes('H2 a pay of 0 is refused', /The pay is a whole number of gold/.test(said) && w.gold(ALICE) === 200);
   said = s.say(ALICE, '/haul 8.5 riften ' + CRATE);
-  yes('H2 part of a coin is refused', /Say the pay first/.test(said) && w.gold(ALICE) === 200);
+  yes('H2 part of a coin is refused', /The pay is a whole number of gold/.test(said) && w.gold(ALICE) === 200);
   said = s.say(ALICE, '/haul 80 cyrodiil ' + CRATE);
   yes('H3 a destination that is not one of the ten towns is refused', /one of the ten towns/.test(said) &&
       w.gold(ALICE) === 200);
@@ -364,7 +376,8 @@ attempt('a haul, start to finish', function () {
   yes('T1 the poster cannot take their own haul', /your own/.test(said));
   said = s.say(BOB, '/take 1');
   yes('T2 anybody takes it, the same as any job, and is told where and how it is paid',
-      /You take the haul to riften/.test(said) && /\/haul done whiterun 1/.test(said) && /72 gold is yours/.test(said) &&
+      /You take the haul to riften/.test(said) && /Alice or a steward confirms it on the board/.test(said) &&
+      /72 gold is yours/.test(said) &&
       /company keeps 8/.test(said) && s.notices().whiterun[0].taken === BOB.pid);
   yes('T3 one taker', /Bob has that one/.test(s.say(CYRUS, '/take 1')));
   yes('T4 it is on the hauler\'s /jobs with its number',
@@ -383,7 +396,7 @@ attempt('a haul, start to finish', function () {
   said = s.say(BOB, '/haul done whiterun 1');
   yes('C3 the hauler cannot confirm it', /Only the person who posted it/.test(said) && w.gold(BOB) === 10);
   said = s.say(ALICE, '/haul done whiterun');
-  yes('C4 a confirm without the number is refused', /Say the hold that posted it and its number/.test(said));
+  yes('C4 a confirm without the number is refused', /That haul is not on any board/.test(said));
   said = s.say(ALICE, '/haul done whiterun 9');
   yes('C4 and one with a number that is not on the board', /There is no number 9/.test(said));
 
@@ -630,89 +643,192 @@ attempt('held pay', function () {
       w.gold(BOB) === 25 && s.funds().whiterun === 65);
 });
 
+// ------------------------------------------------- the haul's two buttons
+attempt('the board panel', function () {
+  const w = world();
+  const P = { actor: 0xff000501, pid: 501, name: 'Poster', gold: 300 };
+  const H = { actor: 0xff000502, pid: 502, name: 'Hauler', gold: 0 };
+  const X = { actor: 0xff000503, pid: 503, name: 'Stranger', gold: 0 };
+  const ST = { actor: 0xff000504, pid: 504, name: 'Steward', gold: 0 };
+  [P, H, X, ST].forEach(w.add);
+  const s = boot({}, w, { stewards: [ST.pid] });
+  [P, H, X, ST].forEach(function (p) { w.at(p, 'falkreath', s); });
+  let panel = s.boardPanel(P.actor, P.pid);
+  const towns = (panel && panel.dests || []).map(function (d) { return d.hold; });
+  yes('B1 Send a haul offers every other town with a board, and not this one',
+      towns.length === 9 && towns.indexOf('falkreath') === -1 && towns.indexOf('ravenrock') !== -1 &&
+      panel.dests.every(function (d) { return !!d.where; }));
+  s.say(P, '/haul 60 windhelm furs');
+  panel = s.boardPanel(X.actor, X.pid);
+  yes('B2 the wall marks it as a haul, with the pay and the town', panel.wall[0].haul === true &&
+      panel.wall[0].job === true && panel.wall[0].text === 'haul to windhelm for 60 gold: furs');
+  yes('B3 a steward is told they are one, so the panel offers them Take down on a haul',
+      s.boardPanel(ST.actor, ST.pid).steward === true && panel.steward === false);
+  s.say(H, '/take 1');
+  [P, H, X, ST].forEach(function (p) { w.at(p, 'windhelm', s); });
+  const mine = s.boardPanel(P.actor, P.pid).arrivals;
+  yes('B4 at the town it went to, the poster sees it under Hauls that came here, with the split',
+      mine.length === 1 && mine[0].from === 'falkreath' && mine[0].n === 1 && mine[0].hauler === 'Hauler' &&
+      mine[0].pay === 60 && mine[0].kept === 6 && mine[0].text === 'furs' && !!mine[0].where);
+  yes('B5 so does a steward, and nobody else, and not the hauler',
+      s.boardPanel(ST.actor, ST.pid).arrivals.length === 1 && s.boardPanel(X.actor, X.pid).arrivals.length === 0 &&
+      s.boardPanel(H.actor, H.pid).arrivals.length === 0);
+  w.at(P, 'riften', s);
+  yes('B6 not at another town\'s board', s.boardPanel(P.actor, P.pid).arrivals.length === 0);
+  w.at(P, 'windhelm', s);
+  const said = s.say(P, '/haul done ' + mine[0].from + ' ' + mine[0].n);
+  yes('B7 the line Confirm sends pays the hauler, and it is gone from the list',
+      /Hauler is paid 54/.test(said) && w.gold(H) === 54 && s.boardPanel(P.actor, P.pid).arrivals.length === 0);
+
+  const page = read('game/ui/thornswood-board.js');
+  yes('B8 the panel sends the haul and the confirm, and draws both lists',
+      page.indexOf("net('/haul ' + pay + ' ' + dest + ' ' + what)") !== -1 &&
+      page.indexOf("net('/haul done ' + from + ' ' + n)") !== -1 &&
+      /b\.dests/.test(page) && /b\.arrivals/.test(page) && /Send a haul/.test(page) && /Confirm/.test(page) &&
+      /row\.haul && b\.steward/.test(page));
+});
+
 // ------------------------------------------------- a sale out of Skyrim
 attempt('a company sale', function () {
   const w = world();
   const WORKER = { actor: 0xff000301, pid: 301, name: 'Worker', gold: 300 };
   const SELLER = { actor: 0xff000302, pid: 302, name: 'Seller', gold: 0,
                    items: [{ baseId: SWORD, count: 1 }, { baseId: PELT, count: 3 }] };
-  const OTHER = { actor: 0xff000303, pid: 303, name: 'Other', gold: 500 };
+  const OTHER = { actor: 0xff000303, pid: 303, name: 'Other', gold: 500, items: [{ baseId: PELT, count: 1 }] };
   const ADMIN = { actor: 0xff000304, pid: 304, name: 'Admin', gold: 50 };
-  [WORKER, SELLER, OTHER, ADMIN].forEach(w.add);
-  const s = boot({}, w, { company: [WORKER.pid], admin: [ADMIN.pid] });
-  const everybody = [WORKER, SELLER, OTHER, ADMIN];
+  const MATE = { actor: 0xff000305, pid: 305, name: 'Mate', gold: 40 };
+  [WORKER, SELLER, OTHER, ADMIN, MATE].forEach(w.add);
+  const s = boot({}, w, { company: [WORKER.pid, MATE.pid], admin: [ADMIN.pid] });
+  const tr = s.ctx.__thornswoodTrade;
+  const everybody = [WORKER, SELLER, OTHER, ADMIN, MATE];
   const before = total(w, s, everybody);
+  function view(p) { const t = tr.tradeOf(p.actor); return t ? tr.view(t, p.actor) : null; }
+  function agree(a, b) { const one = tr.confirm(a.actor); const two = tr.confirm(b.actor); EVERY_LINE.push(one, two); return one + two; }
+  function heard(p) { return s.heard(p); }
 
-  let said = s.say(OTHER, '/company');
-  yes('S1 /company tells somebody not taken on that it is an application in Discord',
-      /takes people on by application, in Discord/.test(said));
-  said = s.say(OTHER, '/company buy 120 Seller Iron Sword');
-  yes('S1 and they cannot buy for it', /Only somebody the Free Skyrim Trading Company has taken on/.test(said) &&
-      w.count(SELLER, SWORD) === 1 && !s.ctx.__thornswoodSocial.standingOffer(SELLER.pid));
-  said = s.say(WORKER, '/company');
-  yes('S2 a worker is told how to buy', /You handle sales for the Free Skyrim Trading Company/.test(said));
-  said = s.say(WORKER, '/company buy Seller Iron Sword');
-  yes('S3 a sale with no price is refused: the price is what the two agreed, and the item has none of its own',
-      /Say the price the two of you agreed/.test(said));
-  said = s.say(WORKER, '/company buy 120 Seller Ebony Blade');
-  yes('S4 a thing the seller is not carrying is refused', /Seller is not carrying that/.test(said));
-  said = s.say(WORKER, '/company buy 120 Worker Iron Sword');
-  yes('S5 the worker cannot buy from themselves', /does not buy from the person handling the sale/.test(said));
-  w.move(SELLER, TAMRIEL, [WHITERUN[0] + 5000, WHITERUN[1], WHITERUN[2]]);
-  said = s.say(WORKER, '/company buy 120 Seller Iron Sword');
-  yes('S6 the seller has to be close', /Stand closer/.test(said));
-  w.move(SELLER, TAMRIEL, WHITERUN);
-  said = s.say(WORKER, '/company buy 400 Seller Iron Sword');
-  yes('S7 a worker who cannot pay offers nothing', /That costs you 360 gold, the price less your 40/.test(said) &&
-      !s.ctx.__thornswoodSocial.standingOffer(SELLER.pid));
+  yes('S1 somebody the company has not taken on is not offered Buy for the company, and cannot press it',
+      tr.begin(OTHER.actor, SELLER.actor) === '' && view(OTHER).canBuy === false &&
+      /Only somebody the Free Skyrim Trading Company has taken on/.test(tr.sale(OTHER.actor)) &&
+      !tr.tradeOf(OTHER.actor).sale);
+  tr.cancel(OTHER.actor);
 
-  said = s.say(WORKER, '/company buy 120 Seller Iron Sword');
-  yes('S8 the worker offers the agreed price and is told what it costs them',
-      /You offer Seller 120 gold for their Iron Sword. It costs you 108, the price less your 12/.test(said));
-  const o = s.ctx.__thornswoodSocial.standingOffer(SELLER.pid);
-  yes('S8 the seller has a sale standing on the prompt', !!o && o.kind === 'sale' && o.price === 120 &&
-      o.baseId === SWORD);
-  yes('S8 and is told the split before saying yes', /You would receive 96: 12 is Worker's for handling it, and 12 leaves the world/.test(s.heard(SELLER)));
-  yes('S8 nothing has moved yet', w.gold(WORKER) === 300 && w.gold(SELLER) === 0 && w.count(SELLER, SWORD) === 1);
-  let r = s.answer(SELLER, '/yes');
-  yes('S9 the seller says yes: 96 to the seller, the worker pays 108, and 12 leaves the world',
+  yes('S2 a worker opens an ordinary trade and is offered Buy for the company; the seller is not',
+      tr.begin(WORKER.actor, SELLER.actor) === '' && view(WORKER).canBuy === true && view(SELLER).canBuy === false &&
+      view(WORKER).sale === null);
+  tr.add(SELLER.actor, 'Iron Sword', 1);
+  tr.gold(WORKER.actor, 120);
+  tr.confirm(SELLER.actor);
+  yes('S3 pressing it makes it a sale and takes both agreements back',
+      tr.sale(WORKER.actor) === '' && tr.tradeOf(WORKER.actor).sale === WORKER.actor &&
+      view(SELLER).iAgreed === false && view(WORKER).iAgreed === false);
+  const sv = view(SELLER).sale;
+  yes('S4 both see the split of the price the worker put up, before anybody agrees',
+      sv && sv.mine === false && sv.worker === 'Worker' && sv.price === 120 && sv.cut === 12 && sv.gone === 12 &&
+      sv.seller === 96 && view(WORKER).sale.mine === true);
+  yes('S4 and the seller is told what it means', /buying for the Free Skyrim Trading Company/.test(heard(SELLER)) &&
+      /leaves Skyrim and does not come back/.test(heard(SELLER)));
+  yes('S5 nothing has moved yet', w.gold(WORKER) === 300 && w.gold(SELLER) === 0 && w.count(SELLER, SWORD) === 1);
+  agree(WORKER, SELLER);
+  yes('S6 both agree: 96 to the seller, the worker pays 108, and 12 leaves the world',
       w.gold(SELLER) === 96 && w.gold(WORKER) === 192 && total(w, s, everybody) === before - 12);
-  yes('S9 the sword has left the world: it is in nobody\'s pack', w.count(SELLER, SWORD) === 0 &&
+  yes('S6 the sword has left the world: it is in nobody\'s pack',
       everybody.every(function (p) { return w.count(p, SWORD) === 0; }));
-  yes('S9 both are told', /It has left Skyrim. You receive 96/.test(r.mine) && /It cost you 108/.test(r.heard));
-  yes('S9 no ledger moved', JSON.stringify(s.funds()) === '{}');
+  yes('S6 both are told, and the trade is over',
+      /Iron Sword left Skyrim. You receive 96: 12 went to Worker for handling it, and 12 left the world/.test(heard(SELLER)) &&
+      /It cost you 108/.test(heard(WORKER)) && !tr.tradeOf(WORKER.actor) && !tr.tradeOf(SELLER.actor));
+  yes('S6 no ledger moved', JSON.stringify(s.funds()) === '{}');
 
   const mid = total(w, s, everybody);
-  s.say(WORKER, '/company buy 9 Seller Bear Pelt');
-  r = s.answer(SELLER, '/yes');
-  yes('S10 under 10 gold the seller receives the whole price and nothing is destroyed',
+  tr.begin(WORKER.actor, SELLER.actor);
+  tr.sale(WORKER.actor);
+  tr.add(SELLER.actor, 'Bear Pelt', 1);
+  tr.gold(WORKER.actor, 9);
+  agree(WORKER, SELLER);
+  yes('S7 under 10 gold the seller receives the whole price and nothing is destroyed',
       w.gold(SELLER) === 105 && w.gold(WORKER) === 183 && total(w, s, everybody) === mid &&
-      /Under 10 gold nothing is cut, and you receive the whole 9/.test(r.mine));
-  yes('S10 and the pelt leaves the world', w.count(SELLER, PELT) === 2);
-  s.say(WORKER, '/company buy 10 Seller Bear Pelt');
-  s.answer(SELLER, '/yes');
-  yes('S11 at 10 gold: 1 to the worker, 1 destroyed, 8 to the seller',
+      /Under 10 gold nothing is cut, and you receive the whole 9/.test(heard(SELLER)));
+  yes('S7 and the pelt leaves the world', w.count(SELLER, PELT) === 2 && w.count(WORKER, PELT) === 0);
+  tr.begin(WORKER.actor, SELLER.actor);
+  tr.sale(WORKER.actor);
+  tr.add(SELLER.actor, 'Bear Pelt', 1);
+  tr.gold(WORKER.actor, 10);
+  agree(WORKER, SELLER);
+  yes('S8 at 10 gold: 1 to the worker, 1 destroyed, 8 to the seller',
       w.gold(SELLER) === 113 && w.gold(WORKER) === 174 && total(w, s, everybody) === mid - 1 && w.count(SELLER, PELT) === 1);
-  yes('S12 the cuts by the page: 10% and 10% rounded down, nothing under 10',
+  yes('S9 the cuts by the page: 10% and 10% rounded down, nothing under 10',
       JSON.stringify(s.saleCuts(125)) === JSON.stringify({ price: 125, worker: 12, gone: 12, seller: 101 }) &&
       JSON.stringify(s.saleCuts(9)) === JSON.stringify({ price: 9, worker: 0, gone: 0, seller: 9 }));
 
-  s.say(WORKER, '/company buy 50 Seller Bear Pelt');
-  r = s.answer(SELLER, '/no');
-  yes('S13 /no moves nothing', w.count(SELLER, PELT) === 1 && w.gold(WORKER) === 174 && w.gold(SELLER) === 113);
-
-  s.say(WORKER, '/company buy 50 Seller Bear Pelt');
+  // The refusals, each checked when both have agreed, and each moves nothing.
+  const still = total(w, s, everybody);
+  function nothingMoved() {
+    return w.gold(SELLER) === 113 && w.gold(WORKER) === 174 && w.count(SELLER, PELT) === 1 &&
+           total(w, s, everybody) === still;
+  }
+  tr.begin(WORKER.actor, SELLER.actor);
+  tr.sale(WORKER.actor);
+  tr.gold(WORKER.actor, 50);
+  let said = agree(WORKER, SELLER);
+  yes('S10 nothing put up to sell is refused', /Seller has put up nothing to sell/.test(said) && nothingMoved() &&
+      !!tr.tradeOf(WORKER.actor) && view(WORKER).iAgreed === false);
+  tr.add(SELLER.actor, 'Bear Pelt', 1);
+  tr.gold(WORKER.actor, 0);
+  said = agree(WORKER, SELLER);
+  yes('S11 no price is refused: the price is what the two agree, and the thing has none of its own',
+      /Worker has put up no gold for it/.test(said) && nothingMoved());
+  tr.gold(WORKER.actor, 50);
+  tr.gold(SELLER.actor, 5);
+  said = agree(WORKER, SELLER);
+  yes('S12 the seller putting up gold is refused: only the company pays',
+      /Only the company pays in a sale/.test(said) && nothingMoved());
+  tr.gold(SELLER.actor, 0);
+  w.people[WORKER.actor].pack.push({ baseId: PELT, count: 1 });
+  tr.add(WORKER.actor, 'Bear Pelt', 1);
+  said = agree(WORKER, SELLER);
+  yes('S13 the worker putting up things is refused: the company pays in gold',
+      /The company pays in gold/.test(said) && w.count(WORKER, PELT) === 1 && w.count(SELLER, PELT) === 1);
+  tr.remove(WORKER.actor, 'Bear Pelt');
+  w.people[WORKER.actor].pack = w.people[WORKER.actor].pack.filter(function (e) { return e.baseId !== PELT; });
   w.people[SELLER.actor].pack = w.people[SELLER.actor].pack.filter(function (e) { return e.baseId !== PELT; });
-  r = s.answer(SELLER, '/yes');
-  yes('S14 a pelt dropped while the offer stood: nothing changes hands and the worker keeps the gold',
-      /not carrying the Bear Pelt now/.test(r.mine) && w.gold(WORKER) === 174 && w.gold(SELLER) === 113);
-
+  said = agree(WORKER, SELLER);
+  yes('S14 a pelt dropped after it was put up: nothing changes hands and the worker keeps the gold',
+      /does not have the Bear Pelt any more/.test(said) && w.gold(WORKER) === 174 && w.gold(SELLER) === 113);
   w.people[SELLER.actor].pack.push({ baseId: PELT, count: 1 });
-  s.say(ADMIN, '/company buy 20 Seller Bear Pelt');
-  r = s.answer(SELLER, '/yes');
-  yes('S15 an admin can handle one, to test the chain, the same as a Jarl',
-      w.count(SELLER, PELT) === 0 && w.gold(ADMIN) === 32 && w.gold(SELLER) === 129);
+  s.ctx.__thornswoodIsCompany = function () { return false; };
+  said = agree(WORKER, SELLER);
+  yes('S15 a worker the company no longer has cannot finish one', /Worker cannot buy for the company now/.test(said) &&
+      nothingMoved());
+  s.ctx.__thornswoodIsCompany = function (pid) { return pid === WORKER.pid || pid === MATE.pid; };
+  yes('S16 pressing it again makes it an ordinary trade, and the pelt crosses instead of leaving',
+      tr.sale(WORKER.actor) === '' && !tr.tradeOf(WORKER.actor).sale && view(SELLER).sale === null &&
+      agree(WORKER, SELLER) === '' && w.count(WORKER, PELT) === 1 && w.gold(SELLER) === 163 &&
+      total(w, s, everybody) === still);
+
+  tr.begin(WORKER.actor, MATE.actor);
+  tr.sale(WORKER.actor);
+  yes('S17 two workers: only one buys, and the other is not offered it',
+      view(MATE).canBuy === false && /Worker is already buying for the company/.test(tr.sale(MATE.actor)));
+  tr.cancel(WORKER.actor);
+
+  tr.begin(ADMIN.actor, OTHER.actor);
+  tr.sale(ADMIN.actor);
+  tr.add(OTHER.actor, 'Bear Pelt', 1);
+  tr.gold(ADMIN.actor, 20);
+  agree(ADMIN, OTHER);
+  yes('S18 an admin can handle one, to test the chain, the same as a Jarl',
+      w.count(OTHER, PELT) === 0 && w.gold(ADMIN) === 32 && w.gold(OTHER) === 516);
+
+  const trade = read('game/ui/thornswood-trade.js');
+  yes('S19 the trade panel has the button for a worker, sends the line, and shows the split to both',
+      trade.indexOf("net('/trade sale')") !== -1 && /data\.canBuy/.test(trade) && /Buy for the company/.test(trade) &&
+      /saleLine\(data\.sale\)/.test(trade) && /leaves the world/.test(trade));
+  const branch = slice(gm, "      if (word === '/trade') {", "      var found = soc.findPerson(rest);");
+  yes('S20 the chat block hands the panel\'s line to the trade block',
+      !!branch && /verb === 'sale'\) \{ out = tr2\.sale\(actorId\); \}/.test(branch) && /verb === 'pack' \|\| verb === 'sale'/.test(branch));
+  ctxSaid(s.ctx);
 });
+
+function ctxSaid(ctx) { ctx.said.forEach(function (x) { EVERY_LINE.push(x.text); }); }
 
 // --------------------------------------------------------------- the wiring
 attempt('the wiring', function () {
@@ -723,44 +839,51 @@ attempt('the wiring', function () {
   }
   const WORDS = arrayOf('WORDS');
   const PLAYER_WORDS = arrayOf('PLAYER_WORDS');
-  yes('W1 /haul and /company are words the server answers, and everybody is told of them',
-      !!WORDS && WORDS.indexOf('/haul') !== -1 && WORDS.indexOf('/company') !== -1 &&
-      !!PLAYER_WORDS && PLAYER_WORDS.indexOf('/haul') !== -1 && PLAYER_WORDS.indexOf('/company') !== -1);
-  yes('W2 the character block hands both to the property block',
-      /word === '\/haul' \|\| word === '\/company' \|\|/.test(gm));
-  yes('W3 the property block answers both',
-      /if \(word === '\/haul'\) \{ return haulCmd\(/.test(prop) && /if \(word === '\/company'\) \{ return companyCmd\(/.test(prop));
-  yes('W4 the property block hands out withdraw and acceptSale',
-      /withdraw: withdraw, mayWithdraw: mayWithdraw/.test(prop) && /acceptSale: acceptSale/.test(prop));
+  yes('W1 /haul is a word the server answers for the board panel, and nobody is told of it; /company is gone',
+      !!WORDS && WORDS.indexOf('/haul') !== -1 && WORDS.indexOf('/company') === -1 &&
+      !!PLAYER_WORDS && PLAYER_WORDS.indexOf('/haul') === -1 && PLAYER_WORDS.indexOf('/company') === -1);
+  yes('W2 the character block hands /haul to the property block', /word === '\/haul' \|\|/.test(gm) &&
+      !/word === '\/company'/.test(gm));
+  yes('W3 the property block answers /haul', /if \(word === '\/haul'\) \{ return haulCmd\(/.test(prop));
+  yes('W4 the property block hands out withdraw, the cuts and who is in the company',
+      /withdraw: withdraw, mayWithdraw: mayWithdraw/.test(prop) && /saleCuts: saleCuts, inCompany: inCompany/.test(prop) &&
+      !/acceptSale/.test(gm));
+  yes('W5 nobody was told to type /haul, /company or /trade sale',
+      EVERY_LINE.length > 50 && EVERY_LINE.every(function (m) { return !/\/haul|\/company|\/trade sale/.test(String(m)); }));
 
   const door = slice(gm, '// ==== thornswood door ====', '// ==== end thornswood door ====');
-  yes('W5 the door reads companyProfiles and answers __thornswoodIsCompany only for a proved profile',
+  yes('W6 the door reads companyProfiles and answers __thornswoodIsCompany only for a proved profile',
       !!door && /doc\.companyProfiles/.test(door) && /companyIds: companyIds/.test(door) &&
       /__thornswoodIsCompany = function \(profileId\) \{\s*var l = load\(\);\s*return passProved\(profileId\) && !!\(l && l\.companyIds/.test(door));
+  yes('W7 and writes it into allowed.json, kept for a profile Discord could not answer for',
+      /companyProfiles: Array\.isArray\(doc\.companyProfiles\) \? doc\.companyProfiles : \[\],/.test(door) &&
+      /companyProfiles: merged\(doc\.companyProfiles, had\.companyProfiles\),/.test(door) &&
+      /doc\.companyProfiles = kept\.companyProfiles;/.test(door));
 
   const site = read('site/server.js');
   const def = /cfg\.access\.company = \['([^']+)'\];/.exec(site);
-  yes('W6 the site gives the role a default name, reads it, and sends companyProfiles to the door',
+  yes('W8 the site gives the role a default name, reads it, and sends companyProfiles to the door',
       !!def && /out\.company = has\(cfg\.access\.company\);/.test(site) &&
       /out\.companyProfiles\.push\(n\)/.test(site) && /'devRoleProfiles', 'companyProfiles'\]/.test(site));
   const bot = read('bot/bot.py');
-  yes('W7 the application is a ticket in Discord, asking for the same role the site reads',
+  yes('W9 the application is a ticket in Discord, asking for the same role the site reads',
       /\('company',\s+'Apply: Trading Company'/.test(bot) && !!def &&
       new RegExp("'company':\\s+'" + def[1] + "',").test(bot) && /'company': \[/.test(bot));
-
+  const build = read('bot/Build-Discord.py');
+  yes('W10 and Build-Discord.py makes that role, so there is one to give',
+      !!def && build.indexOf("ROLES.append(('" + def[1] + "', ") !== -1);
   const party = read('game/ui/thornswood-party.js');
-  yes('W8 the prompt says what a sale is, not that somebody wants to trade',
-      (party.match(/'sale'/g) || []).length >= 2 && /offers to buy something of yours out of Skyrim/.test(party));
-  yes('W9 the /yes branch hands a sale to the property block', /o\.kind === 'sale'/.test(YES_BRANCH) &&
-      /acceptSale\(actorId, themActor, o\)/.test(YES_BRANCH));
+  yes('W11 there is no sale on the request prompt and no sale in /yes: the sale is the trade panel',
+      party.indexOf("'sale'") === -1 && !/o\.kind === 'sale'/.test(YES_BRANCH));
 });
 
 // ------------------------------------------------------------------ the page
 attempt('the pages', function () {
   const page = read('docs/systems/trading-company.md');
   const where = page.slice(page.indexOf('## Where this is'));
-  yes('D1 the trading company page no longer says the company is not built',
-      !/^Not built\./m.test(where) && /\/haul/.test(where));
+  yes('D1 the trading company page no longer says the company is not built, and names the buttons, not a command',
+      !/^Not built\./m.test(where) && /Send a haul/.test(page) && /Buy for the company/.test(page) &&
+      !/`\/haul|`\/company/.test(page));
   const property = read('docs/systems/property.md');
   yes('D2 the property page no longer says the payout is not built',
       property.indexOf('The company payout that\nwithdraws from the ledger is not built') === -1);

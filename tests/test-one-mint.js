@@ -335,11 +335,10 @@ const WRITERS = {
   'property/nameFreshKey': [1, 'names one key off a stack, and the count is the same after'],
   'property/takeGold': [1, 'takes a notice, job or letter fee or a fare out and never puts any in (checked below)'],
   'property/payOut': [1, 'a letter\'s held 15 back out of the ledger it was counted on, to its courier or its sender; payHeld is its one caller and takes the same off that ledger (#1374, checked below)'],
-  'property/takeOne': [1, 'takes the one thing a company sale bought out of the seller\'s pack, and the thing is one /trade lists, which leaves gold out (#1393)'],
-  'property/putOneBack': [1, 'puts back the one thing takeOne has just taken, when the seller\'s share could not be written (#1393)'],
   'spoils/strip': [1, 'only takes things out of a container the world stocked'],
   'spoils/purse': [1, 'THE MINT: forty gold, once per character'],
   'trade/moveById': [2, 'moves a pile from one pack to the other, one write each (section 4)'],
+  'trade/saleById': [2, 'a company sale (#1393): the things out of the seller\'s pack and out of the world with the seller\'s share in, and the price less the worker\'s cut out of the worker\'s pack, which is never less than the share; one write each (section 4)'],
   'outer/markWoven': [1, 'names a garment a Master Weaver just made: units split off a plain stack of the same base, so no base is added and the count is the same after (#1398, test-1398-fuel.js)'],
   'durability/writePack': [1, 'writes back a pack or chest it has just read: a stack renamed for its condition, or a kit or a broken piece taken away. No base is added and no count grows (test-1384-condition.js)']
 };
@@ -388,10 +387,12 @@ for (const at of Object.keys(WRITERS)) {
 }
 
 {
-  // Of all the writers, only three name gold: the mint that hands it out,
-  // the fee that takes it, and the ledger paying a letter's held pay back
-  // out (#1374). A fourth one naming gold is a second mint until somebody
-  // has read it.
+  // Of all the writers, only four name gold: the mint that hands it out,
+  // the fee that takes it, the ledger paying a letter's held pay back out
+  // (#1374), and a company sale (#1393), which puts the seller's share in
+  // and takes more than that out of the worker's pack in the same step,
+  // driven in section 4. A fifth one naming gold is a second mint until
+  // somebody has read it.
   const namesGold = /\b(GOLD|GOLD_ID|goldId)\b|\b0x0*[fF]\b/;
   const naming = [];
   for (const at of Object.keys(WRITERS)) {
@@ -399,9 +400,9 @@ for (const at of Object.keys(WRITERS)) {
     if (body !== null && namesGold.test(body)) { naming.push(at); }
   }
   naming.sort();
-  yes('of the writers, only purse, takeGold and payOut name gold' +
+  yes('of the writers, only purse, takeGold, payOut and a company sale name gold' +
       (naming.length ? ' (' + naming.join(', ') + ')' : ''),
-      naming.join(',') === 'property/payOut,property/takeGold,spoils/purse');
+      naming.join(',') === 'property/payOut,property/takeGold,spoils/purse,trade/saleById');
 }
 
 {
@@ -471,18 +472,16 @@ for (const at of Object.keys(WRITERS)) {
   const letterFee = /\bvar LETTER_FEE = (\d+);/.exec(code);
   const letterPay = /\bvar LETTER_PAY = (\d+);/.exec(code);
   /*
-    A HAUL AND A SALE (#1393). Posting a haul takes JOB_FEE and the pay, a
-    whole number above nothing, onto the ledger. A company sale takes the
-    agreed price, a whole number above nothing, less the worker's 10%, out of
-    the worker's pack. Both take; neither puts any in.
+    A HAUL (#1393). Posting a haul takes JOB_FEE and the pay, a whole number
+    above nothing, onto the ledger. It takes; it puts none in. A company
+    sale is the trade block's saleById, section 4.
   */
-  yes('its six callers pass the fee, NOTICE_FEE or JOB_FEE, a letter\'s cost, LETTER_FEE and LETTER_PAY, a haul\'s cost, ' +
-      'JOB_FEE and the pay, a sale\'s cost, the price less the worker\'s cut, a ride\'s fare and a night\'s price',
-      callers.slice().sort().join(',') === 'cost,cost,cost,fee,price,price' &&
+  yes('its five callers pass the fee, NOTICE_FEE or JOB_FEE, a letter\'s cost, LETTER_FEE and LETTER_PAY, a haul\'s cost, ' +
+      'JOB_FEE and the pay, a ride\'s fare and a night\'s price',
+      callers.slice().sort().join(',') === 'cost,cost,fee,price,price' &&
       /\bvar fee = isJob \? JOB_FEE : NOTICE_FEE;/.test(code) &&
       /\bvar cost = LETTER_FEE \+ LETTER_PAY;/.test(code) &&
-      /\bvar cost = JOB_FEE \+ pay;/.test(code) &&
-      /\bvar cost = cuts\.price - cuts\.worker;/.test(code));
+      /\bvar cost = JOB_FEE \+ pay;/.test(code));
   const fares = ['FARE_FERRY', 'FARE_CARRIAGE', 'FARE_RAVEN_ROCK'].map(function (n) {
     const m = new RegExp('\\bvar ' + n + ' = (\\d+);').exec(code);
     return m ? Number(m[1]) : 0;
@@ -539,13 +538,11 @@ for (const at of Object.keys(WRITERS)) {
     pay less the tenth or the poster's pay back, and haulTick what a haul
     held for somebody who was away, each taking the same off the ledger
     through withdraw, which never takes more than that haul holds. postHaul
-    gives back the cost it has just taken when the ledger would not take it.
-    acceptSale hands the seller their share of the gold it has just taken
-    from the worker, and gives the worker it back when the sale cannot
-    finish (test-1393-company.js).
+    gives back the cost it has just taken when the ledger would not take it
+    (test-1393-company.js).
   */
-  yes('payOut\'s callers are payHeld, a night in a bed and its kept takings (#1392), and the haul and the sale (#1393)',
-      calls.slice().sort().join(',') === 'property/acceptSale,property/acceptSale,property/acceptSale,' +
+  yes('payOut\'s callers are payHeld, a night in a bed and its kept takings (#1392), and the haul (#1393)',
+      calls.slice().sort().join(',') ===
       'property/handHaul,property/haulTick,property/payHeld,property/payNight,property/payTakings,property/postHaul');
 
   /*
@@ -870,6 +867,25 @@ if (tradeBlock !== null) {
     yes('and a pile bigger than the pack is refused with nothing written',
         w.trade.moveById(A, B, [[GOLD, 500]]) === false &&
         w.gold(A) === 10 && w.gold(B) === 50);
+  });
+  /*
+    A SALE OUT OF SKYRIM (#1393). saleById is the trade block's other
+    writer: the seller's share in, the price less the worker's cut out. The
+    worker's pack loses more than the seller's gains, by the 10% that leaves
+    the server, so the total goes down and never up.
+  */
+  attempt('a company sale', function () {
+    const w = tradeWorld();
+    const A = w.person(0xff000001, [{ baseId: GOLD, count: 100 }]);
+    const B = w.person(0xff000002, [{ baseId: LEEK, count: 2 }]);
+    yes('a sale of 50: 40 to the seller, the worker pays 45, 5 leaves, the leek is gone, and nothing is made',
+        w.trade.saleById(B, A, [{ id: LEEK, c: 1, n: 'Leek' }], 40, 45) === true &&
+        w.gold(B) === 40 && w.gold(A) === 55 && w.gold(A) + w.gold(B) === 95 &&
+        w.store[B].inventory.entries.some(function (e) { return e.baseId === LEEK && e.count === 1; }));
+    yes('a share bigger than what the worker pays is refused with nothing written',
+        w.trade.saleById(B, A, [{ id: LEEK, c: 1, n: 'Leek' }], 30, 20) === false && w.gold(B) === 40 && w.gold(A) === 55);
+    yes('and a price bigger than the worker\'s pack is refused with nothing written',
+        w.trade.saleById(B, A, [{ id: LEEK, c: 1, n: 'Leek' }], 400, 500) === false && w.gold(B) === 40 && w.gold(A) === 55);
   });
   attempt('a trade with yourself', function () {
     const w = tradeWorld();
