@@ -50,24 +50,42 @@ function exercise(apply, name) {
 
 const host = read('../launcher/voice-host.html');
 exercise(helper(host, 'the launcher voice page'), 'the launcher voice page');
+// Since #1409 each moved branch also reads the silence marks off the rows that
+// moved (noteRows) and puts the microphone right, between the helper and the
+// return. What matters here is that the table goes through the helper and is
+// never replaced by the rows that moved.
+function movedBranch(src) {
+  const m = /if \(m\.t === 'moved'\) \{( [^\n]*?return; )\}/.exec(src);
+  return m ? m[1] : '';
+}
+const hostMoved = movedBranch(host);
 yes('the launcher voice page sends moved to the helper, not the replace',
-    /if \(m\.t === 'moved'\) \{ applyMoved\(places, m\); place\(\); return; \}/.test(host));
+    /^ applyMoved\(places, m\);/.test(hostMoved) && /place\(\);/.test(hostMoved) &&
+    /return; $/.test(hostMoved) && !/places = /.test(hostMoved));
+yes('and reads the silence marks off the rows that moved', /noteRows\(m\.who \|\| \{\}\);/.test(hostMoved));
 
 const overlay = read('../game/ui/thornswood-voice.js');
 exercise(helper(overlay, 'the game overlay'), 'the game overlay');
+const overlayMoved = movedBranch(overlay);
 yes('the game overlay sends moved to the helper, and the party strip reads the same table',
-    /if \(m\.t === 'moved'\) \{ applyMoved\(lastWho, m\); place\(\); return; \}/.test(overlay) &&
+    /^ applyMoved\(lastWho, m\);/.test(overlayMoved) && /place\(\);/.test(overlayMoved) &&
+    /return; $/.test(overlayMoved) && !/lastWho = /.test(overlayMoved) &&
     /who: function \(\) \{ return lastWho; \}/.test(overlay));
+yes('and reads the silence marks off the rows that moved', /noteRows\(m\.who \|\| \{\}\);/.test(overlayMoved));
 
 const page = read('../voice/public/voice.js');
 const branch = /if \(m\.t === 'moved'\) \{([\s\S]*?)return;\s*\}/.exec(page);
 yes('the browser page has a moved branch', !!branch);
 if (branch) {
-  const apply = new Function('lastWho', 'm', 'place', branch[1]);
+  const apply = new Function('lastWho', 'm', 'place', 'noteRows', 'applyOwnMic', branch[1]);
   const table = { 1: { pos: [0, 0, 0] }, 2: { pos: [1, 0, 0] }, 4: { pos: [2, 0, 0] } };
-  apply(table, { who: { 2: { pos: [9, 0, 0] } }, gone: [4] }, function () { });
+  const noted = [];
+  apply(table, { who: { 2: { pos: [9, 0, 0] } }, gone: [4] }, function () { },
+        function (who) { noted.push(Object.keys(who)); }, function () { });
   yes('the browser page keeps the still, moves the walker and drops the gone',
       !!table[1] && table[2].pos[0] === 9 && !table[4]);
+  yes('and reads the silence marks off the rows that moved, not the whole table',
+      noted.length === 1 && noted[0].join(',') === '2');
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

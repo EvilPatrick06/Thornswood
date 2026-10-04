@@ -120,9 +120,17 @@ if (block !== null && tables.every(function (t) { return t !== null; })) {
     }
     const list = Object.keys(named).sort();
     console.log('      waits a cooldown is read against: ' + list.join(', '));
-    yes('C2 the scan finds the quarry, the plants, the rivers, the game and the carcasses',
-        ['COOLDOWN_MS', 'HARVEST_COOLDOWN_MS', 'FISH_TUNING', 'GAME_TUNING', 'HUNT_TUNING']
-          .every(function (k) { return named[k]; }));
+    // Since #1413 the rivers, the racks and the carcasses keep their waits on
+    // the shared resource stock, by the place and for everybody, and the seams
+    // are deposits: the stations and the plants are what is left on lastUse.
+    yes('C2 the scan finds the stations and the plants, the waits still kept per person',
+        ['COOLDOWN_MS', 'HARVEST_COOLDOWN_MS'].every(function (k) { return named[k]; }));
+    const stockWaits = ['function fish(', 'function game('].filter(function (h) {
+      const body = fnBody(code, h);
+      return !!body && /stock\.left\(refrId,\s*span\)/.test(body) && !/cooldownLeft\(|lastUse\.get\(/.test(body);
+    });
+    yes('C2 and the rivers and the racks wait on the shared stock, not on lastUse (' + stockWaits.length + ' of 2)',
+        stockWaits.length === 2);
     const longestBody = fnBody(code, 'function longestWaitMs(');
     const missing = list.filter(function (k) {
       return !longestBody || !new RegExp('\\b' + k + '\\b').test(longestBody);
