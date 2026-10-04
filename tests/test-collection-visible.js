@@ -77,13 +77,13 @@ yes('it is built on the card that has the Open the collection button',
 
 // ---- the note above Play ---------------------------------------------------
 yes('there is a flag for the note', SHELL.indexOf('static bool collectionNoteUp = false;') > 0);
-const unc = SHELL.slice(SHELL.indexOf('static bool CollectionUnconfirmed()'));
-yes('CollectionUnconfirmed exists', SHELL.indexOf('static bool CollectionUnconfirmed()') > 0);
+const unc = SHELL.slice(SHELL.indexOf('static bool CollectionUnconfirmed(int revision = -1)'));
+yes('CollectionUnconfirmed exists', unc.length < SHELL.length);
 yes('it is only true when CollectionProblem found nothing and the revision is unreadable',
-    /if \(CollectionProblem\(\)\.Length > 0\) return false;/.test(unc.slice(0, 800)) &&
-    /return Checks\.CollectionRevision\(cfg\) <= 0;/.test(unc.slice(0, 800)));
+    /if \(CollectionProblem\(revision\)\.Length > 0\) return false;/.test(unc.slice(0, 800)) &&
+    /return revision <= 0;/.test(unc.slice(0, 800)));
 
-const noteAt = SHELL.indexOf('bool unsure = CollectionUnconfirmed();');
+const noteAt = SHELL.indexOf('bool unsure = CollectionUnconfirmed(collectionRevision);');
 yes('DrawStatus asks it', noteAt > 0);
 const note = noteAt > 0 ? SHELL.slice(noteAt, SHELL.indexOf('// Wrong Skyrim build', noteAt)) : '';
 yes('the note says the mods could not be confirmed', note.indexOf('Your mods could not be confirmed') >= 0);

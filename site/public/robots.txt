@@ -1,10 +1,13 @@
 # Thornswood. The public pages are meant to be found. Nothing behind them is.
 User-agent: *
+Allow: /
 Disallow: /hub
 Disallow: /api/
 Disallow: /auth/
 Disallow: /up/
 Disallow: /file/
+Disallow: /feed/
+Disallow: /feed-dev/
 Disallow: /uploads
 Disallow: /inbox
 Disallow: /linked
@@ -15,3 +18,4 @@ Disallow: /testthese
 Disallow: /suggestions
 Disallow: /link
 Disallow: /.well-known/
+Sitemap: https://thornswood.net/sitemap.xml
