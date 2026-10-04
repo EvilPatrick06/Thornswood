@@ -32,8 +32,10 @@ const { spawn } = require('child_process');
 const CR = String.fromCharCode(13);
 const SRC = path.join(REPO_DIR, 'site', 'server.js');
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
-const HOME = fs.readFileSync(path.join(REPO_DIR, 'site', 'public', 'home.html'), 'utf8')
+// The report form and its request handler moved out of home.html in #1474.
+const HOME = fs.readFileSync(path.join(REPO_DIR, 'site', 'public', 'home.js'), 'utf8')
   .split(CR).join('');
+const HOME_CSS = fs.readFileSync(path.join(REPO_DIR, 'site', 'public', 'home.css'), 'utf8');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -193,7 +195,8 @@ if (lib) {
 // ---------------------------------------------------------------- page --
 yes('the form carries the hidden field', /id="rHome" name="homepage"/.test(HOME));
 yes('out of the tab order, so a keyboard never lands on it', /id="rHome"[^>]*tabindex="-1"/.test(HOME));
-yes('and hidden from a screen reader', /aria-hidden="true" style="position:absolute;left:-10000px/.test(HOME));
+yes('and hidden from a screen reader', /<div[^>]*aria-hidden="true"[^>]*class="hp-trap"[^>]*><label for="rHome"/.test(HOME));
+yes('and the honeypot still sits off the visible page', /\.hp-trap\s*\{[^}]*position:\s*absolute[^}]*left:\s*-10000px/.test(HOME_CSS));
 yes('and the page sends it', /homepage: document\.getElementById\('rHome'\)\.value/.test(HOME));
 yes('the page shows the site\'s own sentence when a report is refused',
     /(said\.textContent = |finish\()res\.j\.error \|\|/.test(HOME));
