@@ -80,8 +80,19 @@ captain variants are not made. Their references are in
 
 ## Where this is
 
-The Accord is on the site. The building is in the world as a place
-that can be claimed like any other door, and nothing yet reserves it
-for an office, caps a roll at 20, or counts the 6. Solitude's box
-and board already exist and are the hold's. Imperial gear is still
-in the crafting lists and still in the world.
+The Accord is on the site. Which building in Solitude is the embassy
+is not settled yet, so none is until an admin opens its door and says
+`/embassy here`. From then on `/claim` at its doors answers that
+the embassy is held, a deed presented there takes nothing, and a
+steward's `/evict` there is refused. A building somebody holds is not
+taken that way: the steward ends that claim first.
+
+An admin writes the roll: `/embassy add` a name, with `armed` to mark
+them, and `arm`, `disarm` and `remove`. The 21st name is refused and
+the 7th armed mark is refused, whatever the file on the server says.
+`/embassy` tells anybody whether they are on it. The Ambassador is
+still a title and not a command.
+
+Solitude's box and board are the hold's, and nothing makes one for the
+embassy. Imperial and Penitus gear is made only by somebody on the
+roll, and the world does not hand it out.
