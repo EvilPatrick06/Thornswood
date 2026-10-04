@@ -28,7 +28,10 @@ const CR = String.fromCharCode(13);
 const read = (p) => fs.readFileSync(path.join(REPO_DIR, p), 'utf8').split(CR).join('');
 const publisher = read('scripts/release/Publish-Installer.ps1');
 const server = read(path.join('site', 'server.js'));
-const page = read(path.join('site', 'public', 'home.html'));
+// The page is home.html and the script that builds it, which moved out of
+// home.html into home.js in #1479. The downloads builder and esc are in the
+// script; the words people read are in either.
+const page = read(path.join('site', 'public', 'home.html')) + '\n' + read(path.join('site', 'public', 'home.js'));
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -189,7 +192,9 @@ async function main() {
     function render(payload) {
       let html = null;
       const fetch = () => Promise.resolve({ json: () => payload });
-      new Function('fetch', 'show', 'esc', body)(fetch, (h) => { html = h; }, esc);
+      // The builder asks through request(), the page's fetch with a time
+      // limit (#1585); here both answer with the same payload.
+      new Function('fetch', 'request', 'show', 'esc', body)(fetch, fetch, (h) => { html = h; }, esc);
       return new Promise((r) => setImmediate(() => r(html || '')));
     }
     const H = sha(Buffer.from('thornswood'));
