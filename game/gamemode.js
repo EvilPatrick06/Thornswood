@@ -5730,6 +5730,9 @@ mp.onDeath = guard('onDeath', function (actorId, killerId) {
     try {
       var blowBy = globalThis.__thornswoodManeuvers;
       if (blowBy && blowBy.killerOf) { killerId = blowBy.killerOf(actorId) || killerId; }
+      // The same for a skill perk's extra blow (#1385).
+      var perkBy = globalThis.__thornswoodPerks;
+      if (!killerId && perkBy && perkBy.killerOf) { killerId = perkBy.killerOf(actorId) || killerId; }
     } catch (eBlow) { }
   }
   let npcDeath = false;
@@ -28235,6 +28238,15 @@ log('gamemode loaded:',
           if (dvid) devRoleIds[dvid] = true;
         }
       }
+      // The trading company's Discord role (#1393), from the same answer.
+      // An application like a Jarl's: asked for in Discord, given by a person.
+      var companyIds = {};
+      if (Array.isArray(doc.companyProfiles)) {
+        for (var co = 0; co < doc.companyProfiles.length; co++) {
+          var coid = Number(doc.companyProfiles[co]);
+          if (coid) companyIds[coid] = true;
+        }
+      }
       var accounts = {};
       if (Array.isArray(doc.people)) {
         for (var pe = 0; pe < doc.people.length; pe++) {
@@ -28246,7 +28258,7 @@ log('gamemode loaded:',
           }
         }
       }
-      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, jarlIds: jarlIds, staffRoleIds: staffRoleIds, devRoleIds: devRoleIds, businessIds: businessIds, factionIds: factionIds, accounts: accounts, count: Object.keys(ids).length };
+      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, jarlIds: jarlIds, staffRoleIds: staffRoleIds, devRoleIds: devRoleIds, businessIds: businessIds, factionIds: factionIds, companyIds: companyIds, accounts: accounts, count: Object.keys(ids).length };
     } catch (e) {
       list = null;
     }
@@ -28309,6 +28321,16 @@ log('gamemode loaded:',
 (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodIsJarl = function (profileId) {
     var l = load();
     return passProved(profileId) && !!(l && l.jarlIds && l.jarlIds[Number(profileId)]);
+  };
+
+  /*
+    The Free Skyrim Trading Company's Discord role on the account (#1393).
+    Accepted on an application in Discord, the same shape as a Jarl's. It is
+    what lets a character handle a company sale, in the property block.
+  */
+  (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodIsCompany = function (profileId) {
+    var l = load();
+    return passProved(profileId) && !!(l && l.companyIds && l.companyIds[Number(profileId)]);
   };
 
   /*
@@ -28549,6 +28571,7 @@ log('gamemode loaded:',
       businessOwnerProfiles: merged(doc.businessOwnerProfiles, had.businessOwnerProfiles),
       factionOwnerProfiles: merged(doc.factionOwnerProfiles, had.factionOwnerProfiles),
       devRoleProfiles: merged(doc.devRoleProfiles, had.devRoleProfiles),
+      companyProfiles: merged(doc.companyProfiles, had.companyProfiles),
       people: people
     };
   }
@@ -28661,6 +28684,7 @@ log('gamemode loaded:',
             doc.businessOwnerProfiles = kept.businessOwnerProfiles;
             doc.factionOwnerProfiles = kept.factionOwnerProfiles;
             doc.devRoleProfiles = kept.devRoleProfiles;
+            doc.companyProfiles = kept.companyProfiles;
             doc.people = kept.people;
             note(doc.failedProfiles.length + ' profiles could not be checked with Discord ' +
                  'and keep the standing they had' +
@@ -28679,6 +28703,10 @@ log('gamemode loaded:',
               businessOwnerProfiles: Array.isArray(doc.businessOwnerProfiles) ? doc.businessOwnerProfiles : [],
               factionOwnerProfiles: Array.isArray(doc.factionOwnerProfiles) ? doc.factionOwnerProfiles : [],
               devRoleProfiles: Array.isArray(doc.devRoleProfiles) ? doc.devRoleProfiles : [],
+              // The Free Skyrim Trading Company's role (#1393), for a
+              // company sale. Without this line the door read a list it
+              // never wrote.
+              companyProfiles: Array.isArray(doc.companyProfiles) ? doc.companyProfiles : [],
               people: doc.people || [],
               // Staff bans with why and until (#412), from the site's own
               // file rather than Discord, so they are fresh even when the
@@ -30892,6 +30920,32 @@ log('gamemode loaded:',
     },
 
     /*
+      WHAT A FILLED PERK PUTS ON THE SAME MAP (#1385). docs/systems/skill-tree.md.
+
+      Two of the fifteen perks are a number the client already knows how to
+      set, so they ride the totals treeApplies sends, on top of the points that
+      filled them. Everything else a filled perk does is in the skill perks
+      block, after the character block, because it is something that happens
+      rather than a number that stands. Font of Magic rides the same map for
+      its 15 seconds, but out of that block (withPerks in the character
+      block), because it is a number that stands only while it runs.
+
+        windwalker     Windwalker, +4 speed. add: on top of Agility's own.
+        purifiedblood  Purified Blood: disease does not take, and poison deals
+                       25%. The game's own resistances, brought UP TO what the
+                       page says: DiseaseResist 100 is no disease at all, and
+                       PoisonResist 75 is poison dealing a quarter. upTo, not
+                       add, so Toughness's own five points are not counted a
+                       second time and the per point numbers above stay the
+                       only per point numbers. What the race already resists
+                       still comes on top, as far as the game lets it.
+    */
+    perkApplies: {
+      windwalker:    { add: { speedMult: 4 } },
+      purifiedblood: { upTo: { diseaseResist: 100, poisonResist: 75 } }
+    },
+
+    /*
       FARMING, AND EVERY ONE OF THESE NUMBERS IS INVENTED.
 
       Patrick, 20 September: 'there is no system for claiming plots for farming,
@@ -31190,6 +31244,19 @@ log('gamemode loaded:',
       for (var what in per) {
         if (!own(per, what)) { continue; }
         out[what] = (own(out, what) ? out[what] : 0) + per[what] * n;
+      }
+    }
+
+    // What a filled perk adds (#1385), out of TUNING.perkApplies.
+    var filled = perks(s);
+    for (var f = 0; f < filled.length; f++) {
+      var pa = own(TUNING.perkApplies, filled[f]) ? TUNING.perkApplies[filled[f]] : null;
+      if (!pa) { continue; }
+      for (var ak in (pa.add || {})) {
+        if (own(pa.add, ak)) { out[ak] = (own(out, ak) ? out[ak] : 0) + pa.add[ak]; }
+      }
+      for (var uk in (pa.upTo || {})) {
+        if (own(pa.upTo, uk) && !(out[uk] >= pa.upTo[uk])) { out[uk] = pa.upTo[uk]; }
       }
     }
 
@@ -35644,6 +35711,74 @@ log('gamemode loaded:',
   }
 
   /*
+    COIN OFF A HOLD'S LEDGER (#1393), deposit's other half.
+
+    Only the payouts docs/systems/trading-company.md names take coin off a
+    ledger: a haul's pay to its hauler, and a haul's pay back to its poster.
+    A letter's 15 is the other, and payHeld pays that. The caller puts the
+    same count back into a pack in the same step (payOut), so the coin was
+    already in the world: this counts it off, and creates nothing.
+
+    HELD PAY STAYS ON THE LEDGER. An open letter's 15 (#1374: letter, not
+    down, pay above 0) and an open haul's pay are counted here until they
+    are paid or handed back, and so is a haul's gold owed to somebody who was
+    away when it came down (owed, see handHaul). A withdrawal never takes
+    them: what is left after it is never less than what is still held, so a
+    courier or a hauler is never refused because the ledger was spent.
+    `releasing` is the one letter or haul on this hold's board whose own held
+    gold this is, so paying a haul out of its own pay is not refused for
+    being held, and never more than it holds.
+
+    mayWithdraw answers why not, or '' when it may. withdraw takes it off
+    and answers true, or false with nothing changed.
+  */
+  /** What one notice holds on its ledger: an open letter's or haul's pay, or a haul's owed gold. */
+  function noticeHolds(x) {
+    if (!x || !(x.letter || x.haul)) { return 0; }
+    var owed = x.haul ? (Math.floor(Number(x.owed)) || 0) : 0;
+    if (owed > 0) { return owed; }
+    if (x.down) { return 0; }
+    var pay = Math.floor(Number(x.pay)) || 0;
+    return pay > 0 ? pay : 0;
+  }
+
+  function heldOn(hold, releasing) {
+    var list = notices[hold] || [];
+    var held = 0;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] !== releasing) { held += noticeHolds(list[i]); }
+    }
+    return held;
+  }
+
+  function mayWithdraw(hold, amount, releasing) {
+    var key = String(hold || '').toLowerCase();
+    var n = Number(amount);
+    if (LEDGER_HOLDS.indexOf(key) < 0) { return 'that is not one of the ten ledgers.'; }
+    if (!Number.isInteger(n) || n <= 0) { return 'that is not a whole number of gold.'; }
+    if (releasing) {
+      if ((notices[key] || []).indexOf(releasing) < 0 || !noticeHolds(releasing)) { return 'that is not held on ' + key + '\'s ledger.'; }
+      if (n > noticeHolds(releasing)) { return 'that is more than it holds.'; }
+    }
+    var have = Number(funds[key]) || 0;
+    var held = heldOn(key, releasing || null);
+    if (have - n < held) {
+      return key + '\'s ledger has ' + have + ' gold, and ' + held + ' of it is held for letters and hauls.';
+    }
+    return '';
+  }
+
+  function withdraw(hold, amount, reason, releasing) {
+    if (mayWithdraw(hold, amount, releasing)) { return false; }
+    var key = String(hold).toLowerCase();
+    var n = Number(amount);
+    funds[key] = (Number(funds[key]) || 0) - n;
+    save();
+    plog(n, 'gold off', key + '\'s ledger:', String(reason || 'no reason given'));
+    return true;
+  }
+
+  /*
     ------------------------------------------------------------------- rent
 
     A rented property is the same claim with an amount and a clock. The server
@@ -36577,10 +36712,11 @@ log('gamemode loaded:',
           job: !!n.job,
           letter: !!n.letter,
           name: n.name || 'somebody',
-          text: n.letter ? sealed(n) : (n.text || ''),
+          text: n.letter ? sealed(n) : (n.haul ? haulText(n) : (n.text || '')),
           taken: n.taken ? (n.takenName || 'somebody') : '',
           mine: Number(n.by) === Number(profileId),
-          held: !!(n.job && Number(n.taken) === Number(profileId))
+          held: !!(n.job && Number(n.taken) === Number(profileId)),
+          haul: !!n.haul
         });
       }
       for (var h in notices) {
@@ -36589,9 +36725,40 @@ log('gamemode loaded:',
         for (var j = 0; j < rows.length; j++) {
           var job = rows[j];
           if (job.job && Number(job.taken) === Number(profileId) && !job.down) {
-            mine.push({ hold: h, n: j + 1, text: job.letter ? sealed(job) : (job.text || ''),
+            mine.push({ hold: h, n: j + 1, text: job.letter ? sealed(job) : (job.haul ? haulText(job) : (job.text || '')),
                         name: job.name || 'somebody' });
           }
+        }
+      }
+    }
+    /*
+      THE HAUL'S TWO BUTTONS (#1393). Send a haul needs the towns it can go
+      to, every board but this one. Confirm needs the hauls that came here:
+      taken, not down, and for the person who posted it or a steward, the
+      two confirmHaul lets through. A steward also takes a haul down from
+      the wall, which unpin lets them do.
+    */
+    var steward = here && isSteward(profileId, actorId);
+    var dests = [];
+    var arrivals = [];
+    if (here) {
+      for (var d = 0; d < LEDGER_HOLDS.length; d++) {
+        var to = LEDGER_HOLDS[d];
+        if (to === hold || !Object.prototype.hasOwnProperty.call(boards, to)) { continue; }
+        dests.push({ hold: to, where: (boards[to] && boards[to].where) || to });
+      }
+      for (var f = 0; f < LEDGER_HOLDS.length; f++) {
+        var from = LEDGER_HOLDS[f];
+        var sent = notices[from] || [];
+        for (var a = 0; a < sent.length; a++) {
+          var hl = sent[a];
+          if (!hl || !hl.haul || hl.down || hl.dest !== hold || !hl.taken) { continue; }
+          if (Number(hl.by) !== Number(profileId) && !steward) { continue; }
+          if (Number(hl.taken) === Number(profileId)) { continue; }
+          var hp = Math.floor(Number(hl.pay)) || 0;
+          arrivals.push({ from: from, where: (boards[from] && boards[from].where) || from,
+                          n: a + 1, name: hl.name || 'somebody', text: hl.text || '',
+                          hauler: hl.takenName || 'somebody', pay: hp, kept: haulTenth(hp) });
         }
       }
     }
@@ -36614,7 +36781,10 @@ log('gamemode loaded:',
       paid: Number(funds[hold]) || 0,
       wall: wall,
       jobs: mine,
-      submit: submit
+      submit: submit,
+      steward: steward,
+      dests: dests,
+      arrivals: arrivals
     };
   }
 
@@ -36868,7 +37038,7 @@ log('gamemode loaded:',
       if (n.down) { continue; }
       lines.push('[' + (i + 1) + '] ' + (n.letter
         ? 'letter for ' + n.to + ', from ' + n.name + (n.taken ? ', taken by ' + n.takenName : '')
-        : (n.job ? (n.taken ? 'job, taken: ' : 'job: ') : '') + n.name + ': ' + n.text));
+        : (n.job ? (n.taken ? 'job, taken: ' : 'job: ') : '') + n.name + ': ' + (n.haul ? haulText(n) : n.text)));
       shown++;
     }
     var more = up > shown
@@ -36941,6 +37111,15 @@ log('gamemode loaded:',
       refreshPanel(actorId);
       return true;
     }
+    if (n.haul) {
+      var tenth = haulTenth(n.pay);
+      plog(who, 'took a haul in', hold, 'to', n.dest + ':', n.text);
+      toProfile(profileId, 'You take the haul to ' + n.dest + ': ' + n.text + '. At ' + n.dest + '\'s board, ' +
+                n.name + ' or a steward confirms it on the board, and ' +
+                (n.pay - tenth) + ' gold is yours. The company keeps ' + tenth + '.');
+      refreshPanel(actorId);
+      return true;
+    }
     plog(who, 'took a job in', hold + ':', n.text);
     toProfile(profileId, 'You take it: ' + n.text + '. Go and see ' + n.name + ' about it.');
     refreshPanel(actorId);
@@ -36957,7 +37136,8 @@ log('gamemode loaded:',
         var n = list[i];
         if (n.job && n.taken === profileId && !n.down) {
           lines.push(hold + ': ' + (n.letter ? sealed(n) + ', from ' + n.name
-                                             : n.text + ' (for ' + n.name + ')'));
+                                             : (n.haul ? '[' + (i + 1) + '] ' + haulText(n) : n.text) +
+                                               ' (for ' + n.name + ')'));
         }
       }
     }
@@ -36985,6 +37165,13 @@ log('gamemode loaded:',
       toProfile(profileId, 'That is not one of yours.');
       return true;
     }
+    /*
+      A HAUL DROPPED IS A HAUL ENDED, #1393. docs/systems/trading-company.md:
+      on a drop the pay returns to the poster's pack and the ledger goes down
+      by that pay, and the fee stays. A haul with its pay gone cannot sit on
+      the board for somebody else, so it comes down.
+    */
+    if (n.haul) { return cancelHaul(hold, at, n, 'drop', actorId, profileId, toProfile); }
     n.taken = 0;
     n.takenName = null;
     save();
@@ -37049,13 +37236,23 @@ log('gamemode loaded:',
       toProfile(profileId, 'That one is already down.');
       return true;
     }
-    if (n.by !== profileId) {
+    /*
+      A STEWARD CANCELS A HAUL, #1393, open or taken, at the board it was
+      posted on. The pay goes back to the poster and the fee stays, the same
+      as the poster's own /unpin before anybody has taken it.
+    */
+    var stewardHaul = !!n.haul && isSteward(profileId, actorId);
+    if (n.by !== profileId && !stewardHaul) {
       toProfile(profileId, 'That is not yours to take down.');
       return true;
     }
-    if (n.job && n.taken) {
+    if (n.job && n.taken && !stewardHaul) {
       toProfile(profileId, n.takenName + ' has taken that job. It can come down once they hand it back.');
       return true;
+    }
+    if (n.haul) {
+      return cancelHaul(hold, at, n, Number(n.by) === Number(profileId) ? 'own' : 'steward',
+                        actorId, profileId, toProfile);
     }
     /*
       A LETTER'S PAY COMES BACK, #1374. The board fee stays, like any
@@ -37261,6 +37458,391 @@ log('gamemode loaded:',
     } catch (e2) { return false; }
   }
 
+  /*
+    ------------------------------------------------------------- a haul
+
+    NOBODY TYPES THESE. Patrick, 4 Oct: no chat commands for anything people
+    do, only buttons and GUI. The board panel (game/ui/thornswood-board.js)
+    sends them, the way it sends /job and /take:
+
+        /haul 80 riften a crate of iron ingots    Send a haul, at the board it leaves from
+        /haul done whiterun 4                     Confirm, at the board it went to
+
+    so /haul is in WORDS and kept out of PLAYER_WORDS, and nothing a person
+    reads names it.
+
+    #1393, as docs/systems/trading-company.md has it. A haul is a job on a
+    board with a pay and a destination hold. Posting it takes the job fee,
+    30, and the pay in full, never halved, and both go onto the posting
+    hold's ledger. The pay is held there the way a letter's 15 is, until the
+    haul is confirmed or taken down.
+
+    /take and /jobs treat it as any job. It comes down before it is delivered
+    three ways, and each hands the pay back out of the ledger to the poster
+    and keeps the fee (cancelHaul): the hauler's /dropjob, the poster's /unpin
+    before anybody has taken it, and a steward's /unpin at the posting board,
+    open or taken. Nothing was delivered, so the company keeps no tenth.
+
+    On a confirm, by the poster or a steward, standing at the board the haul
+    named, the company keeps a tenth of the pay, rounded down, and nothing
+    under 10 gold. The hauler is handed the rest out of the ledger, so the
+    ledger drops by what the hauler received and keeps the fee and the tenth.
+    It is the poster's gold moving, never new gold.
+
+    AN ORDINARY JOB IS NOT A HAUL. A confirm answers only a job posted as a
+    haul, and the taker of an ordinary job is still paid nothing by the
+    server.
+
+    SOMEBODY AWAY IS PAID WHEN THEY ARE BACK. The server hands gold to a pack,
+    and a pack is written only while its owner is in the world. When the
+    hauler on a confirm, or the poster on a drop or a steward's cancel, is
+    away, the haul still comes down, and what is theirs stays held on the
+    ledger as owed to them (handHaul). haulTick hands it over the next time
+    they are in the world, the way a bed's takings wait for a holder who is
+    away (#1392). Nothing else can spend it in the meantime.
+  */
+  var HAUL_TENTH_FROM = 10;
+  var HAUL_EVERY_MS = 5000;
+
+  /** The company's tenth of a pay: rounded down, and nothing under 10. */
+  function haulTenth(pay) {
+    var p = Math.floor(Number(pay)) || 0;
+    return p < HAUL_TENTH_FROM ? 0 : Math.floor(p / 10);
+  }
+
+  /** A haul's line on the wall, the panel and /jobs: where it goes and the pay. */
+  function haulText(n) {
+    return 'haul to ' + n.dest + ' for ' + (Math.floor(Number(n.pay)) || 0) + ' gold: ' + (n.text || '');
+  }
+
+  /* What a person is told when the panel's line is short of something. */
+  var HAUL_HOW = 'A haul is sent from the notice board: click the board, and fill in Send a haul. ' +
+                 'It is confirmed on the board of the hold it went to.';
+
+  function haulCmd(parts, actorId, profileId, toProfile) {
+    var first = (parts && parts.length > 1) ? String(parts[1]).trim().toLowerCase() : '';
+    if (first === 'done') { return confirmHaul(parts, actorId, profileId, toProfile); }
+    if (!first) {
+      toProfile(profileId, HAUL_HOW);
+      return true;
+    }
+    return postHaul(parts, actorId, profileId, toProfile);
+  }
+
+  function postHaul(parts, actorId, profileId, toProfile) {
+    var hold = boardHere(actorId);
+    if (!hold) {
+      toProfile(profileId, 'Stand at the board of the hold you are sending from to post a haul.');
+      return true;
+    }
+    var word = String(parts[1] || '').trim();
+    var pay = /^\d+$/.test(word) ? Number(word) : 0;
+    if (!(pay > 0) || !Number.isSafeInteger(pay)) {
+      toProfile(profileId, 'The pay is a whole number of gold, above nothing. ' + HAUL_HOW);
+      return true;
+    }
+    var dest = String(parts[2] || '').trim().toLowerCase();
+    if (LEDGER_HOLDS.indexOf(dest) < 0 || !Object.prototype.hasOwnProperty.call(boards, dest)) {
+      toProfile(profileId, 'A haul goes to one of the ten towns: ' + LEDGER_HOLDS.join(', ') + '.');
+      return true;
+    }
+    if (dest === hold) {
+      toProfile(profileId, 'A haul goes from one hold to another, and this is ' + hold + '\'s board.');
+      return true;
+    }
+    var text = parts.slice(3).join(' ').trim();
+    if (!text) {
+      toProfile(profileId, 'Say what it carries. ' + HAUL_HOW);
+      return true;
+    }
+    var cost = JOB_FEE + pay;
+    if (!Number.isSafeInteger(cost) || !takeGold(actorId, cost)) {
+      toProfile(profileId, 'That costs ' + cost + ' gold, ' + JOB_FEE + ' for the board and the ' + pay +
+                ' pay, and you do not have it. Nothing was taken.');
+      return true;
+    }
+    var who = 'somebody';
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      if (ap && ap.name) { who = String(ap.name); }
+    } catch (e) { }
+    if (!notices[hold]) { notices[hold] = []; }
+    notices[hold].push({ by: profileId, name: who, text: text, at: Date.now(),
+                         job: true, haul: true, dest: dest, pay: pay, taken: 0 });
+    // deposit saves the notice with the coin, so the two cannot part.
+    if (!deposit(hold, cost, 'a haul to ' + dest + ': the ' + JOB_FEE + ' fee, and ' + pay + ' pay held')) {
+      notices[hold].pop();
+      payOut(actorId, cost);
+      toProfile(profileId, 'That did not work. Nothing was taken.');
+      return true;
+    }
+    plog(who, 'posted a haul in', hold, 'to', dest, 'for', pay, 'gold and the', JOB_FEE, 'fee');
+    toProfile(profileId, 'Your haul to ' + dest + ' is on the board in ' + hold + ', number ' +
+              notices[hold].length + '. That cost ' + cost + ' gold: ' + JOB_FEE + ' for the board, and the ' +
+              pay + ' pay, held until it is confirmed at ' + dest + '.');
+    refreshPanel(actorId);
+    return true;
+  }
+
+  function confirmHaul(parts, actorId, profileId, toProfile) {
+    var standing = boardHere(actorId);
+    if (!standing) {
+      toProfile(profileId, 'Stand at the board of the hold the haul went to.');
+      return true;
+    }
+    var from = String(parts[2] || '').trim().toLowerCase();
+    var num = Number(parts[3] || 0);
+    if (LEDGER_HOLDS.indexOf(from) < 0 || !Number.isInteger(num) || num < 1) {
+      toProfile(profileId, 'That haul is not on any board. ' + HAUL_HOW);
+      return true;
+    }
+    var at = num - 1;
+    var n = (notices[from] || [])[at];
+    if (!n) {
+      toProfile(profileId, 'There is no number ' + num + ' on ' + from + '\'s board.');
+      return true;
+    }
+    if (!n.haul) {
+      toProfile(profileId, 'That is not a haul. What an ordinary job is worth is between the two people, ' +
+                'and the server pays nothing for it.');
+      return true;
+    }
+    if (n.down) {
+      toProfile(profileId, 'That haul is already paid or taken down.');
+      return true;
+    }
+    if (standing !== n.dest) {
+      toProfile(profileId, 'That haul goes to ' + n.dest + '. It is confirmed at ' + n.dest + '\'s board.');
+      return true;
+    }
+    if (Number(n.by) !== Number(profileId) && !isSteward(profileId, actorId)) {
+      toProfile(profileId, 'Only the person who posted it, or a steward, confirms a haul.');
+      return true;
+    }
+    if (!n.taken) {
+      toProfile(profileId, 'Nobody has taken that haul.');
+      return true;
+    }
+    if (Number(n.taken) === Number(profileId)) {
+      toProfile(profileId, 'The hauler does not confirm their own haul. The person who posted it, or a steward, does.');
+      return true;
+    }
+    var pay = Math.floor(Number(n.pay)) || 0;
+    var tenth = haulTenth(pay);
+    var got = pay - tenth;
+    var r = handHaul(from, n, Number(n.taken), got,
+                     'haul ' + num + ' to ' + n.dest + ' delivered, ' + tenth + ' kept for the company', 'hauled');
+    if (r.why) {
+      plog('a haul in', from, 'could not be paid:', r.why);
+      toProfile(profileId, 'That did not work: ' + r.why + ' Nothing was paid.');
+      return true;
+    }
+    n.paid = got;
+    n.kept = tenth;
+    n.done = Date.now();
+    n.doneBy = profileId;
+    takedown(from, at, profileId);
+    var hauled = n.takenName || 'The hauler';
+    var kept = tenth ? ', and the company keeps ' + tenth + '.' : '. Under 10 gold, the company keeps nothing.';
+    if (r.owed) {
+      plog(hauled, 'is owed', got, 'for a haul from', from, 'to', n.dest, 'and the company kept', tenth);
+      toProfile(profileId, 'The haul from ' + from + ' is in: ' + n.text + '. ' + hauled + ' is away, so the ' + got +
+                ' gold is held on ' + from + '\'s ledger for them until they are next in the world' + kept);
+    } else {
+      plog(hauled, 'was paid', got, 'for a haul from', from, 'to', n.dest, 'and the company kept', tenth);
+      toProfile(profileId, 'The haul from ' + from + ' is in: ' + n.text + '. ' + hauled + ' is paid ' + got +
+                ' gold out of ' + from + '\'s ledger' + kept);
+      toProfile(n.taken, 'Your haul to ' + n.dest + ' is confirmed. ' + got + ' gold is in your pack.' +
+                (tenth ? ' The company kept ' + tenth + '.' : ''));
+    }
+    if (Number(n.by) !== Number(profileId)) {
+      toProfile(n.by, 'Your haul to ' + n.dest + ' was confirmed by a steward. ' + hauled + ' ' +
+                (r.owed ? 'is owed ' : 'was paid ') + got + '.');
+    }
+    refreshPanel(actorId);
+    if (r.to) { refreshPanel(r.to); }
+    return true;
+  }
+
+  /*
+    A haul's held gold to one person: `amount` of what n holds on `hold`'s
+    ledger, to the profile `toPid`. In the world, it goes into their pack now
+    and the same comes off the ledger. Away, nothing leaves the ledger: n holds
+    it as owed to them, and haulTick hands it over when they are next in the
+    world. Either way n.pay is 0 after, so the haul is paid once. `owedFor` is
+    'hauled' or 'back', for the line they read then.
+
+    Answers { why } with nothing changed when it cannot, otherwise { owed } and
+    the actor it was paid to, { to }.
+  */
+  function handHaul(hold, n, toPid, amount, reason, owedFor) {
+    var why = mayWithdraw(hold, amount, n);
+    if (why) { return { why: why }; }
+    var to = onlineActorOf(toPid);
+    if (!to) {
+      n.pay = 0;
+      n.owed = amount;
+      n.owedTo = toPid;
+      n.owedFor = owedFor;
+      save();
+      plog(amount, 'gold held on', hold + '\'s ledger for', toPid, 'until they are in the world:', reason);
+      return { owed: true, to: 0 };
+    }
+    if (!payOut(to, amount)) { return { why: 'their pack could not be written.' }; }
+    withdraw(hold, amount, reason, n);
+    n.pay = 0;
+    return { owed: false, to: to };
+  }
+
+  /*
+    What a haul owes somebody who was away, into their pack now they are in
+    the world, and off the ledger it was held on. A ledger that cannot pay it
+    is written to the log once a boot, and the gold stays held.
+  */
+  var haulShort = {};
+  function haulTick() {
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
+    if (!online.length) { return; }
+    var here = {};
+    for (var i = 0; i < online.length; i++) {
+      var pid = profileOf(online[i]);
+      if (pid) { here[pid] = online[i]; }
+    }
+    for (var h = 0; h < LEDGER_HOLDS.length; h++) {
+      var hold = LEDGER_HOLDS[h];
+      var list = notices[hold] || [];
+      for (var j = 0; j < list.length; j++) {
+        var n = list[j];
+        var owed = (n && n.haul) ? (Math.floor(Number(n.owed)) || 0) : 0;
+        if (!(owed > 0) || !here[Number(n.owedTo)]) { continue; }
+        var to = here[Number(n.owedTo)];
+        var why = mayWithdraw(hold, owed, n);
+        if (why) {
+          if (!haulShort[hold + ':' + j]) {
+            haulShort[hold + ':' + j] = true;
+            plog('haul', j + 1, 'in', hold, 'owes', owed, 'and cannot pay it:', why);
+          }
+          continue;
+        }
+        if (!payOut(to, owed)) { continue; }
+        withdraw(hold, owed, 'haul ' + (j + 1) + ' to ' + n.dest + ', held for somebody who was away', n);
+        n.owed = 0;
+        save();
+        var line = n.owedFor === 'hauled'
+          ? 'While you were away, your haul to ' + n.dest + ' was confirmed. ' + owed + ' gold is in your pack.' +
+            ((Number(n.kept) || 0) ? ' The company kept ' + n.kept + '.' : '')
+          : 'While you were away, your haul to ' + n.dest + ' came down. The ' + owed +
+            ' gold pay is back in your pack. The fee stays with ' + hold + '.';
+        plog('handed', owed, 'gold of a haul in', hold, 'to', personName(to));
+        try { notify(to, line); } catch (e2) { }
+        try { say(to, line); } catch (e3) { }
+      }
+    }
+  }
+
+  if (g.__thornswoodHaulTimer) { try { clearInterval(g.__thornswoodHaulTimer); } catch (e) { } }
+  g.__thornswoodHaulTimer = setInterval(
+    (typeof guard === 'function') ? guard('haulTick', haulTick) : haulTick, HAUL_EVERY_MS);
+
+  /*
+    A haul comes down before it is delivered: the hauler's /dropjob, the
+    poster's /unpin before anybody has taken it, or a steward's /unpin at the
+    posting board, open or taken. `how` is 'drop', 'own' or 'steward'. The
+    pay goes back out of the ledger to the poster, held for them while they
+    are away (handHaul), and the fee stays. Nothing was delivered, so the
+    company's tenth is not taken. Who may has been settled by the caller.
+  */
+  function cancelHaul(hold, at, n, how, actorId, profileId, toProfile) {
+    var pay = Math.floor(Number(n.pay)) || 0;
+    var owed = false;
+    if (pay > 0) {
+      var r = handHaul(hold, n, Number(n.by), pay,
+                       'a haul to ' + n.dest + ' taken down, the pay back to ' + n.name, 'back');
+      if (r.why) {
+        toProfile(profileId, 'That did not work: ' + r.why + ' The haul is still up' +
+                  (how === 'drop' ? ', and still yours.' : '.'));
+        return true;
+      }
+      owed = r.owed;
+    }
+    n.back = pay;
+    takedown(hold, at, profileId);
+    var later = owed ? ' when they are next in the world' : '';
+    var fee = 'The fee stays with ' + hold + '.';
+    plog(how === 'drop' ? (n.takenName || 'the hauler') + ' dropped' : (how === 'own' ? n.name : 'a steward') + ' took down',
+         'a haul to', n.dest, 'in', hold, 'and', pay, owed ? 'is held for' : 'went back to', n.name);
+    if (how === 'own') {
+      toProfile(profileId, 'You take the haul down. The ' + pay + ' gold pay comes back to you. ' + fee);
+    } else if (how === 'drop') {
+      toProfile(profileId, 'You hand the haul to ' + n.dest + ' back. It comes down, and the ' + pay +
+                ' gold pay goes back to ' + n.name + later + '. ' + fee);
+      if (!owed) {
+        toProfile(n.by, (n.takenName || 'The hauler') + ' handed your haul to ' + n.dest + ' back. The ' + pay +
+                  ' gold pay is back in your pack. ' + fee);
+      }
+    } else {
+      toProfile(profileId, 'You take ' + n.name + '\'s haul to ' + n.dest + ' down. The ' + pay +
+                ' gold pay goes back to them' + later + '. ' + fee);
+      if (!owed) {
+        toProfile(n.by, 'A steward took your haul to ' + n.dest + ' down. The ' + pay +
+                  ' gold pay is back in your pack. ' + fee);
+      }
+    }
+    if (how !== 'drop' && n.taken && Number(n.taken) !== Number(profileId)) {
+      toProfile(n.taken, 'The haul to ' + n.dest + ' you took was taken down by a steward. It is off your list.');
+    }
+    refreshPanel(actorId);
+    return true;
+  }
+
+  /*
+    ------------------------------------------- a sale out of Skyrim
+
+    #1393, docs/systems/trading-company.md "Sales that leave the world". At a
+    company event somebody sells a thing out of Skyrim. The company buys it
+    through the worker who handles the sale, and the thing leaves the world.
+    It does not come back into a chest.
+
+    IT IS A TRADE, ON THE TRADE PANEL. Patrick, 4 Oct: no chat commands for
+    anything people do. The worker and the seller open an ordinary trade with
+    the key on the look prompt, and the worker presses Buy for the company on
+    the panel. The trade block moves it (saleSwap there). These two are the
+    company's half of it: the cuts, and who may.
+
+    AN ITEM HAS NO GOLD PRICE OF ITS OWN. The price is the gold the worker
+    puts up and the two of them agree to on the panel, the way any trade is
+    agreed. Any change to either side takes both agreements back.
+
+    THE CUTS. The worker takes 10% of the price, rounded down, and another 10%
+    leaves the server. The seller receives the rest. Under 10 gold neither cut
+    is taken and the seller receives the whole price. The price comes out of
+    the worker's pack, the company's coin in their hands, and the worker's own
+    10% is never taken from it, so the worker pays the price less their cut.
+    No coin is created and none goes onto a ledger: the 10% that leaves is
+    destroyed. Where the price comes from is asked on #1393.
+
+    WHO MAY. A character on an account the company has taken on: the Discord
+    role an application in Discord leads to (__thornswoodIsCompany), or an
+    admin testing the chain, the same as a Jarl.
+  */
+  var SALE_CUT_FROM = 10;
+
+  /** A price split: the worker's 10%, the 10% that leaves, and the seller's rest. */
+  function saleCuts(price) {
+    var p = Math.floor(Number(price)) || 0;
+    if (p < SALE_CUT_FROM) { return { price: p, worker: 0, gone: 0, seller: p }; }
+    var tenth = Math.floor(p / 10);
+    return { price: p, worker: tenth, gone: tenth, seller: p - tenth - tenth };
+  }
+
+  function inCompany(profileId) {
+    var adm = g['__thornswoodIsAdmin'];
+    try { if (typeof adm === 'function' && adm(profileId)) { return true; } } catch (e) { }
+    var fn = g['__thornswoodIsCompany'];
+    try { return typeof fn === 'function' && !!fn(profileId); } catch (e2) { return false; }
+  }
+
   function command(word, parts, actorId, profileId, toProfile) {
     if (word === '/deed' || word === '/deeds') {
       return deeds(actorId, profileId, toProfile);
@@ -37292,6 +37874,7 @@ log('gamemode loaded:',
     if (word === '/unpin') { return unpin(parts, actorId, profileId, toProfile); }
     if (word === '/letter') { return postLetter(parts, actorId, profileId, toProfile); }
     if (word === '/deliver') { return deliver(parts, actorId, profileId, toProfile); }
+    if (word === '/haul') { return haulCmd(parts, actorId, profileId, toProfile); }
     return false;
   }
 
@@ -37449,6 +38032,8 @@ log('gamemode loaded:',
     isJarl: isJarl, isSteward: isSteward,
     touchedBox: touchedBox, putIn: putIn, holdOfBox: holdOfBox,
     deposit: deposit, takeGold: takeGold, LEDGER_HOLDS: LEDGER_HOLDS,
+    withdraw: withdraw, mayWithdraw: mayWithdraw, heldOn: heldOn,
+    haulTenth: haulTenth, haulTick: haulTick, saleCuts: saleCuts, inCompany: inCompany,
     holdStanding: holdStanding,
     rentDue: rentDue, funds: function () { return funds; },
     boxes: function () { return boxes; },
@@ -39856,6 +40441,28 @@ log('gamemode loaded:',
     return out;
   }
 
+  /*
+    And what a running skill perk adds while it lasts (#1385): Font of
+    Magic's 15 seconds of free spells, on each school's cost value. Folded in
+    for the same reason as the maneuvers, and asked at write time because the
+    skill perks block loads after this one.
+  */
+  function withPerks(actorId, base) {
+    var pk = g.__thornswoodPerks;
+    if (!pk || !pk.effects || !actorId) { return base; }
+    var add = pk.effects(actorId);
+    if (!add) { return base; }
+    var out = {};
+    for (var k in base) {
+      if (Object.prototype.hasOwnProperty.call(base, k)) { out[k] = base[k]; }
+    }
+    for (var av in add) {
+      if (!Object.prototype.hasOwnProperty.call(add, av)) { continue; }
+      out[av] = (Object.prototype.hasOwnProperty.call(out, av) ? out[av] : 0) + add[av];
+    }
+    return out;
+  }
+
   function needsView(actorId) {
     var n = g.__thornswoodNeeds;
     if (!n || !actorId) { return null; }
@@ -39925,6 +40532,8 @@ log('gamemode loaded:',
       creating: !!creating,
       towns: (creating && chargen) ? chargen.towns() : []
     };
+    // And a running skill perk on top of all of that (#1385): see withPerks.
+    view.effects = withPerks(actorId, view.effects);
     /*
       The recipe book, and only in the world. Creation is about choosing who
       you are, and a page counting what a half you have not picked yet could
@@ -39942,6 +40551,14 @@ log('gamemode loaded:',
       var SS = g.__thornswoodStaffSpells;
       var staff = (SS && SS.view) ? SS.view(P, s) : null;
       if (staff) { view.staff = staff; }
+      /*
+        When each filled perk that waits is ready again, and Font of Magic
+        while it runs (#1385), so the K panel can say so beside the perk. The
+        skill perks block owns the clocks and loads after this one.
+      */
+      var PKV = g.__thornswoodPerks;
+      var perkClocks = (PKV && PKV.clocks && actorId) ? PKV.clocks(actorId, s) : null;
+      if (perkClocks) { view.perkClocks = perkClocks; }
     }
     // Left out entirely when there is nothing to say, per the contract.
     var climbing = progressView(s);
@@ -40704,6 +41321,7 @@ log('gamemode loaded:',
         word === '/steward' || word === '/evict' || word === '/box' ||
         word === '/rent' || word === '/bed' || word === '/notice' || word === '/job' ||
         word === '/board' || word === '/take' || word === '/jobs' ||
+        word === '/haul' ||
         word === '/letter' || word === '/deliver' ||
         word === '/dropjob' || word === '/unpin') {
       if (!actorId) {
@@ -40812,6 +41430,29 @@ log('gamemode loaded:',
           : 'Closed. Press K to open it again.');
         return true;
       }
+      /*
+        A filled perk's Use button on the K panel (#1385): Font of Magic. The
+        skill perks block decides and keeps the clock, so nothing about the
+        character changes here. A refusal is answered like any other pick, as
+        a note about 'perk' and the same line in the chat.
+      */
+      if (what === 'perk') {
+        var PKU = g.__thornswoodPerks;
+        var used = (PKU && PKU.use) ? PKU.use(actorId, s, parts[2])
+          : { ok: false, why: 'perks are not running on this server right now' };
+        if (!used.ok) {
+          toProfile(profileId, 'No: ' + used.why + '.');
+          s.note = { text: used.why, at: Date.now(), about: 'perk' };
+          writeState(actorId, s, true);
+          clog(word, parts.slice(1).join(' '), 'for', actorId.toString(16), 'refused:', used.why);
+          return true;
+        }
+        // An earlier refusal is answered now, as an accepted pick clears it.
+        if (s.note) { s.note = null; writeState(actorId, s, true); }
+        toProfile(profileId, used.line);
+        clog(word, parts.slice(1).join(' '), 'for', actorId.toString(16), 'accepted');
+        return true;
+      }
       if (what === 'class') {
         about = 'class';
         r = P.pickClass(s, String(parts[2] || '').toLowerCase());
@@ -40914,6 +41555,18 @@ log('gamemode loaded:',
     r.state.note = null;
     var st = writeState(actorId, r.state);
     clog(word, parts.slice(1).join(' '), 'for', actorId.toString(16), 'accepted');
+
+    /*
+      A point spent says what it did when that is more than the panel shows
+      (#1385): the perk, the moment a sub-skill fills, and for Precision, that
+      the game ignores critical chance. The skill perks block words both.
+    */
+    if (about === 'spend') {
+      var PK = g.__thornswoodPerks;
+      var spentIn = String((word === '/pick' ? parts[2] : parts[1]) || '').toLowerCase();
+      var spentLine = (PK && PK.spendLine) ? PK.spendLine(st, spentIn) : '';
+      if (spentLine) { toProfile(profileId, spentLine); }
+    }
 
     /*
       A NEW FARMER GETS SEED. Patrick, 20 September: 'to make it so they can
@@ -41057,6 +41710,857 @@ log('gamemode loaded:',
   clog('ready');
 })();
 // ==== end thornswood character ====
+
+// ==== thornswood skill perks ====
+/*
+  THE FILLED PERKS OF THE SKILL TREE (#1385).
+
+  docs/systems/skill-tree.md is the table. Five points fill a sub-skill and a
+  filled one grants its perk. Which perks somebody holds is never stored: it
+  is P.perks over the tree, so the points are the whole of it. What is stored
+  is when a perk that waits may fire again, and that is this block's.
+
+  WHAT EACH ONE DOES HERE, AND WHAT THE SERVER CANNOT DO.
+    Cheat Death        NOT IN THE GAME YET. The engine ends somebody the
+                       moment a write takes health to nothing
+                       (MpActor::SetPercentages calls Kill), and Kill sends
+                       the death to every machine before mp.onDeath is asked
+                       (SendAndSetDeathState, then DeathEvent). So by the time
+                       the server hears of it you are already dead, and
+                       standing the body back up would be a death undone,
+                       which is a band-aid (Developer-Guide.md, "Fix the
+                       cause"). The engine has to ask before it kills.
+                       cheatDeath() is the answer it will get, and the clock
+                       is kept now, so that engine change is all that is left.
+    Troll's Blood      During a fight, 2 health a second, through the engine's
+                       own Actor.RestoreActorValue, so in the engine's own
+                       units, the ones every blow is dealt in. A fight is a hit
+                       landed or taken, or health falling, in the last 15
+                       seconds: the signs and the 15 seconds /stuck reads.
+    Devastating Blow   A power attack takes a quarter again of what it took,
+                       measured the way the maneuvers measure a Heavy blow.
+    Unshakeable        NOT HERE. A block that staggers you is an animation on
+                       your own machine. The server sends no such stagger and
+                       cannot stop one. It needs the client plugin.
+    Purified Blood     The game's own disease and poison resistance, through
+                       the tree's totals (TUNING.perkApplies). A disease the
+                       server itself gives asks holds(actorId, 'purifiedblood').
+    Archmage's Vessel  Once a day, magicka under a tenth is set to half.
+    Leyline Attunement While magicka is falling, which is the one sign of a
+                       cast the server holds, it comes back at half the usual
+                       rate: the race's own rate (RACE DATA, as the engine
+                       reads it) raised by the tree's Clarity, as the client
+                       raises it.
+    Overcharge         Every fifth spell of yours that takes health takes as
+                       much again. The other half, a spell that holds twice as
+                       long, is a magic effect on the machine that runs it and
+                       is NOT HERE.
+    Spellbreaker       A spell that hits you gives you a fifth of what it
+                       costs, its SPIT cost as the record carries it. A
+                       concentration spell's cost is a second of it, so it
+                       counts once a second.
+    Font of Magic      Once a day, from the Use button beside it on the K
+                       panel: for 15 seconds each school's cost value (<School>Mod, the value the game's own
+                       Fortify <School> enchantments raise, a percent off what
+                       a spell costs) is 100 more, which is the game itself
+                       making a spell free. It rides the totals map the client
+                       already applies, the way a warrior's Rush does, through
+                       effects() below and withPerks in the character block.
+                       So the game never takes the magicka at all, and a spell
+                       you could not have afforded can be cast.
+    Tireless           NOT HERE. What running and a swing cost is worked out
+                       on your own machine. It needs the client plugin.
+    Second Wind        Stamina that reaches nothing fills, once every 5
+                       minutes.
+    Windwalker         +4 speed, through the tree's totals. The fall half is
+                       NOT HERE: a fall is taken on your own machine.
+    Pack Mule          NOT HERE. Being slowed by weight is the game's own, on
+                       your machine. It needs the client plugin.
+    Lethal Aim         An arrow or a bolt takes what it would have taken
+                       against half the armour: the engine's own armour sum
+                       (TES5DamageFormula, worn ARMO and their enchantments),
+                       worked again with half of it.
+
+  PRECISION. The client puts critical chance on the character and nothing
+  reads it. The server works out every blow in TES5DamageFormula, and there is
+  no critical hit in that sum at all. So the answer to a point put in
+  Precision says so, and nothing here calls a hit a critical one.
+
+  NOTHING HERE IS A COMMAND (Patrick, 4 Oct: things people do are buttons and
+  GUI, not chat commands). Font of Magic, the one perk a person starts, is the
+  Use button beside it on the K panel. The panel sends 'skills:pick perk
+  fontofmagic', which reaches the server as /pick perk fontofmagic, the route
+  every other press on that panel travels, and no person is told to type it.
+  What a waiting perk's clock says is on the panel too: perkClocks in the
+  character block's view, out of clocks() below.
+
+  THE CLOCKS LIVE ON THE CHARACTER, in PERK_PROPERTY, and the clock is written
+  before the perk fires. A restart or a relog reads the same clock, and a
+  clock that cannot be written does not fire, so nothing fires twice. A day is
+  24 real hours from the moment it fired. Font of Magic's 15 seconds are
+  not kept: its end is a timer in memory. The day it spent is still spent.
+  The view the client last got is kept on the character, so a restart inside
+  those 15 seconds leaves the free spells on until the panel is next sent
+  (issue #1642, the same for a warrior's Rush).
+
+  EVERY TIME ONE FIRES it is a line in thornswood.log, "perks: <name> fired
+  for <actor>", which is the record the page asks for. Troll's Blood and
+  Leyline Attunement say it once a fight and once a cast, not every second.
+
+  STACKING. A Devastating Blow and a warrior's Heavy on one blow each take
+  their quarter of what the blow took before them, so they multiply. The two
+  blocks measure the same blow one after the other.
+*/
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+  var P = g.__thornswoodProgression;
+  if (!P) { console.log('[thornswood perks] the rules block is missing, nothing registered'); return; }
+
+  var PERK_PROPERTY = 'thornswoodPerks';
+  var SECOND = 1000;
+  var MINUTE = 60 * SECOND;
+  var DAY = 24 * 60 * MINUTE;
+  var FIGHT_MS = 15 * SECOND;     // the 15 seconds /stuck counts as a fight
+  var TICK_MS = 250;
+  var HELD_MS = 2000;             // how long who holds what is trusted
+
+  /*
+    The page's table, one row a perk. say is the page's own sentence; not is
+    what of it the game does not do yet, said wherever the perk is named, and
+    none marks a perk of which nothing is in the game yet.
+  */
+  var PERKS = {
+    cheatdeath:        { name: 'Cheat Death', skill: 'vitality', every: DAY, health: 1, none: true,
+                         say: 'Once a day, the blow that would kill you leaves you at 1 health.',
+                         not: 'That is not in the game yet: the engine ends you the moment health reaches nothing, before the server is asked.' },
+    trollsblood:       { name: 'Troll\'s Blood', skill: 'fortitude', perSecond: 2,
+                         say: 'During a fight, health returns at 2 a second.' },
+    devastatingblow:   { name: 'Devastating Blow', skill: 'might', more: 0.25,
+                         say: 'A power attack deals 25% more.' },
+    unshakeable:       { name: 'Unshakeable', skill: 'resilience', none: true,
+                         say: 'A block cannot stagger you.',
+                         not: 'That is not in the game yet: the stagger is played on your own machine, where the server cannot stop it.' },
+    purifiedblood:     { name: 'Purified Blood', skill: 'toughness',
+                         say: 'Disease does not take. Poison deals 25%.' },
+    archmagesvessel:   { name: 'Archmage\'s Vessel', skill: 'capacity', every: DAY, below: 0.1, to: 0.5,
+                         say: 'Drop below a tenth of magicka and it returns to half, once a day.' },
+    leylineattunement: { name: 'Leyline Attunement', skill: 'clarity', rate: 0.5,
+                         say: 'Magicka still returns while you cast, at half the usual rate.' },
+    overcharge:        { name: 'Overcharge', skill: 'potency', inEvery: 5, more: 1,
+                         say: 'One spell in five deals double, or holds twice as long.',
+                         not: 'Holding twice as long is not in the game yet: only the damage is doubled.' },
+    spellbreaker:      { name: 'Spellbreaker', skill: 'ward', share: 0.2,
+                         say: '20% of the magicka in a spell that hits you is added to yours.' },
+    fontofmagic:       { name: 'Font of Magic', skill: 'efficiency', every: DAY, seconds: 15, costOff: 100,
+                         say: 'Once a day, 15 seconds where a spell costs nothing. Press Use beside it on the K panel to start it.' },
+    tireless:          { name: 'Tireless', skill: 'endurance', none: true,
+                         say: 'Running and swinging cost half stamina.',
+                         not: 'That is not in the game yet: what running and a swing cost is worked out on your own machine.' },
+    secondwind:        { name: 'Second Wind', skill: 'vigor', every: 5 * MINUTE,
+                         say: 'When stamina hits 0 it fills, once every 5 minutes.' },
+    windwalker:        { name: 'Windwalker', skill: 'agility',
+                         say: '+4 speed, and a fall deals no damage.',
+                         not: 'The speed is yours. A fall still hurts for now: it is taken on your own machine.' },
+    packmule:          { name: 'Pack Mule', skill: 'burden', none: true,
+                         say: 'Being overloaded does not slow you.',
+                         not: 'That is not in the game yet: the slowing is the game\'s own, on your machine.' },
+    lethalaim:         { name: 'Lethal Aim', skill: 'precision', armour: 0.5,
+                         say: 'An arrow ignores half the armour it hits.' }
+  };
+  var ORDER = ['cheatdeath', 'trollsblood', 'devastatingblow', 'unshakeable', 'purifiedblood',
+               'archmagesvessel', 'leylineattunement', 'overcharge', 'spellbreaker', 'fontofmagic',
+               'tireless', 'secondwind', 'windwalker', 'packmule', 'lethalaim'];
+
+  var CRIT_LINE = 'Critical chance is put on your character, and the game ignores it: the server ' +
+                  'works out what every blow deals and there is no critical hit in that.';
+
+  function plog() {
+    var a = Array.prototype.slice.call(arguments);
+    var line = 'perks: ' + a.join(' ');
+    if (typeof log === 'function') { log(line); } else { console.log('[thornswood] ' + line); }
+  }
+  // say() is the file's own: it finds the profile and posts the line, and
+  // answers nothing when there is nobody to tell.
+  function tell(actorId, text) { say(actorId, text); }
+  function has(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
+  function hex(id) { return (Number(id) >>> 0).toString(16); }
+  function now() { return Date.now(); }
+  function selfOf(id) { return { type: 'form', desc: mp.getDescFromId(id) }; }
+  function personOf(id) {
+    try { return Number(mp.get(id, 'profileId')) > 0; } catch (e) { return false; }
+  }
+  function deadOf(id) {
+    try { return !!mp.get(id, 'isDead'); } catch (e) { return true; }
+  }
+  function pct(id) {
+    try {
+      var p = mp.get(id, 'percentages');
+      if (!p) { return null; }
+      var out = { health: Number(p.health), magicka: Number(p.magicka), stamina: Number(p.stamina) };
+      return (isNaN(out.health) || isNaN(out.magicka) || isNaN(out.stamina)) ? null : out;
+    } catch (e) { return null; }
+  }
+  function setPct(id, health, magicka, stamina) {
+    try {
+      mp.set(id, 'percentages', { health: health, magicka: magicka, stamina: stamina });
+      return true;
+    } catch (e) {
+      plog('could not write the percentages of', hex(id) + ':', e);
+      return false;
+    }
+  }
+  /* The engine's own Actor.RestoreActorValue: an amount in the engine's units. */
+  function restore(id, what, amount) {
+    try {
+      mp.callPapyrusFunction('method', 'Actor', 'RestoreActorValue', selfOf(id), [what, amount]);
+      return true;
+    } catch (e) {
+      plog('could not restore', what, 'on', hex(id) + ':', e);
+      return false;
+    }
+  }
+  function wait(ms) {
+    var s = Math.max(1, Math.ceil(ms / 1000));
+    if (s < 120) { return s + (s === 1 ? ' second' : ' seconds'); }
+    var m = Math.ceil(s / 60);
+    if (m < 120) { return m + ' minutes'; }
+    return Math.ceil(m / 60) + ' hours';
+  }
+
+  // ------------------------------------------------------ who holds what --
+  function stateOf(id) {
+    var ch = g.__thornswoodCharacter;
+    return (ch && ch.stateOf) ? ch.stateOf(id) : null;
+  }
+  function heldIn(s) {
+    var out = {};
+    if (!s) { return out; }
+    var list = P.perks(s);
+    for (var i = 0; i < list.length; i++) { if (has(PERKS, list[i])) { out[list[i]] = true; } }
+    return out;
+  }
+
+  /*
+    The runtime half, on globalThis so a hot reload keeps it. Nothing in here
+    is a clock that matters across a restart: those are on the character.
+      held   actor -> { at, keys, rate }   who holds what, read every HELD_MS
+      last   actor -> { h, m, at }         the shares last seen, for the tick
+      fight  actor -> when they last hit, were hit, or lost health
+      font   actor -> { until }            a Font of Magic that is running
+      troll  actor -> { at, said }         Troll's Blood's second, and its fight
+      ley    actor -> when Leyline Attunement last gave
+      spells actor -> how many spells of theirs have landed towards Overcharge
+      sb     'target:caster:spell' -> when a concentration spell last gave
+      blow   actor -> { by, at }           whose blow, when this block's write killed
+  */
+  var ST = g.__thornswoodPerkState;
+  if (!ST || typeof ST !== 'object') {
+    ST = g.__thornswoodPerkState = { held: {}, last: {}, fight: {}, font: {}, troll: {}, ley: {},
+                                     spells: {}, sb: {}, blow: {} };
+  }
+
+  function heldOf(id, t) {
+    var c = ST.held[id];
+    if (c && t - c.at < HELD_MS) { return c.keys; }
+    var s = personOf(id) ? stateOf(id) : null;
+    var keys = heldIn(s);
+    var rate = 0;
+    if (keys.leylineattunement) { rate = Number(P.treeApplies(s).magickaRateMult) || 0; }
+    ST.held[id] = { at: t, keys: keys, rate: rate };
+    return keys;
+  }
+
+  /** Does this character hold that perk right now. Read fresh, for any block. */
+  function holds(actorId, key) {
+    if (!actorId || !has(PERKS, key) || !personOf(actorId)) { return false; }
+    return !!heldIn(stateOf(actorId))[key];
+  }
+
+  // ------------------------------------------------------------- the clocks --
+  try {
+    mp.makeProperty(PERK_PROPERTY, {
+      isVisibleByOwner: false, isVisibleByNeighbors: false,
+      updateOwner: '', updateNeighbor: ''
+    });
+  } catch (e) { /* made by an earlier load. harmless. */ }
+
+  /*
+    One character's clocks. Never set reads as null and is an empty record.
+    A read that throws is null here: a clock that cannot be read does not
+    fire, the same as one that cannot be written, because an empty record in
+    its place would hand the day back.
+  */
+  function record(id) {
+    var v = null;
+    try {
+      v = mp.get(id, PERK_PROPERTY);
+    } catch (e) {
+      plog('could not read the clocks of', hex(id) + ':', e);
+      return null;
+    }
+    if (!v || typeof v !== 'object' || v.v !== 1) { v = { v: 1 }; }
+    if (!v.ready || typeof v.ready !== 'object') { v.ready = {}; }
+    if (!v.fired || typeof v.fired !== 'object') { v.fired = {}; }
+    return v;
+  }
+  function readyAt(id, key) {
+    var rec = record(id);
+    return rec ? (Number(rec.ready[key]) || 0) : 0;
+  }
+
+  /* Take the clock. Written first; the perk fires only once it is written. */
+  function take(id, key, t) {
+    var rec = record(id);
+    if (!rec || (Number(rec.ready[key]) || 0) > t) { return false; }
+    rec.ready[key] = t + PERKS[key].every;
+    rec.fired[key] = (Number(rec.fired[key]) || 0) + 1;
+    try {
+      mp.set(id, PERK_PROPERTY, rec);
+    } catch (e) {
+      plog('could not write the', PERKS[key].name, 'clock of', hex(id) + ', so it does not fire:', e);
+      return false;
+    }
+    return true;
+  }
+
+  function fired(id, key, more) {
+    plog(PERKS[key].name, 'fired for', hex(id) + (more ? ' ' + more : ''));
+  }
+
+  // ------------------------------------------------------------ Cheat Death --
+  /*
+    THE ONE CHECK THE ENGINE'S DEATH WILL ASK, once the engine asks before it
+    kills (see Cheat Death at the top of this block). True when Cheat Death
+    takes this death: the clock is written first and the person is told, and
+    the engine is to leave them at 1 health instead of killing them. False is
+    an ordinary death. Nothing calls it yet, and mp.onDeath must not: by then
+    the death has been sent.
+  */
+  function cheatDeath(actorId) {
+    if (!actorId || !personOf(actorId)) { return false; }
+    if (!heldIn(stateOf(actorId)).cheatdeath) { return false; }
+    if (!take(actorId, 'cheatdeath', now())) { return false; }
+    fired(actorId, 'cheatdeath');
+    tell(actorId, 'Cheat Death. The blow that would have killed you leaves you at ' +
+                  PERKS.cheatdeath.health + ' health. It comes back in 24 hours.');
+    return true;
+  }
+
+  // -------------------------------------------------------------- the hits --
+  var kinds = {};
+  var records = {};
+  var gmst = null;
+
+  function lookup(id) {
+    if (!id) { return null; }
+    if (has(records, id)) { return records[id]; }
+    var r = null;
+    try { r = mp.lookupEspmRecordById(id) || null; } catch (e) { r = null; }
+    records[id] = r;
+    return r;
+  }
+  function typeOf(r) { return (r && r.record) ? String(r.record.type || '') : ''; }
+  function fieldOf(r, type) {
+    var fields = (r && r.record && r.record.fields) || [];
+    for (var i = 0; i < fields.length; i++) {
+      if (fields[i] && String(fields[i].type) === type) { return fields[i].data || []; }
+    }
+    return null;
+  }
+  function u32(b, at) {
+    if (!b || b.length < at + 4) { return null; }
+    return (b[at] | (b[at + 1] << 8) | (b[at + 2] << 16)) + b[at + 3] * 0x1000000;
+  }
+  function f32(b, at) {
+    if (!b || b.length < at + 4) { return NaN; }
+    var view = new DataView(new ArrayBuffer(4));
+    for (var i = 0; i < 4; i++) { view.setUint8(i, b[at + i]); }
+    return view.getFloat32(0, true);
+  }
+  function globalOf(r, local) {
+    if (!r || typeof r.toGlobalRecordId !== 'function') { return local || 0; }
+    try { return Number(r.toGlobalRecordId(local)) || 0; } catch (e) { return 0; }
+  }
+  function idOfForm(v) {
+    if (typeof v === 'number') { return v; }
+    if (v && v.desc) {
+      try { return Number(mp.getIdFromDesc(String(v.desc))) || 0; } catch (e) { return 0; }
+    }
+    return 0;
+  }
+
+  /* What landed the hit: 'spell', 'bow' (a bow or a crossbow), 'melee', or ''. */
+  function kindOf(id) {
+    if (!id) { return ''; }
+    if (has(kinds, id)) { return kinds[id]; }
+    var kind = '';
+    if (id === 0x1f4) {
+      kind = 'melee';
+    } else {
+      var r = lookup(id);
+      var type = typeOf(r);
+      if (type === 'SPEL') { kind = 'spell'; }
+      else if (type === 'WEAP') {
+        // WEAP DNAM: the animation type is the first byte. Bow 7, crossbow 9.
+        var dnam = fieldOf(r, 'DNAM');
+        var anim = dnam && dnam.length ? dnam[0] : -1;
+        kind = (anim === 7 || anim === 9) ? 'bow' : 'melee';
+      }
+    }
+    kinds[id] = kind;
+    return kind;
+  }
+
+  /*
+    WHAT A SPELL COSTS, as the record carries it: SPIT's first four bytes. All
+    85 spells in the book carry one (game/data/spells.json, built from the
+    same field). The cast type is at 16, and 2 is concentration.
+  */
+  var spellCosts = {};
+  function spellOf(id) {
+    if (has(spellCosts, id)) { return spellCosts[id]; }
+    var spit = fieldOf(lookup(id), 'SPIT');
+    var cost = u32(spit, 0);
+    var info = { id: id, cost: cost || 0, concentration: u32(spit, 16) === 2 };
+    if (!info.cost) { plog('the spell', hex(id), 'carries no cost, so Spellbreaker gives nothing for it'); }
+    spellCosts[id] = info;
+    return info;
+  }
+
+  /*
+    THE ARMOUR, the way the engine sums it (TES5DamageFormula,
+    CalcOpponentArmorRating): each worn ARMO's DNAM rating over 100, and each
+    of its enchantment's effects whose primary value is DamageResist (39, MGEF
+    DATA at 0x44) by its magnitude. The penalty is the engine's too, out of
+    the two game settings it reads.
+  */
+  var DAMAGE_RESIST = 39;
+  function settings() {
+    if (gmst) { return gmst; }
+    var cap = f32(fieldOf(lookup(0x37deb), 'DATA'), 0);     // fMaxArmorRating
+    var scale = f32(fieldOf(lookup(0x21a72), 'DATA'), 0);   // fArmorScalingFactor
+    gmst = (isFinite(cap) && isFinite(scale) && scale > 0) ? { cap: cap, scale: scale } : { broken: true };
+    if (gmst.broken) { plog('the two armour settings could not be read, so Lethal Aim adds nothing'); }
+    return gmst;
+  }
+  function enchantArmour(enchId) {
+    var r = lookup(enchId);
+    var fields = (r && r.record && r.record.fields) || [];
+    var total = 0, av = -1;
+    for (var i = 0; i < fields.length; i++) {
+      var f = fields[i];
+      if (!f) { continue; }
+      if (String(f.type) === 'EFID') {
+        var mgef = lookup(globalOf(r, u32(f.data, 0)));
+        var data = fieldOf(mgef, 'DATA');
+        var n = u32(data, 0x44);
+        av = n === null ? -1 : (n | 0);
+      } else if (String(f.type) === 'EFIT') {
+        var mag = f32(f.data, 0);
+        if (av === DAMAGE_RESIST && isFinite(mag)) { total += mag; }
+        av = -1;
+      }
+    }
+    return total;
+  }
+  function armourOf(target) {
+    var eq = null;
+    try { eq = mp.get(target, 'equipment'); } catch (e) { return 0; }
+    var entries = (eq && eq.inv && eq.inv.entries) || (eq && eq.entries) || [];
+    var total = 0;
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (!e || !e.baseId || !(e.worn || e.wornLeft)) { continue; }
+      var r = lookup(e.baseId);
+      if (typeOf(r) !== 'ARMO') { continue; }
+      var rating = u32(fieldOf(r, 'DNAM'), 0);
+      if (rating !== null) { total += rating / 100; }
+      var ench = u32(fieldOf(r, 'EITM'), 0);
+      if (ench) { total += enchantArmour(globalOf(r, ench)); }
+    }
+    return total;
+  }
+  /* What a blow against this much armour keeps, out of 1. */
+  function penalty(armour, set) {
+    return (100 - Math.min(armour * set.scale, set.cap)) / 100;
+  }
+  /* What Lethal Aim adds to a bow hit that took this much. */
+  function lethalExtra(target, took) {
+    var set = settings();
+    if (set.broken) { return 0; }
+    var armour = armourOf(target);
+    if (!(armour > 0)) { return 0; }
+    var full = penalty(armour, set);
+    var half = penalty(armour * PERKS.lethalaim.armour, set);
+    if (!(full > 0)) { return 0; }
+    return took * (half / full - 1);
+  }
+
+  /*
+    WHAT A HIT TOOK, MEASURED. The same way the maneuvers measure it: OnHit
+    comes before the engine's damage, so health is read at the event and again
+    on the next turn, and the difference is the blow. A hit the engine threw
+    away took nothing and changes nothing.
+  */
+  var pending = {};
+  var queued = false;
+
+  function hit(targetId, aggressor, source, power, bash) {
+    var target = Number(targetId) || 0;
+    if (!target) { return; }
+    var t = now();
+    var by = idOfForm(aggressor);
+    if (personOf(target)) { ST.fight[target] = t; }
+    if (by && by !== target && personOf(by)) { ST.fight[by] = t; }
+    var open = pending[target];
+    if (open && open.length && open[open.length - 1].after === null) {
+      open[open.length - 1].after = (pct(target) || { health: -1 }).health;
+    }
+    var kind = kindOf(idOfForm(source));
+
+    // Spellbreaker is on the one hit, now.
+    if (kind === 'spell' && heldOf(target, t).spellbreaker) { breakSpell(target, by, idOfForm(source), t); }
+
+    if (!by || by === target || !personOf(by)) { return; }
+    var mine = heldOf(by, t);
+    var e = { before: -1, after: null, by: by, more: 0, overcharge: false, aim: false };
+    if (kind === 'melee' && power && !bash && mine.devastatingblow) { e.more = PERKS.devastatingblow.more; }
+    if (kind === 'spell' && mine.overcharge) { e.overcharge = true; }
+    if (kind === 'bow' && mine.lethalaim) { e.aim = true; }
+    if (!e.more && !e.overcharge && !e.aim) { return; }
+    var p = pct(target);
+    e.before = p ? p.health : -1;
+    if (!(e.before > 0)) { return; }
+    if (!pending[target]) { pending[target] = []; }
+    pending[target].push(e);
+    if (!queued) {
+      queued = true;
+      setTimeout((typeof guard === 'function') ? guard('perkHits', flush) : flush, 0);
+    }
+  }
+
+  function breakSpell(target, by, spellId, t) {
+    var info = spellOf(spellId);
+    if (!(info.cost > 0)) { return; }
+    if (info.concentration) {
+      var key = target + ':' + by + ':' + spellId;
+      if (t - (ST.sb[key] || 0) < SECOND) { return; }
+      ST.sb[key] = t;
+    }
+    var gain = info.cost * PERKS.spellbreaker.share;
+    if (restore(target, 'Magicka', gain)) {
+      fired(target, 'spellbreaker', '(' + (Math.round(gain * 10) / 10) + ' magicka from ' + hex(spellId) + ')');
+    }
+  }
+
+  function setHealth(target, h, change, killer) {
+    var next = h + change;
+    if (next > 1) { next = 1; }
+    if (next <= 0) {
+      next = 0;
+      // The engine kills on this write with nobody named; mp.onDeath asks.
+      if (killer) { ST.blow[target] = { by: killer, at: now() }; }
+    }
+    var p = pct(target);
+    if (!p) { return; }
+    setPct(target, next, p.magicka, p.stamina);
+  }
+
+  function flush() {
+    queued = false;
+    var all = pending;
+    pending = {};
+    for (var k in all) {
+      if (!has(all, k)) { continue; }
+      var target = Number(k);
+      var list = all[k];
+      var p = pct(target);
+      var h = p ? p.health : -1;
+      if (list.length && list[list.length - 1].after === null) { list[list.length - 1].after = h; }
+      var change = 0, killer = 0;
+      for (var i = 0; i < list.length; i++) {
+        var e = list[i];
+        var took = e.before - e.after;
+        if (!(e.after >= 0) || !(took > 0)) { continue; }
+        if (e.more) {
+          change -= took * e.more;
+          killer = e.by;
+          fired(e.by, 'devastatingblow');
+        }
+        if (e.aim) {
+          var extra = lethalExtra(target, took);
+          if (extra > 0) {
+            change -= extra;
+            killer = e.by;
+            fired(e.by, 'lethalaim');
+          }
+        }
+        if (e.overcharge) {
+          var n = (ST.spells[e.by] || 0) + 1;
+          if (n >= PERKS.overcharge.inEvery) {
+            n = 0;
+            change -= took * PERKS.overcharge.more;
+            killer = e.by;
+            fired(e.by, 'overcharge');
+            tell(e.by, 'Overcharge: that spell lands double.');
+          }
+          ST.spells[e.by] = n;
+        }
+      }
+      if (h > 0 && change !== 0) { setHealth(target, h, change, killer); }
+    }
+  }
+
+  /** Whose blow it was, when this block's own write was the killing one. */
+  function killerOf(target) {
+    var b = has(ST.blow, target) ? ST.blow[target] : null;
+    if (!b) { return 0; }
+    delete ST.blow[target];
+    return (now() - b.at) < 2000 ? b.by : 0;
+  }
+
+  // -------------------------------------------------------------- the tick --
+  /*
+    THE MAGICKA, THE STAMINA AND THE HEALTH, four times a second, for the
+    people who hold a perk that watches them. The client reports both and the server keeps
+    the share; this reads that share and writes it back up. RACE DATA at 88 is
+    the race's own magicka rate, a percent of the most there is each second.
+  */
+  var raceRates = {};
+  function raceRate(id) {
+    var raceId = 0;
+    try { raceId = Number((mp.get(id, 'appearance') || {}).raceId) || 0; } catch (e) { raceId = 0; }
+    if (!raceId) { return 0; }
+    if (!has(raceRates, raceId)) {
+      var rate = f32(fieldOf(lookup(raceId), 'DATA'), 88);
+      raceRates[raceId] = (isFinite(rate) && rate > 0) ? rate : 0;
+      if (!raceRates[raceId]) { plog('the race', hex(raceId), 'has no magicka rate to read, so Leyline Attunement gives nothing'); }
+    }
+    return raceRates[raceId];
+  }
+
+  function inFight(id, t) { return has(ST.fight, id) && t - ST.fight[id] < FIGHT_MS; }
+
+  function one(id, t) {
+    var mine = heldOf(id, t);
+    if (!mine.trollsblood && !mine.archmagesvessel && !mine.leylineattunement && !mine.secondwind) {
+      delete ST.last[id];
+      return;
+    }
+    if (deadOf(id)) { delete ST.last[id]; return; }
+    var p = pct(id);
+    if (!p) { return; }
+    var last = has(ST.last, id) ? ST.last[id] : null;
+    if (last && p.health < last.h - 0.0001) { ST.fight[id] = t; }
+    var m = p.magicka, st = p.stamina, changed = false, clocked = false;
+
+    if (mine.secondwind && st <= 0.001 && take(id, 'secondwind', t)) {
+      st = 1;
+      changed = true;
+      clocked = true;
+      fired(id, 'secondwind');
+      tell(id, 'Second Wind: your stamina fills. It comes back in 5 minutes.');
+    }
+    if (mine.archmagesvessel && m < PERKS.archmagesvessel.below && take(id, 'archmagesvessel', t)) {
+      m = PERKS.archmagesvessel.to;
+      changed = true;
+      clocked = true;
+      fired(id, 'archmagesvessel');
+      tell(id, 'Archmage\'s Vessel: your magicka returns to half. It comes back in 24 hours.');
+    }
+    if (mine.leylineattunement && last && m < last.m - 0.0005 && m < 1) {
+      var rate = raceRate(id) * (100 + ((ST.held[id] && ST.held[id].rate) || 0)) / 100;
+      var add = PERKS.leylineattunement.rate * (rate / 100) * Math.min(t - last.at, SECOND) / 1000;
+      if (add > 0) {
+        m = Math.min(1, m + add);
+        changed = true;
+        if (t - (ST.ley[id] || 0) > 2 * SECOND) { fired(id, 'leylineattunement'); }
+        ST.ley[id] = t;
+      }
+    }
+    if (changed) { setPct(id, p.health, m, st); }
+    // A clock that moved is on the K panel, so the panel is sent it now.
+    if (clocked) { push(id); }
+    ST.last[id] = { h: p.health, m: m, at: t };
+
+    if (mine.trollsblood && inFight(id, t) && p.health < 1) {
+      var tr = has(ST.troll, id) ? ST.troll[id] : (ST.troll[id] = { at: 0, said: 0 });
+      if (t - tr.at >= SECOND) {
+        tr.at = t;
+        if (restore(id, 'Health', PERKS.trollsblood.perSecond) && t - tr.said > FIGHT_MS) {
+          fired(id, 'trollsblood');
+        }
+        tr.said = t;
+      }
+    }
+  }
+
+  function tick() {
+    var t = now();
+    var online = [];
+    online = mp.get(0, 'onlinePlayers') || [];
+    var here = {};
+    for (var i = 0; i < online.length; i++) {
+      here[online[i]] = true;
+      try { one(online[i], t); } catch (e) { plog('the tick threw for', hex(online[i]) + ':', e); }
+    }
+    var maps = [ST.held, ST.last, ST.font, ST.troll, ST.ley, ST.fight];
+    for (var j = 0; j < maps.length; j++) {
+      for (var k in maps[j]) { if (has(maps[j], k) && !here[k]) { delete maps[j][k]; } }
+    }
+    for (var key in ST.sb) { if (has(ST.sb, key) && t - ST.sb[key] > 5 * SECOND) { delete ST.sb[key]; } }
+    for (var b in ST.blow) { if (has(ST.blow, b) && t - ST.blow[b].at > 5 * SECOND) { delete ST.blow[b]; } }
+  }
+
+  // ------------------------------------------------------------- the words --
+  function about(key) {
+    var p = PERKS[key];
+    return p.name + ': ' + p.say + (p.not ? ' ' + p.not : '');
+  }
+
+  /*
+    FONT OF MAGIC, from the Use button on the K panel. Answers { ok, why } the
+    way every pick on that panel is answered: why is the refusal in plain
+    words, said as 'No: <why>.' in the chat and under the panel, and line is
+    what to say when it starts. The day is spent only once the redraw that
+    carries the free spells can be sent.
+  */
+  function startFont(actorId, s) {
+    var key = 'fontofmagic';
+    if (!heldIn(s)[key]) { return { ok: false, why: 'Font of Magic comes with five points in Efficiency' }; }
+    if (deadOf(actorId)) { return { ok: false, why: 'not while you are down' }; }
+    var t = now();
+    if (has(ST.font, actorId) && ST.font[actorId].until > t) {
+      return { ok: false, why: 'Font of Magic is running, ' + wait(ST.font[actorId].until - t) + ' left' };
+    }
+    var at = readyAt(actorId, key);
+    if (at > t) { return { ok: false, why: 'Font of Magic comes back in ' + wait(at - t) }; }
+    if (!canPush()) { return { ok: false, why: 'Font of Magic cannot reach your character right now' }; }
+    if (!take(actorId, key, t)) { return { ok: false, why: 'Font of Magic could not be started' }; }
+    var ms = PERKS.fontofmagic.seconds * SECOND;
+    var until = t + ms;
+    ST.font[actorId] = { until: until };
+    push(actorId);
+    var end = function () {
+      // Only this start's own end: a later start keeps its own 15 seconds.
+      if (has(ST.font, actorId) && ST.font[actorId].until !== until) { return; }
+      delete ST.font[actorId];
+      push(actorId);
+      tell(actorId, 'Font of Magic has run out.');
+    };
+    setTimeout((typeof guard === 'function') ? guard('fontOfMagicEnd', end) : end, ms + 50);
+    fired(actorId, key);
+    return { ok: true, line: 'Font of Magic: for 15 seconds, a spell costs nothing. It comes back in 24 hours.' };
+  }
+
+  /*
+    A press of a perk's button on the K panel: /pick perk <key>. Font of Magic
+    is the one perk the page has somebody start; every other perk fires by
+    itself, so its key is refused.
+  */
+  function use(actorId, s, word) {
+    var key = String(word || '').toLowerCase();
+    if (key === 'fontofmagic') { return startFont(actorId, s); }
+    return { ok: false, why: has(PERKS, key) ? PERKS[key].name + ' fires by itself' : 'there is no perk by that name' };
+  }
+
+  /*
+    WHAT THE K PANEL SHOWS OF THE CLOCKS, for the perks this character holds
+    that wait between firings: { <key>: { ready: <ms> } }, and until: <ms> on
+    Font of Magic while it runs. ready is when it may fire again, 0 for never
+    fired. Times, not time left, so the view is the same until a perk fires
+    and the panel counts down against its own clock. Cheat Death is left out:
+    nothing in the game fires it yet. null when there is nothing to show.
+  */
+  function clocks(actorId, s) {
+    var mine = heldIn(s);
+    var out = null;
+    for (var i = 0; i < ORDER.length; i++) {
+      var k = ORDER[i];
+      if (!mine[k] || !PERKS[k].every || PERKS[k].none) { continue; }
+      out = out || {};
+      out[k] = { ready: readyAt(actorId, k) };
+      if (k === 'fontofmagic' && has(ST.font, actorId) && ST.font[actorId].until > now()) {
+        out[k].until = ST.font[actorId].until;
+      }
+    }
+    return out;
+  }
+
+  /*
+    WHAT A RUNNING PERK ADDS TO THE CLIENT'S MAP: Font of Magic's 15 seconds,
+    100 on every school's cost value. The character block folds this into the
+    totals it sends (withPerks), beside a warrior's Rush, because the client
+    SETS each value to the total it is given. Every school, not only the ones
+    held: the page says a spell costs nothing, whichever school it is. The
+    names are the progression block's own, TUNING.schoolValues.
+  */
+  function effects(actorId) {
+    var f = has(ST.font, actorId) ? ST.font[actorId] : null;
+    if (!f || !(f.until > now())) { return null; }
+    var schools = (P.TUNING && P.TUNING.schoolValues) || {};
+    var out = null;
+    for (var school in schools) {
+      if (!has(schools, school) || !schools[school].cost) { continue; }
+      out = out || {};
+      out[schools[school].cost] = PERKS.fontofmagic.costOff;
+    }
+    return out;
+  }
+
+  /*
+    The client's skill tree hand sets the totals map on the panel view, and
+    the map is rebuilt from the state on every write, so a redraw is the one
+    way to send Font of Magic and to take it off again. The same as Rush.
+  */
+  function canPush() {
+    var ch = g.__thornswoodCharacter;
+    return !!(ch && ch.writeState && ch.stateOf);
+  }
+  function push(actorId) {
+    if (!canPush()) { return; }
+    var ch = g.__thornswoodCharacter;
+    try { ch.writeState(actorId, ch.stateOf(actorId), true); } catch (e) { plog('could not redraw', hex(actorId) + ':', e); }
+  }
+
+  function treeOf(skill) {
+    for (var attr in P.TABLE.tree) {
+      if (has(P.TABLE.tree, attr) && has(P.TABLE.tree[attr].skills, skill)) { return attr; }
+    }
+    return '';
+  }
+
+  /*
+    What a point spent says once it is in: the perk the moment a sub-skill
+    fills, and, for Precision, every time, that the game ignores critical
+    chance. Nothing for any other point: the panel shows those.
+  */
+  function spendLine(s, skill) {
+    var key = '';
+    for (var i = 0; i < ORDER.length; i++) { if (PERKS[ORDER[i]].skill === skill) { key = ORDER[i]; } }
+    if (!key || !s || !s.tree) { return ''; }
+    var bits = [];
+    if ((s.tree[skill] || 0) >= P.TABLE.limits.skillCap) {
+      var attr = treeOf(skill);
+      bits.push(P.TABLE.tree[attr].skills[skill].name + ' is full. ' + about(key));
+    }
+    if (skill === 'precision') { bits.push(CRIT_LINE); }
+    return bits.join(' ');
+  }
+
+  if (g.__thornswoodPerkTimer) { clearInterval(g.__thornswoodPerkTimer); }
+  g.__thornswoodPerkTimer = setInterval((typeof guard === 'function') ? guard('perkTick', tick) : tick, TICK_MS);
+
+  g.__thornswoodPerks = {
+    PERKS: PERKS, ORDER: ORDER, PROPERTY: PERK_PROPERTY, CRIT_LINE: CRIT_LINE, FIGHT_MS: FIGHT_MS,
+    holds: holds, cheatDeath: cheatDeath, hit: hit, flush: flush, killerOf: killerOf, tick: tick,
+    use: use, clocks: clocks, spendLine: spendLine, effects: effects, armourOf: armourOf,
+    lethalExtra: lethalExtra, readyAt: readyAt, state: ST
+  };
+  console.log('[thornswood perks] ready: ' + ORDER.length + ' perks');
+})();
+// ==== end thornswood skill perks ====
 
 // ==== thornswood warrior maneuvers ====
 /*
@@ -41663,6 +43167,12 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
   var wear = globalThis.__thornswoodDurability;
   if (wear && wear.onHit) {
     try { wear.onHit(targetId, aggressor, source, blocked); } catch (e) { log('durability: the hit threw:', e); }
+  }
+  // The filled skill perks (#1385), before the maneuvers: each measures the
+  // blow on the next turn, and this way round the perks block reads it first.
+  var pk = globalThis.__thornswoodPerks;
+  if (pk && pk.hit) {
+    try { pk.hit(targetId, aggressor, source, power, bash); } catch (e) { log('perks: the hit threw:', e); }
   }
   var mv = globalThis.__thornswoodManeuvers;
   if (mv && mv.hit) { mv.hit(targetId, aggressor, source, power, blocked); }
@@ -43452,6 +44962,10 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/jarl', '/steward', '/evict', '/box', '/rent', '/bed',
                '/notice', '/job', '/board', '/take', '/jobs', '/dropjob', '/unpin',
                '/letter', '/deliver',
+               // A haul (#1393). Sent by the board panel's Send a haul and
+               // Confirm buttons, never typed, and so deliberately NOT in
+               // PLAYER_WORDS. See the property block.
+               '/haul',
                '/tp', '/goto', '/face', '/restart', '/shutdown', '/tspicks',
                // Playtesters', like /tp, and gated the same way. Deliberately
                // absent from PLAYER_WORDS: naming them in /help would be an
@@ -44853,12 +46367,14 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         var live = tr2.tradeOf(actorId);
         var verb = String(parts[1] || '').toLowerCase();
         if (live || verb === 'cancel' || verb === 'ok' || verb === 'add' ||
-            verb === 'remove' || verb === 'gold' || verb === 'pack') {
+            verb === 'remove' || verb === 'gold' || verb === 'pack' || verb === 'sale') {
           if (!live) { toProfile(profileId, 'You are not trading.'); return true; }
           var out = '';
           if (verb === 'cancel') { out = tr2.cancel(actorId); }
           else if (verb === 'ok') { out = tr2.confirm(actorId); }
           else if (verb === 'gold') { out = tr2.gold(actorId, parts[2]); }
+          // The panel's Buy for the company (#1393). Never typed.
+          else if (verb === 'sale') { out = tr2.sale(actorId); }
           else if (verb === 'remove') {
             var rbits = parts.slice(2);
             var rn = 0;
@@ -51053,7 +52569,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var t = {
       a: aActor, b: bActor,
       offerA: [], offerB: [], goldA: 0, goldB: 0,
-      okA: false, okB: false, at: Date.now()
+      okA: false, okB: false, at: Date.now(),
+      // The company worker buying, when it is a sale out of Skyrim (#1393).
+      sale: 0
     };
     open[aActor] = t; open[bActor] = t;
     trades.push(t);
@@ -51280,6 +52798,60 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     return '';
   }
 
+  /*
+    A SALE OUT OF SKYRIM, #1393, docs/systems/trading-company.md. At a company
+    event somebody sells a thing out of Skyrim, and the company buys it
+    through a worker. Patrick, 4 Oct: no chat commands for anything people
+    do. So it is this panel: the two open an ordinary trade with the key, and
+    the worker presses Buy for the company. Then what the other person puts
+    up leaves the world instead of crossing, and the gold the worker puts up
+    is the price the two of them agree, split by the property block's
+    saleCuts (saleSwap). Pressing it again makes it an ordinary trade. Either
+    way both agreements are taken back, the same as any change to a pile.
+
+    Only a worker the company has taken on presses it: the property block's
+    inCompany, the Discord role an application leads to, or an admin testing
+    the chain.
+  */
+  function companyOf(actorId) {
+    var pr = g.__thornswoodProperty;
+    var pid = 0;
+    try { pid = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pid = 0; }
+    return !!(pid && pr && pr.inCompany && pr.inCompany(pid));
+  }
+
+  function sale(actorId) {
+    var t = tradeOf(actorId);
+    if (!t) { return 'You are not trading.'; }
+    if (t.sale === actorId) {
+      t.sale = 0;
+      unconfirm(t); push(t);
+      try { say(other(t, actorId), nameOf(actorId) + ' is not buying for the company now. It is an ordinary trade.'); }
+      catch (e) { }
+      return '';
+    }
+    if (t.sale) { return nameOf(t.sale) + ' is already buying for the company.'; }
+    if (!companyOf(actorId)) {
+      return 'Only somebody the Free Skyrim Trading Company has taken on buys for it. It is an application, in Discord.';
+    }
+    t.sale = actorId;
+    unconfirm(t); push(t);
+    try {
+      say(other(t, actorId), nameOf(actorId) + ' is buying for the Free Skyrim Trading Company. ' +
+          'What you put up leaves Skyrim and does not come back.');
+    } catch (e2) { }
+    return '';
+  }
+
+  /* The split of the price as the panel shows it to either side. */
+  function saleView(t, actorId) {
+    var pr = g.__thornswoodProperty;
+    var price = t.sale === t.a ? t.goldA : t.goldB;
+    var cuts = (pr && pr.saleCuts) ? pr.saleCuts(price) : { price: price, worker: 0, gone: 0, seller: price };
+    return { mine: t.sale === actorId, worker: nameOf(t.sale), price: cuts.price,
+             cut: cuts.worker, gone: cuts.gone, seller: cuts.seller };
+  }
+
   function confirm(actorId) {
     var t = tradeOf(actorId);
     if (!t) { return 'You are not trading.'; }
@@ -51308,6 +52880,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       unconfirm(t); push(t);
       return 'You have moved too far apart.';
     }
+    if (t.sale) { return saleSwap(t); }
     var GOLD = (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F;
 
     var sides = [
@@ -51360,6 +52933,125 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     tlog(nameOf(t.a), 'and', nameOf(t.b), 'traded:', whatA, 'for', whatB);
     close(t, '');
     return '';
+  }
+
+  /*
+    The company's swap (#1393). Everything is asked again here, the same as
+    swap: the worker still buys for the company, the worker's side is gold
+    and nothing else, the seller's side is things and no gold, and each
+    still holds what they put up. Then one write each (saleById): the things
+    out of the seller's pack and out of the world with the seller's share
+    in, and the price less the worker's own cut out of the worker's pack.
+    The 10% that leaves is in neither pack. Never half.
+  */
+  function saleSwap(t) {
+    var GOLD = (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F;
+    var pr = g.__thornswoodProperty;
+    var worker = t.sale;
+    var seller = other(t, worker);
+    var price = worker === t.a ? t.goldA : t.goldB;
+    var asked = seller === t.a ? t.goldA : t.goldB;
+    var things = sideOf(t, seller);
+    function refuse(why) { unconfirm(t); push(t); return why; }
+    if (!pr || !pr.saleCuts) { return refuse('That is not running on this server.'); }
+    if (!companyOf(worker)) { return refuse(nameOf(worker) + ' cannot buy for the company now.'); }
+    if (sideOf(t, worker).length) {
+      return refuse('The company pays in gold. ' + nameOf(worker) + ' takes their things off the table.');
+    }
+    if (asked > 0) { return refuse('Only the company pays in a sale. ' + nameOf(seller) + ' takes their gold off the table.'); }
+    if (!things.length) { return refuse(nameOf(seller) + ' has put up nothing to sell.'); }
+    if (!(price > 0)) { return refuse(nameOf(worker) + ' has put up no gold for it.'); }
+    if (price > holding(worker, GOLD)) { return refuse(nameOf(worker) + ' does not have that gold any more.'); }
+    for (var i = 0; i < things.length; i++) {
+      if (things[i].c > holding(seller, things[i].id)) {
+        return refuse(nameOf(seller) + ' does not have the ' + things[i].n + ' any more.');
+      }
+    }
+    var cuts = pr.saleCuts(price);
+    var cost = cuts.price - cuts.worker;
+    if (!saleById(seller, worker, things, cuts.seller, cost)) {
+      return refuse('Something went wrong moving it. Nothing was taken.');
+    }
+    var what = describe(things, 0);
+    var me = nameOf(worker), them = nameOf(seller);
+    try {
+      say(seller, 'Sold to the Free Skyrim Trading Company for ' + cuts.price + ' gold. ' + what +
+          ' left Skyrim. ' + (cuts.worker
+            ? 'You receive ' + cuts.seller + ': ' + cuts.worker + ' went to ' + me + ' for handling it, and ' +
+              cuts.gone + ' left the world.'
+            : 'Under 10 gold nothing is cut, and you receive the whole ' + cuts.price + '.'));
+      say(worker, 'Bought for the company at ' + cuts.price + ' gold. ' + what + ' left Skyrim. ' + (cuts.worker
+            ? 'It cost you ' + cost + ': your ' + cuts.worker + ' for handling it stays with you, ' + cuts.gone +
+              ' left the world, and ' + them + ' received ' + cuts.seller + '.'
+            : 'Under 10 gold nothing is cut: ' + them + ' received the whole ' + cuts.price + '.'));
+    } catch (e) { }
+    tlog(me, 'bought', them + '\'s', what, 'for the company at', cuts.price, 'gold:', cuts.seller, 'to the seller,',
+         cuts.worker, 'to the worker,', cuts.gone, 'destroyed, and the things left the world');
+    close(t, '');
+    return '';
+  }
+
+  /*
+    A pack's entries less [baseId, count] pairs, or null when they are not
+    all there. An entry that is only partly taken keeps everything else it
+    had.
+  */
+  function withoutPairs(entries, pairs) {
+    var out = entries.slice();
+    for (var i = 0; i < pairs.length; i++) {
+      var baseId = pairs[i][0], left = pairs[i][1];
+      for (var k = 0; k < out.length && left > 0; k++) {
+        if (!out[k] || out[k].baseId !== baseId) { continue; }
+        var had = out[k].count || 1;
+        var take = Math.min(left, had);
+        var rest = {};
+        for (var f in out[k]) { if (Object.prototype.hasOwnProperty.call(out[k], f)) { rest[f] = out[k][f]; } }
+        rest.count = had - take;
+        out[k] = rest;
+        left -= take;
+      }
+      if (left > 0) { return null; }
+    }
+    var keep = [];
+    for (var j = 0; j < out.length; j++) {
+      if (out[j] && (out[j].count || 0) > 0) { keep.push(out[j]); }
+    }
+    return keep;
+  }
+
+  /*
+    A company sale's two packs, one write each, or nothing at all (#1393).
+    The seller's: the things out, and out of the world, and their share in.
+    The worker's: the price less their own cut out. Gold in the seller's
+    pack goes up by less than the worker's goes down; the difference is the
+    10% that leaves the server.
+  */
+  function saleById(sellerActor, workerActor, things, share, cost) {
+    var GOLD = (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F;
+    var sellerInv, workerInv;
+    try {
+      sellerInv = mp.get(sellerActor, 'inventory') || { entries: [] };
+      workerInv = mp.get(workerActor, 'inventory') || { entries: [] };
+    } catch (e) { return false; }
+    var pairs = [];
+    for (var i = 0; i < things.length; i++) { pairs.push([things[i].id, things[i].c]); }
+    var gone = withoutPairs((sellerInv.entries || []).slice(), pairs);
+    var paid = withoutPairs((workerInv.entries || []).slice(), [[GOLD, cost]]);
+    if (!gone || !paid || !(share > 0) || !(cost >= share)) { return false; }
+    var landed = false;
+    for (var k = 0; k < gone.length; k++) {
+      if (gone[k] && gone[k].baseId === GOLD && !gone[k].worn) {
+        gone[k] = { baseId: GOLD, count: (gone[k].count || 1) + share };
+        landed = true;
+        break;
+      }
+    }
+    if (!landed) { gone.push({ baseId: GOLD, count: share }); }
+    try {
+      mp.set(sellerActor, 'inventory', { entries: gone });
+      mp.set(workerActor, 'inventory', { entries: paid });
+    } catch (e2) { return false; }
+    return true;
   }
 
   function describe(items, goldN) {
@@ -51435,6 +53127,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       theyAgreed: meA ? t.okB : t.okA,
       pack: carrying(actorId),
       heldGold: holding(actorId, (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F),
+      // A sale out of Skyrim (#1393): the split, and whether this side may
+      // press Buy for the company.
+      sale: t.sale ? saleView(t, actorId) : null,
+      canBuy: (!t.sale || t.sale === actorId) && companyOf(actorId),
       at: Date.now()
     };
   }
@@ -51510,7 +53206,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
   g.__thornswoodTrade = {
     TRADE: TRADE,
-    begin: begin, add: add, remove: remove, gold: gold,
+    begin: begin, add: add, remove: remove, gold: gold, sale: sale, saleById: saleById,
     confirm: confirm, cancel: cancel, tradeOf: tradeOf,
     carrying: carrying, labelOf: labelOf, within: within,
     view: view, push: push, refresh: refresh, tick: tick, swap: swap, moveById: moveById,
@@ -55463,9 +57159,10 @@ try {
   docs/systems/quests.md. Supply is not this block. Scene gold is created
   with addItem. It is not taken from a trader purse.
 
-  The page does not name the one world reference a scarce place uses, or
-  the sack, shelf, chest, urn, cell, or hold a scene row names. Those stay
-  unbound. A rare vein stays shut until its one place is bound. Which gem
+  The rare mine is bound: RARE_PLACES below is the one building each rare
+  seam is, and every vein of that seam anywhere else stays shut. The page
+  does not name the place the other scarce rows use, or the sack, shelf,
+  chest, urn, cell, or hold a scene row names. Those stay unbound. Which gem
   a trader names, among the four on the miner page, is likewise not said.
 */
 (function () {
@@ -55480,6 +57177,32 @@ try {
     'Sapphire': 'gem',
     'Stalhrim': 'stalhrim',
     'Heart Stone': 'heartstone'
+  };
+  /*
+    THE ONE PLACE EACH RARE SEAM IS (#1380).
+
+    Patrick, 4 Oct: ebony is Raven Rock Mine, stalhrim Kolbjorn Barrow, heart
+    stone Coldcinder Cave, ruby White Ridge Sanctum, sapphire Highpoint Tower,
+    emerald Kolbjorn Barrow, amethyst Highpoint Tower. A place is the
+    building, keyed by its cell as game/data/mine-buildings.json keys it, so
+    every vein of that seam inside it is the place (thirteen ebony in Raven
+    Rock Mine) and the same seam in any other building or on open ground is
+    shut. The trader's scarce quest is the only way in. Once it is turned in
+    the place is shut to that person until the quest's cooldown ends, which
+    turnIn stamps below. No steward has any part in it.
+  */
+  var RARE_PLACES = {
+    ebony: { cell: '142fc:Dragonborn.esm' },
+    stalhrim: { cell: '142ee:Dragonborn.esm' },
+    heartstone: { cell: '3929e:Dragonborn.esm' },
+    gem: {
+      cells: {
+        Ruby: '3c7f5:Dragonborn.esm',
+        Sapphire: '184f0:Dragonborn.esm',
+        Emerald: '142ee:Dragonborn.esm',
+        Amethyst: '184f0:Dragonborn.esm'
+      }
+    }
   };
   var SCARCE = [
     { id: 'ebony', name: 'The ebony', who: 'Miner, master', classKey: 'miner', rank: 'master', ask: 4, holds: 12, hours: 24, scarce: true },
@@ -55600,12 +57323,10 @@ try {
       var open = held && held.open[id];
       if (!open) return 'This place is shut.';
       var place = places[id] || {};
-      if (row.gems) {
-        if (seam.name !== open.gem) return 'This place is shut.';
-        if (!place.refs || place.refs[open.gem] !== refrId) return 'This place is shut.';
-      } else if (place.ref !== refrId) {
-        return 'This place is shut.';
-      }
+      if (row.gems && seam.name !== open.gem) return 'This place is shut.';
+      var cell = row.gems ? (place.cells && place.cells[open.gem]) : place.cell;
+      var veinCell = deps.cellOf ? deps.cellOf(refrId) : '';
+      if (!cell || veinCell !== cell) return 'This place is shut.';
       if (open.drawn >= row.holds) return 'This place has nothing left until you turn the work in.';
       return null;
     }
@@ -55799,6 +57520,9 @@ try {
           } catch (e) { return ''; }
         },
         traderHold: function () { return ''; }
+      });
+      Object.keys(RARE_PLACES).forEach(function (id) {
+        globalThis.__thornswoodQuests.bindPlace(id, RARE_PLACES[id]);
       });
     } catch (e) {
       try { log('custom quests failed to start:', e); } catch (e2) {}

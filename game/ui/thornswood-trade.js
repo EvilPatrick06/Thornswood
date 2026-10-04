@@ -118,6 +118,8 @@
     '#' + ID + ' .gold{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}',
     '#' + ID + ' .gold input{width:110px;margin:0}',
     '#' + ID + ' .ok{color:#9fcf92}',
+    '#' + ID + ' .sale{padding:10px 12px;margin-bottom:10px;line-height:1.5;',
+    '  border:1px solid rgba(198,170,109,.55);background:rgba(0,0,0,.20)}',
     '#' + ID + ' .wait{color:rgba(217,207,180,.6)}',
     '#' + ID + ' .foot{padding:12px 20px;border-top:1px solid rgba(198,170,109,.22);display:flex;gap:12px;',
     '  align-items:center;font-size:13.5px;font-style:italic;color:rgba(217,207,180,.7)}',
@@ -147,11 +149,14 @@
       '<div class="col" id="' + ID + '-theirs"></div>' +
       '</div>' +
       '<div class="foot"><span id="' + ID + '-state"></span><span style="flex:1"></span>' +
+      '<button id="' + ID + '-sale" style="display:none">Buy for the company</button>' +
       '<button id="' + ID + '-cancel">Walk away</button>' +
       '<button class="go" id="' + ID + '-ok">Agree</button></div>' +
       '</div>';
     document.body.appendChild(root);
     root.querySelector('#' + ID + '-cancel').onclick = function () { net('/trade cancel'); };
+    // A sale out of Skyrim (#1393): only a company worker sees it.
+    root.querySelector('#' + ID + '-sale').onclick = function () { net('/trade sale'); };
     root.querySelector('#' + ID + '-ok').onclick = function () { net('/trade ok'); };
     /*
       Escape WALKS AWAY rather than hiding the panel, and that is deliberate.
@@ -170,9 +175,38 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  /*
+    A SALE OUT OF SKYRIM (#1393). When a company worker has pressed Buy for
+    the company, both sides read what happens before they agree: the things
+    leave Skyrim, and the gold is split as the server says.
+  */
+  function saleLine(s) {
+    if (!s) { return ''; }
+    var split = s.cut
+      ? (s.mine
+        ? 'Of ' + s.price + ' gold, ' + esc(data.them) + ' receives ' + s.seller + ', ' + s.cut +
+          ' stays with you for handling it, and ' + s.gone + ' leaves the world.'
+        : 'Of ' + s.price + ' gold, you receive ' + s.seller + ', ' + s.cut + ' is ' + esc(s.worker) +
+          '\'s for handling it, and ' + s.gone + ' leaves the world.')
+      : (s.price
+        ? 'Under 10 gold nothing is cut: the whole ' + s.price + ' goes to ' + (s.mine ? esc(data.them) : 'you') + '.'
+        : (s.mine ? 'Put the price up as gold.' : 'No price is up yet.'));
+    return '<div class="sale">' + (s.mine
+      ? 'You are buying for the Free Skyrim Trading Company. What ' + esc(data.them) +
+        ' puts up leaves Skyrim and does not come back. Your gold is the price. '
+      : esc(s.worker) + ' is buying for the Free Skyrim Trading Company. What you put up leaves Skyrim ' +
+        'and does not come back. Their gold is the price. ') + split + '</div>';
+  }
+
   function draw() {
     if (!root || !data) { return; }
-    root.querySelector('#' + ID + '-title').textContent = 'Trading with ' + (data.them || 'somebody');
+    root.querySelector('#' + ID + '-title').textContent = data.sale
+      ? (data.sale.mine ? 'Buying for the company from ' + (data.them || 'somebody')
+                        : 'Selling out of Skyrim to ' + (data.them || 'somebody'))
+      : 'Trading with ' + (data.them || 'somebody');
+    var saleBtn = root.querySelector('#' + ID + '-sale');
+    saleBtn.style.display = data.canBuy ? '' : 'none';
+    saleBtn.textContent = data.sale && data.sale.mine ? 'Make it a trade' : 'Buy for the company';
 
     // What you are carrying, with a box to narrow it down: a pack of two
     // hundred things is not a list anybody reads.
@@ -229,7 +263,8 @@
     pack.innerHTML = ph;
 
     var mine = root.querySelector('#' + ID + '-mine');
-    var mh = '<h3>You are offering ' + (data.iAgreed ? '<span class="ok">&#10003; agreed</span>' : '') + '</h3>';
+    var mh = '<h3>You are offering ' + (data.iAgreed ? '<span class="ok">&#10003; agreed</span>' : '') + '</h3>' +
+             saleLine(data.sale);
     if (!(data.mine || []).length) { mh += '<div class="none">Nothing yet.</div>'; }
     for (var j = 0; j < (data.mine || []).length; j++) {
       var mineRow = data.mine[j];
