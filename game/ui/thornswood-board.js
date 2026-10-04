@@ -129,7 +129,7 @@
     if (!wall.length) { out += '<div class="none">Nothing on it.</div>'; }
     for (var i = 0; i < wall.length; i++) {
       var row = wall[i];
-      var kind = row.job ? 'Job' : 'Notice';
+      var kind = row.letter ? 'Letter' : (row.job ? 'Job' : 'Notice');
       var who = row.taken ? ', taken by ' + esc(row.taken) : '';
       out += '<div class="row"><span class="nm"><b>' + esc(row.n) + '.</b> ' + kind +
         ', ' + esc(row.name) + who + '<br>' + esc(row.text) + '</span><span class="tools">';
