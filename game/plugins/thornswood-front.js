@@ -82,7 +82,8 @@
   const UI_PATH = 'Data/Platform/UI/index.html';
   const OVERLAYS = ['thornswood-chat.js', 'thornswood-emotes.js', 'thornswood-voice.js',
                     'thornswood-skills.js', 'thornswood-party.js',
-                    'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js', 'thornswood-afk.js'];
+                    'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js',
+                    'thornswood-maneuvers.js', 'thornswood-afk.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -349,6 +350,12 @@
   */
   const MOLD_KEY    = iniNumber(ini, 'MoldKey', 22);       // U
   const LOCK_KEY    = iniNumber(ini, 'LockKey', 45);       // X
+  /*
+    A warrior's maneuvers (#1386): opens the maneuver panel. 9, scan code 10:
+    1 to 8 are the emote slots and the game's own hotkeys, and every letter is
+    already one of ours or the game's.
+  */
+  const MANEUVER_KEY = iniNumber(ini, 'ManeuverKey', 10);  // 9
   /* What the prompt calls them. Read off the scan code so a rebind in the ini
      changes the letter on the screen as well as the key that works. */
   function keyName(code) {
@@ -356,7 +363,8 @@
       16: 'Q', 17: 'W', 18: 'E', 19: 'R', 20: 'T', 21: 'Y', 22: 'U', 23: 'I',
       24: 'O', 25: 'P', 30: 'A', 31: 'S', 32: 'D', 33: 'F', 34: 'G', 35: 'H',
       36: 'J', 37: 'K', 38: 'L', 44: 'Z', 45: 'X', 46: 'C', 47: 'V', 48: 'B',
-      49: 'N', 50: 'M'
+      49: 'N', 50: 'M',
+      2: '1', 3: '2', 4: '3', 5: '4', 6: '5', 7: '6', 8: '7', 9: '8', 10: '9', 11: '0'
     };
     return letters[code] || ('#' + code);
   }
@@ -366,6 +374,7 @@
   const MUTE_NAME = keyName(MUTE_KEY);
   const MOLD_NAME = keyName(MOLD_KEY);
   const LOCK_NAME = keyName(LOCK_KEY);
+  const MANEUVER_NAME = keyName(MANEUVER_KEY);
 
   const ESC = 1;
 
@@ -1943,7 +1952,7 @@
     skills: 'thornswoodSkills', party: 'thornswoodParty', journal: 'thornswoodJournal',
     board: 'thornswoodBoard',
     trade: 'thornswoodTrade', merchant: 'thornswoodMerchant', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
-    afk: 'thornswoodAfk'
+    afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers'
   };
 
   T.claimFocus = function (who, on) {
@@ -7174,6 +7183,8 @@
       return;
     }
 
+    if (e.code === MANEUVER_KEY) { maneuverKeyPressed(); return; }
+
     if (e.code === SKILLS_KEY) {
       if (claims.chat) { return; }
       const busyNow = busyMenuOpen();
@@ -8057,6 +8068,9 @@
       }
       return;
     }
+    if (what === 'maneuvers:opened') { T.claimFocus('maneuvers', true); return; }
+    if (what === 'maneuvers:closed') { T.claimFocus('maneuvers', false); return; }
+    if (what === 'maneuvers:ready') { log('the maneuver panel is in'); maneuversToPage(); return; }
     if (what === 'trade:opened') { T.claimFocus('trade', true); return; }
     if (what === 'trade:closed') { T.claimFocus('trade', false); return; }
     if (what === 'merchant:opened') { T.claimFocus('merchant', true); return; }
@@ -8125,7 +8139,12 @@
       own can send the map by itself. The same numbers arriving twice cost
       nothing; an unchanged map is never applied twice.
     */
-    if (what.indexOf('skills:view ') === 0) { skillsCreatingFrom(what.slice(12)); treeFromView(what.slice(12)); return; }
+    if (what.indexOf('skills:view ') === 0) {
+      skillsCreatingFrom(what.slice(12));
+      treeFromView(what.slice(12));
+      maneuversFromView(what.slice(12));
+      return;
+    }
     if (what.indexOf('skills:effects ') === 0) { treeFromMap(what.slice(15)); return; }
 
     if (what === 'typing') { beat = Date.now(); return; }
@@ -8405,6 +8424,72 @@
   }));
 
   // <<< tree apply: end <<<
+
+  // ------------------------------------------------- a warrior's maneuvers --
+  /*
+    #1386. Patrick, 4 October: no chat commands for anything people do. So a
+    warrior's maneuver is a key and a panel, not /maneuver typed into the
+    chat. The maneuver key (ManeuverKey in Thornswood.ini, 9 by default,
+    because 1 to 8 are the emote slots and every letter is somebody's) opens
+    game/ui/thornswood-maneuvers.js, which lists the rows this character
+    holds; a number or a click there sends /maneuver <name> to the server
+    through the chat's socket, the way the trade and party keys do, and the
+    server's answer comes back in the chat. The relay is collected every one
+    and a half seconds (the chat commands block in the gamemode), so a
+    maneuver starts within a second or two of the press.
+
+    THE ROWS come off the character panel's view, the same view the tree
+    hand reads (skills:view, see treeFromView), as v.panel.maneuvers: the
+    name, the stamina and whether its wait is over. The server redraws that
+    view when one starts and when its wait ends, so nothing here keeps a
+    clock. A character who holds none has no rows, and the key says so.
+
+    The panel holds the keyboard while it is up, under the 'maneuvers' claim,
+    so 1 to 8 reach the panel and not the emote slots or the game's own
+    hotkeys. It says when it opens and closes, the same as every other panel,
+    and the cap closes it like the rest (CAP_CLOSES).
+  */
+  let maneuverRows = [];
+
+  function maneuversToPage() {
+    T.js('try{window.thornswoodManeuvers&&window.thornswoodManeuvers.setRows(' +
+         JSON.stringify(maneuverRows) + ',' + JSON.stringify(MANEUVER_NAME) + ');}catch(e){}');
+  }
+
+  /* The whole panel view, as treeFromView takes it. Only v.panel.maneuvers
+     is read. */
+  function maneuversFromView(json) {
+    let v = null;
+    try { v = JSON.parse(String(json)); } catch (e) { return; }
+    if (!v || typeof v !== 'object') { return; }
+    const view = (v.panel && typeof v.panel === 'object') ? v.panel : v;
+    const list = Array.isArray(view.maneuvers) ? view.maneuvers : [];
+    const rows = [];
+    for (let i = 0; i < list.length; i++) {
+      const r = list[i];
+      if (!r || typeof r.key !== 'string' || !/^[a-z]+$/.test(r.key)) { continue; }
+      rows.push({ key: r.key, name: String(r.name || r.key), stamina: Number(r.stamina) || 0,
+                  cooldown: Number(r.cooldown) || 0, ready: !!r.ready });
+    }
+    const was = JSON.stringify(maneuverRows);
+    maneuverRows = rows;
+    if (JSON.stringify(rows) !== was) { maneuversToPage(); }
+  }
+
+  /* The maneuver key, with the panel shut: a panel up holds the keyboard, and
+     then the page hears the key and closes itself. */
+  function maneuverKeyPressed() {
+    if (claims.chat) { return; }
+    const busyNow = busyMenuOpen();
+    if (busyNow) { say('maneuver key seen, but ' + busyNow + ' is open'); return; }
+    if (skillsCreating) { return; }
+    if (!maneuverRows.length) {
+      note('You have no maneuvers. They are a warrior\'s, on the half you picked.');
+      return;
+    }
+    maneuversToPage();
+    T.js('try{window.thornswoodManeuvers&&window.thornswoodManeuvers.open();}catch(e){}');
+  }
 
   /*
     Write the game's real load order to disk, once, on the first update.

@@ -542,6 +542,9 @@ namespace Thornswood
             l.Add(Dx("lockkey", "ThornsWood", "Lock the door",
                      "Locks the door you last opened, the same door /claim and /lock use. Logged to the server as /lock. Unlock is still /unlock.",
                      ThornIni, "LockKey", 45));
+            l.Add(Dx("maneuvers", "ThornsWood", "A warrior's maneuvers",
+                     "Opens a small panel with the maneuvers you hold. Press a number or click one to start it. This key or Escape closes the panel.",
+                     ThornIni, "ManeuverKey", 10));
 
             l.Add(Dx("cyclehold", "Reaching things", "Cycle modifier",
                      "Held down, the two keys below step through everything you could reach instead of the game picking for you.",
