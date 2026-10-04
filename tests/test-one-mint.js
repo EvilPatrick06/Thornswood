@@ -333,7 +333,8 @@ const WRITERS = {
   'property/giveNamed': [1, 'one named key or mold, KEY or MOLD'],
   'property/takeBlankMold': [1, 'only takes a mold away'],
   'property/nameFreshKey': [1, 'names one key off a stack, and the count is the same after'],
-  'property/takeGold': [1, 'takes a notice or job fee out and never puts any in (checked below)'],
+  'property/takeGold': [1, 'takes a notice, job or letter fee out and never puts any in (checked below)'],
+  'property/payOut': [1, 'a letter\'s held 15 back out of the ledger it was counted on, to its courier or its sender; payHeld is its one caller and takes the same off that ledger (#1374, checked below)'],
   'spoils/strip': [1, 'only takes things out of a container the world stocked'],
   'spoils/purse': [1, 'THE MINT: forty gold, once per character'],
   'trade/moveById': [2, 'moves a pile from one pack to the other, one write each (section 4)']
@@ -383,9 +384,10 @@ for (const at of Object.keys(WRITERS)) {
 }
 
 {
-  // Of all the writers, only two name gold: the mint that hands it out and
-  // the fee that takes it. A third one naming gold is a second mint until
-  // somebody has read it.
+  // Of all the writers, only three name gold: the mint that hands it out,
+  // the fee that takes it, and the ledger paying a letter's held pay back
+  // out (#1374). A fourth one naming gold is a second mint until somebody
+  // has read it.
   const namesGold = /\b(GOLD|GOLD_ID|goldId)\b|\b0x0*[fF]\b/;
   const naming = [];
   for (const at of Object.keys(WRITERS)) {
@@ -393,9 +395,9 @@ for (const at of Object.keys(WRITERS)) {
     if (body !== null && namesGold.test(body)) { naming.push(at); }
   }
   naming.sort();
-  yes('of the writers, only purse and takeGold name gold' +
+  yes('of the writers, only purse, takeGold and payOut name gold' +
       (naming.length ? ' (' + naming.join(', ') + ')' : ''),
-      naming.join(',') === 'property/takeGold,spoils/purse');
+      naming.join(',') === 'property/payOut,property/takeGold,spoils/purse');
 }
 
 {
@@ -460,11 +462,64 @@ for (const at of Object.keys(WRITERS)) {
   }
   const notice = /\bvar NOTICE_FEE = (\d+);/.exec(code);
   const job = /\bvar JOB_FEE = (\d+);/.exec(code);
-  yes('its one caller passes the fee, and the fee is NOTICE_FEE or JOB_FEE',
-      callers.join(',') === 'fee' &&
-      /\bvar fee = isJob \? JOB_FEE : NOTICE_FEE;/.test(code));
-  yes('and both fees are more than nothing',
-      !!notice && !!job && Number(notice[1]) > 0 && Number(job[1]) > 0);
+  const letterFee = /\bvar LETTER_FEE = (\d+);/.exec(code);
+  const letterPay = /\bvar LETTER_PAY = (\d+);/.exec(code);
+  yes('its two callers pass the fee, NOTICE_FEE or JOB_FEE, and a letter\'s cost, LETTER_FEE and LETTER_PAY',
+      callers.join(',') === 'fee,cost' &&
+      /\bvar fee = isJob \? JOB_FEE : NOTICE_FEE;/.test(code) &&
+      /\bvar cost = LETTER_FEE \+ LETTER_PAY;/.test(code));
+  yes('and every one of those is more than nothing',
+      !!notice && !!job && Number(notice[1]) > 0 && Number(job[1]) > 0 &&
+      !!letterFee && !!letterPay && Number(letterFee[1]) > 0 && Number(letterPay[1]) > 0);
+}
+
+{
+  /*
+    payOut puts gold in a pack, so it is read the way takeGold is (#1374).
+    Its one caller is payHeld, which pays a letter's own held pay, never more
+    than that hold's ledger holds, takes the same count off the ledger, and
+    zeroes the pay so it is paid once. Driven here: packs plus ledger add up
+    to the same after a payout, and a ledger short of the pay pays nothing.
+  */
+  const calls = [];
+  const re = /\bpayOut\(/g;
+  let m2;
+  while ((m2 = re.exec(code)) !== null) {
+    if (code.slice(Math.max(0, m2.index - 9), m2.index) === 'function ') { continue; }
+    calls.push(where(m2.index));
+  }
+  yes('payOut has one caller, payHeld', calls.join(',') === 'property/payHeld');
+  const pay = lift('  function payOut(actorId, amount) {', '\n  }\n');
+  const held = lift('  function payHeld(hold, n, actorId) {', '\n  }\n');
+  yes('the payout and the held pay are in the gamemode', pay !== null && held !== null);
+  if (pay !== null && held !== null) {
+    attempt('driving payHeld', function () {
+      const A = 0xff000058;
+      const store = {};
+      store[A] = { inventory: { entries: [{ baseId: GOLD, count: 5 }] } };
+      const ledger = { riften: 35 };
+      const api = new Function('mp', 'GOLD_ID', 'funds', 'plog',
+        pay + '\n' + held + '\nreturn { payHeld: payHeld, payOut: payOut };')(
+        fakeMp(store), GOLD, ledger, function () { });
+      const api2 = api.payHeld;
+      const letter = { letter: true, pay: 15 };
+      const before = goldIn(store[A].inventory) + ledger.riften;
+      yes('a letter\'s 15 goes from the ledger to the pack, and the total is the same',
+          api2('riften', letter, A) === 15 && goldIn(store[A].inventory) === 20 &&
+          ledger.riften === 20 && goldIn(store[A].inventory) + ledger.riften === before);
+      yes('and it is paid once', api2('riften', letter, A) === 0 && goldIn(store[A].inventory) === 20);
+      const short = { riften: 10 };
+      const api3 = new Function('mp', 'GOLD_ID', 'funds', 'plog',
+        pay + '\n' + held + '\nreturn payHeld;')(fakeMp(store), GOLD, short, function () { });
+      yes('a ledger short of the pay pays nothing',
+          api3('riften', { letter: true, pay: 15 }, A) === -1 &&
+          goldIn(store[A].inventory) === 20 && short.riften === 10);
+      yes('a notice holds nothing to pay', api2('riften', { pay: 15 }, A) === 0 &&
+          goldIn(store[A].inventory) === 20);
+      yes('payOut refuses a count that is not more than nothing',
+          api.payOut(A, 0) === false && api.payOut(A, -5) === false && goldIn(store[A].inventory) === 20);
+    });
+  }
 }
 
 // ------------------------------------- 3. no descriptor in the file is gold

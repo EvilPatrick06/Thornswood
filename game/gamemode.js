@@ -35082,6 +35082,22 @@ log('gamemode loaded:',
   var GOLD_ID = 0x0000000F;
   var NOTICE_FEE = 20;
   var JOB_FEE = 30;
+  /*
+    A LETTER, #1374. 35 gold up front, the same for everybody. LETTER_FEE is
+    the board's and stays on the hold's ledger like a notice's. LETTER_PAY is
+    the courier's: it is counted on the same ledger while the letter is up and
+    paid back out of it, to the courier on delivery or to the sender on an
+    /unpin. It is the sender's gold moved, never new gold. There is no
+    courier cooldown; the sender's gold is the limit.
+
+    LETTER_REACH is the trade's 700 units, about 10 metres, which is the reach
+    the page gives a delivery. deliver reads the trade block's own number when
+    that block is loaded, so the two cannot drift apart.
+  */
+  var LETTER_FEE = 20;
+  var LETTER_PAY = 15;
+  var LETTER_CHARS = 300;
+  var LETTER_REACH = 700;
 
   function loadPart(key, fallback) {
     try {
@@ -35451,6 +35467,28 @@ log('gamemode loaded:',
   };
 
   /*
+    RAVEN ROCK, THE TENTH BOARD, #1374. The page: "Raven Rock's board starts
+    at that town's inn until a steward walks it somewhere better."
+
+    Vanilla Skyrim has one inn in Raven Rock, The Retching Netch, in
+    Dragonborn.esm. Its interior cell is 17ec0:Dragonborn.esm
+    (DLC2RRTheRetchingNetch in game/data/doors.json). The point is where its
+    innkeeper, Geldis Sadri, is placed (ref 18291:Dragonborn.esm in
+    game/data/merchant-traders.json), which is the spot
+    game/data/guild-sites.json already gives Raven Rock's guild site and
+    docs/systems/merchants-guild.md calls where that town's board starts.
+
+    Raven Rock is not in the chargen table, so the inn fallback in
+    seededBoards never found it and only nine boards were ever seeded. A town
+    in here is seeded only when that table did not already give it a board.
+    A steward's /board move takes it over for good, the same as any other
+    board, because seedBoards keeps a placed board whatever the seeding says.
+  */
+  var BOARD_INNS = {
+    ravenrock: { cell: '17ec0:Dragonborn.esm', pos: [-39, -178.2, 0], where: 'Raven Rock' }
+  };
+
+  /*
     WHICH SEEDING A BOARD IS STANDING ON, AND WHY A NUMBER RATHER THAN A FLAG.
 
     boards is SAVED, in the register beside the claims and the notices, and it
@@ -35543,6 +35581,12 @@ log('gamemode loaded:',
     } catch (e) {
       plog('could not seed the boards from the town table:', e);
     }
+    for (var inn in BOARD_INNS) {
+      if (!Object.prototype.hasOwnProperty.call(BOARD_INNS, inn) || out[inn]) { continue; }
+      var at = BOARD_INNS[inn];
+      out[inn] = { cell: at.cell, pos: [at.pos[0], at.pos[1], at.pos[2]],
+                   where: at.where || inn, seed: BOARD_SEED };
+    }
     return out;
   }
 
@@ -35607,8 +35651,9 @@ log('gamemode loaded:',
         wall.push({
           n: i + 1,
           job: !!n.job,
+          letter: !!n.letter,
           name: n.name || 'somebody',
-          text: n.text || '',
+          text: n.letter ? sealed(n) : (n.text || ''),
           taken: n.taken ? (n.takenName || 'somebody') : '',
           mine: Number(n.by) === Number(profileId),
           held: !!(n.job && Number(n.taken) === Number(profileId))
@@ -35620,7 +35665,8 @@ log('gamemode loaded:',
         for (var j = 0; j < rows.length; j++) {
           var job = rows[j];
           if (job.job && Number(job.taken) === Number(profileId) && !job.down) {
-            mine.push({ hold: h, n: j + 1, text: job.text || '', name: job.name || 'somebody' });
+            mine.push({ hold: h, n: j + 1, text: job.letter ? sealed(job) : (job.text || ''),
+                        name: job.name || 'somebody' });
           }
         }
       }
@@ -35652,6 +35698,16 @@ log('gamemode loaded:',
   function moveBoard(hold, actorId, profileId, toProfile) {
     if (!isSteward(profileId)) {
       toProfile(profileId, 'Only a steward moves a board.');
+      return true;
+    }
+    /*
+      ONLY A BOARD THAT IS THERE, #1374. One board a town, ten towns. This
+      took any word, so '/board move whiterum' saved an eleventh board that no
+      hold's ledger knows about.
+    */
+    if (!Object.prototype.hasOwnProperty.call(boards, hold)) {
+      toProfile(profileId, 'No board in ' + hold + '. The boards are ' +
+                Object.keys(boards).join(', ') + '.');
       return true;
     }
     var cell = null, pos = null;
@@ -35704,6 +35760,67 @@ log('gamemode loaded:',
       }
     }
     return false;
+  }
+
+  /*
+    THE LEDGER PAYING OUT, and only a letter's held courier pay, #1374.
+
+    takeGold destroys a fee from a pack and the fee is counted on the hold's
+    ledger. This is the other half docs/systems/gold.md describes: it creates
+    the same count back into a pack, and payHeld takes it off that ledger in
+    the same step, so the coin was already in the world and packs plus ledger
+    add up to the same after. payHeld is its one caller, and it pays a
+    letter's own `pay`, which postLetter took from the sender, never more
+    than the ledger holds.
+  */
+  function payOut(actorId, amount) {
+    var count = Math.floor(Number(amount) || 0);
+    if (!(count > 0)) { return false; }
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return false; }
+    var entries = (inv && inv.entries) || [];
+    var put = false;
+    for (var i = 0; i < entries.length && !put; i++) {
+      var e = entries[i];
+      if (e && e.baseId === GOLD_ID) { e.count = (Number(e.count) || 0) + count; put = true; }
+    }
+    if (!put) { entries.push({ baseId: GOLD_ID, count: count }); }
+    try { mp.set(actorId, 'inventory', { entries: entries }); } catch (e2) { return false; }
+    return true;
+  }
+
+  /*
+    A letter's held pay, out of its hold's ledger into one pack. Answers what
+    was paid, 0 when nothing is held, or -1 when it could not be paid and
+    nothing changed. n.pay goes to 0 once paid, so it is paid once.
+  */
+  function payHeld(hold, n, actorId) {
+    var amount = (n && n.letter) ? (Math.floor(Number(n.pay)) || 0) : 0;
+    if (!(amount > 0)) { return 0; }
+    if ((Number(funds[hold]) || 0) < amount) {
+      plog('a letter in', hold, 'holds', amount, 'and the ledger has only', funds[hold], '; nothing paid');
+      return -1;
+    }
+    if (!payOut(actorId, amount)) { return -1; }
+    funds[hold] = (Number(funds[hold]) || 0) - amount;
+    n.pay = 0;
+    return amount;
+  }
+
+  /* What anybody but the person it is for reads of a letter: who it is for. */
+  function sealed(n) {
+    return 'A sealed letter for ' + (n.to || 'somebody');
+  }
+
+  /*
+    The letter's name against a character's. The whole name, or its first
+    words, so 'Lydia' reaches Lydia Stormblade and 'Ly' reaches nobody.
+  */
+  function nameIs(to, name) {
+    var a = String(to || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    var b = String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    if (!a || !b) { return false; }
+    return b === a || b.indexOf(a + ' ') === 0;
   }
 
   function post(parts, actorId, profileId, toProfile, isJob) {
@@ -35823,9 +35940,9 @@ log('gamemode loaded:',
     for (var i = list.length - 1; i >= 0 && shown < 10; i--) {
       var n = list[i];
       if (n.down) { continue; }
-      lines.push('[' + (i + 1) + '] ' +
-                 (n.job ? (n.taken ? 'job, taken: ' : 'job: ') : '') +
-                 n.name + ': ' + n.text);
+      lines.push('[' + (i + 1) + '] ' + (n.letter
+        ? 'letter for ' + n.to + ', from ' + n.name + (n.taken ? ', taken by ' + n.takenName : '')
+        : (n.job ? (n.taken ? 'job, taken: ' : 'job: ') : '') + n.name + ': ' + n.text));
       shown++;
     }
     var more = up > shown
@@ -35890,6 +36007,14 @@ log('gamemode loaded:',
     n.takenName = who;
     n.takenAt = Date.now();
     save();
+    if (n.letter) {
+      plog(who, 'took a letter for', n.to, 'in', hold);
+      toProfile(profileId, 'You take the letter for ' + n.to + ', from ' + n.name + '. It is sealed. ' +
+                'Find ' + n.to + ' and /deliver it within about 10 metres, and the ' +
+                (Number(n.pay) || 0) + ' gold is yours.');
+      refreshPanel(actorId);
+      return true;
+    }
     plog(who, 'took a job in', hold + ':', n.text);
     toProfile(profileId, 'You take it: ' + n.text + '. Go and see ' + n.name + ' about it.');
     refreshPanel(actorId);
@@ -35904,8 +36029,9 @@ log('gamemode loaded:',
       var list = notices[hold];
       for (var i = 0; i < list.length; i++) {
         var n = list[i];
-        if (n.job && n.taken === profileId) {
-          lines.push(hold + ': ' + n.text + ' (for ' + n.name + ')');
+        if (n.job && n.taken === profileId && !n.down) {
+          lines.push(hold + ': ' + (n.letter ? sealed(n) + ', from ' + n.name
+                                             : n.text + ' (for ' + n.name + ')'));
         }
       }
     }
@@ -35929,7 +36055,7 @@ log('gamemode loaded:',
       return true;
     }
     var n = list[at];
-    if (!n.job || n.taken !== profileId) {
+    if (!n.job || n.taken !== profileId || n.down) {
       toProfile(profileId, 'That is not one of yours.');
       return true;
     }
@@ -36005,11 +36131,208 @@ log('gamemode loaded:',
       toProfile(profileId, n.takenName + ' has taken that job. It can come down once they hand it back.');
       return true;
     }
+    /*
+      A LETTER'S PAY COMES BACK, #1374. The board fee stays, like any
+      notice's. The courier's 15 was only held, and with nobody to carry it
+      it is the sender's again. Paid before it comes down, so a pack that
+      cannot be written leaves the letter up and the 15 still held.
+    */
+    var back = n.letter ? payHeld(hold, n, actorId) : 0;
+    if (back < 0) {
+      toProfile(profileId, 'That did not work. The letter is still up.');
+      return true;
+    }
     takedown(hold, at, profileId);
+    if (n.letter) {
+      plog(n.name, 'took down a letter for', n.to, 'in', hold, 'and had', back, 'back');
+      toProfile(profileId, 'You take the letter down. The ' + back + ' gold for the courier comes back ' +
+                'to you. The fee stays with ' + hold + '.');
+      refreshPanel(actorId);
+      return true;
+    }
     plog(n.name, 'took down', n.job ? 'a job' : 'a notice', 'in', hold + ':', n.text);
     toProfile(profileId, 'You take it down. The fee stays with ' + hold + '.');
     refreshPanel(actorId);
     return true;
+  }
+
+  /*
+    ------------------------------------------------------------- a letter
+
+        /letter Lydia Meet me at the Drunken Huntsman at dusk.
+        /letter "Lydia Stormblade" Meet me at the Drunken Huntsman at dusk.
+
+    #1374, as docs/systems/noticeboards.md has it. A letter is a job with a
+    named person at the other end, written standing at the board. The words
+    are up to 300 characters, the same cap as /ooc; a longer one is refused
+    before any gold is taken rather than cut, because the sender paid for the
+    whole letter. The name is one word, or several in double quotes.
+
+    THE WORDS ARE SEALED. Only /deliver hands them to anybody. The wall, the
+    panel, /jobs and the taking line say who it is for and from whom, and the
+    log does not record them either.
+  */
+  function postLetter(parts, actorId, profileId, toProfile) {
+    var hold = boardHere(actorId);
+    if (!hold) {
+      toProfile(profileId, 'Stand at a hold\'s notice board to write a letter there.');
+      return true;
+    }
+    var rest = (parts && parts.length > 1) ? parts.slice(1).join(' ').trim() : '';
+    var to = '', words = '';
+    if (rest.charAt(0) === '"') {
+      var shut = rest.indexOf('"', 1);
+      if (shut > 1) { to = rest.slice(1, shut).trim(); words = rest.slice(shut + 1).trim(); }
+    } else {
+      var gap = rest.indexOf(' ');
+      to = gap < 0 ? rest : rest.slice(0, gap);
+      words = gap < 0 ? '' : rest.slice(gap + 1).trim();
+    }
+    if (!to) {
+      toProfile(profileId, 'Say who it is for, then what it says: /letter <name> <words>.');
+      return true;
+    }
+    if (!words) {
+      toProfile(profileId, 'Say what the letter says.');
+      return true;
+    }
+    if (words.length > LETTER_CHARS) {
+      toProfile(profileId, 'A letter is up to ' + LETTER_CHARS + ' characters. That one is ' +
+                words.length + '. Nothing was taken.');
+      return true;
+    }
+    var cost = LETTER_FEE + LETTER_PAY;
+    if (!takeGold(actorId, cost)) {
+      toProfile(profileId, 'A letter costs ' + cost + ' gold and you do not have it.');
+      return true;
+    }
+    var who = 'somebody';
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      if (ap && ap.name) { who = String(ap.name); }
+    } catch (e) { }
+    if (!notices[hold]) { notices[hold] = []; }
+    notices[hold].push({ by: profileId, name: who, text: words, at: Date.now(),
+                         job: true, letter: true, to: to, pay: LETTER_PAY, taken: 0 });
+    funds[hold] = (Number(funds[hold]) || 0) + cost;
+    save();
+    plog(who, 'posted a letter for', to, 'in', hold, 'for', cost, 'gold');
+    toProfile(profileId, 'Your letter for ' + to + ' is on the board in ' + hold + '. That cost ' + cost +
+              ' gold: ' + LETTER_FEE + ' for the board, and ' + LETTER_PAY +
+              ' held for whoever carries it.');
+    refreshPanel(actorId);
+    return true;
+  }
+
+  /*
+        /deliver Lydia      or the form id the crosshair gives, as /trade takes
+
+    Every letter the courier carries for that person goes over at once,
+    within the trade reach. The name is what is checked and nothing else: the
+    server does not judge what a letter says, and a wrong person is refused
+    with the letter still in the courier's hands. The person it is for is told
+    the words, who wrote them and who brought them. The courier is paid each
+    letter's held 15 out of the ledger it was counted on, and the letter comes
+    off the wall the way an /unpin does, keeping its number.
+  */
+  function deliver(parts, actorId, profileId, toProfile) {
+    var carried = [];
+    for (var h in notices) {
+      if (!Object.prototype.hasOwnProperty.call(notices, h)) { continue; }
+      var list = notices[h] || [];
+      for (var i = 0; i < list.length; i++) {
+        var n = list[i];
+        if (n && n.letter && !n.down && Number(n.taken) === Number(profileId)) {
+          carried.push({ hold: h, at: i, n: n });
+        }
+      }
+    }
+    if (!carried.length) {
+      toProfile(profileId, 'You are not carrying a letter. Take one off a board first.');
+      return true;
+    }
+    var want = (parts && parts.length > 1) ? parts.slice(1).join(' ').trim() : '';
+    if (!want) {
+      toProfile(profileId, 'Say who you are handing it to: /deliver and their name, standing with them.');
+      return true;
+    }
+    var soc = g.__thornswoodSocial;
+    if (!soc || !soc.findPerson || !soc.nameOfPerson || !soc.profileOf) {
+      toProfile(profileId, 'That is not running on this server.');
+      return true;
+    }
+    var found = soc.findPerson(want);
+    if (!found || !found.actorId) {
+      toProfile(profileId, (found && found.why) || 'Nobody here by that name.');
+      return true;
+    }
+    var them = found.actorId;
+    if (them === actorId) { toProfile(profileId, 'That is you.'); return true; }
+    if (!letterReach(actorId, them)) {
+      toProfile(profileId, 'Stand closer. A letter is handed over within about 10 metres.');
+      return true;
+    }
+    var theirName = soc.nameOfPerson(them);
+    var theirPid = Number(soc.profileOf(them)) || 0;
+    if (!theirPid) {
+      // Nobody to hand the words to, so nothing is paid and nothing comes down.
+      toProfile(profileId, 'The server cannot tell who that is right now. Try again in a moment.');
+      return true;
+    }
+    var mine = [];
+    var fors = [];
+    for (var k = 0; k < carried.length; k++) {
+      if (nameIs(carried[k].n.to, theirName)) { mine.push(carried[k]); }
+      else if (fors.indexOf(carried[k].n.to) === -1) { fors.push(carried[k].n.to); }
+    }
+    if (!mine.length) {
+      toProfile(profileId, 'That is ' + theirName + '. What you carry is for ' + fors.join(', ') + '.');
+      return true;
+    }
+    var courier = soc.nameOfPerson(actorId);
+    var paid = 0;
+    var handed = 0;
+    for (var m = 0; m < mine.length; m++) {
+      var c = mine[m];
+      var got = payHeld(c.hold, c.n, actorId);
+      if (got < 0) {
+        toProfile(profileId, 'That did not work. You still have the letter for ' + c.n.to + '.');
+        continue;
+      }
+      paid += got;
+      c.n.delivered = Date.now();
+      c.n.deliveredTo = theirPid;
+      takedown(c.hold, c.at, profileId);
+      handed++;
+      plog(courier, 'handed', theirName, 'a letter from', c.n.name, 'off the board in', c.hold,
+           'and was paid', got);
+      toProfile(theirPid, 'A letter from ' + c.n.name + ', handed to you by ' + courier + ':\n' + c.n.text);
+    }
+    if (handed) {
+      toProfile(profileId, 'You hand ' + theirName + (handed === 1 ? ' the letter. ' : ' ' + handed +
+                ' letters. ') + paid + ' gold is yours.');
+      refreshPanel(actorId);
+      refreshPanel(them);
+    }
+    return true;
+  }
+
+  /* Within the trade's reach of each other, in the same cell. */
+  function letterReach(a, b) {
+    var reach = LETTER_REACH;
+    try {
+      var tr = g.__thornswoodTrade;
+      if (tr && tr.TRADE && Number(tr.TRADE.reach) > 0) { reach = Number(tr.TRADE.reach); }
+    } catch (e) { }
+    try {
+      var ca = String(mp.get(a, 'worldOrCellDesc') || '');
+      var cb = String(mp.get(b, 'worldOrCellDesc') || '');
+      if (!ca || ca !== cb) { return false; }
+      var pa = mp.get(a, 'pos'), pb = mp.get(b, 'pos');
+      if (!pa || !pb) { return false; }
+      var dx = pa[0] - pb[0], dy = pa[1] - pb[1], dz = pa[2] - pb[2];
+      return (dx * dx + dy * dy + dz * dz) <= reach * reach;
+    } catch (e2) { return false; }
   }
 
   function command(word, parts, actorId, profileId, toProfile) {
@@ -36040,6 +36363,8 @@ log('gamemode loaded:',
     if (word === '/jobs') { return jobs(profileId, toProfile); }
     if (word === '/dropjob') { return dropJob(parts, actorId, profileId, toProfile); }
     if (word === '/unpin') { return unpin(parts, actorId, profileId, toProfile); }
+    if (word === '/letter') { return postLetter(parts, actorId, profileId, toProfile); }
+    if (word === '/deliver') { return deliver(parts, actorId, profileId, toProfile); }
     return false;
   }
 
@@ -39001,6 +39326,7 @@ log('gamemode loaded:',
         word === '/steward' || word === '/evict' || word === '/box' ||
         word === '/rent' || word === '/notice' || word === '/job' ||
         word === '/board' || word === '/take' || word === '/jobs' ||
+        word === '/letter' || word === '/deliver' ||
         word === '/dropjob' || word === '/unpin') {
       if (!actorId) {
         toProfile(profileId, 'The server cannot find your character right now. Give it a moment and try again.');
@@ -41131,6 +41457,7 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/deed', '/deeds', '/lock', '/unlock', '/mold', '/key',
                '/jarl', '/steward', '/evict', '/box', '/rent',
                '/notice', '/job', '/board', '/take', '/jobs', '/dropjob', '/unpin',
+               '/letter', '/deliver',
                '/tp', '/goto', '/face', '/restart', '/shutdown', '/tspicks',
                // Playtesters', like /tp, and gated the same way. Deliberately
                // absent from PLAYER_WORDS: naming them in /help would be an
@@ -41202,7 +41529,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // the steward half answers "only a steward sets rent"
                       // to everybody else.
                       '/box', '/rent', '/notice', '/job', '/board',
-                      '/take', '/jobs', '/dropjob', '/unpin', '/help',
+                      '/take', '/jobs', '/dropjob', '/unpin', '/letter', '/deliver', '/help',
                       // Everybody's, and they need to be findable: a meter
                       // nobody knows how to act on is only a penalty.
                       '/needs', '/rest', '/eat', '/drink', '/bard',
