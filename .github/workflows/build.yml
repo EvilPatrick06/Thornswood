@@ -296,6 +296,7 @@ jobs:
                  'test-report-limits.js', 'test-site-hangs.js',
                  'test-backup-restore.ps1',
                  'test-content-release.ps1',
+                 'test-cooldown-sweep.js', 'test-voice-moved-clients.js',
                  'test-release-parity.ps1', 'test-dev-version.ps1', 'test-ship-launcher-reuse.ps1',
                  'test-server-stage-directories.ps1',
                  'test-dev-gamemode-notes.ps1',
