@@ -362,6 +362,10 @@ yes('once taken on, the sister half is the novice row only, even past novice',
   keys(M.held(warrior('bulwark', 'master', 'expert'), M.takenOn(warrior('bulwark', 'master', 'expert')))) === 'cover,plant,rush,set,wall');
 yes('a sister half at novice reads as not taken on, past novice as taken on',
   M.takenOn(warrior('bulwark', 'novice')) === false && M.takenOn(warrior('bulwark', 'novice', 'advanced')) === true);
+box.__thornswoodCharacter.masterFor = function (id, s, half) { return id === 77 && half === 'berserker' ? { ranks: { berserker: 'master' } } : null; };
+yes('a sister half at novice whose Master\'s record stands (/apprentice, #1388) is taken on',
+  M.takenOn(warrior('bulwark', 'novice'), 77) === true && M.takenOn(warrior('bulwark', 'novice'), 78) === false);
+delete box.__thornswoodCharacter.masterFor;
 const master = warrior('berserker', 'master');
 const cookTaught = P.teach(P.pickProfession(P.fresh(), 'cook', 'hearthcook').state, master, 'berserker');
 yes('a Warlord can teach a cook Berserker as an outside trade', cookTaught.ok);
@@ -583,6 +587,17 @@ world.actors.get(BUL).dead = true;
 later(50000);
 yes('nobody starts a maneuver while down', M.use(BUL, 'set') === 'Not while you are down.');
 world.actors.get(BUL).dead = false;
+
+// The sister half through /apprentice.
+box.__thornswoodCharacter.masterFor = function (id, s, half) { return id === BUL && half === 'berserker' ? {} : null; };
+later(100000);
+world.actors.get(BUL).p.stamina = 1;
+yes('once a Warlord has taken a Bulwark on (/apprentice), Rush, the sister half\'s novice row, starts',
+  M.use(BUL, 'rush') === 'Rush: +4 speed for 5 seconds.');
+yes('and Heavy, past the novice row, does not',
+  /sister half, and a sister half has its novice row and no more: Rush/.test(M.use(BUL, 'heavy')));
+delete box.__thornswoodCharacter.masterFor;
+later(6000);
 
 // ------------------------------------------------ the panel's effects map --
 {

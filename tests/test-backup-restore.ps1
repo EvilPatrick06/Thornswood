@@ -10,6 +10,9 @@
   and a character came back and the load order resolves.
 
   It proves:
+    - website configuration, public documents, account records, gallery
+      metadata, uploaded bytes and separate feed metadata are backed up and
+      recovered byte for byte after the original scratch site is deleted
     - the nightly backup takes world, private (characters.json,
       mod-settings.json, take-limit.json, door.json, allowed.json) and data
       from both the live and the dev server, encrypted, and the zip lists
@@ -138,6 +141,7 @@ function Server([string]$root, [int]$port, [string]$who, [int]$worldFiles, [swit
 $work = Join-Path ([IO.Path]::GetTempPath()) ('ts-backup-' + [Guid]::NewGuid().ToString('N').Substring(0, 12))
 $live = Join-Path $work 'live'
 $dev  = Join-Path $work 'dev'
+$site = Join-Path $work 'site'
 $out  = Join-Path $work 'box-backups'
 $key  = Join-Path $work 'key.txt'
 $liveWho = '1234567'
@@ -146,6 +150,26 @@ $devWho  = '7654321'
 try {
     Server $live 45777 $liveWho 1420
     Server $dev  45787 $devWho 30
+    # A site's records and uploaded bytes have no other copy after a loss.
+    # These are invented fixture values, never a deployed configuration.
+    Put (Join-Path $site 'config.json') '{"secret":"fixture-only","discord":{"clientId":"fixture-id"}}'
+    Put (Join-Path $site 'data\site\privacy.md') '# Fixture privacy page'
+    Put (Join-Path $site 'data\board.json') '{"roadmap":{"intro":"Fixture roadmap","sections":[]}}'
+    Put (Join-Path $site 'data\gallery.json') '[{"name":"fixture-shot.png","by":"Fixture author","note":"Fixture caption"}]'
+    Put (Join-Path $site 'data\linked.json') '{"fixture-account":{"profiles":[1234567]}}'
+    Put (Join-Path $site 'uploads\uploads.json') '{"fixture-shot.png":{"orig":"original.png","note":"Fixture caption"}}'
+    Put (Join-Path $site 'uploads\fixture-log.txt') 'Fixture diagnostic log'
+    [IO.File]::WriteAllBytes((Join-Path $site 'uploads\fixture-shot.png'), [byte[]](0..255))
+    foreach ($channel in 'feed', 'feed-dev') {
+        Put (Join-Path $site "$channel\version.json") ('{"version":"fixture-' + $channel + '"}')
+        Put (Join-Path $site "$channel\history\fixture.json") ('{"channel":"' + $channel + '"}')
+    }
+    $sitePrefix = [IO.Path]::GetFullPath($site).TrimEnd('\') + '\'
+    $siteExpected = @{}
+    foreach ($file in @(Get-ChildItem -LiteralPath $site -Recurse -File)) {
+        $relative = $file.FullName.Substring($sitePrefix.Length)
+        $siteExpected[$relative] = [Convert]::ToBase64String([IO.File]::ReadAllBytes($file.FullName))
+    }
     Put $key (Noise 48)
     Put (Join-Path $work 'wrong-key.txt') (Noise 48)
     $keep = [IO.File]::ReadAllBytes((Join-Path $live 'world\changeForms\0.json'))
@@ -167,7 +191,7 @@ try {
 
     # ---- the nightly backup --------------------------------------------------
     $common = @('-GameRoot', $live, '-DevGameRoot', $dev,
-                '-SiteRoot', (Join-Path $work 'no-site'), '-BotRoot', (Join-Path $work 'no-bot'),
+                '-SiteRoot', $site, '-BotRoot', (Join-Path $work 'no-bot'),
                 '-CaddyRoot', (Join-Path $work 'no-caddy'), '-VoiceRoot', (Join-Path $work 'no-voice'))
     $code = Run $Nightly ($common + @('-Out', $out, '-KeyFile', $key))
     Yes "vps-nightly-backup.ps1 runs (exit $code)" ($code -eq 0)
@@ -207,6 +231,8 @@ try {
             $names -contains 'game-dev/world/changeForms/0.json')
         Yes '  and data and the settings from both' (
             $names -contains 'game/data/keep.txt' -and $names -contains 'game-dev/server-settings.json')
+        Yes '  and every website record, upload and separate feed fixture' (
+            @($siteExpected.Keys | Where-Object { $names -notcontains ('site/' + ($_ -replace '\\', '/')) }).Count -eq 0)
         Yes ("  and the zip is far larger than 195 KB ({0} KB)" -f [math]::Round($zip[0].Length / 1KB)) ($zip[0].Length -gt 5 * 195KB)
     }
 
@@ -360,10 +386,27 @@ try {
     if ($code -eq 0 -or -not (Scratch-Clear)) { Show }
 
     $unpackedTo = Join-Path $work 'unpacked-work'
+    # Prove this is recovery from a lost site rather than comparison with a
+    # live source folder. Check the resolved target before deleting scratch.
+    $workPrefix = [IO.Path]::GetFullPath($work).TrimEnd('\') + '\'
+    if (-not $sitePrefix.StartsWith($workPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'The scratch website is outside the test workspace.'
+    }
+    Remove-Item -LiteralPath $site -Recurse -Force
+    Yes 'the original website is gone before recovering its backup' (-not (Test-Path -LiteralPath $site))
     $code = Run $Unpack @('-Backup', $encPath, '-KeyFile', $key, '-To', $unpackedTo, '-Work', $scratch, '-NoPause')
     Yes '  an unpack through -Work leaves the backup in -To and nothing in -Work' (
         $code -eq 0 -and (Test-Path -LiteralPath (Join-Path $unpackedTo 'game\world')) -and (Scratch-Clear))
     if ($code -ne 0) { Show }
+    $siteRecovered = Join-Path $unpackedTo 'site'
+    Yes 'website recovery returns exactly the original fixture files' (
+        @(Get-ChildItem -LiteralPath $siteRecovered -Recurse -File -EA SilentlyContinue).Count -eq $siteExpected.Count)
+    foreach ($relative in @($siteExpected.Keys | Sort-Object)) {
+        $recovered = Join-Path $siteRecovered $relative
+        Yes ("  website $relative returns byte for byte") (
+            (Test-Path -LiteralPath $recovered) -and
+            ([Convert]::ToBase64String([IO.File]::ReadAllBytes($recovered)) -eq $siteExpected[$relative]))
+    }
 
     $srv = Join-Path $work 'restore-work-root'
     Plugins $srv $plugins

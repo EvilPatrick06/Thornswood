@@ -157,10 +157,23 @@ Picking a profession writes the sister half at novice. The craft gate
 allows that novice list, and it allows a taught half at novice, and
 it refuses both of them above novice by name.
 
-`teach` is in the rules and nothing in the world calls it. There is
-no command to take someone on, and no command to end it. When work is
-counted, the master is not passed in, so a sister half's count waits
-at the next threshold and never rises.
+A master takes someone on with `/apprentice <name>`. When they could
+take that person on in more than one half or school, the half goes
+after the name: `/apprentice Lina platewright`. The person accepts or
+refuses on the prompt, the same as a party or a trade, and nothing is
+recorded until they accept. The server reads which arrangement it is
+off the person: the other half of their own profession is the sister
+half, and a half or school of another profession is an outside trade.
+The master ends it with `/apprentice end <name>`. `/apprentice` on
+its own says who you took on, who took you on, and how many of your
+two outside trades are used.
+
+Both characters carry the arrangement, so it holds across a restart
+and with either of them offline. When work is counted, the master is
+passed in while they are still a master of that half and still list
+the person, so the sister half rises past the threshold it waited at.
+An outside trade that was ended stays counted, so it does not open a
+third.
 
 The two-spell cap, the two staff-spell cap, and the three gates on a
 tome are in the server. `/study` is not.

@@ -149,153 +149,22 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// The installed revision as Vortex records it in state.v2, or 0.
-        ///
-        /// Vortex keeps the redux state flattened into LevelDB keys joined by
-        /// ###, the same shape Get-CollectionNewest reads. For an installed
-        /// collection the two keys that matter, under the mod's own id, are:
-        ///
-        ///     persistent###mods###skyrimse###&lt;modId&gt;###attributes###collectionSlug -> "7essxf"
-        ///     persistent###mods###skyrimse###&lt;modId&gt;###attributes###revisionNumber -> 5
-        ///
-        /// LevelDB writes the key, a length byte (a control character), then
-        /// that many bytes of the value's JSON, so a string is "7essxf" and a
-        /// number is a bare 5. The slug and the number are separate keys tied
-        /// together only by the &lt;modId&gt; both carry, so this reads both,
-        /// matches the slug to its mod id, and takes the highest revision
-        /// recorded against a mod id whose slug is the one asked for. A machine
-        /// can have two collections installed at once (an older slug beside 7essxf;
-        /// both tips have used 7essxf since 27 September), and the numbers must not be mixed up between them.
-        ///
-        /// When those two attributes are missing (ship PC after Set-Collection:
-        /// a locally authored vortex_collection_* with no subscriber install
-        /// metadata), fall back through newestFileId to
-        /// collections###revisions###&lt;id&gt; for the same slug. Same rule as
-        /// Get-CollectionRevisionFromState in LoadOrder.ps1.
+        /// Installed revision from current compressed LevelDB metadata, or 0.
+        /// collectionSlug and revisionNumber are tied to one installed mod id.
+        /// The shared reader honors CURRENT, sequences, tombstones and CRCs.
+        /// Locally authored vortex_collection_* mods use their newestFileId
+        /// link to a matching cached slug, never an unrelated cached revision.
+        /// The publisher uses this same read-only helper.
         /// </summary>
         public static int CollectionRevisionFromState(string slug)
         {
-            try
-            {
+            try {
                 if (string.IsNullOrEmpty(slug)) return 0;
-                string dir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "Vortex\\state.v2");
-                if (!Directory.Exists(dir)) return 0;
-
-                var slugRe = new Regex(
-                    "mods###skyrimse###([^#]+)###attributes###collectionSlug[\\x00-\\x1F]{1,4}\"" +
-                    Regex.Escape(slug) + "\"");
-                var revRe = new Regex(
-                    "mods###skyrimse###([^#]+)###attributes###revisionNumber[\\x00-\\x1F]{1,4}(\\d+)");
-
-                var mine = new HashSet<string>(StringComparer.Ordinal);
-                var rev = new Dictionary<string, int>(StringComparer.Ordinal);
-                string[] files = Directory.GetFiles(dir);
-                foreach (string f in files)
-                {
-                    string txt;
-                    try { txt = VortexStateText(f); }
-                    catch { continue; }
-
-                    foreach (Match m in slugRe.Matches(txt)) mine.Add(m.Groups[1].Value);
-                    foreach (Match m in revRe.Matches(txt))
-                    {
-                        int n;
-                        if (!int.TryParse(m.Groups[2].Value, out n)) continue;
-                        string id = m.Groups[1].Value;
-                        int cur;
-                        if (!rev.TryGetValue(id, out cur) || n > cur) rev[id] = n;
-                    }
-                }
-
-                int best = 0;
-                foreach (string id in mine)
-                {
-                    int r;
-                    if (rev.TryGetValue(id, out r) && r > best) best = r;
-                }
-                if (best > 0) return best;
-
-                var revSlugRe = new Regex(
-                    "collections###revisions###([^#]+)###info###collection###slug[\\x00-\\x1F]{1,4}\"" +
-                    Regex.Escape(slug) + "\"");
-                var fileIdRe = new Regex(
-                    "mods###skyrimse###([^#]+)###attributes###newestFileId[\\x00-\\x1F]{1,4}(\\d+)");
-                var verRe = new Regex(
-                    "mods###skyrimse###([^#]+)###attributes###newestVersion[\\x00-\\x1F]{1,4}\"(\\d+)\"");
-                var revIds = new HashSet<string>(StringComparer.Ordinal);
-                var fileIdMods = new Dictionary<string, List<string>>(StringComparer.Ordinal);
-                var modVer = new Dictionary<string, int>(StringComparer.Ordinal);
-                foreach (string f in files)
-                {
-                    string txt;
-                    try { txt = VortexStateText(f); }
-                    catch { continue; }
-                    foreach (Match m in revSlugRe.Matches(txt)) revIds.Add(m.Groups[1].Value);
-                    foreach (Match m in fileIdRe.Matches(txt))
-                    {
-                        string fid = m.Groups[2].Value;
-                        List<string> list;
-                        if (!fileIdMods.TryGetValue(fid, out list))
-                        {
-                            list = new List<string>();
-                            fileIdMods[fid] = list;
-                        }
-                        if (!list.Contains(m.Groups[1].Value)) list.Add(m.Groups[1].Value);
-                    }
-                    foreach (Match m in verRe.Matches(txt))
-                    {
-                        int n;
-                        if (!int.TryParse(m.Groups[2].Value, out n)) continue;
-                        string id = m.Groups[1].Value;
-                        int cur;
-                        if (!modVer.TryGetValue(id, out cur) || n > cur) modVer[id] = n;
-                    }
-                }
-                if (revIds.Count == 0) return 0;
-                var revNum = new Dictionary<string, int>(StringComparer.Ordinal);
-                foreach (string f in files)
-                {
-                    string txt;
-                    try { txt = VortexStateText(f); }
-                    catch { continue; }
-                    foreach (string rid in revIds)
-                    {
-                        var numRe = new Regex(
-                            "collections###revisions###" + Regex.Escape(rid) +
-                            "###info###revisionNumber[\\x00-\\x1F]{1,4}(\\d+)");
-                        foreach (Match m in numRe.Matches(txt))
-                        {
-                            int n;
-                            if (!int.TryParse(m.Groups[1].Value, out n)) continue;
-                            int cur;
-                            if (!revNum.TryGetValue(rid, out cur) || n > cur) revNum[rid] = n;
-                        }
-                    }
-                }
-                foreach (string rid in revIds)
-                {
-                    List<string> mods;
-                    if (!fileIdMods.TryGetValue(rid, out mods)) continue;
-                    int n = 0;
-                    int rn;
-                    if (revNum.TryGetValue(rid, out rn)) n = rn;
-                    if (n <= 0)
-                    {
-                        foreach (string mid in mods)
-                        {
-                            int mv;
-                            if (modVer.TryGetValue(mid, out mv) && mv > n) n = mv;
-                        }
-                    }
-                    if (n > best) best = n;
-                }
-                return best;
+                string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Vortex\\state.v2");
+                return VortexProfileState.CollectionRevision(dir, slug);
             }
             catch { return 0; }
         }
-
         /// <summary>
         /// The legacy fallback: the revision out of the old folder name, or 0.
         /// Kept for a machine that still has collection_&lt;slug&gt;_&lt;rev&gt;_&lt;when&gt;

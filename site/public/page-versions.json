@@ -139,6 +139,14 @@
       {
         "sha256": "820b2524ac768d1181825b551ab9df2fc6da93a096670f8d7a39bfd99dcabd10",
         "changed": "2026-09-25"
+      },
+      {
+        "sha256": "77ad6d56302ae648c19a34d97cc47c027a0ba90d0fd00fa080aa277600eb8446",
+        "changed": "2026-10-03"
+      },
+      {
+        "sha256": "fd790c7398e3f1d456a9d50adf3d07e6c56cc96fc00b165d7855b41cd8ed0261",
+        "changed": "2026-10-03"
       }
     ],
     "rules": [

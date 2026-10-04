@@ -124,6 +124,6 @@ The profession, the two halves, the placed points, the strength
 table and the maneuver table are in the server. A chicken is 1 piece
 and a dragon is 16. A kill between people counts for nothing. What
 the game still has to do for the maneuvers is the second table under
-Maneuvers. A Warlord taking somebody on is not recorded yet (see
-[Masters and apprentices](../apprenticeship.md)), so a sister half's
-novice maneuver opens once that half is past novice.
+Maneuvers. A sister half's novice maneuver opens when a Master of
+that half takes you on with `/apprentice`, and stays once that half is
+past novice. See [Masters and apprentices](../apprenticeship.md).

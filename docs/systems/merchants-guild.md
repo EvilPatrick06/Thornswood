@@ -52,9 +52,9 @@ courier, on the notice board.
 
 ## Guild sites
 
-One spot a hold, taken from the notice-board seeds. Raven Rock has no
-seeded board coordinate. Its site is the town inn, at Geldis Sadri on
-the trader list, which is where that town's board starts. A later walk
+One spot a hold, taken from the notice-board seeds. Raven Rock's board
+is seeded at the town inn, at Geldis Sadri on the trader list, and its
+site is the same spot. A later walk
 can move any of these. Traders are not relocated by this list.
 
 | Hold | Book hold | Spot |
