@@ -5605,70 +5605,170 @@ startChargenTimer();
   and a dragon are not the same fight, so the piece count follows how hard the
   thing was. Until this, every kill was one piece.
 
-  THE HUNTER LIST FIRST. When the body's base is on the hunter list
-  (HUNTS_BY_BASE), the pieces are that row's own hunter rank: novice 1,
-  advanced 2, expert 4, master 8. A named body uses its own row, so Karhu, who
-  is master on that list, is 8 although a bear is 4. The page says so in those
-  words, and it is why a base on the list never reaches the race lines below.
+  BY THE RACE THE ENGINE SAYS THE BODY IS. Actor.GetRace in the fork follows
+  the actor's own template chain, the one the engine rolled when it spawned,
+  so it names the race the body really has (a bandit's base is often a
+  levelled template, and the hunt table's build script measured over a
+  thousand people whose own RNAM says fox). The race's editor id is read out
+  of RACES, the table of every RACE record in the load order, and looked up in
+  the lines below.
 
-  EVERYTHING ELSE BY THE RACE THE ENGINE SAYS IT IS. A bandit, a draugr and a
-  dragon are not on the hunter list, and their base is often a levelled
-  template, so the race on the record itself is not the answer (the hunt
-  table's build script measured over a thousand people whose own RNAM says
-  fox). Actor.GetRace in the fork follows the actor's own template chain, the
-  one the engine rolled when it spawned, so it names the race the body really
-  has. The race's editor id is read out of RACES, the table of every RACE
-  record in the load order, and matched against the lines on the page, first
-  match winning, so a dragon priest is read before a dragon:
+  THE STRENGTH TABLE WINS OVER THE HUNTER LIST. Patrick's answer on #1386, 4
+  October: where the two disagree, the strength table is the one that counts.
+  So a bull netch is a grown netch, 8, though the hunter list calls it
+  advanced; a vale sabre cat and a snowy one are sabre cats, 2; an ice wolf is
+  a wolf, 1; and Karhu is a bear, 4. The hunter list's own rank (novice 1,
+  advanced 2, expert 4, master 8) counts only for a body on it whose race no
+  line here names, which today is none: every race in the load order has a
+  line, and the harness holds that.
 
-    Bandit, guard, forsworn, skeleton           2   the people's races and
-                                                    every skeleton race
-    Draugr, falmer, hagraven                    4
-    Giant, dragon priest, centurion, lurker     8
-    Dragon                                     16
-
-  and, for an animal that is not on the hunter list, the strength table's own
-  kinds: sabre cat, troll, frostbite spider, horse, horker and netch calf 2,
-  bear and chaurus 4, mammoth and a grown netch 8. A named animal off the list
-  uses its kind, which is what the race is. Anything the page does not name
-  (an atronach, a spriggan, a dwarven sphere) is the novice line, 1, which is
-  what every kill was before, and that choice is a question on the issue.
+  THE TWO HALVES OF THE LINES. kinds is the page's own two tables, the
+  strength table and the person-shaped one, each word on the page with the
+  races it is in Skyrim. unnamed is every body neither table names, placed
+  against those lines by how hard it is in vanilla Skyrim (Patrick, 4 October:
+  "use suggested bands"); the page lists the same words under "Bodies neither
+  table names". A race nobody has placed yet, one a new plugin brings, is the
+  novice line, 1, until somebody places it.
 
   A PERSON KILLED BY A PERSON IS STILL NOTHING. That test is in mp.onDeath and
   is not this function's: nothing here is asked about a person's body.
 */
 const WARRIOR_KILL = {
   byRank: { novice: 1, advanced: 2, expert: 4, master: 8 },
-  byRace: [
-    [/dragonpriest/, 8],
-    [/dragon|alduin/, 16],
-    [/^(c00)?giant|frostgiant/, 8],
-    [/centurion/, 8],
-    [/lurker/, 8],
-    [/draugr|falmer|hagraven/, 4],
-    [/skeleton/, 2],
-    [/^(dlc1)?(nord|imperial|breton|redguard|orc|argonian|khajiit|woodelf|highelf|darkelf|elder)race/, 2],
-    [/mammoth|^dlc2netchrace$/, 8],
-    [/^bear|chaurus/, 4],
-    [/sabrecat|troll|frostbitespider|horse|horker|netchcalf/, 2]
+  kinds: [
+    // The strength table: novice, advanced, expert, master animal.
+    ['chicken', 1, ['ChickenRace', 'EE_ChickenAnimalRace01', 'OR_ChickenRace']],
+    ['rabbit', 1, ['HareRace']],
+    ['fox', 1, ['FoxRace']],
+    ['deer', 1, ['DeerRace', 'DLC1DeerGlowRace', 'ElkRace', 'WhiteStagRace']],
+    ['wolf', 1, ['WolfRace', 'C06WolfSpiritRace', 'ccBGSSSE036_BoneWolfCompanionRace']],
+    ['skeever', 1, ['SkeeverRace', 'SkeeverWhiteRace']],
+    ['mudcrab', 1, ['MudcrabRace', 'DLC2MudcrabSolstheimRace', 'ZWJ_Polymorph68_GiantMudcrabRace']],
+    ['goat', 1, ['GoatRace', 'GoatDomesticsRace', 'EE_GoatAnimalRace01']],
+    ['cow', 1, ['CowRace', 'EE_CowAnimalRace01']],
+    ['dog', 1, ['DogRace', 'DogCompanionRace', 'MG07DogRace', 'DA03BarbasDogRace', 'DLC1HuskyBareRace',
+                'DLC1HuskyArmoredRace', 'DLC1HuskyBareCompanionRace', 'DLC1HuskyArmoredCompanionRace']],
+    ['sabre cat', 2, ['SabreCatRace', 'SabreCatSnowyRace', 'DLC1SabreCatGlowRace']],
+    ['troll', 2, ['TrollRace', 'TrollFrostRace', 'DLC1TrollRaceArmored', 'DLC1TrollFrostRaceArmored']],
+    ['spider', 2, ['FrostbiteSpiderRace', 'FrostbiteSpiderRaceGiant', 'FrostbiteSpiderRaceLarge',
+                   'DLC2ExpSpiderBaseRace', 'DLC2ExpSpiderPackmuleRace']],
+    ['horse', 2, ['HorseRace', 'CartHorseRace']],
+    ['horker', 2, ['HorkerRace']],
+    ['netch calf', 2, ['DLC2NetchCalfRace']],
+    ['bear', 4, ['BearBlackRace', 'BearBrownRace', 'BearSnowRace']],
+    ['chaurus', 4, ['ChaurusRace', 'ChaurusReaperRace', 'DLC1_BF_ChaurusRace', 'DLC1ChaurusHunterRace']],
+    ['mammoth', 8, ['MammothRace']],
+    ['a grown netch', 8, ['DLC2NetchRace']],
+    // The person-shaped table. A bandit, a guard and a forsworn are all the
+    // people's races, a vampire and a child of them included.
+    ['bandit, guard, forsworn', 2, ['ArgonianRace', 'ArgonianRaceVampire', 'BretonRace', 'BretonRaceChild',
+      'BretonRaceChildVampire', 'BretonRaceVampire', 'DarkElfRace', 'DarkElfRaceVampire', 'DLC1NordRace',
+      'ElderRace', 'ElderRaceVampire', 'HighElfRace', 'HighElfRaceVampire', 'ImperialRace', 'ImperialRaceChild',
+      'ImperialRaceVampire', 'KhajiitRace', 'KhajiitRaceVampire', 'NordRace', 'NordRaceAstrid', 'NordRaceChild',
+      'NordRaceVampire', 'OrcRace', 'OrcRaceVampire', 'RedguardRace', 'RedguardRaceChild', 'RedguardRaceVampire',
+      'WoodElfRace', 'WoodElfRaceVampire']],
+    ['skeleton', 2, ['SkeletonRace', 'SkeletonArmorRace', 'SkeletonNecroRace', 'SkeletonNecroPriestRace',
+      'DLC1BlackSkeletonRace', 'DLC1SoulCairnSkeletonArmorRace', 'DLC1SoulCairnSkeletonNecroRace',
+      'RigidSkeletonRace', 'DLC2RigidSkeletonRace']],
+    ['draugr', 4, ['DraugrRace', 'DraugrMagicRace', 'DLC2HulkingDraugrRace', 'testDraugrRace']],
+    ['falmer', 4, ['FalmerRace', 'FalmerFrozenVampRace']],
+    ['hagraven', 4, ['HagravenRace']],
+    ['giant', 8, ['GiantRace', 'C00GiantOutsideWhiterunRace', 'DLC2GhostFrostGiantRace']],
+    ['dragon priest', 8, ['DragonPriestRace', 'DLC2AcolyteDragonPriestRace']],
+    ['centurion', 8, ['DwarvenCenturionRace', 'DLC1LD_ForgemasterRace']],
+    ['lurker', 8, ['DLC2LurkerRace']],
+    ['dragon', 16, ['AlduinRace', 'DragonRace', 'DragonBlackRace', 'DLC2DragonBlackRace', 'UndeadDragonRace',
+      'DLC1UndeadDragonRace', 'dlc2SpectralDragonRace', 'DragonRaceLokjun']]
+  ],
+  unnamed: [
+    // With the novice line.
+    ['riekling of Solstheim', 1, ['DLC2RieklingRace', 'DLC2ThirskRieklingRace']],
+    ['ash hopper', 1, ['DLC2AshHopperRace']],
+    ['slaughterfish', 1, ['SlaughterfishRace']],
+    ['nix-hound', 1, ['ccBGSSSE035_NixHoundCompanionRace']],
+    ['shade', 1, ['WispShadeRace']],
+    ['witchlight', 1, ['WitchlightRace']],
+    ['soul wisp', 1, ['DLC1SoulCairnSoulWispRace']],
+    ['swarm', 1, ['SwarmRace', 'SprigganSwarmRace']],
+    ['mannequin', 1, ['ManakinRace']],
+    ['a creature a spell conjures', 1, [
+      'ODN_Con_Daedra_Race_ConjureClannfear', 'ODN_Con_Daedra_Race_ConjureClannroth',
+      'ODN_Con_Daedra_Race_ConjureDaedroth', 'ODN_Con_Daedra_Race_ConjureXivilai',
+      'ODN_Con_Undead_Race_ConjureDreadShade', 'ODN_Con_Undead_Race_ConjureGloomWraith',
+      'ODN_Con_Undead_Race_ConjureSanctifiedWraith', 'TVR_Demon_Race_ConjureGremlin',
+      'TVR_Demon_Race_ConjureLeviathan', 'TVR_Demon_Race_ConjureOathbreaker', 'TVR_Demon_Race_ConjureRavagor',
+      'TVR_Demon_Race_ConjureTempleGrim', 'TVR_Primal_Race_CallHoundOfHircine', 'TVR_Primal_Race_CallRaven',
+      'TVR_Primal_Race_CallSnakes', 'TVR_Primal_Race_CallSnowLeopard', 'TVR_Primal_Race_CallWolf',
+      'TVR_Totem_Race_EyesInTheSky', 'TVR_Totem_Race_Totem', 'TVR_Verdant_Race_ForceOfNature',
+      'TVR_Verdant_Race_Wildshape', 'TVR_Warrior_Race_Fylgja', 'TVR_Warrior_Race_FylgjaStorm',
+      'WB_ConjureBearTotem_Race', 'WB_ConjureCatTotem_Race', 'WB_ConjureCraftlord_Race',
+      'WB_ConjureDeadeyeCaptain_Race', 'WB_ConjureKyrkrim_Race', 'WB_FeralSpirit_Race', 'WB_Lich_Race',
+      'WB_NetherLich_Race', 'WB_Skinwalker_Race', '0_CombatBlue', '0_JarBOMBA', '0_PuppetmanRace',
+      '0_SkeleGiantRace']],
+    ['a race that is not a creature', 1, ['DefaultRace', 'TestRace', 'InvisibleRace', 'dunMiddenEmptyRace',
+      'DLC2FakeCoffinRace', 'DLC2dunInstrumentsRace']],
+    // With the advanced line and the people's line.
+    ['spriggan', 2, ['SprigganRace', 'DLC2SprigganBurntRace']],
+    ['dwarven spider', 2, ['DwarvenSpiderRace']],
+    ['ice wraith', 2, ['IceWraithRace', 'DLC2dunKarstaagIceWraithRace']],
+    ['death hound', 2, ['DLC1DeathHoundRace', 'DLC1DeathHoundCompanionRace']],
+    ['bristleback', 2, ['DLC2BoarRace', '1BoarRideRace']],
+    ['riekling on a bristleback', 2, ['DLC2MountedRieklingRace']],
+    ['ash spawn', 2, ['DLC2AshSpawnRace']],
+    ['magic anomaly', 2, ['MagicAnomalyRace']],
+    ['boneman', 2, ['DLC01SoulCairnBonemanRace']],
+    ['the afflicted', 2, ['DA13AfflictedRace']],
+    ['a riekling of the riekling people', 2, ['1RieklingBlueRace', '1RieklingBlueRaceVampire',
+      '1RieklingPurpleRace', '1RieklingPurpleRaceVampire', '1NpcRieklingBlueRace', '1NpcRieklingBlueRace2',
+      '1NpcRieklingBlueRaceVampire', '1NpcRieklingPurpleRace', '1NpcRieklingPurpleRace2',
+      '1NpcRieklingPurpleRaceVampire']],
+    // With the expert line, beside the draugr and the falmer.
+    ['atronach', 4, ['AtronachFlameRace', 'AtronachFrostRace', 'AtronachStormRace']],
+    ['dwarven sphere', 4, ['DwarvenSphereRace']],
+    ['dwarven ballista', 4, ['DLC2DwarvenBallistaRace']],
+    ['gargoyle', 4, ['DLC1GargoyleRace', 'DLC1GargoyleVariantGreenRace', 'DLC1GargoyleVariantBossRace']],
+    ['dremora', 4, ['DremoraRace', 'DLC2DremoraRace']],
+    ['snow elf', 4, ['SnowElfRace']],
+    ['ash guardian', 4, ['dlc2AshGuardianRace']],
+    ['seeker', 4, ['DLC2SeekerRace']],
+    ['wispmother', 4, ['WispRace']],
+    ['spriggan matron', 4, ['SprigganMatronRace', 'SprigganEarthMotherRace']],
+    ['keeper', 4, ['DLC1SoulCairnKeeperRace']],
+    // With the giants.
+    ['werewolf', 8, ['WerewolfBeastRace']],
+    ['werebear', 8, ['DLC2WerebearBeastRace']],
+    ['vampire lord', 8, ['DLC1VampireBeastRace']],
+    ['Miraak', 8, ['DLC2MiraakRace']]
   ],
   fallback: 1
 };
 
-/** The pieces one kill is worth: the hunter list's rank for a base on it, else
- *  the race's line. Pure, so the harness can ask it about any body. */
+/** The line a race is on: its pieces, or 0 when no line names it. The lookup
+ *  is built once, by lower case editor id. */
+function warriorRaceBand(raceEdid) {
+  if (!WARRIOR_KILL.byRace) {
+    const map = {};
+    const all = WARRIOR_KILL.kinds.concat(WARRIOR_KILL.unnamed);
+    for (let i = 0; i < all.length; i++) {
+      for (let j = 0; j < all[i][2].length; j++) { map[all[i][2][j].toLowerCase()] = all[i][1]; }
+    }
+    WARRIOR_KILL.byRace = map;
+  }
+  const race = String(raceEdid || '').toLowerCase();
+  return (race && Object.prototype.hasOwnProperty.call(WARRIOR_KILL.byRace, race)) ? WARRIOR_KILL.byRace[race] : 0;
+}
+
+/** The pieces one kill is worth: the race's line, else the hunter list's rank
+ *  for a base on it, else the novice line. Pure, so the harness can ask it
+ *  about any body. */
 function warriorPieces(baseDesc, raceEdid) {
+  const band = warriorRaceBand(raceEdid);
+  if (band) { return band; }
   const base = String(baseDesc || '');
   if (base && Object.prototype.hasOwnProperty.call(HUNTS_BY_BASE, base)) {
     const rank = HUNTS_BY_BASE[base].rank;
     if (Object.prototype.hasOwnProperty.call(WARRIOR_KILL.byRank, rank)) {
       return WARRIOR_KILL.byRank[rank];
-    }
-  }
-  const race = String(raceEdid || '').toLowerCase();
-  if (race) {
-    for (let i = 0; i < WARRIOR_KILL.byRace.length; i++) {
-      if (WARRIOR_KILL.byRace[i][0].test(race)) { return WARRIOR_KILL.byRace[i][1]; }
     }
   }
   return WARRIOR_KILL.fallback;
@@ -5702,9 +5802,6 @@ function raceEdidOf(actorId) {
 function killPieces(actorId) {
   let base = '';
   try { base = String(mp.get(actorId, 'baseDesc') || ''); } catch (e) { base = ''; }
-  if (base && Object.prototype.hasOwnProperty.call(HUNTS_BY_BASE, base)) {
-    return warriorPieces(base, '');
-  }
   return warriorPieces(base, raceEdidOf(actorId));
 }
 
@@ -40872,6 +40969,31 @@ log('gamemode loaded:',
     return out;
   }
 
+  /*
+    The map the client applies, folded the way forPanel folds it: the tree,
+    the needs, a running maneuver and a running perk. The maneuvers block
+    reads its stamina to know a person's real most (#1386): the tree's
+    Endurance and the needs' penalties are on it. A change to the fold in
+    forPanel is a change here too.
+  */
+  function effectsOf(actorId) {
+    return withPerks(actorId, withManeuvers(actorId, withNeeds(actorId, P.treeApplies(stateOf(actorId)))));
+  }
+
+  /*
+    A warrior's maneuvers, for the panel the maneuver key opens (#1386). The
+    maneuvers block owns the rows and loads after this one, so it is asked at
+    write time; absent for somebody who holds none.
+  */
+  function maneuversView(actorId, s) {
+    var mv = g.__thornswoodManeuvers;
+    if (!mv || !mv.view || !actorId) { return null; }
+    try { return mv.view(actorId, s); } catch (e) {
+      clog('the maneuvers view threw for', actorId.toString(16) + ':', e);
+      return null;
+    }
+  }
+
   function needsView(actorId) {
     var n = g.__thornswoodNeeds;
     if (!n || !actorId) { return null; }
@@ -40920,6 +41042,8 @@ log('gamemode loaded:',
         number in it. See the needs block at the end of this file.
       */
       effects: withManeuvers(actorId, withNeeds(actorId, P.treeApplies(s))),
+      // What the maneuver key draws. See maneuversView.
+      maneuvers: maneuversView(actorId, s),
       /*
         The three meters, for the panel to draw. Absent entirely when there is
         no character in hand or the needs block is not loaded, so a page from
@@ -42119,7 +42243,7 @@ log('gamemode loaded:',
     beginCreation: beginCreation, updateOwnerScript: updateOwnerScript,
     gate: gate, gateHalf: gateHalf, credit: credit,
     grantSpell: grantSpell, grantKnown: grantKnown, nameOf: nameOf, raiseLines: raiseLines,
-    acceptApprentice: acceptApprentice, masterFor: masterFor,
+    acceptApprentice: acceptApprentice, masterFor: masterFor, effectsOf: effectsOf,
     rankOf: function (actorId, key) { return P.rankOf(stateOf(actorId), key); }
   };
   clog('ready');
@@ -42994,7 +43118,16 @@ log('gamemode loaded:',
   nothing else decides it.
 
   STAMINA IS SPENT WHEN THE MANEUVER STARTS, AND WITHOUT IT NOTHING HAPPENS.
-  spend() takes it through the engine's own Actor.DamageActorValue.
+  15 stamina is 15 of the person's real most, the skill tree's Endurance
+  included (Patrick, 4 October: "it should scale"). spend() says how that is
+  worked out.
+
+  NOBODY TYPES ONE. Patrick, 4 October: no chat commands for anything people
+  do. The maneuver key opens a panel the front plugin draws
+  (game/ui/thornswood-maneuvers.js), and a pick there sends /maneuver <name>
+  through the same relay the trade and party keys use. That line is internal:
+  no help text names it. view() is what the panel draws from, folded into the
+  character panel's view the way effects() is.
 
   WHAT THE SERVER APPLIES, AND WHAT IT CANNOT. Everything here is the server's
   own: the stamina, the clocks, the refusals, and health through the engine's
@@ -43017,11 +43150,12 @@ log('gamemode loaded:',
             client change is needed for it.
     Heavy   25% more on the next power attack within 8 seconds. Applied here,
             by taking a quarter again of what that hit took.
-    Break   the next hit staggers. Sent to a person's own game with
-            Debug.SendAnimationEvent; a creature is animated by whoever hosts
-            it and the server cannot reach that machine, so a creature takes
-            no stagger yet.
-    Wreck   50% more on the next power attack, and it staggers, both as above.
+    Break   the next hit within 8 seconds staggers. Sent to a person's own
+            game with Debug.SendAnimationEvent; a creature is animated by
+            whoever hosts it and the server cannot reach that machine, so a
+            creature takes no stagger yet.
+    Wreck   50% more on the next power attack within 8 seconds, and it
+            staggers, both as above.
 
   A BLOW THAT KILLS OUTRIGHT IS NOT SOFTENED. The engine applies a hit's
   damage after the OnHit event and kills on the spot when that takes health
@@ -43048,8 +43182,8 @@ log('gamemode loaded:',
 
   /*
     The table on the page, row for row. seconds is how long it lasts. Break
-    and Wreck have no length on the page: each waits for the blow it names,
-    and that is what 0 means here.
+    and Wreck wait for the blow they name for 8 seconds, the window Heavy has
+    (Patrick's answer on #1386, 4 October).
   */
   var MANEUVERS = {
     set:     { name: 'Set',   half: 'bulwark',   rank: 'novice',   stamina: 15, cooldown: 45,  seconds: 8 },
@@ -43058,8 +43192,8 @@ log('gamemode loaded:',
     wall:    { name: 'Wall',  half: 'bulwark',   rank: 'master',   stamina: 40, cooldown: 180, seconds: 10, less: 0.2, metres: 3 },
     rush:    { name: 'Rush',  half: 'berserker', rank: 'novice',   stamina: 15, cooldown: 30,  seconds: 5,  speed: 4 },
     heavy:   { name: 'Heavy', half: 'berserker', rank: 'advanced', stamina: 20, cooldown: 45,  seconds: 8,  more: 0.25 },
-    'break': { name: 'Break', half: 'berserker', rank: 'expert',   stamina: 25, cooldown: 60,  seconds: 0 },
-    wreck:   { name: 'Wreck', half: 'berserker', rank: 'master',   stamina: 40, cooldown: 120, seconds: 0,  more: 0.5 }
+    'break': { name: 'Break', half: 'berserker', rank: 'expert',   stamina: 25, cooldown: 60,  seconds: 8 },
+    wreck:   { name: 'Wreck', half: 'berserker', rank: 'master',   stamina: 40, cooldown: 120, seconds: 8,  more: 0.5 }
   };
   var ORDER = ['set', 'plant', 'cover', 'wall', 'rush', 'heavy', 'break', 'wreck'];
   var HALF_NAME = { bulwark: 'Bulwark', berserker: 'Berserker' };
@@ -43150,8 +43284,7 @@ log('gamemode loaded:',
   /*
     cool  actor -> { key: when it is ready again }
     on    actor -> what is running or armed: a window's end for set, plant,
-          wall, rush and heavy; { until, who } for cover; true for break and
-          wreck, which wait for their blow
+          wall, rush, heavy, break and wreck; { until, who } for cover
     block actor -> whether that bulwark is blocking, as last seen
     blow  actor -> { by, at }: who landed the server's own last blow on it
   */
@@ -43167,6 +43300,9 @@ log('gamemode loaded:',
   }
   function deadOf(id) {
     try { return !!mp.get(id, 'isDead'); } catch (e) { return true; }
+  }
+  function onlineOf(id) {
+    try { return !!mp.get(id, 'isOnline'); } catch (e) { return false; }
   }
   function share(id, which) {
     try {
@@ -43206,32 +43342,104 @@ log('gamemode loaded:',
   }
 
   /*
-    STAMINA, SPENT WHEN THE MANEUVER STARTS. The engine holds stamina as a
-    share of the most there is and does not hand that most to this file.
-    Actor.DamageActorValue knows it, and takes the amount off as a share of
-    the engine's own maximum (MpActor::DamageActorValue). So the amount is
-    taken, and a share that hit the floor means there was not that much: it
-    is put back exactly as it was, and the maneuver does not start. The
-    engine's maximum is worked out from the race record, so stamina the skill
-    tree adds on the client is not in it.
+    STAMINA, SPENT WHEN THE MANEUVER STARTS, AS A SHARE OF THE PERSON'S REAL
+    MOST. Patrick's answer on #1386, 4 October: the cost "should scale" with
+    the skill tree. Measured in the fork before this was written:
+
+      The engine holds stamina only as a share, 0 to 1, of a most it works out
+      from the records (GetBaseActorValues.cpp): the race's starting stamina,
+      RACE DATA at byte 44, plus the person's NPC_ stamina offset, ACBS at
+      byte 6, and 100 when that comes to nothing. The client is handed that
+      same number as its base stamina when it spawns (remoteServer.ts).
+
+      The skill tree hand then SETS the base to that plus the map the
+      character panel sends (thornswood-front.js, treeApplyNow): Endurance's
+      +10 a point, less what hunger, thirst, tiredness and cold take off. The
+      share the client reports back, and the share a server write moves it to
+      (setActorValuePercentage in actorvalues.ts), are both of that bigger
+      most.
+
+    So Actor.DamageActorValue, which divides by the engine's most, took 15 of
+    the race's stamina: on a character with Endurance that was more than 15
+    off the bar they see. Here the most is the engine's own from the same two
+    records, plus the stamina in the map the client applies, and the cost is
+    the amount over that, written as a share. Without that much nothing is
+    written and false comes back; the old code took the stamina first and put
+    it back after. A record that cannot be read answers null and starts
+    nothing, with a line in the log.
+
+    Stamina a potion or an enchanted piece of gear adds is not counted: the
+    server does not see the effects running on somebody's character.
   */
-  function spend(actorId, amount) {
-    var before = share(actorId, 'stamina');
-    if (!(before > 0)) { return false; }
+  function fieldOf(id, type) {
+    var res = null;
+    try { res = id ? mp.lookupEspmRecordById(id) : null; } catch (e) { return null; }
+    var fields = (res && res.record && res.record.fields) || [];
+    for (var i = 0; i < fields.length; i++) {
+      if (fields[i] && fields[i].type === type && fields[i].data) { return Buffer.from(fields[i].data); }
+    }
+    return null;
+  }
+
+  /** The engine's own most, the way GetBaseActorValues works it out for a
+      person: their race and their base, which for a person is the NPC_ record
+      every character is made from (0x7) and carries no template. 0 when the
+      records cannot be read. */
+  function engineStamina(actorId) {
+    var raceId = 0, baseId = 0;
     try {
-      mp.callPapyrusFunction('method', 'Actor', 'DamageActorValue', selfOf(actorId), ['Stamina', amount]);
+      var r = mp.callPapyrusFunction('method', 'Actor', 'GetRace', selfOf(actorId), []);
+      raceId = (r && r.desc) ? (Number(mp.getIdFromDesc(String(r.desc))) || 0) : 0;
+      baseId = Number(mp.getIdFromDesc(String(mp.get(actorId, 'baseDesc') || ''))) || 0;
+    } catch (e) {
+      mlog('could not ask the race and base of', actorId.toString(16) + ':', e);
+      return 0;
+    }
+    var race = fieldOf(raceId, 'DATA');
+    var npc = fieldOf(baseId, 'ACBS');
+    if (!race || race.length < 48 || !npc || npc.length < 8) {
+      mlog('no RACE DATA or NPC_ ACBS for', actorId.toString(16), '(race', raceId.toString(16) + ', base', baseId.toString(16) + ')');
+      return 0;
+    }
+    var most = race.readFloatLE(44) + npc.readInt16LE(6);
+    return most > 0 ? most : 100;
+  }
+
+  /** The person's real most stamina: the engine's, plus what the map the
+      client applies adds to it or takes off. NaN when it cannot be read. */
+  function mostStamina(actorId) {
+    var base = engineStamina(actorId);
+    if (!(base > 0)) { return NaN; }
+    var ch = g.__thornswoodCharacter;
+    if (!ch || !ch.effectsOf) { return NaN; }
+    var map = null;
+    try { map = ch.effectsOf(actorId); } catch (e) {
+      mlog('could not read the skill tree map of', actorId.toString(16) + ':', e);
+      return NaN;
+    }
+    return base + ((map && typeof map.stamina === 'number') ? map.stamina : 0);
+  }
+
+  /** true when spent, false when there is not that much, null when the
+      stamina cannot be read. */
+  function spend(actorId, amount) {
+    var p = null;
+    try { p = mp.get(actorId, 'percentages'); } catch (e) { p = null; }
+    var before = p ? Number(p.stamina) : NaN;
+    if (!(before >= 0)) { return null; }
+    var most = mostStamina(actorId);
+    if (isNaN(most)) { return null; }
+    // Hunger, thirst, tiredness and cold together can take the whole of it.
+    if (!(most > 0)) { return false; }
+    var cost = amount / most;
+    if (before < cost) { return false; }
+    try {
+      mp.set(actorId, 'percentages', { health: Number(p.health), magicka: Number(p.magicka), stamina: before - cost });
     } catch (e) {
       mlog('could not take stamina from', actorId.toString(16) + ':', e);
-      return false;
+      return null;
     }
-    if (share(actorId, 'stamina') > 0) { return true; }
-    try {
-      var p = mp.get(actorId, 'percentages');
-      mp.set(actorId, 'percentages', { health: Number(p.health), magicka: Number(p.magicka), stamina: before });
-    } catch (e2) {
-      mlog('could not put the stamina back on', actorId.toString(16) + ':', e2);
-    }
-    return false;
+    return true;
   }
 
   /* The one person Cover is for: the nearest within 3 metres, not yourself. */
@@ -43270,17 +43478,39 @@ log('gamemode loaded:',
     return { speedMult: MANEUVERS.rush.speed };
   }
 
+  /*
+    WHAT THE MANEUVER KEY DRAWS: the rows this character holds, in the page's
+    order, each with its stamina and whether its wait is over. Null for
+    somebody who holds none, so the view carries nothing for them. ready is
+    the only part that moves, and it moves twice a use: a start redraws the
+    panel (push in use) and so does the end of the wait (tick), so the view
+    never changes with the clock and a counter's write still redraws nothing.
+  */
+  function view(actorId, s) {
+    if (!s) { return null; }
+    var mine = held(s, takenOn(s, actorId));
+    var t = now();
+    var out = [];
+    for (var i = 0; i < ORDER.length; i++) {
+      var key = ORDER[i];
+      if (!mine[key]) { continue; }
+      var m = MANEUVERS[key];
+      out.push({ key: key, name: m.name, stamina: m.stamina, cooldown: m.cooldown, ready: !(readyAt(actorId, key) > t) });
+    }
+    return out.length ? out : null;
+  }
+
   var STARTED = {
     set: 'Set, for 8 seconds. Halving what a block costs is not in the game yet, so for now this spends the stamina and starts the wait.',
     plant: 'Plant, for 8 seconds. A Break or a Wreck does not stagger you. Other staggers still land: stopping those is not in the game yet.',
     wall: 'Wall, for 10 seconds. You, and your party within 3 metres of you, take 20% less damage.',
     rush: 'Rush: +4 speed for 5 seconds.',
     heavy: 'Heavy. Your next power attack in the next 8 seconds deals 25% more.',
-    'break': 'Break. Your next hit staggers a person. Staggering a creature is not in the game yet.',
-    wreck: 'Wreck. Your next power attack deals 50% more, and staggers a person. Staggering a creature is not in the game yet.'
+    'break': 'Break. Your next hit in the next 8 seconds staggers a person. Staggering a creature is not in the game yet.',
+    wreck: 'Wreck. Your next power attack in the next 8 seconds deals 50% more, and staggers a person. Staggering a creature is not in the game yet.'
   };
 
-  /** /maneuver with nothing after it: what you hold and when each is ready. */
+  /** What you hold and when each is ready, for a /maneuver with no name. */
   function listLine(actorId, mine) {
     var bits = [];
     var t = now();
@@ -43295,10 +43525,11 @@ log('gamemode loaded:',
       return 'You have no maneuvers. They are a warrior\'s, on the half you picked, at your rank and below. ' +
              'A Warlord can teach the novice row to somebody who is not a warrior.';
     }
-    return 'Your maneuvers: ' + bits.join(', ') + '. /maneuver <name> starts one.';
+    return 'Your maneuvers: ' + bits.join(', ') + '.';
   }
 
-  /** /maneuver <name>. Answers the line to say, always. */
+  /** /maneuver <name>, as the maneuver panel sends it. Answers the line to
+      say, always. */
   function use(actorId, word) {
     var key = String(word || '').trim().toLowerCase();
     var ch = g.__thornswoodCharacter;
@@ -43320,7 +43551,11 @@ log('gamemode loaded:',
       who = coverWho(actorId);
       if (!who) { return 'Cover is for one person within 3 metres of you, and nobody is.'; }
     }
-    if (!spend(actorId, m.stamina)) {
+    var paid = spend(actorId, m.stamina);
+    if (paid === null) {
+      return 'Your stamina could not be read just now, so ' + m.name + ' did not start. Say so in the dev channel.';
+    }
+    if (!paid) {
       return m.name + ' takes ' + m.stamina + ' stamina, and you do not have it. Nothing happens.';
     }
     if (!has(ST.cool, actorId)) { ST.cool[actorId] = {}; }
@@ -43330,12 +43565,14 @@ log('gamemode loaded:',
       rec.cover = { until: t + m.seconds * 1000, who: who };
       ST.block[actorId] = false;
       mlog(actorId.toString(16), 'Cover on', who.toString(16));
+      push(actorId);
       return 'Cover on ' + nameOf(who) + ', for 8 seconds. While you block within 3 metres of them, they take 20% less damage.';
     }
-    rec[key] = m.seconds ? t + m.seconds * 1000 : true;
+    rec[key] = t + m.seconds * 1000;
     mlog(actorId.toString(16), m.name);
+    // The panel's row turns to waiting, and Rush's speed goes on.
+    push(actorId);
     if (key === 'rush') {
-      push(actorId);
       setTimeout(function () { push(actorId); }, m.seconds * 1000 + 50);
     }
     return STARTED[key];
@@ -43433,14 +43670,14 @@ log('gamemode loaded:',
     var e = { before: -1, after: null, by: by, more: 0, less: 0, stagger: false, used: [] };
     var a = (by && has(ST.on, by)) ? ST.on[by] : null;
     if (a && !isSpell(source)) {
-      if (power && a.wreck) {
+      if (power && a.wreck && a.wreck > t) {
         e.more = MANEUVERS.wreck.more; e.stagger = true;
         e.used.push({ key: 'wreck', v: a.wreck }); delete a.wreck;
       } else if (power && a.heavy && a.heavy > t) {
         e.more = MANEUVERS.heavy.more;
         e.used.push({ key: 'heavy', v: a.heavy }); delete a.heavy;
       }
-      if (!e.stagger && a['break']) {
+      if (!e.stagger && a['break'] && a['break'] > t) {
         e.stagger = true;
         e.used.push({ key: 'break', v: a['break'] }); delete a['break'];
       }
@@ -43457,13 +43694,14 @@ log('gamemode loaded:',
     }
   }
 
-  /* A blow that took nothing gives back what it would have spent. */
+  /* A blow that took nothing gives back what it would have spent, while its
+     window is still open. */
   function rearm(e) {
     if (!e.by || !e.used.length) { return; }
     var rec = onOf(e.by, true);
     for (var i = 0; i < e.used.length; i++) {
       var u = e.used[i];
-      if (u.key === 'heavy' && u.v <= now()) { continue; }
+      if (u.v <= now()) { continue; }
       if (!rec[u.key]) { rec[u.key] = u.v; }
     }
   }
@@ -43537,16 +43775,28 @@ log('gamemode loaded:',
 
   // -------------------------------------------------------------- the tick --
   /* Ten times a second while anything runs: a Cover's block is watched, and
-     what has run out is taken off. Nothing to do costs one empty loop. */
+     what has run out is taken off. A wait that ends redraws the panel, so the
+     maneuver key shows that row ready again. Nothing to do costs one empty
+     loop. */
   function tick() {
     var t = now();
+    for (var c in ST.cool) {
+      if (!has(ST.cool, c)) { continue; }
+      var ended = false, waiting = false;
+      for (var w in ST.cool[c]) {
+        if (!has(ST.cool[c], w)) { continue; }
+        if (ST.cool[c][w] <= t) { delete ST.cool[c][w]; ended = true; } else { waiting = true; }
+      }
+      if (!waiting) { delete ST.cool[c]; }
+      if (ended && onlineOf(Number(c))) { push(Number(c)); }
+    }
     for (var k in ST.on) {
       if (!has(ST.on, k)) { continue; }
       var holder = Number(k);
       var rec = ST.on[k];
       if (rec.cover && rec.cover.until > t) { blocking(holder); }
       if (rec.cover && rec.cover.until <= t) { delete rec.cover; delete ST.block[holder]; }
-      var timed = ['set', 'plant', 'wall', 'rush', 'heavy'];
+      var timed = ['set', 'plant', 'wall', 'rush', 'heavy', 'break', 'wreck'];
       for (var i = 0; i < timed.length; i++) {
         if (rec[timed[i]] && rec[timed[i]] <= t) { delete rec[timed[i]]; }
       }
@@ -43564,8 +43814,8 @@ log('gamemode loaded:',
 
   g.__thornswoodManeuvers = {
     MANEUVERS: MANEUVERS, ORDER: ORDER,
-    held: held, takenOn: takenOn, whyNot: whyNot,
-    use: use, effects: effects, hit: hit, flush: flush, killerOf: killerOf, tick: tick,
+    held: held, takenOn: takenOn, whyNot: whyNot, mostStamina: mostStamina,
+    use: use, effects: effects, view: view, hit: hit, flush: flush, killerOf: killerOf, tick: tick,
     state: ST
   };
   mlog('ready:', ORDER.length, 'maneuvers');
@@ -45367,7 +45617,10 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // A carriage or ferry, at the driver (#1394). See the carriages block.
                '/ride',
                '/pick', '/spend',
-               // The maneuvers of a warrior; see the maneuvers block.
+               // A warrior's maneuver, sent by the panel the maneuver key
+               // opens (#1386). Never typed, and no help names it: Patrick,
+               // 4 October, no chat commands for anything people do. See the
+               // maneuvers block.
                '/maneuver',
                // A Master taking somebody on, and ending it (#1388). See the
                // character block.
@@ -45467,8 +45720,6 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // nobody knows how to act on is only a penalty. Not
                       // /rest: sitting or lying down is how you rest (#1603).
                       '/needs', '/eat', '/drink', '/bard',
-                      // For a warrior, and named so a warrior can find them.
-                      '/maneuver',
                       // Everybody's, and the one thing a person in trouble
                       // must be able to find: asking staff, and getting
                       // out of a wedged spot (#414).
@@ -46861,8 +47112,9 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       return true;
     }
 
-    // A warrior's maneuvers (#1386). See the maneuvers block, after the
-    // character block, for what each one does and what the server cannot.
+    // A warrior's maneuvers (#1386), as the maneuver panel sends them; nobody
+    // is told to type it. See the maneuvers block, after the character
+    // block, for what each one does and what the server cannot.
     if (word === '/maneuver') {
       var mvs = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodManeuvers;
       if (!mvs || !mvs.use) {
@@ -47530,7 +47782,8 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           '<name>, and /apprentice end <name> ends it. /apprentice on its own ' +
           'says who took you on. /plot says what is in the ' +
           'ground in front of you and whose farm it is, /plant sows it. A ' +
-          'warrior\'s maneuvers: /maneuver lists yours, /maneuver rush starts one. ' +
+          'warrior\'s maneuvers open on the maneuver key, which the ' +
+          'launcher\'s Controls page names. ' +
           'A repair kit is used from your inventory.');
         return;
       }
