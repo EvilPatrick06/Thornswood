@@ -215,8 +215,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--data', default=r'C:\Thornswood\Game\Data')
     ap.add_argument('--plugins', default=r'C:\Thornswood\Profile\Default\plugins.txt')
-    ap.add_argument('--recipes', default=os.path.join(here, '..', '..', '..', 'game', 'data', 'recipes.json'))
-    ap.add_argument('--gamemode', default=os.path.join(here, '..', '..', '..', 'game', 'gamemode.js'))
+    ap.add_argument('--recipes', default=os.path.join(here, '..', '..', 'game', 'data', 'recipes.json'))
+    ap.add_argument('--gamemode', default=os.path.join(here, '..', '..', 'game', 'gamemode.js'))
     ap.add_argument('--check', action='store_true', help='say what it found, write nothing')
     args = ap.parse_args()
 

@@ -202,8 +202,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--data', default=r'C:\Thornswood\Game\Data')
     ap.add_argument('--plugins', default=r'C:\Thornswood\Profile\Default\plugins.txt')
-    ap.add_argument('--gamemode', default=os.path.join(HERE, '..', '..', '..', 'game', 'gamemode.js'))
-    ap.add_argument('--doors', default=os.path.join(HERE, '..', '..', '..', 'game', 'data', 'doors.json'))
+    ap.add_argument('--gamemode', default=os.path.join(HERE, '..', '..', 'game', 'gamemode.js'))
+    ap.add_argument('--doors', default=os.path.join(HERE, '..', '..', 'game', 'data', 'doors.json'))
     ap.add_argument('--out', default=None, help='write the measurement as JSON to this file')
     ap.add_argument('--open', default='Tamriel,DLC2SolstheimWorld',
                     help='editor ids of the worldspaces that are open ground, comma separated')
