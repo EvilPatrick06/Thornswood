@@ -525,7 +525,8 @@ function fillPage(html, body) {
   const h1 = /<h1[^>]*>([\s\S]*?)<\/h1>/.exec(body);
   const name = h1 ? h1[1].replace(/<[^>]*>/g, '').trim() : '';
   return html
-    .replace('<div id="landing">', () => '<div id="landing" hidden>')
+    .replace(/<div id="landing">[\s\S]*?<\/div><!-- \/landing -->/,
+             () => '<div id="landing" hidden></div><!-- /landing -->')
     .replace('<div class="page" id="page" hidden><div class="wrap" id="pagebody"></div></div>',
              () => '<div class="page" id="page"><div class="wrap" id="pagebody">' + body + '</div></div>')
     .replace('<title>Thornswood</title>',
@@ -562,6 +563,122 @@ function pageMarkdown(name) {
   const file = path.join(dir, name + '.md');
   if (!file.startsWith(dir + path.sep) || !fs.existsSync(file)) return null;
   try { return forMode(fs.readFileSync(file, 'utf8'), cfg.open); } catch (e) { return null; }
+}
+
+// Public discovery uses the configured project domain, never a request's Host.
+const PUBLIC_ORIGIN = 'https://thornswood.net';
+function singlePageHeading(body, title) {
+  let seen = false;
+  body = body.replace(/<h1\b([^>]*)>([\s\S]*?)<\/h1>/gi, (whole, attrs, text) => {
+    if (!seen) { seen = true; return whole; }
+    return '<h2' + attrs + '>' + text + '</h2>';
+  });
+  return seen ? body : '<h1>' + escAttr(title) + '</h1>' + body;
+}
+function publicPageBody(route) {
+  const b = BLURB[route];
+  let body = '<h1>' + escAttr(b[0]) + '</h1><p>' + escAttr(b[1]) + '</p>';
+  if (route === '/news') {
+    const feed = publicJson(NEWS, {news:[]});
+    const news = (Array.isArray(feed.news) ? feed.news : []).slice(0, 60);
+    if (feed.launcher) body += '<p>Launcher <b>' + escAttr(feed.launcher) + '</b> is current.</p>';
+    for (const n of news) {
+      const details = Array.isArray(n.details) ? n.details : (n.details ? [n.details] : []);
+      body += '<article class="rel"><div class="when">' + escAttr(n.date || '') + '</div><h2>' +
+        escAttr(n.title || '') + '</h2>' + (n.body ? '<p>' + escAttr(n.body) + '</p>' : '') +
+        (details.length ? '<ul>' + details.map(d => '<li>' + escAttr(d) + '</li>').join('') + '</ul>' : '') + '</article>';
+    }
+    if (!news.length) body += '<p>No release notes are available yet.</p>';
+  } else if (route === '/roadmap') {
+    // Same public board as /api/roadmap; staff boards never enter this HTML.
+    const rm = readBoard().roadmap || {sections:[]};
+    if (rm.intro) body += pageHtml(rm.intro).replace(/<h1\b/g, '<h2').replace(/<\/h1>/g, '</h2>');
+    let count = 0;
+    for (const section of (rm.sections || [])) {
+      if (/^\s*done\s*$/i.test(section.name || '') || !(section.rows || []).length) continue;
+      body += '<section class="lane"><h2>' + escAttr(section.name || '') + '</h2><ul>';
+      for (const row of section.rows) {
+        const text = (section.columns || []).map(col => (row.cells || {})[col.id]).filter(Boolean).join(' · ');
+        body += '<li>' + escAttr(text) + '</li>'; count++;
+      }
+      body += '</ul></section>';
+    }
+    if (!count) body += '<p>No upcoming work is listed here yet. See <a href="/known">known issues</a> for current limits.</p>';
+  } else if (route === '/gallery') {
+    const shots = publicJson(GALLERY, []);
+    const approved = (Array.isArray(shots) ? shots : []).slice(0, 24);
+    body += '<p>Only pictures approved by staff appear here. <a href="/privacy">How submissions are used</a>.</p><div class="gallery">';
+    for (const g of approved) {
+      if (!/^\/shot\/[^?#]+$/.test(g.url || '')) continue;
+      const alt = g.alt || 'Skyrim scene shared by ' + (g.by || 'the Thornswood community');
+      const media = /\.(mp4|webm)$/i.test(g.name || '')
+        ? '<video controls preload="metadata" aria-label="' + escAttr(alt) + '"><source src="' + escAttr(g.url) + '"></video>'
+        : '<img src="' + escAttr(g.url) + '" alt="' + escAttr(alt) + '" loading="lazy">';
+      body += '<figure class="shot-card"><div class="shot">' + media + '</div><figcaption>' + escAttr(g.by || 'Thornswood community') + '</figcaption></figure>';
+    }
+    body += '</div>';
+    if (!approved.length) body += '<p>No approved pictures are available yet.</p>';
+  } else if (route === '/downloads') {
+    body += '<p>You need to own Skyrim Special Edition on Steam and be eighteen or older.</p>' +
+      '<p><a href="/join">Read the installation and application steps</a>. ' +
+      '<a href="/help">Get installation help</a>.</p>' +
+      '<p>The download controls appear after the age statement. JavaScript is needed for those controls.</p>';
+  } else if (route === '/report') {
+    body += '<p>Reports are private. Your Discord name is optional for game faults and ideas. ' +
+      'A report about a person requires Discord sign-in.</p>' +
+      '<p>Do not include passwords, access tokens, payment details, or unrelated personal information. ' +
+      '<a href="/privacy">Read how reports are stored and used</a>.</p>' +
+      '<p>The report form needs JavaScript. You can also ask for help in the Discord linked above.</p>';
+  }
+  return body;
+}
+const publicAssetVersions = new Map();
+function publicAssetVersion(asset) {
+  const file = path.join(PUBLIC, asset);
+  try {
+    const st = fs.statSync(file), key = st.size + ':' + st.mtimeMs + ':' + st.ctimeMs;
+    const cached = publicAssetVersions.get(asset);
+    if (cached && cached.key === key) return cached.version;
+    const version = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex').slice(0, 16);
+    publicAssetVersions.set(asset, {key, version}); return version;
+  } catch (e) { return null; }
+}
+function publicDiscovery(html, route) {
+  const blurb = BLURB[route], canonical = PUBLIC_ORIGIN + route;
+  const title = route === '/' ? blurb[0] : blurb[0] + ' · Thornswood';
+  const graph = [
+    {'@type':'Organization', '@id':PUBLIC_ORIGIN+'/#community', name:'Thornswood', url:PUBLIC_ORIGIN+'/',
+      logo:PUBLIC_ORIGIN+'/logo.png', description:'A free Skyrim roleplay fan project and online community.'},
+    {'@type':'WebSite', '@id':PUBLIC_ORIGIN+'/#website', url:PUBLIC_ORIGIN+'/', name:'Thornswood',
+      publisher:{'@id':PUBLIC_ORIGIN+'/#community'}},
+    {'@type':'WebPage', '@id':canonical+'#page', url:canonical, name:title, description:blurb[1],
+      isPartOf:{'@id':PUBLIC_ORIGIN+'/#website'}, inLanguage:'en'}
+  ];
+  if (route !== '/') {
+    graph[2].breadcrumb = {'@id':canonical+'#breadcrumb'};
+    graph.push({'@type':'BreadcrumbList', '@id':canonical+'#breadcrumb', itemListElement:[
+      {'@type':'ListItem', position:1, name:'Thornswood', item:PUBLIC_ORIGIN+'/'},
+      {'@type':'ListItem', position:2, name:blurb[0], item:canonical}
+    ]});
+    html = html.replace('<main id="main">', () => '<main id="main"><nav class="wrap breadcrumbs" aria-label="Breadcrumb">' +
+      '<ol><li><a href="/">Thornswood</a></li><li aria-current="page">' + escAttr(blurb[0]) + '</li></ol></nav>');
+  }
+  // Escape the HTML script terminator even if metadata becomes editable later.
+  const ld = JSON.stringify({'@context':'https://schema.org', '@graph':graph}).replace(/</g, '\\u003c');
+  const head = '<link rel="canonical" href="' + canonical + '">\n' +
+    '<meta property="og:url" content="' + canonical + '">\n' +
+    '<meta property="og:image:alt" content="Thornswood emblem over a painted Skyrim landscape">\n' +
+    '<meta name="twitter:image:alt" content="Thornswood emblem over a painted Skyrim landscape">\n' +
+    '<meta name="twitter:title" content="' + escAttr(title) + '">\n' +
+    '<meta name="twitter:description" content="' + escAttr(blurb[1]) + '">\n' +
+    '<script type="application/ld+json">' + ld + '</script>\n';
+  for (const asset of ['home.js', 'home.css']) {
+    const version = publicAssetVersion(asset);
+    if (!version) continue;
+    html = html.replace('"/' + asset + '"', () => '"/' + asset + '?v=' + version + '"');
+  }
+  return html.replace(/<title>[\s\S]*?<\/title>/, () => '<title>' + escAttr(title) + '</title>')
+    .replace('</head>', () => head + '</head>');
 }
 
 
@@ -859,6 +976,42 @@ function noteRules(file, discordId, rules, by, now) {
    machine. Nothing here writes it. */
 const NEWS    = path.join(DATA, 'news.json');
 
+// Cache only immutable public reads, invalidated by file changes. Never reuse
+// authorization, bans, account records, or a staff board through this cache.
+const publicJsonCache = new Map();
+function publicJson(file, fallback) {
+  if (file !== NEWS && file !== GALLERY) throw new Error('not a public cache file');
+  let st;
+  try { st = fs.statSync(file); } catch (e) { publicJsonCache.delete(file); return fallback; }
+  const key = st.size + ':' + st.mtimeMs + ':' + st.ctimeMs;
+  const old = publicJsonCache.get(file);
+  if (old && old.key === key) return old.value;
+  const value = jsonFile(file, fallback);
+  publicJsonCache.set(file, {key, value});
+  return value;
+}
+function galleryPage(offset, limit) {
+  const raw = publicJson(GALLERY, []), shots = Array.isArray(raw) ? raw : [];
+  return {gallery:shots.slice(offset, offset + limit), total:shots.length,
+    next:offset + limit < shots.length ? offset + limit : null};
+}
+
+// In-memory, salted connection keys expire after a minute and are never logged.
+// This is a single-process service; multiple replicas would need a shared cap.
+const publicApiReads = new Map();
+const PUBLIC_API_WINDOW = 60000, PUBLIC_API_CAP = 120;
+function publicApiWait(req, now) {
+  for (const [key, row] of publicApiReads) if (now - row.start >= PUBLIC_API_WINDOW) publicApiReads.delete(key);
+  const key = reportFrom(req);
+  let row = publicApiReads.get(key);
+  if (!row) {
+    if (publicApiReads.size >= 4096) return 1;
+    row = {start:now, count:0}; publicApiReads.set(key, row);
+  }
+  if (row.count >= PUBLIC_API_CAP) return Math.max(1, Math.ceil((row.start + PUBLIC_API_WINDOW - now) / 1000));
+  row.count++; return 0;
+}
+
 // ==== thornswood report limits ====
 //
 // THE PUBLIC REPORT FORM TOOK ANYTHING FROM ANYBODY, AS OFTEN AS THEY LIKED.
@@ -1144,6 +1297,17 @@ function listUploads() {
    route only wants some. It answers 413 or 415 itself and returns; on a good
    file it calls saved(name) and leaves the reply to the route, because /upload
    and /gallery/submit write different things once the bytes are down. */
+// ==== thornswood upload guard ====
+const uploadBudgets = new Map();
+function mediaSignature(ext, bytes) {
+  if (ext === '.png') return bytes.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex'));
+  if (ext === '.jpg' || ext === '.jpeg') return bytes.subarray(0,3).equals(Buffer.from('ffd8ff','hex'));
+  if (ext === '.gif') return /^GIF8[79]a$/.test(bytes.subarray(0,6).toString('ascii'));
+  if (ext === '.webp') return bytes.subarray(0,4).toString('ascii') === 'RIFF' && bytes.subarray(8,12).toString('ascii') === 'WEBP';
+  if (ext === '.mp4') return bytes.subarray(4,8).toString('ascii') === 'ftyp';
+  if (ext === '.webm') return bytes.subarray(0,4).equals(Buffer.from('1a45dfa3','hex'));
+  return false;
+}
 function receiveUpload(req, res, asked, cap, allow, saved) {
   if (Number(req.headers['content-length'] || 0) > cap) {
     return sendJson(res, 413, { error: 'that file is over ' + Math.round(cap / 1048576) + ' MB' });
@@ -1158,13 +1322,31 @@ function receiveUpload(req, res, asked, cap, allow, saved) {
       return sendJson(res, 415, { error: 'that kind of file is not allowed here', allowed: allow });
     }
   }
+  const now = Date.now(), key = reportFrom(req);
+  for (const [k, row] of uploadBudgets) if (!row.active && now - row.start >= 3600000) uploadBudgets.delete(k);
+  let budget = uploadBudgets.get(key);
+  if (!budget) {
+    if (uploadBudgets.size >= 4096) return sendJson(res, 503, {error:'Uploads are busy. Try again shortly.'});
+    budget = {start:now, count:0, bytes:0, active:0}; uploadBudgets.set(key, budget);
+  }
+  if (budget.active >= 2 || budget.count >= 40 || budget.bytes >= 500 * 1048576) {
+    req.resume();
+    return send(res, 429, JSON.stringify({error:'This connection has reached its upload limit. Try again later.'}),
+      null, {'Retry-After':String(Math.max(1, Math.ceil((budget.start + 3600000 - now) / 1000))), Connection:'close'});
+  }
+  budget.count++; budget.active++;
   const d = new Date();
   const two = (n) => String(n).padStart(2, '0');
   const stamp = d.getFullYear() + two(d.getMonth() + 1) + two(d.getDate()) + '-' +
                 two(d.getHours()) + two(d.getMinutes());
-  let name = stamp + '-' + safe, n = 2;
-  while (fs.existsSync(path.join(UP, name))) { name = stamp + '-' + n + '-' + safe; n++; }
+  const name = stamp + '-' + crypto.randomBytes(6).toString('hex') + '-' + safe;
   const dest = path.join(UP, name);
+  let descriptor;
+  try { descriptor = fs.openSync(dest, 'wx'); }
+  catch (e) {
+    budget.active--;
+    return sendJson(res, 500, {error:'The site could not reserve an upload file. Try again shortly.'});
+  }
 
   /* Over the cap or cut off partway, the half file goes (#1095). Over the cap
      it destroyed the request, so the 413 went to a socket already closed, and
@@ -1172,12 +1354,18 @@ function receiveUpload(req, res, asked, cap, allow, saved) {
      open on disk and the route never answered. Now too big is answered 413
      and the rest read and thrown away, and a connection that went is closed
      with nothing left to say. */
-  let got = 0, over = false, cut = false, broke = false;
-  const out = fs.createWriteStream(dest);
+  let got = 0, over = false, cut = false, broke = false, timedOut = false, quotaExceeded = false, prefix = Buffer.alloc(0);
+  const out = fs.createWriteStream(dest, {fd:descriptor, autoClose:true});
+  const deadline = setTimeout(() => {
+    timedOut = true; req.unpipe(out); out.destroy(); req.resume();
+  }, 300000);
   out.on('error', () => { broke = true; });
   req.on('data', (c) => {
     got += c.length;
-    if (got > cap && !over) { over = true; req.unpipe(out); out.destroy(); }
+    budget.bytes += c.length;
+    if (budget.bytes > 500 * 1048576) quotaExceeded = true;
+    if (prefix.length < 12) prefix = Buffer.concat([prefix, c.subarray(0, 12 - prefix.length)]);
+    if ((got > cap || budget.bytes > 500 * 1048576) && !over) { over = true; req.unpipe(out); out.destroy(); }
   });
   const drop = () => { if (!req.complete && !over && !cut) { cut = true; req.unpipe(out); out.destroy(); } };
   req.on('error', drop);
@@ -1185,8 +1373,14 @@ function receiveUpload(req, res, asked, cap, allow, saved) {
   req.on('close', drop);
   req.pipe(out);
   out.on('close', () => {
-    if (over || cut || broke) {
+    clearTimeout(deadline); budget.active--;
+    const invalid = !over && !cut && !broke && !timedOut && allow && !mediaSignature(path.extname(safe).toLowerCase(), prefix);
+    if (over || cut || broke || timedOut || invalid) {
       try { fs.unlinkSync(dest); } catch (e) { }
+      if (timedOut) return send(res, 408, JSON.stringify({error:'That upload took too long. Try again with a smaller file.'}), null, {Connection:'close'});
+      if (quotaExceeded) return send(res, 429, JSON.stringify({error:'This connection has uploaded 500 MB in the last hour. Try again later.'}),
+        null, {'Retry-After':String(Math.max(1, Math.ceil((budget.start + 3600000 - Date.now()) / 1000))), Connection:'close'});
+      if (invalid) return sendJson(res, 415, {error:'The file contents do not match its image or recording type.'});
       if (over) return send(res, 413, JSON.stringify({ error: 'that file is over ' + Math.round(cap / 1048576) + ' MB' }),
                             null, { Connection: 'close' });
       if (cut) { try { res.destroy(); } catch (e) { } return; }
@@ -1196,6 +1390,7 @@ function receiveUpload(req, res, asked, cap, allow, saved) {
   });
 }
 
+// ==== end thornswood upload guard ====
 // ------------------------------------------------------------------ auth --
 const COOKIE = 'tw';
 const ADMIN  = 'twa';
@@ -3325,15 +3520,17 @@ function wantsHtml(req) {
 
 function plainPage(title, lines) {
   const esc = (t) => String(t == null ? '' : t).replace(/[<>&]/g, '');
-  return '<!doctype html><meta charset=utf-8><title>' + esc(title) + ' | Thornswood</title>' +
+  return '<!doctype html><html lang="en"><head><meta charset=utf-8><title>' + esc(title) + ' | Thornswood</title>' +
+    '<meta name="description" content="Find your way back to Thornswood, the Skyrim roleplay community.">' +
+    '<meta name="robots" content="noindex"><link rel="icon" href="/favicon.ico">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
     '<link rel="stylesheet" href="/door.css">' +
-    '<body class="door">' +
-    '<div class="door-box">' +
+    '</head><body class="door">' +
+    '<main class="door-box">' +
     '<h1>' + esc(title) + '</h1>' +
     lines.map((t) => '<p>' + esc(t) + '</p>').join('') +
-    '<p><a href="/">Back to Thornswood</a></p>' +
-    '</div>';
+    '<p><a href="/">Back to Thornswood</a> · <a href="/help">Get help</a></p>' +
+    '</main></body></html>';
 }
 
 function notFoundPage() {
@@ -3518,6 +3715,35 @@ async function handle(req, res) {
      door, and falls to the 404 at the bottom. */
   if (req.method === 'GET' && (/\/\/(?!\/*$)/.test(url.pathname) || /^\/\/+$/.test(url.pathname))) {
     return send(res, 301, '', 'text/plain', { Location: url.pathname.replace(/\/{2,}/g, '/') + url.search });
+  }
+
+  if (req.method === 'GET' && PUBLIC_PAGES.includes(route) &&
+      /^www\.thornswood\.net(?::\d+)?$/i.test(req.headers.host || '')) {
+    return send(res, 301, '', 'text/plain', {Location:PUBLIC_ORIGIN + route + url.search});
+  }
+  // These contain only public addresses. They never require a Discord lookup.
+  if (req.method === 'GET' && route === '/sitemap.xml') {
+    return send(res, 200, '<?xml version="1.0" encoding="UTF-8"?>\n' +
+      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
+      PUBLIC_PAGES.map(page => '<url><loc>' + PUBLIC_ORIGIN + page + '</loc></url>').join('') + '</urlset>',
+      'application/xml; charset=utf-8');
+  }
+  if (req.method === 'GET' && route === '/robots.txt') {
+    return send(res, 200, fs.readFileSync(path.join(PUBLIC, 'robots.txt')), 'text/plain; charset=utf-8',
+      {'Cache-Control':'public, max-age=3600'});
+  }
+  if (req.method === 'GET' && route === '/llms.txt') {
+    const pages = ['/world','/rules','/join','/classes','/known','/help','/news','/roadmap','/privacy','/terms','/cookies','/credits'];
+    return send(res, 200, '# Thornswood\n\n> A free Skyrim roleplay fan project and online community. Eighteen and over.\n\n' +
+      'The site describes an evolving game. Consult Known issues for current limits and News for released changes.\n\n## Public pages\n\n' +
+      pages.map(page => '- [' + BLURB[page][0] + '](' + PUBLIC_ORIGIN + page + '): ' + BLURB[page][1]).join('\n') + '\n',
+      'text/plain; charset=utf-8');
+  }
+
+  if (req.method === 'GET' && (/^\/api\/(?:public|gallery|releases|roadmap)$/.test(route) || /^\/api\/page\/[a-z-]+$/.test(route))) {
+    const retry = publicApiWait(req, Date.now());
+    if (retry) return send(res, 429, JSON.stringify({error:'Too many requests. Try again shortly.'}),
+      'application/json; charset=utf-8', {'Retry-After':String(retry)});
   }
 
   // A page load (GET, HEAD was made GET above) waits SUBMIT_WAIT_MS and may
@@ -3773,13 +3999,12 @@ async function handle(req, res) {
       // above, so nothing anybody typed is mistaken for DISCORD_URL.
       if (MD_PAGES.indexOf(route) >= 0) {
         const md = pageMarkdown(route.slice(1));
-        html = fillPage(html, md === null
-          ? '<h1>Not here</h1><p>That page does not exist yet.</p>'
-          : pageHtml(md));
+        if (md === null) return send(res, 404, notFoundPage(), TYPES['.html']);
+        html = fillPage(html, singlePageHeading(pageHtml(md), blurb[0]));
       } else if (route !== '/') {
         // The remaining public pages draw themselves after an API fetch. Do not
         // paint the home landing while that request is in flight.
-        html = html.replace('<div id="landing">', () => '<div id="landing" hidden>');
+        html = fillPage(html, publicPageBody(route));
         // MD pages get <title> from fillPage (the page's h1). Non-MD routes
         // used to keep the home title until the page's script ran, so a crawler
         // or a slow tab saw only Thornswood. Set it from BLURB here.
@@ -3788,6 +4013,7 @@ async function handle(req, res) {
             () => '<title>' + escAttr(pageTitle) + '</title>');
         }
       }
+      html = publicDiscovery(html, route);
       return send(res, 200, html, TYPES['.html']);
     } catch (e) { return send(res, 500, 'no home.html', 'text/plain'); }
   }
@@ -3806,7 +4032,10 @@ async function handle(req, res) {
 
   // Everything the front page needs and nothing that is anybody's business.
   if (route === '/api/public' && req.method === 'GET') {
-    const feed = jsonFile(NEWS, { news: [] });
+    const feed = publicJson(NEWS, { news: [] });
+    // Installed launchers read the original full array. The website opts into
+    // pagination until those clients can follow a continuation themselves.
+    const gallery = galleryPage(0, url.searchParams.get('galleryLimit') === '24' ? 24 : Number.MAX_SAFE_INTEGER);
     return sendJson(res, 200, {
       // The one switch (#428), for the pages and the Discord bot.
       open: cfg.open === true,
@@ -3816,7 +4045,9 @@ async function handle(req, res) {
       // says "N of 25" whether or not the server has said it (#481).
       status: { up: gameStatus.up, online: gameStatus.online, max: gameStatus.max || mostOnlineFallback(),
                 line: gameStatus.line, full: seatsFull(gameStatus) },
-      gallery: jsonFile(GALLERY, []),
+      gallery: gallery.gallery,
+      galleryTotal: gallery.total,
+      galleryNext: gallery.next,
       launcher: feed.launcher || '',
       collection: feed.collection || '',
       files: listFiles(),
@@ -4162,7 +4393,7 @@ async function handle(req, res) {
   }
 
   if (route === '/api/releases' && req.method === 'GET') {
-    const feed = jsonFile(NEWS, { launcher:'', news: [] });
+    const feed = publicJson(NEWS, { launcher:'', news: [] });
     // PowerShell writes a one item list as a bare string, so entries with a
     // single detail line arrived here as text rather than a list. The page then
     // called .map on a string, threw, and the catch around the fetch told
@@ -4204,6 +4435,13 @@ async function handle(req, res) {
 
   // Pictures chosen for the gallery are public. Everything else in uploads is
   // not, which is why this is a separate door with its own list.
+  if (route === '/api/gallery' && req.method === 'GET') {
+    const offset = Number(url.searchParams.get('offset') || 0), limit = Number(url.searchParams.get('limit') || 24);
+    if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 60) {
+      return sendJson(res, 400, {error:'Use a nonnegative offset and a limit from 1 to 60.'});
+    }
+    return sendJson(res, 200, galleryPage(offset, limit));
+  }
   const shot = route.match(/^\/shot\/([a-z0-9._ -]+)$/);
   if (shot && req.method === 'GET') {
     const ok = jsonFile(GALLERY, [])
@@ -4236,6 +4474,7 @@ async function handle(req, res) {
     catch (e) { return send(res, 500, 'no index.html', 'text/plain'); }
   }
   if (req.method === 'GET' && /^\/[A-Za-z0-9._-]+$/.test(p)) {
+    if (/\.map$/i.test(p)) return send(res, 404, 'not here', 'text/plain');
     const file = path.join(PUBLIC, p.slice(1));
     if (file.startsWith(PUBLIC + path.sep) && fs.existsSync(file)) {
       const type = TYPES[path.extname(file).toLowerCase()] || 'text/plain';

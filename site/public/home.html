@@ -61,8 +61,9 @@
 <header>
   <div class="wrap bar">
     <a class="mark" href="/"><img src="/logo.png" alt="Thornswood">Thornswood</a>
-    <button class="burger" id="burger" aria-label="Menu" aria-expanded="false">&#9776;</button>
-    <nav class="top" id="nav">
+    <a class="mobile-cta" href="/downloads">Download</a>
+    <button class="burger" id="burger" aria-label="Open menu" aria-controls="nav" aria-expanded="false">&#9776;</button>
+    <nav class="top" id="nav" aria-label="Main navigation">
       <a href="/rules">Rules</a>
       <a href="/classes">Professions</a>
       <a href="/roadmap">Roadmap</a>
@@ -120,7 +121,7 @@
     whole. If either file is replaced, take it from the render the launcher
     strip is cut from, not from the strip.
   -->
-  <video class="art" autoplay muted loop playsinline preload="metadata"
+  <video class="art" muted loop playsinline preload="none"
          poster="/banner.jpg" aria-hidden="true" tabindex="-1">
     <source src="/banner.mp4" type="video/mp4">
   </video>
@@ -136,6 +137,7 @@
       <a class="btn ghost" href="#world">Read the world</a>
     </div>
     <div class="live" id="live"><span class="dot" id="dot"></span><span id="livetext">Checking the server</span></div>
+    <button class="hero-motion" type="button" id="bannerMotion" hidden>Play background animation</button>
   </div>
 </div>
 
@@ -151,11 +153,8 @@
   <div class="wrap">
     <div class="eyebrow">What this is</div>
     <h2>A world that is not empty at three in the morning</h2>
-    <p class="lede">Every other server like this strips the people out
-      completely. The towns go quiet, the shops close, and what is left is a
-      very large field you only enjoy on the nights twenty others happen to be
-      in it. Vanilla Skyrim has the opposite problem: so many faces that none
-      of them matter.
+    <p class="lede">Thornswood is built around a smaller population of people
+      in the towns, alongside the characters you and others bring into the world.
       <strong>Thornswood keeps a chosen few.</strong> Enough that a hold feels
       lived in when two of you are online, few enough that you are still the
       reason anything happens.</p>
@@ -165,8 +164,9 @@
         <div class="num">01</div>
         <h3>Fewer, and worth talking to</h3>
         <p>Most of the crowd goes. What stays is what a town actually needs:
-          the innkeeper, the smith, the shopkeeper, the guards on the wall. You
-          can buy from them, rob them, and be chased for it.</p>
+          the innkeeper, the smith, the shopkeeper, the guards on the wall.
+          Trading and routines are still being tested. Read the
+          <a href="/known">known issues</a> for what works today.</p>
       </div>
       <div>
         <div class="num">02</div>
@@ -185,9 +185,9 @@
       <div>
         <div class="num">03</div>
         <h3>The server owns the world</h3>
-        <p>Your character, your gold, your house and every chest in Skyrim live
-          on the server. Nothing is on your machine to lose, and nothing anyone
-          edits on theirs changes what you see.</p>
+        <p>Your character and shared world records live on the server.
+          The launcher and game files stay on your PC. This is an alpha:
+          bugs and announced wipes can still lose progress.</p>
       </div>
     </div>
   </div>
@@ -241,28 +241,28 @@
 
     <div class="feats">
       <div class="feat">
-        <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 3a4 4 0 0 1 4 4v4a4 4 0 0 1-8 0V7a4 4 0 0 1 4-4Z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        <svg aria-hidden="true" focusable="false" class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 3a4 4 0 0 1 4 4v4a4 4 0 0 1-8 0V7a4 4 0 0 1 4-4Z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
         <h3>Voice that carries</h3>
         <p>Proximity voice in the launcher, not a separate call. Whisper to the
           person beside you, shout down the length of a hall, and hear the room
           the way your character would.</p>
       </div>
       <div class="feat">
-        <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="4" y="10" width="16" height="11" rx="1.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg>
+        <svg aria-hidden="true" focusable="false" class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="4" y="10" width="16" height="11" rx="1.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg>
         <h3>Real locks and real keys</h3>
         <p>A house is locked because there is a lock on it. The key is a thing
           you carry, hand over, have copied by a smith, or lose to a
           pickpocket. Anybody can try the lock. Most people should not.</p>
       </div>
       <div class="feat">
-        <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 5h16v13H4z"/><path d="M7 9h7M7 12.5h10M7 16h5"/></svg>
+        <svg aria-hidden="true" focusable="false" class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 5h16v13H4z"/><path d="M7 9h7M7 12.5h10M7 16h5"/></svg>
         <h3>Notice boards in every hold</h3>
         <p>Pay coin to pin a notice or a job at a board outside. Anyone can read
           what is up. Take a job and it goes on your list. Nothing takes a
           notice down yet.</p>
       </div>
       <div class="feat">
-        <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 3v18M5 8l7-5 7 5M5 8v8l7 5 7-5V8"/></svg>
+        <svg aria-hidden="true" focusable="false" class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 3v18M5 8l7-5 7 5M5 8v8l7 5 7-5V8"/></svg>
         <h3>Nobody can do everything</h3>
         <p>You pick a profession, one half of it, and a class. An Edgewright
           cannot make steel armour. Only a hunter can loot an animal, only a miner can
@@ -270,7 +270,7 @@
           remember. <a href="/classes">Professions and classes</a>.</p>
       </div>
       <div class="feat">
-        <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 20h18M6 20V9l6-5 6 5v11"/><path d="M10 20v-6h4v6"/></svg>
+        <svg aria-hidden="true" focusable="false" class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 20h18M6 20V9l6-5 6 5v11"/><path d="M10 20v-6h4v6"/></svg>
         <h3>Property worth owning</h3>
         <p>Claim a door for free, carry the deed, and a steward sets the rent
           and can evict. The house is yours because you hold the paper, not
@@ -285,14 +285,14 @@
         what runs today. See the <a href="/roadmap">roadmap</a>.</p>
       <div class="feats">
         <div class="feat">
-          <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 3 4 7v6c0 4.4 3.4 7.4 8 8 4.6-.6 8-3.6 8-8V7l-8-4Z"/><path d="M9 12l2 2 4-4"/></svg>
+          <svg aria-hidden="true" focusable="false" class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 3 4 7v6c0 4.4 3.4 7.4 8 8 4.6-.6 8-3.6 8-8V7l-8-4Z"/><path d="M9 12l2 2 4-4"/></svg>
           <h3>Law with people behind it</h3>
           <p>Every guard is somebody. Bounties, cells and courts are run by the
             people holding the keys, so getting caught is not a fine and a loading
             screen. Somebody has to decide what happens to you.</p>
         </div>
         <div class="feat">
-          <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="8" r="3.4"/><path d="M5 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M18 3.5l1 2 2 .6-1.5 1.5.3 2.1-1.8-1-1.8 1 .3-2.1L15 6.1l2-.6Z"/></svg>
+          <svg aria-hidden="true" focusable="false" class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="8" r="3.4"/><path d="M5 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M18 3.5l1 2 2 .6-1.5 1.5.3 2.1-1.8-1-1.8 1 .3-2.1L15 6.1l2-.6Z"/></svg>
           <h3>People with their own work</h3>
           <p>The ones who stayed are getting jobs, routines and errands of their
             own, so a quiet hold still has something happening in it and somebody
@@ -346,14 +346,14 @@
   <div class="wrap">
     <div class="cols">
       <div>
-        <h4>The World</h4>
+        <h2>The World</h2>
         <a href="/world">History</a>
         <a href="/roadmap">Roadmap</a>
         <a href="/world#accord">The White Harbour Accord</a>
         <a href="/rules">Rules</a>
       </div>
       <div>
-        <h4>Playing</h4>
+        <h2>Playing</h2>
         <a href="/downloads">How to join</a>
         <a href="/downloads">Download</a>
         <a href="/classes">Professions</a>
@@ -362,7 +362,7 @@
         <a href="/report">Report a problem</a>
       </div>
       <div>
-        <h4>Community</h4>
+        <h2>Community</h2>
         <a href="/gallery">Gallery</a>
         <a href="DISCORD_URL" target="_blank" rel="noopener">Discord</a>
         <a href="https://www.patreon.com/thornswood" id="footPatreon"
@@ -371,7 +371,7 @@
         <a href="/news">Release notes</a>
       </div>
       <div>
-        <h4>Behind it</h4>
+        <h2>Behind it</h2>
         <a href="/hub">Admin login</a>
         <a href="/news">Release notes</a>
         <a href="/credits">Credits</a>
