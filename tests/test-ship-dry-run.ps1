@@ -272,6 +272,12 @@ function Get-LoadOrderCopyDiffs([hashtable]$Copies) { return @() }
 '@)
     $updaterCs = Join-Path $repo 'launcher\app\Updater.cs'
     [IO.File]::WriteAllText($updaterCs, "        public const string Version = `"1.1.93`";`r`n")
+    # Issue #1081: Ship runs scripts\dev\Check-Words.ps1 before it builds.
+    # This stand-in passes. tests\test-ship-check-words.ps1 runs the real
+    # script against a planted hit. A stand-in here keeps this dry run on
+    # what leaves the machine.
+    New-Item -ItemType Directory -Force -Path (Join-Path $repo 'scripts\dev') | Out-Null
+    [IO.File]::WriteAllText((Join-Path $repo 'scripts\dev\Check-Words.ps1'), "param([string]`$Root)`r`nexit 0`r`n")
     # The VPS store (Feed-Store.ps1, #907), stood in for by a folder, and this
     # machine's working copies of it as the last run left them.
     foreach ($d in (Join-Path $site 'feed'), (Join-Path $site 'feed-dev')) { New-Item -ItemType Directory -Force -Path $d | Out-Null }
