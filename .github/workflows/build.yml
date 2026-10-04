@@ -274,6 +274,7 @@ jobs:
                  'test-1374-letters.js',
                  'test-1380-rare-mines.js',
                  'test-1384-condition.js',
+                 'test-1385-perks.js',
                  'test-1386-warrior.js',
                  'test-1388-apprentice.js',
                  'test-1389-lists.js',

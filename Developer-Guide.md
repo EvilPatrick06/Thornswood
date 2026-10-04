@@ -42,6 +42,7 @@ The outline nests, and the table of contents follows it. A part is a numbered se
     - [What this is](#what-this-is)
     - [Words](#words)
     - [Fix the cause, no band-aids](#fix-the-cause-no-band-aids)
+    - [Buttons, not chat commands](#buttons-not-chat-commands)
     - [Everything we need to do goes on the board](#everything-we-need-to-do-goes-on-the-board)
     - [Settled design, not up for a quiet rewrite](#settled-design-not-up-for-a-quiet-rewrite)
     - [How work moves](#how-work-moves)
@@ -699,6 +700,19 @@ written beside it, and it stops and says so instead of looping.
 
 Every pull request says, under What changed, what the cause was and how it
 was found. One that cannot say it is not merged.
+
+#### Buttons, not chat commands
+
+Decided by Patrick on 4 Oct: "no more commands for things [people] do,
+only for dev and staff commands; everything else takes buttons and GUI".
+Anything a person does in the world is a key, a prompt, a panel or the
+thing itself activated, never a line typed in the chat. Staff and dev
+commands stay commands. Never add a chat command for people. A panel may
+send the server a line, but no person is told to type it and help text
+never lists it. [docs/SYSTEMS.md](docs/SYSTEMS.md), "Buttons, not
+commands", is the rule and what counts as a button;
+[docs/systems/commands.md](docs/systems/commands.md) lists every command
+there is today and the issue that converts each one.
 
 #### Everything we need to do goes on the board
 
