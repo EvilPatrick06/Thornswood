@@ -142,7 +142,7 @@ const pieces = {
         'function charcoalHeld(actorId, grade)', 'function fuelRefusal(fuel)', 'function wantsAHandle(row)',
         'function holdsPerk(actorId, key)', 'function markWoven(actorId, outDesc, name, n)',
         'function masterCraft(actorId, row, count)'].map(cut),
-  onCraft: slice(gm, "mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId) {", '\n});\n')
+  onCraft: slice(gm, "mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {", '\n});\n')
 };
 yes('the craft pieces are all in the gamemode',
     !!pieces.grades && !!pieces.hafted && !!pieces.handle && !!pieces.tools && !!pieces.key && !!pieces.delay && !!pieces.after &&

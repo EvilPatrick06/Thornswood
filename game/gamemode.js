@@ -26662,23 +26662,25 @@ function markWoven(actorId, outDesc, name, n) {
 */
 const MASTER_CRAFT_AFTER_MS = 0;
 
-/** After an allowed craft: Grand Chef's second batch and Master Weaver's mark. */
+/** After an allowed craft: Grand Chef's and Master Chemist's second batch, and Master Weaver's mark. */
 function masterCraft(actorId, row, count) {
   if (!row || typeof row !== 'object' || !row.out) { return; }
   const n = Number(count) > 0 ? Math.floor(Number(count)) : (Number(row.makes) || 1);
   const chef = row.owner === 'Cook' && holdsPerk(actorId, 'grandchef');
   const weaver = row.owner === 'Tailor' && row.type === 'ARMO' && holdsPerk(actorId, 'masterweaver');
-  if (!chef && !weaver) { return; }
+  const chemist = row.owner === 'Alchemist' && holdsPerk(actorId, 'masterchemist');
+  if (!chef && !weaver && !chemist) { return; }
   const before = packCount(actorId, row.out);
   setTimeout(function () {
     if (packCount(actorId, row.out) < before + n) {
       log(actorId.toString(16), 'made no', row.name, 'after all (the engine refused the craft), so no master work is added');
       return;
     }
-    if (chef) {
+    if (chef || chemist) {
       try {
         addItem(actorId, row.out, n);
-        log(actorId.toString(16), 'is a Grand Chef: a second batch of', n, row.name);
+        log(actorId.toString(16), 'is a', chef ? 'Grand Chef:' : 'Master Chemist:',
+            'a second batch of', n, row.name);
       } catch (e) { log('the second batch of', row.name, 'was not handed over:', e); }
     }
     if (weaver) {
@@ -26937,7 +26939,254 @@ var RECIPELESS = {
   ARMO: { prof: 'enchanter', made: 'enchanted armour', verb: 'enchant' }
 };
 
-function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
+/*
+  THE TWO SHORT LISTS (#1389): what a lab may brew, docs/systems/mixtures.md,
+  and what an arcane enchanter may put on a piece, docs/systems/enchantments.md.
+  An effect that is not named on its page is refused, even when the vanilla
+  menu would make it.
+
+  KEYED BY THE MAGIC EFFECT, the MGEF record, because that is the one thing a
+  brew and an enchantment are made of. A brewed bottle is a form only the
+  brewing client has (above 0xff000000), and an enchanted piece keeps its own
+  record with a new enchantment hung on it (the ExtraEnchantment the fork's
+  inventory.ts already reads), so neither has a record the server can look up.
+  The effects inside them are plugin records, and the same ids on both sides.
+  The ids are Skyrim.esm's, as UESP lists them for each effect: the alchemy
+  effect for a mixture and the enchanting effect for an enchantment, which are
+  two different records with the same name (Resist Fire, Fear).
+
+  WHAT THE ENGINE PASSES TODAY, read in the fork at the pinned commit
+  (engine/skymp ac044a49): mp.onCraft gets five numbers and nothing else. The
+  client's craft message carries the bench, the inputs by base id and count,
+  and the base id of what arrived in the pack (craftService.ts,
+  CraftItemMessage.h); CraftService asks the gamemode with recipeId 0 and the
+  bench (CraftService.cpp, CraftEvent.cpp). No effect, no enchantment and not
+  even the inputs reach the gamemode. So these lists are asked only when the
+  engine hands over the effects as a sixth argument, an array of MGEF form ids;
+  what the fork has to do for that is written on #1389. Until then a brew and
+  an enchantment go through as they always have, and the log says the lists
+  were not asked.
+
+  The same rank rules as every recipe: craftAnswer is asked of each effect as
+  if it were a row, so the half that owns it, the sister half at novice and a
+  taught half at novice all answer the way they do at a forge.
+*/
+var MIXTURES = {
+  // Medicine, Physicker.
+  '3eb15:Skyrim.esm': { name: 'Restore Health', half: 'physicker', rank: 'novice' },
+  '3eb16:Skyrim.esm': { name: 'Restore Stamina', half: 'physicker', rank: 'novice' },
+  '3eb17:Skyrim.esm': { name: 'Restore Magicka', half: 'physicker', rank: 'novice' },
+  '3eaf3:Skyrim.esm': { name: 'Fortify Health', half: 'physicker', rank: 'advanced' },
+  '3eaf9:Skyrim.esm': { name: 'Fortify Stamina', half: 'physicker', rank: 'advanced' },
+  '3eaf8:Skyrim.esm': { name: 'Fortify Magicka', half: 'physicker', rank: 'advanced' },
+  'ae723:Skyrim.esm': { name: 'Cure Disease', half: 'physicker', rank: 'advanced' },
+  '3eaea:Skyrim.esm': { name: 'Resist Fire', half: 'physicker', rank: 'expert' },
+  '3eaeb:Skyrim.esm': { name: 'Resist Frost', half: 'physicker', rank: 'expert' },
+  '3eaec:Skyrim.esm': { name: 'Resist Shock', half: 'physicker', rank: 'expert' },
+  '3eb01:Skyrim.esm': { name: 'Fortify Carry Weight', half: 'physicker', rank: 'expert' },
+  '3eb06:Skyrim.esm': { name: 'Regenerate Health', half: 'physicker', rank: 'master' },
+  '3eb08:Skyrim.esm': { name: 'Regenerate Stamina', half: 'physicker', rank: 'master' },
+  '3eb07:Skyrim.esm': { name: 'Regenerate Magicka', half: 'physicker', rank: 'master' },
+  // Poison, Blightbrewer.
+  '3eb42:Skyrim.esm': { name: 'Damage Health', half: 'blightbrewer', rank: 'novice' },
+  '3a2c6:Skyrim.esm': { name: 'Damage Stamina', half: 'blightbrewer', rank: 'novice' },
+  '3a2b6:Skyrim.esm': { name: 'Damage Magicka', half: 'blightbrewer', rank: 'novice' },
+  '10aa4a:Skyrim.esm': { name: 'Lingering Damage Health', half: 'blightbrewer', rank: 'advanced' },
+  '73f23:Skyrim.esm': { name: 'Ravage Stamina', half: 'blightbrewer', rank: 'advanced' },
+  '73f27:Skyrim.esm': { name: 'Ravage Magicka', half: 'blightbrewer', rank: 'advanced' },
+  '73f2d:Skyrim.esm': { name: 'Weakness to Fire', half: 'blightbrewer', rank: 'expert' },
+  '73f2e:Skyrim.esm': { name: 'Weakness to Frost', half: 'blightbrewer', rank: 'expert' },
+  '73f2f:Skyrim.esm': { name: 'Weakness to Shock', half: 'blightbrewer', rank: 'expert' },
+  '90042:Skyrim.esm': { name: 'Weakness to Poison', half: 'blightbrewer', rank: 'expert' },
+  '73f30:Skyrim.esm': { name: 'Paralysis', half: 'blightbrewer', rank: 'master' },
+  '73f20:Skyrim.esm': { name: 'Fear', half: 'blightbrewer', rank: 'master' }
+};
+
+var ENCHANTMENTS = {
+  // On a weapon, Bladebinder.
+  '4605a:Skyrim.esm': { name: 'Fire Damage', half: 'bladebinder', rank: 'novice' },
+  '4605b:Skyrim.esm': { name: 'Frost Damage', half: 'bladebinder', rank: 'novice' },
+  '4605c:Skyrim.esm': { name: 'Shock Damage', half: 'bladebinder', rank: 'novice' },
+  '5b452:Skyrim.esm': { name: 'Soul Trap', half: 'bladebinder', rank: 'novice' },
+  'aa155:Skyrim.esm': { name: 'Absorb Health', half: 'bladebinder', rank: 'advanced' },
+  'aa157:Skyrim.esm': { name: 'Absorb Stamina', half: 'bladebinder', rank: 'advanced' },
+  'aa156:Skyrim.esm': { name: 'Absorb Magicka', half: 'bladebinder', rank: 'advanced' },
+  // The cheaper copies the Drainheart Sword and the Drainspell Bow teach.
+  // Same names, so the same rows; asked on #1389.
+  '10f21f:Skyrim.esm': { name: 'Absorb Stamina', half: 'bladebinder', rank: 'advanced' },
+  '10f221:Skyrim.esm': { name: 'Absorb Magicka', half: 'bladebinder', rank: 'advanced' },
+  '5b46b:Skyrim.esm': { name: 'Turn Undead', half: 'bladebinder', rank: 'advanced' },
+  'acbb5:Skyrim.esm': { name: 'Banish', half: 'bladebinder', rank: 'expert' },
+  '5b451:Skyrim.esm': { name: 'Fear', half: 'bladebinder', rank: 'expert' },
+  'acbb6:Skyrim.esm': { name: 'Paralyze', half: 'bladebinder', rank: 'master' },
+  // On armour and clothing, Wardweaver.
+  '493aa:Skyrim.esm': { name: 'Fortify Health', half: 'wardweaver', rank: 'novice' },
+  '49507:Skyrim.esm': { name: 'Fortify Stamina', half: 'wardweaver', rank: 'novice' },
+  '49504:Skyrim.esm': { name: 'Fortify Magicka', half: 'wardweaver', rank: 'novice' },
+  '48c8b:Skyrim.esm': { name: 'Resist Fire', half: 'wardweaver', rank: 'advanced' },
+  '48f45:Skyrim.esm': { name: 'Resist Frost', half: 'wardweaver', rank: 'advanced' },
+  '49295:Skyrim.esm': { name: 'Resist Shock', half: 'wardweaver', rank: 'advanced' },
+  '7a0f4:Skyrim.esm': { name: 'Fortify Carry Weight', half: 'wardweaver', rank: 'advanced' },
+  '92a57:Skyrim.esm': { name: 'Muffle', half: 'wardweaver', rank: 'expert' },
+  '92a48:Skyrim.esm': { name: 'Waterbreathing', half: 'wardweaver', rank: 'expert' },
+  '7a0f8:Skyrim.esm': { name: 'Fortify Health Regen', half: 'wardweaver', rank: 'master' },
+  '7a105:Skyrim.esm': { name: 'Fortify Stamina Regen', half: 'wardweaver', rank: 'master' },
+  '7a0fd:Skyrim.esm': { name: 'Fortify Magicka Regen', half: 'wardweaver', rank: 'master' }
+};
+
+/*
+  TWIN SOULS IS THE SECOND SLOT. enchantments.md: "One enchantment on a piece,
+  until Twin Souls at master, which is two." Three is never.
+*/
+var ENCHANT_SLOTS = 1;
+var TWIN_SOULS_SLOTS = 2;
+
+var OFF_THE_MIXTURES = 'A lab here brews only what the mixtures list names, and that brew carries an effect that is not on it.';
+var OFF_THE_ENCHANTMENTS = 'An arcane enchanter here puts on only what the enchantments list names, and that enchantment is not on it.';
+
+/**
+ * What the two lists say about a brew or an enchantment made of these magic
+ * effects (MGEF form ids, as the engine reports them).
+ *
+ * want is the profession the bench belongs to ('alchemist', 'enchanter'), or
+ * null for a bench nobody has classified, which takes each effect from
+ * whichever list names it. state is the character, already read.
+ *
+ * Returns { refusal, credit }: refusal is the sentence that stops the craft,
+ * credit the half the one piece of work counts under. A batch is one piece
+ * however many effects it carries. It goes to the person's own half when one
+ * of the effects is that half's, and otherwise to the half of the first
+ * effect (a mixed batch is asked on #1389).
+ */
+function listAnswer(actorId, want, effects, state) {
+  var out = { refusal: null, credit: null };
+  var table = want === 'alchemist' ? MIXTURES : (want === 'enchanter' ? ENCHANTMENTS : null);
+  var offList = want === 'enchanter' ? OFF_THE_ENCHANTMENTS : OFF_THE_MIXTURES;
+
+  var rows = [];
+  var seen = {};
+  for (var i = 0; i < effects.length; i++) {
+    var desc = null;
+    try { desc = mp.getDescFromId(Number(effects[i]) || 0); } catch (e) { desc = null; }
+    if (desc && Object.prototype.hasOwnProperty.call(seen, desc)) { continue; }
+    var from = table;
+    if (!from && desc) {
+      from = Object.prototype.hasOwnProperty.call(MIXTURES, desc) ? MIXTURES
+           : (Object.prototype.hasOwnProperty.call(ENCHANTMENTS, desc) ? ENCHANTMENTS : null);
+    }
+    // An effect the server cannot name is not one the list names.
+    if (!desc || !from || !Object.prototype.hasOwnProperty.call(from, desc)) {
+      out.refusal = (from === ENCHANTMENTS) ? OFF_THE_ENCHANTMENTS : offList;
+      return out;
+    }
+    seen[desc] = true;
+    rows.push({ desc: desc, effect: from[desc], enchant: from === ENCHANTMENTS });
+  }
+  // A bottle or a piece with nothing on it is not something the menu makes.
+  if (!rows.length) {
+    out.refusal = offList;
+    return out;
+  }
+
+  var enchantments = 0;
+  for (var k = 0; k < rows.length; k++) { if (rows[k].enchant) { enchantments++; } }
+  if (enchantments > TWIN_SOULS_SLOTS) {
+    out.refusal = 'No piece here holds more than ' + TWIN_SOULS_SLOTS + ' enchantments.';
+    return out;
+  }
+  if (enchantments > ENCHANT_SLOTS && !holdsPerk(actorId, 'twinsouls')) {
+    out.refusal = 'Two enchantments on one piece is Twin Souls, and that is a master ' +
+                  'Enchanter\'s. You can put one on.';
+    return out;
+  }
+
+  for (var j = 0; j < rows.length; j++) {
+    var effect = rows[j].effect;
+    var row = {
+      name: rows[j].enchant
+        ? 'piece enchanted with ' + effect.name
+        : 'bottle of ' + effect.name,
+      owner: rows[j].enchant ? 'Enchanter' : 'Alchemist',
+      half: effect.half,
+      rank: effect.rank
+    };
+    var answer = craftAnswer(actorId, row);
+    if (answer.refusal) {
+      out.refusal = answer.refusal;
+      return out;
+    }
+    if (answer.credit && (!out.credit || (state && answer.credit === state.half))) {
+      out.credit = answer.credit;
+    }
+  }
+  return out;
+}
+
+/*
+  AND THE SECOND SLOT HAS TO BE IN THE MENU. The game's enchanting menu offers a
+  second enchantment only to somebody holding its Extra Effect perk
+  (58f7f:Skyrim.esm), and nothing hands that out here, so without this Twin
+  Souls would be a rule with no slot behind it. The server cannot add a perk
+  to an actor (the fork has no AddPerk), so the number of slots travels to the
+  owner in this property and the updateOwner script puts the perk on, or takes
+  it off, when the number changes. updateOwner runs every frame, so it acts
+  only on a change, the way the swing and the alert scripts do.
+
+  Written by the character block whenever it writes the character, and put
+  back on every spawn with the spells (grantKnown), because a session starts
+  from a save that holds no perks.
+*/
+var ENCHANT_SLOTS_PROPERTY = 'thornswoodEnchantSlots';
+var EXTRA_EFFECT_PERK = 0x58f7f;
+
+function enchantSlotsScript() {
+  return [
+    '(function(){',
+    '  var slots = ctx.value === ' + TWIN_SOULS_SLOTS + ' ? ' + TWIN_SOULS_SLOTS + ' : ' + ENCHANT_SLOTS + ';',
+    '  var st = ctx.state;',
+    '  if (st.thornswoodEnchantSlots === slots) { return; }',
+    '  st.thornswoodEnchantSlots = slots;',
+    '  var sp = ctx.sp;',
+    '  var pc = sp.Game.getPlayer();',
+    '  var perk = sp.Perk.from(sp.Game.getFormEx(' + EXTRA_EFFECT_PERK + '));',
+    '  if (slots === ' + TWIN_SOULS_SLOTS + ') { pc.addPerk(perk); } else { pc.removePerk(perk); }',
+    '})();'
+  ].join('\n');
+}
+
+try {
+  mp.makeProperty(ENCHANT_SLOTS_PROPERTY, {
+    isVisibleByOwner: true,
+    isVisibleByNeighbors: false,
+    updateOwner: enchantSlotsScript(),
+    updateNeighbor: ''
+  });
+} catch (e) {
+  // Made by a previous load. makeProperty cannot change a property already
+  // made, so a changed script needs a restart, which a deploy is.
+}
+
+/** How many enchantments this character may put on one piece. */
+function enchantSlots(state) {
+  var P = globalThis.__thornswoodProgression;
+  var held = (P && P.perks && state) ? P.perks(state) : [];
+  return held.indexOf('twinsouls') !== -1 ? TWIN_SOULS_SLOTS : ENCHANT_SLOTS;
+}
+
+/** Hand the owner the number of enchantment slots, when it has changed. */
+function handEnchantSlots(actorId, state) {
+  var slots = enchantSlots(state);
+  var had = null;
+  try { had = mp.get(actorId, ENCHANT_SLOTS_PROPERTY); } catch (e) { had = null; }
+  if (had === slots) { return; }
+  try {
+    mp.set(actorId, ENCHANT_SLOTS_PROPERTY, slots);
+  } catch (e) {
+    log(actorId.toString(16), 'was not handed', slots, 'enchantment slots:', e);
+  }
+}
+
+function recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects) {
   /*
     WHAT MADE IT, NOT WHAT IT IS.
 
@@ -26969,7 +27218,13 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
     Found by the audit of 21 September, all three.
   */
   var RUNTIME = 0xff000000;
-  var madeFromNothing = (Number(craftedItemBaseId) || 0) >= RUNTIME;
+  /*
+    OR THE ENGINE SAYS WHAT WENT INTO IT (#1389). An enchanted piece keeps its
+    own record and only its enchantment is new, so the id of what arrived is
+    under the line; the effects the engine hands over are what mark it as an
+    enchantment, and the bench says whose. Today's engine hands over none.
+  */
+  var madeFromNothing = (Number(craftedItemBaseId) || 0) >= RUNTIME || Array.isArray(effects);
 
   if (!madeFromNothing) {
     /*
@@ -27214,19 +27469,57 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
   }
 
   /*
-    AND THE WORK COUNTS, which it did not.
-
-    creditWork is the only road to addWork and addWork is the only road to
-    rankUp, so a half whose work is never credited can never leave novice. Every
-    other verb in the file credits: the recipe gate, the sawing station and the
-    kiln. This one allowed the craft with a bare return, so a Blightbrewer could
-    brew for the rest of their life and stay a novice for ever.
+    THE LISTS (#1389). With the effects in hand, each one is asked of the page
+    that names it, at the rank that page gives it, and the work goes to the
+    half that owns it. Without them, which is every craft on the engine at the
+    pinned commit, nothing here can tell one brew from another, so the bench
+    and the profession above are the whole of the gate, as before.
   */
-  try {
-    var ch = globalThis.__thornswoodCharacter;
-    if (ch && ch.credit) { ch.credit(actorId, half); }
-  } catch (e) {
-    log('could not credit', half, 'for a recipeless craft:', e);
+  if (Array.isArray(effects)) {
+    var listed = listAnswer(actorId, want, effects, s);
+    if (listed.refusal) {
+      notify(actorId, listed.refusal);
+      say(actorId, listed.refusal);
+      log(actorId.toString(16), 'was refused a', want === 'enchanter' ? 'enchantment' : 'brew',
+          'at bench', (workbenchId || 0).toString(16), 'carrying', JSON.stringify(effects) + ':',
+          listed.refusal);
+      return false;
+    }
+    if (listed.credit) { half = listed.credit; }
+  } else {
+    log(actorId.toString(16), 'worked at bench', (workbenchId || 0).toString(16),
+        '(' + (whatBench || 'unknown bench') + ') and the engine named no effects,',
+        'so the mixtures and enchantments lists were not asked (#1389)');
+  }
+
+  /*
+    AND THE WORK COUNTS, one piece for one batch (#1389, mixtures.md "One
+    successful batch is one piece of work"), through creditWork like every
+    other piece of work in the file: it costs the rest a piece costs, the party
+    bonus counts, and the line about a new rank is said. It used to go straight
+    to the character block's credit, which counted the piece and dropped the
+    rank line on the floor.
+  */
+  var raised = creditWork(actorId, half);
+  if (raised) {
+    notify(actorId, raised);
+    say(actorId, raised);
+  }
+
+  /*
+    MASTER CHEMIST, alchemist.md: "Every batch yields two instead of one. One
+    craft is still one piece of work." The same road as Grand Chef's second
+    batch: once the engine has put the first bottle in the pack, the second
+    goes on the same stack. A brewed bottle's id is the runtime form the
+    brewing client made, and its descriptor is that id with no plugin, which
+    getIdFromDesc turns back into the same number.
+  */
+  if (want === 'alchemist' && (Number(craftedItemBaseId) || 0) >= RUNTIME) {
+    var brewed = null;
+    try { brewed = mp.getDescFromId(craftedItemBaseId); } catch (e) { brewed = null; }
+    if (brewed) {
+      masterCraft(actorId, { out: brewed, name: 'brew', owner: 'Alchemist', makes: 1 }, 1);
+    }
   }
   return;
 }
@@ -27243,13 +27536,13 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
 const KEY_RECIPE = '15497:Thornswood-Content.esp';
 const KEY_NAME_DELAY = 250;
 
-mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId) {
+mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {
   /*
     NO RECIPE AT ALL, which the fork now reports rather than dropping.
     Everything below this line assumes a recipe id that names a record.
   */
   if (!recipeId) {
-    return recipelessCraft(actorId, craftedItemBaseId, workbenchId);
+    return recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects);
   }
 
   /*
@@ -40086,6 +40379,9 @@ log('gamemode loaded:',
     } catch (e) {
       clog('could not write', actorId.toString(16), e);
     }
+    // Twin Souls is a second enchantment slot in the menu (#1389). It lives
+    // beside the craft gate, outside this block, the way spellOn does.
+    if (typeof handEnchantSlots === 'function') { handEnchantSlots(actorId, s); }
     return s;
   }
 
@@ -40330,6 +40626,9 @@ log('gamemode loaded:',
     if (staff.length) {
       clog('spawn:', put, 'of', staff.length, 'staff spells put back on', actorId.toString(16));
     }
+    // And the second enchantment slot Twin Souls gives (#1389): a session
+    // starts from a save with no perks on it.
+    if (typeof handEnchantSlots === 'function') { handEnchantSlots(actorId, s); }
     return n;
   }
 
