@@ -51,7 +51,7 @@ function yes(what, cond) {
   else { fail++; console.log('FAIL  ' + what); }
 }
 
-const START = 'function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {';
+const START = 'function recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects) {';
 const END = '\n}\n';
 const a = src.indexOf(START);
 const b = a < 0 ? -1 : src.indexOf(END, a);
@@ -174,6 +174,7 @@ function context(opts) {
   const fn = new Function(
     'globalThis', 'log', 'notify', 'say', 'mp', 'idOf', 'Number',
     'RECIPES_BY_ID', 'BENCH_BY_BASE', 'RANK_LADDER', 'NO_PROFESSION_AT_A_BENCH', 'raceOf',
+    'creditWork', 'masterCraft',
     GATE + '\n' + block +
     '\nreturn { recipelessCraft: recipelessCraft, craftAnswer: craftAnswer };');
 
@@ -218,7 +219,11 @@ function context(opts) {
     opts.benches || REAL_BENCHES,
     RANK_LADDER,
     NO_PROF,
-    function () { return opts.race || ''; });
+    function () { return opts.race || ''; },
+    // The work goes through creditWork now (#1389), the one road every other
+    // piece of work takes; what it was asked to count is what is checked.
+    function (id, half) { credited.push(half); return null; },
+    function () { });
   return { api: api, said: said, spoken: spoken, logs: logs, credited: credited, told: told };
 }
 
@@ -533,10 +538,10 @@ if (block !== null) {
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .replace(/\/\/[^\n]*/g, ' ');
   yes('onCraft takes the workbench the fork sends',
-      /function \(actorId, craftedItemBaseId, count, recipeId, workbenchId\)/.test(code));
+      /function \(actorId, craftedItemBaseId, count, recipeId, workbenchId, effects\)/.test(code));
   yes('and a craft with no recipe goes to the gate',
       /if \(!recipeId\) \{/.test(code) &&
-      /return recipelessCraft\(actorId, craftedItemBaseId, workbenchId\);/.test(code));
+      /return recipelessCraft\(actorId, craftedItemBaseId, workbenchId, effects\);/.test(code));
   yes('the runtime line is what splits made-from-nothing from tempering',
       /0xff000000/.test(code) && /madeFromNothing/.test(code));
   yes('and the output record type is no longer consulted',
