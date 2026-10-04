@@ -258,18 +258,20 @@ yes('a name with no revision part reads as 0', revisionFrom(['collection_7essxf_
 yes('a name whose revision is not a number reads as 0',
     revisionFrom(['collection_7essxf_two_2026-09-15T21-08-00Z'], '7essxf') === 0);
 
-// ---- the three copies must agree ------------------------------------------
+// ---- entry points and legacy fallbacks ------------------------------------
 /*
-  C#, PowerShell and this each carry the rule, because they cannot share code.
-  These assert the shape rather than the behaviour, so a rename or a dropped
-  step fails here instead of silently telling everybody to reinstall.
+  Compressed-state and sequence behavior is exercised through the actual shared
+  reader by test-vortex-collection-state.ps1. These keep the entry points and
+  legacy folder fallback connected to it.
 */
+const READER = fs.readFileSync(path.join(REPO_DIR, 'launcher', 'app', 'VortexProfileState.cs'), 'utf8');
 yes('the launcher reads the installed revision from Vortex state',
     CS.indexOf('CollectionRevisionFromState') >= 0 &&
     CS.indexOf('collectionSlug') >= 0 && CS.indexOf('revisionNumber') >= 0 &&
   CS.indexOf('newestFileId') >= 0);
-yes('the launcher ties the slug to its mod id, not the highest number in the file',
-    /mods###skyrimse###\(\[\^#\]\+\)###attributes###collectionSlug/.test(CS));
+yes('the launcher delegates current installed metadata to the shared reader',
+    CS.indexOf('return VortexProfileState.CollectionRevision(dir, slug);') >= 0 &&
+    READER.indexOf('prefix + "revisionNumber"') >= 0);
 yes('the launcher keeps the legacy folder parse as a fallback',
     CS.indexOf('CollectionRevisionFromFolder') >= 0 && CS.indexOf('collection_') >= 0);
 yes('the launcher refuses a slug that is not letters and digits',
@@ -278,8 +280,8 @@ yes('the publisher reads it the same way, from state',
     PS.indexOf('Get-CollectionRevisionFromState') >= 0 &&
     PS.indexOf('collectionSlug') >= 0 && PS.indexOf('revisionNumber') >= 0 &&
   PS.indexOf('newestFileId') >= 0);
-yes('the publisher ties the slug to its mod id too',
-    /mods###skyrimse###\(\[\^#\]\+\)###attributes###collectionSlug/.test(PS));
+yes('the publisher delegates to that same installed metadata reader',
+    PS.indexOf('[Thornswood.VortexProfileState]::CollectionRevision($st, $Slug)') >= 0);
 yes('the publisher keeps the legacy folder parse as a fallback',
     PS.indexOf('Get-CollectionRevisionFromFolder') >= 0 && PS.indexOf('collection_') >= 0);
 yes('the publisher refuses a bad slug', /\^\[A-Za-z0-9\]\+\$/.test(PS));

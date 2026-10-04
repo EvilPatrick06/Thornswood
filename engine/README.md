@@ -10,18 +10,17 @@ each half, with the file and line for each step.
 `.gitmodules:11-15` names the fork, `https://github.com/EvilPatrick06/skymp.git`,
 on the branch `thornswood/engine-changes`, at `engine/skymp`. The repository
 pins a commit, not the branch: `git submodule status` prints
-`22b5d0be68ff2575b4f85839f10a716ddc927a02`, the commit `records\client-build.json:6`
-and `records\server-build.json:10` both name (issue #1200, 29 September). The
-server record hashes every server file of the build of that commit (issue
-#1214): the binary, `de3256be...`, the JavaScript half the server runs,
-`dist_back\skymp5-server.js`, `9bd548da...`, its map, and the rest
-`scripts\deploy\ServerBuild.ps1` names, so the client half and the server half
-are the same source. `Deploy-Server.ps1`, `Export-ServerPayload.ps1`,
-`Publish-Server.ps1` and the installer on the box refuse any server file that is
-not the recorded one until `New-ServerBuildRecord.ps1` records it (see
-"Rebuilding the same commit"), and the build check refuses a pull request whose
-pin and two records do not name one commit, or whose server record leaves a
-file out or names another commit for one (see "One engine").
+`e63065114ee1c439db3757043b00c4ba4749e5a6`, the source commit named by both
+`records\client-build.json` and `records\server-build.json`. The client DLL
+and JavaScript were rebuilt for creation-save inventory. The server
+executable, JavaScript and all seven recorded artifacts retain their
+preceding bytes because server source and dependencies are unchanged;
+`builtUtc` remains 2026-10-03T23:29:35Z. The server native SHA256 is
+`77bdd06c2271308df172bf4d06b9cdc53c9514be5795b44a37df720acd47efdc`.
+`Deploy-Server.ps1`, `Export-ServerPayload.ps1`, `Publish-Server.ps1` and the
+installer refuse server files that differ from the record. The build check
+requires the pin and both records to name one source commit and the server
+record to include every artifact (see "One engine").
 
 `ignore = dirty` (`.gitmodules:15`) keeps a build inside the fork from showing
 as a change here. A different commit checked out in it still shows, and is
