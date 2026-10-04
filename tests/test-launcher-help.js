@@ -570,6 +570,25 @@ const site    = read('site', 'server.js');
       /staff in the world is told/.test(staff) && /staff channel in the Discord/.test(staff));
   yes('and when it cannot get through the game says to open a ticket, as the page does',
       /Open a ticket in the Discord/.test(gm) && /open a ticket in the Discord/.test(staff));
+
+  // /stuck (#414, #1006): the page says what the stuck block does, with its
+  // numbers read out of the block rather than typed here.
+  const sa = gm.indexOf('// ==== thornswood stuck ====');
+  const sz = sa < 0 ? -1 : gm.indexOf('// ==== end thornswood stuck ====', sa);
+  const stuckBlock = (sa >= 0 && sz > sa) ? gm.slice(sa, sz) : '';
+  const again = num(stuckBlock, /var AGAIN_MS = (\d+) \* 60 \* 1000;/);
+  const wait = num(stuckBlock, /var WAIT_MS = (\d+);/) / 1000;
+  const stuckItem = item('Chat and commands', 'Stuck in the world: /stuck');
+  yes('the gamemode answers /stuck for everybody, and the page has an item for it',
+      /if \(word === '\/stuck'\)/.test(gm) && (everybody || []).indexOf('/stuck') !== -1 && stuckItem.length > 0);
+  yes('it says /stuck takes you back a few steps, or to the nearest temple',
+      /back a few steps/.test(stuckItem) && /nearest temple/.test(stuckItem));
+  yes('once every ' + again + ' minutes and a ' + wait + ' second wait in a fight, as the stuck block has them',
+      again > 0 && wait > 0 && stuckItem.indexOf('once every ' + again + ' minutes') !== -1 &&
+      stuckItem.indexOf('waits ' + wait + ' seconds') !== -1);
+  yes('not while dead, and every use is logged for staff, as the stuck block does',
+      /refused outright while you are dead/.test(stuckBlock) && /not while you are dead/.test(stuckItem) &&
+      /every use is logged for staff/.test(stuckItem));
 }
 
 // -------------------------------------------------------- Scan, Fix, logs
