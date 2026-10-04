@@ -29,11 +29,12 @@
       voice.log     the voice and register service
       health.json   what the voice service says about itself right now
 
-  For every log that rolls (server, thornswood, voice, site, bot), the
-  rolled generations .1 through .5 come down too when they exist on the
-  VPS, under the same names. door.log does not roll, so only the current
-  file is fetched. A missing rolled file is skipped quietly, and a copy an
-  earlier pull left here under its name is removed.
+  For every log that rolls (server, thornswood, voice, site, bot), its
+  rolled generations come down too, under the same names: the box is asked
+  once which of them it has, and exactly those are read, so a pull never
+  asks for a file that is not there. The rollers keep five, so that is .1
+  through .5 at most. door.log does not roll, so only the current file is
+  fetched.
 
   Nothing on the VPS is changed. Everything here is a read.
 #>
@@ -93,13 +94,14 @@ $botRoot   = 'C:\Thornswood-Bot'
 Say ("  reading the {0} server at {1}" -f $(if ($Dev) { 'DEV' } else { 'live' }), $srvRoot) 'DarkGray'
 
 $logs = @(
-    # Keep = 5: also fetch Name.1 through Name.5 when they exist (Roll-Log /
-    # site in-process roll). door.log has no Keep: it does not roll.
-    @{ Name = 'server.log'; Path = (Join-Path $srvRoot 'server.log'); What = 'the game server'; Keep = 5 }
+    # Rolls: the box keeps older copies beside it as Name.1, Name.2 and on
+    # (Roll-Log, the site's in-process roll), and they come down too.
+    # door.log has no Rolls: it does not roll.
+    @{ Name = 'server.log'; Path = (Join-Path $srvRoot 'server.log'); What = 'the game server'; Rolls = $true }
     # Thornswood's own lines and nothing else. server.log is about four fifths
     # engine noise on a normal day, so this is the one to read first and
     # server.log is where you go when the answer is not in it.
-    @{ Name = 'thornswood.log'; Path = (Join-Path $srvRoot 'thornswood.log'); What = 'the gamemode, without the engine noise'; Keep = 5 }
+    @{ Name = 'thornswood.log'; Path = (Join-Path $srvRoot 'thornswood.log'); What = 'the gamemode, without the engine noise'; Rolls = $true }
     <#
       THE DOOR'S OWN LOG, WHICH HAS NEVER COME DOWN WITH THE REST.
 
@@ -114,7 +116,7 @@ $logs = @(
       private, and nothing fetched private.
     #>
     @{ Name = 'door.log'; Path = (Join-Path $srvRoot 'private\door.log'); What = 'the door: who it let in and what the site said' }
-    @{ Name = 'voice.log';  Path = (Join-Path $voiceRoot 'voice.log');   What = 'voice and the character register'; Keep = 5 }
+    @{ Name = 'voice.log';  Path = (Join-Path $voiceRoot 'voice.log');   What = 'voice and the character register'; Rolls = $true }
     <#
       The site, added 23 September. It printed everything it worked out into
       a handle nobody held: no redirect on the task and no file anywhere on
@@ -125,92 +127,133 @@ $logs = @(
       keeping five, so site.log.1 to .5 are the older ones if the answer is
       not in the current one.
     #>
-    @{ Name = 'site.log';   Path = (Join-Path $docsRoot 'site.log');     What = 'the website and the Discord door'; Keep = 5 }
+    @{ Name = 'site.log';   Path = (Join-Path $docsRoot 'site.log');     What = 'the website and the Discord door'; Rolls = $true }
     # The bot has written this all along and nothing ever fetched it, which
     # is why the site watcher's startup line had to be read over ssh by hand.
     # In the bot's data folder since #1104, the one folder its account writes.
-    @{ Name = 'bot.log';    Path = (Join-Path $botRoot 'data\bot.log');  What = 'the Discord bot, the panel and the site watcher'; Keep = 5 }
+    @{ Name = 'bot.log';    Path = (Join-Path $botRoot 'data\bot.log');  What = 'the Discord bot, the panel and the site watcher'; Rolls = $true }
 )
 
-# Current file plus rolled .1-.5 for every log that sets Keep. Missing rolled
-# files are optional: one dark-gray MISSING line, no local file, pull goes on.
-$fetch = New-Object System.Collections.Generic.List[object]
-foreach ($base in $logs) {
-    [void]$fetch.Add(@{
-        Name = $base.Name
-        Path = $base.Path
-        What = $base.What
-        Optional = $false
-    })
-    $keep = 0
-    if ($base.ContainsKey('Keep') -and $base.Keep) { $keep = [int]$base.Keep }
-    for ($i = 1; $i -le $keep; $i++) {
-        [void]$fetch.Add(@{
-            Name = ($base.Name + '.' + $i)
-            Path = ($base.Path + '.' + $i)
-            What = ('older ' + $base.Name)
-            Optional = $true
-        })
+<#
+  WHAT THE BOX HAS, asked once (#1605).
+
+  This used to make up the names: every log that rolls got .1 through .5
+  added to the list, and each one was asked for by name whether the box had
+  it or not, with a MISSING answer for the ones it did not. On 4 October that
+  was 15 of the 31 asks on a dev pull (thornswood, site and bot had no
+  rolled copies there), and the MISSING answer is what the case bug below
+  wrote down as a log. So the box is asked one question first, which of
+  these files it has, and the pull reads exactly those and nothing else.
+
+  The answer is full paths, one to a line: the current file when it is
+  there, and Name.<number> beside it for a log that rolls.
+#>
+$wanted = foreach ($base in $logs) {
+    "@{{ Dir = '{0}'; Leaf = '{1}'; Rolls = {2} }}" -f `
+        (Split-Path -Parent $base.Path).Replace("'", "''"),
+        (Split-Path -Leaf $base.Path).Replace("'", "''"),
+        $(if ($base.ContainsKey('Rolls') -and $base.Rolls) { '$true' } else { '$false' })
+}
+$listing = @'
+foreach ($w in @(WANTED)) {
+    if (-not (Test-Path -LiteralPath $w.Dir -PathType Container)) { continue }
+    $rx = '^' + [regex]::Escape($w.Leaf) + $(if ($w.Rolls) { '(\.\d+)?$' } else { '$' })
+    Get-ChildItem -LiteralPath $w.Dir -File | Where-Object { $_.Name -match $rx } | ForEach-Object { $_.FullName }
+}
+'@
+$listing = $listing.Replace('WANTED', ($wanted -join ', '))
+
+<#
+  One question to the box. Any failure there stops that question with exit 1
+  and one line on stderr saying why, so whether it worked is the exit code
+  and the reason is readable, and nothing it says on stderr is taken for an
+  answer.
+#>
+function Read-Box([string]$Remote) {
+    $wrapped = "`$ErrorActionPreference = 'Stop'; `$ProgressPreference = 'SilentlyContinue'`ntry {`n$Remote`n} catch { [Console]::Error.WriteLine(`$_.Exception.Message); exit 1 }"
+    $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($wrapped))
+    $said = @(Invoke-ThornswoodNative { & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes $target "powershell -NoProfile -EncodedCommand $enc" } 2>&1)
+    # What the box printed is the answer. What ssh or powershell wrote on
+    # stderr is about the connection or the failure, never part of a log.
+    [pscustomobject]@{
+        Code   = $LASTEXITCODE
+        Answer = @($said | Where-Object { $_ -is [string] })
+        Stderr = @($said | Where-Object { $_ -isnot [string] } | ForEach-Object { [string]$_ } | Where-Object { $_.Trim() })
     }
 }
 
 Head 'Pulling'
 
-foreach ($l in $fetch) {
-    $dest = Join-Path $Out $l.Name
-
-    <#
-      Read on the far side, not here.
-
-      scp would copy the file, which is the obvious thing and the wrong one:
-      server.log grows without bound and there is no reason to move eighty
-      megabytes across the internet to read the end of it. Get-Content -Tail
-      reads backwards from the end on the machine that already has the file.
-
-      -Raw is deliberately not used. The point is a line count, and -Raw would
-      hand back one enormous string with the tail applied to nothing.
-    #>
-    $tail = if ($All) { '' } else { " -Tail $Lines" }
-    $remote = "if (Test-Path -LiteralPath '$($l.Path)') { Get-Content -LiteralPath '$($l.Path)'$tail } else { 'MISSING: $($l.Path)' }"
-    $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($remote))
-
-    $text = Invoke-ThornswoodNative { & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes $target "powershell -NoProfile -EncodedCommand $enc" } 2>&1
-
-    if ($LASTEXITCODE -ne 0 -and -not $text) {
-        Say ("  {0,-14} could not be read. ssh exit {1}" -f $l.Name, $LASTEXITCODE) 'Red'
-        continue
-    }
-
-    <#
-      WHAT CAME BACK, under a name of its own (#1605).
-
-      PowerShell variable names ignore case, so this used to be the
-      [int]$Lines parameter under another spelling. Every pull tried to put
-      the answer into an int, printed a MetadataError for every log, left the
-      number 4000 in place, counted it as 1 line, and never saw a MISSING
-      answer, so a rolled generation that is not on the box was written down
-      as a file holding the MISSING line. Seen under PowerShell 7.6.6, 4 Oct.
-    #>
-    $got = @($text)
-    $missing = ($got.Count -eq 1 -and ("$($got[0])" -like 'MISSING:*'))
-    # Rolled generations that are not on the box: skip quietly, and do not
-    # fail the rest of the pull. A copy an earlier pull left under that name
-    # is not that generation any more, so it goes, and the folder holds what
-    # the box holds.
-    if ($l.Optional -and $missing) {
-        $gone = ''
-        if (Test-Path -LiteralPath $dest) {
-            Remove-Item -LiteralPath $dest -Force
-            $gone = ', the old copy here removed'
+$box = Read-Box $listing
+if ($box.Code -ne 0) {
+    $why = if ($box.Stderr.Count) { $box.Stderr -join ' | ' } else { 'nothing on stderr' }
+    Say ("  could not ask the VPS which logs it has. ssh exit {0}: {1}" -f $box.Code, $why) 'Red'
+} else {
+    $onBox = @($box.Answer | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    foreach ($base in $logs) {
+        # The current file, then its rolled generations oldest last, the way
+        # they sit on the box.
+        $files = New-Object System.Collections.Generic.List[object]
+        if ($onBox | Where-Object { $_ -ieq $base.Path }) {
+            [void]$files.Add(@{ Name = $base.Name; Path = $base.Path; What = $base.What })
+        } else {
+            Say ("  {0,-14} not on the VPS at {1}" -f $base.Name, $base.Path) 'Red'
         }
-        Say ("  {0,-14} MISSING{1}" -f $l.Name, $gone) 'DarkGray'
-        continue
-    }
+        if ($base.ContainsKey('Rolls') -and $base.Rolls) {
+            $rolled = @(foreach ($p in $onBox) {
+                if ($p.StartsWith($base.Path + '.', [StringComparison]::OrdinalIgnoreCase)) {
+                    $n = $p.Substring($base.Path.Length + 1)
+                    if ($n -match '^\d+$') { [pscustomobject]@{ N = [int]$n; Path = $p } }
+                }
+            })
+            foreach ($g in ($rolled | Sort-Object N)) {
+                [void]$files.Add(@{ Name = ($base.Name + '.' + $g.N); Path = $g.Path; What = ('older ' + $base.Name) })
+            }
+        }
 
-    $text | Set-Content -LiteralPath $dest -Encoding UTF8
-    $size = if (Test-Path -LiteralPath $dest) { (Get-Item -LiteralPath $dest).Length } else { 0 }
-    $count = $got.Count
-    Say ("  {0,-14} {1,7:n0} lines  {2,9:n0} bytes   {3}" -f $l.Name, $count, $size, $l.What) 'Gray'
+        foreach ($f in $files) {
+            $dest = Join-Path $Out $f.Name
+
+            <#
+              Read on the far side, not here.
+
+              scp would copy the file, which is the obvious thing and the wrong one:
+              server.log grows without bound and there is no reason to move eighty
+              megabytes across the internet to read the end of it. Get-Content -Tail
+              reads backwards from the end on the machine that already has the file.
+
+              -Raw is deliberately not used. The point is a line count, and -Raw would
+              hand back one enormous string with the tail applied to nothing.
+            #>
+            $tail = if ($All) { '' } else { " -Tail $Lines" }
+            $read = Read-Box ("Get-Content -LiteralPath '{0}'{1}" -f $f.Path.Replace("'", "''"), $tail)
+
+            # A read that failed is said, and nothing is written for it. A roll
+            # between the question and the read is the one ordinary way to get
+            # here, and the next pull reads the file under its new name.
+            if ($read.Code -ne 0) {
+                $why = if ($read.Stderr.Count) { $read.Stderr -join ' | ' } else { 'nothing on stderr' }
+                Say ("  {0,-14} could not be read. ssh exit {1}: {2}" -f $f.Name, $read.Code, $why) 'Red'
+                continue
+            }
+
+            <#
+              WHAT CAME BACK, under a name of its own (#1605).
+
+              PowerShell variable names ignore case, so this used to be kept in
+              $lines, which is the [int]$Lines parameter under another spelling.
+              Every pull tried to put the answer into an int, printed a
+              MetadataError for every log, left the number 4000 in place and
+              counted it as 1 line. Seen under PowerShell 7.6.6, 4 Oct.
+              tests\test-get-logs.ps1 fails on any parameter given a new value
+              after the defaults are filled in.
+            #>
+            $got = $read.Answer
+            Set-Content -LiteralPath $dest -Value $got -Encoding UTF8
+            $size = (Get-Item -LiteralPath $dest).Length
+            Say ("  {0,-14} {1,7:n0} lines  {2,9:n0} bytes   {3}" -f $f.Name, $got.Count, $size, $f.What) 'Gray'
+        }
+    }
 }
 
 <#

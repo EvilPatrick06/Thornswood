@@ -4,20 +4,25 @@
       pwsh -NoProfile -File .\tests\test-get-logs.ps1
       powershell -NoProfile -File .\tests\test-get-logs.ps1
 
-  Get-Logs.ps1 structure for issue #453 leftover: rolled generations .1
-  through .5 come down with the current file for every log that rolls.
-  door.log does not roll, so it stays current-only.
+  Get-Logs.ps1, issue #453 leftover: the rolled generations of every log
+  that rolls come down with the current file. door.log does not roll, so it
+  stays current-only.
 
   And the pull itself (#1605). On 4 Oct every pull under PowerShell 7.6.6
   printed a MetadataError for every log, said "1 lines" for each, and wrote a
-  rolled generation the box does not have as a file holding the MISSING line:
-  the script kept what ssh answered in $lines, which is the [int]$Lines
-  parameter, because PowerShell names ignore case. So this runs the real
-  script against a stand-in ssh and health check and looks at what it says
-  and what it leaves in the folder.
+  rolled generation the box does not have as a file holding the MISSING line.
+  Two causes. The script kept what ssh answered in $lines, which is the
+  [int]$Lines parameter, because PowerShell names ignore case. And it made up
+  the names: .1 through .5 of every log that rolls, each asked for whether
+  the box had it or not, 15 of 31 asks on that pull answered MISSING. It now
+  asks the box once which files it has and reads exactly those.
 
-  No ssh and no VPS. Parses the script, checks the fetch list shape, and runs
-  the pull against stand-ins.
+  So this runs the real script against a stand-in ssh that runs each
+  question's PowerShell, the way the box would, against a stand-in box in a
+  temp folder, and looks at what it asks, what it says and what it leaves in
+  the folder.
+
+  No ssh and no VPS.
 #>
 [CmdletBinding()]
 param([string]$RepoPath)
@@ -39,90 +44,175 @@ $getLogs = Join-Path $repo 'scripts\vps\Get-Logs.ps1'
 Yes 'Get-Logs.ps1 is in scripts\vps' (Test-Path -LiteralPath $getLogs)
 
 $errs = $null
-[void][System.Management.Automation.Language.Parser]::ParseFile($getLogs, [ref]$null, [ref]$errs)
+$ast = [System.Management.Automation.Language.Parser]::ParseFile($getLogs, [ref]$null, [ref]$errs)
 Yes 'Get-Logs.ps1 parses' (@($errs).Count -eq 0)
 if (@($errs).Count -gt 0) {
     foreach ($e in $errs) { Write-Host ("  parse: {0}" -f $e) }
 }
 
 $text = [IO.File]::ReadAllText($getLogs)
-Yes 'header says rolled .1 through .5 come down' ($text -match 'rolled generations \.1 through \.5')
+Yes 'header says the rolled generations come down' ($text -match 'its\s+rolled generations come down too')
+Yes 'header says the box is asked which it has' ($text -match 'the box is asked\s+once which of them it has')
 Yes 'header says door.log does not roll' ($text -match 'door\.log does not roll')
 
 foreach ($name in @('server.log', 'thornswood.log', 'voice.log', 'site.log', 'bot.log')) {
-    $pat = "Name = '$name'[^`r`n]*Keep = 5"
-    Yes ("$name sets Keep = 5") ($text -match $pat)
+    $pat = "Name = '$name'[^`r`n]*Rolls = \`$true"
+    Yes ("$name rolls") ($text -match $pat)
 }
 
 $doorLine = [regex]::Match($text, "Name = 'door\.log'[^`r`n]*")
 Yes 'door.log is listed' $doorLine.Success
-Yes 'door.log has no Keep' ($doorLine.Success -and $doorLine.Value -notmatch 'Keep')
+Yes 'door.log does not roll' ($doorLine.Success -and $doorLine.Value -notmatch 'Rolls')
 
-Yes 'builds a fetch list from Keep' ($text -match '\$fetch = New-Object System\.Collections\.Generic\.List')
-Yes 'adds Name.i for each Keep generation' (
-    $text.Contains("Name = (`$base.Name + '.' + `$i)") -and
-    $text.Contains("Path = (`$base.Path + '.' + `$i)"))
-Yes 'rolled misses are Optional' ($text.Contains('Optional = $true'))
-Yes 'missing rolled prints DarkGray MISSING' (
-    $text.Contains('MISSING') -and $text.Contains('DarkGray') -and
-    $text.Contains('if ($l.Optional -and $missing)'))
-Yes 'optional missing continues without writing that file' (
-    $text -match '(?s)if \(\$l\.Optional -and \$missing\).*?continue')
+# ---- no parameter is given a new value (#1605) ------------------------------
+# Names ignore case, so $lines is $Lines. A parameter is only ever filled in
+# when it was not given, inside if (-not $Name) { }, and nothing else in the
+# script may assign to one or loop over one, under any spelling.
+$params = @($ast.ParamBlock.Parameters | ForEach-Object { $_.Name.VariablePath.UserPath })
+Yes ('the parameters are read ({0})' -f ($params -join ', ')) ($params -contains 'Lines' -and $params -contains 'Out')
+$reused = @()
+$assigned = $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true)
+foreach ($a in $assigned) {
+    $left = $a.Left
+    if ($left -is [System.Management.Automation.Language.ConvertExpressionAst]) { $left = $left.Child }
+    if (-not ($left -is [System.Management.Automation.Language.VariableExpressionAst])) { continue }
+    $param = @($params | Where-Object { $_ -ieq $left.VariablePath.UserPath })
+    if (-not $param.Count) { continue }
+    $filling = $false
+    for ($up = $a.Parent; $up; $up = $up.Parent) {
+        if (-not ($up -is [System.Management.Automation.Language.IfStatementAst])) { continue }
+        foreach ($clause in $up.Clauses) {
+            $inBody = ($clause.Item2.Extent.StartOffset -le $a.Extent.StartOffset -and $a.Extent.EndOffset -le $clause.Item2.Extent.EndOffset)
+            if ($inBody -and $clause.Item1.Extent.Text -match ('^-not\s+\$' + [regex]::Escape($param[0]) + '$')) { $filling = $true }
+        }
+    }
+    if (-not $filling) { $reused += ('line {0}: {1}' -f $a.Extent.StartLineNumber, $a.Extent.Text) }
+}
+$loops = $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.ForEachStatementAst] }, $true)
+foreach ($l in $loops) {
+    if ($params | Where-Object { $_ -ieq $l.Variable.VariablePath.UserPath }) {
+        $reused += ('line {0}: foreach ({1} in ...)' -f $l.Extent.StartLineNumber, $l.Variable.Extent.Text)
+    }
+}
+foreach ($r in $reused) { Write-Host "      $r" }
+Yes 'no parameter is given a new value under any spelling, only filled in when it was not given' ($reused.Count -eq 0)
 
-# ---- the pull, against a stand-in ssh (#1605) --------------------------------
-# The script keeps what ssh answered under a name of its own. Any assignment
-# to $lines, in any case, is the [int]$Lines parameter.
-$assigns = @([regex]::Matches($text, '(?im)^(?!\s*\[int\]).*\$lines\s*=(?!=)'))
-Yes 'nothing assigns to $Lines, the parameter, under any spelling' ($assigns.Count -eq 0)
-
+# ---- the pull, against a stand-in box (#1605) --------------------------------
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-get-logs-' + [Guid]::NewGuid().ToString('n'))
-New-Item -ItemType Directory -Path $work -Force | Out-Null
+$pulled = Join-Path $work 'pulled'
+$global:standInBox = Join-Path $work 'box'
+New-Item -ItemType Directory -Path $pulled -Force | Out-Null
 # The script names the box's folders as C:\...; off Windows there is no C:
-# drive for Join-Path to accept, so one is lent for the run.
+# drive for Join-Path to accept, so one is lent for the run. Nothing is
+# written under it: the stand-in ssh moves every C: path into the stand-in box.
 $lentC = $false
 if (-not (Get-PSDrive -Name C -ErrorAction SilentlyContinue)) {
     New-PSDrive -Name C -PSProvider FileSystem -Root $work -Scope Global | Out-Null
     $lentC = $true
 }
-# What the box has: every current log, and server.log.1 of the rolled ones.
+
+# What the box has. site.log is not there at all. server.log.2 rolls away
+# between the question and the read. voice.log.1 is empty. Beside them sit
+# files that are not logs of these names and must not be read.
+function Put([string]$rel, [int]$count) {
+    $p = Join-Path $global:standInBox $rel
+    New-Item -ItemType Directory -Path (Split-Path -Parent $p) -Force | Out-Null
+    $body = @(for ($i = 1; $i -le $count; $i++) { "$rel line $i" })
+    Set-Content -LiteralPath $p -Value $body -Encoding UTF8
+}
+Put 'Thornswood-Server-Dev\server.log' 7
+Put 'Thornswood-Server-Dev\server.log.1' 7
+Put 'Thornswood-Server-Dev\server.log.2' 7
+Put 'Thornswood-Server-Dev\server.log.bak' 7
+Put 'Thornswood-Server-Dev\server.log.1.old' 7
+Put 'Thornswood-Server-Dev\thornswood.log' 7
+Put 'Thornswood-Server-Dev\private\door.log' 7
+Put 'Thornswood-Server-Dev\private\door.log.1' 7
+Put 'Thornswood-Voice-Dev\voice.log' 7
+Put 'Thornswood-Voice-Dev\voice.log.1' 0
+Put 'Thornswood-Bot\data\bot.log' 7
+New-Item -ItemType Directory -Path (Join-Path $global:standInBox 'Thornswood-Docs') -Force | Out-Null
+
+# Here, from an earlier pull: an older voice.log.1, which the empty one on
+# the box must replace.
+Set-Content -LiteralPath (Join-Path $pulled 'voice.log.1') -Value 'an older voice.log.1' -Encoding UTF8
+
+# The stand-in ssh. It takes the question the script would send the box,
+# moves its C: paths into the stand-in box, and runs it in a PowerShell of
+# its own, as powershell -EncodedCommand on the box would: what that prints
+# on stdout is the answer, what it prints on stderr stays stderr, and its
+# exit code is ssh's. Every connection also says the post-quantum warning on
+# stderr, as the box's OpenSSH did from 28 September (#941).
+$global:standInPs = (Get-Process -Id $PID).Path
+$global:standInAsks = New-Object System.Collections.Generic.List[string]
+$global:standInListed = @()
 function global:ssh {
     $b64 = ([string]$args[-1] -split ' ')[-1]
     $remote = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($b64))
-    $path = [regex]::Match($remote, "Test-Path -LiteralPath '([^']+)'").Groups[1].Value
-    $global:LASTEXITCODE = 0
-    if ($path -match '\.\d$' -and $path -notmatch 'server\.log\.1$') { return "MISSING: $path" }
-    $n = 7
-    $t = [regex]::Match($remote, '-Tail (\d+)')
-    if ($t.Success) { $n = [int]$t.Groups[1].Value }
-    1..$n | ForEach-Object { "line $_ of $path" }
+    $global:standInAsks.Add($remote)
+    $moved = $remote.Replace("'C:", "'" + $global:standInBox)
+    $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($moved))
+    $came = @(& $global:standInPs -NoProfile -NonInteractive -EncodedCommand $enc 2>&1)
+    $code = $LASTEXITCODE
+    Write-Error '** WARNING: connection is not using a post-quantum key exchange algorithm.'
+    $answer = @()
+    foreach ($c in $came) {
+        if ($c -is [System.Management.Automation.ErrorRecord]) { Write-Error -ErrorRecord $c; continue }
+        $s = [string]$c
+        if ($s.StartsWith($global:standInBox)) { $s = 'C:' + $s.Substring($global:standInBox.Length) }
+        $answer += $s
+    }
+    if ($remote.Contains('Get-ChildItem')) {
+        $global:standInListed = $answer
+        # The roll: server.log.2 leaves between the question and the read.
+        Remove-Item -LiteralPath (Join-Path $global:standInBox 'Thornswood-Server-Dev\server.log.2') -Force
+    }
+    $answer
+    $global:LASTEXITCODE = $code
 }
 function global:Invoke-RestMethod { [pscustomobject]@{ ok = $true; build = 'stand-in'; bind = '127.0.0.1'; auth = 'on' } }
 try {
-    # What an earlier pull of the broken script left: a rolled generation the
-    # box does not have, written down as the MISSING line.
-    Set-Content -LiteralPath (Join-Path $work 'thornswood.log.3') -Value 'MISSING: C:\Thornswood-Server-Dev\thornswood.log.3'
     # Run as a person runs it, where an error is printed and the pull goes on,
     # so every error it says is counted rather than the first one stopping this.
-    $getLogs = Join-Path $repo 'scripts\vps\Get-Logs.ps1'
     $said = @(& {
         $ErrorActionPreference = 'Continue'
-        try { & $getLogs -Vps 203.0.113.9 -User tester -Out $work -Lines 3 -Dev -NoPause *>&1 }
+        try { & $getLogs -Vps 203.0.113.9 -User tester -Out $pulled -Lines 3 -Dev -NoPause *>&1 }
         catch { $_ }
     })
     $errors = @($said | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] })
     foreach ($e in $errors) { Write-Host ('  said: ' + $e) }
     Yes 'the pull says no error' ($errors.Count -eq 0)
     $words = ($said | ForEach-Object { "$_" }) -join "`n"
+    function Pulled([string]$name) { Join-Path $pulled $name }
+
+    $listings = @($global:standInAsks | Where-Object { $_.Contains('Get-ChildItem') })
+    $reads = @($global:standInAsks | Where-Object { $_ -match "Get-Content -LiteralPath '([^']+)'" } | ForEach-Object { [regex]::Match($_, "Get-Content -LiteralPath '([^']+)'").Groups[1].Value })
+    Yes 'it asks the box once which files it has' ($listings.Count -eq 1)
+    Yes ('the box names 8 files, and the pull reads those 8 and asks nothing else ({0} asks)' -f $global:standInAsks.Count) (
+        $global:standInListed.Count -eq 8 -and $reads.Count -eq 8 -and $global:standInAsks.Count -eq 9)
+    $unasked = @($reads | Where-Object { $global:standInListed -notcontains $_ })
+    Yes 'every file it reads is one the box named' ($unasked.Count -eq 0)
+
     Yes 'it counts the lines ssh answered: server.log, 3 lines' ($words -match '(?m)^\s*server\.log\s+3 lines')
-    $server = Join-Path $work 'server.log'
-    Yes 'server.log comes down with the 3 lines asked for' ((Test-Path -LiteralPath $server) -and @(Get-Content -LiteralPath $server).Count -eq 3)
-    Yes 'a rolled generation the box has comes down: server.log.1' (Test-Path -LiteralPath (Join-Path $work 'server.log.1'))
-    Yes 'a rolled generation the box does not have is said as MISSING' ($words -match '(?m)^\s*server\.log\.2\s+MISSING')
-    Yes 'and no file is written for it' (-not (Test-Path -LiteralPath (Join-Path $work 'server.log.2')))
-    Yes 'a copy an earlier pull left of a generation the box no longer has is removed' (-not (Test-Path -LiteralPath (Join-Path $work 'thornswood.log.3')))
-    Yes 'door.log, which does not roll, comes down' (Test-Path -LiteralPath (Join-Path $work 'door.log'))
-    $leftMissing = @(Get-ChildItem -LiteralPath $work -File | Where-Object { (Get-Content -LiteralPath $_.FullName -TotalCount 1) -like 'MISSING:*' })
-    Yes 'nothing in the folder is a MISSING line written down as a log' ($leftMissing.Count -eq 0)
+    Yes 'server.log comes down with the 3 lines asked for' ((Test-Path -LiteralPath (Pulled 'server.log')) -and @(Get-Content -LiteralPath (Pulled 'server.log')).Count -eq 3)
+    Yes 'and holds the log and nothing ssh said on stderr' ((Test-Path -LiteralPath (Pulled 'server.log')) -and -not (Select-String -LiteralPath (Pulled 'server.log') -Pattern 'post-quantum' -Quiet))
+    Yes 'a rolled generation the box has comes down: server.log.1' (Test-Path -LiteralPath (Pulled 'server.log.1'))
+    Yes 'one that rolled away between the question and the read is said as not read' ($words -match '(?m)^\s*server\.log\.2\s+could not be read\. ssh exit 1: .*server\.log\.2')
+    Yes 'and nothing is written for it' (-not (Test-Path -LiteralPath (Pulled 'server.log.2')))
+    Yes 'files beside a log that are not its generations are not read: server.log.bak, server.log.1.old' (
+        -not (Test-Path -LiteralPath (Pulled 'server.log.bak')) -and -not (Test-Path -LiteralPath (Pulled 'server.log.1.old')) -and
+        -not ($reads | Where-Object { $_ -match '\.bak$|\.old$' }))
+    Yes 'door.log comes down, and door.log.1 does not, because door.log does not roll' (
+        (Test-Path -LiteralPath (Pulled 'door.log')) -and -not (Test-Path -LiteralPath (Pulled 'door.log.1')))
+    Yes 'thornswood.log, with no rolled copies on the box, comes down alone' (
+        (Test-Path -LiteralPath (Pulled 'thornswood.log')) -and -not ($words -match 'thornswood\.log\.\d'))
+    Yes 'voice.log.1, empty on the box, comes down empty in place of the older copy here' (
+        (Test-Path -LiteralPath (Pulled 'voice.log.1')) -and (Get-Item -LiteralPath (Pulled 'voice.log.1')).Length -eq 0 -and
+        $words -match '(?m)^\s*voice\.log\.1\s+0 lines')
+    Yes 'site.log, not on the box, is said as not on the VPS' ($words -match '(?m)^\s*site\.log\s+not on the VPS at ')
+    Yes 'and nothing is written for it' (-not (Test-Path -LiteralPath (Pulled 'site.log')))
+    Yes 'bot.log comes down' (Test-Path -LiteralPath (Pulled 'bot.log'))
+    Yes 'nothing is called MISSING any more' (-not ($words -match 'MISSING'))
 } finally {
     Remove-Item -Path function:global:ssh -ErrorAction SilentlyContinue
     Remove-Item -Path function:global:Invoke-RestMethod -ErrorAction SilentlyContinue
