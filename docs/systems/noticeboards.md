@@ -15,9 +15,9 @@ has walked to is saved, and a later seeding does not put it back.
 
 The nine mainland towns have a spot each: Solitude, Whiterun, Riften,
 Windhelm, Markarth, Falkreath, Morthal, Dawnstar, Winterhold. Raven
-Rock's board starts at that town's inn until a steward walks it
-somewhere better. Ten boards, one per town in
-[Creation](creation.md).
+Rock's board starts at that town's inn, The Retching Netch, where
+Geldis Sadri stands, until a steward walks it somewhere better. Ten
+boards, one per town in [Creation](creation.md).
 
 ## A notice and a job
 
@@ -103,10 +103,22 @@ board with `/board move` or `/board here`.
 
 Fees of 20 and 30, the reach of 400, the newest 10, the gaps, `/unpin`,
 `/take`, `/dropjob`, and steward `/board move` and `/board here` are
-in the server. The fee lands on the hold's ledger. Letters are not.
-`/letter` and `/deliver` do not exist. A courier is not paid.
+in the server. The fee lands on the hold's ledger. A steward moves one
+of the ten boards; any other name is refused.
 
-Nine boards are seeded, and each one is that hold's drop box.
-Raven Rock is not among them. Solitude's spot
-was corrected from a walked coordinate and still wants somebody to
-stand on it. There is no guild membership discount.
+Letters are in the server: `/letter`, the 35, the 300 characters, the
+sealed line on the wall and the panel, `/take`, `/dropjob`, the 15
+back on `/unpin`, and `/deliver`, which pays the courier the 15 out of
+the ledger it was held on. The name on a letter is one word, or
+several in double quotes, and it matches the whole of a character's
+name or its first words. `/deliver` takes the person's name, or the
+id the crosshair gives, the same as `/trade`. There is no key for it
+on the prompt that appears when you look at somebody. A letter is
+written with `/letter`, not on the panel.
+
+Ten boards are seeded, and each one is that hold's drop box. Raven
+Rock's is at The Retching Netch, where Geldis Sadri stands. It has no
+message board object of its own: stand by the counter. Pressing E on
+a person or an NPC near a board answers them, not the board. Solitude's
+spot was corrected from a walked coordinate and still wants somebody
+to stand on it. There is no guild membership discount.

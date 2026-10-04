@@ -74,9 +74,9 @@ box pays rent owed by that person first. What is left is the hold's.
 
 Each hold has one box, and it is that hold's notice board. The nine
 mainland towns already have a spot each, the coordinates given for
-the boards. You are at the box when you are within 400 of that spot.
-A steward who moves the board moves the box with it. See
-[Notice boards](noticeboards.md).
+the boards, and Raven Rock's is at its inn. You are at the box when
+you are within 400 of that spot. A steward who moves the board moves
+the box with it. See [Notice boards](noticeboards.md).
 
 A price list is not dropped in as an item. Someone with the Prices
 permission on a faction or business book stands at the board and
@@ -92,7 +92,8 @@ The number `/box` reports is a ledger of what has been paid in. Gold
 dropped in the chest is also in the chest. A fee taken for a notice is
 counted on the ledger and is not sitting in the chest. Nothing
 withdraws from the ledger except the payouts named on
-[Free Skyrim Trading Company](trading-company.md).
+[Free Skyrim Trading Company](trading-company.md), and a letter's 15,
+which goes to its courier or back to its sender.
 
 Notice fees, job fees, rent and company
 payment all use this box. There is no second treasury.
