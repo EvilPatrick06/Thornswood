@@ -335,6 +335,8 @@ const WRITERS = {
   'property/nameFreshKey': [1, 'names one key off a stack, and the count is the same after'],
   'property/takeGold': [1, 'takes a notice, job or letter fee or a fare out and never puts any in (checked below)'],
   'property/payOut': [1, 'a letter\'s held 15 back out of the ledger it was counted on, to its courier or its sender; payHeld is its one caller and takes the same off that ledger (#1374, checked below)'],
+  'property/takeOne': [1, 'takes the one thing a company sale bought out of the seller\'s pack, and the thing is one /trade lists, which leaves gold out (#1393)'],
+  'property/putBack': [1, 'puts back the one thing takeOne has just taken, when the seller\'s share could not be written (#1393)'],
   'spoils/strip': [1, 'only takes things out of a container the world stocked'],
   'spoils/purse': [1, 'THE MINT: forty gold, once per character'],
   'trade/moveById': [2, 'moves a pile from one pack to the other, one write each (section 4)'],
@@ -467,10 +469,19 @@ for (const at of Object.keys(WRITERS)) {
   const job = /\bvar JOB_FEE = (\d+);/.exec(code);
   const letterFee = /\bvar LETTER_FEE = (\d+);/.exec(code);
   const letterPay = /\bvar LETTER_PAY = (\d+);/.exec(code);
-  yes('its four callers pass the fee, NOTICE_FEE or JOB_FEE, a letter\'s cost, LETTER_FEE and LETTER_PAY, a ride\'s fare and a night\'s price',
-      callers.slice().sort().join(',') === 'cost,fee,price,price' &&
+  /*
+    A HAUL AND A SALE (#1393). Posting a haul takes JOB_FEE and the pay, a
+    whole number above nothing, onto the ledger. A company sale takes the
+    agreed price, a whole number above nothing, less the worker's 10%, out of
+    the worker's pack. Both take; neither puts any in.
+  */
+  yes('its six callers pass the fee, NOTICE_FEE or JOB_FEE, a letter\'s cost, LETTER_FEE and LETTER_PAY, a haul\'s cost, ' +
+      'JOB_FEE and the pay, a sale\'s cost, the price less the worker\'s cut, a ride\'s fare and a night\'s price',
+      callers.slice().sort().join(',') === 'cost,cost,cost,fee,price,price' &&
       /\bvar fee = isJob \? JOB_FEE : NOTICE_FEE;/.test(code) &&
-      /\bvar cost = LETTER_FEE \+ LETTER_PAY;/.test(code));
+      /\bvar cost = LETTER_FEE \+ LETTER_PAY;/.test(code) &&
+      /\bvar cost = JOB_FEE \+ pay;/.test(code) &&
+      /\bvar cost = cuts\.price - cuts\.worker;/.test(code));
   const fares = ['FARE_FERRY', 'FARE_CARRIAGE', 'FARE_RAVEN_ROCK'].map(function (n) {
     const m = new RegExp('\\bvar ' + n + ' = (\\d+);').exec(code);
     return m ? Number(m[1]) : 0;
@@ -522,8 +533,18 @@ for (const at of Object.keys(WRITERS)) {
     if (code.slice(Math.max(0, m2.index - 9), m2.index) === 'function ') { continue; }
     calls.push(where(m2.index));
   }
-  yes('payOut\'s callers are payHeld, and a night in a bed and its kept takings (#1392)',
-      calls.slice().sort().join(',') === 'property/payHeld,property/payNight,property/payTakings');
+  /*
+    And the company (#1393). confirmHaul pays a haul's hauler its pay less
+    the tenth, and unpinHaul hands a haul's pay back to its poster, each
+    taking the same off the ledger through withdraw, which never takes more
+    than that haul holds. postHaul gives back the cost it has just taken
+    when the ledger would not take it. acceptSale hands the seller their
+    share of the gold it has just taken from the worker, and gives the
+    worker it back when the sale cannot finish (test-1393-company.js).
+  */
+  yes('payOut\'s callers are payHeld, a night in a bed and its kept takings (#1392), and the haul and the sale (#1393)',
+      calls.slice().sort().join(',') === 'property/acceptSale,property/acceptSale,property/acceptSale,' +
+      'property/confirmHaul,property/payHeld,property/payNight,property/payTakings,property/postHaul,property/unpinHaul');
   const pay = lift('  function payOut(actorId, amount) {', '\n  }\n');
   const held = lift('  function payHeld(hold, n, actorId) {', '\n  }\n');
   yes('the payout and the held pay are in the gamemode', pay !== null && held !== null);
