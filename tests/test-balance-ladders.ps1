@@ -16,8 +16,9 @@
      and read Thread as advanced farmer work for 188 recipes.
   2. NO HALF HAS AN EMPTY RUNG WITH WORK ABOVE IT, over every owned row and over
      the rows the server is asked about.
-  2b. PATRICK'S ANSWERS OF 28 SEPTEMBER ARE IN THE TABLES: every Heart Stone
-     deposit is advanced mining and the miner keeps 20 master deposits; the 161
+  2b. PATRICK'S ANSWERS OF 28 SEPTEMBER ARE IN THE TABLES, with the Heart Stone
+     moved back to master by the miner page (issue #1380): every Heart Stone
+     deposit is master mining and the miner has 24 master deposits; the 161
      Bladebinder staves sit on all four rungs, none more than one rung from its
      stone, and no half needs the second rule; every row held dear by something
      nobody gathers says in rankFrom that it is kept on purpose.
@@ -31,7 +32,7 @@
   4. CHECK-BALANCE RUNS GREEN, which now includes: every row more than one rung
      out is kept on purpose, and none is waiting on a decision.
   5. THE THREE DECISIONS ARE STILL ONE LINE EACH, set as Patrick answered:
-     RANK_BY_ORE names the Heart Stone advanced, CROP_COSTS_THE_FARMERS_RANK is
+     RANK_BY_ORE names the Heart Stone master, CROP_COSTS_THE_FARMERS_RANK is
      off and UNPLACED_INPUT_RULE is 'floor'.
 
   -Repo points it at another checkout, which is how it was shown to fail on
@@ -139,20 +140,20 @@ foreach ($h in $recipes.halves.PSObject.Properties.Name) {
     if ($recipes.halves.$h.PSObject.Properties.Name -contains 'secondRule') { $second += $h }
 }
 Write-Host ("      second rule used by: {0}; rows moved one rung: {1}" -f ($second -join ', '), $moved)
-# Patrick, 28 September: Heart Stone deposits are advanced mining, so the
-# Bladebinder's staves are ranked by what they cost and no half needs the
-# second rule any more.
-Yes 'no half needs the second rule since Heart Stones went to advanced' ($second.Count -eq 0)
+# Patrick, 28 September: the Bladebinder's staves are ranked by what they
+# cost and no half needs the second rule any more. Heart Stone went back to
+# master on the miner page (issue #1380); the staves still do not need it.
+Yes 'no half needs the second rule' ($second.Count -eq 0)
 
 # ---- 2b. Patrick's three answers of 28 September, read off the tables ------
 $heart = @($ores.ores.PSObject.Properties | Where-Object { [string]$_.Value.name -eq 'Heart Stone' })
-Yes ('every Heart Stone deposit is advanced mining ({0} of them)' -f $heart.Count) (
-    $heart.Count -eq 4 -and @($heart | Where-Object { [string]$_.Value.rank -ne 'advanced' }).Count -eq 0)
+Yes ('every Heart Stone deposit is master mining, the miner page''s rank ({0} of them)' -f $heart.Count) (
+    $heart.Count -eq 4 -and @($heart | Where-Object { [string]$_.Value.rank -ne 'master' }).Count -eq 0)
 Yes 'and ores.json says why, under rankNamedOutright' (
     $ores.PSObject.Properties.Name -contains 'rankNamedOutright' -and
-    ([string]$ores.rankNamedOutright.DLC2HeartStone).StartsWith('advanced'))
+    ([string]$ores.rankNamedOutright.DLC2HeartStone).StartsWith('master'))
 $masters = @($ores.ores.PSObject.Properties | Where-Object { [string]$_.Value.rank -eq 'master' }).Count
-Yes ('the miner keeps 20 master deposits ({0})' -f $masters) ($masters -eq 20)
+Yes ('the miner has 24 master deposits ({0})' -f $masters) ($masters -eq 24)
 $bb = @($recipes.recipes.PSObject.Properties | Where-Object { [string]$_.Value.owner -eq 'Enchanter' -and [string]$_.Value.half -eq 'Bladebinder' } | ForEach-Object { $_.Value })
 $bbBy = @(0, 0, 0, 0); $bbFar = 0
 foreach ($r in $bb) {
@@ -244,6 +245,6 @@ Yes 'the wild crop decision is one knob, and it stays off' ((Knob '$CROP_COSTS_T
 Yes 'what an input nobody produces costs is one knob, and it stays floor' ((Knob '$UNPLACED_INPUT_RULE') -and (Knob '$UNPLACED_INPUT_RULE').Right.Extent.Text -eq "'floor'")
 $oreAst = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $Repo 'scripts\dev\Build-OreTable.ps1'), [ref]$tokens, [ref]$errors)
 $rbo = $oreAst.Find({ param($x) $x -is [System.Management.Automation.Language.AssignmentStatementAst] -and $x.Left.Extent.Text -eq '$RANK_BY_ORE' }, $true)
-Yes 'the Heart Stone decision is one entry in RANK_BY_ORE in Build-OreTable.ps1' ($errors.Count -eq 0 -and $rbo -and $rbo.Extent.Text -match "'DLC2HeartStone'\s*=\s*@\{\s*Rank\s*=\s*'advanced'")
+Yes 'the Heart Stone decision is one entry in RANK_BY_ORE in Build-OreTable.ps1' ($errors.Count -eq 0 -and $rbo -and $rbo.Extent.Text -match "'DLC2HeartStone'\s*=\s*@\{\s*Rank\s*=\s*'master'")
 
 Done

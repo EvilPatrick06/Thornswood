@@ -6,7 +6,9 @@
 // and not skip the animation ... you get an ore each time you hit it you know
 // not all at omce so you can stay for a little and get a little or stay andd
 // get all 20", with ten minutes for iron, gold, corundum and silver and thirty
-// for moonstone, quicksilver, orichalcum, ebony and malachite.
+// for moonstone, quicksilver, orichalcum, ebony and malachite. Issue #1380 put
+// the miner page's own clock in their place: iron fifteen, gold twenty,
+// corundum and silver ten, the rest thirty. Ebony is a scarce place now.
 //
 // WHAT IT REPLACED: one press handed over the whole yield and then refused
 // everybody for between ten minutes and four hours. A seam was a vending
@@ -87,17 +89,19 @@ if (block !== null) {
     yes('S3 and can be worked again', r.take(REF, 600000) === 20);
   }
 
-  // S4: PATRICK'S TWO NUMBERS, by name.
+  // S4: THE MINER PAGE'S CLOCK, by name (issue #1380).
   {
     const r = rig();
-    const quick = ['Iron Ore', 'Gold Ore', 'Corundum Ore', 'Silver Ore'];
-    const slow = ['Moonstone Ore', 'Quicksilver Ore', 'Orichalcum Ore',
-                  'Ebony Ore', 'Malachite Ore'];
-    let allQuick = true, allSlow = true;
-    quick.forEach(function (n) { if (r.backMs(n) !== 10 * 60000) { allQuick = false; } });
+    const ten = ['Corundum Ore', 'Silver Ore'];
+    const slow = ['Clay', 'Quarried Stone', 'Moonstone Ore', 'Quicksilver Ore',
+                  'Orichalcum Ore', 'Malachite Ore', 'Shellbug Chitin'];
+    let allTen = true, allSlow = true;
+    ten.forEach(function (n) { if (r.backMs(n) !== 10 * 60000) { allTen = false; } });
     slow.forEach(function (n) { if (r.backMs(n) !== 30 * 60000) { allSlow = false; } });
-    yes('S4 iron, gold, corundum and silver come back in ten minutes', allQuick);
-    yes('S4 moonstone, quicksilver, orichalcum, ebony and malachite in thirty', allSlow);
+    yes('S4 iron comes back in fifteen minutes', r.backMs('Iron Ore') === 15 * 60000);
+    yes('S4 gold in twenty', r.backMs('Gold Ore') === 20 * 60000);
+    yes('S4 corundum and silver in ten', allTen);
+    yes('S4 clay, quarried stone, moonstone, quicksilver, orichalcum, malachite and shellbug in thirty', allSlow);
     yes('S4 and an ore nobody named takes the LONGER one, not the shorter',
         r.backMs('Some Modded Ore') === 30 * 60000);
     yes('S4 and so does one with no name at all', r.backMs('') === 30 * 60000);
@@ -245,9 +249,9 @@ if (block !== null) {
           .indexOf('swing(') === -1);
   yes('the skills panel is not pushed to the browser every frame',
       /st\.thornswoodPanel === body/.test(code));
-  yes('quicksilver is on the thirty minute clock rather than silver\'s ten',
-      /DEPOSIT_SLOW/.test(code) &&
-      code.indexOf('DEPOSIT_SLOW') < code.indexOf('DEPOSIT_QUICK[j]'));
+  yes('the clock is read by the whole name, so quicksilver is never silver',
+      /'quicksilver ore': 30/.test(code) && /'silver ore': 10/.test(code) &&
+      /hasOwnProperty\.call\(DEPOSIT_BACK_MIN, n\)/.test(code));
 
   /*
     THE CHECK THIS HARNESS DID NOT HAVE, AND THE REASON IT PASSED ALL EVENING

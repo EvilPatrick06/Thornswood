@@ -2,7 +2,7 @@
 
 What Thornswood keeps about you, why, and how to have it deleted.
 
-Last changed: 28 September 2026.
+Last changed: 3 October 2026.
 
 Thornswood is a free fan project run by two people. It is not a company. This
 page is written plainly rather than legally, and it is meant to be the whole
@@ -66,6 +66,13 @@ about them.
 **The launcher's own log.** Sent to the site when a session ends. It is about
 the game: which mods are installed, what failed to start, which version you
 are on. It is how somebody who cannot play gets helped without a conversation.
+
+**Gallery submissions.** The picture or recording, your signed-in account,
+the name for its caption and any note for staff are kept for review. Only
+approved submissions appear publicly. Their caption and media then become
+public too. Submit only material you have permission to share, without
+private information about other people. Ask in the Discord to have a
+submission removed. See [Terms](/terms) for publication permissions.
 
 ## What is not stored
 
@@ -134,9 +141,13 @@ be said in the Discord rather than quietly edited.
 
 These cookies make the site and the age gate work. They are not advertising and they are not analytics.
 
-- **tw**. Signed member cookie after Discord sign-in. HttpOnly. Set by the site when you sign in; cleared when you sign out.
-- **twa**. Signed admin cookie for people who run the hub. HttpOnly. Same idea as tw, for staff only.
-- **tw-age-18**. Records that this browser confirmed eighteen or older on the age gate. Also kept in localStorage on the same browser. Not HttpOnly. Clearing it means the gate asks again.
+- **twa**. Signed Discord identity cookie for signed-in accounts, lasting up to 30 days. HttpOnly. Staff permissions are checked from roles, not granted by the cookie alone. Cleared on sign-out.
+- **twst_***. One-use security cookies for a Discord sign-in, lasting ten minutes and scoped to `/auth/discord`. HttpOnly. Cleared when sign-in returns.
+- **tw**. Fallback member-password cookie when Discord sign-in is not configured, lasting up to one year. HttpOnly. Ignored when Discord is configured; cleared on sign-out.
+- **tw-age-18**. Records that this browser stated eighteen or older. The cookie lasts one year. The localStorage copy has no automatic expiry. Not HttpOnly. Clearing site storage means the gate asks again. This is not verified age.
+
+Sign-in cookies use SameSite=Lax and Secure when served over HTTPS. See the
+[cookie policy](/cookies) for their purposes and how to clear them.
 
 There is no advertising cookie and no analytics cookie on this site. A longer list of what is stored about play (Discord id, character, chat, launcher logs) is in the sections above.
 

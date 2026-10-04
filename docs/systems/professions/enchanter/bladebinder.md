@@ -76,7 +76,7 @@ You cannot enchant a cuirass here. That is Wardweaver, and your sister
 half is that menu at novice, which means you may use the arcane
 enchanter. It does not hand you Wardweaver's extra Ward point.
 
-You cannot mine the heart stone until you are a miner of advanced
+You cannot mine the heart stone until you are a miner of master
 rank. The profession does not include the class.
 
 <!-- detail:begin -->
@@ -120,4 +120,4 @@ The spell column is the HasSpell the crafting menu asks for. In the college book
 ## Where this is
 
 The 161 rows, the staff enchanter, and the unlock points are in the
-server. Heart stone is still advanced in the ore table. Cut staves are out of the open recipe book. The references stay in the cut file.
+server. Heart stone is master in the ore table. Cut staves are out of the open recipe book. The references stay in the cut file.

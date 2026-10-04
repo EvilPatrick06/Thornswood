@@ -61,7 +61,23 @@ nav.top a:hover{color:var(--page)}
   text-transform:uppercase}
 .enter:hover{background:var(--gold);color:var(--night)}
 .burger{display:none;margin-left:auto;background:none;border:1px solid var(--edge2);
-  color:var(--page);width:40px;height:38px;border-radius:2px;font-size:17px;cursor:pointer}
+  color:var(--page);width:44px;height:44px;border-radius:2px;font-size:17px;cursor:pointer}
+.mobile-cta{display:none}
+.hero-motion{margin-top:14px;min-height:44px;background:var(--night);color:var(--gold);
+  border:1px solid var(--gold);padding:8px 12px;cursor:pointer;font:13px/1.4 var(--sans)}
+.breadcrumbs{padding-top:24px;font:14px/1.6 var(--sans);color:var(--quiet)}
+.breadcrumbs ol{display:flex;flex-wrap:wrap;gap:12px;list-style:none;margin:0;padding:0}
+.breadcrumbs li+li::before{content:'/';margin-right:12px}
+.breadcrumbs a{text-decoration:underline;text-underline-offset:3px}
+@media(max-width:900px){
+  header .bar{gap:12px}
+  .mark{font-size:15px;letter-spacing:.04em;gap:7px}
+  .mobile-cta{display:flex;align-items:center;min-height:44px;margin-left:auto;
+    padding:0 10px;border:1px solid var(--gold);font:600 13px/1 var(--sans);color:var(--gold)}
+  .burger{margin-left:0;flex-shrink:0}
+}
+/* Keep anchor destinations visible below the sticky header. */
+[id]{scroll-margin-top:100px}
 @media(max-width:900px){
   nav.top{position:fixed;inset:calc(64px + env(safe-area-inset-top,0px)) 0 auto 0;
     flex-direction:column;align-items:stretch;gap:0;background:var(--stone);
@@ -245,7 +261,7 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
   letter-spacing:0;color:var(--faint);margin:3px 0 8px}
 .form input[type=text],.form textarea{width:100%;box-sizing:border-box;
   padding:12px 14px;background:var(--stone);color:var(--page);
-  border:1px solid var(--edge2);border-radius:2px;
+  border:1px solid var(--faint);border-radius:2px;
   font:15px/1.6 var(--serif);transition:border-color .12s,background .12s}
 .form input[type=text]:hover,.form textarea:hover{border-color:var(--faint)}
 .form input[type=text]:focus,.form textarea:focus{outline:none;
@@ -262,7 +278,7 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
   display:grid;place-items:center;color:var(--faint);
   font:400 12px/1.5 var(--sans);letter-spacing:.14em;text-transform:uppercase;
   text-align:center;padding:16px}
-.shot img{width:100%;height:100%;object-fit:cover}
+.shot img,.shot video{width:100%;height:100%;object-fit:cover}
 .shot-card{display:flex;flex-direction:column;gap:8px}
 .shot-card .shot-actions{display:flex;flex-wrap:wrap;gap:8px}
 /* Gallery submit box: same dark gold panel language as the rest of the site,
@@ -316,7 +332,7 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
 .gal-box .form .btn.gal-chosen-x:hover{border-color:var(--gold);
   background:rgba(201,162,75,.12);color:var(--gold)}
 .gal-box .form input[type=text]{width:100%;box-sizing:border-box;padding:12px 14px;
-  background:var(--iron);color:var(--page);border:1px solid var(--edge);
+  background:var(--iron);color:var(--page);border:1px solid var(--faint);
   border-radius:2px;font:15px/1.6 var(--serif);
   -webkit-appearance:none;appearance:none;color-scheme:dark;
   transition:border-color .12s,background .12s,box-shadow .12s}
@@ -420,14 +436,14 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
 .card-row .r span{color:var(--quiet);font-size:15.5px}
 .rel{border-bottom:1px solid var(--edge);padding:26px 0}
 .rel .when{font:400 12px/1 var(--mono);letter-spacing:.1em;color:var(--faint)}
-.rel h3{margin:9px 0 8px;font-size:21px;color:var(--page)}
+.rel h2,.rel h3{margin:9px 0 8px;font-size:21px;color:var(--page)}
 .rel ul{margin:8px 0 0;color:var(--quiet);font-size:15px}
 
 footer{border-top:1px solid var(--edge);padding:52px 0 64px;
   padding-bottom:calc(64px + env(safe-area-inset-bottom,0px));color:var(--faint);
   font:400 14px/1.9 var(--sans)}
 footer .cols{display:grid;gap:36px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
-footer h4{font:600 11px/1 var(--sans);letter-spacing:.2em;text-transform:uppercase;
+footer h2{font:600 11px/1 var(--sans);letter-spacing:.2em;text-transform:uppercase;
   color:var(--quiet);margin:0 0 14px}
 footer a{color:var(--faint);display:block}
 footer a:hover{color:var(--gold)}

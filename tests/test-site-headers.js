@@ -77,9 +77,12 @@ function copy() {
   made.push(dir);
   fs.copyFileSync(path.join(APP, 'server.js'), path.join(dir, 'server.js'));
   fs.mkdirSync(path.join(dir, 'public'));
-  ['home.html', 'robots.txt'].forEach(function (f) {
+  ['home.html','home.js','home.css'].forEach(function (f) {
     fs.copyFileSync(path.join(PUBLIC, f), path.join(dir, 'public', f));
   });
+  fs.writeFileSync(path.join(dir, 'public', 'fixture.txt'), 'public fixture bytes');
+  fs.mkdirSync(path.join(dir, 'data', 'site'), {recursive:true});
+  fs.copyFileSync(path.join(APP, 'data', 'site', 'rules.md'), path.join(dir, 'data', 'site', 'rules.md'));
   fs.copyFileSync(path.join(APP, 'config.example.json'), path.join(dir, 'config.json'));
   fs.mkdirSync(path.join(dir, 'feed', 'assets'), {recursive:true});
   fs.writeFileSync(path.join(dir, 'feed', 'assets', 'a'.repeat(64)), 'feed asset bytes');
@@ -146,17 +149,17 @@ function stop(run) {
         yes('an address that is not there is 404 (' + gone.status + ')', gone.status === 404);
         guarded('a 404 page', gone);
 
-        const asset = await ask(run.port, '/robots.txt');
+        const asset = await ask(run.port, '/fixture.txt');
         yes('a static file is 200 and cached (' + asset.status + ')',
             asset.status === 200 && /max-age/.test(String(asset.headers['cache-control'] || '')));
         guarded('a static file', asset);
 
         const etag = String(asset.headers.etag || '');
-        const again = await ask(run.port, '/robots.txt', { 'if-none-match': etag });
+        const again = await ask(run.port, '/fixture.txt', { 'if-none-match': etag });
         yes('the same file with its ETag is 304 (' + again.status + ')', !!etag && again.status === 304);
         guarded('a 304, which never goes through send()', again);
 
-        const part = await ask(run.port, '/robots.txt', { range: 'bytes=0-3' });
+        const part = await ask(run.port, '/fixture.txt', { range: 'bytes=0-3' });
         yes('a byte range is 206 with four bytes (' + part.status + ')',
             part.status === 206 && part.body.length === 4);
         guarded('a byte range, which writes its own headers', part);
