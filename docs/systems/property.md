@@ -102,18 +102,27 @@ See [Notice boards](noticeboards.md), [Gold](gold.md),
 
 ## What a home is for
 
-A bed you own, rent, or were allowed to use is the bed on
-[Exhaustion](exhaustion.md): 80 rest an hour, and the logout fill.
-A bedroll is the campfire rate, 35. Saying `/rest bed` in the street
-is not a bed.
+Your own bed is the best rest on [Exhaustion](exhaustion.md), 80 an
+hour, and the logout fill. A bed you are allowed in is 50. A bed or
+bedroll in a building nobody holds, or out on the road, is nobody's to
+lend: 25 an hour, or 45 with a fire in reach. A bed in a building
+somebody else holds, who has not let you, is no rest at all. Lying
+down in the bed is how you rest in it, and there is nothing to type.
 
-The holder sets who may sleep there, and what the night costs.
-`/bed 20` at the building sets the gold for one night. `/bed -` means
-a night is free for someone the holder has allowed. `/bed` with no
-amount says the price. The gold is handed to the holder. It is not a
-server price, and it is not the same in every house. An inn is this
-rule. The person who holds the inn sets the night. Once that gold is
-paid, the inn room is 50 rest an hour.
+The holder names who may sleep there. Look at somebody inside a
+building you hold, and the prompt that names them offers Let sleep
+here on the key mold's key, U unless you changed it. Press it and they
+may sleep in any bed of that building for one night, 8 hours from then.
+Press it on them again, Stop letting sleep here, or press Stop beside
+their name on the property page of the K panel, and the night ends
+then. Anybody carrying the building's key or its deed is allowed as
+well, so somebody who lives there carries a key.
+
+The server does not sell a night. Patrick, 4 Oct: "they pay from a
+regular trade and then the owner can grant bed access". The guest pays
+the holder in an ordinary [Trade](trade.md), and the holder lets them
+sleep there. An inn is this rule: the person who holds the inn is paid
+in the trade and lets the guest sleep.
 
 The fire in the hearth is a fire. It warms the way any fire does on
 [Temperature and weather](temperature.md). A claim does not make it
@@ -152,18 +161,22 @@ Claims, deeds, the 14 day lapse, locks, molds, keys, stewards,
 eviction, rent, and the gold-only box are in the server. The register
 is `private/property.json`.
 
-`/bed` sets, clears and says the price of a night, and the gold
-goes from the sleeper's pack to the holder's. A holder who is away
-is handed it the next time they are in the world. `/rest bed`
-counts a bed only when the server saw the person press it and they
-are still beside it, and the rest stops when they leave it or the
-night runs out. The holder, and anybody carrying its key or its
-deed, sleeps free at the bed rate. Anybody else says `/rest bed`
-once to hear the price and again within a minute to pay it. A paid
-night lasts 8 real hours. A bed in a building nobody holds is
-nobody's to lend. Who counts as allowed and how long a night is
-are asked on issue #1392. Prices and paid nights are in
-`private/beds.json`.
+A bed counts only when the server saw the person press it and they
+are still beside it, and the rest stops when they leave it, the night
+runs out, or the holder ends it. The holder sleeps at 80. A guest of
+the night, and anybody carrying the building's key or its deed, sleeps
+at 50. The look prompt offers Let sleep here only to the holder, only
+while the person is in the same building, and the server checks both
+again when the key arrives. A night is 8 real hours from the key press
+and covers every bed in that building. The property page in the K
+panel lists tonight's guests under each place you hold, each with a
+Stop. Guests are in `private/beds.json`, and each names the holder who
+let them in, so a building that changes hands does not keep them.
+There is no night price and no gold moves for a night. The book from
+before held prices, paid nights and gold kept for holders who were
+away. The prices are gone. A night already paid runs to its end as a
+guest. Kept gold is handed to its holder once, the next time they are
+in the world, and that is the last gold the book holds.
 Outhouses and pots stay unknown until the vote on
 [The body](body.md). The company payouts that
 withdraw from the ledger are built: a haul's pay to its hauler, less

@@ -230,6 +230,9 @@ function rig(opts) {
     // crosshair it passes every key on, which is what this stands in for.
     'const MOLD_KEY = 22;\n' +
     'function moldPress() { return false; }\n' +
+    // The sleep key is the mold's, on a person (#1603). Nobody is looked at here.
+    'const SLEEP_KEY = 22;\n' +
+    'function sleepPress() { return false; }\n' +
     'const LOCK_KEY = 45;\n' +
     'function lockPress() { return false; }\n' +
     'const COMMAND_KEY = 53;\nconst ESC = 1, CHAT_KEY = 28, SKILLS_KEY = 37, PARTY_KEY = 25,\n' +
