@@ -32,7 +32,8 @@
   For every log that rolls (server, thornswood, voice, site, bot), the
   rolled generations .1 through .5 come down too when they exist on the
   VPS, under the same names. door.log does not roll, so only the current
-  file is fetched. A missing rolled file is skipped quietly.
+  file is fetched. A missing rolled file is skipped quietly, and a copy an
+  earlier pull left here under its name is removed.
 
   Nothing on the VPS is changed. Everything here is a read.
 #>
@@ -180,18 +181,35 @@ foreach ($l in $fetch) {
         continue
     }
 
-    # Rolled generations that are not on the box: skip quietly. Do not write a
-    # local MISSING file and do not fail the rest of the pull.
-    $lines = @($text)
-    $missing = ($lines.Count -eq 1 -and ("$($lines[0])" -like 'MISSING:*'))
+    <#
+      WHAT CAME BACK, under a name of its own (#1605).
+
+      PowerShell variable names ignore case, so this used to be the
+      [int]$Lines parameter under another spelling. Every pull tried to put
+      the answer into an int, printed a MetadataError for every log, left the
+      number 4000 in place, counted it as 1 line, and never saw a MISSING
+      answer, so a rolled generation that is not on the box was written down
+      as a file holding the MISSING line. Seen under PowerShell 7.6.6, 4 Oct.
+    #>
+    $got = @($text)
+    $missing = ($got.Count -eq 1 -and ("$($got[0])" -like 'MISSING:*'))
+    # Rolled generations that are not on the box: skip quietly, and do not
+    # fail the rest of the pull. A copy an earlier pull left under that name
+    # is not that generation any more, so it goes, and the folder holds what
+    # the box holds.
     if ($l.Optional -and $missing) {
-        Say ("  {0,-14} MISSING" -f $l.Name) 'DarkGray'
+        $gone = ''
+        if (Test-Path -LiteralPath $dest) {
+            Remove-Item -LiteralPath $dest -Force
+            $gone = ', the old copy here removed'
+        }
+        Say ("  {0,-14} MISSING{1}" -f $l.Name, $gone) 'DarkGray'
         continue
     }
 
     $text | Set-Content -LiteralPath $dest -Encoding UTF8
     $size = if (Test-Path -LiteralPath $dest) { (Get-Item -LiteralPath $dest).Length } else { 0 }
-    $count = $lines.Count
+    $count = $got.Count
     Say ("  {0,-14} {1,7:n0} lines  {2,9:n0} bytes   {3}" -f $l.Name, $count, $size, $l.What) 'Gray'
 }
 
