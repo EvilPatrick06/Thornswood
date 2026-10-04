@@ -26930,11 +26930,11 @@ function craftAnswer(actorId, row) {
   of armour with no recipe behind it is an enchantment, because every forge
   craft HAS a recipe and would never reach this path.
 
-  THE RANK IS NOT SET HERE, and that is a knob rather than an oversight. There
-  is no record to carry a rank, so every brew and every enchantment is novice
-  work to anybody who holds the profession. Whether a Master should brew
-  something a novice cannot is a question for the rulebook, and it needs a
-  record or a table before it can be answered.
+  THE RANK IS NOT ON A RECORD. There is no record to carry one, so the rank
+  is the table's: the mixtures and enchantments pages give every effect a
+  rank, and MIXTURES and ENCHANTMENTS below carry them (#1389). They can only
+  be asked once the engine names the effects, and until it does every brew
+  and every enchantment is novice work to anybody who holds the profession.
 */
 var RECIPELESS = {
   ALCH: { prof: 'alchemist', made: 'a potion', verb: 'brew' },
