@@ -707,12 +707,15 @@ Decided by Patrick on 4 Oct: "no more commands for things [people] do,
 only for dev and staff commands; everything else takes buttons and GUI".
 Anything a person does in the world is a key, a prompt, a panel or the
 thing itself activated, never a line typed in the chat. Staff and dev
-commands stay commands. Never add a chat command for people. A panel may
-send the server a line, but no person is told to type it and help text
-never lists it. [docs/SYSTEMS.md](docs/SYSTEMS.md), "Buttons, not
+commands stay commands. So do `/stuck` and the lines that reach staff,
+`/helpme` and `/report`, and help text names them (Patrick, later on
+4 Oct: "change it to except the /stuck and the ones for getting help
+from GMs"). Never add another chat command for people. A panel may send
+the server a line, but no person is told to type it and help text never
+lists it. [docs/SYSTEMS.md](docs/SYSTEMS.md), "Buttons, not
 commands", is the rule and what counts as a button;
 [docs/systems/commands.md](docs/systems/commands.md) lists every command
-there is today and the issue that converts each one.
+there is today and the issue that converts each one that does not stay.
 
 #### Everything we need to do goes on the board
 
