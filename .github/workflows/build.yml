@@ -269,6 +269,7 @@ jobs:
                  'test-1373-scarce-scene.js',
                  'test-1378-shared-gather.js',
                  'test-1380-rare-mines.js',
+                 'test-1388-apprentice.js',
                  'test-secrets-fail-closed.js',
                  'test-site-auth.js',
                  'test-site-headers.js',
