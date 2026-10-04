@@ -4,7 +4,8 @@ const source=fs.readFileSync(path.join(__dirname,'../game/plugins/thornswood-emo
 const serverAddress=JSON.parse(fs.readFileSync(path.join(__dirname,'../scripts/vps/vps.json'),'utf8')).address;
 function fixture() {
   const handlers={},hooks=[],sent=[],labels=[],pins=[],nativeTasks=[];
-  let drawn=true,accepted=true,focused=false,delay=0,waiting=false,inUpdate=false;
+  let drawn=true,accepted=true,focused=false,delay=0,waiting=false,inUpdate=false,resetInterrupts=false,ack=true,time=Date.now();
+  class Clock extends Date { static now(){return time;} }
   function native(fn){if(!inUpdate)throw new Error('native outside update');return fn();}
   const actor={getFormID:()=>0x14,isWeaponDrawn:()=>drawn,sheatheWeapon:()=>{waiting=true;if(!delay)drawn=false;},getParentCell:()=>null};
   actor.getItemCount=()=>native(()=>1);
@@ -21,13 +22,14 @@ function fixture() {
     Debug:{notification(){},sendAnimationEvent(pc,event){nativeTasks.push(()=>{
       const ctx={selfId:pc.getFormID(),animEventName:event,animationSucceeded:accepted,storage:new Map()};
       hooks.forEach(h=>h.enter(ctx));sent.push(ctx.animEventName);
-      hooks.forEach(h=>h.leave(ctx));
+      if(resetInterrupts && event==='IdleForceDefaultState' && waiting){waiting=false; drawn=true;}
+      if(ack)hooks.forEach(h=>h.leave(ctx));
     });}}};
-  const ctx={skyrimPlatform:sp,Thornswood:T,require:()=>io,Date,JSON,Math,Number};
+  const ctx={skyrimPlatform:sp,Thornswood:T,require:()=>io,Date:Clock,JSON,Math,Number};
   vm.createContext(ctx);vm.runInContext(source,ctx);
-  function emit(name,event){inUpdate=name==='update'||name==='buttonEvent';if(name==='update'&&waiting&&delay>0&&!--delay)drawn=false;for(const fn of handlers[name]||[])fn(event);if(name==='update')while(nativeTasks.length)nativeTasks.shift()();inUpdate=false;}
+  function emit(name,event){inUpdate=name==='update'||name==='buttonEvent';if(name==='update'&&waiting&&delay>0&&!--delay){drawn=false;waiting=false;}for(const fn of handlers[name]||[])fn(event);if(name==='update')while(nativeTasks.length)nativeTasks.shift()();inUpdate=false;}
   return {sent,pins,labels,emit,reject(){accepted=false;},
-    focus(){focused=true;},delaySheathe(){delay=5;},
+    focus(){focused=true;},delaySheathe(){delay=5;},interruptSheatheOnReset(){resetInterrupts=true;delay=5;},noAcknowledgement(){ack=false;},elapse(ms){time+=ms;},
     labelsOnly:()=>labels.filter(s=>s.includes('t:"emote"'))};
 }
 const mouse=fixture();
@@ -42,13 +44,14 @@ held.emit('update');assert.equal(held.sent.length,0);
 const explicit=fixture();
 explicit.emit('buttonEvent',{device:0,code:9,isDown:true,isUp:false,isRepeating:false,heldDuration:0});
 assert.equal(explicit.labelsOnly().length,0,'the label waits for an accepted animation');
-explicit.emit('update');explicit.emit('update');explicit.emit('update');
+for(let i=0;i<4;i++)explicit.emit('update');
 assert.ok(explicit.pins.includes(-1),'clear the persistent weapon stance override');
 assert.ok(explicit.sent.includes('idleDrinkingStandingStart'),'a drawn stance must not loop forever on Stop');
 assert.equal(explicit.labelsOnly().length,1,'one accepted explicit selection produces one label');
 const rejected=fixture();rejected.reject();
 rejected.emit('buttonEvent',{device:0,code:9,isDown:true,isUp:false,isRepeating:false,heldDuration:0});
-rejected.emit('update');rejected.emit('update');
+for(let i=0;i<4;i++)rejected.emit('update');
+assert(rejected.sent.includes('idleDrinkingStandingStart'),'exercise rejection of the requested idle itself');
 assert.equal(rejected.labelsOnly().length,0,'a rejected animation cannot claim the emote happened');
 const panel=fixture();panel.focus();
 panel.emit('buttonEvent',{device:0,code:9,isDown:true,isUp:false});panel.emit('update');
@@ -63,11 +66,20 @@ const stopMouse=fixture();stopMouse.emit('buttonEvent',{device:1,code:49,isDown:
 assert.equal(stopMouse.sent.length,0,'Stop also belongs only to the keyboard');
 const wheel=fixture();wheel.emit('buttonEvent',{device:0,code:34,isDown:true,isUp:false});
 wheel.emit('browserMessage',{arguments:['thornswood-emote','__play Lute']});
-for(let i=0;i<3;i++)wheel.emit('update');
+for(let i=0;i<4;i++)wheel.emit('update');
 assert.ok(wheel.sent.includes('IdleLuteStart'),'owned instruments selected on the wheel are checked inside update');
 assert.equal(wheel.labelsOnly().length,1);
 wheel.emit('buttonEvent',{device:0,code:34,isDown:true,isUp:false});
 wheel.emit('browserMessage',{arguments:['thornswood-emote','__stand']});
-const previous=wheel.sent.length;wheel.emit('update');
+const previous=wheel.sent.length;wheel.emit('update');wheel.emit('update');
 assert.equal(wheel.sent[previous],'IdleForceDefaultState','wheel Stop also reaches the update queue');
-console.log('PASS keyboard-only emotes, repeat refusal, stance recovery and accepted-animation labels');
+const interrupted=fixture();interrupted.interruptSheatheOnReset();
+interrupted.emit('buttonEvent',{device:0,code:9,isDown:true,isUp:false});
+for(let i=0;i<10;i++)interrupted.emit('update');
+assert.equal(interrupted.labelsOnly().length,1,'resetting the graph must not interrupt the requested sheathe');
+const unacknowledged=fixture();unacknowledged.noAcknowledgement();
+unacknowledged.emit('buttonEvent',{device:0,code:9,isDown:true,isUp:false});
+for(let i=0;i<4;i++)unacknowledged.emit('update');
+unacknowledged.elapse(2100);unacknowledged.emit('update');
+assert.equal(unacknowledged.labelsOnly().length,0,'an unacknowledged gesture cannot produce a label');
+console.log('PASS keyboard-only emotes, repeat refusal, staged sheathing and accepted-animation labels');
