@@ -138,9 +138,8 @@ work a kit is, so anybody may make one and no charcoal is asked for.
 The inventory shows a piece's condition as it was when the piece
 reached the pack, and a change during a session shows after the
 next login (issue #1651); the repair panel always has the number.
-The 5% more
-damage and armour at 120% is not applied, because the engine works
-damage out on its own. A trade hands a piece over at 100% (issue
-#1594). A piece that is not at 100% cannot be enchanted, because the
+The 5% more damage and armour at 120% is not applied, because the
+engine works damage out on its own. A trade hands a piece over at
+100% (issue #1594). A piece that is not at 100% cannot be enchanted, because the
 engine takes a plain piece for an enchantment. The grindstone and the
 armour table still appear in the crafting menu.
