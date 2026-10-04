@@ -41,7 +41,8 @@
     When the door is split out of server.js this check fails, and the
     paragraph in the README that says one process is what to change.
 
-  Every copy is in the temp folder: server.js, public\home.html, and
+  Every copy is in the temp folder: server.js, public\home.html, the three
+  written pages it asks for (data\site\rules.md, credits.md, world.md), and
   config.example.json as config.json. Nothing here opens
   site\config.json, which on a machine that has one is that
   machine's own, and nothing asks Discord: the sample is checked for empty
@@ -289,6 +290,13 @@ function copy(tag, withConfig, patch) {
   fs.writeFileSync(path.join(dir, 'server.js'), src);
   fs.mkdirSync(path.join(dir, 'public'));
   fs.copyFileSync(path.join(APP, 'public', 'home.html'), path.join(dir, 'public', 'home.html'));
+  // The written pages the copy serves. Since #1585 a written page with no
+  // file behind it answers 404 rather than a 200 saying it does not exist
+  // yet, so /rules, /credits and /world need their markdown to be pages.
+  fs.mkdirSync(path.join(dir, 'data', 'site'), { recursive: true });
+  for (const md of ['rules.md', 'credits.md', 'world.md']) {
+    fs.copyFileSync(path.join(APP, 'data', 'site', md), path.join(dir, 'data', 'site', md));
+  }
   if (withConfig) { fs.copyFileSync(path.join(APP, 'config.example.json'), path.join(dir, 'config.json')); }
   return dir;
 }

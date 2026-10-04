@@ -71,8 +71,11 @@ yes('a config with no play list still works', JSON.stringify(S.playRoles(undefin
 // ----------------------------------------------------- standing(), run --
 const stHead = 'async function standing(discordId) {';
 const stFrom = src.indexOf(stHead);
-// Through holdsStaffRole, which standing() calls and which follows it (#481).
-const stRoles = src.indexOf('\nfunction holdsStaffRole(', stFrom);
+// Through holdsStaffRole (#481) and holdsNamedRole (#1417, #1420), which
+// standing() calls and which follow it, in that order.
+const stStaff = src.indexOf('\nfunction holdsStaffRole(', stFrom);
+const stNamed = src.indexOf('\nfunction holdsNamedRole(', stFrom);
+const stRoles = Math.max(stStaff, stNamed);
 const stTo = stFrom < 0 ? -1 : src.indexOf('\n}\n', stRoles > stFrom ? stRoles : stFrom);
 const stSrc = (stFrom >= 0 && stTo > stFrom) ? src.slice(stFrom, stTo + 2) : '';
 yes('standing() is in server.js', stSrc.length > 0);
@@ -157,8 +160,10 @@ function standingWith(open, roleIds) {
   yes('the site serves home.html through the switch',
       /let html = forMode\(fs\.readFileSync\(path\.join\(PUBLIC, 'home\.html'\), 'utf8'\), cfg\.open\);/.test(src));
   yes('and every written page', /return forMode\(fs\.readFileSync\(file, 'utf8'\), cfg\.open\);/.test(src));
+  // Their script moved out of home.html into home.js in #1479 (no inline
+  // script under the content security policy).
   yes('the downloads page and the status line follow /api/public open',
-      (home.raw.match(/d\.open === true/g) || []).length >= 5);
+      ((home.raw + '\n' + read('site/public/home.js')).match(/d\.open === true/g) || []).length >= 5);
 
   // ---------------------------------------- what somebody not in is told --
   cfgBox.open = false;
@@ -227,7 +232,7 @@ function standingWith(open, roleIds) {
 
   // -------------------------------------- nothing people read says it --
   const PEOPLE = ['README.md', 'SECURITY.md', 'installer/READ ME FIRST.txt', 'site/data/help.md',
-                  'site/data/known.md', 'site/public/home.html', 'bot/content.py',
+                  'site/data/known.md', 'site/public/home.html', 'site/public/home.js', 'bot/content.py',
                   'launcher/app/Help.cs', 'launcher/ui.xaml', 'launcher/app/ShellPacks.cs']
     .concat(fs.readdirSync(path.join(ROOT, 'site/data/site')).filter((n) => /\.md$/.test(n))
       .map((n) => 'site/data/site/' + n));
