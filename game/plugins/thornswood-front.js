@@ -349,6 +349,16 @@
   */
   const MOLD_KEY    = iniNumber(ini, 'MoldKey', 22);       // U
   const LOCK_KEY    = iniNumber(ini, 'LockKey', 45);       // X
+  /*
+    The holder's sleep key on the look prompt (#1603). Patrick: the holder
+    names who may sleep there "with buttons and GUI, not commands". THE MOLD'S
+    KEY, U, and not a new one: every letter is already Skyrim's or ours, and
+    test-thornswood-keys.js holds no two of ours on one default. The two never
+    meet: the mold is armed only while a door is under the crosshair, and this
+    only while a person is, inside a building you hold. Rebinding MoldKey moves
+    both, and its Controls row says so.
+  */
+  const SLEEP_KEY   = MOLD_KEY;
   /* What the prompt calls them. Read off the scan code so a rebind in the ini
      changes the letter on the screen as well as the key that works. */
   function keyName(code) {
@@ -365,6 +375,7 @@
   const TRADE_NAME = keyName(TRADE_KEY);
   const MUTE_NAME = keyName(MUTE_KEY);
   const MOLD_NAME = keyName(MOLD_KEY);
+  const SLEEP_NAME = keyName(SLEEP_KEY);
   const LOCK_NAME = keyName(LOCK_KEY);
 
   const ESC = 1;
@@ -2664,11 +2675,14 @@
     ------------------------------------------------- lying down in a bed (#839)
 
     Ownership clear on activate makes Sleep/Wait open. This half tells the
-    exhaustion meter: furnitureEnter on a bed is /rest bed, furnitureExit is
-    /rest up. Chairs and chopping blocks are not beds, so they leave the
-    meter alone (chopping has its own watcher below).
+    exhaustion meter: furnitureEnter on a bed is /rest bed, on any other
+    furniture /rest sit, and furnitureExit is /rest up. Nobody types them
+    (#1603). The server answers by the furniture it saw pressed, so a chair
+    is a seat, a chair by a fire is a campfire, and a forge or a chopping
+    block is nothing and is answered with nothing (chopping has its own
+    watcher below). This side only says which of the two it saw.
   */
-  let restingInBed = false;
+  let restSent = false;
   /* #843: chairs/benches leave controls off with no menu. The controls
      watchdog, stuck rescue and ownTheCharacter all refuse to fight that
      state when notOurs() says so. getFurnitureReference alone can flicker
@@ -2686,20 +2700,19 @@
       try { clearBedOwnership(ref); } catch (err) { }
       let bed = false;
       try { bed = isBedRef(ref); } catch (err) { }
-      if (!bed) { return; }
-      restingInBed = true;
-      tellServer('/rest bed');
-      say('resting in a bed');
+      restSent = true;
+      tellServer(bed ? '/rest bed' : '/rest sit');
+      say(bed ? 'resting in a bed' : 'sitting down');
     }));
     sp.on('furnitureExit', guard('bedexit', (e) => {
       let actorId = 0;
       try { actorId = e.actor ? e.actor.getFormID() : 0; } catch (err) { }
       if (actorId !== 0x14) { return; }
       seatedInFurniture = false;
-      if (!restingInBed) { return; }
-      restingInBed = false;
+      if (!restSent) { return; }
+      restSent = false;
       tellServer('/rest up');
-      say('left the bed');
+      say('got up');
     }));
     say('watching for beds');
   } catch (e) {
@@ -4543,7 +4556,7 @@
 
   /** Draw or clear the little panel that names them and the three keys. */
   function drawPrompt(row) {
-    const sig = row ? (row.n + '|' + row.f + '|' + row.m + '|' + row.y) : '';
+    const sig = row ? (row.n + '|' + row.f + '|' + row.m + '|' + row.y + '|' + (row.s || 0)) : '';
     if (sig === lookingSig) { return; }
     lookingSig = sig;
     if (!row) {
@@ -4569,7 +4582,11 @@
       keyRow(FRIEND_NAME, row.f ? 'Remove friend' : 'Add friend', !!row.f) +
       keyRow(TRADE_NAME, 'Trade', false) +
       keyRow(MUTE_NAME, row.m ? 'Unmute' : 'Mute', !!row.m) +
-      keyRow(PARTY_NAME, row.y ? 'Party menu' : 'Ask to party', !!row.y);
+      keyRow(PARTY_NAME, row.y ? 'Party menu' : 'Ask to party', !!row.y) +
+      // Only for a holder looking at somebody inside a building they hold:
+      // the server's near list says so (#1603). See sleepPress.
+      (row.s ? keyRow(SLEEP_NAME, row.s === 2 ? 'Stop letting sleep here' : 'Let sleep here',
+                      row.s === 2) : '');
 
     T.js('(function(){try{' +
          'var d=document.getElementById("ts-look");' +
@@ -4648,6 +4665,23 @@
     if (!sent) { note('Could not send the social request. Try again in a moment.'); }
     say(cmd + ' on ' + lookingAt);
     return true;
+  }
+
+  /*
+    Let the person under the crosshair sleep in the building you hold, or end
+    their night (#1603). Only while the prompt offers it, which is the server
+    saying so on the near list, and the server measures all of it again when
+    the line arrives. Answers whether it was used, so the key falls through
+    when it was not.
+  */
+  function sleepPress() {
+    if (!lookingAt) { return false; }
+    if (claims.chat) { return false; }
+    if (busyMenuOpenNow()) { return false; }
+    const near = nearList();
+    const row = (near && Object.prototype.hasOwnProperty.call(near, lookingAt)) ? near[lookingAt] : null;
+    if (!row || !row.s) { return false; }
+    return lookVerb('sleephere');
   }
 
   /*
@@ -7123,6 +7157,8 @@
     // The mold key, and only while a door is under the crosshair and a Key
     // Mold is in the pack. Otherwise it is not used and goes on down the list.
     if (e.code === MOLD_KEY && moldPress()) { return; }
+    // The same key on a person inside a building you hold. See SLEEP_KEY.
+    if (e.code === SLEEP_KEY && sleepPress()) { return; }
     if (e.code === LOCK_KEY && lockPress()) { return; }
     /*
       The five social keys work in the open world, and P and J can always
