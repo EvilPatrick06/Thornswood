@@ -166,7 +166,7 @@ in an outside trade with `/apprentice <name>`, and ends it with
 Not in the world yet: the parts of a warrior's maneuvers the game
 has to do itself (see [Warrior](professions/warrior.md)), the repair
 kits on [Durability](durability.md), Twin Souls as a second
-enchantment, Master Weaver's hidden armour, Master Carver's hotter
-fire, and the vanilla perk lines that still hide some recipes in the
-crafting menu even when the server would allow them. Each profession
+enchantment, Master Weaver's hidden armour, and the vanilla perk
+lines that still hide some recipes in the crafting menu even when the
+server would allow them. Each profession
 page says which of those is its own.
