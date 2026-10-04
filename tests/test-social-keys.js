@@ -92,6 +92,13 @@ function rig(opts) {
     'const SLEEP_KEY = 22; function sleepPress() { return false; }\n' +
     // The same key in the inventory (#1384); no inventory is open here.
     'function repairPress() { return false; }\n' +
+    // The board, ride and merchant presses (#1430, #1394) answer only the
+    // game's Activate event, and the lock key (#1472) only X; none of the
+    // presses here is either. Each has its own harness.
+    'function boardPress() { return false; }\n' +
+    'function driverPress() { return false; }\n' +
+    'function merchantPress() { return false; }\n' +
+    'const LOCK_KEY = 45; function lockPress() { return false; }\n' +
     'const COMMAND_KEY = 53; function commandKeyPressed() { }\n' +
     // The / and P watchers on the game's own menus are test-our-key-menus.js's.
     'const OFF_MENU = { openedBy: function () { return ""; }, shutFor: function () { }, keyDown: function () { } };\n' +

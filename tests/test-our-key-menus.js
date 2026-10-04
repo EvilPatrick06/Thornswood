@@ -174,6 +174,10 @@ function rig(opts) {
     'function sleepPress() { return false; }\n' +
     // The same key in the inventory (#1384); no inventory is open here.
     'function repairPress() { return false; }\n' +
+    // The lock key, X, since #1472, asked only for its own scan code. What it
+    // does is test-lock-keypress.js's business.
+    'const LOCK_KEY = 45;\n' +
+    'function lockPress() { return false; }\n' +
     'const ESC = 1, CHAT_KEY = 28, SKILLS_KEY = 37, PARTY_KEY = 25, JOURNAL_KEY = 36,\n' +
     '      FRIEND_KEY = 21, TRADE_KEY = 35, MUTE_KEY = 38, COMMAND_KEY = 53;\n';
   const api = new Function('sp', 'say', 'T', 'Date', 'guard', 'typed',
