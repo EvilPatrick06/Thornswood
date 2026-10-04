@@ -253,6 +253,7 @@ jobs:
           # never answers, or drops halfway, and the page says to try again.
           # $six is a historical name: the gate list grew well past six (#1368).
           $six = 'test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
+                 'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
                  'test-hand-install-retired.ps1',
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
