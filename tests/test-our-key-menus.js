@@ -178,6 +178,10 @@ function rig(opts) {
     // does is test-lock-keypress.js's business.
     'const LOCK_KEY = 45;\n' +
     'function lockPress() { return false; }\n' +
+    // A warrior's maneuver key (#1386), 9, scan code 10, which nothing here
+    // presses. test-1386-warrior.js has what it does.
+    'const MANEUVER_KEY = 10;\n' +
+    'function maneuverKeyPressed() { }\n' +
     'const ESC = 1, CHAT_KEY = 28, SKILLS_KEY = 37, PARTY_KEY = 25, JOURNAL_KEY = 36,\n' +
     '      FRIEND_KEY = 21, TRADE_KEY = 35, MUTE_KEY = 38, COMMAND_KEY = 53;\n';
   const api = new Function('sp', 'say', 'T', 'Date', 'guard', 'typed',

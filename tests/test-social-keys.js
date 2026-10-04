@@ -99,6 +99,8 @@ function rig(opts) {
     'function driverPress() { return false; }\n' +
     'function merchantPress() { return false; }\n' +
     'const LOCK_KEY = 45; function lockPress() { return false; }\n' +
+    // A warrior's maneuver key (#1386), 9, which nothing here presses.
+    'const MANEUVER_KEY = 10; function maneuverKeyPressed() { }\n' +
     'const COMMAND_KEY = 53; function commandKeyPressed() { }\n' +
     // The / and P watchers on the game's own menus are test-our-key-menus.js's.
     'const OFF_MENU = { openedBy: function () { return ""; }, shutFor: function () { }, keyDown: function () { } };\n' +
