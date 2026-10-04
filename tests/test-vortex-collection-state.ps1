@@ -11,7 +11,7 @@ $cases=@{
  'compressed'=2; 'updated'=3; 'downgraded'=1; 'deleted'=0; 'revision-deleted'=0; 'other-slug'=0;
  'mixed'=2; 'latest-not-installed'=2; 'obsolete'=2; 'authoring'=2; 'authoring-version'=2; 'authoring-numeric-version'=2;
  'cache-only'=0; 'ordinary-mod-cache'=0; 'other-author'=0; 'author-link-deleted'=0;
- 'negative'=0; 'zero'=0; 'fraction'=0; 'overflow'=0; 'string-revision'=0; 'corrupt'=0; 'partial'=0
+ 'negative'=0; 'zero'=0; 'fraction'=0; 'overflow'=0; 'string-revision'=0; 'corrupt'=0; 'partial'=0; 'vertical-tab'=0; 'nbsp'=0; 'valid-space'=2; 'short-cache'=0; 'subscriber-unknown-author'=0; 'authoring-invalid-cache'=0
 }
 $count=0
 try {

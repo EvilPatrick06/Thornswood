@@ -249,15 +249,15 @@ namespace Thornswood
             return found != null && File.Exists(Path.Combine(found, "plugins.txt")) ? found : null;
         }
         const string Mods = "persistent###mods###skyrimse###";
-        const string Revisions = "collections###revisions###";
+        const string Revisions = "persistent###collections###revisions###";
         static string Text(Dictionary<string, Value> values, string key) {
             Value value;
             return values.TryGetValue(key, out value) ? value.Text : null;
         }
         static int Positive(string json) {
             int value;
-            return json != null && System.Text.RegularExpressions.Regex.IsMatch(json.Trim(), "\\A[1-9][0-9]{0,9}\\z") &&
-                int.TryParse(json.Trim(), out value) ? value : 0;
+            return json != null && System.Text.RegularExpressions.Regex.IsMatch(json.Trim(' ', '\t', '\r', '\n'), "\\A[1-9][0-9]{0,9}\\z") &&
+                int.TryParse(json.Trim(' ', '\t', '\r', '\n'), out value) ? value : 0;
         }
         static string StringValue(string json) { return json == null ? null : JsonString(json); }
         static bool CollectionKey(string key) {
@@ -276,14 +276,16 @@ namespace Thornswood
             if (string.IsNullOrEmpty(slug)) return 0;
             var values = CurrentValues(stateDir, CollectionKey);
             int best = 0;
+            bool subscriberFound = false;
             foreach (var pair in values) {
                 if (!pair.Key.StartsWith(Mods, StringComparison.Ordinal) ||
                     !pair.Key.EndsWith("###collectionSlug", StringComparison.Ordinal) || pair.Value.Text == null) continue;
                 if (StringValue(pair.Value.Text) != slug) continue;
+                subscriberFound = true;
                 string prefix = pair.Key.Substring(0, pair.Key.Length - "collectionSlug".Length);
                 best = Math.Max(best, Positive(Text(values, prefix + "revisionNumber")));
             }
-            if (best > 0) return best;
+            if (subscriberFound) return best;
             // Locally authored collections lack subscriber attributes. Only their
             // explicit cache link counts, never an ordinary mod or cached download.
             foreach (var pair in values) {
@@ -295,8 +297,9 @@ namespace Thornswood
                 if (id <= 0) continue;
                 string revision = Revisions + id.ToString(System.Globalization.CultureInfo.InvariantCulture) + "###info###";
                 if (StringValue(Text(values, revision + "collection###slug")) != slug) continue;
-                int number = Positive(Text(values, revision + "revisionNumber"));
-                if (number <= 0) {
+                string cachedNumber = Text(values, revision + "revisionNumber");
+                int number = Positive(cachedNumber);
+                if (number <= 0 && cachedNumber == null) {
                     string version = Text(values, prefix + "newestVersion");
                     number = Positive(version);
                     if (number <= 0) number = Positive(StringValue(version));
@@ -306,7 +309,7 @@ namespace Thornswood
             return best;
         }
         static string JsonString(string json) {
-            json = json.Trim();
+            json = json.Trim(' ', '\t', '\r', '\n');
             if (json.Length > 4096 || !System.Text.RegularExpressions.Regex.IsMatch(json,
                 "\\A\"(?:[^\"\\\\\\x00-\\x1f]|\\\\(?:[\"\\\\/bfnrt]|u[0-9a-fA-F]{4}))*\"\\z"))
                 throw new InvalidDataException("Profile metadata is not one JSON string");

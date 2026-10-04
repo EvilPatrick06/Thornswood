@@ -10,7 +10,7 @@ fixture, record, lp = (tools[n] for n in ('fixture', 'record', 'lp'))
 root = pathlib.Path(sys.argv[1])
 mod = 'persistent###mods###skyrimse###collection_current###attributes###'
 author = 'persistent###mods###skyrimse###vortex_collection_local###attributes###'
-cache = 'collections###revisions###123###info###'
+cache = 'persistent###collections###revisions###123###info###'
 
 
 def rows(values, sequence=10):
@@ -47,3 +47,16 @@ directory = fixture(root, 'collection-corrupt', rows(base))
 data = bytearray((directory / '000001.ldb').read_bytes()); data[0] ^= 1
 (directory / '000001.ldb').write_bytes(data)
 fixture(root, 'collection-partial', rows(base), record(batch(mod+'revisionNumber', 3))[:-4])
+
+# Checksum-valid invalid JSON must remain unknown, even around a valid integer.
+for label, payload in [('vertical-tab', b'2\x0b'), ('nbsp', b'\xc2\xa02'), ('valid-space', b' \t2\r\n')]:
+    entries = rows(base)
+    entries = [(key, payload if key.startswith((mod+'revisionNumber').encode()) else value) for key,value in entries]
+    fixture(root, 'collection-'+label, entries)
+# A cache beneath the wrong state root cannot authenticate an authored collection.
+fixture(root, 'collection-short-cache', rows({key.replace('persistent###collections###', 'collections###'):value for key,value in linked.items()}))
+
+fixture(root, 'collection-subscriber-unknown-author', rows({**base, **linked}), record(batch(mod+'revisionNumber', deleted=True)))
+entries = rows(linked)
+entries = [(key, b'2\x0b' if key.startswith((cache+'revisionNumber').encode()) else value) for key,value in entries]
+fixture(root, 'collection-authoring-invalid-cache', entries)
