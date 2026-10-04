@@ -27402,7 +27402,7 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects) {
       A TEMPER IS REFUSED, AND IT IS NOT WORK (#1384). Tempering at the
       sharpening wheel and the armour table is cut: its 1809 rows are in
       docs/systems/cut-items.md, held so an event can bring one back, and a
-      piece is mended with a kit (the durability block, /repair). Every craft
+      piece is mended with a kit (the durability block). Every craft
       that reaches this line at one of those two benches is a temper, because
       every recipe either of them carries is one.
 
@@ -27414,7 +27414,7 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects) {
     */
     if (tempering) {
       var noTemper = 'Tempering is not done here. A piece is mended with a repair kit: ' +
-                     '/repair says what you carry and how it stands.';
+                     'with one in your pack, your inventory names the key that mends a piece.';
       notify(actorId, noTemper);
       say(actorId, noTemper);
       log(actorId.toString(16), 'was refused a temper of', craftedItemBaseId.toString(16),
@@ -36265,75 +36265,105 @@ log('gamemode loaded:',
   /*
     ------------------------------------------------------------------- beds
 
-    THE NIGHT IS THE HOLDER'S PRICE, AND A BED IS ONE THE SERVER SAW (#1392).
+    WHOSE BED IT IS DECIDES THE REST, AND A BED IS ONE THE SERVER SAW
+    (#1392, #1603).
 
-    docs/systems/property.md, "What a home is for": the holder sets who may
-    sleep there and what the night costs. /bed 20 at the building sets the
-    gold for one night, /bed - makes a night free for the people the holder
-    allows and sells it to nobody else, and /bed alone says the price. An inn
-    is the same rule, and there is no server inn price.
+    Patrick's answers on #1603, 4 Oct. The holder names who may sleep there,
+    with buttons and not commands. A night is 8 hours. Nobody sells a night
+    through the server: "they pay from a regular trade and then the owner can
+    grant bed access". And the rest goes by common sense, up to your own bed:
 
-    docs/systems/exhaustion.md: a bed you own, rent or were allowed is 80 rest
-    an hour, an inn room once the holder's price is paid is 50, a bedroll is
-    the campfire's 35, and saying the word in the street does not count. Those
-    are the three kinds this hands the needs block (bed, inn, bedroll), and
-    the numbers stay in NEEDS.recover there.
+      what you are resting on                            an hour   kind
+      a seat                                               20      sit
+      a bed or bedroll nobody can lend you                 25      rough
+      a seat with a fire in reach                          35      campfire
+      a bed or bedroll nobody can lend you, by a fire      45      camp
+      a bed you are allowed in: a guest, a key, a deed     50      inn
+      your own bed                                         80      bed
 
-    HOW THE SERVER KNOWS A BED. mp.onActivate is handed the bed when somebody
-    presses it, the same way it is handed a door, and the base's own record
-    says what it is: a FURN whose editor id names a bed, read once per base
-    through mp.lookupEspmRecordById and remembered. /rest bed then asks two
-    things the server measures itself: which bed this person last pressed, and
-    whether they are still within BED_REACH of it in the same cell. The typed
-    word is not asked, and neither is the client's own guess at furniture. The
-    building is the bed's own cell, the same way the take limit finds whose a
-    chest is, because a building here is its interior cell.
+    The numbers live in NEEDS.recover in the needs block, and this hands it
+    the kind. docs/systems/exhaustion.md has the same table.
 
-    WHILE THE PLACE IS TRUE. Every BED_EVERY_MS the beds people are resting in
-    are measured again: walk away, lose the key, or let the night run out, and
-    the rest stops. Somebody who comes into the world already resting in a bed
-    the server did not see them lie down in stops too, and lies down again. A
-    restart forgets who lay down where, and that is the case it catches.
+    WHO IS ALLOWED. The holder sleeps in their own bed. A guest is somebody
+    the holder looked at inside the building and let sleep there with the
+    look prompt's key (sleepHere, below), for one night. Anybody carrying the
+    building's key or its deed is allowed too, the two things that already
+    open its locked door (mayPass). A bed in a building somebody else holds,
+    who has let you do none of those, is refused. A bed in a building nobody
+    holds, or out of doors, is nobody's to lend, and that is the 25, or the
+    45 by a fire. A bedroll is a bed here: whose it is decides the rate, not
+    what it is made of.
 
-    THE GOLD MOVES AND IS NEVER MADE. The price comes out of the sleeper's
-    pack through takeGold and goes into the holder's through payOut, the
-    letters' payout. A holder who is not in the world has it kept on the
-    book below, and it goes into their pack the next time they are.
+    A GUEST IS ONE NIGHT, NIGHT_MS from when the holder pressed the key, in
+    every bed of that building. One night rather than until taken back,
+    because a night is what was paid for in the trade, and the holder does
+    not have to remember to end it. Somebody who lives there carries a key.
+    The holder can end a night sooner, from the look prompt or from the
+    property page in the K panel. A guest names the holder who let them in,
+    so a building that changes hands does not keep the last holder's guests.
 
-    TWO THINGS THE PAGE DOES NOT SAY, asked on #1392. ALLOWED is carrying a
-    key to the building or its deed, the two things that already open a locked
-    door (mayPass), because that is the one way the server knows a holder has
-    let somebody in. A NIGHT is NIGHT_MS of real time from paying, at that
-    building. Paying is /rest bed said twice inside PAY_AGAIN_MS: the first
-    says the price, the second pays it, so lying down never spends gold on its
-    own.
+    HOW THE SERVER KNOWS A BED OR A SEAT. mp.onActivate is handed the
+    furniture when somebody presses it, the same way it is handed a door, and
+    the base's own record says what it is: a FURN whose editor id names a
+    bed, a bedroll, or a chair, bench, stool or throne, read once per base
+    through mp.lookupEspmRecordById and remembered. Any other FURN is
+    furniture and nothing more: a forge, a chopping block, a lean. /rest then
+    asks what this person last pressed and whether they are still within
+    BED_REACH of it in the same cell. The word after /rest is not asked, and
+    neither is the client's own guess at furniture: the plugin says /rest bed
+    when somebody lies down and /rest sit when they sit, and the server
+    answers by what was pressed. The building is the bed's own cell, the same
+    way the take limit finds whose a chest is, because a building here is its
+    interior cell.
 
-    The book is beds.json beside the register rather than a field on a claim,
-    so the register's own reader and writer are untouched. A price names the
-    holder who set it, so a building that changes hands does not keep the last
-    holder's price.
+    A FIRE IN REACH is the distance the client already reports for warmth,
+    the needs block's own n.fire (docs/systems/temperature.md): a fire close
+    enough to warm you is close enough to rest by.
+
+    WHILE THE PLACE IS TRUE. Every BED_EVERY_MS the places people are resting
+    in are measured again: walk away, lose the key, let the night run out,
+    move off from the fire, and the rest stops or changes rate. Somebody who
+    comes into the world already resting in a place the server did not see
+    them take stops too, and sits or lies down again. A restart forgets who
+    lay down where, and that is the case it catches.
+
+    NO GOLD MOVES FOR A NIGHT. It is paid in a trade between two people, and
+    the server keeps no price. The book is beds.json beside the register
+    rather than a field on a claim, so the register's own reader and writer
+    are untouched. #1392's book held prices, paid nights and gold kept for a
+    holder who was away. The prices are gone. A night already paid is carried
+    over as a guest of whoever held the building, to the end of that night.
+    Kept gold is handed to its holder once, the next time they are in the
+    world, and leaves the book then. Nothing adds to it any more.
   */
   // INVENTED: far enough to stand beside a double bed and press it, near
   // enough that the next room's bed is not this one.
   var BED_REACH = 200;
-  // INVENTED: one night is the eight hours the Rest clock takes to empty.
+  // Patrick, #1603: a night is 8 hours, the time the Rest clock takes to empty.
   var NIGHT_MS = 8 * 3600000;
-  var PAY_AGAIN_MS = 60000;
   var BED_EVERY_MS = 5000;
   var LYING_FORGET_MS = 48 * 3600000;
+  var GUEST_NAME_MAX = 64;
   /* A bed by its editor id. Bedrolls first, since they say bed too. The
      others are words that hold the letters and are not beds. */
   var BEDROLL_EDID = /bedroll/i;
   var BED_EDID = /bed/i;
   var NOT_BED_EDID = /bedside|embed|riverbed|flowerbed/i;
-  var BED_KINDS = { bed: true, inn: true, bedroll: true };
+  /* A seat by its editor id, the same way. A workbench is a bench to the
+     letters and a crafting station to everybody else. */
+  var SEAT_EDID = /chair|bench|stool|throne/i;
+  var NOT_SEAT_EDID = /workbench|crafting/i;
+  /* Every kind of rest this hands the needs block, and 'bedroll', the kind
+     #1392 handed out, so somebody still resting at it is got up the same way. */
+  var REST_KINDS = { sit: true, rough: true, campfire: true, camp: true, inn: true, bed: true,
+                     bedroll: true };
 
   function bedHas(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
 
-  /* Who pressed which bed, who is lying in one, who was told a price, and who
-     has been seen since coming in. On globalThis, so a hot reload keeps them. */
+  /* Who pressed which furniture, who is resting on what, and who has been
+     seen since coming in. On globalThis, so a hot reload keeps them. */
   if (!g.__thornswoodBedState) {
-    g.__thornswoodBedState = { pressed: {}, lying: {}, offers: {}, seen: {} };
+    g.__thornswoodBedState = { pressed: {}, lying: {}, seen: {} };
   }
   var bedState = g.__thornswoodBedState;
 
@@ -36344,35 +36374,41 @@ log('gamemode loaded:',
     return path.join(path.dirname(registerPath()), 'beds.json');
   }
 
-  /* Rebuilt field by field, the same discipline as the register: a price is
-     a holder and a whole number, a night is a time, and takings are gold. */
+  /* Rebuilt field by field, the same discipline as the register: a guest is
+     a holder, a time and a name, and kept takings are gold. */
   function loadBedBook() {
-    var out = { prices: {}, nights: {}, takings: {} };
+    var out = { guests: {}, takings: {} };
     var raw = null;
     try { raw = JSON.parse(require('fs').readFileSync(bedBookPath(), 'utf8')); }
     catch (e) { return out; }
     if (!raw || typeof raw !== 'object') { return out; }
     var now = Date.now();
-    var prices = (raw.prices && typeof raw.prices === 'object') ? raw.prices : {};
-    for (var b in prices) {
-      if (!bedHas(prices, b) || b === '__proto__' || !prices[b]) { continue; }
-      var by = Number(prices[b].by) || 0;
-      var price = Number(prices[b].price) || 0;
-      if (by > 0 && price > 0 && Math.floor(price) === price) {
-        out.prices[b] = { by: by, price: price };
+    var carried = 0;
+    function add(b, who, by, at, name) {
+      if (!b || b === '__proto__' || who === '__proto__') { return false; }
+      if (!((Number(who) || 0) > 0) || !(by > 0) || !(at > 0) || (now - at) >= NIGHT_MS) { return false; }
+      if (!bedHas(out.guests, b)) { out.guests[b] = {}; }
+      if (bedHas(out.guests[b], who)) { return false; }
+      out.guests[b][who] = { by: by, at: at, name: String(name || '').slice(0, GUEST_NAME_MAX) };
+      return true;
+    }
+    var guests = (raw.guests && typeof raw.guests === 'object') ? raw.guests : {};
+    for (var b in guests) {
+      if (!bedHas(guests, b) || !guests[b] || typeof guests[b] !== 'object') { continue; }
+      for (var who in guests[b]) {
+        var gst = bedHas(guests[b], who) ? guests[b][who] : null;
+        if (!gst || typeof gst !== 'object') { continue; }
+        add(b, who, Number(gst.by) || 0, Number(gst.at) || 0, gst.name);
       }
     }
+    // #1392's paid nights, to their end, as guests of whoever held the building.
     var nights = (raw.nights && typeof raw.nights === 'object') ? raw.nights : {};
     for (var nb in nights) {
-      if (!bedHas(nights, nb) || nb === '__proto__' || !nights[nb] ||
-          typeof nights[nb] !== 'object') { continue; }
-      for (var who in nights[nb]) {
-        if (!bedHas(nights[nb], who) || who === '__proto__') { continue; }
-        var at = Number(nights[nb][who]) || 0;
-        if ((Number(who) || 0) > 0 && at > 0 && (now - at) < NIGHT_MS) {
-          if (!bedHas(out.nights, nb)) { out.nights[nb] = {}; }
-          out.nights[nb][who] = at;
-        }
+      if (!bedHas(nights, nb) || !nights[nb] || typeof nights[nb] !== 'object' ||
+          !bedHas(claims, nb)) { continue; }
+      for (var nw in nights[nb]) {
+        if (bedHas(nights[nb], nw) &&
+            add(nb, nw, Number(claims[nb].by) || 0, Number(nights[nb][nw]) || 0, '')) { carried++; }
       }
     }
     var takings = (raw.takings && typeof raw.takings === 'object') ? raw.takings : {};
@@ -36383,30 +36419,47 @@ log('gamemode loaded:',
         out.takings[tp] = gold;
       }
     }
+    if (raw.prices || raw.nights) {
+      plog('the bed book from before #1603: night prices dropped,', carried,
+           'paid nights carried over as guests, kept gold waits for its holders');
+      out.old = true;
+    }
     return out;
   }
 
-  function saveBedBook() {
+  /* Nights that have run out leave the book. Answers the holders whose
+     guests changed, so their property page can be drawn again. */
+  function pruneGuests() {
     var now = Date.now();
-    for (var b in bedBook.nights) {
-      if (!bedHas(bedBook.nights, b)) { continue; }
-      var row = bedBook.nights[b];
+    var gone = {};
+    for (var b in bedBook.guests) {
+      if (!bedHas(bedBook.guests, b)) { continue; }
+      var row = bedBook.guests[b];
       for (var who in row) {
-        if (bedHas(row, who) && (now - row[who]) >= NIGHT_MS) { delete row[who]; }
+        if (bedHas(row, who) && (now - row[who].at) >= NIGHT_MS) {
+          gone[row[who].by] = true;
+          delete row[who];
+        }
       }
-      if (!Object.keys(row).length) { delete bedBook.nights[b]; }
+      if (!Object.keys(row).length) { delete bedBook.guests[b]; }
     }
+    return gone;
+  }
+
+  function saveBedBook() {
     try {
       var fs = require('fs');
       var file = bedBookPath();
       try { fs.mkdirSync(require('path').dirname(file), { recursive: true }); } catch (e) { }
-      fs.writeFileSync(file, JSON.stringify(bedBook, null, 1));
+      fs.writeFileSync(file, JSON.stringify({ guests: bedBook.guests, takings: bedBook.takings }, null, 1));
     } catch (e) {
       plog('could not write the bed book:', e);
     }
   }
 
   var bedBook = loadBedBook();
+  // The old shape is written over once, so the file says what the server does.
+  if (bedBook.old) { delete bedBook.old; saveBedBook(); }
 
   // ------------------------------------------------------------ the beds --
 
@@ -36419,8 +36472,9 @@ log('gamemode loaded:',
     return out;
   }
 
-  /* 'bed', 'roll' or '' for a base, asked of the engine once and kept. An
-     answer the engine could not give is '', not a bed. */
+  /* 'bed', 'roll', 'seat', 'furn' for any other furniture, or '' for
+     anything that is not furniture, asked of the engine once per base and
+     kept. An answer the engine could not give is '', not a bed. */
   var bedKinds = {};
   function bedKind(baseDesc) {
     baseDesc = String(baseDesc || '');
@@ -36436,19 +36490,21 @@ log('gamemode loaded:',
         for (var i = 0; !edid && i < fields.length; i++) {
           if (fields[i] && String(fields[i].type) === 'EDID') { edid = textOf(fields[i].data); }
         }
+        kind = 'furn';
         if (BEDROLL_EDID.test(edid)) { kind = 'roll'; }
         else if (BED_EDID.test(edid) && !NOT_BED_EDID.test(edid)) { kind = 'bed'; }
+        else if (SEAT_EDID.test(edid) && !NOT_SEAT_EDID.test(edid)) { kind = 'seat'; }
       }
     } catch (e) { kind = ''; }
     bedKinds[baseDesc] = kind;
     return kind;
   }
 
-  /* Called from onActivate for every press. Writes only for a bed. */
+  /* Called from onActivate for every press. Writes only for furniture. */
   function bedTouched(actorId, refrId, baseDesc) {
     var kind = bedKind(baseDesc);
     if (!kind || !actorId || !refrId) { return; }
-    bedState.pressed[actorId] = { ref: refrId, roll: kind === 'roll', at: Date.now() };
+    bedState.pressed[actorId] = { ref: refrId, roll: kind === 'roll', what: kind, at: Date.now() };
   }
 
   function stillAt(actorId, refrId) {
@@ -36467,67 +36523,58 @@ log('gamemode loaded:',
     return isBuilding(cell) ? cell : '';
   }
 
-  /* The building /bed means: the door opened in the last minute, or the
-     building they are standing in. */
-  function bedBuildingHere(actorId) {
-    var b = here(actorId);
-    if (b) { return b; }
-    var cell = '';
-    try { cell = String(mp.get(actorId, 'worldOrCellDesc') || ''); } catch (e) { cell = ''; }
-    return isBuilding(cell) ? cell : null;
+  /* This person's night at this building, or null. See the block. */
+  function guestOf(building, held, profileId) {
+    if (!held || !profileId || !bedHas(bedBook.guests, building)) { return null; }
+    var row = bedBook.guests[building];
+    var gst = bedHas(row, profileId) ? row[profileId] : null;
+    if (!gst || gst.by !== held.by || (Date.now() - gst.at) >= NIGHT_MS) { return null; }
+    return gst;
   }
 
-  /* The holder, or somebody carrying its key or its deed. See the block. */
+  /* The holder, a guest tonight, or somebody carrying its key or its deed. */
   function allowedIn(actorId, profileId, building, held) {
     if (!held) { return false; }
     if (profileId && held.by === profileId) { return true; }
+    if (guestOf(building, held, profileId)) { return true; }
     if (holdsKey(actorId, building)) { return true; }
     if (holdsDeed(actorId, building)) { return true; }
     return false;
   }
 
-  function priceOf(building, held) {
-    var p = bedHas(bedBook.prices, building) ? bedBook.prices[building] : null;
-    return (p && held && p.by === held.by) ? p.price : 0;
-  }
-
-  function nightPaid(building, profileId) {
-    if (!profileId || !bedHas(bedBook.nights, building)) { return false; }
-    var at = Number(bedBook.nights[building][profileId]) || 0;
-    return at > 0 && (Date.now() - at) < NIGHT_MS;
+  /* A fire close enough to warm this person, by the distance their client
+     reports for warmth. See the block. */
+  function fireNear(actorId) {
+    var needs = g.__thornswoodNeeds;
+    if (!needs || !needs.settle) { return false; }
+    var n = null;
+    try { n = needs.settle(actorId); } catch (e) { return false; }
+    return !!n && typeof n.fire === 'number' && n.fire >= 0;
   }
 
   /*
-    What this bed is to this person: a kind of rest, a refusal, or a price
-    still to pay. Asked when they lie down and again on every tick.
+    What this bed is to this person: a kind of rest, or a refusal. Asked
+    when they lie down and again on every tick. See the table in the block.
   */
-  function bedVerdict(actorId, profileId, ref, roll) {
+  function bedVerdict(actorId, profileId, ref) {
     var building = bedBuilding(ref);
     var held = building ? holderOf(building) : null;
-    var out = { building: building, held: held, kind: '', line: '', price: 0, paid: false };
+    var out = { building: building, held: held, kind: '', line: '', guest: null };
     if (!held) {
-      if (roll) { out.kind = 'bedroll'; return out; }
-      out.line = building
-        ? ('Nobody holds ' + nameOf(building) + ', so nobody can let you sleep in its beds.')
-        : 'This bed is nobody\'s to lend, so it does not count as a bed.';
+      out.kind = fireNear(actorId) ? 'camp' : 'rough';
+      return out;
+    }
+    if (profileId && held.by === profileId) {
+      out.kind = 'bed';
       return out;
     }
     if (allowedIn(actorId, profileId, building, held)) {
-      out.kind = roll ? 'bedroll' : 'bed';
+      out.kind = 'inn';
+      out.guest = guestOf(building, held, profileId);
       return out;
     }
-    if (nightPaid(building, profileId)) {
-      out.kind = roll ? 'bedroll' : 'inn';
-      out.paid = true;
-      return out;
-    }
-    var price = priceOf(building, held);
-    if (!price) {
-      out.line = nameOf(building) + ' is ' + held.name + '\'s, and they have not let you ' +
-                 'sleep there. Nights there are not for sale.';
-      return out;
-    }
-    out.price = price;
+    out.line = nameOf(building) + ' is ' + held.name + '\'s, and they have not let you ' +
+               'sleep there. A night there is theirs to give.';
     return out;
   }
 
@@ -36557,31 +36604,14 @@ log('gamemode loaded:',
     try { say(actorId, line); } catch (e) { }
   }
 
-  /* The night's gold from the sleeper's pack to the holder's, and the night
-     written down. False when the sleeper does not have it. */
-  function payNight(actorId, profileId, building, held, price) {
-    if (!takeGold(actorId, price)) { return false; }
-    var to = onlineActorOf(held.by);
-    var handed = to ? payOut(to, price) : false;
-    if (!handed) {
-      bedBook.takings[held.by] = (Number(bedBook.takings[held.by]) || 0) + price;
-    }
-    if (!bedHas(bedBook.nights, building)) { bedBook.nights[building] = {}; }
-    bedBook.nights[building][profileId] = Date.now();
-    saveBedBook();
-    var who = personName(actorId);
-    plog(who, 'paid', price, 'gold for a night at', nameOf(building),
-         handed ? 'into ' + held.name + '\'s pack' : 'kept for ' + held.name + ' until they are in');
-    if (handed) {
-      tellBed(to, who + ' paid you ' + price + ' gold for a night at ' + nameOf(building) + '.');
-    }
-    return true;
-  }
-
   /*
-    /rest bed, /rest inn and /rest bedroll. Answers the line to say. The kind
-    of rest is the server's answer, not the word: /rest inn in your own bed is
-    your own bed, and /rest bed in somebody else's paid room is the inn room.
+    /rest, whatever word follows it. Answers the line to say, or '' for
+    nothing. The plugin says /rest bed when somebody lies down and /rest sit
+    when they sit on any other furniture, and this answers by what they
+    pressed: a bed or a bedroll is the bed's verdict, a seat is a seat, and
+    other furniture (a forge, a chopping block) is not a rest and is answered
+    with nothing, because the plugin says sit at every piece of furniture that
+    is not a bed and the server is what tells them apart.
   */
   function bedRest(actorId, profileId) {
     var needs = g.__thornswoodNeeds;
@@ -36589,76 +36619,86 @@ log('gamemode loaded:',
     if (!actorId || !profileId) {
       return 'The server cannot find your character right now. Give it a moment and try again.';
     }
-    var bed = bedHas(bedState.pressed, actorId) ? bedState.pressed[actorId] : null;
-    if (!bed || !stillAt(actorId, bed.ref)) {
-      return 'There is no bed here. Lie down in a real one and it counts; saying the word does not.';
+    var p = bedHas(bedState.pressed, actorId) ? bedState.pressed[actorId] : null;
+    if (!p || !stillAt(actorId, p.ref)) {
+      return 'There is nothing here to rest on. Sit down or lie down and it counts; saying the word does not.';
     }
-    var v = bedVerdict(actorId, profileId, bed.ref, bed.roll);
-    if (v.line) { return v.line; }
-    var paidLine = '';
-    if (v.price) {
-      var name = nameOf(v.building);
-      var now = Date.now();
-      var offer = bedHas(bedState.offers, actorId) ? bedState.offers[actorId] : null;
-      if (!offer || offer.building !== v.building || offer.price !== v.price ||
-          (now - offer.at) > PAY_AGAIN_MS) {
-        bedState.offers[actorId] = { building: v.building, price: v.price, at: now };
-        return 'A night at ' + name + ' is ' + v.price + ' gold, handed to ' + v.held.name +
-               '. Say /rest bed again within a minute to pay it.';
-      }
-      delete bedState.offers[actorId];
-      if (!payNight(actorId, profileId, v.building, v.held, v.price)) {
-        return 'A night at ' + name + ' is ' + v.price + ' gold, and you are not carrying that much.';
-      }
-      paidLine = 'You pay ' + v.price + ' gold to ' + v.held.name + ' for a night at ' + name + '. ';
-      v.kind = bed.roll ? 'bedroll' : 'inn';
-      v.paid = true;
+    if (p.what === 'furn') { return ''; }
+    var e = { ref: p.ref, roll: !!p.roll, seat: p.what === 'seat', kind: '', guestAt: 0,
+              at: Date.now() };
+    if (e.seat) {
+      e.kind = fireNear(actorId) ? 'campfire' : 'sit';
+    } else {
+      var v = bedVerdict(actorId, profileId, p.ref);
+      if (v.line) { return v.line; }
+      e.kind = v.kind;
+      e.guestAt = v.guest ? v.guest.at : 0;
     }
-    bedState.lying[actorId] = { ref: bed.ref, roll: !!bed.roll, kind: v.kind, paid: !!v.paid,
-                                at: Date.now() };
-    var line = needs.resting(actorId, v.kind);
-    return paidLine + (line || 'You are resting.');
+    bedState.lying[actorId] = e;
+    var line = needs.resting(actorId, e.kind);
+    // Sitting down says nothing: people sit at every table in every inn, and
+    // the Rest bar is what shows it counting.
+    if (e.seat) { return ''; }
+    return line || 'You are resting.';
   }
 
-  /* They got up, or rest somewhere else now. */
+  /* They got up, or rest somewhere else now. Answers 'seat' when it was a
+     seat they got off, so getting up from one is not said either. */
   function bedOff(actorId) {
+    var e = bedHas(bedState.lying, actorId) ? bedState.lying[actorId] : null;
     delete bedState.lying[actorId];
-    delete bedState.offers[actorId];
+    return (e && e.seat) ? 'seat' : '';
   }
 
-  /* Out of a bed the server no longer counts, without touching any other
+  /* Off a place the server no longer counts, without touching any other
      kind of rest they may have started since. */
   function getUp(actorId, needs) {
     delete bedState.lying[actorId];
     if (!needs || !needs.settle || !needs.resting) { return false; }
     var n = null;
     try { n = needs.settle(actorId); } catch (e) { return false; }
-    if (!n || !BED_KINDS[n.resting]) { return false; }
+    if (!n || !REST_KINDS[n.resting]) { return false; }
     try { needs.resting(actorId, ''); } catch (e) { return false; }
     return true;
   }
 
-  /* '' while the bed still counts as it did, otherwise the line to say. */
+  /* '' while the place still counts, at whatever rate it counts now,
+     otherwise the line to say. */
   function stillLying(actorId, e, needs) {
-    if (!stillAt(actorId, e.ref)) { return 'You have left the bed, so you are not resting in it now.'; }
-    var v = bedVerdict(actorId, profileOf(actorId), e.ref, e.roll);
-    if (v.kind) {
-      e.paid = !!v.paid;
-      if (v.kind === e.kind) { return ''; }
-      // Still a bed they may use, at another rate: a key handed over in the
-      // night, or a key lost with the night still paid.
-      e.kind = v.kind;
-      try { needs.resting(actorId, v.kind); } catch (err) { }
+    if (!stillAt(actorId, e.ref)) {
+      return e.seat ? 'You have left the seat, so you are not resting on it now.'
+                    : 'You have left the bed, so you are not resting in it now.';
+    }
+    var v = null;
+    var kind = '';
+    if (e.seat) {
+      kind = fireNear(actorId) ? 'campfire' : 'sit';
+    } else {
+      v = bedVerdict(actorId, profileOf(actorId), e.ref);
+      kind = v.kind;
+    }
+    if (kind) {
+      if (v) { e.guestAt = v.guest ? v.guest.at : 0; }
+      if (kind === e.kind) { return ''; }
+      // Still a place they may rest, at another rate: a key handed over in the
+      // night, a key lost with the night still given, a fire reached or left.
+      e.kind = kind;
+      try { needs.resting(actorId, kind); } catch (err) { }
       return '';
     }
-    if (e.paid && v.building) {
-      return 'Your night at ' + nameOf(v.building) + ' is over.' +
-             (v.price ? ' /bed says what another costs.' : '');
+    if (e.guestAt && v.building && v.held) {
+      return (Date.now() - e.guestAt) >= NIGHT_MS
+        ? ('Your night at ' + nameOf(v.building) + ' is over.')
+        : (v.held.name + ' has stopped letting you sleep at ' + nameOf(v.building) + '.');
     }
     return v.line || 'That bed does not count for you now.';
   }
 
-  /* Gold paid while the holder was away, into their pack now they are here. */
+  /*
+    Gold #1392 kept for a holder who was away, into their pack now they are
+    here. Once: it leaves the book as it is handed over, and nothing adds to
+    the book any more.
+  */
   function payTakings(online) {
     var owed = false;
     for (var k in bedBook.takings) { if (bedHas(bedBook.takings, k)) { owed = true; break; } }
@@ -36680,6 +36720,14 @@ log('gamemode loaded:',
     if (changed) { saveBedBook(); }
   }
 
+  /* The holder's K panel again, so its property page shows tonight's guests. */
+  function redrawPanel(actorId) {
+    var c = g.__thornswoodCharacter;
+    if (!actorId || !c || !c.stateOf || !c.writeState) { return; }
+    var s = c.stateOf(actorId);
+    if (s) { c.writeState(actorId, s); }
+  }
+
   function bedTick() {
     var needs = g.__thornswoodNeeds;
     var online = [];
@@ -36689,22 +36737,19 @@ log('gamemode loaded:',
     for (var s in bedState.seen) {
       if (bedHas(bedState.seen, s) && !on[s]) { delete bedState.seen[s]; }
     }
-    for (var o in bedState.offers) {
-      if (bedHas(bedState.offers, o) && !on[o]) { delete bedState.offers[o]; }
-    }
     for (var p in bedState.pressed) {
       if (bedHas(bedState.pressed, p) && !on[p] && !bedHas(bedState.lying, p)) {
         delete bedState.pressed[p];
       }
     }
-    // Come into the world resting in a bed nobody saw them lie down in.
+    // Come into the world resting in a place nobody saw them take.
     for (var j = 0; j < online.length; j++) {
       var id = online[j];
       if (bedState.seen[id]) { continue; }
       bedState.seen[id] = true;
       if (bedHas(bedState.lying, id)) { continue; }
       if (getUp(id, needs)) {
-        plog(personName(id), 'came in resting in a bed the server did not see, so they are up');
+        plog(personName(id), 'came in resting in a place the server did not see, so they are up');
       }
     }
     var now = Date.now();
@@ -36723,71 +36768,139 @@ log('gamemode loaded:',
       }
     }
     payTakings(online);
+    // A night that ran out leaves the book and the holder's property page.
+    var ended = pruneGuests();
+    var changed = false;
+    for (var h in ended) {
+      if (bedHas(ended, h)) { changed = true; redrawPanel(onlineActorOf(Number(h))); }
+    }
+    if (changed) { saveBedBook(); }
+  }
+
+  // ---------------------------------------------------------- the guests --
+
+  /* The guests of a building tonight, by name, for the property page. */
+  function guestsOf(building) {
+    var held = holderOf(building);
+    var out = [];
+    if (!held || !bedHas(bedBook.guests, building)) { return out; }
+    var row = bedBook.guests[building];
+    for (var who in row) {
+      if (!bedHas(row, who) || !guestOf(building, held, Number(who))) { continue; }
+      out.push({ pid: Number(who), name: row[who].name || 'somebody who paid for the night' });
+    }
+    out.sort(function (a, b) { return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0); });
+    return out;
   }
 
   /*
-    /bed           what a night here costs
-    /bed 20        the holder sets the gold for one night
-    /bed -         the holder makes it free for the people they allow, and
-                   sells it to nobody else
+    For the look prompt, asked by the social block's near list for each two
+    people in the same cell: 0 when the first cannot let the second sleep
+    there, 1 when they can, 2 when they already have.
   */
-  function bedCmd(parts, actorId, profileId, toProfile) {
-    var building = bedBuildingHere(actorId);
-    if (!building) {
-      toProfile(profileId, 'Stand in the building, or open its door, then say that again.');
+  function sleepMark(holderPid, guestPid, cell) {
+    if (!holderPid || !guestPid || holderPid === guestPid || !bedHas(claims, cell)) { return 0; }
+    var held = holderOf(cell);
+    if (!held || held.by !== holderPid) { return 0; }
+    return guestOf(cell, held, guestPid) ? 2 : 1;
+  }
+
+  /* The night ends now. The guest is told, and got up if they are lying in
+     one of its beds and nothing else lets them stay. */
+  function endGuest(building, pid, line) {
+    if (bedHas(bedBook.guests, building)) { delete bedBook.guests[building][pid]; }
+    saveBedBook();
+    var guest = onlineActorOf(pid);
+    if (!guest) { return; }
+    var needs = g.__thornswoodNeeds;
+    var e = bedHas(bedState.lying, guest) ? bedState.lying[guest] : null;
+    var why = (e && !e.seat && bedBuilding(e.ref) === building) ? stillLying(guest, e, needs) : '';
+    if (why) { getUp(guest, needs); }
+    tellBed(guest, why || line);
+  }
+
+  /*
+    THE HOLDER LETS SOMEBODY SLEEP THERE, OR STOPS (#1603).
+
+    Patrick: the holder names who may sleep there, "with buttons and GUI, not
+    commands". The look prompt draws "Let sleep here" while a holder looks at
+    somebody inside a building they hold, and its key sends /sleephere with
+    that person's form id, the way the trade key sends /trade. Pressed on a
+    guest, it ends their night. The property page in the K panel sends
+    /sleephere stop <profile> <building> beside each guest's name. Nobody
+    types either, and help never names them.
+
+    Everything is measured here: the building is the cell the holder stands
+    in, the holder is the register's, and the guest is in that same cell.
+  */
+  function sleepHere(parts, actorId, profileId, toProfile) {
+    var raw = String((parts && parts[1]) || '');
+    if (raw === 'stop') { return stopGuest(parts, actorId, profileId, toProfile); }
+    var them = /^[0-9a-f]{1,8}$/i.test(raw) ? parseInt(raw, 16) : 0;
+    var cell = '';
+    try { cell = String(mp.get(actorId, 'worldOrCellDesc') || ''); } catch (e) { cell = ''; }
+    var building = isBuilding(cell) ? cell : '';
+    var held = building ? holderOf(building) : null;
+    if (!held || !profileId || held.by !== profileId) {
+      toProfile(profileId, building
+        ? ('Only whoever holds ' + nameOf(building) + ' lets people sleep there.')
+        : 'Stand inside a building you hold to let somebody sleep there.');
+      return true;
+    }
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
+    var theirs = '';
+    if (them && them !== actorId && online.indexOf(them) !== -1) {
+      try { theirs = String(mp.get(them, 'worldOrCellDesc') || ''); } catch (e) { theirs = ''; }
+    }
+    var pid = (theirs === cell) ? profileOf(them) : 0;
+    var name = nameOf(building);
+    if (!pid || pid === profileId) {
+      toProfile(profileId, 'Look at somebody inside ' + name + ' with you, then press the key.');
+      return true;
+    }
+    var who = personName(them);
+    if (guestOf(building, held, pid)) {
+      endGuest(building, pid, held.name + ' has stopped letting you sleep at ' + name + '.');
+      plog(held.name, 'stopped letting', who, 'sleep at', name);
+      toProfile(profileId, who + ' may no longer sleep at ' + name + '.');
+      redrawPanel(actorId);
+      return true;
+    }
+    if (!bedHas(bedBook.guests, building)) { bedBook.guests[building] = {}; }
+    bedBook.guests[building][pid] = { by: held.by, at: Date.now(), name: who.slice(0, GUEST_NAME_MAX) };
+    saveBedBook();
+    plog(held.name, 'let', who, 'sleep at', name, 'for a night');
+    toProfile(profileId, who + ' may sleep at ' + name + ' for one night, 8 hours from now. ' +
+                         'Look at them and press the same key to end it sooner.');
+    tellBed(them, held.name + ' lets you sleep at ' + name + ' tonight. Lie down in any of its beds.');
+    redrawPanel(actorId);
+    return true;
+  }
+
+  /* /sleephere stop <profile> <building>, from the property page. */
+  function stopGuest(parts, actorId, profileId, toProfile) {
+    var pid = Number((parts && parts[2]) || 0) || 0;
+    var building = (parts && parts.length > 3) ? parts.slice(3).join(' ') : '';
+    var held = building ? holderOf(building) : null;
+    if (!held || !profileId || held.by !== profileId) {
+      toProfile(profileId, building && isBuilding(building)
+        ? ('Only whoever holds ' + nameOf(building) + ' lets people sleep there.')
+        : 'That is not a building you hold.');
       return true;
     }
     var name = nameOf(building);
-    var held = holderOf(building);
-    var arg = (parts && parts.length > 1) ? String(parts[1]).trim() : '';
-    if (!held) {
-      toProfile(profileId, 'Nobody holds ' + name + ', so nobody sets a night there.');
+    var gst = guestOf(building, held, pid);
+    if (!gst) {
+      toProfile(profileId, 'Nobody by that name is sleeping at ' + name + ' tonight.');
+      redrawPanel(actorId);
       return true;
     }
-    var mine = !!profileId && held.by === profileId;
-    var price = priceOf(building, held);
-
-    if (!arg) {
-      if (mine) {
-        toProfile(profileId, price
-          ? ('A night at ' + name + ' is ' + price + ' gold, and it comes to you. ' +
-             '/bed - makes it free for the people you allow and sold to nobody else.')
-          : ('Nights at ' + name + ' are not for sale, and the people you allow sleep free. ' +
-             '/bed 20 sets the gold for one night.'));
-        return true;
-      }
-      var line = price
-        ? ('A night at ' + name + ' is ' + price + ' gold, handed to ' + held.name + '.')
-        : ('Nights at ' + name + ' are not for sale. ' + held.name +
-           ' lets only the people they allow sleep there.');
-      if (allowedIn(actorId, profileId, building, held)) { line += ' You are allowed, so yours is free.'; }
-      else if (nightPaid(building, profileId)) { line += ' Your night there is paid.'; }
-      toProfile(profileId, line);
-      return true;
-    }
-
-    if (!mine) {
-      toProfile(profileId, 'Only whoever holds ' + name + ' sets what a night there costs.');
-      return true;
-    }
-    if (arg === '-') {
-      delete bedBook.prices[building];
-      saveBedBook();
-      plog(held.name, 'made a night at', name, 'free for the people they allow');
-      toProfile(profileId, 'A night at ' + name + ' is free for the people you allow, ' +
-                           'and not for sale to anybody else.');
-      return true;
-    }
-    var amount = /^\d+$/.test(arg) ? Number(arg) : 0;
-    if (!(amount > 0) || amount > Number.MAX_SAFE_INTEGER) {
-      toProfile(profileId, 'Give a whole number of gold, or - to make a night free for the people you allow.');
-      return true;
-    }
-    bedBook.prices[building] = { by: held.by, price: amount };
-    saveBedBook();
-    plog(held.name, 'set a night at', name, 'to', amount, 'gold');
-    toProfile(profileId, 'A night at ' + name + ' is ' + amount + ' gold now, handed to you. ' +
-                         'The people you allow still sleep free.');
+    var who = gst.name || 'Your guest';
+    endGuest(building, pid, held.name + ' has stopped letting you sleep at ' + name + '.');
+    plog(held.name, 'stopped letting', who, 'sleep at', name);
+    toProfile(profileId, who + ' may no longer sleep at ' + name + '.');
+    redrawPanel(actorId);
     return true;
   }
 
@@ -36796,10 +36909,10 @@ log('gamemode loaded:',
     (typeof guard === 'function') ? guard('bedTick', bedTick) : bedTick, BED_EVERY_MS);
 
   g.__thornswoodBeds = {
-    touched: bedTouched, rest: bedRest, off: bedOff, command: bedCmd, tick: bedTick,
+    touched: bedTouched, rest: bedRest, off: bedOff, tick: bedTick,
+    sleepHere: sleepHere, mark: sleepMark, guestsOf: guestsOf,
     kindOf: bedKind, verdict: bedVerdict, book: function () { return bedBook; },
-    state: bedState, BED_REACH: BED_REACH, NIGHT_MS: NIGHT_MS, PAY_AGAIN_MS: PAY_AGAIN_MS,
-    BED_EVERY_MS: BED_EVERY_MS
+    state: bedState, BED_REACH: BED_REACH, NIGHT_MS: NIGHT_MS, BED_EVERY_MS: BED_EVERY_MS
   };
 
 
@@ -37254,10 +37367,9 @@ log('gamemode loaded:',
     the same count back into a pack, and payHeld takes it off that ledger in
     the same step, so the coin was already in the world and packs plus ledger
     add up to the same after. payHeld pays a letter's own `pay`, which
-    postLetter took from the sender, never more than the ledger holds. A
-    night in a bed (#1392) is its other caller: payNight hands the holder
-    the price it has just taken from the sleeper, and payTakings what was
-    kept for a holder who was away.
+    postLetter took from the sender, never more than the ledger holds. Its
+    other caller is payTakings in the beds, which hands a holder the gold
+    #1392 kept for them while they were away, once (#1603).
   */
   function payOut(actorId, amount) {
     var count = Math.floor(Number(amount) || 0);
@@ -38254,7 +38366,7 @@ log('gamemode loaded:',
     if (word === '/evict') { return evict(actorId, profileId, toProfile); }
     if (word === '/box') { return boxCmd(parts, actorId, profileId, toProfile); }
     if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile); }
-    if (word === '/bed') { return bedCmd(parts, actorId, profileId, toProfile); }
+    if (word === '/sleephere') { return sleepHere(parts, actorId, profileId, toProfile); }
     if (word === '/notice') { return post(parts, actorId, profileId, toProfile, false); }
     if (word === '/job') { return post(parts, actorId, profileId, toProfile, true); }
     if (word === '/board') { return board(parts, actorId, profileId, toProfile); }
@@ -40731,6 +40843,9 @@ log('gamemode loaded:',
   function propertyView(actorId, profileId) {
     var W = g.__thornswoodProperty;
     if (!W || !W.holderOf) { return null; }
+    // Who may sleep in each place you hold tonight, with a Stop beside each
+    // name (#1603). See guestsOf in the beds, in the property block.
+    var B = g.__thornswoodBeds;
     var rows = [], seen = {};
     try {
       var claims = W.claims();
@@ -40740,7 +40855,8 @@ log('gamemode loaded:',
         if (!held || held.by !== profileId) { continue; }
         seen[b] = true;
         rows.push({ name: W.nameOf(b), mine: true, locked: !!held.locked,
-                    keyed: W.holdsKey(actorId, b) });
+                    keyed: W.holdsKey(actorId, b), b: b,
+                    sleep: (B && B.guestsOf) ? B.guestsOf(b) : [] });
       }
       // Then the places somebody let you into. A key to a building you already
       // hold is not a second row: it is the same house and the row above says
@@ -41742,7 +41858,7 @@ log('gamemode loaded:',
         word === '/deed' || word === '/deeds' || word === '/lock' ||
         word === '/unlock' || word === '/mold' || word === '/moldhere' || word === '/key' ||
         word === '/steward' || word === '/evict' || word === '/box' ||
-        word === '/rent' || word === '/bed' || word === '/notice' || word === '/job' ||
+        word === '/rent' || word === '/sleephere' || word === '/notice' || word === '/job' ||
         word === '/board' || word === '/take' || word === '/jobs' ||
         word === '/haul' ||
         word === '/letter' || word === '/deliver' ||
@@ -43711,11 +43827,11 @@ log('gamemode loaded:',
   list over mp.onTakeItem says why nothing here may try.
 */
 mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, aggressor, source, projectile, power, sneak, bash, blocked) {
-  // The break chance at 0% (#1384), in the durability block. First and on
-  // its own, so neither half can stop the other.
+  // The wear and the break chance at 0% (#1384), in the durability block.
+  // First and on its own, so neither half can stop the other.
   var wear = globalThis.__thornswoodDurability;
   if (wear && wear.onHit) {
-    try { wear.onHit(targetId, aggressor, source); } catch (e) { log('durability: the hit threw:', e); }
+    try { wear.onHit(targetId, aggressor, source, blocked); } catch (e) { log('durability: the hit threw:', e); }
   }
   // The filled skill perks (#1385), before the maneuvers: each measures the
   // blow on the next turn, and this way round the perks block reads it first.
@@ -45511,7 +45627,7 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/apprentice',
                '/plant', '/claim', '/plot',
                '/deed', '/deeds', '/lock', '/unlock', '/mold', '/key',
-               '/jarl', '/steward', '/evict', '/box', '/rent', '/bed',
+               '/jarl', '/steward', '/evict', '/box', '/rent',
                '/notice', '/job', '/board', '/take', '/jobs', '/dropjob', '/unpin',
                '/letter', '/deliver',
                // A haul (#1393). Sent by the board panel's Send a haul and
@@ -45544,10 +45660,13 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/chopped',
                // Hunger, thirst and exhaustion. See the needs block at the end
                // of this file; the numbers there are invented and meant to be
-               // argued with.
+               // argued with. /rest is the plugin's, sent when somebody sits
+               // or lies down, and never typed (#1603); see bedRest.
                '/needs', '/rest', '/eat', '/drink', '/bard',
-               // Condition and the repair kits (#1384). See the durability
-               // block, after the take limit.
+               // The repair panel (#1384): sent by the inventory key and by
+               // the panel's buttons, never typed. See the durability block,
+               // after the take limit. Deliberately absent from PLAYER_WORDS:
+               // nothing people do is a command (Patrick, 4 October).
                '/repair',
                // The client's weather report and its "I am on fire". Never typed; see
                // the branches.
@@ -45561,6 +45680,10 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // The mold key: a blank pressed into the door under the
                // crosshair. Sent by the plugin, not typed; see moldHere.
                '/moldhere',
+               // A holder letting the person under the crosshair sleep there,
+               // or the property page ending a guest's night (#1603). Sent by
+               // the plugin and the K panel, never typed; see sleepHere.
+               '/sleephere',
                // The client's load order, every two minutes. Sent by the front
                // plugin, never typed; see the load order refusal block.
                '/loadorder',
@@ -45590,16 +45713,13 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // argument says what a place costs, which is the first
                       // thing somebody standing at a door wants to know, and
                       // the steward half answers "only a steward sets rent"
-                      // to everybody else. /bed with no amount says what a
-                      // night costs, the same way, and only a holder sets it.
-                      '/box', '/rent', '/bed', '/notice', '/job', '/board',
+                      // to everybody else.
+                      '/box', '/rent', '/notice', '/job', '/board',
                       '/take', '/jobs', '/dropjob', '/unpin', '/letter', '/deliver', '/help',
                       // Everybody's, and they need to be findable: a meter
-                      // nobody knows how to act on is only a penalty.
-                      '/needs', '/rest', '/eat', '/drink', '/bard',
-                      // Everybody's: what you carry and how it stands, and
-                      // the kit that mends it (#1384).
-                      '/repair',
+                      // nobody knows how to act on is only a penalty. Not
+                      // /rest: sitting or lying down is how you rest (#1603).
+                      '/needs', '/eat', '/drink', '/bard',
                       // Everybody's, and the one thing a person in trouble
                       // must be able to find: asking staff, and getting
                       // out of a wedged spot (#414).
@@ -46582,8 +46702,10 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       and the world hooks replace them rather than joining them.
 
       /needs   what the three meters say
-      /rest    sit, campfire, inn or bed; /rest up to stop. A bed is one the
-               server saw them press; see "beds" in the property block.
+      /rest    sent by the plugin when somebody sits or lies down, and
+               /rest up when they get off; never typed (#1603). What counts
+               is what the server saw them press; see "beds" in the property
+               block.
       /eat     a meal; /drink water; /drink ale for the good and the bad of it
       /bard    say you are playing, which helps everyone resting near you
     */
@@ -47062,33 +47184,29 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         var where = String(parts[1] || '').toLowerCase();
         var beds = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodBeds;
         if (where === 'up' || where === 'stop') {
-          if (beds && beds.off) { beds.off(actorId); }
+          var was = String(needs.settle(actorId).resting || '');
+          var off = (beds && beds.off) ? beds.off(actorId) : '';
           needs.resting(actorId, '');
-          toProfile(profileId, 'You get up.');
-          return true;
-        }
-        if (!where) {
-          toProfile(profileId, 'Rest where? sit, campfire, inn or bed. /rest up to get going again.');
+          // Said only when there was a rest to get up from, and not off a
+          // seat: the plugin sends this at every piece of furniture it gets
+          // off, and people sit at every table (#1603).
+          if (was && off !== 'seat') { toProfile(profileId, 'You get up.'); }
           return true;
         }
         /*
-          A BED IS ONE THE SERVER SAW (#1392). bed, inn and bedroll go to the
-          beds in the property block, which asks which bed this person pressed
-          and whether they are still at it, whose it is, and whether the night
-          is paid, and answers the kind of rest itself. The word only says that
-          they want a bed. See "beds" in the property block.
+          WHAT WAS PRESSED, NEVER THE WORD (#1392, #1607, #1603). The plugin
+          says /rest bed when somebody lies down and /rest sit when they sit,
+          and the beds in the property block answer by the furniture the server
+          saw them press and whether they are still at it: a seat, a seat by a
+          fire, a bed by whose it is. Nobody types this, and help never names
+          it. See "beds" in the property block.
         */
-        if (where === 'bed' || where === 'inn' || where === 'bedroll') {
-          if (!beds || !beds.rest) {
-            toProfile(profileId, 'Beds are not running on this server right now. Say so in the dev channel.');
-            return true;
-          }
-          toProfile(profileId, beds.rest(actorId, Number(profileId) || 0));
+        if (!beds || !beds.rest) {
+          toProfile(profileId, 'Beds are not running on this server right now. Say so in the dev channel.');
           return true;
         }
-        var said = needs.resting(actorId, where);
-        if (said && beds && beds.off) { beds.off(actorId); }
-        toProfile(profileId, said || ('There is no resting at a ' + where + '. Try sit, campfire, inn or bed.'));
+        var restSaid = beds.rest(actorId, Number(profileId) || 0);
+        if (restSaid) { toProfile(profileId, restSaid); }
         return true;
       }
       // /eat and /drink
@@ -47574,13 +47692,15 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       the unknown-command reply below did not: it advertised /tp to
       everybody and then refused them. Both read the same list now.
     */
-    // Condition and the repair kits (#1384). The work is in the durability
-    // block; this only hands it the character and the rest of the line.
+    // The repair panel (#1384), from the inventory key or a button on the
+    // panel. The work is in the durability block; this only hands it the
+    // character and the words after /repair.
     if (word === '/repair') {
       if (!needCharacter()) { return; }
       var wear = g.__thornswoodDurability;
-      if (!wear) { toProfile(profileId, 'That is not running on this server.'); return; }
-      toProfile(profileId, wear.command(actorId, parts.slice(1).join(' ')));
+      if (!wear) { toProfile(profileId, 'Repair is not running on this server.'); return; }
+      var mended = wear.panel(actorId, parts.slice(1));
+      if (mended) { toProfile(profileId, mended); }
       return;
     }
 
@@ -47646,9 +47766,10 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       if (topic === 'living' || topic === 'needs' || topic === 'food') {
         toProfile(profileId,
           'The four bars are food, water, rest and how warm you are. /eat and ' +
-          '/drink when you have something, /rest sit, /rest campfire, or lie down ' +
-          'in a bed and /rest bed, and /rest up to get going again. A bed counts ' +
-          'when it is yours, you carry its key, or you paid the night. Fires warm you and ' +
+          '/drink when you have something. Sit down or lie down and you rest: a ' +
+          'seat by a fire is better than a bare one, a bedroll by a fire better ' +
+          'still, and your own bed best of all. A bed in somebody else\'s building ' +
+          'counts when they have let you sleep there or you carry its key. Fires warm you and ' +
           'standing in one burns you. What you are wearing matters: fur is the ' +
           'warmest thing there is and metal is the worst.');
         return;
@@ -47663,7 +47784,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           'ground in front of you and whose farm it is, /plant sows it. A ' +
           'warrior\'s maneuvers open on the maneuver key, which the ' +
           'launcher\'s Controls page names. ' +
-          '/repair <name> mends a piece with a kit.');
+          'A repair kit is used from your inventory.');
         return;
       }
       if (topic === 'land' || topic === 'home' || topic === 'deed') {
@@ -47671,7 +47792,8 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           '/claim at a plot takes the farm around it; /claim at a door you have ' +
           'just opened takes the building and hands you the deed. /deed lists ' +
           'what you hold, /lock and /unlock turn the lock, /rent says what a ' +
-          'place costs, and /bed says or sets what a night in its beds costs. ' +
+          'place costs. To let somebody sleep in a building you hold, look at ' +
+          'them inside it and press the key the prompt shows. ' +
           'A smith says /mold at a door with the holder standing ' +
           'there, and /key at a forge with the mold in hand.');
         return;
@@ -48991,7 +49113,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   work and to 100% for anybody else. At 0% a piece that is being worn has a
   10% chance to break on a hit. A piece sitting in a shop chest or a house
   container loses 5% of its condition per real day; a pack does not, and
-  worn gear does not.
+  worn gear does not: worn gear loses 1% a hit instead (Patrick, 4 October).
 
   WHAT HAS A CONDITION. A weapon, a piece of armour and a piece of clothing:
   a WEAP record, and an ARMO record that is not jewellery. Those are the
@@ -49045,20 +49167,40 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   taking a piece out and putting it back does not either: whatever is in
   the chest when its day turns loses the 5%.
 
-  THE BREAK CHANCE, read as: on each hit, every worn piece of armour or
-  clothing on the person hit that is at 0% rolls once, and so does the
-  weapon a person lands the hit with when it is at 0%. A broken piece is
-  gone. Only people's gear rolls: nothing here gives a bandit's sword a
-  condition. The hit arrives through onPapyrusEvent:OnHit, whose one handler
-  is at the end of the warrior maneuvers block and hands it to onHit here.
+  WHAT A HIT REACHES, Patrick's answers of 4 October on #1384. Each hit
+  reaches every worn piece of armour and clothing on the person hit, the
+  weapon the hit was landed with, and, when the hit was blocked, the weapon
+  that blocked it (the shield, when one is worn, is armour and already
+  counted). A weapon is not reached when its holder is hit. A piece the hit
+  reaches loses WEAR_PER_HIT; one already at 0% rolls the break chance
+  instead, and a broken piece is gone. Only people's gear wears: nothing
+  here gives a bandit's sword a condition. The hit arrives through
+  onPapyrusEvent:OnHit, whose one handler is at the end of the warrior
+  maneuvers block and hands it to onHit here.
 
-  THE KITS ARE NOT IN THE WORLD YET. A kit is a MISC record and a recipe in
-  Thornswood-Content.esp, and neither exists. KITS says what each one mends
-  and whose it is; item is the kit's record and stays null until the plugin
-  carries it. With item null, /repair says no kit has been made yet.
+  WHAT IS WORN IS MATCHED TO THE PACK BY THE NAME WITHOUT THE CONDITION.
+  What is worn is read off the equipment, which the client sends, and the
+  client never takes in a new condition on a piece it already holds:
+  skymp5-client's namesEqual (sync/inventory.ts in the fork) drops a
+  trailing "(...)" from both names before comparing, so "Iron Sword (85%)"
+  and "Iron Sword (84%)" are one entry to it and its diff applies nothing.
+  Its equipment keeps naming the piece as it was when it arrived, so a
+  match on the whole name finds the piece once and loses it after the
+  first hit. sameName compares the way the client does.
+
+  THE KITS. A kit is a MISC record and a recipe in Thornswood-Content.esp
+  (scripts/mods/Add-ContentRecords.py). KITS says what each one mends,
+  whose it is, and its record; a server whose plugin does not carry the
+  record yet resolves it to 0, and the panel says no kit has been made.
   repairTo and repairWithKit are what the rest of the file uses, so the fuel
   and master work (#1398) can rely on them: repairTo is the number a kit
   mends to for this person, and repairWithKit is the whole repair.
+
+  THE REPAIR IS A PANEL, NOT A COMMAND (Patrick, 4 October: no chat
+  commands for what people do). With a kit in the pack, the inventory shows
+  a key; the key sends /repair, and panel() answers by publishing the view
+  on PANEL_PROPERTY, which draws game/ui/thornswood-repair.js. Each row's
+  button sends /repair mend with that piece. Nobody is told to type either.
 
   NOTHING HERE TOUCHES A NUMBER ON THE PAGE. 120% does not yet add 5% to a
   weapon's damage or an armour piece's rating: the server works damage out
@@ -49081,6 +49223,12 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   var DAY_MS = 24 * 60 * 60 * 1000;
   // durability.md: at 0%, a worn piece has a 10% chance to break on a hit.
   var BREAK_CHANCE = 0.10;
+  // Patrick, 4 October (#1384): a worn piece loses condition per hit. 1% a
+  // hit, written on durability.md.
+  var WEAR_PER_HIT = 1;
+  // BOD2 slot 39, the shield. A shield blocks for its holder, so a blocked
+  // hit reaches it, and it is armour, so every hit already does.
+  var SHIELD_SLOT = 1 << 9;
   /*
     A dropped thing lies on the ground two minutes before the engine deletes
     it (MpActor::DropItem, kDeletionTimeSeconds), so its condition is kept a
@@ -49095,17 +49243,20 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   var RUNTIME = 0xff000000;
   // Where a container's dull clock is written, on the reference itself.
   var CLOCK_PROPERTY = 'thornswoodDull';
+  // The repair panel's view, the owner's only (game/ui/thornswood-repair.js).
+  var PANEL_PROPERTY = 'thornswoodRepairView';
 
   /*
     THE THREE KITS, by what they mend. half is the half that makes it and
     repairs to 120%; maker is that half as a person reads it. item is the
-    kit's MISC record in Thornswood-Content.esp, null until the plugin
-    carries it (see the block comment).
+    kit's MISC record in Thornswood-Content.esp (Add-ContentRecords.py).
+    Only the half the person picked repairs to 120%, never the sister half at
+    any rank (Patrick, 4 October).
   */
   var KITS = {
-    weapon:   { name: 'Weapon Kit', half: 'edgewright',  maker: 'Edgewright',  item: null },
-    armour:   { name: 'Armor Kit',  half: 'platewright', maker: 'Platewright', item: null },
-    clothing: { name: 'Sewing Kit', half: 'haberdasher', maker: 'Haberdasher', item: null }
+    weapon:   { name: 'Weapon Kit', half: 'edgewright',  maker: 'Edgewright',  item: '154b0:Thornswood-Content.esp' },
+    armour:   { name: 'Armor Kit',  half: 'platewright', maker: 'Platewright', item: '154b1:Thornswood-Content.esp' },
+    clothing: { name: 'Sewing Kit', half: 'haberdasher', maker: 'Haberdasher', item: '154b2:Thornswood-Content.esp' }
   };
 
   // " (85%)" on the end of a name.
@@ -49186,6 +49337,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   function create(api) {
     var kits = api.kits || KITS;
     var kinds = {};
+    var shields = {};
     var names = {};
     // Pieces that went onto the ground and what they were at, oldest first.
     var drops = [];
@@ -49232,6 +49384,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         if (JEWELLERY_KEYWORDS.indexOf(keywords[j]) !== -1) { return ''; }
       }
       if (slots > 0 && (slots & ~JEWELLERY_SLOTS) === 0) { return ''; }
+      if (slots > 0 && (slots & SHIELD_SLOT)) { shields[baseId] = true; }
       if (armourType === 0 || armourType === 1) { return 'armour'; }
       if (armourType === 2) { return 'clothing'; }
       return '';
@@ -49341,30 +49494,33 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       return (state && state.half === kit.half) ? CONDITION.highest : CONDITION.sound;
     }
 
+    function heldOf(entries, id) {
+      var n = 0;
+      for (var i = 0; i < entries.length; i++) {
+        if (entries[i] && entries[i].baseId === id) { n += Number(entries[i].count) || 0; }
+      }
+      return n;
+    }
+
     /*
-      A REPAIR. The piece is the one in the pack whose name matches what was
-      asked for; of several, the one in the worst condition. One kit of the
-      kind that mends it is used up, and one unit of the piece comes out at
-      repairTo. Answers { ok, line } and, when it worked, from, to, kit and
-      baseId. Nothing is taken when anything is refused.
+      A REPAIR. pick is the row the panel's button names: the base, the
+      condition and the name without it. One kit of the kind that mends it is
+      used up, and one unit of the piece comes out at repairTo. Answers
+      { ok, line } and, when it worked, from, to, kit and baseId. Nothing is
+      taken when anything is refused.
     */
-    function repairWithKit(actorId, asked) {
+    function repairWithKit(actorId, pick) {
       function no(line) { return { ok: false, line: line }; }
       var entries = api.inventory(actorId);
       if (!entries) { return no('The server cannot read your pack right now. Try again in a moment.'); }
-      var want = String(asked || '').toLowerCase().replace(/\s+/g, ' ').trim();
-      if (!want) { return no('Say which piece: /repair <name>. /repair on its own lists what you carry.'); }
+      pick = pick || {};
+      var p = null;
       var all = piecesIn(entries);
-      var exact = all.filter(function (p) { return p.name.toLowerCase() === want; });
-      var found = exact.length ? exact : all.filter(function (p) {
-        return p.name.toLowerCase().indexOf(want) !== -1;
-      });
-      if (!found.length) {
-        return no('You are not carrying a weapon, armour or clothing called ' + asked +
-                  '. /repair on its own lists what you carry.');
+      for (var f = 0; f < all.length; f++) {
+        if (all[f].entry.baseId === pick.baseId && all[f].cond === Number(pick.cond) &&
+            all[f].name === String(pick.name || '')) { p = all[f]; break; }
       }
-      found.sort(function (a, b) { return a.cond - b.cond; });
-      var p = found[0];
+      if (!p) { return no('That piece is not in your pack any more.'); }
       var kit = kits[p.kind];
       var id = kitId(p.kind);
       if (!id) {
@@ -49400,48 +49556,75 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
                line: 'Your ' + p.name + ' is at ' + to + '% now. The ' + kit.name + ' is used up.' };
     }
 
-    /** /repair on its own: what you carry that is not at 100%, and your kits. */
-    function describe(actorId) {
+    /*
+      WHAT THE PANEL SHOWS. A row for every piece carried that is not at
+      100%, and for every sound piece this person's kit would raise (the
+      half that makes a kit mends to 120%), worst first; pieces of one base
+      at one condition under one name are one row. Each row says which kit
+      mends it, the number a repair by this person comes out at, and whether
+      that kit is in the pack. The kits are listed with how many are carried
+      and whether the world has the record at all.
+    */
+    function view(actorId) {
       var entries = api.inventory(actorId);
-      if (!entries) { return 'The server cannot read your pack right now. Try again in a moment.'; }
-      var pieces = piecesIn(entries);
-      var off = pieces.filter(function (p) { return p.cond !== CONDITION.sound; });
-      off.sort(function (a, b) { return a.cond - b.cond; });
-      var sound = 0;
-      for (var i = 0; i < pieces.length; i++) {
-        if (pieces[i].cond === CONDITION.sound) { sound += Number(pieces[i].entry.count) || 0; }
+      if (!entries) {
+        return { open: true, rows: [], kits: [],
+                 note: 'The server cannot read your pack right now. Try again in a moment.' };
       }
-      var line;
-      if (!pieces.length) {
-        line = 'You are carrying no weapon, armour or clothing.';
-      } else if (!off.length) {
-        line = 'Everything you carry is at 100%.';
-      } else {
-        line = off.slice(0, 12).map(function (p) {
-          var n = Number(p.entry.count) || 1;
-          return p.name + ' ' + p.cond + '%' + (n > 1 ? ' (' + n + ')' : '');
-        }).join(', ') + (off.length > 12 ? ', and ' + (off.length - 12) + ' more' : '') + '.';
-        if (sound) { line += ' ' + sound + (sound === 1 ? ' more piece is' : ' more pieces are') + ' at 100%.'; }
-      }
-      var held = [];
+      var state = null;
+      try { state = api.stateOf(actorId); } catch (e) { state = null; }
+      var held = {};
+      var kitRows = [];
       for (var key in kits) {
         if (!own(kits, key)) { continue; }
         var id = kitId(key);
-        if (!id) { continue; }
-        var n = 0;
-        for (var j = 0; j < entries.length; j++) {
-          if (entries[j] && entries[j].baseId === id) { n += Number(entries[j].count) || 0; }
-        }
-        if (n) { held.push(n + ' ' + kits[key].name + (n === 1 ? '' : 's')); }
+        held[key] = id ? heldOf(entries, id) : 0;
+        kitRows.push({ kind: key, name: kits[key].name, maker: kits[key].maker,
+                       count: held[key], made: !!id });
       }
-      return line + ' ' + (held.length ? 'Kits: ' + held.join(', ') + '.' : 'You carry no repair kit.') +
-             ' /repair <name> mends a piece with its kit.';
+      var rows = [];
+      var byKey = {};
+      var pieces = piecesIn(entries);
+      for (var i = 0; i < pieces.length; i++) {
+        var p = pieces[i];
+        var to = repairTo(state, p.kind);
+        if (p.cond === CONDITION.sound && to <= CONDITION.sound) { continue; }
+        var n = Number(p.entry.count) || 0;
+        var worn = !!(p.entry.worn || p.entry.wornLeft);
+        var rowKey = p.entry.baseId + '|' + p.cond + '|' + p.name;
+        if (own(byKey, rowKey)) {
+          byKey[rowKey].count += n;
+          byKey[rowKey].worn = byKey[rowKey].worn || worn;
+          continue;
+        }
+        var row = { base: p.entry.baseId.toString(16), cond: p.cond, name: p.name, count: n, worn: worn,
+                    kind: p.kind, kit: kits[p.kind].name, maker: kits[p.kind].maker, to: to,
+                    can: p.cond < to && held[p.kind] > 0 };
+        byKey[rowKey] = row;
+        rows.push(row);
+      }
+      rows.sort(function (a, b) { return a.cond - b.cond; });
+      return { open: true, rows: rows, kits: kitRows };
     }
 
-    /** The chat command. Answers the line to say. */
-    function command(actorId, rest) {
-      var asked = String(rest || '').trim();
-      return asked ? repairWithKit(actorId, asked).line : describe(actorId);
+    /*
+      WHAT THE PANEL AND THE INVENTORY KEY SEND, as the words after /repair.
+      Nothing, the key: draw the panel. 'mend <base in hex> <condition>
+      <name>', a row's button: mend that piece, then draw the panel again.
+      Answers the line to say in the chat, or '' for none.
+    */
+    function panel(actorId, words) {
+      words = words || [];
+      var line = '';
+      if (String(words[0] || '').toLowerCase() === 'mend') {
+        line = repairWithKit(actorId, {
+          baseId: parseInt(String(words[1] || ''), 16) || 0,
+          cond: Number(words[2]),
+          name: words.slice(3).join(' ')
+        }).line;
+      }
+      api.show(actorId, view(actorId));
+      return line;
     }
 
     /*
@@ -49493,81 +49676,126 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
     /*
       A HIT LANDED. targetId was hit, by aggressorId, with the weapon sourceId
-      (a base id, or 0 for a fist or a spell). Nothing here can stop the hit;
-      it only decides whether a piece at 0% breaks.
+      (a base id, or 0 for a fist or a spell), and blocked is the flag the
+      client sent with it. Nothing here can stop the hit; it only wears what
+      the hit reaches (the block comment says what that is) and breaks a
+      piece at 0% on the roll. Answers the names of what broke.
     */
-    function hit(targetId, aggressorId, sourceId) {
+    function hit(targetId, aggressorId, sourceId, blocked) {
       var said = [];
-      if (aggressorId && sourceId && api.isPerson(aggressorId)) {
-        said = said.concat(breaks(aggressorId, function (e) {
-          return e.baseId === sourceId && pieceKind(e.baseId) === 'weapon';
+      if (aggressorId && sourceId && api.isPerson(aggressorId) && pieceKind(sourceId) === 'weapon') {
+        said = said.concat(wear(aggressorId, function (worn) {
+          return inHand(worn.filter(function (w) { return w.baseId === sourceId; }));
         }));
       }
       if (targetId && api.isPerson(targetId)) {
-        said = said.concat(breaks(targetId, function (e) {
-          var kind = pieceKind(e.baseId);
-          return kind === 'armour' || kind === 'clothing';
+        said = said.concat(wear(targetId, function (worn) {
+          var body = worn.filter(function (w) {
+            var kind = pieceKind(w.baseId);
+            return kind === 'armour' || kind === 'clothing';
+          });
+          if (!blocked || body.some(function (w) { return !!shields[w.baseId]; })) { return body; }
+          return body.concat(inHand(worn.filter(function (w) { return pieceKind(w.baseId) === 'weapon'; })));
         }));
       }
       return said;
     }
 
     /*
+      One weapon out of those worn that could be it: the right hand's, else
+      the left's. A hit is landed or blocked with one weapon, and two of the
+      same sword, one in each hand, are still one hit.
+    */
+    function inHand(list) {
+      for (var i = 0; i < list.length; i++) { if (list[i].worn) { return [list[i]]; } }
+      return list.length ? [list[0]] : [];
+    }
+
+    /*
+      The same piece by name, the way the client compares: the condition is
+      not part of it, and no name at all is the base's own name (see WHAT IS
+      WORN IS MATCHED TO THE PACK in the block comment).
+    */
+    function sameName(entry, wornName) {
+      var a = String(entry.name || '').replace(SUFFIX, '');
+      var b = String(wornName || '').replace(SUFFIX, '');
+      if (a === b) { return true; }
+      var plain = baseName(entry.baseId);
+      return (!a && b === plain) || (!b && a === plain);
+    }
+
+    /*
       The pack's entry for a worn thing. What is worn is read off the
       equipment, which is what the client dresses from, and the condition off
-      the pack. When the worn thing names itself, that name; when it does
-      not, the stack of that base the pack has flagged worn, else the first.
+      the pack. When the worn thing names itself, a stack of that name; of
+      those, the one the pack has flagged worn in the same hand, else any
+      flagged worn, else the first.
     */
     function packEntryFor(entries, w) {
-      var at = -1;
+      var at = -1, best = -1;
       var named = typeof w.name === 'string';
       for (var k = 0; k < entries.length; k++) {
         var e = entries[k];
         if (!e || e.baseId !== w.baseId || !(Number(e.count) > 0)) { continue; }
-        if (named && String(e.name || '') !== w.name) { continue; }
-        if (at < 0 || ((e.worn || e.wornLeft) && !(entries[at].worn || entries[at].wornLeft))) { at = k; }
+        if (named && !sameName(e, w.name)) { continue; }
+        var score = (!!e.worn === !!w.worn && !!e.wornLeft === !!w.wornLeft) ? 2 : ((e.worn || e.wornLeft) ? 1 : 0);
+        if (score > best) { at = k; best = score; }
       }
       return at;
     }
 
-    function breaks(actorId, which) {
+    /*
+      ONE HIT ON ONE PERSON'S GEAR. pick chooses, out of what they wear that
+      has a condition, the pieces this hit reaches. Each one above 0% loses
+      WEAR_PER_HIT; each one at 0% rolls the break chance. One write for the
+      lot, and nothing said or logged unless it was written.
+    */
+    function wear(actorId, pick) {
       var worn = [];
       try { worn = api.worn(actorId) || []; } catch (e) { worn = []; }
-      var due = worn.filter(function (w) { return w && w.baseId && which(w); });
+      var due = pick(worn.filter(function (w) { return w && w.baseId && pieceKind(w.baseId); }));
       if (!due.length) { return []; }
       var entries = api.inventory(actorId);
       if (!entries) { return []; }
       var gone = [];
+      var worse = 0;
       for (var j = 0; j < due.length; j++) {
         var at = packEntryFor(entries, due[j]);
-        if (at < 0 || conditionOf(entries[at]) > CONDITION.lowest) { continue; }
+        if (at < 0) { continue; }
+        var cond = conditionOf(entries[at]);
+        if (cond > CONDITION.lowest) {
+          entries = setUnits(entries, at, 1, cond - WEAR_PER_HIT);
+          worse++;
+          continue;
+        }
         if (!(api.random() < BREAK_CHANCE)) { continue; }
-        var name = bareName(entries[at]);
+        gone.push(bareName(entries[at]));
         entries = takeUnit(entries, at);
-        gone.push(name);
       }
-      if (!gone.length) { return []; }
+      if (!gone.length && !worse) { return []; }
       if (!api.setInventory(actorId, entries)) { return []; }
       for (var n = 0; n < gone.length; n++) {
         api.say(actorId, 'Your ' + gone[n] + ' broke. It was at 0%, and a kit would have mended it.');
       }
-      api.log('durability:', actorId.toString(16), 'broke', gone.join(', '), 'on a hit at 0%');
+      if (gone.length) {
+        api.log('durability:', actorId.toString(16), 'broke', gone.join(', '), 'on a hit at 0%');
+      }
       return gone;
     }
 
     /*
       A hit as the engine sends it: the target's id, then the aggressor and
       the weapon or spell as { type, desc } (THE PAPYRUS FAMILY, over
-      mp.onTakeItem). The one OnHit handler, in the warrior maneuvers block,
-      hands it here.
+      mp.onTakeItem), and the client's blocked flag. The one OnHit handler,
+      in the warrior maneuvers block, hands it here.
     */
-    function onHit(targetId, aggressor, source) {
+    function onHit(targetId, aggressor, source, blocked) {
       function idFrom(v) {
         if (typeof v === 'number') { return v; }
         if (v && v.desc) { return api.idOf(v.desc) || 0; }
         return 0;
       }
-      return hit(Number(targetId) || 0, idFrom(aggressor), idFrom(source));
+      return hit(Number(targetId) || 0, idFrom(aggressor), idFrom(source), !!blocked);
     }
 
     function forgetOldDrops() {
@@ -49665,9 +49893,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
     return {
       CONDITION: CONDITION, DULL_PER_DAY: DULL_PER_DAY, DAY_MS: DAY_MS,
-      BREAK_CHANCE: BREAK_CHANCE, KITS: kits,
+      BREAK_CHANCE: BREAK_CHANCE, WEAR_PER_HIT: WEAR_PER_HIT, KITS: kits,
       pieceKind: pieceKind, conditionOf: conditionOf, withCondition: withCondition,
-      repairTo: repairTo, repairWithKit: repairWithKit, describe: describe, command: command,
+      repairTo: repairTo, repairWithKit: repairWithKit, view: view, panel: panel,
       opened: opened, hit: hit, onHit: onHit, dropped: dropped, pressed: pressed
     };
   }
@@ -49682,6 +49910,39 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       updateOwner: '', updateNeighbor: ''
     });
   } catch (e) { /* made by an earlier load. harmless. */ }
+
+  /*
+    THE REPAIR PANEL'S VIEW, seen by its owner only. The owner's script hands
+    it to the page, the way the merchant panel's does, and
+    game/ui/thornswood-repair.js draws it; a view with open set opens it. at
+    moves on every send, so the key pressed again draws the panel again
+    even when nothing in it changed.
+  */
+  var panelScript = [
+    '(function(){',
+    '  try {',
+    '    var v = ctx.value;',
+    '    if (!v || typeof v !== "object") { return; }',
+    '    var st = ctx.state;',
+    '    if (!st) { return; }',
+    '    if (st.thornswoodRepairAt === v.at) { return; }',
+    '    st.thornswoodRepairAt = v.at;',
+    '    var body = JSON.stringify(v);',
+    '    var src = "(function(){try{" +',
+    '      "var d=" + body + ";window.thornswoodRepairView=d;" +',
+    '      "if(window.thornswoodRepair&&window.thornswoodRepair.setData){window.thornswoodRepair.setData(d);}" +',
+    '      "}catch(e){}})();";',
+    '    try { ctx.sp.browser.executeJavaScript(src); } catch (e) { }',
+    '  } catch (e) { }',
+    '})();'
+  ].join('\n');
+  try {
+    mp.makeProperty(PANEL_PROPERTY, {
+      isVisibleByOwner: true, isVisibleByNeighbors: false,
+      updateOwner: panelScript, updateNeighbor: ''
+    });
+  } catch (e) { /* made by an earlier load. harmless. */ }
+  var shownAt = 0;
 
   /*
     Display names by record, out of the recipe table, built once: every
@@ -49773,6 +50034,14 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     setClock: function (id, clock) {
       try { mp.set(id, CLOCK_PROPERTY, clock || { at: 0, days: 0 }); } catch (e) {
         log('durability: could not write the clock of container', Number(id).toString(16) + ':', e);
+      }
+    },
+    show: function (id, v) {
+      var payload = JSON.parse(JSON.stringify(v || { open: false }));
+      shownAt = Math.max(Date.now(), shownAt + 1);
+      payload.at = shownAt;
+      try { mp.set(id, PANEL_PROPERTY, payload); } catch (e) {
+        log('durability: could not send the repair panel to', Number(id).toString(16) + ':', e);
       }
     },
     say: say,
@@ -50142,16 +50411,19 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     /*
       Recovery, per real hour, by where somebody is resting.
 
-      A bed is four times a chair, which is what makes going to an inn worth
-      the walk. The bard is added on top of whatever the place already gives,
-      so a bard in an inn is 75 an hour and is the best rest in the game, which
-      is the point Grim was making.
+      Patrick's ladder on #1603, "use some common sense": a bed is better than
+      a campfire, a bed or bedroll nobody lends you is a little better than
+      sitting, a campfire with a bedroll is better than a campfire alone, and
+      so on up to your own bed. So: a seat 20, a bed or bedroll nobody can lend
+      you 25 (rough), a seat with a fire in reach 35 (campfire), rough with a
+      fire in reach 45 (camp), a bed you are allowed in 50 (inn: a guest, or a
+      key or deed carried), your own bed 80. The bard is added on top of
+      whatever the place already gives.
 
-      bedroll is the campfire's number, which docs/systems/property.md gives
-      it. Which of inn, bed and bedroll somebody gets is the beds' answer in
-      the property block, never the word they typed (#1392).
+      Which kind somebody gets is the beds' answer in the property block, by
+      what the server saw them press, never the word after /rest (#1392, #1607).
     */
-    recover: { sit: 20, campfire: 35, bedroll: 35, inn: 50, bed: 80 },
+    recover: { sit: 20, rough: 25, campfire: 35, camp: 45, inn: 50, bed: 80 },
     bard: 25,
 
     /*
@@ -52068,6 +52340,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     }
 
     var reach = SOCIAL.nearReach * SOCIAL.nearReach;
+    // Whether the look prompt offers "Let sleep here" (#1603). See sleepMark
+    // in the beds, in the property block.
+    var beds = g.__thornswoodBeds;
     for (var a = 0; a < at.length; a++) {
       var me = at[a];
       var s = read(me.id) || fresh();
@@ -52087,7 +52362,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
           f: s.friends[them.pid] ? 1 : 0,
           m: s.muted[them.pid] ? 1 : 0,
           h: (s.namesAll || (s.namesOff && s.namesOff[them.pid])) ? 1 : 0,
-          y: (party && party.members.indexOf(them.pid) !== -1) ? 1 : 0
+          y: (party && party.members.indexOf(them.pid) !== -1) ? 1 : 0,
+          s: (beds && beds.mark) ? beds.mark(me.pid, them.pid, me.cell) : 0
         };
       }
       var sig = JSON.stringify(w) + (s.namesAll ? ':all' : '');

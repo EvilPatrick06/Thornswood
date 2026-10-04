@@ -83,7 +83,7 @@
   const OVERLAYS = ['thornswood-chat.js', 'thornswood-emotes.js', 'thornswood-voice.js',
                     'thornswood-skills.js', 'thornswood-party.js',
                     'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js',
-                    'thornswood-maneuvers.js', 'thornswood-afk.js'];
+                    'thornswood-repair.js', 'thornswood-maneuvers.js', 'thornswood-afk.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -351,6 +351,16 @@
   const MOLD_KEY    = iniNumber(ini, 'MoldKey', 22);       // U
   const LOCK_KEY    = iniNumber(ini, 'LockKey', 45);       // X
   /*
+    The holder's sleep key on the look prompt (#1603). Patrick: the holder
+    names who may sleep there "with buttons and GUI, not commands". THE MOLD'S
+    KEY, U, and not a new one: every letter is already Skyrim's or ours, and
+    test-thornswood-keys.js holds no two of ours on one default. The two never
+    meet: the mold is armed only while a door is under the crosshair, and this
+    only while a person is, inside a building you hold. Rebinding MoldKey moves
+    both, and its Controls row says so.
+  */
+  const SLEEP_KEY   = MOLD_KEY;
+  /*
     A warrior's maneuvers (#1386): opens the maneuver panel. 9, scan code 10:
     1 to 8 are the emote slots and the game's own hotkeys, and every letter is
     already one of ours or the game's.
@@ -373,6 +383,7 @@
   const TRADE_NAME = keyName(TRADE_KEY);
   const MUTE_NAME = keyName(MUTE_KEY);
   const MOLD_NAME = keyName(MOLD_KEY);
+  const SLEEP_NAME = keyName(SLEEP_KEY);
   const LOCK_NAME = keyName(LOCK_KEY);
   const MANEUVER_NAME = keyName(MANEUVER_KEY);
 
@@ -1950,7 +1961,7 @@
   */
   const CAP_CLOSES = {
     skills: 'thornswoodSkills', party: 'thornswoodParty', journal: 'thornswoodJournal',
-    board: 'thornswoodBoard',
+    board: 'thornswoodBoard', repair: 'thornswoodRepair',
     trade: 'thornswoodTrade', merchant: 'thornswoodMerchant', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
     afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers'
   };
@@ -2673,11 +2684,14 @@
     ------------------------------------------------- lying down in a bed (#839)
 
     Ownership clear on activate makes Sleep/Wait open. This half tells the
-    exhaustion meter: furnitureEnter on a bed is /rest bed, furnitureExit is
-    /rest up. Chairs and chopping blocks are not beds, so they leave the
-    meter alone (chopping has its own watcher below).
+    exhaustion meter: furnitureEnter on a bed is /rest bed, on any other
+    furniture /rest sit, and furnitureExit is /rest up. Nobody types them
+    (#1603). The server answers by the furniture it saw pressed, so a chair
+    is a seat, a chair by a fire is a campfire, and a forge or a chopping
+    block is nothing and is answered with nothing (chopping has its own
+    watcher below). This side only says which of the two it saw.
   */
-  let restingInBed = false;
+  let restSent = false;
   /* #843: chairs/benches leave controls off with no menu. The controls
      watchdog, stuck rescue and ownTheCharacter all refuse to fight that
      state when notOurs() says so. getFurnitureReference alone can flicker
@@ -2695,20 +2709,19 @@
       try { clearBedOwnership(ref); } catch (err) { }
       let bed = false;
       try { bed = isBedRef(ref); } catch (err) { }
-      if (!bed) { return; }
-      restingInBed = true;
-      tellServer('/rest bed');
-      say('resting in a bed');
+      restSent = true;
+      tellServer(bed ? '/rest bed' : '/rest sit');
+      say(bed ? 'resting in a bed' : 'sitting down');
     }));
     sp.on('furnitureExit', guard('bedexit', (e) => {
       let actorId = 0;
       try { actorId = e.actor ? e.actor.getFormID() : 0; } catch (err) { }
       if (actorId !== 0x14) { return; }
       seatedInFurniture = false;
-      if (!restingInBed) { return; }
-      restingInBed = false;
+      if (!restSent) { return; }
+      restSent = false;
       tellServer('/rest up');
-      say('left the bed');
+      say('got up');
     }));
     say('watching for beds');
   } catch (e) {
@@ -4552,7 +4565,7 @@
 
   /** Draw or clear the little panel that names them and the three keys. */
   function drawPrompt(row) {
-    const sig = row ? (row.n + '|' + row.f + '|' + row.m + '|' + row.y) : '';
+    const sig = row ? (row.n + '|' + row.f + '|' + row.m + '|' + row.y + '|' + (row.s || 0)) : '';
     if (sig === lookingSig) { return; }
     lookingSig = sig;
     if (!row) {
@@ -4578,7 +4591,11 @@
       keyRow(FRIEND_NAME, row.f ? 'Remove friend' : 'Add friend', !!row.f) +
       keyRow(TRADE_NAME, 'Trade', false) +
       keyRow(MUTE_NAME, row.m ? 'Unmute' : 'Mute', !!row.m) +
-      keyRow(PARTY_NAME, row.y ? 'Party menu' : 'Ask to party', !!row.y);
+      keyRow(PARTY_NAME, row.y ? 'Party menu' : 'Ask to party', !!row.y) +
+      // Only for a holder looking at somebody inside a building they hold:
+      // the server's near list says so (#1603). See sleepPress.
+      (row.s ? keyRow(SLEEP_NAME, row.s === 2 ? 'Stop letting sleep here' : 'Let sleep here',
+                      row.s === 2) : '');
 
     T.js('(function(){try{' +
          'var d=document.getElementById("ts-look");' +
@@ -4657,6 +4674,23 @@
     if (!sent) { note('Could not send the social request. Try again in a moment.'); }
     say(cmd + ' on ' + lookingAt);
     return true;
+  }
+
+  /*
+    Let the person under the crosshair sleep in the building you hold, or end
+    their night (#1603). Only while the prompt offers it, which is the server
+    saying so on the near list, and the server measures all of it again when
+    the line arrives. Answers whether it was used, so the key falls through
+    when it was not.
+  */
+  function sleepPress() {
+    if (!lookingAt) { return false; }
+    if (claims.chat) { return false; }
+    if (busyMenuOpenNow()) { return false; }
+    const near = nearList();
+    const row = (near && Object.prototype.hasOwnProperty.call(near, lookingAt)) ? near[lookingAt] : null;
+    if (!row || !row.s) { return false; }
+    return lookVerb('sleephere');
   }
 
   /*
@@ -4892,6 +4926,139 @@
     moldDoor = '';
     drawMold(false);
   }));
+
+  /*
+    ------------------------------------- a repair kit, used from the inventory
+
+    #1384, and Patrick's rule of 4 October: commands only for dev and staff,
+    and everything people do takes buttons and GUI. A kit mends a
+    piece (docs/systems/durability.md), and a kit is a MISC, which Skyrim's
+    inventory cannot use: E on one does nothing and tells nobody. So while
+    the inventory is open and a repair kit is in the pack, one line at the
+    bottom names a key, and that key shuts the inventory and asks the server
+    for the repair panel (game/ui/thornswood-repair.js). The server answers
+    with the rows on the panel's own property, and the panel's buttons send
+    the rest. /repair is that ask; nobody is told to type it.
+
+    THE KEY IS THE MOLD KEY, U. Every letter is taken by Skyrim or by us, and
+    U only means anything while its own line is up. The mold's line needs
+    the world with no menu open and a door under the crosshair, and the
+    sleep key's (SLEEP_KEY, the same U) a person under it with no menu open;
+    this one needs the inventory open. None of them is up with another, and
+    moldPress and sleepPress have already said no before this is asked.
+
+    ONLY WITH THE PLUGIN THAT HAS KITS. The three kits are 0x154b0, 0x154b1
+    and 0x154b2 in Thornswood-Content.esp (scripts/mods/Add-ContentRecords.py).
+    A build without them has no kit to carry, so nothing is drawn and nothing
+    is sent. Asked once, when the world is up, and remembered as runtime ids,
+    for the reason under THE IDS, RESOLVED ONCE.
+  */
+  const KIT_FILE = 'Thornswood-Content.esp';
+  const KIT_ITEMS = [0x154b0, 0x154b1, 0x154b2];   // MISC Weapon Kit, Armor Kit, Sewing Kit
+  const INVENTORY_MENU = 'InventoryMenu';
+  let kitBases = null;     // null not asked yet, [] none in this build, else runtime ids
+  let repairShown = false;
+
+  /** Whether this build has repair kits, found out once the world is up. */
+  function kitsReady() {
+    if (kitBases) { return kitBases.length > 0; }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    if (!pc) { return false; }
+    const found = [];
+    try {
+      for (const local of KIT_ITEMS) {
+        const form = sp.Game.getFormFromFile(local, KIT_FILE);
+        const id = form ? (form.getFormID() >>> 0) : 0;
+        if (id) { found.push(id); }
+      }
+    } catch (e) {
+      // Not remembered. A throw is not an answer, so it is asked again.
+      return false;
+    }
+    kitBases = found;
+    log(found.length ? 'repair kits: this build has them, so the inventory offers ' + MOLD_NAME
+                     : 'repair kits: no kit records in ' + KIT_FILE + ', so no line in the inventory');
+    return found.length > 0;
+  }
+
+  /** How many repair kits the pack holds, of the three. */
+  function kitsCarried() {
+    if (!kitsReady()) { return 0; }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    if (!pc) { return 0; }
+    let n = 0;
+    for (const id of kitBases) {
+      try {
+        const form = sp.Game.getFormEx(id);
+        n += form ? (Number(pc.getItemCount(form)) || 0) : 0;
+      } catch (e) { }
+    }
+    return n;
+  }
+
+  // At the bottom of the inventory, in the mold line's colours.
+  const REPAIR_CSS =
+    'position:fixed;left:50%;bottom:12%;transform:translateX(-50%);z-index:2147482900;' +
+    'pointer-events:none;white-space:nowrap;' +
+    'font-family:"Palatino Linotype",Palatino,Georgia,serif;font-size:19px;letter-spacing:.03em;' +
+    'color:#d9cfb4;background:rgba(11,10,8,.72);border:1px solid rgba(198,170,109,.42);' +
+    'padding:8px 16px 9px;text-shadow:0 2px 4px rgba(0,0,0,.95)';
+
+  /** The line up or down. Only remembered once the page has taken it. */
+  function drawRepairLine(on) {
+    if (on === repairShown) { return; }
+    if (!on) {
+      if (T.js('try{var d=document.getElementById("ts-repair-line");if(d){d.style.display="none";}}catch(e){}')) {
+        repairShown = false;
+      }
+      return;
+    }
+    const html =
+      '<span style="display:inline-block;min-width:26px;text-align:center;margin-right:12px;' +
+      'padding:1px 7px;border:1px solid rgba(233,209,155,.55);border-bottom-width:2px;' +
+      'border-radius:3px;background:rgba(0,0,0,.35);color:#e9d19b">' + MOLD_NAME + '</span>' +
+      'Mend a piece with your repair kit';
+    if (T.js('(function(){try{' +
+             'var d=document.getElementById("ts-repair-line");' +
+             'if(!d){d=document.createElement("div");d.id="ts-repair-line";' +
+             'd.style.cssText=' + JSON.stringify(REPAIR_CSS) + ';' +
+             'document.body.appendChild(d);}' +
+             'd.innerHTML=' + JSON.stringify(html) + ';' +
+             'd.style.display="";' +
+             '}catch(e){}})();')) {
+      repairShown = true;
+    }
+  }
+
+  sp.on('menuOpen', guard('repair line up', (e) => {
+    if (!e || e.name !== INVENTORY_MENU) { return; }
+    drawRepairLine(!!T.ready && kitsCarried() > 0);
+  }));
+  sp.on('menuClose', guard('repair line down', (e) => {
+    if (!e || e.name !== INVENTORY_MENU) { return; }
+    drawRepairLine(false);
+  }));
+
+  /*
+    The key, in the inventory. Asked again at the press: the inventory open,
+    nothing typing, a kit in the pack. Answers whether it was used, so the
+    key falls through when it was not.
+  */
+  function repairPress() {
+    if (!T.ready || claims.chat) { return false; }
+    let open = false;
+    try { open = !!sp.Ui.isMenuOpen(INVENTORY_MENU); } catch (e) { open = false; }
+    if (!open) { return false; }
+    if (!(kitsCarried() > 0)) { drawRepairLine(false); return false; }
+    drawRepairLine(false);
+    try { sp.TESModPlatform.closeMenu(INVENTORY_MENU); }
+    catch (err) { say('repair: closeMenu threw on the inventory: ' + err); }
+    tellServer('/repair');
+    say('pressed ' + MOLD_NAME + ' in the inventory with a repair kit, asked the server for the repair panel');
+    return true;
+  }
 
   /*
     ------------------------------------- your party: the name, the map, the way
@@ -7132,6 +7299,10 @@
     // The mold key, and only while a door is under the crosshair and a Key
     // Mold is in the pack. Otherwise it is not used and goes on down the list.
     if (e.code === MOLD_KEY && moldPress()) { return; }
+    // The same key on a person inside a building you hold. See SLEEP_KEY.
+    if (e.code === SLEEP_KEY && sleepPress()) { return; }
+    // The same key in the inventory, with a repair kit in the pack (#1384).
+    if (e.code === MOLD_KEY && repairPress()) { return; }
     if (e.code === LOCK_KEY && lockPress()) { return; }
     /*
       The five social keys work in the open world, and P and J can always
@@ -8073,6 +8244,9 @@
     if (what === 'maneuvers:ready') { log('the maneuver panel is in'); maneuversToPage(); return; }
     if (what === 'trade:opened') { T.claimFocus('trade', true); return; }
     if (what === 'trade:closed') { T.claimFocus('trade', false); return; }
+    if (what === 'repair:opened') { T.claimFocus('repair', true); return; }
+    if (what === 'repair:closed') { T.claimFocus('repair', false); return; }
+    if (what === 'repair:ready') { log('the repair panel is in'); return; }
     if (what === 'merchant:opened') { T.claimFocus('merchant', true); return; }
     if (what === 'merchant:closed') { T.claimFocus('merchant', false); return; }
     if (what === 'merchant:ready') {
