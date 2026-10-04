@@ -49952,6 +49952,7 @@ function createPrivateEconomyLedger(fs,path,settings,name,references) {
     const fd=fs.openSync(tmp,'r+');
     try {fs.fsyncSync(fd);} finally {fs.closeSync(fd);}
     fs.renameSync(tmp,file);
+    return true;
   }
   function load() {
     checkPrivate();
@@ -49974,7 +49975,7 @@ function createPrivateEconomyLedger(fs,path,settings,name,references) {
     }
     return doc;
   }
-  return {load,save};
+  return {load,save,durable:true};
 }
 function createNpcMerchantPurses(api,data,storage) {
   const property='thornswoodMerchant',catalogue=new Map(),verified=new Set();
@@ -49990,6 +49991,7 @@ function createNpcMerchantPurses(api,data,storage) {
   let ledger=storage.load();
   function valid(state,identity) {
     return state && state.version===1 && state.reference===identity.reference && state.base===identity.base &&
+      (state.revision===undefined || Number.isSafeInteger(state.revision) && state.revision>=0) &&
       Number.isInteger(state.purse) && state.purse>=0 && state.purse<=2147483647 &&
       Array.isArray(state.stock) && state.stock.every(row=>row && Number.isInteger(row.baseId) &&
         row.baseId>0 && row.baseId<=0xffffffff && row.baseId!==15 &&
@@ -50030,7 +50032,7 @@ function createNpcMerchantPurses(api,data,storage) {
     verified.add(id);
     return JSON.parse(JSON.stringify(state));
   }
-  function commit(id, nextState) {
+  function commit(id, nextState, expectedRevision, requireAcknowledgement) {
     if(!active) throw new Error('Merchant purse service is unavailable');
     const identity=catalogue.get(id);
     if(!identity) throw new Error('That is not a guild trader');
@@ -50039,14 +50041,44 @@ function createNpcMerchantPurses(api,data,storage) {
     if(!valid(nextState, identity)) throw new Error('Merchant state cannot be verified');
     const previous=ledger.entries[identity.reference];
     if(previous===null || previous===undefined) throw new Error('Merchant initialization record is missing');
+    const revision=previous.revision || 0;
+    const expected=expectedRevision===undefined ? (nextState.revision || 0) : expectedRevision;
+    if(!Number.isSafeInteger(expected) || expected<0) throw new Error('Invalid merchant revision');
+    if(revision!==expected) return null;
+    if(revision>=Number.MAX_SAFE_INTEGER) throw new Error('Merchant revision is exhausted');
+    if(requireAcknowledgement && storage.durable!==true)
+      throw new Error('Durable merchant save acknowledgement is unavailable');
     const next=JSON.parse(JSON.stringify(ledger));
-    next.entries[identity.reference]=JSON.parse(JSON.stringify(nextState));
-    storage.save(next);
+    const committed=JSON.parse(JSON.stringify(nextState));
+    committed.revision=revision+1;
+    next.entries[identity.reference]=committed;
+    try {
+      const acknowledgement=storage.save(next);
+      if(requireAcknowledgement && acknowledgement!==true)
+        throw new Error('Durable merchant save acknowledgement is missing');
+    } catch(error) {
+      // A replacement may have reached disk before an error was reported.
+      // Revoke this controller so stale in-memory state cannot overwrite it.
+      active=false;
+      throw error;
+    }
     ledger=next;
-    api.set(id, property, JSON.parse(JSON.stringify(nextState)));
-    return JSON.parse(JSON.stringify(nextState));
+    api.set(id, property, JSON.parse(JSON.stringify(committed)));
+    return JSON.parse(JSON.stringify(committed));
   }
-  return {prepare,commit,shutdown:()=>{active=false;},stats:()=>({catalogue:catalogue.size,verified:verified.size,initialized})};
+  function compareAndCommit(id, expectedRevision, nextState) {
+    return commit(id,nextState,expectedRevision,true);
+  }
+  function pendingRecords() {
+    if(!active) throw new Error('Merchant purse service is unavailable');
+    const pending=[];
+    for(const [id,identity] of catalogue) {
+      const state=ledger.entries[identity.reference];
+      if(state && state.pending) pending.push({merchantId:id,reference:identity.reference,state:JSON.parse(JSON.stringify(state))});
+    }
+    return pending;
+  }
+  return {prepare,commit,compareAndCommit,pendingRecords,shutdown:()=>{active=false;},stats:()=>({catalogue:catalogue.size,verified:verified.size,initialized})};
 }
 // NPC MERCHANT PURSES END
 
