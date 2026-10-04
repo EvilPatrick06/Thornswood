@@ -38,8 +38,7 @@ most. That teaching is one of the two outside trades.
 
 ## Twin Souls
 
-At master. Two enchantments on one item. The menu is one enchantment
-today. The perk is named and not applied.
+At master. Two enchantments on one item. Without it, one.
 
 ## What you are handed
 
@@ -49,6 +48,11 @@ half places one more.
 ## Where this is
 
 The bench gates, the staff list, the staff points, and the unlock
-rules are in the server. Twin Souls is not. Soul gems and the
-disenchant menu are the game's, and the server does not keep a list
-of learned enchantments beyond the staff spells.
+rules are in the server. Twin Souls is in the menu: a master is
+handed the game's Extra Effect perk, put back on every spawn. The
+enchantments list is in the server, and it is asked once the engine
+says what went on a piece, which it does not yet (see
+[Enchantments](../enchantments.md)). Soul gems and the disenchant
+menu are the game's, and the server does not keep a list of learned
+enchantments beyond the staff spells, because it is never told about
+a disenchant.
