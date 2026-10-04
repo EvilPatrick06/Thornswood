@@ -1,0 +1,439 @@
+// test-1390-embassy.js
+//
+// #1390. The embassy building is held by the Ambassador's office: /claim is
+// refused, a steward of Haafingar cannot evict it, and a deed presented at its
+// door is paper. The embassy roll is 20, of whom 6 may be marked armed; the
+// 21st and the 7th armed are refused. The remnant roll is an application an
+// admin writes. Only those two rolls make the embassy and remnant rows; a
+// public forge makes none of them. A character in Thalmor gear reads Thalmor.
+// The patrols wait on the NPC lane, so this block stands up no actor.
+//
+// Read only.
+'use strict';
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+
+const REPO_DIR = path.join(__dirname, '..');
+const gm = fs.readFileSync(path.join(REPO_DIR, 'game', 'gamemode.js'), 'utf8').split(String.fromCharCode(13)).join('');
+
+let pass = 0, fail = 0;
+function yes(what, cond) {
+  if (cond) { pass++; console.log('PASS  ' + what); }
+  else { fail++; console.log('FAIL  ' + what); }
+}
+function slice(src, start, end) {
+  const a = src.indexOf(start);
+  if (a < 0) { return null; }
+  const b = src.indexOf(end, a + start.length);
+  return b < 0 ? null : src.slice(a, b + end.length);
+}
+
+const block = slice(gm, '// ==== thornswood embassy and remnant ====', '// ==== end thornswood embassy and remnant ====');
+yes('the embassy and remnant block is in the gamemode', block !== null);
+
+const recSrc = slice(gm, 'var RECIPES_BY_ID = {', '\n  };');
+let RECIPES = null;
+try { RECIPES = new Function('return ' + recSrc.slice('var RECIPES_BY_ID = '.length).replace(/;$/, ''))(); } catch (e) { RECIPES = null; }
+yes('the recipe table reads', !!RECIPES && Object.keys(RECIPES).length > 1500);
+const adminSrc = slice(gm, 'var ADMIN_ITEMS = {', '\n  };');
+let ADMIN_ITEMS = null;
+try { ADMIN_ITEMS = new Function('return ' + adminSrc.slice('var ADMIN_ITEMS = '.length).replace(/;$/, ''))(); } catch (e) { ADMIN_ITEMS = null; }
+yes('the /give table reads', !!ADMIN_ITEMS && !!ADMIN_ITEMS['thalmor robes']);
+
+// ------------------------------------------------------------- the world --
+
+const ADMIN = 1, STEWARD = 2, NOBODY = 3;
+const EMBASSY = '8ed5:The Great City of Solitude.esp';
+const HOUSE = '1b262:The Great City of Solitude.esp';
+
+// A stable number for a descriptor, the way mp.getIdFromDesc would give one.
+const ids = {};
+let nextId = 0x100;
+function idOf(desc) {
+  if (!desc) { return 0; }
+  if (!ids[desc]) { ids[desc] = nextId++; }
+  return ids[desc];
+}
+
+function memoryFs(files) {
+  return {
+    readFileSync: function (p) {
+      const k = String(p);
+      if (!Object.prototype.hasOwnProperty.call(files, k)) { const e = new Error('ENOENT ' + k); e.code = 'ENOENT'; throw e; }
+      return files[k];
+    },
+    writeFileSync: function (p, text) {
+      if (files.__refuse) { throw new Error('disk full'); }
+      files[String(p)] = String(text);
+    },
+    mkdirSync: function () { },
+    renameSync: function (a, b) { files[String(b)] = files[String(a)]; delete files[String(a)]; }
+  };
+}
+
+/*
+  One load of the block. people: name -> { actor, pid }. Everything the block reads off globalThis is a stub
+  that does what the real one does for these questions and no more.
+*/
+function load(opts) {
+  opts = opts || {};
+  const files = opts.files || {};
+  const people = opts.people || {};
+  const said = [];
+  const box = {
+    console: { log: function () { } },
+    JSON: JSON, Math: Math, Date: Date, Number: Number, String: String, Object: Object, Array: Array,
+    require: function (name) { return name === 'fs' ? memoryFs(files) : require(name); },
+    setTimeout: function () { return 1; }, setInterval: function () { return 2; },
+    clearTimeout: function () { }, clearInterval: function () { },
+    RECIPES_BY_ID: RECIPES, ADMIN_ITEMS: ADMIN_ITEMS, idOf: idOf,
+    wornNow: function (actor) { return (opts.worn && opts.worn[actor]) || []; },
+    say: function (actor, line) { said.push([actor, line]); }
+  };
+  box.globalThis = box;
+  box.__thornswoodIsAdmin = function (pid) { return pid === ADMIN; };
+  box.__thornswoodSocial = {
+    findPerson: function (words) {
+      const w = String(words).toLowerCase();
+      for (const n in people) { if (n.toLowerCase() === w) { return { actorId: people[n].actor, why: '' }; } }
+      return { actorId: 0, why: 'Nobody here by that name.' };
+    },
+    nameOfPerson: function (actor) {
+      for (const n in people) { if (people[n].actor === actor) { return n; } }
+      return '';
+    },
+    profileOf: function (actor) {
+      for (const n in people) { if (people[n].actor === actor) { return people[n].pid; } }
+      return 0;
+    }
+  };
+  const claims = opts.claims || {};
+  box.__thornswoodProperty = {
+    here: function (actor) { return (opts.door && opts.door[actor]) || null; },
+    nameOf: function (b) { return b === EMBASSY ? 'Penitus Oculatus Outpost Solitude' : b; },
+    holderOf: function (b) { return claims[b] || null; },
+    pushAll: function () { }
+  };
+  vm.runInNewContext(block, box);
+  return { box: box, files: files, said: said,
+           E: box.__thornswoodEmbassy, R: box.__thornswoodRolls, T: box.__thornswoodThalmor };
+}
+
+function run(env, pid, actor, text) {
+  const told = [];
+  const parts = text.split(/\s+/);
+  env.E.command(parts[0], parts, actor, pid, function (p, line) { told.push(line); });
+  return told.join(' | ');
+}
+
+function crowd(n) {
+  const people = {};
+  for (let i = 1; i <= n; i++) { people['Person' + i] = { actor: 0xff001000 + i, pid: 1000 + i }; }
+  return people;
+}
+
+if (block && RECIPES && ADMIN_ITEMS) {
+  // ------------------------------------------------- the 20 and the 6 --
+  {
+    const env = load({ people: crowd(22) });
+    for (let i = 1; i <= 20; i++) { run(env, ADMIN, 0x14, '/embassy add Person' + i); }
+    yes('R1 an admin puts 20 on the embassy roll', env.E.rolls().embassy.length === 20);
+    const twentyFirst = run(env, ADMIN, 0x14, '/embassy add Person21');
+    yes('R1 the 21st person is refused', env.E.rolls().embassy.length === 20 && /full/.test(twentyFirst) && /20/.test(twentyFirst));
+    yes('R1 and is not on the roll', !env.R.has(0xff001000 + 21, 'embassy'));
+    run(env, ADMIN, 0x14, '/embassy remove Person20');
+    yes('R1 taking one off makes room', env.E.rolls().embassy.length === 19);
+    run(env, ADMIN, 0x14, '/embassy add Person21');
+    yes('R1 and the next one is named', env.R.has(0xff001000 + 21, 'embassy') && env.E.rolls().embassy.length === 20);
+  }
+  {
+    const env = load({ people: crowd(9) });
+    for (let i = 1; i <= 6; i++) { run(env, ADMIN, 0x14, '/embassy add Person' + i + ' armed'); }
+    const armed = function () { return env.E.rolls().embassy.filter(function (r) { return r.armed; }).length; };
+    yes('R2 six are marked armed', armed() === 6);
+    const seventh = run(env, ADMIN, 0x14, '/embassy add Person7 armed');
+    yes('R2 adding a 7th armed is refused, and nobody is added', armed() === 6 && !env.R.has(0xff001007, 'embassy') && /Nobody was added/.test(seventh));
+    run(env, ADMIN, 0x14, '/embassy add Person7');
+    yes('R2 the same person unarmed is on the roll', env.R.has(0xff001007, 'embassy') && armed() === 6);
+    const arm7 = run(env, ADMIN, 0x14, '/embassy arm Person7');
+    yes('R2 marking a 7th as armed is refused', armed() === 6 && /all the Accord allows/.test(arm7));
+    run(env, ADMIN, 0x14, '/embassy disarm Person1');
+    run(env, ADMIN, 0x14, '/embassy arm Person7');
+    yes('R2 disarming one lets another be marked', armed() === 6 &&
+        env.E.rolls().embassy.filter(function (r) { return r.name === 'Person7'; })[0].armed === true &&
+        env.E.rolls().embassy.filter(function (r) { return r.name === 'Person1'; })[0].armed === false);
+    const again = run(env, ADMIN, 0x14, '/embassy add Person2');
+    yes('R2 nobody is on the roll twice', /already on/.test(again) && env.E.rolls().embassy.length === 7);
+    yes('R2 the person named is told, in their own chat', env.said.some(function (s) { return s[0] === 0xff001001 && /embassy roll, marked armed/.test(s[1]); }));
+  }
+  {
+    const env = load({ people: crowd(3) });
+    const refused = run(env, NOBODY, 0x15, '/embassy add Person1');
+    yes('R3 somebody who is not an admin cannot write the embassy roll', env.E.rolls().embassy.length === 0 && /Only an admin/.test(refused));
+    const remRefused = run(env, STEWARD, 0x16, '/remnant add Person1');
+    yes('R3 nor the remnant roll, which is an application', env.E.rolls().remnant.length === 0 && /application/.test(remRefused));
+    run(env, ADMIN, 0x14, '/embassy add Person1 armed');
+    const own = run(env, NOBODY, 0xff001001, '/embassy');
+    yes('R3 a person on the roll can ask where they stand', /You are on the embassy roll, marked armed/.test(own));
+    const notOn = run(env, NOBODY, 0xff001002, '/embassy');
+    yes('R3 and somebody not on it is told so', /You are not on the embassy roll/.test(notOn));
+    const list = run(env, ADMIN, 0x14, '/embassy');
+    yes('R3 an admin sees the roll and the count', /1 of 20 on the roll, 1 of 6 marked armed/.test(list) && /Person1 \(armed\)/.test(list));
+  }
+  {
+    // Off the roll while not in the world.
+    const people = crowd(2);
+    const env = load({ people: people });
+    run(env, ADMIN, 0x14, '/embassy add Person2');
+    delete people.Person2;
+    const off = run(env, ADMIN, 0x14, '/embassy remove person2');
+    yes('R4 somebody who is not in the world can still be taken off by the name on the roll', !env.R.has(0xff001002, 'embassy') && /is off the embassy roll/.test(off));
+  }
+  {
+    // Kept across a restart, and a hand edit is not a way round the Accord.
+    const env = load({ people: crowd(4) });
+    run(env, ADMIN, 0x14, '/embassy add Person1 armed');
+    run(env, ADMIN, 0x14, '/remnant add Person2');
+    const again = load({ files: env.files });
+    yes('R5 the rolls survive a restart', again.R.has(0xff001001, 'embassy') && again.R.has(0xff001002, 'remnant') &&
+        again.E.rolls().embassy[0].armed === true);
+    const file = Object.keys(env.files).filter(function (k) { return /embassy\.json$/.test(k); })[0];
+    yes('R5 the roll file is in the private folder', /^private[\\/]embassy\.json$/.test(file || ''));
+    const big = { buildings: [EMBASSY, '__proto__'], embassy: [], remnant: [{ actor: 'x' }] };
+    for (let i = 1; i <= 25; i++) { big.embassy.push({ actor: 0xff002000 + i, name: 'P' + i, armed: i <= 9 }); }
+    big.embassy.push({ actor: 0xff002001, name: 'P1 twice', armed: false });
+    const files = {}; files[file] = JSON.stringify(big);
+    const edited = load({ files: files });
+    const rolls = edited.E.rolls();
+    yes('R5 a file with 25 on the roll loads 20', rolls.embassy.length === 20);
+    yes('R5 and with 9 marked armed loads 6', rolls.embassy.filter(function (r) { return r.armed; }).length === 6);
+    yes('R5 and a row that is not a person is dropped', rolls.remnant.length === 0 && rolls.buildings.length === 1);
+  }
+  {
+    // A write that fails changes nothing.
+    const files = {};
+    const env = load({ people: crowd(1), files: files });
+    files.__refuse = true;
+    const line = run(env, ADMIN, 0x14, '/embassy add Person1');
+    yes('R6 a roll that cannot be written refuses and keeps nobody', !env.R.has(0xff001001, 'embassy') && /could not be written/.test(line));
+  }
+  {
+    const env = load({ people: crowd(2) });
+    run(env, ADMIN, 0x14, '/remnant add Person1');
+    yes('R7 the remnant roll holds an applicant an admin wrote', env.R.has(0xff001001, 'remnant') && !env.R.has(0xff001001, 'embassy'));
+    const noArm = run(env, ADMIN, 0x14, '/remnant arm Person1');
+    yes('R7 the remnant roll has no armed mark', /\/remnant add or remove/.test(noArm));
+    run(env, ADMIN, 0x14, '/remnant remove Person1');
+    yes('R7 and an admin takes them off', !env.R.has(0xff001001, 'remnant'));
+    yes('R7 a roll that is neither is never true', !env.R.has(0xff001001, 'legion') && !env.R.has(0xff001001, 'constructor'));
+  }
+
+  // ------------------------------------------------------- the building --
+  {
+    const claims = {};
+    claims[HOUSE] = { by: 77, name: 'Hjoldan' };
+    const env = load({ door: { 0x14: EMBASSY, 0x15: HOUSE }, claims: claims });
+    const notAdmin = run(env, NOBODY, 0x14, '/embassy here');
+    yes('B1 only an admin says which building is the embassy', !env.E.holds(EMBASSY) && /Only an admin/.test(notAdmin));
+    const set = run(env, ADMIN, 0x14, '/embassy here');
+    yes('B1 an admin at its door makes that building the embassy', env.E.holds(EMBASSY) && /is the embassy/.test(set));
+    const held = run(env, ADMIN, 0x15, '/embassy here');
+    yes('B1 a building somebody holds is not taken by the Accord: the steward ends that claim first',
+        !env.E.holds(HOUSE) && /held by Hjoldan/.test(held) && /\/evict/.test(held));
+    const nowhere = run(load({}), ADMIN, 0x16, '/embassy here');
+    yes('B1 an admin who has not opened a door is asked to', /Open the embassy/.test(nowhere));
+    const again = load({ files: env.files });
+    yes('B1 the building is still the embassy after a restart', again.E.holds(EMBASSY));
+    run(env, ADMIN, 0x14, '/embassy here off');
+    yes('B1 and an admin can say it is not', !env.E.holds(EMBASSY));
+  }
+
+  // The property block's own words, driven with the embassy in place.
+  {
+    const env = load({ door: { 0x14: EMBASSY } });
+    run(env, ADMIN, 0x14, '/embassy here');
+    const E = env.E;
+    const claimSrc = slice(gm, '  function claim(actorId, profileId, toProfile) {\n    var building = here(actorId);', '\n  }\n');
+    const evictSrc = slice(gm, '  function evict(actorId, profileId, toProfile) {', '\n  }\n');
+    const touchedSrc = slice(gm, '  function touched(actorId, doorDesc) {', '\n  }\n');
+    yes('B2 claim, evict and the door press are in the property block', !!claimSrc && !!evictSrc && !!touchedSrc);
+    function claimAt(building) {
+      const told = [];
+      const claims = {};
+      const fn = new Function('globalThis', 'here', 'holderOf', 'nameOf', 'mp', 'groundHere', 'claims', 'save', 'pushAll',
+        'giveDeed', 'plog', 'lapseDays', claimSrc + '\nreturn claim;');
+      const claim = fn({ __thornswoodEmbassy: E }, function () { return building; }, function () { return null; },
+        function (b) { return b; }, { get: function () { return { name: 'Bjorn' }; } }, function () { return null; },
+        claims, function () { }, function () { }, function () { return true; }, function () { }, function () { return 14; });
+      claim(0x14, 50, function (p, line) { told.push(line); });
+      return { told: told.join(' '), claims: claims };
+    }
+    const atEmbassy = claimAt(EMBASSY);
+    yes('B2 /claim at the embassy answers that it is held', !atEmbassy.claims[EMBASSY] && atEmbassy.told === E.CLAIM_REFUSED &&
+        /held by the Ambassador's office/.test(atEmbassy.told));
+    const atHouse = claimAt(HOUSE);
+    yes('B2 and any other door is claimed as before', !!atHouse.claims[HOUSE]);
+
+    function evictAt(building, held) {
+      const told = [];
+      const claims = {};
+      if (held) { claims[building] = held; }
+      const fn = new Function('globalThis', 'isSteward', 'here', 'holderOf', 'nameOf', 'claims', 'save', 'pushAll', 'plog',
+        evictSrc + '\nreturn evict;');
+      const evict = fn({ __thornswoodEmbassy: E }, function () { return true; }, function () { return building; },
+        function () { return claims[building] || null; }, function (b) { return b; }, claims,
+        function () { }, function () { }, function () { });
+      evict(0x14, STEWARD, function (p, line) { told.push(line); });
+      return { told: told.join(' '), claims: claims };
+    }
+    const ev = evictAt(EMBASSY, { by: 9, name: 'Somebody' });
+    yes('B3 a steward of Haafingar cannot evict the embassy', !!ev.claims[EMBASSY] && ev.told === E.EVICT_REFUSED &&
+        /does not evict the Accord/.test(ev.told));
+    const evHouse = evictAt(HOUSE, { by: 9, name: 'Somebody' });
+    yes('B3 and still ends a claim anywhere else', !evHouse.claims[HOUSE]);
+
+    function deedAt(building) {
+      const claims = {};
+      const said = [];
+      const fn = new Function('globalThis', 'buildingOf', 'g', 'mp', 'DOOR_PROPERTY', 'plog', 'push', 'holderOf', 'holdsDeed',
+        'groundHere', 'claims', 'save', 'pushAll', 'nameOf', 'notify', 'say', 'refrIdOfDoor',
+        touchedSrc + '\nreturn touched;');
+      const touched = fn({ __thornswoodEmbassy: E }, function () { return building; }, {},
+        { get: function (id, p) { return p === 'profileId' ? 50 : { name: 'Thief' }; }, set: function () { } },
+        'thornswoodDoor', function () { }, function () { }, function () { return null; }, function () { return true; },
+        function () { return null; }, claims, function () { }, function () { }, function (b) { return b; },
+        function (a, l) { said.push(l); }, function (a, l) { said.push(l); }, function () { return 0; });
+      touched(0x14, 'door');
+      return claims;
+    }
+    yes('B4 a deed presented at the embassy door takes nothing', !deedAt(EMBASSY)[EMBASSY]);
+    yes('B4 and a deed at any other door is still the title', !!deedAt(HOUSE)[HOUSE]);
+  }
+
+  // ------------------------------------------- the bench, by the roll --
+  {
+    const P = (function () {
+      const pb = slice(gm, '// ==== thornswood progression ====', '// ==== end thornswood progression ====');
+      const box = { console: { log: function () { } } };
+      box.globalThis = box;
+      vm.runInNewContext(pb, box);
+      return box.__thornswoodProgression;
+    })();
+    const cut = function (head) { return slice(gm, head, '\n}\n'); };
+    const noProfM = /^const NO_PROFESSION_AT_A_BENCH = '([^']*)';$/m.exec(gm);
+    const helpers = ['function rankWord(', 'function aWord(', 'function professionName(', 'function onCraftRoll('].map(cut);
+    const craftSrc = cut('function craftAnswer(');
+    yes('C0 the craft gate and its roll question are in the gamemode', !!craftSrc && helpers.every(function (h) { return !!h; }));
+    function nameOf(key) {
+      const T = P.TABLE;
+      if (P.has(T.classes, key)) { return T.classes[key].name; }
+      for (const p in T.professions) { if (P.has(T.professions[p].halves, key)) { return T.professions[p].halves[key]; } }
+      if (P.has(T.professions, key)) { return T.professions[key].name; }
+      return key;
+    }
+    const env = load({ people: { Envoy: { actor: 0xff003001, pid: 31 }, Exile: { actor: 0xff003002, pid: 32 } } });
+    run(env, ADMIN, 0x14, '/embassy add Envoy');
+    run(env, ADMIN, 0x14, '/remnant add Exile');
+    function answer(state, actor, row) {
+      const g = { __thornswoodProgression: P, __thornswoodRolls: env.R,
+                  __thornswoodCharacter: { stateOf: function () { return state; }, nameOf: nameOf } };
+      const fn = new Function('globalThis', 'log', 'raceGate', 'NO_PROFESSION_AT_A_BENCH',
+        helpers.join('\n') + '\n' + craftSrc + '\nreturn craftAnswer;');
+      return fn(g, function () { }, function () { return null; }, noProfM[1])(actor, row);
+    }
+    function master(prof, half) {
+      const r = P.pickProfession(P.fresh(), prof, half);
+      for (const h of ['platewright', 'edgewright', 'liverywright', 'haberdasher', 'woodwright']) { r.state.ranks[h] = 'master'; }
+      r.state.ranks[half] = 'master';
+      return r.state;
+    }
+    const embassyRows = Object.keys(RECIPES).filter(function (k) { return RECIPES[k].roll === 'embassy'; });
+    const remnantRows = Object.keys(RECIPES).filter(function (k) { return RECIPES[k].roll === 'remnant'; });
+    yes('C1 the cut file counts are the table: 15 embassy rows and 9 remnant rows', embassyRows.length === 15 && remnantRows.length === 9);
+    function who(row) {
+      const half = String(RECIPES[row].half).toLowerCase();
+      const prof = { platewright: 'smith', edgewright: 'smith', liverywright: 'tailor', haberdasher: 'tailor', woodwright: 'woodworker' }[half];
+      return master(prof, half);
+    }
+    const publicBench = embassyRows.concat(remnantRows).filter(function (k) {
+      const a = answer(who(k), 0xff009999, RECIPES[k]);
+      return !(a.refusal && /not made at a public bench/.test(a.refusal));
+    });
+    yes('C2 a master of the right half who is on no roll makes none of the 24 at a public forge', publicBench.length === 0);
+    const envoyMakes = embassyRows.filter(function (k) { return !answer(who(k), 0xff003001, RECIPES[k]).refusal; });
+    yes('C3 a master on the embassy roll makes every embassy row', envoyMakes.length === 15);
+    const envoyThalmor = remnantRows.filter(function (k) { return !answer(who(k), 0xff003001, RECIPES[k]).refusal; });
+    yes('C3 and none of the remnant rows', envoyThalmor.length === 0);
+    const exileMakes = remnantRows.filter(function (k) { return !answer(who(k), 0xff003002, RECIPES[k]).refusal; });
+    yes('C4 a master on the remnant roll makes every remnant row', exileMakes.length === 9);
+    const exileImperial = embassyRows.filter(function (k) { return !answer(who(k), 0xff003002, RECIPES[k]).refusal; });
+    yes('C4 and none of the embassy rows', exileImperial.length === 0);
+    const robe = remnantRows.filter(function (k) { return RECIPES[k].name === 'Thalmor Robes'; })[0];
+    yes('C5 the robes are not race locked: races.md says Thalmor robes are a faction, not a people', robe && RECIPES[robe].race === '');
+  }
+
+  // --------------------------------------------------------- the marker --
+  {
+    const env = load({ worn: { 0xa1: [idOf('65bbf:Skyrim.esm')], 0xa2: [idOf('81f:MoreCraftableEquipment.esp')],
+                               0xa3: [idOf('12e4d:Skyrim.esm')], 0xa4: [idOf('1859:Immersive Weapons.esp')] } });
+    const gear = env.T.gear();
+    const outs = Object.keys(RECIPES).filter(function (k) { return RECIPES[k].roll === 'remnant'; }).map(function (k) { return idOf(RECIPES[k].out); });
+    yes('M1 every piece the remnant rows make reads Thalmor', outs.every(function (id) { return !!gear[id]; }));
+    yes('M1 and so do the game\'s own Thalmor Robes and Hooded Thalmor Robes', !!gear[idOf('65bbf:Skyrim.esm')] && !!gear[idOf('10c698:Skyrim.esm')]);
+    yes('M1 and those two are the records the /give table names for them',
+        ADMIN_ITEMS['thalmor robes'][1] === '65bbf:Skyrim.esm' && ADMIN_ITEMS['hooded thalmor robes'][1] === '10c698:Skyrim.esm');
+    yes('M1 and no Imperial piece does', !gear[idOf('13ed9:Skyrim.esm')] && !gear[idOf('d3ea0:Skyrim.esm')]);
+    yes('M2 a character in Thalmor Robes carries the marker', env.T.marked(0xa1) === true);
+    yes('M2 and in the robes the remnant makes', env.T.marked(0xa2) === true);
+    yes('M2 and carrying a Justiciar Saber', env.T.marked(0xa4) === true);
+    yes('M2 and in iron armour does not', env.T.marked(0xa3) === false);
+    yes('M2 and nothing worn is no marker', env.T.marked(0xa9) === false);
+    const wearer = run(env, NOBODY, 0xa1, '/remnant');
+    yes('M3 /remnant tells somebody in Thalmor robes that what they have on reads Thalmor',
+        /You are not on the Thalmor remnant roll/.test(wearer) && /reads Thalmor/.test(wearer) && /hostile marker/.test(wearer));
+    yes('M3 and says nothing of it to somebody in iron', !/reads Thalmor/.test(run(env, NOBODY, 0xa3, '/remnant')));
+    yes('M3 the embassy question never reads the marker', !/reads Thalmor/.test(run(env, NOBODY, 0xa1, '/embassy')));
+  }
+
+  // ------------------------------------------- what the block does not do --
+  {
+    yes('P1 the block stands up no actor: the patrols wait on the NPC lane',
+        !/placeActors\(|mp\.place\(|createActor|__thornswoodNpcRuntime|__thornswoodNpcPopulation/.test(block));
+    yes('P1 and runs no timer of its own', !/setInterval|setTimeout/.test(block));
+    yes('P1 placeActors is the /spawn commands\' own, as it was', /\n  return \{ made: made, why: why \};\n\}/.test(gm));
+    yes('P2 nothing here makes a box, a board, a ledger or gold for the embassy',
+        !/__thornswoodProperty\.(deposit|putIn|takeGold)|addItemsAtomic|LEDGER_HOLDS|boxes\(|boards\(/.test(block));
+  }
+
+  // ------------------------------------------------------- the open world --
+  {
+    const spoils = slice(gm, '// ==== thornswood spoils ====', '// ==== end thornswood spoils ====');
+    const loot = slice(gm, '// ==== thornswood dungeon loot ====', '// ==== end thornswood dungeon loot ====');
+    yes('S1 the spoils block takes every weapon, armour and arrow the world placed',
+        !!spoils && /var SPOIL_TYPES = \{ WEAP: true, ARMO: true, AMMO: true \};/.test(spoils));
+    const outs = Object.keys(RECIPES).filter(function (k) { return RECIPES[k].roll; }).map(function (k) { return RECIPES[k].out; })
+      .concat(['65bbf:Skyrim.esm', '10c698:Skyrim.esm']);
+    yes('S2 no dungeon chest or body hands out an embassy or remnant piece',
+        !!loot && outs.length === 26 && outs.every(function (d) { return loot.indexOf("'" + d + "'") === -1; }));
+  }
+
+  // ---------------------------------------------------------- the words --
+  {
+    const W = /^const WORDS = (\[[\s\S]*?\]);$/m.exec(gm);
+    const PW = /^const PLAYER_WORDS = (\[[\s\S]*?\]);$/m.exec(gm);
+    const words = W ? new Function('return ' + W[1])() : [];
+    const playerWords = PW ? new Function('return ' + PW[1])() : [];
+    yes('W1 the server answers /embassy and /remnant', words.indexOf('/embassy') !== -1 && words.indexOf('/remnant') !== -1);
+    yes('W1 and /help does not offer them to everybody', playerWords.indexOf('/embassy') === -1 && playerWords.indexOf('/remnant') === -1);
+    yes('W1 the chat dispatcher hands both to the block', /if \(word === '\/embassy' \|\| word === '\/remnant'\) \{[\s\S]{0,200}__thornswoodEmbassy/.test(gm));
+    const EM = String.fromCharCode(0x2014);
+    const lines = (block.match(/'[^'\n]*'/g) || []).join(' ');
+    yes('W2 nothing the block says has an em dash', lines.indexOf(EM) === -1 && block.indexOf(EM) === -1);
+    yes('W2 nor the word the writing rules ban', !/\bplayers?\b/i.test(block));
+  }
+}
+
+console.log('');
+console.log(pass + ' passed, ' + fail + ' failed');
+process.exit(fail ? 1 : 0);
