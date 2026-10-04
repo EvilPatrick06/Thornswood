@@ -151,8 +151,18 @@ Claims, deeds, the 14 day lapse, locks, molds, keys, stewards,
 eviction, rent, and the gold-only box are in the server. The register
 is `private/property.json`.
 
-`/rest bed` still believes the word. It does not look for a bed.
-A holder cannot set a price for a night. `/bed` does not exist.
+`/bed` sets, clears and says the price of a night, and the gold
+goes from the sleeper's pack to the holder's. A holder who is away
+is handed it the next time they are in the world. `/rest bed`
+counts a bed only when the server saw the person press it and they
+are still beside it, and the rest stops when they leave it or the
+night runs out. The holder, and anybody carrying its key or its
+deed, sleeps free at the bed rate. Anybody else says `/rest bed`
+once to hear the price and again within a minute to pay it. A paid
+night lasts 8 real hours. A bed in a building nobody holds is
+nobody's to lend. Who counts as allowed and how long a night is
+are asked on issue #1392. Prices and paid nights are in
+`private/beds.json`.
 Outhouses and pots stay unknown until the vote on
 [The body](body.md). The company payout that
 withdraws from the ledger is not built. The four house parts are

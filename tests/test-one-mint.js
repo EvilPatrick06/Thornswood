@@ -334,6 +334,7 @@ const WRITERS = {
   'property/takeBlankMold': [1, 'only takes a mold away'],
   'property/nameFreshKey': [1, 'names one key off a stack, and the count is the same after'],
   'property/takeGold': [1, 'takes a notice or job fee out and never puts any in (checked below)'],
+  'property/giveGold': [1, 'a night in a bed (#1392): hands the holder only gold payNight has just taken out of the sleeper\'s pack, or the bed book kept from such a payment (checked below)'],
   'spoils/strip': [1, 'only takes things out of a container the world stocked'],
   'spoils/purse': [1, 'THE MINT: forty gold, once per character'],
   'trade/moveById': [2, 'moves a pile from one pack to the other, one write each (section 4)']
@@ -393,9 +394,9 @@ for (const at of Object.keys(WRITERS)) {
     if (body !== null && namesGold.test(body)) { naming.push(at); }
   }
   naming.sort();
-  yes('of the writers, only purse and takeGold name gold' +
+  yes('of the writers, only purse, takeGold and the night\'s giveGold name gold' +
       (naming.length ? ' (' + naming.join(', ') + ')' : ''),
-      naming.join(',') === 'property/takeGold,spoils/purse');
+      naming.join(',') === 'property/giveGold,property/takeGold,spoils/purse');
 }
 
 {
@@ -460,9 +461,39 @@ for (const at of Object.keys(WRITERS)) {
   }
   const notice = /\bvar NOTICE_FEE = (\d+);/.exec(code);
   const job = /\bvar JOB_FEE = (\d+);/.exec(code);
-  yes('its one caller passes the fee, and the fee is NOTICE_FEE or JOB_FEE',
-      callers.join(',') === 'fee' &&
+  yes('its callers pass the fee, and the fee is NOTICE_FEE or JOB_FEE, or a night\'s price',
+      callers.slice().sort().join(',') === 'fee,price' &&
       /\bvar fee = isJob \? JOB_FEE : NOTICE_FEE;/.test(code));
+  /*
+    A NIGHT IN A BED (#1392) takes the holder's price and hands the same
+    number to the holder, so it moves coin and makes none. The price is a
+    whole number above nothing, both where /bed sets it and where the book is
+    read back, so a negative amount never reaches takeGold.
+  */
+  const pay = lift('  function payNight(actorId, profileId, building, held, price) {', '\n  }\n');
+  const cmd = lift('  function bedCmd(parts, actorId, profileId, toProfile) {', '\n  }\n');
+  const load = lift('  function loadBedBook() {', '\n  }\n');
+  yes('a night takes its price before anything is handed over, and refuses when it cannot',
+      pay !== null && /^\s+if \(!takeGold\(actorId, price\)\) \{ return false; \}$/m.test(pay) &&
+      pay.indexOf('takeGold(actorId, price)') < pay.indexOf('giveGold('));
+  yes('the price is set as a whole number above nothing, and read back as one',
+      cmd !== null && /var amount = \/\^\\d\+\$\/\.test\(arg\) \? Number\(arg\) : 0;/.test(cmd) &&
+      /if \(!\(amount > 0\) \|\|/.test(cmd) &&
+      load !== null && /if \(by > 0 && price > 0 && Math\.floor\(price\) === price\)/.test(load));
+  const gives = [];
+  const gre = /\bgiveGold\(\s*([^,()]+),\s*([^()]+?)\)/g;
+  let g2;
+  while ((g2 = gre.exec(code)) !== null) {
+    if (code.slice(Math.max(0, g2.index - 9), g2.index) === 'function ') { continue; }
+    gives.push(where(g2.index) + ':' + g2[2].trim());
+  }
+  yes('giveGold hands over only the night just paid and the kept takings (' + gives.join(', ') + ')',
+      gives.slice().sort().join(',') === 'property/payNight:price,property/payTakings:gold');
+  const kept = lift('  function payTakings(online) {', '\n  }\n');
+  yes('the kept takings only ever grow by a night\'s price that was taken',
+      pay !== null && /bedBook\.takings\[held\.by\] = \(Number\(bedBook\.takings\[held\.by\]\) \|\| 0\) \+ price;/.test(pay) &&
+      (code.match(/bedBook\.takings\[[^\]]+\] = /g) || []).length === 1 &&
+      kept !== null && /delete bedBook\.takings\[pid\];/.test(kept));
   yes('and both fees are more than nothing',
       !!notice && !!job && Number(notice[1]) > 0 && Number(job[1]) > 0);
 }
