@@ -375,9 +375,12 @@ elseif (-not $NoVortex) {
     }
 }
 
+$shipGeneratedFiles = Get-ShipGeneratedFiles $ProfileDir
+Assert-ShipGeneratedBodies $GameDir $ProfileDir
 function Test-FromCollection([string]$rel) {
     if ($null -eq $vortexFiles) { return $false }
     if ($rel -ieq 'Data\Thornswood-Content.esp') { return $false }
+    if ($shipGeneratedFiles -contains $rel) { return $false }
     return $vortexFiles.Contains($rel)
 }
 
