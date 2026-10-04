@@ -24,10 +24,11 @@ You cannot craft on the strength of this half.
 You cannot be credited for killing a person.
 
 The maneuvers for this half are Rush, Heavy, Break, and Wreck. The
-numbers are on [Warrior](../warrior.md). They are not in the server.
+numbers, and what the server does with each, are on
+[Warrior](../warrior.md).
 
 ## Where this is
 
-The half can be picked and the extra Might point lands. Nothing in
-combat reads the word Berserker beyond the kill credit going to
-whichever half you hold.
+The half can be picked, the extra Might point lands, kills credit the
+half by how hard they were, and its four maneuvers are in. A Break or
+a Wreck staggers a person, and not yet a creature.
