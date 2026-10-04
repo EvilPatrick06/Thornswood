@@ -82,7 +82,7 @@ crosshair. Nobody is told to type it, and help text never lists it.
 | `/ooc`, `/o` | Anybody | Out of character, to whoever is near | `gamemode.js:45334` | The list; `/help talking`; Help page; [Text chat](chat.md), [Factions](factions.md), [Notice boards](noticeboards.md); `site/data/site/rules.md` | None. To come: a button on the chat box. | #1639 |
 | `/roll`, `/r` | Anybody | Dice, rolled on the server | `game/ui/thornswood-chat.js:334`, `gamemode.js:45419` | The list; `/help talking`; Help page "Dice" | None. To come: a dice button. | #1639 |
 | `/repair`, `/repair mend <base> <condition> <name>` | Anybody with a repair kit | Opens the repair panel; a row's Mend button mends that piece with a kit | The `/repair` branch of `handle`, then `panel` in the durability block | Nowhere. [Durability](durability.md) names the key and the panel | U in the inventory, with a kit in the pack, opens the panel, and Mend sends `mend`. Never in the list or the help. | #1384 |
-| `/maneuver`, `/maneuver <name>` | A warrior | A warrior's maneuvers | `gamemode.js:44929` | The list; `/help work`; [Warrior](professions/warrior.md) | In hand. | #1386 |
+| `/maneuver <name>`, `/maneuver` | A warrior | Starts a warrior's maneuver; with no name, says which you hold | `gamemode.js`, `use` in the warrior maneuvers block | Nowhere. [Warrior](professions/warrior.md) names the key | The maneuver key (9) opens a panel of yours, and a number or a click there sends it. Never in the list or the help. | #1386 |
 
 `/pick` and `/spend` are the K panel's lines (`gamemode.js:40783`):
 profession, class, town, spells and points, and `/pick perk fontofmagic`
