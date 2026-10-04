@@ -198,7 +198,10 @@ yes('the gamemode\'s list of everybody\'s commands can be read', Array.isArray(e
   let c;
   while ((c = rx.exec(page)) !== null) { named[c[2]] = true; }
   const words = Object.keys(named);
-  yes('the page names commands, ' + words.length + ' of them', words.length >= 10);
+  // Fewer every week since 4 Oct, when Patrick ruled that what people do is
+  // keys and panels and not commands: #1603 took /rest off. Enough that the
+  // scan above is known to read the page.
+  yes('the page names commands, ' + words.length + ' of them', words.length >= 5);
   const unknown = words.filter(function (w) { return (everybody || []).indexOf(w) === -1; });
   yes('and every one is on the gamemode\'s list for everybody' +
       (unknown.length ? ' (not: ' + unknown.join(', ') + ')' : ''), unknown.length === 0);

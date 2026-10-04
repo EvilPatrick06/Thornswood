@@ -468,8 +468,10 @@ for (const at of Object.keys(WRITERS)) {
   const job = /\bvar JOB_FEE = (\d+);/.exec(code);
   const letterFee = /\bvar LETTER_FEE = (\d+);/.exec(code);
   const letterPay = /\bvar LETTER_PAY = (\d+);/.exec(code);
-  yes('its four callers pass the fee, NOTICE_FEE or JOB_FEE, a letter\'s cost, LETTER_FEE and LETTER_PAY, a ride\'s fare and a night\'s price',
-      callers.slice().sort().join(',') === 'cost,fee,price,price' &&
+  // A night in a bed was a fourth (#1392) until #1603: a night is paid in a
+  // trade now, and the server takes no price for one.
+  yes('its three callers pass the fee, NOTICE_FEE or JOB_FEE, a letter\'s cost, LETTER_FEE and LETTER_PAY, and a ride\'s fare',
+      callers.slice().sort().join(',') === 'cost,fee,price' &&
       /\bvar fee = isJob \? JOB_FEE : NOTICE_FEE;/.test(code) &&
       /\bvar cost = LETTER_FEE \+ LETTER_PAY;/.test(code));
   const fares = ['FARE_FERRY', 'FARE_CARRIAGE', 'FARE_RAVEN_ROCK'].map(function (n) {
@@ -483,29 +485,24 @@ for (const at of Object.keys(WRITERS)) {
       !!notice && !!job && Number(notice[1]) > 0 && Number(job[1]) > 0 &&
       !!letterFee && !!letterPay && Number(letterFee[1]) > 0 && Number(letterPay[1]) > 0);
   /*
-    A NIGHT IN A BED (#1392) takes the holder's price and hands the same
-    number to the holder through payOut, so it moves coin and makes none. The
-    price is a whole number above nothing, both where /bed sets it and where
-    the book is read back, so a negative amount never reaches takeGold.
+    A NIGHT IN A BED moves no gold since #1603: it is paid in a trade between
+    two people, and the server keeps no price. What #1392's book kept for a
+    holder who was away is only ever handed out, once, through payOut, and
+    nothing adds to it: the book reads it back as whole gold above nothing,
+    and no line in the gamemode writes a sum into it.
   */
-  const night = lift('  function payNight(actorId, profileId, building, held, price) {', '\n  }\n');
-  const cmd = lift('  function bedCmd(parts, actorId, profileId, toProfile) {', '\n  }\n');
   const load = lift('  function loadBedBook() {', '\n  }\n');
-  yes('a night takes its price before anything is handed over, and refuses when it cannot',
-      night !== null && /^\s+if \(!takeGold\(actorId, price\)\) \{ return false; \}$/m.test(night) &&
-      night.indexOf('takeGold(actorId, price)') < night.indexOf('payOut('));
-  yes('the price is set as a whole number above nothing, and read back as one',
-      cmd !== null && /var amount = \/\^\\d\+\$\/\.test\(arg\) \? Number\(arg\) : 0;/.test(cmd) &&
-      /if \(!\(amount > 0\) \|\|/.test(cmd) &&
-      load !== null && /if \(by > 0 && price > 0 && Math\.floor\(price\) === price\)/.test(load));
   const kept = lift('  function payTakings(online) {', '\n  }\n');
-  yes('the kept takings only ever grow by a night\'s price that was taken',
-      night !== null && /bedBook\.takings\[held\.by\] = \(Number\(bedBook\.takings\[held\.by\]\) \|\| 0\) \+ price;/.test(night) &&
-      (code.match(/bedBook\.takings\[[^\]]+\] = /g) || []).length === 1 &&
+  yes('nothing takes a price for a night any more',
+      code.indexOf('function payNight(') === -1 && code.indexOf('function bedCmd(') === -1);
+  yes('the kept takings are read back as whole gold above nothing',
+      load !== null && /if \(\(Number\(tp\) \|\| 0\) > 0 && gold > 0 && Math\.floor\(gold\) === gold\) \{/.test(load));
+  yes('and they never grow: nothing writes a sum into them',
+      (code.match(/bedBook\.takings\[[^\]]+\] = /g) || []).length === 0 &&
       kept !== null && /delete bedBook\.takings\[pid\];/.test(kept));
-  yes('and a night hands over the price it took, and the takings what was kept',
-      night !== null && /payOut\(to, price\)/.test(night) &&
-      kept !== null && /payOut\(online\[i\], gold\)/.test(kept));
+  yes('and what was kept is handed over through payOut, then taken off the book',
+      kept !== null && /payOut\(online\[i\], gold\)/.test(kept) &&
+      kept.indexOf('payOut(online[i], gold)') < kept.indexOf('delete bedBook.takings[pid];'));
 }
 
 {
@@ -523,8 +520,8 @@ for (const at of Object.keys(WRITERS)) {
     if (code.slice(Math.max(0, m2.index - 9), m2.index) === 'function ') { continue; }
     calls.push(where(m2.index));
   }
-  yes('payOut\'s callers are payHeld, and a night in a bed and its kept takings (#1392)',
-      calls.slice().sort().join(',') === 'property/payHeld,property/payNight,property/payTakings');
+  yes('payOut\'s callers are payHeld, and the takings #1392 kept for a holder, handed over once (#1603)',
+      calls.slice().sort().join(',') === 'property/payHeld,property/payTakings');
   const pay = lift('  function payOut(actorId, amount) {', '\n  }\n');
   const held = lift('  function payHeld(hold, n, actorId) {', '\n  }\n');
   yes('the payout and the held pay are in the gamemode', pay !== null && held !== null);
