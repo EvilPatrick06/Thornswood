@@ -109,6 +109,6 @@ gold, the six refused purses, and trade between two people are in the
 server. A dungeon chest pays its tier's gold on that place's rest.
 A guild trader's 250 is not. A scene quest creates its gold when it is finished, and that
 gold is not taken from a trader's purse. Rank is not for sale. Nothing loses 5% a day for sitting
-in a chest. Notice fees, job fees, letter fees and rent are counted
-on the ledger. The one payout is a letter's 15: to the courier on
-delivery, or back to the sender on an `/unpin`.
+in a chest. Notice fees, job fees, letter fees, rent, and carriage and
+ferry fares are counted on the ledger. The one payout is a letter's 15:
+to the courier on delivery, or back to the sender on an `/unpin`.

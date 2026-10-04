@@ -271,6 +271,7 @@ jobs:
                  'test-1374-letters.js',
                  'test-1380-rare-mines.js',
                  'test-1388-apprentice.js',
+                 'test-1394-fares.js',
                  'test-secrets-fail-closed.js',
                  'test-site-auth.js',
                  'test-site-headers.js',

@@ -6904,6 +6904,82 @@
     return (Math.sin(yaw) * dx + Math.cos(yaw) * dy) / horiz > 0.5;
   }
 
+  /*
+    A CARRIAGE OR FERRY DRIVER ASKS THE SERVER (#1394).
+
+    Pressing E on a driver opens the carriage mod's own talk, and that talk
+    does not know the hold's ledger: its ride is a fade on this machine that
+    the server undoes, because the server refuses a move it did not make.
+    So the same press also tells the server which driver it was, as
+    /ride e <id>, the way the merchant press does, and the server answers in
+    the chat with where this driver goes and what each stop costs. /ride and
+    the stop, said there, is the ride that counts.
+
+    THE DRIVERS ARE KNOWN BY THEIR BASE, the same rows as the carriages block
+    in the gamemode (tests/test-1394-fares.js holds the two lists together).
+    A base from a plugin is asked for by its file and its own id, because a
+    runtime id carries the plugin's place in the load order. Kept as numbers,
+    never as forms: a form does not outlive its frame (see THE IDS, RESOLVED
+    ONCE, above). A first press before the world answers resolves nothing and
+    is tried again on the next one.
+  */
+  const RIDE_DRIVER_BASES = [
+    ['CFTO.esp', 0x6ae98], ['CFTO.esp', 0x6ae97], ['CFTO.esp', 0x6ae99],
+    ['CFTO.esp', 0x6ae96], ['CFTO.esp', 0x6ae95], ['CFTO.esp', 0xbbf8f],
+    ['CFTO.esp', 0xbbf8c], ['CFTO.esp', 0xbbf8d], ['CFTO.esp', 0x1be45a],
+    ['CFTO.esp', 0x14c5a], ['CFTO.esp', 0xaa08], ['CFTO.esp', 0x2d4c09],
+    ['CFTO.esp', 0xaa0b], ['CFTO.esp', 0xaa07], ['CFTO.esp', 0x158ffc],
+    ['CFTO.esp', 0xaa09], ['CFTO.esp', 0xfb28], ['CFTO.esp', 0xfb24],
+    ['CFTO.esp', 0x14c52], ['CFTO.esp', 0x2e1e6], ['CFTO.esp', 0x332f5],
+    ['CFTO.esp', 0x332ed], ['CFTO.esp', 0x14c6e], ['CFTO.esp', 0x14c78],
+    ['CFTO.esp', 0x14c6c], ['Dragonborn.esm', 0x182ae], ['Dragonborn.esm', 0x2582b]
+  ];
+  let rideDriverIds = null;
+
+  function rideDriverIdSet() {
+    if (rideDriverIds) { return rideDriverIds; }
+    const out = {};
+    let found = 0;
+    for (let i = 0; i < RIDE_DRIVER_BASES.length; i++) {
+      try {
+        const form = sp.Game.getFormFromFile(RIDE_DRIVER_BASES[i][1], RIDE_DRIVER_BASES[i][0]);
+        const id = form ? (form.getFormID() >>> 0) : 0;
+        if (id) { out[id] = true; found++; }
+      } catch (err) { }
+    }
+    if (found) {
+      rideDriverIds = out;
+      say('carriage and ferry drivers: ' + found + ' of ' + RIDE_DRIVER_BASES.length + ' bases found');
+    }
+    return out;
+  }
+
+  function driverPress(e) {
+    if (!e || e.userEventName !== 'Activate') { return false; }
+    if (claims.chat || busyMenuOpen()) { return false; }
+    let ref = null;
+    try { ref = sp.Game.getCurrentCrosshairRef(); } catch (err) { ref = null; }
+    if (!ref) { return false; }
+    let baseId = 0;
+    try {
+      const base = ref.getBaseObject();
+      if (!base || base.getType() !== 43) { return false; }
+      baseId = base.getFormID() >>> 0;
+    } catch (err) { return false; }
+    if (!baseId || !rideDriverIdSet()[baseId]) { return false; }
+    let hex = '';
+    try {
+      const convert = globalThis.thornswoodSocialServerId;
+      const localId = ref.getFormID() >>> 0;
+      const serverId = typeof convert === 'function' ? (convert(localId) >>> 0) : localId;
+      if (serverId) { hex = serverId.toString(16); }
+    } catch (err) { hex = ''; }
+    if (!hex) { return false; }
+    tellServer('/ride e ' + hex);
+    say('asked the server where driver ' + hex + ' goes');
+    return true;
+  }
+
   function merchantPress(e) {
     if (!e || e.userEventName !== 'Activate') { return false; }
     if (claims.chat || busyMenuOpen()) { return false; }
@@ -7027,6 +7103,7 @@
     if (!T.ready) return;
 
     if (boardPress(e)) return;
+    if (driverPress(e)) return;
     if (merchantPress(e)) return;
 
     // Reachable only while focus is down, which is the only time it is needed.
