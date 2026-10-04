@@ -118,8 +118,9 @@ written with `/letter`, not on the panel.
 
 Hauls are in the server: `/haul`, the 30 fee and the pay on the
 ledger, the pay and the destination on the wall and the panel, and
-`/haul done` at the destination. See
-[Free Skyrim Trading Company](trading-company.md).
+`/haul done` at the destination. A haul handed back with `/dropjob`
+is not open again: it comes down, and its pay goes back to the poster.
+See [Free Skyrim Trading Company](trading-company.md).
 
 Ten boards are seeded, and each one is that hold's drop box. Raven
 Rock's is at The Retching Netch, where Geldis Sadri stands. It has no

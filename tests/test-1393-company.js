@@ -9,11 +9,13 @@
 // <number>: the company keeps a tenth of the pay, rounded down, nothing under
 // 10, and the hauler is handed the rest out of the ledger. The ledger keeps
 // the fee and the tenth. An ordinary job is not a haul, and its taker is paid
-// nothing. The poster's /unpin before anybody has taken it, or a steward's,
-// hands the pay back and keeps the fee.
+// nothing. The hauler's /dropjob, the poster's /unpin before anybody has
+// taken it, or a steward's, hands the pay back and keeps the fee. Somebody
+// paid who is away is paid the next time they are in the world, and the gold
+// stays held on the ledger until then.
 //
 // The ledger can go down, through withdraw, and never below what is still
-// held for open letters (#1374) and open hauls.
+// held for open letters (#1374), open hauls and hauls owed to somebody away.
 //
 // A company sale: a worker the company has taken on (a Discord role, the
 // application) offers the price the two people agreed, the seller says yes,
@@ -76,9 +78,9 @@ function fn(name) {
 const NAMES = ['takeGold', 'payOut', 'payHeld', 'sealed', 'nameIs', 'post', 'board', 'take',
                'jobs', 'dropJob', 'takedown', 'unpin', 'postLetter', 'deliver', 'letterReach',
                'boardHere', 'nearestBoard', 'boardPanel', 'moveBoard', 'command',
-               'heldOn', 'mayWithdraw', 'withdraw',
-               'haulTenth', 'haulText', 'haulCmd', 'postHaul', 'confirmHaul', 'unpinHaul',
-               'saleCuts', 'inCompany', 'goldHeld', 'itemIn', 'takeOne', 'putBack', 'companyCmd', 'acceptSale',
+               'noticeHolds', 'heldOn', 'mayWithdraw', 'withdraw',
+               'haulTenth', 'haulText', 'haulCmd', 'postHaul', 'confirmHaul', 'handHaul', 'haulTick', 'cancelHaul',
+               'saleCuts', 'inCompany', 'goldHeld', 'itemIn', 'takeOne', 'putOneBack', 'companyCmd', 'acceptSale',
                'personName', 'profileOf', 'onlineActorOf'];
 const lifted = {};
 const missing = [];
@@ -200,6 +202,7 @@ function boot(reg, w, opts) {
     'var GOLD_ID = ' + GOLD + ';',
     'var HAUL_TENTH_FROM = ' + HAUL_FROM + ';',
     'var SALE_CUT_FROM = ' + SALE_FROM + ';',
+    'var haulShort = {};',
     fees,
     ledger,
     seeding,
@@ -212,7 +215,7 @@ function boot(reg, w, opts) {
   NAMES.forEach(function (n) { body.push(lifted[n]); });
   body.push('return { boards: boards, funds: function () { return funds; }, notices: function () { return notices; }, ' +
             'command: command, boardPanel: boardPanel, deposit: deposit, withdraw: withdraw, mayWithdraw: mayWithdraw, ' +
-            'heldOn: heldOn, haulTenth: haulTenth, saleCuts: saleCuts, acceptSale: acceptSale };');
+            'heldOn: heldOn, haulTenth: haulTenth, haulTick: haulTick, saleCuts: saleCuts, acceptSale: acceptSale };');
   const make = new Function('reg', 'mp', 'plog', 'loadPart', 'PASSAGES', 'g', 'isSteward', 'say', 'notify', body.join('\n'));
   const api = make(reg, w.mp, function () { },
                    function (key, fallback) {
@@ -384,13 +387,6 @@ attempt('a haul, start to finish', function () {
   said = s.say(ALICE, '/haul done whiterun 9');
   yes('C4 and one with a number that is not on the board', /There is no number 9/.test(said));
 
-  w.leave(BOB);
-  said = s.say(ALICE, '/haul done whiterun 1');
-  yes('C5 a hauler who is not in the world is not paid, and the haul stays theirs',
-      /has to be in the world to be paid/.test(said) && w.gold(BOB) === 10 && s.funds().whiterun === 110 &&
-      !s.notices().whiterun[0].down);
-  w.come(BOB);
-
   // A restart in the middle: the haul, its taker and its held pay are all on the register.
   s = boot(reg, w);
   yes('R1 after a restart the haul is still up, still taken, and its pay still held',
@@ -408,6 +404,75 @@ attempt('a haul, start to finish', function () {
   said = s.say(ALICE, '/haul done whiterun 1');
   yes('C7 it is paid once', /already paid or taken down/.test(said) && w.gold(BOB) === 82 && s.funds().whiterun === 38);
   yes('C8 the wall no longer shows it', /Nothing on the board in whiterun/.test(s.say(CYRUS, '/board whiterun')));
+});
+
+// ------------------------------------------- somebody paid who is away
+attempt('somebody away', function () {
+  const w = world();
+  const P = { actor: 0xff000401, pid: 401, name: 'Poster', gold: 300 };
+  const H = { actor: 0xff000402, pid: 402, name: 'Hauler', gold: 0 };
+  const O = { actor: 0xff000403, pid: 403, name: 'Other', gold: 0 };
+  [P, H, O].forEach(w.add);
+  const reg = {};
+  let s = boot(reg, w);
+  const everybody = [P, H, O];
+  const start = total(w, s, everybody);
+  [P, H, O].forEach(function (p) { w.at(p, 'markarth', s); });
+  s.say(P, '/haul 50 dawnstar silver');
+  s.say(H, '/take 1');
+  w.at(P, 'dawnstar', s);
+  w.leave(H);
+  let said = s.say(P, '/haul done markarth 1');
+  yes('A1 a hauler away when it is confirmed: it comes down, the company keeps its 5, and the 45 is held for them',
+      /Hauler is away, so the 45 gold is held on markarth's ledger for them until they are next in the world, and the company keeps 5/.test(said) &&
+      !!s.notices().markarth[0].down && s.funds().markarth === 80 && s.heldOn('markarth', null) === 45 && w.gold(H) === 0);
+  yes('A1 it cannot be confirmed twice', /already paid or taken down/.test(s.say(P, '/haul done markarth 1')) &&
+      s.funds().markarth === 80);
+  yes('A2 what is held for the hauler cannot be spent', s.withdraw('markarth', 36, 'x') === false &&
+      s.funds().markarth === 80);
+  s = boot(reg, w);
+  yes('A3 after a restart it is still held for them', s.heldOn('markarth', null) === 45 && s.funds().markarth === 80 &&
+      s.notices().markarth[0].owed === 45 && s.notices().markarth[0].owedTo === H.pid);
+  s.haulTick();
+  yes('A4 while they are away nothing is handed over', w.gold(H) === 0 && s.funds().markarth === 80);
+  w.come(H);
+  s.haulTick();
+  yes('A5 they come into the world: the 45 is in their pack, off the ledger, and they are told the company kept 5',
+      w.gold(H) === 45 && s.funds().markarth === 35 && s.heldOn('markarth', null) === 0 &&
+      /While you were away, your haul to dawnstar was confirmed. 45 gold is in your pack. The company kept 5/.test(s.heard(H)));
+  s.haulTick();
+  yes('A5 once', w.gold(H) === 45 && s.funds().markarth === 35);
+  yes('A6 the ledger keeps the 30 fee and the 5 tenth, and the coin only moved',
+      s.funds().markarth === 35 && total(w, s, everybody) === start);
+
+  w.at(P, 'markarth', s);
+  w.at(H, 'markarth', s);
+  s.say(P, '/haul 20 riften wine');
+  s.say(H, '/take 2');
+  w.leave(P);
+  said = s.say(H, '/dropjob 2');
+  yes('A7 a hauler drops a haul with the poster away: it comes down, and the 20 is held for the poster',
+      /It comes down, and the 20 gold pay goes back to Poster when they are next in the world/.test(said) &&
+      !!s.notices().markarth[1].down && s.heldOn('markarth', null) === 20 && s.funds().markarth === 85);
+  w.come(P);
+  s.haulTick();
+  yes('A8 the poster comes back and has the pay, and the fee stays',
+      s.funds().markarth === 65 && s.heldOn('markarth', null) === 0 &&
+      /While you were away, your haul to riften came down. The 20 gold pay is back in your pack. The fee stays with markarth/.test(s.heard(P)) &&
+      total(w, s, everybody) === start);
+
+  // A ledger short of what it holds, as if somebody had spent it: the owed gold waits, and nothing is made.
+  s.say(P, '/haul 40 riften wine');
+  s.say(O, '/take 3');
+  w.leave(P);
+  s.say(O, '/dropjob 3');
+  reg.funds.markarth = 10;
+  s = boot(reg, w);
+  w.come(P);
+  const had = w.gold(P);
+  s.haulTick();
+  yes('A9 a ledger that cannot pay what it owes pays nothing, and the gold stays owed',
+      w.gold(P) === had && s.funds().markarth === 10 && s.notices().markarth[2].owed === 40);
 });
 
 // ------------------------------------------------- the tenth, by the page's table
@@ -476,27 +541,41 @@ attempt('taking a haul down', function () {
   said = s.say(ALICE, '/unpin 2');
   yes('U3 once taken, the poster cannot take it down', /Bob has taken that job/.test(said) &&
       w.gold(ALICE) === 90 && s.funds().whiterun === 110);
+  said = s.say(CYRUS, '/dropjob 2');
+  yes('U4 nobody but the hauler hands it back', /not one of yours/.test(said) && s.notices().whiterun[1].taken === BOB.pid);
   said = s.say(BOB, '/dropjob 2');
-  yes('U4 the hauler hands it back: it is open on the board again, the pay still held',
-      /back on the board/.test(said) && !s.notices().whiterun[1].taken && s.heldOn('whiterun', null) === 50);
-  said = s.say(ALICE, '/unpin 2');
-  yes('U5 and then the poster takes it down and has the pay back', /50 gold pay comes back/.test(said) &&
-      w.gold(ALICE) === 140 && s.funds().whiterun === 60);
+  yes('U4 the hauler hands it back: the haul comes down, the pay goes back to the poster, the fee stays',
+      /You hand the haul to riften back. It comes down, and the 50 gold pay goes back to Alice. The fee stays with whiterun/.test(said) &&
+      !!s.notices().whiterun[1].down && w.gold(ALICE) === 140 && s.funds().whiterun === 60 && w.gold(BOB) === 10);
+  yes('U4 the poster is told, nothing is held for it, and the coin only moved',
+      (s.told[ALICE.pid] || []).some(function (m) { return /Bob handed your haul to riften back. The 50 gold pay is back in your pack/.test(m); }) &&
+      s.heldOn('whiterun', null) === 0 && total(w, s, everybody) === start);
+  yes('U5 it is off the hauler\'s list and nobody can take it now',
+      /no jobs/.test(s.say(BOB, '/jobs')) && /has been taken down/.test(s.say(CYRUS, '/take 2')));
+  yes('U5 and a second drop or a confirm pays nothing more',
+      /not one of yours/.test(s.say(BOB, '/dropjob 2')) && w.gold(ALICE) === 140 && s.funds().whiterun === 60);
 
   s.say(ALICE, '/haul 40 markarth ore');
   s.say(BOB, '/take 3');
   w.leave(ALICE);
   said = s.say(STEW, '/unpin 3');
-  yes('U6 a steward cannot hand the pay back to a poster who is not in the world, and it stays up',
-      /Alice has to be in the world to have the pay back/.test(said) && !s.notices().whiterun[2].down &&
+  yes('U6 a steward cancels a taken haul at the posting board with the poster away: it comes down, ' +
+      'and the pay is held for them',
+      /goes back to them when they are next in the world. The fee stays with whiterun/.test(said) &&
+      !!s.notices().whiterun[2].down && s.funds().whiterun === 130 && w.gold(ALICE) === 70 &&
+      s.heldOn('whiterun', null) === 40);
+  yes('U6 the hauler is told', (s.told[BOB.pid] || []).some(function (m) { return /taken down by a steward/.test(m); }));
+  yes('U6 what is held for the poster cannot be spent', s.withdraw('whiterun', 91, 'x') === false &&
       s.funds().whiterun === 130);
+  s.haulTick();
+  yes('U7 while the poster is away nothing is handed over', w.gold(ALICE) === 70 && s.funds().whiterun === 130);
   w.come(ALICE);
-  said = s.say(STEW, '/unpin 3');
-  yes('U7 a steward cancels a taken haul at the posting board: the pay goes back to the poster, the fee stays',
-      /goes back to them, and the fee stays with whiterun/.test(said) && w.gold(ALICE) === 110 &&
-      s.funds().whiterun === 90 && !!s.notices().whiterun[2].down);
-  yes('U7 the poster and the hauler are told', (s.told[ALICE.pid] || []).some(function (m) { return /A steward took your haul/.test(m); }) &&
-      (s.told[BOB.pid] || []).some(function (m) { return /taken down by a steward/.test(m); }));
+  s.haulTick();
+  yes('U7 the poster comes back into the world: the pay is in their pack and off the ledger, the fee stays',
+      w.gold(ALICE) === 110 && s.funds().whiterun === 90 && s.heldOn('whiterun', null) === 0 &&
+      /While you were away, your haul to markarth came down. The 40 gold pay is back in your pack/.test(s.heard(ALICE)));
+  s.haulTick();
+  yes('U7 and it is handed over once', w.gold(ALICE) === 110 && s.funds().whiterun === 90);
   yes('U8 the company kept nothing on any of them, and the coin only moved',
       s.funds().whiterun === 90 && total(w, s, everybody) === start);
   yes('U9 a steward is not a steward of a plain notice', /not yours/.test((function () {

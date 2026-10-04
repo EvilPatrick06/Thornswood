@@ -336,7 +336,7 @@ const WRITERS = {
   'property/takeGold': [1, 'takes a notice, job or letter fee or a fare out and never puts any in (checked below)'],
   'property/payOut': [1, 'a letter\'s held 15 back out of the ledger it was counted on, to its courier or its sender; payHeld is its one caller and takes the same off that ledger (#1374, checked below)'],
   'property/takeOne': [1, 'takes the one thing a company sale bought out of the seller\'s pack, and the thing is one /trade lists, which leaves gold out (#1393)'],
-  'property/putBack': [1, 'puts back the one thing takeOne has just taken, when the seller\'s share could not be written (#1393)'],
+  'property/putOneBack': [1, 'puts back the one thing takeOne has just taken, when the seller\'s share could not be written (#1393)'],
   'spoils/strip': [1, 'only takes things out of a container the world stocked'],
   'spoils/purse': [1, 'THE MINT: forty gold, once per character'],
   'trade/moveById': [2, 'moves a pile from one pack to the other, one write each (section 4)'],
@@ -534,17 +534,80 @@ for (const at of Object.keys(WRITERS)) {
     calls.push(where(m2.index));
   }
   /*
-    And the company (#1393). confirmHaul pays a haul's hauler its pay less
-    the tenth, and unpinHaul hands a haul's pay back to its poster, each
-    taking the same off the ledger through withdraw, which never takes more
-    than that haul holds. postHaul gives back the cost it has just taken
-    when the ledger would not take it. acceptSale hands the seller their
-    share of the gold it has just taken from the worker, and gives the
-    worker it back when the sale cannot finish (test-1393-company.js).
+    And the company (#1393). handHaul pays a haul's held gold, the hauler's
+    pay less the tenth or the poster's pay back, and haulTick what a haul
+    held for somebody who was away, each taking the same off the ledger
+    through withdraw, which never takes more than that haul holds. postHaul
+    gives back the cost it has just taken when the ledger would not take it.
+    acceptSale hands the seller their share of the gold it has just taken
+    from the worker, and gives the worker it back when the sale cannot
+    finish (test-1393-company.js).
   */
   yes('payOut\'s callers are payHeld, a night in a bed and its kept takings (#1392), and the haul and the sale (#1393)',
       calls.slice().sort().join(',') === 'property/acceptSale,property/acceptSale,property/acceptSale,' +
-      'property/confirmHaul,property/payHeld,property/payNight,property/payTakings,property/postHaul,property/unpinHaul');
+      'property/handHaul,property/haulTick,property/payHeld,property/payNight,property/payTakings,property/postHaul');
+
+  /*
+    THE LEDGER GOES DOWN ONLY BY A PAYOUT (#1393). Coin comes off a ledger
+    in two places: payHeld, for a letter's 15, and withdraw. withdraw's
+    callers are handHaul and haulTick, and each hands the same count into a
+    pack, first, in the same function. So a ledger never goes down without
+    the same gold appearing in a pack, and packs plus ledgers add up after.
+  */
+  const down = [];
+  const reDown = /\bfunds\[[^\]]+\] = \(Number\(funds\[[^\]]+\]\) \|\| 0\) - /g;
+  let m3;
+  while ((m3 = reDown.exec(code)) !== null) { down.push(where(m3.index)); }
+  yes('a ledger is counted down in payHeld and withdraw, and nowhere else',
+      down.slice().sort().join(',') === 'property/payHeld,property/withdraw');
+  const wd = [];
+  const reWd = /\bwithdraw\(/g;
+  while ((m3 = reWd.exec(code)) !== null) {
+    if (code.slice(Math.max(0, m3.index - 9), m3.index) === 'function ') { continue; }
+    wd.push(where(m3.index));
+  }
+  const hand = bodyOf('property/handHaul');
+  const tick = bodyOf('property/haulTick');
+  yes('withdraw\'s callers are handHaul and haulTick, and each puts the same count in a pack before it',
+      wd.slice().sort().join(',') === 'property/handHaul,property/haulTick' &&
+      !!hand && hand.indexOf('payOut(to, amount)') > 0 && hand.indexOf('payOut(to, amount)') < hand.indexOf('withdraw(hold, amount,') &&
+      !!tick && tick.indexOf('payOut(to, owed)') > 0 && tick.indexOf('payOut(to, owed)') < tick.indexOf('withdraw(hold, owed,'));
+  const drive = ['noticeHolds', 'heldOn', 'mayWithdraw', 'withdraw', 'handHaul'].map(function (n) {
+    return lift('  function ' + n + '(', '\n  }\n');
+  });
+  const holds = lift('  var LEDGER_HOLDS = [', ';\n');
+  yes('the ledger\'s withdrawal and the haul\'s hand over are in the gamemode', drive.every(Boolean) && !!holds);
+  if (drive.every(Boolean) && holds) {
+    attempt('driving a haul\'s payout', function () {
+      const A = 0xff000058;
+      const store = {};
+      store[A] = { inventory: { entries: [{ baseId: GOLD, count: 5 }] }, profileId: 7 };
+      const funds = { riften: 110 };
+      const notices = { riften: [
+        { haul: true, job: true, pay: 80, dest: 'whiterun', taken: 7 },
+        { letter: true, job: true, pay: 15 }
+      ] };
+      funds.riften += 15;
+      const api = new Function('mp', 'GOLD_ID', 'funds', 'notices', 'plog', 'save', 'onlineActorOf',
+        holds + '\n' + lift('  function payOut(actorId, amount) {', '\n  }\n') + '\n' + drive.join('\n') + '\nreturn { handHaul: handHaul, withdraw: withdraw };')(
+        fakeMp(store), GOLD, funds, notices, function () { }, function () { },
+        function (pid) { return pid === 7 ? A : 0; });
+      const before = goldIn(store[A].inventory) + funds.riften;
+      const r = api.handHaul('riften', notices.riften[0], 7, 72, 'test', 'hauled');
+      yes('a haul\'s 72 goes from the ledger to the pack, and packs plus the ledger add up the same',
+          !r.why && !r.owed && goldIn(store[A].inventory) === 77 && funds.riften === 53 &&
+          goldIn(store[A].inventory) + funds.riften === before && notices.riften[0].pay === 0);
+      yes('what is left is the fee, the tenth and the letter\'s held 15, and the 15 cannot be withdrawn',
+          api.withdraw('riften', 39, 'x') === false && api.withdraw('riften', 38, 'x') === true && funds.riften === 15);
+      const away = { haul: true, job: true, pay: 40, dest: 'whiterun', taken: 9 };
+      notices.riften.push(away);
+      funds.riften += 40;
+      const r2 = api.handHaul('riften', away, 9, 40, 'test', 'back');
+      yes('to somebody away nothing leaves the ledger, and it stays held as owed',
+          !r2.why && r2.owed === true && funds.riften === 55 && away.owed === 40 && away.pay === 0 &&
+          api.withdraw('riften', 1, 'x') === false);
+    });
+  }
   const pay = lift('  function payOut(actorId, amount) {', '\n  }\n');
   const held = lift('  function payHeld(hold, n, actorId) {', '\n  }\n');
   yes('the payout and the held pay are in the gamemode', pay !== null && held !== null);

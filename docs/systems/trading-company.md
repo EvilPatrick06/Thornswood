@@ -115,27 +115,29 @@ tenth, and none of them are posted with `/haul`.
 `/haul 80 riften a crate of iron ingots` takes the 30 fee and the pay,
 and both go onto that hold's ledger. The board, the panel and `/jobs`
 show the pay and the destination. `/take` and `/jobs` are the same as
-for any job. `/dropjob` puts the haul back on the board, open, with
-its pay still held.
+for any job.
 
-The poster's `/unpin` before anybody has taken it hands the pay back.
-A steward's `/unpin` at the posting board does the same, open or
-taken. The fee stays. `/haul done whiterun 4`, by the poster or a
-steward at the destination's board, pays the hauler out of the ledger
-and keeps the tenth. The person who took the haul does not confirm it.
-The person paid has to be in the world: the hauler on a confirm, the
-poster on a steward's `/unpin`. Otherwise nothing moves and the pay
-stays held. An ordinary job is not a haul, and `/haul done` refuses
-one.
+The hauler's `/dropjob`, the poster's `/unpin` before anybody has taken
+it, and a steward's `/unpin` at the posting board, open or taken, each
+take the haul down and hand the pay back to the poster. The fee stays.
+`/haul done whiterun 4`, by the poster or a steward at the
+destination's board, pays the hauler out of the ledger and keeps the
+tenth. The person who took the haul does not confirm it. An ordinary
+job is not a haul, and `/haul done` refuses one.
+
+Somebody paid who is away, the hauler on a confirm or the poster on a
+drop or a steward's `/unpin`, is handed the gold the next time they are
+in the world. Until then it stays on the ledger, held for them.
 
 The ledger goes down only for these payouts and a letter's 15. A
 withdrawal never leaves less on the ledger than the open letters and
-hauls still hold.
+hauls still hold, and what a haul holds for somebody away.
 
 The application is a ticket in Discord, Apply: Trading Company. The
-role it leads to is Trading Company, and `access.company` in the
-site's config names it. `/company` says whether a character can handle
-a sale. `/company buy 120 Lydia Iron Sword`, standing with the seller,
+role it leads to is Trading Company, given by a person in Discord, and
+`access.company` in the site's config names it. `/company` says
+whether a character can handle a sale.
+`/company buy 120 Lydia Iron Sword`, standing with the seller,
 offers the price the two agreed, and the seller accepts on the prompt.
 The thing leaves the seller's pack and the world. The worker pays the
 price less their 10%, another 10% is destroyed, and the seller

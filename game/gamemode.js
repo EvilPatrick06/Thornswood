@@ -35501,24 +35501,32 @@ log('gamemode loaded:',
 
     HELD PAY STAYS ON THE LEDGER. An open letter's 15 (#1374: letter, not
     down, pay above 0) and an open haul's pay are counted here until they
-    are paid or handed back. A withdrawal never takes them: what is left
-    after it is never less than what is still held, so a courier or a
-    hauler is never refused because the ledger was spent. `releasing` is
-    the one letter or haul on this hold's board whose own held pay this is,
-    so paying a haul out of its own pay is not refused for being held, and
-    never more than it holds.
+    are paid or handed back, and so is a haul's gold owed to somebody who was
+    away when it came down (owed, see handHaul). A withdrawal never takes
+    them: what is left after it is never less than what is still held, so a
+    courier or a hauler is never refused because the ledger was spent.
+    `releasing` is the one letter or haul on this hold's board whose own held
+    gold this is, so paying a haul out of its own pay is not refused for
+    being held, and never more than it holds.
 
     mayWithdraw answers why not, or '' when it may. withdraw takes it off
     and answers true, or false with nothing changed.
   */
+  /** What one notice holds on its ledger: an open letter's or haul's pay, or a haul's owed gold. */
+  function noticeHolds(x) {
+    if (!x || !(x.letter || x.haul)) { return 0; }
+    var owed = x.haul ? (Math.floor(Number(x.owed)) || 0) : 0;
+    if (owed > 0) { return owed; }
+    if (x.down) { return 0; }
+    var pay = Math.floor(Number(x.pay)) || 0;
+    return pay > 0 ? pay : 0;
+  }
+
   function heldOn(hold, releasing) {
     var list = notices[hold] || [];
     var held = 0;
     for (var i = 0; i < list.length; i++) {
-      var x = list[i];
-      if (!x || x === releasing || x.down || !(x.letter || x.haul)) { continue; }
-      var pay = Math.floor(Number(x.pay)) || 0;
-      if (pay > 0) { held += pay; }
+      if (list[i] !== releasing) { held += noticeHolds(list[i]); }
     }
     return held;
   }
@@ -35529,8 +35537,8 @@ log('gamemode loaded:',
     if (LEDGER_HOLDS.indexOf(key) < 0) { return 'that is not one of the ten ledgers.'; }
     if (!Number.isInteger(n) || n <= 0) { return 'that is not a whole number of gold.'; }
     if (releasing) {
-      if ((notices[key] || []).indexOf(releasing) < 0 || releasing.down) { return 'that is not held on ' + key + '\'s ledger.'; }
-      if (n > (Math.floor(Number(releasing.pay)) || 0)) { return 'that is more than it holds.'; }
+      if ((notices[key] || []).indexOf(releasing) < 0 || !noticeHolds(releasing)) { return 'that is not held on ' + key + '\'s ledger.'; }
+      if (n > noticeHolds(releasing)) { return 'that is more than it holds.'; }
     }
     var have = Number(funds[key]) || 0;
     var held = heldOn(key, releasing || null);
@@ -36902,6 +36910,13 @@ log('gamemode loaded:',
       toProfile(profileId, 'That is not one of yours.');
       return true;
     }
+    /*
+      A HAUL DROPPED IS A HAUL ENDED, #1393. docs/systems/trading-company.md:
+      on a drop the pay returns to the poster's pack and the ledger goes down
+      by that pay, and the fee stays. A haul with its pay gone cannot sit on
+      the board for somebody else, so it comes down.
+    */
+    if (n.haul) { return cancelHaul(hold, at, n, 'drop', actorId, profileId, toProfile); }
     n.taken = 0;
     n.takenName = null;
     save();
@@ -36980,7 +36995,10 @@ log('gamemode loaded:',
       toProfile(profileId, n.takenName + ' has taken that job. It can come down once they hand it back.');
       return true;
     }
-    if (n.haul) { return unpinHaul(hold, at, n, actorId, profileId, toProfile); }
+    if (n.haul) {
+      return cancelHaul(hold, at, n, Number(n.by) === Number(profileId) ? 'own' : 'steward',
+                        actorId, profileId, toProfile);
+    }
     /*
       A LETTER'S PAY COMES BACK, #1374. The board fee stays, like any
       notice's. The courier's 15 was only held, and with nobody to carry it
@@ -37197,10 +37215,11 @@ log('gamemode loaded:',
     hold's ledger. The pay is held there the way a letter's 15 is, until the
     haul is confirmed or taken down.
 
-    /take, /dropjob and /jobs treat it as any job. The poster's /unpin before
-    anybody has taken it, or a steward's at the posting board, open or taken,
-    hands the pay back out of the ledger into the poster's pack, and the fee
-    stays (unpinHaul).
+    /take and /jobs treat it as any job. It comes down before it is delivered
+    three ways, and each hands the pay back out of the ledger to the poster
+    and keeps the fee (cancelHaul): the hauler's /dropjob, the poster's /unpin
+    before anybody has taken it, and a steward's /unpin at the posting board,
+    open or taken. Nothing was delivered, so the company keeps no tenth.
 
     On /haul done, by the poster or a steward, standing at the board the haul
     named, the company keeps a tenth of the pay, rounded down, and nothing
@@ -37212,11 +37231,16 @@ log('gamemode loaded:',
     /haul, and the taker of an ordinary job is still paid nothing by the
     server.
 
-    THE PERSON PAID IS IN THE WORLD. The server hands gold to a pack, so the
-    hauler on a confirm, and the poster on a steward's cancel, have to be in
-    the world when it happens. Otherwise nothing moves and the pay stays held.
+    SOMEBODY AWAY IS PAID WHEN THEY ARE BACK. The server hands gold to a pack,
+    and a pack is written only while its owner is in the world. When the
+    hauler on a confirm, or the poster on a drop or a steward's cancel, is
+    away, the haul still comes down, and what is theirs stays held on the
+    ledger as owed to them (handHaul). haulTick hands it over the next time
+    they are in the world, the way a bed's takings wait for a holder who is
+    away (#1392). Nothing else can spend it in the meantime.
   */
   var HAUL_TENTH_FROM = 10;
+  var HAUL_EVERY_MS = 5000;
 
   /** The company's tenth of a pay: rounded down, and nothing under 10. */
   function haulTenth(pay) {
@@ -37339,83 +37363,169 @@ log('gamemode loaded:',
       toProfile(profileId, 'The hauler does not confirm their own haul. The person who posted it, or a steward, does.');
       return true;
     }
-    var hauler = onlineActorOf(n.taken);
-    if (!hauler) {
-      toProfile(profileId, (n.takenName || 'The hauler') + ' has to be in the world to be paid. ' +
-                'Nothing was paid, and the haul is still theirs.');
-      return true;
-    }
     var pay = Math.floor(Number(n.pay)) || 0;
     var tenth = haulTenth(pay);
     var got = pay - tenth;
-    var why = mayWithdraw(from, got, n);
-    if (why) {
-      plog('a haul in', from, 'could not be paid:', why);
-      toProfile(profileId, 'That did not work: ' + why + ' Nothing was paid.');
+    var r = handHaul(from, n, Number(n.taken), got,
+                     'haul ' + num + ' to ' + n.dest + ' delivered, ' + tenth + ' kept for the company', 'hauled');
+    if (r.why) {
+      plog('a haul in', from, 'could not be paid:', r.why);
+      toProfile(profileId, 'That did not work: ' + r.why + ' Nothing was paid.');
       return true;
     }
-    if (!payOut(hauler, got)) {
-      toProfile(profileId, 'That did not work. Nothing was paid.');
-      return true;
-    }
-    withdraw(from, got, 'haul ' + num + ' to ' + n.dest + ' delivered, ' + tenth + ' kept for the company', n);
-    n.pay = 0;
     n.paid = got;
     n.kept = tenth;
     n.done = Date.now();
     n.doneBy = profileId;
     takedown(from, at, profileId);
     var hauled = n.takenName || 'The hauler';
-    plog(hauled, 'was paid', got, 'for a haul from', from, 'to', n.dest, 'and the company kept', tenth);
-    toProfile(profileId, 'The haul from ' + from + ' is in: ' + n.text + '. ' + hauled + ' is paid ' + got +
-              ' gold out of ' + from + '\'s ledger' +
-              (tenth ? ', and the company keeps ' + tenth + '.' : '. Under 10 gold, the company keeps nothing.'));
-    toProfile(n.taken, 'Your haul to ' + n.dest + ' is confirmed. ' + got + ' gold is in your pack.' +
-              (tenth ? ' The company kept ' + tenth + '.' : ''));
+    var kept = tenth ? ', and the company keeps ' + tenth + '.' : '. Under 10 gold, the company keeps nothing.';
+    if (r.owed) {
+      plog(hauled, 'is owed', got, 'for a haul from', from, 'to', n.dest, 'and the company kept', tenth);
+      toProfile(profileId, 'The haul from ' + from + ' is in: ' + n.text + '. ' + hauled + ' is away, so the ' + got +
+                ' gold is held on ' + from + '\'s ledger for them until they are next in the world' + kept);
+    } else {
+      plog(hauled, 'was paid', got, 'for a haul from', from, 'to', n.dest, 'and the company kept', tenth);
+      toProfile(profileId, 'The haul from ' + from + ' is in: ' + n.text + '. ' + hauled + ' is paid ' + got +
+                ' gold out of ' + from + '\'s ledger' + kept);
+      toProfile(n.taken, 'Your haul to ' + n.dest + ' is confirmed. ' + got + ' gold is in your pack.' +
+                (tenth ? ' The company kept ' + tenth + '.' : ''));
+    }
     if (Number(n.by) !== Number(profileId)) {
-      toProfile(n.by, 'Your haul to ' + n.dest + ' was confirmed by a steward. ' + hauled + ' was paid ' + got + '.');
+      toProfile(n.by, 'Your haul to ' + n.dest + ' was confirmed by a steward. ' + hauled + ' ' +
+                (r.owed ? 'is owed ' : 'was paid ') + got + '.');
     }
     refreshPanel(actorId);
-    refreshPanel(hauler);
+    if (r.to) { refreshPanel(r.to); }
     return true;
   }
 
   /*
-    A haul comes down before it is delivered: the poster's /unpin before
-    anybody has taken it, or a steward's, open or taken. The pay goes back
-    out of the ledger into the poster's pack, and the fee stays. Nothing was
-    delivered, so the company's tenth is not taken.
+    A haul's held gold to one person: `amount` of what n holds on `hold`'s
+    ledger, to the profile `toPid`. In the world, it goes into their pack now
+    and the same comes off the ledger. Away, nothing leaves the ledger: n holds
+    it as owed to them, and haulTick hands it over when they are next in the
+    world. Either way n.pay is 0 after, so the haul is paid once. `owedFor` is
+    'hauled' or 'back', for the line they read then.
+
+    Answers { why } with nothing changed when it cannot, otherwise { owed } and
+    the actor it was paid to, { to }.
   */
-  function unpinHaul(hold, at, n, actorId, profileId, toProfile) {
-    var own = Number(n.by) === Number(profileId);
-    var poster = own ? actorId : onlineActorOf(n.by);
-    if (!poster) {
-      toProfile(profileId, n.name + ' has to be in the world to have the pay back. The haul is still up.');
-      return true;
+  function handHaul(hold, n, toPid, amount, reason, owedFor) {
+    var why = mayWithdraw(hold, amount, n);
+    if (why) { return { why: why }; }
+    var to = onlineActorOf(toPid);
+    if (!to) {
+      n.pay = 0;
+      n.owed = amount;
+      n.owedTo = toPid;
+      n.owedFor = owedFor;
+      save();
+      plog(amount, 'gold held on', hold + '\'s ledger for', toPid, 'until they are in the world:', reason);
+      return { owed: true, to: 0 };
     }
+    if (!payOut(to, amount)) { return { why: 'their pack could not be written.' }; }
+    withdraw(hold, amount, reason, n);
+    n.pay = 0;
+    return { owed: false, to: to };
+  }
+
+  /*
+    What a haul owes somebody who was away, into their pack now they are in
+    the world, and off the ledger it was held on. A ledger that cannot pay it
+    is written to the log once a boot, and the gold stays held.
+  */
+  var haulShort = {};
+  function haulTick() {
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
+    if (!online.length) { return; }
+    var here = {};
+    for (var i = 0; i < online.length; i++) {
+      var pid = profileOf(online[i]);
+      if (pid) { here[pid] = online[i]; }
+    }
+    for (var h = 0; h < LEDGER_HOLDS.length; h++) {
+      var hold = LEDGER_HOLDS[h];
+      var list = notices[hold] || [];
+      for (var j = 0; j < list.length; j++) {
+        var n = list[j];
+        var owed = (n && n.haul) ? (Math.floor(Number(n.owed)) || 0) : 0;
+        if (!(owed > 0) || !here[Number(n.owedTo)]) { continue; }
+        var to = here[Number(n.owedTo)];
+        var why = mayWithdraw(hold, owed, n);
+        if (why) {
+          if (!haulShort[hold + ':' + j]) {
+            haulShort[hold + ':' + j] = true;
+            plog('haul', j + 1, 'in', hold, 'owes', owed, 'and cannot pay it:', why);
+          }
+          continue;
+        }
+        if (!payOut(to, owed)) { continue; }
+        withdraw(hold, owed, 'haul ' + (j + 1) + ' to ' + n.dest + ', held for somebody who was away', n);
+        n.owed = 0;
+        save();
+        var line = n.owedFor === 'hauled'
+          ? 'While you were away, your haul to ' + n.dest + ' was confirmed. ' + owed + ' gold is in your pack.' +
+            ((Number(n.kept) || 0) ? ' The company kept ' + n.kept + '.' : '')
+          : 'While you were away, your haul to ' + n.dest + ' came down. The ' + owed +
+            ' gold pay is back in your pack. The fee stays with ' + hold + '.';
+        plog('handed', owed, 'gold of a haul in', hold, 'to', personName(to));
+        try { notify(to, line); } catch (e2) { }
+        try { say(to, line); } catch (e3) { }
+      }
+    }
+  }
+
+  if (g.__thornswoodHaulTimer) { try { clearInterval(g.__thornswoodHaulTimer); } catch (e) { } }
+  g.__thornswoodHaulTimer = setInterval(
+    (typeof guard === 'function') ? guard('haulTick', haulTick) : haulTick, HAUL_EVERY_MS);
+
+  /*
+    A haul comes down before it is delivered: the hauler's /dropjob, the
+    poster's /unpin before anybody has taken it, or a steward's /unpin at the
+    posting board, open or taken. `how` is 'drop', 'own' or 'steward'. The
+    pay goes back out of the ledger to the poster, held for them while they
+    are away (handHaul), and the fee stays. Nothing was delivered, so the
+    company's tenth is not taken. Who may has been settled by the caller.
+  */
+  function cancelHaul(hold, at, n, how, actorId, profileId, toProfile) {
     var pay = Math.floor(Number(n.pay)) || 0;
+    var owed = false;
     if (pay > 0) {
-      var why = mayWithdraw(hold, pay, n);
-      if (why || !payOut(poster, pay)) {
-        toProfile(profileId, 'That did not work' + (why ? ': ' + why : '.') + ' The haul is still up.');
+      var r = handHaul(hold, n, Number(n.by), pay,
+                       'a haul to ' + n.dest + ' taken down, the pay back to ' + n.name, 'back');
+      if (r.why) {
+        toProfile(profileId, 'That did not work: ' + r.why + ' The haul is still up' +
+                  (how === 'drop' ? ', and still yours.' : '.'));
         return true;
       }
-      withdraw(hold, pay, 'a haul to ' + n.dest + ' taken down, the pay back to ' + n.name, n);
+      owed = r.owed;
     }
-    n.pay = 0;
     n.back = pay;
     takedown(hold, at, profileId);
-    plog(own ? n.name : 'a steward', 'took down a haul to', n.dest, 'in', hold, 'and', pay, 'went back to', n.name);
-    if (own) {
-      toProfile(profileId, 'You take the haul down. The ' + pay + ' gold pay comes back to you. The fee stays with ' +
-                hold + '.');
+    var later = owed ? ' when they are next in the world' : '';
+    var fee = 'The fee stays with ' + hold + '.';
+    plog(how === 'drop' ? (n.takenName || 'the hauler') + ' dropped' : (how === 'own' ? n.name : 'a steward') + ' took down',
+         'a haul to', n.dest, 'in', hold, 'and', pay, owed ? 'is held for' : 'went back to', n.name);
+    if (how === 'own') {
+      toProfile(profileId, 'You take the haul down. The ' + pay + ' gold pay comes back to you. ' + fee);
+    } else if (how === 'drop') {
+      toProfile(profileId, 'You hand the haul to ' + n.dest + ' back. It comes down, and the ' + pay +
+                ' gold pay goes back to ' + n.name + later + '. ' + fee);
+      if (!owed) {
+        toProfile(n.by, (n.takenName || 'The hauler') + ' handed your haul to ' + n.dest + ' back. The ' + pay +
+                  ' gold pay is back in your pack. ' + fee);
+      }
     } else {
       toProfile(profileId, 'You take ' + n.name + '\'s haul to ' + n.dest + ' down. The ' + pay +
-                ' gold pay goes back to them, and the fee stays with ' + hold + '.');
-      toProfile(n.by, 'A steward took your haul to ' + n.dest + ' down. The ' + pay +
-                ' gold pay is back in your pack. The fee stays with ' + hold + '.');
+                ' gold pay goes back to them' + later + '. ' + fee);
+      if (!owed) {
+        toProfile(n.by, 'A steward took your haul to ' + n.dest + ' down. The ' + pay +
+                  ' gold pay is back in your pack. ' + fee);
+      }
     }
-    if (n.taken && Number(n.taken) !== Number(profileId)) {
+    if (how !== 'drop' && n.taken && Number(n.taken) !== Number(profileId)) {
       toProfile(n.taken, 'The haul to ' + n.dest + ' you took was taken down by a steward. It is off your list.');
     }
     refreshPanel(actorId);
@@ -37515,7 +37625,7 @@ log('gamemode loaded:',
     return null;
   }
 
-  function putBack(actorId, one) {
+  function putOneBack(actorId, one) {
     try {
       var inv = mp.get(actorId, 'inventory');
       var entries = ((inv && inv.entries) || []).slice();
@@ -37661,7 +37771,7 @@ log('gamemode loaded:',
                worker: me + ' is not carrying the ' + o.item + ' now.' + none };
     }
     if (!payOut(actorId, cuts.seller)) {
-      putBack(actorId, one);
+      putOneBack(actorId, one);
       payOut(workerActor, cost);
       return { seller: 'That did not work.' + none, worker: 'That did not work.' + none };
     }
@@ -37871,7 +37981,7 @@ log('gamemode loaded:',
     touchedBox: touchedBox, putIn: putIn, holdOfBox: holdOfBox,
     deposit: deposit, takeGold: takeGold, LEDGER_HOLDS: LEDGER_HOLDS,
     withdraw: withdraw, mayWithdraw: mayWithdraw, heldOn: heldOn,
-    haulTenth: haulTenth, saleCuts: saleCuts, acceptSale: acceptSale, inCompany: inCompany,
+    haulTenth: haulTenth, haulTick: haulTick, saleCuts: saleCuts, acceptSale: acceptSale, inCompany: inCompany,
     holdStanding: holdStanding,
     rentDue: rentDue, funds: function () { return funds; },
     boxes: function () { return boxes; },
