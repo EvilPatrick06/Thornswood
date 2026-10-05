@@ -46841,8 +46841,10 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/loadorder',
                // Friends, parties, mutes, trade and journals. See the
                // social block at the end of this file. /journal and /book
-               // are the J panel's lines, never typed (#1630).
-               '/friend', '/party', '/mute', '/trade', '/journal', '/book', '/merchant',
+               // are the J panel's lines, never typed (#1630). /hidename too,
+               // which the P panel's Name buttons send and which was missing
+               // here, so it ran before the character was in the world (#1628).
+               '/friend', '/party', '/mute', '/hidename', '/trade', '/journal', '/book', '/merchant',
                '/yes', '/no',
                // The dice. Rolled here now rather than on the roller's own
                // machine; see the branch for why that matters.
@@ -46873,9 +46875,12 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // /party: P on somebody asks and the P panel runs the
                       // party, and nobody is told to type it (#1629). Not
                       // /journal or /book: J sends those lines and nobody is
-                      // told to type them (#1630).
-                      '/friend', '/mute', '/hidename', '/trade', '/merchant',
-                      '/yes', '/no', '/roll'];
+                      // told to type them (#1630). Not /friend, /mute,
+                      // /hidename, /trade, /yes and /no: Y, H and L on the look
+                      // prompt, the P panel, the trade window and the prompt's
+                      // Accept and Refuse send them, and nobody types them (#1628).
+                      '/merchant',
+                      '/roll'];
 
 // ---------------------------------------------------------------------------
 // A teleport that actually teleports.
@@ -47952,12 +47957,15 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
 
       EVERY ONE OF THESE TAKES A FORM ID OR A NAME, and the form id is the one
       that matters. A key press while looking at somebody sends the hex form
-      id of whatever is under the crosshair, which is exact. A typed name is
-      the same command for people who would rather type, and it refuses an
-      ambiguous one rather than guessing which Bjorn was meant.
+      id of whatever is under the crosshair, which is exact. A typed name
+      still answers, and it refuses an ambiguous one rather than guessing
+      which Bjorn was meant.
 
-      They are in PLAYER_WORDS on purpose, unlike /place and /burn: a key
-      prompt nobody has been told about is a feature nobody has.
+      NOBODY IS TOLD TO TYPE /friend, /trade, /mute, /hidename, /yes and /no
+      (#1628; Patrick, 4 October: "no more commands for things [people] do").
+      Y, H and L on the look prompt, the P panel's Near you, Friends and
+      Muted and hidden lists, the trade window and the prompt's Accept and
+      Refuse send them, so they are in WORDS and not in PLAYER_WORDS.
     */
     if (word === '/merchant') {
       var merchants = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodMerchantTrade;
@@ -48165,6 +48173,25 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         soc.push(actorId);
         return true;
       }
+      /*
+        A VOICE MUTE TAKES THE SAME PEOPLE AS TEXT AND A NAME (#1628): a
+        friend, somebody standing here, or somebody already on your muted
+        list, online or not. It is kept on the character the same as those
+        two, and the P panel's Muted and hidden list has to be able to unmute
+        somebody who has logged off.
+
+        NO OFFER AND NO TELLING THEM. A mute is a decision about your own
+        ears; asking permission to stop listening would be absurd, and
+        telling somebody they have been muted turns it into an argument.
+      */
+      if (word === '/mute') {
+        var muteWho = soc.resolveKnown(actorId, rest);
+        if (!muteWho.pid) { toProfile(profileId, muteWho.why); return true; }
+        var on = soc.toggleMute(actorId, muteWho.pid, muteWho.name);
+        toProfile(profileId, on ? ('You muted ' + muteWho.name + '.') : ('You unmuted ' + muteWho.name + '.'));
+        soc.push(actorId);
+        return true;
+      }
 
       /* Taking somebody off a list does not need them to be standing there. */
       if (word === '/friend' && rest.indexOf('remove ') === 0) {
@@ -48227,7 +48254,13 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
             }
             out = tr2.add(actorId, bits.join(' '), n);
           } else {
-            out = 'trade: add, remove, gold, ok, cancel.';
+            /* Not a verb the trade window sends, while a trade stands: H on
+               somebody, or Trade on the P panel (#1628). One trade at a time,
+               so no new one, and this one's window is sent again, which opens
+               it if it had been closed. Its buttons are the way out; nobody
+               is told to type the verbs. */
+            tr2.refresh(actorId);
+            out = 'You are already in a trade. Its window is open again.';
           }
           if (out) { toProfile(profileId, out); }
           return true;
@@ -48240,16 +48273,6 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       if (them === actorId) { toProfile(profileId, 'That is you.'); return true; }
       var theirPid = soc.profileOf(them);
       var theirName = soc.nameOfPerson(them);
-
-      if (word === '/mute') {
-        /* NO OFFER AND NO TELLING THEM. A mute is a decision about your own
-           ears; asking permission to stop listening would be absurd, and
-           telling somebody they have been muted turns it into an argument. */
-        var on = soc.toggleMute(actorId, theirPid, theirName);
-        toProfile(profileId, on ? ('You muted ' + theirName + '.') : ('You unmuted ' + theirName + '.'));
-        soc.push(actorId);
-        return true;
-      }
 
       if (word === '/friend' && soc.isFriend(actorId, theirPid)) {
         soc.dropFriend(actorId, theirPid);
@@ -48931,7 +48954,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           'New business and New faction on that tab start one, and Leave there ' +
           'drops this character. ' +
           'Work done with your party in the same place ' +
-          'counts for more. /yes and /no answer whatever somebody has asked you.');
+          'counts for more. Answer a request with Accept or Refuse on its prompt.');
         return;
       }
       if (topic === 'living' || topic === 'needs' || topic === 'food') {
@@ -54928,9 +54951,27 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   }
 
   /*
-    A friend on the list, or somebody standing here. Text and a hidden name
-    are kept on the character, so a friend who has logged off can still be
-    named.
+    The name beside a switch, for somebody who may be no friend and may have
+    logged off (#1628): the friend list's, then the person in the world, then
+    the name the switch was turned on with.
+  */
+  function knownName(s, pid) {
+    var f = s.friends[pid];
+    if (f && f.name) { return String(f.name); }
+    var a = actorForProfile(pid);
+    if (a) { return nameOfPerson(a); }
+    var kept = [s.muted, s.textOff, s.namesOff];
+    for (var i = 0; i < kept.length; i++) {
+      if (kept[i] && typeof kept[i][pid] === 'string') { return kept[i][pid]; }
+    }
+    return '';
+  }
+
+  /*
+    A friend on the list, or somebody standing here. Voice, text and a hidden
+    name are kept on the character, so a friend who has logged off can still
+    be named. The P panel sends a profile id: a friend, somebody near, or
+    somebody on the Muted and hidden list, who may be neither (#1628).
   */
   function resolveKnown(actorId, who) {
     var s = stateOf(actorId);
@@ -54938,8 +54979,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (!want) { return { pid: 0, name: '', why: 'Who?' }; }
     var asNum = Number(want);
     if (String(asNum) === want && asNum > 0) {
-      var stored = s.friends[asNum] && s.friends[asNum].name;
-      return { pid: asNum, name: stored || String(asNum), why: '' };
+      if (asNum === profileOf(actorId)) { return { pid: 0, name: '', why: 'That is you.' }; }
+      return { pid: asNum, name: knownName(s, asNum) || 'somebody', why: '' };
     }
     var low = want.toLowerCase();
     var hits = [];
@@ -54956,6 +54997,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (hits.length > 1) { return { pid: 0, name: '', why: 'More than one friend by that name.' }; }
     var target = findPerson(want);
     if (!target.actorId) { return { pid: 0, name: '', why: target.why || 'Nobody here by that name.' }; }
+    if (target.actorId === actorId) { return { pid: 0, name: '', why: 'That is you.' }; }
     return { pid: profileOf(target.actorId), name: nameOfPerson(target.actorId), why: '' };
   }
 
@@ -55328,11 +55370,66 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       }
     }
 
+    /*
+      WHO IS NEAR YOU, for the P panel's Near you list (#1628): the list the
+      look prompt reads, thornswoodNear, so the panel and the prompt agree on
+      who is close enough. The switches are read off the character rather
+      than the list, so a press shows on the push that follows it.
+    */
+    var near = [];
+    var nearNow = null;
+    try { nearNow = mp.get(actorId, NEAR_PROPERTY); } catch (e) { nearNow = null; }
+    var nearW = (nearNow && nearNow.w) || {};
+    for (var hex in nearW) {
+      if (!Object.prototype.hasOwnProperty.call(nearW, hex)) { continue; }
+      var nr = nearW[hex] || {};
+      var np = Number(nr.p) || 0;
+      if (!np) { continue; }
+      near.push({
+        id: hex, p: np, name: String(nr.n || 'somebody'),
+        friend: !!s.friends[np],
+        party: !!(p && p.members.indexOf(np) !== -1),
+        muted: !!s.muted[np],
+        textOff: !!(s.textOff && s.textOff[np]),
+        nameOff: !!(s.namesOff && s.namesOff[np])
+      });
+    }
+    near.sort(function (a, b) { return a.name < b.name ? -1 : 1; });
+
+    /*
+      EVERYBODY YOU SWITCHED OFF, friend or not, here or not (#1628), so the
+      P panel can switch each one back on. A friend is on both lists. Each
+      switch is the one for that person alone, not Hide every name.
+    */
+    var hidden = [];
+    var seenOff = {};
+    var offLists = [s.muted || {}, s.textOff || {}, s.namesOff || {}];
+    for (var li = 0; li < offLists.length; li++) {
+      for (var ok in offLists[li]) {
+        if (!Object.prototype.hasOwnProperty.call(offLists[li], ok)) { continue; }
+        if (!offLists[li][ok] || seenOff[ok]) { continue; }
+        seenOff[ok] = true;
+        var op = Number(ok);
+        hidden.push({
+          p: op, name: knownName(s, op) || 'somebody', on: !!here[op],
+          muted: !!s.muted[op],
+          textOff: !!(s.textOff && s.textOff[op]),
+          nameOff: !!(s.namesOff && s.namesOff[op])
+        });
+      }
+    }
+    hidden.sort(function (a, b) {
+      if (a.on !== b.on) { return a.on ? -1 : 1; }
+      return a.name < b.name ? -1 : 1;
+    });
+
     var offerNow = standingOffer(mine);
     return {
       me: mine,
       friends: friends,
       party: party,
+      near: near,
+      hidden: hidden,
       together: partyNear(actorId),
       bonus: Math.round(SOCIAL.partyBonus * 100),
       namesAll: !!s.namesAll,
