@@ -319,9 +319,11 @@ as docs\RESTORING.md "The box is gone" says.
     `.\scripts\deploy\Install-Backup.ps1 -RunNow`. The box already has this
     machine's passphrase from step 13; on a box without one, Install-Backup
     sends this machine's copy up rather than making a new one.
-24. **The build runner:** `.\scripts\deploy\Install-Runner.ps1`. It replaces the
-    `thornswood-vps` runner the old box registered, so `Launcher builds` runs
-    on the new box from the next pull request.
+24. **The build runners:** `.\scripts\deploy\Install-Runner.ps1`, then
+    `.\scripts\deploy\Install-Runner.ps1 -Number 2` and up for as many as the
+    old box had (the repository's Settings, Actions, Runners lists them). Each
+    replaces the runner of that name the old box registered, so
+    `Launcher builds` runs on the new box from the next pull request.
 25. **Close it to all but ssh with a key**, once every machine that deploys
     has passed `.\scripts\vps\Setup-SshKey.ps1 -Test` against it:
     `.\scripts\vps\Harden-VPS.ps1`. It proves key login first, then turns ssh

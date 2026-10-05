@@ -77,7 +77,7 @@ namespace Thornswood
                 "The profession, and which half of it you work, decides what you can make. The eight are Warrior, Mage, Alchemist, Cook, Smith, Enchanter, Tailor and Woodworker. The class decides where raw material comes from: only a Hunter loots an animal, only a Fisher fishes, only a Gatherer gathers, only a Miner mines and only a Farmer farms. You get one of each, for the life of the character."),
 
             new HelpItem("Character", "The tools come with the pick",
-                "A Miner is handed a pickaxe, a Farmer a shovel and a few crops to sow, and a Woodworker a woodcutter's axe, the moment they choose. A tool wears out. When it breaks or is lost, a smith forges the next one: nothing in the world hands one out."),
+                "A Miner is handed a pickaxe, a Farmer a shovel and a few crops to sow, a Fisher a crude fishing pole, and a Woodworker a woodcutter's axe, the moment they choose. A tool wears out. When it breaks or is lost, a smith forges the next one, and a woodwright makes the next pole: nothing in the world hands one out."),
 
             new HelpItem("Character", "K is your character",
                 "K opens your profession, your class, the recipe book and the skill tree. Skyrim's own levelling is off: rank comes from doing the work of your trade. The panel does not pause the world."),
@@ -131,6 +131,9 @@ namespace Thornswood
             // Issue #414: the asking staff block at the end of gamemode.js.
             new HelpItem("Chat and commands", "Getting staff: /helpme and /report",
                 "/helpme and a few words about what is wrong reaches staff: anybody from staff in the world is told at once, with where you are, and it goes to the staff channel in the Discord. /report, the person's name and what they did, reaches staff and nobody else. The game tells you whether it got through. If it did not, open a ticket in the Discord."),
+
+            new HelpItem("Chat and commands", "Stuck in the world: /stuck",
+                "Wedged in a wall or a rock and cannot walk out? /stuck takes you back a few steps to where you last stood safely, or to the nearest temple when there is no such spot. It works once every 5 minutes and not while you are dead, and in a fight it waits 15 seconds first, which moving or being hit cancels. It is only for being truly stuck: every use is logged for staff."),
 
             new HelpItem("Chat and commands", "Everything else is on /help",
                 "Type /help in the chat for a short menu, then /help talking, /help people, /help living, /help work, /help land or /help staff for one topic each. A word the server does not know is answered with the list of words it does."),

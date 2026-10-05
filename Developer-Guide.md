@@ -301,6 +301,22 @@ gh auth login
 gh auth status
 ```
 
+The bot's libraries go into the Python that `py` starts by default, because
+that is the one the bot harnesses run on: `bot\test-*.py`, and
+`tests\test-staff-commands.js`, which imports bot.py. On the shipping machine
+the default was 3.12 with no discord.py, so every bot harness stopped on its
+first import with nothing to do with the change being tested (#1008). From
+`Thornswood-Repo`:
+
+```
+py -m pip install -r bot\requirements.txt
+py -c "import discord, PIL; print('discord.py ' + discord.__version__)"
+```
+
+The second line prints the discord.py version `bot\requirements.txt` pins when
+the first worked. The nightly does the same into a venv of its own on the VPS,
+because the live bot runs on that box's Python.
+
 Every change goes to the dev channel first, and the dev channel needs the dev
 build on this machine too: in the main launcher, on the Play page, the Server
 dropdown, Dev. It checks your Discord roles first, then puts it
@@ -1004,10 +1020,13 @@ The short form of the rules. The same decisions, with the dates they were made, 
   ~410 of them (tests/, bot, and voice), and a look for stray pull requests
   and branches run every night on the VPS (.github/workflows/nightly.yml,
   03:00 Mountain); a failure there opens an issue on the board, "Nightly
-  checks failed", and whoever broke it fixes it next. It runs on the VPS, on a runner
+  checks failed", and whoever broke it fixes it next. It runs on the VPS, on the runners
   `.\scripts\deploy\Install-Runner.ps1` puts there (issue #437), because
-  GitHub's own runners were blocked on billing from 25 Sep.
-  `.\scripts\deploy\Install-Runner.ps1 -Status` says whether GitHub sees it.
+  GitHub's own runners were blocked on billing from 25 Sep. Several since
+  4 Oct, so checks run side by side: `-Number 2` and up puts each one after
+  the first beside it. `.\scripts\deploy\Install-Runner.ps1 -Status` (with
+  `-Number` for the others) says whether GitHub sees one, and `-Lock` locks
+  every runner's folder again without stopping a job.
 - Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or
   Publish-Update.ps1 without a line in #staff-general first; every machine touches those.
 
