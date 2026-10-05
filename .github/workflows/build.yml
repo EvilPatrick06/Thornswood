@@ -333,6 +333,7 @@ jobs:
                  'test-1714-cut-file.js',
                  'test-1713-bench-table.js',
                  'test-1712-builders-skip-off.js',
+                 'test-1787-ore-eol.js',
                  'test-1628-social-gui.js',
                  'test-1630-journal-gui.js',
                  'test-1629-party-gui.js',
