@@ -138,3 +138,30 @@ function Get-ThornswoodServerBuildProblems($Record, $Sums, [string]$Where = 'the
     }
     return $out
 }
+
+<#
+  Which build a running server is, for a deploy that sends no server files
+  (Deploy-Server.ps1 -GamemodeOnly, issue #1089). The box keeps the record the
+  last full deploy sent beside the files, as $Root\server-build.json, and a
+  gamemode-only deploy goes ahead only when that is the record the commit
+  being deployed holds, so the gamemode comes from a commit whose recorded
+  server build is the one running.
+
+  Byte for byte, once each CR LF is read as LF. The record is a text file in
+  git (git ls-files --eol, 5 Oct: i/lf w/crlf), so a machine with
+  core.autocrlf true checks it out with CR LF and one without checks it out
+  with LF, and a full deploy sends whichever the deploying machine has. Both
+  are the same commit's record; any other difference is another record.
+
+  Kept as text as well, because Deploy-Server puts it in front of the scripts
+  it runs on the box, where this file is not.
+#>
+$ThornswoodRecordSumText = @'
+function Get-ThornswoodRecordSum([byte[]]$Bytes) {
+    $l1 = [Text.Encoding]::GetEncoding(28591)
+    $b = $l1.GetBytes($l1.GetString($Bytes).Replace("`r`n", "`n"))
+    $h = [Security.Cryptography.SHA256]::Create()
+    try { return (($h.ComputeHash($b) | ForEach-Object { $_.ToString('x2') }) -join '') } finally { $h.Dispose() }
+}
+'@
+. ([scriptblock]::Create($ThornswoodRecordSumText))
