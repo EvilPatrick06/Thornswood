@@ -27085,7 +27085,7 @@ function craftAnswer(actorId, row) {
         'so rank comes from doing the work.'
       : 'A ' + made + ' is ' + halfName + ' work past novice, and ' + halfName +
         ' is your sister half. You get the novice of it for nothing and no ' +
-        'further. A Master ' + halfName + ' can take you on with /apprentice.';
+        'further. A Master ' + halfName + ' can take you on, from the prompt they see when they look at you.';
     return out;
   }
 
@@ -41842,6 +41842,9 @@ log('gamemode loaded:',
       var PKV = g.__thornswoodPerks;
       var perkClocks = (PKV && PKV.clocks && actorId) ? PKV.clocks(actorId, s) : null;
       if (perkClocks) { view.perkClocks = perkClocks; }
+      // Masters and apprentices (#1634): see apprenticeView.
+      var taughtView = apprenticeView(actorId, s);
+      if (taughtView) { view.apprentice = taughtView; }
     }
     // Left out entirely when there is nothing to say, per the contract.
     var climbing = progressView(s);
@@ -42249,13 +42252,22 @@ log('gamemode loaded:',
   /*
     MASTERS AND APPRENTICES (#1388, #1147). docs/systems/apprenticeship.md.
 
+      /apprentice <id> <half>           a Master offers to take somebody on
+      /apprentice end <id> <half>       the Master ends it
+      /apprentice leave <half>          the apprentice ends it (#1634)
       /apprentice                       who you took on, and who took you on
-      /apprentice <name> [half]         a Master offers to take somebody on
-      /apprentice end <name> [half]     the Master ends it
 
-    The name can be the form id the crosshair hands over, the same as /party
-    and /trade. The half is needed only when the Master could take that
-    person on in more than one.
+    NOBODY TYPES THESE (#1634; Patrick, 4 Oct: no chat commands for anything
+    people do). They are the lines the buttons send. A Master looking at
+    somebody they could take on sees a row for it on the look prompt, named
+    K (takeOnMark below puts it on the near list), and K opens the Masters
+    and apprentices page with a Take on button for each half that could be
+    meant, which sends the first line with the form id the crosshair handed
+    over. The same page lists who you took on and who took you on, each
+    with End, which sends the second or the third (apprenticeView below).
+    No help text names them, and no line of the server's tells anybody to
+    type one. A name still works in place of the id, and the half is still
+    needed only when the Master could take that person on in more than one.
 
     The Master offers and the person answers, the way a party or a trade is
     asked: the offer stands in the social block's offers for its seconds, and
@@ -42363,6 +42375,75 @@ log('gamemode loaded:',
     return r;
   }
 
+  /*
+    THE LOOK PROMPT'S ROW (#1634). The social block builds the near list
+    every pass and asks these two, so the prompt offers a Master "Take on as
+    apprentice" for exactly the people arrange lets them offer to, with the
+    halves it could be. masterRecord is asked once per person per pass, and
+    somebody who is a Master of nothing costs that one read and no more.
+    takeOnMark is asked for each person near a Master and answers
+    [{ h: half, k: 'sister' | 'outside' }], or null when there is none. The
+    list decides only what is drawn: offerIt asks all of it again when the
+    line arrives.
+  */
+  function masterRecord(actorId) {
+    var ms = readState(actorId);
+    return (ms && mastered(ms).length) ? ms : null;
+  }
+  function takeOnMark(ms, learnerId) {
+    var ls = readState(learnerId);
+    if (!ms || !ls || !ls.prof) { return null; }
+    var mine = mastered(ms);
+    var out = [];
+    for (var i = 0; i < mine.length; i++) {
+      var r = arrange(learnerId, ls, ms, mine[i], null);
+      if (r.ok) { out.push({ h: mine[i], k: r.kind }); }
+    }
+    return out.length ? out : null;
+  }
+
+  /*
+    THE K PANEL'S MASTERS AND APPRENTICES PAGE (#1634), under view.apprentice:
+
+      took:     [ { id: '<form id, hex>', name, half, kind } ]  who this character took on
+      by:       [ { id, name, half, kind, stands } ]            who took them on, one per half
+      mastered: [ '<half>' ]                                    what they could take somebody on in
+      sister:   { half, rank } or null                          their sister half, while it waits on a Master
+      used:     <number>, of: <number>                          outside trades used in this life, of the two
+
+    Each row of took and by carries End on the page: took sends
+    /apprentice end <id> <half>, and by sends /apprentice leave <half>.
+    stands is false for a sister half whose Master no longer lists them or
+    is no longer a Master of it; End then clears their own side. Absent for
+    somebody with no profession, who can neither teach nor be taught.
+  */
+  function apprenticeView(actorId, s) {
+    if (!s || !s.prof) { return null; }
+    var took = [];
+    var rows = s.apprentices || [];
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      if (!row || !row.id || !row.half) { continue; }
+      took.push({ id: Number(row.id).toString(16), name: String(row.name || 'somebody'), half: row.half, kind: row.kind || '' });
+    }
+    var by = [];
+    var stands = {};
+    var masters = s.masters || {};
+    for (var half in masters) {
+      if (!P.has(masters, half)) { continue; }
+      var rec = masters[half] || {};
+      var outside = (s.taught || []).indexOf(half) !== -1;
+      stands[half] = outside || !!masterFor(actorId, s, half);
+      by.push({ id: rec.id ? Number(rec.id).toString(16) : '', name: String(rec.name || 'somebody'), half: half,
+                kind: outside ? 'outside' : 'sister', stands: stands[half] });
+    }
+    var sister = s.half ? P.sisterOf(s.prof, s.half) : null;
+    var waits = (sister && P.rankOf(s, sister) !== 'master' && !stands[sister])
+      ? { half: sister, rank: P.rankOf(s, sister) || 'novice' } : null;
+    return { took: took, by: by, mastered: mastered(s), sister: waits,
+             used: (s.taught || []).length + (s.untaught || []).length, of: P.TABLE.limits.secondaries };
+  }
+
   /** What /apprentice on its own says: both sides of every arrangement this character is in. */
   function standing(actorId) {
     var s = stateOf(actorId);
@@ -42393,7 +42474,7 @@ log('gamemode loaded:',
       var used = (s.taught || []).length + (s.untaught || []).length;
       out.push(used + ' of your ' + P.TABLE.limits.secondaries + ' outside trades used in this life.');
     }
-    out.push('A Master takes somebody on with /apprentice <name>, and ends it with /apprentice end <name>.');
+    out.push('K lists all of it under Masters and apprentices, each with End.');
     return out.join(' ');
   }
 
@@ -42425,8 +42506,8 @@ log('gamemode loaded:',
       if (can.length > 1) {
         var named = [];
         for (var j = 0; j < can.length; j++) { named.push(nameOf(can[j])); }
-        return 'You could take ' + name + ' on in ' + named.join(' or ') + '. Say which: /apprentice ' +
-               name + ' ' + can[0] + '.';
+        return 'You could take ' + name + ' on in ' + named.join(' or ') + '. Look at them and press the key ' +
+               'the prompt names, and pick which.';
       }
       // One that works, or none, in which case the rules say why about the
       // first half they hold at Master.
@@ -42484,16 +42565,17 @@ log('gamemode loaded:',
     clog(masterId.toString(16), 'took', actorId.toString(16), 'on in', half, '(' + r.kind + ')');
     if (r.kind === 'sister') {
       return { learner: who.name + ' has taken you on in ' + nameOf(half) + '. Work in it climbs past novice now, ' +
-                        'and the ranks you earn stay yours if it ends.',
-               master: name + ' is your apprentice in ' + nameOf(half) + '. /apprentice end ' + name + ' ends it.' };
+                        'and the ranks you earn stay yours if it ends. Either of you can end it on K.',
+               master: name + ' is your apprentice in ' + nameOf(half) + '. K lists them, with End.' };
     }
     var school = P.TABLE.schools.indexOf(half) !== -1;
     return { learner: who.name + ' taught you novice ' + nameOf(half) + '. ' +
                       (school ? 'You can learn ' + P.TABLE.limits.outsiderSpells + ' novice spells of it, each from its tome ' +
                                 'with a spell point a semester at the College hands you'
                               : 'It is in your recipe book on K') +
-                      ', and it never climbs past novice. It is one of your two outside trades.',
-             master: 'You taught ' + name + ' novice ' + nameOf(half) + '. /apprentice end ' + name + ' ends it.' };
+                      ', and it never climbs past novice. It is one of your two outside trades. Either of you ' +
+                      'can end it on K.',
+             master: 'You taught ' + name + ' novice ' + nameOf(half) + '. K lists them, with End.' };
   }
 
   /** The Master ends it. Returns the line for the Master. */
@@ -42507,7 +42589,7 @@ log('gamemode loaded:',
       if (half) { words = words.slice(0, -1); }
     }
     var want = words.join(' ').trim().toLowerCase();
-    if (!want) { return 'End whose? /apprentice end <name>, and the half when they are with you in two.'; }
+    if (!want) { return 'End whose? K lists the people you took on, each with End.'; }
     var asId = parseInt(want, 16);
     var exact = [], part = [];
     for (var i = 0; i < rows.length; i++) {
@@ -42525,8 +42607,7 @@ log('gamemode loaded:',
     if (hit.length > 1) {
       var named = [];
       for (var k = 0; k < hit.length; k++) { named.push(nameOf(hit[k].half)); }
-      return hit[0].name + ' is with you in ' + named.join(' and ') + '. Say which: /apprentice end ' +
-             hit[0].name + ' ' + hit[0].half + '.';
+      return hit[0].name + ' is with you in ' + named.join(' and ') + '. Each has its own End on K.';
     }
     var end = hit[0];
     var ended = null;
@@ -42549,7 +42630,7 @@ log('gamemode loaded:',
     var me = personName(actorId);
     var told = (ended === 'outside')
       ? me + ' has ended your teaching in ' + nameOf(end.half) + ', and its novice list is gone. It still counts as ' +
-        'one of your two outside trades.'
+        'one of your two outside trades.' + spellsStay(end.half)
       : me + ' has ended your apprenticeship in ' + nameOf(end.half) + '. The ranks you earned in it stay; past them ' +
         'the count waits again until a Master takes you on.';
     if (!ended) {
@@ -42566,6 +42647,62 @@ log('gamemode loaded:',
     return 'You ended ' + end.name + '\'s apprenticeship in ' + nameOf(end.half) + '. The ranks they earned stay.';
   }
 
+  /*
+    Patrick's answer on #1388, 4 Oct: when a taught school or a taught
+    Bladebinder ends, the spells already learned stay, and no new one can be
+    learned. release() leaves them on the character; this says so.
+  */
+  function spellsStay(half) {
+    return (P.TABLE.schools.indexOf(half) !== -1 || half === 'bladebinder')
+      ? ' The spells you already learned from it stay.' : '';
+  }
+
+  /*
+    The apprentice ends it (#1634). Patrick's answer on #1388, 4 Oct: either
+    one can end it, the apprentice as well as the Master. The same release
+    as the Master's End, from the other side: the person's own record loses
+    the Master in that half, and that Master's list loses the row, online or
+    not, so neither side is left naming the other. An outside trade loses
+    its novice list and stays counted, as it does when the Master ends it.
+    Returns the line for the apprentice.
+  */
+  function leaveIt(actorId, words) {
+    var half = halfKey(words[0]);
+    var ls = stateOf(actorId);
+    var rec = (half && ls.masters && P.has(ls.masters, half)) ? ls.masters[half] : null;
+    if (!rec) { return 'Nobody has taken you on in that.'; }
+    var r = P.release(ls, half, null);
+    if (!r.ok) { return 'No: ' + r.why + '.'; }
+    writeState(actorId, r.state);
+    var who = rec.name || 'your Master';
+    var masterId = Number(rec.id) || 0;
+    var ms = masterId ? readState(masterId) : null;
+    if (ms && lists(ms, actorId, half)) {
+      var m2 = P.clone(ms);
+      var keep = [];
+      var rows = ms.apprentices || [];
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i] && !(rows[i].id === actorId && rows[i].half === half)) { keep.push(rows[i]); }
+      }
+      m2.apprentices = keep;
+      writeState(masterId, m2);
+      try {
+        if (typeof say === 'function') {
+          say(masterId, personName(actorId) + (r.ended === 'outside'
+            ? ' has ended the novice ' + nameOf(half) + ' you taught them.'
+            : ' has ended their apprenticeship with you in ' + nameOf(half) + '.'));
+        }
+      } catch (e) { }
+    }
+    clog(actorId.toString(16), 'left', masterId.toString(16), 'in', half, '(' + r.ended + ')');
+    if (r.ended === 'outside') {
+      return 'You ended your novice ' + nameOf(half) + ' with ' + who + '. Its novice list is gone, and it still ' +
+             'counts as one of your two outside trades.' + spellsStay(half);
+    }
+    return 'You ended your apprenticeship in ' + nameOf(half) + ' with ' + who + '. The ranks you earned in it stay; ' +
+           'past them the count waits again until a Master takes you on.';
+  }
+
   /** /apprentice, every form of it. Answers through toProfile and always handles the word. */
   function apprenticeCommand(parts, actorId, profileId, toProfile) {
     if (!actorId) {
@@ -42576,6 +42713,7 @@ log('gamemode loaded:',
     var first = String(words[0] || '').toLowerCase();
     if (!words.length || first === 'list') { toProfile(profileId, standing(actorId)); return; }
     if (first === 'end') { toProfile(profileId, endIt(actorId, words.slice(1))); return; }
+    if (first === 'leave') { toProfile(profileId, leaveIt(actorId, words.slice(1))); return; }
     toProfile(profileId, offerIt(actorId, words));
   }
 
@@ -43014,6 +43152,7 @@ log('gamemode loaded:',
     gate: gate, gateHalf: gateHalf, credit: credit,
     grantSpell: grantSpell, grantKnown: grantKnown, nameOf: nameOf, raiseLines: raiseLines,
     acceptApprentice: acceptApprentice, masterFor: masterFor, effectsOf: effectsOf,
+    masterRecord: masterRecord, takeOnMark: takeOnMark,
     rankOf: function (actorId, key) { return P.rankOf(stateOf(actorId), key); }
   };
   clog('ready');
@@ -46984,8 +47123,10 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // 4 October, no chat commands for anything people do. See the
                // maneuvers block.
                '/maneuver',
-               // A Master taking somebody on, and ending it (#1388). See the
-               // character block.
+               // A Master taking somebody on, and either of them ending it
+               // (#1388). Sent by the look prompt and the K panel (#1634),
+               // never typed, and so deliberately NOT in PLAYER_WORDS. See
+               // the character block.
                '/apprentice',
                '/plant', '/claim', '/plot',
                // At a door, /claim, /lock and /unlock are what the lock key
@@ -47109,9 +47250,6 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // prompt, the P panel, the trade window and the prompt's
                       // Accept and Refuse send them, and nobody types them (#1628).
                       '/merchant',
-                      // Everybody's: a Master takes somebody on with it, and
-                      // anybody can ask who took them on (#1388).
-                      '/apprentice',
                       '/roll'];
 
 // ---------------------------------------------------------------------------
@@ -49217,9 +49355,9 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         toProfile(profileId,
           'K opens your profession, your class and your skill tree. Work at what ' +
           'you chose and the rank climbs on its own. Your sister half stops at ' +
-          'novice until a Master of it takes you on: a Master types /apprentice ' +
-          '<name>, and /apprentice end <name> ends it. /apprentice on its own ' +
-          'says who took you on. /plot says what is in the ' +
+          'novice until a Master of it takes you on: a Master looks at you and ' +
+          'presses the key the prompt names. K lists who took you on and who you ' +
+          'took on, and either of you can end it there. /plot says what is in the ' +
           'ground in front of you and whose farm it is, /plant sows it. A ' +
           'warrior\'s maneuvers open on the maneuver key, which the ' +
           'launcher\'s Controls page names. ' +
@@ -54962,10 +55100,14 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     // for whom, read once a tick. See lettersCarried in the property block.
     var props = g.__thornswoodProperty;
     var letters = (props && props.lettersCarried) ? props.lettersCarried() : null;
+    // And whether it offers a Master "Take on as apprentice" (#1634). See
+    // takeOnMark in the character block.
+    var ch = g.__thornswoodCharacter;
     for (var a = 0; a < at.length; a++) {
       var me = at[a];
       var s = read(me.id) || fresh();
       var party = partyOf(me.pid);
+      var teacher = (ch && ch.masterRecord) ? ch.masterRecord(me.id) : null;
       var w = {};
       for (var b = 0; b < at.length; b++) {
         if (a === b) { continue; }
@@ -54988,6 +55130,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         if (them.scar) { w[them.id.toString(16)].c = them.scar; }
         // d: you carry a letter for them, and the prompt offers to hand it over (#1595).
         if (letters && letters.carries(me.pid, them.name)) { w[them.id.toString(16)].d = 1; }
+        // a: the halves this Master could take them on in (#1634).
+        var canTake = teacher ? ch.takeOnMark(teacher, them.id) : null;
+        if (canTake) { w[them.id.toString(16)].a = canTake; }
       }
       var sig = JSON.stringify(w) + (s.namesAll ? ':all' : '');
       if (nearWas[me.id] === sig) { continue; }

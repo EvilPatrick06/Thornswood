@@ -162,5 +162,5 @@ is 1 piece and a dragon is 16. A kill between people counts for
 nothing. The stamina scales with the skill tree. What the game still
 has to do for the maneuvers is the second table under Maneuvers. A
 sister half's novice maneuver opens when a Master of that half takes
-you on with `/apprentice`, and stays once that half is past novice.
+you on, and stays once that half is past novice.
 See [Masters and apprentices](../apprenticeship.md).

@@ -352,7 +352,7 @@ attempt('the look prompt', function () {
   const drawPrompt = slice(front, '  function drawPrompt(row) {', '\n  }\n');
   yes('P10 the prompt draws Hand over the letter only for a row the server marked, and redraws when the mark moves',
       !!drawPrompt && /\(row\.d \? keyRow\(deliverName\(\), 'Hand over the letter', false\) : ''\)/.test(drawPrompt) &&
-      /'\|' \+ \(row\.d \|\| 0\)\) : '';/.test(drawPrompt));
+      /'\|' \+ \(row\.d \|\| 0\)/.test(drawPrompt));
   const keys = slice(front, "  sp.on('buttonEvent', guard('keys', (e) => {", '\n  }));\n');
   const at = keys ? keys.indexOf('if (deliverPress(e)) return;') : -1;
   yes('P11 the key handler asks it before the board, the driver and the trader take E',

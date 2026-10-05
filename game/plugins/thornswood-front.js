@@ -361,6 +361,16 @@
   */
   const SLEEP_KEY   = MOLD_KEY;
   /*
+    A Master's "Take on as apprentice" on the look prompt (#1634). K, THE
+    SKILLS KEY, and not a new one: every letter is already Skyrim's or ours,
+    and what it does is open the K panel anyway, on its Masters and
+    apprentices page with the person under the crosshair and a Take on for
+    each half the server says could be meant. Only while the server's near
+    list puts the row there; the rest of the time K is K. See
+    apprenticePress.
+  */
+  const APPRENTICE_KEY = SKILLS_KEY;
+  /*
     A warrior's maneuvers (#1386): opens the maneuver panel. 9, scan code 10:
     1 to 8 are the emote slots and the game's own hotkeys, and every letter is
     already one of ours or the game's.
@@ -384,6 +394,7 @@
   const MUTE_NAME = keyName(MUTE_KEY);
   const MOLD_NAME = keyName(MOLD_KEY);
   const SLEEP_NAME = keyName(SLEEP_KEY);
+  const APPRENTICE_NAME = keyName(APPRENTICE_KEY);
   const LOCK_NAME = keyName(LOCK_KEY);
   const MANEUVER_NAME = keyName(MANEUVER_KEY);
   /*
@@ -4517,7 +4528,7 @@
   /** Draw or clear the little panel that names them and the three keys. */
   function drawPrompt(row) {
     const sig = row ? (row.n + '|' + row.f + '|' + row.m + '|' + row.y + '|' + (row.s || 0) + '|' + (row.c || '') +
-                       '|' + (row.d || 0)) : '';
+                       '|' + (row.d || 0) + '|' + (row.a ? JSON.stringify(row.a) : '')) : '';
     if (sig === lookingSig) { return; }
     lookingSig = sig;
     if (!row) {
@@ -4557,7 +4568,11 @@
                       row.s === 2) : '') +
       // Only while you carry a letter for them: the near list's d (#1595).
       // See deliverPress.
-      (row.d ? keyRow(deliverName(), 'Hand over the letter', false) : '');
+      (row.d ? keyRow(deliverName(), 'Hand over the letter', false) : '') +
+      // Only for a Master looking at somebody they could take on: the
+      // server's near list says so, with the halves (#1634). See
+      // apprenticePress.
+      (Array.isArray(row.a) && row.a.length ? keyRow(APPRENTICE_NAME, 'Take on as apprentice', false) : '');
 
     T.js('(function(){try{' +
          'var d=document.getElementById("ts-look");' +
@@ -4672,6 +4687,31 @@
     const row = (near && Object.prototype.hasOwnProperty.call(near, lookingAt)) ? near[lookingAt] : null;
     if (!row || !row.s) { return false; }
     return lookVerb('sleephere');
+  }
+
+  /*
+    Take the person under the crosshair on as an apprentice (#1634). Only
+    while the prompt offers it, which is the server's near list naming the
+    halves this Master could take them on in. Nothing is sent from here:
+    the K panel opens on Masters and apprentices with that person and a
+    Take on for each half, and its button sends the line, so the choice of
+    half is made before the offer goes. The server asks every rule again
+    when it arrives. Answers whether it was used, so K falls through to
+    opening or closing the panel when it was not.
+  */
+  function apprenticePress() {
+    if (!lookingAt) { return false; }
+    if (claims.chat) { return false; }
+    if (T.hasFocus('skills')) { return false; }
+    if (busyMenuOpenNow()) { return false; }
+    const near = nearList();
+    const row = (near && Object.prototype.hasOwnProperty.call(near, lookingAt)) ? near[lookingAt] : null;
+    if (!row || !Array.isArray(row.a) || !row.a.length) { return false; }
+    const who = { id: lookingAt, name: String(row.n || ''), halves: row.a };
+    T.js('try{if(window.thornswoodSkills&&window.thornswoodSkills.takeOn){' +
+         'window.thornswoodSkills.takeOn(' + JSON.stringify(who) + ');}}catch(e){}');
+    say('take on as apprentice: ' + lookingAt);
+    return true;
   }
 
   /*
@@ -7644,6 +7684,8 @@
 
     if (e.code === MANEUVER_KEY) { maneuverKeyPressed(); return; }
 
+    // K on a person a Master could take on opens K on them (#1634).
+    if (e.code === APPRENTICE_KEY && apprenticePress()) { return; }
     if (e.code === SKILLS_KEY) {
       if (claims.chat) { return; }
       const busyNow = busyMenuOpen();

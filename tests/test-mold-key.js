@@ -292,6 +292,10 @@ function client(opt) {
     // No press here is 9; test-1386-warrior.js has what it does.
     'const MANEUVER_KEY = iniNumber(iniText, "ManeuverKey", 10);',
     'function maneuverKeyPressed() {}',
+    // K on a person a Master could take on (#1634), asked ahead of K. Nobody
+    // is looked at here; test-1634-apprentice-gui.js has what it does.
+    'const APPRENTICE_KEY = SKILLS_KEY;',
+    'function apprenticePress() { return false; }',
     PIECES_FRONT.keys,
     'return { MOLD_KEY: MOLD_KEY, MOLD_NAME: MOLD_NAME, moldPress: moldPress };'
   ].join('\n');

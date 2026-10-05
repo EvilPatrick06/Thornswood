@@ -160,8 +160,8 @@ the sister half at novice, the bench table, the charcoal and the
 handle, and the recipe lists are in the server. Smelting is a smith's
 and tanning is the Platewright's, as above, and neither is one of the
 two outside trades. A master takes someone on in the sister half or
-in an outside trade with `/apprentice <name>`, and ends it with
-`/apprentice end <name>`. See [Masters and apprentices](apprenticeship.md).
+in an outside trade from the look prompt, and either of them ends it on
+the K panel. See [Masters and apprentices](apprenticeship.md).
 
 Not in the world yet: the parts of a warrior's maneuvers the game
 has to do itself (see [Warrior](professions/warrior.md)), the repair
