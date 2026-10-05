@@ -61572,8 +61572,33 @@ try {
     deps = deps || {};
     var GOLD_DESC = deps.goldDesc;
     var places = {};
-    var people = new Map();
     var rankOf = deps.rankOf || function () { return ''; };
+    /*
+      WHAT EACH PERSON HOLDS IS ON THE CHARACTER (#1621), not in a map here.
+      A map in this process was emptied by every restart: a scarce quest open
+      at the time was gone while what it had drawn stayed in the pack, so
+      twelve ebony out of Raven Rock Mine were kept with nothing left to put
+      them back, and every cooldown came back at once. deps.load and deps.save
+      read and write one record on the character, { v, open, cool }. The server
+      keeps it in the character's change form beside the pack and saves that
+      form whole, so no save holds the goods without the quest that drew them.
+      Nothing else holds it, so what the server enforces is what a restart
+      reads.
+
+      Each step reads the record and writes it before it hands anything over:
+      a draw is counted before the ore is in the pack, and a turn-in or a walk
+      away takes the goods before the record lets go of them. A step that
+      cannot be written changes nothing, and goods it had already moved go
+      back where they were.
+    */
+    if (typeof deps.load !== 'function' || typeof deps.save !== 'function') {
+      throw new Error('the custom quests have nowhere on the character to keep them');
+    }
+    var note = deps.log || function () {
+      console.log('[quests] ' + Array.prototype.join.call(arguments, ' '));
+    };
+    var UNREAD = 'Your quests could not be read just now, so nothing changed. Tell staff with /helpme.';
+    var UNWRITTEN = 'Your quests could not be written just now, so nothing changed. Tell staff with /helpme.';
     var traders = new Set();
     try {
       var data = (typeof NPC_POPULATION_DATA !== 'undefined') ? NPC_POPULATION_DATA : null;
@@ -61584,13 +61609,59 @@ try {
       }
     } catch (e) { /* the harness has no population table */ }
 
-    function bucket(actor) {
-      var found = people.get(actor);
-      if (!found) {
-        found = { open: {}, cool: {} };
-        people.set(actor, found);
+    function own(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
+    function whole(n) {
+      n = Number(n);
+      return (n > 0 && Math.floor(n) === n) ? n : 0;
+    }
+    /*
+      One person's quests off the character, rebuilt field by field rather
+      than trusted whole: a quest the tables no longer have, a count that is
+      not a whole number and a cooldown that has run out are left off. Nothing
+      there yet is nothing open and nothing waiting. A read that throws, or a
+      value that is there and is not this record, is null: every step refuses
+      and nothing is written over it, because writing would hand back every
+      cooldown and forget what was drawn.
+    */
+    function questsOf(actor) {
+      var raw;
+      try { raw = deps.load(actor); } catch (e) {
+        note('could not read the quests of', actor + ':', e);
+        return null;
       }
-      return found;
+      var out = { open: {}, cool: {} };
+      if (raw === undefined || raw === null) return out;
+      if (typeof raw !== 'object' || raw.v !== 1) {
+        note('the quests on', actor, 'are not a quest record, so nothing is written over them');
+        return null;
+      }
+      var open = (raw.open && typeof raw.open === 'object') ? raw.open : {};
+      Object.keys(open).forEach(function (id) {
+        var o = open[id];
+        if (!own(byId, id) || !o || typeof o !== 'object') return;
+        out.open[id] = {
+          drawn: whole(o.drawn),
+          kills: whole(o.kills),
+          gem: (byId[id].gems && byId[id].gems.indexOf(o.gem) >= 0) ? o.gem : undefined,
+          itemDesc: (typeof o.itemDesc === 'string' && o.itemDesc) ? o.itemDesc : null
+        };
+      });
+      var cool = (raw.cool && typeof raw.cool === 'object') ? raw.cool : {};
+      var t = deps.now();
+      Object.keys(cool).forEach(function (id) {
+        var until = Number(cool[id]) || 0;
+        if (own(byId, id) && until > t) out.cool[id] = until;
+      });
+      return out;
+    }
+    function keep(actor, b) {
+      try {
+        deps.save(actor, { v: 1, open: b.open, cool: b.cool });
+        return true;
+      } catch (e) {
+        note('could not write the quests of', actor + ', so nothing changed:', e);
+        return false;
+      }
     }
     function qualify(actor, row) {
       if (row.kind === 'retrieval' || row.kind === 'kill') return { ok: true };
@@ -61630,7 +61701,8 @@ try {
     function offer(actor, id, opts) {
       var row = byId[id];
       if (!row) return { ok: false, why: 'unknown' };
-      var b = bucket(actor);
+      var b = questsOf(actor);
+      if (!b) return { ok: false, why: 'unread' };
       if (b.open[id]) return { ok: false, why: 'open' };
       if ((b.cool[id] || 0) > deps.now()) return { ok: false, why: 'cooldown' };
       var gate = qualify(actor, row);
@@ -61640,6 +61712,7 @@ try {
         if (row.gems.indexOf(gem) < 0) return { ok: false, why: 'gem' };
       }
       b.open[id] = { drawn: 0, kills: 0, gem: opts && opts.gem, itemDesc: null };
+      if (!keep(actor, b)) return { ok: false, why: 'unwritten' };
       return { ok: true };
     }
     function bindPlace(id, place) {
@@ -61647,14 +61720,14 @@ try {
       places[id] = place || {};
       return places[id];
     }
-    function rareShut(actor, refrId, seam) {
+    function rareShut(actor, refrId, seam, held) {
       var id = RARE[seam && seam.name];
       if (!id) return null;
       var row = byId[id];
       var gate = qualify(actor, row);
       if (!gate.ok) return row.name + ' takes ' + (row.rank ? row.rank.charAt(0).toUpperCase() + row.rank.slice(1) + ' ' : '') + row.classKey.charAt(0).toUpperCase() + row.classKey.slice(1) + '.';
-      var held = people.get(actor);
-      var open = held && held.open[id];
+      if (!held) return UNREAD;
+      var open = held.open[id];
       if (!open) return 'This place is shut.';
       var place = places[id] || {};
       if (row.gems && seam.name !== open.gem) return 'This place is shut.';
@@ -61665,16 +61738,22 @@ try {
       return null;
     }
     function giveRare(actor, refrId, seam) {
-      var shut = rareShut(actor, refrId, seam);
+      var b = questsOf(actor);
+      var shut = rareShut(actor, refrId, seam, b);
       if (shut) return shut;
       var id = RARE[seam.name];
       var row = byId[id];
-      var open = bucket(actor).open[id];
-      if (!deps.addItem(actor, seam.ore, 1)) {
-        return 'The seam gives up ' + seam.name + ' and there is nothing in this load order to put in your hands.';
-      }
+      var open = b.open[id];
+      var was = open.itemDesc;
       open.drawn += 1;
       open.itemDesc = seam.ore;
+      if (!keep(actor, b)) return UNWRITTEN;
+      if (!deps.addItem(actor, seam.ore, 1)) {
+        open.drawn -= 1;
+        open.itemDesc = was;
+        keep(actor, b);
+        return 'The seam gives up ' + seam.name + ' and there is nothing in this load order to put in your hands.';
+      }
       if (open.drawn >= row.holds) return 'That is all this place will give you.';
       return '';
     }
@@ -61695,7 +61774,7 @@ try {
       if (refused) return refused;
       var tool = toolGateFn(actor, 'miner');
       if (tool) return tool;
-      var shut = rareShut(actor, refrId, seam);
+      var shut = rareShut(actor, refrId, seam, questsOf(actor));
       if (shut) return shut;
       if (miningFn(actor)) { stopMiningFn(actor); return 'You put the pick down.'; }
       if (swingingFn(actor)) return '';
@@ -61709,23 +61788,50 @@ try {
       return '';
     }
     function walkAway(actor, id) {
-      var b = bucket(actor);
+      var b = questsOf(actor);
+      if (!b) return { ok: false, why: 'unread' };
       var open = b.open[id];
       if (!open) return { ok: false, why: 'none' };
       if (open.drawn > 0) {
         if (!deps.takeItem(actor, open.itemDesc, open.drawn)) return { ok: false, why: 'goods' };
       }
       delete b.open[id];
+      if (!keep(actor, b)) {
+        if (open.drawn > 0) deps.addItem(actor, open.itemDesc, open.drawn);
+        return { ok: false, why: 'unwritten' };
+      }
       return { ok: true };
     }
     function turnIn(actor, id, traderRef) {
       var row = byId[id];
-      var b = bucket(actor);
+      var b = row ? questsOf(actor) : null;
+      if (row && !b) return { ok: false, why: 'unread' };
       var open = row && b.open[id];
       if (!row || !open) return { ok: false, why: 'none' };
+      if (!row.scarce && row.kind !== 'retrieval' && row.kind !== 'kill') return { ok: false, why: 'unknown' };
+      /*
+        Finished is the quest closed and its cooldown stamped, in one write.
+        Goods are taken before that write and gold is handed over after it,
+        so a write that fails gives the goods back, and gold that cannot be
+        handed over opens the quest again.
+      */
+      function finish() {
+        delete b.open[id];
+        b.cool[id] = deps.now() + row.hours * HOUR;
+        return keep(actor, b);
+      }
+      function reopen() {
+        b.open[id] = open;
+        delete b.cool[id];
+        keep(actor, b);
+      }
       if (row.scarce) {
         if (open.drawn < row.ask) return { ok: false, why: 'short' };
         if (!deps.takeItem(actor, open.itemDesc, row.ask)) return { ok: false, why: 'goods' };
+        if (!finish()) {
+          deps.addItem(actor, open.itemDesc, row.ask);
+          return { ok: false, why: 'unwritten' };
+        }
       } else if (row.kind === 'retrieval') {
         if (open.drawn < 1) return { ok: false, why: 'short' };
         var place = places[id] || {};
@@ -61734,24 +61840,28 @@ try {
           if (!place.handoffHold || hold !== place.handoffHold) return { ok: false, why: 'hold' };
         }
         if (!deps.takeItem(actor, open.itemDesc, 1)) return { ok: false, why: 'goods' };
+        if (!finish()) {
+          deps.addItem(actor, open.itemDesc, 1);
+          return { ok: false, why: 'unwritten' };
+        }
         if (!deps.addItem(actor, GOLD_DESC, row.gold)) {
           deps.addItem(actor, open.itemDesc, 1);
-          open.drawn = 1;
+          reopen();
           return { ok: false, why: 'gold' };
         }
-      } else if (row.kind === 'kill') {
-        if (open.kills < row.count) return { ok: false, why: 'short' };
-        if (!deps.addItem(actor, GOLD_DESC, row.gold)) return { ok: false, why: 'gold' };
       } else {
-        return { ok: false, why: 'unknown' };
+        if (open.kills < row.count) return { ok: false, why: 'short' };
+        if (!finish()) return { ok: false, why: 'unwritten' };
+        if (!deps.addItem(actor, GOLD_DESC, row.gold)) {
+          reopen();
+          return { ok: false, why: 'gold' };
+        }
       }
-      delete b.open[id];
-      b.cool[id] = deps.now() + row.hours * HOUR;
       return { ok: true, gold: row.scarce ? 0 : row.gold };
     }
     function noteKill(killer, victim) {
-      var b = people.get(killer);
-      if (!b) return { ok: false, why: 'none' };
+      var b = questsOf(killer);
+      if (!b) return { ok: false, why: 'unread' };
       var watching = false;
       Object.keys(b.open).forEach(function (id) {
         if (byId[id] && byId[id].kind === 'kill') watching = true;
@@ -61760,6 +61870,7 @@ try {
       var name = deps.creatureName ? deps.creatureName(victim) : '';
       if (/dragon/i.test(name)) return { ok: false, why: 'dragon' };
       var cell = deps.cellOf ? deps.cellOf(victim) : '';
+      var counted = false;
       SCENE.forEach(function (row) {
         if (row.kind !== 'kill') return;
         var open = b.open[row.id];
@@ -61768,11 +61879,13 @@ try {
         if (!place.cell || cell !== place.cell) return;
         if (!creatureOk(row.match, name)) return;
         open.kills += 1;
+        counted = true;
       });
+      if (counted && !keep(killer, b)) return { ok: false, why: 'unwritten' };
       return { ok: true };
     }
     function noteContainer(actor, ref, cell) {
-      var held = people.get(actor);
+      var held = questsOf(actor);
       if (!held) return null;
       var said = null;
       SCENE.forEach(function (row) {
@@ -61782,9 +61895,15 @@ try {
         var place = places[row.id] || {};
         if (!place.ref || place.ref !== ref || !place.item) return;
         if (place.cell && cell !== place.cell) return;
-        if (!deps.addItem(actor, place.item, 1)) return;
         open.drawn = 1;
         open.itemDesc = place.item;
+        if (!keep(actor, held)) { said = UNWRITTEN; return; }
+        if (!deps.addItem(actor, place.item, 1)) {
+          open.drawn = 0;
+          open.itemDesc = null;
+          keep(actor, held);
+          return;
+        }
         said = 'You take it.';
       });
       return said;
@@ -61801,7 +61920,7 @@ try {
       return null;
     }
     function onActivate(actor, refrId) {
-      var held = people.get(actor);
+      var held = questsOf(actor);
       if (!held) return null;
       var retrieval = false;
       Object.keys(held.open).forEach(function (id) {
@@ -61819,11 +61938,30 @@ try {
     };
   }
 
+  /*
+    Where each person's quests are kept (#1621): on the character, seen by
+    nobody's client, the way the perk clocks and the journals are. Never set
+    reads as nothing open and nothing waiting.
+  */
+  var QUEST_PROPERTY = 'thornswoodQuests';
   if (typeof mp !== 'undefined' && mp && typeof addItem === 'function') {
     try {
+      try {
+        mp.makeProperty(QUEST_PROPERTY, {
+          isVisibleByOwner: false, isVisibleByNeighbors: false,
+          updateOwner: '', updateNeighbor: ''
+        });
+      } catch (e) { /* made by an earlier load. harmless. */ }
       globalThis.__thornswoodQuests = createCustomQuests({
         now: function () { return Date.now(); },
         goldDesc: globalThis.__thornswoodDungeonLoot && globalThis.__thornswoodDungeonLoot.GOLD_DESC,
+        load: function (actor) { return mp.get(actor, QUEST_PROPERTY); },
+        save: function (actor, rec) { mp.set(actor, QUEST_PROPERTY, rec); },
+        log: function () {
+          var a = Array.prototype.slice.call(arguments);
+          a.unshift('custom quests:');
+          log.apply(null, a);
+        },
         addItem: addItem,
         takeItem: takeItem,
         rankOf: function (actor, key) {
