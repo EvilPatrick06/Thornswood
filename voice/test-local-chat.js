@@ -35,6 +35,7 @@
 */
 const { spawn } = require('child_process');
 const fs = require('fs');
+const crypto = require('crypto');
 const path = require('path');
 const os = require('os');
 const net = require('net');
@@ -97,10 +98,13 @@ async function service(range) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'localchat-'));
   fs.copyFileSync(SERVER, path.join(dir, 'voice-server.js'));
   fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
+  // Every join proves itself since #1303, so each service gets a key this
+  // harness signs its join tokens with.
+  const key = crypto.randomBytes(32).toString('hex');
+  fs.writeFileSync(path.join(dir, 'token-key.txt'), key);
   const env = Object.assign({}, process.env, {
     THORNSWOOD_VOICE_PORT: String(port),
     THORNSWOOD_VOICE_BIND: '127.0.0.1',
-    THORNSWOOD_VOICE_AUTH: 'log',
     THORNSWOOD_SITE: '',
     THORNSWOOD_CHAT_DIR: path.join(dir, 'chat')
   });
@@ -123,7 +127,7 @@ async function service(range) {
 
   const socks = [];
   return {
-    port: port, dir: dir, base: base, health: health, socks: socks,
+    port: port, dir: dir, base: base, health: health, socks: socks, key: key,
     log: () => log,
     stop: async () => {
       for (const c of socks) { try { c.ws.close(); } catch (e) { } }
@@ -134,13 +138,19 @@ async function service(range) {
   };
 }
 
+function tokenFor(svc, pid) {
+  const body = String(pid) + '.' + String(Date.now() + 3600000);
+  return 'v1.' + body + '.' + crypto.createHmac('sha256', svc.key).update(body).digest('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 /* One person, joined. Keeps every chat line it is sent. */
 function join(svc, profileId, name) {
   return new Promise((done, failed) => {
     const ws = new WebSocket('ws://127.0.0.1:' + svc.port + '/');
     const c = { ws: ws, profileId: profileId, name: name, got: [] };
     let ok = false;
-    ws.onopen = () => ws.send(JSON.stringify({ t: 'join', profileId: profileId, name: name }));
+    ws.onopen = () => ws.send(JSON.stringify({ t: 'join', profileId: profileId, name: name, token: tokenFor(svc, profileId) }));
     ws.onmessage = (ev) => {
       let m;
       try { m = JSON.parse(ev.data); } catch (e) { return; }
