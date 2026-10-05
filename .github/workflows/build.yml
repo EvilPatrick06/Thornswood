@@ -299,6 +299,7 @@ jobs:
                  'test-1390-embassy.js',
                  'test-1603-beds.js',
                  'test-1606-logout-fill.js',
+                 'test-1676-rest-gate.js',
                  'test-1634-apprentice-gui.js',
                  'test-1637-door-gui.js',
                  'test-1636-farm-gui.js',
