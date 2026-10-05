@@ -29882,22 +29882,43 @@ log('gamemode loaded:',
   the launcher version, the Discord id and a ten minute expiry with the key it
   shares with this server: passKey in door.json, which Set-Door.ps1 -Connect
   copies there from the site. The launcher leaves it in
-  Data/Platform/thornswood-pass.txt and renews it every four minutes, and the
-  front plugin sends it here as "/joinpass <pass>" over the command relay, at
-  once and every minute. The format is makePass in site/server.js.
+  Data/Platform/thornswood-pass.txt and renews it every minute, and the front
+  plugin sends it here as "/joinpass <pass>" over the command relay, at once
+  and every minute. The format is makePass in site/server.js.
 
   WHAT IS CHECKED, here and with nothing asked of anybody: the signature, the
   expiry, that it names this server (thornswoodServer in server-settings.json,
-  "dev" on the dev box, "main" when absent), and that its profile is the one
-  the relay says sent it, which the voice join token proves.
+  "dev" on the dev box, "main" when absent), that its profile is the one the
+  relay says sent it, which the voice join token proves, and that no other
+  session has used it (below).
 
-  THE PROFILE ID IS THE PASS'S. Every profile online needs a valid pass
-  received since it was first seen, or in the minute before. One with none is
-  told one line and ended GRACE_MS after it was first seen. A session under
-  somebody else's number cannot have a pass for it: the site will not issue
-  one and nothing else can sign one. A pass is forgotten when its profile
-  leaves, so a reconnect needs a fresh one, which the front sends within the
-  minute and the launcher keeps fresh.
+  THE PROFILE ID IS THE PASS'S. Every session online needs a valid pass of its
+  own. One with none is told one line and ended GRACE_MS after it was first
+  seen. A session under somebody else's number cannot have a pass for it: the
+  site will not issue one and nothing else can sign one.
+
+  ONE PASS, ONE SESSION (#1320). A pass is a note anybody holding it could
+  show, so it is bound to the first session it proves and never proves
+  another: not the next session after a reconnect, not a second connection
+  under the same number. A session is one engine connection behind a profile
+  (its GUID, connOf), from when it is first seen until it leaves or the
+  connection behind the character changes; a new connection starts a new
+  session, held (#410) and judged afresh. A pass also starts a session only
+  when the site issued it at most ISSUED_MS before that session began, so a
+  pass picked up at the menu, off a disk, or over the wire is good for a
+  minute and a half, not for the ten minutes it lives; after that it only
+  keeps the session it already proved trusted (proven, for roles). The
+  launcher renews every minute, so a reconnect has a new pass within one.
+  Kept on globalThis, so a hot reload keeps every binding; a restart loses
+  them, and then a pass can be shown again only within ISSUED_MS of its
+  issue. Measured on 5 Oct: the pass never travels on the game's own port.
+  It goes launcher to site over https, through a file, and over the relay's
+  socket, which is wss through Caddy whenever the voice address is https; a
+  launcher with no https voice address gets no join token, and with the hold
+  on the relay refuses it. What the gamemode cannot do is tie that socket to
+  the game connection: both only name the profile. Binding the pass into the
+  game login itself, checked before the engine hands over the character, is a
+  fork change, written out on #1320.
 
   THE SERVER'S OWN FAILURES REFUSE TOO, decided on purpose (the standing rule
   is that refusing is the secure side, #937): no passKey in door.json, a relay
@@ -29912,7 +29933,18 @@ log('gamemode loaded:',
   launcher, so that session is the same refusal. The setting still decides
   the hold (#410): with it on, nothing the session does counts until the pass
   arrives. Deploy-DevGamemode.ps1 -RequirePass on|off sets the hold on the
-  dev box. No older launcher or plugin is kept working (Patrick, 28 Sep).
+  dev box, and Deploy-Gamemode.ps1 -RequirePass on|off with Deploy-Server.ps1
+  on live. No older launcher or plugin is kept working (Patrick, 28 Sep).
+
+  THE HOLD FAILS CLOSED (#1319). false is the one way to turn it off. true
+  holds, and so does anything else: absent, null, empty, "true" as text, 1.
+  Until 5 Oct only exactly true held, so one empty value, which the dev
+  server had on 29 Sep (#1222), dropped the hold for the whole server and
+  said nothing. requiring() logs any value that is neither, with the value.
+  Every reader asks requiring(): the seats block, the dispatcher, the voice
+  feed. A deploy never changes what a box does unasked: Deploy-DevGamemode.ps1
+  and Deploy-Server.ps1 refuse a server whose settings hold neither true nor
+  false until -RequirePass says which.
 */
 (function () {
   var g = globalThis;
@@ -29920,7 +29952,8 @@ log('gamemode loaded:',
   try { crypto = require('crypto'); fs = require('fs'); path = require('path'); } catch (e) { }
 
   var GRACE_MS = 180000;      // online this long with no valid pass: ended
-  var BEFORE_MS = 60000;      // a pass this long before the session was first seen counts
+  var BEFORE_MS = 60000;      // a pass at the menu not sent again this long, with no session, is let go
+  var ISSUED_MS = 90000;      // a pass issued this long before a session began can still start it (#1320)
   var SWEEP_MS = 5000;
   var KEY_READ_MS = 60000;
   var SAY_AGAIN_MS = 600000;  // the same bad pass is logged at most this often
@@ -29933,14 +29966,41 @@ log('gamemode loaded:',
                 'clear in a minute, restart the game from the launcher.';
 
   // On globalThis, so a hot reload keeps who has shown a pass.
-  // passes: profile -> { at, x, v }; online: profile -> { joined, judged, actorId }.
+  // passes: profile -> { at, x, v, d, i, id, s }, the pass on hand, s the session it proved (0: none yet);
+  // online: profile -> { joined, judged, actorId, sid, conn }; used: pass id -> { s, x } (#1320).
   if (!g.__thornswoodPassSeen) { g.__thornswoodPassSeen = { passes: {}, online: {}, said: {} }; }
   var seen = g.__thornswoodPassSeen;
+  if (!seen.used) { seen.used = {}; }
+  if (!seen.serial) { seen.serial = 0; }
+  // Sessions from a block before #1320, on a hot reload: each gets its number,
+  // and one that had already proved itself keeps the pass it showed.
+  for (var was in seen.online) {
+    if (Object.prototype.hasOwnProperty.call(seen.online, was) && !seen.online[was].sid) {
+      seen.online[was].sid = ++seen.serial;
+      if (seen.online[was].judged && seen.passes[was]) { seen.passes[was].s = seen.online[was].sid; }
+    }
+  }
 
   function settings() {
     try { return mp.getServerSettings() || {}; } catch (e) { return {}; }
   }
-  function requiring() { return settings().thornswoodRequirePass === true; }
+  /* The hold (#410), failing closed (#1319): off only for false. */
+  function requiring() {
+    var v = settings().thornswoodRequirePass;
+    if (v === true) { return true; }
+    if (v === false) { return false; }
+    var said = 'missing';
+    if (v !== undefined) {
+      try { said = String(JSON.stringify(v)).slice(0, 80) + (typeof v === 'string' ? ' (text)' : ''); }
+      catch (e) { said = 'unreadable'; }
+    }
+    if (fresh('switch ' + said, Date.now())) {
+      console.log('[thornswood] thornswoodRequirePass in server-settings.json is ' + said +
+                  ', which is neither true nor false, so the join pass hold is on. ' +
+                  'false is the one way to turn it off (#1319).');
+    }
+    return true;
+  }
   function serverName() {
     return String(settings().thornswoodServer || '').trim().toLowerCase() || 'main';
   }
@@ -29996,14 +30056,49 @@ log('gamemode loaded:',
     if (now > Number(o.x)) { return { why: 'an expired pass', p: p }; }
     if (String(o.s) !== server) { return { why: 'a pass for the ' + String(o.s) + ' server', p: p }; }
     // d is the Discord account the site signed it for; /stuck's staff record
-    // names it (#414).
-    return { ok: true, p: p, v: String(o.v || ''), x: Number(o.x), d: String(o.d || '') };
+    // names it (#414). i is when the site issued it, and id, its signature,
+    // is what a session binds (#1320).
+    return { ok: true, p: p, v: String(o.v || ''), x: Number(o.x), d: String(o.d || ''),
+             i: Number(o.i) || 0, id: parts[2] };
+  }
+
+  /*
+    Whether this pass may prove the session profileId is in now (#1320): r
+    back with s, the session it is bound to (0 at the menu), or a refusal.
+  */
+  function bind(profileId, r) {
+    var e = seen.online[profileId];
+    var sid = e ? e.sid : 0;
+    var u = seen.used[r.id];
+    if (u && u.s && u.s !== sid) { return { why: 'a pass an earlier session already used', p: r.p }; }
+    if (sid && !(u && u.s === sid) && r.i < e.joined - ISSUED_MS) {
+      return { why: 'a pass issued before this session began', p: r.p };
+    }
+    seen.used[r.id] = { s: sid, x: r.x };
+    r.s = sid;
+    return r;
+  }
+
+  /*
+    Which engine connection is behind a character now (#1320): its GUID, which
+    is new for every connection, or its slot on an engine that cannot say. ''
+    when there is none to name, which changes nothing.
+  */
+  function connOf(actorId) {
+    var u = -1;
+    try { u = mp.getUserByActor(actorId); } catch (e) { u = -1; }
+    if (u === undefined || u === null || u < 0) { return ''; }
+    if (typeof mp.getUserGuid !== 'function') { return 'user ' + u; }
+    var guid = '';
+    try { guid = String(mp.getUserGuid(u) || ''); } catch (e) { guid = ''; }
+    return guid ? 'guid ' + guid : '';
   }
 
   /* One "/joinpass <pass>" from the relay, sent under profileId. */
   function take(profileId, raw, now) {
     var r = readPass(raw, passKey(now), now, serverName());
     if (r.ok && r.p !== profileId) { r = { why: 'a pass for profile ' + r.p, p: r.p }; }
+    if (r.ok) { r = bind(profileId, r); }
     if (!r.ok) {
       if (fresh('bad ' + profileId + ' ' + r.why, now)) {
         console.log('[thornswood] join pass from profile ' + profileId + ' not taken: ' + r.why);
@@ -30013,7 +30108,7 @@ log('gamemode loaded:',
     if (!seen.passes[profileId]) {
       console.log('[thornswood] join pass for profile ' + profileId + ', launcher ' + r.v);
     }
-    seen.passes[profileId] = { at: now, x: r.x, v: r.v, d: r.d };
+    seen.passes[profileId] = { at: now, x: r.x, v: r.v, d: r.d, i: r.i, id: r.id, s: r.s };
     return r;
   }
 
@@ -30041,12 +30136,30 @@ log('gamemode loaded:',
       var pid = Number(online[i] && online[i].profileId) || 0;
       if (!pid) { continue; }
       here[pid] = true;
+      var conn = connOf(online[i].actorId);
       var e = seen.online[pid];
-      if (!e) { e = seen.online[pid] = { joined: now, judged: false, actorId: 0 }; }
+      // Another connection behind this character (#1320): a session of its
+      // own, which the pass the last one showed does not prove.
+      if (e && conn && e.conn && conn !== e.conn) {
+        console.log('[thornswood] profile ' + pid + ' is on another connection now, so that session needs a join pass of its own');
+        delete seen.passes[pid];
+        e = null;
+      }
+      if (!e) {
+        e = seen.online[pid] = { joined: now, judged: false, actorId: 0, sid: ++seen.serial, conn: conn };
+        // A pass that came at the menu is this session's, when it was issued
+        // close enough before it and nothing else has used it.
+        var menu = seen.passes[pid];
+        if (menu && !menu.s && menu.i >= now - ISSUED_MS && !(seen.used[menu.id] && seen.used[menu.id].s)) {
+          menu.s = e.sid;
+          seen.used[menu.id] = { s: e.sid, x: menu.x };
+        }
+      }
+      if (!e.conn && conn) { e.conn = conn; }
       e.actorId = online[i].actorId;
       if (e.judged) { continue; }
       var had = seen.passes[pid];
-      if (had && had.at >= e.joined - BEFORE_MS) { e.judged = true; continue; }
+      if (had && had.s === e.sid) { e.judged = true; continue; }
       // Held until then (#410): said once, after long enough that a pass on
       // its way has had time to arrive.
       if (requiring() && !e.told && now - e.joined >= WAIT_SAY_MS) {
@@ -30073,6 +30186,10 @@ log('gamemode loaded:',
       if (Object.prototype.hasOwnProperty.call(seen.passes, q) && !here[q] &&
           now - seen.passes[q].at > BEFORE_MS) { delete seen.passes[q]; }
     }
+    // A pass past its expiry is refused by readPass anyway.
+    for (var u in seen.used) {
+      if (Object.prototype.hasOwnProperty.call(seen.used, u) && !(Number(seen.used[u].x) > now)) { delete seen.used[u]; }
+    }
     return judged;
   }
 
@@ -30086,12 +30203,11 @@ log('gamemode loaded:',
     commands. So with thornswoodRequirePass on, a profile is taken at its word
     only once this block has a pass for it:
 
-      shown(pid)    a valid pass for the session it is in now: received since
-                    it was first seen online, or in the minute before. A
-                    profile not yet seen online (at the menu, or joined since
-                    the last sweep) counts a pass that has not expired.
+      shown(pid)    a valid pass bound to the session it is in now (#1320).
+                    A profile not yet seen online (at the menu, or joined
+                    since the last sweep) counts a pass that has not expired.
       proven(pid)   shown, and the pass has not expired: what a role needs.
-                    The launcher renews it every four minutes while it is open.
+                    The launcher renews it every minute while it is open.
       held(pid)     enforcement is on and pid has not shown one: the session
                     is in the world, but nothing it does counts yet.
       trusts(pid)   what a role check asks: proven when enforcement is on,
@@ -30111,7 +30227,7 @@ log('gamemode loaded:',
     var had = seen.passes[pid];
     if (!had) { return false; }
     var e = seen.online[pid];
-    if (e) { return had.at >= e.joined - BEFORE_MS; }
+    if (e) { return had.s === e.sid; }
     return Number(had.x) > now;
   }
   function proven(pid, now) {
@@ -30652,8 +30768,13 @@ log('gamemode loaded:',
     var say = g.__thornswoodToProfile;
     // The chat commands block's poll of the relay (pollSaid): answering unless its last try failed.
     var poll = g.__thornswoodCommandPoll;
+    // The join pass block's one reading of the switch, which fails closed
+    // (#1319), as the dispatcher asks it.
+    var jp = g.__thornswoodJoinPass;
+    var requirePass = false;
+    try { requirePass = !!(jp && jp.requiring && jp.requiring()); } catch (eReq) { requirePass = true; }
     return {
-      cap: capOf(s), staffSeats: staffSeatsOf(s), requirePass: s.thornswoodRequirePass === true,
+      cap: capOf(s), staffSeats: staffSeatsOf(s), requirePass: requirePass,
       relayOk: !poll || !poll.failAt || poll.okAt >= poll.failAt,
       holdsStaffRole: holdsStaffRole, hasPass: hasPass,
       tell: function (p, text) { if (say) { say(p, text); } },

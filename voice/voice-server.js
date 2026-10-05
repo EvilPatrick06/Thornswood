@@ -59,7 +59,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-relay-shapes-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-relay-shapes-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -107,7 +107,21 @@ function peerName(p) {
   answer came. Never throws and never hangs: a three second timeout. Only
   'yes' gets a token (#1315); 'unchecked' is not a refusal, so /token says
   the question went unanswered rather than that the profile is not theirs.
+
+  AND THE ANSWER IS READ TO A LIMIT, IN SIZE AND IN TIME (#1352). The site
+  answers about thirty bytes ({"ok":true,"why":"theirs"}), and its own limit
+  on the question is 8 KB. This used to add every byte that came back to one
+  string. Measured on 5 October: a site answering 400 MB took this service
+  from 47 MB to 534 MB, and one answering more than about 512 MB stopped it
+  outright (RangeError: Invalid string length), the longest string node
+  holds. And the three seconds were req2.setTimeout, which counts only time
+  with nothing arriving, so a site sending a byte a second held /token open
+  for as long as it kept sending. So reading stops past OWNS_REPLY_MAX, and
+  the whole exchange has OWNS_WAIT_MS from the moment it is asked; either is
+  unchecked, like anything else unexpected here.
 */
+const OWNS_REPLY_MAX = 64 * 1024;
+const OWNS_WAIT_MS = 3000;
 function owns(ticket, profileId, then) {
   if (!SITE || !ticket) { then('unchecked'); return; }
   let mod;
@@ -116,7 +130,8 @@ function owns(ticket, profileId, then) {
 
   const payload = JSON.stringify({ ticket: ticket, profileId: profileId });
   let done = false;
-  const finish = (v) => { if (!done) { done = true; then(v); } };
+  let late = null;
+  const finish = (v) => { if (!done) { done = true; clearTimeout(late); then(v); } };
 
   let req2;
   try {
@@ -126,7 +141,19 @@ function owns(ticket, profileId, then) {
                  'content-length': Buffer.byteLength(payload) }
     }, (resp) => {
       let buf = '';
-      resp.on('data', (d) => { buf += d; });
+      let size = 0;
+      resp.on('data', (d) => {
+        if (done) return;
+        size += d.length;
+        if (size > OWNS_REPLY_MAX) {
+          console.log('[voice] the site\'s answer to the ownership check passed ' + OWNS_REPLY_MAX +
+                      ' bytes, so the rest was not read');
+          try { req2.destroy(); } catch (e) { }
+          finish('unchecked');
+          return;
+        }
+        buf += d;
+      });
       resp.on('end', () => {
         if (resp.statusCode !== 200) { finish('unchecked'); return; }
         let doc;
@@ -136,7 +163,7 @@ function owns(ticket, profileId, then) {
     });
   } catch (e) { finish('unchecked'); return; }
 
-  req2.setTimeout(3000, () => { try { req2.destroy(); } catch (e) { } finish('unchecked'); });
+  late = setTimeout(() => { try { req2.destroy(); } catch (e) { } finish('unchecked'); }, OWNS_WAIT_MS);
   req2.on('error', () => finish('unchecked'));
   req2.write(payload);
   req2.end();
