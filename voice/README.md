@@ -83,7 +83,10 @@ launcher's voice page do) and to this machine itself, which is how
 On the VPS beside the game servers: the live service in `C:\Thornswood-Voice`
 on 7778, task `Thornswood Voice`, and the dev one in `C:\Thornswood-Voice-Dev`
 on 7789, task `Thornswood Dev Voice`. Caddy carries
-https://thornswood.net/voice/ and /voice-dev/ to them. Its clients are the
+https://thornswood.net/voice/ and /voice-dev/ to them. What it carries comes
+from loopback as the gamemode does, so the gamemode's routes (`/positions`,
+`/commands`, `/silenced`, `/textmute`, `/say`) also refuse any request with a
+forwarding header on it, which Caddy always sets (#1797). Its clients are the
 launcher's hidden voice page (`launcher`), the in-game overlays
 (`game\ui`) and the two gamemodes. `.\scripts\deploy\Install-Voice.ps1` copies
 `voice-server.js` and the two files in `public\`, restarts the task and waits

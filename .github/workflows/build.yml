@@ -322,6 +322,7 @@ jobs:
                  'test-1718-trade-pieces.js',
                  'test-1627-board-panel.js',
                  'test-1595-deliver.js',
+                 'test-1797-voice-proxied.js',
                  'test-1303-voice-auth.js',
                  'test-1398-fuel.js',
                  'test-1398-weaver.js',
