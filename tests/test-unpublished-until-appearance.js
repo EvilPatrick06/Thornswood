@@ -310,6 +310,29 @@ function stuck(at) {
   const lost = tick({ state: stuck(t0), now: t0 + 4 * NUDGE_MS + 1 });
   yes('a truly lost request (no report ever) is still asked',
       lost.asks === 1 && lost.chose === null);
+
+  const aDown = src.indexOf('  faceDown: function (actorId) {');
+  const bDown = aDown < 0 ? -1 : src.indexOf('\n  },\n', aDown);
+  yes('faceDown is in the chargen block', aDown >= 0 && bDown > aDown);
+  if (aDown >= 0 && bDown > aDown) {
+    const body = src.slice(aDown + '  faceDown: '.length, bDown + 4);
+    const store = {};
+    const faceDown = new Function('chargenOf', 'setChargen', 'log',
+      'return ' + body + ';')(
+      function (id) { return store[id] || null; },
+      function (id, s) { store[id] = s; },
+      function () { });
+    const shut = stuck(t0);
+    shut.faceOpenAt = t0 + 5000;
+    shut.faceSeenAt = t0 + 5000;
+    store[0xff000056] = shut;
+    faceDown(0xff000056);
+    yes('an unreported close does not leave the menu marked open forever',
+        !shut.faceOpenAt && !shut.faceSeenAt && !shut.faceDone);
+    const asked = tick({ state: shut, now: t0 + 4 * NUDGE_MS + 1 });
+    yes('and a still-connected player with no stored face is asked again',
+        asked.asks === 1 && asked.chose === null);
+  }
 }
 
 // -------------------------- onUpdateAppearanceAttempt, when the tick cannot see them

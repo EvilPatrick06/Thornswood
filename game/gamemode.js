@@ -4277,8 +4277,10 @@ const GIVEUP_MS = 300000;
   FACE_SEEN_MS is how fresh a report used to have to be before the give up
   treated the menu as gone. That freshness window is not a close: a quiet
   stream after /racemenu was seen is a still-open menu. /face done is the
-  close. A client that never reports at all, because its plugin is older or
-  the race menu never opened, is the lost request and still gets the asks.
+  close for Escape, Cancel and Done. /racedown is the close when the game
+  is quitting (F10, the quit paths) and a half-made face is not done. A
+  client that never reports at all, because its plugin is older or the race
+  menu never opened, is the lost request and still gets the asks.
 
   FACE_CAP_MS is for a race menu that is up and wedged: after half an hour of
   it being reported, the give up goes on anyway, because the panel and a home
@@ -4597,10 +4599,27 @@ globalThis.__thornswoodChargen = {
     return true;
   },
   /*
+    The plugin saw the race menu go down with the game (F10 / quit), not
+    Escape, Cancel or Done. Only means something while the face is awaited.
+    Clears the open marks so a still-connected player can be asked again.
+    Does not set faceDone: a half-made face is not a finished face.
+  */
+  faceDown: function (actorId) {
+    const st = chargenOf(actorId);
+    if (!st || st.stage !== 'appearance') { return false; }
+    delete st.faceOpenAt;
+    delete st.faceSeenAt;
+    delete st.faceHeld;
+    setChargen(actorId, st);
+    log('chargen', actorId.toString(16),
+        'the plugin says the race menu went down with the game, not a finished face');
+    return true;
+  },
+  /*
     The plugin says the race menu is on screen right now. Only means something
-    while the face is awaited. /face done is the close; a quiet stream after
-    a report is still open. The first report is logged and the once a minute
-    ones after it are not.
+    while the face is awaited. /face done and /racedown are the closes; a
+    quiet stream after a report is still open. The first report is logged
+    and the once a minute ones after it are not.
   */
   faceOpen: function (actorId) {
     const st = chargenOf(actorId);
@@ -5286,12 +5305,13 @@ function chargenTick() {
         below are tellOnce: one each for the whole wait, not one per ask.
       */
       const raceMenuIsUp = function () {
-        // /face done is the close. A quiet /racemenu stream is not: the
-        // plugin reports once a minute, and a gap is a missed line, not
-        // a shut menu. Treating faceSeenAt older than FACE_SEEN_MS as
-        // closed sent a second setRaceMenuOpen over a menu that was
-        // still up (access violation). Once /racemenu has been seen,
-        // the menu stays up until /face done or a stored face.
+        // /face done and /racedown are the closes. A quiet /racemenu
+        // stream is not: the plugin reports once a minute, and a gap is
+        // a missed line, not a shut menu. Treating faceSeenAt older than
+        // FACE_SEEN_MS as closed sent a second setRaceMenuOpen over a
+        // menu that was still up (access violation). Once /racemenu has
+        // been seen, the menu stays up until /face done, /racedown, or a
+        // stored face.
         if (state.faceDone) { return false; }
         return !!(state.faceOpenAt || state.faceSeenAt);
       };
@@ -5573,10 +5593,10 @@ function chargenTick() {
       */
 
       if (waited > GIVEUP_MS) {
-        // Not while the race menu is still open. /face done is the close,
-        // not a quiet report. FACE_CAP_MS is the wedged-menu exception.
-        // A stored face is checked first so a quiet stream cannot hold
-        // a finished face in the hall.
+        // Not while the race menu is still open. /face done and /racedown
+        // are the closes, not a quiet report. FACE_CAP_MS is the
+        // wedged-menu exception. A stored face is checked first so a
+        // quiet stream cannot hold a finished face in the hall.
         const menuUp = raceMenuIsUp();
         const menuFor = state.faceOpenAt ? now - state.faceOpenAt : 0;
         if (hasStoredAppearance(appearance)) {
@@ -5612,10 +5632,11 @@ function chargenTick() {
             'staying unpublished');
       }
 
-      // Lost request: no face, and /racemenu was never seen. Walking
-      // already asked and continued. Standing still waits for NUDGE_MS
-      // so the spawn request has time to land, then the helper repeats
-      // every NUDGE_MS. A quiet stream after a report is still open.
+      // Lost request: no face, and the menu is not up. Walking already
+      // asked and continued. Standing still waits for NUDGE_MS so the
+      // spawn request has time to land, then the helper repeats every
+      // NUDGE_MS. A quiet stream after a report is still open. /racedown
+      // has already cleared the open marks.
       if (!hasStoredAppearance(appearance) && waited > NUDGE_MS) {
         askForLostRaceMenu('no face after ' + Math.round(waited / 1000) + 's');
       }
@@ -46612,6 +46633,9 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // The client saying its race menu is still up. Never typed; see
                // FACE_SEEN_MS.
                '/racemenu',
+               // The client saying the race menu went down with the game, not
+               // as a finished face. Never typed; see faceDown.
+               '/racedown',
                // A mod settings menu changed on this client. Never typed;
                // see the mod settings block at the end of this file.
                '/modset',
@@ -46858,7 +46882,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
   var HOLD_MAX = 20;
   var HOLD_ALL = 200;
   // The client's reports of a moment, never kept for later (see runsNow).
-  var MOMENTS = ['/place', '/burn', '/chopped', '/racemenu'];
+  var MOMENTS = ['/place', '/burn', '/chopped', '/racemenu', '/racedown'];
   // Lines from a chat connection that did not prove who it is, logged at most
   // this often per profile (#410).
   var unprovenSaid = {};
@@ -46877,7 +46901,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     if (word === '/place' || word === '/burn' || word === '/chopped') { return true; }
     // "The race menu is up" is a moment too, and one replayed a minute late
     // would hold the give up for somebody who has already left it.
-    if (word === '/racemenu') { return true; }
+    if (word === '/racemenu' || word === '/racedown') { return true; }
     // Kept by profile id, so it needs no character to run.
     if (word === '/modset') { return true; }
     return WORDS.indexOf(word) === -1;
@@ -46985,7 +47009,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     // Said once, and never for the client's own lines: /face, /ate, a
     // broken lockpick and the load order report are not things anybody typed.
     if (!q.told && word !== '/face' && word !== '/ate' && word !== '/tspicks' &&
-        word !== '/loadorder') {
+        word !== '/loadorder' && word !== '/racedown') {
       q.told = true;
       toProfile(profileId, 'Your character is not back in the world yet. That will run ' +
                            'as soon as you arrive.');
@@ -47570,6 +47594,19 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         var upActor = actorOf(profileId);
         if (cgUp && cgUp.faceOpen && upActor) { cgUp.faceOpen(upActor); }
       } catch (eUp) { log('/racemenu failed:', eUp); }
+      return;
+    }
+
+    // The plugin, not a person: the race menu went down with the game
+    // (F10 / quit). Not /face done: a half-made face is not finished.
+    // A different word so a gamemode from before this only says "no
+    // command called", which is harmless.
+    if (word === '/racedown') {
+      try {
+        var cgDown = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodChargen;
+        var downActor = actorOf(profileId);
+        if (cgDown && cgDown.faceDown && downActor) { cgDown.faceDown(downActor); }
+      } catch (eDown) { log('/racedown failed:', eDown); }
       return;
     }
 

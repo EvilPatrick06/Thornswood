@@ -460,12 +460,30 @@ function tickAs(state, now, cameOn) {
   const WORDS = wm ? new Function('return ' + wm[1])() : [];
   yes('S14 /racemenu is in the list of words the server answers',
       WORDS.indexOf('/racemenu') !== -1);
+  yes('S14 /racedown is in the list of words the server answers',
+      WORDS.indexOf('/racedown') !== -1);
   if (ra >= 0 && rb > ra) {
     const runsNow = new Function('WORDS', 'return ' + src.slice(ra + 2, rb + 4) + ';')(WORDS);
     yes('S14 /racemenu runs at once and is never held to be replayed late',
         runsNow('/racemenu', ['/racemenu']) === true);
+    yes('S14 /racedown runs at once and is never held to be replayed late',
+        runsNow('/racedown', ['/racedown']) === true);
   } else {
     yes('S14 runsNow is in the gamemode', false);
+  }
+  const d = src.indexOf("    if (word === '/racedown') {\n      try {");
+  const dEnd = d < 0 ? -1 : src.indexOf('\n    }\n', d);
+  yes('S14 the command handler answers /racedown', d >= 0 && dEnd > d);
+  if (d >= 0 && dEnd > d) {
+    const branch = src.slice(d, dEnd + 7);
+    const seen = [];
+    const g = { __thornswoodChargen: { faceDown: function (id) { seen.push(id); } } };
+    const run = new Function('globalThis', 'word', 'profileId', 'actorOf', 'log',
+      'return (function () {\n' + branch + '\n  return "fell through";\n})();');
+    const said = run(g, '/racedown', 46, function (p) { return p === 46 ? 0xff00000a : 0; },
+                     function () { });
+    yes('S14 /racedown calls faceDown on that person\'s character',
+        seen.length === 1 && seen[0] === 0xff00000a && said === undefined);
   }
 }
 
@@ -525,6 +543,21 @@ function tickAs(state, now, cameOn) {
     frames(100);
     yes('S15 a second race menu is told at once, not a minute later',
         told.length === after + 1 && told[after] === '/racemenu');
+
+    const quitTold = [];
+    let quitHandler = null;
+    const quitMenu = { open: true };
+    const quitSp = { on: function (ev, fn) { if (ev === 'update') { quitHandler = fn; } } };
+    new Function('sp', 'guard', 'raceMenuOpen', 'log', 'tellServer', 'T', 'Date', 'closingGame',
+      fsrc.slice(a, b))(
+      quitSp, function (n, fn) { return fn; }, function () { return quitMenu.open; },
+      function () { }, function (l) { quitTold.push(l); }, { ready: true },
+      { now: function () { return 2000000; } }, true);
+    quitHandler();
+    quitMenu.open = false;
+    quitHandler();
+    yes('S15 a close while the game is quitting tells /racedown, not /face done',
+        quitTold.indexOf('/racedown') >= 0 && quitTold.indexOf('/face done') === -1);
   }
 }
 
@@ -576,6 +609,59 @@ function tickAs(state, now, cameOn) {
   const lost = tick({ state: stuck(t0), now: t0 + 4 * NUDGE_MS + 1 });
   yes('S16 a truly lost request (no report ever) is still asked',
       lost.asks === 1 && lost.chose === null);
+}
+
+// S17: an unreported close (F10 / quit, /racedown) must not leave the
+//      menu marked open forever. The marks clear, the face is not
+//      done, and a still-connected player with no stored face is asked.
+{
+  const a = src.indexOf('  faceDown: function (actorId) {');
+  const b = a < 0 ? -1 : src.indexOf('\n  },\n', a);
+  yes('S17 the chargen block has faceDown', a >= 0 && b > a);
+  const t0 = 17000000;
+  if (a >= 0 && b > a) {
+    const body = src.slice(a + '  faceDown: '.length, b + 4);
+    const store = {};
+    const logs = [];
+    const faceDown = new Function('chargenOf', 'setChargen', 'log',
+      'return ' + body + ';')(
+      function (id) { return store[id] || null; },
+      function (id, s) { store[id] = s; },
+      function () { logs.push(Array.prototype.join.call(arguments, ' ')); });
+    store[7] = {
+      stage: 'appearance',
+      faceOpenAt: t0 + 5000,
+      faceSeenAt: t0 + 5000,
+      faceHeld: t0 + GIVEUP_MS
+    };
+    yes('S17 faceDown clears the open marks and does not mark the face done',
+        faceDown(7) === true &&
+        !store[7].faceOpenAt && !store[7].faceSeenAt && !store[7].faceHeld &&
+        !store[7].faceDone);
+    yes('S17 and the log says it went down with the game',
+        logs.join(' ').indexOf('went down with the game') !== -1);
+    store[8] = { stage: 'choosing', faceOpenAt: 1, faceSeenAt: 1 };
+    yes('S17 a report after the face is made does nothing',
+        faceDown(8) === false && store[8].faceOpenAt === 1);
+    yes('S17 nor for somebody with no creation at all', faceDown(9) === false);
+
+    const shut = stuck(t0);
+    shut.faceOpenAt = t0 + 5000;
+    shut.faceSeenAt = t0 + 5000;
+    store[0xff000056] = shut;
+    faceDown(0xff000056);
+    const asked = tick({ state: shut, now: t0 + 4 * NUDGE_MS + 1 });
+    yes('S17 an unreported close does not leave the menu marked open forever',
+        !shut.faceOpenAt && !shut.faceSeenAt && !shut.faceDone);
+    yes('S17 and a still-connected player with no stored face is asked again',
+        asked.asks === 1 && asked.chose === null);
+    const still = stuck(t0);
+    still.faceOpenAt = t0 + 5000;
+    still.faceSeenAt = t0 + 5000;
+    const held = tick({ state: still, now: t0 + 4 * NUDGE_MS + 1 });
+    yes('S17 a quiet-but-still-open menu is still not asked',
+        held.asks === 0 && held.chose === null);
+  }
 }
 
 console.log('');
