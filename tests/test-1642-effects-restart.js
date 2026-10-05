@@ -190,7 +190,7 @@ function person(srv, id, pid) {
 }
 function stored(id) { return JSON.parse(store[id][charProp]); }
 /* The character block's arrival, as the chargen tick's first sight calls it. */
-function arrive(srv, id) { return (srv.C && typeof srv.C.arrived === 'function') ? srv.C.arrived(id) : undefined; }
+function arrive(srv, id) { return (srv.C && typeof srv.C.arrival === 'function') ? srv.C.arrival(id) : undefined; }
 
 // ------------------------------------------------------------ the client --
 /* What a value of the game reads before anything sets it. */
@@ -398,17 +398,17 @@ delete srv.ctx.__thornswoodChargen;
 
 // ------------------------------------------------------------ the wiring --
 {
-  const at = FIRST_SIGHT.indexOf('c.arrived(actorId)');
+  const at = FIRST_SIGHT.indexOf('c.arrival(actorId)');
   yes('F1 the chargen tick\'s first sight of somebody calls arrival, after the spells and the clothes',
     at > 0 && at > FIRST_SIGHT.indexOf('c.grantKnown(actorId)') && at > FIRST_SIGHT.indexOf('wearWhatIsWorn(actorId)'));
-  yes('F2 the character block hands arrival out', /beginCreation: beginCreation, arrived: arrived,/.test(CHARACTER));
+  yes('F2 the character block hands arrival out', /beginCreation: beginCreation, arrival: arrival,/.test(CHARACTER));
   yes('F3 the refresh answers as the panel\'s own ask, and only that adds the time',
     /if \(what === 'refresh'\) \{[\s\S]{0,300}writeState\(actorId, s, ASKED\);/.test(CHARACTER) &&
     (CHARACTER.match(/view\.asked = /g) || []).length === 1 && /if \(redraw === ASKED\) \{ view\.asked = Date\.now\(\); \}/.test(CHARACTER));
   yes('F4 arrival is not a redraw, so a view this server already sent is not sent again',
-    /function arrived\(actorId\) \{[\s\S]{0,300}return writeState\(actorId, stateOf\(actorId\)\);/.test(CHARACTER));
+    /function arrival\(actorId\) \{[\s\S]{0,300}return writeState\(actorId, stateOf\(actorId\)\);/.test(CHARACTER));
   yes('F5 nothing here watches for a stale effect: no timer in the character block reads one',
-    !/setInterval\(/.test(CHARACTER) && !/setTimeout\(/.test(between(CHARACTER, '  function arrived(actorId) {', '\n  }\n')));
+    !/setInterval\(/.test(CHARACTER) && !/setTimeout\(/.test(between(CHARACTER, '  function arrival(actorId) {', '\n  }\n')));
 }
 
 done();

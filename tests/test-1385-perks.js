@@ -655,7 +655,7 @@ yes('the log says it once a cast', logged('Leyline Attunement') === 1);
 /*
   Font of Magic's 15 seconds ride the K panel's view and end on a timer in
   memory. A restart takes the timer with it, and the server that comes up has
-  nothing running, so the view it works out when the person is back (arrived
+  nothing running, so the view it works out when the person is back (arrival
   in the character block, tests/test-1642-effects-restart.js) has no free
   spells on it. The day stays spent: that clock is on the character.
 */

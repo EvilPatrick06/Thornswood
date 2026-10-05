@@ -1005,7 +1005,7 @@ const keysCs = fs.readFileSync(path.join(root, 'launcher', 'app', 'Keys.cs'), 'u
 /*
   Rush's speed rides the K panel's view and ends on a timer in memory. A
   restart takes the timer with it, and the server that comes up has nothing
-  running, so the view it works out when the person is back (arrived in the
+  running, so the view it works out when the person is back (arrival in the
   character block, tests/test-1642-effects-restart.js) has no speed on it.
 */
 {

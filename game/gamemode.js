@@ -5095,12 +5095,12 @@ function chargenTick() {
       /*
         AND THE K PANEL'S VIEW, WORKED OUT NOW (#1642), so a Rush, a Font of
         Magic or restoration strain that ran into a restart is not on them
-        once they are back. See arrived() in the character block. Last, so
+        once they are back. See arrival() in the character block. Last, so
         anything above that changes the character is in it.
       */
       try {
         const c = globalThis.__thornswoodCharacter;
-        if (c && c.arrived) { c.arrived(actorId); }
+        if (c && c.arrival) { c.arrival(actorId); }
       } catch (e) {
         log('login', actorId.toString(16), 'could not send the panel worked out now:', e);
       }
@@ -42651,7 +42651,7 @@ log('gamemode loaded:',
     (view.asked), because the client's script draws nothing when the value
     matches the one it last handed the page (updateOwnerScript), and it
     counts a value as handed even while the page has no panel to take it.
-    The view sent when somebody arrives (arrived, below) goes before the
+    The view sent when somebody arrives (arrival, below) goes before the
     page is up, and the refresh a few seconds later often answers the same
     view. Without the time the script would drop that answer as drawn
     already, and the panel would stay empty with the skill tree's totals off
@@ -43874,7 +43874,7 @@ log('gamemode loaded:',
     Somebody still being made is left to the creation hall, which sends
     theirs on its first pass after the settle (beginCreation).
   */
-  function arrived(actorId) {
+  function arrival(actorId) {
     var chargen = g.__thornswoodChargen;
     if (chargen && chargen.isChoosing && chargen.isChoosing(actorId)) { return null; }
     return writeState(actorId, stateOf(actorId));
@@ -43883,7 +43883,7 @@ log('gamemode loaded:',
   g.__thornswoodCharacter = {
     PROPERTY: CHAR_PROPERTY, stateOf: stateOf, writeState: writeState,
     forPanel: forPanel, mapHalf: mapHalf, migrate: migrate, command: command,
-    beginCreation: beginCreation, arrived: arrived, updateOwnerScript: updateOwnerScript,
+    beginCreation: beginCreation, arrival: arrival, updateOwnerScript: updateOwnerScript,
     gate: gate, gateHalf: gateHalf, credit: credit,
     grantSpell: grantSpell, grantKnown: grantKnown, nameOf: nameOf, raiseLines: raiseLines,
     acceptApprentice: acceptApprentice, masterFor: masterFor, effectsOf: effectsOf,
@@ -43983,7 +43983,7 @@ log('gamemode loaded:',
   24 real hours from the moment it fired. Font of Magic's 15 seconds are
   not kept: its end is a timer in memory, and a restart ends it. The day it
   spent is still spent. The view a person gets when they come back is worked
-  out then (arrived in the character block, #1642), so the free spells are
+  out then (arrival in the character block, #1642), so the free spells are
   not on it; the same for a warrior's Rush and restoration strain.
 
   EVERY TIME ONE FIRES it is a line in thornswood.log, "perks: <name> fired
@@ -44810,7 +44810,7 @@ log('gamemode loaded:',
   THE CLOCKS LIVE IN MEMORY, on globalThis so a hot reload keeps them. A
   restart clears every wait and every armed blow, which at three minutes at
   most is nothing worth a property write. It ends a running Rush too, and the
-  view a person gets when they come back is worked out then (arrived in the
+  view a person gets when they come back is worked out then (arrival in the
   character block, #1642), so the speed is not on them.
 */
 (function () {
@@ -46292,7 +46292,7 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
     restoration spell. The window and the refusal each end on their own
     clock, and the map is written again when they do. A restart ends both,
     and the view a person gets when they come back is worked out then
-    (arrived in the character block, #1642).
+    (arrival in the character block, #1642).
   */
   function cast(casterId, spell, at) {
     var actorId = Number(casterId) || 0;
