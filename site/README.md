@@ -37,8 +37,9 @@ browser names the page that sent it in `Origin`, or in `Referer` when an old
 one leaves `Origin` off, and either has to be this site's own address, the
 one the request was sent to; `Origin: null` is not. One that names no page
 and carries a sign in cookie is a browser with both taken off, and is refused
-as well. Nothing in the table above sends a cookie or either header, and each
-proves itself with a ticket or the bot's key, so none of it is touched. A
+as well. None of the POST routes in the table above is sent by a browser:
+they carry no cookie and neither header, and each proves itself with a
+ticket or the bot's key, so none of it is touched. A
 refusal is 403 with `why` set to `cross-site` before anything is read or
 Discord is asked, and `site.log` says what was refused and where it said it
 came from. The sign in cookies are still `SameSite=Lax`; this is what holds
