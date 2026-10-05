@@ -781,7 +781,9 @@
       if (m.t === 'peers') { takeIce(m.iceServers); reconcile(m.peers); return; }
       // The whole view on the first tick after a join, then only what moved
       // and who left it (issue #482; the note over the tick in
-      // voice/voice-server.js). The party strip reads the same table.
+      // voice/voice-server.js). The party strip reads the same table. When
+      // this page got on after that first tick, board hands over the view
+      // the chat kept for it, with every move since (#1924).
       if (m.t === 'hush') {
         noteHush(m.profileId, m.on);
         place();
