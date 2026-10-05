@@ -390,6 +390,9 @@ try:
     import discord
 
     class TicketThread(discord.Thread):
+        # Off the panel's channel, which is what makes it a ticket (#1776).
+        parent = CH
+
         def __init__(self):
             self.edited = []
 
