@@ -104,7 +104,8 @@ In the server. A piece's condition is written on its name when it is
 not 100%: Iron Sword (85%). A plain piece is at 100%, and so is every
 piece as it is made. Rings, amulets and circlets carry no condition.
 The pickaxe, the woodcutter's axe and the shovel wear out by use
-instead.
+instead. A trade hands a piece over at the condition on its name, and
+the pieces left in your pack keep theirs.
 
 The three kits are records in the plugin, with the recipes above
 (`scripts/mods/Add-ContentRecords.py`). Open the inventory with a kit
@@ -139,7 +140,7 @@ The inventory shows a piece's condition as it was when the piece
 reached the pack, and a change during a session shows after the
 next login (issue #1651); the repair panel always has the number.
 The 5% more damage and armour at 120% is not applied, because the
-engine works damage out on its own. A trade hands a piece over at
-100% (issue #1594). A piece that is not at 100% cannot be enchanted, because the
-engine takes a plain piece for an enchantment. The grindstone and the
-armour table still appear in the crafting menu.
+engine works damage out on its own. A piece that is not at 100%
+cannot be enchanted, because the engine takes a plain piece for an
+enchantment. The grindstone and the armour table still appear in the
+crafting menu.
