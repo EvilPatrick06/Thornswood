@@ -459,6 +459,23 @@ if (block && RECIPES && ADMIN_ITEMS) {
     const people = cmds.slice(cmds.indexOf('## Commands for people'), cmds.indexOf('## Staff and dev commands'));
     yes('W1 the command list has both among the staff commands, and not among the commands for people',
         /`\/embassy/.test(staff) && /`\/remnant/.test(staff) && !/`\/embassy/.test(people) && !/`\/remnant/.test(people));
+    // #1640: a word handle() never reaches is a word nobody can use. The
+    // character block's command hands a fixed list on and answers false for
+    // the rest, so handle() goes on to the embassy branch.
+    const charBlock = slice(gm, '// ==== thornswood character ====', '// ==== end thornswood character ====');
+    const charCommand = charBlock ? slice(charBlock, '  function command(word, parts, actorId, profileId, toProfile) {', '\n  }\n') : null;
+    let passedOn = false;
+    if (charCommand) {
+      const cbox = { clog: function () { }, g: { __thornswoodProperty: { command: function () { return true; } } } };
+      vm.runInNewContext(charCommand + '\nthis.cmd = command;', cbox);
+      passedOn = ['/embassy', '/remnant'].every(function (w) { return cbox.cmd(w, [w], 0xff000101, 7, function () { }) === false; });
+    }
+    yes('W3 the character block does not take /embassy or /remnant, so handle() goes on to them', passedOn);
+    const handleAt = gm.indexOf('  function handle(cmd) {');
+    const branchAt = gm.indexOf("if (word === '/embassy' || word === '/remnant') {");
+    const unknownAt = gm.indexOf("'No command called ' + word");
+    yes('W3 and the embassy branch is in handle(), before the unknown command reply',
+        handleAt > 0 && branchAt > handleAt && unknownAt > branchAt);
     const EM = String.fromCharCode(0x2014);
     const lines = (block.match(/'[^'\n]*'/g) || []).join(' ');
     yes('W2 nothing the block says has an em dash', lines.indexOf(EM) === -1 && block.indexOf(EM) === -1);
