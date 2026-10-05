@@ -37,7 +37,8 @@ const ROOT = path.join(__dirname, '..');
 function read(p) { return fs.readFileSync(path.join(ROOT, p), 'utf8').split(CR).join(''); }
 const src = read('game/gamemode.js');
 const site = read('site/server.js');
-const home = read('site/public/home.html');
+// The home page's script, out of home.html since #1479.
+const home = read('site/public/home.js');
 const chatJs = read('game/ui/thornswood-chat.js');
 const page = read('game/ui/thornswood-select.js');
 const front = read('game/plugins/thornswood-front.js');
@@ -617,7 +618,7 @@ async function join(standing, status, channel) {
   const ha = home.indexOf(START);
   const hb = ha < 0 ? -1 : home.indexOf(END, ha);
   const hblock = (ha >= 0 && hb >= 0) ? home.slice(ha, hb + END.length) : null;
-  yes('home.html still has its status line', hblock !== null);
+  yes('home.js still has its status line', hblock !== null);
   if (hblock) {
     const say = function (status) {
       const els = {};

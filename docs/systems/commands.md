@@ -7,7 +7,10 @@ The rule is on [Thornswood systems](../SYSTEMS.md), "Buttons, not
 commands". Decided by Patrick on 4 Oct: anything a person does in the
 world is a key, a prompt, a panel, or the thing itself activated. Staff
 and dev commands stay commands. Each command for people below has an
-issue that turns it into buttons, and the umbrella is #1620.
+issue that turns it into buttons, except `/stuck`, `/helpme` and
+`/report`, which stay commands (Patrick, later on 4 Oct: "change it to
+except the /stuck and the ones for getting help from GMs"). The
+umbrella is #1620.
 
 File and line numbers are main at 9b5a667 on 4 Oct. They move as the
 files change, so each row also names the function or block.
@@ -37,10 +40,11 @@ stop"). Each conversion issue takes its commands out of all of them.
 
 ## Commands for people
 
-Each of these becomes buttons. The server may keep a line as an
-internal message that a key or a panel sends, the way Y, H and L on the
-look prompt send `/friend`, `/trade` and `/mute` with the id under the
-crosshair. Nobody is told to type it, and help text never lists it.
+Each of these becomes buttons, except the two rows that say they stay.
+The server may keep a line as an internal message that a key or a panel
+sends, the way Y, H and L on the look prompt send `/friend`, `/trade`
+and `/mute` with the id under the crosshair. Nobody is told to type it,
+and help text never lists it.
 
 | Command | Who | What it does | Read at | Where people are told | Buttons today, then to come | Issue |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -48,22 +52,22 @@ crosshair. Nobody is told to type it, and help text never lists it.
 | `/take <n>`, `/unpin <n>`, `/dropjob <n>` | Anybody at a board | Takes a job, takes your own down, hands a job back | `gamemode.js:37289`, `37292`, `37291` | The list; [Notice boards](noticeboards.md), [Trading company](trading-company.md), [Gold](gold.md) | The board panel has Take, Take down and Put it back. Out of the help. | #1627 |
 | `/board`, `/board <hold>` | Anybody | Reads the board you are at, or any hold's board from anywhere | `gamemode.js:37288`, `board` (36792) | The list; [Notice boards](noticeboards.md); the server's lines (36980 and others) | E on the board opens the panel there. To come: another hold's board away from a board. | #1627 |
 | `/jobs` | Anybody | The jobs you have taken, in every hold | `gamemode.js:37290`, `jobs` (36951) | The list; [Notice boards](noticeboards.md) | None. To come: Your jobs on a panel. | #1627 |
-| `/haul` | Anybody at a board | Posts a haul, and confirms one at the destination | Not built | [Trading company](trading-company.md) | To come: a form and a button on the board panel. | #1627 |
+| `/haul <pay> <hold> <words>`, `/haul done <hold> <n>` | Anybody at a board; the poster or a steward confirms | Sends a haul, and confirms one at the destination | `gamemode.js`, `haulCmd` in the property block | Nowhere. [Trading company](trading-company.md) names the buttons | Send a haul and Confirm on the board panel send it. Never in the list or the help. | #1393 |
 | `/letter <name> <words>`, `/deliver <name>` | Anybody | Writes a letter at a board; hands it over and pays the courier | `gamemode.js:37293`, `37294` | The list; [Notice boards](noticeboards.md) | None. To come: on the board panel and the look prompt. | #1595 |
 | `/friend <name>`, `/friend`, `/friend remove <name>` | Anybody | Asks to be friends, lists them, drops one | `gamemode.js:44640`, the social branch of `handle` | The list; [Friends](friends.md), [Factions](factions.md), [Text chat](chat.md) | Y on the look prompt; the P panel lists and drops. Out of the help. | #1628 |
-| `/trade <name>`, `/trade add`, `remove`, `gold`, `ok`, `cancel` | Anybody | Offers a trade, and works it | `gamemode.js:44847` | The list; [Trade](trade.md), [Text chat](chat.md) | H on the look prompt; the trade window sends every verb. Out of the help. | #1628 |
+| `/trade <name>`, `/trade add`, `remove`, `gold`, `ok`, `cancel`, `sale` | Anybody; `sale` is a company worker's | Offers a trade, and works it; `sale` makes it a sale out of Skyrim (#1393) | `gamemode.js:44847` | The list; [Trade](trade.md), [Text chat](chat.md) | H on the look prompt; the trade window sends every verb, and Buy for the company sends `sale`. Out of the help. | #1628 |
 | `/mute <name>`, `/mute`, `/mute text <name>` | Anybody | Stops hearing somebody, lists who, turns their text off | `gamemode.js:44770`, `44786`, `44895` | The list; [Voice](voice.md), [People beside you](people.md) | L on the look prompt; Mute and Text on P beside a friend. To come: text and the list for anybody. | #1628 |
 | `/hidename <name>`, `/hidename`, `/hidename all` | Anybody | Hides a name above a head, lists them, hides every name | `gamemode.js:44795` to `44812` | The list; [Voice](voice.md), [People beside you](people.md) | Name and Hide every name on P, for friends. To come: for anybody. | #1628 |
 | `/yes`, `/no` | Anybody | Answers whatever somebody has offered | `gamemode.js:44651` | The list; `/help people` | Accept and Refuse on the prompt. Out of the help. | #1628 |
 | `/party <name>`, `/party`, `/party leave`, `disband`, `kick <name>`, `lead <name>` | Anybody; the leader kicks, hands the lead and disbands | Asks, lists, leaves and runs a party | `gamemode.js:44722` to `44750`, the offer at 44912 | The list; `/help people`; Help page "Parties"; [Party](party.md), [Text chat](chat.md); the server's line at 44728 | The P panel has Leave, Disband, Kick, Lead, and Ask beside an online friend. To come: P on the look prompt asks. | #1629 |
 | `/journal` and its verbs | Anybody | Journals, pages and sharing them | `gamemode.js:44712`, `journalCommand` (44324) | The list; [Journals](journal.md); the server's line at 44329 | J sends every verb. Out of the help. | #1630 |
 | `/book` and its verbs | Anybody; founding needs the Business Owner or Faction Owner role, or Dev | Group books: found, invite, leave, roles, prices | `gamemode.js:44631`, the books block's `command` (43205) | The list; `/help people`; [Factions](factions.md), [Text chat](chat.md) | J sends every verb; the board panel submits a price list. To come: inviting the person in front of you, if J lacks it. | #1630 |
-| `/rest sit`, `campfire`, `inn`, `up` | Anybody | Where you are resting, for the rest meter | `gamemode.js:44994` | The list; `/help living`; Help page; [Exhaustion](exhaustion.md), [Thirst](thirst.md), [Hunger](hunger.md), [Property](property.md) | Lying in a bed sends `/rest bed` and `/rest up`. To come: sitting and a campfire seen by the game. | #1631 |
+| `/rest sit`, `campfire`, `inn`, `up` | Anybody | Where you are resting, for the rest meter | `bedRest` in the property block's beds | [Thirst](thirst.md), [Hunger](hunger.md) | Sitting down sends `/rest sit`, lying down `/rest bed` and getting up `/rest up`, and the server answers by the furniture it saw pressed, whatever the word (#1603). Out of the list, `/help living` and the Help page. To come: the wheel's Sit. | #1631 |
 | `/needs` | Anybody | The meters, the warmth with its working out, what is counted as worn | `gamemode.js:44946` | The list; Help page; [Temperature](temperature.md); `site/data/known.md` | The four bars. To come: the rest of it on a panel. | #1631 |
 | `/eat`, `/drink`, `/drink ale` | Anybody | Food or drink with no item | `gamemode.js:45030` to `45040` | The list; `/help living`; Help page; [Emotes](emotes.md) | Eating or drinking the item is already reported as `/ate`. To come: taken out. | #1631 |
 | `/bard` | Anybody | +25 rest for everyone resting in the cell, for 5 minutes | `gamemode.js:44993` | The list; [Exhaustion](exhaustion.md), [Emotes](emotes.md), [People beside you](people.md), [Text chat](chat.md); `site/data/site/classes.md` | None. To come: a button, asked on the issue. | #1631 |
-| `/helpme <what>`, `/help-me`, `/report <name> <what>` | Anybody | Reaches staff; reports somebody to staff | `gamemode.js:45537`, the asking staff block's `ask` (52023) | The list; `/help staff`; Help page "Getting staff"; `site/data/site/privacy.md` | None. To come: a help panel. | #1632 |
-| `/stuck` | Anybody | Out of a wedged spot, a few steps back or to a temple | `gamemode.js:45522`, the stuck block's `command` (52595) | The list; `/help staff`; `site/data/site/privacy.md` | None. To come: a button on the help panel. | #1632 |
+| `/helpme <what>`, `/help-me`, `/report <name> <what>` | Anybody | Reaches staff; reports somebody to staff | `gamemode.js:45537`, the asking staff block's `ask` (52023) | The list; `/help staff`; Help page "Getting staff"; `site/data/site/privacy.md` | Stays a command, and the help names it (Patrick, 4 Oct). | None |
+| `/stuck` | Anybody | Out of a wedged spot, a few steps back or to a temple | `gamemode.js:45522`, the stuck block's `command` (52595) | The list; `/help staff`; `site/data/site/privacy.md` | Stays a command, and the help names it (Patrick, 4 Oct). | None |
 | `/help [topic]`, `/commands` | Anybody | The help in the game | `gamemode.js:45550` | Help page "Everything else is on /help"; the unknown word reply | None. To come: a help panel. | #1633 |
 | `/merchant <id>`, `/merchant buy`, `sell`, `supply`, `close` | Anybody at a guild trader | A trader's wares | `gamemode.js:44619`, then `command` (54951) | The list; [Merchant's Guild](merchants-guild.md) | E on a trader opens the panel, which sends the rest. Out of the list and the page. | #1633 |
 | `/where` | Anybody today; a dev's tool | The cell, position and angle you stand at | `gamemode.js:45073` | The list | Stays a command, for dev and testers only. | #1633 |
@@ -81,9 +85,8 @@ crosshair. Nobody is told to type it, and help text never lists it.
 | `/me`, `/do`, `/whisper`, `/w`, `/shout`, `/s`, `/yell`, `/y` | Anybody | How a line is said, and how far it carries | `voice/voice-server.js:427`, `voice/headlines.js:28` | [Text chat](chat.md), [People beside you](people.md), [Emotes](emotes.md); the voice service's usage lines | None. To come: buttons on the chat box. | #1639 |
 | `/ooc`, `/o` | Anybody | Out of character, to whoever is near | `gamemode.js:45334` | The list; `/help talking`; Help page; [Text chat](chat.md), [Factions](factions.md), [Notice boards](noticeboards.md); `site/data/site/rules.md` | None. To come: a button on the chat box. | #1639 |
 | `/roll`, `/r` | Anybody | Dice, rolled on the server | `game/ui/thornswood-chat.js:334`, `gamemode.js:45419` | The list; `/help talking`; Help page "Dice" | None. To come: a dice button. | #1639 |
-| `/bed`, `/bed <gold>`, `/bed -` | The holder; anybody asks the price | The price of a night | `gamemode.js:37285`, `bedCmd` (36209) | The list; `/help land`; [Property](property.md) | Lying in a bed. In hand. | #1603 |
-| `/repair`, `/repair <name>` | Anybody | Condition, and mending with a kit | `gamemode.js:45512` | The list; `/help work`; [Durability](durability.md) | In hand. | #1384 |
-| `/maneuver`, `/maneuver <name>` | A warrior | A warrior's maneuvers | `gamemode.js:44929` | The list; `/help work`; [Warrior](professions/warrior.md) | In hand. | #1386 |
+| `/repair`, `/repair mend <base> <condition> <name>` | Anybody with a repair kit | Opens the repair panel; a row's Mend button mends that piece with a kit | The `/repair` branch of `handle`, then `panel` in the durability block | Nowhere. [Durability](durability.md) names the key and the panel | U in the inventory, with a kit in the pack, opens the panel, and Mend sends `mend`. Never in the list or the help. | #1384 |
+| `/maneuver <name>`, `/maneuver` | A warrior | Starts a warrior's maneuver; with no name, says which you hold | `gamemode.js`, `use` in the warrior maneuvers block | Nowhere. [Warrior](professions/warrior.md) names the key | The maneuver key (9) opens a panel of yours, and a number or a click there sends it. Never in the list or the help. | #1386 |
 
 `/pick` and `/spend` are the K panel's lines (`gamemode.js:40783`):
 profession, class, town, spells and points, and `/pick perk fontofmagic`
@@ -123,7 +126,8 @@ client reports what only it can see. They stay.
 | `/loadorder` | The front plugin | The client's load order | `gamemode.js:45054` |
 | `/tspicks <n>` | The front plugin | Lockpicks that broke | `gamemode.js:45064` |
 | `/moldhere <id>` | U at a door | A key mold pressed into that door | `gamemode.js:37271` |
-| `/rest bed`, `/rest up` | Lying down in a bed and getting up | Resting in a bed | `gamemode.js:44994` |
+| `/rest bed`, `/rest sit`, `/rest up` | Lying down, sitting down and getting up | Resting in a bed or on a seat, as the server measures it | `bedRest` in the property block's beds |
+| `/sleephere <id>`, `/sleephere stop <profile> <building>` | U on a person inside a building you hold, and Stop on the K panel's property page | Lets them sleep there for a night, or ends their night (#1603) | `sleepHere` in the property block's beds |
 | `/ride e <id>`, `/merchant e <id>` | E on a driver or a trader | Which one was pressed | `gamemode.js:44593`, `54951` |
 | `/party refresh`, `/trade refresh`, `/pick refresh` | A panel as it opens | Send the panel its view | `gamemode.js:44722`, `44847`, `40783` |
 | `/skill` | The client's unused skills menus | Nothing: the page drops it before it is sent | `game/ui/thornswood-bridge.js:72` |

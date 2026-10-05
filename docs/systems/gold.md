@@ -110,6 +110,11 @@ server. A dungeon chest pays its tier's gold on that place's rest.
 A guild trader's 250 is not. A scene quest creates its gold when it is finished, and that
 gold is not taken from a trader's purse. Rank is not for sale. A weapon, armour or clothing in a chest or
 container in a claimed building loses 5% a day, written when the chest
-is next opened. See [Durability](durability.md). Notice fees, job fees, letter fees, rent, and carriage and
-ferry fares are counted on the ledger. The one payout is a letter's 15:
-to the courier on delivery, or back to the sender on an `/unpin`.
+is next opened. See [Durability](durability.md). Notice fees, job fees, letter fees, a haul's fee and pay, rent, and
+carriage and ferry fares are counted on the ledger. The payouts are a
+letter's 15, to the courier on delivery or back to the sender on an
+`/unpin`, and a haul's pay, to the hauler less the company's tenth
+when it is confirmed, or back to the poster when it comes down. A
+company sale, the trade panel's Buy for the company, pays the seller
+from the worker's pack, destroys its 10%, and the thing sold leaves
+the world.

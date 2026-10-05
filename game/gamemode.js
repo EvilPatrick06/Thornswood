@@ -5605,70 +5605,170 @@ startChargenTimer();
   and a dragon are not the same fight, so the piece count follows how hard the
   thing was. Until this, every kill was one piece.
 
-  THE HUNTER LIST FIRST. When the body's base is on the hunter list
-  (HUNTS_BY_BASE), the pieces are that row's own hunter rank: novice 1,
-  advanced 2, expert 4, master 8. A named body uses its own row, so Karhu, who
-  is master on that list, is 8 although a bear is 4. The page says so in those
-  words, and it is why a base on the list never reaches the race lines below.
+  BY THE RACE THE ENGINE SAYS THE BODY IS. Actor.GetRace in the fork follows
+  the actor's own template chain, the one the engine rolled when it spawned,
+  so it names the race the body really has (a bandit's base is often a
+  levelled template, and the hunt table's build script measured over a
+  thousand people whose own RNAM says fox). The race's editor id is read out
+  of RACES, the table of every RACE record in the load order, and looked up in
+  the lines below.
 
-  EVERYTHING ELSE BY THE RACE THE ENGINE SAYS IT IS. A bandit, a draugr and a
-  dragon are not on the hunter list, and their base is often a levelled
-  template, so the race on the record itself is not the answer (the hunt
-  table's build script measured over a thousand people whose own RNAM says
-  fox). Actor.GetRace in the fork follows the actor's own template chain, the
-  one the engine rolled when it spawned, so it names the race the body really
-  has. The race's editor id is read out of RACES, the table of every RACE
-  record in the load order, and matched against the lines on the page, first
-  match winning, so a dragon priest is read before a dragon:
+  THE STRENGTH TABLE WINS OVER THE HUNTER LIST. Patrick's answer on #1386, 4
+  October: where the two disagree, the strength table is the one that counts.
+  So a bull netch is a grown netch, 8, though the hunter list calls it
+  advanced; a vale sabre cat and a snowy one are sabre cats, 2; an ice wolf is
+  a wolf, 1; and Karhu is a bear, 4. The hunter list's own rank (novice 1,
+  advanced 2, expert 4, master 8) counts only for a body on it whose race no
+  line here names, which today is none: every race in the load order has a
+  line, and the harness holds that.
 
-    Bandit, guard, forsworn, skeleton           2   the people's races and
-                                                    every skeleton race
-    Draugr, falmer, hagraven                    4
-    Giant, dragon priest, centurion, lurker     8
-    Dragon                                     16
-
-  and, for an animal that is not on the hunter list, the strength table's own
-  kinds: sabre cat, troll, frostbite spider, horse, horker and netch calf 2,
-  bear and chaurus 4, mammoth and a grown netch 8. A named animal off the list
-  uses its kind, which is what the race is. Anything the page does not name
-  (an atronach, a spriggan, a dwarven sphere) is the novice line, 1, which is
-  what every kill was before, and that choice is a question on the issue.
+  THE TWO HALVES OF THE LINES. kinds is the page's own two tables, the
+  strength table and the person-shaped one, each word on the page with the
+  races it is in Skyrim. unnamed is every body neither table names, placed
+  against those lines by how hard it is in vanilla Skyrim (Patrick, 4 October:
+  "use suggested bands"); the page lists the same words under "Bodies neither
+  table names". A race nobody has placed yet, one a new plugin brings, is the
+  novice line, 1, until somebody places it.
 
   A PERSON KILLED BY A PERSON IS STILL NOTHING. That test is in mp.onDeath and
   is not this function's: nothing here is asked about a person's body.
 */
 const WARRIOR_KILL = {
   byRank: { novice: 1, advanced: 2, expert: 4, master: 8 },
-  byRace: [
-    [/dragonpriest/, 8],
-    [/dragon|alduin/, 16],
-    [/^(c00)?giant|frostgiant/, 8],
-    [/centurion/, 8],
-    [/lurker/, 8],
-    [/draugr|falmer|hagraven/, 4],
-    [/skeleton/, 2],
-    [/^(dlc1)?(nord|imperial|breton|redguard|orc|argonian|khajiit|woodelf|highelf|darkelf|elder)race/, 2],
-    [/mammoth|^dlc2netchrace$/, 8],
-    [/^bear|chaurus/, 4],
-    [/sabrecat|troll|frostbitespider|horse|horker|netchcalf/, 2]
+  kinds: [
+    // The strength table: novice, advanced, expert, master animal.
+    ['chicken', 1, ['ChickenRace', 'EE_ChickenAnimalRace01', 'OR_ChickenRace']],
+    ['rabbit', 1, ['HareRace']],
+    ['fox', 1, ['FoxRace']],
+    ['deer', 1, ['DeerRace', 'DLC1DeerGlowRace', 'ElkRace', 'WhiteStagRace']],
+    ['wolf', 1, ['WolfRace', 'C06WolfSpiritRace', 'ccBGSSSE036_BoneWolfCompanionRace']],
+    ['skeever', 1, ['SkeeverRace', 'SkeeverWhiteRace']],
+    ['mudcrab', 1, ['MudcrabRace', 'DLC2MudcrabSolstheimRace', 'ZWJ_Polymorph68_GiantMudcrabRace']],
+    ['goat', 1, ['GoatRace', 'GoatDomesticsRace', 'EE_GoatAnimalRace01']],
+    ['cow', 1, ['CowRace', 'EE_CowAnimalRace01']],
+    ['dog', 1, ['DogRace', 'DogCompanionRace', 'MG07DogRace', 'DA03BarbasDogRace', 'DLC1HuskyBareRace',
+                'DLC1HuskyArmoredRace', 'DLC1HuskyBareCompanionRace', 'DLC1HuskyArmoredCompanionRace']],
+    ['sabre cat', 2, ['SabreCatRace', 'SabreCatSnowyRace', 'DLC1SabreCatGlowRace']],
+    ['troll', 2, ['TrollRace', 'TrollFrostRace', 'DLC1TrollRaceArmored', 'DLC1TrollFrostRaceArmored']],
+    ['spider', 2, ['FrostbiteSpiderRace', 'FrostbiteSpiderRaceGiant', 'FrostbiteSpiderRaceLarge',
+                   'DLC2ExpSpiderBaseRace', 'DLC2ExpSpiderPackmuleRace']],
+    ['horse', 2, ['HorseRace', 'CartHorseRace']],
+    ['horker', 2, ['HorkerRace']],
+    ['netch calf', 2, ['DLC2NetchCalfRace']],
+    ['bear', 4, ['BearBlackRace', 'BearBrownRace', 'BearSnowRace']],
+    ['chaurus', 4, ['ChaurusRace', 'ChaurusReaperRace', 'DLC1_BF_ChaurusRace', 'DLC1ChaurusHunterRace']],
+    ['mammoth', 8, ['MammothRace']],
+    ['a grown netch', 8, ['DLC2NetchRace']],
+    // The person-shaped table. A bandit, a guard and a forsworn are all the
+    // people's races, a vampire and a child of them included.
+    ['bandit, guard, forsworn', 2, ['ArgonianRace', 'ArgonianRaceVampire', 'BretonRace', 'BretonRaceChild',
+      'BretonRaceChildVampire', 'BretonRaceVampire', 'DarkElfRace', 'DarkElfRaceVampire', 'DLC1NordRace',
+      'ElderRace', 'ElderRaceVampire', 'HighElfRace', 'HighElfRaceVampire', 'ImperialRace', 'ImperialRaceChild',
+      'ImperialRaceVampire', 'KhajiitRace', 'KhajiitRaceVampire', 'NordRace', 'NordRaceAstrid', 'NordRaceChild',
+      'NordRaceVampire', 'OrcRace', 'OrcRaceVampire', 'RedguardRace', 'RedguardRaceChild', 'RedguardRaceVampire',
+      'WoodElfRace', 'WoodElfRaceVampire']],
+    ['skeleton', 2, ['SkeletonRace', 'SkeletonArmorRace', 'SkeletonNecroRace', 'SkeletonNecroPriestRace',
+      'DLC1BlackSkeletonRace', 'DLC1SoulCairnSkeletonArmorRace', 'DLC1SoulCairnSkeletonNecroRace',
+      'RigidSkeletonRace', 'DLC2RigidSkeletonRace']],
+    ['draugr', 4, ['DraugrRace', 'DraugrMagicRace', 'DLC2HulkingDraugrRace', 'testDraugrRace']],
+    ['falmer', 4, ['FalmerRace', 'FalmerFrozenVampRace']],
+    ['hagraven', 4, ['HagravenRace']],
+    ['giant', 8, ['GiantRace', 'C00GiantOutsideWhiterunRace', 'DLC2GhostFrostGiantRace']],
+    ['dragon priest', 8, ['DragonPriestRace', 'DLC2AcolyteDragonPriestRace']],
+    ['centurion', 8, ['DwarvenCenturionRace', 'DLC1LD_ForgemasterRace']],
+    ['lurker', 8, ['DLC2LurkerRace']],
+    ['dragon', 16, ['AlduinRace', 'DragonRace', 'DragonBlackRace', 'DLC2DragonBlackRace', 'UndeadDragonRace',
+      'DLC1UndeadDragonRace', 'dlc2SpectralDragonRace', 'DragonRaceLokjun']]
+  ],
+  unnamed: [
+    // With the novice line.
+    ['riekling of Solstheim', 1, ['DLC2RieklingRace', 'DLC2ThirskRieklingRace']],
+    ['ash hopper', 1, ['DLC2AshHopperRace']],
+    ['slaughterfish', 1, ['SlaughterfishRace']],
+    ['nix-hound', 1, ['ccBGSSSE035_NixHoundCompanionRace']],
+    ['shade', 1, ['WispShadeRace']],
+    ['witchlight', 1, ['WitchlightRace']],
+    ['soul wisp', 1, ['DLC1SoulCairnSoulWispRace']],
+    ['swarm', 1, ['SwarmRace', 'SprigganSwarmRace']],
+    ['mannequin', 1, ['ManakinRace']],
+    ['a creature a spell conjures', 1, [
+      'ODN_Con_Daedra_Race_ConjureClannfear', 'ODN_Con_Daedra_Race_ConjureClannroth',
+      'ODN_Con_Daedra_Race_ConjureDaedroth', 'ODN_Con_Daedra_Race_ConjureXivilai',
+      'ODN_Con_Undead_Race_ConjureDreadShade', 'ODN_Con_Undead_Race_ConjureGloomWraith',
+      'ODN_Con_Undead_Race_ConjureSanctifiedWraith', 'TVR_Demon_Race_ConjureGremlin',
+      'TVR_Demon_Race_ConjureLeviathan', 'TVR_Demon_Race_ConjureOathbreaker', 'TVR_Demon_Race_ConjureRavagor',
+      'TVR_Demon_Race_ConjureTempleGrim', 'TVR_Primal_Race_CallHoundOfHircine', 'TVR_Primal_Race_CallRaven',
+      'TVR_Primal_Race_CallSnakes', 'TVR_Primal_Race_CallSnowLeopard', 'TVR_Primal_Race_CallWolf',
+      'TVR_Totem_Race_EyesInTheSky', 'TVR_Totem_Race_Totem', 'TVR_Verdant_Race_ForceOfNature',
+      'TVR_Verdant_Race_Wildshape', 'TVR_Warrior_Race_Fylgja', 'TVR_Warrior_Race_FylgjaStorm',
+      'WB_ConjureBearTotem_Race', 'WB_ConjureCatTotem_Race', 'WB_ConjureCraftlord_Race',
+      'WB_ConjureDeadeyeCaptain_Race', 'WB_ConjureKyrkrim_Race', 'WB_FeralSpirit_Race', 'WB_Lich_Race',
+      'WB_NetherLich_Race', 'WB_Skinwalker_Race', '0_CombatBlue', '0_JarBOMBA', '0_PuppetmanRace',
+      '0_SkeleGiantRace']],
+    ['a race that is not a creature', 1, ['DefaultRace', 'TestRace', 'InvisibleRace', 'dunMiddenEmptyRace',
+      'DLC2FakeCoffinRace', 'DLC2dunInstrumentsRace']],
+    // With the advanced line and the people's line.
+    ['spriggan', 2, ['SprigganRace', 'DLC2SprigganBurntRace']],
+    ['dwarven spider', 2, ['DwarvenSpiderRace']],
+    ['ice wraith', 2, ['IceWraithRace', 'DLC2dunKarstaagIceWraithRace']],
+    ['death hound', 2, ['DLC1DeathHoundRace', 'DLC1DeathHoundCompanionRace']],
+    ['bristleback', 2, ['DLC2BoarRace', '1BoarRideRace']],
+    ['riekling on a bristleback', 2, ['DLC2MountedRieklingRace']],
+    ['ash spawn', 2, ['DLC2AshSpawnRace']],
+    ['magic anomaly', 2, ['MagicAnomalyRace']],
+    ['boneman', 2, ['DLC01SoulCairnBonemanRace']],
+    ['the afflicted', 2, ['DA13AfflictedRace']],
+    ['a riekling of the riekling people', 2, ['1RieklingBlueRace', '1RieklingBlueRaceVampire',
+      '1RieklingPurpleRace', '1RieklingPurpleRaceVampire', '1NpcRieklingBlueRace', '1NpcRieklingBlueRace2',
+      '1NpcRieklingBlueRaceVampire', '1NpcRieklingPurpleRace', '1NpcRieklingPurpleRace2',
+      '1NpcRieklingPurpleRaceVampire']],
+    // With the expert line, beside the draugr and the falmer.
+    ['atronach', 4, ['AtronachFlameRace', 'AtronachFrostRace', 'AtronachStormRace']],
+    ['dwarven sphere', 4, ['DwarvenSphereRace']],
+    ['dwarven ballista', 4, ['DLC2DwarvenBallistaRace']],
+    ['gargoyle', 4, ['DLC1GargoyleRace', 'DLC1GargoyleVariantGreenRace', 'DLC1GargoyleVariantBossRace']],
+    ['dremora', 4, ['DremoraRace', 'DLC2DremoraRace']],
+    ['snow elf', 4, ['SnowElfRace']],
+    ['ash guardian', 4, ['dlc2AshGuardianRace']],
+    ['seeker', 4, ['DLC2SeekerRace']],
+    ['wispmother', 4, ['WispRace']],
+    ['spriggan matron', 4, ['SprigganMatronRace', 'SprigganEarthMotherRace']],
+    ['keeper', 4, ['DLC1SoulCairnKeeperRace']],
+    // With the giants.
+    ['werewolf', 8, ['WerewolfBeastRace']],
+    ['werebear', 8, ['DLC2WerebearBeastRace']],
+    ['vampire lord', 8, ['DLC1VampireBeastRace']],
+    ['Miraak', 8, ['DLC2MiraakRace']]
   ],
   fallback: 1
 };
 
-/** The pieces one kill is worth: the hunter list's rank for a base on it, else
- *  the race's line. Pure, so the harness can ask it about any body. */
+/** The line a race is on: its pieces, or 0 when no line names it. The lookup
+ *  is built once, by lower case editor id. */
+function warriorRaceBand(raceEdid) {
+  if (!WARRIOR_KILL.byRace) {
+    const map = {};
+    const all = WARRIOR_KILL.kinds.concat(WARRIOR_KILL.unnamed);
+    for (let i = 0; i < all.length; i++) {
+      for (let j = 0; j < all[i][2].length; j++) { map[all[i][2][j].toLowerCase()] = all[i][1]; }
+    }
+    WARRIOR_KILL.byRace = map;
+  }
+  const race = String(raceEdid || '').toLowerCase();
+  return (race && Object.prototype.hasOwnProperty.call(WARRIOR_KILL.byRace, race)) ? WARRIOR_KILL.byRace[race] : 0;
+}
+
+/** The pieces one kill is worth: the race's line, else the hunter list's rank
+ *  for a base on it, else the novice line. Pure, so the harness can ask it
+ *  about any body. */
 function warriorPieces(baseDesc, raceEdid) {
+  const band = warriorRaceBand(raceEdid);
+  if (band) { return band; }
   const base = String(baseDesc || '');
   if (base && Object.prototype.hasOwnProperty.call(HUNTS_BY_BASE, base)) {
     const rank = HUNTS_BY_BASE[base].rank;
     if (Object.prototype.hasOwnProperty.call(WARRIOR_KILL.byRank, rank)) {
       return WARRIOR_KILL.byRank[rank];
-    }
-  }
-  const race = String(raceEdid || '').toLowerCase();
-  if (race) {
-    for (let i = 0; i < WARRIOR_KILL.byRace.length; i++) {
-      if (WARRIOR_KILL.byRace[i][0].test(race)) { return WARRIOR_KILL.byRace[i][1]; }
     }
   }
   return WARRIOR_KILL.fallback;
@@ -5702,9 +5802,6 @@ function raceEdidOf(actorId) {
 function killPieces(actorId) {
   let base = '';
   try { base = String(mp.get(actorId, 'baseDesc') || ''); } catch (e) { base = ''; }
-  if (base && Object.prototype.hasOwnProperty.call(HUNTS_BY_BASE, base)) {
-    return warriorPieces(base, '');
-  }
   return warriorPieces(base, raceEdidOf(actorId));
 }
 
@@ -26665,23 +26762,25 @@ function markWoven(actorId, outDesc, name, n) {
 */
 const MASTER_CRAFT_AFTER_MS = 0;
 
-/** After an allowed craft: Grand Chef's second batch and Master Weaver's mark. */
+/** After an allowed craft: Grand Chef's and Master Chemist's second batch, and Master Weaver's mark. */
 function masterCraft(actorId, row, count) {
   if (!row || typeof row !== 'object' || !row.out) { return; }
   const n = Number(count) > 0 ? Math.floor(Number(count)) : (Number(row.makes) || 1);
   const chef = row.owner === 'Cook' && holdsPerk(actorId, 'grandchef');
   const weaver = row.owner === 'Tailor' && row.type === 'ARMO' && holdsPerk(actorId, 'masterweaver');
-  if (!chef && !weaver) { return; }
+  const chemist = row.owner === 'Alchemist' && holdsPerk(actorId, 'masterchemist');
+  if (!chef && !weaver && !chemist) { return; }
   const before = packCount(actorId, row.out);
   setTimeout(function () {
     if (packCount(actorId, row.out) < before + n) {
       log(actorId.toString(16), 'made no', row.name, 'after all (the engine refused the craft), so no master work is added');
       return;
     }
-    if (chef) {
+    if (chef || chemist) {
       try {
         addItem(actorId, row.out, n);
-        log(actorId.toString(16), 'is a Grand Chef: a second batch of', n, row.name);
+        log(actorId.toString(16), 'is a', chef ? 'Grand Chef:' : 'Master Chemist:',
+            'a second batch of', n, row.name);
       } catch (e) { log('the second batch of', row.name, 'was not handed over:', e); }
     }
     if (weaver) {
@@ -26928,11 +27027,11 @@ function craftAnswer(actorId, row) {
   of armour with no recipe behind it is an enchantment, because every forge
   craft HAS a recipe and would never reach this path.
 
-  THE RANK IS NOT SET HERE, and that is a knob rather than an oversight. There
-  is no record to carry a rank, so every brew and every enchantment is novice
-  work to anybody who holds the profession. Whether a Master should brew
-  something a novice cannot is a question for the rulebook, and it needs a
-  record or a table before it can be answered.
+  THE RANK IS NOT ON A RECORD. There is no record to carry one, so the rank
+  is the table's: the mixtures and enchantments pages give every effect a
+  rank, and MIXTURES and ENCHANTMENTS below carry them (#1389). They can only
+  be asked once the engine names the effects, and until it does every brew
+  and every enchantment is novice work to anybody who holds the profession.
 */
 var RECIPELESS = {
   ALCH: { prof: 'alchemist', made: 'a potion', verb: 'brew' },
@@ -26940,7 +27039,254 @@ var RECIPELESS = {
   ARMO: { prof: 'enchanter', made: 'enchanted armour', verb: 'enchant' }
 };
 
-function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
+/*
+  THE TWO SHORT LISTS (#1389): what a lab may brew, docs/systems/mixtures.md,
+  and what an arcane enchanter may put on a piece, docs/systems/enchantments.md.
+  An effect that is not named on its page is refused, even when the vanilla
+  menu would make it.
+
+  KEYED BY THE MAGIC EFFECT, the MGEF record, because that is the one thing a
+  brew and an enchantment are made of. A brewed bottle is a form only the
+  brewing client has (above 0xff000000), and an enchanted piece keeps its own
+  record with a new enchantment hung on it (the ExtraEnchantment the fork's
+  inventory.ts already reads), so neither has a record the server can look up.
+  The effects inside them are plugin records, and the same ids on both sides.
+  The ids are Skyrim.esm's, as UESP lists them for each effect: the alchemy
+  effect for a mixture and the enchanting effect for an enchantment, which are
+  two different records with the same name (Resist Fire, Fear).
+
+  WHAT THE ENGINE PASSES TODAY, read in the fork at the pinned commit
+  (engine/skymp ac044a49): mp.onCraft gets five numbers and nothing else. The
+  client's craft message carries the bench, the inputs by base id and count,
+  and the base id of what arrived in the pack (craftService.ts,
+  CraftItemMessage.h); CraftService asks the gamemode with recipeId 0 and the
+  bench (CraftService.cpp, CraftEvent.cpp). No effect, no enchantment and not
+  even the inputs reach the gamemode. So these lists are asked only when the
+  engine hands over the effects as a sixth argument, an array of MGEF form ids;
+  what the fork has to do for that is written on #1389. Until then a brew and
+  an enchantment go through as they always have, and the log says the lists
+  were not asked.
+
+  The same rank rules as every recipe: craftAnswer is asked of each effect as
+  if it were a row, so the half that owns it, the sister half at novice and a
+  taught half at novice all answer the way they do at a forge.
+*/
+var MIXTURES = {
+  // Medicine, Physicker.
+  '3eb15:Skyrim.esm': { name: 'Restore Health', half: 'physicker', rank: 'novice' },
+  '3eb16:Skyrim.esm': { name: 'Restore Stamina', half: 'physicker', rank: 'novice' },
+  '3eb17:Skyrim.esm': { name: 'Restore Magicka', half: 'physicker', rank: 'novice' },
+  '3eaf3:Skyrim.esm': { name: 'Fortify Health', half: 'physicker', rank: 'advanced' },
+  '3eaf9:Skyrim.esm': { name: 'Fortify Stamina', half: 'physicker', rank: 'advanced' },
+  '3eaf8:Skyrim.esm': { name: 'Fortify Magicka', half: 'physicker', rank: 'advanced' },
+  'ae723:Skyrim.esm': { name: 'Cure Disease', half: 'physicker', rank: 'advanced' },
+  '3eaea:Skyrim.esm': { name: 'Resist Fire', half: 'physicker', rank: 'expert' },
+  '3eaeb:Skyrim.esm': { name: 'Resist Frost', half: 'physicker', rank: 'expert' },
+  '3eaec:Skyrim.esm': { name: 'Resist Shock', half: 'physicker', rank: 'expert' },
+  '3eb01:Skyrim.esm': { name: 'Fortify Carry Weight', half: 'physicker', rank: 'expert' },
+  '3eb06:Skyrim.esm': { name: 'Regenerate Health', half: 'physicker', rank: 'master' },
+  '3eb08:Skyrim.esm': { name: 'Regenerate Stamina', half: 'physicker', rank: 'master' },
+  '3eb07:Skyrim.esm': { name: 'Regenerate Magicka', half: 'physicker', rank: 'master' },
+  // Poison, Blightbrewer.
+  '3eb42:Skyrim.esm': { name: 'Damage Health', half: 'blightbrewer', rank: 'novice' },
+  '3a2c6:Skyrim.esm': { name: 'Damage Stamina', half: 'blightbrewer', rank: 'novice' },
+  '3a2b6:Skyrim.esm': { name: 'Damage Magicka', half: 'blightbrewer', rank: 'novice' },
+  '10aa4a:Skyrim.esm': { name: 'Lingering Damage Health', half: 'blightbrewer', rank: 'advanced' },
+  '73f23:Skyrim.esm': { name: 'Ravage Stamina', half: 'blightbrewer', rank: 'advanced' },
+  '73f27:Skyrim.esm': { name: 'Ravage Magicka', half: 'blightbrewer', rank: 'advanced' },
+  '73f2d:Skyrim.esm': { name: 'Weakness to Fire', half: 'blightbrewer', rank: 'expert' },
+  '73f2e:Skyrim.esm': { name: 'Weakness to Frost', half: 'blightbrewer', rank: 'expert' },
+  '73f2f:Skyrim.esm': { name: 'Weakness to Shock', half: 'blightbrewer', rank: 'expert' },
+  '90042:Skyrim.esm': { name: 'Weakness to Poison', half: 'blightbrewer', rank: 'expert' },
+  '73f30:Skyrim.esm': { name: 'Paralysis', half: 'blightbrewer', rank: 'master' },
+  '73f20:Skyrim.esm': { name: 'Fear', half: 'blightbrewer', rank: 'master' }
+};
+
+var ENCHANTMENTS = {
+  // On a weapon, Bladebinder.
+  '4605a:Skyrim.esm': { name: 'Fire Damage', half: 'bladebinder', rank: 'novice' },
+  '4605b:Skyrim.esm': { name: 'Frost Damage', half: 'bladebinder', rank: 'novice' },
+  '4605c:Skyrim.esm': { name: 'Shock Damage', half: 'bladebinder', rank: 'novice' },
+  '5b452:Skyrim.esm': { name: 'Soul Trap', half: 'bladebinder', rank: 'novice' },
+  'aa155:Skyrim.esm': { name: 'Absorb Health', half: 'bladebinder', rank: 'advanced' },
+  'aa157:Skyrim.esm': { name: 'Absorb Stamina', half: 'bladebinder', rank: 'advanced' },
+  'aa156:Skyrim.esm': { name: 'Absorb Magicka', half: 'bladebinder', rank: 'advanced' },
+  // The cheaper copies the Drainheart Sword and the Drainspell Bow teach.
+  // Same names, so the same rows; asked on #1389.
+  '10f21f:Skyrim.esm': { name: 'Absorb Stamina', half: 'bladebinder', rank: 'advanced' },
+  '10f221:Skyrim.esm': { name: 'Absorb Magicka', half: 'bladebinder', rank: 'advanced' },
+  '5b46b:Skyrim.esm': { name: 'Turn Undead', half: 'bladebinder', rank: 'advanced' },
+  'acbb5:Skyrim.esm': { name: 'Banish', half: 'bladebinder', rank: 'expert' },
+  '5b451:Skyrim.esm': { name: 'Fear', half: 'bladebinder', rank: 'expert' },
+  'acbb6:Skyrim.esm': { name: 'Paralyze', half: 'bladebinder', rank: 'master' },
+  // On armour and clothing, Wardweaver.
+  '493aa:Skyrim.esm': { name: 'Fortify Health', half: 'wardweaver', rank: 'novice' },
+  '49507:Skyrim.esm': { name: 'Fortify Stamina', half: 'wardweaver', rank: 'novice' },
+  '49504:Skyrim.esm': { name: 'Fortify Magicka', half: 'wardweaver', rank: 'novice' },
+  '48c8b:Skyrim.esm': { name: 'Resist Fire', half: 'wardweaver', rank: 'advanced' },
+  '48f45:Skyrim.esm': { name: 'Resist Frost', half: 'wardweaver', rank: 'advanced' },
+  '49295:Skyrim.esm': { name: 'Resist Shock', half: 'wardweaver', rank: 'advanced' },
+  '7a0f4:Skyrim.esm': { name: 'Fortify Carry Weight', half: 'wardweaver', rank: 'advanced' },
+  '92a57:Skyrim.esm': { name: 'Muffle', half: 'wardweaver', rank: 'expert' },
+  '92a48:Skyrim.esm': { name: 'Waterbreathing', half: 'wardweaver', rank: 'expert' },
+  '7a0f8:Skyrim.esm': { name: 'Fortify Health Regen', half: 'wardweaver', rank: 'master' },
+  '7a105:Skyrim.esm': { name: 'Fortify Stamina Regen', half: 'wardweaver', rank: 'master' },
+  '7a0fd:Skyrim.esm': { name: 'Fortify Magicka Regen', half: 'wardweaver', rank: 'master' }
+};
+
+/*
+  TWIN SOULS IS THE SECOND SLOT. enchantments.md: "One enchantment on a piece,
+  until Twin Souls at master, which is two." Three is never.
+*/
+var ENCHANT_SLOTS = 1;
+var TWIN_SOULS_SLOTS = 2;
+
+var OFF_THE_MIXTURES = 'A lab here brews only what the mixtures list names, and that brew carries an effect that is not on it.';
+var OFF_THE_ENCHANTMENTS = 'An arcane enchanter here puts on only what the enchantments list names, and that enchantment is not on it.';
+
+/**
+ * What the two lists say about a brew or an enchantment made of these magic
+ * effects (MGEF form ids, as the engine reports them).
+ *
+ * want is the profession the bench belongs to ('alchemist', 'enchanter'), or
+ * null for a bench nobody has classified, which takes each effect from
+ * whichever list names it. state is the character, already read.
+ *
+ * Returns { refusal, credit }: refusal is the sentence that stops the craft,
+ * credit the half the one piece of work counts under. A batch is one piece
+ * however many effects it carries. It goes to the person's own half when one
+ * of the effects is that half's, and otherwise to the half of the first
+ * effect (a mixed batch is asked on #1389).
+ */
+function listAnswer(actorId, want, effects, state) {
+  var out = { refusal: null, credit: null };
+  var table = want === 'alchemist' ? MIXTURES : (want === 'enchanter' ? ENCHANTMENTS : null);
+  var offList = want === 'enchanter' ? OFF_THE_ENCHANTMENTS : OFF_THE_MIXTURES;
+
+  var rows = [];
+  var seen = {};
+  for (var i = 0; i < effects.length; i++) {
+    var desc = null;
+    try { desc = mp.getDescFromId(Number(effects[i]) || 0); } catch (e) { desc = null; }
+    if (desc && Object.prototype.hasOwnProperty.call(seen, desc)) { continue; }
+    var from = table;
+    if (!from && desc) {
+      from = Object.prototype.hasOwnProperty.call(MIXTURES, desc) ? MIXTURES
+           : (Object.prototype.hasOwnProperty.call(ENCHANTMENTS, desc) ? ENCHANTMENTS : null);
+    }
+    // An effect the server cannot name is not one the list names.
+    if (!desc || !from || !Object.prototype.hasOwnProperty.call(from, desc)) {
+      out.refusal = (from === ENCHANTMENTS) ? OFF_THE_ENCHANTMENTS : offList;
+      return out;
+    }
+    seen[desc] = true;
+    rows.push({ desc: desc, effect: from[desc], enchant: from === ENCHANTMENTS });
+  }
+  // A bottle or a piece with nothing on it is not something the menu makes.
+  if (!rows.length) {
+    out.refusal = offList;
+    return out;
+  }
+
+  var enchantments = 0;
+  for (var k = 0; k < rows.length; k++) { if (rows[k].enchant) { enchantments++; } }
+  if (enchantments > TWIN_SOULS_SLOTS) {
+    out.refusal = 'No piece here holds more than ' + TWIN_SOULS_SLOTS + ' enchantments.';
+    return out;
+  }
+  if (enchantments > ENCHANT_SLOTS && !holdsPerk(actorId, 'twinsouls')) {
+    out.refusal = 'Two enchantments on one piece is Twin Souls, and that is a master ' +
+                  'Enchanter\'s. You can put one on.';
+    return out;
+  }
+
+  for (var j = 0; j < rows.length; j++) {
+    var effect = rows[j].effect;
+    var row = {
+      name: rows[j].enchant
+        ? 'piece enchanted with ' + effect.name
+        : 'bottle of ' + effect.name,
+      owner: rows[j].enchant ? 'Enchanter' : 'Alchemist',
+      half: effect.half,
+      rank: effect.rank
+    };
+    var answer = craftAnswer(actorId, row);
+    if (answer.refusal) {
+      out.refusal = answer.refusal;
+      return out;
+    }
+    if (answer.credit && (!out.credit || (state && answer.credit === state.half))) {
+      out.credit = answer.credit;
+    }
+  }
+  return out;
+}
+
+/*
+  AND THE SECOND SLOT HAS TO BE IN THE MENU. The game's enchanting menu offers a
+  second enchantment only to somebody holding its Extra Effect perk
+  (58f7f:Skyrim.esm), and nothing hands that out here, so without this Twin
+  Souls would be a rule with no slot behind it. The server cannot add a perk
+  to an actor (the fork has no AddPerk), so the number of slots travels to the
+  owner in this property and the updateOwner script puts the perk on, or takes
+  it off, when the number changes. updateOwner runs every frame, so it acts
+  only on a change, the way the swing and the alert scripts do.
+
+  Written by the character block whenever it writes the character, and put
+  back on every spawn with the spells (grantKnown), because a session starts
+  from a save that holds no perks.
+*/
+var ENCHANT_SLOTS_PROPERTY = 'thornswoodEnchantSlots';
+var EXTRA_EFFECT_PERK = 0x58f7f;
+
+function enchantSlotsScript() {
+  return [
+    '(function(){',
+    '  var slots = ctx.value === ' + TWIN_SOULS_SLOTS + ' ? ' + TWIN_SOULS_SLOTS + ' : ' + ENCHANT_SLOTS + ';',
+    '  var st = ctx.state;',
+    '  if (st.thornswoodEnchantSlots === slots) { return; }',
+    '  st.thornswoodEnchantSlots = slots;',
+    '  var sp = ctx.sp;',
+    '  var pc = sp.Game.getPlayer();',
+    '  var perk = sp.Perk.from(sp.Game.getFormEx(' + EXTRA_EFFECT_PERK + '));',
+    '  if (slots === ' + TWIN_SOULS_SLOTS + ') { pc.addPerk(perk); } else { pc.removePerk(perk); }',
+    '})();'
+  ].join('\n');
+}
+
+try {
+  mp.makeProperty(ENCHANT_SLOTS_PROPERTY, {
+    isVisibleByOwner: true,
+    isVisibleByNeighbors: false,
+    updateOwner: enchantSlotsScript(),
+    updateNeighbor: ''
+  });
+} catch (e) {
+  // Made by a previous load. makeProperty cannot change a property already
+  // made, so a changed script needs a restart, which a deploy is.
+}
+
+/** How many enchantments this character may put on one piece. */
+function enchantSlots(state) {
+  var P = globalThis.__thornswoodProgression;
+  var held = (P && P.perks && state) ? P.perks(state) : [];
+  return held.indexOf('twinsouls') !== -1 ? TWIN_SOULS_SLOTS : ENCHANT_SLOTS;
+}
+
+/** Hand the owner the number of enchantment slots, when it has changed. */
+function handEnchantSlots(actorId, state) {
+  var slots = enchantSlots(state);
+  var had = null;
+  try { had = mp.get(actorId, ENCHANT_SLOTS_PROPERTY); } catch (e) { had = null; }
+  if (had === slots) { return; }
+  try {
+    mp.set(actorId, ENCHANT_SLOTS_PROPERTY, slots);
+  } catch (e) {
+    log(actorId.toString(16), 'was not handed', slots, 'enchantment slots:', e);
+  }
+}
+
+function recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects) {
   /*
     WHAT MADE IT, NOT WHAT IT IS.
 
@@ -26972,7 +27318,13 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
     Found by the audit of 21 September, all three.
   */
   var RUNTIME = 0xff000000;
-  var madeFromNothing = (Number(craftedItemBaseId) || 0) >= RUNTIME;
+  /*
+    OR THE ENGINE SAYS WHAT WENT INTO IT (#1389). An enchanted piece keeps its
+    own record and only its enchantment is new, so the id of what arrived is
+    under the line; the effects the engine hands over are what mark it as an
+    enchantment, and the bench says whose. Today's engine hands over none.
+  */
+  var madeFromNothing = (Number(craftedItemBaseId) || 0) >= RUNTIME || Array.isArray(effects);
 
   if (!madeFromNothing) {
     /*
@@ -27050,7 +27402,7 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
       A TEMPER IS REFUSED, AND IT IS NOT WORK (#1384). Tempering at the
       sharpening wheel and the armour table is cut: its 1809 rows are in
       docs/systems/cut-items.md, held so an event can bring one back, and a
-      piece is mended with a kit (the durability block, /repair). Every craft
+      piece is mended with a kit (the durability block). Every craft
       that reaches this line at one of those two benches is a temper, because
       every recipe either of them carries is one.
 
@@ -27062,7 +27414,7 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
     */
     if (tempering) {
       var noTemper = 'Tempering is not done here. A piece is mended with a repair kit: ' +
-                     '/repair says what you carry and how it stands.';
+                     'with one in your pack, your inventory names the key that mends a piece.';
       notify(actorId, noTemper);
       say(actorId, noTemper);
       log(actorId.toString(16), 'was refused a temper of', craftedItemBaseId.toString(16),
@@ -27217,19 +27569,57 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
   }
 
   /*
-    AND THE WORK COUNTS, which it did not.
-
-    creditWork is the only road to addWork and addWork is the only road to
-    rankUp, so a half whose work is never credited can never leave novice. Every
-    other verb in the file credits: the recipe gate, the sawing station and the
-    kiln. This one allowed the craft with a bare return, so a Blightbrewer could
-    brew for the rest of their life and stay a novice for ever.
+    THE LISTS (#1389). With the effects in hand, each one is asked of the page
+    that names it, at the rank that page gives it, and the work goes to the
+    half that owns it. Without them, which is every craft on the engine at the
+    pinned commit, nothing here can tell one brew from another, so the bench
+    and the profession above are the whole of the gate, as before.
   */
-  try {
-    var ch = globalThis.__thornswoodCharacter;
-    if (ch && ch.credit) { ch.credit(actorId, half); }
-  } catch (e) {
-    log('could not credit', half, 'for a recipeless craft:', e);
+  if (Array.isArray(effects)) {
+    var listed = listAnswer(actorId, want, effects, s);
+    if (listed.refusal) {
+      notify(actorId, listed.refusal);
+      say(actorId, listed.refusal);
+      log(actorId.toString(16), 'was refused a', want === 'enchanter' ? 'enchantment' : 'brew',
+          'at bench', (workbenchId || 0).toString(16), 'carrying', JSON.stringify(effects) + ':',
+          listed.refusal);
+      return false;
+    }
+    if (listed.credit) { half = listed.credit; }
+  } else {
+    log(actorId.toString(16), 'worked at bench', (workbenchId || 0).toString(16),
+        '(' + (whatBench || 'unknown bench') + ') and the engine named no effects,',
+        'so the mixtures and enchantments lists were not asked (#1389)');
+  }
+
+  /*
+    AND THE WORK COUNTS, one piece for one batch (#1389, mixtures.md "One
+    successful batch is one piece of work"), through creditWork like every
+    other piece of work in the file: it costs the rest a piece costs, the party
+    bonus counts, and the line about a new rank is said. It used to go straight
+    to the character block's credit, which counted the piece and dropped the
+    rank line on the floor.
+  */
+  var raised = creditWork(actorId, half);
+  if (raised) {
+    notify(actorId, raised);
+    say(actorId, raised);
+  }
+
+  /*
+    MASTER CHEMIST, alchemist.md: "Every batch yields two instead of one. One
+    craft is still one piece of work." The same road as Grand Chef's second
+    batch: once the engine has put the first bottle in the pack, the second
+    goes on the same stack. A brewed bottle's id is the runtime form the
+    brewing client made, and its descriptor is that id with no plugin, which
+    getIdFromDesc turns back into the same number.
+  */
+  if (want === 'alchemist' && (Number(craftedItemBaseId) || 0) >= RUNTIME) {
+    var brewed = null;
+    try { brewed = mp.getDescFromId(craftedItemBaseId); } catch (e) { brewed = null; }
+    if (brewed) {
+      masterCraft(actorId, { out: brewed, name: 'brew', owner: 'Alchemist', makes: 1 }, 1);
+    }
   }
   return;
 }
@@ -27246,13 +27636,13 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
 const KEY_RECIPE = '15497:Thornswood-Content.esp';
 const KEY_NAME_DELAY = 250;
 
-mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId) {
+mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {
   /*
     NO RECIPE AT ALL, which the fork now reports rather than dropping.
     Everything below this line assumes a recipe id that names a record.
   */
   if (!recipeId) {
-    return recipelessCraft(actorId, craftedItemBaseId, workbenchId);
+    return recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects);
   }
 
   /*
@@ -28238,6 +28628,15 @@ log('gamemode loaded:',
           if (dvid) devRoleIds[dvid] = true;
         }
       }
+      // The trading company's Discord role (#1393), from the same answer.
+      // An application like a Jarl's: asked for in Discord, given by a person.
+      var companyIds = {};
+      if (Array.isArray(doc.companyProfiles)) {
+        for (var co = 0; co < doc.companyProfiles.length; co++) {
+          var coid = Number(doc.companyProfiles[co]);
+          if (coid) companyIds[coid] = true;
+        }
+      }
       var accounts = {};
       if (Array.isArray(doc.people)) {
         for (var pe = 0; pe < doc.people.length; pe++) {
@@ -28249,7 +28648,7 @@ log('gamemode loaded:',
           }
         }
       }
-      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, jarlIds: jarlIds, staffRoleIds: staffRoleIds, devRoleIds: devRoleIds, businessIds: businessIds, factionIds: factionIds, accounts: accounts, count: Object.keys(ids).length };
+      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, jarlIds: jarlIds, staffRoleIds: staffRoleIds, devRoleIds: devRoleIds, businessIds: businessIds, factionIds: factionIds, companyIds: companyIds, accounts: accounts, count: Object.keys(ids).length };
     } catch (e) {
       list = null;
     }
@@ -28312,6 +28711,16 @@ log('gamemode loaded:',
 (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodIsJarl = function (profileId) {
     var l = load();
     return passProved(profileId) && !!(l && l.jarlIds && l.jarlIds[Number(profileId)]);
+  };
+
+  /*
+    The Free Skyrim Trading Company's Discord role on the account (#1393).
+    Accepted on an application in Discord, the same shape as a Jarl's. It is
+    what lets a character handle a company sale, in the property block.
+  */
+  (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodIsCompany = function (profileId) {
+    var l = load();
+    return passProved(profileId) && !!(l && l.companyIds && l.companyIds[Number(profileId)]);
   };
 
   /*
@@ -28552,6 +28961,7 @@ log('gamemode loaded:',
       businessOwnerProfiles: merged(doc.businessOwnerProfiles, had.businessOwnerProfiles),
       factionOwnerProfiles: merged(doc.factionOwnerProfiles, had.factionOwnerProfiles),
       devRoleProfiles: merged(doc.devRoleProfiles, had.devRoleProfiles),
+      companyProfiles: merged(doc.companyProfiles, had.companyProfiles),
       people: people
     };
   }
@@ -28664,6 +29074,7 @@ log('gamemode loaded:',
             doc.businessOwnerProfiles = kept.businessOwnerProfiles;
             doc.factionOwnerProfiles = kept.factionOwnerProfiles;
             doc.devRoleProfiles = kept.devRoleProfiles;
+            doc.companyProfiles = kept.companyProfiles;
             doc.people = kept.people;
             note(doc.failedProfiles.length + ' profiles could not be checked with Discord ' +
                  'and keep the standing they had' +
@@ -28682,6 +29093,10 @@ log('gamemode loaded:',
               businessOwnerProfiles: Array.isArray(doc.businessOwnerProfiles) ? doc.businessOwnerProfiles : [],
               factionOwnerProfiles: Array.isArray(doc.factionOwnerProfiles) ? doc.factionOwnerProfiles : [],
               devRoleProfiles: Array.isArray(doc.devRoleProfiles) ? doc.devRoleProfiles : [],
+              // The Free Skyrim Trading Company's role (#1393), for a
+              // company sale. Without this line the door read a list it
+              // never wrote.
+              companyProfiles: Array.isArray(doc.companyProfiles) ? doc.companyProfiles : [],
               people: doc.people || [],
               // Staff bans with why and until (#412), from the site's own
               // file rather than Discord, so they are fresh even when the
@@ -35686,6 +36101,74 @@ log('gamemode loaded:',
   }
 
   /*
+    COIN OFF A HOLD'S LEDGER (#1393), deposit's other half.
+
+    Only the payouts docs/systems/trading-company.md names take coin off a
+    ledger: a haul's pay to its hauler, and a haul's pay back to its poster.
+    A letter's 15 is the other, and payHeld pays that. The caller puts the
+    same count back into a pack in the same step (payOut), so the coin was
+    already in the world: this counts it off, and creates nothing.
+
+    HELD PAY STAYS ON THE LEDGER. An open letter's 15 (#1374: letter, not
+    down, pay above 0) and an open haul's pay are counted here until they
+    are paid or handed back, and so is a haul's gold owed to somebody who was
+    away when it came down (owed, see handHaul). A withdrawal never takes
+    them: what is left after it is never less than what is still held, so a
+    courier or a hauler is never refused because the ledger was spent.
+    `releasing` is the one letter or haul on this hold's board whose own held
+    gold this is, so paying a haul out of its own pay is not refused for
+    being held, and never more than it holds.
+
+    mayWithdraw answers why not, or '' when it may. withdraw takes it off
+    and answers true, or false with nothing changed.
+  */
+  /** What one notice holds on its ledger: an open letter's or haul's pay, or a haul's owed gold. */
+  function noticeHolds(x) {
+    if (!x || !(x.letter || x.haul)) { return 0; }
+    var owed = x.haul ? (Math.floor(Number(x.owed)) || 0) : 0;
+    if (owed > 0) { return owed; }
+    if (x.down) { return 0; }
+    var pay = Math.floor(Number(x.pay)) || 0;
+    return pay > 0 ? pay : 0;
+  }
+
+  function heldOn(hold, releasing) {
+    var list = notices[hold] || [];
+    var held = 0;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] !== releasing) { held += noticeHolds(list[i]); }
+    }
+    return held;
+  }
+
+  function mayWithdraw(hold, amount, releasing) {
+    var key = String(hold || '').toLowerCase();
+    var n = Number(amount);
+    if (LEDGER_HOLDS.indexOf(key) < 0) { return 'that is not one of the ten ledgers.'; }
+    if (!Number.isInteger(n) || n <= 0) { return 'that is not a whole number of gold.'; }
+    if (releasing) {
+      if ((notices[key] || []).indexOf(releasing) < 0 || !noticeHolds(releasing)) { return 'that is not held on ' + key + '\'s ledger.'; }
+      if (n > noticeHolds(releasing)) { return 'that is more than it holds.'; }
+    }
+    var have = Number(funds[key]) || 0;
+    var held = heldOn(key, releasing || null);
+    if (have - n < held) {
+      return key + '\'s ledger has ' + have + ' gold, and ' + held + ' of it is held for letters and hauls.';
+    }
+    return '';
+  }
+
+  function withdraw(hold, amount, reason, releasing) {
+    if (mayWithdraw(hold, amount, releasing)) { return false; }
+    var key = String(hold).toLowerCase();
+    var n = Number(amount);
+    funds[key] = (Number(funds[key]) || 0) - n;
+    save();
+    plog(n, 'gold off', key + '\'s ledger:', String(reason || 'no reason given'));
+    return true;
+  }
+
+  /*
     ------------------------------------------------------------------- rent
 
     A rented property is the same claim with an amount and a clock. The server
@@ -35782,75 +36265,105 @@ log('gamemode loaded:',
   /*
     ------------------------------------------------------------------- beds
 
-    THE NIGHT IS THE HOLDER'S PRICE, AND A BED IS ONE THE SERVER SAW (#1392).
+    WHOSE BED IT IS DECIDES THE REST, AND A BED IS ONE THE SERVER SAW
+    (#1392, #1603).
 
-    docs/systems/property.md, "What a home is for": the holder sets who may
-    sleep there and what the night costs. /bed 20 at the building sets the
-    gold for one night, /bed - makes a night free for the people the holder
-    allows and sells it to nobody else, and /bed alone says the price. An inn
-    is the same rule, and there is no server inn price.
+    Patrick's answers on #1603, 4 Oct. The holder names who may sleep there,
+    with buttons and not commands. A night is 8 hours. Nobody sells a night
+    through the server: "they pay from a regular trade and then the owner can
+    grant bed access". And the rest goes by common sense, up to your own bed:
 
-    docs/systems/exhaustion.md: a bed you own, rent or were allowed is 80 rest
-    an hour, an inn room once the holder's price is paid is 50, a bedroll is
-    the campfire's 35, and saying the word in the street does not count. Those
-    are the three kinds this hands the needs block (bed, inn, bedroll), and
-    the numbers stay in NEEDS.recover there.
+      what you are resting on                            an hour   kind
+      a seat                                               20      sit
+      a bed or bedroll nobody can lend you                 25      rough
+      a seat with a fire in reach                          35      campfire
+      a bed or bedroll nobody can lend you, by a fire      45      camp
+      a bed you are allowed in: a guest, a key, a deed     50      inn
+      your own bed                                         80      bed
 
-    HOW THE SERVER KNOWS A BED. mp.onActivate is handed the bed when somebody
-    presses it, the same way it is handed a door, and the base's own record
-    says what it is: a FURN whose editor id names a bed, read once per base
-    through mp.lookupEspmRecordById and remembered. /rest bed then asks two
-    things the server measures itself: which bed this person last pressed, and
-    whether they are still within BED_REACH of it in the same cell. The typed
-    word is not asked, and neither is the client's own guess at furniture. The
-    building is the bed's own cell, the same way the take limit finds whose a
-    chest is, because a building here is its interior cell.
+    The numbers live in NEEDS.recover in the needs block, and this hands it
+    the kind. docs/systems/exhaustion.md has the same table.
 
-    WHILE THE PLACE IS TRUE. Every BED_EVERY_MS the beds people are resting in
-    are measured again: walk away, lose the key, or let the night run out, and
-    the rest stops. Somebody who comes into the world already resting in a bed
-    the server did not see them lie down in stops too, and lies down again. A
-    restart forgets who lay down where, and that is the case it catches.
+    WHO IS ALLOWED. The holder sleeps in their own bed. A guest is somebody
+    the holder looked at inside the building and let sleep there with the
+    look prompt's key (sleepHere, below), for one night. Anybody carrying the
+    building's key or its deed is allowed too, the two things that already
+    open its locked door (mayPass). A bed in a building somebody else holds,
+    who has let you do none of those, is refused. A bed in a building nobody
+    holds, or out of doors, is nobody's to lend, and that is the 25, or the
+    45 by a fire. A bedroll is a bed here: whose it is decides the rate, not
+    what it is made of.
 
-    THE GOLD MOVES AND IS NEVER MADE. The price comes out of the sleeper's
-    pack through takeGold and goes into the holder's through payOut, the
-    letters' payout. A holder who is not in the world has it kept on the
-    book below, and it goes into their pack the next time they are.
+    A GUEST IS ONE NIGHT, NIGHT_MS from when the holder pressed the key, in
+    every bed of that building. One night rather than until taken back,
+    because a night is what was paid for in the trade, and the holder does
+    not have to remember to end it. Somebody who lives there carries a key.
+    The holder can end a night sooner, from the look prompt or from the
+    property page in the K panel. A guest names the holder who let them in,
+    so a building that changes hands does not keep the last holder's guests.
 
-    TWO THINGS THE PAGE DOES NOT SAY, asked on #1392. ALLOWED is carrying a
-    key to the building or its deed, the two things that already open a locked
-    door (mayPass), because that is the one way the server knows a holder has
-    let somebody in. A NIGHT is NIGHT_MS of real time from paying, at that
-    building. Paying is /rest bed said twice inside PAY_AGAIN_MS: the first
-    says the price, the second pays it, so lying down never spends gold on its
-    own.
+    HOW THE SERVER KNOWS A BED OR A SEAT. mp.onActivate is handed the
+    furniture when somebody presses it, the same way it is handed a door, and
+    the base's own record says what it is: a FURN whose editor id names a
+    bed, a bedroll, or a chair, bench, stool or throne, read once per base
+    through mp.lookupEspmRecordById and remembered. Any other FURN is
+    furniture and nothing more: a forge, a chopping block, a lean. /rest then
+    asks what this person last pressed and whether they are still within
+    BED_REACH of it in the same cell. The word after /rest is not asked, and
+    neither is the client's own guess at furniture: the plugin says /rest bed
+    when somebody lies down and /rest sit when they sit, and the server
+    answers by what was pressed. The building is the bed's own cell, the same
+    way the take limit finds whose a chest is, because a building here is its
+    interior cell.
 
-    The book is beds.json beside the register rather than a field on a claim,
-    so the register's own reader and writer are untouched. A price names the
-    holder who set it, so a building that changes hands does not keep the last
-    holder's price.
+    A FIRE IN REACH is the distance the client already reports for warmth,
+    the needs block's own n.fire (docs/systems/temperature.md): a fire close
+    enough to warm you is close enough to rest by.
+
+    WHILE THE PLACE IS TRUE. Every BED_EVERY_MS the places people are resting
+    in are measured again: walk away, lose the key, let the night run out,
+    move off from the fire, and the rest stops or changes rate. Somebody who
+    comes into the world already resting in a place the server did not see
+    them take stops too, and sits or lies down again. A restart forgets who
+    lay down where, and that is the case it catches.
+
+    NO GOLD MOVES FOR A NIGHT. It is paid in a trade between two people, and
+    the server keeps no price. The book is beds.json beside the register
+    rather than a field on a claim, so the register's own reader and writer
+    are untouched. #1392's book held prices, paid nights and gold kept for a
+    holder who was away. The prices are gone. A night already paid is carried
+    over as a guest of whoever held the building, to the end of that night.
+    Kept gold is handed to its holder once, the next time they are in the
+    world, and leaves the book then. Nothing adds to it any more.
   */
   // INVENTED: far enough to stand beside a double bed and press it, near
   // enough that the next room's bed is not this one.
   var BED_REACH = 200;
-  // INVENTED: one night is the eight hours the Rest clock takes to empty.
+  // Patrick, #1603: a night is 8 hours, the time the Rest clock takes to empty.
   var NIGHT_MS = 8 * 3600000;
-  var PAY_AGAIN_MS = 60000;
   var BED_EVERY_MS = 5000;
   var LYING_FORGET_MS = 48 * 3600000;
+  var GUEST_NAME_MAX = 64;
   /* A bed by its editor id. Bedrolls first, since they say bed too. The
      others are words that hold the letters and are not beds. */
   var BEDROLL_EDID = /bedroll/i;
   var BED_EDID = /bed/i;
   var NOT_BED_EDID = /bedside|embed|riverbed|flowerbed/i;
-  var BED_KINDS = { bed: true, inn: true, bedroll: true };
+  /* A seat by its editor id, the same way. A workbench is a bench to the
+     letters and a crafting station to everybody else. */
+  var SEAT_EDID = /chair|bench|stool|throne/i;
+  var NOT_SEAT_EDID = /workbench|crafting/i;
+  /* Every kind of rest this hands the needs block, and 'bedroll', the kind
+     #1392 handed out, so somebody still resting at it is got up the same way. */
+  var REST_KINDS = { sit: true, rough: true, campfire: true, camp: true, inn: true, bed: true,
+                     bedroll: true };
 
   function bedHas(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
 
-  /* Who pressed which bed, who is lying in one, who was told a price, and who
-     has been seen since coming in. On globalThis, so a hot reload keeps them. */
+  /* Who pressed which furniture, who is resting on what, and who has been
+     seen since coming in. On globalThis, so a hot reload keeps them. */
   if (!g.__thornswoodBedState) {
-    g.__thornswoodBedState = { pressed: {}, lying: {}, offers: {}, seen: {} };
+    g.__thornswoodBedState = { pressed: {}, lying: {}, seen: {} };
   }
   var bedState = g.__thornswoodBedState;
 
@@ -35861,35 +36374,41 @@ log('gamemode loaded:',
     return path.join(path.dirname(registerPath()), 'beds.json');
   }
 
-  /* Rebuilt field by field, the same discipline as the register: a price is
-     a holder and a whole number, a night is a time, and takings are gold. */
+  /* Rebuilt field by field, the same discipline as the register: a guest is
+     a holder, a time and a name, and kept takings are gold. */
   function loadBedBook() {
-    var out = { prices: {}, nights: {}, takings: {} };
+    var out = { guests: {}, takings: {} };
     var raw = null;
     try { raw = JSON.parse(require('fs').readFileSync(bedBookPath(), 'utf8')); }
     catch (e) { return out; }
     if (!raw || typeof raw !== 'object') { return out; }
     var now = Date.now();
-    var prices = (raw.prices && typeof raw.prices === 'object') ? raw.prices : {};
-    for (var b in prices) {
-      if (!bedHas(prices, b) || b === '__proto__' || !prices[b]) { continue; }
-      var by = Number(prices[b].by) || 0;
-      var price = Number(prices[b].price) || 0;
-      if (by > 0 && price > 0 && Math.floor(price) === price) {
-        out.prices[b] = { by: by, price: price };
+    var carried = 0;
+    function add(b, who, by, at, name) {
+      if (!b || b === '__proto__' || who === '__proto__') { return false; }
+      if (!((Number(who) || 0) > 0) || !(by > 0) || !(at > 0) || (now - at) >= NIGHT_MS) { return false; }
+      if (!bedHas(out.guests, b)) { out.guests[b] = {}; }
+      if (bedHas(out.guests[b], who)) { return false; }
+      out.guests[b][who] = { by: by, at: at, name: String(name || '').slice(0, GUEST_NAME_MAX) };
+      return true;
+    }
+    var guests = (raw.guests && typeof raw.guests === 'object') ? raw.guests : {};
+    for (var b in guests) {
+      if (!bedHas(guests, b) || !guests[b] || typeof guests[b] !== 'object') { continue; }
+      for (var who in guests[b]) {
+        var gst = bedHas(guests[b], who) ? guests[b][who] : null;
+        if (!gst || typeof gst !== 'object') { continue; }
+        add(b, who, Number(gst.by) || 0, Number(gst.at) || 0, gst.name);
       }
     }
+    // #1392's paid nights, to their end, as guests of whoever held the building.
     var nights = (raw.nights && typeof raw.nights === 'object') ? raw.nights : {};
     for (var nb in nights) {
-      if (!bedHas(nights, nb) || nb === '__proto__' || !nights[nb] ||
-          typeof nights[nb] !== 'object') { continue; }
-      for (var who in nights[nb]) {
-        if (!bedHas(nights[nb], who) || who === '__proto__') { continue; }
-        var at = Number(nights[nb][who]) || 0;
-        if ((Number(who) || 0) > 0 && at > 0 && (now - at) < NIGHT_MS) {
-          if (!bedHas(out.nights, nb)) { out.nights[nb] = {}; }
-          out.nights[nb][who] = at;
-        }
+      if (!bedHas(nights, nb) || !nights[nb] || typeof nights[nb] !== 'object' ||
+          !bedHas(claims, nb)) { continue; }
+      for (var nw in nights[nb]) {
+        if (bedHas(nights[nb], nw) &&
+            add(nb, nw, Number(claims[nb].by) || 0, Number(nights[nb][nw]) || 0, '')) { carried++; }
       }
     }
     var takings = (raw.takings && typeof raw.takings === 'object') ? raw.takings : {};
@@ -35900,30 +36419,47 @@ log('gamemode loaded:',
         out.takings[tp] = gold;
       }
     }
+    if (raw.prices || raw.nights) {
+      plog('the bed book from before #1603: night prices dropped,', carried,
+           'paid nights carried over as guests, kept gold waits for its holders');
+      out.old = true;
+    }
     return out;
   }
 
-  function saveBedBook() {
+  /* Nights that have run out leave the book. Answers the holders whose
+     guests changed, so their property page can be drawn again. */
+  function pruneGuests() {
     var now = Date.now();
-    for (var b in bedBook.nights) {
-      if (!bedHas(bedBook.nights, b)) { continue; }
-      var row = bedBook.nights[b];
+    var gone = {};
+    for (var b in bedBook.guests) {
+      if (!bedHas(bedBook.guests, b)) { continue; }
+      var row = bedBook.guests[b];
       for (var who in row) {
-        if (bedHas(row, who) && (now - row[who]) >= NIGHT_MS) { delete row[who]; }
+        if (bedHas(row, who) && (now - row[who].at) >= NIGHT_MS) {
+          gone[row[who].by] = true;
+          delete row[who];
+        }
       }
-      if (!Object.keys(row).length) { delete bedBook.nights[b]; }
+      if (!Object.keys(row).length) { delete bedBook.guests[b]; }
     }
+    return gone;
+  }
+
+  function saveBedBook() {
     try {
       var fs = require('fs');
       var file = bedBookPath();
       try { fs.mkdirSync(require('path').dirname(file), { recursive: true }); } catch (e) { }
-      fs.writeFileSync(file, JSON.stringify(bedBook, null, 1));
+      fs.writeFileSync(file, JSON.stringify({ guests: bedBook.guests, takings: bedBook.takings }, null, 1));
     } catch (e) {
       plog('could not write the bed book:', e);
     }
   }
 
   var bedBook = loadBedBook();
+  // The old shape is written over once, so the file says what the server does.
+  if (bedBook.old) { delete bedBook.old; saveBedBook(); }
 
   // ------------------------------------------------------------ the beds --
 
@@ -35936,8 +36472,9 @@ log('gamemode loaded:',
     return out;
   }
 
-  /* 'bed', 'roll' or '' for a base, asked of the engine once and kept. An
-     answer the engine could not give is '', not a bed. */
+  /* 'bed', 'roll', 'seat', 'furn' for any other furniture, or '' for
+     anything that is not furniture, asked of the engine once per base and
+     kept. An answer the engine could not give is '', not a bed. */
   var bedKinds = {};
   function bedKind(baseDesc) {
     baseDesc = String(baseDesc || '');
@@ -35953,19 +36490,21 @@ log('gamemode loaded:',
         for (var i = 0; !edid && i < fields.length; i++) {
           if (fields[i] && String(fields[i].type) === 'EDID') { edid = textOf(fields[i].data); }
         }
+        kind = 'furn';
         if (BEDROLL_EDID.test(edid)) { kind = 'roll'; }
         else if (BED_EDID.test(edid) && !NOT_BED_EDID.test(edid)) { kind = 'bed'; }
+        else if (SEAT_EDID.test(edid) && !NOT_SEAT_EDID.test(edid)) { kind = 'seat'; }
       }
     } catch (e) { kind = ''; }
     bedKinds[baseDesc] = kind;
     return kind;
   }
 
-  /* Called from onActivate for every press. Writes only for a bed. */
+  /* Called from onActivate for every press. Writes only for furniture. */
   function bedTouched(actorId, refrId, baseDesc) {
     var kind = bedKind(baseDesc);
     if (!kind || !actorId || !refrId) { return; }
-    bedState.pressed[actorId] = { ref: refrId, roll: kind === 'roll', at: Date.now() };
+    bedState.pressed[actorId] = { ref: refrId, roll: kind === 'roll', what: kind, at: Date.now() };
   }
 
   function stillAt(actorId, refrId) {
@@ -35984,67 +36523,58 @@ log('gamemode loaded:',
     return isBuilding(cell) ? cell : '';
   }
 
-  /* The building /bed means: the door opened in the last minute, or the
-     building they are standing in. */
-  function bedBuildingHere(actorId) {
-    var b = here(actorId);
-    if (b) { return b; }
-    var cell = '';
-    try { cell = String(mp.get(actorId, 'worldOrCellDesc') || ''); } catch (e) { cell = ''; }
-    return isBuilding(cell) ? cell : null;
+  /* This person's night at this building, or null. See the block. */
+  function guestOf(building, held, profileId) {
+    if (!held || !profileId || !bedHas(bedBook.guests, building)) { return null; }
+    var row = bedBook.guests[building];
+    var gst = bedHas(row, profileId) ? row[profileId] : null;
+    if (!gst || gst.by !== held.by || (Date.now() - gst.at) >= NIGHT_MS) { return null; }
+    return gst;
   }
 
-  /* The holder, or somebody carrying its key or its deed. See the block. */
+  /* The holder, a guest tonight, or somebody carrying its key or its deed. */
   function allowedIn(actorId, profileId, building, held) {
     if (!held) { return false; }
     if (profileId && held.by === profileId) { return true; }
+    if (guestOf(building, held, profileId)) { return true; }
     if (holdsKey(actorId, building)) { return true; }
     if (holdsDeed(actorId, building)) { return true; }
     return false;
   }
 
-  function priceOf(building, held) {
-    var p = bedHas(bedBook.prices, building) ? bedBook.prices[building] : null;
-    return (p && held && p.by === held.by) ? p.price : 0;
-  }
-
-  function nightPaid(building, profileId) {
-    if (!profileId || !bedHas(bedBook.nights, building)) { return false; }
-    var at = Number(bedBook.nights[building][profileId]) || 0;
-    return at > 0 && (Date.now() - at) < NIGHT_MS;
+  /* A fire close enough to warm this person, by the distance their client
+     reports for warmth. See the block. */
+  function fireNear(actorId) {
+    var needs = g.__thornswoodNeeds;
+    if (!needs || !needs.settle) { return false; }
+    var n = null;
+    try { n = needs.settle(actorId); } catch (e) { return false; }
+    return !!n && typeof n.fire === 'number' && n.fire >= 0;
   }
 
   /*
-    What this bed is to this person: a kind of rest, a refusal, or a price
-    still to pay. Asked when they lie down and again on every tick.
+    What this bed is to this person: a kind of rest, or a refusal. Asked
+    when they lie down and again on every tick. See the table in the block.
   */
-  function bedVerdict(actorId, profileId, ref, roll) {
+  function bedVerdict(actorId, profileId, ref) {
     var building = bedBuilding(ref);
     var held = building ? holderOf(building) : null;
-    var out = { building: building, held: held, kind: '', line: '', price: 0, paid: false };
+    var out = { building: building, held: held, kind: '', line: '', guest: null };
     if (!held) {
-      if (roll) { out.kind = 'bedroll'; return out; }
-      out.line = building
-        ? ('Nobody holds ' + nameOf(building) + ', so nobody can let you sleep in its beds.')
-        : 'This bed is nobody\'s to lend, so it does not count as a bed.';
+      out.kind = fireNear(actorId) ? 'camp' : 'rough';
+      return out;
+    }
+    if (profileId && held.by === profileId) {
+      out.kind = 'bed';
       return out;
     }
     if (allowedIn(actorId, profileId, building, held)) {
-      out.kind = roll ? 'bedroll' : 'bed';
+      out.kind = 'inn';
+      out.guest = guestOf(building, held, profileId);
       return out;
     }
-    if (nightPaid(building, profileId)) {
-      out.kind = roll ? 'bedroll' : 'inn';
-      out.paid = true;
-      return out;
-    }
-    var price = priceOf(building, held);
-    if (!price) {
-      out.line = nameOf(building) + ' is ' + held.name + '\'s, and they have not let you ' +
-                 'sleep there. Nights there are not for sale.';
-      return out;
-    }
-    out.price = price;
+    out.line = nameOf(building) + ' is ' + held.name + '\'s, and they have not let you ' +
+               'sleep there. A night there is theirs to give.';
     return out;
   }
 
@@ -36074,31 +36604,14 @@ log('gamemode loaded:',
     try { say(actorId, line); } catch (e) { }
   }
 
-  /* The night's gold from the sleeper's pack to the holder's, and the night
-     written down. False when the sleeper does not have it. */
-  function payNight(actorId, profileId, building, held, price) {
-    if (!takeGold(actorId, price)) { return false; }
-    var to = onlineActorOf(held.by);
-    var handed = to ? payOut(to, price) : false;
-    if (!handed) {
-      bedBook.takings[held.by] = (Number(bedBook.takings[held.by]) || 0) + price;
-    }
-    if (!bedHas(bedBook.nights, building)) { bedBook.nights[building] = {}; }
-    bedBook.nights[building][profileId] = Date.now();
-    saveBedBook();
-    var who = personName(actorId);
-    plog(who, 'paid', price, 'gold for a night at', nameOf(building),
-         handed ? 'into ' + held.name + '\'s pack' : 'kept for ' + held.name + ' until they are in');
-    if (handed) {
-      tellBed(to, who + ' paid you ' + price + ' gold for a night at ' + nameOf(building) + '.');
-    }
-    return true;
-  }
-
   /*
-    /rest bed, /rest inn and /rest bedroll. Answers the line to say. The kind
-    of rest is the server's answer, not the word: /rest inn in your own bed is
-    your own bed, and /rest bed in somebody else's paid room is the inn room.
+    /rest, whatever word follows it. Answers the line to say, or '' for
+    nothing. The plugin says /rest bed when somebody lies down and /rest sit
+    when they sit on any other furniture, and this answers by what they
+    pressed: a bed or a bedroll is the bed's verdict, a seat is a seat, and
+    other furniture (a forge, a chopping block) is not a rest and is answered
+    with nothing, because the plugin says sit at every piece of furniture that
+    is not a bed and the server is what tells them apart.
   */
   function bedRest(actorId, profileId) {
     var needs = g.__thornswoodNeeds;
@@ -36106,76 +36619,86 @@ log('gamemode loaded:',
     if (!actorId || !profileId) {
       return 'The server cannot find your character right now. Give it a moment and try again.';
     }
-    var bed = bedHas(bedState.pressed, actorId) ? bedState.pressed[actorId] : null;
-    if (!bed || !stillAt(actorId, bed.ref)) {
-      return 'There is no bed here. Lie down in a real one and it counts; saying the word does not.';
+    var p = bedHas(bedState.pressed, actorId) ? bedState.pressed[actorId] : null;
+    if (!p || !stillAt(actorId, p.ref)) {
+      return 'There is nothing here to rest on. Sit down or lie down and it counts; saying the word does not.';
     }
-    var v = bedVerdict(actorId, profileId, bed.ref, bed.roll);
-    if (v.line) { return v.line; }
-    var paidLine = '';
-    if (v.price) {
-      var name = nameOf(v.building);
-      var now = Date.now();
-      var offer = bedHas(bedState.offers, actorId) ? bedState.offers[actorId] : null;
-      if (!offer || offer.building !== v.building || offer.price !== v.price ||
-          (now - offer.at) > PAY_AGAIN_MS) {
-        bedState.offers[actorId] = { building: v.building, price: v.price, at: now };
-        return 'A night at ' + name + ' is ' + v.price + ' gold, handed to ' + v.held.name +
-               '. Say /rest bed again within a minute to pay it.';
-      }
-      delete bedState.offers[actorId];
-      if (!payNight(actorId, profileId, v.building, v.held, v.price)) {
-        return 'A night at ' + name + ' is ' + v.price + ' gold, and you are not carrying that much.';
-      }
-      paidLine = 'You pay ' + v.price + ' gold to ' + v.held.name + ' for a night at ' + name + '. ';
-      v.kind = bed.roll ? 'bedroll' : 'inn';
-      v.paid = true;
+    if (p.what === 'furn') { return ''; }
+    var e = { ref: p.ref, roll: !!p.roll, seat: p.what === 'seat', kind: '', guestAt: 0,
+              at: Date.now() };
+    if (e.seat) {
+      e.kind = fireNear(actorId) ? 'campfire' : 'sit';
+    } else {
+      var v = bedVerdict(actorId, profileId, p.ref);
+      if (v.line) { return v.line; }
+      e.kind = v.kind;
+      e.guestAt = v.guest ? v.guest.at : 0;
     }
-    bedState.lying[actorId] = { ref: bed.ref, roll: !!bed.roll, kind: v.kind, paid: !!v.paid,
-                                at: Date.now() };
-    var line = needs.resting(actorId, v.kind);
-    return paidLine + (line || 'You are resting.');
+    bedState.lying[actorId] = e;
+    var line = needs.resting(actorId, e.kind);
+    // Sitting down says nothing: people sit at every table in every inn, and
+    // the Rest bar is what shows it counting.
+    if (e.seat) { return ''; }
+    return line || 'You are resting.';
   }
 
-  /* They got up, or rest somewhere else now. */
+  /* They got up, or rest somewhere else now. Answers 'seat' when it was a
+     seat they got off, so getting up from one is not said either. */
   function bedOff(actorId) {
+    var e = bedHas(bedState.lying, actorId) ? bedState.lying[actorId] : null;
     delete bedState.lying[actorId];
-    delete bedState.offers[actorId];
+    return (e && e.seat) ? 'seat' : '';
   }
 
-  /* Out of a bed the server no longer counts, without touching any other
+  /* Off a place the server no longer counts, without touching any other
      kind of rest they may have started since. */
   function getUp(actorId, needs) {
     delete bedState.lying[actorId];
     if (!needs || !needs.settle || !needs.resting) { return false; }
     var n = null;
     try { n = needs.settle(actorId); } catch (e) { return false; }
-    if (!n || !BED_KINDS[n.resting]) { return false; }
+    if (!n || !REST_KINDS[n.resting]) { return false; }
     try { needs.resting(actorId, ''); } catch (e) { return false; }
     return true;
   }
 
-  /* '' while the bed still counts as it did, otherwise the line to say. */
+  /* '' while the place still counts, at whatever rate it counts now,
+     otherwise the line to say. */
   function stillLying(actorId, e, needs) {
-    if (!stillAt(actorId, e.ref)) { return 'You have left the bed, so you are not resting in it now.'; }
-    var v = bedVerdict(actorId, profileOf(actorId), e.ref, e.roll);
-    if (v.kind) {
-      e.paid = !!v.paid;
-      if (v.kind === e.kind) { return ''; }
-      // Still a bed they may use, at another rate: a key handed over in the
-      // night, or a key lost with the night still paid.
-      e.kind = v.kind;
-      try { needs.resting(actorId, v.kind); } catch (err) { }
+    if (!stillAt(actorId, e.ref)) {
+      return e.seat ? 'You have left the seat, so you are not resting on it now.'
+                    : 'You have left the bed, so you are not resting in it now.';
+    }
+    var v = null;
+    var kind = '';
+    if (e.seat) {
+      kind = fireNear(actorId) ? 'campfire' : 'sit';
+    } else {
+      v = bedVerdict(actorId, profileOf(actorId), e.ref);
+      kind = v.kind;
+    }
+    if (kind) {
+      if (v) { e.guestAt = v.guest ? v.guest.at : 0; }
+      if (kind === e.kind) { return ''; }
+      // Still a place they may rest, at another rate: a key handed over in the
+      // night, a key lost with the night still given, a fire reached or left.
+      e.kind = kind;
+      try { needs.resting(actorId, kind); } catch (err) { }
       return '';
     }
-    if (e.paid && v.building) {
-      return 'Your night at ' + nameOf(v.building) + ' is over.' +
-             (v.price ? ' /bed says what another costs.' : '');
+    if (e.guestAt && v.building && v.held) {
+      return (Date.now() - e.guestAt) >= NIGHT_MS
+        ? ('Your night at ' + nameOf(v.building) + ' is over.')
+        : (v.held.name + ' has stopped letting you sleep at ' + nameOf(v.building) + '.');
     }
     return v.line || 'That bed does not count for you now.';
   }
 
-  /* Gold paid while the holder was away, into their pack now they are here. */
+  /*
+    Gold #1392 kept for a holder who was away, into their pack now they are
+    here. Once: it leaves the book as it is handed over, and nothing adds to
+    the book any more.
+  */
   function payTakings(online) {
     var owed = false;
     for (var k in bedBook.takings) { if (bedHas(bedBook.takings, k)) { owed = true; break; } }
@@ -36197,6 +36720,14 @@ log('gamemode loaded:',
     if (changed) { saveBedBook(); }
   }
 
+  /* The holder's K panel again, so its property page shows tonight's guests. */
+  function redrawPanel(actorId) {
+    var c = g.__thornswoodCharacter;
+    if (!actorId || !c || !c.stateOf || !c.writeState) { return; }
+    var s = c.stateOf(actorId);
+    if (s) { c.writeState(actorId, s); }
+  }
+
   function bedTick() {
     var needs = g.__thornswoodNeeds;
     var online = [];
@@ -36206,22 +36737,19 @@ log('gamemode loaded:',
     for (var s in bedState.seen) {
       if (bedHas(bedState.seen, s) && !on[s]) { delete bedState.seen[s]; }
     }
-    for (var o in bedState.offers) {
-      if (bedHas(bedState.offers, o) && !on[o]) { delete bedState.offers[o]; }
-    }
     for (var p in bedState.pressed) {
       if (bedHas(bedState.pressed, p) && !on[p] && !bedHas(bedState.lying, p)) {
         delete bedState.pressed[p];
       }
     }
-    // Come into the world resting in a bed nobody saw them lie down in.
+    // Come into the world resting in a place nobody saw them take.
     for (var j = 0; j < online.length; j++) {
       var id = online[j];
       if (bedState.seen[id]) { continue; }
       bedState.seen[id] = true;
       if (bedHas(bedState.lying, id)) { continue; }
       if (getUp(id, needs)) {
-        plog(personName(id), 'came in resting in a bed the server did not see, so they are up');
+        plog(personName(id), 'came in resting in a place the server did not see, so they are up');
       }
     }
     var now = Date.now();
@@ -36240,71 +36768,139 @@ log('gamemode loaded:',
       }
     }
     payTakings(online);
+    // A night that ran out leaves the book and the holder's property page.
+    var ended = pruneGuests();
+    var changed = false;
+    for (var h in ended) {
+      if (bedHas(ended, h)) { changed = true; redrawPanel(onlineActorOf(Number(h))); }
+    }
+    if (changed) { saveBedBook(); }
+  }
+
+  // ---------------------------------------------------------- the guests --
+
+  /* The guests of a building tonight, by name, for the property page. */
+  function guestsOf(building) {
+    var held = holderOf(building);
+    var out = [];
+    if (!held || !bedHas(bedBook.guests, building)) { return out; }
+    var row = bedBook.guests[building];
+    for (var who in row) {
+      if (!bedHas(row, who) || !guestOf(building, held, Number(who))) { continue; }
+      out.push({ pid: Number(who), name: row[who].name || 'somebody who paid for the night' });
+    }
+    out.sort(function (a, b) { return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0); });
+    return out;
   }
 
   /*
-    /bed           what a night here costs
-    /bed 20        the holder sets the gold for one night
-    /bed -         the holder makes it free for the people they allow, and
-                   sells it to nobody else
+    For the look prompt, asked by the social block's near list for each two
+    people in the same cell: 0 when the first cannot let the second sleep
+    there, 1 when they can, 2 when they already have.
   */
-  function bedCmd(parts, actorId, profileId, toProfile) {
-    var building = bedBuildingHere(actorId);
-    if (!building) {
-      toProfile(profileId, 'Stand in the building, or open its door, then say that again.');
+  function sleepMark(holderPid, guestPid, cell) {
+    if (!holderPid || !guestPid || holderPid === guestPid || !bedHas(claims, cell)) { return 0; }
+    var held = holderOf(cell);
+    if (!held || held.by !== holderPid) { return 0; }
+    return guestOf(cell, held, guestPid) ? 2 : 1;
+  }
+
+  /* The night ends now. The guest is told, and got up if they are lying in
+     one of its beds and nothing else lets them stay. */
+  function endGuest(building, pid, line) {
+    if (bedHas(bedBook.guests, building)) { delete bedBook.guests[building][pid]; }
+    saveBedBook();
+    var guest = onlineActorOf(pid);
+    if (!guest) { return; }
+    var needs = g.__thornswoodNeeds;
+    var e = bedHas(bedState.lying, guest) ? bedState.lying[guest] : null;
+    var why = (e && !e.seat && bedBuilding(e.ref) === building) ? stillLying(guest, e, needs) : '';
+    if (why) { getUp(guest, needs); }
+    tellBed(guest, why || line);
+  }
+
+  /*
+    THE HOLDER LETS SOMEBODY SLEEP THERE, OR STOPS (#1603).
+
+    Patrick: the holder names who may sleep there, "with buttons and GUI, not
+    commands". The look prompt draws "Let sleep here" while a holder looks at
+    somebody inside a building they hold, and its key sends /sleephere with
+    that person's form id, the way the trade key sends /trade. Pressed on a
+    guest, it ends their night. The property page in the K panel sends
+    /sleephere stop <profile> <building> beside each guest's name. Nobody
+    types either, and help never names them.
+
+    Everything is measured here: the building is the cell the holder stands
+    in, the holder is the register's, and the guest is in that same cell.
+  */
+  function sleepHere(parts, actorId, profileId, toProfile) {
+    var raw = String((parts && parts[1]) || '');
+    if (raw === 'stop') { return stopGuest(parts, actorId, profileId, toProfile); }
+    var them = /^[0-9a-f]{1,8}$/i.test(raw) ? parseInt(raw, 16) : 0;
+    var cell = '';
+    try { cell = String(mp.get(actorId, 'worldOrCellDesc') || ''); } catch (e) { cell = ''; }
+    var building = isBuilding(cell) ? cell : '';
+    var held = building ? holderOf(building) : null;
+    if (!held || !profileId || held.by !== profileId) {
+      toProfile(profileId, building
+        ? ('Only whoever holds ' + nameOf(building) + ' lets people sleep there.')
+        : 'Stand inside a building you hold to let somebody sleep there.');
+      return true;
+    }
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
+    var theirs = '';
+    if (them && them !== actorId && online.indexOf(them) !== -1) {
+      try { theirs = String(mp.get(them, 'worldOrCellDesc') || ''); } catch (e) { theirs = ''; }
+    }
+    var pid = (theirs === cell) ? profileOf(them) : 0;
+    var name = nameOf(building);
+    if (!pid || pid === profileId) {
+      toProfile(profileId, 'Look at somebody inside ' + name + ' with you, then press the key.');
+      return true;
+    }
+    var who = personName(them);
+    if (guestOf(building, held, pid)) {
+      endGuest(building, pid, held.name + ' has stopped letting you sleep at ' + name + '.');
+      plog(held.name, 'stopped letting', who, 'sleep at', name);
+      toProfile(profileId, who + ' may no longer sleep at ' + name + '.');
+      redrawPanel(actorId);
+      return true;
+    }
+    if (!bedHas(bedBook.guests, building)) { bedBook.guests[building] = {}; }
+    bedBook.guests[building][pid] = { by: held.by, at: Date.now(), name: who.slice(0, GUEST_NAME_MAX) };
+    saveBedBook();
+    plog(held.name, 'let', who, 'sleep at', name, 'for a night');
+    toProfile(profileId, who + ' may sleep at ' + name + ' for one night, 8 hours from now. ' +
+                         'Look at them and press the same key to end it sooner.');
+    tellBed(them, held.name + ' lets you sleep at ' + name + ' tonight. Lie down in any of its beds.');
+    redrawPanel(actorId);
+    return true;
+  }
+
+  /* /sleephere stop <profile> <building>, from the property page. */
+  function stopGuest(parts, actorId, profileId, toProfile) {
+    var pid = Number((parts && parts[2]) || 0) || 0;
+    var building = (parts && parts.length > 3) ? parts.slice(3).join(' ') : '';
+    var held = building ? holderOf(building) : null;
+    if (!held || !profileId || held.by !== profileId) {
+      toProfile(profileId, building && isBuilding(building)
+        ? ('Only whoever holds ' + nameOf(building) + ' lets people sleep there.')
+        : 'That is not a building you hold.');
       return true;
     }
     var name = nameOf(building);
-    var held = holderOf(building);
-    var arg = (parts && parts.length > 1) ? String(parts[1]).trim() : '';
-    if (!held) {
-      toProfile(profileId, 'Nobody holds ' + name + ', so nobody sets a night there.');
+    var gst = guestOf(building, held, pid);
+    if (!gst) {
+      toProfile(profileId, 'Nobody by that name is sleeping at ' + name + ' tonight.');
+      redrawPanel(actorId);
       return true;
     }
-    var mine = !!profileId && held.by === profileId;
-    var price = priceOf(building, held);
-
-    if (!arg) {
-      if (mine) {
-        toProfile(profileId, price
-          ? ('A night at ' + name + ' is ' + price + ' gold, and it comes to you. ' +
-             '/bed - makes it free for the people you allow and sold to nobody else.')
-          : ('Nights at ' + name + ' are not for sale, and the people you allow sleep free. ' +
-             '/bed 20 sets the gold for one night.'));
-        return true;
-      }
-      var line = price
-        ? ('A night at ' + name + ' is ' + price + ' gold, handed to ' + held.name + '.')
-        : ('Nights at ' + name + ' are not for sale. ' + held.name +
-           ' lets only the people they allow sleep there.');
-      if (allowedIn(actorId, profileId, building, held)) { line += ' You are allowed, so yours is free.'; }
-      else if (nightPaid(building, profileId)) { line += ' Your night there is paid.'; }
-      toProfile(profileId, line);
-      return true;
-    }
-
-    if (!mine) {
-      toProfile(profileId, 'Only whoever holds ' + name + ' sets what a night there costs.');
-      return true;
-    }
-    if (arg === '-') {
-      delete bedBook.prices[building];
-      saveBedBook();
-      plog(held.name, 'made a night at', name, 'free for the people they allow');
-      toProfile(profileId, 'A night at ' + name + ' is free for the people you allow, ' +
-                           'and not for sale to anybody else.');
-      return true;
-    }
-    var amount = /^\d+$/.test(arg) ? Number(arg) : 0;
-    if (!(amount > 0) || amount > Number.MAX_SAFE_INTEGER) {
-      toProfile(profileId, 'Give a whole number of gold, or - to make a night free for the people you allow.');
-      return true;
-    }
-    bedBook.prices[building] = { by: held.by, price: amount };
-    saveBedBook();
-    plog(held.name, 'set a night at', name, 'to', amount, 'gold');
-    toProfile(profileId, 'A night at ' + name + ' is ' + amount + ' gold now, handed to you. ' +
-                         'The people you allow still sleep free.');
+    var who = gst.name || 'Your guest';
+    endGuest(building, pid, held.name + ' has stopped letting you sleep at ' + name + '.');
+    plog(held.name, 'stopped letting', who, 'sleep at', name);
+    toProfile(profileId, who + ' may no longer sleep at ' + name + '.');
+    redrawPanel(actorId);
     return true;
   }
 
@@ -36313,10 +36909,10 @@ log('gamemode loaded:',
     (typeof guard === 'function') ? guard('bedTick', bedTick) : bedTick, BED_EVERY_MS);
 
   g.__thornswoodBeds = {
-    touched: bedTouched, rest: bedRest, off: bedOff, command: bedCmd, tick: bedTick,
+    touched: bedTouched, rest: bedRest, off: bedOff, tick: bedTick,
+    sleepHere: sleepHere, mark: sleepMark, guestsOf: guestsOf,
     kindOf: bedKind, verdict: bedVerdict, book: function () { return bedBook; },
-    state: bedState, BED_REACH: BED_REACH, NIGHT_MS: NIGHT_MS, PAY_AGAIN_MS: PAY_AGAIN_MS,
-    BED_EVERY_MS: BED_EVERY_MS
+    state: bedState, BED_REACH: BED_REACH, NIGHT_MS: NIGHT_MS, BED_EVERY_MS: BED_EVERY_MS
   };
 
 
@@ -36619,10 +37215,11 @@ log('gamemode loaded:',
           job: !!n.job,
           letter: !!n.letter,
           name: n.name || 'somebody',
-          text: n.letter ? sealed(n) : (n.text || ''),
+          text: n.letter ? sealed(n) : (n.haul ? haulText(n) : (n.text || '')),
           taken: n.taken ? (n.takenName || 'somebody') : '',
           mine: Number(n.by) === Number(profileId),
-          held: !!(n.job && Number(n.taken) === Number(profileId))
+          held: !!(n.job && Number(n.taken) === Number(profileId)),
+          haul: !!n.haul
         });
       }
       for (var h in notices) {
@@ -36631,9 +37228,40 @@ log('gamemode loaded:',
         for (var j = 0; j < rows.length; j++) {
           var job = rows[j];
           if (job.job && Number(job.taken) === Number(profileId) && !job.down) {
-            mine.push({ hold: h, n: j + 1, text: job.letter ? sealed(job) : (job.text || ''),
+            mine.push({ hold: h, n: j + 1, text: job.letter ? sealed(job) : (job.haul ? haulText(job) : (job.text || '')),
                         name: job.name || 'somebody' });
           }
+        }
+      }
+    }
+    /*
+      THE HAUL'S TWO BUTTONS (#1393). Send a haul needs the towns it can go
+      to, every board but this one. Confirm needs the hauls that came here:
+      taken, not down, and for the person who posted it or a steward, the
+      two confirmHaul lets through. A steward also takes a haul down from
+      the wall, which unpin lets them do.
+    */
+    var steward = here && isSteward(profileId, actorId);
+    var dests = [];
+    var arrivals = [];
+    if (here) {
+      for (var d = 0; d < LEDGER_HOLDS.length; d++) {
+        var to = LEDGER_HOLDS[d];
+        if (to === hold || !Object.prototype.hasOwnProperty.call(boards, to)) { continue; }
+        dests.push({ hold: to, where: (boards[to] && boards[to].where) || to });
+      }
+      for (var f = 0; f < LEDGER_HOLDS.length; f++) {
+        var from = LEDGER_HOLDS[f];
+        var sent = notices[from] || [];
+        for (var a = 0; a < sent.length; a++) {
+          var hl = sent[a];
+          if (!hl || !hl.haul || hl.down || hl.dest !== hold || !hl.taken) { continue; }
+          if (Number(hl.by) !== Number(profileId) && !steward) { continue; }
+          if (Number(hl.taken) === Number(profileId)) { continue; }
+          var hp = Math.floor(Number(hl.pay)) || 0;
+          arrivals.push({ from: from, where: (boards[from] && boards[from].where) || from,
+                          n: a + 1, name: hl.name || 'somebody', text: hl.text || '',
+                          hauler: hl.takenName || 'somebody', pay: hp, kept: haulTenth(hp) });
         }
       }
     }
@@ -36656,7 +37284,10 @@ log('gamemode loaded:',
       paid: Number(funds[hold]) || 0,
       wall: wall,
       jobs: mine,
-      submit: submit
+      submit: submit,
+      steward: steward,
+      dests: dests,
+      arrivals: arrivals
     };
   }
 
@@ -36736,10 +37367,9 @@ log('gamemode loaded:',
     the same count back into a pack, and payHeld takes it off that ledger in
     the same step, so the coin was already in the world and packs plus ledger
     add up to the same after. payHeld pays a letter's own `pay`, which
-    postLetter took from the sender, never more than the ledger holds. A
-    night in a bed (#1392) is its other caller: payNight hands the holder
-    the price it has just taken from the sleeper, and payTakings what was
-    kept for a holder who was away.
+    postLetter took from the sender, never more than the ledger holds. Its
+    other caller is payTakings in the beds, which hands a holder the gold
+    #1392 kept for them while they were away, once (#1603).
   */
   function payOut(actorId, amount) {
     var count = Math.floor(Number(amount) || 0);
@@ -36910,7 +37540,7 @@ log('gamemode loaded:',
       if (n.down) { continue; }
       lines.push('[' + (i + 1) + '] ' + (n.letter
         ? 'letter for ' + n.to + ', from ' + n.name + (n.taken ? ', taken by ' + n.takenName : '')
-        : (n.job ? (n.taken ? 'job, taken: ' : 'job: ') : '') + n.name + ': ' + n.text));
+        : (n.job ? (n.taken ? 'job, taken: ' : 'job: ') : '') + n.name + ': ' + (n.haul ? haulText(n) : n.text)));
       shown++;
     }
     var more = up > shown
@@ -36983,6 +37613,15 @@ log('gamemode loaded:',
       refreshPanel(actorId);
       return true;
     }
+    if (n.haul) {
+      var tenth = haulTenth(n.pay);
+      plog(who, 'took a haul in', hold, 'to', n.dest + ':', n.text);
+      toProfile(profileId, 'You take the haul to ' + n.dest + ': ' + n.text + '. At ' + n.dest + '\'s board, ' +
+                n.name + ' or a steward confirms it on the board, and ' +
+                (n.pay - tenth) + ' gold is yours. The company keeps ' + tenth + '.');
+      refreshPanel(actorId);
+      return true;
+    }
     plog(who, 'took a job in', hold + ':', n.text);
     toProfile(profileId, 'You take it: ' + n.text + '. Go and see ' + n.name + ' about it.');
     refreshPanel(actorId);
@@ -36999,7 +37638,8 @@ log('gamemode loaded:',
         var n = list[i];
         if (n.job && n.taken === profileId && !n.down) {
           lines.push(hold + ': ' + (n.letter ? sealed(n) + ', from ' + n.name
-                                             : n.text + ' (for ' + n.name + ')'));
+                                             : (n.haul ? '[' + (i + 1) + '] ' + haulText(n) : n.text) +
+                                               ' (for ' + n.name + ')'));
         }
       }
     }
@@ -37027,6 +37667,13 @@ log('gamemode loaded:',
       toProfile(profileId, 'That is not one of yours.');
       return true;
     }
+    /*
+      A HAUL DROPPED IS A HAUL ENDED, #1393. docs/systems/trading-company.md:
+      on a drop the pay returns to the poster's pack and the ledger goes down
+      by that pay, and the fee stays. A haul with its pay gone cannot sit on
+      the board for somebody else, so it comes down.
+    */
+    if (n.haul) { return cancelHaul(hold, at, n, 'drop', actorId, profileId, toProfile); }
     n.taken = 0;
     n.takenName = null;
     save();
@@ -37091,13 +37738,23 @@ log('gamemode loaded:',
       toProfile(profileId, 'That one is already down.');
       return true;
     }
-    if (n.by !== profileId) {
+    /*
+      A STEWARD CANCELS A HAUL, #1393, open or taken, at the board it was
+      posted on. The pay goes back to the poster and the fee stays, the same
+      as the poster's own /unpin before anybody has taken it.
+    */
+    var stewardHaul = !!n.haul && isSteward(profileId, actorId);
+    if (n.by !== profileId && !stewardHaul) {
       toProfile(profileId, 'That is not yours to take down.');
       return true;
     }
-    if (n.job && n.taken) {
+    if (n.job && n.taken && !stewardHaul) {
       toProfile(profileId, n.takenName + ' has taken that job. It can come down once they hand it back.');
       return true;
+    }
+    if (n.haul) {
+      return cancelHaul(hold, at, n, Number(n.by) === Number(profileId) ? 'own' : 'steward',
+                        actorId, profileId, toProfile);
     }
     /*
       A LETTER'S PAY COMES BACK, #1374. The board fee stays, like any
@@ -37303,6 +37960,391 @@ log('gamemode loaded:',
     } catch (e2) { return false; }
   }
 
+  /*
+    ------------------------------------------------------------- a haul
+
+    NOBODY TYPES THESE. Patrick, 4 Oct: no chat commands for anything people
+    do, only buttons and GUI. The board panel (game/ui/thornswood-board.js)
+    sends them, the way it sends /job and /take:
+
+        /haul 80 riften a crate of iron ingots    Send a haul, at the board it leaves from
+        /haul done whiterun 4                     Confirm, at the board it went to
+
+    so /haul is in WORDS and kept out of PLAYER_WORDS, and nothing a person
+    reads names it.
+
+    #1393, as docs/systems/trading-company.md has it. A haul is a job on a
+    board with a pay and a destination hold. Posting it takes the job fee,
+    30, and the pay in full, never halved, and both go onto the posting
+    hold's ledger. The pay is held there the way a letter's 15 is, until the
+    haul is confirmed or taken down.
+
+    /take and /jobs treat it as any job. It comes down before it is delivered
+    three ways, and each hands the pay back out of the ledger to the poster
+    and keeps the fee (cancelHaul): the hauler's /dropjob, the poster's /unpin
+    before anybody has taken it, and a steward's /unpin at the posting board,
+    open or taken. Nothing was delivered, so the company keeps no tenth.
+
+    On a confirm, by the poster or a steward, standing at the board the haul
+    named, the company keeps a tenth of the pay, rounded down, and nothing
+    under 10 gold. The hauler is handed the rest out of the ledger, so the
+    ledger drops by what the hauler received and keeps the fee and the tenth.
+    It is the poster's gold moving, never new gold.
+
+    AN ORDINARY JOB IS NOT A HAUL. A confirm answers only a job posted as a
+    haul, and the taker of an ordinary job is still paid nothing by the
+    server.
+
+    SOMEBODY AWAY IS PAID WHEN THEY ARE BACK. The server hands gold to a pack,
+    and a pack is written only while its owner is in the world. When the
+    hauler on a confirm, or the poster on a drop or a steward's cancel, is
+    away, the haul still comes down, and what is theirs stays held on the
+    ledger as owed to them (handHaul). haulTick hands it over the next time
+    they are in the world, the way a bed's takings wait for a holder who is
+    away (#1392). Nothing else can spend it in the meantime.
+  */
+  var HAUL_TENTH_FROM = 10;
+  var HAUL_EVERY_MS = 5000;
+
+  /** The company's tenth of a pay: rounded down, and nothing under 10. */
+  function haulTenth(pay) {
+    var p = Math.floor(Number(pay)) || 0;
+    return p < HAUL_TENTH_FROM ? 0 : Math.floor(p / 10);
+  }
+
+  /** A haul's line on the wall, the panel and /jobs: where it goes and the pay. */
+  function haulText(n) {
+    return 'haul to ' + n.dest + ' for ' + (Math.floor(Number(n.pay)) || 0) + ' gold: ' + (n.text || '');
+  }
+
+  /* What a person is told when the panel's line is short of something. */
+  var HAUL_HOW = 'A haul is sent from the notice board: click the board, and fill in Send a haul. ' +
+                 'It is confirmed on the board of the hold it went to.';
+
+  function haulCmd(parts, actorId, profileId, toProfile) {
+    var first = (parts && parts.length > 1) ? String(parts[1]).trim().toLowerCase() : '';
+    if (first === 'done') { return confirmHaul(parts, actorId, profileId, toProfile); }
+    if (!first) {
+      toProfile(profileId, HAUL_HOW);
+      return true;
+    }
+    return postHaul(parts, actorId, profileId, toProfile);
+  }
+
+  function postHaul(parts, actorId, profileId, toProfile) {
+    var hold = boardHere(actorId);
+    if (!hold) {
+      toProfile(profileId, 'Stand at the board of the hold you are sending from to post a haul.');
+      return true;
+    }
+    var word = String(parts[1] || '').trim();
+    var pay = /^\d+$/.test(word) ? Number(word) : 0;
+    if (!(pay > 0) || !Number.isSafeInteger(pay)) {
+      toProfile(profileId, 'The pay is a whole number of gold, above nothing. ' + HAUL_HOW);
+      return true;
+    }
+    var dest = String(parts[2] || '').trim().toLowerCase();
+    if (LEDGER_HOLDS.indexOf(dest) < 0 || !Object.prototype.hasOwnProperty.call(boards, dest)) {
+      toProfile(profileId, 'A haul goes to one of the ten towns: ' + LEDGER_HOLDS.join(', ') + '.');
+      return true;
+    }
+    if (dest === hold) {
+      toProfile(profileId, 'A haul goes from one hold to another, and this is ' + hold + '\'s board.');
+      return true;
+    }
+    var text = parts.slice(3).join(' ').trim();
+    if (!text) {
+      toProfile(profileId, 'Say what it carries. ' + HAUL_HOW);
+      return true;
+    }
+    var cost = JOB_FEE + pay;
+    if (!Number.isSafeInteger(cost) || !takeGold(actorId, cost)) {
+      toProfile(profileId, 'That costs ' + cost + ' gold, ' + JOB_FEE + ' for the board and the ' + pay +
+                ' pay, and you do not have it. Nothing was taken.');
+      return true;
+    }
+    var who = 'somebody';
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      if (ap && ap.name) { who = String(ap.name); }
+    } catch (e) { }
+    if (!notices[hold]) { notices[hold] = []; }
+    notices[hold].push({ by: profileId, name: who, text: text, at: Date.now(),
+                         job: true, haul: true, dest: dest, pay: pay, taken: 0 });
+    // deposit saves the notice with the coin, so the two cannot part.
+    if (!deposit(hold, cost, 'a haul to ' + dest + ': the ' + JOB_FEE + ' fee, and ' + pay + ' pay held')) {
+      notices[hold].pop();
+      payOut(actorId, cost);
+      toProfile(profileId, 'That did not work. Nothing was taken.');
+      return true;
+    }
+    plog(who, 'posted a haul in', hold, 'to', dest, 'for', pay, 'gold and the', JOB_FEE, 'fee');
+    toProfile(profileId, 'Your haul to ' + dest + ' is on the board in ' + hold + ', number ' +
+              notices[hold].length + '. That cost ' + cost + ' gold: ' + JOB_FEE + ' for the board, and the ' +
+              pay + ' pay, held until it is confirmed at ' + dest + '.');
+    refreshPanel(actorId);
+    return true;
+  }
+
+  function confirmHaul(parts, actorId, profileId, toProfile) {
+    var standing = boardHere(actorId);
+    if (!standing) {
+      toProfile(profileId, 'Stand at the board of the hold the haul went to.');
+      return true;
+    }
+    var from = String(parts[2] || '').trim().toLowerCase();
+    var num = Number(parts[3] || 0);
+    if (LEDGER_HOLDS.indexOf(from) < 0 || !Number.isInteger(num) || num < 1) {
+      toProfile(profileId, 'That haul is not on any board. ' + HAUL_HOW);
+      return true;
+    }
+    var at = num - 1;
+    var n = (notices[from] || [])[at];
+    if (!n) {
+      toProfile(profileId, 'There is no number ' + num + ' on ' + from + '\'s board.');
+      return true;
+    }
+    if (!n.haul) {
+      toProfile(profileId, 'That is not a haul. What an ordinary job is worth is between the two people, ' +
+                'and the server pays nothing for it.');
+      return true;
+    }
+    if (n.down) {
+      toProfile(profileId, 'That haul is already paid or taken down.');
+      return true;
+    }
+    if (standing !== n.dest) {
+      toProfile(profileId, 'That haul goes to ' + n.dest + '. It is confirmed at ' + n.dest + '\'s board.');
+      return true;
+    }
+    if (Number(n.by) !== Number(profileId) && !isSteward(profileId, actorId)) {
+      toProfile(profileId, 'Only the person who posted it, or a steward, confirms a haul.');
+      return true;
+    }
+    if (!n.taken) {
+      toProfile(profileId, 'Nobody has taken that haul.');
+      return true;
+    }
+    if (Number(n.taken) === Number(profileId)) {
+      toProfile(profileId, 'The hauler does not confirm their own haul. The person who posted it, or a steward, does.');
+      return true;
+    }
+    var pay = Math.floor(Number(n.pay)) || 0;
+    var tenth = haulTenth(pay);
+    var got = pay - tenth;
+    var r = handHaul(from, n, Number(n.taken), got,
+                     'haul ' + num + ' to ' + n.dest + ' delivered, ' + tenth + ' kept for the company', 'hauled');
+    if (r.why) {
+      plog('a haul in', from, 'could not be paid:', r.why);
+      toProfile(profileId, 'That did not work: ' + r.why + ' Nothing was paid.');
+      return true;
+    }
+    n.paid = got;
+    n.kept = tenth;
+    n.done = Date.now();
+    n.doneBy = profileId;
+    takedown(from, at, profileId);
+    var hauled = n.takenName || 'The hauler';
+    var kept = tenth ? ', and the company keeps ' + tenth + '.' : '. Under 10 gold, the company keeps nothing.';
+    if (r.owed) {
+      plog(hauled, 'is owed', got, 'for a haul from', from, 'to', n.dest, 'and the company kept', tenth);
+      toProfile(profileId, 'The haul from ' + from + ' is in: ' + n.text + '. ' + hauled + ' is away, so the ' + got +
+                ' gold is held on ' + from + '\'s ledger for them until they are next in the world' + kept);
+    } else {
+      plog(hauled, 'was paid', got, 'for a haul from', from, 'to', n.dest, 'and the company kept', tenth);
+      toProfile(profileId, 'The haul from ' + from + ' is in: ' + n.text + '. ' + hauled + ' is paid ' + got +
+                ' gold out of ' + from + '\'s ledger' + kept);
+      toProfile(n.taken, 'Your haul to ' + n.dest + ' is confirmed. ' + got + ' gold is in your pack.' +
+                (tenth ? ' The company kept ' + tenth + '.' : ''));
+    }
+    if (Number(n.by) !== Number(profileId)) {
+      toProfile(n.by, 'Your haul to ' + n.dest + ' was confirmed by a steward. ' + hauled + ' ' +
+                (r.owed ? 'is owed ' : 'was paid ') + got + '.');
+    }
+    refreshPanel(actorId);
+    if (r.to) { refreshPanel(r.to); }
+    return true;
+  }
+
+  /*
+    A haul's held gold to one person: `amount` of what n holds on `hold`'s
+    ledger, to the profile `toPid`. In the world, it goes into their pack now
+    and the same comes off the ledger. Away, nothing leaves the ledger: n holds
+    it as owed to them, and haulTick hands it over when they are next in the
+    world. Either way n.pay is 0 after, so the haul is paid once. `owedFor` is
+    'hauled' or 'back', for the line they read then.
+
+    Answers { why } with nothing changed when it cannot, otherwise { owed } and
+    the actor it was paid to, { to }.
+  */
+  function handHaul(hold, n, toPid, amount, reason, owedFor) {
+    var why = mayWithdraw(hold, amount, n);
+    if (why) { return { why: why }; }
+    var to = onlineActorOf(toPid);
+    if (!to) {
+      n.pay = 0;
+      n.owed = amount;
+      n.owedTo = toPid;
+      n.owedFor = owedFor;
+      save();
+      plog(amount, 'gold held on', hold + '\'s ledger for', toPid, 'until they are in the world:', reason);
+      return { owed: true, to: 0 };
+    }
+    if (!payOut(to, amount)) { return { why: 'their pack could not be written.' }; }
+    withdraw(hold, amount, reason, n);
+    n.pay = 0;
+    return { owed: false, to: to };
+  }
+
+  /*
+    What a haul owes somebody who was away, into their pack now they are in
+    the world, and off the ledger it was held on. A ledger that cannot pay it
+    is written to the log once a boot, and the gold stays held.
+  */
+  var haulShort = {};
+  function haulTick() {
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
+    if (!online.length) { return; }
+    var here = {};
+    for (var i = 0; i < online.length; i++) {
+      var pid = profileOf(online[i]);
+      if (pid) { here[pid] = online[i]; }
+    }
+    for (var h = 0; h < LEDGER_HOLDS.length; h++) {
+      var hold = LEDGER_HOLDS[h];
+      var list = notices[hold] || [];
+      for (var j = 0; j < list.length; j++) {
+        var n = list[j];
+        var owed = (n && n.haul) ? (Math.floor(Number(n.owed)) || 0) : 0;
+        if (!(owed > 0) || !here[Number(n.owedTo)]) { continue; }
+        var to = here[Number(n.owedTo)];
+        var why = mayWithdraw(hold, owed, n);
+        if (why) {
+          if (!haulShort[hold + ':' + j]) {
+            haulShort[hold + ':' + j] = true;
+            plog('haul', j + 1, 'in', hold, 'owes', owed, 'and cannot pay it:', why);
+          }
+          continue;
+        }
+        if (!payOut(to, owed)) { continue; }
+        withdraw(hold, owed, 'haul ' + (j + 1) + ' to ' + n.dest + ', held for somebody who was away', n);
+        n.owed = 0;
+        save();
+        var line = n.owedFor === 'hauled'
+          ? 'While you were away, your haul to ' + n.dest + ' was confirmed. ' + owed + ' gold is in your pack.' +
+            ((Number(n.kept) || 0) ? ' The company kept ' + n.kept + '.' : '')
+          : 'While you were away, your haul to ' + n.dest + ' came down. The ' + owed +
+            ' gold pay is back in your pack. The fee stays with ' + hold + '.';
+        plog('handed', owed, 'gold of a haul in', hold, 'to', personName(to));
+        try { notify(to, line); } catch (e2) { }
+        try { say(to, line); } catch (e3) { }
+      }
+    }
+  }
+
+  if (g.__thornswoodHaulTimer) { try { clearInterval(g.__thornswoodHaulTimer); } catch (e) { } }
+  g.__thornswoodHaulTimer = setInterval(
+    (typeof guard === 'function') ? guard('haulTick', haulTick) : haulTick, HAUL_EVERY_MS);
+
+  /*
+    A haul comes down before it is delivered: the hauler's /dropjob, the
+    poster's /unpin before anybody has taken it, or a steward's /unpin at the
+    posting board, open or taken. `how` is 'drop', 'own' or 'steward'. The
+    pay goes back out of the ledger to the poster, held for them while they
+    are away (handHaul), and the fee stays. Nothing was delivered, so the
+    company's tenth is not taken. Who may has been settled by the caller.
+  */
+  function cancelHaul(hold, at, n, how, actorId, profileId, toProfile) {
+    var pay = Math.floor(Number(n.pay)) || 0;
+    var owed = false;
+    if (pay > 0) {
+      var r = handHaul(hold, n, Number(n.by), pay,
+                       'a haul to ' + n.dest + ' taken down, the pay back to ' + n.name, 'back');
+      if (r.why) {
+        toProfile(profileId, 'That did not work: ' + r.why + ' The haul is still up' +
+                  (how === 'drop' ? ', and still yours.' : '.'));
+        return true;
+      }
+      owed = r.owed;
+    }
+    n.back = pay;
+    takedown(hold, at, profileId);
+    var later = owed ? ' when they are next in the world' : '';
+    var fee = 'The fee stays with ' + hold + '.';
+    plog(how === 'drop' ? (n.takenName || 'the hauler') + ' dropped' : (how === 'own' ? n.name : 'a steward') + ' took down',
+         'a haul to', n.dest, 'in', hold, 'and', pay, owed ? 'is held for' : 'went back to', n.name);
+    if (how === 'own') {
+      toProfile(profileId, 'You take the haul down. The ' + pay + ' gold pay comes back to you. ' + fee);
+    } else if (how === 'drop') {
+      toProfile(profileId, 'You hand the haul to ' + n.dest + ' back. It comes down, and the ' + pay +
+                ' gold pay goes back to ' + n.name + later + '. ' + fee);
+      if (!owed) {
+        toProfile(n.by, (n.takenName || 'The hauler') + ' handed your haul to ' + n.dest + ' back. The ' + pay +
+                  ' gold pay is back in your pack. ' + fee);
+      }
+    } else {
+      toProfile(profileId, 'You take ' + n.name + '\'s haul to ' + n.dest + ' down. The ' + pay +
+                ' gold pay goes back to them' + later + '. ' + fee);
+      if (!owed) {
+        toProfile(n.by, 'A steward took your haul to ' + n.dest + ' down. The ' + pay +
+                  ' gold pay is back in your pack. ' + fee);
+      }
+    }
+    if (how !== 'drop' && n.taken && Number(n.taken) !== Number(profileId)) {
+      toProfile(n.taken, 'The haul to ' + n.dest + ' you took was taken down by a steward. It is off your list.');
+    }
+    refreshPanel(actorId);
+    return true;
+  }
+
+  /*
+    ------------------------------------------- a sale out of Skyrim
+
+    #1393, docs/systems/trading-company.md "Sales that leave the world". At a
+    company event somebody sells a thing out of Skyrim. The company buys it
+    through the worker who handles the sale, and the thing leaves the world.
+    It does not come back into a chest.
+
+    IT IS A TRADE, ON THE TRADE PANEL. Patrick, 4 Oct: no chat commands for
+    anything people do. The worker and the seller open an ordinary trade with
+    the key on the look prompt, and the worker presses Buy for the company on
+    the panel. The trade block moves it (saleSwap there). These two are the
+    company's half of it: the cuts, and who may.
+
+    AN ITEM HAS NO GOLD PRICE OF ITS OWN. The price is the gold the worker
+    puts up and the two of them agree to on the panel, the way any trade is
+    agreed. Any change to either side takes both agreements back.
+
+    THE CUTS. The worker takes 10% of the price, rounded down, and another 10%
+    leaves the server. The seller receives the rest. Under 10 gold neither cut
+    is taken and the seller receives the whole price. The price comes out of
+    the worker's pack, the company's coin in their hands, and the worker's own
+    10% is never taken from it, so the worker pays the price less their cut.
+    No coin is created and none goes onto a ledger: the 10% that leaves is
+    destroyed. Where the price comes from is asked on #1393.
+
+    WHO MAY. A character on an account the company has taken on: the Discord
+    role an application in Discord leads to (__thornswoodIsCompany), or an
+    admin testing the chain, the same as a Jarl.
+  */
+  var SALE_CUT_FROM = 10;
+
+  /** A price split: the worker's 10%, the 10% that leaves, and the seller's rest. */
+  function saleCuts(price) {
+    var p = Math.floor(Number(price)) || 0;
+    if (p < SALE_CUT_FROM) { return { price: p, worker: 0, gone: 0, seller: p }; }
+    var tenth = Math.floor(p / 10);
+    return { price: p, worker: tenth, gone: tenth, seller: p - tenth - tenth };
+  }
+
+  function inCompany(profileId) {
+    var adm = g['__thornswoodIsAdmin'];
+    try { if (typeof adm === 'function' && adm(profileId)) { return true; } } catch (e) { }
+    var fn = g['__thornswoodIsCompany'];
+    try { return typeof fn === 'function' && !!fn(profileId); } catch (e2) { return false; }
+  }
+
   function command(word, parts, actorId, profileId, toProfile) {
     if (word === '/deed' || word === '/deeds') {
       return deeds(actorId, profileId, toProfile);
@@ -37324,7 +38366,7 @@ log('gamemode loaded:',
     if (word === '/evict') { return evict(actorId, profileId, toProfile); }
     if (word === '/box') { return boxCmd(parts, actorId, profileId, toProfile); }
     if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile); }
-    if (word === '/bed') { return bedCmd(parts, actorId, profileId, toProfile); }
+    if (word === '/sleephere') { return sleepHere(parts, actorId, profileId, toProfile); }
     if (word === '/notice') { return post(parts, actorId, profileId, toProfile, false); }
     if (word === '/job') { return post(parts, actorId, profileId, toProfile, true); }
     if (word === '/board') { return board(parts, actorId, profileId, toProfile); }
@@ -37334,6 +38376,7 @@ log('gamemode loaded:',
     if (word === '/unpin') { return unpin(parts, actorId, profileId, toProfile); }
     if (word === '/letter') { return postLetter(parts, actorId, profileId, toProfile); }
     if (word === '/deliver') { return deliver(parts, actorId, profileId, toProfile); }
+    if (word === '/haul') { return haulCmd(parts, actorId, profileId, toProfile); }
     return false;
   }
 
@@ -37491,6 +38534,8 @@ log('gamemode loaded:',
     isJarl: isJarl, isSteward: isSteward,
     touchedBox: touchedBox, putIn: putIn, holdOfBox: holdOfBox,
     deposit: deposit, takeGold: takeGold, LEDGER_HOLDS: LEDGER_HOLDS,
+    withdraw: withdraw, mayWithdraw: mayWithdraw, heldOn: heldOn,
+    haulTenth: haulTenth, haulTick: haulTick, saleCuts: saleCuts, inCompany: inCompany,
     holdStanding: holdStanding,
     rentDue: rentDue, funds: function () { return funds; },
     boxes: function () { return boxes; },
@@ -39798,6 +40843,9 @@ log('gamemode loaded:',
   function propertyView(actorId, profileId) {
     var W = g.__thornswoodProperty;
     if (!W || !W.holderOf) { return null; }
+    // Who may sleep in each place you hold tonight, with a Stop beside each
+    // name (#1603). See guestsOf in the beds, in the property block.
+    var B = g.__thornswoodBeds;
     var rows = [], seen = {};
     try {
       var claims = W.claims();
@@ -39807,7 +40855,8 @@ log('gamemode loaded:',
         if (!held || held.by !== profileId) { continue; }
         seen[b] = true;
         rows.push({ name: W.nameOf(b), mine: true, locked: !!held.locked,
-                    keyed: W.holdsKey(actorId, b) });
+                    keyed: W.holdsKey(actorId, b), b: b,
+                    sleep: (B && B.guestsOf) ? B.guestsOf(b) : [] });
       }
       // Then the places somebody let you into. A key to a building you already
       // hold is not a second row: it is the same house and the row above says
@@ -39920,6 +40969,31 @@ log('gamemode loaded:',
     return out;
   }
 
+  /*
+    The map the client applies, folded the way forPanel folds it: the tree,
+    the needs, a running maneuver and a running perk. The maneuvers block
+    reads its stamina to know a person's real most (#1386): the tree's
+    Endurance and the needs' penalties are on it. A change to the fold in
+    forPanel is a change here too.
+  */
+  function effectsOf(actorId) {
+    return withPerks(actorId, withManeuvers(actorId, withNeeds(actorId, P.treeApplies(stateOf(actorId)))));
+  }
+
+  /*
+    A warrior's maneuvers, for the panel the maneuver key opens (#1386). The
+    maneuvers block owns the rows and loads after this one, so it is asked at
+    write time; absent for somebody who holds none.
+  */
+  function maneuversView(actorId, s) {
+    var mv = g.__thornswoodManeuvers;
+    if (!mv || !mv.view || !actorId) { return null; }
+    try { return mv.view(actorId, s); } catch (e) {
+      clog('the maneuvers view threw for', actorId.toString(16) + ':', e);
+      return null;
+    }
+  }
+
   function needsView(actorId) {
     var n = g.__thornswoodNeeds;
     if (!n || !actorId) { return null; }
@@ -39968,6 +41042,8 @@ log('gamemode loaded:',
         number in it. See the needs block at the end of this file.
       */
       effects: withManeuvers(actorId, withNeeds(actorId, P.treeApplies(s))),
+      // What the maneuver key draws. See maneuversView.
+      maneuvers: maneuversView(actorId, s),
       /*
         The three meters, for the panel to draw. Absent entirely when there is
         no character in hand or the needs block is not loaded, so a page from
@@ -40160,6 +41236,9 @@ log('gamemode loaded:',
     } catch (e) {
       clog('could not write', actorId.toString(16), e);
     }
+    // Twin Souls is a second enchantment slot in the menu (#1389). It lives
+    // beside the craft gate, outside this block, the way spellOn does.
+    if (typeof handEnchantSlots === 'function') { handEnchantSlots(actorId, s); }
     return s;
   }
 
@@ -40404,6 +41483,9 @@ log('gamemode loaded:',
     if (staff.length) {
       clog('spawn:', put, 'of', staff.length, 'staff spells put back on', actorId.toString(16));
     }
+    // And the second enchantment slot Twin Souls gives (#1389): a session
+    // starts from a save with no perks on it.
+    if (typeof handEnchantSlots === 'function') { handEnchantSlots(actorId, s); }
     return n;
   }
 
@@ -40776,8 +41858,9 @@ log('gamemode loaded:',
         word === '/deed' || word === '/deeds' || word === '/lock' ||
         word === '/unlock' || word === '/mold' || word === '/moldhere' || word === '/key' ||
         word === '/steward' || word === '/evict' || word === '/box' ||
-        word === '/rent' || word === '/bed' || word === '/notice' || word === '/job' ||
+        word === '/rent' || word === '/sleephere' || word === '/notice' || word === '/job' ||
         word === '/board' || word === '/take' || word === '/jobs' ||
+        word === '/haul' ||
         word === '/letter' || word === '/deliver' ||
         word === '/dropjob' || word === '/unpin') {
       if (!actorId) {
@@ -41160,7 +42243,7 @@ log('gamemode loaded:',
     beginCreation: beginCreation, updateOwnerScript: updateOwnerScript,
     gate: gate, gateHalf: gateHalf, credit: credit,
     grantSpell: grantSpell, grantKnown: grantKnown, nameOf: nameOf, raiseLines: raiseLines,
-    acceptApprentice: acceptApprentice, masterFor: masterFor,
+    acceptApprentice: acceptApprentice, masterFor: masterFor, effectsOf: effectsOf,
     rankOf: function (actorId, key) { return P.rankOf(stateOf(actorId), key); }
   };
   clog('ready');
@@ -42035,7 +43118,16 @@ log('gamemode loaded:',
   nothing else decides it.
 
   STAMINA IS SPENT WHEN THE MANEUVER STARTS, AND WITHOUT IT NOTHING HAPPENS.
-  spend() takes it through the engine's own Actor.DamageActorValue.
+  15 stamina is 15 of the person's real most, the skill tree's Endurance
+  included (Patrick, 4 October: "it should scale"). spend() says how that is
+  worked out.
+
+  NOBODY TYPES ONE. Patrick, 4 October: no chat commands for anything people
+  do. The maneuver key opens a panel the front plugin draws
+  (game/ui/thornswood-maneuvers.js), and a pick there sends /maneuver <name>
+  through the same relay the trade and party keys use. That line is internal:
+  no help text names it. view() is what the panel draws from, folded into the
+  character panel's view the way effects() is.
 
   WHAT THE SERVER APPLIES, AND WHAT IT CANNOT. Everything here is the server's
   own: the stamina, the clocks, the refusals, and health through the engine's
@@ -42058,11 +43150,12 @@ log('gamemode loaded:',
             client change is needed for it.
     Heavy   25% more on the next power attack within 8 seconds. Applied here,
             by taking a quarter again of what that hit took.
-    Break   the next hit staggers. Sent to a person's own game with
-            Debug.SendAnimationEvent; a creature is animated by whoever hosts
-            it and the server cannot reach that machine, so a creature takes
-            no stagger yet.
-    Wreck   50% more on the next power attack, and it staggers, both as above.
+    Break   the next hit within 8 seconds staggers. Sent to a person's own
+            game with Debug.SendAnimationEvent; a creature is animated by
+            whoever hosts it and the server cannot reach that machine, so a
+            creature takes no stagger yet.
+    Wreck   50% more on the next power attack within 8 seconds, and it
+            staggers, both as above.
 
   A BLOW THAT KILLS OUTRIGHT IS NOT SOFTENED. The engine applies a hit's
   damage after the OnHit event and kills on the spot when that takes health
@@ -42089,8 +43182,8 @@ log('gamemode loaded:',
 
   /*
     The table on the page, row for row. seconds is how long it lasts. Break
-    and Wreck have no length on the page: each waits for the blow it names,
-    and that is what 0 means here.
+    and Wreck wait for the blow they name for 8 seconds, the window Heavy has
+    (Patrick's answer on #1386, 4 October).
   */
   var MANEUVERS = {
     set:     { name: 'Set',   half: 'bulwark',   rank: 'novice',   stamina: 15, cooldown: 45,  seconds: 8 },
@@ -42099,8 +43192,8 @@ log('gamemode loaded:',
     wall:    { name: 'Wall',  half: 'bulwark',   rank: 'master',   stamina: 40, cooldown: 180, seconds: 10, less: 0.2, metres: 3 },
     rush:    { name: 'Rush',  half: 'berserker', rank: 'novice',   stamina: 15, cooldown: 30,  seconds: 5,  speed: 4 },
     heavy:   { name: 'Heavy', half: 'berserker', rank: 'advanced', stamina: 20, cooldown: 45,  seconds: 8,  more: 0.25 },
-    'break': { name: 'Break', half: 'berserker', rank: 'expert',   stamina: 25, cooldown: 60,  seconds: 0 },
-    wreck:   { name: 'Wreck', half: 'berserker', rank: 'master',   stamina: 40, cooldown: 120, seconds: 0,  more: 0.5 }
+    'break': { name: 'Break', half: 'berserker', rank: 'expert',   stamina: 25, cooldown: 60,  seconds: 8 },
+    wreck:   { name: 'Wreck', half: 'berserker', rank: 'master',   stamina: 40, cooldown: 120, seconds: 8,  more: 0.5 }
   };
   var ORDER = ['set', 'plant', 'cover', 'wall', 'rush', 'heavy', 'break', 'wreck'];
   var HALF_NAME = { bulwark: 'Bulwark', berserker: 'Berserker' };
@@ -42191,8 +43284,7 @@ log('gamemode loaded:',
   /*
     cool  actor -> { key: when it is ready again }
     on    actor -> what is running or armed: a window's end for set, plant,
-          wall, rush and heavy; { until, who } for cover; true for break and
-          wreck, which wait for their blow
+          wall, rush, heavy, break and wreck; { until, who } for cover
     block actor -> whether that bulwark is blocking, as last seen
     blow  actor -> { by, at }: who landed the server's own last blow on it
   */
@@ -42208,6 +43300,9 @@ log('gamemode loaded:',
   }
   function deadOf(id) {
     try { return !!mp.get(id, 'isDead'); } catch (e) { return true; }
+  }
+  function onlineOf(id) {
+    try { return !!mp.get(id, 'isOnline'); } catch (e) { return false; }
   }
   function share(id, which) {
     try {
@@ -42247,32 +43342,104 @@ log('gamemode loaded:',
   }
 
   /*
-    STAMINA, SPENT WHEN THE MANEUVER STARTS. The engine holds stamina as a
-    share of the most there is and does not hand that most to this file.
-    Actor.DamageActorValue knows it, and takes the amount off as a share of
-    the engine's own maximum (MpActor::DamageActorValue). So the amount is
-    taken, and a share that hit the floor means there was not that much: it
-    is put back exactly as it was, and the maneuver does not start. The
-    engine's maximum is worked out from the race record, so stamina the skill
-    tree adds on the client is not in it.
+    STAMINA, SPENT WHEN THE MANEUVER STARTS, AS A SHARE OF THE PERSON'S REAL
+    MOST. Patrick's answer on #1386, 4 October: the cost "should scale" with
+    the skill tree. Measured in the fork before this was written:
+
+      The engine holds stamina only as a share, 0 to 1, of a most it works out
+      from the records (GetBaseActorValues.cpp): the race's starting stamina,
+      RACE DATA at byte 44, plus the person's NPC_ stamina offset, ACBS at
+      byte 6, and 100 when that comes to nothing. The client is handed that
+      same number as its base stamina when it spawns (remoteServer.ts).
+
+      The skill tree hand then SETS the base to that plus the map the
+      character panel sends (thornswood-front.js, treeApplyNow): Endurance's
+      +10 a point, less what hunger, thirst, tiredness and cold take off. The
+      share the client reports back, and the share a server write moves it to
+      (setActorValuePercentage in actorvalues.ts), are both of that bigger
+      most.
+
+    So Actor.DamageActorValue, which divides by the engine's most, took 15 of
+    the race's stamina: on a character with Endurance that was more than 15
+    off the bar they see. Here the most is the engine's own from the same two
+    records, plus the stamina in the map the client applies, and the cost is
+    the amount over that, written as a share. Without that much nothing is
+    written and false comes back; the old code took the stamina first and put
+    it back after. A record that cannot be read answers null and starts
+    nothing, with a line in the log.
+
+    Stamina a potion or an enchanted piece of gear adds is not counted: the
+    server does not see the effects running on somebody's character.
   */
-  function spend(actorId, amount) {
-    var before = share(actorId, 'stamina');
-    if (!(before > 0)) { return false; }
+  function fieldOf(id, type) {
+    var res = null;
+    try { res = id ? mp.lookupEspmRecordById(id) : null; } catch (e) { return null; }
+    var fields = (res && res.record && res.record.fields) || [];
+    for (var i = 0; i < fields.length; i++) {
+      if (fields[i] && fields[i].type === type && fields[i].data) { return Buffer.from(fields[i].data); }
+    }
+    return null;
+  }
+
+  /** The engine's own most, the way GetBaseActorValues works it out for a
+      person: their race and their base, which for a person is the NPC_ record
+      every character is made from (0x7) and carries no template. 0 when the
+      records cannot be read. */
+  function engineStamina(actorId) {
+    var raceId = 0, baseId = 0;
     try {
-      mp.callPapyrusFunction('method', 'Actor', 'DamageActorValue', selfOf(actorId), ['Stamina', amount]);
+      var r = mp.callPapyrusFunction('method', 'Actor', 'GetRace', selfOf(actorId), []);
+      raceId = (r && r.desc) ? (Number(mp.getIdFromDesc(String(r.desc))) || 0) : 0;
+      baseId = Number(mp.getIdFromDesc(String(mp.get(actorId, 'baseDesc') || ''))) || 0;
+    } catch (e) {
+      mlog('could not ask the race and base of', actorId.toString(16) + ':', e);
+      return 0;
+    }
+    var race = fieldOf(raceId, 'DATA');
+    var npc = fieldOf(baseId, 'ACBS');
+    if (!race || race.length < 48 || !npc || npc.length < 8) {
+      mlog('no RACE DATA or NPC_ ACBS for', actorId.toString(16), '(race', raceId.toString(16) + ', base', baseId.toString(16) + ')');
+      return 0;
+    }
+    var most = race.readFloatLE(44) + npc.readInt16LE(6);
+    return most > 0 ? most : 100;
+  }
+
+  /** The person's real most stamina: the engine's, plus what the map the
+      client applies adds to it or takes off. NaN when it cannot be read. */
+  function mostStamina(actorId) {
+    var base = engineStamina(actorId);
+    if (!(base > 0)) { return NaN; }
+    var ch = g.__thornswoodCharacter;
+    if (!ch || !ch.effectsOf) { return NaN; }
+    var map = null;
+    try { map = ch.effectsOf(actorId); } catch (e) {
+      mlog('could not read the skill tree map of', actorId.toString(16) + ':', e);
+      return NaN;
+    }
+    return base + ((map && typeof map.stamina === 'number') ? map.stamina : 0);
+  }
+
+  /** true when spent, false when there is not that much, null when the
+      stamina cannot be read. */
+  function spend(actorId, amount) {
+    var p = null;
+    try { p = mp.get(actorId, 'percentages'); } catch (e) { p = null; }
+    var before = p ? Number(p.stamina) : NaN;
+    if (!(before >= 0)) { return null; }
+    var most = mostStamina(actorId);
+    if (isNaN(most)) { return null; }
+    // Hunger, thirst, tiredness and cold together can take the whole of it.
+    if (!(most > 0)) { return false; }
+    var cost = amount / most;
+    if (before < cost) { return false; }
+    try {
+      mp.set(actorId, 'percentages', { health: Number(p.health), magicka: Number(p.magicka), stamina: before - cost });
     } catch (e) {
       mlog('could not take stamina from', actorId.toString(16) + ':', e);
-      return false;
+      return null;
     }
-    if (share(actorId, 'stamina') > 0) { return true; }
-    try {
-      var p = mp.get(actorId, 'percentages');
-      mp.set(actorId, 'percentages', { health: Number(p.health), magicka: Number(p.magicka), stamina: before });
-    } catch (e2) {
-      mlog('could not put the stamina back on', actorId.toString(16) + ':', e2);
-    }
-    return false;
+    return true;
   }
 
   /* The one person Cover is for: the nearest within 3 metres, not yourself. */
@@ -42311,17 +43478,39 @@ log('gamemode loaded:',
     return { speedMult: MANEUVERS.rush.speed };
   }
 
+  /*
+    WHAT THE MANEUVER KEY DRAWS: the rows this character holds, in the page's
+    order, each with its stamina and whether its wait is over. Null for
+    somebody who holds none, so the view carries nothing for them. ready is
+    the only part that moves, and it moves twice a use: a start redraws the
+    panel (push in use) and so does the end of the wait (tick), so the view
+    never changes with the clock and a counter's write still redraws nothing.
+  */
+  function view(actorId, s) {
+    if (!s) { return null; }
+    var mine = held(s, takenOn(s, actorId));
+    var t = now();
+    var out = [];
+    for (var i = 0; i < ORDER.length; i++) {
+      var key = ORDER[i];
+      if (!mine[key]) { continue; }
+      var m = MANEUVERS[key];
+      out.push({ key: key, name: m.name, stamina: m.stamina, cooldown: m.cooldown, ready: !(readyAt(actorId, key) > t) });
+    }
+    return out.length ? out : null;
+  }
+
   var STARTED = {
     set: 'Set, for 8 seconds. Halving what a block costs is not in the game yet, so for now this spends the stamina and starts the wait.',
     plant: 'Plant, for 8 seconds. A Break or a Wreck does not stagger you. Other staggers still land: stopping those is not in the game yet.',
     wall: 'Wall, for 10 seconds. You, and your party within 3 metres of you, take 20% less damage.',
     rush: 'Rush: +4 speed for 5 seconds.',
     heavy: 'Heavy. Your next power attack in the next 8 seconds deals 25% more.',
-    'break': 'Break. Your next hit staggers a person. Staggering a creature is not in the game yet.',
-    wreck: 'Wreck. Your next power attack deals 50% more, and staggers a person. Staggering a creature is not in the game yet.'
+    'break': 'Break. Your next hit in the next 8 seconds staggers a person. Staggering a creature is not in the game yet.',
+    wreck: 'Wreck. Your next power attack in the next 8 seconds deals 50% more, and staggers a person. Staggering a creature is not in the game yet.'
   };
 
-  /** /maneuver with nothing after it: what you hold and when each is ready. */
+  /** What you hold and when each is ready, for a /maneuver with no name. */
   function listLine(actorId, mine) {
     var bits = [];
     var t = now();
@@ -42336,10 +43525,11 @@ log('gamemode loaded:',
       return 'You have no maneuvers. They are a warrior\'s, on the half you picked, at your rank and below. ' +
              'A Warlord can teach the novice row to somebody who is not a warrior.';
     }
-    return 'Your maneuvers: ' + bits.join(', ') + '. /maneuver <name> starts one.';
+    return 'Your maneuvers: ' + bits.join(', ') + '.';
   }
 
-  /** /maneuver <name>. Answers the line to say, always. */
+  /** /maneuver <name>, as the maneuver panel sends it. Answers the line to
+      say, always. */
   function use(actorId, word) {
     var key = String(word || '').trim().toLowerCase();
     var ch = g.__thornswoodCharacter;
@@ -42361,7 +43551,11 @@ log('gamemode loaded:',
       who = coverWho(actorId);
       if (!who) { return 'Cover is for one person within 3 metres of you, and nobody is.'; }
     }
-    if (!spend(actorId, m.stamina)) {
+    var paid = spend(actorId, m.stamina);
+    if (paid === null) {
+      return 'Your stamina could not be read just now, so ' + m.name + ' did not start. Say so in the dev channel.';
+    }
+    if (!paid) {
       return m.name + ' takes ' + m.stamina + ' stamina, and you do not have it. Nothing happens.';
     }
     if (!has(ST.cool, actorId)) { ST.cool[actorId] = {}; }
@@ -42371,12 +43565,14 @@ log('gamemode loaded:',
       rec.cover = { until: t + m.seconds * 1000, who: who };
       ST.block[actorId] = false;
       mlog(actorId.toString(16), 'Cover on', who.toString(16));
+      push(actorId);
       return 'Cover on ' + nameOf(who) + ', for 8 seconds. While you block within 3 metres of them, they take 20% less damage.';
     }
-    rec[key] = m.seconds ? t + m.seconds * 1000 : true;
+    rec[key] = t + m.seconds * 1000;
     mlog(actorId.toString(16), m.name);
+    // The panel's row turns to waiting, and Rush's speed goes on.
+    push(actorId);
     if (key === 'rush') {
-      push(actorId);
       setTimeout(function () { push(actorId); }, m.seconds * 1000 + 50);
     }
     return STARTED[key];
@@ -42474,14 +43670,14 @@ log('gamemode loaded:',
     var e = { before: -1, after: null, by: by, more: 0, less: 0, stagger: false, used: [] };
     var a = (by && has(ST.on, by)) ? ST.on[by] : null;
     if (a && !isSpell(source)) {
-      if (power && a.wreck) {
+      if (power && a.wreck && a.wreck > t) {
         e.more = MANEUVERS.wreck.more; e.stagger = true;
         e.used.push({ key: 'wreck', v: a.wreck }); delete a.wreck;
       } else if (power && a.heavy && a.heavy > t) {
         e.more = MANEUVERS.heavy.more;
         e.used.push({ key: 'heavy', v: a.heavy }); delete a.heavy;
       }
-      if (!e.stagger && a['break']) {
+      if (!e.stagger && a['break'] && a['break'] > t) {
         e.stagger = true;
         e.used.push({ key: 'break', v: a['break'] }); delete a['break'];
       }
@@ -42498,13 +43694,14 @@ log('gamemode loaded:',
     }
   }
 
-  /* A blow that took nothing gives back what it would have spent. */
+  /* A blow that took nothing gives back what it would have spent, while its
+     window is still open. */
   function rearm(e) {
     if (!e.by || !e.used.length) { return; }
     var rec = onOf(e.by, true);
     for (var i = 0; i < e.used.length; i++) {
       var u = e.used[i];
-      if (u.key === 'heavy' && u.v <= now()) { continue; }
+      if (u.v <= now()) { continue; }
       if (!rec[u.key]) { rec[u.key] = u.v; }
     }
   }
@@ -42578,16 +43775,28 @@ log('gamemode loaded:',
 
   // -------------------------------------------------------------- the tick --
   /* Ten times a second while anything runs: a Cover's block is watched, and
-     what has run out is taken off. Nothing to do costs one empty loop. */
+     what has run out is taken off. A wait that ends redraws the panel, so the
+     maneuver key shows that row ready again. Nothing to do costs one empty
+     loop. */
   function tick() {
     var t = now();
+    for (var c in ST.cool) {
+      if (!has(ST.cool, c)) { continue; }
+      var ended = false, waiting = false;
+      for (var w in ST.cool[c]) {
+        if (!has(ST.cool[c], w)) { continue; }
+        if (ST.cool[c][w] <= t) { delete ST.cool[c][w]; ended = true; } else { waiting = true; }
+      }
+      if (!waiting) { delete ST.cool[c]; }
+      if (ended && onlineOf(Number(c))) { push(Number(c)); }
+    }
     for (var k in ST.on) {
       if (!has(ST.on, k)) { continue; }
       var holder = Number(k);
       var rec = ST.on[k];
       if (rec.cover && rec.cover.until > t) { blocking(holder); }
       if (rec.cover && rec.cover.until <= t) { delete rec.cover; delete ST.block[holder]; }
-      var timed = ['set', 'plant', 'wall', 'rush', 'heavy'];
+      var timed = ['set', 'plant', 'wall', 'rush', 'heavy', 'break', 'wreck'];
       for (var i = 0; i < timed.length; i++) {
         if (rec[timed[i]] && rec[timed[i]] <= t) { delete rec[timed[i]]; }
       }
@@ -42605,8 +43814,8 @@ log('gamemode loaded:',
 
   g.__thornswoodManeuvers = {
     MANEUVERS: MANEUVERS, ORDER: ORDER,
-    held: held, takenOn: takenOn, whyNot: whyNot,
-    use: use, effects: effects, hit: hit, flush: flush, killerOf: killerOf, tick: tick,
+    held: held, takenOn: takenOn, whyNot: whyNot, mostStamina: mostStamina,
+    use: use, effects: effects, view: view, hit: hit, flush: flush, killerOf: killerOf, tick: tick,
     state: ST
   };
   mlog('ready:', ORDER.length, 'maneuvers');
@@ -42618,11 +43827,11 @@ log('gamemode loaded:',
   list over mp.onTakeItem says why nothing here may try.
 */
 mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, aggressor, source, projectile, power, sneak, bash, blocked) {
-  // The break chance at 0% (#1384), in the durability block. First and on
-  // its own, so neither half can stop the other.
+  // The wear and the break chance at 0% (#1384), in the durability block.
+  // First and on its own, so neither half can stop the other.
   var wear = globalThis.__thornswoodDurability;
   if (wear && wear.onHit) {
-    try { wear.onHit(targetId, aggressor, source); } catch (e) { log('durability: the hit threw:', e); }
+    try { wear.onHit(targetId, aggressor, source, blocked); } catch (e) { log('durability: the hit threw:', e); }
   }
   // The filled skill perks (#1385), before the maneuvers: each measures the
   // blow on the next turn, and this way round the perks block reads it first.
@@ -44408,16 +45617,23 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // A carriage or ferry, at the driver (#1394). See the carriages block.
                '/ride',
                '/pick', '/spend',
-               // The maneuvers of a warrior; see the maneuvers block.
+               // A warrior's maneuver, sent by the panel the maneuver key
+               // opens (#1386). Never typed, and no help names it: Patrick,
+               // 4 October, no chat commands for anything people do. See the
+               // maneuvers block.
                '/maneuver',
                // A Master taking somebody on, and ending it (#1388). See the
                // character block.
                '/apprentice',
                '/plant', '/claim', '/plot',
                '/deed', '/deeds', '/lock', '/unlock', '/mold', '/key',
-               '/jarl', '/steward', '/evict', '/box', '/rent', '/bed',
+               '/jarl', '/steward', '/evict', '/box', '/rent',
                '/notice', '/job', '/board', '/take', '/jobs', '/dropjob', '/unpin',
                '/letter', '/deliver',
+               // A haul (#1393). Sent by the board panel's Send a haul and
+               // Confirm buttons, never typed, and so deliberately NOT in
+               // PLAYER_WORDS. See the property block.
+               '/haul',
                '/tp', '/goto', '/face', '/restart', '/shutdown', '/tspicks',
                // Playtesters', like /tp, and gated the same way. Deliberately
                // absent from PLAYER_WORDS: naming them in /help would be an
@@ -44444,10 +45660,13 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/chopped',
                // Hunger, thirst and exhaustion. See the needs block at the end
                // of this file; the numbers there are invented and meant to be
-               // argued with.
+               // argued with. /rest is the plugin's, sent when somebody sits
+               // or lies down, and never typed (#1603); see bedRest.
                '/needs', '/rest', '/eat', '/drink', '/bard',
-               // Condition and the repair kits (#1384). See the durability
-               // block, after the take limit.
+               // The repair panel (#1384): sent by the inventory key and by
+               // the panel's buttons, never typed. See the durability block,
+               // after the take limit. Deliberately absent from PLAYER_WORDS:
+               // nothing people do is a command (Patrick, 4 October).
                '/repair',
                // The client's weather report and its "I am on fire". Never typed; see
                // the branches.
@@ -44461,6 +45680,10 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // The mold key: a blank pressed into the door under the
                // crosshair. Sent by the plugin, not typed; see moldHere.
                '/moldhere',
+               // A holder letting the person under the crosshair sleep there,
+               // or the property page ending a guest's night (#1603). Sent by
+               // the plugin and the K panel, never typed; see sleepHere.
+               '/sleephere',
                // The client's load order, every two minutes. Sent by the front
                // plugin, never typed; see the load order refusal block.
                '/loadorder',
@@ -44490,18 +45713,13 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // argument says what a place costs, which is the first
                       // thing somebody standing at a door wants to know, and
                       // the steward half answers "only a steward sets rent"
-                      // to everybody else. /bed with no amount says what a
-                      // night costs, the same way, and only a holder sets it.
-                      '/box', '/rent', '/bed', '/notice', '/job', '/board',
+                      // to everybody else.
+                      '/box', '/rent', '/notice', '/job', '/board',
                       '/take', '/jobs', '/dropjob', '/unpin', '/letter', '/deliver', '/help',
                       // Everybody's, and they need to be findable: a meter
-                      // nobody knows how to act on is only a penalty.
-                      '/needs', '/rest', '/eat', '/drink', '/bard',
-                      // Everybody's: what you carry and how it stands, and
-                      // the kit that mends it (#1384).
-                      '/repair',
-                      // For a warrior, and named so a warrior can find them.
-                      '/maneuver',
+                      // nobody knows how to act on is only a penalty. Not
+                      // /rest: sitting or lying down is how you rest (#1603).
+                      '/needs', '/eat', '/drink', '/bard',
                       // Everybody's, and the one thing a person in trouble
                       // must be able to find: asking staff, and getting
                       // out of a wedged spot (#414).
@@ -45484,8 +46702,10 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       and the world hooks replace them rather than joining them.
 
       /needs   what the three meters say
-      /rest    sit, campfire, inn or bed; /rest up to stop. A bed is one the
-               server saw them press; see "beds" in the property block.
+      /rest    sent by the plugin when somebody sits or lies down, and
+               /rest up when they get off; never typed (#1603). What counts
+               is what the server saw them press; see "beds" in the property
+               block.
       /eat     a meal; /drink water; /drink ale for the good and the bad of it
       /bard    say you are playing, which helps everyone resting near you
     */
@@ -45820,12 +47040,14 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         var live = tr2.tradeOf(actorId);
         var verb = String(parts[1] || '').toLowerCase();
         if (live || verb === 'cancel' || verb === 'ok' || verb === 'add' ||
-            verb === 'remove' || verb === 'gold' || verb === 'pack') {
+            verb === 'remove' || verb === 'gold' || verb === 'pack' || verb === 'sale') {
           if (!live) { toProfile(profileId, 'You are not trading.'); return true; }
           var out = '';
           if (verb === 'cancel') { out = tr2.cancel(actorId); }
           else if (verb === 'ok') { out = tr2.confirm(actorId); }
           else if (verb === 'gold') { out = tr2.gold(actorId, parts[2]); }
+          // The panel's Buy for the company (#1393). Never typed.
+          else if (verb === 'sale') { out = tr2.sale(actorId); }
           else if (verb === 'remove') {
             var rbits = parts.slice(2);
             var rn = 0;
@@ -45890,8 +47112,9 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       return true;
     }
 
-    // A warrior's maneuvers (#1386). See the maneuvers block, after the
-    // character block, for what each one does and what the server cannot.
+    // A warrior's maneuvers (#1386), as the maneuver panel sends them; nobody
+    // is told to type it. See the maneuvers block, after the character
+    // block, for what each one does and what the server cannot.
     if (word === '/maneuver') {
       var mvs = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodManeuvers;
       if (!mvs || !mvs.use) {
@@ -45961,33 +47184,29 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         var where = String(parts[1] || '').toLowerCase();
         var beds = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodBeds;
         if (where === 'up' || where === 'stop') {
-          if (beds && beds.off) { beds.off(actorId); }
+          var was = String(needs.settle(actorId).resting || '');
+          var off = (beds && beds.off) ? beds.off(actorId) : '';
           needs.resting(actorId, '');
-          toProfile(profileId, 'You get up.');
-          return true;
-        }
-        if (!where) {
-          toProfile(profileId, 'Rest where? sit, campfire, inn or bed. /rest up to get going again.');
+          // Said only when there was a rest to get up from, and not off a
+          // seat: the plugin sends this at every piece of furniture it gets
+          // off, and people sit at every table (#1603).
+          if (was && off !== 'seat') { toProfile(profileId, 'You get up.'); }
           return true;
         }
         /*
-          A BED IS ONE THE SERVER SAW (#1392). bed, inn and bedroll go to the
-          beds in the property block, which asks which bed this person pressed
-          and whether they are still at it, whose it is, and whether the night
-          is paid, and answers the kind of rest itself. The word only says that
-          they want a bed. See "beds" in the property block.
+          WHAT WAS PRESSED, NEVER THE WORD (#1392, #1607, #1603). The plugin
+          says /rest bed when somebody lies down and /rest sit when they sit,
+          and the beds in the property block answer by the furniture the server
+          saw them press and whether they are still at it: a seat, a seat by a
+          fire, a bed by whose it is. Nobody types this, and help never names
+          it. See "beds" in the property block.
         */
-        if (where === 'bed' || where === 'inn' || where === 'bedroll') {
-          if (!beds || !beds.rest) {
-            toProfile(profileId, 'Beds are not running on this server right now. Say so in the dev channel.');
-            return true;
-          }
-          toProfile(profileId, beds.rest(actorId, Number(profileId) || 0));
+        if (!beds || !beds.rest) {
+          toProfile(profileId, 'Beds are not running on this server right now. Say so in the dev channel.');
           return true;
         }
-        var said = needs.resting(actorId, where);
-        if (said && beds && beds.off) { beds.off(actorId); }
-        toProfile(profileId, said || ('There is no resting at a ' + where + '. Try sit, campfire, inn or bed.'));
+        var restSaid = beds.rest(actorId, Number(profileId) || 0);
+        if (restSaid) { toProfile(profileId, restSaid); }
         return true;
       }
       // /eat and /drink
@@ -46473,13 +47692,15 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       the unknown-command reply below did not: it advertised /tp to
       everybody and then refused them. Both read the same list now.
     */
-    // Condition and the repair kits (#1384). The work is in the durability
-    // block; this only hands it the character and the rest of the line.
+    // The repair panel (#1384), from the inventory key or a button on the
+    // panel. The work is in the durability block; this only hands it the
+    // character and the words after /repair.
     if (word === '/repair') {
       if (!needCharacter()) { return; }
       var wear = g.__thornswoodDurability;
-      if (!wear) { toProfile(profileId, 'That is not running on this server.'); return; }
-      toProfile(profileId, wear.command(actorId, parts.slice(1).join(' ')));
+      if (!wear) { toProfile(profileId, 'Repair is not running on this server.'); return; }
+      var mended = wear.panel(actorId, parts.slice(1));
+      if (mended) { toProfile(profileId, mended); }
       return;
     }
 
@@ -46545,9 +47766,10 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       if (topic === 'living' || topic === 'needs' || topic === 'food') {
         toProfile(profileId,
           'The four bars are food, water, rest and how warm you are. /eat and ' +
-          '/drink when you have something, /rest sit, /rest campfire, or lie down ' +
-          'in a bed and /rest bed, and /rest up to get going again. A bed counts ' +
-          'when it is yours, you carry its key, or you paid the night. Fires warm you and ' +
+          '/drink when you have something. Sit down or lie down and you rest: a ' +
+          'seat by a fire is better than a bare one, a bedroll by a fire better ' +
+          'still, and your own bed best of all. A bed in somebody else\'s building ' +
+          'counts when they have let you sleep there or you carry its key. Fires warm you and ' +
           'standing in one burns you. What you are wearing matters: fur is the ' +
           'warmest thing there is and metal is the worst.');
         return;
@@ -46560,8 +47782,9 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           '<name>, and /apprentice end <name> ends it. /apprentice on its own ' +
           'says who took you on. /plot says what is in the ' +
           'ground in front of you and whose farm it is, /plant sows it. A ' +
-          'warrior\'s maneuvers: /maneuver lists yours, /maneuver rush starts one. ' +
-          '/repair <name> mends a piece with a kit.');
+          'warrior\'s maneuvers open on the maneuver key, which the ' +
+          'launcher\'s Controls page names. ' +
+          'A repair kit is used from your inventory.');
         return;
       }
       if (topic === 'land' || topic === 'home' || topic === 'deed') {
@@ -46569,7 +47792,8 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           '/claim at a plot takes the farm around it; /claim at a door you have ' +
           'just opened takes the building and hands you the deed. /deed lists ' +
           'what you hold, /lock and /unlock turn the lock, /rent says what a ' +
-          'place costs, and /bed says or sets what a night in its beds costs. ' +
+          'place costs. To let somebody sleep in a building you hold, look at ' +
+          'them inside it and press the key the prompt shows. ' +
           'A smith says /mold at a door with the holder standing ' +
           'there, and /key at a forge with the mold in hand.');
         return;
@@ -47889,7 +49113,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   work and to 100% for anybody else. At 0% a piece that is being worn has a
   10% chance to break on a hit. A piece sitting in a shop chest or a house
   container loses 5% of its condition per real day; a pack does not, and
-  worn gear does not.
+  worn gear does not: worn gear loses 1% a hit instead (Patrick, 4 October).
 
   WHAT HAS A CONDITION. A weapon, a piece of armour and a piece of clothing:
   a WEAP record, and an ARMO record that is not jewellery. Those are the
@@ -47943,20 +49167,40 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   taking a piece out and putting it back does not either: whatever is in
   the chest when its day turns loses the 5%.
 
-  THE BREAK CHANCE, read as: on each hit, every worn piece of armour or
-  clothing on the person hit that is at 0% rolls once, and so does the
-  weapon a person lands the hit with when it is at 0%. A broken piece is
-  gone. Only people's gear rolls: nothing here gives a bandit's sword a
-  condition. The hit arrives through onPapyrusEvent:OnHit, whose one handler
-  is at the end of the warrior maneuvers block and hands it to onHit here.
+  WHAT A HIT REACHES, Patrick's answers of 4 October on #1384. Each hit
+  reaches every worn piece of armour and clothing on the person hit, the
+  weapon the hit was landed with, and, when the hit was blocked, the weapon
+  that blocked it (the shield, when one is worn, is armour and already
+  counted). A weapon is not reached when its holder is hit. A piece the hit
+  reaches loses WEAR_PER_HIT; one already at 0% rolls the break chance
+  instead, and a broken piece is gone. Only people's gear wears: nothing
+  here gives a bandit's sword a condition. The hit arrives through
+  onPapyrusEvent:OnHit, whose one handler is at the end of the warrior
+  maneuvers block and hands it to onHit here.
 
-  THE KITS ARE NOT IN THE WORLD YET. A kit is a MISC record and a recipe in
-  Thornswood-Content.esp, and neither exists. KITS says what each one mends
-  and whose it is; item is the kit's record and stays null until the plugin
-  carries it. With item null, /repair says no kit has been made yet.
+  WHAT IS WORN IS MATCHED TO THE PACK BY THE NAME WITHOUT THE CONDITION.
+  What is worn is read off the equipment, which the client sends, and the
+  client never takes in a new condition on a piece it already holds:
+  skymp5-client's namesEqual (sync/inventory.ts in the fork) drops a
+  trailing "(...)" from both names before comparing, so "Iron Sword (85%)"
+  and "Iron Sword (84%)" are one entry to it and its diff applies nothing.
+  Its equipment keeps naming the piece as it was when it arrived, so a
+  match on the whole name finds the piece once and loses it after the
+  first hit. sameName compares the way the client does.
+
+  THE KITS. A kit is a MISC record and a recipe in Thornswood-Content.esp
+  (scripts/mods/Add-ContentRecords.py). KITS says what each one mends,
+  whose it is, and its record; a server whose plugin does not carry the
+  record yet resolves it to 0, and the panel says no kit has been made.
   repairTo and repairWithKit are what the rest of the file uses, so the fuel
   and master work (#1398) can rely on them: repairTo is the number a kit
   mends to for this person, and repairWithKit is the whole repair.
+
+  THE REPAIR IS A PANEL, NOT A COMMAND (Patrick, 4 October: no chat
+  commands for what people do). With a kit in the pack, the inventory shows
+  a key; the key sends /repair, and panel() answers by publishing the view
+  on PANEL_PROPERTY, which draws game/ui/thornswood-repair.js. Each row's
+  button sends /repair mend with that piece. Nobody is told to type either.
 
   NOTHING HERE TOUCHES A NUMBER ON THE PAGE. 120% does not yet add 5% to a
   weapon's damage or an armour piece's rating: the server works damage out
@@ -47979,6 +49223,12 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   var DAY_MS = 24 * 60 * 60 * 1000;
   // durability.md: at 0%, a worn piece has a 10% chance to break on a hit.
   var BREAK_CHANCE = 0.10;
+  // Patrick, 4 October (#1384): a worn piece loses condition per hit. 1% a
+  // hit, written on durability.md.
+  var WEAR_PER_HIT = 1;
+  // BOD2 slot 39, the shield. A shield blocks for its holder, so a blocked
+  // hit reaches it, and it is armour, so every hit already does.
+  var SHIELD_SLOT = 1 << 9;
   /*
     A dropped thing lies on the ground two minutes before the engine deletes
     it (MpActor::DropItem, kDeletionTimeSeconds), so its condition is kept a
@@ -47993,17 +49243,20 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   var RUNTIME = 0xff000000;
   // Where a container's dull clock is written, on the reference itself.
   var CLOCK_PROPERTY = 'thornswoodDull';
+  // The repair panel's view, the owner's only (game/ui/thornswood-repair.js).
+  var PANEL_PROPERTY = 'thornswoodRepairView';
 
   /*
     THE THREE KITS, by what they mend. half is the half that makes it and
     repairs to 120%; maker is that half as a person reads it. item is the
-    kit's MISC record in Thornswood-Content.esp, null until the plugin
-    carries it (see the block comment).
+    kit's MISC record in Thornswood-Content.esp (Add-ContentRecords.py).
+    Only the half the person picked repairs to 120%, never the sister half at
+    any rank (Patrick, 4 October).
   */
   var KITS = {
-    weapon:   { name: 'Weapon Kit', half: 'edgewright',  maker: 'Edgewright',  item: null },
-    armour:   { name: 'Armor Kit',  half: 'platewright', maker: 'Platewright', item: null },
-    clothing: { name: 'Sewing Kit', half: 'haberdasher', maker: 'Haberdasher', item: null }
+    weapon:   { name: 'Weapon Kit', half: 'edgewright',  maker: 'Edgewright',  item: '154b0:Thornswood-Content.esp' },
+    armour:   { name: 'Armor Kit',  half: 'platewright', maker: 'Platewright', item: '154b1:Thornswood-Content.esp' },
+    clothing: { name: 'Sewing Kit', half: 'haberdasher', maker: 'Haberdasher', item: '154b2:Thornswood-Content.esp' }
   };
 
   // " (85%)" on the end of a name.
@@ -48084,6 +49337,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   function create(api) {
     var kits = api.kits || KITS;
     var kinds = {};
+    var shields = {};
     var names = {};
     // Pieces that went onto the ground and what they were at, oldest first.
     var drops = [];
@@ -48130,6 +49384,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         if (JEWELLERY_KEYWORDS.indexOf(keywords[j]) !== -1) { return ''; }
       }
       if (slots > 0 && (slots & ~JEWELLERY_SLOTS) === 0) { return ''; }
+      if (slots > 0 && (slots & SHIELD_SLOT)) { shields[baseId] = true; }
       if (armourType === 0 || armourType === 1) { return 'armour'; }
       if (armourType === 2) { return 'clothing'; }
       return '';
@@ -48239,30 +49494,33 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       return (state && state.half === kit.half) ? CONDITION.highest : CONDITION.sound;
     }
 
+    function heldOf(entries, id) {
+      var n = 0;
+      for (var i = 0; i < entries.length; i++) {
+        if (entries[i] && entries[i].baseId === id) { n += Number(entries[i].count) || 0; }
+      }
+      return n;
+    }
+
     /*
-      A REPAIR. The piece is the one in the pack whose name matches what was
-      asked for; of several, the one in the worst condition. One kit of the
-      kind that mends it is used up, and one unit of the piece comes out at
-      repairTo. Answers { ok, line } and, when it worked, from, to, kit and
-      baseId. Nothing is taken when anything is refused.
+      A REPAIR. pick is the row the panel's button names: the base, the
+      condition and the name without it. One kit of the kind that mends it is
+      used up, and one unit of the piece comes out at repairTo. Answers
+      { ok, line } and, when it worked, from, to, kit and baseId. Nothing is
+      taken when anything is refused.
     */
-    function repairWithKit(actorId, asked) {
+    function repairWithKit(actorId, pick) {
       function no(line) { return { ok: false, line: line }; }
       var entries = api.inventory(actorId);
       if (!entries) { return no('The server cannot read your pack right now. Try again in a moment.'); }
-      var want = String(asked || '').toLowerCase().replace(/\s+/g, ' ').trim();
-      if (!want) { return no('Say which piece: /repair <name>. /repair on its own lists what you carry.'); }
+      pick = pick || {};
+      var p = null;
       var all = piecesIn(entries);
-      var exact = all.filter(function (p) { return p.name.toLowerCase() === want; });
-      var found = exact.length ? exact : all.filter(function (p) {
-        return p.name.toLowerCase().indexOf(want) !== -1;
-      });
-      if (!found.length) {
-        return no('You are not carrying a weapon, armour or clothing called ' + asked +
-                  '. /repair on its own lists what you carry.');
+      for (var f = 0; f < all.length; f++) {
+        if (all[f].entry.baseId === pick.baseId && all[f].cond === Number(pick.cond) &&
+            all[f].name === String(pick.name || '')) { p = all[f]; break; }
       }
-      found.sort(function (a, b) { return a.cond - b.cond; });
-      var p = found[0];
+      if (!p) { return no('That piece is not in your pack any more.'); }
       var kit = kits[p.kind];
       var id = kitId(p.kind);
       if (!id) {
@@ -48298,48 +49556,75 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
                line: 'Your ' + p.name + ' is at ' + to + '% now. The ' + kit.name + ' is used up.' };
     }
 
-    /** /repair on its own: what you carry that is not at 100%, and your kits. */
-    function describe(actorId) {
+    /*
+      WHAT THE PANEL SHOWS. A row for every piece carried that is not at
+      100%, and for every sound piece this person's kit would raise (the
+      half that makes a kit mends to 120%), worst first; pieces of one base
+      at one condition under one name are one row. Each row says which kit
+      mends it, the number a repair by this person comes out at, and whether
+      that kit is in the pack. The kits are listed with how many are carried
+      and whether the world has the record at all.
+    */
+    function view(actorId) {
       var entries = api.inventory(actorId);
-      if (!entries) { return 'The server cannot read your pack right now. Try again in a moment.'; }
-      var pieces = piecesIn(entries);
-      var off = pieces.filter(function (p) { return p.cond !== CONDITION.sound; });
-      off.sort(function (a, b) { return a.cond - b.cond; });
-      var sound = 0;
-      for (var i = 0; i < pieces.length; i++) {
-        if (pieces[i].cond === CONDITION.sound) { sound += Number(pieces[i].entry.count) || 0; }
+      if (!entries) {
+        return { open: true, rows: [], kits: [],
+                 note: 'The server cannot read your pack right now. Try again in a moment.' };
       }
-      var line;
-      if (!pieces.length) {
-        line = 'You are carrying no weapon, armour or clothing.';
-      } else if (!off.length) {
-        line = 'Everything you carry is at 100%.';
-      } else {
-        line = off.slice(0, 12).map(function (p) {
-          var n = Number(p.entry.count) || 1;
-          return p.name + ' ' + p.cond + '%' + (n > 1 ? ' (' + n + ')' : '');
-        }).join(', ') + (off.length > 12 ? ', and ' + (off.length - 12) + ' more' : '') + '.';
-        if (sound) { line += ' ' + sound + (sound === 1 ? ' more piece is' : ' more pieces are') + ' at 100%.'; }
-      }
-      var held = [];
+      var state = null;
+      try { state = api.stateOf(actorId); } catch (e) { state = null; }
+      var held = {};
+      var kitRows = [];
       for (var key in kits) {
         if (!own(kits, key)) { continue; }
         var id = kitId(key);
-        if (!id) { continue; }
-        var n = 0;
-        for (var j = 0; j < entries.length; j++) {
-          if (entries[j] && entries[j].baseId === id) { n += Number(entries[j].count) || 0; }
-        }
-        if (n) { held.push(n + ' ' + kits[key].name + (n === 1 ? '' : 's')); }
+        held[key] = id ? heldOf(entries, id) : 0;
+        kitRows.push({ kind: key, name: kits[key].name, maker: kits[key].maker,
+                       count: held[key], made: !!id });
       }
-      return line + ' ' + (held.length ? 'Kits: ' + held.join(', ') + '.' : 'You carry no repair kit.') +
-             ' /repair <name> mends a piece with its kit.';
+      var rows = [];
+      var byKey = {};
+      var pieces = piecesIn(entries);
+      for (var i = 0; i < pieces.length; i++) {
+        var p = pieces[i];
+        var to = repairTo(state, p.kind);
+        if (p.cond === CONDITION.sound && to <= CONDITION.sound) { continue; }
+        var n = Number(p.entry.count) || 0;
+        var worn = !!(p.entry.worn || p.entry.wornLeft);
+        var rowKey = p.entry.baseId + '|' + p.cond + '|' + p.name;
+        if (own(byKey, rowKey)) {
+          byKey[rowKey].count += n;
+          byKey[rowKey].worn = byKey[rowKey].worn || worn;
+          continue;
+        }
+        var row = { base: p.entry.baseId.toString(16), cond: p.cond, name: p.name, count: n, worn: worn,
+                    kind: p.kind, kit: kits[p.kind].name, maker: kits[p.kind].maker, to: to,
+                    can: p.cond < to && held[p.kind] > 0 };
+        byKey[rowKey] = row;
+        rows.push(row);
+      }
+      rows.sort(function (a, b) { return a.cond - b.cond; });
+      return { open: true, rows: rows, kits: kitRows };
     }
 
-    /** The chat command. Answers the line to say. */
-    function command(actorId, rest) {
-      var asked = String(rest || '').trim();
-      return asked ? repairWithKit(actorId, asked).line : describe(actorId);
+    /*
+      WHAT THE PANEL AND THE INVENTORY KEY SEND, as the words after /repair.
+      Nothing, the key: draw the panel. 'mend <base in hex> <condition>
+      <name>', a row's button: mend that piece, then draw the panel again.
+      Answers the line to say in the chat, or '' for none.
+    */
+    function panel(actorId, words) {
+      words = words || [];
+      var line = '';
+      if (String(words[0] || '').toLowerCase() === 'mend') {
+        line = repairWithKit(actorId, {
+          baseId: parseInt(String(words[1] || ''), 16) || 0,
+          cond: Number(words[2]),
+          name: words.slice(3).join(' ')
+        }).line;
+      }
+      api.show(actorId, view(actorId));
+      return line;
     }
 
     /*
@@ -48391,81 +49676,126 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
     /*
       A HIT LANDED. targetId was hit, by aggressorId, with the weapon sourceId
-      (a base id, or 0 for a fist or a spell). Nothing here can stop the hit;
-      it only decides whether a piece at 0% breaks.
+      (a base id, or 0 for a fist or a spell), and blocked is the flag the
+      client sent with it. Nothing here can stop the hit; it only wears what
+      the hit reaches (the block comment says what that is) and breaks a
+      piece at 0% on the roll. Answers the names of what broke.
     */
-    function hit(targetId, aggressorId, sourceId) {
+    function hit(targetId, aggressorId, sourceId, blocked) {
       var said = [];
-      if (aggressorId && sourceId && api.isPerson(aggressorId)) {
-        said = said.concat(breaks(aggressorId, function (e) {
-          return e.baseId === sourceId && pieceKind(e.baseId) === 'weapon';
+      if (aggressorId && sourceId && api.isPerson(aggressorId) && pieceKind(sourceId) === 'weapon') {
+        said = said.concat(wear(aggressorId, function (worn) {
+          return inHand(worn.filter(function (w) { return w.baseId === sourceId; }));
         }));
       }
       if (targetId && api.isPerson(targetId)) {
-        said = said.concat(breaks(targetId, function (e) {
-          var kind = pieceKind(e.baseId);
-          return kind === 'armour' || kind === 'clothing';
+        said = said.concat(wear(targetId, function (worn) {
+          var body = worn.filter(function (w) {
+            var kind = pieceKind(w.baseId);
+            return kind === 'armour' || kind === 'clothing';
+          });
+          if (!blocked || body.some(function (w) { return !!shields[w.baseId]; })) { return body; }
+          return body.concat(inHand(worn.filter(function (w) { return pieceKind(w.baseId) === 'weapon'; })));
         }));
       }
       return said;
     }
 
     /*
+      One weapon out of those worn that could be it: the right hand's, else
+      the left's. A hit is landed or blocked with one weapon, and two of the
+      same sword, one in each hand, are still one hit.
+    */
+    function inHand(list) {
+      for (var i = 0; i < list.length; i++) { if (list[i].worn) { return [list[i]]; } }
+      return list.length ? [list[0]] : [];
+    }
+
+    /*
+      The same piece by name, the way the client compares: the condition is
+      not part of it, and no name at all is the base's own name (see WHAT IS
+      WORN IS MATCHED TO THE PACK in the block comment).
+    */
+    function sameName(entry, wornName) {
+      var a = String(entry.name || '').replace(SUFFIX, '');
+      var b = String(wornName || '').replace(SUFFIX, '');
+      if (a === b) { return true; }
+      var plain = baseName(entry.baseId);
+      return (!a && b === plain) || (!b && a === plain);
+    }
+
+    /*
       The pack's entry for a worn thing. What is worn is read off the
       equipment, which is what the client dresses from, and the condition off
-      the pack. When the worn thing names itself, that name; when it does
-      not, the stack of that base the pack has flagged worn, else the first.
+      the pack. When the worn thing names itself, a stack of that name; of
+      those, the one the pack has flagged worn in the same hand, else any
+      flagged worn, else the first.
     */
     function packEntryFor(entries, w) {
-      var at = -1;
+      var at = -1, best = -1;
       var named = typeof w.name === 'string';
       for (var k = 0; k < entries.length; k++) {
         var e = entries[k];
         if (!e || e.baseId !== w.baseId || !(Number(e.count) > 0)) { continue; }
-        if (named && String(e.name || '') !== w.name) { continue; }
-        if (at < 0 || ((e.worn || e.wornLeft) && !(entries[at].worn || entries[at].wornLeft))) { at = k; }
+        if (named && !sameName(e, w.name)) { continue; }
+        var score = (!!e.worn === !!w.worn && !!e.wornLeft === !!w.wornLeft) ? 2 : ((e.worn || e.wornLeft) ? 1 : 0);
+        if (score > best) { at = k; best = score; }
       }
       return at;
     }
 
-    function breaks(actorId, which) {
+    /*
+      ONE HIT ON ONE PERSON'S GEAR. pick chooses, out of what they wear that
+      has a condition, the pieces this hit reaches. Each one above 0% loses
+      WEAR_PER_HIT; each one at 0% rolls the break chance. One write for the
+      lot, and nothing said or logged unless it was written.
+    */
+    function wear(actorId, pick) {
       var worn = [];
       try { worn = api.worn(actorId) || []; } catch (e) { worn = []; }
-      var due = worn.filter(function (w) { return w && w.baseId && which(w); });
+      var due = pick(worn.filter(function (w) { return w && w.baseId && pieceKind(w.baseId); }));
       if (!due.length) { return []; }
       var entries = api.inventory(actorId);
       if (!entries) { return []; }
       var gone = [];
+      var worse = 0;
       for (var j = 0; j < due.length; j++) {
         var at = packEntryFor(entries, due[j]);
-        if (at < 0 || conditionOf(entries[at]) > CONDITION.lowest) { continue; }
+        if (at < 0) { continue; }
+        var cond = conditionOf(entries[at]);
+        if (cond > CONDITION.lowest) {
+          entries = setUnits(entries, at, 1, cond - WEAR_PER_HIT);
+          worse++;
+          continue;
+        }
         if (!(api.random() < BREAK_CHANCE)) { continue; }
-        var name = bareName(entries[at]);
+        gone.push(bareName(entries[at]));
         entries = takeUnit(entries, at);
-        gone.push(name);
       }
-      if (!gone.length) { return []; }
+      if (!gone.length && !worse) { return []; }
       if (!api.setInventory(actorId, entries)) { return []; }
       for (var n = 0; n < gone.length; n++) {
         api.say(actorId, 'Your ' + gone[n] + ' broke. It was at 0%, and a kit would have mended it.');
       }
-      api.log('durability:', actorId.toString(16), 'broke', gone.join(', '), 'on a hit at 0%');
+      if (gone.length) {
+        api.log('durability:', actorId.toString(16), 'broke', gone.join(', '), 'on a hit at 0%');
+      }
       return gone;
     }
 
     /*
       A hit as the engine sends it: the target's id, then the aggressor and
       the weapon or spell as { type, desc } (THE PAPYRUS FAMILY, over
-      mp.onTakeItem). The one OnHit handler, in the warrior maneuvers block,
-      hands it here.
+      mp.onTakeItem), and the client's blocked flag. The one OnHit handler,
+      in the warrior maneuvers block, hands it here.
     */
-    function onHit(targetId, aggressor, source) {
+    function onHit(targetId, aggressor, source, blocked) {
       function idFrom(v) {
         if (typeof v === 'number') { return v; }
         if (v && v.desc) { return api.idOf(v.desc) || 0; }
         return 0;
       }
-      return hit(Number(targetId) || 0, idFrom(aggressor), idFrom(source));
+      return hit(Number(targetId) || 0, idFrom(aggressor), idFrom(source), !!blocked);
     }
 
     function forgetOldDrops() {
@@ -48563,9 +49893,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
     return {
       CONDITION: CONDITION, DULL_PER_DAY: DULL_PER_DAY, DAY_MS: DAY_MS,
-      BREAK_CHANCE: BREAK_CHANCE, KITS: kits,
+      BREAK_CHANCE: BREAK_CHANCE, WEAR_PER_HIT: WEAR_PER_HIT, KITS: kits,
       pieceKind: pieceKind, conditionOf: conditionOf, withCondition: withCondition,
-      repairTo: repairTo, repairWithKit: repairWithKit, describe: describe, command: command,
+      repairTo: repairTo, repairWithKit: repairWithKit, view: view, panel: panel,
       opened: opened, hit: hit, onHit: onHit, dropped: dropped, pressed: pressed
     };
   }
@@ -48580,6 +49910,39 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       updateOwner: '', updateNeighbor: ''
     });
   } catch (e) { /* made by an earlier load. harmless. */ }
+
+  /*
+    THE REPAIR PANEL'S VIEW, seen by its owner only. The owner's script hands
+    it to the page, the way the merchant panel's does, and
+    game/ui/thornswood-repair.js draws it; a view with open set opens it. at
+    moves on every send, so the key pressed again draws the panel again
+    even when nothing in it changed.
+  */
+  var panelScript = [
+    '(function(){',
+    '  try {',
+    '    var v = ctx.value;',
+    '    if (!v || typeof v !== "object") { return; }',
+    '    var st = ctx.state;',
+    '    if (!st) { return; }',
+    '    if (st.thornswoodRepairAt === v.at) { return; }',
+    '    st.thornswoodRepairAt = v.at;',
+    '    var body = JSON.stringify(v);',
+    '    var src = "(function(){try{" +',
+    '      "var d=" + body + ";window.thornswoodRepairView=d;" +',
+    '      "if(window.thornswoodRepair&&window.thornswoodRepair.setData){window.thornswoodRepair.setData(d);}" +',
+    '      "}catch(e){}})();";',
+    '    try { ctx.sp.browser.executeJavaScript(src); } catch (e) { }',
+    '  } catch (e) { }',
+    '})();'
+  ].join('\n');
+  try {
+    mp.makeProperty(PANEL_PROPERTY, {
+      isVisibleByOwner: true, isVisibleByNeighbors: false,
+      updateOwner: panelScript, updateNeighbor: ''
+    });
+  } catch (e) { /* made by an earlier load. harmless. */ }
+  var shownAt = 0;
 
   /*
     Display names by record, out of the recipe table, built once: every
@@ -48671,6 +50034,14 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     setClock: function (id, clock) {
       try { mp.set(id, CLOCK_PROPERTY, clock || { at: 0, days: 0 }); } catch (e) {
         log('durability: could not write the clock of container', Number(id).toString(16) + ':', e);
+      }
+    },
+    show: function (id, v) {
+      var payload = JSON.parse(JSON.stringify(v || { open: false }));
+      shownAt = Math.max(Date.now(), shownAt + 1);
+      payload.at = shownAt;
+      try { mp.set(id, PANEL_PROPERTY, payload); } catch (e) {
+        log('durability: could not send the repair panel to', Number(id).toString(16) + ':', e);
       }
     },
     say: say,
@@ -49040,16 +50411,19 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     /*
       Recovery, per real hour, by where somebody is resting.
 
-      A bed is four times a chair, which is what makes going to an inn worth
-      the walk. The bard is added on top of whatever the place already gives,
-      so a bard in an inn is 75 an hour and is the best rest in the game, which
-      is the point Grim was making.
+      Patrick's ladder on #1603, "use some common sense": a bed is better than
+      a campfire, a bed or bedroll nobody lends you is a little better than
+      sitting, a campfire with a bedroll is better than a campfire alone, and
+      so on up to your own bed. So: a seat 20, a bed or bedroll nobody can lend
+      you 25 (rough), a seat with a fire in reach 35 (campfire), rough with a
+      fire in reach 45 (camp), a bed you are allowed in 50 (inn: a guest, or a
+      key or deed carried), your own bed 80. The bard is added on top of
+      whatever the place already gives.
 
-      bedroll is the campfire's number, which docs/systems/property.md gives
-      it. Which of inn, bed and bedroll somebody gets is the beds' answer in
-      the property block, never the word they typed (#1392).
+      Which kind somebody gets is the beds' answer in the property block, by
+      what the server saw them press, never the word after /rest (#1392, #1607).
     */
-    recover: { sit: 20, campfire: 35, bedroll: 35, inn: 50, bed: 80 },
+    recover: { sit: 20, rough: 25, campfire: 35, camp: 45, inn: 50, bed: 80 },
     bard: 25,
 
     /*
@@ -50966,6 +52340,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     }
 
     var reach = SOCIAL.nearReach * SOCIAL.nearReach;
+    // Whether the look prompt offers "Let sleep here" (#1603). See sleepMark
+    // in the beds, in the property block.
+    var beds = g.__thornswoodBeds;
     for (var a = 0; a < at.length; a++) {
       var me = at[a];
       var s = read(me.id) || fresh();
@@ -50985,7 +52362,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
           f: s.friends[them.pid] ? 1 : 0,
           m: s.muted[them.pid] ? 1 : 0,
           h: (s.namesAll || (s.namesOff && s.namesOff[them.pid])) ? 1 : 0,
-          y: (party && party.members.indexOf(them.pid) !== -1) ? 1 : 0
+          y: (party && party.members.indexOf(them.pid) !== -1) ? 1 : 0,
+          s: (beds && beds.mark) ? beds.mark(me.pid, them.pid, me.cell) : 0
         };
       }
       var sig = JSON.stringify(w) + (s.namesAll ? ':all' : '');
@@ -51871,7 +53249,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var t = {
       a: aActor, b: bActor,
       offerA: [], offerB: [], goldA: 0, goldB: 0,
-      okA: false, okB: false, at: Date.now()
+      okA: false, okB: false, at: Date.now(),
+      // The company worker buying, when it is a sale out of Skyrim (#1393).
+      sale: 0
     };
     open[aActor] = t; open[bActor] = t;
     trades.push(t);
@@ -52098,6 +53478,60 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     return '';
   }
 
+  /*
+    A SALE OUT OF SKYRIM, #1393, docs/systems/trading-company.md. At a company
+    event somebody sells a thing out of Skyrim, and the company buys it
+    through a worker. Patrick, 4 Oct: no chat commands for anything people
+    do. So it is this panel: the two open an ordinary trade with the key, and
+    the worker presses Buy for the company. Then what the other person puts
+    up leaves the world instead of crossing, and the gold the worker puts up
+    is the price the two of them agree, split by the property block's
+    saleCuts (saleSwap). Pressing it again makes it an ordinary trade. Either
+    way both agreements are taken back, the same as any change to a pile.
+
+    Only a worker the company has taken on presses it: the property block's
+    inCompany, the Discord role an application leads to, or an admin testing
+    the chain.
+  */
+  function companyOf(actorId) {
+    var pr = g.__thornswoodProperty;
+    var pid = 0;
+    try { pid = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pid = 0; }
+    return !!(pid && pr && pr.inCompany && pr.inCompany(pid));
+  }
+
+  function sale(actorId) {
+    var t = tradeOf(actorId);
+    if (!t) { return 'You are not trading.'; }
+    if (t.sale === actorId) {
+      t.sale = 0;
+      unconfirm(t); push(t);
+      try { say(other(t, actorId), nameOf(actorId) + ' is not buying for the company now. It is an ordinary trade.'); }
+      catch (e) { }
+      return '';
+    }
+    if (t.sale) { return nameOf(t.sale) + ' is already buying for the company.'; }
+    if (!companyOf(actorId)) {
+      return 'Only somebody the Free Skyrim Trading Company has taken on buys for it. It is an application, in Discord.';
+    }
+    t.sale = actorId;
+    unconfirm(t); push(t);
+    try {
+      say(other(t, actorId), nameOf(actorId) + ' is buying for the Free Skyrim Trading Company. ' +
+          'What you put up leaves Skyrim and does not come back.');
+    } catch (e2) { }
+    return '';
+  }
+
+  /* The split of the price as the panel shows it to either side. */
+  function saleView(t, actorId) {
+    var pr = g.__thornswoodProperty;
+    var price = t.sale === t.a ? t.goldA : t.goldB;
+    var cuts = (pr && pr.saleCuts) ? pr.saleCuts(price) : { price: price, worker: 0, gone: 0, seller: price };
+    return { mine: t.sale === actorId, worker: nameOf(t.sale), price: cuts.price,
+             cut: cuts.worker, gone: cuts.gone, seller: cuts.seller };
+  }
+
   function confirm(actorId) {
     var t = tradeOf(actorId);
     if (!t) { return 'You are not trading.'; }
@@ -52126,6 +53560,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       unconfirm(t); push(t);
       return 'You have moved too far apart.';
     }
+    if (t.sale) { return saleSwap(t); }
     var GOLD = (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F;
 
     var sides = [
@@ -52178,6 +53613,125 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     tlog(nameOf(t.a), 'and', nameOf(t.b), 'traded:', whatA, 'for', whatB);
     close(t, '');
     return '';
+  }
+
+  /*
+    The company's swap (#1393). Everything is asked again here, the same as
+    swap: the worker still buys for the company, the worker's side is gold
+    and nothing else, the seller's side is things and no gold, and each
+    still holds what they put up. Then one write each (saleById): the things
+    out of the seller's pack and out of the world with the seller's share
+    in, and the price less the worker's own cut out of the worker's pack.
+    The 10% that leaves is in neither pack. Never half.
+  */
+  function saleSwap(t) {
+    var GOLD = (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F;
+    var pr = g.__thornswoodProperty;
+    var worker = t.sale;
+    var seller = other(t, worker);
+    var price = worker === t.a ? t.goldA : t.goldB;
+    var asked = seller === t.a ? t.goldA : t.goldB;
+    var things = sideOf(t, seller);
+    function refuse(why) { unconfirm(t); push(t); return why; }
+    if (!pr || !pr.saleCuts) { return refuse('That is not running on this server.'); }
+    if (!companyOf(worker)) { return refuse(nameOf(worker) + ' cannot buy for the company now.'); }
+    if (sideOf(t, worker).length) {
+      return refuse('The company pays in gold. ' + nameOf(worker) + ' takes their things off the table.');
+    }
+    if (asked > 0) { return refuse('Only the company pays in a sale. ' + nameOf(seller) + ' takes their gold off the table.'); }
+    if (!things.length) { return refuse(nameOf(seller) + ' has put up nothing to sell.'); }
+    if (!(price > 0)) { return refuse(nameOf(worker) + ' has put up no gold for it.'); }
+    if (price > holding(worker, GOLD)) { return refuse(nameOf(worker) + ' does not have that gold any more.'); }
+    for (var i = 0; i < things.length; i++) {
+      if (things[i].c > holding(seller, things[i].id)) {
+        return refuse(nameOf(seller) + ' does not have the ' + things[i].n + ' any more.');
+      }
+    }
+    var cuts = pr.saleCuts(price);
+    var cost = cuts.price - cuts.worker;
+    if (!saleById(seller, worker, things, cuts.seller, cost)) {
+      return refuse('Something went wrong moving it. Nothing was taken.');
+    }
+    var what = describe(things, 0);
+    var me = nameOf(worker), them = nameOf(seller);
+    try {
+      say(seller, 'Sold to the Free Skyrim Trading Company for ' + cuts.price + ' gold. ' + what +
+          ' left Skyrim. ' + (cuts.worker
+            ? 'You receive ' + cuts.seller + ': ' + cuts.worker + ' went to ' + me + ' for handling it, and ' +
+              cuts.gone + ' left the world.'
+            : 'Under 10 gold nothing is cut, and you receive the whole ' + cuts.price + '.'));
+      say(worker, 'Bought for the company at ' + cuts.price + ' gold. ' + what + ' left Skyrim. ' + (cuts.worker
+            ? 'It cost you ' + cost + ': your ' + cuts.worker + ' for handling it stays with you, ' + cuts.gone +
+              ' left the world, and ' + them + ' received ' + cuts.seller + '.'
+            : 'Under 10 gold nothing is cut: ' + them + ' received the whole ' + cuts.price + '.'));
+    } catch (e) { }
+    tlog(me, 'bought', them + '\'s', what, 'for the company at', cuts.price, 'gold:', cuts.seller, 'to the seller,',
+         cuts.worker, 'to the worker,', cuts.gone, 'destroyed, and the things left the world');
+    close(t, '');
+    return '';
+  }
+
+  /*
+    A pack's entries less [baseId, count] pairs, or null when they are not
+    all there. An entry that is only partly taken keeps everything else it
+    had.
+  */
+  function withoutPairs(entries, pairs) {
+    var out = entries.slice();
+    for (var i = 0; i < pairs.length; i++) {
+      var baseId = pairs[i][0], left = pairs[i][1];
+      for (var k = 0; k < out.length && left > 0; k++) {
+        if (!out[k] || out[k].baseId !== baseId) { continue; }
+        var had = out[k].count || 1;
+        var take = Math.min(left, had);
+        var rest = {};
+        for (var f in out[k]) { if (Object.prototype.hasOwnProperty.call(out[k], f)) { rest[f] = out[k][f]; } }
+        rest.count = had - take;
+        out[k] = rest;
+        left -= take;
+      }
+      if (left > 0) { return null; }
+    }
+    var keep = [];
+    for (var j = 0; j < out.length; j++) {
+      if (out[j] && (out[j].count || 0) > 0) { keep.push(out[j]); }
+    }
+    return keep;
+  }
+
+  /*
+    A company sale's two packs, one write each, or nothing at all (#1393).
+    The seller's: the things out, and out of the world, and their share in.
+    The worker's: the price less their own cut out. Gold in the seller's
+    pack goes up by less than the worker's goes down; the difference is the
+    10% that leaves the server.
+  */
+  function saleById(sellerActor, workerActor, things, share, cost) {
+    var GOLD = (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F;
+    var sellerInv, workerInv;
+    try {
+      sellerInv = mp.get(sellerActor, 'inventory') || { entries: [] };
+      workerInv = mp.get(workerActor, 'inventory') || { entries: [] };
+    } catch (e) { return false; }
+    var pairs = [];
+    for (var i = 0; i < things.length; i++) { pairs.push([things[i].id, things[i].c]); }
+    var gone = withoutPairs((sellerInv.entries || []).slice(), pairs);
+    var paid = withoutPairs((workerInv.entries || []).slice(), [[GOLD, cost]]);
+    if (!gone || !paid || !(share > 0) || !(cost >= share)) { return false; }
+    var landed = false;
+    for (var k = 0; k < gone.length; k++) {
+      if (gone[k] && gone[k].baseId === GOLD && !gone[k].worn) {
+        gone[k] = { baseId: GOLD, count: (gone[k].count || 1) + share };
+        landed = true;
+        break;
+      }
+    }
+    if (!landed) { gone.push({ baseId: GOLD, count: share }); }
+    try {
+      mp.set(sellerActor, 'inventory', { entries: gone });
+      mp.set(workerActor, 'inventory', { entries: paid });
+    } catch (e2) { return false; }
+    return true;
   }
 
   function describe(items, goldN) {
@@ -52253,6 +53807,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       theyAgreed: meA ? t.okB : t.okA,
       pack: carrying(actorId),
       heldGold: holding(actorId, (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F),
+      // A sale out of Skyrim (#1393): the split, and whether this side may
+      // press Buy for the company.
+      sale: t.sale ? saleView(t, actorId) : null,
+      canBuy: (!t.sale || t.sale === actorId) && companyOf(actorId),
       at: Date.now()
     };
   }
@@ -52328,7 +53886,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
   g.__thornswoodTrade = {
     TRADE: TRADE,
-    begin: begin, add: add, remove: remove, gold: gold,
+    begin: begin, add: add, remove: remove, gold: gold, sale: sale, saleById: saleById,
     confirm: confirm, cancel: cancel, tradeOf: tradeOf,
     carrying: carrying, labelOf: labelOf, within: within,
     view: view, push: push, refresh: refresh, tick: tick, swap: swap, moveById: moveById,

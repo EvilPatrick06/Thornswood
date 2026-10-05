@@ -53,7 +53,8 @@ function links(html) {
 }
 
 // ------------------------------------------------------------------ the bar
-const a = src.indexOf('<nav class="top" id="nav">');
+// Found by its opening, not the whole tag: #1585 gave the bar an aria-label.
+const a = src.indexOf('<nav class="top" id="nav"');
 const b = a < 0 ? -1 : src.indexOf('</nav>', a);
 const bar = (a >= 0 && b >= 0) ? src.slice(a, b) : null;
 yes('the top bar is in home.html', bar !== null);

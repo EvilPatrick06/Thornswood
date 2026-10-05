@@ -40,16 +40,22 @@ Staff and dev commands stay commands: moderation (`/kick`,
 `/silence`, `/ban` and the rest), and the testers' `/tp`, `/give`
 and `/spawn`.
 
+Getting help stays a command too. Decided by Patrick later on 4 Oct:
+"change it to except the /stuck and the ones for getting help from
+GMs". `/stuck`, and the lines that reach staff, `/helpme` (and
+`/help-me`) and `/report`, are typed in the chat, and the help in the
+game, the launcher's Help and the site name them.
+
 A panel or a key may send the server the same line a command used to
 be. The look prompt already sends `/trade` and the id of the person
 under the crosshair. Nobody is told to type that line, and help text
 never lists it.
 
-A page below that still tells people to type something is out of date
-on that point. [Chat commands](systems/commands.md) lists every
-command the game answers today, who may use it, and the issue that
-turns each one for people into buttons. A new system is written with
-its buttons from the start.
+A page below that still tells people to type something other than
+those three is out of date on that point. [Chat commands](systems/commands.md)
+lists every command the game answers today, who may use it, and the
+issue that turns each one for people into buttons. A new system is
+written with its buttons from the start.
 
 ## A person arrives
 
@@ -75,8 +81,9 @@ separate page.
 as hunger. Ale and potions are drinks, with their own pages.
 
 [Exhaustion](systems/exhaustion.md). Called rest on the bar. Empties in 8
-hours. Sit, campfire, inn and bed recover at 20, 35, 50 and 80 an hour.
-Crafting stops under 15.
+hours. A seat recovers 20 an hour, a bed nobody can lend you 25, a seat
+by a fire 35, that bed by a fire 45, a bed you are allowed in 50, and
+your own bed 80. Crafting stops under 15.
 
 [Food](systems/food.md). Raw, burnt, cooked, and a feast. Eating takes
 time. A full stomach refuses another meal's help.
@@ -115,7 +122,7 @@ end it.
 
 [Durability](systems/durability.md). Weapon Kit, Armor Kit, Sewing
 Kit. The right half repairs to 120%. Anyone else repairs to 100%.
-At 0%, a worn piece can break.
+Worn gear loses 1% a hit. At 0%, a worn piece can break.
 
 [Cut items](systems/cut-items.md). What leaves the open book, and the
 references kept so a row can come back. The recipe file is not

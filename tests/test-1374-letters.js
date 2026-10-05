@@ -56,7 +56,9 @@ function fn(name) {
 
 const NAMES = ['takeGold', 'payOut', 'payHeld', 'sealed', 'nameIs', 'post', 'board', 'take',
                'jobs', 'dropJob', 'takedown', 'unpin', 'postLetter', 'deliver', 'letterReach',
-               'boardHere', 'nearestBoard', 'boardPanel', 'moveBoard', 'command'];
+               'boardHere', 'nearestBoard', 'boardPanel', 'moveBoard', 'command',
+               // The panel also lists the towns a haul can go to and the hauls that came here (#1393).
+               'haulTenth'];
 const lifted = {};
 const missing = [];
 NAMES.forEach(function (n) { lifted[n] = fn(n); if (!lifted[n]) { missing.push(n); } });
@@ -71,6 +73,9 @@ const seeding = prop ? (function () {
   return (a < 0 || b < 0) ? null : prop.slice(a, b);
 })() : null;
 yes('the board seeding is in the property block', seeding !== null);
+const holds = prop ? slice(prop, '  var LEDGER_HOLDS = [', '];') : null;
+const tenthFrom = prop ? slice(prop, '  var HAUL_TENTH_FROM = ', ';') : null;
+yes('the ten ledgers and the company\'s tenth are in the property block', holds !== null && tenthFrom !== null);
 
 // The real chargen town table, which is where nine of the boards come from.
 const chargenLine = gm.split('\n').find(function (l) { return l.indexOf('const CHARGEN = ') === 0; });
@@ -151,6 +156,8 @@ function boot(reg, w, opts) {
     'var funds = loadPart("funds", {});',
     'var notices = loadPart("notices", {});',
     'var GOLD_ID = ' + GOLD + ';',
+    holds,
+    tenthFrom,
     fees,
     block,
     'function save() { reg.funds = JSON.parse(JSON.stringify(funds)); ' +

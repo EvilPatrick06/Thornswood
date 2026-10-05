@@ -40,7 +40,9 @@ const os = require('os');
 const path = require('path');
 
 const SITE = process.argv[2] || path.join(__dirname, '..', 'site', 'server.js');
-const HOME = fs.readFileSync(path.join(__dirname, '..', 'site', 'public', 'home.html'), 'utf8')
+// The home page's script, which moved out of home.html into home.js in #1479
+// (no inline script under the content security policy).
+const HOME = fs.readFileSync(path.join(__dirname, '..', 'site', 'public', 'home.js'), 'utf8')
   .split(String.fromCharCode(13)).join('');
 
 let pass = 0, fail = 0;
@@ -173,7 +175,7 @@ function pageChecks() {
   const a = HOME.indexOf("} else if (here === '/report') {");
   const b = a < 0 ? -1 : HOME.indexOf('\n}\n', a);
   const page = (a >= 0 && b > a) ? HOME.slice(a, b) : '';
-  yes('home.html has the report page', !!page);
+  yes('home.js has the report page', !!page);
   const sub = page.slice(page.indexOf("form.addEventListener('submit'"));
   yes('pressing Send it says it is sending, on the button and under it',
       /btn\.textContent\s*=\s*'Sending'/.test(sub) && /said\.textContent\s*=\s*'Sending it\.'/.test(sub));
@@ -182,7 +184,11 @@ function pageChecks() {
       /setTimeout\(/.test(sub));
   const gaveUp = (sub.match(/'No answer from the site[^']*'/) || [''])[0];
   yes('and says so in words when it does', /No answer from the site/.test(gaveUp) && fair(gaveUp));
-  yes('the button comes back as Send it afterwards', /btn\.textContent\s*=\s*'Send it'/.test(sub));
+  // The button's own label, read off its markup (Send report since #1585),
+  // is what it says again once the answer is in.
+  const label = (page.match(/<button class="btn first" type="submit">([^<]+)<\/button>/) || [])[1] || '';
+  yes('the button comes back as its own label afterwards (' + label + ')',
+      !!label && new RegExp("btn\\.textContent\\s*=\\s*'" + label + "'").test(sub));
   yes('an answer that is not JSON still ends in a message, not a stuck button',
       /r\.json\(\)\.catch\(/.test(sub));
 }

@@ -16,15 +16,26 @@ function yes(what, cond) {
   else { fail++; console.log('FAIL  ' + what); }
 }
 
-const home = fs.readFileSync(HOME, 'utf8').split(CR).join('');
-const hub = fs.readFileSync(HUB, 'utf8').split(CR).join('');
+// Each page as it reaches the browser: its markup, its style and its script.
+// The style and script moved out of the pages into home.css, home.js, hub.css
+// and hub.js in #1479 (no inline style or script under the content security
+// policy), so each page is read with its two files after it.
+function pageOf(html, css, js) {
+  return [html, css, js].map(function (f) {
+    return fs.readFileSync(path.join(ROOT, 'site', 'public', f), 'utf8').split(CR).join('');
+  }).join('\n');
+}
+const home = pageOf(path.basename(HOME), 'home.css', 'home.js');
+const hub = pageOf(path.basename(HUB), 'hub.css', 'hub.js');
 
-const barA = home.indexOf('<nav class="top" id="nav">');
+// By its opening: #1585 gave the bar an aria-label.
+const barA = home.indexOf('<nav class="top" id="nav"');
 const barB = home.indexOf('</nav>', barA);
 const bar = home.slice(barA, barB);
 yes('top bar links to /gallery', /href="\/gallery">Gallery</.test(bar));
+// The footer's headings are h2 since #1585 (heading order).
 yes('footer Community links to /gallery',
-    /<h4>Community<\/h4>\s*<a href="\/gallery">Gallery<\/a>/.test(home));
+    /<h2>Community<\/h2>\s*<a href="\/gallery">Gallery<\/a>/.test(home));
 
 yes('home has gallery slideshow shell', /id="galleryShow"/.test(home));
 yes('home has See the gallery link', /See the gallery/.test(home));
@@ -39,10 +50,13 @@ yes('slideshow has themed prev next arrows',
     /\.gal-show \.gal-nav\{[^}]*border:1px solid var\(--gold\)/.test(home) &&
     /aria-label', 'Previous picture'/.test(home) &&
     /aria-label', 'Next picture'/.test(home));
-yes('gallery cards use By or a descriptive fallback alt',
-    /esc\(g\.by \|\| 'Gallery image'\)/.test(home));
-yes('gallery slideshow uses By or a descriptive fallback alt',
-    /img\.alt = s\.by \|\| 'Gallery image';/.test(home));
+// Since #1585 a picture's alt is its own stored alt first, then who shared
+// it, then the community, and never the bare words Gallery image.
+yes('gallery cards use the picture\'s alt, By, or a descriptive fallback',
+    /var description = esc\(g\.alt \|\| 'Skyrim scene shared by ' \+ \(g\.by \|\| 'the Thornswood community'\)\);/.test(home) &&
+    /alt="' \+ description \+ '"/.test(home));
+yes('gallery slideshow uses the picture\'s alt, By, or a descriptive fallback',
+    /img\.alt = s\.alt \|\| 'Skyrim scene shared by ' \+ \(s\.by \|\| 'the Thornswood community'\);/.test(home));
 yes('hub gallery thumbnails use By or contextual fallback alts',
     /esc\(g\.by \|\| 'Pending gallery image'\)/.test(hub) &&
     /esc\(g\.by \|\| 'Live gallery image'\)/.test(hub));
@@ -116,7 +130,8 @@ yes('By and Note stack as full-width gal-fields with labels above',
     !/<label>By<input/.test(home) &&
     !/<label>Note<span class="hint">/.test(home));
 yes('By and Note stay inside the themed .form grid',
-    /id="galChosen"[\s\S]{0,200}gal-field[\s\S]{0,200}galBy[\s\S]{0,300}galNote[\s\S]{0,200}galSend/.test(home) &&
+    // #1585 put the permission and privacy line between Note and Send.
+    /id="galChosen"[\s\S]{0,200}gal-field[\s\S]{0,200}galBy[\s\S]{0,300}galNote[\s\S]{0,600}galSend/.test(home) &&
     !/'<\/div><\/div><\/div>' \+[\s\S]{0,40}<label>By/.test(home));
 yes('By and Note inputs use charcoal iron night theme',
     /\.gal-box \.form input\[type=text\]\{[^}]*background:var\(--iron\)/.test(home) &&
