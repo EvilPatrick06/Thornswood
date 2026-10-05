@@ -36,8 +36,10 @@ levelling is off, so the face menu does not start a perk tree.
 ## Where this is
 
 The hall, the face, the K panel, the town, the waiting class and
-profession, the 40 gold and the three tools are in the server. A
-fisher is not handed a pole. The public
+profession, the 40 gold and the four tools are in the server: the
+pickaxe, the woodcutter's axe, the shovel, and the crude fishing pole
+a new fisher is handed, without which the water turns them away. The
+farmer's seed is handed with the shovel. The public
 steps are on the site's help page.
 
 Somebody still choosing who puts the panel down gets it back on its

@@ -304,6 +304,7 @@ jobs:
                  'test-1734-rest-reconnect.js',
                  'test-1676-rest-gate.js',
                  'test-1733-injury-gate.js',
+                 'test-1767-creation-tools.js',
                  'test-1741-encoding.js',
                  'test-1634-apprentice-gui.js',
                  'test-1637-door-gui.js',
