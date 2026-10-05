@@ -7,9 +7,10 @@ using System.Windows.Controls;
 
 namespace Thornswood
 {
-    // The add-ons tab rows and the collection card that names where the
-    // mods come from. They live apart from Shell.cs because they are one
-    // self-contained page slice, and Shell.cs was long enough (#500).
+    // The add-on rows and the collection card that names where the mods
+    // come from. They live apart from Shell.cs because they are one
+    // self-contained page slice, and Shell.cs was long enough (#500). Both
+    // are drawn on Diagnostics, since nothing opens the Mods page (#1170).
     static partial class Shell
     {
         // Ids being installed or removed right now, so a second click on the
@@ -76,6 +77,53 @@ namespace Thornswood
                 none.Margin = new Thickness(2, 10, 0, 0);
                 modList.Children.Add(none);
             }
+        }
+
+        /// <summary>
+        /// The optional packs on the Diagnostics page, under the collection
+        /// card (#1170). Their only home was the Add-ons tab of the Mods page,
+        /// and nothing has opened that page since #599 took it off the rail,
+        /// so a published pack could not be installed from the launcher.
+        ///
+        /// The same rows, buttons and version.json list as that tab, so the
+        /// two cannot disagree. Nothing is drawn until the feed lists a pack,
+        /// which is before the update check answers and whenever none is
+        /// published: a heading with nothing under it, on the page people
+        /// open when something is wrong, reads as one more thing wrong.
+        /// </summary>
+        static void DrawAddons()
+        {
+            if (diagAddons == null) return;
+            diagAddons.Children.Clear();
+
+            var have = pendingDoc == null ? null : pendingDoc.optional;
+            if (have == null) return;
+
+            var rows = new List<UIElement>();
+            foreach (var p in have)
+            {
+                if (p == null || string.IsNullOrEmpty(p.id)) continue;
+                rows.Add(PackRow(p, Updater.IsInstalled(p.id)));
+            }
+            if (rows.Count == 0) return;
+
+            var head = new TextBlock();
+            head.Text = "Add-ons";
+            head.Style = win.Resources["Eyebrow"] as Style;
+            head.Margin = new Thickness(0, 22, 0, 11);
+            diagAddons.Children.Add(head);
+
+            var about = new TextBlock();
+            about.Text = "Extras you can have if you want them and skip if you do not. " +
+                         "These are textures, meshes, weather and shaders, never a plugin, " +
+                         "which is why they are safe: the server compares plugin lists and " +
+                         "never looks at anything in here. Nobody is at a disadvantage for " +
+                         "leaving them off.";
+            about.Style = win.Resources["Body"] as Style;
+            about.Margin = new Thickness(0, 0, 8, 12);
+            diagAddons.Children.Add(about);
+
+            foreach (UIElement r in rows) diagAddons.Children.Add(r);
         }
 
         static string Bytes(long n)
@@ -247,6 +295,7 @@ namespace Thornswood
 
             packBusy.Add(p.id);
             BuildModList();
+            DrawAddons();
 
             ThreadPool.QueueUserWorkItem(delegate
             {
@@ -266,6 +315,7 @@ namespace Thornswood
                     {
                         packBusy.Remove(p.id);
                         BuildModList();
+                        DrawAddons();
                         DrawStatus();
                     }));
                 }
