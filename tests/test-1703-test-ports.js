@@ -141,7 +141,7 @@ yes('there are the twelve #1727 found, and the five that already waited for the 
                    'tests/test-site-headers.js', 'tests/test-site-local.js']).every((f) => sites.indexOf(f) >= 0));
 // Waiting on the site's own line is "await listening(...)" here, or reading
 // the child's "listening on " line, as the five did before #1727. waitUp()
-// was the connect loop seven of the twelve polled the port with.
+// was the connect loop six of the twelve polled the port with.
 for (const f of sites) {
   const own = /await listening\(\w+, \w+\)/.test(text[f]) || text[f].indexOf("'listening on ") >= 0;
   yes(f + ' waits for its own site to say it is listening, with no waitUp() poll of the port',
