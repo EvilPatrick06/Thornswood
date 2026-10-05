@@ -20,7 +20,6 @@
       .\Install-Voice.ps1 -Remove      take it off again
       .\Install-Voice.ps1 -PutBack     the files the last install replaced go
                                        back in, checked; the task is left as is
-      .\Install-Voice.ps1 -Auth on     require a join to prove itself
       .\Install-Voice.ps1 -ChatRange on   typed chat reaches only the people near
       .\Install-Voice.ps1 -TurnUrl turn:host:3478
                                        offer a relay; its key is turn-key.txt
@@ -43,13 +42,6 @@ param(
     # change here reaches it.
     [ValidateSet('0.0.0.0', '127.0.0.1')]
     [string]$Bind     = '0.0.0.0',
-    # Whether a join has to prove itself. log is the shipped default: an
-    # unproven join is let in as whatever profile it claims, and a line is
-    # written so that can be checked before anything is actually refused.
-    # on refuses it outright. off is the behaviour from before entry 6, kept
-    # for working out whether a problem is the auth check or something else.
-    [ValidateSet('on', 'log', 'off')]
-    [string]$Auth     = 'log',
     # Who reads a typed line, entry 150. on is the shipped default since
     # 4 Oct, for live as well as dev (Patrick: local chat "should have went
     # out with the other changes to live"): the same cell and 4000 units,
@@ -62,7 +54,7 @@ param(
     # THORNSWOOD_TURN_URL on the service's command line. The relay's key never
     # goes on a command line: it sits in turn-key.txt in -Root on the VPS, put
     # there by hand, and the service reads it from there. Left off, whatever
-    # is running is kept, the same as -Bind, -Auth and -ChatRange; -TurnUrl ''
+    # is running is kept, the same as -Bind and -ChatRange; -TurnUrl ''
     # takes it away. With no relay at all, the command line is the one it
     # always was.
     [string]$TurnUrl  = '',
@@ -131,16 +123,15 @@ if ($Restart) {
 <#
   What is already running, so a flag left off does not quietly undo it.
 
-  -Bind and -Auth both changed real behaviour today and both default to
-  0.0.0.0 and log whatever is already live. That is right for a first
-  install. Once the service is on loopback and enforcing, though, a later
-  command that leaves either one off, which is the easy thing to do once this
-  is routine, would silently reopen the port or drop back out of enforcing
-  it. Read what is actually running first, and keep it unless the flag was
-  actually passed.
+  -Bind changed real behaviour and defaults to 0.0.0.0 whatever is already
+  live. That is right for a first install. Once the service is on loopback,
+  though, a later command that leaves it off, which is the easy thing to do
+  once this is routine, would silently reopen the port. Read what is
+  actually running first, and keep it unless the flag was actually passed.
+  -Auth went with #1303: the service refuses every join that cannot prove
+  itself, so there is no auth left to keep.
 #>
 $bindExplicit = $PSBoundParameters.ContainsKey('Bind')
-$authExplicit = $PSBoundParameters.ContainsKey('Auth')
 $chatExplicit = $PSBoundParameters.ContainsKey('ChatRange')
 $turnExplicit = $PSBoundParameters.ContainsKey('TurnUrl')
 # What a relay address may look like, whether it came from -TurnUrl or from
@@ -148,23 +139,22 @@ $turnExplicit = $PSBoundParameters.ContainsKey('TurnUrl')
 # would start a second command.
 $turnShape = '^turns?:[A-Za-z0-9.-]+(:\d{1,5})?(\?transport=(udp|tcp))?(,turns?:[A-Za-z0-9.-]+(:\d{1,5})?(\?transport=(udp|tcp))?)*$'
 if ($TurnUrl -and $TurnUrl -notmatch $turnShape) { Die "-TurnUrl takes turn:host:port, or several joined by commas, and nothing else." }
-if (-not $bindExplicit -or -not $authExplicit -or -not $chatExplicit -or -not $turnExplicit) {
+if (-not $bindExplicit -or -not $chatExplicit -or -not $turnExplicit) {
     # The relay is read off /ice, the list every page is handed, because that
     # is what is actually being served; a relay with no key serves nothing and
     # so is not kept, and /health's turn field is read too so that is said
     # rather than done quietly. On its own try, so a service that cannot
-    # answer /ice still has its bind, auth and chat range kept. The relay
+    # answer /ice still has its bind and chat range kept. The relay
     # comes last in the answer because its address is read to the end.
     $probe = @"
 try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; `$t = ''; try { `$t = @((Invoke-RestMethod 'http://127.0.0.1:$Port/ice' -TimeoutSec 5).iceServers | ForEach-Object { `$_.urls } | Where-Object { "`$_" -match '^turns?:' }) -join ',' } catch { }; 'bind=' + `$h.bind + ';auth=' + `$h.auth + ';chat=' + `$h.chatRange + ';relay=' + `$h.turn + ';turn=' + `$t } catch { 'none' }
 "@
     $current = & (Join-Path $Here '..\vps\Remote.ps1') $probe -VpsHost $VpsHost -VpsUser $VpsUser 2>$null | Select-Object -Last 1
-    if ("$current" -match 'bind=([\d.]+);auth=(on|log|off)') {
+    if ("$current" -match 'bind=([\d.]+);') {
         if (-not $bindExplicit) { Say "  keeping the current bind, $($Matches[1]), since -Bind was not passed" 'DarkGray'; $Bind = $Matches[1] }
-        if (-not $authExplicit) { Say "  keeping the current auth, $($Matches[2]), since -Auth was not passed" 'DarkGray'; $Auth = $Matches[2] }
     }
-    # Whatever range is running is kept, 0 as off, the same as -Bind and
-    # -Auth: the default is for a first install. A service older than the
+    # Whatever range is running is kept, 0 as off, the same as -Bind: the
+    # default is for a first install. A service older than the
     # setting reports none and gets the default.
     if (-not $chatExplicit -and "$current" -match ';chat=(\d+)') {
         $ChatRange = $Matches[1]
@@ -326,9 +316,15 @@ if (-not (Get-NetFirewallRule -DisplayName '$TaskName' -EA SilentlyContinue)) {
 # a roll that fails still starts voice. The relay line, when there is one,
 # sits with the other settings ahead of the roll, so it is set in this cmd
 # before node starts whatever the roll does.
+#
+# THORNSWOOD_VOICE_AUTH=on is not read by this voice-server.js, which refuses
+# every join that cannot prove itself (#1303). It stays on the line because
+# -PutBack puts the files the last install replaced back under this same
+# task, and a copy from before #1303 reads it and lets unproven joins in
+# without it.
 `$roll = Join-Path '$Root' 'roll-log.ps1'
 `$psExe = Join-Path `$env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-`$cmd = ('/c "set THORNSWOOD_SITE=$Site&& set THORNSWOOD_VOICE_PORT=$Port&& set THORNSWOOD_VOICE_BIND=$Bind&& set THORNSWOOD_VOICE_AUTH=$Auth&& set THORNSWOOD_CHAT_RANGE=$ChatRange&& $turnSet"{2}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{3}" -Path "{1}" & "{0}" voice-server.js >> "{1}" 2>&1"' -f `$node.Source, `$log, `$psExe, `$roll)
+`$cmd = ('/c "set THORNSWOOD_SITE=$Site&& set THORNSWOOD_VOICE_PORT=$Port&& set THORNSWOOD_VOICE_BIND=$Bind&& set THORNSWOOD_VOICE_AUTH=on&& set THORNSWOOD_CHAT_RANGE=$ChatRange&& $turnSet"{2}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{3}" -Path "{1}" & "{0}" voice-server.js >> "{1}" 2>&1"' -f `$node.Source, `$log, `$psExe, `$roll)
 
 # The task as it is now, for the way back: a new install that does not answer
 # gets its old files AND its old settings back.
