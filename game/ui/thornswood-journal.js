@@ -201,10 +201,18 @@
       '<div class="main" id="' + ID + '-main"></div>' +
       '</div>' +
       '<div class="foot"><span id="' + ID + '-foot"></span><span style="flex:1"></span>' +
+      '<button id="' + ID + '-help">Help</button>' +
       '<button id="' + ID + '-close">Close</button></div>' +
       '</div>';
     document.body.appendChild(root);
     root.querySelector('#' + ID + '-close').onclick = close;
+    // Help, beside Close (#1633): the help panel on its People topic, which
+    // has journals and group books, and this one put down; the help opens
+    // first, so the keyboard is never let go between the two.
+    root.querySelector('#' + ID + '-help').onclick = function () {
+      try { if (window.thornswoodHelp) { window.thornswoodHelp.open('people'); } } catch (e) { }
+      close();
+    };
     fit();
     window.addEventListener('resize', fit);
     // The page answers its own Escape, and its own J; no plugin can see a key

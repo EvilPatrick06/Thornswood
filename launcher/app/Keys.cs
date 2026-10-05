@@ -505,8 +505,18 @@ namespace Thornswood
                      "Hands the keyboard to the chat box and puts the cursor in it. Escape gives it back to the game. Nothing in Skyrim uses Enter while you are playing, which is why it is here.",
                      ThornIni, "ChatKey", 28));
             l.Add(Dx("command", "ThornsWood", "Type a command",
-                     "Opens the chat with a slash already typed. The game's skill tree, also on this key, stays shut.",
+                     "Opens the chat with a slash already typed, for what is still typed there: /stuck, /helpme and /report, how a line is said (/me, /do, /w, /s, /y and /ooc), /roll, and staff and dev commands. The game's skill tree, also on this key, stays shut.",
                      ThornIni, "CommandKey", 53));
+            // The help panel (#1633): what /help used to say, as the keys and
+            // panels it is now, opened without the chat. F7: every letter is
+            // already Skyrim's or ours, F1 to F4 are SkyUI's favourite groups
+            // (F1 and F2 the client's as well), F5 and F9 are quicksave and
+            // quickload, F6 is the client's, F8 the mark and F10 closing Skyrim
+            // at creation. tests\test-1633-help-panel.js checks that nothing
+            // else of ours, the mods' or Skyrim's answers to it.
+            l.Add(Dx("help", "ThornsWood", "Help",
+                     "Opens the help panel: talking, people, living, work, land and getting help, with every key named as it is bound here. Help on the K, P and J panels opens it too. This key or Escape closes it.",
+                     ThornIni, "HelpKey", 65));
 
 
             l.Add(Dx("skills", "ThornsWood", "Profession, class and skill tree",

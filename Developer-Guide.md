@@ -2375,7 +2375,7 @@ Never paste any of them into a chat, a commit, a Discord message or a doc.
 
 ### Q. Staff commands
 
-Staff, testers and admins type these in the game's chat box: Enter opens it. They stay commands, unlike what people do in the world ([Buttons, not chat commands](#buttons-not-chat-commands)), and `/help` never lists them. [docs/systems/commands.md](docs/systems/commands.md) has every command there is with the line the server reads it at. The code is the staff block of `game\gamemode.js` (`// ==== thornswood staff ====`) and the `/tp`, `/give` and `/spawn` branches of `handle` in its chat commands block. A pull request that adds or changes a staff command changes its row here and on that page too.
+Staff, testers and admins type these in the game's chat box: Enter opens it. They stay commands, unlike what people do in the world ([Buttons, not chat commands](#buttons-not-chat-commands)), and the help panel never lists them; the reply to `/help` and to a word the server does not know names `/tp`, `/give`, `/spawn` and `/where` to a tester and nobody else (#1633). [docs/systems/commands.md](docs/systems/commands.md) has every command there is with the line the server reads it at. The code is the staff block of `game\gamemode.js` (`// ==== thornswood staff ====`) and the `/tp`, `/give`, `/spawn` and `/where` branches of `handle` in its chat commands block. A pull request that adds or changes a staff command changes its row here and on that page too.
 
 #### Who may run them
 
@@ -2401,7 +2401,7 @@ Each staff command answers you in your chat, tells the person it was done to, wr
 | `/tp <place>`, `/goto <place>` | Moves you to a town, or to any inn, keep, shop or house by its name. Part of the name is enough: `/tp bannered mare` |
 | `/give <item> [count]` | Puts it in your pack. Any named item in the load order, gold included, or a form id: `/give iron ore 5`, `/give 12eb7:Skyrim.esm`. Up to 100,000 |
 | `/spawn <creature> [count]` | Puts it a few steps in front of you, several spread round you. Any named actor, or a form id: `/spawn troll`, `/spawn skeleton 3`, `/spawn 23aba`. Up to 40 |
-| `/where` | Your cell, position and facing, for a bug report or a new place. Anybody can run it |
+| `/where` | Your cell, position and facing, for a bug report or a new place. Refused to anybody who is not a tester (#1633) |
 
 The count is the last word, and only when it is a number with a name in front of it.
 

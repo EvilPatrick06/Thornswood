@@ -109,6 +109,9 @@ function rig(opts) {
     'function treatPress() { return false; }\nfunction treatSelfPress() { return false; }\n' +
     // A warrior's maneuver key (#1386), 9, which nothing here presses.
     'const MANEUVER_KEY = 10; function maneuverKeyPressed() { }\n' +
+    // The help key (#1633), F7, which nothing here presses.
+    // test-1633-help-panel.js has what it does.
+    'const HELP_KEY = 65; function helpKeyPressed() { }\n' +
     // K on a person a Master could take on (#1634), asked ahead of K; nobody
     // is looked at here. test-1634-apprentice-gui.js has what it does.
     'const APPRENTICE_KEY = 37; function apprenticePress() { return false; }\n' +

@@ -22,6 +22,24 @@ const path = require('path');
 const vm = require('vm');
 const CR = String.fromCharCode(13);
 const gm = fs.readFileSync(process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js'), 'utf8').split(CR).join('');
+/*
+  One topic of the help panel (#1633), as a fresh install reads it: /help's
+  topics moved out of the gamemode into game/ui/thornswood-help.js, each a
+  list of paragraphs made from the key names.
+*/
+function helpTopic(id) {
+  const page = fs.readFileSync(path.join(REPO_DIR, 'game', 'ui', 'thornswood-help.js'), 'utf8')
+    .split(String.fromCharCode(13)).join('');
+  const a = page.indexOf('  var TOPICS = [');
+  const b = a < 0 ? -1 : page.indexOf('\n  ];\n', a);
+  const k = /var keys = (\{[\s\S]*?\});/.exec(page);
+  if (a < 0 || b < 0 || !k) { return ''; }
+  try {
+    const topics = new Function('return ' + page.slice(page.indexOf('[', a), b + 4))();
+    const t = topics.filter(function (x) { return x.id === id; })[0];
+    return t ? t.text(new Function('return ' + k[1])()).join(' ') : '';
+  } catch (e) { return ''; }
+}
 const ui = fs.readFileSync(path.join(REPO_DIR, 'game', 'ui', 'thornswood-skills.js'), 'utf8').split(CR).join('');
 
 let pass = 0, fail = 0;
@@ -373,8 +391,9 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
       !!WORDS && five.every(function (w) { return WORDS.indexOf(w) !== -1; }) && WORDS.indexOf('/board') !== -1);
   yes('G2 and none of them is in the list named to everybody, which /help and the unknown command reply read',
       !!PLAYER && five.every(function (w) { return PLAYER.indexOf(w) === -1; }));
-  const help = slice(gm, "if (topic === 'land' || topic === 'home' || topic === 'deed') {", 'return;');
-  yes('G3 /help land names no office line, and says where the office is',
+  // The help is a panel since #1633: its Land topic, as a fresh install reads it.
+  const help = helpTopic('land');
+  yes('G3 the help panel\'s Land names no office line, and says where the office is',
       !!help && !/\/rent|\/steward|\/evict|\/box|\/jarl|board move|board here/.test(help) && /Office page on K/.test(help));
   // What the server says, in the functions the buttons reach: no line to type.
   const said = [];

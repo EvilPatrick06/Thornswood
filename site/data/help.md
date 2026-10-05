@@ -137,6 +137,9 @@ closed.
   **N** stands you up out of an emote. The number keys **1** to **8** play a
   slot with the wheel shut.
 - **U** presses a blank key mold into the lock of the door you are looking at.
+- **F7** opens the help in the game, without the chat: talking, people, living,
+  work, land and getting help, with the keys as you have them set. Help on the
+  K, P and J panels opens it too.
 - **F1** turns the names over heads off and on, and **F2** hides and shows the
   overlay.
 

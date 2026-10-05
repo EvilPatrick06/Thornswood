@@ -25,6 +25,23 @@ function read(...bits) {
   return fs.readFileSync(path.join(REPO_DIR, ...bits), 'utf8').split(CR).join('');
 }
 const gm = process.env.GM ? fs.readFileSync(process.env.GM, 'utf8').split(CR).join('') : read('game', 'gamemode.js');
+/*
+  One topic of the help panel (#1633), as a fresh install reads it: /help's
+  topics moved out of the gamemode into game/ui/thornswood-help.js, each a
+  list of paragraphs made from the key names.
+*/
+function helpTopic(id) {
+  const page = read('game', 'ui', 'thornswood-help.js');
+  const a = page.indexOf('  var TOPICS = [');
+  const b = a < 0 ? -1 : page.indexOf('\n  ];\n', a);
+  const k = /var keys = (\{[\s\S]*?\});/.exec(page);
+  if (a < 0 || b < 0 || !k) { return ''; }
+  try {
+    const topics = new Function('return ' + page.slice(page.indexOf('[', a), b + 4))();
+    const t = topics.filter(function (x) { return x.id === id; })[0];
+    return t ? t.text(new Function('return ' + k[1])()).join(' ') : '';
+  } catch (e) { return ''; }
+}
 const front = process.env.FRONT ? fs.readFileSync(process.env.FRONT, 'utf8').split(CR).join('')
                                 : read('game', 'plugins', 'thornswood-front.js');
 const panel = read('game', 'ui', 'thornswood-party.js');
@@ -117,6 +134,7 @@ function rig(opts) {
     'const TREAT_KEY = 45, TREAT_SELF_KEY = 35;\n' +
     'function treatPress() { return false; }\nfunction treatSelfPress() { return false; }\n' +
     'const MANEUVER_KEY = 10; function maneuverKeyPressed() { }\n' +
+    'const HELP_KEY = 65; function helpKeyPressed() { }\n' +
     'const COMMAND_KEY = 53; function commandKeyPressed() { }\n' +
     'const statsOnSlash = { openedBy: function () { return ""; }, shutFor: function () { }, keyDown: function () { } };\n' +
     'function busyMenuOpen() { for (const n of KEYBOARD_MENUS) { if (sp.Ui.isMenuOpen(n)) { return n; } } return ""; }\n' +
@@ -349,8 +367,10 @@ if (social && trade && branch) {
       named.indexOf('/helpme') !== -1 && named.indexOf('/party') === -1);
   yes('W1 and the server still answers the line the key and the panel send',
       answered.indexOf('/party') !== -1);
+  // Since #1633 the reply ends with helpLine, which names that list.
   yes('W2 the reply to an unknown word reads that same list',
-      /'Try \/help\. There is ' \+ PLAYER_WORDS\.join/.test(gm));
+      /'No command called ' \+ word \+ '\. ' \+ helpLine\(profileId\)/.test(gm) &&
+      /function helpLine\(profileId\) \{[\s\S]*?PLAYER_WORDS\.join\(', '\)/.test(gm));
 
   // Every string in the gamemode that says /party is the bare word the
   // handler compares against: no line tells anybody to type it.
@@ -361,9 +381,10 @@ if (social && trade && branch) {
       (lits.length > 1 || (lits.length === 1 && lits[0] !== "'/party'") ? ' (' + lits.join(', ') + ')' : ''),
       lits.length === 1 && lits[0] === "'/party'");
 
-  const people = slice(gm, "if (topic === 'people' || topic === 'friends' || topic === 'party') {", 'return;');
-  yes('W4 /help people says P on somebody asks them to party',
-      !!people && /P to ask them to party/.test(people) && people.indexOf('/party') === -1);
+  // The help is a panel since #1633: its People topic, as a fresh install reads it.
+  const people = helpTopic('people');
+  yes('W4 the help panel\'s People says P on somebody asks them to party',
+      !!people && /P asks them to party/.test(people) && people.indexOf('/party') === -1);
 }
 
 // --------------------------------------------------- the panel and the pages

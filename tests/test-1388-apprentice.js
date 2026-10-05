@@ -24,6 +24,24 @@ const REPO = path.join(__dirname, '..');
 const SRC = process.env.GM || path.join(REPO, 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
+/*
+  One topic of the help panel (#1633), as a fresh install reads it: /help's
+  topics moved out of the gamemode into game/ui/thornswood-help.js, each a
+  list of paragraphs made from the key names.
+*/
+function helpTopic(id) {
+  const page = fs.readFileSync(path.join(REPO, 'game', 'ui', 'thornswood-help.js'), 'utf8')
+    .split(String.fromCharCode(13)).join('');
+  const a = page.indexOf('  var TOPICS = [');
+  const b = a < 0 ? -1 : page.indexOf('\n  ];\n', a);
+  const k = /var keys = (\{[\s\S]*?\});/.exec(page);
+  if (a < 0 || b < 0 || !k) { return ''; }
+  try {
+    const topics = new Function('return ' + page.slice(page.indexOf('[', a), b + 4))();
+    const t = topics.filter(function (x) { return x.id === id; })[0];
+    return t ? t.text(new Function('return ' + k[1])()).join(' ') : '';
+  } catch (e) { return ''; }
+}
 const party = fs.readFileSync(path.join(REPO, 'game', 'ui', 'thornswood-party.js'), 'utf8').split(CR).join('');
 const page = fs.readFileSync(path.join(REPO, 'docs', 'systems', 'apprenticeship.md'), 'utf8').split(CR).join('');
 
@@ -451,9 +469,10 @@ yes('C8: an offer that no longer holds when it is answered writes nothing, and t
   // #1634: the look prompt and K send it, and nobody is told to type it.
   yes('D1: the server answers /apprentice, and it is not in the list named to everybody (#1634)',
       W.indexOf('/apprentice') !== -1 && PW.indexOf('/helpme') !== -1 && PW.indexOf('/apprentice') === -1);
-  const h = between("      if (topic === 'work' || topic === 'trade' || topic === 'class') {", '        return;');
-  yes('D1: /help work says a Master takes you on from the prompt and K lists it, and names no /apprentice (#1634)',
-      !!h && !/\/apprentice/.test(h) && /presses the key the prompt names/.test(h) && /K lists who took you on/.test(h));
+  // The help is a panel since #1633: its Work topic, as a fresh install reads it.
+  const h = helpTopic('work');
+  yes('D1: the help panel\'s Work says a Master takes you on from the prompt and K lists it, and names no /apprentice (#1634)',
+      !!h && !/\/apprentice/.test(h) && /presses K when the prompt names it/.test(h) && /K lists who took you on/.test(h));
   yes('D2: the prompt on P says what an apprentice offer is',
       /kind === 'apprentice'\) \{ return 'offers to take you on as an apprentice\.'; \}/.test(party) &&
       /data\.offer\.kind === 'apprentice' \? 'offers to take you on as an apprentice'/.test(party));
