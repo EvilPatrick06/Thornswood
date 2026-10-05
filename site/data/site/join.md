@@ -77,8 +77,8 @@ script extender and Thornswood's own content, and nothing else.
 Not optional. Without it you have a launcher and no mods, and the server turns
 you away when you press Play.
 
-The link is on the [Downloads](/downloads) page and on the launcher's Add-ons
-tab. Open it and Vortex takes it from there: it makes a profile for Thornswood,
+The link is on the [Downloads](/downloads) page and on the launcher's
+Diagnostics page. Open it and Vortex takes it from there: it makes a profile for Thornswood,
 downloads every mod from its own author, and deploys them. Give it time.
 
 If the wrong profile is active in Vortex, the launcher says so before you press

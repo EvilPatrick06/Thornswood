@@ -8,12 +8,15 @@
 
     Deploy-Server.ps1     the carry on the box ($settingsCarryBlock in
                           ServerSettings.ps1) refuses, clears the stage and
-                          leaves the server alone
+                          leaves the server alone, unless this run's
+                          -RequirePass says which (#1223: never the build)
     Deploy-DevGamemode    the first step on the box, before anything is sent,
                           refuses unless -RequirePass was given, and a
                           -RequirePass on or off always writes a real true or
                           false, even over "true" or "false" as text
-    Deploy-Gamemode       says what the gamemode will do with the build's value
+    Deploy-Gamemode       writes no value into the build any more, and
+                          says Deploy-Server -RequirePass is what sets it
+                          (#1223)
 
   HOW. ServerSettings.ps1 is dot-sourced and its carry block run here against
   settings files in a temp folder; the two deploy scripts are read. Nothing
@@ -45,7 +48,7 @@ Yes 'true is a real answer' ((Get-ThornswoodPassSwitchProblem (Doc '{"thornswood
 Yes 'false is a real answer' ((Get-ThornswoodPassSwitchProblem (Doc '{"thornswoodRequirePass":false}')) -eq '')
 $missing = Get-ThornswoodPassSwitchProblem (Doc '{"port":7777}')
 Yes 'absent is not, and the reason says missing and what to run' ($missing -match '^thornswoodRequirePass is missing' -and
-    $missing -match 'Deploy-Gamemode\.ps1 -RequirePass on, or off' -and $missing -match '#1319')
+    $missing -match 'Deploy-Server\.ps1 -RequirePass on, or off' -and $missing -match '#1319')
 foreach ($j in @('{"thornswoodRequirePass":""}', '{"thornswoodRequirePass":"true"}', '{"thornswoodRequirePass":"false"}',
                  '{"thornswoodRequirePass":null}', '{"thornswoodRequirePass":1}', '{"thornswoodRequirePass":0}')) {
     $w = Get-ThornswoodPassSwitchProblem (Doc $j)
@@ -57,10 +60,15 @@ Yes 'nothing at all is not a real answer either' ((Get-ThornswoodPassSwitchProbl
 # ---- Deploy-Server's carry ---------------------------------------------------
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-1319-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tmp | Out-Null
-function Carry($running, $release) {
+function Carry($running, $release, [string]$RequirePass = '') {
     $Root = Join-Path $tmp ([Guid]::NewGuid().ToString('N'))
     $Stage = '.stage-20261005-000000'
-    $ReleaseKeys = $ThornswoodGamemodeKeys
+    # As Deploy-Server.ps1 hands them over (#1223): the keys the build may
+    # change, and what this run asked for, which the swap may let move too.
+    $Asked = New-ThornswoodAsked $RequirePass
+    $ReleaseKeys = @($ThornswoodGamemodeKeys + @($Asked.Keys))
+    # The line itself, run here the way the box runs it, sets $Asked.
+    . ([scriptblock]::Create((Get-ThornswoodAskedLine $Asked)))
     New-Item -ItemType Directory -Path (Join-Path $Root $Stage) -Force | Out-Null
     [IO.File]::WriteAllText((Join-Path $Root 'server-settings.json'), ($running | ConvertTo-Json -Depth 10), (New-Object Text.UTF8Encoding($false)))
     [IO.File]::WriteAllText((Join-Path (Join-Path $Root $Stage) 'server-settings.json'), ($release | ConvertTo-Json -Depth 10), (New-Object Text.UTF8Encoding($false)))
@@ -85,18 +93,23 @@ try {
     Yes 'live true, the build silent: carried, and live keeps true' ($r.Carried -and -not $r.Refused -and $r.Staged.thornswoodRequirePass -eq $true)
     $r = Carry (With $live 'thornswoodRequirePass' $false) $build
     Yes 'live false, the build silent: carried, and live keeps false' ($r.Carried -and $r.Staged.thornswoodRequirePass -is [bool] -and -not $r.Staged.thornswoodRequirePass)
+    # A build's value is never taken (#1223): only this run's -RequirePass.
     $r = Carry $live (With $build 'thornswoodRequirePass' $true)
-    Yes 'live missing, the build says true (Deploy-Gamemode -RequirePass on): carried as true' ($r.Carried -and $r.Staged.thornswoodRequirePass -eq $true)
-    $r = Carry $live (With $build 'thornswoodRequirePass' $false)
-    Yes 'live missing, the build says false: carried as false' ($r.Carried -and $r.Staged.thornswoodRequirePass -is [bool] -and -not $r.Staged.thornswoodRequirePass)
+    Yes 'live missing, the build says true and this run says nothing: refused, the build is not the answer' ($r.Refused -and -not $r.Carried -and $r.RunKept)
+    $r = Carry $live $build 'on'
+    Yes 'live missing, -RequirePass on: carried as true' ($r.Carried -and $r.Staged.thornswoodRequirePass -eq $true)
+    $r = Carry $live $build 'off'
+    Yes 'live missing, -RequirePass off: carried as false' ($r.Carried -and $r.Staged.thornswoodRequirePass -is [bool] -and -not $r.Staged.thornswoodRequirePass)
     $r = Carry $live $build
-    Yes 'live missing and the build silent: CARRY REFUSED' ($r.Refused -and -not $r.Carried)
-    Yes '  with the reason, naming the key and what to run' (($r.Said -join "`n") -match 'thornswoodRequirePass is missing' -and ($r.Said -join "`n") -match '-RequirePass on, or off')
+    Yes 'live missing and nothing asked: CARRY REFUSED' ($r.Refused -and -not $r.Carried)
+    Yes '  with the reason, naming the key and what to run' (($r.Said -join "`n") -match 'thornswoodRequirePass is missing' -and ($r.Said -join "`n") -match 'Deploy-Server\.ps1 -RequirePass on, or off')
     Yes '  and the stage is cleared and the running settings left as they were' ($r.StageGone -and $r.RunKept)
     $r = Carry (With $live 'thornswoodRequirePass' 'true') $build
-    Yes 'live holding "true" as text and the build silent: refused' ($r.Refused -and $r.StageGone -and $r.RunKept)
+    Yes 'live holding "true" as text and nothing asked: refused' ($r.Refused -and $r.StageGone -and $r.RunKept)
+    $r = Carry (With $live 'thornswoodRequirePass' 'true') $build 'on'
+    Yes 'live holding "true" as text, -RequirePass on: carried as a real true' ($r.Carried -and $r.Staged.thornswoodRequirePass -is [bool] -and $r.Staged.thornswoodRequirePass)
     $r = Carry (With $live 'thornswoodRequirePass' $true) (With $build 'thornswoodRequirePass' '')
-    Yes 'a build holding an empty value over live true: refused, never carried empty' ($r.Refused -and $r.RunKept)
+    Yes 'a build holding an empty value over live true: carried, and live keeps true, never empty' ($r.Carried -and $r.Staged.thornswoodRequirePass -eq $true)
 } finally {
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
 }
@@ -140,10 +153,11 @@ Yes '-RequirePass on over true: nothing to write' (-not (DevMoves 'on' $true))
 Yes '-RequirePass off over false: nothing to write' (-not (DevMoves 'off' $false))
 
 # ---- Deploy-Gamemode ------------------------------------------------------------
+# Since #1223 the build carries no value at all: Deploy-Server -RequirePass
+# sets live's on the box, so there is nothing here to read as on or off.
 $gm = [IO.File]::ReadAllText((Join-Path $deploy 'Deploy-Gamemode.ps1'))
-Yes 'Deploy-Gamemode says the hold is off only for a real false' (
-    $gm.Contains("`$s.thornswoodRequirePass -is [bool]) {") -and $gm.Contains("if (`$s.thornswoodRequirePass) { 'on' } else { 'off' }"))
-Yes '  and that Deploy-Server refuses neither true nor false' ($gm -match 'neither true nor false, which Deploy-Server\.ps1 refuses \(#1319\)')
+Yes 'Deploy-Gamemode writes no thornswoodRequirePass into the build' ($gm -notmatch 'NotePropertyName thornswoodRequirePass')
+Yes '  and says Deploy-Server -RequirePass on or off is what changes it' ($gm -match 'Deploy-Server\.ps1 -RequirePass on\|off')
 Yes '  and no longer calls anything but true watched only' ($gm -notmatch 'watched only, nobody refused')
 
 Write-Host ''

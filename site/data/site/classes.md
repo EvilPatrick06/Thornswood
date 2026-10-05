@@ -251,12 +251,11 @@ equipped.
 | **Fisher** | A crude fishing pole, or a fine or master one |
 | **Woodworker** | A woodcutter's axe |
 
-You are handed yours the moment you pick. After that it wears with the work: a
-pickaxe, a shovel or an axe has a hundred uses in it and a pole has fifty, you
-are told when it is worn thin, and when it breaks the next one comes from a
-smith, or for a pole from a woodwright. With no tool in your pack the seam, the
-plot, the water, the chopping block and the kiln turn you away, and nothing
-hands you a free one.
+You are handed yours the moment you pick. After that it wears with the work:
+each one has 50 uses in it, you are told when it is worn thin, and when it
+breaks the next one comes from a smith, or for a pole from a woodwright. With
+no tool in your pack the seam, the plot, the water, the chopping block and the
+kiln turn you away, and nothing hands you a free one.
 
 Any of them counts. The game has two shovels that look and read exactly alike,
 and six things it calls a pickaxe including the Notched Pickaxe and the ancient

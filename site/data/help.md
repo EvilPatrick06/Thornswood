@@ -38,7 +38,7 @@ Skyrim the way it was.
    **Downgrade** and Steam downloads that build under your own account. It is
    a few gigabytes, so give it a while.
 3. Install the collection in Vortex. The link is on the Downloads page and on
-   the launcher's Add-ons page. Not optional: without it you have a launcher
+   the launcher's Diagnostics page. Not optional: without it you have a launcher
    and no mods, and the server turns you away when you press Play.
 4. Press **Connect Discord** on the launcher's front page. Your browser opens,
    you say yes, and it closes itself. You never do this again.

@@ -2021,17 +2021,21 @@ const TOOL_AGAIN_HOURS = 12;
   you have to get a new one from a smith making them". So a tool stops being a
   thing somebody owns once and becomes stock, which somebody has to make.
 
-  A hundred uses, measured against the ladder rather than picked out of the air.
-  TUNING.workPerRank added up to 20 + 50 + 120 = 190 yields from novice to
-  Master when this was written, so one tool carried somebody a little over half
-  the way: two tools to the top, and a Master who keeps working keeps ordering.
-  That was a standing order book for the smiths without being a chore.
+  FIFTY USES, the plan's number: classes.md "It has 50 uses", and the miner,
+  farmer, woodworker and fisher pages say the same (#1381). The pull request
+  that closed #1381 changed only README.md, so the server kept 100 until
+  #1588. The pick, the axe, the shovel and the pole all have 50, and so does
+  the tool handed at creation, because handTool starts no count of its own:
+  wearTool counts every one of them against this. A tool that was already
+  past 49 uses under the old hundred breaks at its next one, because it has
+  done its 50.
 
-  IT IS 100 + 250 + 600 = 950 NOW, changed on 21 September when a rank stopped
-  meaning twenty seams and started meaning one. So the climb costs about ten
-  tools rather than two, which is five times the order book and may well be too
-  much of one. If the tool starts feeling like a toll rather than stock, this
-  is the number to move and not the ladder.
+  It was a hundred first, measured against the ladder when TUNING.workPerRank
+  added up to 20 + 50 + 120 = 190 yields from novice to Master: two tools to
+  the top. The ladder is 100 + 250 + 600 = 950 now, changed on 21 September
+  when a rank stopped meaning twenty seams and started meaning one, so the
+  climb costs about nineteen tools. If the tool starts feeling like a toll
+  rather than stock, that is a question for the plan pages, not this line.
 
   The warning comes at fifteen left. Far enough out to finish what you are doing
   and walk to a town, short enough to mean something.
@@ -2041,9 +2045,9 @@ const TOOL_AGAIN_HOURS = 12;
   cannot be read, or the tool is not in it, the swing wears nothing rather than
   breaking something at random.
 */
-const TOOL_USES = 100;
+const TOOL_USES = 50;
 const TOOL_WARN_AT = 15;
-// Poles are 50. fisher.md. The pick, the axe and the shovel stay on TOOL_USES.
+// Poles are 50 too. fisher.md: "50 uses, the same as the pick, the axe, and the shovel".
 const POLE_USES = 50;
 const FISH_TRAP_MAX = 3;
 
@@ -29953,8 +29957,8 @@ log('gamemode loaded:',
   launcher, so that session is the same refusal. The setting still decides
   the hold (#410): with it on, nothing the session does counts until the pass
   arrives. Deploy-DevGamemode.ps1 -RequirePass on|off sets the hold on the
-  dev box, and Deploy-Gamemode.ps1 -RequirePass on|off with Deploy-Server.ps1
-  on live. No older launcher or plugin is kept working (Patrick, 28 Sep).
+  dev box, and Deploy-Server.ps1 -RequirePass on|off on live (#1223). No
+  older launcher or plugin is kept working (Patrick, 28 Sep).
 
   THE HOLD FAILS CLOSED (#1319). false is the one way to turn it off. true
   holds, and so does anything else: absent, null, empty, "true" as text, 1.
@@ -31405,11 +31409,11 @@ log('gamemode loaded:',
       number, it is the absence of anything like a vein on the gathering side,
       and it wants watching before it wants another guess.
 
-      AND IT IS TOOLS. TOOL_USES is 100, so the whole climb now costs about ten
-      tools rather than two. That is a far bigger standing order for the smiths
-      than the comment on TOOL_USES describes, and it is the next number to
-      look at if the tool stops feeling like stock and starts feeling like a
-      toll.
+      AND IT IS TOOLS. TOOL_USES is 50 (the plan's number, #1381), so the
+      whole climb now costs about nineteen tools rather than two. That is a
+      far bigger standing order for the smiths than the ladder had when the
+      tool was first counted, and it is the next number to look at if the
+      tool stops feeling like stock and starts feeling like a toll.
     */
     workPerRank: { advanced: 100, expert: 250, master: 600 },
     /*
@@ -32510,9 +32514,10 @@ log('gamemode loaded:',
     spells anyone can learn that way'. So what they can spend is the smaller
     of the points they hold and the places left under the cap, and the cap
     cannot be got round by holding points. Until #1387 applied the semester
-    nothing gave them a point, and the places alone were what they spent;
-    whether the places alone should still be enough is asked on #1387, and
-    placesLeft(s) on its own in the line below is that answer.
+    nothing gave them a point, and the places alone were what they spent.
+    Patrick decided on 4 October that they need both (#1387, "Patrick's
+    answers"): that is the Math.min below, and placesLeft(s) on its own
+    would be the answer he did not choose.
   */
   function placesLeft(s) {
     var known = (s.spells && s.spells.known) || [];
@@ -45955,15 +45960,29 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
   MEASURED 29 September, this block run against the 57 plugins of the server
   load order read off disk: 497 books teach a spell, 84 of them a spell
   SPELLS lists, and 492 give a school and rank. The five that do not are the
-  Oghma Infinium (a mod makes it teach Dragon Knowledge) and the four Fishing
-  in Skyrim cheat books, and refusing all five is right. For the 85 spells
-  SPELLS lists, the records alone agree with the book on 83; Odin moves
-  Invisibility to Expert and Call to Arms to Master, and the book wins.
+  Oghma Infinium (1a332:Skyrim.esm, which ZIA_Complete Pack.esp makes teach
+  d788c, Dragon Knowledge) and the four Fishing in Skyrim cheat books
+  (27a95, 27a96, 27a97 and 27a9b:FishingInSkyrim.esp, the rod, net,
+  dynamite and depth charge spells). For the 85 spells SPELLS lists, the
+  records alone agree with the book on 83; Odin moves Invisibility to Expert
+  and Call to Arms to Master, and the book wins.
 
-  A tome whose spell has no school or rank that can be read is refused and
-  logged: handing out a spell nobody could check would be the hole this
-  closes. A missing character block is a build fault and lets the book read
-  as Skyrim reads it, the same choice every gate in this file makes.
+  WHAT READING THOSE FIVE DOES (#1127): it is refused as off the book, with
+  the same line as every other tome the book does not list, and the tome is
+  kept. None of the five spells is on a school's page, and magic.md grants
+  only the book's ("A mod that adds a spell ... is not in the book. It is
+  not a college spell and it is not granted"), so none is given a school and
+  rank here. A spell the book lists always has its school and rank from
+  SPELLS, so a spell whose school or rank cannot be read is never the
+  book's, and its refusal is the off-book one. It used to say the school
+  and rank could not be read and to tell staff, which asked for reports
+  about books nothing was wrong with. Nothing here keeps the five out of
+  the world: the dungeon loot block hands out only the Skyrim tomes it
+  lists, and whether the four cheat books should leave world containers as
+  well is asked on #1127.
+
+  A missing character block is a build fault and lets the book read as
+  Skyrim reads it, the same choice every gate in this file makes.
 */
 (function () {
   'use strict';
@@ -46135,10 +46154,11 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
     }
     var s = C.stateOf(actorId);
     if (!spell.school || !spell.rank) {
-      tlog('no school and rank readable for', spell.desc, '(' + spell.name + '), so the tome is refused to',
+      // Not the book's, since the book gives every spell it lists a school
+      // and rank: refused as off the book, like any other (#1127).
+      tlog('no school and rank readable for', spell.desc, '(' + spell.name + '), so it is off the book and the tome is refused to',
            Number(actorId).toString(16));
-      return { refused: true, line: 'Nobody can learn ' + spell.name + ' from a tome here yet, because ' +
-               'its school and rank cannot be read. You keep the tome; tell staff with /helpme.' };
+      return { refused: true, line: 'You cannot learn ' + spell.name + ' from this tome: ' + P.OFF_BOOK + '. You keep the tome.' };
     }
 
     var staffDesc = (S && S.isStaffSpell && spell.desc && S.isStaffSpell(spell.desc)) ? spell.desc : null;

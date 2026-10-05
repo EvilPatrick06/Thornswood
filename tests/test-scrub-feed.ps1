@@ -201,9 +201,13 @@ $site = Join-Path $T 'site'
 $fa = Join-Path $site 'feed\assets'; $da = Join-Path $site 'feed-dev\assets'
 New-Item -ItemType Directory -Force -Path $fa, $da | Out-Null
 Copy-Item -LiteralPath (Join-Path $repo 'site\server.js') -Destination (Join-Path $site 'server.js')
-$sitePort = Free-Port; $dead = Free-Port
+$sitePort = Free-Port
+# The game check knocks on port 1 (#1816). The system never hands that port
+# out for a listen on 0 and no harness listens on a fixed port
+# (test-1703-test-ports.js), so no run beside this one can take it and make
+# the game read as up. A port taken from the system and let go could be.
 Put (Join-Path $site 'config.json') (@{
-    password = ''; secret = ([Guid]::NewGuid().ToString('N') + [Guid]::NewGuid().ToString('N')); botKey = ''; gameCheckPort = $dead
+    password = ''; secret = ([Guid]::NewGuid().ToString('N') + [Guid]::NewGuid().ToString('N')); botKey = ''; gameCheckPort = 1
     onlineFile = (Join-Path $site 'online.json')
     discord = @{ clientId = ''; clientSecret = ''; botToken = ''; guildId = ''; invite = '' }
 } | ConvertTo-Json -Depth 4)

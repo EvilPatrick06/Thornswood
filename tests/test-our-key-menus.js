@@ -75,7 +75,27 @@ yes('the tick asks for the cursor after it puts the focus right',
     /applyFocus\(\);\n\s*\/\/ And a claim holding the keyboard has its cursor \(issue 958\)\.\n\s*keepCursor\(\);/.test(src));
 
 const JOURNAL = 'Journal Menu', MAGIC = 'MagicMenu', STATS = 'StatsMenu', CURSOR = 'Cursor Menu';
-const J = 36, P = 25, SLASH = 53, ESC = 1, K = 37;
+/*
+  The keys as the plugin declares them: every `const ..._KEY` and ESC at the
+  top of its scope, in its order, read through the plugin's own iniNumber from
+  a Thornswood.ini that is empty unless a case gives it lines. Read from the
+  plugin rather than typed here (#1652): a typed copy kept the friend key on G
+  after #529 moved it to Y, so the harness pressed a key the plugin no longer
+  reads.
+*/
+const KEY_DECLS = (src.match(/^  const (?:[A-Z]+_)*KEY\b[^;\n]*;|^  const ESC = \d+;/gm) || []).join('\n');
+const INI_AT = src.indexOf('  function iniNumber(text, key, fallback) {');
+const INI_NUMBER = INI_AT < 0 ? '' : src.slice(INI_AT, src.indexOf('\n  }\n', INI_AT) + 4);
+function keyPrelude(iniText) {
+  return 'const ini = ' + JSON.stringify(iniText || '') + ';\n' + INI_NUMBER + KEY_DECLS + '\n';
+}
+yes('the plugin reads its keys through iniNumber', INI_NUMBER !== '' && KEY_DECLS !== '');
+const KEY = INI_NUMBER === '' ? {} : new Function(keyPrelude('') + 'return { ' +
+  (KEY_DECLS.match(/const \w+/g) || []).map(function (d) { return d.slice(6) + ': ' + d.slice(6); }).join(', ') + ' };')();
+
+const J = KEY.JOURNAL_KEY, P = KEY.PARTY_KEY, SLASH = KEY.COMMAND_KEY, ESC = KEY.ESC, K = KEY.SKILLS_KEY;
+yes('the plugin declares every key the handler reads', !!keys &&
+    (keys.match(/\b(?:[A-Z]+_)*KEY\b|\bESC\b/g) || []).every(function (k) { return typeof KEY[k] === 'number'; }));
 const MENU_FOR = { 'Journal': JOURNAL, 'Quick Magic': MAGIC, 'Quick Stats': STATS, 'Pause': JOURNAL };
 
 function rig(opts) {
@@ -167,10 +187,8 @@ function rig(opts) {
     'function lookVerb() { }\n' +
     'function tellServer() { }\n' +
     'function log() { }\n' +
-    'const MOLD_KEY = 22;\n' +
     'function moldPress() { return false; }\n' +
     // The sleep key is the mold's, on a person (#1603). Nobody is looked at here.
-    'const SLEEP_KEY = 22;\n' +
     'function sleepPress() { return false; }\n' +
     // Hand over the letter (#1595), Activate on somebody you carry a letter
     // for. Nobody is looked at here; test-1595-deliver.js has the press.
@@ -183,27 +201,21 @@ function rig(opts) {
     'function repairPress() { return false; }\n' +
     // The lock key, X, since #1472, asked only for its own scan code. What it
     // does is test-lock-keypress.js's business.
-    'const LOCK_KEY = 45;\n' +
     'function lockPress() { return false; }\n' +
     // Tend their wounds (#1383), X on a hurt person, and Tend your wounds,
     // H in the inventory. Nobody is looked at and no inventory is open
     // here; test-1383-treatments.js has what they do.
-    'const TREAT_KEY = 45, TREAT_SELF_KEY = 35;\n' +
     'function treatPress() { return false; }\nfunction treatSelfPress() { return false; }\n' +
     // A warrior's maneuver key (#1386), 9, scan code 10, which nothing here
     // presses. test-1386-warrior.js has what it does.
-    'const MANEUVER_KEY = 10;\n' +
     'function maneuverKeyPressed() { }\n' +
     // The help key (#1633), F7, scan code 65, which nothing here presses.
     // test-1633-help-panel.js has what it does.
-    'const HELP_KEY = 65;\n' +
     'function helpKeyPressed() { }\n' +
     // K on a person a Master could take on (#1634), asked ahead of K; nobody
     // is looked at here. test-1634-apprentice-gui.js has what it does.
-    'const APPRENTICE_KEY = 37;\n' +
     'function apprenticePress() { return false; }\n' +
-    'const ESC = 1, CHAT_KEY = 28, SKILLS_KEY = 37, PARTY_KEY = 25, JOURNAL_KEY = 36,\n' +
-    '      FRIEND_KEY = 21, TRADE_KEY = 35, MUTE_KEY = 38, COMMAND_KEY = 53;\n';
+    keyPrelude('');
   const api = new Function('sp', 'say', 'T', 'Date', 'guard', 'typed',
     prelude + arbiter + '\n' + middle + '\n' + keys +
     '\nreturn { claims: claims, applyFocus: applyFocus,' +

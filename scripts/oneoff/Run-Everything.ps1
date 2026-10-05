@@ -8,9 +8,11 @@
   One run that installs everything waiting, checks each piece actually landed,
   and publishes once at the end instead of once per mod.
 
-  Launched by Run-Everything.cmd so it can be double clicked. Every step
-  runs with -NoShip, so the launcher gets built and the release goes out a
-  single time, with one version bump and one news post.
+  It was started by double clicking Run-Everything.cmd beside it, which was
+  removed in #1796: that started tools\Run-Everything.ps1, a path left from
+  before the move here, and this file refuses to run. Every step ran with
+  -NoShip, so the launcher was built and the release went out a single
+  time, with one version bump and one news post.
 
   If a step fails, this stops there rather than carrying on and publishing a
   half applied build.
