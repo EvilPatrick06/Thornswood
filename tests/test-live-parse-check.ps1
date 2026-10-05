@@ -3,18 +3,25 @@
 
       pwsh -NoProfile -File .\tests\test-live-parse-check.ps1
 
-  The live gamemode deploys check gamemode.js parses before anything is
-  written or sent.
+  The three gamemode deploys check gamemode.js parses before anything is
+  written or sent, and refuse on a machine without node.
 
   WHY. Deploy-DevGamemode.ps1 ran node --check; Deploy-Gamemode.ps1 and
   Deploy-Server.ps1 did not, so a gamemode.js with a syntax error could go to
   the live server and stop it at start (issue #544). The live two now refuse,
   and refuse too when node is missing, since the live server is the one that
-  cannot be left down.
+  cannot be left down. The dev one still skipped the check with a warning
+  where node was missing, then stopped the dev server and sent a file nobody
+  had checked, and it sent the artifact to the box's store before the check
+  either way (issue #1857). A gamemode that does not parse takes the dev
+  server down for everybody testing on it, so it refuses the same way now.
 
-  HOW. Reads the scripts as text: the check is there, it throws, and it comes
-  before the line that writes or sends the file. Then runs node --check on a
-  broken file, to show the check this relies on really fails.
+  HOW. Reads the scripts as text and as syntax trees: the check is there, it
+  throws, and it comes before the line that writes or sends the file. Each
+  script asks for node in one place, and that place only refuses, with the
+  same sentence, before anything leaves the machine; that block is run here
+  with node missing and with node there. Then runs node --check on a broken
+  file, to show the check this relies on really fails.
 #>
 [CmdletBinding()]
 param([string]$Repo)
@@ -74,9 +81,105 @@ Yes '  before it lists what it sends' ($check -gt 0 -and $list -gt $check)
 Yes '  and before anything talks to the VPS' ($check -gt 0 -and ($first -eq 0 -or $first -gt $check))
 Yes '  and stops when it fails' (($s -join "`n") -match "LASTEXITCODE -ne 0\) \{ throw 'gamemode.js does not parse")
 
-# ---- Deploy-DevGamemode.ps1 still has its own ---------------------------------
+# ---- Deploy-DevGamemode.ps1 ---------------------------------------------------
 $d = @(Get-Content -LiteralPath (Join-Path $Repo 'scripts\deploy\Deploy-DevGamemode.ps1'))
 Yes 'Deploy-DevGamemode still runs node --check' ((LineOf $d '& node --check \$Gamemode') -gt 0)
+Yes '  and stops when it fails' (($d -join "`n") -match "LASTEXITCODE -ne 0\) \{ throw 'gamemode.js does not parse")
+Yes '  and never says the check was skipped' (($d -join "`n") -notmatch 'check was skipped')
+
+# ---- node missing: all three refuse, none skips (#1857) -----------------------
+# Each script asks for node in one if, and that if only throws: no else that
+# carries on, nothing else in it. The sentence is the same in all three, up to
+# what each would have done next (Deploy-Gamemode writes the build, the other
+# two send).
+$shared = 'node is not on this machine, so gamemode.js cannot be checked before it goes live. Nothing was '
+function Read-Ast([string]$rel) {
+    $tk = $null; $pe = $null
+    return [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $Repo $rel), [ref]$tk, [ref]$pe)
+}
+function InFunction($n) {
+    for ($p = $n.Parent; $p; $p = $p.Parent) { if ($p -is [System.Management.Automation.Language.FunctionDefinitionAst]) { return $true } }
+    return $false
+}
+function NodeIfs($ast) {
+    return , @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.IfStatementAst] }, $true) |
+               Where-Object { @($_.Clauses | Where-Object { $_.Item1.Extent.Text -match 'Get-Command\s+node\b' }).Count })
+}
+# The if run on its own, with Get-Command answering for node as a machine
+# with or without it would. What it throws, or '' when it carries on.
+function Run-NodeIf($if, [bool]$hasNode) {
+    $stub = "function Get-Command { param([string]`$Name, `$ErrorAction) if (`$Name -eq 'node') { if (`$$hasNode) { return 'node' } return `$null } throw 'asked for ' + `$Name }"
+    try { & ([scriptblock]::Create($stub + "`n" + $if.Extent.Text)); return '' }
+    catch { return $_.Exception.Message }
+}
+$scripts = [ordered]@{
+    'Deploy-Gamemode.ps1'    = @{ Rel = 'scripts\deploy\Deploy-Gamemode.ps1';    Next = 'written.' }
+    'Deploy-Server.ps1'      = @{ Rel = 'scripts\deploy\Deploy-Server.ps1';      Next = 'sent.' }
+    'Deploy-DevGamemode.ps1' = @{ Rel = 'scripts\deploy\Deploy-DevGamemode.ps1'; Next = 'sent.' }
+}
+$said = @{}
+foreach ($n in $scripts.Keys) {
+    $w = $scripts[$n]
+    $ast = Read-Ast $w.Rel
+    $ifs = NodeIfs $ast
+    Yes "$n asks for node in one place ($($ifs.Count))" ($ifs.Count -eq 1)
+    if ($ifs.Count -ne 1) { continue }
+    $if = $ifs[0]
+    $body = @($if.Clauses[0].Item2.Statements)
+    $throw = $null
+    if ($body.Count -eq 1 -and $body[0] -is [System.Management.Automation.Language.ThrowStatementAst]) { $throw = $body[0] }
+    Yes '  and there it only throws, with no else that carries on' (
+        $if.Clauses.Count -eq 1 -and -not $if.ElseClause -and $if.Clauses[0].Item1.Extent.Text -match '^-not\s*\(' -and $throw)
+    # Run only when all it does is throw, so nothing else in it runs here.
+    $missing = ''; $there = 'not run'
+    if ($throw) { $missing = Run-NodeIf $if $false; $there = Run-NodeIf $if $true }
+    $said[$n] = $missing
+    Yes "  run with node missing, it refuses: $missing" ($missing -eq ($shared + $w.Next))
+    Yes '  run with node there, it carries on' ($there -eq '')
+    $check = @($ast.FindAll({ param($x) $x -is [System.Management.Automation.Language.CommandAst] -and $x.GetCommandName() -eq 'node' -and $x.Extent.Text -match '--check' }, $true))
+    Yes '  before it runs node --check, which nothing asking for node wraps' (
+        $check.Count -eq 1 -and $if.Extent.EndOffset -lt $check[0].Extent.StartOffset -and
+        -not ($ifs | Where-Object { $_.Extent.StartOffset -lt $check[0].Extent.StartOffset -and $_.Extent.EndOffset -gt $check[0].Extent.EndOffset }))
+}
+Yes 'Deploy-DevGamemode refuses with the same sentence as Deploy-Server' (
+    $said['Deploy-DevGamemode.ps1'] -and $said['Deploy-DevGamemode.ps1'] -eq $said['Deploy-Server.ps1'])
+
+# Deploy-Gamemode writes the build and talks to nobody: the refusal comes
+# before it copies gamemode.js in.
+$gAst = Read-Ast 'scripts\deploy\Deploy-Gamemode.ps1'
+$gIf = @(NodeIfs $gAst)
+$gCopy = LineOf $g "^Copy-Item -LiteralPath \`$Gamemode -Destination \(Join-Path \`$Dist 'gamemode.js'\)"
+Yes 'Deploy-Gamemode refuses before it copies the file into the build' ($gIf.Count -eq 1 -and $gCopy -gt $gIf[0].Extent.StartLineNumber)
+
+# Deploy-DevGamemode refuses before anything reaches the box: the artifact
+# sent to the store, a Remote, ssh or scp, or any function of its own that
+# calls one. Read off the syntax tree, outside function bodies, because a
+# body runs where it is called and not where it is written.
+$dAst = Read-Ast 'scripts\deploy\Deploy-DevGamemode.ps1'
+$far = @('ssh', 'scp', 'Invoke-ThornswoodRemote', 'Send-ThornswoodArtifact', 'Set-ThornswoodArtifactCurrent', 'Save-SwapPreviousRecord', 'Restore-SwapRecord')
+$fns = @($dAst.FindAll({ param($x) $x -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true))
+do {
+    $grew = $false
+    foreach ($f in $fns) {
+        if ($far -contains $f.Name) { continue }
+        $calls = @($f.Body.FindAll({ param($x) $x -is [System.Management.Automation.Language.CommandAst] }, $true) | ForEach-Object { $_.GetCommandName() })
+        if (@($calls | Where-Object { $far -contains $_ }).Count) { $far += $f.Name; $grew = $true }
+    }
+} while ($grew)
+$firstFar = @($dAst.FindAll({ param($x) $x -is [System.Management.Automation.Language.CommandAst] }, $true) |
+              Where-Object { ($far -contains $_.GetCommandName()) -and -not (InFunction $_) } |
+              Sort-Object { $_.Extent.StartOffset } | Select-Object -First 1)
+$dIf = @(NodeIfs $dAst)
+$farSay = if ($firstFar.Count) { '{0}, line {1}' -f $firstFar[0].GetCommandName(), $firstFar[0].Extent.StartLineNumber } else { 'none' }
+Yes "Deploy-DevGamemode refuses before anything reaches the box (the first is $farSay)" (
+    $dIf.Count -eq 1 -and $firstFar.Count -eq 1 -and $dIf[0].Extent.EndOffset -lt $firstFar[0].Extent.StartOffset)
+$dCheck = @($dAst.FindAll({ param($x) $x -is [System.Management.Automation.Language.CommandAst] -and $x.GetCommandName() -eq 'node' }, $true))
+Yes '  and checks the file before anything reaches the box too' ($dCheck.Count -eq 1 -and $firstFar.Count -eq 1 -and $dCheck[0].Extent.EndOffset -lt $firstFar[0].Extent.StartOffset)
+Yes '  and checks the copy it sends, the artifact''s' ($dCheck.Count -eq 1 -and $dCheck[0].Extent.StartOffset -gt ($dAst.Extent.Text.IndexOf('$Gamemode = Join-Path $artifact.Folder')))
+# A put-back sends no gamemode, so it asks for no node, as Deploy-Server's.
+$guard = @($dAst.FindAll({ param($x) $x -is [System.Management.Automation.Language.IfStatementAst] -and $x.Clauses[0].Item1.Extent.Text -eq '-not $PutBack' }, $true) |
+           Where-Object { $dIf.Count -eq 1 -and $_.Extent.StartOffset -lt $dIf[0].Extent.StartOffset -and $_.Extent.EndOffset -gt $dIf[0].Extent.EndOffset })
+Yes '  and a put-back, which sends no gamemode, does not ask for node' ($guard.Count -ge 1)
 
 # ---- node --check really fails on a broken file -------------------------------
 if (Get-Command node -ErrorAction SilentlyContinue) {

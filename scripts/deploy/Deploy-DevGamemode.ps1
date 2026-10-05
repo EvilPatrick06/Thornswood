@@ -238,8 +238,9 @@ if (-not (Test-Path -LiteralPath $Gamemode)) { throw "There is no gamemode at $G
 
 # What goes up is the gamemode artifact (issue #459, Artifact.ps1):
 # game\gamemode.js as the commit holds it, in one zip named by commit and hash,
-# sent to the box's store first. From here $Gamemode is the artifact's copy,
-# so the check, the stamp and the send are all of what the zip holds.
+# checked here and only then sent to the box's store. From here $Gamemode is
+# the artifact's copy, so the check, the stamp and the send are all of what
+# the zip holds.
 # A gamemode with uncommitted changes is refused before the box is touched,
 # and so are the other files this sends out of the repository: the number
 # of people it holds (records\most-online.json) and, with -LoadOrder, our
@@ -253,8 +254,21 @@ $alsoSends = @('records/most-online.json')
 if ($LoadOrder) { $alsoSends += 'game/content/Thornswood-Content.esp' }
 $artifact = New-ThornswoodArtifact -Component gamemode -RepoDir (Join-Path $Here '..\..') -Paths 'game/gamemode.js' -AlsoSends $alsoSends
 Write-Host ('  artifact ' + (Format-ThornswoodArtifact $artifact))
-Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
 $Gamemode = Join-Path $artifact.Folder 'game\gamemode.js'
+
+# Syntax first, before the artifact leaves this machine. A gamemode that does
+# not parse takes the dev server down at start, for everybody testing on it.
+# node is required, as it is for Deploy-Gamemode.ps1 and Deploy-Server.ps1:
+# this used to skip the check with a warning where node was missing, then
+# stop the dev server and send a file nobody had checked (#1857), and the
+# artifact went to the box's store before the check either way. -PutBack
+# sends no gamemode, so it has none to check.
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw 'node is not on this machine, so gamemode.js cannot be checked before it goes live. Nothing was sent.' }
+& node --check $Gamemode
+if ($LASTEXITCODE -ne 0) { throw 'gamemode.js does not parse. Nothing was sent.' }
+Write-Host '  gamemode.js parses'
+
+Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
 }
 
 function Remote($script) {
@@ -264,15 +278,6 @@ function Remote($script) {
 }
 
 $rootWin = $Root.Replace('/', '\')
-
-# Syntax first. A gamemode that does not parse takes the server down at start.
-if (Get-Command node -ErrorAction SilentlyContinue) {
-  & node --check $Gamemode
-  if ($LASTEXITCODE -ne 0) { throw 'gamemode.js does not parse. Nothing was sent.' }
-  Write-Host '  gamemode.js parses'
-} else {
-  Write-Host '  node is not on this machine, so the syntax check was skipped' -ForegroundColor Yellow
-}
 
 # What this gamemode is, written down to go up beside it, so the dev server can
 # say which build it runs. Made here, before anything is stopped, so nothing

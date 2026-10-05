@@ -288,9 +288,10 @@ installer. `--check` proves the gamemode matches. Older comments named
 Everything goes to the dev server first.
 
 - **Dev:** `.\scripts\deploy\Deploy-DevGamemode.ps1`. It checks the file parses with
-  `node --check` (`scripts\deploy\Deploy-DevGamemode.ps1:& node --check $Gamemode`),
-  and on a machine without node it skips that check with a warning
-  (`scripts\deploy\Deploy-DevGamemode.ps1:so the syntax check was skipped`), reads how many are
+  `node --check` (`scripts\deploy\Deploy-DevGamemode.ps1:& node --check $Gamemode`)
+  before anything leaves the machine, and on a machine without node it refuses,
+  as the live deploys do
+  (`scripts\deploy\Deploy-DevGamemode.ps1:node is not on this machine, so gamemode.js cannot be checked`). It reads how many are
   on, warns them, sends `gamemode.js` alone to `C:\Thornswood-Server-Dev` and
   restarts only the process on the dev port. `-LoadOrder` brings the dev load
   order up to the built server's; a change to the CHARGEN records needs

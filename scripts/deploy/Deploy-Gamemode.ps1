@@ -256,8 +256,9 @@ $maxOnline = Get-MostOnline
 
 # Syntax first, as Deploy-DevGamemode.ps1 does. A gamemode that does not parse
 # stops the live server at start, and a live deploy is not always preceded by a
-# dev one with the same file. Here node is required, not optional: the live
-# server is the one that cannot be left down.
+# dev one with the same file. node is required here, as it is in
+# Deploy-DevGamemode.ps1 and Deploy-Server.ps1 (#1857): a check skipped where
+# node is missing checks nothing.
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw 'node is not on this machine, so gamemode.js cannot be checked before it goes live. Nothing was written.' }
 & node --check $Gamemode
 if ($LASTEXITCODE -ne 0) { throw 'gamemode.js does not parse. Nothing was written.' }
