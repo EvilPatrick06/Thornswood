@@ -4,11 +4,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname, '../game/gamemode.js'), 'utf8');
-const begin = source.indexOf('\ntry {', source.indexOf('// MERCHANT TRADING BUNDLE END'));
-const end = source.indexOf('// ==== thornswood custom quests ====', begin);
+const begin = source.lastIndexOf('// NPC SERVER STARTUP BEGIN');
+const end = source.indexOf('// NPC SERVER STARTUP END', begin);
 assert.ok(begin >= 0 && end > begin);
 for (const channel of ['main', 'dev', undefined]) {
-  let prepared = 0, population = 0, runtime = 0, quotes = 0;
+  let prepared = 0, population = 0, runtime = 0, quotes = 0, shutdowns = 0;
   const ledgerChannels = [], logs = [];
   const settings = { thornswoodServer: channel, loadOrder: ['Skyrim.esm'], privDir: `${channel || 'main'}-private` };
   const ctx = {
@@ -20,7 +20,7 @@ for (const channel of ['main', 'dev', undefined]) {
     createNpcMerchantPurses: () => ({ shutdown() {} }),
     createNpcPopulation: () => { population++; return {}; },
     startSharedNpcServerRuntime: () => { runtime++; return { stop() {} }; },
-    MERCHANT_TRADING: { installMerchantTrading: () => { quotes++; return {}; } }
+    MERCHANT_TRADING: { installMerchantTrading: () => { quotes++; return { shutdown() { shutdowns++; } }; } }
   };
   vm.createContext(ctx);
   vm.runInContext(source.slice(begin, end), ctx);
@@ -32,6 +32,8 @@ for (const channel of ['main', 'dev', undefined]) {
   assert.deepEqual(logs, []);
   ctx.NPC_POPULATION_DATA.plugins = ['Wrong.esm'];
   vm.runInContext(source.slice(begin, end), ctx);
+  assert.equal(shutdowns, 1, 'A failed reload revokes the previous merchant service');
+  assert.equal(ctx.__thornswoodMerchantTrade, null, 'A failed reload cannot retain the merchant writer');
   assert.equal(runtime, 1, 'A mismatched catalogue cannot start another runtime');
   assert.equal(ctx.__thornswoodNpcRuntime, null, 'Failed startup revokes the active runtime');
   assert.ok(logs.some(line => line.includes('does not match')));

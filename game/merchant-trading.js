@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 var GOLD_BASE = 15;
 var REACH = 400;
@@ -46,76 +46,26 @@ function guildSite(bookHold) {
   return null;
 }
 
-function createNativeMerchantTransfer(api) {
-  function ready() {
-    return !!api &&
-      typeof api.beginMerchantTransfer === 'function' &&
-      typeof api.commitMerchantHumanDebit === 'function' &&
-      typeof api.isMerchantHumanDebitDurable === 'function' &&
-      typeof api.releaseMerchantQuarantine === 'function';
-  }
+var SETTLEMENT = typeof MERCHANT_SETTLEMENT !== 'undefined' ? MERCHANT_SETTLEMENT : require('./merchant-settlement');
+
+function createNativeMerchantTransfer(mp) {
   return {
-    available: ready,
-    recall: function (id) {
-      if (!api || typeof api.merchantTransferStatus !== 'function') return { known: false };
-      var status = api.merchantTransferStatus(id);
-      if (!status) return { known: false };
-      return {
-        known: status.known !== false,
-        durable: !!status.durable,
-        attempted: !!status.attempted
-      };
+    available: function () {
+      return !!mp && ['validateInventoryTransaction','compareAndSetInventory','getInventoryReceipt','getSavedInventoryReceipt',
+        'getNpcAIState','getDescFromId','getIdFromDesc','get'].every(function (key) { return typeof mp[key] === 'function'; });
     },
-    move: function (req) {
-      if (!ready()) {
-        return {
-          ok: false, durable: false, attempted: false,
-          reason: 'Native merchant transfer is not on this server.'
-        };
-      }
-      var began = api.beginMerchantTransfer({
-        humanId: req.humanId,
-        merchantId: req.merchantId,
-        humanLoses: req.humanLoses,
-        humanGains: req.humanGains,
-        intentId: req.intentId
-      });
-      if (!began || !began.ok) {
-        return {
-          ok: false, durable: false, attempted: false,
-          reason: (began && began.reason) || 'The transfer was refused.'
-        };
-      }
-      var debit = api.commitMerchantHumanDebit(req.humanId, began.offerId);
-      if (!debit || !debit.ok) {
-        return {
-          ok: false, durable: false, attempted: !!(debit && debit.attempted),
-          offerId: began.offerId,
-          reason: (debit && debit.reason) || 'The debit was refused.'
-        };
-      }
-      if (!api.isMerchantHumanDebitDurable(req.humanId, began.offerId)) {
-        return {
-          ok: false, durable: false, attempted: true, offerId: began.offerId,
-          reason: 'The debit is not durable yet.'
-        };
-      }
-      var released = api.releaseMerchantQuarantine(req.humanId, began.offerId);
-      if (!released || !released.ok) {
-        return {
-          ok: false, durable: false, attempted: true, offerId: began.offerId,
-          reason: (released && released.reason) || 'Quarantine was not released.'
-        };
-      }
-      var done = typeof api.merchantTransferStatus === 'function'
-        ? api.merchantTransferStatus(began.offerId) : { known: true, durable: true, attempted: true };
-      if (!done || !done.durable) {
-        return {
-          ok: false, durable: false, attempted: true, offerId: began.offerId,
-          reason: 'The transfer is not durable yet.'
-        };
-      }
-      return { ok: true, durable: true, attempted: true, offerId: began.offerId };
+    identity: function (id) {
+      var ai = mp.getNpcAIState(id);
+      if (!ai || !ai.isHuman || !Number.isInteger(ai.profileId) || ai.profileId <= 0) return null;
+      return {desc:mp.getDescFromId(id),profileId:ai.profileId};
+    },
+    resolve: function (desc) { return mp.getIdFromDesc(desc); },
+    inventory: function (id) { return mp.get(id, 'inventory'); },
+    validate: function (snapshot) { return mp.validateInventoryTransaction(snapshot); },
+    receipt: function (id) { return mp.getInventoryReceipt(id); },
+    saved: function (id) { return mp.getSavedInventoryReceipt(id); },
+    cas: function (id, expected, receipt, next, sequence, profile) {
+      return mp.compareAndSetInventory(id, expected, receipt, next, sequence, profile);
     }
   };
 }
@@ -129,7 +79,8 @@ function createMerchantTrading(deps) {
   var now = deps.now || function () { return Date.now(); };
   var reach = deps.reach == null ? REACH : deps.reach;
   var sessions = new Map();
-  var seq = 0;
+  var settlement = SETTLEMENT.createSettlement({purses:purses,transfer:transfer,world:deps.namespace || purses.namespace,log:deps.log});
+  var active = true;
 
   function placeOf(reference) {
     return places[reference] || null;
@@ -139,39 +90,33 @@ function createMerchantTrading(deps) {
     return { text: text, view: view || null };
   }
 
-  function stockCopy(stock) {
-    return (stock || []).map(function (row) {
-      return { baseId: row.baseId, count: row.count, name: row.name };
+  function stockCopy(stock) { return JSON.parse(JSON.stringify(stock || [])); }
+  function addStock(stock, entries, name) {
+    entries.forEach(function (entry) {
+      var key = SETTLEMENT.metadataKey(entry);
+      var row = stock.find(function (held) {
+        return held.name === name && SETTLEMENT.metadataKey(held.entry || {baseId:held.baseId,count:held.count}) === key;
+      });
+      if (row) {
+        if (row.count + entry.count > MAX_GOLD) throw new Error('The shelf is full.');
+        row.count += entry.count; row.entry = Object.assign({}, entry, {count:row.count});
+      } else stock.push({baseId:entry.baseId,count:entry.count,name:name,entry:JSON.parse(JSON.stringify(entry))});
     });
+    SETTLEMENT.inventory({entries:stock.map(function (row) { return row.entry || {baseId:row.baseId,count:row.count}; })});
+    return stock;
   }
-
-  function sameStock(a, b) {
-    return JSON.stringify(stockCopy(a)) === JSON.stringify(stockCopy(b));
-  }
-
-  function findStock(stock, name, baseId) {
-    var key = String(name || '').toLowerCase();
-    for (var i = 0; i < stock.length; i++) {
-      if (stock[i].baseId === baseId && String(stock[i].name || '').toLowerCase() === key) return stock[i];
-    }
-    for (var j = 0; j < stock.length; j++) {
-      if (stock[j].baseId === baseId) return stock[j];
-    }
-    return null;
-  }
-
-  function addStock(stock, baseId, name, count) {
-    var row = findStock(stock, name, baseId);
-    if (row) row.count += count;
-    else stock.push({ baseId: baseId, count: count, name: name });
-  }
-
   function takeStock(stock, baseId, name, count) {
-    var row = findStock(stock, name, baseId);
-    if (!row || row.count < count) return false;
-    row.count -= count;
-    if (row.count === 0) stock.splice(stock.indexOf(row), 1);
-    return true;
+    var entries = [], left = count;
+    for (var i = 0; i < stock.length && left > 0; i++) {
+      var row = stock[i];
+      if (row.baseId !== baseId || String(row.name || '').toLowerCase() !== name.toLowerCase()) continue;
+      var n = Math.min(row.count, left);
+      entries.push(Object.assign({}, row.entry || {baseId:row.baseId}, {count:n}));
+      row.count -= n; left -= n;
+      if (row.entry) row.entry.count = row.count;
+    }
+    if (left) throw new Error('The shelf is empty.');
+    return {stock:stock.filter(function (row) { return row.count > 0; }),entries:entries};
   }
 
   function inReach(humanId, merchantId) {
@@ -207,7 +152,7 @@ function createMerchantTrading(deps) {
     var offers = [];
     for (var i = 0; i < catalog.length; i++) {
       var row = catalog[i];
-      var held = findStock(state.stock || [], row.name, null);
+      var held = (state.stock || []).find(function (entry) { return String(entry.name || '').toLowerCase() === String(row.name).toLowerCase(); });
       var count = 0;
       var stock = state.stock || [];
       for (var s = 0; s < stock.length; s++) {
@@ -233,59 +178,30 @@ function createMerchantTrading(deps) {
     }
     return {
       open: true,
-      transfer: !!(transfer && transfer.available && transfer.available()),
+      transfer: settlement.available(),
       trader: place.name || 'Trader',
       place: place.locationName || '',
       hold: place.bookHold,
       purse: state.purse,
       offers: offers,
       supply: supply,
-      note: note || (transfer && transfer.available && transfer.available()
+      note: note || (settlement.available()
         ? ''
         : 'Buying and selling wait on the native transfer. Nothing has moved.')
     };
   }
 
-  function clearPending(id, state) {
-    var next = JSON.parse(JSON.stringify(state));
-    next.pending = null;
-    purses.commit(id, next);
-    return purses.prepare(id);
-  }
-
-  function applyPending(id, state) {
-    var pending = state.pending;
-    if (!pending) return state;
-    if (state.purse === pending.nextPurse && sameStock(state.stock, pending.nextStock)) {
-      return clearPending(id, state);
-    }
-    if (state.purse !== pending.previousPurse || !sameStock(state.stock, pending.previousStock)) {
-      return state;
-    }
-    var next = JSON.parse(JSON.stringify(state));
-    next.purse = pending.nextPurse;
-    next.stock = stockCopy(pending.nextStock);
-    next.supply = pending.nextSupply || state.supply || {};
-    next.pending = null;
-    purses.commit(id, next);
-    return purses.prepare(id);
-  }
-
-  function recoverOne(id) {
-    var state = purses.prepare(id);
-    if (!state || !state.pending) return;
-    var recalled = { known: false };
-    try {
-      if (transfer && transfer.recall) recalled = transfer.recall(state.pending.id) || { known: false };
-    } catch (e) {
-      return;
-    }
-    if (recalled.durable) applyPending(id, state);
-    else if (recalled.known && !recalled.attempted) clearPending(id, state);
-  }
-
-  function recover(ids) {
-    for (var i = 0; i < ids.length; i++) recoverOne(ids[i]);
+  function recover() {
+    if (!active) return [];
+    var changed = settlement.tick(), views = [];
+    sessions.forEach(function (session, profileId) {
+      if (changed.indexOf(session.merchantId) < 0) return;
+      var human = transfer.identity(session.actorId);
+      if (!human || human.profileId !== profileId) {sessions.delete(profileId); return;}
+      var state = purses.read(session.merchantId), place = state && placeOf(state.reference);
+      if (state && place) views.push({actorId:session.actorId,view:viewFor(session.merchantId,state,place)});
+    });
+    return views;
   }
 
   function sessionMerchant(profileId) {
@@ -294,6 +210,7 @@ function createMerchantTrading(deps) {
   }
 
   function command(ctx) {
+    if (!active) return fail('Trading is unavailable.');
     var parts = (ctx && ctx.parts) || [];
     var profileId = Number(ctx && ctx.profileId) || 0;
     var actorId = ctx && ctx.actorId;
@@ -325,7 +242,7 @@ function createMerchantTrading(deps) {
     var merchantId = 0;
     if (!verb || verb === 'open' || /^[0-9a-f]+$/i.test(verb)) {
       var token = verb === 'open' ? parts[2] : (verb || '');
-      if (!token) return fail('Look at a guild trader and use /merchant with their id.');
+      if (!token) return fail('Press E on a guild trader.');
       merchantId = parseInt(token, 16);
       if (!merchantId) return fail('That is not a guild trader.');
       var reached = inReach(actorId, merchantId);
@@ -339,7 +256,7 @@ function createMerchantTrading(deps) {
       }
       var prior = sessions.get(profileId);
       var repeat = prior && prior.merchantId === merchantId && (now() - prior.at) < 3000;
-      sessions.set(profileId, { merchantId: merchantId, at: now() });
+      sessions.set(profileId, { merchantId: merchantId, actorId:actorId, at: now() });
       var opened = viewFor(merchantId, state, place);
       return {
         text: repeat ? '' : (opened.transfer
@@ -350,7 +267,7 @@ function createMerchantTrading(deps) {
     }
 
     merchantId = sessionMerchant(profileId);
-    if (!merchantId) return fail('Look at a guild trader and use /merchant with their id.');
+    if (!merchantId) return fail('Press E on a guild trader.');
     var again = inReach(actorId, merchantId);
     if (!again.ok) {
       sessions.delete(profileId);
@@ -360,7 +277,7 @@ function createMerchantTrading(deps) {
     if (verb === 'buy' || verb === 'sell' || verb === 'supply') {
       return trade(actorId, profileId, merchantId, verb, parts.slice(2));
     }
-    return fail('merchant: look at a trader, then buy, sell, or supply. People cannot join.');
+    return fail('Use the trader panel to buy, sell, or turn in supplies.');
   }
 
   function parseCountAndName(bits, fixedCount) {
@@ -400,69 +317,37 @@ function createMerchantTrading(deps) {
     if (npcBuys && state.purse < gold) return fail('The trader cannot pay.');
     if (!npcBuys && gold > 0 && world.carry(actorId, GOLD_BASE) < gold) return fail('You cannot pay.');
     if (npcBuys && world.carry(actorId, resolved.baseId) < asked.count) return fail('You are not carrying that.');
-    var stock = stockCopy(state.stock);
-    if (!npcBuys && !takeStock(stock, resolved.baseId, itemName, asked.count)) {
-      return fail('The shelf is empty.');
+    if (!settlement.available()) {
+      return fail('Buying and selling wait on the native transfer. Nothing was taken.', viewFor(merchantId, state, place));
     }
     var nextPurse = npcBuys ? state.purse - gold : state.purse + gold;
     if (nextPurse < 0 || nextPurse > MAX_GOLD) return fail('That price cannot be verified.');
-    if (npcBuys) addStock(stock, resolved.baseId, itemName, asked.count);
-    var humanLoses = [];
-    var humanGains = [];
-    if (npcBuys) {
-      humanLoses.push({ baseId: resolved.baseId, count: asked.count });
-      if (gold > 0) humanGains.push({ baseId: GOLD_BASE, count: gold });
-    } else {
-      if (gold > 0) humanLoses.push({ baseId: GOLD_BASE, count: gold });
-      humanGains.push({ baseId: resolved.baseId, count: asked.count });
-    }
-    if (!humanLoses.length && !humanGains.length) return fail('Nothing would move.');
-    if (!transfer || !transfer.available || !transfer.available()) {
-      var waiting = viewFor(merchantId, state, place);
-      return fail('Buying and selling wait on the native transfer. Nothing was taken.', waiting);
-    }
-    seq += 1;
-    var intentId = state.reference + ':' + now() + ':' + seq;
-    var nextSupply = JSON.parse(JSON.stringify(state.supply || {}));
-    if (verb === 'supply') nextSupply[itemName.toLowerCase()] = now();
-    var pending = {
-      id: intentId,
-      kind: verb,
-      previousPurse: state.purse,
-      previousStock: stockCopy(state.stock),
-      nextPurse: nextPurse,
-      nextStock: stock,
-      nextSupply: nextSupply
-    };
-    var armed = JSON.parse(JSON.stringify(state));
-    armed.pending = pending;
-    purses.commit(merchantId, armed);
     var moved;
     try {
-      moved = transfer.move({
-        humanId: actorId,
-        merchantId: merchantId,
-        humanLoses: humanLoses,
-        humanGains: humanGains,
-        intentId: intentId
-      });
-    } catch (e) {
-      moved = { ok: false, durable: false, attempted: true, reason: 'The transfer failed.' };
+      var expected = SETTLEMENT.inventory(transfer.inventory(actorId));
+      var outgoing = SETTLEMENT.takeEntries(expected, npcBuys ? resolved.baseId : GOLD_BASE, npcBuys ? asked.count : gold);
+      var stock = stockCopy(state.stock), credit;
+      if (npcBuys) {
+        stock = addStock(stock, outgoing.entries, itemName);
+        credit = gold > 0 ? [{baseId:GOLD_BASE,count:gold}] : [];
+      } else {
+        var picked = takeStock(stock, resolved.baseId, itemName, asked.count);
+        stock = picked.stock; credit = picked.entries;
+      }
+      var nextSupply = JSON.parse(JSON.stringify(state.supply || {}));
+      if (verb === 'supply') nextSupply[itemName.toLowerCase()] = now();
+      moved = settlement.begin({merchantId:merchantId,humanId:actorId,profileId:profileId,
+        previous:state,expected:expected,debit:outgoing.inventory,credit:credit,kind:verb,
+        next:{purse:nextPurse,stock:stock,supply:nextSupply}});
+    } catch (error) {
+      return fail(settlement.available() ? String(error.message || error) : 'Trading is unavailable. The saved transfer is retained.');
     }
     var current = purses.prepare(merchantId);
-    if (moved && moved.durable) {
-      current = applyPending(merchantId, current);
-      var done = viewFor(merchantId, current, place, '');
-      var said = npcBuys
-        ? ('Sold ' + asked.count + ' ' + itemName + ' for ' + gold + '. Purse ' + current.purse + '.')
-        : ('Bought ' + asked.count + ' ' + itemName + ' for ' + gold + '. Purse ' + current.purse + '.');
-      return { text: said, view: done };
-    }
-    if (!moved || !moved.attempted) {
-      clearPending(merchantId, current);
-      return fail((moved && moved.reason) || 'The transfer was refused.', viewFor(merchantId, purses.prepare(merchantId), place));
-    }
-    return fail((moved && moved.reason) || 'The transfer is waiting on the save.', viewFor(merchantId, purses.prepare(merchantId), place));
+    if (!moved.done) return fail(moved.reason, viewFor(merchantId, current, place, moved.reason));
+    var said = npcBuys
+      ? ('Sold ' + asked.count + ' ' + itemName + ' for ' + gold + '. Purse ' + current.purse + '.')
+      : ('Bought ' + asked.count + ' ' + itemName + ' for ' + gold + '. Purse ' + current.purse + '.');
+    return {text:said,view:viewFor(merchantId, current, place)};
   }
 
   function activate(actorId, merchantId) {
@@ -480,7 +365,8 @@ function createMerchantTrading(deps) {
     command: command,
     activate: activate,
     recover: recover,
-    nativeReady: function () { return !!(transfer && transfer.available && transfer.available()); },
+    nativeReady: function () { return settlement.available(); },
+    shutdown: function () { active=false; sessions.clear(); settlement.shutdown(); },
     REACH: REACH,
     SUPPLY_COUNT: SUPPLY_COUNT,
     bookHoldOf: bookHoldOf
@@ -507,6 +393,7 @@ function installMerchantTrading(env) {
   }
   var trading = createMerchantTrading({
     purses: env.purses,
+    log:log,
     prices: {
       quote: function (hold, item) {
         var books = g.__thornswoodBooks;
@@ -592,7 +479,18 @@ function installMerchantTrading(env) {
     payload.at = Date.now();
     try { mp.set(actorId, property, payload); } catch (e) { log('merchant panel: ' + e); }
   };
-  try { trading.recover(Array.from(traderIds)); } catch (e) { log('merchant recover: ' + e); }
+  var timers=env.timers || (typeof setTimeout === 'function' && typeof clearTimeout === 'function' ? {setTimeout:setTimeout,clearTimeout:clearTimeout} : null);
+  var alive=true, timer=null;
+  var stop=trading.shutdown;
+  trading.shutdown=function () {alive=false; if(timer!==null && timers) timers.clearTimeout(timer); stop();};
+  function advance() {
+    if(!alive) return;
+    try { trading.recover().forEach(function (result) {if(alive) trading.push(result.actorId,result.view);}); }
+    catch(error) {log('merchant recover: '+error);}
+    // This checks exact save acknowledgements, never elapsed-time settlement.
+    if(alive && trading.nativeReady() && timers) timer=timers.setTimeout(advance,1000);
+  }
+  if(trading.nativeReady()) advance();
   return trading;
 }
 

@@ -28497,7 +28497,7 @@ log('gamemode loaded:',
     }
     var ids = [];
     try {
-      var doc = JSON.parse(fs.readFileSync(path.join(privDir, 'allowed.json'), 'utf8').replace(/^﻿/, ''));
+      var doc = JSON.parse(fs.readFileSync(path.join(privDir, 'allowed.json'), 'utf8').replace(/^ï»¿/, ''));
       var list = (doc && Array.isArray(doc.profiles)) ? doc.profiles : [];
       for (var i = 0; i < list.length; i++) {
         var n = Number(list[i]);
@@ -28518,7 +28518,7 @@ log('gamemode loaded:',
   function push() {
     var conf;
     try {
-      conf = JSON.parse(fs.readFileSync(path.join(privDir, 'door.json'), 'utf8').replace(/^﻿/, ''));
+      conf = JSON.parse(fs.readFileSync(path.join(privDir, 'door.json'), 'utf8').replace(/^ï»¿/, ''));
     } catch (e) { return; }
     if (!conf || !conf.site || !conf.key) return;
     var https;
@@ -28697,7 +28697,7 @@ log('gamemode loaded:',
     if (now - readAt < 30000) return list;
     readAt = now;
     try {
-      var doc = JSON.parse(fs.readFileSync(FILE, 'utf8').replace(/^﻿/, ''));
+      var doc = JSON.parse(fs.readFileSync(FILE, 'utf8').replace(/^ï»¿/, ''));
       var ids = {};
       if (Array.isArray(doc.profiles)) {
         for (var i = 0; i < doc.profiles.length; i++) {
@@ -29861,7 +29861,7 @@ log('gamemode loaded:',
     var k = '';
     try {
       var dir = String(settings().privDir || 'private');
-      var doc = JSON.parse(String(fs.readFileSync(path.join(dir, 'door.json'), 'utf8')).replace(/^﻿/, ''));
+      var doc = JSON.parse(String(fs.readFileSync(path.join(dir, 'door.json'), 'utf8')).replace(/^ï»¿/, ''));
       k = String((doc && doc.passKey) || '');
     } catch (e) { k = ''; }
     if (!k && fresh('no key', now)) {
@@ -54222,7 +54222,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       Patrick: "why is temp a water drop and the food icon seems weird too".
       He was looking at a real bug. The old flame was
       "M10 18a5 5 0 0 0 5-5c0-4-5-11-5-11S5 9 5 13a5 5 0 0 0 5 5z" and the old
-      droplet was "M10 2C10 2 4 9 4 12.5A6 6 0 0 0 16 12.5C16 9 10 2 10 2z" —
+      droplet was "M10 2C10 2 4 9 4 12.5A6 6 0 0 0 16 12.5C16 9 10 2 10 2z" â€”
       the same teardrop, one of them upside down. At fourteen pixels they were
       indistinguishable, so Temp genuinely did look like a second water drop.
       The drumstick was three disconnected strokes and read as nothing at all.
@@ -58215,7 +58215,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     } catch (e) { }
     try {
       var conf = JSON.parse(fs.readFileSync(path.join(privDir, 'door.json'), 'utf8')
-                              .replace(/^﻿/, ''));
+                              .replace(/^ï»¿/, ''));
       if (conf && conf.site && conf.key) { return { site: String(conf.site), key: String(conf.key) }; }
     } catch (e) { }
     return null;
@@ -59342,7 +59342,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var conf = null;
     try {
       conf = JSON.parse(fs.readFileSync(path.join(String(settings().privDir || 'private'), 'door.json'), 'utf8')
-                          .replace(/^﻿/, ''));
+                          .replace(/^ï»¿/, ''));
     } catch (e) { conf = null; }
     if (!conf || !conf.site || !conf.key) { end(false, 'this server has no door.json naming the site'); return; }
     var url;
@@ -59396,7 +59396,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var list = [], pk = [], written = 0;
     try {
       var doc = JSON.parse(fs.readFileSync(path.join(String(settings().privDir || 'private'), 'allowed.json'), 'utf8')
-                             .replace(/^﻿/, ''));
+                             .replace(/^ï»¿/, ''));
       if (doc && Array.isArray(doc.bans)) { list = doc.bans; }
       if (doc && Array.isArray(doc.pk)) { pk = doc.pk; }
       written = Date.parse(String((doc && doc.at) || '')) || 0;
@@ -59937,10 +59937,10 @@ try { globalThis.__thornswoodResourceStock=createSharedResourceStock(mp,()=>Date
 catch(error) { log('Shared resource stock could not start: '+error); }
 
 // NPC MERCHANT PURSES BEGIN
-function createPrivateMerchantLedger(fs,path,settings,references) {
-  return createPrivateEconomyLedger(fs,path,settings,'merchant',references);
+function createPrivateMerchantLedger(fs,path,settings,references,durableWriter) {
+  return createPrivateEconomyLedger(fs,path,settings,'merchant',references,durableWriter);
 }
-function createPrivateEconomyLedger(fs,path,settings,name,references) {
+function createPrivateEconomyLedger(fs,path,settings,name,references,durableWriter) {
   if(name!=='merchant' && name!=='dungeon-rewards') throw new Error('Unknown private economy ledger');
   const dir=path.resolve(settings.privDir || 'private'),served=path.resolve(settings.dataDir || 'data');
   function realPath(input) {
@@ -59962,12 +59962,18 @@ function createPrivateEconomyLedger(fs,path,settings,name,references) {
   const checksum=doc=>require('crypto').createHash('sha256').update(JSON.stringify([doc.version,doc.entries])).digest('hex');
   function save(doc) {
     checkPrivate();
+    const bytes=JSON.stringify({version:doc.version,entries:doc.entries,sha256:checksum(doc)});
+    if(typeof durableWriter==='function') {
+      if(durableWriter(name,bytes)!==true) throw new Error('Durable merchant save acknowledgement is missing');
+      return true;
+    }
     fs.mkdirSync(dir,{recursive:true});
     const tmp=file+'.tmp';
-    fs.writeFileSync(tmp,JSON.stringify({version:doc.version,entries:doc.entries,sha256:checksum(doc)}));
+    fs.writeFileSync(tmp,bytes);
     const fd=fs.openSync(tmp,'r+');
     try {fs.fsyncSync(fd);} finally {fs.closeSync(fd);}
     fs.renameSync(tmp,file);
+    return true;
   }
   function load() {
     checkPrivate();
@@ -59982,6 +59988,8 @@ function createPrivateEconomyLedger(fs,path,settings,name,references) {
     const doc=JSON.parse(fs.readFileSync(file,'utf8').replace(/^\uFEFF/,''));
     if(!doc || typeof doc.sha256!=='string' || doc.sha256!==checksum(doc))
       throw new Error('Saved merchant ledger integrity cannot be verified');
+    // Existing documents pass the native path and alias checks before use.
+    if(typeof durableWriter==='function') save(doc);
     // This marker distinguishes a first deployment from a deleted ledger.
     if(!fs.existsSync(marker)) {
       fs.writeFileSync(marker,'1');
@@ -59990,7 +59998,7 @@ function createPrivateEconomyLedger(fs,path,settings,name,references) {
     }
     return doc;
   }
-  return {load,save};
+  return {load,save,durable:typeof durableWriter==='function',namespace:String(settings.thornswoodServer || 'main').toLowerCase()+':'+(path.sep==='\\' ? realPath(file).toLowerCase() : realPath(file))};
 }
 function createNpcMerchantPurses(api,data,storage) {
   const property='thornswoodMerchant',catalogue=new Map(),verified=new Set();
@@ -60006,6 +60014,7 @@ function createNpcMerchantPurses(api,data,storage) {
   let ledger=storage.load();
   function valid(state,identity) {
     return state && state.version===1 && state.reference===identity.reference && state.base===identity.base &&
+      (state.revision===undefined || Number.isSafeInteger(state.revision) && state.revision>=0) &&
       Number.isInteger(state.purse) && state.purse>=0 && state.purse<=2147483647 &&
       Array.isArray(state.stock) && state.stock.every(row=>row && Number.isInteger(row.baseId) &&
         row.baseId>0 && row.baseId<=0xffffffff && row.baseId!==15 &&
@@ -60036,7 +60045,11 @@ function createNpcMerchantPurses(api,data,storage) {
       const next=JSON.parse(JSON.stringify(ledger));
       next.entries[identity.reference]=state;
       // Initialization and balance commit together before the native mirror.
-      storage.save(next);
+      try {
+        const acknowledgement=storage.save(next);
+        if(storage.durable===true && acknowledgement!==true) throw new Error('Durable merchant save acknowledgement is missing');
+      } catch(error) {active=false;throw error;}
+      if(!active) throw new Error('Merchant purse service is unavailable');
       ledger=next;
       initialized++;
     }
@@ -60046,7 +60059,7 @@ function createNpcMerchantPurses(api,data,storage) {
     verified.add(id);
     return JSON.parse(JSON.stringify(state));
   }
-  function commit(id, nextState) {
+  function commit(id, nextState, expectedRevision, requireAcknowledgement) {
     if(!active) throw new Error('Merchant purse service is unavailable');
     const identity=catalogue.get(id);
     if(!identity) throw new Error('That is not a guild trader');
@@ -60055,14 +60068,50 @@ function createNpcMerchantPurses(api,data,storage) {
     if(!valid(nextState, identity)) throw new Error('Merchant state cannot be verified');
     const previous=ledger.entries[identity.reference];
     if(previous===null || previous===undefined) throw new Error('Merchant initialization record is missing');
+    const revision=previous.revision || 0;
+    const expected=expectedRevision===undefined ? (nextState.revision || 0) : expectedRevision;
+    if(!Number.isSafeInteger(expected) || expected<0) throw new Error('Invalid merchant revision');
+    if(revision!==expected) return null;
+    if(revision>=Number.MAX_SAFE_INTEGER) throw new Error('Merchant revision is exhausted');
+    if(requireAcknowledgement && storage.durable!==true)
+      throw new Error('Durable merchant save acknowledgement is unavailable');
     const next=JSON.parse(JSON.stringify(ledger));
-    next.entries[identity.reference]=JSON.parse(JSON.stringify(nextState));
-    storage.save(next);
+    const committed=JSON.parse(JSON.stringify(nextState));
+    committed.revision=revision+1;
+    next.entries[identity.reference]=committed;
+    try {
+      const acknowledgement=storage.save(next);
+      if(requireAcknowledgement && acknowledgement!==true)
+        throw new Error('Durable merchant save acknowledgement is missing');
+    } catch(error) {
+      // A replacement may have reached disk before an error was reported.
+      // Revoke this controller so stale in-memory state cannot overwrite it.
+      active=false;
+      throw error;
+    }
+    if(!active) throw new Error('Merchant purse service is unavailable');
     ledger=next;
-    api.set(id, property, JSON.parse(JSON.stringify(nextState)));
-    return JSON.parse(JSON.stringify(nextState));
+    api.set(id, property, JSON.parse(JSON.stringify(committed)));
+    return JSON.parse(JSON.stringify(committed));
   }
-  return {prepare,commit,shutdown:()=>{active=false;},stats:()=>({catalogue:catalogue.size,verified:verified.size,initialized})};
+  function compareAndCommit(id, expectedRevision, nextState) {
+    return commit(id,nextState,expectedRevision,true);
+  }
+  function read(id) {
+    if(!active) throw new Error('Merchant purse service is unavailable');
+    const identity=catalogue.get(id);
+    return identity && ledger.entries[identity.reference] ? JSON.parse(JSON.stringify(ledger.entries[identity.reference])) : null;
+  }
+  function pendingRecords() {
+    if(!active) throw new Error('Merchant purse service is unavailable');
+    const pending=[];
+    for(const [id,identity] of catalogue) {
+      const state=ledger.entries[identity.reference];
+      if(state && state.pending) pending.push({merchantId:id,reference:identity.reference,state:JSON.parse(JSON.stringify(state))});
+    }
+    return pending;
+  }
+  return {prepare,read,commit,compareAndCommit,pendingRecords,durable:storage.durable===true,namespace:storage.namespace,shutdown:()=>{active=false;},stats:()=>({catalogue:catalogue.size,verified:verified.size,initialized})};
 }
 // NPC MERCHANT PURSES END
 
@@ -60914,7 +60963,243 @@ function startSharedNpcServerRuntime(api, timers, now, report, population) {
 const MERCHANT_TRADING = (function () {
 const module = { exports: {} };
 const MERCHANT_GUILD_SITES = [{"hold":"Haafingar","bookHold":"solitude","place":"Solitude","spot":"the notice board","x":-64867,"y":104407.2,"z":-8405.9,"source":"docs/systems/noticeboards.md"},{"hold":"Whiterun","bookHold":"whiterun","place":"Whiterun","spot":"the notice board","x":23139.4,"y":-7891.7,"z":-3494.4,"source":"docs/systems/noticeboards.md"},{"hold":"the Rift","bookHold":"riften","place":"Riften","spot":"the notice board","x":174559.5,"y":-94337,"z":11130.2,"source":"docs/systems/noticeboards.md"},{"hold":"Eastmarch","bookHold":"windhelm","place":"Windhelm","spot":"the notice board","x":134265.1,"y":35842.3,"z":-12397.5,"source":"docs/systems/noticeboards.md"},{"hold":"the Reach","bookHold":"markarth","place":"Markarth","spot":"the notice board","x":-173494.7,"y":5049.1,"z":-3447.6,"source":"docs/systems/noticeboards.md"},{"hold":"Falkreath","bookHold":"falkreath","place":"Falkreath","spot":"the notice board","x":-30342.2,"y":-87022.7,"z":-3119.1,"source":"docs/systems/noticeboards.md"},{"hold":"Hjaalmarch","bookHold":"morthal","place":"Morthal","spot":"the notice board","x":-38766.1,"y":64411.9,"z":-13920.9,"source":"docs/systems/noticeboards.md"},{"hold":"the Pale","bookHold":"dawnstar","place":"Dawnstar","spot":"the notice board","x":32216.4,"y":102314,"z":-13263,"source":"docs/systems/noticeboards.md"},{"hold":"Winterhold","bookHold":"winterhold","place":"Winterhold","spot":"the notice board","x":109969.6,"y":100594.4,"z":-9033,"source":"docs/systems/noticeboards.md"},{"hold":"Solstheim","bookHold":"ravenrock","place":"Raven Rock","spot":"the town inn, at Geldis Sadri","x":-39.04017639160156,"y":-178.24331665039062,"z":0,"cell":"17ec0:Dragonborn.esm","ref":"18291:Dragonborn.esm","source":"docs/systems/noticeboards.md says Raven Rock's board starts at the town inn; Geldis Sadri is that trader"}];
-﻿'use strict';
+const MERCHANT_SETTLEMENT = (function () { const module = {exports:{}};
+'use strict';
+
+var MAX_PENDING = 25;
+var MAX_INVENTORY_BYTES = 128 * 1024;
+var MAX_INTENT_BYTES = 512 * 1024;
+var MAX_COUNT = 2147483647;
+function copy(value) { return JSON.parse(JSON.stringify(value)); }
+function equal(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+function bounded(value, limit) {
+  if (Buffer.byteLength(JSON.stringify(value), 'utf8') > limit) throw new Error('The trade is too large.');
+  return value;
+}
+function inventory(value) {
+  if (!value || !Array.isArray(value.entries) || Object.keys(value).length !== 1) throw new Error('Inventory cannot be verified.');
+  var total=0;
+  value.entries.forEach(function (row) {
+    if (!row || !Number.isInteger(row.baseId) || row.baseId <= 0 || row.baseId > 0xffffffff ||
+        !Number.isInteger(row.count) || row.count <= 0 || row.count > MAX_COUNT) throw new Error('Inventory cannot be verified.');
+    total+=row.count;
+    if(total>0xffffffff) throw new Error('Inventory total is too large.');
+  });
+  return bounded(copy(value), MAX_INVENTORY_BYTES);
+}
+function metadataKey(entry) {
+  var out = {};
+  Object.keys(entry).sort().forEach(function (key) { if (key !== 'count') out[key] = entry[key]; });
+  return JSON.stringify(out);
+}
+function addEntries(snapshot, entries) {
+  var next = inventory(snapshot);
+  inventory({entries:entries}).entries.forEach(function (entry) {
+    var key = metadataKey(entry);
+    var held = next.entries.find(function (row) { return metadataKey(row) === key; });
+    if (held) {
+      if (held.count + entry.count > MAX_COUNT) throw new Error('Inventory count is too large.');
+      held.count += entry.count;
+    } else next.entries.push(copy(entry));
+  });
+  return inventory(next);
+}
+function takeEntries(snapshot, baseId, count) {
+  var next = inventory(snapshot), taken = [], left = count;
+  for (var i = 0; i < next.entries.length && left > 0; i++) {
+    var row = next.entries[i];
+    if (row.baseId !== baseId) continue;
+    var n = Math.min(left, row.count);
+    taken.push(Object.assign({}, copy(row), {count:n}));
+    row.count -= n; left -= n;
+  }
+  if (left) throw new Error('You are not carrying that.');
+  next.entries = next.entries.filter(function (row) { return row.count > 0; });
+  return {inventory:inventory(next), entries:taken};
+}
+function receiptAt(human, sequence) {
+  return JSON.stringify({actor:human.desc, profile:human.profileId, sequence:sequence});
+}
+function sequenceOf(receipt, human) {
+  var doc = JSON.parse(receipt);
+  if (doc === null) return 0;
+  if (!doc || Object.keys(doc).length !== 3 || doc.actor !== human.desc || doc.profile !== human.profileId ||
+      !Number.isSafeInteger(doc.sequence) || doc.sequence < 1) throw new Error('Inventory receipt cannot be verified.');
+  return doc.sequence;
+}
+
+// Native receipt writes are atomic with the human inventory. Ledger writes are
+// synchronous durable replacements. Neither is inferred from elapsed time.
+function createSettlement(deps) {
+  var purses = deps.purses, transfer = deps.transfer, world = deps.world;
+  var active = true, cursor = 0, busy = false;
+  var errors = new Map();
+  function report(id, error) {
+    var message=String(error.message || error);
+    if(errors.get(id)!==message && deps.log) deps.log('merchant settlement ' + id.toString(16) + ': ' + message);
+    errors.set(id,message);
+  }
+  function available() {
+    return active && !!world && !!purses && purses.durable !== false && typeof purses.compareAndCommit === 'function' &&
+      typeof purses.pendingRecords === 'function' && typeof purses.read === 'function' &&
+      !!transfer && typeof transfer.validate==='function' && transfer.available();
+  }
+  function records() { return purses.pendingRecords(); }
+  function humanKey(human) { return human && human.desc && human.profileId > 0 ? human.desc + ':' + human.profileId : ''; }
+  function admitted(human, reference) {
+    var pending = records(), key = humanKey(human);
+    if (!key || pending.length >= MAX_PENDING) return false;
+    return pending.every(function (record) {
+      var other = record.state.pending.human;
+      return humanKey(other) && humanKey(other) !== key && record.reference !== reference;
+    });
+  }
+  function save(id, state, next, intentId) {
+    if (!active || intentId && (!state.pending || state.pending.id !== intentId)) return null;
+    try {
+      var committed = purses.compareAndCommit(id, state.revision || 0, next);
+      return active ? committed : null;
+    } catch (error) {
+      // The replacement may be durable even when its acknowledgement failed.
+      // Only a newly loaded ledger can decide what happened.
+      active = false;
+      throw error;
+    }
+  }
+  function identity(pending) {
+    var id = transfer.resolve(pending.human.desc);
+    if (!id) return 0;
+    var human = transfer.identity(id);
+    return equal(human, pending.human) ? id : 0;
+  }
+  function valid(pending, state) {
+    return pending && pending.version === 2 && pending.world === world &&
+      pending.reference === state.reference && pending.base === state.base &&
+      typeof pending.id === 'string' && humanKey(pending.human) &&
+      (pending.phase === 'debit' || pending.phase === 'credit') &&
+      Number.isSafeInteger(pending.sequence) && pending.sequence > 0 && pending.sequence < Number.MAX_SAFE_INTEGER &&
+      pending.debitReceipt === receiptAt(pending.human, pending.sequence) &&
+      pending.finalReceipt === receiptAt(pending.human, pending.sequence + 1);
+  }
+  function commitMerchant(id, state) {
+    var pending = state.pending;
+    if (!equal({purse:state.purse,stock:state.stock,supply:state.supply || {}}, pending.previous)) return null;
+    var next = Object.assign({}, copy(state), copy(pending.next));
+    next.pending.phase = 'credit';
+    return save(id, state, next, pending.id);
+  }
+  function reconcile(id) {
+    if (!available()) return false;
+    var state = purses.read(id), pending = state && state.pending;
+    if (!valid(pending, state)) return false;
+    // Corrupt duplicate reservations must not independently credit one human.
+    var key = humanKey(pending.human);
+    if (records().filter(function (r) { return humanKey(r.state.pending.human) === key; }).length !== 1) return false;
+    var humanId = identity(pending);
+    if (!active || !humanId) return false;
+    var live = transfer.receipt(humanId), saved = transfer.saved(humanId);
+    if (!active) return false;
+    if (live === pending.finalReceipt) {
+      if (pending.phase !== 'credit' || saved !== pending.finalReceipt ||
+          !equal({purse:state.purse,stock:state.stock,supply:state.supply || {}}, pending.next)) return false;
+      return !!save(id, state, Object.assign({}, copy(state), {pending:null}), pending.id);
+    }
+    if (pending.phase === 'debit') {
+      if (live === pending.expectedReceipt) {
+        // Replaying the identical debit is safe only against its original
+        // snapshot and receipt. A refused snapshot remains reserved.
+        if (!active) return false;
+        if (!equal(transfer.inventory(humanId), pending.expected)) {
+          // Calls are synchronous and busy fences this instance. An unchanged
+          // original receipt proves this transaction never changed inventory,
+          // including after restart. No original inventory restoration is needed.
+          return !!save(id, state, Object.assign({}, copy(state), {pending:null}), pending.id);
+        }
+        if (!active || !identity(pending)) return false;
+        var changed = transfer.cas(humanId, pending.expected, pending.expectedReceipt, pending.debit, pending.sequence, pending.human.profileId);
+        if (!active) return false;
+        live = transfer.receipt(humanId); saved = transfer.saved(humanId);
+        if (changed === false && live === pending.expectedReceipt)
+          return !!save(id, state, Object.assign({}, copy(state), {pending:null}), pending.id);
+      }
+      if (live !== pending.debitReceipt || saved !== pending.debitReceipt || !active) return false;
+      state = commitMerchant(id, state);
+      if (!state || !active) return false;
+      pending = state.pending;
+    }
+    if (live !== pending.debitReceipt || saved !== pending.debitReceipt || !active) return false;
+    var current = inventory(transfer.inventory(humanId));
+    if (!pending.creditAttempt || !equal(pending.creditAttempt.expected, current)) {
+      var next = copy(state);
+      next.pending.creditAttempt = {expected:current,replacement:addEntries(current, pending.credit)};
+      if(transfer.validate(next.pending.creditAttempt.replacement)!==true) throw new Error('Native inventory validation failed.');
+      state = save(id, state, bounded(next, MAX_INTENT_BYTES), pending.id);
+      if (!state || !active) return false;
+      pending = state.pending;
+    }
+    if (!active || !identity(pending)) return false;
+    transfer.cas(humanId, pending.creditAttempt.expected, pending.debitReceipt,
+      pending.creditAttempt.replacement, pending.sequence + 1, pending.human.profileId);
+    // A notification may throw after CAS changed inventory. The saved intent
+    // and final receipt, rather than this return value, determine completion.
+    if (!active || transfer.receipt(humanId) !== pending.finalReceipt || transfer.saved(humanId) !== pending.finalReceipt) return false;
+    return !!save(id, state, Object.assign({}, copy(state), {pending:null}), pending.id);
+  }
+  function begin(offer) {
+    if (!available() || busy) return {accepted:false,done:false,reason:'Trading is unavailable.'};
+    busy = true;
+    try {
+      var human = transfer.identity(offer.humanId), state = purses.read(offer.merchantId);
+      if (!human || human.profileId !== offer.profileId || !state || state.pending ||
+          !equal(state, offer.previous) || !admitted(human, state.reference))
+        return {accepted:false,done:false,reason:'A transfer is waiting.'};
+      var expected = inventory(transfer.inventory(offer.humanId));
+      if (!equal(expected, offer.expected)) return {accepted:false,done:false,reason:'Your inventory changed. Choose the trade again.'};
+      var receipt = transfer.receipt(offer.humanId), sequence = sequenceOf(receipt, human) + 1;
+      if (!Number.isSafeInteger(sequence + 1)) throw new Error('Inventory receipt sequence is exhausted.');
+      var pending = {version:2,id:world + ':' + state.reference + ':' + (state.revision || 0),world:world,
+        reference:state.reference,base:state.base,human:human,kind:offer.kind,phase:'debit',
+        previous:{purse:state.purse,stock:copy(state.stock),supply:copy(state.supply || {})},next:copy(offer.next),
+        expected:expected,expectedReceipt:receipt,debit:inventory(offer.debit),credit:inventory({entries:offer.credit}).entries,
+        sequence:sequence,debitReceipt:receiptAt(human,sequence),finalReceipt:receiptAt(human,sequence+1)};
+      // Use the same native validator as CAS, including its serialized-byte
+      // representation. No separate JS estimate can substitute for that check.
+      [expected,pending.debit,addEntries(pending.debit,pending.credit)].forEach(function (snapshot) {
+        if(transfer.validate(snapshot)!==true) throw new Error('Native inventory validation failed.');
+      });
+      var armed = Object.assign({}, copy(state), {pending:pending});
+      if (!save(offer.merchantId, state, bounded(armed, MAX_INTENT_BYTES))) return {accepted:false,done:false,reason:'The offer changed.'};
+      var done = false;
+      if (active) {
+        try { done = reconcile(offer.merchantId); }
+        catch (error) { report(offer.merchantId,error); if (!active) throw error; }
+      }
+      var after = active && purses.read(offer.merchantId);
+      var cancelled = after && !after.pending && equal({purse:after.purse,stock:after.stock,supply:after.supply || {}},pending.previous);
+      return {accepted:!cancelled,done:done && !cancelled,reason:cancelled ? 'Your inventory changed. Choose the trade again.' : done ? '' : 'The transfer is waiting on the save.'};
+    } finally { busy = false; }
+  }
+  function tick() {
+    if (!available() || busy) return [];
+    busy = true;
+    try {
+      var all = records(), changed = [];
+      for (var i = 0; i < Math.min(MAX_PENDING, all.length) && active; i++) {
+        var record = all[(cursor + i) % all.length];
+        try { if(reconcile(record.merchantId)) {changed.push(record.merchantId);errors.delete(record.merchantId);} }
+        catch (error) { report(record.merchantId,error); if (!active) throw error; }
+      }
+      cursor = all.length ? (cursor + MAX_PENDING) % all.length : 0;
+      return changed;
+    } finally { busy = false; }
+  }
+  return {begin:begin,tick:tick,available:available,shutdown:function () { active=false; }};
+}
+
+module.exports = {createSettlement:createSettlement,inventory:inventory,takeEntries:takeEntries,
+  addEntries:addEntries,metadataKey:metadataKey,MAX_PENDING:MAX_PENDING};
+return module.exports;})();
+'use strict';
 
 var GOLD_BASE = 15;
 var REACH = 400;
@@ -60962,76 +61247,26 @@ function guildSite(bookHold) {
   return null;
 }
 
-function createNativeMerchantTransfer(api) {
-  function ready() {
-    return !!api &&
-      typeof api.beginMerchantTransfer === 'function' &&
-      typeof api.commitMerchantHumanDebit === 'function' &&
-      typeof api.isMerchantHumanDebitDurable === 'function' &&
-      typeof api.releaseMerchantQuarantine === 'function';
-  }
+var SETTLEMENT = typeof MERCHANT_SETTLEMENT !== 'undefined' ? MERCHANT_SETTLEMENT : require('./merchant-settlement');
+
+function createNativeMerchantTransfer(mp) {
   return {
-    available: ready,
-    recall: function (id) {
-      if (!api || typeof api.merchantTransferStatus !== 'function') return { known: false };
-      var status = api.merchantTransferStatus(id);
-      if (!status) return { known: false };
-      return {
-        known: status.known !== false,
-        durable: !!status.durable,
-        attempted: !!status.attempted
-      };
+    available: function () {
+      return !!mp && ['validateInventoryTransaction','compareAndSetInventory','getInventoryReceipt','getSavedInventoryReceipt',
+        'getNpcAIState','getDescFromId','getIdFromDesc','get'].every(function (key) { return typeof mp[key] === 'function'; });
     },
-    move: function (req) {
-      if (!ready()) {
-        return {
-          ok: false, durable: false, attempted: false,
-          reason: 'Native merchant transfer is not on this server.'
-        };
-      }
-      var began = api.beginMerchantTransfer({
-        humanId: req.humanId,
-        merchantId: req.merchantId,
-        humanLoses: req.humanLoses,
-        humanGains: req.humanGains,
-        intentId: req.intentId
-      });
-      if (!began || !began.ok) {
-        return {
-          ok: false, durable: false, attempted: false,
-          reason: (began && began.reason) || 'The transfer was refused.'
-        };
-      }
-      var debit = api.commitMerchantHumanDebit(req.humanId, began.offerId);
-      if (!debit || !debit.ok) {
-        return {
-          ok: false, durable: false, attempted: !!(debit && debit.attempted),
-          offerId: began.offerId,
-          reason: (debit && debit.reason) || 'The debit was refused.'
-        };
-      }
-      if (!api.isMerchantHumanDebitDurable(req.humanId, began.offerId)) {
-        return {
-          ok: false, durable: false, attempted: true, offerId: began.offerId,
-          reason: 'The debit is not durable yet.'
-        };
-      }
-      var released = api.releaseMerchantQuarantine(req.humanId, began.offerId);
-      if (!released || !released.ok) {
-        return {
-          ok: false, durable: false, attempted: true, offerId: began.offerId,
-          reason: (released && released.reason) || 'Quarantine was not released.'
-        };
-      }
-      var done = typeof api.merchantTransferStatus === 'function'
-        ? api.merchantTransferStatus(began.offerId) : { known: true, durable: true, attempted: true };
-      if (!done || !done.durable) {
-        return {
-          ok: false, durable: false, attempted: true, offerId: began.offerId,
-          reason: 'The transfer is not durable yet.'
-        };
-      }
-      return { ok: true, durable: true, attempted: true, offerId: began.offerId };
+    identity: function (id) {
+      var ai = mp.getNpcAIState(id);
+      if (!ai || !ai.isHuman || !Number.isInteger(ai.profileId) || ai.profileId <= 0) return null;
+      return {desc:mp.getDescFromId(id),profileId:ai.profileId};
+    },
+    resolve: function (desc) { return mp.getIdFromDesc(desc); },
+    inventory: function (id) { return mp.get(id, 'inventory'); },
+    validate: function (snapshot) { return mp.validateInventoryTransaction(snapshot); },
+    receipt: function (id) { return mp.getInventoryReceipt(id); },
+    saved: function (id) { return mp.getSavedInventoryReceipt(id); },
+    cas: function (id, expected, receipt, next, sequence, profile) {
+      return mp.compareAndSetInventory(id, expected, receipt, next, sequence, profile);
     }
   };
 }
@@ -61045,7 +61280,8 @@ function createMerchantTrading(deps) {
   var now = deps.now || function () { return Date.now(); };
   var reach = deps.reach == null ? REACH : deps.reach;
   var sessions = new Map();
-  var seq = 0;
+  var settlement = SETTLEMENT.createSettlement({purses:purses,transfer:transfer,world:deps.namespace || purses.namespace,log:deps.log});
+  var active = true;
 
   function placeOf(reference) {
     return places[reference] || null;
@@ -61055,39 +61291,33 @@ function createMerchantTrading(deps) {
     return { text: text, view: view || null };
   }
 
-  function stockCopy(stock) {
-    return (stock || []).map(function (row) {
-      return { baseId: row.baseId, count: row.count, name: row.name };
+  function stockCopy(stock) { return JSON.parse(JSON.stringify(stock || [])); }
+  function addStock(stock, entries, name) {
+    entries.forEach(function (entry) {
+      var key = SETTLEMENT.metadataKey(entry);
+      var row = stock.find(function (held) {
+        return held.name === name && SETTLEMENT.metadataKey(held.entry || {baseId:held.baseId,count:held.count}) === key;
+      });
+      if (row) {
+        if (row.count + entry.count > MAX_GOLD) throw new Error('The shelf is full.');
+        row.count += entry.count; row.entry = Object.assign({}, entry, {count:row.count});
+      } else stock.push({baseId:entry.baseId,count:entry.count,name:name,entry:JSON.parse(JSON.stringify(entry))});
     });
+    SETTLEMENT.inventory({entries:stock.map(function (row) { return row.entry || {baseId:row.baseId,count:row.count}; })});
+    return stock;
   }
-
-  function sameStock(a, b) {
-    return JSON.stringify(stockCopy(a)) === JSON.stringify(stockCopy(b));
-  }
-
-  function findStock(stock, name, baseId) {
-    var key = String(name || '').toLowerCase();
-    for (var i = 0; i < stock.length; i++) {
-      if (stock[i].baseId === baseId && String(stock[i].name || '').toLowerCase() === key) return stock[i];
-    }
-    for (var j = 0; j < stock.length; j++) {
-      if (stock[j].baseId === baseId) return stock[j];
-    }
-    return null;
-  }
-
-  function addStock(stock, baseId, name, count) {
-    var row = findStock(stock, name, baseId);
-    if (row) row.count += count;
-    else stock.push({ baseId: baseId, count: count, name: name });
-  }
-
   function takeStock(stock, baseId, name, count) {
-    var row = findStock(stock, name, baseId);
-    if (!row || row.count < count) return false;
-    row.count -= count;
-    if (row.count === 0) stock.splice(stock.indexOf(row), 1);
-    return true;
+    var entries = [], left = count;
+    for (var i = 0; i < stock.length && left > 0; i++) {
+      var row = stock[i];
+      if (row.baseId !== baseId || String(row.name || '').toLowerCase() !== name.toLowerCase()) continue;
+      var n = Math.min(row.count, left);
+      entries.push(Object.assign({}, row.entry || {baseId:row.baseId}, {count:n}));
+      row.count -= n; left -= n;
+      if (row.entry) row.entry.count = row.count;
+    }
+    if (left) throw new Error('The shelf is empty.');
+    return {stock:stock.filter(function (row) { return row.count > 0; }),entries:entries};
   }
 
   function inReach(humanId, merchantId) {
@@ -61123,7 +61353,7 @@ function createMerchantTrading(deps) {
     var offers = [];
     for (var i = 0; i < catalog.length; i++) {
       var row = catalog[i];
-      var held = findStock(state.stock || [], row.name, null);
+      var held = (state.stock || []).find(function (entry) { return String(entry.name || '').toLowerCase() === String(row.name).toLowerCase(); });
       var count = 0;
       var stock = state.stock || [];
       for (var s = 0; s < stock.length; s++) {
@@ -61149,59 +61379,30 @@ function createMerchantTrading(deps) {
     }
     return {
       open: true,
-      transfer: !!(transfer && transfer.available && transfer.available()),
+      transfer: settlement.available(),
       trader: place.name || 'Trader',
       place: place.locationName || '',
       hold: place.bookHold,
       purse: state.purse,
       offers: offers,
       supply: supply,
-      note: note || (transfer && transfer.available && transfer.available()
+      note: note || (settlement.available()
         ? ''
         : 'Buying and selling wait on the native transfer. Nothing has moved.')
     };
   }
 
-  function clearPending(id, state) {
-    var next = JSON.parse(JSON.stringify(state));
-    next.pending = null;
-    purses.commit(id, next);
-    return purses.prepare(id);
-  }
-
-  function applyPending(id, state) {
-    var pending = state.pending;
-    if (!pending) return state;
-    if (state.purse === pending.nextPurse && sameStock(state.stock, pending.nextStock)) {
-      return clearPending(id, state);
-    }
-    if (state.purse !== pending.previousPurse || !sameStock(state.stock, pending.previousStock)) {
-      return state;
-    }
-    var next = JSON.parse(JSON.stringify(state));
-    next.purse = pending.nextPurse;
-    next.stock = stockCopy(pending.nextStock);
-    next.supply = pending.nextSupply || state.supply || {};
-    next.pending = null;
-    purses.commit(id, next);
-    return purses.prepare(id);
-  }
-
-  function recoverOne(id) {
-    var state = purses.prepare(id);
-    if (!state || !state.pending) return;
-    var recalled = { known: false };
-    try {
-      if (transfer && transfer.recall) recalled = transfer.recall(state.pending.id) || { known: false };
-    } catch (e) {
-      return;
-    }
-    if (recalled.durable) applyPending(id, state);
-    else if (recalled.known && !recalled.attempted) clearPending(id, state);
-  }
-
-  function recover(ids) {
-    for (var i = 0; i < ids.length; i++) recoverOne(ids[i]);
+  function recover() {
+    if (!active) return [];
+    var changed = settlement.tick(), views = [];
+    sessions.forEach(function (session, profileId) {
+      if (changed.indexOf(session.merchantId) < 0) return;
+      var human = transfer.identity(session.actorId);
+      if (!human || human.profileId !== profileId) {sessions.delete(profileId); return;}
+      var state = purses.read(session.merchantId), place = state && placeOf(state.reference);
+      if (state && place) views.push({actorId:session.actorId,view:viewFor(session.merchantId,state,place)});
+    });
+    return views;
   }
 
   function sessionMerchant(profileId) {
@@ -61210,6 +61411,7 @@ function createMerchantTrading(deps) {
   }
 
   function command(ctx) {
+    if (!active) return fail('Trading is unavailable.');
     var parts = (ctx && ctx.parts) || [];
     var profileId = Number(ctx && ctx.profileId) || 0;
     var actorId = ctx && ctx.actorId;
@@ -61241,7 +61443,7 @@ function createMerchantTrading(deps) {
     var merchantId = 0;
     if (!verb || verb === 'open' || /^[0-9a-f]+$/i.test(verb)) {
       var token = verb === 'open' ? parts[2] : (verb || '');
-      if (!token) return fail('Look at a guild trader and use /merchant with their id.');
+      if (!token) return fail('Press E on a guild trader.');
       merchantId = parseInt(token, 16);
       if (!merchantId) return fail('That is not a guild trader.');
       var reached = inReach(actorId, merchantId);
@@ -61255,7 +61457,7 @@ function createMerchantTrading(deps) {
       }
       var prior = sessions.get(profileId);
       var repeat = prior && prior.merchantId === merchantId && (now() - prior.at) < 3000;
-      sessions.set(profileId, { merchantId: merchantId, at: now() });
+      sessions.set(profileId, { merchantId: merchantId, actorId:actorId, at: now() });
       var opened = viewFor(merchantId, state, place);
       return {
         text: repeat ? '' : (opened.transfer
@@ -61266,7 +61468,7 @@ function createMerchantTrading(deps) {
     }
 
     merchantId = sessionMerchant(profileId);
-    if (!merchantId) return fail('Look at a guild trader and use /merchant with their id.');
+    if (!merchantId) return fail('Press E on a guild trader.');
     var again = inReach(actorId, merchantId);
     if (!again.ok) {
       sessions.delete(profileId);
@@ -61276,7 +61478,7 @@ function createMerchantTrading(deps) {
     if (verb === 'buy' || verb === 'sell' || verb === 'supply') {
       return trade(actorId, profileId, merchantId, verb, parts.slice(2));
     }
-    return fail('merchant: look at a trader, then buy, sell, or supply. People cannot join.');
+    return fail('Use the trader panel to buy, sell, or turn in supplies.');
   }
 
   function parseCountAndName(bits, fixedCount) {
@@ -61316,69 +61518,37 @@ function createMerchantTrading(deps) {
     if (npcBuys && state.purse < gold) return fail('The trader cannot pay.');
     if (!npcBuys && gold > 0 && world.carry(actorId, GOLD_BASE) < gold) return fail('You cannot pay.');
     if (npcBuys && world.carry(actorId, resolved.baseId) < asked.count) return fail('You are not carrying that.');
-    var stock = stockCopy(state.stock);
-    if (!npcBuys && !takeStock(stock, resolved.baseId, itemName, asked.count)) {
-      return fail('The shelf is empty.');
+    if (!settlement.available()) {
+      return fail('Buying and selling wait on the native transfer. Nothing was taken.', viewFor(merchantId, state, place));
     }
     var nextPurse = npcBuys ? state.purse - gold : state.purse + gold;
     if (nextPurse < 0 || nextPurse > MAX_GOLD) return fail('That price cannot be verified.');
-    if (npcBuys) addStock(stock, resolved.baseId, itemName, asked.count);
-    var humanLoses = [];
-    var humanGains = [];
-    if (npcBuys) {
-      humanLoses.push({ baseId: resolved.baseId, count: asked.count });
-      if (gold > 0) humanGains.push({ baseId: GOLD_BASE, count: gold });
-    } else {
-      if (gold > 0) humanLoses.push({ baseId: GOLD_BASE, count: gold });
-      humanGains.push({ baseId: resolved.baseId, count: asked.count });
-    }
-    if (!humanLoses.length && !humanGains.length) return fail('Nothing would move.');
-    if (!transfer || !transfer.available || !transfer.available()) {
-      var waiting = viewFor(merchantId, state, place);
-      return fail('Buying and selling wait on the native transfer. Nothing was taken.', waiting);
-    }
-    seq += 1;
-    var intentId = state.reference + ':' + now() + ':' + seq;
-    var nextSupply = JSON.parse(JSON.stringify(state.supply || {}));
-    if (verb === 'supply') nextSupply[itemName.toLowerCase()] = now();
-    var pending = {
-      id: intentId,
-      kind: verb,
-      previousPurse: state.purse,
-      previousStock: stockCopy(state.stock),
-      nextPurse: nextPurse,
-      nextStock: stock,
-      nextSupply: nextSupply
-    };
-    var armed = JSON.parse(JSON.stringify(state));
-    armed.pending = pending;
-    purses.commit(merchantId, armed);
     var moved;
     try {
-      moved = transfer.move({
-        humanId: actorId,
-        merchantId: merchantId,
-        humanLoses: humanLoses,
-        humanGains: humanGains,
-        intentId: intentId
-      });
-    } catch (e) {
-      moved = { ok: false, durable: false, attempted: true, reason: 'The transfer failed.' };
+      var expected = SETTLEMENT.inventory(transfer.inventory(actorId));
+      var outgoing = SETTLEMENT.takeEntries(expected, npcBuys ? resolved.baseId : GOLD_BASE, npcBuys ? asked.count : gold);
+      var stock = stockCopy(state.stock), credit;
+      if (npcBuys) {
+        stock = addStock(stock, outgoing.entries, itemName);
+        credit = gold > 0 ? [{baseId:GOLD_BASE,count:gold}] : [];
+      } else {
+        var picked = takeStock(stock, resolved.baseId, itemName, asked.count);
+        stock = picked.stock; credit = picked.entries;
+      }
+      var nextSupply = JSON.parse(JSON.stringify(state.supply || {}));
+      if (verb === 'supply') nextSupply[itemName.toLowerCase()] = now();
+      moved = settlement.begin({merchantId:merchantId,humanId:actorId,profileId:profileId,
+        previous:state,expected:expected,debit:outgoing.inventory,credit:credit,kind:verb,
+        next:{purse:nextPurse,stock:stock,supply:nextSupply}});
+    } catch (error) {
+      return fail(settlement.available() ? String(error.message || error) : 'Trading is unavailable. The saved transfer is retained.');
     }
     var current = purses.prepare(merchantId);
-    if (moved && moved.durable) {
-      current = applyPending(merchantId, current);
-      var done = viewFor(merchantId, current, place, '');
-      var said = npcBuys
-        ? ('Sold ' + asked.count + ' ' + itemName + ' for ' + gold + '. Purse ' + current.purse + '.')
-        : ('Bought ' + asked.count + ' ' + itemName + ' for ' + gold + '. Purse ' + current.purse + '.');
-      return { text: said, view: done };
-    }
-    if (!moved || !moved.attempted) {
-      clearPending(merchantId, current);
-      return fail((moved && moved.reason) || 'The transfer was refused.', viewFor(merchantId, purses.prepare(merchantId), place));
-    }
-    return fail((moved && moved.reason) || 'The transfer is waiting on the save.', viewFor(merchantId, purses.prepare(merchantId), place));
+    if (!moved.done) return fail(moved.reason, viewFor(merchantId, current, place, moved.reason));
+    var said = npcBuys
+      ? ('Sold ' + asked.count + ' ' + itemName + ' for ' + gold + '. Purse ' + current.purse + '.')
+      : ('Bought ' + asked.count + ' ' + itemName + ' for ' + gold + '. Purse ' + current.purse + '.');
+    return {text:said,view:viewFor(merchantId, current, place)};
   }
 
   function activate(actorId, merchantId) {
@@ -61396,7 +61566,8 @@ function createMerchantTrading(deps) {
     command: command,
     activate: activate,
     recover: recover,
-    nativeReady: function () { return !!(transfer && transfer.available && transfer.available()); },
+    nativeReady: function () { return settlement.available(); },
+    shutdown: function () { active=false; sessions.clear(); settlement.shutdown(); },
     REACH: REACH,
     SUPPLY_COUNT: SUPPLY_COUNT,
     bookHoldOf: bookHoldOf
@@ -61423,6 +61594,7 @@ function installMerchantTrading(env) {
   }
   var trading = createMerchantTrading({
     purses: env.purses,
+    log:log,
     prices: {
       quote: function (hold, item) {
         var books = g.__thornswoodBooks;
@@ -61508,7 +61680,18 @@ function installMerchantTrading(env) {
     payload.at = Date.now();
     try { mp.set(actorId, property, payload); } catch (e) { log('merchant panel: ' + e); }
   };
-  try { trading.recover(Array.from(traderIds)); } catch (e) { log('merchant recover: ' + e); }
+  var timers=env.timers || (typeof setTimeout === 'function' && typeof clearTimeout === 'function' ? {setTimeout:setTimeout,clearTimeout:clearTimeout} : null);
+  var alive=true, timer=null;
+  var stop=trading.shutdown;
+  trading.shutdown=function () {alive=false; if(timer!==null && timers) timers.clearTimeout(timer); stop();};
+  function advance() {
+    if(!alive) return;
+    try { trading.recover().forEach(function (result) {if(alive) trading.push(result.actorId,result.view);}); }
+    catch(error) {log('merchant recover: '+error);}
+    // This checks exact save acknowledgements, never elapsed-time settlement.
+    if(alive && trading.nativeReady() && timers) timer=timers.setTimeout(advance,1000);
+  }
+  if(trading.nativeReady()) advance();
   return trading;
 }
 
@@ -61532,12 +61715,17 @@ return module.exports;
 })();
 // MERCHANT TRADING BUNDLE END
 
+// NPC SERVER STARTUP BEGIN
 try {
+  if (globalThis.__thornswoodMerchantTrade) globalThis.__thornswoodMerchantTrade.shutdown();
+  globalThis.__thornswoodMerchantTrade=null;
+  if (globalThis.__thornswoodNpcRuntime) globalThis.__thornswoodNpcRuntime.stop();
+  globalThis.__thornswoodNpcRuntime=null;
+  globalThis.__thornswoodNpcPopulation=null;
+  if (globalThis.__thornswoodNpcMerchants) globalThis.__thornswoodNpcMerchants.shutdown();
+  globalThis.__thornswoodNpcMerchants=null;
   const cfgNpc = mp.getServerSettings();
   if (/^(main|dev)$/i.test(String(cfgNpc.thornswoodServer || 'main'))) {
-    if (globalThis.__thornswoodNpcRuntime) globalThis.__thornswoodNpcRuntime.stop();
-    if (globalThis.__thornswoodNpcMerchants) globalThis.__thornswoodNpcMerchants.shutdown();
-    globalThis.__thornswoodNpcMerchants=null;
     // Build the winning-record indexes during startup, before scheduled work.
     mp.prepareNpcLoad();
     const plugins=(cfgNpc.loadOrder || []).map(p=>String(p).split(/[\\/]/).pop());
@@ -61545,7 +61733,8 @@ try {
       throw new Error('Merchant catalogue does not match the installed load order');
     globalThis.__thornswoodNpcMerchants=createNpcMerchantPurses(mp,NPC_POPULATION_DATA,
       createPrivateMerchantLedger(require('fs'),require('path'),cfgNpc,
-        NPC_POPULATION_DATA.keep.filter(row=>row[6]==='trader').map(row=>row[0])));
+        NPC_POPULATION_DATA.keep.filter(row=>row[6]==='trader').map(row=>row[0]),
+        typeof mp.writePrivateEconomyLedger==='function' ? mp.writePrivateEconomyLedger.bind(mp) : null));
     try {
       globalThis.__thornswoodMerchantTrade = MERCHANT_TRADING.installMerchantTrading({
         mp: mp,
@@ -61562,6 +61751,8 @@ try {
       mp, {setTimeout, clearTimeout}, Date.now, text=>log(text),globalThis.__thornswoodNpcPopulation);
   }
 } catch (e) {
+  if(globalThis.__thornswoodMerchantTrade) globalThis.__thornswoodMerchantTrade.shutdown();
+  globalThis.__thornswoodMerchantTrade=null;
   if(globalThis.__thornswoodNpcMerchants) globalThis.__thornswoodNpcMerchants.shutdown();
   if(globalThis.__thornswoodNpcRuntime) globalThis.__thornswoodNpcRuntime.stop();
   globalThis.__thornswoodNpcMerchants=null;
@@ -61569,6 +61760,7 @@ try {
   globalThis.__thornswoodNpcRuntime=null;
   log('NPC server runtime failed to start: ' + e);
 }
+// NPC SERVER STARTUP END
 
 // ==== thornswood custom quests ====
 /*
