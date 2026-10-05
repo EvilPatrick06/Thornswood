@@ -98,8 +98,9 @@ async function service(range) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'localchat-'));
   fs.copyFileSync(SERVER, path.join(dir, 'voice-server.js'));
   fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
-  // Every join proves itself since #1303, so each service gets a key this
-  // harness signs its join tokens with.
+  // Every connection proves itself since #1303, so each service gets a key
+  // this harness signs its join tokens with; one token opens one connection,
+  // offered with the handshake (#1337, #1322).
   const key = crypto.randomBytes(32).toString('hex');
   fs.writeFileSync(path.join(dir, 'token-key.txt'), key);
   const env = Object.assign({}, process.env, {
@@ -139,18 +140,19 @@ async function service(range) {
 }
 
 function tokenFor(svc, pid) {
-  const body = String(pid) + '.' + String(Date.now() + 3600000);
-  return 'v1.' + body + '.' + crypto.createHmac('sha256', svc.key).update(body).digest('base64')
+  const body = 'v2.' + pid + '.' + Date.now() + '.' + crypto.randomBytes(16).toString('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return body + '.' + crypto.createHmac('sha256', svc.key).update(body).digest('base64')
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 /* One person, joined. Keeps every chat line it is sent. */
 function join(svc, profileId, name) {
   return new Promise((done, failed) => {
-    const ws = new WebSocket('ws://127.0.0.1:' + svc.port + '/');
+    const ws = new WebSocket('ws://127.0.0.1:' + svc.port + '/', ['thornswood', tokenFor(svc, profileId)]);
     const c = { ws: ws, profileId: profileId, name: name, got: [] };
     let ok = false;
-    ws.onopen = () => ws.send(JSON.stringify({ t: 'join', profileId: profileId, name: name, token: tokenFor(svc, profileId) }));
+    ws.onopen = () => ws.send(JSON.stringify({ t: 'join', profileId: profileId, name: name }));
     ws.onmessage = (ev) => {
       let m;
       try { m = JSON.parse(ev.data); } catch (e) { return; }

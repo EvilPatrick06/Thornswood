@@ -40,13 +40,15 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-keepalive-'));
 for (const f of ['voice-server.js', 'headlines.js']) {
   fs.copyFileSync(path.join(__dirname, f), path.join(dir, f));
 }
-// Every join proves itself since #1303, so this harness signs its own join
-// tokens with a key it puts beside its copy of the service.
+// Every connection proves itself since #1303, so this harness signs its own
+// join tokens with a key it puts beside its copy of the service. One token
+// opens one connection and goes with the handshake since #1337 and #1322.
 const KEY = crypto.randomBytes(32).toString('hex');
 fs.writeFileSync(path.join(dir, 'token-key.txt'), KEY);
 function tokenFor(pid) {
-  const body = String(pid) + '.' + String(Date.now() + 3600000);
-  return 'v1.' + body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
+  const body = 'v2.' + pid + '.' + Date.now() + '.' + crypto.randomBytes(16).toString('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 const pub = path.join(dir, 'public');
@@ -133,8 +135,9 @@ async function ready() {
   return await r.json();
 }
 
-/* The handshake by hand, so the frames underneath can be read. */
-function open() {
+/* The handshake by hand, so the frames underneath can be read. pid is who
+   it is, since the token goes with the handshake. */
+function open(pid) {
   return new Promise((resolve, reject) => {
     const key = crypto.randomBytes(16).toString('base64');
     const s = net.connect(PORT, '127.0.0.1', () => {
@@ -143,6 +146,7 @@ function open() {
               'Upgrade: websocket\r\n' +
               'Connection: Upgrade\r\n' +
               'Sec-WebSocket-Key: ' + key + '\r\n' +
+              'Sec-WebSocket-Protocol: thornswood, ' + tokenFor(pid) + '\r\n' +
               'Sec-WebSocket-Version: 13\r\n\r\n');
     });
     let head = '';
@@ -210,8 +214,8 @@ function textFrame(obj) {
   console.log('service up: build ' + h.build + ', ping every ' + PING_MS + 'ms for this run');
   console.log('');
 
-  const { sock, head } = await open();
-  check('the service upgrades a plain websocket request',
+  const { sock, head } = await open(517);
+  check('the service upgrades a websocket request that offers a token',
         /^HTTP\/1\.1 101/.test(head), true);
 
   /*
@@ -244,7 +248,7 @@ function textFrame(obj) {
     socket used to sit in the room until TCP gave up on it. Three pings with
     no answer and the service lets it go, with a line in its log.
   */
-  const silent = await open();
+  const silent = await open(518);
   let silentClosedAt = 0;
   const silentFrom = Date.now();
   silent.sock.on('close', () => { silentClosedAt = Date.now(); });
@@ -258,7 +262,7 @@ function textFrame(obj) {
   check('and the service log says so', /answered nothing for \d+ s/.test(log), true);
 
   // One that answers every ping the way a browser does stays, however long.
-  const talks = await open();
+  const talks = await open(519);
   let talksClosed = false;
   const got = [];
   talks.sock.on('close', () => { talksClosed = true; });
@@ -279,7 +283,7 @@ function textFrame(obj) {
   talks.sock.write(textFrame({ t: 'ping' }));
   await sleep(300);
   check('a page ping before it has joined is not answered', got.some((m) => m.t === 'pong'), false);
-  talks.sock.write(textFrame({ t: 'join', profileId: 519, name: 'keepalive', token: tokenFor(519) }));
+  talks.sock.write(textFrame({ t: 'join', profileId: 519, name: 'keepalive' }));
   talks.sock.write(textFrame({ t: 'ping' }));
   for (let i = 0; i < 20 && !got.some((m) => m.t === 'pong'); i++) { await sleep(100); }
   check('a page ping once joined is answered with a pong', got.some((m) => m.t === 'pong'), true);
