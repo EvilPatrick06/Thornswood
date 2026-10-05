@@ -38,7 +38,7 @@ judging one. Magic is not their business. See
 
 There is no Thalmor faction the server will set on a character to
 make the world friendly. The old embassy in Haafingar was emptied.
-`/claim` on a ruin does not found a new one. A claim is still a
+Claiming a ruin's door does not found a new one. A claim is still a
 claim, and the court can take it. See [Property](property.md).
 
 ## Patrols
