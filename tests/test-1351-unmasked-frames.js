@@ -30,6 +30,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const net = require('net');
+const http = require('http');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 
@@ -99,7 +100,8 @@ function textFrame(obj, masked) {
 
 /* A raw socket that has done the handshake as pid, with every frame it is
    sent. */
-function raw(port, pid) {
+async function raw(port, pid) {
+  const token = await joinToken(port, pid);
   return new Promise((ok, bad) => {
     const s = net.connect(port, '127.0.0.1');
     const me = { sock: s, frames: [], msgs: [], closed: false };
@@ -107,7 +109,7 @@ function raw(port, pid) {
     s.on('connect', () => {
       s.write('GET / HTTP/1.1\r\nHost: 127.0.0.1:' + port + '\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n' +
               'Sec-WebSocket-Version: 13\r\nSec-WebSocket-Key: ' + crypto.randomBytes(16).toString('base64') + '\r\n' +
-              'Sec-WebSocket-Protocol: thornswood, ' + tokenFor(pid) + '\r\n\r\n');
+              'Sec-WebSocket-Protocol: thornswood, ' + token + '\r\n\r\n');
     });
     s.on('data', (d) => {
       buf = Buffer.concat([buf, d]);
@@ -140,28 +142,67 @@ const closeCode = (c) => {
 };
 
 /*
-  Every join proves itself with a token (#1303), so this signs its own with
-  a key it puts beside its copy of the service, the way voice-server.js
-  signs them. One token opens one connection and goes with the handshake,
-  after 'thornswood' (#1337, #1322).
+  Every join proves itself with a token (#1303). One token opens one
+  connection and goes with the handshake, after 'thornswood' (#1337, #1322).
 */
-const KEY = crypto.randomBytes(32).toString('hex');
-function tokenFor(pid) {
-  const body = 'v2.' + pid + '.' + Date.now() + '.' + crypto.randomBytes(16).toString('base64')
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  return body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+/*
+  The site, as far as the service asks it anything: every ticket owns its
+  profile. So the service mints each join token itself (joinToken).
+*/
+function siteThatSaysYes() {
+  return new Promise((ok) => {
+    const site = http.createServer((req, res) => {
+      req.resume();
+      req.on('end', () => {
+        if (req.method === 'POST' && req.url === '/api/play/owns') {
+          res.writeHead(200, { 'content-type': 'application/json' }).end('{"ok":true}');
+        } else {
+          res.writeHead(404).end();
+        }
+      });
+    });
+    // Once it is up it holds nothing open, so a harness that ends by letting
+    // its loop drain still ends; before that the listen itself keeps it alive.
+    site.listen(0, '127.0.0.1', () => { site.unref(); ok('http://127.0.0.1:' + site.address().port); });
+  });
+}
+let SITE = '';
+
+/*
+  A join token as the launcher gets one: asked of the service, which mints
+  it on its own clock once the site says the ticket owns the profile. It was
+  signed here with this process's Date.now(), and the service refuses a
+  token minted before it started by its own clock; on Windows two node
+  processes can read the wall clock a few ms apart (#1867).
+*/
+function joinToken(port, pid) {
+  return new Promise((ok, bad) => {
+    const body = JSON.stringify({ profileId: pid, ticket: 'a ticket the stand-in site takes' });
+    const req = http.request({ host: '127.0.0.1', port: port, path: '/token', method: 'POST', agent: false,
+                               headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) } }, (res) => {
+      let b = '';
+      res.on('data', (d) => { b += d; });
+      res.on('end', () => {
+        let doc = null;
+        try { doc = JSON.parse(b); } catch (e) { }
+        if (res.statusCode === 200 && doc && typeof doc.token === 'string') { ok(doc.token); return; }
+        bad(new Error('the service minted no token for profile ' + pid + ': ' + res.statusCode + ' ' + b.slice(0, 200)));
+      });
+    });
+    req.on('error', bad);
+    req.end(body);
+  });
 }
 
 (async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-1351-'));
   fs.copyFileSync(VOICE, path.join(dir, 'voice-server.js'));
   fs.copyFileSync(path.join(path.dirname(VOICE), 'headlines.js'), path.join(dir, 'headlines.js'));
-  fs.writeFileSync(path.join(dir, 'token-key.txt'), KEY);
+  SITE = await siteThatSaysYes();
   const PORT = await freePort('127.0.0.1');
   const srv = spawn(process.execPath, ['voice-server.js'], { cwd: dir,
     env: Object.assign({}, process.env, { THORNSWOOD_VOICE_PORT: String(PORT), THORNSWOOD_VOICE_BIND: '127.0.0.1',
-                                          THORNSWOOD_SITE: '',
+                                          THORNSWOOD_SITE: SITE,
                                           THORNSWOOD_CHAT_DIR: path.join(dir, 'chat') }) });
   let srvLog = '';
   srv.stdout.on('data', (d) => { srvLog += d; });
@@ -208,7 +249,7 @@ function tokenFor(pid) {
 
   console.log('\nthe browser\'s own WebSocket, which masks everything:');
   const got = [];
-  const ws = new WebSocket('ws://127.0.0.1:' + PORT + '/', ['thornswood', tokenFor(4)]);
+  const ws = new WebSocket('ws://127.0.0.1:' + PORT + '/', ['thornswood', await joinToken(PORT, 4)]);
   ws.onmessage = (e) => { try { got.push(JSON.parse(e.data)); } catch (x) { } };
   await new Promise((ok) => { ws.onopen = ok; ws.onerror = ok; });
   ws.send(JSON.stringify({ t: 'join', profileId: 4, name: 'Dagny' }));
