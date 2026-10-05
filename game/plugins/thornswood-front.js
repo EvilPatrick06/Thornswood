@@ -4994,6 +4994,10 @@
                                           and the line says which it will do.
       a forge, carrying a key mold that   Cut a key.
       has been pressed into a door
+      a crop (#1636)                      What is in the ground and whose farm
+                                          it is, E's Sow a Cabbage when the
+                                          press would sow it, and Claim this
+                                          farm when the key would claim it.
 
     THE DOOR'S WORD IS THE SERVER'S. Which building a door belongs to, who
     holds it and whether it is locked are all in the register, so the server
@@ -5009,10 +5013,20 @@
     tests/test-1637-door-gui.js. The mold is a Key Mold with a door's name on
     it, counted the way the mold key counts them.
 
+    A CROP ASKS (#1636). A plot's state is on the plot, where nobody's client
+    can read it, and whose farm it is is in the claims file. So a crop that
+    stays under the crosshair for a second look sends /plot and its id, and
+    the server writes the answer on thornswoodPlotLine (plotLine in the
+    farming block) for this person alone. Asked again every PLOT_ASK_MS while
+    it is looked at, so the minutes move, and never for a crop only swept
+    past. The crops are known by base, every base CROPS answers in the
+    gamemode, held to that table by tests/test-1636-farm-gui.js.
+
     The key sends /claim, /lock, /unlock or /key with the id under the
     crosshair. Those are the lines the server always answered, nobody is told
     to type them, and the server checks everything again: the door just
-    opened, the holder, the smith, the forge, the mold and the ingot.
+    opened, the holder, the smith, the forge, the mold and the ingot, and at
+    a plot the class, the reach and whose ground it is.
 
     Never over a menu or while the chat has the keyboard, on the crosshair
     poll's beat, and down the moment a menu takes the keyboard, for the
@@ -5031,30 +5045,83 @@
     ['Skyrim.esm', 0x1a2ad], ['Skyrim.esm', 0xbf9e1], ['Skyrim.esm', 0xcae0b],
     ['Dragonborn.esm', 0x2b074], ['Dragonborn.esm', 0x3cf6e], ['North Keep.esp', 0x21152]
   ];
+  const CROP_BASES = [
+    ['Skyrim.esm', 0xbcf48], ['Skyrim.esm', 0xbb952], ['Skyrim.esm', 0xbcf47],
+    ['Skyrim.esm', 0xbe3e6], ['Skyrim.esm', 0xbb953], ['Dragonborn.esm', 0x206e8],
+    ['JKs Skyrim.esp', 0x2493e], ['JKs Skyrim.esp', 0x2493d], ['JKs Skyrim.esp', 0x2c91],
+    ['JKs Skyrim.esp', 0x3274], ["JK's Whiterun's Outskirts.esp", 0x1503ff],
+    ["JK's Whiterun's Outskirts.esp", 0x18d5d7], ["JK's Whiterun's Outskirts.esp", 0x141081],
+    ["JK's Whiterun's Outskirts.esp", 0x141088]
+  ];
+  const PLOT_ASK_MS = 10000;     // asked again this often while one crop is looked at
+  const PLOT_LINE_MS = 30000;    // an answer older than this is not drawn
   let lockAt = 0;
-  let lockShown = '';      // the line's words while it is up, '' while it is down
+  let lockShown = '';      // what the line says while it is up, '' while it is down
   let lockSentFor = '';
   let lockSentAt = 0;
   let forgeIds = null;     // null not found yet, else { runtime id: true }
+  let cropIds = null;
   let keyMoldId = -1;      // -1 not asked yet, 0 not in this build, else the Key Mold's runtime id
+  let plotLookHex = '';    // the crop under the crosshair at the last look
+  let plotAskedFor = '';
+  let plotAskedAt = 0;
 
-  function forgeIdSet() {
-    if (forgeIds) { return forgeIds; }
+  /* A list of bases by file and local id as runtime ids, or null until the world answers for any. */
+  function basesOf(list) {
     const out = {};
     let found = 0;
-    for (let i = 0; i < FORGE_BASES.length; i++) {
+    for (let i = 0; i < list.length; i++) {
       try {
-        const form = sp.Game.getFormFromFile(FORGE_BASES[i][1], FORGE_BASES[i][0]);
+        const form = sp.Game.getFormFromFile(list[i][1], list[i][0]);
         const id = form ? (form.getFormID() >>> 0) : 0;
         if (id) { out[id] = true; found++; }
       } catch (err) { }
     }
-    // Remembered once the world answers for any of them; asked again until then.
-    if (found) {
-      forgeIds = out;
-      say('forges for the lock key: ' + found + ' of ' + FORGE_BASES.length + ' bases found');
-    }
-    return out;
+    return found ? { ids: out, found: found } : null;
+  }
+
+  // Remembered once the world answers for any of them; asked again until then.
+  function forgeIdSet() {
+    if (forgeIds) { return forgeIds; }
+    const got = basesOf(FORGE_BASES);
+    if (!got) { return {}; }
+    forgeIds = got.ids;
+    say('forges for the lock key: ' + got.found + ' of ' + FORGE_BASES.length + ' bases found');
+    return forgeIds;
+  }
+
+  function cropIdSet() {
+    if (cropIds) { return cropIds; }
+    const got = basesOf(CROP_BASES);
+    if (!got) { return {}; }
+    cropIds = got.ids;
+    say('crops for the line at a plot: ' + got.found + ' of ' + CROP_BASES.length + ' bases found');
+    return cropIds;
+  }
+
+  /** The server's answer for this crop, while it is new enough to draw. */
+  function plotLineNow(hex) {
+    let v = null;
+    try { v = globalThis.thornswoodPlotLine; } catch (e) { v = null; }
+    if (!v || typeof v !== 'object' || v.hex !== hex) { return null; }
+    if (Date.now() - (Number(v.seen) || 0) > PLOT_LINE_MS) { return null; }
+    return v;
+  }
+
+  /*
+    Ask the server about the crop under the crosshair: on the second look at
+    the same one, so a crop swept past is never asked about, and then every
+    PLOT_ASK_MS for as long as it stays there.
+  */
+  function askPlot(hex) {
+    const t = Date.now();
+    if (hex !== plotLookHex) { plotLookHex = hex; return; }
+    const v = plotLineNow(hex);
+    if (v && t - (Number(v.seen) || 0) < PLOT_ASK_MS) { return; }
+    if (hex === plotAskedFor && t - plotAskedAt < PLOT_ASK_MS) { return; }
+    plotAskedFor = hex;
+    plotAskedAt = t;
+    tellServer('/plot ' + hex);
   }
 
   function keyMoldNow() {
@@ -5101,6 +5168,12 @@
       if (busyMenuOpenNow()) { return null; }
       return { hex: hex, verb: v.x, words: LOCK_WORDS[v.x] + String(v.n || 'this building') };
     }
+    if (baseId && cropIdSet()[baseId]) {
+      if (busyMenuOpenNow()) { return null; }
+      const p = plotLineNow(hex);
+      return { hex: hex, plot: true, verb: p && p.x ? 'claim' : '', words: p ? p.x : '',
+               info: p ? p.t : '', e: p ? p.e : '' };
+    }
     if (!baseId || !forgeIdSet()[baseId]) { return null; }
     const mold = keyMoldNow();
     if (!mold) { return null; }
@@ -5115,20 +5188,34 @@
     return { hex: hex, verb: 'key', words: 'Cut a key from your key mold' };
   }
 
-  /** The line up with these words, or down for none. Only remembered once the page has taken it. */
-  function drawLock(words) {
-    words = words ? String(words).replace(/[<>&"]/g, '') : '';
-    if (words === lockShown) { return; }
-    if (!words) {
+  function plainWords(text) { return String(text || '').replace(/[<>&"]/g, ''); }
+  function lockRow(key, words) {
+    return '<div style="margin-top:2px"><span style="display:inline-block;min-width:26px;' +
+      'text-align:center;margin-right:12px;padding:1px 7px;border:1px solid rgba(233,209,155,.55);' +
+      'border-bottom-width:2px;border-radius:3px;background:rgba(0,0,0,.35);color:#e9d19b">' +
+      key + '</span>' + plainWords(words) + '</div>';
+  }
+
+  /*
+    The line up with what lockKeyNow found, or down for nothing: at a plot
+    the server's words first and then a row for each key that does
+    something there, E before the lock key; at a door or a forge the lock
+    key's row alone. Only remembered once the page has taken it.
+  */
+  function drawLock(now) {
+    const info = now && now.info ? plainWords(now.info) : '';
+    const rows = [];
+    if (now && now.e) { rows.push(lockRow('E', now.e)); }
+    if (now && now.words) { rows.push(lockRow(LOCK_NAME, now.words)); }
+    const html = (info ? '<div style="font-size:16px;color:#c9b99a;margin-bottom:3px">' + info + '</div>' : '') +
+                 rows.join('');
+    if (html === lockShown) { return; }
+    if (!html) {
       if (T.js('try{var d=document.getElementById("ts-lock");if(d){d.style.display="none";}}catch(e){}')) {
         lockShown = '';
       }
       return;
     }
-    const html =
-      '<span style="display:inline-block;min-width:26px;text-align:center;margin-right:12px;' +
-      'padding:1px 7px;border:1px solid rgba(233,209,155,.55);border-bottom-width:2px;' +
-      'border-radius:3px;background:rgba(0,0,0,.35);color:#e9d19b">' + LOCK_NAME + '</span>' + words;
     if (T.js('(function(){try{' +
              'var d=document.getElementById("ts-lock");' +
              'if(!d){d=document.createElement("div");d.id="ts-lock";' +
@@ -5137,14 +5224,15 @@
              'd.innerHTML=' + JSON.stringify(html) + ';' +
              'd.style.display="";' +
              '}catch(e){}})();')) {
-      lockShown = words;
+      lockShown = html;
     }
   }
 
   function lockLook() {
     if (!T.ready) { lockShown = ''; return; }
     const now = lockKeyNow();
-    drawLock(now ? now.words : '');
+    if (now && now.plot) { askPlot(now.hex); } else { plotLookHex = ''; }
+    drawLock(now);
   }
 
   /*
@@ -5157,8 +5245,8 @@
     if (!T.ready) { return false; }
     if (claims.chat) { return false; }
     const now = lockKeyNow();
-    drawLock(now ? now.words : '');
-    if (!now) { return false; }
+    drawLock(now);
+    if (!now || !now.verb) { return false; }
     const sig = now.verb + ' ' + now.hex;
     const t = Date.now();
     if (sig === lockSentFor && t - lockSentAt < 1500) { return true; }
@@ -5179,7 +5267,7 @@
   sp.on('menuOpen', guard('lock menu', (e) => {
     if (!lockShown) { return; }
     if (KEYBOARD_MENUS.indexOf(String((e && e.name) || '')) === -1) { return; }
-    drawLock('');
+    drawLock(null);
   }));
 
   /*
