@@ -2901,9 +2901,15 @@
     raceWasOpen = open;
     if (!open) {
       raceToldAt = 0;
-      // Not when the menu went because the game is being closed: a face
-      // left half made is not a face done. See closeGame.
-      if (closingGame) { log('the race menu closed with the game closing, not telling the server'); return; }
+      // closingGame is F10 twice or the quit paths. A face left half made
+      // is not /face done, so that word is not sent. The server still has
+      // to learn the menu is down: if faceOpenAt stays set, a player who
+      // is still connected is never asked again. /racedown is that fact.
+      if (closingGame) {
+        log('the race menu closed with the game closing, telling the server it is down');
+        tellServer('/racedown');
+        return;
+      }
       log('the race menu closed, telling the server');
       tellServer('/face done');
     }
@@ -8211,7 +8217,7 @@
     the key's update.
 
     closingGame goes up first, so the race menu closing as the game comes
-    apart is not told to the server as a finished face.
+    apart is told as /racedown, not as a finished face.
   */
   function closeGame(from) {
     closingGame = true;

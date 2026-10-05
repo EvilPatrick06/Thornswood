@@ -4166,10 +4166,16 @@ const SETTLE_MS = 10000;
  * before giving up on it entirely and moving on. Both measured from the moment
  * the creation stage opened, not from the nudge. */
 
-const NUDGE_MS = 120000;   // two minutes; see the nudge below
+/* Two minutes. Used as the gap between race-menu asks when the open
+ * request was lost: no stored face, and the plugin has not reported
+ * the menu as up. A one-shot flag left them in the hall forever if
+ * that second request was also lost (Djinn, 5 Oct 2026). Asking
+ * while /racemenu is already reported is an access violation. */
+const NUDGE_MS = 120000;
 
-/* How long somebody has to be walking about before their creation counts as
- * finished, whatever the appearance says.
+/* How long somebody has to be walking about before a STORED face lets
+ * creation move on. Walking without a stored appearance does not publish
+ * them. See hasStoredAppearance.
  *
  * Was eight seconds. Since the appearance stopped arriving this is not a
  * fallback any more, it is the only way anybody leaves the hall, so every
@@ -4184,15 +4190,11 @@ const NUDGE_MS = 120000;   // two minutes; see the nudge below
  * tick, two seconds is still two separate confirmations that a person is on
  * their feet rather than nudging a camera.
  *
- * And down again to one, which at CHARGEN_TICK_MS is 500 ms and one tick. The
- * check it gates is not "did the camera twitch", it is "is this person's
- * position or facing different from the last sample", which a menu does not
- * produce at all. A second confirmation was insurance against a thing that was
- * never happening, paid for by everybody standing in an empty room.
+ * And down again to one, which at CHARGEN_TICK_MS is 500 ms and one tick.
  *
- * The sentence above it said "at a one second tick" while the tick was half a
- * second, so the two confirmations it describes were one second and not two.
- * The number here never moved; the tick under it did. */
+ * 3 Oct 2026: this wait is no longer a way out of the hall without a face.
+ * A stored appearance is required. Walking with no face asks for the race
+ * menu again instead of publishing an empty actor. */
 const MOVED_ENOUGH_MS = 500;
 
 /* How far counts as having moved, between two consecutive samples.
@@ -4237,11 +4239,11 @@ const CHOOSE_REMIND_MS = 30000;
   it, and nothing about their character has been decided either way.
 */
 const CHOOSE_LATER_MS = 600000;
-/* Five minutes, not forty five seconds. This exists so nobody is stranded when
- * the race menu never opens, and it used to be short enough to fire on somebody
- * who was simply still making their face: it would give up and start them
- * mid-menu. Being stuck is the thing worth guarding against; taking a while
- * over a nose is not. */
+/* Five minutes, not forty five seconds. This used to move them on without a
+ * face. That published an empty actor (3 Oct 2026, profile 598737699). It
+ * now asks for the race menu again and stays unpublished until a face is
+ * stored. Being stuck is still the thing worth guarding against; publishing
+ * nobody is not the rescue. */
 const GIVEUP_MS = 300000;
 
 /*
@@ -4272,11 +4274,13 @@ const GIVEUP_MS = 300000;
   and once a minute while it stays open), and while that is fresh the give up
   holds off. Sitting still reading a slider moves nobody on.
 
-  FACE_SEEN_MS is how fresh the last report has to be: two and a half beats,
-  so one lost line does not end the hold, while a client that crashed or quit
-  stops reporting and the give up runs as it always did. A client that never
-  reports at all, because its plugin is older or the race menu never opened,
-  is exactly the case the five minutes were written for and still gets them.
+  FACE_SEEN_MS is how fresh a report used to have to be before the give up
+  treated the menu as gone. That freshness window is not a close: a quiet
+  stream after /racemenu was seen is a still-open menu. /face done is the
+  close for Escape, Cancel and Done. /racedown is the close when the game
+  is quitting (F10, the quit paths) and a half-made face is not done. A
+  client that never reports at all, because its plugin is older or the race
+  menu never opened, is the lost request and still gets the asks.
 
   FACE_CAP_MS is for a race menu that is up and wedged: after half an hour of
   it being reported, the give up goes on anyway, because the panel and a home
@@ -4445,6 +4449,13 @@ function giveShift(actorId) {
  * 20 September) or never came at all.
  */
 function beginChoosing(actorId, state, why) {
+  let appearance = null;
+  try { appearance = mp.get(actorId, 'appearance'); } catch (e) { appearance = null; }
+  if (!hasStoredAppearance(appearance)) {
+    log('chargen', actorId.toString(16),
+        'not leaving the face step (' + why + '): no appearance is stored yet');
+    return;
+  }
   state.stage = 'choosing';
   state.at = Date.now();
   state.remindAt = Date.now() + CHOOSE_REMIND_MS;
@@ -4588,9 +4599,27 @@ globalThis.__thornswoodChargen = {
     return true;
   },
   /*
+    The plugin saw the race menu go down with the game (F10 / quit), not
+    Escape, Cancel or Done. Only means something while the face is awaited.
+    Clears the open marks so a still-connected player can be asked again.
+    Does not set faceDone: a half-made face is not a finished face.
+  */
+  faceDown: function (actorId) {
+    const st = chargenOf(actorId);
+    if (!st || st.stage !== 'appearance') { return false; }
+    delete st.faceOpenAt;
+    delete st.faceSeenAt;
+    delete st.faceHeld;
+    setChargen(actorId, st);
+    log('chargen', actorId.toString(16),
+        'the plugin says the race menu went down with the game, not a finished face');
+    return true;
+  },
+  /*
     The plugin says the race menu is on screen right now. Only means something
-    while the face is awaited; see FACE_SEEN_MS for what it holds off. The
-    first report is logged and the once a minute ones after it are not.
+    while the face is awaited. /face done and /racedown are the closes; a
+    quiet stream after a report is still open. The first report is logged
+    and the once a minute ones after it are not.
   */
   faceOpen: function (actorId) {
     const st = chargenOf(actorId);
@@ -4604,6 +4633,8 @@ globalThis.__thornswoodChargen = {
     setChargen(actorId, st);
     return true;
   },
+  hasStoredAppearance: hasStoredAppearance,
+  publishedForOthers: publishedForOthers,
   /*
     The panel was closed on purpose, so hold the reminder off. See
     CHOOSE_LATER_MS and the 'later' branch of /pick.
@@ -4712,6 +4743,40 @@ function faceMark(a) {
             (a.tints || []).length].join('|');
   } catch (e) {
     return '';
+  }
+}
+
+/*
+  A STORED APPEARANCE, not a name, not the word Adventurer, not a guess.
+
+  Djinn, 3 Oct 2026 about 22:31 ET on dev, profile 598737699: he picked a
+  brand-new slot, the race menu never opened, he was in the world as the
+  placeholder, the trade list named him "somebody", and Patrick could not
+  see a body. The walking path (MOVED_ENOUGH_MS, half a second) and the
+  five-minute give-up both called beginChoosing while appearance was still
+  missing. Neighbours then got an actor with no base (player 0x7 is omitted
+  on purpose) and no face, so the client correctly refused to place a mesh.
+  The trade name fell back because appearance.name was empty. Voice is
+  keyed by profile id and was not this.
+
+  THE GATE IS THE OBJECT THE ENGINE STORED. closeRaceMenu already asks
+  this: a value that is an object means the race menu wrote a face; null
+  or a throw does not. A blank name is still a stored face. A returning
+  character whose appearance is already there is not sent back through
+  the menu.
+*/
+function hasStoredAppearance(a) {
+  return !!(a && typeof a === 'object');
+}
+
+/** True when this person may be in the world for anybody else. */
+function publishedForOthers(actorId) {
+  try {
+    return hasStoredAppearance(mp.get(actorId, 'appearance'));
+  } catch (e) {
+    // A read that throws is treated as published, because hiding a
+    // returning character from the lists is the worse of the two mistakes.
+    return true;
   }
 }
 
@@ -5233,6 +5298,49 @@ function chargenTick() {
 
     if (state.stage === 'appearance') {
       /*
+        A lost open-race-menu request (no /racemenu report, no stored face)
+        is asked again every NUDGE_MS. A second setRaceMenuOpen over a menu
+        the plugin already says is up is an access violation, so that case
+        is never asked. Once a face is stored the asks stop. The two lines
+        below are tellOnce: one each for the whole wait, not one per ask.
+      */
+      const raceMenuIsUp = function () {
+        // /face done and /racedown are the closes. A quiet /racemenu
+        // stream is not: the plugin reports once a minute, and a gap is
+        // a missed line, not a shut menu. Treating faceSeenAt older than
+        // FACE_SEEN_MS as closed sent a second setRaceMenuOpen over a
+        // menu that was still up (access violation). Once /racemenu has
+        // been seen, the menu stays up until /face done, /racedown, or a
+        // stored face.
+        if (state.faceDone) { return false; }
+        return !!(state.faceOpenAt || state.faceSeenAt);
+      };
+      const askForLostRaceMenu = function (why) {
+        if (hasStoredAppearance(appearance) || raceMenuIsUp()) { return false; }
+        const last = state.askedMenuAt || 0;
+        if (last && now - last < NUDGE_MS) { return false; }
+        state.askedMenuAt = now;
+        state.menuAsks = (state.menuAsks || 0) + 1;
+        setChargen(actorId, state);
+        try {
+          mp.setRaceMenuOpen(actorId, true);
+          log('chargen', actorId.toString(16),
+              'asking for the race menu again (' + why + '), ask', state.menuAsks);
+        } catch (e) {
+          log('chargen', actorId.toString(16), 'could not open the race menu:', e);
+        }
+        if (state.menuAsks === 2) {
+          tellOnce(actorId, 'raceMenuAgain',
+              "Your character creation menu didn't open. Opening it again.");
+        } else if (state.menuAsks >= 3) {
+          tellOnce(actorId, 'raceMenuRelog',
+              'The character creation menu still did not open. Relog, and if it ' +
+              'still does not open, contact staff.');
+        }
+        return true;
+      };
+
+      /*
         A reconnect starts the wait again from nothing.
 
         None of the fields below are cleared when somebody drops out of the
@@ -5254,6 +5362,8 @@ function chargenTick() {
         delete state.where;
         delete state.askedAt;
         delete state.nudged;
+        delete state.askedMenuAt;
+        delete state.menuAsks;
         // The last session's race menu went with it. This one reports its own.
         delete state.faceOpenAt;
         delete state.faceSeenAt;
@@ -5361,49 +5471,44 @@ function chargenTick() {
 
       // The plugin says the race menu closed (/face done, over the chat
       // socket). That is the fact the mark above is only a proxy for: a face
-      // confirmed unchanged, or a name kept, changes no mark, and until 20
-      // September the only way on from there was to walk (below). The menu
-      // closing is enough on its own.
+      // confirmed unchanged, or a name kept, changes no mark. The menu
+      // closing is enough only when a face was actually stored. A close
+      // without a store is how 598737699 left the hall as a placeholder.
       if (state.faceDone) {
-        beginChoosing(actorId, state, 'the race menu closed');
+        if (hasStoredAppearance(appearance)) {
+          beginChoosing(actorId, state, 'the race menu closed');
+        } else {
+          log('chargen', actorId.toString(16),
+              'the plugin says the race menu closed but no appearance is stored, staying unpublished');
+          askForLostRaceMenu('race menu closed with no face');
+        }
         continue;
       }
 
-      // Walking around the hall is the end of character creation.
-      //
-      // Everything above waits on one signal: the appearance property changing
-      // on the change form, which is what arrives when the race menu closes.
-      // When that signal does not come, the whole flow stops, and the log says
-      // exactly that and nothing else: "-> appearance (already in the hall)"
-      // and then silence while somebody stands in a stone room wondering what
-      // they did wrong.
-      //
-      // The rescue below existed for that, and it is far too patient: two
-      // minutes before it reopens the race menu, five before it gives up and
-      // starts them anyway. Nobody waits two minutes in an empty room. They
-      // alt-F4, which is what happened three times tonight.
-      //
-      // But the evidence was there the whole time. The race menu is paused, so
-      // a character in one does not move; a character who IS moving is a
-      // character whose menu has closed. That is not a guess about the
-      // appearance, it is a stronger fact than the appearance, and this file
-      // was already measuring it a dozen lines up in order to decide whether
-      // nudging was safe.
-      //
-      // So: on your feet, and we get on with it. The appearance can arrive
-      // whenever it likes.
+      // Walking used to end creation, whatever the appearance said. That is
+      // the 3 Oct 2026 session: half a second on their feet, no face stored,
+      // neighbours given an actor with no base and no mesh. Walking is still
+      // the sign that no race menu is open, so it is when a missing face
+      // should be asked for again, not when they are published.
       const onFeetFor = state.liveSince ? (now - state.liveSince) : 0;
 
       if (onFeetFor > MOVED_ENOUGH_MS) {
-        // Said in full because the appearance not arriving is still a bug
-        // and this is the only place it can be seen from.
+        if (hasStoredAppearance(appearance)) {
+          log('chargen', actorId.toString(16), 'walking after',
+              Math.round(onFeetFor / 1000) + 's with a face stored.',
+              'mark now', JSON.stringify(faceNow) + ',',
+              'mark at the start', JSON.stringify(state.faceWas || '') + '.',
+              'Going on.');
+          beginChoosing(actorId, state, 'on their feet');
+          continue;
+        }
         log('chargen', actorId.toString(16), 'walking after',
-            Math.round(onFeetFor / 1000) + 's and the face never arrived.',
+            Math.round(onFeetFor / 1000) + 's and no appearance is stored.',
             'appearance is', appearance ? 'present' : 'MISSING,',
             'mark now', JSON.stringify(faceNow) + ',',
             'mark at the start', JSON.stringify(state.faceWas || '') + '.',
-            'Going on the movement instead.');
-        beginChoosing(actorId, state, 'on their feet');
+            'Staying unpublished.');
+        askForLostRaceMenu('walking with no face');
         continue;
       }
 
@@ -5417,9 +5522,9 @@ function chargenTick() {
       // reason is somewhere in a client mid save-load, which is not somewhere
       // this can reach.
       //
-      // So: ask once, then stop waiting. A character who never saw the race
-      // menu can open it later. One who cannot leave the room cannot do
-      // anything at all.
+      // So: keep asking on NUDGE_MS while the request is lost. A character
+      // who never saw the race menu is asked again; one whose plugin says
+      // the menu is already up is not.
       //
       // But only once it is clear that nobody is standing in a menu already.
       //
@@ -5480,40 +5585,31 @@ function chargenTick() {
         out for a character who cannot move, which is precisely the character
         it exists for, so it runs on the clock like it says it does.
 
-        AND THE NUDGE IS UNREACHABLE TODAY, which is worth writing down rather
-        than leaving somebody to assume it is doing something. It needs
-        liveSince, and the branch a dozen lines above ends the stage the moment
-        onFeetFor passes MOVED_ENOUGH_MS, which is 500. So anybody with
-        liveSince set has been moved on half a second in, 119 and a half seconds
-        before the nudge could fire, and anybody without it is guarded out here.
-        There is no path to it at all.
-
-        It is kept rather than deleted because it is the safety net if
-        MOVED_ENOUGH_MS is ever raised past NUDGE_MS, and because a race menu
-        that never opened is still a real failure somebody may want to rescue
-        differently later. What it must not do is read as a rescue that is
-        running, because it is not.
+        THE TWO-MINUTE CLOCK IS NOW THE INTERVAL, not a one-shot. A lost
+        request (no /racemenu report, no stored face) is asked again every
+        NUDGE_MS. Walking asks on that same helper as soon as they are on
+        their feet; standing still becomes eligible at NUDGE_MS. state.nudged
+        is no longer the gate, so the old one-shot cannot swallow a later ask.
       */
-      if (!state.nudged && waited > NUDGE_MS && state.liveSince) {
-        state.nudged = now;
-        setChargen(actorId, state);
-        try {
-          mp.setRaceMenuOpen(actorId, true);
-          log('chargen', actorId.toString(16),
-              'walking around with no face after', Math.round(waited / 1000) +
-              's, so the race menu never opened. Asking for it.');
-        } catch (e) {
-          log('chargen', actorId.toString(16), 'could not open the race menu:', e);
-        }
-        continue;
-      }
 
       if (waited > GIVEUP_MS) {
-        // Not while the plugin says the race menu is up: that person is making
-        // a face, not stuck. See FACE_SEEN_MS, and FACE_CAP_MS for the one
-        // exception. Said once, when the hold starts, and not every tick.
-        const menuUp = !!state.faceSeenAt && now - state.faceSeenAt < FACE_SEEN_MS;
+        // Not while the race menu is still open. /face done and /racedown
+        // are the closes, not a quiet report. FACE_CAP_MS is the
+        // wedged-menu exception. A stored face is checked first so a
+        // quiet stream cannot hold a finished face in the hall.
+        const menuUp = raceMenuIsUp();
         const menuFor = state.faceOpenAt ? now - state.faceOpenAt : 0;
+        if (hasStoredAppearance(appearance)) {
+          if (menuUp) {
+            log('chargen', actorId.toString(16), 'the race menu has been up for',
+                Math.round(menuFor / 60000), 'minutes, face is stored, going on');
+          }
+          log('chargen', actorId.toString(16),
+              'a face is stored after', Math.round(waited / 1000) + 's,',
+              'going on to the choices');
+          beginChoosing(actorId, state, 'face stored after ' + Math.round(waited / 1000) + 's');
+          continue;
+        }
         if (menuUp && menuFor < FACE_CAP_MS) {
           if (!state.faceHeld) {
             state.faceHeld = now;
@@ -5527,15 +5623,22 @@ function chargenTick() {
         }
         if (menuUp) {
           log('chargen', actorId.toString(16), 'the race menu has been up for',
-              Math.round(menuFor / 60000), 'minutes, going on without it');
+              Math.round(menuFor / 60000),
+              'minutes, still no appearance stored, staying unpublished');
+          continue;
         }
-        // Still no face. Go on without one rather than leave them standing
-        // here: a character who never saw the race menu can change their face
-        // later, a character who cannot leave the room can do nothing at all.
         log('chargen', actorId.toString(16),
             'appearance never arrived after', Math.round(waited / 1000) + 's,',
-            'going on to the choices anyway');
-        beginChoosing(actorId, state, 'no face after ' + Math.round(waited / 1000) + 's');
+            'staying unpublished');
+      }
+
+      // Lost request: no face, and the menu is not up. Walking already
+      // asked and continued. Standing still waits for NUDGE_MS so the
+      // spawn request has time to land, then the helper repeats every
+      // NUDGE_MS. A quiet stream after a report is still open. /racedown
+      // has already cleared the open marks.
+      if (!hasStoredAppearance(appearance) && waited > NUDGE_MS) {
+        askForLostRaceMenu('no face after ' + Math.round(waited / 1000) + 's');
       }
     }
   }
@@ -46875,6 +46978,9 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // The client saying its race menu is still up. Never typed; see
                // FACE_SEEN_MS.
                '/racemenu',
+               // The client saying the race menu went down with the game, not
+               // as a finished face. Never typed; see faceDown.
+               '/racedown',
                // A mod settings menu changed on this client. Never typed;
                // see the mod settings block at the end of this file.
                '/modset',
@@ -47116,7 +47222,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
   var HOLD_MAX = 20;
   var HOLD_ALL = 200;
   // The client's reports of a moment, never kept for later (see runsNow).
-  var MOMENTS = ['/place', '/burn', '/chopped', '/racemenu'];
+  var MOMENTS = ['/place', '/burn', '/chopped', '/racemenu', '/racedown'];
   // Lines from a chat connection that did not prove who it is, logged at most
   // this often per profile (#410).
   var unprovenSaid = {};
@@ -47135,7 +47241,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     if (word === '/place' || word === '/burn' || word === '/chopped') { return true; }
     // "The race menu is up" is a moment too, and one replayed a minute late
     // would hold the give up for somebody who has already left it.
-    if (word === '/racemenu') { return true; }
+    if (word === '/racemenu' || word === '/racedown') { return true; }
     // Kept by profile id, so it needs no character to run.
     if (word === '/modset') { return true; }
     return WORDS.indexOf(word) === -1;
@@ -47243,7 +47349,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     // Said once, and never for the client's own lines: /face, /ate, a
     // broken lockpick and the load order report are not things anybody typed.
     if (!q.told && word !== '/face' && word !== '/ate' && word !== '/tspicks' &&
-        word !== '/loadorder') {
+        word !== '/loadorder' && word !== '/racedown') {
       q.told = true;
       toProfile(profileId, 'Your character is not back in the world yet. That will run ' +
                            'as soon as you arrive.');
@@ -47828,6 +47934,19 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         var upActor = actorOf(profileId);
         if (cgUp && cgUp.faceOpen && upActor) { cgUp.faceOpen(upActor); }
       } catch (eUp) { log('/racemenu failed:', eUp); }
+      return;
+    }
+
+    // The plugin, not a person: the race menu went down with the game
+    // (F10 / quit). Not /face done: a half-made face is not finished.
+    // A different word so a gamemode from before this only says "no
+    // command called", which is harmless.
+    if (word === '/racedown') {
+      try {
+        var cgDown = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodChargen;
+        var downActor = actorOf(profileId);
+        if (cgDown && cgDown.faceDown && downActor) { cgDown.faceDown(downActor); }
+      } catch (eDown) { log('/racedown failed:', eDown); }
       return;
     }
 
@@ -50120,6 +50239,12 @@ function bodyShapeCheck(actorId, appearance, why) {
 
 mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (actorId, appearance, isAllowed) {
   if (isAllowed) { bodyShapeCheck(actorId, appearance, 'sent'); }
+  if (isAllowed && hasStoredAppearance(appearance)) {
+    const st = chargenOf(actorId);
+    if (st && st.stage === 'appearance') {
+      beginChoosing(actorId, st, 'the face arrived');
+    }
+  }
   return true;
 });
 
@@ -54637,7 +54762,15 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
   function online() {
     return memo('online', function () {
-      try { return mp.get(0, 'onlinePlayers') || []; } catch (e) { return []; }
+      var all = [];
+      try { all = mp.get(0, 'onlinePlayers') || []; } catch (e) { return []; }
+      var chargen = g.__thornswoodChargen;
+      if (!chargen || !chargen.publishedForOthers) { return all; }
+      var out = [];
+      for (var i = 0; i < all.length; i++) {
+        if (chargen.publishedForOthers(all[i])) { out.push(all[i]); }
+      }
+      return out;
     });
   }
 
