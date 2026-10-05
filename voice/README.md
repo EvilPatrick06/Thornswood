@@ -18,6 +18,13 @@ the dev service, where this file still has 7778 written in.
 live gamemode, undoing that, so it stops when the two differ; `-Force` is the
 only way past.
 
+A socket opened by a browser has to come from the page this service serves
+(its Origin names the host the socket was asked for, straight or through
+Caddy) or from a page loaded off disk, which says `null` or `file://`: the
+game's pages and the launcher's voice page. A page on any other website is
+refused with 403 before the handshake (#1321). A client that sends no Origin
+is not a browser and is let in.
+
 ## On your machine
 
 Run it from a scratch copy, as its harnesses do, not from the checkout: on its
