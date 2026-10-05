@@ -28,6 +28,20 @@
        launcher's voice page take the list from the roster and ask /ice for
        nothing.
 
+  Every join token a page joins with is minted by the service itself, on
+  its own clock, the way the launcher gets one: POST /token, with a stand-in
+  for the site that says every ticket owns its profile. It used to be signed
+  here, with this process's Date.now(), and the service refuses a token
+  minted before it started by its own clock. On Windows each node process
+  reads the wall clock from its own anchor (V8 takes GetSystemTimeAsFileTime,
+  about 15.6 ms coarse, once, then counts from it), so two processes can
+  disagree by a tick, and a token signed here a few ms after the service said
+  it was listening could read as older than the service. That refused part
+  4's page on the VPS runners (#1867, #1889, #1897). Each wait is for the
+  thing itself: a page's roster, or the socket refused or closed before it,
+  which the check then names; and the service's log is read once the
+  service has gone and every line of it is in.
+
   Writes only to a temp folder, on loopback ports the system hands out.
 */
 const REPO_DIR = require('path').join(__dirname, '..');
@@ -47,9 +61,9 @@ const RELAY = 'turn:relay.example.net:3478';
 const STUN = JSON.stringify([{ urls: 'stun:stun.l.google.com:19302' }]);
 
 let pass = 0, fail = 0;
-function yes(what, cond) {
+function yes(what, cond, why) {
   if (cond) { pass++; console.log('PASS  ' + what); }
-  else { fail++; console.log('FAIL  ' + what); }
+  else { fail++; console.log('FAIL  ' + what + (why ? '\n      ' + why : '')); }
 }
 const read = (rel) => fs.readFileSync(path.join(REPO_DIR, rel), 'utf8').split(CR).join('');
 const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
@@ -98,46 +112,151 @@ function tokenFor(pid, minted) {
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-/* The service in a temp folder, with what env adds. */
+/*
+  The site, as far as the service asks it anything: every ticket owns its
+  profile. So the service mints each join token itself (joinToken).
+*/
+function siteThatSaysYes() {
+  return new Promise((ok) => {
+    const site = http.createServer((req, res) => {
+      req.resume();
+      req.on('end', () => {
+        if (req.method === 'POST' && req.url === '/api/play/owns') {
+          res.writeHead(200, { 'content-type': 'application/json' }).end('{"ok":true}');
+        } else {
+          res.writeHead(404).end();
+        }
+      });
+    });
+    site.listen(0, '127.0.0.1', () => ok('http://127.0.0.1:' + site.address().port));
+  });
+}
+let SITE = '';
+
+/*
+  The service in a temp folder, with only the environment env gives it
+  (#1889). Nothing named THORNSWOOD_ is passed on from this process's own,
+  so a runner with a relay, a token life or anything else of the service's
+  set in its environment tests what each part says it tests.
+*/
 async function start(env) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-1821-'));
   fs.copyFileSync(VOICE, path.join(dir, 'voice-server.js'));
   fs.copyFileSync(path.join(path.dirname(VOICE), 'headlines.js'), path.join(dir, 'headlines.js'));
   fs.writeFileSync(path.join(dir, 'token-key.txt'), KEY);
   const port = await freePort('127.0.0.1');
+  const own = {};
+  for (const k of Object.keys(process.env)) { if (!/^THORNSWOOD_/i.test(k)) { own[k] = process.env[k]; } }
   const srv = spawn(process.execPath, ['voice-server.js'], { cwd: dir,
-    env: Object.assign({}, process.env, { THORNSWOOD_VOICE_PORT: String(port), THORNSWOOD_VOICE_BIND: '127.0.0.1',
-                                          THORNSWOOD_SITE: '', THORNSWOOD_CHAT_DIR: path.join(dir, 'chat') }, env) });
+    env: Object.assign(own, { THORNSWOOD_VOICE_PORT: String(port), THORNSWOOD_VOICE_BIND: '127.0.0.1',
+                              THORNSWOOD_SITE: SITE, THORNSWOOD_CHAT_DIR: path.join(dir, 'chat') }, env) });
   const s = { port: port, srv: srv, log: '' };
   srv.stdout.on('data', (d) => { s.log += d; });
   srv.stderr.on('data', (d) => { s.log += d; });
   await listening(srv, port);
   return s;
 }
-const stop = (s) => new Promise((ok) => { s.srv.once('exit', ok); s.srv.kill(); });
+/* Stopped, and resolved once its output has all been read ('close', not
+   'exit'), so s.log is then every line it wrote. */
+const stop = (s) => new Promise((ok) => { s.srv.once('close', ok); s.srv.kill(); });
+
+/*
+  A join token as the launcher gets one: asked of the service, which mints
+  it on its own clock once the site says the ticket owns the profile.
+*/
+function joinToken(s, pid) {
+  return new Promise((ok, bad) => {
+    const body = JSON.stringify({ profileId: pid, ticket: 'a ticket the stand-in site takes' });
+    const req = http.request({ host: '127.0.0.1', port: s.port, path: '/token', method: 'POST', agent: false,
+                               headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) } }, (res) => {
+      let b = '';
+      res.on('data', (d) => { b += d; });
+      res.on('end', () => {
+        let doc = null;
+        try { doc = JSON.parse(b); } catch (e) { }
+        if (res.statusCode === 200 && doc && typeof doc.token === 'string') { ok(doc.token); return; }
+        bad(new Error('the service minted no token for profile ' + pid + ': ' + res.statusCode + ' ' + b.slice(0, 200)));
+      });
+    });
+    req.on('error', bad);
+    req.end(body);
+  });
+}
+// When a token says it was minted.
+const mintedOf = (token) => Number(String(token).split('.')[2]) || 0;
+
+/* A handshake offering the token, as a page makes one: { status, body }.
+   A refusal's body is the service's reason ("no: an expired token"). */
+function knock(port, token) {
+  return new Promise((ok) => {
+    const req = http.request({ host: '127.0.0.1', port: port, path: '/', agent: false, headers: {
+      connection: 'Upgrade', upgrade: 'websocket', 'sec-websocket-version': '13',
+      'sec-websocket-key': crypto.randomBytes(16).toString('base64'),
+      'sec-websocket-protocol': 'thornswood, ' + token } });
+    req.on('upgrade', (res, socket) => { socket.destroy(); ok({ status: 101, body: '' }); });
+    req.on('response', (res) => {
+      let b = '';
+      res.on('data', (d) => { b += d; });
+      res.on('end', () => ok({ status: res.statusCode, body: b }));
+    });
+    req.on('error', (e) => ok({ status: 0, body: String(e && e.message) }));
+    req.end();
+  });
+}
 
 /*
   A page in the room: the token offered with the handshake, the join, and
-  every message kept. rosters() is the peers messages so far.
+  every message kept. rosters() is the peers messages so far; roster(n) is
+  the n-th when it comes, or null once the socket is refused or closed
+  without it, and ended then says which. page() resolves on its first.
+
+  It used to resolve on the first roster, on close, or after four seconds,
+  and its callers read rosters() whatever had happened. A refused handshake
+  fires error and no close in node 22's WebSocket, so a refused page sat out
+  the four seconds and then read as a roster with the wrong list (#1867).
+  Fifteen seconds with the socket open and no roster is a stuck service, as
+  in listening(), and says so.
 */
 function page(port, token, pid) {
-  return new Promise((done) => {
-    const got = [];
-    const ws = new WebSocket('ws://127.0.0.1:' + port + '/', ['thornswood', token]);
-    const p = { ws: ws, got: got, rosters: () => got.filter((m) => m.t === 'peers') };
-    ws.onopen = () => ws.send(JSON.stringify({ t: 'join', profileId: pid, name: 'tester ' + pid }));
-    ws.onmessage = (ev) => {
-      let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
-      got.push(m);
-      if (m.t === 'peers' && p.rosters().length === 1) { done(p); }
-    };
-    ws.onclose = () => done(p);
-    setTimeout(() => done(p), 4000);
+  const got = [];
+  const waits = [];
+  const ws = new WebSocket('ws://127.0.0.1:' + port + '/', ['thornswood', token]);
+  const p = { ws: ws, got: got, ended: '', rosters: () => got.filter((m) => m.t === 'peers') };
+  let opened = false;
+  function settle() {
+    const have = p.rosters();
+    for (const w of waits.slice()) {
+      if (have.length >= w.n || p.ended || w.late) {
+        waits.splice(waits.indexOf(w), 1);
+        clearTimeout(w.timer);
+        if (w.late && have.length < w.n && !p.ended) { p.ended = 'no roster ' + w.n + ' within fifteen seconds, the socket still open'; }
+        w.ok(have.length >= w.n ? have[w.n - 1] : null);
+      }
+    }
+  }
+  p.roster = (n) => new Promise((ok) => {
+    const w = { n: n, ok: ok, late: false };
+    w.timer = setTimeout(() => { w.late = true; settle(); }, 15000);
+    waits.push(w);
+    settle();
   });
+  const end = (why) => { if (!p.ended) { p.ended = why; } settle(); };
+  ws.onopen = () => { opened = true; ws.send(JSON.stringify({ t: 'join', profileId: pid, name: 'tester ' + pid })); };
+  ws.onmessage = (ev) => {
+    let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+    got.push(m);
+    settle();
+  };
+  ws.onerror = () => end(opened ? 'the socket failed' : 'the handshake was refused');
+  ws.onclose = (ev) => end((opened ? 'the socket closed' : 'the handshake was refused') + ' (' + ev.code + ')');
+  return p.roster(1).then(() => p);
 }
-async function until(cond) {
-  for (let i = 0; i < 80 && !cond(); i++) { await sleep(50); }
-  return cond();
+/* What a page's roster check found, for a FAIL line: the list it got, or
+   why none came and what the service wrote about it. */
+function found(p, r, s) {
+  if (r) { return 'it got ' + JSON.stringify(r.iceServers); }
+  const said = (s.log.match(/\[voice\] REFUSED[^\n]*/g) || []).join('; ');
+  return 'no roster: ' + (p.ended || 'none yet') + (said ? '; the service wrote: ' + said : '');
 }
 
 /* /ice as a page asks it through Caddy, or as this machine asks it. */
@@ -174,15 +293,16 @@ function lift(src, name) {
 }
 
 (async () => {
+  SITE = await siteThatSaysYes();
   const svc = await start({ THORNSWOOD_TURN_URL: RELAY, THORNSWOOD_TURN_SECRET: SECRET,
                             THORNSWOOD_TURN_TTL: '600', THORNSWOOD_TOKEN_SECONDS: '1' });
 
   console.log('1. the first roster:');
-  const mintedA = Date.now();
-  const tokA = tokenFor(41, mintedA);
+  const tokA = await joinToken(svc, 41);
+  const mintedA = mintedOf(tokA);
   const a = await page(svc.port, tokA, 41);
   const first = a.rosters()[0];
-  yes('a page that joined is sent a roster', !!first);
+  yes('a page that joined is sent a roster', !!first, found(a, first, svc));
   const r1 = relayOf(first && first.iceServers);
   yes('it carries the ICE list, STUN first', !!first && Array.isArray(first.iceServers) &&
       JSON.stringify(first.iceServers[0]) === JSON.stringify(JSON.parse(STUN)[0]));
@@ -193,17 +313,13 @@ function lift(src, name) {
 
   console.log('\n2. longer in the room than a token lives:');
   await sleep(2200);
-  const knock = await new Promise((ok) => {
-    const ws = new WebSocket('ws://127.0.0.1:' + svc.port + '/', ['thornswood', tokenFor(41, mintedA)]);
-    ws.onopen = () => { ws.close(); ok('open'); };
-    ws.onerror = () => ok('refused');
-  });
+  const old = await knock(svc.port, tokenFor(41, mintedA));
   yes('a token as old as the one this page joined with is refused now (expired)',
-      knock === 'refused' && /REFUSED a connection for profile 41: an expired token/.test(svc.log));
-  const b = await page(svc.port, tokenFor(42), 42);
-  yes('somebody else joins', b.rosters().length >= 1);
-  yes('and the page that has been in the room all along is sent the next roster', await until(() => a.rosters().length >= 2));
-  const second = a.rosters()[a.rosters().length - 1];
+      old.status === 403 && old.body === 'no: an expired token\n', old.status + ' ' + JSON.stringify(old.body));
+  const b = await page(svc.port, await joinToken(svc, 42), 42);
+  yes('somebody else joins', b.rosters().length >= 1, found(b, b.rosters()[0], svc));
+  const second = await a.roster(2);
+  yes('and the page that has been in the room all along is sent the next roster', !!second, found(a, second, svc));
   const r2 = relayOf(second && second.iceServers);
   yes('that roster names the newcomer', !!second && second.peers.some((p) => p.profileId === 42));
   yes('and still carries the relay', !!r2);
@@ -223,18 +339,20 @@ function lift(src, name) {
   yes('this machine is handed the relay, which is what Install-Voice.ps1 reads', !!relayOf(r.list));
   r = await ice(svc.port, 'POST', JSON.stringify({ token: 'not a token' }), false);
   yes('by POST too, whatever the body says', !!relayOf(r.list));
-  yes('no token reaches the service\'s log', svc.log.indexOf(tokA) < 0 && !/v2\.4[12]\.\d+\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{20,}/.test(svc.log));
   try { a.ws.close(); } catch (e) { }
   try { b.ws.close(); } catch (e) { }
   await stop(svc);
+  yes('the service wrote down the expired token it refused, by profile',
+      /REFUSED a connection for profile 41: an expired token/.test(svc.log));
+  yes('no token reaches the service\'s log', svc.log.indexOf(tokA) < 0 && !/v2\.4[12]\.\d+\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{20,}/.test(svc.log));
 
   console.log('\n4. no relay set, which is every box today:');
   const bare = await start({});
-  const c = await page(bare.port, tokenFor(43), 43);
+  const c = await page(bare.port, await joinToken(bare, 43), 43);
   const cr = c.rosters()[0];
-  yes('the roster carries the STUN list and nothing else', !!cr && JSON.stringify(cr.iceServers) === STUN);
   try { c.ws.close(); } catch (e) { }
   await stop(bare);
+  yes('the roster carries the STUN list and nothing else', !!cr && JSON.stringify(cr.iceServers) === STUN, found(c, cr, bare));
 
   console.log('\n5. the pages:');
   // The game's chat socket, run as it ships, with a socket that records.
