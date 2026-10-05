@@ -749,6 +749,9 @@
     }
     wired = true;
     report('server', 'sharing the chat socket to ' + cfg.host + ':' + cfg.port);
+    // The launcher took the audio before the chat's socket was here to say
+    // so on (#1925; see enterRelay).
+    if (inRelay()) { n.noVoice(); }
 
     // Restated on every connect. The join that put us in the room was sent by
     // the chat file, which knows nothing about modes, so without this a
@@ -828,7 +831,10 @@
 
   function reconcile(list) {
     var want = new Map();
-    list.forEach(function (p) { if (p.peer !== myPeer) want.set(p.peer, p); });
+    // Not a connection that carries no voice: another game whose launcher
+    // has the audio, which would never answer (#1925). One this page had to
+    // it is dropped below like anybody who left.
+    list.forEach(function (p) { if (p.peer !== myPeer && p.voice !== false) want.set(p.peer, p); });
     conns.forEach(function (_, id) { if (!want.has(id)) drop(id); });
     want.forEach(function (p, id) {
       if (conns.has(id)) {
@@ -976,7 +982,7 @@
       it, and board hands over what came before this page was on in that
       same order. A sender with no connection here is one this page chose
       not to open, in relay mode or with no audio, and has nothing to answer
-      with.
+      with, or one that has said since it carries no voice (#1925).
     */
     if (!rec) return;
 
@@ -1185,6 +1191,16 @@
       for, and the relay guard in the handler above is the belt to this braces.
     */
     try { var n = net(); if (n && n.off && onNet) { n.off(onNet); onNet = null; } } catch (e) { }
+    /*
+      AND THE ROOM IS TOLD (#1925). Every launcher in the room built a
+      WebRTC connection to this socket off the roster, and from here this
+      page answers none of them, so each sat on its offer for the rest of the
+      session and counted in that launcher's peers. The chat tells the
+      service this connection carries no voice, and says so in every join
+      after; the roster marks it and the pages close those connections.
+      With no chat socket yet, connect says it once it has one.
+    */
+    if (n) { n.noVoice(); }
     joined = false;
     draw();
   }

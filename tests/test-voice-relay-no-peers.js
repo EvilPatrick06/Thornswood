@@ -70,6 +70,7 @@ function page(withAudio) {
   FakePc.prototype.restartIce = function () { };
 
   const listeners = [];
+  const told = [];
   const net = {
     post: function () { return true; },
     on: function (fn) { listeners.push(fn); },
@@ -80,7 +81,9 @@ function page(withAudio) {
         if (listeners[i] === fn) { listeners.splice(i, 1); }
       }
     },
-    peer: function () { return 1; }
+    peer: function () { return 1; },
+    // How the overlay tells the room its socket carries no voice (#1925).
+    noVoice: function () { told.push('no voice'); }
   };
   const el = function () {
     return { style: {}, appendChild: function () { }, setAttribute: function () { } };
@@ -116,7 +119,7 @@ function page(withAudio) {
       try { fn(m); } catch (e) { threw.push(String(e)); }
     });
   }
-  return { V: win.thornswoodVoice, made: made, serve: serve, listeners: listeners, threw: threw };
+  return { V: win.thornswoodVoice, made: made, serve: serve, listeners: listeners, threw: threw, told: told };
 }
 
 const CONFIG = { host: 'voice.test', port: 7789, profileId: 100, name: 'Me',
@@ -187,6 +190,13 @@ const OFFER = { t: 'sdp', from: 2, sdp: { type: 'offer', sdp: 'v=0' } };
   p.serve(SOMEBODY);
   p.serve(OFFER);
   yes('and builds nothing afterwards', p.made.length === 1);
+  yes('it tells the room, through the chat, that its socket carries no voice (#1925)', p.told.length >= 1);
+  yes('while the page that carried voice never said so', (function () {
+    const q = page(true);
+    q.V.configure(CONFIG);
+    q.serve(SOMEBODY);
+    return q.told.length === 0;
+  })());
 }
 
 // ------------------- and nothing asks for administrator to write a rule instead
