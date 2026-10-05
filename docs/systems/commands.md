@@ -99,7 +99,8 @@ anybody to type them, so there is nothing to turn.
 
 ## Staff and dev commands
 
-These stay commands.
+These stay commands. How to run each one, with examples:
+[Developer-Guide.md, Q. Staff commands](../../Developer-Guide.md#q-staff-commands).
 
 | Command | Who | What it does | Read at | Where staff are told |
 | --- | --- | --- | --- | --- |
