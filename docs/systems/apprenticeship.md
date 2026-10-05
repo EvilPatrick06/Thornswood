@@ -34,9 +34,10 @@ not your profession's other name. You remain the half you picked.
 
 Taking you on is the master's decision. Nobody is owed it. There is
 no fee, and there is no distance written down. It is an agreement the
-master makes, and the server records it. They can end it. Ranks you
-already earned on that half stay. Further ranks stop, and the count
-waits at the next threshold again.
+master makes, and the server records it. Either of you can end it: the
+master, or you (Patrick, 4 October). Ranks you already earned on that
+half stay. Further ranks stop, and the count waits at the next
+threshold again.
 
 The sister half does not hand you that half's placed skill point.
 You get the placed point of the half you picked, and no second line
@@ -79,8 +80,10 @@ half's placed point. It does not give you the class that feeds the
 trade. A smith taught to cook is not a farmer. A tailor taught a
 school is not a mage.
 
-Two in a life. A master can end one. Ending it takes the novice list
-away. It does not open a third.
+Two in a life. Either of you can end one. Ending it takes the novice
+list away. A taught school or a taught Bladebinder keeps the spells
+already learned from it, and no new one can be learned (Patrick,
+4 October). It does not open a third.
 
 ## A mage teaching someone who is not a mage
 
@@ -159,16 +162,20 @@ Picking a profession writes the sister half at novice. The craft gate
 allows that novice list, and it allows a taught half at novice, and
 it refuses both of them above novice by name.
 
-A master takes someone on with `/apprentice <name>`. When they could
-take that person on in more than one half or school, the half goes
-after the name: `/apprentice Lina platewright`. The person accepts or
-refuses on the prompt, the same as a party or a trade, and nothing is
-recorded until they accept. The server reads which arrangement it is
-off the person: the other half of their own profession is the sister
-half, and a half or school of another profession is an outside trade.
-The master ends it with `/apprentice end <name>`. `/apprentice` on
-its own says who you took on, who took you on, and how many of your
-two outside trades are used.
+Nothing here is typed. A master looking at somebody they could take
+on sees a row for it on the look prompt, Take on as apprentice, named
+K. K then opens the Masters and apprentices page of the K panel on that
+person, with a Take on button for each half or school it could be, so
+a master of two picks which there. The person accepts or refuses on
+the prompt, the same as a party or a trade, and nothing is recorded
+until they accept. The server reads which arrangement it is off the
+person: the other half of their own profession is the sister half, and
+a half or school of another profession is an outside trade.
+
+The same page lists who you took on and who took you on, each with
+End, and how many of your two outside trades are used. Either of you
+ends it there, and End asks twice. The buttons send the server a line,
+and no help text names it.
 
 Both characters carry the arrangement, so it holds across a restart
 and with either of them offline. When work is counted, the master is
