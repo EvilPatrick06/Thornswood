@@ -31,13 +31,38 @@ Your recipes are two, made at the alchemy lab Thornswood places: the
 poultice at novice and the remedy at advanced. Everything else you
 make is brewed.
 
+<!-- detail:begin -->
+
+## Every recipe
+
+Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 2 recipes. 2 reach the server. None of them are tempering. The same rows, with ids, are in [alchemist-physicker](../../lists/alchemist-physicker.md).
+
+The rank on the row is the rank. It is the dearest ingredient a class produces. An item has no gold price.
+
+### Names that reach the server
+
+**Novice** (1 name). Poultice.
+
+**Advanced** (1 name). Physicker's Remedy.
+
+**Expert.** None.
+
+**Master.** None.
+
+| Item | Makes | Rank | Kind | Bench | Asks for | Race | Server asked | Id |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Poultice | 1 | novice | Other goods | ThornswoodCraftingAlchemy | 1 Tundra Cotton, 1 Garlic |  | yes | `154c6:Thornswood-Content.esp` |
+| Physicker's Remedy | 1 | advanced | Other goods | ThornswoodCraftingAlchemy | 1 Mudcrab Chitin, 1 Blue Mountain Flower |  | yes | `154c7:Thornswood-Content.esp` |
+
+<!-- detail:end -->
+
 ## Where this is
 
 The lab gate, the double batch and the disease list are in the
 server. A cure disease potion you brew is still only the sip, because
 the server cannot read what a brewed potion does. The poultice and the
-remedy are in Thornswood-Content.esp, and the recipe table takes them in
-as yours at its next rebuild (#1622). Setting a bone is a button on the
+remedy are in Thornswood-Content.esp, and the recipe table names them
+yours (#1622). Setting a bone is a button on the
 wounds panel: X on somebody hurt, or H in your inventory for your own
 (see [Injury](../../injury.md)). At master the same button clears a
 crooked heal.

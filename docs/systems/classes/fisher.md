@@ -143,6 +143,8 @@ Generated from the work tables by `scripts/dev/Write-SystemLists.js`. The same r
 ## Where this is
 
 The fifteen records, the waits, the yields, and a cooldown kept per
-person are in the server. No pole is required. The fishing mod's
-rods are in the collection and do nothing. None of the new water is
-placed. The trap is not a recipe. A fisher is not handed a pole.
+person are in the server. A pole is required, and a new fisher is
+handed a crude pole. The fishing mod's rods are in the collection and
+do nothing. None of the new water is placed. The poles and the trap
+are Woodwright recipes at the ranks above, in Thornswood-Content.esp
+and the recipe table.

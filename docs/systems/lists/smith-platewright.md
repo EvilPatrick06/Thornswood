@@ -1,8 +1,8 @@
 # Smith/Platewright
 
-Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 156 recipes, 156 of them reach the server. A row the server is not asked about is tempering: the armour table and the grindstone never call the server.
+Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 157 recipes, 157 of them reach the server. A row the server is not asked about is tempering: the armour table and the grindstone never call the server.
 
-By rank: novice 45, advanced 57, expert 31, master 23.
+By rank: novice 46, advanced 57, expert 31, master 23.
 
 | Item | Makes | Rank | Kind | Bench | Asks for | Race | Server asked | Id |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -36,19 +36,20 @@ By rank: novice 45, advanced 57, expert 31, master 23.
 | Riekling Chief Helmet | 1 | novice | Helmets | SmithingForge | 2 Iron Ingot, 3 Leather, 3 Scathecraw | riekling | yes | `19f9d:Playable Rieklings.esp` |
 | Riekling Horned Helmet | 1 | novice | Helmets | SmithingForge | 3 Iron Ingot, 2 Leather Strips | riekling | yes | `19f8f:Playable Rieklings.esp` |
 | Stormcloak Helmet | 1 | novice | Helmets | SmithingForge | 3 Iron Ingot, 2 Leather Strips |  | yes | `8db:MoreCraftableEquipment.esp` |
-| Corundum Ingot | 1 | novice | Ingots | Smelter |  |  | yes | `a30cb:Skyrim.esm` |
-| Ebony Ingot | 1 | novice | Ingots | Smelter |  |  | yes | `a30d3:Skyrim.esm` |
-| Glacial Crystal Ingot | 1 | novice | Ingots | Smelter |  |  | yes | `da0c03:Update.esm` |
-| Gold Ingot | 1 | novice | Ingots | Smelter |  |  | yes | `a30d4:Skyrim.esm` |
-| Iron Ingot | 1 | novice | Ingots | Smelter |  |  | yes | `a30c3:Skyrim.esm` |
-| Orichalcum Ingot | 1 | novice | Ingots | Smelter |  |  | yes | `a30db:Skyrim.esm` |
-| Quicksilver Ingot | 1 | novice | Ingots | Smelter |  |  | yes | `a30dc:Skyrim.esm` |
-| Refined Malachite | 1 | novice | Ingots | Smelter |  |  | yes | `a30da:Skyrim.esm` |
-| Refined Moonstone | 1 | novice | Ingots | Smelter |  |  | yes | `a30d9:Skyrim.esm` |
-| Silver Ingot | 1 | novice | Ingots | Smelter |  |  | yes | `a30dd:Skyrim.esm` |
-| Steel Ingot | 1 | novice | Ingots | Smelter |  |  | yes | `a30e4:Skyrim.esm` |
-| Leather | 1 | novice | Leather | TanningRack |  |  | yes | `1033de:Skyrim.esm` |
-| Leather Strips | 1 | novice | Leather | TanningRack |  |  | yes | `f7f43:Skyrim.esm` |
+| Corundum Ingot | 1 | novice | Ingots | Smelter | 2 Corundum Ore |  | yes | `a30cb:Skyrim.esm` |
+| Ebony Ingot | 1 | novice | Ingots | Smelter | 2 Ebony Ore |  | yes | `a30d3:Skyrim.esm` |
+| Glacial Crystal Ingot | 2 | novice | Ingots | Smelter | 1 Frost Salts, 4 Refined Moonstone |  | yes | `da0c03:Update.esm` |
+| Gold Ingot | 1 | novice | Ingots | Smelter | 2 Gold Ore |  | yes | `a30d4:Skyrim.esm` |
+| Iron Ingot | 1 | novice | Ingots | Smelter | 1 Iron Ore |  | yes | `a30c3:Skyrim.esm` |
+| Orichalcum Ingot | 1 | novice | Ingots | Smelter | 2 Orichalcum Ore |  | yes | `a30db:Skyrim.esm` |
+| Quicksilver Ingot | 1 | novice | Ingots | Smelter | 2 Quicksilver Ore |  | yes | `a30dc:Skyrim.esm` |
+| Refined Malachite | 1 | novice | Ingots | Smelter | 2 Malachite Ore |  | yes | `a30da:Skyrim.esm` |
+| Refined Moonstone | 1 | novice | Ingots | Smelter | 2 Moonstone Ore |  | yes | `a30d9:Skyrim.esm` |
+| Silver Ingot | 1 | novice | Ingots | Smelter | 2 Silver Ore |  | yes | `a30dd:Skyrim.esm` |
+| Steel Ingot | 1 | novice | Ingots | Smelter | 1 Corundum Ore, 1 Iron Ore |  | yes | `a30e4:Skyrim.esm` |
+| Leather | 2 | novice | Leather | TanningRack | 1 Deer Hide |  | yes | `1033de:Skyrim.esm` |
+| Leather Strips | 4 | novice | Leather | TanningRack | 1 Leather |  | yes | `f7f43:Skyrim.esm` |
+| Armor Kit | 1 | novice | Other goods | SmithingForge | 1 Iron Ingot, 1 Leather |  | yes | `154b4:Thornswood-Content.esp` |
 | Hide Shield | 1 | novice | Shields | SmithingForge | 2 Leather Strips, 4 Leather |  | yes | `db5d6:Skyrim.esm` |
 | Iron Shield | 1 | novice | Shields | SmithingForge | 1 Leather Strips, 4 Iron Ingot |  | yes | `db293:Skyrim.esm` |
 | Ancient Nord Boots | 1 | advanced | Armoured boots | SmithingSkyforge | 3 Leather Strips, 2 Iron Ingot, 4 Steel Ingot, 2 Leather |  | yes | `f46cd:Skyrim.esm` |

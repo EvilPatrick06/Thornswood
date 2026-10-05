@@ -13,8 +13,8 @@ The half places 1 in Ward. The profession already placed 1 in Ward,
 so a Wardweaver starts at 2: +10 magic resistance.
 
 You do not earn staff spell points. Bladebinder is your sister half
-at novice: 66 staves, if you have the heart stone, and novice staff
-spells only. A master Bladebinder can teach you further. That is an
+at novice: the three novice staves, Flames, Frostbite and Sparks, if
+you have the heart stone, and novice staff spells only. A master Bladebinder can teach you further. That is an
 apprenticeship inside the profession, not one of the two outside
 trades.
 
