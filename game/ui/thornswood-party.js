@@ -378,7 +378,8 @@
       var what = data.offer.kind === 'friend' ? 'wants to be friends'
         : (data.offer.kind === 'party' ? 'is asking you to join their party'
         : (data.offer.kind === 'apprentice' ? 'offers to take you on as an apprentice'
-                                            : 'is offering to trade'));
+        : (data.offer.kind === 'book' ? 'invites you into ' + esc(data.offer.about || 'a group book')
+                                            : 'is offering to trade')));
       html += '<div class="ask"><span class="who"><span class="kicker">Request</span><b>' + esc(data.offer.name) +
               '</b> ' + what + '</span>' +
               '<button class="go" data-do="yes">Accept</button>' +
@@ -394,8 +395,8 @@
 
     html += '<div><h3>Your party</h3>';
     if (!data.party || !data.party.length) {
-      html += '<div class="none">Not in a party. Look at somebody and press the party key, ' +
-              'or use the Ask button on a friend below.</div>';
+      html += '<div class="none">Not in a party. Look at somebody and press the party key to ' +
+              'ask them, or press Ask to party beside a friend below.</div>';
     } else {
       for (var i = 0; i < data.party.length; i++) {
         var m = data.party[i];
@@ -494,10 +495,12 @@
     }
   }
 
-  function offerWords(kind) {
+  function offerWords(kind, about) {
     if (kind === 'friend') { return 'wants to be friends.'; }
     if (kind === 'party') { return 'is asking you to join their party.'; }
     if (kind === 'apprentice') { return 'offers to take you on as an apprentice.'; }
+    // A group book invite, "the business The Bee" (#1591). Accept joins it.
+    if (kind === 'book') { return 'invites you into ' + esc(about || 'a group book') + '.'; }
     return 'is offering to trade.';
   }
 
@@ -506,7 +509,7 @@
     if (!data || !data.offer) { askEl.innerHTML = ''; return; }
     askEl.innerHTML =
       '<div class="card"><span class="who"><span class="kicker">Request</span><b>' + esc(data.offer.name) + '</b> ' +
-      offerWords(data.offer.kind) + '</span>' +
+      offerWords(data.offer.kind, data.offer.about) + '</span>' +
       '<button class="go" data-do="yes">Accept</button>' +
       '<button data-do="no">Refuse</button></div>';
     var buttons = askEl.querySelectorAll('button[data-do]');

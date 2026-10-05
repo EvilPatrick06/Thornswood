@@ -11,16 +11,24 @@ ride does not reload.
 ## The fare
 
 You stand within 400 of the driver, the same reach as a notice board,
-and you name the stop.
+and press E on them. A panel names every stop that driver goes to and
+its fare, with a Ride button beside each. Ride takes the fare and moves
+you. Walking away closes the panel. Nothing is typed in the chat.
 
 | Trip | Gold | Where it goes |
 | --- | --- | --- |
-| A ferry, one river stop to the next | 10 | The departure hold's ledger |
-| A carriage, any mainland hold to any other | 20 | The departure hold's ledger |
-| Either end is Raven Rock | 40 | The departure hold's ledger |
+| A ferry, one stop to another on its water, Solstheim's own ferry included | 10 | The departure hold's ledger |
+| A carriage to a stop in the same hold | 10 | The departure hold's ledger |
+| A carriage, one hold to another | 20 | The departure hold's ledger |
+| The crossing between the mainland and Solstheim, the Northern Maiden between Windhelm and Raven Rock | 40 | The departure hold's ledger |
+
+Decided by Patrick on 4 Oct (#1394): 40 is only that crossing. A ferry
+ride between Raven Rock, Skaal Village and Tel Mithryn is 10 like any
+other ferry, and a carriage ride inside one hold is 10.
 
 If the gold is not in the pack, you do not move and nothing is taken.
-Dying does not refund a fare already paid.
+The panel says so and stays open. Dying does not refund a fare already
+paid.
 
 The driver is a worker of the hold the stop sits in. The fare is that
 hold's, counted the way a notice fee is counted. See [Gold](gold.md)
@@ -60,15 +68,19 @@ collection with it.
 The server keeps the route list: the 27 drivers the collection
 places. That is nine carriages, the North Coast, Lake Honrich, Lake
 Ilinalta and Solstheim ferries, and the Northern Maiden between
-Windhelm and Raven Rock. `/ride` at a driver says where that driver
-goes and what each stop costs. `/ride` and the stop takes the fare
-onto the departure hold's ledger and moves you, once. A short pack is
-refused and keeps its gold. Pressing E on a driver asks the server the
-same question.
+Windhelm and Raven Rock. Pressing E on a driver opens the panel of
+that driver's stops and fares (`game/ui/thornswood-ride.js`, #1635).
+Ride takes the fare onto the departure hold's ledger and moves you,
+once. A short pack is refused and keeps its gold, and the panel stays
+open with the reason. Walking out of reach of the driver closes it.
+The fares are the table above. Every carriage stop on the list is in
+a different hold, so the 10 for a carriage inside one hold is charged
+once a village stop is added.
 
-The mod's own conversation still opens, and it does not ask the
-ledger. Its fade does not land: the server refuses a move it did not
-make and puts you back where you were. The stops nobody drives from
-are not on the server's list yet: the villages, the Hearthfire homes,
-the Thalmor Embassy and the small ferry landings. Their positions are
-not in the repo.
+The mod's own conversation still opens on the same press, and it does
+not ask the ledger. The panel waits for it and opens when it closes.
+Its fade does not land: the server refuses a move it did not make and
+puts you back where you were. The stops nobody drives from are not on
+the server's list yet: the villages, the Hearthfire homes, the Thalmor
+Embassy and the small ferry landings. Their positions are not in the
+repo.
