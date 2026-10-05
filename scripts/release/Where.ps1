@@ -30,13 +30,32 @@
   LAYOUT. layout.json at the repository root holds the places; where.js
   beside this reads the same file.
 
+  THE FOLDER A RELEASE IS BUILT FROM, issue #1692. ShipRoot and ShipRootDev
+  are the Thornswood install a main and a dev release are built from on this
+  machine, which Ship.ps1, Check-ShipReady.ps1, Setup-ShipMachine.ps1 and
+  Build-Generated.ps1 each worked out for themselves until 5 October, by the
+  same rule copied four times: the launcher install (C:\Thornswood, or
+  Thornswood on the first other fixed drive with Launcher\Thornswood.exe in
+  it), and for dev that with -DevBuild on the end, where the main launcher's
+  Settings page installs the dev build. A machine where Vortex deploys into
+  that dev folder (docs\COLLECTION-REVISION-2.md step 8) builds its dev
+  release in another one, and nothing knew which: on 4 October a dev Ship
+  from a clean worktree took Vortex's folder, built and installed the
+  launcher there and then stopped at its generated files. ShipRoots is the
+  file in this machine's own data (not in the repository, so every clone and
+  worktree reads it) that names the folder for a channel, as
+  {"dev": "C:\\Thornswood-Release-DevBuild"}; Setup-ShipMachine.ps1 -Root
+  writes it. A channel it does not name is the rule above. These three are
+  this machine's, and only the PowerShell release scripts ask, so where.js
+  does not answer them.
+
   Read only. It creates nothing and prints nothing but the one path.
 
 .PARAMETER What
   Which place: Repo, Engine, ServerDist, ClientDist, ServerSettings,
-  ChangeForms, Out, Dist, Package, Payload, ServerZip, Releases or ReleasesDev;
-  or a top folder from layout.json (docs, bot, voice, site, tests, game,
-  launcher, installer, records, scripts).
+  ChangeForms, Out, Dist, Package, Payload, ServerZip, Releases, ReleasesDev,
+  ShipRoot, ShipRootDev or ShipRoots; or a top folder from layout.json (docs,
+  bot, voice, site, tests, game, launcher, installer, records, scripts).
 #>
 [CmdletBinding()]
 param(
@@ -74,6 +93,36 @@ function Get-Named($obj, [string]$name) {
     return $prop.Value
 }
 
+# The launcher install: C:\Thornswood, or Thornswood on the first other fixed
+# drive that has Launcher\Thornswood.exe in it, else C:\Thornswood. The first
+# is asked as a plain string, so a machine with no C: drive (a harness off
+# Windows) gets an answer rather than an error from Join-Path.
+function Find-InstallRoot {
+    $first = 'C:\Thornswood'
+    if (Test-Path -LiteralPath ($first + '\Launcher\Thornswood.exe')) { return $first }
+    foreach ($d in @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue | Where-Object { $_.Root -match '^[A-Za-z]:\\$' })) {
+        $cand = Join-Path $d.Root 'Thornswood'
+        if (Test-Path -LiteralPath (Join-Path $cand 'Launcher\Thornswood.exe')) { return $cand }
+    }
+    return $first
+}
+
+# The folder a release on $channel is built from on this machine (#1692, see
+# the header): what ShipRoots names for it, or the install rule.
+function Get-ShipRoot([string]$channel) {
+    $file = Get-Place 'ShipRoots'
+    if (Test-Path -LiteralPath $file) {
+        $rec = $null
+        try { $rec = [IO.File]::ReadAllText($file) | ConvertFrom-Json }
+        catch { throw "$file does not read as JSON, so which folder a release is built from here is not known. Fix it, or write it again with .\scripts\release\Setup-ShipMachine.ps1 -Channel $channel -Root <folder>." }
+        $named = [string](Get-Named $rec $channel)
+        if ($named) { return $named }
+    }
+    $root = Find-InstallRoot
+    if ($channel -eq 'dev') { return ($root + '-DevBuild') }
+    return $root
+}
+
 function Get-Place([string]$name) {
     switch ($name) {
         'Repo'   { return $repo }
@@ -81,6 +130,10 @@ function Get-Place([string]$name) {
         # not clones of Thornswood-Releases beside the repository any more.
         'Releases'    { return Join-Path $env:LOCALAPPDATA 'Thornswood\feed\main' }
         'ReleasesDev' { return Join-Path $env:LOCALAPPDATA 'Thornswood\feed\dev' }
+        # The folder a release is built from here, and the file that names it (#1692).
+        'ShipRoots'   { return Join-Path $env:LOCALAPPDATA 'Thornswood\ship-roots.json' }
+        'ShipRoot'    { return Get-ShipRoot 'main' }
+        'ShipRootDev' { return Get-ShipRoot 'dev' }
     }
     $place = Get-Named $layout.places $name
     if ($null -ne $place) { return Join-Under $repo ([string]$place) }
@@ -93,7 +146,8 @@ function Get-Place([string]$name) {
 }
 
 $placeNames = @('Repo', 'Engine', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms',
-                'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Releases', 'ReleasesDev')
+                'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Releases', 'ReleasesDev',
+                'ShipRoot', 'ShipRootDev', 'ShipRoots')
 $folderNames = @($layout.folders.PSObject.Properties.Name)
 
 if ($placeNames -contains $What) {

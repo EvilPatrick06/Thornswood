@@ -298,7 +298,14 @@ try {
     # ------------------------------------------------ the script's own rules --
     $setupText = Get-Content -LiteralPath $Setup -Raw
     Yes 'Setup-ShipMachine never sets "enabled" on a signing config' ($setupText -notmatch '(?i)\.enabled\s*=' -and $setupText -notmatch '(?i)enabled\s*=\s*\$false')
-    Yes 'it writes signing.json only through New-SigningConfig' (([regex]::Matches($setupText, 'WriteAllText\(')).Count -eq 1)
+    # Two writers since #1692: New-SigningConfig, the one for signing.json,
+    # and Save-ShipRoot, which records the release folder outside the repository.
+    $writers = @(([System.Management.Automation.Language.Parser]::ParseInput($setupText, [ref]$null, [ref]$null)).FindAll({ param($n)
+        $n -is [System.Management.Automation.Language.InvokeMemberExpressionAst] -and $n.Member.Extent.Text -eq 'WriteAllText' }, $true) | ForEach-Object {
+        $p = $_.Parent; while ($p -and -not ($p -is [System.Management.Automation.Language.FunctionDefinitionAst])) { $p = $p.Parent }
+        if ($p) { $p.Name } else { '(top level)' } })
+    Yes ('it writes signing.json only through New-SigningConfig, and nothing else but Save-ShipRoot writes a file (' + ($writers -join ', ') + ')') (
+        $writers.Count -eq 2 -and $writers -contains 'New-SigningConfig' -and $writers -contains 'Save-ShipRoot')
     Yes 'it never prints the Azure token' ($setupText -notmatch 'Say[^\n]*\$t\b' -and $setupText -notmatch 'Write-Host[^\n]*\$t\b')
     Yes 'it runs Check-ShipReady for the verdict' ($setupText -match "Check-ShipReady\.ps1'\) @readyArgs")
     $declared = @($setupAst.ParamBlock.Parameters | ForEach-Object { $_.Name.VariablePath.UserPath })
