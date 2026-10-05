@@ -122,11 +122,13 @@ See [Notice boards](noticeboards.md), [Gold](gold.md),
 ## What a home is for
 
 Your own bed is the best rest on [Exhaustion](exhaustion.md), 80 an
-hour, and the logout fill. A bed you are allowed in is 50. A bed or
-bedroll in a building nobody holds, or out on the road, is nobody's to
-lend: 25 an hour, or 45 with a fire in reach. A bed in a building
-somebody else holds, who has not let you, is no rest at all. Lying
-down in the bed is how you rest in it, and there is nothing to type.
+hour. A bed you are allowed in is 50. Both give the logout fill: log
+out lying in one and you come back rested. A bed or bedroll in a
+building nobody holds, or out on the road, is nobody's to lend: 25 an
+hour, or 45 with a fire in reach, and no logout fill. A bed in a
+building somebody else holds, who has not let you, is no rest at all.
+Lying down in the bed is how you rest in it, and there is nothing to
+type.
 
 The holder names who may sleep there. Look at somebody inside a
 building you hold, and the prompt that names them offers Let sleep
