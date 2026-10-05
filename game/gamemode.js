@@ -5091,6 +5091,19 @@ function chargenTick() {
       } catch (e) {
         log('login', actorId.toString(16), 'could not put the clothes back on:', e);
       }
+
+      /*
+        AND THE K PANEL'S VIEW, WORKED OUT NOW (#1642), so a Rush, a Font of
+        Magic or restoration strain that ran into a restart is not on them
+        once they are back. See arrived() in the character block. Last, so
+        anything above that changes the character is in it.
+      */
+      try {
+        const c = globalThis.__thornswoodCharacter;
+        if (c && c.arrived) { c.arrived(actorId); }
+      } catch (e) {
+        log('login', actorId.toString(16), 'could not send the panel worked out now:', e);
+      }
     }
     /*
       NOBODY STANDS ABOUT UNDRESSED WAITING FOR A DOOR.
@@ -42631,6 +42644,22 @@ log('gamemode loaded:',
     return null;
   }
 
+  /*
+    THE PANEL'S OWN ASK, as writeState's redraw (#1642). The panel sends
+    /pick refresh once it is in and each time it opens, and the answer is sent
+    whether anything changed or not. It also carries when it was asked
+    (view.asked), because the client's script draws nothing when the value
+    matches the one it last handed the page (updateOwnerScript), and it
+    counts a value as handed even while the page has no panel to take it.
+    The view sent when somebody arrives (arrived, below) goes before the
+    page is up, and the refresh a few seconds later often answers the same
+    view. Without the time the script would drop that answer as drawn
+    already, and the panel would stay empty with the skill tree's totals off
+    the character. drawn() is worked out before the time is added, so the
+    signature that holds back an unchanged write does not count it.
+  */
+  var ASKED = 'asked';
+
   function writeState(actorId, s, redraw) {
     s.v = 1;
     // forPanel is what the client sees; the rules state is what is stored.
@@ -42661,6 +42690,7 @@ log('gamemode loaded:',
     var sig = drawn(view);
     var sending = !!redraw || lastDrawn[actorId] !== sig;
     if (sending) {
+      if (redraw === ASKED) { view.asked = Date.now(); }
       s.panel = view;
     } else {
       // A counter and nothing else. The record is written; the panel is not
@@ -43515,7 +43545,8 @@ log('gamemode loaded:',
       if (what === 'refresh') {
         // A refresh asks for the panel outright, so it is sent whether
         // anything changed or not: that is the whole point of the command.
-        writeState(actorId, s, true);   // the write is what fires updateOwner
+        // And drawn whether anything changed or not: see ASKED.
+        writeState(actorId, s, ASKED);   // the write is what fires updateOwner
         return true;
       }
       /*
@@ -43822,10 +43853,37 @@ log('gamemode loaded:',
     writeState(actorId, stateOf(actorId), true);
   }
 
+  /*
+    SOMEBODY HAS COME INTO THE WORLD (#1642): the K panel's view, worked out
+    now. Called from the chargen tick's first sight of them after a load or a
+    login, the hook the spells and the clothes ride on.
+
+    The view is kept on the character, and the map the client applies is in
+    it (effects): the tree, what the needs take off, and what a running
+    effect adds, a warrior's Rush, Font of Magic and restoration strain. Each
+    of those runs in memory and ends on a timer that sends the view again
+    without it. A restart loses the timers and leaves the stored view carrying
+    the effect. skymp5-client reconnects by itself after a restart, with the
+    page and the panel still up, so the game keeps the speed or the free
+    spells it was last sent, and nothing on it asks for the view again. So
+    the view a person gets on arrival is the one worked out at this moment,
+    out of what is running now, which after a restart is nothing. Not a
+    redraw: it is sent when it is not the view this server last sent them,
+    and after a restart this server has sent them none.
+
+    Somebody still being made is left to the creation hall, which sends
+    theirs on its first pass after the settle (beginCreation).
+  */
+  function arrived(actorId) {
+    var chargen = g.__thornswoodChargen;
+    if (chargen && chargen.isChoosing && chargen.isChoosing(actorId)) { return null; }
+    return writeState(actorId, stateOf(actorId));
+  }
+
   g.__thornswoodCharacter = {
     PROPERTY: CHAR_PROPERTY, stateOf: stateOf, writeState: writeState,
     forPanel: forPanel, mapHalf: mapHalf, migrate: migrate, command: command,
-    beginCreation: beginCreation, updateOwnerScript: updateOwnerScript,
+    beginCreation: beginCreation, arrived: arrived, updateOwnerScript: updateOwnerScript,
     gate: gate, gateHalf: gateHalf, credit: credit,
     grantSpell: grantSpell, grantKnown: grantKnown, nameOf: nameOf, raiseLines: raiseLines,
     acceptApprentice: acceptApprentice, masterFor: masterFor, effectsOf: effectsOf,
@@ -43923,10 +43981,10 @@ log('gamemode loaded:',
   before the perk fires. A restart or a relog reads the same clock, and a
   clock that cannot be written does not fire, so nothing fires twice. A day is
   24 real hours from the moment it fired. Font of Magic's 15 seconds are
-  not kept: its end is a timer in memory. The day it spent is still spent.
-  The view the client last got is kept on the character, so a restart inside
-  those 15 seconds leaves the free spells on until the panel is next sent
-  (issue #1642, the same for a warrior's Rush).
+  not kept: its end is a timer in memory, and a restart ends it. The day it
+  spent is still spent. The view a person gets when they come back is worked
+  out then (arrived in the character block, #1642), so the free spells are
+  not on it; the same for a warrior's Rush and restoration strain.
 
   EVERY TIME ONE FIRES it is a line in thornswood.log, "perks: <name> fired
   for <actor>", which is the record the page asks for. Troll's Blood and
@@ -44751,7 +44809,9 @@ log('gamemode loaded:',
 
   THE CLOCKS LIVE IN MEMORY, on globalThis so a hot reload keeps them. A
   restart clears every wait and every armed blow, which at three minutes at
-  most is nothing worth a property write.
+  most is nothing worth a property write. It ends a running Rush too, and the
+  view a person gets when they come back is worked out then (arrived in the
+  character block, #1642), so the speed is not on them.
 */
 (function () {
   'use strict';
@@ -46230,7 +46290,9 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
   /*
     Every cast, from the OnSpellCast handler. Only a person's, and only a
     restoration spell. The window and the refusal each end on their own
-    clock, and the map is written again when they do.
+    clock, and the map is written again when they do. A restart ends both,
+    and the view a person gets when they come back is worked out then
+    (arrived in the character block, #1642).
   */
   function cast(casterId, spell, at) {
     var actorId = Number(casterId) || 0;
