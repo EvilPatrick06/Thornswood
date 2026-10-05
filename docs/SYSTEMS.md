@@ -48,13 +48,21 @@ GMs". `/stuck`, and the lines that reach staff, `/helpme` (and
 `/help-me`) and `/report`, are typed in the chat, and the help in the
 game, the launcher's Help and the site name them.
 
+Talking stays a command as well. Decided by Patrick later on 4 Oct,
+about the ways of saying a line and the dice (#1639): "Allow those
+commands and don't do buttons." `/me`, `/do`, `/w` (`/whisper`), `/s`
+(`/shout`), `/y` (`/yell`), `/ooc` (`/o`) and `/roll` (`/r`) are typed
+in the chat box, with no buttons for them, and the help in the game,
+the launcher's Help, [Text chat](systems/chat.md) and the site's rules
+name them.
+
 A panel or a key may send the server the same line a command used to
 be. The look prompt already sends `/trade` and the id of the person
 under the crosshair. Nobody is told to type that line, and help text
 never lists it.
 
 A page below that still tells people to type something other than
-those three is out of date on that point. [Chat commands](systems/commands.md)
+getting help or talking is out of date on that point. [Chat commands](systems/commands.md)
 lists every command the game answers today, who may use it, and the
 issue that turns each one for people into buttons. A new system is
 written with its buttons from the start.
