@@ -25,11 +25,13 @@
 // Read only. Nothing outside the temp folder is touched.
 const fs = require('fs');
 const os = require('os');
+const net = require('net');
 const path = require('path');
 const { spawn } = require('child_process');
 
 const SERVER = process.env.VOICE_SERVER || path.join(__dirname, 'voice-server.js');
-const PORT = 7913;
+// Set by ready(), from the system. It was a fixed 7913 (#1703).
+let PORT = 0;
 const TICK_MS = 200;
 
 let pass = 0, fail = 0;
@@ -84,19 +86,8 @@ function body() {
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-moved-'));
 fs.copyFileSync(SERVER, path.join(dir, 'voice-server.js'));
 fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
-const srv = spawn(process.execPath, ['voice-server.js'], {
-  cwd: dir,
-  env: Object.assign({}, process.env, {
-    THORNSWOOD_VOICE_PORT: String(PORT),
-    THORNSWOOD_VOICE_BIND: '127.0.0.1',
-    THORNSWOOD_VOICE_AUTH: 'off',
-    THORNSWOOD_SITE: '',
-    THORNSWOOD_CHAT_DIR: path.join(dir, 'chat')
-  })
-});
+let srv = null;
 let log = '';
-srv.stdout.on('data', (d) => { log += d; });
-srv.stderr.on('data', (d) => { log += d; });
 
 const sockets = [];
 let feeder = null;
@@ -106,20 +97,70 @@ function done(code) {
   if (feeder) { clearInterval(feeder); }
   for (const s of sockets) { try { s.close(); } catch (e) { } }
   const rm = () => { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { } };
-  srv.once('exit', rm);
-  try { srv.kill(); } catch (e) { }
+  if (srv) { srv.once('exit', rm); try { srv.kill(); } catch (e) { } }
   setTimeout(rm, 300).unref();
 }
 
+/*
+  A port of this run's own (#1703). Builds run side by side on the VPS, and
+  with a fixed number one run's requests can be answered by another run's
+  service. The system names a port nothing holds, the service is started on
+  it, and nothing is asked of the port until this service has said it is
+  listening there.
+*/
+function freePort(host) {
+  return new Promise((ok, bad) => {
+    const s = net.createServer();
+    s.on('error', bad);
+    s.listen(0, host, () => { const p = s.address().port; s.close(() => ok(p)); });
+  });
+}
+/* Waits for srv's own "listening on ...:port" line. If it stops first,
+   something took the port in between or it could not start, and the error
+   says which, with what it printed. */
+function listening(srv, port) {
+  return new Promise((ok, bad) => {
+    let out = '';
+    const said = (d) => {
+      out += d;
+      const m = /\[voice\] listening on \S+:(\d+)/.exec(out);
+      if (m && Number(m[1]) === port) { end(null); }
+    };
+    const more = (d) => { out += d; };
+    const gone = (code) => end(new Error((/EADDRINUSE/.test(out) ? 'something else already holds port ' + port + ', so ' : '') +
+                                         'the voice service stopped (exit ' + code + ') before it was listening. It printed:\n' + out));
+    const late = setTimeout(() => end(new Error('the voice service did not say it was listening on ' + port +
+                                                ' within fifteen seconds. It printed:\n' + out)), 15000);
+    function end(err) {
+      clearTimeout(late);
+      srv.stdout.removeListener('data', said);
+      srv.stderr.removeListener('data', more);
+      srv.removeListener('exit', gone);
+      if (err) { bad(err); } else { ok(); }
+    }
+    srv.stdout.on('data', said);
+    srv.stderr.on('data', more);
+    srv.on('exit', gone);
+  });
+}
 async function ready() {
-  for (let i = 0; i < 60; i++) {
-    try {
-      const r = await fetch('http://127.0.0.1:' + PORT + '/health');
-      if (r.ok) { return await r.json(); }
-    } catch (e) { }
-    await wait(150);
-  }
-  throw new Error('the service never came up. log:\n' + log);
+  PORT = await freePort('127.0.0.1');
+  srv = spawn(process.execPath, ['voice-server.js'], {
+    cwd: dir,
+    env: Object.assign({}, process.env, {
+      THORNSWOOD_VOICE_PORT: String(PORT),
+      THORNSWOOD_VOICE_BIND: '127.0.0.1',
+      THORNSWOOD_VOICE_AUTH: 'off',
+      THORNSWOOD_SITE: '',
+      THORNSWOOD_CHAT_DIR: path.join(dir, 'chat')
+    })
+  });
+  srv.stdout.on('data', (d) => { log += d; });
+  srv.stderr.on('data', (d) => { log += d; });
+  await listening(srv, PORT);
+  const r = await fetch('http://127.0.0.1:' + PORT + '/health');
+  if (!r.ok) { throw new Error('the service answered /health with ' + r.status + '. log:\n' + log); }
+  return await r.json();
 }
 
 function feed() {

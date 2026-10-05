@@ -52806,13 +52806,31 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       Logging out in a bed. Blade: "laying down in a bed in an inn or your home
       when you log out will give you bonuses when you come back."
 
-      Full rest on return, and RESTED_FOR of the wear taken off the other two
+      Full rest on return, and sleptAlso of the wear taken off the other two
       as well, because somebody who slept properly did not also starve. It is
       not a bonus stat: a stat bonus for logging out correctly is a rule about
       when to play, and this is a rule about where to sleep.
     */
     sleptRest: 100,
     sleptAlso: 25,
+    /*
+      WHICH BEDS, AND HOW LONG AWAY (#1606), each asked on that issue and
+      built as the suggested answer.
+
+      The rests that count as a night in a bed: your own bed, and a bed you
+      are allowed in (a night the holder gave you, or the building's key or
+      deed carried). Blade's "a bed in an inn or your home", and the property
+      page before #1603 gave the fill to a bed you own, rent or were allowed
+      to use. A bed or bedroll nobody can lend you is the road, and is not one.
+
+      And how long away is a night: 8 hours on the game clock, which runs
+      twenty times real time, so 24 real minutes. Away for less is the
+      ordinary settle of the time away, at the bed's own rate. Without it,
+      lying down at home and logging straight back in would put 25 on hunger
+      and thirst every time.
+    */
+    sleptIn: { bed: true, inn: true },
+    sleptFor: 24 * 60000,
 
     /*
       What a thing is worth. The default is what an unlisted food or drink
@@ -53042,6 +53060,35 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   }
 
   /*
+    WHO HAS COME INTO THE WORLD SINCE THEY LAST LEFT IT (#1606).
+
+    The first settle after somebody comes online is their arrival, and the
+    arrival is where a night in a bed is counted (arrived, below). Every
+    reader of the meters goes through settle, whichever of them comes first
+    after a login: the client's first /place, the K panel, the beds' first
+    sight, this block's own tick. So settle is the one place that always sees
+    the arrival before anything else has moved the clock on.
+
+    here holds everybody settled since they came online. The tick takes out
+    whoever is no longer online, so their next settle is an arrival again. It
+    is on globalThis, so a hot reload is not an arrival, and whoever is online
+    when this block first loads has already arrived.
+  */
+  if (!g.__thornswoodNeedsHere) {
+    var already = {};
+    // No list at all is a cold start, and nobody is online at a cold start.
+    var on = [];
+    try { on = mp.getOnlinePlayers() || []; } catch (e) { on = []; }
+    for (var oi = 0; oi < on.length; oi++) { already[on[oi]] = true; }
+    g.__thornswoodNeedsHere = already;
+  }
+  var here = g.__thornswoodNeedsHere;
+
+  function onlineNow(actorId) {
+    try { return (mp.getOnlinePlayers() || []).indexOf(actorId) !== -1; } catch (e) { return false; }
+  }
+
+  /*
     Bring a character's meters up to now, and answer them.
 
     Everything is worked out from ELAPSED REAL TIME rather than ticked, so a
@@ -53052,6 +53099,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   function settle(actorId, now) {
     now = now || Date.now();
     var n = read(actorId);
+    var arriving = !here[actorId] && onlineNow(actorId);
+    if (arriving) { here[actorId] = true; }
     /*
       IN CREATION NOTHING MOVES, AND THE CLOCK IS MOVED ON WITH IT.
 
@@ -53079,6 +53128,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     }
     if (!n) { n = fresh(); write(actorId, n); return n; }
 
+    var away = now - n.at;
     var hours = (now - n.at) / 3600000;
     if (hours <= 0) { return n; }
     // A session that has been away for a week does not starve to death twice
@@ -53122,8 +53172,23 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (k > 1) { k = 1; }
     if (k > 0) { n.temp = clamp(n.temp + (target - n.temp) * k); }
 
+    // A night in a bed, on top of the time away settled above (#1606).
+    var slept = arriving ? arrived(actorId, n, away) : '';
+
     n.at = now;
     write(actorId, n);
+    if (slept) {
+      /*
+        Up, in the beds' book as well, so the property block does not go on
+        counting them as lying in the bed they woke in. And the bands the
+        night moved reach the character, the way a crossing does.
+      */
+      var beds = g.__thornswoodBeds;
+      if (beds && beds.off) { beds.off(actorId); }
+      pushEffects(actorId);
+      notify(actorId, slept);
+      say(actorId, slept);
+    }
     return n;
   }
 
@@ -53936,22 +54001,34 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   }
 
   /*
-    They logged out in a bed, so they come back rested. Blade's bonus.
+    They logged out in a bed, so they come back rested. Blade's bonus, and
+    exhaustion.md: "Logging out in a real bed fills rest to 100 when you come
+    back, and puts 25 back on hunger and on thirst."
 
-    Called when somebody arrives, from the character block's first sight of
-    them: if the meters say they were in a bed when they were last seen, the
-    sleep counted.
+    Called by settle at somebody's arrival (see here, above settle), on the
+    meters it has just brought up to now and with how long they were away.
+    The sleep counted when the meters say they were resting in one of
+    NEEDS.sleptIn when they were last seen, and they were away at least
+    NEEDS.sleptFor. Answers the line to say, or ''. n is changed in place and
+    settle writes it.
+
+    The time away is settled first, the ordinary way: hunger and thirst fell
+    while they were gone and the 25 is put back on what is left, as the page
+    says. The first version of this read the meters without settling them, so
+    a night away would have cost no hunger at all.
+
+    #1606: this was written and exported and nothing ever called it. Its
+    comment named the character block's first sight of somebody as the
+    caller, and that call was never written; the first commit of this
+    repository already has it without one.
   */
-  function arrived(actorId) {
-    var n = read(actorId);
-    if (!n) { write(actorId, fresh()); return ''; }
-    if (n.resting !== 'bed') { settle(actorId); return ''; }
+  function arrived(actorId, n, away) {
+    if (!Object.prototype.hasOwnProperty.call(NEEDS.sleptIn, n.resting) ||
+        !(away >= NEEDS.sleptFor)) { return ''; }
     n.rest = NEEDS.sleptRest;
     n.food = clamp(n.food + NEEDS.sleptAlso);
     n.drink = clamp(n.drink + NEEDS.sleptAlso);
     n.resting = '';
-    n.at = Date.now();
-    write(actorId, n);
     return 'You slept well. You are rested.';
   }
 
@@ -54058,6 +54135,12 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   function tick() {
     var online = [];
     try { online = mp.getOnlinePlayers() || []; } catch (e) { return; }
+    // Whoever has left arrives again at their next settle (#1606).
+    for (var h in here) {
+      if (Object.prototype.hasOwnProperty.call(here, h) && online.indexOf(Number(h)) === -1) {
+        delete here[h];
+      }
+    }
     for (var i = 0; i < online.length; i++) {
       var who = online[i];
       try {
@@ -54461,7 +54544,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     NEEDS: NEEDS, COST: COST, TEMP_COST: TEMP_COST, CRAFT_REST: CRAFT_REST,
     bandOf: bandOf, tempBand: tempBand, consumed: consumed,
     settle: settle, view: view, effects: effects,
-    ate: ate, resting: resting, worked: worked, bard: bard, arrived: arrived,
+    ate: ate, resting: resting, worked: worked, bard: bard,
     place: place, tooTiredToCraft: tooTiredToCraft,
     setBurning: setBurning, catchFire: catchFire,
     fresh: fresh, clamp: clamp,

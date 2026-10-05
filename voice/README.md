@@ -43,8 +43,11 @@ unset, nobody is asked whether a join owns the profile it claims). `/health`
 reports
 the `BUILD` string at the top of the file, which is the only way to tell from
 outside which copy is running, so change it whenever behaviour changes. The
-harnesses run the real file in a temporary folder on a spare port and need
-nothing else: `node voice\test-auth.js` and the rest.
+harnesses run the real file in a temporary folder on a port the system hands
+out, and ask it nothing until that copy has said it is listening there,
+because several builds run at once on the VPS and a fixed port let one run
+answer another (#1703). They need nothing else: `node voice\test-auth.js` and
+the rest.
 
 A TURN relay, for the pairs of people who cannot reach each other directly,
 is `THORNSWOOD_TURN_URL`. Its key is `THORNSWOOD_TURN_SECRET` or, so it stays
