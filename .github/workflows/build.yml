@@ -303,12 +303,14 @@ jobs:
                  'test-1388-apprentice.js',
                  'test-launcher-help.js', 'test-classes-page.js',
                  'test-1389-lists.js',
+                 'test-1590-hunter-lists.js',
                  'test-1390-embassy.js',
                  'test-1603-beds.js',
                  'test-1606-logout-fill.js',
                  'test-1734-rest-reconnect.js',
                  'test-1676-rest-gate.js',
                  'test-1733-injury-gate.js',
+                 'test-1767-creation-tools.js',
                  'test-1741-encoding.js',
                  'test-1634-apprentice-gui.js',
                  'test-1637-door-gui.js',
@@ -320,9 +322,11 @@ jobs:
                  'test-1718-trade-pieces.js',
                  'test-1627-board-panel.js',
                  'test-1595-deliver.js',
+                 'test-1303-voice-auth.js',
                  'test-1398-fuel.js',
                  'test-1398-weaver.js',
                  'test-1622-recipe-generator.js',
+                 'test-1714-cut-file.js',
                  'test-1713-bench-table.js',
                  'test-1712-builders-skip-off.js',
                  'test-1628-social-gui.js',
@@ -448,6 +452,39 @@ jobs:
           }
           if ($bad) { exit 1 }
           Write-Host 'every bot file parses'
+
+      - name: Check the Python names what exists
+        shell: pwsh
+        run: |
+          # Issue #1343. Parsing (the step above) passes a name that does not
+          # exist, and Python only finds out when that line runs: in the bot,
+          # on the VPS, in front of people. ruff with four rule groups and
+          # nothing else: E9 a file that will not compile, F63 a comparison
+          # or assert that is always true or false, F7 a break, continue,
+          # return or yield where none can be, F82 a name never defined.
+          # No style rules, so no line here is red for how it looks. All 48
+          # Python files passed on main on 5 October with nothing changed.
+          # ruff comes into a venv of this run's own, never the machine's
+          # Python, pinned by version and hash in .github\ruff-requirements.txt.
+          # By hand, from the repository folder, in any venv:
+          #   python -m pip install --only-binary :all: --require-hashes -r .github\ruff-requirements.txt
+          #   python -m ruff check --isolated --select E9,F63,F7,F82 (git ls-files '*.py')
+          $venv = Join-Path $env:RUNNER_TEMP 'ruff-venv'
+          python -m venv $venv
+          $py = Join-Path $venv 'Scripts\python.exe'
+          if (-not (Test-Path -LiteralPath $py)) {
+            Write-Host '::error::could not make a venv for ruff, so the Python was not checked'
+            exit 1
+          }
+          & $py -m pip install --quiet --disable-pip-version-check --only-binary :all: --require-hashes -r .github\ruff-requirements.txt
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=.github/ruff-requirements.txt::could not install the pinned ruff, so the Python was not checked'
+            exit 1
+          }
+          $files = @(git ls-files '*.py')
+          & $py -m ruff check --isolated --no-cache --select E9,F63,F7,F82 --output-format github @files
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Write-Host ("{0} Python file(s) name only what exists" -f $files.Count)
 
       - name: Count the silent catches in the launcher
         shell: pwsh

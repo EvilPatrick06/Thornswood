@@ -40,6 +40,15 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-keepalive-'));
 for (const f of ['voice-server.js', 'headlines.js']) {
   fs.copyFileSync(path.join(__dirname, f), path.join(dir, f));
 }
+// Every join proves itself since #1303, so this harness signs its own join
+// tokens with a key it puts beside its copy of the service.
+const KEY = crypto.randomBytes(32).toString('hex');
+fs.writeFileSync(path.join(dir, 'token-key.txt'), KEY);
+function tokenFor(pid) {
+  const body = String(pid) + '.' + String(Date.now() + 3600000);
+  return 'v1.' + body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
 const pub = path.join(dir, 'public');
 try { fs.mkdirSync(pub); } catch (e) { }
 
@@ -111,7 +120,6 @@ async function ready() {
     cwd: dir,
     env: Object.assign({}, process.env, {
       THORNSWOOD_VOICE_PORT: String(PORT),
-      THORNSWOOD_VOICE_AUTH: 'off',
       THORNSWOOD_SITE: '',
       THORNSWOOD_VOICE_PING_MS: String(PING_MS),
       THORNSWOOD_VOICE_SILENT_MS: String(SILENT_MS),
@@ -271,7 +279,7 @@ function textFrame(obj) {
   talks.sock.write(textFrame({ t: 'ping' }));
   await sleep(300);
   check('a page ping before it has joined is not answered', got.some((m) => m.t === 'pong'), false);
-  talks.sock.write(textFrame({ t: 'join', profileId: 519, name: 'keepalive' }));
+  talks.sock.write(textFrame({ t: 'join', profileId: 519, name: 'keepalive', token: tokenFor(519) }));
   talks.sock.write(textFrame({ t: 'ping' }));
   for (let i = 0; i < 20 && !got.some((m) => m.t === 'pong'); i++) { await sleep(100); }
   check('a page ping once joined is answered with a pong', got.some((m) => m.t === 'pong'), true);

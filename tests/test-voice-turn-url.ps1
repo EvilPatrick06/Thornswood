@@ -4,9 +4,9 @@
       pwsh -NoProfile -File .\tests\test-voice-turn-url.ps1
 
   Install-Voice.ps1 can hand the voice service a relay address, keeps it on
-  the next install the way it keeps -Bind and -Auth, says so when it drops one
-  that has no key, and with no relay sends the service the command line it
-  always sent.
+  the next install the way it keeps -Bind, says so when it drops one that has
+  no key, and with no relay sends the service the command line it always
+  sent, but for auth, which is on on every line since #1303.
 
   WHY THIS EXISTS. The To Do List entry "Voice is a full peer-to-peer mesh
   with no relay and no cap, and the code already admits a pair that cannot
@@ -173,7 +173,7 @@ require('fs').writeFileSync('seen.json', JSON.stringify({
 # the line in it that the VPS runs.
 function CommandFor([string]$url) {
     $TurnUrl = $url
-    $Site = 'https://thornswood.net'; $Port = 7778; $Bind = '0.0.0.0'; $Auth = 'log'; $ChatRange = 'off'
+    $Site = 'https://thornswood.net'; $Port = 7778; $Bind = '0.0.0.0'; $ChatRange = 'off'
     $Root = 'C:\Thornswood-Voice'; $TaskName = 'Thornswood Voice'; $expectBuild = 'x'
     . ([scriptblock]::Create($turnSetAst.Extent.Text))
     . ([scriptblock]::Create($turnSetIf.Extent.Text))
@@ -210,16 +210,17 @@ function RunCommand([string]$cmd) {
 # came onto the line with local chat (tests\test-chat-range-install.ps1), and
 # off is what an install that does not mention it hands over. The roller in
 # front of node came with entry 220, so voice.log is rolled before each start.
-$before = '/c "set THORNSWOOD_SITE=https://thornswood.net&& set THORNSWOOD_VOICE_PORT=7778&& set THORNSWOOD_VOICE_BIND=0.0.0.0&& set THORNSWOOD_VOICE_AUTH=log&& set THORNSWOOD_CHAT_RANGE=off&& "{2}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{3}" -Path "{1}" & "{0}" voice-server.js >> "{1}" 2>&1"' -f $nodeExe, $logPath, $psExePath, $rollPath
+# Auth is on whatever the install is given since #1303: there is no -Auth.
+$before = '/c "set THORNSWOOD_SITE=https://thornswood.net&& set THORNSWOOD_VOICE_PORT=7778&& set THORNSWOOD_VOICE_BIND=0.0.0.0&& set THORNSWOOD_VOICE_AUTH=on&& set THORNSWOOD_CHAT_RANGE=off&& "{2}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{3}" -Path "{1}" & "{0}" voice-server.js >> "{1}" 2>&1"' -f $nodeExe, $logPath, $psExePath, $rollPath
 
 $none = CommandFor ''
 Yes 'with no relay the command line is the one every install sent before, to the character' (
     $none -and $none.Cmd -ceq $before)
 $seen = if ($none) { RunCommand $none.Cmd } else { $null }
 Yes 'and the service it starts is handed no relay address' ($seen -and $null -eq $seen.url)
-Yes 'with site, port, bind, auth and chat range as they always were' (
+Yes 'with site, port, bind and chat range as they always were, and auth on' (
     $seen -and $seen.site -eq 'https://thornswood.net' -and $seen.port -eq '7778' -and
-    $seen.bind -eq '0.0.0.0' -and $seen.auth -eq 'log' -and $seen.chat -eq 'off')
+    $seen.bind -eq '0.0.0.0' -and $seen.auth -eq 'on' -and $seen.chat -eq 'off')
 
 $relay = 'turn:relay.example.net:3478,turns:relay.example.net:5349?transport=tcp'
 $with = CommandFor $relay
@@ -229,13 +230,13 @@ $seen = if ($with) { RunCommand $with.Cmd } else { $null }
 Yes 'and the service gets exactly that address, with no space on the end' ($seen -and $seen.url -ceq $relay)
 Yes 'the rest is unchanged' (
     $seen -and $seen.site -eq 'https://thornswood.net' -and $seen.port -eq '7778' -and
-    $seen.bind -eq '0.0.0.0' -and $seen.auth -eq 'log' -and $seen.chat -eq 'off')
+    $seen.bind -eq '0.0.0.0' -and $seen.auth -eq 'on' -and $seen.chat -eq 'off')
 Yes 'and no relay key rides on the command line: the service is handed none there' (
     $seen -and $null -eq $seen.secret -and $with.Remote -notmatch 'TURN_SECRET|TURN_PASS|TURN_USER')
 
 # ---- the probe --------------------------------------------------------------
 Write-Host ''
-Write-Host 'what is already running is kept, the way -Bind and -Auth are:'
+Write-Host 'what is already running is kept, the way -Bind is:'
 $stubDir = Join-Path $script:temp 'stub'
 # Laid out the way scripts\ is since phase 8 of issue #440: the install in
 # deploy, and the Remote.ps1 it calls as ..\vps\Remote.ps1 beside it.
@@ -283,8 +284,8 @@ function StartVoice([int]$port, [hashtable]$vars, [string]$key) {
 # variables as its parameter block would leave them.
 function Probe([int]$port, [hashtable]$given, [string]$canned) {
     $Here = Join-Path $stubDir 'deploy'; $Port = $port; $VpsHost = 'vps.invalid'; $VpsUser = 'nobody'
-    $Bind = '0.0.0.0'; $Auth = 'log'; $ChatRange = 'on'; $TurnUrl = ''
-    $bindExplicit = $false; $authExplicit = $false; $chatExplicit = $false; $turnExplicit = $false
+    $Bind = '0.0.0.0'; $ChatRange = 'on'; $TurnUrl = ''
+    $bindExplicit = $false; $chatExplicit = $false; $turnExplicit = $false
     if ($given.ContainsKey('TurnUrl')) { $TurnUrl = $given['TurnUrl']; $turnExplicit = $true }
     $Root = 'C:\Thornswood-Voice'
     $script:said = @()
@@ -292,7 +293,7 @@ function Probe([int]$port, [hashtable]$given, [string]$canned) {
     $env:TS_PROBE_ANSWER = $canned
     try { . ([scriptblock]::Create($probeAst.Extent.Text)) }
     finally { Remove-Item Env:\TS_PROBE_ANSWER -ErrorAction SilentlyContinue }
-    return [pscustomobject]@{ Bind = $Bind; Auth = $Auth; ChatRange = $ChatRange; TurnUrl = $TurnUrl; Said = ($script:said -join "`n") }
+    return [pscustomobject]@{ Bind = $Bind; ChatRange = $ChatRange; TurnUrl = $TurnUrl; Said = ($script:said -join "`n") }
 }
 
 $withRelay = 7922
@@ -307,7 +308,7 @@ Yes 'three real voice services came up here: a relay with its key in turn-key.tx
 
 $r = Probe $withRelay @{} ''
 Yes 'an install that does not pass -TurnUrl keeps the relay that is running' ($r.TurnUrl -ceq $relay)
-Yes 'and still keeps the bind and the auth, as it did before' ($r.Bind -eq '127.0.0.1' -and $r.Auth -eq 'on')
+Yes 'and still keeps the bind, as it did before' ($r.Bind -eq '127.0.0.1')
 # The relay rides on the end of the same answer local chat's range is read
 # from, so one install keeping both is the case that shows neither eats the
 # other.
@@ -324,15 +325,15 @@ $r = Probe $withRelay @{ TurnUrl = 'turn:other.example.net:3478' } ''
 Yes 'a -TurnUrl that is passed wins over what is running' ($r.TurnUrl -ceq 'turn:other.example.net:3478')
 $r = Probe $plain @{} ''
 Yes 'a service with no relay leaves the install with none, which is every box today, and its range off kept off' (
-    $r.TurnUrl -eq '' -and $r.Bind -eq '0.0.0.0' -and $r.Auth -eq 'log' -and $r.ChatRange -eq 'off')
+    $r.TurnUrl -eq '' -and $r.Bind -eq '0.0.0.0' -and $r.ChatRange -eq 'off')
 Yes 'and says nothing about a relay at all' ($r.Said -notmatch 'relay')
 $r = Probe $plain @{} 'bind=127.0.0.1;auth=on;chat=2500;relay=none;turn='
-Yes 'an answer with nothing after turn= keeps bind, auth and chat range and no relay' (
-    $r.TurnUrl -eq '' -and $r.Bind -eq '127.0.0.1' -and $r.Auth -eq 'on' -and $r.ChatRange -eq '2500')
+Yes 'an answer with nothing after turn= keeps bind and chat range and no relay' (
+    $r.TurnUrl -eq '' -and $r.Bind -eq '127.0.0.1' -and $r.ChatRange -eq '2500')
 $r = Probe $plain @{} 'bind=0.0.0.0;auth=log;chat=0;relay=ephemeral;turn=turn:x:3478&&calc'
 Yes 'an answer carrying something that is not a relay address is not put on the command line' ($r.TurnUrl -eq '')
 $r = Probe $plain @{} 'none'
 Yes 'nothing running leaves every default as it was, local chat on' (
-    $r.TurnUrl -eq '' -and $r.Bind -eq '0.0.0.0' -and $r.Auth -eq 'log' -and $r.ChatRange -eq 'on')
+    $r.TurnUrl -eq '' -and $r.Bind -eq '0.0.0.0' -and $r.ChatRange -eq 'on')
 
 Done

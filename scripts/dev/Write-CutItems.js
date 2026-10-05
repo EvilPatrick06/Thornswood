@@ -5,12 +5,48 @@
 // what leaves the open craft book. The json is the same list, one row per
 // reference, so a row can be put back for an event without hunting the plugin.
 //
+// A TABLE THAT IS ALREADY CUT (issue #1714). The rules below sorted the table
+// once, before anything was cut (#1391), and wrote 3342 references. Since #1622
+// Build-RecipeTable.ps1 reads cut-items.json and writes a table that is already
+// cut: a cut row nobody owned is in the refused map, and the rows kept after the
+// first pass have owners (the smelt and leather rows, #1400; the kits, #1384;
+// the poles and the trap, #1379). The rules read that table wrongly. Measured
+// on 5 October: 231 cut rows dropped out of the list because they are refused
+// now, and 20 kept rows were cut because they are owned now, so a recipe build
+// after this would have put 231 rows back in the open book and taken 20 out.
+// So on a table that is already cut this starts from the cut file it has and
+// writes both files from that list. The rules run only on a table with nothing
+// cut, and that table only exists before the first cut.
+//
 //   node scripts/dev/Write-CutItems.js
 const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..', '..');
 const recipes = JSON.parse(fs.readFileSync(path.join(ROOT, 'game', 'data', 'recipes.json'), 'utf8'));
+const CUT_JSON = path.join(ROOT, 'docs', 'systems', 'cut-items.json');
+const cutFile = fs.existsSync(CUT_JSON) ? JSON.parse(fs.readFileSync(CUT_JSON, 'utf8')) : null;
+
+// Cut means the recipe build has applied a cut file to it: an owned row marked
+// out of the open book or onto a roll, or a refused row the cut file names.
+function tableIsCut() {
+  const ids = {};
+  ((cutFile && cutFile.items) || []).forEach(function (item) { ids[item.id] = true; });
+  const owned = recipes.recipes || {};
+  for (const id in owned) {
+    if (owned[id].book === 'cut' || owned[id].roll) { return true; }
+  }
+  for (const id in (recipes.refused || {})) {
+    if (ids[id]) { return true; }
+  }
+  return false;
+}
+const ALREADY_CUT = tableIsCut();
+if (ALREADY_CUT && !cutFile) {
+  console.log('STOP. game/data/recipes.json is already cut and there is no docs/systems/cut-items.json to start from.');
+  console.log('The rules cannot sort a table that is already cut, so nothing was written.');
+  process.exit(1);
+}
 
 function clean(s) {
   return String(s == null ? '' : s)
@@ -173,12 +209,15 @@ function plainWeapon(name, family) {
   return false;
 }
 
+// On a table that is already cut the rules have nothing to read: see the top.
 const owned = [];
-Object.keys(recipes.recipes).forEach(function (id) {
-  const row = recipes.recipes[id];
-  row._id = id;
-  owned.push(row);
-});
+if (!ALREADY_CUT) {
+  Object.keys(recipes.recipes).forEach(function (id) {
+    const row = recipes.recipes[id];
+    row._id = id;
+    owned.push(row);
+  });
+}
 
 const cuts = [];
 const kept = [];
@@ -351,11 +390,13 @@ Object.keys(dupeGroups).forEach(function (name) {
 
 // Unowned ingots and leather: one row per name, dragon and daedra cut entirely.
 const unowned = [];
-Object.keys(recipes.unowned || {}).forEach(function (id) {
-  const row = recipes.unowned[id];
-  row._id = id;
-  unowned.push(row);
-});
+if (!ALREADY_CUT) {
+  Object.keys(recipes.unowned || {}).forEach(function (id) {
+    const row = recipes.unowned[id];
+    row._id = id;
+    unowned.push(row);
+  });
+}
 
 function isSmelt(name) {
   if (!name) { return false; }
@@ -396,7 +437,8 @@ Object.keys(smeltByName).forEach(function (name) {
   });
 });
 
-const outCuts = cuts.filter(function (item) { return item.disposition !== 'keep' && item.disposition !== 'cook'; });
+const outCuts = ALREADY_CUT ? cutFile.items.slice() :
+  cuts.filter(function (item) { return item.disposition !== 'keep' && item.disposition !== 'cook'; });
 outCuts.sort(function (a, b) {
   if (a.disposition !== b.disposition) { return a.disposition < b.disposition ? -1 : 1; }
   if (a.why !== b.why) { return a.why < b.why ? -1 : 1; }
@@ -415,6 +457,9 @@ function countBy(list, key) {
 
 const byDisp = countBy(outCuts, 'disposition');
 const keptCraft = kept.filter(function (item) { return item.disposition === 'keep'; });
+// The rows the first pass left in the open book. That pass is the one the count
+// describes, so a table that is already cut keeps the number the file has.
+const keptCount = ALREADY_CUT ? cutFile.counts.kept : keptCraft.length;
 
 let md = '';
 md += '# Cut items\n\n';
@@ -430,7 +475,10 @@ md += '| cut | Not found and not made. Held here. |\n';
 md += '| embassy | Not found in Skyrim. The embassy roll may craft it. |\n';
 md += '| thalmor | Not found. Someone on the Thalmor remnant roll may craft it. |\n\n';
 md += 'Counts in this file: cut ' + (byDisp.cut || 0) + ', embassy ' + (byDisp.embassy || 0) + ', thalmor ' + (byDisp.thalmor || 0) + '. ';
-md += 'Rows this pass left in the open book, or on a lock that is not a cut: ' + keptCraft.length + '.\n\n';
+md += 'Rows this pass left in the open book, or on a lock that is not a cut: ' + keptCount + '.\n\n';
+md += 'The rules below sorted the recipe table once, before anything was cut. The recipe build ';
+md += '(`scripts/dev/Build-RecipeTable.ps1`) reads [cut-items.json](cut-items.json), so the table it writes is already cut, ';
+md += 'and `scripts/dev/Write-CutItems.js` run on that table writes this page from the list it has instead of sorting the table again.\n\n';
 md += '## Rules that built the lists\n\n';
 md += 'One suit per material. Where a material has a heavy set and a light set, both stay. ';
 md += 'A suit is body, head, hands, and feet. Shields are fewer than suits: one shield named Shield, not the buckler and not the painted variants.\n\n';
@@ -483,13 +531,23 @@ md += section('Cut', 'cut',
 const json = {
   builtFrom: 'game/data/recipes.json',
   note: 'References held out of the open craft book. recipes.json is not edited by the script that writes this file.',
-  counts: { cut: byDisp.cut || 0, embassy: byDisp.embassy || 0, thalmor: byDisp.thalmor || 0, kept: keptCraft.length },
+  counts: { cut: byDisp.cut || 0, embassy: byDisp.embassy || 0, thalmor: byDisp.thalmor || 0, kept: keptCount },
   rieklingKept: Array.from(RIEKLING_KEEP),
   items: outCuts
 };
 
+// Each file keeps the line ending it already has (LF for a new one), so a run
+// that changes nothing writes the same bytes on a Windows checkout too.
 const dir = path.join(ROOT, 'docs', 'systems');
-fs.writeFileSync(path.join(dir, 'cut-items.md'), md, 'utf8');
-fs.writeFileSync(path.join(dir, 'cut-items.json'), JSON.stringify(json, null, 2) + '\n', 'utf8');
-console.log('cut', byDisp.cut || 0, 'embassy', byDisp.embassy || 0, 'thalmor', byDisp.thalmor || 0, 'kept', keptCraft.length);
+function writeKeepingEol(file, text) {
+  const had = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+  const eol = had.indexOf('\r\n') !== -1 ? '\r\n' : '\n';
+  fs.writeFileSync(file, eol === '\n' ? text : text.split('\n').join(eol), 'utf8');
+}
+writeKeepingEol(path.join(dir, 'cut-items.md'), md);
+writeKeepingEol(path.join(dir, 'cut-items.json'), JSON.stringify(json, null, 2) + '\n');
+if (ALREADY_CUT) {
+  console.log('the recipe table is already cut, so the list is the one docs/systems/cut-items.json has');
+}
+console.log('cut', byDisp.cut || 0, 'embassy', byDisp.embassy || 0, 'thalmor', byDisp.thalmor || 0, 'kept', keptCount);
 console.log('wrote docs/systems/cut-items.md and cut-items.json');
