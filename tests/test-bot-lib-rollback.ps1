@@ -48,11 +48,9 @@ foreach ($c in @(@('python'), @('py', '-3'))) {
     $pre = @($c | Select-Object -Skip 1)
     $o = ''
     try { $o = "$(& $c[0] @pre -c 'import sys; print(sys.executable)' 2>$null | Select-Object -Last 1)".Trim() } catch { }
-    if ($LASTEXITCODE -eq 0 -and $o -and (Test-Path -LiteralPath $o)) { $py = $o; break }
-}
-if ($py) {
-    $null = & $py -m pip --version 2>$null
-    if ($LASTEXITCODE -ne 0) { $py = '' }
+    if ($LASTEXITCODE -ne 0 -or -not $o -or -not (Test-Path -LiteralPath $o)) { continue }
+    $null = & $o -m pip --version 2>$null
+    if ($LASTEXITCODE -eq 0) { $py = $o; break }
 }
 $ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 if (-not $py -or -not (Test-Path -LiteralPath $ps51)) {
