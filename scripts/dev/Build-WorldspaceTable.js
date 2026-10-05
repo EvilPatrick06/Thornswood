@@ -153,11 +153,11 @@ function readWorldspaces(dataDir, pluginsTxt) {
 
 // The "worldspaces" array in a JSON text, replaced by list and laid out the
 // way it was: one entry a line at the old indent, or all on one line.
-const LIST_RE = /"worldspaces"(\s*):(\s*)\[((?:\s*"(?:[^"\\]|\\.)*"\s*,?)*\s*)\]/g;
+// Written so that a list it cannot read fails at once rather than backtracking.
+const LIST_RE = /"worldspaces"(\s*):(\s*)\[(\s*(?:"(?:[^"\\]|\\.)*"\s*(?:,\s*)?)*)\]/g;
 function replaceList(text, list) {
   const found = text.match(LIST_RE) || [];
   if (found.length !== 1) { return null; }
-  LIST_RE.lastIndex = 0;
   return text.replace(LIST_RE, function (all, s1, s2, inner) {
     const nl = inner.indexOf('\r\n') >= 0 ? '\r\n' : '\n';
     const item = /\n([ \t]*)"/.exec(inner);
