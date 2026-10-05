@@ -9,18 +9,25 @@ each half, with the file and line for each step.
 
 `.gitmodules:11-15` names the fork, `https://github.com/EvilPatrick06/skymp.git`,
 on the branch `thornswood/engine-changes`, at `engine/skymp`. The repository
-pins a commit, not the branch: `git submodule status` prints
-`e65341299bfdbdc0993678e93572930cae43d183`, the source commit named by both
-`records\client-build.json` and `records\server-build.json`. The server
-executable was rebuilt from it to read every plugin into memory when the
-server starts (issue #1602); its SHA256 is
-`7477e037a3050d37619c4643d6fbe1a7d877b5248fbda8d64af142ddcdacce10`, built
-2026-10-04T20:50:16Z. The six client files keep their recorded bytes, because
-that commit changes no client source.
+pins a commit, not the branch. This page does not name that commit or the
+hashes built from it, because every engine change moves them: twice it named
+a pin the records had already left (issue #1346). Read them where they are
+written:
+
+```powershell
+git ls-tree HEAD engine/skymp                                                    # the pin
+(Get-Content records\client-build.json -Raw | ConvertFrom-Json).forkCommit       # the client build
+(Get-Content records\server-build.json -Raw | ConvertFrom-Json).source.commit    # the server build
+```
+
+All three name one commit. `records\server-build.json` also holds the server
+executable's SHA256 and build time, and `records\README.md` lists the
+provenance note for any build that kept an earlier build's bytes.
 `Deploy-Server.ps1`, `Export-ServerPayload.ps1`, `Publish-Server.ps1` and the
 installer refuse server files that differ from the record. The build check
 requires the pin and both records to name one source commit and the server
-record to include every artifact (see "One engine").
+record to include every artifact (see "One engine"), and this page to name no
+commit or hash in full.
 
 `ignore = dirty` (`.gitmodules:15`) keeps a build inside the fork from showing
 as a change here. A different commit checked out in it still shows, and is
@@ -203,8 +210,9 @@ put back from `local\engine-dist-3cbf2f87`, so neither record changed and
 From 27 September both records named `5c54e8b9`. Then the client record and
 the pin moved on (#1016 to `10841f40`, #898 to `b4543a86`) and the server record
 did not, so the servers ran the `5c54e8b9` build while every later server fix
-sat in the fork unused (issue #1200). Since 29 September the pin and both
-records name `1a2e5995` again, built together; "One engine" below keeps it so.
+sat in the fork unused (issue #1200). On 29 September the pin and both
+records were put back on one commit, `1a2e5995`, built together, and "One
+engine" below has kept them on one commit since.
 
 So the recorded binaries stay unless the engine changed:
 
