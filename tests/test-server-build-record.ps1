@@ -28,6 +28,10 @@
        not the fork's, compiled Papyrus that is not the fork's or that the fork
        does not compile, a launch_server.bat that is not the configure's, and
        packages that are not the ones yarn.lock names
+    3b. when the build compiled the Papyrus itself (build\skymp5-scripts\pex,
+       fork #31, #1220): that compile is recorded and the committed .pex left
+       alone; the committed one in the build, a compile older than its .psc and
+       a compile with no .psc are each refused
     4. ServerBuild.ps1 on a folder: a file from another build, a server file
        the record does not list, a record of the binary alone and a record
        whose files name another commit are each a problem
@@ -112,6 +116,7 @@ try {
     Put (Join-Path $fork 'skymp5-server\package.json') '{ "name": "skymp5-server", "version": "0.0.0", "license": "AGPL-3.0" }'
     Put (Join-Path $fork 'skymp5-server\yarn.lock') "# yarn lockfile v1`n`n`n"
     Put (Join-Path $fork 'skymp5-scripts\pex\ActiveMagicEffect.pex') 'compiled papyrus'
+    Put (Join-Path $fork 'skymp5-scripts\psc\ActiveMagicEffect.psc') 'Scriptname ActiveMagicEffect'
     Put (Join-Path $fork '.gitignore') "build/`nnode_modules/`n"
     [void](Run-Native { git -C $fork init -q })
     [void](Run-Native { git -C $fork -c user.email=t@t -c user.name=t add -A })
@@ -192,6 +197,35 @@ try {
     Push-Location -LiteralPath (Join-Path $fork 'skymp5-server')
     try { [void](Run-Native { yarn install --frozen-lockfile --offline }) } finally { Pop-Location }
     Put (Join-Path $fork 'skymp5-server\node_modules\pkg\index.js') $pkgJs
+    Write-GoodBuild
+
+    # ---- 3b. Papyrus the build compiled itself (#1220) -----------------------
+    # With the Creation Kit's compiler the fork compiles into
+    # build\skymp5-scripts\pex and leaves the committed .pex alone (fork #31).
+    Write-Host ''; Write-Host 'Papyrus compiled into the build folder'
+    $builtDir = Join-Path $fork 'build\skymp5-scripts\pex'
+    $built = Join-Path $builtDir 'ActiveMagicEffect.pex'
+    $committedPex = Join-Path $fork 'skymp5-scripts\pex\ActiveMagicEffect.pex'
+    Put $built 'compiled on this machine'
+    Put (Join-Path $dist 'data\scripts\ActiveMagicEffect.pex') 'compiled on this machine'
+    $r = Record
+    Yes ("the build's own compile is recorded (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Written)
+    if (-not $r.Written) { Write-Host (($r.Out -split "`n" | Select-Object -Last 8) -join "`n") -ForegroundColor DarkGray }
+    Yes '  and the committed .pex is untouched' ([IO.File]::ReadAllText($committedPex) -eq 'compiled papyrus')
+    Put (Join-Path $dist 'data\scripts\ActiveMagicEffect.pex') 'compiled papyrus'
+    $r = Record
+    Yes 'the committed .pex in the build is refused once the build compiled its own' (
+        $r.Code -ne 0 -and -not $r.Written -and $r.Out -match "ActiveMagicEffect\.pex in the build is not the fork's build\\skymp5-scripts\\pex")
+    Put (Join-Path $dist 'data\scripts\ActiveMagicEffect.pex') 'compiled on this machine'
+    (Get-Item -LiteralPath $built).LastWriteTime = (Get-Item -LiteralPath (Join-Path $fork 'skymp5-scripts\psc\ActiveMagicEffect.psc')).LastWriteTime.AddMinutes(-5)
+    $r = Record
+    Yes 'a compiled .pex older than its .psc is refused' ($r.Code -ne 0 -and -not $r.Written -and $r.Out -match 'ActiveMagicEffect\.pex is older than skymp5-scripts\\psc\\ActiveMagicEffect\.psc')
+    Put $built 'compiled on this machine'
+    Put (Join-Path $builtDir 'Stray.pex') 'left from a .psc the fork no longer has'
+    Put (Join-Path $dist 'data\scripts\Stray.pex') 'left from a .psc the fork no longer has'
+    $r = Record
+    Yes 'a compiled .pex with no .psc in the fork is refused' ($r.Code -ne 0 -and -not $r.Written -and $r.Out -match 'Stray\.pex has no \.psc')
+    Remove-Item -LiteralPath (Join-Path $fork 'build\skymp5-scripts') -Recurse -Force
     Write-GoodBuild
 
     # ---- 4. ServerBuild.ps1 on a folder ----------------------------------------

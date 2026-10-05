@@ -112,10 +112,6 @@
               microphone: true, micName: '' };
 
   var ctx = null, mic = null, myPeer = 0;
-  /* The one listener this page puts on the chat's shared socket, kept in a
-     variable so it can be taken off again when the launcher takes the audio.
-     See enterRelay. */
-  var onNet = null;
   var talking = false, joined = false, wired = false;
 
   /*
@@ -761,7 +757,14 @@
 
     myPeer = n.peer();
 
-    onNet = function (m) {
+    /*
+      On for the life of the page, relay mode included (#1959). The
+      positions, the modes on them and the staff silences that come down
+      this socket are what the speaking marks and the party strip are drawn
+      from, and a launcher holding the audio changes none of that. Only the
+      signalling is the launcher's, and the guard below drops it.
+    */
+    var onNet = function (m) {
       if (!m || !m.t) { return; }
       if (m.t === 'welcome') { myPeer = Number(m.peer) || 0; return; }
       /*
@@ -779,6 +782,11 @@
         UDP sockets on every network the machine has, which is what makes
         Windows Firewall ask about the game's browser. The launcher's voice
         page does all of this in WebView2, so this page has no reason to.
+
+        This guard is all relay mode takes from this listener (#1959). It
+        used to take the listener off the socket as well, and then a page
+        configured before the launcher took the audio heard no position
+        again: no speaking marks and a party strip frozen where it was.
       */
       if (inRelay() && (m.t === 'sdp' || m.t === 'ice' || m.t === 'peers')) { return; }
       if (m.t === 'peers') { takeIce(m.iceServers); reconcile(m.peers); return; }
@@ -1178,21 +1186,19 @@
     } catch (e) { }
     micError = '';
     /*
-      OFF THE BUS, PROPERLY.
+      STILL ON THE SOCKET (#1959).
 
-      This line used to read `if (n && n.leave) n.leave()`. thornswoodNet has
-      never had a leave, so the guard was always false and the call never
-      happened: the page kept being handed every voice message on the shared
-      socket and rebuilt its peer connections from the next offer. Nothing
-      said so, because a guard that is false reads exactly like a call that
-      worked.
-
-      It cannot CLOSE the socket either, which is why leave was the wrong idea
-      rather than a missing one: the socket belongs to the chat and voice is a
-      passenger on it. What it can do is stop listening, which is what off is
-      for, and the relay guard in the handler above is the belt to this braces.
+      This used to take the page's listener off the chat's socket here, so
+      that no offer could rebuild what was just dropped. That also cut off
+      the positions, the modes and the staff silences, which relay mode
+      still draws the speaking marks and the party strip from: a page
+      configured before the launcher took the audio froze them, while one
+      configured after it, whose listener went on with relay mode already
+      set, kept them. The relay guard at the top of the listener in connect
+      is what keeps the signalling out, the same in both orders, so the
+      listener stays.
     */
-    try { var n = net(); if (n && n.off && onNet) { n.off(onNet); onNet = null; } } catch (e) { }
+    var n = net();
     /*
       AND THE ROOM IS TOLD (#1925). Every launcher in the room built a
       WebRTC connection to this socket off the roster, and from here this

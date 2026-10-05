@@ -115,12 +115,16 @@ if (-not (Test-Path -LiteralPath $WorkflowDir)) { Done }
 $files = @(Get-ChildItem -LiteralPath $WorkflowDir -File | Where-Object { $_.Extension -in '.yml', '.yaml' } | Sort-Object Name)
 Yes ("it holds workflows to read ({0}: {1})" -f $files.Count, (($files | ForEach-Object { $_.Name }) -join ', ')) ($files.Count -ge 1)
 
-# The three that exist today. Named rather than counted, so a renamed or
+# The four that exist today. Named rather than counted, so a renamed or
 # deleted workflow says so here instead of this harness reading two files and
 # reporting that everything is fine.
-foreach ($want in 'build.yml', 'nightly.yml', 'release.yml') {
+foreach ($want in 'build.yml', 'nightly.yml', 'release.yml', 'drop-claims.yml') {
     Yes "$want is one of them" (@($files | Where-Object { $_.Name -eq $want }).Count -eq 1)
 }
+# drop-claims.yml (#1863) runs no action on purpose: it checks out nothing and
+# makes its label calls from its own script, so there is nothing in it to pin.
+# tests\test-1863-drop-claims.ps1 holds it to that.
+$noActions = @('drop-claims.yml')
 
 $all = @()
 foreach ($f in $files) {
@@ -130,7 +134,9 @@ foreach ($f in $files) {
 # has stopped matching the file rather than the files having become clean.
 Yes ("the reader finds the actions the workflows run ({0} found)" -f $all.Count) ($all.Count -ge 4)
 foreach ($f in $files) {
-    Yes ("{0} has at least one action in it" -f $f.Name) (@($all | Where-Object { $_.File -eq $f.Name }).Count -ge 1)
+    $n = @($all | Where-Object { $_.File -eq $f.Name }).Count
+    if ($noActions -contains $f.Name) { Yes ("{0} runs no action, as it is meant to" -f $f.Name) ($n -eq 0); continue }
+    Yes ("{0} has at least one action in it" -f $f.Name) ($n -ge 1)
 }
 
 $faults = @(Get-PinFaults $all)

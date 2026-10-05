@@ -744,7 +744,9 @@ Every rule in this file binds them the same as a person. They share notes
 through an Obsidian vault at `C:\Thornswood Vault\Thornswood` on that machine
 (`wiki/status.md` is what is true now); the vault is for coordinating, and
 the board is still the one record of work. They mark what they are on with a
-`claimed: <lane>` label and the board card moved to In Progress. Their
+`claimed: <lane>` label and the board card moved to In Progress. When the
+issue closes, `.github\workflows\drop-claims.yml` takes every `claimed:`
+label off it (#1863), so a lane's finish step need not. Their
 branches carry the lane's name (`launcher/`, `website/`, `github/` and so on).
 On the shipping machine `C:\Users\evilp\Downloads\Thornswood-Repo` is shared
 by all of them and sits detached at `origin/main`, because lanes build from
@@ -827,10 +829,14 @@ it in the meantime. A cause in the engine is fixed in the fork
 
 The band-aids already in the tree are defects, and each one goes on the
 board. Taking one out means finding the cause it covered and fixing that in
-the same pull request. Known on 4 Oct: the Riekling and Goblin clothes remount
-in `game\plugins\thornswood-front.js` (#614), and in `game\gamemode.js` the
-`dressIfBare` watch (#1604), the `wearWhatIsWorn` ask at login and the wear
-script's retries.
+the same pull request. The dress asks came out with their cause, an
+equipment record the server could not write (#1560): in `game\gamemode.js`
+the wear script's retries, the `wearWhatIsWorn` ask at login and the
+`dressIfBare` watch (#1604), and in `game\plugins\thornswood-front.js` the
+front putting the shift on by itself. The Riekling and Goblin clothes remount
+(#614) came out on 4 Oct (#1681) before its cause was found, decided by
+Patrick because it was taking clothes off at every door; the front plugin's
+race read is measuring that cause, and #614 stays open until it is fixed.
 
 A retry is allowed only where failing is outside our control and expected:
 a request over the network, a file another program has open. The reason is

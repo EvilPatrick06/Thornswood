@@ -147,9 +147,8 @@ house, fort, or station anywhere in the province.
 The embassy may hold no more than twenty persons in service, of whom no more
 than six may bear arms, and those six within its walls only.
 
-No Legion soldier may go armed anywhere in Skyrim outside the embassy walls.
-The six inside them are the whole of the exception, and they do not carry
-past the gate.
+No Legion soldier may set foot in Skyrim under arms. The embassy guard are not
+Legion and are not to be called so.
 
 ## Article the Fourth: On Law
 
@@ -234,11 +233,13 @@ Fourth Era.*
 - **You can play an Imperial.** Citizens, merchants, embassy staff, the
   Ambassador's people. You are legal, you are watched, and you are one bad
   night away from being told to leave.
-- **You can play a Legion soldier, at the embassy.** Article the Third allows
-  six under arms inside those walls and nowhere else in the province. Walk
-  out the gate carrying and you have broken the Accord, and the Ambassador will
-  hand you over rather than answer for you. A veteran who served forty years ago
-  and settled here is a different thing again, and a good one.
+- **You can play a Legion veteran.** Somebody who served forty years ago and
+  settled here is a good character to play. You cannot play a serving Legion
+  soldier: Article the Third keeps every one of them out of Skyrim under
+  arms. The six who bear arms at the embassy are its own guard, not Legion,
+  armed inside those walls and nowhere else. Walk out the gate carrying and
+  you have broken the Accord, and the Ambassador will hand you over rather
+  than answer for you.
 - **You can play a Thalmor.** You are a criminal. There is no embassy to run
   to, no immunity, no orders from home. Article the Fifth means the Empire will
   hand you over as fast as a Nord will. Play it as what it is: a hunted thing

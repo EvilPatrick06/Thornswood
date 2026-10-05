@@ -1,7 +1,7 @@
 // test-voice-range.js
 //
 // Whisper, local and yell actually carry different distances, and the handoff
-// to the launcher lets go of the socket.
+// to the launcher answers nothing on the socket.
 //
 // TWO ENTRIES ON THE TO DO LIST, and they are in the same file for the same
 // underlying reason: something was being set that nothing read.
@@ -105,11 +105,6 @@ function lift(src, head) {
 
 // -------------------------------------------------------- the relay handoff
 {
-  yes('the shared socket can be let go of now', /off: function \(fn\)/.test(chat));
-  yes('and it really removes the listener',
-      /listeners\.splice\(i, 1\)/.test(chat));
-  yes('the voice page keeps its listener so it can take it off',
-      /var onNet = null;/.test(overlay) && /n\.board\(onNet\)/.test(overlay));
   /*
     THE CODE, NOT THE COMMENT. The first version of this searched the whole
     file for n.leave() and found it inside the paragraph explaining why it was
@@ -119,28 +114,17 @@ function lift(src, head) {
   */
   const code = overlay.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   yes('the call to a method that never existed is gone', !/n\.leave\(\)/.test(code));
-  yes('and handing over actually takes it off the bus',
-      /n\.off\(onNet\)/.test(overlay));
-  yes('with a second guard, so a message that slips through is ignored',
-      /inRelay\(\) && \(m\.t === 'sdp'/.test(overlay));
-
   /*
-    The listener removal, run rather than read. A splice loop that walks
-    forwards and removes as it goes skips the next entry, which is the classic
-    way this is written wrong.
+    Handing over keeps the page on the socket (#1959). Taking it off, as
+    this checked for until then, also cut off the positions the speaking
+    marks and the party strip are drawn from. The signalling is kept out by
+    the guard instead; tests\test-1959-relay-keeps-reading.js runs both
+    orders through the real service.
   */
-  const off = lift(chat, 'off: function (fn)');
-  if (off) {
-    const listeners = [];
-    const a = function () { }, b = function () { }, c = function () { };
-    const api = new Function('listeners', 'return { ' + off + ' };')(listeners);
-    listeners.push(a, b, b, c);
-    api.off(b);
-    yes('removing a listener registered twice removes both',
-        listeners.length === 2 && listeners[0] === a && listeners[1] === c);
-    api.off(function () { });
-    yes('and removing one that was never on changes nothing', listeners.length === 2);
-  }
+  yes('handing over leaves the page on the socket', !/\.off\(/.test(code) && /n\.board\(onNet\)/.test(code));
+  yes('and the chat has no way off it to call', !/off: function/.test(chat));
+  yes('a guard keeps the signalling out in relay mode',
+      /inRelay\(\) && \(m\.t === 'sdp' \|\| m\.t === 'ice' \|\| m\.t === 'peers'\)/.test(code));
 }
 
 console.log('');
