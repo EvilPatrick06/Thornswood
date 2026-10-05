@@ -1,10 +1,10 @@
 # When a scanner calls the setup program malware
 
 What to do when VirusTotal, Defender, SmartScreen or somebody's antivirus
-flags `Thornswood-Setup-<date>.exe`. Nothing here is a fix for a real
-detection: if a build is ever genuinely dirty, it comes off the site first and
-is worked out afterwards. This page is for the ones that are wrong, which is
-all of them so far.
+flags `Thornswood-Setup.exe`, the setup program on the Downloads page.
+Nothing here is a fix for a real detection: if a build is ever genuinely
+dirty, it comes off the site first and is worked out afterwards. This page
+is for the ones that are wrong, which is all of them so far.
 
 ## What was measured
 
@@ -30,6 +30,16 @@ copyright line, and Build-Launcher stamps FileVersion and ProductVersion from
 the launcher's own version (`installer\setup\Bootstrap.cs:35-39`). VirusTotal
 also tagged the file `detect-debug-environment` and
 `packers: .NET executable`.
+
+That build is from before two changes made later the same day. Issue #390
+turned signing on (Azure Artifact Signing), and the site stopped stamping the
+date into the name: it publishes one name, `Thornswood-Setup.exe`
+(`scripts\release\Publish-Installer.ps1:$exeOut`), and removes any stamped
+copy left from before
+(`scripts\release\Publish-Installer.ps1:Drop any leftover stamped tips`).
+Nothing on this page measures a signed build yet. Before reporting a file,
+check which kind it is: `Get-AuthenticodeSignature` says Valid for a signed
+build and NotSigned for one from before 27 September.
 
 ## Why an honest installer earns those verdicts
 
@@ -58,11 +68,14 @@ dropper does.
 - Its resources have high entropy. The icon and the logo are compressed
   images sitting in `.rsrc`, which reads the same to an entropy check as a
   packed payload does.
-- Its file name changes every release. `Thornswood-Setup-<date>.exe` is a new
-  hash every build, so reputation never accumulates on the file. The product
-  NAME is deliberately stable for the same reason, and must stay stable:
-  Thornswood Setup, company Thornswood, from thornswood.net. Changing those
-  strings throws away what little identity an unsigned build has.
+- Every build is a new file. Until 27 September the name changed too
+  (`Thornswood-Setup-<date>.exe`); since then it is always
+  `Thornswood-Setup.exe`. A stable file name does not help: every build is
+  still a new hash, so reputation never accumulates on the file. The
+  certificate in the first bullet is what carries across releases. The
+  product NAME is deliberately stable for the same reason, and must stay
+  stable: Thornswood Setup, company Thornswood, from thornswood.net. Changing
+  those strings throws away the identity the signed publisher is building.
 
 `ti!<hash>` deserves its own line. McAfeeD is not looking at the file, it is
 looking up a hash in a threat intelligence feed, and those feeds read
@@ -80,10 +93,15 @@ facts, so write them once and paste them into each form.
     modded Skyrim multiplayer server at https://thornswood.net
     It downloads the Thornswood payload from thornswood.net, checks it
     against the SHA-256 the site published, unpacks it and runs the
-    Setup.bat inside it. It is not code signed yet.
-    File: Thornswood-Setup-<date>.exe
+    Setup.bat inside it. It is Authenticode signed through Azure
+    Artifact Signing.
+    File: Thornswood-Setup.exe
     SHA-256: <the hash of that exact file>
     Report: https://www.virustotal.com/gui/file/<sha256>
+
+The name is the same for every build, so the SHA-256 is what says which build
+a report is about. For a build from before 27 September, say instead that it
+is not signed, and give the dated name it was published under.
 
 1. **VirusTotal, the report itself.** Get the hash the way the site gets it,
    in lower case: Publish-Installer measures the exe
@@ -155,5 +173,8 @@ What actually ends this is signing, and it is on since 27 September (issue
 certificate that does not, so the counts should fall as signed builds are
 downloaded; a new publisher still starts with little reputation. Keep
 the identity strings stable, keep the ask before anything is ended, keep the
-published SHA-256 and the report link on the Downloads page, and send the
-false positive reports. Those still help while the signed publisher builds reputation.
+published SHA-256 on the Downloads page, and send the false positive reports.
+Those still help while the signed publisher builds reputation. The Downloads
+page shows the hash and no VirusTotal link (`site\public\home.js` `sum`):
+signing is the trust path, and publish no longer sends the file (#802). The
+report address goes in the comment and the vendor messages, not on the site.
