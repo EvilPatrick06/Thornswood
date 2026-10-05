@@ -1794,6 +1794,11 @@ server.on('upgrade', (req, socket, head) => {
       console.log('[voice] refused a socket opened by a page on ' + JSON.stringify(String(req.headers.origin).slice(0, 100)) +
                   ' (' + originRefused + ' refused so far): only this service\'s own page and the game\'s may open one');
     }
+    // The HTTP server took its own error listener off this socket when it
+    // handed the upgrade over, so without one a refused page that has
+    // already gone (a reset as the answer is written) stops the whole
+    // service. The socket is being closed either way.
+    socket.on('error', () => { });
     socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
     return;
   }

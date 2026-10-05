@@ -22,6 +22,8 @@
     null or file:// and are let in, and join;
     a client that sends no Origin, which is not a browser, is let in and
     joins, as every harness does;
+    a refused page that hangs up as it is answered does not stop the
+    service;
     the refusal is in the log once, not once per socket;
     and the page this service serves opens its socket to the host it was
     loaded from.
@@ -173,6 +175,28 @@ function knock(port, headers, pid) {
     yes(what + ' (' + origin + ') is refused with 403 (' + r.status + '), not joined, and closed',
         r.status === 403 && !r.joined && r.closed);
   }
+
+  /*
+    A refused page that is already gone when the 403 is written. The HTTP
+    server takes its own error listener off a socket it hands over for an
+    upgrade, so an error there with nobody listening stopped the service:
+    in the first version of this change, 300 such handshakes ended it with
+    "Error: write ECONNRESET".
+  */
+  let exited = null;
+  srv.on('exit', (code) => { exited = code; });
+  for (let i = 0; i < 200 && exited === null; i++) {
+    const c = net.connect(PORT, '127.0.0.1', () => {
+      c.write('GET / HTTP/1.1\r\nHost: ' + HOST + '\r\nOrigin: https://evil.example\r\nUpgrade: websocket\r\n' +
+              'Connection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: ' +
+              crypto.randomBytes(16).toString('base64') + '\r\n\r\n');
+      c.resetAndDestroy();
+    });
+    c.on('error', () => { });
+    await wait(5);
+  }
+  await wait(300);
+  yes('200 refused pages that hang up at once leave the service running', exited === null);
 
   console.log('\nthis service\'s own page, the game\'s and the launcher\'s:');
   for (const [what, origin, host] of [
