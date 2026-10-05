@@ -153,6 +153,53 @@ The tanning rack, not the loom, because the loom's keyword is a mod's record
 All three MISC records are cloned from the charcoal, like the handle, so no
 new mesh has to ship.
 
+THE FOUR TREATMENTS (issue #1383)
+
+docs/systems/injury.md: a bandage stops a bleed, a splint holds a break, a
+poultice cuts the wound fever chance, and a physicker's remedy closes a cut
+and clears one ordinary disease. Patrick, 4 October, settled who makes each:
+a bandage is a Haberdasher novice recipe at the loom, a splint a Woodwright
+novice recipe at the kiln, and the poultice and the remedy Physicker recipes,
+novice and advanced. What each one asks for was not said, so these are the
+suggested recipes on #1383, every input something a class supplies, the rank
+the dearest of them:
+
+    ThornswoodMiscBandage         the Bandage, a MISC.
+    ThornswoodMiscSplint          the Splint, a MISC.
+    ThornswoodMiscPoultice        the Poultice, a MISC.
+    ThornswoodMiscRemedy          the Physicker's Remedy, a MISC.
+    ThornswoodRecipeBandage       1 tundra cotton, at the loom. Tailor,
+                                  Haberdasher. Novice: a gatherer's cotton.
+    ThornswoodRecipeSplint        1 firewood and 1 leather strips, at the kiln.
+                                  Woodworker, Woodwright. Novice: the
+                                  woodworker's firewood, the hunter's leather.
+    ThornswoodRecipePoultice      1 tundra cotton and 1 garlic, at the alchemy
+                                  lab. Alchemist, Physicker. Novice: both a
+                                  gatherer's at novice.
+    ThornswoodRecipeRemedy        1 mudcrab chitin and 1 blue mountain flower,
+                                  at the alchemy lab. Alchemist, Physicker.
+                                  Advanced: the flower is a gatherer's at
+                                  advanced, and the chitin cures disease.
+
+THE LOOM IS A MOD'S BENCH, AND THIS PLUGIN CAN STILL NAME IT. The loom's
+keyword is MCE_CraftingLoom, which MoreCraftableEquipment.esp injects into
+Update.esm's own numbering as 0x6CE000 (game/data/recipes.json reads it as
+6ce000:Update.esm, and the gamemode's TWO_HANDS and BENCH_ACCESS key it the
+same way). Update.esm is this plugin's master 01, so 0x016CE000 here is that
+keyword, with no new master. The repair kits stayed off the loom because
+they named only Skyrim.esm; Patrick asked for the bandage at the loom.
+
+THE ALCHEMY LAB IS THIS PLUGIN'S OWN. ThornswoodCraftingAlchemyWorkbench
+(FURN 0x5042E69) is a create-object bench, WBDT 01 10, placed 25 times, and
+carries ThornswoodCraftingAlchemy (KYWD 0x5042E6B), which no recipe named
+until now. Skyrim's own alchemy lab cannot show a recipe at all: it brews from
+the effects ingredients share. So the physicker's two are made at this one.
+
+The owner and the half are named in $RECIPE_OWNER in
+scripts/dev/Build-RecipeTable.ps1, because none of the four can be read off a
+MISC at these benches. All four MISC records are cloned from the charcoal,
+like the kits, so no new mesh has to ship.
+
 THIS IS A SHIPPED FILE, so its size changing means a release and every client
 downloading it again.
 
@@ -250,6 +297,17 @@ RECIPE_WEAPON_KIT = 0x50154B3
 RECIPE_ARMOR_KIT = 0x50154B4
 RECIPE_SEWING_KIT = 0x50154B5
 
+# The four treatments and the recipes that make them (#1383). After a gap from
+# the kits, for the same reason the kits left one after the catches.
+BANDAGE = 0x50154C0
+SPLINT = 0x50154C1
+POULTICE = 0x50154C2
+REMEDY = 0x50154C3
+RECIPE_BANDAGE = 0x50154C4
+RECIPE_SPLINT = 0x50154C5
+RECIPE_POULTICE = 0x50154C6
+RECIPE_REMEDY = 0x50154C7
+
 LEATHER_STRIPS = 0x000800E4
 TUNDRA_COTTON = 0x0003F7F8
 STEEL_INGOT = 0x0005ACE5
@@ -262,6 +320,13 @@ CYRODILIC_SPADETAIL = 0x000106E19
 ABECEAN_LONGFIN = 0x000106E1B
 LEATHER = 0x000DB5D2         # Leather01, what the tanning rack makes from a hide
 TANNING_KEYWORD = 0x007866A  # CraftingTanningRack
+GARLIC = 0x00034D22          # a gatherer's at novice (game/data/harvests.json)
+MUDCRAB_CHITIN = 0x0006BC00  # a hunter's off a mudcrab, novice (HUNTS_BY_BASE)
+BLUE_MOUNTAIN_FLOWER = 0x00077E1C  # a gatherer's at advanced (game/data/harvests.json)
+# MCE_CraftingLoom: MoreCraftableEquipment.esp's keyword, injected as Update.esm's
+# 0x6CE000. Update.esm is this plugin's master 01. See THE LOOM at the top.
+LOOM_KEYWORD = 0x016CE000
+ALCHEMY_KEYWORD = 0x5042E6B  # ThornswoodCraftingAlchemy, this plugin's own lab
 
 DEED_WORDS = (
     '<p align="center"><font size="30">Deed</font></p>'
@@ -293,6 +358,13 @@ METAL_KIT_VALUE = 15
 METAL_KIT_WEIGHT = 1.0
 SEWING_KIT_VALUE = 10
 SEWING_KIT_WEIGHT = 0.5
+
+# What each treatment is worth and weighs (#1383). The rulebook sets neither;
+# an item has no gold price here, and a bandage is light.
+BANDAGE_VALUE, BANDAGE_WEIGHT = 2, 0.1
+SPLINT_VALUE, SPLINT_WEIGHT = 5, 1.0
+POULTICE_VALUE, POULTICE_WEIGHT = 5, 0.2
+REMEDY_VALUE, REMEDY_WEIGHT = 15, 0.2
 
 
 def cnto(base, count):
@@ -584,7 +656,15 @@ def main():
                       ('ThornswoodMiscSewingKit', SEWING_KIT),
                       ('ThornswoodRecipeWeaponKit', RECIPE_WEAPON_KIT),
                       ('ThornswoodRecipeArmorKit', RECIPE_ARMOR_KIT),
-                      ('ThornswoodRecipeSewingKit', RECIPE_SEWING_KIT)):
+                      ('ThornswoodRecipeSewingKit', RECIPE_SEWING_KIT),
+                      ('ThornswoodMiscBandage', BANDAGE),
+                      ('ThornswoodMiscSplint', SPLINT),
+                      ('ThornswoodMiscPoultice', POULTICE),
+                      ('ThornswoodMiscRemedy', REMEDY),
+                      ('ThornswoodRecipeBandage', RECIPE_BANDAGE),
+                      ('ThornswoodRecipeSplint', RECIPE_SPLINT),
+                      ('ThornswoodRecipePoultice', RECIPE_POULTICE),
+                      ('ThornswoodRecipeRemedy', RECIPE_REMEDY)):
         here_already = name in by_edid
         if here_already and by_edid[name].fid != fid:
             print('')
@@ -803,6 +883,34 @@ def main():
     })
     set_inputs(make_sewing_kit, [(TUNDRA_COTTON, 1), (LEATHER_STRIPS, 1)])
 
+    # The four treatments (#1383), and what makes each. See the top.
+    def treatment(fid, edid, name, value, weight):
+        return clone(misc_src, fid, edid, sets={
+            b'FULL': zstr(name),
+            b'DATA': struct.pack('<If', value, weight),
+        })
+
+    def recipe(fid, edid, out, bench, inputs):
+        r = clone(cobj_charcoal, fid, edid, sets={
+            b'CNAM': struct.pack('<I', out),
+            b'BNAM': struct.pack('<I', bench),
+        })
+        set_inputs(r, inputs)
+        return r
+
+    bandage = treatment(BANDAGE, 'ThornswoodMiscBandage', 'Bandage', BANDAGE_VALUE, BANDAGE_WEIGHT)
+    splint = treatment(SPLINT, 'ThornswoodMiscSplint', 'Splint', SPLINT_VALUE, SPLINT_WEIGHT)
+    poultice = treatment(POULTICE, 'ThornswoodMiscPoultice', 'Poultice', POULTICE_VALUE, POULTICE_WEIGHT)
+    remedy = treatment(REMEDY, 'ThornswoodMiscRemedy', "Physicker's Remedy", REMEDY_VALUE, REMEDY_WEIGHT)
+    make_bandage = recipe(RECIPE_BANDAGE, 'ThornswoodRecipeBandage', BANDAGE, LOOM_KEYWORD,
+                          [(TUNDRA_COTTON, 1)])
+    make_splint = recipe(RECIPE_SPLINT, 'ThornswoodRecipeSplint', SPLINT, KILN_KEYWORD,
+                         [(FIREWOOD, 1), (LEATHER_STRIPS, 1)])
+    make_poultice = recipe(RECIPE_POULTICE, 'ThornswoodRecipePoultice', POULTICE, ALCHEMY_KEYWORD,
+                           [(TUNDRA_COTTON, 1), (GARLIC, 1)])
+    make_remedy = recipe(RECIPE_REMEDY, 'ThornswoodRecipeRemedy', REMEDY, ALCHEMY_KEYWORD,
+                         [(MUDCRAB_CHITIN, 1), (BLUE_MOUNTAIN_FLOWER, 1)])
+
     print('')
     print('What goes in')
     print('  MISC 0x%07X ThornswoodMiscToolHandle      Tool Handle, %d gold, %s weight'
@@ -841,6 +949,22 @@ def main():
           % RECIPE_ARMOR_KIT)
     print('  COBJ 0x%07X ThornswoodRecipeSewingKit     1 tundra cotton + 1 leather strips -> 1 Sewing Kit, '
           'at a tanning rack' % RECIPE_SEWING_KIT)
+    print('  MISC 0x%07X ThornswoodMiscBandage         Bandage, %d gold, %s weight'
+          % (BANDAGE, BANDAGE_VALUE, BANDAGE_WEIGHT))
+    print('  MISC 0x%07X ThornswoodMiscSplint          Splint, %d gold, %s weight'
+          % (SPLINT, SPLINT_VALUE, SPLINT_WEIGHT))
+    print('  MISC 0x%07X ThornswoodMiscPoultice        Poultice, %d gold, %s weight'
+          % (POULTICE, POULTICE_VALUE, POULTICE_WEIGHT))
+    print("  MISC 0x%07X ThornswoodMiscRemedy          Physicker's Remedy, %d gold, %s weight"
+          % (REMEDY, REMEDY_VALUE, REMEDY_WEIGHT))
+    print('  COBJ 0x%07X ThornswoodRecipeBandage       1 tundra cotton -> 1 Bandage, at the loom'
+          % RECIPE_BANDAGE)
+    print('  COBJ 0x%07X ThornswoodRecipeSplint        1 firewood + 1 leather strips -> 1 Splint, at the kiln'
+          % RECIPE_SPLINT)
+    print('  COBJ 0x%07X ThornswoodRecipePoultice      1 tundra cotton + 1 garlic -> 1 Poultice, at the alchemy lab'
+          % RECIPE_POULTICE)
+    print("  COBJ 0x%07X ThornswoodRecipeRemedy        1 mudcrab chitin + 1 blue mountain flower -> 1 Physicker's "
+          'Remedy, at the alchemy lab' % RECIPE_REMEDY)
     print('')
     print('What changes')
     print('  COBJ 0x%07X ThornswoodRecipeWeaponPickaxe now wants a handle as well as the ingot'
@@ -874,7 +998,9 @@ def main():
                          catch_histcarp, catch_betty, catch_scales, catch_perch,
                          catch_spadetail, catch_longfin,
                          weapon_kit, armor_kit, sewing_kit,
-                         make_weapon_kit, make_armor_kit, make_sewing_kit)
+                         make_weapon_kit, make_armor_kit, make_sewing_kit,
+                         bandage, splint, poultice, remedy,
+                         make_bandage, make_splint, make_poultice, make_remedy)
              if r.editor_id() not in already]
     # An edit that has already been made is not made twice. A recipe that already
     # asks for a handle would otherwise gain a second one on every run.

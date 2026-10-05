@@ -180,6 +180,11 @@
   Thornswood-Content.esp already defines a keyword called ThornswoodCraftingAlchemy
   and nothing in the build points a recipe at it.
 
+  Since #1383 (4 October) two of its recipes do: the Physicker's poultice and
+  remedy, made at that plugin's own lab, a create-object bench, and named in
+  RECIPE_OWNER. They are the Physicker's only rows. The Blightbrewer still has
+  none.
+
   There are no enchanting recipes either, with one exception. The only
   enchanting keyword any COBJ uses is 17738:Dragonborn.esm, DLC2StaffEnchanter,
   and its 160 recipes all output a staff. Enchanting a sword or a cuirass is
@@ -504,8 +509,7 @@ $PROFESSION_CRAFTS = [ordered]@{
 $HALVES_WITH_NO_RECIPES = [ordered]@{
     'Warrior/Bulwark'      = @{ Crafts = $false; Why = 'warriors do not craft. Bulwark and Berserker are halves of how somebody fights, and classes.md gives them combat maneuvers rather than recipes. There is nothing in the records to find.' }
     'Warrior/Berserker'    = @{ Crafts = $false; Why = 'the same. Warrior is the one profession whose halves are not about making anything.' }
-    'Alchemist/Blightbrewer' = @{ Crafts = $true; Why = 'Skyrim has no alchemy recipes. Not one COBJ record in the whole load order names an alchemy bench keyword: potions are worked out from the effects that the ingredients share, in the alchemy menu, and no record is involved. The poison bit that would split this half from the Physicker is proved and ready in the code above, so the moment a mod adds an alchemy bench recipe it lands here by itself.' }
-    'Alchemist/Physicker'  = @{ Crafts = $true; Why = 'the same. There is nothing for this table to gate until alchemy is answered somewhere other than a recipe record.' }
+    'Alchemist/Blightbrewer' = @{ Crafts = $true; Why = 'Skyrim has no alchemy recipes. Not one COBJ record in the whole load order names an alchemy bench keyword: potions are worked out from the effects that the ingredients share, in the alchemy menu, and no record is involved. The poison bit that would split this half from the Physicker is proved and ready in the code above, so the moment a mod adds an alchemy bench recipe it lands here by itself. The Physicker''s poultice and remedy (#1383) are named recipes in RECIPE_OWNER, not brews, so they are not this half''s.' }
     'Enchanter/Wardweaver' = @{ Crafts = $true; Why = 'the only enchanting recipes in the build are the staff recipes on the Dragonborn staff enchanter, and a staff is a weapon, so they all land on the Bladebinder. Enchanting a cuirass or a robe is the enchanting menu and not a record, so the Wardweaver has nothing to own here.' }
 }
 
@@ -1859,6 +1863,10 @@ $RECIPE_OWNER = [ordered]@{
     'ThornswoodRecipeWeaponKit'  = @{ Owner = 'Smith'; Half = 'Edgewright'; Why = 'the Weapon Kit is the Edgewright''s repair kit (docs/systems/durability.md), and the output is a MISC, so the forge rule, which settles ownership by the output being a WEAP, cannot see it. Patrick, 4 October: use a suggested recipe; this is the one picked (#1384).' }
     'ThornswoodRecipeArmorKit'   = @{ Owner = 'Smith'; Half = 'Platewright'; Why = 'the Armor Kit is the Platewright''s repair kit (docs/systems/durability.md). A MISC at a forge, so the forge rule cannot see it, and it would not land on the Platewright if it could. Patrick, 4 October: use a suggested recipe; this is the one picked (#1384).' }
     'ThornswoodRecipeSewingKit'  = @{ Owner = 'Tailor'; Half = 'Haberdasher'; Why = 'the Sewing Kit is the Haberdasher''s repair kit (docs/systems/durability.md). A MISC at the tanning rack, which is open furniture whose own rule hands a hide into leather to the Platewright, so nothing derived would give it to a tailor. Patrick, 4 October: use a suggested recipe; this is the one picked (#1384).' }
+    'ThornswoodRecipeBandage'    = @{ Owner = 'Tailor'; Half = 'Haberdasher'; Why = 'the bandage is a tailor''s work (docs/systems/injury.md, who treats what). Patrick, 4 October, on #1383: a Haberdasher novice recipe at the loom. A MISC, named here so its half is that answer and not a reading of the output.' }
+    'ThornswoodRecipeSplint'     = @{ Owner = 'Woodworker'; Half = 'Woodwright'; Why = 'the splint holds a break (docs/systems/injury.md). Patrick, 4 October, on #1383: a Woodwright novice recipe at the kiln. The kiln''s own rule gives its work to the Charburner, so it is named here.' }
+    'ThornswoodRecipePoultice'   = @{ Owner = 'Alchemist'; Half = 'Physicker'; Why = 'the poultice cuts the wound fever chance (docs/systems/injury.md). Patrick, 4 October, on #1383: a Physicker recipe at novice. A MISC at the alchemy lab Thornswood-Content.esp ships, a create-object bench, which nothing else names.' }
+    'ThornswoodRecipeRemedy'     = @{ Owner = 'Alchemist'; Half = 'Physicker'; Why = 'the physicker''s remedy closes a cut and clears one ordinary disease (docs/systems/injury.md, disease.md, physicker.md). Patrick, 4 October, on #1383: a Physicker recipe at advanced, which its blue mountain flower makes it. A MISC at the same alchemy lab.' }
     # The fish trap (#1379). docs/systems/classes/fisher.md: "A woodwright makes
     # them", the poles and the trap. The poles reach the Woodwright by the spear
     # rule further down; the trap is a MISC with no pole in its name, so the
