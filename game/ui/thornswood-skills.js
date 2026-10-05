@@ -1624,6 +1624,12 @@
     drawn from whether the list arrived. There is nothing here that can put an
     empty page in front of anybody.
 
+    WHAT YOU HOLD IS HERE AND NOT BEHIND A TYPED /deed (#1637): each building
+    with what rent is owed on it, and your farm, which is ground with no
+    building on it and lapses on the same 14 days. Claiming, locking and
+    unlocking are the lock key at the door, so the page says where that is
+    rather than naming a word to type.
+
     ONE THING IS SENT, AND IT IS A STOP (#1603). Under each place you hold are
     the people you let sleep there tonight, and a Stop beside each name ends
     that night: /sleephere stop <profile> <building>, through the same chat
@@ -1640,7 +1646,8 @@
     var pRows = propertyRows();
     if (!pRows.length) {
       elBody.appendChild(el('p', 'lead',
-        'You hold nothing and carry no keys. Open a door and say /claim: it costs nothing.'));
+        'You hold nothing and carry no keys. Open the door of a building nobody holds and ' +
+        'press the key the line under the crosshair names: claiming costs nothing.'));
       return;
     }
     var pHeld = 0;
@@ -1661,12 +1668,21 @@
     pRows.forEach(function (r) {
       var card = el('div', 'card' + (r.mine ? ' mine' : ' off'));
       var name = el('div', 'name', String(r.name || 'somewhere'));
-      name.appendChild(el('span', 'tag', r.mine ? 'yours' : 'key only'));
+      name.appendChild(el('span', 'tag', r.farm ? 'farm' : (r.mine ? 'yours' : 'key only')));
       card.appendChild(name);
+      if (r.farm) {
+        var days = Number(r.days) || 0;
+        card.appendChild(el('div', 'desc', 'The ground ' + (Number(r.reach) || 0) +
+          ' out from the plot you claimed it at. Sowing or bringing something in keeps it; ' +
+          'with nothing done on it, it goes back in ' + days + (days === 1 ? ' day.' : ' days.')));
+        wrap.appendChild(card);
+        return;
+      }
       card.appendChild(el('div', 'desc', r.mine
-        ? (r.locked ? 'Locked. Anybody without a key has to pick it.'
-                    : 'Unlocked. Say /lock at the door to turn it.') +
-          (r.keyed ? ' You are carrying a key to it as well.' : '')
+        ? (r.locked ? 'Locked. Anybody without a key has to pick it. Open its door and the ' +
+                      'key the line names unlocks it.'
+                    : 'Unlocked. Open its door and the key the line names locks it.') +
+          (r.keyed ? ' You are carrying a key to it as well.' : '') + rentLine(r.rent)
         : (r.by ? 'Held by ' + r.by + '. ' : 'Nobody holds it. ') +
           (r.locked ? 'Your key opens the door.'
                     : 'It is not locked, so your key is not needed yet.')));
@@ -1674,6 +1690,14 @@
       wrap.appendChild(card);
     });
     elBody.appendChild(wrap);
+  }
+
+  /* The rent on a place you hold, and what is owed on it now (#1637). */
+  function rentLine(rent) {
+    if (!rent) return ' No rent on it.';
+    var owed = Number(rent.owed) || 0;
+    return ' Rent is ' + (Number(rent.amount) || 0) + ' gold every ' + (Number(rent.every) || 7) +
+      ' days, ' + (owed ? owed + ' gold owed now.' : 'and nothing is owed now.');
   }
 
   /* Who may sleep in a place you hold tonight, and a Stop for each. */

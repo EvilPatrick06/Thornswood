@@ -27784,7 +27784,7 @@ mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recip
     if (!stampedAt) {
       const no = 'A key is cut from a mold, and you are carrying none that has been stamped. ' +
                  'Forge a blank key mold, take it to the door with whoever holds the place, ' +
-                 'and say /mold there.';
+                 'and press it into the lock there.';
       notify(actorId, no);
       say(actorId, no);
       return false;
@@ -34460,6 +34460,19 @@ log('gamemode loaded:',
     return 'Nothing in your pack to sow, so here is seed. ' + line;
   }
 
+  /*
+    The farm this person holds, for the property page on K (#1637), or null.
+    days is the whole days left before it lapses with nothing done on it, and
+    reach how far it runs out from the plot it was claimed at.
+  */
+  function farmOf(profileId) {
+    var key = String(profileId || '');
+    if (!key || key === '0' || !P.has(claims, key) || lapsed(key)) { return null; }
+    var lapse = tuning().claimLapseDays;
+    var left = lapse > 0 ? lapse * 86400000 - (Date.now() - claims[key].at) : 0;
+    return { days: Math.max(0, Math.ceil(left / 86400000)), reach: tuning().claimRadius };
+  }
+
   function command(word, parts, actorId, profileId, toProfile) {
     if (word === '/plant') { plant(actorId, profileId, toProfile); return; }
     if (word === '/claim') { claim(actorId, profileId, toProfile); return; }
@@ -34469,7 +34482,8 @@ log('gamemode loaded:',
   g.__thornswoodFarming = {
     PROPERTY: PLOT_PROPERTY,
     activate: activate, command: command, giveSeeds: giveSeeds,
-    readPlot: readPlot, claimCovering: claimCovering, groundOf: groundOf
+    readPlot: readPlot, claimCovering: claimCovering, groundOf: groundOf,
+    farmOf: farmOf
   };
   flog('ready,', Object.keys(CROPS).length, 'crops and', Object.keys(claims).length, 'claims');
 })();
@@ -34538,6 +34552,18 @@ log('gamemode loaded:',
      business knowing which doors you have been trying. */
   var DOOR_PROPERTY = 'thornswoodDoor';
 
+  /*
+    THE LINE AT THE DOOR (#1637). Patrick, 4 October: no chat commands for
+    anything people do. So the door you just opened says what the lock key
+    will do there, and the key does it: Claim when nobody holds the building,
+    Lock or Unlock when it is yours. The client cannot know any of that, since
+    a door is one of 4,891 and the register is here, so this is written to the
+    person on every door they open and again after every press, and their
+    client draws the line while one of that building's doors is under the
+    crosshair. Visible to its owner only, for the reason the lock list is.
+  */
+  var DOOR_LINE_PROPERTY = 'thornswoodDoorLine';
+
   function ready() {
     try {
       mp.makeProperty(DOOR_PROPERTY, {
@@ -34589,6 +34615,12 @@ log('gamemode loaded:',
       mp.makeProperty(LOCK_PROPERTY, {
         isVisibleByOwner: true, isVisibleByNeighbors: false,
         updateOwner: lockScript(), updateNeighbor: ''
+      });
+    } catch (e) { }
+    try {
+      mp.makeProperty(DOOR_LINE_PROPERTY, {
+        isVisibleByOwner: true, isVisibleByNeighbors: false,
+        updateOwner: doorLineScript(), updateNeighbor: ''
       });
     } catch (e) { }
   }
@@ -34873,8 +34905,19 @@ log('gamemode loaded:',
     and it does two things: it is what /claim reads back, and it is what keeps a
     claim alive, because opening your own front door is what 'entering the house'
     means. The second one is why this writes the register at all.
+
+    And then the line at the door (#1637), after the deed below may have moved
+    the place, so the lock key offers what is true once the door is open.
   */
   function touched(actorId, doorDesc) {
+    openedDoor(actorId, doorDesc);
+    if (!buildingOf(doorDesc)) { return; }
+    var mine = 0;
+    try { mine = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { mine = 0; }
+    doorLine(actorId, mine);
+  }
+
+  function openedDoor(actorId, doorDesc) {
     var building = buildingOf(doorDesc);
     if (!building) { return; }
     /*
@@ -35007,6 +35050,85 @@ log('gamemode loaded:',
     return buildingOf(String(v.door));
   }
 
+  /*
+    WHAT THE LOCK KEY DOES AT THE DOOR THEY LAST OPENED, written to them
+    (#1637). The key is X unless it was rebound (LockKey), and it does what
+    the line under the crosshair says and nothing else:
+
+      x     'claim' when nobody holds the building; 'lock' or 'unlock' when
+            they hold it or carry its deed, which is who setLock lets turn
+            it; '' for anybody else, which draws no line
+      n     the building's name, for the line
+      d     every door of the building as the form id the crosshair hands
+            back, in hex, so the line is up at either half of a front door
+      left  what is left of DOOR_MEMORY_MS, so the line goes when here()
+            would stop taking that door as the one just opened
+
+    The rules stay in claim() and setLock(), which the key's lines reach:
+    this only says which of them the key will ask for. Written on every door
+    of a building they open and after every press of the key, so the word on
+    the line is the answer to the last thing that happened.
+
+    A stamp rather than the clock alone, so two writes in one millisecond
+    are still two changes to the script on the other end.
+  */
+  var doorLineStamp = 0;
+
+  function doorLine(actorId, profileId) {
+    var v = null;
+    try { v = mp.get(actorId, DOOR_PROPERTY); } catch (e) { v = null; }
+    var since = (v && typeof v === 'object') ? Date.now() - (Number(v.at) || 0) : DOOR_MEMORY_MS;
+    var building = (since < DOOR_MEMORY_MS && v.door) ? buildingOf(String(v.door)) : null;
+    doorLineStamp = Math.max(doorLineStamp + 1, Date.now());
+    var line = { at: doorLineStamp, x: '', n: '', d: [], left: 0 };
+    if (building) {
+      var held = holderOf(building);
+      // The embassy is held by its office, not by a claim, so its doors offer
+      // nothing to claim (#1390); claim() refuses the line if it comes anyway.
+      var accordLine = globalThis.__thornswoodEmbassy;
+      if (!held) {
+        if (!(accordLine && accordLine.holds(building))) { line.x = 'claim'; }
+      } else if ((profileId && held.by === profileId) || holdsDeed(actorId, building)) {
+        line.x = held.locked ? 'unlock' : 'lock';
+      }
+      if (line.x) {
+        line.n = nameOf(building);
+        line.left = DOOR_MEMORY_MS - since;
+        var doors = doorsOf(building);
+        for (var i = 0; i < doors.length; i++) {
+          var id = idOf(doors[i]);
+          if (id) { line.d.push((id >>> 0).toString(16)); }
+        }
+      }
+    }
+    try {
+      mp.set(actorId, DOOR_LINE_PROPERTY, line);
+    } catch (e) {
+      plog('could not write the door line for', actorId.toString(16) + ':', e);
+    }
+  }
+
+  /*
+    The client half: the line, put where the front plugin reads it
+    (lockKeyNow there). Its own clock starts when a new stamp
+    arrives, because the server's clock and the client's are two clocks.
+  */
+  function doorLineScript() {
+    return [
+      '(function(){',
+      '  try {',
+      '    var v = ctx.value;',
+      '    if (!v || typeof v !== "object") { return; }',
+      '    var was = globalThis.thornswoodDoorLine;',
+      '    if (was && was.stamp === v.at) { return; }',
+      '    globalThis.thornswoodDoorLine = { stamp: v.at, seen: Date.now(),',
+      '      left: Number(v.left) || 0, x: String(v.x || ""), n: String(v.n || ""),',
+      '      d: Array.isArray(v.d) ? v.d.map(String) : [] };',
+      '  } catch (e) { }',
+      '})();'
+    ].join('\n');
+  }
+
   // ------------------------------------------------------------ the claim --
 
   /*
@@ -35040,8 +35162,8 @@ log('gamemode loaded:',
   function claim(actorId, profileId, toProfile) {
     var building = here(actorId);
     if (!building) {
-      toProfile(profileId, 'Stand at a door and open it, then say /claim. That is how ' +
-                           'the server knows which building you mean.');
+      toProfile(profileId, 'Open the door of the building you mean first. That is how ' +
+                           'the server knows which one it is.');
       return true;
     }
     // embassy.md: "/claim on them answers that the embassy is held" (#1390).
@@ -35104,7 +35226,8 @@ log('gamemode loaded:',
       if (holderOf(b) && claims[b].by === profileId) { mine.push(nameOf(b)); }
     }
     if (!mine.length) {
-      toProfile(profileId, 'You hold nothing. Open a door and say /claim: it costs nothing.');
+      toProfile(profileId, 'You hold nothing. Open the door of a building nobody holds and ' +
+                           'press the key the line under the crosshair names: it costs nothing.');
       return true;
     }
     mine.sort();
@@ -35409,13 +35532,13 @@ log('gamemode loaded:',
   function setLock(actorId, profileId, toProfile, on) {
     var building = here(actorId);
     if (!building) {
-      toProfile(profileId, 'Stand at the door and open it, then say that again.');
+      toProfile(profileId, 'Open the door of the building you mean first.');
       return true;
     }
     var held = holderOf(building);
     if (!held) {
       toProfile(profileId, 'Nobody holds ' + nameOf(building) + ', so there is nothing to ' +
-                           (on ? 'lock' : 'unlock') + '. Say /claim: it costs nothing.');
+                           (on ? 'lock' : 'unlock') + '. It can be claimed at its door for nothing.');
       return true;
     }
     if (held.by !== profileId && !holdsDeed(actorId, building)) {
@@ -35473,7 +35596,7 @@ log('gamemode loaded:',
   function mold(actorId, profileId, toProfile) {
     var building = here(actorId);
     if (!building) {
-      toProfile(profileId, 'Stand at the door you mean and open it, then say /mold.');
+      toProfile(profileId, 'Open the door you mean first.');
       return true;
     }
     if (!isSmith(actorId)) {
@@ -35644,8 +35767,8 @@ log('gamemode loaded:',
       return true;
     }
     if (!blankMoldsExist()) {
-      toProfile(profileId, 'There are no blank key molds on this server yet. Until there are, ' +
-                           'a smith makes the mold at the door with /mold.');
+      toProfile(profileId, 'There are no blank key molds on this server yet, so there is ' +
+                           'nothing to press into the lock.');
       return true;
     }
     if (!carriesBlankMold(actorId)) {
@@ -35711,13 +35834,14 @@ log('gamemode loaded:',
     return mine;
   }
 
-  function cutKey(actorId, profileId, toProfile) {
+  function cutKey(actorId, profileId, toProfile, parts) {
     if (!isSmith(actorId)) {
-      toProfile(profileId, 'Cutting a key is a smith\'s work.');
+      toProfile(profileId, 'Cutting a key is a smith\'s work. Hand the mold to a smith.');
       return true;
     }
-    if (!atForge(actorId)) {
-      toProfile(profileId, 'Stand at a forge and press it, then say /key.');
+    if (!forgeHere(parts, actorId)) {
+      toProfile(profileId, 'Stand at a forge and look at it, then press the key the line ' +
+                           'under the crosshair names.');
       return true;
     }
     var building = moldInHand(actorId);
@@ -35761,19 +35885,31 @@ log('gamemode loaded:',
       } else if (mine.length > 1) {
         var names = [];
         for (var i = 0; i < mine.length; i++) { names.push(nameOf(mine[i])); }
-        toProfile(profileId, 'You hold ' + names.join(', ') + '. Stand at the door of the one ' +
-                             'you mean and open it, then come back and say /key, or bring the ' +
-                             'mold for it.');
+        toProfile(profileId, 'You hold ' + names.join(', ') + '. A key comes off the mold of ' +
+                             'the one you mean, so press a blank key mold into its door first.');
         return true;
       }
     }
     if (!building) {
-      toProfile(profileId, 'You hold nothing with a door, and you are carrying no key mold. ' +
-                           'Claim a place with /claim, or have the holder of one stand at their ' +
-                           'door while you say /mold.');
+      toProfile(profileId, 'A key comes off a key mold that has been pressed into a door, and ' +
+                           'you are carrying none. Press a blank one into the lock you mean, ' +
+                           'with whoever holds the place standing there.');
+      return true;
+    }
+    /*
+      ONE IRON INGOT, THE KEY'S PRICE AT THE FORGE (#1637). The Key in the
+      forge's own list costs one (docs/systems/lists/smith-edgewright.md), and
+      the lock key at a forge is the same cut, so it costs the same. A key out
+      of nothing beside a row that charges an ingot would make that row one
+      nobody uses. Asked on #1637. Taken before the key is handed over and put
+      back if it cannot be, so nobody pays for a key they did not get.
+    */
+    if (!takeItem(actorId, KEY_INGOT, 1)) {
+      toProfile(profileId, 'A key is cut from one iron ingot, and you are carrying none.');
       return true;
     }
     if (!giveNamed(actorId, KEY, keyLabel(building))) {
+      addItem(actorId, KEY_INGOT, 1);
       toProfile(profileId, 'The key could not be handed over. Say so in the dev channel.');
       return true;
     }
@@ -35897,6 +36033,29 @@ log('gamemode loaded:',
     } catch (e) {
       return true;
     }
+  }
+
+  /*
+    THE FORGE UNDER THE CROSSHAIR (#1637). At a forge, with a key mold that
+    has been pressed into a door in the pack, the lock key sends /key and the
+    forge's form id in hex, the way the mold key sends a door's. The id is a
+    hint and this is the gate: a forge the bench table knows, and the person
+    standing at it by the server's own reckoning, MOLD_REACH, for the reasons
+    given over it. With no id, the forge they last pressed, as before.
+  */
+  var KEY_INGOT = '5ace4:Skyrim.esm';   // Iron Ingot, the Key's input at a forge
+
+  function forgeHere(parts, actorId) {
+    var raw = String((parts && parts[1]) || '');
+    if (!raw) { return atForge(actorId); }
+    if (!/^[0-9a-f]{1,8}$/i.test(raw)) { return false; }
+    var refrId = parseInt(raw, 16);
+    var base = '';
+    try { base = String(mp.get(refrId, 'baseDesc') || ''); } catch (e) { return false; }
+    if (!Object.prototype.hasOwnProperty.call(BENCH_BY_BASE, base) ||
+        BENCH_BY_BASE[base] !== FORGE) { return false; }
+    var far = distanceTo(actorId, refrId);
+    return far >= 0 && far <= MOLD_REACH;
   }
 
   /** Are they standing at a forge. The bench tables already know which is one. */
@@ -38521,17 +38680,29 @@ log('gamemode loaded:',
     if (word === '/deed' || word === '/deeds') {
       return deeds(actorId, profileId, toProfile);
     }
-    if (word === '/lock') { return setLock(actorId, profileId, toProfile, true); }
-    if (word === '/unlock') { return setLock(actorId, profileId, toProfile, false); }
+    /*
+      /claim, /lock and /unlock are what the lock key sends at a door (#1637),
+      with the door's id after them, and nobody is told to type them. Each
+      answer draws the line at the door again, so the key's next word is the
+      one that is true now, whatever this one did.
+    */
+    if (word === '/lock' || word === '/unlock') {
+      setLock(actorId, profileId, toProfile, word === '/lock');
+      doorLine(actorId, profileId);
+      return true;
+    }
     if (word === '/mold') { return mold(actorId, profileId, toProfile); }
     if (word === '/moldhere') { return moldHere(parts, actorId, profileId, toProfile); }
-    if (word === '/key') { return cutKey(actorId, profileId, toProfile); }
+    // The lock key at a forge, with the forge's id (#1637). See forgeHere.
+    if (word === '/key') { return cutKey(actorId, profileId, toProfile, parts); }
     if (word === '/claim') {
       // Only when they are actually at a door. Otherwise this is farming's word
       // and farming answers it, which is what keeps /claim meaning one thing in
       // a field and another on a doorstep without either of them guessing.
       if (!here(actorId)) { return false; }
-      return claim(actorId, profileId, toProfile);
+      claim(actorId, profileId, toProfile);
+      doorLine(actorId, profileId);
+      return true;
     }
     if (word === '/jarl') { return jarlCmd(parts, actorId, profileId, toProfile); }
     if (word === '/steward') { return stewardCmd(parts, actorId, profileId, toProfile); }
@@ -38820,6 +38991,7 @@ log('gamemode loaded:',
   ready();
   g.__thornswoodProperty = {
     command: command, touched: touched, here: here, claim: claim, deeds: deeds,
+    doorLine: doorLine, DOOR_LINE_PROPERTY: DOOR_LINE_PROPERTY,
     holderOf: holderOf, buildingOf: buildingOf, nameOf: nameOf, giveDeed: giveDeed,
     setLock: setLock, mold: mold, cutKey: cutKey, mayPass: mayPass,
     holdsKey: holdsKey, holdsMold: holdsMold, holdsDeed: holdsDeed,
@@ -41688,15 +41860,32 @@ log('gamemode loaded:',
     var B = g.__thornswoodBeds;
     var rows = [], seen = {};
     try {
+      /*
+        AND THE RENT OWED ON EACH (#1637): what you hold is on this page and
+        not behind a typed /deed, rent with it. Counted up to now first, the
+        same count /rent makes, so the page and the steward agree.
+      */
+      if (W.rentDue) { W.rentDue(); }
       var claims = W.claims();
       for (var b in claims) {
         if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
         var held = W.holderOf(b);
         if (!held || held.by !== profileId) { continue; }
         seen[b] = true;
-        rows.push({ name: W.nameOf(b), mine: true, locked: !!held.locked,
+        var rent = held.rent ? { amount: Number(held.rent.amount) || 0,
+                                 every: Number(held.rent.everyDays) || 7,
+                                 owed: Number(held.rent.owed) || 0 } : null;
+        rows.push({ name: W.nameOf(b), mine: true, locked: !!held.locked, rent: rent,
                     keyed: W.holdsKey(actorId, b), b: b,
                     sleep: (B && B.guestsOf) ? B.guestsOf(b) : [] });
+      }
+      // And the farm, one a person: ground with no building on it, which is
+      // the farming block's own claim (#1637). See farmOf there.
+      var F = g.__thornswoodFarming;
+      var farm = (F && F.farmOf) ? F.farmOf(profileId) : null;
+      if (farm) {
+        rows.push({ name: 'Your farm', mine: true, farm: true,
+                    days: farm.days, reach: farm.reach });
       }
       // Then the places somebody let you into. A key to a building you already
       // hold is not a second row: it is the same house and the row above says
@@ -47113,6 +47302,10 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // character block.
                '/apprentice',
                '/plant', '/claim', '/plot',
+               // At a door, /claim, /lock and /unlock are what the lock key
+               // sends, and /key is the same key at a forge (#1637). /deed and
+               // /mold are still answered, and no help names any of them:
+               // what you hold is on K, and the mold key presses a mold.
                '/deed', '/deeds', '/lock', '/unlock', '/mold', '/key',
                // The offices' powers (#1638). Sent by the Office page of the
                // K panel, never typed, and so deliberately NOT in
@@ -47198,7 +47391,6 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
   an invitation rather than a help.
 */
 const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
-                      '/deed', '/lock', '/unlock', '/mold', '/key',
                       // Not /jarl, /steward, /evict, /box or /rent: the
                       // offices' powers are buttons on the Office page of K
                       // (#1638), and the board panel says what the box holds.
@@ -49343,13 +49535,14 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       }
       if (topic === 'land' || topic === 'home' || topic === 'deed') {
         toProfile(profileId,
-          '/claim at a plot takes the farm around it; /claim at a door you have ' +
-          'just opened takes the building and hands you the deed. /deed lists ' +
-          'what you hold, /lock and /unlock turn the lock. A Jarl or a steward ' +
-          'has an Office page on K. To let somebody sleep in a building you hold, look at ' +
-          'them inside it and press the key the prompt shows. ' +
-          'A smith says /mold at a door with the holder standing ' +
-          'there, and /key at a forge with the mold in hand.');
+          '/claim at a plot takes the farm around it. At a door you just opened, ' +
+          'a line names a key, X unless you changed it: it claims a building ' +
+          'nobody holds, and locks or unlocks one you hold. K lists what you ' +
+          'hold and the rent owed. A Jarl or a steward has an Office page on K. ' +
+          'To let somebody sleep in a building you hold, look at them inside ' +
+          'it and press the key the prompt shows. A blank key mold goes into a ' +
+          'lock on the key its line names, and a smith carrying that mold cuts ' +
+          'a key at a forge the same way.');
         return;
       }
       if (topic === 'staff' || topic === 'rules' || topic === 'help') {

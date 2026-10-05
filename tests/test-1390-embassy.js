@@ -285,8 +285,11 @@ if (block && RECIPES && ADMIN_ITEMS) {
     const E = env.E;
     const claimSrc = slice(gm, '  function claim(actorId, profileId, toProfile) {\n    var building = here(actorId);', '\n  }\n');
     const evictSrc = slice(gm, '  function evict(actorId, profileId, toProfile) {', '\n  }\n');
-    const touchedSrc = slice(gm, '  function touched(actorId, doorDesc) {', '\n  }\n');
-    yes('B2 claim, evict and the door press are in the property block', !!claimSrc && !!evictSrc && !!touchedSrc);
+    // A door press is touched(): openedDoor() (the deed and the renewal), then doorLine() (#1637).
+    const touchedSrc = slice(gm, '  function openedDoor(actorId, doorDesc) {', '\n  }\n');
+    const lineSrc = slice(gm, '  function doorLine(actorId, profileId) {', '\n  }\n');
+    yes('B2 claim, evict, the door press and the line at the door are in the property block',
+        !!claimSrc && !!evictSrc && !!touchedSrc && !!lineSrc);
     function claimAt(building) {
       const told = [];
       const claims = {};
@@ -331,7 +334,7 @@ if (block && RECIPES && ADMIN_ITEMS) {
       const said = [];
       const fn = new Function('globalThis', 'buildingOf', 'g', 'mp', 'DOOR_PROPERTY', 'plog', 'push', 'holderOf', 'holdsDeed',
         'groundHere', 'claims', 'save', 'pushAll', 'nameOf', 'notify', 'say', 'refrIdOfDoor',
-        touchedSrc + '\nreturn touched;');
+        touchedSrc + '\nreturn openedDoor;');
       const touched = fn({ __thornswoodEmbassy: E }, function () { return building; }, {},
         { get: function (id, p) { return p === 'profileId' ? 50 : { name: 'Thief' }; }, set: function () { } },
         'thornswoodDoor', function () { }, function () { }, function () { return null; }, function () { return true; },
@@ -342,6 +345,23 @@ if (block && RECIPES && ADMIN_ITEMS) {
     }
     yes('B4 a deed presented at the embassy door takes nothing', !deedAt(EMBASSY)[EMBASSY]);
     yes('B4 and a deed at any other door is still the title', !!deedAt(HOUSE)[HOUSE]);
+
+    // The line the lock key reads at the door just opened (#1637).
+    function lineAt(building, held) {
+      let line = null;
+      const fn = new Function('globalThis', 'mp', 'DOOR_PROPERTY', 'DOOR_MEMORY_MS', 'buildingOf', 'holderOf', 'holdsDeed',
+        'nameOf', 'doorsOf', 'idOf', 'DOOR_LINE_PROPERTY', 'plog', 'doorLineStamp', lineSrc + '\nreturn doorLine;');
+      const doorLine = fn({ __thornswoodEmbassy: E },
+        { get: function () { return { door: 'door', at: Date.now() }; }, set: function (a, p, v) { line = v; } },
+        'thornswoodDoor', 60000, function () { return building; }, function () { return held || null; },
+        function () { return false; }, function (b) { return b; }, function () { return ['5cb0:The Great City of Solitude.esp']; },
+        function () { return 0x5cb0; }, 'thornswoodDoorLine', function () { }, 0);
+      doorLine(0x14, 50);
+      return line;
+    }
+    yes('B5 the embassy door offers nothing to claim', lineAt(EMBASSY, null).x === '');
+    yes('B5 and any other door nobody holds offers the claim as before', lineAt(HOUSE, null).x === 'claim');
+    yes('B5 a claim somebody made there before is still theirs to lock', lineAt(EMBASSY, { by: 50, locked: false }).x === 'lock');
   }
 
   // ------------------------------------------- the bench, by the roll --

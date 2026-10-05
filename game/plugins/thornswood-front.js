@@ -4746,13 +4746,18 @@
     return moldBase > 0;
   }
 
-  /** How many of the Key Molds carried have a name, which is a door's. 0 when it cannot tell. */
-  function stampedMolds(pc) {
+  /*
+    How many of the Key Molds carried have a name, which is a door's. 0 when
+    it cannot tell. base is the Key Mold's runtime id when the caller has its
+    own (the lock key at a forge, #1637), and moldBase otherwise.
+  */
+  function stampedMolds(pc, base) {
+    const want = base || moldBase;
     let named = 0;
     try {
       const changes = sp.getExtraContainerChanges(pc.getFormID()) || [];
       for (let i = 0; i < changes.length; i++) {
-        if (!changes[i] || changes[i].baseId !== moldBase) { continue; }
+        if (!changes[i] || changes[i].baseId !== want) { continue; }
         const lists = changes[i].extendDataList || [];
         for (let j = 0; j < lists.length; j++) {
           let n = 1, name = false;
@@ -4872,21 +4877,6 @@
     return true;
   }
 
-
-  /*
-    Lock the door you last opened. Patrick on #615: /lock should be a key
-    press that is logged to the server as /lock when pressed. The server
-    keeps every rule /lock already has (stand at the door, be the holder or
-    carry the deed). Unlock stays the typed /unlock.
-  */
-  function lockPress() {
-    if (!T.ready) { return false; }
-    if (claims.chat) { return false; }
-    if (busyMenuOpenNow()) { return false; }
-    tellServer('/lock');
-    say('pressed ' + LOCK_NAME + ' for /lock');
-    return true;
-  }
   sp.on('update', guard('mold', () => {
     const now = Date.now();
     if (now - moldAt < MOLD_EVERY) { return; }
@@ -4900,6 +4890,209 @@
     if (KEYBOARD_MENUS.indexOf(String((e && e.name) || '')) === -1) { return; }
     moldDoor = '';
     drawMold(false);
+  }));
+
+  /*
+    ------------------------------------- the lock key: a door, a forge (#1637)
+
+    Patrick, 4 October: no chat commands for anything people do, only
+    buttons and GUI. The lock key (X unless LockKey moved it) used to send
+    /lock at whatever door was opened last, and claiming, unlocking and
+    cutting a key were typed. Now it does what one line under the crosshair
+    says, and only while that line is up:
+
+      a door of the building you just     Claim when nobody holds it, Lock or
+      opened                              Unlock when it is yours. The
+                                          suggested answer on #1637: one key,
+                                          and the line says which it will do.
+      a forge, carrying a key mold that   Cut a key.
+      has been pressed into a door
+
+    THE DOOR'S WORD IS THE SERVER'S. Which building a door belongs to, who
+    holds it and whether it is locked are all in the register, so the server
+    writes thornswoodDoorLine on every door of a building somebody opens and
+    after every press (doorLine in the property block): the word, the name,
+    and that building's doors by form id. The line is up while one of those
+    doors is under the crosshair, either half of a front door, for as long as
+    the server still takes it as the door just opened.
+
+    THE FORGE IS KNOWN BY ITS BASE, the six forges of the bench table in the
+    gamemode (BENCH_BY_BASE rows for CraftingSmithingForge), resolved by file
+    and local id like the drivers below, and held to that table by
+    tests/test-1637-door-gui.js. The mold is a Key Mold with a door's name on
+    it, counted the way the mold key counts them.
+
+    The key sends /claim, /lock, /unlock or /key with the id under the
+    crosshair. Those are the lines the server always answered, nobody is told
+    to type them, and the server checks everything again: the door just
+    opened, the holder, the smith, the forge, the mold and the ingot.
+
+    Never over a menu or while the chat has the keyboard, on the crosshair
+    poll's beat, and down the moment a menu takes the keyboard, for the
+    reasons the mold line gives.
+  */
+  const LOCK_EVERY = 320;
+  // The mold line's look, a line lower, so the two never sit on each other:
+  // a holder carrying a blank who looks at their own door has both.
+  const LOCK_CSS =
+    'position:fixed;left:50%;top:67%;transform:translateX(-50%);z-index:2147482900;' +
+    'pointer-events:none;white-space:nowrap;' +
+    'font-family:"Palatino Linotype",Palatino,Georgia,serif;font-size:19px;letter-spacing:.03em;' +
+    'color:#d9cfb4;background:rgba(11,10,8,.72);border:1px solid rgba(198,170,109,.42);' +
+    'padding:8px 16px 9px;text-shadow:0 2px 4px rgba(0,0,0,.95)';
+  const FORGE_BASES = [
+    ['Skyrim.esm', 0x1a2ad], ['Skyrim.esm', 0xbf9e1], ['Skyrim.esm', 0xcae0b],
+    ['Dragonborn.esm', 0x2b074], ['Dragonborn.esm', 0x3cf6e], ['North Keep.esp', 0x21152]
+  ];
+  let lockAt = 0;
+  let lockShown = '';      // the line's words while it is up, '' while it is down
+  let lockSentFor = '';
+  let lockSentAt = 0;
+  let forgeIds = null;     // null not found yet, else { runtime id: true }
+  let keyMoldId = -1;      // -1 not asked yet, 0 not in this build, else the Key Mold's runtime id
+
+  function forgeIdSet() {
+    if (forgeIds) { return forgeIds; }
+    const out = {};
+    let found = 0;
+    for (let i = 0; i < FORGE_BASES.length; i++) {
+      try {
+        const form = sp.Game.getFormFromFile(FORGE_BASES[i][1], FORGE_BASES[i][0]);
+        const id = form ? (form.getFormID() >>> 0) : 0;
+        if (id) { out[id] = true; found++; }
+      } catch (err) { }
+    }
+    // Remembered once the world answers for any of them; asked again until then.
+    if (found) {
+      forgeIds = out;
+      say('forges for the lock key: ' + found + ' of ' + FORGE_BASES.length + ' bases found');
+    }
+    return out;
+  }
+
+  function keyMoldNow() {
+    if (keyMoldId >= 0) { return keyMoldId; }
+    try {
+      if (!sp.Game.getPlayer()) { return 0; }
+      const item = sp.Game.getFormFromFile(MOLD_ITEM, MOLD_FILE);
+      keyMoldId = item ? (item.getFormID() >>> 0) : 0;
+    } catch (e) {
+      // Not remembered. A throw is not an answer, so it is asked again.
+      return 0;
+    }
+    return keyMoldId;
+  }
+
+  /** The line the server wrote for the door just opened, while it still counts. */
+  function doorLineNow() {
+    let v = null;
+    try { v = globalThis.thornswoodDoorLine; } catch (e) { v = null; }
+    if (!v || typeof v !== 'object' || !v.x || !Array.isArray(v.d)) { return null; }
+    if (Date.now() - (Number(v.seen) || 0) > (Number(v.left) || 0)) { return null; }
+    return v;
+  }
+
+  const LOCK_WORDS = { claim: 'Claim ', lock: 'Lock ', unlock: 'Unlock ' };
+
+  /** What the lock key would do right now: { hex, verb, words }, or null. */
+  function lockKeyNow() {
+    if (anyClaim()) { return null; }
+    let ref = null;
+    try { ref = sp.Game.getCurrentCrosshairRef(); } catch (e) { ref = null; }
+    if (!ref) { return null; }
+    let type = 0, baseId = 0, hex = '';
+    try {
+      const b = ref.getBaseObject();
+      type = b ? b.getType() : 0;
+      baseId = b ? (b.getFormID() >>> 0) : 0;
+      hex = (ref.getFormID() >>> 0).toString(16);
+    } catch (e) { return null; }
+    if (type === DOOR_TYPE) {
+      const v = doorLineNow();
+      if (!v || v.d.indexOf(hex) === -1 ||
+          !Object.prototype.hasOwnProperty.call(LOCK_WORDS, v.x)) { return null; }
+      if (busyMenuOpenNow()) { return null; }
+      return { hex: hex, verb: v.x, words: LOCK_WORDS[v.x] + String(v.n || 'this building') };
+    }
+    if (!baseId || !forgeIdSet()[baseId]) { return null; }
+    const mold = keyMoldNow();
+    if (!mold) { return null; }
+    if (busyMenuOpenNow()) { return null; }
+    let pc = null, carried = 0;
+    try {
+      pc = sp.Game.getPlayer();
+      const form = sp.Game.getFormEx(mold);
+      carried = (pc && form) ? pc.getItemCount(form) : 0;
+    } catch (e) { carried = 0; }
+    if (!(carried > 0) || !(stampedMolds(pc, mold) > 0)) { return null; }
+    return { hex: hex, verb: 'key', words: 'Cut a key from your key mold' };
+  }
+
+  /** The line up with these words, or down for none. Only remembered once the page has taken it. */
+  function drawLock(words) {
+    words = words ? String(words).replace(/[<>&"]/g, '') : '';
+    if (words === lockShown) { return; }
+    if (!words) {
+      if (T.js('try{var d=document.getElementById("ts-lock");if(d){d.style.display="none";}}catch(e){}')) {
+        lockShown = '';
+      }
+      return;
+    }
+    const html =
+      '<span style="display:inline-block;min-width:26px;text-align:center;margin-right:12px;' +
+      'padding:1px 7px;border:1px solid rgba(233,209,155,.55);border-bottom-width:2px;' +
+      'border-radius:3px;background:rgba(0,0,0,.35);color:#e9d19b">' + LOCK_NAME + '</span>' + words;
+    if (T.js('(function(){try{' +
+             'var d=document.getElementById("ts-lock");' +
+             'if(!d){d=document.createElement("div");d.id="ts-lock";' +
+             'd.style.cssText=' + JSON.stringify(LOCK_CSS) + ';' +
+             'document.body.appendChild(d);}' +
+             'd.innerHTML=' + JSON.stringify(html) + ';' +
+             'd.style.display="";' +
+             '}catch(e){}})();')) {
+      lockShown = words;
+    }
+  }
+
+  function lockLook() {
+    if (!T.ready) { lockShown = ''; return; }
+    const now = lockKeyNow();
+    drawLock(now ? now.words : '');
+  }
+
+  /*
+    The key. Asked again at the moment it goes down, so what is sent is what
+    is under the crosshair at the press. Answers whether it was used, so the
+    key falls through when no line is up. The same word for the same thing
+    once in a second and a half, so a double press is not a second answer.
+  */
+  function lockPress() {
+    if (!T.ready) { return false; }
+    if (claims.chat) { return false; }
+    const now = lockKeyNow();
+    drawLock(now ? now.words : '');
+    if (!now) { return false; }
+    const sig = now.verb + ' ' + now.hex;
+    const t = Date.now();
+    if (sig === lockSentFor && t - lockSentAt < 1500) { return true; }
+    lockSentFor = sig;
+    lockSentAt = t;
+    tellServer('/' + sig);
+    say('pressed ' + LOCK_NAME + ' for /' + sig);
+    return true;
+  }
+
+  sp.on('update', guard('lock line', () => {
+    const now = Date.now();
+    if (now - lockAt < LOCK_EVERY) { return; }
+    lockAt = now;
+    lockLook();
+  }));
+
+  sp.on('menuOpen', guard('lock menu', (e) => {
+    if (!lockShown) { return; }
+    if (KEYBOARD_MENUS.indexOf(String((e && e.name) || '')) === -1) { return; }
+    drawLock('');
   }));
 
   /*
