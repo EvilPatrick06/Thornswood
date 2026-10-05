@@ -28,7 +28,7 @@ of these:
   under the crosshair: Y for a friend, H to trade, L to mute, U to
   press a key mold into a door;
 - a key of its own, the way X claims, locks or unlocks the door you
-  just opened and cuts a key at a forge;
+  just opened, cuts a key at a forge and claims a farm at a crop;
 - the prompt that answers an offer with Accept and Refuse, and the P
   panel of friends and the party;
 - a panel: K for the profession, the class and the skill tree, J for

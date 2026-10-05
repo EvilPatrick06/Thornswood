@@ -22,10 +22,12 @@ A plot is one crop in a field. The first time anyone touches it, it is
 empty. There is no startup sweep that fills the farms. Emptiness is
 the absence of a record.
 
-Stand within 200 of the plot. `/plant` with the crop in your pack. The
-crop is its own seed: a cabbage plants a cabbage. `/plot` says what is
-in the ground. Bringing it in is the press when it is ripe. The plot
-is empty again. It does not grow back. Sow another.
+Look at a plot and a line under the crosshair says what is in the
+ground and whose farm it is. Press an empty plot with the crop in your
+pack to sow it, and the line names that press when it would sow: E,
+Sow a Cabbage. The crop is its own seed: a cabbage plants a cabbage.
+Bringing it in is the press when it is ripe. The plot is empty again.
+It does not grow back. Sow another. Nothing is typed.
 
 One sow or one bring-in is one piece of work. 100, then 250, then 600.
 
@@ -54,9 +56,12 @@ What you bring in is more than the one you sowed:
 
 ## The claim
 
-`/claim` at a plot. One farm at a time, a circle 1200 units out from
-that plot, same cell. That is 2400 across, a farm and not the village
-behind it. Claims do not overlap. A plot is never in two.
+At a plot on ground nobody holds, the line names the lock key, X
+unless you changed it: Claim this farm. One farm at a time, a circle
+1200 units out from that plot, same cell. That is 2400 across, a farm
+and not the village behind it. Claims do not overlap. A plot is never
+in two. Claiming a second lets the first go, and the line says so
+before you press it.
 
 14 real days with nothing sown and nothing brought in, and the claim
 is gone. Work refreshes it. Anyone with the class may use a farm
@@ -122,8 +127,8 @@ farmer is who makes it. See [Hearthcook](../professions/cook/hearthcook.md).
 At the moment you pick the class: 3 cabbage, 3 leek, 3 potato. All
 novice, all the base game's own records.
 
-If the pack holds no crop at all, standing at a plot hands a few of
-those three again, and not more often than every 12 hours. It is a
+If the pack holds no crop at all, pressing an empty plot hands a few
+of those three again, and not more often than every 12 hours. It is a
 way back. It is not a wage. Nine vegetables against an empty pack,
 while one ripe plot pays more than that.
 
@@ -179,3 +184,16 @@ is a farmer verb: 1 Honeycomb, 10 minutes, one piece of work, no rank
 gate. Spring, summer and autumn do not yet stop a crop for temperature.
 The page names that and gives no degree. The cold link into hunger
 and thirst is not here.
+
+The line at a plot is in the front plugin and the farming block
+(#1636). A crop that stays under the crosshair asks the server, which
+answers that person alone with what is in the ground, whose farm it is,
+whether pressing it would sow it and whether the lock key would claim
+the farm, and asks again every 10 seconds while it is looked at. The
+server only offers what its own rules would let through, and checks
+them all again on the press: the class, the shovel, the rank, the crop
+in the pack, whose ground it is, one farm a person, and that the plot
+is within 400 of the person. Pressing a plot draws its line again. The
+lines the client sends are in [Chat commands](../commands.md), and no
+help names them. Your farm, with the days it has left, is on the
+property page of the K panel.
