@@ -30,4 +30,4 @@ places one more.
 ## Where this is
 
 The kiln, the axe, the chop, the recipe gates, and the hotter fire
-are in the server.
+are in the server. The axe has 50 uses.
