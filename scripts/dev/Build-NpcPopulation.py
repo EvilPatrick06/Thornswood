@@ -407,19 +407,59 @@ def write_runtime(payload):
         output.write(source[:begin] + block + source[end:])
 
 
+# docs/HUNTING-SPOTS.csv is every retained animal with what its body gives.
+# One writer, so a population rebuild and a hunt table rebuild both leave the
+# same columns (#1874): it reads only npc-population.json and hunts.json, and
+# Build-ResourceLocations.py --hunting-only runs it without any plugin.
+HUNTING_COLUMNS = ['ref', 'name', 'base', 'hold', 'locationName', 'location', 'habitat', 'role',
+                   'species', 'tier', 'cap', 'returnMinutes', 'leash', 'cell', 'world', 'x', 'y', 'z',
+                   'rank', 'access', 'products', 'productIds', 'yieldByRank', 'sharedStock', 'rewardRule']
+
+
+def hunting_rows(npcs, hunts):
+    rows = []
+    for row in npcs:
+        if not row['keep'] or row['role'] != 'animal':
+            continue
+        hunt = hunts.get(row['base'])
+        products = hunt['gives'] if hunt else []
+        rows.append(dict(row, x=row['pos'][0], y=row['pos'][1], z=row['pos'][2],
+            rank=hunt['rank'] if hunt else '', access='Hunter' if hunt else 'No dressing yield',
+            products='; '.join(item['name'] for item in products),
+            productIds='; '.join(item['item'] for item in products),
+            yieldByRank=json.dumps(hunt['yield'], separators=(',', ':')) if hunt else '',
+            sharedStock=1, rewardRule='One dressing per life' if hunt else 'None'))
+    return rows
+
+
+def write_hunting_spots(npcs):
+    root = HERE.parent.parent
+    hunts = json.loads((root / 'game/data/hunts.json').read_text(encoding='utf-8'))['hunts']
+    rows = hunting_rows(npcs, hunts)
+    target = root / 'docs' / 'HUNTING-SPOTS.csv'
+    # The line ending the file already uses, the way Build-HuntTable.ps1's
+    # EolOf keeps hunts.json's, so a run on any clone changes only the rows
+    # that changed.
+    eol = '\r\n' if target.is_file() and b'\r\n' in target.read_bytes() else '\n'
+    with target.open('w', encoding='utf-8', newline='') as output:
+        writer = csv.DictWriter(output, fieldnames=HUNTING_COLUMNS, lineterminator=eol)
+        writer.writeheader()
+        writer.writerows({key: row.get(key, '') for key in HUNTING_COLUMNS} for row in rows)
+    return rows
+
+
 def write_catalogues(payload):
     root = HERE.parent.parent / 'docs'
     columns = ['ref', 'name', 'base', 'hold', 'locationName', 'location', 'habitat', 'role',
                'species', 'tier', 'cap', 'returnMinutes', 'leash', 'cell', 'world', 'x', 'y', 'z']
     kept = [r for r in payload['npcs'] if r['keep']]
-    for filename, rows in [('NPC-SPAWNS.csv', kept),
-                           ('HUNTING-SPOTS.csv', [r for r in kept if r['role'] == 'animal'])]:
-        with (root / filename).open('w', encoding='utf-8', newline='') as output:
-            writer = csv.DictWriter(output, fieldnames=columns)
-            writer.writeheader()
-            for r in rows:
-                writer.writerow(dict({k: r.get(k) for k in columns if k not in {'x', 'y', 'z'}},
-                                     x=r['pos'][0], y=r['pos'][1], z=r['pos'][2]))
+    with (root / 'NPC-SPAWNS.csv').open('w', encoding='utf-8', newline='') as output:
+        writer = csv.DictWriter(output, fieldnames=columns)
+        writer.writeheader()
+        for r in kept:
+            writer.writerow(dict({k: r.get(k) for k in columns if k not in {'x', 'y', 'z'}},
+                                 x=r['pos'][0], y=r['pos'][1], z=r['pos'][2]))
+    write_hunting_spots(payload['npcs'])
     summary = payload['summary']
     lines = ['# NPC population catalogue', '',
         'Generated from the winning records in the 48-plugin dev load order.',

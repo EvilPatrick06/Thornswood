@@ -21,6 +21,13 @@ and their traders. Humans, profiles and connected identities are protected.
 The existing fishing placements are a source inventory, before the new fishery
 allocation, poles, traps and scarce quest gates in the Fisher specification.
 
+The hunting list reads no plugin: it is every retained animal from
+`game/data/npc-population.json` with what `game/data/hunts.json` gives for its
+body. A population rebuild writes it, and so does
+`python scripts/dev/Build-ResourceLocations.py --hunting-only` after a hunt
+table rebuild. `tests/test-1874-hunting-spots.js` fails the build when it is not
+what those two tables say.
+
 Loading advances one candidate every 10 ms. Native record and navigation indexes
 are prepared during startup. Navigation preparation shares raw geometry and a
 spatial index across overlapping regions, yields after bounded work, and creates

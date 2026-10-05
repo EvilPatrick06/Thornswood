@@ -31,11 +31,20 @@ def write_csv(filename, rows, columns):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--settings', required=True)
-    parser.add_argument('--strings-dir', required=True)
+    parser.add_argument('--settings')
+    parser.add_argument('--strings-dir')
+    parser.add_argument('--hunting-only', action='store_true',
+        help='write docs/HUNTING-SPOTS.csv from npc-population.json and hunts.json, reading no plugin')
     args = parser.parse_args()
-    settings = json.loads(pathlib.Path(args.settings).read_text(encoding='utf-8-sig'))
     population = json.loads((ROOT / 'game/data/npc-population.json').read_text(encoding='utf-8'))
+    if args.hunting_only:
+        animals = P.write_hunting_spots(population['npcs'])
+        print(json.dumps({'animalPlacements': len(animals),
+            'dressablePlacements': sum(bool(row['products']) for row in animals)}))
+        return
+    if not args.settings or not args.strings_dir:
+        parser.error('--settings and --strings-dir are required, unless --hunting-only')
+    settings = json.loads(pathlib.Path(args.settings).read_text(encoding='utf-8-sig'))
     paths = settings['loadOrder']
     order = [pathlib.Path(path).name for path in paths]
     if order != [row['name'] for row in population['loadOrder']]:
@@ -78,28 +87,12 @@ def main():
             water=water, waterType=water_record.get('e', ''), waterClass=water_record.get('c', ''),
             access='Fisher' if base in fish else 'Hunter')
         (catches if base in fish else hanging).append(item)
-    hunts = json.loads((ROOT / 'game/data/hunts.json').read_text(encoding='utf-8'))['hunts']
-    animals = []
-    for row in population['npcs']:
-        if not row['keep'] or row['role'] != 'animal':
-            continue
-        hunt = hunts.get(row['base'])
-        products = hunt['gives'] if hunt else []
-        animals.append(dict(row, x=row['pos'][0], y=row['pos'][1], z=row['pos'][2],
-            rank=hunt['rank'] if hunt else '', access='Hunter' if hunt else 'No dressing yield',
-            products='; '.join(item['name'] for item in products),
-            productIds='; '.join(item['item'] for item in products),
-            yieldByRank=json.dumps(hunt['yield'], separators=(',', ':')) if hunt else '',
-            sharedStock=1, rewardRule='One dressing per life' if hunt else 'None'))
+    animals = P.write_hunting_spots(population['npcs'])
     resource_columns = ['ref', 'base', 'hold', 'location', 'cell', 'world', 'x', 'y', 'z',
         'source', 'produce', 'item', 'rank', 'access', 'returnMinutes', 'sharedStock',
         'water', 'waterType', 'waterClass', 'holdFrom']
     write_csv('FISHING-SPOTS.csv', catches, resource_columns)
     write_csv('HANGING-GAME-SPOTS.csv', hanging, resource_columns)
-    write_csv('HUNTING-SPOTS.csv', animals, ['ref', 'name', 'base', 'hold', 'locationName',
-        'location', 'habitat', 'role', 'species', 'tier', 'cap', 'returnMinutes', 'leash',
-        'cell', 'world', 'x', 'y', 'z', 'rank', 'access', 'products', 'productIds',
-        'yieldByRank', 'sharedStock', 'rewardRule'])
     payload = {'version': 1, 'builtBy': 'scripts/dev/Build-ResourceLocations.py',
         'loadOrder': population['loadOrder'], 'fishing': catches, 'hangingGame': hanging}
     with (ROOT / 'game/data/resource-locations.json').open('w', encoding='utf-8', newline='\n') as output:
