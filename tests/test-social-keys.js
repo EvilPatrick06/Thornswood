@@ -102,6 +102,11 @@ function rig(opts) {
     'function driverPress() { return false; }\n' +
     'function merchantPress() { return false; }\n' +
     'const LOCK_KEY = 45; function lockPress() { return false; }\n' +
+    // Tend their wounds (#1383), X on a hurt person, and Tend your wounds,
+    // H in the inventory. Nobody is looked at and no inventory is open
+    // here; test-1383-treatments.js has what they do.
+    'const TREAT_KEY = 45, TREAT_SELF_KEY = 35;\n' +
+    'function treatPress() { return false; }\nfunction treatSelfPress() { return false; }\n' +
     // A warrior's maneuver key (#1386), 9, which nothing here presses.
     'const MANEUVER_KEY = 10; function maneuverKeyPressed() { }\n' +
     // K on a person a Master could take on (#1634), asked ahead of K; nobody

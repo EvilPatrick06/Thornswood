@@ -95,18 +95,54 @@ open bite and an untreated bad burn roll wound fever at 40%, 10%
 bandaged, 5% with a poultice. A bite rolls bite sickness at 25% closed
 and 60% open. A break costs what this page says. Set, it heals in 3
 days. Nobody sets it and it heals crooked in 3 days, a lasting -4
-speed or -0.05 melee damage until a temple puts it right. The fire is
+speed or -0.05 melee damage until a master physicker or a temple puts
+it right. The fire is
 timed from the client's own reports at 7 a second: one that dealt 30
 or more is a bad burn, what you wear counts at half for warmth, and it
 heals in a day.
 
-What treats a wound today: a healing spell by its own rank (novice
-stops a bleed, advanced and up closes a cut, expert sets a splinted
-break), and a shrine pressed inside one of the temples the wake uses,
-which sets breaks and clears a crooked heal. A broken arm and a missing
-hand refuse the forges, the armour table, the wheel, the smelter, the
-tanning rack, the loom and the kiln. A missing eye is -20% damage with
-a bow and with destruction. A scar is a line on the look prompt.
+What opens a wound, by Patrick's answer on #1383 (4 October). An
+unblocked power or sneak attack with a blade or an axe is a cut, and
+so is an arrow or a bolt that lands. An unblocked power attack with a
+mace or a warhammer is a break, the arm or the leg at even odds. An
+unblocked hit from a wolf, a dog, a bear, a sabre cat, a skeever, a
+spider, a chaurus, a troll, a horker or a slaughterfish is a bite. A
+blow opens a wound only when it took health and left you standing.
+
+What treats a wound today: torn cloth, a bandage, a splint, a poultice
+and a physicker's remedy, as Who treats what says; a physicker
+setting a bone, and a master physicker clearing a crooked heal; a
+healing spell by its own rank (novice stops a bleed, advanced and up
+closes a cut, expert sets a splinted break); and a shrine pressed
+inside one of the temples the wake uses, which sets breaks and clears
+a crooked heal. A remedy closes a cut the way a bandage does and
+clears one ordinary disease, wound fever first.
+
+Your own wounds are tended from the inventory: while you have one
+somebody could tend, a line at the bottom names H, and H opens a panel
+of your wounds with a button for each treatment you can give.
+Somebody else's are tended from the look prompt: Tend their wounds, on
+X, opens the same panel for them, within about 4 metres. Torn cloth and
+setting a bone take no item. A bandage, a splint, a poultice or a
+remedy comes out of your pack only when it helps a wound.
+
+| Item | Asks for | Bench | Made by |
+| --- | --- | --- | --- |
+| Bandage | 1 Tundra Cotton | Loom | Tailor, Haberdasher, novice |
+| Splint | 1 Firewood, 1 Leather Strips | Kiln | Woodworker, Woodwright, novice |
+| Poultice | 1 Tundra Cotton, 1 Garlic | Alchemy lab | Alchemist, Physicker, novice |
+| Physicker's Remedy | 1 Mudcrab Chitin, 1 Blue Mountain Flower | Alchemy lab | Alchemist, Physicker, advanced |
+
+The four are records in Thornswood-Content.esp. Who may make each is
+the recipe table's to enforce, and the table takes them in at its next
+rebuild (#1622). Until then a bench lets in whoever it already lets in.
+The alchemy lab is the one Thornswood-Content.esp places, which takes
+recipes; Skyrim's own lab only brews.
+
+A broken arm and a missing hand refuse the forges, the armour table,
+the wheel, the smelter, the tanning rack, the loom and the kiln. A
+missing eye is -20% damage with a bow and with destruction. A scar is a
+line on the look prompt.
 
 An agreed loss is written onto the character by staff with /hurt,
 because the yes is given out of character. Staff can also give a cut,
@@ -118,10 +154,5 @@ Not in yet:
   before the server hears of it. The fork has to ask the server first,
   and #1383 says what it has to expose. Until then a bleed that empties
   your health is a death with no killer, and the wake stops the bleed.
-- What opens a cut, a break or a bite in the world. This page does not
-  say which blow does it. The question is on #1383.
-- Bandages, splints, poultices, torn cloth and the physicker's remedy.
-  None of them is an item yet, and setting a bone is not yet something
-  a physicker can do.
 - A block costing twice the stamina, and sprint refused on a broken
   leg. Neither is an actor value the server can send.

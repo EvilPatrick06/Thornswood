@@ -27,12 +27,19 @@ physicker or a temple until you are master. At master, Master
 Chemist is the double batch. The master treatment of a crooked bone
 is the injury page, and it is not a separate recipe.
 
-You have no recipe list.
+Your recipes are two, made at the alchemy lab Thornswood places: the
+poultice at novice and the remedy at advanced. Everything else you
+make is brewed.
 
 ## Where this is
 
 The lab gate, the double batch and the disease list are in the
 server. A cure disease potion you brew is still only the sip, because
-the server cannot read what a brewed potion does. Remedies are not in.
+the server cannot read what a brewed potion does. The poultice and the
+remedy are in Thornswood-Content.esp, and the recipe table takes them in
+as yours at its next rebuild (#1622). Setting a bone is a button on the
+wounds panel: X on somebody hurt, or H in your inventory for your own
+(see [Injury](../../injury.md)). At master the same button clears a
+crooked heal.
 Toughness on the tree already writes disease
 resistance. This half's Clarity point already lands.

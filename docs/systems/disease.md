@@ -66,7 +66,9 @@ fouled water last their 30 and 45 minutes from when they show. While a
 disease shows, its meter counts as at least weary, or at least bad, so
 a hungry person with food sickness does not pay the same penalty twice.
 A bad one refuses every craft. A potion of cure disease clears one, the
-one furthest along, and is still the sip of 5. A shrine pressed inside
+one furthest along, and is still the sip of 5. A physicker's remedy
+clears one too, wound fever first, used from the wounds panel (see
+[Injury](injury.md)). A shrine pressed inside
 one of the temples the wake uses clears them all. A fire, a bed, warmth
 back to fine after being cold, or 2 hours clears a chill. An hour asleep
 on open ground (on a seat, with no roof over you and no fire in reach)
@@ -81,5 +83,4 @@ Not in yet:
   server, waiting for that.
 - A potion of cure disease somebody brews is only the sip, because the
   server cannot read what a brewed potion does.
-- The physicker's remedy is not an item, and a cooked meal's help
-  against disease is not in.
+- A cooked meal's help against disease is not in.
