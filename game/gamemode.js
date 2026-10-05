@@ -35269,7 +35269,7 @@ log('gamemode loaded:',
                            'the server knows which one it is.');
       return true;
     }
-    // embassy.md: "/claim on them answers that the embassy is held" (#1390).
+    // embassy.md: the embassy doors start held, so a claim is refused (#1390).
     var accordClaim = globalThis.__thornswoodEmbassy;
     if (accordClaim && accordClaim.holds(building)) {
       toProfile(profileId, accordClaim.CLAIM_REFUSED);
@@ -39135,17 +39135,18 @@ log('gamemode loaded:',
   docs/systems/embassy.md, thalmor.md, npcs.md and cut-items.md are the
   design. Every number here is one of theirs.
 
-  THE BUILDING. "The embassy doors start held by the Ambassador's office.
-  /claim on them answers that the embassy is held. A steward of Haafingar
-  does not evict the Accord." The page calls it a warehouse in Solitude
+  THE BUILDING. "The embassy doors start held by the Ambassador's office,
+  so the line at them offers nobody a claim. A steward of Haafingar does
+  not evict the Accord." The page calls it a warehouse in Solitude
   ("The Empire wanted the province and got a warehouse. This is that
   warehouse") and names none. EMBASSY_BUILDING is the answer suggested on
   #1390, the Abandoned Warehouse: the one warehouse in Solitude that is
   not a shop and not the East Empire Company's, which the trading company
   replaces. If Patrick names another building, that one line changes. The
-  property block asks holds() before a claim, an eviction, and a deed
-  presented at the door. It is not a hold: nothing here makes a box, a
-  board, a ledger or a mint, and Solitude's box and board stay Haafingar's.
+  property block asks holds() for the line at the door, before a claim and
+  an eviction, and before a deed presented at the door. It is not a hold:
+  nothing here makes a box, a board, a ledger or a mint, and Solitude's box
+  and board stay Haafingar's.
 
   THE EMBASSY ROLL. "20 persons in service, no more. Of those, 6 may be
   marked armed, and those 6 bear arms inside the walls only. Naming a 21st
