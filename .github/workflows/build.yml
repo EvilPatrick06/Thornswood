@@ -345,6 +345,7 @@ jobs:
                  'test-1336-missing-stops.ps1',
                  'test-1367-cross-site.js',
                  'test-1326-engine-secrets.ps1',
+                 'test-1321-socket-origin.js',
                  'test-1330-webview2-signature.js',
                  'test-1352-site-answer-limit.js',
                  'test-1351-unmasked-frames.js',
