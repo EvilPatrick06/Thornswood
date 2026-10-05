@@ -186,6 +186,10 @@ function rig(opts) {
     // presses. test-1386-warrior.js has what it does.
     'const MANEUVER_KEY = 10;\n' +
     'function maneuverKeyPressed() { }\n' +
+    // K on a person a Master could take on (#1634), asked ahead of K; nobody
+    // is looked at here. test-1634-apprentice-gui.js has what it does.
+    'const APPRENTICE_KEY = 37;\n' +
+    'function apprenticePress() { return false; }\n' +
     'const ESC = 1, CHAT_KEY = 28, SKILLS_KEY = 37, PARTY_KEY = 25, JOURNAL_KEY = 36,\n' +
     '      FRIEND_KEY = 21, TRADE_KEY = 35, MUTE_KEY = 38, COMMAND_KEY = 53;\n';
   const api = new Function('sp', 'say', 'T', 'Date', 'guard', 'typed',
