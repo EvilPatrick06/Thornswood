@@ -124,7 +124,9 @@ try {
     $t = New-Tree 'missing' ''
     $r = Invoke-Copy $t
     Yes 'the run stops' ($r.Code -ne 0)
-    Yes '  naming the file' ($r.Text -match 'STOP\. .*LoadOrder\.ps1 is not here' -and $r.Text -match 'LoadOrder\.ps1 is missing, so the collection revision was not checked')
+    # The STOP line, which Write-Host never wraps. The error the run ends on
+    # says the same, but a console wraps it at its width.
+    Yes '  naming the file' ($r.Text -match 'STOP\. .*[\\/]scripts[\\/]mods[\\/]LoadOrder\.ps1 is not here, so the collection revision cannot be checked')
     Yes '  saying nothing was written and how past it' ($r.Text -match 'Nothing was written' -and $r.Text -match '-IgnoreRevision')
     Yes '  before gamemode.js is checked or copied' ($r.Text -notmatch 'gamemode\.js parses' -and -not (Wrote $t 'gamemode.js'))
     Yes '  and with no build stamp written' (-not (Wrote $t 'thornswood-build.json'))
