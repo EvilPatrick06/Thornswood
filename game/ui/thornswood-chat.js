@@ -143,6 +143,9 @@
     them grows.
   */
   var HELD_FROM_ONE = 100;
+  /* False once the voice overlay has handed the audio to a launcher, for
+     the rest of this page (noVoice, below). */
+  var carriesVoice = true;
   var heldRoom = null;
   var heldSignals = [];
   var heldView = null;
@@ -313,8 +316,13 @@
       // welcome is what says we are in.
       joined = false;
       heard = Date.now();
+      // Said in the join once voice has gone to a launcher (noVoice), so a
+      // new connection is on the room's roster as carrying none from the
+      // first roster on, and no launcher builds a connection to it (#1925).
+      var join = { t: 'join', profileId: ME, name: NAME };
+      if (!carriesVoice) { join.voice = false; }
       try {
-        ws.send(JSON.stringify({ t: 'join', profileId: ME, name: NAME }));
+        ws.send(JSON.stringify(join));
       } catch (e) { }
     };
 
@@ -630,6 +638,26 @@
     off: function (fn) {
       for (var i = listeners.length - 1; i >= 0; i--) {
         if (listeners[i] === fn) { listeners.splice(i, 1); }
+      }
+    },
+
+    /*
+      Voice has gone to the launcher, for good (#1925). The overlay calls
+      this when it goes into relay mode, which it never leaves. Every page in
+      the room builds a WebRTC connection to everybody on the roster, and in
+      relay mode the overlay takes no signalling, so each of those to this
+      socket sent its offer and waited for ever. So the service is told this
+      connection carries no voice, its row on the roster says so, and the
+      pages close the connection they had to it and build none. An open
+      socket has sent its join already (onopen sends it in the same task the
+      socket opens in), so this goes after it on the same socket; one still
+      opening says it in the join, as every later connection does.
+    */
+    noVoice: function () {
+      if (!carriesVoice) return;
+      carriesVoice = false;
+      if (ws && ws.readyState === 1) {
+        try { ws.send(JSON.stringify({ t: 'voice', on: false })); } catch (e) { }
       }
     },
 
