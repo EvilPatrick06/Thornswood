@@ -51,13 +51,15 @@ A staff silence is a different tool, further down.
 
 | Switch | What you stop | How |
 | --- | --- | --- |
-| Voice | Hearing them, and seeing the speaking mark | Look at them and press L, or `/mute` and the name |
-| Text | Their lines in the box, and the words above their head | `/mute text` and the name |
-| Name | Their name above their head | `/hidename` and the name |
+| Voice | Hearing them, and seeing the speaking mark | Look at them and press L, or Mute beside them on P |
+| Text | Their lines in the box, and the words above their head | Text beside them on P |
+| Name | Their name above their head | Name beside them on P |
 
-`/mute` with nothing after it lists who you have stopped hearing and
-whose text you have turned off. `/hidename` with nothing after it
-lists whose names you have hidden.
+P has the three beside each friend, beside each person under Near
+you, who is everybody close enough to look at, and beside each
+person under Muted and hidden. That last list is everybody you have
+switched off, friend or not, online or not, and pressing the switch
+again there turns it back on. Nobody types a command for any of it.
 
 Turning off their voice does not turn off their text. Turning off
 their name does not turn off either. The party map marker and the
@@ -69,8 +71,8 @@ your party. The look-at prompt offers the same three.
 
 ## Every name
 
-`/hidename all` hides every name above a head, for you. The same
-command again puts them back. A name you hid one person at a time
+Hide every name, on P, hides every name above a head, for you. Show
+names puts them back. A name you hid one person at a time
 stays hidden after you turn this off. The party map marker and the
 arrow on the strip stay, the same as hiding one name. It is saved on
 the character.
@@ -105,8 +107,14 @@ close that microphone and to hear nothing from them.
 Text mute is remembered on the character, and the chat service drops
 those lines for the person who turned them off. Hiding a name, and
 hiding every name, are remembered too, and the name tag is drawn
-clear. P lists Mute, Text, and Name for each friend, and Hide every
-name for the whole list.
+clear. P lists Mute, Text, and Name for each friend, each person
+near you and each person switched off, and Hide every name for the
+whole list. The buttons and L send the server the lines `/mute` and
+`/hidename` once were, and nobody is told to type them. The look-at
+prompt offers only the voice switch, on L, and the party rows on P
+have no switches yet; Text and Name for somebody who is not a friend
+are under Near you on P. Whether the prompt gets rows for them too is
+asked on #1628.
 
 The mark above the head is drawn while the microphone is open. It
 sits above the name, and it does not recolor the name. Whisper is
