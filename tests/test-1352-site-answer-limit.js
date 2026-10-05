@@ -157,7 +157,10 @@ async function token(port) {
     return { status: r.status, doc: doc, ms: Date.now() - t0 };
   } catch (e) { return { status: 0, doc: null, ms: Date.now() - t0, err: String(e && e.message) }; }
 }
-const checked = (r) => r.status === 200 && !!r.doc && r.doc.checked === true && typeof r.doc.token === 'string';
+// A token the site vouched for: 200 with a token that does not say checked
+// false. Since #1315 an unchecked one is not minted at all, and a minted one
+// no longer carries checked; before it, unchecked came back checked false.
+const checked = (r) => r.status === 200 && !!r.doc && typeof r.doc.token === 'string' && r.doc.checked !== false;
 
 (async () => {
   await new Promise((ok) => siteServer.listen(0, '127.0.0.1', ok));
