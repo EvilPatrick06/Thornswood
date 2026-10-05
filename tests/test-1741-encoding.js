@@ -10,7 +10,7 @@
 //
 // This holds the file to UTF-8 read as UTF-8: no Windows-1252 reading of
 // UTF-8 bytes anywhere in it, no byte order mark character written into the
-// source (an escape, ﻿, cannot be misread), every strip after a
+// source (an escape, \uFEFF, cannot be misread), every strip after a
 // readFileSync removes a real byte order mark, and the comment reads as it
 // did before.
 //
@@ -38,9 +38,9 @@ yes('E2 the gamemode does not start with a byte order mark', !(raw[0] === 0xEF &
 
 // The characters Windows-1252 gives the bytes 0x80 to 0xBF, which is what the
 // second and third bytes of a UTF-8 character turn into when read that way.
-const TAIL = '\u0080-¿ŒœŠšŸŽžƒˆ˜' +
-             '–—‘-‚“-„†-•…‰‹›€™';
-const MISREAD = new RegExp('[Â-ô][' + TAIL + ']', 'g');
+const TAIL = '\u0080-\u00BF\u0152\u0153\u0160\u0161\u0178\u017D\u017E\u0192\u02C6\u02DC' +
+             '\u2013\u2014\u2018-\u201A\u201C-\u201E\u2020-\u2022\u2026\u2030\u2039\u203A\u20AC\u2122';
+const MISREAD = new RegExp('[\u00C2-\u00F4][' + TAIL + ']', 'g');
 const misread = [];
 gm.split('\n').forEach(function (line, i) {
   if (MISREAD.test(line)) { misread.push(i + 1); }
