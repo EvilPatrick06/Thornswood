@@ -450,6 +450,8 @@ if (F.iniNumber && F.raceMenuOpen && F.race && F.messages) {
     w.frames(200);
     yes('R7 a race menu that shuts because the game is closing is not told to the server as a finished face',
         w.exits === 1 && w.server.indexOf('/face done') === -1);
+    yes('R7 and the server is told the menu is down, so a still-connected player can be asked again',
+        w.server.indexOf('/racedown') >= 0);
   }
   {
     // Every text cleared from under the line, and its id handed to somebody
