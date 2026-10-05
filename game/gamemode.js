@@ -40990,15 +40990,15 @@ log('gamemode loaded:',
       if (typeof putBack === 'function') {
         try { putBack(actorId, refrId); } catch (e) { slog('could not put purse', refrId.toString(16), 'back:', e); }
       }
-      // #627: say plainly it was not left by a player (the old 'by nobody'
-      // line was read as flavour rather than as the rule).
-      return 'That coin purse was not left here by a player. Coin comes from ' +
+      // #627: say plainly the world put it there and no person left it (the
+      // old 'by nobody' line was read as flavour rather than as the rule).
+      return 'That coin purse was put here by the world, not left by a person. Coin comes from ' +
              'people in this world, not off the ground.';
     }
     // Made at runtime rather than placed by a plugin, so somebody put it there.
     if (refrId >= 0xff000000) { return null; }
     if (!isSpoil(baseId)) { return null; }
-    return 'That was not left here by a player. Weapons, armour and coin come ' +
+    return 'That was put here by the world, not left by a person. Weapons, armour and coin come ' +
            'from people in this world, not off the ground.';
   }
 
