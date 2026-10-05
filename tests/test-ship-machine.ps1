@@ -319,25 +319,28 @@ try {
                         'Vortex', 'feed', 'webhooks', 'VPS access', 'Backups', 'records\signing\signing.template.json')) {
         Yes ("6. it covers " + $item) ($sec.IndexOf($item, [StringComparison]::OrdinalIgnoreCase) -ge 0)
     }
-    # Patrick, 29 Sep (#1121): only his Azure account can sign, so a second
-    # machine signs only while signed in as him; and the domain is in his own
-    # Cloudflare login, signed in with GitHub.
-    Yes '6. it says only Patrick''s Azure account can sign, so a second machine signs only signed in as him' (
-        $sec -match "Only Patrick's Azure account has signing access" -and $sec -match 'signs only while it is signed in as him')
-    Yes '4. Setup-ShipMachine says to sign in as Patrick, and no longer to be given the role' (
-        $setupText.Contains('az login   (as Patrick: only his Azure account can sign)') -and
-        $setupText.Contains('so this machine signs only while signed in as him') -and
-        $setupText -notmatch 'Patrick gives your Azure account' -and $setupText -notmatch 'the account Patrick gave the signer role')
+    # Patrick, 4 Oct (#1740): each person who ships signs in as themselves, with
+    # an account of their own that holds the signer role, which he makes once;
+    # a device code is refused by the tenant (AADSTS530035). It replaced 29
+    # Sep's rule that only his account signs (#1121). And the domain is in his
+    # own Cloudflare login, signed in with GitHub.
+    Yes '6. it says each person signs with an account of their own, made once by Patrick, never with a device code' (
+        $sec -match 'an account of their own' -and $sec -match '(?m)^#### Your own signing sign in\s*$' -and
+        $sec -match 'AADSTS530035' -and $sec -notmatch "Only Patrick's Azure account has signing access" -and
+        $sec -notmatch 'signs only while it is signed in as him')
+    Yes '4. Setup-ShipMachine sends a sign in with no role to that step, not to Patrick''s own sign in' (
+        $setupText.Contains('Your own signing sign in') -and $setupText.Contains('--allow-no-subscriptions') -and
+        $setupText -notmatch 'as Patrick: only his Azure account' -and $setupText -notmatch 'signs only while signed in as him')
     $own = [IO.File]::ReadAllText((Join-Path $Repo 'docs\OWNERSHIP.md'))
     $signRow = [regex]::Match($own, '(?m)^\| Code signing \|.*$').Value
     $domainRow = [regex]::Match($own, '(?m)^\| Domain \|.*$').Value
-    Yes 'OWNERSHIP.md: signing is Patrick''s Azure account alone, and a second machine signs as him' (
-        $signRow -match 'the only one with signing access' -and $signRow -match 'signed in as Patrick')
+    Yes 'OWNERSHIP.md: each person signs with an account of their own, which Patrick makes' (
+        $signRow -match 'an account of their own' -and $signRow -notmatch 'the only one with signing access')
     Yes 'OWNERSHIP.md: the domain is in Patrick''s own Cloudflare login, signed in with GitHub, with no gap left' (
         $domainRow -match "Patrick: it is registered in his own Cloudflare login, which he signs in to with GitHub" -and $domainRow -notmatch 'fill in|is the gap')
-    Yes 'Developer-Guide.md secrets table has the domain row and signing as Patrick' (
+    Yes 'Developer-Guide.md secrets table has the domain row and signing with an account of their own' (
         $dev -match '(?m)^\| The domain, thornswood\.net \| Registered at Cloudflare, in Patrick''s own Cloudflare login, which he signs in to with GitHub' -and
-        $dev -match '(?m)^\| Code signing \|.*as Patrick, whose Azure account is the only one with signing access')
+        $dev -match '(?m)^\| Code signing \|.*an account of their own')
     Yes '6. it names this harness' ($sec -match 'tests\\test-ship-machine\.ps1')
     Yes '6. and the dev channel for the Ship it ends on' ($sec -match '\.\\scripts\\release\\Ship\.ps1 -Channel dev')
 

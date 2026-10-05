@@ -38,10 +38,12 @@ On a new machine `.\scripts\release\Setup-ShipMachine.ps1` fetches the client
 at the pinned version (refusing any other bytes), writes `records\signing\signing.json`
 from the template when there is none, and asks the signing service whether
 this machine's `az login` can sign with the profile. The sign in is the
-credential, and only Patrick's Azure account has signing access (the
-Certificate Profile Signer role on the ThornswoodSigning account), so a second
-machine signs only while `az` on it is signed in as Patrick (Patrick,
-29 Sep). Never copy another machine's
+credential. Each person who ships signs in as themselves, with an account of
+their own in the signing tenant that holds the Certificate Profile Signer role
+on the ThornswoodRelease profile, which Patrick makes once (Developer-Guide.md,
+"Your own signing sign in"; Patrick, 4 Oct, #1740). Until then only his
+account could sign (29 Sep, #1121). `az login --use-device-code` is refused by
+the tenant's security defaults (AADSTS530035). Never copy another machine's
 `records\signing\signing.json`: One's names `C:\tools\metadata.json`, which no other
 machine has.
 
