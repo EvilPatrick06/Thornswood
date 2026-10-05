@@ -395,12 +395,13 @@ with.
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `e65341299bfdbdc0993678e93572930cae43d183` on the public fork. The server executable was
-  rebuilt from that commit, which reads every plugin into memory when the
-  server starts; its SHA256 is
-  `7477e037a3050d37619c4643d6fbe1a7d877b5248fbda8d64af142ddcdacce10`, built
-  2026-10-04T20:50:16Z. The six client files keep the bytes recorded before,
-  because that commit changes no client source.
+  name `a247ef27b9915bdfcdad7a8ba70d78acbd8f7beb` on the public fork. The
+  server module was built from that commit, which adds the merchant settlement
+  and the appearance publication change (`records\merchant-runtime-provenance.md`);
+  its SHA256 is
+  `e83c6e8133b30fe66d0060dcb7927fb672f98690df8a0262648c8b8d6bf9f152`, built
+  2026-10-05T04:40:47Z. The six client files keep the published `e6534129`
+  bytes, because their source is the same at both commits (the same record).
   Main remains on `8cab23e6b86609181a4ec212818b56199db9061e` until its next release.
   Section 13 of the AGPL asks that everybody who connects to a modified server
   over a network be offered its source. The next section is that offer.
@@ -427,9 +428,9 @@ certifi is the Certifi project (Mozilla CA bundle as an MPL-2.0 package).
 
 For the six client files and for the game server module running on the VPS, the
 Corresponding Source is the fork at the commit each record names. The six
-client files and the game server module, both built from one commit:
+client files and the game server module, at the one commit both records name:
 
-https://github.com/EvilPatrick06/skymp/tree/e65341299bfdbdc0993678e93572930cae43d183
+https://github.com/EvilPatrick06/skymp/tree/a247ef27b9915bdfcdad7a8ba70d78acbd8f7beb
 
 The game server module the live server runs until its next server release:
 

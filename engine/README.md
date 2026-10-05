@@ -289,7 +289,10 @@ A change to the engine goes like this:
    server record came out of step 2.
 4. One pull request here with the new pin (`git -C engine/skymp checkout
    <commit>`, then `git add engine/skymp`), both records, and the commit named
-   in `THIRD-PARTY.md` and `site\data\site\credits.md`.
+   in `THIRD-PARTY.md` (its fork section, "On our servers" with the server's
+   SHA256, and the link in "Where the source is") and in
+   `site\data\site\credits.md`. `tests\test-third-party.js` is red when any of
+   those is not the commit `records\server-build.json` names.
 5. After it merges: the server to the dev server with `Publish-Server.ps1
    -Channel dev`, the client with the next dev Ship.
 
