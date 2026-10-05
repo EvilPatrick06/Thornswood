@@ -565,8 +565,8 @@ if (social && trade) {
     yes('D2: an accepted trade arriving before its panel mounts is retained',
       !!page.thornswoodTradeView && page.thornswoodTradeView.open === true);
     command(w, A, '/trade missing');
-    yes('D2: invalid trade actions give a refusal rather than vanishing',
-      w.lines(A).some(s => /trade: add/.test(s)));
+    yes('D2: invalid trade actions give a refusal rather than vanishing, and teach no typed verb (#1628)',
+      w.lines(A).some(s => /already in a trade/.test(s)) && !w.lines(A).some(s => /trade: add/.test(s)));
   }
 
   // A whole browser reload also loses the cache while owner state survives.

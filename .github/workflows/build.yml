@@ -300,6 +300,7 @@ jobs:
                  'test-1635-ride-panel.js',
                  'test-1393-company.js',
                  'test-1398-fuel.js',
+                 'test-1628-social-gui.js',
                  'test-1630-journal-gui.js',
                  'test-1629-party-gui.js',
                  'test-1640-jarl-word.js',
