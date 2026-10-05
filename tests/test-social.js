@@ -184,6 +184,39 @@ if (social && trade) {
         /thornswood-trade\.js/.test(FRONT));
   }
 
+  // A new profile with no appearance must not show on the trade/party lists.
+  // 3 Oct 2026, profile 598737699: the engine had already published him, and
+  // the trade name fell back to "somebody" because appearance.name was empty.
+  // The fallback string stays. The list itself hides him until a face is stored.
+  {
+    const w = world();
+    const A = w.person(0xff000001, 'Bjorn', 101, 'town:X.esm', [0, 0, 0]);
+    const NEW = 0xff000099;
+    w.store[NEW] = {
+      here: true, profileId: 598737699, appearance: null,
+      worldOrCellDesc: 'town:X.esm', pos: [50, 0, 0], inventory: []
+    };
+    w.g.__thornswoodChargen = {
+      publishedForOthers: function (id) {
+        try {
+          const a = w.mp.get(id, 'appearance');
+          return !!(a && typeof a === 'object');
+        } catch (e) { return true; }
+      }
+    };
+    w.soc.nearTick();
+    yes('a person with no stored appearance is not on the near list',
+        !w.near(A)[NEW.toString(16)]);
+
+    w.store[NEW].appearance = { name: '' };
+    w.soc.nearTick();
+    const row = w.near(A)[NEW.toString(16)];
+    yes('once an appearance object is stored they are near, even with a blank name',
+        !!row);
+    yes('and the trade name fallback is still somebody when the stored name is empty',
+        !!row && row.n === 'somebody');
+  }
+
   // --------------------------------------------------------------- friends
   {
     const w = world();
@@ -565,8 +598,8 @@ if (social && trade) {
     yes('D2: an accepted trade arriving before its panel mounts is retained',
       !!page.thornswoodTradeView && page.thornswoodTradeView.open === true);
     command(w, A, '/trade missing');
-    yes('D2: invalid trade actions give a refusal rather than vanishing',
-      w.lines(A).some(s => /trade: add/.test(s)));
+    yes('D2: invalid trade actions give a refusal rather than vanishing, and teach no typed verb (#1628)',
+      w.lines(A).some(s => /already in a trade/.test(s)) && !w.lines(A).some(s => /trade: add/.test(s)));
   }
 
   // A whole browser reload also loses the cache while owner state survives.

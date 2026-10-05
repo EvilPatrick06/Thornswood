@@ -10,14 +10,17 @@ court's, and the server does not pick a side.
 
 ## A claim
 
-Stand at the door and open it, then say `/claim`. The door you opened is
-the building. A door opened more than a minute ago does not count, so a
-door you passed on the way across town is not the one you claim from a
-field.
+Open the door. For the next minute, while one of that building's doors
+is under the crosshair, a line names the lock key, X unless you changed
+it, and says what it will do there. At a building nobody holds it says
+Claim, and pressing it claims the building. Nothing is typed. The door
+you opened is the building. A door opened more than a minute ago does
+not count, so a door you passed on the way across town is not the one
+you claim from a field.
 
-If nobody holds it, it is yours. If you already hold it, the server says
-so. If somebody else holds it, it names them and stops. It does not take
-the building off them.
+If nobody holds it, it is yours. A building you hold offers Lock or
+Unlock instead. A building somebody else holds offers nothing, and the
+key does not take it off them.
 
 The claim lapses 14 real days after the last time the holder opened one
 of its doors. Living there keeps it. When it lapses, the register drops
@@ -35,7 +38,9 @@ Claiming hands you a deed there and then. Every building uses one book.
 The name on that copy is the building: Deed to Breezehome is not Deed
 to Honeyside.
 
-`/deed` lists what you hold.
+What you hold is on the property page of the K panel: each building,
+whether it is locked, the rent owed on it, and your farm with the days
+it has left. The page is there once you hold something or carry a key.
 
 The register is the record that decides the holder. It lives with the
 server, not in the pack. A deed can be stolen. A stolen deed does not
@@ -44,27 +49,39 @@ the server never issued it.
 
 ## Locks and keys
 
-The holder says `/lock` and `/unlock` at the door. A lock reaches
-everybody on the next moment the list changes. A door whose cell was
-not loaded yet is caught within 4 seconds of it loading.
+The holder locks and unlocks it with the same key at the door. On an
+unlocked door the line says Lock, on a locked one Unlock, and the key
+does what the line says. Whoever carries the deed may turn it too. A
+lock reaches everybody on the next moment the list changes. A door
+whose cell was not loaded yet is caught within 4 seconds of it loading.
 
-A key is a smith's work, at a forge, with `/key`. The holder's own door
-needs no mold. Anybody else's door needs a mold cut at that door with
-`/mold`. The key opens that building.
+A key comes off a key mold. A smith forges a blank mold at a forge out
+of one iron ingot. Look at the door with a blank in your pack and a line
+names the mold key, U unless you changed it. Press it and the blank goes
+into the lock: it is that building's mold now, in the holder's pack. The
+holder has to be the one pressing or be standing there.
+
+A smith carrying the mold looks at a forge, and the lock key's line says
+Cut a key. It costs one iron ingot, the same as the Key in the forge's
+own list, and the key goes into the smith's pack, named for the
+building. The mold is kept for the next one. The key opens that
+building.
 
 A key can be lifted, the same as any other thing in a pack. The server
 does not change which key a door wants.
 
 ## Stewards and rent
 
-A jarl names stewards. Only a steward can `/evict`, and only at the
-door. Eviction ends the claim. It does not empty the house. It does not
+A jarl names stewards. Only a steward can evict, and only at the
+door: open it, then press Evict on the Office page of the K panel
+within a minute. Eviction ends the claim. It does not empty the house. It does not
 take a key back, so a tenant who kept one can still walk in. That is a
 person's problem, handled like a person.
 
-Rent is optional. A steward at the door says `/rent 50` and the place
-owes 50 gold every 7 real days, or `/rent -` and it owes nothing.
-`/rent` with no amount says what is owed.
+Rent is optional. A steward opens the door, then on the Office page
+sets 50 and the place owes 50 gold every 7 real days, or presses No
+rent and it owes nothing. The page shows the steward what is owed
+there.
 
 The server counts the debt. It does not take the gold out of a pack.
 Rent is handed to a steward, or put in the hold's box. Gold put in the
@@ -84,11 +101,13 @@ submits the list. The guild of that hold keeps the copy. The rules
 are on [Factions and businesses](factions.md) and
 [Merchant's Guild](merchants-guild.md).
 
-A steward can still mark a container with `/box whiterun`. Only gold
-goes in that chest. Anything else is handed back, still in the hand.
+A steward can still make a container a hold's box: open it, then
+press the hold on the Office page of the K panel within a minute. Only
+gold goes in that chest. Anything else is handed back, still in the hand.
 The board itself is enough to submit a list.
 
-The number `/box` reports is a ledger of what has been paid in. Gold
+The number the board panel shows as paid in is a ledger of what has
+been paid in. Gold
 dropped in the chest is also in the chest. A fee taken for a notice is
 counted on the ledger and is not sitting in the chest. Nothing
 withdraws from the ledger except the payouts named on
@@ -159,7 +178,27 @@ not company wares.
 
 Claims, deeds, the 14 day lapse, locks, molds, keys, stewards,
 eviction, rent, and the gold-only box are in the server. The register
-is `private/property.json`.
+is `private/property.json`. Eviction, the rent and marking a box are
+the Office page of the K panel, for a steward or a Jarl; see
+[Offices](offices.md). A container is made one of the ten holds' boxes
+and no other. The rent owed is on that page for the steward at the
+door; a holder does not see it on a panel yet.
+
+Claiming, locking, unlocking and cutting a key are the lock key, with
+nothing typed (#1637). The server writes the door's word, Claim, Lock or
+Unlock, and that building's doors to the person on every door of a
+building they open and again after every press, and the front plugin
+draws the line while one of those doors is under the crosshair. The key
+sends the server what the line said and the door's id. At a forge it
+sends the forge's id, and the server checks that it is one of the
+forges the bench table knows and that the smith is standing at it, as
+it checks a door for the mold key. The lines it sends are in
+[Chat commands](commands.md), and no help names them. The property page
+on K lists each building with the rent owed on it, and the farm. The
+suggested answers on #1637 are what is built until Patrick answers
+there: one key that locks and unlocks and says which, what you hold on
+K, the same key to claim at a door and to cut at a forge, and one iron
+ingot for each key it cuts.
 
 A bed counts only when the server saw the person press it and they
 are still beside it, and the rest stops when they leave it, the night

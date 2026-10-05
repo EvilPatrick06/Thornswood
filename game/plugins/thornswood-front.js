@@ -83,7 +83,7 @@
   const OVERLAYS = ['thornswood-chat.js', 'thornswood-emotes.js', 'thornswood-voice.js',
                     'thornswood-skills.js', 'thornswood-party.js',
                     'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js',
-                    'thornswood-repair.js', 'thornswood-maneuvers.js', 'thornswood-afk.js'];
+                    'thornswood-repair.js', 'thornswood-maneuvers.js', 'thornswood-ride.js', 'thornswood-afk.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -1879,15 +1879,15 @@
     the J journal.
 
     The trade window's close hides it and leaves the trade to the server: the
-    next change to either pile draws it again, and /trade cancel in the chat
-    still walks away. The wheel's name is the one it has always had here. The
+    next change to either pile draws it again, and so does H, or Trade on the
+    P panel, while the trade stands (#1628), which puts Walk away back. The wheel's name is the one it has always had here. The
     select window is only ever capped once its choice is no longer up.
   */
   const CAP_CLOSES = {
     skills: 'thornswoodSkills', party: 'thornswoodParty', journal: 'thornswoodJournal',
     board: 'thornswoodBoard', repair: 'thornswoodRepair',
     trade: 'thornswoodTrade', merchant: 'thornswoodMerchant', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
-    afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers'
+    afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers', ride: 'thornswoodRide'
   };
 
   T.claimFocus = function (who, on) {
@@ -2901,9 +2901,15 @@
     raceWasOpen = open;
     if (!open) {
       raceToldAt = 0;
-      // Not when the menu went because the game is being closed: a face
-      // left half made is not a face done. See closeGame.
-      if (closingGame) { log('the race menu closed with the game closing, not telling the server'); return; }
+      // closingGame is F10 twice or the quit paths. A face left half made
+      // is not /face done, so that word is not sent. The server still has
+      // to learn the menu is down: if faceOpenAt stays set, a player who
+      // is still connected is never asked again. /racedown is that fact.
+      if (closingGame) {
+        log('the race menu closed with the game closing, telling the server it is down');
+        tellServer('/racedown');
+        return;
+      }
       log('the race menu closed, telling the server');
       tellServer('/face done');
     }
@@ -4746,13 +4752,18 @@
     return moldBase > 0;
   }
 
-  /** How many of the Key Molds carried have a name, which is a door's. 0 when it cannot tell. */
-  function stampedMolds(pc) {
+  /*
+    How many of the Key Molds carried have a name, which is a door's. 0 when
+    it cannot tell. base is the Key Mold's runtime id when the caller has its
+    own (the lock key at a forge, #1637), and moldBase otherwise.
+  */
+  function stampedMolds(pc, base) {
+    const want = base || moldBase;
     let named = 0;
     try {
       const changes = sp.getExtraContainerChanges(pc.getFormID()) || [];
       for (let i = 0; i < changes.length; i++) {
-        if (!changes[i] || changes[i].baseId !== moldBase) { continue; }
+        if (!changes[i] || changes[i].baseId !== want) { continue; }
         const lists = changes[i].extendDataList || [];
         for (let j = 0; j < lists.length; j++) {
           let n = 1, name = false;
@@ -4872,21 +4883,6 @@
     return true;
   }
 
-
-  /*
-    Lock the door you last opened. Patrick on #615: /lock should be a key
-    press that is logged to the server as /lock when pressed. The server
-    keeps every rule /lock already has (stand at the door, be the holder or
-    carry the deed). Unlock stays the typed /unlock.
-  */
-  function lockPress() {
-    if (!T.ready) { return false; }
-    if (claims.chat) { return false; }
-    if (busyMenuOpenNow()) { return false; }
-    tellServer('/lock');
-    say('pressed ' + LOCK_NAME + ' for /lock');
-    return true;
-  }
   sp.on('update', guard('mold', () => {
     const now = Date.now();
     if (now - moldAt < MOLD_EVERY) { return; }
@@ -4900,6 +4896,209 @@
     if (KEYBOARD_MENUS.indexOf(String((e && e.name) || '')) === -1) { return; }
     moldDoor = '';
     drawMold(false);
+  }));
+
+  /*
+    ------------------------------------- the lock key: a door, a forge (#1637)
+
+    Patrick, 4 October: no chat commands for anything people do, only
+    buttons and GUI. The lock key (X unless LockKey moved it) used to send
+    /lock at whatever door was opened last, and claiming, unlocking and
+    cutting a key were typed. Now it does what one line under the crosshair
+    says, and only while that line is up:
+
+      a door of the building you just     Claim when nobody holds it, Lock or
+      opened                              Unlock when it is yours. The
+                                          suggested answer on #1637: one key,
+                                          and the line says which it will do.
+      a forge, carrying a key mold that   Cut a key.
+      has been pressed into a door
+
+    THE DOOR'S WORD IS THE SERVER'S. Which building a door belongs to, who
+    holds it and whether it is locked are all in the register, so the server
+    writes thornswoodDoorLine on every door of a building somebody opens and
+    after every press (doorLine in the property block): the word, the name,
+    and that building's doors by form id. The line is up while one of those
+    doors is under the crosshair, either half of a front door, for as long as
+    the server still takes it as the door just opened.
+
+    THE FORGE IS KNOWN BY ITS BASE, the six forges of the bench table in the
+    gamemode (BENCH_BY_BASE rows for CraftingSmithingForge), resolved by file
+    and local id like the drivers below, and held to that table by
+    tests/test-1637-door-gui.js. The mold is a Key Mold with a door's name on
+    it, counted the way the mold key counts them.
+
+    The key sends /claim, /lock, /unlock or /key with the id under the
+    crosshair. Those are the lines the server always answered, nobody is told
+    to type them, and the server checks everything again: the door just
+    opened, the holder, the smith, the forge, the mold and the ingot.
+
+    Never over a menu or while the chat has the keyboard, on the crosshair
+    poll's beat, and down the moment a menu takes the keyboard, for the
+    reasons the mold line gives.
+  */
+  const LOCK_EVERY = 320;
+  // The mold line's look, a line lower, so the two never sit on each other:
+  // a holder carrying a blank who looks at their own door has both.
+  const LOCK_CSS =
+    'position:fixed;left:50%;top:67%;transform:translateX(-50%);z-index:2147482900;' +
+    'pointer-events:none;white-space:nowrap;' +
+    'font-family:"Palatino Linotype",Palatino,Georgia,serif;font-size:19px;letter-spacing:.03em;' +
+    'color:#d9cfb4;background:rgba(11,10,8,.72);border:1px solid rgba(198,170,109,.42);' +
+    'padding:8px 16px 9px;text-shadow:0 2px 4px rgba(0,0,0,.95)';
+  const FORGE_BASES = [
+    ['Skyrim.esm', 0x1a2ad], ['Skyrim.esm', 0xbf9e1], ['Skyrim.esm', 0xcae0b],
+    ['Dragonborn.esm', 0x2b074], ['Dragonborn.esm', 0x3cf6e], ['North Keep.esp', 0x21152]
+  ];
+  let lockAt = 0;
+  let lockShown = '';      // the line's words while it is up, '' while it is down
+  let lockSentFor = '';
+  let lockSentAt = 0;
+  let forgeIds = null;     // null not found yet, else { runtime id: true }
+  let keyMoldId = -1;      // -1 not asked yet, 0 not in this build, else the Key Mold's runtime id
+
+  function forgeIdSet() {
+    if (forgeIds) { return forgeIds; }
+    const out = {};
+    let found = 0;
+    for (let i = 0; i < FORGE_BASES.length; i++) {
+      try {
+        const form = sp.Game.getFormFromFile(FORGE_BASES[i][1], FORGE_BASES[i][0]);
+        const id = form ? (form.getFormID() >>> 0) : 0;
+        if (id) { out[id] = true; found++; }
+      } catch (err) { }
+    }
+    // Remembered once the world answers for any of them; asked again until then.
+    if (found) {
+      forgeIds = out;
+      say('forges for the lock key: ' + found + ' of ' + FORGE_BASES.length + ' bases found');
+    }
+    return out;
+  }
+
+  function keyMoldNow() {
+    if (keyMoldId >= 0) { return keyMoldId; }
+    try {
+      if (!sp.Game.getPlayer()) { return 0; }
+      const item = sp.Game.getFormFromFile(MOLD_ITEM, MOLD_FILE);
+      keyMoldId = item ? (item.getFormID() >>> 0) : 0;
+    } catch (e) {
+      // Not remembered. A throw is not an answer, so it is asked again.
+      return 0;
+    }
+    return keyMoldId;
+  }
+
+  /** The line the server wrote for the door just opened, while it still counts. */
+  function doorLineNow() {
+    let v = null;
+    try { v = globalThis.thornswoodDoorLine; } catch (e) { v = null; }
+    if (!v || typeof v !== 'object' || !v.x || !Array.isArray(v.d)) { return null; }
+    if (Date.now() - (Number(v.seen) || 0) > (Number(v.left) || 0)) { return null; }
+    return v;
+  }
+
+  const LOCK_WORDS = { claim: 'Claim ', lock: 'Lock ', unlock: 'Unlock ' };
+
+  /** What the lock key would do right now: { hex, verb, words }, or null. */
+  function lockKeyNow() {
+    if (anyClaim()) { return null; }
+    let ref = null;
+    try { ref = sp.Game.getCurrentCrosshairRef(); } catch (e) { ref = null; }
+    if (!ref) { return null; }
+    let type = 0, baseId = 0, hex = '';
+    try {
+      const b = ref.getBaseObject();
+      type = b ? b.getType() : 0;
+      baseId = b ? (b.getFormID() >>> 0) : 0;
+      hex = (ref.getFormID() >>> 0).toString(16);
+    } catch (e) { return null; }
+    if (type === DOOR_TYPE) {
+      const v = doorLineNow();
+      if (!v || v.d.indexOf(hex) === -1 ||
+          !Object.prototype.hasOwnProperty.call(LOCK_WORDS, v.x)) { return null; }
+      if (busyMenuOpenNow()) { return null; }
+      return { hex: hex, verb: v.x, words: LOCK_WORDS[v.x] + String(v.n || 'this building') };
+    }
+    if (!baseId || !forgeIdSet()[baseId]) { return null; }
+    const mold = keyMoldNow();
+    if (!mold) { return null; }
+    if (busyMenuOpenNow()) { return null; }
+    let pc = null, carried = 0;
+    try {
+      pc = sp.Game.getPlayer();
+      const form = sp.Game.getFormEx(mold);
+      carried = (pc && form) ? pc.getItemCount(form) : 0;
+    } catch (e) { carried = 0; }
+    if (!(carried > 0) || !(stampedMolds(pc, mold) > 0)) { return null; }
+    return { hex: hex, verb: 'key', words: 'Cut a key from your key mold' };
+  }
+
+  /** The line up with these words, or down for none. Only remembered once the page has taken it. */
+  function drawLock(words) {
+    words = words ? String(words).replace(/[<>&"]/g, '') : '';
+    if (words === lockShown) { return; }
+    if (!words) {
+      if (T.js('try{var d=document.getElementById("ts-lock");if(d){d.style.display="none";}}catch(e){}')) {
+        lockShown = '';
+      }
+      return;
+    }
+    const html =
+      '<span style="display:inline-block;min-width:26px;text-align:center;margin-right:12px;' +
+      'padding:1px 7px;border:1px solid rgba(233,209,155,.55);border-bottom-width:2px;' +
+      'border-radius:3px;background:rgba(0,0,0,.35);color:#e9d19b">' + LOCK_NAME + '</span>' + words;
+    if (T.js('(function(){try{' +
+             'var d=document.getElementById("ts-lock");' +
+             'if(!d){d=document.createElement("div");d.id="ts-lock";' +
+             'd.style.cssText=' + JSON.stringify(LOCK_CSS) + ';' +
+             'document.body.appendChild(d);}' +
+             'd.innerHTML=' + JSON.stringify(html) + ';' +
+             'd.style.display="";' +
+             '}catch(e){}})();')) {
+      lockShown = words;
+    }
+  }
+
+  function lockLook() {
+    if (!T.ready) { lockShown = ''; return; }
+    const now = lockKeyNow();
+    drawLock(now ? now.words : '');
+  }
+
+  /*
+    The key. Asked again at the moment it goes down, so what is sent is what
+    is under the crosshair at the press. Answers whether it was used, so the
+    key falls through when no line is up. The same word for the same thing
+    once in a second and a half, so a double press is not a second answer.
+  */
+  function lockPress() {
+    if (!T.ready) { return false; }
+    if (claims.chat) { return false; }
+    const now = lockKeyNow();
+    drawLock(now ? now.words : '');
+    if (!now) { return false; }
+    const sig = now.verb + ' ' + now.hex;
+    const t = Date.now();
+    if (sig === lockSentFor && t - lockSentAt < 1500) { return true; }
+    lockSentFor = sig;
+    lockSentAt = t;
+    tellServer('/' + sig);
+    say('pressed ' + LOCK_NAME + ' for /' + sig);
+    return true;
+  }
+
+  sp.on('update', guard('lock line', () => {
+    const now = Date.now();
+    if (now - lockAt < LOCK_EVERY) { return; }
+    lockAt = now;
+    lockLook();
+  }));
+
+  sp.on('menuOpen', guard('lock menu', (e) => {
+    if (!lockShown) { return; }
+    if (KEYBOARD_MENUS.indexOf(String((e && e.name) || '')) === -1) { return; }
+    drawLock('');
   }));
 
   /*
@@ -7056,15 +7255,17 @@
   }
 
   /*
-    A CARRIAGE OR FERRY DRIVER ASKS THE SERVER (#1394).
+    A CARRIAGE OR FERRY DRIVER OPENS HIS PANEL (#1394, #1635).
 
     Pressing E on a driver opens the carriage mod's own talk, and that talk
     does not know the hold's ledger: its ride is a fade on this machine that
     the server undoes, because the server refuses a move it did not make.
     So the same press also tells the server which driver it was, as
-    /ride e <id>, the way the merchant press does, and the server answers in
-    the chat with where this driver goes and what each stop costs. /ride and
-    the stop, said there, is the ride that counts.
+    /ride e <id>, the way the merchant press does, and the server answers
+    with where this driver goes and what each stop costs, which
+    game/ui/thornswood-ride.js draws. A stop's Ride button there is the ride
+    that counts. Nobody types a line (Patrick, 4 Oct: no chat commands for
+    what people do).
 
     THE DRIVERS ARE KNOWN BY THEIR BASE, the same rows as the carriages block
     in the gamemode (tests/test-1394-fares.js holds the two lists together).
@@ -7086,6 +7287,46 @@
     ['CFTO.esp', 0x14c6c], ['Dragonborn.esm', 0x182ae], ['Dragonborn.esm', 0x2582b]
   ];
   let rideDriverIds = null;
+
+  /*
+    THE RIDE PANEL WAITS FOR THE MOD'S CONVERSATION (#1635). The same E opens
+    the carriage mod's own talk, the Dialogue Menu, and a panel that took the
+    keyboard while that is up would leave the talk with no keys. So the
+    panel is up only while no menu is. When the page says the server's view
+    has come ('ride:wants'), it opens at once if no menu is open, or when the
+    menu that is open closes. A menu the game raises over the panel (the
+    talk opening after the server answered, a load screen) closes the panel,
+    and it waits again. It is over when you walk out of reach of the driver
+    you pressed, the reach the server measures (RIDE_REACH in the carriages
+    block), and when the page closes it: Step back, Escape, or the server
+    after a ride that went. The driver is kept as his local form id, never
+    as a form, and asked for in the frame it is used.
+  */
+  const RIDE_REACH = 400;
+  let rideDriver = 0;
+  let rideState = '';
+  let rideWatchAt = 0;
+
+  function rideInReach() {
+    if (!rideDriver) { return false; }
+    try {
+      const pc = sp.Game.getPlayer();
+      const ref = sp.ObjectReference.from(sp.Game.getFormEx(rideDriver));
+      if (!pc || !ref) { return false; }
+      const dx = pc.getPositionX() - ref.getPositionX();
+      const dy = pc.getPositionY() - ref.getPositionY();
+      const dz = pc.getPositionZ() - ref.getPositionZ();
+      return Math.sqrt(dx * dx + dy * dy + dz * dz) <= RIDE_REACH;
+    } catch (err) { return false; }
+  }
+
+  // except: the menu that is closing right now, which is not in the way.
+  function rideOpenIfFree(except) {
+    if (rideState !== 'waiting') { return; }
+    if (!rideInReach()) { rideState = ''; return; }
+    if (busyMenuOpenNow(except)) { return; }
+    T.js('try{window.thornswoodRide&&window.thornswoodRide.open();}catch(e){}');
+  }
 
   function rideDriverIdSet() {
     if (rideDriverIds) { return rideDriverIds; }
@@ -7119,17 +7360,39 @@
     } catch (err) { return false; }
     if (!baseId || !rideDriverIdSet()[baseId]) { return false; }
     let hex = '';
+    let localId = 0;
     try {
       const convert = globalThis.thornswoodSocialServerId;
-      const localId = ref.getFormID() >>> 0;
+      localId = ref.getFormID() >>> 0;
       const serverId = typeof convert === 'function' ? (convert(localId) >>> 0) : localId;
       if (serverId) { hex = serverId.toString(16); }
     } catch (err) { hex = ''; }
     if (!hex) { return false; }
+    rideDriver = localId;
     tellServer('/ride e ' + hex);
     say('asked the server where driver ' + hex + ' goes');
     return true;
   }
+
+  sp.on('menuOpen', guard('ride panel waits', (e) => {
+    if (rideState !== 'up' || !e || SELF_OPENING_MENUS.indexOf(e.name) < 0) { return; }
+    rideState = 'waiting';
+    T.js('try{window.thornswoodRide&&window.thornswoodRide.close();}catch(e){}');
+  }));
+
+  sp.on('menuClose', guard('ride panel opens', (e) => {
+    rideOpenIfFree(e && e.name ? e.name : '');
+  }));
+
+  sp.on('update', guard('ride distance', () => {
+    if (!rideState) { return; }
+    const now = Date.now();
+    if (now - rideWatchAt < 250) { return; }
+    rideWatchAt = now;
+    if (rideInReach()) { return; }
+    rideState = '';
+    T.js('try{window.thornswoodRide&&window.thornswoodRide.close();}catch(e){}');
+  }));
 
   function merchantPress(e) {
     if (!e || e.userEventName !== 'Activate') { return false; }
@@ -7954,7 +8217,7 @@
     the key's update.
 
     closingGame goes up first, so the race menu closing as the game comes
-    apart is not told to the server as a finished face.
+    apart is told as /racedown, not as a finished face.
   */
   function closeGame(from) {
     closingGame = true;
@@ -8233,6 +8496,15 @@
       log('the merchant panel is in');
       return;
     }
+    // The ride panel (#1635): see THE RIDE PANEL WAITS above.
+    if (what === 'ride:wants') { rideState = 'waiting'; rideOpenIfFree(''); return; }
+    if (what === 'ride:opened') { rideState = 'up'; T.claimFocus('ride', true); return; }
+    if (what === 'ride:closed') {
+      T.claimFocus('ride', false);
+      if (rideState === 'up') { rideState = ''; }
+      return;
+    }
+    if (what === 'ride:ready') { log('the ride panel is in'); return; }
     if (what === 'party:ready' || what === 'journal:ready' || what === 'trade:ready' || what === 'board:ready') {
       tellServer(what === 'trade:ready' ? '/trade refresh' : '/party refresh');
       log('the ' + what.split(':')[0] + ' panel is in');

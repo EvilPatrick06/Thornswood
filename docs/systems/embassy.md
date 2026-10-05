@@ -44,8 +44,8 @@ a day after. That declaration is an event, not a command.
 
 ## The building
 
-The embassy doors start held by the Ambassador's office. `/claim` on
-them answers that the embassy is held. A steward of Haafingar does not
+The embassy doors start held by the Ambassador's office, so the line at
+them offers nobody a claim. A steward of Haafingar does not
 evict the Accord. A Thalmor does not found a claim on it. See
 [The Thalmor](thalmor.md) and [Property](property.md).
 

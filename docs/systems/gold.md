@@ -55,8 +55,9 @@ Gold pays, when the system that asks for it exists:
 | A job, including a haul's posting fee | 30 | The hold's ledger |
 | A haul's pay | Whatever was posted | The hold's ledger, then out to the hauler minus the company's tenth |
 | Rent | Whatever the steward set, every 7 real days | That hold's ledger |
-| A carriage | 20, or 40 if Raven Rock is either end | The departure hold's ledger |
-| A ferry | 10 | The departure hold's ledger |
+| A carriage | 10 to a stop in the same hold, 20 to another hold | The departure hold's ledger |
+| A ferry | 10, Solstheim's own ferry included | The departure hold's ledger |
+| The crossing to Solstheim, the Northern Maiden between Windhelm and Raven Rock | 40 | The departure hold's ledger |
 
 The rows that are not in the server yet are said at the bottom of the
 page they belong to. The amounts are the plan's amounts. The Merchant's

@@ -74,8 +74,12 @@ function yes(what, cond) {
   const b = a < 0 ? -1 : src.indexOf("    if (word === '/help' || word === '/commands') {", a);
   const branch = (a >= 0 && b >= 0) ? src.slice(a, b) : null;
   yes('the server answers /roll', branch !== null);
-  yes('and it is a command people are told about',
-      /'\/yes', '\/no', '\/roll'\]/.test(src));
+  // Read off PLAYER_WORDS rather than its last line, which moves as words
+  // leave it for keys and panels (#1628 took /yes and /no off before it).
+  const pw = /^const PLAYER_WORDS = (\[[\s\S]*?\]);$/m.exec(src);
+  let told = [];
+  try { told = pw ? new Function('return ' + pw[1].replace(/\/\/[^\n]*/g, ''))() : []; } catch (e) { told = []; }
+  yes('and it is a command people are told about', told.indexOf('/roll') !== -1);
 
   if (branch) {
     yes('the server is the one rolling', /Math\.random/.test(branch));
