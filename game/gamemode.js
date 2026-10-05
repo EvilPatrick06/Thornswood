@@ -37624,6 +37624,46 @@ log('gamemode loaded:',
     } catch (e) { }
   }
 
+  /*
+    THE NEWEST TEN, NUMBERED BY WHERE THEY REALLY ARE. What a board shows, on
+    its own panel and under Boards on J (#1627).
+
+    The typed reader this replaced had two faults in one loop. It showed the
+    OLDEST ten, so the eleventh paid posting in a hold was invisible for ever
+    and the fee was taken first. And it numbered the lines 1..10 by their
+    position in the listing while take indexes the real array, so the moment
+    anything was hidden the numbers a person could read stopped being the
+    numbers they could take.
+
+    A notice somebody took down stays in the list marked down, so it is
+    skipped here and leaves a gap in the numbers rather than moving every
+    newer one. See unpin below. `older` counts what is still up and not among
+    the ten: noticeboards.md, "The line under the ten says how many are older."
+  */
+  function wallOf(hold, profileId) {
+    var list = notices[hold] || [];
+    var rows = [];
+    var up = 0;
+    for (var i = list.length - 1; i >= 0; i--) {
+      var n = list[i];
+      if (n.down) { continue; }
+      up++;
+      if (rows.length >= 10) { continue; }
+      rows.push({
+        n: i + 1,
+        job: !!n.job,
+        letter: !!n.letter,
+        name: n.name || 'somebody',
+        text: n.letter ? sealed(n) : (n.haul ? haulText(n) : (n.text || '')),
+        taken: n.taken ? (n.takenName || 'somebody') : '',
+        mine: Number(n.by) === Number(profileId),
+        held: !!(n.job && Number(n.taken) === Number(profileId)),
+        haul: !!n.haul
+      });
+    }
+    return { rows: rows, older: up - rows.length };
+  }
+
   /** What the board panel draws. Null until they are near one. */
   function boardPanel(actorId, profileId) {
     var near = nearestBoard(actorId, 1500);
@@ -37632,37 +37672,13 @@ log('gamemode loaded:',
     var b = near.board;
     var here = near.dist <= BOARD_REACH;
     var wall = [];
+    var older = 0;
     var mine = [];
     if (here) {
-      var list = notices[hold] || [];
-      var shown = 0;
-      for (var i = list.length - 1; i >= 0 && shown < 10; i--) {
-        var n = list[i];
-        if (n.down) { continue; }
-        shown++;
-        wall.push({
-          n: i + 1,
-          job: !!n.job,
-          letter: !!n.letter,
-          name: n.name || 'somebody',
-          text: n.letter ? sealed(n) : (n.haul ? haulText(n) : (n.text || '')),
-          taken: n.taken ? (n.takenName || 'somebody') : '',
-          mine: Number(n.by) === Number(profileId),
-          held: !!(n.job && Number(n.taken) === Number(profileId)),
-          haul: !!n.haul
-        });
-      }
-      for (var h in notices) {
-        if (!Object.prototype.hasOwnProperty.call(notices, h)) { continue; }
-        var rows = notices[h];
-        for (var j = 0; j < rows.length; j++) {
-          var job = rows[j];
-          if (job.job && Number(job.taken) === Number(profileId) && !job.down) {
-            mine.push({ hold: h, n: j + 1, text: job.letter ? sealed(job) : (job.haul ? haulText(job) : (job.text || '')),
-                        name: job.name || 'somebody' });
-          }
-        }
-      }
+      var seen = wallOf(hold, profileId);
+      wall = seen.rows;
+      older = seen.older;
+      mine = jobsOf(profileId);
     }
     /*
       THE HAUL'S TWO BUTTONS (#1393). Send a haul needs the towns it can go
@@ -37713,11 +37729,47 @@ log('gamemode loaded:',
       here: here,
       paid: Number(funds[hold]) || 0,
       wall: wall,
+      older: older,
       jobs: mine,
       submit: submit,
       steward: steward,
       dests: dests,
       arrivals: arrivals
+    };
+  }
+
+  /*
+    EVERY TOWN'S BOARD, ON J (#1627). noticeboards.md: "Reading another
+    hold's board by name does not require standing there." That was
+    /board <hold>, typed. Patrick, 4 Oct: nothing people do is a chat
+    command. J has a Boards tab with the ten towns, and picking one sends
+    /board <hold>, which nobody is told to type. The server keeps which board
+    that character is reading, and the social view carries that one wall,
+    read only, with their jobs under it. Only the one they picked is sent,
+    so ten walls are not pushed to everybody on every tick.
+
+    boardReads is not saved. After a restart J shows the towns with none
+    picked, which is true: nobody has asked this server for one yet.
+  */
+  var boardReads = {};
+
+  function boardsView(profileId) {
+    var list = [];
+    for (var i = 0; i < LEDGER_HOLDS.length; i++) {
+      var h = LEDGER_HOLDS[i];
+      if (!Object.prototype.hasOwnProperty.call(boards, h)) { continue; }
+      list.push({ hold: h, where: (boards[h] && boards[h].where) || h });
+    }
+    var hold = Object.prototype.hasOwnProperty.call(boardReads, profileId) ? boardReads[profileId] : '';
+    if (!hold || !Object.prototype.hasOwnProperty.call(boards, hold)) {
+      return { list: list, read: null, jobs: null };
+    }
+    var seen = wallOf(hold, profileId);
+    return {
+      list: list,
+      read: { hold: hold, where: (boards[hold] && boards[hold].where) || hold,
+              wall: seen.rows, older: seen.older },
+      jobs: jobsOf(profileId)
     };
   }
 
@@ -37932,54 +37984,22 @@ log('gamemode loaded:',
     }
 
     /*
-      THE WORD BEATS THE PLACE WHEN A WORD WAS GIVEN.
-
-      This read `standing || arg`, so anybody at a board who named a different
-      hold was shown the one in front of them with no hint the argument had
-      been thrown away, while the prompt below told them to 'name a hold'. The
-      message advertised exactly what the expression prevented.
+      READING A BOARD IS A PANEL, NOT A LINE IN THE CHAT (#1627). Clicking
+      the board opens its panel there, and J's Boards tab sends
+      /board <hold> for any town's, from anywhere. That line puts the board
+      on J (boardsView) and answers nothing in the chat. With no town, it
+      says where the boards are.
     */
-    var named = (arg && Object.prototype.hasOwnProperty.call(boards, arg)) ? arg : null;
-    var hold = named || standing || null;
-    if (!hold) {
-      toProfile(profileId, arg
-        ? 'No board in ' + arg + '. Stand at a board, or name a hold that has one.'
-        : 'Stand at a board, or name a hold.');
+    if (!arg) {
+      toProfile(profileId, 'Click a notice board to read it. Every town\'s board is on J, under Boards.');
       return true;
     }
-    var list = notices[hold] || [];
-    var up = 0;
-    for (var u = 0; u < list.length; u++) { if (!list[u].down) { up++; } }
-    if (!up) {
-      toProfile(profileId, 'Nothing on the board in ' + hold + '.');
+    if (!Object.prototype.hasOwnProperty.call(boards, arg)) {
+      toProfile(profileId, 'No board in ' + arg + '.');
       return true;
     }
-    /*
-      THE NEWEST TEN, NUMBERED BY WHERE THEY REALLY ARE.
-
-      Two faults in one loop. It showed the OLDEST ten, so the eleventh paid
-      posting in a hold was invisible for ever and the fee was taken first. And
-      it numbered the lines 1..10 by their position in the listing while /take
-      indexes the real array, so the moment anything was hidden the numbers a
-      person could read stopped being the numbers they could take.
-
-      A notice somebody took down with /unpin stays in the list marked down,
-      so it is skipped here and leaves a gap in the numbers rather than
-      moving every newer one. See unpin below.
-    */
-    var lines = [];
-    var shown = 0;
-    for (var i = list.length - 1; i >= 0 && shown < 10; i--) {
-      var n = list[i];
-      if (n.down) { continue; }
-      lines.push('[' + (i + 1) + '] ' + (n.letter
-        ? 'letter for ' + n.to + ', from ' + n.name + (n.taken ? ', taken by ' + n.takenName : '')
-        : (n.job ? (n.taken ? 'job, taken: ' : 'job: ') : '') + n.name + ': ' + (n.haul ? haulText(n) : n.text)));
-      shown++;
-    }
-    var more = up > shown
-      ? '\n(' + (up - shown) + ' older, and /take uses the numbers shown)' : '';
-    toProfile(profileId, 'The board in ' + hold + ':\n' + lines.join('\n') + more);
+    boardReads[profileId] = arg;
+    refreshPanel(actorId);
     return true;
   }
 
@@ -38010,7 +38030,7 @@ log('gamemode loaded:',
     var list = notices[hold] || [];
     var at = Number((parts && parts[1]) || 0) - 1;
     if (!(at >= 0 && at < list.length)) {
-      toProfile(profileId, 'Say which one by its number, as /board lists them.');
+      toProfile(profileId, 'That one is not on the board.');
       return true;
     }
     var n = list[at];
@@ -38062,25 +38082,29 @@ log('gamemode loaded:',
     return true;
   }
 
-  /** What somebody is carrying off the boards, anywhere in Skyrim. */
-  function jobs(profileId, toProfile) {
-    var lines = [];
+  /*
+    What somebody is carrying off the boards, anywhere in Skyrim: Your jobs,
+    on the board panel and under Boards on J (#1627). It was /jobs, typed.
+    A job is handed back only at the board it came from (dropJob), so the
+    panel puts Put it back on the rows of the board you stand at, and J,
+    which is read only, has none.
+  */
+  function jobsOf(profileId) {
+    var out = [];
     for (var hold in notices) {
       if (!Object.prototype.hasOwnProperty.call(notices, hold)) { continue; }
       var list = notices[hold];
       for (var i = 0; i < list.length; i++) {
         var n = list[i];
-        if (n.job && n.taken === profileId && !n.down) {
-          lines.push(hold + ': ' + (n.letter ? sealed(n) + ', from ' + n.name
-                                             : (n.haul ? '[' + (i + 1) + '] ' + haulText(n) : n.text) +
-                                               ' (for ' + n.name + ')'));
+        if (n.job && Number(n.taken) === Number(profileId) && !n.down) {
+          out.push({ hold: hold, where: (boards[hold] && boards[hold].where) || hold, n: i + 1,
+                     name: n.name || 'somebody',
+                     text: n.letter ? sealed(n) : (n.haul ? haulText(n) : (n.text || '')),
+                     letter: !!n.letter, haul: !!n.haul });
         }
       }
     }
-    toProfile(profileId, lines.length
-      ? 'You have taken:\n' + lines.join('\n')
-      : 'You have taken no jobs.');
-    return true;
+    return out;
   }
 
   /** Hand one back, so it does not sit dead on the board. */
@@ -38093,7 +38117,7 @@ log('gamemode loaded:',
     var list = notices[hold] || [];
     var at = Number((parts && parts[1]) || 0) - 1;
     if (!(at >= 0 && at < list.length)) {
-      toProfile(profileId, 'Say which one by its number, as /board lists them.');
+      toProfile(profileId, 'That one is not on the board.');
       return true;
     }
     var n = list[at];
@@ -38127,18 +38151,18 @@ log('gamemode loaded:',
     their own notice or their own untaken job, and nobody else's.
 
     A JOB SOMEBODY HAS TAKEN STAYS UP. It is on the taker's list, and pulling
-    it out from under them would empty their /jobs with no word to either of
-    them. It can come down once they hand it back with /dropjob.
+    it out from under them would take it off their Your jobs with no word to
+    either of them. It can come down once they hand it back.
 
     NO REFUND. The fee went into the hold's box the moment the notice was
     posted, and the box is the hold's money, which only the City Court draws.
 
-    THE NUMBERS DO NOT MOVE. /take and /dropjob act on a notice's place in the
-    list, and a person reads that number off /board and types it a moment
-    later. Cutting a notice out would shift every newer one down by one, so
-    somebody who read [4] and typed /take 4 would take the job that had been
-    [5]. So a notice that comes down stays in the list marked down, and /board
-    and /take step over it.
+    THE NUMBERS DO NOT MOVE. The panel's Take, Put it back and Take down send
+    a notice's place in the list, drawn on the wall a moment before. Cutting a
+    notice out would shift every newer one down by one, so somebody who
+    pressed Take on 4 would take the job that had been 5. So a notice that
+    comes down stays in the list marked down, and the wall and take step over
+    it.
 
     takedown is the store half, with no rule in it about who may. It is on
     g.__thornswoodProperty so the guards (entries 209 and 208) can tear
@@ -38164,7 +38188,7 @@ log('gamemode loaded:',
     var list = notices[hold] || [];
     var at = Number((parts && parts[1]) || 0) - 1;
     if (!(at >= 0 && at < list.length)) {
-      toProfile(profileId, 'Say which one by its number, as /board lists them.');
+      toProfile(profileId, 'That one is not on the board.');
       return true;
     }
     var n = list[at];
@@ -38413,7 +38437,7 @@ log('gamemode loaded:',
     hold's ledger. The pay is held there the way a letter's 15 is, until the
     haul is confirmed or taken down.
 
-    /take and /jobs treat it as any job. It comes down before it is delivered
+    take and Your jobs treat it as any job. It comes down before it is delivered
     three ways, and each hands the pay back out of the ledger to the poster
     and keeps the fee (cancelHaul): the hauler's /dropjob, the poster's /unpin
     before anybody has taken it, and a steward's /unpin at the posting board,
@@ -38446,7 +38470,7 @@ log('gamemode loaded:',
     return p < HAUL_TENTH_FROM ? 0 : Math.floor(p / 10);
   }
 
-  /** A haul's line on the wall, the panel and /jobs: where it goes and the pay. */
+  /** A haul's line on the wall and in Your jobs: where it goes and the pay. */
   function haulText(n) {
     return 'haul to ' + n.dest + ' for ' + (Math.floor(Number(n.pay)) || 0) + ' gold: ' + (n.text || '');
   }
@@ -38817,7 +38841,6 @@ log('gamemode loaded:',
     if (word === '/job') { return post(parts, actorId, profileId, toProfile, true); }
     if (word === '/board') { return board(parts, actorId, profileId, toProfile); }
     if (word === '/take') { return take(parts, actorId, profileId, toProfile); }
-    if (word === '/jobs') { return jobs(profileId, toProfile); }
     if (word === '/dropjob') { return dropJob(parts, actorId, profileId, toProfile); }
     if (word === '/unpin') { return unpin(parts, actorId, profileId, toProfile); }
     if (word === '/letter') { return postLetter(parts, actorId, profileId, toProfile); }
@@ -39119,6 +39142,7 @@ log('gamemode loaded:',
     boxes: function () { return boxes; },
     notices: function () { return notices; }, takedown: takedown,
     boards: function () { return boards; }, boardHere: boardHere, boardPanel: boardPanel,
+    boardsView: boardsView,
     stewards: function () { return stewards.slice(); }
   };
   plog('ready,', Object.keys(BUILDING_BY_DOOR).length, 'doors across',
@@ -43170,7 +43194,7 @@ log('gamemode loaded:',
         word === '/unlock' || word === '/mold' || word === '/moldhere' || word === '/key' ||
         word === '/jarl' || word === '/steward' || word === '/evict' || word === '/box' ||
         word === '/rent' || word === '/sleephere' || word === '/notice' || word === '/job' ||
-        word === '/board' || word === '/take' || word === '/jobs' ||
+        word === '/board' || word === '/take' ||
         word === '/haul' ||
         word === '/letter' || word === '/deliver' ||
         word === '/dropjob' || word === '/unpin') {
@@ -47557,7 +47581,11 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // PLAYER_WORDS: Patrick, 4 October, no chat commands for
                // anything people do, and a Jarl and a steward are people.
                '/jarl', '/steward', '/evict', '/box', '/rent',
-               '/notice', '/job', '/board', '/take', '/jobs', '/dropjob', '/unpin',
+               // The notice board (#1627). Sent by the board panel's buttons
+               // and J's Boards tab, never typed, and so NOT in PLAYER_WORDS:
+               // Patrick, 4 October, nothing people do is a chat command. A
+               // steward's /board move and /board here are #1638's.
+               '/notice', '/job', '/board', '/take', '/dropjob', '/unpin',
                '/letter', '/deliver',
                // A haul (#1393). Sent by the board panel's Send a haul and
                // Confirm buttons, never typed, and so deliberately NOT in
@@ -47642,8 +47670,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // Not /jarl, /steward, /evict, /box or /rent: the
                       // offices' powers are buttons on the Office page of K
                       // (#1638), and the board panel says what the box holds.
-                      '/notice', '/job', '/board',
-                      '/take', '/jobs', '/dropjob', '/unpin', '/letter', '/deliver', '/help',
+                      '/letter', '/deliver', '/help',
                       // Everybody's, and they need to be findable: a meter
                       // nobody knows how to act on is only a penalty. Not
                       // /rest: sitting or lying down is how you rest (#1603).
@@ -49818,7 +49845,8 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       toProfile(profileId,
         'Ask for one of these: /help talking, /help people, /help living, ' +
         '/help work, /help land, /help staff, and /helpme reaches staff. Press K for your profession and ' +
-        'skills, P for friends and party, J for journals, Enter to talk and ' +
+        'skills, P for friends and party, J for journals and every town\'s notice ' +
+        'board, Enter to talk and ' +
         'hold V to speak.' + extra);
       return;
     }
@@ -56276,6 +56304,15 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
           if (!prop || !prop.boardPanel) { return null; }
           return prop.boardPanel(actorId, mine);
         } catch (eBoard) { return null; }
+      })(),
+      // J's Boards tab: the ten towns, the board picked there, read only,
+      // and your jobs under it (#1627).
+      boards: (function () {
+        try {
+          var prop = g.__thornswoodProperty;
+          if (!prop || !prop.boardsView) { return null; }
+          return prop.boardsView(mine);
+        } catch (eBoards) { return null; }
       })()
     };
   }

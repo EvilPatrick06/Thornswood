@@ -40,6 +40,13 @@ It does not use one of the 12 journals. Someone with Prices stands
 at that hold's notice board, which is the drop box, and leaves a
 copy from the board's panel. The list stays in the book.
 
+## Boards
+
+J also has Boards: the ten towns, and the notice board of the one you
+pick, read only, from anywhere, with the jobs you have taken under it.
+Posting and taking stay at the board itself. See
+[Notice boards](noticeboards.md).
+
 ## Where this is
 
 The caps, the panel, typing in the title and the page, and sharing
