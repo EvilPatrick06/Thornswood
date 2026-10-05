@@ -1001,6 +1001,43 @@ const keysCs = fs.readFileSync(path.join(root, 'launcher', 'app', 'Keys.cs'), 'u
   yes('and it never answers false', !!body && !/\breturn\s+false\b/.test(body));
 }
 
+// --------------------------------------- a restart while Rush runs (#1642) --
+/*
+  Rush's speed rides the K panel's view and ends on a timer in memory. A
+  restart takes the timer with it, and the server that comes up has nothing
+  running, so the view it works out when the person is back (arrived in the
+  character block, tests/test-1642-effects-restart.js) has no speed on it.
+*/
+{
+  const RUSHER = actor(0xff00000b, { pos: [7000, 0, 0] });
+  states.set(RUSHER, warrior('berserker', 'novice'));
+  yes('Rush starts, with the speed on the map', M.use(RUSHER, 'rush') === 'Rush: +4 speed for 5 seconds.' &&
+    M.effects(RUSHER).speedMult === 4);
+  later(2000);
+  world.timers.length = 0;   // the process's timers go with it
+  const again = {
+    console: { log: function () {} },
+    Buffer: Buffer,
+    mp: Object.assign({}, mpFake),
+    guard: function (n, fn) { return fn; },
+    setTimeout: function (fn, ms) { world.timers.push({ fn: fn, at: clock.t + (ms || 0) }); return world.timers.length; },
+    setInterval: function () { return 1; },
+    clearInterval: function () {},
+    __thornswoodCharacter: box.__thornswoodCharacter,
+    __thornswoodSocial: box.__thornswoodSocial
+  };
+  again.globalThis = again;
+  vm.createContext(again);
+  again.__clock = clock;
+  vm.runInContext('Date.now = function () { return __clock.t; };', again);
+  vm.runInContext(progression, again);
+  vm.runInContext(maneuvers, again);
+  const M2 = again.__thornswoodManeuvers;
+  yes('a restart two seconds in ends it: the new server puts no speed on any view it works out',
+    !!M2 && M2.effects(RUSHER) === null);
+  yes('and clears its wait, as the page says', /Rush \(15 stamina, ready\)/.test(M2.use(RUSHER, '')));
+}
+
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
