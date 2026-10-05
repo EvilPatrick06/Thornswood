@@ -124,7 +124,7 @@ These stay commands. How to run each one, with examples:
 | `/remnant`, `/remnant add <name>`, `remove` | Admins only | Shows and writes the Thalmor remnant roll, once an application is accepted (#1390) | `command` in the embassy and remnant block | [The Thalmor](thalmor.md) |
 | `/hurt <person> [what]` | Staff | A cut, a bite, a break or a disease for a scene, an agreed loss written down after a yes given out of character, or what somebody carries (#1383) | The staff block's `command`, which hands it to `staff` in the injury and disease block | The staff block's header; [Injury](injury.md) |
 | `/restart`, `/shutdown` | Nobody | Answers that restarts are not run from chat | `gamemode.js:45207` | Nowhere |
-| `/close` (Discord) | Staff | Closes a ticket | `bot/bot.py:1440` | Discord's own command list |
+| `/close` (Discord), and the Close ticket button | Staff: the bot's `STAFF_ROLES` (Owner, Dev, Gamemaster, Moderator, Loremaster), by id or name; Manage Threads alone is not staff (#1342) | Closes a ticket | `close_here` and `is_staff` in `bot/bot.py` | Discord's own command list |
 | `/live-smoke start`, `reset`, `refresh`, `report` (Discord) | Owner, Dev and Lead Gamemaster | The Live smoke checklist in #test-tasks | `bot/bot.py:2565` | Discord's own command list |
 
 ## Lines the game sends itself
