@@ -14,6 +14,8 @@ one socket to the voice service), the emote wheel, voice, the character panel
 and character creation behind K (`thornswood-skills.js`), the party menu
 behind P, journals behind J, the trade panel, the repair panel that a key
 in the inventory opens while a repair kit is carried (`thornswood-repair.js`),
+the wounds panel that a key in the inventory, or X on somebody hurt, opens
+(`thornswood-treat.js`),
 the stops and fares of a carriage or ferry driver that E on the driver
 opens (`thornswood-ride.js`), and the "Are you still here?"
 window after 15 minutes idle (`thornswood-afk.js`). `thornswood-theme.mp3` is
