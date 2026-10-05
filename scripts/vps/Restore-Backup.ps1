@@ -48,7 +48,7 @@ function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Ho
 $script:temp = $null
 function Clear-RestoreZip {
   if ($script:temp -and (Test-Path -LiteralPath $script:temp)) {
-    Remove-Item -LiteralPath $script:temp -Force -EA SilentlyContinue
+    Remove-Item -LiteralPath $script:temp -Force -EA Stop
   }
 }
 function Die($m) {
@@ -89,53 +89,79 @@ if ($src.ToLower().EndsWith('.enc')) {
   $pass = (Get-Content -LiteralPath $KeyFile -Raw).Trim()
   if (-not $pass) { Die "The passphrase file at $KeyFile is empty." }
 
-  $bytes = [System.IO.File]::ReadAllBytes($src)
-  if ($bytes.Length -lt 5 + 16 + 16 + 32) { Die 'That file is too short to be one of these backups.' }
-  $magic = [Text.Encoding]::ASCII.GetString($bytes, 0, 5)
-  if ($magic -ne 'TSBK1') { Die "That is not a Thornswood backup: it starts with '$magic', not TSBK1." }
-
-  $salt = New-Object byte[] 16; [Array]::Copy($bytes, 5, $salt, 0, 16)
-  $iv   = New-Object byte[] 16; [Array]::Copy($bytes, 21, $iv, 0, 16)
-  $cipherLen = $bytes.Length - 5 - 16 - 16 - 32
-  $cipher = New-Object byte[] $cipherLen
-  [Array]::Copy($bytes, 37, $cipher, 0, $cipherLen)
-  $mac = New-Object byte[] 32
-  [Array]::Copy($bytes, $bytes.Length - 32, $mac, 0, 32)
-
-  Head 'Checking it has not been changed'
-  $kdf = [System.Security.Cryptography.Rfc2898DeriveBytes]::new($pass, $salt, 200000, [System.Security.Cryptography.HashAlgorithmName]::SHA256)
-  $kEnc = $kdf.GetBytes(32)
-  $kMac = $kdf.GetBytes(32)
-  $hmac = [System.Security.Cryptography.HMACSHA256]::new($kMac)
-  $signed = New-Object byte[] (32 + $cipherLen)
-  [Array]::Copy($salt, 0, $signed, 0, 16)
-  [Array]::Copy($iv, 0, $signed, 16, 16)
-  [Array]::Copy($cipher, 0, $signed, 32, $cipherLen)
-  $want = $hmac.ComputeHash($signed)
-  # Compared a byte at a time to the end rather than stopping at the first
-  # difference, so how long this takes says nothing about how close a wrong
-  # answer was.
-  $same = $want.Length -eq $mac.Length
-  $diff = 0
-  for ($i = 0; $i -lt $mac.Length; $i++) { $diff = $diff -bor ($want[$i] -bxor $mac[$i]) }
-  if (-not $same -or $diff -ne 0) {
-    $kdf.Dispose(); $hmac.Dispose()
-    Die ("The signature does not match. Either the passphrase is not the one this was made with, " +
-         "or the file has been changed or damaged. Nothing was decrypted.")
+  $inputFile = $null; $outputFile = $null; $kdf = $null; $hmac = $null
+  $aes = $null; $decryptor = $null; $cryptoStream = $null
+  $operationFailure = $null
+  try {
+    # Keep one read-only handle for verification and decryption. The bytes
+    # cannot be replaced or written between those passes on Windows.
+    $inputFile = [IO.File]::Open($src, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    if ($inputFile.Length -lt 85) { Die 'That file is too short to be one of these backups.' }
+    $header = New-Object byte[] 37
+    $read = 0
+    while ($read -lt $header.Length) {
+      $n = $inputFile.Read($header, $read, $header.Length - $read)
+      if ($n -eq 0) { Die 'That backup has an incomplete header.' }
+      $read += $n
+    }
+    $magic = [Text.Encoding]::ASCII.GetString($header, 0, 5)
+    if ($magic -ne 'TSBK1') { Die "That is not a Thornswood backup: it starts with '$magic', not TSBK1." }
+    $salt = [byte[]]$header[5..20]; $iv = [byte[]]$header[21..36]
+    $cipherLen = $inputFile.Length - 69
+    if ($cipherLen % 16 -ne 0) { Die 'That backup has a truncated or invalid ciphertext length. Nothing was decrypted.' }
+    Head 'Checking it has not been changed'
+    $kdf = [Security.Cryptography.Rfc2898DeriveBytes]::new($pass, $salt, 200000, [Security.Cryptography.HashAlgorithmName]::SHA256)
+    $kEnc = $kdf.GetBytes(32); $kMac = $kdf.GetBytes(32)
+    $hmac = [Security.Cryptography.HMACSHA256]::new($kMac)
+    $inputFile.Position = 5
+    $left = $inputFile.Length - 37
+    $chunk = New-Object byte[] 1MB
+    while ($left -gt 0) {
+      $n = $inputFile.Read($chunk, 0, [int][Math]::Min([long]$chunk.Length, [long]$left))
+      if ($n -eq 0) { Die 'That backup ended before its signature. Nothing was decrypted.' }
+      [void]$hmac.TransformBlock($chunk, 0, $n, $chunk, 0); $left -= $n
+    }
+    [void]$hmac.TransformFinalBlock([byte[]]@(), 0, 0)
+    $want = $hmac.Hash
+    $mac = New-Object byte[] 32; $read = 0
+    while ($read -lt $mac.Length) {
+      $n = $inputFile.Read($mac, $read, $mac.Length - $read)
+      if ($n -eq 0) { Die 'That backup has an incomplete signature. Nothing was decrypted.' }
+      $read += $n
+    }
+    $diff = 0
+    for ($i = 0; $i -lt 32; $i++) { $diff = $diff -bor ($want[$i] -bxor $mac[$i]) }
+    if ($diff -ne 0) {
+      Die 'The signature does not match. Either the passphrase is wrong or the file has been changed or damaged. Nothing was decrypted.'
+    }
+    Say '  signature matches' 'Green'
+    # Only authenticated ciphertext reaches the plaintext file. The old
+    # TSBK1 format and KDF remain unchanged; memory use stays bounded.
+    $aes = [Security.Cryptography.Aes]::Create()
+    $aes.KeySize = 256; $aes.Mode = 'CBC'; $aes.Padding = 'PKCS7'; $aes.Key = $kEnc; $aes.IV = $iv
+    $temp = Join-Path $Work ('thornswood-restore-' + [Guid]::NewGuid().ToString('N') + '.zip')
+    $outputFile = [IO.File]::Open($temp, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+    $script:temp = $temp
+    $decryptor = $aes.CreateDecryptor()
+    $cryptoStream = [Security.Cryptography.CryptoStream]::new($outputFile, $decryptor, [Security.Cryptography.CryptoStreamMode]::Write, $true)
+    $inputFile.Position = 37; $left = $cipherLen
+    while ($left -gt 0) {
+      $n = $inputFile.Read($chunk, 0, [int][Math]::Min([long]$chunk.Length, [long]$left))
+      if ($n -eq 0) { throw 'The authenticated ciphertext ended prematurely.' }
+      $cryptoStream.Write($chunk, 0, $n); $left -= $n
+    }
+    $cryptoStream.FlushFinalBlock(); $outputFile.Flush($true)
+    $zipPath = $temp
+    Say ("  decrypted to a zip of {0} MB" -f [math]::Round($outputFile.Length / 1MB, 2)) 'DarkGray'
+  } catch { $operationFailure = $_; throw } finally {
+    $cleanupFailure = $null
+    foreach ($resource in @($cryptoStream, $decryptor, $outputFile, $inputFile, $aes, $hmac, $kdf)) {
+      if ($null -ne $resource) {
+        try { $resource.Dispose() } catch { if (-not $cleanupFailure) { $cleanupFailure = $_ } }
+      }
+    }
+    if ($cleanupFailure -and -not $operationFailure) { throw $cleanupFailure }
   }
-  Say '  signature matches' 'Green'
-
-  $aes = [System.Security.Cryptography.Aes]::Create()
-  $aes.KeySize = 256; $aes.Mode = 'CBC'; $aes.Padding = 'PKCS7'
-  $aes.Key = $kEnc; $aes.IV = $iv
-  $plain = $aes.CreateDecryptor().TransformFinalBlock($cipher, 0, $cipher.Length)
-  $aes.Dispose(); $kdf.Dispose(); $hmac.Dispose()
-
-  $temp = Join-Path $Work ('thornswood-restore-' + [Guid]::NewGuid().ToString('N').Substring(0, 8) + '.zip')
-  $script:temp = $temp
-  [System.IO.File]::WriteAllBytes($temp, $plain)
-  $zipPath = $temp
-  Say ("  decrypted to a zip of {0} MB" -f [math]::Round($plain.Length / 1MB, 2)) 'DarkGray'
 } else {
   $zipPath = $src
   Say '  not encrypted, so there is nothing to check' 'Yellow'

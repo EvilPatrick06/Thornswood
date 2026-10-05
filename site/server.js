@@ -666,7 +666,7 @@ function publicDiscovery(html, route) {
       {'@type':'ListItem', position:1, name:'Thornswood', item:PUBLIC_ORIGIN+'/'},
       {'@type':'ListItem', position:2, name:blurb[0], item:canonical}
     ]});
-    html = html.replace('<main id="main">', () => '<main id="main"><nav class="wrap breadcrumbs" aria-label="Breadcrumb">' +
+    html = html.replace('<main id="main" tabindex="-1">', () => '<main id="main" tabindex="-1"><nav class="wrap breadcrumbs" aria-label="Breadcrumb">' +
       '<ol><li><a href="/">Thornswood</a></li><li aria-current="page">' + escAttr(blurb[0]) + '</li></ol></nav>');
   }
   // Escape the HTML script terminator even if metadata becomes editable later.
