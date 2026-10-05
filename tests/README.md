@@ -53,8 +53,11 @@ never gives a service a fixed port. It asks the system for one nothing holds
 (listen on 0 and read the port back) and passes it in through the setting the
 service already reads, `THORNSWOOD_VOICE_PORT` or `THORNSWOOD_DOCS_PORT`. A
 server in the harness's own process listens on 0 and is asked on the port it
-got. One that starts the voice service asks nothing of the port until that
-copy has printed its own `[voice] listening on` line for it, and fails saying
-so when the service stops first because something else took the port. Before issue #1703
-a run read another run's `/health` as its own. `test-1703-test-ports.js` fails
-on any `.js` harness here or in `voice\` that names a fixed port.
+got. One that starts the voice service or the site asks nothing of the port
+until that copy has printed its own `[voice] listening on` or
+`[thornswood-docs] listening on` line for it, and fails saying so when the
+service stops first because something else took the port. Before issue #1703
+a run read another run's `/health` as its own, and before #1727 twelve site
+harnesses polled the port they had let go until anything answered.
+`test-1703-test-ports.js` fails on any `.js` harness here or in `voice\` that
+names a fixed port, or that starts the site without waiting for that line.
