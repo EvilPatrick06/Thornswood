@@ -316,13 +316,16 @@ function finish() {
 
 (async () => {
   const PORT = await freePort();
-  const DEAD = await freePort();
   fs.copyFileSync(SRC, path.join(dir, 'server.js'));
   // A config of its own, so the copy never asks Discord anything and its
-  // game check knocks on a port nothing is listening on.
+  // game check knocks on a port nothing is listening on: port 1 (#1816). The
+  // system never hands it out for a listen on 0 and no harness listens on a
+  // fixed port (test-1703-test-ports.js), so no run beside this one can take
+  // it and make the game read as up. A port taken from the system and let go
+  // could be.
   fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({
     password: '', secret: crypto.randomBytes(32).toString('hex'), botKey: KEY,
-    gameCheckPort: DEAD, onlineFile: path.join(dir, 'online.json'),
+    gameCheckPort: 1, onlineFile: path.join(dir, 'online.json'),
     discord: { clientId: '', clientSecret: '', botToken: '', guildId: '', invite: '' }
   }));
   srv = spawn(process.execPath, ['server.js'], {
