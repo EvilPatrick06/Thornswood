@@ -14,7 +14,8 @@
   HOW. The real Publish-Server.ps1 and Export-ServerPayload.ps1 run in a child
   PowerShell against a scratch build, with ssh and scp stand-ins first on PATH
   (they write down what they were asked and say INSTALL OK), and a listener on
-  this machine standing in for the resources port the run probes afterwards:
+  this machine standing in for the resources port the run probes afterwards,
+  on a port from the system that it holds for the whole run (#1728):
 
     1. a dev publish: the zip starts the server on 7787, voice 7789, named
        Thornswood Dev, with no byte order mark, and the build's own settings
@@ -63,6 +64,16 @@ function Done {
 $publish = Join-Path $repo 'scripts\release\Publish-Server.ps1'
 $export = Join-Path $repo 'scripts\release\Export-ServerPayload.ps1'
 Yes 'Publish-Server.ps1 and Export-ServerPayload.ps1 are there' ((Test-Path -LiteralPath $publish) -and (Test-Path -LiteralPath $export))
+# The ports a person shipping gets, who passes neither -GamePort nor
+# -ResourcesPort (#1728). The game port is also held below by the refusals of
+# a zip packed for the other channel; the resources port is read here, because
+# this run hands its own to every publish.
+$pubSrc = [IO.File]::ReadAllText($publish)
+Yes 'by default a payload is held to the channel''s game port, 7787 dev and 7777 live' (
+    $pubSrc.Contains('$wantPort = if ($GamePort -gt 0) { $GamePort } elseif ($IsDev) { 7787 } else { 7777 }'))
+Yes '  and the check after the install knocks on 3000 for 7777 and the game port plus one otherwise' (
+    $pubSrc.Contains('$ResPort  = if ($ResourcesPort -gt 0) { $ResourcesPort } elseif ($GamePort -eq 7777) { 3000 } else { $GamePort + 1 }') -and
+    $pubSrc.Contains('$GamePort = $wantPort'))
 
 $T = Join-Path ([IO.Path]::GetTempPath()) ('ts-pubserver-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $dist = Join-Path $T 'dist'
@@ -151,7 +162,8 @@ function Run([string]$script, [string[]]$more) {
     return [pscustomobject]@{ Code = $code; Out = $out; Calls = $calls }
 }
 function Publish([string[]]$more) {
-    return Run $publish (@('-Dist', $dist, '-Zip', $zip, '-Record', $record, '-VpsHost', '127.0.0.1', '-VpsUser', 'test', '-NoPause', '-NoNews', '-NoPush', '-Wait', '1') + @($more))
+    return Run $publish (@('-Dist', $dist, '-Zip', $zip, '-Record', $record, '-VpsHost', '127.0.0.1', '-VpsUser', 'test', '-NoPause', '-NoNews', '-NoPush', '-Wait', '1',
+                           '-ResourcesPort', [string]$script:resPort) + @($more))
 }
 function Tail($r, [bool]$ok) { if (-not $ok) { Write-Host (($r.Out -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -Last 12) -join "`n") -ForegroundColor DarkGray } }
 function Sent($r) { return @($r.Calls | Where-Object { $_ -match '^scp .*thornswood-server\.zip' }).Count }
@@ -176,11 +188,18 @@ try {
     }
     $env:PATH = $bin + ';' + $oldPath
     $env:TS_PUB_CALLS = $log
-    # The resources ports the run probes afterwards, dev's and live's. The
-    # operating system answers a connect for a started listener by itself.
-    foreach ($p in 7788, 3000) {
-        try { $l = New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback, $p); $l.Start(); $listeners += $l } catch { }
-    }
+    # The resources port the run probes afterwards: one from the system, held
+    # by this listener for the whole run and handed to every publish as
+    # -ResourcesPort, so what answers is this listener and nothing else. Until
+    # #1728 this bound dev's and live's own, 7788 and 3000, inside a catch that
+    # carried on when either was held, which on the VPS the dev and live
+    # servers do. The operating system answers a connect for a started
+    # listener by itself.
+    $res = New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback, 0)
+    $res.Start()
+    $listeners += $res
+    $resPort = $res.LocalEndpoint.Port
+    Yes ("a listener holds port {0} from the system for the resources check" -f $resPort) ($resPort -gt 0)
 
     # ---- 1. a dev publish ---------------------------------------------------------
     Write-Host ''; Write-Host 'a dev publish'
@@ -189,6 +208,8 @@ try {
     $r = Publish @('-Channel', 'dev')
     $ok = $r.Code -eq 0 -and (Sent $r) -eq 1
     Yes ("a dev publish runs through and sends its zip (exit {0})" -f $r.Code) $ok; Tail $r $ok
+    Yes ("  and the check after the install was answered on the port this run holds, {0}" -f $resPort) (
+        $r.Out -match ('is up at 127\.0\.0\.1:7787, resources on ' + $resPort + '\b'))
     $z = Read-Zip $zip
     Yes ("  the zip starts the dev server: port {0}, voice {1}, name {2}" -f $z.Port, $z.Voice, $z.Name) ($z.Port -eq '7787' -and $z.Voice -eq '7789' -and $z.Name -eq 'Thornswood Dev')
     Yes '  its settings have no byte order mark' (-not $z.Bom)
@@ -213,6 +234,8 @@ try {
     $r = Publish @('-Channel', 'main')
     $ok = $r.Code -eq 0 -and (Sent $r) -eq 1
     Yes ("a live publish after the dev one runs through (exit {0})" -f $r.Code) $ok; Tail $r $ok
+    Yes ("  and its check was answered on the same held port, {0}, not 3000" -f $resPort) (
+        $r.Out -match ('is up at 127\.0\.0\.1:7777, resources on ' + $resPort + '\b'))
     $z = Read-Zip $zip
     Yes ("  and packs port {0}, voice {1}, name {2}" -f $z.Port, $z.Voice, $z.Name) ($z.Port -eq '7777' -and $z.Voice -eq '7778' -and $z.Name -eq 'Thornswood')
 
