@@ -29406,6 +29406,18 @@ log('gamemode loaded:',
 
   var PLUGIN = /\.(esp|esm|esl)$/i;
 
+  // The plugins whose bytes this server hands out: Thornswood's own and
+  // nothing else (#1180). Every other plugin in the load order is somebody
+  // else's mod, which people get from its author through Vortex and the
+  // collection. Measured on 5 Oct, the main and the dev server each handed
+  // out 43 plugins to anyone who asked, 42 of them other authors' (27 MB),
+  // because the rule here named what to leave out (Bethesda's five masters)
+  // instead of what is ours. The names are the plugins
+  // scripts\release\Ship-Rules.ps1 calls ours ($ShipOursFiles), and
+  // tests\test-1180-own-plugins.js holds the two lists to each other, so a
+  // plugin the repo makes goes into both in one change.
+  var OURS = { 'thornswood-content.esp': 1 };
+
   function publish() {
     var doc;
     try {
@@ -29422,7 +29434,11 @@ log('gamemode loaded:',
     var out = {
       versionMajor: doc.versionMajor || 1,
       mods: mods,
-      loadOrder: Array.isArray(doc.loadOrder) ? doc.loadOrder : mods.map(function (m) { return m.filename; })
+      loadOrder: Array.isArray(doc.loadOrder) ? doc.loadOrder : mods.map(function (m) { return m.filename; }),
+      // Which of those the launcher's Fix may fetch from /plugins/ (#1180).
+      // The client reads mods and loadOrder only.
+      served: mods.filter(function (m) { return OURS[m.filename.toLowerCase()]; })
+                  .map(function (m) { return m.filename; })
     };
 
     try {
@@ -29445,21 +29461,24 @@ log('gamemode loaded:',
     return true;
   }
 
-  // The files themselves, beside the manifest, for the launcher's Fix.
+  // Our own plugins themselves, beside the manifest, for the launcher's Fix.
   //
   // A plugin with the right name in the right place and the wrong bytes paints
-  // LOAD ORDER ERROR over somebody's screen for the whole session (17 Sep), and
-  // nothing on that machine can put the right bytes there: the collection gave
-  // it the build it had. This box has the exact files the manifest describes,
-  // so they are served under
+  // LOAD ORDER ERROR over somebody's screen for the whole session (17 Sep).
+  // For Thornswood's own plugin this box has the bytes the manifest describes,
+  // and they are ours to hand out, so it is served under
   //
   //     /api/servers/thornswood/plugins/<file>
   //
-  // as hard links into the plugins folder, so there is no second copy on disk
+  // as a hard link into the plugins folder, so there is no second copy on disk
   // (a copy when a link is refused). Relinked at every start, because a deploy
-  // may have replaced the file behind the link. The five Bethesda masters stay
-  // out: the client never compares their bytes and Steam owns them.
-  var STOREFRONT = { 'skyrim.esm': 1, 'update.esm': 1, 'dawnguard.esm': 1, 'hearthfires.esm': 1, 'dragonborn.esm': 1 };
+  // may have replaced the file behind the link.
+  //
+  // Nothing else is (#1180). Another author's plugin with the wrong bytes is
+  // put right by updating or reinstalling that mod in Vortex, which fetches it
+  // from its author; the launcher's Fix says which mod. Bethesda's masters
+  // were never served. The clearing below takes the files an older start
+  // published off this box.
 
   function publishFiles(mods) {
     var order = [];
@@ -29476,14 +29495,19 @@ log('gamemode loaded:',
     // each file is served as its position in the manifest with a .bin
     // extension, which the resources server does hand over. The launcher
     // fetches /plugins/<index>.bin for the manifest entry at that index.
+    // Since #1180 this is also what takes other authors' plugins, which an
+    // older start published, off this box, so a file that stays is said.
     try {
       var stale = fs.readdirSync(PLUG);
-      for (var s = 0; s < stale.length; s++) { try { fs.unlinkSync(path.join(PLUG, stale[s])); } catch (e) { } }
-    } catch (e) { }
+      for (var s = 0; s < stale.length; s++) {
+        try { fs.unlinkSync(path.join(PLUG, stale[s])); }
+        catch (e) { console.log('[thornswood] could not take ' + stale[s] + ' off /plugins/, so it is still served: ' + e.message); }
+      }
+    } catch (e) { console.log('[thornswood] could not read /plugins/ to clear it: ' + e.message); }
     var linked = 0, copied = 0, missing = 0, bytes = 0;
     for (var j = 0; j < mods.length; j++) {
       var name = mods[j].filename;
-      if (STOREFRONT[name.toLowerCase()]) continue;
+      if (!OURS[name.toLowerCase()]) continue;
       var src = byName[name.toLowerCase()];
       if (!src || !fs.existsSync(src)) { missing++; continue; }
       var dst = path.join(PLUG, j + '.bin');
@@ -29496,7 +29520,7 @@ log('gamemode loaded:',
       }
       bytes += Number(mods[j].size) || 0;
     }
-    console.log('[thornswood] ' + (linked + copied) + ' plugin files published at /api/servers/' + KEY +
+    console.log('[thornswood] ' + (linked + copied) + ' of our plugin files published at /api/servers/' + KEY +
                 '/plugins/ for the launcher, ' + Math.round(bytes / 1048576) + ' MB' +
                 (copied ? ', ' + copied + ' copied rather than linked' : '') +
                 (missing ? ', ' + missing + ' not found on this box' : ''));
