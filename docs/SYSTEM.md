@@ -2,8 +2,10 @@
 
 One page, for somebody new, with or without AI. What runs where, what talks
 to what, and which script puts each piece in place. Every port, folder and
-task name here is read off a script; the file and line are beside it. If a
-script and this page disagree, the script is right and this page needs a fix.
+task name here is read off a script, which is named beside it. A script is
+cited as `<script>.ps1:<what it says>`, its own words for the thing, never a
+line number, because every edit above a line moves it. If a script and this
+page disagree, the script is right and this page needs a fix.
 Developer-Guide.md is the long form and the rules.
 
 ## The three places things run
@@ -14,7 +16,7 @@ Developer-Guide.md is the long form and the rules.
 | Any developer's machine that can sign | The repo, the SkyMP fork build, `Ship.ps1`, `Publish-*`, `Deploy-*`, `Install-*` | Developers. Any of them may ship dev and main (Developer-Guide.md) |
 | The VPS, 192.135.112.23, Windows, user Administrator | Both game servers, both voice services, the site, Caddy, the bot, the watchdog, the nightly backup | Reached over ssh by the scripts; nobody edits it by hand |
 
-<!-- VPS address: Deploy-Server.ps1:39, Deploy-Docs.ps1:41, Install-Bot.ps1:26, Install-Voice.ps1:32, launcher/app/Config.cs:256 -->
+<!-- VPS address: "address" in scripts/vps/vps.json, which the scripts that reach the box over ssh read through `Vps.ps1:Get-ThornswoodVpsAddress`; launcher/app/Config.cs:256 -->
 
 ## The picture
 
@@ -91,7 +93,8 @@ the Steam copy's game plus exactly the files Vortex's record lists.
 **The SkyMP client runtime** (six files) is built from the fork in
 `engine\skymp`, recorded in `records\client-build.json`, and shipped both inside
 packs and as its own asset named in the feed's `clientRuntime`
-(`Publish-Update.ps1:955-990,1236-1245`, `ClientRuntime.cs:261-269`).
+(`Publish-Update.ps1:the client runtime, as an asset with an address`,
+`Publish-Update.ps1:Set-Prop $doc 'clientRuntime'`, `ClientRuntime.cs:261-269`).
 
 ## Updates, the installer and the site
 
@@ -110,18 +113,20 @@ packs and as its own asset named in the feed's `clientRuntime`
   then checks every asset the feed names is up with `Remirror-Site-Feed.ps1`. Then `Publish-News.ps1` (main only), then
   `Publish-Discord.ps1` (#news, or the dev updates channel), then
   `Request-Restart.ps1`, which warns the room for five minutes
-  (`Ship.ps1:1033-1098`).
+  (`Ship.ps1:Invoke-PostShip`, `Ship.ps1:$AnnounceMinutes = 5`).
 - **The installer.** `Package-Thornswood.ps1` builds `Thornswood-Setup` and
   `Publish-Installer.ps1` copies it over ssh into `C:\Thornswood-Docs\files`
-  on the VPS (`Publish-Installer.ps1:45,157,198`). The setup program asks the
+  on the VPS (`Publish-Installer.ps1:$Root = 'C:/Thornswood-Docs'`,
+  `Publish-Installer.ps1:$Root/files/`). The setup program asks the
   site's `/api/payload` for `Thornswood-Setup.zip` (or a leftover stamped tip), its size and
   sha256 (`site/server.js:2247-2275`); people get it from
   `https://thornswood.net/downloads` (`server.js:2214-2215`). A dev release
-  never touches the installer (`Ship.ps1:975-978`).
+  never touches the installer (`Ship.ps1:dev release, the installer is not touched`).
 - **The site.** `site`, deployed by `Deploy-Docs.ps1` into
-  `C:\Thornswood-Docs` (`Deploy-Docs.ps1:43`). Node listens on 3001
-  (`server.js:34`) and, once `THORNSWOOD_DOCS_LOCAL=1` is set by
-  `Setup-Domain.ps1:207`, only on 127.0.0.1 (`server.js:38`). Caddy holds 80 and
+  `C:\Thornswood-Docs` (`Deploy-Docs.ps1:$Root = 'C:/Thornswood-Docs'`). Node
+  listens on 3001 (`server.js:34`) and, once `THORNSWOOD_DOCS_LOCAL=1` is set
+  by `Setup-Domain.ps1` (`Setup-Domain.ps1:SetEnvironmentVariable('THORNSWOOD_DOCS_LOCAL','1','Machine')`),
+  only on 127.0.0.1 (`server.js:38`). Caddy holds 80 and
   443 for `thornswood.net` and `www.thornswood.net`, proxies `/voice/*` to
   7778, `/voice-dev/*` to 7789 and everything else to 3001
   (`scripts/deploy/Caddyfile:40-51`). The live Caddyfile is
@@ -144,27 +149,31 @@ somebody away only when `allowed.json` says `"enforce": true`
 
 ## The VPS services
 
-Every service is a Windows scheduled task. The watchdog starts a task by name
-when its check fails, three times an hour at most (`Watch-Services.ps1:631-671`).
+Every service but the bot is a Windows scheduled task; the bot is a Windows
+service. The watchdog starts a task, or restarts the bot's service, by name
+when its check fails, three times an hour at most
+(`Watch-Services.ps1:$already -ge 3`).
 
 | Service | Folder on the VPS | Port(s) | Scheduled task | Deployed or set up by | From |
 | --- | --- | --- | --- | --- | --- |
-| Game server (live) | `C:\Thornswood-Server` | UDP and TCP 7777, resources TCP 3000 | `Thornswood Server` | `Deploy-Gamemode.ps1` builds it locally, `Deploy-Server.ps1` sends it; first install `Install-ThornswoodServer.ps1` | `Deploy-Server.ps1:41-42,228-230`, `Bootstrap-VPS.ps1:32-33,150-152`, `Install-ThornswoodServer.ps1:18-19` |
-| Dev game server | `C:\Thornswood-Server-Dev` | UDP and TCP 7787, resources TCP 7788 | `Thornswood Dev Server` | Made once by `vps-dev-instance.ps1` (runs on the VPS); gamemode by `Deploy-DevGamemode.ps1` | `vps-dev-instance.ps1:9-10,64-69,102-112`, `Deploy-DevGamemode.ps1:108-109` |
-| Voice (live) | `C:\Thornswood-Voice` | TCP 7778, and `/voice` through Caddy | `Thornswood Voice` | `Install-Voice.ps1` | `Install-Voice.ps1:34-35,66,345`, `voice-server.js:28` |
-| Dev voice | `C:\Thornswood-Voice-Dev` | TCP 7789 on 127.0.0.1 only, and `/voice-dev` through Caddy | `Thornswood Dev Voice` | Made by `vps-dev-instance.ps1`; `Install-Voice.ps1 -Root C:\Thornswood-Voice-Dev -Port 7789 -TaskName 'Thornswood Dev Voice'` | `vps-dev-instance.ps1:11-12,77-97`, `voice/README.md:57-64` |
-| Site | `C:\Thornswood-Docs` | 127.0.0.1:3001 | `Thornswood Docs` | `Deploy-Docs.ps1`, `-Site` for the public pages | `Deploy-Docs.ps1:43-45`, `server.js:34-38` |
-| Caddy | `C:\Thornswood-Caddy` | 80, 443 | `Thornswood Web` (at startup and every five minutes) | `Setup-Domain.ps1`; the Caddyfile itself is kept in step with `scripts\deploy\Caddyfile` by hand | `Setup-Domain.ps1:30,183,248-266`, `scripts/deploy/Caddyfile:4-7` |
+| Game server (live) | `C:\Thornswood-Server` | UDP and TCP 7777, resources TCP 3000 | `Thornswood Server` | `Deploy-Gamemode.ps1` builds it locally, `Deploy-Server.ps1` sends it; first install `Install-ThornswoodServer.ps1` | `Deploy-Server.ps1:$Root = 'C:/Thornswood-Server'`, `Deploy-Server.ps1:$Task = 'Thornswood Server'`, `Bootstrap-VPS.ps1:$GamePort = 7777`, `Bootstrap-VPS.ps1:$ResourcePort = 3000`, `Install-ThornswoodServer.ps1:$TaskName = 'Thornswood Server'` |
+| Dev game server | `C:\Thornswood-Server-Dev` | UDP and TCP 7787, resources TCP 7788 | `Thornswood Dev Server` | Made once by `vps-dev-instance.ps1` (runs on the VPS); gamemode by `Deploy-DevGamemode.ps1` | `vps-dev-instance.ps1:$Dev = 'C:\Thornswood-Server-Dev'`, `vps-dev-instance.ps1:$devPort = 7787`, `vps-dev-instance.ps1:Port = ($devPort + 1)`, `vps-dev-instance.ps1:Register-ScheduledTask -TaskName 'Thornswood Dev Server'`, `Deploy-DevGamemode.ps1:$Root = 'C:/Thornswood-Server-Dev'` |
+| Voice (live) | `C:\Thornswood-Voice` | TCP 7778 on 127.0.0.1 only, and `/voice` through Caddy | `Thornswood Voice` | `Install-Voice.ps1` | `Install-Voice.ps1:$Root = 'C:\Thornswood-Voice'`, `Install-Voice.ps1:$Port = 7778`, `Install-Voice.ps1:$Bind = '127.0.0.1'`, `Install-Voice.ps1:$TaskName = 'Thornswood Voice'`, `voice-server.js:28` |
+| Dev voice | `C:\Thornswood-Voice-Dev` | TCP 7789 on 127.0.0.1 only, and `/voice-dev` through Caddy | `Thornswood Dev Voice` | Made by `vps-dev-instance.ps1`; `Install-Voice.ps1 -Root C:\Thornswood-Voice-Dev -Port 7789 -TaskName 'Thornswood Dev Voice'` | `vps-dev-instance.ps1:$DevVoice = 'C:\Thornswood-Voice-Dev'`, `vps-dev-instance.ps1:$devVoicePort = 7789`, `vps-dev-instance.ps1:THORNSWOOD_VOICE_BIND=127.0.0.1`, `vps-dev-instance.ps1:Register-ScheduledTask -TaskName 'Thornswood Dev Voice'`, `voice/README.md:57-64` |
+| Site | `C:\Thornswood-Docs` | 127.0.0.1:3001 | `Thornswood Docs` | `Deploy-Docs.ps1`, `-Site` for the public pages | `Deploy-Docs.ps1:$Root = 'C:/Thornswood-Docs'`, `Deploy-Docs.ps1:$Task = 'Thornswood Docs'`, `Deploy-Docs.ps1:$Port = 3001`, `server.js:34-38` |
+| Caddy | `C:\Thornswood-Caddy` | 80, 443 | `Thornswood Web` (at startup and every five minutes) | `Setup-Domain.ps1`, which sends `scripts\deploy\Caddyfile` as the live one on every run without `-TaskOnly` (issue #543) | `Setup-Domain.ps1:$CaddyDir = 'C:/Thornswood-Caddy'`, `Setup-Domain.ps1:Caddyfile written, from scripts\deploy\Caddyfile`, `Setup-Domain.ps1:Register-ScheduledTask -TaskName 'Thornswood Web'`, `Setup-Domain.ps1:New-ScheduledTaskTrigger -AtStartup`, `Setup-Domain.ps1:-RepetitionInterval (New-TimeSpan -Minutes 5)`, `scripts/deploy/Caddyfile:4-7` |
 | Discord bot | `C:\Thornswood-Bot` | none | none: the Windows service `ThornswoodBot`, as `NT SERVICE\ThornswoodBot` (issue #465) | `Install-Bot.ps1`, `-CodeOnly` for the code, the card art and the live smoke's export | `Install-Bot.ps1`, `Bot-Service.ps1`, `BotService.cs` |
-| Watchdog | `C:\Thornswood-Watch` (`watch.ps1`, `watch.log`) | none | `Thornswood Watch`, every five minutes as SYSTEM | `Watch-Services.ps1 -Install` | `Watch-Services.ps1:65-66,361` |
-| Nightly backup | `C:\Thornswood-Backup` (passphrase in `key.txt`) | none | `Thornswood Backup`, daily at 03:15 | `Install-Backup.ps1`; `Fetch-Backups.ps1` brings them down | `Install-Backup.ps1:30-34,149-152`, `vps-nightly-backup.ps1:53-72` |
+| Watchdog | `C:\Thornswood-Watch` (`watch.ps1`, `watch.log`) | none | `Thornswood Watch`, every five minutes as SYSTEM | `Watch-Services.ps1 -Install` | `Watch-Services.ps1:$Root = 'C:\Thornswood-Watch'`, `Watch-Services.ps1:$Task = 'Thornswood Watch'`, `Watch-Services.ps1:schtasks /create /tn '$Task' /sc minute /mo 5 /ru SYSTEM` |
+| Nightly backup | `C:\Thornswood-Backup` (passphrase in `key.txt`) | none | `Thornswood Backup`, daily at 03:15 | `Install-Backup.ps1`; `Fetch-Backups.ps1` brings them down | `Install-Backup.ps1:$Root = 'C:\Thornswood-Backup'`, `Install-Backup.ps1:$keyFile = Join-Path $Root 'key.txt'`, `Install-Backup.ps1:$TaskName = 'Thornswood Backup'`, `Install-Backup.ps1:$At = '03:15'`, `Install-Backup.ps1:New-ScheduledTaskTrigger -Daily`, `vps-nightly-backup.ps1:$KeyFile = 'C:\Thornswood-Backup\key.txt'` |
 
 What the watchdog checks: `https://thornswood.net/` for Caddy, then TCP 3001,
 3000, 7778, 7788 and 7789, and a python process with `Thornswood-Bot` in its
-command line for the bot (`Watch-Services.ps1:595-679`). The bot writes
+command line for the bot (`Watch-Services.ps1:$checks`,
+`Watch-Services.ps1:BotAlive`). The bot writes
 `heartbeat.json` in `C:\Thornswood-Bot\data` every minute (#1104), and a bot whose process runs but
-which is hung or off Discord for ten minutes is down too; that is told about
-and not restarted for (issue #449, `Watch-Services.ps1:217-300`,
+which is hung or off Discord for ten minutes is down too, and is restarted by
+its service's name like one whose process is gone (issues #449 and #465,
+`Watch-Services.ps1:BotSilent`, `Watch-Services.ps1:$beatStale = 600`,
 `bot/bot.py:2408-2510`). From outside the box, the bot also pings an uptime
 monitor every minute while it is on Discord, so a bot or a whole VPS that
 stops is noticed when One is off too: the address is `PING_URL` in
@@ -172,27 +181,40 @@ stops is noticed when One is off too: the address is `PING_URL` in
 how to make the check (issue #449, `bot/bot.py:2513-2618`). It also asks the site,
 both game servers and both voice servers over HTTP, which it tells about and
 never restarts for, and checks the `Thornswood Backup` task's last result with
-a backup under 26 hours old, the build runner's service, and writes DISK LOW
+a backup under 26 hours old, every build runner's service, and writes DISK LOW
 under 20 percent free on C: and DISK CRITICAL under 10. It tells the staff
 channel once when any of these goes down and once when it is back (issue
 #447): each message goes into `C:\Thornswood-Watch\alerts.jsonl`, the bot
 posts it within a minute, and when the bot is down or silent the watchdog posts
 it through the webhook in `alerts-webhook.txt` beside it
-(`Watch-Services.ps1:22-47,302-573`, `bot/bot.py:1998-2098`).
+(`Watch-Services.ps1:HealthProblem`, `Watch-Services.ps1:$tellOnly`,
+`Watch-Services.ps1:$diskLow = 20`, `Watch-Services.ps1:$diskCritical = 10`,
+`Watch-Services.ps1:Observe`, `Watch-Services.ps1:Deliver`,
+`bot/bot.py:1998-2098`).
 
 What the backup takes: the live server's `world`, `private`, `data`,
 `server-settings.json` and `gamemode.js`, and the same five from
 `C:\Thornswood-Server-Dev` under `game-dev` (issue #401); the site's data,
 config, uploads and each feed's store but not its downloads (issue #454); the
-bot's config and join record; the voice service's `choices.json`; the
-Caddyfile. Encrypted, seven daily and four weekly kept
-(`vps-nightly-backup.ps1:8-55`). It takes nothing from
-`C:\Thornswood-Voice-Dev`. The copy off the box is pulled to Patrick's machine
+bot's config and join record; the Caddyfile. Encrypted, seven daily and four
+weekly kept (`vps-nightly-backup.ps1:$KeepDaily = 7`,
+`vps-nightly-backup.ps1:$KeepWeekly = 4`). It takes nothing from either voice
+folder: the live one's `choices.json`, which nothing reads, stopped being taken
+with issue #1084. The copy off the box is pulled to Patrick's machine
 over ssh by the `Thornswood Fetch Backups` task there (`Fetch-Backups.ps1
 -Schedule`), never served over HTTPS; `Restore-Server.ps1` puts one back into
 a server folder, `Restore-Box.ps1` puts all of it onto a new box, and
 `tests\test-backup-restore.ps1` and `tests\test-new-box-runbook.ps1` prove the
 round trip.
+
+03:15 is a quiet hour, not the hour after a restart: no script under `scripts`
+registers a nightly restart task. Measured on 5 Oct over every
+`Register-ScheduledTask`, `New-ScheduledTaskTrigger` and `schtasks /create` in
+`scripts`: the only daily triggers are this backup's and the one
+`Fetch-Backups.ps1 -Schedule` makes on Patrick's machine, and every other task
+those scripts register starts at boot, every few minutes, at sign in or once.
+`Install-Backup.ps1` says the same
+(`Install-Backup.ps1:well clear of when anybody is playing`).
 
 A deploy sends a commit or nothing (issue #1121): `Deploy-Docs.ps1`,
 `Install-Voice.ps1`, `Install-Bot.ps1`, `Deploy-DevGamemode.ps1`,
@@ -250,12 +272,14 @@ The harnesses are `tests\test-deploy-swaps.ps1`,
   `DevBuild.cs:26`).
 - **Game server to voice:** `gamemode.js` pushes positions five times a second
   to `127.0.0.1:<thornswoodVoicePort>` from its own `server-settings.json`,
-  falling back to 7778 (`gamemode.js:253-258,10641`, `Install-Voice.ps1:8-12`).
-  `Deploy-DevGamemode.ps1` sets 7789 for dev (`Deploy-DevGamemode.ps1:110-114`).
+  falling back to 7778 (`gamemode.js:253-258,10641`,
+  `Install-Voice.ps1:five times a second, over loopback on the VPS`).
+  `Deploy-DevGamemode.ps1` sets 7789 for dev (`Deploy-DevGamemode.ps1:$VoicePort = 7789`).
 - **Launcher to voice:** the voice page holds a WebSocket to `voiceUrl`
   (`https://thornswood.net/voice` or `/voice-dev`), or with that empty the same
   built-in address, never the raw port: the service listens on loopback and
-  takes a join token only over wss (#1304). Audio goes between people directly (`Install-Voice.ps1:8-12`). The
+  takes a join token only over wss (#1304). Audio goes between people directly
+  (`Install-Voice.ps1:The audio itself goes straight between people`). The
   page and the game's chat each offer a join token of their own with the
   handshake, minted by the launcher for that one connection (#1337, #1322).
 - **Bot to site:** `/api/ticket` with the site's `botKey` (`bot.py:27,277`).
@@ -267,7 +291,7 @@ The harnesses are `tests\test-deploy-swaps.ps1`,
 `Ship.ps1`, `Publish-*`, `Repair-Manifest.ps1`, `Bump-Version.ps1`, every
 `Deploy-*` and `Install-*`, and `Request-Restart.ps1`. The engine build and the
 release output (`out`, ignored by git) are in the repo folder; `scripts\release\Where.ps1`
-says where (`Where.ps1:71-82`). The feed and its baseline are received from
+says where (`Where.ps1:Get-Place`). The feed and its baseline are received from
 the VPS into `%LOCALAPPDATA%\Thornswood\feed\main` and `\dev`, working copies
 with a backup of the last twenty of each, not git clones (`Feed-Store.ps1`,
 #907). Which command each
@@ -275,13 +299,6 @@ change needs after a merge: Developer-Guide.md, "After a pull request is merged"
 
 ## Where the sources disagree
 
-- `Setup-Domain.ps1:136-142` writes a Caddyfile with only
-  `reverse_proxy 127.0.0.1:3001`, and writes it on every run without
-  `-TaskOnly` (`Setup-Domain.ps1:130,179-181`). `scripts/deploy/Caddyfile:43-49` has the
-  `/voice` and `/voice-dev` blocks that both feeds' `voiceUrl` now point at.
-  Running `Setup-Domain.ps1` again would take voice through Caddy away.
-- `Install-Backup.ps1:32` says 03:15 is "after the nightly restart". No script
-  in `tools` registers a nightly restart task.
 - `DevBuild.cs:21-22` says both launchers share the one Skyrim, and
   `DevBuild.cs:92` copies `developer.flag`. Developer-Guide.md:431-435 says the dev
   build makes its own `<Root>-DevBuild\Game`, and Developer-Guide.md:180-182 says
