@@ -1,27 +1,68 @@
 const { spawn } = require('child_process');
-const fs = require('fs'), path = require('path'), os = require('os'), crypto = require('crypto');
+const fs = require('fs'), path = require('path'), os = require('os'), crypto = require('crypto'), net = require('net');
 const REPO = path.resolve(__dirname, '..');
-const PORT = 7903;
 let pass = 0, fail = 0;
 function check(what, got, want) {
   const ok = JSON.stringify(got) === JSON.stringify(want);
   console.log((ok ? '  ok   ' : '  FAIL ') + what + (ok ? '' : '  got ' + JSON.stringify(got) + ' want ' + JSON.stringify(want)));
   ok ? pass++ : fail++;
 }
+/*
+  A port of this run's own (#1703). Builds run side by side on the VPS, and
+  with a fixed number one run's requests can be answered by another run's
+  service. The system names a port nothing holds, the service is started on
+  it, and nothing is asked of the port until this service has said it is
+  listening there.
+*/
+function freePort(host) {
+  return new Promise((ok, bad) => {
+    const s = net.createServer();
+    s.on('error', bad);
+    s.listen(0, host, () => { const p = s.address().port; s.close(() => ok(p)); });
+  });
+}
+/* Waits for srv's own "listening on ...:port" line. If it stops first,
+   something took the port in between or it could not start, and the error
+   says which, with what it printed. */
+function listening(srv, port) {
+  return new Promise((ok, bad) => {
+    let out = '';
+    const said = (d) => {
+      out += d;
+      const m = /\[voice\] listening on \S+:(\d+)/.exec(out);
+      if (m && Number(m[1]) === port) { end(null); }
+    };
+    const more = (d) => { out += d; };
+    const gone = (code) => end(new Error((/EADDRINUSE/.test(out) ? 'something else already holds port ' + port + ', so ' : '') +
+                                         'the voice service stopped (exit ' + code + ') before it was listening. It printed:\n' + out));
+    const late = setTimeout(() => end(new Error('the voice service did not say it was listening on ' + port +
+                                                ' within fifteen seconds. It printed:\n' + out)), 15000);
+    function end(err) {
+      clearTimeout(late);
+      srv.stdout.removeListener('data', said);
+      srv.stderr.removeListener('data', more);
+      srv.removeListener('exit', gone);
+      if (err) { bad(err); } else { ok(); }
+    }
+    srv.stdout.on('data', said);
+    srv.stderr.on('data', more);
+    srv.on('exit', gone);
+  });
+}
+// Each run is on a port of its own. It was a fixed 7903 for every run, the same
+// as test-keepalive.js (#1703).
 function run(env, then) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ice-'));
   fs.copyFileSync(path.join(__dirname, 'voice-server.js'), path.join(dir, 'voice-server.js'));
   fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
   fs.writeFileSync(path.join(dir, 'secret.txt'), 'test');
-  const srv = spawn(process.execPath, ['voice-server.js'], { cwd: dir,
-    env: Object.assign({}, process.env, { THORNSWOOD_VOICE_PORT: String(PORT), THORNSWOOD_SITE: '' }, env) });
-  let log = '';
-  srv.stdout.on('data', d => log += d); srv.stderr.on('data', d => log += d);
   return (async () => {
-    for (let i = 0; i < 60; i++) {
-      try { const r = await fetch('http://127.0.0.1:' + PORT + '/health'); if (r.ok) break; } catch (e) {}
-      await new Promise(r => setTimeout(r, 150));
-    }
+    const PORT = await freePort('0.0.0.0');
+    const srv = spawn(process.execPath, ['voice-server.js'], { cwd: dir,
+      env: Object.assign({}, process.env, { THORNSWOOD_VOICE_PORT: String(PORT), THORNSWOOD_SITE: '' }, env) });
+    let log = '';
+    srv.stdout.on('data', d => log += d); srv.stderr.on('data', d => log += d);
+    await listening(srv, PORT);
     // The headers come back too, because whether a page is ALLOWED to read
     // this answer matters as much as what is in it. The in-game page is loaded
     // off disk, so its Origin is the literal string null, and without the
@@ -31,8 +72,7 @@ function run(env, then) {
     const cors = res.headers.get('access-control-allow-origin');
     const ice = await res.json();
     const health = await (await fetch('http://127.0.0.1:' + PORT + '/health')).json();
-    srv.kill();
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise((r) => { srv.once('exit', r); srv.kill(); });
     return { ice: ice.iceServers, turn: health.turn, cors: cors, log };
   })();
 }

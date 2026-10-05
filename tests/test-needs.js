@@ -42,15 +42,21 @@ let block = (a >= 0 && b >= 0) ? src.slice(a, b) : null;
   The block is an IIFE that publishes itself on the global and starts a timer.
   It is run with a fake global, a fake mp and a fake clock, and the timer is
   swallowed. Everything it needs from the rest of the gamemode (notify, say,
-  guard, mp) is passed in.
+  guard, mp) is passed in. Everybody with meters is online, until leave()
+  takes them out and runs the block's own tick, the way logging out looks to
+  it (#1606).
 */
 function rig(startAt) {
   const store = {};
   const clock = { now: startAt || 1000000000000 };
   const said = [];
   const g = {};
+  const gone = {};
+  const named = {};
   const Fake = {
-    getOnlinePlayers: function () { return Object.keys(store).map(Number); },
+    getOnlinePlayers: function () {
+      return Object.keys(store).map(Number).filter(function (id) { return !gone[id]; });
+    },
     makeProperty: function () { },
     get: function (id, key) {
       if (key === 'worldOrCellDesc') { return (store[id] && store[id].cell) || 'cell:X.esm'; }
@@ -69,11 +75,13 @@ function rig(startAt) {
   const api = fn(
     g, Fake, FakeDate, { log: function () { } },
     function () { return 0; }, function () { },
-    function (n, f) { return f; },
+    function (n, f) { named[n] = f; return f; },
     function (id, line) { said.push(line); },
     function (id, line) { said.push(line); },
     Math, Number, String, Object, isFinite);
   api.clock = clock;
+  api.leave = function (id) { gone[id] = true; named.needsTick(); };
+  api.back = function (id) { delete gone[id]; };
   api.said = said;
   api.cellOf = function (id, c) { if (!store[id]) { store[id] = {}; } store[id].cell = c; };
   api.seed = function (id) { Fake.set(id, 'x', api.fresh()); };
@@ -240,19 +248,22 @@ if (block !== null && smoke) {
         rec.bed > rec.inn && rec.inn > rec.campfire && rec.campfire > rec.sit);
   }
 
-  // S7: logging out in a bed.
+  // S7: logging out in a bed. The first settle after somebody comes back
+  // into the world is their arrival, and that is where the night counts
+  // (#1606; tests/test-1606-logout-fill.js has the rest of it).
   {
     const r = rig();
     r.seed(ME);
     r.clock.now += 15 * HOUR;
     r.settle(ME);
     r.resting(ME, 'bed');
-    // Away for a night.
+    // Logged out, and away for a night.
+    r.leave(ME);
     r.clock.now += 9 * HOUR;
-    const line = r.arrived(ME);
+    r.back(ME);
     const n = r.settle(ME);
     yes('S7 sleeping in a bed and logging out means coming back rested',
-        n.rest === 100 && line.length > 0);
+        n.rest === 100 && r.said.some(function (l) { return /slept well/.test(l); }));
     yes('S7 and it is not still resting when they get up', n.resting === '');
 
     // Somebody who logged out standing in a field does not.
@@ -260,8 +271,9 @@ if (block !== null && smoke) {
     r2.seed(ME);
     r2.clock.now += 15 * HOUR;
     r2.settle(ME);
+    r2.leave(ME);
     r2.clock.now += 9 * HOUR;
-    r2.arrived(ME);
+    r2.back(ME);
     yes('S7 but logging out on your feet does not', r2.settle(ME).rest < 100);
   }
 
