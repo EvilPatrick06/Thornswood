@@ -47,7 +47,7 @@ What floats:
 - `/s`, `/shout`, `/y`, or `/yell`, for people inside the shout reach.
 
 What does not float: every other command. `/trade`, `/party`,
-`/bard`, `/book`, and the rest stay in the box. `/bard` still pays
+`/bard`, and the rest stay in the box. `/bard` still pays
 the rest on [People beside you](people.md). A lyric above the head
 is a plain line or a `/me`.
 
