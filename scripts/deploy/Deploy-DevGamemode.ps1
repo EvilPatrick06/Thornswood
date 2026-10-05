@@ -51,12 +51,13 @@
                                    the files the last run replaced go back in,
                                    after the same warning, checked the same way
 
-    .\Deploy-DevGamemode.ps1 "The door answers on the first knock"
-                                   - The door no longer needs a second try
-                                   before it opens.
+    .\Deploy-DevGamemode.ps1 -Note "The door answers on the first knock
+    - The door no longer needs a second try before it opens."
 
   -Note is required on every deploy except -PutBack. It is the same shape
   Ship takes: a title, then "- " lines from the side of the person playing.
+  It is the one parameter taken without its name, so a bare string after the
+  script is the note; every other one is given by name (#1929).
   After a successful deploy it posts to the dev updates channel through
   Publish-Discord.ps1 -Dev -GamemodeDeploy, the same embed style as a dev
   Ship, with footer "dev server". Issue #594.
@@ -196,7 +197,11 @@ param(
   # What goes to the dev updates channel after a successful deploy. The same
   # shape Ship takes: first line the title, "- " lines the details. Not taken
   # on -PutBack, which sends nothing and posts nothing.
-  [string]$Note = ''
+  # Position 0, and the only parameter with one, which leaves every other
+  # parameter named only (#1929). With none set, PowerShell numbered them in
+  # the order above, so a bare note bound to -Vps: on 5 Oct the refusal's own
+  # example became the VPS address and the script refused again.
+  [Parameter(Position = 0)][string]$Note = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -216,7 +221,9 @@ if (-not $PutBack) {
     Write-Host '  can be told what changed. Nothing was sent.' -ForegroundColor Red
     Write-Host ''
     Write-Host '  The shape, written from the side of the person playing:' -ForegroundColor DarkGray
-    Write-Host '      .\scripts\deploy\Deploy-DevGamemode.ps1 "The door answers on the first knock"' -ForegroundColor DarkGray
+    # By name, and the quote left open until the last line, so the two lines
+    # pasted together are one command with one note of two lines (#1929).
+    Write-Host '      .\scripts\deploy\Deploy-DevGamemode.ps1 -Note "The door answers on the first knock' -ForegroundColor DarkGray
     Write-Host '      - The door no longer needs a second try before it opens."' -ForegroundColor DarkGray
     exit 1
   }
