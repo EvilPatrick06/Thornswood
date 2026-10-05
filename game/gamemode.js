@@ -29299,14 +29299,15 @@ log('gamemode loaded:',
   // plugin the repo makes goes into both in one change.
   var OURS = { 'thornswood-content.esp': 1 };
 
+  // Returns '' once the manifest is published, otherwise why it was not.
   function publish() {
     var doc;
     try {
       doc = JSON.parse(fs.readFileSync(SRC, 'utf8'));
     } catch (e) {
-      return false;   // not written yet, or not readable
+      return 'could not read ' + SRC + ': ' + e.message;
     }
-    if (!doc || !Array.isArray(doc.mods)) return false;
+    if (!doc || !Array.isArray(doc.mods)) return SRC + ' has no mods list';
 
     var mods = doc.mods.filter(function (m) {
       return m && typeof m.filename === 'string' && PLUGIN.test(m.filename);
@@ -29326,8 +29327,7 @@ log('gamemode loaded:',
       fs.mkdirSync(DIR, { recursive: true });
       fs.writeFileSync(DST, JSON.stringify(out));
     } catch (e) {
-      console.log('[thornswood] could not publish the manifest: ' + e.message);
-      return false;
+      return 'could not write ' + DST + ': ' + e.message;
     }
 
     // Kept for the load order refusal below, which compares what a client
@@ -29339,7 +29339,7 @@ log('gamemode loaded:',
                 '/manifest.json, ' + mods.length + ' plugins' +
                 (dropped > 0 ? ' (' + dropped + ' archive entries left out)' : ''));
     try { publishFiles(mods); } catch (e) { console.log('[thornswood] could not publish the plugin files: ' + e.message); }
-    return true;
+    return '';
   }
 
   // Our own plugins themselves, beside the manifest, for the launcher's Fix.
@@ -29407,14 +29407,33 @@ log('gamemode loaded:',
                 (missing ? ', ' + missing + ' not found on this box' : ''));
   }
 
-  if (publish()) return;
-
-  // generateManifest runs before the gamemode is loaded, so this should not be
-  // needed. It costs nothing to be wrong about that.
-  var tries = 0;
-  var again = setInterval(function () {
-    if (publish() || ++tries > 20) clearInterval(again);
-  }, 1000);
+  // Once, at load, with nothing trying again (#1885). The engine's main()
+  // calls manifestGen.generateManifest, which writes data/manifest.json with
+  // writeFileSync, and only after it returns does setupGamemode load this file
+  // (skymp5-server/ts/index.ts at the commit records\server-build.json names;
+  // tests\test-1885-manifest-order.js reads it there). A start whose
+  // generateManifest throws never loads the gamemode at all. So the file is
+  // complete when this runs, and a publish that fails here fails for a reason
+  // no wait mends: the file unreadable, no mods in it, the api folder not
+  // writable. Until 5 Oct a timer tried again every second for twenty seconds
+  // and then stopped without a word.
+  //
+  // A manifest an earlier start published describes that start's plugins, so
+  // it is taken off rather than left to answer for this one, and the refusal
+  // below gets no list: the client, the launcher's Scan and the refusal then
+  // find no manifest instead of a wrong one.
+  var why = publish();
+  if (why) {
+    globalThis.__thornswoodManifestMods = null;
+    var old = '';
+    if (fs.existsSync(DST)) {
+      try { fs.unlinkSync(DST); old = ' The one an earlier start published was taken off.'; }
+      catch (e) { old = ' The one an earlier start published could not be taken off, so it still answers: ' + e.message + '.'; }
+    }
+    console.error('[thornswood] the load order manifest was NOT published at /api/servers/' + KEY +
+                  '/manifest.json: ' + why + '.' + old + ' Until it is, launchers check no plugin bytes and ' +
+                  'nobody\'s load order is checked. Nothing tries again: put the cause right and restart the server.');
+  }
 })();
 // ==== end thornswood server manifest ====
 
@@ -29632,7 +29651,7 @@ log('gamemode loaded:',
     var mods = g.__thornswoodManifestMods;
     if (!Array.isArray(mods) || !mods.length) {
       console.log('[thornswood] load order report from profile ' + profileId +
-                  ' not checked: the manifest is not published yet');
+                  ' not checked: the load order manifest was not published (the line saying why is earlier in this log)');
       return undefined;
     }
 
