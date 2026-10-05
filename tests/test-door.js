@@ -22,6 +22,11 @@
 // GAMEMODE=<path> runs it against another copy, which is how it was shown to
 // fail on the door before this change.
 //
+// The door tells the person why and kicks five seconds later (#1894), on a
+// timer the test fires by hand (later), so each turning away below fires it
+// before it counts the kicks. test-1894-door-sentence.js holds the sentence
+// and its order.
+//
 // Read only.
 const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
@@ -105,9 +110,10 @@ function rig(enforce, profiles) {
   };
 
   const timers = {};
+  const pendingKicks = [];
   const said = [];
   const run = new Function(
-    'require', 'mp', 'setInterval', 'clearInterval', 'Date', 'console', 'globalThis',
+    'require', 'mp', 'setInterval', 'clearInterval', 'setTimeout', 'Date', 'console', 'globalThis',
     block);
   run(function (name) {
         if (name === 'fs') return fakeFs;
@@ -118,6 +124,7 @@ function rig(enforce, profiles) {
       mp,
       function (fn, ms) { timers[ms] = fn; return ms; },
       function () { },
+      function (fn, ms) { pendingKicks.push({ fn: fn, ms: ms }); return pendingKicks.length; },
       FakeDate,
       { log: function (s) { said.push(String(s)); } },
       {});
@@ -126,6 +133,8 @@ function rig(enforce, profiles) {
     files: files, said: said, kicked: kicked, world: world, pending: pending,
     advance: function (ms) { clock += ms; },
     tick: function () { clock += 2000; timers[2000](); },
+    /** The kicks the door put off until its sentence could be read (#1894). */
+    later: function () { clock += 5000; pendingKicks.splice(0).forEach(function (t) { t.fn(); }); },
     refresh: function () { timers[300000](); },
     refuseWrites: function (on) { refuseWrite = !!on; },
     /** Answer the oldest question the door has put to the site. */
@@ -168,6 +177,7 @@ if (block !== null) {
     r.arrive(A, 101, 1);
     r.tick();
     yes('S1 a listed profile is let in', r.since(0, /let in profile 101/) === 1);
+    r.later();
     yes('S1 and nobody is turned away', r.kicked.length === 0);
   }
 
@@ -181,9 +191,11 @@ if (block !== null) {
     r.tick();
     yes('S2 an unknown profile makes the door ask the site again',
         r.pending.length === 1 && r.since(0, /202 is not on the list yet/) === 1);
+    r.later();
     yes('S2 and is not turned away while the answer is out', r.kicked.length === 0);
     r.answer(200, { profiles: [101, 202] });
     r.tick();
+    r.later();
     yes('S2 and is let in once the answer lands with them',
         r.since(0, /let in profile 202/) === 1 && r.kicked.length === 0);
   }
@@ -201,6 +213,7 @@ if (block !== null) {
     r.refresh();
     r.answer(200, { profiles: [101] });
     r.tick();
+    r.later();
     yes('S3 a profile that drops off a list that landed is judged again',
         r.since(mark, /profile 202 dropped off the list while in the world/) === 1);
     yes('S3 and with the door enforcing they are turned away',
@@ -225,6 +238,7 @@ if (block !== null) {
         r.since(0, /let in profile 202/) === 1);
     r.answer(200, { profiles: [101] });
     r.tick();
+    r.later();
     yes('S3b and turned away when the first answer lands without them',
         r.kicked.length === 1 && r.kicked[0] === 2);
   }
@@ -244,6 +258,7 @@ if (block !== null) {
     r.tick();
     yes('S4 watching only, the drop is logged as WOULD TURN AWAY',
         r.since(mark, /WOULD TURN AWAY profile 202/) === 1);
+    r.later();
     yes('S4 and nobody is kicked', r.kicked.length === 0);
     r.tick(); r.tick();
     r.advance(300000);
@@ -270,6 +285,7 @@ if (block !== null) {
       r.answer(200, { profiles: [202, 101, 303] });
       r.tick(); r.tick();
     }
+    r.later();
     yes('S5 an unchanged list turns nobody away', r.kicked.length === 0);
     yes('S5 and says nothing about the people already in',
         r.since(mark, /let in profile|dropped off|WOULD TURN AWAY|turned away/) === 0);
@@ -292,6 +308,7 @@ if (block !== null) {
     r.refresh();
     goWrong(r);
     r.tick(); r.tick(); r.advance(60000); r.tick();
+    r.later();
     yes(name + ': nobody already in is turned away', r.kicked.length === 0);
     yes(name + ': and nobody is judged again',
         r.since(0, /dropped off|WOULD TURN AWAY|turned away/) === 0);
@@ -300,6 +317,7 @@ if (block !== null) {
     r.refresh();
     r.answer(200, { profiles: [101] });
     r.tick();
+    r.later();
     yes(name + ': and a good list after it still turns the banned one away',
         r.kicked.length === 1 && r.kicked[0] === 2);
     return r;
@@ -362,6 +380,7 @@ if (block !== null) {
     r.refresh();
     r.answer(200, { profiles: [101] });
     r.tick();
+    r.later();
     yes('S13 and not again when the next list still lacks them',
         r.since(0, /WOULD TURN AWAY profile 303/) === 1 && r.kicked.length === 0);
   }
@@ -378,6 +397,7 @@ if (block !== null) {
     r.refresh();
     r.answer(200, { profiles: [101] });
     r.tick();
+    r.later();
     yes('S14 a person who has already gone is not chased', r.kicked.length === 0);
   }
 
@@ -394,12 +414,14 @@ if (block !== null) {
     r.files[ALLOWED] = JSON.stringify({ enforce: true, profiles: [101] });
     r.advance(31000);
     r.tick(); r.tick();
+    r.later();
     yes('S15 a hand edit to the file judges nobody already in again',
         r.kicked.length === 0 && r.since(0, /dropped off|WOULD TURN AWAY|turned away/) === 0);
     r.advance(300000);
     r.refresh();
     r.answer(200, { profiles: [101] });
     r.tick();
+    r.later();
     yes('S15 and the next list from the site does, with enforce as it was left',
         r.kicked.length === 1 && r.kicked[0] === 2);
   }
@@ -421,6 +443,7 @@ if (block !== null) {
     r.answer(200, { profiles: [101], lookupFailed: true, failedProfiles: [303],
                     lookupFailedWhy: 'Discord is rate limiting the bot' });
     r.tick();
+    r.later();
     yes('S16 Discord answered for some: the one it could not check is still on the list on disk',
         JSON.parse(r.files[ALLOWED]).profiles.indexOf(303) >= 0);
     yes('S16 and the ban in the same answer turns that one away',
@@ -430,6 +453,7 @@ if (block !== null) {
         r.since(mark, /profile 303 dropped off|turned away profile 303|WOULD TURN AWAY profile 303/) === 0);
     const kicks = r.kicked.length;
     r.tick(); r.advance(60000); r.tick();
+    r.later();
     yes('S16 and nothing more happens on the ticks after',
         r.kicked.length === kicks && r.kicked.indexOf(3) < 0);
   }
