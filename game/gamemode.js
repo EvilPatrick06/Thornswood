@@ -29576,7 +29576,10 @@ log('gamemode loaded:',
     if (!refuse) {
       if (fresh(profileId, at, now)) {
         tell(loadOrderSentence(verdict, false));
-        console.log('[thornswood] WOULD REFUSE profile ' + profileId + ': ' + what + ' differs at ' +
+        // The full one's words are what site\server.js reads the server log
+        // for (serverRefusal); the light one's carry the same lead.
+        console.log((light ? '[thornswood] WOULD REFUSE profile ' + profileId + ': light load order differs at '
+                           : '[thornswood] WOULD REFUSE profile ' + profileId + ': load order differs at ') +
                     verdict.at + ', where the server has ' + verdict.theirs +
                     '. Watching only, they stayed (thornswoodLoadOrderRefuse is not true).');
       }
@@ -29585,7 +29588,8 @@ log('gamemode loaded:',
     seen.last[profileId] = { key: at, at: now };
     var told = loadOrderSentence(verdict, true);
     tell(told);
-    console.log('[thornswood] refusing profile ' + profileId + ': ' + what + ' differs at ' +
+    console.log((light ? '[thornswood] refusing profile ' + profileId + ': light load order differs at '
+                       : '[thornswood] refusing profile ' + profileId + ': load order differs at ') +
                 verdict.at + ', where the server has ' + verdict.theirs);
     refuseLater(profileId, actorId, told);
     return verdict;
