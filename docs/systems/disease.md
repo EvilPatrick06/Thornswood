@@ -65,8 +65,10 @@ caught window, ill, bad and the durations above. Food sickness and
 fouled water last their 30 and 45 minutes from when they show. While a
 disease shows, its meter counts as at least weary, or at least bad, so
 a hungry person with food sickness does not pay the same penalty twice.
-A bad one refuses every craft. A potion of cure disease clears one, the
-one furthest along, and is still the sip of 5. A physicker's remedy
+A bad one refuses every craft: a bench's own menu, a key cut at a forge
+and a kiln burned by pressing it, before anything is taken. A potion of
+cure disease clears one, the one furthest along, and is still the sip
+of 5. A physicker's remedy
 clears one too, wound fever first, used from the wounds panel (see
 [Injury](injury.md)). A shrine pressed inside
 one of the temples the wake uses clears them all. A fire, a bed, warmth
