@@ -508,8 +508,14 @@ function Protect([string]$path, [string[]]$sids) {
     }
     Set-Acl -LiteralPath $path -AclObject $acl
 }
+# The bot's account's rules on a path, read by SID (#1880). Get-Acl's .Access
+# names every account Windows knows, and on the VPS, where the ThornswoodBot
+# service is real, the bot's rule reads NT SERVICE\ThornswoodBot rather than
+# its SID. A match on the SID found no rule there: the sixteen checks that
+# want one failed on the build runner, and the ones that want none passed
+# whatever the folder held.
 function Rules([string]$path) {
-    return @((Get-Acl -LiteralPath $path).Access | Where-Object { "$($_.IdentityReference)" -eq $sid -or $_.IdentityReference.Value -eq $sid })
+    return @((Get-Acl -LiteralPath $path).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | Where-Object { $_.IdentityReference.Value -eq $sid })
 }
 $me = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $g = Join-Path $tmp 'grants'

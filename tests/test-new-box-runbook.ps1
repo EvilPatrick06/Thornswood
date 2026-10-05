@@ -21,18 +21,24 @@
        value its ValidateSet allows. That includes a script carried to the box
        by Remote.ps1 -File with -Arguments, and one run there by ssh
        "powershell ... -File C:\<script>.ps1 <arguments>".
-    2. the steps are in the order the scripts need: the address first, the
+    2. every scp that carries Install-ThornswoodServer.ps1 up carries every
+       file it loads from beside itself, read off the installer's own syntax
+       tree (issue #1884: step 6 left ServerBuild.ps1 behind, and the
+       installer stops without it). The rehearsal in RESTORING.md, which
+       records what was typed before that file existed, says it is needed
+       today.
+    3. the steps are in the order the scripts need: the address first, the
        ssh key before anything that uses it, the server program before the
        restore, the restore before the site, the bot and the game start, and
        the watchdog, which starts whatever is stopped, after all of them. The
        page ends with the watchers.
-    3. no command carries a secret, and every secret the steps need says where
+    4. no command carries a secret, and every secret the steps need says where
        it comes from, with the passphrase's file the one Restore-Box.ps1 and
        Install-Backup.ps1 actually default to.
-    4. what can run here does: Where.ps1 knows the payload it names, the Ship
+    5. what can run here does: Where.ps1 knows the payload it names, the Ship
        note passes Ship's own rules, and Restore-Box.ps1 refuses a backup it
        cannot use before it reaches for ssh.
-    5. the box-side half, under Windows PowerShell 5.1 as on the VPS: the real
+    6. the box-side half, under Windows PowerShell 5.1 as on the VPS: the real
        vps-nightly-backup.ps1 takes every site upload even over its advisory
        threshold, and the feed store (not its downloads)
        from a scratch site, and the real vps-restore-services.ps1
@@ -333,6 +339,84 @@ Yes '  and the site and the bot after it' (
     (First $gone 'Deploy-Docs.ps1' $null) -gt $gRestore -and (First $gone 'Install-Bot.ps1' $null) -gt $gRestore)
 Yes 'neither page still tells anyone to import scheduled tasks from the backup' (
     @($pages.Values | Where-Object { $_ -match '(?i)import the scheduled tasks|tasks. folder in the backup' }).Count -eq 0)
+
+# ---------------------------------------- what goes up with the installer --
+# Install-ThornswoodServer.ps1 loads files from the folder it runs in and
+# stops without them. Step 6 sent it without ServerBuild.ps1, which it loads
+# since #1214, so followed as written it installed nothing (#1884). Read off
+# the installer's syntax tree, so a file it starts loading from beside itself
+# is wanted here the day it does: every Join-Path of the folder it runs from
+# ($PSScriptRoot, or a variable given it) and a bare file name.
+function Beside([string]$path) {
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$null, [ref]$null)
+    $here = @('PSScriptRoot')
+    foreach ($a in @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and $n.Right.Extent.Text -eq '$PSScriptRoot' }, $true))) {
+        if ($a.Left -is [System.Management.Automation.Language.VariableExpressionAst]) { $here += $a.Left.VariablePath.UserPath }
+    }
+    $out = @()
+    foreach ($c in @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and $n.GetCommandName() -eq 'Join-Path' }, $true))) {
+        $e = @($c.CommandElements | Select-Object -Skip 1)
+        if ($e.Count -ne 2) { continue }
+        if ($e[0] -isnot [System.Management.Automation.Language.VariableExpressionAst] -or $here -notcontains $e[0].VariablePath.UserPath) { continue }
+        if ($e[1] -isnot [System.Management.Automation.Language.StringConstantExpressionAst] -or $e[1].Value -match '[\\/]') { continue }
+        $out += $e[1].Value
+    }
+    return , @($out | Sort-Object -Unique)
+}
+# Every scp on a page: the names of the files it sends, and the command.
+function Scps([string]$pageText) {
+    $out = @()
+    foreach ($c in (Commands $pageText)) {
+        $text = [regex]::Replace($c.Text, '<[^<>\n]+>', 'PLACEHOLDER')
+        $ast = [System.Management.Automation.Language.Parser]::ParseInput($text, [ref]$null, [ref]$null)
+        foreach ($cmd in @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and $n.GetCommandName() -eq 'scp' }, $true))) {
+            $a = @($cmd.CommandElements | Select-Object -Skip 1 | Where-Object { $_ -isnot [System.Management.Automation.Language.CommandParameterAst] })
+            if ($a.Count -lt 2) { continue }
+            $sends = @($a | Select-Object -First ($a.Count - 1) | ForEach-Object { ([string]$_.Extent.Text).Trim('"', "'") -split '[\\/]' | Select-Object -Last 1 })
+            $out += [pscustomobject]@{ Sends = $sends; Text = $cmd.Extent.Text }
+        }
+    }
+    return , @($out)
+}
+$beside = Beside (Join-Path $scriptsDir 'deploy\Install-ThornswoodServer.ps1')
+Yes ('the installer loads {0} from beside itself, read off its syntax tree' -f ($beside -join ', ')) (
+    $beside -contains 'ServerSettings.ps1' -and $beside -contains 'ServerBuild.ps1')
+function Short-Of($scps) {
+    $miss = @()
+    foreach ($sc in $scps) {
+        if ($sc.Sends -notcontains 'Install-ThornswoodServer.ps1') { continue }
+        foreach ($b in $beside) { if ($sc.Sends -notcontains $b) { $miss += "$b is not in: $($sc.Text)" } }
+    }
+    return , @($miss)
+}
+# The check itself, on step 6 as it was, so a check that stopped finding the
+# scp cannot pass the real pages by finding nothing.
+$wasStep6 = "   ``````powershell`n   scp .\scripts\deploy\Install-ThornswoodServer.ps1 .\scripts\deploy\ServerSettings.ps1 .\scripts\vps\Roll-Log.ps1 Administrator@<new address>:C:/`n   ``````"
+$caughtScp = Short-Of (Scps $wasStep6)
+Yes 'the check catches step 6 as it was, which left ServerBuild.ps1 behind' ($caughtScp.Count -eq 1 -and $caughtScp[0] -match '^ServerBuild\.ps1 ')
+$carries = 0; $short = @()
+foreach ($page in $pages.Keys) {
+    $sc = Scps $pages[$page]
+    $carries += @($sc | Where-Object { $_.Sends -contains 'Install-ThornswoodServer.ps1' }).Count
+    $miss = Short-Of $sc
+    foreach ($m in $miss) { $short += "$page : $m" }
+}
+Yes ('every scp that carries the installer up carries all of them with it ({0} on the pages)' -f $carries) ($carries -ge 1 -and $short.Count -eq 0)
+foreach ($m in $short) { Write-Host "        $m" }
+# The rehearsal in RESTORING.md records what was typed on 28 September,
+# before ServerBuild.ps1, and stays as it was typed. Whatever the installer
+# loads from beside itself that no scp there sends, the section says, outside
+# that record, is needed today.
+$rehearsal = Section 'docs\RESTORING.md' '## Rehearsing it'
+$rs = @(); $prose = ''
+if ($rehearsal) {
+    $rs = Scps $rehearsal
+    $prose = ([regex]'(?ms)^[ \t]*```[a-z]*\n(.*?)^[ \t]*```').Replace($rehearsal, '')
+}
+$sentThere = @($rs | ForEach-Object { $_.Sends })
+$unsaid = @($beside | Where-Object { $sentThere -notcontains $_ -and -not $prose.Contains($_) })
+Yes ('RESTORING.md''s rehearsal says what the installer needs beside it today that was not typed then' + $(if ($unsaid.Count) { ': not ' + ($unsaid -join ', ') } else { '' })) (
+    @($rs | Where-Object { $_.Sends -contains 'Install-ThornswoodServer.ps1' }).Count -ge 1 -and $unsaid.Count -eq 0)
 
 # ------------------------------------------------------------- the secrets --
 $all = @($moving + $gone)
