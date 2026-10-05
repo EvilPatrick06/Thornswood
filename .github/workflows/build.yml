@@ -184,14 +184,16 @@ jobs:
           # September the server record was two days and several fixes behind
           # the pin and nothing said so, so the servers ran old engine code.
           # Reads only the checkout (the pin is the gitlink in HEAD's tree),
-          # well under a second. Fail closed, like the steps above.
+          # well under a second. Fail closed, like the steps above. It also
+          # holds engine\README.md to naming no commit or hash in full, since
+          # the page went stale twice copying the pin (issue #1346).
           if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
             Write-Host '::error file=tests/test-one-engine.js::no node on this runner, so the engine commit was not checked'
             exit 1
           }
           node tests\test-one-engine.js
           if ($LASTEXITCODE -ne 0) {
-            Write-Host '::error file=records/server-build.json::the engine pin and the client and server build records do not name one fork commit; the lines above say which'
+            Write-Host '::error file=records/server-build.json::the engine pin and the client and server build records do not name one fork commit, or engine/README.md names a commit or hash in full; the lines above say which'
             exit 1
           }
 
@@ -280,6 +282,8 @@ jobs:
                  'test-npc-merchant-purses.js', 'test-merchant-ledger-storage.js', 'test-npc-merchant-startup.js',
                  'test-merchant-ledger-revisions.js', 'test-merchant-settlement.js', 'test-merchant-trading.js', 'test-merchant-deployment.js', 'test-merchant-traders.js',
                  'test-dungeon-loot.js', 'test-dungeon-reward-safety.js', 'test-dungeon-reward-storage.js', 'test-one-mint.js',
+                 'test-1319-pass-switch.js',
+                 'test-1319-pass-switch.ps1',
                  'test-1373-scarce-scene.js',
                  'test-nobody-makes.js',
                  'test-1378-shared-gather.js',
@@ -298,12 +302,14 @@ jobs:
                  'test-1388-apprentice.js',
                  'test-launcher-help.js', 'test-classes-page.js',
                  'test-1389-lists.js',
+                 'test-1590-hunter-lists.js',
                  'test-1390-embassy.js',
                  'test-1603-beds.js',
                  'test-1606-logout-fill.js',
                  'test-1734-rest-reconnect.js',
                  'test-1676-rest-gate.js',
                  'test-1733-injury-gate.js',
+                 'test-1767-creation-tools.js',
                  'test-1741-encoding.js',
                  'test-1634-apprentice-gui.js',
                  'test-1637-door-gui.js',
@@ -315,9 +321,13 @@ jobs:
                  'test-1718-trade-pieces.js',
                  'test-1627-board-panel.js',
                  'test-1595-deliver.js',
+                 'test-1303-voice-auth.js',
                  'test-1398-fuel.js',
                  'test-1398-weaver.js',
                  'test-1622-recipe-generator.js',
+                 'test-1714-cut-file.js',
+                 'test-1713-bench-table.js',
+                 'test-1712-builders-skip-off.js',
                  'test-1628-social-gui.js',
                  'test-1630-journal-gui.js',
                  'test-1629-party-gui.js',
@@ -332,6 +342,7 @@ jobs:
                  'test-1703-test-ports.js',
                  'test-1721-social-tick.js',
                  'test-1336-missing-stops.ps1',
+                 'test-1330-webview2-signature.js',
                  'test-table-install.js',
                  'test-secrets-fail-closed.js',
                  'test-our-key-menus.js', 'test-slash-key.js', 'test-social-keys.js',
@@ -441,6 +452,39 @@ jobs:
           }
           if ($bad) { exit 1 }
           Write-Host 'every bot file parses'
+
+      - name: Check the Python names what exists
+        shell: pwsh
+        run: |
+          # Issue #1343. Parsing (the step above) passes a name that does not
+          # exist, and Python only finds out when that line runs: in the bot,
+          # on the VPS, in front of people. ruff with four rule groups and
+          # nothing else: E9 a file that will not compile, F63 a comparison
+          # or assert that is always true or false, F7 a break, continue,
+          # return or yield where none can be, F82 a name never defined.
+          # No style rules, so no line here is red for how it looks. All 48
+          # Python files passed on main on 5 October with nothing changed.
+          # ruff comes into a venv of this run's own, never the machine's
+          # Python, pinned by version and hash in .github\ruff-requirements.txt.
+          # By hand, from the repository folder, in any venv:
+          #   python -m pip install --only-binary :all: --require-hashes -r .github\ruff-requirements.txt
+          #   python -m ruff check --isolated --select E9,F63,F7,F82 (git ls-files '*.py')
+          $venv = Join-Path $env:RUNNER_TEMP 'ruff-venv'
+          python -m venv $venv
+          $py = Join-Path $venv 'Scripts\python.exe'
+          if (-not (Test-Path -LiteralPath $py)) {
+            Write-Host '::error::could not make a venv for ruff, so the Python was not checked'
+            exit 1
+          }
+          & $py -m pip install --quiet --disable-pip-version-check --only-binary :all: --require-hashes -r .github\ruff-requirements.txt
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=.github/ruff-requirements.txt::could not install the pinned ruff, so the Python was not checked'
+            exit 1
+          }
+          $files = @(git ls-files '*.py')
+          & $py -m ruff check --isolated --no-cache --select E9,F63,F7,F82 --output-format github @files
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Write-Host ("{0} Python file(s) name only what exists" -f $files.Count)
 
       - name: Count the silent catches in the launcher
         shell: pwsh

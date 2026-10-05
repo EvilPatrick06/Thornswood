@@ -355,7 +355,9 @@ yes('B2 the background is the size the card always was, 1000 by 360 (got %r)'
 
 
 def mean(im, box):
-    px = list(im.crop(box).getdata())
+    # get_flattened_data, not getdata: Pillow 12.1 deprecated getdata and
+    # Pillow 14 removes it (#1401). The pin is 12.3.0, which has both.
+    px = list(im.crop(box).get_flattened_data())
     return [sum(p[i] for p in px) / float(len(px)) for i in range(3)]
 
 
@@ -442,7 +444,7 @@ STARFIELD = {
     'the number': ((316, 228, 600, 258), card.GOLD, 7.75, 7.69),
 }
 for label, (box, colour, was50, was90) in STARFIELD.items():
-    px = sorted(lum(p) for p in under.crop(box).getdata())
+    px = sorted(lum(p) for p in under.crop(box).get_flattened_data())
     c50 = contrast(lum(colour), px[len(px) // 2])
     c90 = contrast(lum(colour), px[int(len(px) * 0.9)])
     yes('R1 %s is as readable as on the starfield: %.2f against the middle of '

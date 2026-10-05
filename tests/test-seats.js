@@ -383,8 +383,11 @@ r.staff[797] = true; r.join(797); r.tick(); r.tick(r.api().staffWait + 1000);
 yes('one that never shows a pass is refused after the wait, and the log says why',
     r.saidTo(797).length === 1 && /refusing profile 797: .* \(a staff role, but no join pass was shown\)/.test(r.log()));
 
-// With a pass required, nobody waits without one.
-r = rig(Object.assign({ thornswoodRequirePass: true }, SEATS)); r.tick();
+// With a pass required, nobody waits without one. The seats block asks the
+// join pass block's one reading of the switch (#1319), stood in for here.
+r = rig(Object.assign({ thornswoodRequirePass: true }, SEATS));
+r.box.__thornswoodJoinPass = { requiring: function () { return true; } };
+r.tick();
 r.fill(800, 25);
 yes('with thornswoodRequirePass on, an ask with no pass is not placed', r.want(826) === 'no pass' &&
     r.lastLine(826).pass === true && r.api().status().line === 0);

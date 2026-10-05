@@ -15,7 +15,7 @@ set up today. Read the header before running anything.
 | Script | What it did | Why it is here |
 | --- | --- | --- |
 | `Add-SkyrimUnbound.ps1` | Installed Skyrim Unbound Reborn into the old build and published. | The collection installs Unbound now. **It refuses to run** (#1179). |
-| `Run-Everything.ps1`, `Run Everything.cmd` | Ran the old Add-* installers in one go and published once. | The collection installs the mods now. **It refuses to run** (#1179). |
+| `Run-Everything.ps1`, `Run-Everything.cmd` | Ran the old Add-* installers in one go and published once. | The collection installs the mods now. **It refuses to run** (#1179). |
 | `Fix-Voice.ps1` | Got the voice service running on the VPS on 13 September. | `Install-Voice.ps1` does that job. |
 | `Check-RosterScript.ps1` | Parsed the roster script before it was sent. | Named a path on one machine; `Check-Roster.ps1` is the live one. |
 | `Add-TempleRespawn.ps1` | Installed Respawn - Death Overhaul. | That mod is out (the known issues page). **It refuses to run.** It throws at the top rather than putting a plugin back that no live load order carries. |

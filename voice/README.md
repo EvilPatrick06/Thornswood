@@ -31,23 +31,29 @@ $env:THORNSWOOD_VOICE_PORT = '7900'; $env:THORNSWOOD_VOICE_BIND = '127.0.0.1'; n
 
 then open http://127.0.0.1:7900/health. It reads `THORNSWOOD_VOICE_PORT`
 (7778 when unset), `THORNSWOOD_VOICE_BIND` (every address when unset),
-`THORNSWOOD_VOICE_AUTH` (`log` when unset: a join that cannot prove itself is
-let in and written down; `on` refuses it), `THORNSWOOD_CHAT_RANGE` (off when
+`THORNSWOOD_CHAT_RANGE` (off when
 unset, though Install-Voice.ps1 sets it on for live and dev: every typed
 line goes to everybody; `on` keeps a line to the same cell
 and 4000 units, a number sets the units, and /me, /do, /w and /s work),
 `THORNSWOOD_CHAT_BURST` and `THORNSWOOD_CHAT_REFILL_MS` (5 and 1500 when
 unset: how many said lines one connection gets out at once, and how often it
-earns another; slash lines are never counted) and `THORNSWOOD_SITE` (when
-unset, nobody is asked whether a join owns the profile it claims). `/health`
+earns another; slash lines are never counted) and `THORNSWOOD_SITE`, the
+site `/token` asks whether a Discord ticket owns the profile it wants a join
+token for. A join that cannot prove itself with a token is refused, and
+`/token` mints one only when the site says yes: with the site unset, down or
+answering anything else, it answers 503 and mints nothing (#1303, #1315).
+`THORNSWOOD_VOICE_AUTH`, which once let unproven joins in, is not read any
+more. `/health`
 reports
 the `BUILD` string at the top of the file, which is the only way to tell from
 outside which copy is running, so change it whenever behaviour changes. The
 harnesses run the real file in a temporary folder on a port the system hands
 out, and ask it nothing until that copy has said it is listening there,
 because several builds run at once on the VPS and a fixed port let one run
-answer another (#1703). They need nothing else: `node voice\test-auth.js` and
-the rest.
+answer another (#1703). They need nothing else: each puts its own
+`token-key.txt` beside its copy and signs the tokens it joins with, and
+`test-auth.js` answers `/token`'s questions with a small site of its own.
+`node voice\test-auth.js` and the rest.
 
 A TURN relay, for the pairs of people who cannot reach each other directly,
 is `THORNSWOOD_TURN_URL`. Its key is `THORNSWOOD_TURN_SECRET` or, so it stays

@@ -30,6 +30,7 @@
 //
 // Read only. Nothing outside the temp folder is touched.
 const fs = require('fs');
+const crypto = require('crypto');
 const os = require('os');
 const net = require('net');
 const path = require('path');
@@ -216,6 +217,15 @@ yes('and somebody in no party carries none',
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-cull-'));
 fs.copyFileSync(SERVER, path.join(dir, 'voice-server.js'));
 fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
+// Every join proves itself since #1303, so this harness signs its own join
+// tokens with a key it puts beside its copy of the service.
+const KEY = crypto.randomBytes(32).toString('hex');
+fs.writeFileSync(path.join(dir, 'token-key.txt'), KEY);
+function tokenFor(pid) {
+  const body = String(pid) + '.' + String(Date.now() + 3600000);
+  return 'v1.' + body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
 let srv = null;
 let log = '';
 
@@ -282,7 +292,6 @@ async function ready() {
     cwd: dir,
     env: Object.assign({}, process.env, {
       THORNSWOOD_VOICE_PORT: String(PORT),
-      THORNSWOOD_VOICE_AUTH: 'off',
       THORNSWOOD_SITE: '',
       THORNSWOOD_CHAT_DIR: path.join(dir, 'chat')
     })
@@ -313,7 +322,7 @@ function join(pid, name) {
     const me = { pid: pid, ws: ws, welcome: false, last: null, lastText: '' };
     sockets.push(ws);
     const late = setTimeout(() => reject(new Error('no welcome for ' + pid + ' in twenty seconds')), 20000);
-    ws.onopen = () => { ws.send(JSON.stringify({ t: 'join', profileId: pid, name: name })); };
+    ws.onopen = () => { ws.send(JSON.stringify({ t: 'join', profileId: pid, name: name, token: tokenFor(pid) })); };
     ws.onmessage = (ev) => {
       const text = String(ev.data);
       if (text.startsWith('{"t":"peers"')) { return; }

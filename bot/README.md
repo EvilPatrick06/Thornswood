@@ -217,6 +217,15 @@ Lead Gamemaster and Trial Gamemaster are not in that list, so neither opens
 `#test-tasks` by that channel's own line in the plan. Loremaster sees every
 hold as well.
 
+Neither is staff to the bot either. Closing a ticket, with `/close` or the
+Close ticket button, and skipping the one open ticket rule and the cooldown
+take one of the `STAFF_ROLES` roles in `bot.env.json` (Owner, Dev, Gamemaster,
+Moderator and Loremaster by default), matched by id or name, and nothing
+else. The Manage Threads that both of them carry on every channel used to
+count as staff there, and it no longer does (#1342). `test-staff-gate.py`
+runs every staff and admin command and button as somebody who is not staff
+for it, and fails on any new one whose gate is not written down in it.
+
 Staff roles are job titles on purpose. Thane, Steward, Warden and Housecarl are
 all things somebody should be able to play, and a moderator wearing one makes
 every in-world use of the word ambiguous.
@@ -277,6 +286,16 @@ stops the service, renames the new files in, starts it again by its name and
 waits for it to say it is watching the server. If it does not, the old files
 go back and it is started on those. Python, the libraries, the token and the
 service itself are left alone.
+
+So a library moved in `requirements.txt`, by a Dependabot pull request or by
+hand, does not reach the box with `-CodeOnly`: that sends the file and leaves
+`py-libs` as it was. The full run, `.\scripts\deploy\Install-Bot.ps1 -NoToken`,
+installs the pinned versions into a new `py-libs` and swaps it in with the
+code, so a bump that stops the bot from starting puts the old libraries back.
+The pull request build only parses the bot; the nightly runs its harnesses.
+So before merging a bump, install the new pins and run `bot\test-*.py` on
+them, the way [Setting up a machine](../Developer-Guide.md#setting-up-a-machine)
+installs them (#1401).
 
 What goes up with it: `bot.py`, `card.py`, the channel ids, the card artwork,
 `requirements.txt`, and `live-smoke-discord-export.json`, which `bot.py` reads
