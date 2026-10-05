@@ -4026,10 +4026,10 @@ function burnCharcoal(actorId, refrId) {
   const tool = toolGate(actorId, 'woodworker');
   if (tool) return tool;
 
-  // Too tired to burn anything (#1676), the gate every bench asks.
-  const needs = globalThis.__thornswoodNeeds;
-  const tired = (needs && needs.craftRefusal) ? needs.craftRefusal(actorId) : '';
-  if (tired) return tired;
+  // Too sick, too hurt or too tired to burn anything: the gate every way of
+  // making something asks (unfitToMake, #1733), at the kiln pressed.
+  const unfit = unfitToMake(actorId, refrId);
+  if (unfit) return unfit;
 
   const wait = cooldownLeft(actorId, refrId);
   if (wait > 0) return 'The kiln is still burning. ' + wait + ' seconds.';
@@ -8648,7 +8648,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   if (prop && prop.touchedBench) {
     // Which bench they just pressed, for /key. Costs one hash lookup and is
     // passed over inside touchedBench for anything that is not a bench.
-    try { prop.touchedBench(casterRefrId, baseDesc); } catch (e) { }
+    try { prop.touchedBench(casterRefrId, baseDesc, refrId); } catch (e) { }
   }
 
   /*
@@ -27821,37 +27821,51 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects) {
 const KEY_RECIPE = '15497:Thornswood-Content.esp';
 const KEY_NAME_DELAY = 250;
 
+/*
+  FIT TO MAKE ANYTHING (#1733): the one gate every way of making something
+  asks, before anything is taken. Today that is a bench's own menu
+  (mp.onCraft, brews, enchanting and tempering included), a kiln burned by
+  pressing it (burnCharcoal) and a key cut at a forge (cutKey in the
+  property block). It asks two blocks, in this order:
+
+    too sick or too hurt (#1383)  the injury and disease block: a disease
+                                  gone bad refuses every craft, and a broken
+                                  arm or a missing hand refuses a bench that
+                                  takes two hands;
+    too tired (#1676)             the needs block: exhaustion.md, "Under 15,
+                                  crafting is refused".
+
+  WHY ONE FUNCTION. Each road used to ask the gates itself. #1676 put the
+  rest gate in all three, and the injury gate stayed in mp.onCraft alone, so
+  somebody with a broken arm was refused the forge's own Key row and cut the
+  same key with the lock key at the same forge. A road that asks this asks
+  both, and a gate added later goes here and reaches every road at once.
+  tests/test-1733-injury-gate.js holds every road, and the rest of the file,
+  to it.
+
+  workbenchId is the bench reference the work is done at, because the injury
+  gate reads which bench it is. Answers the line to say, or ''.
+*/
+function unfitToMake(actorId, workbenchId) {
+  const hurt = globalThis.__thornswoodHurt;
+  const unfit = (hurt && hurt.craftRefusal) ? hurt.craftRefusal(actorId, workbenchId) : '';
+  if (unfit) { return unfit; }
+  const needs = globalThis.__thornswoodNeeds;
+  return (needs && needs.craftRefusal) ? needs.craftRefusal(actorId) : '';
+}
+
 mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {
   /*
-    TOO SICK OR TOO HURT TO WORK (#1383), asked before anything else, brews
-    and tempering included: a disease that has turned bad refuses every
-    craft, and a broken arm or a missing hand refuses a bench that takes two.
-    The injury and disease block answers. The materials stay in the pack.
-  */
-  const hurt = globalThis.__thornswoodHurt;
-  if (hurt && hurt.craftRefusal) {
-    let unfit = '';
-    try { unfit = hurt.craftRefusal(actorId, workbenchId); } catch (e) { log('injury: the craft check threw:', e); }
-    if (unfit) {
-      notify(actorId, unfit);
-      say(actorId, unfit);
-      return false;
-    }
-  }
-
-  /*
-    TOO TIRED TO MAKE ANYTHING (#1676), asked here for the same reason, every
-    bench, brews, enchanting and tempering included: exhaustion.md, "Under
-    15, crafting is refused". The needs block has had the gate since the
-    first commit of this repository and nothing asked it. It answers the
+    TOO SICK, TOO HURT OR TOO TIRED TO MAKE ANYTHING (#1383, #1676), asked
+    before anything else, brews, enchanting and tempering included. The gate
+    every way of making something asks (unfitToMake, #1733) answers the
     line. The materials stay in the pack.
   */
-  const needs = globalThis.__thornswoodNeeds;
-  const tired = (needs && needs.craftRefusal) ? needs.craftRefusal(actorId) : '';
-  if (tired) {
-    notify(actorId, tired);
-    say(actorId, tired);
-    log(actorId.toString(16), 'was refused a craft at bench', (workbenchId || 0).toString(16) + ':', tired);
+  const unfit = unfitToMake(actorId, workbenchId);
+  if (unfit) {
+    notify(actorId, unfit);
+    say(actorId, unfit);
+    log(actorId.toString(16), 'was refused a craft at bench', (workbenchId || 0).toString(16) + ':', unfit);
     return false;
   }
 
@@ -36208,16 +36222,17 @@ log('gamemode loaded:',
       toProfile(profileId, 'Cutting a key is a smith\'s work. Hand the mold to a smith.');
       return true;
     }
-    if (!forgeHere(parts, actorId)) {
+    var forge = forgeHere(parts, actorId);
+    if (!forge) {
       toProfile(profileId, 'Stand at a forge and look at it, then press the key the line ' +
                            'under the crosshair names.');
       return true;
     }
-    // Too tired to cut it (#1676), the gate every bench asks.
-    var needs = g.__thornswoodNeeds;
-    var tired = (needs && needs.craftRefusal) ? needs.craftRefusal(actorId) : '';
-    if (tired) {
-      toProfile(profileId, tired);
+    // Too sick, too hurt or too tired to cut it: the gate every way of making
+    // something asks (unfitToMake, #1733), at this forge.
+    var unfit = unfitToMake(actorId, forge);
+    if (unfit) {
+      toProfile(profileId, unfit);
       return true;
     }
     var building = moldInHand(actorId);
@@ -36418,39 +36433,41 @@ log('gamemode loaded:',
     hint and this is the gate: a forge the bench table knows, and the person
     standing at it by the server's own reckoning, MOLD_REACH, for the reasons
     given over it. With no id, the forge they last pressed, as before.
+    Answers that forge's reference, or 0: the craft gate reads which bench
+    it is (unfitToMake, #1733).
   */
   var KEY_INGOT = '5ace4:Skyrim.esm';   // Iron Ingot, the Key's input at a forge
 
   function forgeHere(parts, actorId) {
     var raw = String((parts && parts[1]) || '');
     if (!raw) { return atForge(actorId); }
-    if (!/^[0-9a-f]{1,8}$/i.test(raw)) { return false; }
+    if (!/^[0-9a-f]{1,8}$/i.test(raw)) { return 0; }
     var refrId = parseInt(raw, 16);
     var base = '';
-    try { base = String(mp.get(refrId, 'baseDesc') || ''); } catch (e) { return false; }
+    try { base = String(mp.get(refrId, 'baseDesc') || ''); } catch (e) { return 0; }
     if (!Object.prototype.hasOwnProperty.call(BENCH_BY_BASE, base) ||
-        BENCH_BY_BASE[base] !== FORGE) { return false; }
+        BENCH_BY_BASE[base] !== FORGE) { return 0; }
     var far = distanceTo(actorId, refrId);
-    return far >= 0 && far <= MOLD_REACH;
+    return (far >= 0 && far <= MOLD_REACH) ? refrId : 0;
   }
 
-  /** Are they standing at a forge. The bench tables already know which is one. */
+  /** The forge they just pressed, or 0. The bench tables already know which is one. */
   function atForge(actorId) {
     var v = null;
     try { v = mp.get(actorId, DOOR_PROPERTY); } catch (e) { v = null; }
     // The forge is remembered the same way a door is; see touchedBench.
     var w = null;
     try { w = mp.get(actorId, BENCH_PROPERTY); } catch (e) { w = null; }
-    if (!w || typeof w !== 'object') { return false; }
-    if ((Date.now() - (Number(w.at) || 0)) > DOOR_MEMORY_MS) { return false; }
-    return String(w.bench || '') === FORGE;
+    if (!w || typeof w !== 'object') { return 0; }
+    if ((Date.now() - (Number(w.at) || 0)) > DOOR_MEMORY_MS) { return 0; }
+    return String(w.bench || '') === FORGE ? (Number(w.ref) || 0) : 0;
   }
 
-  /** The forge they just pressed, written down the way a door is. */
-  function touchedBench(actorId, baseDesc) {
+  /** The bench they just pressed, which and what kind, written down the way a door is. */
+  function touchedBench(actorId, baseDesc, refrId) {
     if (!Object.prototype.hasOwnProperty.call(BENCH_BY_BASE, baseDesc)) { return; }
     try {
-      mp.set(actorId, BENCH_PROPERTY, { bench: BENCH_BY_BASE[baseDesc], at: Date.now() });
+      mp.set(actorId, BENCH_PROPERTY, { bench: BENCH_BY_BASE[baseDesc], ref: Number(refrId) || 0, at: Date.now() });
     } catch (e) { }
   }
 
@@ -37036,8 +37053,26 @@ log('gamemode loaded:',
     in are measured again: walk away, lose the key, let the night run out,
     move off from the fire, and the rest stops or changes rate. Somebody who
     comes into the world already resting in a place the server did not see
-    them take stops too, and sits or lies down again. A restart forgets who
-    lay down where, and that is the case it catches.
+    them take stops too, and sits or lies down again.
+
+    THE PLACE ENDS WITH THE SESSION (#1734). Nobody comes back into the world
+    sitting or lying down, so the beds let go of where somebody sat or lay on
+    the first tick that finds them gone, with who was seen and what they
+    pressed. Coming back is then the same first sight as after a restart: up,
+    once the needs block has counted a night in a bed (#1606, settle's
+    arrival). Measured in the fork (engine/skymp at 0460584): the
+    only thing that puts a client's own character into furniture is the
+    server's answer to a press (MpObjectReference::ProcessActivateNormal,
+    FURN, SendOpenContainer, and the client's onOpenContainerMessage
+    activating it). Who occupies a piece of furniture is held in memory and
+    is not saved. PartOne::SetUserActor, which hands a reconnecting client its
+    character, clears the last animation as well. On the client,
+    thornswood-front.js's restSent starts false. Until #1734 the beds kept
+    the record for 48 hours offline (LYING_FORGET_MS) and the first sight
+    passed over anybody still in it. So somebody who logged out on a seat
+    and came back without a restart was counted resting at the seat's rate
+    while standing beside it, and was told they had left it when they walked
+    off.
 
     NO GOLD MOVES FOR A NIGHT. It is paid in a trade between two people, and
     the server keeps no price. The book is beds.json beside the register
@@ -37054,7 +37089,6 @@ log('gamemode loaded:',
   // Patrick, #1603: a night is 8 hours, the time the Rest clock takes to empty.
   var NIGHT_MS = 8 * 3600000;
   var BED_EVERY_MS = 5000;
-  var LYING_FORGET_MS = 48 * 3600000;
   var GUEST_NAME_MAX = 64;
   /* A bed by its editor id. Bedrolls first, since they say bed too. The
      others are words that hold the letters and are not beds. */
@@ -37457,15 +37491,20 @@ log('gamemode loaded:',
     try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
     var on = {};
     for (var i = 0; i < online.length; i++) { on[online[i]] = true; }
+    // Gone from the world, and off whatever they pressed or rested on with
+    // it (#1734): THE PLACE ENDS WITH THE SESSION, in the block.
     for (var s in bedState.seen) {
       if (bedHas(bedState.seen, s) && !on[s]) { delete bedState.seen[s]; }
     }
     for (var p in bedState.pressed) {
-      if (bedHas(bedState.pressed, p) && !on[p] && !bedHas(bedState.lying, p)) {
-        delete bedState.pressed[p];
-      }
+      if (bedHas(bedState.pressed, p) && !on[p]) { delete bedState.pressed[p]; }
     }
-    // Come into the world resting in a place nobody saw them take.
+    for (var l in bedState.lying) {
+      if (bedHas(bedState.lying, l) && !on[l]) { delete bedState.lying[l]; }
+    }
+    // Come into the world resting in a place nobody saw them take: after a
+    // restart, or back from a logout. A place they took this session, before
+    // this first sight of them, stays.
     for (var j = 0; j < online.length; j++) {
       var id = online[j];
       if (bedState.seen[id]) { continue; }
@@ -37488,10 +37527,6 @@ log('gamemode loaded:',
       if (!bedHas(bedState.lying, k)) { continue; }
       var e = bedState.lying[k];
       var who = Number(k);
-      if (!on[k]) {
-        if ((now - e.at) > LYING_FORGET_MS) { delete bedState.lying[k]; }
-        continue;
-      }
       // Up off the ground, which is no news, the way getting off a chair is not.
       if (e.ground && !sitsOnGround(who)) { getUp(who, needs); continue; }
       var why = stillLying(who, e, needs);
@@ -55867,7 +55902,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     THE BENCH. disease.md: while a disease is bad, crafting is refused.
     injury.md: a broken arm, and a missing hand for good, refuse crafting that
     needs both hands. Answers the refusal, or ''. workbenchId is the bench
-    reference the craft was made at.
+    reference the craft was made at. Asked only through unfitToMake (#1733),
+    the gate every way of making something asks: a bench's own menu, a key
+    cut at a forge and a kiln burned by pressing it.
   */
   function craftRefusal(actorId, workbenchId) {
     var rec = read(actorId);
