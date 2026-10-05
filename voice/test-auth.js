@@ -247,7 +247,6 @@ async function ready() {
   check('no profile: 400', (await post('/token', { ticket: 'good' })).status, 400);
   const none = await post('/token', { profileId: 4242, ticket: 'good' }, BARE);
   check('a service with no THORNSWOOD_SITE mints nothing: 503', none.status, 503);
-  check('  and says why in its log', /NO TOKEN for profile 4242: THORNSWOOD_SITE is not set/.test(bareLog), true);
 
   console.log('');
   console.log('WHO GETS IN (#1303, #1337, #1322), with THORNSWOOD_VOICE_AUTH off on one service and log on the other:');
@@ -263,8 +262,6 @@ async function ready() {
   const again = await handshake('thornswood, ' + t2);
   check('the same token again, while its connection is still open, is refused: it was copied',
         [again.status, /already used/.test(again.body)], [403, true]);
-  check('  and the service writes that down as a copied token, with when the first use was',
-        /REFUSED a connection for profile 4242: a token that was already used, by another connection at \d{4}-\d\d-\d\dT[\d:.]+Z, so it was copied\. A token opens one connection/.test(log), true);
   check('  and tells whoever presented it nothing about when', /\d{4}-\d\d-\d\dT/.test(again.body), false);
   first.ws.send(JSON.stringify({ t: 'join', profileId: 4242, name: 'a second join on the same socket' }));
   await new Promise((r) => setTimeout(r, 300));
@@ -302,6 +299,20 @@ async function ready() {
   check('the service with THORNSWOOD_VOICE_AUTH log refuses a handshake with no token too',
         (await handshake(null)).status, 403);
   PORT = was;
+
+  /*
+    The log is read once both services have gone and every line they wrote
+    has come through their pipes ('close'). A line is written before the
+    answer it goes with, but it travels on another pipe, and on a busy
+    machine the answer can arrive first: checked straight after the 403,
+    the copied token's line was not in yet in 2 of 32 runs under load (#1867).
+  */
+  await new Promise((ok) => { srv.once('close', ok); srv.kill(); });
+  await new Promise((ok) => { bare.once('close', ok); bare.kill(); });
+  check('the service with no THORNSWOOD_SITE says why it minted nothing, in its log',
+        /NO TOKEN for profile 4242: THORNSWOOD_SITE is not set/.test(bareLog), true);
+  check('the service writes the copied token down as copied, with when the first use was',
+        /REFUSED a connection for profile 4242: a token that was already used, by another connection at \d{4}-\d\d-\d\dT[\d:.]+Z, so it was copied\. A token opens one connection/.test(log), true);
   check('nothing was let in unproven', /UNPROVEN|UNCHECKED/.test(log + bareLog), false);
   check('no token was ever written to the log', /v[12]\.\d+\.\d{12,14}\./.test(log + bareLog), false);
 
