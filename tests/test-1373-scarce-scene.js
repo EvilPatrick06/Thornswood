@@ -81,9 +81,13 @@ function world(ranks) {
   const adds = [];
   let purseTouches = 0;
   const purse = { touch: function () { purseTouches++; throw new Error('purse'); } };
+  // Each person's quests are kept on the character (#1621).
+  const kept = new Map();
   const svc = create({
     now: function () { return clock; },
     goldDesc: 'f:Skyrim.esm',
+    load: function (actor) { return kept.has(actor) ? JSON.parse(kept.get(actor)) : undefined; },
+    save: function (actor, rec) { kept.set(actor, JSON.stringify(rec)); },
     addItem: function (actor, item, count) {
       const key = actor + '|' + item;
       inv.set(key, (inv.get(key) || 0) + count);

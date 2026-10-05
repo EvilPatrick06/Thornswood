@@ -14,8 +14,8 @@
     data                  the door's own records and the online count
     server-settings.json  the port, the name, the load order
     gamemode.js           so a restore is a working server and not a puzzle
-    the site's uploads    the gallery's pictures and what staff put up; over
-                          300 MB, only its files of 10 MB or less
+    the site's uploads    the gallery's pictures and what staff put up;
+                          every upload, including larger recordings
     the feed's store      each channel's version.json, published.json,
                           launchers.txt, releases.txt and history, not assets
     the site's data       linked Discord accounts, the boards, the documents
@@ -31,7 +31,7 @@
 
   What it leaves: node_modules, the installer under the site's public folder,
   the dev voice service, and anything over the size cap. All of those come
-  back from the repo.
+  back from the repo. Uploads are always taken in full.
 
   The server writes world while this runs, so a file can be caught half
   written. Every .json taken from a world folder is read back, and one that
@@ -70,7 +70,8 @@ param(
   [int]$KeepWeekly    = 4,
   # Per file. The installer is the only thing that goes near it.
   [int]$MaxFileMB     = 200,
-  # The site's uploads folder, whole, up to this; see where it is taken.
+  # Warn at this total size, but always take every upload. Kept as an option
+  # for existing tasks; it no longer discards larger recordings.
   [int]$MaxUploadsMB  = 300,
   # Take the copy but do not encrypt it. For working out what is wrong, never
   # for a backup that is kept.
@@ -87,22 +88,49 @@ function Note($m) {
   try { Add-Content -LiteralPath $log -Value $line -Encoding UTF8 } catch { }
 }
 
+$pass = $null
+if (-not $Plain) {
+  if (-not (Test-Path -LiteralPath $KeyFile)) { throw 'No backup passphrase file. No archive was created.' }
+  $pass = (Get-Content -LiteralPath $KeyFile -Raw).Trim()
+  if (-not $pass) { throw 'The backup passphrase file is empty. No archive was created.' }
+}
+
 if (-not (Test-Path $Out)) { [void](New-Item -ItemType Directory -Path $Out -Force) }
 Note "---- nightly backup $stamp ----"
 
 # ---------------------------------------------------------------- gather ----
-$stage = Join-Path $env:TEMP ("thornswood-backup-" + $stamp)
-[void](New-Item -ItemType Directory -Path $stage -Force)
+$ownedStage = Join-Path $env:TEMP ("thornswood-backup-" + $stamp + "-" + [Guid]::NewGuid().ToString("N"))
+$ownedStage = [IO.Path]::GetFullPath($ownedStage)
+$stageRoot = [IO.Path]::GetFullPath($env:TEMP).TrimEnd("\") + "\"
+if (-not $ownedStage.StartsWith($stageRoot, [StringComparison]::OrdinalIgnoreCase)) { throw "Backup stage is outside TEMP." }
+$stage = Join-Path $ownedStage 'payload'
+$zip = Join-Path $ownedStage 'archive.zip'
+$archive = Join-Path $Out ("thornswood-$stamp.zip")
+$stageOwned = $false
 $cap = $MaxFileMB * 1MB
 $took = 0
 $skipped = 0
 
-function Grab($from, $to) {
+try {
+  [void](New-Item -ItemType Directory -Path $ownedStage)
+  $stageOwned = $true
+  # The temporary copies include credentials. Restrict access before copying
+  # any data; descendants inherit this ACL even when TEMP is shared.
+  $acl = [Security.AccessControl.DirectorySecurity]::new()
+  $acl.SetAccessRuleProtection($true, $false)
+  $currentSid = [Security.Principal.WindowsIdentity]::GetCurrent().User
+  foreach ($sid in @($currentSid, [Security.Principal.SecurityIdentifier]::new('S-1-5-18'), [Security.Principal.SecurityIdentifier]::new('S-1-5-32-544'))) {
+    $rule = [Security.AccessControl.FileSystemAccessRule]::new($sid, 'FullControl', 'ContainerInherit, ObjectInherit', 'None', 'Allow')
+    [void]$acl.AddAccessRule($rule)
+  }
+  Set-Acl -LiteralPath $ownedStage -AclObject $acl
+  [void](New-Item -ItemType Directory -Path $stage)
+function Grab($from, $to, [switch]$Complete) {
   if (-not (Test-Path -LiteralPath $from)) { Note "  missing   $from"; return }
   $dest = Join-Path $stage $to
   $item = Get-Item -LiteralPath $from
   if (-not $item.PSIsContainer) {
-    if ($item.Length -gt $cap) { Note ("  too big   $from"); $script:skipped++; return }
+    if (-not $Complete -and $item.Length -gt $cap) { Note ("  too big   $from"); $script:skipped++; return }
     $parent = Split-Path -Parent $dest
     if (-not (Test-Path $parent)) { [void](New-Item -ItemType Directory -Path $parent -Force) }
     Copy-Item -LiteralPath $from -Destination $dest -Force
@@ -114,9 +142,9 @@ function Grab($from, $to) {
   # FullName is not: cutting by the short length takes the wrong relative
   # path (issue #1156).
   $listedFrom = $item.FullName
-  foreach ($f in (Get-ChildItem -LiteralPath $listedFrom -Recurse -File -EA SilentlyContinue)) {
+  foreach ($f in (Get-ChildItem -LiteralPath $listedFrom -Recurse -File -EA $(if ($Complete) { "Stop" } else { "SilentlyContinue" }))) {
     if ($f.FullName -match '\\node_modules\\') { continue }
-    if ($f.Length -gt $cap) { $script:skipped++; continue }
+    if (-not $Complete -and $f.Length -gt $cap) { $script:skipped++; continue }
     $rel = $f.FullName.Substring($listedFrom.Length).TrimStart('\')
     $d = Join-Path $dest $rel
     $parent = Split-Path -Parent $d
@@ -124,8 +152,24 @@ function Grab($from, $to) {
     # The server writes into world while this runs. A file that moves under us
     # is one character, and stopping the whole backup over it would be worse
     # than missing it, so it is counted and the rest carries on.
-    try { Copy-Item -LiteralPath $f.FullName -Destination $d -Force; $n++ }
-    catch { $script:skipped++ }
+    try {
+      if ($Complete) {
+        # Hold the source against concurrent writing for this copy. A busy or
+        # unreadable upload fails the run instead of making a partial archive.
+        $inputFile = $null; $outputFile = $null
+        try {
+          $inputFile = [IO.File]::Open($f.FullName, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+          $outputFile = [IO.File]::Create($d)
+          $inputFile.CopyTo($outputFile)
+          if ($outputFile.Length -ne $inputFile.Length) { throw 'Incomplete upload copy.' }
+        } finally {
+          if ($null -ne $outputFile) { $outputFile.Dispose() }
+          if ($null -ne $inputFile) { $inputFile.Dispose() }
+        }
+      } else { Copy-Item -LiteralPath $f.FullName -Destination $d -Force }
+      $n++
+    }
+    catch { if ($Complete) { throw }; $script:skipped++ }
   }
   $script:took += $n
   Note ("  {0,-42} {1} files" -f $to, $n)
@@ -197,21 +241,17 @@ Grab (Join-Path $SiteRoot 'config.json')          'site\config.json'
 # releases repository went. Not the feed's assets: they are every release's
 # downloads, and Remirror-Site-Feed.ps1 sends them again from the machine that
 # shipped them.
-# The site takes recordings of up to 100 MB there, so it has a budget: over
-# it, the pictures and anything else of 10 MB or less are taken and the big
-# files are named in the log, rather than one night's backup growing past what
-# this box can encrypt in memory.
+# The old budget omitted larger recordings. Encryption now streams, so size
+# is an advisory warning rather than permission to lose gallery media.
 $up = Join-Path $SiteRoot 'uploads'
-$upListed = $up
-if (Test-Path -LiteralPath $up) { $upListed = (Get-Item -LiteralPath $up).FullName }
-$upFiles = @(Get-ChildItem -LiteralPath $upListed -Recurse -File -EA SilentlyContinue)
-$upMB = [math]::Round((($upFiles | Measure-Object Length -Sum).Sum) / 1MB, 1)
-if (-not (Test-Path -LiteralPath $up) -or $upMB -le $MaxUploadsMB) { Grab $up 'site\uploads' }
-else {
-  $small = @($upFiles | Where-Object { $_.Length -le 10MB })
-  foreach ($f in $small) { Grab $f.FullName ('site\uploads\' + $f.FullName.Substring($upListed.Length).TrimStart('\')) }
-  Note ("  site\uploads is {0} MB, over {1}: took the {2} file(s) of 10 MB or less, left out {3} bigger" -f $upMB, $MaxUploadsMB, $small.Count, ($upFiles.Count - $small.Count))
+$upBytes = 0
+if (Test-Path -LiteralPath $up) {
+  $upBytes = (Get-ChildItem -LiteralPath $up -Recurse -File -EA Stop | Measure-Object Length -Sum).Sum
 }
+if ($upBytes -gt ([long]$MaxUploadsMB * 1MB)) {
+  Note ('  uploads exceed the advisory threshold of ' + $MaxUploadsMB + ' MB; every file will be taken')
+}
+Grab $up 'site\uploads' -Complete
 foreach ($feed in 'feed', 'feed-dev') {
   foreach ($n in 'version.json', 'published.json', 'launchers.txt', 'releases.txt', 'history') {
     Grab (Join-Path $SiteRoot "$feed\$n")         "site\$feed\$n"
@@ -270,63 +310,72 @@ $notes += 'Skyrim data files. All of those come back from the repo.'
 Set-Content -LiteralPath (Join-Path $stage 'NOTES.txt') -Value ($notes -join "`r`n") -Encoding UTF8
 
 Note "  $took files taken, $skipped skipped"
-if ($took -eq 0) { Note '  NOTHING WAS TAKEN. Stopping rather than writing an empty backup.'; Remove-Item $stage -Recurse -Force -EA SilentlyContinue; exit 1 }
+if ($took -eq 0) { Note '  NOTHING WAS TAKEN. Stopping rather than writing an empty backup.'; Remove-Item -LiteralPath $stage -Recurse -Force -EA SilentlyContinue; exit 1 }
 
 # ------------------------------------------------------------------ zip ----
-$zip = Join-Path $Out ("thornswood-$stamp.zip")
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::CreateFromDirectory($stage, $zip)
-Remove-Item $stage -Recurse -Force -EA SilentlyContinue
+Remove-Item -LiteralPath $stage -Recurse -Force
 $zipMB = [math]::Round((Get-Item $zip).Length / 1MB, 2)
 Note "  zipped    $([IO.Path]::GetFileName($zip))  $zipMB MB"
 
 # -------------------------------------------------------------- encrypt ----
 if ($Plain) {
+  # File.Move refuses an existing destination. Never overwrite an earlier run
+  # or let failure cleanup remove an archive that this run did not create.
+  [IO.File]::Move($zip, $archive)
   Note '  NOT ENCRYPTED, -Plain was passed. This does not belong anywhere but here.'
 } else {
-  if (-not (Test-Path -LiteralPath $KeyFile)) {
-    Note "  NO PASSPHRASE AT $KeyFile. The zip is left in the clear; fix this."
-  } else {
-    $pass = (Get-Content -LiteralPath $KeyFile -Raw).Trim()
-    if (-not $pass) { Note '  the passphrase file is empty. The zip is left in the clear.'; }
-    else {
-      $enc = $zip + '.enc'
-      $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
-      $salt = New-Object byte[] 16; $rng.GetBytes($salt)
-      $iv   = New-Object byte[] 16; $rng.GetBytes($iv)
-      # Two keys out of one passphrase: one to encrypt with, one to sign the
-      # result with. Never the same bytes for both.
-      $kdf = [System.Security.Cryptography.Rfc2898DeriveBytes]::new($pass, $salt, 200000, [System.Security.Cryptography.HashAlgorithmName]::SHA256)
-      $kEnc = $kdf.GetBytes(32)
-      $kMac = $kdf.GetBytes(32)
-      $aes = [System.Security.Cryptography.Aes]::Create()
-      $aes.KeySize = 256; $aes.Mode = 'CBC'; $aes.Padding = 'PKCS7'
-      $aes.Key = $kEnc; $aes.IV = $iv
-      # Named $clear rather than $plain, and the stream below $fs rather than
-      # $out, because -Plain and -Out are parameters of this script and a
-      # parameter keeps its declared type for the whole run. Assigning bytes
-      # to $plain is assigning them to a [switch], which fails with a message
-      # about SwitchParameter that says nothing about where it came from.
-      $clear = [System.IO.File]::ReadAllBytes($zip)
-      $cipher = $aes.CreateEncryptor().TransformFinalBlock($clear, 0, $clear.Length)
-      # Signed over everything that is not the signature, so a changed salt or
-      # IV is caught too, and checked before anything is decrypted.
-      $hmac = [System.Security.Cryptography.HMACSHA256]::new($kMac)
-      $signed = New-Object byte[] (16 + 16 + $cipher.Length)
-      [Array]::Copy($salt, 0, $signed, 0, 16)
-      [Array]::Copy($iv, 0, $signed, 16, 16)
-      [Array]::Copy($cipher, 0, $signed, 32, $cipher.Length)
-      $mac = $hmac.ComputeHash($signed)
-      $magic = [Text.Encoding]::ASCII.GetBytes('TSBK1')
-      $fs = New-Object System.IO.FileStream($enc, [IO.FileMode]::Create)
-      $fs.Write($magic, 0, $magic.Length)
-      $fs.Write($signed, 0, $signed.Length)
-      $fs.Write($mac, 0, $mac.Length)
-      $fs.Close()
-      $aes.Dispose(); $kdf.Dispose(); $hmac.Dispose(); $rng.Dispose()
-      Remove-Item -LiteralPath $zip -Force
-      Note "  encrypted $([IO.Path]::GetFileName($enc))  $([math]::Round((Get-Item $enc).Length / 1MB, 2)) MB"
+  $enc = $archive + '.enc'
+  $partial = $enc + '.' + [Guid]::NewGuid().ToString('N') + '.partial'
+  $rng = $null; $kdf = $null; $aes = $null; $hmac = $null
+  $inputFile = $null; $outputFile = $null; $cryptoStream = $null; $encryptor = $null
+  $partialOwned = $false; $operationFailure = $null
+  try {
+    $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+    $salt = New-Object byte[] 16; $rng.GetBytes($salt)
+    $iv = New-Object byte[] 16; $rng.GetBytes($iv)
+    $kdf = [Security.Cryptography.Rfc2898DeriveBytes]::new($pass, $salt, 200000, [Security.Cryptography.HashAlgorithmName]::SHA256)
+    $kEnc = $kdf.GetBytes(32); $kMac = $kdf.GetBytes(32)
+    $aes = [Security.Cryptography.Aes]::Create()
+    $aes.KeySize = 256; $aes.Mode = 'CBC'; $aes.Padding = 'PKCS7'; $aes.Key = $kEnc; $aes.IV = $iv
+    $outputFile = [IO.File]::Open($partial, [IO.FileMode]::CreateNew, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    $partialOwned = $true
+    $magic = [Text.Encoding]::ASCII.GetBytes('TSBK1')
+    $outputFile.Write($magic, 0, 5); $outputFile.Write($salt, 0, 16); $outputFile.Write($iv, 0, 16)
+    $encryptor = $aes.CreateEncryptor()
+    $cryptoStream = [Security.Cryptography.CryptoStream]::new($outputFile, $encryptor, [Security.Cryptography.CryptoStreamMode]::Write, $true)
+    $inputFile = [IO.File]::OpenRead($zip)
+    $inputFile.CopyTo($cryptoStream); $cryptoStream.FlushFinalBlock()
+    $cryptoStream.Dispose(); $cryptoStream = $null
+    $inputFile.Dispose(); $inputFile = $null
+    # Same TSBK1 signature as existing archives: salt, IV and ciphertext.
+    # A second bounded pass authenticates the ciphertext, never the plaintext.
+    $hmac = [Security.Cryptography.HMACSHA256]::new($kMac)
+    $outputFile.Position = 5
+    $left = $outputFile.Length - 5
+    $chunk = New-Object byte[] 1MB
+    while ($left -gt 0) {
+      $n = $outputFile.Read($chunk, 0, [int][Math]::Min([long]$chunk.Length, [long]$left))
+      if ($n -eq 0) { throw 'Encrypted archive ended before its signature was complete.' }
+      [void]$hmac.TransformBlock($chunk, 0, $n, $chunk, 0); $left -= $n
     }
+    [void]$hmac.TransformFinalBlock([byte[]]@(), 0, 0)
+    $mac = $hmac.Hash; $outputFile.Write($mac, 0, $mac.Length)
+    $outputFile.Flush($true); $outputFile.Dispose(); $outputFile = $null
+    [IO.File]::Move($partial, $enc)
+    Note "  encrypted $([IO.Path]::GetFileName($enc))  $([math]::Round((Get-Item $enc).Length / 1MB, 2)) MB"
+  } catch { $operationFailure = $_; throw } finally {
+    $cleanupFailure = $null
+    foreach ($resource in @($cryptoStream, $encryptor, $inputFile, $outputFile, $hmac, $aes, $kdf, $rng)) {
+      if ($null -ne $resource) {
+        try { $resource.Dispose() } catch { if (-not $cleanupFailure) { $cleanupFailure = $_ } }
+      }
+    }
+    if ($partialOwned -and (Test-Path -LiteralPath $partial)) {
+      try { Remove-Item -LiteralPath $partial -Force } catch { if (-not $cleanupFailure) { $cleanupFailure = $_ } }
+    }
+    if ($cleanupFailure -and -not $operationFailure) { throw $cleanupFailure }
   }
 }
 
@@ -350,3 +399,7 @@ foreach ($f in $drop) {
 }
 Note ("  kept      {0} daily, {1} weekly" -f [Math]::Min($daily.Count, $KeepDaily), [Math]::Min($weekly.Count, $KeepWeekly))
 Note '  done. Fetch-Backups.ps1 on the other machine is what gets these off this box.'
+
+} finally {
+  if ($stageOwned -and (Test-Path -LiteralPath $ownedStage)) { Remove-Item -LiteralPath $ownedStage -Recurse -Force }
+}

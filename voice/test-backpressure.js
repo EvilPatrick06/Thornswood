@@ -50,9 +50,10 @@ const { spawn } = require('child_process');
 const SERVER = process.env.VOICE_SERVER || path.join(__dirname, 'voice-server.js');
 // Its own port. test-chat-limit.js reached main on 7907 while this branch
 // was open, and two harnesses on one port can each end up talking to the
-// other's service.
-const PORT = 7908;
-const BASE = 'http://127.0.0.1:' + PORT;
+// other's service. A fixed 7908 still let a build beside this one on the VPS
+// do the same (#1703), so ready() takes one from the system.
+let PORT = 0;
+let BASE = '';
 const ROWS = 1500;
 // The ceiling the service promises. A connection whose queue passes it is
 // closed so it can reconnect, rather than held onto at any size.
@@ -110,35 +111,83 @@ function probe() {
 }
 fs.writeFileSync(path.join(dir, 'probe.js'), '(' + probe.toString() + ')();');
 
-const srv = spawn(process.execPath, ['--expose-gc', '-r', path.join(dir, 'probe.js'), 'voice-server.js'], {
-  cwd: dir,
-  env: Object.assign({}, process.env, {
-    THORNSWOOD_VOICE_PORT: String(PORT),
-    THORNSWOOD_VOICE_BIND: '127.0.0.1',
-    THORNSWOOD_VOICE_AUTH: 'off',
-    THORNSWOOD_SITE: '',
-    THORNSWOOD_CHAT_DIR: path.join(dir, 'chat'),
-    THORNSWOOD_CHAT_BURST: String(CHAT_BURST),
-    THORNSWOOD_CHAT_REFILL_MS: String(CHAT_REFILL_MS),
-    THORNSWOOD_CHAT_RANGE: '',
-  }),
-});
+let srv = null;
 let log = '';
 const probes = [];
 let partial = '';
-srv.stdout.on('data', (d) => {
-  partial += d;
-  const lines = partial.split(/\r?\n/);
-  partial = lines.pop();
-  for (const line of lines) {
-    if (line.indexOf('PROBE ') === 0) {
-      try { probes.push(JSON.parse(line.slice(6))); } catch (e) { }
-    } else {
-      log += line + '\n';
+/*
+  A port of this run's own (#1703). Builds run side by side on the VPS, and
+  with a fixed number one run's requests can be answered by another run's
+  service. The system names a port nothing holds, the service is started on
+  it, and nothing is asked of the port until this service has said it is
+  listening there.
+*/
+function freePort(host) {
+  return new Promise((ok, bad) => {
+    const s = net.createServer();
+    s.on('error', bad);
+    s.listen(0, host, () => { const p = s.address().port; s.close(() => ok(p)); });
+  });
+}
+/* Waits for srv's own "listening on ...:port" line. If it stops first,
+   something took the port in between or it could not start, and the error
+   says which, with what it printed. */
+function listening(srv, port) {
+  return new Promise((ok, bad) => {
+    let out = '';
+    const said = (d) => {
+      out += d;
+      const m = /\[voice\] listening on \S+:(\d+)/.exec(out);
+      if (m && Number(m[1]) === port) { end(null); }
+    };
+    const more = (d) => { out += d; };
+    const gone = (code) => end(new Error((/EADDRINUSE/.test(out) ? 'something else already holds port ' + port + ', so ' : '') +
+                                         'the voice service stopped (exit ' + code + ') before it was listening. It printed:\n' + out));
+    const late = setTimeout(() => end(new Error('the voice service did not say it was listening on ' + port +
+                                                ' within fifteen seconds. It printed:\n' + out)), 15000);
+    function end(err) {
+      clearTimeout(late);
+      srv.stdout.removeListener('data', said);
+      srv.stderr.removeListener('data', more);
+      srv.removeListener('exit', gone);
+      if (err) { bad(err); } else { ok(); }
     }
-  }
-});
-srv.stderr.on('data', (d) => { log += d; });
+    srv.stdout.on('data', said);
+    srv.stderr.on('data', more);
+    srv.on('exit', gone);
+  });
+}
+async function start() {
+  PORT = await freePort('127.0.0.1');
+  BASE = 'http://127.0.0.1:' + PORT;
+  srv = spawn(process.execPath, ['--expose-gc', '-r', path.join(dir, 'probe.js'), 'voice-server.js'], {
+    cwd: dir,
+    env: Object.assign({}, process.env, {
+      THORNSWOOD_VOICE_PORT: String(PORT),
+      THORNSWOOD_VOICE_BIND: '127.0.0.1',
+      THORNSWOOD_VOICE_AUTH: 'off',
+      THORNSWOOD_SITE: '',
+      THORNSWOOD_CHAT_DIR: path.join(dir, 'chat'),
+      THORNSWOOD_CHAT_BURST: String(CHAT_BURST),
+      THORNSWOOD_CHAT_REFILL_MS: String(CHAT_REFILL_MS),
+      THORNSWOOD_CHAT_RANGE: '',
+    }),
+  });
+  srv.stdout.on('data', (d) => {
+    partial += d;
+    const lines = partial.split(/\r?\n/);
+    partial = lines.pop();
+    for (const line of lines) {
+      if (line.indexOf('PROBE ') === 0) {
+        try { probes.push(JSON.parse(line.slice(6))); } catch (e) { }
+      } else {
+        log += line + '\n';
+      }
+    }
+  });
+  srv.stderr.on('data', (d) => { log += d; });
+  await listening(srv, PORT);
+}
 
 let feeding = null;
 // Ended rather than exited; see test-keepalive.js for the crash that taught it.
@@ -149,7 +198,7 @@ function done(code) {
   // The folder goes once the service has let go of it. The timer on its own
   // let node leave first, and every run left a folder behind in %TEMP%.
   const rm = () => { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { } };
-  if (srv.exitCode !== null || srv.signalCode !== null) rm();
+  if (!srv || srv.exitCode !== null || srv.signalCode !== null) rm();
   else srv.once('exit', rm);
   try { srv.kill(); } catch (e) { }
   setTimeout(rm, 300).unref();
@@ -160,14 +209,10 @@ async function health() {
 }
 
 async function ready() {
-  for (let i = 0; i < 60; i++) {
-    try {
-      const r = await fetch(BASE + '/health');
-      if (r.ok) { return await r.json(); }
-    } catch (e) { }
-    await sleep(150);
-  }
-  throw new Error('the service never came up. log:\n' + log);
+  await start();
+  const r = await fetch(BASE + '/health');
+  if (!r.ok) { throw new Error('the service answered /health with ' + r.status + '. log:\n' + log); }
+  return await r.json();
 }
 
 /* A heavy feed, because the loopback buffers swallow a light one: at 200 rows

@@ -8,9 +8,12 @@ it does not survive a restart. Friends are [Friends](friends.md).
 Look at them and press P. Under somebody who is not in your party,
 the look prompt says "Ask to party" beside P, and P sends the offer.
 Ask to party beside a friend who is online, on the P panel, sends it
-too. A prompt appears on their screen with Accept and Refuse, the
-same prompt a friend request and a trade offer use. They do not type
-a command to answer. The offer stands for 45 seconds.
+too. It goes to whoever that friend is playing now, a new character
+under a new name included, and when they are not in the world it
+says so and asks nobody. A prompt appears on their screen with
+Accept and Refuse, the same prompt a friend request and a trade
+offer use. They do not type a command to answer. The offer stands
+for 45 seconds.
 
 P with nobody in front of you, or with somebody from your party
 there, opens the P panel. It lists who is in the party and how many
@@ -73,9 +76,12 @@ above the green name.
 The offer, the prompt, the leave, the cap of 6, the 15%, and the
 same-cell test are in the server. P on somebody not in your party
 sends the offer, and P on a party member or on nobody opens the
-panel. Accept and Refuse on that prompt are what a person presses.
-Anyone in the party can already invite. The bonus is paid as a whole
-extra piece, not as a fraction on the screen.
+panel. Ask to party beside a friend sends the server that friend's
+profile id, the one the friends list is kept by, never a name, and
+the server asks whoever that profile is playing now. Accept and
+Refuse on that prompt are what a person presses. Anyone in the party
+can already invite. The bonus is paid as a whole extra piece, not as
+a fraction on the screen.
 
 The leader is stored. P shows Kick, Lead, and Disband to the leader,
 and Leave to everyone. The server answers the lines those buttons

@@ -63,9 +63,13 @@ as /bard, and also add a singing emote for people that are only
 singing". There is no bard profession. The check is that the server
 sees them playing.
 
-Logging out in a real bed fills rest to 100 when you come back, and
-puts 25 back on hunger and on thirst. It is not a stat bonus for
-logging out at a clever hour. It is a rule about the bed.
+Logging out lying in your own bed, or in a bed you are allowed in,
+fills rest to 100 when you come back, and puts 25 back on hunger and
+on thirst. A bed or bedroll nobody can lend you does not. You have to
+be away for a night: 8 hours on the game clock, which is 24 real
+minutes. Hunger and thirst fall while you are away, the same as
+anywhere, and the 25 goes back on what is left. It is not a stat
+bonus for logging out at a clever hour. It is a rule about the bed.
 
 Sleeping on open ground is sitting, 20 an hour, and it can start a
 chill. See [Disease](disease.md).
@@ -95,9 +99,17 @@ wheel is a seat on the ground, by a fire or not: the server reads the
 last animation the game sent for the person, which ends the moment they
 stand up, walk or play anything else. The bard is read the same way,
 every 20 seconds: the wheel's lute, flute or drum with that instrument
-in the pack, or Sing. Tea and skooma are
-not items the needs block knows. Sleeping on open ground, an hour on a
-seat with no roof over you and no fire in reach, starts a chill. See
-[Disease](disease.md).
-The craft gate has not been extended to mining or chopping, and this
+in the pack, or Sing. The logout fill is
+counted once, the first time the server reads your meters after you
+come back into the world, whatever reads them first. The server
+counts you as up then, not lying in the bed. Which beds give it and
+the 24 minutes are the suggested answers on #1606, built that way
+until Patrick says otherwise. Tea and skooma are not items the needs
+block knows.
+Sleeping on open ground, an hour on a seat with no roof over you and
+no fire in reach, starts a chill. See [Disease](disease.md).
+The craft gate is asked at every bench's own menu, brews, enchanting
+and tempering included, at a key cut at a forge, and at a kiln burned
+by pressing it, before anything is taken, and the line says your Rest
+is under 15. It has not been extended to mining or chopping, and this
 plan does not extend it.

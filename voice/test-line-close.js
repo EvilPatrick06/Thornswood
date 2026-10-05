@@ -21,10 +21,13 @@
 */
 const { spawn } = require('child_process');
 const fs = require('fs');
+const net = require('net');
 const path = require('path');
 const os = require('os');
 
-const PORT = 7911;
+// Set by start(), from the system, each time the service starts. It was a
+// fixed 7911, the same as test-cull.js and tests/test-command-ack.js (#1703).
+let PORT = 0;
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -36,9 +39,52 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-lineclose-'));
 fs.copyFileSync(path.join(__dirname, 'voice-server.js'), path.join(dir, 'voice-server.js'));
 fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
 
+/*
+  A port of this run's own (#1703). Builds run side by side on the VPS, and
+  with a fixed number one run's requests can be answered by another run's
+  service. The system names a port nothing holds, the service is started on
+  it, and nothing is asked of the port until this service has said it is
+  listening there.
+*/
+function freePort(host) {
+  return new Promise((ok, bad) => {
+    const s = net.createServer();
+    s.on('error', bad);
+    s.listen(0, host, () => { const p = s.address().port; s.close(() => ok(p)); });
+  });
+}
+/* Waits for srv's own "listening on ...:port" line. If it stops first,
+   something took the port in between or it could not start, and the error
+   says which, with what it printed. */
+function listening(srv, port) {
+  return new Promise((ok, bad) => {
+    let out = '';
+    const said = (d) => {
+      out += d;
+      const m = /\[voice\] listening on \S+:(\d+)/.exec(out);
+      if (m && Number(m[1]) === port) { end(null); }
+    };
+    const more = (d) => { out += d; };
+    const gone = (code) => end(new Error((/EADDRINUSE/.test(out) ? 'something else already holds port ' + port + ', so ' : '') +
+                                         'the voice service stopped (exit ' + code + ') before it was listening. It printed:\n' + out));
+    const late = setTimeout(() => end(new Error('the voice service did not say it was listening on ' + port +
+                                                ' within fifteen seconds. It printed:\n' + out)), 15000);
+    function end(err) {
+      clearTimeout(late);
+      srv.stdout.removeListener('data', said);
+      srv.stderr.removeListener('data', more);
+      srv.removeListener('exit', gone);
+      if (err) { bad(err); } else { ok(); }
+    }
+    srv.stdout.on('data', said);
+    srv.stderr.on('data', more);
+    srv.on('exit', gone);
+  });
+}
 let srv = null;
 let log = '';
-function start() {
+async function start() {
+  PORT = await freePort('0.0.0.0');
   srv = spawn(process.execPath, ['voice-server.js'], {
     cwd: dir,
     env: Object.assign({}, process.env, {
@@ -50,6 +96,7 @@ function start() {
   });
   srv.stdout.on('data', (d) => { log += d; });
   srv.stderr.on('data', (d) => { log += d; });
+  await listening(srv, PORT);
 }
 
 /* Ended rather than exited; see test-keepalive.js. */
@@ -64,14 +111,9 @@ function done(code) {
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function ready() {
-  for (let i = 0; i < 60; i++) {
-    try {
-      const r = await fetch('http://127.0.0.1:' + PORT + '/health');
-      if (r.ok) { return await r.json(); }
-    } catch (e) { }
-    await wait(150);
-  }
-  throw new Error('the service never came up. log:\n' + log);
+  const r = await fetch('http://127.0.0.1:' + PORT + '/health');
+  if (!r.ok) { throw new Error('the service answered /health with ' + r.status + '. log:\n' + log); }
+  return await r.json();
 }
 
 function person(profileId, name) {
@@ -94,7 +136,7 @@ async function commands() {
 async function shut(p) { p.ws.close(); await wait(300); }
 
 (async () => {
-  start();
+  await start();
   const h = await ready();
   console.log('service up: build ' + h.build);
   yes('the build says it has the line close', /line-close-1/.test(h.build));
@@ -170,9 +212,10 @@ async function shut(p) { p.ws.close(); await wait(300); }
   await shut(typer);
 
   // ---- a restart -------------------------------------------------------------------
-  srv.kill();
-  await wait(500);
-  start();
+  // The first service is waited out, and the second is on a port of its own,
+  // so nothing below can be answered by the one that was stopped.
+  await new Promise((r) => { srv.once('exit', r); srv.kill(); });
+  await start();
   await ready();
   got = await commands();
   yes('after a restart the boot stamp is new, which is how the gamemode knows to give the line a minute',

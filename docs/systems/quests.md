@@ -132,9 +132,11 @@ a scarce row still applies.
 The four miner rows are bound to the buildings named above, by each
 building's cell, and every other vein of those seams is shut. The
 cooldown is the server's, one for each person and quest, stamped at
-the turn-in. The open quests and the cooldowns are kept in memory, so
-a restart of the server clears them. The one place each other scarce
-row opens, and the sack, shelf, chest, urn, strongbox, ruin, cell, and
-hold a scene row names, are not written on this page. They are not
-bound, so those places stay shut. A dragon is not a bounty. Papyrus
-quests do not run.
+the turn-in. The open quests, what each has drawn or killed, and the
+cooldowns are kept on the character, so a restart of the server keeps
+them. When a character's quests cannot be read, nothing is written
+over them and their quest steps are refused until it is put right.
+The one place each other scarce row opens, and the sack, shelf,
+chest, urn, strongbox, ruin, cell, and hold a scene row names, are
+not written on this page. They are not bound, so those places stay
+shut. A dragon is not a bounty. Papyrus quests do not run.

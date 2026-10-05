@@ -3,6 +3,11 @@
 What you type. Enter opens the box. A line that starts with `/` is a
 command. A line that does not is speech.
 
+How a line is said, out of character, and the dice are typed, and the
+help names them. There are no buttons for them on the chat box.
+Decided by Patrick on 4 Oct (#1639): "Allow those commands and don't
+do buttons."
+
 Speech is local. Two people on the Whiterun road are not read by a
 smith in Markarth.
 
@@ -31,6 +36,14 @@ happened.
 
 A line longer than 300 characters is cut to 300. If nobody is near
 enough, you are told.
+
+## Dice
+
+`/roll` or `/r`, and the dice. The number is the sides: `/roll 20` is
+one twenty sided die, and `/roll 6x3` is three six sided ones. A
+leading `d` is fine. `/roll` alone is a twenty. Up to 1000 sides and
+100 dice. The server rolls it, so nobody can make a number up, and
+the result goes to the same people `/ooc` reaches.
 
 ## Above the head
 
@@ -81,7 +94,8 @@ It is not this text.
 
 ## Where this is
 
-`/ooc` is local, 4000 units, same cell, in the server. `/me`, `/do`,
+`/ooc` is local, 4000 units, same cell, in the server. `/roll` is
+rolled in the server and goes to the same people. `/me`, `/do`,
 `/w`, and `/s` are local too, whether or not the plain-line switch is
 on. They are not sent on to the game server.
 

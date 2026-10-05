@@ -837,7 +837,7 @@ attempt('a company sale', function () {
   yes('S19 the trade panel has the button for a worker, sends the line, and shows the split to both',
       trade.indexOf("net('/trade sale')") !== -1 && /data\.canBuy/.test(trade) && /Buy for the company/.test(trade) &&
       /saleLine\(data\.sale\)/.test(trade) && /leaves the world/.test(trade));
-  const branch = slice(gm, "      if (word === '/trade') {", "      var found = soc.findPerson(rest);");
+  const branch = slice(gm, "      if (word === '/trade') {", "      if (!found.actorId) { toProfile(profileId, found.why); return true; }");
   yes('S20 the chat block hands the panel\'s line to the trade block',
       !!branch && /verb === 'sale'\) \{ out = tr2\.sale\(actorId\); \}/.test(branch) && /verb === 'pack' \|\| verb === 'sale'/.test(branch));
   ctxSaid(s.ctx);

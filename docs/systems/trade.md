@@ -57,6 +57,12 @@ after the other has already agreed.
 Walk away, or Escape, ends it. Nothing has moved until both have
 confirmed.
 
+A thing crosses as it is. A key or a deed still names its house, a
+piece keeps the condition on its name, and an enchanted piece keeps
+its enchantment and its charge. What stays in your pack keeps what it
+had, and so does everything the other person was already holding. A
+piece you were wearing arrives in their pack, not on them.
+
 If nobody touches it for 3 minutes, it ends. The check is every 2
 seconds.
 
@@ -75,9 +81,9 @@ it an ordinary trade. Either way both confirmations are cleared.
 ## Where this is
 
 The offer, the prompt, the names, the groups, the buttons, the
-distance, the two confirmations, the 24 lines, the 3 minutes, and
-the gold check are in the server. H and Trade under Near you on P
-offer it. Accept and Refuse on that prompt are what a person presses.
-So are Agree, Walk away and Buy for the company. The key and the
-buttons send the server the lines `/trade` and its verbs once were,
-and nobody is told to type them.
+distance, the two confirmations, the 24 lines, the 3 minutes, the
+gold check, and a thing crossing as it is are in the server. H and
+Trade under Near you on P offer it. Accept and Refuse on that prompt
+are what a person presses. So are Agree, Walk away and Buy for the
+company. The key and the buttons send the server the lines `/trade`
+and its verbs once were, and nobody is told to type them.

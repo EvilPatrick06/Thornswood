@@ -1,9 +1,9 @@
 'use strict';
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const source=fs.readFileSync(path.join(__dirname,'../game/gamemode.js'),'utf8').replace(/\r\n/g,'\n');
-const begin=source.lastIndexOf('try {\n  const cfgNpc = mp.getServerSettings();');
+const begin=source.lastIndexOf('// NPC SERVER STARTUP BEGIN');
 assert.ok(begin>=0,'Use the production NPC startup path');
-const startup=source.slice(begin);
+const startup=source.slice(begin,source.indexOf('// NPC SERVER STARTUP END',begin));
 for(const failure of ['population','runtime',null]) {
   let active=true,stopped=false;
   const merchant={prepare(){if(!active)throw new Error('unavailable');return 250;},shutdown(){active=false;}};
@@ -23,5 +23,13 @@ for(const failure of ['population','runtime',null]) {
     assert.equal(ctx.__thornswoodNpcMerchants.prepare(),250);
     assert.ok(ctx.__thornswoodNpcPopulation);assert.ok(ctx.__thornswoodNpcRuntime);assert.equal(stopped,false);
   }
+}
+{
+  let revoked=false;
+  const ctx={mp:{getServerSettings:()=>({thornswoodServer:'unsupported'})},
+    __thornswoodMerchantTrade:{shutdown(){revoked=true;}}, require,setTimeout,clearTimeout,log(){}};
+  vm.createContext(ctx); vm.runInContext(startup,ctx);
+  assert.equal(revoked,true,'changing channel must revoke the old native writer before the new channel gate');
+  assert.equal(ctx.__thornswoodMerchantTrade,null);
 }
 console.log('PASS NPC merchant partial startup revocation and successful startup');

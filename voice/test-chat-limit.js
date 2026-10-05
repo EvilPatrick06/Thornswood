@@ -23,10 +23,12 @@
 */
 const { spawn } = require('child_process');
 const fs = require('fs');
+const net = require('net');
 const path = require('path');
 const os = require('os');
 
-const PORT = 7907;
+// Set by ready(), from the system. It was a fixed 7907 (#1703).
+let PORT = 0;
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -39,22 +41,8 @@ fs.copyFileSync(path.join(__dirname, 'voice-server.js'), path.join(dir, 'voice-s
 fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
 const CHAT_DIR = path.join(dir, 'chat');
 
-const srv = spawn(process.execPath, ['voice-server.js'], {
-  cwd: dir,
-  env: Object.assign({}, process.env, {
-    THORNSWOOD_VOICE_PORT: String(PORT),
-    THORNSWOOD_VOICE_AUTH: 'off',
-    THORNSWOOD_SITE: '',
-    THORNSWOOD_CHAT_DIR: CHAT_DIR,
-    // The shipped numbers, not ones picked to make this pass. Cleared in
-    // case the machine running this has them set.
-    THORNSWOOD_CHAT_BURST: '',
-    THORNSWOOD_CHAT_REFILL_MS: '',
-  }),
-});
+let srv = null;
 let log = '';
-srv.stdout.on('data', (d) => { log += d; });
-srv.stderr.on('data', (d) => { log += d; });
 
 /*
   Ended rather than exited. process.exit while the killed child's pipes are
@@ -71,15 +59,69 @@ function done(code) {
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/*
+  A port of this run's own (#1703). Builds run side by side on the VPS, and
+  with a fixed number one run's requests can be answered by another run's
+  service. The system names a port nothing holds, the service is started on
+  it, and nothing is asked of the port until this service has said it is
+  listening there.
+*/
+function freePort(host) {
+  return new Promise((ok, bad) => {
+    const s = net.createServer();
+    s.on('error', bad);
+    s.listen(0, host, () => { const p = s.address().port; s.close(() => ok(p)); });
+  });
+}
+/* Waits for srv's own "listening on ...:port" line. If it stops first,
+   something took the port in between or it could not start, and the error
+   says which, with what it printed. */
+function listening(srv, port) {
+  return new Promise((ok, bad) => {
+    let out = '';
+    const said = (d) => {
+      out += d;
+      const m = /\[voice\] listening on \S+:(\d+)/.exec(out);
+      if (m && Number(m[1]) === port) { end(null); }
+    };
+    const more = (d) => { out += d; };
+    const gone = (code) => end(new Error((/EADDRINUSE/.test(out) ? 'something else already holds port ' + port + ', so ' : '') +
+                                         'the voice service stopped (exit ' + code + ') before it was listening. It printed:\n' + out));
+    const late = setTimeout(() => end(new Error('the voice service did not say it was listening on ' + port +
+                                                ' within fifteen seconds. It printed:\n' + out)), 15000);
+    function end(err) {
+      clearTimeout(late);
+      srv.stdout.removeListener('data', said);
+      srv.stderr.removeListener('data', more);
+      srv.removeListener('exit', gone);
+      if (err) { bad(err); } else { ok(); }
+    }
+    srv.stdout.on('data', said);
+    srv.stderr.on('data', more);
+    srv.on('exit', gone);
+  });
+}
 async function ready() {
-  for (let i = 0; i < 60; i++) {
-    try {
-      const r = await fetch('http://127.0.0.1:' + PORT + '/health');
-      if (r.ok) { return await r.json(); }
-    } catch (e) { }
-    await wait(150);
-  }
-  throw new Error('the service never came up. log:\n' + log);
+  PORT = await freePort('0.0.0.0');
+  srv = spawn(process.execPath, ['voice-server.js'], {
+    cwd: dir,
+    env: Object.assign({}, process.env, {
+      THORNSWOOD_VOICE_PORT: String(PORT),
+      THORNSWOOD_VOICE_AUTH: 'off',
+      THORNSWOOD_SITE: '',
+      THORNSWOOD_CHAT_DIR: CHAT_DIR,
+      // The shipped numbers, not ones picked to make this pass. Cleared in
+      // case the machine running this has them set.
+      THORNSWOOD_CHAT_BURST: '',
+      THORNSWOOD_CHAT_REFILL_MS: '',
+    }),
+  });
+  srv.stdout.on('data', (d) => { log += d; });
+  srv.stderr.on('data', (d) => { log += d; });
+  await listening(srv, PORT);
+  const r = await fetch('http://127.0.0.1:' + PORT + '/health');
+  if (!r.ok) { throw new Error('the service answered /health with ' + r.status + '. log:\n' + log); }
+  return await r.json();
 }
 
 /* A joined socket that keeps every chat message it is sent. */

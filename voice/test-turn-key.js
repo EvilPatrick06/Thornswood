@@ -32,11 +32,10 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const net = require('net');
 const vm = require('vm');
 const crypto = require('crypto');
 
-const PORT = 7921;
-const BASE = 'http://127.0.0.1:' + PORT;
 const REPO = path.resolve(__dirname, '..');
 
 // What /ice answered, to the byte, before any of this. The STUN server the
@@ -52,9 +51,10 @@ const HEALTH_FIELDS = ['ok', 'build', 'deploy', 'auth', 'uptimeSeconds', 'starte
                        'chatRange', 'peers', 'tracked', 'queuedCommands',
                        'backed', 'largestQueueBytes', 'droppedPositions', 'skippedRosters',
                        'closedBacklogged', 'closedSilent'];
-// The two lines every start wrote, with nothing configured.
-const START_LOG = '[voice] listening on 0.0.0.0:' + PORT + '\n' +
-                  '[voice] positions accepted from loopback at POST /positions\n';
+// The two lines every start wrote, with nothing configured, on the port that
+// start was given.
+const startLog = (port) => '[voice] listening on 0.0.0.0:' + port + '\n' +
+                           '[voice] positions accepted from loopback at POST /positions\n';
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -62,13 +62,55 @@ function yes(what, cond) {
   else { fail++; console.log('FAIL  ' + what); }
 }
 function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
-function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
+/*
+  A port of this run's own (#1703). Builds run side by side on the VPS, and
+  with a fixed number one run's requests can be answered by another run's
+  service. The system names a port nothing holds, the service is started on
+  it, and nothing is asked of the port until this service has said it is
+  listening there.
+*/
+function freePort(host) {
+  return new Promise((ok, bad) => {
+    const s = net.createServer();
+    s.on('error', bad);
+    s.listen(0, host, () => { const p = s.address().port; s.close(() => ok(p)); });
+  });
+}
+/* Waits for srv's own "listening on ...:port" line. If it stops first,
+   something took the port in between or it could not start, and the error
+   says which, with what it printed. */
+function listening(srv, port) {
+  return new Promise((ok, bad) => {
+    let out = '';
+    const said = (d) => {
+      out += d;
+      const m = /\[voice\] listening on \S+:(\d+)/.exec(out);
+      if (m && Number(m[1]) === port) { end(null); }
+    };
+    const more = (d) => { out += d; };
+    const gone = (code) => end(new Error((/EADDRINUSE/.test(out) ? 'something else already holds port ' + port + ', so ' : '') +
+                                         'the voice service stopped (exit ' + code + ') before it was listening. It printed:\n' + out));
+    const late = setTimeout(() => end(new Error('the voice service did not say it was listening on ' + port +
+                                                ' within fifteen seconds. It printed:\n' + out)), 15000);
+    function end(err) {
+      clearTimeout(late);
+      srv.stdout.removeListener('data', said);
+      srv.stderr.removeListener('data', more);
+      srv.removeListener('exit', gone);
+      if (err) { bad(err); } else { ok(); }
+    }
+    srv.stdout.on('data', said);
+    srv.stderr.on('data', more);
+    srv.on('exit', gone);
+  });
+}
 /*
   The real service in a scratch folder, with the files given beside it. A file
   given as null is made as a folder of that name, which is a file that is there
   and cannot be read. Nothing from this machine's own THORNSWOOD_ settings is
   passed through, so a developer's environment cannot change the answer.
+  Each start is on a port of its own; it was a fixed 7921 (#1703).
 */
 async function run(env, files) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'turnkey-'));
@@ -81,20 +123,22 @@ async function run(env, files) {
   }
   const clean = {};
   for (const k of Object.keys(process.env)) { if (!/^THORNSWOOD_/i.test(k)) clean[k] = process.env[k]; }
+  const port = await freePort('0.0.0.0');
+  const BASE = 'http://127.0.0.1:' + port;
   const srv = spawn(process.execPath, ['voice-server.js'], {
     cwd: dir,
-    env: Object.assign(clean, { THORNSWOOD_VOICE_PORT: String(PORT), THORNSWOOD_SITE: '' }, env)
+    env: Object.assign(clean, { THORNSWOOD_VOICE_PORT: String(port), THORNSWOOD_SITE: '' }, env)
   });
   const exited = new Promise((r) => srv.once('exit', r));
   let log = '';
   srv.stdout.on('data', (d) => { log += d; });
   srv.stderr.on('data', (d) => { log += d; });
 
-  const out = { up: false, ice: null, iceText: '', iceHeaders: {}, health: null, healthText: '', log: '', dir: dir };
-  for (let i = 0; i < 60 && !out.up; i++) {
-    try { out.up = (await fetch(BASE + '/health')).ok; } catch (e) { }
-    if (!out.up) { await sleep(150); }
-  }
+  const out = { up: false, port: port, ice: null, iceText: '', iceHeaders: {}, health: null, healthText: '', log: '', dir: dir };
+  try {
+    await listening(srv, port);
+    out.up = (await fetch(BASE + '/health')).ok;
+  } catch (e) { console.log('      ' + e.message); }
   if (out.up) {
     const r = await fetch(BASE + '/ice', { headers: { Origin: 'null' } });
     r.headers.forEach((v, k) => { if (k !== 'date') out.iceHeaders[k] = v; });
@@ -135,7 +179,7 @@ function leaks(r, key) {
       r.iceHeaders['access-control-allow-origin'] === '*');
   yes('/health has the same fields in the same order', !!r.health && same(Object.keys(r.health), HEALTH_FIELDS));
   yes('and still says there is no relay', !!r.health && r.health.turn === 'none');
-  yes('the log is the two lines every start writes, and nothing about a relay', r.log === START_LOG);
+  yes('the log is the two lines every start writes, and nothing about a relay', r.log === startLog(r.port));
 
   // Each page starts from its own list and swaps in whatever /ice answers, so
   // an unchanged answer leaves every page exactly where it started.

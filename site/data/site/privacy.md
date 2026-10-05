@@ -2,11 +2,16 @@
 
 What Thornswood keeps about you, why, and how to have it deleted.
 
-Last changed: 3 October 2026.
+Last changed: 4 October 2026.
 
 Thornswood is a free fan project run by two people. It is not a company. This
 page is written plainly rather than legally, and it is meant to be the whole
 truth rather than the minimum.
+
+The operators are primarily based in Colorado, United States. Thornswood is
+aimed at adults in North and South America. Privacy questions and requests
+go through the [Discord](https://discord.gg/vAkpbWyfFP), including its private
+support tickets.
 
 ## The short version
 
@@ -89,7 +94,7 @@ Honesty about the things a page does by existing:
 
 - **Discord** is where sign-in happens, so signing in tells Discord that you
   signed in here.
-- **GitHub** hosts the launcher updates, so your launcher asks GitHub for them.
+- **Launcher updates** are fetched from Thornswood's own site.
 
 Opening a page on this site loads nothing from anybody else. The fonts came
 from Google and a markdown renderer from cdnjs until 24 September 2026, and
@@ -110,11 +115,23 @@ both are served from here now.
   wipe, which is announced first.
 - **Launcher logs** are kept while they are useful for fixing something.
 
+**Backups.** Encrypted recovery copies include site records and uploads. The
+server keeps seven daily and four weekly copies. Copies fetched to the
+operator's computer are kept for 30 days, with at least seven retained for
+recovery. These are private recovery copies, not public downloads. Removing
+a live record does not rewrite older backups; they expire through that
+retention schedule. Staff must reapply completed deletion requests before
+putting an older backup back into service.
+
 ## Deleting it
 
 Ask in the Discord, or open a ticket there with **I need help**. Say which
 account and what you want removed. It is done by a person, and you will be told
 when it is.
+
+You can also ask what is kept about your account, request a copy, or ask to
+correct it. Use a private ticket for account details rather than a public
+Discord message. Do not send a government identity document.
 
 What deletion means here: your Discord link, your session records, your chat
 and your character. What cannot be undone is something you said that somebody

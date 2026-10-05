@@ -12,13 +12,17 @@ Refuse. Nobody types a command to ask or to answer. The offer stands
 for 45 seconds. Both sides are written. A list with one name in it is
 not a friendship.
 
-P lists them, and says who is away. Remove beside a name takes one
-off.
+P lists them by the name they are online under, and says who is
+away. While a friend is away, the list shows the name they had when
+you became friends. Remove beside a name takes one off.
 
 Near you on P is everybody close enough to look at, the same people
 the look prompt names. Two people with the same name are not mixed
 up: the key while you are looking at them, and Add friend beside
-them, each send that person and not a name.
+them, each send that person and not a name. A friend's row on P is
+the same: Ask to party, Remove, and the three switches send that
+friend, so a friend whose character ended and who came back on a new
+one is still the one they reach.
 
 ## How many
 
@@ -44,4 +48,6 @@ Y, Add friend under Near you, the prompt, the 45 seconds, the list,
 Remove, and the cap of 120 are in the server. Accept and Refuse on
 that prompt are what a person presses. The list survives a restart.
 The panel and the key send the server the line `/friend` once was,
-and nobody is told to type it.
+and nobody is told to type it. The buttons on a friend's row send the
+profile id the list is kept by, and the server finds whoever that
+profile is playing now.

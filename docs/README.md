@@ -6,6 +6,7 @@ Developer-Guide.md at the root; the long form is Developer-Guide.md.
 | Page | What it answers |
 | --- | --- |
 | [WEBSITE-AUDIT.md](WEBSITE-AUDIT.md) | Public website discovery, accessibility, privacy and reliability checks, with verification and remaining operator risks. |
+| [WEBSITE-OPERATIONS.md](WEBSITE-OPERATIONS.md) | Confirmed operator facts, legal applicability questions, public asset permission evidence and recovery procedures. |
 | [SYSTEM.md](SYSTEM.md) | What runs where, what talks to what, and which script puts each piece in place: every VPS service with its folder, port and task. |
 | [FEED.md](FEED.md) | The update feed launchers read: every field of version.json, who writes it, who reads it, and what happens when it is wrong. |
 | [GAMEMODE.md](GAMEMODE.md) | How game/gamemode.js is laid out, where its data lives, how it is deployed and which tests cover it. |

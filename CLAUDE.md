@@ -73,7 +73,7 @@ band-aids" is the rule for everybody. For a Claude it also means:
 
 ### Buttons, not chat commands
 
-Decided by Patrick on 4 Oct: never add a chat command for something people do in the world, only for staff and dev. `/stuck` and the lines that reach staff (`/helpme`, `/report`) stay commands, and help text names them; docs\SYSTEMS.md "Buttons, not commands" is the rule and what counts as a button.
+Decided by Patrick on 4 Oct: never add a chat command for something people do in the world, only for staff and dev. `/stuck`, the lines that reach staff (`/helpme`, `/report`), the ways of saying a line (`/me`, `/do`, `/w`, `/s`, `/y`, `/ooc`) and `/roll` stay commands with no buttons, and help text names them; docs\SYSTEMS.md "Buttons, not commands" is the rule and what counts as a button.
 
 ### Every reply ends with the commands, in order, and what each one is for
 
