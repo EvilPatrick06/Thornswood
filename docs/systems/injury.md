@@ -133,9 +133,8 @@ remedy comes out of your pack only when it helps a wound.
 | Poultice | 1 Tundra Cotton, 1 Garlic | Alchemy lab | Alchemist, Physicker, novice |
 | Physicker's Remedy | 1 Mudcrab Chitin, 1 Blue Mountain Flower | Alchemy lab | Alchemist, Physicker, advanced |
 
-The four are records in Thornswood-Content.esp. Who may make each is
-the recipe table's to enforce, and the table takes them in at its next
-rebuild (#1622). Until then a bench lets in whoever it already lets in.
+The four are records in Thornswood-Content.esp. The recipe table
+names who may make each, at the rank above (#1622).
 The alchemy lab is the one Thornswood-Content.esp places, which takes
 recipes; Skyrim's own lab only brews.
 
