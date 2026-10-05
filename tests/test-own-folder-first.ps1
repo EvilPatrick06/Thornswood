@@ -636,6 +636,10 @@ namespace Thornswood
                 string.Equals(Path.GetFullPath(Paths.Game), Path.GetFullPath(s.Payload), StringComparison.OrdinalIgnoreCase) &&
                 Under(Paths.Exe, s.Payload) && Under(Paths.Loader, s.Payload) && Under(Paths.MpClient, s.Payload) && !Under(Paths.Game, s.Game));
             Yes(n + "Paths.SteamCopy is the Steam copy", string.Equals(Path.GetFullPath(Paths.SteamCopy), Path.GetFullPath(s.Game), StringComparison.OrdinalIgnoreCase));
+            Yes(n + "the game's facts are read from the Steam copy (Paths.Skyrim, SkyrimExe), the script extender plugins from it and Payload (#1235)",
+                string.Equals(Path.GetFullPath(Paths.Skyrim), Path.GetFullPath(s.Game), StringComparison.OrdinalIgnoreCase) &&
+                Under(Paths.SkyrimExe, s.Game) && Paths.SksePluginDirs.Length == 2 &&
+                Under(Paths.SksePluginDirs[0], s.Game) && Under(Paths.SksePluginDirs[1], s.Payload));
             SettleList(s, n);
             Deploy(s, DateTime.UtcNow.AddMinutes(-10));
             var before = Snap(s.Game);
@@ -689,6 +693,9 @@ namespace Thornswood
             Start(s);
             Yes(n + "after the restart it runs from Root\\Game", !Paths.Collection && !Paths.OwnFirst && OwnGame.Active &&
                 string.Equals(Path.GetFullPath(Paths.Game), Path.GetFullPath(own), StringComparison.OrdinalIgnoreCase));
+            Yes(n + "and the game's facts are read from Root\\Game, one script extender folder (#1235)",
+                string.Equals(Path.GetFullPath(Paths.Skyrim), Path.GetFullPath(own), StringComparison.OrdinalIgnoreCase) &&
+                Paths.SksePluginDirs.Length == 1 && Under(Paths.SksePluginDirs[0], own));
             Yes(n + "once the folder exists the list is written where the game reads it, not into Windows' folder",
                 !Paths.Collection &&
                 string.Equals(Path.GetFullPath(Verify.OrderFolder), Path.GetFullPath(Paths.Live), StringComparison.OrdinalIgnoreCase) &&
@@ -743,6 +750,8 @@ namespace Thornswood
             Deploy(s, DateTime.UtcNow.AddMinutes(-10));
             var before = Snap(s.Game);
             Yes(n + "the Downgrade card is up: it reads the Steam copy's newer exe, not Payload's missing one", Downgrade.Needed(s.Cfg));
+            Yes(n + "and the build it names is the Steam copy's, never missing (#1235)",
+                Downgrade.Describe(s.Cfg) != "missing" && Downgrade.Describe(s.Cfg) == Downgrade.Describe(s.Cfg, Path.Combine(s.Game, "SkyrimSE.exe")));
             Yes(n + "Steam's Updates setting is not touched while a downgrade is needed", !SteamUpdates.LooksAtStart(!Paths.Collection, Downgrade.Needed(s.Cfg)));
             StartWrites(s, "pack1");
             Yes(n + "the first start wrote nothing into the Steam copy", Same(before, Snap(s.Game)));
@@ -766,6 +775,9 @@ namespace Thornswood
             string n = "not-chosen: ";
             Yes(n + "without the choice the launcher uses the Steam copy as it always has", Paths.Collection && !Paths.OwnFirst &&
                 string.Equals(Path.GetFullPath(Paths.Game), Path.GetFullPath(s.Game), StringComparison.OrdinalIgnoreCase));
+            Yes(n + "and reads the game's facts there, one script extender folder (#1235)",
+                string.Equals(Path.GetFullPath(Paths.Skyrim), Path.GetFullPath(s.Game), StringComparison.OrdinalIgnoreCase) &&
+                Paths.SksePluginDirs.Length == 1);
             SettleList(s, n);
             Deploy(s, DateTime.UtcNow.AddMinutes(-10));
             Yes(n + "and Steam's Updates setting is looked at", SteamUpdates.LooksAtStart(!Paths.Collection, Downgrade.Needed(s.Cfg)));
