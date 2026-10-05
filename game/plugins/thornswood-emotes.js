@@ -291,10 +291,11 @@ function log() {
  * So with the wheel up only the page hears a key, and the page closes it on
  * this letter, on CLOSE_KEY's letter and on Escape by sending __close
  * (#1852). The branches of the keys handler below that shut an open wheel on
- * OPEN_KEY or CLOSE_KEY are reached only while the wheel is drawn without the
- * keyboard, which is the front's two minute cap taking the claim back. This
- * comment used to say the opposite, that buttonEvent keeps arriving the whole
- * time the wheel is up (#1675).
+ * OPEN_KEY or CLOSE_KEY are reached only while the wheel is open without the
+ * keyboard. The front's two minute cap used to leave it that way; it closes
+ * the wheel through setOpen now (#1918), so nothing known does. This comment
+ * used to say the opposite, that buttonEvent keeps arriving the whole time
+ * the wheel is up (#1675).
  *
  * An earlier page closed the wheel on this letter too, and a log of
  * 25 September has one tap opening the wheel and shutting it again before it
@@ -467,6 +468,15 @@ function setOpen(v) {
     if (T.claimFocus) { T.claimFocus('wheel', false); }
   }
 }
+
+/*
+ * The front's two minute cap closes the wheel through here, the way a press
+ * or a pick does, so the page is hidden, the claim goes and open follows
+ * (#1918). It used to call window.thornswoodEmotes.close() in the page,
+ * which nothing defines, and the claim was taken back with the wheel still
+ * drawn and open still true, so 1 to 8 played nothing.
+ */
+(T.capCloses = T.capCloses || {}).wheel = function () { setOpen(false); };
 
 /**
  * Play an idle on the local character. The client's own sendAnimationEvent hook

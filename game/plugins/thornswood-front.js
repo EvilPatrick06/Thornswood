@@ -2045,13 +2045,23 @@
 
     The trade window's close hides it and leaves the trade to the server: the
     next change to either pile draws it again, and so does H, or Trade on the
-    P panel, while the trade stands (#1628), which puts Walk away back. The wheel's name is the one it has always had here. The
+    P panel, while the trade stands (#1628), which puts Walk away back. The
     select window is only ever capped once its choice is no longer up.
+
+    The emote wheel is not here. Its name here was thornswoodEmotes, which
+    no page defines, so the cap took the wheel's claim back and left the
+    wheel drawn with no cursor, and the emote plugin still had it open, so 1
+    to 8 played nothing (#1918). The wheel is the emote plugin's to open and
+    close, so the cap closes it through that plugin, by the function it puts
+    in T.capCloses under the claim's name. A claim whose plugin puts one
+    there is closed by it, and the page's close is left to that plugin.
+    tests/test-1918-cap-closes.js holds every name here to a page that
+    defines it with a close, and every claim to one or the other.
   */
   const CAP_CLOSES = {
     skills: 'thornswoodSkills', party: 'thornswoodParty', journal: 'thornswoodJournal',
     board: 'thornswoodBoard', repair: 'thornswoodRepair', treat: 'thornswoodTreat',
-    trade: 'thornswoodTrade', merchant: 'thornswoodMerchant', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
+    trade: 'thornswoodTrade', merchant: 'thornswoodMerchant', select: 'thornswoodSelect',
     afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers', ride: 'thornswoodRide',
     help: 'thornswoodHelp'
   };
@@ -8332,9 +8342,13 @@
       if (!claims[who] || !claimedAt[who]) { continue; }
       if (now - claimedAt[who] > 120000) {
         log('the ' + who + ' claim has held the keyboard for two minutes, closing it and taking it back');
-        // Each window by its own name, and only that one: see CAP_CLOSES.
+        // Each window by its own name, and only that one: see CAP_CLOSES. A
+        // window a plugin owns, the emote wheel, is closed through that
+        // plugin, so what it holds open follows (#1918).
+        const own = T.capCloses && T.capCloses[who];
         const win = CAP_CLOSES[who];
-        if (win) { T.js('try{window.' + win + '&&window.' + win + '.close();}catch(e){}'); }
+        if (typeof own === 'function') { own(); }
+        else if (win) { T.js('try{window.' + win + '&&window.' + win + '.close();}catch(e){}'); }
         T.claimFocus(who, false);
       }
     }

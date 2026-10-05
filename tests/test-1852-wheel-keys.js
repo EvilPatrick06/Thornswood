@@ -361,14 +361,16 @@ function heard(list, what) { return list.indexOf(what) >= 0; }
 
 // ====================================== D. drawn without the keyboard
 {
-  // The front's two minute cap takes the claim back and the wheel is still
-  // drawn: the plugin hears keys again, and G is its to close.
+  // The claim taken back from outside the plugin with the wheel still drawn:
+  // the plugin hears keys again, and G is its to close. The front's two
+  // minute cap used to do this; it closes the wheel through the plugin now
+  // (#1918, tests/test-1918-cap-closes.js).
   const w = world();
   w.frames(2);
   w.tap(G, 4);
   w.T.claimFocus('wheel', false);
   w.frames(2);
-  yes('D1 the cap took the keyboard back with the wheel still drawn', w.page.shown() && !w.focus);
+  yes('D1 the claim was taken back with the wheel still drawn', w.page.shown() && !w.focus);
   w.tap(G, 4);
   yes('D1 G then reaches the plugin, which closes it, and the page heard none of it',
       !w.page.shown() && w.closes() === 0 &&
