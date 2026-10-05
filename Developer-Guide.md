@@ -1112,7 +1112,8 @@ The short form of the rules. The same decisions, with the dates they were made, 
   intermediate; that soft skip must not reach the site or the feed. The live main launcher,
   1.1.101, predates signing; the next main Ship is the first signed one.
 - Every pull request gets the build check (.github/workflows/build.yml, about
-  two minutes: the secret scan, every script and file parses, the writing
+  two minutes: the secret scan, every script and file parses, the Python
+  names only what exists (ruff, issue #1343), the writing
   rules and the two harnesses that prove the writing checks (see Words), the ownership page (`tests\test-ownership.js`, added by issue #752),
   seven more harnesses that are just as quick (the script index, the script
   paths, the architecture page and three launcher harnesses, issue #875, and
@@ -2479,5 +2480,5 @@ Not from the chat: `/restart` and `/shutdown` answer that restarts are not run f
 
 | Command | Who | What it does |
 | --- | --- | --- |
-| `/close [why]` | Staff, in a ticket | Closes the ticket |
+| `/close [why]` | Staff, in a ticket: the bot's `STAFF_ROLES`, by id or name, never Manage Threads alone (#1342) | Closes the ticket |
 | `/live-smoke start`, `reset`, `refresh`, `report` | Owner, Dev and Lead Gamemaster | The Live smoke checklist in #test-tasks: opens a dated session, closes it and starts a fresh one, rewrites the checklist, counts a session's marks |

@@ -247,16 +247,20 @@ against stand-in launchers.
 
 **Signature** (Signature.cs). Whether a downloaded launcher is really ours,
 asked by CheckSigner in Updater before the `.new` is written (issue
-#912). `Signature.cs:97 Refusal()` has Windows verify the signature and its
+#912). `Signature.cs:101 Refusal()` has Windows verify the signature and its
 chain (WinVerifyTrust, the call behind Get-AuthenticodeSignature's Valid),
-takes the chain Windows built from `Signature.cs:290 Trust()`, and then pins
+takes the chain Windows built from `Signature.cs:294 Trust()`, and then pins
 Microsoft's Artifact Signing: the root, an "ID Verified CS" issuer, a
 timestamp, and Thornswood's durable identity value in the certificate, which
 stays the same when the three day certificate renews. Only then does it look
 for `ExpectedSigner` in the Subject. `scripts\release\Assert-PublishSigned.ps1`
 runs the same class before a Ship publishes, and
 `tests\test-signer-check.ps1` compiles it on its own and points it at signed,
-unsigned, self-signed and changed files.
+unsigned, self-signed and changed files. `Signature.cs:403 MicrosoftRefusal()`
+asks the same of a program Microsoft signed itself, the WebView2 installer
+Voice downloads (issue #1330): the same Windows check, then the chain must end
+at Microsoft Root Certificate Authority 2011 and the certificate must be
+Microsoft Corporation's, for signing programs.
 
 **FeedNotice** (FeedNotice.cs). What the feed says to everybody. Three
 optional fields in version.json, set by hand in the releases repository:
@@ -360,10 +364,12 @@ browser's data in `Profile\VoiceBrowser`. It talks to the game through small
 files in both `Game\Data\Platform` and Profile (`voice-token.txt`,
 `voice-status.txt`, and push to talk and `voice-muted.txt` written by the
 game, the second passed on to the voice page by
-`Voice.cs:1092 PassMuted()`). `Voice.cs:896 Reconfigure()` tells it which
+`Voice.cs:1111 PassMuted()`). `Voice.cs:915 Reconfigure()` tells it which
 character is being played. The join token is only asked for over https,
 because the request carries the Discord ticket; with a voice address that is
-not https there is no token.
+not https there is no token. With no WebView2 runtime on the machine,
+`Voice.cs:445 Bootstrap()` downloads Microsoft's installer and runs it only
+when `Signature.MicrosoftRefusal` says Microsoft signed it (#1330).
 
 **OwnGame** (OwnGame.cs, OwnGameShare.cs, OwnGameKinds.cs and OwnGameClean.cs, with
 ShellOwnGame.cs for its card and offer). `<Root>\Game` itself. `OwnGame.cs:692 Make()` builds it in

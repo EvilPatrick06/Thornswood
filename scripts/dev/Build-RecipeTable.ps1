@@ -1586,8 +1586,9 @@ $OPEN_ROW_WHY = [ordered]@{
 # after the build had written them, so the next rebuild would have put all 3342
 # rows back in the open book (issue #1622). This file is now what the build
 # reads. scripts\dev\Write-CutItems.js wrote it once from the table before
-# anything was cut; run on a table that is already cut it writes a shorter list,
-# so it is not a step after this one.
+# anything was cut. On a table that is already cut it starts from this file
+# and writes it back as it is (issue #1714), because its rules would read the
+# cut table wrongly.
 $CUT_FILE = Join-Path $PSScriptRoot '..\..\docs\systems\cut-items.json'
 $CUT_ROLLS = [ordered]@{ 'embassy' = 'embassy'; 'thalmor' = 'remnant' }
 # What the gamemode says, after "Nobody makes that here. ", for a cut row.

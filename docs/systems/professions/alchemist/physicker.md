@@ -62,7 +62,10 @@ The lab gate, the double batch and the disease list are in the
 server. A cure disease potion you brew is still only the sip, because
 the server cannot read what a brewed potion does. The poultice and the
 remedy are in Thornswood-Content.esp, and the recipe table names them
-yours (#1622). Setting a bone is a button on the
+yours (#1622). The lab Thornswood places, where they are made, is in
+the bench table since #1713: it opens for anyone who can work this
+half at novice, so a Physicker, a Blightbrewer by the sister half,
+and anyone a master has taught it. Setting a bone is a button on the
 wounds panel: X on somebody hurt, or H in your inventory for your own
 (see [Injury](../../injury.md)). At master the same button clears a
 crooked heal.

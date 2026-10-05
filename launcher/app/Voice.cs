@@ -435,6 +435,10 @@ namespace Thornswood
         /// only, with no administrator prompt. That copy comes without
         /// Microsoft's mDNS firewall rule, which is why Begin turns mDNS off.
         ///
+        /// The download is run only when Windows says Microsoft signed it
+        /// (Signature.MicrosoftRefusal, #1330); anything else is deleted
+        /// unrun and the log says why.
+        ///
         /// Failure is not fatal anywhere. Voice stays off, the launcher is
         /// untouched, and it tries again next start.
         /// </summary>
@@ -460,6 +464,21 @@ namespace Thornswood
                     Say("Voice: could not download the WebView2 runtime: " + ex.Message);
                     return;
                 }
+
+                // Only a program Microsoft signed is run (#1330). The file came
+                // over the network, so without this whoever could change it on
+                // the way, or at the server it came from, chose what ran here.
+                // Signature.MicrosoftRefusal says what it checks and why.
+                string said;
+                string why = Signature.MicrosoftRefusal(exe, out said);
+                if (why.Length > 0)
+                {
+                    Say("Voice: the WebView2 installer that was downloaded " + why +
+                        " It was not run, and voice is off until the next start.");
+                    try { File.Delete(exe); } catch (Exception ex) { Swallow.Note("Voice.Bootstrap, delete refused installer", ex); }
+                    return;
+                }
+                Say("Voice: the WebView2 installer is Microsoft's. " + said);
 
                 try
                 {
