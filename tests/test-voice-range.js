@@ -109,7 +109,7 @@ function lift(src, head) {
   yes('and it really removes the listener',
       /listeners\.splice\(i, 1\)/.test(chat));
   yes('the voice page keeps its listener so it can take it off',
-      /var onNet = null;/.test(overlay) && /n\.on\(onNet\)/.test(overlay));
+      /var onNet = null;/.test(overlay) && /n\.board\(onNet\)/.test(overlay));
   /*
     THE CODE, NOT THE COMMENT. The first version of this searched the whole
     file for n.leave() and found it inside the paragraph explaining why it was

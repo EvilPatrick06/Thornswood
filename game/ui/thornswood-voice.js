@@ -815,7 +815,15 @@
         return;
       }
     };
-    n.on(onNet);
+    /*
+      On with board, not on (#1869). The chat's socket may have joined the
+      room before this page was configured (at the character choice, or
+      when the launcher's token came back first), and the roster and every
+      offer the room sent this connection came then. board hands those over
+      first, roster before signalling, so every peer is opened here before
+      anything it sent is read.
+    */
+    n.board(onNet);
   }
 
   function reconcile(list) {
@@ -962,6 +970,14 @@
 
   function onSdp(m) {
     var rec = conns.get(m.from);
+    /*
+      Nobody here is still to be opened (#1869). The service writes the
+      roster that names somebody to this socket before anything they send
+      it, and board hands over what came before this page was on in that
+      same order. A sender with no connection here is one this page chose
+      not to open, in relay mode or with no audio, and has nothing to answer
+      with.
+    */
     if (!rec) return;
 
     // Glare. Two offers crossed in flight, so somebody has to give way.
@@ -1002,6 +1018,8 @@
 
   function onIce(m) {
     var rec = conns.get(m.from);
+    // As in onSdp: a sender with no connection here is one this page chose
+    // not to open.
     if (!rec) return;
     if (!rec.haveRemote) {
       rec.pendingIce.push(m.candidate);

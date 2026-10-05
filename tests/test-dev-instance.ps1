@@ -22,8 +22,10 @@
     - the program, plugins, manifest and the data scripts are there; the world,
       the logs and live's data files are not
     - server-settings.json has the dev port, name and plugin paths
-    - dev voice has the program, its page and the roller, and none of live's
-      chat logs, token-key.txt, turn-key.txt, secret.txt or choices.json
+    - dev voice has the program, every file it requires (read out of
+      voice\voice-server.js, so headlines.js today, #1870) and the roller,
+      and none of live's chat logs, token-key.txt, turn-key.txt, secret.txt
+      or choices.json
     - the run file sets auth on and 127.0.0.1, and starts voice with them
     - both dev folders take nothing from above and no Users rule reaches them
     - run again, it copies nothing more of live's private and keeps dev's own
@@ -38,6 +40,31 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 $repo = (Resolve-Path (Join-Path $Here '..')).Path
 $script = Join-Path $repo 'scripts\vps\vps-dev-instance.ps1'
 $ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+
+# Every file the voice service requires, read out of the repository's
+# voice\voice-server.js and whatever that requires in turn: the relative
+# require('./name') calls, as file names in the voice folder. Since #1406 that
+# is headlines.js, and a dev voice folder without it stops at the first line
+# (#1870). Read here rather than written out, so a require added later is
+# wanted in dev the day it is added.
+$voiceDir = Join-Path $repo 'voice'
+$required = @()
+$outside = @()
+$toRead = New-Object Collections.Generic.Queue[string]
+$toRead.Enqueue('voice-server.js')
+while ($toRead.Count) {
+    $f = $toRead.Dequeue()
+    $src = [IO.File]::ReadAllText((Join-Path $voiceDir $f))
+    foreach ($m in [regex]::Matches($src, "require\(\s*['""](\.{1,2}/[^'""]+)['""]\s*\)")) {
+        $rel = $m.Groups[1].Value
+        if ($rel -notmatch '^\./[^/]+$') { $outside += "$f requires $rel"; continue }
+        $name = $rel.Substring(2)
+        if (-not [IO.Path]::HasExtension($name)) { $name += '.js' }
+        if ($required -contains $name) { continue }
+        $required += $name
+        if (Test-Path -LiteralPath (Join-Path $voiceDir $name)) { $toRead.Enqueue($name) } else { $outside += "$f requires $rel, which voice\ does not have" }
+    }
+}
 
 $script:pass = 0; $script:fail = 0
 function Yes([string]$what, [bool]$cond) {
@@ -85,6 +112,7 @@ try {
     Put (Join-Path $live 'data\scripts\s.js') '// script'
     Put (Join-Path $live 'data\api\a.json') '{}'
     Put (Join-Path $lv 'voice-server.js') '// voice'
+    foreach ($r in $required) { Put (Join-Path $lv $r) "// $r" }
     Put (Join-Path $lv 'roll-log.ps1') '# roller'
     Put (Join-Path $lv 'public\index.html') '<html></html>'
     Put (Join-Path $lv 'chat\20260928.jsonl') '{"text":"what live people said"}'
@@ -132,8 +160,9 @@ try {
     # ---- voice ----------------------------------------------------------------
     $v = @(Get-ChildItem -LiteralPath $dv -Recurse -File -Force | ForEach-Object { $_.FullName.Substring($dv.Length + 1) } | Sort-Object)
     # Not the page live may still keep in public: the service serves none (#1822).
-    Yes ('dev voice has the program, the roller and its run file, and nothing else (' + ($v -join ', ') + ')') (
-        ($v -join ',') -eq 'roll-log.ps1,run-dev-voice.cmd,voice-server.js')
+    $want = @(@('voice-server.js', 'roll-log.ps1', 'run-dev-voice.cmd') + $required | Sort-Object)
+    Yes ('dev voice has the program, what it requires, the roller and its run file, and nothing else (' + ($v -join ', ') + ')') (
+        ($v -join ',') -eq ($want -join ','))
     Yes 'none of live''s chat logs, keys or old secret' (
         -not (Test-Path -LiteralPath (Join-Path $dv 'chat')) -and -not (Test-Path -LiteralPath (Join-Path $dv 'token-key.txt')) -and
         -not (Test-Path -LiteralPath (Join-Path $dv 'turn-key.txt')) -and -not (Test-Path -LiteralPath (Join-Path $dv 'secret.txt')))
@@ -164,6 +193,13 @@ try {
 
     # ---- the parts -FilesOnly does not run ----------------------------------------------
     $body = Get-Content -LiteralPath $script -Raw
+    $copy = [regex]::Match($body, '(?m)^\s*& robocopy \$liveVoice \$devVoice ([^\r\n/]+)/')
+    $named = @($copy.Groups[1].Value.Trim() -split '\s+' | Where-Object { $_ })
+    Yes ('voice-server.js requires ' + ($required -join ', ') + ', each a file beside it in voice\') ($required.Count -ge 1 -and $outside.Count -eq 0)
+    foreach ($o in $outside) { Write-Host "      $o" }
+    Yes ('the script copies each of them to dev voice by name, with the program and the roller (' + ($named -join ' ') + ')') (
+        $copy.Success -and $named -contains 'voice-server.js' -and $named -contains 'roll-log.ps1' -and
+        @($required | Where-Object { $named -notcontains $_ }).Count -eq 0)
     Yes 'the script opens no firewall rule for dev voice' ($body -notmatch "Name = 'Thornswood Dev Voice'")
     Yes 'and takes an old one down' ($body -match "Remove-NetFirewallRule -DisplayName 'Thornswood Dev Voice'")
     Yes 'it never copies live''s private folder' ($body -match '& robocopy \$live \$dev [^\r\n]*/XD [^\r\n]*\bprivate\b')

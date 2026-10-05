@@ -280,6 +280,11 @@ build carries the join pass switch (issue #1223), and the installer refuses a
 server without one (issue #1804). Restore-Server then puts the backup's own
 switch back (issue #1845).
 
+Typed now, the first `scp` carries `.\scripts\deploy\ServerBuild.ps1` as well,
+into the same folder as the installer. Since issue #1214 the installer loads
+it from beside itself to hold the payload's server files to their record, and
+without it stops at `INSTALL REFUSED` having changed nothing (issue #1884).
+
 The whole thing, typing included, is well under the hour this section used to
 guess. `Install-ThornswoodServer`'s own load order check resolves against the
 live server's plugins, because the payload's settings name

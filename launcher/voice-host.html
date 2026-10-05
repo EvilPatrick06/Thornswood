@@ -498,6 +498,11 @@ function open(id, info, initiator) {
 
 function onSdp(m) {
   var rec = conns.get(m.from);
+  // Never a peer still to be opened (#1869): the service writes the roster
+  // that names somebody to this socket before anything they send it, and
+  // onPeers opens everybody on a roster before the next message is read.
+  // tests/test-1869-voice-negotiation.js measures it on a socket that is
+  // backed up as well. So this only turns away what no page sends.
   if (!rec) return;
   var collision = m.sdp.type === 'offer' &&
                   (rec.makingOffer || rec.pc.signalingState !== 'stable');
@@ -516,6 +521,7 @@ function onSdp(m) {
 
 function onIce(m) {
   var rec = conns.get(m.from);
+  // As in onSdp: never a peer still to be opened.
   if (!rec) return;
   // Candidates routinely arrive before the description they belong to.
   if (!rec.haveRemote) { rec.pendingIce.push(m.candidate); return; }

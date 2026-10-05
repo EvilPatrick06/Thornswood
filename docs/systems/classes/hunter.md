@@ -41,7 +41,9 @@ and it is a different yield and a different wait from dressing a body.
 | Rabbit, gives Raw Rabbit Leg | 2 (`38b0e`, `38b0f`, both Skyrim.esm) | Novice |
 | Charred skeever, gives Cooked Skeever | 1 advanced (`775fe:Skyrim.esm`), 2 expert (`52185`, `52189`, both Skyrim.esm) | The record's own rank |
 
-The wait is the rack's rank, not yours, and it is your own wait:
+The wait is the rack's rank, not yours. It is kept on the rack, not
+on you: once a rack is picked, it is picked for every hunter until the
+wait is over.
 
 | Rack's rank | Wait |
 | --- | --- |
@@ -55,9 +57,10 @@ advanced 1 to 2, expert 1 to 3, master 2 to 4. A novice can take the
 pheasant and the rabbit. A novice cannot take an expert skeever. One
 press is one piece of work, whatever the count.
 
-A restart clears the wait. The carcass clock of 5 minutes does not
-apply to a rack, and the rack's wait does not apply to a wolf on the
-ground.
+A restart does not clear the wait, because return times and shared
+stock survive a restart ([People who are not people](../npcs.md)). The
+carcass clock of 5 minutes does not apply to a rack, and the rack's
+wait does not apply to a wolf on the ground.
 
 One successful dressing is one piece of work. 100 to advanced, then
 the count starts again at 250, then at 600. Rest costs 1.5, 1.2,
@@ -190,9 +193,11 @@ Generated from the work tables by `scripts/dev/Write-SystemLists.js`. The same r
 ## Where this is
 
 The verb, the 5 minutes, the rank on the row, and the yields are in the
-server. The list is that table. A rack's wait is kept on the rack and
-shared by every hunter (#1413), and a picked-clean rack says how long
-is left in minutes and hours (#1826).
+server. The list is that table. A rack's wait is kept on the rack,
+shared by every hunter and kept through a restart (#1413), and a
+picked-clean rack says how long is left in minutes and hours (#1826).
+Until 5 October this page said the wait was your own and cleared by a
+restart, which it was before #1413 (#1887).
 
 A body that never lies on the ground is not on the list, whatever its
 race (#1808): a spirit, an animal a spell brings, a mod's hidden actor

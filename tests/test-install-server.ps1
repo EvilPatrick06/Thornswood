@@ -512,10 +512,19 @@ try {
     # ---- a good one ----------------------------------------------------------
     # The site's read on the root's files and on data's, which Deploy-Docs.ps1
     # puts on the folder going out (issue #1105): carried across by name.
+    # Only the access rules are written back, the way the scripts do it since
+    # #1120 (Set-ThornswoodAclAccess in Bot-Service.ps1). Set-Acl, when its
+    # first try is refused, keeps the audit part whenever the folder's own
+    # rules are protected, which the installer has just made them, and the
+    # audit part needs SeSecurityPrivilege: an Administrator has it, and the
+    # build runner's account never will. On the runner that stopped this
+    # harness here (#1880).
     foreach ($d in $root, (Join-Path $root 'data')) {
         $acl = Get-Acl -LiteralPath $d
         $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier('S-1-5-19')), 'Read', 'ObjectInherit', 'NoPropagateInherit', 'Allow')))
-        Set-Acl -LiteralPath $d -AclObject $acl
+        $item = Get-Item -LiteralPath $d -Force
+        if ($PSVersionTable.PSEdition -eq 'Core') { [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]$item, [Security.AccessControl.DirectorySecurity]$acl) }
+        else { $item.SetAccessControl($acl) }
     }
     $running = Owner $P
     $v2 = Payload
