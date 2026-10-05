@@ -238,7 +238,7 @@
     Thornswood.ini, window.THORNSWOOD.needsBars). The bars are a div the
     server's own script writes into this page, #ts-hud, and it is rewritten
     every few seconds, so a rule in the sheet is what keeps it hidden rather
-    than taking the node out. /needs in chat still says every one of them.
+    than taking the node out. The Body page on K still says every one of them.
   */
   var NEEDS_CLASS = 'thornswood-needs-hidden';
 

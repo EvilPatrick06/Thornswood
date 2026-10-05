@@ -135,6 +135,16 @@
       'skills:pick perk fontofmagic', and a refusal comes back as a note
       about 'perk'.
 
+    body: { food, drink, rest, temp, foodBand, drinkBand, restBand, tempBand,
+            resting, place, roof, night, fireAway, fireWorth, tempTarget,
+            exposure, cover, worn: [ { name, worth, known } ] }
+      The Body page (#1631), the needs block's view, sent with every panel
+      in the world and never while creating. What /needs used to say: the
+      four meters and their bands, where you are resting, the warmth with
+      its target and what sets it, and what the server counts as worn. It
+      reads as of the panel's last arrival; Read again sends 'skills:refresh'
+      for a new one. Nothing on it is picked or sent.
+
     officePage: { jarl, may, name, steward: <bool>,
                   stewards: [ { pid, name } ], people: [ { pid, name } ],
                   door: { name, by, rent: { amount, every, owed } | null } | null,
@@ -335,6 +345,15 @@
       container are the server's, under mine.officePage; this is the title
       and the one sentence over the page.
     */
+    /*
+      The Body page (#1631). The numbers are the server's, under mine.body;
+      this is the title and the sentence over the page.
+    */
+    body: {
+      title: 'Body',
+      lead: 'Hunger, thirst, rest and warmth, as the server counts them, and why your warmth is what it is. The four bars at the bottom left show the same meters as you play.',
+      rows: []
+    },
     office: {
       title: 'Office',
       lead: 'The office on this character. A Jarl names the stewards. A steward ends a claim and sets the rent at a door, makes a container a hold\'s box, and moves a hold\'s notice board.',
@@ -966,6 +985,34 @@
     if (!got || typeof got !== 'object' || Array.isArray(got)) return null;
     return got;
   }
+  /* The Body page (#1631): the server's, under mine.body, or null while creating. */
+  function bodyView() {
+    var got = mine && mine.body;
+    if (!got || typeof got !== 'object' || Array.isArray(got)) return null;
+    return got;
+  }
+  /* The meters that are not fine, in a word each, for the section list. */
+  function bodyWorries(v) {
+    var out = [];
+    if (!v) return out;
+    var words = { food: 'hungry', drink: 'thirsty', rest: 'tired' };
+    for (var k in words) if (v[k + 'Band'] && v[k + 'Band'] !== 'fine') out.push(words[k]);
+    if (v.tempBand && v.tempBand !== 'fine') out.push(tempWord(v.temp).toLowerCase());
+    return out;
+  }
+  /* The word the bars at the bottom left give a reading (hudScript in the
+     needs block), so the page and the bar never call one number two things. */
+  function tempWord(t) {
+    t = Number(t) || 0;
+    if (t < 15) return 'Freezing';
+    if (t < 30) return 'Cold';
+    if (t < 42) return 'Chilly';
+    if (t <= 58) return 'Fine';
+    if (t <= 70) return 'Warm';
+    if (t <= 85) return 'Hot';
+    return 'Burning';
+  }
+
   /* The Office page (#1638): the server's, under mine.officePage, or null for somebody with no office. */
   function officePage() {
     var got = mine && mine.officePage;
@@ -1254,6 +1301,8 @@
     if (section === 'property') return 0;
     // The Office page is buttons beside what is true; nothing is marked.
     if (section === 'office') return 0;
+    // The Body page is what is true, and one button to read it again.
+    if (section === 'body') return 0;
     return rows().length + (laterOffered(section) ? 1 : 0);
   }
   /* Another section: the top row, and the status line back to the hint. */
@@ -1312,6 +1361,9 @@
     if (!creating() && collegeView()) sections.splice(sections.indexOf('spells') + 1 || 1, 0, 'college');
     // The offices (#1638), for a character that holds one or may take one:
     // the server sends the page to them and nobody else, never while creating.
+    // The Body page (#1631), after the tree: the server sends it to anybody
+    // in the world, and never while creating.
+    if (!creating() && bodyView()) sections.push('body');
     if (!creating() && officePage()) sections.push('office');
     /*
       Property, last, and only once there is something on it. Patrick,
@@ -1421,6 +1473,11 @@
       if (apB.length) return { t: apB.length === 1 ? 'taken on by ' + apB[0].name : apB.length + ' Masters', c: 'set' };
       return { t: apV ? (Number(apV.used) || 0) + ' of ' + (Number(apV.of) || 0) + ' trades used' : 'nobody yet', c: '' };
     }
+    if (sec === 'body') {
+      var bv = bodyView();
+      var bw = bodyWorries(bv);
+      return bw.length ? { t: bw.join(', '), c: 'need' } : { t: 'fine', c: 'set' };
+    }
     if (sec === 'office') {
       var ov = officePage();
       if (ov && ov.jarl) return { t: 'Jarl', c: 'set' };
@@ -1502,6 +1559,7 @@
     else if (section === 'recipes') drawRecipes();
     else if (section === 'property') drawProperty();
     else if (section === 'office') drawOffice();
+    else if (section === 'body') drawNeeds();
     else if (section === 'review') drawReview();
     else drawTree();
   }
@@ -1665,6 +1723,90 @@
     Confectioner can bake nothing at all yet, so the server sends why and
     this draws it. Every one of those sentences is the server's.
   */
+  /*
+    THE BODY PAGE (#1631).
+
+    What /needs used to say in the chat, which nobody types any more: the four
+    meters and their bands, where you are resting, the warmth with what sets
+    it, and what the server counts as worn. It was written for finding out
+    whether the warmth is broken (23 September), and that question needs the
+    target, the place the server believes you are in, whether it sees a
+    fire, and what it thinks you are wearing, so all of it is here.
+
+    Everything on it is the server's, under mine.body, as of the last time
+    the panel arrived: K asks for it outright as it opens. Read again asks
+    once more, through 'skills:refresh', the same line the panel sends as it
+    opens. Nothing is picked or sent.
+  */
+  var BAND_WORDS = { fine: 'fine', weary: 'weary', bad: 'bad', spent: 'spent' };
+  var REST_WORDS = {
+    sit: 'sitting', campfire: 'sitting by a fire', rough: 'in a bed nobody can lend you',
+    camp: 'in a bed by a fire', inn: 'in a bed you may use', bed: 'in your own bed', bedroll: 'in a bedroll'
+  };
+  var PLACE_WORDS = {
+    indoors: 'indoors', outdoors: 'out of doors', rain: 'out in the rain', snow: 'out in the snow',
+    water: 'in the water', shallow: 'wading', fire: 'in a fire'
+  };
+
+  function drawNeeds() {
+    var v = bodyView();
+    if (!v) return;
+    var wrap = el('div', 'cards');
+    function meter(name, value, band, extra) {
+      var card = el('div', 'card' + (band && band !== 'fine' ? '' : ' mine'));
+      var nm = el('div', 'name', name);
+      nm.appendChild(el('span', 'tag' + (band && band !== 'fine' ? ' gold' : ''), BAND_WORDS[band] || String(band || '')));
+      card.appendChild(nm);
+      card.appendChild(el('div', 'desc', (Number(value) || 0) + ' of 100.' + (extra ? ' ' + extra : '')));
+      wrap.appendChild(card);
+    }
+    meter('Hunger', v.food, v.foodBand, 'Eating something from your pack fills it.');
+    meter('Thirst', v.drink, v.drinkBand, 'Drinking something from your pack fills it.');
+    meter('Rest', v.rest, v.restBand, v.resting
+      ? 'Resting now, ' + (REST_WORDS[v.resting] || v.resting) + '.'
+      : 'Not resting. Sit down or lie down and it fills.');
+
+    var t = Number(v.temp) || 0, to = Number(v.tempTarget) || 0;
+    var card = el('div', 'card' + (v.tempBand && v.tempBand !== 'fine' ? '' : ' mine'));
+    var nm = el('div', 'name', 'Warmth');
+    nm.appendChild(el('span', 'tag' + (v.tempBand && v.tempBand !== 'fine' ? ' gold' : ''), tempWord(t) + ' ' + t));
+    card.appendChild(nm);
+    card.appendChild(el('div', 'desc',
+      (to > t ? 'Warming toward ' + to + '.' : (to < t ? 'Cooling toward ' + to + '.' : 'Settled at ' + to + '.')) +
+      ' 50 is comfortable.'));
+    var fire = (Number(v.fireAway) >= 0)
+      ? 'a fire ' + Number(v.fireAway) + ' away, worth ' + (Number(v.fireWorth) || 0)
+      : 'no fire in reach';
+    card.appendChild(el('div', 'inn',
+      'You are ' + (PLACE_WORDS[v.place] || 'somewhere the server does not know yet') +
+      (v.roof ? ', under a roof' : ', with no roof') + (v.night ? ', at night' : '') + ', with ' + fire + '. ' +
+      'Weather and height are worth ' + (Number(v.exposure) || 0) + '. ' +
+      'What you are wearing covers ' + (Number(v.cover) || 0) + ' per cent of you.'));
+    var worn = Array.isArray(v.worn) ? v.worn : [];
+    if (!worn.length) {
+      card.appendChild(el('div', 'inn',
+        'The server has no record of anything on you. Whatever you are wearing was handed to your own ' +
+        'game and never reached it, so it cannot count toward warmth. Say so in the dev channel.'));
+    }
+    worn.forEach(function (w) {
+      var row = el('div', 'guest');
+      row.appendChild(el('span', 'who', String((w && w.name) || 'something')));
+      row.appendChild(el('span', 'dim', (w && w.known) ? (Number(w.worth) || 0) + '%' : 'not in the warmth table'));
+      card.appendChild(row);
+    });
+    wrap.appendChild(card);
+
+    var again = el('div', 'card');
+    var line = el('div', 'guest');
+    line.appendChild(el('span', 'who', 'These are the server\'s numbers from when K opened.'));
+    var go = el('span', 'act', 'Read again');
+    go.onclick = function (ev) { ev.stopPropagation(); tell('refresh'); };
+    line.appendChild(go);
+    again.appendChild(line);
+    wrap.appendChild(again);
+    elBody.appendChild(wrap);
+  }
+
   /*
     THE PROPERTY PAGE.
 
@@ -2389,7 +2531,7 @@
     // the tree's own sending, so neither carries a Confirm.
     var showConfirm = cr ? section === 'review'
       : (section !== 'tree' && section !== 'recipes' && section !== 'property' && section !== 'office' &&
-         section !== 'apprentice');
+         section !== 'apprentice' && section !== 'body');
     var shut = closeWord();
     var key = JSON.stringify([line, statusKind, can, label, showConfirm, cr, shut]);
     if (key === footKey) return;
@@ -2439,6 +2581,7 @@
       return 'Press Study in one of the College\'s rooms. Anywhere else, the College says no.';
     }
     if (section === 'office') return 'Each button is checked again by the server, and it answers in the chat.';
+    if (section === 'body') return 'As the server counted it when K opened. Read again asks it now.';
     if (section === 'staff') {
       if (staffWaiting()) return 'Sent. The server is checking.';
       if (markedStaffDescs().length) return 'Unlock sends the staff spells you marked, one staff spell point each.';
