@@ -84,7 +84,7 @@
                     'thornswood-skills.js', 'thornswood-party.js',
                     'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js',
                     'thornswood-repair.js', 'thornswood-treat.js', 'thornswood-maneuvers.js', 'thornswood-ride.js',
-                    'thornswood-afk.js'];
+                    'thornswood-help.js', 'thornswood-afk.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -394,6 +394,24 @@
     already one of ours or the game's.
   */
   const MANEUVER_KEY = iniNumber(ini, 'ManeuverKey', 10);  // 9
+  /*
+    The help panel (#1633): what /help said, as keys and panels, opened
+    without the chat. Patrick's answer on #1633: its own key, on the
+    Controls page, and Help on the K, P and J panels. F7, scan code 65:
+    every letter is already Skyrim's or ours, F1 to F4 are SkyUI's
+    favourite groups (F1 and F2 the client's as well), F5 and F9 save and
+    load, F6 is the client's, F8 the mark and F10 closing Skyrim at
+    creation; tests/test-1633-help-panel.js checks it the way
+    test-mold-key.js checks U.
+  */
+  const HELP_KEY = iniNumber(ini, 'HelpKey', 65);          // F7
+  /*
+    Three keys the help panel names that are read by the voice and emote
+    plugins and not used here: the help says the key as this machine has it.
+  */
+  const TALK_KEY = iniNumber(ini, 'PushToTalk', 47);       // V
+  const VOICE_MODE_KEY = iniNumber(ini, 'VoiceModeKey', 48); // B
+  const WHEEL_KEY = iniNumber(ini, 'WheelKey', 34);        // G
   /* What the prompt calls them. Read off the scan code so a rebind in the ini
      changes the letter on the screen as well as the key that works. */
   function keyName(code) {
@@ -402,7 +420,11 @@
       24: 'O', 25: 'P', 30: 'A', 31: 'S', 32: 'D', 33: 'F', 34: 'G', 35: 'H',
       36: 'J', 37: 'K', 38: 'L', 44: 'Z', 45: 'X', 46: 'C', 47: 'V', 48: 'B',
       49: 'N', 50: 'M',
-      2: '1', 3: '2', 4: '3', 5: '4', 6: '5', 7: '6', 8: '7', 9: '8', 10: '9', 11: '0'
+      2: '1', 3: '2', 4: '3', 5: '4', 6: '5', 7: '6', 8: '7', 9: '8', 10: '9', 11: '0',
+      // The help panel names the chat keys and its own (#1633).
+      28: 'Enter', 53: '/',
+      59: 'F1', 60: 'F2', 61: 'F3', 62: 'F4', 63: 'F5', 64: 'F6', 65: 'F7',
+      66: 'F8', 67: 'F9', 68: 'F10', 87: 'F11', 88: 'F12'
     };
     return letters[code] || ('#' + code);
   }
@@ -415,6 +437,7 @@
   const APPRENTICE_NAME = keyName(APPRENTICE_KEY);
   const LOCK_NAME = keyName(LOCK_KEY);
   const MANEUVER_NAME = keyName(MANEUVER_KEY);
+  const HELP_NAME = keyName(HELP_KEY);
   const TREAT_NAME = keyName(TREAT_KEY);
   const TREAT_SELF_NAME = keyName(TREAT_SELF_KEY);
   /*
@@ -1937,7 +1960,8 @@
     skills: 'thornswoodSkills', party: 'thornswoodParty', journal: 'thornswoodJournal',
     board: 'thornswoodBoard', repair: 'thornswoodRepair', treat: 'thornswoodTreat',
     trade: 'thornswoodTrade', merchant: 'thornswoodMerchant', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
-    afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers', ride: 'thornswoodRide'
+    afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers', ride: 'thornswoodRide',
+    help: 'thornswoodHelp'
   };
 
   T.claimFocus = function (who, on) {
@@ -7892,6 +7916,7 @@
     }
 
     if (e.code === MANEUVER_KEY) { maneuverKeyPressed(); return; }
+    if (e.code === HELP_KEY) { helpKeyPressed(); return; }
 
     // K on a person a Master could take on opens K on them (#1634).
     if (e.code === APPRENTICE_KEY && apprenticePress()) { return; }
@@ -8780,6 +8805,9 @@
     if (what === 'maneuvers:opened') { T.claimFocus('maneuvers', true); return; }
     if (what === 'maneuvers:closed') { T.claimFocus('maneuvers', false); return; }
     if (what === 'maneuvers:ready') { log('the maneuver panel is in'); maneuversToPage(); return; }
+    if (what === 'help:opened') { T.claimFocus('help', true); return; }
+    if (what === 'help:closed') { T.claimFocus('help', false); return; }
+    if (what === 'help:ready') { log('the help panel is in'); helpToPage(); return; }
     if (what === 'trade:opened') { T.claimFocus('trade', true); return; }
     if (what === 'trade:closed') { T.claimFocus('trade', false); return; }
     if (what === 'repair:opened') { T.claimFocus('repair', true); return; }
@@ -9213,6 +9241,52 @@
     }
     maneuversToPage();
     T.js('try{window.thornswoodManeuvers&&window.thornswoodManeuvers.open();}catch(e){}');
+  }
+
+  // ------------------------------------------------------------ the help --
+  /*
+    #1633. Patrick, 4 October: no chat commands for anything people do, and
+    /help was a menu typed into the chat. The help key (HelpKey in
+    Thornswood.ini, F7 by default) opens game/ui/thornswood-help.js, and so
+    does Help on the K, P and J panels, which the page does on its own. The
+    page holds the topics; this hands it the name of every key it mentions,
+    as this machine has them bound, so a rebind on the Controls page is what
+    the help says. E is the game's Activate, wherever that is bound.
+
+    The panel holds the keyboard while it is up, under the 'help' claim, and
+    says when it opens and closes like every other panel; the cap closes it
+    like the rest (CAP_CLOSES). With the panel up the page hears this key
+    and Escape and closes itself.
+  */
+  function helpKeys() {
+    return {
+      help: HELP_NAME, chat: keyName(CHAT_KEY), command: keyName(COMMAND_KEY),
+      skills: keyName(SKILLS_KEY), party: PARTY_NAME, journal: keyName(JOURNAL_KEY),
+      friend: FRIEND_NAME, trade: TRADE_NAME, mute: MUTE_NAME, mold: MOLD_NAME,
+      lock: LOCK_NAME, maneuver: MANEUVER_NAME, talk: keyName(TALK_KEY),
+      voiceMode: keyName(VOICE_MODE_KEY), wheel: keyName(WHEEL_KEY), activate: deliverName()
+    };
+  }
+
+  function helpToPage() {
+    T.js('try{window.thornswoodHelp&&window.thornswoodHelp.setKeys(' +
+         JSON.stringify(helpKeys()) + ');}catch(e){}');
+  }
+
+  /* The help key. With the panel up the page hears it and closes itself, so
+     this sees it only when the panel holds no keyboard; it closes it then
+     too. Not while the chat has the keyboard or one of the game's own menus
+     is up, the same as K. */
+  function helpKeyPressed() {
+    if (claims.chat) { return; }
+    if (T.hasFocus('help')) {
+      T.js('try{window.thornswoodHelp&&window.thornswoodHelp.close();}catch(e){}');
+      return;
+    }
+    const busyNow = busyMenuOpen();
+    if (busyNow) { say('help key seen, but ' + busyNow + ' is open'); return; }
+    helpToPage();
+    T.js('try{window.thornswoodHelp&&window.thornswoodHelp.open();}catch(e){}');
   }
 
   /*

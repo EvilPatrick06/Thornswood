@@ -35,6 +35,24 @@ const CR = String.fromCharCode(13);
 const read = function (p) { return fs.readFileSync(p, 'utf8').split(CR).join(''); };
 
 const gm = read(process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js'));
+/*
+  One topic of the help panel (#1633), as a fresh install reads it: /help's
+  topics moved out of the gamemode into game/ui/thornswood-help.js, each a
+  list of paragraphs made from the key names.
+*/
+function helpTopic(id) {
+  const page = fs.readFileSync(path.join(REPO_DIR, 'game', 'ui', 'thornswood-help.js'), 'utf8')
+    .split(String.fromCharCode(13)).join('');
+  const a = page.indexOf('  var TOPICS = [');
+  const b = a < 0 ? -1 : page.indexOf('\n  ];\n', a);
+  const k = /var keys = (\{[\s\S]*?\});/.exec(page);
+  if (a < 0 || b < 0 || !k) { return ''; }
+  try {
+    const topics = new Function('return ' + page.slice(page.indexOf('[', a), b + 4))();
+    const t = topics.filter(function (x) { return x.id === id; })[0];
+    return t ? t.text(new Function('return ' + k[1])()).join(' ') : '';
+  } catch (e) { return ''; }
+}
 const front = read(process.env.FRONT || path.join(REPO_DIR, 'game', 'plugins', 'thornswood-front.js'));
 const keysCs = read(path.join(REPO_DIR, 'launcher', 'app', 'Keys.cs'));
 const farmerMd = read(path.join(REPO_DIR, 'docs', 'systems', 'classes', 'farmer.md'));
@@ -510,9 +528,10 @@ try {
   const words = (/const WORDS = \[([\s\S]*?)\];/.exec(gm) || [])[1] || '';
   yes('H2 and the server still answers the lines the line and the key send',
       ['/plot', '/claim'].every(function (x) { return words.indexOf("'" + x + "'") !== -1; }));
+  // The help is a panel since #1633: its Work and Land, as a fresh install reads them.
   ['work', 'land'].forEach(function (t) {
-    const said = ((new RegExp("if \\(topic === '" + t + "'[\\s\\S]*?toProfile\\(profileId,([\\s\\S]*?)\\);\\n")).exec(gm) || [])[1] || '';
-    yes('H3 /help ' + t + ' names none of them', said.length > 100 && !/\/(plot|plant|claim)\b/.test(said));
+    const said = helpTopic(t);
+    yes('H3 the help panel\'s ' + t + ' topic names none of them', said.length > 100 && !/\/(plot|plant|claim)\b/.test(said));
   });
   yes('H4 farmer.md tells nobody to type them', !/`\/(plot|plant|claim)`/.test(farmerMd) && /Claim this farm/.test(farmerMd));
   const row = (/Dx\("lockkey",[\s\S]*?ThornIni, "LockKey", 45\)\);/.exec(keysCs) || [''])[0];

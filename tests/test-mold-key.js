@@ -298,6 +298,10 @@ function client(opt) {
     // No press here is 9; test-1386-warrior.js has what it does.
     'const MANEUVER_KEY = iniNumber(iniText, "ManeuverKey", 10);',
     'function maneuverKeyPressed() {}',
+    // The help key (#1633), F7, scan code 65. No press here is F7;
+    // test-1633-help-panel.js has what it does.
+    'const HELP_KEY = iniNumber(iniText, "HelpKey", 65);',
+    'function helpKeyPressed() {}',
     // K on a person a Master could take on (#1634), asked ahead of K. Nobody
     // is looked at here; test-1634-apprentice-gui.js has what it does.
     'const APPRENTICE_KEY = SKILLS_KEY;',

@@ -194,6 +194,10 @@ function rig(opts) {
     // presses. test-1386-warrior.js has what it does.
     'const MANEUVER_KEY = 10;\n' +
     'function maneuverKeyPressed() { }\n' +
+    // The help key (#1633), F7, scan code 65, which nothing here presses.
+    // test-1633-help-panel.js has what it does.
+    'const HELP_KEY = 65;\n' +
+    'function helpKeyPressed() { }\n' +
     // K on a person a Master could take on (#1634), asked ahead of K; nobody
     // is looked at here. test-1634-apprentice-gui.js has what it does.
     'const APPRENTICE_KEY = 37;\n' +

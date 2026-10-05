@@ -24,6 +24,24 @@ const vm = require('vm');
 
 const root = path.join(__dirname, '..');
 const gm = fs.readFileSync(path.join(root, 'game', 'gamemode.js'), 'utf8').replace(/\r/g, '');
+/*
+  One topic of the help panel (#1633), as a fresh install reads it: /help's
+  topics moved out of the gamemode into game/ui/thornswood-help.js, each a
+  list of paragraphs made from the key names.
+*/
+function helpTopic(id) {
+  const page = fs.readFileSync(path.join(root, 'game', 'ui', 'thornswood-help.js'), 'utf8')
+    .split(String.fromCharCode(13)).join('');
+  const a = page.indexOf('  var TOPICS = [');
+  const b = a < 0 ? -1 : page.indexOf('\n  ];\n', a);
+  const k = /var keys = (\{[\s\S]*?\});/.exec(page);
+  if (a < 0 || b < 0 || !k) { return ''; }
+  try {
+    const topics = new Function('return ' + page.slice(page.indexOf('[', a), b + 4))();
+    const t = topics.filter(function (x) { return x.id === id; })[0];
+    return t ? t.text(new Function('return ' + k[1])()).join(' ') : '';
+  } catch (e) { return ''; }
+}
 const page = fs.readFileSync(path.join(root, 'docs', 'systems', 'professions', 'warrior.md'), 'utf8').replace(/\r/g, '');
 
 let pass = 0, fail = 0;
@@ -991,9 +1009,10 @@ const keysCs = fs.readFileSync(path.join(root, 'launcher', 'app', 'Keys.cs'), 'u
   const PW = pw ? new Function('return ' + pw[1])() : [];
   yes('and not one anybody is told about (Patrick, 4 October: no chat commands for what people do)',
     !!pw && PW.indexOf('/maneuver') === -1);
-  const helpWork = slice(gm, "if (topic === 'work' || topic === 'trade' || topic === 'class') {", 'return;');
+  // The help is a panel since #1633: its Work topic, as a fresh install reads it.
+  const helpWork = helpTopic('work');
   yes('the help names the maneuver key, not the line it sends',
-    !!helpWork && helpWork.indexOf('/maneuver') === -1 && /maneuvers open on the maneuver key/.test(helpWork));
+    !!helpWork && helpWork.indexOf('/maneuver') === -1 && /maneuvers open on 9\./.test(helpWork));
   yes('the chat router hands /maneuver to the maneuvers block', /if \(word === '\/maneuver'\) \{[\s\S]{0,400}mvs\.use\(actorId, parts\[1\]\)/.test(gm));
   const reg = gm.split('\n').filter(function (l) { return /^mp\['onPapyrusEvent:OnHit'\]\s*=/.test(l); });
   yes('OnHit is registered once, through guard()', reg.length === 1 && reg[0].indexOf("guard('onPapyrusEvent:OnHit', function") !== -1);

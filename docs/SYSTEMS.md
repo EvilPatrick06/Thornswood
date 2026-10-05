@@ -34,7 +34,8 @@ of these:
   panel of friends and the party;
 - a panel: K for the profession, the class, the skill tree and the
   body, J for journals, group books and every town's notice board, the
-  notice board itself, the trade window, a trader's wares;
+  notice board itself, the trade window, a trader's wares, and the help,
+  on F7 and on Help on the K, P and J panels (#1633);
 - activating the thing itself in the world: E on a board, a driver or
   a trader, lying down in a bed, sitting on a seat;
 - the emote wheel: Sit is a seat on the ground, and a lute, a flute,
