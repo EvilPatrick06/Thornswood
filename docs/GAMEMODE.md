@@ -121,6 +121,17 @@ key in `private\door.json` (`gamemode.js:11364`) and refreshed on a timer
 (`gamemode.js:11060`). `scripts\ops\Set-Door.ps1` sets both. Developer-Guide.md,
 "Who gets into the game", says what it can and cannot keep out.
 
+Turning somebody away (`turnAway`, #1894) is the same as every other end on
+purpose (#1157): the sentence in their chat (`TURNED_AWAY`: not on the list,
+and thornswood.net/join to apply; on the dev server, that it is for staff and
+to play from the Thornswood launcher instead), the same sentence as
+`{ end }` on their line so their game closes its own connection and goes back
+to the character choice with it, and the kick five seconds later, the join
+pass refusal's wait, for a game that does not close itself. Somebody off the
+list because they are banned or their character is dead for good (the `bans`
+and `pk` in the same `allowed.json`) is left to the staff block's ban sweep,
+which ends the session with the ban and its reason.
+
 ## Professions, benches and BENCH_ACCESS
 
 The rulebook is `TABLE` in progression (`gamemode.js:12361`). Stations ask
