@@ -81,15 +81,16 @@ spend into a second mint.
 
 The lore is on the site. An admin writes the remnant roll with
 `/remnant add` once the application is accepted, and `/remnant remove`.
-Only somebody on it makes the Thalmor robes, boots, gloves and hood and
-the Justiciar weapons, and the world does not hand them out. The robes
-are not race locked, as the race page says.
+Those are staff commands, and the person named is told in their own
+chat. Only somebody on the roll makes the Thalmor robes, boots, gloves
+and hood and the Justiciar weapons, and the world does not hand them
+out. The robes are not race locked, as the race page says.
 
 A character wearing any of those pieces, or the game's own Thalmor
-robes, reads Thalmor to the server, and `/remnant` tells the person
-wearing them so. Nothing else acts on that yet: guards do not attack on
-sight, because most of them are still the game's own actors and the
-server does not run their AI.
+robes, reads Thalmor to the server. Nothing acts on that yet: guards do
+not attack on sight, because most of them are still the game's own
+actors and the server does not run their AI. The server knows no item
+that is a Dominion flag, so a flag is not read yet.
 
 No patrol is spawned by the server yet. Every actor the server stands
 up goes through the shared NPC population and its runtime, and the

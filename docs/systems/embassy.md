@@ -80,18 +80,19 @@ captain variants are not made. Their references are in
 
 ## Where this is
 
-The Accord is on the site. Which building in Solitude is the embassy
-is not settled yet, so none is until an admin opens its door and says
-`/embassy here`. From then on `/claim` at its doors answers that
-the embassy is held, a deed presented there takes nothing, and a
-steward's `/evict` there is refused. A building somebody holds is not
-taken that way: the steward ends that claim first.
+The Accord is on the site. This page names no building, so the server
+holds the one suggested on #1390 until the embassy is named: the
+Abandoned Warehouse in Solitude. Its doors start held. `/claim` at them
+answers that the embassy is held, a deed presented there takes nothing,
+and a steward's `/evict` there is refused. A claim somebody made on it
+before is still theirs until it lapses or a steward ends it.
 
-An admin writes the roll: `/embassy add` a name, with `armed` to mark
-them, and `arm`, `disarm` and `remove`. The 21st name is refused and
-the 7th armed mark is refused, whatever the file on the server says.
-`/embassy` tells anybody whether they are on it. The Ambassador is
-still a title and not a command.
+An admin writes the roll with `/embassy`, a staff command: `add` a
+name, with `armed` to mark them, and `arm`, `disarm` and `remove`. The
+21st name is refused and the 7th armed mark is refused, whatever the
+file on the server says. The person named is told in their own chat
+each time, and nobody else types anything. The Ambassador is still a
+title and not a command.
 
 Solitude's box and board are the hold's, and nothing makes one for the
 embassy. Imperial and Penitus gear is made only by somebody on the
