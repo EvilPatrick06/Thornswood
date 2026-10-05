@@ -50,8 +50,9 @@ function yes(what, cond) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/* A port nobody is on right now. Several harnesses in this folder use fixed
-   ports, and two of them share one, so this one asks the machine instead. */
+/* A port nobody is on right now, from the machine. Builds run side by side on
+   the VPS, so a fixed number can be another run's (#1703). Nothing is asked
+   of it until this run's service has said it is listening there. */
 function freePort() {
   return new Promise((done) => {
     const s = net.createServer();
@@ -59,6 +60,35 @@ function freePort() {
       const p = s.address().port;
       s.close(() => done(p));
     });
+  });
+}
+
+/* Waits for srv's own "listening on ...:port" line. If it stops first,
+   something took the port in between or it could not start, and the error
+   says which, with what it printed. */
+function listening(srv, port) {
+  return new Promise((ok, bad) => {
+    let out = '';
+    const said = (d) => {
+      out += d;
+      const m = /\[voice\] listening on \S+:(\d+)/.exec(out);
+      if (m && Number(m[1]) === port) { end(null); }
+    };
+    const more = (d) => { out += d; };
+    const gone = (code) => end(new Error((/EADDRINUSE/.test(out) ? 'something else already holds port ' + port + ', so ' : '') +
+                                         'the voice service stopped (exit ' + code + ') before it was listening. It printed:\n' + out));
+    const late = setTimeout(() => end(new Error('the voice service did not say it was listening on ' + port +
+                                                ' within fifteen seconds. It printed:\n' + out)), 15000);
+    function end(err) {
+      clearTimeout(late);
+      srv.stdout.removeListener('data', said);
+      srv.stderr.removeListener('data', more);
+      srv.removeListener('exit', gone);
+      if (err) { bad(err); } else { ok(); }
+    }
+    srv.stdout.on('data', said);
+    srv.stderr.on('data', more);
+    srv.on('exit', gone);
   });
 }
 
@@ -83,15 +113,13 @@ async function service(range) {
   srv.stderr.on('data', (d) => { log += d; });
 
   const base = 'http://127.0.0.1:' + port;
-  let health = null;
-  for (let i = 0; i < 60 && !health; i++) {
-    try { const r = await fetch(base + '/health'); if (r.ok) { health = await r.json(); } } catch (e) { }
-    if (!health) { await sleep(150); }
-  }
-  if (!health) {
+  await listening(srv, port);
+  const r = await fetch(base + '/health');
+  if (!r.ok) {
     srv.kill();
-    throw new Error('the service never came up. log:\n' + log);
+    throw new Error('the service answered /health with ' + r.status + '. log:\n' + log);
   }
+  const health = await r.json();
 
   const socks = [];
   return {
