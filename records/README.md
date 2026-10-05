@@ -50,8 +50,40 @@ read it (issue #440, phase 8):
   breasts, the seat, the genitals or the nipples (#1004) or takes the
   underwear off (#405), and Ship stops after a change until the files are
   built again.
+- `most-online.json`: the most people in the world at once (`people`) and
+  the seats over it that only the Discord staff roles may take
+  (`staffSeats`), with Patrick's decisions in its `note` (issue #481).
+  `scripts\deploy\MaxOnline.ps1` reads it for Deploy-Gamemode,
+  Deploy-DevGamemode, Publish-Server and Publish-Update, and `site\server.js`
+  reads `people` when the site runs from the repository. No script writes
+  this one: it is changed by hand in a pull request, then each server is
+  deployed and a Ship carries it to the feed.
 - `signing\`: the code signing setup, with its own README. On since
   27 September: Ship refuses a launcher that is not signed (Developer-Guide.md).
+
+## Provenance notes
+
+Each of these says how one engine build was made when it was not a plain
+build of the pinned commit: which files were built again, which kept the
+bytes of an earlier build and why that is the same source, and what was run
+to check it. They are evidence for the records above at the commit each
+names. No script reads them. `THIRD-PARTY.md` and
+`site\data\site\credits.md` point at the one behind the current pin.
+
+- `client-provenance-e84a91f1.md`, `client-provenance-663686af.md`,
+  `client-provenance-6725fc77.md` and `client-provenance-df2ae1f1.md`: the
+  six client files at those fork commits (30 September to 2 October).
+- `creation-clothes-provenance.md`: the client and SkyrimPlatformImpl.dll
+  built for the starting clothes in character creation (fork commit
+  75cb6ca1, 3 October).
+- `merchant-runtime-provenance.md`: the server module built for merchant
+  settlement, and why the six client files kept their ac044a49 bytes (fork
+  commit 0460584e, 4 October).
+
+`client-inputs-e84a91f1.json`, the hashes of the cached build inputs behind
+`client-provenance-e84a91f1.md`, was removed on 5 October (issue #1347):
+nothing read it, the engine has been pinned to other commits since, and it
+named folders on the machine that built it. It is in the history at 9e4ba70.
 
 Change a record only by running the script that writes it, in the same pull
 request as the build or the fork commit it describes.

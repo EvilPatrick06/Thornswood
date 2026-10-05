@@ -69,9 +69,10 @@ class Perms(object):
     """
     Everything thread_block asks about, all allowed.
 
-    Managing threads is not, because is_staff asks the same channel about the
-    person sending, and they are a newcomer: the one ticket at a time limit
-    applies to them as it would to anybody.
+    Managing threads is not. The person sending is a newcomer, and the one
+    ticket at a time limit applies to them as it would to anybody. is_staff
+    reads only their roles since #1342, so this would not make them staff
+    either way.
     """
     view_channel = True
     send_messages = True

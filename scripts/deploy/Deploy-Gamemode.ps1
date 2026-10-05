@@ -138,10 +138,12 @@ param(
     #>
     [long[]]$Devs        = @(),
     [long[]]$Playtesters = @(),
-    # thornswoodRequirePass for the live server (#937): on ends a session that
-    # shows no join pass from an up to date launcher, off only logs WOULD
-    # REFUSE. Left off, the built settings keep what they have. Live goes on
-    # only when Patrick says Main.
+    # thornswoodRequirePass for the live server (#937, #410): on holds a
+    # session until its join pass arrives, off lets it act meanwhile, and a
+    # session with no pass is ended at three minutes either way. Left off, the
+    # built settings keep what they have, and Deploy-Server.ps1 refuses a
+    # server left with neither true nor false, because the gamemode reads that
+    # as on (#1319). Live goes on only when Patrick says Main.
     [ValidateSet('', 'on', 'off')]
     [string]$RequirePass = '',
     # Deploy even though the collection installed here is behind the one
@@ -583,7 +585,15 @@ $s | Add-Member -NotePropertyName thornswoodServer -NotePropertyValue 'main' -Fo
 if ($RequirePass) {
     $s | Add-Member -NotePropertyName thornswoodRequirePass -NotePropertyValue ($RequirePass -eq 'on') -Force
 }
-Write-Host ("  join pass: {0}" -f $(if ($s.thornswoodRequirePass -eq $true) { 'required' } else { 'watched only, nobody refused' })) -ForegroundColor DarkGray
+# The hold as the gamemode reads it: off only for false (#1319). Every session
+# needs a pass either way (#937).
+if ($s.PSObject.Properties.Name -contains 'thornswoodRequirePass' -and $s.thornswoodRequirePass -is [bool]) {
+    Write-Host ("  join pass: the hold is {0}" -f $(if ($s.thornswoodRequirePass) { 'on' } else { 'off' })) -ForegroundColor DarkGray
+} elseif ($s.PSObject.Properties.Name -contains 'thornswoodRequirePass') {
+    Write-Host '  join pass: thornswoodRequirePass in this build is neither true nor false, which Deploy-Server.ps1 refuses (#1319). -RequirePass on or off writes one.' -ForegroundColor Yellow
+} else {
+    Write-Host '  join pass: not in this build, so Deploy-Server.ps1 keeps the live server''s own, and refuses one with neither true nor false (#1319).' -ForegroundColor DarkGray
+}
 # Server-simulated NPCs. Off is SkyMP's default and it is the old multiplayer
 # mod's behaviour we are leaving behind: everyone gets their own private copy of every
 # bandit. On means one shared world. npcSettings stays empty, which is "no

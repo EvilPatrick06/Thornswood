@@ -212,10 +212,13 @@ yes('Rotate-BotToken.ps1, Set-DiscordLogin.ps1 and Install-Bot.ps1 all hand the 
 
 // ------------------------------------------------------------------- the voice ---
 const vk = row(/voice/i) || ['', '', '', ''];
-yes('the voice key row says not enforced unless -Auth on', /\*\*not enforced\*\*/i.test(vk[2]) && /-Auth on/.test(vk[2]));
-yes('the voice service still defaults to log and keeps its key in token-key.txt',
-    /THORNSWOOD_VOICE_AUTH \|\| 'log'/.test(voice) && /'token-key\.txt'/.test(voice));
-yes('Install-Voice.ps1 still defaults -Auth to log', /\[string\]\$Auth\s+= 'log'/.test(installVoice));
+// Since #1303 and #1315 the key is enforced: no setting lets an unproven join
+// in, and nothing is minted without the site's yes.
+yes('the voice key row says it is enforced, and no longer that it is not',
+    /\bEnforced\b/.test(vk[2]) && !/\*\*not enforced\*\*/i.test(vk[2]) && !/-Auth on/.test(vk[2]));
+yes('the voice service reads no auth setting and keeps its key in token-key.txt',
+    !/process\.env\.THORNSWOOD_VOICE_AUTH/.test(voice) && /'token-key\.txt'/.test(voice));
+yes('Install-Voice.ps1 has no -Auth to turn it off with', !/\[string\]\$Auth\b/.test(installVoice));
 
 // ---------------------------------------------------------------- the VPS key ---
 // The row used to say "Setup-SshKey.ps1 -KeyOnly makes a new key". It does not

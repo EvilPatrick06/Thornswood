@@ -27,9 +27,13 @@
                                    are not the server's (#402); off only warns
 
     .\Deploy-DevGamemode.ps1 -RequirePass on
-                                   the same, and end a session that shows no
-                                   join pass from an up to date launcher
-                                   (#937); off only logs WOULD REFUSE
+                                   the same, and hold a session until its
+                                   join pass arrives (#410); off lets it act
+                                   meanwhile. A session with no pass is ended
+                                   at three minutes either way (#937). A dev
+                                   server whose settings hold neither true
+                                   nor false is refused until this says which
+                                   (#1319)
 
     .\Deploy-DevGamemode.ps1 -Npcs off
                                    the same, with no NPCs kept alive by the
@@ -157,9 +161,11 @@ param(
   # tells the person and logs WOULD REFUSE. Left off, the box keeps what it has.
   [ValidateSet('', 'on', 'off')]
   [string]$LoadOrderRefuse = '',
-  # thornswoodRequirePass in the dev settings (#937): on ends a session that
-  # shows no join pass from an up to date launcher; off only logs WOULD
-  # REFUSE. Left off, the box keeps what it has.
+  # thornswoodRequirePass in the dev settings (#937, #410): on holds a session
+  # until its join pass arrives, off lets it act meanwhile, and a session with
+  # no pass is ended at three minutes either way. Left off, the box keeps what
+  # it has, and a box with neither true nor false is refused before anything
+  # is sent, because the gamemode reads that as on (#1319).
   [ValidateSet('', 'on', 'off')]
   [string]$RequirePass = '',
   # npcEnabled in the dev settings (#385): on keeps every NPC in the world
@@ -587,6 +593,7 @@ if (-not $PutBack) {
   $made = @(Remote @"
 `$s = Get-Content '$rootWin\server-settings.json' -Raw | ConvertFrom-Json
 if ([int]`$s.port -eq 7777) { 'REFUSING: $rootWin is on port 7777, which is the live server'; exit 9 }
+if (-not '$RequirePass' -and -not (`$s.thornswoodRequirePass -is [bool])) { 'NO PASS SWITCH'; exit 8 }
 Get-ChildItem -LiteralPath '$rootWin' -Directory -Force -EA SilentlyContinue |
   Where-Object { `$_.Name -like '.stage-*' } |
   ForEach-Object { Remove-Item -LiteralPath `$_.FullName -Recurse -Force -EA SilentlyContinue }
@@ -597,6 +604,13 @@ Copy-Item -LiteralPath '$rootWin\server-settings.json' -Destination '$stageWin\s
 "@ | ForEach-Object { "$_".Trim() })
   foreach ($l in $made) { Write-Host "  $l" }
   if ($made -match '^REFUSING') { throw 'Refused: that root is the live server. Nothing was sent or stopped.' }
+  # The gamemode holds every session until its pass arrives unless the switch
+  # is false, so a box with neither true nor false would change what it does
+  # the moment this gamemode reached it, with nobody having asked (#1319).
+  if ($made -contains 'NO PASS SWITCH') {
+    throw ('Refused: thornswoodRequirePass on the dev server is neither true nor false, and the gamemode ' +
+           'reads that as on (#1319). Run again with -RequirePass on or -RequirePass off. Nothing was sent or stopped.')
+  }
   if ($made -notcontains 'STAGE MADE') { throw "could not make $stageWin on the dev box. Nothing was sent or stopped." }
 
   $send = [ordered]@{}
@@ -800,7 +814,7 @@ if ('$LoadOrderRefuse' -and `$s.thornswoodLoadOrderRefuse -ne `$refuse) {
 }
 `$wantPass = `$false
 `$needPass = ('$RequirePass' -eq 'on')
-if ('$RequirePass' -and `$s.thornswoodRequirePass -ne `$needPass) {
+if ('$RequirePass' -and (-not (`$s.thornswoodRequirePass -is [bool]) -or `$s.thornswoodRequirePass -ne `$needPass)) {
   `$wantPass = `$true
   'thornswoodRequirePass moves from ' + `$s.thornswoodRequirePass + ' to ' + `$needPass
 }

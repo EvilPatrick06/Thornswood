@@ -127,3 +127,9 @@ draws its own speaking light.
 Staff `/silence` stops their voice, what they type, the words above
 the head, and the speaking mark for everybody. It does not hide
 their name.
+
+Voice and the text chat need the launcher signed in to Discord. The
+voice service lets a connection in only with a join token, and it
+makes one only when the site says that Discord account owns the
+character. While the site cannot answer, nobody new gets into voice
+or the chat; a connection already in stays in (#1303, #1315).
