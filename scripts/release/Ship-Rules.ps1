@@ -744,7 +744,9 @@ function Test-ShipBethesda([string]$rel) {
 #     Online, enforced ..." and were written into the Steam copy on 14 September
 #     at 15:00 and 14:56, TrueHUD.ini at 14:43 in the same session, all before
 #     Thornswood's first pack (15 September); they were never in a pack, and
-#     reached people through the installer and the dev records. Community
+#     reached people through the installer and the dev records. The launcher
+#     takes what the dev records handed out back out of Thornswood's own
+#     folder while it is still those bytes (Leaks.cs, #1252). Community
 #     Shaders' SettingsUser.json was written on 19 September at the end of its
 #     first time setup on one machine (FirstTimeSetupCompleted, one effect off
 #     at boot, beside a window layout for a 2560x1440 screen), rode in one dev
