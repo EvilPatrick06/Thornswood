@@ -74,13 +74,15 @@ const MB = (n) => (n / 1048576).toFixed(2) + ' MB';
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-backpressure-'));
 fs.copyFileSync(SERVER, path.join(dir, 'voice-server.js'));
 fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
-// Every join proves itself since #1303, so this harness signs its own join
-// tokens with a key it puts beside its copy of the service.
+// Every connection proves itself since #1303, so this harness signs its own
+// join tokens with a key it puts beside its copy of the service. One token
+// opens one connection and goes with the handshake since #1337 and #1322.
 const KEY = crypto.randomBytes(32).toString('hex');
 fs.writeFileSync(path.join(dir, 'token-key.txt'), KEY);
 function tokenFor(pid) {
-  const body = String(pid) + '.' + String(Date.now() + 3600000);
-  return 'v1.' + body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
+  const body = 'v2.' + pid + '.' + Date.now() + '.' + crypto.randomBytes(16).toString('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 try { fs.mkdirSync(path.join(dir, 'public')); } catch (e) { }
@@ -247,8 +249,9 @@ function feed() {
 
 const opened = [];
 /* The handshake by hand, so the frames underneath can be read, and so a
-   socket can be left paused, which is a machine that has stopped reading. */
-function open() {
+   socket can be left paused, which is a machine that has stopped reading.
+   pid is who it joins as, since the token goes with the handshake. */
+function open(pid) {
   return new Promise((resolve, reject) => {
     const key = crypto.randomBytes(16).toString('base64');
     const s = net.connect(PORT, '127.0.0.1', () => {
@@ -257,6 +260,7 @@ function open() {
               'Upgrade: websocket\r\n' +
               'Connection: Upgrade\r\n' +
               'Sec-WebSocket-Key: ' + key + '\r\n' +
+              'Sec-WebSocket-Protocol: thornswood, ' + tokenFor(pid) + '\r\n' +
               'Sec-WebSocket-Version: 13\r\n\r\n');
     });
     opened.push(s);
@@ -375,7 +379,7 @@ yes('only the roster is sent newest-only',
     check below would be measuring nothing.
   */
   // Somebody whose link keeps up.
-  const R = await open();
+  const R = await open(100000);
   let roster = [];
   const got = [];
   // The largest position message it was sent, which is how much one tick
@@ -387,11 +391,11 @@ yes('only the roster is sent newest-only',
     if (m.t === 'pos' || m.t === 'moved') { got.push(Date.now()); posBytes = Math.max(posBytes, JSON.stringify(m).length); }
     if (m.t === 'chat') heard.push(m);
   });
-  send(R, { t: 'join', profileId: 100000, name: 'keeps up', token: tokenFor(100000) });
+  send(R, { t: 'join', profileId: 100000, name: 'keeps up' });
 
   // Somebody who has stopped reading. Joined, then never read again.
-  const S = await open();
-  send(S, { t: 'join', profileId: 100001, name: 'never reads', token: tokenFor(100001) });
+  const S = await open(100001);
+  send(S, { t: 'join', profileId: 100001, name: 'never reads' });
 
   /*
     Wait for it to back up. The loopback buffers take the first couple of MB,
@@ -464,10 +468,10 @@ yes('only the roster is sent newest-only',
   const BURST = 60;
   const markR = probes.length;
   const baseQueue = probes.length ? probes[probes.length - 1].queue : 0;
-  const crowd = await Promise.all(Array.from({ length: BURST }, () => open()));
+  const crowd = await Promise.all(Array.from({ length: BURST }, (_, i) => open(200000 + i)));
   crowd.forEach((c, i) => {
     read(c, () => { });
-    send(c, { t: 'join', profileId: 200000 + i, name: ('Somebody passing through ' + i + ' ').padEnd(40, 'x'), token: tokenFor(200000 + i) });
+    send(c, { t: 'join', profileId: 200000 + i, name: ('Somebody passing through ' + i + ' ').padEnd(40, 'x') });
   });
   const full = await until('full', () => roster.length === BURST + 2, 5000);
   const stays = crowd[0];
@@ -519,8 +523,8 @@ yes('only the roster is sent newest-only',
     reconnect. Signalling is the heaviest of them, so that is what fills it.
   */
   console.log('');
-  const S2 = await open();
-  send(S2, { t: 'join', profileId: 100002, name: 'never reads either', token: tokenFor(100002) });
+  const S2 = await open(100002);
+  send(S2, { t: 'join', profileId: 100002, name: 'never reads either' });
   // Found by profile, not by name: every join is proven since #1303, and a
   // proven one is shown under the name the position feed has for it.
   await until('roster', () => roster.some((p) => p.profileId === 100002), 3000);
@@ -577,8 +581,8 @@ yes('only the roster is sent newest-only',
     loopback buffers take a few MB before anything queues.
   */
   console.log('');
-  const S3 = await open();
-  send(S3, { t: 'join', profileId: 100003, name: 'talks to itself', token: tokenFor(100003) });
+  const S3 = await open(100003);
+  send(S3, { t: 'join', profileId: 100003, name: 'talks to itself' });
   await until('roster', () => roster.some((p) => p.profileId === 100003), 3000);
   const self = (roster.find((p) => p.profileId === 100003) || {}).peer;
   yes('a third stuck socket is in the room', !!self);
@@ -633,8 +637,8 @@ yes('only the roster is sent newest-only',
     still is.
   */
   console.log('');
-  const S4 = await open();
-  send(S4, { t: 'join', profileId: 100004, name: 'pings and never reads', token: tokenFor(100004) });
+  const S4 = await open(100004);
+  send(S4, { t: 'join', profileId: 100004, name: 'pings and never reads' });
   await until('roster', () => roster.some((p) => p.profileId === 100004), 3000);
   const PING = Buffer.from([0x89, 0x80, 0, 0, 0, 0]);   // masked, empty, a zero key
   const PINGS = 1500000;

@@ -15,6 +15,12 @@
 // looked, to both pages, exactly like a quiet room: the service's pings are
 // answered by the browser without the page ever hearing of them.
 //
+// Since #1322 and #1337 a token opens one connection and goes with the
+// handshake, so each try asks for a fresh token first (the launcher's page
+// asks the launcher, the game's overlay asks the front) and a refused token
+// is a handshake that never opens. The fake launcher here answers an ask
+// 300 ms later, as the fetch would.
+//
 // This runs the REAL scripts of launcher/voice-host.html and
 // game/ui/thornswood-chat.js in a sandbox, with a fake socket and a clock this
 // file moves by hand, and replays both halves of that evening. Read only.
@@ -68,12 +74,15 @@ function clock() {
 
 /*
   The socket. open() and refuse() and vanish() are the three things the voice
-  service can do to it; sent is what the page wrote.
+  service can do to it; sent is what the page wrote, token the token it
+  offered with the handshake.
 */
 function sockets() {
   const made = [];
-  function FakeSocket(url) {
+  function FakeSocket(url, protocols) {
     this.url = url; this.readyState = 0; this.sent = []; this.closed = false;
+    this.protocols = protocols || [];
+    this.token = (protocols && protocols[0] === 'thornswood') ? protocols[1] : '';
     made.push(this);
   }
   FakeSocket.prototype.send = function (s) { this.sent.push(JSON.parse(s)); };
@@ -86,8 +95,9 @@ function sockets() {
   FakeSocket.prototype.say = function (obj) { if (this.onmessage) { this.onmessage({ data: JSON.stringify(obj) }); } };
   /* The network is down: it never opens, it just closes. */
   FakeSocket.prototype.fail = function () { this.close(); };
-  /* The service refuses the join, as it does an expired token, and closes. */
-  FakeSocket.prototype.refuse = function (why) { this.open(); this.say({ t: 'denied', why: why }); this.close(); };
+  /* The service refuses the token at the handshake (#1337): 403, and the
+     socket never opens. */
+  FakeSocket.prototype.refuse = function () { this.close(); };
   /* Let in. */
   FakeSocket.prototype.admit = function (peer) { this.open(); this.say({ t: 'welcome', peer: peer, profileId: 7 }); };
   return { FakeSocket: FakeSocket, made: made };
@@ -102,6 +112,10 @@ function hostPage() {
   const s = sockets();
   const posted = [];
   let onMessage = null;
+  // The launcher: every ask for a token is answered 300 ms later, with a
+  // fresh one unless the page's test says the launcher has none to give.
+  let minted = 0;
+  const launcher = { gives: true };
   function FakePc() { this.signalingState = 'stable'; }
   FakePc.prototype.addTrack = function () { };
   FakePc.prototype.addTransceiver = function () { };
@@ -111,7 +125,16 @@ function hostPage() {
     window: {
       chrome: { webview: {
         addEventListener: function (kind, fn) { if (kind === 'message') { onMessage = fn; } },
-        postMessage: function (raw) { posted.push(JSON.parse(raw)); }
+        postMessage: function (raw) {
+          const m = JSON.parse(raw);
+          posted.push(m);
+          if (m.t === 'token') {
+            c.setTimeout(function () {
+              tell(launcher.gives ? { t: 'token', token: 'fresh-' + (++minted) }
+                                  : { t: 'token', token: '', why: 'no answer from the site' });
+            }, 300);
+          }
+        }
       } },
       AudioContext: FakeAudio
     },
@@ -128,7 +151,7 @@ function hostPage() {
   vm.createContext(sandbox);
   vm.runInContext(m[1], sandbox);
   function tell(obj) { onMessage({ data: JSON.stringify(obj) }); }
-  return { clock: c, made: s.made, posted: posted, tell: tell };
+  return { clock: c, made: s.made, posted: posted, tell: tell, launcher: launcher };
 }
 
 {
@@ -136,6 +159,8 @@ function hostPage() {
   p.tell({ t: 'config', host: 'h', port: '1', profileId: 7, name: '', token: 'old',
            base: 'https://example.invalid/voice', socket: 'wss://example.invalid/voice/' });
   yes('the page opens a socket once it is configured', p.made.length === 1);
+  yes('offering the config\'s token with the handshake, after thornswood',
+      p.made[0].protocols[0] === 'thornswood' && p.made[0].token === 'old' && p.made[0].url.indexOf('old') < 0);
 
   /*
     19:09 to 19:39: the network is down, so no try ever opens. Thirty minutes
@@ -152,46 +177,57 @@ function hostPage() {
   yes('thirty minutes offline is a few dozen tries, not hundreds', offline > 10 && offline <= 60);
   yes('and it keeps trying at least once a minute',
       (p.clock.now() - start) / Math.max(1, offline) <= 60000);
+  const tokens = p.made.map((w) => w.token);
+  yes('every try offered a token of its own, none twice (#1322)',
+      tokens.every((t) => !!t) && new Set(tokens).size === tokens.length);
+  yes('each one asked the launcher for first', p.posted.filter((m) => m.t === 'token').length === offline);
 
   /*
-    20:06: back, with a token that expired while the machine slept. The
-    service refuses it. The page must not come straight back with the same
-    token: it tells the launcher, and waits.
+    20:06: back, and the service refuses the token at the handshake. The page
+    must not come straight back, and its next try has a fresh token.
   */
-  // The next try after the network is back, whenever the backoff makes it.
   for (let i = 0; i < 120 && p.made[p.made.length - 1].closed; i++) { p.clock.advance(1000); }
   const refusedAt = p.made.length;
   const w = p.made[p.made.length - 1];
-  w.refuse('an expired token');
-  yes('a refusal is passed to the launcher, which fetches a fresh token',
-      p.posted.some((m) => m.t === 'denied' && /expired/.test(m.text)));
-  p.clock.advance(5000);
-  yes('and the page does not come straight back with the token it was refused',
-      p.made.length === refusedAt);
-
-  // The launcher's fresh token arrives: the page tries at once with it.
-  p.tell({ t: 'token', token: 'fresh' });
-  p.clock.advance(10);
-  yes('a fresh token after a refusal is tried at once', p.made.length === refusedAt + 1);
+  w.refuse();
+  p.clock.advance(500);
+  yes('a refused handshake is not tried again at once', p.made.length === refusedAt);
+  for (let i = 0; i < 120 && p.made.length === refusedAt; i++) { p.clock.advance(1000); }
   const retried = p.made[p.made.length - 1];
+  yes('the next try, after the backoff, offers a fresh token and not the refused one',
+      p.made.length === refusedAt + 1 && !!retried.token && retried.token !== w.token);
   retried.admit(3);
   const join = retried.sent.filter((m) => m.t === 'join')[0];
-  yes('with the fresh token', !!join && join.token === 'fresh');
+  yes('and the join message carries no token', !!join && !('token' in join));
 
   /*
-    Five minutes of a refused token, the old page's 134 tries, with no fresh
-    token ever coming: the backoff alone has to hold it down.
+    Five minutes of refused handshakes, the old page's 134 tries: a fresh
+    token every time, so only the backoff holds it down.
   */
   const q = hostPage();
   q.tell({ t: 'config', host: 'h', port: '1', profileId: 7, name: '', token: 'dead',
            base: 'https://example.invalid/voice', socket: 'wss://example.invalid/voice/' });
   for (let i = 0; i < 300; i++) {
     const last = q.made[q.made.length - 1];
-    if (!last.closed) { last.refuse('an expired token'); }
+    if (!last.closed) { last.refuse(); }
     q.clock.advance(1000);
   }
-  console.log('      five minutes of refusals and no fresh token: ' + q.made.length + ' tries (the old page made 134 in the same five minutes)');
+  console.log('      five minutes of refusals: ' + q.made.length + ' tries (the old page made 134 in the same five minutes)');
   yes('five minutes of refusals is a handful of tries', q.made.length <= 12);
+
+  // The launcher has no token to give: the page waits and asks again, and
+  // never opens a socket without one.
+  const e = hostPage();
+  e.launcher.gives = false;
+  e.tell({ t: 'config', host: 'h', port: '1', profileId: 7, name: '', token: '',
+           base: 'https://example.invalid/voice', socket: 'wss://example.invalid/voice/' });
+  e.clock.advance(5 * 60000);
+  const asks = e.posted.filter((m) => m.t === 'token').length;
+  yes('with no token to be had, nothing is opened', e.made.length === 0);
+  yes('and the launcher is asked again on the backoff, not every moment (' + asks + ' asks in five minutes)', asks >= 3 && asks <= 15);
+  e.launcher.gives = true;
+  e.clock.advance(61000);
+  yes('and once it has one, the page connects with it', e.made.length === 1 && /^fresh-/.test(e.made[0].token));
 
   // Once in, the next loss starts again from about two seconds.
   const r = hostPage();
@@ -201,8 +237,8 @@ function hostPage() {
   r.made[r.made.length - 1].admit(4);
   const n = r.made.length;
   r.made[r.made.length - 1].close();
-  r.clock.advance(2100);
-  yes('once let in, a later loss is retried within two seconds again', r.made.length === n + 1);
+  r.clock.advance(2400);
+  yes('once let in, a later loss is retried within two seconds again, and the token\'s fetch', r.made.length === n + 1);
 
   /*
     #519. Joined, and then nothing: the socket has gone half open. The page
@@ -231,11 +267,19 @@ function chatPage() {
   const c = clock();
   const s = sockets();
   const lines = [];
+  const asks = [];
+  let minted = 0;
+  // The front and the launcher: an ask is answered 300 ms later with a fresh
+  // token, handed in through setToken as the front does.
   const win = {
     THORNSWOOD: { host: 'h', port: 1, profileId: 7, name: 'Tester', token: 't',
                   base: 'https://example.invalid/voice' },
     thornswoodChat: { add: function (parts) { lines.push(parts.map((p) => p.text).join('')); } },
-    skyrimPlatform: { sendMessage: function () { } }
+    skyrimPlatform: { sendMessage: function (to, what) {
+      if (to !== 'thornswood-front' || !/^token\? /.test(String(what))) { return; }
+      asks.push(what);
+      c.setTimeout(function () { win.thornswoodNet.setToken('c-' + (++minted)); }, 300);
+    } }
   };
   const sandbox = {
     window: win, WebSocket: s.FakeSocket,
@@ -246,7 +290,7 @@ function chatPage() {
   };
   vm.createContext(sandbox);
   vm.runInContext(src, sandbox);
-  return { clock: c, made: s.made, lines: lines, net: win.thornswoodNet };
+  return { clock: c, made: s.made, lines: lines, net: win.thornswoodNet, asks: asks };
 }
 
 {
@@ -264,17 +308,22 @@ function chatPage() {
       ws.closed && p.lines.some((l) => /lost the server/.test(l)));
   p.clock.advance(3000);
   yes('and it tries again', p.made.length === 2);
+  yes('having asked the front for a token of its own, for its character', p.asks[0] === 'token? 7');
+  yes('and offers that one, not the one it spent', p.made[1].token === 'c-1' && p.made[0].token === 't');
 
-  // A refused join opens and closes at once; that must not reset the backoff.
+  // A refused handshake never opens; a fresh token each time, and the
+  // backoff holds it down.
   const q = chatPage();
   for (let i = 0; i < 300; i++) {
     const last = q.made[q.made.length - 1];
-    if (!last.closed) { last.refuse('an expired token'); }
+    if (!last.closed) { last.refuse(); }
     q.clock.advance(1000);
   }
+  const qt = q.made.map((w) => w.token);
   console.log('      chat overlay, five minutes of refusals: ' + q.made.length +
               ' tries (it reset its backoff on every open, so a refused join came back every second)');
   yes('the chat overlay does not retry a refused join every second', q.made.length <= 25);
+  yes('and never offers one token twice', new Set(qt).size === qt.length);
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

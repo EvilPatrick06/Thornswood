@@ -45,15 +45,19 @@ $fake = [ordered]@{
     'discord-bot-token' = 'M' + ('T' * 23) + '.' + ('G' * 6) + '.' + ('Fake' * 8)
     'github-token'      = 'ghp' + '_' + ('Fake' * 9)
     'private-key'       = '-----BEGIN ' + 'OPENSSH PRIVATE KEY-----'
-    'voice-join-token'  = 'v1' + '.42.' + '1790000000000' + '.' + ('Fake' * 10) + 'FAK'
+    # The shape the service makes since #1322; the v1 one is $fakeV1 below.
+    'voice-join-token'  = 'v2' + '.42.' + '1790000000000' + '.' + ('Fake' * 5) + 'FK' + '.' + ('Fake' * 10) + 'FAK'
     'aws-access-key'    = 'AKIA' + ('FAKE' * 4)
     'slack-token'       = 'xoxb' + '-' + ('0' * 12) + '-fake'
     'google-api-key'    = 'AIza' + ('Fake' * 8) + 'FAK'
 }
 
+# The hour long join token from before #1322, which nine packs carried.
+$fakeV1 = 'v1' + '.42.' + '1790000000000' + '.' + ('Fake' * 10) + 'FAK'
+
 # True when the output carries any planted value, or the tail of one.
 function Test-Leaks([string]$out) {
-    foreach ($v in $fake.Values) {
+    foreach ($v in @($fake.Values) + $fakeV1) {
         if ($out.Contains($v)) { return $true }
         if ($out.Contains($v.Substring($v.Length - 12))) { return $true }
     }
@@ -138,6 +142,7 @@ try {
     foreach ($k in $fake.Keys) {
         Write-Utf8 (Join-Path $tree ('notes\' + $k + '.txt')) ("line one`nline two`nsee " + $fake[$k] + " here`n")
     }
+    Write-Utf8 (Join-Path $tree 'notes\voice-join-token-v1.txt') ("line one`nline two`nsee " + $fakeV1 + " here`n")
     # Something untracked is never opened: the tree is what git tracks.
     Write-Utf8 (Join-Path $tree 'loose\unadded.txt') ($fake['discord-webhook'] + "`n")
     Invoke-Git $tree @('add', 'notes')
@@ -147,6 +152,7 @@ try {
     foreach ($k in $fake.Keys) {
         yes ("rule $k names the file and line 3") ($r.Out.Contains('notes/' + $k + '.txt:3  ' + $k))
     }
+    yes 'and the older v1 join token shape is still voice-join-token' ($r.Out.Contains('notes/voice-join-token-v1.txt:3  voice-join-token'))
     yes 'no planted value, or the tail of one, is in the output' (-not (Test-Leaks $r.Out))
     yes 'a file git does not track is not read' (-not $r.Out.Contains('unadded'))
 

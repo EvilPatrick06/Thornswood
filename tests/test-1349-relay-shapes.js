@@ -96,9 +96,9 @@ function listening(srv, port) {
   });
 }
 
-function socket(port) {
+function socket(port, pid) {
   return new Promise((ok) => {
-    const ws = new WebSocket('ws://127.0.0.1:' + port + '/');
+    const ws = new WebSocket('ws://127.0.0.1:' + port + '/', ['thornswood', tokenFor(pid)]);
     const got = [];
     ws.onmessage = (e) => { try { got.push(JSON.parse(e.data)); } catch (x) { } };
     ws.onopen = () => ok({ ws: ws, got: got, send: (o) => ws.send(JSON.stringify(o)) });
@@ -110,12 +110,14 @@ const C = String.fromCharCode;
 /*
   Every join proves itself with a token (#1303), so this signs its own with
   a key it puts beside its copy of the service, the way voice-server.js
-  signs them.
+  signs them. One token opens one connection and goes with the handshake,
+  after 'thornswood' (#1337, #1322).
 */
 const KEY = crypto.randomBytes(32).toString('hex');
 function tokenFor(pid) {
-  const body = String(pid) + '.' + String(Date.now() + 3600000);
-  return 'v1.' + body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
+  const body = 'v2.' + pid + '.' + Date.now() + '.' + crypto.randomBytes(16).toString('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 const BAD = new RegExp('[' + C(0) + '-' + C(0x1f) + C(0x7f) + '-' + C(0x9f) + C(0x61c) + C(0x200e) + C(0x200f) +
@@ -139,11 +141,11 @@ const keys = (o) => Object.keys(o || {}).sort().join(',');
 
   console.log('#1349, a hostile name:');
   const HOSTILE = 'Bob' + C(0x202e) + C(7) + '\n[voice] REFUSED a join for profile 1: forged' + C(0x2028);
-  const watcher = await socket(PORT);
-  watcher.send({ t: 'join', profileId: 20, name: 'S' + C(0xf6) + 'lvi Two-Feather\'s', token: tokenFor(20) });
+  const watcher = await socket(PORT, 20);
+  watcher.send({ t: 'join', profileId: 20, name: 'S' + C(0xf6) + 'lvi Two-Feather\'s' });
   await wait(150);
-  const bob = await socket(PORT);
-  bob.send({ t: 'join', profileId: 21, name: HOSTILE, token: tokenFor(21) });
+  const bob = await socket(PORT, 21);
+  bob.send({ t: 'join', profileId: 21, name: HOSTILE });
   await wait(200);
   const roster = watcher.got.filter((m) => m.t === 'peers').pop();
   const bobRow = roster && roster.peers.find((p) => p.profileId === 21);
@@ -171,10 +173,10 @@ const keys = (o) => Object.keys(o || {}).sort().join(',');
   yes('the gamemode reads no name off a command', !/\bcmd\.name\b/.test(gm) && /function dispatch\(cmd\)/.test(gm));
 
   console.log('\n#1350, signalling:');
-  const one = await socket(PORT), two = await socket(PORT);
-  one.send({ t: 'join', profileId: 31, name: 'One', token: tokenFor(31) });
+  const one = await socket(PORT, 31), two = await socket(PORT, 32);
+  one.send({ t: 'join', profileId: 31, name: 'One' });
   await wait(100);
-  two.send({ t: 'join', profileId: 32, name: 'Two', token: tokenFor(32) });
+  two.send({ t: 'join', profileId: 32, name: 'Two' });
   await wait(200);
   const oneId = (one.got.find((m) => m.t === 'welcome') || {}).peer;
   const twoId = (two.got.find((m) => m.t === 'welcome') || {}).peer;

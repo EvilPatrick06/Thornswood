@@ -318,10 +318,16 @@ function chatPage() {
     this.readyState = 3;
     if (this.onclose) { this.onclose(); }
   };
+  // The front, which answers the page's ask for a join token (#1322) a
+  // moment later, the way the launcher's fetch does, as a timer here.
+  let minted = 0;
   const win = {
     THORNSWOOD: { host: 'voice.test', port: 7778, profileId: 7, name: 'Traveller', token: 't' },
     thornswoodChat: { add: function (parts) { notes.push(parts.map(function (r) { return r.text; }).join('')); } },
-    skyrimPlatform: { sendMessage: function () { } }
+    skyrimPlatform: { sendMessage: function (to, what) {
+      if (to !== 'thornswood-front' || String(what).indexOf('token? ') !== 0) { return; }
+      timers.push(function () { win.thornswoodNet.setToken('front-' + (++minted)); });
+    } }
   };
   const box = {
     window: win, WebSocket: Sock, console: { log: function () { } },
@@ -340,7 +346,14 @@ function chatPage() {
       s.readyState = 1; s.onopen(); s.onmessage({ data: JSON.stringify({ t: 'welcome', peer: 3 }) });
     },
     drop: function () { const s = sockets[sockets.length - 1]; s.close(); },
-    retry: function () { const t = timers.splice(0); t.forEach(function (fn) { fn(); }); },
+    // The next try: timers run until it has opened a socket, since a try with
+    // no token asks the front first and goes when the answer comes (#1322).
+    retry: function () {
+      const before = sockets.length;
+      for (let i = 0; i < 5 && sockets.length === before; i++) {
+        const t = timers.splice(0); t.forEach(function (fn) { fn(); });
+      }
+    },
     count: function (text) { return notes.filter(function (n) { return n === text; }).length; },
     chatSent: function (s) { return s.sent.filter(function (m) { return m.t === 'chat'; }).map(function (m) { return m.text; }); }
   };

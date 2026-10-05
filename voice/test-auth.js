@@ -12,6 +12,11 @@
   THORNSWOOD_SITE all get 503 and no token. Since #1303 a join that cannot
   prove itself is refused whatever THORNSWOOD_VOICE_AUTH says; the service
   here is started with it set to off to show it is not read.
+
+  Since #1337 and #1322 the token goes with the handshake, as the second of
+  the protocols offered after 'thornswood', and opens that one connection:
+  without one the handshake is answered 403 and never becomes a socket, and
+  a token that has opened a connection opens no other.
 */
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -42,19 +47,45 @@ function check(what, got, want) {
   ok ? pass++ : fail++;
 }
 
-const sign = (profileId, until) => {
+const b64url = (b) => b.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const mac = (key, body) => b64url(crypto.createHmac('sha256', key).update(body).digest());
+// A token as the service makes them, minted at a time of this file's choosing.
+const sign = (profileId, minted, key) => {
+  const body = 'v2.' + profileId + '.' + minted + '.' + b64url(crypto.randomBytes(16));
+  return body + '.' + mac(key || KEY, body);
+};
+// The hour long kind from before #1322, signed with the right key.
+const signV1 = (profileId, until) => {
   const body = String(profileId) + '.' + String(until);
-  const mac = crypto.createHmac('sha256', KEY).update(body).digest('base64')
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  return 'v1.' + body + '.' + mac;
+  return 'v1.' + body + '.' + mac(KEY, body);
 };
 
 const post = (route, body, port) => fetch('http://127.0.0.1:' + (port || PORT) + route, {
   method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
 });
 
-// What a join that cannot prove itself gets, whatever any setting says (#1303).
-function refused(why) { return { t: 'denied', why: why }; }
+/*
+  A handshake by hand, so what the service answers a refused one can be read:
+  { status, protocol, body }. 101 is a connection; anything else is not.
+*/
+function handshake(protocols, port) {
+  return new Promise((ok) => {
+    const headers = { Connection: 'Upgrade', Upgrade: 'websocket', 'Sec-WebSocket-Version': '13',
+                      'Sec-WebSocket-Key': crypto.randomBytes(16).toString('base64') };
+    if (protocols != null) headers['Sec-WebSocket-Protocol'] = protocols;
+    const req = http.request({ host: '127.0.0.1', port: port || PORT, path: '/', headers: headers, agent: false });
+    req.on('upgrade', (res, socket) => {
+      ok({ status: res.statusCode, protocol: res.headers['sec-websocket-protocol'] || '', body: '' });
+      socket.destroy();
+    });
+    req.on('response', (res) => {
+      let b = ''; res.on('data', (d) => { b += d; });
+      res.on('end', () => ok({ status: res.statusCode, protocol: res.headers['sec-websocket-protocol'] || '', body: b }));
+    });
+    req.on('error', (e) => ok({ status: 0, protocol: '', body: String(e && e.message) }));
+    req.end();
+  });
+}
 
 /*
   The site's half: POST /api/play/owns, answered by the ticket. good owns
@@ -81,20 +112,32 @@ const site = http.createServer((req, res) => {
   });
 });
 
-/* Join, and report what the room said back. 'denied' or the welcome. */
-function join(msg) {
+/*
+  Join the way the pages do: the token offered with the handshake, then the
+  join message. Reports the welcome, or that the connection never opened.
+  With keep, the socket is left open and handed back, so a second use of the
+  same token can be tried while the first is still in the room.
+*/
+function join(token, msg, keep) {
   return new Promise((done) => {
-    const ws = new WebSocket('ws://127.0.0.1:' + PORT + '/');
+    const ws = token == null ? new WebSocket('ws://127.0.0.1:' + PORT + '/')
+                             : new WebSocket('ws://127.0.0.1:' + PORT + '/', ['thornswood', token]);
     let answered = false;
-    const finish = (v) => { if (!answered) { answered = true; try { ws.close(); } catch (e) {} done(v); } };
-    ws.onopen = () => ws.send(JSON.stringify(msg));
+    const finish = (v) => {
+      if (answered) return;
+      answered = true;
+      if (!(keep && v.t === 'welcome')) { try { ws.close(); } catch (e) {} }
+      if (keep) { v.ws = ws; }
+      done(v);
+    };
+    ws.onopen = () => ws.send(JSON.stringify(msg || { t: 'join', profileId: 0, name: 'tester' }));
     ws.onmessage = (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
-      if (m.t === 'denied') return finish({ t: 'denied', why: m.why });
       if (m.t === 'welcome') return finish({ t: 'welcome', profileId: m.profileId });
+      if (m.t === 'denied') return finish({ t: 'denied', why: m.why });
     };
-    ws.onerror = () => finish({ t: 'error' });
-    ws.onclose = () => finish({ t: 'closed with nothing said' });
+    ws.onerror = () => finish({ t: 'refused' });
+    ws.onclose = () => finish({ t: 'refused' });
     setTimeout(() => finish({ t: 'nothing came back' }), 4000);
   });
 }
@@ -143,11 +186,14 @@ function listening(srv, port) {
 }
 let srv = null;
 let bare = null;
+// A moment before the service was started, for a token it cannot know about.
+let startedBefore = 0;
 let log = '';
 let bareLog = '';
 async function ready() {
   await new Promise((ok) => site.listen(0, '127.0.0.1', ok));
   PORT = await freePort('0.0.0.0');
+  startedBefore = Date.now() - 50;
   srv = spawn(process.execPath, ['voice-server.js'], {
     cwd: dir,
     env: Object.assign({}, process.env, {
@@ -204,38 +250,65 @@ async function ready() {
   check('  and says why in its log', /NO TOKEN for profile 4242: THORNSWOOD_SITE is not set/.test(bareLog), true);
 
   console.log('');
-  console.log('WHO GETS IN (#1303), with THORNSWOOD_VOICE_AUTH off on one service and log on the other:');
-  check('a real token joins as its own profile',
-        await join({ t: 'join', profileId: 4242, name: 'tester', token: minted.token }), { t: 'welcome', profileId: 4242 });
+  console.log('WHO GETS IN (#1303, #1337, #1322), with THORNSWOOD_VOICE_AUTH off on one service and log on the other:');
+  check('the token /token hands out is v2, with the profile second',
+        [minted.token.split('.').length, minted.token.split('.')[0], minted.token.split('.')[1]], [5, 'v2', '4242']);
+  check('and is good for two minutes', minted.until - Date.now() > 100000 && minted.until - Date.now() <= 120000, true);
+  const opened = await handshake('thornswood, ' + minted.token);
+  check('a real token opens the connection, and the answer names thornswood and never the token',
+        [opened.status, opened.protocol], [101, 'thornswood']);
+  const t2 = (await (await post('/token', { profileId: 4242, ticket: 'good' })).json()).token;
+  const first = await join(t2, { t: 'join', profileId: 99, name: 'liar' }, true);
+  check('it joins as the token\'s profile, whatever the join message claims', first.t + ' ' + first.profileId, 'welcome 4242');
+  const again = await handshake('thornswood, ' + t2);
+  check('the same token again, while its connection is still open, is refused: it was copied',
+        [again.status, /already used/.test(again.body)], [403, true]);
+  check('  and the service writes that down as a copied token, with when the first use was',
+        /REFUSED a connection for profile 4242: a token that was already used, by another connection at \d{4}-\d\d-\d\dT[\d:.]+Z, so it was copied\. A token opens one connection/.test(log), true);
+  check('  and tells whoever presented it nothing about when', /\d{4}-\d\d-\d\dT/.test(again.body), false);
+  first.ws.send(JSON.stringify({ t: 'join', profileId: 4242, name: 'a second join on the same socket' }));
+  await new Promise((r) => setTimeout(r, 300));
+  const h1 = await (await fetch('http://127.0.0.1:' + PORT + '/health')).json();
+  check('a second join on that connection is not a second person in the room', h1.peers, 1);
+  first.ws.close();
+  await new Promise((r) => setTimeout(r, 300));
+  check('and once that connection has closed, its token still opens nothing',
+        (await handshake('thornswood, ' + t2)).status, 403);
 
-  check('no token at all is refused',
-        await join({ t: 'join', profileId: 4242, name: 'stranger' }), refused('no token'));
-
-  check('somebody else\'s profile in the message loses to the token',
-        await join({ t: 'join', profileId: 99, name: 'liar', token: minted.token }), { t: 'welcome', profileId: 4242 });
-
+  const noTok = await handshake(null);
+  check('no token at all: 403 before any socket, and the reason', [noTok.status, noTok.body.trim()], [403, 'no: no token']);
+  check('thornswood offered with no token: 403', (await handshake('thornswood')).status, 403);
+  const t3 = (await (await post('/token', { profileId: 4242, ticket: 'good' })).json()).token;
+  check('a token offered without thornswood beside it: 403', (await handshake(t3)).status, 403);
+  check('a page that sends its token in the join message, as every page did before, never gets a socket',
+        (await join(null, { t: 'join', profileId: 4242, name: 'an old page', token: t3 })).t, 'refused');
   check('a made up token is refused',
-        await join({ t: 'join', profileId: 4242, token: 'v1.4242.' + (Date.now() + 60000) + '.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' }),
-        refused('a token that does not check out'));
-  check('an expired token is refused, and named as expired',
-        await join({ t: 'join', profileId: 7, token: sign(7, Date.now() - 1000) }),
-        refused('an expired token'));
+        (await handshake('thornswood, v2.4242.' + Date.now() + '.AAAAAAAAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')).body.trim(),
+        'no: a token that does not check out');
   check('a token signed with another key is refused',
-        await join({ t: 'join', profileId: 4242, token: 'v1.4242.' + (Date.now() + 60000) + '.' +
-          crypto.createHmac('sha256', 'a different key').update('4242.' + (Date.now() + 60000)).digest('base64')
-            .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') }),
-        refused('a token that does not check out'));
+        (await handshake('thornswood, ' + sign(4242, Date.now(), 'a different key'))).body.trim(),
+        'no: a token that does not check out');
+  check('an hour long v1 token, signed with the right key, is not read at all',
+        (await handshake('thornswood, ' + signV1(4242, Date.now() + 3600000))).body.trim(),
+        'no: a token that does not check out');
+  check('a token two minutes old is refused, and named as expired',
+        (await handshake('thornswood, ' + sign(7, Date.now() - 121000))).body.trim(), 'no: an expired token');
+  check('a token minted before this copy of the service started is refused, since its spending is not known',
+        (await handshake('thornswood, ' + sign(7, startedBefore))).body.trim(), 'no: a token from before this service started');
+  check('a token signed here a moment ago opens a connection', (await join(sign(7, Date.now()))).t, 'welcome');
+
   const was = PORT;
   PORT = BARE;
-  check('the service with THORNSWOOD_VOICE_AUTH log refuses a join with no token too',
-        await join({ t: 'join', profileId: 4242, name: 'stranger' }), refused('no token'));
+  check('the service with THORNSWOOD_VOICE_AUTH log refuses a handshake with no token too',
+        (await handshake(null)).status, 403);
   PORT = was;
   check('nothing was let in unproven', /UNPROVEN|UNCHECKED/.test(log + bareLog), false);
+  check('no token was ever written to the log', /v[12]\.\d+\.\d{12,14}\./.test(log + bareLog), false);
 
   console.log('');
   console.log('what the service wrote down:');
   for (const line of (log + bareLog).split('\n')) {
-    if (/REFUSED|NO TOKEN|claimed profile/.test(line)) console.log('  ' + line.trim());
+    if (/REFUSED|NO TOKEN|claimed profile|token is for/.test(line)) console.log('  ' + line.trim());
   }
 
   console.log('');

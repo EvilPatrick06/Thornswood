@@ -92,6 +92,19 @@ function listening(srv, port) {
 }
 
 let PORT = 0;
+/*
+  A socket needs a join token of its own, offered with the handshake (#1337,
+  #1322), so this signs them with a key it puts beside its copy of the
+  service; then a 101 is the door letting it in and nothing else.
+*/
+const KEY = crypto.randomBytes(32).toString('hex');
+let nextPid = 1;
+function tokenFor(pid) {
+  const body = 'v2.' + pid + '.' + Date.now() + '.' + crypto.randomBytes(16).toString('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
 /* POST /token, with the sender forwarded the way Caddy writes it, or none. */
 function token(xff) {
   return new Promise((ok) => {
@@ -115,6 +128,7 @@ function knock(xff, hangUp) {
     s.on('connect', () => {
       s.write('GET / HTTP/1.1\r\nHost: 127.0.0.1:' + PORT + '\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n' +
               'Sec-WebSocket-Version: 13\r\nSec-WebSocket-Key: ' + crypto.randomBytes(16).toString('base64') + '\r\n' +
+              'Sec-WebSocket-Protocol: thornswood, ' + tokenFor(nextPid++) + '\r\n' +
               (xff ? 'X-Forwarded-For: ' + xff + '\r\n' : '') + '\r\n');
       if (hangUp) { s.resetAndDestroy(); finish({ status: -1, retry: 0 }); }
     });
@@ -140,6 +154,7 @@ async function many(n, fn) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-1323-'));
   fs.copyFileSync(VOICE, path.join(dir, 'voice-server.js'));
   fs.copyFileSync(path.join(path.dirname(VOICE), 'headlines.js'), path.join(dir, 'headlines.js'));
+  fs.writeFileSync(path.join(dir, 'token-key.txt'), KEY);
   PORT = await freePort('127.0.0.1');
   const srv = spawn(process.execPath, ['voice-server.js'], { cwd: dir,
     env: Object.assign({}, process.env, { THORNSWOOD_VOICE_PORT: String(PORT), THORNSWOOD_VOICE_BIND: '127.0.0.1',

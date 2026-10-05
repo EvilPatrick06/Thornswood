@@ -60,7 +60,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -1025,30 +1025,17 @@ function cleanName(v) {
     .slice(0, 40);
 }
 
-function onJoin(ws, msg) {
+/*
+  profileId is the one the handshake's token proved (#1337): nothing gets a
+  socket to send a join on without one, so there is nothing left to refuse
+  here. A token in the message is not read, and the profileId in it is only
+  compared, so a page that says one thing and proved another is written down.
+*/
+function onJoin(ws, msg, profileId) {
   const claimed = Number(msg.profileId) || 0;
-  const tok = readToken(msg.token);
-  let profileId = 0;
-
-  if (tok && !tok.expired) {
-    // The only line here that decides who somebody is. Note that it reads the
-    // token and not the message, even when the two agree.
-    profileId = tok.profileId;
-    if (claimed && claimed !== profileId) {
-      console.log('[voice] join claimed profile ' + claimed + ' with a token for ' +
-                  profileId + '. The token wins.');
-    }
-  } else {
-    // Refused, whatever any setting says (#1303). THORNSWOOD_VOICE_AUTH log,
-    // which let this in as whatever profile it claimed, was for the one
-    // release the tokens took to go out, and stayed the default after it:
-    // a service started by hand or installed on a new box took anybody's
-    // word for who they were.
-    const why = !msg.token ? 'no token' : (tok && tok.expired ? 'an expired token' : 'a token that does not check out');
-    console.log('[voice] REFUSED a join for profile ' + claimed + ': ' + why);
-    ws.send({ t: 'denied', why: why });
-    try { ws.close(); } catch (e) { }
-    return 0;
+  if (claimed && claimed !== profileId) {
+    console.log('[voice] join claimed profile ' + claimed + ' on a connection whose token is for ' +
+                profileId + '. The token wins.');
   }
 
   const id = nextPeer++;
@@ -1316,9 +1303,11 @@ function isLoopback(req) {
   with nobody's address forwarded, is not counted: the box's own scripts and
   the harnesses.
 
-  The launcher asks for a token when Play is pressed, every thirty minutes,
-  and after a refusal at most every thirty seconds (Voice.cs RenewToken), so
-  twenty a minute is several people behind one address. A page that lost its
+  The launcher asks for a token whenever its voice page or the game's chat
+  is about to connect, since a token opens one connection (#1322): one each
+  when Play is pressed, then one per try after a loss, the tries spaced as
+  below, so twenty a minute is a few people behind one address reconnecting
+  at once. A page that lost its
   socket tries again after one to thirty seconds (thornswood-chat.js) or two
   to sixty (voice-host.html), so sixty sockets a minute is several people
   reconnecting at once. Both are settings, so they can be tuned on the box
@@ -1433,16 +1422,14 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
   So identity comes from a token now, and never from the message. The launcher
   proves who it is to /token with the Discord ticket it already holds, the site
   answers whether that ticket owns that profile, and what comes back is signed
-  by this service and good for five minutes. join carries the token; the
-  profileId in the message is ignored.
+  by this service. The token goes with the WebSocket handshake, in
+  Sec-WebSocket-Protocol, and opens that one connection and no other: see
+  WHO THIS IS, BEFORE THE SOCKET OPENS over the upgrade handler. The
+  profileId in the join message is ignored.
 
   The key is this service's own, made on first run and kept beside it. Not the
   server password: everybody who plays here holds that, which is right for
   reading the character register and useless for telling two of them apart.
-
-  Five minutes because a token is only ever carried from pressing Play to the
-  socket opening, and a connection that is already up is not rechecked. It is
-  not a session, and nothing renews it.
 
   A connection that cannot prove itself is refused, always (#1303).
   THORNSWOOD_VOICE_AUTH used to choose: on refused it, log let it in and
@@ -1453,26 +1440,31 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
   can.
 */
 /*
-  How long a token is good for.
+  HOW LONG A TOKEN IS GOOD FOR, AND FOR HOW MANY CONNECTIONS (#1322).
 
-  This was five minutes, on the reasoning that a token is only carried from
-  pressing Play to the socket opening. That reasoning was wrong, and the first
-  real join proved it: an expired token, from somebody who had just made a
-  character. Between minting and joining sits Skyrim loading, the mod list, the
-  main menu, character creation and the world loading in. Five minutes does not
-  cover a fast session, let alone a new character on a slow disk.
+  It was good for an hour and for any number of connections. The launcher
+  minted one at Play, wrote it to voice-token.txt, handed the same string to
+  its own voice page and to the game, renewed it every half hour, and every
+  reconnect presented it again. So it was a bearer pass: whoever read it, off
+  that file, out of a pack it should never have been in (19 September), or
+  off the wire, joined as that person beside them for up to an hour, and
+  nothing could tell the copy from the real one.
 
-  An hour covers a session's start with room to spare, and the launcher renews
-  it on its own tick while the game runs, so a long evening is covered too.
+  Now a token opens one connection. The handshake that presents it spends it,
+  and a second handshake with it is refused and written down, because a token
+  used twice was copied. Nobody carries one any more: the launcher's page and
+  the game each ask the launcher for a fresh token at the moment they connect,
+  so two minutes is plenty, and the hour it once needed (Skyrim loading
+  between Play and the first join) is no longer anywhere in the path.
 
-  The shorter window was also buying less than it looked. The token sits in
-  voice-token.txt in the game folder for the whole session either way, so
-  anybody who can read that file can read it at minute four as easily as at
-  minute fifty. What the expiry actually guards against is a token that leaks
-  out of that machine being useful forever, and an hour is a perfectly good
-  answer to that.
+  And it is good only to the copy of this service that made it. The list of
+  spent tokens lives in this process, so a token minted before it started is
+  refused rather than trusted to be unspent.
+
+  THORNSWOOD_TOKEN_SECONDS sets the two minutes.
 */
-const TOKEN_LIFETIME_MS = Number(process.env.THORNSWOOD_TOKEN_MINUTES || 60) * 60 * 1000;
+const TOKEN_LIFETIME_MS = (Number(process.env.THORNSWOOD_TOKEN_SECONDS) || 120) * 1000;
+const STARTED_AT = Date.now();
 
 const TOKEN_KEY_FILE = path.join(HERE, 'token-key.txt');
 let TOKEN_KEY = '';
@@ -1495,11 +1487,24 @@ if (!TOKEN_KEY) {
   }
 }
 
-function signToken(profileId, until) {
-  const body = String(profileId) + '.' + String(until);
+/*
+  v2.<profile>.<minted, ms>.<nonce>.<mac>. The nonce is what makes each one
+  its own, so spending one spends nothing else; the mac covers the v2 as well,
+  so nothing signed for v1 can be read as one of these. v1 tokens, the hour
+  long passes, are not read at all.
+*/
+function signToken(profileId, minted, nonce) {
+  const body = 'v2.' + String(profileId) + '.' + String(minted) + '.' + String(nonce);
   const mac = crypto.createHmac('sha256', TOKEN_KEY).update(body).digest('base64')
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  return 'v1.' + body + '.' + mac;
+  return body + '.' + mac;
+}
+
+function mintToken(profileId) {
+  const minted = Date.now();
+  const nonce = crypto.randomBytes(16).toString('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return { token: signToken(profileId, minted, nonce), until: minted + TOKEN_LIFETIME_MS };
 }
 
 /*
@@ -1511,11 +1516,12 @@ function signToken(profileId, until) {
 function readToken(raw) {
   const s = String(raw == null ? '' : raw);
   const parts = s.split('.');
-  if (parts.length !== 4 || parts[0] !== 'v1') return null;
+  if (parts.length !== 5 || parts[0] !== 'v2') return null;
   const profileId = Number(parts[1]) || 0;
-  const until = Number(parts[2]) || 0;
-  if (profileId <= 0 || until <= 0) return null;
-  const want = signToken(profileId, until);
+  const minted = Number(parts[2]) || 0;
+  const nonce = parts[3];
+  if (profileId <= 0 || minted <= 0 || !/^[A-Za-z0-9_-]{16,64}$/.test(nonce)) return null;
+  const want = signToken(profileId, minted, nonce);
   const a = Buffer.from(want);
   const b = Buffer.from(s);
   if (a.length !== b.length) return null;
@@ -1524,8 +1530,31 @@ function readToken(raw) {
   if (!ok) return null;
   // Expiry last. A token that is genuinely ours but stale is a different thing
   // from one that was made up, and the log should be able to say which.
-  if (Date.now() > until) return { profileId: profileId, expired: true };
-  return { profileId: profileId, expired: false };
+  return { profileId: profileId, minted: minted, nonce: nonce,
+           expired: Date.now() > minted + TOKEN_LIFETIME_MS };
+}
+
+/*
+  Spent tokens, nonce -> { until, profileId, at }, kept only while the token
+  could still be presented: one past its two minutes is refused as expired
+  anyway, so it is dropped from here then.
+*/
+const spent = new Map();
+
+/* The token a handshake presented, spent: { profileId } when it opens this
+   connection, { why, profileId } when it does not. */
+function spendToken(raw, now) {
+  if (!raw) return { why: 'no token', profileId: 0 };
+  const tok = readToken(raw);
+  if (!tok) return { why: 'a token that does not check out', profileId: 0 };
+  if (tok.expired) return { why: 'an expired token', profileId: tok.profileId };
+  if (tok.minted < STARTED_AT) return { why: 'a token from before this service started', profileId: tok.profileId };
+  for (const [n, s] of spent) { if (now > s.until) spent.delete(n); }
+  const was = spent.get(tok.nonce);
+  // When it was first used is for the log, not for whoever presented it now.
+  if (was) return { why: 'a token that was already used', profileId: tok.profileId, copiedAt: was.at };
+  spent.set(tok.nonce, { until: tok.minted + TOKEN_LIFETIME_MS, profileId: tok.profileId, at: now });
+  return { profileId: tok.profileId };
 }
 
 /*
@@ -1758,9 +1787,9 @@ const server = http.createServer((req, res) => {
           res.writeHead(503, { 'content-type': 'text/plain' }).end('nobody could check this profile, so no token');
           return;
         }
-        const until = Date.now() + TOKEN_LIFETIME_MS;
+        const t = mintToken(pid);
         res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ token: signToken(pid, until), until: until, profileId: pid }));
+        res.end(JSON.stringify({ token: t.token, until: t.until, profileId: pid }));
       });
     });
     return;
@@ -2012,6 +2041,35 @@ function originAllowed(req) {
 let originRefused = 0;
 let originSaidAt = 0;
 
+/*
+  WHO THIS IS, BEFORE THE SOCKET OPENS (#1337, #1322).
+
+  The handshake used to be answered for anybody, and who they were was the
+  first message after it. So anybody could hold a socket open and send it
+  whatever they liked without a credential at all, and the token, once it
+  came, was the same hour long string on every connection.
+
+  A browser cannot set a header on a WebSocket, but it can offer protocols,
+  and those travel as Sec-WebSocket-Protocol: the pages offer 'thornswood'
+  and their token. Before anything is answered the token is read and spent.
+  A handshake without one, with one that does not check out, or with one
+  that has already opened a connection is answered 403 and closed, and never
+  becomes a socket. The 101 names 'thornswood', which is what a browser needs
+  to hear back to keep the connection; the token is never echoed.
+*/
+const PROTOCOL = 'thornswood';
+
+function refuseUpgrade(socket, why) {
+  const body = 'no: ' + why + '\n';
+  try {
+    socket.on('error', () => { });
+    socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Type: text/plain\r\n' +
+               'Content-Length: ' + Buffer.byteLength(body) + '\r\n\r\n' + body);
+  } catch (e) {
+    try { socket.destroy(); } catch (x) { }
+  }
+}
+
 server.on('upgrade', (req, socket, head) => {
   if (!originAllowed(req)) {
     originRefused++;
@@ -2040,11 +2098,26 @@ server.on('upgrade', (req, socket, head) => {
   }
   const key = req.headers['sec-websocket-key'];
   if (!key) { socket.destroy(); return; }
+  const offered = String(req.headers['sec-websocket-protocol'] || '').split(',')
+    .map((s) => s.trim()).filter(Boolean);
+  const pass = offered.indexOf(PROTOCOL) === -1
+    ? { why: 'no token', profileId: 0 }
+    : spendToken(offered.filter((p) => p !== PROTOCOL)[0] || '', Date.now());
+  if (!pass.profileId || pass.why) {
+    // The profile only when the token named one, and never the token itself.
+    console.log('[voice] REFUSED a connection' + (pass.profileId ? ' for profile ' + pass.profileId : '') +
+                ': ' + pass.why + (pass.copiedAt ? ', by another connection at ' + new Date(pass.copiedAt).toISOString() +
+                ', so it was copied. A token opens one connection (#1322).' : ''));
+    refuseUpgrade(socket, pass.why);
+    return;
+  }
+  const proven = pass.profileId;
   socket.write(
     'HTTP/1.1 101 Switching Protocols\r\n' +
     'Upgrade: websocket\r\n' +
     'Connection: Upgrade\r\n' +
-    'Sec-WebSocket-Accept: ' + accept(key) + '\r\n\r\n');
+    'Sec-WebSocket-Accept: ' + accept(key) + '\r\n' +
+    'Sec-WebSocket-Protocol: ' + PROTOCOL + '\r\n\r\n');
 
   const ws = new Sock(socket);
   let myId = 0;
@@ -2052,7 +2125,9 @@ server.on('upgrade', (req, socket, head) => {
   let refusedAt = 0;
 
   ws.onmessage = (msg) => {
-    if (msg.t === 'join') { myId = onJoin(ws, msg); return; }
+    // One join per connection, as the profile its token proved. A second
+    // join on the same socket was a second peer for the one connection.
+    if (msg.t === 'join') { if (!myId) { myId = onJoin(ws, msg, proven); } return; }
     if (!myId) return;
 
     /*
