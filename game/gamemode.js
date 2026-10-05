@@ -44891,16 +44891,6 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
 })();
 
 /*
-  Every cast the engine sends on (#1387): restoration strain, in the college
-  block. It never answers false: the engine does not read what this family
-  answers, and the list over mp.onTakeItem says why nothing here may try.
-*/
-mp['onPapyrusEvent:OnSpellCast'] = guard('onPapyrusEvent:OnSpellCast', function (casterId, spell) {
-  var college = globalThis.__thornswoodCollege;
-  if (college && college.cast) { college.cast(casterId, spell); }
-});
-
-/*
   What somebody holds, every time it changes (#1387): a spell the book does
   not list is taken back, in the college block. It returns nothing: the
   engine has already decided by the time this fires, and its OnFireBlocked
@@ -49403,9 +49393,10 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   the event reaching a lever's or a quest's own script. That is why nothing
   here may ever return false to this family. This file listens to two
   names: OnHit, for the warrior maneuvers (#1386), the break chance at 0% in
-  the durability block (#1384) and a reanimate spell on a person's body
-  (#1387), and OnSpellCast, for restoration strain (#1387). The engine does
-  not build the
+  the durability block (#1384), a wound in the injury block (#1383) and a
+  reanimate spell on a person's body (#1387); and OnSpellCast, one handler
+  in the injury block, for a healing spell (#1383) and restoration strain
+  (#1387). The engine does not build the
   arguments for a name mp has no function for, so the rest of the family
   costs this file nothing.
 
@@ -53973,6 +53964,11 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   */
   mp['onPapyrusEvent:OnSpellCast'] = guard('onPapyrusEvent:OnSpellCast', function (casterId, spell) {
     try { cast(casterId, spell); } catch (e) { hlog('the cast threw:', e); }
+    // Restoration strain (#1387), in the college block, on its own.
+    var college = g.__thornswoodCollege;
+    if (college && college.cast) {
+      try { college.cast(casterId, spell); } catch (e) { hlog('the strain threw:', e); }
+    }
   });
 
   if (g.__thornswoodHurtTimer) { try { clearInterval(g.__thornswoodHurtTimer); } catch (e) { } }

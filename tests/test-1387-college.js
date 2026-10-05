@@ -479,7 +479,8 @@ person(srv, OUT, 13, 'smith', 'platewright', function (s) {
   srv = server(store);
   person(srv, CASTER, 21, 'mage', ['destruction', 'restoration']);
   const t0 = srv.now();
-  const cast = srv.ctx.mp['onPapyrusEvent:OnSpellCast'];
+  // The one OnSpellCast handler is the injury block's (#1383); it hands every cast on to this block.
+  const cast = function (id, sp) { return srv.CO.cast(id, sp); };
   const heal = { type: 'espm', desc: HEALING };
   const mod = function () { const e = srv.CO.effects(CASTER); return e ? e.RestorationMod : 0; };
   const effectsOnPanel = function () { const s = JSON.parse(store[CASTER].thornswoodCharacter); return (s.panel && s.panel.effects) || {}; };
@@ -516,6 +517,11 @@ person(srv, OUT, 13, 'smith', 'platewright', function (s) {
   store[NPC] = { profileId: JSON.stringify(-1) };
   cast(NPC, heal);
   yes('F4: an NPC a client hosts is the world\'s, not strained', !srv.CO.strain[NPC]);
+  const castAt = src.indexOf("mp['onPapyrusEvent:OnSpellCast'] = guard(");
+  yes('F4: there is one OnSpellCast handler, and it hands every cast to the college block on its own, never answering false',
+      (src.match(/mp\['onPapyrusEvent:OnSpellCast'\] =/g) || []).length === 1 &&
+      /var college = g\.__thornswoodCollege;\s*if \(college && college\.cast\) \{\s*try \{ college\.cast\(casterId, spell\); \}/.test(src.slice(castAt, castAt + 600)) &&
+      !/return false/.test(src.slice(castAt, src.indexOf('\n  });', castAt))));
   yes('F5: the effects reach the client on the map it already applies, on top of the tree, the needs and the maneuvers',
       /view\.effects = withCollege\(actorId, view\.effects\);/.test(CHARACTER));
   yes('F5: withered is not claimed: it waits for a cooked meal (#1382), and the page says so',
