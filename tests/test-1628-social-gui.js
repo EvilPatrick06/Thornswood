@@ -36,6 +36,23 @@ function read(...bits) {
   return fs.readFileSync(path.join(REPO_DIR, ...bits), 'utf8').split(CR).join('');
 }
 const src = read('game', 'gamemode.js');
+/*
+  One topic of the help panel (#1633), as a fresh install reads it: /help's
+  topics moved out of the gamemode into game/ui/thornswood-help.js, each a
+  list of paragraphs made from the key names.
+*/
+function helpTopic(id) {
+  const page = fs.readFileSync(path.join(REPO_DIR, 'game', 'ui', 'thornswood-help.js'), 'utf8');
+  const a = page.indexOf('  var TOPICS = [');
+  const b = a < 0 ? -1 : page.indexOf('\n  ];\n', a);
+  const k = /var keys = (\{[\s\S]*?\});/.exec(page);
+  if (a < 0 || b < 0 || !k) { return ''; }
+  try {
+    const topics = new Function('return ' + page.slice(page.indexOf('[', a), b + 4))();
+    const t = topics.filter(function (x) { return x.id === id; })[0];
+    return t ? t.text(new Function('return ' + k[1])()).join(' ') : '';
+  } catch (e) { return ''; }
+}
 const helpCs = read('launcher', 'app', 'Help.cs');
 const panelSrc = read('game', 'ui', 'thornswood-party.js');
 
@@ -83,9 +100,10 @@ if (helpBlock) {
   const strings = (helpBlock.match(/'(?:[^'\\]|\\.)*'/g) || []).join(' ');
   const named = namesAny(strings);
   yes('/help names none of the six' + (named.length ? ' (names: ' + named.join(', ') + ')' : ''), named.length === 0);
-  const people = helpBlock.slice(helpBlock.indexOf("topic === 'people'"));
-  yes('/help people says a request is answered with Accept or Refuse on its prompt',
-      /Answer a request with Accept or Refuse on its prompt\./.test(people));
+  // The help is a panel since #1633: its People topic, as a fresh install reads it.
+  const people = helpTopic('people');
+  yes('the help panel\'s People names none of the six, and says a request is answered with Accept or Refuse on its prompt',
+      namesAny(people).length === 0 && /Answer a request with Accept or Refuse on its prompt\./.test(people));
 }
 
 {

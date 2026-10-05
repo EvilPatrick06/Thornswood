@@ -34,6 +34,23 @@ const read = function () {
   return fs.readFileSync(path.join.apply(path, [ROOT].concat([].slice.call(arguments))), 'utf8').split(CR).join('');
 };
 const gm = read('game', 'gamemode.js');
+/*
+  One topic of the help panel (#1633), as a fresh install reads it: /help's
+  topics moved out of the gamemode into game/ui/thornswood-help.js, each a
+  list of paragraphs made from the key names.
+*/
+function helpTopic(id) {
+  const page = fs.readFileSync(path.join(ROOT, 'game', 'ui', 'thornswood-help.js'), 'utf8');
+  const a = page.indexOf('  var TOPICS = [');
+  const b = a < 0 ? -1 : page.indexOf('\n  ];\n', a);
+  const k = /var keys = (\{[\s\S]*?\});/.exec(page);
+  if (a < 0 || b < 0 || !k) { return ''; }
+  try {
+    const topics = new Function('return ' + page.slice(page.indexOf('[', a), b + 4))();
+    const t = topics.filter(function (x) { return x.id === id; })[0];
+    return t ? t.text(new Function('return ' + k[1])()).join(' ') : '';
+  } catch (e) { return ''; }
+}
 const skills = read('game', 'ui', 'thornswood-skills.js');
 const emotes = read('game', 'plugins', 'thornswood-emotes.js');
 const helpCs = read('launcher', 'app', 'Help.cs');
@@ -102,16 +119,12 @@ const GONE = ['/needs', '/eat', '/drink', '/bard'];
   yes('A4 no line the server says names /needs, /eat, /drink or /bard' +
       (said.length ? ' (' + said.slice(0, 3).join(' | ') + ')' : ''), said.length === 0);
 
-  const living = slice(gm, "      if (topic === 'living' || topic === 'needs' || topic === 'food') {", '        return;');
-  let text = '';
-  try {
-    new Function('toProfile', 'profileId', living.slice(living.indexOf('{') + 1, living.lastIndexOf('return;')))(
-      function (pid, line) { text = line; }, 1);
-  } catch (e) { text = 'threw ' + e.message; }
-  yes('A5 /help living names the Body page on K, Sit on the emote wheel, the instruments and Sing',
+  // The help is a panel since #1633: its Living topic, as a fresh install reads it.
+  const text = helpTopic('living');
+  yes('A5 the help panel\'s Living names the Body page on K, Sit on the emote wheel, the instruments and Sing',
       /Body page on K/.test(text) && /Sit on the emote wheel/.test(text) &&
       /lute, flute or drum/.test(text) && /Sing/.test(text));
-  yes('A5 and names no word to type, and stays short', !/\//.test(text) && text.length <= 520);
+  yes('A5 and names no word to type', text.length > 0 && !/\//.test(text));
 
   yes('A6 the launcher\'s Help page tells nobody to type /needs, /eat, /drink, /bard or /rest',
       !/\/(needs|eat|drink|bard|rest)\b/.test(helpCs));

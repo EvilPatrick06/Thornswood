@@ -31,6 +31,23 @@ const REPO = path.join(__dirname, '..');
 const SRC = process.env.GM || path.join(REPO, 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
+/*
+  One topic of the help panel (#1633), as a fresh install reads it: /help's
+  topics moved out of the gamemode into game/ui/thornswood-help.js, each a
+  list of paragraphs made from the key names.
+*/
+function helpTopic(id) {
+  const page = fs.readFileSync(path.join(REPO, 'game', 'ui', 'thornswood-help.js'), 'utf8');
+  const a = page.indexOf('  var TOPICS = [');
+  const b = a < 0 ? -1 : page.indexOf('\n  ];\n', a);
+  const k = /var keys = (\{[\s\S]*?\});/.exec(page);
+  if (a < 0 || b < 0 || !k) { return ''; }
+  try {
+    const topics = new Function('return ' + page.slice(page.indexOf('[', a), b + 4))();
+    const t = topics.filter(function (x) { return x.id === id; })[0];
+    return t ? t.text(new Function('return ' + k[1])()).join(' ') : '';
+  } catch (e) { return ''; }
+}
 function read(...bits) { return fs.readFileSync(path.join(REPO, ...bits), 'utf8').split(CR).join(''); }
 const ui = read('game', 'ui', 'thornswood-skills.js');
 const front = read('game', 'plugins', 'thornswood-front.js');
@@ -519,9 +536,10 @@ person(BRYN, 'Bryn', 209, 'smith', 'edgewright');
   const PW = pwords ? new Function('return ' + pwords[1])() : [];
   yes('F1: the server still answers /apprentice, the line the buttons send', W.indexOf('/apprentice') !== -1);
   yes('F1: and it is not in the list named to everybody', PW.indexOf('/helpme') !== -1 && PW.indexOf('/apprentice') === -1);
-  const help = between(src, "      if (topic === 'work' || topic === 'trade' || topic === 'class') {", '        return;');
-  yes('F1: /help work says a Master takes you on from the prompt and K lists it, with no /apprentice',
-      !!help && !/\/apprentice/.test(help) && /presses the key the prompt names/.test(help) && /either of you can end it there/.test(help));
+  // The help is a panel since #1633: its Work topic, as a fresh install reads it.
+  const help = helpTopic('work');
+  yes('F1: the help panel\'s Work says a Master takes you on from the prompt and K lists it, with no /apprentice',
+      !!help && !/\/apprentice/.test(help) && /presses K when the prompt names it/.test(help) && /either of you can end it there/.test(help));
   const gate = between(src, 'function craftAnswer(actorId, row) {', '\n}\n') || '';
   yes('F1: the craft gate says where a Master takes you on, with no /apprentice',
       /can take you on, from the prompt they see when they look at you/.test(gate) && !/\/apprentice/.test(gate));

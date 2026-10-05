@@ -28,6 +28,23 @@ const vm = require('vm');
 const CR = String.fromCharCode(13);
 const read = function (p) { return fs.readFileSync(path.join(REPO_DIR, p), 'utf8').split(CR).join(''); };
 const gm = process.env.GM ? fs.readFileSync(process.env.GM, 'utf8').split(CR).join('') : read('game/gamemode.js');
+/*
+  One topic of the help panel (#1633), as a fresh install reads it: /help's
+  topics moved out of the gamemode into game/ui/thornswood-help.js, each a
+  list of paragraphs made from the key names.
+*/
+function helpTopic(id) {
+  const page = fs.readFileSync(path.join(REPO_DIR, 'game', 'ui', 'thornswood-help.js'), 'utf8');
+  const a = page.indexOf('  var TOPICS = [');
+  const b = a < 0 ? -1 : page.indexOf('\n  ];\n', a);
+  const k = /var keys = (\{[\s\S]*?\});/.exec(page);
+  if (a < 0 || b < 0 || !k) { return ''; }
+  try {
+    const topics = new Function('return ' + page.slice(page.indexOf('[', a), b + 4))();
+    const t = topics.filter(function (x) { return x.id === id; })[0];
+    return t ? t.text(new Function('return ' + k[1])()).join(' ') : '';
+  } catch (e) { return ''; }
+}
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -197,7 +214,8 @@ attempt('the words', function () {
   const PLAYER_WORDS = arrayOf('PLAYER_WORDS');
   yes('W1 the list named to everybody, which the unknown word reply reads, names no board word',
       !!PLAYER_WORDS && BOARD_WORDS.every(function (x) { return PLAYER_WORDS.indexOf(x) === -1; }) &&
-      /'Try \/help\. There is ' \+ PLAYER_WORDS\.join/.test(chat));
+      /'No command called ' \+ word \+ '\. ' \+ helpLine\(profileId\)/.test(chat) &&
+      /function helpLine\(profileId\) \{[\s\S]*?PLAYER_WORDS\.join\(', '\)/.test(chat));
   yes('W2 the server still answers the lines the board panel and J send',
       !!WORDS && ['/notice', '/job', '/board', '/take', '/dropjob', '/unpin'].every(function (x) { return WORDS.indexOf(x) !== -1; }));
   yes('W3 /jobs is gone: nothing sends it, so nothing answers it', !!WORDS && WORDS.indexOf('/jobs') === -1 &&
@@ -208,10 +226,11 @@ attempt('the words', function () {
       /word === '\/notice' \|\| word === '\/job' \|\|\s*word === '\/board' \|\| word === '\/take' \|\|/.test(character) &&
       /word === '\/dropjob' \|\| word === '\/unpin'\) \{/.test(character));
 
-  const helpBranch = slice(chat, "    if (word === '/help' || word === '/commands') {", "    // Anything else beginning with a slash");
-  yes('W5 the /help topics name no board word, and the menu says J has every town\'s board',
-      !!helpBranch && !NAMES_A_WORD.test(code(helpBranch).replace(/'\/help[^']*'/g, '')) &&
-      /J for journals and every town\\'s notice ' \+\s*'board/.test(helpBranch));
+  // The help is a panel since #1633: every topic, as a fresh install reads it.
+  const helpText = ['talking', 'people', 'living', 'work', 'land', 'help'].map(helpTopic).join(' ');
+  yes('W5 the help panel names no board word, and says E opens a board and J has every town\'s board',
+      helpText.length > 1000 && !NAMES_A_WORD.test(helpText) &&
+      /E on a notice board opens it/.test(helpTopic('work')) && /J shows every town's board/.test(helpTopic('work')));
 
   const pages = ['docs/systems/noticeboards.md', 'docs/systems/trading-company.md', 'docs/systems/gold.md'];
   let named = '';
