@@ -281,6 +281,7 @@ jobs:
                  'test-1373-scarce-scene.js',
                  'test-nobody-makes.js',
                  'test-1378-shared-gather.js',
+                 'test-special-edition-only.js',
                  'test-1374-letters.js',
                  'test-1380-rare-mines.js',
                  'test-unpin.js', 'test-coffers.js',
