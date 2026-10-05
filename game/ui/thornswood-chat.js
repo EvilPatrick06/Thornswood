@@ -36,6 +36,18 @@
   // Who the voice service believes we are. Everything else on this socket,
   // chat included, hangs off the identity this establishes.
   var TOKEN = String(CFG.token || '');
+  /*
+    ONE TOKEN, ONE TRY (#1322, #1337). TOKEN is one not yet used, or ''. It
+    goes with the handshake, as the protocol after 'thornswood', and is spent
+    on that try whatever comes of it: the service opens one connection with a
+    token and refuses a handshake without one. A try with none asks the front
+    for one ('token? <profile>' to thornswood-front, which asks the launcher
+    through the folder push to talk uses) and waits for the backoff, and a
+    token handed over by setToken or rejoinAs goes at once. SPENT is the last
+    one used, because the front can hand the same string over again until the
+    launcher has written a new one.
+  */
+  var SPENT = '';
 
   // Colours from the launcher's own palette so the chat looks like the rest of
   // the build rather than like a web page.
@@ -145,8 +157,16 @@
     if (!HOST) { note('No server address, so the chat is off.', C_WARN); return; }
     if (ws && (ws.readyState === 0 || ws.readyState === 1)) return;
 
+    if (!TOKEN) {
+      try { window.skyrimPlatform.sendMessage('thornswood-front', 'token? ' + ME); } catch (e) { }
+      retry();
+      return;
+    }
+    var token = TOKEN;
+    SPENT = token;
+    TOKEN = '';
     try {
-      ws = new WebSocket(url());
+      ws = new WebSocket(url(), ['thornswood', token]);
     } catch (e) {
       retry();
       return;
@@ -160,7 +180,7 @@
       joined = false;
       heard = Date.now();
       try {
-        ws.send(JSON.stringify({ t: 'join', profileId: ME, name: NAME, token: TOKEN }));
+        ws.send(JSON.stringify({ t: 'join', profileId: ME, name: NAME }));
       } catch (e) { }
     };
 
@@ -247,6 +267,19 @@
     ws.onerror = function () {
       try { ws.close(); } catch (e) { }
     };
+  }
+
+  /*
+    A token handed over: kept unless it is the one just spent, and used at
+    once when no connection is up or opening, rather than after the backoff.
+  */
+  function take(t) {
+    t = String(t || '');
+    if (!t || t === SPENT || t === TOKEN) return;
+    TOKEN = t;
+    if (ws && (ws.readyState === 0 || ws.readyState === 1)) return;
+    if (timer) { clearTimeout(timer); timer = null; }
+    connect();
   }
 
   /* The socket is gone, however it went. */
@@ -439,11 +472,14 @@
     peer: function () { return peerId; },
 
     /**
-     * The join token this page holds now, the freshest setToken gave it.
-     * Voice sends it with its ask for the relay list, which the service hands
-     * only to somebody whose token checks out (#1307).
+     * The join token this page holds now, the freshest setToken gave it, or
+     * else the one its connection was opened with. Voice sends it with its
+     * ask for the relay list, which the service hands only to somebody whose
+     * token checks out (#1307). A token opens one connection (#1322), so the
+     * one in hand is usually the spent one, which /ice still takes for the
+     * two minutes it is good for.
      */
-    token: function () { return TOKEN; },
+    token: function () { return TOKEN || SPENT; },
 
     isUp: function () { return !!(ws && ws.readyState === 1 && joined); },
 
@@ -472,22 +508,16 @@
     },
 
     /**
-     * A freshly minted join token, pushed in from thornswood-front.js.
+     * A join token the launcher minted because this page asked for one,
+     * pushed in from thornswood-front.js (#1322).
      *
-     * TOKEN is read once, when this page is first injected, and this browser
-     * page is not reloaded for the length of a normal session. Voice.cs
-     * refreshes voice-token.txt on its own clock, on this machine, but nothing
-     * makes this page look at the file again on its own. Without this, a
-     * socket that drops and reconnects late in a long session, from a network
-     * blip or the voice service restarting, would present whatever token was
-     * good when the world first loaded, which by then can be expired.
-     *
-     * Deliberately does not reconnect. The connection already up was let in
-     * and is never rechecked, so there is nothing here to disrupt; this only
-     * matters the next time the socket has to open on its own.
+     * A try waiting on it goes at once. One that arrives while the connection
+     * is up is kept for the next try. The one this page last spent is not
+     * taken again: the front reads the file the launcher writes and can hand
+     * the same string over twice.
      */
     setToken: function (t) {
-      TOKEN = String(t || '');
+      take(t);
     },
 
     /**
@@ -498,14 +528,18 @@
      * When they pick another character the front hands the place over and
      * then calls this with that character's own join token: the connection
      * closes and opens again as that character, the way setName does, since
-     * the service takes who somebody is from the token at the join and never
-     * after. The same character again only takes the token.
+     * the service takes who somebody is from the token at the handshake and
+     * never after. The same character again only takes the token, which goes
+     * at once if a try is waiting on it (see take).
      */
     rejoinAs: function (id, t) {
       id = Number(id) || 0;
-      TOKEN = String(t || '');
-      if (!id || id === ME) return false;
+      if (!id || id === ME) { take(t); return false; }
       ME = id;
+      // A token for the character this was is no use to the next one.
+      TOKEN = '';
+      t = String(t || '');
+      if (t && t !== SPENT) { TOKEN = t; }
       if (ws && (ws.readyState === 0 || ws.readyState === 1)) {
         tries = 0;
         if (joined) renaming = true;

@@ -97,15 +97,17 @@ function textFrame(obj, masked) {
   return Buffer.concat([head, key, body]);
 }
 
-/* A raw socket that has done the handshake, with every frame it is sent. */
-function raw(port) {
+/* A raw socket that has done the handshake as pid, with every frame it is
+   sent. */
+function raw(port, pid) {
   return new Promise((ok, bad) => {
     const s = net.connect(port, '127.0.0.1');
     const me = { sock: s, frames: [], msgs: [], closed: false };
     let buf = Buffer.alloc(0), up = false;
     s.on('connect', () => {
       s.write('GET / HTTP/1.1\r\nHost: 127.0.0.1:' + port + '\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n' +
-              'Sec-WebSocket-Version: 13\r\nSec-WebSocket-Key: ' + crypto.randomBytes(16).toString('base64') + '\r\n\r\n');
+              'Sec-WebSocket-Version: 13\r\nSec-WebSocket-Key: ' + crypto.randomBytes(16).toString('base64') + '\r\n' +
+              'Sec-WebSocket-Protocol: thornswood, ' + tokenFor(pid) + '\r\n\r\n');
     });
     s.on('data', (d) => {
       buf = Buffer.concat([buf, d]);
@@ -140,12 +142,14 @@ const closeCode = (c) => {
 /*
   Every join proves itself with a token (#1303), so this signs its own with
   a key it puts beside its copy of the service, the way voice-server.js
-  signs them.
+  signs them. One token opens one connection and goes with the handshake,
+  after 'thornswood' (#1337, #1322).
 */
 const KEY = crypto.randomBytes(32).toString('hex');
 function tokenFor(pid) {
-  const body = String(pid) + '.' + String(Date.now() + 3600000);
-  return 'v1.' + body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
+  const body = 'v2.' + pid + '.' + Date.now() + '.' + crypto.randomBytes(16).toString('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
@@ -165,14 +169,14 @@ function tokenFor(pid) {
   await listening(srv, PORT);
 
   console.log('masked, as a browser sends it:');
-  const a = await raw(PORT);
-  a.sock.write(textFrame({ t: 'join', profileId: 1, name: 'Alva', token: tokenFor(1) }, true));
+  const a = await raw(PORT, 1);
+  a.sock.write(textFrame({ t: 'join', profileId: 1, name: 'Alva' }, true));
   await wait(200);
   yes('a masked join is welcomed', a.msgs.some((m) => m.t === 'welcome'));
 
   console.log('\nunmasked:');
-  const b = await raw(PORT);
-  b.sock.write(textFrame({ t: 'join', profileId: 2, name: 'Brand', token: tokenFor(2) }, false));
+  const b = await raw(PORT, 2);
+  b.sock.write(textFrame({ t: 'join', profileId: 2, name: 'Brand' }, false));
   await wait(300);
   yes('an unmasked join is not welcomed', !b.msgs.some((m) => m.t === 'welcome'));
   yes('it is answered with a close frame carrying 1002, a protocol error (' + closeCode(b) + ')', closeCode(b) === 1002);
@@ -182,8 +186,8 @@ function tokenFor(pid) {
       !a.msgs.some((m) => m.t === 'peers' && m.peers.some((p) => p.profileId === 2)));
 
   console.log('\nsomebody already in the room who sends one unmasked frame:');
-  const c = await raw(PORT);
-  c.sock.write(textFrame({ t: 'join', profileId: 3, name: 'Cyra', token: tokenFor(3) }, true));
+  const c = await raw(PORT, 3);
+  c.sock.write(textFrame({ t: 'join', profileId: 3, name: 'Cyra' }, true));
   await wait(200);
   yes('joins masked and is in the room', c.msgs.some((m) => m.t === 'welcome') &&
       a.msgs.some((m) => m.t === 'peers' && m.peers.some((p) => p.profileId === 3)));
@@ -196,7 +200,7 @@ function tokenFor(pid) {
   yes('and leaves the room', !!after && !after.peers.some((p) => p.profileId === 3));
 
   console.log('\nan unmasked ping:');
-  const d = await raw(PORT);
+  const d = await raw(PORT, 5);
   d.sock.write(Buffer.from([0x89, 0x00]));
   await wait(300);
   yes('gets no pong', !d.frames.some((f) => f.op === 0xa));
@@ -204,10 +208,10 @@ function tokenFor(pid) {
 
   console.log('\nthe browser\'s own WebSocket, which masks everything:');
   const got = [];
-  const ws = new WebSocket('ws://127.0.0.1:' + PORT + '/');
+  const ws = new WebSocket('ws://127.0.0.1:' + PORT + '/', ['thornswood', tokenFor(4)]);
   ws.onmessage = (e) => { try { got.push(JSON.parse(e.data)); } catch (x) { } };
   await new Promise((ok) => { ws.onopen = ok; ws.onerror = ok; });
-  ws.send(JSON.stringify({ t: 'join', profileId: 4, name: 'Dagny', token: tokenFor(4) }));
+  ws.send(JSON.stringify({ t: 'join', profileId: 4, name: 'Dagny' }));
   await wait(200);
   ws.send(JSON.stringify({ t: 'chat', text: 'masked words' }));
   await wait(300);

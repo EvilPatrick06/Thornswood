@@ -40,13 +40,15 @@ function yes(what, cond) {
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-chatlimit-'));
 fs.copyFileSync(path.join(__dirname, 'voice-server.js'), path.join(dir, 'voice-server.js'));
 fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
-// Every join proves itself since #1303, so this harness signs its own join
-// tokens with a key it puts beside its copy of the service.
+// Every connection proves itself since #1303, so this harness signs its own
+// join tokens with a key it puts beside its copy of the service. One token
+// opens one connection and goes with the handshake since #1337 and #1322.
 const KEY = crypto.randomBytes(32).toString('hex');
 fs.writeFileSync(path.join(dir, 'token-key.txt'), KEY);
 function tokenFor(pid) {
-  const body = String(pid) + '.' + String(Date.now() + 3600000);
-  return 'v1.' + body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
+  const body = 'v2.' + pid + '.' + Date.now() + '.' + crypto.randomBytes(16).toString('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 const CHAT_DIR = path.join(dir, 'chat');
@@ -136,9 +138,9 @@ async function ready() {
 /* A joined socket that keeps every chat message it is sent. */
 function person(profileId, name) {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket('ws://127.0.0.1:' + PORT + '/');
+    const ws = new WebSocket('ws://127.0.0.1:' + PORT + '/', ['thornswood', tokenFor(profileId)]);
     const me = { ws: ws, peer: 0, chat: [] };
-    ws.onopen = () => ws.send(JSON.stringify({ t: 'join', profileId: profileId, name: name, token: tokenFor(profileId) }));
+    ws.onopen = () => ws.send(JSON.stringify({ t: 'join', profileId: profileId, name: name }));
     ws.onmessage = (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
       if (m.t === 'welcome') { me.peer = m.peer; resolve(me); return; }

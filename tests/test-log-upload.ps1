@@ -190,6 +190,11 @@ console.log((o && o.ticket === 'tk1.x.y' ? 'TICKET ' : 'NOTICKET ') +
     $out = $T::Scrub($page)
     Yes 'a join token is taken out' (($out.IndexOf('AbCdEfGhIjKl') -lt 0) -and ($out.IndexOf('v1.[join token removed]') -ge 0))
     Yes 'and the rest of the line is kept' ($out.StartsWith('window.THORNSWOOD={"host":"192.0.2.1"'))
+    # The shape since #1322: v2.<profile>.<minted>.<nonce>.<signature>.
+    $v2 = 'connecting with v2.134631970.1790000000000.QrStUvWxYz0123456789_-.AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcde now'
+    $out = $T::Scrub($v2)
+    Yes 'a v2 join token is taken out, nonce and signature both' (($out.IndexOf('QrStUvWx') -lt 0) -and ($out.IndexOf('AbCdEfGhIjKl') -lt 0) -and
+        ($out -ceq 'connecting with v2.[join token removed] now'))
 
     $tk = 'ticket tk1.eyJkIjoiMTIzNDUiLCJuIjoiYSJ9.0123456789abcdef0123456789abcdef in a line'
     $out = $T::Scrub($tk)
