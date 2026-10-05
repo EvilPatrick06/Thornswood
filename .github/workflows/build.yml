@@ -414,6 +414,7 @@ jobs:
                  'test-dev-settings-keys.ps1',
                  'test-dev-gamemode-notes.ps1',
                  'test-1929-dev-gamemode-note.ps1',
+                 'test-1955-ship-stack-note.ps1',
                  'test-package-release-dir.ps1', 'test-no-machine-files.ps1',
                  'test-main-runtime-startup.js',
                  'test-spawn-reply.js',
