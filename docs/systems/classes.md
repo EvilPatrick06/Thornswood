@@ -18,7 +18,7 @@ you may take out of the world.
 
 | Class | The verb | The list |
 | --- | --- | --- |
-| [Hunter](classes/hunter.md) | Loot an animal body | 112 names, 361 placed bodies |
+| [Hunter](classes/hunter.md) | Loot an animal body | 92 names, 336 placed bodies |
 | [Fisher](classes/fisher.md) | A pole, then press E at the water | 15 spots stand today. The plan places a hold's worth |
 | [Gatherer](classes/gatherer.md) | Take a reagent | 46 names, 105 placed plants |
 | [Miner](classes/miner.md) | Swing a pickaxe at a seam | 18 names, 581 veins |

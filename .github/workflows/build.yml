@@ -339,6 +339,7 @@ jobs:
                  'test-1712-builders-skip-off.js',
                  'test-1787-ore-eol.js',
                  'test-1828-harvest-spell-eol.js',
+                 'test-1808-hunt-not-a-body.js',
                  'test-1628-social-gui.js',
                  'test-1630-journal-gui.js',
                  'test-1629-party-gui.js',
