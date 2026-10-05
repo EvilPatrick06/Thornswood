@@ -223,7 +223,8 @@
   installed and tells every launcher to match it, so it refuses while
   scripts\mods\Check-CoveredBodies.ps1 finds a nude body here; a dev release
   only warns. Give it for a security fix that cannot wait for the covered
-  bodies' collection revision, and only on Patrick's word.
+  bodies' collection revision, and only on Patrick's word. A body mesh the
+  check cannot read refuses on both channels, with or without it (#1956).
 
 .EXAMPLE
   .\scripts\release\Ship.ps1 -Channel dev "The map marker points at the right door now"
@@ -1383,7 +1384,8 @@ if ($LASTEXITCODE -ne 0) {
 # everybody at a nude body. Check-CoveredBodies.ps1 reads the shapes in each
 # body mesh: 0 covered, 2 a nude body, 1 unreadable. Main refuses on 2 unless
 # -AllowUncoveredBodies; dev warns, so work can still be tried on the dev build
-# while the covered bodies' revision is on its way.
+# while the covered bodies' revision is on its way. 1 refuses on both channels
+# (#1956, Patrick 5 Oct), as the SkyUI menus step below does since #1913.
 Head 'Covered bodies'
 if ($GameDir) {
     $global:LASTEXITCODE = 0
@@ -1394,7 +1396,15 @@ if ($GameDir) {
         Die 'A body in the game folder is nude, and a main release would point everybody at this collection revision. Install the collection revision with the covered bodies (issue #405), bring the game folder up to date, and Ship again. -AllowUncoveredBodies ships anyway, on Patrick''s word only.'
     }
     if ($bodiesExit -eq 2) { Say '  a body in the game folder is nude (issue #405); shipping anyway' 'Yellow' }
-    elseif ($bodiesExit -ne 0) { Say '  the body meshes could not all be read; see above' 'Yellow' }
+    elseif ($bodiesExit -ne 0) {
+        # Anything but 0 and 2, 1 for a mesh or a Data folder it could not read
+        # or the check itself failing, refuses on both channels, the way the
+        # SkyUI menus step does (#1956, Patrick 5 Oct). A check that cannot read
+        # is not a pass: the unread mesh may be the nude one.
+        Unbump 'the body meshes could not all be read'
+        Die ("The body meshes in the game folder could not all be read (Check-CoveredBodies.ps1 exit $bodiesExit), so whether a body is nude is not known. " +
+             'The red lines above say what could not be read. Fix or replace it in the game folder, and Ship again. -AllowUncoveredBodies does not let this through.')
+    }
 } else {
     Say '  no game folder here, so the bodies were not read' 'DarkGray'
 }
