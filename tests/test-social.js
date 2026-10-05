@@ -196,13 +196,10 @@ if (social && trade) {
       here: true, profileId: 598737699, appearance: null,
       worldOrCellDesc: 'town:X.esm', pos: [50, 0, 0], inventory: []
     };
+    // The chargen block's test of a stored face, which the social block asks
+    // of the appearance it read once this pass (#1721).
     w.g.__thornswoodChargen = {
-      publishedForOthers: function (id) {
-        try {
-          const a = w.mp.get(id, 'appearance');
-          return !!(a && typeof a === 'object');
-        } catch (e) { return true; }
-      }
+      hasStoredAppearance: function (a) { return !!(a && typeof a === 'object'); }
     };
     w.soc.nearTick();
     yes('a person with no stored appearance is not on the near list',
