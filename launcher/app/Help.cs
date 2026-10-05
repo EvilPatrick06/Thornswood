@@ -90,7 +90,7 @@ namespace Thornswood
             // launcher\Thornswood.ini, which Keys.cs falls back to as well.
             // test-launcher-help.js reads both and fails when one moves.
             new HelpItem("Keys", "The keys on a fresh install",
-                "Enter opens the chat, and / opens it with the slash already typed. K is your character panel, P your friends and party, J your journals. Looking at somebody, Y asks them to be friends, H offers a trade and L stops you hearing them. Hold V to talk, O keeps the microphone open, and B steps between a whisper, your normal voice and a yell. G opens the emote wheel and N stands you up out of one. U presses a blank key mold into the lock of the door you are looking at. F1 turns the names over heads off and on, and F2 hides and shows everything the game's overlay draws."),
+                "Enter opens the chat, and / opens it with the slash already typed. K is your character panel, P your friends and party, J your journals. Looking at somebody, Y asks them to be friends, H offers a trade and L stops you hearing them. Hold V to talk, O keeps the microphone open, and B steps between a whisper, your normal voice and a yell. G opens the emote wheel and N stands you up out of one. U presses a blank key mold into the lock of the door you are looking at. F7 opens the help in the game. F1 turns the names over heads off and on, and F2 hides and shows everything the game's overlay draws."),
 
             new HelpItem("Keys", "The Controls page changes them",
                 "Controls in the launcher lists every key, read from the files themselves. Press Change, then the key you want. Close Skyrim first, because the game writes its settings back when it exits and would undo it. F1 and F2 belong to the game client and cannot be moved."),
@@ -101,7 +101,13 @@ namespace Thornswood
             // and dev. Whoever turns it off changes this item in the same
             // release; test-launcher-help.js ties the two together.
             new HelpItem("Chat and commands", "The chat box",
-                "Enter opens it and Escape gives the keyboard back to the game. / opens it with the slash already typed, for a command. A line typed there reaches the people near you, in the same place and within about 60 metres, the same as the line over your head, so treat it as the room rather than the whole server. A line that starts with a slash is a command for the server and is not shown to anybody else. Text chat is kept, with the name and the time. Voice is not recorded."),
+                "Enter opens it and Escape gives the keyboard back to the game. / opens it with the slash already typed, for the few lines still typed there, which this section names. A line typed there reaches the people near you, in the same place and within about 60 metres, the same as the line over your head, so treat it as the room rather than the whole server. A line that starts with a slash is a command for the server and is not shown to anybody else. Text chat is kept, with the name and the time. Voice is not recorded."),
+
+            // How a line is said stays typed, with no buttons (Patrick,
+            // 4 Oct, #1639), and the help names it. The voice service says
+            // these itself; docs\systems\chat.md has the ranges.
+            new HelpItem("Chat and commands", "How a line is said",
+                "Start a line with /me and what your character does, or /do and what there is to see. /w whispers it to the people closest to you, and /s or /y shouts it further. /me draws a sword is an attempt: whether it lands is the other person's."),
 
             new HelpItem("Chat and commands", "Out of character",
                 "Type /ooc and then what you meant. It goes only to people in the same place as you and within about 60 metres, in double brackets with your name on it. /ooc can we not ends any scene at once, from anybody in it, with no reason owed."),
@@ -136,8 +142,11 @@ namespace Thornswood
             new HelpItem("Chat and commands", "Stuck in the world: /stuck",
                 "Wedged in a wall or a rock and cannot walk out? /stuck takes you back a few steps to where you last stood safely, or to the nearest temple when there is no such spot. It works once every 5 minutes and not while you are dead, and in a fight it waits 15 seconds first, which moving or being hit cancels. It is only for being truly stuck: every use is logged for staff."),
 
-            new HelpItem("Chat and commands", "Everything else is on /help",
-                "Type /help in the chat for a short menu, then /help talking, /help people, /help living, /help work, /help land or /help staff for one topic each. A word the server does not know is answered with the list of words it does."),
+            // The help in the game is a panel since #1633, and nobody is told
+            // to type /help. test-launcher-help.js holds the key to the ini
+            // and the topics to the panel.
+            new HelpItem("Chat and commands", "Everything else is on the help panel",
+                "F7, unless you have moved it on the Controls page, opens the help in the game without the chat: talking, people, living, work, land and getting help, each with the keys and panels for it as your keys are set. Help on the K, P and J panels opens it too. Everything else you do in the world is a key, a prompt or a panel, and nothing else is typed. A word the server does not know is answered with where the help is."),
 
             new HelpItem("Chat and commands", "The console is switched off",
                 "Skyrim's console opens for a moment and shuts again, with a line in the chat saying so. It is the same rule for everybody."),

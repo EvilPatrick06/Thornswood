@@ -27,18 +27,27 @@ line is queued for the game server, which collects the queue in the
 chat commands block of `game/gamemode.js`: `dispatch` (43770) first,
 then `handle` (44415).
 
-Two lists in that block decide what people are told. `WORDS` (43436) is
-every word the server answers. The list at 43514 is the words named to
-everybody. `/help` reads it, and so does the reply to a word the server
-does not know, "No command called ... Try /help. There is ..." (45653).
-In the tables below, "the list" means that second list.
+Two lists in that block decide what people are told. `WORDS` is every
+word the server answers. `PLAYER_WORDS` is the words named to everybody,
+and since #1633 it is exactly the commands that stay, the rows below that
+say so: `/stuck`, `/helpme`, `/report`, `/me`, `/do`, `/w`, `/s`, `/y`,
+`/ooc` and `/roll`. `helpLine` reads it: the answer to `/help` and
+`/commands`, and the end of the reply to a word the server does not know,
+"No command called ... Help is a panel: F7 opens it ... Typed in the
+chat: ...". In the tables below, "the list" means `PLAYER_WORDS`.
 
-Other places that tell people to type a command: the `/help` topics in
-the game (45550, topics talking, people, living, work, land and staff),
-the launcher's Help page (`launcher/app/Help.cs`, "Chat and commands"
-and "In game"), the system pages in this folder, the site's pages in
-`site/data/site`, and the server's own answers. Each conversion issue
-takes its commands out of all of them.
+The help in the game is a panel since #1633 (`game/ui/thornswood-help.js`):
+its own key, HelpKey in `Thornswood.ini` (F7), on the launcher's Controls
+page, and Help on the K, P and J panels (Patrick's answer on #1633). Its
+topics are talking, people, living, work, land and getting help, written
+as keys, prompts and panels, with every key named as that machine has it
+bound. It names the commands that stay and no other.
+
+Other places that tell people to type a command: the help panel, the
+launcher's Help page (`launcher/app/Help.cs`, "Chat and commands"), the
+system pages in this folder, the site's pages in `site/data/site`, and
+the server's own answers. Each conversion issue took its commands out of
+all of them.
 
 ## Commands for people
 
@@ -68,11 +77,10 @@ and help text never lists it.
 | `/needs` | Nobody | Gone (#1631). The meters, the warmth with its working out and what is counted as worn are the Body page on K | `view` in the needs block, put on the K panel by `writeState` in the character block | Nowhere. [Temperature](temperature.md) and `site/data/known.md` name the Body page. The launcher's line on hiding the bars still names it (`launcher/app/Shell.cs`, which takes a line in #staff-general first) | The four bars, and the Body page on K, with Read again. Out of the list, the help and the pages. | #1631 |
 | `/eat`, `/drink`, `/drink ale` | Nobody | Gone (#1631). They gave food or drink with no item | None | Nowhere | Eating or drinking the item, which the front plugin reports as `/ate`. Said on #1382. | #1631 |
 | `/bard` | Nobody | Gone (#1631). The bard is somebody the server sees playing | `playing` and `bardSeen` in the needs block | Nowhere. [Exhaustion](exhaustion.md), [Emotes](emotes.md) and [People beside you](people.md) name the wheel | Lute, Flute or Drum on the emote wheel with that instrument in the pack, or Sing (Patrick, 4 Oct), read from the last animation the game sent for the person. | #1631 |
-| `/helpme <what>`, `/help-me`, `/report <name> <what>` | Anybody | Reaches staff; reports somebody to staff | `gamemode.js:45537`, the asking staff block's `ask` (52023) | The list; `/help staff`; Help page "Getting staff"; `site/data/site/privacy.md` | Stays a command, and the help names it (Patrick, 4 Oct). | None |
-| `/stuck` | Anybody | Out of a wedged spot, a few steps back or to a temple | `gamemode.js:45522`, the stuck block's `command` (52595) | The list; `/help staff`; `site/data/site/privacy.md` | Stays a command, and the help names it (Patrick, 4 Oct). | None |
-| `/help [topic]`, `/commands` | Anybody | The help in the game | `gamemode.js:45550` | Help page "Everything else is on /help"; the unknown word reply | None. To come: a help panel. | #1633 |
-| `/merchant <id>`, `/merchant buy`, `sell`, `supply`, `close` | Anybody at a guild trader | A trader's wares | `gamemode.js:44619`, then `command` (54951) | The list; [Merchant's Guild](merchants-guild.md) | E on a trader opens the panel, which sends the rest. Out of the list and the page. | #1633 |
-| `/where` | Anybody today; a dev's tool | The cell, position and angle you stand at | `gamemode.js:45073` | The list | Stays a command, for dev and testers only. | #1633 |
+| `/helpme <what>`, `/help-me`, `/report <name> <what>` | Anybody | Reaches staff; reports somebody to staff | The `/helpme` branch of `handle`, then the asking staff block's `ask` | The list; the help panel's Getting help; Help page "Getting staff"; `site/data/site/privacy.md` | Stays a command, and the help names it (Patrick, 4 Oct). | None |
+| `/stuck` | Anybody | Out of a wedged spot, a few steps back or to a temple | The `/stuck` branch of `handle`, then the stuck block's `command` | The list; the help panel's Getting help; Help page "Stuck in the world"; `site/data/site/privacy.md` | Stays a command, and the help names it (Patrick, 4 Oct). | None |
+| `/help`, `/commands` | Anybody, typed out of habit | Says where the help panel is and names the list; a tester is told theirs as well | The `/help` branch of `handle`, `helpLine` | Nowhere. The Help page, the site's help and the reply to a word nobody has point at the panel | The help panel, on HelpKey (F7) and on Help on the K, P and J panels. Nobody is told to type `/help`. | #1633 |
+| `/merchant <id>`, `/merchant buy`, `sell`, `supply`, `close` | Anybody at a guild trader | A trader's wares | The `/merchant` branch of `handle`, then the merchant block's `command` | Nowhere. [Merchant's Guild](merchants-guild.md) names E and the panel | E on a trader opens the panel, which sends the rest. Out of the list and the page (#1633). | #1633 |
 | `/apprentice <id> <half>`, `/apprentice end <id> <half>`, `/apprentice leave <half>`, `/apprentice` | A Master takes on; either of them ends it | Takes somebody on, ends it from either side, says who is whose | `apprenticeCommand` in the character block | Nowhere. [Masters and apprentices](apprenticeship.md) names the prompt row and the K page | K on the look prompt, for a Master looking at somebody they could take on, opens the Masters and apprentices page on K with Take on for each half; End there for each side; Accept and Refuse for the learner. Never in the list or the help. | #1634 |
 | `/study` | Anybody in the College rooms | A spell point in a semester | Never a word. Study on the K panel's College page sends `/pick study`, below | [Magic](magic.md), [Masters and apprentices](apprenticeship.md) | Study on K, which the server answers only in the College's rooms. | #1387 |
 | `/ride`, `/ride <stop>` | Anybody at a driver | Where the driver goes and the fares; pay and go | The `/ride` branch of `handle`, then the carriages block's `command` | Nowhere. [Carriages and ferries](carriages.md) names E and the panel | E on a driver opens the panel of his stops and fares, and its Ride button sends `/ride` and the stop. Never in the list or the help. | #1635 |
@@ -84,9 +92,9 @@ and help text never lists it.
 | `/steward`, `/steward <id>`, `/steward -<id>` | A Jarl; anybody asks who holds it | Names or removes a steward | `stewardCmd` in the property block | Nowhere. [Offices](offices.md) names the page | Name steward beside a person in the world, and Remove beside a steward, on the Office page of K, send the person's profile id. Never in the list or the help. | #1638 |
 | `/evict`, `/rent`, `/box` | A steward; anybody asks the rent or which box | Ends a claim, sets rent, marks the hold's box | `evict`, `rentCmd` and `boxCmd` in the property block | Nowhere. [Property](property.md) names the page | Evict, Set rent and No rent for the door opened in the last minute, and a hold's town for the container opened in the last minute, on the Office page of K. The board panel says what the box has been paid. Never in the list or the help. | #1638 |
 | `/board move <hold>`, `/board here` | A steward | Moves a notice board | `board` and `moveBoard` in the property block | Nowhere. [Notice boards](noticeboards.md) names the page | A board's town on the Office page of K, pressed twice, sends `/board move <hold>`. Nothing sends `/board here`. Never in the list or the help. | #1638 |
-| `/me`, `/do`, `/whisper`, `/w`, `/shout`, `/s`, `/yell`, `/y` | Anybody | How a line is said, and how far it carries | `voice/voice-server.js:427`, `voice/headlines.js:28` | [Text chat](chat.md), [People beside you](people.md), [Emotes](emotes.md); the voice service's usage lines | Stays a command, with no buttons, and the help names it (Patrick, 4 Oct). | None |
-| `/ooc`, `/o` | Anybody | Out of character, to whoever is near | `gamemode.js:45334` | The list; `/help talking`; Help page; [Text chat](chat.md), [Factions](factions.md), [Notice boards](noticeboards.md); `site/data/site/rules.md` | Stays a command, with no buttons, and the help names it (Patrick, 4 Oct). | None |
-| `/roll`, `/r` | Anybody | Dice, rolled on the server | `game/ui/thornswood-chat.js:334`, `gamemode.js:45419` | The list; `/help talking`; Help page "Dice"; [Text chat](chat.md) | Stays a command, with no buttons, and the help names it (Patrick, 4 Oct). | None |
+| `/me`, `/do`, `/whisper`, `/w`, `/shout`, `/s`, `/yell`, `/y` | Anybody | How a line is said, and how far it carries | `voice/voice-server.js:427`, `voice/headlines.js:28` | The list, as `/me`, `/do`, `/w`, `/s` and `/y`; the help panel's Talking; Help page "How a line is said"; [Text chat](chat.md), [People beside you](people.md), [Emotes](emotes.md); the voice service's usage lines | Stays a command, with no buttons, and the help names it (Patrick, 4 Oct). | None |
+| `/ooc`, `/o` | Anybody | Out of character, to whoever is near | `gamemode.js:45334` | The list; the help panel's Talking; Help page; [Text chat](chat.md), [Factions](factions.md), [Notice boards](noticeboards.md); `site/data/site/rules.md` | Stays a command, with no buttons, and the help names it (Patrick, 4 Oct). | None |
+| `/roll`, `/r` | Anybody | Dice, rolled on the server | `game/ui/thornswood-chat.js:334`, `gamemode.js:45419` | The list; the help panel's Talking; Help page "Dice"; [Text chat](chat.md) | Stays a command, with no buttons, and the help names it (Patrick, 4 Oct). | None |
 | `/repair`, `/repair mend <base> <condition> <name>` | Anybody with a repair kit | Opens the repair panel; a row's Mend button mends that piece with a kit | The `/repair` branch of `handle`, then `panel` in the durability block | Nowhere. [Durability](durability.md) names the key and the panel | U in the inventory, with a kit in the pack, opens the panel, and Mend sends `mend`. Never in the list or the help. | #1384 |
 | `/treat`, `/treat <id>`, `/treat <me or id> <cloth, bandage, splint, poultice, remedy or set>` | Anybody, on themselves or on somebody hurt within about 4 metres | Opens the wounds panel for you or for them; a row's button gives that treatment | The `/treat` branch of `handle`, then `panel` in the injury and disease block | Nowhere. [Injury](injury.md) names the keys and the panel | H in the inventory, while you have a wound to tend, opens yours; X on somebody hurt, as the look prompt says, opens theirs; each button sends the treatment. Never in the list or the help. | #1383 |
 | `/maneuver <name>`, `/maneuver` | A warrior | Starts a warrior's maneuver; with no name, says which you hold | `gamemode.js`, `use` in the warrior maneuvers block | Nowhere. [Warrior](professions/warrior.md) names the key | The maneuver key (9) opens a panel of yours, and a number or a click there sends it. Never in the list or the help. | #1386 |
@@ -103,8 +111,9 @@ These stay commands.
 
 | Command | Who | What it does | Read at | Where staff are told |
 | --- | --- | --- | --- | --- |
-| `/tp <place>`, `/goto <place>`, `/tp` | Testers and dev: the Playtester role on Discord (the door's allowed list), the written playtester and dev lists, and the admins | Moves you to a town or a named place; `/tp` alone lists the places | `gamemode.js:45107`, `isPlaytester` (45799) | The `/help` menu adds a line for them (45552) |
+| `/tp <place>`, `/goto <place>`, `/tp` | Testers and dev: the Playtester role on Discord (the door's allowed list), the written playtester and dev lists, and the admins | Moves you to a town or a named place; `/tp` alone lists the places | `gamemode.js:45107`, `isPlaytester` (45799) | The reply to `/help` and to a word nobody has adds a line for them, and for nobody else (`helpLine`) |
 | `/give <item> [count]`, `/spawn <creature> [count]` | Testers and dev | Makes items in your pack, or creatures beside you | `gamemode.js:45243` | The same line |
+| `/where` | Testers and dev, refused to everybody else the way `/give` is (#1633) | The cell, position and angle you stand at | The `/where` branch of `handle`, `isPlaytester` | The same line |
 | `/kick`, `/freeze`, `/unfreeze`, `/bring`, `/goto <person>`, `/silence`, `/unsilence`, `/warn`, `/spawnat`, and `/give`, `/spawn` and `/tp` aimed at a person | Staff: Owner, Dev, Gamemaster, Moderator, Loremaster, the admins and the dev list, on a proven connection with a join pass | Moderation in the world | The staff block's `command`, `gamemode.js:53418` | The staff block's header (52661); [Voice](voice.md) for silence |
 | `/ban`, `/unban`, `/banaccount`, `/unbanaccount`, `/pk`, `/note` | Staff | Bans, a character killed for good, and notes, kept on the site | `gamemode.js:53478` | The staff pages on the site (`site/public/hub.js`) |
 | `/unpk` | Admins only | Undoes a PK made by mistake | `gamemode.js:53477` | The staff pages on the site |
