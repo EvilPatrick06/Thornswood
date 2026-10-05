@@ -243,7 +243,7 @@ try {
         # What the outer here-string fills in at install time. $turnSet is the
         # relay line, empty with no relay, which is every box today;
         # tests\test-voice-turn-url.ps1 runs this line with one.
-        $fmt = $m.Groups[1].Value.Replace('$Site', 'https://site.invalid').Replace('$Port', '7999').Replace('$Bind', '127.0.0.1').Replace('$Auth', 'log').Replace('$ChatRange', 'off').Replace('$turnSet', '')
+        $fmt = $m.Groups[1].Value.Replace('$Site', 'https://site.invalid').Replace('$Port', '7999').Replace('$Bind', '127.0.0.1').Replace('$ChatRange', 'off').Replace('$turnSet', '')
         $line = FillLine $fmt $m.Groups[2].Value @{
             '$node.Source' = $node; '$log' = $vlog; '$psExe' = $winps; '$roll' = (Join-Path $vr 'roll-log.ps1')
         }
@@ -252,7 +252,8 @@ try {
             Fill $vlog (4MB + 7)
             $p = RunCmd $line $vr
             Yes 'a voice.log past 4 MB is rolled before voice starts' ((Size ($vlog + '.1')) -eq (4MB + 7))
-            Yes 'voice is still writing to voice.log afterwards, with its settings' ((Count (Get $vlog) 'stand-in voice up on 7999 auth log') -eq 1)
+            # Auth is on, written into the line since #1303 took -Auth away.
+            Yes 'voice is still writing to voice.log afterwards, with its settings' ((Count (Get $vlog) 'stand-in voice up on 7999 auth on') -eq 1)
             Yes 'the command line still names the log, which is how the installer finds its own process' ($line -like ('*' + $vlog + '*'))
         }
     }
