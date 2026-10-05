@@ -123,9 +123,16 @@ not one wait for every quest.
 
 Scarce quests and scene quests from the tables above are in the
 server. The counts, the cooldowns, and the lineup are those tables.
-No trader offers one in the game yet: speaking to a trader does not
-bring up the offer. Supply is not. Scene gold is created when the
-quest is finished. It is not taken from a trader's purse. Walking
+Supply is available on Dev through the merchant panel: look at a
+trader and use the interaction button, then choose a supply turn-in.
+The offer is five goods the hold already buys, paid from that trader's
+finite purse, with a six-hour cooldown after completion. The server
+checks the character, reach, submitted price, goods and purse before
+accepting it. Goods and payment persist through reconnects and restarts.
+
+Scarce and scene offers are not connected to the trader panel yet.
+Scene gold is created when the quest is finished. It is not taken
+from a trader's purse. Walking
 away puts the goods back and does not start the cooldown. The rank on
 a scarce row still applies.
 

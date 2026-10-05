@@ -82,6 +82,39 @@ vm.runInContext(source.slice(source.indexOf('// NPC MERCHANT PURSES BEGIN'),sour
   assert.equal(mp.get(human,'inventory').entries.find(x=>x.baseId===15).count,38);
   assert.equal(mp.get(human,'inventory').entries.find(x=>x.baseId===iron).count,3);
   assert.equal(mp.get(human,'inventory').entries.find(x=>x.baseId===iron).name,'Kept name');
+  // Real native identities and separate saved receipts for two supply owners.
+  const current=mp.get(human,'inventory');
+  current.entries.find(x=>x.baseId===iron).count=8;
+  mp.set(human,'inventory',current);
+  const secondHuman=mp.createActor(0,mp.get(merchantId,'pos'),0,mp.getIdFromDesc(mp.get(merchantId,'worldOrCellDesc')),8);
+  mp.set(secondHuman,'inventory',{entries:[{baseId:15,count:40},{baseId:iron,count:8}]});
+  panel.command({actorId:human,profileId:7,parts:['/merchant',merchantId.toString(16)]});
+  assert.equal(panel.command({actorId:human,profileId:7,parts:['/merchant','supply','Iron','Ingot']}).view.open,true);
+  for(let i=0;i<600 && purses.read(merchantId).pending;i++){mp.tick();panel.recover();await new Promise(resolve=>setTimeout(resolve,10));}
+  assert.equal(purses.read(merchantId).pending,null);
+  assert.equal(mp.get(human,'inventory').entries.find(x=>x.baseId===15).count,53);
+  const secondOffer=panel.command({actorId:secondHuman,profileId:8,parts:['/merchant',merchantId.toString(16)]});
+  assert.equal(secondOffer.view.supply.find(x=>x.name==='Iron Ingot').ready,true);
+  panel.command({actorId:secondHuman,profileId:8,parts:['/merchant','supply','Iron','Ingot']});
+  for(let i=0;i<600 && purses.read(merchantId).pending;i++){mp.tick();panel.recover();await new Promise(resolve=>setTimeout(resolve,10));}
+  assert.equal(purses.read(merchantId).pending,null);
+  assert.equal(mp.get(secondHuman,'inventory').entries.find(x=>x.baseId===15).count,55);
+  assert.equal(purses.read(merchantId).purse,222);
+  assert.equal(purses.read(merchantId).stock.reduce((sum,x)=>sum+x.count,0),10);
+  assert.equal(Object.keys(purses.read(merchantId).supply).length,2);
+  assert.equal(mp.getSavedInventoryReceipt(secondHuman),mp.getInventoryReceipt(secondHuman));
+  const largeHuman=mp.createActor(0,mp.get(merchantId,'pos'),0,mp.getIdFromDesc(mp.get(merchantId,'worldOrCellDesc')),9);
+  const largeInventory={entries:[{baseId:15,count:40,name:''},{baseId:iron,count:8}]};
+  largeInventory.entries[0].name='x'.repeat(131000-Buffer.byteLength(JSON.stringify(largeInventory)));
+  assert.equal(mp.validateInventoryTransaction(largeInventory),true);
+  mp.set(largeHuman,'inventory',largeInventory);
+  panel.command({actorId:largeHuman,profileId:9,parts:['/merchant',merchantId.toString(16)]});
+  panel.command({actorId:largeHuman,profileId:9,parts:['/merchant','supply','Iron','Ingot']});
+  for(let i=0;i<600 && purses.read(merchantId).pending;i++){mp.tick();panel.recover();await new Promise(resolve=>setTimeout(resolve,10));}
+  assert.equal(purses.read(merchantId).pending,null,'native-valid large inventory must fit its complete recovery record');
+  assert.equal(mp.get(largeHuman,'inventory').entries.filter(x=>x.baseId===15).reduce((sum,x)=>sum+x.count,0),55);
+  assert.equal(purses.read(merchantId).purse,207);
+  assert.equal(mp.getSavedInventoryReceipt(largeHuman),mp.getInventoryReceipt(largeHuman));
   panel.shutdown();purses.shutdown();
   const alias=path.join(served,'private-alias');
   fs.symlinkSync(settings.privDir,alias,process.platform==='win32'?'junction':'dir');

@@ -106,7 +106,8 @@ Buying and selling use the hold's submitted price. The trader's purse
 falls when it buys and rises when it sells. Purchased goods stay on that
 trader's shelf. An empty purse refuses a buy. An empty shelf refuses a
 sale. A supply turn-in is five of an item at that same buy price, paid
-from the same purse, and it will not be offered again for six hours.
+from the same purse. Each character waits six hours after its completed
+supply before that trader offers the same supply again.
 Scene quests are not paid from the purse.
 
 The person must be the authenticated character and within 400 of that
@@ -115,8 +116,7 @@ buy, sell or supply buttons. The panel requests the trade; the server
 checks its price, reach, purse, stock and character identity. People
 cannot join, and there is no due or discount.
 
-The settlement implementation is under review and has not been released.
-It uses the native inventory comparison and exact saved receipts. The
+Settlement uses the native inventory comparison and exact saved receipts. The
 engine validates the complete resulting inventory with the same count,
 byte and metadata checks it uses for mutation. The complete offer is
 saved in the private ledger before outgoing goods or
@@ -125,7 +125,12 @@ to be saved. The purse and shelf then change together in the ledger,
 and the incoming inventory is credited. Completion waits for its exact
 saved receipt. Other inventory earned or spent during the save is kept.
 Item names, condition, charge and other inventory details stay with the
-goods. A reload resumes the saved offer without paying twice.
+goods. A reload resumes the saved offer without paying twice. The record limit is
+512 KiB. Before removing anything, the server reserves space for both
+recovery inventory snapshots at their full 128 KiB limits. After the
+outgoing inventory is saved, its redundant snapshots are retired in the
+same durable commit as the merchant's purse and stock. A trade whose
+complete recovery record cannot fit is refused before anything is taken.
 
 At most 25 transfers may wait across the server, including offline
 characters and unloaded traders. One person and one trader may each
