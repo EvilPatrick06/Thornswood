@@ -225,8 +225,15 @@ try {
 
 # ---- 3. configure -----------------------------------------------------------
 Head 'Configure'
+# Configured means the solution the build step runs is there. CMakeCache.txt is
+# written at the start of a configure, so one that stopped part way (a vcpkg
+# download that could not resolve its host, 5 Oct) left the cache and no
+# ALL_BUILD.vcxproj, and the next run skipped the configure and stopped at
+# MSB1009. A configure over that cache carries on from it.
 $cache = Join-Path $build 'CMakeCache.txt'
-if (Test-Path -LiteralPath $cache) { Ok "already configured: $build" }
+$solution = Join-Path $build 'ALL_BUILD.vcxproj'
+if (Test-Path -LiteralPath $solution) { Ok "already configured: $build" }
+elseif ($Check -and (Test-Path -LiteralPath $cache)) { Miss "$build was configured part way (no ALL_BUILD.vcxproj); this run would configure it again from where it stopped" }
 elseif ($Check) { Miss "$build is not configured; this run would configure it (the first time builds every vcpkg library, which is slow)" }
 else {
     $toolchain = Join-Path $Fork 'vcpkg\scripts\buildsystems\vcpkg.cmake'
