@@ -651,15 +651,18 @@ exit code $code"
     $at = $shipText.IndexOf("Head 'Generated files'")
     $bodies = $shipText.IndexOf("Head 'Covered bodies'")
     Yes 'B: Ship.ps1 has a Generated files step' ($at -gt 0)
-    $step = if ($at -gt 0 -and $bodies -gt $at) { $shipText.Substring($at, $bodies - $at) } else { '' }
+    # The step runs to the launcher build, which comes after it since #1692.
+    $build = if ($at -gt 0) { $shipText.IndexOf('# ------------------------------------------------------------ build', $at) } else { -1 }
+    $step = if ($at -gt 0 -and $build -gt $at) { $shipText.Substring($at, $build - $at) } else { '' }
     Yes 'B: it reads the state of this install''s folder against records\generated.json' (
         $step -match "\. \(Join-Path \`$Here '\.\.\\mods\\Generated\.ps1'\)" -and $step -match "Get-GeneratedState \`$Root \(Join-Path \`$RepoDir 'records\\generated\.json'\)")
     Yes 'B: and stops, on both channels, with the sentence that says what to run, putting the version back' (
         $step -match "if \(-not \`$genState\.Current\) \{\s*Unbump '[^']+'\s*Die \(Get-GeneratedStaleSays \`$genState \`$Channel\)" -and $step -notmatch '\$Dev')
-    $client = $shipText.IndexOf("Head 'Client build'")
     $publish = $shipText.IndexOf("Publish-Update.ps1", $at + 1)
-    Yes 'B: after the client check, before the covered bodies (which read what it built) and before anything is published' (
-        $client -gt 0 -and $at -gt $client -and $bodies -gt $at -and ($publish -lt 0 -or $publish -gt $at))
+    $buildCall = $shipText.IndexOf("'Build-Launcher.ps1') -Root")
+    $installCall = $shipText.IndexOf("'Install-Launcher.ps1')")
+    Yes 'B: before the launcher is built or installed (#1692), before the covered bodies (which read what it built) and before anything is published' (
+        $buildCall -gt $at -and $installCall -gt $at -and $bodies -gt $at -and ($publish -lt 0 -or $publish -gt $at))
 
     # ======================================================== C: in use
     $recBefore = Text $record

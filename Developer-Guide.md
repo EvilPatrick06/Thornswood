@@ -531,6 +531,22 @@ in, above). When both say READY:
 Any developer may run a main Ship from a machine that can sign (How work moves). The same script with
 `-Channel main` checks a machine for it.
 
+Ship builds a channel's release from one folder on each machine: the main
+install for main and `<Root>-DevBuild` for dev, unless the machine has
+recorded another (issue #1692). On a machine whose Vortex deploys into the
+dev build's game folder (docs/COLLECTION-REVISION-2.md step 8), record the
+release folder once:
+
+```
+.\scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root C:\Thornswood-Release-DevBuild
+```
+
+It writes the file `.\scripts\release\Where.ps1 ShipRoots` names, in this
+machine's own data, so every clone and worktree reads it, and Ship,
+Check-ShipReady and Build-Generated then take that folder without `-Root`.
+Ship and Check-ShipReady refuse a folder Vortex deploys into, before
+anything is built.
+
 `tests\test-ship-machine.ps1` walks this section: every script it names is
 in the repository with the parameters it is given, the template holds paths
 only, and the fetch refuses a signing client or a client runtime that is not
@@ -1647,6 +1663,10 @@ the launcher closed, on the machine that ships:
 .\scripts\mods\Build-Generated.ps1 -Channel dev      C:\Thornswood-DevBuild\Game
 .\scripts\mods\Build-Generated.ps1 -Channel main     C:\Thornswood\Game
 ```
+
+Those are the defaults; on a machine that recorded its release folder with
+`Setup-ShipMachine.ps1 -Root`, `-Channel` builds in that one, the folder
+Ship packs (issue #1692).
 
 It runs two tools the collection installs, with what `records\generated.json`
 names. The behavior files come from Pandora Behaviour Engine+ (Nexus 133232,

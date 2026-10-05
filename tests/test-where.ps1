@@ -68,6 +68,8 @@ try {
     Yes 'Repo is the folder above scripts\release' (Same (Ask 'Repo') $repo)
     Yes 'Releases is this machine''s working copy of the main feed (#907)' (Same (Ask 'Releases') (Join-Path $env:LOCALAPPDATA 'Thornswood\feed\main'))
     Yes 'ReleasesDev is the dev one' (Same (Ask 'ReleasesDev') (Join-Path $env:LOCALAPPDATA 'Thornswood\feed\dev'))
+    Yes 'ShipRoots is beside them, in this machine''s own data (#1692; tests\test-1692-release-root.ps1 holds the rest)' (
+        Same (Ask 'ShipRoots') (Join-Path $env:LOCALAPPDATA 'Thornswood\ship-roots.json'))
     Yes 'with nothing anywhere, the engine is engine\skymp' (Same (Ask 'Engine') $newEngine)
     Yes 'and the output is out' (Same (Ask 'Out') $newOut)
     Yes 'and ServerDist is under the engine''s build' (Same (Ask 'ServerDist') (Join-Path $newEngine 'build\dist\server'))
@@ -80,7 +82,7 @@ try {
     $strictSaid = @{}
     & {
         Set-StrictMode -Version Latest
-        foreach ($p in 'ClientDist', 'ServerDist', 'ServerSettings', 'ChangeForms', 'Dist', 'Payload', 'ServerZip', 'Releases', 'ReleasesDev', 'Engine', 'Out', 'bot') {
+        foreach ($p in 'ClientDist', 'ServerDist', 'ServerSettings', 'ChangeForms', 'Dist', 'Payload', 'ServerZip', 'Releases', 'ReleasesDev', 'ShipRoot', 'ShipRootDev', 'ShipRoots', 'Engine', 'Out', 'bot') {
             try { $strictSaid[$p] = [string](& $w $p) } catch { $strictSaid[$p] = 'THREW ' + $_.Exception.Message }
         }
     }
@@ -145,7 +147,7 @@ try {
     # ---- the scripts --------------------------------------------------------
     # A string naming C:\Thornswood-Dev: scripts\oneoff is parked history.
     $named = @()
-    $keys = @('Repo', 'Engine', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms', 'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Releases', 'ReleasesDev')
+    $keys = @('Repo', 'Engine', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms', 'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Releases', 'ReleasesDev', 'ShipRoot', 'ShipRootDev', 'ShipRoots')
     $badKeys = @()
     $callers = 0
     $scriptsDir = Join-Path $realRepo 'scripts'
