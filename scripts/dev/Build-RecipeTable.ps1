@@ -1540,12 +1540,45 @@ $NOBODY_MAKES = [ordered]@{
 # dropping BNAM. This list refuses them on rebuild so the gate matches the menu.
 # Matched on the recipe's own editor id, not the output name, so the keeper stays.
 $COLLAPSED_SMELT_EDITOR_IDS = [ordered]@{
-    'RecipeIngotDwarvenScrapPlateMetalSmall' = 'duplicate Dwarven Metal Ingot scrap smelt. One scrap path stays (RecipeIngotDwarvenScrapPlateMetalLarge). The other five are hidden from the smelter menu in Thornswood-Content.esp and refused here so the gate matches the menu. No sale price; player-run economy.'
-    'RecipeIngotDwarvenScrapLarge03' = 'duplicate Dwarven Metal Ingot scrap smelt. One scrap path stays (RecipeIngotDwarvenScrapPlateMetalLarge). The other five are hidden from the smelter menu in Thornswood-Content.esp and refused here so the gate matches the menu. No sale price; player-run economy.'
-    'RecipeIngotDwarvenScrapLarge02' = 'duplicate Dwarven Metal Ingot scrap smelt. One scrap path stays (RecipeIngotDwarvenScrapPlateMetalLarge). The other five are hidden from the smelter menu in Thornswood-Content.esp and refused here so the gate matches the menu. No sale price; player-run economy.'
-    'RecipeIngotDwarvenScrapLarge' = 'duplicate Dwarven Metal Ingot scrap smelt. One scrap path stays (RecipeIngotDwarvenScrapPlateMetalLarge). The other five are hidden from the smelter menu in Thornswood-Content.esp and refused here so the gate matches the menu. No sale price; player-run economy.'
-    'RecipeIngotDwarvenScrapBent' = 'duplicate Dwarven Metal Ingot scrap smelt. One scrap path stays (RecipeIngotDwarvenScrapPlateMetalLarge). The other five are hidden from the smelter menu in Thornswood-Content.esp and refused here so the gate matches the menu. No sale price; player-run economy.'
+    'RecipeIngotDwarvenScrapPlateMetalSmall' = 'duplicate Dwarven Metal Ingot scrap smelt. One scrap path stays (RecipeIngotDwarvenScrapPlateMetalLarge). The other five are hidden from the smelter menu in Thornswood-Content.esp and refused here so the gate matches the menu. No sale price. People sell to each other.'
+    'RecipeIngotDwarvenScrapLarge03' = 'duplicate Dwarven Metal Ingot scrap smelt. One scrap path stays (RecipeIngotDwarvenScrapPlateMetalLarge). The other five are hidden from the smelter menu in Thornswood-Content.esp and refused here so the gate matches the menu. No sale price. People sell to each other.'
+    'RecipeIngotDwarvenScrapLarge02' = 'duplicate Dwarven Metal Ingot scrap smelt. One scrap path stays (RecipeIngotDwarvenScrapPlateMetalLarge). The other five are hidden from the smelter menu in Thornswood-Content.esp and refused here so the gate matches the menu. No sale price. People sell to each other.'
+    'RecipeIngotDwarvenScrapLarge' = 'duplicate Dwarven Metal Ingot scrap smelt. One scrap path stays (RecipeIngotDwarvenScrapPlateMetalLarge). The other five are hidden from the smelter menu in Thornswood-Content.esp and refused here so the gate matches the menu. No sale price. People sell to each other.'
+    'RecipeIngotDwarvenScrapBent' = 'duplicate Dwarven Metal Ingot scrap smelt. One scrap path stays (RecipeIngotDwarvenScrapPlateMetalLarge). The other five are hidden from the smelter menu in Thornswood-Content.esp and refused here so the gate matches the menu. No sale price. People sell to each other.'
 }
+
+# THE DWARVEN SCRAP SMELT THAT STAYS (#613, #1400). It stays in the unowned map,
+# because #613 kept it out of the owned bucket and tests\test-613-dwarven-ingot-collapse.js
+# holds it there, and the gamemode gates it by hand in KEPT_SMELT as novice
+# Platewright work. Its reason says so instead of the smelter's "open to
+# everybody", which #1400 wrote into recipes.json by hand and a rebuild undid.
+$OPEN_ROW_WHY = [ordered]@{
+    'RecipeIngotDwarvenScrapPlateMetalLarge' = 'a smelter makes ingots, which are stock rather than a finished good. Both halves of the Smith need them, and a Miner who could not smelt his own ore would have nothing to sell. Smith work at novice, so both smith halves can do it. Not open to anybody.'
+}
+
+# THE CUT FILE (#1391). docs\systems\cut-items.json names every recipe that
+# leaves the open craft book, one row per reference so a row can be put back
+# for an event, and says which of three things each one is:
+#   cut       not found and not made. An owned row keeps its owner and rank in
+#             recipes.json with "book": "cut", so putting it back is taking its
+#             line out of the cut file, and the gamemode block carries it as a
+#             row nobody makes. A row nobody owned goes to the refused map with
+#             the cut file's reason, because unowned means anybody may make it.
+#   embassy   made only by the embassy roll: "roll": "embassy" on the row.
+#   thalmor   made only by the Thalmor remnant roll: "roll": "remnant".
+# It is applied after every rank and every count above, so the ladders and the
+# half counts are the same with it as without it.
+#
+# Until 4 October this was done to recipes.json and the gamemode block by hand
+# after the build had written them, so the next rebuild would have put all 3342
+# rows back in the open book (issue #1622). This file is now what the build
+# reads. scripts\dev\Write-CutItems.js wrote it once from the table before
+# anything was cut; run on a table that is already cut it writes a shorter list,
+# so it is not a step after this one.
+$CUT_FILE = Join-Path $PSScriptRoot '..\..\docs\systems\cut-items.json'
+$CUT_ROLLS = [ordered]@{ 'embassy' = 'embassy'; 'thalmor' = 'remnant' }
+# What the gamemode says, after "Nobody makes that here. ", for a cut row.
+$CUT_SENTENCE = 'Cut from the open book. Not found and not made. The reference stays in the cut file.'
 
 
 # WHICH FOOD IS A DESSERT. This was expected to be a judgement and it is not,
@@ -1825,6 +1858,36 @@ $RECIPE_OWNER = [ordered]@{
     'ThornswoodRecipeWeaponKit'  = @{ Owner = 'Smith'; Half = 'Edgewright'; Why = 'the Weapon Kit is the Edgewright''s repair kit (docs/systems/durability.md), and the output is a MISC, so the forge rule, which settles ownership by the output being a WEAP, cannot see it. Patrick, 4 October: use a suggested recipe; this is the one picked (#1384).' }
     'ThornswoodRecipeArmorKit'   = @{ Owner = 'Smith'; Half = 'Platewright'; Why = 'the Armor Kit is the Platewright''s repair kit (docs/systems/durability.md). A MISC at a forge, so the forge rule cannot see it, and it would not land on the Platewright if it could. Patrick, 4 October: use a suggested recipe; this is the one picked (#1384).' }
     'ThornswoodRecipeSewingKit'  = @{ Owner = 'Tailor'; Half = 'Haberdasher'; Why = 'the Sewing Kit is the Haberdasher''s repair kit (docs/systems/durability.md). A MISC at the tanning rack, which is open furniture whose own rule hands a hide into leather to the Platewright, so nothing derived would give it to a tailor. Patrick, 4 October: use a suggested recipe; this is the one picked (#1384).' }
+    # The fish trap (#1379). docs/systems/classes/fisher.md: "A woodwright makes
+    # them", the poles and the trap. The poles reach the Woodwright by the spear
+    # rule further down; the trap is a MISC with no pole in its name, so the
+    # forge rule leaves it to anybody unless it is named here.
+    'ThornswoodRecipeFishTrap'   = @{ Owner = 'Woodworker'; Half = 'Woodwright'; Why = 'the fish trap is a woodwright novice good, made with the poles (docs/systems/classes/fisher.md, issue #1379). A MISC at a forge with no pole in its name, so neither the forge rule nor the spear rule can see it.' }
+    # ONE SMELT ROW PER INGOT AND ONE ROW FOR LEATHER (#1391, #1400). Smelting an
+    # ingot is smith work and tanning a hide is the Platewright's
+    # (docs/systems/cut-items.md, "Smelting and tanning are not anybody's work").
+    # The duplicates are cut in docs/systems/cut-items.json, which CUT_FILE reads,
+    # and these are the rows that stay. They are named here because the smelter
+    # is open furniture in BENCH_OWNER and the tanning rack is no profession's
+    # bench, so no derived rule gives either to a half. All of them are novice
+    # in RECIPE_RANK, Platewright work that the sister half reaches at novice.
+    # Family is the recipe book's group for them, Ingots and Leather, because a
+    # MISC output names no kind of thing and would land in Other goods.
+    # Until 4 October they were put in recipes.json by hand after the build,
+    # so a rebuild handed every one of them back to anybody (issue #1622).
+    'RecipeIngotCorundum'        = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
+    'RecipeIngotEbony'           = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
+    'IMRIngotGlacialCrystal'     = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
+    'RecipeIngotGold'            = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
+    'RecipeIngotIron'            = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
+    'RecipeIngotOrichalcum'      = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
+    'RecipeIngotQuicksilver'     = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
+    'RecipeIngotMalachite'       = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
+    'RecipeIngotMoonstone'       = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
+    'RecipeIngotSilver'          = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
+    'RecipeIngotSteel'           = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
+    'RecipeLeatherDeerHide02'    = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Leather'; Why = 'The one row kept for this leather. Platewright work, as the smith page says. Not anybody''s.' }
+    'RecipeLeatherStrips'        = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Leather'; Why = 'The one row kept for this leather. Platewright work, as the smith page says. Not anybody''s.' }
 }
 
 # FOUR NAMED RECIPES WHOSE RANK IS A DECISION RATHER THAN A READING.
@@ -1857,6 +1920,30 @@ $RECIPE_RANK = [ordered]@{
     'ThornswoodRecipeCharcoalTier2' = @{ Rank = 'advanced'; Why = 'the second charcoal grade, which burnCharcoal hands to an advanced charburner.' }
     'ThornswoodRecipeCharcoalTier3' = @{ Rank = 'expert';   Why = 'the third charcoal grade, which burnCharcoal hands to an expert charburner.' }
     'ThornswoodRecipeCharcoalTier4' = @{ Rank = 'master';   Why = 'coke, the last charcoal grade, which burnCharcoal hands to a master charburner alone.' }
+    # The poles and the trap, as docs/systems/classes/fisher.md ranks them under
+    # "The poles and the trap" (issue #1379). Input cost puts the fine pole on
+    # advanced and the master pole on expert, because a steel ingot and a
+    # refined moonstone are their dearest makings; the page ranks a pole by the
+    # water it fishes, so the rank is a decision and not a reading.
+    'ThornswoodRecipePoleCrude'     = @{ Rank = 'novice';   Why = 'the crude pole, novice on the fisher page.' }
+    'ThornswoodRecipePoleFine'      = @{ Rank = 'expert';   Why = 'the fine pole, expert on the fisher page: it fishes novice through expert water.' }
+    'ThornswoodRecipePoleMaster'    = @{ Rank = 'master';   Why = 'the master pole, master on the fisher page: it fishes all of it.' }
+    'ThornswoodRecipeFishTrap'      = @{ Rank = 'novice';   Why = 'the fish trap, a woodwright novice good on the fisher page.' }
+    # The kept smelt and tan rows named in RECIPE_OWNER (#1391, #1400): novice
+    # smith work, whatever the ore costs to dig.
+    'RecipeIngotCorundum'           = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
+    'RecipeIngotEbony'              = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
+    'IMRIngotGlacialCrystal'        = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
+    'RecipeIngotGold'               = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
+    'RecipeIngotIron'               = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
+    'RecipeIngotOrichalcum'         = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
+    'RecipeIngotQuicksilver'        = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
+    'RecipeIngotMalachite'          = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
+    'RecipeIngotMoonstone'          = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
+    'RecipeIngotSilver'             = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
+    'RecipeIngotSteel'              = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
+    'RecipeLeatherDeerHide02'       = @{ Rank = 'novice';   Why = 'the one row kept for this leather, Platewright work at novice (#1391, #1400).' }
+    'RecipeLeatherStrips'           = @{ Rank = 'novice';   Why = 'the one row kept for this leather, Platewright work at novice (#1391, #1400).' }
 }
 
 $BENCH_OWNER = [ordered]@{
@@ -3228,6 +3315,21 @@ foreach ($desc in $recipes.Keys) {
     $outTypeCount[$o.Type] = $outTypeCount[$o.Type] + 1
     $names = KeywordNames $o
 
+    # 1a. A duplicate dwarven scrap smelt (#613). Thornswood-Content.esp takes
+    #     the bench keyword off five of them so the smelter menu hides them,
+    #     which put them on the bench NONE rule just below, unowned, before the
+    #     refusal further down was ever reached. The build that #613 wrote this
+    #     refusal for never ran against the plugins, and recipes.json was set by
+    #     hand to what it should have said (issue #1622). So they are refused by
+    #     their own editor id first, whatever bench the winning record names.
+    if ($COLLAPSED_SMELT_EDITOR_IDS.Contains($r.Edid)) {
+        $refusedRows[$desc] = [pscustomobject]@{
+            Edid = $r.Edid; OutDesc = $o.Desc; OutName = $o.Name; OutType = $o.Type; BenchDesc = $r.BenchDesc; BenchName = $benchName
+            Why = [string]$COLLAPSED_SMELT_EDITOR_IDS[$r.Edid]
+        }
+        continue
+    }
+
     # 2. A recipe with no bench keyword. CraftService's own note says it: in the
     #    original game, setting the bench keyword to NONE removes the recipe
     #    from every crafting station. So nobody can reach it whatever this table
@@ -3259,12 +3361,16 @@ foreach ($desc in $recipes.Keys) {
     # 4. A bench that settles the profession on its own, and sometimes the half
     #    with it. The smelter is in this table with an empty owner, which is how
     #    a bench is declared open to everybody.
+    #    A recipe named in RECIPE_OWNER is not open whatever its bench, which
+    #    is how the one smelt row kept for each ingot is the smith's (#1400).
     $benchOwner = $null
     if ($BENCH_OWNER.Contains($benchName)) { $benchOwner = $BENCH_OWNER[$benchName] }
-    if ($benchOwner -and -not $benchOwner.Owner) {
+    if ($benchOwner -and -not $benchOwner.Owner -and -not $RECIPE_OWNER.Contains($r.Edid)) {
+        $openWhy = $benchOwner.Why
+        if ($OPEN_ROW_WHY.Contains($r.Edid)) { $openWhy = [string]$OPEN_ROW_WHY[$r.Edid] }
         $unowned[$desc] = [pscustomobject]@{
             Edid = $r.Edid; OutDesc = $o.Desc; OutName = $o.Name; OutType = $o.Type; BenchDesc = $r.BenchDesc; BenchName = $benchName
-            Why = $benchOwner.Why
+            Why = $openWhy
         }
         continue
     }
@@ -3428,14 +3534,6 @@ foreach ($desc in $recipes.Keys) {
             continue
         }
 
-        if (-not $refusedWhy -and $COLLAPSED_SMELT_EDITOR_IDS.Contains($r.Edid)) {
-            $refusedWhy = [string]$COLLAPSED_SMELT_EDITOR_IDS[$r.Edid]
-            $refusedRows[$desc] = [pscustomobject]@{
-                Edid = $r.Edid; OutDesc = $o.Desc; OutName = $o.Name; OutType = $o.Type; BenchDesc = $r.BenchDesc; BenchName = $benchName
-                Why = $refusedWhy
-            }
-            continue
-        }
         #
         # Then the fishing poles, which are the Woodwright's by the same
         # sentence that gave him spears. Patrick, 23 September: 'Same with
@@ -3482,6 +3580,9 @@ foreach ($desc in $recipes.Keys) {
     # record, never off the half: two halves can make the same kind of thing
     # and a family is about what the thing is.
     $famRead = FamilyOf $o $names
+    if ($RECIPE_OWNER.Contains($r.Edid) -and $RECIPE_OWNER[$r.Edid].ContainsKey('Family')) {
+        $famRead = @([string]$RECIPE_OWNER[$r.Edid].Family, 'named in RECIPE_OWNER', 'named')
+    }
 
     # Whose race made it. See $RACE_LOCK_WORDS: the word looked for is the one
     # the item is named with, Riekling or Bosmer, and the word recorded is the
@@ -3556,7 +3657,7 @@ Write-Host 'families' -ForegroundColor Cyan
 $famRows = @{}
 $famPerHalf = @{}
 $famPerHalfFiring = @{}
-$famReadCount = @{ 'keyword' = 0; 'twoKinds' = 0; 'type' = 0 }
+$famReadCount = @{ 'keyword' = 0; 'twoKinds' = 0; 'type' = 0; 'named' = 0 }
 $famNameless = New-Object 'System.Collections.Generic.List[string]'
 foreach ($desc in $owned.Keys) {
     $row = $owned[$desc]
@@ -3582,8 +3683,8 @@ if ($famNameless.Count -gt 0) {
 } else {
     Ok ("every one of the {0} owned rows has a family, in {1} families across the table" -f $owned.Count, $famRows.Count)
 }
-Note ("{0} row(s) read their family off one kind keyword on the output, {1} off the record type because the output named two kinds and so named none, {2} off the record type because the output named no kind at all" -f `
-      $famReadCount['keyword'], $famReadCount['twoKinds'], $famReadCount['type'])
+Note ("{0} row(s) read their family off one kind keyword on the output, {1} off the record type because the output named two kinds and so named none, {2} off the record type because the output named no kind at all, {3} named in RECIPE_OWNER" -f `
+      $famReadCount['keyword'], $famReadCount['twoKinds'], $famReadCount['type'], $famReadCount['named'])
 foreach ($f in ($famRows.Keys | Sort-Object { -$famRows[$_] })) {
     Write-Host ("  {0,6}  {1}" -f $famRows[$f], $f)
 }
@@ -5017,6 +5118,65 @@ foreach ($t in ($outTypeCount.Keys | Sort-Object { -$outTypeCount[$_] })) {
     Note ("{0}: {1}" -f $t, $outTypeCount[$t])
 }
 
+# ------------------------------------------------------------ the cut file -
+#
+# See $CUT_FILE. Every rank and count above is settled before this runs, so it
+# moves no ladder: it marks what leaves the open book and what only a roll
+# makes, and hands the rows nobody owned to the refused map.
+
+Write-Host ''
+Write-Host 'the cut file' -ForegroundColor Cyan
+$cutCount = [ordered]@{ 'owned' = 0; 'refused' = 0; 'alreadyRefused' = 0; 'embassy' = 0; 'thalmor' = 0 }
+$cutNotHere = New-Object 'System.Collections.Generic.List[string]'
+if (-not (Test-Path -LiteralPath $CUT_FILE)) {
+    Bad "the cut file is not there: $CUT_FILE"
+} else {
+    $cutDoc = Get-Content -LiteralPath $CUT_FILE -Raw -Encoding UTF8 | ConvertFrom-Json
+    foreach ($ci in @($cutDoc.items)) {
+        $cid = [string]$ci.id
+        $disp = [string]$ci.disposition
+        if ($disp -ne 'cut' -and -not $CUT_ROLLS.Contains($disp)) {
+            Bad ("the cut file names {0} as '{1}', which is not cut, embassy or thalmor" -f $cid, $disp)
+            continue
+        }
+        if ($owned.Contains($cid)) {
+            if ($disp -eq 'cut') {
+                $owned[$cid] | Add-Member -NotePropertyName Book -NotePropertyValue 'cut' -Force
+                $cutCount['owned']++
+            } else {
+                $owned[$cid] | Add-Member -NotePropertyName Roll -NotePropertyValue ([string]$CUT_ROLLS[$disp]) -Force
+                $cutCount[$disp]++
+            }
+        } elseif ($unowned.Contains($cid)) {
+            if ($disp -ne 'cut') {
+                Bad ("the cut file puts {0} ({1}) on the {2} roll, and nobody owns it, so a roll has no half to gate" -f $cid, $unowned[$cid].OutName, $disp)
+                continue
+            }
+            $u = $unowned[$cid]
+            $refusedRows[$cid] = [pscustomobject]@{
+                Edid = $u.Edid; OutDesc = $u.OutDesc; OutName = $u.OutName; OutType = $u.OutType; BenchDesc = $u.BenchDesc; BenchName = $u.BenchName
+                Why = [string]$ci.why; Cut = $true
+            }
+            $unowned.Remove($cid)
+            $cutCount['refused']++
+        } elseif ($refusedRows.Contains($cid)) {
+            # Already refused by this build, by NOBODY_MAKES or the collapsed
+            # dwarven smelts, whose own reason is the one the gate says.
+            $cutCount['alreadyRefused']++
+        } else {
+            $cutNotHere.Add($cid)
+        }
+    }
+    Ok ("{0} owned row(s) cut from the open book, {1} row(s) nobody owned now refused, {2} already refused here" -f `
+        $cutCount['owned'], $cutCount['refused'], $cutCount['alreadyRefused'])
+    Ok ("{0} row(s) on the embassy roll and {1} on the Thalmor remnant roll" -f $cutCount['embassy'], $cutCount['thalmor'])
+    if ($cutNotHere.Count -gt 0) {
+        # A reference to a recipe this load order does not carry. It cuts
+        # nothing and does no harm, and the cut file keeps it for an event.
+        Loud ("{0} row(s) in the cut file are not in this load order: {1}" -f $cutNotHere.Count, (($cutNotHere | Select-Object -First 10) -join ', '))
+    }
+}
+
 # ------------------------------------------------------------- the writing -
 
 Write-Host ''
@@ -5229,7 +5389,9 @@ foreach ($desc in $owned.Keys) {
              ', "inputRank": ' + $(if ($r.InputRank) { JsonStr $r.InputRank } else { 'null' }) +
              ', "inputRankWho": ' + $(if ($r.InputRankWho) { JsonStr $r.InputRankWho } else { 'null' }) +
              ', "inputsWithNoProducer": ' + $r.InputsUnplaced +
-             ', "whyThatRank": ' + (JsonStr $r.RankWhy) + ' }' + $comma)
+             ', "whyThatRank": ' + (JsonStr $r.RankWhy) +
+             $(if ($r.PSObject.Properties['Book']) { ', "book": ' + (JsonStr $r.Book) } else { '' }) +
+             $(if ($r.PSObject.Properties['Roll']) { ', "roll": ' + (JsonStr $r.Roll) } else { '' }) + ' }' + $comma)
 }
 $doc.Add('  },')
 
@@ -5282,6 +5444,16 @@ $blockRows = New-Object 'System.Collections.Generic.List[string]'
 foreach ($desc in $owned.Keys) {
     if (-not $owned[$desc].Fires) { continue }
     $r = $owned[$desc]
+    # A row the cut file takes out of the open book goes in as a row nobody
+    # makes, the way a refused row does, so the gate turns it down before it
+    # asks about a half or a rank (see $CUT_FILE).
+    if ($r.PSObject.Properties['Book'] -and $r.Book -eq 'cut') {
+        $blockRows.Add('    ' + (JsonStr $desc) + ': { "out": ' + (JsonStr $r.OutDesc) + ', "name": ' + (JsonStr $r.OutName) +
+                       ', "type": ' + (JsonStr $r.OutType) + ', "makes": ' + $r.Count +
+                       ', "owner": "", "half": "", "race": ' + (JsonStr $r.Race) + ', "rank": "", "family": ""' +
+                       ', "nobody": ' + (JsonStr $CUT_SENTENCE) + ' },')
+        continue
+    }
     $dayOneTxt = 'false'
     if ($r.DayOne) { $dayOneTxt = 'true' }
     # The spell a staff binds, on the rows that have one, for the gamemode's
@@ -5294,7 +5466,8 @@ foreach ($desc in $owned.Keys) {
                    ', "owner": ' + (JsonStr $r.Owner) + ', "half": ' + (JsonStr $r.Half) +
                    ', "race": ' + (JsonStr $r.Race) +
                    ', "rank": ' + (JsonStr $r.Rank) + ', "family": ' + (JsonStr $r.Family) +
-                   ', "open": ' + $dayOneTxt + $spellTxt + ' },')
+                   ', "open": ' + $dayOneTxt + $spellTxt +
+                   $(if ($r.PSObject.Properties['Roll']) { ', "roll": ' + (JsonStr $r.Roll) } else { '' }) + ' },')
 }
 
 # THE STAFF SPELLS, the second block this script owns in game\gamemode.js
@@ -5395,10 +5568,12 @@ $staffLines.Add('  };')
 # about profession or rank: there is no rank at which a nail becomes useful.
 foreach ($desc in $refusedRows.Keys) {
     $r = $refusedRows[$desc]
+    $nobodyWhy = $r.Why
+    if ($r.PSObject.Properties['Cut'] -and $r.Cut) { $nobodyWhy = $CUT_SENTENCE }
     $blockRows.Add('    ' + (JsonStr $desc) + ': { "out": ' + (JsonStr $r.OutDesc) + ', "name": ' + (JsonStr $r.OutName) +
                    ', "type": ' + (JsonStr $r.OutType) + ', "makes": 1' +
                    ', "owner": "", "half": "", "race": "", "rank": "", "family": ""' +
-                   ', "nobody": ' + (JsonStr $r.Why) + ' },')
+                   ', "nobody": ' + (JsonStr $nobodyWhy) + ' },')
 }
 if ($blockRows.Count -gt 0) {
     $last = $blockRows[$blockRows.Count - 1]
