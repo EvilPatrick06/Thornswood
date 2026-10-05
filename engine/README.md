@@ -303,3 +303,12 @@ leaves out a server file or says one was built from another commit. `tests\test-
 in the nightly checks, asks GitHub whether the pin is the head of the branch
 (or the head is only merge commits over it with the same files), and is red
 when a fork change has been merged and not pinned here.
+
+One more, a level up (issue #1791). `tests\test-fork-upstream.js`, in the
+nightly checks, asks GitHub for the commits on upstream
+skyrim-multiplayer/skymp `main` that `thornswood/engine-changes` does not
+have, and is red naming each one. Patrick, 5 Oct: the nightly goes red when
+upstream has fixes the fork does not. It goes green when each is merged into
+the fork branch (a fork pull request, then the steps above), or when
+`records\upstream-not-taken.json` lists it with the reason it is not being
+taken and who decided.
