@@ -153,3 +153,13 @@ the chat keeps the newest roster and the offers sent to it, and hands
 them over in that order (#1869).
 `tests/test-1869-voice-negotiation.js` runs both clients through the
 real service.
+
+The service sends each connection where everybody near is once, when
+it joins, and after that only who moved. So the chat also keeps that
+first view with every move since, the voice modes said since the
+roster, and any staff silence still on, and hands them over too
+(#1924). Without them an overlay that started listening late never
+saw anybody standing still, itself included: no speaking marks until
+it moved, and the party strip read the same empty table.
+`tests/test-1924-voice-whole-view.js` runs it through the real
+service.
