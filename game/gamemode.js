@@ -28574,7 +28574,7 @@ log('gamemode loaded:',
     }
     var ids = [];
     try {
-      var doc = JSON.parse(fs.readFileSync(path.join(privDir, 'allowed.json'), 'utf8').replace(/^ï»¿/, ''));
+      var doc = JSON.parse(fs.readFileSync(path.join(privDir, 'allowed.json'), 'utf8').replace(/^\uFEFF/, ''));
       var list = (doc && Array.isArray(doc.profiles)) ? doc.profiles : [];
       for (var i = 0; i < list.length; i++) {
         var n = Number(list[i]);
@@ -28595,7 +28595,7 @@ log('gamemode loaded:',
   function push() {
     var conf;
     try {
-      conf = JSON.parse(fs.readFileSync(path.join(privDir, 'door.json'), 'utf8').replace(/^ï»¿/, ''));
+      conf = JSON.parse(fs.readFileSync(path.join(privDir, 'door.json'), 'utf8').replace(/^\uFEFF/, ''));
     } catch (e) { return; }
     if (!conf || !conf.site || !conf.key) return;
     var https;
@@ -28774,7 +28774,7 @@ log('gamemode loaded:',
     if (now - readAt < 30000) return list;
     readAt = now;
     try {
-      var doc = JSON.parse(fs.readFileSync(FILE, 'utf8').replace(/^ï»¿/, ''));
+      var doc = JSON.parse(fs.readFileSync(FILE, 'utf8').replace(/^\uFEFF/, ''));
       var ids = {};
       if (Array.isArray(doc.profiles)) {
         for (var i = 0; i < doc.profiles.length; i++) {
@@ -29938,7 +29938,7 @@ log('gamemode loaded:',
     var k = '';
     try {
       var dir = String(settings().privDir || 'private');
-      var doc = JSON.parse(String(fs.readFileSync(path.join(dir, 'door.json'), 'utf8')).replace(/^ï»¿/, ''));
+      var doc = JSON.parse(String(fs.readFileSync(path.join(dir, 'door.json'), 'utf8')).replace(/^\uFEFF/, ''));
       k = String((doc && doc.passKey) || '');
     } catch (e) { k = ''; }
     if (!k && fresh('no key', now)) {
@@ -42779,20 +42779,34 @@ log('gamemode loaded:',
   }
 
   /*
-    THE PANEL'S OWN ASK, as writeState's redraw (#1642). The panel sends
-    /pick refresh once it is in and each time it opens, and the answer is sent
-    whether anything changed or not. It also carries when it was asked
-    (view.asked), because the client's script draws nothing when the value
-    matches the one it last handed the page (updateOwnerScript), and it
-    counts a value as handed even while the page has no panel to take it.
-    The view sent when somebody arrives (arrival, below) goes before the
-    page is up, and the refresh a few seconds later often answers the same
-    view. Without the time the script would drop that answer as drawn
-    already, and the panel would stay empty with the skill tree's totals off
-    the character. drawn() is worked out before the time is added, so the
-    signature that holds back an unchanged write does not count it.
+    A REDRAW REACHES THE PAGE (#1730). writeState's redraw is a write the
+    page has to take whether anything on the panel changed or not: the
+    panel's own ask (/pick refresh, sent once it is in and each time it
+    opens), a refusal, the creation hall's reminder (beginCreation), an
+    effect starting or ending. Measured along the way: the engine sends
+    every write (CustomPropertyBinding::Set in the fork has no comparison),
+    and the page draws whatever setData is handed and opens when open() is
+    called. What held a repeated one back is the client's script
+    (updateOwnerScript): it runs every frame, so it cannot tell a second
+    write of the same value from the next frame, and it draws only a value
+    unlike the one it last handed the page. A reminder is the same value as
+    the reminder before it, so the panel stayed shut for somebody who closed
+    it while choosing until something else on it moved. The same held back a
+    refresh answering the view sent before the page was in (#1642).
+
+    So a redraw carries asked, a number later than any redraw before it on
+    this server, and the script draws it once. It sits on the value beside
+    the panel and not inside it, because it is about the write and not about
+    the panel: the page draws from the panel (viewKey in thornswood-skills.js),
+    and a refusal or a reminder must not tear its cards down. drawn() never
+    sees it, so the signature that holds back an unchanged write does not
+    count it, and every other write leaves it off.
   */
-  var ASKED = 'asked';
+  var lastAsked = 0;
+  function askedNow() {
+    lastAsked = Math.max(Date.now(), lastAsked + 1);
+    return lastAsked;
+  }
 
   function writeState(actorId, s, redraw) {
     s.v = 1;
@@ -42823,6 +42837,7 @@ log('gamemode loaded:',
     }
     var sig = drawn(view);
     var sending = !!redraw || lastDrawn[actorId] !== sig;
+    delete s.asked;   // only the redraw below carries one (#1730)
     if (sending) {
       /*
         The Body page (#1631): the meters, the warmth with its working out
@@ -42834,7 +42849,7 @@ log('gamemode loaded:',
       */
       var N = g.__thornswoodNeeds;
       if (view && !view.creating && N && N.view) { view.body = N.view(actorId); }
-      if (redraw === ASKED) { view.asked = Date.now(); }
+      if (redraw) { s.asked = askedNow(); }
       s.panel = view;
     } else {
       // A counter and nothing else. The record is written; the panel is not
@@ -43689,8 +43704,8 @@ log('gamemode loaded:',
       if (what === 'refresh') {
         // A refresh asks for the panel outright, so it is sent whether
         // anything changed or not: that is the whole point of the command.
-        // And drawn whether anything changed or not: see ASKED.
-        writeState(actorId, s, ASKED);   // the write is what fires updateOwner
+        // And drawn whether anything changed or not: see askedNow.
+        writeState(actorId, s, true);   // the write is what fires updateOwner
         return true;
       }
       /*
@@ -44007,7 +44022,8 @@ log('gamemode loaded:',
     // Always a redraw. A reminder is the same state as the reminder before it,
     // so a write that only goes out when something changed would send the
     // first one and none of the others, and the panel would never re-open for
-    // somebody who closed it while they were still choosing.
+    // somebody who closed it while they were still choosing. A redraw carries
+    // asked, so the client's script draws it and opens the panel (#1730).
     writeState(actorId, stateOf(actorId), true);
   }
 
@@ -54524,7 +54540,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       Patrick: "why is temp a water drop and the food icon seems weird too".
       He was looking at a real bug. The old flame was
       "M10 18a5 5 0 0 0 5-5c0-4-5-11-5-11S5 9 5 13a5 5 0 0 0 5 5z" and the old
-      droplet was "M10 2C10 2 4 9 4 12.5A6 6 0 0 0 16 12.5C16 9 10 2 10 2z" â€”
+      droplet was "M10 2C10 2 4 9 4 12.5A6 6 0 0 0 16 12.5C16 9 10 2 10 2z":
       the same teardrop, one of them upside down. At fourteen pixels they were
       indistinguishable, so Temp genuinely did look like a second water drop.
       The drumstick was three disconnected strokes and read as nothing at all.
@@ -56607,14 +56623,27 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     });
   }
 
+  /*
+    A PERSON'S APPEARANCE, ONCE A PASS (#1721). Two things in a pass need
+    it: whether they are published for others (online, below) and their name.
+    The publish test used to ask the chargen block's publishedForOthers, which
+    reads the engine itself, outside this memo, so twenty people cost forty
+    appearance reads a pass, every 1.5 seconds. So the read is made here, once,
+    and the chargen block's own test of a stored face (hasStoredAppearance) is
+    asked of what came back. A read that throws is kept as that, and each
+    reader answers it the way it always has.
+  */
+  function appearanceOf(actorId) {
+    return memo('a' + actorId, function () {
+      try { return { ap: mp.get(actorId, 'appearance') }; } catch (e) { return { threw: true }; }
+    });
+  }
+
   function nameOfPerson(actorId) {
     return memo('n' + actorId, function () {
-      try {
-        var ap = mp.get(actorId, 'appearance');
-        var n = String((ap && ap.name) || '');
-        if (n) { return n; }
-      } catch (e) { }
-      return 'somebody';
+      var seen = appearanceOf(actorId);
+      var n = String((seen.ap && seen.ap.name) || '');
+      return n || 'somebody';
     });
   }
 
@@ -56623,10 +56652,13 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       var all = [];
       try { all = mp.get(0, 'onlinePlayers') || []; } catch (e) { return []; }
       var chargen = g.__thornswoodChargen;
-      if (!chargen || !chargen.publishedForOthers) { return all; }
+      if (!chargen || !chargen.hasStoredAppearance) { return all; }
       var out = [];
       for (var i = 0; i < all.length; i++) {
-        if (chargen.publishedForOthers(all[i])) { out.push(all[i]); }
+        // Published as publishedForOthers says: a face is stored, or the read
+        // threw, because hiding a returning character is the worse mistake.
+        var seen = appearanceOf(all[i]);
+        if (seen.threw || chargen.hasStoredAppearance(seen.ap)) { out.push(all[i]); }
       }
       return out;
     });
@@ -59166,7 +59198,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     } catch (e) { }
     try {
       var conf = JSON.parse(fs.readFileSync(path.join(privDir, 'door.json'), 'utf8')
-                              .replace(/^ï»¿/, ''));
+                              .replace(/^\uFEFF/, ''));
       if (conf && conf.site && conf.key) { return { site: String(conf.site), key: String(conf.key) }; }
     } catch (e) { }
     return null;
@@ -60293,7 +60325,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var conf = null;
     try {
       conf = JSON.parse(fs.readFileSync(path.join(String(settings().privDir || 'private'), 'door.json'), 'utf8')
-                          .replace(/^ï»¿/, ''));
+                          .replace(/^\uFEFF/, ''));
     } catch (e) { conf = null; }
     if (!conf || !conf.site || !conf.key) { end(false, 'this server has no door.json naming the site'); return; }
     var url;
@@ -60347,7 +60379,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var list = [], pk = [], written = 0;
     try {
       var doc = JSON.parse(fs.readFileSync(path.join(String(settings().privDir || 'private'), 'allowed.json'), 'utf8')
-                             .replace(/^ï»¿/, ''));
+                             .replace(/^\uFEFF/, ''));
       if (doc && Array.isArray(doc.bans)) { list = doc.bans; }
       if (doc && Array.isArray(doc.pk)) { pk = doc.pk; }
       written = Date.parse(String((doc && doc.at) || '')) || 0;

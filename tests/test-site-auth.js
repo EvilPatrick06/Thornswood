@@ -120,6 +120,39 @@ function freePort() {
     s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => ok(p)); });
   });
 }
+/*
+  Waits for the site's own "[thornswood-docs] listening on ...:port" line, so
+  nothing is asked of the port before this run's site holds it (#1727). The
+  port came from the system and was let go again, and builds run side by side
+  on the VPS: if something takes it in between, the site stops on EADDRINUSE,
+  and polling the port would have read whatever holds it as this site. The
+  error says which, with what the site printed.
+*/
+function listening(srv, port) {
+  return new Promise((ok, bad) => {
+    let out = '';
+    const said = (d) => {
+      out += d;
+      const m = /\[thornswood-docs\] listening on \S+:(\d+)/.exec(out);
+      if (m && Number(m[1]) === port) { end(null); }
+    };
+    const more = (d) => { out += d; };
+    const gone = (code) => end(new Error((/EADDRINUSE/.test(out) ? 'something else already holds port ' + port + ', so ' : '') +
+                                         'the site stopped (exit ' + code + ') before it was listening. It printed:\n' + out));
+    const late = setTimeout(() => end(new Error('the site did not say it was listening on ' + port +
+                                                ' within fifteen seconds. It printed:\n' + out)), 15000);
+    function end(err) {
+      clearTimeout(late);
+      srv.stdout.removeListener('data', said);
+      srv.stderr.removeListener('data', more);
+      srv.removeListener('close', gone);
+      if (err) { bad(err); } else { ok(); }
+    }
+    srv.stdout.on('data', said);
+    srv.stderr.on('data', more);
+    srv.on('close', gone);
+  });
+}
 
 let PORT = 0;
 function ask(where, headers) {
@@ -199,12 +232,7 @@ function runRefresh(refreshSrc, privDir, FILE, sent, notes) {
   srv.stderr.on('data', (d) => { out += d; });
 
   try {
-    let up = false;
-    for (let i = 0; i < 80 && !up; i++) {
-      const r = await ask('/api/hello');
-      if (r.status) up = true; else await new Promise((ok) => setTimeout(ok, 100));
-    }
-    if (!up) throw new Error('the scratch site never came up:\n' + out);
+    await listening(srv, PORT);
 
     // ==== the key ============================================================
     console.log('');
