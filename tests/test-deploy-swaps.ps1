@@ -869,8 +869,10 @@ try {
     $devFar = ($devRoot -replace '\\', '/') + '/plugins/'
     Put (Join-Path $devRoot 'plugins\Skyrim.esm') 'skyrim'
     Put (Join-Path $devRoot 'gamemode.js') '// dev v1'
+    # A real true or false for the join pass hold, which Deploy-DevGamemode
+    # refuses a dev server without (#1319).
     Put (Join-Path $devRoot 'server-settings.json') (([ordered]@{ port = $devPort; name = 'Thornswood Dev'; dataDir = 'data'
-        loadOrder = @($devFar + 'Skyrim.esm'); thornswoodServer = 'dev' }) | ConvertTo-Json)
+        loadOrder = @($devFar + 'Skyrim.esm'); thornswoodServer = 'dev'; thornswoodRequirePass = $true }) | ConvertTo-Json)
     Put (Join-Path $devRoot 'data\keep.txt') 'the character book'
     Task 'Thornswood Test Dev Server' $node.Source ('"' + $gameStub + '" "' + $devRoot + '"') $devRoot
     $gm = Join-Path $repo 'game\gamemode.js'

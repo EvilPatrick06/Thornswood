@@ -97,9 +97,13 @@ function freePort() {
 function request(port, method, where, headers, body) {
   return new Promise((ok) => {
     const data = body === undefined ? '' : (typeof body === 'string' ? body : JSON.stringify(body));
+  // A browser names the page that sent a signed in write, and the site
+  // refuses one that names no page (#1367). These come from its own pages.
+    const signed = method !== 'GET' && Object.keys(headers || {}).some((k) => k.toLowerCase() === 'cookie');
     const r = http.request({ host: '127.0.0.1', port, method, path: where,
       headers: Object.assign({ 'content-type': 'application/json',
-                               'content-length': Buffer.byteLength(data) }, headers || {}) },
+                               'content-length': Buffer.byteLength(data) },
+                             signed ? { origin: 'http://127.0.0.1:' + port } : {}, headers || {}) },
     (res) => {
       let buf = '';
       res.on('data', (d) => { buf += d; });

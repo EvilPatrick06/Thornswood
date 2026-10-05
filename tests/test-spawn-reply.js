@@ -43,7 +43,11 @@ const NOT_NPC = { 0x12eb7: 'WEAP' };
 const placed = [], moved = [], destroyed = [], created = [], said = [], logs = [];
 let nextRef = 0xff000100;
 let placeThrows = '', setThrows = '';
-let settings = {};
+// The join pass hold off on purpose: these lines come from a chat connection
+// with no join token and a session with no pass, and the hold is what
+// test-join-pass-trust.js covers. Absent would be on (#1319).
+const HOLD_OFF = { thornswoodRequirePass: false };
+let settings = Object.assign({}, HOLD_OFF);
 const properties = new Set();
 
 const mpBase = {
@@ -169,7 +173,7 @@ function one(r) { return r.said.length === 1 ? r.said[0] : JSON.stringify(r.said
 
 if (loaded && pollTimer) {
   // ------------------------------------------------ nobody on a list ---
-  settings = {};
+  settings = Object.assign({}, HOLD_OFF);
   let r = send('/spawn troll');
   yes('a person on no list is told /spawn is not theirs: ' + one(r),
       r.said.length === 1 && /is not yours to run/.test(r.said[0]) && r.to[0] === PID);
@@ -178,7 +182,7 @@ if (loaded && pollTimer) {
   yes('the same for /give: ' + one(r), r.said.length === 1 && /is not yours to run/.test(r.said[0]));
 
   // ------------------------------------------------------- a tester ---
-  settings = { thornswoodPlaytesters: [PID] };
+  settings = Object.assign({ thornswoodPlaytesters: [PID] }, HOLD_OFF);
 
   r = send('/spawn troll');
   const trollId = r.placed.length ? r.placed[0].base : 0;
@@ -271,7 +275,7 @@ if (loaded && pollTimer) {
     admit: function(id) { admittedMarker = actors[id].thornswoodNpcCommanded === true; return admittedMarker; },
     release: function() {}
   };
-  settings = {thornswoodPlaytesters:[PID]};
+  settings = Object.assign({ thornswoodPlaytesters: [PID] }, HOLD_OFF);
   const devSpawn = send('/spawn troll');
   yes('Dev command marks its actor before population admission', admittedMarker && devSpawn.destroyed.length === 0 && devSpawn.placed.length === 1 && enrolled === 1);
   delete box.__thornswoodNpcPopulation;
