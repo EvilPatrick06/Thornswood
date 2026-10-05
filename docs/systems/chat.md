@@ -46,8 +46,8 @@ What floats:
 - `/w` or `/whisper`, for people inside the whisper reach.
 - `/s`, `/shout`, `/y`, or `/yell`, for people inside the shout reach.
 
-What does not float: every other command. `/trade`, `/party`,
-`/bard`, and the rest stay in the box. `/bard` still pays
+What does not float: every other command. `/trade`, `/bard`, and
+the rest stay in the box. `/bard` still pays
 the rest on [People beside you](people.md). A lyric above the head
 is a plain line or a `/me`.
 
