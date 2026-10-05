@@ -4649,6 +4649,26 @@
   }
 
   /*
+    Who is in front of you, for the group book on J (#1630). factions.md: "You
+    invite the character in front of you, or by name". The J panel cannot see
+    the crosshair, so as it opens it is told who the look prompt is drawn
+    for: the same form id Y, H and L send, and the name the server put on the
+    near list. Its group tab then offers Invite with that name, and the line
+    it sends is /book invite with the id, which the server checks again.
+    Nobody in front clears it, so the button is there only while it applies.
+    A listener of its own, so the J key handling (#1016) is left alone.
+  */
+  sp.on('browserMessage', guard('journal facing', (event) => {
+    const a = event && event.arguments;
+    if (!a || a[0] !== 'thornswood-front' || a[1] !== 'journal:opened') { return; }
+    const near = nearList();
+    const row = (lookingAt && near && Object.prototype.hasOwnProperty.call(near, lookingAt)) ? near[lookingAt] : null;
+    const facing = row ? { id: lookingAt, name: String(row.n || '') } : null;
+    T.js('try{if(window.thornswoodJournal&&window.thornswoodJournal.setFacing){' +
+         'window.thornswoodJournal.setFacing(' + JSON.stringify(facing) + ');}}catch(e){}');
+  }));
+
+  /*
     ------------------------------------------ a key mold, into a door's lock
 
     Patrick, 24 September, in order: "you should press e on a un molded door
