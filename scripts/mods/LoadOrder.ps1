@@ -139,7 +139,8 @@ function Get-CollectionRevisionFromFolder([string]$Slug) {
   newestFileId linked to a cached revision of the slug. Until #1902 this
   matched raw bytes, which find nothing once Vortex compacts the keys into a
   compressed table, and Check-CollectionRules then skipped the installed
-  collection. Same as Checks.CollectionModIds in the launcher.
+  collection. The launcher has no copy: it never looks for the collection's
+  folder, and the one it had was removed with no caller (#1957).
 #>
 function Get-CollectionModIds([string]$Slug) {
     $none = [string[]]@()
@@ -338,8 +339,9 @@ function Get-CollectionJsonPath([string]$Folder) {
 <#
   The newest collection revision VORTEX KNOWS ABOUT for a slug, or 0.
 
-  Read through the shared reader (launcher\app\VortexProfileState.cs), the
-  same as Checks.CollectionNewest in the launcher. Highest wins of:
+  Read through the shared reader (launcher\app\VortexProfileState.cs). The
+  launcher has no copy: it never asks for the newest revision, and the one
+  it had was removed with no caller (#1957). Highest wins of:
     1. the newestVersion Vortex records against the collection's own mod,
        tied to the slug the way the installed revision is
     2. collections###revisions###<id>###info###revisionNumber for a cached
