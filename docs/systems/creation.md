@@ -39,3 +39,8 @@ The hall, the face, the K panel, the town, the waiting class and
 profession, the 40 gold and the three tools are in the server. A
 fisher is not handed a pole. The public
 steps are on the site's help page.
+
+Somebody still choosing who puts the panel down gets it back on its
+own: ten minutes after Escape or K, and within thirty seconds when it
+went any other way. It comes back whether or not anything on it has
+changed.

@@ -321,7 +321,7 @@ yes('A7 and the view kept on the character carries none of the three now',
   !after.panel.perkClocks.fontofmagic.until);
 yes('A7 the day Font of Magic spent is still spent', /^Font of Magic comes back in \d+ hours$/.test(
   (srv.PK.use(W, srv.C.stateOf(W), 'fontofmagic') || {}).why || ''));
-yes('A7 arrival is not the panel asking, so it carries no ask time', after.panel.asked === undefined);
+yes('A7 arrival is not a redraw, so it carries no ask time', after.asked === undefined && after.panel.asked === undefined);
 
 // ------------------------------------- B. a restart, the game started again --
 srv = server(T0 + 120000);
@@ -342,10 +342,11 @@ yes('B3 arrival writes the view worked out now, still before the panel is in', f
 f.mount();
 srv.pick(F, 'refresh');
 const answer = stored(F);
-yes('B4 the panel is in and asks: the answer carries when it was asked', answer.panel.asked === srv.now());
+yes('B4 the panel is in and asks: the answer carries when it was asked, beside the panel (#1730)',
+  answer.asked === srv.now() && answer.panel.asked === undefined);
 {
   const a = JSON.parse(JSON.stringify(arrivedView)), b = JSON.parse(JSON.stringify(answer));
-  delete b.panel.asked;
+  delete b.asked;
   yes('B4 and apart from that it is the same view arrival sent', JSON.stringify(a) === JSON.stringify(b));
   // The trap: the client's script holds back a value it last handed, even to a page with no panel.
   const st = {};
@@ -402,9 +403,9 @@ delete srv.ctx.__thornswoodChargen;
   yes('F1 the chargen tick\'s first sight of somebody calls arrival, after the spells and the clothes',
     at > 0 && at > FIRST_SIGHT.indexOf('c.grantKnown(actorId)') && at > FIRST_SIGHT.indexOf('wearWhatIsWorn(actorId)'));
   yes('F2 the character block hands arrival out', /beginCreation: beginCreation, arrival: arrival,/.test(CHARACTER));
-  yes('F3 the refresh answers as the panel\'s own ask, and only that adds the time',
-    /if \(what === 'refresh'\) \{[\s\S]{0,300}writeState\(actorId, s, ASKED\);/.test(CHARACTER) &&
-    (CHARACTER.match(/view\.asked = /g) || []).length === 1 && /if \(redraw === ASKED\) \{ view\.asked = Date\.now\(\); \}/.test(CHARACTER));
+  yes('F3 the refresh answers as a redraw, and a redraw, and nothing else, adds the time (#1730)',
+    /if \(what === 'refresh'\) \{[\s\S]{0,300}writeState\(actorId, s, true\);/.test(CHARACTER) &&
+    (CHARACTER.match(/\.asked = /g) || []).length === 1 && /if \(redraw\) \{ s\.asked = askedNow\(\); \}/.test(CHARACTER));
   yes('F4 arrival is not a redraw, so a view this server already sent is not sent again',
     /function arrival\(actorId\) \{[\s\S]{0,300}return writeState\(actorId, stateOf\(actorId\)\);/.test(CHARACTER));
   yes('F5 nothing here watches for a stale effect: no timer in the character block reads one',
