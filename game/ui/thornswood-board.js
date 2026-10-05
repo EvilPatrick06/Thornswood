@@ -10,9 +10,10 @@
 
   Everything this panel DOES it does by sending the ordinary lines, through
   window.thornswoodNet.say. There is no second protocol. The labels are
-  words. The lines are how the panel talks to the server. A haul (#1393)
-  has no other way in: Send a haul and Confirm send /haul, which nobody is
-  told to type (Patrick, 4 Oct: no chat commands for anything people do).
+  words. The lines are how the panel talks to the server, and nobody is told
+  to type one (Patrick, 4 Oct: no chat commands for anything people do).
+  Posting, Take, Take down and Put it back send /notice, /job, /take, /unpin
+  and /dropjob (#1627); Send a haul and Confirm send /haul (#1393).
 
   setData never opens the panel. The click does. A later setData redraws
   what is already open, and the plugin closes it once you walk away.
@@ -153,16 +154,32 @@
       }
       out += '</span></div>';
     }
-    var jobs = b.jobs || [];
-    var elsewhere = [];
-    for (var j = 0; j < jobs.length; j++) {
-      if (jobs[j].hold !== b.hold) { elsewhere.push(jobs[j]); }
+    var older = Number(b.older) || 0;
+    if (older > 0) {
+      out += '<div class="note">' + esc(String(older)) + (older === 1 ? ' older one is' : ' older ones are') +
+        ' up and not on the wall.</div>';
     }
-    if (elsewhere.length) {
-      out += '<div class="note">Hand these back at the board you took them from.</div>';
-      for (var e = 0; e < elsewhere.length; e++) {
-        out += '<div class="none">' + esc(elsewhere[e].hold) + ': ' + esc(elsewhere[e].text) + '</div>';
+    /*
+      YOUR JOBS (#1627): every job you have taken, in every town, which was
+      /jobs. A job goes back only at the board it came from, so Put it back
+      is on the rows of this board and the others say where theirs is.
+    */
+    var jobs = b.jobs || [];
+    out += '<h3>Your jobs</h3>';
+    if (!jobs.length) { out += '<div class="none">You have taken none.</div>'; }
+    for (var j = 0; j < jobs.length; j++) {
+      var mine = jobs[j];
+      var what = mine.letter ? 'Letter' : (mine.haul ? 'Haul' : 'Job');
+      out += '<div class="row"><span class="nm"><b>' + esc(mine.n) + '.</b> ' + what + ', ' +
+        esc(mine.where || mine.hold) + ', for ' + esc(mine.name) + '<br>' + esc(mine.text) +
+        '</span><span class="tools">';
+      if (mine.hold === b.hold) {
+        out += '<button data-do="drop" data-n="' + esc(mine.n) + '">' +
+          (mine.haul ? 'Hand it back' : 'Put it back') + '</button>';
+      } else {
+        out += '<span class="none">Back at ' + esc(mine.where || mine.hold) + '</span>';
       }
+      out += '</span></div>';
     }
     out += '<h3>Put something up</h3>';
     out += '<div class="line"><input id="' + ID + '-notice" placeholder="the notice">' +
