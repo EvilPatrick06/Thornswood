@@ -6805,6 +6805,34 @@
     openTheGates();
   }));
 
+  /*
+    WHICH MENUS ARE UP, FROM THE GAME'S OWN EVENTS. Issue 1033.
+
+    The pulse below names the open menus when isInMenuMode says there is one.
+    It used to find them by asking isMenuOpen for each of these 28 names, one
+    after another in the same frame as its other asks, every five seconds
+    while any menu was up; the #963 audit measured the pulse's worst single
+    call at 122 ms. The game says when a menu opens and closes, so the names are kept
+    here as menuOpen and menuClose come, and the pulse reads them without
+    asking the game anything.
+  */
+  const PULSE_MENUS = [
+    'Console', 'Console Native UI Menu', 'Loading Menu', 'Main Menu',
+    'MessageBoxMenu', 'Dialogue Menu', 'RaceSex Menu', 'InventoryMenu',
+    'MagicMenu', 'MapMenu', 'StatsMenu', 'ContainerMenu', 'Journal Menu',
+    'Sleep/Wait Menu', 'Crafting Menu', 'Book Menu', 'Lockpicking Menu',
+    'Barter Menu', 'FavoritesMenu', 'TweenMenu', 'Fader Menu',
+    'LoadWaitSpinner', 'Training Menu', 'GiftMenu', 'Quantity Menu',
+    'Tutorial Menu', 'Credits Menu', 'TitleSequence Menu'
+  ];
+  const pulseMenusUp = {};
+  sp.on('menuOpen', guard('pulse menu open', (e) => {
+    if (e && e.name) { pulseMenusUp[e.name] = true; }
+  }));
+  sp.on('menuClose', guard('pulse menu close', (e) => {
+    if (e && e.name) { delete pulseMenusUp[e.name]; }
+  }));
+
   sp.on('update', guard('pulse', () => {
     logOwnerOutfitTransition();
     // One pass through the handlers is one frame. See frameWent above.
@@ -6829,19 +6857,7 @@
     // from a menu that is an artefact of the window losing foreground.
     let names = '';
     if (menu === 'yes') {
-      const probe = [
-        'Console', 'Console Native UI Menu', 'Loading Menu', 'Main Menu',
-        'MessageBoxMenu', 'Dialogue Menu', 'RaceSex Menu', 'InventoryMenu',
-        'MagicMenu', 'MapMenu', 'StatsMenu', 'ContainerMenu', 'Journal Menu',
-        'Sleep/Wait Menu', 'Crafting Menu', 'Book Menu', 'Lockpicking Menu',
-        'Barter Menu', 'FavoritesMenu', 'TweenMenu', 'Fader Menu',
-        'LoadWaitSpinner', 'Training Menu', 'GiftMenu', 'Quantity Menu',
-        'Tutorial Menu', 'Credits Menu', 'TitleSequence Menu'
-      ];
-      const open = [];
-      for (const n of probe) {
-        try { if (sp.Ui.isMenuOpen(n)) { open.push(n); } } catch (e) { }
-      }
+      const open = PULSE_MENUS.filter(function (n) { return pulseMenusUp[n] === true; });
       names = open.length ? (' [' + open.join(', ') + ']') : ' [none of the usual ones]';
     }
 
