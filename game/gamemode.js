@@ -4166,7 +4166,12 @@ const SETTLE_MS = 10000;
  * before giving up on it entirely and moving on. Both measured from the moment
  * the creation stage opened, not from the nudge. */
 
-const NUDGE_MS = 120000;   // two minutes; see the nudge below
+/* Two minutes. Used as the gap between race-menu asks when the open
+ * request was lost: no stored face, and the plugin has not reported
+ * the menu as up. A one-shot flag left them in the hall forever if
+ * that second request was also lost (Djinn, 5 Oct 2026). Asking
+ * while /racemenu is already reported is an access violation. */
+const NUDGE_MS = 120000;
 
 /* How long somebody has to be walking about before a STORED face lets
  * creation move on. Walking without a stored appearance does not publish
@@ -5273,6 +5278,42 @@ function chargenTick() {
 
     if (state.stage === 'appearance') {
       /*
+        A lost open-race-menu request (no /racemenu report, no stored face)
+        is asked again every NUDGE_MS. A second setRaceMenuOpen over a menu
+        the plugin already says is up is an access violation, so that case
+        is never asked. Once a face is stored the asks stop. The two lines
+        below are tellOnce: one each for the whole wait, not one per ask.
+      */
+      const raceMenuIsUp = function () {
+        if (state.faceDone) { return false; }
+        return !!state.faceSeenAt && now - state.faceSeenAt < FACE_SEEN_MS;
+      };
+      const askForLostRaceMenu = function (why) {
+        if (hasStoredAppearance(appearance) || raceMenuIsUp()) { return false; }
+        const last = state.askedMenuAt || 0;
+        if (last && now - last < NUDGE_MS) { return false; }
+        state.askedMenuAt = now;
+        state.menuAsks = (state.menuAsks || 0) + 1;
+        setChargen(actorId, state);
+        try {
+          mp.setRaceMenuOpen(actorId, true);
+          log('chargen', actorId.toString(16),
+              'asking for the race menu again (' + why + '), ask', state.menuAsks);
+        } catch (e) {
+          log('chargen', actorId.toString(16), 'could not open the race menu:', e);
+        }
+        if (state.menuAsks === 2) {
+          tellOnce(actorId, 'raceMenuAgain',
+              "Your character creation menu didn't open. Opening it again.");
+        } else if (state.menuAsks >= 3) {
+          tellOnce(actorId, 'raceMenuRelog',
+              'The character creation menu still did not open. Relog, and if it ' +
+              'still does not open, contact staff.');
+        }
+        return true;
+      };
+
+      /*
         A reconnect starts the wait again from nothing.
 
         None of the fields below are cleared when somebody drops out of the
@@ -5294,6 +5335,8 @@ function chargenTick() {
         delete state.where;
         delete state.askedAt;
         delete state.nudged;
+        delete state.askedMenuAt;
+        delete state.menuAsks;
         // The last session's race menu went with it. This one reports its own.
         delete state.faceOpenAt;
         delete state.faceSeenAt;
@@ -5410,6 +5453,7 @@ function chargenTick() {
         } else {
           log('chargen', actorId.toString(16),
               'the plugin says the race menu closed but no appearance is stored, staying unpublished');
+          askForLostRaceMenu('race menu closed with no face');
         }
         continue;
       }
@@ -5437,17 +5481,7 @@ function chargenTick() {
             'mark now', JSON.stringify(faceNow) + ',',
             'mark at the start', JSON.stringify(state.faceWas || '') + '.',
             'Staying unpublished.');
-        if (!state.nudged) {
-          state.nudged = now;
-          setChargen(actorId, state);
-          try {
-            mp.setRaceMenuOpen(actorId, true);
-            log('chargen', actorId.toString(16),
-                'walking around with no face, so the race menu never opened. Asking for it.');
-          } catch (e) {
-            log('chargen', actorId.toString(16), 'could not open the race menu:', e);
-          }
-        }
+        askForLostRaceMenu('walking with no face');
         continue;
       }
 
@@ -5461,9 +5495,9 @@ function chargenTick() {
       // reason is somewhere in a client mid save-load, which is not somewhere
       // this can reach.
       //
-      // So: ask once, then stop waiting. A character who never saw the race
-      // menu can open it later. One who cannot leave the room cannot do
-      // anything at all.
+      // So: keep asking on NUDGE_MS while the request is lost. A character
+      // who never saw the race menu is asked again; one whose plugin says
+      // the menu is already up is not.
       //
       // But only once it is clear that nobody is standing in a menu already.
       //
@@ -5524,33 +5558,12 @@ function chargenTick() {
         out for a character who cannot move, which is precisely the character
         it exists for, so it runs on the clock like it says it does.
 
-        AND THE NUDGE IS UNREACHABLE TODAY, which is worth writing down rather
-        than leaving somebody to assume it is doing something. It needs
-        liveSince, and the branch a dozen lines above ends the stage the moment
-        onFeetFor passes MOVED_ENOUGH_MS, which is 500. So anybody with
-        liveSince set has been moved on half a second in, 119 and a half seconds
-        before the nudge could fire, and anybody without it is guarded out here.
-        There is no path to it at all.
-
-        It is kept rather than deleted because it is the safety net if
-        MOVED_ENOUGH_MS is ever raised past NUDGE_MS, and because a race menu
-        that never opened is still a real failure somebody may want to rescue
-        differently later. What it must not do is read as a rescue that is
-        running, because it is not.
+        THE TWO-MINUTE CLOCK IS NOW THE INTERVAL, not a one-shot. A lost
+        request (no /racemenu report, no stored face) is asked again every
+        NUDGE_MS. Walking asks on that same helper as soon as they are on
+        their feet; standing still becomes eligible at NUDGE_MS. state.nudged
+        is no longer the gate, so the old one-shot cannot swallow a later ask.
       */
-      if (!state.nudged && waited > NUDGE_MS && state.liveSince) {
-        state.nudged = now;
-        setChargen(actorId, state);
-        try {
-          mp.setRaceMenuOpen(actorId, true);
-          log('chargen', actorId.toString(16),
-              'walking around with no face after', Math.round(waited / 1000) +
-              's, so the race menu never opened. Asking for it.');
-        } catch (e) {
-          log('chargen', actorId.toString(16), 'could not open the race menu:', e);
-        }
-        continue;
-      }
 
       if (waited > GIVEUP_MS) {
         // Not while the plugin says the race menu is up: that person is making
@@ -5589,18 +5602,13 @@ function chargenTick() {
         log('chargen', actorId.toString(16),
             'appearance never arrived after', Math.round(waited / 1000) + 's,',
             'staying unpublished');
-        if (!state.nudged) {
-          state.nudged = now;
-          setChargen(actorId, state);
-          try {
-            mp.setRaceMenuOpen(actorId, true);
-            log('chargen', actorId.toString(16),
-                'no face after', Math.round(waited / 1000) +
-                's, so the race menu never opened. Asking for it.');
-          } catch (e) {
-            log('chargen', actorId.toString(16), 'could not open the race menu:', e);
-          }
-        }
+      }
+
+      // Lost request: no face, menu not reported up. Walking already asked
+      // and continued. Standing still waits for NUDGE_MS so the spawn
+      // request has time to land, then the helper repeats every NUDGE_MS.
+      if (!hasStoredAppearance(appearance) && waited > NUDGE_MS) {
+        askForLostRaceMenu('no face after ' + Math.round(waited / 1000) + 's');
       }
     }
   }

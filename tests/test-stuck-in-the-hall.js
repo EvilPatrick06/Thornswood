@@ -69,8 +69,12 @@ const FACE_CAP_MS = numOr('FACE_CAP_MS');
   there jumps to the condition, which is false, so it leaves exactly the way
   the real one leaves an iteration. Same trick chargentest.js uses.
 */
+const AGAIN = "Your character creation menu didn't open. Opening it again.";
+const RELOG = 'The character creation menu still did not open. Relog, and if it ' +
+  'still does not open, contact staff.';
+
 function tick(opts) {
-  const out = { chose: null, nudged: false, log: [], state: opts.state };
+  const out = { chose: null, asks: 0, said: [], log: [], state: opts.state };
   const actorId = 0xff000056;
   const now = opts.now;
   const firstSeen = new Map([[actorId, opts.state.seenAt || 1]]);
@@ -82,7 +86,7 @@ function tick(opts) {
       if (key === 'angle') { return opts.angle || [0, 0, 0]; }
       return null;
     },
-    setRaceMenuOpen() { out.nudged = true; }
+    setRaceMenuOpen() { out.asks++; }
   };
   const log = (...a) => out.log.push(a.join(' '));
   const setChargen = (id, s) => { out.state = s; };
@@ -91,15 +95,22 @@ function tick(opts) {
   // Same check the gamemode uses. A stored appearance is an object; a blank
   // name still counts. The stage now refuses to publish without one.
   const hasStoredAppearance = (a) => !!(a && typeof a === 'object');
+  const tellOnce = function (id, step, text) {
+    if (!state.told) { state.told = {}; }
+    if (state.told[step]) { return false; }
+    state.told[step] = now;
+    out.said.push(text);
+    return true;
+  };
 
   const fn = new Function(
     'actorId', 'now', 'firstSeen', 'appearance', 'state', 'mp', 'log',
-    'setChargen', 'faceMark', 'beginChoosing', 'hasStoredAppearance',
+    'setChargen', 'faceMark', 'beginChoosing', 'hasStoredAppearance', 'tellOnce',
     'NUDGE_MS', 'GIVEUP_MS', 'MOVED_ENOUGH_MS', 'MOVED_UNITS', 'MOVED_DEGREES',
     'FACE_SEEN_MS', 'FACE_CAP_MS',
     'do {\n' + stage + '\n} while (false);');
   fn(actorId, now, firstSeen, appearance, state, mp, log, setChargen, faceMark,
-     beginChoosing, hasStoredAppearance,
+     beginChoosing, hasStoredAppearance, tellOnce,
      NUDGE_MS, GIVEUP_MS, MOVED_ENOUGH_MS, MOVED_UNITS, MOVED_DEGREES,
      FACE_SEEN_MS, FACE_CAP_MS);
   return out;
@@ -135,20 +146,25 @@ console.log('');
       out.log.join(' ').indexOf('never arrived') !== -1);
   yes('S1 and that they are staying unpublished',
       out.log.join(' ').indexOf('staying unpublished') !== -1);
-  yes('S1 and the race menu is asked for', out.nudged);
+  yes('S1 and the lost request is asked once on that tick', out.asks === 1);
   console.log('S1   ' + (out.log[0] || '(nothing logged)'));
 }
 
-// S2: and they are NOT nudged, because the nudge opens a race menu and a
-//     second race menu over a first one took the game down with an access
-//     violation in a head part call. Not moving is the proxy for "a menu may
-//     be open", so the nudge keeps that guard even though the give up does not.
+// S2: a lost request (never moved, no /racemenu report, no face) is asked
+//     at the two-minute mark. A menu that IS reported up is not asked,
+//     because a second open over one already on screen is an access violation.
 {
   const t0 = 2000000;
   const st = stuck(t0);
   const out = tick({ state: st, now: t0 + NUDGE_MS + 1000 });
-  yes('S2 somebody who never moved is not sent a second race menu', !out.nudged);
+  yes('S2 a lost request is asked at the two-minute mark', out.asks === 1);
   yes('S2 and is not moved on before the give up either', out.chose === null);
+
+  const held = stuck(t0);
+  held.faceOpenAt = t0 + 5000;
+  held.faceSeenAt = t0 + NUDGE_MS;
+  const quiet = tick({ state: held, now: t0 + NUDGE_MS + 1000 });
+  yes('S2 a reported-up race menu is not sent another open', quiet.asks === 0);
 }
 
 // S3: somebody who IS on their feet with no stored face stays unpublished.
@@ -160,13 +176,14 @@ console.log('');
   st.liveSince = t0;
   const out = tick({ state: st, now: t0 + MOVED_ENOUGH_MS + 100 });
   yes('S3 a walking character with no face stays unpublished', out.chose === null);
-  yes('S3 and is asked for the race menu', out.nudged);
+  yes('S3 and is asked for the race menu once', out.asks === 1);
   yes('S3 and the log says staying unpublished',
       out.log.join(' ').indexOf('Staying unpublished') !== -1);
 
-  const late = tick({ state: stuck(t0), now: t0 + NUDGE_MS + 1000 });
-  yes('S3 and a still character has not been nudged at the nudge time either',
-      !late.nudged);
+  const still = stuck(t0);
+  const late = tick({ state: still, now: t0 + NUDGE_MS + 1000 });
+  yes('S3 a still character with a lost request is asked at the two-minute mark',
+      late.asks === 1);
 
   const withFace = stuck(t0);
   withFace.liveSince = t0;
@@ -177,7 +194,7 @@ console.log('');
   yes('S3 a walking character with a stored face (blank name included) is moved on',
       gone.chose !== null);
   yes('S3 and is not asked for a second race menu once the face is there',
-      !gone.nudged);
+      gone.asks === 0);
 }
 
 // S4: the face arriving is still the ordinary way out, whatever the clock says.
@@ -186,7 +203,7 @@ console.log('');
   const st = stuck(t0);
   const out = tick({ state: st, now: t0 + 2000, appearance: { mark: 'a-new-face' } });
   yes('S4 a face that arrives ends the stage at once', out.chose !== null);
-  yes('S4 and nothing was nudged to get it', !out.nudged);
+  yes('S4 and nothing was nudged to get it', out.asks === 0);
 }
 
 // S5: the plugin saying the race menu closed is only a way out when a face
@@ -201,6 +218,7 @@ console.log('');
       out.chose === null);
   yes('S5 and the log says staying unpublished',
       out.log.join(' ').indexOf('staying unpublished') !== -1);
+  yes('S5 and the lost close is asked once', out.asks === 1);
 
   const stored = stuck(t0);
   stored.faceDone = true;
@@ -210,6 +228,7 @@ console.log('');
   });
   yes('S5 the race menu closing with a stored appearance ends the stage',
       done.chose !== null);
+  yes('S5 and a stored face is not asked to open the race menu', done.asks === 0);
 }
 
 // S6: the guard is gone from the give up, in the shipped text. A check that
@@ -226,8 +245,8 @@ console.log('');
     .replace(/\/\/[^\n]*/g, ' ');
   yes('S6 no bare liveSince guard stands anywhere in the code',
       code.indexOf('if (!state.liveSince) { continue; }') === -1);
-  yes('S6 and the nudge still asks for liveSince',
-      /waited > NUDGE_MS && state\.liveSince/.test(code));
+  yes('S6 the lost-request ask is on the two-minute interval',
+      /waited > NUDGE_MS/.test(code) && /askForLostRaceMenu/.test(code));
   yes('S6 the give up is still there', /waited > GIVEUP_MS/.test(code));
 }
 
@@ -267,6 +286,7 @@ function inRaceMenu(t0, opened, lastSeen) {
   yes('S8 sitting still in a reported race menu past five minutes moves nobody on',
       out.chose === null);
   yes('S8 and the log says why', out.log.join(' ').indexOf('race menu is still up') !== -1);
+  yes('S8 and no setRaceMenuOpen is sent over a reported-up menu', out.asks === 0);
   console.log('S8   ' + (out.log[0] || '(nothing logged)'));
 
   // The next tick, and a minute later with a fresh beat: still held, and the
@@ -290,6 +310,7 @@ function inRaceMenu(t0, opened, lastSeen) {
       out.chose === null);
   yes('S9 and the log says staying unpublished',
       out.log.join(' ').indexOf('staying unpublished') !== -1);
+  yes('S9 and the stale lost request is asked once', out.asks === 1);
 
   const stored = inRaceMenu(t0, t0 + 5000, at - FACE_SEEN_MS - 1000);
   const gone = tick({
@@ -314,6 +335,7 @@ function inRaceMenu(t0, opened, lastSeen) {
       out.log.join(' ').indexOf('race menu has been up for') !== -1);
   yes('S10 and that they are staying unpublished',
       out.log.join(' ').indexOf('staying unpublished') !== -1);
+  yes('S10 and a reported-up menu is not sent another open', out.asks === 0);
 
   const stored = inRaceMenu(t0, t0 + 5000, at - 10000);
   const gone = tick({
@@ -333,7 +355,7 @@ function inRaceMenu(t0, opened, lastSeen) {
   const st = inRaceMenu(t0, t0 + 5000, t0 + 60000);
   const out = tick({ state: st, now: t0 + 120000 });
   yes('S11 before the give up a reported race menu changes nothing', out.chose === null &&
-      out.log.length === 0);
+      out.log.length === 0 && out.asks === 0);
 }
 
 // S12: a reconnect starts the report over, because the old session's race
@@ -356,16 +378,16 @@ function inRaceMenu(t0, opened, lastSeen) {
 
 /** tick(), but with the actor seen online at `cameOn` rather than seenAt. */
 function tickAs(state, now, cameOn) {
-  const out = { chose: null, nudged: false, log: [], state: state };
+  const out = { chose: null, asks: 0, said: [], log: [], state: state };
   const actorId = 0xff000056;
   const firstSeen = new Map([[actorId, cameOn]]);
   const mp = {
     get(id, key) { return key === 'pos' || key === 'angle' ? [0, 0, 0] : null; },
-    setRaceMenuOpen() { out.nudged = true; }
+    setRaceMenuOpen() { out.asks++; }
   };
   const fn = new Function(
     'actorId', 'now', 'firstSeen', 'appearance', 'state', 'mp', 'log',
-    'setChargen', 'faceMark', 'beginChoosing', 'hasStoredAppearance',
+    'setChargen', 'faceMark', 'beginChoosing', 'hasStoredAppearance', 'tellOnce',
     'NUDGE_MS', 'GIVEUP_MS', 'MOVED_ENOUGH_MS', 'MOVED_UNITS', 'MOVED_DEGREES',
     'FACE_SEEN_MS', 'FACE_CAP_MS',
     'do {\n' + stage + '\n} while (false);');
@@ -374,6 +396,7 @@ function tickAs(state, now, cameOn) {
      function (id, s) { out.state = s; }, function () { return ''; },
      function (id, s, why) { out.chose = why; },
      function (a) { return !!(a && typeof a === 'object'); },
+     function () { return false; },
      NUDGE_MS, GIVEUP_MS, MOVED_ENOUGH_MS, MOVED_UNITS, MOVED_DEGREES,
      FACE_SEEN_MS, FACE_CAP_MS);
   return out;
@@ -504,6 +527,46 @@ function tickAs(state, now, cameOn) {
     yes('S15 a second race menu is told at once, not a minute later',
         told.length === after + 1 && told[after] === '/racemenu');
   }
+}
+
+// S16: a lost request is asked on every two-minute interval, and each of
+//      the two player lines is said once for the whole wait.
+{
+  const t0 = 16000000;
+  let st = stuck(t0);
+  let asks = 0;
+  const said = [];
+  function step(at) {
+    const out = tick({ state: st, now: at });
+    st = out.state;
+    asks += out.asks;
+    for (let i = 0; i < out.said.length; i++) { said.push(out.said[i]); }
+    return out;
+  }
+  const a1 = step(t0 + NUDGE_MS + 1);
+  yes('S16 first interval: one ask and no player line',
+      a1.asks === 1 && a1.said.length === 0 && asks === 1 && said.length === 0);
+  const mid = step(t0 + NUDGE_MS + 1000);
+  yes('S16 inside the interval: no second ask',
+      mid.asks === 0 && asks === 1 && said.length === 0);
+  const a2 = step(t0 + 2 * NUDGE_MS + 1);
+  yes('S16 second interval: one ask', a2.asks === 1 && asks === 2);
+  yes('S16 and the first player line is that one sentence, once',
+      said.length === 1 && said[0] === AGAIN);
+  const a3 = step(t0 + 3 * NUDGE_MS + 1);
+  yes('S16 third interval: one ask', a3.asks === 1 && asks === 3);
+  yes('S16 and the relog line is that one sentence, once',
+      said.length === 2 && said[0] === AGAIN && said[1] === RELOG);
+  const a4 = step(t0 + 4 * NUDGE_MS + 1);
+  yes('S16 fourth interval: one ask and no new player line',
+      a4.asks === 1 && a4.said.length === 0 && asks === 4 &&
+      said.length === 2 && said[0] === AGAIN && said[1] === RELOG);
+  const done = tick({
+    state: st, now: t0 + 4 * NUDGE_MS + 2,
+    appearance: { mark: 'stored', name: '' }
+  });
+  yes('S16 a stored face stops the asks and moves on',
+      done.asks === 0 && done.chose !== null);
 }
 
 console.log('');

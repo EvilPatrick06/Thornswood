@@ -152,8 +152,12 @@ const MOVED_DEGREES = num('MOVED_DEGREES');
 const FACE_SEEN_MS = num('FACE_SEEN_MS');
 const FACE_CAP_MS = num('FACE_CAP_MS');
 
+const AGAIN = "Your character creation menu didn't open. Opening it again.";
+const RELOG = 'The character creation menu still did not open. Relog, and if it ' +
+  'still does not open, contact staff.';
+
 function tick(opts) {
-  const out = { chose: null, nudged: false, log: [], state: opts.state };
+  const out = { chose: null, asks: 0, said: [], log: [], state: opts.state };
   const actorId = 0xff000056;
   const now = opts.now;
   const firstSeen = new Map([[actorId, opts.state.seenAt || 1]]);
@@ -165,11 +169,18 @@ function tick(opts) {
       if (key === 'angle') { return opts.angle || [0, 0, 0]; }
       return null;
     },
-    setRaceMenuOpen: function () { out.nudged = true; }
+    setRaceMenuOpen: function () { out.asks++; }
+  };
+  const tellOnce = function (id, step, text) {
+    if (!state.told) { state.told = {}; }
+    if (state.told[step]) { return false; }
+    state.told[step] = now;
+    out.said.push(text);
+    return true;
   };
   const fn = new Function(
     'actorId', 'now', 'firstSeen', 'appearance', 'state', 'mp', 'log',
-    'setChargen', 'faceMark', 'beginChoosing', 'hasStoredAppearance',
+    'setChargen', 'faceMark', 'beginChoosing', 'hasStoredAppearance', 'tellOnce',
     'NUDGE_MS', 'GIVEUP_MS', 'MOVED_ENOUGH_MS', 'MOVED_UNITS', 'MOVED_DEGREES',
     'FACE_SEEN_MS', 'FACE_CAP_MS',
     'do {\n' + stage + '\n} while (false);');
@@ -178,7 +189,7 @@ function tick(opts) {
      function (id, s) { out.state = s; },
      function (ap) { return (ap && ap.mark) ? String(ap.mark) : ''; },
      function (id, s, why) { out.chose = why; },
-     hasStoredAppearance,
+     hasStoredAppearance, tellOnce,
      NUDGE_MS, GIVEUP_MS, MOVED_ENOUGH_MS, MOVED_UNITS, MOVED_DEGREES,
      FACE_SEEN_MS, FACE_CAP_MS);
   return out;
@@ -195,7 +206,7 @@ function stuck(at) {
   const out = tick({ state: walk, now: t0 + MOVED_ENOUGH_MS + 100 });
   yes('walking half a second with no stored face does not publish them',
       out.chose === null);
-  yes('and asks for the race menu instead', out.nudged);
+  yes('and asks for the race menu once', out.asks === 1);
 }
 
 {
@@ -220,6 +231,7 @@ function stuck(at) {
       out.chose === null);
   yes('and the log says staying unpublished',
       out.log.join(' ').indexOf('staying unpublished') !== -1);
+  yes('and that lost request is asked once', out.asks === 1);
 }
 
 {
@@ -240,6 +252,7 @@ function stuck(at) {
   st.faceSeenAt = at - 10000;
   const out = tick({ state: st, now: at });
   yes('FACE_CAP without a stored face does not publish them', out.chose === null);
+  yes('and a reported-up menu is not sent another open', out.asks === 0);
 }
 
 {
@@ -249,6 +262,7 @@ function stuck(at) {
   const out = tick({ state: st, now: t0 + 2000 });
   yes('the plugin closing the race menu without a store does not publish them',
       out.chose === null);
+  yes('and the closed-without-a-face case is asked once', out.asks === 1);
 }
 
 {
@@ -259,6 +273,33 @@ function stuck(at) {
   });
   yes('a face that actually arrives still ends the stage at once',
       out.chose === 'the face arrived');
+  yes('and a stored face is not asked to open the race menu', out.asks === 0);
+}
+
+{
+  const t0 = 8000000;
+  let st = stuck(t0);
+  const said = [];
+  let asks = 0;
+  function step(at) {
+    const out = tick({ state: st, now: at });
+    st = out.state;
+    asks += out.asks;
+    for (let i = 0; i < out.said.length; i++) { said.push(out.said[i]); }
+    return out;
+  }
+  step(t0 + NUDGE_MS + 1);
+  step(t0 + 2 * NUDGE_MS + 1);
+  step(t0 + 3 * NUDGE_MS + 1);
+  const fourth = step(t0 + 4 * NUDGE_MS + 1);
+  yes('a lost request is asked on each two-minute interval', asks === 4 && fourth.asks === 1);
+  yes('the two player lines are each that one sentence, once',
+      said.length === 2 && said[0] === AGAIN && said[1] === RELOG);
+  const up = stuck(t0);
+  up.faceOpenAt = t0 + 5000;
+  up.faceSeenAt = t0 + 3 * NUDGE_MS;
+  const held = tick({ state: up, now: t0 + 3 * NUDGE_MS + 1 });
+  yes('a reported-up race menu is not asked again', held.asks === 0 && held.chose === null);
 }
 
 // -------------------------- onUpdateAppearanceAttempt, when the tick cannot see them

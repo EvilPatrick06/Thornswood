@@ -114,7 +114,7 @@ function server(opts) {
     clock: { now: 1790000000000 },
     props: {},
     online: [],
-    said: [], notified: [], logs: [], errors: [],
+    said: [], notified: [], logs: [], errors: [], raceOpens: [],
     // A record write that does not stick: 'drop' loses it, 'throw' throws.
     chargenWrite: 'ok',
   };
@@ -130,7 +130,7 @@ function server(opts) {
       if (!S.props[id]) { S.props[id] = {}; }
       S.props[id][key] = JSON.parse(JSON.stringify(v));
     },
-    setRaceMenuOpen: function () { },
+    setRaceMenuOpen: function () { S.raceOpens.push(S.clock.now); },
   };
   const FakeDate = { now: function () { return S.clock.now; } };
   const g = {
@@ -208,6 +208,9 @@ const CLOTHES_LINE = /plain clothes/;
 const PANEL_LINE = /Press K/;
 const INN_LINE = /You start at the inn/;
 const BACK_LINE = /Welcome back to Thornswood/;
+const AGAIN_LINE = "Your character creation menu didn't open. Opening it again.";
+const RELOG_LINE = 'The character creation menu still did not open. Relog, and if it ' +
+  'still does not open, contact staff.';
 
 const EM = String.fromCharCode(0x2014);
 function clean(line) {
@@ -341,15 +344,33 @@ function clean(line) {
   const ME = 0xff00005c;
   const S = server();
   S.join(ME, HALL.desc, 14, []);
-  const GIVEUP_TICKS = Math.ceil(K.GIVEUP_MS / TICK) + SETTLE_TICKS + 20;
-  S.run(GIVEUP_TICKS);
-  yes('the give up does not publish them after ' + Math.round(K.GIVEUP_MS / 1000) + ' s standing still',
-      S.stage(ME) === 'appearance' &&
-      S.logs.some(function (l) { return /appearance never arrived after/.test(l); }) &&
-      S.logs.some(function (l) { return /staying unpublished/.test(l); }));
-  S.run(400);
-  yes('stuck in the hall: ' + (GIVEUP_TICKS + 400) + ' ticks, one hall line and no clothes line',
-      S.to(ME, HALL_LINE).length === 1 && S.to(ME, CLOTHES_LINE).length === 0 && S.to(ME).length === 1);
+  S.run(SETTLE_TICKS + 20);
+  yes('stuck in the hall starts on the face step with one hall line',
+      S.stage(ME) === 'appearance' && S.to(ME).length === 1 &&
+      HALL_LINE.test(S.to(ME)[0].text) && S.to(ME, CLOTHES_LINE).length === 0);
+  const askedAt = (S.mod.chargenOf(ME) || {}).askedAt;
+  function runUntil(at) {
+    while (S.clock.now < at) { S.run(1); }
+  }
+  runUntil(askedAt + K.NUDGE_MS + TICK);
+  yes('first lost-request interval: one race-menu ask and no extra line',
+      S.raceOpens.length === 1 && S.to(ME).length === 1);
+  runUntil(askedAt + 2 * K.NUDGE_MS + TICK);
+  yes('second interval: two asks and the first player line once',
+      S.raceOpens.length === 2 && S.to(ME).length === 2 &&
+      S.to(ME)[1].text === AGAIN_LINE);
+  runUntil(askedAt + 3 * K.NUDGE_MS + TICK);
+  yes('third interval: three asks and the relog line once',
+      S.raceOpens.length === 3 && S.to(ME).length === 3 &&
+      S.to(ME)[1].text === AGAIN_LINE && S.to(ME)[2].text === RELOG_LINE);
+  runUntil(askedAt + 4 * K.NUDGE_MS + TICK);
+  yes('fourth interval: four asks and still those two lines only',
+      S.raceOpens.length === 4 && S.to(ME).length === 3 &&
+      S.to(ME)[0] && HALL_LINE.test(S.to(ME)[0].text) &&
+      S.to(ME)[1].text === AGAIN_LINE && S.to(ME)[2].text === RELOG_LINE &&
+      S.to(ME, CLOTHES_LINE).length === 0 && S.stage(ME) === 'appearance');
+  yes('the give up still does not publish them',
+      S.logs.filter(function (l) { return /staying unpublished/.test(l); }).length >= 1);
 }
 
 // ------------------------------------------- somebody who has played before

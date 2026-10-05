@@ -1,35 +1,35 @@
 {
-    "recordedUtc":  "2026-10-05T01:47:09Z",
-    "builtUtc":  "2026-10-05T01:46:25Z",
-    "fork":  "https://github.com/EvilPatrick06/skymp",
-    "forkBranch":  "thornswood/engine-changes",
-    "forkCommit":  "3acc55da",
-    "upstreamBase":  "f926944b",
-    "thornswoodPatchBlocks":  18,
-    "files":  {
-                  "Data\\SKSE\\Plugins\\MpClientPlugin.dll":  {
-                                                                  "sha256":  "ec45c03c8abe1fae2dbf43ba9c9dbd89cb0c32f2ed94242afa120217361f7fdc",
-                                                                  "bytes":  1477632
-                                                              },
-                  "Data\\SKSE\\Plugins\\SkyrimPlatform.dll":  {
-                                                                  "sha256":  "5f85578056f3e98d05ea6a0cfab195236f091ea7552c77570367a83460d8122c",
-                                                                  "bytes":  149504
-                                                              },
-                  "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll":  {
-                                                                                                    "sha256":  "365ab363d16d6c5b4172c3a3bee0cfa9eccc0525d8b5f0cea5557ae5da1cf63c",
-                                                                                                    "bytes":  15699968
-                                                                                                },
-                  "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformCEF.exe.hidden":  {
-                                                                                                          "sha256":  "61e5b4928fac75cdee992f9664694634583086f4eb9f5bcc8f46d97a4cb5a983",
-                                                                                                          "bytes":  431616
-                                                                                                      },
-                  "Data\\Platform\\Plugins\\skymp5-client.js":  {
-                                                                    "sha256":  "12c182c087a6a46379dd7fd25be7e47ecedaf22e4b2578298a0a662a1fc81447",
-                                                                    "bytes":  1496329
-                                                                },
-                  "Data\\Scripts\\TESModPlatform.pex":  {
-                                                            "sha256":  "fc02e76eb66788204908b7adda93aebcd447661ad7589c01ca2dc08e3d863137",
-                                                            "bytes":  2530
-                                                        }
-              }
+  "recordedUtc": "2026-10-05T01:47:09Z",
+  "builtUtc": "2026-10-05T01:46:25Z",
+  "fork": "https://github.com/EvilPatrick06/skymp",
+  "forkBranch": "thornswood/engine-changes",
+  "forkCommit": "3acc55da",
+  "upstreamBase": "f926944b",
+  "thornswoodPatchBlocks": 18,
+  "files": {
+    "Data\\SKSE\\Plugins\\MpClientPlugin.dll": {
+      "sha256": "ec45c03c8abe1fae2dbf43ba9c9dbd89cb0c32f2ed94242afa120217361f7fdc",
+      "bytes": 1477632
+    },
+    "Data\\SKSE\\Plugins\\SkyrimPlatform.dll": {
+      "sha256": "5f85578056f3e98d05ea6a0cfab195236f091ea7552c77570367a83460d8122c",
+      "bytes": 149504
+    },
+    "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll": {
+      "sha256": "365ab363d16d6c5b4172c3a3bee0cfa9eccc0525d8b5f0cea5557ae5da1cf63c",
+      "bytes": 15699968
+    },
+    "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformCEF.exe.hidden": {
+      "sha256": "61e5b4928fac75cdee992f9664694634583086f4eb9f5bcc8f46d97a4cb5a983",
+      "bytes": 431616
+    },
+    "Data\\Platform\\Plugins\\skymp5-client.js": {
+      "sha256": "12c182c087a6a46379dd7fd25be7e47ecedaf22e4b2578298a0a662a1fc81447",
+      "bytes": 1496329
+    },
+    "Data\\Scripts\\TESModPlatform.pex": {
+      "sha256": "fc02e76eb66788204908b7adda93aebcd447661ad7589c01ca2dc08e3d863137",
+      "bytes": 2530
+    }
+  }
 }
