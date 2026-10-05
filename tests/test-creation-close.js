@@ -142,6 +142,8 @@ function panelRig(creatingNow) {
   const api = { close: function () { w.closed++; } };
   const prelude =
     "var section = 'review', status = '', statusKind = '', footKey = '';\n" +
+    // SkillsKey's name, which the Close button's key cap shows (#1919).
+    "var keyName = 'K';\n" +
     'function creating() { return !!mine.creating; }\n' +
     'function canConfirm() { return false; }\n' +
     "function hint() { return ''; }\n";

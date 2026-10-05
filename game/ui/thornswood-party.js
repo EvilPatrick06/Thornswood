@@ -20,8 +20,9 @@
   THE CONTRACT with thornswood-front.js, the same shape thornswood-skills.js
   uses and for the same reasons:
 
-    window.thornswoodParty = { open, close, toggle, isOpen, setData }
+    window.thornswoodParty = { open, close, toggle, isOpen, setData, setKey }
     page -> plugin  'party:ready' | 'party:opened' | 'party:closed'
+    setKey(name)    PartyKey's name, P unless it is bound elsewhere (#1919)
 
   Everything this panel DOES it does by sending the server the lines its
   commands were, through window.thornswoodNet.say: /friend, /trade, /party,
@@ -37,6 +38,8 @@
   var shown = false;
   var root = null;
   var askEl = null;
+  // PartyKey as bound. P until the front says otherwise.
+  var keyName = 'P';
 
   function tell(what) {
     try { window.skyrimPlatform.sendMessage('thornswood-front', 'party:' + what); }
@@ -343,18 +346,50 @@
     root.querySelector('#' + ID + '-help').onclick = help;
 
     /*
-      Escape closes it, and the page has to handle that itself.
+      Escape and P close it, and the page has to handle both itself.
 
       While the browser holds the keyboard no plugin can see a key: focus
       raises DInputHook::ChromeFocus and buttonEvent goes deaf. That is
       written out at length in thornswood-bridge.js and is the reason every
-      panel on this server answers its own Escape.
+      panel on this server answers its own Escape. The front's P branch,
+      which toggles this panel, waits for a buttonEvent that does not come
+      while the panel is up, so the footer said "Escape or P closes this"
+      and P did nothing (#1919, the same as J on the journal, #530).
+
+      P is PartyKey as bound, which the front hands over with setKey. A
+      repeat is not a press, and a key with Ctrl, Alt or the Windows key
+      held is not P.
+
+      The tap of P that opens the panel cannot also close it: the fork reads
+      the keyboard for this page in the same call that hands the game P going
+      down, or an earlier one, so by the time the front hears P and the panel
+      takes the keyboard, P is already down there and this page hears at
+      most P coming up (the note over LETTERS in
+      game/plugins/thornswood-emotes.js has the code path, #1852).
     */
     document.addEventListener('keydown', function (ev) {
       if (!shown) { return; }
-      if (ev.key === 'Escape') { ev.preventDefault(); close(); }
+      if (ev.key === 'Escape') { ev.preventDefault(); close(); return; }
+      if (ev.repeat || ev.ctrlKey || ev.altKey || ev.metaKey || typing(ev.target)) { return; }
+      if (keyName && String(ev.key || '').toUpperCase() === keyName.toUpperCase()) {
+        ev.preventDefault();
+        close();
+      }
     });
     return root;
+  }
+
+  // True when a key would go into a text field. The panel has none today; a
+  // box added later keeps its letters.
+  function typing(el) {
+    if (!el || !el.tagName) { return false; }
+    var t = String(el.tagName).toUpperCase();
+    return t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || !!el.isContentEditable;
+  }
+
+  // What the footer names, Escape and the key when it is one the page hears.
+  function closesLine() {
+    return keyName ? 'Escape or ' + keyName + ' closes this.' : 'Escape closes this.';
   }
 
   function esc(s) {
@@ -522,7 +557,7 @@
     body.innerHTML = html;
     sub.textContent = (data.friends ? data.friends.length : 0) + ' friend' +
                       ((data.friends && data.friends.length === 1) ? '' : 's');
-    foot.textContent = 'Escape or P closes this.';
+    foot.textContent = closesLine();
 
     var buttons = body.querySelectorAll('button[data-do]');
     for (var k = 0; k < buttons.length; k++) {
@@ -612,6 +647,16 @@
     open: open,
     close: close,
     toggle: toggle,
+    /*
+      PartyKey's name, handed over by the front when this page says it is
+      ready. A key the front has no name for (#57, say) is not one this page
+      can hear, so nothing but Escape closes it then.
+    */
+    setKey: function (name) {
+      var n = String(name == null ? '' : name);
+      keyName = n.charAt(0) === '#' ? '' : n;
+      if (shown) { draw(); }
+    },
     isOpen: function () { return shown; },
     setData: function (d) {
       data = d || null;

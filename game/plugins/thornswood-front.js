@@ -8005,8 +8005,9 @@
     if (e.code === TRADE_KEY) { lookVerb('trade'); return; }
     if (e.code === MUTE_KEY) { lookVerb('mute'); return; }
     if (e.code === PARTY_KEY) {
-      // On somebody not in your party it asks them (#1629); otherwise, or
-      // while the panel is up and P is closing it, it is the panel.
+      // On somebody not in your party it asks them (#1629); otherwise it is
+      // the panel. While the panel holds the keyboard no buttonEvent comes,
+      // and the page closes itself on P (#1919).
       if (T.hasFocus('party') || !partyPress()) {
         T.js('try{window.thornswoodParty&&window.thornswoodParty.toggle();}catch(e){}');
       }
@@ -8951,6 +8952,12 @@
     }
     if (what === 'ride:ready') { log('the ride panel is in'); return; }
     if (what === 'party:ready' || what === 'journal:ready' || what === 'trade:ready' || what === 'board:ready') {
+      // The P panel closes on P itself while it holds the keyboard, so it
+      // is told which key P is (#1919).
+      if (what === 'party:ready') {
+        T.js('try{window.thornswoodParty&&window.thornswoodParty.setKey&&window.thornswoodParty.setKey(' +
+             JSON.stringify(PARTY_NAME) + ');}catch(e){}');
+      }
       tellServer(what === 'trade:ready' ? '/trade refresh' : '/party refresh');
       log('the ' + what.split(':')[0] + ' panel is in');
       return;
@@ -8975,7 +8982,13 @@
     if (what === 'skills:opened') { T.claimFocus('skills', true); return; }
     if (what === 'skills:closed') { T.claimFocus('skills', false); return; }
     if (what === 'skills:ready' || what === 'skills:refresh') {
-      if (what === 'skills:ready') { log('the skills panel is in'); }
+      if (what === 'skills:ready') {
+        log('the skills panel is in');
+        // The K panel closes on K itself while it holds the keyboard, so it
+        // is told which key K is (#1919).
+        T.js('try{window.thornswoodSkills&&window.thornswoodSkills.setKey&&window.thornswoodSkills.setKey(' +
+             JSON.stringify(keyName(SKILLS_KEY)) + ');}catch(e){}');
+      }
       // The panel mounts after the first property write of the session, so
       // it asks the server to say again what this character already is, and
       // asks again every time it opens. The answer comes back through the

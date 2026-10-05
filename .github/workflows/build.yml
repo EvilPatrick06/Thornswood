@@ -358,6 +358,7 @@ jobs:
                  'test-1642-effects-restart.js',
                  'test-1730-forced-panel.js',
                  'test-1852-wheel-keys.js',
+                 'test-1919-p-k-close.js',
                  'test-1717-property-page.js',
                  'test-1703-test-ports.js',
                  'test-1721-social-tick.js',
