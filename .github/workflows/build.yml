@@ -366,6 +366,7 @@ jobs:
                  'test-1814-loadorder-missing.ps1',
                  'test-1804-install-pass-switch.ps1',
                  'test-live-parse-check.ps1',
+                 'test-dev-instance.ps1',
                  'test-1692-release-root.ps1',
                  'test-1367-cross-site.js',
                  'test-1326-engine-secrets.ps1',
