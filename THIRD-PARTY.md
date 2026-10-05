@@ -94,7 +94,7 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `a247ef27` (in full, `a247ef27b9915bdfcdad7a8ba70d78acbd8f7beb`). That
+commit `b7c0d916` (in full, `b7c0d9162e71768feb1a604fe56e3e8cfd850cd0`). That
 is upstream skyrim-multiplayer/skymp at `f926944b` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
@@ -395,14 +395,17 @@ with.
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `a247ef27b9915bdfcdad7a8ba70d78acbd8f7beb` on the public fork. The
-  server module was built from that commit, which adds the merchant settlement
-  and the appearance publication change (`records\merchant-runtime-provenance.md`);
-  its SHA256 is
-  `e83c6e8133b30fe66d0060dcb7927fb672f98690df8a0262648c8b8d6bf9f152`, built
-  2026-10-05T04:40:47Z. The six client files keep the published `e6534129`
-  bytes, because their source is the same at both commits (the same record).
-  Main remains on `8cab23e6b86609181a4ec212818b56199db9061e` until its next release.
+  name `b7c0d9162e71768feb1a604fe56e3e8cfd850cd0` on the public fork. The
+  server module and the six client files were built from that commit, which
+  adds the 5 October security fixes (the RPC route, request bodies, metrics,
+  the login line, the settings files), the server's equipment write for a new
+  character, a saved character whose race cannot be read kept under its own
+  id, and the build fixes; the server module's SHA256 is
+  `cc2b61307b35cade42d5c81019473d64c2644e0c5d628c568b9615760555f98e`, built
+  2026-10-05T20:52:40Z. It goes to the dev server first.
+  Main remains on `a247ef27b9915bdfcdad7a8ba70d78acbd8f7beb` until its next release
+  (read from each server's own record on 5 October; dev runs it too until
+  this build reaches it).
   Section 13 of the AGPL asks that everybody who connects to a modified server
   over a network be offered its source. The next section is that offer.
 
@@ -430,11 +433,11 @@ For the six client files and for the game server module running on the VPS, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
 
-https://github.com/EvilPatrick06/skymp/tree/a247ef27b9915bdfcdad7a8ba70d78acbd8f7beb
+https://github.com/EvilPatrick06/skymp/tree/b7c0d9162e71768feb1a604fe56e3e8cfd850cd0
 
 The game server module the live server runs until its next server release:
 
-https://github.com/EvilPatrick06/skymp/tree/8cab23e6b86609181a4ec212818b56199db9061e
+https://github.com/EvilPatrick06/skymp/tree/a247ef27b9915bdfcdad7a8ba70d78acbd8f7beb
 
 It is on the branch `thornswood/engine-changes`, it is public, and the branch
 answered an anonymous request on 24 September. It builds with CMake and
