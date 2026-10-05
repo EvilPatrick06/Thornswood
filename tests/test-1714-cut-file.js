@@ -86,6 +86,20 @@ try {
   yes("the kept rows that have owners now (Armor Kit, Iron Ingot, Leather Strips, Crude Fishing Pole, Fish Trap) are not cut",
     keptOwned.every(function (id) { return !!table.recipes[id] && !table.recipes[id].book && !backIds[id]; }));
 
+  // A Windows checkout holds both files with CRLF, and they are written back so.
+  const crlfJson = CUT_JSON.split("\r\n").join("\n").split("\n").join("\r\n");
+  const crlfMd = CUT_MD.split("\r\n").join("\n").split("\n").join("\r\n");
+  const win = box(TABLE, crlfJson, crlfMd);
+  const rw = run(win);
+  yes("a CRLF checkout's files are written back byte for byte, CRLF kept",
+    rw.code === 0 && readOut(win, "cut-items.json") === crlfJson && readOut(win, "cut-items.md") === crlfMd);
+  const lfJson = CUT_JSON.split("\r\n").join("\n");
+  const lfMd = CUT_MD.split("\r\n").join("\n");
+  const lin = box(TABLE, lfJson, lfMd);
+  const rl = run(lin);
+  yes("an LF checkout's files are written back byte for byte, LF kept",
+    rl.code === 0 && readOut(lin, "cut-items.json") === lfJson && readOut(lin, "cut-items.md") === lfMd);
+
   // ---- a cut table with no cut file ---------------------------------------
   const lost = box(TABLE, null, null);
   const r3 = run(lost);
