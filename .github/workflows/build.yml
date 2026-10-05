@@ -347,6 +347,7 @@ jobs:
                  'test-1640-jarl-word.js',
                  'test-1638-office.js',
                  'test-1631-needs-gui.js',
+                 'test-1764-away-no-rest.js',
                  'test-1633-help-panel.js',
                  'test-1642-effects-restart.js',
                  'test-1730-forced-panel.js',
