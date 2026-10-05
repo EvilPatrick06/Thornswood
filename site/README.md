@@ -32,6 +32,22 @@ else does.
 | `/api/report/game`, `/dev/api/report/game` | POST | each game server, with the bot's key in a header, when somebody types /helpme or /report; the row goes into the inbox and the bot says it in the staff channel (`game\gamemode.js`, the asking staff block) |
 | `/api/play/who` | POST | nothing in the repo asks it now. It says who a ticket belongs to and writes nothing, which makes it the one to try by hand |
 
+Every request that is not a GET has to come from this site (#1367). A
+browser names the page that sent it in `Origin`, or in `Referer` when an old
+one leaves `Origin` off, and either has to be this site's own address, the
+one the request was sent to; `Origin: null` is not. One that names no page
+and carries a sign in cookie is a browser with both taken off, and is refused
+as well. None of the POST routes in the table above is sent by a browser:
+they carry no cookie and neither header, and each proves itself with a
+ticket or the bot's key, so none of it is touched. A
+refusal is 403 with `why` set to `cross-site` before anything is read or
+Discord is asked, and `site.log` says what was refused and where it said it
+came from. The sign in cookies are still `SameSite=Lax`; this is what holds
+when a browser too old for that sends them on another site's form anyway, or
+a page on another name under thornswood.net does. A GET changes nothing
+another page can choose. `tests\test-1367-cross-site.js` sends every kind of
+write the hub makes from another site and from this one.
+
 ## On your machine
 
 It needs node and nothing else. Run it from a copy of this folder rather than
