@@ -359,7 +359,6 @@ jobs:
                  'test-1721-social-tick.js',
                  'test-1307-ice-relay.js',
                  'test-1821-ice-on-socket.js',
-                 'test-1821-clock-probe.js',
                  'test-1822-voice-page-gone.js',
                  'test-1336-missing-stops.ps1',
                  'test-1223-live-pass-asked.ps1',
