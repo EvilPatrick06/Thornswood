@@ -171,7 +171,10 @@ menu this session. Writes `Profile\launcher.log` through Log and
 `Paths.cs:71 Init()` from where the exe is. `Collection` says which shape the
 install is; `OwnFirst` that its own folder was chosen at install and is not
 made yet, when `Game` is `Profile\Payload` (#1226); `SteamCopy` is the Steam
-copy, read for the game's build before the folder exists. Owns no files.
+copy, read for the game's build before the folder exists. `Skyrim` is the
+folder the facts about the game are read from (its exe, the script extender,
+their plugins with `SksePluginDirs`): the Steam copy while `OwnFirst`, `Game`
+otherwise, and never a path anything writes to (#1235). Owns no files.
 
 **Acceptance** (Acceptance.cs). `Profile\accepted.json`, the same file the
 setup program writes when the terms, the privacy policy and the rules are
