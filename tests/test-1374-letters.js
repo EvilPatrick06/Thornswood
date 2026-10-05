@@ -6,7 +6,7 @@
 // A letter is a job with a named person at the other end, written at the
 // board. It costs 35 up front: 20 is the board's fee and stays on the hold's
 // ledger, 15 is the courier's pay, held on the same ledger. The courier does
-// not read it: the wall, the panel, /jobs and the taking line name who it is
+// not read it: the wall, the panels, Your jobs and the taking line name who it is
 // for, never the words. /deliver, within the trade reach of 700, to the named
 // person, hands them the words and pays the courier the 15 out of the ledger.
 // The 15 is the sender's gold moved, never created, so packs plus ledger add
@@ -55,8 +55,8 @@ function fn(name) {
 }
 
 const NAMES = ['takeGold', 'payOut', 'payHeld', 'sealed', 'nameIs', 'post', 'board', 'take',
-               'jobs', 'dropJob', 'takedown', 'unpin', 'postLetter', 'deliver', 'letterReach',
-               'boardHere', 'nearestBoard', 'boardPanel', 'moveBoard', 'command',
+               'jobsOf', 'dropJob', 'takedown', 'unpin', 'postLetter', 'deliver', 'letterReach',
+               'boardHere', 'nearestBoard', 'wallOf', 'boardPanel', 'boardsView', 'moveBoard', 'command',
                // The panel also lists the towns a haul can go to and the hauls that came here (#1393).
                'haulTenth'];
 const lifted = {};
@@ -156,6 +156,7 @@ function boot(reg, w, opts) {
     'var funds = loadPart("funds", {});',
     'var notices = loadPart("notices", {});',
     'var GOLD_ID = ' + GOLD + ';',
+    'var boardReads = {};',
     holds,
     tenthFrom,
     fees,
@@ -170,6 +171,7 @@ function boot(reg, w, opts) {
   NAMES.forEach(function (n) { body.push(lifted[n]); });
   body.push('return { boards: boards, funds: function () { return funds; }, ' +
             'notices: function () { return notices; }, command: command, boardPanel: boardPanel, ' +
+            'boardsView: boardsView, ' +
             'nameIs: nameIs, seed: BOARD_SEED };');
   const g = { __thornswoodSocial: social(w), __thornswoodTrade: { TRADE: { reach: 700 } } };
   const make = new Function('reg', 'mp', 'plog', 'loadPart', 'PASSAGES', 'g', 'isSteward', body.join('\n'));
@@ -314,12 +316,16 @@ if (missing.length === 0 && fees && seeding && PASSAGES) {
         n.job === true && n.letter === true && n.to === 'Lydia' && n.pay === 15 && n.text === WORDS);
     yes('P4 and the total of packs and ledger has not moved', total(w, s) === start);
 
-    // The wall and the panel.
-    let wall = s.say(CYRUS, '/board');
-    yes('P5 the wall says it is a letter and who it is for, and not the words',
-        wall.indexOf('[1] letter for Lydia, from Alice') !== -1 && wall.indexOf('Drunken') === -1);
-    wall = s.say(CYRUS, '/board whiterun');
-    yes('P5 and so does reading the board by name', wall.indexOf('letter for Lydia') !== -1 && wall.indexOf('Drunken') === -1);
+    // The wall, on J and on the panel.
+    const where = s.say(CYRUS, '/board');
+    yes('P5 /board on its own puts nothing in the chat but where the boards are',
+        /J, under Boards/.test(where) && where.indexOf('Lydia') === -1);
+    const quiet = s.say(CYRUS, '/board whiterun');
+    const onJ = s.boardsView(CYRUS.pid);
+    yes('P5 J\'s Boards tab says it is a letter and who it is for, and not the words',
+        quiet === '' && onJ.read.hold === 'whiterun' && onJ.read.wall.length === 1 &&
+        onJ.read.wall[0].letter === true && onJ.read.wall[0].name === 'Alice' &&
+        onJ.read.wall[0].text === 'A sealed letter for Lydia' && JSON.stringify(onJ).indexOf('Drunken') === -1);
     const panel = s.boardPanel(CYRUS.actor, CYRUS.pid);
     yes('P6 the panel marks it a letter for Lydia and does not carry the words',
         panel && panel.wall.length === 1 && panel.wall[0].letter === true && panel.wall[0].job === true &&
@@ -334,9 +340,11 @@ if (missing.length === 0 && fees && seeding && PASSAGES) {
         s.notices().whiterun[0].taken === BOB.pid);
     said = s.say(CYRUS, '/take 1');
     yes('T3 one taker', /Bob has that one/.test(said));
-    const list = s.say(BOB, '/jobs');
-    yes('T4 the courier\'s list names who it is for, not the words',
-        list.indexOf('A sealed letter for Lydia, from Alice') !== -1 && list.indexOf('Drunken') === -1);
+    s.say(BOB, '/board riften');
+    const list = s.boardsView(BOB.pid).jobs;
+    yes('T4 the courier\'s Your jobs on J names who it is for and from whom, not the words',
+        list.length === 1 && list[0].letter === true && list[0].text === 'A sealed letter for Lydia' &&
+        list[0].name === 'Alice' && list[0].hold === 'whiterun' && JSON.stringify(list).indexOf('Drunken') === -1);
     const held = s.boardPanel(BOB.actor, BOB.pid);
     yes('T4 and so does the panel\'s list of what they carry',
         held.jobs.length === 1 && held.jobs[0].text === 'A sealed letter for Lydia' &&
@@ -383,14 +391,15 @@ if (missing.length === 0 && fees && seeding && PASSAGES) {
     const done = s.notices().whiterun[0];
     yes('D10 the letter comes off the wall, delivered, and its pay is spent',
         !!done.down && !!done.delivered && done.deliveredTo === LYDIA.pid && done.pay === 0);
-    yes('D10 and nobody reads it on the wall afterwards',
-        /Nothing on the board/.test(s.say(CYRUS, '/board')));
+    s.say(CYRUS, '/board whiterun');
+    yes('D10 and nobody reads it on the wall afterwards', s.boardsView(CYRUS.pid).read.wall.length === 0);
     yes('D11 it cannot be delivered twice', /not carrying a letter/.test(s.say(BOB, '/deliver Lydia')) &&
         w.gold(BOB) === 25);
     yes('D11 nor handed back, nor taken down for a refund',
         /not one of yours/.test(s.say(BOB, '/dropjob 1')) &&
         /already down/.test(s.say(ALICE, '/unpin 1')) && w.gold(ALICE) === 165 && s.funds().whiterun === 20);
-    yes('D12 the courier\'s list is empty again', /You have taken no jobs/.test(s.say(BOB, '/jobs')));
+    s.say(BOB, '/board whiterun');
+    yes('D12 the courier\'s list is empty again', s.boardsView(BOB.pid).jobs.length === 0);
     s = boot(reg, w);
     yes('D13 after a restart the delivery and the ledger stand',
         !!s.notices().whiterun[0].delivered && s.funds().whiterun === 20 && s.notices().whiterun[0].pay === 0);
