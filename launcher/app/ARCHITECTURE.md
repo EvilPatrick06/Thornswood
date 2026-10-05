@@ -321,7 +321,9 @@ author's plugin, #1180), and other servers' files moved into
 `Verify.cs:1019 DeployPersonal()` copies `<Root>\Your Mods` into `Game\Data`.
 
 **Vortex profile state** (VortexProfileState.cs). Checks and the PowerShell
-load-order scripts share this reader for the named Skyrim profile. It reads
+load-order scripts share this reader for the named Skyrim profile and for the
+collection: the revision installed, the newest revision Vortex knows of, and
+the mod ids that name its staging folder (#1582, #1902). It reads
 the current LevelDB manifest, compressed tables and sequenced log records
 without opening or writing the database. Deleted, ambiguous, corrupt or
 incomplete profile metadata is refused. Finish deployment and close Vortex

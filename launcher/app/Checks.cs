@@ -256,71 +256,23 @@ namespace Thornswood
 
         /// <summary>
         /// Newest collection revision Vortex knows for a slug, or 0. Same as
-        /// Get-CollectionNewest in LoadOrder.ps1.
+        /// Get-CollectionNewest in LoadOrder.ps1. Read through
+        /// VortexProfileState, as the installed revision is since #1582: until
+        /// #1902 this matched raw bytes in every file of state.v2, which finds
+        /// nothing once Vortex compacts the keys into a compressed table, so
+        /// Newest fell to the installed revision and Behind read false.
         /// </summary>
         public static int CollectionNewest(string slug)
         {
             try
             {
-                string dir = VortexStateDir();
-                if (!Directory.Exists(dir)) return 0;
-                int best = 0;
-                var revIds = new HashSet<string>(StringComparer.Ordinal);
-                string[] files = Directory.GetFiles(dir);
-                var transRe = new Regex("\"newestVersion\"\\s*,\\s*\"from\"\\s*:\\s*\"(\\d+)\"\\s*,\\s*\"to\"\\s*:\\s*\"(\\d+)\"");
-                var plainRe = new Regex("newestVersion[\\x00-\\x1F]{1,4}\"(\\d+)\"");
-                Regex slugRe = null;
-                if (!string.IsNullOrEmpty(slug))
-                    slugRe = new Regex(
-                        "collections###revisions###([^#]+)###info###collection###slug[\\x00-\\x1F]{1,4}\"" +
-                        Regex.Escape(slug) + "\"");
-                foreach (string f in files)
-                {
-                    string txt;
-                    try { txt = VortexStateText(f); } catch { continue; }
-                    foreach (Match m in transRe.Matches(txt))
-                    {
-                        int n;
-                        if (int.TryParse(m.Groups[2].Value, out n) && n > best) best = n;
-                    }
-                    foreach (Match m in plainRe.Matches(txt))
-                    {
-                        int n;
-                        if (int.TryParse(m.Groups[1].Value, out n) && n > best) best = n;
-                    }
-                    if (slugRe != null)
-                        foreach (Match m in slugRe.Matches(txt)) revIds.Add(m.Groups[1].Value);
-                }
-                if (!string.IsNullOrEmpty(slug) && revIds.Count > 0)
-                {
-                    foreach (string f in files)
-                    {
-                        string txt;
-                        try { txt = VortexStateText(f); } catch { continue; }
-                        foreach (string id in revIds)
-                        {
-                            var revRe = new Regex(
-                                "collections###revisions###" + Regex.Escape(id) +
-                                "###info###revisionNumber[\\x00-\\x1F]{1,4}(\\d+)");
-                            foreach (Match m in revRe.Matches(txt))
-                            {
-                                int n;
-                                if (int.TryParse(m.Groups[1].Value, out n) && n > best) best = n;
-                            }
-                        }
-                    }
-                }
-                if (!string.IsNullOrEmpty(slug))
-                {
-                    int have = CollectionRevisionFromState(slug);
-                    if (have > best) best = have;
-                }
-                return best;
+                if (string.IsNullOrEmpty(slug)) return 0;
+                return VortexProfileState.CollectionNewest(VortexStateDir(), slug);
             }
-            catch { return 0; }
+            catch (Exception ex) { Swallow.Note("Checks.CollectionNewest", ex); return 0; }
         }
 
-        /// <summary>Have/Newest/Behind/Known â€” same as Get-CollectionState.</summary>
+        /// <summary>Have, Newest, Behind and Known, the same as Get-CollectionState.</summary>
         public static void CollectionState(Config cfg, out int have, out int newest, out bool behind, out bool known)
         {
             have = 0; newest = 0; behind = false; known = false;
@@ -335,54 +287,18 @@ namespace Thornswood
             catch (Exception ex) { Swallow.Note("Checks.CollectionState", ex); }
         }
 
-        /// <summary>Mod ids for a collection slug from state.v2.
-        /// Prefers attributes###collectionSlug; falls back to newestFileId
-        /// tied through collections###revisions (authoring shape).</summary>
+        /// <summary>Mod ids for a collection slug from state.v2, through
+        /// VortexProfileState and its tie: attributes###collectionSlug, or for
+        /// an authored collection newestFileId linked to a cached revision of
+        /// the slug. Same as Get-CollectionModIds. Until #1902 this matched
+        /// raw bytes, which find nothing in a compacted table.</summary>
         public static List<string> CollectionModIds(string slug)
         {
             var ids = new List<string>();
             try
             {
                 if (string.IsNullOrEmpty(slug)) return ids;
-                string dir = VortexStateDir();
-                if (!Directory.Exists(dir)) return ids;
-                var slugRe = new Regex(
-                    "mods###skyrimse###([^#]+)###attributes###collectionSlug[\\x00-\\x1F]{1,4}\"" +
-                    Regex.Escape(slug) + "\"");
-                var seen = new HashSet<string>(StringComparer.Ordinal);
-                string[] files = Directory.GetFiles(dir);
-                foreach (string f in files)
-                {
-                    string txt;
-                    try { txt = VortexStateText(f); } catch { continue; }
-                    foreach (Match m in slugRe.Matches(txt))
-                        if (seen.Add(m.Groups[1].Value)) ids.Add(m.Groups[1].Value);
-                }
-                if (ids.Count > 0) return ids;
-
-                var revSlugRe = new Regex(
-                    "collections###revisions###([^#]+)###info###collection###slug[\\x00-\\x1F]{1,4}\"" +
-                    Regex.Escape(slug) + "\"");
-                var fileIdRe = new Regex(
-                    "mods###skyrimse###([^#]+)###attributes###newestFileId[\\x00-\\x1F]{1,4}(\\d+)");
-                var revIds = new HashSet<string>(StringComparer.Ordinal);
-                foreach (string f in files)
-                {
-                    string txt;
-                    try { txt = VortexStateText(f); } catch { continue; }
-                    foreach (Match m in revSlugRe.Matches(txt)) revIds.Add(m.Groups[1].Value);
-                }
-                if (revIds.Count == 0) return ids;
-                foreach (string f in files)
-                {
-                    string txt;
-                    try { txt = VortexStateText(f); } catch { continue; }
-                    foreach (Match m in fileIdRe.Matches(txt))
-                    {
-                        if (!revIds.Contains(m.Groups[2].Value)) continue;
-                        if (seen.Add(m.Groups[1].Value)) ids.Add(m.Groups[1].Value);
-                    }
-                }
+                ids.AddRange(VortexProfileState.CollectionModIds(VortexStateDir(), slug));
             }
             catch (Exception ex) { Swallow.Note("Checks.CollectionModIds", ex); }
             return ids;
