@@ -31,6 +31,11 @@ namespace Thornswood
         public long WantSize;
         public int WantCrc;
         public int WantIndex;   // position in the server manifest; the file is served at /plugins/<index>.bin
+        // The server hands out its copy: Thornswood's own plugin, the only one
+        // its manifest lists as served (#1180). Fix fetches only these; every
+        // other plugin is another author's mod, which Vortex installs from its
+        // author, and Fix names the mod to put right in Vortex instead.
+        public bool Served;
         // The folder Vortex really deploys into, when it is not the Skyrim this
         // install reads. Fix points the launcher at it and Thornswood's own
         // folder is made from it, so the plugins Run finds missing are not a
@@ -353,10 +358,14 @@ namespace Thornswood
         // name, same place in the order, other bytes.
         //
         // So the same comparison runs here, against the same manifest, and
-        // Fix fetches the server's copy of a plugin that differs. The five
-        // Bethesda masters and the Creation Club files are left out the way
-        // the game leaves them out: Steam owns those, and a person's Skyrim
-        // is not the launcher's to rewrite.
+        // Fix fetches the server's copy of a plugin that differs when the
+        // server hands that plugin out, which it does for Thornswood's own and
+        // nothing else (#1180, the manifest's "served" list). Another author's
+        // plugin comes from its author through Vortex, and Fix names the mod
+        // to update or reinstall there. The five Bethesda masters and the
+        // Creation Club files are left out the way the game leaves them out:
+        // Steam owns those, and a person's Skyrim is not the launcher's to
+        // rewrite.
         //
         // A server that cannot be reached reports nothing. A check that could
         // not run is not a problem with this machine, and Play should not be
@@ -376,6 +385,9 @@ namespace Thornswood
         class ServerManifest
         {
             [DataMember] public ServerMod[] mods;
+            // The plugins the server hands out at /plugins/<index>.bin:
+            // Thornswood's own, by the gamemode's server manifest block (#1180).
+            [DataMember] public string[] served;
         }
 
         [DataContract]
@@ -384,6 +396,8 @@ namespace Thornswood
             [DataMember] public string filename;
             [DataMember] public long size;
             [DataMember] public long crc32;   // the server writes it as a signed 32 bit number
+            // Named in the manifest's "served" list, set by Manifest (#1180).
+            public bool Served;
         }
 
         /// <summary>True when the last Run got a manifest out of the server, so "Everything matches" can say what it covered.</summary>
@@ -421,6 +435,9 @@ namespace Thornswood
                 ServerManifest doc;
                 using (var ms = new MemoryStream(raw)) doc = (ServerManifest)ser.ReadObject(ms);
                 if (doc == null || doc.mods == null || doc.mods.Length == 0) return null;
+                var served = new HashSet<string>(doc.served ?? new string[0], StringComparer.OrdinalIgnoreCase);
+                foreach (ServerMod m in doc.mods)
+                    if (m != null && m.filename != null) m.Served = served.Contains(m.filename);
                 manifestCache = doc.mods;
                 manifestAt = DateTime.UtcNow;
                 manifestFrom = url;
@@ -469,15 +486,35 @@ namespace Thornswood
                 var i = new Issue(
                     m.filename + " is not the same file the server has" +
                     (size == m.size ? " (same size, other contents)" : " (yours is " + Fmt(size) + ", the server's is " + Fmt(m.size) + ")") +
-                    ". The game shows that as LOAD ORDER ERROR and anything in it can mean something else here than on the server. Fix fetches the server's copy.",
+                    ". The game shows that as LOAD ORDER ERROR and anything in it can mean something else here than on the server. " +
+                    (m.Served ? "Fix fetches the server's copy." : FromVortex(cfg, m.filename)),
                     true);
                 i.Plugin = m.filename;
                 i.WantSize = m.size;
                 i.WantCrc = (int)m.crc32;
                 i.WantIndex = idx;
+                i.Served = m.Served;
                 issues.Add(i);
             }
             return issues;
+        }
+
+        /// <summary>
+        /// What puts another author's plugin right, said by Scan and by Fix.
+        /// The server hands out only Thornswood's own plugin (#1180): any
+        /// other is that author's to give out, through Vortex and the
+        /// collection, so Vortex is where it is put right. The mod is named by
+        /// Vortex's own deployment record when there is one.
+        /// </summary>
+        static string FromVortex(Config cfg, string plugin)
+        {
+            string mod = null;
+            try { mod = OwnGame.VortexModOf(cfg, plugin); }
+            catch (Exception ex) { Swallow.Note("Verify.FromVortex, asking Vortex's record which mod has " + plugin, ex); }
+            return "It comes from another author's mod, which Vortex installs from its author, so the server does not hand it out. " +
+                   "In Vortex, update the Thornswood collection, or reinstall " +
+                   (string.IsNullOrEmpty(mod) ? "the mod that has " + plugin : mod) +
+                   " (right click it on the Mods page, Reinstall), then press Scan.";
         }
 
         /// <summary>The manifest's plugin names in its order, which is the server's load order.</summary>
@@ -726,6 +763,15 @@ namespace Thornswood
         /// </summary>
         static bool FetchPlugin(Config cfg, Issue i, Action<string> say)
         {
+            // Only what the server lists as served, Thornswood's own plugin
+            // (#1180). Before that this fetched any plugin that differed, and
+            // the server handed out 42 other authors' mods to anybody who
+            // asked (measured on both servers, 5 Oct).
+            if (!i.Served)
+            {
+                say(i.Plugin + " was left as it is. " + FromVortex(cfg, i.Plugin));
+                return false;
+            }
             string dest = Path.Combine(Paths.Game, "Data", i.Plugin);
             // Served by manifest position, not name: the resources server refuses
             // any URL whose name contains .esp/.esm/.esl. gamemode publishFiles
@@ -918,16 +964,20 @@ namespace Thornswood
             try { n += OwnGame.RestoreMissingPlugins(cfg, say); }
             catch (Exception ex) { Swallow.Note("Verify.Fix, restoring missing plugins from Vortex", ex); say("Could not restore missing plugins from Vortex (" + ex.Message.TrimEnd('.') + ")."); }
 
-            // The server's copy of every plugin whose bytes are not its own.
+            // The server's copy of our own plugin when its bytes are not the
+            // server's; another author's is named for Vortex (#1180).
             if (cfg != null)
             {
                 foreach (Issue i in Bytes(cfg))
                     if (i.Plugin != null && FetchPlugin(cfg, i, say)) n++;
             }
 
-            // Still missing from Data and listed on the server: fetch that copy.
-            // Bytes skips absent files on purpose (Run already named them); Fix
-            // still has to put them back when Vortex did not have them.
+            // Still missing from Data and served by the server, which is our
+            // own plugin only (#1180): fetch that copy. Bytes skips absent
+            // files on purpose (Run already named them); Fix still has to put
+            // ours back when the game folder lost it. Another author's missing
+            // plugin is Vortex's to put back, and RestoreMissingPlugins above
+            // has already said so.
             if (cfg != null)
             {
                 try
@@ -939,7 +989,7 @@ namespace Thornswood
                         for (int idx = 0; idx < mods.Length; idx++)
                         {
                             ServerMod m = mods[idx];
-                            if (m == null || string.IsNullOrEmpty(m.filename) || Storefront.Contains(m.filename)) continue;
+                            if (m == null || string.IsNullOrEmpty(m.filename) || Storefront.Contains(m.filename) || !m.Served) continue;
                             string dest = Path.Combine(dataDir, m.filename);
                             bool goneFile = false;
                             try { goneFile = !File.Exists(dest); }
@@ -951,6 +1001,7 @@ namespace Thornswood
                             miss.WantSize = m.size;
                             miss.WantCrc = (int)m.crc32;
                             miss.WantIndex = idx;
+                            miss.Served = true;
                             if (FetchPlugin(cfg, miss, say)) n++;
                         }
                     }
