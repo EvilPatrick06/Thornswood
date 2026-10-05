@@ -7377,9 +7377,12 @@ function fish(actorId, refrId, baseDesc) {
   // the game.
   const span = Object.prototype.hasOwnProperty.call(FISH_TUNING.cooldownMs, caught.rank)
     ? FISH_TUNING.cooldownMs[caught.rank] : FISH_TUNING.cooldownMs.master;
-  const wait = stock.left(refrId,span);
-  if (wait > 0) {
-    return 'This water is fished out for now. ' + waitWord(wait) + ' to go.';
+  // stock.left answers in milliseconds and waitWord takes seconds. Until
+  // #1826 the milliseconds went in as seconds, and ten minutes left read
+  // '166 hours and 40 minutes to go'.
+  const waitMs = stock.left(refrId,span);
+  if (waitMs > 0) {
+    return 'This water is fished out for now. ' + waitWord(waitMs / 1000) + ' to go.';
   }
 
   const pair = FISH_TUNING.yieldByStep[step] || FISH_TUNING.yieldByStep[0];
@@ -7477,9 +7480,10 @@ function game(actorId, refrId, baseDesc) {
   // seams and the bodies do.
   const span = Object.prototype.hasOwnProperty.call(GAME_TUNING.cooldownMs, hung.rank)
     ? GAME_TUNING.cooldownMs[hung.rank] : GAME_TUNING.cooldownMs.master;
-  const wait = stock.left(refrId,span);
-  if (wait > 0) {
-    return 'This one is picked clean for now. ' + waitWord(wait) + ' to go.';
+  // milliseconds from the stock, seconds to waitWord, as in fish() (#1826)
+  const waitMs = stock.left(refrId,span);
+  if (waitMs > 0) {
+    return 'This one is picked clean for now. ' + waitWord(waitMs / 1000) + ' to go.';
   }
 
   const pair = GAME_TUNING.yieldByStep[step] || GAME_TUNING.yieldByStep[0];
