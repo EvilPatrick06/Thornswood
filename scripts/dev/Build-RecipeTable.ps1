@@ -2541,14 +2541,25 @@ if ($Plugins.Count -gt 0) {
 } else {
     foreach ($p in $MASTERS_FIRST) { $order.Add($p) }
     if (-not (Test-Path -LiteralPath $PluginsTxt)) { throw "not found: $PluginsTxt" }
+    # Vortex marks the plugins that are switched on with '*'. A line without
+    # one is a plugin it knows about and has switched off: the game does not
+    # load it and the server never sees its records, so it is not part of this
+    # build. Until 4 October this read every line, switched off or not, the way
+    # Build-HarvestTable.ps1 and Build-HuntTable.ps1 never did. Collection
+    # revision 2 switched off five plugins and left three of them out of the
+    # game folder altogether, so the build stopped on three plugins the game
+    # does not load (issue #1622).
+    $offCount = 0
     foreach ($line in [System.IO.File]::ReadAllLines($PluginsTxt)) {
         $t = $line.Trim()
         if (-not $t -or $t.StartsWith('#')) { continue }
-        if ($t.StartsWith('*')) { $t = $t.Substring(1) }   # Vortex marks the enabled ones
+        if (-not $t.StartsWith('*')) { $offCount++; continue }
+        $t = $t.Substring(1).Trim()
         if (-not $t) { continue }
         if (-not $order.Contains($t)) { $order.Add($t) }
     }
     Ok ("{0} plugins: the five masters, then {1}" -f $order.Count, $PluginsTxt)
+    if ($offCount -gt 0) { Note "$offCount line(s) in that list are switched off and were left out" }
 }
 
 $missing = New-Object 'System.Collections.Generic.List[string]'
