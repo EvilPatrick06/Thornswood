@@ -88,6 +88,8 @@ yes('the Help page has its items, ' + items.length + ' of them', items.length > 
 const partyItems = items.filter(function (h) {
   return /\bpart(y|ies)\b/i.test(h.title) || h.body.indexOf('/party') !== -1;
 });
+// Every item on the page, so a /party left in any of them is found (#1629).
+const pageText = items.map(function (h) { return h.title + '. ' + h.body; }).join(' ');
 const together = items.filter(function (h) { return h.section === 'Playing together'; });
 const text = partyItems.map(function (h) { return h.title + '. ' + h.body; }).join(' ');
 const aboutTogether = together.concat(partyItems)
@@ -147,22 +149,30 @@ yes('and the page says ' + spoken(LAPSE) + ' seconds', says(text, LAPSE, '', ' s
       !!letter && frontKey === keysKey);
   yes('the page names that key, and says it can be moved',
       new RegExp('\\b' + letter + ', unless you have moved it on the Controls page').test(text));
+  // Nothing to type: the chat is not how a party is asked or run (#1629).
   // 28 is the DirectInput scan code for Enter.
-  yes('the page says Enter, and Enter is the chat key',
-      /press Enter\b/.test(text) && cm && Number(cm[1]) === 28);
+  yes('the party items never send anybody to the chat to type',
+      !/press Enter\b/.test(text) && !/\btype\b/i.test(text) && cm && Number(cm[1]) === 28);
 
   /*
     THE LOOK PROMPT. The panel drawn over somebody under the crosshair says
-    "Ask to party" beside the party key, but the key handler only opens the
-    P panel: it never sends /party for the person being looked at. Until it
-    does, the page must not tell anybody to look at somebody and press P to
-    bring them in. When the key is changed to ask, this lets the page say so.
+    "Ask to party" beside the party key for somebody not in your party, and
+    "Party menu" for somebody who is. Since #1629 the key does what it says:
+    partyPress sends /party with their form id, the way Y sends /friend, and
+    answers false for a party member or nobody, so P opens the panel. The
+    page says look at them and press P, and that has to be what P does.
   */
-  const branch = front.match(/if \(e\.code === PARTY_KEY\) \{([\s\S]*?)\n\s*\}/);
-  const keyAsks = !!(branch && /lookVerb\('party'\)/.test(branch[1]));
+  const branch = front.match(/if \(e\.code === PARTY_KEY\) \{([\s\S]*?)\n {4}\}/);
+  const pa = front.indexOf('  function partyPress() {');
+  const pressFn = pa < 0 ? '' : front.slice(pa, front.indexOf('\n  }', pa));
+  const keyAsks = !!branch && /partyPress\(\)/.test(branch[1]) &&
+                  /lookVerb\('party'\)/.test(pressFn) && /if \(!row \|\| row\.y\) \{ return false; \}/.test(pressFn);
+  yes('P on somebody not in your party asks them, and on a member it is the panel', keyAsks);
+  yes('the look prompt says Ask to party for one and Party menu for the other',
+      /keyRow\(PARTY_NAME, row\.y \? 'Party menu' : 'Ask to party', !!row\.y\)/.test(front));
   const promises = /look at (somebody|them|someone)[^.]*press/i.test(text);
-  yes('the page only says look at somebody and press the key if the key does that',
-      !promises || keyAsks);
+  yes('the page says look at them and press the key, and the key does that',
+      promises && keyAsks);
 }
 
 // ------------------------------------------------------------ the commands
@@ -175,7 +185,9 @@ yes('and the page says ' + spoken(LAPSE) + ' seconds', says(text, LAPSE, '', ' s
   const named = (text.match(/\/[a-z]+/g) || []).filter(function (w, i, all) {
     return all.indexOf(w) === i;
   });
-  yes('the page names /party', named.indexOf('/party') !== -1);
+  yes('no item on the page names /party: P and the P panel do it all (#1629)',
+      pageText.indexOf('/party') === -1);
+  yes('and the gamemode no longer names it to everybody', words.indexOf('/party') === -1);
   yes('an ask is answered on the prompt, not by typing /yes or /no',
       named.indexOf('/yes') === -1 && named.indexOf('/no') === -1 &&
       /Accept or Refuse on the prompt/.test(text));
@@ -183,12 +195,23 @@ yes('and the page says ' + spoken(LAPSE) + ' seconds', says(text, LAPSE, '', ' s
   yes('every command the page names is one everybody may use' +
       (refused.length ? ' (not: ' + refused.join(', ') + ')' : ''), refused.length === 0);
 
-  yes('/party on its own answers with who is in yours',
-      /\/party on its own/.test(text) &&
-      src.indexOf("word === '/party' && (rest === '' || rest === 'list')") !== -1);
-  yes('/party leave takes you out',
-      /\/party leave/.test(text) &&
+  // The lines the panel sends are still answered: the server keeps them as
+  // the panel's own, and nobody is told to type them.
+  yes('the P panel says who is in yours and how many are with you, from the server\'s view',
+      /The P panel says who is in yours and how many of them are in the same place as you/.test(text) &&
+      /together: partyNear\(actorId\)/.test(src) &&
+      /data\.together/.test(code(panel)));
+  yes('Leave on the panel takes you out',
+      /Leave there takes you out/.test(text) &&
+      /verb === 'leave'\) \{ net\('\/party leave'\); \}/.test(code(panel)) &&
       src.indexOf("word === '/party' && rest === 'leave'") !== -1);
+  yes('the leader\'s Kick, Lead and Disband are on the panel and answered',
+      /The leader also sees Kick and Lead beside each other person, and Disband/.test(text) &&
+      /verb === 'kick'\) \{ net\('\/party kick ' \+ who\); \}/.test(code(panel)) &&
+      /verb === 'lead'\) \{ net\('\/party lead ' \+ who\); \}/.test(code(panel)) &&
+      /verb === 'disband'\) \{ net\('\/party disband'\); \}/.test(code(panel)) &&
+      src.indexOf("word === '/party' && rest === 'disband'") !== -1 &&
+      src.indexOf("word === '/party' && (rest.indexOf('kick ') === 0 || rest.indexOf('lead ') === 0)") !== -1);
 }
 
 // --------------------------------------------------------------- the panel
@@ -290,7 +313,7 @@ if (social) {
     yes('and with nobody from it in the same place it counts the same as alone',
         soc.workBonus(people[0]) === 1);
 
-    // /party leave, and logging out, both take you out.
+    // Leave on the P panel, and logging out, both take you out.
     yes('leaving takes you out', soc.leaveParty(pid(people[1])) === true &&
         !soc.partyOf(pid(people[1])));
     store[people[2]].here = false;

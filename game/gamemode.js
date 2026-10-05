@@ -42106,7 +42106,7 @@ log('gamemode loaded:',
     if (word === '/plant' || word === '/claim' || word === '/plot' ||
         word === '/deed' || word === '/deeds' || word === '/lock' ||
         word === '/unlock' || word === '/mold' || word === '/moldhere' || word === '/key' ||
-        word === '/steward' || word === '/evict' || word === '/box' ||
+        word === '/jarl' || word === '/steward' || word === '/evict' || word === '/box' ||
         word === '/rent' || word === '/sleephere' || word === '/notice' || word === '/job' ||
         word === '/board' || word === '/take' || word === '/jobs' ||
         word === '/haul' ||
@@ -45797,11 +45797,13 @@ function thornswoodBooks(env) {
     if (Number(hit.pid) === Number(pid)) { return 'That is you.'; }
     if (memberOf(taken.book, hit.pid)) { return 'They are already in it.'; }
     pending[hit.pid] = { bookId: taken.book.id, from: Number(pid), at: now() };
+    // The P prompt says which book it is, "the business The Bee" (#1591).
+    var about = 'the ' + taken.book.kind + ' ' + taken.book.name;
     var asked = '';
-    if (env.offer) { asked = env.offer(actorId, hit.actorId) || ''; }
+    if (env.offer) { asked = env.offer(actorId, hit.actorId, about) || ''; }
     else {
       var soc = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodSocial;
-      if (soc && soc.offer && hit.actorId) { asked = soc.offer('book', actorId, hit.actorId) || ''; }
+      if (soc && soc.offer && hit.actorId) { asked = soc.offer('book', actorId, hit.actorId, about) || ''; }
     }
     if (asked) { delete pending[hit.pid]; return asked; }
     refresh();
@@ -46269,7 +46271,7 @@ function thornswoodBooks(env) {
       if (!bits[0] || bits.length > 3) { return 'Name the line, then the buy and the sell. A blank is -.'; }
       return setPrice(taken.book, bits[0], bits[1], bits[2]);
     }
-    return 'book: new business <name>, new faction <name>, invite, leave. The rest is on J.';
+    return 'The group book is on J.';
   }
 
   function view(pid, textOff) {
@@ -46311,9 +46313,15 @@ function thornswoodBooks(env) {
         }
       }
       var roleNames = [];
+      var roleRows = [];
       if (hasPerm(b, pid, 'Roles')) {
         var roles = b.roles || [];
-        for (var rr = 0; rr < roles.length; rr++) { roleNames.push(roles[rr].name); }
+        for (var rr = 0; rr < roles.length; rr++) {
+          roleNames.push(roles[rr].name);
+          // What each role may do, so J switches a permission on and off
+          // rather than anybody typing the list (#1630).
+          roleRows.push({ name: roles[rr].name, perms: (roles[rr].perms || []).slice() });
+        }
       }
       books.push({
         id: b.id,
@@ -46331,13 +46339,15 @@ function thornswoodBooks(env) {
         chat: chat,
         priceList: prices,
         submitted: read ? submittedHolds(b.id) : [],
-        roleNames: roleNames
+        roleNames: roleNames,
+        roles: roleRows
       });
     }
     return {
       show: true,
       canBusiness: !!((r.business || r.dev) && !ownsKind(r.account, 'business')),
       canFaction: !!((r.faction || r.dev) && !ownsKind(r.account, 'faction')),
+      permNames: PERMS.slice(),
       books: books
     };
   }
@@ -46534,7 +46544,8 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // plugin, never typed; see the load order refusal block.
                '/loadorder',
                // Friends, parties, mutes, trade and journals. See the
-               // social block at the end of this file.
+               // social block at the end of this file. /journal and /book
+               // are the J panel's lines, never typed (#1630).
                '/friend', '/party', '/mute', '/trade', '/journal', '/book', '/merchant',
                '/yes', '/no',
                // The dice. Rolled here now rather than on the roller's own
@@ -46571,8 +46582,12 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // out of a wedged spot (#414).
                       '/helpme', '/report', '/stuck',
                       // Everybody's, and they have to be findable: a key
-                      // prompt nobody sees is a feature nobody has.
-                      '/friend', '/party', '/mute', '/hidename', '/trade', '/journal', '/book', '/merchant',
+                      // prompt nobody sees is a feature nobody has. Not
+                      // /party: P on somebody asks and the P panel runs the
+                      // party, and nobody is told to type it (#1629). Not
+                      // /journal or /book: J sends those lines and nobody is
+                      // told to type them (#1630).
+                      '/friend', '/mute', '/hidename', '/trade', '/merchant',
                       // Everybody's: a Master takes somebody on with it, and
                       // anybody can ask who took them on (#1388).
                       '/apprentice',
@@ -47337,13 +47352,14 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
   function round1(v) { return Math.round(Number(v) * 10) / 10; }
 
   /*
-    The journal verbs, which the J panel speaks and a person can type.
+    The journal verbs, which the J panel speaks.
 
     Patrick asked for "multiple journals, pages inside them, and sharing
     either a whole journal or a single page with a friend", so the shape is
     journal, page, share, and the panel sends exactly these lines rather than
     having a protocol of its own. That is the same choice the K panel made
-    with /pick: one way in, and a person who would rather type can.
+    with /pick: one way in. Nobody is told to type them and no help names
+    them (Patrick, 4 Oct: buttons, not commands; #1630).
 
     The separator is two colons because a page has a title and a body and a
     body has newlines in it, and the chat socket is line based. Everything
@@ -47354,7 +47370,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     var s = soc.stateOf(actorId);
 
     if (!verb || verb === 'list') {
-      if (!s.journals.length) { return 'No journals yet. /journal new <title>, or press J.'; }
+      if (!s.journals.length) { return 'No journals yet. J opens them, and New journal starts one.'; }
       var names = [];
       for (var i = 0; i < s.journals.length; i++) {
         names.push(s.journals[i].title + ' (' + s.journals[i].pages.length + ')');
@@ -47760,7 +47776,11 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       }
 
       /* /party with nothing after it is about your own party rather than
-         about somebody else, so those two go first. */
+         about somebody else, so those two go first.
+
+         Every /party line is sent by P on somebody (an ask with their form
+         id) or by a button on the P panel (leave, disband, kick, lead, and an
+         ask beside a friend). Nobody is told to type one (#1629). */
       // Opening or mounting a panel requests its owner's current view (#1275).
       if (word === '/party' && rest === 'refresh') {
         soc.push(actorId, true);
@@ -47768,7 +47788,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       }
       if (word === '/party' && (rest === '' || rest === 'list')) {
         var pp = soc.partyOf(mine);
-        if (!pp) { toProfile(profileId, 'You are not in a party. Look at somebody and press the party key, or /party <name>.'); return true; }
+        if (!pp) { toProfile(profileId, 'You are not in a party. Look at somebody and press the party key to ask them.'); return true; }
         var names = [];
         for (var pi = 0; pi < pp.members.length; pi++) {
           var pa = soc.actorForProfile(pp.members[pi]);
@@ -47951,6 +47971,15 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         soc.dropFriend(actorId, theirPid);
         toProfile(profileId, theirName + ' is no longer on your list.');
         soc.push(actorId);
+        return true;
+      }
+
+      /* Somebody already in your party is not asked again. P draws "Party
+         menu" over them rather than an ask, and this is the server's own
+         check of the same thing, for an ask that left as they joined. */
+      var askerParty = word === '/party' ? soc.partyOf(mine) : null;
+      if (askerParty && askerParty.members.indexOf(theirPid) !== -1) {
+        toProfile(profileId, theirName + ' is already in your party.');
         return true;
       }
 
@@ -48611,11 +48640,12 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       if (topic === 'people' || topic === 'friends' || topic === 'party') {
         toProfile(profileId,
           'Look at somebody and press Y to ask them to be friends, H to offer a ' +
-          'trade, L to stop hearing them. P opens your friends and your party; ' +
+          'trade, L to stop hearing them, P to ask them to party. P opens your ' +
+          'friends and party; ' +
           'J opens your journals, and a group book beside them when this character ' +
           'is in one or the Discord account may found one. A Dev may found one of each. ' +
-          '/book new business <name> and /book new faction <name> start one. ' +
-          '/book leave drops this character. ' +
+          'New business and New faction on that tab start one, and Leave there ' +
+          'drops this character. ' +
           'Work done with your party in the same place ' +
           'counts for more. /yes and /no answer whatever somebody has asked you.');
         return;
@@ -54512,14 +54542,16 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     In memory rather than on the character, because an offer that survived a
     restart would be a request from somebody who is not here any more.
   */
-  var offers = {};   // toProfileId -> { kind, from, fromName, at }
+  var offers = {};   // toProfileId -> { kind, from, fromName, at, about }
 
-  function offer(kind, fromActor, toActor) {
+  // about: what a book invite is into, for the P prompt (#1591).
+  function offer(kind, fromActor, toActor, about) {
     var fromPid = profileOf(fromActor);
     var toPid = profileOf(toActor);
     if (!fromPid || !toPid) { return 'That person is not here.'; }
     if (fromPid === toPid) { return 'That is you.'; }
-    offers[toPid] = { kind: kind, from: fromPid, fromName: nameOfPerson(fromActor), at: Date.now() };
+    offers[toPid] = { kind: kind, from: fromPid, fromName: nameOfPerson(fromActor), at: Date.now(),
+                      about: about ? String(about) : '' };
     return '';
   }
 
@@ -55013,7 +55045,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       together: partyNear(actorId),
       bonus: Math.round(SOCIAL.partyBonus * 100),
       namesAll: !!s.namesAll,
-      offer: offerNow ? { kind: offerNow.kind, from: offerNow.from, name: offerNow.fromName } : null,
+      offer: offerNow ? { kind: offerNow.kind, from: offerNow.from, name: offerNow.fromName,
+                          about: offerNow.about || '' } : null,
       journals: s.journals,
       shared: sharedWithMe(actorId),
       muted: s.muted,
