@@ -318,6 +318,7 @@ jobs:
                  'test-1398-fuel.js',
                  'test-1398-weaver.js',
                  'test-1622-recipe-generator.js',
+                 'test-1712-builders-skip-off.js',
                  'test-1628-social-gui.js',
                  'test-1630-journal-gui.js',
                  'test-1629-party-gui.js',
