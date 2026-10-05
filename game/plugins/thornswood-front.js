@@ -83,7 +83,7 @@
   const OVERLAYS = ['thornswood-chat.js', 'thornswood-emotes.js', 'thornswood-voice.js',
                     'thornswood-skills.js', 'thornswood-party.js',
                     'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js',
-                    'thornswood-repair.js', 'thornswood-maneuvers.js', 'thornswood-afk.js'];
+                    'thornswood-repair.js', 'thornswood-maneuvers.js', 'thornswood-ride.js', 'thornswood-afk.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -1887,7 +1887,7 @@
     skills: 'thornswoodSkills', party: 'thornswoodParty', journal: 'thornswoodJournal',
     board: 'thornswoodBoard', repair: 'thornswoodRepair',
     trade: 'thornswoodTrade', merchant: 'thornswoodMerchant', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
-    afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers'
+    afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers', ride: 'thornswoodRide'
   };
 
   T.claimFocus = function (who, on) {
@@ -7056,15 +7056,17 @@
   }
 
   /*
-    A CARRIAGE OR FERRY DRIVER ASKS THE SERVER (#1394).
+    A CARRIAGE OR FERRY DRIVER OPENS HIS PANEL (#1394, #1635).
 
     Pressing E on a driver opens the carriage mod's own talk, and that talk
     does not know the hold's ledger: its ride is a fade on this machine that
     the server undoes, because the server refuses a move it did not make.
     So the same press also tells the server which driver it was, as
-    /ride e <id>, the way the merchant press does, and the server answers in
-    the chat with where this driver goes and what each stop costs. /ride and
-    the stop, said there, is the ride that counts.
+    /ride e <id>, the way the merchant press does, and the server answers
+    with where this driver goes and what each stop costs, which
+    game/ui/thornswood-ride.js draws. A stop's Ride button there is the ride
+    that counts. Nobody types a line (Patrick, 4 Oct: no chat commands for
+    what people do).
 
     THE DRIVERS ARE KNOWN BY THEIR BASE, the same rows as the carriages block
     in the gamemode (tests/test-1394-fares.js holds the two lists together).
@@ -7086,6 +7088,46 @@
     ['CFTO.esp', 0x14c6c], ['Dragonborn.esm', 0x182ae], ['Dragonborn.esm', 0x2582b]
   ];
   let rideDriverIds = null;
+
+  /*
+    THE RIDE PANEL WAITS FOR THE MOD'S CONVERSATION (#1635). The same E opens
+    the carriage mod's own talk, the Dialogue Menu, and a panel that took the
+    keyboard while that is up would leave the talk with no keys. So the
+    panel is up only while no menu is. When the page says the server's view
+    has come ('ride:wants'), it opens at once if no menu is open, or when the
+    menu that is open closes. A menu the game raises over the panel (the
+    talk opening after the server answered, a load screen) closes the panel,
+    and it waits again. It is over when you walk out of reach of the driver
+    you pressed, the reach the server measures (RIDE_REACH in the carriages
+    block), and when the page closes it: Step back, Escape, or the server
+    after a ride that went. The driver is kept as his local form id, never
+    as a form, and asked for in the frame it is used.
+  */
+  const RIDE_REACH = 400;
+  let rideDriver = 0;
+  let rideState = '';
+  let rideWatchAt = 0;
+
+  function rideInReach() {
+    if (!rideDriver) { return false; }
+    try {
+      const pc = sp.Game.getPlayer();
+      const ref = sp.ObjectReference.from(sp.Game.getFormEx(rideDriver));
+      if (!pc || !ref) { return false; }
+      const dx = pc.getPositionX() - ref.getPositionX();
+      const dy = pc.getPositionY() - ref.getPositionY();
+      const dz = pc.getPositionZ() - ref.getPositionZ();
+      return Math.sqrt(dx * dx + dy * dy + dz * dz) <= RIDE_REACH;
+    } catch (err) { return false; }
+  }
+
+  // except: the menu that is closing right now, which is not in the way.
+  function rideOpenIfFree(except) {
+    if (rideState !== 'waiting') { return; }
+    if (!rideInReach()) { rideState = ''; return; }
+    if (busyMenuOpenNow(except)) { return; }
+    T.js('try{window.thornswoodRide&&window.thornswoodRide.open();}catch(e){}');
+  }
 
   function rideDriverIdSet() {
     if (rideDriverIds) { return rideDriverIds; }
@@ -7119,17 +7161,39 @@
     } catch (err) { return false; }
     if (!baseId || !rideDriverIdSet()[baseId]) { return false; }
     let hex = '';
+    let localId = 0;
     try {
       const convert = globalThis.thornswoodSocialServerId;
-      const localId = ref.getFormID() >>> 0;
+      localId = ref.getFormID() >>> 0;
       const serverId = typeof convert === 'function' ? (convert(localId) >>> 0) : localId;
       if (serverId) { hex = serverId.toString(16); }
     } catch (err) { hex = ''; }
     if (!hex) { return false; }
+    rideDriver = localId;
     tellServer('/ride e ' + hex);
     say('asked the server where driver ' + hex + ' goes');
     return true;
   }
+
+  sp.on('menuOpen', guard('ride panel waits', (e) => {
+    if (rideState !== 'up' || !e || SELF_OPENING_MENUS.indexOf(e.name) < 0) { return; }
+    rideState = 'waiting';
+    T.js('try{window.thornswoodRide&&window.thornswoodRide.close();}catch(e){}');
+  }));
+
+  sp.on('menuClose', guard('ride panel opens', (e) => {
+    rideOpenIfFree(e && e.name ? e.name : '');
+  }));
+
+  sp.on('update', guard('ride distance', () => {
+    if (!rideState) { return; }
+    const now = Date.now();
+    if (now - rideWatchAt < 250) { return; }
+    rideWatchAt = now;
+    if (rideInReach()) { return; }
+    rideState = '';
+    T.js('try{window.thornswoodRide&&window.thornswoodRide.close();}catch(e){}');
+  }));
 
   function merchantPress(e) {
     if (!e || e.userEventName !== 'Activate') { return false; }
@@ -8233,6 +8297,15 @@
       log('the merchant panel is in');
       return;
     }
+    // The ride panel (#1635): see THE RIDE PANEL WAITS above.
+    if (what === 'ride:wants') { rideState = 'waiting'; rideOpenIfFree(''); return; }
+    if (what === 'ride:opened') { rideState = 'up'; T.claimFocus('ride', true); return; }
+    if (what === 'ride:closed') {
+      T.claimFocus('ride', false);
+      if (rideState === 'up') { rideState = ''; }
+      return;
+    }
+    if (what === 'ride:ready') { log('the ride panel is in'); return; }
     if (what === 'party:ready' || what === 'journal:ready' || what === 'trade:ready' || what === 'board:ready') {
       tellServer(what === 'trade:ready' ? '/trade refresh' : '/party refresh');
       log('the ' + what.split(':')[0] + ' panel is in');
