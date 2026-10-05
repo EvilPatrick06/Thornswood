@@ -73,9 +73,15 @@ function Get-ThornswoodSettingNames($Settings) {
 
 <#
   The running server's settings with the release's keys put in. Returns
-  Settings (the object to write), Changed (release keys that move) and Kept
+  Settings (the object to write), Changed (release keys that move), Kept
   (keys the release had differently, or had and the server does not, left as
-  the server has them), and Said, the lines to print.
+  the server has them), Absent (release keys the release does not carry at
+  all, left as the server has them), and Said, the lines to print.
+
+  Absent used to go unsaid (#1336). A live deploy whose build carried no
+  thornswoodRequirePass, or no role lists, kept the running server's and the
+  run said only which keys moved, so it read the same as one that had set
+  them. Now each is named. Names only, never a value.
 #>
 function Join-ThornswoodServerSettings($Running, $Release, [string[]]$Keys) {
     $runNames = Get-ThornswoodSettingNames $Running
@@ -93,12 +99,14 @@ function Join-ThornswoodServerSettings($Running, $Release, [string[]]$Keys) {
         if ($Keys -contains $k) { continue }
         if ($runNames -notcontains $k -or (Get-ThornswoodSettingText $Running.$k) -ne (Get-ThornswoodSettingText $Release.$k)) { $kept += $k }
     }
+    $absent = @($Keys | Where-Object { $relNames -notcontains $_ })
     $said = @()
     if ($changed.Count) { $said += ('the settings this release changes: ' + ($changed -join ', ')) }
     else { $said += 'this release changes none of the settings' }
+    if ($absent.Count) { $said += ('not in the release, so left as the running server has them: ' + ($absent -join ', ')) }
     if ($kept.Count) { $said += ('kept as the running server has them, not as the release had them: ' + ($kept -join ', ')) }
     $said += ('every other setting of the ' + $runNames.Count + ' the running server has is carried across as it is')
-    return [pscustomobject]@{ Settings = [pscustomobject]$out; Changed = $changed; Kept = $kept; Said = $said }
+    return [pscustomobject]@{ Settings = [pscustomobject]$out; Changed = $changed; Kept = $kept; Absent = $absent; Said = $said }
 }
 
 # The keys outside -Keys whose values differ between two settings objects, or

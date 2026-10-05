@@ -91,6 +91,20 @@ if ($why.Count) {
 $recFiles = Get-ThornswoodServerRecordFiles $rec
 Write-Host ('every server file is the recorded build of ' + ([string]$rec.source.commit).Substring(0, 8) + ': ' + $recFiles.Count + ' files, scam_native.node ' + ([string]$rec.sha256).Substring(0, 12)) -ForegroundColor Cyan
 
+# ---- the gamemode, and the stamp that names it -------------------------------
+# A file this expects and does not find stops it (#1336). gamemode.js was
+# left out without a word when the build had none, and the installer only
+# parsed one that was there, so the payload went up and the server started
+# with no gamemode: no door, no join pass, nobody's character. The recorded
+# files were held above. The build stamp may be missing, from a build
+# Deploy-Gamemode.ps1 never wrote one into, and that is said.
+if (-not (Test-Path -LiteralPath (Join-Path $Dist 'gamemode.js'))) {
+    throw "there is no gamemode.js in $Dist, so the server would start with no gamemode. Publish-Server.ps1 copies game\gamemode.js into the build; Export-ServerPayload.ps1 by itself needs it there first. Nothing was packed."
+}
+if (-not (Test-Path -LiteralPath (Join-Path $Dist 'thornswood-build.json'))) {
+    Write-Host "no thornswood-build.json in $Dist, so the server will not be able to say which gamemode it runs" -ForegroundColor Yellow
+}
+
 if (Test-Path -LiteralPath $OutDir) { Remove-Item -LiteralPath $OutDir -Recurse -Force }
 New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $OutDir 'plugins') -Force | Out-Null
@@ -132,10 +146,16 @@ foreach ($p in $s.loadOrder) {
     $bytes += (Get-Item -LiteralPath $src).Length
     $newOrder += "$vpsPlugins/$name"
 }
-Write-Host ("plugins: {0} copied, {1:N0} MB" -f $newOrder.Count, ($bytes/1MB)) -ForegroundColor Cyan
+# A plugin the load order names and this machine does not have stops it
+# (#1336). It used to be printed in red and left out, and the payload went
+# with the shorter order: every form id after the gap then names the plugin
+# one place on, and the installer cannot see it, because the order it is
+# given is the shorter one and every plugin in that is there.
 if ($missing) {
-    Write-Host ("  NOT FOUND, left out: {0}" -f ($missing -join ', ')) -ForegroundColor Red
+    Write-Host ("plugins the load order names that are not on this machine: {0}" -f ($missing -join ', ')) -ForegroundColor Red
+    throw ("the load order names {0} plugin(s) this machine does not have, the lines above say which. Left out, every form id after the gap would name the wrong plugin. Install them where the order says they are (the collection, through Vortex) and run this again. Nothing was packed." -f $missing.Count)
 }
+Write-Host ("plugins: {0} copied, {1:N0} MB" -f $newOrder.Count, ($bytes/1MB)) -ForegroundColor Cyan
 
 # ---- a settings file with VPS paths ----------------------------------------
 # The load order must stay in exactly this order. Its indices are what form ids

@@ -228,7 +228,17 @@ back and tells the store. A whole server install through
 server folder, so they cost disk), the world, the roster, the runtime data and
 the logs are carried across, and a server that does not answer is swapped
 back and kept as `.failed-<stamp>` to read. `Publish-Server.ps1 -PutBack`
-puts the newest `.prev` back. The documents and public pages the site serves
+puts the newest `.prev` back. What a publish expects and does not find stops
+it, never skipped without a word (issue #1336): `Export-ServerPayload.ps1`
+refuses a build with no `gamemode.js` (skymp5-server logs the missing file and
+runs on with no gamemode, so no door and no join pass) and a load order naming
+a plugin the machine does not have, and the installer refuses a stage with no
+`gamemode.js`. A dev publish gives the dev door the live `door.json`'s address,
+key and join pass key; when the live one, or any of those three, is not there,
+the dev door is left as it was and the publish stops with exit 1
+(`DOOR NOT CARRIED`). The settings lines a deploy prints name every release
+key the release does not carry, which stays as the running server has it.
+`tests\test-1336-missing-stops.ps1` holds all of it. The documents and public pages the site serves
 from `data` are content, not the app, and still go up in place with a `.bak`.
 The harnesses are `tests\test-deploy-swaps.ps1`,
 `tests\test-install-server.ps1` and `tests\test-deploy-server-swap.ps1`.
