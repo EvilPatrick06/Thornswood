@@ -1242,21 +1242,26 @@ def _chunks(s, n):
         s = s[len(cut):].lstrip('\n')
 
 
-def is_staff(who, ch):
+def is_staff(who):
     """
-    Staff, or anybody the channel itself trusts with threads.
+    Somebody holding one of the STAFF_ROLES roles, matched by id or by name.
+    The one gate on /close, the Close ticket button and the ticket limits, and
+    the same list that pulls staff into every ticket thread.
+
+    Nothing else makes somebody staff here, a channel permission included.
+    This used to let in anybody the channel trusted with threads as well, and
+    Lead Gamemaster and Trial Gamemaster carry Manage Threads on every channel
+    (GM in Build-Discord.py) while neither is a staff role, so both could
+    close any ticket and skip the ticket limits without one (#1342).
 
     Content Creator is not staff. That role is added to creator application
     threads through EXTRA_STAFF and nowhere else. It does not close tickets,
     and it does not skip the one open ticket rule or the five minute cooldown.
+
+    A person whose roles cannot be read is not staff.
     """
     try:
-        if _who_hits(who, STAFF_IDS, STAFF_NAMES):
-            return True
-    except Exception:
-        pass
-    try:
-        return bool(ch.permissions_for(who).manage_threads)
+        return _who_hits(who, STAFF_IDS, STAFF_NAMES)
     except Exception:
         return False
 
@@ -1358,7 +1363,7 @@ def ticket_refusal(interaction):
     try:
         who = interaction.user
         guild = interaction.guild
-        if guild is None or is_staff(who, interaction.channel):
+        if guild is None or is_staff(who):
             return None
         key = _ticket_key(guild, who)
         tid = _open_tickets().get(key)
@@ -1396,7 +1401,7 @@ async def close_here(interaction, why=None):
             'This one only works inside a ticket.', ephemeral=True)
         return
 
-    if not is_staff(interaction.user, ch):
+    if not is_staff(interaction.user):
         await interaction.response.send_message(
             'Staff close these. Say what you need in here and somebody will.',
             ephemeral=True)

@@ -9,18 +9,25 @@ each half, with the file and line for each step.
 
 `.gitmodules:11-15` names the fork, `https://github.com/EvilPatrick06/skymp.git`,
 on the branch `thornswood/engine-changes`, at `engine/skymp`. The repository
-pins a commit, not the branch: `git submodule status` prints
-`ac044a49760cf7ee85f6ac1547cc244657509e78`, the source commit named by both
-`records\client-build.json` and `records\server-build.json`. The server
-executable was rebuilt from it to read every plugin into memory when the
-server starts (issue #1602); its SHA256 is
-`7477e037a3050d37619c4643d6fbe1a7d877b5248fbda8d64af142ddcdacce10`, built
-2026-10-04T20:50:16Z. The six client files keep their recorded bytes, because
-that commit changes no client source.
+pins a commit, not the branch. This page does not name that commit or the
+hashes built from it, because every engine change moves them: twice it named
+a pin the records had already left (issue #1346). Read them where they are
+written:
+
+```powershell
+git ls-tree HEAD engine/skymp                                                    # the pin
+(Get-Content records\client-build.json -Raw | ConvertFrom-Json).forkCommit       # the client build
+(Get-Content records\server-build.json -Raw | ConvertFrom-Json).source.commit    # the server build
+```
+
+All three name one commit. `records\server-build.json` also holds the server
+executable's SHA256 and build time, and `records\README.md` lists the
+provenance note for any build that kept an earlier build's bytes.
 `Deploy-Server.ps1`, `Export-ServerPayload.ps1`, `Publish-Server.ps1` and the
 installer refuse server files that differ from the record. The build check
 requires the pin and both records to name one source commit and the server
-record to include every artifact (see "One engine").
+record to include every artifact (see "One engine"), and this page to name no
+commit or hash in full.
 
 `ignore = dirty` (`.gitmodules:15`) keeps a build inside the fork from showing
 as a change here. A different commit checked out in it still shows, and is
@@ -112,12 +119,32 @@ cmake -S engine\skymp -B engine\skymp\build -G "Visual Studio 17 2022" -A x64 `
 These are the settings read off the shipping machine's `CMakeCache.txt` on
 24 September (`docs\OWNERSHIP.md:68-71`) and used again for the configure at
 `engine\skymp` on 25 September, which took 24.2 seconds
-(`docs\archive\todo-list-2026-09-25.md:2987`). NOT CHECKED against the fork's
-own `CMakeLists.txt`: the submodule was not fetched where this page was
-written. `OFFLINE_MODE`, `BUILD_CLIENT`, `BUILD_SKYRIM_PLATFORM` and
-`SKYRIM_DIR` are named in that cache reading; the variable carrying the
-triplet is assumed to be `VCPKG_TARGET_TRIPLET`. Check both against
-`engine\skymp\CMakeLists.txt` and the `cmake` folder beside it.
+(`docs\archive\todo-list-2026-09-25.md:2987`). On 5 October (issue #1357)
+each one was read against the fork's own CMake files at 0460584e, the
+commit pinned that day:
+
+| Setting | Where the fork reads it | Without it |
+| --- | --- | --- |
+| `-G "Visual Studio 17 2022"` | `CMakeLists.txt:78-83` stops the configure with any other generator when the compiler is MSVC | stops |
+| `-A x64` | CMake's own platform switch; the triplet below is x64 too (`overlay_triplets\x64-windows-sp.cmake:1`) | the generator's default |
+| `CMAKE_TOOLCHAIN_FILE` | `CMakeLists.txt:28-35` sets it itself before `project()`: the fork's `vcpkg\scripts\buildsystems\vcpkg.cmake`, or `C:/vcpkg/...` when the environment has `CI=true` on Windows. The value passed is not the one used; off a CI machine they are the same file | the same file |
+| `VCPKG_TARGET_TRIPLET` | `CMakeLists.txt:7-15`, from `overlay_triplets` (`:17`) | `x64-windows-sp` on Windows |
+| `OFFLINE_MODE` | `option`, `CMakeLists.txt:94`: offline mode in the server and client settings files the build generates | ON |
+| `BUILD_CLIENT` | `option`, `CMakeLists.txt:90`; `skymp5-client\CMakeLists.txt:5` builds the bundle only when it is on | ON |
+| `BUILD_SKYRIM_PLATFORM` | `option`, `CMakeLists.txt:92`; `skyrim-platform\CMakeLists.txt:3` | ON |
+| `SKYRIM_DIR` | `option`, `CMakeLists.txt:117`; a folder with no `SkyrimSE.exe` in it stops the configure (`:138-142`) | the server settings get no plugin paths (`:133-135`) |
+
+So every name is one the fork reads, and all but `SKYRIM_DIR` repeat what the
+fork does without them; they are passed so a changed default upstream does
+not quietly change our build. The fork also stops unless the build folder is
+`<fork>\build` (`CMakeLists.txt:46-56`), and asks for CMake 3.19 or newer
+(`:74`).
+
+NOT CHECKED: that this line configures cleanly at the current pin, and with
+which CMake version. That needs Windows, Visual Studio and a Skyrim folder,
+and the reading above had none of them. `Build-Engine.ps1` runs this line;
+whoever runs it next puts `cmake --version` and the configure's last line
+here.
 
 Never move a configured build folder: CMake writes absolute paths into it,
 which is why the move to `engine\skymp` needed this configure again.
@@ -167,10 +194,12 @@ The client runtime is six files (`New-ClientBuildRecord.ps1:50-57`):
 `MpClientPlugin.dll`, `SkyrimPlatform.dll`, `SkyrimPlatformImpl.dll`,
 `SkyrimPlatformCEF.exe.hidden`, `skymp5-client.js` and `TESModPlatform.pex`.
 The bundle comes from `npx webpack` in `engine\skymp\skymp5-client`; the other
-five from the native build with `BUILD_CLIENT` and `BUILD_SKYRIM_PLATFORM` on.
-NOT CHECKED here: which MSBuild targets produce the five, and that webpack
-writes into `build\dist\client`, which is where `Where.ps1 ClientDist` and
-every script below look.
+five from the native build with `BUILD_SKYRIM_PLATFORM` on (MpClientPlugin is
+built on Windows whatever `BUILD_CLIENT` says, `skymp5-server\cpp\CMakeLists.txt:9-22`).
+The bundle goes into `build\dist\client\Data\Platform\Plugins`
+(`skymp5-client\webpack.config.js:8-9`), and `build\dist\client` is where
+`Where.ps1 ClientDist` and every script below look. NOT CHECKED here: which
+MSBuild targets produce the five and which step puts them in that folder.
 
 Then, in order:
 
@@ -203,8 +232,9 @@ put back from `local\engine-dist-c8832519`, so neither record changed and
 From 27 September both records named `d0006351`. Then the client record and
 the pin moved on (#1016 to `44366c7e`, #898 to `c63fe637`) and the server record
 did not, so the servers ran the `d0006351` build while every later server fix
-sat in the fork unused (issue #1200). Since 29 September the pin and both
-records name `1ed42585` again, built together; "One engine" below keeps it so.
+sat in the fork unused (issue #1200). On 29 September the pin and both
+records were put back on one commit, `1ed42585`, built together, and "One
+engine" below has kept them on one commit since.
 
 So the recorded binaries stay unless the engine changed:
 
