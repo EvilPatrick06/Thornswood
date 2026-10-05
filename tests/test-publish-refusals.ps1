@@ -44,6 +44,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 $Here = Split-Path -Parent $Here
 if (-not $PublishPath) { $PublishPath = Join-Path $Here 'scripts\release\Publish-Update.ps1' }
 $ToolsDir = Split-Path -Parent $PublishPath
+. (Join-Path $Here 'tests\fixtures\generated-bodies.ps1')
 
 $script:pass = 0
 $script:fail = 0
@@ -77,6 +78,10 @@ function New-Install([string]$name, [string[]]$record, [int64]$bytes) {
     [IO.File]::WriteAllText((Join-Path $root 'rel\published.json'), '{"Data\\gone.esp":"10:1"}')
     if ($null -ne $record) {
         [IO.File]::WriteAllLines((Join-Path $root 'Profile\OwnGame\files.txt'), $record)
+        # The covered bodies a publish needs since d2519bb, built as a build
+        # leaves them, so each case is refused for what it is about. Their
+        # record holds files.txt's hash, so they come after it.
+        New-GeneratedBodies $root (Split-Path -Parent $tools)
     }
     # One file of ours, the size the case asks for. Under Data\Platform\UI, since
     # outside it only what Ship-Rules names is ours (#1178).
@@ -135,7 +140,8 @@ try {
                    'scripts\release\Feed-Store.ps1', 'scripts\release\Source-Notice.ps1',
                    'scripts\release\Release-Baseline.ps1', 'scripts\release\Release-Name.ps1',
                    'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt',
-                   'scripts\release\Where.ps1', 'records\client-build.json') {
+                   'scripts\release\Where.ps1', 'records\client-build.json',
+                   'scripts\mods\Generated.ps1', 'records\generated.json') {
         $from = Join-Path $repoRoot $f
         $to = Join-Path (Split-Path -Parent $tools) $f
         New-Item -ItemType Directory -Path (Split-Path -Parent $to) -Force | Out-Null
