@@ -54,8 +54,35 @@ $gitDir = Join-Path $tmp 'repo'; [IO.Directory]::CreateDirectory($gitDir) | Out-
 $base = (& git -C $gitDir rev-parse HEAD).Trim()
 & git -C $gitDir -c user.name=Fixture -c user.email=fixture@example.invalid commit -qm main --allow-empty
 $main = (& git -C $gitDir rev-parse HEAD).Trim()
-& git -C $gitDir -c user.name=Fixture -c user.email=fixture@example.invalid commit -qm unfinished --allow-empty
+# Unfinished work carries a change Main does not have. An empty commit has
+# nothing for Main to be missing, so it would count as published by content.
+[IO.File]::WriteAllText((Join-Path $gitDir 'unfinished.txt'), 'not on main')
+& git -C $gitDir add unfinished.txt
+& git -C $gitDir -c user.name=Fixture -c user.email=fixture@example.invalid commit -qm unfinished
 $unfinished = (& git -C $gitDir rev-parse HEAD).Trim()
+# A branch squash merged onto main, the way pull requests merge here: the
+# branch commit a Dev release was built from never becomes an ancestor of
+# main, and main gains the same change as a new commit.
+& git -C $gitDir checkout -q --detach $main
+[IO.File]::WriteAllText((Join-Path $gitDir 'squashed.txt'), 'merged by squash')
+& git -C $gitDir add squashed.txt
+& git -C $gitDir -c user.name=Fixture -c user.email=fixture@example.invalid commit -qm 'branch work'
+$branch = (& git -C $gitDir rev-parse HEAD).Trim()
+[IO.File]::WriteAllText((Join-Path $gitDir 'more.txt'), 'only on the branch')
+& git -C $gitDir add more.txt
+& git -C $gitDir -c user.name=Fixture -c user.email=fixture@example.invalid commit -qm 'branch work main never took'
+$branchMore = (& git -C $gitDir rev-parse HEAD).Trim()
+& git -C $gitDir checkout -q --detach $main
+[IO.File]::WriteAllText((Join-Path $gitDir 'squashed.txt'), 'merged by squash')
+& git -C $gitDir add squashed.txt
+& git -C $gitDir -c user.name=Fixture -c user.email=fixture@example.invalid commit -qm 'branch work (#1)'
+$squashed = (& git -C $gitDir rev-parse HEAD).Trim()
+# Main then moves the same lines on, the way a newer engine pin or the next
+# gamemode change does, so merging the branch into main's tip now conflicts.
+[IO.File]::WriteAllText((Join-Path $gitDir 'squashed.txt'), 'changed again on main')
+& git -C $gitDir add squashed.txt
+& git -C $gitDir -c user.name=Fixture -c user.email=fixture@example.invalid commit -qm 'later main work on the same lines'
+$movedOn = (& git -C $gitDir rev-parse HEAD).Trim()
 $mainDoc = [pscustomobject]@{ launcherVersion='1.1.105'; release=[pscustomobject]@{commit=$main;uncommitted=0}; news=@() }
 $doc = [pscustomobject]@{ release=[pscustomobject]@{commit=$base;uncommitted=0}; mainVersion='1.1.103' }
 $notes = @([pscustomobject]@{title='Renamed Main feature';channel='dev';sourceCommit=$base},
@@ -74,6 +101,29 @@ $notes[0].channel = 'dev'; $before = $notes | ConvertTo-Json -Depth 5 -Compress
 $null = Update-DevNewsChannels $doc $notes $null $gitDir
 Assert (($notes | ConvertTo-Json -Depth 5 -Compress) -eq $before) 'An unreadable Main feed preserves news marks'
 Assert ($doc.mainVersion -eq '1.1.103') 'An unreadable Main feed preserves the last known Main version'
+$squashMain = [pscustomobject]@{ launcherVersion='1.1.106'; release=[pscustomobject]@{commit=$squashed;uncommitted=0}; news=@() }
+$squashDoc = [pscustomobject]@{ release=[pscustomobject]@{commit=$branch;uncommitted=0}; mainVersion='1.1.105' }
+$squashNotes = @([pscustomobject]@{title='Branch work';channel='dev';sourceCommit=$branch},
+    [pscustomobject]@{title='Older legacy note';channel='dev'},
+    [pscustomobject]@{title='Branch work main never took';channel='dev';sourceCommit=$branchMore},
+    [pscustomobject]@{title='Unfinished Dev work';channel='dev';sourceCommit=$unfinished})
+$null = Update-DevNewsChannels $squashDoc $squashNotes $squashMain $gitDir
+Assert ($squashNotes[0].channel -eq '') 'A Dev source squash merged onto Main is promoted though it is not an ancestor'
+Assert ($squashNotes[1].channel -eq '') 'Legacy notes clear when the preceding Dev release was squash merged onto Main'
+Assert ($squashNotes[2].channel -eq 'dev') 'A branch commit with a change Main never took stays marked Dev'
+Assert ($squashNotes[3].channel -eq 'dev') 'Work on no branch Main took stays marked Dev'
+$squashNotes[0].channel = 'dev'
+$null = Update-DevNewsChannels $squashDoc @([pscustomobject]@{title='Gone';channel='dev';sourceCommit=('0' * 40)}) $squashMain $gitDir
+Assert ($squashNotes[0].channel -eq 'dev') 'Only the notes passed in are touched'
+$gone = @([pscustomobject]@{title='Gone';channel='dev';sourceCommit=('f' * 40)})
+$null = Update-DevNewsChannels $squashDoc $gone $squashMain $gitDir
+Assert ($gone[0].channel -eq 'dev') 'A Dev source this clone does not have proves nothing and stays marked'
+$laterMain = [pscustomobject]@{ launcherVersion='1.1.107'; release=[pscustomobject]@{commit=$movedOn;uncommitted=0}; news=@() }
+$later = @([pscustomobject]@{title='Branch work';channel='dev';sourceCommit=$branch},
+    [pscustomobject]@{title='Branch work main never took';channel='dev';sourceCommit=$branchMore})
+$null = Update-DevNewsChannels $squashDoc $later $laterMain $gitDir
+Assert ($later[0].channel -eq '') 'Squash merged work stays promoted after Main changes the same lines again'
+Assert ($later[1].channel -eq 'dev') 'and work Main never took is still marked once Main has moved on'
 [IO.Directory]::CreateDirectory((Join-Path $gitDir 'game')) | Out-Null
 [IO.File]::WriteAllText((Join-Path $gitDir 'game\untracked-plugin.js'), 'new work')
 Assert ((Get-ReleaseSource $gitDir).Uncommitted -eq 1) 'Untracked shipping inputs prevent source parity claims'
