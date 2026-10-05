@@ -195,6 +195,22 @@ function WaitUp([int]$port) {
     for ($i = 0; $i -lt 40; $i++) { if (Answers $port) { return $true }; Start-Sleep -Milliseconds 250 }
     return $false
 }
+# A game port the system hands out, with the port above it free as well,
+# because the server in a payload binds its game port and the resources port
+# one above it. Not one already taken by this run ($avoid). 0 when the system
+# hands out none such in fifty asks. For the Publish-Server runs below, which
+# until #1728 needed the dev and live servers' own ports and skipped when
+# anything held one.
+function Pair([int[]]$avoid) {
+    for ($i = 0; $i -lt 50; $i++) {
+        $u = New-Object Net.Sockets.UdpClient(0)
+        $p = ([Net.IPEndPoint]$u.Client.LocalEndPoint).Port
+        $u.Close()
+        $near = @($avoid | Where-Object { [Math]::Abs($_ - $p) -le 2 }).Count
+        if ($p -lt 65535 -and $near -eq 0 -and (Free $p) -and (Free ($p + 1))) { return $p }
+    }
+    return 0
+}
 
 # The task scheduler, for the far side. A task is a file holding its action;
 # starting it starts that action, the real cmd.exe line, and stopping it ends
@@ -655,12 +671,15 @@ try {
         $prev.Count -eq 2 -and -not (Test-Path -LiteralPath (Join-Path $box 'Thornswood-Server.prev-20000101-000003')))
     if ($script:fail -gt $failed) { Show }
 
-    # ---- Publish-Server.ps1, whole, against the dev channel's ports ---------------
-    # Publish-Server checks the answer from here on the dev server's own
-    # ports, 7787 and 7788, so this part needs those two free.
-    if (-not ((Free 7787) -and (Free 7788))) {
-        Write-Host 'SKIP  Publish-Server.ps1 is checked on 7787 and 7788, and something on this machine holds one'
-    } else {
+    # ---- Publish-Server.ps1, whole, on the dev channel ---------------------------
+    # Publish-Server holds the payload to a game port and checks the answer on
+    # the resources port. By default those are the dev server's own, 7787 and
+    # 7788, which the dev server holds on the VPS where this runs; so this
+    # takes a pair from the system and passes them (-GamePort, -ResourcesPort,
+    # #1728). A pair the system will not give fails here rather than skipping.
+    $D = Pair @($P, $Q)
+    Yes ("a game port from the system for the dev Publish-Server runs, {0}, and {1} above it, both free" -f $D, ($D + 1)) ($D -gt 0)
+    if ($D -gt 0) {
         $devRoot = Join-Path $box 'Thornswood-Server-Dev'
         $dist = Join-Path $work 'dist'
         Put (Join-Path $dist 'server-settings.json') ((@{ port = 7777; name = 'Thornswood'; loadOrder = @('c:/x/Skyrim.esm') }) | ConvertTo-Json)
@@ -717,9 +736,10 @@ try {
         # default binary.
         $recordFile = Join-Path $work 'server-build.json'
         Put $recordFile (RecordText 'binary v2')
-        function Publish([string]$zip, [string[]]$more, [string]$channel = 'dev', [string]$vpsRoot = $devRoot, [string]$task = 'Thornswood Test Dev') {
+        function Publish([string]$zip, [string[]]$more, [string]$channel = 'dev', [string]$vpsRoot = $devRoot, [string]$task = 'Thornswood Test Dev', [int]$port = $D) {
             $a = @{ Channel = $channel; VpsRoot = $vpsRoot; TaskName = $task; VpsHost = '127.0.0.1'; VpsUser = 'nobody'
-                    Dist = $dist; Zip = $zip; SkipBuild = $true; NoPause = $true; Wait = 8; Record = $recordFile; NoNews = $true; NoPush = $true }
+                    Dist = $dist; Zip = $zip; SkipBuild = $true; NoPause = $true; Wait = 8; Record = $recordFile; NoNews = $true; NoPush = $true
+                    GamePort = $port; ResourcesPort = ($port + 1) }
             foreach ($x in $more) { $a[$x] = $true }
             $global:TsSshSeen.Clear()
             $global:LASTEXITCODE = 0
@@ -728,9 +748,9 @@ try {
             return $global:LASTEXITCODE
         }
 
-        $code = Publish (Payload -Port 7787 -ForRoot $devRoot -Gamemode '// dev v1') @()
+        $code = Publish (Payload -Port $D -ForRoot $devRoot -Gamemode '// dev v1') @()
         $failed = $script:fail
-        Yes 'Publish-Server puts a first dev server up and exits 0' ($code -eq 0 -and (WaitUp 7787))
+        Yes 'Publish-Server puts a first dev server up and exits 0' ($code -eq 0 -and (WaitUp $D))
         if ($script:fail -gt $failed) { Show }
         # The dev server's own switches, the ones dev rollout 6 lost (#1222).
         $devOwn = SettingsOf $devRoot
@@ -745,48 +765,48 @@ try {
         $build = @{ name = 'Thornswood'; npcSettings = @{ default = @{ spawnInInterior = $true; spawnInExterior = $true } }
                     npcAllowCrimeFaction = $false; npcAllowEssential = $false; thornswoodVoicePort = 7789 }
         $devBefore = Tree $devRoot
-        $devPid = Owner 7787
+        $devPid = Owner $D
 
-        $code = Publish (Payload -Port 7787 -ForRoot $devRoot -Order @('Skyrim.esm', 'Missing.esp')) @()
+        $code = Publish (Payload -Port $D -ForRoot $devRoot -Order @('Skyrim.esm', 'Missing.esp')) @()
         $failed = $script:fail
         Yes 'Publish-Server with a payload the installer refuses exits 1' ($code -ne 0)
         Yes '  and says the server was not stopped or changed' ((($script:lastOut) -join "`n") -match 'was not stopped or changed')
-        Yes '  and it was not: the same process, the root as it was' (((Owner 7787) -eq $devPid) -and ((Tree $devRoot) -eq $devBefore))
+        Yes '  and it was not: the same process, the root as it was' (((Owner $D) -eq $devPid) -and ((Tree $devRoot) -eq $devBefore))
         Yes '  and nothing it sent the box before the installer stops anything' (
             @($global:TsSshSeen | Where-Object { $_ -match 'EncodedCommand' }).Count -eq 0)
         if ($script:fail -gt $failed) { Show }
 
         $global:TsScpFail = 'thornswood-server\.zip'
-        $code = Publish (Payload -Port 7787 -ForRoot $devRoot) @()
+        $code = Publish (Payload -Port $D -ForRoot $devRoot) @()
         $global:TsScpFail = ''
         $failed = $script:fail
         Yes 'Publish-Server whose copy fails exits 1 with the server untouched' (
-            $code -ne 0 -and ((Owner 7787) -eq $devPid) -and ((Tree $devRoot) -eq $devBefore))
+            $code -ne 0 -and ((Owner $D) -eq $devPid) -and ((Tree $devRoot) -eq $devBefore))
         if ($script:fail -gt $failed) { Show }
 
         # A binary the record does not name, in a zip whose own record names it.
-        $code = Publish (Payload -Port 7787 -ForRoot $devRoot -Binary 'binary v9') @()
+        $code = Publish (Payload -Port $D -ForRoot $devRoot -Binary 'binary v9') @()
         $failed = $script:fail
         Yes 'Publish-Server with a binary the build record does not name exits 1 (#1214)' ($code -ne 0 -and (($script:lastOut) -join "`n") -match 'not the recorded build')
         Yes '  before anything is sent: the installer never ran, the same process, the root as it was' (
-            @($global:TsSshSeen | Where-Object { $_ -match '-File' }).Count -eq 0 -and ((Owner 7787) -eq $devPid) -and ((Tree $devRoot) -eq $devBefore))
+            @($global:TsSshSeen | Where-Object { $_ -match '-File' }).Count -eq 0 -and ((Owner $D) -eq $devPid) -and ((Tree $devRoot) -eq $devBefore))
         if ($script:fail -gt $failed) { Show }
 
         # The recorded binary beside a JavaScript half from another build, in a
         # zip whose own record names it: the shape of 29 September.
-        $code = Publish (Payload -Port 7787 -ForRoot $devRoot -Js '// the 24 Sep JavaScript half') @()
+        $code = Publish (Payload -Port $D -ForRoot $devRoot -Js '// the 24 Sep JavaScript half') @()
         $failed = $script:fail
         Yes 'Publish-Server with a JavaScript half the build record does not name exits 1 (#1214)' (
             $code -ne 0 -and (($script:lastOut) -join "`n") -match 'dist_back/skymp5-server\.js in the payload is not the build')
         Yes '  before anything is sent: the installer never ran, the same process, the root as it was' (
-            @($global:TsSshSeen | Where-Object { $_ -match '-File' }).Count -eq 0 -and ((Owner 7787) -eq $devPid) -and ((Tree $devRoot) -eq $devBefore))
+            @($global:TsSshSeen | Where-Object { $_ -match '-File' }).Count -eq 0 -and ((Owner $D) -eq $devPid) -and ((Tree $devRoot) -eq $devBefore))
         if ($script:fail -gt $failed) { Show }
 
-        $code = Publish (Payload -Port 7787 -ForRoot $devRoot -Gamemode '// dev v2' -Settings $build -Order @('Skyrim.esm', 'A.esp', 'B.esp') -Carry @('Skyrim.esm', 'A.esp', 'B.esp')) @()
+        $code = Publish (Payload -Port $D -ForRoot $devRoot -Gamemode '// dev v2' -Settings $build -Order @('Skyrim.esm', 'A.esp', 'B.esp') -Carry @('Skyrim.esm', 'A.esp', 'B.esp')) @()
         $failed = $script:fail
         $devAfter = SettingsOf $devRoot
         Yes 'Publish-Server with a good payload exits 0 and the new gamemode answers' (
-            $code -eq 0 -and (Get (Join-Path $devRoot 'gamemode.js')) -eq '// dev v2' -and (WaitUp 7787))
+            $code -eq 0 -and (Get (Join-Path $devRoot 'gamemode.js')) -eq '// dev v2' -and (WaitUp $D))
         Yes ('  and the dev server keeps every one of its own settings (#1222): ' + ((Carried $devOwn $devAfter) -join ', ')) (
             (Carried $devOwn $devAfter).Count -eq 0 -and $devAfter.thornswoodServer -eq 'dev' -and $devAfter.thornswoodLoadOrderRefuse -eq $true -and
             $devAfter.thornswoodRequirePass -eq $false -and $devAfter.name -eq 'Thornswood Dev' -and (Js $devAfter.npcSettings) -eq '{}')
@@ -796,22 +816,21 @@ try {
         $code = Publish '' @('PutBack')
         $failed = $script:fail
         Yes 'Publish-Server -PutBack exits 0 and the previous gamemode answers again' (
-            $code -eq 0 -and (Get (Join-Path $devRoot 'gamemode.js')) -eq '// dev v1' -and (WaitUp 7787))
+            $code -eq 0 -and (Get (Join-Path $devRoot 'gamemode.js')) -eq '// dev v1' -and (WaitUp $D))
         Yes '  with the dev server''s own settings still' ((Carried $devOwn (SettingsOf $devRoot)).Count -eq 0)
         if ($script:fail -gt $failed) { Show }
     }
 
     # ---- Publish-Server.ps1, whole, on the live channel (#1222) --------------------
-    # The same over a live server, on its own ports, 7777 and 3000.
-    if (-not ((Free 7777) -and (Free 3000))) {
-        Write-Host 'SKIP  a live Publish-Server is checked on 7777 and 3000, and something on this machine holds one'
-    } elseif (-not (Get-Command Publish -EA SilentlyContinue)) {
-        Write-Host 'SKIP  the live Publish-Server run needs the dev one''s stand-ins, which were skipped'
-    } else {
+    # The same over a live server. Its own ports, 7777 and 3000, are the live
+    # server's on the VPS, so this takes a pair from the system too (#1728).
+    $L = Pair @($P, $Q, $D)
+    Yes ("a game port from the system for the live Publish-Server runs, {0}, and {1} above it, both free" -f $L, ($L + 1)) ($L -gt 0)
+    if ($L -gt 0 -and $D -gt 0) {
         $liveRoot = Join-Path $box 'Live\Thornswood-Server'
-        $code = Publish (Payload -Port 7777 -ForRoot $liveRoot -Gamemode '// live v1') @() 'main' $liveRoot 'Thornswood Test Live'
+        $code = Publish (Payload -Port $L -ForRoot $liveRoot -Gamemode '// live v1') @() 'main' $liveRoot 'Thornswood Test Live' $L
         $failed = $script:fail
-        Yes 'Publish-Server -Channel main puts a first live server up and exits 0' ($code -eq 0 -and (WaitUp 7777))
+        Yes 'Publish-Server -Channel main puts a first live server up and exits 0' ($code -eq 0 -and (WaitUp $L))
         if ($script:fail -gt $failed) { Show }
         $liveOwn = SettingsOf $liveRoot
         foreach ($kv in @(@('name', 'Thornswood'), @('thornswoodServer', 'main'), @('thornswoodLoadOrderRefuse', $true),
@@ -821,12 +840,12 @@ try {
         }
         Put (Join-Path $liveRoot 'server-settings.json') ($liveOwn | ConvertTo-Json -Depth 8)
         $liveOwn = SettingsOf $liveRoot
-        $code = Publish (Payload -Port 7777 -ForRoot $liveRoot -Gamemode '// live v2' -Settings @{ name = 'Thornswood Test'
-                         npcSettings = @{ default = @{ spawnInInterior = $true } }; thornswoodRequirePass = $false }) @() 'main' $liveRoot 'Thornswood Test Live'
+        $code = Publish (Payload -Port $L -ForRoot $liveRoot -Gamemode '// live v2' -Settings @{ name = 'Thornswood Test'
+                         npcSettings = @{ default = @{ spawnInInterior = $true } }; thornswoodRequirePass = $false }) @() 'main' $liveRoot 'Thornswood Test Live' $L
         $failed = $script:fail
         $liveAfter = SettingsOf $liveRoot
         Yes 'a live publish over it exits 0 and the new gamemode answers' (
-            $code -eq 0 -and (Get (Join-Path $liveRoot 'gamemode.js')) -eq '// live v2' -and (WaitUp 7777))
+            $code -eq 0 -and (Get (Join-Path $liveRoot 'gamemode.js')) -eq '// live v2' -and (WaitUp $L))
         Yes ('  and the live server keeps every one of its own settings: ' + ((Carried $liveOwn $liveAfter) -join ', ')) (
             (Carried $liveOwn $liveAfter).Count -eq 0 -and $liveAfter.thornswoodServer -eq 'main' -and $liveAfter.thornswoodRequirePass -eq $true -and
             $liveAfter.thornswoodLoadOrderRefuse -eq $true -and (Js $liveAfter.npcSettings) -eq '{}' -and @($liveAfter.thornswoodDevs).Count -eq 1)
