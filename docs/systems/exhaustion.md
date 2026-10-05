@@ -57,9 +57,13 @@ Someone who has said `/bard` in the same cell within the last 5 minutes
 adds 25 on top of whatever place you are already in. There is no bard
 profession. The check is that they said they are playing.
 
-Logging out in a real bed fills rest to 100 when you come back, and
-puts 25 back on hunger and on thirst. It is not a stat bonus for
-logging out at a clever hour. It is a rule about the bed.
+Logging out lying in your own bed, or in a bed you are allowed in,
+fills rest to 100 when you come back, and puts 25 back on hunger and
+on thirst. A bed or bedroll nobody can lend you does not. You have to
+be away for a night: 8 hours on the game clock, which is 24 real
+minutes. Hunger and thirst fall while you are away, the same as
+anywhere, and the 25 goes back on what is left. It is not a stat
+bonus for logging out at a clever hour. It is a rule about the bed.
 
 Sleeping on open ground is sitting, 20 an hour, and it can start a
 chill. See [Disease](disease.md).
@@ -84,9 +88,14 @@ Any other furniture, such as a forge or a chopping block, is not a
 rest. The fire is the distance the game already reports for warmth.
 All of it is measured again every 5 seconds, so walking away, losing a
 key, a night running out or moving away from the fire stops the rest
-or changes its rate. See [Property](property.md). Tea and skooma are
-not items the needs block knows. Sleeping on open ground, an hour on a
-seat with no roof over you and no fire in reach, starts a chill. See
-[Disease](disease.md).
+or changes its rate. See [Property](property.md). The logout fill is
+counted once, the first time the server reads your meters after you
+come back into the world, whatever reads them first. The server
+counts you as up then, not lying in the bed. Which beds give it and
+the 24 minutes are the suggested answers on #1606, built that way
+until Patrick says otherwise. Tea and skooma are not items the needs
+block knows.
+Sleeping on open ground, an hour on a seat with no roof over you and
+no fire in reach, starts a chill. See [Disease](disease.md).
 The craft gate has not been extended to mining or chopping, and this
 plan does not extend it.
