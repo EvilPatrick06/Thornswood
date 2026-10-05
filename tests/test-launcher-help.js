@@ -249,8 +249,13 @@ yes('the gamemode\'s list of everybody\'s commands can be read', Array.isArray(e
   yes('Install-Voice.ps1 installs the voice service with the range off',
       /\[string\]\$ChatRange = 'off'/.test(vinstall) &&
       /set THORNSWOOD_CHAT_RANGE=\$ChatRange/.test(vinstall));
+  // Since #1406 a plain line goes out through deliver(), which also puts the
+  // line above the head for those close enough and skips anybody who has
+  // blocked the sender. With the range off it is still every peer.
+  const everyone = block.indexOf('for (const [, p] of peers) deliver(p);');
   yes('the voice service still sends a plain chat line to every peer when the range is off',
-      /for \(const \[, p\] of peers\) \{/.test(block) && /p\.ws\.send\(out\)/.test(block));
+      everyone > block.indexOf('if (CHAT_RANGE) {') && block.indexOf('if (CHAT_RANGE) {') >= 0 &&
+      /function deliver\(p\) \{[\s\S]*?p\.ws\.send\(copy\);/.test(block));
   yes('so the page says a chat line goes to everybody connected',
       /goes to everybody connected/.test(item('Chat and commands', 'The chat box')));
   yes('and that a slash line is a command, which the voice service holds back',
@@ -412,10 +417,12 @@ function tableNames(src, name) {
       purse > 0 && item('Character', 'What you start with').indexOf(purse + ' gold, once') !== -1);
 
   const tools = [];
-  const tr = /^  (miner|woodworker|farmer): \{\n    give: '[^']+',\n    accept: [\s\S]*?name: '((?:[^'\\]|\\.)*)'/gm;
+  // Every TOOLS row with a give, which is handed over at the pick: the
+  // miner's, woodworker's and farmer's, and the fisher's pole since #1379.
+  const tr = /^  (\w+): \{\n    give: '[^']+',\n    accept: [\s\S]*?name: '((?:[^'\\]|\\.)*)'/gm;
   let r;
   while ((r = tr.exec(gm)) !== null) { tools.push(r[2].replace(/\\'/g, '\'')); }
-  yes('the gamemode hands out ' + tools.length + ' tools (' + tools.join(', ') + ')', tools.length === 3);
+  yes('the gamemode hands out ' + tools.length + ' tools (' + tools.join(', ') + ')', tools.length >= 4);
   const lostTool = tools.filter(function (x) { return item('Character', 'The tools come with the pick').indexOf(x) === -1; });
   yes('and the page names every one' + (lostTool.length ? ' (not: ' + lostTool.join(', ') + ')' : ''), lostTool.length === 0);
   /*
@@ -440,11 +447,20 @@ function tableNames(src, name) {
   const toolsAt = gm.indexOf('const TOOLS = {');
   const toolsBlock = toolsAt < 0 ? '' : gm.slice(toolsAt, gm.indexOf('\n};\n', toolsAt));
   const wheres = toolsBlock.match(/where: '[^']*/g) || [];
-  yes('every refusal names a smith as the way to another (' + wheres.length + ' of 3)',
-      wheres.length === 3 && wheres.every(function (w) { return /a smith forges them/i.test(w); }));
+  // Four tools since the fisher's pole (#1379): a smith forges the pickaxe,
+  // the axe and the shovel, and a woodwright makes the pole.
+  const names = (toolsBlock.match(/name: '(?:[^'\\]|\\.)*'/g) || []).map(function (n) {
+    return n.slice(7, -1).replace(/\\'/g, "'");
+  });
+  yes('every refusal names who makes another, a smith or for the pole a woodwright (' + wheres.length + ' tools)',
+      wheres.length >= 4 && wheres.length === names.length &&
+      wheres.every(function (w) { return /a smith forges them|a woodwright makes them/i.test(w); }));
   const toolItem = item('Character', 'The tools come with the pick');
-  yes('and the page says a smith forges the next one and nothing hands one out',
-      /a smith forges the next one/.test(toolItem) && /nothing in the world hands one out/.test(toolItem) &&
+  yes('and the page names every tool the gamemode asks for (' + names.join(', ') + ')',
+      names.length >= 4 && names.every(function (n) { return toolItem.indexOf(n) >= 0; }));
+  yes('and says a smith forges the next one, a woodwright the next pole, and nothing hands one out',
+      /a smith forges the next one/.test(toolItem) && /a woodwright makes the next pole/.test(toolItem) &&
+      /nothing in the world hands one out/.test(toolItem) &&
       !/once every \d+ hours|hands you one/.test(toolItem));
 
   const remind = num(gm, /const CHOOSE_REMIND_MS = (\d+);/) / 1000;

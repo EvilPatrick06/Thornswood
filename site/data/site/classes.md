@@ -203,7 +203,7 @@ verb that nobody else in the game has.
 | Class | What only they can do |
 |---|---|
 | **Hunter** | Loot an animal body. Everyone else walks past the carcass |
-| **Fisher** | Fish: press E at salmon, clams, pearl oysters, horker meat and slaughterfish egg nests in the water. No rod or net is needed, and the ones from the Fishing in Skyrim mod do nothing here |
+| **Fisher** | Fish: with a fishing pole in your pack, press E at salmon, clams, pearl oysters, horker meat and slaughterfish egg nests in the water. A crude pole fishes novice water, a fine one fishes through expert, and a master one fishes every water |
 | **Gatherer** | Gather material out of the world |
 | **Miner** | Mine |
 | **Farmer** | Farm |
@@ -238,20 +238,23 @@ Class and Profession. **Gatherer** and **Tailor** remain in the tables above.
 
 ## The tools
 
-Three picks need a tool in your pack before the work happens: two of the classes
-and one whole profession. In the pack is enough; nothing has to be equipped.
+Four picks need a tool in your pack before the work happens: three of the
+classes and one whole profession. In the pack is enough; nothing has to be
+equipped.
 
 | Who | What they carry |
 |---|---|
 | **Miner** | A pickaxe |
 | **Farmer** | A shovel |
+| **Fisher** | A crude fishing pole, or a fine or master one |
 | **Woodworker** | A woodcutter's axe |
 
 You are handed yours the moment you pick. After that it wears with the work: a
-tool has a hundred uses in it, you are told when it is worn thin, and when it
-breaks the next one comes from a smith. With no tool in your pack the seam, the
-plot, the chopping block and the kiln turn you away, and nothing hands you a
-free one.
+pickaxe, a shovel or an axe has a hundred uses in it and a pole has fifty, you
+are told when it is worn thin, and when it breaks the next one comes from a
+smith, or for a pole from a woodwright. With no tool in your pack the seam, the
+plot, the water, the chopping block and the kiln turn you away, and nothing
+hands you a free one.
 
 Any of them counts. The game has two shovels that look and read exactly alike,
 and six things it calls a pickaxe including the Notched Pickaxe and the ancient
@@ -263,7 +266,7 @@ any of the mods we load on top of it either; every one of them was searched. So
 farming asks for a shovel, which a smith forges, and a shovel is what we mean
 whenever this page says farming needs a tool.
 
-Nothing else asks for one. Gathering, hunting and fishing need your hands.
+Nothing else asks for one. Gathering and hunting need your hands.
 
 ## Farming
 
