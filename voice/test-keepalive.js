@@ -51,8 +51,6 @@ function tokenFor(pid) {
   return body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
-const pub = path.join(dir, 'public');
-try { fs.mkdirSync(pub); } catch (e) { }
 
 let srv = null;
 let log = '';

@@ -8,9 +8,10 @@
       writing, not operational text), docs\archive\ (dated snapshots, kept as
       they were) and the engine submodule;
     - the launcher's help (launcher/app/Help.cs) and window (launcher/ui.xaml),
-      the bot's channel posts (bot/content.py), the site's and the voice
-      service's public pages (site/public/*.html, voice/public/*.html) and the
-      read me every installer carries (installer/READ ME FIRST.txt).
+      the bot's channel posts (bot/content.py), the site's public pages
+      (site/public/*.html) and the read me every installer carries
+      (installer/READ ME FIRST.txt). The voice service serves no page since
+      #1822, so it has none to read.
   Not the code files (the gamemode, the overlays, the rest of the launcher): a
   word check there fires on identifiers, engine calls like player.moveto and
   Skyrim's own record names, and those are not text for people.
@@ -132,7 +133,7 @@ function Test-ForPeople([string]$rel) {
     if ($rel -match '^(lore|engine|docs/archive)/' -or $rel -match '(^|/)node_modules/') { return $false }
     if ($Named -contains $rel) { return $true }
     if ($rel -match '\.md$') { return $true }
-    if ($rel -match '^(site|voice)/public/[^/]+\.html$') { return $true }
+    if ($rel -match '^site/public/[^/]+\.html$') { return $true }
     return $false
 }
 

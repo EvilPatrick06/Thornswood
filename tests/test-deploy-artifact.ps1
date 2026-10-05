@@ -106,8 +106,6 @@ try {
     [IO.File]::WriteAllBytes((Join-Path $src 'site\public\logo.png'), [byte[]](0, 1, 2, 3, 255, 13, 10, 0))
     Put (Join-Path $src 'voice\voice-server.js') "'use strict';`nconst BUILD = 'test';`n"
     Put (Join-Path $src 'voice\headlines.js') "'use strict';`nconsole.log('headlines');`n"
-    Put (Join-Path $src 'voice\public\index.html') "<!doctype html>`n<p>voice</p>`n"
-    Put (Join-Path $src 'voice\public\voice.js') "'use strict';`nconsole.log('voice');`n"
     Run-Git -C $src init -q
     Run-Git -C $src config core.autocrlf false
     Run-Git -C $src add -A
@@ -293,7 +291,7 @@ try {
     Flip-Last $n2.Zip
     Yes 'the site zip is accepted again once its hash matches' ((Refusal { Assert-ThornswoodSourceIntegrity -Artifact $n2 -RepoDir $src }) -eq '')
 
-    $voicePaths = @('voice/voice-server.js', 'voice/headlines.js', 'voice/public')
+    $voicePaths = @('voice/voice-server.js', 'voice/headlines.js')
     $v = New-ThornswoodArtifact -Component voice -RepoDir $src -Paths $voicePaths -OutDir (Join-Path $tmp 'out-voice')
     $shipped = $false
     try {
@@ -301,7 +299,7 @@ try {
         $shipped = $true
     } catch { $shipped = $false }
     Yes 'a voice tree that matches the commit may be sent' $shipped
-    $voiceFile = Join-Path $v.Folder 'voice\public\voice.js'
+    $voiceFile = Join-Path $v.Folder 'voice\headlines.js'
     Flip-Last $voiceFile
     $shipped = $false
     $why = Refusal {
@@ -309,7 +307,7 @@ try {
         $shipped = $true
     }
     Yes 'a tampered voice file is refused before a send' (
-        -not $shipped -and $why.Contains('voice/public/voice.js') -and $why -match 'nothing was sent' -and $why -match 'the box was not touched')
+        -not $shipped -and $why.Contains('voice/headlines.js') -and $why -match 'nothing was sent' -and $why -match 'the box was not touched')
     Flip-Last $voiceFile
     Yes 'the voice tree is accepted again once the file matches the commit' (
         (Refusal { Assert-ThornswoodSourceIntegrity -Artifact $v -RepoDir $src }) -eq '')
