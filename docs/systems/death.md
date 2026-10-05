@@ -87,6 +87,8 @@ nearest temple, and a death on Solstheim writes Raven Rock. The public
 rules on the site are the yes and the no above, and this page does not
 replace that page.
 
-There is no downed state and no wound record. Fire still hurts. A
-person killing a person already counts for nothing toward a rank. An
-animal in the hunt table already lies for 5 minutes.
+The wounds and the diseases you had come through the wake with you,
+on the record the injury page describes. The bleed stops at the death.
+There is no downed state yet: the injury page says why. A person
+killing a person already counts for nothing toward a rank. An animal
+in the hunt table already lies for 5 minutes.

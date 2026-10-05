@@ -280,6 +280,7 @@ jobs:
                  'test-1374-letters.js',
                  'test-1380-rare-mines.js',
                  'test-unpin.js', 'test-coffers.js',
+                 'test-1383-injury.js',
                  'test-1384-condition.js',
                  'test-1385-perks.js',
                  'test-1386-warrior.js',
