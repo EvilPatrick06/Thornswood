@@ -106,7 +106,8 @@ Buying and selling use the hold's submitted price. The trader's purse
 falls when it buys and rises when it sells. Purchased goods stay on that
 trader's shelf. An empty purse refuses a buy. An empty shelf refuses a
 sale. A supply turn-in is five of an item at that same buy price, paid
-from the same purse, and it will not be offered again for six hours.
+from the same purse. Each character waits six hours after its completed
+supply before that trader offers the same supply again.
 Scene quests are not paid from the purse.
 
 The person must be the authenticated character and within 400 of that
@@ -115,8 +116,7 @@ buy, sell or supply buttons. The panel requests the trade; the server
 checks its price, reach, purse, stock and character identity. People
 cannot join, and there is no due or discount.
 
-The settlement implementation is under review and has not been released.
-It uses the native inventory comparison and exact saved receipts. The
+Settlement uses the native inventory comparison and exact saved receipts. The
 engine validates the complete resulting inventory with the same count,
 byte and metadata checks it uses for mutation. The complete offer is
 saved in the private ledger before outgoing goods or

@@ -30,25 +30,25 @@ function worldOf(native) {
   };
   const inv = { 10: { 15: 40, 100: 8, 101: 2 } };
   const records = new Map();
-  let live="null",saved="null";
+  const live=new Map(),saved=new Map();
   return {
     actors, inv, records,
     actor(id) { return actors[id] || null; },
     carry(id, baseId) { return (inv[id] && inv[id][baseId]) || 0; },
-    save() { saved=live; },
+    save() { for (const [id,receipt] of live) saved.set(id,receipt); },
     transfer: {
       available() { return native.on; }, validate() {return true;},
       identity(id) { const a=actors[id]; return a && a.profileId>0 ? {desc:id.toString(16)+':Skyrim.esm',profileId:a.profileId} : null; },
       resolve(desc) { return parseInt(desc.split(':')[0],16); },
       inventory(id) { return {entries:Object.entries(inv[id]).filter(([,count])=>count>0).map(([baseId,count])=>({baseId:Number(baseId),count}))}; },
-      receipt() { return live; }, saved() { return saved; },
+      receipt(id) { return live.get(id) || "null"; }, saved(id) { return saved.get(id) || "null"; },
       cas(id,expected,receipt,next,sequence,profile) {
         if (native.fail === 'throw') throw new Error('native failed');
         if (native.fail === 'refuse') return false;
-        if (receipt!==live || JSON.stringify(this.inventory(id))!==JSON.stringify(expected) || profile!==actors[id].profileId) return false;
+        if (receipt!==(live.get(id) || "null") || JSON.stringify(this.inventory(id))!==JSON.stringify(expected) || profile!==actors[id].profileId) return false;
         inv[id]={}; for(const row of next.entries) inv[id][row.baseId]=(inv[id][row.baseId] || 0)+row.count;
-        live=JSON.stringify({actor:id.toString(16)+':Skyrim.esm',profile,sequence});
-        if (native.fail!=='stuck') saved=live;
+        live.set(id,JSON.stringify({actor:id.toString(16)+':Skyrim.esm',profile,sequence}));
+        if (native.fail!=='stuck') saved.set(id,live.get(id));
         return true;
       }
     }
@@ -82,19 +82,20 @@ function resolve(name) {
   return null;
 }
 
-function service(native, purse) {
+function service(native, purse, clock) {
   const world = worldOf(native);
   const purses = memoryPurses([[1, {
     version: 1, reference: '1:Skyrim.esm', base: 'a:Skyrim.esm', purse: purse, stock: [], supply: {}
   }], [2, {
     version: 1, reference: '2:Skyrim.esm', base: 'b:Skyrim.esm', purse: 250, stock: []
   }]]);
-  const api = trading.createMerchantTrading({
+  const deps = {
     purses, prices, transfer: world.transfer, world, places, resolve,
     isTrader: function (id) { return id === 1 || id === 2; },
-    now: () => 1_700_000_000_000
-  });
-  return { api, world, purses };
+    now: clock || (() => 1_700_000_000_000)
+  };
+  const api = trading.createMerchantTrading(deps);
+  return { api, world, purses, deps };
 }
 
 function open(api) {
@@ -176,6 +177,107 @@ assert.equal(supply.world.inv[10][15], 55);
 let again = supply.api.command({ actorId: 10, profileId: 7, parts: ['/merchant', 'supply', 'Iron', 'Ingot'] });
 assert.match(again.text, /not due/);
 assert.equal(supply.purses.prepare(1).purse, 5);
+// Supplies belong to the authenticated character, not everybody at a trader.
+let supplyAt = 1_700_000_000_000;
+const personal = service({on:true}, 250, () => supplyAt);
+open(personal.api);
+assert.match(personal.api.command({actorId:10,profileId:7,parts:['/merchant','supply','Iron','Ingot']}).text,/Sold 5/);
+personal.world.actors[11]={pos:[0,0,0],cell:'whiterun',profileId:8,isHuman:true};
+personal.world.inv[11]={15:40,100:8};
+let secondCharacter=personal.api.command({actorId:11,profileId:8,parts:['/merchant','1']});
+assert.equal(secondCharacter.view.supply[0].ready,true,'another character must have an independent supply offer');
+assert.match(personal.api.command({actorId:11,profileId:8,parts:['/merchant','supply','Iron','Ingot']}).text,/Sold 5/);
+// Another character on the same account also has its own cooldown.
+personal.world.actors[12]={pos:[0,0,0],cell:'whiterun',profileId:7,isHuman:true};
+personal.world.inv[12]={15:40,100:8};
+assert.equal(personal.api.command({actorId:12,profileId:7,parts:['/merchant','1']}).view.supply[0].ready,true);
+assert.match(personal.api.command({actorId:12,profileId:7,parts:['/merchant','supply','Iron','Ingot']}).text,/Sold 5/);
+personal.api.shutdown();
+const resumed=trading.createMerchantTrading(personal.deps);
+personal.world.inv[10][100]=8;
+assert.equal(open(resumed).view.supply[0].ready,false,'restart must retain this character cooldown');
+assert.match(resumed.command({actorId:10,profileId:7,parts:['/merchant','supply','Iron','Ingot']}).text,/not due/);
+supplyAt += 6*60*60*1000-1;
+assert.equal(open(resumed).view.supply[0].ready,false);
+supplyAt++;
+assert.equal(open(resumed).view.supply[0].ready,true);
+assert.match(resumed.command({actorId:10,profileId:7,parts:['/merchant','supply','Iron','Ingot']}).text,/Sold 5/);
+assert.equal(personal.purses.prepare(1).purse,190);
+assert.equal(personal.purses.prepare(1).stock[0].count,20);
+assert.equal(personal.world.inv[10][15],70);
+assert.equal(personal.world.inv[11][15],55);
+assert.equal(personal.world.inv[12][15],55);
+
+// A delayed or interrupted supply starts its window only at completion.
+let completionAt=1_700_000_000_000;
+const delayedNative={on:true,fail:'stuck'};
+const delayed=service(delayedNative,250,()=>completionAt);
+open(delayed.api);
+assert.match(delayed.api.command({actorId:10,profileId:7,parts:['/merchant','supply','Iron','Ingot']}).text,/waiting on the save/);
+assert.equal(open(delayed.api).view.supply[0].ready,false,'a pending supply is unavailable in the panel');
+completionAt+=12*60*60*1000;
+delayed.api.shutdown();
+const delayedResume=trading.createMerchantTrading(delayed.deps);
+delayed.world.save();
+delete delayedNative.fail;
+delayedResume.recover();
+delayed.world.inv[10][100]=8;
+assert.equal(open(delayedResume).view.supply[0].ready,false,'six hours start at saved completion after a long disconnect');
+completionAt+=6*60*60*1000;
+assert.equal(open(delayedResume).view.supply[0].ready,true);
+
+// Expired history cannot permanently fill an otherwise empty merchant intent.
+const history=service({on:true},250);
+const state=history.purses.prepare(1);
+for(let i=0;i<6000;i++)state.supply[JSON.stringify(['old'+i+':Skyrim.esm',i+1,'iron ingot'])]=1;
+history.purses.commit(1,state);
+open(history.api);
+assert.match(history.api.command({actorId:10,profileId:7,parts:['/merchant','sell','1','Iron','Ingot']}).text,/Sold 1/);
+assert.deepEqual(history.purses.prepare(1).supply,{});
+
+const cleanupFailure=service({on:true},250);
+let expired=cleanupFailure.purses.prepare(1);expired.supply={'old':1};cleanupFailure.purses.commit(1,expired);
+cleanupFailure.purses.compareAndCommit=()=>{throw new Error('cleanup acknowledgement failed');};
+open(cleanupFailure.api);
+assert.match(cleanupFailure.api.command({actorId:10,profileId:7,parts:['/merchant','sell','1','Iron','Ingot']}).text,/unavailable/);
+assert.equal(cleanupFailure.api.nativeReady(),false);
+assert.equal(cleanupFailure.world.inv[10][100],8);
+assert.equal(cleanupFailure.world.inv[10][15],40);
+
+// A reentrant projection must not reuse the earlier character's cooldown key.
+const replacedCharacter=service({on:true},250);
+expired=replacedCharacter.purses.prepare(1);expired.supply={'old':1};replacedCharacter.purses.commit(1,expired);
+const commitCleanup=replacedCharacter.purses.compareAndCommit.bind(replacedCharacter.purses);
+replacedCharacter.purses.compareAndCommit=(...args)=>{
+  const result=commitCleanup(...args);
+  replacedCharacter.world.transfer.identity=()=>({desc:'new-character:Skyrim.esm',profileId:7});
+  return result;
+};
+open(replacedCharacter.api);
+assert.match(replacedCharacter.api.command({actorId:10,profileId:7,parts:['/merchant','supply','Iron','Ingot']}).text,/cooldown cannot be verified/);
+assert.equal(replacedCharacter.world.inv[10][100],8);
+assert.equal(replacedCharacter.purses.prepare(1).purse,250);
+assert.equal(replacedCharacter.purses.prepare(1).pending,undefined);
+
+// Unidentified old completions retain their window. Old pending supplies
+// finish under their original key without attributing them to somebody new.
+let legacyAt=1_700_000_000_000;
+const legacyNative={on:true,fail:'stuck'};
+const legacy=service(legacyNative,250,()=>legacyAt);
+open(legacy.api);
+legacy.api.command({actorId:10,profileId:7,parts:['/merchant','supply','Iron','Ingot']});
+let oldPending=legacy.purses.prepare(1);
+oldPending.pending.next.supply={'iron ingot':legacyAt};
+legacy.purses.commit(1,oldPending);
+legacyAt+=12*60*60*1000;
+legacy.world.save();delete legacyNative.fail;
+legacy.api.recover();
+assert.equal(legacy.purses.prepare(1).pending,null);
+assert.deepEqual(legacy.purses.prepare(1).supply,{'iron ingot':legacyAt});
+assert.equal(open(legacy.api).view.supply[0].ready,false);
+legacyAt+=6*60*60*1000;
+assert.equal(open(legacy.api).view.supply[0].ready,true);
+
 let poor = service({ on: true }, 14);
 open(poor.api);
 let skipped = poor.api.command({ actorId: 10, profileId: 7, parts: ['/merchant', 'supply', 'Iron', 'Ingot'] });
