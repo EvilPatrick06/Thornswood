@@ -1,0 +1,11 @@
+# ruff, for the build check's step "Check the Python names what exists"
+# (.github/workflows/build.yml, issue #1343). Pinned by version and by the
+# sha256 PyPI publishes for each wheel, because the step runs on the VPS
+# beside the live server: the Windows wheel the runner takes, and the Linux
+# one for running the same check by hand. No source archive is listed, so a
+# machine with neither wheel stops instead of building one. To move it, take
+# the new version's two wheel hashes from https://pypi.org/pypi/ruff/<version>/json
+# and replace the three values together.
+ruff==0.16.10 \
+    --hash=sha256:97f2015c92aa97105b0eab19eb5d224884399281cfc5da86a92db4ab5e7fb2ca \
+    --hash=sha256:f33f43a864a8483eebd160e713336c8bab02c934feaff0a33cf5ccb41546d09a

@@ -39,9 +39,11 @@ WHAT IT WRITES, between markers, the way the recipe table is written:
                     This is the join the server has never had.
     BENCH_ACCESS    bench keyword descriptor -> what can be made there:
                       name    the keyword's editor id, for the log and nothing else
-                      anyone  true when the bench holds a recipe nobody owns, which
-                              means anybody may use it. The smelter is the one this
-                              exists for and BENCH_OWNER says why in as many words.
+                      anyone  true when the professions page calls the bench open
+                              furniture (OPEN_FURNITURE below), or when it holds a
+                              recipe nobody owns, which means anybody may use it.
+                              The smelter is the one the second exists for and
+                              BENCH_OWNER says why in as many words.
                       halves  each half that owns anything here, against the LOWEST
                               rank at which they own something. That is the rank
                               the door asks for, because a bench that opened only
@@ -98,6 +100,28 @@ MENU_STATIONS = {
         'halves': {'bladebinder': 'novice', 'wardweaver': 'novice'}},
     5: {'key': 'alchemy', 'name': 'the alchemy lab',
         'halves': {'blightbrewer': 'novice', 'physicker': 'novice'}},
+}
+
+# THE BENCHES THE PROFESSIONS PAGE CALLS OPEN FURNITURE.
+#
+# docs/systems/professions.md, "Benches, in one picture": some furniture is
+# open, and the recipe is what refuses you. Which bench is open is the page's
+# decision, by bench, and it is carried here by the bench keyword's editor id,
+# the name recipes.json gives it. Until 5 October this script worked it out
+# from the recipes alone, a bench being open when it held a row nobody owned.
+# That held while every one of these benches had such a row. #1391 moved every
+# cookpot row nobody owned into the refused map, so a rebuild would have shut
+# the cookpot that cook.md and hearthcook.md say does not turn a stranger away
+# at the furniture (issue #1713). A bench that holds a row nobody owns still
+# opens for everybody as well, since anybody may make that row: that is the
+# smelter, which BENCH_OWNER in Build-RecipeTable.ps1 leaves open on purpose.
+OPEN_FURNITURE = {
+    'CraftingCookpot': 'Cookpot. Open furniture. The recipe is still Hearthcook\'s',
+    'CraftingSmithingForge': 'Forge. Open furniture. A forge recipe still has an owner and a rank',
+    'CraftingTanningRack': 'Tanning rack. Open furniture. A hide into leather is the Platewright\'s',
+    'MCE_CraftingLoom': 'Loom. Open furniture. The garment still has an owner and a rank',
+    'CraftingSmithingArmorTable': 'Armour table. Open furniture. Tempering never reaches the server',
+    'DLC1LD_CraftingForgeAetherium': 'Aetherium forge. Open furniture. The staff and the plate made there are master recipes',
 }
 
 
@@ -241,15 +265,29 @@ def main():
             a['halves'][half] = rank
 
     # ------------------------------------------------- the load order, once
+    # Vortex marks the plugins that are switched on with '*'. A line without one
+    # is a plugin it knows about and has switched off: the game does not load it
+    # and the server never sees its records, so it is not part of this build.
+    # Until 5 October this read every line and only stripped the '*', so
+    # collection revision 2's five switched off plugins, three of them not in the
+    # game folder at all, stopped it (issue #1712).
     order = list(MASTERS)
+    off = 0
     for line in io.open(args.plugins, encoding='utf-8', errors='replace'):
         line = line.strip()
         if not line or line.startswith('#'):
             continue
-        if line.startswith('*'):
-            line = line[1:]
-        if line not in order:
+        if not line.startswith('*'):
+            off += 1
+            continue
+        line = line[1:].strip()
+        if line and line not in order:
             order.append(line)
+    print('Load order')
+    print('  %d plugin(s): the five masters, then %s' % (len(order), args.plugins))
+    if off:
+        print('  %d line(s) in that list are switched off and were left out' % off)
+    print('')
 
     missing = [n for n in order if not os.path.isfile(os.path.join(args.data, n))]
     if missing:
@@ -278,6 +316,17 @@ def main():
         a = access.setdefault(bench, {'name': bname, 'anyone': False, 'halves': {}})
         a['anyone'] = True
 
+    # The benches the professions page calls open furniture open for everybody,
+    # whatever rows they hold. One the load order does not have stands nowhere.
+    not_here = []
+    for bname in sorted(OPEN_FURNITURE):
+        bench = by_name.get(bname) or keywords.get(bname)
+        if not bench:
+            not_here.append(bname)
+            continue
+        a = access.setdefault(bench, {'name': bname, 'anyone': False, 'halves': {}})
+        a['anyone'] = True
+
     # And the two stations whose work is a menu rather than a recipe.
     for spec in MENU_STATIONS.values():
         a = access.setdefault(spec['key'], {'name': spec['name'], 'anyone': False,
@@ -292,6 +341,12 @@ def main():
         halves = ', '.join('%s %s' % (h, a['halves'][h]) for h in sorted(a['halves']))
         print('    %-32s %-27s %s%s' % (a['name'], bench,
                                         'anyone' if a['anyone'] else '', halves and ' | ' + halves))
+    if not_here:
+        print('')
+        print('  %d bench(es) the professions page calls open furniture are not in this load order:'
+              % len(not_here))
+        for n in not_here:
+            print('    %s' % n)
     if no_desc:
         print('')
         print('  %d bench name(s) appear only on unowned rows, so this cannot place them:'
@@ -344,14 +399,19 @@ def main():
         return 0
 
     # ------------------------------------------------------------- the blocks
+    # The blocks are written with the line ending the gamemode already has.
+    # Until 5 October they were always CRLF, which a Windows checkout hides and
+    # a checkout that keeps LF does not: there, a run left two CRLF blocks in an
+    # LF file (issue #1713), the fault #1622 found in Build-RecipeTable.ps1.
+    text = io.open(args.gamemode, encoding='utf-8', newline='').read()
+    eol = '\r\n' if '\r\n' in text else '\n'
+
     def block(open_mark, close_mark, lines, text):
         a, b = text.find(open_mark), text.find(close_mark)
         if a < 0 or b < 0 or b < a:
             print('  STOP. no %s block in the gamemode, so nothing was written.' % open_mark)
             return None
-        return text[:a] + '\r\n'.join([open_mark] + lines) + '\r\n' + text[b:]
-
-    text = io.open(args.gamemode, encoding='utf-8', newline='').read()
+        return text[:a] + eol.join([open_mark] + lines) + eol + text[b:]
 
     lines = ['/* Furniture base -> the bench keyword it carries. Generated by',
              '   scripts\\dev\\Build-BenchTable.py; do not hand edit. mp.onActivate is handed a',
@@ -367,7 +427,8 @@ def main():
 
     lines = ['/* Bench keyword -> who can make anything at it. Generated by',
              '   scripts\\dev\\Build-BenchTable.py; do not hand edit.',
-             '     anyone  the bench holds a recipe nobody owns, so it opens for everybody',
+             '     anyone  the professions page calls it open furniture, or it holds a recipe',
+             '             nobody owns, so it opens for everybody',
              '     halves  each half that owns something here, at the LOWEST rank it owns',
              '             something at, because that is the rank the door asks for. */',
              'const BENCH_ACCESS = ' + json.dumps(access, sort_keys=True,

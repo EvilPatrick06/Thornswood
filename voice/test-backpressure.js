@@ -74,6 +74,15 @@ const MB = (n) => (n / 1048576).toFixed(2) + ' MB';
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-backpressure-'));
 fs.copyFileSync(SERVER, path.join(dir, 'voice-server.js'));
 fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
+// Every join proves itself since #1303, so this harness signs its own join
+// tokens with a key it puts beside its copy of the service.
+const KEY = crypto.randomBytes(32).toString('hex');
+fs.writeFileSync(path.join(dir, 'token-key.txt'), KEY);
+function tokenFor(pid) {
+  const body = String(pid) + '.' + String(Date.now() + 3600000);
+  return 'v1.' + body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
 try { fs.mkdirSync(path.join(dir, 'public')); } catch (e) { }
 
 /*
@@ -165,7 +174,6 @@ async function start() {
     env: Object.assign({}, process.env, {
       THORNSWOOD_VOICE_PORT: String(PORT),
       THORNSWOOD_VOICE_BIND: '127.0.0.1',
-      THORNSWOOD_VOICE_AUTH: 'off',
       THORNSWOOD_SITE: '',
       THORNSWOOD_CHAT_DIR: path.join(dir, 'chat'),
       THORNSWOOD_CHAT_BURST: String(CHAT_BURST),
@@ -379,11 +387,11 @@ yes('only the roster is sent newest-only',
     if (m.t === 'pos' || m.t === 'moved') { got.push(Date.now()); posBytes = Math.max(posBytes, JSON.stringify(m).length); }
     if (m.t === 'chat') heard.push(m);
   });
-  send(R, { t: 'join', profileId: 100000, name: 'keeps up' });
+  send(R, { t: 'join', profileId: 100000, name: 'keeps up', token: tokenFor(100000) });
 
   // Somebody who has stopped reading. Joined, then never read again.
   const S = await open();
-  send(S, { t: 'join', profileId: 100001, name: 'never reads' });
+  send(S, { t: 'join', profileId: 100001, name: 'never reads', token: tokenFor(100001) });
 
   /*
     Wait for it to back up. The loopback buffers take the first couple of MB,
@@ -459,7 +467,7 @@ yes('only the roster is sent newest-only',
   const crowd = await Promise.all(Array.from({ length: BURST }, () => open()));
   crowd.forEach((c, i) => {
     read(c, () => { });
-    send(c, { t: 'join', profileId: 200000 + i, name: ('Somebody passing through ' + i + ' ').padEnd(40, 'x') });
+    send(c, { t: 'join', profileId: 200000 + i, name: ('Somebody passing through ' + i + ' ').padEnd(40, 'x'), token: tokenFor(200000 + i) });
   });
   const full = await until('full', () => roster.length === BURST + 2, 5000);
   const stays = crowd[0];
@@ -493,8 +501,8 @@ yes('only the roster is sent newest-only',
   yes('and health no longer counts it as backed up',
       await until('none backed', async () => (await health()).backed === 0, 3000));
   const current = await until('current roster', () => !!lastRoster && lastRoster.length === 3 &&
-      lastRoster.some((p) => p.name === 'keeps up') && lastRoster.some((p) => p.name === 'never reads') &&
-      lastRoster.some((p) => p.name === staysName), 3000);
+      lastRoster.some((p) => p.profileId === 100000) && lastRoster.some((p) => p.profileId === 100001) &&
+      lastRoster.some((p) => p.profileId === 200000 && p.name === staysName), 3000);
   console.log('      ' + rosters + ' rosters reached it after it read again, the last with ' +
               (lastRoster ? lastRoster.length : 0) + ' people');
   yes('and it is sent the roster as it is now, not lost', current);
@@ -512,9 +520,11 @@ yes('only the roster is sent newest-only',
   */
   console.log('');
   const S2 = await open();
-  send(S2, { t: 'join', profileId: 100002, name: 'never reads either' });
-  await until('roster', () => roster.some((p) => p.name === 'never reads either'), 3000);
-  const target = (roster.find((p) => p.name === 'never reads either') || {}).peer;
+  send(S2, { t: 'join', profileId: 100002, name: 'never reads either', token: tokenFor(100002) });
+  // Found by profile, not by name: every join is proven since #1303, and a
+  // proven one is shown under the name the position feed has for it.
+  await until('roster', () => roster.some((p) => p.profileId === 100002), 3000);
+  const target = (roster.find((p) => p.profileId === 100002) || {}).peer;
   yes('the second stuck socket is in the room', !!target);
 
   const markB = probes.length;
@@ -568,9 +578,9 @@ yes('only the roster is sent newest-only',
   */
   console.log('');
   const S3 = await open();
-  send(S3, { t: 'join', profileId: 100003, name: 'talks to itself' });
-  await until('roster', () => roster.some((p) => p.name === 'talks to itself'), 3000);
-  const self = (roster.find((p) => p.name === 'talks to itself') || {}).peer;
+  send(S3, { t: 'join', profileId: 100003, name: 'talks to itself', token: tokenFor(100003) });
+  await until('roster', () => roster.some((p) => p.profileId === 100003), 3000);
+  const self = (roster.find((p) => p.profileId === 100003) || {}).peer;
   yes('a third stuck socket is in the room', !!self);
 
   const note = 'y'.repeat(4000);
@@ -583,7 +593,7 @@ yes('only the roster is sent newest-only',
   const wroteAt = Date.now();
   S3.write(Buffer.concat(burst));
   const gone = await until('closed', async () => (await health()).closedBacklogged === 2 &&
-      !roster.some((p) => p.name === 'talks to itself'), 10000);
+      !roster.some((p) => p.profileId === 100003), 10000);
   const tookMs = Date.now() - wroteAt;
   await sleep(500);
 
@@ -624,8 +634,8 @@ yes('only the roster is sent newest-only',
   */
   console.log('');
   const S4 = await open();
-  send(S4, { t: 'join', profileId: 100004, name: 'pings and never reads' });
-  await until('roster', () => roster.some((p) => p.name === 'pings and never reads'), 3000);
+  send(S4, { t: 'join', profileId: 100004, name: 'pings and never reads', token: tokenFor(100004) });
+  await until('roster', () => roster.some((p) => p.profileId === 100004), 3000);
   const PING = Buffer.from([0x89, 0x80, 0, 0, 0, 0]);   // masked, empty, a zero key
   const PINGS = 1500000;
   const flood = Buffer.alloc(PING.length * PINGS);
