@@ -45931,15 +45931,29 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
   MEASURED 29 September, this block run against the 57 plugins of the server
   load order read off disk: 497 books teach a spell, 84 of them a spell
   SPELLS lists, and 492 give a school and rank. The five that do not are the
-  Oghma Infinium (a mod makes it teach Dragon Knowledge) and the four Fishing
-  in Skyrim cheat books, and refusing all five is right. For the 85 spells
-  SPELLS lists, the records alone agree with the book on 83; Odin moves
-  Invisibility to Expert and Call to Arms to Master, and the book wins.
+  Oghma Infinium (1a332:Skyrim.esm, which ZIA_Complete Pack.esp makes teach
+  d788c, Dragon Knowledge) and the four Fishing in Skyrim cheat books
+  (27a95, 27a96, 27a97 and 27a9b:FishingInSkyrim.esp, the rod, net,
+  dynamite and depth charge spells). For the 85 spells SPELLS lists, the
+  records alone agree with the book on 83; Odin moves Invisibility to Expert
+  and Call to Arms to Master, and the book wins.
 
-  A tome whose spell has no school or rank that can be read is refused and
-  logged: handing out a spell nobody could check would be the hole this
-  closes. A missing character block is a build fault and lets the book read
-  as Skyrim reads it, the same choice every gate in this file makes.
+  WHAT READING THOSE FIVE DOES (#1127): it is refused as off the book, with
+  the same line as every other tome the book does not list, and the tome is
+  kept. None of the five spells is on a school's page, and magic.md grants
+  only the book's ("A mod that adds a spell ... is not in the book. It is
+  not a college spell and it is not granted"), so none is given a school and
+  rank here. A spell the book lists always has its school and rank from
+  SPELLS, so a spell whose school or rank cannot be read is never the
+  book's, and its refusal is the off-book one. It used to say the school
+  and rank could not be read and to tell staff, which asked for reports
+  about books nothing was wrong with. Nothing here keeps the five out of
+  the world: the dungeon loot block hands out only the Skyrim tomes it
+  lists, and whether the four cheat books should leave world containers as
+  well is asked on #1127.
+
+  A missing character block is a build fault and lets the book read as
+  Skyrim reads it, the same choice every gate in this file makes.
 */
 (function () {
   'use strict';
@@ -46111,10 +46125,11 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
     }
     var s = C.stateOf(actorId);
     if (!spell.school || !spell.rank) {
-      tlog('no school and rank readable for', spell.desc, '(' + spell.name + '), so the tome is refused to',
+      // Not the book's, since the book gives every spell it lists a school
+      // and rank: refused as off the book, like any other (#1127).
+      tlog('no school and rank readable for', spell.desc, '(' + spell.name + '), so it is off the book and the tome is refused to',
            Number(actorId).toString(16));
-      return { refused: true, line: 'Nobody can learn ' + spell.name + ' from a tome here yet, because ' +
-               'its school and rank cannot be read. You keep the tome; tell staff with /helpme.' };
+      return { refused: true, line: 'You cannot learn ' + spell.name + ' from this tome: ' + P.OFF_BOOK + '. You keep the tome.' };
     }
 
     var staffDesc = (S && S.isStaffSpell && spell.desc && S.isStaffSpell(spell.desc)) ? spell.desc : null;
