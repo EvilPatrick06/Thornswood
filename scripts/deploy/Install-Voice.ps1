@@ -50,12 +50,13 @@ param(
     # for working out whether a problem is the auth check or something else.
     [ValidateSet('on', 'log', 'off')]
     [string]$Auth     = 'log',
-    # Who reads a typed line, entry 150. off is the shipped default and is
-    # every line to everybody, as it has always been. on is the same cell
-    # and 4000 units, the range /ooc uses, and turns on /me, /do, /w and /s;
-    # a number is the range in units. See CHAT_RANGE in voice\voice-server.js.
+    # Who reads a typed line, entry 150. on is the shipped default since
+    # 4 Oct, for live as well as dev (Patrick: local chat "should have went
+    # out with the other changes to live"): the same cell and 4000 units,
+    # the range /ooc uses. off is every line to everybody, as before; a
+    # number is the range in units. See CHAT_RANGE in voice\voice-server.js.
     [ValidatePattern('^(off|on|\d+)$')]
-    [string]$ChatRange = 'off',
+    [string]$ChatRange = 'on',
     # A relay for the pairs that cannot reach each other directly:
     # turn:host:3478, or several joined by commas. It becomes
     # THORNSWOOD_TURN_URL on the service's command line. The relay's key never
@@ -162,10 +163,13 @@ try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; `$t
         if (-not $bindExplicit) { Say "  keeping the current bind, $($Matches[1]), since -Bind was not passed" 'DarkGray'; $Bind = $Matches[1] }
         if (-not $authExplicit) { Say "  keeping the current auth, $($Matches[2]), since -Auth was not passed" 'DarkGray'; $Auth = $Matches[2] }
     }
-    # A range of 0, or a service older than the setting that reports none, is
-    # off, which is already the default, so only a live range is kept.
-    if (-not $chatExplicit -and "$current" -match ';chat=([1-9]\d*)') {
-        Say "  keeping the current chat range, $($Matches[1]), since -ChatRange was not passed" 'DarkGray'; $ChatRange = $Matches[1]
+    # Whatever range is running is kept, 0 as off, the same as -Bind and
+    # -Auth: the default is for a first install. A service older than the
+    # setting reports none and gets the default.
+    if (-not $chatExplicit -and "$current" -match ';chat=(\d+)') {
+        $ChatRange = $Matches[1]
+        if ($ChatRange -eq '0') { $ChatRange = 'off' }
+        Say "  keeping the current chat range, $ChatRange, since -ChatRange was not passed" 'DarkGray'
     }
     if (-not $turnExplicit -and "$current" -match ';turn=(\S+)') {
         $was = $Matches[1]

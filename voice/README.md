@@ -33,7 +33,8 @@ then open http://127.0.0.1:7900/health. It reads `THORNSWOOD_VOICE_PORT`
 (7778 when unset), `THORNSWOOD_VOICE_BIND` (every address when unset),
 `THORNSWOOD_VOICE_AUTH` (`log` when unset: a join that cannot prove itself is
 let in and written down; `on` refuses it), `THORNSWOOD_CHAT_RANGE` (off when
-unset: every typed line goes to everybody; `on` keeps a line to the same cell
+unset, though Install-Voice.ps1 sets it on for live and dev: every typed
+line goes to everybody; `on` keeps a line to the same cell
 and 4000 units, a number sets the units, and /me, /do, /w and /s work),
 `THORNSWOOD_CHAT_BURST` and `THORNSWOOD_CHAT_REFILL_MS` (5 and 1500 when
 unset: how many said lines one connection gets out at once, and how often it
