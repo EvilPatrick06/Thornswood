@@ -290,11 +290,12 @@ function log() {
  *
  * So with the wheel up only the page hears a key, and the page closes it on
  * this letter, on CLOSE_KEY's letter and on Escape by sending __close
- * (#1852). The branches of the keys handler below that shut an open wheel on
- * OPEN_KEY or CLOSE_KEY are reached only while the wheel is drawn without the
- * keyboard, which is the front's two minute cap taking the claim back. This
- * comment used to say the opposite, that buttonEvent keeps arriving the whole
- * time the wheel is up (#1675).
+ * (#1852). The front's two-minute cap asks the same way: CAP_CLOSES names
+ * thornswoodEmotes, and close() sends __close so this plugin's open follows
+ * (#1918). The branches of the keys handler below that shut an open wheel on
+ * OPEN_KEY or CLOSE_KEY are reached only while the wheel is drawn without
+ * the keyboard. This comment used to say the opposite, that buttonEvent
+ * keeps arriving the whole time the wheel is up (#1675).
  *
  * An earlier page closed the wheel on this letter too, and a log of
  * 25 September has one tap opening the wheel and shutting it again before it

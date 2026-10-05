@@ -309,16 +309,30 @@
   // that leaked in, so it is stopped before React sees it. Capture phase,
   // because the chat's own listener is on the input.
   //
-  // A journal title, a page, the trade boxes and the emote search are the
-  // exception. Stopping the key here, before it reaches the field, is why
-  // those boxes would not take a single letter. The same stop kept Escape
-  // and J from the panels that close themselves, because their listeners
-  // sit on the bubble and this one is on the capture.
+  // A panel that is up is the exception: the keys are its own. Stopping the
+  // key here, before it reaches a field, is why a journal title, the trade
+  // boxes and the emote search would not take a single letter. The same stop
+  // kept Escape and J from the panels that close themselves, because their
+  // listeners sit on the bubble and this one is on the capture.
+  //
+  // Which panels those are used to be a list written here: the journal, the
+  // trade and the party. The help, maneuver, board, ride, repair, treat and
+  // merchant panels and the away prompt came after it and were never added,
+  // so none of them heard Escape, and the board's boxes and the rent on K
+  // took no letter (#1917). So nothing here names a panel now. Every page
+  // that draws one hangs it on window as thornswoodSomething with an isOpen,
+  // and each of those is asked, so a panel added later is asked too.
+  // tests/test-1917-panel-keys.js holds every page that listens for a key or
+  // has a box to that, and presses the keys with this file in the page. The
+  // emote wheel and the ask prompt have no isOpen and are found by their id.
   function overlayWantsKeys() {
     try {
-      if (window.thornswoodJournal && window.thornswoodJournal.isOpen()) { return true; }
-      if (window.thornswoodTrade && window.thornswoodTrade.isOpen()) { return true; }
-      if (window.thornswoodParty && window.thornswoodParty.isOpen()) { return true; }
+      var names = Object.keys(window);
+      for (var i = 0; i < names.length; i++) {
+        if (names[i].indexOf('thornswood') !== 0) { continue; }
+        var panel = window[names[i]];
+        if (panel && typeof panel.isOpen === 'function' && panel.isOpen()) { return true; }
+      }
       var wheel = document.getElementById('thornswood-wheel');
       if (wheel && String(wheel.className).indexOf('gone') === -1) { return true; }
       var ask = document.getElementById('ts-ask');

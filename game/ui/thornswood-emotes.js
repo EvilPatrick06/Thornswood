@@ -11,6 +11,14 @@
 
   The page draws and reports. Which animation a name means, and playing it,
   belong to the plugin.
+
+  THE CONTRACT with thornswood-front.js:
+    window.thornswoodEmotes = { close() }
+    page -> plugin  '__close' (and the rest of the __ messages)
+    The two-minute cap calls close() by that name. close() sends __close so
+    the plugin's open follows (#1918). Hide-only is not close:
+    thornswoodHideWheel is what the plugin uses after it has already set
+    open false.
 */
 
 (function () {
@@ -333,6 +341,14 @@
     host.className = 'gone';
     pin = 0;
     try { find.blur(); } catch (e) { }
+  };
+
+  // The front's cap looks up this name in CAP_CLOSES and calls close().
+  // Sending __close is the close: the plugin sets open false, hides the
+  // wheel, and gives the keyboard back. Calling HideWheel here would leave
+  // the plugin thinking the wheel is still up, so 1 to 8 would stay dead.
+  window.thornswoodEmotes = {
+    close: function () { say('__close'); }
   };
 
   say('__ready');
