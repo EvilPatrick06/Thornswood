@@ -141,7 +141,9 @@ adds (Endurance is +10 a point), and what hunger, thirst, tiredness and
 cold take off it (Patrick, 4 Oct). So 15 stamina is 15 off the bar you
 see. Stamina a potion or a piece of enchanted gear adds is not counted,
 because the server does not see it. The waits are kept in memory, so a
-restart of the server clears them.
+restart of the server clears them. A restart ends a running Rush too, and
+when you come back into the world the server sends your K panel as it
+stands at that moment, so the speed is not left on you (issue #1642).
 
 ## Warlord
 
