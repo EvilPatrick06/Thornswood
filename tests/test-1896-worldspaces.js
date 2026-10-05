@@ -158,7 +158,9 @@ if (arrivalSrc && DATA) {
   const now = resolver(new Set(DATA.worldspaces));
   const without = resolver(new Set());
   // Spots where npc-population.json stands somebody, in the Soul Cairn, the
-  // Forgotten Vale, the Pit under Windhelm and one of the arena's floors.
+  // Forgotten Vale, the Pit under Windhelm and one of the arena's floors. All
+  // four have coordinates of their own, so since #1909 they wake by their own
+  // worldspace (DATA.ownWorlds) before the set is asked at all, in it or out.
   const spots = [
     { desc: '1408:Dawnguard.esm', pos: [11694.0, -3113.3, 941.1] },
     { desc: 'bb5:Dawnguard.esm', pos: [-9689.1, -234.4, 3013.8] },
@@ -167,17 +169,18 @@ if (arrivalSrc && DATA) {
   ];
   for (const s of spots) {
     const a = now(s), b = without(s);
-    yes('a death in ' + MEASURED[s.desc] + ' is read as outdoors (' + a.via + ') and gets the hold it got before (' + a.hold + ')',
-      a.via === 'nearest-capital' && b.via === 'unmapped-interior' && a.hold === b.hold && a.destination === b.destination);
+    yes('a death in ' + MEASURED[s.desc] + ' wakes by its own worldspace (' + a.via + '), in the set or out of it',
+      a.via === 'own-world-none' && b.via === a.via && a.desc === b.desc);
   }
-  // The one thing that moves: a hold with no temple of its own borrows the
-  // nearest door to the death, no longer the nearest door to its capital.
-  // Measured on 5 October: 18 of the 110 spots npc-population.json has in the
-  // Forgotten Vale, this Falmer's among them, and none anywhere else.
-  const vale = { desc: 'bb5:Dawnguard.esm', pos: [-19840.9, 21843.7, 4771.2] };
-  const a = now(vale), b = without(vale);
-  yes('in the Forgotten Vale, where the nearest capital is Morthal\'s, the borrowed door is measured from where they fell: ' +
-      a.destination + ' ' + a.slot + ', was ' + b.destination + ' ' + b.slot + ' (Morthal\'s nearest)',
+  // In Tamriel's coordinates the set still decides. LabyrinthianWorld is laid
+  // out in them (its doors land beside Tamriel's) and stands in Hjaalmarch,
+  // which has no temple of its own: in the set the borrowed door is measured
+  // from where they fell, out of it from Morthal.
+  const lab = { desc: '1cdd3:Skyrim.esm', pos: [-12404, 44258, 1711] };
+  const a = now(lab), b = without(lab);
+  yes('in LabyrinthianWorld, where the nearest capital is Morthal\'s, the borrowed door is measured from where they fell: ' +
+      a.destination + ' ' + a.slot + ' (' + a.via + '), out of the set ' + b.destination + ' ' + b.slot + ' (' + b.via + ')',
+    a.via === 'nearest-capital' && b.via === 'unmapped-interior' &&
     a.hold === 'HjaalmarchHoldLocation' && b.hold === a.hold && a.reason === 'borrowed' && b.reason === 'borrowed' &&
     a.destination === 'whiterun' && a.slot === 'hallOfTheDead' && b.destination === 'solitude' && b.slot === 'hallOfTheDead');
   const interior = { desc: '165a7:Skyrim.esm', pos: [1056.2, 254.9, 63] };

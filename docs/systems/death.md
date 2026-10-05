@@ -13,8 +13,16 @@ If nobody agreed, you wake in a temple. That happened. Move on.
 
 The wake is the nearest consecrated door, a temple or a Hall of the
 Dead, chosen one door at a time rather than one city at a time.
-Solstheim's map is not in the same coordinates as the mainland, so a
-death there is not measured against Whiterun. It wakes at Raven Rock.
+
+A worldspace with coordinates of its own (Solstheim, Blackreach, the
+Soul Cairn, Sovngarde, Apocrypha, the Forgotten Vale, the arena's
+floors) is never measured against the mainland's map. A death there
+wakes in the nearest Hall of the Dead, temple or inn in that same
+worldspace (Patrick, 5 Oct, #1909). On Solstheim that is the temple
+or the Retching Netch in Raven Rock, whichever door is nearer. No
+other worldspace of its own has any of the three, so a death in one
+wakes in the Temple of Kynareth in Whiterun, the fallback, and the
+death log says `own-world-none`.
 
 The wounds you already had come with you. A disease you already had
 comes with you. The temple stopped the death. It did not wash a cut,
@@ -83,11 +91,16 @@ person.
 ## Where this is
 
 The wake is in the server. At the moment of death it writes the
-nearest temple, and a death on Solstheim writes Raven Rock. A death in
-any worldspace of the load order counts as out of doors for that, the
-Soul Cairn and the Forgotten Vale too: the list is read out of the
-plugins (#1896). A worldspace with coordinates of its own, like those
-two, is still measured against the mainland's doors (#1909). The public
+nearest temple. A death in any worldspace of the load order counts as
+out of doors for that, the Soul Cairn and the Forgotten Vale too: the
+list is read out of the plugins (#1896). Which worldspaces have
+coordinates of their own, and the Halls of the Dead, temples and inns
+in each, are read out of the plugins too, by
+`scripts\dev\Build-WakeTable.js` into `DATA.ownWorlds` (#1909); a
+worldspace is in the mainland's coordinates when its doors land within
+one cell of the doors they lead to there. The sky over a worldspace of
+its own is still measured against the mainland's holds (`climateOf`,
+#1909). The public
 rules on the site are the yes and the no above, and this page does not
 replace that page.
 

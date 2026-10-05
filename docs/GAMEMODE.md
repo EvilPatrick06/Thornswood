@@ -271,6 +271,7 @@ because each reads the one before.
 | `SPELL_IDS` 11826-11930 | `Build-SpellTable.ps1` | `spells.json` | `Build-SpellTable.ps1:// ==== end SPELL_IDS ====` |
 | `DATA` 23 | `Install-GamemodeConsts.js` | `data.json` | `Install-GamemodeConsts.js` |
 | `DATA.worldspaces`, inside line 23 | `Build-WorldspaceTable.js`, from the WRLD records of the load order | `data.json` (`worldspaces`) | `Build-WorldspaceTable.js:install`, the list and nothing else of the line |
+| `DATA.ownWorlds`, inside line 23 | `Build-WakeTable.js`, from the doors, rooms and locations of the load order | `data.json` (`ownWorlds`) | `Build-WakeTable.js:install`, the table and nothing else of the line |
 | `STATIONS` 24 | `Install-GamemodeConsts.js` | `stations.json` | `Install-GamemodeConsts.js` |
 | `ITEMS` 25 | `Install-GamemodeConsts.js` | `items.json` | `Install-GamemodeConsts.js` |
 | `CHARGEN` ~3878 | `Install-GamemodeConsts.js` | `chargen.json` | `Install-GamemodeConsts.js` |
@@ -292,9 +293,18 @@ a plugin that adds a worldspace comes into the load order. Its two readers,
 set or out of it, because `cellToHold` names no worldspace; what the set
 changes is the death log's `nearest-capital` for `unmapped-interior`, and,
 for a hold with no temple of its own, a borrowed door measured from where the
-person fell rather than from the hold's capital. Both readers measure a
-worldspace with coordinates of its own against the mainland's map, in the
-set or out of it (#1909). Older comments named
+person fell rather than from the hold's capital.
+
+`DATA.ownWorlds` is read out of the plugins as well (#1909):
+`scripts\dev\Build-WakeTable.js` keys every worldspace with coordinates of its
+own (one whose doors do not land within a cell of the doors they lead to in
+Tamriel's coordinates) to the Halls of the Dead, temples and inns whose front
+door stands in it. `resolveArrival` wakes a death in one of those at the
+nearest of them, and never measures it against the mainland; one with none
+wakes at the fallback temple, logged `own-world-none`. `climateOf` still
+measures such a worldspace against the mainland's map. Run it with
+Build-WorldspaceTable.js, and `--check` says whether both places hold what the
+load order says. Older comments named
 `respawn-holds.json`; that file never lived in this repository.
 `fires.json` is not in the gamemode: it goes into `thornswood-front.js`.
 
