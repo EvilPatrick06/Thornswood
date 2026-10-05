@@ -49,8 +49,10 @@ function squash(s) { return s.replace(/\s+/g, ' '); }
 // ------------------------------------------------------------ the files
 let tracked = null;
 try {
-  tracked = execSync('git ls-files -z', { cwd: ROOT, maxBuffer: 64 * 1024 * 1024 })
-    .toString('utf8').split('\0').filter(Boolean);
+  // Once each: in the middle of a merge, git lists a file with a conflict
+  // once for each side.
+  tracked = Array.from(new Set(execSync('git ls-files -z', { cwd: ROOT, maxBuffer: 64 * 1024 * 1024 })
+    .toString('utf8').split('\0').filter(Boolean)));
 } catch (e) {
   console.log('NOTE  git ls-files did not answer, so the folders were walked instead: ' + e.message);
 }
