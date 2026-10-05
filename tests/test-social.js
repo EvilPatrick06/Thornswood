@@ -692,11 +692,13 @@ if (social && trade) {
 // Mount/open events keep focus claims and use the normal command route.
 {
   const start=FRONT.indexOf("    if (what === 'social:unavailable')"), end=FRONT.indexOf("    /*",start);
-  const lines=[],focus=[],notes=[];
-  const event=new Function('what','T','tellServer','log','note',FRONT.slice(start,end));
+  const lines=[],focus=[],notes=[],pageJs=[];
+  // PARTY_NAME: the P panel is told its key when it is ready (#1919).
+  const event=new Function('what','T','tellServer','log','note','PARTY_NAME',FRONT.slice(start,end));
   for(const what of ['party:ready','journal:ready','party:opened','journal:opened']) {
-    event(what,{claimFocus(name,value){focus.push([name,value]);}},line=>lines.push(line),()=>{},text=>notes.push(text));
+    event(what,{claimFocus(name,value){focus.push([name,value]);},js(code){pageJs.push(code);}},line=>lines.push(line),()=>{},text=>notes.push(text),'P');
   }
+  yes('D5: a ready P panel is told its key, and no other panel is', pageJs.length===1&&pageJs[0].indexOf('thornswoodParty.setKey("P")')>=0);
   yes('D5: mounting and opening social panels request an owner refresh', lines.length===4&&lines.every(x=>x==='/party refresh'));
   event('trade:ready',{},line=>lines.push(line),()=>{},()=>{});
   yes('D5: a ready trade panel requests its own current session',lines[4]==='/trade refresh');
