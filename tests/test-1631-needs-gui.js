@@ -146,6 +146,18 @@ const GONE = ['/needs', '/eat', '/drink', '/bard'];
   });
   yes('A7 no page the issue names tells anybody to type them' + (stale.length ? ' (' + stale.join(', ') + ')' : ''),
       stale.length === 0);
+
+  // #1743: the launcher's Settings page. The line under "Show the needs bars
+  // on screen", and what Settings logs when the bars are turned off, both
+  // said to type /needs, which the server no longer answers.
+  const shellCs = read('launcher', 'app', 'Shell.cs');
+  const uiXaml = read('launcher', 'ui.xaml');
+  const offLine = (/\? "The needs bars are shown\.[^"]*"\s*:\s*"([^"]*)"\);/.exec(shellCs) || [])[1] || '';
+  const boxLine = (/x:Name="ChkNeedsBars"[^>]*\/>\s*<TextBlock[^>]*Text="([^"]*)"/.exec(uiXaml) || [])[1] || '';
+  yes('A8 the Settings page\'s needs bars line, and the line it logs when they go off, tell nobody to type /needs',
+      offLine.length > 0 && boxLine.length > 0 && !/\/needs\b/.test(shellCs) && !/\/needs\b/.test(uiXaml));
+  yes('A8 and both send people to the Body page on K',
+      /Body page on K/.test(offLine) && /Body page on K/.test(boxLine));
 }
 
 // ================================================ B. the bard, as it plays

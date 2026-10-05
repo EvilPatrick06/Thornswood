@@ -29,6 +29,14 @@
   For the self-made certificate it also runs the old Subject read, to show
   that one passed (the bug this closes).
 
+  Issue #1330: Signature.MicrosoftRefusal, which Voice asks before it runs
+  the WebView2 installer it downloads, is pointed at the same files. It
+  refuses all of them, and an installer signed with a self-made certificate
+  named Microsoft Corporation. A program on this machine that Microsoft
+  signed (Edge, its updater, the WebView2 runtime, csc.exe) is accepted when
+  the chain Windows builds for it ends at Microsoft's own root and names
+  Microsoft Corporation, and refused otherwise.
+
   The self-made certificates are made with New-SelfSignedCertificate in the
   CurrentUser store, used once, and removed from every CurrentUser store
   before this ends, whatever happens. Nothing is trusted, nothing is written
@@ -299,6 +307,85 @@ try {
             $r.Why -match "somebody else's identity")
     } else {
         Skip 'no program signed through Artifact Signing by another publisher on this machine (Git for Windows is one)'
+    }
+
+    # ---- Microsoft's own programs (issue #1330) --------------------------------
+    # Signature.MicrosoftRefusal, which Voice asks before it runs the WebView2
+    # installer it downloads. Everything above that is not a program Microsoft
+    # signed under its own root is refused by it too, and a program on this
+    # machine that Microsoft did sign is accepted or refused by where the chain
+    # Windows builds for it ends.
+    $ms = $S.GetMethod('MicrosoftRefusal', $flags, $null, [Type[]]@([string], [string].MakeByRefType()), $null)
+    Yes 'Signature.MicrosoftRefusal is there' ($null -ne $ms)
+    if ($ms) {
+        $msRoot = [string]$S.GetField('MicrosoftRoot').GetValue($null)
+        $msName = [string]$S.GetField('MicrosoftSigner').GetValue($null)
+        function MsCheck([string]$path) {
+            $a = [object[]]@($path, $null)
+            $why = [string]$ms.Invoke($null, $a)
+            return @{ Why = $why; Said = [string]$a[1] }
+        }
+
+        if ($haveSigned) {
+            $r = MsCheck $Signed
+            Yes ('Thornswood''s own signed launcher is not Microsoft''s program: ' + $r.Why) ($r.Why -match "not under Microsoft's own root")
+            $r = MsCheck $flip
+            Yes ('with one byte changed it is refused for that first: ' + $r.Why) ($r.Why -match 'changed since it was signed')
+        }
+        if ($ok) {
+            $r = MsCheck $stub
+            Yes ('MicrosoftRefusal refuses an unsigned exe: ' + $r.Why) ($r.Why -eq 'is not signed.')
+        }
+        $r = MsCheck $junk
+        Yes ('MicrosoftRefusal refuses a file that is not a program: ' + $r.Why) ($r.Why -ne '')
+        $r = MsCheck (Join-Path $tmp 'gone.exe')
+        Yes ('MicrosoftRefusal refuses a missing file: ' + $r.Why) ($r.Why -match 'could not be opened')
+        if ($peer) {
+            $r = MsCheck $peer
+            Yes ('another publisher''s Artifact Signing program is not Microsoft''s: ' + $r.Why) ($r.Why -match "not under Microsoft's own root")
+        }
+        if ($ok -and (Get-Command New-SelfSignedCertificate -ErrorAction SilentlyContinue)) {
+            $fake = New-SelfSignedCertificate -Type CodeSigningCert -Subject ('CN=' + $msName + ', O=' + $msName + ', C=US') `
+                        -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddDays(2)
+            $made += $fake.Thumbprint
+            $f = Join-Path $tmp 'msfake\MicrosoftEdgeWebview2Setup.exe'
+            $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $f)
+            Copy-Item -LiteralPath $stub -Destination $f
+            $null = Set-AuthenticodeSignature -LiteralPath $f -Certificate $fake -HashAlgorithm SHA256
+            $r = MsCheck $f
+            Yes ('an installer signed with a self-made certificate named ' + $msName + ' is refused: ' + $r.Why) ($r.Why -match 'does not trust')
+        }
+
+        $pf86 = [Environment]::GetFolderPath('ProgramFilesX86')
+        $mine = @()
+        foreach ($c in @((Join-Path $pf86 'Microsoft\Edge\Application\msedge.exe'),
+                         (Join-Path $pf86 'Microsoft\EdgeUpdate\MicrosoftEdgeUpdate.exe'),
+                         (Join-Path $fw 'csc.exe'))) {
+            if (Test-Path -LiteralPath $c) { $mine += $c }
+        }
+        $wv = @(Get-ChildItem -Path (Join-Path $pf86 'Microsoft\EdgeWebView\Application\*\msedgewebview2.exe') -ErrorAction SilentlyContinue)
+        if ($wv.Count) { $mine += $wv[0].FullName }
+        $accepted = 0
+        foreach ($c in $mine) {
+            $sc = (Get-AuthenticodeSignature -LiteralPath $c).SignerCertificate
+            # Embedded, not from a catalog: a catalog signature is not in the file.
+            $embedded = $false
+            try { $null = [Security.Cryptography.X509Certificates.X509Certificate]::CreateFromSignedFile($c); $embedded = $true } catch { $embedded = $false }
+            if (-not $sc -or -not $embedded) { continue }
+            $ch = New-Object Security.Cryptography.X509Certificates.X509Chain
+            $ch.ChainPolicy.RevocationMode = 'NoCheck'
+            $null = $ch.Build($sc)
+            $top = $ch.ChainElements[$ch.ChainElements.Count - 1].Certificate
+            $theirs = ($top.Thumbprint -eq $msRoot) -and ($sc.GetNameInfo('SimpleName', $false) -eq $msName)
+            $r = MsCheck $c
+            if ($theirs) {
+                $accepted++
+                Yes ((Split-Path -Leaf $c) + ', signed by ' + $msName + ' under Microsoft''s own root, is accepted: ' + $(if ($r.Why) { $r.Why } else { $r.Said })) ($r.Why -eq '')
+            } else {
+                Yes ((Split-Path -Leaf $c) + ', signed for ' + $sc.Subject + ' under ' + $top.Subject + ', is refused: ' + $r.Why) ($r.Why -ne '')
+            }
+        }
+        if (-not $accepted) { Skip 'no program Microsoft signed under its own root on this machine (Edge, its updater and the WebView2 runtime are): accepted not run' }
     }
 }
 finally {
