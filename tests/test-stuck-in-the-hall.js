@@ -298,27 +298,26 @@ function inRaceMenu(t0, opened, lastSeen) {
   yes('S8 a minute later with the next report, still held', later.chose === null);
 }
 
-// S9: the reports stopped. The client crashed, quit, or its race menu closed
-//     and the /face done line was lost. The give up used to publish them
-//     anyway. Without a stored face they stay unpublished.
+// S9: the reports went quiet. That is not a close. The menu was seen
+//     open, /face done never came, so another setRaceMenuOpen is the
+//     access violation. A stored face still leaves the face step.
 {
   const t0 = 9000000;
   const at = t0 + GIVEUP_MS + 1000;
   const st = inRaceMenu(t0, t0 + 5000, at - FACE_SEEN_MS - 1000);
   const out = tick({ state: st, now: at });
-  yes('S9 a stale race menu report without a stored face does not publish them',
-      out.chose === null);
-  yes('S9 and the log says staying unpublished',
-      out.log.join(' ').indexOf('staying unpublished') !== -1);
-  yes('S9 and the stale lost request is asked once', out.asks === 1);
+  yes('S9 a quiet-but-still-open menu is not published', out.chose === null);
+  yes('S9 and is not sent another setRaceMenuOpen', out.asks === 0);
+  yes('S9 and the give up still holds because the menu was seen open',
+      out.log.join(' ').indexOf('race menu is still up') !== -1);
 
   const stored = inRaceMenu(t0, t0 + 5000, at - FACE_SEEN_MS - 1000);
   const gone = tick({
     state: stored, now: at,
     appearance: { mark: 'stale-but-stored' }
   });
-  yes('S9 a stale report with a stored face still lets the give up move them on',
-      gone.chose !== null);
+  yes('S9 a quiet report with a stored face still lets the give up move them on',
+      gone.chose !== null && gone.asks === 0);
 }
 
 // S10: the race menu has been reported for longer than the cap. It is up and
@@ -567,6 +566,16 @@ function tickAs(state, now, cameOn) {
   });
   yes('S16 a stored face stops the asks and moves on',
       done.asks === 0 && done.chose !== null);
+
+  const quiet = stuck(t0);
+  quiet.faceOpenAt = t0 + 5000;
+  quiet.faceSeenAt = t0 + 5000;
+  const silent = tick({ state: quiet, now: t0 + 4 * NUDGE_MS + 1 });
+  yes('S16 a quiet-but-still-open menu is not asked again',
+      silent.asks === 0 && silent.chose === null);
+  const lost = tick({ state: stuck(t0), now: t0 + 4 * NUDGE_MS + 1 });
+  yes('S16 a truly lost request (no report ever) is still asked',
+      lost.asks === 1 && lost.chose === null);
 }
 
 console.log('');

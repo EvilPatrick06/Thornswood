@@ -300,6 +300,16 @@ function stuck(at) {
   up.faceSeenAt = t0 + 3 * NUDGE_MS;
   const held = tick({ state: up, now: t0 + 3 * NUDGE_MS + 1 });
   yes('a reported-up race menu is not asked again', held.asks === 0 && held.chose === null);
+
+  const quiet = stuck(t0);
+  quiet.faceOpenAt = t0 + 5000;
+  quiet.faceSeenAt = t0 + 5000;
+  const silent = tick({ state: quiet, now: t0 + 4 * NUDGE_MS + 1 });
+  yes('a quiet-but-still-open menu is not asked again',
+      silent.asks === 0 && silent.chose === null);
+  const lost = tick({ state: stuck(t0), now: t0 + 4 * NUDGE_MS + 1 });
+  yes('a truly lost request (no report ever) is still asked',
+      lost.asks === 1 && lost.chose === null);
 }
 
 // -------------------------- onUpdateAppearanceAttempt, when the tick cannot see them

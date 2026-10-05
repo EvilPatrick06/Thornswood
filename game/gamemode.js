@@ -4274,11 +4274,11 @@ const GIVEUP_MS = 300000;
   and once a minute while it stays open), and while that is fresh the give up
   holds off. Sitting still reading a slider moves nobody on.
 
-  FACE_SEEN_MS is how fresh the last report has to be: two and a half beats,
-  so one lost line does not end the hold, while a client that crashed or quit
-  stops reporting and the give up runs as it always did. A client that never
-  reports at all, because its plugin is older or the race menu never opened,
-  is exactly the case the five minutes were written for and still gets them.
+  FACE_SEEN_MS is how fresh a report used to have to be before the give up
+  treated the menu as gone. That freshness window is not a close: a quiet
+  stream after /racemenu was seen is a still-open menu. /face done is the
+  close. A client that never reports at all, because its plugin is older or
+  the race menu never opened, is the lost request and still gets the asks.
 
   FACE_CAP_MS is for a race menu that is up and wedged: after half an hour of
   it being reported, the give up goes on anyway, because the panel and a home
@@ -4598,8 +4598,9 @@ globalThis.__thornswoodChargen = {
   },
   /*
     The plugin says the race menu is on screen right now. Only means something
-    while the face is awaited; see FACE_SEEN_MS for what it holds off. The
-    first report is logged and the once a minute ones after it are not.
+    while the face is awaited. /face done is the close; a quiet stream after
+    a report is still open. The first report is logged and the once a minute
+    ones after it are not.
   */
   faceOpen: function (actorId) {
     const st = chargenOf(actorId);
@@ -5285,8 +5286,14 @@ function chargenTick() {
         below are tellOnce: one each for the whole wait, not one per ask.
       */
       const raceMenuIsUp = function () {
+        // /face done is the close. A quiet /racemenu stream is not: the
+        // plugin reports once a minute, and a gap is a missed line, not
+        // a shut menu. Treating faceSeenAt older than FACE_SEEN_MS as
+        // closed sent a second setRaceMenuOpen over a menu that was
+        // still up (access violation). Once /racemenu has been seen,
+        // the menu stays up until /face done or a stored face.
         if (state.faceDone) { return false; }
-        return !!state.faceSeenAt && now - state.faceSeenAt < FACE_SEEN_MS;
+        return !!(state.faceOpenAt || state.faceSeenAt);
       };
       const askForLostRaceMenu = function (why) {
         if (hasStoredAppearance(appearance) || raceMenuIsUp()) { return false; }
@@ -5566,22 +5573,12 @@ function chargenTick() {
       */
 
       if (waited > GIVEUP_MS) {
-        // Not while the plugin says the race menu is up: that person is making
-        // a face, not stuck. See FACE_SEEN_MS, and FACE_CAP_MS for the one
-        // exception. Said once, when the hold starts, and not every tick.
-        const menuUp = !!state.faceSeenAt && now - state.faceSeenAt < FACE_SEEN_MS;
+        // Not while the race menu is still open. /face done is the close,
+        // not a quiet report. FACE_CAP_MS is the wedged-menu exception.
+        // A stored face is checked first so a quiet stream cannot hold
+        // a finished face in the hall.
+        const menuUp = raceMenuIsUp();
         const menuFor = state.faceOpenAt ? now - state.faceOpenAt : 0;
-        if (menuUp && menuFor < FACE_CAP_MS) {
-          if (!state.faceHeld) {
-            state.faceHeld = now;
-            setChargen(actorId, state);
-            log('chargen', actorId.toString(16), 'no face after',
-                Math.round(waited / 1000) + 's, but the race menu is still up,',
-                'so the give up waits for it, for at most',
-                Math.round(FACE_CAP_MS / 60000), 'minutes');
-          }
-          continue;
-        }
         if (hasStoredAppearance(appearance)) {
           if (menuUp) {
             log('chargen', actorId.toString(16), 'the race menu has been up for',
@@ -5591,6 +5588,17 @@ function chargenTick() {
               'a face is stored after', Math.round(waited / 1000) + 's,',
               'going on to the choices');
           beginChoosing(actorId, state, 'face stored after ' + Math.round(waited / 1000) + 's');
+          continue;
+        }
+        if (menuUp && menuFor < FACE_CAP_MS) {
+          if (!state.faceHeld) {
+            state.faceHeld = now;
+            setChargen(actorId, state);
+            log('chargen', actorId.toString(16), 'no face after',
+                Math.round(waited / 1000) + 's, but the race menu is still up,',
+                'so the give up waits for it, for at most',
+                Math.round(FACE_CAP_MS / 60000), 'minutes');
+          }
           continue;
         }
         if (menuUp) {
@@ -5604,9 +5612,10 @@ function chargenTick() {
             'staying unpublished');
       }
 
-      // Lost request: no face, menu not reported up. Walking already asked
-      // and continued. Standing still waits for NUDGE_MS so the spawn
-      // request has time to land, then the helper repeats every NUDGE_MS.
+      // Lost request: no face, and /racemenu was never seen. Walking
+      // already asked and continued. Standing still waits for NUDGE_MS
+      // so the spawn request has time to land, then the helper repeats
+      // every NUDGE_MS. A quiet stream after a report is still open.
       if (!hasStoredAppearance(appearance) && waited > NUDGE_MS) {
         askForLostRaceMenu('no face after ' + Math.round(waited / 1000) + 's');
       }
