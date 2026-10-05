@@ -186,9 +186,12 @@ try {
     Copy-Item -LiteralPath $serverJs -Destination (Join-Path $siteDir 'server.js')
     $secret = ShaOf ([Text.Encoding]::UTF8.GetBytes([Guid]::NewGuid().ToString()))
     $sitePort = Free-Port
-    $deadPort = Free-Port
+    # The game check knocks on port 1 (#1816). The system never hands that port
+    # out for a listen on 0 and no harness listens on a fixed port
+    # (test-1703-test-ports.js), so no run beside this one can take it and make
+    # the game read as up. A port taken from the system and let go could be.
     [IO.File]::WriteAllText((Join-Path $siteDir 'config.json'), (@{
-        password = ''; secret = $secret; botKey = ''; gameCheckPort = $deadPort
+        password = ''; secret = $secret; botKey = ''; gameCheckPort = 1
         onlineFile = (Join-Path $siteDir 'online.json')
         discord = @{ clientId = ''; clientSecret = ''; botToken = ''; guildId = ''; invite = '' }
     } | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding($false)))

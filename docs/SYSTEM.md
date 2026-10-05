@@ -260,6 +260,11 @@ key and join pass key; when the live one, or any of those three, is not there,
 the dev door is left as it was and the publish stops with exit 1
 (`DOOR NOT CARRIED`). The settings lines a deploy prints name every release
 key the release does not carry, which stays as the running server has it.
+The live join pass switch and the written role lists are never a release
+key (issue #1223): a build no longer carries them, and they change on live
+only in a `Deploy-Server.ps1` run given `-RequirePass on|off`, `-Devs` or
+`-Playtesters`, set on the box in the carry and named there
+(`tests\test-1223-live-pass-asked.ps1`).
 `tests\test-1336-missing-stops.ps1` holds all of it. The documents and public pages the site serves
 from `data` are content, not the app, and still go up in place with a `.bak`.
 The harnesses are `tests\test-deploy-swaps.ps1`,
