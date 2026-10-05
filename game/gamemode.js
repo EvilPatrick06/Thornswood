@@ -29912,7 +29912,18 @@ log('gamemode loaded:',
   launcher, so that session is the same refusal. The setting still decides
   the hold (#410): with it on, nothing the session does counts until the pass
   arrives. Deploy-DevGamemode.ps1 -RequirePass on|off sets the hold on the
-  dev box. No older launcher or plugin is kept working (Patrick, 28 Sep).
+  dev box, and Deploy-Gamemode.ps1 -RequirePass on|off with Deploy-Server.ps1
+  on live. No older launcher or plugin is kept working (Patrick, 28 Sep).
+
+  THE HOLD FAILS CLOSED (#1319). false is the one way to turn it off. true
+  holds, and so does anything else: absent, null, empty, "true" as text, 1.
+  Until 5 Oct only exactly true held, so one empty value, which the dev
+  server had on 29 Sep (#1222), dropped the hold for the whole server and
+  said nothing. requiring() logs any value that is neither, with the value.
+  Every reader asks requiring(): the seats block, the dispatcher, the voice
+  feed. A deploy never changes what a box does unasked: Deploy-DevGamemode.ps1
+  and Deploy-Server.ps1 refuse a server whose settings hold neither true nor
+  false until -RequirePass says which.
 */
 (function () {
   var g = globalThis;
@@ -29940,7 +29951,23 @@ log('gamemode loaded:',
   function settings() {
     try { return mp.getServerSettings() || {}; } catch (e) { return {}; }
   }
-  function requiring() { return settings().thornswoodRequirePass === true; }
+  /* The hold (#410), failing closed (#1319): off only for false. */
+  function requiring() {
+    var v = settings().thornswoodRequirePass;
+    if (v === true) { return true; }
+    if (v === false) { return false; }
+    var said = 'missing';
+    if (v !== undefined) {
+      try { said = String(JSON.stringify(v)).slice(0, 80) + (typeof v === 'string' ? ' (text)' : ''); }
+      catch (e) { said = 'unreadable'; }
+    }
+    if (fresh('switch ' + said, Date.now())) {
+      console.log('[thornswood] thornswoodRequirePass in server-settings.json is ' + said +
+                  ', which is neither true nor false, so the join pass hold is on. ' +
+                  'false is the one way to turn it off (#1319).');
+    }
+    return true;
+  }
   function serverName() {
     return String(settings().thornswoodServer || '').trim().toLowerCase() || 'main';
   }
@@ -30652,8 +30679,13 @@ log('gamemode loaded:',
     var say = g.__thornswoodToProfile;
     // The chat commands block's poll of the relay (pollSaid): answering unless its last try failed.
     var poll = g.__thornswoodCommandPoll;
+    // The join pass block's one reading of the switch, which fails closed
+    // (#1319), as the dispatcher asks it.
+    var jp = g.__thornswoodJoinPass;
+    var requirePass = false;
+    try { requirePass = !!(jp && jp.requiring && jp.requiring()); } catch (eReq) { requirePass = true; }
     return {
-      cap: capOf(s), staffSeats: staffSeatsOf(s), requirePass: s.thornswoodRequirePass === true,
+      cap: capOf(s), staffSeats: staffSeatsOf(s), requirePass: requirePass,
       relayOk: !poll || !poll.failAt || poll.okAt >= poll.failAt,
       holdsStaffRole: holdsStaffRole, hasPass: hasPass,
       tell: function (p, text) { if (say) { say(p, text); } },
