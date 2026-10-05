@@ -79,7 +79,7 @@ function createMerchantTrading(deps) {
   var now = deps.now || function () { return Date.now(); };
   var reach = deps.reach == null ? REACH : deps.reach;
   var sessions = new Map();
-  var settlement = SETTLEMENT.createSettlement({purses:purses,transfer:transfer,world:deps.namespace || purses.namespace,log:deps.log});
+  var settlement = SETTLEMENT.createSettlement({purses:purses,transfer:transfer,world:deps.namespace || purses.namespace,log:deps.log,now:now});
   var active = true;
 
   function placeOf(reference) {
@@ -147,7 +147,17 @@ function createMerchantTrading(deps) {
     return Number(profileId) > 0 && Number(profileId) === Number(human.profileId);
   }
 
-  function viewFor(merchantId, state, place, note) {
+  function supplyKey(human, itemName) {
+    return JSON.stringify([human.desc, human.profileId, itemName.toLowerCase()]);
+  }
+  function lastSupply(state, key, itemName) {
+    var stamps = state.supply || {};
+    // Old item-only stamps cannot be assigned to a character. Keep their
+    // original window rather than resetting an unidentified completed supply.
+    return Math.max(stamps[key] || 0, stamps[itemName.toLowerCase()] || 0);
+  }
+
+  function viewFor(merchantId, state, place, actorId, profileId, note) {
     var catalog = prices.catalog ? prices.catalog(place.bookHold) : [];
     var offers = [];
     for (var i = 0; i < catalog.length; i++) {
@@ -167,13 +177,14 @@ function createMerchantTrading(deps) {
       });
     }
     var supply = [];
-    var stamp = state.supply || {};
+    var human = settlement.available() ? transfer.identity(actorId) : null;
+    var owns = human && human.desc && human.profileId === profileId;
     var at = now();
     for (var k = 0; k < offers.length; k++) {
       if (offers[k].buy == null) continue;
       var pay = offers[k].buy * SUPPLY_COUNT;
-      var last = stamp[offers[k].name.toLowerCase()] || 0;
-      var ready = state.purse >= pay && (!last || at - last >= SUPPLY_WAIT);
+      var last = owns ? lastSupply(state, supplyKey(human, offers[k].name), offers[k].name) : 0;
+      var ready = !!owns && !state.pending && state.purse >= pay && (!last || at - last >= SUPPLY_WAIT);
       supply.push({ name: offers[k].name, pay: pay, count: SUPPLY_COUNT, ready: ready });
     }
     return {
@@ -199,7 +210,7 @@ function createMerchantTrading(deps) {
       var human = transfer.identity(session.actorId);
       if (!human || human.profileId !== profileId) {sessions.delete(profileId); return;}
       var state = purses.read(session.merchantId), place = state && placeOf(state.reference);
-      if (state && place) views.push({actorId:session.actorId,view:viewFor(session.merchantId,state,place)});
+      if (state && place) views.push({actorId:session.actorId,view:viewFor(session.merchantId,state,place,session.actorId,profileId)});
     });
     return views;
   }
@@ -257,7 +268,7 @@ function createMerchantTrading(deps) {
       var prior = sessions.get(profileId);
       var repeat = prior && prior.merchantId === merchantId && (now() - prior.at) < 3000;
       sessions.set(profileId, { merchantId: merchantId, actorId:actorId, at: now() });
-      var opened = viewFor(merchantId, state, place);
+      var opened = viewFor(merchantId, state, place, actorId, profileId);
       return {
         text: repeat ? '' : (opened.transfer
           ? ('Trading with ' + opened.trader + ' in ' + opened.place + '. Purse ' + opened.purse + '.')
@@ -310,20 +321,39 @@ function createMerchantTrading(deps) {
     var gold = unit * asked.count;
     if (!Number.isInteger(gold) || gold < 0 || gold > MAX_GOLD) return fail('That price cannot be verified.');
     var npcBuys = verb !== 'buy';
+    var completedSupplyKey = null;
     if (verb === 'supply') {
-      var last = (state.supply && state.supply[itemName.toLowerCase()]) || 0;
+      if (!settlement.available()) return fail('Buying and selling wait on the native transfer. Nothing was taken.', viewFor(merchantId, state, place, actorId, profileId));
+      var human = transfer.identity(actorId);
+      if (!human || !human.desc || human.profileId !== profileId) return fail('That request is not yours.');
+      completedSupplyKey = supplyKey(human, itemName);
+      var last = lastSupply(state, completedSupplyKey, itemName);
       if (last && now() - last < SUPPLY_WAIT) return fail('That supply is not due.');
     }
     if (npcBuys && state.purse < gold) return fail('The trader cannot pay.');
     if (!npcBuys && gold > 0 && world.carry(actorId, GOLD_BASE) < gold) return fail('You cannot pay.');
     if (npcBuys && world.carry(actorId, resolved.baseId) < asked.count) return fail('You are not carrying that.');
     if (!settlement.available()) {
-      return fail('Buying and selling wait on the native transfer. Nothing was taken.', viewFor(merchantId, state, place));
+      return fail('Buying and selling wait on the native transfer. Nothing was taken.', viewFor(merchantId, state, place, actorId, profileId));
     }
     var nextPurse = npcBuys ? state.purse - gold : state.purse + gold;
     if (nextPurse < 0 || nextPurse > MAX_GOLD) return fail('That price cannot be verified.');
     var moved;
     try {
+      // Capture every trade's authenticated native character before a save
+      // can publish a projection or reenter another request.
+      var tradingHuman = transfer.identity(actorId);
+      if (!tradingHuman || tradingHuman.profileId !== profileId) return fail('That request is not yours.');
+      try {
+        state = settlement.pruneSupplyHistory(merchantId, state, SUPPLY_WAIT);
+      } catch (error) {
+        active = false; sessions.clear(); settlement.shutdown();
+        throw error;
+      }
+      if (!state || !active) return fail('The offer changed. Choose the trade again.');
+      var currentHuman = transfer.identity(actorId);
+      if (!currentHuman || currentHuman.desc !== tradingHuman.desc || currentHuman.profileId !== tradingHuman.profileId)
+        return fail('That request is not yours.');
       var expected = SETTLEMENT.inventory(transfer.inventory(actorId));
       var outgoing = SETTLEMENT.takeEntries(expected, npcBuys ? resolved.baseId : GOLD_BASE, npcBuys ? asked.count : gold);
       var stock = stockCopy(state.stock), credit;
@@ -335,7 +365,7 @@ function createMerchantTrading(deps) {
         stock = picked.stock; credit = picked.entries;
       }
       var nextSupply = JSON.parse(JSON.stringify(state.supply || {}));
-      if (verb === 'supply') nextSupply[itemName.toLowerCase()] = now();
+      if (verb === 'supply') nextSupply[completedSupplyKey] = now();
       moved = settlement.begin({merchantId:merchantId,humanId:actorId,profileId:profileId,
         previous:state,expected:expected,debit:outgoing.inventory,credit:credit,kind:verb,
         next:{purse:nextPurse,stock:stock,supply:nextSupply}});
@@ -343,11 +373,11 @@ function createMerchantTrading(deps) {
       return fail(settlement.available() ? String(error.message || error) : 'Trading is unavailable. The saved transfer is retained.');
     }
     var current = purses.prepare(merchantId);
-    if (!moved.done) return fail(moved.reason, viewFor(merchantId, current, place, moved.reason));
+    if (!moved.done) return fail(moved.reason, viewFor(merchantId, current, place, actorId, profileId, moved.reason));
     var said = npcBuys
       ? ('Sold ' + asked.count + ' ' + itemName + ' for ' + gold + '. Purse ' + current.purse + '.')
       : ('Bought ' + asked.count + ' ' + itemName + ' for ' + gold + '. Purse ' + current.purse + '.');
-    return {text:said,view:viewFor(merchantId, current, place)};
+    return {text:said,view:viewFor(merchantId, current, place, actorId, profileId)};
   }
 
   function activate(actorId, merchantId) {

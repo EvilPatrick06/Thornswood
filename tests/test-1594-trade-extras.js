@@ -273,7 +273,8 @@ attempt('the piece was dropped between the offer and the agreement', function ()
   w.trade.confirm(A);
   w.store[A].inventory = { entries: [] };
   const answer = w.trade.confirm(B);
-  yes('the trade is refused and says why', /does not have the Key any more/.test(answer));
+  // The line is the piece, so the refusal names its house (#1718).
+  yes('the trade is refused and says why', /does not have the Key to Breezehome any more/.test(answer));
   yes('and the gold did not move', w.gold(B) === 20 && w.writes.length === 0);
 });
 
