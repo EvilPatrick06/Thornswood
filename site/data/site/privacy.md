@@ -94,7 +94,7 @@ Honesty about the things a page does by existing:
 
 - **Discord** is where sign-in happens, so signing in tells Discord that you
   signed in here.
-- **GitHub** hosts the launcher updates, so your launcher asks GitHub for them.
+- **Launcher updates** are fetched from Thornswood's own site.
 
 Opening a page on this site loads nothing from anybody else. The fonts came
 from Google and a markdown renderer from cdnjs until 24 September 2026, and
