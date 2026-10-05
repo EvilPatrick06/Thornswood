@@ -177,8 +177,8 @@ building in the table under The one place, by that building's cell in
 `game/data/mine-buildings.json`, and every other vein of that seam is
 shut. A scarce quest is the only way in, and its cooldown starts at
 the turn-in. A swing at a scarce place gives 1, without the chance of
-one more. The open quest and the cooldown are kept in memory, so a
-restart of the server clears them. No trader offers the quest in the
-game yet, so every rare vein still answers shut in play. The table
-under Every record is that server book. The numbers above it are the
-plan.
+one more. The open quest, what it has drawn, and the cooldown are
+kept on the character, so a restart of the server keeps them. No
+trader offers the quest in the game yet, so every rare vein still
+answers shut in play. The table under Every record is that server
+book. The numbers above it are the plan.
