@@ -2021,17 +2021,21 @@ const TOOL_AGAIN_HOURS = 12;
   you have to get a new one from a smith making them". So a tool stops being a
   thing somebody owns once and becomes stock, which somebody has to make.
 
-  A hundred uses, measured against the ladder rather than picked out of the air.
-  TUNING.workPerRank added up to 20 + 50 + 120 = 190 yields from novice to
-  Master when this was written, so one tool carried somebody a little over half
-  the way: two tools to the top, and a Master who keeps working keeps ordering.
-  That was a standing order book for the smiths without being a chore.
+  FIFTY USES, the plan's number: classes.md "It has 50 uses", and the miner,
+  farmer, woodworker and fisher pages say the same (#1381). The pull request
+  that closed #1381 changed only README.md, so the server kept 100 until
+  #1588. The pick, the axe, the shovel and the pole all have 50, and so does
+  the tool handed at creation, because handTool starts no count of its own:
+  wearTool counts every one of them against this. A tool that was already
+  past 49 uses under the old hundred breaks at its next one, because it has
+  done its 50.
 
-  IT IS 100 + 250 + 600 = 950 NOW, changed on 21 September when a rank stopped
-  meaning twenty seams and started meaning one. So the climb costs about ten
-  tools rather than two, which is five times the order book and may well be too
-  much of one. If the tool starts feeling like a toll rather than stock, this
-  is the number to move and not the ladder.
+  It was a hundred first, measured against the ladder when TUNING.workPerRank
+  added up to 20 + 50 + 120 = 190 yields from novice to Master: two tools to
+  the top. The ladder is 100 + 250 + 600 = 950 now, changed on 21 September
+  when a rank stopped meaning twenty seams and started meaning one, so the
+  climb costs about nineteen tools. If the tool starts feeling like a toll
+  rather than stock, that is a question for the plan pages, not this line.
 
   The warning comes at fifteen left. Far enough out to finish what you are doing
   and walk to a town, short enough to mean something.
@@ -2041,9 +2045,9 @@ const TOOL_AGAIN_HOURS = 12;
   cannot be read, or the tool is not in it, the swing wears nothing rather than
   breaking something at random.
 */
-const TOOL_USES = 100;
+const TOOL_USES = 50;
 const TOOL_WARN_AT = 15;
-// Poles are 50. fisher.md. The pick, the axe and the shovel stay on TOOL_USES.
+// Poles are 50 too. fisher.md: "50 uses, the same as the pick, the axe, and the shovel".
 const POLE_USES = 50;
 const FISH_TRAP_MAX = 3;
 
@@ -31381,11 +31385,11 @@ log('gamemode loaded:',
       number, it is the absence of anything like a vein on the gathering side,
       and it wants watching before it wants another guess.
 
-      AND IT IS TOOLS. TOOL_USES is 100, so the whole climb now costs about ten
-      tools rather than two. That is a far bigger standing order for the smiths
-      than the comment on TOOL_USES describes, and it is the next number to
-      look at if the tool stops feeling like stock and starts feeling like a
-      toll.
+      AND IT IS TOOLS. TOOL_USES is 50 (the plan's number, #1381), so the
+      whole climb now costs about nineteen tools rather than two. That is a
+      far bigger standing order for the smiths than the ladder had when the
+      tool was first counted, and it is the next number to look at if the
+      tool stops feeling like stock and starts feeling like a toll.
     */
     workPerRank: { advanced: 100, expert: 250, master: 600 },
     /*
