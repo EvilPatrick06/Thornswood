@@ -1,6 +1,7 @@
 # What this repository depends on, watched rather than remembered.
 #
-# TWO ECOSYSTEMS, because two manifests exist here.
+# TWO ECOSYSTEMS, because two manifests exist here, and the engine submodule
+# is watched another way (below).
 #
 # github-actions: every workflow pins actions by full length commit SHA (see
 # build.yml), and a pinned action still goes stale quietly when the tag it
@@ -17,6 +18,18 @@
 # depend on nothing. Pointing dependabot at a folder with no manifest gives
 # an error on the Dependabot tab that reads like a fault and watches nothing,
 # which is worse than not configuring it.
+#
+# NOT gitsubmodule, for engine/skymp (issue #1348). Dependabot's bump would
+# move the pin alone, and a pin is merged only with a client build and a
+# server build of the same commit, recorded in records\client-build.json and
+# records\server-build.json on a machine that builds the engine (engine\README.md,
+# "One engine"). tests\test-one-engine.js turns every such pull request red,
+# so each would sit open until closed by hand. The bump itself is already
+# watched: tests\test-engine-at-fork-head.js runs every night (nightly.yml)
+# and is red, naming the commits, as soon as the head of
+# thornswood/engine-changes has a change the pin does not, and a red night
+# opens an issue on the board. Upstream skyrim-multiplayer/skymp reaches us
+# only through that branch, so a submodule entry here would not see it.
 #
 # The launcher is C# built with the .NET Framework csc and has no package
 # manager at all, by design, so there is nothing here for it.
