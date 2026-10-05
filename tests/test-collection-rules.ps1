@@ -89,19 +89,6 @@ function PluginList([string]$path, [string[]]$lines) {
     [IO.File]::WriteAllText($path, $text + "`r`n", (New-Object Text.UTF8Encoding($false)))
 }
 
-# One flattened mod attribute in state.v2, byte for byte as Vortex writes it:
-# the key joined by ###, one length byte, then the value's JSON. This is how
-# the installed collection's slug and revision are recorded now that the mod
-# folder is named for an opaque id rather than the collection.
-function Attr([string]$modId, [string]$name, [string]$valueJson) {
-    $b = [Collections.Generic.List[byte]]::new()
-    $b.AddRange([Text.Encoding]::ASCII.GetBytes("persistent###mods###skyrimse###$modId###attributes###$name"))
-    $b.Add([byte]$valueJson.Length)
-    $b.AddRange([Text.Encoding]::ASCII.GetBytes($valueJson))
-    $b.AddRange([Text.Encoding]::ASCII.GetBytes([char]1 + 'persistent###mods###skyrimse'))
-    return $b.ToArray()
-}
-
 # A collection.json. Each rule is a hashtable with name and after or before,
 # names in lower case, as Vortex writes them. $null for a collection that
 # carries no plugin rules at all, which is revisions 2 to 4.
@@ -117,19 +104,34 @@ function Collection([string]$path, $rules) {
 
 # One APPDATA holding an installed collection the way Vortex lays one out
 # today: a staging folder named for an opaque mod id, and state.v2 tying the
-# slug and the revision number to that id. What goes inside the folder is the
+# slug and the revision number to that id, each a flattened key joined by ###
+# with the JSON Vortex stores for it. What goes inside the folder is the
 # caller's business, because that is the part this file is about.
+#
+# Since #1582 the revision is read by launcher\app\VortexProfileState.cs, which
+# reads state.v2 as LevelDB (CURRENT, the manifest, the tables and the log),
+# and bytes with no CURRENT read as nothing there. So state.v2 is written as
+# LevelDB by tests\fixtures\vortex-state-rows.py, the writer the reader's own
+# fixtures use, once every case is named (Write-VortexState). The rows go in
+# the log, as Vortex writes a change before compaction, because the folder is
+# still found by reading state as text, which only the log keeps whole (#1902).
+$appDatas = Join-Path $root 'appdata'
+$vortexState = [ordered]@{}
 function VortexAppData([string]$name, [string]$modId, [int]$rev) {
-    $ad = Join-Path $root $name
-    $st = Join-Path $ad 'Vortex\state.v2'
-    $null = New-Item -ItemType Directory -Force -Path $st
-    $sb = [Collections.Generic.List[byte]]::new()
-    $sb.AddRange([byte[]](Attr $modId 'collectionSlug' '"7essxf"'))
-    $sb.AddRange([byte[]](Attr $modId 'revisionNumber' ([string]$rev)))
-    [IO.File]::WriteAllBytes((Join-Path $st '000200.log'), $sb.ToArray())
+    $ad = Join-Path $appDatas $name
+    $key = "persistent###mods###skyrimse###$modId###attributes###"
+    $vortexState[$name] = [ordered]@{ table = @(); log = @(
+        [pscustomobject]@{ key = $key + 'collectionSlug'; value = '"7essxf"' },
+        [pscustomobject]@{ key = $key + 'revisionNumber'; value = [string]$rev }) }
     $mod = Join-Path $ad ('Vortex\skyrimse\mods\' + $modId)
     $null = New-Item -ItemType Directory -Force -Path $mod
     return [pscustomobject]@{ AppData = $ad; Mod = $mod }
+}
+function Write-VortexState {
+    $path = Join-Path $root 'vortex-state.json'
+    [IO.File]::WriteAllText($path, (ConvertTo-Json -InputObject $vortexState -Depth 6), (New-Object Text.UTF8Encoding($false)))
+    & python (Join-Path $Here 'tests\fixtures\vortex-state-rows.py') $appDatas $path
+    if ($LASTEXITCODE) { throw 'tests\fixtures\vortex-state-rows.py could not write state.v2 for the Vortex cases' }
 }
 
 # A Vortex export archive, which is what an AUTHORED collection leaves in its
@@ -320,16 +322,10 @@ try {
     # for an opaque mod id, not the collection, and the slug and revision live
     # in state.v2. state maps the slug to the folder, and the revision comes
     # from state, not from the folder name.
-    $appDataNew = Join-Path $root 'AppDataNew'
-    $modsNew = Join-Path $appDataNew 'Vortex\skyrimse\mods'
-    $modId = 'vortex_collection_ZRT7NjhN_'
-    Collection (Join-Path $modsNew ($modId + '\collection.json')) $chain
-    $stateNew = Join-Path $appDataNew 'Vortex\state.v2'
-    $null = New-Item -ItemType Directory -Force -Path $stateNew
-    $sb = [Collections.Generic.List[byte]]::new()
-    $sb.AddRange([byte[]](Attr $modId 'collectionSlug' '"7essxf"'))
-    $sb.AddRange([byte[]](Attr $modId 'revisionNumber' '5'))
-    [IO.File]::WriteAllBytes((Join-Path $stateNew '000200.log'), $sb.ToArray())
+    $newMachine = VortexAppData 'AppDataNew' 'vortex_collection_ZRT7NjhN_' 5
+    $appDataNew = $newMachine.AppData
+    Collection (Join-Path $newMachine.Mod 'collection.json') $chain
+    Write-VortexState
 
     # Everything the runs may read, so the last check can prove none was written.
     # Every path, and every file's size and write time. Not a folder's write
