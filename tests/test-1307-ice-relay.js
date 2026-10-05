@@ -15,15 +15,16 @@
 
     a stranger, GET or POST, with no token, a made up one or an expired
     one, is handed the STUN list and nothing else;
-    a page that POSTs a join token that checks out is handed the relay too,
-    with a credential coturn takes (HMAC-SHA1 of the expiry);
+    since #1821 a page that POSTs a join token that checks out is handed
+    the STUN list too: the pages in the room get the relay on the roster,
+    over the socket their token proved (tests/test-1821-ice-on-socket.js);
     this machine itself, which is how Install-Voice.ps1 reads the running
-    relay before it reinstalls, is handed the relay by a plain GET;
+    relay before it reinstalls, is handed the relay by a plain GET, with a
+    credential coturn takes (HMAC-SHA1 of the expiry);
     every answer may be read by a page on a null origin;
     the token never reaches the service's log;
-    and the two pages that hold a token, the game's voice overlay and the
-    launcher's voice page, POST it, the overlay taking the freshest one from
-    the chat socket.
+    and neither page that holds a token, the game's voice overlay and the
+    launcher's voice page, sends it to /ice.
 
   VOICE points it at another copy of voice-server.js, which is how it was
   shown to fail on the code before the change. Writes only to a temp folder,
@@ -153,35 +154,29 @@ const relayOf = (r) => (r.list || []).find((s) => [].concat(s.urls)[0] === 'turn
   r = await ice('GET', null, true);
   yes('and every one of those may be read from a null origin', r.cors === '*');
 
-  console.log('\na page that holds a join token that checks out:');
+  console.log('\na page that holds a join token that checks out (#1821: the relay comes on the roster):');
   r = await ice('POST', JSON.stringify({ token: good }), true);
+  yes('is handed the STUN list and nothing else', stunOnly(r));
+  yes('readable from a null origin', r.cors === '*');
+
+  console.log('\nthis machine itself:');
+  r = await ice('GET', null, false);
   const relay = relayOf(r);
-  yes('is handed STUN first', r.status === 200 && !!r.list && JSON.stringify(r.list[0]) === JSON.stringify(JSON.parse(STUN)[0]));
-  yes('and the relay', !!relay);
+  yes('a plain GET is handed the relay, which is what Install-Voice.ps1 reads', !!relay);
   const until = relay ? Number(relay.username) : 0;
   const now = Math.floor(Date.now() / 1000);
   yes('with a username that is an expiry about ten minutes out', until > now + 500 && until < now + 700);
   yes('and a password coturn takes, HMAC-SHA1 of it',
       !!relay && relay.credential === crypto.createHmac('sha1', SECRET).update(relay.username).digest('base64'));
-  yes('readable from a null origin', r.cors === '*');
-
-  console.log('\nthis machine itself:');
-  r = await ice('GET', null, false);
-  yes('a plain GET is handed the relay, which is what Install-Voice.ps1 reads', !!relayOf(r));
 
   console.log('\nthe log and the pages:');
   yes('the token never reaches the service\'s log', srvLog.indexOf(good) < 0);
   const overlay = fs.readFileSync(path.join(REPO_DIR, 'game', 'ui', 'thornswood-voice.js'), 'utf8').split(CR).join('');
   const chat = fs.readFileSync(path.join(REPO_DIR, 'game', 'ui', 'thornswood-chat.js'), 'utf8').split(CR).join('');
   const host = fs.readFileSync(path.join(REPO_DIR, 'launcher', 'voice-host.html'), 'utf8').split(CR).join('');
-  yes('the chat socket hands out the token it holds now, or the one its connection opened with (#1322)',
-      /token: function \(\) \{ return TOKEN \|\| SPENT; \}/.test(chat));
-  yes('the game\'s voice overlay takes it from there and POSTs it to /ice',
-      /n\.token\(\)/.test(overlay) && /'\/ice',\s*\{ method: 'POST', body: JSON\.stringify\(\{ token: tok \}\) \}/.test(overlay));
-  yes('the launcher\'s voice page POSTs its own',
-      /'\/ice', \{ method: 'POST', body: JSON\.stringify\(\{ token: \(cfg && cfg\.token\) \|\| '' \}\) \}/.test(host));
-  yes('neither sets a header that would need a preflight',
-      !/'\/ice'[^)]*headers/.test(overlay) && !/'\/ice'[^)]*headers/.test(host));
+  yes('the chat socket hands its token to nothing else on the page (#1821)', !/token: function/.test(chat));
+  yes('the game\'s voice overlay sends no token to /ice, nor asks it anything', !/\/ice'/.test(overlay) && !/\.token\(\)/.test(overlay));
+  yes('nor does the launcher\'s voice page', !/\/ice'/.test(host));
 
   await new Promise((ok) => { srv.once('exit', ok); srv.kill(); });
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
