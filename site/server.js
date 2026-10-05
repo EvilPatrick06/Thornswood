@@ -3493,8 +3493,9 @@ function readTicket(t) {
   runs out, both unix milliseconds. mac is base64url HMAC-SHA256 over "jp1." and
   the body, keyed on cfg.passKey. tests\test-join-pass-site.js and
   tests\test-join-pass-game.js hold one pass in common, so the two ends cannot
-  drift apart. Ten minutes: the launcher renews it every four while the game
-  runs, so a session that reconnects after a server restart still has one.
+  drift apart. Ten minutes, though the game server lets a pass prove one
+  session only, and start one only in the minute and a half after i (#1320),
+  so the launcher renews it every minute while the game runs.
 */
 const PASS_MS = 10 * 60000;
 
