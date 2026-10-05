@@ -95,7 +95,9 @@ if (handler) {
   const fishText = branchSlice(fishBranch, ['else if (isGame(baseDesc))', 'else if (isChurn(baseDesc))']);
   const gameText = branchSlice(gameBranch, ['else if (isChurn(baseDesc))', 'else if (isPlant(baseDesc))']);
   const plantText = branchSlice(plantBranch, ['else if (isVein(baseDesc))', 'else {']);
-  const churnText = branchSlice(churnBranch, ['else if (isPlant(baseDesc))', 'else if (isVein(baseDesc))']);
+  // The hive branch sits between the churn and the plants, and puts back the
+  // way the plants do, so it ends the churn's slice.
+  const churnText = branchSlice(churnBranch, ['else if (isHive(baseDesc))', 'else if (isPlant(baseDesc))', 'else if (isVein(baseDesc))']);
 
   yes('fish branch calls putBack gated by floraHanded',
       /putBack\(casterRefrId, refrId\)/.test(fishText) &&
@@ -134,6 +136,24 @@ if (handler) {
   yes('novice fish and game rows exist', !!fishBase && !!gameBase);
 
   const given = [];
+  /*
+    What fish() and game() lean on since #1413 (resource returns): a reach
+    check, the shared stock that holds each water's and rack's wait, and the
+    grant that puts every item in the pack at once or none of them. The reach
+    and the stock have their own harnesses (test-resource-stock-integration.js);
+    here the person is in reach and the stock is open, so the class gate and
+    the toast are what answer. The stock's take answers the way the real one
+    does: not ok when the grant answers false.
+  */
+  function addItemsAtomic(a, rows) {
+    rows.forEach(function (r) { given.push([a, r.item, r.count]); });
+    return true;
+  }
+  function inReach() { return true; }
+  globalThis.__thornswoodResourceStock = {
+    left: function () { return 0; },
+    take: function (refrId, span, grant) { return { ok: grant() !== false, waitMs: 0 }; }
+  };
   const FISH_NO = 'Only a fisher can fish. Ask one.';
   const GATH_NO = 'Only a gatherer can pull that out of the ground. Ask one.';
   const HUNT_NO = 'Only a hunter can take anything off a carcass. Ask one.';
@@ -142,7 +162,7 @@ if (handler) {
     return new Function(
       'classGate', 'rankStep', 'rankWord', 'RANK_LADDER', 'addItem', 'creditWork',
       'cooldownLeft', 'stampCooldown', 'waitWord', 'randInt', 'FISH_BY_BASE', 'FISH_TUNING',
-      'isFish',
+      'isFish', 'addItemsAtomic', 'withinResourceReach', 'toolGate', 'wearTool',
       fishFn + '\nreturn fish;'
     )(
       function (actorId, verb) {
@@ -160,7 +180,11 @@ if (handler) {
       function (a) { return a; },
       FISH_BY_BASE,
       { cooldownMs: { novice: 1, advanced: 1, expert: 1, master: 1 }, yieldByStep: { 0: [1, 1] } },
-      function (d) { return Object.prototype.hasOwnProperty.call(FISH_BY_BASE, d); }
+      function (d) { return Object.prototype.hasOwnProperty.call(FISH_BY_BASE, d); },
+      addItemsAtomic,
+      inReach,
+      function () { return null; },   // a pole in the pack: test-1379-poles-trap.js drives the refusal
+      function () { return null; }    // wear: test-tool-wear's business
     );
   }
 
@@ -180,7 +204,7 @@ if (handler) {
     return new Function(
       'classGate', 'rankStep', 'rankWord', 'RANK_LADDER', 'addItem', 'creditWork',
       'cooldownLeft', 'stampCooldown', 'waitWord', 'randInt', 'GAME_BY_BASE', 'GAME_TUNING',
-      'isGame',
+      'isGame', 'addItemsAtomic', 'withinResourceReach',
       gameFn + '\nreturn game;'
     )(
       function (actorId, verb) {
@@ -198,7 +222,9 @@ if (handler) {
       function (a) { return a; },
       GAME_BY_BASE,
       { cooldownMs: { novice: 1, advanced: 1, expert: 1, master: 1 }, yieldByStep: { 0: [1, 1] } },
-      function (d) { return Object.prototype.hasOwnProperty.call(GAME_BY_BASE, d); }
+      function (d) { return Object.prototype.hasOwnProperty.call(GAME_BY_BASE, d); },
+      addItemsAtomic,
+      inReach
     );
   }
 
