@@ -44,8 +44,10 @@ on the ThornswoodRelease profile, which Patrick makes once (Developer-Guide.md,
 "Your own signing sign in"; Patrick, 4 Oct, #1740). Until then only his
 account could sign (29 Sep, #1121). `az login --use-device-code` is refused by
 the tenant's security defaults (AADSTS530035). Never copy another machine's
-`records\signing\signing.json`: One's names `C:\tools\metadata.json`, which no other
-machine has.
+`records\signing\signing.json`: it names that machine's paths. One's used to
+name `C:\tools\metadata.json`; that folder held only an older copy of
+`metadata.json` (the same account and profile) and was removed on 5 Oct, so
+One writes its `signing.json` from the template like any other machine.
 
 SIGNING IS ON since 27 September (issue #390, closed). It was switched off on
 purpose until then (Patrick, 22 September: "the code signing stuff isnt

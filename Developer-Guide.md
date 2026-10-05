@@ -403,7 +403,7 @@ by hand, and no secret is written into the repository.
 | The feed, its baseline, the launcher list and history | the VPS store, with a working copy in `%LOCALAPPDATA%\Thornswood\feed\<channel>` | Nothing to copy: every Ship receives them from the VPS first (`scripts\release\Feed-Store.ps1`, #907). The working copy is made on the first Ship |
 | The release webhooks, dev and #news | the VPS, `C:\Thornswood-Bot\webhooks`; One has no local copy | Nothing to copy: Ship reads them over ssh (`scripts\ops\Discord-Hook.ps1`) |
 | VPS access | One's own key, `.ssh\thornswood_ed25519` | Its own key: `.\scripts\vps\Setup-SshKey.ps1 -KeyOnly`, and somebody the VPS already knows runs `.\scripts\vps\Add-VpsKey.ps1 -PublicKey '<the line>'`. With no such machine left, the BisectHosting panel is the way in (`docs\IT-IS-DOWN.md`) |
-| Signing: `records\signing\signing.json` | enabled, naming `C:\tools\metadata.json` and the client under `records\signing\client\client`, paths only One has. Never copy it | `.\scripts\release\Setup-ShipMachine.ps1` writes one from `records\signing\signing.template.json` (paths and "enabled": true, no key or password) |
+| Signing: `records\signing\signing.json` | written from the template like any other machine's since 5 Oct, when `C:\tools` (an older copy of `metadata.json`) was removed. Never copy one machine's to another | `.\scripts\release\Setup-ShipMachine.ps1` writes one from `records\signing\signing.template.json` (paths and "enabled": true, no key or password) |
 | Signing: Microsoft's signing client | `records\signing\client`, ignored by git | The same script fetches `Microsoft.ArtifactSigning.Client` 1.0.128 from nuget.org and refuses it unless its sha256 is the pinned one, which is the package One has |
 | Signing: the Azure sign in | `az login` on One, as Patrick | `az login` on the new machine, as the person who ships from it, with an account of their own in the signing tenant that holds the Certificate Profile Signer role on the ThornswoodSigning account's profile ThornswoodRelease (Patrick, 4 Oct; #1740). Patrick makes the account and gives the role once: [Your own signing sign in](#your-own-signing-sign-in). The script asks the signing service with that sign in and checks the profile answers with the identity the launcher pins |
 | The client runtime `records\client-build.json` names | only in the dev game folder, `C:\Thornswood-DevBuild\Game`. The build copies in `Downloads\Thornswood-ClientBuild-<commit>` are older builds, and the shared clone's `engine\skymp\build` does not match the record | The script fetches the zip of the recorded commit from the site's feed (`clientRuntime` in `/feed-dev/version.json` or `/feed/version.json`), checks it against the feed's sha256 and every file against the record, and puts the six files in the build folder. A commit on neither feed is built: `.\scripts\release\Setup-ShipMachine.ps1 -Rebuild`, or `.\scripts\release\Build-Engine.ps1` |
@@ -827,10 +827,14 @@ it in the meantime. A cause in the engine is fixed in the fork
 
 The band-aids already in the tree are defects, and each one goes on the
 board. Taking one out means finding the cause it covered and fixing that in
-the same pull request. Known on 4 Oct: the Riekling and Goblin clothes remount
-in `game\plugins\thornswood-front.js` (#614), and in `game\gamemode.js` the
-`dressIfBare` watch (#1604), the `wearWhatIsWorn` ask at login and the wear
-script's retries.
+the same pull request. The dress asks came out with their cause, an
+equipment record the server could not write (#1560): in `game\gamemode.js`
+the wear script's retries, the `wearWhatIsWorn` ask at login and the
+`dressIfBare` watch (#1604), and in `game\plugins\thornswood-front.js` the
+front putting the shift on by itself. The Riekling and Goblin clothes remount
+(#614) came out on 4 Oct (#1681) before its cause was found, decided by
+Patrick because it was taking clothes off at every door; the front plugin's
+race read is measuring that cause, and #614 stays open until it is fixed.
 
 A retry is allowed only where failing is outside our control and expected:
 a request over the network, a file another program has open. The reason is
@@ -1098,14 +1102,40 @@ The short form of the rules. The same decisions, with the dates they were made, 
   ```
 - One fix per pull request. A branch that changes eight things is eight
   reviews nobody has time for; split it.
-- No stray branches and no stray pull requests. Decided by Patrick on
+- No stray branches, worktrees or pull requests. Decided by Patrick on
   25 Sep, after a count found 70 branches on GitHub, two of them holding
   work that had never been merged and was nearly deleted with the rest:
   "we need to make sure in the docs that we don't leave a bunch of stray
   branches and PRs and fix+merge them everytime or delete if old".
+  Widened by Patrick on 5 Oct to everything local as well as on GitHub, in
+  the engine fork as well as here: "we need rules ... not to leave stale
+  worktrees, branches, or PRs local or on GitHub it's messy work". That day
+  a clean pass removed 48 fork branches, 4 branches here, about 30 GB of
+  finished worktrees, a spare clone and old build copies in Downloads, and
+  found the shared clone on an old branch with an unmerged engine checked out.
   - A branch is deleted once its pull request is merged. GitHub does that
-    by itself (the repository setting "Automatically delete head branches", on since 25 Sep);
-    delete it by hand if it was not.
+    by itself in both repositories (the setting "Automatically delete head
+    branches", on here since 25 Sep and on the fork since 5 Oct); delete it
+    by hand if it was not. A pull request closed without merging gets its
+    branch deleted the same minute.
+  - The same moment, on the machine: `git worktree remove` the branch's
+    folder and `git branch -D` the local branch (a squash merge leaves it
+    looking unmerged to `-d`). Fork worktrees and fork branches too.
+  - No scratch clones, copies of a build, or folders made for one task are
+    left behind, and no process started for the work (a build, a load test)
+    is left running after it.
+  - Three folders, no copies (Patrick, 5 Oct). On a machine, Thornswood work
+    lives in the repository folder (its ignored `local\` and `out\` for what
+    is one machine's own), and in one folder for worktrees and scratch
+    (`C:\ThornswoodTemps&Worktrees` on One, `worktrees\<name>` and
+    `temp\<task>`, each removed when its work is done), plus the shared notes
+    on One (`C:\Thornswood Vault`). The launcher's installs, the main one and
+    `<Root>-DevBuild`, are the product and stay. No other top-level folders
+    and no scratch files in Downloads. And no copies of what GitHub or the VPS
+    already holds: logs, report bundles, builds and backups are read where
+    they live and cited by where they are. His words: "I dont need a million
+    backups and copies of things that are already on GitHub or the VPs thats
+    the whole point of those".
   - Work goes into a pull request the day it is done, never left on a
     pushed branch without one. That is how the two above were lost track of.
   - At the start of a session, and before anything is shipped, look at what
@@ -1117,6 +1147,11 @@ The short form of the rules. The same decisions, with the dates they were made, 
     decide on: ask them, and put it on the board if they cannot be asked.
     Check whether its work is already in main before deleting it; a
     squashed merge leaves the branch looking unmerged to git.
+  - Before a session ends, the same look in both repositories, locally
+    too: `git worktree list`, `git branch`, `gh pr list` and
+    `git ls-remote --heads origin`, here and in `engine\skymp` (and
+    `gh pr list -R EvilPatrick06/skymp`). Each of yours still there is open
+    work with the reason it is open written on its issue, or it goes.
 ##### Signing, the build check, and the six shared files
 
 - Code signing is on since 27 Sep (issue #390, closed): the launcher and the
@@ -1226,7 +1261,11 @@ this is the long form.
   (`Data\Platform\PluginsNoLoad`). The installer of 16 Sep carried that
   sign in file before the list was shared; the launcher removes that exact
   copy from every install (Leaks.cs), matched by content so nobody's own
-  sign in is touched.
+  sign in is touched. The dev records of 28 and 29 Sep handed out the
+  machine that ships' mod menu settings, window layouts and notes; Leaks.cs
+  takes those out of Thornswood's own folder the same way, only while each
+  is still the bytes the record handed out, and never out of the Steam copy
+  (#1252).
 
 ## 3. How to release to dev
 

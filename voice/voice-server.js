@@ -973,7 +973,8 @@ function cleanMode(v) {
   ({ type, sdp }) and as RTCIceCandidate's own fields, and every page reads
   only from, sdp and candidate. So that is what goes on, rebuilt here, and a
   message that is not that shape goes nowhere. Who may signal whom stays the
-  room: every page builds a connection to everybody on the roster.
+  room: every page builds a connection to everybody on the roster who
+  carries voice (#1925, over roster).
 */
 const SDP_TYPES = ['offer', 'answer', 'pranswer'];
 function signal(msg) {
@@ -992,10 +993,27 @@ function signal(msg) {
   return { t: 'ice', to: to, candidate: out };
 }
 
+/*
+  A CONNECTION THAT CARRIES NO VOICE IS MARKED ON THE ROSTER (#1925).
+
+  Every connection is a peer, the game's chat socket included, and every
+  page builds a WebRTC connection to everybody on the roster. While a
+  launcher holds the audio, the game's overlay on that chat socket takes no
+  signalling at all (thornswood-voice.js, relay mode), so every launcher's
+  connection to it sent an offer and its candidates through here and then
+  waited for good, one per person in the room, and counted in the peers the
+  launcher reports. So a connection says when it carries no voice, in its
+  join ({ voice: false }) or later ({ t: 'voice', on: false }), and its row
+  says voice: false. Both clients build no connection to a row that says it
+  and close one they had. A row without it carries voice, which is every
+  connection from a page older than this.
+*/
 function roster() {
   const list = [];
   for (const [id, p] of peers) {
-    list.push({ peer: id, profileId: p.profileId, name: peerName(p), mode: p.mode || 'local' });
+    const row = { peer: id, profileId: p.profileId, name: peerName(p), mode: p.mode || 'local' };
+    if (p.voice === false) row.voice = false;
+    list.push(row);
   }
   return list;
 }
@@ -1058,7 +1076,9 @@ function onJoin(ws, msg, profileId) {
 
   const id = nextPeer++;
   const name = cleanName(msg.name);
+  // voice is false only when the join says so (#1925, over roster).
   peers.set(id, { ws, profileId, name, mode: cleanMode(msg.mode), proven: true,
+                  voice: msg.voice !== false,
                   chatTokens: CHAT_BURST, chatAt: Date.now(), chatSlowed: false });
 
   ws.send({ t: 'welcome', peer: id, profileId: profileId });
@@ -2210,6 +2230,22 @@ server.on('upgrade', (req, socket, head) => {
       if (!out) return;
       out.from = myId;
       to.ws.send(out);
+      return;
+    }
+
+    /*
+      This connection carries no voice from now on (#1925, over roster): the
+      game's overlay has handed the audio to a launcher. Only ever off, and
+      only once, for the life of the connection, because the overlay never
+      leaves relay mode, and because each change sends the whole roster to
+      everybody: a switch that could go both ways would cost the room a
+      roster for every frame somebody sent.
+    */
+    if (msg.t === 'voice') {
+      const me = peers.get(myId);
+      if (!me || msg.on !== false || me.voice === false) return;
+      me.voice = false;
+      announce();
       return;
     }
 

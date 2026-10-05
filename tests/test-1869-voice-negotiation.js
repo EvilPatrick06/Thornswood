@@ -913,13 +913,17 @@ function partFive() {
   for (let i = 0; i < 150; i++) say({ t: 'ice', from: 11, candidate: { candidate: 'flood ' + i } });
   const got = [];
   n.board((m) => got.push(m));
-  const shape = got.map((m) => m.t === 'peers' ? 'peers ' + m.peers.map((p) => p.peer).join(',')
+  // The position view is handed over too, after the roster (#1924); the
+  // order of the signalling is what this part reads.
+  const shape = got.filter((m) => m.t === 'peers' || m.t === 'sdp' || m.t === 'ice')
+                   .map((m) => m.t === 'peers' ? 'peers ' + m.peers.map((p) => p.peer).join(',')
                                                : m.t + ' ' + m.from + ' ' + (m.sdp ? m.sdp.sdp : m.candidate.candidate));
   yes('voice gets the newest roster first', shape[0] === 'peers 4,10,11');
   yes('then what the people on it sent, in the order it came',
       JSON.stringify(shape.slice(1, 5)) === JSON.stringify(['sdp 4 four', 'ice 4 c4a', 'ice 4 c4b', 'sdp 11 eleven']));
   yes('and nothing from somebody the newest roster no longer names', !shape.some((l) => / 5 /.test(l)));
-  yes('and no position, which the next tick carries', !got.some((m) => m.t === 'pos'));
+  yes('and the whole position view right after the roster, since the next tick carries only what moved (#1924)',
+      !!got[1] && got[1].t === 'pos' && got.filter((m) => m.t === 'pos').length === 1);
   yes('a hundred from one peer is the most kept, and the log says so once',
       got.filter((m) => m.from === 11).length === 100 && c.logged.filter((l) => /peer 11 sent 100/.test(l)).length === 1);
   say({ t: 'sdp', from: 4, sdp: { type: 'offer', sdp: 'live' } });

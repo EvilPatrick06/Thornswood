@@ -235,9 +235,13 @@ if (block !== null) {
   yes('the pickaxe the person owns is the one put in their hands',
       /const pick = toolIdIn\(actorId, 'miner'\)/.test(code) &&
       /function toolIdIn\(actorId, key\)/.test(code));
-  yes('the client equips it before the animation and takes it off after',
-      /pc\.equipItem\(it, false, true\)/.test(code) &&
-      /unequipItem\(/.test(code));
+  // #611: the pick comes off for the swing, because the animation carries its
+  // own, and goes back on after it only if it was on before. This used to look
+  // for pc.equipItem(it, false, true), which since #611 only the wear script
+  // had, so it was holding the wrong code; the wear script is gone (#1560).
+  yes('the client takes the pick off for the swing and puts it back after, if it was on',
+      /if \(had\) \{ pc\.unequipItem\(it, false, true\); \}/.test(code) &&
+      /if \(back\) \{ pc\.equipItem\(back, false, true\); \}/.test(code));
   yes('a held swing is not ended by a timer, because the spell ends it',
       /if \(o\.hold\) \{/.test(code) && /function swingEnd\(actorId, tool\)/.test(code));
   yes('and stopping a spell is the one place the animation is left',

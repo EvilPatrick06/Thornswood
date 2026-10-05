@@ -77,10 +77,10 @@ function Get-VortexStateDir {
   installs a collection it records, against the mod, the slug it was installed
   from and the revision NUMBER it is on. That is independent of what the folder
   is called, so it answers for both eras. It is read the same way
-  Get-CollectionNewest reads state.v2, as text rather than by opening the
-  database, because this only needs a number and must never be the reason a
-  deploy fails. The old folder-name parse stays as a fallback for a machine
-  that only has the legacy folders and no readable state.
+  Get-CollectionNewest reads state.v2, through the read-only LevelDB reader
+  (#1582, #1902), which opens no database handle and takes no lock. The old
+  folder-name parse stays as a fallback for a machine that only has the legacy
+  folders and no readable state.
 #>
 function Get-CollectionRevision([string]$Slug) {
     if (-not $Slug) { return 0 }
@@ -140,47 +140,23 @@ function Get-CollectionRevisionFromFolder([string]$Slug) {
   Empty when state cannot be read or names no collection with that slug. Used
   to find the collection's mod folder now that the folder is named for the mod
   id rather than the slug (see Get-CollectionInstalledFolder).
+
+  Read through the shared reader, with the tie Get-CollectionRevisionFromState
+  uses: collectionSlug against the mod, or for a collection authored here
+  newestFileId linked to a cached revision of the slug. Until #1902 this
+  matched raw bytes, which find nothing once Vortex compacts the keys into a
+  compressed table, and Check-CollectionRules then skipped the installed
+  collection. Same as Checks.CollectionModIds in the launcher.
 #>
 function Get-CollectionModIds([string]$Slug) {
-    $ids = New-Object Collections.Generic.List[string]
-    if (-not $Slug) { return , [string[]]$ids.ToArray() }
+    $none = [string[]]@()
+    if (-not $Slug) { return , $none }
     $st = Get-VortexStateDir
-    if (-not (Test-Path -LiteralPath $st)) { return , [string[]]$ids.ToArray() }
-    $slugRe = 'mods###skyrimse###([^#]+)###attributes###collectionSlug[\x00-\x1F]{1,4}"' + [regex]::Escape($Slug) + '"'
-    $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-    $files = @(Get-ChildItem -LiteralPath $st -File -EA SilentlyContinue)
-    foreach ($f in $files) {
-        try {
-            $txt = Get-VortexStateText $f.FullName
-            foreach ($m in [regex]::Matches($txt, $slugRe)) {
-                if ($seen.Add($m.Groups[1].Value)) { [void]$ids.Add($m.Groups[1].Value) }
-            }
-        } catch { }
-    }
-    if ($ids.Count -gt 0) { return , [string[]]$ids.ToArray() }
-
-    # Same authoring shape as Get-CollectionRevisionFromState: map slug to
-    # collections###revisions id, then to the mod whose newestFileId is that id.
-    $revSlugRe = 'collections###revisions###([^#]+)###info###collection###slug[\x00-\x1F]{1,4}"' + [regex]::Escape($Slug) + '"'
-    $fileIdRe = 'mods###skyrimse###([^#]+)###attributes###newestFileId[\x00-\x1F]{1,4}(\d+)'
-    $revIds = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-    foreach ($f in $files) {
-        try {
-            $txt = Get-VortexStateText $f.FullName
-            foreach ($m in [regex]::Matches($txt, $revSlugRe)) { [void]$revIds.Add($m.Groups[1].Value) }
-        } catch { }
-    }
-    if ($revIds.Count -eq 0) { return , [string[]]$ids.ToArray() }
-    foreach ($f in $files) {
-        try {
-            $txt = Get-VortexStateText $f.FullName
-            foreach ($m in [regex]::Matches($txt, $fileIdRe)) {
-                if (-not $revIds.Contains($m.Groups[2].Value)) { continue }
-                if ($seen.Add($m.Groups[1].Value)) { [void]$ids.Add($m.Groups[1].Value) }
-            }
-        } catch { }
-    }
-    return , [string[]]$ids.ToArray()
+    if (-not (Test-Path -LiteralPath $st)) { return , $none }
+    try {
+        Import-VortexStateReader
+        return , [string[]][Thornswood.VortexProfileState]::CollectionModIds($st, $Slug)
+    } catch { return , $none }
 }
 
 <#
@@ -369,57 +345,35 @@ function Get-CollectionJsonPath([string]$Folder) {
 <#
   The newest collection revision VORTEX KNOWS ABOUT for a slug, or 0.
 
-  Sources, highest wins (same as Checks.CollectionNewest in the launcher):
-    1. newestVersion transition: "newestVersion","from":"3","to":"4"
-    2. plain newestVersion value (key, length byte, "N")
-    3. collections###revisions###<id>###info###revisionNumber tied to the slug
-    4. when -Slug is set, the installed revisionNumber for that slug (floor so
-       Known stays true on a current draft with no newestVersion key)
+  Read through the shared reader (launcher\app\VortexProfileState.cs), the
+  same as Checks.CollectionNewest in the launcher. Highest wins of:
+    1. the newestVersion Vortex records against the collection's own mod,
+       tied to the slug the way the installed revision is
+    2. collections###revisions###<id>###info###revisionNumber for a cached
+       revision of the slug
+    3. the installed revision, as the floor, so Known stays true on a current
+       draft with no newestVersion key
 
-  Pass the slug from Get-CollectionState so two collections on one machine
-  never mix numbers. 0 when nothing can be read.
+  Until #1902 this matched raw bytes in every file of state.v2: the plain
+  newestVersion value, and the "newestVersion","from":"3","to":"4" transition
+  text. Those are whole only in the write-ahead log. Once Vortex compacts them
+  into a compressed table nothing matched, Newest fell to the installed
+  revision, and Behind read false with a newer revision known. Neither text
+  was tied to a mod or a slug, so any mod whose version went from one whole
+  number to another counted as a revision. The newestVersion Vortex keeps on
+  the collection's own mod is the number, read from current state; another
+  mod's newestVersion is that mod's version, not a revision.
+
+  0 when nothing can be read, which Get-CollectionState reports as not Known.
 #>
-function Get-CollectionNewest([string]$Slug = '') {
+function Get-CollectionNewest([string]$Slug) {
+    if (-not $Slug) { return 0 }
     $st = Get-VortexStateDir
     if (-not (Test-Path -LiteralPath $st)) { return 0 }
-    $best = 0
-    $revIds = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-    $files = @(Get-ChildItem -LiteralPath $st -File -EA SilentlyContinue)
-    foreach ($f in $files) {
-        try {
-            $txt = Get-VortexStateText $f.FullName
-            foreach ($m in [regex]::Matches($txt, '"newestVersion"\s*,\s*"from"\s*:\s*"(\d+)"\s*,\s*"to"\s*:\s*"(\d+)"')) {
-                $n = 0
-                if ([int]::TryParse($m.Groups[2].Value, [ref]$n) -and $n -gt $best) { $best = $n }
-            }
-            foreach ($m in [regex]::Matches($txt, 'newestVersion[\x00-\x1F]{1,4}"(\d+)"')) {
-                $n = 0
-                if ([int]::TryParse($m.Groups[1].Value, [ref]$n) -and $n -gt $best) { $best = $n }
-            }
-            if ($Slug) {
-                $slugRe = 'collections###revisions###([^#]+)###info###collection###slug[\x00-\x1F]{1,4}"' + [regex]::Escape($Slug) + '"'
-                foreach ($m in [regex]::Matches($txt, $slugRe)) { [void]$revIds.Add($m.Groups[1].Value) }
-            }
-        } catch { }
-    }
-    if ($Slug -and $revIds.Count -gt 0) {
-        foreach ($f in $files) {
-            try {
-                $txt = Get-VortexStateText $f.FullName
-                foreach ($id in $revIds) {
-                    foreach ($m in [regex]::Matches($txt, ('collections###revisions###' + [regex]::Escape($id) + '###info###revisionNumber[\x00-\x1F]{1,4}(\d+)'))) {
-                        $n = 0
-                        if ([int]::TryParse($m.Groups[1].Value, [ref]$n) -and $n -gt $best) { $best = $n }
-                    }
-                }
-            } catch { }
-        }
-    }
-    if ($Slug) {
-        $have = Get-CollectionRevisionFromState $Slug
-        if ($have -gt $best) { $best = $have }
-    }
-    return $best
+    try {
+        Import-VortexStateReader
+        return [Thornswood.VortexProfileState]::CollectionNewest($st, $Slug)
+    } catch { return 0 }
 }
 
 <#

@@ -589,63 +589,6 @@
 
 
   /*
-    ------------------------------------------------- putting the shift on
-
-    Patrick, twice, from playing it: "We keep spawning in with our clothes off
-    still".
-
-    THE SERVER CANNOT DRESS ANYBODY, and that is the whole of it. giveShift
-    pushes the two shift records into the pack with worn: true, and in the
-    engine the worn flag on an inventory entry and the equipment the client
-    actually wears are two different things. There is no 'equipment' property
-    binding for a gamemode at all: the client owns what is equipped and only
-    ever reports it upward. So the shift arrived in the pack and stayed there,
-    folded, and the person stood in the creation hall with nothing on.
-
-    So the only place this can be done is here.
-
-    THE TWO IDS ARE VANILLA AND THEY MUST MATCH CHARGEN.shift IN gamemode.js,
-    which is 1be1a and 1be1b out of Skyrim.esm. They are written here rather
-    than fetched because they are Bethesda's own records and cannot move, and
-    because a fetch that fails would leave somebody naked, which is the thing
-    being fixed. If the shift ever changes, both places change.
-
-    ONCE, AND ONLY WHAT IS NOT ALREADY WORN. Equipping something already worn
-    is how a person ends up dressed twice, and equipping every armour in the
-    pack would take somebody's own clothes off to put rags on. Each id is tried
-    once per session and never again.
-  */
-  const SHIFT_IDS = [0x1be1a, 0x1be1b];
-  let shiftDone = false;
-
-  function wearTheShift() {
-    if (shiftDone) { return; }
-    shiftDone = true;
-    let pc = null;
-    try { pc = sp.Game.getPlayer(); } catch (e) { return; }
-    if (!pc) { return; }
-    const ac = sp.Actor.from(pc);
-    if (!ac) { return; }
-
-    let put = 0;
-    for (let i = 0; i < SHIFT_IDS.length; i++) {
-      const id = SHIFT_IDS[i];
-      try {
-        const form = sp.Game.getFormEx(id);
-        if (!form) { continue; }
-        // Only what they are actually carrying, and only if it is not on.
-        if (pc.getItemCount(form) <= 0) { continue; }
-        if (ac.isEquipped(form)) { continue; }
-        ac.equipItem(form, false, true);   // not preventRemoval, silent
-        put++;
-      } catch (e) {
-        log('could not put on shift item ' + id.toString(16) + ': ' + e);
-      }
-    }
-    if (put) { log('put on ' + put + ' piece(s) of the shift'); }
-  }
-
-  /*
     ------------------------------------------- which race the body is (#614)
 
     Patrick via Smeagle: any clothes a Goblin or Riekling wears break on rejoin
@@ -8007,8 +7950,9 @@
     if (e.code === TRADE_KEY) { lookVerb('trade'); return; }
     if (e.code === MUTE_KEY) { lookVerb('mute'); return; }
     if (e.code === PARTY_KEY) {
-      // On somebody not in your party it asks them (#1629); otherwise, or
-      // while the panel is up and P is closing it, it is the panel.
+      // On somebody not in your party it asks them (#1629); otherwise it is
+      // the panel. While the panel holds the keyboard no buttonEvent comes,
+      // and the page closes itself on P (#1919).
       if (T.hasFocus('party') || !partyPress()) {
         T.js('try{window.thornswoodParty&&window.thornswoodParty.toggle();}catch(e){}');
       }
@@ -8117,12 +8061,6 @@
       */
       try { globalThis.__thornswoodInWorld = true; } catch (e) { }
 
-      /*
-        AND PUT THE SHIFT ON. Here rather than on a tick, because this is the
-        moment the world is known to be up and calls into the game work, which
-        is the same reason the flag above is set here.
-      */
-      wearTheShift();
       // Cleared again on the way out, below. Nothing in the shipped client
       // bundle reads this today, so it costs nothing either way, but a flag
       // that is only ever set true is a flag that lies the moment anything
@@ -8953,6 +8891,12 @@
     }
     if (what === 'ride:ready') { log('the ride panel is in'); return; }
     if (what === 'party:ready' || what === 'journal:ready' || what === 'trade:ready' || what === 'board:ready') {
+      // The P panel closes on P itself while it holds the keyboard, so it
+      // is told which key P is (#1919).
+      if (what === 'party:ready') {
+        T.js('try{window.thornswoodParty&&window.thornswoodParty.setKey&&window.thornswoodParty.setKey(' +
+             JSON.stringify(PARTY_NAME) + ');}catch(e){}');
+      }
       tellServer(what === 'trade:ready' ? '/trade refresh' : '/party refresh');
       log('the ' + what.split(':')[0] + ' panel is in');
       return;
@@ -8977,7 +8921,13 @@
     if (what === 'skills:opened') { T.claimFocus('skills', true); return; }
     if (what === 'skills:closed') { T.claimFocus('skills', false); return; }
     if (what === 'skills:ready' || what === 'skills:refresh') {
-      if (what === 'skills:ready') { log('the skills panel is in'); }
+      if (what === 'skills:ready') {
+        log('the skills panel is in');
+        // The K panel closes on K itself while it holds the keyboard, so it
+        // is told which key K is (#1919).
+        T.js('try{window.thornswoodSkills&&window.thornswoodSkills.setKey&&window.thornswoodSkills.setKey(' +
+             JSON.stringify(keyName(SKILLS_KEY)) + ');}catch(e){}');
+      }
       // The panel mounts after the first property write of the session, so
       // it asks the server to say again what this character already is, and
       // asks again every time it opens. The answer comes back through the
