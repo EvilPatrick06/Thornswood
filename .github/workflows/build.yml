@@ -316,6 +316,7 @@ jobs:
                  'test-1695-party-ask-id.js',
                  'test-1640-jarl-word.js',
                  'test-1638-office.js',
+                 'test-1642-effects-restart.js',
                  'test-1717-property-page.js',
                  'test-1703-test-ports.js',
                  'test-table-install.js',

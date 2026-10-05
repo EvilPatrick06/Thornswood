@@ -101,6 +101,11 @@ A day, for the three once-a-day perks, is 24 real hours from when it
 fired. The clock is kept on the character and written before the perk
 fires, so a restart or a relog cannot fire it twice.
 
+Font of Magic's 15 seconds are kept in memory, so a restart ends them
+and the day stays spent. When you come back into the world the server
+sends your K panel as it stands at that moment, so the free spells are
+not left on you (issue #1642).
+
 | Perk | Fires | What is not in the game yet |
 | --- | --- | --- |
 | Cheat Death | No | All of it. The engine ends you the moment health reaches nothing, and sends the death before the server is asked. The engine has to ask first (issue #1626). The once-a-day clock is in the server, waiting for that |
