@@ -28547,7 +28547,7 @@ log('gamemode loaded:',
     }
     var ids = [];
     try {
-      var doc = JSON.parse(fs.readFileSync(path.join(privDir, 'allowed.json'), 'utf8').replace(/^ï»¿/, ''));
+      var doc = JSON.parse(fs.readFileSync(path.join(privDir, 'allowed.json'), 'utf8').replace(/^\uFEFF/, ''));
       var list = (doc && Array.isArray(doc.profiles)) ? doc.profiles : [];
       for (var i = 0; i < list.length; i++) {
         var n = Number(list[i]);
@@ -28568,7 +28568,7 @@ log('gamemode loaded:',
   function push() {
     var conf;
     try {
-      conf = JSON.parse(fs.readFileSync(path.join(privDir, 'door.json'), 'utf8').replace(/^ï»¿/, ''));
+      conf = JSON.parse(fs.readFileSync(path.join(privDir, 'door.json'), 'utf8').replace(/^\uFEFF/, ''));
     } catch (e) { return; }
     if (!conf || !conf.site || !conf.key) return;
     var https;
@@ -28747,7 +28747,7 @@ log('gamemode loaded:',
     if (now - readAt < 30000) return list;
     readAt = now;
     try {
-      var doc = JSON.parse(fs.readFileSync(FILE, 'utf8').replace(/^ï»¿/, ''));
+      var doc = JSON.parse(fs.readFileSync(FILE, 'utf8').replace(/^\uFEFF/, ''));
       var ids = {};
       if (Array.isArray(doc.profiles)) {
         for (var i = 0; i < doc.profiles.length; i++) {
@@ -29911,7 +29911,7 @@ log('gamemode loaded:',
     var k = '';
     try {
       var dir = String(settings().privDir || 'private');
-      var doc = JSON.parse(String(fs.readFileSync(path.join(dir, 'door.json'), 'utf8')).replace(/^ï»¿/, ''));
+      var doc = JSON.parse(String(fs.readFileSync(path.join(dir, 'door.json'), 'utf8')).replace(/^\uFEFF/, ''));
       k = String((doc && doc.passKey) || '');
     } catch (e) { k = ''; }
     if (!k && fresh('no key', now)) {
@@ -54497,7 +54497,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       Patrick: "why is temp a water drop and the food icon seems weird too".
       He was looking at a real bug. The old flame was
       "M10 18a5 5 0 0 0 5-5c0-4-5-11-5-11S5 9 5 13a5 5 0 0 0 5 5z" and the old
-      droplet was "M10 2C10 2 4 9 4 12.5A6 6 0 0 0 16 12.5C16 9 10 2 10 2z" â€”
+      droplet was "M10 2C10 2 4 9 4 12.5A6 6 0 0 0 16 12.5C16 9 10 2 10 2z":
       the same teardrop, one of them upside down. At fourteen pixels they were
       indistinguishable, so Temp genuinely did look like a second water drop.
       The drumstick was three disconnected strokes and read as nothing at all.
@@ -59139,7 +59139,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     } catch (e) { }
     try {
       var conf = JSON.parse(fs.readFileSync(path.join(privDir, 'door.json'), 'utf8')
-                              .replace(/^ï»¿/, ''));
+                              .replace(/^\uFEFF/, ''));
       if (conf && conf.site && conf.key) { return { site: String(conf.site), key: String(conf.key) }; }
     } catch (e) { }
     return null;
@@ -60266,7 +60266,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var conf = null;
     try {
       conf = JSON.parse(fs.readFileSync(path.join(String(settings().privDir || 'private'), 'door.json'), 'utf8')
-                          .replace(/^ï»¿/, ''));
+                          .replace(/^\uFEFF/, ''));
     } catch (e) { conf = null; }
     if (!conf || !conf.site || !conf.key) { end(false, 'this server has no door.json naming the site'); return; }
     var url;
@@ -60320,7 +60320,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var list = [], pk = [], written = 0;
     try {
       var doc = JSON.parse(fs.readFileSync(path.join(String(settings().privDir || 'private'), 'allowed.json'), 'utf8')
-                             .replace(/^ï»¿/, ''));
+                             .replace(/^\uFEFF/, ''));
       if (doc && Array.isArray(doc.bans)) { list = doc.bans; }
       if (doc && Array.isArray(doc.pk)) { pk = doc.pk; }
       written = Date.parse(String((doc && doc.at) || '')) || 0;
