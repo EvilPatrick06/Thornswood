@@ -24,6 +24,18 @@ namespace Thornswood
     /// showed exactly that. Every plugin was present with the server's bytes;
     /// LOOT had re-sorted the list, and the launcher only compared it with
     /// the shipped reference, which had been re-sorted the same way.
+    ///
+    /// Light plugins have an order of their own (#1715). The game gives each
+    /// one a light index, its place among the light plugins it loads, and
+    /// every form in it the id 0xFE000000 | (index &lt;&lt; 12) | local id. Once the
+    /// server loads them too, that index has to be the same on the server and
+    /// on every client, or a stored light form id names a different plugin.
+    /// Measured on 5 Oct: across 133 session logs since 24 Sep the clients
+    /// reported ten different light orders, KhisartinBeards.esp anywhere from
+    /// light index 0x1E to 0x29, and a beard stored on dev as 0xFE020827 named
+    /// RaceMenuMorphsHIMBO.esp under that day's dev release. LightOrder is the
+    /// game's light order, and ReorderWhole puts a list into the server's
+    /// whole order, light plugins included.
     /// </summary>
     static class LoadOrder
     {
@@ -54,6 +66,28 @@ namespace Thornswood
             foreach (string m in Masters) { order.Add(m); seen.Add(m); }
             Take(order, seen, ccc, isLightOrMissing, existsInData);
             Take(order, seen, enabled, isLightOrMissing, existsInData);
+            return order;
+        }
+
+        /// <summary>
+        /// The light plugin order the game will use, which is what a light
+        /// index counts: the Skyrim.ccc entries that are in Data and light,
+        /// then the enabled entries that are in Data and light, a name never
+        /// listed twice. The game loads the Skyrim.ccc ones before any list,
+        /// so _ResourcePack.esl, which Bethesda's own update puts in every Data
+        /// folder and Skyrim.ccc names, is light index 0 on every machine that
+        /// has it: every light list the game wrote to
+        /// thornswood-plugins-light.txt in the main sessions of 5 Oct starts
+        /// with it. No master hoisting, the same as GameOrder.
+        /// </summary>
+        public static List<string> LightOrder(IList<string> enabled, Func<string, bool> isLight, IList<string> ccc, Func<string, bool> existsInData)
+        {
+            var order = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string m in Masters) seen.Add(m);
+            Func<string, bool> notLight = delegate(string n) { return isLight == null || !isLight(n); };
+            Take(order, seen, ccc, notLight, existsInData);
+            Take(order, seen, enabled, notLight, existsInData);
             return order;
         }
 
@@ -174,7 +208,32 @@ namespace Thornswood
         /// </summary>
         public static List<string> Reorder(IList<string> lines, IList<string> manifest, Func<string, bool> isLight)
         {
+            return Put(lines, manifest, isLight, null);
+        }
+
+        /// <summary>
+        /// The same lines with every plugin the server names, full and light,
+        /// in the server's whole order (#1715): <paramref name="whole"/> is the
+        /// manifest's loadOrder, which a server that loads light plugins
+        /// publishes beside its light list. The light plugins land in the
+        /// server's light order, so each takes the light index the server
+        /// stores its forms under, and among the full ones where the server
+        /// has them. The names the game loads before it reads any list, the
+        /// five masters and <paramref name="loadedFirst"/> (Skyrim.ccc's), are
+        /// skipped on the server's side: the server names _ResourcePack.esl
+        /// as its first light plugin and no plugin list carries it. Null for
+        /// the same reasons as Reorder. A name of its own rather than an
+        /// overload, because tests	est-load-order.ps1 calls these by name.
+        /// </summary>
+        public static List<string> ReorderWhole(IList<string> lines, IList<string> whole, IList<string> loadedFirst)
+        {
+            return Put(lines, whole, null, loadedFirst);
+        }
+
+        static List<string> Put(IList<string> lines, IList<string> manifest, Func<string, bool> isLight, IList<string> loadedFirst)
+        {
             if (lines == null || manifest == null) return null;
+            var first = Names(loadedFirst);
 
             // Which line enables each plugin. Two lines enabling the same
             // name is a list nothing here can put in one order, so it is
@@ -194,7 +253,7 @@ namespace Thornswood
             foreach (string raw in manifest)
             {
                 string n = Norm(raw);
-                if (n.Length == 0 || IsMaster(n) || placed.Contains(n)) continue;
+                if (n.Length == 0 || IsMaster(n) || first.Contains(n) || placed.Contains(n)) continue;
                 placed.Add(n);
                 int line;
                 if (!at.TryGetValue(n, out line)) return null;
@@ -238,8 +297,20 @@ namespace Thornswood
         /// </summary>
         public static List<string> NotEnabled(IList<string> lines, IList<string> manifest)
         {
+            return Missing(lines, manifest, null);
+        }
+
+        /// <summary>NotEnabled for ReorderWhole: the names the game loads first are skipped, as it skips them.</summary>
+        public static List<string> NotEnabledWhole(IList<string> lines, IList<string> whole, IList<string> loadedFirst)
+        {
+            return Missing(lines, whole, loadedFirst);
+        }
+
+        static List<string> Missing(IList<string> lines, IList<string> manifest, IList<string> loadedFirst)
+        {
             var missing = new List<string>();
             if (lines == null || manifest == null) return missing;
+            var first = Names(loadedFirst);
             var have = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (string l in lines)
             {
@@ -249,10 +320,22 @@ namespace Thornswood
             foreach (string raw in manifest)
             {
                 string n = Norm(raw);
-                if (n.Length == 0 || IsMaster(n) || have.Contains(n)) continue;
+                if (n.Length == 0 || IsMaster(n) || first.Contains(n) || have.Contains(n)) continue;
                 if (!missing.Contains(n)) missing.Add(n);
             }
             return missing;
+        }
+
+        static HashSet<string> Names(IList<string> names)
+        {
+            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (names == null) return set;
+            foreach (string raw in names)
+            {
+                string n = Norm(raw);
+                if (n.Length > 0) set.Add(n);
+            }
+            return set;
         }
     }
 }

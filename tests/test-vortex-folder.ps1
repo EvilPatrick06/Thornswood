@@ -135,6 +135,8 @@ namespace Thornswood
         public static List<string> NotLight() { return new List<string>(); }
         public static List<string> NotLight(IEnumerable<string> mustBeLight) { return new List<string>(); }
         public static List<string> StrayCreations(ICollection<string> wanted) { return new List<string>(); }
+        // Against a server's light order (#1715).
+        public static List<string> StrayCreations(ICollection<string> wanted, ICollection<string> serverLight) { return new List<string>(); }
         public static bool TakesNoPlace(string name) { return false; }
         public static int IsolateForeign(Action<string> say) { return 0; }
         public static int FlagLight(Action<string> say) { return 0; }
@@ -144,6 +146,7 @@ namespace Thornswood
         // plugin list alone.
         public static string VortexProfileDir(string name) { return null; }
         public static int IsolateCreations(ICollection<string> wanted, Action<string> say) { return 0; }
+        public static int IsolateCreations(ICollection<string> wanted, ICollection<string> serverLight, Action<string> say) { return 0; }
     }
     static class Keep { public static List<string> Held() { return new List<string>(); } }
     static class Junction { public static bool IsLink(string p) { return false; } }
