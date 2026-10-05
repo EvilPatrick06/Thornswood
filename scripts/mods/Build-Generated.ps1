@@ -77,9 +77,11 @@
   1 when it stopped, 3 when the folder is in use.
 
 .PARAMETER Channel
-  main or dev: which install's folder to build in, the same way Ship.ps1
-  finds it. dev is the main install's folder with -DevBuild on the end.
-  Required unless -Root is given, so the folder is always chosen.
+  main or dev: which install's folder to build in, the one Ship.ps1 builds
+  that channel's release from: Where.ps1 ShipRoot or ShipRootDev (#1692),
+  the folder Setup-ShipMachine.ps1 -Root recorded, or else the launcher
+  install, and for dev that with -DevBuild on the end. Required unless -Root
+  is given, so the folder is always chosen.
 
 .PARAMETER Root
   The Thornswood install to build in (the folder with Game, Launcher and
@@ -144,19 +146,12 @@ function Die([string]$m, [int]$code = 1) {
 $script:WorkDir = ''
 
 # ------------------------------------------------------------ which folder
-function Find-Root {
-    $first = 'C:\Thornswood'
-    if (Test-Path -LiteralPath (Join-Path $first 'Launcher\Thornswood.exe')) { return $first }
-    foreach ($d in @(Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Root -match '^[A-Za-z]:\\$' })) {
-        $cand = Join-Path $d.Root 'Thornswood'
-        if (Test-Path -LiteralPath (Join-Path $cand 'Launcher\Thornswood.exe')) { return $cand }
-    }
-    return $first
-}
+# The one Ship builds the channel's release from, which Where.ps1 answers for
+# Ship, Check-ShipReady, Setup-ShipMachine and this alike (#1692).
 if (-not $Root) {
-    if (-not $Channel) { Die 'Say which folder: -Channel dev (C:\Thornswood-DevBuild) or -Channel main (C:\Thornswood).' }
-    $Root = Find-Root
-    if ($Channel -eq 'dev') { $Root = $Root + '-DevBuild' }
+    if (-not $Channel) { Die 'Say which folder: -Channel dev or -Channel main (the folder Ship builds that channel from), or -Root.' }
+    try { $Root = [string](& (Join-Path $RepoDir 'scripts\release\Where.ps1') $(if ($Channel -eq 'dev') { 'ShipRootDev' } else { 'ShipRoot' })) }
+    catch { Die $_.Exception.Message }
 }
 $Root = [IO.Path]::GetFullPath($Root).TrimEnd('\')
 if (-not $Channel) { $Channel = $(if ($Root -match '-DevBuild$') { 'dev' } else { 'main' }) }

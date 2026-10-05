@@ -46,20 +46,37 @@
        question Ship asks (the dev build, its game folder, the Vortex profile,
        the VPS and the feed store) and gives the verdict.
 
+  WHICH FOLDER A RELEASE IS BUILT FROM (#1692). -Root records the folder
+  this machine builds the channel's release from, in the file Where.ps1
+  ShipRoots names (this machine's own data, beside its copies of the feeds),
+  and Ship, Check-ShipReady, this and Build-Generated read it back through
+  Where.ps1 ShipRoot and ShipRootDev. Needed where that is not the launcher
+  install (main) or the install with -DevBuild on the end (dev): on a machine
+  whose Vortex deploys into C:\Thornswood-DevBuild, the dev release folder is
+  another one (docs\COLLECTION-REVISION-2.md step 8). A folder Vortex
+  deploys into is never recorded.
+
   WHAT IT NEVER DOES. It writes no secret anywhere, never turns signing off
   or writes "enabled": false, never edits an existing records\signing\signing.json,
   never ships, publishes or deploys, and does not sign anything. The only
   files it writes are the signing client under records\signing\client, a new
   records\signing\signing.json, the six client files in the build folder
   (Where.ps1 ClientDist), and its downloads under out\ship-machine, all
-  ignored by git.
+  ignored by git, and with -Root the file Where.ps1 ShipRoots names, outside
+  the repository.
 
   Any developer may run a main Ship from a machine that can sign
   (Developer-Guide.md): -Channel main checks that machine.
 
 .PARAMETER Channel
   dev (the default) or main: which channel Check-ShipReady asks about, and
-  which game folder the client is checked in (<root>-DevBuild\Game for dev).
+  which game folder the client is checked in (the channel's release folder,
+  Where.ps1 ShipRoot or ShipRootDev, and its Game).
+
+.PARAMETER Root
+  The folder this machine builds the channel's release from, recorded for
+  Ship, Check-ShipReady and Build-Generated to read (see WHICH FOLDER). With
+  -Check it is only used, not recorded.
 
 .PARAMETER Check
   Report only. Nothing is fetched or written; each step says what it would do.
@@ -88,6 +105,11 @@
 .EXAMPLE
   .\scripts\release\Setup-ShipMachine.ps1
   Prepares what it can for a dev Ship, then runs Check-ShipReady -Channel dev.
+
+.EXAMPLE
+  .\scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root C:\Thornswood-Release-DevBuild
+  The same, and records that a dev release on this machine is built from
+  C:\Thornswood-Release-DevBuild.
 #>
 [CmdletBinding()]
 param(
@@ -97,7 +119,8 @@ param(
   [switch]$Rebuild,
   [switch]$NoVps,
   [switch]$NoPause,
-  [string]$Site = 'https://thornswood.net'
+  [string]$Site = 'https://thornswood.net',
+  [string]$Root = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -322,15 +345,20 @@ function Install-ClientRuntime([string]$Zip, [string]$Sha256, [long]$Bytes, [str
   return ''
 }
 
-# Same rule as Find-Root in Ship.ps1 and Sync-Client.ps1.
-function Find-Root {
-  $first = 'C:\Thornswood'
-  if (Test-Path -LiteralPath (Join-Path $first 'Launcher\Thornswood.exe')) { return $first }
-  foreach ($d in @(Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Root -match '^[A-Za-z]:\\$' })) {
-    $cand = Join-Path $d.Root 'Thornswood'
-    if (Test-Path -LiteralPath (Join-Path $cand 'Launcher\Thornswood.exe')) { return $cand }
+# Records $Root as the folder a $Channel release is built from, in $File (the
+# one Where.ps1 ShipRoots names, #1692), keeping what it says for the other
+# channel. A file that does not read as JSON is left as it is and throws.
+function Save-ShipRoot([string]$File, [string]$Channel, [string]$Root) {
+  $rec = [ordered]@{}
+  if (Test-Path -LiteralPath $File) {
+    $old = $null
+    try { $old = [IO.File]::ReadAllText($File) | ConvertFrom-Json } catch { $old = $null }
+    if ($null -eq $old) { throw ($File + ' does not read as JSON, so it was left as it is. Fix it or delete it, then run this again.') }
+    foreach ($p in @($old.PSObject.Properties)) { $rec[$p.Name] = $p.Value }
   }
-  return $first
+  $rec[$Channel] = $Root
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $File) | Out-Null
+  [IO.File]::WriteAllText($File, (ConvertTo-Json -InputObject $rec), (New-Object Text.UTF8Encoding($false)))
 }
 
 # signtool the way Sign-Artifact.ps1 looks for it: newest x64 in the SDK.
@@ -367,6 +395,28 @@ if ($Channel -eq 'main') {
 }
 
 $Work = Join-Path (& (Join-Path $Here 'Where.ps1') Out) 'ship-machine'
+
+# ------------------------------------------ the folder a release is built from --
+# See WHICH FOLDER above (#1692). -Root is recorded for this channel, beside
+# whatever the file already says for the other one, unless it is a folder
+# Vortex deploys into, which Ship refuses.
+Head ('The folder a ' + $Channel + ' release is built from')
+$rootsFile = & (Join-Path $Here 'Where.ps1') ShipRoots
+if ($Root) {
+  $Root = [IO.Path]::GetFullPath($Root).TrimEnd('\')
+  $vortexRoot = Test-Path -LiteralPath (Join-Path $Root 'Game\Data\vortex.deployment.json')
+  Row ('it is not a folder Vortex deploys into') (-not $vortexRoot) $Root `
+    $(if ($vortexRoot) { 'Game\Data\vortex.deployment.json is there: give -Root the release folder, not Vortex''s (docs\COLLECTION-REVISION-2.md step 8)' } else { '' })
+  if ($Check -and -not $vortexRoot) { Plan ('record ' + $Root + ' as the folder a ' + $Channel + ' release is built from, in ' + $rootsFile) }
+  elseif (-not $vortexRoot) {
+    Save-ShipRoot $rootsFile $Channel $Root
+    Say ('  recorded in ' + $rootsFile) 'Green'
+  }
+  $shipRoot = $Root
+} else {
+  $shipRoot = [string](& (Join-Path $Here 'Where.ps1') $(if ($Channel -eq 'dev') { 'ShipRootDev' } else { 'ShipRoot' }))
+  Say ('  ' + $shipRoot + $(if (Test-Path -LiteralPath $rootsFile) { ', as ' + $rootsFile + ' says or the install rule gives' } else { ', the install rule; -Root records another' })) 'DarkGray'
+}
 
 # ------------------------------------------------------------ 1. the tools --
 Head '1. The tools a Ship calls'
@@ -458,9 +508,7 @@ $rec = Get-Content -LiteralPath $record -Raw | ConvertFrom-Json
 $commit = [string]$rec.forkCommit
 $total = @($rec.files.PSObject.Properties).Count
 $dist = & (Join-Path $Here 'Where.ps1') ClientDist
-$gameRoot = Find-Root
-if ($Channel -eq 'dev') { $gameRoot = $gameRoot + '-DevBuild' }
-$game = Join-Path $gameRoot 'Game'
+$game = Join-Path $shipRoot 'Game'
 $inGame = Get-ClientMatch $record $game
 $inDist = Get-ClientMatch $record $dist
 Say ('  record ' + $commit + '; the game folder ' + $game + ' holds ' + $inGame + ' of ' + $total + ', the build folder ' + $inDist + ' of ' + $total) 'DarkGray'
@@ -525,6 +573,7 @@ Say '  Then Check-ShipReady asks everything else a Ship asks:' 'DarkGray'
 # ------------------------------------------------------ 6. Check-ShipReady --
 $readyArgs = @{ Channel = $Channel; NoPause = $true }
 if ($NoVps) { $readyArgs['NoVps'] = $true }
+if ($Root) { $readyArgs['Root'] = $Root }
 $global:LASTEXITCODE = 0
 & (Join-Path $Here 'Check-ShipReady.ps1') @readyArgs
 $readyCode = $LASTEXITCODE
