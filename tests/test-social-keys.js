@@ -106,7 +106,10 @@ function rig(opts) {
     'const OFF_MENU = { openedBy: function () { return ""; }, shutFor: function () { }, keyDown: function () { } };\n' +
     'const statsOnSlash = OFF_MENU, magicOnP = OFF_MENU;\n' +
     'function busyMenuOpen() { for (const n of KEYBOARD_MENUS) { if (sp.Ui.isMenuOpen(n)) { return n; } } return ""; }\n' +
-    'function lookVerb(v) { verbs.push(v); }\n';
+    'function lookVerb(v) { verbs.push(v); }\n' +
+    // P on somebody not in your party asks them in (#1629). Nobody is looked
+    // at here, so P is the panel; test-1629-party-gui.js has the ask.
+    'function partyPress() { return false; }\n';
   new Function('sp', 'T', 'claims', 'say', 'guard', 'verbs', prelude + keys)(
     sp, T, claims, function (t) { w.logs.push(String(t)); }, guard, w.verbs);
   w.press = function (code) {
