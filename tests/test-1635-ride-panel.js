@@ -244,7 +244,7 @@ if (R0) {
   const PW = pm ? new Function('return ' + pm[1])() : [];
   yes('the server still answers /ride, the line the panel sends', W.indexOf('/ride') >= 0 &&
     /if \(word === '\/ride'\) \{[\s\S]{0,400}?__thornswoodCarriages[\s\S]{0,200}?\.command\(parts, actorId, profileId, toProfile\)/.test(gm));
-  yes('and /ride is not among the words named to everybody, which /help reads', PW.length > 10 && PW.indexOf('/ride') < 0);
+  yes('and /ride is not among the words named to everybody, which /help reads', PW.indexOf('/helpme') !== -1 && PW.indexOf('/ride') < 0);
   // '/ride threw:' is the router's line for the server log, which nobody in the world reads.
   const lits = (gm.match(/'(?:[^'\\\n]|\\.)*'/g) || []).filter(function (l) {
     return /\/ride/.test(l) && l !== "'/ride threw:'";

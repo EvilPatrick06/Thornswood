@@ -180,7 +180,9 @@ yes('and the page says ' + spoken(LAPSE) + ' seconds', says(text, LAPSE, '', ' s
   const pm = src.match(/const PLAYER_WORDS = (\[[\s\S]*?\]);/);
   let words = [];
   try { words = pm ? new Function('return ' + code(pm[1]))() : []; } catch (e) { words = []; }
-  yes('the gamemode says which commands everybody may use', words.length > 10);
+  // Read when it names /helpme, which stays a command (Patrick, 4 Oct): the
+  // list shrinks with every conversion to buttons, so its length says nothing.
+  yes('the gamemode says which commands everybody may use', words.indexOf('/helpme') !== -1);
 
   const named = (text.match(/\/[a-z]+/g) || []).filter(function (w, i, all) {
     return all.indexOf(w) === i;

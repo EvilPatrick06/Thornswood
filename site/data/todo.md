@@ -83,7 +83,7 @@ redeploy brings the collection back.
 
 - Emote wheel. It was on this list as never investigated. It has been in
   `thornswood-emotes.js` the whole time: G opens it, Tab moves to the
-  search, N stops, fifty nine emotes and eight quick slots. G is WheelKey = 34
+  search, N stops, sixty emotes and eight quick slots. G is WheelKey = 34
   in `launcher\Thornswood.ini`, and 34 is also the plugin's fallback when
   that line is missing. The number keys 1 to 8 play a slot with the wheel shut.
 - The installer is one small file now and fetches its own payload, which is
