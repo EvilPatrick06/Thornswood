@@ -7,7 +7,10 @@ The rule is on [Thornswood systems](../SYSTEMS.md), "Buttons, not
 commands". Decided by Patrick on 4 Oct: anything a person does in the
 world is a key, a prompt, a panel, or the thing itself activated. Staff
 and dev commands stay commands. Each command for people below has an
-issue that turns it into buttons, and the umbrella is #1620.
+issue that turns it into buttons, except `/stuck`, `/helpme` and
+`/report`, which stay commands (Patrick, later on 4 Oct: "change it to
+except the /stuck and the ones for getting help from GMs"). The
+umbrella is #1620.
 
 File and line numbers are main at 9b5a667 on 4 Oct. They move as the
 files change, so each row also names the function or block.
@@ -37,10 +40,11 @@ stop"). Each conversion issue takes its commands out of all of them.
 
 ## Commands for people
 
-Each of these becomes buttons. The server may keep a line as an
-internal message that a key or a panel sends, the way Y, H and L on the
-look prompt send `/friend`, `/trade` and `/mute` with the id under the
-crosshair. Nobody is told to type it, and help text never lists it.
+Each of these becomes buttons, except the two rows that say they stay.
+The server may keep a line as an internal message that a key or a panel
+sends, the way Y, H and L on the look prompt send `/friend`, `/trade`
+and `/mute` with the id under the crosshair. Nobody is told to type it,
+and help text never lists it.
 
 | Command | Who | What it does | Read at | Where people are told | Buttons today, then to come | Issue |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -62,8 +66,8 @@ crosshair. Nobody is told to type it, and help text never lists it.
 | `/needs` | Anybody | The meters, the warmth with its working out, what is counted as worn | `gamemode.js:44946` | The list; Help page; [Temperature](temperature.md); `site/data/known.md` | The four bars. To come: the rest of it on a panel. | #1631 |
 | `/eat`, `/drink`, `/drink ale` | Anybody | Food or drink with no item | `gamemode.js:45030` to `45040` | The list; `/help living`; Help page; [Emotes](emotes.md) | Eating or drinking the item is already reported as `/ate`. To come: taken out. | #1631 |
 | `/bard` | Anybody | +25 rest for everyone resting in the cell, for 5 minutes | `gamemode.js:44993` | The list; [Exhaustion](exhaustion.md), [Emotes](emotes.md), [People beside you](people.md), [Text chat](chat.md); `site/data/site/classes.md` | None. To come: a button, asked on the issue. | #1631 |
-| `/helpme <what>`, `/help-me`, `/report <name> <what>` | Anybody | Reaches staff; reports somebody to staff | `gamemode.js:45537`, the asking staff block's `ask` (52023) | The list; `/help staff`; Help page "Getting staff"; `site/data/site/privacy.md` | None. To come: a help panel. | #1632 |
-| `/stuck` | Anybody | Out of a wedged spot, a few steps back or to a temple | `gamemode.js:45522`, the stuck block's `command` (52595) | The list; `/help staff`; `site/data/site/privacy.md` | None. To come: a button on the help panel. | #1632 |
+| `/helpme <what>`, `/help-me`, `/report <name> <what>` | Anybody | Reaches staff; reports somebody to staff | `gamemode.js:45537`, the asking staff block's `ask` (52023) | The list; `/help staff`; Help page "Getting staff"; `site/data/site/privacy.md` | Stays a command, and the help names it (Patrick, 4 Oct). | None |
+| `/stuck` | Anybody | Out of a wedged spot, a few steps back or to a temple | `gamemode.js:45522`, the stuck block's `command` (52595) | The list; `/help staff`; `site/data/site/privacy.md` | Stays a command, and the help names it (Patrick, 4 Oct). | None |
 | `/help [topic]`, `/commands` | Anybody | The help in the game | `gamemode.js:45550` | Help page "Everything else is on /help"; the unknown word reply | None. To come: a help panel. | #1633 |
 | `/merchant <id>`, `/merchant buy`, `sell`, `supply`, `close` | Anybody at a guild trader | A trader's wares | `gamemode.js:44619`, then `command` (54951) | The list; [Merchant's Guild](merchants-guild.md) | E on a trader opens the panel, which sends the rest. Out of the list and the page. | #1633 |
 | `/where` | Anybody today; a dev's tool | The cell, position and angle you stand at | `gamemode.js:45073` | The list | Stays a command, for dev and testers only. | #1633 |

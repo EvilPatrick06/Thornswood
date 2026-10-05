@@ -94,6 +94,8 @@ const mostOnlineFallback = () => 0;
 // writes back (entry 142).
 eval(grab('guildMembers') + '\n' + grab('memberOf') + '\n' + grab('roleNames') + '\n' + grab('standing') +
      '\n' + route('function holdsStaffRole(') +
+     // The Business Owner, Faction Owner and Dev roles standing reads by name (#1417, #1420).
+     '\n' + route('function holdsNamedRole(') +
      '\n' + grab('standingCached') + '\n' + grab('hasLeft') + '\n' + grab('departed') +
      '\n' + route('function notAcceptedYet(') +
      // What a banned account is told at Play (#1010).
@@ -103,6 +105,8 @@ eval(grab('guildMembers') + '\n' + grab('memberOf') + '\n' + grab('roleNames') +
      '\n' + src.slice(src.indexOf('const PLAY_BODY_MS'), src.indexOf('\n', src.indexOf('const PLAY_BODY_MS'))) +
      '\n' + route('class BodyFailed') + '\n' + route('function passBodyFailure(') +
      '\n' + route('function within(') + '\n' + route('function standingLate(') +
+     // The one 503 body every launcher door sends when Discord did not answer (#1164).
+     '\n' + route('function discordUnasked(') +
      '\nasync function join(p, req, res) {\n' + JOIN + '\n}');
 
 function reset() {
