@@ -27,8 +27,11 @@
                                       (yarn check --integrity); the bundle
                                       names that map
     package.json, yarn.lock           the fork's skymp5-server ones, byte for byte
-    data\scripts\*                    the fork's skymp5-scripts\pex, byte for byte,
-                                      every one of them
+    data\scripts\*                    the fork's compiled Papyrus, byte for byte,
+                                      every one of them: build\skymp5-scripts\pex
+                                      when the build compiled it there, each
+                                      newer than its .psc, otherwise the
+                                      committed skymp5-scripts\pex (#1220)
     launch_server.bat                 the one the fork's configure wrote
     scam_native.node                  built from the clone, newer than its sources
   Anything else stops it and nothing is written.
@@ -175,12 +178,33 @@ $srv = Join-Path $Clone 'skymp5-server'
 foreach ($n in 'package.json', 'yarn.lock') {
   if (-not (Test-SameBytes (Join-Path $Dist $n) (Join-Path $srv $n))) { $why += "$n in the build is not the fork's skymp5-server\$n" }
 }
-$pexDir = Join-Path $Clone 'skymp5-scripts\pex'
+# The fork's Papyrus. With the Creation Kit's compiler, the fork compiles it
+# into its build folder and leaves the committed skymp5-scripts\pex alone
+# (fork #31, #1220); without it, the build copies the committed files. So
+# data\scripts is held to the build's own compile when there is one, each
+# newer than the .psc it came from, and to the committed files otherwise.
+$pexName = 'skymp5-scripts\pex'
+$builtPexName = 'build\skymp5-scripts\pex'
+$builtPex = Join-Path $Clone $builtPexName
+$pscDir = Join-Path $Clone 'skymp5-scripts\psc'
+if (Test-Path -LiteralPath $builtPex) {
+  $pexName = $builtPexName
+  $psc = @(if (Test-Path -LiteralPath $pscDir) { Get-ChildItem -LiteralPath $pscDir -File -Filter '*.psc' })
+  foreach ($s in $psc) {
+    $p = Join-Path $builtPex ($s.BaseName + '.pex')
+    if (-not (Test-Path -LiteralPath $p)) { $why += "the build compiled the fork's Papyrus into $builtPexName but has no $($s.BaseName).pex for skymp5-scripts\psc\$($s.Name)" }
+    elseif ((Get-Item -LiteralPath $p).LastWriteTime -lt $s.LastWriteTime) { $why += "$builtPexName\$($s.BaseName).pex is older than skymp5-scripts\psc\$($s.Name), so it was not compiled from it" }
+  }
+  foreach ($p in @(Get-ChildItem -LiteralPath $builtPex -File)) {
+    if (-not (@($psc | Where-Object { $_.BaseName -eq $p.BaseName }).Count)) { $why += "$builtPexName\$($p.Name) has no .psc in the fork's skymp5-scripts\psc" }
+  }
+}
+$pexDir = Join-Path $Clone $pexName
 $distPex = Join-Path $Dist 'data\scripts'
 $forkPex = @(if (Test-Path -LiteralPath $pexDir) { Get-ChildItem -LiteralPath $pexDir -File | ForEach-Object { $_.Name } })
 if (-not $forkPex.Count) { $why += "the fork has no compiled Papyrus in $pexDir, so data\scripts cannot be tied to it" }
 foreach ($n in $forkPex) {
-  if (-not (Test-SameBytes (Join-Path $distPex $n) (Join-Path $pexDir $n))) { $why += "data\scripts\$n in the build is not the fork's skymp5-scripts\pex\$n" }
+  if (-not (Test-SameBytes (Join-Path $distPex $n) (Join-Path $pexDir $n))) { $why += "data\scripts\$n in the build is not the fork's $pexName\$n" }
 }
 foreach ($f in @(if (Test-Path -LiteralPath $distPex) { Get-ChildItem -LiteralPath $distPex -Recurse -File })) {
   if ($forkPex -notcontains $f.Name) { $why += "data\scripts\$($f.Name) in the build is not one the fork compiles" }
