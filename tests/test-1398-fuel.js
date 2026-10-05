@@ -153,7 +153,7 @@ const pieces = {
         'function craftRow(recipeDesc)', 'function fuelFor(recipeDesc)', 'function packCount(actorId, itemDesc)',
         'function charcoalHeld(actorId, grade)', 'function fuelRefusal(fuel)', 'function wantsAHandle(row)',
         'function holdsPerk(actorId, key)', 'function wovenMark(actorId)', 'function markWoven(actorId, outDesc, name, n)',
-        'function masterCraft(actorId, row, count)'].map(cut),
+        'function masterCraft(actorId, row, count)', 'function unfitToMake(actorId, workbenchId)'].map(cut),
   onCraft: slice(gm, "mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {", '\n});\n')
 };
 yes('the craft pieces are all in the gamemode',
