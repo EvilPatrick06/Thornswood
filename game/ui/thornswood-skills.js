@@ -135,6 +135,13 @@
       'skills:pick perk fontofmagic', and a refusal comes back as a note
       about 'perk'.
 
+    weave: 'warmth' | 'armour'
+      What a Master Weaver's next garments carry (#1398), sent only to
+      somebody who holds the perk, and only in the world. Drawn under the
+      perk on their own profession card; a press on the other one sends
+      'skills:pick weave <key>', and a refusal comes back as a note about
+      'weave'.
+
     property: [ { name, mine: <bool>, locked, keyed, b, by,
                   rent: { amount, every, owed } | null,
                   sleep: [ { pid, name } ], farm, days, reach } ]
@@ -2381,6 +2388,7 @@
           card.appendChild(el('div', 'inn', 'Pick the half you will make your own. The other is yours at novice from the start.'));
         }
         if (r.perk) card.appendChild(el('div', 'perk', r.perk));
+        if (isMine && mine.weave) drawWeave(card);
       }
       card.onclick = function () {
         if (have) { rowAt = i; draw(); return; }
@@ -2395,6 +2403,44 @@
     });
     if (laterOffered('profession')) laterCard(wrap, 'profession', rows().length);
     elBody.appendChild(wrap);
+  }
+
+  /*
+    MASTER WEAVER'S PICK (#1398), under the perk on a Master Weaver's own
+    profession card: what the garments they make from now on carry, warmth
+    or armour, and never both. The server sends weave, 'warmth' or 'armour',
+    to somebody who holds the perk and to nobody else. The lit one is what
+    it holds; a press on the other sends 'skills:pick weave <key>', and the
+    answer is the view written again. The numbers are the server's: 4 is
+    NEEDS.wear.woven.degrees and 10% is WOVEN.less in the maneuvers block.
+  */
+  var WEAVES = [
+    { key: 'warmth', name: 'Warmth', desc: 'One worn ignores 4 degrees of the weather.' },
+    { key: 'armour', name: 'Armour', desc: 'Hidden armour: one worn gives back 10% of each hit.' }
+  ];
+  function weaveWaiting() {
+    for (var i = 0; i < pending.length; i++) if (pending[i].section === 'weave') return true;
+    return false;
+  }
+  function drawWeave(card) {
+    card.appendChild(el('div', 'inn', 'What the garments you make from now on carry. Each one carries one of the two.'));
+    var row = el('div', 'halves');
+    WEAVES.forEach(function (w) {
+      var on = mine.weave === w.key;
+      var h = el('div', 'half' + (on ? ' mine' : ''));
+      h.appendChild(el('div', 'hn', w.name));
+      h.appendChild(el('div', 'hd', w.desc));
+      if (on) h.appendChild(el('div', 'hr', 'What you weave now'));
+      h.onclick = function (ev) {
+        ev.stopPropagation();
+        if (on || weaveWaiting()) return;
+        send('weave', 'weave ' + w.key);
+        status = 'Sent.'; statusKind = '';
+        draw();
+      };
+      row.appendChild(h);
+    });
+    card.appendChild(row);
   }
 
   function drawHome() {
@@ -3058,6 +3104,10 @@
       }
       else if (p.section === 'tree') { status = 'Spent.'; statusKind = 'ok'; }
       else if (p.section === 'perk' && perkRunning('fontofmagic')) { status = 'Font of Magic: for 15 seconds, a spell costs nothing.'; statusKind = 'ok'; }
+      else if (p.section === 'weave' && after.weave && after.weave !== (before && before.weave)) {
+        status = after.weave === 'armour' ? 'The garments you make now carry hidden armour.' : 'The garments you make now keep the weather off.';
+        statusKind = 'ok';
+      }
       else done = false;
       if (done) picked[p.section] = null;
       else if (now - p.at < PENDING_MS) keep.push(p);
@@ -3090,7 +3140,7 @@
     list on PENDING_MS. The card stays as it was picked either way, so it can
     be sent again or replaced.
   */
-  var ABOUT_SECTION = { 'class': 'class', 'profession': 'profession', 'spell': 'spells', 'staffspell': 'staff', 'town': 'home', 'spend': 'tree', 'perk': 'perk', 'study': 'college' };
+  var ABOUT_SECTION = { 'class': 'class', 'profession': 'profession', 'spell': 'spells', 'staffspell': 'staff', 'town': 'home', 'spend': 'tree', 'perk': 'perk', 'study': 'college', 'weave': 'weave' };
   function refused(text, about) {
     status = 'No: ' + text + '.'; statusKind = 'no';
     if (!pending.length) return;

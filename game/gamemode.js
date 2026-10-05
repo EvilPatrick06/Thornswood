@@ -26844,12 +26844,15 @@ function wantsAHandle(row) {
   is credited once, by the caller, as before.
 
   Master Weaver, docs/systems/professions/tailor.md: clothing a master tailor
-  makes keeps the weather off. Which garment is one is written on it, the way
-  durability writes a condition and a key its house: the fresh garment is
-  named with the needs block's mark in front, and the needs block reads the
-  mark off what is worn. The hidden armour half is not here: the page gives
-  it no rating, and the server cannot reach a garment's armour (see the note
-  over the durability block).
+  makes carries hidden armour or keeps the weather off, and Patrick's answer
+  on #1398 is that the tailor picks one per garment. The pick is on the K
+  panel's profession card and stays until they change it (weaveOf in the
+  character block), so a garment is woven for what was lit when it was made.
+  Which garment is one is written on it, the way durability writes a
+  condition and a key its house: the fresh garment is named with the mark of
+  the half it carries in front, the needs block's for the weather and the
+  maneuvers block's for the armour, and each block reads its own mark off
+  what is worn.
 
   The perk is the progression block's own answer (perks), so it is held at
   master in the half somebody picked and nowhere else.
@@ -26861,10 +26864,22 @@ function holdsPerk(actorId, key) {
   try { return P.perks(C.stateOf(actorId)).indexOf(key) !== -1; } catch (e) { return false; }
 }
 
+/** The mark a master weaver's garment carries now: the armour's when that is their pick, else the weather's. */
+function wovenMark(actorId) {
+  const C = globalThis.__thornswoodCharacter;
+  let weave = '';
+  try { weave = C && C.weaveOf ? C.weaveOf(C.stateOf(actorId)) : ''; } catch (e) { weave = ''; }
+  if (weave === 'armour') {
+    const M = globalThis.__thornswoodManeuvers;
+    return M && M.WOVEN ? M.WOVEN.mark : '';
+  }
+  const N = globalThis.__thornswoodNeeds;
+  return N && N.NEEDS && N.NEEDS.wear && N.NEEDS.wear.woven ? N.NEEDS.wear.woven.mark : '';
+}
+
 /** Name n plain units of a garment just made as a master weaver's. Answers how many. */
 function markWoven(actorId, outDesc, name, n) {
-  const N = globalThis.__thornswoodNeeds;
-  const mark = N && N.NEEDS && N.NEEDS.wear && N.NEEDS.wear.woven ? N.NEEDS.wear.woven.mark : '';
+  const mark = wovenMark(actorId);
   const baseId = idOf(outDesc);
   if (!mark || !baseId || !(n > 0)) { return 0; }
   let inv = null;
@@ -42489,6 +42504,36 @@ log('gamemode loaded:',
     }
   }
 
+  /*
+    WHAT A MASTER WEAVER'S GARMENTS CARRY (#1398). Patrick's answer on #1398:
+    the tailor picks one per garment, warmth or armour. The pick is on the
+    profession card on K, whose two buttons send /pick weave warmth and
+    /pick weave armour (nobody types either), and it is kept on the character
+    as weave until they press the other. markWoven reads it at the craft.
+    Warmth until they pick armour, which is what every garment woven before
+    there was a pick carries. null for anybody who does not hold the perk.
+  */
+  function weaveOf(s) {
+    if (!s || P.perks(s).indexOf('masterweaver') === -1) { return null; }
+    return s.weave === 'armour' ? 'armour' : 'warmth';
+  }
+
+  /** What a Master Weaver is told when the pick is taken. */
+  function weaveLine(weave) {
+    if (weave === 'armour') {
+      var M = g.__thornswoodManeuvers;
+      var back = (M && M.WOVEN) ? Math.round(M.WOVEN.less * 100) : 0;
+      return 'The garments you make now carry hidden armour' +
+             (back ? ': one worn gives back ' + back + '% of each hit' : '') +
+             '. They do not keep the weather off.';
+    }
+    var N = g.__thornswoodNeeds;
+    var degrees = (N && N.NEEDS && N.NEEDS.wear && N.NEEDS.wear.woven) ? N.NEEDS.wear.woven.degrees : 0;
+    return 'The garments you make now keep the weather off' +
+           (degrees ? ': one worn ignores ' + degrees + ' degrees of exposure' : '') +
+           '. They carry no hidden armour.';
+  }
+
   function needsView(actorId) {
     var n = g.__thornswoodNeeds;
     if (!n || !actorId) { return null; }
@@ -42594,6 +42639,9 @@ log('gamemode loaded:',
       // Masters and apprentices (#1634): see apprenticeView.
       var taughtView = apprenticeView(actorId, s);
       if (taughtView) { view.apprentice = taughtView; }
+      // What a Master Weaver's next garments carry (#1398): see weaveOf.
+      var weave = weaveOf(s);
+      if (weave) { view.weave = weave; }
     }
     // Left out entirely when there is nothing to say, per the contract.
     var climbing = progressView(s);
@@ -43748,6 +43796,19 @@ log('gamemode loaded:',
         var CO = g.__thornswoodCollege;
         r = (CO && CO.study) ? CO.study(actorId, s)
           : { ok: false, why: 'the College is not running on this server right now' };
+      } else if (what === 'weave') {
+        // A Master Weaver's pick on the profession card (#1398): see weaveOf.
+        about = 'weave';
+        var weave = String(parts[2] || '').toLowerCase();
+        if (!weaveOf(s)) {
+          r = { ok: false, why: 'only a Master Weaver picks what a garment carries' };
+        } else if (weave !== 'warmth' && weave !== 'armour') {
+          r = { ok: false, why: 'a garment carries warmth or armour' };
+        } else {
+          var woven = P.clone(s);
+          woven.weave = weave;
+          r = { ok: true, state: woven, line: weaveLine(weave) };
+        }
       } else if (what === 'spend') {
         about = 'spend';
         r = P.spendPoint(s, String(parts[2] || '').toLowerCase(), parts[3]);
@@ -43867,6 +43928,7 @@ log('gamemode loaded:',
       grantSpell says in the log and nothing else notices.
     */
     if (about === 'study' && r.line) { toProfile(profileId, r.line); }
+    if (about === 'weave' && r.line) { toProfile(profileId, r.line); }
 
     if (spellPicked) {
       grantSpell(actorId, spellPicked, true);
@@ -43956,7 +44018,7 @@ log('gamemode loaded:',
     gate: gate, gateHalf: gateHalf, credit: credit,
     grantSpell: grantSpell, grantKnown: grantKnown, nameOf: nameOf, raiseLines: raiseLines,
     acceptApprentice: acceptApprentice, masterFor: masterFor, effectsOf: effectsOf,
-    masterRecord: masterRecord, takeOnMark: takeOnMark,
+    masterRecord: masterRecord, takeOnMark: takeOnMark, weaveOf: weaveOf,
     rankOf: function (actorId, key) { return P.rankOf(stateOf(actorId), key); }
   };
   clog('ready');
@@ -45363,6 +45425,50 @@ log('gamemode loaded:',
     return 0;
   }
 
+  /*
+    MASTER WEAVER'S HIDDEN ARMOUR (#1398). docs/systems/professions/tailor.md:
+    a master tailor's garment carries hidden armour or keeps the weather off.
+    Patrick's answer on #1398, 4 October: the tailor picks one per garment,
+    and armour "gives back 10% of each hit, the way the warrior's Wall does
+    it". So it is this path: the hit is measured like a Wall's, and less is
+    what flush() gives back. The gamemode cannot reach a garment's armour
+    rating (the server's damage is the fork's TES5DamageFormula), and this
+    adds no weight, which is the page's "still weighs what clothing weighs".
+
+    mark is what the craft writes in front of the garment's name (markWoven,
+    beside mp.onCraft), the way the weather half writes NEEDS.wear.woven.mark.
+    The two marks differ, so a garment carries one half and never both: the
+    needs block reads only its own. One worn is enough and two do not give
+    back 20%. A piece with an enchantment on it is not one, for the reason
+    the needs block gives: anybody can name a piece at the enchanting table,
+    and the engine only enchants a plain one, which a woven garment is not.
+    Only a person's clothes count, the way only a person's gear wears.
+  */
+  var WOVEN = { mark: 'Master-Lined ', less: 0.1 };
+
+  function wornBy(id) {
+    try {
+      var eq = mp.get(id, 'equipment');
+      var ee = eq && ((eq.inv && eq.inv.entries) || eq.entries);
+      if (ee) { return ee; }
+    } catch (e) { }
+    try {
+      var inv = mp.get(id, 'inventory');
+      return (inv && inv.entries) || [];
+    } catch (e2) { return []; }
+  }
+
+  function wovenArmour(target) {
+    if (!personOf(target)) { return 0; }
+    var worn = wornBy(target);
+    for (var i = 0; i < worn.length; i++) {
+      var e = worn[i];
+      if (!e || !e.worn || e.enchantmentId) { continue; }
+      if (typeof e.name === 'string' && e.name.indexOf(WOVEN.mark) === 0) { return WOVEN.less; }
+    }
+    return 0;
+  }
+
   function anyOn() {
     for (var k in ST.on) { if (has(ST.on, k)) { return true; } }
     return false;
@@ -45376,7 +45482,8 @@ log('gamemode loaded:',
     if (open && open.length && open[open.length - 1].after === null) {
       open[open.length - 1].after = share(target, 'health');
     }
-    if (!anyOn()) { return; }
+    var lined = wovenArmour(target);
+    if (!lined && !anyOn()) { return; }
     var t = now();
     var by = idOfForm(aggressor);
     // A bulwark's own blocked hit is a block seen.
@@ -45397,7 +45504,9 @@ log('gamemode loaded:',
         e.used.push({ key: 'break', v: a['break'] }); delete a['break'];
       }
     }
-    e.less = shielded(target, t);
+    // A woven garment's 10% is on top of a Wall's or a Cover's 20%: the two
+    // add, 30% back (the question to Patrick on #1398).
+    e.less = shielded(target, t) + lined;
     if (!e.more && !e.less && !e.stagger) { return; }
     e.before = share(target, 'health');
     if (!(e.before > 0)) { rearm(e); return; }
@@ -45528,7 +45637,7 @@ log('gamemode loaded:',
   g.__thornswoodManeuverTimer = setInterval(guard('maneuverTick', tick), 100);
 
   g.__thornswoodManeuvers = {
-    MANEUVERS: MANEUVERS, ORDER: ORDER,
+    MANEUVERS: MANEUVERS, ORDER: ORDER, WOVEN: WOVEN, wovenArmour: wovenArmour,
     held: held, takenOn: takenOn, whyNot: whyNot, mostStamina: mostStamina,
     use: use, effects: effects, view: view, hit: hit, flush: flush, killerOf: killerOf, tick: tick,
     state: ST
