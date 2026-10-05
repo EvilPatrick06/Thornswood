@@ -1,7 +1,7 @@
 'use strict';
 // Opt-in native integration: addon path and the verified 48-plugin fixture.
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),vm=require('node:vm');
-const {createNativeMerchantTransfer}=require('../game/merchant-trading');
+const {createNativeMerchantTransfer,installMerchantTrading}=require('../game/merchant-trading');
 const {createSettlement,takeEntries}=require('../game/merchant-settlement');
 const addon=require(path.resolve(process.argv[2]));
 const installed=JSON.parse(fs.readFileSync(process.argv[3],'utf8'));
@@ -23,7 +23,7 @@ vm.runInContext(source.slice(source.indexOf('// NPC MERCHANT PURSES BEGIN'),sour
   const storage=ctx.createPrivateMerchantLedger(fs,path,settings,['13487:Skyrim.esm'],mp.writePrivateEconomyLedger.bind(mp));
   const purseApi={}; for(const key of ['makeProperty','getIdFromDesc','getNpcAIState','get','set']) purseApi[key]=mp[key].bind(mp);
   let purses=ctx.createNpcMerchantPurses(purseApi,data,storage); purses.prepare(merchantId);
-  const human=mp.createActor(0,[0,0,0],0,0x133c9,7);
+  const human=mp.createActor(0,mp.get(merchantId,'pos'),0,mp.getIdFromDesc(mp.get(merchantId,'worldOrCellDesc')),7);
   const iron=0x5ace4;
   mp.set(human,'inventory',{entries:[{baseId:15,count:40},{baseId:iron,count:3,name:'Kept name',health:0.7,chargePercent:0.4}]});
   const transfer=createNativeMerchantTransfer(mp);
@@ -64,7 +64,25 @@ vm.runInContext(source.slice(source.indexOf('// NPC MERCHANT PURSES BEGIN'),sour
   assert.equal(mp.getInventoryReceipt(human),beforeReceipt);
   assert.equal(mp.validateInventoryTransaction(beforeValidation),true);
 
-  settle.shutdown();purses.shutdown();
+  settle.shutdown();
+  const panel=installMerchantTrading({mp,purses,
+    catalog:{byRef:{'13487:Skyrim.esm':{name:'Lucan',locationName:'Riverwood',bookHold:'whiterun'}}},
+    g:{__thornswoodBooks:{guildPrice:()=>({buy:3,sell:5}),catalog:()=>[{name:'Iron Ingot',buy:3,sell:5}]},
+      __thornswoodResolveItem:()=>({baseId:iron,name:'Iron Ingot'})},
+    timers:{setTimeout:()=>1,clearTimeout(){}},log:console.log});
+  assert.equal(panel.nativeReady(),true);
+  const opened=panel.activate(human,merchantId);
+  assert.equal(opened.view?.open,true,opened.text);
+  assert.equal(opened.view.transfer,true,'actual native actor identity/reach opens usable trade panel');
+  panel.command({actorId:human,profileId:7,parts:['/merchant','buy','1','Iron','Ingot']});
+  for(let i=0;i<600 && purses.read(merchantId).pending;i++) {mp.tick();panel.recover();await new Promise(resolve=>setTimeout(resolve,10));}
+  assert.equal(purses.read(merchantId).pending,null);
+  assert.equal(purses.read(merchantId).purse,252);
+  assert.equal(purses.read(merchantId).stock.length,0);
+  assert.equal(mp.get(human,'inventory').entries.find(x=>x.baseId===15).count,38);
+  assert.equal(mp.get(human,'inventory').entries.find(x=>x.baseId===iron).count,3);
+  assert.equal(mp.get(human,'inventory').entries.find(x=>x.baseId===iron).name,'Kept name');
+  panel.shutdown();purses.shutdown();
   const alias=path.join(served,'private-alias');
   fs.symlinkSync(settings.privDir,alias,process.platform==='win32'?'junction':'dir');
   const ledger=path.join(settings.privDir,'merchant-ledger.json');
