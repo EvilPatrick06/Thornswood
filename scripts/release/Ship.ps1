@@ -1121,6 +1121,21 @@ if ($GameDir) {
     Say '  no own game folder here, so there are none to check' 'DarkGray'
 }
 
+# ------------------------------------------------------------ node
+# The SkyUI menus step below reads the game folder with node (#960). Without
+# node it used to say so in yellow and ship unread, so a machine with no node
+# published without the one check that keeps the SkyUI error box off every
+# login (#1913). A game folder means that check has something to read, so no
+# node stops the release here, before the launcher is built and installed,
+# Go.ps1 copies anything, or anything is published.
+if ($GameDir -and -not (Get-Command node -ErrorAction SilentlyContinue)) {
+    Unbump 'node is not on this machine'
+    Die ('node is not on this machine, and Ship reads SkyUI''s menus in the game folder with it (scripts\mods\Check-SkyUIMenus.js), ' +
+         'so a release never gives everybody the SkyUI error box on the way in. Install it with ' +
+         'winget install --id OpenJS.NodeJS.LTS -e (Developer-Guide.md, "Install the tools"), open a new window, and Ship again. ' +
+         'Nothing was built or published.')
+}
+
 # ------------------------------------------------------------ build
 if (-not $ModsOnly) {
     # The exe's time going in, so a build that put nothing in place is told
@@ -1393,8 +1408,10 @@ if ($GameDir) {
 # plugin's archive over earlier): 0 they agree, 2 they do not, 1 unreadable.
 # Paths every pack deletes are read as gone, since every install loses them
 # with this release. It refuses both channels: the box is on every login.
+# node is on the machine by now: Ship stopped before the build without it
+# (#1913).
 Head 'SkyUI menus'
-if ($GameDir -and (Get-Command node -ErrorAction SilentlyContinue)) {
+if ($GameDir) {
     $skyuiPlugins = Join-Path (Get-ShipLoadOrderDir $Root $profileDir) 'plugins.txt'
     $global:LASTEXITCODE = 0
     & node (Join-Path $Here '..\mods\Check-SkyUIMenus.js') --data (Join-Path $GameDir 'Data') --plugins $skyuiPlugins --gone (@(Get-ShipDeleteAlways) -join ';') --quiet
@@ -1403,9 +1420,15 @@ if ($GameDir -and (Get-Command node -ErrorAction SilentlyContinue)) {
         Unbump 'SkyUI''s menus are not the version its script wants'
         Die 'SkyUI''s menus in the game folder are not the version its script wants, so everybody would get the SkyUI error box on the way in. See the lines above for which file wins and where it comes from, fix that, and Ship again.'
     }
-    if ($skyuiExit -ne 0) { Say '  SkyUI''s menus could not all be read; see above' 'Yellow' }
-} elseif ($GameDir) {
-    Say '  node is not on this machine, so SkyUI''s menus were not read' 'Yellow'
+    # Anything else, 1 for a menu, a script or a plugins.txt it could not read
+    # or node failing, refuses too (#1913). A check that cannot read is not a
+    # pass: an unread menu may be the one that does not match, and the box it
+    # would bring up is on every login, on both channels.
+    if ($skyuiExit -ne 0) {
+        Unbump 'SkyUI''s menus could not all be read'
+        Die ("SkyUI's menus could not all be read (Check-SkyUIMenus.js exit $skyuiExit), so whether everybody gets the SkyUI error box on the way in is not known. " +
+             'The UNREAD and FAIL lines above say which file. Fix or replace it in the game folder, and Ship again.')
+    }
 } else {
     Say '  no game folder here, so SkyUI''s menus were not read' 'DarkGray'
 }

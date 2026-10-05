@@ -1942,11 +1942,66 @@ function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
     $mainRelease = $mainDoc.PSObject.Properties['release']
     $mainCommit = if ($mainRelease) { Val $mainDoc.release 'commit' } else { '' }
     $mainClean = $mainRelease -and $mainDoc.release.PSObject.Properties['uncommitted'] -and $mainDoc.release.uncommitted -eq 0
+    # Main has a Dev source when the commit is an ancestor of Main's, or when
+    # Main took everything in it as a commit of its own.
+    #
+    # The second half is for squash merges, which is how pull requests merge
+    # here. A Dev release is often built from a branch; the branch is squashed
+    # onto main as one new commit and deleted, so the commit the Dev release
+    # recorded never becomes an ancestor of main, and its note stayed marked
+    # DEV after Main shipped the same work. Measured 5 Oct: 39 of the Dev
+    # feed's 40 notes were marked, the 1 and 2 Oct ones included, which went
+    # out on Main 1.1.105 on 3 Oct.
+    #
+    # The proof is by content, never by a headline: some commit on Main's own
+    # line since the two parted, one that touched the files the Dev commit
+    # changed, already held all of it, because merging the Dev commit into
+    # that commit gives that commit's own tree back. That is the squash commit
+    # itself. Main is not compared at its tip, because later work on the same
+    # lines (a newer engine pin, the next gamemode change) makes the merge
+    # conflict there although the work went in. Against main at c63e9fab this
+    # reads 3 of the 39 as still Dev, the three whose Dev release was built
+    # with uncommitted files: no commit records what those carried, so
+    # nothing can prove them.
+    #
+    # The release tags Ship pushes (release/dev/<id>) keep those commits
+    # fetchable after the branch is gone. A git too old for
+    # merge-tree --write-tree (before 2.38), or a commit this clone does not
+    # have, proves nothing, and the note stays marked.
+    $script:publishedSeen = @{}
     function Is-Published([string]$commit) {
         if (-not $mainClean -or $commit -notmatch '^[0-9a-f]{40}$' -or $mainCommit -notmatch '^[0-9a-f]{40}$') { return $false }
+        if ($script:publishedSeen.ContainsKey($commit)) { return $script:publishedSeen[$commit] }
         $was = $global:LASTEXITCODE
-        try { return ((Invoke-ReleaseGit $sourceRepo @('merge-base', '--is-ancestor', $commit, $mainCommit)).Code -eq 0) }
+        $yes = $false
+        try {
+            if ((Invoke-ReleaseGit $sourceRepo @('merge-base', '--is-ancestor', $commit, $mainCommit)).Code -eq 0) { $yes = $true }
+            else {
+                $base = Invoke-ReleaseGit $sourceRepo @('merge-base', $commit, $mainCommit)
+                if ($base.Code -eq 0 -and $base.First -match '^[0-9a-f]{40}$') {
+                    $files = @((Invoke-ReleaseGit $sourceRepo @('diff', '--name-only', $base.First, $commit)).Lines |
+                        Where-Object { $_ } | ForEach-Object { ([string]$_).Trim() })
+                    # Every Main commit since they parted that touched those
+                    # files, oldest first, each with its tree. Past 200 files
+                    # the list would not fit on a Windows command line, so
+                    # every Main commit since they parted is tried instead.
+                    $walk = @('rev-list', '--first-parent', '--reverse', '--format=%T', ($base.First + '..' + $mainCommit))
+                    if ($files.Count -gt 0 -and $files.Count -le 200) { $walk += @('--') + $files }
+                    $lines = @((Invoke-ReleaseGit $sourceRepo $walk).Lines | ForEach-Object { ([string]$_).Trim() })
+                    for ($i = 0; $i + 1 -lt $lines.Count -and -not $yes; $i += 2) {
+                        if ($lines[$i] -notmatch '^commit ([0-9a-f]{40})$') { $i--; continue }
+                        $at = $Matches[1]
+                        $tree = $lines[$i + 1]
+                        $merged = Invoke-ReleaseGit $sourceRepo @('merge-tree', '--write-tree', $at, $commit)
+                        if ($merged.Code -eq 0 -and $merged.First -eq $tree) { $yes = $true }
+                        elseif ($merged.Code -gt 1) { break }   # this git has no merge-tree --write-tree
+                    }
+                }
+            }
+        }
         finally { $global:LASTEXITCODE = $was }
+        $script:publishedSeen[$commit] = $yes
+        return $yes
     }
     # Before sourceCommit existed, the preceding Dev release is the only
     # recorded source covering its historical notes. Dirty releases provide

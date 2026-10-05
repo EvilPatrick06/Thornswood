@@ -3,7 +3,8 @@
     python vortex-state-rows.py <root> <spec.json>
 
 The spec maps a case name to {"table": [{"key": k, "value": json}, ...],
-"log": [...]}, each value the JSON text Vortex stores. Each case becomes
+"log": [...]}, each value the JSON text Vortex stores. A log row whose value
+is null is a deletion, the way Vortex removes a key. Each case becomes
 <root>/<case>/Vortex/state.v2, so <root>/<case> is the APPDATA a harness points
 at. Table rows go into a compressed table, the way state is left after
 compaction; log rows go into the write-ahead log after it, the way Vortex
@@ -33,8 +34,14 @@ def table_rows(rows, sequence=10):
             for i, row in enumerate(rows)]
 
 
+def put_or_delete(row):
+    if row['value'] is None:
+        return b'\0' + lp(row['key'].encode())
+    return b'\1' + lp(row['key'].encode()) + lp(row['value'].encode())
+
+
 def log(rows, sequence=100):
-    return fragmented_log([struct.pack('<QI', sequence + i, 1) + b'\1' + lp(row['key'].encode()) + lp(row['value'].encode())
+    return fragmented_log([struct.pack('<QI', sequence + i, 1) + put_or_delete(row)
                            for i, row in enumerate(rows)])
 
 

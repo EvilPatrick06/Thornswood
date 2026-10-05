@@ -140,6 +140,16 @@ own at https://thornswood.net/voice/ until #1822. It had no way to
 get a join token, because it could not sign in to Discord, so it
 could never get in. Nothing linked to it, and it is gone.
 
+The game's chat connection is on the roster as well, because the
+overlay's own voice rides it when no launcher has the audio. Once a
+launcher has it, the overlay answers nobody, so the chat tells the
+service that connection carries no voice, and says so in every join
+after. Its place on the roster is marked, and both clients connect to
+nobody marked and close a connection they had, so a launcher holds
+one connection for each other person with voice and reports that
+many (#1925). `tests/test-1925-voice-relay-peers.js` runs it through
+the real service.
+
 Both clients connect to everybody the service names on its roster,
 and both offer again whenever their own side changes, as when the
 microphone opens. When two offers cross, the one who joined first
@@ -153,3 +163,13 @@ the chat keeps the newest roster and the offers sent to it, and hands
 them over in that order (#1869).
 `tests/test-1869-voice-negotiation.js` runs both clients through the
 real service.
+
+The service sends each connection where everybody near is once, when
+it joins, and after that only who moved. So the chat also keeps that
+first view with every move since, the voice modes said since the
+roster, and any staff silence still on, and hands them over too
+(#1924). Without them an overlay that started listening late never
+saw anybody standing still, itself included: no speaking marks until
+it moved, and the party strip read the same empty table.
+`tests/test-1924-voice-whole-view.js` runs it through the real
+service.

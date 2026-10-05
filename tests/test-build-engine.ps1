@@ -78,6 +78,14 @@ if (Test-Path -LiteralPath $cm) {
     Yes 'the fork defaults its triplet to x64-windows-sp' ($c.Contains('x64-windows-sp'))
 } else { Write-Host 'SKIP  the fork is not checked out here, so its option names were not read' }
 
+# A configure that stopped part way leaves CMakeCache.txt and no solution; on
+# 5 Oct the next run took the cache as configured and MSBuild stopped at
+# MSB1009 for want of ALL_BUILD.vcxproj. Configured is the solution.
+Yes 'it calls the build configured only when ALL_BUILD.vcxproj is there' (
+    $text -match "\`$solution = Join-Path \`$build 'ALL_BUILD\.vcxproj'" -and
+    $text -match 'if \(Test-Path -LiteralPath \$solution\) \{ Ok "already configured' -and
+    $text -notmatch 'if \(Test-Path -LiteralPath \$cache\) \{ Ok "already configured')
+
 # On a machine without the tools: it says what is missing and builds nothing.
 $fake = Join-Path ([IO.Path]::GetTempPath()) ('ts-engine-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $fake | Out-Null
