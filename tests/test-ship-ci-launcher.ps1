@@ -226,6 +226,11 @@ Yes '  lists it in SHA256SUMS beside the launcher' ($rel -match [regex]::Escape(
 Yes '  and attaches it to the draft' ($rel -match [regex]::Escape('foreach ($asset in @($exe, $stub, $sums))'))
 Yes 'Ship fetches it for a main -Package, before the build and the publish' ($src -match '(?s)if \(\$Package -and -not \$Dev -and -not \$DryRun\) \{.*?Get-ReleaseStub.*?# -+ build')
 Yes '  and hands it to Package-Thornswood as -Stub' ($src -match [regex]::Escape("if (`$ciStub) { `$pkgArgs['Stub'] = `$ciStub }") -and $src -match [regex]::Escape("& (Join-Path `$Here 'Package-Thornswood.ps1') @pkgArgs"))
+# Issue #1213: the site carries the one file build, so -Package asks for it,
+# and every Package-Thornswood line Ship prints for a person says -OneFile too.
+Yes '  in the one file shape the site carries (#1213)' ($src -match [regex]::Escape("`$pkgArgs = @{ Root = `$Root; OutDir = `$DistDir; NoPause = `$true; OneFile = `$true }"))
+$told = @([regex]::Matches($src, "\.\\scripts\\release\\Package-Thornswood\.ps1[^'`"\r\n]*") | ForEach-Object { $_.Value })
+Yes ('  and every Package-Thornswood command Ship prints says -OneFile (' + $told.Count + ')') ($told.Count -ge 5 -and @($told | Where-Object { $_ -notmatch ' -OneFile\b' }).Count -eq 0)
 $pkg = [IO.File]::ReadAllText((Join-Path $repoRoot 'scripts/release/Package-Thornswood.ps1'))
 Yes 'Package-Thornswood takes -Stub and packs that one, refusing one that is not there' ($pkg -match '\[string\]\$Stub = ' -and $pkg -match '(?s)if \(\$Stub\) \{\s*if \(-not \(Test-Path -LiteralPath \$Stub\)\) \{ Die' -and $pkg -match '\$stub = \$stubNow')
 
