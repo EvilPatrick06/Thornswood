@@ -102,9 +102,12 @@ every 20 seconds: the wheel's lute, flute or drum with that instrument
 in the pack, or Sing. The logout fill is
 counted once, the first time the server reads your meters after you
 come back into the world, whatever reads them first. The server
-counts you as up then, not lying in the bed. Which beds give it and
-the 24 minutes are the suggested answers on #1606, built that way
-until Patrick says otherwise. Tea and skooma are not items the needs
+counts you as up then, not lying in the bed. Coming back from any
+logout, on a seat or in a bed, with or without a server restart, you
+are up: nobody comes back into the world sitting or lying down, so a
+rest counts again once you sit or lie down again (#1734). Which beds
+give the fill and the 24 minutes are the suggested answers on #1606,
+built that way until Patrick says otherwise. Tea and skooma are not items the needs
 block knows.
 Sleeping on open ground, an hour on a seat with no roof over you and
 no fire in reach, starts a chill. See [Disease](disease.md).
