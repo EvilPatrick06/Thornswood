@@ -1,8 +1,8 @@
 # Tailor/Haberdasher
 
-Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 166 recipes, 166 of them reach the server. A row the server is not asked about is tempering: the armour table and the grindstone never call the server.
+Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 168 recipes, 168 of them reach the server. A row the server is not asked about is tempering: the armour table and the grindstone never call the server.
 
-By rank: novice 113, advanced 26, expert 10, master 17.
+By rank: novice 115, advanced 26, expert 10, master 17.
 
 | Item | Makes | Rank | Kind | Bench | Asks for | Race | Server asked | Id |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -37,6 +37,7 @@ By rank: novice 113, advanced 26, expert 10, master 17.
 | Vampire Hood | 1 | novice | Hats and hoods | MCE_CraftingLoom | 2 Thread |  | yes | `94e:MoreCraftableEquipment.esp` |
 | Leather Cape | 1 | novice | Other armour and clothing | TanningRack | 2 Leather |  | yes | `55bd:Cloaks&Capes.esp` |
 | Riekling Fur Cloak | 1 | novice | Other armour and clothing | SmithingForge | 3 Leather | riekling | yes | `23a0a:Playable Rieklings.esp` |
+| Bandage | 1 | novice | Other goods | MCE_CraftingLoom | 1 Tundra Cotton |  | yes | `154c4:Thornswood-Content.esp` |
 | Boy's Blue Tunic | 1 | novice | Other goods | MCE_CraftingLoom | 2 Thread |  | yes | `9f7:MoreCraftableEquipment.esp` |
 | Boy's Green Tunic | 1 | novice | Other goods | MCE_CraftingLoom | 2 Thread |  | yes | `9f6:MoreCraftableEquipment.esp` |
 | Boy's Grey Tunic | 1 | novice | Other goods | MCE_CraftingLoom | 2 Thread |  | yes | `9f8:MoreCraftableEquipment.esp` |
@@ -47,6 +48,7 @@ By rank: novice 113, advanced 26, expert 10, master 17.
 | Girl's Grey Dress | 1 | novice | Other goods | MCE_CraftingLoom | 2 Thread |  | yes | `9fd:MoreCraftableEquipment.esp` |
 | Girl's Red Dress | 1 | novice | Other goods | MCE_CraftingLoom | 2 Thread |  | yes | `9fa:MoreCraftableEquipment.esp` |
 | Girl's Yellow Dress | 1 | novice | Other goods | MCE_CraftingLoom | 2 Thread |  | yes | `9fe:MoreCraftableEquipment.esp` |
+| Sewing Kit | 1 | novice | Other goods | TanningRack | 1 Tundra Cotton, 1 Leather Strips |  | yes | `154b5:Thornswood-Content.esp` |
 | Thread | 1 | novice | Other goods | MCE_CraftingLoom | 2 Tundra Cotton |  | yes | `84a:MoreCraftableEquipment.esp` |
 | Belted Tunic | 1 | novice | Robes and body wear | MCE_CraftingLoom | 4 Thread |  | yes | `96f:MoreCraftableEquipment.esp` |
 | Blacksmith's Apron | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Leather, 3 Thread |  | yes | `925:MoreCraftableEquipment.esp` |

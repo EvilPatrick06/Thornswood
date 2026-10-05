@@ -51,13 +51,13 @@ fur. The garment's material is still what the table says. See
 
 ## Every recipe
 
-Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 166 recipes. 166 reach the server. None of them are tempering. The same rows, with ids, are in [tailor-haberdasher](../../lists/tailor-haberdasher.md).
+Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 168 recipes. 168 reach the server. None of them are tempering. The same rows, with ids, are in [tailor-haberdasher](../../lists/tailor-haberdasher.md).
 
 The rank on the row is the rank. It is the dearest ingredient a class produces. An item has no gold price.
 
 ### Names that reach the server
 
-**Novice** (80 names). Alik'r Hood. Belted Tunic. Blacksmith's Apron. Boots. Boy's Blue Tunic. Boy's Green Tunic. Boy's Grey Tunic. Boy's Red Tunic. Boy's Yellow Tunic. Chef's Hat. Chef's Tunic. Clothes. College Boots. Cowl. Cuffed Boots. Dark Alik'r Hood. Dark Hammerfell Garb. Dark Redguard Boots. Dunmer Hooded Outfit. Dunmer Outfit. Dunmer Shoes. Embroidered Garment. Fine Armguards. Fine Boots. Fine Clothes. Fine Hat. Fine Raiment. Footwraps. Fur Collar - Loose. Fur Collar - Tight. Fur Hood. Fur Hood - Black. Fur Hood - White. Fur Mantle. Fur Mantle - Black. Fur Mantle - White. Fur-Trimmed Cloak. Fur-lined Boots. Girl's Blue Dress. Girl's Green Dress. Girl's Grey Dress. Girl's Red Dress. Girl's Yellow Dress. Gloves. Hammerfell Garb. Hat. Jester's Boots. Jester's Clothes. Jester's Gloves. Jester's Hat. Leather Cape. Miner's Clothes. Mourner's Clothes. Mourner's Hat. Noble Clothes. Pleated Shoes. Ragged Boots. Ragged Cap. Ragged Trousers. Redguard Boots. Refined Tunic. Riekling Fur Cloak. Roughspun Tunic. Shoes. Shrouded Hand Wraps. Shrouded Hood. Shrouded Shoes. Tavern Clothes. Telvanni Shoes. Temple Priest Boots. Temple Priest Hood. Thread. Ulfric's Armguards. Ulfric's Boots. Ulfric's Clothes. Vampire Boots. Vampire Gloves. Vampire Hood. Wedding Dress. Wedding Sandals.
+**Novice** (82 names). Alik'r Hood. Bandage. Belted Tunic. Blacksmith's Apron. Boots. Boy's Blue Tunic. Boy's Green Tunic. Boy's Grey Tunic. Boy's Red Tunic. Boy's Yellow Tunic. Chef's Hat. Chef's Tunic. Clothes. College Boots. Cowl. Cuffed Boots. Dark Alik'r Hood. Dark Hammerfell Garb. Dark Redguard Boots. Dunmer Hooded Outfit. Dunmer Outfit. Dunmer Shoes. Embroidered Garment. Fine Armguards. Fine Boots. Fine Clothes. Fine Hat. Fine Raiment. Footwraps. Fur Collar - Loose. Fur Collar - Tight. Fur Hood. Fur Hood - Black. Fur Hood - White. Fur Mantle. Fur Mantle - Black. Fur Mantle - White. Fur-Trimmed Cloak. Fur-lined Boots. Girl's Blue Dress. Girl's Green Dress. Girl's Grey Dress. Girl's Red Dress. Girl's Yellow Dress. Gloves. Hammerfell Garb. Hat. Jester's Boots. Jester's Clothes. Jester's Gloves. Jester's Hat. Leather Cape. Miner's Clothes. Mourner's Clothes. Mourner's Hat. Noble Clothes. Pleated Shoes. Ragged Boots. Ragged Cap. Ragged Trousers. Redguard Boots. Refined Tunic. Riekling Fur Cloak. Roughspun Tunic. Sewing Kit. Shoes. Shrouded Hand Wraps. Shrouded Hood. Shrouded Shoes. Tavern Clothes. Telvanni Shoes. Temple Priest Boots. Temple Priest Hood. Thread. Ulfric's Armguards. Ulfric's Boots. Ulfric's Clothes. Vampire Boots. Vampire Gloves. Vampire Hood. Wedding Dress. Wedding Sandals.
 
 **Advanced** (23 names). Apotheus Scarf. Bandana. Bandana, Tied. College of Winterhold Cloak. Eyepatch. Linen Cape (Black). Linen Cape (Blue). Linen Cape (Green). Linen Cape (Purple). Linen Cape (Red). Linen Cape (White). Linen Cape (Yellow). Redguard Knight Cape. Seadog Cape. Shaman Unarmored Boots. Shaman Unarmored Gloves. Thread. Tribunal Unarmored Hood Black. Tribunal Unarmored Hood Blue. Tribunal Unarmored Hood Green. Tribunal Unarmored Hood Red. Tribunal Unarmored Hood White. Wedding Wreath.
 
@@ -98,6 +98,7 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 | Vampire Hood | 1 | novice | Hats and hoods | MCE_CraftingLoom | 2 Thread |  | yes | `94e:MoreCraftableEquipment.esp` |
 | Leather Cape | 1 | novice | Other armour and clothing | TanningRack | 2 Leather |  | yes | `55bd:Cloaks&Capes.esp` |
 | Riekling Fur Cloak | 1 | novice | Other armour and clothing | SmithingForge | 3 Leather | riekling | yes | `23a0a:Playable Rieklings.esp` |
+| Bandage | 1 | novice | Other goods | MCE_CraftingLoom | 1 Tundra Cotton |  | yes | `154c4:Thornswood-Content.esp` |
 | Boy's Blue Tunic | 1 | novice | Other goods | MCE_CraftingLoom | 2 Thread |  | yes | `9f7:MoreCraftableEquipment.esp` |
 | Boy's Green Tunic | 1 | novice | Other goods | MCE_CraftingLoom | 2 Thread |  | yes | `9f6:MoreCraftableEquipment.esp` |
 | Boy's Grey Tunic | 1 | novice | Other goods | MCE_CraftingLoom | 2 Thread |  | yes | `9f8:MoreCraftableEquipment.esp` |
@@ -108,6 +109,7 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 | Girl's Grey Dress | 1 | novice | Other goods | MCE_CraftingLoom | 2 Thread |  | yes | `9fd:MoreCraftableEquipment.esp` |
 | Girl's Red Dress | 1 | novice | Other goods | MCE_CraftingLoom | 2 Thread |  | yes | `9fa:MoreCraftableEquipment.esp` |
 | Girl's Yellow Dress | 1 | novice | Other goods | MCE_CraftingLoom | 2 Thread |  | yes | `9fe:MoreCraftableEquipment.esp` |
+| Sewing Kit | 1 | novice | Other goods | TanningRack | 1 Tundra Cotton, 1 Leather Strips |  | yes | `154b5:Thornswood-Content.esp` |
 | Thread | 1 | novice | Other goods | MCE_CraftingLoom | 2 Tundra Cotton |  | yes | `84a:MoreCraftableEquipment.esp` |
 | Belted Tunic | 1 | novice | Robes and body wear | MCE_CraftingLoom | 4 Thread |  | yes | `96f:MoreCraftableEquipment.esp` |
 | Blacksmith's Apron | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Leather, 3 Thread |  | yes | `925:MoreCraftableEquipment.esp` |

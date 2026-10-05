@@ -2,15 +2,16 @@
 
 Every row the recipe, harvest, ore and hunt tables currently hold. The pages that say what a profession or a class is are next to this folder. These lists are the items.
 
+- [Alchemist/Physicker](alchemist-physicker.md) (2, 2 reach the server)
 - [Cook/Confectioner](cook-confectioner.md) (12, 12 reach the server)
 - [Cook/Hearthcook](cook-hearthcook.md) (53, 53 reach the server)
 - [Enchanter/Bladebinder](enchanter-bladebinder.md) (13, 13 reach the server)
-- [Smith/Edgewright](smith-edgewright.md) (78, 78 reach the server)
-- [Smith/Platewright](smith-platewright.md) (156, 156 reach the server)
-- [Tailor/Haberdasher](tailor-haberdasher.md) (166, 166 reach the server)
+- [Smith/Edgewright](smith-edgewright.md) (79, 79 reach the server)
+- [Smith/Platewright](smith-platewright.md) (157, 157 reach the server)
+- [Tailor/Haberdasher](tailor-haberdasher.md) (168, 168 reach the server)
 - [Tailor/Liverywright](tailor-liverywright.md) (81, 81 reach the server)
 - [Woodworker/Charburner](woodworker-charburner.md) (5, 5 reach the server)
-- [Woodworker/Woodwright](woodworker-woodwright.md) (31, 31 reach the server)
+- [Woodworker/Woodwright](woodworker-woodwright.md) (36, 36 reach the server)
 - [Embassy and remnant rolls](roll-gates.md) (24)
 - [Anybody](anybody.md) (588)
 - [Refused](refused.md) (235)
