@@ -88,7 +88,21 @@ param(
     [int]$Wait = 60,
     # The build record the binary is held to (#1214). The repository's own,
     # which the committed check below holds to the commit.
-    [string]$Record = ''
+    [string]$Record = '',
+    <#
+      The ports this run holds the payload and the box to, for the harnesses
+      only (#1728). Left at 0, which is how a person shipping runs it, they
+      are the channel's, exactly as before: the zip must start the server on
+      7787 (dev) or 7777 (live), and the check after the install knocks on the
+      resources port, 3000 for 7777 and the game port plus one otherwise.
+      tests\test-publish-server-channel.ps1 and tests\test-install-server.ps1
+      run beside other builds on the VPS, where the dev and live servers hold
+      those very ports, so each takes ports from the system and passes them.
+      A payload is built with the channel's port, so -GamePort only matches a
+      -SkipBuild zip made for that port; any other zip is refused as before.
+    #>
+    [ValidateRange(0, 65535)][int]$GamePort = 0,
+    [ValidateRange(0, 65535)][int]$ResourcesPort = 0
 )
 if (-not $Record) { $Record = Join-Path $PSScriptRoot '..\..\records\server-build.json' }
 
@@ -360,7 +374,7 @@ Say ("payload {0:N1} MB" -f ((Get-Item -LiteralPath $Zip).Length / 1MB)) 'Green'
 
 # The port the zip will really start on, read out of the zip (#1114), so a
 # -SkipBuild zip packed for the other channel cannot go to this one either.
-$wantPort = if ($IsDev) { 7787 } else { 7777 }
+$wantPort = if ($GamePort -gt 0) { $GamePort } elseif ($IsDev) { 7787 } else { 7777 }
 $zipPort = ''
 # And every server file in it is the recorded build, with the record beside
 # them for the installer (#1214), read out of the zip too, so a -SkipBuild zip
@@ -570,9 +584,10 @@ if ($why) {
 # The resources port is not a setting. skymp5-server/ts/ui.ts:102 derives it:
 # 3000 when the game port is 7777, and game port plus one otherwise. So dev is
 # 7788 and there is no clash with live, and this is where that rule is written
-# down on our side of the fence.
-$GamePort = if ($IsDev) { 7787 } else { 7777 }
-$ResPort  = if ($GamePort -eq 7777) { 3000 } else { $GamePort + 1 }
+# down on our side of the fence. -GamePort and -ResourcesPort are the
+# harnesses' (see the parameters); a person shipping passes neither.
+$GamePort = $wantPort
+$ResPort  = if ($ResourcesPort -gt 0) { $ResourcesPort } elseif ($GamePort -eq 7777) { 3000 } else { $GamePort + 1 }
 
 Head 'Checking it answers'
 $up = $false
