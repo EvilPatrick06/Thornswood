@@ -651,6 +651,29 @@ yes('the log says it once a cast', logged('Leyline Attunement') === 1);
     /send\('perk', 'perk ' \+ key\)/.test(panel));
 }
 
+// ------------------------------- a restart while Font of Magic runs (#1642) --
+/*
+  Font of Magic's 15 seconds ride the K panel's view and end on a timer in
+  memory. A restart takes the timer with it, and the server that comes up has
+  nothing running, so the view it works out when the person is back (arrival
+  in the character block, tests/test-1642-effects-restart.js) has no free
+  spells on it. The day stays spent: that clock is on the character.
+*/
+{
+  const RUN = actor(0xff00000c);
+  states.set(RUN, filled(['efficiency']));
+  box.__thornswoodCharacter.writeState = function (id, s) { return s; };
+  const go = K.use(RUN, states.get(RUN), 'fontofmagic');
+  yes('Font of Magic starts, with the free spells on the map', go.ok === true && !!K.effects(RUN) && K.effects(RUN).DestructionMod === 100);
+  later(5000);
+  world.timers.length = 0;   // the process's timers go with it
+  box = makeBox();
+  K = box.__thornswoodPerks;
+  yes('a restart five seconds in ends it: the new server puts no free spells on any view it works out',
+    K.effects(RUN) === null && !K.clocks(RUN, states.get(RUN)).fontofmagic.until);
+  yes('and the day it spent is still spent', /^Font of Magic comes back in \d+ hours$/.test(K.use(RUN, states.get(RUN), 'fontofmagic').why));
+}
+
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
