@@ -116,7 +116,9 @@ if (recipes) {
   yes('and it reads which mold is in the pack', /prop\.moldInHand\(actorId\)/.test(b));
   yes('no stamped mold refuses the craft, so no blank key is ever made',
       /if \(!stampedAt\)/.test(b) && /return false;/.test(b));
-  yes('and the refusal says how to get one', /say \/mold there/.test(b));
+  // By the mold key at the door, never a typed /mold (#1637).
+  yes('and the refusal says how to get one, with nothing to type',
+      /press it into the lock there/.test(b) && !/say \/mold/.test(b));
   yes('the key is named after the craft lands, not before',
       /setTimeout\(function \(\)/.test(b) && /prop\.nameFreshKey\(actorId, named\)/.test(b));
   yes('and nothing in that path spends the mold',
