@@ -145,6 +145,7 @@ function load(name, initial) {
   Object.assign(win, initial || {});
   new Function('window', 'document', SRC[name])(win, doc);
   page.win = win;
+  page.doc = doc;
   page.style = doc.head.children[0];
   page.root = doc.body.children[0];
   page.css = page.style ? page.style.textContent : '';
@@ -405,6 +406,36 @@ const P = rules(party.css);
   party.win.thornswoodParty.open();
   party.keys.keydown({ key: 'Escape', preventDefault() { } });
   yes('Escape closes it too', pr.className === '' && !party.win.thornswoodParty.isOpen());
+
+  /*
+    #1591: a group book invite is an offer of kind book. The panel and the
+    ask card both word an offer from its kind, and both used to know only
+    friend and party, so a book invite read as a trade. It names the book.
+  */
+  party.win.thornswoodParty.setData({
+    me: 'p1', offer: { kind: 'book', name: 'Ingrid', about: 'the business The <Bee>' },
+    party: [], together: 0, bonus: 10, friends: []
+  });
+  party.win.thornswoodParty.open();
+  const panelAsk = allHtml(pr);
+  yes('#1591: a book invite on the P panel reads as one and names the book, escaped',
+      /Ingrid<\/b> invites you into the business The &lt;Bee&gt;/.test(panelAsk) && !/offering to trade/.test(panelAsk));
+  const askCard = party.doc.body.children.filter(function (c) { return c.id === 'ts-ask'; })[0];
+  yes('#1591: and the ask card says the same, not a trade',
+      !!askCard && /Ingrid<\/b> invites you into the business The &lt;Bee&gt;\./.test(askCard.html) &&
+      !/trade/.test(askCard.html));
+  const cardYes = askCard ? askCard.querySelectorAll('button[data-do]').filter(function (b) {
+    return b.getAttribute('data-do') === 'yes';
+  })[0] : null;
+  if (cardYes) { cardYes.onclick.call(cardYes); }
+  yes('#1591: Accept on the card still sends /yes, which joins the book', party.sent[party.sent.length - 1] === '/yes');
+  party.win.thornswoodParty.setData({
+    me: 'p1', offer: { kind: 'book', name: 'Ingrid' }, party: [], together: 0, bonus: 10, friends: []
+  });
+  yes('#1591: an invite with no book named still reads as a group book',
+      /invites you into a group book\./.test(askCard ? askCard.html : '') &&
+      /invites you into a group book/.test(allHtml(pr)));
+  party.win.thornswoodParty.close();
 }
 
 // ============================================================== the trade

@@ -96,12 +96,12 @@ namespace Thornswood
                 "Controls in the launcher lists every key, read from the files themselves. Press Change, then the key you want. Close Skyrim first, because the game writes its settings back when it exits and would undo it. F1 and F2 belong to the game client and cannot be moved."),
 
             // =========================================== chat and commands
-            // "Everybody connected" is how chat ships. Entry 150 put a range on
-            // it behind THORNSWOOD_CHAT_RANGE in the voice service, and that is
-            // off until Install-Voice.ps1 is run with -ChatRange on or a number.
-            // Whoever turns it on changes this item in the same release.
+            // Local is how chat ships since 4 Oct: Install-Voice.ps1 sets
+            // THORNSWOOD_CHAT_RANGE on (the same cell and 4000 units) for live
+            // and dev. Whoever turns it off changes this item in the same
+            // release; test-launcher-help.js ties the two together.
             new HelpItem("Chat and commands", "The chat box",
-                "Enter opens it and Escape gives the keyboard back to the game. / opens it with the slash already typed, for a command. A line typed there goes to everybody connected, wherever they are, so treat it as the whole server rather than the room. A line that starts with a slash is a command for the server and is not shown to anybody else. Text chat is kept, with the name and the time. Voice is not recorded."),
+                "Enter opens it and Escape gives the keyboard back to the game. / opens it with the slash already typed, for a command. A line typed there reaches the people near you, in the same place and within about 60 metres, the same as the line over your head, so treat it as the room rather than the whole server. A line that starts with a slash is a command for the server and is not shown to anybody else. Text chat is kept, with the name and the time. Voice is not recorded."),
 
             new HelpItem("Chat and commands", "Out of character",
                 "Type /ooc and then what you meant. It goes only to people in the same place as you and within about 60 metres, in double brackets with your name on it. /ooc can we not ends any scene at once, from anybody in it, with no reason owed."),
@@ -113,20 +113,21 @@ namespace Thornswood
                 "Hold V to talk, or press O to keep the microphone open until you press O again, for a song or a long speech. Voice runs in the launcher rather than in the game, so leave the launcher open while you play; it minimises by itself. B steps your voice between a whisper, which carries about 7 metres, your normal voice, about 30 metres, and a yell, about 85 metres. The further away somebody is standing, the quieter you are to them. If nobody can hear you, check that the launcher is still open and that Windows has not given your microphone to something else."),
 
             new HelpItem("Chat and commands", "Friends and trading",
-                "Look at somebody and press Y to ask them to be friends, H to offer a trade, or L to stop hearing them. Those three only work with somebody under your crosshair. A request shows on their screen with Accept and Refuse, and it stands for forty five seconds. Your friends are on the P panel, and friends are kept. On that panel, Mute stops their voice, Text stops their lines in the chat, and Name hides the name above their head. Hide every name does that for everyone."),
+                "Look at somebody and press Y to ask them to be friends, H to offer a trade, or L to stop hearing them. Those three only work with somebody under your crosshair. Carrying a letter off a notice board for the person you look at, the prompt also shows E, Hand over the letter. A request shows on their screen with Accept and Refuse, and it stands for forty five seconds. Your friends are on the P panel, and friends are kept. On that panel, Mute stops their voice, Text stops their lines in the chat, and Name hides the name above their head. Hide every name does that for everyone. P also lists the people near you, with Add friend, Trade, Mute, Text and Name beside each, and everybody you have muted or hidden, friend or not, to turn them back on."),
 
             // The two party items came from main (entry 336, #281).
             // tests\test-help-parties.js finds them by what they are about
-            // and holds every number, key and command in them to the gamemode,
-            // the plugin and the P panel.
+            // and holds every number, key and button in them to the gamemode,
+            // the plugin and the P panel. Nothing here tells anybody to type
+            // /party: P on somebody asks, and the P panel does the rest (#1629).
             new HelpItem("Chat and commands", "Parties",
-                "P, unless you have moved it on the Controls page, opens your friends and your party. To bring somebody in, press Enter and type /party and their name, or press Ask to party beside a friend who is online. They have forty five seconds to press Accept or Refuse on the prompt. A party holds up to six. /party on its own says who is in yours, and /party leave takes you out. Logging out takes you out too, and every party ends when the server restarts. The leader sees Kick and Lead beside each other person, and Disband. Everyone else sees Leave."),
+                "P, unless you have moved it on the Controls page, opens your friends and your party. To bring somebody in, look at them and press P, or press Ask to party beside a friend who is online. They have forty five seconds to press Accept or Refuse on the prompt. A party holds up to six. The P panel says who is in yours and how many of them are in the same place as you, and Leave there takes you out. Logging out takes you out too, and every party ends when the server restarts. The leader also sees Kick and Lead beside each other person, and Disband."),
 
             new HelpItem("Chat and commands", "Finding your party",
                 "Everybody in your party has their name in green above their head, a marker on your map, and an arrow on a strip under your compass with how far away they are. Green on the strip means the same place as you, gold means somewhere else. You cannot fast travel to the marker. Work done with somebody from your party in the same place counts 15 per cent more."),
 
             new HelpItem("Chat and commands", "Journals",
-                "J opens your journals and their pages. You can type a title and a page. You can share a whole journal, or one page of it, with a friend, including one who is not online. They see a shared page while you are in the world."),
+                "J opens your journals and their pages. You can type a title and a page. You can share a whole journal, or one page of it, with a friend, including one who is not online. They see a shared page while you are in the world. Under Boards, J also shows any town's notice board, read only, and the jobs you have taken."),
 
             // Issue #414: the asking staff block at the end of gamemode.js.
             new HelpItem("Chat and commands", "Getting staff: /helpme and /report",

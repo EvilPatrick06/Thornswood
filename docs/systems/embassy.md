@@ -44,8 +44,8 @@ a day after. That declaration is an event, not a command.
 
 ## The building
 
-The embassy doors start held by the Ambassador's office. `/claim` on
-them answers that the embassy is held. A steward of Haafingar does not
+The embassy doors start held by the Ambassador's office, so the line at
+them offers nobody a claim. A steward of Haafingar does not
 evict the Accord. A Thalmor does not found a claim on it. See
 [The Thalmor](thalmor.md) and [Property](property.md).
 
@@ -80,8 +80,21 @@ captain variants are not made. Their references are in
 
 ## Where this is
 
-The Accord is on the site. The building is in the world as a place
-that can be claimed like any other door, and nothing yet reserves it
-for an office, caps a roll at 20, or counts the 6. Solitude's box
-and board already exist and are the hold's. Imperial gear is still
-in the crafting lists and still in the world.
+The Accord is on the site. This page names no building, so the server
+holds the one suggested on #1390 until the embassy is named: the
+Abandoned Warehouse in Solitude. Its doors start held: the line at them
+offers nobody a claim, a claim sent anyway answers that the embassy is
+held, a deed presented there takes nothing, and a steward's eviction
+there is refused. A claim somebody made on it before is still theirs
+until it lapses or a steward ends it.
+
+An admin writes the roll with `/embassy`, a staff command: `add` a
+name, with `armed` to mark them, and `arm`, `disarm` and `remove`. The
+21st name is refused and the 7th armed mark is refused, whatever the
+file on the server says. The person named is told in their own chat
+each time, and nobody else types anything. The Ambassador is still a
+title and not a command.
+
+Solitude's box and board are the hold's, and nothing makes one for the
+embassy. Imperial and Penitus gear is made only by somebody on the
+roll, and the world does not hand it out.

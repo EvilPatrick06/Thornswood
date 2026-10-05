@@ -52,17 +52,23 @@ function steward(opts) {
   const isJarlFn = opts.isJarl || function (pid, aid) {
     return pid === JARL && aid === JARL_ACTOR;
   };
+  // The Office page on K is written again after a change (#1638).
+  const redrawn = [];
   const fn = new Function(
     'parts', 'actorId', 'profileId', 'toProfile', 'stewards', 'isJarl', 'save', 'plog',
+    'officeRedraw', 'onlineActorOf', 'personName',
     cmdBlock + '\nreturn stewardCmd;');
   const call = fn(
     null, null, null, null, stewards,
     isJarlFn,
     function () { saved.n++; },
-    function () { });
+    function () { },
+    function (aid, pid) { redrawn.push([aid, pid]); },
+    function (pid) { return pid === ALICE ? 0xff0000a1 : 0; },
+    function (aid) { return aid === 0xff0000a1 ? 'Alice' : 'somebody'; });
   call(opts.parts || ['/steward'], actorId, opts.by,
        function (pid, m) { told.push(m); });
-  return { told: told, stewards: stewards, saves: saved.n };
+  return { told: told, stewards: stewards, saves: saved.n, redrawn: redrawn };
 }
 
 /** Drive /evict with a given claim and caller. */
@@ -74,7 +80,7 @@ function evict(opts) {
   const pushed = { n: 0 };
   const fn = new Function(
     'actorId', 'profileId', 'toProfile', 'isSteward', 'here', 'holderOf',
-    'nameOf', 'claims', 'save', 'pushAll', 'plog',
+    'nameOf', 'claims', 'save', 'pushAll', 'plog', 'redrawPanel', 'OFFICE_AT_DOOR',
     evictBlock + '\nreturn evict;');
   const call = fn(
     null, null, null,
@@ -84,9 +90,11 @@ function evict(opts) {
     function () { return 'Breezehome'; },
     claims,
     function () { }, function () { pushed.n++; },
-    function () { logs.push(Array.prototype.join.call(arguments, ' ')); });
+    function () { logs.push(Array.prototype.join.call(arguments, ' ')); },
+    function () { pushed.redraws = (pushed.redraws || 0) + 1; },
+    'Open the door of the building, then press the button on the Office page of K within a minute.');
   call(0xff000058, opts.by, function (pid, m) { told.push(m); });
-  return { told: told, claims: claims, pushes: pushed.n };
+  return { told: told, claims: claims, pushes: pushed.n, redraws: pushed.redraws || 0 };
 }
 
 if (cmdBlock !== null) {
@@ -95,8 +103,8 @@ if (cmdBlock !== null) {
     yes('S1 anybody may ask who the stewards are',
         r.told.length === 1 && r.told[0].indexOf(String(ALICE)) !== -1);
     const none = steward({ by: BOB, stewards: [] });
-    yes('S1 and with none it says how one is named',
-        none.told[0].indexOf('A jarl names one') !== -1);
+    yes('S1 and with none it says where a Jarl names one, the Office page of K, not a line to type',
+        none.told[0] === 'No stewards. A Jarl names one on the Office page of K.');
   }
 
   {
@@ -110,6 +118,9 @@ if (cmdBlock !== null) {
     const r = steward({ by: JARL, stewards: [], parts: ['/steward', String(ALICE)] });
     yes('S3 a jarl names a steward', r.stewards.indexOf(ALICE) !== -1);
     yes('S3 and the register is written', r.saves === 1);
+    yes('S3 and the Jarl is told the name of the person picked, not a number', r.told[0] === 'Alice is a steward now.');
+    yes('S3 and the Office page is written again, the Jarl\'s and the new steward\'s',
+        r.redrawn.length === 1 && r.redrawn[0][0] === JARL_ACTOR && r.redrawn[0][1] === ALICE);
     const again = steward({ by: JARL, stewards: [ALICE],
                             parts: ['/steward', String(ALICE)] });
     yes('S3 and naming the same person twice does not double them',
@@ -121,6 +132,7 @@ if (cmdBlock !== null) {
                         parts: ['/steward', '-' + ALICE] });
     yes('S4 a jarl takes the office back', r.stewards.indexOf(ALICE) === -1);
     yes('S4 and leaves the other one alone', r.stewards.indexOf(BOB) !== -1);
+    yes('S4 and the Office page is written again', r.redrawn.length === 1 && r.redrawn[0][1] === ALICE);
     const missing = steward({ by: JARL, stewards: [BOB],
                               parts: ['/steward', '-' + ALICE] });
     yes('S4 and taking it from somebody who never had it changes nothing',
@@ -174,6 +186,7 @@ if (evictBlock !== null) {
         r.pushes === 1);
     yes('S7 and the person who lost it is named to the steward',
         r.told[0].indexOf('Alice') !== -1);
+    yes('S7 and the steward\'s Office page is written again', r.redraws === 1);
   }
 
   {
@@ -190,7 +203,7 @@ if (evictBlock !== null) {
           .told[0].indexOf('Nobody holds') !== -1);
     yes('S9 and away from a door is told to go to one',
         evict({ by: BOB, stewards: [BOB], held: alicesHouse, atDoor: false })
-          .told[0].indexOf('Stand at the door') !== -1);
+          .told[0].indexOf('Open the door of the building') !== -1);
   }
 }
 

@@ -4166,10 +4166,16 @@ const SETTLE_MS = 10000;
  * before giving up on it entirely and moving on. Both measured from the moment
  * the creation stage opened, not from the nudge. */
 
-const NUDGE_MS = 120000;   // two minutes; see the nudge below
+/* Two minutes. Used as the gap between race-menu asks when the open
+ * request was lost: no stored face, and the plugin has not reported
+ * the menu as up. A one-shot flag left them in the hall forever if
+ * that second request was also lost (Djinn, 5 Oct 2026). Asking
+ * while /racemenu is already reported is an access violation. */
+const NUDGE_MS = 120000;
 
-/* How long somebody has to be walking about before their creation counts as
- * finished, whatever the appearance says.
+/* How long somebody has to be walking about before a STORED face lets
+ * creation move on. Walking without a stored appearance does not publish
+ * them. See hasStoredAppearance.
  *
  * Was eight seconds. Since the appearance stopped arriving this is not a
  * fallback any more, it is the only way anybody leaves the hall, so every
@@ -4184,15 +4190,11 @@ const NUDGE_MS = 120000;   // two minutes; see the nudge below
  * tick, two seconds is still two separate confirmations that a person is on
  * their feet rather than nudging a camera.
  *
- * And down again to one, which at CHARGEN_TICK_MS is 500 ms and one tick. The
- * check it gates is not "did the camera twitch", it is "is this person's
- * position or facing different from the last sample", which a menu does not
- * produce at all. A second confirmation was insurance against a thing that was
- * never happening, paid for by everybody standing in an empty room.
+ * And down again to one, which at CHARGEN_TICK_MS is 500 ms and one tick.
  *
- * The sentence above it said "at a one second tick" while the tick was half a
- * second, so the two confirmations it describes were one second and not two.
- * The number here never moved; the tick under it did. */
+ * 3 Oct 2026: this wait is no longer a way out of the hall without a face.
+ * A stored appearance is required. Walking with no face asks for the race
+ * menu again instead of publishing an empty actor. */
 const MOVED_ENOUGH_MS = 500;
 
 /* How far counts as having moved, between two consecutive samples.
@@ -4237,11 +4239,11 @@ const CHOOSE_REMIND_MS = 30000;
   it, and nothing about their character has been decided either way.
 */
 const CHOOSE_LATER_MS = 600000;
-/* Five minutes, not forty five seconds. This exists so nobody is stranded when
- * the race menu never opens, and it used to be short enough to fire on somebody
- * who was simply still making their face: it would give up and start them
- * mid-menu. Being stuck is the thing worth guarding against; taking a while
- * over a nose is not. */
+/* Five minutes, not forty five seconds. This used to move them on without a
+ * face. That published an empty actor (3 Oct 2026, profile 598737699). It
+ * now asks for the race menu again and stays unpublished until a face is
+ * stored. Being stuck is still the thing worth guarding against; publishing
+ * nobody is not the rescue. */
 const GIVEUP_MS = 300000;
 
 /*
@@ -4272,11 +4274,13 @@ const GIVEUP_MS = 300000;
   and once a minute while it stays open), and while that is fresh the give up
   holds off. Sitting still reading a slider moves nobody on.
 
-  FACE_SEEN_MS is how fresh the last report has to be: two and a half beats,
-  so one lost line does not end the hold, while a client that crashed or quit
-  stops reporting and the give up runs as it always did. A client that never
-  reports at all, because its plugin is older or the race menu never opened,
-  is exactly the case the five minutes were written for and still gets them.
+  FACE_SEEN_MS is how fresh a report used to have to be before the give up
+  treated the menu as gone. That freshness window is not a close: a quiet
+  stream after /racemenu was seen is a still-open menu. /face done is the
+  close for Escape, Cancel and Done. /racedown is the close when the game
+  is quitting (F10, the quit paths) and a half-made face is not done. A
+  client that never reports at all, because its plugin is older or the race
+  menu never opened, is the lost request and still gets the asks.
 
   FACE_CAP_MS is for a race menu that is up and wedged: after half an hour of
   it being reported, the give up goes on anyway, because the panel and a home
@@ -4445,6 +4449,13 @@ function giveShift(actorId) {
  * 20 September) or never came at all.
  */
 function beginChoosing(actorId, state, why) {
+  let appearance = null;
+  try { appearance = mp.get(actorId, 'appearance'); } catch (e) { appearance = null; }
+  if (!hasStoredAppearance(appearance)) {
+    log('chargen', actorId.toString(16),
+        'not leaving the face step (' + why + '): no appearance is stored yet');
+    return;
+  }
   state.stage = 'choosing';
   state.at = Date.now();
   state.remindAt = Date.now() + CHOOSE_REMIND_MS;
@@ -4588,9 +4599,27 @@ globalThis.__thornswoodChargen = {
     return true;
   },
   /*
+    The plugin saw the race menu go down with the game (F10 / quit), not
+    Escape, Cancel or Done. Only means something while the face is awaited.
+    Clears the open marks so a still-connected player can be asked again.
+    Does not set faceDone: a half-made face is not a finished face.
+  */
+  faceDown: function (actorId) {
+    const st = chargenOf(actorId);
+    if (!st || st.stage !== 'appearance') { return false; }
+    delete st.faceOpenAt;
+    delete st.faceSeenAt;
+    delete st.faceHeld;
+    setChargen(actorId, st);
+    log('chargen', actorId.toString(16),
+        'the plugin says the race menu went down with the game, not a finished face');
+    return true;
+  },
+  /*
     The plugin says the race menu is on screen right now. Only means something
-    while the face is awaited; see FACE_SEEN_MS for what it holds off. The
-    first report is logged and the once a minute ones after it are not.
+    while the face is awaited. /face done and /racedown are the closes; a
+    quiet stream after a report is still open. The first report is logged
+    and the once a minute ones after it are not.
   */
   faceOpen: function (actorId) {
     const st = chargenOf(actorId);
@@ -4604,6 +4633,8 @@ globalThis.__thornswoodChargen = {
     setChargen(actorId, st);
     return true;
   },
+  hasStoredAppearance: hasStoredAppearance,
+  publishedForOthers: publishedForOthers,
   /*
     The panel was closed on purpose, so hold the reminder off. See
     CHOOSE_LATER_MS and the 'later' branch of /pick.
@@ -4712,6 +4743,40 @@ function faceMark(a) {
             (a.tints || []).length].join('|');
   } catch (e) {
     return '';
+  }
+}
+
+/*
+  A STORED APPEARANCE, not a name, not the word Adventurer, not a guess.
+
+  Djinn, 3 Oct 2026 about 22:31 ET on dev, profile 598737699: he picked a
+  brand-new slot, the race menu never opened, he was in the world as the
+  placeholder, the trade list named him "somebody", and Patrick could not
+  see a body. The walking path (MOVED_ENOUGH_MS, half a second) and the
+  five-minute give-up both called beginChoosing while appearance was still
+  missing. Neighbours then got an actor with no base (player 0x7 is omitted
+  on purpose) and no face, so the client correctly refused to place a mesh.
+  The trade name fell back because appearance.name was empty. Voice is
+  keyed by profile id and was not this.
+
+  THE GATE IS THE OBJECT THE ENGINE STORED. closeRaceMenu already asks
+  this: a value that is an object means the race menu wrote a face; null
+  or a throw does not. A blank name is still a stored face. A returning
+  character whose appearance is already there is not sent back through
+  the menu.
+*/
+function hasStoredAppearance(a) {
+  return !!(a && typeof a === 'object');
+}
+
+/** True when this person may be in the world for anybody else. */
+function publishedForOthers(actorId) {
+  try {
+    return hasStoredAppearance(mp.get(actorId, 'appearance'));
+  } catch (e) {
+    // A read that throws is treated as published, because hiding a
+    // returning character from the lists is the worse of the two mistakes.
+    return true;
   }
 }
 
@@ -5233,6 +5298,49 @@ function chargenTick() {
 
     if (state.stage === 'appearance') {
       /*
+        A lost open-race-menu request (no /racemenu report, no stored face)
+        is asked again every NUDGE_MS. A second setRaceMenuOpen over a menu
+        the plugin already says is up is an access violation, so that case
+        is never asked. Once a face is stored the asks stop. The two lines
+        below are tellOnce: one each for the whole wait, not one per ask.
+      */
+      const raceMenuIsUp = function () {
+        // /face done and /racedown are the closes. A quiet /racemenu
+        // stream is not: the plugin reports once a minute, and a gap is
+        // a missed line, not a shut menu. Treating faceSeenAt older than
+        // FACE_SEEN_MS as closed sent a second setRaceMenuOpen over a
+        // menu that was still up (access violation). Once /racemenu has
+        // been seen, the menu stays up until /face done, /racedown, or a
+        // stored face.
+        if (state.faceDone) { return false; }
+        return !!(state.faceOpenAt || state.faceSeenAt);
+      };
+      const askForLostRaceMenu = function (why) {
+        if (hasStoredAppearance(appearance) || raceMenuIsUp()) { return false; }
+        const last = state.askedMenuAt || 0;
+        if (last && now - last < NUDGE_MS) { return false; }
+        state.askedMenuAt = now;
+        state.menuAsks = (state.menuAsks || 0) + 1;
+        setChargen(actorId, state);
+        try {
+          mp.setRaceMenuOpen(actorId, true);
+          log('chargen', actorId.toString(16),
+              'asking for the race menu again (' + why + '), ask', state.menuAsks);
+        } catch (e) {
+          log('chargen', actorId.toString(16), 'could not open the race menu:', e);
+        }
+        if (state.menuAsks === 2) {
+          tellOnce(actorId, 'raceMenuAgain',
+              "Your character creation menu didn't open. Opening it again.");
+        } else if (state.menuAsks >= 3) {
+          tellOnce(actorId, 'raceMenuRelog',
+              'The character creation menu still did not open. Relog, and if it ' +
+              'still does not open, contact staff.');
+        }
+        return true;
+      };
+
+      /*
         A reconnect starts the wait again from nothing.
 
         None of the fields below are cleared when somebody drops out of the
@@ -5254,6 +5362,8 @@ function chargenTick() {
         delete state.where;
         delete state.askedAt;
         delete state.nudged;
+        delete state.askedMenuAt;
+        delete state.menuAsks;
         // The last session's race menu went with it. This one reports its own.
         delete state.faceOpenAt;
         delete state.faceSeenAt;
@@ -5361,49 +5471,44 @@ function chargenTick() {
 
       // The plugin says the race menu closed (/face done, over the chat
       // socket). That is the fact the mark above is only a proxy for: a face
-      // confirmed unchanged, or a name kept, changes no mark, and until 20
-      // September the only way on from there was to walk (below). The menu
-      // closing is enough on its own.
+      // confirmed unchanged, or a name kept, changes no mark. The menu
+      // closing is enough only when a face was actually stored. A close
+      // without a store is how 598737699 left the hall as a placeholder.
       if (state.faceDone) {
-        beginChoosing(actorId, state, 'the race menu closed');
+        if (hasStoredAppearance(appearance)) {
+          beginChoosing(actorId, state, 'the race menu closed');
+        } else {
+          log('chargen', actorId.toString(16),
+              'the plugin says the race menu closed but no appearance is stored, staying unpublished');
+          askForLostRaceMenu('race menu closed with no face');
+        }
         continue;
       }
 
-      // Walking around the hall is the end of character creation.
-      //
-      // Everything above waits on one signal: the appearance property changing
-      // on the change form, which is what arrives when the race menu closes.
-      // When that signal does not come, the whole flow stops, and the log says
-      // exactly that and nothing else: "-> appearance (already in the hall)"
-      // and then silence while somebody stands in a stone room wondering what
-      // they did wrong.
-      //
-      // The rescue below existed for that, and it is far too patient: two
-      // minutes before it reopens the race menu, five before it gives up and
-      // starts them anyway. Nobody waits two minutes in an empty room. They
-      // alt-F4, which is what happened three times tonight.
-      //
-      // But the evidence was there the whole time. The race menu is paused, so
-      // a character in one does not move; a character who IS moving is a
-      // character whose menu has closed. That is not a guess about the
-      // appearance, it is a stronger fact than the appearance, and this file
-      // was already measuring it a dozen lines up in order to decide whether
-      // nudging was safe.
-      //
-      // So: on your feet, and we get on with it. The appearance can arrive
-      // whenever it likes.
+      // Walking used to end creation, whatever the appearance said. That is
+      // the 3 Oct 2026 session: half a second on their feet, no face stored,
+      // neighbours given an actor with no base and no mesh. Walking is still
+      // the sign that no race menu is open, so it is when a missing face
+      // should be asked for again, not when they are published.
       const onFeetFor = state.liveSince ? (now - state.liveSince) : 0;
 
       if (onFeetFor > MOVED_ENOUGH_MS) {
-        // Said in full because the appearance not arriving is still a bug
-        // and this is the only place it can be seen from.
+        if (hasStoredAppearance(appearance)) {
+          log('chargen', actorId.toString(16), 'walking after',
+              Math.round(onFeetFor / 1000) + 's with a face stored.',
+              'mark now', JSON.stringify(faceNow) + ',',
+              'mark at the start', JSON.stringify(state.faceWas || '') + '.',
+              'Going on.');
+          beginChoosing(actorId, state, 'on their feet');
+          continue;
+        }
         log('chargen', actorId.toString(16), 'walking after',
-            Math.round(onFeetFor / 1000) + 's and the face never arrived.',
+            Math.round(onFeetFor / 1000) + 's and no appearance is stored.',
             'appearance is', appearance ? 'present' : 'MISSING,',
             'mark now', JSON.stringify(faceNow) + ',',
             'mark at the start', JSON.stringify(state.faceWas || '') + '.',
-            'Going on the movement instead.');
-        beginChoosing(actorId, state, 'on their feet');
+            'Staying unpublished.');
+        askForLostRaceMenu('walking with no face');
         continue;
       }
 
@@ -5417,9 +5522,9 @@ function chargenTick() {
       // reason is somewhere in a client mid save-load, which is not somewhere
       // this can reach.
       //
-      // So: ask once, then stop waiting. A character who never saw the race
-      // menu can open it later. One who cannot leave the room cannot do
-      // anything at all.
+      // So: keep asking on NUDGE_MS while the request is lost. A character
+      // who never saw the race menu is asked again; one whose plugin says
+      // the menu is already up is not.
       //
       // But only once it is clear that nobody is standing in a menu already.
       //
@@ -5480,40 +5585,31 @@ function chargenTick() {
         out for a character who cannot move, which is precisely the character
         it exists for, so it runs on the clock like it says it does.
 
-        AND THE NUDGE IS UNREACHABLE TODAY, which is worth writing down rather
-        than leaving somebody to assume it is doing something. It needs
-        liveSince, and the branch a dozen lines above ends the stage the moment
-        onFeetFor passes MOVED_ENOUGH_MS, which is 500. So anybody with
-        liveSince set has been moved on half a second in, 119 and a half seconds
-        before the nudge could fire, and anybody without it is guarded out here.
-        There is no path to it at all.
-
-        It is kept rather than deleted because it is the safety net if
-        MOVED_ENOUGH_MS is ever raised past NUDGE_MS, and because a race menu
-        that never opened is still a real failure somebody may want to rescue
-        differently later. What it must not do is read as a rescue that is
-        running, because it is not.
+        THE TWO-MINUTE CLOCK IS NOW THE INTERVAL, not a one-shot. A lost
+        request (no /racemenu report, no stored face) is asked again every
+        NUDGE_MS. Walking asks on that same helper as soon as they are on
+        their feet; standing still becomes eligible at NUDGE_MS. state.nudged
+        is no longer the gate, so the old one-shot cannot swallow a later ask.
       */
-      if (!state.nudged && waited > NUDGE_MS && state.liveSince) {
-        state.nudged = now;
-        setChargen(actorId, state);
-        try {
-          mp.setRaceMenuOpen(actorId, true);
-          log('chargen', actorId.toString(16),
-              'walking around with no face after', Math.round(waited / 1000) +
-              's, so the race menu never opened. Asking for it.');
-        } catch (e) {
-          log('chargen', actorId.toString(16), 'could not open the race menu:', e);
-        }
-        continue;
-      }
 
       if (waited > GIVEUP_MS) {
-        // Not while the plugin says the race menu is up: that person is making
-        // a face, not stuck. See FACE_SEEN_MS, and FACE_CAP_MS for the one
-        // exception. Said once, when the hold starts, and not every tick.
-        const menuUp = !!state.faceSeenAt && now - state.faceSeenAt < FACE_SEEN_MS;
+        // Not while the race menu is still open. /face done and /racedown
+        // are the closes, not a quiet report. FACE_CAP_MS is the
+        // wedged-menu exception. A stored face is checked first so a
+        // quiet stream cannot hold a finished face in the hall.
+        const menuUp = raceMenuIsUp();
         const menuFor = state.faceOpenAt ? now - state.faceOpenAt : 0;
+        if (hasStoredAppearance(appearance)) {
+          if (menuUp) {
+            log('chargen', actorId.toString(16), 'the race menu has been up for',
+                Math.round(menuFor / 60000), 'minutes, face is stored, going on');
+          }
+          log('chargen', actorId.toString(16),
+              'a face is stored after', Math.round(waited / 1000) + 's,',
+              'going on to the choices');
+          beginChoosing(actorId, state, 'face stored after ' + Math.round(waited / 1000) + 's');
+          continue;
+        }
         if (menuUp && menuFor < FACE_CAP_MS) {
           if (!state.faceHeld) {
             state.faceHeld = now;
@@ -5527,15 +5623,22 @@ function chargenTick() {
         }
         if (menuUp) {
           log('chargen', actorId.toString(16), 'the race menu has been up for',
-              Math.round(menuFor / 60000), 'minutes, going on without it');
+              Math.round(menuFor / 60000),
+              'minutes, still no appearance stored, staying unpublished');
+          continue;
         }
-        // Still no face. Go on without one rather than leave them standing
-        // here: a character who never saw the race menu can change their face
-        // later, a character who cannot leave the room can do nothing at all.
         log('chargen', actorId.toString(16),
             'appearance never arrived after', Math.round(waited / 1000) + 's,',
-            'going on to the choices anyway');
-        beginChoosing(actorId, state, 'no face after ' + Math.round(waited / 1000) + 's');
+            'staying unpublished');
+      }
+
+      // Lost request: no face, and the menu is not up. Walking already
+      // asked and continued. Standing still waits for NUDGE_MS so the
+      // spawn request has time to land, then the helper repeats every
+      // NUDGE_MS. A quiet stream after a report is still open. /racedown
+      // has already cleared the open marks.
+      if (!hasStoredAppearance(appearance) && waited > NUDGE_MS) {
+        askForLostRaceMenu('no face after ' + Math.round(waited / 1000) + 's');
       }
     }
   }
@@ -26920,8 +27023,8 @@ function craftAnswer(actorId, row) {
     roll is refused before profession and rank, because the bench is not
     where these are found. The roll is read off the character when it has
     one, or off __thornswoodRolls.has(actorId, roll) when a roll list is
-    installed. Neither list exists yet, so the public bench makes none of
-    them.
+    installed. The embassy and remnant block installs it (#1390), and an
+    admin writes both rolls, so the public bench makes none of them.
   */
   if (row && row.roll) {
     const roll = String(row.roll);
@@ -26982,7 +27085,7 @@ function craftAnswer(actorId, row) {
         'so rank comes from doing the work.'
       : 'A ' + made + ' is ' + halfName + ' work past novice, and ' + halfName +
         ' is your sister half. You get the novice of it for nothing and no ' +
-        'further. A Master ' + halfName + ' can take you on with /apprentice.';
+        'further. A Master ' + halfName + ' can take you on, from the prompt they see when they look at you.';
     return out;
   }
 
@@ -27784,7 +27887,7 @@ mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recip
     if (!stampedAt) {
       const no = 'A key is cut from a mold, and you are carrying none that has been stamped. ' +
                  'Forge a blank key mold, take it to the door with whoever holds the place, ' +
-                 'and say /mold there.';
+                 'and press it into the lock there.';
       notify(actorId, no);
       say(actorId, no);
       return false;
@@ -34460,6 +34563,19 @@ log('gamemode loaded:',
     return 'Nothing in your pack to sow, so here is seed. ' + line;
   }
 
+  /*
+    The farm this person holds, for the property page on K (#1637), or null.
+    days is the whole days left before it lapses with nothing done on it, and
+    reach how far it runs out from the plot it was claimed at.
+  */
+  function farmOf(profileId) {
+    var key = String(profileId || '');
+    if (!key || key === '0' || !P.has(claims, key) || lapsed(key)) { return null; }
+    var lapse = tuning().claimLapseDays;
+    var left = lapse > 0 ? lapse * 86400000 - (Date.now() - claims[key].at) : 0;
+    return { days: Math.max(0, Math.ceil(left / 86400000)), reach: tuning().claimRadius };
+  }
+
   function command(word, parts, actorId, profileId, toProfile) {
     if (word === '/plant') { plant(actorId, profileId, toProfile); return; }
     if (word === '/claim') { claim(actorId, profileId, toProfile); return; }
@@ -34469,7 +34585,8 @@ log('gamemode loaded:',
   g.__thornswoodFarming = {
     PROPERTY: PLOT_PROPERTY,
     activate: activate, command: command, giveSeeds: giveSeeds,
-    readPlot: readPlot, claimCovering: claimCovering, groundOf: groundOf
+    readPlot: readPlot, claimCovering: claimCovering, groundOf: groundOf,
+    farmOf: farmOf
   };
   flog('ready,', Object.keys(CROPS).length, 'crops and', Object.keys(claims).length, 'claims');
 })();
@@ -34538,6 +34655,18 @@ log('gamemode loaded:',
      business knowing which doors you have been trying. */
   var DOOR_PROPERTY = 'thornswoodDoor';
 
+  /*
+    THE LINE AT THE DOOR (#1637). Patrick, 4 October: no chat commands for
+    anything people do. So the door you just opened says what the lock key
+    will do there, and the key does it: Claim when nobody holds the building,
+    Lock or Unlock when it is yours. The client cannot know any of that, since
+    a door is one of 4,891 and the register is here, so this is written to the
+    person on every door they open and again after every press, and their
+    client draws the line while one of that building's doors is under the
+    crosshair. Visible to its owner only, for the reason the lock list is.
+  */
+  var DOOR_LINE_PROPERTY = 'thornswoodDoorLine';
+
   function ready() {
     try {
       mp.makeProperty(DOOR_PROPERTY, {
@@ -34589,6 +34718,12 @@ log('gamemode loaded:',
       mp.makeProperty(LOCK_PROPERTY, {
         isVisibleByOwner: true, isVisibleByNeighbors: false,
         updateOwner: lockScript(), updateNeighbor: ''
+      });
+    } catch (e) { }
+    try {
+      mp.makeProperty(DOOR_LINE_PROPERTY, {
+        isVisibleByOwner: true, isVisibleByNeighbors: false,
+        updateOwner: doorLineScript(), updateNeighbor: ''
       });
     } catch (e) { }
   }
@@ -34873,8 +35008,19 @@ log('gamemode loaded:',
     and it does two things: it is what /claim reads back, and it is what keeps a
     claim alive, because opening your own front door is what 'entering the house'
     means. The second one is why this writes the register at all.
+
+    And then the line at the door (#1637), after the deed below may have moved
+    the place, so the lock key offers what is true once the door is open.
   */
   function touched(actorId, doorDesc) {
+    openedDoor(actorId, doorDesc);
+    if (!buildingOf(doorDesc)) { return; }
+    var mine = 0;
+    try { mine = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { mine = 0; }
+    doorLine(actorId, mine);
+  }
+
+  function openedDoor(actorId, doorDesc) {
     var building = buildingOf(doorDesc);
     if (!building) { return; }
     /*
@@ -34911,6 +35057,11 @@ log('gamemode loaded:',
     var mine = 0;
     try { mine = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { mine = 0; }
     push(actorId, mine);
+
+    // The embassy is held by its office, not by a claim, so a deed presented
+    // at its door is paper (#1390, see the embassy and remnant block).
+    var accordHeld = globalThis.__thornswoodEmbassy;
+    if (accordHeld && accordHeld.holds(building)) { return; }
 
     var held = holderOf(building);
     try { mine = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { mine = 0; }
@@ -35002,6 +35153,85 @@ log('gamemode loaded:',
     return buildingOf(String(v.door));
   }
 
+  /*
+    WHAT THE LOCK KEY DOES AT THE DOOR THEY LAST OPENED, written to them
+    (#1637). The key is X unless it was rebound (LockKey), and it does what
+    the line under the crosshair says and nothing else:
+
+      x     'claim' when nobody holds the building; 'lock' or 'unlock' when
+            they hold it or carry its deed, which is who setLock lets turn
+            it; '' for anybody else, which draws no line
+      n     the building's name, for the line
+      d     every door of the building as the form id the crosshair hands
+            back, in hex, so the line is up at either half of a front door
+      left  what is left of DOOR_MEMORY_MS, so the line goes when here()
+            would stop taking that door as the one just opened
+
+    The rules stay in claim() and setLock(), which the key's lines reach:
+    this only says which of them the key will ask for. Written on every door
+    of a building they open and after every press of the key, so the word on
+    the line is the answer to the last thing that happened.
+
+    A stamp rather than the clock alone, so two writes in one millisecond
+    are still two changes to the script on the other end.
+  */
+  var doorLineStamp = 0;
+
+  function doorLine(actorId, profileId) {
+    var v = null;
+    try { v = mp.get(actorId, DOOR_PROPERTY); } catch (e) { v = null; }
+    var since = (v && typeof v === 'object') ? Date.now() - (Number(v.at) || 0) : DOOR_MEMORY_MS;
+    var building = (since < DOOR_MEMORY_MS && v.door) ? buildingOf(String(v.door)) : null;
+    doorLineStamp = Math.max(doorLineStamp + 1, Date.now());
+    var line = { at: doorLineStamp, x: '', n: '', d: [], left: 0 };
+    if (building) {
+      var held = holderOf(building);
+      // The embassy is held by its office, not by a claim, so its doors offer
+      // nothing to claim (#1390); claim() refuses the line if it comes anyway.
+      var accordLine = globalThis.__thornswoodEmbassy;
+      if (!held) {
+        if (!(accordLine && accordLine.holds(building))) { line.x = 'claim'; }
+      } else if ((profileId && held.by === profileId) || holdsDeed(actorId, building)) {
+        line.x = held.locked ? 'unlock' : 'lock';
+      }
+      if (line.x) {
+        line.n = nameOf(building);
+        line.left = DOOR_MEMORY_MS - since;
+        var doors = doorsOf(building);
+        for (var i = 0; i < doors.length; i++) {
+          var id = idOf(doors[i]);
+          if (id) { line.d.push((id >>> 0).toString(16)); }
+        }
+      }
+    }
+    try {
+      mp.set(actorId, DOOR_LINE_PROPERTY, line);
+    } catch (e) {
+      plog('could not write the door line for', actorId.toString(16) + ':', e);
+    }
+  }
+
+  /*
+    The client half: the line, put where the front plugin reads it
+    (lockKeyNow there). Its own clock starts when a new stamp
+    arrives, because the server's clock and the client's are two clocks.
+  */
+  function doorLineScript() {
+    return [
+      '(function(){',
+      '  try {',
+      '    var v = ctx.value;',
+      '    if (!v || typeof v !== "object") { return; }',
+      '    var was = globalThis.thornswoodDoorLine;',
+      '    if (was && was.stamp === v.at) { return; }',
+      '    globalThis.thornswoodDoorLine = { stamp: v.at, seen: Date.now(),',
+      '      left: Number(v.left) || 0, x: String(v.x || ""), n: String(v.n || ""),',
+      '      d: Array.isArray(v.d) ? v.d.map(String) : [] };',
+      '  } catch (e) { }',
+      '})();'
+    ].join('\n');
+  }
+
   // ------------------------------------------------------------ the claim --
 
   /*
@@ -35035,8 +35265,14 @@ log('gamemode loaded:',
   function claim(actorId, profileId, toProfile) {
     var building = here(actorId);
     if (!building) {
-      toProfile(profileId, 'Stand at a door and open it, then say /claim. That is how ' +
-                           'the server knows which building you mean.');
+      toProfile(profileId, 'Open the door of the building you mean first. That is how ' +
+                           'the server knows which one it is.');
+      return true;
+    }
+    // embassy.md: the embassy doors start held, so a claim is refused (#1390).
+    var accordClaim = globalThis.__thornswoodEmbassy;
+    if (accordClaim && accordClaim.holds(building)) {
+      toProfile(profileId, accordClaim.CLAIM_REFUSED);
       return true;
     }
     var held = holderOf(building);
@@ -35093,7 +35329,8 @@ log('gamemode loaded:',
       if (holderOf(b) && claims[b].by === profileId) { mine.push(nameOf(b)); }
     }
     if (!mine.length) {
-      toProfile(profileId, 'You hold nothing. Open a door and say /claim: it costs nothing.');
+      toProfile(profileId, 'You hold nothing. Open the door of a building nobody holds and ' +
+                           'press the key the line under the crosshair names: it costs nothing.');
       return true;
     }
     mine.sort();
@@ -35398,13 +35635,13 @@ log('gamemode loaded:',
   function setLock(actorId, profileId, toProfile, on) {
     var building = here(actorId);
     if (!building) {
-      toProfile(profileId, 'Stand at the door and open it, then say that again.');
+      toProfile(profileId, 'Open the door of the building you mean first.');
       return true;
     }
     var held = holderOf(building);
     if (!held) {
       toProfile(profileId, 'Nobody holds ' + nameOf(building) + ', so there is nothing to ' +
-                           (on ? 'lock' : 'unlock') + '. Say /claim: it costs nothing.');
+                           (on ? 'lock' : 'unlock') + '. It can be claimed at its door for nothing.');
       return true;
     }
     if (held.by !== profileId && !holdsDeed(actorId, building)) {
@@ -35462,7 +35699,7 @@ log('gamemode loaded:',
   function mold(actorId, profileId, toProfile) {
     var building = here(actorId);
     if (!building) {
-      toProfile(profileId, 'Stand at the door you mean and open it, then say /mold.');
+      toProfile(profileId, 'Open the door you mean first.');
       return true;
     }
     if (!isSmith(actorId)) {
@@ -35633,8 +35870,8 @@ log('gamemode loaded:',
       return true;
     }
     if (!blankMoldsExist()) {
-      toProfile(profileId, 'There are no blank key molds on this server yet. Until there are, ' +
-                           'a smith makes the mold at the door with /mold.');
+      toProfile(profileId, 'There are no blank key molds on this server yet, so there is ' +
+                           'nothing to press into the lock.');
       return true;
     }
     if (!carriesBlankMold(actorId)) {
@@ -35700,13 +35937,14 @@ log('gamemode loaded:',
     return mine;
   }
 
-  function cutKey(actorId, profileId, toProfile) {
+  function cutKey(actorId, profileId, toProfile, parts) {
     if (!isSmith(actorId)) {
-      toProfile(profileId, 'Cutting a key is a smith\'s work.');
+      toProfile(profileId, 'Cutting a key is a smith\'s work. Hand the mold to a smith.');
       return true;
     }
-    if (!atForge(actorId)) {
-      toProfile(profileId, 'Stand at a forge and press it, then say /key.');
+    if (!forgeHere(parts, actorId)) {
+      toProfile(profileId, 'Stand at a forge and look at it, then press the key the line ' +
+                           'under the crosshair names.');
       return true;
     }
     var building = moldInHand(actorId);
@@ -35750,19 +35988,31 @@ log('gamemode loaded:',
       } else if (mine.length > 1) {
         var names = [];
         for (var i = 0; i < mine.length; i++) { names.push(nameOf(mine[i])); }
-        toProfile(profileId, 'You hold ' + names.join(', ') + '. Stand at the door of the one ' +
-                             'you mean and open it, then come back and say /key, or bring the ' +
-                             'mold for it.');
+        toProfile(profileId, 'You hold ' + names.join(', ') + '. A key comes off the mold of ' +
+                             'the one you mean, so press a blank key mold into its door first.');
         return true;
       }
     }
     if (!building) {
-      toProfile(profileId, 'You hold nothing with a door, and you are carrying no key mold. ' +
-                           'Claim a place with /claim, or have the holder of one stand at their ' +
-                           'door while you say /mold.');
+      toProfile(profileId, 'A key comes off a key mold that has been pressed into a door, and ' +
+                           'you are carrying none. Press a blank one into the lock you mean, ' +
+                           'with whoever holds the place standing there.');
+      return true;
+    }
+    /*
+      ONE IRON INGOT, THE KEY'S PRICE AT THE FORGE (#1637). The Key in the
+      forge's own list costs one (docs/systems/lists/smith-edgewright.md), and
+      the lock key at a forge is the same cut, so it costs the same. A key out
+      of nothing beside a row that charges an ingot would make that row one
+      nobody uses. Asked on #1637. Taken before the key is handed over and put
+      back if it cannot be, so nobody pays for a key they did not get.
+    */
+    if (!takeItem(actorId, KEY_INGOT, 1)) {
+      toProfile(profileId, 'A key is cut from one iron ingot, and you are carrying none.');
       return true;
     }
     if (!giveNamed(actorId, KEY, keyLabel(building))) {
+      addItem(actorId, KEY_INGOT, 1);
       toProfile(profileId, 'The key could not be handed over. Say so in the dev channel.');
       return true;
     }
@@ -35886,6 +36136,29 @@ log('gamemode loaded:',
     } catch (e) {
       return true;
     }
+  }
+
+  /*
+    THE FORGE UNDER THE CROSSHAIR (#1637). At a forge, with a key mold that
+    has been pressed into a door in the pack, the lock key sends /key and the
+    forge's form id in hex, the way the mold key sends a door's. The id is a
+    hint and this is the gate: a forge the bench table knows, and the person
+    standing at it by the server's own reckoning, MOLD_REACH, for the reasons
+    given over it. With no id, the forge they last pressed, as before.
+  */
+  var KEY_INGOT = '5ace4:Skyrim.esm';   // Iron Ingot, the Key's input at a forge
+
+  function forgeHere(parts, actorId) {
+    var raw = String((parts && parts[1]) || '');
+    if (!raw) { return atForge(actorId); }
+    if (!/^[0-9a-f]{1,8}$/i.test(raw)) { return false; }
+    var refrId = parseInt(raw, 16);
+    var base = '';
+    try { base = String(mp.get(refrId, 'baseDesc') || ''); } catch (e) { return false; }
+    if (!Object.prototype.hasOwnProperty.call(BENCH_BY_BASE, base) ||
+        BENCH_BY_BASE[base] !== FORGE) { return false; }
+    var far = distanceTo(actorId, refrId);
+    return far >= 0 && far <= MOLD_REACH;
   }
 
   /** Are they standing at a forge. The bench tables already know which is one. */
@@ -36110,7 +36383,11 @@ log('gamemode loaded:',
     /box whiterun      make the container you are at the hold's box
     /box               say which hold's box you are standing at
 
-    A steward's word, because designating the city's treasury is city business.
+    A steward's, because designating the city's treasury is city business.
+    Sent by the Office page of the K panel (#1638), which offers the ten
+    holds for the container the steward just opened, never typed. Only one of
+    the ten is taken, the same as a board: any other word would start a box
+    no hold's ledger knows about.
   */
   function boxCmd(parts, actorId, profileId, toProfile) {
     var at = boxAt(actorId);
@@ -36154,7 +36431,11 @@ log('gamemode loaded:',
       return true;
     }
     if (!at) {
-      toProfile(profileId, 'Open the container you mean, then say that again.');
+      toProfile(profileId, 'Open the container, then press the hold on the Office page of K within a minute.');
+      return true;
+    }
+    if (LEDGER_HOLDS.indexOf(arg) < 0) {
+      toProfile(profileId, 'No hold called ' + arg + '. The holds are ' + LEDGER_HOLDS.join(', ') + '.');
       return true;
     }
     boxes[arg] = at;
@@ -36162,6 +36443,7 @@ log('gamemode loaded:',
     save();
     plog('a steward made', at.toString(16), 'the box for', arg);
     toProfile(profileId, 'That container is ' + arg + '\'s box now. Rent and fees go in it.');
+    redrawPanel(actorId);
     return true;
   }
 
@@ -36353,11 +36635,17 @@ log('gamemode loaded:',
     /rent            what this place costs, and what is owed on it
     /rent 50         a steward sets it, per week
     /rent -          a steward waives it
+
+    Sent by Set rent and No rent on the Office page of the K panel (#1638),
+    never typed; the page shows a steward what is owed at the door they just
+    opened. See officeView.
   */
+  var OFFICE_AT_DOOR = 'Open the door of the building, then press the button on the Office page of K within a minute.';
+
   function rentCmd(parts, actorId, profileId, toProfile) {
     var building = here(actorId);
     if (!building) {
-      toProfile(profileId, 'Stand at the door and open it, then say that again.');
+      toProfile(profileId, OFFICE_AT_DOOR);
       return true;
     }
     var held = holderOf(building);
@@ -36375,7 +36663,7 @@ log('gamemode loaded:',
       return true;
     }
 
-    if (!isSteward(profileId)) {
+    if (!isSteward(profileId, actorId)) {
       toProfile(profileId, 'Only a steward sets rent.');
       return true;
     }
@@ -36388,17 +36676,19 @@ log('gamemode loaded:',
       save();
       plog('a steward waived the rent on', nameOf(building));
       toProfile(profileId, 'No rent on ' + nameOf(building) + ' now.');
+      redrawPanel(actorId);
       return true;
     }
     var amount = Number(arg) || 0;
     if (amount <= 0) {
-      toProfile(profileId, 'Give an amount in gold, or - to waive it.');
+      toProfile(profileId, 'The rent is a number of gold above 0.');
       return true;
     }
     held.rent = { amount: amount, everyDays: 7, owed: 0, since: Date.now() };
     save();
     plog('a steward set the rent on', nameOf(building), 'to', amount);
     toProfile(profileId, nameOf(building) + ' pays ' + amount + ' gold every 7 days now.');
+    redrawPanel(actorId);
     return true;
   }
 
@@ -37334,6 +37624,46 @@ log('gamemode loaded:',
     } catch (e) { }
   }
 
+  /*
+    THE NEWEST TEN, NUMBERED BY WHERE THEY REALLY ARE. What a board shows, on
+    its own panel and under Boards on J (#1627).
+
+    The typed reader this replaced had two faults in one loop. It showed the
+    OLDEST ten, so the eleventh paid posting in a hold was invisible for ever
+    and the fee was taken first. And it numbered the lines 1..10 by their
+    position in the listing while take indexes the real array, so the moment
+    anything was hidden the numbers a person could read stopped being the
+    numbers they could take.
+
+    A notice somebody took down stays in the list marked down, so it is
+    skipped here and leaves a gap in the numbers rather than moving every
+    newer one. See unpin below. `older` counts what is still up and not among
+    the ten: noticeboards.md, "The line under the ten says how many are older."
+  */
+  function wallOf(hold, profileId) {
+    var list = notices[hold] || [];
+    var rows = [];
+    var up = 0;
+    for (var i = list.length - 1; i >= 0; i--) {
+      var n = list[i];
+      if (n.down) { continue; }
+      up++;
+      if (rows.length >= 10) { continue; }
+      rows.push({
+        n: i + 1,
+        job: !!n.job,
+        letter: !!n.letter,
+        name: n.name || 'somebody',
+        text: n.letter ? sealed(n) : (n.haul ? haulText(n) : (n.text || '')),
+        taken: n.taken ? (n.takenName || 'somebody') : '',
+        mine: Number(n.by) === Number(profileId),
+        held: !!(n.job && Number(n.taken) === Number(profileId)),
+        haul: !!n.haul
+      });
+    }
+    return { rows: rows, older: up - rows.length };
+  }
+
   /** What the board panel draws. Null until they are near one. */
   function boardPanel(actorId, profileId) {
     var near = nearestBoard(actorId, 1500);
@@ -37342,37 +37672,13 @@ log('gamemode loaded:',
     var b = near.board;
     var here = near.dist <= BOARD_REACH;
     var wall = [];
+    var older = 0;
     var mine = [];
     if (here) {
-      var list = notices[hold] || [];
-      var shown = 0;
-      for (var i = list.length - 1; i >= 0 && shown < 10; i--) {
-        var n = list[i];
-        if (n.down) { continue; }
-        shown++;
-        wall.push({
-          n: i + 1,
-          job: !!n.job,
-          letter: !!n.letter,
-          name: n.name || 'somebody',
-          text: n.letter ? sealed(n) : (n.haul ? haulText(n) : (n.text || '')),
-          taken: n.taken ? (n.takenName || 'somebody') : '',
-          mine: Number(n.by) === Number(profileId),
-          held: !!(n.job && Number(n.taken) === Number(profileId)),
-          haul: !!n.haul
-        });
-      }
-      for (var h in notices) {
-        if (!Object.prototype.hasOwnProperty.call(notices, h)) { continue; }
-        var rows = notices[h];
-        for (var j = 0; j < rows.length; j++) {
-          var job = rows[j];
-          if (job.job && Number(job.taken) === Number(profileId) && !job.down) {
-            mine.push({ hold: h, n: j + 1, text: job.letter ? sealed(job) : (job.haul ? haulText(job) : (job.text || '')),
-                        name: job.name || 'somebody' });
-          }
-        }
-      }
+      var seen = wallOf(hold, profileId);
+      wall = seen.rows;
+      older = seen.older;
+      mine = jobsOf(profileId);
     }
     /*
       THE HAUL'S TWO BUTTONS (#1393). Send a haul needs the towns it can go
@@ -37423,6 +37729,7 @@ log('gamemode loaded:',
       here: here,
       paid: Number(funds[hold]) || 0,
       wall: wall,
+      older: older,
       jobs: mine,
       submit: submit,
       steward: steward,
@@ -37431,9 +37738,48 @@ log('gamemode loaded:',
     };
   }
 
-  /** A steward moves a hold's board to where they stand. */
+  /*
+    EVERY TOWN'S BOARD, ON J (#1627). noticeboards.md: "Reading another
+    hold's board by name does not require standing there." That was
+    /board <hold>, typed. Patrick, 4 Oct: nothing people do is a chat
+    command. J has a Boards tab with the ten towns, and picking one sends
+    /board <hold>, which nobody is told to type. The server keeps which board
+    that character is reading, and the social view carries that one wall,
+    read only, with their jobs under it. Only the one they picked is sent,
+    so ten walls are not pushed to everybody on every tick.
+
+    boardReads is not saved. After a restart J shows the towns with none
+    picked, which is true: nobody has asked this server for one yet.
+  */
+  var boardReads = {};
+
+  function boardsView(profileId) {
+    var list = [];
+    for (var i = 0; i < LEDGER_HOLDS.length; i++) {
+      var h = LEDGER_HOLDS[i];
+      if (!Object.prototype.hasOwnProperty.call(boards, h)) { continue; }
+      list.push({ hold: h, where: (boards[h] && boards[h].where) || h });
+    }
+    var hold = Object.prototype.hasOwnProperty.call(boardReads, profileId) ? boardReads[profileId] : '';
+    if (!hold || !Object.prototype.hasOwnProperty.call(boards, hold)) {
+      return { list: list, read: null, jobs: null };
+    }
+    var seen = wallOf(hold, profileId);
+    return {
+      list: list,
+      read: { hold: hold, where: (boards[hold] && boards[hold].where) || hold,
+              wall: seen.rows, older: seen.older },
+      jobs: jobsOf(profileId)
+    };
+  }
+
+  /*
+    A steward moves a hold's board to where they stand. Move it here, beside
+    each board on the Office page of the K panel, sends /board move <hold>
+    (#1638); nobody types it.
+  */
   function moveBoard(hold, actorId, profileId, toProfile) {
-    if (!isSteward(profileId)) {
+    if (!isSteward(profileId, actorId)) {
       toProfile(profileId, 'Only a steward moves a board.');
       return true;
     }
@@ -37608,7 +37954,7 @@ log('gamemode loaded:',
     // /board here moves it, and only a steward may.
     if (arg === 'here') {
       if (!standing) {
-        toProfile(profileId, 'Say which hold: /board here needs you at the board you are moving.');
+        toProfile(profileId, 'Stand at the board you are moving.');
         return true;
       }
       return moveBoard(standing, actorId, profileId, toProfile);
@@ -37631,61 +37977,29 @@ log('gamemode loaded:',
       var which = (parts && parts.length > 2)
         ? String(parts[2]).trim().toLowerCase() : standing;
       if (!which) {
-        toProfile(profileId, 'Say which board: /board move <hold>, standing where you want it.');
+        toProfile(profileId, 'Pick the board to move on the Office page of K, standing where you want it.');
         return true;
       }
       return moveBoard(which, actorId, profileId, toProfile);
     }
 
     /*
-      THE WORD BEATS THE PLACE WHEN A WORD WAS GIVEN.
-
-      This read `standing || arg`, so anybody at a board who named a different
-      hold was shown the one in front of them with no hint the argument had
-      been thrown away, while the prompt below told them to 'name a hold'. The
-      message advertised exactly what the expression prevented.
+      READING A BOARD IS A PANEL, NOT A LINE IN THE CHAT (#1627). Clicking
+      the board opens its panel there, and J's Boards tab sends
+      /board <hold> for any town's, from anywhere. That line puts the board
+      on J (boardsView) and answers nothing in the chat. With no town, it
+      says where the boards are.
     */
-    var named = (arg && Object.prototype.hasOwnProperty.call(boards, arg)) ? arg : null;
-    var hold = named || standing || null;
-    if (!hold) {
-      toProfile(profileId, arg
-        ? 'No board in ' + arg + '. Stand at a board, or name a hold that has one.'
-        : 'Stand at a board, or name a hold.');
+    if (!arg) {
+      toProfile(profileId, 'Click a notice board to read it. Every town\'s board is on J, under Boards.');
       return true;
     }
-    var list = notices[hold] || [];
-    var up = 0;
-    for (var u = 0; u < list.length; u++) { if (!list[u].down) { up++; } }
-    if (!up) {
-      toProfile(profileId, 'Nothing on the board in ' + hold + '.');
+    if (!Object.prototype.hasOwnProperty.call(boards, arg)) {
+      toProfile(profileId, 'No board in ' + arg + '.');
       return true;
     }
-    /*
-      THE NEWEST TEN, NUMBERED BY WHERE THEY REALLY ARE.
-
-      Two faults in one loop. It showed the OLDEST ten, so the eleventh paid
-      posting in a hold was invisible for ever and the fee was taken first. And
-      it numbered the lines 1..10 by their position in the listing while /take
-      indexes the real array, so the moment anything was hidden the numbers a
-      person could read stopped being the numbers they could take.
-
-      A notice somebody took down with /unpin stays in the list marked down,
-      so it is skipped here and leaves a gap in the numbers rather than
-      moving every newer one. See unpin below.
-    */
-    var lines = [];
-    var shown = 0;
-    for (var i = list.length - 1; i >= 0 && shown < 10; i--) {
-      var n = list[i];
-      if (n.down) { continue; }
-      lines.push('[' + (i + 1) + '] ' + (n.letter
-        ? 'letter for ' + n.to + ', from ' + n.name + (n.taken ? ', taken by ' + n.takenName : '')
-        : (n.job ? (n.taken ? 'job, taken: ' : 'job: ') : '') + n.name + ': ' + (n.haul ? haulText(n) : n.text)));
-      shown++;
-    }
-    var more = up > shown
-      ? '\n(' + (up - shown) + ' older, and /take uses the numbers shown)' : '';
-    toProfile(profileId, 'The board in ' + hold + ':\n' + lines.join('\n') + more);
+    boardReads[profileId] = arg;
+    refreshPanel(actorId);
     return true;
   }
 
@@ -37716,7 +38030,7 @@ log('gamemode loaded:',
     var list = notices[hold] || [];
     var at = Number((parts && parts[1]) || 0) - 1;
     if (!(at >= 0 && at < list.length)) {
-      toProfile(profileId, 'Say which one by its number, as /board lists them.');
+      toProfile(profileId, 'That one is not on the board.');
       return true;
     }
     var n = list[at];
@@ -37748,8 +38062,8 @@ log('gamemode loaded:',
     if (n.letter) {
       plog(who, 'took a letter for', n.to, 'in', hold);
       toProfile(profileId, 'You take the letter for ' + n.to + ', from ' + n.name + '. It is sealed. ' +
-                'Find ' + n.to + ' and /deliver it within about 10 metres, and the ' +
-                (Number(n.pay) || 0) + ' gold is yours.');
+                'Find ' + n.to + ', look at them within about 10 metres, and hand it over with the key ' +
+                'the prompt shows. The ' + (Number(n.pay) || 0) + ' gold is yours.');
       refreshPanel(actorId);
       return true;
     }
@@ -37768,25 +38082,29 @@ log('gamemode loaded:',
     return true;
   }
 
-  /** What somebody is carrying off the boards, anywhere in Skyrim. */
-  function jobs(profileId, toProfile) {
-    var lines = [];
+  /*
+    What somebody is carrying off the boards, anywhere in Skyrim: Your jobs,
+    on the board panel and under Boards on J (#1627). It was /jobs, typed.
+    A job is handed back only at the board it came from (dropJob), so the
+    panel puts Put it back on the rows of the board you stand at, and J,
+    which is read only, has none.
+  */
+  function jobsOf(profileId) {
+    var out = [];
     for (var hold in notices) {
       if (!Object.prototype.hasOwnProperty.call(notices, hold)) { continue; }
       var list = notices[hold];
       for (var i = 0; i < list.length; i++) {
         var n = list[i];
-        if (n.job && n.taken === profileId && !n.down) {
-          lines.push(hold + ': ' + (n.letter ? sealed(n) + ', from ' + n.name
-                                             : (n.haul ? '[' + (i + 1) + '] ' + haulText(n) : n.text) +
-                                               ' (for ' + n.name + ')'));
+        if (n.job && Number(n.taken) === Number(profileId) && !n.down) {
+          out.push({ hold: hold, where: (boards[hold] && boards[hold].where) || hold, n: i + 1,
+                     name: n.name || 'somebody',
+                     text: n.letter ? sealed(n) : (n.haul ? haulText(n) : (n.text || '')),
+                     letter: !!n.letter, haul: !!n.haul });
         }
       }
     }
-    toProfile(profileId, lines.length
-      ? 'You have taken:\n' + lines.join('\n')
-      : 'You have taken no jobs.');
-    return true;
+    return out;
   }
 
   /** Hand one back, so it does not sit dead on the board. */
@@ -37799,7 +38117,7 @@ log('gamemode loaded:',
     var list = notices[hold] || [];
     var at = Number((parts && parts[1]) || 0) - 1;
     if (!(at >= 0 && at < list.length)) {
-      toProfile(profileId, 'Say which one by its number, as /board lists them.');
+      toProfile(profileId, 'That one is not on the board.');
       return true;
     }
     var n = list[at];
@@ -37833,18 +38151,18 @@ log('gamemode loaded:',
     their own notice or their own untaken job, and nobody else's.
 
     A JOB SOMEBODY HAS TAKEN STAYS UP. It is on the taker's list, and pulling
-    it out from under them would empty their /jobs with no word to either of
-    them. It can come down once they hand it back with /dropjob.
+    it out from under them would take it off their Your jobs with no word to
+    either of them. It can come down once they hand it back.
 
     NO REFUND. The fee went into the hold's box the moment the notice was
     posted, and the box is the hold's money, which only the City Court draws.
 
-    THE NUMBERS DO NOT MOVE. /take and /dropjob act on a notice's place in the
-    list, and a person reads that number off /board and types it a moment
-    later. Cutting a notice out would shift every newer one down by one, so
-    somebody who read [4] and typed /take 4 would take the job that had been
-    [5]. So a notice that comes down stays in the list marked down, and /board
-    and /take step over it.
+    THE NUMBERS DO NOT MOVE. The panel's Take, Put it back and Take down send
+    a notice's place in the list, drawn on the wall a moment before. Cutting a
+    notice out would shift every newer one down by one, so somebody who
+    pressed Take on 4 would take the job that had been 5. So a notice that
+    comes down stays in the list marked down, and the wall and take step over
+    it.
 
     takedown is the store half, with no rule in it about who may. It is on
     g.__thornswoodProperty so the guards (entries 209 and 208) can tear
@@ -37870,7 +38188,7 @@ log('gamemode loaded:',
     var list = notices[hold] || [];
     var at = Number((parts && parts[1]) || 0) - 1;
     if (!(at >= 0 && at < list.length)) {
-      toProfile(profileId, 'Say which one by its number, as /board lists them.');
+      toProfile(profileId, 'That one is not on the board.');
       return true;
     }
     var n = list[at];
@@ -37927,15 +38245,19 @@ log('gamemode loaded:',
         /letter Lydia Meet me at the Drunken Huntsman at dusk.
         /letter "Lydia Stormblade" Meet me at the Drunken Huntsman at dusk.
 
+    NOBODY TYPES THESE (#1595). Patrick, 4 Oct: nothing people do is a chat
+    command. The board panel's Write a letter sends the second form, the name
+    always in double quotes, and nothing a person reads names /letter.
+
     #1374, as docs/systems/noticeboards.md has it. A letter is a job with a
     named person at the other end, written standing at the board. The words
     are up to 300 characters, the same cap as /ooc; a longer one is refused
     before any gold is taken rather than cut, because the sender paid for the
     whole letter. The name is one word, or several in double quotes.
 
-    THE WORDS ARE SEALED. Only /deliver hands them to anybody. The wall, the
-    panel, /jobs and the taking line say who it is for and from whom, and the
-    log does not record them either.
+    THE WORDS ARE SEALED. Only deliver hands them to anybody. The wall, the
+    panels, Your jobs and the taking line say who it is for and from whom, and
+    the log does not record them either.
   */
   function postLetter(parts, actorId, profileId, toProfile) {
     var hold = boardHere(actorId);
@@ -37954,7 +38276,7 @@ log('gamemode loaded:',
       words = gap < 0 ? '' : rest.slice(gap + 1).trim();
     }
     if (!to) {
-      toProfile(profileId, 'Say who it is for, then what it says: /letter <name> <words>.');
+      toProfile(profileId, 'Say who the letter is for.');
       return true;
     }
     if (!words) {
@@ -37990,7 +38312,13 @@ log('gamemode loaded:',
   }
 
   /*
-        /deliver Lydia      or the form id the crosshair gives, as /trade takes
+        /deliver ff000103    the form id the crosshair gives, as /trade takes
+
+    NOBODY TYPES THIS (#1595). The look prompt shows Hand over the letter
+    while you carry one for the person under the crosshair (lettersCarried,
+    below, through the near list's `d`), and its key sends this line with
+    their form id. A name still finds them, the way findPerson always has,
+    but nothing a person reads names /deliver.
 
     Every letter the courier carries for that person goes over at once,
     within the trade reach. The name is what is checked and nothing else: the
@@ -37998,7 +38326,7 @@ log('gamemode loaded:',
     with the letter still in the courier's hands. The person it is for is told
     the words, who wrote them and who brought them. The courier is paid each
     letter's held 15 out of the ledger it was counted on, and the letter comes
-    off the wall the way an /unpin does, keeping its number.
+    off the wall the way a take down does, keeping its number.
   */
   function deliver(parts, actorId, profileId, toProfile) {
     var carried = [];
@@ -38018,7 +38346,7 @@ log('gamemode loaded:',
     }
     var want = (parts && parts.length > 1) ? parts.slice(1).join(' ').trim() : '';
     if (!want) {
-      toProfile(profileId, 'Say who you are handing it to: /deliver and their name, standing with them.');
+      toProfile(profileId, 'Look at the person the letter is for, and use the key the prompt shows.');
       return true;
     }
     var soc = g.__thornswoodSocial;
@@ -38101,6 +38429,41 @@ log('gamemode loaded:',
   }
 
   /*
+    WHO CARRIES A LETTER FOR WHOM, for the look prompt (#1595). The prompt
+    shows Hand over the letter only while you carry a letter for the person
+    under the crosshair, and only the server knows what anybody carries, so
+    the social block's near list marks that person with `d`. deliver checks
+    everything again when the line arrives: this decides what is drawn, never
+    what is paid.
+
+    One pass over every board, so the near list asks once a tick rather than
+    once for every two people standing together. carries matches the names
+    the way deliver does, with nameIs.
+  */
+  function lettersCarried() {
+    var byCourier = {};
+    for (var h in notices) {
+      if (!Object.prototype.hasOwnProperty.call(notices, h)) { continue; }
+      var list = notices[h] || [];
+      for (var i = 0; i < list.length; i++) {
+        var n = list[i];
+        if (!n || !n.letter || n.down || !n.taken) { continue; }
+        var who = String(Number(n.taken));
+        (byCourier[who] = byCourier[who] || []).push(n.to);
+      }
+    }
+    return {
+      carries: function (courierPid, name) {
+        var key = String(Number(courierPid));
+        var tos = Object.prototype.hasOwnProperty.call(byCourier, key) ? byCourier[key] : null;
+        if (!tos) { return false; }
+        for (var k = 0; k < tos.length; k++) { if (nameIs(tos[k], name)) { return true; } }
+        return false;
+      }
+    };
+  }
+
+  /*
     ------------------------------------------------------------- a haul
 
     NOBODY TYPES THESE. Patrick, 4 Oct: no chat commands for anything people
@@ -38119,7 +38482,7 @@ log('gamemode loaded:',
     hold's ledger. The pay is held there the way a letter's 15 is, until the
     haul is confirmed or taken down.
 
-    /take and /jobs treat it as any job. It comes down before it is delivered
+    take and Your jobs treat it as any job. It comes down before it is delivered
     three ways, and each hands the pay back out of the ledger to the poster
     and keeps the fee (cancelHaul): the hauler's /dropjob, the poster's /unpin
     before anybody has taken it, and a steward's /unpin at the posting board,
@@ -38152,7 +38515,7 @@ log('gamemode loaded:',
     return p < HAUL_TENTH_FROM ? 0 : Math.floor(p / 10);
   }
 
-  /** A haul's line on the wall, the panel and /jobs: where it goes and the pay. */
+  /** A haul's line on the wall and in Your jobs: where it goes and the pay. */
   function haulText(n) {
     return 'haul to ' + n.dest + ' for ' + (Math.floor(Number(n.pay)) || 0) + ' gold: ' + (n.text || '');
   }
@@ -38489,17 +38852,29 @@ log('gamemode loaded:',
     if (word === '/deed' || word === '/deeds') {
       return deeds(actorId, profileId, toProfile);
     }
-    if (word === '/lock') { return setLock(actorId, profileId, toProfile, true); }
-    if (word === '/unlock') { return setLock(actorId, profileId, toProfile, false); }
+    /*
+      /claim, /lock and /unlock are what the lock key sends at a door (#1637),
+      with the door's id after them, and nobody is told to type them. Each
+      answer draws the line at the door again, so the key's next word is the
+      one that is true now, whatever this one did.
+    */
+    if (word === '/lock' || word === '/unlock') {
+      setLock(actorId, profileId, toProfile, word === '/lock');
+      doorLine(actorId, profileId);
+      return true;
+    }
     if (word === '/mold') { return mold(actorId, profileId, toProfile); }
     if (word === '/moldhere') { return moldHere(parts, actorId, profileId, toProfile); }
-    if (word === '/key') { return cutKey(actorId, profileId, toProfile); }
+    // The lock key at a forge, with the forge's id (#1637). See forgeHere.
+    if (word === '/key') { return cutKey(actorId, profileId, toProfile, parts); }
     if (word === '/claim') {
       // Only when they are actually at a door. Otherwise this is farming's word
       // and farming answers it, which is what keeps /claim meaning one thing in
       // a field and another on a doorstep without either of them guessing.
       if (!here(actorId)) { return false; }
-      return claim(actorId, profileId, toProfile);
+      claim(actorId, profileId, toProfile);
+      doorLine(actorId, profileId);
+      return true;
     }
     if (word === '/jarl') { return jarlCmd(parts, actorId, profileId, toProfile); }
     if (word === '/steward') { return stewardCmd(parts, actorId, profileId, toProfile); }
@@ -38511,7 +38886,6 @@ log('gamemode loaded:',
     if (word === '/job') { return post(parts, actorId, profileId, toProfile, true); }
     if (word === '/board') { return board(parts, actorId, profileId, toProfile); }
     if (word === '/take') { return take(parts, actorId, profileId, toProfile); }
-    if (word === '/jobs') { return jobs(profileId, toProfile); }
     if (word === '/dropjob') { return dropJob(parts, actorId, profileId, toProfile); }
     if (word === '/unpin') { return unpin(parts, actorId, profileId, toProfile); }
     if (word === '/letter') { return postLetter(parts, actorId, profileId, toProfile); }
@@ -38527,17 +38901,22 @@ log('gamemode loaded:',
         /steward 1893288986      name one
         /steward -1893288986     take it back
 
+    Sent by the Office page of the K panel (#1638), never typed: Name steward
+    beside a person in the world, Remove beside a steward. See officeView.
+
     A PROFILE ID AND NOT A NAME, and that is a limit rather than a choice: two
     characters can carry the same name and this block has no way to tell them
-    apart. The id is what the register keys on everywhere else. It is on the
-    person's own K panel, so asking somebody for theirs is a sentence.
+    apart. The id is what the register keys on everywhere else, and the page
+    sends the id of the person picked, so picking somebody by name on the page
+    still names exactly that person.
   */
   /*
     Seat the Jarl office on THIS character.
 
         /jarl
 
-    Discord Jarl (or admin) eligibility is required. The office is the
+    Sent by Take the office on the Office page of the K panel (#1638), never
+    typed. Discord Jarl (or admin) eligibility is required. The office is the
     character property, so a second character on the same account stays
     ordinary. Admins may seat without the Discord role so the first
     office can be placed out of character (#397).
@@ -38582,7 +38961,7 @@ log('gamemode loaded:',
     if (!arg) {
       toProfile(profileId, who.length
         ? 'Stewards: ' + who.join(', ') + '.'
-        : 'No stewards. A jarl names one with /steward and their profile id.');
+        : 'No stewards. A Jarl names one on the Office page of K.');
       return true;
     }
 
@@ -38594,26 +38973,42 @@ log('gamemode loaded:',
     var drop = arg.charAt(0) === '-';
     var pid = Number(drop ? arg.slice(1) : arg) || 0;
     if (!pid) {
-      toProfile(profileId, 'That is not a profile id. It is the number on the K panel.');
+      toProfile(profileId, 'That is not a profile id.');
       return true;
     }
 
     var at = stewards.indexOf(pid);
+    // The person picked on the page, by name when they are in the world.
+    var them = onlineActorOf(pid);
+    var who = them ? personName(them) : 'Profile ' + pid;
     if (drop) {
-      if (at === -1) { toProfile(profileId, pid + ' is not a steward.'); return true; }
+      if (at === -1) { toProfile(profileId, who + ' is not a steward.'); return true; }
       stewards.splice(at, 1);
       save();
       plog('a jarl took the stewardship back from', pid);
-      toProfile(profileId, pid + ' is no longer a steward.');
+      toProfile(profileId, who + ' is no longer a steward.');
+      officeRedraw(actorId, pid);
       return true;
     }
 
-    if (at !== -1) { toProfile(profileId, pid + ' is already a steward.'); return true; }
+    if (at !== -1) { toProfile(profileId, who + ' is already a steward.'); return true; }
     stewards.push(pid);
     save();
     plog('a jarl named', pid, 'steward');
-    toProfile(profileId, pid + ' is a steward now.');
+    toProfile(profileId, who + ' is a steward now.');
+    officeRedraw(actorId, pid);
     return true;
+  }
+
+  /*
+    The Office page again (#1638): the K panel of whoever pressed, and of the
+    person a steward was named or removed, when they are in the world, so the
+    page in front of each of them says what is true now.
+  */
+  function officeRedraw(actorId, pid) {
+    redrawPanel(actorId);
+    var them = pid ? onlineActorOf(pid) : 0;
+    if (them && them !== actorId) { redrawPanel(them); }
   }
 
   /*
@@ -38630,17 +39025,27 @@ log('gamemode loaded:',
     rather than being written.
   */
   function evict(actorId, profileId, toProfile) {
-    if (!isSteward(profileId)) {
+    if (!isSteward(profileId, actorId)) {
       toProfile(profileId, 'Only a steward ends a claim.');
       return true;
     }
     var building = here(actorId);
     if (!building) {
-      toProfile(profileId, 'Stand at the door and open it, then say that again.');
+      toProfile(profileId, OFFICE_AT_DOOR);
       return true;
     }
     var held = holderOf(building);
     if (!held) {
+      /*
+        embassy.md: "A steward of Haafingar does not evict the Accord" (#1390).
+        A claim somebody made before the embassy held this door is still that
+        person's claim, and ending it below is still the steward's to do.
+      */
+      var accordEvict = globalThis.__thornswoodEmbassy;
+      if (accordEvict && accordEvict.holds(building)) {
+        toProfile(profileId, accordEvict.EVICT_REFUSED);
+        return true;
+      }
       toProfile(profileId, 'Nobody holds ' + nameOf(building) + '.');
       return true;
     }
@@ -38651,12 +39056,113 @@ log('gamemode loaded:',
     plog('a steward ended', was + '\'s claim on', nameOf(building));
     toProfile(profileId, 'You end ' + was + '\'s claim on ' + nameOf(building) +
               '. What is inside is untouched, and any key they hold still works.');
+    redrawPanel(actorId);
     return true;
+  }
+
+  /*
+    THE OFFICE PAGE ON K (#1638).
+
+    Patrick, 4 Oct: no commands for things people do, and a Jarl and a
+    steward are people in the world (offices.md: "A steward is not staff").
+    So the offices' powers are buttons on a page of the K panel, for the
+    character that may hold one: Take the office; name a steward by picking
+    a person in the world, and remove one; evict and set or clear the rent at
+    the door the steward just opened, with what is owed there; make the
+    container they just opened a hold's box; and move any of the ten boards
+    to where they stand. Each button sends the line the command was (/jarl,
+    /steward, /evict, /rent, /box, /board move), and every rule is checked
+    again when it arrives. This only says what is true, so the page can draw
+    it.
+
+    "Just opened" is the same minute the lines have always used (here and
+    boxAt): the door or container is read when the panel is written, and K
+    asks for that the moment it opens.
+
+    THE STATE IS HANDED IN, NEVER READ. This is called from the character
+    block's writeState, and that block's stateOf writes a character it has
+    not seen through writeState, so reading it from here would ask for
+    itself. So the office is worked out from s, the way isJarl and isSteward
+    work it out, and the two are held together by tests/test-1638-office.js.
+
+    Null for anybody who holds no office and could not take one, and then the
+    page is not drawn at all.
+  */
+  var OFFICE_PEOPLE_MAX = 40;
+
+  function officeView(actorId, profileId, s) {
+    var pid = Number(profileId) || 0;
+    if (!pid || !actorId) { return null; }
+    var adm = g['__thornswoodIsAdmin'];
+    var fn = g['__thornswoodIsJarl'];
+    var admin = false, role = false;
+    try { admin = typeof adm === 'function' && !!adm(pid); } catch (e) { admin = false; }
+    try { role = typeof fn === 'function' && !!fn(pid); } catch (e2) { role = false; }
+    var holds = !!(s && s.office === 'jarl');
+    var jarl = admin || (role && holds);                     // isJarl
+    var steward = jarl || stewards.indexOf(pid) !== -1;      // isSteward
+    if (!admin && !role && !steward) { return null; }
+
+    // Who is in the world, by profile, named the way a guest is named.
+    var names = {};
+    var order = [];
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e3) { online = []; }
+    for (var i = 0; i < online.length; i++) {
+      var op = profileOf(online[i]);
+      var nm = '';
+      try {
+        var ap = mp.get(online[i], 'appearance');
+        if (ap && ap.name) { nm = String(ap.name); }
+      } catch (e4) { nm = ''; }
+      if (!op || !nm || Object.prototype.hasOwnProperty.call(names, op)) { continue; }
+      names[op] = nm;
+      order.push(op);
+    }
+
+    var view = { jarl: holds, may: (admin || role) && !holds, name: jarl, steward: steward,
+                 stewards: [], people: [], door: null, box: null, boards: [] };
+    for (var k = 0; k < stewards.length; k++) {
+      view.stewards.push({ pid: stewards[k],
+                           name: Object.prototype.hasOwnProperty.call(names, stewards[k]) ? names[stewards[k]] : '' });
+    }
+    if (jarl) {
+      // Anybody in the world who is not a steward already, by name. The id
+      // goes with the name, because the id is what the button sends.
+      for (var j = 0; j < order.length; j++) {
+        if (order[j] === pid || stewards.indexOf(order[j]) !== -1) { continue; }
+        view.people.push({ pid: order[j], name: names[order[j]] });
+      }
+      view.people.sort(function (a, b) {
+        return a.name < b.name ? -1 : (a.name > b.name ? 1 : a.pid - b.pid);
+      });
+      view.people = view.people.slice(0, OFFICE_PEOPLE_MAX);
+    }
+    if (!steward) { return view; }
+
+    var building = here(actorId);
+    if (building) {
+      var held = holderOf(building);
+      if (held && held.rent) { rentDue(); }
+      view.door = { name: nameOf(building), by: held ? held.name : null,
+                    rent: (held && held.rent) ? { amount: Number(held.rent.amount) || 0,
+                                                  every: Number(held.rent.everyDays) || 7,
+                                                  owed: Number(held.rent.owed) || 0 } : null };
+    }
+    var at = boxAt(actorId);
+    if (at) { view.box = { hold: holdOfBox(at) || null }; }
+    for (var h = 0; h < LEDGER_HOLDS.length; h++) {
+      var bh = LEDGER_HOLDS[h];
+      if (!Object.prototype.hasOwnProperty.call(boards, bh)) { continue; }
+      view.boards.push({ hold: bh, where: (boards[bh] && boards[bh].where) || bh });
+    }
+    return view;
   }
 
   ready();
   g.__thornswoodProperty = {
     command: command, touched: touched, here: here, claim: claim, deeds: deeds,
+    doorLine: doorLine, DOOR_LINE_PROPERTY: DOOR_LINE_PROPERTY,
     holderOf: holderOf, buildingOf: buildingOf, nameOf: nameOf, giveDeed: giveDeed,
     setLock: setLock, mold: mold, cutKey: cutKey, mayPass: mayPass,
     holdsKey: holdsKey, holdsMold: holdsMold, holdsDeed: holdsDeed,
@@ -38671,7 +39177,7 @@ log('gamemode loaded:',
     coversGround: coversGround, groundHere: groundHere,
     DOOR_PROPERTY: DOOR_PROPERTY,
     claims: function () { return claims; },
-    isJarl: isJarl, isSteward: isSteward,
+    isJarl: isJarl, isSteward: isSteward, officeView: officeView,
     touchedBox: touchedBox, putIn: putIn, holdOfBox: holdOfBox,
     deposit: deposit, takeGold: takeGold, LEDGER_HOLDS: LEDGER_HOLDS,
     withdraw: withdraw, mayWithdraw: mayWithdraw, heldOn: heldOn,
@@ -38681,6 +39187,7 @@ log('gamemode loaded:',
     boxes: function () { return boxes; },
     notices: function () { return notices; }, takedown: takedown,
     boards: function () { return boards; }, boardHere: boardHere, boardPanel: boardPanel,
+    boardsView: boardsView, lettersCarried: lettersCarried,
     stewards: function () { return stewards.slice(); }
   };
   plog('ready,', Object.keys(BUILDING_BY_DOOR).length, 'doors across',
@@ -38690,17 +39197,488 @@ log('gamemode loaded:',
 })();
 // ==== end thornswood property ====
 
+// ==== thornswood embassy and remnant ====
+/*
+  THE EMBASSY, THE TWO ROLLS AND THE THALMOR MARKER (#1390).
+
+  docs/systems/embassy.md, thalmor.md, npcs.md and cut-items.md are the
+  design. Every number here is one of theirs.
+
+  THE BUILDING. "The embassy doors start held by the Ambassador's office,
+  so the line at them offers nobody a claim. A steward of Haafingar does
+  not evict the Accord." The page calls it a warehouse in Solitude
+  ("The Empire wanted the province and got a warehouse. This is that
+  warehouse") and names none. EMBASSY_BUILDING is the answer suggested on
+  #1390, the Abandoned Warehouse: the one warehouse in Solitude that is
+  not a shop and not the East Empire Company's, which the trading company
+  replaces. If Patrick names another building, that one line changes. The
+  property block asks holds() for the line at the door, before a claim and
+  an eviction, and before a deed presented at the door. It is not a hold:
+  nothing here makes a box, a board, a ledger or a mint, and Solitude's box
+  and board stay Haafingar's.
+
+  THE EMBASSY ROLL. "20 persons in service, no more. Of those, 6 may be
+  marked armed, and those 6 bear arms inside the walls only. Naming a 21st
+  person is refused. Marking a 7th as armed is refused." Armed is what the
+  roll says. Nothing here looks in a pack or takes a sword at the gate. The
+  Ambassador is a title and not a command (offices.md), so an admin writes
+  the roll, the same way an admin places the Jarl role.
+
+  THE REMNANT ROLL. "The roll is an application, the same kind as a Jarl,
+  not a button on K." An admin writes that one too. The page puts no number
+  on it.
+
+  /embassy AND /remnant ARE STAFF COMMANDS. Only an admin uses them, and
+  nobody else is told to type anything (docs/SYSTEMS.md, "Buttons, not
+  commands"). The person a change is about is told in their own chat when
+  they are put on a roll, marked armed or not, or taken off.
+
+  Both rolls are who may craft what the cut file marks embassy and remnant:
+  craftAnswer asks onCraftRoll, and onCraftRoll asks has() below. Nobody else
+  makes those at a public bench, and the spoils block already keeps the
+  world from handing them out.
+
+  THE MARKER. "Wearing Justiciar robes, Thalmor armour, or carrying a
+  Dominion flag in a hold is a hostile marker." marked() reads what a
+  character has on against what the remnant rows of the recipe table make
+  and the game's own two Thalmor robes. Neither the recipe table nor the
+  /give table names a Dominion flag, so there is none to read yet. The
+  robes are not race locked: races.md says Thalmor robes are a faction,
+  not a people.
+
+  THE PATROLS ARE NOT HERE. "A patrol is 2 to 4. They are on the roads
+  between holds. At most 3 patrols in the province at once, and only one on
+  a given road." Every actor the server stands up goes through the NPC
+  population policy and the shared NPC runtime: placeActors admits and
+  enrolls what it places, and the policy switches off any runtime actor it
+  has no rule for. Those are the NPC lane's, so the patrols wait on it.
+  What a patrol needs from it is written on issue #1390.
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+  function elog() {
+    var a = Array.prototype.slice.call(arguments);
+    a.unshift('[embassy]');
+    console.log(a.join(' '));
+  }
+
+  // ------------------------------------------------------------ the numbers --
+
+  var ROLL_MOST = 20;     // embassy.md: 20 persons in service, no more
+  var ARMED_MOST = 6;     // embassy.md: of those, 6 may be marked armed
+
+  // The Abandoned Warehouse in Solitude, the answer suggested on #1390.
+  var EMBASSY_BUILDING = 'e48e:The Great City of Solitude.esp';
+
+  var ROLL_NAME = { embassy: 'the embassy roll', remnant: 'the Thalmor remnant roll' };
+
+  var CLAIM_REFUSED = 'The embassy is held by the Ambassador\'s office under the Accord. ' +
+                      'It cannot be claimed.';
+  var EVICT_REFUSED = 'The embassy is not a house of the hold. A steward of Haafingar ' +
+                      'does not evict the Accord.';
+  var NOT_ADMIN = {
+    embassy: 'Only an admin writes the embassy roll.',
+    remnant: 'The remnant roll is an application. Only an admin writes it.'
+  };
+
+  // ------------------------------------------------------------- the file --
+
+  var ROLL_FILE = 'embassy.json';
+
+  /* In the private folder, beside property.json, because every row names a
+     profile and the data folder is served to anybody who asks (#541). */
+  function privatePath(name) {
+    var path = require('path');
+    var privDir = 'private';
+    try {
+      var cfg = JSON.parse(require('fs').readFileSync('server-settings.json', 'utf8'));
+      if (cfg && cfg.privDir) { privDir = String(cfg.privDir); }
+    } catch (e) { }
+    return path.join(privDir, name);
+  }
+
+  /*
+    The rolls off disk, rebuilt row by row rather than trusted whole, the
+    same discipline as the property register. And the caps hold whatever the
+    file says: a 21st row is dropped and a 7th armed mark comes off, with a
+    line in the log saying so, because a hand edit is not a way round the
+    Accord.
+
+    No file yet is two empty rolls. A file that is there and cannot be read
+    is not: the rolls stay empty and nothing writes over it until somebody
+    puts it right, because writing would throw away every name it holds.
+  */
+  function cleanRow(r, roll) {
+    if (!r || typeof r !== 'object') { return null; }
+    var actor = Number(r.actor) || 0;
+    if (!(actor > 0)) { return null; }
+    var row = { actor: actor, profile: Number(r.profile) || 0,
+                name: String(r.name || 'somebody').slice(0, 64), at: Number(r.at) || 0 };
+    if (roll === 'embassy') { row.armed = r.armed === true; }
+    return row;
+  }
+
+  var unreadable = '';
+
+  function loadRolls() {
+    var out = { embassy: [], remnant: [] };
+    var file = privatePath(ROLL_FILE);
+    var text = null;
+    try {
+      text = String(require('fs').readFileSync(file, 'utf8')).replace(/^\uFEFF/, '');
+    } catch (e) {
+      if (e && e.code === 'ENOENT') { return out; }
+      unreadable = String(e && e.message ? e.message : e);
+      elog('could not read', file + ':', unreadable, '- the rolls are empty and nothing is written until it is put right');
+      return out;
+    }
+    var raw = null;
+    try { raw = JSON.parse(text); } catch (e2) { raw = null; }
+    if (!raw || typeof raw !== 'object') {
+      unreadable = 'it is not a roll file';
+      elog(file, 'is not a roll file - the rolls are empty and nothing is written until it is put right');
+      return out;
+    }
+    var dropped = 0, disarmed = 0;
+    ['embassy', 'remnant'].forEach(function (roll) {
+      var list = Array.isArray(raw[roll]) ? raw[roll] : [];
+      var armed = 0;
+      for (var j = 0; j < list.length; j++) {
+        var row = cleanRow(list[j], roll);
+        if (!row || rowIn(out[roll], row.actor)) { dropped++; continue; }
+        if (roll === 'embassy') {
+          if (out.embassy.length >= ROLL_MOST) { dropped++; continue; }
+          if (row.armed) {
+            if (armed >= ARMED_MOST) { row.armed = false; disarmed++; } else { armed++; }
+          }
+        }
+        out[roll].push(row);
+      }
+    });
+    if (dropped || disarmed) {
+      elog('the roll file asked for more than the Accord allows or held rows that were not ' +
+           'people:', dropped, 'row(s) left off and', disarmed, 'armed mark(s) taken off');
+    }
+    return out;
+  }
+
+  function rowIn(list, actor) {
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].actor === actor) { return list[i]; }
+    }
+    return null;
+  }
+
+  var reg = loadRolls();
+
+  /*
+    Every change is written before it is made: the next rolls go to disk,
+    and only once they are there do they become the rolls. So what the
+    server enforces is always what a restart will read, and a write that
+    fails changes nothing.
+  */
+  function commit(roll, list) {
+    var next = { embassy: reg.embassy, remnant: reg.remnant };
+    next[roll] = list;
+    if (unreadable) { return false; }
+    var fs = require('fs');
+    var file = privatePath(ROLL_FILE);
+    try {
+      fs.mkdirSync(require('path').dirname(file), { recursive: true });
+      fs.writeFileSync(file + '.tmp', JSON.stringify(next, null, 1));
+      fs.renameSync(file + '.tmp', file);
+    } catch (e) {
+      elog('could not write', file + ':', e);
+      return false;
+    }
+    reg = next;
+    return true;
+  }
+
+  function notWritten() {
+    return unreadable
+      ? 'The roll file on the server could not be read (' + unreadable + '), so nothing ' +
+        'changes until it is put right. Say so in the dev channel.'
+      : 'The roll could not be written, so nothing changed. Say so in the dev channel.';
+  }
+
+  // ------------------------------------------------------- what is asked --
+
+  /** True when this building is the embassy. Asked by the property block. */
+  function holds(building) {
+    return !!building && String(building) === EMBASSY_BUILDING;
+  }
+
+  /** True when this character is on that roll. onCraftRoll asks this. */
+  function has(actorId, roll) {
+    if (roll !== 'embassy' && roll !== 'remnant') { return false; }
+    return !!rowIn(reg[roll], Number(actorId) || 0);
+  }
+
+  function armedCount() {
+    var n = 0;
+    for (var i = 0; i < reg.embassy.length; i++) { if (reg.embassy[i].armed) { n++; } }
+    return n;
+  }
+
+  function counts() {
+    return reg.embassy.length + ' of ' + ROLL_MOST + ' on the roll, ' + armedCount() +
+           ' of ' + ARMED_MOST + ' marked armed.';
+  }
+
+  // ------------------------------------------------- writing the rolls --
+
+  /*
+    One person onto a roll. who is { actor, profile, name }. Answers
+    { ok, line } and changes nothing when it refuses. The two refusals the
+    page names are here and nowhere else, so no other road onto the roll
+    can step round them.
+  */
+  function enter(roll, who, armed) {
+    var list = reg[roll];
+    var already = rowIn(list, who.actor);
+    if (already) {
+      return { ok: false, line: already.name + ' is already on ' + ROLL_NAME[roll] + '.' };
+    }
+    if (roll === 'embassy') {
+      if (list.length >= ROLL_MOST) {
+        return { ok: false, line: 'The embassy roll is full: ' + ROLL_MOST + ' persons in ' +
+                 'service, no more. Take somebody off it first.' };
+      }
+      if (armed && armedCount() >= ARMED_MOST) {
+        return { ok: false, line: ARMED_MOST + ' on the roll are already marked armed, which ' +
+                 'is all the Accord allows. Nobody was added. Disarm one first.' };
+      }
+    }
+    var row = { actor: who.actor, profile: who.profile || 0,
+                name: String(who.name || 'somebody').slice(0, 64), at: Date.now() };
+    if (roll === 'embassy') { row.armed = !!armed; }
+    if (!commit(roll, list.concat([row]))) { return { ok: false, line: notWritten() }; }
+    elog(row.name, 'is on', ROLL_NAME[roll] + (row.armed ? ', marked armed' : ''));
+    return { ok: true, row: row,
+             line: row.name + ' is on ' + ROLL_NAME[roll] + (row.armed ? ', marked armed' : '') +
+                   '.' + (roll === 'embassy' ? ' ' + counts() : ''),
+             told: 'You are on ' + ROLL_NAME[roll] +
+                   (row.armed ? ', marked armed. You bear arms inside the walls only.' : '.') };
+  }
+
+  function setArmed(row, armed) {
+    if (!!row.armed === !!armed) {
+      return { ok: false, line: row.name + (armed ? ' is already marked armed.' : ' is not marked armed.') };
+    }
+    if (armed && armedCount() >= ARMED_MOST) {
+      return { ok: false, line: ARMED_MOST + ' on the roll are already marked armed, which is ' +
+               'all the Accord allows. Disarm one first.' };
+    }
+    var changed = { actor: row.actor, profile: row.profile, name: row.name, at: row.at, armed: !!armed };
+    var list = reg.embassy.map(function (r) { return r === row ? changed : r; });
+    if (!commit('embassy', list)) { return { ok: false, line: notWritten() }; }
+    elog(row.name, armed ? 'is marked armed' : 'is no longer marked armed');
+    return { ok: true, row: changed,
+             line: row.name + (armed ? ' is marked armed. Inside the walls only.'
+                                     : ' is no longer marked armed.') + ' ' + counts(),
+             told: armed ? 'You are marked armed on the embassy roll. You bear arms inside the walls only.'
+                         : 'You are no longer marked armed on the embassy roll.' };
+  }
+
+  function leave(roll, row) {
+    if (reg[roll].indexOf(row) === -1) {
+      return { ok: false, line: row.name + ' is not on ' + ROLL_NAME[roll] + '.' };
+    }
+    var list = reg[roll].filter(function (r) { return r !== row; });
+    if (!commit(roll, list)) { return { ok: false, line: notWritten() }; }
+    elog(row.name, 'is off', ROLL_NAME[roll]);
+    return { ok: true, row: row,
+             line: row.name + ' is off ' + ROLL_NAME[roll] + '.' +
+                   (roll === 'embassy' ? ' ' + counts() : ''),
+             told: 'You are off ' + ROLL_NAME[roll] + '.' };
+  }
+
+  // ---------------------------------------------------- finding a person --
+
+  /* Somebody in the world, by name or by the form id the crosshair gives. */
+  function inWorld(words) {
+    var soc = g.__thornswoodSocial;
+    if (!soc || !soc.findPerson) { return { why: 'That is not running on this server.' }; }
+    var f = soc.findPerson(words);
+    if (!f || !f.actorId) { return { why: (f && f.why) || 'Nobody here by that name.' }; }
+    var name = String(soc.nameOfPerson(f.actorId) || '');
+    var pid = Number(soc.profileOf(f.actorId)) || 0;
+    return { actor: f.actorId, profile: pid, name: name || words };
+  }
+
+  /*
+    A row already on the roll, by its name or profile number, so somebody who
+    is not in the world can still be taken off or disarmed. Then the world.
+  */
+  function onRollBy(roll, words) {
+    var list = reg[roll];
+    var low = String(words || '').toLowerCase();
+    var asNumber = Number(words) || 0;
+    var exact = [], part = [];
+    for (var i = 0; i < list.length; i++) {
+      var n = String(list[i].name).toLowerCase();
+      if (n === low || (asNumber && list[i].profile === asNumber)) { exact.push(list[i]); }
+      else if (low && n.indexOf(low) === 0) { part.push(list[i]); }
+    }
+    var hit = exact.length ? exact : part;
+    if (hit.length === 1) { return { row: hit[0] }; }
+    if (hit.length > 1) { return { why: 'More than one on ' + ROLL_NAME[roll] + ' answers to that. Say more of the name.' }; }
+    var w = inWorld(words);
+    if (!w.actor) { return { why: w.why }; }
+    var row = rowIn(list, w.actor);
+    return row ? { row: row } : { why: w.name + ' is not on ' + ROLL_NAME[roll] + '.' };
+  }
+
+  // ------------------------------------------------- the staff commands --
+
+  /*
+    An admin's, and nobody else's:
+
+        /embassy                      the roll, the count and which building it is
+        /embassy add <person>         onto the roll
+        /embassy add <person> armed   onto the roll, marked armed
+        /embassy arm <person>         marked armed
+        /embassy disarm <person>      no longer marked armed
+        /embassy remove <person>      off the roll
+        /remnant                      the remnant roll
+        /remnant add <person>         onto the remnant roll, after the application
+        /remnant remove <person>      off it
+  */
+  function command(word, parts, actorId, profileId, toProfile) {
+    var roll = word === '/remnant' ? 'remnant' : 'embassy';
+    var verb = String((parts && parts[1]) || '').toLowerCase();
+    var rest = (parts || []).slice(2);
+    var adm = g.__thornswoodIsAdmin;
+    if (!(typeof adm === 'function' && adm(profileId))) {
+      toProfile(profileId, NOT_ADMIN[roll]);
+      return true;
+    }
+    if (!verb) { toProfile(profileId, listing(roll)); return true; }
+
+    var armed = false;
+    if (roll === 'embassy' && verb === 'add' && rest.length > 1 &&
+        String(rest[rest.length - 1]).toLowerCase() === 'armed') {
+      armed = true;
+      rest = rest.slice(0, -1);
+    }
+    var words = rest.join(' ').trim();
+    var usage = roll === 'embassy'
+      ? '/embassy add, arm, disarm or remove, and a name.'
+      : '/remnant add or remove, and a name.';
+    if (!words) { toProfile(profileId, usage); return true; }
+
+    var done = null;
+    if (verb === 'add') {
+      var w = inWorld(words);
+      if (!w.actor) { toProfile(profileId, w.why); return true; }
+      done = enter(roll, w, armed);
+    } else if (verb === 'remove' || (roll === 'embassy' && (verb === 'arm' || verb === 'disarm'))) {
+      var found = onRollBy(roll, words);
+      if (!found.row) { toProfile(profileId, found.why); return true; }
+      done = verb === 'remove' ? leave(roll, found.row) : setArmed(found.row, verb === 'arm');
+    } else {
+      toProfile(profileId, usage);
+      return true;
+    }
+    toProfile(profileId, done.line);
+    // The person it is about hears it in their own chat, if they are in the world.
+    if (done.ok && done.row.actor !== actorId) { say(done.row.actor, done.told); }
+    return true;
+  }
+
+  function listing(roll) {
+    var list = reg[roll];
+    var names = [];
+    for (var i = 0; i < list.length; i++) {
+      names.push(list[i].name + (list[i].armed ? ' (armed)' : ''));
+    }
+    var head = roll === 'embassy' ? 'The embassy roll: ' + counts() : 'The Thalmor remnant roll: ' + list.length + '.';
+    var where = '';
+    if (roll === 'embassy') {
+      var P = g.__thornswoodProperty;
+      where = ' The embassy is ' + (P && P.nameOf ? P.nameOf(EMBASSY_BUILDING) : EMBASSY_BUILDING) + '.';
+    }
+    var broken = unreadable ? ' ' + notWritten() : '';
+    return head + (names.length ? ' ' + names.join(', ') + '.' : '') + where + broken;
+  }
+
+  // -------------------------------------------------------- the marker --
+
+  /*
+    The pieces that read Thalmor: what the remnant rows of the recipe table
+    make, and the game's own Thalmor Robes and Hooded Thalmor Robes, which
+    those rows do not make (the /give table names both; it is read by /give
+    and nothing else, so they are written here). Built once, by base id, and
+    a piece whose plugin is not loaded is left out.
+  */
+  var GAME_THALMOR = ['65bbf:Skyrim.esm', '10c698:Skyrim.esm'];
+  var gearIds = null;
+  function thalmorGear() {
+    if (gearIds) { return gearIds; }
+    var out = {};
+    for (var k in RECIPES_BY_ID) {
+      if (!Object.prototype.hasOwnProperty.call(RECIPES_BY_ID, k)) { continue; }
+      var row = RECIPES_BY_ID[k];
+      if (!row || row.roll !== 'remnant') { continue; }
+      var id = idOf(row.out);
+      if (id) { out[id] = true; }
+    }
+    for (var i = 0; i < GAME_THALMOR.length; i++) {
+      var id2 = idOf(GAME_THALMOR[i]);
+      if (id2) { out[id2] = true; }
+    }
+    gearIds = out;
+    return out;
+  }
+
+  /** True when this character has on something that reads Thalmor. */
+  function marked(actorId) {
+    var on = wornNow(actorId);
+    if (!on || !on.length) { return false; }
+    var gear = thalmorGear();
+    for (var i = 0; i < on.length; i++) {
+      if (Object.prototype.hasOwnProperty.call(gear, on[i])) { return true; }
+    }
+    return false;
+  }
+
+  g.__thornswoodEmbassy = {
+    holds: holds, command: command, enter: enter, setArmed: setArmed, leave: leave,
+    listing: listing, rolls: function () { return reg; },
+    CLAIM_REFUSED: CLAIM_REFUSED, EVICT_REFUSED: EVICT_REFUSED,
+    EMBASSY_BUILDING: EMBASSY_BUILDING, ROLL_MOST: ROLL_MOST, ARMED_MOST: ARMED_MOST
+  };
+  g.__thornswoodRolls = { has: has };
+  g.__thornswoodThalmor = { marked: marked, gear: thalmorGear };
+  elog('ready,', reg.embassy.length, 'on the embassy roll,', reg.remnant.length,
+       'on the remnant roll' + (unreadable ? ', and the roll file could not be read' : ''));
+})();
+// ==== end thornswood embassy and remnant ====
+
 // ==== thornswood carriages ====
 /*
   CARRIAGES AND FERRIES: THE ROUTE LIST, THE FARE, AND THE ONE MOVE (#1394).
 
   docs/systems/carriages.md is the design and every number here is from it.
-  You stand within 400 of the driver and name the stop. A ferry is 10 gold, a
-  carriage 20, and either one is 40 when Raven Rock is at either end. The fare
+  You stand within 400 of the driver and press E on him, and a panel of his
+  stops and fares opens. A ferry is 10 gold, Solstheim's own ferry included.
+  A carriage is 10 to a stop in the same hold and 20 to another hold. 40 is
+  only the crossing between the mainland and Solstheim, the Northern Maiden
+  between Windhelm and Raven Rock (Patrick, 4 Oct, on #1394). The fare
   goes onto the ledger of the hold the stop you leave from is in, counted the
   way a notice fee is counted (deposit, in the property block). A pack that is
   short does not move and loses nothing. Fast travel stays off: nothing here
   offers the map, and there is no word that skips the driver.
+
+  THE PANEL, NOT A COMMAND (#1635; Patrick, 4 Oct: no chat commands for
+  what people do). E on a driver sends /ride e <id> from the front plugin.
+  The server answers by publishing that driver's stops and fares on
+  PANEL_PROPERTY, which game/ui/thornswood-ride.js draws, and each stop's
+  Ride button sends /ride and the stop. Nobody is told to type either line,
+  and no help names /ride. A refusal is said in the chat and drawn on the
+  panel, which stays up. A ride that goes closes it.
 
   THE MOD'S OWN RIDE DOES NOT LAND, READ IN THE FORK. MovementValidation
   in skymp5-server refuses any move a client reports that changes the cell or
@@ -38750,20 +39728,21 @@ log('gamemode loaded:',
     console.log(a.join(' '));
   }
 
+  /*
+    The fares, Patrick's answers on #1394 (4 Oct). A ferry is 10, Solstheim's
+    own ferry between Raven Rock, Skaal Village and Tel Mithryn included. A
+    carriage is 10 to a stop in the same hold and 20 to another hold. 40 is
+    only the crossing between the mainland and Solstheim.
+  */
   var FARE_FERRY = 10;
+  var FARE_CARRIAGE_IN_HOLD = 10;
   var FARE_CARRIAGE = 20;
-  var FARE_RAVEN_ROCK = 40;
+  var FARE_CROSSING = 40;
+  /* Solstheim's world. A ride with one end in it and the other not is the crossing. */
+  var SOLSTHEIM = '800:Dragonborn.esm';
 
   /* The same reach as a notice board. */
   var RIDE_REACH = 400;
-
-  /*
-    How long after pressing E on a driver /ride still means that driver. A
-    minute, the same as a door for /claim (DOOR_MEMORY_MS). It only matters
-    for a driver who has wandered off his spot, because a person within reach
-    of the spot itself is at the stop whether they pressed anything or not.
-  */
-  var DRIVER_MEMORY_MS = 60000;
 
   var RIDE_LINES = {
     carriage: { kind: 'carriage', what: 'the carriage' },
@@ -38846,7 +39825,7 @@ log('gamemode loaded:',
       ref: '332ef:CFTO.esp', base: '332ed:CFTO.esp', world: '3c:Skyrim.esm',
       pos: [-40803.1, -57902.2, 814.6], rot: 97.4 },
     // The Solstheim ferry.
-    { key: 'solstheim:ravenrock', line: 'solstheim', name: 'Raven Rock', hold: 'ravenrock', driver: 'Maslyn', ravenRock: true,
+    { key: 'solstheim:ravenrock', line: 'solstheim', name: 'Raven Rock', hold: 'ravenrock', driver: 'Maslyn',
       ref: '14c6f:CFTO.esp', base: '14c6e:CFTO.esp', world: '800:Dragonborn.esm',
       pos: [28344.6, 34630.7, 306.5], rot: 122.2 },
     { key: 'solstheim:telmithryn', line: 'solstheim', name: 'Tel Mithryn', hold: 'ravenrock', driver: 'Bildul',
@@ -38859,7 +39838,7 @@ log('gamemode loaded:',
     { key: 'maiden:windhelm', line: 'maiden', name: 'Windhelm', hold: 'windhelm', driver: 'Gjalund Salt-Sage',
       ref: '182af:Dragonborn.esm', base: '182ae:Dragonborn.esm', world: '3c:Skyrim.esm',
       pos: [141310, 34083.7, -13995.5], rot: 353.4 },
-    { key: 'maiden:ravenrock', line: 'maiden', name: 'Raven Rock', hold: 'ravenrock', driver: 'Gjalund Salt-Sage', ravenRock: true,
+    { key: 'maiden:ravenrock', line: 'maiden', name: 'Raven Rock', hold: 'ravenrock', driver: 'Gjalund Salt-Sage',
       ref: '2582c:Dragonborn.esm', base: '2582b:Dragonborn.esm', world: '800:Dragonborn.esm',
       pos: [28928.7, 33144.2, 309.9], rot: 73.1 }
   ];
@@ -38893,8 +39872,9 @@ log('gamemode loaded:',
     if (!from.driver) { return 0; }
     var line = Object.prototype.hasOwnProperty.call(RIDE_LINES, from.line) ? RIDE_LINES[from.line] : null;
     if (!line) { return 0; }
-    if (from.ravenRock || to.ravenRock) { return FARE_RAVEN_ROCK; }
-    return line.kind === 'ferry' ? FARE_FERRY : FARE_CARRIAGE;
+    if ((from.world === SOLSTHEIM) !== (to.world === SOLSTHEIM)) { return FARE_CROSSING; }
+    if (line.kind === 'ferry') { return FARE_FERRY; }
+    return from.hold === to.hold ? FARE_CARRIAGE_IN_HOLD : FARE_CARRIAGE;
   }
 
   /** Every stop this one's driver goes to. */
@@ -38927,6 +39907,12 @@ log('gamemode loaded:',
     Believed only as far as the server can check it: the actor has to be one
     of the drivers on the list, by its base, and the person has to be within
     reach of where that actor is now. Null when it is not a driver at all.
+
+    A press lasts for as long as that driver is within reach. The panel it
+    opens stays up that long (the front plugin closes it when you walk off),
+    so its Ride has to mean him for as long, even for a driver who has
+    wandered off his spot. Out of his reach, or with him gone, it is
+    forgotten.
   */
   var pressedBy = {};
 
@@ -38948,7 +39934,7 @@ log('gamemode loaded:',
     var me = placeOf(actorId);
     if (!me) { return null; }
     var p = Object.prototype.hasOwnProperty.call(pressedBy, actorId) ? pressedBy[actorId] : null;
-    if (p && Date.now() - p.at <= DRIVER_MEMORY_MS) {
+    if (p) {
       var s = stopByKey(p.stop);
       var them = placeOf(p.driver);
       var base = '';
@@ -38957,6 +39943,7 @@ log('gamemode loaded:',
           apart(me.pos, them.pos) <= RIDE_REACH) {
         return s;
       }
+      delete pressedBy[actorId];
     }
     /*
       Otherwise the driver himself, or his spot. The population block keeps a
@@ -39001,13 +39988,59 @@ log('gamemode loaded:',
     return hits.length === 1 ? hits[0] : null;
   }
 
-  function offer(from) {
+  /*
+    THE PANEL'S VIEW, seen by its owner only, the way the repair and the
+    merchant panels' are. The owner's script hands it to the page, and
+    game/ui/thornswood-ride.js draws it. A view with open set asks for the
+    panel (the front plugin opens it once the mod's own conversation has
+    closed), and open false closes it. at moves on every send, so a second
+    press draws it again even when nothing in it changed.
+  */
+  var PANEL_PROPERTY = 'thornswoodRideView';
+  var panelScript = [
+    '(function(){',
+    '  try {',
+    '    var v = ctx.value;',
+    '    if (!v || typeof v !== "object") { return; }',
+    '    var st = ctx.state;',
+    '    if (!st) { return; }',
+    '    if (st.thornswoodRideAt === v.at) { return; }',
+    '    st.thornswoodRideAt = v.at;',
+    '    var body = JSON.stringify(v);',
+    '    var src = "(function(){try{" +',
+    '      "var d=" + body + ";window.thornswoodRideView=d;" +',
+    '      "if(window.thornswoodRide&&window.thornswoodRide.setData){window.thornswoodRide.setData(d);}" +',
+    '      "}catch(e){}})();";',
+    '    try { ctx.sp.browser.executeJavaScript(src); } catch (e) { }',
+    '  } catch (e) { }',
+    '})();'
+  ].join('\n');
+  try {
+    mp.makeProperty(PANEL_PROPERTY, {
+      isVisibleByOwner: true, isVisibleByNeighbors: false,
+      updateOwner: panelScript, updateNeighbor: ''
+    });
+  } catch (e) { /* made by an earlier load. harmless. */ }
+
+  /** What the panel shows at this stop: the driver, his stops and their fares. */
+  function panelView(from, note) {
     var list = destinations(from);
-    var bits = [];
-    for (var i = 0; i < list.length; i++) { bits.push(list[i].name + ' ' + fare(from, list[i])); }
-    return from.driver + ' runs ' + RIDE_LINES[from.line].what + ' from ' + from.name +
-      '. Say /ride and the stop: ' + bits.join(', ') + ' gold. The fare goes to ' +
-      (HOLD_NAMES[from.hold] || from.hold) + '\'s ledger.';
+    var stops = [];
+    for (var i = 0; i < list.length; i++) { stops.push({ name: list[i].name, fare: fare(from, list[i]) }); }
+    return {
+      open: true, driver: from.driver, what: RIDE_LINES[from.line].what, from: from.name,
+      ledger: HOLD_NAMES[from.hold] || from.hold, stops: stops, note: note || ''
+    };
+  }
+
+  var shownAt = 0;
+  function show(actorId, view) {
+    var payload = JSON.parse(JSON.stringify(view));
+    shownAt = Math.max(Date.now(), shownAt + 1);
+    payload.at = shownAt;
+    try { mp.set(actorId, PANEL_PROPERTY, payload); } catch (e) {
+      plog('could not send the ride panel to', Number(actorId).toString(16) + ':', e);
+    }
   }
 
   /* Whether the pack can pay, by the same test takeGold makes: one stack of
@@ -39031,27 +40064,29 @@ log('gamemode loaded:',
     });
   }
 
-  /** A ride: the line to say back, and the move when it goes. */
+  function answer(line, from, went) {
+    return { line: line, from: from, went: !!went };
+  }
+
+  /** A ride, and the move when it goes: the line to say back, the stop it was asked at, and whether it went. */
   function ride(actorId, profileId, wanted) {
     var from = stopHere(actorId);
-    if (!from) {
-      return 'Stand at a carriage or ferry driver, then say /ride and where you are going.';
-    }
-    if (!wanted) { return offer(from); }
+    if (!from) { return answer('Walk up to a carriage or ferry driver first.', null); }
+    if (!wanted) { return answer('', from); }
     var to = pick(destinations(from), wanted);
-    if (!to) { return 'No ride to ' + wanted + ' from here. ' + offer(from); }
+    if (!to) { return answer('No ride to ' + wanted + ' from here.', from); }
     var price = fare(from, to);
     // Never 0 or less: destinations() offers only rides with a fare, and an
     // amount below 1 would make takeGold add rather than take.
-    if (!(price > 0)) { return 'No ride to ' + wanted + ' from here. ' + offer(from); }
+    if (!(price > 0)) { return answer('No ride to ' + wanted + ' from here.', from); }
     var prop = g.__thornswoodProperty;
     if (!prop || typeof prop.takeGold !== 'function' || typeof prop.deposit !== 'function') {
       plog('a ride was asked for and the hold ledger is not loaded');
-      return 'The hold\'s ledger is not running on this server, so nobody rides. Say so in the dev channel.';
+      return answer('The hold\'s ledger is not running on this server, so nobody rides. Say so in the dev channel.', from);
     }
     // A pack that is short keeps all of it and stays where it is.
     if (!canPay(actorId, price)) {
-      return 'The ride to ' + to.name + ' is ' + price + ' gold and you do not have it. Nothing was taken.';
+      return answer('The ride to ' + to.name + ' is ' + price + ' gold and you do not have it. Nothing was taken.', from);
     }
     /*
       THE MOVE, THEN THE FARE, so a move the server could not make costs
@@ -39064,13 +40099,13 @@ log('gamemode loaded:',
       moveTo(actorId, to);
     } catch (e) {
       plog('profile', profileId, 'could not be moved from', from.key, 'to', to.key + ':', e);
-      return 'The ride did not go, and nothing was taken. Say so in the dev channel.';
+      return answer('The ride did not go, and nothing was taken. Say so in the dev channel.', from);
     }
     if (!prop.takeGold(actorId, price)) {
       try { moveTo(actorId, from); } catch (e2) { }
       plog('profile', profileId, 'rode from', from.key, 'to', to.key,
            'and the fare could not be taken, so they were put back');
-      return 'The fare could not be taken, so the ride did not go. Nothing was taken.';
+      return answer('The fare could not be taken, so the ride did not go. Nothing was taken.', from);
     }
     delete pressedBy[actorId];
     var what = RIDE_LINES[from.line].what;
@@ -39080,13 +40115,15 @@ log('gamemode loaded:',
     }
     plog('profile', profileId, 'rode', what, 'from', from.name, 'to', to.name, 'for', price,
          'gold, onto', from.hold + '\'s ledger');
-    return 'You pay the ' + price + ' gold fare and ride to ' + to.name + '.';
+    return answer('You pay the ' + price + ' gold fare and ride to ' + to.name + '.', from, true);
   }
 
   /*
-    /ride                 at a driver: where this driver goes, and the fares
-    /ride <stop>          at a driver: pay and go
-    /ride e <id>          the front plugin, when somebody presses E on a driver
+    /ride e <id>          the front plugin, when somebody presses E on a
+                          driver: his panel opens
+    /ride <stop>          the panel's Ride button: pay and go
+    /ride                 the panel of the driver you are at
+    Nobody is told to type any of them (#1635).
   */
   function command(parts, actorId, profileId, toProfile) {
     if (!actorId) {
@@ -39098,19 +40135,27 @@ log('gamemode loaded:',
       var pressed = pressDriver(actorId, parseInt(parts[2], 16) >>> 0);
       // Not a driver: the press was for something else, so nothing to say.
       if (!pressed) { return true; }
-      toProfile(profileId, pressed.far ? 'Walk up to ' + pressed.stop.driver + ' first.' : offer(pressed.stop));
+      if (pressed.far) {
+        toProfile(profileId, 'Walk up to ' + pressed.stop.driver + ' first.');
+        return true;
+      }
+      show(actorId, panelView(pressed.stop, ''));
       return true;
     }
-    toProfile(profileId, ride(actorId, profileId, (parts || []).slice(1).join(' ').trim()));
+    var done = ride(actorId, profileId, (parts || []).slice(1).join(' ').trim());
+    if (done.line) { toProfile(profileId, done.line); }
+    // A ride that went, or no driver here, closes the panel. A refusal is
+    // drawn on it, and it stays up.
+    show(actorId, done.went || !done.from ? { open: false } : panelView(done.from, done.line));
     return true;
   }
 
   g.__thornswoodCarriages = {
-    STOPS: RIDE_STOPS, LINES: RIDE_LINES, REACH: RIDE_REACH,
-    FARE_FERRY: FARE_FERRY, FARE_CARRIAGE: FARE_CARRIAGE, FARE_RAVEN_ROCK: FARE_RAVEN_ROCK,
-    DRIVER_MEMORY_MS: DRIVER_MEMORY_MS,
+    STOPS: RIDE_STOPS, LINES: RIDE_LINES, REACH: RIDE_REACH, SOLSTHEIM: SOLSTHEIM,
+    FARE_FERRY: FARE_FERRY, FARE_CARRIAGE_IN_HOLD: FARE_CARRIAGE_IN_HOLD, FARE_CARRIAGE: FARE_CARRIAGE,
+    FARE_CROSSING: FARE_CROSSING, PANEL_PROPERTY: PANEL_PROPERTY,
     stopByKey: stopByKey, stopByBase: stopByBase, fare: fare, destinations: destinations,
-    stopHere: stopHere, pressDriver: pressDriver, ride: ride, command: command
+    stopHere: stopHere, pressDriver: pressDriver, panelView: panelView, ride: ride, command: command
   };
   plog('ready,', RIDE_STOPS.length, 'stops on', Object.keys(RIDE_LINES).length, 'lines');
 })();
@@ -40988,15 +42033,32 @@ log('gamemode loaded:',
     var B = g.__thornswoodBeds;
     var rows = [], seen = {};
     try {
+      /*
+        AND THE RENT OWED ON EACH (#1637): what you hold is on this page and
+        not behind a typed /deed, rent with it. Counted up to now first, the
+        same count /rent makes, so the page and the steward agree.
+      */
+      if (W.rentDue) { W.rentDue(); }
       var claims = W.claims();
       for (var b in claims) {
         if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
         var held = W.holderOf(b);
         if (!held || held.by !== profileId) { continue; }
         seen[b] = true;
-        rows.push({ name: W.nameOf(b), mine: true, locked: !!held.locked,
+        var rent = held.rent ? { amount: Number(held.rent.amount) || 0,
+                                 every: Number(held.rent.everyDays) || 7,
+                                 owed: Number(held.rent.owed) || 0 } : null;
+        rows.push({ name: W.nameOf(b), mine: true, locked: !!held.locked, rent: rent,
                     keyed: W.holdsKey(actorId, b), b: b,
                     sleep: (B && B.guestsOf) ? B.guestsOf(b) : [] });
+      }
+      // And the farm, one a person: ground with no building on it, which is
+      // the farming block's own claim (#1637). See farmOf there.
+      var F = g.__thornswoodFarming;
+      var farm = (F && F.farmOf) ? F.farmOf(profileId) : null;
+      if (farm) {
+        rows.push({ name: 'Your farm', mine: true, farm: true,
+                    days: farm.days, reach: farm.reach });
       }
       // Then the places somebody let you into. A key to a building you already
       // hold is not a second row: it is the same house and the row above says
@@ -41264,6 +42326,9 @@ log('gamemode loaded:',
       var PKV = g.__thornswoodPerks;
       var perkClocks = (PKV && PKV.clocks && actorId) ? PKV.clocks(actorId, s) : null;
       if (perkClocks) { view.perkClocks = perkClocks; }
+      // Masters and apprentices (#1634): see apprenticeView.
+      var taughtView = apprenticeView(actorId, s);
+      if (taughtView) { view.apprentice = taughtView; }
     }
     // Left out entirely when there is nothing to say, per the contract.
     var climbing = progressView(s);
@@ -41390,6 +42455,15 @@ log('gamemode loaded:',
       try { pid = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pid = 0; }
       var held = propertyView(actorId, pid);
       if (held) { view.property = held; }
+      /*
+        The Office page (#1638), for a character that holds an office or may
+        take one, and left off for everybody else. The property block owns
+        the offices; it is handed s, because asking stateOf from inside
+        writeState would ask for itself. See officeView.
+      */
+      var W = g.__thornswoodProperty;
+      var desk = (W && W.officeView) ? W.officeView(actorId, pid, s) : null;
+      if (desk) { view.officePage = desk; }
     }
     var sig = drawn(view);
     var sending = !!redraw || lastDrawn[actorId] !== sig;
@@ -41662,13 +42736,22 @@ log('gamemode loaded:',
   /*
     MASTERS AND APPRENTICES (#1388, #1147). docs/systems/apprenticeship.md.
 
+      /apprentice <id> <half>           a Master offers to take somebody on
+      /apprentice end <id> <half>       the Master ends it
+      /apprentice leave <half>          the apprentice ends it (#1634)
       /apprentice                       who you took on, and who took you on
-      /apprentice <name> [half]         a Master offers to take somebody on
-      /apprentice end <name> [half]     the Master ends it
 
-    The name can be the form id the crosshair hands over, the same as /party
-    and /trade. The half is needed only when the Master could take that
-    person on in more than one.
+    NOBODY TYPES THESE (#1634; Patrick, 4 Oct: no chat commands for anything
+    people do). They are the lines the buttons send. A Master looking at
+    somebody they could take on sees a row for it on the look prompt, named
+    K (takeOnMark below puts it on the near list), and K opens the Masters
+    and apprentices page with a Take on button for each half that could be
+    meant, which sends the first line with the form id the crosshair handed
+    over. The same page lists who you took on and who took you on, each
+    with End, which sends the second or the third (apprenticeView below).
+    No help text names them, and no line of the server's tells anybody to
+    type one. A name still works in place of the id, and the half is still
+    needed only when the Master could take that person on in more than one.
 
     The Master offers and the person answers, the way a party or a trade is
     asked: the offer stands in the social block's offers for its seconds, and
@@ -41776,6 +42859,75 @@ log('gamemode loaded:',
     return r;
   }
 
+  /*
+    THE LOOK PROMPT'S ROW (#1634). The social block builds the near list
+    every pass and asks these two, so the prompt offers a Master "Take on as
+    apprentice" for exactly the people arrange lets them offer to, with the
+    halves it could be. masterRecord is asked once per person per pass, and
+    somebody who is a Master of nothing costs that one read and no more.
+    takeOnMark is asked for each person near a Master and answers
+    [{ h: half, k: 'sister' | 'outside' }], or null when there is none. The
+    list decides only what is drawn: offerIt asks all of it again when the
+    line arrives.
+  */
+  function masterRecord(actorId) {
+    var ms = readState(actorId);
+    return (ms && mastered(ms).length) ? ms : null;
+  }
+  function takeOnMark(ms, learnerId) {
+    var ls = readState(learnerId);
+    if (!ms || !ls || !ls.prof) { return null; }
+    var mine = mastered(ms);
+    var out = [];
+    for (var i = 0; i < mine.length; i++) {
+      var r = arrange(learnerId, ls, ms, mine[i], null);
+      if (r.ok) { out.push({ h: mine[i], k: r.kind }); }
+    }
+    return out.length ? out : null;
+  }
+
+  /*
+    THE K PANEL'S MASTERS AND APPRENTICES PAGE (#1634), under view.apprentice:
+
+      took:     [ { id: '<form id, hex>', name, half, kind } ]  who this character took on
+      by:       [ { id, name, half, kind, stands } ]            who took them on, one per half
+      mastered: [ '<half>' ]                                    what they could take somebody on in
+      sister:   { half, rank } or null                          their sister half, while it waits on a Master
+      used:     <number>, of: <number>                          outside trades used in this life, of the two
+
+    Each row of took and by carries End on the page: took sends
+    /apprentice end <id> <half>, and by sends /apprentice leave <half>.
+    stands is false for a sister half whose Master no longer lists them or
+    is no longer a Master of it; End then clears their own side. Absent for
+    somebody with no profession, who can neither teach nor be taught.
+  */
+  function apprenticeView(actorId, s) {
+    if (!s || !s.prof) { return null; }
+    var took = [];
+    var rows = s.apprentices || [];
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      if (!row || !row.id || !row.half) { continue; }
+      took.push({ id: Number(row.id).toString(16), name: String(row.name || 'somebody'), half: row.half, kind: row.kind || '' });
+    }
+    var by = [];
+    var stands = {};
+    var masters = s.masters || {};
+    for (var half in masters) {
+      if (!P.has(masters, half)) { continue; }
+      var rec = masters[half] || {};
+      var outside = (s.taught || []).indexOf(half) !== -1;
+      stands[half] = outside || !!masterFor(actorId, s, half);
+      by.push({ id: rec.id ? Number(rec.id).toString(16) : '', name: String(rec.name || 'somebody'), half: half,
+                kind: outside ? 'outside' : 'sister', stands: stands[half] });
+    }
+    var sister = s.half ? P.sisterOf(s.prof, s.half) : null;
+    var waits = (sister && P.rankOf(s, sister) !== 'master' && !stands[sister])
+      ? { half: sister, rank: P.rankOf(s, sister) || 'novice' } : null;
+    return { took: took, by: by, mastered: mastered(s), sister: waits,
+             used: (s.taught || []).length + (s.untaught || []).length, of: P.TABLE.limits.secondaries };
+  }
+
   /** What /apprentice on its own says: both sides of every arrangement this character is in. */
   function standing(actorId) {
     var s = stateOf(actorId);
@@ -41806,7 +42958,7 @@ log('gamemode loaded:',
       var used = (s.taught || []).length + (s.untaught || []).length;
       out.push(used + ' of your ' + P.TABLE.limits.secondaries + ' outside trades used in this life.');
     }
-    out.push('A Master takes somebody on with /apprentice <name>, and ends it with /apprentice end <name>.');
+    out.push('K lists all of it under Masters and apprentices, each with End.');
     return out.join(' ');
   }
 
@@ -41838,8 +42990,8 @@ log('gamemode loaded:',
       if (can.length > 1) {
         var named = [];
         for (var j = 0; j < can.length; j++) { named.push(nameOf(can[j])); }
-        return 'You could take ' + name + ' on in ' + named.join(' or ') + '. Say which: /apprentice ' +
-               name + ' ' + can[0] + '.';
+        return 'You could take ' + name + ' on in ' + named.join(' or ') + '. Look at them and press the key ' +
+               'the prompt names, and pick which.';
       }
       // One that works, or none, in which case the rules say why about the
       // first half they hold at Master.
@@ -41897,16 +43049,17 @@ log('gamemode loaded:',
     clog(masterId.toString(16), 'took', actorId.toString(16), 'on in', half, '(' + r.kind + ')');
     if (r.kind === 'sister') {
       return { learner: who.name + ' has taken you on in ' + nameOf(half) + '. Work in it climbs past novice now, ' +
-                        'and the ranks you earn stay yours if it ends.',
-               master: name + ' is your apprentice in ' + nameOf(half) + '. /apprentice end ' + name + ' ends it.' };
+                        'and the ranks you earn stay yours if it ends. Either of you can end it on K.',
+               master: name + ' is your apprentice in ' + nameOf(half) + '. K lists them, with End.' };
     }
     var school = P.TABLE.schools.indexOf(half) !== -1;
     return { learner: who.name + ' taught you novice ' + nameOf(half) + '. ' +
                       (school ? 'You can learn ' + P.TABLE.limits.outsiderSpells + ' novice spells of it, each from its tome ' +
                                 'with a spell point a semester at the College hands you'
                               : 'It is in your recipe book on K') +
-                      ', and it never climbs past novice. It is one of your two outside trades.',
-             master: 'You taught ' + name + ' novice ' + nameOf(half) + '. /apprentice end ' + name + ' ends it.' };
+                      ', and it never climbs past novice. It is one of your two outside trades. Either of you ' +
+                      'can end it on K.',
+             master: 'You taught ' + name + ' novice ' + nameOf(half) + '. K lists them, with End.' };
   }
 
   /** The Master ends it. Returns the line for the Master. */
@@ -41920,7 +43073,7 @@ log('gamemode loaded:',
       if (half) { words = words.slice(0, -1); }
     }
     var want = words.join(' ').trim().toLowerCase();
-    if (!want) { return 'End whose? /apprentice end <name>, and the half when they are with you in two.'; }
+    if (!want) { return 'End whose? K lists the people you took on, each with End.'; }
     var asId = parseInt(want, 16);
     var exact = [], part = [];
     for (var i = 0; i < rows.length; i++) {
@@ -41938,8 +43091,7 @@ log('gamemode loaded:',
     if (hit.length > 1) {
       var named = [];
       for (var k = 0; k < hit.length; k++) { named.push(nameOf(hit[k].half)); }
-      return hit[0].name + ' is with you in ' + named.join(' and ') + '. Say which: /apprentice end ' +
-             hit[0].name + ' ' + hit[0].half + '.';
+      return hit[0].name + ' is with you in ' + named.join(' and ') + '. Each has its own End on K.';
     }
     var end = hit[0];
     var ended = null;
@@ -41962,7 +43114,7 @@ log('gamemode loaded:',
     var me = personName(actorId);
     var told = (ended === 'outside')
       ? me + ' has ended your teaching in ' + nameOf(end.half) + ', and its novice list is gone. It still counts as ' +
-        'one of your two outside trades.'
+        'one of your two outside trades.' + spellsStay(end.half)
       : me + ' has ended your apprenticeship in ' + nameOf(end.half) + '. The ranks you earned in it stay; past them ' +
         'the count waits again until a Master takes you on.';
     if (!ended) {
@@ -41979,6 +43131,62 @@ log('gamemode loaded:',
     return 'You ended ' + end.name + '\'s apprenticeship in ' + nameOf(end.half) + '. The ranks they earned stay.';
   }
 
+  /*
+    Patrick's answer on #1388, 4 Oct: when a taught school or a taught
+    Bladebinder ends, the spells already learned stay, and no new one can be
+    learned. release() leaves them on the character; this says so.
+  */
+  function spellsStay(half) {
+    return (P.TABLE.schools.indexOf(half) !== -1 || half === 'bladebinder')
+      ? ' The spells you already learned from it stay.' : '';
+  }
+
+  /*
+    The apprentice ends it (#1634). Patrick's answer on #1388, 4 Oct: either
+    one can end it, the apprentice as well as the Master. The same release
+    as the Master's End, from the other side: the person's own record loses
+    the Master in that half, and that Master's list loses the row, online or
+    not, so neither side is left naming the other. An outside trade loses
+    its novice list and stays counted, as it does when the Master ends it.
+    Returns the line for the apprentice.
+  */
+  function leaveIt(actorId, words) {
+    var half = halfKey(words[0]);
+    var ls = stateOf(actorId);
+    var rec = (half && ls.masters && P.has(ls.masters, half)) ? ls.masters[half] : null;
+    if (!rec) { return 'Nobody has taken you on in that.'; }
+    var r = P.release(ls, half, null);
+    if (!r.ok) { return 'No: ' + r.why + '.'; }
+    writeState(actorId, r.state);
+    var who = rec.name || 'your Master';
+    var masterId = Number(rec.id) || 0;
+    var ms = masterId ? readState(masterId) : null;
+    if (ms && lists(ms, actorId, half)) {
+      var m2 = P.clone(ms);
+      var keep = [];
+      var rows = ms.apprentices || [];
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i] && !(rows[i].id === actorId && rows[i].half === half)) { keep.push(rows[i]); }
+      }
+      m2.apprentices = keep;
+      writeState(masterId, m2);
+      try {
+        if (typeof say === 'function') {
+          say(masterId, personName(actorId) + (r.ended === 'outside'
+            ? ' has ended the novice ' + nameOf(half) + ' you taught them.'
+            : ' has ended their apprenticeship with you in ' + nameOf(half) + '.'));
+        }
+      } catch (e) { }
+    }
+    clog(actorId.toString(16), 'left', masterId.toString(16), 'in', half, '(' + r.ended + ')');
+    if (r.ended === 'outside') {
+      return 'You ended your novice ' + nameOf(half) + ' with ' + who + '. Its novice list is gone, and it still ' +
+             'counts as one of your two outside trades.' + spellsStay(half);
+    }
+    return 'You ended your apprenticeship in ' + nameOf(half) + ' with ' + who + '. The ranks you earned in it stay; ' +
+           'past them the count waits again until a Master takes you on.';
+  }
+
   /** /apprentice, every form of it. Answers through toProfile and always handles the word. */
   function apprenticeCommand(parts, actorId, profileId, toProfile) {
     if (!actorId) {
@@ -41989,6 +43197,7 @@ log('gamemode loaded:',
     var first = String(words[0] || '').toLowerCase();
     if (!words.length || first === 'list') { toProfile(profileId, standing(actorId)); return; }
     if (first === 'end') { toProfile(profileId, endIt(actorId, words.slice(1))); return; }
+    if (first === 'leave') { toProfile(profileId, leaveIt(actorId, words.slice(1))); return; }
     toProfile(profileId, offerIt(actorId, words));
   }
 
@@ -42028,9 +43237,9 @@ log('gamemode loaded:',
     if (word === '/plant' || word === '/claim' || word === '/plot' ||
         word === '/deed' || word === '/deeds' || word === '/lock' ||
         word === '/unlock' || word === '/mold' || word === '/moldhere' || word === '/key' ||
-        word === '/steward' || word === '/evict' || word === '/box' ||
+        word === '/jarl' || word === '/steward' || word === '/evict' || word === '/box' ||
         word === '/rent' || word === '/sleephere' || word === '/notice' || word === '/job' ||
-        word === '/board' || word === '/take' || word === '/jobs' ||
+        word === '/board' || word === '/take' ||
         word === '/haul' ||
         word === '/letter' || word === '/deliver' ||
         word === '/dropjob' || word === '/unpin') {
@@ -42427,6 +43636,7 @@ log('gamemode loaded:',
     gate: gate, gateHalf: gateHalf, credit: credit,
     grantSpell: grantSpell, grantKnown: grantKnown, nameOf: nameOf, raiseLines: raiseLines,
     acceptApprentice: acceptApprentice, masterFor: masterFor, effectsOf: effectsOf,
+    masterRecord: masterRecord, takeOnMark: takeOnMark,
     rankOf: function (actorId, key) { return P.rankOf(stateOf(actorId), key); }
   };
   clog('ready');
@@ -45719,11 +46929,13 @@ function thornswoodBooks(env) {
     if (Number(hit.pid) === Number(pid)) { return 'That is you.'; }
     if (memberOf(taken.book, hit.pid)) { return 'They are already in it.'; }
     pending[hit.pid] = { bookId: taken.book.id, from: Number(pid), at: now() };
+    // The P prompt says which book it is, "the business The Bee" (#1591).
+    var about = 'the ' + taken.book.kind + ' ' + taken.book.name;
     var asked = '';
-    if (env.offer) { asked = env.offer(actorId, hit.actorId) || ''; }
+    if (env.offer) { asked = env.offer(actorId, hit.actorId, about) || ''; }
     else {
       var soc = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodSocial;
-      if (soc && soc.offer && hit.actorId) { asked = soc.offer('book', actorId, hit.actorId) || ''; }
+      if (soc && soc.offer && hit.actorId) { asked = soc.offer('book', actorId, hit.actorId, about) || ''; }
     }
     if (asked) { delete pending[hit.pid]; return asked; }
     refresh();
@@ -46191,7 +47403,7 @@ function thornswoodBooks(env) {
       if (!bits[0] || bits.length > 3) { return 'Name the line, then the buy and the sell. A blank is -.'; }
       return setPrice(taken.book, bits[0], bits[1], bits[2]);
     }
-    return 'book: new business <name>, new faction <name>, invite, leave. The rest is on J.';
+    return 'The group book is on J.';
   }
 
   function view(pid, textOff) {
@@ -46233,9 +47445,15 @@ function thornswoodBooks(env) {
         }
       }
       var roleNames = [];
+      var roleRows = [];
       if (hasPerm(b, pid, 'Roles')) {
         var roles = b.roles || [];
-        for (var rr = 0; rr < roles.length; rr++) { roleNames.push(roles[rr].name); }
+        for (var rr = 0; rr < roles.length; rr++) {
+          roleNames.push(roles[rr].name);
+          // What each role may do, so J switches a permission on and off
+          // rather than anybody typing the list (#1630).
+          roleRows.push({ name: roles[rr].name, perms: (roles[rr].perms || []).slice() });
+        }
       }
       books.push({
         id: b.id,
@@ -46253,13 +47471,15 @@ function thornswoodBooks(env) {
         chat: chat,
         priceList: prices,
         submitted: read ? submittedHolds(b.id) : [],
-        roleNames: roleNames
+        roleNames: roleNames,
+        roles: roleRows
       });
     }
     return {
       show: true,
       canBusiness: !!((r.business || r.dev) && !ownsKind(r.account, 'business')),
       canFaction: !!((r.faction || r.dev) && !ownsKind(r.account, 'faction')),
+      permNames: PERMS.slice(),
       books: books
     };
   }
@@ -46376,21 +47596,44 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/helpme', '/help-me', '/report',
                // Out of a wedged spot; see the stuck block after it.
                '/stuck',
-               // A carriage or ferry, at the driver (#1394). See the carriages block.
+               // A carriage or ferry (#1394). E on a driver sends /ride e <id>,
+               // and the ride panel's buttons send /ride and the stop (#1635).
+               // Never typed, and so deliberately NOT in PLAYER_WORDS. See the
+               // carriages block.
                '/ride',
+               // The embassy roll and the Thalmor remnant roll, written by an
+               // admin (#1390). See the embassy and remnant block.
+               '/embassy', '/remnant',
                '/pick', '/spend',
                // A warrior's maneuver, sent by the panel the maneuver key
                // opens (#1386). Never typed, and no help names it: Patrick,
                // 4 October, no chat commands for anything people do. See the
                // maneuvers block.
                '/maneuver',
-               // A Master taking somebody on, and ending it (#1388). See the
-               // character block.
+               // A Master taking somebody on, and either of them ending it
+               // (#1388). Sent by the look prompt and the K panel (#1634),
+               // never typed, and so deliberately NOT in PLAYER_WORDS. See
+               // the character block.
                '/apprentice',
                '/plant', '/claim', '/plot',
+               // At a door, /claim, /lock and /unlock are what the lock key
+               // sends, and /key is the same key at a forge (#1637). /deed and
+               // /mold are still answered, and no help names any of them:
+               // what you hold is on K, and the mold key presses a mold.
                '/deed', '/deeds', '/lock', '/unlock', '/mold', '/key',
+               // The offices' powers (#1638). Sent by the Office page of the
+               // K panel, never typed, and so deliberately NOT in
+               // PLAYER_WORDS: Patrick, 4 October, no chat commands for
+               // anything people do, and a Jarl and a steward are people.
                '/jarl', '/steward', '/evict', '/box', '/rent',
-               '/notice', '/job', '/board', '/take', '/jobs', '/dropjob', '/unpin',
+               // The notice board (#1627). Sent by the board panel's buttons
+               // and J's Boards tab, never typed, and so NOT in PLAYER_WORDS:
+               // Patrick, 4 October, nothing people do is a chat command. A
+               // steward's /board move and /board here are #1638's.
+               '/notice', '/job', '/board', '/take', '/dropjob', '/unpin',
+               // A letter (#1595): Write a letter on the board panel sends
+               // /letter, and the look prompt's Hand over the letter sends
+               // /deliver. Never typed, and not in PLAYER_WORDS either.
                '/letter', '/deliver',
                // A haul (#1393). Sent by the board panel's Send a haul and
                // Confirm buttons, never typed, and so deliberately NOT in
@@ -46439,6 +47682,9 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // The client saying its race menu is still up. Never typed; see
                // FACE_SEEN_MS.
                '/racemenu',
+               // The client saying the race menu went down with the game, not
+               // as a finished face. Never typed; see faceDown.
+               '/racedown',
                // A mod settings menu changed on this client. Never typed;
                // see the mod settings block at the end of this file.
                '/modset',
@@ -46453,8 +47699,11 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // plugin, never typed; see the load order refusal block.
                '/loadorder',
                // Friends, parties, mutes, trade and journals. See the
-               // social block at the end of this file.
-               '/friend', '/party', '/mute', '/trade', '/journal', '/book', '/merchant',
+               // social block at the end of this file. /journal and /book
+               // are the J panel's lines, never typed (#1630). /hidename too,
+               // which the P panel's Name buttons send and which was missing
+               // here, so it ran before the character was in the world (#1628).
+               '/friend', '/party', '/mute', '/hidename', '/trade', '/journal', '/book', '/merchant',
                '/yes', '/no',
                // The dice. Rolled here now rather than on the roller's own
                // machine; see the branch for why that matters.
@@ -46466,21 +47715,10 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
   an invitation rather than a help.
 */
 const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
-                      '/deed', '/lock', '/unlock', '/mold', '/key',
-                      // Named to everybody on purpose. /steward with no
-                      // argument says who holds the office, which is a thing
-                      // anybody in a hold should be able to find out, and
-                      // /evict answers "only a steward ends a claim" to
-                      // everybody else, which is the rule stated rather than
-                      // a power hidden.
-                      '/jarl', '/steward', '/evict',
-                      // The board and the box are everybody's. /rent with no
-                      // argument says what a place costs, which is the first
-                      // thing somebody standing at a door wants to know, and
-                      // the steward half answers "only a steward sets rent"
-                      // to everybody else.
-                      '/box', '/rent', '/notice', '/job', '/board',
-                      '/take', '/jobs', '/dropjob', '/unpin', '/letter', '/deliver', '/help',
+                      // Not /jarl, /steward, /evict, /box or /rent: the
+                      // offices' powers are buttons on the Office page of K
+                      // (#1638), and the board panel says what the box holds.
+                      '/help',
                       // Everybody's, and they need to be findable: a meter
                       // nobody knows how to act on is only a penalty. Not
                       // /rest: sitting or lying down is how you rest (#1603).
@@ -46489,15 +47727,17 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // must be able to find: asking staff, and getting
                       // out of a wedged spot (#414).
                       '/helpme', '/report', '/stuck',
-                      // Everybody's: the way between holds is a driver (#1394).
-                      '/ride',
                       // Everybody's, and they have to be findable: a key
-                      // prompt nobody sees is a feature nobody has.
-                      '/friend', '/party', '/mute', '/hidename', '/trade', '/journal', '/book', '/merchant',
-                      // Everybody's: a Master takes somebody on with it, and
-                      // anybody can ask who took them on (#1388).
-                      '/apprentice',
-                      '/yes', '/no', '/roll'];
+                      // prompt nobody sees is a feature nobody has. Not
+                      // /party: P on somebody asks and the P panel runs the
+                      // party, and nobody is told to type it (#1629). Not
+                      // /journal or /book: J sends those lines and nobody is
+                      // told to type them (#1630). Not /friend, /mute,
+                      // /hidename, /trade, /yes and /no: Y, H and L on the look
+                      // prompt, the P panel, the trade window and the prompt's
+                      // Accept and Refuse send them, and nobody types them (#1628).
+                      '/merchant',
+                      '/roll'];
 
 // ---------------------------------------------------------------------------
 // A teleport that actually teleports.
@@ -46682,7 +47922,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
   var HOLD_MAX = 20;
   var HOLD_ALL = 200;
   // The client's reports of a moment, never kept for later (see runsNow).
-  var MOMENTS = ['/place', '/burn', '/chopped', '/racemenu'];
+  var MOMENTS = ['/place', '/burn', '/chopped', '/racemenu', '/racedown'];
   // Lines from a chat connection that did not prove who it is, logged at most
   // this often per profile (#410).
   var unprovenSaid = {};
@@ -46701,7 +47941,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     if (word === '/place' || word === '/burn' || word === '/chopped') { return true; }
     // "The race menu is up" is a moment too, and one replayed a minute late
     // would hold the give up for somebody who has already left it.
-    if (word === '/racemenu') { return true; }
+    if (word === '/racemenu' || word === '/racedown') { return true; }
     // Kept by profile id, so it needs no character to run.
     if (word === '/modset') { return true; }
     return WORDS.indexOf(word) === -1;
@@ -46809,7 +48049,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     // Said once, and never for the client's own lines: /face, /ate, a
     // broken lockpick and the load order report are not things anybody typed.
     if (!q.told && word !== '/face' && word !== '/ate' && word !== '/tspicks' &&
-        word !== '/loadorder') {
+        word !== '/loadorder' && word !== '/racedown') {
       q.told = true;
       toProfile(profileId, 'Your character is not back in the world yet. That will run ' +
                            'as soon as you arrive.');
@@ -47258,13 +48498,14 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
   function round1(v) { return Math.round(Number(v) * 10) / 10; }
 
   /*
-    The journal verbs, which the J panel speaks and a person can type.
+    The journal verbs, which the J panel speaks.
 
     Patrick asked for "multiple journals, pages inside them, and sharing
     either a whole journal or a single page with a friend", so the shape is
     journal, page, share, and the panel sends exactly these lines rather than
     having a protocol of its own. That is the same choice the K panel made
-    with /pick: one way in, and a person who would rather type can.
+    with /pick: one way in. Nobody is told to type them and no help names
+    them (Patrick, 4 Oct: buttons, not commands; #1630).
 
     The separator is two colons because a page has a title and a body and a
     body has newlines in it, and the chat socket is line based. Everything
@@ -47275,7 +48516,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     var s = soc.stateOf(actorId);
 
     if (!verb || verb === 'list') {
-      if (!s.journals.length) { return 'No journals yet. /journal new <title>, or press J.'; }
+      if (!s.journals.length) { return 'No journals yet. J opens them, and New journal starts one.'; }
       var names = [];
       for (var i = 0; i < s.journals.length; i++) {
         names.push(s.journals[i].title + ' (' + s.journals[i].pages.length + ')');
@@ -47393,6 +48634,19 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         var upActor = actorOf(profileId);
         if (cgUp && cgUp.faceOpen && upActor) { cgUp.faceOpen(upActor); }
       } catch (eUp) { log('/racemenu failed:', eUp); }
+      return;
+    }
+
+    // The plugin, not a person: the race menu went down with the game
+    // (F10 / quit). Not /face done: a half-made face is not finished.
+    // A different word so a gamemode from before this only says "no
+    // command called", which is harmless.
+    if (word === '/racedown') {
+      try {
+        var cgDown = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodChargen;
+        var downActor = actorOf(profileId);
+        if (cgDown && cgDown.faceDown && downActor) { cgDown.faceDown(downActor); }
+      } catch (eDown) { log('/racedown failed:', eDown); }
       return;
     }
 
@@ -47549,15 +48803,31 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     }
 
     /*
-      A carriage or ferry (#1394), said at the driver, or sent by the front
-      plugin as /ride e <id> when somebody presses E on one. The carriages
-      block answers it, and takes the fare onto the hold's ledger.
+      A carriage or ferry (#1394). Sent by the front plugin as /ride e <id>
+      when somebody presses E on a driver, and as /ride and the stop by the
+      ride panel's buttons (#1635); nobody types it. The carriages block
+      answers it, and takes the fare onto the hold's ledger.
     */
     if (word === '/ride') {
       var rides = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodCarriages;
       if (!rides) { toProfile(profileId, 'That is not running on this server.'); return true; }
       try { rides.command(parts, actorId, profileId, toProfile); } catch (eRide) {
         log('/ride threw:', eRide);
+        toProfile(profileId, 'That did not work. Say so in the dev channel.');
+      }
+      return true;
+    }
+
+    /*
+      The embassy roll and the remnant roll (#1390). Staff commands: an admin
+      writes both, and nobody else is told to type them. The embassy and
+      remnant block, after the property block, answers.
+    */
+    if (word === '/embassy' || word === '/remnant') {
+      var accord = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodEmbassy;
+      if (!accord) { toProfile(profileId, 'That is not running on this server.'); return true; }
+      try { accord.command(word, parts, actorId, profileId, toProfile); } catch (eAccord) {
+        log(word + ' threw:', eAccord);
         toProfile(profileId, 'That did not work. Say so in the dev channel.');
       }
       return true;
@@ -47572,12 +48842,15 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
 
       EVERY ONE OF THESE TAKES A FORM ID OR A NAME, and the form id is the one
       that matters. A key press while looking at somebody sends the hex form
-      id of whatever is under the crosshair, which is exact. A typed name is
-      the same command for people who would rather type, and it refuses an
-      ambiguous one rather than guessing which Bjorn was meant.
+      id of whatever is under the crosshair, which is exact. A typed name
+      still answers, and it refuses an ambiguous one rather than guessing
+      which Bjorn was meant.
 
-      They are in PLAYER_WORDS on purpose, unlike /place and /burn: a key
-      prompt nobody has been told about is a feature nobody has.
+      NOBODY IS TOLD TO TYPE /friend, /trade, /mute, /hidename, /yes and /no
+      (#1628; Patrick, 4 October: "no more commands for things [people] do").
+      Y, H and L on the look prompt, the P panel's Near you, Friends and
+      Muted and hidden lists, the trade window and the prompt's Accept and
+      Refuse send them, so they are in WORDS and not in PLAYER_WORDS.
     */
     if (word === '/merchant') {
       var merchants = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodMerchantTrade;
@@ -47680,7 +48953,11 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       }
 
       /* /party with nothing after it is about your own party rather than
-         about somebody else, so those two go first. */
+         about somebody else, so those two go first.
+
+         Every /party line is sent by P on somebody (an ask with their form
+         id) or by a button on the P panel (leave, disband, kick, lead, and an
+         ask beside a friend). Nobody is told to type one (#1629). */
       // Opening or mounting a panel requests its owner's current view (#1275).
       if (word === '/party' && rest === 'refresh') {
         soc.push(actorId, true);
@@ -47688,7 +48965,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       }
       if (word === '/party' && (rest === '' || rest === 'list')) {
         var pp = soc.partyOf(mine);
-        if (!pp) { toProfile(profileId, 'You are not in a party. Look at somebody and press the party key, or /party <name>.'); return true; }
+        if (!pp) { toProfile(profileId, 'You are not in a party. Look at somebody and press the party key to ask them.'); return true; }
         var names = [];
         for (var pi = 0; pi < pp.members.length; pi++) {
           var pa = soc.actorForProfile(pp.members[pi]);
@@ -47781,6 +49058,25 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         soc.push(actorId);
         return true;
       }
+      /*
+        A VOICE MUTE TAKES THE SAME PEOPLE AS TEXT AND A NAME (#1628): a
+        friend, somebody standing here, or somebody already on your muted
+        list, online or not. It is kept on the character the same as those
+        two, and the P panel's Muted and hidden list has to be able to unmute
+        somebody who has logged off.
+
+        NO OFFER AND NO TELLING THEM. A mute is a decision about your own
+        ears; asking permission to stop listening would be absurd, and
+        telling somebody they have been muted turns it into an argument.
+      */
+      if (word === '/mute') {
+        var muteWho = soc.resolveKnown(actorId, rest);
+        if (!muteWho.pid) { toProfile(profileId, muteWho.why); return true; }
+        var on = soc.toggleMute(actorId, muteWho.pid, muteWho.name);
+        toProfile(profileId, on ? ('You muted ' + muteWho.name + '.') : ('You unmuted ' + muteWho.name + '.'));
+        soc.push(actorId);
+        return true;
+      }
 
       /* Taking somebody off a list does not need them to be standing there. */
       if (word === '/friend' && rest.indexOf('remove ') === 0) {
@@ -47843,7 +49139,13 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
             }
             out = tr2.add(actorId, bits.join(' '), n);
           } else {
-            out = 'trade: add, remove, gold, ok, cancel.';
+            /* Not a verb the trade window sends, while a trade stands: H on
+               somebody, or Trade on the P panel (#1628). One trade at a time,
+               so no new one, and this one's window is sent again, which opens
+               it if it had been closed. Its buttons are the way out; nobody
+               is told to type the verbs. */
+            tr2.refresh(actorId);
+            out = 'You are already in a trade. Its window is open again.';
           }
           if (out) { toProfile(profileId, out); }
           return true;
@@ -47857,20 +49159,19 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       var theirPid = soc.profileOf(them);
       var theirName = soc.nameOfPerson(them);
 
-      if (word === '/mute') {
-        /* NO OFFER AND NO TELLING THEM. A mute is a decision about your own
-           ears; asking permission to stop listening would be absurd, and
-           telling somebody they have been muted turns it into an argument. */
-        var on = soc.toggleMute(actorId, theirPid, theirName);
-        toProfile(profileId, on ? ('You muted ' + theirName + '.') : ('You unmuted ' + theirName + '.'));
-        soc.push(actorId);
-        return true;
-      }
-
       if (word === '/friend' && soc.isFriend(actorId, theirPid)) {
         soc.dropFriend(actorId, theirPid);
         toProfile(profileId, theirName + ' is no longer on your list.');
         soc.push(actorId);
+        return true;
+      }
+
+      /* Somebody already in your party is not asked again. P draws "Party
+         menu" over them rather than an ask, and this is the server's own
+         check of the same thing, for an ask that left as they joined. */
+      var askerParty = word === '/party' ? soc.partyOf(mine) : null;
+      if (askerParty && askerParty.members.indexOf(theirPid) !== -1) {
+        toProfile(profileId, theirName + ' is already in your party.');
         return true;
       }
 
@@ -48531,13 +49832,14 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       if (topic === 'people' || topic === 'friends' || topic === 'party') {
         toProfile(profileId,
           'Look at somebody and press Y to ask them to be friends, H to offer a ' +
-          'trade, L to stop hearing them. P opens your friends and your party; ' +
+          'trade, L to stop hearing them, P to ask them to party. P opens your ' +
+          'friends and party; ' +
           'J opens your journals, and a group book beside them when this character ' +
           'is in one or the Discord account may found one. A Dev may found one of each. ' +
-          '/book new business <name> and /book new faction <name> start one. ' +
-          '/book leave drops this character. ' +
+          'New business and New faction on that tab start one, and Leave there ' +
+          'drops this character. ' +
           'Work done with your party in the same place ' +
-          'counts for more. /yes and /no answer whatever somebody has asked you.');
+          'counts for more. Answer a request with Accept or Refuse on its prompt.');
         return;
       }
       if (topic === 'living' || topic === 'needs' || topic === 'food') {
@@ -48555,9 +49857,9 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         toProfile(profileId,
           'K opens your profession, your class and your skill tree. Work at what ' +
           'you chose and the rank climbs on its own. Your sister half stops at ' +
-          'novice until a Master of it takes you on: a Master types /apprentice ' +
-          '<name>, and /apprentice end <name> ends it. /apprentice on its own ' +
-          'says who took you on. /plot says what is in the ' +
+          'novice until a Master of it takes you on: a Master looks at you and ' +
+          'presses the key the prompt names. K lists who took you on and who you ' +
+          'took on, and either of you can end it there. /plot says what is in the ' +
           'ground in front of you and whose farm it is, /plant sows it. A ' +
           'warrior\'s maneuvers open on the maneuver key, which the ' +
           'launcher\'s Controls page names. ' +
@@ -48566,13 +49868,14 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       }
       if (topic === 'land' || topic === 'home' || topic === 'deed') {
         toProfile(profileId,
-          '/claim at a plot takes the farm around it; /claim at a door you have ' +
-          'just opened takes the building and hands you the deed. /deed lists ' +
-          'what you hold, /lock and /unlock turn the lock, /rent says what a ' +
-          'place costs. To let somebody sleep in a building you hold, look at ' +
-          'them inside it and press the key the prompt shows. ' +
-          'A smith says /mold at a door with the holder standing ' +
-          'there, and /key at a forge with the mold in hand.');
+          '/claim at a plot takes the farm around it. At a door you just opened, ' +
+          'a line names a key, X unless you changed it: it claims a building ' +
+          'nobody holds, and locks or unlocks one you hold. K lists what you ' +
+          'hold and the rent owed. A Jarl or a steward has an Office page on K. ' +
+          'To let somebody sleep in a building you hold, look at them inside ' +
+          'it and press the key the prompt shows. A blank key mold goes into a ' +
+          'lock on the key its line names, and a smith carrying that mold cuts ' +
+          'a key at a forge the same way.');
         return;
       }
       if (topic === 'staff' || topic === 'rules' || topic === 'help') {
@@ -48590,7 +49893,8 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       toProfile(profileId,
         'Ask for one of these: /help talking, /help people, /help living, ' +
         '/help work, /help land, /help staff, and /helpme reaches staff. Press K for your profession and ' +
-        'skills, P for friends and party, J for journals, Enter to talk and ' +
+        'skills, P for friends and party, J for journals and every town\'s notice ' +
+        'board, Enter to talk and ' +
         'hold V to speak.' + extra);
       return;
     }
@@ -49651,6 +50955,12 @@ function bodyShapeCheck(actorId, appearance, why) {
 
 mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (actorId, appearance, isAllowed) {
   if (isAllowed) { bodyShapeCheck(actorId, appearance, 'sent'); }
+  if (isAllowed && hasStoredAppearance(appearance)) {
+    const st = chargenOf(actorId);
+    if (st && st.stage === 'appearance') {
+      beginChoosing(actorId, st, 'the face arrived');
+    }
+  }
   return true;
 });
 
@@ -54168,7 +55478,15 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
   function online() {
     return memo('online', function () {
-      try { return mp.get(0, 'onlinePlayers') || []; } catch (e) { return []; }
+      var all = [];
+      try { all = mp.get(0, 'onlinePlayers') || []; } catch (e) { return []; }
+      var chargen = g.__thornswoodChargen;
+      if (!chargen || !chargen.publishedForOthers) { return all; }
+      var out = [];
+      for (var i = 0; i < all.length; i++) {
+        if (chargen.publishedForOthers(all[i])) { out.push(all[i]); }
+      }
+      return out;
     });
   }
 
@@ -54280,10 +55598,18 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     // Whether the look prompt offers "Let sleep here" (#1603). See sleepMark
     // in the beds, in the property block.
     var beds = g.__thornswoodBeds;
+    // Whether it offers "Hand over the letter" (#1595): who carries a letter
+    // for whom, read once a tick. See lettersCarried in the property block.
+    var props = g.__thornswoodProperty;
+    var letters = (props && props.lettersCarried) ? props.lettersCarried() : null;
+    // And whether it offers a Master "Take on as apprentice" (#1634). See
+    // takeOnMark in the character block.
+    var ch = g.__thornswoodCharacter;
     for (var a = 0; a < at.length; a++) {
       var me = at[a];
       var s = read(me.id) || fresh();
       var party = partyOf(me.pid);
+      var teacher = (ch && ch.masterRecord) ? ch.masterRecord(me.id) : null;
       var w = {};
       for (var b = 0; b < at.length; b++) {
         if (a === b) { continue; }
@@ -54304,6 +55630,11 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         };
         // c, not s: s is the holder's sleep key (#1603).
         if (them.scar) { w[them.id.toString(16)].c = them.scar; }
+        // d: you carry a letter for them, and the prompt offers to hand it over (#1595).
+        if (letters && letters.carries(me.pid, them.name)) { w[them.id.toString(16)].d = 1; }
+        // a: the halves this Master could take them on in (#1634).
+        var canTake = teacher ? ch.takeOnMark(teacher, them.id) : null;
+        if (canTake) { w[them.id.toString(16)].a = canTake; }
       }
       var sig = JSON.stringify(w) + (s.namesAll ? ':all' : '');
       if (nearWas[me.id] === sig) { continue; }
@@ -54432,14 +55763,16 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     In memory rather than on the character, because an offer that survived a
     restart would be a request from somebody who is not here any more.
   */
-  var offers = {};   // toProfileId -> { kind, from, fromName, at }
+  var offers = {};   // toProfileId -> { kind, from, fromName, at, about }
 
-  function offer(kind, fromActor, toActor) {
+  // about: what a book invite is into, for the P prompt (#1591).
+  function offer(kind, fromActor, toActor, about) {
     var fromPid = profileOf(fromActor);
     var toPid = profileOf(toActor);
     if (!fromPid || !toPid) { return 'That person is not here.'; }
     if (fromPid === toPid) { return 'That is you.'; }
-    offers[toPid] = { kind: kind, from: fromPid, fromName: nameOfPerson(fromActor), at: Date.now() };
+    offers[toPid] = { kind: kind, from: fromPid, fromName: nameOfPerson(fromActor), at: Date.now(),
+                      about: about ? String(about) : '' };
     return '';
   }
 
@@ -54525,9 +55858,27 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   }
 
   /*
-    A friend on the list, or somebody standing here. Text and a hidden name
-    are kept on the character, so a friend who has logged off can still be
-    named.
+    The name beside a switch, for somebody who may be no friend and may have
+    logged off (#1628): the friend list's, then the person in the world, then
+    the name the switch was turned on with.
+  */
+  function knownName(s, pid) {
+    var f = s.friends[pid];
+    if (f && f.name) { return String(f.name); }
+    var a = actorForProfile(pid);
+    if (a) { return nameOfPerson(a); }
+    var kept = [s.muted, s.textOff, s.namesOff];
+    for (var i = 0; i < kept.length; i++) {
+      if (kept[i] && typeof kept[i][pid] === 'string') { return kept[i][pid]; }
+    }
+    return '';
+  }
+
+  /*
+    A friend on the list, or somebody standing here. Voice, text and a hidden
+    name are kept on the character, so a friend who has logged off can still
+    be named. The P panel sends a profile id: a friend, somebody near, or
+    somebody on the Muted and hidden list, who may be neither (#1628).
   */
   function resolveKnown(actorId, who) {
     var s = stateOf(actorId);
@@ -54535,8 +55886,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (!want) { return { pid: 0, name: '', why: 'Who?' }; }
     var asNum = Number(want);
     if (String(asNum) === want && asNum > 0) {
-      var stored = s.friends[asNum] && s.friends[asNum].name;
-      return { pid: asNum, name: stored || String(asNum), why: '' };
+      if (asNum === profileOf(actorId)) { return { pid: 0, name: '', why: 'That is you.' }; }
+      return { pid: asNum, name: knownName(s, asNum) || 'somebody', why: '' };
     }
     var low = want.toLowerCase();
     var hits = [];
@@ -54553,6 +55904,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (hits.length > 1) { return { pid: 0, name: '', why: 'More than one friend by that name.' }; }
     var target = findPerson(want);
     if (!target.actorId) { return { pid: 0, name: '', why: target.why || 'Nobody here by that name.' }; }
+    if (target.actorId === actorId) { return { pid: 0, name: '', why: 'That is you.' }; }
     return { pid: profileOf(target.actorId), name: nameOfPerson(target.actorId), why: '' };
   }
 
@@ -54925,15 +56277,71 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       }
     }
 
+    /*
+      WHO IS NEAR YOU, for the P panel's Near you list (#1628): the list the
+      look prompt reads, thornswoodNear, so the panel and the prompt agree on
+      who is close enough. The switches are read off the character rather
+      than the list, so a press shows on the push that follows it.
+    */
+    var near = [];
+    var nearNow = null;
+    try { nearNow = mp.get(actorId, NEAR_PROPERTY); } catch (e) { nearNow = null; }
+    var nearW = (nearNow && nearNow.w) || {};
+    for (var hex in nearW) {
+      if (!Object.prototype.hasOwnProperty.call(nearW, hex)) { continue; }
+      var nr = nearW[hex] || {};
+      var np = Number(nr.p) || 0;
+      if (!np) { continue; }
+      near.push({
+        id: hex, p: np, name: String(nr.n || 'somebody'),
+        friend: !!s.friends[np],
+        party: !!(p && p.members.indexOf(np) !== -1),
+        muted: !!s.muted[np],
+        textOff: !!(s.textOff && s.textOff[np]),
+        nameOff: !!(s.namesOff && s.namesOff[np])
+      });
+    }
+    near.sort(function (a, b) { return a.name < b.name ? -1 : 1; });
+
+    /*
+      EVERYBODY YOU SWITCHED OFF, friend or not, here or not (#1628), so the
+      P panel can switch each one back on. A friend is on both lists. Each
+      switch is the one for that person alone, not Hide every name.
+    */
+    var hidden = [];
+    var seenOff = {};
+    var offLists = [s.muted || {}, s.textOff || {}, s.namesOff || {}];
+    for (var li = 0; li < offLists.length; li++) {
+      for (var ok in offLists[li]) {
+        if (!Object.prototype.hasOwnProperty.call(offLists[li], ok)) { continue; }
+        if (!offLists[li][ok] || seenOff[ok]) { continue; }
+        seenOff[ok] = true;
+        var op = Number(ok);
+        hidden.push({
+          p: op, name: knownName(s, op) || 'somebody', on: !!here[op],
+          muted: !!s.muted[op],
+          textOff: !!(s.textOff && s.textOff[op]),
+          nameOff: !!(s.namesOff && s.namesOff[op])
+        });
+      }
+    }
+    hidden.sort(function (a, b) {
+      if (a.on !== b.on) { return a.on ? -1 : 1; }
+      return a.name < b.name ? -1 : 1;
+    });
+
     var offerNow = standingOffer(mine);
     return {
       me: mine,
       friends: friends,
       party: party,
+      near: near,
+      hidden: hidden,
       together: partyNear(actorId),
       bonus: Math.round(SOCIAL.partyBonus * 100),
       namesAll: !!s.namesAll,
-      offer: offerNow ? { kind: offerNow.kind, from: offerNow.from, name: offerNow.fromName } : null,
+      offer: offerNow ? { kind: offerNow.kind, from: offerNow.from, name: offerNow.fromName,
+                          about: offerNow.about || '' } : null,
       journals: s.journals,
       shared: sharedWithMe(actorId),
       muted: s.muted,
@@ -54950,6 +56358,15 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
           if (!prop || !prop.boardPanel) { return null; }
           return prop.boardPanel(actorId, mine);
         } catch (eBoard) { return null; }
+      })(),
+      // J's Boards tab: the ten towns, the board picked there, read only,
+      // and your jobs under it (#1627).
+      boards: (function () {
+        try {
+          var prop = g.__thornswoodProperty;
+          if (!prop || !prop.boardsView) { return null; }
+          return prop.boardsView(mine);
+        } catch (eBoards) { return null; }
       })()
     };
   }

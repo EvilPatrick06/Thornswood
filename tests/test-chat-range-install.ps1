@@ -1,11 +1,14 @@
 <#
   test-chat-range-install.ps1
 
-  Install-Voice.ps1 can turn local chat on, and leaves it off unless told to.
+  Install-Voice.ps1 installs local chat on unless told otherwise, and keeps
+  whatever range is running.
 
   Entry 150 put local in-character chat into the voice service behind
-  THORNSWOOD_CHAT_RANGE, shipped off (voice\test-local-chat.js drives
-  the service itself). A setting only counts if the install hands it over, and
+  THORNSWOOD_CHAT_RANGE (voice\test-local-chat.js drives the service
+  itself). It shipped off until 4 Oct, when Patrick said local chat "should
+  have went out with the other changes to live", and Install-Voice.ps1's
+  default became on. A setting only counts if the install hands it over, and
   the install builds the service's command line inside a here-string that is
   expanded on this machine and run on the VPS. That expansion is where '$log'
   once became '**' and killed live voice twice (Check-VoiceInstall.ps1), so
@@ -13,9 +16,10 @@
 
   It also checks the other direction. An install run later for some other
   reason, with no -ChatRange on it, must keep whatever range is running, the
-  same as -Bind and -Auth already do. Otherwise the next voice fix quietly
-  turns local chat back into global chat, and nobody notices until a scene on
-  the Whiterun road is read in Markarth again.
+  same as -Bind and -Auth already do, off included. Otherwise the next voice
+  fix quietly turns local chat back into global chat, and nobody notices until
+  a scene on the Whiterun road is read in Markarth again, or turns a range
+  somebody switched off on purpose back on.
 
   Read only. Never connects to anything.
 #>
@@ -54,7 +58,7 @@ Yes 'it has a -ChatRange parameter' ($null -ne $param)
 
 $default = $null
 if ($param -and $param.DefaultValue) { $default = $param.DefaultValue.SafeGetValue() }
-Yes 'and it defaults to off, so an install that does not mention it changes nothing' ($default -eq 'off')
+Yes 'and it defaults to on, local chat, for a first install; a later one keeps what runs (below)' ($default -eq 'on')
 
 $pattern = $null
 if ($param) {
@@ -96,7 +100,7 @@ function StartLine([string]$expanded) {
 if ($remote.Success) {
     $off = StartLine (Expand 'off')
     Yes 'the line that starts the service sets THORNSWOOD_CHAT_RANGE' ($off -match 'set THORNSWOOD_CHAT_RANGE=')
-    Yes 'and by default it hands it off' ($off.Contains('set THORNSWOOD_CHAT_RANGE=off&&'))
+    Yes '-ChatRange off hands it off' ($off.Contains('set THORNSWOOD_CHAT_RANGE=off&&'))
     $at = $off.IndexOf('THORNSWOOD_CHAT_RANGE')
     $node = $off.IndexOf('voice-server.js')
     Yes 'before node starts, so the service is there to read it' ($at -ge 0 -and $node -gt $at)
@@ -122,14 +126,18 @@ Yes 'and still read for the bind and the auth' $bindAt.Success
 if ($keepAt.Success -and $bindAt.Success) {
     $keep = $keepAt.Groups[1].Value
     $both = $bindAt.Groups[1].Value
+    # What the install ends up with when -ChatRange was not passed: the
+    # running range, 0 read as off, or the default when there is none.
+    $zero = $src.Contains('if ($ChatRange -eq ''0'') { $ChatRange = ''off'' }')
+    Yes 'a running range of 0 is read as off' $zero
     function Kept([string]$answer) {
-        if ($answer -match $keep) { return $Matches[1] }
-        return 'off'
+        if ($answer -match $keep) { if ($Matches[1] -eq '0' -and $zero) { return 'off' }; return $Matches[1] }
+        return 'on'
     }
     Yes 'a running range of 4000 is kept' ((Kept 'bind=0.0.0.0;auth=log;chat=4000') -eq '4000')
     Yes 'a running range of 0 stays off' ((Kept 'bind=0.0.0.0;auth=log;chat=0') -eq 'off')
-    Yes 'a service older than the setting, which answers with nothing, stays off' ((Kept 'bind=0.0.0.0;auth=log;chat=') -eq 'off')
-    Yes 'a service that did not answer at all stays off' ((Kept 'none') -eq 'off')
+    Yes 'a service older than the setting, which answers with nothing, gets the default, on' ((Kept 'bind=0.0.0.0;auth=log;chat=') -eq 'on')
+    Yes 'a first install, with no service to answer, gets the default, on' ((Kept 'none') -eq 'on')
     $ok = 'bind=127.0.0.1;auth=on;chat=4000' -match $both
     Yes 'the longer answer still gives up the bind and the auth' ($ok -and $Matches[1] -eq '127.0.0.1' -and $Matches[2] -eq 'on')
 }

@@ -328,8 +328,9 @@ work(srv, EDGE2, 'platewright', 130);
 yes('B7: a Master whose character is gone hands nothing in, and the count waits',
     P.rankOf(st(srv, EDGE2), 'platewright') === 'novice' && P.workDone(st(srv, EDGE2), 'platewright') === 100);
 const brynLine = srv.craft(EDGE2, ROW.plateAdvanced).refusal || '';
-yes('B7: and the craft gate says a Master can take him on, not that one has (' + brynLine + ')',
-    /A Master Platewright can take you on with \/apprentice/.test(brynLine));
+yes('B7: and the craft gate says a Master can take him on, not that one has, and names no command (' + brynLine + ')',
+    /A Master Platewright can take you on, from the prompt they see when they look at you/.test(brynLine) &&
+    !/\/apprentice/.test(brynLine));
 gone.length = 0;
 const bryn = st(srv, EDGE2);
 bryn.masters = {};
@@ -386,8 +387,9 @@ yes('C4: a third outside trade is refused, and says it is two in a life (' + lin
     /2 outside trades, and that is all there is in a life/.test(lines.join(' ')) && !srv.soc.standingOffer(112));
 
 lines = srv.type(CHEF, '/apprentice end Sven');
-yes('C5: a Master with the same person in two halves is asked which (' + lines.join(' ') + ')',
-    /Say which/.test(lines.join(' ')) && st(srv, SMITH).taught.length === 2);
+yes('C5: a Master with the same person in two halves is asked which, on K and not by typing (' + lines.join(' ') + ')',
+    /Each has its own End on K/.test(lines.join(' ')) && !/\/apprentice/.test(lines.join(' ')) &&
+    st(srv, SMITH).taught.length === 2);
 lines = srv.type(CHEF, '/apprentice end Sven hearthcook');
 yes('C5: ending it takes the novice list away (' + lines.join(' ') + ')',
     st(srv, SMITH).taught.indexOf('hearthcook') === -1 && !P.rankOf(st(srv, SMITH), 'hearthcook') &&
@@ -446,14 +448,18 @@ yes('C8: an offer that no longer holds when it is answered writes nothing, and t
   const pwords = /^const PLAYER_WORDS = (\[[\s\S]*?\]);$/m.exec(src);
   const W = words ? new Function('return ' + words[1])() : [];
   const PW = pwords ? new Function('return ' + pwords[1])() : [];
-  yes('D1: the server answers /apprentice and tells everybody about it', W.indexOf('/apprentice') !== -1 && PW.indexOf('/apprentice') !== -1);
+  // #1634: the look prompt and K send it, and nobody is told to type it.
+  yes('D1: the server answers /apprentice, and it is not in the list named to everybody (#1634)',
+      W.indexOf('/apprentice') !== -1 && PW.length > 10 && PW.indexOf('/apprentice') === -1);
   const h = between("      if (topic === 'work' || topic === 'trade' || topic === 'class') {", '        return;');
-  yes('D1: /help work names /apprentice and /apprentice end', !!h && /\/apprentice ' \+\s*'<name>/.test(h) && /\/apprentice end <name>/.test(h));
+  yes('D1: /help work says a Master takes you on from the prompt and K lists it, and names no /apprentice (#1634)',
+      !!h && !/\/apprentice/.test(h) && /presses the key the prompt names/.test(h) && /K lists who took you on/.test(h));
   yes('D2: the prompt on P says what an apprentice offer is',
       /kind === 'apprentice'\) \{ return 'offers to take you on as an apprentice\.'; \}/.test(party) &&
       /data\.offer\.kind === 'apprentice' \? 'offers to take you on as an apprentice'/.test(party));
-  yes('D3: the page names the commands and no longer says nothing calls teach',
-      /`\/apprentice <name>`/.test(page) && /`\/apprentice end <name>`/.test(page) && !/nothing in the world calls it/.test(page));
+  yes('D3: the page names the prompt row and K, no command, and no longer says nothing calls teach (#1634)',
+      !/\/apprentice/.test(page) && /Take on as apprentice/.test(page) && /Masters and apprentices page/.test(page) &&
+      !/nothing in the world calls it/.test(page));
   yes('D3: every rank still rises through rankUp: the character block writes no rank itself',
       !/\.ranks\[[^\]]+\]\s*=/.test(CHARACTER.slice(CHARACTER.indexOf('MASTERS AND APPRENTICES'), CHARACTER.indexOf('/** /apprentice, every form of it.'))));
 }

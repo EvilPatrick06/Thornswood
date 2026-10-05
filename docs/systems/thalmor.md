@@ -38,7 +38,7 @@ judging one. Magic is not their business. See
 
 There is no Thalmor faction the server will set on a character to
 make the world friendly. The old embassy in Haafingar was emptied.
-`/claim` on a ruin does not found a new one. A claim is still a
+Claiming a ruin's door does not found a new one. A claim is still a
 claim, and the court can take it. See [Property](property.md).
 
 ## Patrols
@@ -79,11 +79,21 @@ spend into a second mint.
 
 ## Where this is
 
-The lore is on the site. The robes are items in the tailor lists and
-they are not race locked, and the world can still hand them out. No
-remnant roll exists. No patrol is spawned by the server. No
-marker on a character reads Thalmor. Guards do not yet attack on
-sight, because most of them are still the game's own actors and the
-server does not run their AI. The known-issues page still says the
-cast that stays is traders and the carriage workers. This page adds
-the patrols to that cast. See [People who are not people](npcs.md).
+The lore is on the site. An admin writes the remnant roll with
+`/remnant add` once the application is accepted, and `/remnant remove`.
+Those are staff commands, and the person named is told in their own
+chat. Only somebody on the roll makes the Thalmor robes, boots, gloves
+and hood and the Justiciar weapons, and the world does not hand them
+out. The robes are not race locked, as the race page says.
+
+A character wearing any of those pieces, or the game's own Thalmor
+robes, reads Thalmor to the server. Nothing acts on that yet: guards do
+not attack on sight, because most of them are still the game's own
+actors and the server does not run their AI. The server knows no item
+that is a Dominion flag, so a flag is not read yet.
+
+No patrol is spawned by the server yet. Every actor the server stands
+up goes through the shared NPC population and its runtime, and the
+patrols wait on that work. The known-issues page still says the cast
+that stays is traders and the carriage workers. This page adds the
+patrols to that cast. See [People who are not people](npcs.md).

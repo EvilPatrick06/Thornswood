@@ -400,8 +400,9 @@ So a person can end up knowing their own trade properly, a little of the half
 next door, and a little of two other trades entirely. That is the ceiling, and
 it is deliberately low enough that you still need the room.
 
-The master decides who, and can end it. Nobody is owed an apprenticeship and
-nobody is stuck in one.
+The master decides who, and either of you can end it. Nobody is owed an
+apprenticeship and nobody is stuck in one. A Master takes somebody on by
+looking at them, and the K panel lists who is whose.
 
 ## The skill tree
 
