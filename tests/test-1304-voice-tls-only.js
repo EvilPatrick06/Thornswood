@@ -77,12 +77,53 @@ function listening(srv, port) {
   });
 }
 
-const KEY = crypto.randomBytes(32).toString('hex');
-function tokenFor(pid) {
-  const body = 'v2.' + pid + '.' + Date.now() + '.' + crypto.randomBytes(16).toString('base64')
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  return body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+/*
+  The site, as far as the service asks it anything: every ticket owns its
+  profile. So the service mints each join token itself (joinToken).
+*/
+function siteThatSaysYes() {
+  return new Promise((ok) => {
+    const site = http.createServer((req, res) => {
+      req.resume();
+      req.on('end', () => {
+        if (req.method === 'POST' && req.url === '/api/play/owns') {
+          res.writeHead(200, { 'content-type': 'application/json' }).end('{"ok":true}');
+        } else {
+          res.writeHead(404).end();
+        }
+      });
+    });
+    // Once it is up it holds nothing open, so a harness that ends by letting
+    // its loop drain still ends; before that the listen itself keeps it alive.
+    site.listen(0, '127.0.0.1', () => { site.unref(); ok('http://127.0.0.1:' + site.address().port); });
+  });
+}
+let SITE = '';
+
+/*
+  A join token as the launcher gets one: asked of the service, which mints
+  it on its own clock once the site says the ticket owns the profile. It was
+  signed here with this process's Date.now(), and the service refuses a
+  token minted before it started by its own clock; on Windows two node
+  processes can read the wall clock a few ms apart (#1867).
+*/
+function joinToken(port, pid) {
+  return new Promise((ok, bad) => {
+    const body = JSON.stringify({ profileId: pid, ticket: 'a ticket the stand-in site takes' });
+    const req = http.request({ host: '127.0.0.1', port: port, path: '/token', method: 'POST', agent: false,
+                               headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) } }, (res) => {
+      let b = '';
+      res.on('data', (d) => { b += d; });
+      res.on('end', () => {
+        let doc = null;
+        try { doc = JSON.parse(b); } catch (e) { }
+        if (res.statusCode === 200 && doc && typeof doc.token === 'string') { ok(doc.token); return; }
+        bad(new Error('the service minted no token for profile ' + pid + ': ' + res.statusCode + ' ' + b.slice(0, 200)));
+      });
+    });
+    req.on('error', bad);
+    req.end(body);
+  });
 }
 
 const started = [];
@@ -90,8 +131,7 @@ async function start(bind) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-1304-'));
   fs.copyFileSync(VOICE, path.join(dir, 'voice-server.js'));
   fs.copyFileSync(path.join(path.dirname(VOICE), 'headlines.js'), path.join(dir, 'headlines.js'));
-  fs.writeFileSync(path.join(dir, 'token-key.txt'), KEY);
-  const env = Object.assign({}, process.env, { THORNSWOOD_SITE: '', THORNSWOOD_CHAT_DIR: path.join(dir, 'chat') });
+  const env = Object.assign({}, process.env, { THORNSWOOD_SITE: SITE, THORNSWOOD_CHAT_DIR: path.join(dir, 'chat') });
   delete env.THORNSWOOD_VOICE_BIND;
   if (bind) { env.THORNSWOOD_VOICE_BIND = bind; }
   const port = await freePort(bind || '127.0.0.1');
@@ -141,6 +181,7 @@ for (const list of Object.values(os.networkInterfaces())) {
 }
 
 (async () => {
+  SITE = await siteThatSaysYes();
   console.log('1. with no THORNSWOOD_VOICE_BIND:');
   const quiet = await start('');
   const h = JSON.parse((await ask('127.0.0.1', quiet.port, 'GET', '/health')).body || '{}');
@@ -155,7 +196,7 @@ for (const list of Object.values(os.networkInterfaces())) {
   console.log('\n2. told to answer every interface, straight off the network:');
   const open = await start('0.0.0.0');
   if (LAN) {
-    const tok = tokenFor(77);
+    const tok = await joinToken(open.port, 77);
     const r = await knock(LAN, open.port, { 'Sec-WebSocket-Protocol': 'thornswood, ' + tok });
     yes('a handshake with a good token is refused over plain ws (' + r.status + ')', r.status === 403 && /only goes over wss/.test(r.body));
     const again = await knock('127.0.0.1', open.port, { 'Sec-WebSocket-Protocol': 'thornswood, ' + tok });
@@ -172,15 +213,15 @@ for (const list of Object.values(os.networkInterfaces())) {
 
   console.log('\n3. through a proxy, as it says it took the request:');
   const viaHttp = await knock('127.0.0.1', open.port, { 'X-Forwarded-For': '203.0.113.9', 'X-Forwarded-Proto': 'http',
-                                                         'Sec-WebSocket-Protocol': 'thornswood, ' + tokenFor(78) });
+                                                         'Sec-WebSocket-Protocol': 'thornswood, ' + await joinToken(open.port, 78) });
   yes('over plain http, refused (' + viaHttp.status + ')', viaHttp.status === 403);
   const tHttp = await ask('127.0.0.1', open.port, 'POST', '/token', { profileId: 78, ticket: 'x' },
                           { 'X-Forwarded-For': '203.0.113.9', 'X-Forwarded-Proto': 'http' });
   yes('/token over plain http through it, refused (' + tHttp.status + ')', tHttp.status === 403);
   const viaHttps = await knock('127.0.0.1', open.port, { 'X-Forwarded-For': '203.0.113.9', 'X-Forwarded-Proto': 'https',
-                                                          'Sec-WebSocket-Protocol': 'thornswood, ' + tokenFor(79) });
+                                                          'Sec-WebSocket-Protocol': 'thornswood, ' + await joinToken(open.port, 79) });
   yes('over https, the way Caddy carries it, a connection (' + viaHttps.status + ')', viaHttps.status === 101);
-  const here = await knock('127.0.0.1', open.port, { 'Sec-WebSocket-Protocol': 'thornswood, ' + tokenFor(80) });
+  const here = await knock('127.0.0.1', open.port, { 'Sec-WebSocket-Protocol': 'thornswood, ' + await joinToken(open.port, 80) });
   yes('and this machine itself, with nothing forwarded, a connection (' + here.status + ')', here.status === 101);
 
   console.log('\n4. the clients build nothing but https and wss:');

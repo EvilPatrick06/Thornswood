@@ -74,9 +74,14 @@ outside which copy is running, so change it whenever behaviour changes. The
 harnesses run the real file in a temporary folder on a port the system hands
 out, and ask it nothing until that copy has said it is listening there,
 because several builds run at once on the VPS and a fixed port let one run
-answer another (#1703). They need nothing else: each puts its own
-`token-key.txt` beside its copy and signs the tokens it joins with, and
-`test-auth.js` answers `/token`'s questions with a small site of its own.
+answer another (#1703). They need nothing else. Most put their own
+`token-key.txt` beside their copy and sign the tokens they join with. A
+harness that joins the moment its copy is up asks that copy's `/token`
+instead, with a small site of its own that says yes, as `test-auth.js` does
+(`test-local-chat.js`, and `test-1304`, `test-1351` and `test-1821` in
+`tests`): on Windows two node processes can read the wall clock a few ms
+apart, and a token signed in the harness then can read as minted before the
+service started, which it refuses (#1867).
 `node voice\test-auth.js` and the rest.
 
 A TURN relay, for the pairs of people who cannot reach each other directly,

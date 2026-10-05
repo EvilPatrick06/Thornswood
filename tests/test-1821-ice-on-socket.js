@@ -128,7 +128,9 @@ function siteThatSaysYes() {
         }
       });
     });
-    site.listen(0, '127.0.0.1', () => ok('http://127.0.0.1:' + site.address().port));
+    // Once it is up it holds nothing open, so a harness that ends by letting
+    // its loop drain still ends; before that the listen itself keeps it alive.
+    site.listen(0, '127.0.0.1', () => { site.unref(); ok('http://127.0.0.1:' + site.address().port); });
   });
 }
 let SITE = '';
