@@ -226,15 +226,15 @@ yes('the gamemode\'s list of everybody\'s commands can be read', Array.isArray(e
 
 // ---------------------------------------------------------- the chat box
 /*
-  The chat box is server wide as it ships: the voice service sends every plain
-  line to every peer. Entry 150 reached main as a setting, THORNSWOOD_CHAT_RANGE,
-  that keeps a line to the people near and ships off, so the old loop is still
-  there for the off case and finding it proves nothing on its own. What the
-  page stands on is the default: off in the voice service when nothing sets
-  it, and off in Install-Voice.ps1, which is what sets it on the box. Turn
-  either default on and this fails, and the page has to change with it rather
-  than going on saying the old thing. Turning it on by hand for one install is
-  Patrick's call and is not in the repository, so no harness can see it.
+  The chat box is local as it ships since 4 Oct: Install-Voice.ps1 sets
+  THORNSWOOD_CHAT_RANGE on for live and dev (Patrick: local chat "should have
+  went out with the other changes to live"), and the voice service then sends a
+  plain line only to the people hearers() finds in the same cell and within
+  the range. The old loop to every peer is still there for a service with the
+  setting off, so finding it proves nothing on its own. What the page stands
+  on is the default Install-Voice.ps1 installs with, and that a later install
+  keeps what is running. Turn the default off and this fails, and the page has
+  to change with it rather than going on saying the old thing.
 */
 {
   const c = vserver.indexOf("if (msg.t === 'chat') {");
@@ -244,20 +244,27 @@ yes('the gamemode\'s list of everybody\'s commands can be read', Array.isArray(e
   try { rangeOf = fr ? new Function(fr[0] + '\nreturn chatRangeOf;')() : null; } catch (e) { rangeOf = null; }
   yes('the voice service reads its chat range from THORNSWOOD_CHAT_RANGE',
       /const CHAT_RANGE = chatRangeOf\(process\.env\.THORNSWOOD_CHAT_RANGE\);/.test(vserver) && !!rangeOf);
-  yes('and an unset or off range is no range at all, so every line goes to everybody',
-      !!rangeOf && rangeOf(undefined) === 0 && rangeOf('') === 0 && rangeOf('off') === 0);
-  yes('Install-Voice.ps1 installs the voice service with the range off',
-      /\[string\]\$ChatRange = 'off'/.test(vinstall) &&
+  yes('and on is the same 4000 units /ooc uses, while unset or off is no range at all',
+      !!rangeOf && rangeOf('on') === 4000 && rangeOf(undefined) === 0 && rangeOf('') === 0 && rangeOf('off') === 0);
+  yes('Install-Voice.ps1 installs the voice service with the range on',
+      /\[string\]\$ChatRange = 'on'/.test(vinstall) &&
       /set THORNSWOOD_CHAT_RANGE=\$ChatRange/.test(vinstall));
   // Since #1406 a plain line goes out through deliver(), which also puts the
   // line above the head for those close enough and skips anybody who has
   // blocked the sender. With the range off it is still every peer.
   const everyone = block.indexOf('for (const [, p] of peers) deliver(p);');
-  yes('the voice service still sends a plain chat line to every peer when the range is off',
+  yes('a plain line goes out through deliver(), and to every peer only when the range is off',
       everyone > block.indexOf('if (CHAT_RANGE) {') && block.indexOf('if (CHAT_RANGE) {') >= 0 &&
       /function deliver\(p\) \{[\s\S]*?p\.ws\.send\(copy\);/.test(block));
-  yes('so the page says a chat line goes to everybody connected',
-      /goes to everybody connected/.test(item('Chat and commands', 'The chat box')));
+  yes('and a later install keeps whatever range is running, off included',
+      /\$chatExplicit -and "\$current" -match ';chat=\(\\d\+\)'/.test(vinstall) &&
+      /if \(\$ChatRange -eq '0'\) \{ \$ChatRange = 'off' \}/.test(vinstall));
+  yes('with a range, a plain chat line goes only to the people hearers() finds near',
+      /if \(CHAT_RANGE\) \{\s*const heard = hearers\(myId, me, chatReach\('say'\)\);/.test(block) &&
+      /them\.cell !== mine\.cell/.test(vserver) && /> reach \* reach\) continue;/.test(vserver));
+  yes('so the page says a chat line reaches the people near you, in the same place and within about 60 metres',
+      /reaches the people near you, in the same place and within about 60 metres/.test(item('Chat and commands', 'The chat box')) &&
+      !/everybody connected/.test(item('Chat and commands', 'The chat box')));
   yes('and that a slash line is a command, which the voice service holds back',
       /text\.charAt\(0\) === '\/'/.test(block) &&
       /starts with a slash is a command/.test(item('Chat and commands', 'The chat box')));

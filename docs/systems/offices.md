@@ -44,7 +44,8 @@ One, for the embassy in Solitude. Keeps the roll of 20, of whom 6 may
 be armed. Does not evict the Accord and is not evicted by Haafingar's
 steward. See [The Imperial Embassy](embassy.md).
 
-Not in the server. The word is not a command yet.
+Not in the server. The word is not a command yet. Until it is, an
+admin writes the roll with `/embassy`.
 
 ## Archmage of the College
 

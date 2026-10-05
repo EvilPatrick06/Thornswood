@@ -510,7 +510,7 @@ namespace Thornswood
 
 
             l.Add(Dx("skills", "ThornsWood", "Profession, class and skill tree",
-                     "Your profession and which half of it you work, your class, and the fifteen sub-skills under Health, Magicka and Stamina. Opens over the world without pausing it. Escape closes it too.",
+                     "Your profession and which half of it you work, your class, and the fifteen sub-skills under Health, Magicka and Stamina. Opens over the world without pausing it. Escape closes it too. A Master looking at somebody they could take on as an apprentice sees this key named under the crosshair, and it opens on that person.",
                      ThornIni, "SkillsKey", 37));
 
             // ------------------------------------------------ the people keys

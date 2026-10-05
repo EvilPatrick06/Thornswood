@@ -96,12 +96,12 @@ namespace Thornswood
                 "Controls in the launcher lists every key, read from the files themselves. Press Change, then the key you want. Close Skyrim first, because the game writes its settings back when it exits and would undo it. F1 and F2 belong to the game client and cannot be moved."),
 
             // =========================================== chat and commands
-            // "Everybody connected" is how chat ships. Entry 150 put a range on
-            // it behind THORNSWOOD_CHAT_RANGE in the voice service, and that is
-            // off until Install-Voice.ps1 is run with -ChatRange on or a number.
-            // Whoever turns it on changes this item in the same release.
+            // Local is how chat ships since 4 Oct: Install-Voice.ps1 sets
+            // THORNSWOOD_CHAT_RANGE on (the same cell and 4000 units) for live
+            // and dev. Whoever turns it off changes this item in the same
+            // release; test-launcher-help.js ties the two together.
             new HelpItem("Chat and commands", "The chat box",
-                "Enter opens it and Escape gives the keyboard back to the game. / opens it with the slash already typed, for a command. A line typed there goes to everybody connected, wherever they are, so treat it as the whole server rather than the room. A line that starts with a slash is a command for the server and is not shown to anybody else. Text chat is kept, with the name and the time. Voice is not recorded."),
+                "Enter opens it and Escape gives the keyboard back to the game. / opens it with the slash already typed, for a command. A line typed there reaches the people near you, in the same place and within about 60 metres, the same as the line over your head, so treat it as the room rather than the whole server. A line that starts with a slash is a command for the server and is not shown to anybody else. Text chat is kept, with the name and the time. Voice is not recorded."),
 
             new HelpItem("Chat and commands", "Out of character",
                 "Type /ooc and then what you meant. It goes only to people in the same place as you and within about 60 metres, in double brackets with your name on it. /ooc can we not ends any scene at once, from anybody in it, with no reason owed."),
@@ -127,7 +127,7 @@ namespace Thornswood
                 "Everybody in your party has their name in green above their head, a marker on your map, and an arrow on a strip under your compass with how far away they are. Green on the strip means the same place as you, gold means somewhere else. You cannot fast travel to the marker. Work done with somebody from your party in the same place counts 15 per cent more."),
 
             new HelpItem("Chat and commands", "Journals",
-                "J opens your journals and their pages. You can type a title and a page. You can share a whole journal, or one page of it, with a friend, including one who is not online. They see a shared page while you are in the world."),
+                "J opens your journals and their pages. You can type a title and a page. You can share a whole journal, or one page of it, with a friend, including one who is not online. They see a shared page while you are in the world. Under Boards, J also shows any town's notice board, read only, and the jobs you have taken."),
 
             // Issue #414: the asking staff block at the end of gamemode.js.
             new HelpItem("Chat and commands", "Getting staff: /helpme and /report",

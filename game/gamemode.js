@@ -4166,10 +4166,16 @@ const SETTLE_MS = 10000;
  * before giving up on it entirely and moving on. Both measured from the moment
  * the creation stage opened, not from the nudge. */
 
-const NUDGE_MS = 120000;   // two minutes; see the nudge below
+/* Two minutes. Used as the gap between race-menu asks when the open
+ * request was lost: no stored face, and the plugin has not reported
+ * the menu as up. A one-shot flag left them in the hall forever if
+ * that second request was also lost (Djinn, 5 Oct 2026). Asking
+ * while /racemenu is already reported is an access violation. */
+const NUDGE_MS = 120000;
 
-/* How long somebody has to be walking about before their creation counts as
- * finished, whatever the appearance says.
+/* How long somebody has to be walking about before a STORED face lets
+ * creation move on. Walking without a stored appearance does not publish
+ * them. See hasStoredAppearance.
  *
  * Was eight seconds. Since the appearance stopped arriving this is not a
  * fallback any more, it is the only way anybody leaves the hall, so every
@@ -4184,15 +4190,11 @@ const NUDGE_MS = 120000;   // two minutes; see the nudge below
  * tick, two seconds is still two separate confirmations that a person is on
  * their feet rather than nudging a camera.
  *
- * And down again to one, which at CHARGEN_TICK_MS is 500 ms and one tick. The
- * check it gates is not "did the camera twitch", it is "is this person's
- * position or facing different from the last sample", which a menu does not
- * produce at all. A second confirmation was insurance against a thing that was
- * never happening, paid for by everybody standing in an empty room.
+ * And down again to one, which at CHARGEN_TICK_MS is 500 ms and one tick.
  *
- * The sentence above it said "at a one second tick" while the tick was half a
- * second, so the two confirmations it describes were one second and not two.
- * The number here never moved; the tick under it did. */
+ * 3 Oct 2026: this wait is no longer a way out of the hall without a face.
+ * A stored appearance is required. Walking with no face asks for the race
+ * menu again instead of publishing an empty actor. */
 const MOVED_ENOUGH_MS = 500;
 
 /* How far counts as having moved, between two consecutive samples.
@@ -4237,11 +4239,11 @@ const CHOOSE_REMIND_MS = 30000;
   it, and nothing about their character has been decided either way.
 */
 const CHOOSE_LATER_MS = 600000;
-/* Five minutes, not forty five seconds. This exists so nobody is stranded when
- * the race menu never opens, and it used to be short enough to fire on somebody
- * who was simply still making their face: it would give up and start them
- * mid-menu. Being stuck is the thing worth guarding against; taking a while
- * over a nose is not. */
+/* Five minutes, not forty five seconds. This used to move them on without a
+ * face. That published an empty actor (3 Oct 2026, profile 598737699). It
+ * now asks for the race menu again and stays unpublished until a face is
+ * stored. Being stuck is still the thing worth guarding against; publishing
+ * nobody is not the rescue. */
 const GIVEUP_MS = 300000;
 
 /*
@@ -4272,11 +4274,13 @@ const GIVEUP_MS = 300000;
   and once a minute while it stays open), and while that is fresh the give up
   holds off. Sitting still reading a slider moves nobody on.
 
-  FACE_SEEN_MS is how fresh the last report has to be: two and a half beats,
-  so one lost line does not end the hold, while a client that crashed or quit
-  stops reporting and the give up runs as it always did. A client that never
-  reports at all, because its plugin is older or the race menu never opened,
-  is exactly the case the five minutes were written for and still gets them.
+  FACE_SEEN_MS is how fresh a report used to have to be before the give up
+  treated the menu as gone. That freshness window is not a close: a quiet
+  stream after /racemenu was seen is a still-open menu. /face done is the
+  close for Escape, Cancel and Done. /racedown is the close when the game
+  is quitting (F10, the quit paths) and a half-made face is not done. A
+  client that never reports at all, because its plugin is older or the race
+  menu never opened, is the lost request and still gets the asks.
 
   FACE_CAP_MS is for a race menu that is up and wedged: after half an hour of
   it being reported, the give up goes on anyway, because the panel and a home
@@ -4445,6 +4449,13 @@ function giveShift(actorId) {
  * 20 September) or never came at all.
  */
 function beginChoosing(actorId, state, why) {
+  let appearance = null;
+  try { appearance = mp.get(actorId, 'appearance'); } catch (e) { appearance = null; }
+  if (!hasStoredAppearance(appearance)) {
+    log('chargen', actorId.toString(16),
+        'not leaving the face step (' + why + '): no appearance is stored yet');
+    return;
+  }
   state.stage = 'choosing';
   state.at = Date.now();
   state.remindAt = Date.now() + CHOOSE_REMIND_MS;
@@ -4588,9 +4599,27 @@ globalThis.__thornswoodChargen = {
     return true;
   },
   /*
+    The plugin saw the race menu go down with the game (F10 / quit), not
+    Escape, Cancel or Done. Only means something while the face is awaited.
+    Clears the open marks so a still-connected player can be asked again.
+    Does not set faceDone: a half-made face is not a finished face.
+  */
+  faceDown: function (actorId) {
+    const st = chargenOf(actorId);
+    if (!st || st.stage !== 'appearance') { return false; }
+    delete st.faceOpenAt;
+    delete st.faceSeenAt;
+    delete st.faceHeld;
+    setChargen(actorId, st);
+    log('chargen', actorId.toString(16),
+        'the plugin says the race menu went down with the game, not a finished face');
+    return true;
+  },
+  /*
     The plugin says the race menu is on screen right now. Only means something
-    while the face is awaited; see FACE_SEEN_MS for what it holds off. The
-    first report is logged and the once a minute ones after it are not.
+    while the face is awaited. /face done and /racedown are the closes; a
+    quiet stream after a report is still open. The first report is logged
+    and the once a minute ones after it are not.
   */
   faceOpen: function (actorId) {
     const st = chargenOf(actorId);
@@ -4604,6 +4633,8 @@ globalThis.__thornswoodChargen = {
     setChargen(actorId, st);
     return true;
   },
+  hasStoredAppearance: hasStoredAppearance,
+  publishedForOthers: publishedForOthers,
   /*
     The panel was closed on purpose, so hold the reminder off. See
     CHOOSE_LATER_MS and the 'later' branch of /pick.
@@ -4712,6 +4743,40 @@ function faceMark(a) {
             (a.tints || []).length].join('|');
   } catch (e) {
     return '';
+  }
+}
+
+/*
+  A STORED APPEARANCE, not a name, not the word Adventurer, not a guess.
+
+  Djinn, 3 Oct 2026 about 22:31 ET on dev, profile 598737699: he picked a
+  brand-new slot, the race menu never opened, he was in the world as the
+  placeholder, the trade list named him "somebody", and Patrick could not
+  see a body. The walking path (MOVED_ENOUGH_MS, half a second) and the
+  five-minute give-up both called beginChoosing while appearance was still
+  missing. Neighbours then got an actor with no base (player 0x7 is omitted
+  on purpose) and no face, so the client correctly refused to place a mesh.
+  The trade name fell back because appearance.name was empty. Voice is
+  keyed by profile id and was not this.
+
+  THE GATE IS THE OBJECT THE ENGINE STORED. closeRaceMenu already asks
+  this: a value that is an object means the race menu wrote a face; null
+  or a throw does not. A blank name is still a stored face. A returning
+  character whose appearance is already there is not sent back through
+  the menu.
+*/
+function hasStoredAppearance(a) {
+  return !!(a && typeof a === 'object');
+}
+
+/** True when this person may be in the world for anybody else. */
+function publishedForOthers(actorId) {
+  try {
+    return hasStoredAppearance(mp.get(actorId, 'appearance'));
+  } catch (e) {
+    // A read that throws is treated as published, because hiding a
+    // returning character from the lists is the worse of the two mistakes.
+    return true;
   }
 }
 
@@ -5233,6 +5298,49 @@ function chargenTick() {
 
     if (state.stage === 'appearance') {
       /*
+        A lost open-race-menu request (no /racemenu report, no stored face)
+        is asked again every NUDGE_MS. A second setRaceMenuOpen over a menu
+        the plugin already says is up is an access violation, so that case
+        is never asked. Once a face is stored the asks stop. The two lines
+        below are tellOnce: one each for the whole wait, not one per ask.
+      */
+      const raceMenuIsUp = function () {
+        // /face done and /racedown are the closes. A quiet /racemenu
+        // stream is not: the plugin reports once a minute, and a gap is
+        // a missed line, not a shut menu. Treating faceSeenAt older than
+        // FACE_SEEN_MS as closed sent a second setRaceMenuOpen over a
+        // menu that was still up (access violation). Once /racemenu has
+        // been seen, the menu stays up until /face done, /racedown, or a
+        // stored face.
+        if (state.faceDone) { return false; }
+        return !!(state.faceOpenAt || state.faceSeenAt);
+      };
+      const askForLostRaceMenu = function (why) {
+        if (hasStoredAppearance(appearance) || raceMenuIsUp()) { return false; }
+        const last = state.askedMenuAt || 0;
+        if (last && now - last < NUDGE_MS) { return false; }
+        state.askedMenuAt = now;
+        state.menuAsks = (state.menuAsks || 0) + 1;
+        setChargen(actorId, state);
+        try {
+          mp.setRaceMenuOpen(actorId, true);
+          log('chargen', actorId.toString(16),
+              'asking for the race menu again (' + why + '), ask', state.menuAsks);
+        } catch (e) {
+          log('chargen', actorId.toString(16), 'could not open the race menu:', e);
+        }
+        if (state.menuAsks === 2) {
+          tellOnce(actorId, 'raceMenuAgain',
+              "Your character creation menu didn't open. Opening it again.");
+        } else if (state.menuAsks >= 3) {
+          tellOnce(actorId, 'raceMenuRelog',
+              'The character creation menu still did not open. Relog, and if it ' +
+              'still does not open, contact staff.');
+        }
+        return true;
+      };
+
+      /*
         A reconnect starts the wait again from nothing.
 
         None of the fields below are cleared when somebody drops out of the
@@ -5254,6 +5362,8 @@ function chargenTick() {
         delete state.where;
         delete state.askedAt;
         delete state.nudged;
+        delete state.askedMenuAt;
+        delete state.menuAsks;
         // The last session's race menu went with it. This one reports its own.
         delete state.faceOpenAt;
         delete state.faceSeenAt;
@@ -5361,49 +5471,44 @@ function chargenTick() {
 
       // The plugin says the race menu closed (/face done, over the chat
       // socket). That is the fact the mark above is only a proxy for: a face
-      // confirmed unchanged, or a name kept, changes no mark, and until 20
-      // September the only way on from there was to walk (below). The menu
-      // closing is enough on its own.
+      // confirmed unchanged, or a name kept, changes no mark. The menu
+      // closing is enough only when a face was actually stored. A close
+      // without a store is how 598737699 left the hall as a placeholder.
       if (state.faceDone) {
-        beginChoosing(actorId, state, 'the race menu closed');
+        if (hasStoredAppearance(appearance)) {
+          beginChoosing(actorId, state, 'the race menu closed');
+        } else {
+          log('chargen', actorId.toString(16),
+              'the plugin says the race menu closed but no appearance is stored, staying unpublished');
+          askForLostRaceMenu('race menu closed with no face');
+        }
         continue;
       }
 
-      // Walking around the hall is the end of character creation.
-      //
-      // Everything above waits on one signal: the appearance property changing
-      // on the change form, which is what arrives when the race menu closes.
-      // When that signal does not come, the whole flow stops, and the log says
-      // exactly that and nothing else: "-> appearance (already in the hall)"
-      // and then silence while somebody stands in a stone room wondering what
-      // they did wrong.
-      //
-      // The rescue below existed for that, and it is far too patient: two
-      // minutes before it reopens the race menu, five before it gives up and
-      // starts them anyway. Nobody waits two minutes in an empty room. They
-      // alt-F4, which is what happened three times tonight.
-      //
-      // But the evidence was there the whole time. The race menu is paused, so
-      // a character in one does not move; a character who IS moving is a
-      // character whose menu has closed. That is not a guess about the
-      // appearance, it is a stronger fact than the appearance, and this file
-      // was already measuring it a dozen lines up in order to decide whether
-      // nudging was safe.
-      //
-      // So: on your feet, and we get on with it. The appearance can arrive
-      // whenever it likes.
+      // Walking used to end creation, whatever the appearance said. That is
+      // the 3 Oct 2026 session: half a second on their feet, no face stored,
+      // neighbours given an actor with no base and no mesh. Walking is still
+      // the sign that no race menu is open, so it is when a missing face
+      // should be asked for again, not when they are published.
       const onFeetFor = state.liveSince ? (now - state.liveSince) : 0;
 
       if (onFeetFor > MOVED_ENOUGH_MS) {
-        // Said in full because the appearance not arriving is still a bug
-        // and this is the only place it can be seen from.
+        if (hasStoredAppearance(appearance)) {
+          log('chargen', actorId.toString(16), 'walking after',
+              Math.round(onFeetFor / 1000) + 's with a face stored.',
+              'mark now', JSON.stringify(faceNow) + ',',
+              'mark at the start', JSON.stringify(state.faceWas || '') + '.',
+              'Going on.');
+          beginChoosing(actorId, state, 'on their feet');
+          continue;
+        }
         log('chargen', actorId.toString(16), 'walking after',
-            Math.round(onFeetFor / 1000) + 's and the face never arrived.',
+            Math.round(onFeetFor / 1000) + 's and no appearance is stored.',
             'appearance is', appearance ? 'present' : 'MISSING,',
             'mark now', JSON.stringify(faceNow) + ',',
             'mark at the start', JSON.stringify(state.faceWas || '') + '.',
-            'Going on the movement instead.');
-        beginChoosing(actorId, state, 'on their feet');
+            'Staying unpublished.');
+        askForLostRaceMenu('walking with no face');
         continue;
       }
 
@@ -5417,9 +5522,9 @@ function chargenTick() {
       // reason is somewhere in a client mid save-load, which is not somewhere
       // this can reach.
       //
-      // So: ask once, then stop waiting. A character who never saw the race
-      // menu can open it later. One who cannot leave the room cannot do
-      // anything at all.
+      // So: keep asking on NUDGE_MS while the request is lost. A character
+      // who never saw the race menu is asked again; one whose plugin says
+      // the menu is already up is not.
       //
       // But only once it is clear that nobody is standing in a menu already.
       //
@@ -5480,40 +5585,31 @@ function chargenTick() {
         out for a character who cannot move, which is precisely the character
         it exists for, so it runs on the clock like it says it does.
 
-        AND THE NUDGE IS UNREACHABLE TODAY, which is worth writing down rather
-        than leaving somebody to assume it is doing something. It needs
-        liveSince, and the branch a dozen lines above ends the stage the moment
-        onFeetFor passes MOVED_ENOUGH_MS, which is 500. So anybody with
-        liveSince set has been moved on half a second in, 119 and a half seconds
-        before the nudge could fire, and anybody without it is guarded out here.
-        There is no path to it at all.
-
-        It is kept rather than deleted because it is the safety net if
-        MOVED_ENOUGH_MS is ever raised past NUDGE_MS, and because a race menu
-        that never opened is still a real failure somebody may want to rescue
-        differently later. What it must not do is read as a rescue that is
-        running, because it is not.
+        THE TWO-MINUTE CLOCK IS NOW THE INTERVAL, not a one-shot. A lost
+        request (no /racemenu report, no stored face) is asked again every
+        NUDGE_MS. Walking asks on that same helper as soon as they are on
+        their feet; standing still becomes eligible at NUDGE_MS. state.nudged
+        is no longer the gate, so the old one-shot cannot swallow a later ask.
       */
-      if (!state.nudged && waited > NUDGE_MS && state.liveSince) {
-        state.nudged = now;
-        setChargen(actorId, state);
-        try {
-          mp.setRaceMenuOpen(actorId, true);
-          log('chargen', actorId.toString(16),
-              'walking around with no face after', Math.round(waited / 1000) +
-              's, so the race menu never opened. Asking for it.');
-        } catch (e) {
-          log('chargen', actorId.toString(16), 'could not open the race menu:', e);
-        }
-        continue;
-      }
 
       if (waited > GIVEUP_MS) {
-        // Not while the plugin says the race menu is up: that person is making
-        // a face, not stuck. See FACE_SEEN_MS, and FACE_CAP_MS for the one
-        // exception. Said once, when the hold starts, and not every tick.
-        const menuUp = !!state.faceSeenAt && now - state.faceSeenAt < FACE_SEEN_MS;
+        // Not while the race menu is still open. /face done and /racedown
+        // are the closes, not a quiet report. FACE_CAP_MS is the
+        // wedged-menu exception. A stored face is checked first so a
+        // quiet stream cannot hold a finished face in the hall.
+        const menuUp = raceMenuIsUp();
         const menuFor = state.faceOpenAt ? now - state.faceOpenAt : 0;
+        if (hasStoredAppearance(appearance)) {
+          if (menuUp) {
+            log('chargen', actorId.toString(16), 'the race menu has been up for',
+                Math.round(menuFor / 60000), 'minutes, face is stored, going on');
+          }
+          log('chargen', actorId.toString(16),
+              'a face is stored after', Math.round(waited / 1000) + 's,',
+              'going on to the choices');
+          beginChoosing(actorId, state, 'face stored after ' + Math.round(waited / 1000) + 's');
+          continue;
+        }
         if (menuUp && menuFor < FACE_CAP_MS) {
           if (!state.faceHeld) {
             state.faceHeld = now;
@@ -5527,15 +5623,22 @@ function chargenTick() {
         }
         if (menuUp) {
           log('chargen', actorId.toString(16), 'the race menu has been up for',
-              Math.round(menuFor / 60000), 'minutes, going on without it');
+              Math.round(menuFor / 60000),
+              'minutes, still no appearance stored, staying unpublished');
+          continue;
         }
-        // Still no face. Go on without one rather than leave them standing
-        // here: a character who never saw the race menu can change their face
-        // later, a character who cannot leave the room can do nothing at all.
         log('chargen', actorId.toString(16),
             'appearance never arrived after', Math.round(waited / 1000) + 's,',
-            'going on to the choices anyway');
-        beginChoosing(actorId, state, 'no face after ' + Math.round(waited / 1000) + 's');
+            'staying unpublished');
+      }
+
+      // Lost request: no face, and the menu is not up. Walking already
+      // asked and continued. Standing still waits for NUDGE_MS so the
+      // spawn request has time to land, then the helper repeats every
+      // NUDGE_MS. A quiet stream after a report is still open. /racedown
+      // has already cleared the open marks.
+      if (!hasStoredAppearance(appearance) && waited > NUDGE_MS) {
+        askForLostRaceMenu('no face after ' + Math.round(waited / 1000) + 's');
       }
     }
   }
@@ -26920,8 +27023,8 @@ function craftAnswer(actorId, row) {
     roll is refused before profession and rank, because the bench is not
     where these are found. The roll is read off the character when it has
     one, or off __thornswoodRolls.has(actorId, roll) when a roll list is
-    installed. Neither list exists yet, so the public bench makes none of
-    them.
+    installed. The embassy and remnant block installs it (#1390), and an
+    admin writes both rolls, so the public bench makes none of them.
   */
   if (row && row.roll) {
     const roll = String(row.roll);
@@ -26982,7 +27085,7 @@ function craftAnswer(actorId, row) {
         'so rank comes from doing the work.'
       : 'A ' + made + ' is ' + halfName + ' work past novice, and ' + halfName +
         ' is your sister half. You get the novice of it for nothing and no ' +
-        'further. A Master ' + halfName + ' can take you on with /apprentice.';
+        'further. A Master ' + halfName + ' can take you on, from the prompt they see when they look at you.';
     return out;
   }
 
@@ -35130,6 +35233,11 @@ log('gamemode loaded:',
     try { mine = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { mine = 0; }
     push(actorId, mine);
 
+    // The embassy is held by its office, not by a claim, so a deed presented
+    // at its door is paper (#1390, see the embassy and remnant block).
+    var accordHeld = globalThis.__thornswoodEmbassy;
+    if (accordHeld && accordHeld.holds(building)) { return; }
+
     var held = holderOf(building);
     try { mine = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { mine = 0; }
 
@@ -35262,8 +35370,11 @@ log('gamemode loaded:',
     var line = { at: doorLineStamp, x: '', n: '', d: [], left: 0 };
     if (building) {
       var held = holderOf(building);
+      // The embassy is held by its office, not by a claim, so its doors offer
+      // nothing to claim (#1390); claim() refuses the line if it comes anyway.
+      var accordLine = globalThis.__thornswoodEmbassy;
       if (!held) {
-        line.x = 'claim';
+        if (!(accordLine && accordLine.holds(building))) { line.x = 'claim'; }
       } else if ((profileId && held.by === profileId) || holdsDeed(actorId, building)) {
         line.x = held.locked ? 'unlock' : 'lock';
       }
@@ -35340,6 +35451,12 @@ log('gamemode loaded:',
     if (!building) {
       toProfile(profileId, 'Open the door of the building you mean first. That is how ' +
                            'the server knows which one it is.');
+      return true;
+    }
+    // embassy.md: the embassy doors start held, so a claim is refused (#1390).
+    var accordClaim = globalThis.__thornswoodEmbassy;
+    if (accordClaim && accordClaim.holds(building)) {
+      toProfile(profileId, accordClaim.CLAIM_REFUSED);
       return true;
     }
     var held = holderOf(building);
@@ -37691,6 +37808,46 @@ log('gamemode loaded:',
     } catch (e) { }
   }
 
+  /*
+    THE NEWEST TEN, NUMBERED BY WHERE THEY REALLY ARE. What a board shows, on
+    its own panel and under Boards on J (#1627).
+
+    The typed reader this replaced had two faults in one loop. It showed the
+    OLDEST ten, so the eleventh paid posting in a hold was invisible for ever
+    and the fee was taken first. And it numbered the lines 1..10 by their
+    position in the listing while take indexes the real array, so the moment
+    anything was hidden the numbers a person could read stopped being the
+    numbers they could take.
+
+    A notice somebody took down stays in the list marked down, so it is
+    skipped here and leaves a gap in the numbers rather than moving every
+    newer one. See unpin below. `older` counts what is still up and not among
+    the ten: noticeboards.md, "The line under the ten says how many are older."
+  */
+  function wallOf(hold, profileId) {
+    var list = notices[hold] || [];
+    var rows = [];
+    var up = 0;
+    for (var i = list.length - 1; i >= 0; i--) {
+      var n = list[i];
+      if (n.down) { continue; }
+      up++;
+      if (rows.length >= 10) { continue; }
+      rows.push({
+        n: i + 1,
+        job: !!n.job,
+        letter: !!n.letter,
+        name: n.name || 'somebody',
+        text: n.letter ? sealed(n) : (n.haul ? haulText(n) : (n.text || '')),
+        taken: n.taken ? (n.takenName || 'somebody') : '',
+        mine: Number(n.by) === Number(profileId),
+        held: !!(n.job && Number(n.taken) === Number(profileId)),
+        haul: !!n.haul
+      });
+    }
+    return { rows: rows, older: up - rows.length };
+  }
+
   /** What the board panel draws. Null until they are near one. */
   function boardPanel(actorId, profileId) {
     var near = nearestBoard(actorId, 1500);
@@ -37699,37 +37856,13 @@ log('gamemode loaded:',
     var b = near.board;
     var here = near.dist <= BOARD_REACH;
     var wall = [];
+    var older = 0;
     var mine = [];
     if (here) {
-      var list = notices[hold] || [];
-      var shown = 0;
-      for (var i = list.length - 1; i >= 0 && shown < 10; i--) {
-        var n = list[i];
-        if (n.down) { continue; }
-        shown++;
-        wall.push({
-          n: i + 1,
-          job: !!n.job,
-          letter: !!n.letter,
-          name: n.name || 'somebody',
-          text: n.letter ? sealed(n) : (n.haul ? haulText(n) : (n.text || '')),
-          taken: n.taken ? (n.takenName || 'somebody') : '',
-          mine: Number(n.by) === Number(profileId),
-          held: !!(n.job && Number(n.taken) === Number(profileId)),
-          haul: !!n.haul
-        });
-      }
-      for (var h in notices) {
-        if (!Object.prototype.hasOwnProperty.call(notices, h)) { continue; }
-        var rows = notices[h];
-        for (var j = 0; j < rows.length; j++) {
-          var job = rows[j];
-          if (job.job && Number(job.taken) === Number(profileId) && !job.down) {
-            mine.push({ hold: h, n: j + 1, text: job.letter ? sealed(job) : (job.haul ? haulText(job) : (job.text || '')),
-                        name: job.name || 'somebody' });
-          }
-        }
-      }
+      var seen = wallOf(hold, profileId);
+      wall = seen.rows;
+      older = seen.older;
+      mine = jobsOf(profileId);
     }
     /*
       THE HAUL'S TWO BUTTONS (#1393). Send a haul needs the towns it can go
@@ -37780,11 +37913,47 @@ log('gamemode loaded:',
       here: here,
       paid: Number(funds[hold]) || 0,
       wall: wall,
+      older: older,
       jobs: mine,
       submit: submit,
       steward: steward,
       dests: dests,
       arrivals: arrivals
+    };
+  }
+
+  /*
+    EVERY TOWN'S BOARD, ON J (#1627). noticeboards.md: "Reading another
+    hold's board by name does not require standing there." That was
+    /board <hold>, typed. Patrick, 4 Oct: nothing people do is a chat
+    command. J has a Boards tab with the ten towns, and picking one sends
+    /board <hold>, which nobody is told to type. The server keeps which board
+    that character is reading, and the social view carries that one wall,
+    read only, with their jobs under it. Only the one they picked is sent,
+    so ten walls are not pushed to everybody on every tick.
+
+    boardReads is not saved. After a restart J shows the towns with none
+    picked, which is true: nobody has asked this server for one yet.
+  */
+  var boardReads = {};
+
+  function boardsView(profileId) {
+    var list = [];
+    for (var i = 0; i < LEDGER_HOLDS.length; i++) {
+      var h = LEDGER_HOLDS[i];
+      if (!Object.prototype.hasOwnProperty.call(boards, h)) { continue; }
+      list.push({ hold: h, where: (boards[h] && boards[h].where) || h });
+    }
+    var hold = Object.prototype.hasOwnProperty.call(boardReads, profileId) ? boardReads[profileId] : '';
+    if (!hold || !Object.prototype.hasOwnProperty.call(boards, hold)) {
+      return { list: list, read: null, jobs: null };
+    }
+    var seen = wallOf(hold, profileId);
+    return {
+      list: list,
+      read: { hold: hold, where: (boards[hold] && boards[hold].where) || hold,
+              wall: seen.rows, older: seen.older },
+      jobs: jobsOf(profileId)
     };
   }
 
@@ -37999,54 +38168,22 @@ log('gamemode loaded:',
     }
 
     /*
-      THE WORD BEATS THE PLACE WHEN A WORD WAS GIVEN.
-
-      This read `standing || arg`, so anybody at a board who named a different
-      hold was shown the one in front of them with no hint the argument had
-      been thrown away, while the prompt below told them to 'name a hold'. The
-      message advertised exactly what the expression prevented.
+      READING A BOARD IS A PANEL, NOT A LINE IN THE CHAT (#1627). Clicking
+      the board opens its panel there, and J's Boards tab sends
+      /board <hold> for any town's, from anywhere. That line puts the board
+      on J (boardsView) and answers nothing in the chat. With no town, it
+      says where the boards are.
     */
-    var named = (arg && Object.prototype.hasOwnProperty.call(boards, arg)) ? arg : null;
-    var hold = named || standing || null;
-    if (!hold) {
-      toProfile(profileId, arg
-        ? 'No board in ' + arg + '. Stand at a board, or name a hold that has one.'
-        : 'Stand at a board, or name a hold.');
+    if (!arg) {
+      toProfile(profileId, 'Click a notice board to read it. Every town\'s board is on J, under Boards.');
       return true;
     }
-    var list = notices[hold] || [];
-    var up = 0;
-    for (var u = 0; u < list.length; u++) { if (!list[u].down) { up++; } }
-    if (!up) {
-      toProfile(profileId, 'Nothing on the board in ' + hold + '.');
+    if (!Object.prototype.hasOwnProperty.call(boards, arg)) {
+      toProfile(profileId, 'No board in ' + arg + '.');
       return true;
     }
-    /*
-      THE NEWEST TEN, NUMBERED BY WHERE THEY REALLY ARE.
-
-      Two faults in one loop. It showed the OLDEST ten, so the eleventh paid
-      posting in a hold was invisible for ever and the fee was taken first. And
-      it numbered the lines 1..10 by their position in the listing while /take
-      indexes the real array, so the moment anything was hidden the numbers a
-      person could read stopped being the numbers they could take.
-
-      A notice somebody took down with /unpin stays in the list marked down,
-      so it is skipped here and leaves a gap in the numbers rather than
-      moving every newer one. See unpin below.
-    */
-    var lines = [];
-    var shown = 0;
-    for (var i = list.length - 1; i >= 0 && shown < 10; i--) {
-      var n = list[i];
-      if (n.down) { continue; }
-      lines.push('[' + (i + 1) + '] ' + (n.letter
-        ? 'letter for ' + n.to + ', from ' + n.name + (n.taken ? ', taken by ' + n.takenName : '')
-        : (n.job ? (n.taken ? 'job, taken: ' : 'job: ') : '') + n.name + ': ' + (n.haul ? haulText(n) : n.text)));
-      shown++;
-    }
-    var more = up > shown
-      ? '\n(' + (up - shown) + ' older, and /take uses the numbers shown)' : '';
-    toProfile(profileId, 'The board in ' + hold + ':\n' + lines.join('\n') + more);
+    boardReads[profileId] = arg;
+    refreshPanel(actorId);
     return true;
   }
 
@@ -38077,7 +38214,7 @@ log('gamemode loaded:',
     var list = notices[hold] || [];
     var at = Number((parts && parts[1]) || 0) - 1;
     if (!(at >= 0 && at < list.length)) {
-      toProfile(profileId, 'Say which one by its number, as /board lists them.');
+      toProfile(profileId, 'That one is not on the board.');
       return true;
     }
     var n = list[at];
@@ -38129,25 +38266,29 @@ log('gamemode loaded:',
     return true;
   }
 
-  /** What somebody is carrying off the boards, anywhere in Skyrim. */
-  function jobs(profileId, toProfile) {
-    var lines = [];
+  /*
+    What somebody is carrying off the boards, anywhere in Skyrim: Your jobs,
+    on the board panel and under Boards on J (#1627). It was /jobs, typed.
+    A job is handed back only at the board it came from (dropJob), so the
+    panel puts Put it back on the rows of the board you stand at, and J,
+    which is read only, has none.
+  */
+  function jobsOf(profileId) {
+    var out = [];
     for (var hold in notices) {
       if (!Object.prototype.hasOwnProperty.call(notices, hold)) { continue; }
       var list = notices[hold];
       for (var i = 0; i < list.length; i++) {
         var n = list[i];
-        if (n.job && n.taken === profileId && !n.down) {
-          lines.push(hold + ': ' + (n.letter ? sealed(n) + ', from ' + n.name
-                                             : (n.haul ? '[' + (i + 1) + '] ' + haulText(n) : n.text) +
-                                               ' (for ' + n.name + ')'));
+        if (n.job && Number(n.taken) === Number(profileId) && !n.down) {
+          out.push({ hold: hold, where: (boards[hold] && boards[hold].where) || hold, n: i + 1,
+                     name: n.name || 'somebody',
+                     text: n.letter ? sealed(n) : (n.haul ? haulText(n) : (n.text || '')),
+                     letter: !!n.letter, haul: !!n.haul });
         }
       }
     }
-    toProfile(profileId, lines.length
-      ? 'You have taken:\n' + lines.join('\n')
-      : 'You have taken no jobs.');
-    return true;
+    return out;
   }
 
   /** Hand one back, so it does not sit dead on the board. */
@@ -38160,7 +38301,7 @@ log('gamemode loaded:',
     var list = notices[hold] || [];
     var at = Number((parts && parts[1]) || 0) - 1;
     if (!(at >= 0 && at < list.length)) {
-      toProfile(profileId, 'Say which one by its number, as /board lists them.');
+      toProfile(profileId, 'That one is not on the board.');
       return true;
     }
     var n = list[at];
@@ -38194,18 +38335,18 @@ log('gamemode loaded:',
     their own notice or their own untaken job, and nobody else's.
 
     A JOB SOMEBODY HAS TAKEN STAYS UP. It is on the taker's list, and pulling
-    it out from under them would empty their /jobs with no word to either of
-    them. It can come down once they hand it back with /dropjob.
+    it out from under them would take it off their Your jobs with no word to
+    either of them. It can come down once they hand it back.
 
     NO REFUND. The fee went into the hold's box the moment the notice was
     posted, and the box is the hold's money, which only the City Court draws.
 
-    THE NUMBERS DO NOT MOVE. /take and /dropjob act on a notice's place in the
-    list, and a person reads that number off /board and types it a moment
-    later. Cutting a notice out would shift every newer one down by one, so
-    somebody who read [4] and typed /take 4 would take the job that had been
-    [5]. So a notice that comes down stays in the list marked down, and /board
-    and /take step over it.
+    THE NUMBERS DO NOT MOVE. The panel's Take, Put it back and Take down send
+    a notice's place in the list, drawn on the wall a moment before. Cutting a
+    notice out would shift every newer one down by one, so somebody who
+    pressed Take on 4 would take the job that had been 5. So a notice that
+    comes down stays in the list marked down, and the wall and take step over
+    it.
 
     takedown is the store half, with no rule in it about who may. It is on
     g.__thornswoodProperty so the guards (entries 209 and 208) can tear
@@ -38231,7 +38372,7 @@ log('gamemode loaded:',
     var list = notices[hold] || [];
     var at = Number((parts && parts[1]) || 0) - 1;
     if (!(at >= 0 && at < list.length)) {
-      toProfile(profileId, 'Say which one by its number, as /board lists them.');
+      toProfile(profileId, 'That one is not on the board.');
       return true;
     }
     var n = list[at];
@@ -38480,7 +38621,7 @@ log('gamemode loaded:',
     hold's ledger. The pay is held there the way a letter's 15 is, until the
     haul is confirmed or taken down.
 
-    /take and /jobs treat it as any job. It comes down before it is delivered
+    take and Your jobs treat it as any job. It comes down before it is delivered
     three ways, and each hands the pay back out of the ledger to the poster
     and keeps the fee (cancelHaul): the hauler's /dropjob, the poster's /unpin
     before anybody has taken it, and a steward's /unpin at the posting board,
@@ -38513,7 +38654,7 @@ log('gamemode loaded:',
     return p < HAUL_TENTH_FROM ? 0 : Math.floor(p / 10);
   }
 
-  /** A haul's line on the wall, the panel and /jobs: where it goes and the pay. */
+  /** A haul's line on the wall and in Your jobs: where it goes and the pay. */
   function haulText(n) {
     return 'haul to ' + n.dest + ' for ' + (Math.floor(Number(n.pay)) || 0) + ' gold: ' + (n.text || '');
   }
@@ -38888,7 +39029,6 @@ log('gamemode loaded:',
     if (word === '/job') { return post(parts, actorId, profileId, toProfile, true); }
     if (word === '/board') { return board(parts, actorId, profileId, toProfile); }
     if (word === '/take') { return take(parts, actorId, profileId, toProfile); }
-    if (word === '/jobs') { return jobs(profileId, toProfile); }
     if (word === '/dropjob') { return dropJob(parts, actorId, profileId, toProfile); }
     if (word === '/unpin') { return unpin(parts, actorId, profileId, toProfile); }
     if (word === '/letter') { return postLetter(parts, actorId, profileId, toProfile); }
@@ -39039,6 +39179,16 @@ log('gamemode loaded:',
     }
     var held = holderOf(building);
     if (!held) {
+      /*
+        embassy.md: "A steward of Haafingar does not evict the Accord" (#1390).
+        A claim somebody made before the embassy held this door is still that
+        person's claim, and ending it below is still the steward's to do.
+      */
+      var accordEvict = globalThis.__thornswoodEmbassy;
+      if (accordEvict && accordEvict.holds(building)) {
+        toProfile(profileId, accordEvict.EVICT_REFUSED);
+        return true;
+      }
       toProfile(profileId, 'Nobody holds ' + nameOf(building) + '.');
       return true;
     }
@@ -39180,6 +39330,7 @@ log('gamemode loaded:',
     boxes: function () { return boxes; },
     notices: function () { return notices; }, takedown: takedown,
     boards: function () { return boards; }, boardHere: boardHere, boardPanel: boardPanel,
+    boardsView: boardsView,
     stewards: function () { return stewards.slice(); }
   };
   plog('ready,', Object.keys(BUILDING_BY_DOOR).length, 'doors across',
@@ -39188,6 +39339,466 @@ log('gamemode loaded:',
        Object.keys(claims).length, 'claim(s)');
 })();
 // ==== end thornswood property ====
+
+// ==== thornswood embassy and remnant ====
+/*
+  THE EMBASSY, THE TWO ROLLS AND THE THALMOR MARKER (#1390).
+
+  docs/systems/embassy.md, thalmor.md, npcs.md and cut-items.md are the
+  design. Every number here is one of theirs.
+
+  THE BUILDING. "The embassy doors start held by the Ambassador's office,
+  so the line at them offers nobody a claim. A steward of Haafingar does
+  not evict the Accord." The page calls it a warehouse in Solitude
+  ("The Empire wanted the province and got a warehouse. This is that
+  warehouse") and names none. EMBASSY_BUILDING is the answer suggested on
+  #1390, the Abandoned Warehouse: the one warehouse in Solitude that is
+  not a shop and not the East Empire Company's, which the trading company
+  replaces. If Patrick names another building, that one line changes. The
+  property block asks holds() for the line at the door, before a claim and
+  an eviction, and before a deed presented at the door. It is not a hold:
+  nothing here makes a box, a board, a ledger or a mint, and Solitude's box
+  and board stay Haafingar's.
+
+  THE EMBASSY ROLL. "20 persons in service, no more. Of those, 6 may be
+  marked armed, and those 6 bear arms inside the walls only. Naming a 21st
+  person is refused. Marking a 7th as armed is refused." Armed is what the
+  roll says. Nothing here looks in a pack or takes a sword at the gate. The
+  Ambassador is a title and not a command (offices.md), so an admin writes
+  the roll, the same way an admin places the Jarl role.
+
+  THE REMNANT ROLL. "The roll is an application, the same kind as a Jarl,
+  not a button on K." An admin writes that one too. The page puts no number
+  on it.
+
+  /embassy AND /remnant ARE STAFF COMMANDS. Only an admin uses them, and
+  nobody else is told to type anything (docs/SYSTEMS.md, "Buttons, not
+  commands"). The person a change is about is told in their own chat when
+  they are put on a roll, marked armed or not, or taken off.
+
+  Both rolls are who may craft what the cut file marks embassy and remnant:
+  craftAnswer asks onCraftRoll, and onCraftRoll asks has() below. Nobody else
+  makes those at a public bench, and the spoils block already keeps the
+  world from handing them out.
+
+  THE MARKER. "Wearing Justiciar robes, Thalmor armour, or carrying a
+  Dominion flag in a hold is a hostile marker." marked() reads what a
+  character has on against what the remnant rows of the recipe table make
+  and the game's own two Thalmor robes. Neither the recipe table nor the
+  /give table names a Dominion flag, so there is none to read yet. The
+  robes are not race locked: races.md says Thalmor robes are a faction,
+  not a people.
+
+  THE PATROLS ARE NOT HERE. "A patrol is 2 to 4. They are on the roads
+  between holds. At most 3 patrols in the province at once, and only one on
+  a given road." Every actor the server stands up goes through the NPC
+  population policy and the shared NPC runtime: placeActors admits and
+  enrolls what it places, and the policy switches off any runtime actor it
+  has no rule for. Those are the NPC lane's, so the patrols wait on it.
+  What a patrol needs from it is written on issue #1390.
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+  function elog() {
+    var a = Array.prototype.slice.call(arguments);
+    a.unshift('[embassy]');
+    console.log(a.join(' '));
+  }
+
+  // ------------------------------------------------------------ the numbers --
+
+  var ROLL_MOST = 20;     // embassy.md: 20 persons in service, no more
+  var ARMED_MOST = 6;     // embassy.md: of those, 6 may be marked armed
+
+  // The Abandoned Warehouse in Solitude, the answer suggested on #1390.
+  var EMBASSY_BUILDING = 'e48e:The Great City of Solitude.esp';
+
+  var ROLL_NAME = { embassy: 'the embassy roll', remnant: 'the Thalmor remnant roll' };
+
+  var CLAIM_REFUSED = 'The embassy is held by the Ambassador\'s office under the Accord. ' +
+                      'It cannot be claimed.';
+  var EVICT_REFUSED = 'The embassy is not a house of the hold. A steward of Haafingar ' +
+                      'does not evict the Accord.';
+  var NOT_ADMIN = {
+    embassy: 'Only an admin writes the embassy roll.',
+    remnant: 'The remnant roll is an application. Only an admin writes it.'
+  };
+
+  // ------------------------------------------------------------- the file --
+
+  var ROLL_FILE = 'embassy.json';
+
+  /* In the private folder, beside property.json, because every row names a
+     profile and the data folder is served to anybody who asks (#541). */
+  function privatePath(name) {
+    var path = require('path');
+    var privDir = 'private';
+    try {
+      var cfg = JSON.parse(require('fs').readFileSync('server-settings.json', 'utf8'));
+      if (cfg && cfg.privDir) { privDir = String(cfg.privDir); }
+    } catch (e) { }
+    return path.join(privDir, name);
+  }
+
+  /*
+    The rolls off disk, rebuilt row by row rather than trusted whole, the
+    same discipline as the property register. And the caps hold whatever the
+    file says: a 21st row is dropped and a 7th armed mark comes off, with a
+    line in the log saying so, because a hand edit is not a way round the
+    Accord.
+
+    No file yet is two empty rolls. A file that is there and cannot be read
+    is not: the rolls stay empty and nothing writes over it until somebody
+    puts it right, because writing would throw away every name it holds.
+  */
+  function cleanRow(r, roll) {
+    if (!r || typeof r !== 'object') { return null; }
+    var actor = Number(r.actor) || 0;
+    if (!(actor > 0)) { return null; }
+    var row = { actor: actor, profile: Number(r.profile) || 0,
+                name: String(r.name || 'somebody').slice(0, 64), at: Number(r.at) || 0 };
+    if (roll === 'embassy') { row.armed = r.armed === true; }
+    return row;
+  }
+
+  var unreadable = '';
+
+  function loadRolls() {
+    var out = { embassy: [], remnant: [] };
+    var file = privatePath(ROLL_FILE);
+    var text = null;
+    try {
+      text = String(require('fs').readFileSync(file, 'utf8')).replace(/^\uFEFF/, '');
+    } catch (e) {
+      if (e && e.code === 'ENOENT') { return out; }
+      unreadable = String(e && e.message ? e.message : e);
+      elog('could not read', file + ':', unreadable, '- the rolls are empty and nothing is written until it is put right');
+      return out;
+    }
+    var raw = null;
+    try { raw = JSON.parse(text); } catch (e2) { raw = null; }
+    if (!raw || typeof raw !== 'object') {
+      unreadable = 'it is not a roll file';
+      elog(file, 'is not a roll file - the rolls are empty and nothing is written until it is put right');
+      return out;
+    }
+    var dropped = 0, disarmed = 0;
+    ['embassy', 'remnant'].forEach(function (roll) {
+      var list = Array.isArray(raw[roll]) ? raw[roll] : [];
+      var armed = 0;
+      for (var j = 0; j < list.length; j++) {
+        var row = cleanRow(list[j], roll);
+        if (!row || rowIn(out[roll], row.actor)) { dropped++; continue; }
+        if (roll === 'embassy') {
+          if (out.embassy.length >= ROLL_MOST) { dropped++; continue; }
+          if (row.armed) {
+            if (armed >= ARMED_MOST) { row.armed = false; disarmed++; } else { armed++; }
+          }
+        }
+        out[roll].push(row);
+      }
+    });
+    if (dropped || disarmed) {
+      elog('the roll file asked for more than the Accord allows or held rows that were not ' +
+           'people:', dropped, 'row(s) left off and', disarmed, 'armed mark(s) taken off');
+    }
+    return out;
+  }
+
+  function rowIn(list, actor) {
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].actor === actor) { return list[i]; }
+    }
+    return null;
+  }
+
+  var reg = loadRolls();
+
+  /*
+    Every change is written before it is made: the next rolls go to disk,
+    and only once they are there do they become the rolls. So what the
+    server enforces is always what a restart will read, and a write that
+    fails changes nothing.
+  */
+  function commit(roll, list) {
+    var next = { embassy: reg.embassy, remnant: reg.remnant };
+    next[roll] = list;
+    if (unreadable) { return false; }
+    var fs = require('fs');
+    var file = privatePath(ROLL_FILE);
+    try {
+      fs.mkdirSync(require('path').dirname(file), { recursive: true });
+      fs.writeFileSync(file + '.tmp', JSON.stringify(next, null, 1));
+      fs.renameSync(file + '.tmp', file);
+    } catch (e) {
+      elog('could not write', file + ':', e);
+      return false;
+    }
+    reg = next;
+    return true;
+  }
+
+  function notWritten() {
+    return unreadable
+      ? 'The roll file on the server could not be read (' + unreadable + '), so nothing ' +
+        'changes until it is put right. Say so in the dev channel.'
+      : 'The roll could not be written, so nothing changed. Say so in the dev channel.';
+  }
+
+  // ------------------------------------------------------- what is asked --
+
+  /** True when this building is the embassy. Asked by the property block. */
+  function holds(building) {
+    return !!building && String(building) === EMBASSY_BUILDING;
+  }
+
+  /** True when this character is on that roll. onCraftRoll asks this. */
+  function has(actorId, roll) {
+    if (roll !== 'embassy' && roll !== 'remnant') { return false; }
+    return !!rowIn(reg[roll], Number(actorId) || 0);
+  }
+
+  function armedCount() {
+    var n = 0;
+    for (var i = 0; i < reg.embassy.length; i++) { if (reg.embassy[i].armed) { n++; } }
+    return n;
+  }
+
+  function counts() {
+    return reg.embassy.length + ' of ' + ROLL_MOST + ' on the roll, ' + armedCount() +
+           ' of ' + ARMED_MOST + ' marked armed.';
+  }
+
+  // ------------------------------------------------- writing the rolls --
+
+  /*
+    One person onto a roll. who is { actor, profile, name }. Answers
+    { ok, line } and changes nothing when it refuses. The two refusals the
+    page names are here and nowhere else, so no other road onto the roll
+    can step round them.
+  */
+  function enter(roll, who, armed) {
+    var list = reg[roll];
+    var already = rowIn(list, who.actor);
+    if (already) {
+      return { ok: false, line: already.name + ' is already on ' + ROLL_NAME[roll] + '.' };
+    }
+    if (roll === 'embassy') {
+      if (list.length >= ROLL_MOST) {
+        return { ok: false, line: 'The embassy roll is full: ' + ROLL_MOST + ' persons in ' +
+                 'service, no more. Take somebody off it first.' };
+      }
+      if (armed && armedCount() >= ARMED_MOST) {
+        return { ok: false, line: ARMED_MOST + ' on the roll are already marked armed, which ' +
+                 'is all the Accord allows. Nobody was added. Disarm one first.' };
+      }
+    }
+    var row = { actor: who.actor, profile: who.profile || 0,
+                name: String(who.name || 'somebody').slice(0, 64), at: Date.now() };
+    if (roll === 'embassy') { row.armed = !!armed; }
+    if (!commit(roll, list.concat([row]))) { return { ok: false, line: notWritten() }; }
+    elog(row.name, 'is on', ROLL_NAME[roll] + (row.armed ? ', marked armed' : ''));
+    return { ok: true, row: row,
+             line: row.name + ' is on ' + ROLL_NAME[roll] + (row.armed ? ', marked armed' : '') +
+                   '.' + (roll === 'embassy' ? ' ' + counts() : ''),
+             told: 'You are on ' + ROLL_NAME[roll] +
+                   (row.armed ? ', marked armed. You bear arms inside the walls only.' : '.') };
+  }
+
+  function setArmed(row, armed) {
+    if (!!row.armed === !!armed) {
+      return { ok: false, line: row.name + (armed ? ' is already marked armed.' : ' is not marked armed.') };
+    }
+    if (armed && armedCount() >= ARMED_MOST) {
+      return { ok: false, line: ARMED_MOST + ' on the roll are already marked armed, which is ' +
+               'all the Accord allows. Disarm one first.' };
+    }
+    var changed = { actor: row.actor, profile: row.profile, name: row.name, at: row.at, armed: !!armed };
+    var list = reg.embassy.map(function (r) { return r === row ? changed : r; });
+    if (!commit('embassy', list)) { return { ok: false, line: notWritten() }; }
+    elog(row.name, armed ? 'is marked armed' : 'is no longer marked armed');
+    return { ok: true, row: changed,
+             line: row.name + (armed ? ' is marked armed. Inside the walls only.'
+                                     : ' is no longer marked armed.') + ' ' + counts(),
+             told: armed ? 'You are marked armed on the embassy roll. You bear arms inside the walls only.'
+                         : 'You are no longer marked armed on the embassy roll.' };
+  }
+
+  function leave(roll, row) {
+    if (reg[roll].indexOf(row) === -1) {
+      return { ok: false, line: row.name + ' is not on ' + ROLL_NAME[roll] + '.' };
+    }
+    var list = reg[roll].filter(function (r) { return r !== row; });
+    if (!commit(roll, list)) { return { ok: false, line: notWritten() }; }
+    elog(row.name, 'is off', ROLL_NAME[roll]);
+    return { ok: true, row: row,
+             line: row.name + ' is off ' + ROLL_NAME[roll] + '.' +
+                   (roll === 'embassy' ? ' ' + counts() : ''),
+             told: 'You are off ' + ROLL_NAME[roll] + '.' };
+  }
+
+  // ---------------------------------------------------- finding a person --
+
+  /* Somebody in the world, by name or by the form id the crosshair gives. */
+  function inWorld(words) {
+    var soc = g.__thornswoodSocial;
+    if (!soc || !soc.findPerson) { return { why: 'That is not running on this server.' }; }
+    var f = soc.findPerson(words);
+    if (!f || !f.actorId) { return { why: (f && f.why) || 'Nobody here by that name.' }; }
+    var name = String(soc.nameOfPerson(f.actorId) || '');
+    var pid = Number(soc.profileOf(f.actorId)) || 0;
+    return { actor: f.actorId, profile: pid, name: name || words };
+  }
+
+  /*
+    A row already on the roll, by its name or profile number, so somebody who
+    is not in the world can still be taken off or disarmed. Then the world.
+  */
+  function onRollBy(roll, words) {
+    var list = reg[roll];
+    var low = String(words || '').toLowerCase();
+    var asNumber = Number(words) || 0;
+    var exact = [], part = [];
+    for (var i = 0; i < list.length; i++) {
+      var n = String(list[i].name).toLowerCase();
+      if (n === low || (asNumber && list[i].profile === asNumber)) { exact.push(list[i]); }
+      else if (low && n.indexOf(low) === 0) { part.push(list[i]); }
+    }
+    var hit = exact.length ? exact : part;
+    if (hit.length === 1) { return { row: hit[0] }; }
+    if (hit.length > 1) { return { why: 'More than one on ' + ROLL_NAME[roll] + ' answers to that. Say more of the name.' }; }
+    var w = inWorld(words);
+    if (!w.actor) { return { why: w.why }; }
+    var row = rowIn(list, w.actor);
+    return row ? { row: row } : { why: w.name + ' is not on ' + ROLL_NAME[roll] + '.' };
+  }
+
+  // ------------------------------------------------- the staff commands --
+
+  /*
+    An admin's, and nobody else's:
+
+        /embassy                      the roll, the count and which building it is
+        /embassy add <person>         onto the roll
+        /embassy add <person> armed   onto the roll, marked armed
+        /embassy arm <person>         marked armed
+        /embassy disarm <person>      no longer marked armed
+        /embassy remove <person>      off the roll
+        /remnant                      the remnant roll
+        /remnant add <person>         onto the remnant roll, after the application
+        /remnant remove <person>      off it
+  */
+  function command(word, parts, actorId, profileId, toProfile) {
+    var roll = word === '/remnant' ? 'remnant' : 'embassy';
+    var verb = String((parts && parts[1]) || '').toLowerCase();
+    var rest = (parts || []).slice(2);
+    var adm = g.__thornswoodIsAdmin;
+    if (!(typeof adm === 'function' && adm(profileId))) {
+      toProfile(profileId, NOT_ADMIN[roll]);
+      return true;
+    }
+    if (!verb) { toProfile(profileId, listing(roll)); return true; }
+
+    var armed = false;
+    if (roll === 'embassy' && verb === 'add' && rest.length > 1 &&
+        String(rest[rest.length - 1]).toLowerCase() === 'armed') {
+      armed = true;
+      rest = rest.slice(0, -1);
+    }
+    var words = rest.join(' ').trim();
+    var usage = roll === 'embassy'
+      ? '/embassy add, arm, disarm or remove, and a name.'
+      : '/remnant add or remove, and a name.';
+    if (!words) { toProfile(profileId, usage); return true; }
+
+    var done = null;
+    if (verb === 'add') {
+      var w = inWorld(words);
+      if (!w.actor) { toProfile(profileId, w.why); return true; }
+      done = enter(roll, w, armed);
+    } else if (verb === 'remove' || (roll === 'embassy' && (verb === 'arm' || verb === 'disarm'))) {
+      var found = onRollBy(roll, words);
+      if (!found.row) { toProfile(profileId, found.why); return true; }
+      done = verb === 'remove' ? leave(roll, found.row) : setArmed(found.row, verb === 'arm');
+    } else {
+      toProfile(profileId, usage);
+      return true;
+    }
+    toProfile(profileId, done.line);
+    // The person it is about hears it in their own chat, if they are in the world.
+    if (done.ok && done.row.actor !== actorId) { say(done.row.actor, done.told); }
+    return true;
+  }
+
+  function listing(roll) {
+    var list = reg[roll];
+    var names = [];
+    for (var i = 0; i < list.length; i++) {
+      names.push(list[i].name + (list[i].armed ? ' (armed)' : ''));
+    }
+    var head = roll === 'embassy' ? 'The embassy roll: ' + counts() : 'The Thalmor remnant roll: ' + list.length + '.';
+    var where = '';
+    if (roll === 'embassy') {
+      var P = g.__thornswoodProperty;
+      where = ' The embassy is ' + (P && P.nameOf ? P.nameOf(EMBASSY_BUILDING) : EMBASSY_BUILDING) + '.';
+    }
+    var broken = unreadable ? ' ' + notWritten() : '';
+    return head + (names.length ? ' ' + names.join(', ') + '.' : '') + where + broken;
+  }
+
+  // -------------------------------------------------------- the marker --
+
+  /*
+    The pieces that read Thalmor: what the remnant rows of the recipe table
+    make, and the game's own Thalmor Robes and Hooded Thalmor Robes, which
+    those rows do not make (the /give table names both; it is read by /give
+    and nothing else, so they are written here). Built once, by base id, and
+    a piece whose plugin is not loaded is left out.
+  */
+  var GAME_THALMOR = ['65bbf:Skyrim.esm', '10c698:Skyrim.esm'];
+  var gearIds = null;
+  function thalmorGear() {
+    if (gearIds) { return gearIds; }
+    var out = {};
+    for (var k in RECIPES_BY_ID) {
+      if (!Object.prototype.hasOwnProperty.call(RECIPES_BY_ID, k)) { continue; }
+      var row = RECIPES_BY_ID[k];
+      if (!row || row.roll !== 'remnant') { continue; }
+      var id = idOf(row.out);
+      if (id) { out[id] = true; }
+    }
+    for (var i = 0; i < GAME_THALMOR.length; i++) {
+      var id2 = idOf(GAME_THALMOR[i]);
+      if (id2) { out[id2] = true; }
+    }
+    gearIds = out;
+    return out;
+  }
+
+  /** True when this character has on something that reads Thalmor. */
+  function marked(actorId) {
+    var on = wornNow(actorId);
+    if (!on || !on.length) { return false; }
+    var gear = thalmorGear();
+    for (var i = 0; i < on.length; i++) {
+      if (Object.prototype.hasOwnProperty.call(gear, on[i])) { return true; }
+    }
+    return false;
+  }
+
+  g.__thornswoodEmbassy = {
+    holds: holds, command: command, enter: enter, setArmed: setArmed, leave: leave,
+    listing: listing, rolls: function () { return reg; },
+    CLAIM_REFUSED: CLAIM_REFUSED, EVICT_REFUSED: EVICT_REFUSED,
+    EMBASSY_BUILDING: EMBASSY_BUILDING, ROLL_MOST: ROLL_MOST, ARMED_MOST: ARMED_MOST
+  };
+  g.__thornswoodRolls = { has: has };
+  g.__thornswoodThalmor = { marked: marked, gear: thalmorGear };
+  elog('ready,', reg.embassy.length, 'on the embassy roll,', reg.remnant.length,
+       'on the remnant roll' + (unreadable ? ', and the roll file could not be read' : ''));
+})();
+// ==== end thornswood embassy and remnant ====
 
 // ==== thornswood carriages ====
 /*
@@ -41858,6 +42469,9 @@ log('gamemode loaded:',
       var PKV = g.__thornswoodPerks;
       var perkClocks = (PKV && PKV.clocks && actorId) ? PKV.clocks(actorId, s) : null;
       if (perkClocks) { view.perkClocks = perkClocks; }
+      // Masters and apprentices (#1634): see apprenticeView.
+      var taughtView = apprenticeView(actorId, s);
+      if (taughtView) { view.apprentice = taughtView; }
     }
     // Left out entirely when there is nothing to say, per the contract.
     var climbing = progressView(s);
@@ -42265,13 +42879,22 @@ log('gamemode loaded:',
   /*
     MASTERS AND APPRENTICES (#1388, #1147). docs/systems/apprenticeship.md.
 
+      /apprentice <id> <half>           a Master offers to take somebody on
+      /apprentice end <id> <half>       the Master ends it
+      /apprentice leave <half>          the apprentice ends it (#1634)
       /apprentice                       who you took on, and who took you on
-      /apprentice <name> [half]         a Master offers to take somebody on
-      /apprentice end <name> [half]     the Master ends it
 
-    The name can be the form id the crosshair hands over, the same as /party
-    and /trade. The half is needed only when the Master could take that
-    person on in more than one.
+    NOBODY TYPES THESE (#1634; Patrick, 4 Oct: no chat commands for anything
+    people do). They are the lines the buttons send. A Master looking at
+    somebody they could take on sees a row for it on the look prompt, named
+    K (takeOnMark below puts it on the near list), and K opens the Masters
+    and apprentices page with a Take on button for each half that could be
+    meant, which sends the first line with the form id the crosshair handed
+    over. The same page lists who you took on and who took you on, each
+    with End, which sends the second or the third (apprenticeView below).
+    No help text names them, and no line of the server's tells anybody to
+    type one. A name still works in place of the id, and the half is still
+    needed only when the Master could take that person on in more than one.
 
     The Master offers and the person answers, the way a party or a trade is
     asked: the offer stands in the social block's offers for its seconds, and
@@ -42379,6 +43002,75 @@ log('gamemode loaded:',
     return r;
   }
 
+  /*
+    THE LOOK PROMPT'S ROW (#1634). The social block builds the near list
+    every pass and asks these two, so the prompt offers a Master "Take on as
+    apprentice" for exactly the people arrange lets them offer to, with the
+    halves it could be. masterRecord is asked once per person per pass, and
+    somebody who is a Master of nothing costs that one read and no more.
+    takeOnMark is asked for each person near a Master and answers
+    [{ h: half, k: 'sister' | 'outside' }], or null when there is none. The
+    list decides only what is drawn: offerIt asks all of it again when the
+    line arrives.
+  */
+  function masterRecord(actorId) {
+    var ms = readState(actorId);
+    return (ms && mastered(ms).length) ? ms : null;
+  }
+  function takeOnMark(ms, learnerId) {
+    var ls = readState(learnerId);
+    if (!ms || !ls || !ls.prof) { return null; }
+    var mine = mastered(ms);
+    var out = [];
+    for (var i = 0; i < mine.length; i++) {
+      var r = arrange(learnerId, ls, ms, mine[i], null);
+      if (r.ok) { out.push({ h: mine[i], k: r.kind }); }
+    }
+    return out.length ? out : null;
+  }
+
+  /*
+    THE K PANEL'S MASTERS AND APPRENTICES PAGE (#1634), under view.apprentice:
+
+      took:     [ { id: '<form id, hex>', name, half, kind } ]  who this character took on
+      by:       [ { id, name, half, kind, stands } ]            who took them on, one per half
+      mastered: [ '<half>' ]                                    what they could take somebody on in
+      sister:   { half, rank } or null                          their sister half, while it waits on a Master
+      used:     <number>, of: <number>                          outside trades used in this life, of the two
+
+    Each row of took and by carries End on the page: took sends
+    /apprentice end <id> <half>, and by sends /apprentice leave <half>.
+    stands is false for a sister half whose Master no longer lists them or
+    is no longer a Master of it; End then clears their own side. Absent for
+    somebody with no profession, who can neither teach nor be taught.
+  */
+  function apprenticeView(actorId, s) {
+    if (!s || !s.prof) { return null; }
+    var took = [];
+    var rows = s.apprentices || [];
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      if (!row || !row.id || !row.half) { continue; }
+      took.push({ id: Number(row.id).toString(16), name: String(row.name || 'somebody'), half: row.half, kind: row.kind || '' });
+    }
+    var by = [];
+    var stands = {};
+    var masters = s.masters || {};
+    for (var half in masters) {
+      if (!P.has(masters, half)) { continue; }
+      var rec = masters[half] || {};
+      var outside = (s.taught || []).indexOf(half) !== -1;
+      stands[half] = outside || !!masterFor(actorId, s, half);
+      by.push({ id: rec.id ? Number(rec.id).toString(16) : '', name: String(rec.name || 'somebody'), half: half,
+                kind: outside ? 'outside' : 'sister', stands: stands[half] });
+    }
+    var sister = s.half ? P.sisterOf(s.prof, s.half) : null;
+    var waits = (sister && P.rankOf(s, sister) !== 'master' && !stands[sister])
+      ? { half: sister, rank: P.rankOf(s, sister) || 'novice' } : null;
+    return { took: took, by: by, mastered: mastered(s), sister: waits,
+             used: (s.taught || []).length + (s.untaught || []).length, of: P.TABLE.limits.secondaries };
+  }
+
   /** What /apprentice on its own says: both sides of every arrangement this character is in. */
   function standing(actorId) {
     var s = stateOf(actorId);
@@ -42409,7 +43101,7 @@ log('gamemode loaded:',
       var used = (s.taught || []).length + (s.untaught || []).length;
       out.push(used + ' of your ' + P.TABLE.limits.secondaries + ' outside trades used in this life.');
     }
-    out.push('A Master takes somebody on with /apprentice <name>, and ends it with /apprentice end <name>.');
+    out.push('K lists all of it under Masters and apprentices, each with End.');
     return out.join(' ');
   }
 
@@ -42441,8 +43133,8 @@ log('gamemode loaded:',
       if (can.length > 1) {
         var named = [];
         for (var j = 0; j < can.length; j++) { named.push(nameOf(can[j])); }
-        return 'You could take ' + name + ' on in ' + named.join(' or ') + '. Say which: /apprentice ' +
-               name + ' ' + can[0] + '.';
+        return 'You could take ' + name + ' on in ' + named.join(' or ') + '. Look at them and press the key ' +
+               'the prompt names, and pick which.';
       }
       // One that works, or none, in which case the rules say why about the
       // first half they hold at Master.
@@ -42500,16 +43192,17 @@ log('gamemode loaded:',
     clog(masterId.toString(16), 'took', actorId.toString(16), 'on in', half, '(' + r.kind + ')');
     if (r.kind === 'sister') {
       return { learner: who.name + ' has taken you on in ' + nameOf(half) + '. Work in it climbs past novice now, ' +
-                        'and the ranks you earn stay yours if it ends.',
-               master: name + ' is your apprentice in ' + nameOf(half) + '. /apprentice end ' + name + ' ends it.' };
+                        'and the ranks you earn stay yours if it ends. Either of you can end it on K.',
+               master: name + ' is your apprentice in ' + nameOf(half) + '. K lists them, with End.' };
     }
     var school = P.TABLE.schools.indexOf(half) !== -1;
     return { learner: who.name + ' taught you novice ' + nameOf(half) + '. ' +
                       (school ? 'You can learn ' + P.TABLE.limits.outsiderSpells + ' novice spells of it, each from its tome ' +
                                 'with a spell point a semester at the College hands you'
                               : 'It is in your recipe book on K') +
-                      ', and it never climbs past novice. It is one of your two outside trades.',
-             master: 'You taught ' + name + ' novice ' + nameOf(half) + '. /apprentice end ' + name + ' ends it.' };
+                      ', and it never climbs past novice. It is one of your two outside trades. Either of you ' +
+                      'can end it on K.',
+             master: 'You taught ' + name + ' novice ' + nameOf(half) + '. K lists them, with End.' };
   }
 
   /** The Master ends it. Returns the line for the Master. */
@@ -42523,7 +43216,7 @@ log('gamemode loaded:',
       if (half) { words = words.slice(0, -1); }
     }
     var want = words.join(' ').trim().toLowerCase();
-    if (!want) { return 'End whose? /apprentice end <name>, and the half when they are with you in two.'; }
+    if (!want) { return 'End whose? K lists the people you took on, each with End.'; }
     var asId = parseInt(want, 16);
     var exact = [], part = [];
     for (var i = 0; i < rows.length; i++) {
@@ -42541,8 +43234,7 @@ log('gamemode loaded:',
     if (hit.length > 1) {
       var named = [];
       for (var k = 0; k < hit.length; k++) { named.push(nameOf(hit[k].half)); }
-      return hit[0].name + ' is with you in ' + named.join(' and ') + '. Say which: /apprentice end ' +
-             hit[0].name + ' ' + hit[0].half + '.';
+      return hit[0].name + ' is with you in ' + named.join(' and ') + '. Each has its own End on K.';
     }
     var end = hit[0];
     var ended = null;
@@ -42565,7 +43257,7 @@ log('gamemode loaded:',
     var me = personName(actorId);
     var told = (ended === 'outside')
       ? me + ' has ended your teaching in ' + nameOf(end.half) + ', and its novice list is gone. It still counts as ' +
-        'one of your two outside trades.'
+        'one of your two outside trades.' + spellsStay(end.half)
       : me + ' has ended your apprenticeship in ' + nameOf(end.half) + '. The ranks you earned in it stay; past them ' +
         'the count waits again until a Master takes you on.';
     if (!ended) {
@@ -42582,6 +43274,62 @@ log('gamemode loaded:',
     return 'You ended ' + end.name + '\'s apprenticeship in ' + nameOf(end.half) + '. The ranks they earned stay.';
   }
 
+  /*
+    Patrick's answer on #1388, 4 Oct: when a taught school or a taught
+    Bladebinder ends, the spells already learned stay, and no new one can be
+    learned. release() leaves them on the character; this says so.
+  */
+  function spellsStay(half) {
+    return (P.TABLE.schools.indexOf(half) !== -1 || half === 'bladebinder')
+      ? ' The spells you already learned from it stay.' : '';
+  }
+
+  /*
+    The apprentice ends it (#1634). Patrick's answer on #1388, 4 Oct: either
+    one can end it, the apprentice as well as the Master. The same release
+    as the Master's End, from the other side: the person's own record loses
+    the Master in that half, and that Master's list loses the row, online or
+    not, so neither side is left naming the other. An outside trade loses
+    its novice list and stays counted, as it does when the Master ends it.
+    Returns the line for the apprentice.
+  */
+  function leaveIt(actorId, words) {
+    var half = halfKey(words[0]);
+    var ls = stateOf(actorId);
+    var rec = (half && ls.masters && P.has(ls.masters, half)) ? ls.masters[half] : null;
+    if (!rec) { return 'Nobody has taken you on in that.'; }
+    var r = P.release(ls, half, null);
+    if (!r.ok) { return 'No: ' + r.why + '.'; }
+    writeState(actorId, r.state);
+    var who = rec.name || 'your Master';
+    var masterId = Number(rec.id) || 0;
+    var ms = masterId ? readState(masterId) : null;
+    if (ms && lists(ms, actorId, half)) {
+      var m2 = P.clone(ms);
+      var keep = [];
+      var rows = ms.apprentices || [];
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i] && !(rows[i].id === actorId && rows[i].half === half)) { keep.push(rows[i]); }
+      }
+      m2.apprentices = keep;
+      writeState(masterId, m2);
+      try {
+        if (typeof say === 'function') {
+          say(masterId, personName(actorId) + (r.ended === 'outside'
+            ? ' has ended the novice ' + nameOf(half) + ' you taught them.'
+            : ' has ended their apprenticeship with you in ' + nameOf(half) + '.'));
+        }
+      } catch (e) { }
+    }
+    clog(actorId.toString(16), 'left', masterId.toString(16), 'in', half, '(' + r.ended + ')');
+    if (r.ended === 'outside') {
+      return 'You ended your novice ' + nameOf(half) + ' with ' + who + '. Its novice list is gone, and it still ' +
+             'counts as one of your two outside trades.' + spellsStay(half);
+    }
+    return 'You ended your apprenticeship in ' + nameOf(half) + ' with ' + who + '. The ranks you earned in it stay; ' +
+           'past them the count waits again until a Master takes you on.';
+  }
+
   /** /apprentice, every form of it. Answers through toProfile and always handles the word. */
   function apprenticeCommand(parts, actorId, profileId, toProfile) {
     if (!actorId) {
@@ -42592,6 +43340,7 @@ log('gamemode loaded:',
     var first = String(words[0] || '').toLowerCase();
     if (!words.length || first === 'list') { toProfile(profileId, standing(actorId)); return; }
     if (first === 'end') { toProfile(profileId, endIt(actorId, words.slice(1))); return; }
+    if (first === 'leave') { toProfile(profileId, leaveIt(actorId, words.slice(1))); return; }
     toProfile(profileId, offerIt(actorId, words));
   }
 
@@ -42633,7 +43382,7 @@ log('gamemode loaded:',
         word === '/unlock' || word === '/mold' || word === '/moldhere' || word === '/key' ||
         word === '/jarl' || word === '/steward' || word === '/evict' || word === '/box' ||
         word === '/rent' || word === '/sleephere' || word === '/notice' || word === '/job' ||
-        word === '/board' || word === '/take' || word === '/jobs' ||
+        word === '/board' || word === '/take' ||
         word === '/haul' ||
         word === '/letter' || word === '/deliver' ||
         word === '/dropjob' || word === '/unpin') {
@@ -43030,6 +43779,7 @@ log('gamemode loaded:',
     gate: gate, gateHalf: gateHalf, credit: credit,
     grantSpell: grantSpell, grantKnown: grantKnown, nameOf: nameOf, raiseLines: raiseLines,
     acceptApprentice: acceptApprentice, masterFor: masterFor, effectsOf: effectsOf,
+    masterRecord: masterRecord, takeOnMark: takeOnMark,
     rankOf: function (actorId, key) { return P.rankOf(stateOf(actorId), key); }
   };
   clog('ready');
@@ -46994,14 +47744,19 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // Never typed, and so deliberately NOT in PLAYER_WORDS. See the
                // carriages block.
                '/ride',
+               // The embassy roll and the Thalmor remnant roll, written by an
+               // admin (#1390). See the embassy and remnant block.
+               '/embassy', '/remnant',
                '/pick', '/spend',
                // A warrior's maneuver, sent by the panel the maneuver key
                // opens (#1386). Never typed, and no help names it: Patrick,
                // 4 October, no chat commands for anything people do. See the
                // maneuvers block.
                '/maneuver',
-               // A Master taking somebody on, and ending it (#1388). See the
-               // character block.
+               // A Master taking somebody on, and either of them ending it
+               // (#1388). Sent by the look prompt and the K panel (#1634),
+               // never typed, and so deliberately NOT in PLAYER_WORDS. See
+               // the character block.
                '/apprentice',
                '/plant', '/claim', '/plot',
                // At a door, /claim, /lock and /unlock are what the lock key
@@ -47014,7 +47769,11 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // PLAYER_WORDS: Patrick, 4 October, no chat commands for
                // anything people do, and a Jarl and a steward are people.
                '/jarl', '/steward', '/evict', '/box', '/rent',
-               '/notice', '/job', '/board', '/take', '/jobs', '/dropjob', '/unpin',
+               // The notice board (#1627). Sent by the board panel's buttons
+               // and J's Boards tab, never typed, and so NOT in PLAYER_WORDS:
+               // Patrick, 4 October, nothing people do is a chat command. A
+               // steward's /board move and /board here are #1638's.
+               '/notice', '/job', '/board', '/take', '/dropjob', '/unpin',
                '/letter', '/deliver',
                // A haul (#1393). Sent by the board panel's Send a haul and
                // Confirm buttons, never typed, and so deliberately NOT in
@@ -47063,6 +47822,9 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // The client saying its race menu is still up. Never typed; see
                // FACE_SEEN_MS.
                '/racemenu',
+               // The client saying the race menu went down with the game, not
+               // as a finished face. Never typed; see faceDown.
+               '/racedown',
                // A mod settings menu changed on this client. Never typed;
                // see the mod settings block at the end of this file.
                '/modset',
@@ -47098,8 +47860,7 @@ const PLAYER_WORDS = ['/ooc', '/where',
                       // Not /jarl, /steward, /evict, /box or /rent: the
                       // offices' powers are buttons on the Office page of K
                       // (#1638), and the board panel says what the box holds.
-                      '/notice', '/job', '/board',
-                      '/take', '/jobs', '/dropjob', '/unpin', '/letter', '/deliver', '/help',
+                      '/letter', '/deliver', '/help',
                       // Everybody's, and they need to be findable: a meter
                       // nobody knows how to act on is only a penalty. Not
                       // /rest: sitting or lying down is how you rest (#1603).
@@ -47118,9 +47879,6 @@ const PLAYER_WORDS = ['/ooc', '/where',
                       // prompt, the P panel, the trade window and the prompt's
                       // Accept and Refuse send them, and nobody types them (#1628).
                       '/merchant',
-                      // Everybody's: a Master takes somebody on with it, and
-                      // anybody can ask who took them on (#1388).
-                      '/apprentice',
                       '/roll'];
 
 // ---------------------------------------------------------------------------
@@ -47306,7 +48064,7 @@ const PLAYER_WORDS = ['/ooc', '/where',
   var HOLD_MAX = 20;
   var HOLD_ALL = 200;
   // The client's reports of a moment, never kept for later (see runsNow).
-  var MOMENTS = ['/place', '/burn', '/chopped', '/racemenu'];
+  var MOMENTS = ['/place', '/burn', '/chopped', '/racemenu', '/racedown'];
   // Lines from a chat connection that did not prove who it is, logged at most
   // this often per profile (#410).
   var unprovenSaid = {};
@@ -47325,7 +48083,7 @@ const PLAYER_WORDS = ['/ooc', '/where',
     if (word === '/place' || word === '/burn' || word === '/chopped') { return true; }
     // "The race menu is up" is a moment too, and one replayed a minute late
     // would hold the give up for somebody who has already left it.
-    if (word === '/racemenu') { return true; }
+    if (word === '/racemenu' || word === '/racedown') { return true; }
     // Kept by profile id, so it needs no character to run.
     if (word === '/modset') { return true; }
     return WORDS.indexOf(word) === -1;
@@ -47433,7 +48191,7 @@ const PLAYER_WORDS = ['/ooc', '/where',
     // Said once, and never for the client's own lines: /face, /ate, a
     // broken lockpick and the load order report are not things anybody typed.
     if (!q.told && word !== '/face' && word !== '/ate' && word !== '/tspicks' &&
-        word !== '/loadorder') {
+        word !== '/loadorder' && word !== '/racedown') {
       q.told = true;
       toProfile(profileId, 'Your character is not back in the world yet. That will run ' +
                            'as soon as you arrive.');
@@ -48021,6 +48779,19 @@ const PLAYER_WORDS = ['/ooc', '/where',
       return;
     }
 
+    // The plugin, not a person: the race menu went down with the game
+    // (F10 / quit). Not /face done: a half-made face is not finished.
+    // A different word so a gamemode from before this only says "no
+    // command called", which is harmless.
+    if (word === '/racedown') {
+      try {
+        var cgDown = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodChargen;
+        var downActor = actorOf(profileId);
+        if (cgDown && cgDown.faceDown && downActor) { cgDown.faceDown(downActor); }
+      } catch (eDown) { log('/racedown failed:', eDown); }
+      return;
+    }
+
     /*
       A missing character no longer refuses every command.
 
@@ -48184,6 +48955,21 @@ const PLAYER_WORDS = ['/ooc', '/where',
       if (!rides) { toProfile(profileId, 'That is not running on this server.'); return true; }
       try { rides.command(parts, actorId, profileId, toProfile); } catch (eRide) {
         log('/ride threw:', eRide);
+        toProfile(profileId, 'That did not work. Say so in the dev channel.');
+      }
+      return true;
+    }
+
+    /*
+      The embassy roll and the remnant roll (#1390). Staff commands: an admin
+      writes both, and nobody else is told to type them. The embassy and
+      remnant block, after the property block, answers.
+    */
+    if (word === '/embassy' || word === '/remnant') {
+      var accord = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodEmbassy;
+      if (!accord) { toProfile(profileId, 'That is not running on this server.'); return true; }
+      try { accord.command(word, parts, actorId, profileId, toProfile); } catch (eAccord) {
+        log(word + ' threw:', eAccord);
         toProfile(profileId, 'That did not work. Say so in the dev channel.');
       }
       return true;
@@ -49213,10 +49999,10 @@ const PLAYER_WORDS = ['/ooc', '/where',
         toProfile(profileId,
           'K opens your profession, your class and your skill tree. Work at what ' +
           'you chose and the rank climbs on its own. Your sister half stops at ' +
-          'novice until a Master of it takes you on: a Master types /apprentice ' +
-          '<name>, and /apprentice end <name> ends it. /apprentice on its own ' +
-          'says who took you on. A line at a crop says what is sown and whose ' +
-          'farm it is; press an empty plot to sow it. A ' +
+          'novice until a Master of it takes you on: a Master looks at you and ' +
+          'presses the key the prompt names. K lists who took you on and who you ' +
+          'took on, and either of you can end it there. At a crop, a line says ' +
+          'what is sown and whose farm it is. A ' +
           'warrior\'s maneuvers open on the maneuver key, which the ' +
           'launcher\'s Controls page names. ' +
           'A repair kit is used from your inventory.');
@@ -49249,7 +50035,8 @@ const PLAYER_WORDS = ['/ooc', '/where',
       toProfile(profileId,
         'Ask for one of these: /help talking, /help people, /help living, ' +
         '/help work, /help land, /help staff, and /helpme reaches staff. Press K for your profession and ' +
-        'skills, P for friends and party, J for journals, Enter to talk and ' +
+        'skills, P for friends and party, J for journals and every town\'s notice ' +
+        'board, Enter to talk and ' +
         'hold V to speak.' + extra);
       return;
     }
@@ -50310,6 +51097,12 @@ function bodyShapeCheck(actorId, appearance, why) {
 
 mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (actorId, appearance, isAllowed) {
   if (isAllowed) { bodyShapeCheck(actorId, appearance, 'sent'); }
+  if (isAllowed && hasStoredAppearance(appearance)) {
+    const st = chargenOf(actorId);
+    if (st && st.stage === 'appearance') {
+      beginChoosing(actorId, st, 'the face arrived');
+    }
+  }
   return true;
 });
 
@@ -54827,7 +55620,15 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
   function online() {
     return memo('online', function () {
-      try { return mp.get(0, 'onlinePlayers') || []; } catch (e) { return []; }
+      var all = [];
+      try { all = mp.get(0, 'onlinePlayers') || []; } catch (e) { return []; }
+      var chargen = g.__thornswoodChargen;
+      if (!chargen || !chargen.publishedForOthers) { return all; }
+      var out = [];
+      for (var i = 0; i < all.length; i++) {
+        if (chargen.publishedForOthers(all[i])) { out.push(all[i]); }
+      }
+      return out;
     });
   }
 
@@ -54939,10 +55740,14 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     // Whether the look prompt offers "Let sleep here" (#1603). See sleepMark
     // in the beds, in the property block.
     var beds = g.__thornswoodBeds;
+    // And whether it offers a Master "Take on as apprentice" (#1634). See
+    // takeOnMark in the character block.
+    var ch = g.__thornswoodCharacter;
     for (var a = 0; a < at.length; a++) {
       var me = at[a];
       var s = read(me.id) || fresh();
       var party = partyOf(me.pid);
+      var teacher = (ch && ch.masterRecord) ? ch.masterRecord(me.id) : null;
       var w = {};
       for (var b = 0; b < at.length; b++) {
         if (a === b) { continue; }
@@ -54963,6 +55768,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         };
         // c, not s: s is the holder's sleep key (#1603).
         if (them.scar) { w[them.id.toString(16)].c = them.scar; }
+        // a: the halves this Master could take them on in (#1634).
+        var canTake = teacher ? ch.takeOnMark(teacher, them.id) : null;
+        if (canTake) { w[them.id.toString(16)].a = canTake; }
       }
       var sig = JSON.stringify(w) + (s.namesAll ? ':all' : '');
       if (nearWas[me.id] === sig) { continue; }
@@ -55686,6 +56494,15 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
           if (!prop || !prop.boardPanel) { return null; }
           return prop.boardPanel(actorId, mine);
         } catch (eBoard) { return null; }
+      })(),
+      // J's Boards tab: the ten towns, the board picked there, read only,
+      // and your jobs under it (#1627).
+      boards: (function () {
+        try {
+          var prop = g.__thornswoodProperty;
+          if (!prop || !prop.boardsView) { return null; }
+          return prop.boardsView(mine);
+        } catch (eBoards) { return null; }
       })()
     };
   }

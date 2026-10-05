@@ -63,7 +63,7 @@
   cursor rule restyles nothing.
 
   THE CONTRACT with thornswood-front.js, unchanged from the first cut:
-    window.thornswoodSkills = { open, close, toggle, isOpen, setData }
+    window.thornswoodSkills = { open, close, toggle, isOpen, setData, takeOn }
     page -> plugin  'skills:ready' | 'skills:opened' | 'skills:closed' |
                     'skills:refresh' | 'skills:pick <words>'
     the plugin turns 'skills:pick X' into the chat line '/pick X'
@@ -103,6 +103,18 @@
       mage, or somebody a Master mage taught. opens is when the next semester
       opens on the server's clock, 0 when one is open now. Study sends
       'skills:pick study'; a refusal comes back as a note about 'study'.
+
+    apprentice: { took: [ { id, name, half, kind } ], by: [ { id, name, half, kind, stands } ],
+                  mastered: [ '<half>' ], sister: { half, rank } | null, used: <n>, of: <n> }
+      Masters and apprentices (#1634), sent to anybody with a profession.
+      took is who you took on, by is who took you on, kind is 'sister' or
+      'outside', and id is the form id in hex. Each row has End, which sends
+      '/apprentice end <id> <half>' or '/apprentice leave <half>' through
+      window.thornswoodNet.say, the way the property page's Stop does. The
+      look prompt's K hands takeOn the person under the crosshair,
+      { id, name, halves: [ { h, k } ] }, and Take on sends
+      '/apprentice <id> <half>'. The server answers in the chat and by
+      rewriting this.
 
     staff: { points: <number>, rank: '<Bladebinder rank>',
              mine: [ '<spell desc>' ], spells: [ [ desc, name, rank ] ] }
@@ -310,6 +322,15 @@
       rows: []
     },
     /*
+      Masters and apprentices (#1634). Who is whose is the server's, under
+      mine.apprentice; this is the title and the sentence over the page.
+    */
+    apprentice: {
+      title: 'Masters and apprentices',
+      lead: 'A Master can take you on in your sister half, so it climbs past novice, or teach you the novice work of a half from another profession, twice in a life. Either of you can end it here.',
+      rows: []
+    },
+    /*
       The offices (#1638). Who holds what, and what is at the door and the
       container are the server's, under mine.officePage; this is the title
       and the one sentence over the page.
@@ -364,6 +385,9 @@
   var footKey = '';        // the same for the foot
   var progRows = [];       // the value half of each progress line on the page, in order
   var progKey = '';        // the same for those lines: their words, so a tick writes once
+  var candidate = null;    // who the look prompt's K opened the page on: { id, name, halves: [{ h, k }] } (#1634)
+  var endArmed = null;     // an End pressed once, waiting for the second press: { key, at }
+  var apprSent = null;     // an End sent and not yet answered: { key, name, at }
 
   // ------------------------------------------------------------------ css --
   /*
@@ -428,6 +452,10 @@
     '#ts-skills .card .inn{font-size:12.5px;color:rgba(217,207,180,.6);font-style:italic;margin-top:3px}',
     '#ts-skills .card .guest{display:flex;align-items:center;gap:12px;font-size:13px;color:#d9cfb4;margin-top:5px}',
     '#ts-skills .card .guest .stop{border:1px solid rgba(198,170,109,.55);color:#e9d19b;padding:1px 9px;font-size:11.5px;cursor:pointer}',
+    // Take on and End on Masters and apprentices (#1634); End asks twice, in Close Skyrim's colours.
+    '#ts-skills .card .act{flex:0 0 auto;margin-left:auto;border:1px solid rgba(198,170,109,.55);color:#e9d19b;padding:1px 9px;',
+    'font-size:11.5px;white-space:nowrap;cursor:pointer}',
+    '#ts-skills .card .act.armed{border-color:#e9a27a;color:#f6c9b0;background:rgba(120,40,30,.45)}',
     // The Office page (#1638): its rows are guest rows, and these wrap.
     '#ts-skills .card .guest.wrap{flex-wrap:wrap;gap:8px}',
     '#ts-skills .card .guest .who{flex:1;min-width:160px}',
@@ -916,6 +944,22 @@
       });
     }
   }
+  /* Masters and apprentices (#1634): the server's, under mine.apprentice, or null with no profession. */
+  function apprView() {
+    var got = mine && mine.apprentice;
+    if (!got || typeof got !== 'object' || Array.isArray(got)) return null;
+    return got;
+  }
+  function apprList(field) {
+    var v = apprView();
+    return (v && Array.isArray(v[field])) ? v[field] : [];
+  }
+  /* A school or Bladebinder: ending it leaves the spells learned from it (Patrick, on #1388). */
+  function spellHalf(key) {
+    var r = rowOf('profession', 'mage');
+    var schools = r ? (r.subs || []).map(function (s) { return s.key; }) : [];
+    return schools.indexOf(key) >= 0 || key === 'bladebinder';
+  }
   /* The College page (#1387): the server's, under mine.college, or null when magic is not open to them. */
   function collegeView() {
     var got = mine && mine.college;
@@ -1200,6 +1244,8 @@
     if (section === 'staff') return staffRows().length;
     // The College page is a page to read and one button.
     if (section === 'college') return 0;
+    // Masters and apprentices: its buttons are on its cards.
+    if (section === 'apprentice') return 0;
     // Nothing in the recipe book is picked, marked or sent, so there is no
     // row for the arrow keys to walk. Left and right still move sections.
     if (section === 'recipes') return 0;
@@ -1238,7 +1284,8 @@
   function viewKey() {
     var v = null;
     if (mine) { v = {}; for (var k in mine) if (!NOT_DRAWN[k]) v[k] = mine[k]; }
-    return JSON.stringify([tableGen, sections, section, rowAt, picked, later, marked, markedStaff, v, progressShape()]);
+    return JSON.stringify([tableGen, sections, section, rowAt, picked, later, marked, markedStaff, v, progressShape(),
+                           candidate, endArmed]);
   }
 
   function draw() {
@@ -1274,6 +1321,9 @@
       somebody holds nothing and carries no key, so the button appearing IS the
       server having something to say. Nothing here decides it.
     */
+    // Masters and apprentices (#1634), before Property: the server sends it to
+    // anybody with a profession, and the look prompt's K opens it on a person.
+    if (!creating() && (apprView() || candidate)) sections.push('apprentice');
     if (propertyRows().length) sections.push('property');
     if (sections.indexOf(section) < 0) section = sections[0];
     var n = countRows();
@@ -1364,6 +1414,13 @@
       var opens = cv ? Number(cv.opens) || 0 : 0;
       return opens > Date.now() ? { t: 'next ' + whenOpens(opens), c: '' } : { t: 'a semester is open', c: 'need' };
     }
+    if (sec === 'apprentice') {
+      if (candidate) return { t: 'take on ' + candidate.name, c: 'need' };
+      var apT = apprList('took'), apB = apprList('by'), apV = apprView();
+      if (apT.length) return { t: apT.length + (apT.length === 1 ? ' apprentice' : ' apprentices'), c: 'set' };
+      if (apB.length) return { t: apB.length === 1 ? 'taken on by ' + apB[0].name : apB.length + ' Masters', c: 'set' };
+      return { t: apV ? (Number(apV.used) || 0) + ' of ' + (Number(apV.of) || 0) + ' trades used' : 'nobody yet', c: '' };
+    }
     if (sec === 'office') {
       var ov = officePage();
       if (ov && ov.jarl) return { t: 'Jarl', c: 'set' };
@@ -1441,6 +1498,7 @@
     else if (section === 'spells') drawSpells();
     else if (section === 'staff') drawStaff();
     else if (section === 'college') drawCollege();
+    else if (section === 'apprentice') drawApprentice();
     else if (section === 'recipes') drawRecipes();
     else if (section === 'property') drawProperty();
     else if (section === 'office') drawOffice();
@@ -1914,6 +1972,103 @@
       : 'A semester is open to you now.'));
   }
 
+  /*
+    MASTERS AND APPRENTICES (#1634). Everything on it is the server's, under
+    mine.apprentice, except the person the look prompt's K opened it on
+    (candidate, from api.takeOn). Three things are sent, each through the
+    chat line every panel uses and none of them typed by anybody: Take on
+    (/apprentice <id> <half>), End beside somebody you took on
+    (/apprentice end <id> <half>), and End beside a Master who took you on
+    (/apprentice leave <half>; Patrick on #1388, either of you can end it).
+    End asks twice, the way Close Skyrim does, because an outside trade that
+    ends still counts as one of the two. The server checks all of it again
+    and answers in the chat, and a row that ends leaves the page when the
+    server writes the property.
+  */
+  function drawApprentice() {
+    var v = apprView();
+    var took = apprList('took');
+    var by = apprList('by');
+    if (v) {
+      var bar = el('div', 'spellbar');
+      bar.appendChild(el('div', 'spellpts', (Number(v.used) || 0) + ' of your ' + (Number(v.of) || 0) +
+        ' outside trades used in this life'));
+      bar.appendChild(el('div', 'spellnote', 'Your sister half does not count toward them.'));
+      elBody.appendChild(bar);
+    }
+    var wrap = el('div', 'cards');
+    if (candidate) {
+      var card = el('div', 'card chosen');
+      var nm = el('div', 'name', candidate.name);
+      nm.appendChild(el('span', 'tag gold', 'in front of you'));
+      card.appendChild(nm);
+      card.appendChild(el('div', 'desc', 'They say yes or no on their own prompt, and nothing is recorded until they say yes.'));
+      candidate.halves.forEach(function (h) {
+        var line = el('div', 'guest');
+        line.appendChild(el('span', '', h.k === 'sister'
+          ? nameOf('profession', h.h) + ', their sister half. It climbs past novice on their own work while you stand as their Master, and costs them nothing.'
+          : 'Novice ' + nameOf('profession', h.h) + ', an outside trade. It never climbs past novice, and it is one of only two they can ever take.'));
+        var go = el('span', 'act', 'Take on');
+        go.onclick = function (ev) { ev.stopPropagation(); takeOnPress(h.h); };
+        line.appendChild(go);
+        card.appendChild(line);
+      });
+      wrap.appendChild(card);
+    }
+    if (took.length) wrap.appendChild(el('div', 'rankhead', 'You took on'));
+    took.forEach(function (r) {
+      var half = nameOf('profession', r.half);
+      apprCard(wrap, 'took:' + r.id + ':' + r.half, r.name, half,
+        r.kind === 'sister' ? 'Their sister half. Ending it keeps every rank they earned in it; past them, their count waits again.'
+        : (r.kind === 'outside' ? 'Novice ' + half + ', an outside trade. Ending it takes its novice list from them' +
+                                  (spellHalf(r.half) ? ', the spells they already learned from it stay' : '') +
+                                  ', and it still counts as one of their two.'
+                                : 'Either of you can end it.'),
+        '/apprentice end ' + r.id + ' ' + r.half);
+    });
+    if (by.length) wrap.appendChild(el('div', 'rankhead', 'Took you on'));
+    by.forEach(function (r) {
+      var half = nameOf('profession', r.half);
+      apprCard(wrap, 'by:' + r.half, r.name, half,
+        r.kind === 'outside'
+          ? 'Novice ' + half + ', an outside trade they taught you. Ending it takes its novice list away' +
+            (spellHalf(r.half) ? ', the spells you already learned from it stay' : '') + ', and it still counts as one of your two.'
+          : (r.stands ? 'Your sister half, past novice while they stand as your Master. Ending it keeps every rank you earned in it.'
+                      : 'Your sister half. This no longer stands: they no longer list you, or are no longer a Master of it, ' +
+                        'so it climbs no further. End clears it from your side.'),
+        '/apprentice leave ' + r.half);
+    });
+    if (wrap.children.length) elBody.appendChild(wrap);
+    if (!v) return;
+    var notes = [];
+    if (!took.length && !by.length && !candidate) notes.push('Nobody has taken you on, and you have taken nobody on.');
+    if (v.sister && v.sister.half) {
+      notes.push(nameOf('profession', v.sister.half) + ', your sister half, waits at ' +
+        (RANK_NAMES[v.sister.rank] || cap(v.sister.rank) || 'Novice') + ' until a Master of it takes you on.');
+    }
+    var ms = Array.isArray(v.mastered) ? v.mastered.map(function (k) { return nameOf('profession', k); }) : [];
+    if (ms.length) {
+      notes.push('You are a Master of ' + (ms.length > 1 ? ms.slice(0, -1).join(', ') + ' and ' + ms[ms.length - 1] : ms[0]) +
+        '. Look at somebody: when you could take them on, the prompt says so, and its key opens this page on them.');
+    }
+    notes.forEach(function (t) { elBody.appendChild(el('p', 'lead', t)); });
+  }
+  /* One arrangement: who, which half, what ending it does, and its End. */
+  function apprCard(wrap, key, name, half, desc, line) {
+    var card = el('div', 'card');
+    var nm = el('div', 'name', String(name || 'somebody'));
+    nm.appendChild(el('span', 'tag', half));
+    card.appendChild(nm);
+    var row = el('div', 'guest');
+    row.appendChild(el('span', '', desc));
+    var armed = !!(endArmed && endArmed.key === key && Date.now() - endArmed.at < END_ARM_MS);
+    var end = el('span', 'act' + (armed ? ' armed' : ''), armed ? 'Press again to end' : 'End');
+    end.onclick = function (ev) { ev.stopPropagation(); endPress(key, line, String(name || 'them')); };
+    row.appendChild(end);
+    card.appendChild(row);
+    wrap.appendChild(card);
+  }
+
   function drawRecipes() {
     var book = recipeBook();
     var halves = recipeHalves();
@@ -2233,7 +2388,8 @@
     // The recipe book sends nothing, the same way the tree's plus buttons are
     // the tree's own sending, so neither carries a Confirm.
     var showConfirm = cr ? section === 'review'
-      : (section !== 'tree' && section !== 'recipes' && section !== 'property' && section !== 'office');
+      : (section !== 'tree' && section !== 'recipes' && section !== 'property' && section !== 'office' &&
+         section !== 'apprentice');
     var shut = closeWord();
     var key = JSON.stringify([line, statusKind, can, label, showConfirm, cr, shut]);
     if (key === footKey) return;
@@ -2272,6 +2428,11 @@
       var sp = spellPoints();
       if (sp !== null && sp <= 0) return 'No spell points to spend. More come with every rank and with a semester at the College.';
       return 'Mark the spells you want, then press Learn. One point each.';
+    }
+    if (section === 'apprentice') {
+      if (candidate) return 'Take on asks them. They answer on their own prompt.';
+      if (apprList('took').length || apprList('by').length) return 'End asks twice. Either of you can end it, and the ranks earned stay.';
+      return 'A Master takes somebody on by looking at them and pressing the key the prompt names.';
     }
     if (section === 'college') {
       if (studyWaiting()) return 'Sent. The server is checking.';
@@ -2402,6 +2563,61 @@
     status = 'Sent. The server is checking.'; statusKind = '';
     setTimeout(function () { if (!studyWaiting()) draw(); }, LEARN_WAIT_MS + 50);
     draw();
+  }
+
+  /*
+    Masters and apprentices (#1634). Take on goes at once: the person still
+    has to say yes on their own prompt. End arms on the first press and
+    sends on a second inside END_ARM_MS; a first press on its own disarms,
+    so a stray click ends nothing. Both send through the chat line the way
+    the property page's Stop does, and the server answers in the chat.
+  */
+  var END_ARM_MS = 5000;
+  function sayLine(line) {
+    try {
+      if (window.thornswoodNet && window.thornswoodNet.say) { window.thornswoodNet.say(line); return true; }
+    } catch (e) { }
+    status = 'The connection is loading. Try again in a moment.'; statusKind = 'no';
+    return false;
+  }
+  function takeOnPress(half) {
+    if (!candidate) return;
+    var who = candidate;
+    if (!sayLine('/apprentice ' + who.id + ' ' + half)) { draw(); return; }
+    candidate = null;
+    status = 'Asked ' + who.name + '. They answer on their own prompt; if the server cannot ask, the chat says why.';
+    statusKind = '';
+    draw();
+  }
+  function endPress(key, line, name) {
+    var now = Date.now();
+    if (!(endArmed && endArmed.key === key && now - endArmed.at < END_ARM_MS)) {
+      endArmed = { key: key, at: now };
+      setTimeout(function () {
+        if (endArmed && endArmed.key === key && Date.now() - endArmed.at >= END_ARM_MS) { endArmed = null; draw(); }
+      }, END_ARM_MS + 50);
+      draw();
+      return;
+    }
+    endArmed = null;
+    if (!sayLine(line)) { draw(); return; }
+    apprSent = { key: key, name: name, at: now };
+    status = 'Sent. The server answers in the chat.'; statusKind = '';
+    draw();
+  }
+  /* An End is answered when its row is gone from what the server sent. A refusal is a line in the chat. */
+  function apprAnswered() {
+    if (!apprSent) return;
+    var left = false;
+    apprList('took').forEach(function (r) { if ('took:' + r.id + ':' + r.half === apprSent.key) left = true; });
+    apprList('by').forEach(function (r) { if ('by:' + r.half === apprSent.key) left = true; });
+    if (!left) {
+      status = 'Ended with ' + apprSent.name + '. The chat says what it changed.'; statusKind = 'ok';
+      apprSent = null;
+      return;
+    }
+    // Still there long after: it was refused, the chat said why, and the page stops listening for it.
+    if (Date.now() - apprSent.at >= PENDING_MS) apprSent = null;
   }
 
   function canConfirm() {
@@ -2791,12 +3007,33 @@
       if (root.className === 'gone') return;
       root.className = 'gone';
       quitArmed = 0;   // a panel put down with Close Skyrim armed comes back unarmed
+      candidate = null;   // the person the look prompt opened it on is that moment's, not the next
+      endArmed = null;
       tell('closed');
     },
     toggle: function () {
       if (root.className === 'gone') { api.open(); } else { closeByHand(); }
     },
     isOpen: function () { return root.className !== 'gone'; },
+    /*
+      The look prompt's K on somebody a Master could take on (#1634): the
+      front hands over the form id under the crosshair, the name, and the
+      halves the server's near list says could be meant, and the panel opens
+      on Masters and apprentices with a Take on for each. Never while
+      creating.
+    */
+    takeOn: function (who) {
+      if (creating() || !who || typeof who !== 'object') return;
+      var halves = (Array.isArray(who.halves) ? who.halves : []).filter(function (h) {
+        return h && typeof h.h === 'string' && /^[a-z]+$/.test(h.h);
+      }).map(function (h) { return { h: h.h, k: h.k === 'sister' ? 'sister' : 'outside' }; });
+      var id = String(who.id || '');
+      if (!/^[0-9a-f]+$/i.test(id) || !halves.length) return;
+      candidate = { id: id, name: String(who.name || 'Somebody'), halves: halves };
+      endArmed = null;
+      goTo('apprentice');
+      if (root.className === 'gone') api.open(); else draw();
+    },
     /*
       What the server sent. The property carries the whole stored state with
       the view for this panel nested under .panel; the first cut read the top
@@ -2809,6 +3046,7 @@
         var before = mine;
         mine = (got.panel && typeof got.panel === 'object') ? got.panel : got;
         answered(before, mine);
+        apprAnswered();
         // A note is new when its time, its words or what it is about
         // changed: two refusals from one Confirm can carry the same
         // millisecond, and two picks can be refused in the same words.
