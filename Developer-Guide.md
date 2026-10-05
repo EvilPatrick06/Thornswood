@@ -1226,7 +1226,11 @@ this is the long form.
   (`Data\Platform\PluginsNoLoad`). The installer of 16 Sep carried that
   sign in file before the list was shared; the launcher removes that exact
   copy from every install (Leaks.cs), matched by content so nobody's own
-  sign in is touched.
+  sign in is touched. The dev records of 28 and 29 Sep handed out the
+  machine that ships' mod menu settings, window layouts and notes; Leaks.cs
+  takes those out of Thornswood's own folder the same way, only while each
+  is still the bytes the record handed out, and never out of the Steam copy
+  (#1252).
 
 ## 3. How to release to dev
 
