@@ -747,7 +747,7 @@ What checks these, since 29 Sep (issue #460). Every pull request's build
 (`Launcher builds`, step "Check the writing rules") runs
 `scripts\dev\Check-Words.ps1` over every Markdown file outside `lore\` and
 `docs\archive\`, the launcher's help and window, the bot's channel posts,
-the public pages of the site and the voice service, and the installer's read
+the public pages of the site, and the installer's read
 me. Each hit names the file, the line and the rule, and turns the build red:
 
 | Rule | What it refuses |
@@ -1457,7 +1457,7 @@ repository folder. Any developer may.
 | The public pages, `site\data\site\*.md` | `.\scripts\deploy\Deploy-Docs.ps1 -Site` |
 | The bot's code or join card art in `bot` | `.\scripts\deploy\Install-Bot.ps1 -CodeOnly` |
 | The bot's avatar, `bot\thornswood-bot-*.png` | No script sends it. Upload it by hand in the Discord developer portal. |
-| The voice service, `voice\voice-server.js` or `voice\public` | `.\scripts\deploy\Install-Voice.ps1` |
+| The voice service, `voice\voice-server.js` or `voice\headlines.js` | `.\scripts\deploy\Install-Voice.ps1` |
 | Scripts that only change how a release is built (Ship.ps1, Publish-Update.ps1, the Deploy scripts) | Nothing more. The pull is the change. |
 
 3. Everybody else, once it is out, from the main folder: `git checkout main`, then
@@ -2229,8 +2229,7 @@ Open these in Visual Studio Code. `Ctrl+P`, then the file name.
 | [site/public/home.html](site/public/home.html) | The public page at https://thornswood.net |
 | [site/public/index.html](site/public/index.html) | The staff hub at https://thornswood.net/hub |
 | [game/ui/index.html](game/ui/index.html) | The page Skyrim Platform opens over the game |
-| [voice/public/index.html](voice/public/index.html) | The voice page |
-| [launcher/voice-host.html](launcher/voice-host.html) | The voice page as the launcher hosts it |
+| [launcher/voice-host.html](launcher/voice-host.html) | The voice page, which the launcher hosts |
 
 In `home.html`, the `<title>` is the tab name. Two `<link>` tags pull in the stylesheets, `fonts.css` and `home.css`. The page loads nothing from another site. Keep it that way: a test fails if a `src`, a `url()`, or a stylesheet link points anywhere else.
 
@@ -2267,7 +2266,6 @@ JavaScript is the language of the site scripts, the checks in `tests`, the game 
 | [site/public/hub.js](site/public/hub.js) | The staff hub's script |
 | [game/gamemode.js](game/gamemode.js) | The server. It is one long file. Read an overlay before you read this |
 | [game/ui/thornswood-chat.js](game/ui/thornswood-chat.js) | One overlay, the chat, and the one socket to the voice service |
-| [voice/public/voice.js](voice/public/voice.js) | The voice page's script |
 
 A file is a list of statements the program runs from the top. Open `home.js` beside `home.html` and you are looking at the page and the code that runs in it.
 
