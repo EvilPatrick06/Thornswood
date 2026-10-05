@@ -116,6 +116,10 @@ server. A dungeon chest can put a novice or a master tome in the pack.
 Reading it still has to pass the three gates. Picking a master spell
 on K spends the tome. See [Dungeon loot](dungeon-loot.md).
 
+Somebody a master has taught learns a spell only by reading its tome.
+The spell book on K is a mage's, and the server refuses its pick for
+anybody else with a line naming the tome to read.
+
 A semester is in the server. The College page on K has the Study
 button. The server checks the room: the four halls by their cells, and
 the courtyard as the open ground the halls' outside doors stand in. A
