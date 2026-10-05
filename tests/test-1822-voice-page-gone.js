@@ -48,11 +48,17 @@ const CR = String.fromCharCode(13);
 const VOICE = process.env.VOICE || path.join(REPO_DIR, 'voice', 'voice-server.js');
 
 let pass = 0, fail = 0;
-function yes(what, cond) {
+function yes(what, cond, why) {
   if (cond) { pass++; console.log('PASS  ' + what); }
-  else { fail++; console.log('FAIL  ' + what); }
+  else { fail++; console.log('FAIL  ' + what + (why ? '\n      ' + why : '')); }
 }
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/*
+  How long any one answer is waited for before the wait gives up and says
+  what did not come. Each check waits for the thing it reads (#1926), so this
+  only ends a wait on a service that is stuck, as listening() does.
+*/
+const BOUND_MS = 15000;
 function read(rel) {
   try { return fs.readFileSync(path.join(REPO_DIR, rel), 'utf8').split(CR).join(''); } catch (e) { return ''; }
 }
@@ -112,13 +118,33 @@ function textFrame(obj) {
   return Buffer.concat([head, key, body]);
 }
 
-/* A raw handshake with the headers given, with a token or none:
-   { status, joined }. */
+/*
+  A raw handshake with the headers given, with a token or none:
+  { status, joined, late }. It resolves on what the checks read: the welcome
+  to its join, or the socket's end. It used to give every handshake 400 ms
+  and read whatever had come by then, so on a busy machine a welcome that
+  came later read as a page refused (#1926). BOUND_MS with neither is a
+  stuck service, and late then says what did not come.
+*/
 function knock(port, headers, pid, withToken) {
   return new Promise((ok) => {
     const s = net.connect(port, '127.0.0.1');
-    const me = { status: 0, joined: false };
+    const me = { status: 0, joined: false, late: '' };
     let buf = Buffer.alloc(0);
+    let settled = false;
+    const done = () => {
+      if (settled) { return; }
+      settled = true;
+      clearTimeout(bound);
+      s.destroy();
+      ok(me);
+    };
+    const bound = setTimeout(() => {
+      me.late = me.status === 101 ? 'no welcome to its join within ' + BOUND_MS / 1000 + ' s'
+              : me.status ? 'answered ' + me.status + ' and the socket still open after ' + BOUND_MS / 1000 + ' s'
+              : 'no answer to the handshake within ' + BOUND_MS / 1000 + ' s';
+      done();
+    }, BOUND_MS);
     s.on('connect', () => {
       let h = 'GET / HTTP/1.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\n' +
               'Sec-WebSocket-Key: ' + crypto.randomBytes(16).toString('base64') + '\r\n';
@@ -135,10 +161,10 @@ function knock(port, headers, pid, withToken) {
         buf = buf.slice(i + 4);
         if (me.status === 101) { s.write(textFrame({ t: 'join', profileId: pid, name: 'P' + pid })); }
       }
-      if (buf.indexOf('"welcome"') >= 0) { me.joined = true; }
+      if (buf.indexOf('"welcome"') >= 0) { me.joined = true; done(); }
     });
+    s.on('close', done);
     s.on('error', () => { });
-    setTimeout(() => { s.destroy(); ok(me); }, 400);
   });
 }
 
@@ -239,23 +265,25 @@ function get(port, route) {
     const caddy = { Host: 'thornswood.net', Origin: 'https://thornswood.net', 'X-Forwarded-For': '203.0.113.7' };
     let r = await knock(PORT, caddy, ++pid, false);
     yes('a socket opened the way the page opened it (this host, through Caddy, no token) is refused (' + r.status + ')',
-        r.status === 403 && !r.joined);
+        r.status === 403 && !r.joined, r.late);
     r = await knock(PORT, caddy, ++pid, true);
-    yes('a page on this host is refused even with a good token (' + r.status + ')', r.status === 403 && !r.joined);
+    yes('a page on this host is refused even with a good token (' + r.status + ')', r.status === 403 && !r.joined, r.late);
     r = await knock(PORT, { Host: HOST, Origin: 'http://' + HOST }, ++pid, true);
-    yes('and so is one asked straight, not through Caddy (' + r.status + ')', r.status === 403 && !r.joined);
+    yes('and so is one asked straight, not through Caddy (' + r.status + ')', r.status === 403 && !r.joined, r.late);
     r = await knock(PORT, { Host: HOST, Origin: 'null' }, ++pid, true);
-    yes('a page off disk that says null, with a good token, joins (' + r.status + ')', r.status === 101 && r.joined);
+    yes('a page off disk that says null, with a good token, joins (' + r.status + ')', r.status === 101 && r.joined, r.late);
     r = await knock(PORT, { Host: HOST, Origin: 'file://' }, ++pid, true);
-    yes('and so does one that says file:// (' + r.status + ')', r.status === 101 && r.joined);
+    yes('and so does one that says file:// (' + r.status + ')', r.status === 101 && r.joined, r.late);
     r = await knock(PORT, { Host: HOST, Origin: 'null' }, ++pid, false);
-    yes('a page off disk with no token is still refused (' + r.status + ')', r.status !== 101 && !r.joined);
+    yes('a page off disk with no token is still refused (' + r.status + ')', r.status !== 101 && !r.joined, r.late);
 
     await new Promise((ok) => { srv.once('exit', ok); srv.kill(); });
     stopped = true;
   } finally {
-    if (!stopped) { try { srv.kill(); } catch (e) { } }
-    await wait(100);
+    // Gone before its folder is: once it has exited, not after a pause.
+    if (!stopped && srv.exitCode === null && srv.signalCode === null) {
+      await new Promise((ok) => { srv.once('exit', ok); try { srv.kill(); } catch (e) { ok(); } });
+    }
     try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { }
   }
 
