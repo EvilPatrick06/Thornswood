@@ -67,10 +67,19 @@ real into the folder picked, and asks Skyrim to close first if it is running.
 ## Where it runs
 
 On the machine of anybody installing Thornswood for the first time.
-`Thornswood-Setup.exe` and its zip are put on the site by
-`Publish-Installer.ps1`, which `Package-Thornswood.ps1` runs at the end. A main
-Ship rebuilds them when it is given `-Package`; a dev Ship never touches the
-installer. The address it downloads from is written into `Bootstrap.cs`.
+`Thornswood-Setup.exe` is put on the site by `Publish-Installer.ps1`, which
+`Package-Thornswood.ps1` runs at the end. A main Ship rebuilds it when it is
+given `-Package`; a dev Ship never touches the installer.
+
+The site carries the one file shape: the payload attached to
+`Thornswood-Setup.exe`, nothing beside it (`/file/Thornswood-Setup.exe` was
+252,624,384 bytes on 29 September, with no `Thornswood-Setup.zip` and an empty
+`/api/payload`). A main Ship with `-Package` builds that shape, passing
+`Package-Thornswood.ps1 -OneFile` (issue #1213), and so does a hand-run
+`Package-Thornswood.ps1 -OneFile`. Without `-OneFile` it builds the two file
+shape, a small exe that downloads `Thornswood-Setup.zip` from
+`/api/payload`, at the address written into `Bootstrap.cs`; Bootstrap reads
+either. Which shape the site carries is the owner's call, asked on #1213.
 
 ### VirusTotal (optional, manual)
 
