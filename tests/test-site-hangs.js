@@ -208,6 +208,9 @@ function ask(method, where, body, opts) {
     const headers = { 'x-forwarded-for': o.from || ('10.8.0.' + (++lane)) };
     if (method !== 'GET') { headers['content-type'] = o.type || 'application/json'; headers['content-length'] = Buffer.byteLength(data); }
     if (o.as) headers.cookie = cookieFor(o.as);
+    // A browser names the page that sent a signed in write, and the site
+    // refuses one that names no page (#1367). These come from its own pages.
+    if (o.as && method !== 'GET') headers.origin = 'http://127.0.0.1:' + port;
     const started = Date.now();
     const r = http.request({ host: '127.0.0.1', port, method, path: where, headers }, (res) => {
       let buf = '';
@@ -449,7 +452,8 @@ function pageChecks() {
     r = await ask('GET', '/api/gallery/who', null, { as: '612' });
     const up = path.join(dir, 'uploads');
     const before = fs.existsSync(up) ? fs.readdirSync(up).length : 0;
-    await partial('/api/gallery/submit?name=cut.png', 5000, 300, 'drop', 'Cookie: ' + cookieFor('612') + '\r\n');
+    await partial('/api/gallery/submit?name=cut.png', 5000, 300, 'drop',
+                  'Cookie: ' + cookieFor('612') + '\r\nOrigin: http://127.0.0.1:' + port + '\r\n');
     await sleep(700);
     const after = fs.existsSync(up) ? fs.readdirSync(up).filter((n) => /cut\.png$/.test(n)).length : 0;
     yes('a picture cut off halfway: no half file is left in uploads (' + before + ' before, ' + after + ' left)', after === 0);

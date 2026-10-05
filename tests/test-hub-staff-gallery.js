@@ -234,6 +234,10 @@ function ask(method, where, headers, body) {
     const data = body === undefined ? null : Buffer.from(body);
     const h = Object.assign({}, headers || {});
     if (data && h['content-length'] === undefined) h['content-length'] = data.length;
+    // A browser names the page that sent a signed in write, and the site
+    // refuses one that names no page (#1367). These come from its own pages.
+    if (method !== 'GET' && h.origin === undefined &&
+        Object.keys(h).some((k) => k.toLowerCase() === 'cookie')) h.origin = 'http://127.0.0.1:' + PORT;
     const req = http.request({ host: '127.0.0.1', port: PORT, method: method, path: where, headers: h, agent: false },
       (res) => {
         let text = '';

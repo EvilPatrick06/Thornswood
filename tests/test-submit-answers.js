@@ -174,7 +174,9 @@ function post(where, body, opts) {
     const headers = { 'content-type': o.type || 'application/json',
                       'content-length': Buffer.byteLength(data),
                       'x-forwarded-for': o.from || ('10.9.0.' + (++lane)) };
-    if (o.as) headers.cookie = cookieFor(o.as);
+    // A browser names the page that sent a signed in write, and the site
+    // refuses one that names no page (#1367). These come from its own pages.
+    if (o.as) { headers.cookie = cookieFor(o.as); headers.origin = 'http://127.0.0.1:' + port; }
     const started = Date.now();
     const r = http.request({ host: '127.0.0.1', port, method: 'POST', path: where, headers }, (res) => {
       let buf = '';
