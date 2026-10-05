@@ -65,6 +65,40 @@ function Put([string]$path, [string]$text) {
 }
 function Sha([string]$path) { return (Get-FeedStoreSha $path) }
 function Threw([scriptblock]$b) { try { & $b | Out-Null; return '' } catch { return $_.Exception.Message } }
+# The port came from the system and was let go, so another run beside this one
+# can take it before the child binds it, the fault #1727 fixed in the .js
+# harnesses (#1755). Nothing asks the port anything until the child itself has
+# said on its output that it is listening there. A child that closes its output
+# first has stopped, and EADDRINUSE on its errors means something else holds
+# the port. $err is the task already draining the child's errors. Answers ''
+# once the line has come, otherwise why it did not.
+function Wait-OwnLine($proc, $err, [string]$mark, [int]$port, [string]$what) {
+    $deadline = [DateTime]::UtcNow.AddSeconds(20)
+    $seen = New-Object 'System.Collections.Generic.List[string]'
+    while ($true) {
+        $left = [int][Math]::Max(0, ($deadline - [DateTime]::UtcNow).TotalMilliseconds)
+        $read = $proc.StandardOutput.ReadLineAsync()
+        if (-not $read.Wait($left)) { return ('{0} did not say it was listening on port {1} within 20 seconds' -f $what, $port) }
+        $got = $read.Result
+        if ($null -eq $got) {
+            [void]$proc.WaitForExit(5000)
+            $said = ''
+            if ($err.Wait(5000)) { $said = ([string]$err.Result).Trim() }
+            $code = '?'
+            if ($proc.HasExited) { $code = $proc.ExitCode }
+            if ($said -match 'EADDRINUSE') {
+                return ('something else already holds port {0}, so {1} stopped (exit {2}) before it was listening' -f $port, $what, $code)
+            }
+            return ('{0} stopped (exit {1}) before it was listening: {2} {3}' -f $what, $code, ($seen -join ' '), $said)
+        }
+        $seen.Add($got)
+        if ($got.StartsWith($mark + ' listening on ') -and $got.EndsWith(':' + $port)) {
+            # Drained from here on, so a chatty child never blocks on a full pipe.
+            $null = $proc.StandardOutput.ReadToEndAsync()
+            return ''
+        }
+    }
+}
 $procs = @()
 
 try {
@@ -177,16 +211,16 @@ try {
         $psi.EnvironmentVariables['THORNSWOOD_DOCS_LOCAL'] = '1'
         $psi.EnvironmentVariables['THORNSWOOD_CHAT_DIR'] = (Join-Path $site 'chat')
         $p = [Diagnostics.Process]::Start($psi)
-        $null = $p.StandardOutput.ReadToEndAsync(); $null = $p.StandardError.ReadToEndAsync()
+        $pErr = $p.StandardError.ReadToEndAsync()
         $procs += $p
         $base = "http://127.0.0.1:$port"
         function Code([string]$path) {
             try { $r = [Net.HttpWebRequest]::Create($base + $path).GetResponse(); $c = [int]$r.StatusCode; $r.Close(); return $c }
             catch [Net.WebException] { if ($null -ne $_.Exception.Response) { return [int]$_.Exception.Response.StatusCode }; return 0 }
         }
-        $up = $false
-        for ($i = 0; $i -lt 100 -and -not $up; $i++) { if ((Code '/feed/version.json') -ne 0) { $up = $true } else { Start-Sleep -Milliseconds 100 } }
-        Yes 'a scratch copy of site\server.js starts on the stand-in folder' $up
+        $why = Wait-OwnLine $p $pErr '[thornswood-docs]' $port 'the site'
+        Yes 'a scratch copy of site\server.js starts on the stand-in folder' ($why -eq '')
+        if ($why) { Write-Host "      $why" }
         Yes '  /feed/version.json answers 200' ((Code '/feed/version.json') -eq 200)
         Yes '  and an asset answers 200' ((Code "/feed/assets/$asset") -eq 200)
         $histName = @(Get-ChildItem -LiteralPath (Join-Path $site 'feed-dev\history') -File)[0].Name

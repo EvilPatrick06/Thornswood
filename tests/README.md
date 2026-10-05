@@ -59,5 +59,10 @@ until that copy has printed its own `[voice] listening on` or
 service stops first because something else took the port. Before issue #1703
 a run read another run's `/health` as its own, and before #1727 twelve site
 harnesses polled the port they had let go until anything answered.
-`test-1703-test-ports.js` fails on any `.js` harness here or in `voice\` that
-names a fixed port, or that starts the site without waiting for that line.
+A `.ps1` harness does the same with its `Wait-OwnLine`, which reads the
+child's output up to that line, and so does any stand-in it starts on a port
+it let go (the GitHub stand-in in `test-site-assets.ps1`, the game server in
+`test-record-sync.ps1`); before #1755 five of them drained the output unread
+and polled the port. `test-1703-test-ports.js` fails on any `.js` harness here
+or in `voice\` that names a fixed port, or on any `.js` or `.ps1` harness that
+starts the site without waiting for that line.
