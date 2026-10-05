@@ -118,3 +118,30 @@ one stores an id that moves with the light order.
 - The synthetic save that builds a returning character at the main menu
   cannot name a light plugin's form at all on main's native (issue #1930);
   that is the engine's to fix and is apart from this.
+
+## Why what is stored from now on does not drift
+
+The world still stores the runtime id the client sends, light or full. A full
+id has always been the same kind of number (its top byte is the plugin's place
+among the full plugins), and it holds because the full order is fixed in one
+place and every machine is held to it. With an engine that loads light
+plugins, the light order is fixed and held the same way, so a stored light id
+keeps naming the same record:
+
+- **Fixed on the server.** Each deploy keeps the light order the server already
+  runs; a new light plugin goes on the end of it, and one the game would load
+  ahead of the others (an .esl, a master, a Skyrim.ccc plugin) stops the deploy
+  (`Get-ThornswoodServerOrder`, `tests\test-light-order.ps1`).
+- **Held on every machine.** Scan names the first light plugin out of the
+  server's order and Fix puts the list into it; the pack ships its list in that
+  order (`tests\test-load-order.ps1`). The client's own check compares its light
+  list with the manifest's (`loadOrderCheck.ts` in the fork), and the front
+  plugin reports it to the server as `/loadorderlight`, which tells the person
+  in one sentence and, with `thornswoodLoadOrderRefuse` on, ends the session
+  before a wrong id can be stored (`tests\test-load-order-refusal.js`).
+- **What can still move them** is what moves a full id: a light plugin taken
+  out of the collection (Deploy-Gamemode says so and names
+  `Move-LightFormIds.ps1`), or a new order on purpose with `-NewOrder` and a
+  wiped world. Storing appearance forms by plugin and local id instead, the
+  second fix #1930 names, would make even that harmless; it is a change to how
+  the engine stores appearance, so it belongs to the fork and is not made here.
