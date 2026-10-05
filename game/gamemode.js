@@ -602,9 +602,9 @@ function ensureProperties() {
       updateOwner: '',
       updateNeighbor: '',
     });
-    // When each of the three tools was last handed over. Nothing on the client
-    // reads it and nobody standing next to you has any business knowing it, so
-    // it is invisible to both. See TOOL_AGAIN_HOURS.
+    // How much work each tool in the pack has done (wearTool). Nothing on the
+    // client reads it and nobody standing next to you has any business knowing
+    // it, so it is invisible to both.
     mp.makeProperty(TOOL_PROPERTY, {
       isVisibleByOwner: false,
       isVisibleByNeighbors: false,
@@ -1926,9 +1926,9 @@ function rankStep(actorId, key) {
   So 112 of the 450 shovels lying about the province are the one the first draft
   refused, and a farmer who lost the shovel they were handed, walked to a mill
   and picked up the shovel leaning on the wall had a one in four chance of being
-  told they need a shovel while carrying one. Inside TOOL_AGAIN_HOURS of their
-  last handout that is a hard refusal with no way out of it. Measured in the
-  harness rather than worked out: toollens.js case G.
+  told they need a shovel while carrying one, which is a hard refusal with no
+  way out of it. Measured in the harness rather than worked out: toollens.js
+  case G.
 
   The pickaxes are the same shape of problem with smaller numbers. Three of the
   six are quest items somebody may well be carrying and nothing else, and the
@@ -1998,21 +1998,13 @@ const TOOLS = {
 };
 
 /*
-  HOW LONG BEFORE A LOST TOOL IS REPLACED. THE RULEBOOK DOES NOT SET THIS.
-
-  classes.md does not mention a tool at all, so every number about one is
-  invented. Twelve hours, which is the number TUNING.farming.seedAgainHours
-  already runs on, for exactly the same reason: a tool handed out once at the
-  pick and never again is a class somebody loses for good the first time they
-  empty their pack into a chest, and every character made before this release
-  has no tool at all because their pick is months of sessions behind them.
-
-  It cannot be worked for profit. A pickaxe, a woodcutter's axe and a shovel are
-  worth a few gold between them, the handout asks for a pack with none of that
-  tool in it, and it happens at the seam, the kiln or the plot rather than
-  anywhere a person would be standing anyway.
+  NO TOOL IS HANDED OUT AGAIN. Until 21 September a seam, a block, a kiln or a
+  plot handed a free tool to anybody with none, once every TOOL_AGAIN_HOURS
+  (twelve), through offerTool. Patrick, that day: tools come from a smith, and
+  nobody works without one (toolGate). Nothing called offerTool after that, and
+  it and its clock came out in #1038. The one tool anybody is given is the one
+  a starting class hands over at creation (giveTool).
 */
-const TOOL_AGAIN_HOURS = 12;
 
 /*
   HOW MUCH WORK A TOOL HAS IN IT BEFORE IT BREAKS. NOT IN THE RULEBOOK.
@@ -2111,7 +2103,7 @@ function holdsTool(actorId, tool) {
   return false;
 }
 
-/** When each tool was last handed over. Always an object, never a throw. */
+/** The wear count of each tool, under 'wear:<key>'. Always an object, never a throw. */
 function toolStamps(actorId) {
   let v = null;
   try {
@@ -2124,8 +2116,8 @@ function toolStamps(actorId) {
 }
 
 /**
- * The tool into the pack, and the moment written down. The tool, or null when
- * nothing reached them. Called by both doors below and by neither directly.
+ * The tool into the pack. The tool, or null when nothing reached them. Called
+ * by giveTool, at a starting class's pick, and by nothing else.
  */
 function handTool(actorId, key) {
   const tool = toolFor(key);
@@ -2134,15 +2126,6 @@ function handTool(actorId, key) {
     log('there is no', tool.name, 'in this load order, so', actorId.toString(16),
         'was handed nothing');
     return null;
-  }
-  const stamps = toolStamps(actorId);
-  stamps[key] = Date.now();
-  try {
-    mp.set(actorId, TOOL_PROPERTY, stamps);
-  } catch (e) {
-    // The tool is in the pack and the moment is not written down, so the way
-    // back below will hand another one over. That is the harmless direction.
-    log('could not record the', key, 'tool handout for', actorId.toString(16) + ':', e);
   }
   log(actorId.toString(16), 'was handed a', tool.name, 'for', key);
   return tool;
@@ -2153,33 +2136,6 @@ function giveTool(actorId, key) {
   const tool = handTool(actorId, key);
   if (!tool) { return null; }
   return 'You are handed a ' + tool.name + '. Keep it in your pack: the work needs it there.';
-}
-
-/*
-  THE WAY BACK, and it is the same way back the farmer's seed has.
-
-  offerSeed in the farming block exists because seed used to be handed out at
-  exactly one moment, the pick, so a Farmer who lost their crops was a Farmer who
-  could never farm again and every Farmer who picked the class on an earlier
-  build was born in that state. A tool that is required to work is the same shape
-  of trap and it is worse, because nobody who exists today has one.
-
-  So the tool is asked for rather than given: this runs at the seam, the kiln or
-  the plot, where somebody is standing saying they want to do the work, and never
-  from a read. Two conditions, and the pack one is the real one: no tool of that
-  kind in the pack at all, and TOOL_AGAIN_HOURS since the last one.
-*/
-function offerTool(actorId, key) {
-  const stamps = toolStamps(actorId);
-  const last = Object.prototype.hasOwnProperty.call(stamps, key)
-    ? (Number(stamps[key]) || 0) : 0;
-  if (last && TOOL_AGAIN_HOURS > 0 &&
-      (Date.now() - last) < TOOL_AGAIN_HOURS * 3600000) {
-    return null;
-  }
-  const tool = handTool(actorId, key);
-  if (!tool) { return null; }
-  return 'You had no ' + tool.name + ', so here is one. Do that again now.';
 }
 
 /**
@@ -2241,9 +2197,9 @@ function toolGate(actorId, key) {
     thing that was supposed to make you go and buy another.
 
     A tool comes from a smith now, which is the whole point of the handle and
-    the recipes that need one. offerTool and handTool are left where they are:
-    they are how the FIRST tool of a starting profession is placed, and taking
-    them out of this gate is what stops them being an endless supply.
+    the recipes that need one. handTool is left where it is: through giveTool
+    it is how the FIRST tool of a starting class is placed. offerTool, the free
+    replacement, had no caller after this and came out in #1038.
   */
   return 'You need a ' + tool.name + ' in your pack for that. ' + tool.where;
 }
@@ -2285,18 +2241,14 @@ function heldToolId(actorId, tool) {
   Returns the sentence to say, or null when there is nothing worth saying. Three
   answers: silence, the warning near the end, and the break.
 
-  WHAT A BREAK DOES. The tool comes out of the pack and the handout clock is
-  set to now, which is the whole of the balance. TOOL_AGAIN_HOURS is twelve, so
-  for twelve hours the free replacement at the seam is not coming and the way
-  back is a smith, which is what Patrick asked for. After twelve hours the old
-  safety net is there again, because a tool that is required to work must never
-  be the reason somebody's class is over: that is the same trap offerTool and
-  offerSeed were both written to close, and breaking one must not reopen it.
+  WHAT A BREAK DOES. The tool comes out of the pack and its count starts again.
+  The way back is a smith, which is what Patrick asked for: nothing hands a
+  replacement over (#1038), and the refusal at the seam, the block, the kiln
+  or the plot says who makes one.
 
-  The count is kept beside the handout stamps under a 'wear:' key rather than in
-  a second property. offerTool reads stamps[key] and nothing else, so a
-  'wear:miner' sitting next to 'miner' is invisible to it, every character who
-  already has stamps keeps them, and there is no migration to get wrong.
+  The count is kept in TOOL_PROPERTY under a 'wear:' key. A character made
+  before #1038 may also carry the time each tool was handed over, under the
+  bare key ('miner'); nothing reads that any more and it is left as it is.
 */
 function wearTool(actorId, key) {
   const tool = toolFor(key);
@@ -2327,7 +2279,7 @@ function wearTool(actorId, key) {
     return null;
   }
 
-  // Worn out. Take it, forget the count, and hold the free replacement off.
+  // Worn out. Take it, and forget the count.
   if (!takeItemById(actorId, baseId, 1)) {
     // It could not be taken, so it is not broken. Counting it again next swing
     // is the honest answer; snapping a tool that is still in the pack is not.
@@ -2335,7 +2287,6 @@ function wearTool(actorId, key) {
     return null;
   }
   stamps[wearKey] = 0;
-  stamps[key] = Date.now();
   try {
     mp.set(actorId, TOOL_PROPERTY, stamps);
   } catch (e) {
@@ -41047,8 +40998,8 @@ log('gamemode loaded:',
     this server picked their class before any of this was written, and the
     world they are standing in no longer has a coin in it. A starting purse that
     only new characters got would leave everybody already here with no money and
-    no way to get any. Same reasoning as the tool handout's way back, written
-    out over offerTool.
+    no way to get any. The tool handout had the same reasoning until tools
+    became a smith's (#1038).
   */
   var PURSE = 40;
   var PURSE_PROPERTY = 'thornswoodPurse';
