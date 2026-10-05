@@ -200,10 +200,13 @@
 
   WHAT IT COMES TO ON THIS BUILD
 
-  361 animals in the table and 73 left out and listed: 67 with no death item
-  anywhere in their traits chain, which is the audio templates, the conjured
-  spirits and the cut Dragonborn spiders, and 6 boars. The ranks come out 156
-  novice, 150 advanced, 47 expert and 8 master.
+  336 animals in the table and 99 left out and listed: 43 that are not a body
+  to dress (the spirits, the spell actors and the hidden actors NOT A BODY TO
+  DRESS in the knobs reads off the records, and the test netch, issue #1808),
+  50 with no death item anywhere in their traits chain, which is mostly the
+  audio templates and the cut Dragonborn spiders, 5 boars and one Creation Club
+  creature. The ranks come out 147 novice, 140 advanced, 43 expert and 6
+  master. Measured on 5 October against the Main install's load order.
 
   Read only. It touches nothing in the game folder and nothing on the VPS, and
   it proves that by fingerprinting the game folder before and after and failing
@@ -220,7 +223,9 @@
   four bytes, if an RNAM names no RACE record, if a race carries both the
   animal keyword and the person keyword, if no animals are found at all, if a
   yield item names no record in the build, if an item has no readable price, if
-  the novice rung is empty, or if the game folder changed underneath it.
+  the novice rung is empty, if a name in the NOT A BODY TO DRESS knobs is not in
+  the load order or a base in LEFT_OUT is not an animal, if an animal's scripts
+  cannot be read, or if the game folder changed underneath it.
   Nothing is written unless every check passed.
 #>
 param(
@@ -271,6 +276,59 @@ $USE_TRAITS_BIT = 0x0001
 # so a table that stops at the record's FULL is not reading the name anybody sees.
 # The header has what that cost.
 $USE_BASE_DATA_BIT = 0x0080
+#
+# USE_SPELL_LIST_BIT and USE_SCRIPT_BIT: bits 0x0008 and 0x0200 of the same
+# field, named UseSpelllist and UseScript in the fork's NPC_.h. While one is
+# set, the game takes the spell list or the scripts from TPLT and not from the
+# record, so the ghost marks below are read where the game reads them.
+$USE_SPELL_LIST_BIT = 0x0008
+$USE_SCRIPT_BIT     = 0x0200
+#
+# NOT A BODY TO DRESS (issue #1808). The animal keyword says what a race is. It
+# does not say whether the actor is an animal's body lying on the ground, and
+# the table carried a spirit, two spell actors, a mod's storage actor and a
+# netch that gave a mammoth's tusk until 5 October. Each rule below takes a base
+# out of the table, lists it under skipped with the rule's own words, and is
+# counted on every run. They are read off the records, the same as the rest of
+# this script, except LEFT_OUT, which names records one by one.
+#
+# SUMMONABLE_BIT: ACBS flag 0x00004000, Summonable. A spell brings the actor and
+# takes it away, so it is never a carcass: SummonFireStorm (Fire Storm), Odin's
+# Flaming Thrall and its familiars, YokuWeapons' Jar Bomb. The fork's NPC_.h
+# puts this flag under Use Base Data, so it is read through that chain.
+$SUMMONABLE_BIT = 0x00004000
+#
+# GHOST_BIT: ACBS flag 0x20000000, Is Ghost. Nothing can strike an actor that
+# carries it. The game puts it on its ghosts, and mods put it on the hidden
+# actors they keep in the world: Odin's Buried Storage is a chest in the shape
+# of a chicken, FishingInSkyrim's net is a slaughterfish. The fork does not say
+# which template bit carries it, so it is read off the record itself.
+$GHOST_BIT = 0x20000000
+#
+# GHOST_SCRIPT, GHOST_SPELLS and GHOST_DEATH_ITEM: the other marks the game
+# gives a spirit. The ghost script, whose properties are the ghost's shaders,
+# the ghost abilities that make it glow, and the death item a ghost leaves,
+# which is ectoplasm and not an animal's parts. A spell named here that the load
+# order does not have fails the run, so the list cannot go stale quietly.
+$GHOST_SCRIPT     = 'defaultGhostScript'
+$GHOST_SPELLS     = @('GhostAbility', 'GhostAbilityFire', 'GhostAbilityFireNoAlpha', 'GhostAbilityFrost',
+                      'GhostAbilityNew', 'GhostAbilityStorm', 'GhostAbilityViolet')
+$GHOST_DEATH_ITEM = 'DeathItemGhost'
+#
+# SPIRIT_RACES: a race that is a spirit's although nothing on its actors says
+# so. Keyed by the race's editor id, each with the reason, which is printed. A
+# race named here that the load order does not have fails the run.
+$SPIRIT_RACES = [ordered]@{
+    'C06WolfSpiritRace' = 'the race of the wolf spirits of Kodlak, Farkas and Vilkas: their own records carry no ghost mark the game reads (the ghost script on three of them is replaced by their template''s, because Use Script is set)'
+}
+#
+# LEFT_OUT: a base taken out by name, because no rule above reaches it and the
+# reason is in the record. Keyed by the base, with the reason, which is printed
+# and written under skipped. A base named here that is not an animal in this
+# load order fails the run, so an entry cannot outlive its record quietly.
+$LEFT_OUT = [ordered]@{
+    '2173b:Dragonborn.esm' = 'DLC2EncNetchTest, a test netch Bethesda left in Dragonborn.esm: no record in the load order refers to it, so no levelled list names it and nothing in the world places it, and its death item is the mammoth''s, so it would hand a hunter a mammoth''s tusk and snout off a netch'
+}
 #
 # VALUE_RULES: where the gold value sits in each kind of record. Proved in the
 # header of Build-HarvestTable.ps1, against the prices these items actually
@@ -504,6 +562,18 @@ function JsonStr($s) {
     return '"' + $t + '"'
 }
 
+# The line ending a file already uses: CRLF when it holds one, LF otherwise.
+# The table and the gamemode block are written with it, so a run never mixes
+# the two in one file. Until 5 October both were joined with CRLF whatever the
+# file held, and a checkout that keeps LF (the agents' VM, the VPS runner's
+# clones) got a whole-file diff of hunts.json and CRLF lines inside an LF
+# gamemode. Build-RecipeTable.ps1 (#1622), Build-OreTable.ps1 (#1787),
+# Build-HarvestTable.ps1 and Build-SpellTable.ps1 (#1828) do the same.
+function EolOf([string]$text) {
+    if ($text.Contains("`r`n")) { return "`r`n" }
+    return "`n"
+}
+
 # Everything sitting directly in the game folder, with its size and its last
 # write. Taken before the work and again after it, so 'read only' is something
 # the run proves rather than something the header claims. Only the top level:
@@ -541,6 +611,49 @@ function Split-Subrecords([byte[]]$rec) {
         $k += $sz
     }
     return $out
+}
+
+# The names of the scripts in a VMAD, in order. The layout is the one
+# Build-OreTable.ps1 reads a vein's ore out of: a version (2 to 5; 4 and up put
+# a status byte after a script name and after a property's type), an object
+# format, a count of scripts, then per script its name, its properties and
+# each property's value, whose length the type decides. The values are stepped
+# over; only the names are kept. Throws on anything it cannot step over,
+# because a half read VMAD would say a ghost has no ghost script.
+function Read-VmadScripts([byte[]]$v) {
+    $names = New-Object 'System.Collections.Generic.List[string]'
+    if ($v.Length -lt 6) { throw "a VMAD of $($v.Length) bytes is too short to hold a header" }
+    $version = [BitConverter]::ToInt16($v, 0)
+    if ($version -lt 2 -or $version -gt 5) { throw "VMAD version $version is not one this can read" }
+    $count = [int][BitConverter]::ToUInt16($v, 4)
+    $p = 6
+    for ($s = 0; $s -lt $count; $s++) {
+        $nl = [int][BitConverter]::ToUInt16($v, $p); $p += 2
+        $names.Add([System.Text.Encoding]::GetEncoding(1252).GetString($v, $p, $nl)); $p += $nl
+        if ($version -ge 4) { $p += 1 }
+        $pc = [int][BitConverter]::ToUInt16($v, $p); $p += 2
+        for ($q = 0; $q -lt $pc; $q++) {
+            $pl = [int][BitConverter]::ToUInt16($v, $p); $p += 2 + $pl
+            $pt = [int]$v[$p]; $p += 1
+            if ($version -ge 4) { $p += 1 }
+            switch ($pt) {
+                1  { $p += 8 }
+                2  { $sl = [int][BitConverter]::ToUInt16($v, $p); $p += 2 + $sl }
+                3  { $p += 4 }
+                4  { $p += 4 }
+                5  { $p += 1 }
+                11 { $n2 = [int][BitConverter]::ToUInt32($v, $p); $p += 4 + $n2 * 8 }
+                12 { $n2 = [int][BitConverter]::ToUInt32($v, $p); $p += 4
+                     for ($z = 0; $z -lt $n2; $z++) { $sl = [int][BitConverter]::ToUInt16($v, $p); $p += 2 + $sl } }
+                13 { $n2 = [int][BitConverter]::ToUInt32($v, $p); $p += 4 + $n2 * 4 }
+                14 { $n2 = [int][BitConverter]::ToUInt32($v, $p); $p += 4 + $n2 * 4 }
+                15 { $n2 = [int][BitConverter]::ToUInt32($v, $p); $p += 4 + $n2 }
+                default { throw ("a property on script {0} has type {1}, which this cannot step over" -f $names[$names.Count - 1], $pt) }
+            }
+            if ($p -gt $v.Length) { throw ("script {0} ran past the end of the VMAD" -f $names[$names.Count - 1]) }
+        }
+    }
+    return ,$names.ToArray()   # ',' for the same reason as Get-PluginMasters
 }
 
 function Rank-For([long]$value) {
@@ -672,12 +785,14 @@ Write-Host 'records' -ForegroundColor Cyan
 # overrides a record replaces what an earlier one said about it, which is what
 # the game does.
 $ITEM_TYPES = @('MISC', 'INGR', 'ALCH', 'ARMO', 'WEAP', 'SLGM', 'KEYM', 'AMMO', 'BOOK', 'SCRL', 'LIGH')
-$wantLabels = @{ 'NPC_' = $true; 'RACE' = $true; 'KYWD' = $true; 'LVLI' = $true; 'LVLN' = $true }
+$wantLabels = @{ 'NPC_' = $true; 'RACE' = $true; 'KYWD' = $true; 'LVLI' = $true; 'LVLN' = $true; 'SPEL' = $true }
 foreach ($t in $ITEM_TYPES) { $wantLabels[$t] = $true }
 
 $npcs  = New-Object System.Collections.Specialized.OrderedDictionary
 $races = New-Object System.Collections.Specialized.OrderedDictionary
 $kywds = @{}
+# SPEL: only the editor id, for the ghost abilities (GHOST_SPELLS)
+$spels = @{}
 $lvli  = @{}
 $lvln  = @{}
 $items = @{}
@@ -752,6 +867,8 @@ foreach ($pl in $order) {
 
                     if ($type -eq 'KYWD') {
                         $kywds[$desc] = $edid
+                    } elseif ($type -eq 'SPEL') {
+                        $spels[$desc] = $edid
                     } elseif ($type -eq 'RACE') {
                         $kw = New-Object 'System.Collections.Generic.List[string]'
                         foreach ($s in $subs) {
@@ -784,6 +901,10 @@ foreach ($pl in $order) {
                     } elseif ($type -eq 'NPC_') {
                         $script:npcCount++
                         $rnam = ''; $inam = ''; $tplt = ''; $tmpl = 0; $cnam = ''
+                        # what NOT A BODY TO DRESS reads: the ACBS flags, the
+                        # spell list and the scripts, kept raw and read only
+                        # for the animals
+                        $acbsFlags = [uint32]0; $splo = New-Object 'System.Collections.Generic.List[string]'; $vmad = $null
                         $seenRnam = 0
                         foreach ($s in $subs) {
                             if ($s.Tag -eq 'RNAM') {
@@ -797,7 +918,12 @@ foreach ($pl in $order) {
                             } elseif ($s.Tag -eq 'TPLT' -and $s.Bytes.Length -eq 4) {
                                 $tplt = Desc-Of ([BitConverter]::ToUInt32($s.Bytes, 0)) $masters $pl
                             } elseif ($s.Tag -eq 'ACBS' -and $s.Bytes.Length -ge 24) {
+                                $acbsFlags = [BitConverter]::ToUInt32($s.Bytes, 0)
                                 $tmpl = [int][BitConverter]::ToUInt16($s.Bytes, 18)
+                            } elseif ($s.Tag -eq 'SPLO' -and $s.Bytes.Length -eq 4) {
+                                $splo.Add((Desc-Of ([BitConverter]::ToUInt32($s.Bytes, 0)) $masters $pl))
+                            } elseif ($s.Tag -eq 'VMAD') {
+                                $vmad = $s.Bytes
                             } elseif ($s.Tag -eq 'CNAM' -and $s.Bytes.Length -eq 4) {
                                 $script:cnamPresent++
                                 $cnam = Desc-Of ([BitConverter]::ToUInt32($s.Bytes, 0)) $masters $pl
@@ -821,6 +947,7 @@ foreach ($pl in $order) {
                         $npcs[$desc] = [pscustomobject]@{
                             Desc = $desc; Edid = $edid; Full = $full; FullFrom = $fullFrom
                             Rnam = $rnam; Inam = $inam; Tplt = $tplt; Cnam = $cnam; TemplateFlags = $tmpl; SeenIn = $pl
+                            Flags = $acbsFlags; Splo = $splo.ToArray(); Vmad = $vmad
                         }
                         $hereNpcs++
                     } else {
@@ -1073,6 +1200,117 @@ if ($mixed.Count -gt 0) {
     foreach ($m in $mixed) { Note ('  ' + $m.Edid + '  ' + $m.Desc) }
 }
 
+# ------------------------------------------------- not a body to dress ------
+
+Write-Host ''
+Write-Host 'not a body to dress' -ForegroundColor Cyan
+# The rules over NOT A BODY TO DRESS at the top. Each mark is read where the
+# game reads it: the Summonable flag through Use Base Data, the scripts through
+# Use Script, the spell list through Use Spell List, the death item and the
+# race off the traits pairs the table already follows. A base whose template is
+# an LVLN is marked only when every NPC the list can be carries the mark, so a
+# list that is partly real animals keeps its row for them, the same least-of
+# rule the yield is picked under.
+
+# The NPC records the game reads one tab of a base off: the record itself while
+# that tab's template bit is clear, the template while it is set, and every NPC
+# in it when the template is an LVLN.
+$leafCache = @{}
+function Leaves-Through([string]$desc, [int]$bit, [int]$depth) {
+    if ($depth -gt 10) { return ,@() }
+    $key = [string]$bit + '|' + $desc
+    if ($leafCache.ContainsKey($key)) { return ,$leafCache[$key] }
+    $out = New-Object 'System.Collections.Generic.List[string]'
+    if ($npcs.Contains($desc)) {
+        $n = $npcs[$desc]
+        if (((([int]$n.TemplateFlags) -band $bit) -ne 0) -and [string]$n.Tplt) {
+            foreach ($x in (Leaves-Through ([string]$n.Tplt) $bit ($depth + 1))) { if (-not $out.Contains($x)) { $out.Add($x) } }
+        } else {
+            $out.Add($desc)
+        }
+    } elseif ($lvln.ContainsKey($desc)) {
+        foreach ($e in $lvln[$desc].Entries) {
+            if ([string]$e.Desc -eq $desc) { continue }
+            foreach ($x in (Leaves-Through ([string]$e.Desc) $bit ($depth + 1))) { if (-not $out.Contains($x)) { $out.Add($x) } }
+        }
+    }
+    $arr = $out.ToArray()
+    # the last hop is not cached, for the reason the traits walk says
+    if ($depth -lt 9) { $leafCache[$key] = $arr }
+    return ,$arr
+}
+
+# the names the knobs use, found in this load order. A name that is not here
+# fails the run rather than quietly marking nothing.
+$ghostSpellDescs = @{}
+foreach ($e in $GHOST_SPELLS) {
+    $hit = @($spels.Keys | Where-Object { [string]$spels[$_] -eq $e })
+    if ($hit.Count -eq 0) { Bad ("{0} is named in GHOST_SPELLS and no SPEL record in this build carries that editor id" -f $e) }
+    foreach ($h in $hit) { $ghostSpellDescs[[string]$h] = $e }
+}
+$ghostItem = @($lvli.Keys | Where-Object { [string]$lvli[$_].Edid -eq $GHOST_DEATH_ITEM })
+if ($ghostItem.Count -ne 1) { Bad ("{0} is GHOST_DEATH_ITEM and {1} levelled lists in this build carry that editor id, not one" -f $GHOST_DEATH_ITEM, $ghostItem.Count) }
+$spiritRaceDescs = @{}
+foreach ($e in $SPIRIT_RACES.Keys) {
+    $hit = @($races.Keys | Where-Object { [string]$races[$_].Edid -eq $e })
+    if ($hit.Count -eq 0) { Bad ("{0} is named in SPIRIT_RACES and no RACE record in this build carries that editor id" -f $e) }
+    foreach ($h in $hit) { $spiritRaceDescs[[string]$h] = $e }
+}
+foreach ($k in $LEFT_OUT.Keys) {
+    if (-not $animals.Contains($k)) { Bad ("{0} is named in LEFT_OUT and is not an animal in this build" -f $k) }
+}
+
+$vmadCache = @{}
+function Scripts-Of([string]$desc) {
+    if ($vmadCache.ContainsKey($desc)) { return ,$vmadCache[$desc] }
+    $names = @()
+    if ($null -ne $npcs[$desc].Vmad) {
+        try { $names = Read-VmadScripts $npcs[$desc].Vmad }
+        catch { Bad ("the scripts on {0} ({1}) could not be read, so whether it is a spirit is not known: {2}" -f $desc, $npcs[$desc].Edid, $_.Exception.Message) }
+    }
+    $vmadCache[$desc] = $names
+    return ,$names
+}
+function All-Leaves([string]$desc, [int]$bit, [scriptblock]$test) {
+    $leaves = Leaves-Through $desc $bit 0
+    if ($leaves.Count -eq 0) { return $false }
+    foreach ($l in $leaves) { if (-not (& $test $l)) { return $false } }
+    return $true
+}
+
+$notABody = New-Object System.Collections.Specialized.OrderedDictionary
+$byRule = [ordered]@{ 'LEFT_OUT' = 0; 'SUMMONABLE_BIT' = 0; 'GHOST_BIT' = 0; 'GHOST_SCRIPT' = 0; 'GHOST_SPELLS' = 0; 'GHOST_DEATH_ITEM' = 0; 'SPIRIT_RACES' = 0 }
+foreach ($d in $animals.Keys) {
+    $a = $animals[$d]
+    $why = New-Object 'System.Collections.Generic.List[string]'
+    if ($LEFT_OUT.Contains([string]$d)) {
+        $why.Add([string]$LEFT_OUT[[string]$d]); $byRule['LEFT_OUT']++
+    }
+    if (All-Leaves $d $USE_BASE_DATA_BIT { param($l) ([uint32]$npcs[$l].Flags -band $SUMMONABLE_BIT) -ne 0 }) {
+        $why.Add('it is Summonable (ACBS flag 0x4000, read through Use Base Data): a spell brings it and takes it away, so it never lies as a carcass'); $byRule['SUMMONABLE_BIT']++
+    }
+    if (([uint32]$a.Npc.Flags -band $GHOST_BIT) -ne 0) {
+        $why.Add('it is a ghost (ACBS flag 0x20000000, Is Ghost): nothing can strike it, so it never lies as a carcass'); $byRule['GHOST_BIT']++
+    }
+    if (All-Leaves $d $USE_SCRIPT_BIT { param($l) (Scripts-Of $l) -contains $GHOST_SCRIPT }) {
+        $why.Add('it carries ' + $GHOST_SCRIPT + ' (read through Use Script), the script the game gives its spirits'); $byRule['GHOST_SCRIPT']++
+    }
+    if (All-Leaves $d $USE_SPELL_LIST_BIT { param($l) @($npcs[$l].Splo | Where-Object { $ghostSpellDescs.ContainsKey([string]$_) }).Count -gt 0 }) {
+        $why.Add('its spell list (read through Use Spell List) carries a ghost ability, which the game gives its spirits'); $byRule['GHOST_SPELLS']++
+    }
+    if ($ghostItem.Count -eq 1 -and @($a.Pairs | Where-Object { [string]$_.Item -ne [string]$ghostItem[0] }).Count -eq 0) {
+        $why.Add('its death item is ' + $GHOST_DEATH_ITEM + ', the ectoplasm a spirit leaves, not an animal''s parts'); $byRule['GHOST_DEATH_ITEM']++
+    }
+    if (@($a.Pairs | Where-Object { -not $spiritRaceDescs.ContainsKey([string]$_.Race) }).Count -eq 0) {
+        $r = [string]$spiritRaceDescs[[string]$a.Pairs[0].Race]
+        $why.Add('its race is ' + $r + ', ' + [string]$SPIRIT_RACES[$r]); $byRule['SPIRIT_RACES']++
+    }
+    if ($why.Count -gt 0) { $notABody[$d] = ($why -join '; ') }
+}
+Ok ("{0} of the animals are not a body to dress, and are left out and listed under skipped" -f $notABody.Count)
+foreach ($r in $byRule.Keys) { Note ("{0,-17} {1}" -f $r, $byRule[$r]) }
+foreach ($d in $notABody.Keys) { Note ("  {0,-40} {1}" -f $animals[$d].Npc.Edid, $d) }
+
 # ------------------------------------------------------------- the yield ----
 
 Write-Host ''
@@ -1203,6 +1441,11 @@ foreach ($d in $animals.Keys) {
     $a = $animals[$d]
     if ($creation.ContainsKey([string]$d)) {
         $skipped.Add([pscustomobject]@{ Desc = $d; Edid = $a.Npc.Edid; Why = 'a Creation Club creature: every Special Edition has the record, but its art comes with the Creation Club files Thornswood leaves out' })
+        continue
+    }
+    # not a body to dress (#1808): the rules and their counts are above
+    if ($notABody.Contains([string]$d)) {
+        $skipped.Add([pscustomobject]@{ Desc = $d; Edid = $a.Npc.Edid; Why = [string]$notABody[[string]$d] })
         continue
     }
     $withItem = @($a.Pairs | Where-Object { [string]$_.Item -and $yieldOf.ContainsKey([string]$_.Item) })
@@ -1487,6 +1730,9 @@ Write-Host 'writing' -ForegroundColor Cyan
 # no timestamp in it, so that the same game files give byte for byte the same
 # file: ConvertTo-Json lays out Windows PowerShell 5.1 and PowerShell 7
 # differently, and a rebuild that changed nothing would be a whole-file diff.
+# The line ending is the one the table already has, CRLF for a new one.
+$jsonEol = "`r`n"
+if (Test-Path -LiteralPath $Out) { $jsonEol = EolOf ([System.IO.File]::ReadAllText($Out)) }
 function Gives-Json($gives) {
     $parts = New-Object 'System.Collections.Generic.List[string]'
     foreach ($g in $gives) {
@@ -1568,12 +1814,12 @@ foreach ($d in $detail.Keys) {
         if ($f -eq 'bestValue') { $fields.Add('      "' + $f + '": ' + [long]$v[$f]) }
         else { $fields.Add('      "' + $f + '": ' + (JsonStr ([string]$v[$f]))) }
     }
-    $docLines.Add(($fields -join (',' + "`r`n")))
+    $docLines.Add(($fields -join (',' + $jsonEol)))
     $docLines.Add('    }' + $comma)
 }
 $docLines.Add('  }')
 $docLines.Add('}')
-$json = ($docLines -join "`r`n") + "`r`n"
+$json = ($docLines -join $jsonEol) + $jsonEol
 
 # A run that failed leaves the table it could not rebuild exactly as it was.
 # Nothing is written until every check above has passed: pointing -Data at a
@@ -1670,7 +1916,8 @@ if (-not $NoInstall -and $fail -eq 0) {
             }
             $body.Add($indent + '};')
             $body.Add('')
-            $new = $text.Substring(0, $m.Index) + (($body -join "`r`n")) + "`r`n" + $text.Substring($b)
+            $eol = EolOf $text
+            $new = $text.Substring(0, $m.Index) + (($body -join $eol)) + $eol + $text.Substring($b)
             [System.IO.File]::WriteAllText($gm, $new, (New-Object System.Text.UTF8Encoding($false)))
             Ok ("wrote {0} animals into the HUNTS_BY_BASE block of {1}" -f $table.Count, $gm)
         }
