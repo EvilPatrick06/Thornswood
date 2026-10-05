@@ -124,10 +124,30 @@
     it hears an answer, so a hundred from one peer is not a connection
     being made. Nothing more from that peer is kept, and the log says so
     once.
+
+    THE POSITION VIEW, THE MODES AND THE SILENCES TOO (#1924). The service
+    sends a connection its whole view once, { t: 'pos' } on the first tick
+    after it joins, and from then on only the rows that changed
+    ({ t: 'moved' }, the note over the tick in voice/voice-server.js). So
+    an overlay that got on after that first tick never held anybody
+    standing still, itself included: no speaking marks until it moved, the
+    party strip reading the same empty table, and nobody placed in its own
+    mesh. So the view is kept as
+    the overlay would have kept it, the last whole one with every change
+    since applied, and board hands it over as one whole view. A mode said
+    since the newest roster is written onto that roster, for everybody on
+    the speaker's profile, as the service does for the next roster it
+    sends. A staff silence is kept until it is lifted, since it is told to
+    every connection once and the rows carry it only when they change. Each
+    of these replaces what it says rather than adding to it, so none of
+    them grows.
   */
   var HELD_FROM_ONE = 100;
   var heldRoom = null;
   var heldSignals = [];
+  var heldView = null;
+  var heldViewAt = 0;
+  var heldHush = {};
   var boarded = false;
   var saidTooMany = false;
 
@@ -139,6 +159,43 @@
       var list = msg.peers || [];
       for (var i = 0; i < list.length; i++) { named[list[i].peer] = true; }
       heldSignals = heldSignals.filter(function (s) { return named[s.from]; });
+      return;
+    }
+    if (msg.t === 'pos') {
+      heldView = {};
+      var whole = msg.who || {};
+      for (var w in whole) {
+        if (Object.prototype.hasOwnProperty.call(whole, w)) { heldView[w] = whole[w]; }
+      }
+      heldViewAt = msg.at;
+      return;
+    }
+    if (msg.t === 'moved') {
+      // The service sends a connection its whole view before any change to
+      // it, so there is always one here to apply this to.
+      if (!heldView) return;
+      var rows = msg.who || {};
+      for (var r in rows) {
+        if (Object.prototype.hasOwnProperty.call(rows, r)) { heldView[r] = rows[r]; }
+      }
+      var gone = msg.gone || [];
+      for (var g = 0; g < gone.length; g++) { delete heldView[gone[g]]; }
+      heldViewAt = msg.at;
+      return;
+    }
+    if (msg.t === 'vmode') {
+      // Said by somebody the newest roster names, since the service writes
+      // that roster here before anything they send.
+      var on = heldRoom ? (heldRoom.peers || []) : [];
+      for (var v = 0; v < on.length; v++) {
+        if (Number(on[v].profileId) === Number(msg.profileId)) { on[v].mode = msg.mode; }
+      }
+      return;
+    }
+    if (msg.t === 'hush') {
+      var pid = Number(msg.profileId) || 0;
+      if (!pid) return;
+      if (msg.on) { heldHush[pid] = true; } else { delete heldHush[pid]; }
       return;
     }
     if (msg.t !== 'sdp' && msg.t !== 'ice') return;
@@ -159,6 +216,9 @@
   function forget() {
     heldRoom = null;
     heldSignals = [];
+    heldView = null;
+    heldViewAt = 0;
+    heldHush = {};
   }
 
   function chat() { return window.thornswoodChat; }
@@ -532,7 +592,8 @@
 
     /*
       How voice gets on (#1869): on, and first everything kept for it since
-      this connection joined, the newest roster and then the offers and
+      this connection joined, the newest roster, then the whole position
+      view and the silences still on (#1924), and then the offers and
       candidates in the order they came. See keep.
     */
     board: function (fn) {
@@ -540,7 +601,14 @@
       listeners.push(fn);
       if (boarded) return;
       boarded = true;
-      var missed = (heldRoom ? [heldRoom] : []).concat(heldSignals);
+      var missed = heldRoom ? [heldRoom] : [];
+      if (heldView) { missed.push({ t: 'pos', at: heldViewAt, who: heldView }); }
+      for (var h in heldHush) {
+        if (Object.prototype.hasOwnProperty.call(heldHush, h)) {
+          missed.push({ t: 'hush', profileId: Number(h), on: true });
+        }
+      }
+      missed = missed.concat(heldSignals);
       forget();
       for (var i = 0; i < missed.length; i++) {
         try { fn(missed[i]); } catch (e) {
