@@ -45,3 +45,16 @@ Each prints a PASS or FAIL line per check and ends on `N passed, M failed`,
 and exits 1 when anything failed. A harness that reads something only one
 machine has, such as the game folder, says SKIP for that part and checks the
 rest.
+
+## A harness that starts a service
+
+Several builds run at once on the VPS and share its 127.0.0.1, so a harness
+never gives a service a fixed port. It asks the system for one nothing holds
+(listen on 0 and read the port back) and passes it in through the setting the
+service already reads, `THORNSWOOD_VOICE_PORT` or `THORNSWOOD_DOCS_PORT`. A
+server in the harness's own process listens on 0 and is asked on the port it
+got. One that starts the voice service asks nothing of the port until that
+copy has printed its own `[voice] listening on` line for it, and fails saying
+so when the service stops first because something else took the port. Before issue #1703
+a run read another run's `/health` as its own. `test-1703-test-ports.js` fails
+on any `.js` harness here or in `voice\` that names a fixed port.

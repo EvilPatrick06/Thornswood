@@ -51,6 +51,45 @@ function freePort() {
     s.listen(0, '127.0.0.1', () => { const n = s.address().port; s.close(() => ok(n)); });
   });
 }
+/*
+  Waits for the voice service's own "listening on ...:port" line, so nothing
+  is asked of the port before this run's service holds it (#1703). If it
+  stops first, something took the port in between or it could not start,
+  and the error says which, with what it printed.
+*/
+function listening(srv, port) {
+  return new Promise((ok, bad) => {
+    let out = '';
+    const said = (d) => {
+      out += d;
+      const m = /\[voice\] listening on \S+:(\d+)/.exec(out);
+      if (m && Number(m[1]) === port) { end(null); }
+    };
+    const more = (d) => { out += d; };
+    const gone = (code) => end(new Error((/EADDRINUSE/.test(out) ? 'something else already holds port ' + port + ', so ' : '') +
+                                         'the voice service stopped (exit ' + code + ') before it was listening. It printed:\n' + out));
+    const late = setTimeout(() => end(new Error('the voice service did not say it was listening on ' + port +
+                                                ' within fifteen seconds. It printed:\n' + out)), 15000);
+    function end(err) {
+      clearTimeout(late);
+      srv.stdout.removeListener('data', said);
+      srv.stderr.removeListener('data', more);
+      srv.removeListener('exit', gone);
+      if (err) { bad(err); } else { ok(); }
+    }
+    srv.stdout.on('data', said);
+    srv.stderr.on('data', more);
+    srv.on('exit', gone);
+  });
+}
+// Ends a service and waits until it has gone, rather than for a guessed time.
+function stopped(srv) {
+  return new Promise((ok) => {
+    if (srv.exitCode !== null || srv.signalCode !== null) { ok(); return; }
+    srv.once('exit', () => ok());
+    srv.kill();
+  });
+}
 // One GET against the scratch site, with whatever cookie the caller offers.
 function ask(port, where, cookie) {
   return new Promise((done) => {
@@ -215,24 +254,29 @@ async function main() {
   const voice = read('voice/voice-server.js');
   yes('voice-server.js reads the record beside itself', voice.includes("path.join(dir, 'thornswood-deploy.json')"));
   yes('and /health carries it', /build: BUILD, deploy: deployRecord\(HERE\)/.test(voice));
-  const PORT = 7931;
+  // Each start is on a port of its own from the system, and nothing is asked
+  // of it until that service has said it is listening there. It was a fixed
+  // 7931 (#1703): two builds on the VPS reached this in the same second, and
+  // one run's /health was answered by the other run's service, the one with a
+  // record beside it.
   async function health(withRecord) {
     const d = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-voice-deploy-'));
     fs.copyFileSync(path.join(REPO, 'voice', 'voice-server.js'), path.join(d, 'voice-server.js'));
     fs.copyFileSync(path.join(REPO, 'voice', 'headlines.js'), path.join(d, 'headlines.js'));
     if (withRecord) fs.writeFileSync(path.join(d, 'thornswood-deploy.json'), JSON.stringify(Object.assign({}, record, { component: 'voice' })));
+    const port = await freePort();
     const srv = spawn(process.execPath, ['voice-server.js'], { cwd: d,
-      env: Object.assign({}, process.env, { THORNSWOOD_VOICE_PORT: String(PORT), THORNSWOOD_SITE: '', THORNSWOOD_VOICE_BIND: '127.0.0.1' }) });
+      env: Object.assign({}, process.env, { THORNSWOOD_VOICE_PORT: String(port), THORNSWOOD_SITE: '', THORNSWOOD_VOICE_BIND: '127.0.0.1' }) });
     srv.stdout.on('data', () => {}); srv.stderr.on('data', () => {});
     let h = null;
     try {
-      for (let i = 0; i < 60 && !h; i++) {
-        try { const r = await fetch('http://127.0.0.1:' + PORT + '/health'); if (r.ok) h = await r.json(); } catch (e) { }
-        if (!h) await new Promise((r) => setTimeout(r, 150));
-      }
+      await listening(srv, port);
+      const r = await fetch('http://127.0.0.1:' + port + '/health');
+      if (r.ok) h = await r.json();
+    } catch (e) {
+      console.log('      ' + e.message);
     } finally {
-      srv.kill();
-      await new Promise((r) => setTimeout(r, 300));
+      await stopped(srv);
       try { fs.rmSync(d, { recursive: true, force: true }); } catch (e) { }
     }
     return h;
