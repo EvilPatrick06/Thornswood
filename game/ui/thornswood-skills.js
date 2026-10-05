@@ -97,6 +97,13 @@
     spells: { '<spell name>': true }     what the character actually holds
     spellPoints: <number>                what is left to spend
 
+    college: { gain: <number>, school: '<taught school>' | null,
+               opens: <ms>, hours: <number>, rooms: [ '<a room, in words>' ] }
+      A semester at the College (#1387), sent to anybody magic is open to: a
+      mage, or somebody a Master mage taught. opens is when the next semester
+      opens on the server's clock, 0 when one is open now. Study sends
+      'skills:pick study'; a refusal comes back as a note about 'study'.
+
     staff: { points: <number>, rank: '<Bladebinder rank>',
              mine: [ '<spell desc>' ], spells: [ [ desc, name, rank ] ] }
       An Enchanter's staff spells (#1128), sent to an Enchanter and nobody
@@ -215,7 +222,7 @@
     */
     spells: {
       title: 'Spell book',
-      lead: 'The spells of your two schools, by rank. A spell costs one point; points come with each rank.',
+      lead: 'The spells of your two schools, by rank. A spell costs one point; points come with each rank and with a semester at the College.',
       ranks: [{ key: 'novice', name: 'Novice' }, { key: 'advanced', name: 'Advanced' },
               { key: 'expert', name: 'Expert' }, { key: 'master', name: 'Master' }],
       schools: {
@@ -276,6 +283,16 @@
       */
       lead: 'What you can make right now, by the kind of thing it is. Your own half, your sister half, and anything a Master taught you, each as far as your rank in it reaches. Recipes Skyrim keeps behind a perk, a spell or something you have to be holding are not counted as open.',
       rows: []   // the server sends the halves and their families
+    },
+    /*
+      A semester at the College (#1387). How many points, which school and
+      when the next one opens are all the server's, under mine.college; this
+      is the title and the one sentence over the page.
+    */
+    college: {
+      title: 'College',
+      lead: 'Stand in one of the rooms of the College of Winterhold and press Study, and the College hands you spell points, once a semester. Anywhere else, it says no.',
+      rows: []
     },
     home: {
       title: 'Home',
@@ -869,6 +886,25 @@
       });
     }
   }
+  /* The College page (#1387): the server's, under mine.college, or null when magic is not open to them. */
+  function collegeView() {
+    var got = mine && mine.college;
+    if (!got || typeof got !== 'object' || Array.isArray(got)) return null;
+    return got;
+  }
+  /* When a semester opens, as a time on this machine's clock: today, tomorrow, or the date. */
+  var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
+                'September', 'October', 'November', 'December'];
+  function whenOpens(ms) {
+    var d = new Date(ms);
+    var t = new Date();
+    var hm = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+    var day = new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime();
+    var then = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    if (then === day) return 'today at ' + hm;
+    if (then === day + 86400000) return 'tomorrow at ' + hm;
+    return d.getDate() + ' ' + MONTHS[d.getMonth()] + ' at ' + hm;
+  }
   /*
     THE STAFF SPELL PAGE, an Enchanter's spell book (#1128). The same three
     rules as the spell book above, over the Bladebinder rank the server sends
@@ -1126,6 +1162,8 @@
     if (section === 'tree') return 15;
     if (section === 'spells') return bookRows().length;
     if (section === 'staff') return staffRows().length;
+    // The College page is a page to read and one button.
+    if (section === 'college') return 0;
     // Nothing in the recipe book is picked, marked or sent, so there is no
     // row for the arrow keys to walk. Left and right still move sections.
     if (section === 'recipes') return 0;
@@ -1183,6 +1221,10 @@
     // An Enchanter's staff spells (#1128), right after the recipe book: the
     // server sends the page to an Enchanter and nobody else.
     if (staffBook()) sections.splice(sections.indexOf('recipes') + 1 || 1, 0, 'staff');
+    // The College (#1387), right after the spell book, or after Profession
+    // for somebody a Master mage taught: the server sends it to anybody
+    // magic is open to, and never while creating.
+    if (!creating() && collegeView()) sections.splice(sections.indexOf('spells') + 1 || 1, 0, 'college');
     /*
       Property, last, and only once there is something on it. Patrick,
       21 September: "once they claim a house or have a key to a house a property
@@ -1276,6 +1318,11 @@
       var m = markedCount();
       return { t: sp ? sp + ' to spend' : (m ? m + ' marked' : 'nothing yet'), c: sp ? 'need' : '' };
     }
+    if (sec === 'college') {
+      var cv = collegeView();
+      var opens = cv ? Number(cv.opens) || 0 : 0;
+      return opens > Date.now() ? { t: 'next ' + whenOpens(opens), c: '' } : { t: 'a semester is open', c: 'need' };
+    }
     if (sec === 'staff') {
       var sl = staffLeft();
       var sm = markedStaffDescs().length;
@@ -1346,6 +1393,7 @@
     else if (section === 'home') drawHome();
     else if (section === 'spells') drawSpells();
     else if (section === 'staff') drawStaff();
+    else if (section === 'college') drawCollege();
     else if (section === 'recipes') drawRecipes();
     else if (section === 'property') drawProperty();
     else if (section === 'review') drawReview();
@@ -1601,6 +1649,31 @@
       row.appendChild(stop);
       card.appendChild(row);
     });
+  }
+
+  /*
+    The College page (#1387): what a semester hands this character, where it
+    is studied, and when the next one opens. Everything on it is the
+    server's. Study is the foot's button.
+  */
+  function drawCollege() {
+    var cv = collegeView();
+    if (!cv) return;
+    var gain = Number(cv.gain) || 0;
+    var hours = Number(cv.hours) || 0;
+    var opens = Number(cv.opens) || 0;
+    elBody.appendChild(el('p', 'lead', 'A semester is ' + hours + ' hours. Each one hands you ' + gain +
+      (gain === 1 ? ' spell point' : ' spell points') +
+      (cv.school ? ', and it buys a Novice spell of ' + cap(cv.school) + ', the school you were taught, from its tome.'
+                 : ', for the spell book.')));
+    var rooms = Array.isArray(cv.rooms) ? cv.rooms.map(String) : [];
+    if (rooms.length) {
+      elBody.appendChild(el('p', 'lead', 'The rooms that count: ' +
+        (rooms.length > 1 ? rooms.slice(0, -1).join(', ') + ' and ' + rooms[rooms.length - 1] : rooms[0]) + '.'));
+    }
+    elBody.appendChild(el('p', 'lead', opens > Date.now()
+      ? 'Your next semester opens ' + whenOpens(opens) + '.'
+      : 'A semester is open to you now.'));
   }
 
   function drawRecipes() {
@@ -1917,7 +1990,8 @@
     var line = status || hint();
     // The spell book's own button says Learn, because what it sends is not a
     // choice about who you are: it is the spells you marked, one pick each.
-    var label = (!cr && section === 'spells') ? 'Learn' : ((!cr && section === 'staff') ? 'Unlock' : 'Confirm');
+    var label = (!cr && section === 'spells') ? 'Learn' : ((!cr && section === 'staff') ? 'Unlock'
+      : ((!cr && section === 'college') ? 'Study' : 'Confirm'));
     // The recipe book sends nothing, the same way the tree's plus buttons are
     // the tree's own sending, so neither carries a Confirm.
     var showConfirm = cr ? section === 'review'
@@ -1958,8 +2032,12 @@
       // 0 is the server saying none; no number at all is the server saying
       // nothing, and the page does not put words in its mouth.
       var sp = spellPoints();
-      if (sp !== null && sp <= 0) return 'No spell points to spend. More come with every rank.';
+      if (sp !== null && sp <= 0) return 'No spell points to spend. More come with every rank and with a semester at the College.';
       return 'Mark the spells you want, then press Learn. One point each.';
+    }
+    if (section === 'college') {
+      if (studyWaiting()) return 'Sent. The server is checking.';
+      return 'Press Study in one of the College\'s rooms. Anywhere else, the College says no.';
     }
     if (section === 'staff') {
       if (staffWaiting()) return 'Sent. The server is checking.';
@@ -2064,10 +2142,34 @@
     draw();
   }
 
+  /*
+    Study, on the College page (#1387): one press, dark from the moment it
+    sends until the answer is back or LEARN_WAIT_MS has passed, the way
+    Learn is. Lit whatever the clock says: the server holds the clock and
+    says when the next semester opens if it is not open yet.
+  */
+  var studyAt = 0;
+  function studyWaiting() {
+    if (!studyAt) return false;
+    if (Date.now() - studyAt >= LEARN_WAIT_MS) { studyAt = 0; return false; }
+    for (var i = 0; i < pending.length; i++) if (pending[i].section === 'college') return true;
+    studyAt = 0;
+    return false;
+  }
+  function study() {
+    if (studyWaiting() || !collegeView()) return;
+    send('college', 'study');
+    studyAt = Date.now();
+    status = 'Sent. The server is checking.'; statusKind = '';
+    setTimeout(function () { if (!studyWaiting()) draw(); }, LEARN_WAIT_MS + 50);
+    draw();
+  }
+
   function canConfirm() {
     if (creating()) return section === 'review' && !!softHome();
     if (section === 'spells') return canLearn();
     if (section === 'staff') return canUnlockStaff();
+    if (section === 'college') return !!collegeView() && !studyWaiting();
     var p = picked[section];
     if (!p || !p.row) return false;
     if (section === 'class') return !haveClass();
@@ -2120,6 +2222,7 @@
     if (creating()) { begin(); return; }
     if (section === 'spells') { learn(); return; }
     if (section === 'staff') { unlockStaff(); return; }
+    if (section === 'college') { study(); return; }
     var p = picked[section];
     send(section, section === 'class' ? 'class ' + p.row : 'profession ' + p.row + ' ' + p.subs.join(','));
     status = 'Sent. The server is checking.'; statusKind = '';
@@ -2324,6 +2427,12 @@
         markedStaff[p.spell] = false;
         cleared = true;
       }
+      else if (p.section === 'college' && after.college && before && before.college &&
+               after.college.opens !== before.college.opens) {
+        // The server opened a semester and moved the clock: the points are
+        // in the spell book, and the chat says how many.
+        status = 'Studied. The next semester opens ' + whenOpens(Number(after.college.opens) || 0) + '.'; statusKind = 'ok';
+      }
       else if (p.section === 'tree') { status = 'Spent.'; statusKind = 'ok'; }
       else if (p.section === 'perk' && perkRunning('fontofmagic')) { status = 'Font of Magic: for 15 seconds, a spell costs nothing.'; statusKind = 'ok'; }
       else done = false;
@@ -2358,7 +2467,7 @@
     list on PENDING_MS. The card stays as it was picked either way, so it can
     be sent again or replaced.
   */
-  var ABOUT_SECTION = { 'class': 'class', 'profession': 'profession', 'spell': 'spells', 'staffspell': 'staff', 'town': 'home', 'spend': 'tree', 'perk': 'perk' };
+  var ABOUT_SECTION = { 'class': 'class', 'profession': 'profession', 'spell': 'spells', 'staffspell': 'staff', 'town': 'home', 'spend': 'tree', 'perk': 'perk', 'study': 'college' };
   function refused(text, about) {
     status = 'No: ' + text + '.'; statusKind = 'no';
     if (!pending.length) return;

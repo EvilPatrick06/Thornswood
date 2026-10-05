@@ -248,7 +248,12 @@ yes('Flames, a Novice Destruction spell, is a staff spell a tome teaches',
 const TEACHER = { prof: 'mage', ranks: { destruction: 'master' } };
 function taught(srv, actor) {
   const s = srv.P.teach(srv.C.stateOf(actor), TEACHER, 'destruction');
-  if (s.ok) { srv.C.writeState(actor, s.state); }
+  if (s.ok) {
+    // And two semesters at the College (#1387), which is where somebody a
+    // Master mage taught earns the points their two places are learned with.
+    const t0 = 1800000000000;
+    srv.C.writeState(actor, srv.P.study(srv.P.study(s.state, t0).state, t0 + 24 * 3600000).state);
+  }
   return srv.C.stateOf(actor);
 }
 function chat(srv, actor) {

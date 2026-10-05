@@ -72,7 +72,7 @@ and help text never lists it.
 | `/merchant <id>`, `/merchant buy`, `sell`, `supply`, `close` | Anybody at a guild trader | A trader's wares | `gamemode.js:44619`, then `command` (54951) | The list; [Merchant's Guild](merchants-guild.md) | E on a trader opens the panel, which sends the rest. Out of the list and the page. | #1633 |
 | `/where` | Anybody today; a dev's tool | The cell, position and angle you stand at | `gamemode.js:45073` | The list | Stays a command, for dev and testers only. | #1633 |
 | `/apprentice <name> [half]`, `/apprentice end <name>`, `/apprentice` | A Master; anybody asks who is whose | Takes somebody on, ends it, says who is whose | `gamemode.js:40758`, `apprenticeCommand` (40656) | The list; `/help work`; [Masters and apprentices](apprenticeship.md), [Professions](professions.md), [Warrior](professions/warrior.md); the server's lines | Accept and Refuse for the learner. To come: a look prompt row for a Master, and the list on K. | #1634 |
-| `/study` | Anybody in the College rooms | A spell point in a semester | Not built | [Magic](magic.md), [Masters and apprentices](apprenticeship.md), [Liverywright](professions/tailor/liverywright.md) | To come: a button. | #1634 |
+| `/study` | Anybody in the College rooms | A spell point in a semester | Never a word. Study on the K panel's College page sends `/pick study`, below | [Magic](magic.md), [Masters and apprentices](apprenticeship.md) | Study on K, which the server answers only in the College's rooms. | #1387 |
 | `/ride`, `/ride <stop>` | Anybody at a driver | Where the driver goes and the fares; pay and go | `gamemode.js:44593`, the carriages block's `command` (37864) | The list; [Carriages and ferries](carriages.md); the server's lines at 37782 and 37811 | E on a driver lists the stops in the chat. To come: a panel of stops. | #1635 |
 | `/plant`, `/plot`, `/claim` at a plot | Anybody with the class | Sows a plot, says what is in it, claims the farm | `gamemode.js:40701`, then the farming block's `command` (33866) | The list; `/help work`, `/help land`; [Farmer](classes/farmer.md) | Bringing a crop in is the press. To come: a line and keys at the plot. | #1636 |
 | `/claim` at a door, `/deed`, `/deeds` | Anybody | Claims a building and hands the deed; lists what you hold | `gamemode.js:40701`, then the property block's `command` (37264) | The list; `/help land`; [Property](property.md), [Embassy](embassy.md), [Thalmor](thalmor.md) | None. To come: a line and a key at the door, and a list on a panel. | #1637 |
@@ -89,8 +89,9 @@ and help text never lists it.
 | `/maneuver <name>`, `/maneuver` | A warrior | Starts a warrior's maneuver; with no name, says which you hold | `gamemode.js`, `use` in the warrior maneuvers block | Nowhere. [Warrior](professions/warrior.md) names the key | The maneuver key (9) opens a panel of yours, and a number or a click there sends it. Never in the list or the help. | #1386 |
 
 `/pick` and `/spend` are the K panel's lines (`gamemode.js:40783`):
-profession, class, town, spells and points, and `/pick perk fontofmagic`
-from the Use button beside Font of Magic. K sends them and nothing tells
+profession, class, town, spells and points, `/pick perk fontofmagic`
+from the Use button beside Font of Magic, and `/pick study` from the
+Study button on the College page (#1387). K sends them and nothing tells
 anybody to type them, so there is nothing to turn.
 
 ## Staff and dev commands

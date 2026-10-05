@@ -414,7 +414,7 @@ const gerdHeard = srv.answer(SMITH2, '/yes');
 const g2 = st(srv, SMITH2);
 yes('C7: a Master mage teaches a Smith one school through the same command, and the non-mage rules hold',
     g2.taught.indexOf('destruction') !== -1 && P.schoolsOf(g2).join() === 'destruction' &&
-    P.spellPoints(g2) === L.outsiderSpells &&
+    P.placesLeft(g2) === L.outsiderSpells && P.spellPoints(g2) === 0 &&
     gerdHeard.some(function (x) { return x.id === SMITH2 && /learn 2 novice spells of it, each from its tome/.test(x.text); }));
 
 // #1147's own case: a Master Bladebinder teaching a Smith, through the command.
