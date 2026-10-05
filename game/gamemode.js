@@ -53390,7 +53390,17 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (n.worked && (now - n.worked) < NEEDS.workFor) {
       restRate = restRate * workMultiplier(actorId);
     }
-    var gain = restingGain(actorId, n);
+    /*
+      THE TIME AWAY GAINS NO REST (#1764). On an arrival n.resting is still
+      the place they logged out on, and nobody comes back into the world
+      sitting or lying down (#1734), so that place was not true while they
+      were gone: exhaustion.md, "You are resting only while the place is
+      true". Until #1764 the whole time away gained that place's rate, so a
+      chair or a bedroll on the road filled rest the way only the logout fill
+      may. The time away drains; the fill for the beds that give it is
+      arrived(), below, and the beds' first sight of them gets them up.
+    */
+    var gain = arriving ? 0 : restingGain(actorId, n);
     n.rest = clamp(n.rest + (gain - restRate) * hours);
 
     /*

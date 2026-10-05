@@ -105,7 +105,9 @@ come back into the world, whatever reads them first. The server
 counts you as up then, not lying in the bed. Coming back from any
 logout, on a seat or in a bed, with or without a server restart, you
 are up: nobody comes back into the world sitting or lying down, so a
-rest counts again once you sit or lie down again (#1734). Which beds
+rest counts again once you sit or lie down again (#1734). The time you
+were away gains no rest, whatever you logged out on: it only drains,
+and the logout fill above is the one thing a bed gives for it (#1764). Which beds
 give the fill and the 24 minutes are the suggested answers on #1606,
 built that way until Patrick says otherwise. Tea and skooma are not items the needs
 block knows.

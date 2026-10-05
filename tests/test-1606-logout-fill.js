@@ -210,8 +210,10 @@ function night(kind, away, first) {
   yes('A4 away exactly the night, 24 minutes, counts', t.n.rest === 100 && t.r.slept(ME) === 1);
   const s = night('bed', N.sleptFor - MIN);
   const d = s.r.N.NEEDS;
-  const rest = Math.min(100, s.was.rest + (d.recover.bed - d.drain.rest) * (N.sleptFor - MIN) / HOUR);
-  yes('A4 away a minute less is the ordinary settle at the bed\'s rate, and no line',
+  // #1764: the time away gains no rest, so a minute short of the night is
+  // the drain alone, not the bed's rate.
+  const rest = Math.max(0, s.was.rest - d.drain.rest * (N.sleptFor - MIN) / HOUR);
+  yes('A4 away a minute less is no night: no line, and the time away only drained (#1764)',
       s.r.slept(ME) === 0 && Math.abs(s.n.rest - rest) < 1e-6 && s.n.resting === 'bed');
 }
 
