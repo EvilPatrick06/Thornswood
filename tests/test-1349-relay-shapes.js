@@ -39,6 +39,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const net = require('net');
+const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const CR = String.fromCharCode(13);
@@ -106,6 +107,17 @@ function socket(port) {
 }
 // Built from code points, so this file stays plain ASCII.
 const C = String.fromCharCode;
+/*
+  Every join proves itself with a token (#1303), so this signs its own with
+  a key it puts beside its copy of the service, the way voice-server.js
+  signs them.
+*/
+const KEY = crypto.randomBytes(32).toString('hex');
+function tokenFor(pid) {
+  const body = String(pid) + '.' + String(Date.now() + 3600000);
+  return 'v1.' + body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
 const BAD = new RegExp('[' + C(0) + '-' + C(0x1f) + C(0x7f) + '-' + C(0x9f) + C(0x61c) + C(0x200e) + C(0x200f) +
                        C(0x2028) + C(0x2029) + C(0x202a) + '-' + C(0x202e) + C(0x2066) + '-' + C(0x2069) + ']');
 const keys = (o) => Object.keys(o || {}).sort().join(',');
@@ -114,10 +126,11 @@ const keys = (o) => Object.keys(o || {}).sort().join(',');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-1349-'));
   fs.copyFileSync(VOICE, path.join(dir, 'voice-server.js'));
   fs.copyFileSync(path.join(path.dirname(VOICE), 'headlines.js'), path.join(dir, 'headlines.js'));
+  fs.writeFileSync(path.join(dir, 'token-key.txt'), KEY);
   const PORT = await freePort('127.0.0.1');
   const srv = spawn(process.execPath, ['voice-server.js'], { cwd: dir,
     env: Object.assign({}, process.env, { THORNSWOOD_VOICE_PORT: String(PORT), THORNSWOOD_VOICE_BIND: '127.0.0.1',
-                                          THORNSWOOD_VOICE_AUTH: 'off', THORNSWOOD_SITE: '',
+                                          THORNSWOOD_SITE: '',
                                           THORNSWOOD_CHAT_DIR: path.join(dir, 'chat') }) });
   let srvLog = '';
   srv.stdout.on('data', (d) => { srvLog += d; });
@@ -127,10 +140,10 @@ const keys = (o) => Object.keys(o || {}).sort().join(',');
   console.log('#1349, a hostile name:');
   const HOSTILE = 'Bob' + C(0x202e) + C(7) + '\n[voice] REFUSED a join for profile 1: forged' + C(0x2028);
   const watcher = await socket(PORT);
-  watcher.send({ t: 'join', profileId: 20, name: 'S' + C(0xf6) + 'lvi Two-Feather\'s' });
+  watcher.send({ t: 'join', profileId: 20, name: 'S' + C(0xf6) + 'lvi Two-Feather\'s', token: tokenFor(20) });
   await wait(150);
   const bob = await socket(PORT);
-  bob.send({ t: 'join', profileId: 21, name: HOSTILE });
+  bob.send({ t: 'join', profileId: 21, name: HOSTILE, token: tokenFor(21) });
   await wait(200);
   const roster = watcher.got.filter((m) => m.t === 'peers').pop();
   const bobRow = roster && roster.peers.find((p) => p.profileId === 21);
@@ -159,9 +172,9 @@ const keys = (o) => Object.keys(o || {}).sort().join(',');
 
   console.log('\n#1350, signalling:');
   const one = await socket(PORT), two = await socket(PORT);
-  one.send({ t: 'join', profileId: 31, name: 'One' });
+  one.send({ t: 'join', profileId: 31, name: 'One', token: tokenFor(31) });
   await wait(100);
-  two.send({ t: 'join', profileId: 32, name: 'Two' });
+  two.send({ t: 'join', profileId: 32, name: 'Two', token: tokenFor(32) });
   await wait(200);
   const oneId = (one.got.find((m) => m.t === 'welcome') || {}).peer;
   const twoId = (two.got.find((m) => m.t === 'welcome') || {}).peer;
