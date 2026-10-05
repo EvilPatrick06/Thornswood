@@ -40,7 +40,7 @@ named below is in `launcher\app` unless the path says otherwise.
 
 ## Reading the references, and keeping them true
 
-A reference looks like `Shell.cs:5105 Play()`: the file, the line, and the
+A reference looks like `Shell.cs:5109 Play()`: the file, the line, and the
 name found on that line. A name ending in `()` is where that method is
 declared. A name without them is the line that calls it, sets it, or wires it.
 
@@ -105,7 +105,7 @@ it says a pool thread.
 | 5 | `Shell.cs:315 XamlReader.Parse` | Builds the window from the embedded ui.xaml. |
 | 6 | `Shell.cs:317 Bind` | Finds the controls, and sets `Discord.Folder` to Profile. |
 | 7 | `Shell.cs:318 Themes.Apply` | Colours from config.json's theme. |
-| 8 | `Shell.cs:319 Wire` | Attaches every handler, including the Play button, calls `WirePages` and `WireOwnGame`, and starts the two second timer (`Shell.cs:2542 DispatcherTimer`). |
+| 8 | `Shell.cs:319 Wire` | Attaches every handler, including the Play button, calls `WirePages` and `WireOwnGame`, and starts the two second timer (`Shell.cs:2544 DispatcherTimer`). |
 | 9 | `Shell.cs:320 BuildThemeRow` | Then `Shell.cs:322 BuildDisplay`, `Shell.cs:324 BuildStatRow`, `Shell.cs:325 BuildPathRows` and `Shell.cs:326 BuildHelp`: the theme buttons and display rows on Settings, the strip of figures from `Profile\stats.txt` (time played, sessions, last played, last update), the install and game folder rows, and the Help page. They draw controls and write nothing. |
 | 10 | `Shell.cs:332 OpenForUninstall` | Only when Windows sent `-uninstall`, which is what Uninstall under Installed apps runs. `ShellUninstall.cs:49 OpenForUninstall()` stops the two second timer before it has ticked, stands down the game folder check, opens on Settings with the Uninstall button in view, and runs the message loop itself. Run returns from here, so no row below this one happens: no update check, no server scan, no client repair, no voice, and the Installed apps entry is not written again. |
 | 11 | `Shell.cs:334 BuildModList` | The Mods page's list, then `Shell.cs:335 RefreshDiscord` (the Discord card) and `Shell.cs:339 ShowPage`, which opens on Play. |
@@ -147,7 +147,7 @@ go through it.
 
 ### The two second timer
 
-`Shell.cs:2544 timer.Tick` runs every two seconds for the life of the window,
+`Shell.cs:2546 timer.Tick` runs every two seconds for the life of the window,
 except in a window opened to uninstall, which stops it before it ticks.
 Every fifteenth tick it pings the server. While a game is running it reads the
 character choice every tick and checks for updates every fifteenth. The tick
@@ -282,9 +282,9 @@ pristine in `Profile\Keep` and put back before every Play by
 wrote them (`Keep.cs:175 Remember()`), plus the fixed `Core` list and any
 plugin named `thornswood-*.js`. Any other script in
 `Game\Data\Platform\Plugins` is parked in `Profile\Parked`, listed in
-`Profile\Parked\parked.txt`, until `Keep.cs:406 Unpark()` puts it back. Also
+`Profile\Parked\parked.txt`, until `Keep.cs:422 Unpark()` puts it back. Also
 writes and deletes the session note `Game\Data\Platform\thornswood-session.txt`
-(`Keep.cs:474 LeaveNote()`), which the plugins read to know the session is
+(`Keep.cs:490 LeaveNote()`), which the plugins read to know the session is
 ours. `Profile\developer.flag` makes a newer game copy win over the kept one;
 nothing writes it since 25 September, when `Go.ps1` started refreshing the kept
 copies of what it installs, so the machine that ships repairs the way a
@@ -325,21 +325,21 @@ without opening or writing the database. Deleted, ambiguous, corrupt or
 incomplete profile metadata is refused. Finish deployment and close Vortex
 before a bake or Ship so its exclusively held database can be read.
 
-**Checks** (Checks.cs). The rows on the Play page (`Checks.cs:1105 All()`):
+**Checks** (Checks.cs). The rows on the Play page (`Checks.cs:974 All()`):
 game build, script extender, Address Library, multiplayer, client, mods, mod
 list, other servers, auto load, Steam. A failed row shuts Play unless it is
 advisory, which is drawn amber and leaves Play alone. Address Library
 (`Checks.cs:51 AddressLibraryRow()`) is advisory, because a new row that
 blocks and is wrong on somebody's machine locks them out with nothing they
 can press. Finding and closing the game's processes
-(`Checks.cs:1284 GameRunning()`, `Checks.cs:1433 CloseGame()`). Writes nothing
+(`Checks.cs:1153 GameRunning()`, `Checks.cs:1302 CloseGame()`). Writes nothing
 except when Fix moves a file aside.
 
 **Door and Discord** (Door.cs, Discord.cs). Who is allowed in. The Discord
 ticket lives in `Profile\discord.txt`, DPAPI encrypted and locked to this
 account, with `discord-name.txt` and `dev-allowed.txt` beside it.
 `Door.cs:106 Check()` asks thornswood.net at `/api/play/join` through
-`Discord.cs:436 Join()`, holds a yes for five minutes, and writes the site's
+`Discord.cs:448 Join()`, holds a yes for five minutes, and writes the site's
 last answer to `Profile\door.txt`; when the site cannot be reached, or
 answers that it could not ask Discord, a yes in that file less than 72 hours
 old still lets the person in. Discord.cs also
@@ -366,7 +366,7 @@ writes `WebView2Loader.dll` and `voice-host.html` beside the exe and keeps the
 browser's data in `Profile\VoiceBrowser`. It talks to the game through small
 files in both `Game\Data\Platform` and Profile (`voice-status.txt`, and push
 to talk and `voice-muted.txt` written by the game, the second passed on to the
-voice page by `Voice.cs:1116 PassMuted()`). `Voice.cs:922 Reconfigure()` tells
+voice page by `Voice.cs:1122 PassMuted()`). `Voice.cs:928 Reconfigure()` tells
 it which character is being played. A join token opens one connection and is
 good for two minutes (#1322), so nothing keeps one: the voice page asks for a
 token before every try (`PageToken()`), and the game's chat asks by writing
@@ -379,8 +379,8 @@ there is no token. With no WebView2 runtime on the machine,
 when `Signature.MicrosoftRefusal` says Microsoft signed it (#1330).
 
 **OwnGame** (OwnGame.cs, OwnGameShare.cs, OwnGameKinds.cs and OwnGameClean.cs, with
-ShellOwnGame.cs for its card and offer). `<Root>\Game` itself. `OwnGame.cs:692 Make()` builds it in
-`<Root>\Game.new` and moves it into place; `OwnGame.cs:815 Refresh()` brings it
+ShellOwnGame.cs for its card and offer). `<Root>\Game` itself. `OwnGame.cs:718 Make()` builds it in
+`<Root>\Game.new` and moves it into place; `OwnGame.cs:844 Refresh()` brings it
 up to date with Vortex. Once made, the folder needs nothing from the Steam copy
 (#1218): a refresh takes only the files Vortex's record lists, the game's own
 files are the folder's own copies, and nothing writes into the Steam copy, so
@@ -408,7 +408,7 @@ name (`Owned`), and forgotten when the folder is made anew),
 `shared.txt`, `differs.txt` and `changed.txt` (the archives, OwnGameShare.cs),
 `made.txt`, `left-out.txt`, `declined.txt`, and Vortex's `plugins.txt` and
 `loadorder.txt`. `OwnGame.cs:361 WhyNot()` names the one thing stopping the
-folder being made. Every writer into Game calls `OwnGame.cs:1375 Unshare()` or
+folder being made. Every writer into Game calls `OwnGame.cs:1408 Unshare()` or
 Detach first, so a write never lands in Vortex's copy through a hard link.
 Make takes `Profile\Payload` in too, Thornswood's own files when the folder was
 chosen at install, and removes it (#1226). `OwnGameClean.cs CleanSteamCopy()`
@@ -532,16 +532,16 @@ appearing".
 
 ### The gate
 
-`Shell.cs:2811 DrawStatus()` runs on every page change, scan and recheck. It
-draws a row for each check in `Checks.cs:1105 All()`, and a failed row counts
-against Play unless it is advisory (`Shell.cs:2830 c.Blocks`); an advisory row
+`Shell.cs:2813 DrawStatus()` runs on every page change, scan and recheck. It
+draws a row for each check in `Checks.cs:974 All()`, and a failed row counts
+against Play unless it is advisory (`Shell.cs:2832 c.Blocks`); an advisory row
 that fails is drawn amber instead. The rows live in `StatusList` on the
 Diagnostics page now (#607); the Play page shows a one line summary of them
 (`DrawStatus.UpdateReadySummary`), and both are updated in place rather than
 torn down and rebuilt, so an unchanged pass does not flash or re-say itself.
 `DrawStatus.StatusRow` builds a row once and `DrawStatus.FillStatusRow` fills
 it. Then it sets
-`Shell.cs:2959 btnPlay.IsEnabled`, which turns the button on only when no row
+`Shell.cs:2963 btnPlay.IsEnabled`, which turns the button on only when no row
 counts against Play, none of
 `playing`, `updatePending`, `collectionBarUp` or `ownGameBusy` is set, no work
 is showing on the button (`playBar.Active`, see PlayProgress in section 2), and the
@@ -559,40 +559,40 @@ configured at all, which is a developer's own build and never a tester's.
 
 | # | Where | What happens | Left behind |
 |---|---|---|---|
-| 1 | `Shell.cs:2191 btnPlay.Click` | Wired in Wire. A game this launcher already started goes to Play; otherwise StartPlay. | |
+| 1 | `Shell.cs:2193 btnPlay.Click` | Wired in Wire. A game this launcher already started goes to Play; otherwise StartPlay. | |
 | 2 | `ShellChars.cs:38 StartPlay()` | | |
 | 3 | `ShellChars.cs:43 OwnGameRequired` | `ShellOwnGame.cs:255 OwnGameRequired()` returns straight away in this shape. In the shared shape it offers to make the folder, or says what is in the way, and Play stops. | nothing |
 | 3b | `ShellChars.cs:46 OwnGameRefreshIfDue` | `ShellOwnGame.cs:161 OwnGameRefreshIfDue()` asks `OwnGame.NeedsRefresh` under Waiting, then reads `ownGameBusy` again, since a bring-up-to-date queued at startup can begin inside that wait. When Vortex has deployed since the folder was made, it runs the same bring-up-to-date as Diagnostics, Bring it up to date from Vortex, and Play stops for it. When that succeeds, StartPlay runs again from step 1, so one press ends in the game; when it fails, nothing more runs and the reason is shown. A folder that still does not match straight after is said and not refreshed again. When NeedsRefresh cannot be answered, a log line says so and Play goes on. | the game folder, through OwnGame.Refresh, only when due |
 | 4 | `ShellChars.cs:53 Door.RecentlyCleared` | A yes from the site in the last five minutes skips the next step. | |
-| 5 | `ShellChars.cs:58 Door.Check` | `Door.cs:106 Check()` on a pool thread: `Discord.cs:436 Join()` posts the ticket and the profile id currently in `skymp5-client-settings.txt` to thornswood.net `/api/play/join`. A yes comes back through `ShellChars.cs:72 StartPlay`, which runs StartPlay again from the top and passes this step. A no shows why (`Door.cs:204 Explain()`) and nothing more runs. | `Profile\door.txt` (the answer and when); `discord-name.txt` and `dev-allowed.txt` when they changed |
+| 5 | `ShellChars.cs:58 Door.Check` | `Door.cs:106 Check()` on a pool thread: `Discord.cs:448 Join()` posts the ticket and the profile id currently in `skymp5-client-settings.txt` to thornswood.net `/api/play/join`. A yes comes back through `ShellChars.cs:72 StartPlay`, which runs StartPlay again from the top and passes this step. A no shows why (`Door.cs:204 Explain()`) and nothing more runs. | `Profile\door.txt` (the answer and when); `discord-name.txt` and `dev-allowed.txt` when they changed |
 | 6 | `ShellChars.cs:90 Checks.GameRunning` | A Skyrim started by hand goes straight to Play with nothing under Data touched, because a write to the client settings reloads every plugin in a running game. | |
 | 7 | `ShellChars.cs:101 Chars.Prepare` | Under Waiting. `Chars.cs:829 Prepare()`, below in its own table. It throws when the client settings or the character list cannot be written, and Play stops. | see below |
 | 8 | `ShellChars.cs:114 Chars.KnownIds` | Every profile id this install could pick, then `ShellChars.cs:120 CheckIn` for each on a pool thread, posting each one to `/api/play/join` so the server's allowed list has it before the person picks. A failure is a log line; the game still starts. | |
-| 9 | `ShellChars.cs:127 Play` | Into `Shell.cs:5105 Play()`. Its first lines check `updatePending`, `collectionBarUp`, `ownGameBusy`, `OwnGameRefreshIfDue` and the feed's hold again, because the button is not the only way in. | |
-| 9b | `Shell.cs:5120 OwnGameRefreshIfDue` | Same as step 3b, for the ways in that are not the button. | |
-| 10 | `Shell.cs:5123 Paths.Loader` | `Game\skse64_loader.exe` has to exist, and `Shell.cs:5124 Paths.MpClient` (`Game\Data\SKSE\Plugins\MpClientPlugin.dll`). | |
-| 11 | `Shell.cs:5129 ClearStuckGame` | A Skyrim with no window is closed; one on screen is asked about. Then, under Waiting, `Shell.cs:5141 OwnGame.CheckShared`: every archive the folder shares with the Steam copy still has the bytes on record (the change time is read, and the bytes only when it moved). One that changed stops Play and brings up the Downgrade card. | `Profile\OwnGame\shared.txt` and `changed.txt`, when anything moved |
-| 12 | `Shell.cs:5155 Verify.Run` | Under Waiting. Reads the plugin list, the server's manifest and the plugins' bytes. Any problem that would get the person refused: the Diagnostics page (Scan and Fix) opens with a message saying what to do, and Play stops. | nothing |
-| 13 | `Shell.cs:5213 Verify.DeployPersonal` | `<Root>\Your Mods` copied into `Game\Data`, never a plugin. | those files in `Game\Data` |
-| 14 | `Shell.cs:5227 Display.MatchScreen` | Skipped when Lock resolution is ticked. The game's window size and Display Tweaks' resolution follow the screen, then `Shell.cs:5229 Display.ScaleMenus`. | `Game\Data\SKSE\Plugins\SSEDisplayTweaks.ini`, `Profile\MyGames\SkyrimPrefs.ini`, `Game\Data\Interface\skyui\config.txt` and `config.shipped.txt`, each only when it changes |
-| 15 | `Shell.cs:5232 Enforce.Apply` | Settings two mods rewrite on the way out, put back; SkyrimPlatform at its normal log level with no text window; one actor draw distance for everybody (#963). Then `Shell.cs:5236 CrashDump.Apply`: the full crash snapshot on for the dev build and staff, off for everybody else, and snapshots it should not keep deleted (#1191). | `Game\Data\SKSE\Plugins\SkyrimSoulsRE.ini`, `OpenAnimationReplacer.ini`, `SkyrimPlatform.ini`, `CrashLogger.ini`, `Profile\MyGames\SkyrimPrefs.ini`; old `crash-*.dmp` in `Profile\MyGames\SKSE` deleted |
-| 16 | `Shell.cs:5243 AutoJoin.Apply` | `AutoJoin.cs:124 Apply()`: the server address and port, and where the client fetches the server's load order, through Hold.Around. SkyMP has no join screen; this file is the whole of joining. | `skymp5-client-settings.txt` when it changes |
-| 17 | `Shell.cs:5252 ThornIni.Ensure` | The template, if the file is missing. | `Game\Data\SKSE\Plugins\Thornswood.ini` |
-| 18 | `Shell.cs:5255 Mics.Apply` | This machine's microphone name, the voice port and the voice address. | `Thornswood.ini` |
-| 19 | `Shell.cs:5260 EnsureServer` | `Shell.cs:5068 EnsureServer()`: `SkyMp.Up` connects to the resources port. A server elsewhere that does not answer is asked about; one on this machine is started. | `Profile\server.pid` and `server.log`, local server only |
-| 20 | `Shell.cs:5267 Keep.Restore` | Last thing before the game that can still say no, so nothing is left parked by a refusal. Our Data\Platform files back from `Profile\Keep`; other servers' plugins parked. | changed files in `Game\Data\Platform`; `Profile\Parked\*` and `parked.txt` |
-| 21 | `Shell.cs:5269 Keep.LeaveNote` | The note that says this session is ours. The plugins idle without it. | `Game\Data\Platform\thornswood-session.txt` |
-| 22 | `Shell.cs:5275 Hold.Take` | Read only handles on every kept file and the client settings, and an empty held stand-in where each parked plugin was. | locks, and the stand-ins |
-| 23 | `Shell.cs:5279 Swap.Apply` | Windows' two Skyrim folders pointed at Profile. Throws, with the folder named, when Windows will not let one go. On the next line `playing` goes true, the theme music and the video behind the title stop, the button reads RUNNING and Quit game appears. | two junctions, two `.st-backup` folders, `Profile\swap.json` |
-| 24 | `Shell.cs:5298 ProcessStartInfo` | For `Game\skse64_loader.exe`, with Game as the working directory and no arguments, started at `Shell.cs:5321 Process.Start`. The loader starts `SkyrimSE.exe` beside it. Then one log line names the launcher version, the newest pack applied and the display mode. | |
-| 25 | `Shell.cs:5348 Discord.NewSession` | An id for this session, then `Shell.cs:5352 Discord.SessionStart` on a pool thread posts it to `/api/play/start`. | `Profile\logs-pending.txt` |
-| 26 | `Shell.cs:5359 Presence.Start` | The Discord card, on its own thread. | |
-| 27 | `Shell.cs:5361 PlayedFile` | Then `Shell.cs:5363 Stats.StartedPlaying`, a pause of 1.2 seconds, and the window minimises unless Keep launcher open is ticked. | `Profile\played.flag`, `Profile\stats.txt` |
+| 9 | `ShellChars.cs:127 Play` | Into `Shell.cs:5109 Play()`. Its first lines check `updatePending`, `collectionBarUp`, `ownGameBusy`, `OwnGameRefreshIfDue` and the feed's hold again, because the button is not the only way in. | |
+| 9b | `Shell.cs:5124 OwnGameRefreshIfDue` | Same as step 3b, for the ways in that are not the button. | |
+| 10 | `Shell.cs:5127 Paths.Loader` | `Game\skse64_loader.exe` has to exist, and `Shell.cs:5128 Paths.MpClient` (`Game\Data\SKSE\Plugins\MpClientPlugin.dll`). | |
+| 11 | `Shell.cs:5133 ClearStuckGame` | A Skyrim with no window is closed; one on screen is asked about. Then, under Waiting, `Shell.cs:5145 OwnGame.CheckShared`: every archive the folder shares with the Steam copy still has the bytes on record (the change time is read, and the bytes only when it moved). One that changed stops Play and brings up the Downgrade card. | `Profile\OwnGame\shared.txt` and `changed.txt`, when anything moved |
+| 12 | `Shell.cs:5159 Verify.Run` | Under Waiting. Reads the plugin list, the server's manifest and the plugins' bytes. Any problem that would get the person refused: the Diagnostics page (Scan and Fix) opens with a message saying what to do, and Play stops. | nothing |
+| 13 | `Shell.cs:5217 Verify.DeployPersonal` | `<Root>\Your Mods` copied into `Game\Data`, never a plugin. | those files in `Game\Data` |
+| 14 | `Shell.cs:5231 Display.MatchScreen` | Skipped when Lock resolution is ticked. The game's window size and Display Tweaks' resolution follow the screen, then `Shell.cs:5233 Display.ScaleMenus`. | `Game\Data\SKSE\Plugins\SSEDisplayTweaks.ini`, `Profile\MyGames\SkyrimPrefs.ini`, `Game\Data\Interface\skyui\config.txt` and `config.shipped.txt`, each only when it changes |
+| 15 | `Shell.cs:5236 Enforce.Apply` | Settings two mods rewrite on the way out, put back; SkyrimPlatform at its normal log level with no text window; one actor draw distance for everybody (#963). Then `Shell.cs:5240 CrashDump.Apply`: the full crash snapshot on for the dev build and staff, off for everybody else, and snapshots it should not keep deleted (#1191). | `Game\Data\SKSE\Plugins\SkyrimSoulsRE.ini`, `OpenAnimationReplacer.ini`, `SkyrimPlatform.ini`, `CrashLogger.ini`, `Profile\MyGames\SkyrimPrefs.ini`; old `crash-*.dmp` in `Profile\MyGames\SKSE` deleted |
+| 16 | `Shell.cs:5247 AutoJoin.Apply` | `AutoJoin.cs:124 Apply()`: the server address and port, and where the client fetches the server's load order, through Hold.Around. SkyMP has no join screen; this file is the whole of joining. | `skymp5-client-settings.txt` when it changes |
+| 17 | `Shell.cs:5256 ThornIni.Ensure` | The template, if the file is missing. | `Game\Data\SKSE\Plugins\Thornswood.ini` |
+| 18 | `Shell.cs:5259 Mics.Apply` | This machine's microphone name, the voice port and the voice address. | `Thornswood.ini` |
+| 19 | `Shell.cs:5264 EnsureServer` | `Shell.cs:5072 EnsureServer()`: `SkyMp.Up` connects to the resources port. A server elsewhere that does not answer is asked about; one on this machine is started. | `Profile\server.pid` and `server.log`, local server only |
+| 20 | `Shell.cs:5271 Keep.Restore` | Last thing before the game that can still say no, so nothing is left parked by a refusal. Our Data\Platform files back from `Profile\Keep`; other servers' plugins parked. | changed files in `Game\Data\Platform`; `Profile\Parked\*` and `parked.txt` |
+| 21 | `Shell.cs:5273 Keep.LeaveNote` | The note that says this session is ours. The plugins idle without it. | `Game\Data\Platform\thornswood-session.txt` |
+| 22 | `Shell.cs:5279 Hold.Take` | Read only handles on every kept file and the client settings, and an empty held stand-in where each parked plugin was. | locks, and the stand-ins |
+| 23 | `Shell.cs:5283 Swap.Apply` | Windows' two Skyrim folders pointed at Profile. Throws, with the folder named, when Windows will not let one go. On the next line `playing` goes true, the theme music and the video behind the title stop, the button reads RUNNING and Quit game appears. | two junctions, two `.st-backup` folders, `Profile\swap.json` |
+| 24 | `Shell.cs:5302 ProcessStartInfo` | For `Game\skse64_loader.exe`, with Game as the working directory and no arguments, started at `Shell.cs:5325 Process.Start`. The loader starts `SkyrimSE.exe` beside it. Then one log line names the launcher version, the newest pack applied and the display mode. | |
+| 25 | `Shell.cs:5352 Discord.NewSession` | An id for this session, then `Shell.cs:5356 Discord.SessionStart` on a pool thread posts it to `/api/play/start`. | `Profile\logs-pending.txt` |
+| 26 | `Shell.cs:5363 Presence.Start` | The Discord card, on its own thread. | |
+| 27 | `Shell.cs:5365 PlayedFile` | Then `Shell.cs:5367 Stats.StartedPlaying`, a pause of 1.2 seconds, and the window minimises unless Keep launcher open is ticked. | `Profile\played.flag`, `Profile\stats.txt` |
 
 If anything in Play throws, the catch at the end of it undoes the work in
-this order: `Shell.cs:5377 Swap.Restore`, `Shell.cs:5378 Hold.Release`,
-`Shell.cs:5379 Keep.Unpark`, `Shell.cs:5380 Presence.Stop`,
-`Shell.cs:5381 Keep.TakeNote`. A reason longer than one line is shown in a
+this order: `Shell.cs:5381 Swap.Restore`, `Shell.cs:5382 Hold.Release`,
+`Shell.cs:5383 Keep.Unpark`, `Shell.cs:5384 Presence.Stop`,
+`Shell.cs:5385 Keep.TakeNote`. A reason longer than one line is shown in a
 box.
 
 ### Inside Chars.Prepare (step 7)
@@ -637,7 +637,7 @@ empty stand-ins where parked plugins were.
 
 ### While the game runs
 
-`Shell.cs:2544 timer.Tick` keeps going. `Shell.cs:2558 PollChoice` reads
+`Shell.cs:2546 timer.Tick` keeps going. `Shell.cs:2560 PollChoice` reads
 `Game\Data\Platform\thornswood-choice.txt`, which the menu plugin writes when
 the person picks (`Chars.cs:592 ReadChoice()`); a new id is written into
 `profiles.txt` (`Chars.cs:617 Chose()`), handed to voice and checked in with
@@ -647,31 +647,31 @@ every minute after (a pass proves one session, #1320), and left in `Game\Data\Pl
 for the front plugin to hand the game server, which ends a session without
 one. Nothing in this loop writes the client settings: a write to that
 file reloads every plugin in the running game.
-`Shell.cs:2563 CheckUpdatesInPlay` looks for a release every thirty seconds
+`Shell.cs:2565 CheckUpdatesInPlay` looks for a release every thirty seconds
 and, four and a half minutes after first seeing one, closes the game so it can
 be installed, landing on the server's own five minute warning.
 
 ### When the game closes
 
 The first tick that finds no game runs, in order:
-`Shell.cs:2579 Presence.Stop`, `Shell.cs:2580 Hold.Release`,
-`Shell.cs:2581 Keep.TakeNote` (the session note goes),
-`Shell.cs:2582 Swap.Restore` (Windows' folders back, `swap.json` gone),
-`Shell.cs:2584 Keep.Unpark` (parked plugins home, or into `Profile\Isolated`
+`Shell.cs:2581 Presence.Stop`, `Shell.cs:2582 Hold.Release`,
+`Shell.cs:2583 Keep.TakeNote` (the session note goes),
+`Shell.cs:2584 Swap.Restore` (Windows' folders back, `swap.json` gone),
+`Shell.cs:2586 Keep.Unpark` (parked plugins home, or into `Profile\Isolated`
 when their launcher has already written a new copy),
-`Shell.cs:2587 Stats.StoppedPlaying`, then on a pool thread
-`Shell.cs:2598 Discord.SessionEnd` and `Shell.cs:2605 Discord.SessionLogs`
+`Shell.cs:2589 Stats.StoppedPlaying`, then on a pool thread
+`Shell.cs:2600 Discord.SessionEnd` and `Shell.cs:2607 Discord.SessionLogs`
 (the session's logs up to the site before the next start truncates them),
-`Shell.cs:2613 Chars.AddPlaytime`, `Shell.cs:2621 CrashDump.AfterSession`
+`Shell.cs:2615 Chars.AddPlaytime`, `Shell.cs:2623 CrashDump.AfterSession`
 (when a crash log was written this session, a line naming it and the
-snapshot beside it), `Shell.cs:2628 Checks.LastRunFrom` (a
-warning if that session ran some other Skyrim), and `Shell.cs:2641 Verify.Run`
+snapshot beside it), `Shell.cs:2630 Checks.LastRunFrom` (a
+warning if that session ran some other Skyrim), and `Shell.cs:2643 Verify.Run`
 on a pool thread. A game closed for an update then fetches and installs it
-(`Shell.cs:2676 CheckUpdatesBackground`).
+(`Shell.cs:2678 CheckUpdatesBackground`).
 
 ### Closing the launcher
 
-`Shell.cs:2523 win.Closing` asks first when a game is still running, then
+`Shell.cs:2525 win.Closing` asks first when a game is still running, then
 runs Swap.Restore, Hold.Release and, when no game is running, Keep.Unpark.
 
 ## 4. The six shared files
