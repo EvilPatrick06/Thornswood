@@ -16,18 +16,22 @@ namespace Thornswood
     /// When a character is picked at the game's menu (Shell.PollChoice), this
     /// asks the site for a pass for that character (Discord.Pass) and leaves it
     /// in Game\Data\Platform\thornswood-pass.txt, where the front plugin reads
-    /// it and sends it to the game server. A pass is good for ten minutes, so
-    /// it is fetched again every four while the game runs, which keeps a
-    /// session that reconnects after a server restart in. A fetch that fails
-    /// is tried again a minute later, and the site's reason goes in the log and
-    /// on the status line once. The pass itself never goes in a log.
+    /// it and sends it to the game server. A pass is good for ten minutes, but
+    /// the game server lets it prove one session only, and start one only in
+    /// the minute and a half after the site issued it (#1320), so it is
+    /// fetched again every minute while the game runs: a session that
+    /// reconnects after a server restart, or after its connection dropped, has
+    /// a pass it has not used within the minute. A fetch that fails is tried
+    /// again a minute later, and the site's reason goes in the log and on the
+    /// status line once. The pass itself never goes in a log.
     ///
     /// Only for joining the game: updating needs none, so a launcher of any age
     /// can still reach the feed and update itself.
     /// </summary>
     static class JoinPass
     {
-        const int RenewMinutes = 4;
+        // Inside the game server's ISSUED_MS, a minute and a half (#1320).
+        const int RenewMinutes = 1;
         const int RetryMinutes = 1;
 
         static readonly object gate = new object();
