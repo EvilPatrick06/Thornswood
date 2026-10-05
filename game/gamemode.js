@@ -48788,7 +48788,8 @@ const PLAYER_WORDS = ['/ooc', '/where',
               (pid2 === '-' ? 'a journal' : 'a page') + ' with you. Press J.');
         } catch (e) { }
       }
-      var fname = (soc.stateOf(actorId).friends[resolved.pid] || {}).name;
+      // The name they are on now, then the one the list kept (#1695).
+      var fname = there ? soc.nameOfPerson(there) : (soc.stateOf(actorId).friends[resolved.pid] || {}).name;
       return 'Shared with ' + (fname || 'them') + '.';
     }
 
@@ -49273,6 +49274,21 @@ const PLAYER_WORDS = ['/ooc', '/where',
         return true;
       }
 
+      /* Remove beside a friend on P sends their profile id (#1695), which is
+         exact whatever name they are on now. The list keeps the name they had
+         the day you became friends, so the name the row shows is not it. */
+      if (word === '/friend' && /^remove [1-9][0-9]*$/.test(rest)) {
+        var gonePid = Number(rest.slice(7));
+        var sfp = soc.stateOf(actorId);
+        if (!sfp.friends[gonePid]) { toProfile(profileId, 'They are not on your friends list.'); return true; }
+        var goneActor = soc.actorForProfile(gonePid);
+        var goneName = goneActor ? soc.nameOfPerson(goneActor) : String(sfp.friends[gonePid].name || 'That friend');
+        soc.dropFriend(actorId, gonePid);
+        toProfile(profileId, goneName + ' is no longer on your list.');
+        soc.push(actorId);
+        return true;
+      }
+
       /* Taking somebody off a list does not need them to be standing there. */
       if (word === '/friend' && rest.indexOf('remove ') === 0) {
         var gone = rest.slice(7).trim().toLowerCase();
@@ -49347,7 +49363,11 @@ const PLAYER_WORDS = ['/ooc', '/where',
         }
       }
 
-      var found = soc.findPerson(rest);
+      /* Ask to party beside a friend on P sends their profile id (#1695):
+         whoever that friend is playing now, never a name. */
+      var restPid = Number(rest);
+      var found = (word === '/party' && String(restPid) === rest && restPid > 0)
+        ? soc.friendNow(actorId, restPid) : soc.findPerson(rest);
       if (!found.actorId) { toProfile(profileId, found.why); return true; }
       var them = found.actorId;
       if (them === actorId) { toProfile(profileId, 'That is you.'); return true; }
@@ -56054,14 +56074,16 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
   /*
     The name beside a switch, for somebody who may be no friend and may have
-    logged off (#1628): the friend list's, then the person in the world, then
-    the name the switch was turned on with.
+    logged off (#1628): the person in the world, then the friend list's, then
+    the name the switch was turned on with. The world's first (#1695): the
+    list keeps the name a friend had the day you became friends, and a friend
+    whose character ended comes back as the same profile on a new one.
   */
   function knownName(s, pid) {
-    var f = s.friends[pid];
-    if (f && f.name) { return String(f.name); }
     var a = actorForProfile(pid);
     if (a) { return nameOfPerson(a); }
+    var f = s.friends[pid];
+    if (f && f.name) { return String(f.name); }
     var kept = [s.muted, s.textOff, s.namesOff];
     for (var i = 0; i < kept.length; i++) {
       if (kept[i] && typeof kept[i][pid] === 'string') { return kept[i][pid]; }
@@ -56101,6 +56123,22 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (!target.actorId) { return { pid: 0, name: '', why: target.why || 'Nobody here by that name.' }; }
     if (target.actorId === actorId) { return { pid: 0, name: '', why: 'That is you.' }; }
     return { pid: profileOf(target.actorId), name: nameOfPerson(target.actorId), why: '' };
+  }
+
+  /*
+    A friend on your list, by the profile id the P panel's friend row sends
+    (#1695), and whoever that profile is playing now. The list keys a friend
+    by profile and keeps only the name they had the day you became friends,
+    so a name sent from the row missed a friend on a new character, and could
+    find somebody else who answers to it. A friend who is not in the world is
+    said to be away, not looked for by name.
+  */
+  function friendNow(actorId, pid) {
+    var s = stateOf(actorId);
+    if (!s.friends[pid]) { return { actorId: 0, why: 'They are not on your friends list.' }; }
+    var a = actorForProfile(pid);
+    if (!a) { return { actorId: 0, why: (knownName(s, pid) || 'That friend') + ' is not in the world right now.' }; }
+    return { actorId: a, why: '' };
   }
 
   var lastTextSig = '';
@@ -56448,7 +56486,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       var n = Number(pid);
       friends.push({
         p: n,
-        name: (s.friends[pid] && s.friends[pid].name) || here[n] || 'somebody',
+        // The name they are online under, then the one kept (#1695).
+        name: here[n] || (s.friends[pid] && s.friends[pid].name) || 'somebody',
         on: !!here[n],
         muted: !!s.muted[pid],
         textOff: !!(s.textOff && s.textOff[n]),
@@ -56685,7 +56724,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     offer: offer, standingOffer: standingOffer, offers: offers,
     addFriend: addFriend, dropFriend: dropFriend, isFriend: isFriend,
     toggleMute: toggleMute, toggleText: toggleText, toggleName: toggleName,
-    toggleNamesAll: toggleNamesAll, resolveKnown: resolveKnown,
+    toggleNamesAll: toggleNamesAll, resolveKnown: resolveKnown, friendNow: friendNow,
     partyOf: partyOf, joinParty: joinParty, leaveParty: leaveParty,
     partyMember: partyMember, kickParty: kickParty, leadParty: leadParty,
     disbandParty: disbandParty,

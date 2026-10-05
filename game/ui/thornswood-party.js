@@ -426,6 +426,12 @@
     if (!data.friends || !data.friends.length) {
       html += '<div class="none">Nobody yet. Look at somebody and press the friend key.</div>';
     } else {
+      /*
+        EVERY BUTTON ON A FRIEND'S ROW SENDS THEIR PROFILE ID (#1695), never
+        the name drawn there. The list is kept by profile, and a friend whose
+        character ended comes back as the same profile under a new name; the
+        server finds whoever that profile is playing now.
+      */
       for (var j = 0; j < data.friends.length; j++) {
         var f = data.friends[j];
         var friendId = f.p != null ? f.p : f.name;
@@ -436,11 +442,11 @@
                 (f.textOff ? '<span class="tag m">text</span>' : '') +
                 (f.nameOff ? '<span class="tag m">name</span>' : '') +
                 '<span class="tools">' +
-                (f.on && !f.party ? '<button data-do="ask" data-who="' + esc(f.name) + '">Ask to party</button>' : '') +
+                (f.on && !f.party ? '<button data-do="ask" data-who="' + esc(friendId) + '">Ask to party</button>' : '') +
                 '<button data-do="mute" data-who="' + esc(friendId) + '">' + (f.muted ? 'Unmute' : 'Mute') + '</button>' +
                 '<button data-do="mtext" data-who="' + esc(friendId) + '">' + (f.textOff ? 'Read' : 'Text') + '</button>' +
                 '<button data-do="mname" data-who="' + esc(friendId) + '">' + (f.nameOff ? 'Show' : 'Name') + '</button>' +
-                '<button data-do="drop" data-who="' + esc(f.name) + '">Remove</button>' +
+                '<button data-do="drop" data-who="' + esc(friendId) + '">Remove</button>' +
                 '</span></div>';
       }
     }
