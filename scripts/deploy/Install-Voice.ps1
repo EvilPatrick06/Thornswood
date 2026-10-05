@@ -34,14 +34,13 @@ param(
     [string]$VpsUser  = '',
     [string]$Root     = 'C:\Thornswood-Voice',
     [int]$Port        = 7778,
-    # Which addresses the service answers on. Every interface is how this
-    # has always worked and is what an older launcher needs. 127.0.0.1 is
-    # for when Caddy carries /voice/ and the raw port is closing: check
-    # nothing is still connecting directly before using it, because a
-    # launcher that cannot reach voice has the address compiled in and no
-    # change here reaches it.
+    # Which addresses the service answers on. Loopback is the default since
+    # #1304: Caddy carries /voice/ and /voice-dev/, every launcher uses that
+    # https address, and live and dev have run on loopback since 29 September.
+    # 0.0.0.0 opens the raw port again, for a box with no proxy in front, and
+    # even then the service takes no token or ticket over it.
     [ValidateSet('0.0.0.0', '127.0.0.1')]
-    [string]$Bind     = '0.0.0.0',
+    [string]$Bind     = '127.0.0.1',
     # Who reads a typed line, entry 150. on is the shipped default since
     # 4 Oct, for live as well as dev (Patrick: local chat "should have went
     # out with the other changes to live"): the same cell and 4000 units,
@@ -123,11 +122,11 @@ if ($Restart) {
 <#
   What is already running, so a flag left off does not quietly undo it.
 
-  -Bind changed real behaviour and defaults to 0.0.0.0 whatever is already
-  live. That is right for a first install. Once the service is on loopback,
-  though, a later command that leaves it off, which is the easy thing to do
-  once this is routine, would silently reopen the port. Read what is
-  actually running first, and keep it unless the flag was actually passed.
+  -Bind changed real behaviour, and its default is loopback whatever is
+  already live. A box someone set to every interface on purpose would be
+  closed again by a later command that leaves it off, which is the easy
+  thing to do once this is routine. Read what is actually running first, and
+  keep it unless the flag was actually passed.
   -Auth went with #1303: the service refuses every join that cannot prove
   itself, so there is no auth left to keep.
 #>
@@ -289,12 +288,16 @@ if (-not `$node) {
 }
 if (-not `$node) { 'node is not installed on this machine'; 'SWAP REFUSED'; exit 1 }
 
-# The port everyone's browser connects to. The position feed is loopback only
-# and needs nothing opened.
+# The port, opened only for a service that answers every interface. On
+# loopback (the default since #1304) nothing outside has any business with it,
+# so a rule an earlier install made for it goes. The position feed is
+# loopback only and needs nothing opened either way.
 # Checked under the same name it is created under. This used to look for
 # 'Thornswood Voice' and create '$TaskName', so installing dev found the live
 # rule already there and never opened 7789 at all.
-if (-not (Get-NetFirewallRule -DisplayName '$TaskName' -EA SilentlyContinue)) {
+if ('$Bind' -eq '127.0.0.1') {
+    Remove-NetFirewallRule -DisplayName '$TaskName' -EA SilentlyContinue
+} elseif (-not (Get-NetFirewallRule -DisplayName '$TaskName' -EA SilentlyContinue)) {
     New-NetFirewallRule -DisplayName '$TaskName' -Direction Inbound -Protocol TCP -LocalPort $Port -Action Allow | Out-Null
 }
 

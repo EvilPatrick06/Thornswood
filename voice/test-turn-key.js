@@ -52,8 +52,8 @@ const HEALTH_FIELDS = ['ok', 'build', 'deploy', 'auth', 'uptimeSeconds', 'starte
                        'backed', 'largestQueueBytes', 'droppedPositions', 'skippedRosters',
                        'closedBacklogged', 'closedSilent'];
 // The two lines every start wrote, with nothing configured, on the port that
-// start was given.
-const startLog = (port) => '[voice] listening on 0.0.0.0:' + port + '\n' +
+// start was given. Loopback with nothing configured since #1304.
+const startLog = (port) => '[voice] listening on 127.0.0.1:' + port + ' (loopback only, so something must be proxying to it)\n' +
                            '[voice] positions accepted from loopback at POST /positions\n';
 
 let pass = 0, fail = 0;

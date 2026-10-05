@@ -213,9 +213,11 @@ exactly as this did before.
 /*
   Where the voice service is, for this page.
 
-  The launcher sends base and socket now. Older configs, and anything that has
-  not been rebuilt, send only host and port, so those are still what this falls
-  back to and the behaviour is unchanged for them.
+  The launcher sends base and socket, https and wss. Only those are taken
+  (#1304): the host and port the config also carries were the raw port,
+  which is shut, and the service refuses a join token over plain ws, so a
+  page that fell back to it would only ever be refused. No secure address is
+  no address, and the page says so.
 
   Two of them because they are not the same string: a base of
   https://thornswood.net/voice gives wss://thornswood.net/voice/ for the
@@ -223,17 +225,15 @@ exactly as this did before.
   useful about why.
 */
 function voiceBase() {
-  if (cfg && cfg.base) { return String(cfg.base).replace(/\/+$/, ''); }
-  if (!cfg) { return ''; }
-  return 'http://' + cfg.host + ':' + cfg.port;
+  var b = cfg ? String(cfg.base || '').replace(/\/+$/, '') : '';
+  return /^https:\/\//i.test(b) ? b : '';
 }
 
 function voiceSocket() {
-  if (cfg && cfg.socket) { return String(cfg.socket); }
+  var s = cfg ? String(cfg.socket || '') : '';
+  if (/^wss:\/\//i.test(s)) { return s; }
   var b = voiceBase();
-  if (b.indexOf('https://') === 0) { return 'wss://' + b.slice(8) + '/'; }
-  if (b.indexOf('http://') === 0) { return 'ws://' + b.slice(7) + '/'; }
-  return b + '/';
+  return b ? 'wss://' + b.slice(8) + '/' : '';
 }
 
 /*
@@ -307,7 +307,7 @@ function lost() {
 
 var ICE = [{ urls: 'stun:stun.l.google.com:19302' }];
 function refreshIce() {
-  if (!cfg || !cfg.host) { return; }
+  if (!cfg || !voiceBase()) { return; }
   try {
     // With the join token, in the body: the service hands the relay only to
     // somebody whose token checks out (#1307), and everybody else STUN.
@@ -352,6 +352,13 @@ function connect() {
   cfg.token = '';
 
   var url = voiceSocket();
+  if (!url) {
+    // Nothing to spend the token on: it stays for when a config with an
+    // address arrives, which calls this again.
+    cfg.token = token;
+    say('the launcher gave no secure voice address, so voice is off');
+    return;
+  }
   say('connecting to ' + url + (tries ? ' (try ' + (tries + 1) + ')' : ''));
   // The token goes with the handshake, as the protocol after 'thornswood',
   // and is what says who we are (#1337). It is never in the url, which this

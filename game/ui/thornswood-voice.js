@@ -714,8 +714,10 @@
       */
       var n = net();
       var tok = (n && typeof n.token === 'function') ? n.token() : String((window.THORNSWOOD || {}).token || '');
-      fetch(String((window.THORNSWOOD || {}).base || ('http://' + cfg.host + ':' + cfg.port)).replace(/\/+$/, '') + '/ice',
-            { method: 'POST', body: JSON.stringify({ token: tok }) })
+      // The https address only (#1304): the token rides this POST.
+      var base = String((window.THORNSWOOD || {}).base || '').replace(/\/+$/, '');
+      if (base.indexOf('https://') !== 0) { return; }
+      fetch(base + '/ice', { method: 'POST', body: JSON.stringify({ token: tok }) })
         .then(function (r) { return r.json(); })
         .then(function (d) {
           if (d && d.iceServers && d.iceServers.length) {

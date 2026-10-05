@@ -305,10 +305,10 @@
   })();
   const NEEDS_BARS = !/^\s*NeedsBars\s*=\s*0\s*$/im.test(ini);
   /*
-    Where voice lives when it is not just a port on the server address.
-    Written by the launcher at every Play, the same way VoicePort is.
-    Empty is the normal case and means the raw port, which is how this
-    worked before Caddy carried /voice/.
+    Where voice lives: https://thornswood.net/voice, or /voice-dev on the dev
+    build. Written by the launcher at every Play, the same way VoicePort is,
+    and always https since #1304, when the raw port it used to fall back to
+    was shut and the chat stopped opening anything but wss.
   */
   const VOICE_URL = (function () {
     const m = ini.match(/^\s*VoiceUrl\s*=\s*(\S+)/m);

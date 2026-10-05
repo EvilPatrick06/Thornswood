@@ -284,7 +284,8 @@ function StartVoice([int]$port, [hashtable]$vars, [string]$key) {
 # variables as its parameter block would leave them.
 function Probe([int]$port, [hashtable]$given, [string]$canned) {
     $Here = Join-Path $stubDir 'deploy'; $Port = $port; $VpsHost = 'vps.invalid'; $VpsUser = 'nobody'
-    $Bind = '0.0.0.0'; $ChatRange = 'on'; $TurnUrl = ''
+    # Loopback is the parameter's default since #1304.
+    $Bind = '127.0.0.1'; $ChatRange = 'on'; $TurnUrl = ''
     $bindExplicit = $false; $chatExplicit = $false; $turnExplicit = $false
     if ($given.ContainsKey('TurnUrl')) { $TurnUrl = $given['TurnUrl']; $turnExplicit = $true }
     $Root = 'C:\Thornswood-Voice'
@@ -325,7 +326,7 @@ $r = Probe $withRelay @{ TurnUrl = 'turn:other.example.net:3478' } ''
 Yes 'a -TurnUrl that is passed wins over what is running' ($r.TurnUrl -ceq 'turn:other.example.net:3478')
 $r = Probe $plain @{} ''
 Yes 'a service with no relay leaves the install with none, which is every box today, and its range off kept off' (
-    $r.TurnUrl -eq '' -and $r.Bind -eq '0.0.0.0' -and $r.ChatRange -eq 'off')
+    $r.TurnUrl -eq '' -and $r.Bind -eq '127.0.0.1' -and $r.ChatRange -eq 'off')
 Yes 'and says nothing about a relay at all' ($r.Said -notmatch 'relay')
 $r = Probe $plain @{} 'bind=127.0.0.1;auth=on;chat=2500;relay=none;turn='
 Yes 'an answer with nothing after turn= keeps bind and chat range and no relay' (
@@ -334,6 +335,6 @@ $r = Probe $plain @{} 'bind=0.0.0.0;auth=log;chat=0;relay=ephemeral;turn=turn:x:
 Yes 'an answer carrying something that is not a relay address is not put on the command line' ($r.TurnUrl -eq '')
 $r = Probe $plain @{} 'none'
 Yes 'nothing running leaves every default as it was, local chat on' (
-    $r.TurnUrl -eq '' -and $r.Bind -eq '0.0.0.0' -and $r.ChatRange -eq 'on')
+    $r.TurnUrl -eq '' -and $r.Bind -eq '127.0.0.1' -and $r.ChatRange -eq 'on')
 
 Done
