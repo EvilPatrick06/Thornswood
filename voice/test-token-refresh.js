@@ -42,7 +42,9 @@ FakeSocket.prototype.welcome = function () { if (this.onmessage) this.onmessage(
 const asked = [];
 let timers = [];
 const win = {
-  THORNSWOOD: { host: '127.0.0.1', port: 7778, profileId: 4242, name: 'tester', token: 'v2.4242.1.first' },
+  // The https address the launcher writes; there is no ws:// fallback (#1304).
+  THORNSWOOD: { host: '127.0.0.1', port: 7778, profileId: 4242, name: 'tester', token: 'v2.4242.1.first',
+                base: 'https://thornswood.net/voice' },
   skyrimPlatform: { sendMessage: (to, what) => { if (to === 'thornswood-front' && /^token\? /.test(what)) asked.push(what); } },
 };
 const sandbox = {

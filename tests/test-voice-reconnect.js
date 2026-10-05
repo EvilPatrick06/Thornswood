@@ -180,7 +180,10 @@ function hostPage() {
   const tokens = p.made.map((w) => w.token);
   yes('every try offered a token of its own, none twice (#1322)',
       tokens.every((t) => !!t) && new Set(tokens).size === tokens.length);
-  yes('each one asked the launcher for first', p.posted.filter((m) => m.t === 'token').length === offline);
+  // One ask a try, and the last ask can still be waiting on its answer when
+  // the half hour ends: the backoff is random, so either is right.
+  const asked = p.posted.filter((m) => m.t === 'token').length;
+  yes('each one asked the launcher for first (' + asked + ' asks, ' + offline + ' tries)', asked === offline || asked === offline + 1);
 
   /*
     20:06: back, and the service refuses the token at the handshake. The page

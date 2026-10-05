@@ -103,9 +103,10 @@ namespace Thornswood
             // shared game folder has to be told which one every launch, or a
             // dev session would put its positions on the main server.
             string port = cfg == null ? "" : (cfg.VoicePort ?? "").Trim();
-            // And where voice lives, when that is not just a port. The game
-            // overlay opens its own socket and has no other way to be told.
-            string vurl = cfg == null ? "" : (cfg.VoiceUrl ?? "").Trim();
+            // And where voice lives. The game overlay opens its own socket and
+            // has no other way to be told. VoiceBase, not the raw setting, so
+            // the game always gets the https address the launcher uses (#1304).
+            string vurl = cfg == null ? "" : cfg.VoiceBase();
             if (want.Length == 0 && port.Length == 0 && vurl.Length == 0) return "";
 
             string ini = Path.Combine(Paths.Game, "Data\\SKSE\\Plugins\\Thornswood.ini");

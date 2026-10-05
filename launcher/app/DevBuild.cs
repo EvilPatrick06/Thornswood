@@ -33,8 +33,8 @@ namespace Thornswood
         /// commands from the dev service only. Until 20 September the dev
         /// build kept the main address, so its chat lines, /pick among them,
         /// went to the live service and were answered by the live gamemode,
-        /// which had never heard of the command. Empty stays empty: that is
-        /// the raw port, and VoicePort already says which one.
+        /// which had never heard of the command. Empty stays empty: the dev
+        /// build's Config.VoiceBase gives it this for Config.Voice.
         /// </summary>
         public static string DevVoiceUrl(string mainUrl)
         {

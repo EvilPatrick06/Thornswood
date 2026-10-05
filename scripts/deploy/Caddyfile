@@ -14,24 +14,21 @@
 # validate complains about the line if you do not.
 #
 # ---------------------------------------------------------------------------
-# THE VOICE BLOCKS ARE LIVE, AND ON THEIR OWN THEY CHANGE NOTHING.
+# THE VOICE BLOCKS ARE THE ONLY WAY TO VOICE.
 #
-# The voice service still answers on 7778 and 7789 directly as well, so every
-# launcher already installed carries on exactly as before. These blocks add a
-# second way in, through the certificate, for clients that know to use it.
+# The voice services listen on 127.0.0.1:7778 and 127.0.0.1:7789 only, and
+# every client uses https://thornswood.net/voice and /voice-dev with wss for
+# the socket. The three steps this block once listed are done: the clients
+# build wss and nothing else, they went out, and the services bind loopback,
+# the default since #1304. A join token and a Discord ticket only ever reach
+# the service through here: it refuses one over plain http or ws, and Caddy
+# marks what it carries with X-Forwarded-Proto https.
 #
 # handle_path strips the prefix, so /voice/health reaches the service as
 # /health and everything it serves keeps working unchanged. Caddy carries a
 # WebSocket upgrade through reverse_proxy without being told to, so the
-# signalling socket needs nothing more than this.
-#
-# What is NOT done yet, in this order:
-#   1. the clients still build ws://host:port and must learn to use wss
-#   2. those clients have to ship and go out
-#   3. only then THORNSWOOD_VOICE_BIND=127.0.0.1 and the two ports close
-#
-# Doing 3 before 2 takes voice from everybody, and no change here brings them
-# back, because the raw address is compiled into the copy on their machine.
+# signalling socket needs nothing more than this. Take these blocks out
+# (Setup-Domain.ps1 writes a Caddyfile without them) and voice is gone.
 # ---------------------------------------------------------------------------
 
 {

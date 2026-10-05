@@ -554,9 +554,10 @@ yes('the chat box itself is on screen', P.dom.onScreen(T.input));
   const widget = P.front.sets[P.front.sets.length - 1][0];
   widget.send('typed before the socket');
 
-  P.loadChat({ host: 'voice.test', port: 7778, profileId: 1, name: 'Sera', token: 'test-token' });
+  // The https address the launcher writes; there is no ws:// fallback (#1304).
+  P.loadChat({ host: 'voice.test', port: 7778, profileId: 1, name: 'Sera', token: 'test-token', base: 'https://voice.test/voice' });
   const ws = P.sockets[0];
-  yes('thornswood-chat.js opens its socket', !!ws && ws.url === 'ws://voice.test:7778/');
+  yes('thornswood-chat.js opens its socket, over wss', !!ws && ws.url === 'wss://voice.test/voice/');
 
   P.runIntervals();
   ws.readyState = 1;
