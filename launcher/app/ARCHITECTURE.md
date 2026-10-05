@@ -639,8 +639,8 @@ empty stand-ins where parked plugins were.
 the person picks (`Chars.cs:592 ReadChoice()`); a new id is written into
 `profiles.txt` (`Chars.cs:617 Chose()`), handed to voice and checked in with
 the site. The same tick keeps a join pass for the character picked
-(`JoinPass.cs:63 Tick()`, #937): fetched from the site when they pick and
-every four minutes after, and left in `Game\Data\Platform	hornswood-pass.txt`
+(`JoinPass.cs:67 Tick()`, #937): fetched from the site when they pick and
+every minute after (a pass proves one session, #1320), and left in `Game\Data\Platform	hornswood-pass.txt`
 for the front plugin to hand the game server, which ends a session without
 one. Nothing in this loop writes the client settings: a write to that
 file reloads every plugin in the running game.

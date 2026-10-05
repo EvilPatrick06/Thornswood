@@ -8,7 +8,8 @@
   it found has just published it, in a build log anybody on the repository can
   read.
 
-      .\scripts\dev\Check-Secrets.ps1                            every file git tracks here
+      .\scripts\dev\Check-Secrets.ps1                            every file git tracks here, and in
+                                             each submodule that is checked out
       .\scripts\dev\Check-Secrets.ps1 -Zip <pack, installer zip, or Setup program>
                                              the entries of a zip. A Setup program is a
                                              program with a zip appended; that zip is read too.
@@ -36,6 +37,16 @@
   that sit gitignored on the shipping machine (the two webhook files,
   server-secret.txt, config.json) are never opened.
 
+  AND WHAT ITS SUBMODULES TRACK (#1326). engine\skymp, the fork every server
+  and client build is made from, is a submodule: git ls-files here lists it as
+  one gitlink, which is not a file, so not one of its files was ever read.
+  Each submodule that is checked out is now read the same way, by its own
+  git ls-files, its paths reported and allowed under engine/skymp/. One that
+  is not checked out is said by name, and -Submodules Require counts it as
+  not read, so a run that fetched it first cannot pass without having read
+  it. The fork's own submodules (vcpkg) are Microsoft's and other people's
+  code, not the fork's, and are named and left.
+
   A known non-secret that a rule matches goes in Check-Secrets.allow.txt beside
   this script, by path and rule, with a line saying why it is safe. Never a real
   secret: a real one is taken out and replaced, not allowed.
@@ -52,7 +63,10 @@ param(
     # A built program, read byte by byte as text and as UTF-16.
     [string[]]$Binary = @(),
     # The allow list. Empty is Check-Secrets.allow.txt beside this script.
-    [string]$Allow = ''
+    [string]$Allow = '',
+    # A submodule the tree scan finds not checked out (#1326): Say names it
+    # and carries on; Require also counts it as not read, so the scan exits 2.
+    [ValidateSet('Say', 'Require')][string]$Submodules = 'Say'
 )
 
 Set-StrictMode -Version Latest
@@ -348,26 +362,87 @@ function Read-Entry($entry) {
 }
 
 # ---------------------------------------------------------------- modes
-function Invoke-Tree([string]$root) {
-    if (-not $root) { $root = Split-Path -Parent (Split-Path -Parent $Here) }
+# git in $dir, its output as lines, and whether it answered 0.
+function Invoke-GitLines([string]$dir, [string[]]$argv) {
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    $files = @(& git -C $root -c core.quotepath=off ls-files 2>$null)
-    $rc = $LASTEXITCODE
-    $ErrorActionPreference = $old
-    if ($rc -ne 0 -or -not $files.Count) { Write-Unread $root 'git ls-files gave no list of tracked files'; return }
-    foreach ($rel in $files) {
-        if (-not $rel) { continue }
-        Test-Name $rel $rel (Split-Path $rel -Leaf) $true
-        $full = Join-Path $root $rel
+    try { $lines = @(& git -C $dir -c core.quotepath=off @argv 2>$null); $rc = $LASTEXITCODE }
+    finally { $ErrorActionPreference = $old }
+    return [pscustomobject]@{ Ok = ($rc -eq 0); Lines = @($lines | Where-Object { $_ }) }
+}
+
+# The submodules a repository tracks: the paths git lists with mode 160000,
+# and the commit each is pinned to.
+function Get-Gitlinks([string]$dir) {
+    $out = @()
+    foreach ($l in (Invoke-GitLines $dir @('ls-files', '-s')).Lines) {
+        $m = [regex]::Match($l, '^160000 ([0-9a-f]{40}) \d+\t(.+)$')
+        if ($m.Success) { $out += [pscustomobject]@{ Path = $m.Groups[2].Value; Pin = $m.Groups[1].Value } }
+    }
+    return $out
+}
+
+# Every file in $files, under $dir, reported as $prefix plus its path.
+function Test-TreeFiles([string]$dir, [string]$prefix, [string[]]$files, [string[]]$skip) {
+    foreach ($f in $files) {
+        if (-not $f -or $skip -contains $f) { continue }
+        $rel = $prefix + $f
+        Test-Name $rel $rel (Split-Path $f -Leaf) $true
+        $full = Join-Path $dir $f
         # Tracked but deleted in this working copy: nothing to read.
         if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { continue }
-        $ext = [IO.Path]::GetExtension($rel).ToLowerInvariant()
+        $ext = [IO.Path]::GetExtension($f).ToLowerInvariant()
         if ($BinaryExts -contains $ext) { continue }
         $len = (Get-Item -LiteralPath $full -Force).Length
         if ($len -gt $TextCap) { Write-Unread $rel 'larger than the text cap'; continue }
         Test-TextBytes $rel $rel ([IO.File]::ReadAllBytes($full))
     }
+}
+
+# One submodule of the tree (#1326): read the way the tree is, when it is
+# checked out, and named when it is not.
+function Invoke-Submodule([string]$root, $link) {
+    $full = Join-Path $root $link.Path
+    $short = $link.Pin.Substring(0, 12)
+    # Checked out means a repository of its own at that path: git there is at
+    # the top of its tree. An empty folder there answers git with this
+    # repository, from a folder below its top, and is not.
+    $isOwn = $false
+    if (Test-Path -LiteralPath $full -PathType Container) {
+        $pre = Invoke-GitLines $full @('rev-parse', '--show-prefix')
+        $isOwn = $pre.Ok -and $pre.Lines.Count -eq 0
+    }
+    if (-not $isOwn) {
+        $why = 'it is not checked out here, so none of its files were read. git submodule update --init --depth 1 ' + $link.Path + ' fetches it at ' + $short
+        if ($Submodules -eq 'Require') { Write-Unread $link.Path $why; return }
+        if ($env:GITHUB_ACTIONS -eq 'true') { Write-Host ('::notice file=.gitmodules::{0}: {1}' -f $link.Path, $why) }
+        else { Write-Host ('  {0}: {1}' -f $link.Path, $why) -ForegroundColor Yellow }
+        return
+    }
+    $list = Invoke-GitLines $full @('ls-files')
+    if (-not $list.Ok -or -not $list.Lines.Count) { Write-Unread $link.Path 'git ls-files gave no list of its tracked files'; return }
+    $head = (Invoke-GitLines $full @('rev-parse', 'HEAD')).Lines
+    $at = if ($head.Count) { [string]$head[0] } else { '' }
+    if ($at -and $at -ne $link.Pin) {
+        Write-Host ('  {0} is checked out at {1}, not at {2}, the commit this repository pins; what is checked out is what was read' -f $link.Path, $at.Substring(0, 12), $short) -ForegroundColor Yellow
+    }
+    $nested = @(Get-Gitlinks $full)
+    $before = $script:read
+    Test-TreeFiles $full ($link.Path + '/') $list.Lines @($nested | ForEach-Object { $_.Path })
+    Write-Host ('  {0}: {1} tracked files at {2}, {3} read as text' -f $link.Path, $list.Lines.Count, $(if ($at) { $at.Substring(0, 12) } else { $short }), ($script:read - $before))
+    if ($nested.Count) {
+        Write-Host ('  {0}: its own submodules are other people''s code and were not read: {1}' -f $link.Path, (($nested | ForEach-Object { $_.Path }) -join ', ')) -ForegroundColor DarkGray
+    }
+}
+
+function Invoke-Tree([string]$root) {
+    if (-not $root) { $root = Split-Path -Parent (Split-Path -Parent $Here) }
+    $list = Invoke-GitLines $root @('ls-files')
+    $files = $list.Lines
+    if (-not $list.Ok -or -not $files.Count) { Write-Unread $root 'git ls-files gave no list of tracked files'; return }
+    $links = @(Get-Gitlinks $root)
+    Test-TreeFiles $root '' $files @($links | ForEach-Object { $_.Path })
     Write-Host ('  {0} tracked files, {1} read as text' -f $files.Count, $script:read)
+    foreach ($l in $links) { Invoke-Submodule $root $l }
 }
 
 # .NET ZipFile.OpenRead does not read a zip concatenated onto a program.

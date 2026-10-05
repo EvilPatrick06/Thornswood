@@ -532,10 +532,12 @@ yes('only the roster is sent newest-only',
   yes('the second stuck socket is in the room', !!target);
 
   const markB = probes.length;
+  // As a description, the shape every page sends: the service passes on
+  // signalling of no other shape (#1350).
   const offer = 'x'.repeat(60000);
   let sent = 0, closed = false;
   for (let round = 0; round < 40 && !closed; round++) {
-    for (let i = 0; i < 10; i++) { send(R, { t: 'sdp', to: target, sdp: offer }); sent++; }
+    for (let i = 0; i < 10; i++) { send(R, { t: 'sdp', to: target, sdp: { type: 'offer', sdp: offer } }); sent++; }
     await sleep(80);
     closed = (await health()).peers === 2;
   }
@@ -588,7 +590,7 @@ yes('only the roster is sent newest-only',
   const note = 'y'.repeat(4000);
   const burst = [];
   for (let i = 0; i < 3000; i++) {
-    burst.push(frameOf({ t: 'sdp', to: self, sdp: note }));
+    burst.push(frameOf({ t: 'sdp', to: self, sdp: { type: 'offer', sdp: note } }));
     burst.push(frameOf({ t: 'chat', text: 'line ' + i }));
     burst.push(frameOf({ t: 'chat', text: '/roll ' + i }));
   }

@@ -11,7 +11,7 @@ Every row the recipe, harvest, ore and hunt tables currently hold. The pages tha
 - [Tailor/Haberdasher](tailor-haberdasher.md) (168, 168 reach the server)
 - [Tailor/Liverywright](tailor-liverywright.md) (81, 81 reach the server)
 - [Woodworker/Charburner](woodworker-charburner.md) (5, 5 reach the server)
-- [Woodworker/Woodwright](woodworker-woodwright.md) (36, 36 reach the server)
+- [Woodworker/Woodwright](woodworker-woodwright.md) (33, 33 reach the server)
 - [Embassy and remnant rolls](roll-gates.md) (24)
 - [Anybody](anybody.md) (588)
 - [Refused](refused.md) (235)
@@ -21,7 +21,7 @@ Every row the recipe, harvest, ore and hunt tables currently hold. The pages tha
 - [Gatherer](gatherer.md) (46 rows, 105 records)
 - [Farmer](farmer.md) (10 rows, 14 records)
 - [Fisher](fisher.md) (12 rows, 21 records)
-- [Hunter](hunter.md) (36 rows, 119 records)
+- [Hunter](hunter.md) (116 rows, 361 records)
 - [Eggs and wild food](wild-food.md) (4)
 - [Unranked](unranked.md) (44)
 

@@ -145,6 +145,8 @@ Generated from the work tables by `scripts/dev/Write-SystemLists.js`. The same r
 The fifteen records, the waits, the yields, and a cooldown kept per
 person are in the server. A pole is required, and a new fisher is
 handed a crude pole. The fishing mod's rods are in the collection and
-do nothing. None of the new water is placed. The poles and the trap
+do nothing, and its three pole recipes are cut (the cut file, #1766),
+so the Woodwright's book holds only our three poles and the trap. None
+of the new water is placed. The poles and the trap
 are Woodwright recipes at the ranks above, in Thornswood-Content.esp
 and the recipe table.

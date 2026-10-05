@@ -22,6 +22,7 @@
 
 const http = require('http');
 const crypto = require('crypto');
+const net = require('net');
 const fs = require('fs');
 const path = require('path');
 const headlines = require('./headlines');
@@ -59,7 +60,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-token-once-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-token-once-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -107,7 +108,21 @@ function peerName(p) {
   answer came. Never throws and never hangs: a three second timeout. Only
   'yes' gets a token (#1315); 'unchecked' is not a refusal, so /token says
   the question went unanswered rather than that the profile is not theirs.
+
+  AND THE ANSWER IS READ TO A LIMIT, IN SIZE AND IN TIME (#1352). The site
+  answers about thirty bytes ({"ok":true,"why":"theirs"}), and its own limit
+  on the question is 8 KB. This used to add every byte that came back to one
+  string. Measured on 5 October: a site answering 400 MB took this service
+  from 47 MB to 534 MB, and one answering more than about 512 MB stopped it
+  outright (RangeError: Invalid string length), the longest string node
+  holds. And the three seconds were req2.setTimeout, which counts only time
+  with nothing arriving, so a site sending a byte a second held /token open
+  for as long as it kept sending. So reading stops past OWNS_REPLY_MAX, and
+  the whole exchange has OWNS_WAIT_MS from the moment it is asked; either is
+  unchecked, like anything else unexpected here.
 */
+const OWNS_REPLY_MAX = 64 * 1024;
+const OWNS_WAIT_MS = 3000;
 function owns(ticket, profileId, then) {
   if (!SITE || !ticket) { then('unchecked'); return; }
   let mod;
@@ -116,7 +131,8 @@ function owns(ticket, profileId, then) {
 
   const payload = JSON.stringify({ ticket: ticket, profileId: profileId });
   let done = false;
-  const finish = (v) => { if (!done) { done = true; then(v); } };
+  let late = null;
+  const finish = (v) => { if (!done) { done = true; clearTimeout(late); then(v); } };
 
   let req2;
   try {
@@ -126,7 +142,19 @@ function owns(ticket, profileId, then) {
                  'content-length': Buffer.byteLength(payload) }
     }, (resp) => {
       let buf = '';
-      resp.on('data', (d) => { buf += d; });
+      let size = 0;
+      resp.on('data', (d) => {
+        if (done) return;
+        size += d.length;
+        if (size > OWNS_REPLY_MAX) {
+          console.log('[voice] the site\'s answer to the ownership check passed ' + OWNS_REPLY_MAX +
+                      ' bytes, so the rest was not read');
+          try { req2.destroy(); } catch (e) { }
+          finish('unchecked');
+          return;
+        }
+        buf += d;
+      });
       resp.on('end', () => {
         if (resp.statusCode !== 200) { finish('unchecked'); return; }
         let doc;
@@ -136,7 +164,7 @@ function owns(ticket, profileId, then) {
     });
   } catch (e) { finish('unchecked'); return; }
 
-  req2.setTimeout(3000, () => { try { req2.destroy(); } catch (e) { } finish('unchecked'); });
+  late = setTimeout(() => { try { req2.destroy(); } catch (e) { } finish('unchecked'); }, OWNS_WAIT_MS);
   req2.on('error', () => finish('unchecked'));
   req2.write(payload);
   req2.end();
@@ -826,6 +854,20 @@ class Sock {
       const b0 = this.buf[0], b1 = this.buf[1];
       const op = b0 & 0x0f;
       const masked = (b1 & 0x80) !== 0;
+      /*
+        A frame from the client that is not masked ends the connection
+        (#1351). RFC 6455 section 5.1: "The server MUST close the connection
+        upon receiving a frame that is not masked", and it may say why with
+        1002, a protocol error. This used to read such a frame as it was.
+        Every browser masks every frame, and so do the harnesses that write
+        their own (voice/test-backpressure.js, voice/test-keepalive.js), so
+        nothing that talks to this service sends one.
+      */
+      if (!masked) {
+        try { this.socket.write(Buffer.from([0x88, 2, 0x03, 0xea])); } catch (e) { }   // FIN+close, len 2, 1002
+        this.close();
+        return;
+      }
       let len = b1 & 0x7f;
       let off = 2;
 
@@ -919,6 +961,37 @@ function cleanMode(v) {
   return MODES.indexOf(m) === -1 ? 'local' : m;
 }
 
+/*
+  WHAT A PAGE'S SIGNALLING MAY CARRY TO ANOTHER PAGE (#1350).
+
+  It used to be passed on as it came, with only from set here, so any field
+  a page added reached the other page, and an sdp message with no
+  description reached the handlers in thornswood-voice.js, voice-host.html
+  and voice.js, which read m.sdp.type and threw. Every page sends
+  { t: 'sdp', to, sdp: pc.localDescription } and
+  { t: 'ice', to, candidate: e.candidate }, which arrive as an offer or answer
+  ({ type, sdp }) and as RTCIceCandidate's own fields, and every page reads
+  only from, sdp and candidate. So that is what goes on, rebuilt here, and a
+  message that is not that shape goes nowhere. Who may signal whom stays the
+  room: every page builds a connection to everybody on the roster.
+*/
+const SDP_TYPES = ['offer', 'answer', 'pranswer'];
+function signal(msg) {
+  const to = Number(msg.to);
+  if (msg.t === 'sdp') {
+    const d = msg.sdp;
+    if (!d || typeof d !== 'object' || SDP_TYPES.indexOf(d.type) === -1 || typeof d.sdp !== 'string') return null;
+    return { t: 'sdp', to: to, sdp: { type: d.type, sdp: d.sdp } };
+  }
+  const c = msg.candidate;
+  if (!c || typeof c !== 'object' || typeof c.candidate !== 'string') return null;
+  const out = { candidate: c.candidate };
+  if (typeof c.sdpMid === 'string' || c.sdpMid === null) out.sdpMid = c.sdpMid;
+  if (Number.isInteger(c.sdpMLineIndex) || c.sdpMLineIndex === null) out.sdpMLineIndex = c.sdpMLineIndex;
+  if (typeof c.usernameFragment === 'string' || c.usernameFragment === null) out.usernameFragment = c.usernameFragment;
+  return { t: 'ice', to: to, candidate: out };
+}
+
 function roster() {
   const list = [];
   for (const [id, p] of peers) {
@@ -930,6 +1003,26 @@ function roster() {
 function announce() {
   const list = roster();
   for (const [, p] of peers) p.ws.sendLatest({ t: 'peers', peers: list });
+}
+
+/*
+  A NAME AS A PAGE SENT IT, CLEANED ONCE WHERE IT COMES IN (#1349).
+
+  It was kept as sent, cut to forty characters, and from here it goes out in
+  the roster and on chat lines other people's pages draw, beside each command
+  to the gamemode, and into the chat limit's log line. Measured on 5 October:
+  a name holding a line break and "[voice] REFUSED a join for profile 1"
+  printed a log line this service never wrote. No character name holds a
+  control character, a line or paragraph separator, or a mark that turns the
+  direction of the text round, so those go before the cap. The gamemode never
+  reads the name off a command (dispatch reads the text, the profile and the
+  proven and relay marks), so no name can change the command it rides with.
+*/
+function cleanName(v) {
+  return String(v == null ? '' : v)
+    .replace(/[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g, '')
+    .trim()
+    .slice(0, 40);
 }
 
 /*
@@ -946,7 +1039,7 @@ function onJoin(ws, msg, profileId) {
   }
 
   const id = nextPeer++;
-  const name = String(msg.name || '').slice(0, 40);
+  const name = cleanName(msg.name);
   peers.set(id, { ws, profileId, name, mode: cleanMode(msg.mode), proven: true,
                   chatTokens: CHAT_BURST, chatAt: Date.now(), chatSlowed: false });
 
@@ -1169,6 +1262,93 @@ function isLoopback(req) {
   const ra = req.socket.remoteAddress || '';
   return ra === '127.0.0.1' || ra === '::1' || ra === '::ffff:127.0.0.1';
 }
+
+/*
+  HOW OFTEN ONE PLACE MAY ASK FOR A TOKEN OR OPEN A SOCKET (#1323).
+
+  Neither door counted anything. Measured on 5 October: sixty POST /token and
+  sixty socket handshakes from one address, one after another, were every one
+  answered. Each /token is an HMAC and a request to the site, and each socket
+  is a peer, a roster sent to everybody, and a place in every position tick.
+
+  So each door takes so many a minute from one place, and past that answers
+  429 with Retry-After, never a quiet drop. The rules are the site's own
+  limiters' (site/server.js, the report and login limits). A place is the
+  socket's address or, behind Caddy, the last X-Forwarded-For hop, which is
+  the one Caddy wrote, believed only when the socket is loopback. An IPv6
+  address counts as its /64, because one home is handed a whole /64. The
+  table holds only a hash of it, under a key made at each start. Only what
+  was let in counts, so a script hammering on a refusal does not keep the
+  people behind the same address locked out. This machine itself, loopback
+  with nobody's address forwarded, is not counted: the box's own scripts and
+  the harnesses.
+
+  The launcher asks for a token whenever its voice page or the game's chat
+  is about to connect, since a token opens one connection (#1322): one each
+  when Play is pressed, then one per try after a loss, the tries spaced as
+  below, so twenty a minute is a few people behind one address reconnecting
+  at once. A page that lost its
+  socket tries again after one to thirty seconds (thornswood-chat.js) or two
+  to sixty (voice-host.html), so sixty sockets a minute is several people
+  reconnecting at once. Both are settings, so they can be tuned on the box
+  without a release.
+*/
+const TOKEN_PER_MINUTE = Number(process.env.THORNSWOOD_TOKEN_PER_MINUTE) || 20;
+const SOCKETS_PER_MINUTE = Number(process.env.THORNSWOOD_SOCKETS_PER_MINUTE) || 60;
+const doorSalt = crypto.randomBytes(32);
+const tokenDoor = { name: 'token requests', max: TOKEN_PER_MINUTE, seen: new Map(), saidAt: 0 };
+const socketDoor = { name: 'sockets', max: SOCKETS_PER_MINUTE, seen: new Map(), saidAt: 0 };
+
+/* Where a request comes from, the way site/server.js clientAddr reads it. */
+function clientAddr(req) {
+  const sock = String((req.socket && req.socket.remoteAddress) || '');
+  let addr = sock;
+  if (/^(127\.|::1$|::ffff:127\.)/i.test(sock)) {
+    const hops = String(req.headers['x-forwarded-for'] || '').split(',')
+      .map((s) => s.trim()).filter(Boolean);
+    if (hops.length) addr = hops[hops.length - 1];
+  }
+  return addr.toLowerCase().replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/, '');
+}
+
+/* Seconds to wait before this one may come in, or 0 when it is let in, and
+   then it is counted. */
+function doorWait(door, req, now) {
+  let addr = clientAddr(req);
+  if (/^(127\.|::1$)/.test(addr)) return 0;
+  if (net.isIPv6(addr)) {
+    const halves = addr.split('%')[0].split('::');
+    const head = halves[0] ? halves[0].split(':') : [];
+    const tail = halves.length > 1 && halves[1] ? halves[1].split(':') : [];
+    const gap = halves.length > 1 ? Math.max(0, 8 - head.length - tail.length) : 0;
+    addr = head.concat(new Array(gap).fill('0'), tail).slice(0, 4)
+      .map((g) => (parseInt(g, 16) || 0).toString(16)).join(':') + '::/64';
+  }
+  const key = crypto.createHmac('sha256', doorSalt).update(addr).digest('hex').slice(0, 32);
+  const list = (door.seen.get(key) || []).filter((t) => t > now - 60000);
+  if (list.length >= door.max) {
+    door.seen.set(key, list);
+    if (now - door.saidAt > 60000) {
+      door.saidAt = now;
+      console.log('[voice] one address passed ' + door.max + ' ' + door.name +
+                  ' in a minute, so it is answered 429 until the minute is up');
+    }
+    return Math.max(1, Math.ceil((list[0] + 60000 - now) / 1000));
+  }
+  list.push(now);
+  door.seen.set(key, list);
+  return 0;
+}
+// Places whose minute is over are forgotten.
+setInterval(() => {
+  const cut = Date.now() - 60000;
+  for (const door of [tokenDoor, socketDoor]) {
+    for (const [key, list] of door.seen) {
+      const kept = list.filter((t) => t > cut);
+      if (kept.length) door.seen.set(key, kept); else door.seen.delete(key);
+    }
+  }
+}, 60000);
 
 /*
   AN OVERSIZED BODY IS ANSWERED, NOT DROPPED.
@@ -1548,6 +1728,13 @@ const server = http.createServer((req, res) => {
     profileId on its own proves nothing, which was the whole problem.
   */
   if (req.method === 'POST' && route === '/token') {
+    // So many a minute from one place (#1323); see doorWait.
+    const tokenWait = doorWait(tokenDoor, req, Date.now());
+    if (tokenWait) {
+      res.writeHead(429, { 'content-type': 'text/plain', 'retry-after': String(tokenWait) });
+      res.end('Too many token requests from this address. Try again in ' + tokenWait + ' seconds.');
+      return;
+    }
     readBody(req, res, 4000, (doc) => {
       const pid = Number(doc.profileId) || 0;
       if (pid <= 0) { res.writeHead(400).end('no profileId'); return; }
@@ -1779,6 +1966,40 @@ const server = http.createServer((req, res) => {
 });
 
 /*
+  WHICH PAGES MAY OPEN A SOCKET HERE (#1321).
+
+  A browser names the page that opens a socket in Origin, and the page cannot
+  change it. Nothing read it, so any website could open sockets to this
+  service from its visitors' browsers: measured on 5 October, a handshake with
+  Origin https://evil.example was answered 101 and its join welcomed. This
+  service sets no cookie and a join proves itself with its own token, so such
+  a socket borrows nothing of the visitor's; what it gets is each visitor's
+  browser, from that visitor's address, as a client for free.
+
+  So a browser's socket must come from this service's own page: an Origin
+  that names the host the request was made to, straight or through Caddy,
+  which passes Host on as it came. The game's pages and the launcher's voice
+  page are loaded off disk and say null (file:// in older Chromium), and are
+  let in. No Origin at all is not a browser (a harness, a script), which this
+  was never meant to stop. Anything else is refused before the handshake.
+
+  What this cannot close: a sandboxed frame on any website also says null,
+  and nothing in the request tells it apart from the game's own page.
+*/
+function originAllowed(req) {
+  const o = req.headers.origin;
+  if (o === undefined) return true;
+  const s = String(o).trim().toLowerCase();
+  if (s === 'null' || s === 'file://') return true;
+  let page, asked;
+  try { page = new URL(s); asked = new URL(page.protocol + '//' + String(req.headers.host || '')); }
+  catch (e) { return false; }
+  return !!asked.host && page.host === asked.host;
+}
+let originRefused = 0;
+let originSaidAt = 0;
+
+/*
   WHO THIS IS, BEFORE THE SOCKET OPENS (#1337, #1322).
 
   The handshake used to be answered for anybody, and who they were was the
@@ -1808,6 +2029,31 @@ function refuseUpgrade(socket, why) {
 }
 
 server.on('upgrade', (req, socket, head) => {
+  if (!originAllowed(req)) {
+    originRefused++;
+    // Once a minute at most, so a busy website cannot fill the log.
+    if (Date.now() - originSaidAt > 60000) {
+      originSaidAt = Date.now();
+      console.log('[voice] refused a socket opened by a page on ' + JSON.stringify(String(req.headers.origin).slice(0, 100)) +
+                  ' (' + originRefused + ' refused so far): only this service\'s own page and the game\'s may open one');
+    }
+    // The HTTP server took its own error listener off this socket when it
+    // handed the upgrade over, so without one a refused page that has
+    // already gone (a reset as the answer is written) stops the whole
+    // service. The socket is being closed either way.
+    socket.on('error', () => { });
+    socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+    return;
+  }
+  // So many a minute from one place (#1323); see doorWait.
+  const socketWait = doorWait(socketDoor, req, Date.now());
+  if (socketWait) {
+    // An error listener for the reason given over the 403 just above.
+    socket.on('error', () => { });
+    socket.end('HTTP/1.1 429 Too Many Requests\r\nRetry-After: ' + socketWait +
+               '\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+    return;
+  }
   const key = req.headers['sec-websocket-key'];
   if (!key) { socket.destroy(); return; }
   const offered = String(req.headers['sec-websocket-protocol'] || '').split(',')
@@ -1855,12 +2101,16 @@ server.on('upgrade', (req, socket, head) => {
     */
     if (msg.t === 'ping') { ws.send({ t: 'pong' }); return; }
 
-    // Signalling is passed through untouched. The server never inspects an
-    // offer or a candidate, it only decides who is allowed to hear it.
+    // Signalling is passed on as signalling and nothing else (#1350). The
+    // server never inspects what an offer or a candidate says, it only
+    // decides who is allowed to hear it; see signal for the shape.
     if (msg.t === 'sdp' || msg.t === 'ice') {
       const to = peers.get(Number(msg.to));
       if (!to) return;
-      to.ws.send(Object.assign({}, msg, { from: myId }));
+      const out = signal(msg);
+      if (!out) return;
+      out.from = myId;
+      to.ws.send(out);
       return;
     }
 

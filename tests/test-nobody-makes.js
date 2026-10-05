@@ -84,12 +84,28 @@ const theMold = rowFor('Key Mold');
 yes('and the mold that names it is craftable too', !!theMold && theMold.owner === 'Smith');
 
 // --------------------------------------------- and what the Woodwright makes
-['Fishing Pole - Crude', 'Fishing Pole - Fine', 'Fishing Pole - Master'].forEach(function (what) {
+// The poles are Thornswood-Content.esp's own since #1379. The fishing mod's
+// three keep the Woodwright as their owner, so putting one back is one line of
+// the cut file, and are cut (#1766): the fisher page says the fishing mod's
+// rows are not the plan, and only ours fish.
+['Crude Fishing Pole', 'Fine Fishing Pole', 'Master Fishing Pole'].forEach(function (what) {
   const r = rowFor(what);
   yes(what + ' is the Woodwright’s',
       !!r && r.owner === 'Woodworker' && r.half === 'Woodwright');
   if (r) { yes('  and nobody is not set on it', !r.nobody); }
 });
+{
+  const table = JSON.parse(fs.readFileSync(path.join(REPO_DIR, 'game', 'data', 'recipes.json'), 'utf8').split(CR).join('')).recipes;
+  ['Fishing Pole - Crude', 'Fishing Pole - Fine', 'Fishing Pole - Master'].forEach(function (what) {
+    const r = rowFor(what);
+    const ids = Object.keys(table).filter(function (k) { return table[k].name === what; });
+    const t = ids.length ? table[ids[0]] : null;
+    yes('the fishing mod\'s ' + what + ' keeps the Woodwright as its owner in the recipe table, and is cut there',
+        !!t && t.owner === 'Woodworker' && t.half === 'Woodwright' && t.book === 'cut');
+    yes('  and the gamemode refuses it as cut, so nobody makes it',
+        !!r && /^Cut from the open book/.test(String(r.nobody || '')));
+  });
+}
 
 // ----------------------------------------------------------------- the gate
 {
@@ -150,7 +166,7 @@ if (recipes) {
   const poles = Object.keys(recipes.recipes).filter(function (k) {
     return /^Fishing Pole/.test(String(recipes.recipes[k].name || ''));
   });
-  yes('the poles moved out of unowned and into a half, ' + poles.length + ' of them',
+  yes('the fishing mod\'s poles moved out of unowned and into a half, ' + poles.length + ' of them',
       poles.length >= 3);
   const stillOpen = Object.keys(recipes.unowned || {}).filter(function (k) {
     return /^(Nails|Hinge|Lock|Iron Fittings|Fishing Pole)/i.test(String(recipes.unowned[k].name || ''));
