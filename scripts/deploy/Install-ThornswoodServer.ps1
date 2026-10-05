@@ -725,12 +725,42 @@ if (-not $NoTask) {
                                       -Argument $cmd `
                                       -WorkingDirectory $Root
     $triggers = @(New-ScheduledTaskTrigger -AtStartup)
+
+    # Priority 4, normal, not Task Scheduler's default of 7. A task registered
+    # without -Priority starts its process below normal, with I/O priority 1
+    # (low) and memory priority 2, and node, started by the task's cmd.exe,
+    # inherits all three. Measured on the VPS on 5 October: both game servers
+    # ran BelowNormal, I/O priority 1, memory priority 2, while the build
+    # runners, the bot and lsass ran Normal, 2 and 5.
+    #
+    # The low I/O priority is what the server waited on when somebody first
+    # entered a cell (#1931). The kernel trace of 4 October 17:19
+    # (logs\dev\stall-trace-20261004-173319) has the dev server's main thread
+    # reading its own memory back from pagefile.sys: 91 reads in a login that
+    # took 1.9 s, 51 in the 2.1 s after a move into WhiterunWorld. Every read
+    # went out at low priority and took 24 ms on average, up to 78 ms, held
+    # back in steps of the 15.6 ms clock tick, while none of the 79,000 normal
+    # priority I/Os on the same disk in those 90 s took 5 ms. Windows holds
+    # low priority I/O back while normal priority I/O is going, and on the VPS
+    # it always is, mostly from the two servers' own saves; low priority I/O
+    # waited longest in the seconds the build job did no I/O at all.
+    #
+    # Memory priority 2 puts the server's pages below every service's: first
+    # to be trimmed from its working set, and once trimmed, first to be given
+    # to other uses, after which touching them again is a read from the page
+    # file. Priority 4 gives memory priority 5 too, so nothing else sets it.
+    #
+    # 4 to 6 is the band Microsoft's table starts as NORMAL_PRIORITY_CLASS.
+    # tests\test-server-task-priority.ps1 registers a task with these settings
+    # and measures the CPU, I/O and memory priority of the program its cmd.exe
+    # starts.
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries `
                                              -DontStopIfGoingOnBatteries `
                                              -StartWhenAvailable `
                                              -RestartCount 999 `
                                              -RestartInterval (New-TimeSpan -Minutes 1) `
-                                             -ExecutionTimeLimit ([TimeSpan]::Zero)
+                                             -ExecutionTimeLimit ([TimeSpan]::Zero) `
+                                             -Priority 4
     $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
 
     Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $triggers `
