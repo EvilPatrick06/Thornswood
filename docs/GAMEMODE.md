@@ -180,8 +180,8 @@ is `NEEDS` (`gamemode.js:21152`), `COST` (21530) and `TEMP_COST` (21563).
 Warmth: `warmthTarget` (21784), `fireWarmth` (21839), `exposure` (21878),
 `weatherRow` (21920) off `WEATHER`, `insulation` (22134) off `WARMTH`. Food
 and drink: `foodKind` (21972) off `FOODS`, `waterKind` (21862) off `WATERS`,
-`consumed` (21997). The bard (22198), the verbs `/eat`, `/drink`, `/rest`
-(22329), the tick (22518), the HUD script (22579) and burning (22782). State
+`consumed` (21997). The bard (22198), which the tick reads off the emote
+wheel (`bardSeen`, #1631), `/rest` (22329), the tick (22518), the HUD script (22579) and burning (22782). State
 is `thornswoodNeeds` (21137).
 
 ## Chat and commands

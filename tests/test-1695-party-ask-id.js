@@ -51,7 +51,7 @@ function slice(src, start, end) {
 const social = slice(gm, '// ==== thornswood social:', '// ==== end thornswood social ====');
 const trade = slice(gm, '// ==== thornswood trade ====', '// ==== end thornswood trade ====');
 const ca = gm.indexOf("    if (word === '/friend' || word === '/party' || word === '/mute' ||");
-const cb = ca < 0 ? -1 : gm.indexOf("    if (word === '/needs' || word === '/rest'", ca);
+const cb = ca < 0 ? -1 : gm.indexOf("    if (word === '/rest') {", ca);
 const branch = (ca >= 0 && cb >= 0) ? gm.slice(ca, cb) : null;
 const journal = slice(gm, '  function journalCommand(soc, actorId, profileId, parts) {', '\n  }\n');
 yes('the social and trade blocks, the social branch of handle and the journal verbs are in the gamemode',

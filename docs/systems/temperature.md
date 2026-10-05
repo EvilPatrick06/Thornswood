@@ -15,9 +15,9 @@ It moves both ways, toward whatever the place is worth.
 | Up to 85 | Hot |
 | Above 85 | Burning |
 
-`/needs` says the reading, whether you are warming or cooling, the
-target, the roof, the night, the fire, what weather and height are
-worth, and every worn piece it can see.
+The Body page on K says the reading, whether you are warming or
+cooling, the target, the roof, the night, the fire, what weather and
+height are worth, and every worn piece it can see.
 
 ## What it costs
 
@@ -224,7 +224,8 @@ A burn on a part of the body, from [Injury](injury.md), means the
 clothing on that part counts at half until the burn heals.
 
 The server reads equipment. A piece handed to the client inside its own
-game and never seen by the server cannot count. `/needs` says so.
+game and never seen by the server cannot count. The Body page on K
+says so.
 
 ## A meal
 
@@ -236,8 +237,8 @@ warmer for 20 minutes. A feast shifts it 8 degrees for 10 minutes. See
 
 The place targets, the weather numbers, the fire of 34 at 300 units,
 the water classes, the clothing table, the cap of 0.80, the heat factor
-of 0.5, the settle times, the on-fire damage, the spread, and `/needs`
-are in the server.
+of 0.5, the settle times, the on-fire damage, the spread, and the Body
+page on K are in the server.
 
 In it: the season shift on an outdoor target, the roll of the sky, the
 master woodworker's 48, and the master tailor's 4 degrees. Not in it:

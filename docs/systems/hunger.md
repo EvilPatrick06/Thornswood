@@ -46,5 +46,5 @@ The bed has to be a bed. See [Property](property.md) and
 The clock, the four bands, the 15, the ale cost and the 25 from a bed
 are in the server. The cold multipliers are not. Hunger does not yet
 speed up in the snow. Food states are not on the meal. "Full" does not
-yet sicken you. `/rest bed` is still a word you say, not a check that
-you are in a bed.
+yet sicken you. The bed is the one the server saw them lie down in, by
+whose it is, the same as for rest. See [Exhaustion](exhaustion.md).

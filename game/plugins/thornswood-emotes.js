@@ -21,9 +21,9 @@
 //
 // Three names to avoid, from that same send path: anything containing 'equip'
 // is rewritten to SkympFakeEquip, and SneakStart/SneakStop are swallowed
-// outright. Every name in the table below was read out of an IDLE record's ENAM
-// field in this setup's own Skyrim.esm and Dragonborn.esm, and none of them trip
-// those rules.
+// outright. Every name in the table below but Sing's (see EMOTES) was read out
+// of an IDLE record's ENAM field in this setup's own Skyrim.esm and
+// Dragonborn.esm, and none of them trip those rules.
 //
 // What changed: this used to call browser.loadUrl on a page of its own. There
 // is one browser, so that threw away whatever was in it, which was the chat and
@@ -138,10 +138,22 @@ const STOP = 'IdleForceDefaultState';
  * with the wheel shut. The full list sits on the right of the wheel, with a
  * search, in alphabetical order. Tab moves to that search.
  *
- * Every event below is an IDLE record's ENAM from Skyrim.esm or Dragonborn.esm,
- * an animation under Actors\Character\Behaviors. The name on the list is ours;
- * the string in `event` is the game's. Chop wood, Drink, Eat, Hoe and Drink
+ * Every event below but Sing's is an IDLE record's ENAM from Skyrim.esm or
+ * Dragonborn.esm, an animation under Actors\Character\Behaviors. The name on
+ * the list is ours; the string in `event` is the game's. Chop wood, Drink, Eat, Hoe and Drink
  * potion are the animation only. They do not perform the class verb.
+ *
+ * Lute, Flute, Drum and Sing are the bard (#1631). The server reads the last
+ * animation it was sent for this character, and the instrument in the pack,
+ * and counts somebody playing one of them as a bard for the people resting
+ * in the same place: the needs block's BARD_PLAYS. Skyrim has no singing
+ * idle (its bards sing over the lute), so Sing is the nearest the base game
+ * has: IdleDialogueHappyStart, an event of its own behaviour graph
+ * (0_master), the happy talking NPCs do in a conversation. It was read out of
+ * the graph's event list, not out of an IDLE record. Whether it lasts until
+ * you stand up, the way the lute does, is still to be seen in the game. Sit
+ * is read the same way, as a seat on the ground: GROUND_SIT in the property
+ * block's beds. Renaming any of their events is a change on the server too.
  *
  * Three to avoid, from skymp5-client's send path: anything containing 'equip'
  * is rewritten to SkympFakeEquip, and SneakStart and SneakStop are swallowed
@@ -195,6 +207,7 @@ const EMOTES = [
   { name: 'Read book', event: 'IdleBook_Reading' },
   { name: 'Reel', event: 'IdleCiceroDance3' },
   { name: 'Salute', event: 'IdleSalute' },
+  { name: 'Sing', event: 'IdleDialogueHappyStart' },
   { name: 'Sit', event: 'IdleSitCrossLeggedEnter' },
   { name: 'Slow clap', event: 'IdleApplaudSarcastic' },
   { name: 'Study', event: 'IdleStudy' },

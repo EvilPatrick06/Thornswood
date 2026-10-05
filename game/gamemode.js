@@ -5261,8 +5261,9 @@ function chargenTick() {
     /*
       Bard is RP-only now (see RP_ONLY), not a Class. The old instrument
       ability that was handed out for that class key is gone: nobody gets
-      PlayInstrumentSpell for having been a bard. Playing for rest is /bard;
-      instruments themselves are woodwright craft and the emote wheel.
+      PlayInstrumentSpell for having been a bard. Playing for rest is the
+      emote wheel's lute, flute, drum or Sing, which the needs block sees
+      (#1631); instruments themselves are woodwright craft.
     */
 
     // 'arriving' was the kit top-up after the teleport. There are no kits, so
@@ -36980,6 +36981,15 @@ log('gamemode loaded:',
     the needs block's own n.fire (docs/systems/temperature.md): a fire close
     enough to warm you is close enough to rest by.
 
+    SIT ON THE EMOTE WHEEL IS A SEAT ON THE GROUND (#1631). Nothing is
+    pressed and no line is sent for it, so the server reads what it can see:
+    the engine's lastAnimEvent, the last animation the client sent for its
+    own character, which the engine clears the moment they move. While that
+    is the wheel's Sit, they are sitting, at the seat's 20, or the campfire's
+    35 with a fire in reach, the same as a chair. Standing up, walking off or
+    playing another emote ends it on the next measure, without a word, the
+    way getting off a chair says nothing.
+
     WHILE THE PLACE IS TRUE. Every BED_EVERY_MS the places people are resting
     in are measured again: walk away, lose the key, let the night run out,
     move off from the fire, and the rest stops or changes rate. Somebody who
@@ -37013,6 +37023,9 @@ log('gamemode loaded:',
      letters and a crafting station to everybody else. */
   var SEAT_EDID = /chair|bench|stool|throne/i;
   var NOT_SEAT_EDID = /workbench|crafting/i;
+  /* The emote wheel's Sit, by its event (thornswood-emotes.js), lowercased
+     the way the engine's is compared. See the block. */
+  var GROUND_SIT = 'idlesitcrossleggedenter';
   /* Every kind of rest this hands the needs block, and 'bedroll', the kind
      #1392 handed out, so somebody still resting at it is got up the same way. */
   var REST_KINDS = { sit: true, rough: true, campfire: true, camp: true, inn: true, bed: true,
@@ -37212,6 +37225,14 @@ log('gamemode loaded:',
     return !!n && typeof n.fire === 'number' && n.fire >= 0;
   }
 
+  /* Sitting on the ground with the wheel's Sit, by the engine's last
+     animation for them. See the block. */
+  function sitsOnGround(actorId) {
+    var ev = '';
+    try { ev = String(mp.get(actorId, 'lastAnimEvent') || '').toLowerCase(); } catch (e) { return false; }
+    return ev === GROUND_SIT;
+  }
+
   /*
     What this bed is to this person: a kind of rest, or a refusal. Asked
     when they lie down and again on every tick. See the table in the block.
@@ -37325,7 +37346,7 @@ log('gamemode loaded:',
   /* '' while the place still counts, at whatever rate it counts now,
      otherwise the line to say. */
   function stillLying(actorId, e, needs) {
-    if (!stillAt(actorId, e.ref)) {
+    if (!e.ground && !stillAt(actorId, e.ref)) {
       return e.seat ? 'You have left the seat, so you are not resting on it now.'
                     : 'You have left the bed, so you are not resting in it now.';
     }
@@ -37413,6 +37434,14 @@ log('gamemode loaded:',
       }
     }
     var now = Date.now();
+    // Sitting down on the ground with the wheel's Sit (#1631). See the block.
+    for (var gi = 0; gi < online.length; gi++) {
+      var sat = online[gi];
+      if (bedHas(bedState.lying, sat) || !needs || !needs.resting || !sitsOnGround(sat)) { continue; }
+      var gk = fireNear(sat) ? 'campfire' : 'sit';
+      bedState.lying[sat] = { ref: 0, roll: false, seat: true, ground: true, kind: gk, guestAt: 0, at: now };
+      needs.resting(sat, gk);
+    }
     for (var k in bedState.lying) {
       if (!bedHas(bedState.lying, k)) { continue; }
       var e = bedState.lying[k];
@@ -37421,6 +37450,8 @@ log('gamemode loaded:',
         if ((now - e.at) > LYING_FORGET_MS) { delete bedState.lying[k]; }
         continue;
       }
+      // Up off the ground, which is no news, the way getting off a chair is not.
+      if (e.ground && !sitsOnGround(who)) { getUp(who, needs); continue; }
       var why = stillLying(who, e, needs);
       if (why) {
         getUp(who, needs);
@@ -42718,6 +42749,16 @@ log('gamemode loaded:',
     var sig = drawn(view);
     var sending = !!redraw || lastDrawn[actorId] !== sig;
     if (sending) {
+      /*
+        The Body page (#1631): the meters, the warmth with its working out
+        and what is counted as worn, which /needs used to say. Put only on a
+        panel that is going anyway, after the signature, because its numbers
+        move every minute and a panel sent for them alone would be the flower
+        redraw again. K asks for the panel outright as it opens (/pick
+        refresh), so the page reads as of that moment.
+      */
+      var N = g.__thornswoodNeeds;
+      if (view && !view.creating && N && N.view) { view.body = N.view(actorId); }
       if (redraw === ASKED) { view.asked = Date.now(); }
       s.panel = view;
     } else {
@@ -47958,8 +47999,11 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // Hunger, thirst and exhaustion. See the needs block at the end
                // of this file; the numbers there are invented and meant to be
                // argued with. /rest is the plugin's, sent when somebody sits
-               // or lies down, and never typed (#1603); see bedRest.
-               '/needs', '/rest', '/eat', '/drink', '/bard',
+               // or lies down, and never typed (#1603); see bedRest. Not
+               // /needs, /eat, /drink or /bard (#1631): the Body page on K
+               // says what /needs said, eating and drinking is the item (/ate),
+               // and the bard is somebody the server sees playing (bardSeen).
+               '/rest',
                // The repair panel (#1384): sent by the inventory key and by
                // the panel's buttons, never typed. See the durability block,
                // after the take limit. Deliberately absent from PLAYER_WORDS:
@@ -48015,10 +48059,11 @@ const PLAYER_WORDS = ['/ooc', '/where',
                       // offices' powers are buttons on the Office page of K
                       // (#1638), and the board panel says what the box holds.
                       '/help',
-                      // Everybody's, and they need to be findable: a meter
-                      // nobody knows how to act on is only a penalty. Not
-                      // /rest: sitting or lying down is how you rest (#1603).
-                      '/needs', '/eat', '/drink', '/bard',
+                      // Not /rest: sitting or lying down is how you rest
+                      // (#1603). Not /needs, /eat, /drink or /bard (#1631):
+                      // the four bars and the Body page on K show the meters,
+                      // eating or drinking the item is the meal, and playing
+                      // an instrument or Sing on the emote wheel is the bard.
                       // Everybody's, and the one thing a person in trouble
                       // must be able to find: asking staff, and getting
                       // out of a wedged spot (#414).
@@ -49011,19 +49056,15 @@ const PLAYER_WORDS = ['/ooc', '/where',
     /*
       ------------------------------------------------- hunger, thirst, rest
 
-      The words that drive the needs block. They exist BEFORE anything in the
-      world does, deliberately: a meter nobody can act on is a punishment, and
-      the client side that will notice a chair and a plate of food is its own
-      piece of work. These make the whole thing playable and tunable tonight,
-      and the world hooks replace them rather than joining them.
+      The world hooks replaced the words that drove the needs block, as they
+      were always meant to (#1631): eating and drinking is the item (/ate,
+      below), the meters are the four bars and the Body page on K, and the
+      bard is somebody the needs block sees playing on the emote wheel.
 
-      /needs   what the three meters say
       /rest    sent by the plugin when somebody sits or lies down, and
                /rest up when they get off; never typed (#1603). What counts
                is what the server saw them press; see "beds" in the property
                block.
-      /eat     a meal; /drink water; /drink ale for the good and the bad of it
-      /bard    say you are playing, which helps everyone resting near you
     */
     /*
       NOT A COMMAND ANYBODY TYPES. The client reports where somebody is
@@ -49520,101 +49561,44 @@ const PLAYER_WORDS = ['/ooc', '/where',
       return true;
     }
 
-    if (word === '/needs' || word === '/rest' || word === '/eat' ||
-        word === '/drink' || word === '/bard') {
+    /*
+      WHERE SOMEBODY IS RESTING, AND NOTHING ELSE (#1631). /rest is the
+      plugin's line when somebody sits down, lies down or gets up. /needs,
+      /eat, /drink and /bard are gone: the four bars and the Body page on K
+      show what /needs said, eating or drinking the item is a meal (/ate), and
+      the bard is somebody the server sees playing (bardSeen, in the needs
+      block). Typed, they get the answer every unknown word gets.
+    */
+    if (word === '/rest') {
       var needs = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodNeeds;
       if (!needs) { toProfile(profileId, 'That is not running on this server.'); return true; }
       if (!needCharacter()) { return true; }
-
-      if (word === '/needs') {
-        var v = needs.view(actorId);
-        toProfile(profileId, 'Food ' + v.food + ' (' + v.foodBand + '), drink ' + v.drink +
-                  ' (' + v.drinkBand + '), rest ' + v.rest + ' (' + v.restBand + ')' +
-                  (v.resting ? ', resting at a ' + v.resting + '.' : '.'));
-        /*
-          THE WARMTH, WITH ITS WORKING OUT.
-
-          Said as a second line rather than squeezed onto the first, because
-          this one is read when somebody is trying to find out whether the
-          temperature is broken, and that question needs the target, the
-          place the server believes they are in, whether it can see a fire,
-          and what it thinks they are wearing. Every one of those was
-          invisible on 23 September and every one of them was guessed at.
-        */
-        var where = v.place || 'nowhere the server knows about';
-        var fireBit = (v.fireAway >= 0)
-          ? ('a fire ' + v.fireAway + ' away, worth ' + v.fireWorth)
-          : 'no fire in reach';
-        var moving = (v.tempTarget > v.temp) ? 'warming toward '
-                   : (v.tempTarget < v.temp) ? 'cooling toward ' : 'settled at ';
-        toProfile(profileId,
-          'Warmth ' + v.temp + ' (' + v.tempBand + '), ' + moving + v.tempTarget + '. ' +
-          'You are ' + where + (v.roof ? ' under a roof' : ' with no roof') +
-          (v.night ? ', at night' : '') + ', ' + fireBit + '. ' +
-          'Weather and height are worth ' + v.exposure + '. ' +
-          'What you are wearing covers ' + v.cover + ' per cent of you.');
-        /*
-          A third line, and only when there is something to say. The server
-          holding no record of what somebody is wearing looks identical to
-          clothes not mattering, and it is the far more likely of the two:
-          anything handed out inside the client's own game is dropped from
-          the equipment update because the server never saw it arrive.
-        */
-        var wornBits = [];
-        for (var wi = 0; wi < v.worn.length && wi < 12; wi++) {
-          wornBits.push(v.worn[wi].name + ' ' +
-                        (v.worn[wi].known ? (v.worn[wi].worth + '%')
-                                          : 'not in the warmth table'));
-        }
-        toProfile(profileId, wornBits.length
-          ? ('Counted on you: ' + wornBits.join(', ') + '.')
-          : ('The server has no record of anything on you. Whatever you are ' +
-             'wearing was handed to your own game and never reached here, so ' +
-             'it cannot count toward warmth. Say so in the dev channel.'));
+      var where = String(parts[1] || '').toLowerCase();
+      var beds = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodBeds;
+      if (where === 'up' || where === 'stop') {
+        var was = String(needs.settle(actorId).resting || '');
+        var off = (beds && beds.off) ? beds.off(actorId) : '';
+        needs.resting(actorId, '');
+        // Said only when there was a rest to get up from, and not off a
+        // seat: the plugin sends this at every piece of furniture it gets
+        // off, and people sit at every table (#1603).
+        if (was && off !== 'seat') { toProfile(profileId, 'You get up.'); }
         return true;
       }
-      if (word === '/bard') { toProfile(profileId, needs.bard(actorId)); return true; }
-      if (word === '/rest') {
-        var where = String(parts[1] || '').toLowerCase();
-        var beds = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodBeds;
-        if (where === 'up' || where === 'stop') {
-          var was = String(needs.settle(actorId).resting || '');
-          var off = (beds && beds.off) ? beds.off(actorId) : '';
-          needs.resting(actorId, '');
-          // Said only when there was a rest to get up from, and not off a
-          // seat: the plugin sends this at every piece of furniture it gets
-          // off, and people sit at every table (#1603).
-          if (was && off !== 'seat') { toProfile(profileId, 'You get up.'); }
-          return true;
-        }
-        /*
-          WHAT WAS PRESSED, NEVER THE WORD (#1392, #1607, #1603). The plugin
-          says /rest bed when somebody lies down and /rest sit when they sit,
-          and the beds in the property block answer by the furniture the server
-          saw them press and whether they are still at it: a seat, a seat by a
-          fire, a bed by whose it is. Nobody types this, and help never names
-          it. See "beds" in the property block.
-        */
-        if (!beds || !beds.rest) {
-          toProfile(profileId, 'Beds are not running on this server right now. Say so in the dev channel.');
-          return true;
-        }
-        var restSaid = beds.rest(actorId, Number(profileId) || 0);
-        if (restSaid) { toProfile(profileId, restSaid); }
+      /*
+        WHAT WAS PRESSED, NEVER THE WORD (#1392, #1607, #1603). The plugin
+        says /rest bed when somebody lies down and /rest sit when they sit,
+        and the beds in the property block answer by the furniture the server
+        saw them press and whether they are still at it: a seat, a seat by a
+        fire, a bed by whose it is. Nobody types this, and help never names
+        it. See "beds" in the property block.
+      */
+      if (!beds || !beds.rest) {
+        toProfile(profileId, 'Beds are not running on this server right now. Say so in the dev channel.');
         return true;
       }
-      // /eat and /drink
-      var what = String(parts[1] || '').toLowerCase();
-      var line;
-      if (word === '/drink') {
-        line = needs.ate(actorId, what === 'ale' ? 'ale' : 'drink');
-        toProfile(profileId, what === 'ale'
-          ? ('You drink the ale. It goes down well and you will feel it later.' + (line ? ' ' + line : ''))
-          : ('You drink.' + (line ? ' ' + line : '')));
-        return true;
-      }
-      line = needs.ate(actorId, 'food');
-      toProfile(profileId, 'You eat.' + (line ? ' ' + line : ''));
+      var restSaid = beds.rest(actorId, Number(profileId) || 0);
+      if (restSaid) { toProfile(profileId, restSaid); }
       return true;
     }
 
@@ -50172,13 +50156,14 @@ const PLAYER_WORDS = ['/ooc', '/where',
       }
       if (topic === 'living' || topic === 'needs' || topic === 'food') {
         toProfile(profileId,
-          'The four bars are food, water, rest and how warm you are. /eat and ' +
-          '/drink when you have something. Sit down or lie down and you rest: a ' +
-          'seat by a fire is better than a bare one, a bedroll by a fire better ' +
-          'still, and your own bed best of all. A bed in somebody else\'s building ' +
-          'counts when they have let you sleep there or you carry its key. Fires warm you and ' +
-          'standing in one burns you. What you are wearing matters: fur is the ' +
-          'warmest thing there is and metal is the worst.');
+          'The four bars are food, water, rest and how warm you are, and the Body ' +
+          'page on K says why. Eat or drink from your pack. Sit or lie down to rest: ' +
+          'on a seat, on the ground with Sit on the emote wheel, or in a bed. By a ' +
+          'fire is better, and your own bed is best. Somebody else\'s bed counts when ' +
+          'they let you sleep there or you carry its key. A lute, flute or drum ' +
+          'played on the wheel, or Sing, helps everybody resting there. Fires warm ' +
+          'you and standing in one burns you. Fur is the warmest to wear, metal ' +
+          'the worst.');
         return;
       }
       if (topic === 'work' || topic === 'trade' || topic === 'class') {
@@ -53618,9 +53603,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     own game, or the clothes being worth so little on a mild day that the
     difference is under a degree.
 
-    The first is answered by /needs saying where the warmth is heading. This
-    answers the other three: every worn thing the server can see, whether the
-    table knows it, and what it is worth. A piece the server has no record of
+    The first is answered by the Body page on K (it was /needs until #1631)
+    saying where the warmth is heading. This answers the other three: every
+    worn thing the server can see, whether the table knows it, and what it
+    is worth. A piece the server has no record of
     cannot appear here at all, and that absence is the answer in the third
     case: ActionListener::OnUpdateEquipment logs 'dropped N item(s) the
     server has no record of' when the client equips something it was handed
@@ -53805,15 +53791,69 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   /*
     A bard playing where this person is resting.
 
-    Grim's idea and Patrick's yes. Somebody counts as a bard for this when they
-    have said so with /bard, they are in the same cell, and they said it in the
-    last few minutes. There is no bard profession in the rulebook to read, and
-    inventing one here would be settling a design question that is Patrick's,
-    so this asks the cheapest honest question instead: is somebody here saying
-    they are playing.
+    Grim's idea and Patrick's yes. Somebody counts as a bard for this when the
+    server has seen them playing, they are in the same cell, and it saw them
+    in the last few minutes. There is no bard profession in the rulebook to
+    read, and inventing one here would be settling a design question that is
+    Patrick's.
+
+    PLAYING, NOT SAYING (#1631). This used to be the word /bard, and nothing
+    people do is a typed word any more. Patrick's answer on #1631, 4 Oct:
+    "instrument emotes require the instrument, so if they do an emote with an
+    instrument have that count as /bard, and also add a singing emote for
+    people that are only singing". So a bard is somebody whose last animation
+    is the emote wheel's Lute, Flute or Drum with that instrument in the pack,
+    or its Sing, which needs nothing. The server reads both itself: the
+    animation is the engine's lastAnimEvent, the last one the client sent for
+    its own character, which the engine clears the moment they move; the
+    instrument is the server's own inventory. No line from the client is
+    asked or believed. Each tick that sees them playing is the word said
+    again, so a bard counts while they play and for BARD_FOR after.
   */
   var BARDS = {};
   var BARD_FOR = 300000;
+  /* The wheel's bard emotes by their event, lowercased the way the engine's
+     is compared, and the instrument each needs in the pack. Sing needs none.
+     The instruments are the Woodwright's, the same three local ids the
+     wheel asks for (thornswood-emotes.js, INSTRUMENTS). */
+  var BARD_PLAYS = {
+    idlelutestart: '1d9b:PlayFluteLuteDrum.esp',
+    idleflutestart: 'd62:PlayFluteLuteDrum.esp',
+    idledrumstart: '287f:PlayFluteLuteDrum.esp',
+    idledialoguehappystart: ''
+  };
+
+  /* Does this pack hold one of this record. */
+  function carries(actorId, desc) {
+    var id = idOf(desc);
+    if (!id) { return false; }
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return false; }
+    var entries = (inv && inv.entries) || [];
+    for (var i = 0; i < entries.length; i++) {
+      if (entries[i] && entries[i].baseId === id && entries[i].count > 0) { return true; }
+    }
+    return false;
+  }
+
+  /* Is the server seeing this person play: a bard emote is the last thing
+     their client played, they have not moved since, and the instrument it
+     needs is in their pack. */
+  function playing(actorId) {
+    var ev = '';
+    try { ev = String(mp.get(actorId, 'lastAnimEvent') || '').toLowerCase(); } catch (e) { return false; }
+    if (!ev || !Object.prototype.hasOwnProperty.call(BARD_PLAYS, ev)) { return false; }
+    return !BARD_PLAYS[ev] || carries(actorId, BARD_PLAYS[ev]);
+  }
+
+  /* Everybody online the server sees playing is a bard from now. Asked by
+     the tick, before anybody's meters are settled, so a bard counts for the
+     people resting beside them in the same pass. */
+  function bardSeen(online) {
+    for (var i = 0; i < online.length; i++) {
+      if (playing(online[i])) { bard(online[i]); }
+    }
+  }
 
   function bardNear(actorId) {
     var myCell = null;
@@ -54045,10 +54085,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     return crossed(actorId, was, n);
   }
 
-  /** Somebody says they are playing. See bardNear. */
+  /** The server saw them playing. See bardNear and bardSeen. */
   function bard(actorId) {
     BARDS[actorId] = Date.now();
-    return 'You strike up a tune. Anyone resting here recovers faster for a while.';
   }
 
   /*
@@ -54205,6 +54244,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         delete here[h];
       }
     }
+    bardSeen(online);
     for (var i = 0; i < online.length; i++) {
       var who = online[i];
       try {
@@ -54612,6 +54652,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     place: place, tooTiredToCraft: tooTiredToCraft, craftRefusal: craftRefusal,
     setBurning: setBurning, catchFire: catchFire,
     fresh: fresh, clamp: clamp,
+    // The bard the server sees playing (#1631).
+    playing: playing, bardSeen: bardSeen,
     // The meters as last settled, without settling them again (#1383).
     read: read
   };

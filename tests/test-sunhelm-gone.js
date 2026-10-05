@@ -151,16 +151,25 @@ const body = needsAt.length ? (helpStrings[needsAt[0] + 1] || '') : '';
 yes('it sends nobody to an MCM, which went with SunHelm', !/\bMCM\b/.test(body));
 
 // Where the needs are shown, checked against the thing that draws them.
-yes('it names /needs', body.indexOf('/needs') >= 0);
-yes('and /needs is a command the gamemode answers', GM.indexOf("if (word === '/needs')") >= 0);
+// /needs went with #1631 (nothing people do is typed, Patrick, 4 Oct): the
+// numbers behind the bars are the Body page on K, which the K panel draws
+// from the needs block's own view, put on the panel by writeState.
+const SKILLS = read(['game', 'ui', 'thornswood-skills.js']);
+const bodyPage = /sections\.push\('body'\)/.test(SKILLS) && /function drawNeeds\(\)/.test(SKILLS) &&
+    /view\.body = N\.view\(actorId\)/.test(GM);
+yes('it names the Body page on K', /Body page on K/.test(body));
+yes('and the K panel draws a Body page out of the needs block\'s view', bodyPage);
 const slashes = [];
 body.replace(/(^|\s)(\/[a-z]+)\b/g, function (all, pre, w) {
   if (slashes.indexOf(w) < 0) { slashes.push(w); }
   return all;
 });
 const untold = slashes.filter(function (w) { return playerWords.indexOf("'" + w + "'") < 0; });
-yes('every command it names (' + slashes.join(' ') + ') is one everybody is told about, not only a playtester' +
-    (untold.length ? ': not ' + untold.join(', ') : ''), slashes.length > 0 && untold.length === 0);
+yes('every command it names (' + (slashes.join(' ') || 'none') + ') is one everybody is told about, not only a playtester' +
+    (untold.length ? ': not ' + untold.join(', ') : ''), untold.length === 0);
+yes('it tells nobody to type /needs, /eat, /drink or /bard, which the gamemode no longer answers (#1631)',
+    !/\/(needs|eat|drink|bard)\b/.test(body) &&
+    !/'\/(needs|eat|drink|bard)'/.test(playerWords) && !/word === '\/(needs|eat|drink|bard)'/.test(GM));
 
 // Each claim about the bars is checked only if the item makes it, and has to
 // be true of hudScript when it does.
@@ -260,8 +269,8 @@ yes('the row does not say the choices are kept in your save, when known.md says 
 const shRow = KNOWN.split('\n').filter(function (l) { return /^\|\s*SunHelm Survival\s*\|/.test(l); })[0] || '';
 yes('known.md has a row for SunHelm Survival', shRow.length > 0);
 yes('it says the needs run on the server now', /on the server/i.test(shRow) && /hunger/i.test(shRow));
-yes('and points at /needs, which is a command everybody is told about',
-    shRow.indexOf('/needs') >= 0 && playerWords.indexOf("'/needs'") >= 0);
+yes('and points at the Body page on K, which the K panel draws (#1631)',
+    /Body page on K/.test(shRow) && bodyPage && shRow.indexOf('/needs') < 0);
 if (/bottom left/i.test(shRow)) {
   yes('it says the bars are bottom left, and the HUD is anchored bottom left',
       /position:fixed;left:\d+px;bottom:\d+px/.test(hud));

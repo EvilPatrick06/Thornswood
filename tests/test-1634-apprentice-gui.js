@@ -54,7 +54,7 @@ const RULES = between(src, '// ==== thornswood progression ====', '// ==== end t
 const CHARACTER = between(src, '// ==== thornswood character ====', '// ==== end thornswood character ====');
 const SOCIAL = between(src, '// ==== thornswood social:', '// ==== end thornswood social ====');
 const SOCIAL_CMDS = between(src, "    if (word === '/friend' || word === '/party' || word === '/mute' ||",
-                            "    if (word === '/needs' || word === '/rest'");
+                            "    if (word === '/rest') {");
 yes('the rules, the character store, the social block and the /yes branch are in the gamemode',
     !!(RULES && CHARACTER && SOCIAL && SOCIAL_CMDS));
 if (!(RULES && CHARACTER && SOCIAL && SOCIAL_CMDS)) { done(); }
@@ -518,7 +518,7 @@ person(BRYN, 'Bryn', 209, 'smith', 'edgewright');
   const W = words ? new Function('return ' + words[1])() : [];
   const PW = pwords ? new Function('return ' + pwords[1])() : [];
   yes('F1: the server still answers /apprentice, the line the buttons send', W.indexOf('/apprentice') !== -1);
-  yes('F1: and it is not in the list named to everybody', PW.length > 10 && PW.indexOf('/apprentice') === -1);
+  yes('F1: and it is not in the list named to everybody', PW.indexOf('/helpme') !== -1 && PW.indexOf('/apprentice') === -1);
   const help = between(src, "      if (topic === 'work' || topic === 'trade' || topic === 'class') {", '        return;');
   yes('F1: /help work says a Master takes you on from the prompt and K lists it, with no /apprentice',
       !!help && !/\/apprentice/.test(help) && /presses the key the prompt names/.test(help) && /either of you can end it there/.test(help));

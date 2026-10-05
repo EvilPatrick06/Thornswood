@@ -54,7 +54,7 @@ function list(name) {
       W.indexOf('/journal') !== -1 && W.indexOf('/book') !== -1 &&
       gm.indexOf("if (word === '/book') {") !== -1 && gm.indexOf("if (word === '/journal') {") !== -1);
   yes('A2: neither is on the list of words named to everybody (/help, the unknown word reply)',
-      PW.length > 10 && PW.indexOf('/journal') === -1 && PW.indexOf('/book') === -1);
+      PW.indexOf('/helpme') !== -1 && PW.indexOf('/journal') === -1 && PW.indexOf('/book') === -1);
 
   const people = slice(gm, "      if (topic === 'people' || topic === 'friends' || topic === 'party') {", '        return;');
   yes('A3: /help people names J and its buttons for a group book, and no /book line',
