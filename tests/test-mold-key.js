@@ -784,9 +784,10 @@ if (missingGm.length === 0 && KEY_DESC && MOLD_DESC && DEED_DESC && RECIPE_DESC 
     E.person(ALICE, TAMRIEL, [1050, 1000, 0], [E.blank()]);
     const s = boot(E, held());
     const told = s.say(ALICE, '/moldhere', HEX);
-    yes('S5 with no blank mold recipe on the server it says so and points at /mold: "' +
+    // And names nothing to type: no chat commands for what people do (#1637).
+    yes('S5 with no blank mold recipe on the server it says so, with nothing to type: "' +
         first(told, ALICE) + '"', /no blank key molds/.test(first(told, ALICE)) &&
-        /\/mold/.test(first(told, ALICE)));
+        !/\/\w/.test(first(told, ALICE)));
     yes('S5 and makes nothing', E.molds(ALICE, LABEL) === 0);
   }
 
