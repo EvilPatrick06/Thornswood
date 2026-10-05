@@ -16,6 +16,8 @@ An item in this file is not found in the world and not made at a public bench. T
 
 Counts in this file: cut 3318, embassy 15, thalmor 9. Rows this pass left in the open book, or on a lock that is not a cut: 596.
 
+The rules below sorted the recipe table once, before anything was cut. The recipe build (`scripts/dev/Build-RecipeTable.ps1`) reads [cut-items.json](cut-items.json), so the table it writes is already cut, and `scripts/dev/Write-CutItems.js` run on that table writes this page from the list it has instead of sorting the table again.
+
 ## Rules that built the lists
 
 One suit per material. Where a material has a heavy set and a light set, both stay. A suit is body, head, hands, and feet. Shields are fewer than suits: one shield named Shield, not the buckler and not the painted variants.
