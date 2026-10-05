@@ -211,9 +211,10 @@ function knock(port, token) {
   without it, and ended then says which. page() resolves on its first.
 
   It used to resolve on the first roster, on close, or after four seconds,
-  and its callers read rosters() whatever had happened. A refused handshake
-  fires error and no close in node 22's WebSocket, so a refused page sat out
-  the four seconds and then read as a roster with the wrong list (#1867).
+  and its callers read rosters() whatever had happened, so a refused page
+  read as a roster with the wrong list (#1867). A refused handshake fires
+  error, then close 1006 in node 24 (the runners) and no close at all in
+  node 22, so both are heard.
   Fifteen seconds with the socket open and no roster is a stuck service, as
   in listening(), and says so.
 */

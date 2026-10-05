@@ -60,7 +60,8 @@ function site() {
 }
 async function start() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-1821p-'));
-  fs.copyFileSync(VOICE, path.join(dir, 'voice-server.js'));
+  fs.writeFileSync(path.join(dir, 'voice-server.js'), fs.readFileSync(VOICE, 'utf8').replace('const STARTED_AT = Date.now();',
+    'const STARTED_AT = Date.now(); console.log("[voice] probe STARTED_AT " + STARTED_AT);'));
   fs.copyFileSync(path.join(path.dirname(VOICE), 'headlines.js'), path.join(dir, 'headlines.js'));
   fs.writeFileSync(path.join(dir, 'token-key.txt'), KEY);
   const port = await freePort();
@@ -102,6 +103,24 @@ const tally = (list) => { const t = {}; for (const x of list) { t[x] = (t[x] || 
 
 (async () => {
   console.log('PROBE node ' + process.version + ' on ' + process.platform + ' ' + os.release() + ', ' + os.cpus().length + ' cpus');
+  // 0. Skew by round trip: this process's time before and after a child's reading.
+  const skews = [];
+  for (let i = 0; i < 40; i++) {
+    const c = spawn(process.execPath, ['-e', 'process.stdin.on("data", () => process.stdout.write(String(Date.now()) + "\\n"))']);
+    let buf = '';
+    c.stdout.on('data', (d) => { buf += d; });
+    await new Promise((ok) => setTimeout(ok, 150));
+    for (let k = 0; k < 5; k++) {
+      const t0 = Date.now(); buf = ''; c.stdin.write('x');
+      await new Promise((ok) => { const f = () => { if (buf.indexOf('\n') >= 0) { c.stdout.removeListener('data', f); ok(); } }; c.stdout.on('data', f); });
+      const t1 = Date.now(); const tc = Number(buf.trim());
+      if (t1 - t0 <= 2) { skews.push(tc - (t0 + t1) / 2); }
+    }
+    c.kill();
+  }
+  skews.sort((x, y) => x - y);
+  console.log('PROBE skew, a child minus this, round trips of 2 ms or less (' + skews.length + '): min ' + skews[0] + ', median ' +
+              skews[Math.floor(skews.length / 2)] + ', max ' + skews[skews.length - 1] + '; over 2 ms ahead ' + skews.filter((x) => x > 2).length);
   // 1. The same instant read by two processes: this one, after a child's reading reached it.
   const ds = [];
   for (let i = 0; i < 100; i++) {
@@ -116,12 +135,22 @@ const tally = (list) => { const t = {}; for (const x of list) { t[x] = (t[x] || 
   SITE = await site();
   // 2. The old way: a token signed here the moment the service says it is listening.
   const oldWay = [];
-  for (let i = 0; i < 50; i++) { const s = await start(); oldWay.push(await knock(s.port, tokenFor(43, Date.now()))); await stop(s); }
-  console.log('PROBE signed here at once, 50 starts: ' + tally(oldWay));
+  const margins = [];
+  for (let i = 0; i < 300; i++) {
+    const s = await start();
+    const minted = Date.now();
+    margins.push(minted - Number((/probe STARTED_AT (\d+)/.exec(s.log) || [])[1]));
+    oldWay.push(await knock(s.port, tokenFor(43, minted)));
+    await stop(s);
+  }
+  margins.sort((x, y) => x - y);
+  console.log('PROBE signed here at once, 300 starts: ' + tally(oldWay));
+  console.log('PROBE minted here minus the service STARTED_AT by its clock: min ' + margins[0] + ' ms, 1st pct ' + margins[3] +
+              ', median ' + margins[150] + ', max ' + margins[299] + '; the lowest ten: ' + margins.slice(0, 10).join(' '));
   // 3. The new way: the service mints it (POST /token).
   const newWay = [];
-  for (let i = 0; i < 50; i++) { const s = await start(); newWay.push(await knock(s.port, await joinToken(s, 43))); await stop(s); }
-  console.log('PROBE minted by the service, 50 starts: ' + tally(newWay));
+  for (let i = 0; i < 100; i++) { const s = await start(); newWay.push(await knock(s.port, await joinToken(s, 43))); await stop(s); }
+  console.log('PROBE minted by the service, 100 starts: ' + tally(newWay));
   // 4. This node's WebSocket on a refused handshake.
   const s = await start();
   const t0 = Date.now();
