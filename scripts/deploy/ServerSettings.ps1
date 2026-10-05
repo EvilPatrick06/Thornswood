@@ -73,9 +73,15 @@ function Get-ThornswoodSettingNames($Settings) {
 
 <#
   The running server's settings with the release's keys put in. Returns
-  Settings (the object to write), Changed (release keys that move) and Kept
+  Settings (the object to write), Changed (release keys that move), Kept
   (keys the release had differently, or had and the server does not, left as
-  the server has them), and Said, the lines to print.
+  the server has them), Absent (release keys the release does not carry at
+  all, left as the server has them), and Said, the lines to print.
+
+  Absent used to go unsaid (#1336). A live deploy whose build carried no
+  thornswoodRequirePass, or no role lists, kept the running server's and the
+  run said only which keys moved, so it read the same as one that had set
+  them. Now each is named. Names only, never a value.
 #>
 function Join-ThornswoodServerSettings($Running, $Release, [string[]]$Keys) {
     $runNames = Get-ThornswoodSettingNames $Running
@@ -93,12 +99,14 @@ function Join-ThornswoodServerSettings($Running, $Release, [string[]]$Keys) {
         if ($Keys -contains $k) { continue }
         if ($runNames -notcontains $k -or (Get-ThornswoodSettingText $Running.$k) -ne (Get-ThornswoodSettingText $Release.$k)) { $kept += $k }
     }
+    $absent = @($Keys | Where-Object { $relNames -notcontains $_ })
     $said = @()
     if ($changed.Count) { $said += ('the settings this release changes: ' + ($changed -join ', ')) }
     else { $said += 'this release changes none of the settings' }
+    if ($absent.Count) { $said += ('not in the release, so left as the running server has them: ' + ($absent -join ', ')) }
     if ($kept.Count) { $said += ('kept as the running server has them, not as the release had them: ' + ($kept -join ', ')) }
     $said += ('every other setting of the ' + $runNames.Count + ' the running server has is carried across as it is')
-    return [pscustomobject]@{ Settings = [pscustomobject]$out; Changed = $changed; Kept = $kept; Said = $said }
+    return [pscustomobject]@{ Settings = [pscustomobject]$out; Changed = $changed; Kept = $kept; Absent = $absent; Said = $said }
 }
 
 # The keys outside -Keys whose values differ between two settings objects, or
@@ -114,6 +122,24 @@ function Compare-ThornswoodCarried($Before, $After, [string[]]$Keys) {
         if ((Get-ThornswoodSettingText $Before.$k) -ne (Get-ThornswoodSettingText $After.$k)) { $moved += $k }
     }
     return $moved
+}
+
+<#
+  The join pass hold (#410) fails closed in the gamemode (#1319): false is the
+  one way to turn it off, and anything that is neither true nor false holds.
+  A server whose settings hold neither would change what it does the moment a
+  new gamemode reached it, with nobody having asked, so Deploy-Server's carry
+  refuses one until Deploy-Gamemode.ps1 -RequirePass says which. Returns ''
+  for true or false, otherwise the reason, which names the key and not its
+  value.
+#>
+function Get-ThornswoodPassSwitchProblem($Settings) {
+    $names = Get-ThornswoodSettingNames $Settings
+    if ($names -contains 'thornswoodRequirePass' -and $Settings.thornswoodRequirePass -is [bool]) { return '' }
+    $had = 'missing'
+    if ($names -contains 'thornswoodRequirePass') { $had = 'neither true nor false' }
+    return ('thornswoodRequirePass is ' + $had + ' on this server and in the release, and the gamemode reads ' +
+            'that as on (#1319). Say which with .\scripts\deploy\Deploy-Gamemode.ps1 -RequirePass on, or off, then deploy again.')
 }
 
 <#
@@ -164,7 +190,15 @@ if ($null -eq $run -or $null -eq $rel) {
 } else {
   $m = Join-ThornswoodServerSettings $run $rel $ReleaseKeys
   foreach ($l in $m.Said) { $l }
-  [IO.File]::WriteAllText($sp, (ConvertTo-Json -InputObject $m.Settings -Depth 30), (New-Object Text.UTF8Encoding($false)))
-  'CARRIED ' + (Get-FileHash -LiteralPath $sp -Algorithm SHA256).Hash.ToLowerInvariant()
+  $passWhy = Get-ThornswoodPassSwitchProblem $m.Settings
+  if ($passWhy) {
+    $passWhy
+    Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
+    'the stage is cleared and the server was not touched'
+    'CARRY REFUSED'
+  } else {
+    [IO.File]::WriteAllText($sp, (ConvertTo-Json -InputObject $m.Settings -Depth 30), (New-Object Text.UTF8Encoding($false)))
+    'CARRIED ' + (Get-FileHash -LiteralPath $sp -Algorithm SHA256).Hash.ToLowerInvariant()
+  }
 }
 '@

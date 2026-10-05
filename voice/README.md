@@ -18,6 +18,13 @@ the dev service, where this file still has 7778 written in.
 live gamemode, undoing that, so it stops when the two differ; `-Force` is the
 only way past.
 
+A socket opened by a browser has to come from the page this service serves
+(its Origin names the host the socket was asked for, straight or through
+Caddy) or from a page loaded off disk, which says `null` or `file://`: the
+game's pages and the launcher's voice page. A page on any other website is
+refused with 403 before the handshake (#1321). A client that sends no Origin
+is not a browser and is let in.
+
 ## On your machine
 
 Run it from a scratch copy, as its harnesses do, not from the checkout: on its
@@ -37,7 +44,11 @@ line goes to everybody; `on` keeps a line to the same cell
 and 4000 units, a number sets the units, and /me, /do, /w and /s work),
 `THORNSWOOD_CHAT_BURST` and `THORNSWOOD_CHAT_REFILL_MS` (5 and 1500 when
 unset: how many said lines one connection gets out at once, and how often it
-earns another; slash lines are never counted) and `THORNSWOOD_SITE`, the
+earns another; slash lines are never counted), `THORNSWOOD_TOKEN_PER_MINUTE`
+and `THORNSWOOD_SOCKETS_PER_MINUTE` (20 and 60 when unset: how many token
+requests and sockets one address gets a minute before it is answered 429;
+behind Caddy the address is the last `X-Forwarded-For` hop, and this machine
+itself is never counted, #1323) and `THORNSWOOD_SITE`, the
 site `/token` asks whether a Discord ticket owns the profile it wants a join
 token for. A join that cannot prove itself with a token is refused, and
 `/token` mints one only when the site says yes: with the site unset, down or

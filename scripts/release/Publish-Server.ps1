@@ -88,7 +88,21 @@ param(
     [int]$Wait = 60,
     # The build record the binary is held to (#1214). The repository's own,
     # which the committed check below holds to the commit.
-    [string]$Record = ''
+    [string]$Record = '',
+    <#
+      The ports this run holds the payload and the box to, for the harnesses
+      only (#1728). Left at 0, which is how a person shipping runs it, they
+      are the channel's, exactly as before: the zip must start the server on
+      7787 (dev) or 7777 (live), and the check after the install knocks on the
+      resources port, 3000 for 7777 and the game port plus one otherwise.
+      tests\test-publish-server-channel.ps1 and tests\test-install-server.ps1
+      run beside other builds on the VPS, where the dev and live servers hold
+      those very ports, so each takes ports from the system and passes them.
+      A payload is built with the channel's port, so -GamePort only matches a
+      -SkipBuild zip made for that port; any other zip is refused as before.
+    #>
+    [ValidateRange(0, 65535)][int]$GamePort = 0,
+    [ValidateRange(0, 65535)][int]$ResourcesPort = 0
 )
 if (-not $Record) { $Record = Join-Path $PSScriptRoot '..\..\records\server-build.json' }
 
@@ -360,7 +374,7 @@ Say ("payload {0:N1} MB" -f ((Get-Item -LiteralPath $Zip).Length / 1MB)) 'Green'
 
 # The port the zip will really start on, read out of the zip (#1114), so a
 # -SkipBuild zip packed for the other channel cannot go to this one either.
-$wantPort = if ($IsDev) { 7787 } else { 7777 }
+$wantPort = if ($GamePort -gt 0) { $GamePort } elseif ($IsDev) { 7787 } else { 7777 }
 $zipPort = ''
 # And every server file in it is the recorded build, with the record beside
 # them for the installer (#1214), read out of the zip too, so a -SkipBuild zip
@@ -488,6 +502,15 @@ Invoke-Installer $instArgs
   in /dev, so a rotated key still reaches dev and the list stays the dev one.
   allowed.json is copied only when dev has none, so the Owner has commands
   on a fresh dev root until its door fetches its own. Nothing else is touched.
+
+  NOTHING TO CARRY STOPS THE PUBLISH (#1336). A live root with no private
+  folder, no door.json, one that does not read, or one without the address,
+  the key or the join pass key used to be a line in green and a publish that
+  went on to say it was done, with the dev door still on whatever key it had
+  before the live one was rotated. Now the dev door is left as it was, the
+  script says which of those it was and ends DOOR NOT CARRIED, and the
+  publish stops there with exit 1. The dev server it installed is up; its
+  door is what was not done. Only names are said, never a value.
 #>
 if ($IsDev) {
     Head 'The roster'
@@ -498,37 +521,50 @@ if ($IsDev) {
 $ProgressPreference = 'SilentlyContinue'
 $live = 'C:\Thornswood-Server\private'
 $dev  = '@@DEVROOT@@\private'
-if (-not (Test-Path -LiteralPath $live)) {
-    'the live server has no private folder, so there is no roster to copy'
+# What the dev door needs from live, each named when it is not there, and
+# nothing on dev touched then (#1336). Names only: no value is printed.
+$liveDoor = Join-Path $live 'door.json'
+$d = $null
+$why = ''
+if (-not (Test-Path -LiteralPath $live)) { $why = 'the live server has no private folder' }
+elseif (-not (Test-Path -LiteralPath $liveDoor)) { $why = 'the live server has no door.json' }
+else {
+    try { $d = Get-Content -LiteralPath $liveDoor -Raw | ConvertFrom-Json } catch { $why = 'the live door.json could not be read' }
+    if (-not $why -and $null -eq $d) { $why = 'the live door.json is empty' }
+    if (-not $why) {
+        $lack = @()
+        foreach ($k in 'site', 'key', 'passKey') { if (-not [string]$d.$k) { $lack += $k } }
+        if ($lack.Count) { $why = 'the live door.json has no ' + ($lack -join ' and no ') }
+    }
+}
+if ($why) {
+    $why + ', so the dev door was left as it was'
+    'DOOR NOT CARRIED'
 } else {
     New-Item -ItemType Directory -Path $dev -Force | Out-Null
-    $liveDoor = Join-Path $live 'door.json'
-    if (Test-Path -LiteralPath $liveDoor) {
-        try {
-            $d = Get-Content -LiteralPath $liveDoor -Raw | ConvertFrom-Json
-            $site = ([string]$d.site).TrimEnd('/')
-            if ($site -and $site -notmatch '/dev$') { $site = $site + '/dev' }
-            $d | Add-Member -NotePropertyName site -NotePropertyValue $site -Force
-            [IO.File]::WriteAllText((Join-Path $dev 'door.json'), ($d | ConvertTo-Json),
-                (New-Object Text.UTF8Encoding($false)))
-            "dev door.json has the live key and asks $site/api/allowed"
-        } catch {
-            'the live door.json could not be read, so the dev one was left as it was'
-        }
-    } else {
-        'the live server has no door.json, so the dev one was left as it was'
-    }
+    $site = ([string]$d.site).TrimEnd('/')
+    if ($site -notmatch '/dev$') { $site = $site + '/dev' }
+    $d | Add-Member -NotePropertyName site -NotePropertyValue $site -Force
+    [IO.File]::WriteAllText((Join-Path $dev 'door.json'), ($d | ConvertTo-Json),
+        (New-Object Text.UTF8Encoding($false)))
+    "dev door.json has the live key and join pass key and asks $site/api/allowed"
     $devList = Join-Path $dev 'allowed.json'
     if (-not (Test-Path -LiteralPath $devList) -and (Test-Path -LiteralPath (Join-Path $live 'allowed.json'))) {
         Copy-Item -LiteralPath (Join-Path $live 'allowed.json') -Destination $devList -Force
         'dev had no allowed.json, so it starts from the live one until its door fetches the dev list'
     }
+    'DOOR CARRIED'
 }
 '@
     $seed = $seed.Replace('@@DEVROOT@@', $VpsRoot.TrimEnd('\'))
     $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($seed))
-    $out = Invoke-ThornswoodNative { & ssh @ssh $target "powershell -NoProfile -EncodedCommand $enc" }
-    foreach ($line in @($out)) { Say "  $line" 'Green' }
+    $out = @(Invoke-ThornswoodNative { & ssh @ssh $target "powershell -NoProfile -EncodedCommand $enc" } | ForEach-Object { "$_".Trim() })
+    $carried = $out -contains 'DOOR CARRIED'
+    foreach ($line in $out) { Say "  $line" $(if ($carried) { 'Green' } else { 'Red' }) }
+    if (-not $carried) {
+        Die ("the dev server is installed and answering, but its door was not given the live server's keys, so a rotated key does not reach it. " +
+             "The line above says what was missing on live. Put it right there (.\scripts\ops\Set-Door.ps1 -Connect writes the live door.json), then publish to dev again.")
+    }
 }
 
 # ---------------------------------------------------------------- verify -----
@@ -548,9 +584,10 @@ if (-not (Test-Path -LiteralPath $live)) {
 # The resources port is not a setting. skymp5-server/ts/ui.ts:102 derives it:
 # 3000 when the game port is 7777, and game port plus one otherwise. So dev is
 # 7788 and there is no clash with live, and this is where that rule is written
-# down on our side of the fence.
-$GamePort = if ($IsDev) { 7787 } else { 7777 }
-$ResPort  = if ($GamePort -eq 7777) { 3000 } else { $GamePort + 1 }
+# down on our side of the fence. -GamePort and -ResourcesPort are the
+# harnesses' (see the parameters); a person shipping passes neither.
+$GamePort = $wantPort
+$ResPort  = if ($ResourcesPort -gt 0) { $ResourcesPort } elseif ($GamePort -eq 7777) { 3000 } else { $GamePort + 1 }
 
 Head 'Checking it answers'
 $up = $false

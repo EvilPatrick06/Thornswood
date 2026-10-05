@@ -10488,9 +10488,9 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "55ae:Cloaks&Capes.esp": { "out": "2dfb:Cloaks&Capes.esp", "name": "Dark Brotherhood Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
     "55ac:Cloaks&Capes.esp": { "out": "2df9:Cloaks&Capes.esp", "name": "Dawngaurd Cloak", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Liverywright", "race": "", "rank": "advanced", "family": "Other armour and clothing", "open": false },
     "92d4:FishingInSkyrim.esp": { "out": "92d3:FishingInSkyrim.esp", "name": "Dwemer Fire Paste", "type": "INGR", "makes": 2, "owner": "Cook", "half": "Hearthcook", "race": "", "rank": "master", "family": "Ingredients", "open": true },
-    "1f24f:FishingInSkyrim.esp": { "out": "20d45:FishingInSkyrim.esp", "name": "Fishing Pole - Crude", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "race": "", "rank": "novice", "family": "Other goods", "open": true },
-    "2180d:FishingInSkyrim.esp": { "out": "207e2:FishingInSkyrim.esp", "name": "Fishing Pole - Fine", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "race": "", "rank": "expert", "family": "Other goods", "open": true },
-    "1f252:FishingInSkyrim.esp": { "out": "1f253:FishingInSkyrim.esp", "name": "Fishing Pole - Master", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Woodwright", "race": "", "rank": "master", "family": "Other goods", "open": true },
+    "1f24f:FishingInSkyrim.esp": { "out": "20d45:FishingInSkyrim.esp", "name": "Fishing Pole - Crude", "type": "MISC", "makes": 1, "owner": "", "half": "", "race": "", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
+    "2180d:FishingInSkyrim.esp": { "out": "207e2:FishingInSkyrim.esp", "name": "Fishing Pole - Fine", "type": "MISC", "makes": 1, "owner": "", "half": "", "race": "", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
+    "1f252:FishingInSkyrim.esp": { "out": "1f253:FishingInSkyrim.esp", "name": "Fishing Pole - Master", "type": "MISC", "makes": 1, "owner": "", "half": "", "race": "", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
     "15480:Thornswood-Content.esp": { "out": "15481:Thornswood-Content.esp", "name": "Poor Charcoal", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "race": "", "rank": "novice", "family": "Other goods", "open": true },
     "15486:Thornswood-Content.esp": { "out": "15482:Thornswood-Content.esp", "name": "Charcoal", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "race": "", "rank": "advanced", "family": "Other goods", "open": true },
     "15487:Thornswood-Content.esp": { "out": "15484:Thornswood-Content.esp", "name": "Charcoal Briquette", "type": "MISC", "makes": 1, "owner": "Woodworker", "half": "Charburner", "race": "", "rank": "expert", "family": "Other goods", "open": true },
@@ -26782,10 +26782,10 @@ const CHARCOAL_GRADES = [
 
 // ==== FUEL_BY_RECIPE, generated ====
 /* Built by scripts\dev\Build-FuelTable.js out of game\data\recipes.json. Do not hand edit.
-   335 recipes at a forge, a skyforge or a smelter, out of 3717.
-   181 burn Poor Charcoal, 76 Charcoal, 60 Charcoal Briquette and 18 Coke.
+   332 recipes at a forge, a skyforge or a smelter, out of 3717.
+   179 burn Poor Charcoal, 76 Charcoal, 59 Charcoal Briquette and 18 Coke.
    Recipe desc -> [grade 1 to 4, the metal that asks for it or nothing, the bench]. */
-const FUEL_BY_RECIPE = {"108cf8:Skyrim.esm":[2,"dwarven","forge"],"108cf9:Skyrim.esm":[3,"ebony","forge"],"108cfa:Skyrim.esm":[2,"elven","forge"],"108cfb:Skyrim.esm":[3,"glass","forge"],"108cfc:Skyrim.esm":[2,"orcish","forge"],"10dd28:Skyrim.esm":[2,"dwarven","smelter"],"1548d:Thornswood-Content.esp":[1,"iron","forge"],"1548e:Thornswood-Content.esp":[1,"iron","forge"],"15492:Thornswood-Content.esp":[1,"iron","forge"],"15496:Thornswood-Content.esp":[1,"iron","forge"],"15497:Thornswood-Content.esp":[1,"iron","forge"],"1549c:Thornswood-Content.esp":[1,"","forge"],"1549d:Thornswood-Content.esp":[1,"steel","forge"],"1549e:Thornswood-Content.esp":[2,"elven","forge"],"1549f:Thornswood-Content.esp":[1,"iron","forge"],"154b3:Thornswood-Content.esp":[1,"iron","forge"],"154b4:Thornswood-Content.esp":[1,"iron","forge"],"1838:PlayFluteLuteDrum.esp":[1,"","forge"],"19f8c:Playable Rieklings.esp":[1,"","forge"],"19f8d:Playable Rieklings.esp":[1,"","forge"],"19f8e:Playable Rieklings.esp":[1,"","forge"],"19f8f:Playable Rieklings.esp":[1,"iron","forge"],"19f97:Playable Rieklings.esp":[1,"iron","forge"],"19f9d:Playable Rieklings.esp":[1,"iron","forge"],"19fb4:Playable Rieklings.esp":[1,"steel","forge"],"19fb7:Playable Rieklings.esp":[1,"steel","forge"],"19fb8:Playable Rieklings.esp":[1,"steel","forge"],"1d90:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"1f24f:FishingInSkyrim.esp":[1,"iron","forge"],"1f252:FishingInSkyrim.esp":[3,"ebony","forge"],"214aa:Hothtrooper44_ArmorCompilation.esp":[1,"steel","skyforge"],"2180d:FishingInSkyrim.esp":[1,"steel","forge"],"22fe:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23062:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23063:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23190:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"23195:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"2319a:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"2319f:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"231a9:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231ae:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231b3:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231b8:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231c6:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c8:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c9:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231ca:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cb:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cc:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cd:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231ce:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cf:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d0:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d1:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d2:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d3:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d4:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d5:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d6:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d8:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d9:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"238fd:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"238fe:Hothtrooper44_ArmorCompilation.esp":[2,"silver","forge"],"23900:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"23907:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23908:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"2390e:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"23918:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23919:Hothtrooper44_ArmorCompilation.esp":[2,"silver","forge"],"23a0a:Playable Rieklings.esp":[1,"","forge"],"286a:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"2b04f:Dragonborn.esm":[1,"iron","forge"],"2b050:Dragonborn.esm":[1,"iron","forge"],"2b051:Dragonborn.esm":[1,"iron","forge"],"2b052:Dragonborn.esm":[1,"","forge"],"2b053:Dragonborn.esm":[1,"iron","forge"],"2b054:Dragonborn.esm":[1,"iron","forge"],"2b055:Dragonborn.esm":[1,"","forge"],"2b056:Dragonborn.esm":[1,"","forge"],"2b057:Dragonborn.esm":[1,"","forge"],"2b058:Dragonborn.esm":[1,"iron","forge"],"2b05a:Dragonborn.esm":[1,"iron","forge"],"2b05b:Dragonborn.esm":[1,"iron","forge"],"2b05c:Dragonborn.esm":[1,"iron","forge"],"2b065:Dragonborn.esm":[3,"nordic","forge"],"2b066:Dragonborn.esm":[3,"nordic","forge"],"2b067:Dragonborn.esm":[3,"nordic","forge"],"2b068:Dragonborn.esm":[3,"nordic","forge"],"2b069:Dragonborn.esm":[3,"nordic","forge"],"2b06a:Dragonborn.esm":[4,"stalhrim","forge"],"2b06c:Dragonborn.esm":[4,"stalhrim","forge"],"2b06d:Dragonborn.esm":[4,"stalhrim","forge"],"2b06e:Dragonborn.esm":[4,"stalhrim","forge"],"2b06f:Dragonborn.esm":[4,"stalhrim","forge"],"2b070:Dragonborn.esm":[4,"stalhrim","forge"],"2b071:Dragonborn.esm":[4,"stalhrim","forge"],"2b072:Dragonborn.esm":[4,"stalhrim","forge"],"2b075:Dragonborn.esm":[4,"stalhrim","forge"],"2b076:Dragonborn.esm":[4,"stalhrim","forge"],"2b077:Dragonborn.esm":[4,"stalhrim","forge"],"2b078:Dragonborn.esm":[4,"stalhrim","forge"],"2b079:Dragonborn.esm":[4,"stalhrim","forge"],"2b07a:Dragonborn.esm":[4,"stalhrim","forge"],"2b07b:Dragonborn.esm":[4,"stalhrim","forge"],"2b07c:Dragonborn.esm":[4,"stalhrim","forge"],"2b07d:Dragonborn.esm":[4,"stalhrim","forge"],"2b07e:Dragonborn.esm":[3,"nordic","forge"],"2b07f:Dragonborn.esm":[3,"nordic","forge"],"2b080:Dragonborn.esm":[3,"nordic","forge"],"2b081:Dragonborn.esm":[3,"nordic","forge"],"2b082:Dragonborn.esm":[3,"nordic","forge"],"2b083:Dragonborn.esm":[3,"nordic","forge"],"2b084:Dragonborn.esm":[3,"nordic","forge"],"2b085:Dragonborn.esm":[3,"nordic","forge"],"2dd7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"2de4:PlayFluteLuteDrum.esp":[1,"","forge"],"2de5:PlayFluteLuteDrum.esp":[1,"","forge"],"372fe:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"372ff:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37300:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37301:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37306:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37307:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37308:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37309:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"3cf53:Dragonborn.esm":[3,"nordic","forge"],"3cf54:Dragonborn.esm":[4,"stalhrim","forge"],"3d2dd:Dragonborn.esm":[1,"iron","forge"],"490d86:Immersive Weapons.esp":[1,"","forge"],"491dc0:Immersive Weapons.esp":[3,"glass","forge"],"491dc4:Immersive Weapons.esp":[3,"glass","forge"],"53b3:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"53b5:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"53b7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"6aa09:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"77100a:Immersive Weapons.esp":[1,"steel","forge"],"82ebf:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec0:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec1:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec2:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"844:MoreCraftableEquipment.esp":[1,"","forge"],"848:MoreCraftableEquipment.esp":[1,"","forge"],"849:MoreCraftableEquipment.esp":[1,"","forge"],"855:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"856:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"857:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"858:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"85f:MoreCraftableEquipment.esp":[1,"steel","forge"],"860:MoreCraftableEquipment.esp":[1,"steel","forge"],"861:MoreCraftableEquipment.esp":[1,"steel","forge"],"863:MoreCraftableEquipment.esp":[1,"steel","forge"],"866:MoreCraftableEquipment.esp":[1,"steel","forge"],"867:MoreCraftableEquipment.esp":[1,"steel","forge"],"868:MoreCraftableEquipment.esp":[1,"iron","forge"],"869:MoreCraftableEquipment.esp":[1,"iron","forge"],"874:MoreCraftableEquipment.esp":[2,"falmer","forge"],"87b:MoreCraftableEquipment.esp":[2,"falmer","forge"],"87c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88d:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88e:MoreCraftableEquipment.esp":[2,"falmer","forge"],"897:MoreCraftableEquipment.esp":[2,"falmer","forge"],"89c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8a9:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8aa:MoreCraftableEquipment.esp":[1,"","forge"],"8ab:MoreCraftableEquipment.esp":[1,"","forge"],"8ac:MoreCraftableEquipment.esp":[1,"","forge"],"8ad:MoreCraftableEquipment.esp":[1,"","forge"],"8d0:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d1:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d2:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d3:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d4:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d5:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d6:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d7:MoreCraftableEquipment.esp":[1,"","forge"],"8d8:MoreCraftableEquipment.esp":[1,"","forge"],"8d9:MoreCraftableEquipment.esp":[1,"","forge"],"8db:MoreCraftableEquipment.esp":[1,"iron","forge"],"8f0:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f7:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f8:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f9:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8fa:MoreCraftableEquipment.esp":[1,"steel","forge"],"8fc:MoreCraftableEquipment.esp":[1,"iron","forge"],"900:MoreCraftableEquipment.esp":[2,"silver","forge"],"901:MoreCraftableEquipment.esp":[2,"silver","forge"],"94185a:Immersive Weapons.esp":[3,"glass","forge"],"9cf:Update.esm":[1,"steel","forge"],"9d0:Update.esm":[1,"steel","forge"],"9d1:Update.esm":[1,"steel","forge"],"9d2:Update.esm":[1,"steel","forge"],"9d3:Update.esm":[1,"steel","forge"],"9e775:Playable Rieklings.esp":[1,"","forge"],"a30c3:Skyrim.esm":[1,"iron","smelter"],"a30cb:Skyrim.esm":[1,"","smelter"],"a30d3:Skyrim.esm":[3,"ebony","smelter"],"a30d4:Skyrim.esm":[1,"","smelter"],"a30d9:Skyrim.esm":[2,"elven","smelter"],"a30da:Skyrim.esm":[3,"glass","smelter"],"a30db:Skyrim.esm":[2,"orcish","smelter"],"a30dc:Skyrim.esm":[1,"","smelter"],"a30dd:Skyrim.esm":[2,"silver","smelter"],"a30e4:Skyrim.esm":[1,"steel","smelter"],"a5cd6:Skyrim.esm":[1,"steel","forge"],"ab72:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab73:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab74:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab75:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"b64f:Dawnguard.esm":[1,"iron","forge"],"b650:Dawnguard.esm":[1,"steel","forge"],"b651:Dawnguard.esm":[3,"ebony","forge"],"b652:Dawnguard.esm":[2,"dwarven","forge"],"b653:Dawnguard.esm":[3,"glass","forge"],"b654:Dawnguard.esm":[2,"orcish","forge"],"b655:Dawnguard.esm":[2,"elven","forge"],"bc99a:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"c74736:Immersive Weapons.esp":[2,"silver","forge"],"c74737:Immersive Weapons.esp":[2,"silver","forge"],"da0c03:Update.esm":[2,"elven","smelter"],"da769:Skyrim.esm":[1,"iron","forge"],"da76a:Skyrim.esm":[1,"iron","forge"],"da76b:Skyrim.esm":[1,"iron","forge"],"da76c:Skyrim.esm":[1,"iron","forge"],"da76d:Skyrim.esm":[1,"iron","forge"],"da76e:Skyrim.esm":[1,"iron","forge"],"da76f:Skyrim.esm":[1,"iron","forge"],"db28e:Skyrim.esm":[1,"","forge"],"db28f:Skyrim.esm":[1,"iron","forge"],"db290:Skyrim.esm":[1,"iron","forge"],"db291:Skyrim.esm":[1,"iron","forge"],"db292:Skyrim.esm":[1,"iron","forge"],"db293:Skyrim.esm":[1,"iron","forge"],"db5d3:Skyrim.esm":[1,"","forge"],"db5d4:Skyrim.esm":[1,"","forge"],"db5d5:Skyrim.esm":[1,"","forge"],"db5d6:Skyrim.esm":[1,"","forge"],"db5d7:Skyrim.esm":[1,"steel","forge"],"db896:Skyrim.esm":[1,"steel","forge"],"db897:Skyrim.esm":[1,"steel","forge"],"db898:Skyrim.esm":[1,"steel","forge"],"db899:Skyrim.esm":[2,"orcish","forge"],"db89a:Skyrim.esm":[2,"orcish","forge"],"db89b:Skyrim.esm":[1,"steel","forge"],"db89c:Skyrim.esm":[2,"orcish","forge"],"db89d:Skyrim.esm":[2,"orcish","forge"],"db89e:Skyrim.esm":[1,"steel","forge"],"db89f:Skyrim.esm":[2,"orcish","forge"],"db8a0:Skyrim.esm":[2,"orcish","forge"],"db8a1:Skyrim.esm":[2,"orcish","forge"],"db8a3:Skyrim.esm":[2,"dwarven","forge"],"db8a4:Skyrim.esm":[2,"dwarven","forge"],"db8a5:Skyrim.esm":[2,"dwarven","forge"],"db8a6:Skyrim.esm":[2,"dwarven","forge"],"db8a7:Skyrim.esm":[2,"dwarven","forge"],"db8a8:Skyrim.esm":[2,"dwarven","forge"],"db8a9:Skyrim.esm":[2,"dwarven","forge"],"db8aa:Skyrim.esm":[2,"elven","forge"],"db8ab:Skyrim.esm":[2,"elven","forge"],"db8ac:Skyrim.esm":[2,"elven","forge"],"db8ad:Skyrim.esm":[2,"elven","forge"],"db8ae:Skyrim.esm":[2,"elven","forge"],"db8af:Skyrim.esm":[2,"elven","forge"],"db8b0:Skyrim.esm":[2,"elven","forge"],"db8b1:Skyrim.esm":[3,"glass","forge"],"db8b2:Skyrim.esm":[3,"glass","forge"],"db8b3:Skyrim.esm":[3,"glass","forge"],"db8b4:Skyrim.esm":[3,"glass","forge"],"db8b5:Skyrim.esm":[3,"glass","forge"],"db8b6:Skyrim.esm":[3,"glass","forge"],"db8b7:Skyrim.esm":[3,"glass","forge"],"db8b8:Skyrim.esm":[3,"ebony","forge"],"db8b9:Skyrim.esm":[3,"ebony","forge"],"db8ba:Skyrim.esm":[3,"ebony","forge"],"db8bb:Skyrim.esm":[3,"ebony","forge"],"db8bc:Skyrim.esm":[3,"ebony","forge"],"db8bd:Skyrim.esm":[3,"ebony","forge"],"db8be:Skyrim.esm":[3,"ebony","forge"],"dc9f5:Skyrim.esm":[1,"steel","forge"],"dc9f6:Skyrim.esm":[1,"steel","forge"],"dc9f7:Skyrim.esm":[1,"steel","forge"],"dc9f8:Skyrim.esm":[1,"steel","forge"],"dc9f9:Skyrim.esm":[1,"steel","forge"],"dc9fa:Skyrim.esm":[2,"elven","forge"],"dc9fb:Skyrim.esm":[2,"elven","forge"],"dc9fc:Skyrim.esm":[2,"elven","forge"],"dc9fd:Skyrim.esm":[2,"elven","forge"],"dc9fe:Skyrim.esm":[2,"elven","forge"],"dc9ff:Skyrim.esm":[1,"iron","forge"],"dca00:Skyrim.esm":[1,"iron","forge"],"dca01:Skyrim.esm":[1,"","forge"],"dca02:Skyrim.esm":[1,"","forge"],"dca03:Skyrim.esm":[1,"","forge"],"dca04:Skyrim.esm":[1,"","forge"],"dca05:Skyrim.esm":[1,"steel","forge"],"dca06:Skyrim.esm":[1,"steel","forge"],"dca07:Skyrim.esm":[1,"steel","forge"],"dca08:Skyrim.esm":[1,"steel","forge"],"dca0e:Skyrim.esm":[3,"glass","forge"],"dca0f:Skyrim.esm":[3,"glass","forge"],"dca10:Skyrim.esm":[3,"glass","forge"],"dca11:Skyrim.esm":[3,"glass","forge"],"dca12:Skyrim.esm":[3,"glass","forge"],"dd975:Skyrim.esm":[1,"steel","forge"],"dd977:Skyrim.esm":[1,"steel","forge"],"dd978:Skyrim.esm":[1,"steel","forge"],"dd979:Skyrim.esm":[2,"dwarven","forge"],"dd97a:Skyrim.esm":[2,"dwarven","forge"],"dd97b:Skyrim.esm":[2,"dwarven","forge"],"dd97c:Skyrim.esm":[2,"dwarven","forge"],"dd97d:Skyrim.esm":[2,"dwarven","forge"],"dd97e:Skyrim.esm":[1,"steel","forge"],"dd97f:Skyrim.esm":[1,"steel","forge"],"dd980:Skyrim.esm":[1,"steel","forge"],"dd981:Skyrim.esm":[1,"steel","forge"],"dd983:Skyrim.esm":[2,"orcish","forge"],"dd984:Skyrim.esm":[2,"orcish","forge"],"dd985:Skyrim.esm":[2,"orcish","forge"],"dd986:Skyrim.esm":[2,"orcish","forge"],"dd987:Skyrim.esm":[2,"orcish","forge"],"dd988:Skyrim.esm":[3,"ebony","forge"],"dd989:Skyrim.esm":[3,"ebony","forge"],"dd98a:Skyrim.esm":[3,"ebony","forge"],"dd98b:Skyrim.esm":[3,"ebony","forge"],"dd98c:Skyrim.esm":[3,"ebony","forge"],"f46cc:Skyrim.esm":[1,"ancient nord","skyforge"],"f46cd:Skyrim.esm":[1,"ancient nord","skyforge"],"f46cf:Skyrim.esm":[1,"ancient nord","skyforge"],"f46d0:Skyrim.esm":[1,"ancient nord","skyforge"],"f6f2a:Skyrim.esm":[1,"steel","forge"],"f74d:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"f813:Dawnguard.esm":[1,"steel","forge"],"f814:Dawnguard.esm":[2,"dwarven","forge"]};
+const FUEL_BY_RECIPE = {"108cf8:Skyrim.esm":[2,"dwarven","forge"],"108cf9:Skyrim.esm":[3,"ebony","forge"],"108cfa:Skyrim.esm":[2,"elven","forge"],"108cfb:Skyrim.esm":[3,"glass","forge"],"108cfc:Skyrim.esm":[2,"orcish","forge"],"10dd28:Skyrim.esm":[2,"dwarven","smelter"],"1548d:Thornswood-Content.esp":[1,"iron","forge"],"1548e:Thornswood-Content.esp":[1,"iron","forge"],"15492:Thornswood-Content.esp":[1,"iron","forge"],"15496:Thornswood-Content.esp":[1,"iron","forge"],"15497:Thornswood-Content.esp":[1,"iron","forge"],"1549c:Thornswood-Content.esp":[1,"","forge"],"1549d:Thornswood-Content.esp":[1,"steel","forge"],"1549e:Thornswood-Content.esp":[2,"elven","forge"],"1549f:Thornswood-Content.esp":[1,"iron","forge"],"154b3:Thornswood-Content.esp":[1,"iron","forge"],"154b4:Thornswood-Content.esp":[1,"iron","forge"],"1838:PlayFluteLuteDrum.esp":[1,"","forge"],"19f8c:Playable Rieklings.esp":[1,"","forge"],"19f8d:Playable Rieklings.esp":[1,"","forge"],"19f8e:Playable Rieklings.esp":[1,"","forge"],"19f8f:Playable Rieklings.esp":[1,"iron","forge"],"19f97:Playable Rieklings.esp":[1,"iron","forge"],"19f9d:Playable Rieklings.esp":[1,"iron","forge"],"19fb4:Playable Rieklings.esp":[1,"steel","forge"],"19fb7:Playable Rieklings.esp":[1,"steel","forge"],"19fb8:Playable Rieklings.esp":[1,"steel","forge"],"1d90:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"214aa:Hothtrooper44_ArmorCompilation.esp":[1,"steel","skyforge"],"22fe:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23062:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23063:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23190:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"23195:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"2319a:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"2319f:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"231a9:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231ae:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231b3:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231b8:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231c6:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c8:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c9:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231ca:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cb:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cc:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cd:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231ce:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cf:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d0:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d1:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d2:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d3:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d4:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d5:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d6:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d8:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d9:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"238fd:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"238fe:Hothtrooper44_ArmorCompilation.esp":[2,"silver","forge"],"23900:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"23907:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23908:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"2390e:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"23918:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23919:Hothtrooper44_ArmorCompilation.esp":[2,"silver","forge"],"23a0a:Playable Rieklings.esp":[1,"","forge"],"286a:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"2b04f:Dragonborn.esm":[1,"iron","forge"],"2b050:Dragonborn.esm":[1,"iron","forge"],"2b051:Dragonborn.esm":[1,"iron","forge"],"2b052:Dragonborn.esm":[1,"","forge"],"2b053:Dragonborn.esm":[1,"iron","forge"],"2b054:Dragonborn.esm":[1,"iron","forge"],"2b055:Dragonborn.esm":[1,"","forge"],"2b056:Dragonborn.esm":[1,"","forge"],"2b057:Dragonborn.esm":[1,"","forge"],"2b058:Dragonborn.esm":[1,"iron","forge"],"2b05a:Dragonborn.esm":[1,"iron","forge"],"2b05b:Dragonborn.esm":[1,"iron","forge"],"2b05c:Dragonborn.esm":[1,"iron","forge"],"2b065:Dragonborn.esm":[3,"nordic","forge"],"2b066:Dragonborn.esm":[3,"nordic","forge"],"2b067:Dragonborn.esm":[3,"nordic","forge"],"2b068:Dragonborn.esm":[3,"nordic","forge"],"2b069:Dragonborn.esm":[3,"nordic","forge"],"2b06a:Dragonborn.esm":[4,"stalhrim","forge"],"2b06c:Dragonborn.esm":[4,"stalhrim","forge"],"2b06d:Dragonborn.esm":[4,"stalhrim","forge"],"2b06e:Dragonborn.esm":[4,"stalhrim","forge"],"2b06f:Dragonborn.esm":[4,"stalhrim","forge"],"2b070:Dragonborn.esm":[4,"stalhrim","forge"],"2b071:Dragonborn.esm":[4,"stalhrim","forge"],"2b072:Dragonborn.esm":[4,"stalhrim","forge"],"2b075:Dragonborn.esm":[4,"stalhrim","forge"],"2b076:Dragonborn.esm":[4,"stalhrim","forge"],"2b077:Dragonborn.esm":[4,"stalhrim","forge"],"2b078:Dragonborn.esm":[4,"stalhrim","forge"],"2b079:Dragonborn.esm":[4,"stalhrim","forge"],"2b07a:Dragonborn.esm":[4,"stalhrim","forge"],"2b07b:Dragonborn.esm":[4,"stalhrim","forge"],"2b07c:Dragonborn.esm":[4,"stalhrim","forge"],"2b07d:Dragonborn.esm":[4,"stalhrim","forge"],"2b07e:Dragonborn.esm":[3,"nordic","forge"],"2b07f:Dragonborn.esm":[3,"nordic","forge"],"2b080:Dragonborn.esm":[3,"nordic","forge"],"2b081:Dragonborn.esm":[3,"nordic","forge"],"2b082:Dragonborn.esm":[3,"nordic","forge"],"2b083:Dragonborn.esm":[3,"nordic","forge"],"2b084:Dragonborn.esm":[3,"nordic","forge"],"2b085:Dragonborn.esm":[3,"nordic","forge"],"2dd7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"2de4:PlayFluteLuteDrum.esp":[1,"","forge"],"2de5:PlayFluteLuteDrum.esp":[1,"","forge"],"372fe:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"372ff:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37300:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37301:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37306:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37307:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37308:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37309:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"3cf53:Dragonborn.esm":[3,"nordic","forge"],"3cf54:Dragonborn.esm":[4,"stalhrim","forge"],"3d2dd:Dragonborn.esm":[1,"iron","forge"],"490d86:Immersive Weapons.esp":[1,"","forge"],"491dc0:Immersive Weapons.esp":[3,"glass","forge"],"491dc4:Immersive Weapons.esp":[3,"glass","forge"],"53b3:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"53b5:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"53b7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"6aa09:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"77100a:Immersive Weapons.esp":[1,"steel","forge"],"82ebf:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec0:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec1:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec2:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"844:MoreCraftableEquipment.esp":[1,"","forge"],"848:MoreCraftableEquipment.esp":[1,"","forge"],"849:MoreCraftableEquipment.esp":[1,"","forge"],"855:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"856:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"857:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"858:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"85f:MoreCraftableEquipment.esp":[1,"steel","forge"],"860:MoreCraftableEquipment.esp":[1,"steel","forge"],"861:MoreCraftableEquipment.esp":[1,"steel","forge"],"863:MoreCraftableEquipment.esp":[1,"steel","forge"],"866:MoreCraftableEquipment.esp":[1,"steel","forge"],"867:MoreCraftableEquipment.esp":[1,"steel","forge"],"868:MoreCraftableEquipment.esp":[1,"iron","forge"],"869:MoreCraftableEquipment.esp":[1,"iron","forge"],"874:MoreCraftableEquipment.esp":[2,"falmer","forge"],"87b:MoreCraftableEquipment.esp":[2,"falmer","forge"],"87c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88d:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88e:MoreCraftableEquipment.esp":[2,"falmer","forge"],"897:MoreCraftableEquipment.esp":[2,"falmer","forge"],"89c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8a9:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8aa:MoreCraftableEquipment.esp":[1,"","forge"],"8ab:MoreCraftableEquipment.esp":[1,"","forge"],"8ac:MoreCraftableEquipment.esp":[1,"","forge"],"8ad:MoreCraftableEquipment.esp":[1,"","forge"],"8d0:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d1:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d2:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d3:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d4:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d5:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d6:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d7:MoreCraftableEquipment.esp":[1,"","forge"],"8d8:MoreCraftableEquipment.esp":[1,"","forge"],"8d9:MoreCraftableEquipment.esp":[1,"","forge"],"8db:MoreCraftableEquipment.esp":[1,"iron","forge"],"8f0:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f7:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f8:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f9:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8fa:MoreCraftableEquipment.esp":[1,"steel","forge"],"8fc:MoreCraftableEquipment.esp":[1,"iron","forge"],"900:MoreCraftableEquipment.esp":[2,"silver","forge"],"901:MoreCraftableEquipment.esp":[2,"silver","forge"],"94185a:Immersive Weapons.esp":[3,"glass","forge"],"9cf:Update.esm":[1,"steel","forge"],"9d0:Update.esm":[1,"steel","forge"],"9d1:Update.esm":[1,"steel","forge"],"9d2:Update.esm":[1,"steel","forge"],"9d3:Update.esm":[1,"steel","forge"],"9e775:Playable Rieklings.esp":[1,"","forge"],"a30c3:Skyrim.esm":[1,"iron","smelter"],"a30cb:Skyrim.esm":[1,"","smelter"],"a30d3:Skyrim.esm":[3,"ebony","smelter"],"a30d4:Skyrim.esm":[1,"","smelter"],"a30d9:Skyrim.esm":[2,"elven","smelter"],"a30da:Skyrim.esm":[3,"glass","smelter"],"a30db:Skyrim.esm":[2,"orcish","smelter"],"a30dc:Skyrim.esm":[1,"","smelter"],"a30dd:Skyrim.esm":[2,"silver","smelter"],"a30e4:Skyrim.esm":[1,"steel","smelter"],"a5cd6:Skyrim.esm":[1,"steel","forge"],"ab72:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab73:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab74:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab75:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"b64f:Dawnguard.esm":[1,"iron","forge"],"b650:Dawnguard.esm":[1,"steel","forge"],"b651:Dawnguard.esm":[3,"ebony","forge"],"b652:Dawnguard.esm":[2,"dwarven","forge"],"b653:Dawnguard.esm":[3,"glass","forge"],"b654:Dawnguard.esm":[2,"orcish","forge"],"b655:Dawnguard.esm":[2,"elven","forge"],"bc99a:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"c74736:Immersive Weapons.esp":[2,"silver","forge"],"c74737:Immersive Weapons.esp":[2,"silver","forge"],"da0c03:Update.esm":[2,"elven","smelter"],"da769:Skyrim.esm":[1,"iron","forge"],"da76a:Skyrim.esm":[1,"iron","forge"],"da76b:Skyrim.esm":[1,"iron","forge"],"da76c:Skyrim.esm":[1,"iron","forge"],"da76d:Skyrim.esm":[1,"iron","forge"],"da76e:Skyrim.esm":[1,"iron","forge"],"da76f:Skyrim.esm":[1,"iron","forge"],"db28e:Skyrim.esm":[1,"","forge"],"db28f:Skyrim.esm":[1,"iron","forge"],"db290:Skyrim.esm":[1,"iron","forge"],"db291:Skyrim.esm":[1,"iron","forge"],"db292:Skyrim.esm":[1,"iron","forge"],"db293:Skyrim.esm":[1,"iron","forge"],"db5d3:Skyrim.esm":[1,"","forge"],"db5d4:Skyrim.esm":[1,"","forge"],"db5d5:Skyrim.esm":[1,"","forge"],"db5d6:Skyrim.esm":[1,"","forge"],"db5d7:Skyrim.esm":[1,"steel","forge"],"db896:Skyrim.esm":[1,"steel","forge"],"db897:Skyrim.esm":[1,"steel","forge"],"db898:Skyrim.esm":[1,"steel","forge"],"db899:Skyrim.esm":[2,"orcish","forge"],"db89a:Skyrim.esm":[2,"orcish","forge"],"db89b:Skyrim.esm":[1,"steel","forge"],"db89c:Skyrim.esm":[2,"orcish","forge"],"db89d:Skyrim.esm":[2,"orcish","forge"],"db89e:Skyrim.esm":[1,"steel","forge"],"db89f:Skyrim.esm":[2,"orcish","forge"],"db8a0:Skyrim.esm":[2,"orcish","forge"],"db8a1:Skyrim.esm":[2,"orcish","forge"],"db8a3:Skyrim.esm":[2,"dwarven","forge"],"db8a4:Skyrim.esm":[2,"dwarven","forge"],"db8a5:Skyrim.esm":[2,"dwarven","forge"],"db8a6:Skyrim.esm":[2,"dwarven","forge"],"db8a7:Skyrim.esm":[2,"dwarven","forge"],"db8a8:Skyrim.esm":[2,"dwarven","forge"],"db8a9:Skyrim.esm":[2,"dwarven","forge"],"db8aa:Skyrim.esm":[2,"elven","forge"],"db8ab:Skyrim.esm":[2,"elven","forge"],"db8ac:Skyrim.esm":[2,"elven","forge"],"db8ad:Skyrim.esm":[2,"elven","forge"],"db8ae:Skyrim.esm":[2,"elven","forge"],"db8af:Skyrim.esm":[2,"elven","forge"],"db8b0:Skyrim.esm":[2,"elven","forge"],"db8b1:Skyrim.esm":[3,"glass","forge"],"db8b2:Skyrim.esm":[3,"glass","forge"],"db8b3:Skyrim.esm":[3,"glass","forge"],"db8b4:Skyrim.esm":[3,"glass","forge"],"db8b5:Skyrim.esm":[3,"glass","forge"],"db8b6:Skyrim.esm":[3,"glass","forge"],"db8b7:Skyrim.esm":[3,"glass","forge"],"db8b8:Skyrim.esm":[3,"ebony","forge"],"db8b9:Skyrim.esm":[3,"ebony","forge"],"db8ba:Skyrim.esm":[3,"ebony","forge"],"db8bb:Skyrim.esm":[3,"ebony","forge"],"db8bc:Skyrim.esm":[3,"ebony","forge"],"db8bd:Skyrim.esm":[3,"ebony","forge"],"db8be:Skyrim.esm":[3,"ebony","forge"],"dc9f5:Skyrim.esm":[1,"steel","forge"],"dc9f6:Skyrim.esm":[1,"steel","forge"],"dc9f7:Skyrim.esm":[1,"steel","forge"],"dc9f8:Skyrim.esm":[1,"steel","forge"],"dc9f9:Skyrim.esm":[1,"steel","forge"],"dc9fa:Skyrim.esm":[2,"elven","forge"],"dc9fb:Skyrim.esm":[2,"elven","forge"],"dc9fc:Skyrim.esm":[2,"elven","forge"],"dc9fd:Skyrim.esm":[2,"elven","forge"],"dc9fe:Skyrim.esm":[2,"elven","forge"],"dc9ff:Skyrim.esm":[1,"iron","forge"],"dca00:Skyrim.esm":[1,"iron","forge"],"dca01:Skyrim.esm":[1,"","forge"],"dca02:Skyrim.esm":[1,"","forge"],"dca03:Skyrim.esm":[1,"","forge"],"dca04:Skyrim.esm":[1,"","forge"],"dca05:Skyrim.esm":[1,"steel","forge"],"dca06:Skyrim.esm":[1,"steel","forge"],"dca07:Skyrim.esm":[1,"steel","forge"],"dca08:Skyrim.esm":[1,"steel","forge"],"dca0e:Skyrim.esm":[3,"glass","forge"],"dca0f:Skyrim.esm":[3,"glass","forge"],"dca10:Skyrim.esm":[3,"glass","forge"],"dca11:Skyrim.esm":[3,"glass","forge"],"dca12:Skyrim.esm":[3,"glass","forge"],"dd975:Skyrim.esm":[1,"steel","forge"],"dd977:Skyrim.esm":[1,"steel","forge"],"dd978:Skyrim.esm":[1,"steel","forge"],"dd979:Skyrim.esm":[2,"dwarven","forge"],"dd97a:Skyrim.esm":[2,"dwarven","forge"],"dd97b:Skyrim.esm":[2,"dwarven","forge"],"dd97c:Skyrim.esm":[2,"dwarven","forge"],"dd97d:Skyrim.esm":[2,"dwarven","forge"],"dd97e:Skyrim.esm":[1,"steel","forge"],"dd97f:Skyrim.esm":[1,"steel","forge"],"dd980:Skyrim.esm":[1,"steel","forge"],"dd981:Skyrim.esm":[1,"steel","forge"],"dd983:Skyrim.esm":[2,"orcish","forge"],"dd984:Skyrim.esm":[2,"orcish","forge"],"dd985:Skyrim.esm":[2,"orcish","forge"],"dd986:Skyrim.esm":[2,"orcish","forge"],"dd987:Skyrim.esm":[2,"orcish","forge"],"dd988:Skyrim.esm":[3,"ebony","forge"],"dd989:Skyrim.esm":[3,"ebony","forge"],"dd98a:Skyrim.esm":[3,"ebony","forge"],"dd98b:Skyrim.esm":[3,"ebony","forge"],"dd98c:Skyrim.esm":[3,"ebony","forge"],"f46cc:Skyrim.esm":[1,"ancient nord","skyforge"],"f46cd:Skyrim.esm":[1,"ancient nord","skyforge"],"f46cf:Skyrim.esm":[1,"ancient nord","skyforge"],"f46d0:Skyrim.esm":[1,"ancient nord","skyforge"],"f6f2a:Skyrim.esm":[1,"steel","forge"],"f74d:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"f813:Dawnguard.esm":[1,"steel","forge"],"f814:Dawnguard.esm":[2,"dwarven","forge"]};
 // ==== end FUEL_BY_RECIPE ====
 
 /** The fuel a recipe burns, { grade, metal, bench }, or null when it burns none. */
@@ -29882,22 +29882,43 @@ log('gamemode loaded:',
   the launcher version, the Discord id and a ten minute expiry with the key it
   shares with this server: passKey in door.json, which Set-Door.ps1 -Connect
   copies there from the site. The launcher leaves it in
-  Data/Platform/thornswood-pass.txt and renews it every four minutes, and the
-  front plugin sends it here as "/joinpass <pass>" over the command relay, at
-  once and every minute. The format is makePass in site/server.js.
+  Data/Platform/thornswood-pass.txt and renews it every minute, and the front
+  plugin sends it here as "/joinpass <pass>" over the command relay, at once
+  and every minute. The format is makePass in site/server.js.
 
   WHAT IS CHECKED, here and with nothing asked of anybody: the signature, the
   expiry, that it names this server (thornswoodServer in server-settings.json,
-  "dev" on the dev box, "main" when absent), and that its profile is the one
-  the relay says sent it, which the voice join token proves.
+  "dev" on the dev box, "main" when absent), that its profile is the one the
+  relay says sent it, which the voice join token proves, and that no other
+  session has used it (below).
 
-  THE PROFILE ID IS THE PASS'S. Every profile online needs a valid pass
-  received since it was first seen, or in the minute before. One with none is
-  told one line and ended GRACE_MS after it was first seen. A session under
-  somebody else's number cannot have a pass for it: the site will not issue
-  one and nothing else can sign one. A pass is forgotten when its profile
-  leaves, so a reconnect needs a fresh one, which the front sends within the
-  minute and the launcher keeps fresh.
+  THE PROFILE ID IS THE PASS'S. Every session online needs a valid pass of its
+  own. One with none is told one line and ended GRACE_MS after it was first
+  seen. A session under somebody else's number cannot have a pass for it: the
+  site will not issue one and nothing else can sign one.
+
+  ONE PASS, ONE SESSION (#1320). A pass is a note anybody holding it could
+  show, so it is bound to the first session it proves and never proves
+  another: not the next session after a reconnect, not a second connection
+  under the same number. A session is one engine connection behind a profile
+  (its GUID, connOf), from when it is first seen until it leaves or the
+  connection behind the character changes; a new connection starts a new
+  session, held (#410) and judged afresh. A pass also starts a session only
+  when the site issued it at most ISSUED_MS before that session began, so a
+  pass picked up at the menu, off a disk, or over the wire is good for a
+  minute and a half, not for the ten minutes it lives; after that it only
+  keeps the session it already proved trusted (proven, for roles). The
+  launcher renews every minute, so a reconnect has a new pass within one.
+  Kept on globalThis, so a hot reload keeps every binding; a restart loses
+  them, and then a pass can be shown again only within ISSUED_MS of its
+  issue. Measured on 5 Oct: the pass never travels on the game's own port.
+  It goes launcher to site over https, through a file, and over the relay's
+  socket, which is wss through Caddy whenever the voice address is https; a
+  launcher with no https voice address gets no join token, and with the hold
+  on the relay refuses it. What the gamemode cannot do is tie that socket to
+  the game connection: both only name the profile. Binding the pass into the
+  game login itself, checked before the engine hands over the character, is a
+  fork change, written out on #1320.
 
   THE SERVER'S OWN FAILURES REFUSE TOO, decided on purpose (the standing rule
   is that refusing is the secure side, #937): no passKey in door.json, a relay
@@ -29912,7 +29933,18 @@ log('gamemode loaded:',
   launcher, so that session is the same refusal. The setting still decides
   the hold (#410): with it on, nothing the session does counts until the pass
   arrives. Deploy-DevGamemode.ps1 -RequirePass on|off sets the hold on the
-  dev box. No older launcher or plugin is kept working (Patrick, 28 Sep).
+  dev box, and Deploy-Gamemode.ps1 -RequirePass on|off with Deploy-Server.ps1
+  on live. No older launcher or plugin is kept working (Patrick, 28 Sep).
+
+  THE HOLD FAILS CLOSED (#1319). false is the one way to turn it off. true
+  holds, and so does anything else: absent, null, empty, "true" as text, 1.
+  Until 5 Oct only exactly true held, so one empty value, which the dev
+  server had on 29 Sep (#1222), dropped the hold for the whole server and
+  said nothing. requiring() logs any value that is neither, with the value.
+  Every reader asks requiring(): the seats block, the dispatcher, the voice
+  feed. A deploy never changes what a box does unasked: Deploy-DevGamemode.ps1
+  and Deploy-Server.ps1 refuse a server whose settings hold neither true nor
+  false until -RequirePass says which.
 */
 (function () {
   var g = globalThis;
@@ -29920,7 +29952,8 @@ log('gamemode loaded:',
   try { crypto = require('crypto'); fs = require('fs'); path = require('path'); } catch (e) { }
 
   var GRACE_MS = 180000;      // online this long with no valid pass: ended
-  var BEFORE_MS = 60000;      // a pass this long before the session was first seen counts
+  var BEFORE_MS = 60000;      // a pass at the menu not sent again this long, with no session, is let go
+  var ISSUED_MS = 90000;      // a pass issued this long before a session began can still start it (#1320)
   var SWEEP_MS = 5000;
   var KEY_READ_MS = 60000;
   var SAY_AGAIN_MS = 600000;  // the same bad pass is logged at most this often
@@ -29933,14 +29966,41 @@ log('gamemode loaded:',
                 'clear in a minute, restart the game from the launcher.';
 
   // On globalThis, so a hot reload keeps who has shown a pass.
-  // passes: profile -> { at, x, v }; online: profile -> { joined, judged, actorId }.
+  // passes: profile -> { at, x, v, d, i, id, s }, the pass on hand, s the session it proved (0: none yet);
+  // online: profile -> { joined, judged, actorId, sid, conn }; used: pass id -> { s, x } (#1320).
   if (!g.__thornswoodPassSeen) { g.__thornswoodPassSeen = { passes: {}, online: {}, said: {} }; }
   var seen = g.__thornswoodPassSeen;
+  if (!seen.used) { seen.used = {}; }
+  if (!seen.serial) { seen.serial = 0; }
+  // Sessions from a block before #1320, on a hot reload: each gets its number,
+  // and one that had already proved itself keeps the pass it showed.
+  for (var was in seen.online) {
+    if (Object.prototype.hasOwnProperty.call(seen.online, was) && !seen.online[was].sid) {
+      seen.online[was].sid = ++seen.serial;
+      if (seen.online[was].judged && seen.passes[was]) { seen.passes[was].s = seen.online[was].sid; }
+    }
+  }
 
   function settings() {
     try { return mp.getServerSettings() || {}; } catch (e) { return {}; }
   }
-  function requiring() { return settings().thornswoodRequirePass === true; }
+  /* The hold (#410), failing closed (#1319): off only for false. */
+  function requiring() {
+    var v = settings().thornswoodRequirePass;
+    if (v === true) { return true; }
+    if (v === false) { return false; }
+    var said = 'missing';
+    if (v !== undefined) {
+      try { said = String(JSON.stringify(v)).slice(0, 80) + (typeof v === 'string' ? ' (text)' : ''); }
+      catch (e) { said = 'unreadable'; }
+    }
+    if (fresh('switch ' + said, Date.now())) {
+      console.log('[thornswood] thornswoodRequirePass in server-settings.json is ' + said +
+                  ', which is neither true nor false, so the join pass hold is on. ' +
+                  'false is the one way to turn it off (#1319).');
+    }
+    return true;
+  }
   function serverName() {
     return String(settings().thornswoodServer || '').trim().toLowerCase() || 'main';
   }
@@ -29996,14 +30056,49 @@ log('gamemode loaded:',
     if (now > Number(o.x)) { return { why: 'an expired pass', p: p }; }
     if (String(o.s) !== server) { return { why: 'a pass for the ' + String(o.s) + ' server', p: p }; }
     // d is the Discord account the site signed it for; /stuck's staff record
-    // names it (#414).
-    return { ok: true, p: p, v: String(o.v || ''), x: Number(o.x), d: String(o.d || '') };
+    // names it (#414). i is when the site issued it, and id, its signature,
+    // is what a session binds (#1320).
+    return { ok: true, p: p, v: String(o.v || ''), x: Number(o.x), d: String(o.d || ''),
+             i: Number(o.i) || 0, id: parts[2] };
+  }
+
+  /*
+    Whether this pass may prove the session profileId is in now (#1320): r
+    back with s, the session it is bound to (0 at the menu), or a refusal.
+  */
+  function bind(profileId, r) {
+    var e = seen.online[profileId];
+    var sid = e ? e.sid : 0;
+    var u = seen.used[r.id];
+    if (u && u.s && u.s !== sid) { return { why: 'a pass an earlier session already used', p: r.p }; }
+    if (sid && !(u && u.s === sid) && r.i < e.joined - ISSUED_MS) {
+      return { why: 'a pass issued before this session began', p: r.p };
+    }
+    seen.used[r.id] = { s: sid, x: r.x };
+    r.s = sid;
+    return r;
+  }
+
+  /*
+    Which engine connection is behind a character now (#1320): its GUID, which
+    is new for every connection, or its slot on an engine that cannot say. ''
+    when there is none to name, which changes nothing.
+  */
+  function connOf(actorId) {
+    var u = -1;
+    try { u = mp.getUserByActor(actorId); } catch (e) { u = -1; }
+    if (u === undefined || u === null || u < 0) { return ''; }
+    if (typeof mp.getUserGuid !== 'function') { return 'user ' + u; }
+    var guid = '';
+    try { guid = String(mp.getUserGuid(u) || ''); } catch (e) { guid = ''; }
+    return guid ? 'guid ' + guid : '';
   }
 
   /* One "/joinpass <pass>" from the relay, sent under profileId. */
   function take(profileId, raw, now) {
     var r = readPass(raw, passKey(now), now, serverName());
     if (r.ok && r.p !== profileId) { r = { why: 'a pass for profile ' + r.p, p: r.p }; }
+    if (r.ok) { r = bind(profileId, r); }
     if (!r.ok) {
       if (fresh('bad ' + profileId + ' ' + r.why, now)) {
         console.log('[thornswood] join pass from profile ' + profileId + ' not taken: ' + r.why);
@@ -30013,7 +30108,7 @@ log('gamemode loaded:',
     if (!seen.passes[profileId]) {
       console.log('[thornswood] join pass for profile ' + profileId + ', launcher ' + r.v);
     }
-    seen.passes[profileId] = { at: now, x: r.x, v: r.v, d: r.d };
+    seen.passes[profileId] = { at: now, x: r.x, v: r.v, d: r.d, i: r.i, id: r.id, s: r.s };
     return r;
   }
 
@@ -30041,12 +30136,30 @@ log('gamemode loaded:',
       var pid = Number(online[i] && online[i].profileId) || 0;
       if (!pid) { continue; }
       here[pid] = true;
+      var conn = connOf(online[i].actorId);
       var e = seen.online[pid];
-      if (!e) { e = seen.online[pid] = { joined: now, judged: false, actorId: 0 }; }
+      // Another connection behind this character (#1320): a session of its
+      // own, which the pass the last one showed does not prove.
+      if (e && conn && e.conn && conn !== e.conn) {
+        console.log('[thornswood] profile ' + pid + ' is on another connection now, so that session needs a join pass of its own');
+        delete seen.passes[pid];
+        e = null;
+      }
+      if (!e) {
+        e = seen.online[pid] = { joined: now, judged: false, actorId: 0, sid: ++seen.serial, conn: conn };
+        // A pass that came at the menu is this session's, when it was issued
+        // close enough before it and nothing else has used it.
+        var menu = seen.passes[pid];
+        if (menu && !menu.s && menu.i >= now - ISSUED_MS && !(seen.used[menu.id] && seen.used[menu.id].s)) {
+          menu.s = e.sid;
+          seen.used[menu.id] = { s: e.sid, x: menu.x };
+        }
+      }
+      if (!e.conn && conn) { e.conn = conn; }
       e.actorId = online[i].actorId;
       if (e.judged) { continue; }
       var had = seen.passes[pid];
-      if (had && had.at >= e.joined - BEFORE_MS) { e.judged = true; continue; }
+      if (had && had.s === e.sid) { e.judged = true; continue; }
       // Held until then (#410): said once, after long enough that a pass on
       // its way has had time to arrive.
       if (requiring() && !e.told && now - e.joined >= WAIT_SAY_MS) {
@@ -30073,6 +30186,10 @@ log('gamemode loaded:',
       if (Object.prototype.hasOwnProperty.call(seen.passes, q) && !here[q] &&
           now - seen.passes[q].at > BEFORE_MS) { delete seen.passes[q]; }
     }
+    // A pass past its expiry is refused by readPass anyway.
+    for (var u in seen.used) {
+      if (Object.prototype.hasOwnProperty.call(seen.used, u) && !(Number(seen.used[u].x) > now)) { delete seen.used[u]; }
+    }
     return judged;
   }
 
@@ -30086,12 +30203,11 @@ log('gamemode loaded:',
     commands. So with thornswoodRequirePass on, a profile is taken at its word
     only once this block has a pass for it:
 
-      shown(pid)    a valid pass for the session it is in now: received since
-                    it was first seen online, or in the minute before. A
-                    profile not yet seen online (at the menu, or joined since
-                    the last sweep) counts a pass that has not expired.
+      shown(pid)    a valid pass bound to the session it is in now (#1320).
+                    A profile not yet seen online (at the menu, or joined
+                    since the last sweep) counts a pass that has not expired.
       proven(pid)   shown, and the pass has not expired: what a role needs.
-                    The launcher renews it every four minutes while it is open.
+                    The launcher renews it every minute while it is open.
       held(pid)     enforcement is on and pid has not shown one: the session
                     is in the world, but nothing it does counts yet.
       trusts(pid)   what a role check asks: proven when enforcement is on,
@@ -30111,7 +30227,7 @@ log('gamemode loaded:',
     var had = seen.passes[pid];
     if (!had) { return false; }
     var e = seen.online[pid];
-    if (e) { return had.at >= e.joined - BEFORE_MS; }
+    if (e) { return had.s === e.sid; }
     return Number(had.x) > now;
   }
   function proven(pid, now) {
@@ -30652,8 +30768,13 @@ log('gamemode loaded:',
     var say = g.__thornswoodToProfile;
     // The chat commands block's poll of the relay (pollSaid): answering unless its last try failed.
     var poll = g.__thornswoodCommandPoll;
+    // The join pass block's one reading of the switch, which fails closed
+    // (#1319), as the dispatcher asks it.
+    var jp = g.__thornswoodJoinPass;
+    var requirePass = false;
+    try { requirePass = !!(jp && jp.requiring && jp.requiring()); } catch (eReq) { requirePass = true; }
     return {
-      cap: capOf(s), staffSeats: staffSeatsOf(s), requirePass: s.thornswoodRequirePass === true,
+      cap: capOf(s), staffSeats: staffSeatsOf(s), requirePass: requirePass,
       relayOk: !poll || !poll.failAt || poll.okAt >= poll.failAt,
       holdsStaffRole: holdsStaffRole, hasPass: hasPass,
       tell: function (p, text) { if (say) { say(p, text); } },

@@ -767,7 +767,10 @@ longer matches anything is itself a hit. Release notes are not files, so
 before anything is built. The same build step runs `tests\test-check-words.ps1`
 and `tests\test-note-rules.ps1`, which plant a break of every rule and fail
 if either check lets one through. Secrets are checked by
-`scripts\dev\Check-Secrets.ps1` in the same build.
+`scripts\dev\Check-Secrets.ps1` in the same build. It reads the files of
+`engine\skymp` too whenever the fork is checked out, and says so when it is
+not (#1326); the build leaves it out, and the nightly fetches it at its pin
+and reads it every night (`tests\test-1326-engine-secrets.ps1`).
 
 No machine checks these, so the person writing keeps them: plain, direct
 sentences with no filler; the text inside code (the launcher's messages, the
