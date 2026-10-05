@@ -34,13 +34,16 @@
   here, with this process's Date.now(), and the service refuses a token
   minted before it started by its own clock. On Windows each node process
   reads the wall clock from its own anchor (V8 takes GetSystemTimeAsFileTime,
-  about 15.6 ms coarse, once, then counts from it), so two processes can
-  disagree by a tick, and a token signed here a few ms after the service said
-  it was listening could read as older than the service. That refused part
-  4's page on the VPS runners (#1867, #1889, #1897). Each wait is for the
-  thing itself: a page's roster, or the socket refused or closed before it,
-  which the check then names; and the service's log is read once the
-  service has gone and every line of it is in.
+  as coarse as the system timer, up to 15.6 ms, once, then counts from it),
+  so two processes can disagree: 3.5 ms measured on the runner. A token
+  signed here as the service said it was listening, 8 to 27 ms after its
+  start by the runner's measure, could then read as older than the service.
+  That is the one refusal a new service can give such a token, and part 4's
+  page on the VPS runners was answered as fast as a pass and got no roster
+  (#1867, #1889, #1897). Each wait is for the thing itself: a page's roster,
+  or the socket refused or closed before it, which the check then names; and
+  the service's log is read once the service has gone and every line of it
+  is in.
 
   Writes only to a temp folder, on loopback ports the system hands out.
 */
