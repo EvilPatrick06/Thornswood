@@ -61746,6 +61746,7 @@ function sequenceOf(receipt, human) {
 // synchronous durable replacements. Neither is inferred from elapsed time.
 function createSettlement(deps) {
   var purses = deps.purses, transfer = deps.transfer, world = deps.world;
+  var now = deps.now || function () { return Date.now(); };
   var active = true, cursor = 0, busy = false;
   var errors = new Map();
   function report(id, error) {
@@ -61798,9 +61799,50 @@ function createSettlement(deps) {
   function commitMerchant(id, state) {
     var pending = state.pending;
     if (!equal({purse:state.purse,stock:state.stock,supply:state.supply || {}}, pending.previous)) return null;
-    var next = Object.assign({}, copy(state), copy(pending.next));
+    return save(id, state, creditState(state), pending.id);
+  }
+  function creditState(state) {
+    var next = Object.assign({}, copy(state), copy(state.pending.next));
     next.pending.phase = 'credit';
-    return save(id, state, next, pending.id);
+    // Saved debit is conclusive. Its original snapshots are no longer read
+    // in this phase; retaining them would crowd out the recovery snapshots.
+    delete next.pending.expected;
+    delete next.pending.debit;
+    delete next.pending.expectedReceipt;
+    next.pending.previous = {supply:copy(next.pending.previous.supply || {})};
+    return next;
+  }
+  function pruneSupplyHistory(id, state, wait) {
+    if (!available() || busy) return null;
+    busy = true;
+    try {
+      var current = purses.read(id);
+      if (!current || current.pending || !equal(current, state)) return null;
+      var next = copy(current), changed = false, at = now();
+      Object.keys(next.supply || {}).forEach(function (key) {
+        var stamp = next.supply[key];
+        if (Number.isSafeInteger(stamp) && stamp > 0 && at - stamp >= wait) {
+          delete next.supply[key]; changed = true;
+        }
+      });
+      return changed ? save(id, current, next) : current;
+    } finally { busy = false; }
+  }
+  function changedSupplyKey(previous, next) {
+    var before = previous.supply || {}, after = next.supply || {};
+    var keys = Object.keys(after).filter(function (key) { return before[key] !== after[key]; });
+    return keys.length === 1 && Number.isSafeInteger(after[keys[0]]) && after[keys[0]] > 0 ? keys[0] : null;
+  }
+  function complete(id, state) {
+    var pending = state.pending, next = Object.assign({}, copy(state), {pending:null});
+    if (pending.kind === 'supply') {
+      // Completion, including legacy intents, follows the exact saved final
+      // receipt. A disconnect cannot consume the six-hour window in advance.
+      var key = changedSupplyKey(pending.previous, pending.next), at = now();
+      if (!key || !Number.isSafeInteger(at) || at <= 0) throw new Error('Supply completion cannot be verified.');
+      next.supply[key] = at;
+    }
+    return !!save(id, state, next, pending.id);
   }
   function reconcile(id) {
     if (!available()) return false;
@@ -61816,7 +61858,7 @@ function createSettlement(deps) {
     if (live === pending.finalReceipt) {
       if (pending.phase !== 'credit' || saved !== pending.finalReceipt ||
           !equal({purse:state.purse,stock:state.stock,supply:state.supply || {}}, pending.next)) return false;
-      return !!save(id, state, Object.assign({}, copy(state), {pending:null}), pending.id);
+      return complete(id, state);
     }
     if (pending.phase === 'debit') {
       if (live === pending.expectedReceipt) {
@@ -61842,6 +61884,14 @@ function createSettlement(deps) {
       pending = state.pending;
     }
     if (live !== pending.debitReceipt || saved !== pending.debitReceipt || !active) return false;
+    // A pre-upgrade credit intent may still contain the saved debit snapshots.
+    // Compact it durably before building or replacing a recovery attempt.
+    var compact = creditState(state);
+    if (!equal(compact, state)) {
+      state = save(id, state, bounded(compact, MAX_INTENT_BYTES), pending.id);
+      if (!state || !active) return false;
+      pending = state.pending;
+    }
     var current = inventory(transfer.inventory(humanId));
     if (!pending.creditAttempt || !equal(pending.creditAttempt.expected, current)) {
       var next = copy(state);
@@ -61857,7 +61907,7 @@ function createSettlement(deps) {
     // A notification may throw after CAS changed inventory. The saved intent
     // and final receipt, rather than this return value, determine completion.
     if (!active || transfer.receipt(humanId) !== pending.finalReceipt || transfer.saved(humanId) !== pending.finalReceipt) return false;
-    return !!save(id, state, Object.assign({}, copy(state), {pending:null}), pending.id);
+    return complete(id, state);
   }
   function begin(offer) {
     if (!available() || busy) return {accepted:false,done:false,reason:'Trading is unavailable.'};
@@ -61867,6 +61917,13 @@ function createSettlement(deps) {
       if (!human || human.profileId !== offer.profileId || !state || state.pending ||
           !equal(state, offer.previous) || !admitted(human, state.reference))
         return {accepted:false,done:false,reason:'A transfer is waiting.'};
+      if (offer.kind === 'supply') {
+        var key = changedSupplyKey(state, offer.next), owner;
+        try { owner = JSON.parse(key); } catch (error) { owner = null; }
+        if (!Array.isArray(owner) || owner.length !== 3 || owner[0] !== human.desc ||
+            owner[1] !== human.profileId || typeof owner[2] !== 'string' || !owner[2])
+          throw new Error('Supply cooldown cannot be verified.');
+      }
       var expected = inventory(transfer.inventory(offer.humanId));
       if (!equal(expected, offer.expected)) return {accepted:false,done:false,reason:'Your inventory changed. Choose the trade again.'};
       var receipt = transfer.receipt(offer.humanId), sequence = sequenceOf(receipt, human) + 1;
@@ -61882,6 +61939,12 @@ function createSettlement(deps) {
         if(transfer.validate(snapshot)!==true) throw new Error('Native inventory validation failed.');
       });
       var armed = Object.assign({}, copy(state), {pending:pending});
+      // Either recovery inventory can reach the native/JS inventory limit.
+      // Reserve both plus the JSON envelope before charging, including later
+      // inventory growth. The 512 KiB intent bound stays unchanged.
+      var recovery = creditState(armed);
+      if (Buffer.byteLength(JSON.stringify(recovery), 'utf8') + 2 * MAX_INVENTORY_BYTES + 64 > MAX_INTENT_BYTES)
+        throw new Error('The trade is too large to recover.');
       if (!save(offer.merchantId, state, bounded(armed, MAX_INTENT_BYTES))) return {accepted:false,done:false,reason:'The offer changed.'};
       var done = false;
       if (active) {
@@ -61907,7 +61970,7 @@ function createSettlement(deps) {
       return changed;
     } finally { busy = false; }
   }
-  return {begin:begin,tick:tick,available:available,shutdown:function () { active=false; }};
+  return {begin:begin,tick:tick,available:available,pruneSupplyHistory:pruneSupplyHistory,shutdown:function () { active=false; }};
 }
 
 module.exports = {createSettlement:createSettlement,inventory:inventory,takeEntries:takeEntries,
@@ -61994,7 +62057,7 @@ function createMerchantTrading(deps) {
   var now = deps.now || function () { return Date.now(); };
   var reach = deps.reach == null ? REACH : deps.reach;
   var sessions = new Map();
-  var settlement = SETTLEMENT.createSettlement({purses:purses,transfer:transfer,world:deps.namespace || purses.namespace,log:deps.log});
+  var settlement = SETTLEMENT.createSettlement({purses:purses,transfer:transfer,world:deps.namespace || purses.namespace,log:deps.log,now:now});
   var active = true;
 
   function placeOf(reference) {
@@ -62062,7 +62125,17 @@ function createMerchantTrading(deps) {
     return Number(profileId) > 0 && Number(profileId) === Number(human.profileId);
   }
 
-  function viewFor(merchantId, state, place, note) {
+  function supplyKey(human, itemName) {
+    return JSON.stringify([human.desc, human.profileId, itemName.toLowerCase()]);
+  }
+  function lastSupply(state, key, itemName) {
+    var stamps = state.supply || {};
+    // Old item-only stamps cannot be assigned to a character. Keep their
+    // original window rather than resetting an unidentified completed supply.
+    return Math.max(stamps[key] || 0, stamps[itemName.toLowerCase()] || 0);
+  }
+
+  function viewFor(merchantId, state, place, actorId, profileId, note) {
     var catalog = prices.catalog ? prices.catalog(place.bookHold) : [];
     var offers = [];
     for (var i = 0; i < catalog.length; i++) {
@@ -62082,13 +62155,14 @@ function createMerchantTrading(deps) {
       });
     }
     var supply = [];
-    var stamp = state.supply || {};
+    var human = settlement.available() ? transfer.identity(actorId) : null;
+    var owns = human && human.desc && human.profileId === profileId;
     var at = now();
     for (var k = 0; k < offers.length; k++) {
       if (offers[k].buy == null) continue;
       var pay = offers[k].buy * SUPPLY_COUNT;
-      var last = stamp[offers[k].name.toLowerCase()] || 0;
-      var ready = state.purse >= pay && (!last || at - last >= SUPPLY_WAIT);
+      var last = owns ? lastSupply(state, supplyKey(human, offers[k].name), offers[k].name) : 0;
+      var ready = !!owns && !state.pending && state.purse >= pay && (!last || at - last >= SUPPLY_WAIT);
       supply.push({ name: offers[k].name, pay: pay, count: SUPPLY_COUNT, ready: ready });
     }
     return {
@@ -62114,7 +62188,7 @@ function createMerchantTrading(deps) {
       var human = transfer.identity(session.actorId);
       if (!human || human.profileId !== profileId) {sessions.delete(profileId); return;}
       var state = purses.read(session.merchantId), place = state && placeOf(state.reference);
-      if (state && place) views.push({actorId:session.actorId,view:viewFor(session.merchantId,state,place)});
+      if (state && place) views.push({actorId:session.actorId,view:viewFor(session.merchantId,state,place,session.actorId,profileId)});
     });
     return views;
   }
@@ -62172,7 +62246,7 @@ function createMerchantTrading(deps) {
       var prior = sessions.get(profileId);
       var repeat = prior && prior.merchantId === merchantId && (now() - prior.at) < 3000;
       sessions.set(profileId, { merchantId: merchantId, actorId:actorId, at: now() });
-      var opened = viewFor(merchantId, state, place);
+      var opened = viewFor(merchantId, state, place, actorId, profileId);
       return {
         text: repeat ? '' : (opened.transfer
           ? ('Trading with ' + opened.trader + ' in ' + opened.place + '. Purse ' + opened.purse + '.')
@@ -62225,20 +62299,39 @@ function createMerchantTrading(deps) {
     var gold = unit * asked.count;
     if (!Number.isInteger(gold) || gold < 0 || gold > MAX_GOLD) return fail('That price cannot be verified.');
     var npcBuys = verb !== 'buy';
+    var completedSupplyKey = null;
     if (verb === 'supply') {
-      var last = (state.supply && state.supply[itemName.toLowerCase()]) || 0;
+      if (!settlement.available()) return fail('Buying and selling wait on the native transfer. Nothing was taken.', viewFor(merchantId, state, place, actorId, profileId));
+      var human = transfer.identity(actorId);
+      if (!human || !human.desc || human.profileId !== profileId) return fail('That request is not yours.');
+      completedSupplyKey = supplyKey(human, itemName);
+      var last = lastSupply(state, completedSupplyKey, itemName);
       if (last && now() - last < SUPPLY_WAIT) return fail('That supply is not due.');
     }
     if (npcBuys && state.purse < gold) return fail('The trader cannot pay.');
     if (!npcBuys && gold > 0 && world.carry(actorId, GOLD_BASE) < gold) return fail('You cannot pay.');
     if (npcBuys && world.carry(actorId, resolved.baseId) < asked.count) return fail('You are not carrying that.');
     if (!settlement.available()) {
-      return fail('Buying and selling wait on the native transfer. Nothing was taken.', viewFor(merchantId, state, place));
+      return fail('Buying and selling wait on the native transfer. Nothing was taken.', viewFor(merchantId, state, place, actorId, profileId));
     }
     var nextPurse = npcBuys ? state.purse - gold : state.purse + gold;
     if (nextPurse < 0 || nextPurse > MAX_GOLD) return fail('That price cannot be verified.');
     var moved;
     try {
+      // Capture every trade's authenticated native character before a save
+      // can publish a projection or reenter another request.
+      var tradingHuman = transfer.identity(actorId);
+      if (!tradingHuman || tradingHuman.profileId !== profileId) return fail('That request is not yours.');
+      try {
+        state = settlement.pruneSupplyHistory(merchantId, state, SUPPLY_WAIT);
+      } catch (error) {
+        active = false; sessions.clear(); settlement.shutdown();
+        throw error;
+      }
+      if (!state || !active) return fail('The offer changed. Choose the trade again.');
+      var currentHuman = transfer.identity(actorId);
+      if (!currentHuman || currentHuman.desc !== tradingHuman.desc || currentHuman.profileId !== tradingHuman.profileId)
+        return fail('That request is not yours.');
       var expected = SETTLEMENT.inventory(transfer.inventory(actorId));
       var outgoing = SETTLEMENT.takeEntries(expected, npcBuys ? resolved.baseId : GOLD_BASE, npcBuys ? asked.count : gold);
       var stock = stockCopy(state.stock), credit;
@@ -62250,7 +62343,7 @@ function createMerchantTrading(deps) {
         stock = picked.stock; credit = picked.entries;
       }
       var nextSupply = JSON.parse(JSON.stringify(state.supply || {}));
-      if (verb === 'supply') nextSupply[itemName.toLowerCase()] = now();
+      if (verb === 'supply') nextSupply[completedSupplyKey] = now();
       moved = settlement.begin({merchantId:merchantId,humanId:actorId,profileId:profileId,
         previous:state,expected:expected,debit:outgoing.inventory,credit:credit,kind:verb,
         next:{purse:nextPurse,stock:stock,supply:nextSupply}});
@@ -62258,11 +62351,11 @@ function createMerchantTrading(deps) {
       return fail(settlement.available() ? String(error.message || error) : 'Trading is unavailable. The saved transfer is retained.');
     }
     var current = purses.prepare(merchantId);
-    if (!moved.done) return fail(moved.reason, viewFor(merchantId, current, place, moved.reason));
+    if (!moved.done) return fail(moved.reason, viewFor(merchantId, current, place, actorId, profileId, moved.reason));
     var said = npcBuys
       ? ('Sold ' + asked.count + ' ' + itemName + ' for ' + gold + '. Purse ' + current.purse + '.')
       : ('Bought ' + asked.count + ' ' + itemName + ' for ' + gold + '. Purse ' + current.purse + '.');
-    return {text:said,view:viewFor(merchantId, current, place)};
+    return {text:said,view:viewFor(merchantId, current, place, actorId, profileId)};
   }
 
   function activate(actorId, merchantId) {
