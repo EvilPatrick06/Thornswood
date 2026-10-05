@@ -9,8 +9,10 @@ world is a key, a prompt, a panel, or the thing itself activated. Staff
 and dev commands stay commands. Each command for people below has an
 issue that turns it into buttons, except `/stuck`, `/helpme` and
 `/report`, which stay commands (Patrick, later on 4 Oct: "change it to
-except the /stuck and the ones for getting help from GMs"). The
-umbrella is #1620.
+except the /stuck and the ones for getting help from GMs"), and the
+ways of saying a line and `/roll`, which stay commands with no buttons
+(Patrick, 4 Oct, #1639: "Allow those commands and don't do buttons").
+The umbrella is #1620.
 
 File and line numbers are main at 9b5a667 on 4 Oct. They move as the
 files change, so each row also names the function or block.
@@ -40,7 +42,7 @@ takes its commands out of all of them.
 
 ## Commands for people
 
-Each of these becomes buttons, except the two rows that say they stay.
+Each of these becomes buttons, except the rows that say they stay.
 The server may keep a line as an internal message that a key or a panel
 sends, the way Y, H and L on the look prompt send `/friend`, `/trade`
 and `/mute` with the id under the crosshair. Nobody is told to type it,
@@ -82,9 +84,9 @@ and help text never lists it.
 | `/steward`, `/steward <id>`, `/steward -<id>` | A Jarl; anybody asks who holds it | Names or removes a steward | `stewardCmd` in the property block | Nowhere. [Offices](offices.md) names the page | Name steward beside a person in the world, and Remove beside a steward, on the Office page of K, send the person's profile id. Never in the list or the help. | #1638 |
 | `/evict`, `/rent`, `/box` | A steward; anybody asks the rent or which box | Ends a claim, sets rent, marks the hold's box | `evict`, `rentCmd` and `boxCmd` in the property block | Nowhere. [Property](property.md) names the page | Evict, Set rent and No rent for the door opened in the last minute, and a hold's town for the container opened in the last minute, on the Office page of K. The board panel says what the box has been paid. Never in the list or the help. | #1638 |
 | `/board move <hold>`, `/board here` | A steward | Moves a notice board | `board` and `moveBoard` in the property block | Nowhere. [Notice boards](noticeboards.md) names the page | A board's town on the Office page of K, pressed twice, sends `/board move <hold>`. Nothing sends `/board here`. Never in the list or the help. | #1638 |
-| `/me`, `/do`, `/whisper`, `/w`, `/shout`, `/s`, `/yell`, `/y` | Anybody | How a line is said, and how far it carries | `voice/voice-server.js:427`, `voice/headlines.js:28` | [Text chat](chat.md), [People beside you](people.md), [Emotes](emotes.md); the voice service's usage lines | None. To come: buttons on the chat box. | #1639 |
-| `/ooc`, `/o` | Anybody | Out of character, to whoever is near | `gamemode.js:45334` | The list; `/help talking`; Help page; [Text chat](chat.md), [Factions](factions.md), [Notice boards](noticeboards.md); `site/data/site/rules.md` | None. To come: a button on the chat box. | #1639 |
-| `/roll`, `/r` | Anybody | Dice, rolled on the server | `game/ui/thornswood-chat.js:334`, `gamemode.js:45419` | The list; `/help talking`; Help page "Dice" | None. To come: a dice button. | #1639 |
+| `/me`, `/do`, `/whisper`, `/w`, `/shout`, `/s`, `/yell`, `/y` | Anybody | How a line is said, and how far it carries | `voice/voice-server.js:427`, `voice/headlines.js:28` | [Text chat](chat.md), [People beside you](people.md), [Emotes](emotes.md); the voice service's usage lines | Stays a command, with no buttons, and the help names it (Patrick, 4 Oct). | None |
+| `/ooc`, `/o` | Anybody | Out of character, to whoever is near | `gamemode.js:45334` | The list; `/help talking`; Help page; [Text chat](chat.md), [Factions](factions.md), [Notice boards](noticeboards.md); `site/data/site/rules.md` | Stays a command, with no buttons, and the help names it (Patrick, 4 Oct). | None |
+| `/roll`, `/r` | Anybody | Dice, rolled on the server | `game/ui/thornswood-chat.js:334`, `gamemode.js:45419` | The list; `/help talking`; Help page "Dice"; [Text chat](chat.md) | Stays a command, with no buttons, and the help names it (Patrick, 4 Oct). | None |
 | `/repair`, `/repair mend <base> <condition> <name>` | Anybody with a repair kit | Opens the repair panel; a row's Mend button mends that piece with a kit | The `/repair` branch of `handle`, then `panel` in the durability block | Nowhere. [Durability](durability.md) names the key and the panel | U in the inventory, with a kit in the pack, opens the panel, and Mend sends `mend`. Never in the list or the help. | #1384 |
 | `/maneuver <name>`, `/maneuver` | A warrior | Starts a warrior's maneuver; with no name, says which you hold | `gamemode.js`, `use` in the warrior maneuvers block | Nowhere. [Warrior](professions/warrior.md) names the key | The maneuver key (9) opens a panel of yours, and a number or a click there sends it. Never in the list or the help. | #1386 |
 
