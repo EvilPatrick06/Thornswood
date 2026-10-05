@@ -108,7 +108,28 @@ yes('and lets it go when the page says it closed',
 
 const JOURNAL = 'Journal Menu';
 const CURSOR = 'Cursor Menu';
-const J = 36, ESC = 1, U = 22;
+/*
+  The keys as the plugin declares them: every `const ..._KEY` and ESC at the
+  top of its scope, in its order, read through the plugin's own iniNumber from
+  a Thornswood.ini that is empty unless a case gives it lines. Read from the
+  plugin rather than typed here (#1652): a typed copy kept the friend key on G
+  after #529 moved it to Y, so the harness pressed a key the plugin no longer
+  reads.
+*/
+const KEY_DECLS = (src.match(/^  const (?:[A-Z]+_)*KEY\b[^;\n]*;|^  const ESC = \d+;/gm) || []).join('\n');
+const INI_AT = src.indexOf('  function iniNumber(text, key, fallback) {');
+const INI_NUMBER = INI_AT < 0 ? '' : src.slice(INI_AT, src.indexOf('\n  }\n', INI_AT) + 4);
+function keyPrelude(iniText) {
+  return 'const ini = ' + JSON.stringify(iniText || '') + ';\n' + INI_NUMBER + KEY_DECLS + '\n';
+}
+yes('the plugin reads its keys through iniNumber', INI_NUMBER !== '' && KEY_DECLS !== '');
+const KEY = INI_NUMBER === '' ? {} : new Function(keyPrelude('') + 'return { ' +
+  (KEY_DECLS.match(/const \w+/g) || []).map(function (d) { return d.slice(6) + ': ' + d.slice(6); }).join(', ') + ' };')();
+
+// U is the mold key, which the game's journal is moved onto in S4 and ours in S5.
+const J = KEY.JOURNAL_KEY, ESC = KEY.ESC, U = KEY.MOLD_KEY;
+yes('the plugin declares every key the handler reads', !!keys &&
+    (keys.match(/\b(?:[A-Z]+_)*KEY\b|\bESC\b/g) || []).every(function (k) { return typeof KEY[k] === 'number'; }));
 
 /*
   The pretend game, the page and SkyrimPlatform between them.
@@ -228,10 +249,8 @@ function rig(opts) {
     'function lookVerb() { }\n' +
     // The mold key's check runs first in the handler. With no door under the
     // crosshair it passes every key on, which is what this stands in for.
-    'const MOLD_KEY = 22;\n' +
     'function moldPress() { return false; }\n' +
     // The sleep key is the mold's, on a person (#1603). Nobody is looked at here.
-    'const SLEEP_KEY = 22;\n' +
     'function sleepPress() { return false; }\n' +
     // Hand over the letter (#1595), Activate on somebody you carry a letter
     // for. Nobody is looked at here; test-1595-deliver.js has the press.
@@ -239,18 +258,22 @@ function rig(opts) {
     // The same key's check in the inventory (#1384). No inventory is open
     // here, so it passes every key on as well.
     "function repairPress() { return false; }\n" +
-    'const LOCK_KEY = 45;\n' +
     'function lockPress() { return false; }\n' +
     // Tend their wounds (#1383), X on a hurt person, and Tend your wounds,
     // H in the inventory. Nobody is looked at and no inventory is open
     // here; test-1383-treatments.js has what they do.
-    'const TREAT_KEY = 45, TREAT_SELF_KEY = 35;\n' +
     'function treatPress() { return false; }\nfunction treatSelfPress() { return false; }\n' +
-    'const COMMAND_KEY = 53;\nconst ESC = 1, CHAT_KEY = 28, SKILLS_KEY = 37, PARTY_KEY = 25,\n' +
-    '      FRIEND_KEY = 34, TRADE_KEY = 35, MUTE_KEY = 38;\n';
-  const make = new Function('sp', 'say', 'T', 'Date', 'guard', 'JOURNAL_KEY',
+    // A warrior's maneuvers (#1386), 9, and the help panel (#1633), F7, which
+    // nothing here presses; test-1386-warrior.js and test-1633-help-panel.js
+    // have what they do. K on a person a Master could take on (#1634) and P on
+    // somebody not in your party (#1629): nobody is looked at here.
+    'function maneuverKeyPressed() { }\nfunction helpKeyPressed() { }\n' +
+    'function apprenticePress() { return false; }\nfunction partyPress() { return false; }\n' +
+    // JournalKey in Thornswood.ini, read by the plugin's own iniNumber.
+    keyPrelude(opts.journalKey ? 'JournalKey=' + opts.journalKey + '\n' : '');
+  const make = new Function('sp', 'say', 'T', 'Date', 'guard',
     prelude + arbiter + '\n' + jBlock + jStandIns + '\n' + keys + '\nreturn { claims: claims };');
-  make(sp, say, T, clockDate, guard, opts.journalKey || J);
+  make(sp, say, T, clockDate, guard);
 
   // The two lines of the plugin's main browserMessage handler checked above.
   sp.on('browserMessage', function (event) {
@@ -470,6 +493,9 @@ if (arbiter !== null && keys !== null) {
     h.run(120);
     yes('S4 and U opens the game\'s journal, which stays',
         h.game.open[JOURNAL] === 'Quests' && h.game.shut.length === 0 && !h.page.shown);
+    // Until #1652 this harness typed its keys and had no MANEUVER_KEY, so U
+    // threw inside the handler and the checks above passed on the throw.
+    yes('S4 and nothing threw', h.threw.length === 0); show(h.threw);
 
     const n = rig({ controls: { 36: '', 22: 'Journal' }, noNames: true });
     n.press(J);

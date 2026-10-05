@@ -104,8 +104,8 @@ In the server. A piece's condition is written on its name when it is
 not 100%: Iron Sword (85%). A plain piece is at 100%, and so is every
 piece as it is made. Rings, amulets and circlets carry no condition.
 The pickaxe, the woodcutter's axe and the shovel wear out by use
-instead. A trade hands a piece over at the condition on its name, and
-the pieces left in your pack keep theirs.
+instead, 50 uses each. A trade hands a piece over at the condition on
+its name, and the pieces left in your pack keep theirs.
 
 The three kits are records in the plugin, with the recipes above
 (`scripts/mods/Add-ContentRecords.py`). Open the inventory with a kit

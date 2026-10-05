@@ -2,9 +2,8 @@
 
 Scripts that did one job once, kept rather than deleted. Nothing in the
 repository calls any of them, and none of them is part of a release, a deploy
-or a test. They were parked here on 25 September from `tools\` (and one from
-the repository root), after the audit of that day found nothing still using
-them.
+or a test. They were parked here on 25 September from `tools\`, after the
+audit of that day found nothing still using them.
 
 They were written to sit in `tools\`, which is gone since 29 September, and
 some of them reach the scripts beside them from there, so a script taken out to
@@ -15,7 +14,7 @@ set up today. Read the header before running anything.
 | Script | What it did | Why it is here |
 | --- | --- | --- |
 | `Add-SkyrimUnbound.ps1` | Installed Skyrim Unbound Reborn into the old build and published. | The collection installs Unbound now. **It refuses to run** (#1179). |
-| `Run-Everything.ps1`, `Run-Everything.cmd` | Ran the old Add-* installers in one go and published once. | The collection installs the mods now. **It refuses to run** (#1179). |
+| `Run-Everything.ps1` | Ran the old Add-* installers in one go and published once. | The collection installs the mods now. **It refuses to run** (#1179). |
 | `Fix-Voice.ps1` | Got the voice service running on the VPS on 13 September. | `Install-Voice.ps1` does that job. |
 | `Check-RosterScript.ps1` | Parsed the roster script before it was sent. | Named a path on one machine; `Check-Roster.ps1` is the live one. |
 | `Add-TempleRespawn.ps1` | Installed Respawn - Death Overhaul. | That mod is out (the known issues page). **It refuses to run.** It throws at the top rather than putting a plugin back that no live load order carries. |
