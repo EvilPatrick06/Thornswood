@@ -915,6 +915,18 @@ function JsonStr($s) {
     return '"' + $t + '"'
 }
 
+# The line ending a file already uses: CRLF when it holds one, LF otherwise.
+# The table and the four gamemode blocks are written with it, so a run never
+# mixes the two in one file. Until 5 October all of them were joined with CRLF
+# whatever the file held, and a checkout that keeps LF (the agents' VM, the
+# VPS runner's clones) got a whole-file diff of harvests.json and CRLF lines
+# inside an LF gamemode (issue #1828). Build-RecipeTable.ps1 (#1622) and
+# Build-OreTable.ps1 (#1787) do the same.
+function EolOf([string]$text) {
+    if ($text.Contains("`r`n")) { return "`r`n" }
+    return "`n"
+}
+
 # Everything sitting directly in the game folder, with its size and its last
 # write. Taken before the work and again after it, so 'read only' is something
 # the run proves rather than something the header claims. Only the top level:
@@ -2113,6 +2125,9 @@ Write-Host 'writing' -ForegroundColor Cyan
 # no timestamp in it, so that the same game files give byte for byte the same
 # file: ConvertTo-Json lays out Windows PowerShell 5.1 and PowerShell 7
 # differently, and a rebuild that changed nothing would be a whole-file diff.
+# The line ending is the one the table already has, CRLF for a new one.
+$jsonEol = "`r`n"
+if (Test-Path -LiteralPath $Out) { $jsonEol = EolOf ([System.IO.File]::ReadAllText($Out)) }
 $docLines = New-Object 'System.Collections.Generic.List[string]'
 $docLines.Add('{')
 $docLines.Add('  "builtBy": ' + (JsonStr 'scripts\dev\Build-HarvestTable.ps1') + ',')
@@ -2128,7 +2143,7 @@ $docLines.Add('  "cropsRankedBy": ' + (JsonStr ('how hard the crop is to grow, n
 $thr = New-Object 'System.Collections.Generic.List[string]'
 foreach ($r in $RANK_MAX_VALUE) { $thr.Add('    ' + (JsonStr ([string]$r.Rank)) + ': ' + [int]$r.Max) }
 $docLines.Add('  "rankMaxValue": {')
-$docLines.Add(($thr -join (',' + "`r`n")))
+$docLines.Add(($thr -join (',' + $jsonEol)))
 $docLines.Add('  },')
 $docLines.Add('  "count": ' + $table.Count + ',')
 $docLines.Add('  "harvests": {')
@@ -2221,7 +2236,7 @@ foreach ($d in $unranked.Keys) {
     $docLines.Add('    ' + (JsonStr ([string]$d)) + ': {')
     $fields = New-Object 'System.Collections.Generic.List[string]'
     foreach ($f in $u.Keys) { $fields.Add('      "' + $f + '": ' + (JsonStr ([string]$u[$f]))) }
-    $docLines.Add(($fields -join (',' + "`r`n")))
+    $docLines.Add(($fields -join (',' + $jsonEol)))
     $docLines.Add('    }' + $comma)
 }
 $docLines.Add('  },')
@@ -2238,12 +2253,12 @@ foreach ($d in $detail.Keys) {
         if ($f -eq 'produceValue') { $fields.Add('      "' + $f + '": ' + [int]$v[$f]) }
         else { $fields.Add('      "' + $f + '": ' + (JsonStr ([string]$v[$f]))) }
     }
-    $docLines.Add(($fields -join (',' + "`r`n")))
+    $docLines.Add(($fields -join (',' + $jsonEol)))
     $docLines.Add('    }' + $comma)
 }
 $docLines.Add('  }')
 $docLines.Add('}')
-$json = ($docLines -join "`r`n") + "`r`n"
+$json = ($docLines -join $jsonEol) + $jsonEol
 
 # A run that failed leaves the table it could not rebuild exactly as it was.
 # Nothing is written until every check above has passed: pointing -Data at a
@@ -2408,7 +2423,8 @@ if (-not $NoInstall -and $fail -eq 0) {
             }
             $body.Add($indent + '};')
             $body.Add('')
-            $new = $text.Substring(0, $m.Index) + (($body -join "`r`n")) + "`r`n" + $text.Substring($b)
+            $eol = EolOf $text
+            $new = $text.Substring(0, $m.Index) + (($body -join $eol)) + $eol + $text.Substring($b)
             [System.IO.File]::WriteAllText($gm, $new, (New-Object System.Text.UTF8Encoding($false)))
             Ok ("wrote {0} plants into the HARVESTS_BY_BASE block of {1}" -f $table.Count, $gm)
         }
@@ -2464,7 +2480,8 @@ if (-not $NoInstall -and $fail -eq 0) {
             }
             $body.Add($indent + '};')
             $body.Add('')
-            $new = $text.Substring(0, $m.Index) + (($body -join "`r`n")) + "`r`n" + $text.Substring($b)
+            $eol = EolOf $text
+            $new = $text.Substring(0, $m.Index) + (($body -join $eol)) + $eol + $text.Substring($b)
             [System.IO.File]::WriteAllText($gm, $new, (New-Object System.Text.UTF8Encoding($false)))
             Ok ("wrote {0} crops into the CROPS_BY_BASE block of {1}" -f $crops.Count, $gm)
         }
@@ -2520,7 +2537,8 @@ if (-not $NoInstall -and $fail -eq 0) {
             }
             $body.Add($indent + '};')
             $body.Add('')
-            $new = $text.Substring(0, $m.Index) + (($body -join "`r`n")) + "`r`n" + $text.Substring($b)
+            $eol = EolOf $text
+            $new = $text.Substring(0, $m.Index) + (($body -join $eol)) + $eol + $text.Substring($b)
             [System.IO.File]::WriteAllText($gm, $new, (New-Object System.Text.UTF8Encoding($false)))
             Ok ("wrote {0} water records into the FISH_BY_BASE block of {1}" -f $fish.Count, $gm)
         }
@@ -2570,7 +2588,8 @@ if (-not $NoInstall -and $fail -eq 0) {
             }
             $body.Add($indent + '};')
             $body.Add('')
-            $new = $text.Substring(0, $m.Index) + (($body -join "`r`n")) + "`r`n" + $text.Substring($b)
+            $eol = EolOf $text
+            $new = $text.Substring(0, $m.Index) + (($body -join $eol)) + $eol + $text.Substring($b)
             [System.IO.File]::WriteAllText($gm, $new, (New-Object System.Text.UTF8Encoding($false)))
             Ok ("wrote {0} hanging game records into the GAME_BY_BASE block of {1}" -f $game.Count, $gm)
         }
