@@ -3,14 +3,15 @@
   Optional manual tool: leaves one community comment on a build's VirusTotal report, or says plainly that it is not commenting and carries on.
 
 .DESCRIPTION
-  The setup program is not signed yet, issue #390, and the engines that flag it
-  are machine learning scores and hash intelligence rather than signatures for
-  anything known: 5 of 71 on 27 September, one of them McAfeeD's ti!<hash>,
-  which is a lookup in a feed that reads VirusTotal itself. There is no byte to
-  change for verdicts like those. What a vendor reads when somebody picks the
-  file out of their queue is the report, so a comment on the report that names
-  the program, the company, the site it is published from and the state of the
-  signing is the one piece of signal that can be added without a certificate.
+  The engines that flagged the setup program are machine learning scores and
+  hash intelligence rather than signatures for anything known: 5 of 71 on
+  27 September, on a build from before signing (issue #390), one of them
+  McAfeeD's ti!<hash>, which is a lookup in a feed that reads VirusTotal
+  itself. There is no byte to change for verdicts like those. What a vendor
+  reads when somebody picks the file out of their queue is the report, so a
+  comment on the report that names the program, the company, the site it is
+  published from and the state of the signing is signal added beside the
+  certificate, while a new signed publisher has little reputation yet.
   docs\VIRUSTOTAL-FALSE-POSITIVE.md is the whole picture and the checklist for
   the vendors that want a form filled in.
 
@@ -49,8 +50,8 @@
 
 .PARAMETER Text
   Different comment text. The default names Thornswood Setup, the company, what
-  the program does and that it is not signed yet, which is what the vendors
-  read.
+  the program does and that it is Authenticode signed, which is what the
+  vendors read.
 
 .PARAMETER Api
   The VirusTotal API v3 root. Only a test points this anywhere else, at an
@@ -122,8 +123,8 @@ function Get-DefaultText() {
         'It closes a running Skyrim before it installs, and since 27 September it asks first and',
         'stops if the answer is no.',
         'Nothing in it is packed or obfuscated: the high entropy is the icon and the logo in .rsrc.',
-        'It is not Authenticode signed yet, which is what the machine learning verdicts here are',
-        'reading. Please take another look.'
+        'It is Authenticode signed through Azure Artifact Signing, a new publisher with little',
+        'reputation yet. Please take another look.'
     ) -join ' '
 }
 
