@@ -34485,10 +34485,12 @@ log('gamemode loaded:',
     if (!plot) {
       // A plot nobody ever worked still holds what the world put there, and
       // the first press brings it in (see neverWorked).
+      var named = aOrAn(CROPS[found.base].name);
       if (neverWorked(found.refrId)) {
-        return 'A ' + CROPS[found.base].name + ' standing from before anybody farmed here. ' + whose;
+        return named.charAt(0).toUpperCase() + named.slice(1) +
+               ' standing from before anybody farmed here. ' + whose;
       }
-      return 'A ' + CROPS[found.base].name + ' plot, and nothing sown in it. ' + whose;
+      return named.charAt(0).toUpperCase() + named.slice(1) + ' plot, and nothing sown in it. ' + whose;
     }
     var left = minutesLeft(plot);
     if (left > 0) {
@@ -34523,6 +34525,9 @@ log('gamemode loaded:',
     if (flatDistance2(ground.pos, at.pos) + dz * dz > LOOK_REACH * LOOK_REACH) { return null; }
     return { refrId: refrId, base: base };
   }
+
+  /** 'a Cabbage', 'an Ash Yam'. */
+  function aOrAn(name) { return (/^[aeiou]/i.test(name) ? 'an ' : 'a ') + name; }
 
   /** Does this pack hold the crop this plot is sown with, its own seed. */
   function carriesSeed(actorId, base) {
@@ -34570,7 +34575,7 @@ log('gamemode loaded:',
       if (farmer && mine && ground && !toolGate(actorId, 'farmer') && !readPlot(found.refrId) &&
           !neverWorked(found.refrId) && (!held || held.by === mine) &&
           rankOk(rankStep(actorId, 'farmer'), found.base) && carriesSeed(actorId, found.base)) {
-        line.e = 'Sow a ' + CROPS[found.base].name;
+        line.e = 'Sow ' + aOrAn(CROPS[found.base].name);
       }
       if (farmer && mine && ground && !held && !claimTooClose(ground, mine)) {
         line.x = P.has(claims, String(mine)) ? 'Claim this farm and let your other one go'
