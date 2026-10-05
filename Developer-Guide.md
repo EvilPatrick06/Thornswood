@@ -301,6 +301,22 @@ gh auth login
 gh auth status
 ```
 
+The bot's libraries go into the Python that `py` starts by default, because
+that is the one the bot harnesses run on: `bot\test-*.py`, and
+`tests\test-staff-commands.js`, which imports bot.py. On the shipping machine
+the default was 3.12 with no discord.py, so every bot harness stopped on its
+first import with nothing to do with the change being tested (#1008). From
+`Thornswood-Repo`:
+
+```
+py -m pip install -r bot\requirements.txt
+py -c "import discord, PIL; print('discord.py ' + discord.__version__)"
+```
+
+The second line prints the discord.py version `bot\requirements.txt` pins when
+the first worked. The nightly does the same into a venv of its own on the VPS,
+because the live bot runs on that box's Python.
+
 Every change goes to the dev channel first, and the dev channel needs the dev
 build on this machine too: in the main launcher, on the Play page, the Server
 dropdown, Dev. It checks your Discord roles first, then puts it

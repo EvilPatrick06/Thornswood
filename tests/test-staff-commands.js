@@ -535,7 +535,15 @@ function python(args) {
     'print(bot.moderation_text("dev", {"did":"silence","by":1,"byName":"A","who":2,"whoName":"B","minutes":10}))\n' +
     'print(bot.moderation_text("dev", {"did":"nonsense"}))\n' +
     'print("watch_moderation()" in __import__("inspect").getsource(bot.on_ready))']);
+  // A Python with no discord.py stops at bot.py's first import, which says
+  // nothing about the bot. Said once, with the line that fixes it, rather than
+  // as four checks of the bot failing (#1008).
+  const noLibrary = !!py && /No module named 'discord'/.test(String(py.stderr || ''));
   if (!py) { yes('python is here to check the bot', false); }
+  else if (noLibrary) {
+    yes('a Python here has the bot\'s libraries (none does: from the repository folder, ' +
+        'py -m pip install -r bot\\requirements.txt, Developer-Guide.md "Setting up a machine")', false);
+  }
   else {
     const out = String(py.stdout || '').split(/\r?\n/);
     yes('the bot says a kick in the staff channel with both names and profiles',
