@@ -395,8 +395,8 @@
 
     html += '<div><h3>Your party</h3>';
     if (!data.party || !data.party.length) {
-      html += '<div class="none">Not in a party. Look at somebody and press the party key, ' +
-              'or use the Ask button on a friend below.</div>';
+      html += '<div class="none">Not in a party. Look at somebody and press the party key to ' +
+              'ask them, or press Ask to party beside a friend below.</div>';
     } else {
       for (var i = 0; i < data.party.length; i++) {
         var m = data.party[i];

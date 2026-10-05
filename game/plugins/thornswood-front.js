@@ -4594,7 +4594,8 @@
 
     P and J are Patrick's own choices and are the exception: those two open
     their panels whether or not anybody is being looked at, because a party
-    menu you can only open by staring at a friend is not a menu.
+    menu you can only open by staring at a friend is not a menu. P on
+    somebody who is not in your party asks them in instead (partyPress).
   */
   function lookVerb(cmd) {
     if (!lookingAt) { return false; }
@@ -4624,6 +4625,27 @@
     const row = (near && Object.prototype.hasOwnProperty.call(near, lookingAt)) ? near[lookingAt] : null;
     if (!row || !row.s) { return false; }
     return lookVerb('sleephere');
+  }
+
+  /*
+    P on somebody who is not in your party asks them in (#1629), the way Y
+    sends /friend: the prompt says "Ask to party" for exactly them, from the
+    near list's y flag. On a party member the prompt says "Party menu", and
+    with nobody looked at there is no prompt; either way this answers false
+    and the key opens the panel. Nobody types /party any more (Patrick,
+    4 Oct: buttons, not commands); this and the P panel are what send it,
+    and the server checks the ask again when it arrives.
+
+    No menu check here. The key handler has already made it for P, and the
+    game's Quick Magic, which this same press opened, is let through there
+    and shut by magicOnP; asking busyMenuOpenNow would refuse every press.
+  */
+  function partyPress() {
+    if (!lookingAt) { return false; }
+    const near = nearList();
+    const row = (near && Object.prototype.hasOwnProperty.call(near, lookingAt)) ? near[lookingAt] : null;
+    if (!row || row.y) { return false; }
+    return lookVerb('party');
   }
 
   /*
@@ -7227,7 +7249,8 @@
     */
     /*
       The social keys. The three verbs need somebody under the crosshair and
-      say nothing when there is not; P and J open their panels regardless.
+      say nothing when there is not; P and J open their panels regardless,
+      except that P on somebody not in your party asks them in.
     */
     // The mold key, and only while a door is under the crosshair and a Key
     // Mold is in the pack. Otherwise it is not used and goes on down the list.
@@ -7274,8 +7297,13 @@
     if (e.code === TRADE_KEY) { lookVerb('trade'); return; }
     if (e.code === MUTE_KEY) { lookVerb('mute'); return; }
     if (e.code === PARTY_KEY) {
-      T.js('try{window.thornswoodParty&&window.thornswoodParty.toggle();}catch(e){}');
-      // The game took this same press as its Quick Magic: shut that menu.
+      // On somebody not in your party it asks them (#1629); otherwise, or
+      // while the panel is up and P is closing it, it is the panel.
+      if (T.hasFocus('party') || !partyPress()) {
+        T.js('try{window.thornswoodParty&&window.thornswoodParty.toggle();}catch(e){}');
+      }
+      // The game took this same press as its Quick Magic: shut that menu,
+      // whichever of the two P did.
       magicOnP.shutFor(e);
       return;
     }

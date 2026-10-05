@@ -117,10 +117,11 @@ namespace Thornswood
 
             // The two party items came from main (entry 336, #281).
             // tests\test-help-parties.js finds them by what they are about
-            // and holds every number, key and command in them to the gamemode,
-            // the plugin and the P panel.
+            // and holds every number, key and button in them to the gamemode,
+            // the plugin and the P panel. Nothing here tells anybody to type
+            // /party: P on somebody asks, and the P panel does the rest (#1629).
             new HelpItem("Chat and commands", "Parties",
-                "P, unless you have moved it on the Controls page, opens your friends and your party. To bring somebody in, press Enter and type /party and their name, or press Ask to party beside a friend who is online. They have forty five seconds to press Accept or Refuse on the prompt. A party holds up to six. /party on its own says who is in yours, and /party leave takes you out. Logging out takes you out too, and every party ends when the server restarts. The leader sees Kick and Lead beside each other person, and Disband. Everyone else sees Leave."),
+                "P, unless you have moved it on the Controls page, opens your friends and your party. To bring somebody in, look at them and press P, or press Ask to party beside a friend who is online. They have forty five seconds to press Accept or Refuse on the prompt. A party holds up to six. The P panel says who is in yours and how many of them are in the same place as you, and Leave there takes you out. Logging out takes you out too, and every party ends when the server restarts. The leader also sees Kick and Lead beside each other person, and Disband."),
 
             new HelpItem("Chat and commands", "Finding your party",
                 "Everybody in your party has their name in green above their head, a marker on your map, and an arrow on a strip under your compass with how far away they are. Green on the strip means the same place as you, gold means somewhere else. You cannot fast travel to the marker. Work done with somebody from your party in the same place counts 15 per cent more."),
