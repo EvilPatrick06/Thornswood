@@ -18,7 +18,7 @@ function fixture() {
     }
   };
   const transfer={
-    available: () => available,
+    available: () => available, validate: () => true,
     identity: id => id===10 && profile>0 ? {desc:'ff000010:Skyrim.esm',profileId:profile} : null,
     resolve: desc => desc==='ff000010:Skyrim.esm' ? 10 : 0,
     inventory: () => copy(inv), receipt: () => live, saved: () => saved,
@@ -109,6 +109,10 @@ f=fixture(); s=f.make(); s.shutdown(); assert.equal(s.begin(f.offer()).accepted,
 f=fixture(); s=f.make(); const save=f.purses.compareAndCommit;
 f.purses.compareAndCommit=(...args)=>{const out=save(...args);s.shutdown();return out;};
 s.begin(f.offer()); assert.deepEqual(f.calls,[]);
+
+// Native serialization validation must happen before any durable reservation.
+f=fixture();f.transfer.validate=()=>{throw new Error('native byte bound');};s=f.make();
+assert.throws(()=>s.begin(f.offer()),/native byte bound/);assert.deepEqual(f.calls,[]);assert.equal(f.states.get(1).pending,undefined);
 
 // Native inventory bounds apply to the aggregate, not just each stack.
 f=fixture();f.inv.entries.push({baseId:200,count:2147483647},{baseId:201,count:2147483600});

@@ -117,7 +117,9 @@ cannot join, and there is no due or discount.
 
 The settlement implementation is under review and has not been released.
 It uses the native inventory comparison and exact saved receipts. The
-complete offer is saved in the private ledger before outgoing goods or
+engine validates the complete resulting inventory with the same count,
+byte and metadata checks it uses for mutation. The complete offer is
+saved in the private ledger before outgoing goods or
 gold are removed. Incoming payment or goods wait for that exact debit
 to be saved. The purse and shelf then change together in the ledger,
 and the incoming inventory is credited. Completion waits for its exact

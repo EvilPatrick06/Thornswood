@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 const assert = require('node:assert/strict');
 const trading = require('../game/merchant-trading.js');
 
@@ -37,7 +37,7 @@ function worldOf(native) {
     carry(id, baseId) { return (inv[id] && inv[id][baseId]) || 0; },
     save() { saved=live; },
     transfer: {
-      available() { return native.on; },
+      available() { return native.on; }, validate() {return true;},
       identity(id) { const a=actors[id]; return a && a.profileId>0 ? {desc:id.toString(16)+':Skyrim.esm',profileId:a.profileId} : null; },
       resolve(desc) { return parseInt(desc.split(':')[0],16); },
       inventory(id) { return {entries:Object.entries(inv[id]).filter(([,count])=>count>0).map(([baseId,count])=>({baseId:Number(baseId),count}))}; },

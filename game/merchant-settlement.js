@@ -76,7 +76,7 @@ function createSettlement(deps) {
   function available() {
     return active && !!world && !!purses && purses.durable !== false && typeof purses.compareAndCommit === 'function' &&
       typeof purses.pendingRecords === 'function' && typeof purses.read === 'function' &&
-      !!transfer && transfer.available();
+      !!transfer && typeof transfer.validate==='function' && transfer.available();
   }
   function records() { return purses.pendingRecords(); }
   function humanKey(human) { return human && human.desc && human.profileId > 0 ? human.desc + ':' + human.profileId : ''; }
@@ -166,6 +166,7 @@ function createSettlement(deps) {
     if (!pending.creditAttempt || !equal(pending.creditAttempt.expected, current)) {
       var next = copy(state);
       next.pending.creditAttempt = {expected:current,replacement:addEntries(current, pending.credit)};
+      if(transfer.validate(next.pending.creditAttempt.replacement)!==true) throw new Error('Native inventory validation failed.');
       state = save(id, state, bounded(next, MAX_INTENT_BYTES), pending.id);
       if (!state || !active) return false;
       pending = state.pending;
@@ -195,7 +196,11 @@ function createSettlement(deps) {
         previous:{purse:state.purse,stock:copy(state.stock),supply:copy(state.supply || {})},next:copy(offer.next),
         expected:expected,expectedReceipt:receipt,debit:inventory(offer.debit),credit:inventory({entries:offer.credit}).entries,
         sequence:sequence,debitReceipt:receiptAt(human,sequence),finalReceipt:receiptAt(human,sequence+1)};
-      addEntries(pending.debit,pending.credit); // Preflight the complete native credit before charging.
+      // Use the same native validator as CAS, including its serialized-byte
+      // representation. No separate JS estimate can substitute for that check.
+      [expected,pending.debit,addEntries(pending.debit,pending.credit)].forEach(function (snapshot) {
+        if(transfer.validate(snapshot)!==true) throw new Error('Native inventory validation failed.');
+      });
       var armed = Object.assign({}, copy(state), {pending:pending});
       if (!save(offer.merchantId, state, bounded(armed, MAX_INTENT_BYTES))) return {accepted:false,done:false,reason:'The offer changed.'};
       var done = false;

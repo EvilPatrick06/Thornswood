@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 var GOLD_BASE = 15;
 var REACH = 400;
@@ -51,7 +51,7 @@ var SETTLEMENT = typeof MERCHANT_SETTLEMENT !== 'undefined' ? MERCHANT_SETTLEMEN
 function createNativeMerchantTransfer(mp) {
   return {
     available: function () {
-      return !!mp && ['compareAndSetInventory','getInventoryReceipt','getSavedInventoryReceipt',
+      return !!mp && ['validateInventoryTransaction','compareAndSetInventory','getInventoryReceipt','getSavedInventoryReceipt',
         'getNpcAIState','getDescFromId','getIdFromDesc','get'].every(function (key) { return typeof mp[key] === 'function'; });
     },
     identity: function (id) {
@@ -61,6 +61,7 @@ function createNativeMerchantTransfer(mp) {
     },
     resolve: function (desc) { return mp.getIdFromDesc(desc); },
     inventory: function (id) { return mp.get(id, 'inventory'); },
+    validate: function (snapshot) { return mp.validateInventoryTransaction(snapshot); },
     receipt: function (id) { return mp.getInventoryReceipt(id); },
     saved: function (id) { return mp.getSavedInventoryReceipt(id); },
     cas: function (id, expected, receipt, next, sequence, profile) {

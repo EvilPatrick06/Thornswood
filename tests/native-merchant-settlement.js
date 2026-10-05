@@ -53,6 +53,17 @@ vm.runInContext(source.slice(source.indexOf('// NPC MERCHANT PURSES BEGIN'),sour
   assert.equal(mp.getInventoryReceipt(human),receipt,'completion cannot replay the credit');
   assert.throws(()=>mp.compareAndSetInventory(human,mp.get(human,'inventory'),receipt,mp.get(human,'inventory'),3,9),/profile/);
   assert.throws(()=>mp.writePrivateEconomyLedger('../served','bad'),/Unknown/);
+  // Canonical native float JSON uses more bytes than JSON.stringify at the
+  // boundary. The read-only validator must reject this before any debit.
+  const beforeValidation=mp.get(human,'inventory'),beforeReceipt=mp.getInventoryReceipt(human);
+  const near={entries:[{baseId:15,count:40},{baseId:iron,count:1,health:1,name:''}]};
+  near.entries[1].name='x'.repeat(131072-Buffer.byteLength(JSON.stringify(near)));
+  assert.equal(Buffer.byteLength(JSON.stringify(near)),131072);
+  assert.throws(()=>mp.validateInventoryTransaction(near),/round trip/);
+  assert.deepEqual(mp.get(human,'inventory'),beforeValidation);
+  assert.equal(mp.getInventoryReceipt(human),beforeReceipt);
+  assert.equal(mp.validateInventoryTransaction(beforeValidation),true);
+
   settle.shutdown();purses.shutdown();
   const alias=path.join(served,'private-alias');
   fs.symlinkSync(settings.privDir,alias,process.platform==='win32'?'junction':'dir');
