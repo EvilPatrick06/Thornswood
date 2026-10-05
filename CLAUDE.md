@@ -131,6 +131,21 @@ worktrees in the shared clone and read a session-start snapshot as the truth.
   branch. Before deleting a worktree or branch you did not make, check no
   running process names its folder and its pull request merged over an hour
   ago; lanes may be mid-run in it.
+- Leave nothing stale (Patrick, 5 Oct: "we need rules ... not to leave stale
+  worktrees, branches, or PRs local or on GitHub it's messy work"). The
+  moment a pull request of yours merges or is closed, its worktree, local
+  branch and GitHub branch go, in the fork as well as here, and so do any
+  scratch folders and any process you started for it (a build, a load
+  test). Before the session ends, list `git worktree list`, `git branch`,
+  `gh pr list` and `git ls-remote --heads origin` in both repositories;
+  what of yours is still there has its reason written on its issue, or it
+  goes. Developer-Guide.md "No stray branches, worktrees or pull requests"
+  is the rule for everybody.
+- Three folders, no copies (Patrick, 5 Oct). Work only in this repository,
+  the vault and `C:\ThornswoodTemps&Worktrees` (`worktrees\<name>`,
+  `temp\<task>`); never make another top-level folder or leave scratch in
+  Downloads, and never save a copy of a log, report, build or backup that
+  GitHub or the VPS already holds. Cite where it lives instead.
 - The git status at the start of a session is a snapshot and can be hours
   old. Run `git status` and `git log -1 origin/main` before saying what state
   the clone is in.
