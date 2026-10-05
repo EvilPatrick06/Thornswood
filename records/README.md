@@ -60,6 +60,11 @@ read it (issue #440, phase 8):
   reads `people` when the site runs from the repository. No script writes
   this one: it is changed by hand in a pull request, then each server is
   deployed and a Ship carries it to the feed.
+- `upstream-not-taken.json`: the upstream SkyMP commits the fork is not
+  taking, each by its full sha with the reason and who decided (issue
+  #1791). `tests\test-fork-upstream.js` is red every night upstream `main`
+  has a commit `thornswood/engine-changes` lacks that is not listed here.
+  No script writes this one: it is changed by hand in a pull request.
 - `signing\`: the code signing setup, with its own README. On since
   27 September: Ship refuses a launcher that is not signed (Developer-Guide.md).
 

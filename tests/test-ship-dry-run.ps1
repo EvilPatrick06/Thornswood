@@ -44,6 +44,10 @@
     L  the same folder with a check that passes runs to the end, so J and K
        stop on node and on the check, not on the folder; and a mismatch
        (exit 2) still refuses (#960)
+    M  a body mesh the covered bodies check could not read
+       (Check-CoveredBodies.ps1 exit 1): refused on dev and on main, nothing
+       published, the version put back (#1956); a nude body (exit 2) on dev
+       still only warns and runs to the end (#405)
 
   R is there so D and V prove something: the same stand-ins, on a real Ship,
   do write down the installer going to the site, the feed and baseline going to
@@ -641,7 +645,8 @@ function Get-GeneratedStaleSays($State, [string]$Channel) { return 'The generate
 function Get-GeneratedState($Root, $ListPath) { return [pscustomobject]@{ Current = $true; Record = [pscustomobject]@{ Files = @('stand-in') } } }
 function Get-GeneratedStaleSays($State, [string]$Channel) { return '' }
 '@)
-    [IO.File]::WriteAllText((Join-Path $repo 'scripts\mods\Check-CoveredBodies.ps1'), "param([string]`$Game, [switch]`$Quiet)`r`nexit 0`r`n")
+    # The covered bodies stand-in exits with TS_BODIES_EXIT, 0 when unset, for M.
+    [IO.File]::WriteAllText((Join-Path $repo 'scripts\mods\Check-CoveredBodies.ps1'), "param([string]`$Game, [switch]`$Quiet)`r`nexit ([int]`$env:TS_BODIES_EXIT)`r`n")
     $nodeStandIn = Join-Path $bin 'node.ps1'
     $nodeLine = '[IO.File]::AppendAllText($env:TS_DRY_CALLS, ((@(''node'') + @($args | ForEach-Object { [string]$_ })) -join '' '') + "`r`n")'
     # PATH without any folder that holds a real node, for J.
@@ -651,6 +656,7 @@ function Get-GeneratedStaleSays($State, [string]$Channel) { return '' }
     $skyNote = "The map marker points at the right door`n- The marker over a house now sits on the door you walk through"
     $skyArgs = @($skyNote, '-Channel', 'dev', '-DryRun', '-Root', $skyRoot, '-DistRoot', $dist, '-NoPause')
     $oldNodeExit = $env:TS_NODE_EXIT
+    $oldBodiesExit = $env:TS_BODIES_EXIT
     try {
         # J: no node at all.
         $env:PATH = $noNodePath
@@ -692,9 +698,33 @@ function Get-GeneratedStaleSays($State, [string]$Channel) { return '' }
         $m = Invoke-Ship $skyArgs
         Yes ("L a mismatch, exit 2, is still refused (exit {0})" -f $m.Code) (
             $m.Code -eq 1 -and $m.Out -match 'not the version its script wants' -and (Called $m 'Publish-Update').Count -eq 0)
+
+        # ---- M: a body mesh the covered bodies check could not read (#1956) ----------
+        # Patrick, 5 Oct: refuse, the way the SkyUI menus step does since #1913.
+        # It used to print a yellow line and ship, on main as well as dev. The
+        # SkyUI check passes here, so M stops on the bodies and nothing else.
+        $env:TS_NODE_EXIT = '0'
+        $env:TS_BODIES_EXIT = '1'
+        $mainArgs = @($skyNote, '-DryRun', '-Root', $skyRoot, '-DistRoot', $dist, '-NoPause')
+        foreach ($case in @(@{ Name = 'dev'; Args = $skyArgs }, @{ Name = 'main'; Args = $mainArgs })) {
+            $b = Invoke-Ship $case.Args
+            Yes ("M a {0} Ship whose body meshes could not all be read is refused (exit {1})" -f $case.Name, $b.Code) (
+                $b.Code -eq 1 -and $b.Out -match 'STOP\. The body meshes in the game folder could not all be read \(Check-CoveredBodies\.ps1 exit 1\)')
+            Yes '  and no longer says it in yellow and carries on' ($b.Out -notmatch 'the body meshes could not all be read; see above' -and $b.Out -notmatch 'Dry run finished')
+            Yes '  before the SkyUI menus are read or anything is published' (
+                (Called $b 'node').Count -eq 0 -and (Called $b 'Publish-Update').Count -eq 0 -and (Away $b).Count -eq 0)
+            Yes '  and Updater.cs is on the version it had' ((Read-Version $updaterCs) -eq '1.1.93')
+        }
+
+        # A nude body, exit 2, on dev still only warns (#405): M changed exit 1 only.
+        $env:TS_BODIES_EXIT = '2'
+        $n = Invoke-Ship $skyArgs
+        Yes ("M a nude body on dev still warns and runs to the end (exit {0})" -f $n.Code) (
+            $n.Code -eq 0 -and $n.Out -match 'a body in the game folder is nude \(issue #405\); shipping anyway' -and $n.Out -match 'Dry run finished')
     } finally {
         $env:PATH = $bin + ';' + $oldPath
         $env:TS_NODE_EXIT = $oldNodeExit
+        $env:TS_BODIES_EXIT = $oldBodiesExit
         Remove-Item -LiteralPath $nodeStandIn -Force -ErrorAction SilentlyContinue
     }
 }
