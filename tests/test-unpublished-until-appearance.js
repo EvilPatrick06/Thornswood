@@ -398,12 +398,9 @@ function stuck(at) {
   yes('without the chargen helper the near list still includes a missing face',
       !!((store[0xff000001].thornswoodNear || {}).w || {})['ff000099']);
 
-  g.__thornswoodChargen = {
-    publishedForOthers: function (id) {
-      try { return hasStoredAppearance(mp.get(id, 'appearance')); }
-      catch (e) { return true; }
-    }
-  };
+  // The chargen block's own test of a stored face, which the social block
+  // asks of the appearance it read once this pass (#1721).
+  g.__thornswoodChargen = { hasStoredAppearance: hasStoredAppearance };
   g.__thornswoodSocial.nearTick();
   yes('with the helper, a missing appearance is not on the near list',
       !((store[0xff000001].thornswoodNear || {}).w || {})['ff000099']);

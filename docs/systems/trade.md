@@ -34,6 +34,14 @@ Chips along the top narrow the list to one group, and a find box
 narrows it by name. The type is the same size as the rest of the K
 panel, large enough to read at the distance the window sits.
 
+Each piece you are holding is its own line, under its own name. Two
+pieces of one thing that differ are two lines: a key to Breezehome and
+a key to Honeyside, a sword at 85% and a plain one. An enchantment, a
+poison, a soul or a temper is not part of a name, so it is said after
+it, as in Steel Dagger (enchanted), and an enchanted dagger never reads
+the same as a plain one. The same piece held more than once is one
+line with its count, whether or not one of them is worn.
+
 Each line you are holding has a box for a count, and Add sends that
 count. An empty box, or a count of zero, sends one. Add 1 is always
 there. Add 5 appears when you have at least five, Add 10 when you
@@ -46,9 +54,10 @@ and None.
 ## What goes on the table
 
 The buttons on the panel put a thing up, with a count, and Set puts
-up gold. You cannot put up more gold than you are holding. Each side
-can put up 24 lines. A person uses the buttons; nobody types a
-command for any of it.
+up gold. What goes up is the piece on that line, and the other person
+sees it on the table under the same name. You cannot put up more gold
+than you are holding. Each side can put up 24 lines. A person uses
+the buttons; nobody types a command for any of it.
 
 Both press Agree. Any change to either pile clears both
 confirmations. One side does not get to swap a sword for a worse one
@@ -57,7 +66,8 @@ after the other has already agreed.
 Walk away, or Escape, ends it. Nothing has moved until both have
 confirmed.
 
-A thing crosses as it is. A key or a deed still names its house, a
+A thing crosses as it is, and it is the piece that was put up, never
+another of the same thing. A key or a deed still names its house, a
 piece keeps the condition on its name, and an enchanted piece keeps
 its enchantment and its charge. What stays in your pack keeps what it
 had, and so does everything the other person was already holding. A
@@ -80,10 +90,11 @@ it an ordinary trade. Either way both confirmations are cleared.
 
 ## Where this is
 
-The offer, the prompt, the names, the groups, the buttons, the
-distance, the two confirmations, the 24 lines, the 3 minutes, the
-gold check, and a thing crossing as it is are in the server. H and
-Trade under Near you on P offer it. Accept and Refuse on that prompt
-are what a person presses. So are Agree, Walk away and Buy for the
-company. The key and the buttons send the server the lines `/trade`
-and its verbs once were, and nobody is told to type them.
+The offer, the prompt, the names, one line a piece, the groups, the
+buttons, the distance, the two confirmations, the 24 lines, the 3
+minutes, the gold check, and the piece put up crossing as it is are
+in the server. H and Trade under Near you on P offer it. Accept and
+Refuse on that prompt are what a person presses. So are Agree, Walk
+away and Buy for the company. The key and the buttons send the server
+the lines `/trade` and its verbs once were, and nobody is told to type
+them.

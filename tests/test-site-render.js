@@ -373,6 +373,39 @@ function freePort() {
     });
   });
 }
+/*
+  Waits for the site's own "[thornswood-docs] listening on ...:port" line, so
+  nothing is asked of the port before this run's site holds it (#1727). The
+  port came from the system and was let go again, and builds run side by side
+  on the VPS: if something takes it in between, the site stops on EADDRINUSE,
+  and polling the port would have read whatever holds it as this site. The
+  error says which, with what the site printed.
+*/
+function listening(srv, port) {
+  return new Promise((ok, bad) => {
+    let out = '';
+    const said = (d) => {
+      out += d;
+      const m = /\[thornswood-docs\] listening on \S+:(\d+)/.exec(out);
+      if (m && Number(m[1]) === port) { end(null); }
+    };
+    const more = (d) => { out += d; };
+    const gone = (code) => end(new Error((/EADDRINUSE/.test(out) ? 'something else already holds port ' + port + ', so ' : '') +
+                                         'the site stopped (exit ' + code + ') before it was listening. It printed:\n' + out));
+    const late = setTimeout(() => end(new Error('the site did not say it was listening on ' + port +
+                                                ' within fifteen seconds. It printed:\n' + out)), 15000);
+    function end(err) {
+      clearTimeout(late);
+      srv.stdout.removeListener('data', said);
+      srv.stderr.removeListener('data', more);
+      srv.removeListener('close', gone);
+      if (err) { bad(err); } else { ok(); }
+    }
+    srv.stdout.on('data', said);
+    srv.stderr.on('data', more);
+    srv.on('close', gone);
+  });
+}
 
 async function get(port, route) {
   const r = await fetch('http://127.0.0.1:' + port + route);
@@ -402,10 +435,7 @@ async function boot() {
   started = true;
   srv.stdout.on('data', function (d) { out.log += d; });
   srv.stderr.on('data', function (d) { out.log += d; });
-  for (let i = 0; i < 80 && !out.up; i++) {
-    try { const r = await fetch('http://127.0.0.1:' + port + '/fonts.css'); out.up = r.status > 0; }
-    catch (e) { await new Promise(function (r) { setTimeout(r, 150); }); }
-  }
+  try { await listening(srv, port); out.up = true; } catch (e) { out.log = e.message; }
   return out;
 }
 // What the server wrote to its own log, which it does before it listens.

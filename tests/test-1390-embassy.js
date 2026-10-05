@@ -506,6 +506,41 @@ if (block && RECIPES && ADMIN_ITEMS) {
   }
 }
 
+
+// ------------------------------------------- the Accord says the same --
+// #1697: the site's Article the Third and lore/accord.md said forty and twelve
+// while the server held 20 and 6. The numbers in the words people read are
+// read here against the ones the block enforces, so they cannot part again.
+{
+  const rollM = /var ROLL_MOST = (\d+);/.exec(block || '');
+  const armedM = /var ARMED_MOST = (\d+);/.exec(block || '');
+  yes('A1 the block holds ROLL_MOST and ARMED_MOST', !!rollM && !!armedM);
+  if (rollM && armedM) {
+    const roll = +rollM[1], armed = +armedM[1];
+    const ones = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+      'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+    const tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+    const word = n => n < 20 ? ones[n] : tens[Math.floor(n / 10)] + (n % 10 ? '-' + ones[n % 10] : '');
+    const read = rel => fs.readFileSync(path.join(REPO_DIR, rel), 'utf8').split(String.fromCharCode(13)).join('');
+    const article = text => slice(text, 'Article the Third', 'Article the Fourth') || '';
+    const said = 'no more than ' + word(roll) + ' persons in service, of whom no more than ' +
+                 word(armed) + ' may bear arms';
+    for (const rel of ['site/data/site/world.md', 'lore/accord.md']) {
+      const text = read(rel);
+      yes('A2 ' + rel + ' Article the Third says ' + word(roll) + ' in service and ' + word(armed) + ' armed',
+          article(text).replace(/\s+/g, ' ').indexOf(said) >= 0);
+      const flat = text.replace(/\s+/g, ' ');
+      const other = [/allows (\w+) under arms/g, /The (\w+) inside them/g, /those (\w+) within its walls/g]
+        .map(re => Array.from(flat.matchAll(re), m => m[1].toLowerCase()))
+        .reduce((a, b) => a.concat(b), []).filter(w => w !== word(armed));
+      yes('A3 ' + rel + ' names no other armed number', other.length === 0);
+    }
+    const page = read('docs/systems/embassy.md').replace(/\s+/g, ' ');
+    yes('A4 docs/systems/embassy.md says ' + roll + ' in service and ' + armed + ' armed',
+        page.indexOf(roll + ' persons in service, no more. Of those, ' + armed + ' may be marked armed') >= 0);
+  }
+}
+
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

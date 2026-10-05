@@ -59,6 +59,12 @@ only at the board of the town it named, once somebody has taken it.
 At the posting board there is nothing to confirm. The person who took
 it does not confirm their own haul.
 
+A steward here is anybody a jarl has named steward, or a jarl. The
+server keeps one list of stewards for every hold, so any of them can
+confirm a haul at the destination's board or take one down at the
+posting board. Decided by Patrick on 4 Oct (#1646): "the person who
+posted or a steward."
+
 On confirm, the company keeps a tenth of the pay, rounded down to a
 whole gold. A pay under 10 gold keeps nothing, and the hauler receives
 all of it. The rest is handed to the hauler as gold. The ledger drops
@@ -83,7 +89,8 @@ is not a new mint. See [Gold](gold.md).
 Somebody who is away when gold is theirs, the hauler on a confirm or
 the poster on a hand back or a take down, is handed it the next time
 they are in the world. Until then it stays on the ledger, held for
-them, and nothing else can spend it.
+them, and nothing else can spend it. A confirm is not refused because
+the hauler is away. Decided by Patrick on 4 Oct (#1646).
 
 ## Who runs it
 
@@ -116,6 +123,11 @@ server. The seller receives what is left. A price under 10 gold pays
 the seller the whole price, and neither cut is taken. See
 [Gold](gold.md).
 
+The price is the worker's own gold, from their pack. No hold's ledger
+pays for a sale or moves with one. Decided by Patrick on 4 Oct
+(#1646): "Most of these can only be got from the trading company, so
+the hold's ledger makes no sense."
+
 ## What is not a haul
 
 A sale across a counter in the same town is a trade. Rent is rent. A
@@ -146,6 +158,6 @@ for the company, as above. The things the seller put up leave the
 seller's pack and the world. The worker pays the price less their
 10%, another 10% is destroyed, and the seller receives the rest.
 Under 10 gold the seller receives the whole price. No ledger is
-touched by a sale. Where the price comes from, the worker's pack or a
-ledger, is asked on issue #1393; the server takes it from the
-worker's pack.
+touched by a sale: the price comes from the worker's pack, as decided
+on #1646. A steward is anybody on the one list of stewards, or a
+jarl (`isSteward` in the property block), at any hold's board.

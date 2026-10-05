@@ -167,7 +167,7 @@ Not in the world yet: the parts of a warrior's maneuvers the game
 has to do itself (see [Warrior](professions/warrior.md)), the repair
 kits on [Durability](durability.md), the check of which effect a
 brew or an enchantment carries (the engine does not pass it yet),
-Master Weaver's hidden armour, and the vanilla perk
+and the vanilla perk
 lines that still hide some recipes in the crafting menu even when the
 server would allow them. Each profession
 page says which of those is its own.

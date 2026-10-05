@@ -144,11 +144,11 @@ itself.
 The Empire may maintain one embassy within Skyrim, at Solitude, and no other
 house, fort, or station anywhere in the province.
 
-The embassy may hold no more than forty persons in service, of whom no more
-than twelve may bear arms, and those twelve within its walls only.
+The embassy may hold no more than twenty persons in service, of whom no more
+than six may bear arms, and those six within its walls only.
 
 No Legion soldier may go armed anywhere in Skyrim outside the embassy walls.
-The twelve inside them are the whole of the exception, and they do not carry
+The six inside them are the whole of the exception, and they do not carry
 past the gate.
 
 ## Article the Fourth: On Law
@@ -235,7 +235,7 @@ Fourth Era.*
   Ambassador's people. You are legal, you are watched, and you are one bad
   night away from being told to leave.
 - **You can play a Legion soldier, at the embassy.** Article the Third allows
-  twelve under arms inside those walls and nowhere else in the province. Walk
+  six under arms inside those walls and nowhere else in the province. Walk
   out the gate carrying and you have broken the Accord, and the Ambassador will
   hand you over rather than answer for you. A veteran who served forty years ago
   and settled here is a different thing again, and a good one.

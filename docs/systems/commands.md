@@ -93,13 +93,16 @@ and help text never lists it.
 
 `/pick` and `/spend` are the K panel's lines (`gamemode.js:40783`):
 profession, class, town, spells and points, `/pick perk fontofmagic`
-from the Use button beside Font of Magic, and `/pick study` from the
-Study button on the College page (#1387). K sends them and nothing tells
-anybody to type them, so there is nothing to turn.
+from the Use button beside Font of Magic, `/pick study` from the
+Study button on the College page (#1387), and `/pick weave warmth` or
+`/pick weave armour` from Warmth and Armour on a Master Weaver's
+profession card (#1398). K sends them and nothing tells anybody to
+type them, so there is nothing to turn.
 
 ## Staff and dev commands
 
-These stay commands.
+These stay commands. How to run each one, with examples:
+[Developer-Guide.md, Q. Staff commands](../../Developer-Guide.md#q-staff-commands).
 
 | Command | Who | What it does | Read at | Where staff are told |
 | --- | --- | --- | --- | --- |

@@ -215,10 +215,11 @@ Warm clothes pull a cold place back toward 50 by that fraction. In a
 hot place they push further away, at half that fraction (the heat
 factor is 0.5). Full kit at a forge is worse than a shirt.
 
-A master tailor's garment ignores 4 degrees of exposure on top of the
-table, and does not weigh more than clothing. It does not replace fur.
-Hidden armour on that garment is the tailor perk, not this meter. See
-[Professions](professions.md).
+A master tailor's garment woven for warmth ignores 4 degrees of
+exposure on top of the table, and does not weigh more than clothing.
+It does not replace fur. The tailor can weave a garment for hidden
+armour instead, which is not this meter. See
+[Tailor](professions/tailor.md).
 
 A burn on a part of the body, from [Injury](injury.md), means the
 clothing on that part counts at half until the burn heals.

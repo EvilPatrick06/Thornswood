@@ -41,6 +41,31 @@ function fixture() {
       credit:[{baseId:15,count:3}],expected:copy(inv),kind:'sell'})};
 }
 
+// Four large snapshots fit the initial phase but exceeded the old recovery
+// record after debit. Saved debit snapshots must retire before credit growth.
+{
+  const large=fixture();
+  large.inv.entries.push({baseId:200,count:1,name:''});
+  large.inv.entries[2].name='x'.repeat(131000-Buffer.byteLength(JSON.stringify(large.inv)));
+  assert.equal(Buffer.byteLength(JSON.stringify(large.inv)),131000);
+  const offer=large.offer();offer.debit.entries.push(copy(large.inv.entries[2]));
+  const settle=large.make();settle.begin(offer);large.save();settle.tick();
+  assert.equal(large.inv.entries[0].count,43,'large valid inventory receives its saved credit');
+  large.save();settle.tick();assert.equal(large.states.get(1).pending,null);
+  assert.deepEqual(large.calls,[1,2]);
+}
+// A representation that cannot reserve two maximal recovery snapshots must
+// refuse before charge, even though the initial representation would fit.
+{
+  const full=fixture(), state=full.states.get(1);
+  const item={baseId:200,count:1,name:'x'.repeat(130700)};
+  state.stock=[{baseId:200,count:1,name:'Large item',entry:item}];
+  const offer=full.offer();offer.next.stock.unshift(copy(state.stock[0]));
+  assert.throws(()=>full.make().begin(offer),/too large to recover/);
+  assert.deepEqual(full.calls,[]);assert.equal(full.inv.entries[1].count,8);
+  assert.equal(full.states.get(1).pending,undefined);
+}
+
 let f=fixture(), s=f.make();
 let result=s.begin(f.offer());
 assert.equal(result.done,false);

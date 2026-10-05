@@ -26,6 +26,12 @@ The outline nests, and the table of contents follows it. A part is a numbered se
     - [Reach the VPS](#reach-the-vps)
   - [Setting up a machine](#setting-up-a-machine)
   - [Shipping from another machine](#shipping-from-another-machine)
+    - [Your own signing sign in](#your-own-signing-sign-in)
+      - [Patrick, once for each person](#patrick-once-for-each-person)
+      - [The person, on their own machine](#the-person-on-their-own-machine)
+      - [Never a device code](#never-a-device-code)
+      - [When somebody stops shipping](#when-somebody-stops-shipping)
+    - [Check the machine and Ship](#check-the-machine-and-ship)
 - [2. How to make changes](#2-how-to-make-changes)
   - [On your branch](#on-your-branch)
     - [Start from a current main](#start-from-a-current-main)
@@ -128,6 +134,16 @@ The outline nests, and the table of contents follows it. A part is a numbered se
     - [JavaScript](#javascript)
     - [Learn more about the other tools](#learn-more-about-the-other-tools)
   - [P. Secrets, by name and place, never by value](#p-secrets-by-name-and-place-never-by-value)
+  - [Q. Staff commands](#q-staff-commands)
+    - [Who may run them](#who-may-run-them)
+    - [For yourself](#for-yourself)
+    - [At somebody else](#at-somebody-else)
+    - [Keeping order](#keeping-order)
+    - [Bans, PKs and notes](#bans-pks-and-notes)
+    - [Wounds for a scene](#wounds-for-a-scene)
+    - [The embassy and remnant rolls](#the-embassy-and-remnant-rolls)
+    - [Restarts](#restarts)
+    - [In Discord](#in-discord)
 
 ## Glossary
 
@@ -389,11 +405,99 @@ by hand, and no secret is written into the repository.
 | VPS access | One's own key, `.ssh\thornswood_ed25519` | Its own key: `.\scripts\vps\Setup-SshKey.ps1 -KeyOnly`, and somebody the VPS already knows runs `.\scripts\vps\Add-VpsKey.ps1 -PublicKey '<the line>'`. With no such machine left, the BisectHosting panel is the way in (`docs\IT-IS-DOWN.md`) |
 | Signing: `records\signing\signing.json` | enabled, naming `C:\tools\metadata.json` and the client under `records\signing\client\client`, paths only One has. Never copy it | `.\scripts\release\Setup-ShipMachine.ps1` writes one from `records\signing\signing.template.json` (paths and "enabled": true, no key or password) |
 | Signing: Microsoft's signing client | `records\signing\client`, ignored by git | The same script fetches `Microsoft.ArtifactSigning.Client` 1.0.128 from nuget.org and refuses it unless its sha256 is the pinned one, which is the package One has |
-| Signing: the Azure sign in | `az login` on One, as Patrick | `az login` on the new machine, as Patrick. Only Patrick's Azure account has signing access (the Certificate Profile Signer role on the ThornswoodSigning account, profile ThornswoodRelease), so a second machine signs only while it is signed in as him (Patrick, 29 Sep). The script asks the signing service with that sign in and checks the profile answers with the identity the launcher pins. Signing in is the one step only Patrick can do |
+| Signing: the Azure sign in | `az login` on One, as Patrick | `az login` on the new machine, as the person who ships from it, with an account of their own in the signing tenant that holds the Certificate Profile Signer role on the ThornswoodSigning account's profile ThornswoodRelease (Patrick, 4 Oct; #1740). Patrick makes the account and gives the role once: [Your own signing sign in](#your-own-signing-sign-in). The script asks the signing service with that sign in and checks the profile answers with the identity the launcher pins |
 | The client runtime `records\client-build.json` names | only in the dev game folder, `C:\Thornswood-DevBuild\Game`. The build copies in `Downloads\Thornswood-ClientBuild-<commit>` are older builds, and the shared clone's `engine\skymp\build` does not match the record | The script fetches the zip of the recorded commit from the site's feed (`clientRuntime` in `/feed-dev/version.json` or `/feed/version.json`), checks it against the feed's sha256 and every file against the record, and puts the six files in the build folder. A commit on neither feed is built: `.\scripts\release\Setup-ShipMachine.ps1 -Rebuild`, or `.\scripts\release\Build-Engine.ps1` |
 | The game folder the Ship packs, `<root>-DevBuild\Game` | built by the dev launcher from what Vortex deployed | Skyrim Special Edition on Steam, Vortex with a profile named Thornswood and the Thornswood collection installed and deployed, the launcher from thornswood.net, then the dev build and its own game folder (Setting up a machine, above). A person does this; it needs a Nexus account, not Patrick's |
 | The collection itself | Nexus collection `7essxf`, curated from Patrick's Nexus account in his Vortex | Any machine installs it. Only publishing a new revision needs his account (`docs\OWNERSHIP.md`) |
 | Backups | the originals on the VPS, `C:\Thornswood-Backup`, and copies fetched to One's `Downloads\Thornswood-Backups`; the passphrase on the VPS and in One's Documents | Not needed to Ship. `.\scripts\vps\Fetch-Backups.ps1` brings them down to any machine the VPS knows |
+
+#### Your own signing sign in
+
+Until 4 Oct only Patrick's Azure account could sign (29 Sep, #1121), so a
+second machine signed only while he sat at it and signed in. Since 4 Oct each
+person who ships signs in as themselves, with an account of their own in the
+signing tenant, Default Directory (`5a096034-ce55-40d2-b313-10ee86efe26a`, domain
+`evilpatrick06outlook.onmicrosoft.com`), that holds the Artifact Signing Certificate
+Profile Signer role on the ThornswoodRelease profile (Patrick, 4 Oct; #1740).
+The role is on that profile only, so the account can sign and can do nothing
+else in the subscription. What it signs carries the same publisher name as
+what Patrick signs, because the certificate comes from his identity
+validation. Accounts that can sign, 4 Oct: Patrick's own, and
+`djinn@evilpatrick06outlook.onmicrosoft.com`.
+
+##### Patrick, once for each person
+
+On a machine where `az` is signed in as Patrick, in PowerShell 7:
+
+```powershell
+az account show --query "{user:user.name, tenant:tenantId}" -o table
+```
+
+It names evilpatrick06@outlook.com and the tenant above. Then:
+
+```powershell
+$scope = (az resource list --name ThornswoodSigning --resource-type Microsoft.CodeSigning/codeSigningAccounts --query "[0].id" -o tsv) + "/certificateProfiles/ThornswoodRelease"; $scope
+$domain = (az ad signed-in-user show --query userPrincipalName -o tsv).Split('@')[1]; $domain
+$who = Read-Host 'Their name, one lower case word'
+$pw = 'Tw7' + (-join ((48..57) + (65..90) + (97..122) | Get-Random -Count 17 | ForEach-Object { [char]$_ })); $id = az ad user create --display-name $who --user-principal-name "$who@$domain" --password $pw --force-change-password-next-sign-in true --query id -o tsv; $id
+$role = az role definition list --query "[?ends_with(roleName, 'Certificate Profile Signer')].roleName" -o tsv | Select-Object -First 1; $role
+az role assignment create --assignee-object-id $id --assignee-principal-type User --role $role --scope $scope
+"$who@$domain   $pw"
+```
+
+The first line prints a path that starts with `/subscriptions/` and ends with
+`/certificateProfiles/ThornswoodRelease`. The second prints the domain above.
+The account line prints the new account's id, the role line prints Artifact
+Signing Certificate Profile Signer, and the assignment prints the role and
+that path. The last line is the account and a first password: send both to
+the person in a direct message, never a channel. They have to change it the
+first time they sign in, so it stops working after that.
+
+##### The person, on their own machine
+
+In PowerShell 7, in the repository folder:
+
+```powershell
+az config set core.enable_broker_on_windows=false
+az login --tenant 5a096034-ce55-40d2-b313-10ee86efe26a --allow-no-subscriptions
+.\scripts\release\Setup-ShipMachine.ps1 -Check
+```
+
+The first line makes `az` sign in through your web browser. On Windows it
+opens a sign in window of its own by default, and on 4 Oct that window sent
+a work account to the page for personal Microsoft accounts, which answered
+"That Microsoft account doesn't exist". The second opens the tenant's own
+sign in page: sign in with the account Patrick sent, set a new password, and
+set up Microsoft Authenticator when it asks. It ends by printing the tenant
+above and your account. The account has no subscription of its own to list,
+which is what `--allow-no-subscriptions` is for. `Setup-ShipMachine.ps1 -Check`
+then says, under 4, that profile ThornswoodRelease answers this sign in with
+the identity the launcher pins. A role given a few minutes ago can take a
+little longer to reach the signing service.
+
+##### Never a device code
+
+`az login --use-device-code` does not work here, for anybody. The tenant has
+Microsoft's security defaults on, and they refuse every device code sign in:
+AADSTS530035, "Access has been blocked by security defaults", measured on
+4 Oct when Patrick entered a code for Djinn's machine. Do not turn security
+defaults off to get past it. They are what puts MFA on every account that
+can sign.
+
+##### When somebody stops shipping
+
+Patrick, with `$scope` and `$domain` set as above:
+
+```powershell
+$who = Read-Host 'Their name, as it is before the @'
+az role assignment delete --assignee "$who@$domain" --scope $scope
+az ad user delete --id "$who@$domain"
+```
+
+The first takes the role away and the second removes the account. Neither
+prints anything when it worked.
+
+#### Check the machine and Ship
 
 The whole of it, on the second machine, from the repository folder:
 
@@ -415,10 +519,9 @@ recorded client, and then runs `.\scripts\release\Check-ShipReady.ps1 -Channel d
 for everything else Ship asks: the dev build, its game folder, the Vortex
 profile, the VPS and the feed store. Each gap prints the command that closes
 it and says when it is Patrick's. It never turns signing off, never edits a
-`records\signing\signing.json` that is there, and never ships. Signing needs Patrick in
-person: only his Azure account has signing access, so the `az login` on the
-second machine is his, and that machine signs only while it is signed in as
-him. When both say READY:
+`records\signing\signing.json` that is there, and never ships. The sign in is
+the one step that needs Patrick, once for each person (Your own signing sign
+in, above). When both say READY:
 
 ```
 .\scripts\release\Ship.ps1 -Channel dev "what changed, in plain words
@@ -2218,7 +2321,7 @@ says **not enforced** where nothing checks it.
 | GitHub access | your own `gh auth login`, kept in Windows' credential store | Pushing branches and opening pull requests here, and a main Ship's download of the launcher CI built. Releases go to the VPS, not GitHub, since #897 and #907. | You: `gh auth logout`, then `gh auth login`, or revoke it on GitHub under Settings, Applications. Collaborator access to the source repo is Patrick's to give or take away. |
 | VPS access | your own key, `.ssh\thornswood_ed25519` in your profile, made by `Setup-SshKey.ps1`, and its public half in `C:\ProgramData\ssh\administrators_authorized_keys` on the VPS | Administrator on the VPS, and so every VPS row in this table: the site, the bot, both game servers, voice and the backups. None of the scripts needs the Administrator password; `Add-VpsKey.ps1` exists so nobody else has to hold it. | You. First move the old key aside: rename both `.ssh\thornswood_ed25519` and `.ssh\thornswood_ed25519.pub`, say by adding `.old`. While the old key still opens the VPS, `Setup-SshKey.ps1` says it already works and stops, and while the `.pub` is there it uses that one again rather than making a new one. Passing `-KeyPath` a new file does not get round this, because that first check goes through your ssh config, which still names the old key. Then `Setup-SshKey.ps1 -KeyOnly` makes a new key at the same path and prints its public line. Patrick adds it with `Add-VpsKey.ps1 -PublicKey '<the new line>'` and takes the old one off with `Add-VpsKey.ps1 -PublicKey '<the line in the .old .pub>' -Remove`. For his own key, Patrick runs `Setup-SshKey.ps1` without `-KeyOnly`, which asks for the Administrator password once and puts the new key on itself, and then removes the old line the same way. Delete the `.old` pair once `Setup-SshKey.ps1 -Test` passes and the old line is off. |
 | VirusTotal API key | the environment variable `VT_API_KEY` on the machine that runs the optional manual upload, and nowhere in this repository: `Publish-VirusTotal.ps1` reads it from there only, so it has no file to be committed in and no parameter to be typed on a command line | Reading and uploading under our VirusTotal account when somebody runs the manual tool. Publish, Package, and Ship do not call it (#802). | Whoever owns the VirusTotal account, in the account's own API key page, then sets the variable on that machine. A machine without it skips a manual run; publish does not need the key. |
-| Code signing | `records\signing\signing.json` on a machine that signs, written from `records\signing\signing.template.json` by `Setup-ShipMachine.ps1`. It names the setup and holds no key: the credential is the `az login` on that machine, as Patrick, whose Azure account is the only one with signing access (the Certificate Profile Signer role on the Artifact Signing profile), or a certificate in that machine's own store | Whether Windows treats the launcher and the installer as ours rather than as an unknown download. | Patrick, in Azure: the signing account is his, and a second machine signs only while `az` on it is signed in as him. Without the file `Sign-Artifact.ps1` signs nothing and a local build carries on unsigned. Ship and Publish-Installer refuse that soft skip before anything reaches the site or the feed. |
+| Code signing | `records\signing\signing.json` on a machine that signs, written from `records\signing\signing.template.json` by `Setup-ShipMachine.ps1`. It names the setup and holds no key: the credential is the `az login` on that machine, as the person who ships from it, with an account of their own that holds the Certificate Profile Signer role on the Artifact Signing profile ([Your own signing sign in](#your-own-signing-sign-in)), or a certificate in that machine's own store | Whether Windows treats the launcher and the installer as ours rather than as an unknown download. | Patrick, in Azure: the signing account and the tenant are his. He makes each person's account, gives it the role, and takes the role away when they stop shipping. Without the file `Sign-Artifact.ps1` signs nothing and a local build carries on unsigned. Ship and Publish-Installer refuse that soft skip before anything reaches the site or the feed. |
 | The domain, thornswood.net | Registered at Cloudflare, in Patrick's own Cloudflare login, which he signs in to with GitHub (`docs\OWNERSHIP.md`). Nothing about it is kept on a machine or in this repository | The address everybody reaches the site, the feed and the launcher downloads at. Whoever holds the login can point it anywhere or let it lapse. | Patrick, in that Cloudflare login: renewing, moving or changing the records. Nobody else holds it. |
 
 **The rule for this table.** A control that does not exist is listed as
@@ -2270,3 +2373,111 @@ except the backup passphrase, in the clear.
 
 Never paste any of them into a chat, a commit, a Discord message or a doc.
 
+### Q. Staff commands
+
+Staff, testers and admins type these in the game's chat box: Enter opens it. They stay commands, unlike what people do in the world ([Buttons, not chat commands](#buttons-not-chat-commands)), and `/help` never lists them. [docs/systems/commands.md](docs/systems/commands.md) has every command there is with the line the server reads it at. The code is the staff block of `game\gamemode.js` (`// ==== thornswood staff ====`) and the `/tp`, `/give` and `/spawn` branches of `handle` in its chat commands block. A pull request that adds or changes a staff command changes its row here and on that page too.
+
+#### Who may run them
+
+| Tier | Who | Runs |
+| --- | --- | --- |
+| Tester | The Playtester role on Discord, which is the door's allowed list, and the profiles in `thornswoodPlaytesters` in the game server's `server-settings.json` on the VPS | [For yourself](#for-yourself) |
+| Staff | The Discord staff roles, Owner, Dev, Gamemaster, Moderator and Loremaster, and the profiles in `thornswoodDevs` | Everything a tester runs, and everything below except the admin rows |
+| Admin | The Owner and Dev roles, and the profiles in `thornswoodAdmins` | Everything, and `/unpk`, `/embassy` and `/remnant` |
+
+An admin is staff and staff are testers, so nobody is listed twice. Anybody else is told "That one is not yours to run." Every tier also needs the launcher's join pass, so leave the Thornswood launcher open while you play.
+
+A staff command also needs the chat to have proved who you are. When it has not, the answer says so: "Staff commands need the chat to have proved who you are" means close the game, open the launcher and press Play; "Staff commands need your launcher's pass" means the launcher was closed, so open it and wait a minute.
+
+A person, wherever these say `<person>`, is their name or the start of it while only one name starts that way, the form id the crosshair gives, or their profile number. A profile number reaches somebody who has left, for a ban, a note or `/unsilence`.
+
+Each staff command answers you in your chat, tells the person it was done to, writes a line to `thornswood.log`, and writes a line to `private\moderation.log`, which the bot says in the staff channel.
+
+#### For yourself
+
+| Command | What it does |
+| --- | --- |
+| `/tp` | Lists the towns you can name |
+| `/tp <place>`, `/goto <place>` | Moves you to a town, or to any inn, keep, shop or house by its name. Part of the name is enough: `/tp bannered mare` |
+| `/give <item> [count]` | Puts it in your pack. Any named item in the load order, gold included, or a form id: `/give iron ore 5`, `/give 12eb7:Skyrim.esm`. Up to 100,000 |
+| `/spawn <creature> [count]` | Puts it a few steps in front of you, several spread round you. Any named actor, or a form id: `/spawn troll`, `/spawn skeleton 3`, `/spawn 23aba`. Up to 40 |
+| `/where` | Your cell, position and facing, for a bug report or a new place. Anybody can run it |
+
+The count is the last word, and only when it is a number with a name in front of it.
+
+#### At somebody else
+
+Staff. With no person named, `/give`, `/spawn` and `/tp` are the ones for yourself, above.
+
+| Command | What it does |
+| --- | --- |
+| `/give <person> <item> [count]` | Puts it in their pack |
+| `/spawn <creature> [count] on <person>`, `/spawnat <person> <creature> [count]` | Puts it beside them |
+| `/tp <person> <place or person>` | Sends them to a place, or to somebody else |
+| `/bring <person>` | Moves them to you |
+| `/goto <person>` | Moves you to them |
+
+Somebody frozen stays frozen where they are sent.
+
+#### Keeping order
+
+Staff.
+
+| Command | What it does |
+| --- | --- |
+| `/warn <person> <why>` | Tells them that staff have warned them, why, and that the next step is being removed from the world |
+| `/freeze <person> [why]` | Holds them where they stand, across a reconnect |
+| `/unfreeze <person>` | Lets them go |
+| `/silence <person> [minutes] [why]` | Stops their voice, what they type, the words above their head and the speaking mark. 30 minutes unless you say, a day at most. Their name stays |
+| `/unsilence <person>` | Lets them speak again |
+| `/kick <person> [why]` | Tells them, then ends their session four seconds later |
+
+#### Bans, PKs and notes
+
+Staff, apart from `/unpk`. These are kept on the site, on the staff pages at https://thornswood.net/hub, and a ban ends the session at once.
+
+| Command | What it does |
+| --- | --- |
+| `/ban <person> <how long> <why>` | Bans this character. How long is `30m`, `2h`, `3d`, `1w`, a number of minutes, or `forever`: `/ban Aela 3d spamming the market`. Their other characters can still play |
+| `/unban <person>` | Lifts the ban on this character |
+| `/banaccount <person> <how long> <why>` | Bans the whole Discord account: every character on it, and any new one |
+| `/unbanaccount <person>` | Lifts the ban on the account |
+| `/pk <person> <why>` | The character dies for good. It is kept for staff, the account can make a new one, and nobody but you and its owner is told |
+| `/unpk <person or character> <why>` | Admins only. Undoes a PK made by mistake: a profile number, the start of the dead character's name, or its owner. It comes back into a free slot on the account; with none free, the site says so and nothing changes. The PK stays on the record with your reason |
+| `/note <person> <text>` | Keeps a note against them, for staff to read on the site |
+
+#### Wounds for a scene
+
+Staff. For a Gamemaster's scene, or an agreed loss the person said yes to out of character. [docs/systems/injury.md](docs/systems/injury.md) says what each one does.
+
+| Command | What it does |
+| --- | --- |
+| `/hurt <person>` | What they have now |
+| `/hurt <person> cut`, `bite`, `break arm`, `break leg` | A wound |
+| `/hurt <person> chill`, `food`, `fouled`, `fever`, `bitesick` | A disease, caught now with no roll |
+| `/hurt <person> agreed hand`, `eye`, `scar <what people are told>` | An agreed loss |
+| `/hurt <person> unagree hand`, `eye`, `scar` | Takes back an agreed loss written down by mistake |
+| `/hurt <person> clear` | Every wound and disease, but not an agreed loss |
+
+#### The embassy and remnant rolls
+
+Admins only.
+
+| Command | What it does |
+| --- | --- |
+| `/embassy` | The roll, how many are on it, and which building it is |
+| `/embassy add <person>`, `/embassy add <person> armed` | Onto the roll, marked armed or not. 20 at most, 6 of them armed |
+| `/embassy arm <person>`, `/embassy disarm <person>` | Marks them armed, or not |
+| `/embassy remove <person>` | Off the roll |
+| `/remnant`, `/remnant add <person>`, `/remnant remove <person>` | The Thalmor remnant roll, once an application is accepted |
+
+#### Restarts
+
+Not from the chat: `/restart` and `/shutdown` answer that restarts are not run from chat. A developer counts the server down from a machine the VPS knows, with `scripts\vps\Request-Restart.ps1` (the list under [After a pull request is merged](#after-a-pull-request-is-merged)).
+
+#### In Discord
+
+| Command | Who | What it does |
+| --- | --- | --- |
+| `/close [why]` | Staff, in a ticket | Closes the ticket |
+| `/live-smoke start`, `reset`, `refresh`, `report` | Owner, Dev and Lead Gamemaster | The Live smoke checklist in #test-tasks: opens a dated session, closes it and starts a fresh one, rewrites the checklist, counts a session's marks |

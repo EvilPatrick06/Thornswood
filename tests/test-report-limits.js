@@ -107,9 +107,22 @@ if (lib) {
       from('127.0.0.1', '2001:db8:1:2::1') === from('127.0.0.1', '2001:db8:1:2::abcd'));
 
   // privacy.md: the sign-in log is the only thing here holding an address.
+  // The key is the block's HMAC of the address under a salt it makes at
+  // start. This used to search the key for "203", and a fresh salt makes a
+  // hash with those three digits in it about one start in 140 (#1738), so
+  // the block is lifted again here with two salts this harness chose, and
+  // the key is held to exactly the hash it has to be.
   const k = from('127.0.0.1', '203.0.113.5');
+  const under = (salt) => new Function('crypto', 'net', block + '\nreturn reportFrom;')(
+    Object.assign(Object.create(crypto), { randomBytes: () => salt }), net)(req('127.0.0.1', '203.0.113.5'));
+  const hmac = (salt) => crypto.createHmac('sha256', salt).update('203.0.113.5').digest('hex').slice(0, 32);
+  const s1 = Buffer.alloc(32, 1), s2 = Buffer.alloc(32, 2);
   yes('the table is keyed by a hash, not by the address',
-      /^[0-9a-f]{32}$/.test(k) && k.indexOf('203') < 0);
+      /^[0-9a-f]{32}$/.test(k) && k !== '203.0.113.5');
+  yes('the hash is of the address under the salt made at start',
+      under(s1) === hmac(s1) && under(s2) === hmac(s2));
+  yes('so the same address is another key after the next start',
+      under(s1) !== under(s2));
 
   // ----------------------------------------------------- five an hour --
   const T0 = Date.UTC(2026, 8, 24, 12, 0, 0);
@@ -209,6 +222,39 @@ function freePort() {
     s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => done(p)); });
   });
 }
+/*
+  Waits for the site's own "[thornswood-docs] listening on ...:port" line, so
+  nothing is asked of the port before this run's site holds it (#1727). The
+  port came from the system and was let go again, and builds run side by side
+  on the VPS: if something takes it in between, the site stops on EADDRINUSE,
+  and polling the port would have read whatever holds it as this site. The
+  error says which, with what the site printed.
+*/
+function listening(srv, port) {
+  return new Promise((ok, bad) => {
+    let out = '';
+    const said = (d) => {
+      out += d;
+      const m = /\[thornswood-docs\] listening on \S+:(\d+)/.exec(out);
+      if (m && Number(m[1]) === port) { end(null); }
+    };
+    const more = (d) => { out += d; };
+    const gone = (code) => end(new Error((/EADDRINUSE/.test(out) ? 'something else already holds port ' + port + ', so ' : '') +
+                                         'the site stopped (exit ' + code + ') before it was listening. It printed:\n' + out));
+    const late = setTimeout(() => end(new Error('the site did not say it was listening on ' + port +
+                                                ' within fifteen seconds. It printed:\n' + out)), 15000);
+    function end(err) {
+      clearTimeout(late);
+      srv.stdout.removeListener('data', said);
+      srv.stderr.removeListener('data', more);
+      srv.removeListener('close', gone);
+      if (err) { bad(err); } else { ok(); }
+    }
+    srv.stdout.on('data', said);
+    srv.stderr.on('data', more);
+    srv.on('close', gone);
+  });
+}
 
 // Many reports from one address at once, each connection sending its headers
 // first and its body only once every connection has sent its headers. fetch
@@ -290,10 +336,7 @@ function finish() {
 
   const base = 'http://127.0.0.1:' + PORT;
   let up = false;
-  for (let i = 0; i < 80 && !up; i++) {
-    try { up = (await fetch(base + '/api/public')).ok; } catch (e) { }
-    if (!up) await new Promise((r) => setTimeout(r, 100));
-  }
+  try { await listening(srv, PORT); up = true; } catch (e) { said = e.message; }
   yes('a scratch copy of the site starts', up);
   if (!up) { console.log(said); return finish(); }
 
