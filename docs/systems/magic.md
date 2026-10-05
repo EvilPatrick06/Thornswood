@@ -34,7 +34,8 @@ spells. They are outlaws, and Talos is lawful. See
 Three gates, all of them, whether you pick it on K or read a tome:
 
 1. A spell point. A mage earns them by rank: 2 to start, +1 at
-   advanced, +1 at expert, +2 at master. Anybody else has only the
+   advanced, +1 at expert, +2 at master. Anybody else earns 1 with
+   a semester at the College, and each spell also takes one of the
    2 places a master gave them.
 2. Your rank in that school is at least the spell's rank. Apprentice
    and Adept are both Advanced.
@@ -129,8 +130,8 @@ not reset the 24 hours.
 
 A person a master has taught needs a semester's point as well as one
 of their 2 places to learn a spell from a tome, because the semester is
-the only thing that hands them a point. Whether the places alone should
-be enough is asked on issue 1387.
+the only thing that hands them a point. Patrick decided on 4 October
+that they need both (issue 1387).
 
 Only the book is granted. A tome of a spell the book does not list is
 refused, and the tome is kept. A spell like that which a tome taught

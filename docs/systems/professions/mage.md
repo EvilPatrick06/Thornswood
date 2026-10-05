@@ -35,9 +35,10 @@ Learning a spell spends one. A novice spell needs no spell below it.
 Anything higher needs a spell of that school one rank down, and needs
 your rank in that school to be at least the spell's rank.
 
-Someone a master taught is not a mage. They hold 2 places, not points,
-they stay at novice, and they learn from the tome. That cap is on the
-magic page.
+Someone a master taught is not a mage. They hold 2 places, not a
+mage's points: each spell takes a place and a point from a semester at
+the College. They stay at novice, and they learn from the tome. That
+cap is on the magic page.
 
 ## How the schools climb
 

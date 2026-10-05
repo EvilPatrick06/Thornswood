@@ -300,6 +300,7 @@ jobs:
                  'test-1127-unplaceable-tomes.js',
                  'test-1386-warrior.js',
                  'test-1387-college.js',
+                 'test-1148-semester-points.js',
                  'test-1149-pick-spell-tome.js',
                  'test-python-defaults.js',
                  'test-1388-apprentice.js',

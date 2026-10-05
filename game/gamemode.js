@@ -32490,9 +32490,10 @@ log('gamemode loaded:',
     spells anyone can learn that way'. So what they can spend is the smaller
     of the points they hold and the places left under the cap, and the cap
     cannot be got round by holding points. Until #1387 applied the semester
-    nothing gave them a point, and the places alone were what they spent;
-    whether the places alone should still be enough is asked on #1387, and
-    placesLeft(s) on its own in the line below is that answer.
+    nothing gave them a point, and the places alone were what they spent.
+    Patrick decided on 4 October that they need both (#1387, "Patrick's
+    answers"): that is the Math.min below, and placesLeft(s) on its own
+    would be the answer he did not choose.
   */
   function placesLeft(s) {
     var known = (s.spells && s.spells.known) || [];
