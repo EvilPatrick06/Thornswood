@@ -59,7 +59,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -1843,7 +1843,57 @@ const server = http.createServer((req, res) => {
   });
 });
 
+/*
+  WHICH PAGES MAY OPEN A SOCKET HERE (#1321).
+
+  A browser names the page that opens a socket in Origin, and the page cannot
+  change it. Nothing read it, so any website could open sockets to this
+  service from its visitors' browsers: measured on 5 October, a handshake with
+  Origin https://evil.example was answered 101 and its join welcomed. This
+  service sets no cookie and a join proves itself with its own token, so such
+  a socket borrows nothing of the visitor's; what it gets is each visitor's
+  browser, from that visitor's address, as a client for free.
+
+  So a browser's socket must come from this service's own page: an Origin
+  that names the host the request was made to, straight or through Caddy,
+  which passes Host on as it came. The game's pages and the launcher's voice
+  page are loaded off disk and say null (file:// in older Chromium), and are
+  let in. No Origin at all is not a browser (a harness, a script), which this
+  was never meant to stop. Anything else is refused before the handshake.
+
+  What this cannot close: a sandboxed frame on any website also says null,
+  and nothing in the request tells it apart from the game's own page.
+*/
+function originAllowed(req) {
+  const o = req.headers.origin;
+  if (o === undefined) return true;
+  const s = String(o).trim().toLowerCase();
+  if (s === 'null' || s === 'file://') return true;
+  let page, asked;
+  try { page = new URL(s); asked = new URL(page.protocol + '//' + String(req.headers.host || '')); }
+  catch (e) { return false; }
+  return !!asked.host && page.host === asked.host;
+}
+let originRefused = 0;
+let originSaidAt = 0;
+
 server.on('upgrade', (req, socket, head) => {
+  if (!originAllowed(req)) {
+    originRefused++;
+    // Once a minute at most, so a busy website cannot fill the log.
+    if (Date.now() - originSaidAt > 60000) {
+      originSaidAt = Date.now();
+      console.log('[voice] refused a socket opened by a page on ' + JSON.stringify(String(req.headers.origin).slice(0, 100)) +
+                  ' (' + originRefused + ' refused so far): only this service\'s own page and the game\'s may open one');
+    }
+    // The HTTP server took its own error listener off this socket when it
+    // handed the upgrade over, so without one a refused page that has
+    // already gone (a reset as the answer is written) stops the whole
+    // service. The socket is being closed either way.
+    socket.on('error', () => { });
+    socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+    return;
+  }
   const key = req.headers['sec-websocket-key'];
   if (!key) { socket.destroy(); return; }
   socket.write(
