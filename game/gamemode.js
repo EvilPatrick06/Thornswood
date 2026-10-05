@@ -42508,7 +42508,7 @@ log('gamemode loaded:',
     if (word === '/plant' || word === '/claim' || word === '/plot' ||
         word === '/deed' || word === '/deeds' || word === '/lock' ||
         word === '/unlock' || word === '/mold' || word === '/moldhere' || word === '/key' ||
-        word === '/steward' || word === '/evict' || word === '/box' ||
+        word === '/jarl' || word === '/steward' || word === '/evict' || word === '/box' ||
         word === '/rent' || word === '/sleephere' || word === '/notice' || word === '/job' ||
         word === '/board' || word === '/take' || word === '/jobs' ||
         word === '/haul' ||
