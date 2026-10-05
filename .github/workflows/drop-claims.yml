@@ -1,0 +1,61 @@
+# When an issue closes, every claimed: label comes off it (#1863). A lane
+# marks what it is on with a claimed: <lane> label, and a pull request's
+# Closes #N closes the issue without touching labels: the board's "Item
+# closed" workflow moves the card and nothing else, and only the Claude
+# agents' tw-unclaim takes its own lane's label off. On 5 Oct five closed
+# issues still carried one (#1580, #1379, #1167, #1081, #608) and were
+# cleared by hand (#1123). Patrick, 5 Oct: yes, a workflow that removes them.
+#
+# WHAT IT DOES. It checks out nothing and runs nothing from the repository.
+# The label names come from the event through the environment, never pasted
+# into the script, and each claimed: label is one DELETE with the run's own
+# token, which can do nothing but edit issues. A label that is already off
+# (a lane's own finish step got there first, so GitHub answers 404) is said
+# and passed over; any other answer turns the run red.
+#
+# WHERE IT RUNS. On the VPS runners, [self-hosted, Windows, thornswood-vps],
+# the same as build.yml, nightly.yml and release.yml: GitHub's own runners
+# have been blocked on billing since 25 Sep (#437), so they are the only
+# runners this repository has. A label edit needs no checkout, but it still
+# needs a runner to make the call. The job only starts when the closed issue
+# carries a claimed label, so a close with none takes no runner slot; one
+# that has one takes a few seconds of one.
+name: Drop claims on close
+on:
+  issues:
+    types: [closed]
+permissions:
+  issues: write
+jobs:
+  drop:
+    name: Drop claims
+    if: ${{ contains(join(github.event.issue.labels.*.name, '|'), 'claimed') }}
+    runs-on: [self-hosted, Windows, thornswood-vps]
+    # One call per label. Past this it is stuck, not slow.
+    timeout-minutes: 2
+    steps:
+      - name: Remove every claimed label from the closed issue
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+          LABELS: ${{ toJSON(github.event.issue.labels.*.name) }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $h = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
+          $claims = @(@($env:LABELS | ConvertFrom-Json) | Where-Object { $_ -like 'claimed*' })
+          foreach ($l in $claims) {
+            $u = "https://api.github.com/repos/$env:GITHUB_REPOSITORY/issues/$env:ISSUE/labels/" + [Uri]::EscapeDataString($l)
+            try {
+              Invoke-RestMethod -Method Delete -Uri $u -Headers $h | Out-Null
+              Write-Host "removed $l from #$env:ISSUE"
+            } catch {
+              # 404 is GitHub saying the label is not on the issue: something
+              # else took it off between the close and this run, which is the
+              # state this run is for. Anything else is a failure and is red.
+              $r = $_.Exception.Response
+              if ($r -and [int]$r.StatusCode -eq 404) { Write-Host "$l was already off #$env:ISSUE" }
+              else { throw }
+            }
+          }
+          Write-Host ("#{0}: {1} claimed label(s) handled" -f $env:ISSUE, $claims.Count)
