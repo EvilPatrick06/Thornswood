@@ -1551,7 +1551,8 @@ $COLLAPSED_SMELT_EDITOR_IDS = [ordered]@{
 # because #613 kept it out of the owned bucket and tests\test-613-dwarven-ingot-collapse.js
 # holds it there, and the gamemode gates it by hand in KEPT_SMELT as novice
 # Platewright work. Its reason says so instead of the smelter's "open to
-# everybody", which #1400 wrote into recipes.json by hand and a rebuild undid.
+# everybody", which #1400 wrote into recipes.json by hand and a rebuild would
+# have undone.
 $OPEN_ROW_WHY = [ordered]@{
     'RecipeIngotDwarvenScrapPlateMetalLarge' = 'a smelter makes ingots, which are stock rather than a finished good. Both halves of the Smith need them, and a Miner who could not smelt his own ore would have nothing to sell. Smith work at novice, so both smith halves can do it. Not open to anybody.'
 }
@@ -1890,7 +1891,7 @@ $RECIPE_OWNER = [ordered]@{
     'RecipeLeatherStrips'        = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Leather'; Why = 'The one row kept for this leather. Platewright work, as the smith page says. Not anybody''s.' }
 }
 
-# FOUR NAMED RECIPES WHOSE RANK IS A DECISION RATHER THAN A READING.
+# NAMED RECIPES WHOSE RANK IS A DECISION RATHER THAN A READING.
 #
 # The charcoal grades. gamemode.js burnCharcoal hands over one of four grades by
 # rankStep(actorId, 'charburner'): Poor Charcoal at novice, Charcoal at advanced,
