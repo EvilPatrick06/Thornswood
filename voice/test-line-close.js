@@ -36,6 +36,13 @@ function yes(what, cond) {
   else { fail++; console.log('FAIL  ' + what); }
 }
 
+/*
+  How long any one answer is waited for before the wait gives up and says
+  what did not come. Each check waits for the thing it reads (#1926), so this
+  only ends a wait on a service that is stuck, as listening() does.
+*/
+const BOUND_MS = 15000;
+
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-lineclose-'));
 fs.copyFileSync(path.join(__dirname, 'voice-server.js'), path.join(dir, 'voice-server.js'));
 fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
@@ -119,8 +126,6 @@ function done(code) {
   }, 300).unref();
 }
 
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-
 async function ready() {
   const r = await fetch('http://127.0.0.1:' + PORT + '/health');
   if (!r.ok) { throw new Error('the service answered /health with ' + r.status + '. log:\n' + log); }
@@ -130,11 +135,13 @@ async function ready() {
 function person(profileId, name) {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket('ws://127.0.0.1:' + PORT + '/', ['thornswood', tokenFor(profileId)]);
-    const me = { ws: ws, peer: 0 };
+    const me = { ws: ws, name: name, peer: 0, pongs: [], closed: null };
+    me.closed = new Promise((ok) => { ws.addEventListener('close', ok); });
     ws.onopen = () => ws.send(JSON.stringify({ t: 'join', profileId: profileId, name: name }));
     ws.onmessage = (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
       if (m.t === 'welcome') { me.peer = m.peer; resolve(me); }
+      if (m.t === 'pong') { const p = me.pongs.shift(); if (p) { p(); } }
     };
     ws.onerror = () => reject(new Error('socket error joining as ' + name));
     setTimeout(() => reject(new Error('no welcome for ' + name + ' in four seconds')), 4000);
@@ -144,7 +151,48 @@ const say = (p, text) => p.ws.send(JSON.stringify({ t: 'chat', text: text }));
 async function commands() {
   return (await (await fetch('http://127.0.0.1:' + PORT + '/commands')).json());
 }
-async function shut(p) { p.ws.close(); await wait(300); }
+
+/*
+  A page's own ping, answered once the service has handled everything this
+  socket sent before it (#519), so every command said before it is queued
+  by the time the pong is in. This used to ask /commands 200 ms after
+  sending instead, so on a busy machine a command could still be on its way
+  (#1926).
+*/
+function settle(p) {
+  return new Promise((ok, bad) => {
+    const late = setTimeout(() => bad(new Error('no pong to a ping from ' + p.name + ' within ' + BOUND_MS / 1000 + ' s')), BOUND_MS);
+    p.pongs.push(() => { clearTimeout(late); ok(); });
+    p.ws.send(JSON.stringify({ t: 'ping' }));
+  });
+}
+
+/*
+  Closed, and resolved once the service has answered the close frame and
+  the socket is gone. The service writes that answer and runs the leaving
+  (lineClosed) in the same turn, so what /commands says after this is all
+  the close did. It used to give the close 300 ms (#1926).
+*/
+function shut(p) {
+  return new Promise((ok, bad) => {
+    const late = setTimeout(() => bad(new Error('the socket of ' + p.name + ' was not closed within ' + BOUND_MS / 1000 + ' s')), BOUND_MS);
+    p.closed.then(() => { clearTimeout(late); ok(); });
+    p.ws.close();
+  });
+}
+
+/* Whether the service's log says it, waited for until the line has come
+   through its pipe. The line is written before what it goes with, but on
+   another pipe, and on a busy machine that can come first (#1867). */
+function logSays(re) {
+  return new Promise((ok) => {
+    if (re.test(log)) { ok(true); return; }
+    const said = () => { if (re.test(log)) { end(true); } };
+    const late = setTimeout(() => end(false), BOUND_MS);
+    function end(v) { clearTimeout(late); srv.stdout.removeListener('data', said); ok(v); }
+    srv.stdout.on('data', said);
+  });
+}
 
 (async () => {
   await start();
@@ -155,7 +203,7 @@ async function shut(p) { p.ws.close(); await wait(300); }
   // ---- a waiting menu closes -------------------------------------------------
   const waiter = await person(501, 'Waiter');
   say(waiter, '/line');
-  await wait(200);
+  await settle(waiter);
   let got = await commands();
   const boot1 = got.boot;
   yes('GET /commands carries the boot stamp', typeof boot1 === 'string' && boot1.length >= 8);
@@ -167,13 +215,13 @@ async function shut(p) { p.ws.close(); await wait(300); }
   yes('the waiting socket closing tells the game server at once: "/line gone" under that profile',
       gone.length === 1 && gone[0].profileId === 501);
   yes('marked relay, so the gamemode knows it is the service and not a person', gone[0] && gone[0].relay === true);
-  yes('and the service log says so', /profile 501 was waiting in line and its connection closed/.test(log));
+  yes('and the service log says so', await logSays(/profile 501 was waiting in line and its connection closed/));
 
   // ---- somebody who never waited, or stopped waiting ---------------------------
   const walker = await person(502, 'Walker');
   say(walker, 'hello');
   say(walker, '/roll 20');
-  await wait(200);
+  await settle(walker);
   await commands();
   await shut(walker);
   got = await commands();
@@ -182,7 +230,7 @@ async function shut(p) { p.ws.close(); await wait(300); }
   const leaver = await person(503, 'Leaver');
   say(leaver, '/line');
   say(leaver, '/line leave');
-  await wait(200);
+  await settle(leaver);
   await commands();
   await shut(leaver);
   got = await commands();
@@ -193,7 +241,8 @@ async function shut(p) { p.ws.close(); await wait(300); }
   const a = await person(504, 'Twice');
   const b = await person(504, 'Twice');
   say(a, '/line'); say(b, '/line');
-  await wait(200);
+  await settle(a);
+  await settle(b);
   await commands();
   await shut(a);
   got = await commands();
@@ -206,7 +255,7 @@ async function shut(p) { p.ws.close(); await wait(300); }
   // ---- moved out for being idle ---------------------------------------------------
   const idle = await person(505, 'Idle');
   say(idle, '/afk out');
-  await wait(200);
+  await settle(idle);
   await commands();
   await shut(idle);
   got = await commands();
@@ -216,9 +265,10 @@ async function shut(p) { p.ws.close(); await wait(300); }
   // ---- a typed "/line gone" -------------------------------------------------------
   const typer = await person(506, 'Typer');
   say(typer, '/line gone');
-  await wait(200);
+  await settle(typer);
   got = await commands();
   yes('a person typing "/line gone" is not marked relay, so the gamemode does not take it',
+      got.commands.filter((c) => c.text === '/line gone').length === 1 &&
       got.commands.filter((c) => c.text === '/line gone').every((c) => c.relay === false));
   await shut(typer);
 

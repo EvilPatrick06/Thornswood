@@ -36,6 +36,40 @@ function check(what, got, want) {
   else { fail++; console.log('FAIL  ' + what + '\n      wanted [' + want + '] got [' + got + ']'); }
 }
 
+/*
+  How long any one answer is waited for before the wait gives up and says
+  what did not come. Each check waits for the thing it reads (#1926), so this
+  only ends a wait on a service that is stuck, as listening() does.
+*/
+const BOUND_MS = 15000;
+// A masked empty pong, as a browser answers a ping, and a masked empty ping.
+const PONG = Buffer.from([0x8a, 0x80, 0, 0, 0, 0]);
+const PING = Buffer.from([0x89, 0x80, 0, 0, 0, 0]);
+
+/* A wait for one thing: resolves true when its hit() is called by whoever
+   hears the thing, or false after BOUND_MS. */
+function waitFor() {
+  let hit = null;
+  const p = new Promise((ok) => {
+    const late = setTimeout(() => ok(false), BOUND_MS);
+    hit = () => { clearTimeout(late); ok(true); };
+  });
+  p.hit = hit;
+  return p;
+}
+
+/* Whether the service's log says it, waited for until the line has come
+   through its pipe. The line is written as the thing happens, but on
+   another pipe, and on a busy machine what goes with it can come first
+   (#1867). */
+function logSays(re) {
+  if (re.test(log)) { return Promise.resolve(true); }
+  const w = waitFor();
+  const said = () => { if (re.test(log)) { w.hit(); } };
+  srv.stdout.on('data', said);
+  return w.then((v) => { srv.stdout.removeListener('data', said); return v; });
+}
+
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-keepalive-'));
 for (const f of ['voice-server.js', 'headlines.js']) {
   fs.copyFileSync(path.join(__dirname, f), path.join(dir, f));
@@ -235,8 +269,22 @@ function textFrame(obj) {
   const after = await nextFrame(sock, PING_MS * 8);
   check('a pong back is taken quietly and the pings continue', after && after.op, 9);
 
+  /*
+    The service has had the socket's going to trip over once a second ping
+    round has reached another socket: the first round may have been on its
+    way already, but the second is written a ping later, after the service
+    has heard the socket go and has written to everything it still holds.
+    This used to ask 300 ms after the destroy, which is one ping on a quiet
+    machine and can be none on a busy one (#1926).
+  */
+  const other = await open(520);
   try { sock.destroy(); } catch (e) { }
-  await new Promise((r) => setTimeout(r, 300));
+  const o1 = await nextFrame(other.sock, BOUND_MS);
+  other.sock.write(PONG);
+  const o2 = await nextFrame(other.sock, BOUND_MS);
+  try { other.sock.destroy(); } catch (e) { }
+  check('another socket is pinged twice after it (' + (o1 && o1.op) + ', ' + (o2 && o2.op) + ')',
+        !!o1 && !!o2 && o1.op === 9 && o2.op === 9, true);
   check('the service is still up after the socket goes',
         (await (await fetch('http://127.0.0.1:' + PORT + '/health')).json()).build === h.build, true);
 
@@ -249,26 +297,35 @@ function textFrame(obj) {
   const silent = await open(518);
   let silentClosedAt = 0;
   const silentFrom = Date.now();
-  silent.sock.on('close', () => { silentClosedAt = Date.now(); });
+  // Its close, as it comes, rather than looked for every 100 ms (#1926).
+  const silentClosed = waitFor();
+  silent.sock.on('close', () => { silentClosedAt = Date.now(); silentClosed.hit(); });
   silent.sock.on('data', () => { });                  // reads, never answers
-  for (let i = 0; i < 40 && !silentClosedAt; i++) { await sleep(100); }
+  await silentClosed;
   check('a socket that answers nothing is closed by the service', silentClosedAt > 0, true);
   check('after about three pings, not before (' + (silentClosedAt - silentFrom) + ' ms)',
         silentClosedAt - silentFrom >= SILENT_MS - PING_MS && silentClosedAt - silentFrom <= SILENT_MS + 3 * PING_MS, true);
   const h2 = await (await fetch('http://127.0.0.1:' + PORT + '/health')).json();
   check('/health counts it', h2.closedSilent >= 1, true);
-  check('and the service log says so', /answered nothing for \d+ s/.test(log), true);
+  check('and the service log says so', await logSays(/answered nothing for \d+ s/), true);
 
   // One that answers every ping the way a browser does stays, however long.
   const talks = await open(519);
   let talksClosed = false;
   const got = [];
-  talks.sock.on('close', () => { talksClosed = true; });
+  // What is waited for next on this socket: a pong frame, a pong message,
+  // the socket's close.
+  let onPongFrame = null, onPong = null;
+  const talksGone = waitFor();
+  talks.sock.on('close', () => { talksClosed = true; talksGone.hit(); });
   frames(talks.sock, (op, body) => {
-    if (op === 9) { talks.sock.write(Buffer.from([0x8a, 0x80, 0, 0, 0, 0])); return; }
+    if (op === 9) { if (!talks.sock.writableEnded) { talks.sock.write(PONG); } return; }
+    if (op === 0xa) { if (onPongFrame) { onPongFrame(); } return; }
     if (op !== 1) { return; }
     try { got.push(JSON.parse(body.toString('utf8'))); } catch (e) { }
+    if (got[got.length - 1] && got[got.length - 1].t === 'pong' && onPong) { onPong(); }
   });
+  // A pause for time itself, which stays: kept this long is what is checked.
   await sleep(SILENT_MS * 3);
   check('a socket that answers its pings is kept, three times as long', talksClosed, false);
 
@@ -278,27 +335,46 @@ function textFrame(obj) {
     socket that way. It sends { t: 'ping' } and the service answers with
     { t: 'pong' }, which the page can see.
   */
+  /*
+    The page ping before the join is followed by a ping frame, which the
+    service answers with a pong frame once it has handled what came before
+    it on this socket. So by that pong, an answer to the page ping would have
+    come. This used to read 300 ms after sending it (#1926).
+  */
+  let heard = waitFor();
+  onPongFrame = heard.hit;
   talks.sock.write(textFrame({ t: 'ping' }));
-  await sleep(300);
-  check('a page ping before it has joined is not answered', got.some((m) => m.t === 'pong'), false);
+  talks.sock.write(PING);
+  const framed = await heard;
+  onPongFrame = null;
+  check('a page ping before it has joined is not answered (pong frame after it: ' + framed + ')',
+        framed && !got.some((m) => m.t === 'pong'), true);
+  heard = waitFor();
+  onPong = heard.hit;
   talks.sock.write(textFrame({ t: 'join', profileId: 519, name: 'keepalive' }));
   talks.sock.write(textFrame({ t: 'ping' }));
-  for (let i = 0; i < 20 && !got.some((m) => m.t === 'pong'); i++) { await sleep(100); }
-  check('a page ping once joined is answered with a pong', got.some((m) => m.t === 'pong'), true);
+  check('a page ping once joined is answered with a pong', await heard, true);
   check('it is in the room', (await (await fetch('http://127.0.0.1:' + PORT + '/health')).json()).peers, 1);
 
   /*
     Its end shut with no close frame, a process killed or a tab gone. The
-    service used to notice only when its next write failed, so a socket sent
-    nothing stayed in the room. It goes at once now, well inside a ping.
+    service used to notice only when its next write failed, or here once the
+    socket had been silent for SILENT_MS, so a socket sent nothing stayed in
+    the room. It goes at once now.
+
+    So this waits for the socket to close at this end, which is the service
+    letting it go, and then asks /health: out of the room, and not counted
+    as closed for silence. It used to look every 20 ms for a tenth of a
+    second or so, which a busy machine can let pass (#1926).
   */
+  const silentBefore = (await (await fetch('http://127.0.0.1:' + PORT + '/health')).json()).closedSilent;
   talks.sock.end();
-  let left = false;
-  for (let i = 0; i < 10 && !left; i++) {
-    await sleep(20);
-    left = (await (await fetch('http://127.0.0.1:' + PORT + '/health')).json()).peers === 0;
-  }
-  check('a socket whose other end shuts leaves the room before the next ping', left, true);
+  const shut = await talksGone;
+  const h3 = await (await fetch('http://127.0.0.1:' + PORT + '/health')).json();
+  check('a socket whose other end shuts is closed and leaves the room (closed ' + shut + ', ' + h3.peers + ' in the room)',
+        shut && h3.peers === 0, true);
+  check('at once, not found silent later (' + (h3.closedSilent - silentBefore) + ' closed for silence)',
+        h3.closedSilent - silentBefore, 0);
   try { talks.sock.destroy(); } catch (e) { }
 
   console.log('');
