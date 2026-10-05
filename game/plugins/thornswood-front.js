@@ -83,7 +83,8 @@
   const OVERLAYS = ['thornswood-chat.js', 'thornswood-emotes.js', 'thornswood-voice.js',
                     'thornswood-skills.js', 'thornswood-party.js',
                     'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js',
-                    'thornswood-repair.js', 'thornswood-maneuvers.js', 'thornswood-ride.js', 'thornswood-afk.js'];
+                    'thornswood-repair.js', 'thornswood-treat.js', 'thornswood-maneuvers.js', 'thornswood-ride.js',
+                    'thornswood-afk.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -371,6 +372,23 @@
   */
   const APPRENTICE_KEY = SKILLS_KEY;
   /*
+    "Tend their wounds" on the look prompt (#1383). THE LOCK KEY, X, and not
+    a new one: every letter is already Skyrim's or ours. The two never meet:
+    the lock key answers only with a door, a crop or a forge under the
+    crosshair (lockKeyNow), and this only with a person the server's near
+    list says has a wound to tend. Rebinding LockKey moves both, and its
+    Controls row says so. See treatPress.
+  */
+  const TREAT_KEY = LOCK_KEY;
+  /*
+    "Tend your wounds" in the inventory (#1383). THE TRADE KEY, H: in the
+    inventory the social keys refuse to act, Skyrim's controlmap.txt binds
+    nothing to H (measured 24 September, tests/test-creation-close.js), and
+    U, the key the repair kit uses there, can be up at the same time as this.
+    See treatSelfPress.
+  */
+  const TREAT_SELF_KEY = TRADE_KEY;
+  /*
     A warrior's maneuvers (#1386): opens the maneuver panel. 9, scan code 10:
     1 to 8 are the emote slots and the game's own hotkeys, and every letter is
     already one of ours or the game's.
@@ -397,6 +415,8 @@
   const APPRENTICE_NAME = keyName(APPRENTICE_KEY);
   const LOCK_NAME = keyName(LOCK_KEY);
   const MANEUVER_NAME = keyName(MANEUVER_KEY);
+  const TREAT_NAME = keyName(TREAT_KEY);
+  const TREAT_SELF_NAME = keyName(TREAT_SELF_KEY);
   /*
     HANDING OVER A LETTER (#1595). Patrick, 4 Oct: /deliver becomes a key on
     the look prompt, shown while you carry a letter for the person under the
@@ -1915,7 +1935,7 @@
   */
   const CAP_CLOSES = {
     skills: 'thornswoodSkills', party: 'thornswoodParty', journal: 'thornswoodJournal',
-    board: 'thornswoodBoard', repair: 'thornswoodRepair',
+    board: 'thornswoodBoard', repair: 'thornswoodRepair', treat: 'thornswoodTreat',
     trade: 'thornswoodTrade', merchant: 'thornswoodMerchant', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
     afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers', ride: 'thornswoodRide'
   };
@@ -4528,7 +4548,7 @@
   /** Draw or clear the little panel that names them and the three keys. */
   function drawPrompt(row) {
     const sig = row ? (row.n + '|' + row.f + '|' + row.m + '|' + row.y + '|' + (row.s || 0) + '|' + (row.c || '') +
-                       '|' + (row.d || 0) + '|' + (row.a ? JSON.stringify(row.a) : '')) : '';
+                       '|' + (row.d || 0) + '|' + (row.a ? JSON.stringify(row.a) : '') + '|' + (row.t || 0)) : '';
     if (sig === lookingSig) { return; }
     lookingSig = sig;
     if (!row) {
@@ -4572,7 +4592,10 @@
       // Only for a Master looking at somebody they could take on: the
       // server's near list says so, with the halves (#1634). See
       // apprenticePress.
-      (Array.isArray(row.a) && row.a.length ? keyRow(APPRENTICE_NAME, 'Take on as apprentice', false) : '');
+      (Array.isArray(row.a) && row.a.length ? keyRow(APPRENTICE_NAME, 'Take on as apprentice', false) : '') +
+      // Only while they have a wound somebody could tend: the near list's t
+      // (#1383). See treatPress.
+      (row.t ? keyRow(TREAT_NAME, 'Tend their wounds', false) : '');
 
     T.js('(function(){try{' +
          'var d=document.getElementById("ts-look");' +
@@ -4712,6 +4735,24 @@
          'window.thornswoodSkills.takeOn(' + JSON.stringify(who) + ');}}catch(e){}');
     say('take on as apprentice: ' + lookingAt);
     return true;
+  }
+
+  /*
+    Tend the wounds of the person under the crosshair (#1383). Only while the
+    prompt offers it, which is the server's near list saying they have a
+    wound somebody could tend. It sends /treat with their form id, and the
+    server answers with the treatment panel for them (game/ui/thornswood-treat.js),
+    measuring the reach again. Answers whether it was used, so X falls
+    through when it was not.
+  */
+  function treatPress() {
+    if (!lookingAt) { return false; }
+    if (claims.chat) { return false; }
+    if (busyMenuOpenNow()) { return false; }
+    const near = nearList();
+    const row = (near && Object.prototype.hasOwnProperty.call(near, lookingAt)) ? near[lookingAt] : null;
+    if (!row || !row.t) { return false; }
+    return lookVerb('treat');
   }
 
   /*
@@ -5400,6 +5441,82 @@
     catch (err) { say('repair: closeMenu threw on the inventory: ' + err); }
     tellServer('/repair');
     say('pressed ' + MOLD_NAME + ' in the inventory with a repair kit, asked the server for the repair panel');
+    return true;
+  }
+
+  /*
+    ------------------------------------- your own wounds, tended from the inventory
+
+    #1383. A bandage, a splint, a poultice and a physicker's remedy are MISC
+    records, which Skyrim's inventory cannot use, and torn cloth and setting
+    a bone are no item at all. So it is the repair kit's pattern: while the
+    inventory is open and you have a wound somebody could tend, one line at
+    the bottom names a key, and that key shuts the inventory and asks the
+    server for the treatment panel (game/ui/thornswood-treat.js), whose
+    buttons send the rest. /treat is that ask; nobody is told to type it.
+
+    Whether there is anything to tend is the server's: its injury and
+    disease block writes it on your own record, and the owner's script puts
+    it on thornswoodHurtCare. Above the repair line, so both can be up.
+  */
+  let treatSelfShown = false;
+  const TREAT_SELF_CSS = REPAIR_CSS.replace('bottom:12%', 'bottom:17%');
+
+  function hurtCare() {
+    try { return !!globalThis.thornswoodHurtCare; } catch (e) { return false; }
+  }
+
+  /** The line up or down. Only remembered once the page has taken it. */
+  function drawTreatSelfLine(on) {
+    if (on === treatSelfShown) { return; }
+    if (!on) {
+      if (T.js('try{var d=document.getElementById("ts-treat-line");if(d){d.style.display="none";}}catch(e){}')) {
+        treatSelfShown = false;
+      }
+      return;
+    }
+    const html =
+      '<span style="display:inline-block;min-width:26px;text-align:center;margin-right:12px;' +
+      'padding:1px 7px;border:1px solid rgba(233,209,155,.55);border-bottom-width:2px;' +
+      'border-radius:3px;background:rgba(0,0,0,.35);color:#e9d19b">' + TREAT_SELF_NAME + '</span>' +
+      'Tend your wounds';
+    if (T.js('(function(){try{' +
+             'var d=document.getElementById("ts-treat-line");' +
+             'if(!d){d=document.createElement("div");d.id="ts-treat-line";' +
+             'd.style.cssText=' + JSON.stringify(TREAT_SELF_CSS) + ';' +
+             'document.body.appendChild(d);}' +
+             'd.innerHTML=' + JSON.stringify(html) + ';' +
+             'd.style.display="";' +
+             '}catch(e){}})();')) {
+      treatSelfShown = true;
+    }
+  }
+
+  sp.on('menuOpen', guard('treat line up', (e) => {
+    if (!e || e.name !== INVENTORY_MENU) { return; }
+    drawTreatSelfLine(!!T.ready && hurtCare());
+  }));
+  sp.on('menuClose', guard('treat line down', (e) => {
+    if (!e || e.name !== INVENTORY_MENU) { return; }
+    drawTreatSelfLine(false);
+  }));
+
+  /*
+    The key, in the inventory. Asked again at the press: the inventory open,
+    nothing typing, something to tend. Answers whether it was used, so the
+    key falls through when it was not.
+  */
+  function treatSelfPress() {
+    if (!T.ready || claims.chat) { return false; }
+    let open = false;
+    try { open = !!sp.Ui.isMenuOpen(INVENTORY_MENU); } catch (e) { open = false; }
+    if (!open) { return false; }
+    if (!hurtCare()) { drawTreatSelfLine(false); return false; }
+    drawTreatSelfLine(false);
+    try { sp.TESModPlatform.closeMenu(INVENTORY_MENU); }
+    catch (err) { say('treat: closeMenu threw on the inventory: ' + err); }
+    tellServer('/treat');
+    say('pressed ' + TREAT_SELF_NAME + ' in the inventory with a wound to tend, asked the server for the treatment panel');
     return true;
   }
 
@@ -7715,6 +7832,10 @@
     // The same key in the inventory, with a repair kit in the pack (#1384).
     if (e.code === MOLD_KEY && repairPress()) { return; }
     if (e.code === LOCK_KEY && lockPress()) { return; }
+    // The same key on a hurt person under the crosshair (#1383). See TREAT_KEY.
+    if (e.code === TREAT_KEY && treatPress()) { return; }
+    // The trade key in the inventory, with a wound to tend (#1383). See TREAT_SELF_KEY.
+    if (e.code === TREAT_SELF_KEY && treatSelfPress()) { return; }
     /*
       The five social keys work in the open world, and P and J can always
       close their own panel. Djinn on dev, 24 September: "The party menu
@@ -8664,6 +8785,9 @@
     if (what === 'repair:opened') { T.claimFocus('repair', true); return; }
     if (what === 'repair:closed') { T.claimFocus('repair', false); return; }
     if (what === 'repair:ready') { log('the repair panel is in'); return; }
+    if (what === 'treat:opened') { T.claimFocus('treat', true); return; }
+    if (what === 'treat:closed') { T.claimFocus('treat', false); return; }
+    if (what === 'treat:ready') { log('the treatment panel is in'); return; }
     if (what === 'merchant:opened') { T.claimFocus('merchant', true); return; }
     if (what === 'merchant:closed') { T.claimFocus('merchant', false); return; }
     if (what === 'merchant:ready') {

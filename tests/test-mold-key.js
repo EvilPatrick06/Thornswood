@@ -279,6 +279,12 @@ function client(opt) {
     // and what it does is test-lock-keypress.js's business.
     'const LOCK_KEY = iniNumber(iniText, "LockKey", 45);',
     'function lockPress() { return false; }',
+    // Tend their wounds (#1383), X on a hurt person, and Tend your wounds,
+    // H in the inventory. Nobody is looked at and no inventory is open
+    // here; test-1383-treatments.js has what they do.
+    'const TREAT_KEY = LOCK_KEY, TREAT_SELF_KEY = 35;',
+    'function treatPress() { return false; }',
+    'function treatSelfPress() { return false; }',
     PIECES_FRONT.mold,
     // The same key after the mold says no: sleeping on a person inside a
     // building you hold (#1603, SLEEP_KEY is MOLD_KEY in the plugin) and a

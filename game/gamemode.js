@@ -45439,6 +45439,12 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
   if (hurt && hurt.hit) {
     try { hurt.hit(targetId, aggressor, source); } catch (e) { log('injury: the hit threw:', e); }
   }
+  // A blow that opens a cut, a break or a bite (#1383), measured on the next
+  // turn in the same block. On its own as well.
+  if (hurt && hurt.blow) {
+    try { hurt.blow(targetId, aggressor, source, projectile, power, sneak, bash, blocked); }
+    catch (e) { log('injury: the blow threw:', e); }
+  }
 });
 // ==== end thornswood warrior maneuvers ====
 
@@ -47869,6 +47875,11 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // after the take limit. Deliberately absent from PLAYER_WORDS:
                // nothing people do is a command (Patrick, 4 October).
                '/repair',
+               // The treatment panel (#1383): sent by the inventory key, the
+               // look prompt's key and the panel's buttons, never typed, and
+               // so deliberately NOT in PLAYER_WORDS. See the injury and
+               // disease block.
+               '/treat',
                // The client's weather report and its "I am on fire". Never typed; see
                // the branches.
                '/place', '/burn', '/ate',
@@ -49974,6 +49985,18 @@ const PLAYER_WORDS = ['/ooc', '/where',
       if (!wear) { toProfile(profileId, 'Repair is not running on this server.'); return; }
       var mended = wear.panel(actorId, parts.slice(1));
       if (mended) { toProfile(profileId, mended); }
+      return;
+    }
+
+    // Tending wounds (#1383), from the inventory key, the look prompt's key
+    // and the treatment panel's buttons. The work is in the injury and
+    // disease block; this only hands it the character and the words.
+    if (word === '/treat') {
+      if (!needCharacter()) { return; }
+      var tending = g.__thornswoodHurt;
+      if (!tending || !tending.panel) { toProfile(profileId, 'Tending wounds is not running on this server.'); return; }
+      var tended = tending.panel(actorId, parts.slice(1));
+      if (tended) { toProfile(profileId, tended); }
       return;
     }
 
@@ -54420,9 +54443,16 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
                (#1382). It calls exposed() with what it was, and the chances
                are here, beside the disease they start.
     A cut, a break, a bite
-               the page does not say which blow opens which, so nothing in the
-               world opens one yet. The question is on #1383. Staff give one
-               with /hurt for a scene, and everything after that is real.
+               the blow that lands, by Patrick's answer on #1383 (blow, below):
+               a power or sneak attack with a blade or an axe, or an arrow or a
+               bolt, cuts; a power attack with a mace or a warhammer breaks an
+               arm or a leg; an animal that bites, bites. Staff can still give
+               one with /hurt for a scene.
+
+  WHAT TREATS THEM (treat, below): torn cloth, a bandage, a splint, a poultice
+  and a physicker's remedy, the last four items in Thornswood-Content.esp, and
+  a physicker setting a bone. Yours from the inventory, somebody else's from
+  the look prompt, both through one panel (game/ui/thornswood-treat.js).
 
   GOING DOWN IS NOT HERE, AND WHY. Health reaching zero is the engine's death.
   MpActor::Kill applies the death, sends it to every client and starts the
@@ -54507,8 +54537,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     minutes after showing make it bad.
 
     Bite sickness is not on the page's list of closest meters. It is a wound
-    disease that turns bad the way a fever does, so it reads as a fever does
-    until #1383 says otherwise.
+    disease that turns bad the way a fever does, so it reads as a fever does:
+    hunger and rest (Patrick's answer on #1383, 4 October).
   */
   var DISEASE = {
     chill:  { name: 'chill', meters: { cold: true }, lasts: 120, from: 'caught', bad: false },
@@ -54565,9 +54595,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   /*
     BENCHES THAT TAKE BOTH HANDS, by the keyword a bench carries (BENCH_BY_BASE).
     A broken arm and a missing hand refuse these. The page does not list them,
-    so this is a question on #1383: the forges, the armour table, the wheel,
-    the smelter, the tanning rack, the loom and the kiln. Cooking, brewing and
-    enchanting are not on it.
+    and Patrick's answer on #1383 (4 October) is these: the forges, the armour
+    table, the wheel, the smelter, the tanning rack, the loom and the kiln.
+    Cooking, brewing and enchanting are not on it.
   */
   var TWO_HANDS = {
     '88105:Skyrim.esm': 'the forge',
@@ -54639,6 +54669,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
   function write(actorId, rec) {
     rec.show = lines(rec, Date.now());
+    // Whether anybody could tend something here: the inventory's line and
+    // the look prompt's row are offered only then (#1383).
+    rec.care = needsCare(rec) ? 1 : 0;
     try { mp.set(actorId, HURT_PROPERTY, rec); return true; }
     catch (e) { hlog('could not write', actorId.toString(16) + ':', e); return false; }
   }
@@ -54754,7 +54787,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     THE BURN ON WHAT YOU WEAR. injury.md: clothing on that part counts at half
     for warmth until it heals. The server is not told where the fire touched
     and the client puts the flames on the whole body, so it is everything
-    worn, which is a question on #1383. The needs block's insulation() asks.
+    worn (Patrick's answer on #1383, 4 October). The needs block's
+    insulation() asks.
   */
   function burntWear(actorId) {
     var rec = read(actorId);
@@ -55163,6 +55197,185 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     tell(targetId, healed(targetId, s.rank));
   }
 
+  // ----------------------------------------------- the blow that opens one --
+
+  /*
+    WHICH BLOW OPENS A WOUND. Patrick's answer on #1383, 4 October:
+
+      a cut    an unblocked power or sneak attack with a blade or an axe, or
+               an arrow or a bolt that lands;
+      a break  an unblocked power attack with a mace or a warhammer, the arm
+               or the leg at even odds;
+      a bite   an unblocked hit from an animal that bites: a wolf, a dog, a
+               bear, a sabre cat, a skeever, a spider, a chaurus, a troll, a
+               horker or a slaughterfish.
+
+    A bash is a shove with the shield or the hilt, and a spell is none of
+    these. Held back until a bandage existed, because a cut only a mage could
+    stop would kill anybody else in about a minute.
+
+    WHAT THE WEAPON IS, off its record. The weapon type keyword Skyrim puts on
+    every weapon (WeapTypeSword and the rest), read by its editor id so no form
+    id is remembered here; failing that, the animation type, the first byte of
+    DNAM. A bow and a crossbow are told by the animation type alone, the way
+    the perks block tells them. The animation type cannot tell a battleaxe
+    from a warhammer, which swing alike, so without a keyword that one opens
+    nothing.
+
+    WHICH ANIMALS BITE is the warrior block's own lines of races by animal
+    (WARRIOR_KILL), so a wolf here is the same races a wolf is there, and the
+    race is the one the engine says the body has (raceEdidOf).
+
+    MEASURED, NOT ASSUMED. OnHit is raised before the engine works the damage
+    out, and a hit the engine then throws away raised it all the same. So
+    health is read at the event and again on the next turn, the way the perks
+    and the maneuvers measure a blow, and only a blow that took health and
+    left the person standing opens a wound. A blow that killed is the death.
+  */
+  var BITERS = ['wolf', 'dog', 'bear', 'sabre cat', 'skeever', 'spider', 'chaurus', 'troll',
+                'horker', 'slaughterfish'];
+  var WEAPON_TYPES = {
+    WeapTypeSword: 'blade', WeapTypeGreatsword: 'blade', WeapTypeDagger: 'blade',
+    WeapTypeWarAxe: 'axe', WeapTypeBattleaxe: 'axe',
+    WeapTypeMace: 'blunt', WeapTypeWarhammer: 'blunt'
+  };
+  // DNAM's animation type: 1 sword, 2 dagger, 3 war axe, 4 mace, 5 two handed
+  // sword, 7 bow, 9 crossbow. 6, the two handed axe, is a battleaxe or a hammer.
+  var BY_ANIM = { 1: 'blade', 2: 'blade', 3: 'axe', 4: 'blunt', 5: 'blade', 7: 'bow', 9: 'bow' };
+  var weaponKinds = {};
+  var biterRaces = null;
+
+  function recordOf(id) {
+    try { return mp.lookupEspmRecordById(id) || null; } catch (e) { return null; }
+  }
+  function fieldOf(res, type) {
+    var fields = (res && res.record && res.record.fields) || [];
+    for (var i = 0; i < fields.length; i++) {
+      if (fields[i] && String(fields[i].type) === type) { return fields[i].data || []; }
+    }
+    return null;
+  }
+  function textOf(v) {
+    if (typeof v === 'string') { return v; }
+    var out = '';
+    for (var i = 0; v && i < v.length && v[i]; i++) { out += String.fromCharCode(v[i]); }
+    return out;
+  }
+  function editorIdOf(res) {
+    var e = (res && res.record) ? textOf(res.record.editorId) : '';
+    return e || textOf(fieldOf(res, 'EDID'));
+  }
+
+  /* What landed it: 'blade', 'axe', 'blunt', 'bow', 'spell', or '' for a
+     fist, a claw or anything else. Asked once per base. */
+  function weaponKind(id) {
+    if (!id) { return ''; }
+    if (has(weaponKinds, id)) { return weaponKinds[id]; }
+    var kind = '';
+    var res = recordOf(id);
+    var type = (res && res.record) ? String(res.record.type || '') : '';
+    if (type === 'SPEL') { kind = 'spell'; }
+    if (type === 'WEAP') {
+      var dnam = fieldOf(res, 'DNAM');
+      var anim = (dnam && dnam.length) ? Number(dnam[0]) : -1;
+      if (anim === 7 || anim === 9) { kind = 'bow'; }
+      var kw = fieldOf(res, 'KWDA') || [];
+      for (var k = 0; !kind && k + 4 <= kw.length; k += 4) {
+        var local = (kw[k] | (kw[k + 1] << 8) | (kw[k + 2] << 16)) + kw[k + 3] * 0x1000000;
+        var global = local;
+        try {
+          if (typeof res.toGlobalRecordId === 'function') { global = Number(res.toGlobalRecordId(local)) || local; }
+        } catch (e) { global = local; }
+        var word = editorIdOf(recordOf(global));
+        if (has(WEAPON_TYPES, word)) { kind = WEAPON_TYPES[word]; }
+      }
+      if (!kind && has(BY_ANIM, anim)) { kind = BY_ANIM[anim]; }
+    }
+    weaponKinds[id] = kind;
+    return kind;
+  }
+
+  /* The races that bite, lower case, by the warrior block's lines. */
+  function bitingRaces() {
+    if (biterRaces) { return biterRaces; }
+    var out = {};
+    var rows = (typeof WARRIOR_KILL !== 'undefined' && WARRIOR_KILL)
+      ? WARRIOR_KILL.kinds.concat(WARRIOR_KILL.unnamed) : [];
+    for (var i = 0; i < rows.length; i++) {
+      if (BITERS.indexOf(rows[i][0]) === -1) { continue; }
+      for (var j = 0; j < rows[i][2].length; j++) { out[String(rows[i][2][j]).toLowerCase()] = rows[i][0]; }
+    }
+    biterRaces = out;
+    return out;
+  }
+
+  function idOfForm(v) {
+    if (typeof v === 'number') { return v; }
+    if (v && v.desc) {
+      try { return Number(mp.getIdFromDesc(String(v.desc))) || 0; } catch (e) { return 0; }
+    }
+    return 0;
+  }
+
+  /* 'cut', 'break', 'bite', or '' when this hit opens nothing. */
+  function woundFrom(aggressorId, sourceId, power, sneak, bash, blocked) {
+    if (blocked || bash) { return ''; }
+    var kind = weaponKind(sourceId);
+    if (kind === 'bow') { return 'cut'; }
+    if (kind === 'blade' || kind === 'axe') { return (power || sneak) ? 'cut' : ''; }
+    if (kind === 'blunt') { return power ? 'break' : ''; }
+    if (kind === 'spell') { return ''; }
+    var race = '';
+    try { race = (typeof raceEdidOf === 'function') ? String(raceEdidOf(aggressorId) || '') : ''; } catch (e) { race = ''; }
+    return (race && has(bitingRaces(), race.toLowerCase())) ? 'bite' : '';
+  }
+
+  function healthOf(id) {
+    try {
+      var p = mp.get(id, 'percentages');
+      return p ? Number(p.health) : -1;
+    } catch (e) { return -1; }
+  }
+
+  var blows = [];
+  var blowsQueued = false;
+
+  /* A hit, heard from onPapyrusEvent:OnHit: does it open a wound. */
+  function blow(targetId, aggressor, source, projectile, power, sneak, bash, blocked) {
+    var target = Number(targetId) || 0;
+    if (!target || !personal(target)) { return; }
+    var by = idOfForm(aggressor);
+    if (!by || by === target) { return; }
+    var k = woundFrom(by, idOfForm(source), !!power, !!sneak, !!bash, !!blocked);
+    if (!k) { return; }
+    var before = healthOf(target);
+    if (!(before > 0)) { return; }
+    blows.push({ target: target, k: k, before: before });
+    if (!blowsQueued) {
+      blowsQueued = true;
+      setTimeout(guard('hurtBlows', landed), 0);
+    }
+  }
+
+  /* The next turn: each blow that took health and left them standing opens its wound. */
+  function landed() {
+    blowsQueued = false;
+    var all = blows;
+    blows = [];
+    var now = Date.now();
+    for (var i = 0; i < all.length; i++) {
+      var b = all[i];
+      var dead = true;
+      try { dead = !!mp.get(b.target, 'isDead'); } catch (e) { dead = true; }
+      var after = healthOf(b.target);
+      if (dead || !(after > 0) || !(after < b.before)) { continue; }
+      var limb = (b.k === 'break') ? (Math.random() < 0.5 ? 'arm' : 'leg') : '';
+      var line = wound(b.target, b.k, limb, now);
+      if (line) { hlog(b.target.toString(16), 'took a', b.k, limb, 'from a blow'); }
+      tell(b.target, line);
+    }
+  }
+
   // --------------------------------------------------------- the cures --
 
   /* The one furthest along, then the oldest. Answers it, or null. */
@@ -55202,8 +55415,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     THE TEMPLE RITE: a shrine pressed inside one of the temples the wake uses
     (the stuck block's TEMPLES, the same cells). injury.md and disease.md: a
     temple sets breaks, clears a crooked heal and clears ordinary disease, and
-    does not clear an agreed loss. A wayside shrine is a blessing only. That
-    reading is a question on #1383. Answers a line, or ''.
+    does not clear an agreed loss. A wayside shrine is a blessing only
+    (Patrick's answer on #1383, 4 October). Answers a line, or ''.
   */
   function inTemple(actorId) {
     var cell = '';
@@ -55285,8 +55498,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     A DEATH. The temple stopped the death and did not wash the cuts
     (death.md), so every wound and disease stays on the record. The bleed
     stops: the wake is the death being stopped, and a cut still bleeding in
-    the temple would kill again before anybody could reach it. Whether the
-    wake should stop it is a question on #1383. The fire goes out with the body.
+    the temple would kill again before anybody could reach it (Patrick's
+    answer on #1383, 4 October). The fire goes out with the body.
   */
   function died(actorId) {
     delete fires[actorId];
@@ -55305,6 +55518,316 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   function scarOf(actorId) {
     var rec = read(actorId);
     return rec.agreed.scar ? rec.agreed.scar.text : '';
+  }
+
+  // ------------------------------------------------------ the treatments --
+
+  /*
+    WHAT TREATS A WOUND, AND WHO MAKES IT. injury.md, who treats what, and
+    Patrick's answers on #1383, 4 October:
+
+      torn cloth   anybody, and no item: a bleed from 2 a second to 1. It does
+                   not change the fever chance.
+      a bandage    a Haberdasher's, at the loom, used by anybody: stops a bleed,
+                   and wound fever is 10% instead of 40%.
+      a splint     a Woodwright's, at the kiln: holds a break. An expert healing
+                   spell sets only a break that is splinted.
+      a poultice   a Physicker's, novice, at the alchemy lab: wound fever 5%.
+      a remedy     a Physicker's, advanced, at the alchemy lab: closes a cut the
+                   way a bandage does, and clears one ordinary disease, wound
+                   fever first (disease.md: "the better answer to wound fever").
+      setting      a physicker, no item: sets a break, and its 3 days start. A
+                   master physicker also clears a crooked heal.
+
+    The four items are MISC records in Thornswood-Content.esp
+    (scripts/mods/Add-ContentRecords.py). Skyrim's inventory cannot use a MISC,
+    so they are used the way a repair kit is (#1384): in the inventory a key
+    opens a panel of your wounds and what you can do for them, and on somebody
+    hurt the look prompt's key opens the same panel for them. Its buttons send
+    /treat, and nobody types it.
+
+    NOTHING IS TAKEN UNLESS IT HELPS. Each treatment first finds the wound it
+    would help, and a refusal leaves the item in the pack.
+  */
+  var TREAT = {
+    bandage:  { name: 'Bandage', item: '154c0:Thornswood-Content.esp',
+                maker: 'A Haberdasher makes them at a loom.' },
+    splint:   { name: 'Splint', item: '154c1:Thornswood-Content.esp',
+                maker: 'A Woodwright makes them at a kiln.' },
+    poultice: { name: 'Poultice', item: '154c2:Thornswood-Content.esp',
+                maker: 'A Physicker makes them at an alchemy lab.' },
+    remedy:   { name: 'Physicker\'s Remedy', item: '154c3:Thornswood-Content.esp',
+                maker: 'A Physicker makes them at an alchemy lab, from advanced.' }
+  };
+  // The panel's rows, in order, and what each is called.
+  var TREAT_ROWS = [
+    ['cloth', 'Torn cloth'], ['bandage', 'Bandage'], ['splint', 'Splint'],
+    ['poultice', 'Poultice'], ['remedy', 'Physicker\'s remedy'], ['set', 'Set the bone']
+  ];
+  // About 4 metres. The look prompt offers only somebody under the
+  // crosshair, and the server measures again when the line arrives.
+  var TREAT_REACH = 300;
+  // The panel's view, its owner's only (game/ui/thornswood-treat.js).
+  var TREAT_VIEW_PROPERTY = 'thornswoodTreatView';
+
+  function cutOrBite(w) { return w.k === 'cut' || w.k === 'bite'; }
+  function badBurn(w) { return w.k === 'burn' && w.dealt >= HURT.burn.bad; }
+  /* A bandage helps a bleed, and an open cut, bite or bad burn whose fever is still to roll. */
+  function bandageHelps(w) {
+    if (cutOrBite(w)) { return w.bleed || (!w.closed && !w.bandage && !w.rolled); }
+    return badBurn(w) && !w.bandage && !w.rolled;
+  }
+  /* A poultice helps an open wound whose fever is still to roll. */
+  function poulticeHelps(w) {
+    return (cutOrBite(w) || badBurn(w)) && !w.closed && !w.poultice && !w.rolled;
+  }
+  /* The first wound test passes, taking one prefer also passes first. */
+  function firstWound(rec, test, prefer) {
+    var fallback = null;
+    for (var i = 0; i < rec.wounds.length; i++) {
+      var w = rec.wounds[i];
+      if (!test(w)) { continue; }
+      if (!prefer || prefer(w)) { return w; }
+      if (!fallback) { fallback = w; }
+    }
+    return fallback;
+  }
+  function wordFor(w) { return w.k === 'break' ? 'broken ' + w.limb : w.k; }
+
+  /* Whether anybody could tend anything on this record. */
+  function needsCare(rec) {
+    for (var i = 0; i < rec.wounds.length; i++) {
+      var w = rec.wounds[i];
+      if (bandageHelps(w) || poulticeHelps(w) || (w.k === 'break' && !w.set)) { return true; }
+    }
+    if (rec.crooked.arm || rec.crooked.leg) { return true; }
+    var now = Date.now();
+    for (var j = 0; j < rec.ills.length; j++) {
+      if (stageOf(rec.ills[j], now) !== 'caught') { return true; }
+    }
+    return false;
+  }
+  function careOf(actorId) { return needsCare(read(actorId)); }
+
+  /* How many of one treatment the pack holds. */
+  function carried(actorId, what) {
+    if (!has(TREAT, what) || typeof packCount !== 'function') { return 0; }
+    try { return Number(packCount(actorId, TREAT[what].item)) || 0; } catch (e) { return 0; }
+  }
+
+  function nameOf(actorId) {
+    var soc = g.__thornswoodSocial;
+    try { return (soc && soc.nameOfPerson) ? String(soc.nameOfPerson(actorId) || 'somebody') : 'somebody'; }
+    catch (e) { return 'somebody'; }
+  }
+
+  function within(a, b) {
+    try {
+      var ca = String(mp.get(a, 'worldOrCellDesc') || '');
+      var cb = String(mp.get(b, 'worldOrCellDesc') || '');
+      if (!ca || ca !== cb) { return false; }
+      var pa = mp.get(a, 'pos'), pb = mp.get(b, 'pos');
+      if (!pa || !pb) { return false; }
+      var dx = pa[0] - pb[0], dy = pa[1] - pb[1], dz = pa[2] - pb[2];
+      return (dx * dx + dy * dy + dz * dz) <= TREAT_REACH * TREAT_REACH;
+    } catch (e) { return false; }
+  }
+
+  function deadNow(id) {
+    try { return !!mp.get(id, 'isDead'); } catch (e) { return true; }
+  }
+
+  /*
+    WHAT ONE TREATMENT WOULD DO, before anything is done. Answers { why },
+    the sentence to say, when it cannot be done; or { item, apply } when it
+    can: item is what it takes from the doer's pack ('' for nothing), and
+    apply changes the record and answers { line, them }, the line for the one
+    doing it and the one for the person tended when that is somebody else.
+  */
+  function plan(doerId, targetId, rec, what, now) {
+    var self = doerId === targetId;
+    var your = self ? 'your' : (nameOf(targetId) + '\'s');
+    var by = self ? '' : nameOf(doerId);
+    if (what === 'cloth') {
+      var bleeding = rec.wounds.filter(function (w) { return cutOrBite(w) && w.bleed; });
+      if (!bleeding.length) { return { why: 'Nothing is bleeding.' }; }
+      var bare = bleeding.filter(function (w) { return !w.cloth; });
+      if (!bare.length) { return { why: 'The bleeding is already bound with cloth. A bandage stops it.' }; }
+      return { item: '', apply: function () {
+        bare.forEach(function (w) { w.cloth = true; });
+        return { line: 'You tear a strip of cloth and bind ' + your + ' bleeding. It slows. It has not stopped.',
+                 them: by + ' binds your bleeding with torn cloth. It slows. It has not stopped.' };
+      } };
+    }
+    if (what === 'bandage') {
+      var wb = firstWound(rec, bandageHelps, function (w) { return cutOrBite(w) && w.bleed; });
+      if (!wb) { return { why: 'There is no open wound a bandage would help.' }; }
+      if (carried(doerId, 'bandage') < 1) { return { why: 'You carry no bandage. ' + TREAT.bandage.maker }; }
+      return { item: 'bandage', apply: function () {
+        var bled = cutOrBite(wb) && wb.bleed;
+        wb.bandage = true;
+        if (cutOrBite(wb)) { wb.bleed = false; }
+        var after = bled ? ' The bleeding stops.' : '';
+        return { line: 'You bandage ' + your + ' ' + wordFor(wb) + '.' + after,
+                 them: by + ' bandages your ' + wordFor(wb) + '.' + after };
+      } };
+    }
+    if (what === 'splint') {
+      var ws = firstWound(rec, function (w) { return w.k === 'break' && !w.splint && !w.set; });
+      if (!ws) { return { why: 'There is no broken bone a splint would hold.' }; }
+      if (carried(doerId, 'splint') < 1) { return { why: 'You carry no splint. ' + TREAT.splint.maker }; }
+      return { item: 'splint', apply: function () {
+        ws.splint = true;
+        var still = ' It still has to be set: by a physicker, a temple shrine, or an expert healing spell.';
+        return { line: 'You splint ' + your + ' ' + wordFor(ws) + '.' + still,
+                 them: by + ' splints your ' + wordFor(ws) + '.' + still };
+      } };
+    }
+    if (what === 'poultice') {
+      var wp = firstWound(rec, poulticeHelps, cutOrBite);
+      if (!wp) { return { why: 'There is no open wound whose fever is still to come.' }; }
+      if (carried(doerId, 'poultice') < 1) { return { why: 'You carry no poultice. ' + TREAT.poultice.maker }; }
+      return { item: 'poultice', apply: function () {
+        wp.poultice = true;
+        return { line: 'You press a poultice on ' + your + ' ' + wordFor(wp) + '. Wound fever is far less likely now.',
+                 them: by + ' presses a poultice on your ' + wordFor(wp) + '. Wound fever is far less likely now.' };
+      } };
+    }
+    if (what === 'remedy') {
+      var wr = firstWound(rec, function (w) { return cutOrBite(w) && bandageHelps(w); },
+                          function (w) { return w.bleed; });
+      if (!rec.ills.length && !wr) { return { why: 'There is no sickness and no open cut for a remedy.' }; }
+      if (carried(doerId, 'remedy') < 1) { return { why: 'You carry no remedy. ' + TREAT.remedy.maker }; }
+      return { item: 'remedy', apply: function () {
+        var did = [];
+        if (wr) { wr.bleed = false; wr.bandage = true; did.push('closes the ' + wordFor(wr)); }
+        var gone = null;
+        for (var i = 0; i < rec.ills.length; i++) {
+          if (rec.ills[i].k === 'fever') {
+            gone = { shown: stageOf(rec.ills[i], now) !== 'caught', ill: rec.ills.splice(i, 1)[0] };
+            break;
+          }
+        }
+        if (!gone) { gone = cureOne(rec, now); }
+        if (gone && gone.shown) { did.push('clears the ' + DISEASE[gone.ill.k].name); }
+        var words = did.length ? did.join(' and ') + '.' : 'goes down, and nothing you can feel changes.';
+        return { line: 'The remedy ' + words, them: by + '\'s remedy ' + words };
+      } };
+    }
+    if (what === 'set') {
+      var breaks = rec.wounds.filter(function (w) { return w.k === 'break' && !w.set; });
+      var crooked = ['arm', 'leg'].filter(function (l) { return !!rec.crooked[l]; });
+      if (!breaks.length && !crooked.length) { return { why: 'There is no broken or crooked bone to set.' }; }
+      var P = g.__thornswoodProgression;
+      var s = stateOf(doerId);
+      var rankOk = function (rank) {
+        try { return !!(P && P.canWork && s && P.canWork(s, 'physicker', rank)); } catch (e) { return false; }
+      };
+      if (!rankOk('novice')) { return { why: 'Only a physicker sets a bone, or a shrine in a temple.' }; }
+      var master = rankOk('master');
+      if (!breaks.length && !master) { return { why: 'A crooked heal takes a master physicker, or a shrine in a temple.' }; }
+      return { item: '', apply: function () {
+        var did = [];
+        breaks.forEach(function (w) { w.set = now; did.push('the broken ' + w.limb); });
+        if (master && crooked.length) {
+          rec.crooked = {};
+          crooked.forEach(function (l) { did.push('the crooked ' + l); });
+        }
+        var list = did.join(' and ');
+        var heals = breaks.length ? ' A set break heals in ' + HURT.breakDays + ' days.' : '';
+        return { line: 'You set ' + list + (self ? '' : ' for ' + nameOf(targetId)) + '.' + heals,
+                 them: by + ' sets your ' + did.map(function (d) { return d.replace(/^the /, ''); }).join(' and ') +
+                       '.' + heals };
+      } };
+    }
+    return { why: 'That is not a treatment.' };
+  }
+
+  /*
+    ONE TREATMENT, DONE. Answers { ok, line, them }. The item comes out of
+    the doer's pack only once the treatment is sure to help.
+  */
+  function treat(doerId, targetId, what) {
+    var self = doerId === targetId;
+    if (!self) {
+      if (!personal(targetId)) { return { ok: false, line: 'That is nobody you can tend.' }; }
+      if (!within(doerId, targetId)) { return { ok: false, line: 'Stand closer. You tend somebody within arm\'s reach.' }; }
+    }
+    if (deadNow(targetId)) { return { ok: false, line: 'It is too late for that.' }; }
+    var rec = read(targetId);
+    var now = Date.now();
+    var p = plan(doerId, targetId, rec, String(what || ''), now);
+    if (p.why) { return { ok: false, line: p.why }; }
+    if (p.item) {
+      var took = false;
+      try { took = typeof takeItem === 'function' && takeItem(doerId, TREAT[p.item].item, 1); } catch (e) { took = false; }
+      if (!took) {
+        return { ok: false, line: 'The ' + TREAT[p.item].name + ' could not be taken from your pack. Nothing was done.' };
+      }
+    }
+    var said = p.apply();
+    write(targetId, rec);
+    redraw(targetId);
+    hlog(doerId.toString(16), 'tended', targetId.toString(16) + ':', what);
+    return { ok: true, line: said.line, them: self ? '' : said.them };
+  }
+
+  /* What the panel shows: the wounds, and each treatment with whether it can be done and why not. */
+  function viewFor(doerId, targetId, note) {
+    var self = doerId === targetId;
+    var rec = read(targetId);
+    var now = Date.now();
+    var dead = deadNow(targetId);
+    var rows = [];
+    for (var i = 0; i < TREAT_ROWS.length; i++) {
+      var what = TREAT_ROWS[i][0];
+      var p = dead ? { why: 'It is too late for that.' } : plan(doerId, targetId, rec, what, now);
+      rows.push({ id: what, name: TREAT_ROWS[i][1], can: !p.why, why: p.why || '',
+                  count: has(TREAT, what) ? carried(doerId, what) : -1 });
+    }
+    return { open: true, who: self ? '' : nameOf(targetId), target: self ? 'me' : targetId.toString(16),
+             lines: lines(rec, now), rows: rows, note: String(note || '') };
+  }
+
+  var treatShownAt = 0;
+  function showTreat(actorId, view) {
+    var payload = JSON.parse(JSON.stringify(view || { open: false }));
+    treatShownAt = Math.max(Date.now(), treatShownAt + 1);
+    payload.at = treatShownAt;
+    try { mp.set(actorId, TREAT_VIEW_PROPERTY, payload); } catch (e) {
+      hlog('could not send the treatment panel to', actorId.toString(16) + ':', e);
+    }
+  }
+
+  /*
+    WHAT THE INVENTORY KEY, THE LOOK PROMPT AND THE PANEL SEND, as the words
+    after /treat. Nothing: your own panel. A form id: theirs, the one the
+    look prompt sends. Either, or me, then one of cloth, bandage, splint,
+    poultice, remedy or set: do it, then draw the panel again. Answers the
+    line to say in the chat, or '' for none.
+  */
+  function panel(actorId, words) {
+    words = words || [];
+    var first = String(words[0] || '').trim();
+    var target = actorId;
+    if (first && first.toLowerCase() !== 'me') {
+      var soc = g.__thornswoodSocial;
+      var found = (soc && soc.findPerson) ? soc.findPerson(first) : null;
+      if (!found || !found.actorId) { return (found && found.why) || 'Nobody here by that name.'; }
+      target = found.actorId;
+    }
+    if (target !== actorId && !within(actorId, target)) {
+      return 'Stand closer. You tend somebody within arm\'s reach.';
+    }
+    var what = String(words[1] || '').toLowerCase();
+    var note = '';
+    if (what) {
+      var r = treat(actorId, target, what);
+      note = r.line;
+      if (r.ok && r.them) { tell(target, r.them); }
+    }
+    showTreat(actorId, viewFor(actorId, target, note));
+    return note;
   }
 
   // ------------------------------------------------------ staff, /hurt --
@@ -55418,9 +55941,13 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       '    var st = ctx.state;',
       '    if (!st) { return; }',
       '    var show = (v && v.show && v.show.length) ? v.show : [];',
-      '    var sig = "hurt:" + show.join("|");',
+      '    var sig = "hurt:" + show.join("|") + ((v && v.care) ? "|care" : "");',
       '    if (st.thornswoodHurtHud === sig) { return; }',
       '    st.thornswoodHurtHud = sig;',
+      // The front plugin offers Tend your wounds in the inventory while there
+      // is something to tend (#1383). The globalThis a plugin sees; see the
+      // note over thornswoodCatchFire.
+      '    try { globalThis.thornswoodHurtCare = (v && v.care) ? 1 : 0; } catch (e) { }',
       '    var html = "";',
       '    for (var i = 0; i < show.length; i++) {',
       '      html += "<div>" + String(show[i]).replace(/[<>&]/g, "") + "</div>";',
@@ -55446,6 +55973,39 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       isVisibleByNeighbors: false,
       updateOwner: hudScript(),
       updateNeighbor: ''
+    });
+  } catch (e) {
+    // Already made by a previous load. The script cannot change until a restart, which a deploy is.
+  }
+
+  /*
+    THE TREATMENT PANEL'S VIEW, seen by its owner only, handed to the page the
+    way the repair panel's is; game/ui/thornswood-treat.js draws it, and a
+    view with open set opens it. at moves on every send, so the key pressed
+    again draws the panel again even when nothing in it changed.
+  */
+  var treatScript = [
+    '(function(){',
+    '  try {',
+    '    var v = ctx.value;',
+    '    if (!v || typeof v !== "object") { return; }',
+    '    var st = ctx.state;',
+    '    if (!st) { return; }',
+    '    if (st.thornswoodTreatAt === v.at) { return; }',
+    '    st.thornswoodTreatAt = v.at;',
+    '    var body = JSON.stringify(v);',
+    '    var src = "(function(){try{" +',
+    '      "var d=" + body + ";window.thornswoodTreatView=d;" +',
+    '      "if(window.thornswoodTreat&&window.thornswoodTreat.setData){window.thornswoodTreat.setData(d);}" +',
+    '      "}catch(e){}})();";',
+    '    try { ctx.sp.browser.executeJavaScript(src); } catch (e) { }',
+    '  } catch (e) { }',
+    '})();'
+  ].join('\n');
+  try {
+    mp.makeProperty(TREAT_VIEW_PROPERTY, {
+      isVisibleByOwner: true, isVisibleByNeighbors: false,
+      updateOwner: treatScript, updateNeighbor: ''
     });
   } catch (e) {
     // Already made by a previous load. The script cannot change until a restart, which a deploy is.
@@ -55491,7 +56051,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     stageOf: stageOf, lines: lines, chanceFor: chanceFor,
     forNeeds: forNeeds, burntWear: burntWear, wound: wound, burning: burning,
     healed: healed, cast: cast, hit: hit, swallowed: swallowed, rite: rite,
-    exposed: exposed, craftRefusal: craftRefusal, died: died, scarOf: scarOf, staff: staff
+    exposed: exposed, craftRefusal: craftRefusal, died: died, scarOf: scarOf, staff: staff,
+    BITERS: BITERS, TREAT: TREAT, TREAT_REACH: TREAT_REACH,
+    weaponKind: weaponKind, woundFrom: woundFrom, bitingRaces: bitingRaces, blow: blow, landed: landed,
+    needsCare: needsCare, careOf: careOf, plan: plan, treat: treat, viewFor: viewFor, panel: panel
   };
 
   hlog('ready: wounds and the five diseases, every', TICK_MS / 1000, 'seconds, and the bleed every second');
@@ -55786,7 +56349,11 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       */
       var scar = '';
       try { scar = (g.__thornswoodHurt && g.__thornswoodHurt.scarOf) ? g.__thornswoodHurt.scarOf(id) : ''; } catch (eScar) { scar = ''; }
-      at.push({ id: id, pos: pos, cell: cell, pid: profileOf(id), name: nameOfPerson(id), scar: scar });
+      // And whether they have a wound somebody could tend (#1383): the look
+      // prompt's Tend their wounds.
+      var care = false;
+      try { care = !!(g.__thornswoodHurt && g.__thornswoodHurt.careOf && g.__thornswoodHurt.careOf(id)); } catch (eCare) { care = false; }
+      at.push({ id: id, pos: pos, cell: cell, pid: profileOf(id), name: nameOfPerson(id), scar: scar, care: care });
     }
 
     var reach = SOCIAL.nearReach * SOCIAL.nearReach;
@@ -55830,6 +56397,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         // a: the halves this Master could take them on in (#1634).
         var canTake = teacher ? ch.takeOnMark(teacher, them.id) : null;
         if (canTake) { w[them.id.toString(16)].a = canTake; }
+        // t: they have a wound to tend, and the prompt offers it (#1383).
+        if (them.care) { w[them.id.toString(16)].t = 1; }
       }
       var sig = JSON.stringify(w) + (s.namesAll ? ':all' : '');
       if (nearWas[me.id] === sig) { continue; }

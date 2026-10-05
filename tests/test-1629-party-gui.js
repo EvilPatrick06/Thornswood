@@ -111,6 +111,11 @@ function rig(opts) {
     'function driverPress() { return false; }\n' +
     'function merchantPress() { return false; }\n' +
     'const LOCK_KEY = 45; function lockPress() { return false; }\n' +
+    // Tend their wounds (#1383), X on a hurt person, and Tend your wounds,
+    // H in the inventory. Nobody hurt is looked at and no inventory is open
+    // here; test-1383-treatments.js has what they do.
+    'const TREAT_KEY = 45, TREAT_SELF_KEY = 35;\n' +
+    'function treatPress() { return false; }\nfunction treatSelfPress() { return false; }\n' +
     'const MANEUVER_KEY = 10; function maneuverKeyPressed() { }\n' +
     'const COMMAND_KEY = 53; function commandKeyPressed() { }\n' +
     'const statsOnSlash = { openedBy: function () { return ""; }, shutFor: function () { }, keyDown: function () { } };\n' +
