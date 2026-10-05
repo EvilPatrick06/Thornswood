@@ -77,8 +77,8 @@ script extender and Thornswood's own content, and nothing else.
 Not optional. Without it you have a launcher and no mods, and the server turns
 you away when you press Play.
 
-The link is on the [Downloads](/downloads) page and on the launcher's Add-ons
-tab. Open it and Vortex takes it from there: it makes a profile for Thornswood,
+The link is on the [Downloads](/downloads) page and on the launcher's
+Diagnostics page. Open it and Vortex takes it from there: it makes a profile for Thornswood,
 downloads every mod from its own author, and deploys them. Give it time.
 
 If the wrong profile is active in Vortex, the launcher says so before you press
@@ -98,7 +98,8 @@ Not Skyrim. Not Steam. Not SKSE. Always the Thornswood shortcut.
 The launcher checks for updates and takes any that are waiting, because
 everybody has to be running the same files or nobody can connect. It also
 compares every plugin with the server's copy, byte for byte. If one differs it
-says so, and **Fix** downloads the server's copy of that plugin.
+says so. For Thornswood's own plugin **Fix** downloads the server's copy; for
+another author's mod it names the mod to update or reinstall in Vortex.
 
 Then the game loads to its main menu and asks who you are today: one of your
 characters, or a new one. Pick and press Play.

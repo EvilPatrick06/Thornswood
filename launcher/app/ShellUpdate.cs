@@ -168,9 +168,11 @@ namespace Thornswood
             ShowNotice(v);
             BuildNews();
 
-            // The add-ons tab is drawn straight from this document, so redraw
-            // it if somebody is sitting on that tab while the check lands.
+            // The add-ons are drawn straight from this document, so redraw
+            // them when the check lands: the Mods page's tab if somebody is
+            // sitting on it, and their place on Diagnostics (#1170).
             if (modTab == 3) BuildModList();
+            DrawAddons();
 
             // Packs a launcher before 1.1.32 marked as applied on a collection
             // install without writing a single game file. Back into the queue

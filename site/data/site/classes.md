@@ -251,12 +251,11 @@ equipped.
 | **Fisher** | A crude fishing pole, or a fine or master one |
 | **Woodworker** | A woodcutter's axe |
 
-You are handed yours the moment you pick. After that it wears with the work: a
-pickaxe, a shovel or an axe has a hundred uses in it and a pole has fifty, you
-are told when it is worn thin, and when it breaks the next one comes from a
-smith, or for a pole from a woodwright. With no tool in your pack the seam, the
-plot, the water, the chopping block and the kiln turn you away, and nothing
-hands you a free one.
+You are handed yours the moment you pick. After that it wears with the work:
+each one has 50 uses in it, you are told when it is worn thin, and when it
+breaks the next one comes from a smith, or for a pole from a woodwright. With
+no tool in your pack the seam, the plot, the water, the chopping block and the
+kiln turn you away, and nothing hands you a free one.
 
 Any of them counts. The game has two shovels that look and read exactly alike,
 and six things it calls a pickaxe including the Notched Pickaxe and the ancient
@@ -383,12 +382,17 @@ rank is worth the years rather than just a word over your head.
 A Master can take on an apprentice, and there are two different things that
 can mean.
 
-**Inside the same half.** A Platewright teaching Platewrights. The apprentice
-climbs faster: the same hours spent under somebody who already got to the top
-are worth more than the same hours spent alone, which is the whole reason to go
-and find one. This is also the only way past novice in your sister half. An
-Edgewright who wants to go further than plain iron plate needs a Master
-Platewright to take them on.
+**The other half of your own profession.** Your sister half is yours at
+novice the moment you pick a half, and your work on it is counted on the same
+ladder as your own. Without a Master of that half it never leaves novice: the
+count waits at the threshold. Once a Master of that half takes you on, the next
+piece raises you, and from there it climbs the whole ladder. This is the only
+way past novice in your sister half. An Edgewright who wants to go further than
+plain iron plate needs a Master Platewright to take them on.
+
+Your own half needs nobody. It climbs on your own work, at the same pace with a
+Master beside you or without one, and a Master of your own half cannot take you
+on in it.
 
 **Outside your profession entirely.** A Master can teach a novice's worth of
 their own work to somebody from another profession. A Master Cook can show a
@@ -396,9 +400,10 @@ Smith how to feed themselves properly. It has to be a Master of the exact half
 you want to learn, it never goes past novice, and **you may only ever do this
 twice**. Your sister half does not count against the two.
 
-So a person can end up knowing their own trade properly, a little of the half
-next door, and a little of two other trades entirely. That is the ceiling, and
-it is deliberately low enough that you still need the room.
+So a person can end up knowing their own trade properly, the half next door at
+novice, or further if a Master of it takes them on, and a little of two other
+trades entirely. That is the ceiling, and it is deliberately low enough that you
+still need the room.
 
 The master decides who, and either of you can end it. Nobody is owed an
 apprenticeship and nobody is stuck in one. A Master takes somebody on by
@@ -460,8 +465,9 @@ gear, no land, no profession, no seat in a hold.
 
 **Not gold.** Coin buys goods and work off other people, which is the whole
 point of having it. It does not buy a rank and it does not unlock anything you
-have not put the hours into. A master can take you on as an apprentice and that
-makes your hours count for more, but they still have to be your hours.
+have not put the hours into. A master can take you on as an apprentice, and that
+lets the other half of your profession climb past novice, but it still climbs on
+your hours.
 
 **Not being here first.** Being around longer than the person next to you earns
 nothing on its own.

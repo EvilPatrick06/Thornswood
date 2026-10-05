@@ -142,8 +142,10 @@ Generated from the work tables by `scripts/dev/Write-SystemLists.js`. The same r
 
 ## Where this is
 
-The fifteen records, the waits, the yields, and a cooldown kept per
-person are in the server. A pole is required, and a new fisher is
+The fifteen records, the waits and the yields are in the server. The
+wait is kept on the water and shared by everyone who fishes it (#1413),
+and a fished-out water says how long is left in minutes and hours
+(#1826). A pole is required, and a new fisher is
 handed a crude pole. The fishing mod's rods are in the collection and
 do nothing, and its three pole recipes are cut (the cut file, #1766),
 so the Woodwright's book holds only our three poles and the trap. None

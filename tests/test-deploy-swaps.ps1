@@ -452,8 +452,6 @@ Put (Join-Path $repo 'site\public\robots.txt') 'robots'
 Put (Join-Path $repo 'site\data\help.md') 'help'
 Put (Join-Path $repo 'site\data\site\about.md') 'about'
 Put (Join-Path $repo 'voice\headlines.js') "module.exports = {};`n"
-Put (Join-Path $repo 'voice\public\index.html') 'voice page'
-Put (Join-Path $repo 'voice\public\voice.js') 'voice script'
 Put (Join-Path $repo 'bot\card.py') 'CARD = 1'
 Put (Join-Path $repo 'bot\dev-channel.txt') '0'
 # What bot.py reads from beside itself for the live smoke (LIVE_SMOKE_EXPORT).
@@ -511,7 +509,7 @@ try {
     $refusals = @(
         @{ Name = 'Deploy-Docs.ps1'; File = 'site/public/home.html'; How = 'changed'
            Args = $docs.Clone() },
-        @{ Name = 'Install-Voice.ps1'; File = 'voice/public/extra.js'; How = 'new'
+        @{ Name = 'Install-Voice.ps1'; File = 'voice/headlines.js'; How = 'changed'
            Args = @{ VpsHost = '127.0.0.1'; VpsUser = 'nobody'; Root = (Join-Path $box 'Thornswood-Voice'); Port = (PickPort); Site = ''; Bind = '0.0.0.0'
                      ChatRange = 'off'; TurnUrl = ''; TaskName = 'Thornswood Test Voice'; NoPause = $true; Wait = 10 } },
         @{ Name = 'Install-Voice.ps1'; File = 'scripts/vps/Roll-Log.ps1'; How = 'changed'
@@ -697,7 +695,7 @@ try {
     if ($script:fail -gt $failed) { Show }
 
     Voice 'voice-v3'
-    $a = $voice.Clone(); $a['ScpFail'] = 'public/voice\.js$'
+    $a = $voice.Clone(); $a['ScpFail'] = 'headlines\.js$'
     $r = Deploy 'Install-Voice.ps1' $a
     $failed = $script:fail
     Yes 'Install-Voice: a copy that fails stops the install with the service untouched' (

@@ -36,6 +36,8 @@
   // Who the voice service believes we are. Everything else on this socket,
   // chat included, hangs off the identity this establishes.
   var TOKEN = String(CFG.token || '');
+  // Taken, so the page's settings do not keep a copy of it (#1821).
+  CFG.token = '';
   /*
     ONE TOKEN, ONE TRY (#1322, #1337). TOKEN is one not yet used, or ''. It
     goes with the handshake, as the protocol after 'thornswood', and is spent
@@ -45,7 +47,9 @@
     through the folder push to talk uses) and waits for the backoff, and a
     token handed over by setToken or rejoinAs goes at once. SPENT is the last
     one used, because the front can hand the same string over again until the
-    launcher has written a new one.
+    launcher has written a new one. It is only compared, never sent again or
+    handed to anything else: the relay list comes on the roster (#1821), so no
+    other page needs a token once the handshake has spent it.
   */
   var SPENT = '';
 
@@ -476,16 +480,6 @@
 
     /** The service's id for this connection, 0 until the welcome arrives. */
     peer: function () { return peerId; },
-
-    /**
-     * The join token this page holds now, the freshest setToken gave it, or
-     * else the one its connection was opened with. Voice sends it with its
-     * ask for the relay list, which the service hands only to somebody whose
-     * token checks out (#1307). A token opens one connection (#1322), so the
-     * one in hand is usually the spent one, which /ice still takes for the
-     * two minutes it is good for.
-     */
-    token: function () { return TOKEN || SPENT; },
 
     isUp: function () { return !!(ws && ws.readyState === 1 && joined); },
 

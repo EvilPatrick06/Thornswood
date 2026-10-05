@@ -32,6 +32,9 @@
       nightly NOTES.txt counts the same way (first rehearsal, 28 September)
     - a live restore into a folder holding the dev payload takes the port,
       name and server keys from the backup, so live comes back as live
+    - and the join pass switch and the written role lists from the backup,
+      over a payload with others, one the backup has not taken off, each
+      named and no value printed (#1845)
     - a folder missing one plugin is refused and the plugin is named
     - -Which dev restores the dev character and not the live one
     - a second restore keeps what it replaced, and a running server is refused
@@ -150,6 +153,12 @@ $devWho  = '7654321'
 try {
     Server $live 45777 $liveWho 1420
     Server $dev  45787 $devWho 30
+    # The live server's own join pass switch and role list (#1845). No
+    # playtester list, so a payload's is taken off.
+    $ls = [IO.File]::ReadAllText((Join-Path $live 'server-settings.json')) | ConvertFrom-Json
+    $ls | Add-Member -NotePropertyName thornswoodRequirePass -NotePropertyValue $true
+    $ls | Add-Member -NotePropertyName thornswoodDevs -NotePropertyValue @(4401, 4402)
+    Put (Join-Path $live 'server-settings.json') ($ls | ConvertTo-Json -Depth 5)
     # A site's records and uploaded bytes have no other copy after a loss.
     # These are invented fixture values, never a deployed configuration.
     Put (Join-Path $site 'config.json') '{"secret":"fixture-only","discord":{"clientId":"fixture-id"}}'
@@ -269,6 +278,10 @@ try {
     $rs = [IO.File]::ReadAllText($rsPath) | ConvertFrom-Json
     $rs.name = 'Thornswood Dev'
     $rs | Add-Member -NotePropertyName thornswoodServer -NotePropertyValue 'dev'
+    # With another join pass switch and other role lists than the backup's (#1845).
+    $rs | Add-Member -NotePropertyName thornswoodRequirePass -NotePropertyValue $false
+    $rs | Add-Member -NotePropertyName thornswoodDevs -NotePropertyValue @(4409)
+    $rs | Add-Member -NotePropertyName thornswoodPlaytesters -NotePropertyValue @(4405, 4406)
     Put $rsPath ($rs | ConvertTo-Json -Depth 5)
     Remove-Item -LiteralPath $live -Recurse -Force
     Yes 'the original server folder is gone before the restore' (-not (Test-Path -LiteralPath $live))
@@ -301,6 +314,16 @@ try {
     Yes '  in the same order' ((@($s.loadOrder | ForEach-Object { Split-Path -Leaf $_ }) -join '|') -eq ($plugins -join '|'))
     Yes '  and it is the live server again: the port and name from the backup, not the dev payload' (
         $s.port -eq 45777 -and $s.name -eq 'Thornswood Test' -and -not ($s.PSObject.Properties.Name -contains 'thornswoodServer'))
+    Yes '  and the join pass switch is the backup''s, not the payload''s (#1845)' ($s.thornswoodRequirePass -eq $true)
+    Yes '  and the dev list is the backup''s' ((@($s.thornswoodDevs) -join ',') -eq '4401,4402')
+    Yes '  and the playtester list the backup has not is taken off' (-not ($s.PSObject.Properties.Name -contains 'thornswoodPlaytesters'))
+    Yes '  each said by name' (
+        (Said 'thornswoodRequirePass from the backup, the folder''s was different') -and
+        (Said 'thornswoodDevs from the backup, the folder''s was different') -and
+        (Said 'thornswoodPlaytesters taken off: the backup''s settings do not have it'))
+    $passLines = @($script:last | Where-Object { $_ -match 'thornswoodRequirePass|thornswoodDevs|thornswoodPlaytesters' })
+    Yes '  with no value printed' (
+        $passLines.Count -eq 3 -and @($passLines | Where-Object { $_ -match 'true|false|440[0-9]' }).Count -eq 0)
     Yes '  and the decrypted copy is not left in the temp folder' (
         @(Get-ChildItem -LiteralPath ([IO.Path]::GetTempPath()) -Directory -Filter 'thornswood-restore-*' -EA SilentlyContinue |
           Where-Object { $_.LastWriteTime -gt (Get-Date).AddMinutes(-2) }).Count -eq 0)

@@ -39,12 +39,6 @@ if (Test-Path -LiteralPath $vsrc) {
   Invoke-ThornswoodNative { & scp -o BatchMode=yes -o StrictHostKeyChecking=yes $vsrc "$User@${Vps}:C:/Thornswood-Voice/voice-server.js" } 2>&1 | Out-Null
   if ($LASTEXITCODE -eq 0) { Note 'voice-server.js is up to date on the server' }
   else { Bad 'scp failed'; return }
-
-  $pub = Join-Path $Here 'voice\public'
-  if (Test-Path -LiteralPath $pub) {
-    Invoke-ThornswoodNative { & scp -o BatchMode=yes -o StrictHostKeyChecking=yes -r "$pub" "$User@${Vps}:C:/Thornswood-Voice/" } 2>&1 | Out-Null
-    if ($LASTEXITCODE -eq 0) { Note 'public folder copied' }
-  }
 }
 
 Head 'Starting'

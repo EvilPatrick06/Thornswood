@@ -6,11 +6,12 @@
 // its table with each message would keep only the people who moved, and
 // everybody standing still would fall silent.
 //
-// Each of the three clients is checked here: the launcher's voice page, the
-// game's overlay (whose table the party strip reads too) and the plain
-// browser page. The two that share a helper have it run; all three have to
-// route 'moved' to it rather than to the replace. voice/test-moved.js checks
-// the same thing against the real service. Read only.
+// Both clients are checked here: the launcher's voice page and the game's
+// overlay (whose table the party strip reads too). Each has the shared helper
+// run, and each has to route 'moved' to it rather than to the replace. The
+// plain browser page the service once served was a third, until it went
+// (#1822). voice/test-moved.js checks the same thing against the real
+// service. Read only.
 const fs = require('fs');
 const path = require('path');
 
@@ -72,21 +73,6 @@ yes('the game overlay sends moved to the helper, and the party strip reads the s
     /return; $/.test(overlayMoved) && !/lastWho = /.test(overlayMoved) &&
     /who: function \(\) \{ return lastWho; \}/.test(overlay));
 yes('and reads the silence marks off the rows that moved', /noteRows\(m\.who \|\| \{\}\);/.test(overlayMoved));
-
-const page = read('../voice/public/voice.js');
-const branch = /if \(m\.t === 'moved'\) \{([\s\S]*?)return;\s*\}/.exec(page);
-yes('the browser page has a moved branch', !!branch);
-if (branch) {
-  const apply = new Function('lastWho', 'm', 'place', 'noteRows', 'applyOwnMic', branch[1]);
-  const table = { 1: { pos: [0, 0, 0] }, 2: { pos: [1, 0, 0] }, 4: { pos: [2, 0, 0] } };
-  const noted = [];
-  apply(table, { who: { 2: { pos: [9, 0, 0] } }, gone: [4] }, function () { },
-        function (who) { noted.push(Object.keys(who)); }, function () { });
-  yes('the browser page keeps the still, moves the walker and drops the gone',
-      !!table[1] && table[2].pos[0] === 9 && !table[4]);
-  yes('and reads the silence marks off the rows that moved, not the whole table',
-      noted.length === 1 && noted[0].join(',') === '2');
-}
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exitCode = fail ? 1 : 0;

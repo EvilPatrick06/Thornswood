@@ -131,5 +131,34 @@ namespace Thornswood
             get { return Path.Combine(Game, "Data\\SKSE\\Plugins\\MpClientPlugin.dll"); }
         }
         public static string Exe { get { return Path.Combine(Game, "SkyrimSE.exe"); } }
+
+        /// <summary>
+        /// The Skyrim the facts about the game are read from: its exe, the
+        /// script extender beside it and the plugins Vortex deployed. Game,
+        /// except while the own folder is chosen and not made (OwnFirst,
+        /// #1226): Game is then Profile\Payload, Thornswood's own files only,
+        /// and the game the folder will be made from is the Steam copy's, which
+        /// Checks.All reads too. For reading only, never a path to write to,
+        /// which is why Exe, Loader and MpClient stay under Game (#1235).
+        /// </summary>
+        public static string Skyrim { get { return OwnFirst ? SteamCopy : Game; } }
+        public static string SkyrimExe { get { return Path.Combine(Skyrim, "SkyrimSE.exe"); } }
+
+        /// <summary>
+        /// The script extender plugin folders the game's plugins are read
+        /// from: Skyrim's, and Game's when that is another folder, since while
+        /// OwnFirst Thornswood's own plugins wait in Payload and the rest are
+        /// what Vortex deployed into the Steam copy (#1235).
+        /// </summary>
+        public static string[] SksePluginDirs
+        {
+            get
+            {
+                string skyrim = Path.Combine(Skyrim, "Data\\SKSE\\Plugins");
+                string game = Path.Combine(Game, "Data\\SKSE\\Plugins");
+                if (string.Equals(skyrim, game, StringComparison.OrdinalIgnoreCase)) return new string[] { game };
+                return new string[] { skyrim, game };
+            }
+        }
     }
 }

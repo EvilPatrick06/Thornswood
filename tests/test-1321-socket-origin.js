@@ -15,18 +15,17 @@
     socket is closed;
     so is a page on this host at another port, a look-alike host, and an
     Origin that is not an address at all;
-    the service's own page is let in, asked straight (Host 127.0.0.1:port)
-    and through Caddy (Host thornswood.net, Origin https://thornswood.net,
-    X-Forwarded-For set);
+    so is a page on this very host, asked straight (Host 127.0.0.1:port) and
+    through Caddy (Host thornswood.net, Origin https://thornswood.net,
+    X-Forwarded-For set): the service's own page was let in that way until it
+    went (#1822), and nothing else of ours is served from there;
     the game's pages and the launcher's voice page, loaded off disk, say
     null or file:// and are let in, and join;
     a client that sends no Origin, which is not a browser, is let in and
     joins, as every harness does;
     a refused page that hangs up as it is answered does not stop the
     service;
-    the refusal is in the log once, not once per socket;
-    and the page this service serves opens its socket to the host it was
-    loaded from.
+    and the refusal is in the log once, not once per socket.
 
   VOICE points it at another copy of voice-server.js, which is how it was
   shown to fail on the code before the change. Writes only to a temp folder,
@@ -40,7 +39,6 @@ const net = require('net');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 
-const CR = String.fromCharCode(13);
 const VOICE = process.env.VOICE || path.join(REPO_DIR, 'voice', 'voice-server.js');
 
 let pass = 0, fail = 0;
@@ -170,7 +168,10 @@ function knock(port, headers, pid) {
     ['this host at another port', 'http://127.0.0.1:' + (PORT === 65535 ? 1 : PORT + 1), HOST],
     ['a look-alike of the site', 'https://thornswood.net.evil.example', 'thornswood.net'],
     ['another website through Caddy', 'https://evil.example', 'thornswood.net'],
-    ['an Origin that is not an address', 'not an origin', HOST]
+    ['an Origin that is not an address', 'not an origin', HOST],
+    ['a page on this host asked straight', 'http://' + HOST, HOST],
+    ['a page on this host through Caddy', 'https://thornswood.net', 'thornswood.net'],
+    ['a page on this host through Caddy, written in capitals', 'HTTPS://Thornswood.net', 'thornswood.net']
   ]) {
     const h = { Host: host, Origin: origin };
     if (host === 'thornswood.net') { h['X-Forwarded-For'] = '203.0.113.7'; }
@@ -201,11 +202,8 @@ function knock(port, headers, pid) {
   await wait(300);
   yes('200 refused pages that hang up at once leave the service running', exited === null);
 
-  console.log('\nthis service\'s own page, the game\'s and the launcher\'s:');
+  console.log('\nthe game\'s pages and the launcher\'s:');
   for (const [what, origin, host] of [
-    ['the page asked straight', 'http://' + HOST, HOST],
-    ['the page through Caddy', 'https://thornswood.net', 'thornswood.net'],
-    ['the page through Caddy, written in capitals', 'HTTPS://Thornswood.net', 'thornswood.net'],
     ['a page off disk that says null', 'null', HOST],
     ['a page off disk that says file://', 'file://', HOST]
   ]) {
@@ -226,13 +224,10 @@ function knock(port, headers, pid) {
   yes('and so is node\'s own WebSocket, as every harness uses', welcomed);
   try { node.close(); } catch (e) { }
 
-  console.log('\nthe log and the page:');
+  console.log('\nthe log:');
   const said = srvLog.split('\n').filter((l) => /refused a socket opened by a page on/.test(l));
   yes('the refusal is in the log once, not once per socket (' + said.length + ')', said.length === 1 &&
       /"https:\/\/evil\.example"/.test(said[0]));
-  const page = fs.readFileSync(path.join(REPO_DIR, 'voice', 'public', 'voice.js'), 'utf8').split(CR).join('');
-  yes('the page this service serves opens its socket to the host it was loaded from',
-      /new WebSocket\(proto \+ ':\/\/' \+ location\.host\)/.test(page));
 
   await new Promise((ok) => { srv.once('exit', ok); srv.kill(); });
   console.log('\n' + pass + ' passed, ' + fail + ' failed');

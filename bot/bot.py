@@ -1386,6 +1386,27 @@ def ticket_refusal(interaction):
         return None
 
 
+def is_ticket_thread(ch):
+    """
+    True for a thread a ticket opened: one off a channel named in
+    TICKET_CHANNEL, which is the only place TicketModal opens one. A ticket
+    that could not have its thread goes into the TICKET_LOG channel as a
+    plain message, never a thread, so that channel has none to close.
+
+    This used to be any thread at all (#1776). /close in a Live smoke session
+    thread or a #tales post archived and locked it and wrote "Closed: ..."
+    into the staff ticket record as if it were a ticket.
+
+    A thread whose parent is not in the bot's cache is not a ticket here:
+    refusing a close costs nothing, since staff can still archive a thread by
+    hand.
+    """
+    if not isinstance(ch, discord.Thread):
+        return False
+    name = getattr(ch.parent, 'name', None)
+    return bool(name) and name.lower() in TICKETS
+
+
 async def close_here(interaction, why=None):
     """
     Close the ticket this was used in.
@@ -1394,9 +1415,12 @@ async def close_here(interaction, why=None):
     somebody was told and when, and the one time anybody goes looking for it
     is the argument afterwards, so nothing here removes anything. Locked means
     it takes a staff member to open it again, not a stray message.
+
+    Only in a ticket's own thread (is_ticket_thread), refused before anything
+    is said, archived or written down.
     """
     ch = interaction.channel
-    if not isinstance(ch, discord.Thread):
+    if not is_ticket_thread(ch):
         await interaction.response.send_message(
             'This one only works inside a ticket.', ephemeral=True)
         return
@@ -1958,9 +1982,10 @@ async def ensure_hold_panel(guild):
 # WHO MAY START ONE. Owner, Dev and Lead Gamemaster, which is wider than
 # Owner and Dev and narrower than STAFF: a Moderator alone does not start,
 # reset, refresh or report on a session. Roles were deleted and renamed in
-# the cleanup, so these are matched by name against whatever the server
-# carries today, and LIVE_SMOKE_ADMIN_ROLES in bot.env.json moves them
-# without a deploy. No snowflake is written down anywhere here.
+# the cleanup, so LIVE_SMOKE_ADMIN_ROLES in bot.env.json carries them, as
+# role ids (preferred, since an id survives a rename) or names, matched the
+# way STAFF_ROLES is (#1355). The defaults are names, so no snowflake is
+# written down anywhere here.
 #
 # The default is in this file and not read out of the export, so content that
 # moves when Cynthia refreshes the Live set can never widen who may start a
@@ -1972,10 +1997,10 @@ LIVE_SMOKE_CHANNEL = [n.strip().lower() for n in
                       os.environ.get('LIVE_SMOKE_CHANNEL', 'test-tasks').split(',')
                       if n.strip()]
 # Lead Gamemaster and Lead GM are both here because the role has been written
-# both ways and the scrub is not finished. Matching is by name and ignores
-# case, the way STAFF_ROLES already works, so the order is only what a refusal
-# names first: Lead Gamemaster, which is the canonical spelling the export
-# carries, and Lead GM after it as the alias.
+# both ways and the scrub is not finished. A name matches ignoring case and a
+# digit token matches the role id, the way STAFF_ROLES works, so the order is
+# only what a refusal names first: Lead Gamemaster, which is the canonical
+# spelling the export carries, and Lead GM after it as the alias.
 LIVE_SMOKE_ADMIN_NAMES = [r.strip() for r in
                           os.environ.get('LIVE_SMOKE_ADMIN_ROLES',
                                          'Owner,Dev,Lead Gamemaster,Lead GM').split(',')
