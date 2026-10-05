@@ -132,10 +132,9 @@ A temper at the grindstone or the armour table is refused, and it is
 not counted as work.
 
 Not yet. The kits reach people with the next release that carries
-the plugin. Until the recipe table is built again on the shipping
-machine (`scripts/dev/Build-RecipeTable.ps1`, then
-`scripts/dev/Build-FuelTable.js`), the server does not know whose
-work a kit is, so anybody may make one and no charcoal is asked for.
+the plugin. The recipe table names whose work each kit is, at novice
+for the half in the table above, and the Weapon Kit and the Armor Kit
+burn one Poor Charcoal at the forge (#1622).
 The inventory shows a piece's condition as it was when the piece
 reached the pack, and a change during a session shows after the
 next login (issue #1651); the repair panel always has the number.

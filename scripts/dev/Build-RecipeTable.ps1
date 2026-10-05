@@ -1144,11 +1144,19 @@ $HOP_THROUGH_A_TEMPER = $false
 # and a half that fails it has to be named in the knob under it with the
 # measured reason or this build does not write a table.
 #
-# SETTLED ON 28 SEPTEMBER, issue #398: Patrick made Heart Stone deposits
-# advanced mining (RANK_BY_ORE in Build-OreTable.ps1). The staves' input cost is
-# advanced now, the one rung hole fill below spreads them over all four rungs,
-# and no half on this build reaches the second rule. It stays as the last resort
-# for a future half, and the build prints by name any half that uses it.
+# SETTLED ON 28 SEPTEMBER, issue #398, AND AGAIN ON 4 OCTOBER, issue #1622. On
+# 28 September Patrick made Heart Stone deposits advanced mining, and the one
+# rung hole fill below spread the staves over all four rungs. The miner page
+# then put heart stone back on master, in one place (#1380, #1586, RANK_BY_ORE
+# in Build-OreTable.ps1), so input cost puts every staff on master again, one
+# rung cannot close three holes, and this rule would rank the half by shopping
+# list once more. Patrick, 4 October, answering #1622: "B, each college book
+# staff at its spell's rank". The thirteen are named in RECIPE_RANK, which fills
+# novice, advanced and expert before the hole check runs, and the other 148,
+# all cut, stay on master where their stone puts them. Measured on 4 October:
+# novice 3, advanced 6, expert 4, master 148. So no half on this build reaches
+# the second rule. It stays as the last resort for a future half, and the build
+# prints by name any half that uses it.
 #
 # 'total inputs'    how many things the recipe wants in all, counting three
 #                   firewood as three. This is the one in use: it is the
@@ -1207,7 +1215,7 @@ $RUNGS_MUST_BE_STANDABLE = $true
 # the build, because a rung nobody can gather for is a rank that opens nothing.
 $HALVES_WITH_AN_UNSTANDABLE_RUNG = [ordered]@{
     'Cook/Confectioner' = 'every one of its 28 rows wants a Sack of Flour and a pat of Butter, counted over the whole half on 21 September, and flour is made from Wheat, which harvests.json ranks advanced for a gatherer and for a farmer alike. So the cheapest thing a Confectioner can bake is advanced work to gather for and the novice rung cannot be stood on whatever rule ranks the half: by input cost all 28 land 20 advanced and 8 expert and none novice (28 September), and filling the empty novice rung (HOLE_FILL_MOVES_ONE_RUNG) only relabels eight of the advanced ones. This appeared the day the hop was followed and it was always true; before it, flour had no producer at all and every row read as costing nothing. It closes when somebody decides where a Confectioner''s flour comes from, which is the same decision HALVES_NOBODY_CAN_START is already waiting on for this half: all 28 rows are behind two vanilla perks nobody here will ever hold, so nothing is being opened to anybody at any rank yet.'
-    'Enchanter/Bladebinder' = '160 of its 161 rows want a Heart Stone, which Patrick made advanced mining on 28 September (issue #398, RANK_BY_ORE in Build-OreTable.ps1), so by input cost 160 land on advanced and the hole fill (HOLE_FILL_MOVES_ONE_RUNG) moves some of them one rung either way: novice 66, advanced 55, expert 39, master 1, none more than a rung from its stone. The 66 on novice are one rung below the stone, so a novice Bladebinder buys stones from an advanced miner rather than digging them. That is the whole cost and it is one rung, not the three the second rule left before. Each staff also wants its spell, which an Enchanter learns by reading its tome (TOMES_TEACH_STAFF_SPELLS, issue #967).'
+    'Enchanter/Bladebinder' = 'all of its 161 rows but the Aetherial Staff want a Heart Stone, which is master mining (the miner page, issues #1380 and #1586, RANK_BY_ORE in Build-OreTable.ps1), so by input cost all 160 land on master. Patrick, 4 October (#1622): each college book staff at its spell''s rank, named in RECIPE_RANK. So the thirteen the Bladebinder page keeps sit novice 3, advanced 6 and expert 4, and the other 148, all cut, stay on master. The novice, advanced and expert rungs hold only staves whose stone nobody below master can dig, so a Bladebinder below master buys heart stones from a master miner. That is the decision, not a hole: the recipe says what the spell gate already says, because a staff is not made until its spell is on you and a Bladebinder unlocks a spell on K only at a rank at least the spell''s.'
 }
 
 # WHERE THE GOLD VALUE SITS IN EACH KIND OF RECORD. The first five were proved
@@ -1938,6 +1946,31 @@ $RECIPE_RANK = [ordered]@{
     'ThornswoodRecipePoleFine'      = @{ Rank = 'expert';   Why = 'the fine pole, expert on the fisher page: it fishes novice through expert water.' }
     'ThornswoodRecipePoleMaster'    = @{ Rank = 'master';   Why = 'the master pole, master on the fisher page: it fishes all of it.' }
     'ThornswoodRecipeFishTrap'      = @{ Rank = 'novice';   Why = 'the fish trap, a woodwright novice good on the fisher page.' }
+    # THE COLLEGE BOOK STAVES, each at its spell's rank. Patrick, 4 October,
+    # answering issue #1622: "B, each college book staff at its spell's rank".
+    # Heart stone is master mining (the miner page, #1380, #1586), so input
+    # cost puts every staff on master. A staff is not made until its spell is
+    # on you, and a Bladebinder unlocks a spell only at a rank at least the
+    # spell's (the Bladebinder page, Staff spells), so the recipe says what the
+    # spell gate already says. These are the thirteen the Bladebinder page
+    # keeps; the other 147 and the Aetherial Staff are cut and stay where input
+    # cost puts them. The rank is the spell's in the college book, the mage
+    # school pages and STAFF_SPELLS, and tests\test-1622-recipe-generator.js
+    # holds each line to it. A Bladebinder below master buys the stones from a
+    # master miner, which HALVES_WITH_AN_UNSTANDABLE_RUNG says for this half.
+    'DLC2RecipeStaffFlames'         = @{ Rank = 'novice';   Why = 'Staff of Flames, at the rank of Flames in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
+    'DLC2RecipeStaffFrostbite'      = @{ Rank = 'novice';   Why = 'Staff of Frostbite, at the rank of Frostbite in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
+    'DLC2RecipeStaffSparks'         = @{ Rank = 'novice';   Why = 'Staff of Sparks, at the rank of Sparks in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
+    'DLC2RecipeStaffFirebolt'       = @{ Rank = 'advanced'; Why = 'Staff of Firebolts, at the rank of Firebolt in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
+    'DLC2RecipeStaffIceSpike'       = @{ Rank = 'advanced'; Why = 'Staff of Ice Spikes, at the rank of Ice Spike in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
+    'DLC2RecipeStaffLightningBolt'  = @{ Rank = 'advanced'; Why = 'Staff of Lightning Bolts, at the rank of Lightning Bolt in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
+    'DLC2RecipeStaffIceStorm'       = @{ Rank = 'advanced'; Why = 'Staff of Ice Storms, at the rank of Ice Storm in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
+    'DLC2RecipeStaffSoulTrap'       = @{ Rank = 'advanced'; Why = 'Staff of Soul Trapping, at the rank of Soul Trap in the college book (conjuration). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
+    'DLC2RecipeStaffTurnUndead'     = @{ Rank = 'advanced'; Why = 'Staff of Turning, at the rank of Turn Undead in the college book (restoration). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
+    'DLC2RecipeStaffTurnGreaterUndead' = @{ Rank = 'expert';   Why = 'Grand Staff of Turning, at the rank of Turn Greater Undead in the college book (restoration). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
+    'DLC2RecipeStaffIcySpear'       = @{ Rank = 'expert';   Why = 'Staff of Icy Spear, at the rank of Icy Spear in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
+    'DLC2RecipeStaffIncinerate'     = @{ Rank = 'expert';   Why = 'Staff of Incineration, at the rank of Incinerate in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
+    'DLC2RecipeStaffThunderbolt'    = @{ Rank = 'expert';   Why = 'Staff of Thunderbolts, at the rank of Thunderbolt in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
     # The kept smelt and tan rows named in RECIPE_OWNER (#1391, #1400): novice
     # smith work, whatever the ore costs to dig.
     'RecipeIngotCorundum'           = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
@@ -2595,6 +2628,16 @@ function InputsJson($r) {
         $bits += ($line + ' }')
     }
     return '[' + ($bits -join ', ') + ']'
+}
+
+# The line ending a file already uses: CRLF when it holds one, LF otherwise. The
+# table and the gamemode blocks are written with it, so a run never mixes the
+# two in one file. Build-FuelTable.js and Build-ItemNameTable.js follow the
+# gamemode's ending the same way, and they turned the whole of it to CRLF when
+# this wrote CRLF blocks into an LF checkout (issue #1622).
+function EolOf([string]$text) {
+    if ($text.Contains("`r`n")) { return "`r`n" }
+    return "`n"
 }
 
 # A listing of the game folder: name, size and last write, for the files this
@@ -3620,7 +3663,7 @@ foreach ($desc in $recipes.Keys) {
         DayOne = (NeedsAreReachable $needs)
         # No condition at all. NOVICE_MUST_BE_REACHABLE ranks by this rather than
         # by DayOne, so a staff opened by its tome (TOMES_TEACH_STAFF_SPELLS) does
-        # not move the Bladebinder's ladder that #398 set.
+        # not move the Bladebinder's ladder, which RECIPE_RANK sets (#1622).
         Bare = ($needs.Count -eq 0)
         BehindVanillaPerk = $behindPerk
         ServerChecks = $serverChecks
@@ -5431,7 +5474,13 @@ foreach ($desc in $unowned.Keys) {
 }
 $doc.Add('  }')
 $doc.Add('}')
-$json = ($doc -join "`r`n") + "`r`n"
+# The line ending the table already has, CRLF for a new one. A Windows checkout
+# holds CRLF and git stores LF; a checkout that holds LF (this VM, issue #1622)
+# got CRLF from this line until 5 October and committed every line of it as a
+# change.
+$jsonEol = "`r`n"
+if (Test-Path -LiteralPath $Out) { $jsonEol = EolOf ([System.IO.File]::ReadAllText($Out)) }
+$json = ($doc -join $jsonEol) + $jsonEol
 
 # A run that failed leaves the table it could not rebuild exactly as it was.
 # Nothing is written until every check above has passed, for the same reason the
@@ -5722,7 +5771,8 @@ if (-not $NoInstall -and $fail -eq 0) {
             $body.Add($open)
             foreach ($l in $lines) { $body.Add($l) }
             $body.Add('')
-            $new = $text.Substring(0, $a) + (($body -join "`r`n")) + "`r`n" + $text.Substring($b)
+            $eol = EolOf $text
+            $new = $text.Substring(0, $a) + (($body -join $eol)) + $eol + $text.Substring($b)
             [System.IO.File]::WriteAllText($gm, $new, (New-Object System.Text.UTF8Encoding($false)))
             Ok ("wrote {0} recipes and the comment over them into the RECIPES_BY_ID block of {1}" -f $blockRows.Count, $gm)
         }
@@ -5738,7 +5788,8 @@ if (-not $NoInstall -and $fail -eq 0) {
             $body = New-Object 'System.Collections.Generic.List[string]'
             $body.Add($sOpen)
             foreach ($l in $staffLines) { $body.Add($l) }
-            $new = $text.Substring(0, $a) + (($body -join "`r`n")) + "`r`n" + $text.Substring($b)
+            $eol = EolOf $text
+            $new = $text.Substring(0, $a) + (($body -join $eol)) + $eol + $text.Substring($b)
             [System.IO.File]::WriteAllText($gm, $new, (New-Object System.Text.UTF8Encoding($false)))
             Ok ("wrote {0} staff spells into the STAFF_SPELLS block of {1}" -f $staffSpells.Count, $gm)
         }

@@ -19,9 +19,12 @@
   2b. PATRICK'S ANSWERS OF 28 SEPTEMBER ARE IN THE TABLES, with the Heart Stone
      moved back to master by the miner page (issue #1380): every Heart Stone
      deposit is master mining and the miner has 24 master deposits; the 161
-     Bladebinder staves sit on all four rungs, none more than one rung from its
-     stone, and no half needs the second rule; every row held dear by something
-     nobody gathers says in rankFrom that it is kept on purpose.
+     Bladebinder staves sit on all four rungs and no half needs the second rule;
+     every row held dear by something nobody gathers says in rankFrom that it
+     is kept on purpose. With the stone on master, Patrick answered #1622 on
+     4 October: each college book staff at its spell's rank. So a staff more
+     than one rung below its stone is one of the book's, named in RECIPE_RANK,
+     and no other staff is; until then the check was that none was.
   3. THE ONE RUNG HOLE FILL does what HOLE_FILL_MOVES_ONE_RUNG says: it closes a
      hole next to a crowded rung without moving any row more than one rung or
      any pinned row, and a half it cannot close (every row on master, the
@@ -155,14 +158,20 @@ Yes 'and ores.json says why, under rankNamedOutright' (
 $masters = @($ores.ores.PSObject.Properties | Where-Object { [string]$_.Value.rank -eq 'master' }).Count
 Yes ('the miner has 24 master deposits ({0})' -f $masters) ($masters -eq 24)
 $bb = @($recipes.recipes.PSObject.Properties | Where-Object { [string]$_.Value.owner -eq 'Enchanter' -and [string]$_.Value.half -eq 'Bladebinder' } | ForEach-Object { $_.Value })
-$bbBy = @(0, 0, 0, 0); $bbFar = 0
+$bbBy = @(0, 0, 0, 0); $bbFar = 0; $bbBook = 0
 foreach ($r in $bb) {
     $bbBy[(At ([string]$r.rank))]++
-    if ([string]$r.inputRank -and [Math]::Abs((At ([string]$r.rank)) - (At ([string]$r.inputRank))) -gt 1) { $bbFar++ }
+    if ([string]$r.inputRank -and [Math]::Abs((At ([string]$r.rank)) - (At ([string]$r.inputRank))) -gt 1) {
+        # Patrick, 4 October (#1622): each college book staff at its spell's
+        # rank, which is a rank named in RECIPE_RANK on a staff the book keeps.
+        if ([string]$r.rankFrom -eq 'named outright in RECIPE_RANK' -and [string]$r.book -ne 'cut') { $bbBook++ } else { $bbFar++ }
+    }
 }
 Write-Host ("      Bladebinder staves: novice {0}, advanced {1}, expert {2}, master {3}" -f $bbBy[0], $bbBy[1], $bbBy[2], $bbBy[3])
-Yes 'the staves spread over all four rungs, none more than one rung from its stone' (
-    $bb.Count -eq 161 -and $bbBy[0] -gt 0 -and $bbBy[1] -gt 0 -and $bbBy[2] -gt 0 -and $bbBy[3] -gt 0 -and $bbFar -eq 0)
+Yes 'the staves spread over all four rungs' (
+    $bb.Count -eq 161 -and $bbBy[0] -gt 0 -and $bbBy[1] -gt 0 -and $bbBy[2] -gt 0 -and $bbBy[3] -gt 0)
+Yes ('a staff more than one rung below its stone is a college book staff named in RECIPE_RANK at its spell''s rank ({0}), and no other staff is' -f $bbBook) (
+    $bbBook -gt 0 -and $bbFar -eq 0)
 $held = @($recipes.recipes.PSObject.Properties | Where-Object { ([string]$_.Value.rankFrom).Contains('held above what its placed inputs cost') } | ForEach-Object { $_.Value })
 $notKept = @($held | Where-Object { -not ([string]$_.rankFrom).Contains('Kept on purpose') })
 Yes ('every row held dear by something nobody gathers says it is kept on purpose ({0} rows)' -f $held.Count) ($held.Count -gt 0 -and $notKept.Count -eq 0)
