@@ -7377,9 +7377,12 @@ function fish(actorId, refrId, baseDesc) {
   // the game.
   const span = Object.prototype.hasOwnProperty.call(FISH_TUNING.cooldownMs, caught.rank)
     ? FISH_TUNING.cooldownMs[caught.rank] : FISH_TUNING.cooldownMs.master;
-  const wait = stock.left(refrId,span);
-  if (wait > 0) {
-    return 'This water is fished out for now. ' + waitWord(wait) + ' to go.';
+  // stock.left answers in milliseconds and waitWord takes seconds. Until
+  // #1826 the milliseconds went in as seconds, and ten minutes left read
+  // '166 hours and 40 minutes to go'.
+  const waitMs = stock.left(refrId,span);
+  if (waitMs > 0) {
+    return 'This water is fished out for now. ' + waitWord(waitMs / 1000) + ' to go.';
   }
 
   const pair = FISH_TUNING.yieldByStep[step] || FISH_TUNING.yieldByStep[0];
@@ -7477,9 +7480,10 @@ function game(actorId, refrId, baseDesc) {
   // seams and the bodies do.
   const span = Object.prototype.hasOwnProperty.call(GAME_TUNING.cooldownMs, hung.rank)
     ? GAME_TUNING.cooldownMs[hung.rank] : GAME_TUNING.cooldownMs.master;
-  const wait = stock.left(refrId,span);
-  if (wait > 0) {
-    return 'This one is picked clean for now. ' + waitWord(wait) + ' to go.';
+  // milliseconds from the stock, seconds to waitWord, as in fish() (#1826)
+  const waitMs = stock.left(refrId,span);
+  if (waitMs > 0) {
+    return 'This one is picked clean for now. ' + waitWord(waitMs / 1000) + ' to go.';
   }
 
   const pair = GAME_TUNING.yieldByStep[step] || GAME_TUNING.yieldByStep[0];
@@ -7853,7 +7857,6 @@ var HUNTS_BY_BASE = {
   "10f2a3:Skyrim.esm": { "name": "Ice Wolf", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad75:Skyrim.esm", "name": "Ice Wolf Pelt", "count": 1 }] },
   "10f2a2:Skyrim.esm": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
   "10d29c:Skyrim.esm": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
-  "10bf90:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
   "109e41:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
   "109e40:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
   "109e3e:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
@@ -7877,10 +7880,6 @@ var HUNTS_BY_BASE = {
   "fe2d6:Skyrim.esm": { "name": "Sabre Cat", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6d:Skyrim.esm", "name": "Sabre Cat Pelt", "count": 1 }, { "item": "6bc04:Skyrim.esm", "name": "Sabre Cat Tooth", "count": 1 }, { "item": "6bc07:Skyrim.esm", "name": "Eye of Sabre Cat", "count": 1 }] },
   "fdc5a:Skyrim.esm": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
   "fa6d9:Skyrim.esm": { "name": "Chicken", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "f2011:Skyrim.esm", "name": "Chicken Breast", "count": 1 }] },
-  "f9060:Skyrim.esm": { "name": "Spectral Warhound", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad63:Skyrim.esm", "name": "Ectoplasm", "count": 1 }] },
-  "f608c:Skyrim.esm": { "name": "Wolf Spirit", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad75:Skyrim.esm", "name": "Ice Wolf Pelt", "count": 1 }] },
-  "f6089:Skyrim.esm": { "name": "Vilkas's Wolf Spirit", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad75:Skyrim.esm", "name": "Ice Wolf Pelt", "count": 1 }] },
-  "f6087:Skyrim.esm": { "name": "Farkas's Wolf Spirit", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad75:Skyrim.esm", "name": "Ice Wolf Pelt", "count": 1 }] },
   "f4c90:Skyrim.esm": { "name": "Frost Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
   "f077a:Skyrim.esm": { "name": "Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
   "ef610:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
@@ -7924,12 +7923,6 @@ var HUNTS_BY_BASE = {
   "5487e:Skyrim.esm": { "name": "Goat", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8e:Skyrim.esm", "name": "Goat Hide", "count": 1 }, { "item": "65c9a:Skyrim.esm", "name": "Goat Meat", "count": 1 }] },
   "39662:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
   "21875:Skyrim.esm": { "name": "Mudcrab", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3540:HearthFires.esm", "name": "Mudcrab Legs", "count": 1 }, { "item": "6bc00:Skyrim.esm", "name": "Mudcrab Chitin", "count": 2 }] },
-  "e7eb2:Skyrim.esm": { "name": "Guardian Troll Spirit", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
-  "e7eaf:Skyrim.esm": { "name": "Mammoth Guardian Spirit", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]], "gives": [{ "item": "3ad6c:Skyrim.esm", "name": "Mammoth Tusk", "count": 1 }, { "item": "669a4:Skyrim.esm", "name": "Mammoth Snout", "count": 1 }] },
-  "e7ead:Skyrim.esm": { "name": "Sabre Cat Guardian Spirit", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad6e:Skyrim.esm", "name": "Sabre Cat Snow Pelt", "count": 1 }, { "item": "6bc04:Skyrim.esm", "name": "Sabre Cat Tooth", "count": 1 }, { "item": "6bc07:Skyrim.esm", "name": "Eye of Sabre Cat", "count": 1 }] },
-  "e7ea9:Skyrim.esm": { "name": "Ursine Guardian", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad54:Skyrim.esm", "name": "Snow Bear Pelt", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 1 }] },
-  "e662e:Skyrim.esm": { "name": "Skeever Guardian Spirit", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
-  "e662d:Skyrim.esm": { "name": "Wolf Guardian Spirit", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
   "e4011:Skyrim.esm": { "name": "Mudcrab", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3540:HearthFires.esm", "name": "Mudcrab Legs", "count": 1 }, { "item": "6bc00:Skyrim.esm", "name": "Mudcrab Chitin", "count": 1 }] },
   "e4010:Skyrim.esm": { "name": "Mudcrab", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3540:HearthFires.esm", "name": "Mudcrab Legs", "count": 1 }, { "item": "6bc00:Skyrim.esm", "name": "Mudcrab Chitin", "count": 1 }] },
   "e1672:Skyrim.esm": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
@@ -7958,7 +7951,6 @@ var HUNTS_BY_BASE = {
   "c96be:Skyrim.esm": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
   "c39f1:Skyrim.esm": { "name": "Cow", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8f:Skyrim.esm", "name": "Cow Hide", "count": 1 }, { "item": "65c99:Skyrim.esm", "name": "Raw Beef", "count": 1 }] },
   "c214e:Skyrim.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
-  "c026a:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
   "a19ff:Skyrim.esm": { "name": "Lis", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
   "a19fe:Skyrim.esm": { "name": "Lis", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
   "8327d:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
@@ -7983,7 +7975,6 @@ var HUNTS_BY_BASE = {
   "a5600:Skyrim.esm": { "name": "Chaurus", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
   "9da4b:Skyrim.esm": { "name": "Cow", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8f:Skyrim.esm", "name": "Cow Hide", "count": 1 }, { "item": "65c99:Skyrim.esm", "name": "Raw Beef", "count": 1 }] },
   "9d74e:Skyrim.esm": { "name": "Dog", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
-  "9ce28:Skyrim.esm": { "name": "Flaming Thrall", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
   "9ccd7:Skyrim.esm": { "name": "Shadowmere", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
   "9a7aa:Skyrim.esm": { "name": "Vigilance", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
   "8e4fc:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
@@ -7996,10 +7987,8 @@ var HUNTS_BY_BASE = {
   "48d64:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
   "23ef1:Skyrim.esm": { "name": "Tiber", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
   "23eed:Skyrim.esm": { "name": "Ysgramor", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
-  "877eb:Skyrim.esm": { "name": "Fire Storm", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
   "79bfd:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
   "59397:Skyrim.esm": { "name": "Sabre Cat", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6d:Skyrim.esm", "name": "Sabre Cat Pelt", "count": 1 }, { "item": "6bc04:Skyrim.esm", "name": "Sabre Cat Tooth", "count": 1 }, { "item": "6bc07:Skyrim.esm", "name": "Eye of Sabre Cat", "count": 1 }] },
-  "58303:Skyrim.esm": { "name": "Kodlak's Wolf Spirit", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad75:Skyrim.esm", "name": "Ice Wolf Pelt", "count": 1 }] },
   "58272:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
   "7398a:Skyrim.esm": { "name": "Wolf", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] },
   "73989:Skyrim.esm": { "name": "Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 1 }] },
@@ -8067,7 +8056,6 @@ var HUNTS_BY_BASE = {
   "1e7a4:Skyrim.esm": { "name": "Cave Bear", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad52:Skyrim.esm", "name": "Bear Pelt", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 1 }] },
   "1e7a1:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
   "1e7a0:Skyrim.esm": { "name": "Skeever", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad6f:Skyrim.esm", "name": "Skeever Tail", "count": 1 }, { "item": "8ac:Gourmet.esp", "name": "Skeever Meat", "count": 1 }] },
-  "804:Update.esm": { "name": "Goat", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8e:Skyrim.esm", "name": "Goat Hide", "count": 1 }, { "item": "65c9a:Skyrim.esm", "name": "Goat Meat", "count": 1 }] },
   "138b8:Dawnguard.esm": { "name": "Giant Frostbite Spider", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "e41b8:Skyrim.esm", "name": "Frostbite Venom", "count": 2 }] },
   "113c1:Dawnguard.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
   "cef3:Dawnguard.esm": { "name": "Husky", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
@@ -8101,8 +8089,6 @@ var HUNTS_BY_BASE = {
   "d0b9:Dawnguard.esm": { "name": "Armored Frost Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
   "d0b8:Dawnguard.esm": { "name": "Armored Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
   "c21d:Dawnguard.esm": { "name": "Chaurus Hunter", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "183b7:Dawnguard.esm", "name": "Chaurus Hunter Antennae", "count": 1 }, { "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
-  "bdd0:Dawnguard.esm": { "name": "Arvak", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
-  "bdcf:Dawnguard.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
   "9d39:Dawnguard.esm": { "name": "Chaurus Hunter", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "183b7:Dawnguard.esm", "name": "Chaurus Hunter Antennae", "count": 1 }, { "item": "3ad57:Skyrim.esm", "name": "Chaurus Chitin", "count": 1 }] },
   "966d:Dawnguard.esm": { "name": "Horse", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad93:Skyrim.esm", "name": "Horse Hide", "count": 1 }, { "item": "65c9c:Skyrim.esm", "name": "Horse Meat", "count": 1 }] },
   "8a6c:Dawnguard.esm": { "name": "Pack Member", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad75:Skyrim.esm", "name": "Ice Wolf Pelt", "count": 1 }] },
@@ -8134,8 +8120,6 @@ var HUNTS_BY_BASE = {
   "2857e:Dragonborn.esm": { "name": "Bull Netch", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "1cd72:Dragonborn.esm", "name": "Netch Jelly", "count": 1 }, { "item": "1cd7c:Dragonborn.esm", "name": "Netch Leather", "count": 1 }] },
   "26196:Dragonborn.esm": { "name": "Lord Tusk", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad68:Skyrim.esm", "name": "Horker Tusk", "count": 1 }, { "item": "65c9b:Skyrim.esm", "name": "Horker Meat", "count": 1 }] },
   "25ae4:Dragonborn.esm": { "name": "Solstheim Mudcrab", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3540:HearthFires.esm", "name": "Mudcrab Legs", "count": 1 }, { "item": "6bc00:Skyrim.esm", "name": "Mudcrab Chitin", "count": 1 }] },
-  "2173b:Dragonborn.esm": { "name": "Netch", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]], "gives": [{ "item": "3ad6c:Skyrim.esm", "name": "Mammoth Tusk", "count": 1 }, { "item": "669a4:Skyrim.esm", "name": "Mammoth Snout", "count": 1 }] },
-  "1dfa1:Dragonborn.esm": { "name": "Frost Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
   "1d77a:Dragonborn.esm": { "name": "Old Salty", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3540:HearthFires.esm", "name": "Mudcrab Legs", "count": 1 }, { "item": "6bc00:Skyrim.esm", "name": "Mudcrab Chitin", "count": 2 }] },
   "1b657:Dragonborn.esm": { "name": "Ash Hopper", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "1cd71:Dragonborn.esm", "name": "Ash Hopper Jelly", "count": 1 }, { "item": "2b04e:Dragonborn.esm", "name": "Chitin Plate", "count": 1 }, { "item": "3bd15:Dragonborn.esm", "name": "Ash Hopper Meat", "count": 1 }, { "item": "3d125:Dragonborn.esm", "name": "Ash Hopper Leg", "count": 1 }] },
   "1b649:Dragonborn.esm": { "name": "Betty Netch", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "1cd72:Dragonborn.esm", "name": "Netch Jelly", "count": 1 }, { "item": "1cd7c:Dragonborn.esm", "name": "Netch Leather", "count": 1 }] },
@@ -8149,13 +8133,9 @@ var HUNTS_BY_BASE = {
   "291791:WindhelmSSE.esp": { "name": "Karhu", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]], "gives": [{ "item": "2ba5f2:WindhelmSSE.esp", "name": "Pelt of Karhu", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 2 }, { "item": "af5fd:Skyrim.esm", "name": "Skull", "count": 1 }] },
   "48459:WindhelmSSE.esp": { "name": "Sulvar's Dog", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
   "200a46:WindhelmSSE.esp": { "name": "Hugo", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
-  "3ee9b8:Riften Expansion.esp": { "name": "Bear Avatar", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad52:Skyrim.esm", "name": "Bear Pelt", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 1 }] },
-  "1b829f:Odin - Skyrim Magic Overhaul.esp": { "name": "Buried Storage", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "f2011:Skyrim.esm", "name": "Chicken Breast", "count": 1 }] },
-  "1a5ad2:Odin - Skyrim Magic Overhaul.esp": { "name": "Familiar", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]], "gives": [{ "item": "3ad52:Skyrim.esm", "name": "Bear Pelt", "count": 1 }, { "item": "6bc02:Skyrim.esm", "name": "Bear Claws", "count": 1 }] },
   "4c36de:aaaGraniteHill.esp": { "name": "Hund", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
   "e0c0:aaaGraniteHill.esp": { "name": "Chicken", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "f2011:Skyrim.esm", "name": "Chicken Breast", "count": 1 }] },
   "375af:ElysiumEstate.esp": { "name": "Chloe", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad8e:Skyrim.esm", "name": "Goat Hide", "count": 1 }, { "item": "65c9a:Skyrim.esm", "name": "Goat Meat", "count": 1 }] },
-  "d64:FishingInSkyrim.esp": { "name": "FishingNetSlaughterfish", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad70:Skyrim.esm", "name": "Slaughterfish Scales", "count": 1 }, { "item": "8ae:Gourmet.esp", "name": "Slaughterfish Meat", "count": 1 }] },
   "1db39:SkyrimSewers.esp": { "name": "Cave Troll", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
   "1ebcf:SkyrimSewers.esp": { "name": "Aldhissla", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad72:Skyrim.esm", "name": "Troll Fat", "count": 1 }] },
   "25af1:SkyrimSewers.esp": { "name": "Stray Dog", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
@@ -8203,8 +8183,7 @@ var HUNTS_BY_BASE = {
   "19f7:OarsRest.esp": { "name": "Barnaby", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
   "4d081:OarsRest.esp": { "name": "Chicken", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "f2011:Skyrim.esm", "name": "Chicken Breast", "count": 1 }] },
   "4d083:OarsRest.esp": { "name": "Constipated Chicken", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "f2011:Skyrim.esm", "name": "Chicken Breast", "count": 1 }] },
-  "60ec2:Immersive Patrols II.esp": { "name": "Dawnguard Husky", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] },
-  "863:YokuWeapons.esp": { "name": "Jar Bomb", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "3ad74:Skyrim.esm", "name": "Wolf Pelt", "count": 1 }] }
+  "60ec2:Immersive Patrols II.esp": { "name": "Dawnguard Husky", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]], "gives": [{ "item": "edb2e:Skyrim.esm", "name": "Dog Meat", "count": 1 }] }
 };
 
 // ==== end HUNTS_BY_BASE ====
@@ -29431,6 +29410,18 @@ log('gamemode loaded:',
 
   var PLUGIN = /\.(esp|esm|esl)$/i;
 
+  // The plugins whose bytes this server hands out: Thornswood's own and
+  // nothing else (#1180). Every other plugin in the load order is somebody
+  // else's mod, which people get from its author through Vortex and the
+  // collection. Measured on 5 Oct, the main and the dev server each handed
+  // out 43 plugins to anyone who asked, 42 of them other authors' (27 MB),
+  // because the rule here named what to leave out (Bethesda's five masters)
+  // instead of what is ours. The names are the plugins
+  // scripts\release\Ship-Rules.ps1 calls ours ($ShipOursFiles), and
+  // tests\test-1180-own-plugins.js holds the two lists to each other, so a
+  // plugin the repo makes goes into both in one change.
+  var OURS = { 'thornswood-content.esp': 1 };
+
   function publish() {
     var doc;
     try {
@@ -29447,7 +29438,11 @@ log('gamemode loaded:',
     var out = {
       versionMajor: doc.versionMajor || 1,
       mods: mods,
-      loadOrder: Array.isArray(doc.loadOrder) ? doc.loadOrder : mods.map(function (m) { return m.filename; })
+      loadOrder: Array.isArray(doc.loadOrder) ? doc.loadOrder : mods.map(function (m) { return m.filename; }),
+      // Which of those the launcher's Fix may fetch from /plugins/ (#1180).
+      // The client reads mods and loadOrder only.
+      served: mods.filter(function (m) { return OURS[m.filename.toLowerCase()]; })
+                  .map(function (m) { return m.filename; })
     };
 
     try {
@@ -29470,21 +29465,24 @@ log('gamemode loaded:',
     return true;
   }
 
-  // The files themselves, beside the manifest, for the launcher's Fix.
+  // Our own plugins themselves, beside the manifest, for the launcher's Fix.
   //
   // A plugin with the right name in the right place and the wrong bytes paints
-  // LOAD ORDER ERROR over somebody's screen for the whole session (17 Sep), and
-  // nothing on that machine can put the right bytes there: the collection gave
-  // it the build it had. This box has the exact files the manifest describes,
-  // so they are served under
+  // LOAD ORDER ERROR over somebody's screen for the whole session (17 Sep).
+  // For Thornswood's own plugin this box has the bytes the manifest describes,
+  // and they are ours to hand out, so it is served under
   //
   //     /api/servers/thornswood/plugins/<file>
   //
-  // as hard links into the plugins folder, so there is no second copy on disk
+  // as a hard link into the plugins folder, so there is no second copy on disk
   // (a copy when a link is refused). Relinked at every start, because a deploy
-  // may have replaced the file behind the link. The five Bethesda masters stay
-  // out: the client never compares their bytes and Steam owns them.
-  var STOREFRONT = { 'skyrim.esm': 1, 'update.esm': 1, 'dawnguard.esm': 1, 'hearthfires.esm': 1, 'dragonborn.esm': 1 };
+  // may have replaced the file behind the link.
+  //
+  // Nothing else is (#1180). Another author's plugin with the wrong bytes is
+  // put right by updating or reinstalling that mod in Vortex, which fetches it
+  // from its author; the launcher's Fix says which mod. Bethesda's masters
+  // were never served. The clearing below takes the files an older start
+  // published off this box.
 
   function publishFiles(mods) {
     var order = [];
@@ -29501,14 +29499,19 @@ log('gamemode loaded:',
     // each file is served as its position in the manifest with a .bin
     // extension, which the resources server does hand over. The launcher
     // fetches /plugins/<index>.bin for the manifest entry at that index.
+    // Since #1180 this is also what takes other authors' plugins, which an
+    // older start published, off this box, so a file that stays is said.
     try {
       var stale = fs.readdirSync(PLUG);
-      for (var s = 0; s < stale.length; s++) { try { fs.unlinkSync(path.join(PLUG, stale[s])); } catch (e) { } }
-    } catch (e) { }
+      for (var s = 0; s < stale.length; s++) {
+        try { fs.unlinkSync(path.join(PLUG, stale[s])); }
+        catch (e) { console.log('[thornswood] could not take ' + stale[s] + ' off /plugins/, so it is still served: ' + e.message); }
+      }
+    } catch (e) { console.log('[thornswood] could not read /plugins/ to clear it: ' + e.message); }
     var linked = 0, copied = 0, missing = 0, bytes = 0;
     for (var j = 0; j < mods.length; j++) {
       var name = mods[j].filename;
-      if (STOREFRONT[name.toLowerCase()]) continue;
+      if (!OURS[name.toLowerCase()]) continue;
       var src = byName[name.toLowerCase()];
       if (!src || !fs.existsSync(src)) { missing++; continue; }
       var dst = path.join(PLUG, j + '.bin');
@@ -29521,7 +29524,7 @@ log('gamemode loaded:',
       }
       bytes += Number(mods[j].size) || 0;
     }
-    console.log('[thornswood] ' + (linked + copied) + ' plugin files published at /api/servers/' + KEY +
+    console.log('[thornswood] ' + (linked + copied) + ' of our plugin files published at /api/servers/' + KEY +
                 '/plugins/ for the launcher, ' + Math.round(bytes / 1048576) + ' MB' +
                 (copied ? ', ' + copied + ' copied rather than linked' : '') +
                 (missing ? ', ' + missing + ' not found on this box' : ''));

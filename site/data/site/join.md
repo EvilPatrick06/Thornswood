@@ -98,7 +98,8 @@ Not Skyrim. Not Steam. Not SKSE. Always the Thornswood shortcut.
 The launcher checks for updates and takes any that are waiting, because
 everybody has to be running the same files or nobody can connect. It also
 compares every plugin with the server's copy, byte for byte. If one differs it
-says so, and **Fix** downloads the server's copy of that plugin.
+says so. For Thornswood's own plugin **Fix** downloads the server's copy; for
+another author's mod it names the mod to update or reinstall in Vortex.
 
 Then the game loads to its main menu and asks who you are today: one of your
 characters, or a new one. Pick and press Play.

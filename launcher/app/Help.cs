@@ -192,13 +192,15 @@ namespace Thornswood
             // ===================================================== breakage
             // Scan and Fix are on the Diagnostics page since #607. Fix is
             // Verify.Fix: the server's order, other servers' files and Creation
-            // Club plugins moved aside, missing plugins back from Vortex, and
-            // the server's copy of any plugin whose bytes differ.
+            // Club plugins moved aside, missing plugins back from Vortex, the
+            // server's copy of Thornswood's own plugin when its bytes differ,
+            // and the mod to put right in Vortex when another author's differs
+            // (#1180: the server hands out only its own).
             new HelpItem("If it breaks", "What Scan and Fix do",
-                "Both are on the Diagnostics page. Scan compares your plugins with the server's: the same names, in the same order, with the same bytes. Fix makes yours match. It puts your plugin list in the server's order, puts back plugins Vortex has that the game folder lost, downloads the server's copy of any plugin whose bytes differ, and moves another server's files and stray Creation Club plugins aside, never deleting them. Close Skyrim first. Fix cannot install a mod Vortex never installed: if Scan says a plugin is not installed, the collection is not fully installed or the wrong Vortex profile is on."),
+                "Both are on the Diagnostics page. Scan compares your plugins with the server's: the same names, in the same order, with the same bytes. Fix makes yours match. It puts your plugin list in the server's order, puts back plugins Vortex has that the game folder lost, downloads the server's copy of Thornswood's own plugin when its bytes differ, names the mod to update or reinstall in Vortex when another author's plugin differs, and moves another server's files and stray Creation Club plugins aside, never deleting them. Close Skyrim first. Fix cannot install a mod Vortex never installed: if Scan says a plugin is not installed, the collection is not fully installed or the wrong Vortex profile is on."),
 
             new HelpItem("If it breaks", "\"LOAD ORDER ERROR\", or Play is refused",
-                "A plugin differs from the server's, and joining like that would desync everyone. Close the game, open Diagnostics, press Scan and then Fix, and press Play again. Nothing in Vortex has to change."),
+                "A plugin differs from the server's, and joining like that would desync everyone. Close the game, open Diagnostics, press Scan and then Fix, and press Play again. When the plugin that differs is another author's mod, Scan names the mod to update or reinstall in Vortex, because the server hands out only Thornswood's own."),
 
             new HelpItem("If it breaks", "The game will not start",
                 "Check the Play page first. A red row is the actual problem, and the usual one is Steam not running, because the game still checks ownership through it."),

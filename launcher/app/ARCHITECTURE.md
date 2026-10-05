@@ -309,14 +309,16 @@ In the shared shape Apply does nothing, because Vortex owns those folders
 there.
 
 **Verify and LoadOrder** (Verify.cs, LoadOrder.cs). Whether this install's
-plugin list is the server's. `Verify.cs:74 Run()` reads, and writes nothing:
+plugin list is the server's. `Verify.cs:79 Run()` reads, and writes nothing:
 the shipped reference `Profile\Default\plugins.txt`, the live list
 `Profile\LocalAppData\plugins.txt`, the server's manifest over HTTP on its
 resources port (3000 for the main server, 7788 for dev), and the size and
 CRC of each plugin. Only the Fix button writes: the reference list into the
-live one, a plugin fetched from the server (the old one kept in
-`Profile\Replaced`), and other servers' files moved into `Profile\Isolated`.
-`Verify.cs:968 DeployPersonal()` copies `<Root>\Your Mods` into `Game\Data`.
+live one, Thornswood's own plugin fetched from the server when its bytes
+differ (the old one kept in `Profile\Replaced`; the server hands out no other
+author's plugin, #1180), and other servers' files moved into
+`Profile\Isolated`.
+`Verify.cs:1019 DeployPersonal()` copies `<Root>\Your Mods` into `Game\Data`.
 
 **Vortex profile state** (VortexProfileState.cs). Checks and the PowerShell
 load-order scripts share this reader for the named Skyrim profile. It reads
