@@ -474,7 +474,7 @@ function Get-VortexProfileDir([string]$Name = 'Thornswood') {
 }
 
 <#
-  Require the named Vortex profile. Throws when missing — bake and Ship must
+  Require the named Vortex profile. Throws when missing: bake and Ship must
   not fall through to another profile's list.
 #>
 function Assert-VortexProfile([string]$Name = 'Thornswood') {
