@@ -20,9 +20,9 @@
   WebSocket exists. SkyrimPlatform's own HttpClient can only poll.
 
   The page is served from file:///, which Chromium treats as a trustworthy
-  origin, so an outbound ws:// from here is allowed. That is the same rule that
-  made the old separate voice window impossible: a page served over plain http
-  from a remote address gets no microphone at all, whatever flags it is given.
+  origin, so it may open sockets anywhere. It opens only wss:// to the
+  address the launcher gives it, since the join token goes with the handshake
+  and the service refuses one over plain ws (#1304).
 */
 
 (function () {
@@ -141,20 +141,20 @@
   }
 
   /*
-    Through Caddy when the plugin was told about one, the raw port
-    otherwise. A base of https://... gives wss://, and getting that wrong
-    is a mixed content error that says nothing useful about why.
+    Through Caddy, the only way in (#1304): a base of https://... gives
+    wss://. The raw port this fell back to without a base is shut, and the
+    service refuses a join token over plain ws, so anything that is not
+    https is no address at all.
   */
   function url() {
     var b = String(CFG.base || '').replace(/\/+$/, '');
-    if (!b) { return 'ws://' + HOST + ':' + PORT + '/'; }
     if (b.indexOf('https://') === 0) { return 'wss://' + b.slice(8) + '/'; }
-    if (b.indexOf('http://') === 0) { return 'ws://' + b.slice(7) + '/'; }
-    return b + '/';
+    return '';
   }
 
   function connect() {
     if (!HOST) { note('No server address, so the chat is off.', C_WARN); return; }
+    if (!url()) { note('No secure address for the chat from the launcher, so the chat is off.', C_WARN); return; }
     if (ws && (ws.readyState === 0 || ws.readyState === 1)) return;
 
     if (!TOKEN) {

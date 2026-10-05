@@ -60,7 +60,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -1755,6 +1755,14 @@ const server = http.createServer((req, res) => {
     profileId on its own proves nothing, which was the whole problem.
   */
   if (req.method === 'POST' && route === '/token') {
+    // The Discord ticket comes in this body, so never over plain http (#1304).
+    // Too late for that ticket, but nothing is minted on it and the log says so.
+    if (plainFromOutside(req)) {
+      console.log('[voice] REFUSED a token request that came over plain http: a ticket only goes over https (#1304)');
+      res.writeHead(403, { 'content-type': 'text/plain' }).end('a ticket only goes over https');
+      req.resume();
+      return;
+    }
     // So many a minute from one place (#1323); see doorWait.
     const tokenWait = doorWait(tokenDoor, req, Date.now());
     if (tokenWait) {
@@ -2042,6 +2050,32 @@ let originRefused = 0;
 let originSaidAt = 0;
 
 /*
+  A JOIN TOKEN AND A TICKET ONLY OVER TLS (#1304).
+
+  Every client reaches this service through Caddy, over https and wss, and the
+  raw ports have been shut from outside since 29 September (bound to
+  loopback; measured again on 5 October: 7778 and 7789 do not answer from
+  outside, 443 does). The code still listened on every interface unless told
+  otherwise, and still took a token over plain ws from anywhere, so a box set
+  up without THORNSWOOD_VOICE_BIND carried tokens and tickets in the clear.
+
+  A request that came straight off the network, not from loopback, came over
+  plain http or ws, because this service has no certificate. One that came
+  through a proxy says how it came in X-Forwarded-Proto, which Caddy always
+  sets; anything but https there was plain too. Either way /token and the
+  handshake refuse it, and a token that arrived like that is spent on the
+  spot, so whoever saw it on the wire cannot use it either. Straight from
+  loopback with no forwarding header is this machine: the gamemode and the
+  harnesses.
+*/
+function plainFromOutside(req) {
+  const ra = (req.socket && req.socket.remoteAddress) || '';
+  if (!(ra === '127.0.0.1' || ra === '::1' || ra === '::ffff:127.0.0.1')) return true;
+  const proto = req.headers['x-forwarded-proto'];
+  return proto !== undefined && String(proto).split(',')[0].trim().toLowerCase() !== 'https';
+}
+
+/*
   WHO THIS IS, BEFORE THE SOCKET OPENS (#1337, #1322).
 
   The handshake used to be answered for anybody, and who they were was the
@@ -2100,6 +2134,16 @@ server.on('upgrade', (req, socket, head) => {
   if (!key) { socket.destroy(); return; }
   const offered = String(req.headers['sec-websocket-protocol'] || '').split(',')
     .map((s) => s.trim()).filter(Boolean);
+  // Over plain ws from outside: spent, so a copy off the wire opens nothing,
+  // and refused (#1304).
+  if (plainFromOutside(req)) {
+    const seen = offered.filter((p) => p !== PROTOCOL)[0] || '';
+    if (seen) { spendToken(seen, Date.now()); }
+    console.log('[voice] REFUSED a connection that came over plain ws' + (seen ? ', and spent the token it carried' : '') +
+                ': a join token only goes over wss (#1304)');
+    refuseUpgrade(socket, 'a join token only goes over wss');
+    return;
+  }
   const pass = offered.indexOf(PROTOCOL) === -1
     ? { why: 'no token', profileId: 0 }
     : spendToken(offered.filter((p) => p !== PROTOCOL)[0] || '', Date.now());
@@ -2405,26 +2449,21 @@ server.on('upgrade', (req, socket, head) => {
 /*
   Which addresses the service answers on.
 
-  It has always been every interface, because the launcher and everybody's
-  browser reach it from their own house. That also means the port is open to
-  the whole internet, which entry 6 is about.
+  It was every interface, because the launcher and everybody's browser
+  reached it from their own house, which put the port on the whole internet
+  (entry 6). Behind Caddy it does not need to be: Caddy holds 443 for the
+  site, carries /voice/ and /voice-dev/ through to here, and this listens on
+  loopback only, one door with a certificate on it, wss:// rather than ws://.
 
-  Behind Caddy it does not need to be. Caddy already holds 443 for the site, it
-  can carry /voice/ through to here, and then this can listen on loopback only:
-  one door instead of two, with a certificate on it, and wss:// instead of ws://
-  so nobody's voice traffic crosses the internet in the clear.
-
-  It is a setting rather than a rewrite because the two halves cannot land at
-  the same instant. Every launcher already out there connects to the raw port.
-  Bind this to loopback before those are replaced and none of them can reach it,
-  and no server side change brings them back, because the address they try is
-  compiled into the copy on their machine. So: ship the clients that can use
-  wss first, let them go out, then set this.
-
-  THORNSWOOD_VOICE_BIND=127.0.0.1 is the whole switch, and unsetting it is the
-  whole rollback.
+  Live and dev have run on loopback since 29 September, set on the command
+  line, and every launcher has used the https address the feed gives it.
+  Loopback is the default since #1304, so a service started without the
+  setting does not open the port again. THORNSWOOD_VOICE_BIND=0.0.0.0 still
+  answers every interface, for a machine with no proxy in front, and even
+  then nothing that carries a token or a ticket is taken over it
+  (plainFromOutside).
 */
-const BIND = String(process.env.THORNSWOOD_VOICE_BIND || '0.0.0.0').trim() || '0.0.0.0';
+const BIND = String(process.env.THORNSWOOD_VOICE_BIND || '127.0.0.1').trim() || '127.0.0.1';
 
 server.listen(PORT, BIND, () => {
   console.log('[voice] listening on ' + BIND + ':' + PORT +

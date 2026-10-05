@@ -513,7 +513,8 @@ yes('dispatch() hands "/afk <word>" to the idle block, with no character needed'
   const sent = [];
   const sockets = [];
   const win = {
-    THORNSWOOD: { host: 'h', port: 1, profileId: 4242, token: 'v1.4242.9.x' },
+    // The https address the launcher writes; there is no ws:// fallback (#1304).
+    THORNSWOOD: { host: 'h', port: 1, profileId: 4242, token: 'v1.4242.9.x', base: 'https://h.test/voice' },
     thornswoodChat: { add: function () { } },
     skyrimPlatform: { sendMessage: function (a, b) { sent.push(a + ' ' + b); } }
   };

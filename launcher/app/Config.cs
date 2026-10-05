@@ -47,49 +47,49 @@ namespace Thornswood
         [DataMember] public string VoicePort = "7778";
 
         /// <summary>
-        /// Where the voice service is, when it is not simply the server address
-        /// and a port. Empty means it is, which is how this has always worked.
+        /// Where the voice service is, as the feed gives it:
+        /// https://thornswood.net/voice, or /voice-dev on the dev build.
         /// </summary>
         /// <remarks>
-        /// Set this to https://thornswood.net/voice and everything voice does
-        /// goes through Caddy on 443 instead of the raw port: one door with a
+        /// Everything voice does goes through Caddy on 443: one door with a
         /// certificate on it, and wss:// rather than ws://, so nobody's voice
-        /// signalling crosses the internet in the clear.
+        /// signalling, join token or Discord ticket crosses the internet in
+        /// the clear.
         ///
-        /// It stays empty until the launchers that understand it have gone out.
-        /// A launcher that has never heard of this setting connects to the raw
-        /// port, so the port has to keep answering until they are all replaced.
+        /// Empty, or anything that is not https, used to mean the raw port,
+        /// http://address:7778. That port has been shut from outside since
+        /// 29 September, the service refuses a token over plain ws (#1304),
+        /// and FetchToken never sent the ticket to it anyway, so VoiceBase
+        /// gives the built-in address instead (Voice, below).
         /// </remarks>
         [DataMember] public string VoiceUrl = "";
 
         /// <summary>
-        /// The voice service as a base address, with no trailing slash.
+        /// The voice service behind Caddy, for a config whose VoiceUrl is
+        /// empty or not https: a new install before its first update check,
+        /// or a feed that sends voiceUrl empty. The dev build adds -dev, the
+        /// same as DevBuild.DevVoiceUrl, written out here because several
+        /// harnesses compile this file without DevBuild.cs.
+        /// </summary>
+        public const string Voice = "https://thornswood.net/voice";
+
+        /// <summary>
+        /// The voice service as a base address, https, with no trailing slash.
         /// </summary>
         public string VoiceBase()
         {
             string u = VoiceUrl == null ? "" : VoiceUrl.Trim();
             while (u.EndsWith("/")) { u = u.Substring(0, u.Length - 1); }
-            if (u.Length > 0) { return u; }
-            string p = VoicePort == null ? "" : VoicePort.Trim();
-            if (p.Length == 0) { p = "7778"; }
-            return "http://" + (ServerAddress == null ? "" : ServerAddress) + ":" + p;
+            if (u.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) { return u; }
+            return IsDev ? Voice + "-dev" : Voice;
         }
 
         /// <summary>
-        /// The same address as a WebSocket url, so a secure base gives wss.
+        /// The same address as a WebSocket url, which is always wss (#1304).
         /// </summary>
         public string VoiceSocket()
         {
-            string b = VoiceBase();
-            if (b.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            {
-                return "wss://" + b.Substring(8) + "/";
-            }
-            if (b.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
-            {
-                return "ws://" + b.Substring(7) + "/";
-            }
-            return b + "/";
+            return "wss://" + VoiceBase().Substring(8) + "/";
         }
 
         /*
