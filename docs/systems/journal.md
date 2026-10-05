@@ -9,8 +9,9 @@ quest log. Vanilla quests do not run.
 page title is 60 characters. Past that, the rest is cut off rather
 than refused as a second page.
 
-J opens the panel. `/journal` is the same. `/journal new` and a title
-starts one.
+J opens the panel, and everything on this page is done there. New
+journal starts one, and Rename gives it its title. Nothing here is
+typed into the chat.
 
 The title, a page's title, and the page itself can be typed. While
 the panel is open the keyboard stays in it, including in those
@@ -48,9 +49,11 @@ Posting and taking stay at the board itself. See
 
 ## Where this is
 
-The caps, the panel, typing in the title and the page, the commands,
-and sharing with a friend are in the server. A friend who is offline
-can be named, and the share is kept. The page still only appears
+The caps, the panel, typing in the title and the page, and sharing
+with a friend are in the server. The panel sends the server a line
+for each button; nobody is told to type it, and no help names it
+(#1630). A friend who is offline can be named, and the share is
+kept. The page still only appears
 while the person who wrote it is online. A journal survives a
 restart. It is not a quest. The group tab is on the same panel. A price list is left from the
 notice board's panel, while you are standing at it, and the list

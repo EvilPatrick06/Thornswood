@@ -18,14 +18,19 @@
   would look for it rather than left to be discovered.
 
   THE CONTRACT with thornswood-front.js:
-    window.thornswoodJournal = { open, close, toggle, isOpen, setData }
+    window.thornswoodJournal = { open, close, toggle, isOpen, setData, setFacing }
     page -> plugin  'journal:ready' | 'journal:opened' | 'journal:closed'
+    plugin -> page  setFacing({ id, name }) or setFacing(null) as it opens:
+                    who the look prompt was drawn for when J opened
 
-  Everything it does goes out as the ordinary /journal command, the same lines
-  a person could type. See the journalCommand note in gamemode.js.
+  Everything it does goes out as a /journal line. See the journalCommand note
+  in gamemode.js. Those lines are the panel's: J is the only way in, nobody is
+  told to type them, and no help names them (Patrick, 4 Oct: buttons, not
+  commands; #1630).
 
   A faction or a business is a separate tab on this same panel, drawn only
-  when the server says this character may see it. Those lines go out as /book.
+  when the server says this character may see it. Those lines go out as /book,
+  the same way.
 */
 (function () {
   if (window.thornswoodJournal) { return; }
@@ -40,6 +45,9 @@
   var readingShared = -1;
   var openGroup = '';
   var onBoards = false;  // the Boards tab is what the right side shows (issue 1627)
+  // Who was in front of you when J opened, { id, name }, or null. The plugin
+  // hands it over from the look prompt (#1630); see setFacing.
+  var facing = null;
 
   function tell(what) {
     try { window.skyrimPlatform.sendMessage('thornswood-front', 'journal:' + what); }
@@ -222,9 +230,11 @@
     return t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || !!el.isContentEditable;
   }
 
+  // The quote too: a role or a price line's name goes inside an attribute
+  // (data-role, data-name), and a name with a quote in it would end it there.
   function esc(s) {
     return String(s == null ? '' : s)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
   function books() { return (data && data.journals) || []; }
@@ -487,16 +497,47 @@
              '<button class="go" data-g="say">Say</button></div>';
     }
     if (book.invite) {
-      out += '<div class="bar"><input id="' + ID + '-ginvite" placeholder="who is here">' +
+      /*
+        factions.md: "You invite the character in front of you, or by name".
+        The person in front is whoever the look prompt named when J opened,
+        sent as the same form id Y, H and L send. Nobody in front, no button.
+      */
+      out += '<div class="bar">' +
+             (facing ? '<button data-g="invitefacing">Invite ' + esc(facing.name) + '</button>' : '') +
+             '<input id="' + ID + '-ginvite" placeholder="who is here">' +
              '<button data-g="invite">Invite</button></div>';
     }
     if (book.canRoles) {
+      /*
+        Each role and what it may do, a permission lit while the role holds
+        it. A press switches that one and sends the role's whole list
+        (factions.md, Roles: "The owner makes the roles and sets what each
+        role may do").
+      */
+      out += '<b>Roles</b>';
+      var roleRows = book.roles || [];
+      var permNames = (data && data.group && data.group.permNames) || [];
+      for (var ri = 0; ri < roleRows.length; ri++) {
+        out += '<div class="bar"><span class="grow">' + esc(roleRows[ri].name) + '</span>';
+        for (var pn = 0; pn < permNames.length; pn++) {
+          var held = (roleRows[ri].perms || []).indexOf(permNames[pn]) !== -1;
+          out += '<button data-g="perm" data-role="' + esc(roleRows[ri].name) + '" data-perm="' +
+                 esc(permNames[pn]) + '"' + (held ? ' class="go"' : '') + '>' + esc(permNames[pn]) + '</button>';
+        }
+        out += '</div>';
+      }
       out += '<div class="bar"><input id="' + ID + '-grole" placeholder="a role">' +
              '<button data-g="rolenew">New role</button></div>';
+      out += '<div class="bar"><input id="' + ID + '-grold" placeholder="a role">' +
+             '<input id="' + ID + '-grnew" placeholder="its new name">' +
+             '<button data-g="rolerename">Rename role</button></div>';
+    }
+    // Invite also removes someone who is not the owner (factions.md, Roles).
+    if (book.canRoles || book.invite) {
       out += '<div class="bar"><input id="' + ID + '-gwho" placeholder="who is in the book">' +
-             '<input id="' + ID + '-gset" placeholder="their role">' +
-             '<button data-g="setrole">Set role</button>' +
-             '<button data-g="remove">Remove</button></div>';
+             (book.canRoles ? '<input id="' + ID + '-gset" placeholder="their role">' +
+                              '<button data-g="setrole">Set role</button>' : '') +
+             (book.invite ? '<button data-g="remove">Remove</button>' : '') + '</div>';
     }
     if (book.owner) {
       out += '<div class="bar"><input id="' + ID + '-grename" placeholder="a new name">' +
@@ -543,6 +584,11 @@
       net('/book invite ' + book.id + ' ' + who);
       return;
     }
+    if (verb === 'invitefacing') {
+      if (!facing) { return; }
+      net('/book invite ' + book.id + ' ' + facing.id);
+      return;
+    }
     if (verb === 'leave') { net('/book leave ' + book.id); openGroup = ''; return; }
     if (verb === 'rename') {
       var next = gval('grename');
@@ -565,6 +611,27 @@
       var role = gval('grole');
       if (!role) { return; }
       net('/book role ' + book.id + ' new | ' + role);
+      return;
+    }
+    if (verb === 'rolerename') {
+      var was = gval('grold');
+      var renamed = gval('grnew');
+      if (!was || !renamed) { return; }
+      net('/book role ' + book.id + ' rename | ' + was + ' | ' + renamed);
+      return;
+    }
+    if (verb === 'perm') {
+      var rname = this.getAttribute('data-role') || '';
+      var flip = this.getAttribute('data-perm') || '';
+      var rows = book.roles || [];
+      var perms = [];
+      for (var ri = 0; ri < rows.length; ri++) {
+        if (rows[ri].name === rname) { perms = (rows[ri].perms || []).slice(); }
+      }
+      var at = perms.indexOf(flip);
+      if (at === -1) { perms.push(flip); } else { perms.splice(at, 1); }
+      // An empty list is a role that may do nothing, which the server keeps.
+      net('/book role ' + book.id + ' perm | ' + rname + ' | ' + perms.join(' '));
       return;
     }
     if (verb === 'setrole') {
@@ -755,6 +822,19 @@
     toggle: toggle,
     isOpen: function () { return shown; },
     scaleFor: scaleFor,
+    /*
+      Who was in front of you as J opened, from the look prompt
+      (thornswood-front.js, the journal facing handler), or null for nobody.
+      The group tab offers Invite with their name only while there is
+      somebody. Not redrawn under somebody typing, the same as setData.
+    */
+    setFacing: function (f) {
+      facing = (f && f.id) ? { id: String(f.id), name: String(f.name || 'them') } : null;
+      if (!shown) { return; }
+      var el = document.activeElement;
+      if (el && root && root.contains && root.contains(el) && typing(el)) { return; }
+      draw();
+    },
     setData: function (d) {
       data = d || null;
       /*
