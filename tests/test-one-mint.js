@@ -3,7 +3,8 @@
 // Authorized coin sources are explicit and bounded. A character gets forty
 // once; dungeon rewards use fixed tier ranges and durable return reservations.
 // Merchant NPC starting purses are checked by test-npc-merchant-purses.js and
-// test-merchant-ledger-storage.js; buying and selling are not enabled yet.
+// test-merchant-ledger-storage.js; receipt-based trading conservation is checked
+// by test-merchant-trading.js and test-merchant-settlement.js.
 //
 // Entry 326 on the To Do List is the economy with a bottom: traders who start
 // with a purse and buy and sell against it, "so coin moves between people
@@ -387,12 +388,24 @@ for (const at of Object.keys(WRITERS)) {
 }
 
 {
+  const calls=code.match(/\b\w+\.compareAndSetInventory\(/g) || [];
+  yes('the merchant native inventory writer is the single audited profile-bound CAS',
+    calls.length===1 && calls[0]==='mp.compareAndSetInventory(' &&
+    /mp\.compareAndSetInventory\(id, expected, receipt, next, sequence, profile\)/.test(code));
+  yes('merchant credit comes from durable finite stock or its debited purse, checked by the settlement and trading regressions',
+    /nextPurse = npcBuys \? state\.purse - gold : state\.purse \+ gold/.test(code) &&
+    /credit = gold > 0 \? \[\{baseId:GOLD_BASE,count:gold\}\] : \[\]/.test(code) &&
+    /saved !== pending\.debitReceipt/.test(code) && /pending\.phase !== 'credit'/.test(code));
+}
+
+{
   // Of all the writers, only four name gold: the mint that hands it out,
   // the fee that takes it, the ledger paying a letter's held pay back out
   // (#1374), and a company sale (#1393), which puts the seller's share in
   // and takes more than that out of the worker's pack in the same step,
   // driven in section 4. A fifth one naming gold is a second mint until
   // somebody has read it.
+
   const namesGold = /\b(GOLD|GOLD_ID|goldId)\b|\b0x0*[fF]\b/;
   const naming = [];
   for (const at of Object.keys(WRITERS)) {

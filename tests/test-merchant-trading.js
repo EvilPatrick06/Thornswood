@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 const assert = require('node:assert/strict');
 const trading = require('../game/merchant-trading.js');
 
@@ -6,13 +6,18 @@ function memoryPurses(seed) {
   const states = new Map();
   for (const [id, state] of seed) states.set(id, JSON.parse(JSON.stringify(state)));
   return {
+    namespace:'dev:test-ledger',
+    read(id) { return this.prepare(id); },
+    pendingRecords() { return Array.from(states,([merchantId,state])=>({merchantId,reference:state.reference,state:JSON.parse(JSON.stringify(state))})).filter(x=>x.state.pending); },
+    compareAndCommit(id,rev,next) { if ((states.get(id).revision || 0)!==rev) return null; return this.commit(id,next); },
     prepare(id) {
       const state = states.get(id);
       return state ? JSON.parse(JSON.stringify(state)) : null;
     },
     commit(id, next) {
-      states.set(id, JSON.parse(JSON.stringify(next)));
-      return JSON.parse(JSON.stringify(next));
+      const committed={...next,revision:(states.get(id).revision || 0)+1};
+      states.set(id, JSON.parse(JSON.stringify(committed)));
+      return JSON.parse(JSON.stringify(committed));
     }
   };
 }
@@ -25,29 +30,26 @@ function worldOf(native) {
   };
   const inv = { 10: { 15: 40, 100: 8, 101: 2 } };
   const records = new Map();
+  let live="null",saved="null";
   return {
     actors, inv, records,
     actor(id) { return actors[id] || null; },
     carry(id, baseId) { return (inv[id] && inv[id][baseId]) || 0; },
+    save() { saved=live; },
     transfer: {
-      available() { return native.on; },
-      recall(id) { return records.get(id) || { known: false }; },
-      move(req) {
-        if (!native.on) return { ok: false, durable: false, attempted: false, reason: 'Native merchant transfer is not on this server.' };
+      available() { return native.on; }, validate() {return true;},
+      identity(id) { const a=actors[id]; return a && a.profileId>0 ? {desc:id.toString(16)+':Skyrim.esm',profileId:a.profileId} : null; },
+      resolve(desc) { return parseInt(desc.split(':')[0],16); },
+      inventory(id) { return {entries:Object.entries(inv[id]).filter(([,count])=>count>0).map(([baseId,count])=>({baseId:Number(baseId),count}))}; },
+      receipt() { return live; }, saved() { return saved; },
+      cas(id,expected,receipt,next,sequence,profile) {
         if (native.fail === 'throw') throw new Error('native failed');
-        if (native.fail === 'refuse') return { ok: false, durable: false, attempted: false, reason: 'refused' };
-        if (native.fail === 'stuck') {
-          records.set(req.intentId, { known: true, durable: false, attempted: true });
-          return { ok: false, durable: false, attempted: true, reason: 'The debit is not durable yet.' };
-        }
-        for (const row of req.humanLoses) {
-          const have = (inv[req.humanId][row.baseId] || 0);
-          if (have < row.count) return { ok: false, durable: false, attempted: false, reason: 'short' };
-        }
-        for (const row of req.humanLoses) inv[req.humanId][row.baseId] -= row.count;
-        for (const row of req.humanGains) inv[req.humanId][row.baseId] = (inv[req.humanId][row.baseId] || 0) + row.count;
-        records.set(req.intentId, { known: true, durable: true, attempted: true });
-        return { ok: true, durable: true, attempted: true, offerId: req.intentId };
+        if (native.fail === 'refuse') return false;
+        if (receipt!==live || JSON.stringify(this.inventory(id))!==JSON.stringify(expected) || profile!==actors[id].profileId) return false;
+        inv[id]={}; for(const row of next.entries) inv[id][row.baseId]=(inv[id][row.baseId] || 0)+row.count;
+        live=JSON.stringify({actor:id.toString(16)+':Skyrim.esm',profile,sequence});
+        if (native.fail!=='stuck') saved=live;
+        return true;
       }
     }
   };
@@ -184,17 +186,15 @@ let stuckNative = { on: true, fail: 'stuck' };
 let stuck = service(stuckNative, 250);
 open(stuck.api);
 let waiting = stuck.api.command({ actorId: 10, profileId: 7, parts: ['/merchant', 'sell', '1', 'Iron', 'Ingot'] });
-assert.match(waiting.text, /not durable/);
+assert.match(waiting.text, /waiting on the save/);
 assert.equal(stuck.purses.prepare(1).purse, 250);
 assert.ok(stuck.purses.prepare(1).pending);
-assert.equal(stuck.world.inv[10][100], 8);
+assert.equal(stuck.world.inv[10][100], 7);
 let second = stuck.api.command({ actorId: 10, profileId: 7, parts: ['/merchant', 'sell', '1', 'Iron', 'Ingot'] });
 assert.match(second.text, /waiting/);
 assert.equal(stuck.purses.prepare(1).purse, 250);
-const pendingId = stuck.purses.prepare(1).pending.id;
-stuck.world.records.set(pendingId, { known: true, durable: true, attempted: true });
-stuck.world.inv[10][100] -= 1;
-stuck.world.inv[10][15] += 3;
+stuck.world.save();
+stuckNative.fail='';
 stuck.api.recover([1]);
 assert.equal(stuck.purses.prepare(1).purse, 247);
 assert.equal(stuck.purses.prepare(1).stock[0].count, 1);
@@ -211,7 +211,7 @@ assert.equal(fresh.purses.prepare(1).stock[0].count, 1);
 
 const absent = trading.createNativeMerchantTransfer({});
 assert.equal(absent.available(), false);
-assert.match(absent.move({}).reason, /not on this server/);
+assert.equal(typeof absent.cas, 'function');
 
 assert.equal(trading.bookHoldOf('Whiterun'), 'whiterun');
 assert.equal(trading.bookHoldOf('no hold'), null);

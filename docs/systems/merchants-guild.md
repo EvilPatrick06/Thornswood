@@ -110,15 +110,36 @@ from the same purse, and it will not be offered again for six hours.
 Scene quests are not paid from the purse.
 
 The person must be the authenticated character and within 400 of that
-trader in the same place. Press E on the trader. /merchant and the
-trader's id still opens the same panel. The panel only sends /merchant.
-It does not move gold or goods. People cannot join, and there is no due
-or discount.
+trader in the same place. Press E on the trader, then use the panel's
+buy, sell or supply buttons. The panel requests the trade; the server
+checks its price, reach, purse, stock and character identity. People
+cannot join, and there is no due or discount.
 
-Gold and goods move only through the native merchant transfer. Until
-that transfer is present the server refuses the trade and leaves the
-purse and the shelf as they were. A transfer that has started and is
-not yet durable stays on the trader and is not paid twice.
+The settlement implementation is under review and has not been released.
+It uses the native inventory comparison and exact saved receipts. The
+engine validates the complete resulting inventory with the same count,
+byte and metadata checks it uses for mutation. The complete offer is
+saved in the private ledger before outgoing goods or
+gold are removed. Incoming payment or goods wait for that exact debit
+to be saved. The purse and shelf then change together in the ledger,
+and the incoming inventory is credited. Completion waits for its exact
+saved receipt. Other inventory earned or spent during the save is kept.
+Item names, condition, charge and other inventory details stay with the
+goods. A reload resumes the saved offer without paying twice.
+
+At most 25 transfers may wait across the server, including offline
+characters and unloaded traders. One person and one trader may each
+have only one pending transfer. An older unresolved record without a
+verified character identity prevents new admission. A definite refused
+debit frees its reservation; an uncertain result keeps it. An uncertain
+ledger write stops the current service until the ledger is loaded again.
+
+The native writer flushes a new exclusive temporary file and replaces the
+private ledger before acknowledging it. It refuses served-directory
+aliases and linked ledger files. Startup and reload revoke old trading
+services before checking the server channel or loading new state. The
+ordinary NPC property is a projection of the private ledger and cannot
+replace it as the authority.
 
 Exact counts and places are in [Merchant trader counts](merchant-traders.md).
 Pressing E on a trader opens the panel. The two CWGuardTemplates
