@@ -76,6 +76,40 @@ function Free-Port {
     $l = New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback, 0)
     $l.Start(); $p = $l.LocalEndpoint.Port; $l.Stop(); return $p
 }
+# The port came from the system and was let go, so another run beside this one
+# can take it before the child binds it, the fault #1727 fixed in the .js
+# harnesses (#1755). Nothing asks the port anything until the child itself has
+# said on its output that it is listening there. A child that closes its output
+# first has stopped, and EADDRINUSE on its errors means something else holds
+# the port. $err is the task already draining the child's errors. Answers ''
+# once the line has come, otherwise why it did not.
+function Wait-OwnLine($proc, $err, [string]$mark, [int]$port, [string]$what) {
+    $deadline = [DateTime]::UtcNow.AddSeconds(20)
+    $seen = New-Object 'System.Collections.Generic.List[string]'
+    while ($true) {
+        $left = [int][Math]::Max(0, ($deadline - [DateTime]::UtcNow).TotalMilliseconds)
+        $read = $proc.StandardOutput.ReadLineAsync()
+        if (-not $read.Wait($left)) { return ('{0} did not say it was listening on port {1} within 20 seconds' -f $what, $port) }
+        $got = $read.Result
+        if ($null -eq $got) {
+            [void]$proc.WaitForExit(5000)
+            $said = ''
+            if ($err.Wait(5000)) { $said = ([string]$err.Result).Trim() }
+            $code = '?'
+            if ($proc.HasExited) { $code = $proc.ExitCode }
+            if ($said -match 'EADDRINUSE') {
+                return ('something else already holds port {0}, so {1} stopped (exit {2}) before it was listening' -f $port, $what, $code)
+            }
+            return ('{0} stopped (exit {1}) before it was listening: {2} {3}' -f $what, $code, ($seen -join ' '), $said)
+        }
+        $seen.Add($got)
+        if ($got.StartsWith($mark + ' listening on ') -and $got.EndsWith(':' + $port)) {
+            # Drained from here on, so a chatty child never blocks on a full pipe.
+            $null = $proc.StandardOutput.ReadToEndAsync()
+            return ''
+        }
+    }
+}
 function Run-Child([string]$script, [string[]]$more) {
     $argv = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $script) + $more
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
@@ -186,7 +220,7 @@ http.createServer((req, res) => {
     }
   }
   res.writeHead(404); res.end('no');
-}).listen(port, '127.0.0.1');
+}).listen(port, '127.0.0.1', () => console.log('[github] listening on 127.0.0.1:' + port));
 '@, (New-Object Text.UTF8Encoding($false)))
     $ghPort = Free-Port
     $ghLog = Join-Path $work 'gh\requests.txt'
@@ -203,26 +237,25 @@ http.createServer((req, res) => {
         $psi.RedirectStandardError = $true
         foreach ($k in $envs.Keys) { $psi.EnvironmentVariables[$k] = $envs[$k] }
         $p = [Diagnostics.Process]::Start($psi)
-        # Drained so a chatty server never blocks on a full pipe.
-        $null = $p.StandardOutput.ReadToEndAsync()
-        $null = $p.StandardError.ReadToEndAsync()
+        # Errors drained now; the output is read by Wait-OwnLine up to the
+        # child's listening line and drained from there, so a chatty server
+        # never blocks on a full pipe.
+        $script:errOf[$p.Id] = $p.StandardError.ReadToEndAsync()
         return $p
     }
-    $procs += Start-Node $siteDir @('server.js') @{ THORNSWOOD_DOCS_PORT = [string]$sitePort; THORNSWOOD_DOCS_LOCAL = '1'; THORNSWOOD_CHAT_DIR = (Join-Path $siteDir 'chat') }
-    $procs += Start-Node (Split-Path -Parent $ghJs) @($ghJs, $ghDir, [string]$ghPort, $ghLog) @{}
+    $script:errOf = @{}
+    $siteProc = Start-Node $siteDir @('server.js') @{ THORNSWOOD_DOCS_PORT = [string]$sitePort; THORNSWOOD_DOCS_LOCAL = '1'; THORNSWOOD_CHAT_DIR = (Join-Path $siteDir 'chat') }
+    $procs += $siteProc
+    $ghProc = Start-Node (Split-Path -Parent $ghJs) @($ghJs, $ghDir, [string]$ghPort, $ghLog) @{}
+    $procs += $ghProc
     $site = "http://127.0.0.1:$sitePort"
     $ghBase = "http://127.0.0.1:$ghPort"
-    function Up([string]$url) {
-        for ($i = 0; $i -lt 100; $i++) {
-            try { $r = [Net.HttpWebRequest]::Create($url).GetResponse(); $r.Close(); return $true }
-            catch [Net.WebException] { if ($null -ne $_.Exception.Response) { return $true } }
-            catch { }
-            Start-Sleep -Milliseconds 100
-        }
-        return $false
-    }
-    Yes 'a scratch copy of the site starts' (Up "$site/api/public")
-    Yes 'and so does the GitHub stand-in' (Up "$ghBase/up")
+    $why = Wait-OwnLine $siteProc $script:errOf[$siteProc.Id] '[thornswood-docs]' $sitePort 'the site'
+    Yes 'a scratch copy of the site starts' ($why -eq '')
+    if ($why) { Write-Host "      $why" }
+    $why = Wait-OwnLine $ghProc $script:errOf[$ghProc.Id] '[github]' $ghPort 'the GitHub stand-in'
+    Yes 'and so does the GitHub stand-in' ($why -eq '')
+    if ($why) { Write-Host "      $why" }
 
     # ---------------------------------------------------------- the feeds --
     # main: the launcher by the api shape, a pack already on the site, a pack by
