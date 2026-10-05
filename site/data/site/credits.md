@@ -34,17 +34,15 @@ the branch `thornswood/engine-changes`. Anybody can read it or download it,
 with no account.
 
 The server's engine, `scam_native.node`, is built from one commit,
-[`5328e5c1`](https://github.com/EvilPatrick06/skymp/tree/5328e5c11618647f664e2cf3a4f439fa370e1725).
+[`0a505323`](https://github.com/EvilPatrick06/skymp/tree/0a5053239b683c7bec5aed5805c2ab5c2c402e3b).
 That commit starts from
 [SkyMP](https://github.com/skyrim-multiplayer/skymp) at `f926944b`, and
-[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/f926944b...5328e5c1)
+[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/f926944b...0a505323)
 is the difference between the two.
 
-The server's engine goes to our test server first. Main remains on
-`6a64b0f0` until its next release. The current Dev engine adds durable
-merchant settlement and keeps unfinished characters hidden from other people.
-The six client files reuse the published build because their source is unchanged.
-The build evidence is in [the runtime provenance record](https://github.com/EvilPatrick06/Thornswood/blob/main/records/merchant-runtime-provenance.md).
+The server's engine goes to our test server first, then to the main server.
+Until it reaches them, both run
+[`5328e5c1`](https://github.com/EvilPatrick06/skymp/tree/5328e5c11618647f664e2cf3a4f439fa370e1725).
 
 The six client files are built from the commit named by the feed a person
 got them from (`clientRuntime.forkCommit` in that channel's `version.json`).
@@ -54,8 +52,8 @@ the same public branch:
 
 | Channel | Feed | The six client files are built from |
 |---|---|---|
-| Public | `feed/version.json` | [`6a64b0f0`](https://github.com/EvilPatrick06/skymp/tree/6a64b0f0) |
-| Dev | `feed-dev/version.json` | [`5328e5c1`](https://github.com/EvilPatrick06/skymp/tree/5328e5c1) |
+| Public | `feed/version.json` | [`5328e5c1`](https://github.com/EvilPatrick06/skymp/tree/5328e5c1) |
+| Dev | `feed-dev/version.json` | [`0a505323`](https://github.com/EvilPatrick06/skymp/tree/0a505323) |
 
 | File | Built from | Licence |
 |---|---|---|
