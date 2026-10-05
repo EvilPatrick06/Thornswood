@@ -97,5 +97,8 @@ until Patrick says otherwise. Tea and skooma are not items the needs
 block knows.
 Sleeping on open ground, an hour on a seat with no roof over you and
 no fire in reach, starts a chill. See [Disease](disease.md).
-The craft gate has not been extended to mining or chopping, and this
+The craft gate is asked at every bench's own menu, brews, enchanting
+and tempering included, at a key cut at a forge, and at a kiln burned
+by pressing it, before anything is taken, and the line says your Rest
+is under 15. It has not been extended to mining or chopping, and this
 plan does not extend it.
