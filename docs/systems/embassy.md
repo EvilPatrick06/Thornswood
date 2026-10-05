@@ -10,7 +10,9 @@ The text of the Accord is on the site. This page is the numbers.
 ## The roll
 
 20 persons in service, no more. Of those, 6 may be marked armed, and
-those 6 bear arms inside the walls only.
+those 6 bear arms inside the walls only. The 6 are the embassy's own
+guard, not Legion: no Legion soldier sets foot in Skyrim under arms,
+so nobody plays one (Patrick, 5 Oct, #1760).
 
 The Ambassador keeps the roll. The Ambassador is a title, not a class.
 See [Offices](offices.md). Naming a 21st person is refused. Marking a
@@ -22,8 +24,8 @@ marks armed has broken the Accord, and the Ambassador hands them to
 the Jarl of Haafingar rather than shelter them. That handoff is a
 scene. It is not a teleport.
 
-A veteran who served decades ago and settled in a hold is not on this
-roll and is not limited by the 6.
+A Legion veteran who served decades ago and settled in a hold can be
+played, is not on this roll and is not limited by the 6.
 
 ## The law at the door
 
