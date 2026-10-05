@@ -441,13 +441,14 @@ function tableNames(src, name) {
   yes('and the page names every one' + (lostTool.length ? ' (not: ' + lostTool.join(', ') + ')' : ''), lostTool.length === 0);
   /*
     What happens once the tool is gone, read from what the code DOES rather
-    than from a constant. TOOL_AGAIN_HOURS is still defined, and the first
-    version of this check passed on it while the page promised a free tool at
-    the seam that toolGate had stopped handing over (Patrick, 21 September:
-    "Don't let p[eople chop wood, mine, or farm without a pickaxe, shovel, or
-    woodcutters axe"). So: toolGate refuses and hands nothing over, nothing
-    calls offerTool, and every refusal sends people to a smith. The day a
-    handout comes back, the first two fail and the page has to follow.
+    than from a constant. TOOL_AGAIN_HOURS stayed defined until #1038, and the
+    first version of this check passed on it while the page promised a free
+    tool at the seam that toolGate had stopped handing over (Patrick, 21
+    September: "Don't let p[eople chop wood, mine, or farm without a pickaxe,
+    shovel, or woodcutters axe"). So: toolGate refuses and hands nothing over,
+    there is no offerTool and handTool is called only by giveTool at the pick,
+    and every refusal sends people to a smith. The day a handout comes back,
+    the first two fail and the page has to follow.
   */
   const gateAt = gm.indexOf('function toolGate(actorId, key) {');
   const gate = gateAt < 0 ? '' : gm.slice(gateAt, gm.indexOf('\n}\n', gateAt))
@@ -455,9 +456,13 @@ function tableNames(src, name) {
   yes('toolGate refuses somebody with no tool and hands nothing over',
       /return 'You need a ' \+ tool\.name \+ ' in your pack for that\. ' \+ tool\.where;/.test(gate) &&
       !/\b(offerTool|handTool|giveTool)\(/.test(gate));
-  const offerCalls = (gm.match(/\bofferTool\(/g) || []).length;
-  yes('nothing calls offerTool, so no seam, block, kiln or plot gives a tool away (' +
-      (offerCalls - 1) + ' callers)', offerCalls === 1 && /function offerTool\(/.test(gm));
+  // #1038: offerTool, the free replacement nothing called, is gone, and the
+  // one way a tool is handed over is giveTool at a starting class's pick.
+  const gmCode = gm.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  const handCalls = (gmCode.match(/\bhandTool\(/g) || []).length;
+  yes('there is no offerTool, and handTool is called only by giveTool, so no seam, block, kiln or plot gives a tool away (' +
+      (handCalls - 1) + ' caller)', !/\bofferTool\b/.test(gmCode) && !/\bTOOL_AGAIN_HOURS\b/.test(gmCode) &&
+      handCalls === 2 && /function giveTool\(actorId, key\) \{\s*const tool = handTool\(actorId, key\);/.test(gmCode));
   const toolsAt = gm.indexOf('const TOOLS = {');
   const toolsBlock = toolsAt < 0 ? '' : gm.slice(toolsAt, gm.indexOf('\n};\n', toolsAt));
   const wheres = toolsBlock.match(/where: '[^']*/g) || [];
