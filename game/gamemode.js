@@ -29929,8 +29929,8 @@ log('gamemode loaded:',
   launcher, so that session is the same refusal. The setting still decides
   the hold (#410): with it on, nothing the session does counts until the pass
   arrives. Deploy-DevGamemode.ps1 -RequirePass on|off sets the hold on the
-  dev box, and Deploy-Gamemode.ps1 -RequirePass on|off with Deploy-Server.ps1
-  on live. No older launcher or plugin is kept working (Patrick, 28 Sep).
+  dev box, and Deploy-Server.ps1 -RequirePass on|off on live (#1223). No
+  older launcher or plugin is kept working (Patrick, 28 Sep).
 
   THE HOLD FAILS CLOSED (#1319). false is the one way to turn it off. true
   holds, and so does anything else: absent, null, empty, "true" as text, 1.
