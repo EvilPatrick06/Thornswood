@@ -708,6 +708,23 @@ Copy-Item -LiteralPath '$rootWin\server-settings.json' -Destination '$stageWin\s
   # counts double and the far end truncates at about 8191 characters. Ten lines of
   # comment in there took the block from roughly 7,400 to 10,252 and the VPS
   # received a script that stopped in the middle of the line that writes the file.
+  #
+  # EVERY KEY THE BLOCK BELOW MAY SET, and no other (#1224). The stage is a
+  # copy of the running settings taken before the countdown, so anything that
+  # changed the running file meanwhile (a second run, Publish-Server -Channel
+  # dev, a hand edit) would be overwritten by the older copy at the swap, and
+  # nothing said so. These are handed to the swap, which reads every other key
+  # of the staged file back against the running one before it starts anything
+  # and puts the old files back when one moved: the read-back #1222 gave
+  # Deploy-Server. tests\test-dev-settings-keys.ps1 holds this list to the
+  # keys the block writes.
+  $DevSettingsKeys = @(
+    'loadOrder', 'startPoints', 'thornswoodMostOnline', 'maxPlayers', 'npcSettings',
+    'npcAllowCrimeFaction', 'npcAllowEssential', 'thornswoodLoadOrderRefuse',
+    'thornswoodRequirePass', 'thornswoodServer', 'npcEnabled', 'thornswoodVoicePort',
+    'equipmentSlotCheckEnabled', 'equipmentSpellCheckEnabled', 'equipmentInventoryCheckEnabled',
+    'forbiddenReloot'
+  )
   & {
     # The block below edits the staged copy, never the running one: $rootWin
     # is the stage folder for as long as it runs (issue #446).
@@ -904,12 +921,16 @@ Write-Host ''
 Write-Host 'Stopping the dev server...'
 $pick = ''
 if ($PutBack) { $pick = $putBackPick }
+# A put-back sends nothing and edits nothing, so it has no keys of its own and
+# no read-back: what it puts back is the whole previous set of files.
+$readBackKeys = $null
+if (-not $PutBack) { $readBackKeys = $DevSettingsKeys }
 # A stray line on stderr must not stop this side reading while the far side is
 # half way through a swap.
 $eap = $ErrorActionPreference
 $ErrorActionPreference = 'Continue'
 try {
-  $swapOut = @(Remote ((SwapVars $Root $Task $stageName $prevName $Wait $hashes) + $pick + $swapBlock) |
+  $swapOut = @(Remote ((SwapVars $Root $Task $stageName $prevName $Wait $hashes $readBackKeys) + $pick + $swapBlock) |
                ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
 } finally { $ErrorActionPreference = $eap }
 $swapped = Show-SwapResult $swapOut "$rootWin\.prev-<stamp>"

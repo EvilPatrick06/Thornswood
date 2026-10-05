@@ -243,6 +243,39 @@ yes('the mentions left are all in tables that only describe a record or list it 
   const inJson = C.gamemodeUses(records, [json], true);
   yes('in harvests.json a row of the table is refused, and the left out list may name one',
       inJson.some(function (h) { return !h.allowed && /306a/.test(h.key); }) && inJson.some(function (h) { return h.allowed && /306b/.test(h.key); }));
+  // npc-population.json is one line, so it is read row by row (#479, #1413).
+  const population = { name: 'npc-population.json', text: JSON.stringify({
+    npcs: [
+      { role: 'cut', keep: false, reason: 'Deleted or initially switched off', ref: '3027:Update.esm', base: '3025:Update.esm' },
+      { role: 'animal', keep: true, ref: '1:Skyrim.esm', base: '30c9:Update.esm' },
+      { role: 'cut', keep: false, ref: '2:Skyrim.esm', base: '3:ccBGSSSE001-Fish.esm' }
+    ],
+    locations: [{ refs: ['3025:Update.esm'] }]
+  }) };
+  const inPopulation = C.gamemodeUses(records, [population], true);
+  yes('in npc-population.json a row left out (keep false) may name one',
+      inPopulation.some(function (h) { return h.allowed && /3025/.test(h.key); }));
+  yes('...a kept row may not',
+      inPopulation.some(function (h) { return !h.allowed && /30c9/.test(h.key); }));
+  yes('...nor anything outside the rows',
+      inPopulation.filter(function (h) { return !h.allowed && /3025/.test(h.key); }).length === 1);
+  yes('...and a Creation Club file is refused even in a row left out',
+      inPopulation.some(function (h) { return !h.allowed && h.why === 'a Creation Club file'; }));
+}
+
+// The twenty bone wolf rows are what keeps those refs out of the world: each is
+// a cut row, and the gamemode hands every cut ref to the engine to leave out.
+{
+  let pop = null;
+  try { pop = JSON.parse(read('game/data/npc-population.json').replace(/^\uFEFF/, '')); } catch (e) { pop = null; }
+  const wolves = pop ? pop.npcs.filter(function (r) { return r.base === '3025:Update.esm'; }) : [];
+  yes('npc-population.json reads, and every row with the bone wolf as its base is left out (' + wolves.length + ')',
+      !!pop && wolves.length > 0 && wolves.every(function (r) { return r.keep === false && r.role === 'cut'; }));
+  const gm = read('game/gamemode.js');
+  const cut = /"cut":\[([^\]]*)\]/.exec(gm);
+  yes('...and every one of their refs is on the gamemode\'s cut list, which goes to setNpcPlacementExclusions',
+      !!cut && wolves.every(function (r) { return cut[1].indexOf('"' + r.ref + '"') >= 0; }) &&
+      /api\.setNpcPlacementExclusions\(excluded\)/.test(gm) && /const excluded=data\.cut\.map\(resolve\);/.test(gm));
 }
 
 // The table scripts skip the list, so running one again cannot bring a row back.

@@ -27,8 +27,7 @@ stronger. The bench refuses it. A petty gem is legal at every rank,
 and it is the weak one.
 
 One enchantment on a piece, until Twin Souls at master, which is two.
-Twin Souls is not applied. See
-[Wardweaver](professions/enchanter/wardweaver.md).
+Three is never. See [Wardweaver](professions/enchanter/wardweaver.md).
 
 ## On a weapon
 
@@ -63,7 +62,21 @@ sell one. See [Gold](gold.md).
 
 ## Where this is
 
-The arcane enchanter is closed to the two enchanter halves. The menu
-still teaches and applies whatever Skyrim would. The server does not
-read the enchantment, so it cannot refuse one that is off this list.
-Twin Souls is not a second slot.
+The arcane enchanter is closed to the two enchanter halves. Twin Souls
+is the second slot: a master Enchanter is handed the game's Extra
+Effect perk, so the menu offers a second enchantment, and it is put
+back on every spawn.
+
+This list is in the server (`ENCHANTMENTS` in `game/gamemode.js`),
+keyed by the game's enchanting effects, with the rank of each. As
+soon as the engine says what went on a piece, the server refuses an
+enchantment that is off it, one above the rank, and a second one
+without Twin Souls, and counts the rest as one piece of work for the
+half that owns it. The engine does not say yet: the craft message
+from the client names the piece and not its enchantment, so the menu
+still applies whatever Skyrim would. [#1389](https://github.com/EvilPatrick06/Thornswood/issues/1389)
+says what the engine has to pass.
+
+The soul gem table above is not checked. The server does not keep a
+list of learned enchantments, because it is never told about a
+disenchant.

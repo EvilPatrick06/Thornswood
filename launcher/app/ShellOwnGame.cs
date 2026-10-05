@@ -17,6 +17,9 @@ namespace Thornswood
     static partial class Shell
     {
         static bool ownGameBusy, ownGameStarted, restarting;
+        // True while StartPlay runs again straight after a bring-up-to-date
+        // Play asked for, so OwnGameRefreshIfDue cannot ask for a second one.
+        static bool ownGameRefreshedForPlay;
         // Only the window's thread changes this: DrawOwnGame bumps it, and the
         // background answer compares it on the way back through the Dispatcher.
         static int ownGameDrawGen;
@@ -130,6 +133,75 @@ namespace Thornswood
                 }
                 catch (Exception ex) { Swallow.Note("ShellOwnGame.OwnGameAtStart, BeginInvoke", ex); }
             });
+        }
+
+        /// <summary>
+        /// The same bring-up-to-date Diagnostics runs (BtnOwnGameRefresh,
+        /// StartOwnGame(false, true)). True when Play must stop for that work.
+        ///
+        /// OwnGameAtStart does this once when the window is first shown.
+        /// Play never asked, so a collection Vortex had already deployed
+        /// while the launcher was open went into the game from the last
+        /// refresh. That is the cause: StartPlay and Play() checked
+        /// ownGameBusy and then launched, and never called NeedsRefresh.
+        ///
+        /// When the bring-up-to-date succeeds, StartPlay runs again from the
+        /// top, so one press of Play ends in the game, through the same Discord
+        /// check and character list as any other press. A failure stops there
+        /// and says why. StartPlay rather than Play(), because Play() is also
+        /// reached from paths that have not been through Discord.
+        ///
+        /// ownGameBusy is read again after the wait. NeedsRefresh runs under
+        /// Waiting, which keeps the window's messages moving, and the
+        /// bring-up-to-date OwnGameAtStart queues when the window is first
+        /// shown can start inside that wait. Read only before it, a Play
+        /// pressed in that first second went on into the game while the
+        /// folder under it was being rewritten.
+        /// </summary>
+        static bool OwnGameRefreshIfDue()
+        {
+            if (!OwnGame.Active) return false;
+            if (playing || Checks.GameRunning()) return false;
+            if (ownGameBusy)
+            {
+                Log("Thornswood's own Skyrim folder is being prepared. Play comes back when it is done.");
+                return true;
+            }
+            bool due = false;
+            try
+            {
+                Waiting(delegate { due = OwnGame.NeedsRefresh(cfg); });
+            }
+            catch (Exception ex)
+            {
+                // Same as at startup: not knowing is not a reason to refuse
+                // Play, but it is said, so a report shows the check was missed.
+                Swallow.Note("ShellOwnGame.OwnGameRefreshIfDue", ex);
+                Log("Could not tell whether Thornswood's own Skyrim folder matches what Vortex has deployed (" +
+                    ex.Message.TrimEnd('.') + "). Starting from the folder as it is.");
+                return false;
+            }
+            if (ownGameBusy)
+            {
+                Log("Thornswood's own Skyrim folder is being prepared. Play comes back when it is done.");
+                return true;
+            }
+            if (!due) return false;
+            if (ownGameRefreshedForPlay)
+            {
+                // Just brought up to date for this same press, and it still
+                // does not match. Starting it again would go round for ever.
+                Log("Thornswood's own Skyrim folder still does not match what Vortex has deployed after bringing it up to date. " +
+                    "Press Bring it up to date from Vortex on Diagnostics, and send the launcher log if it keeps saying this.");
+                return true;
+            }
+            StartOwnGame(false, true, delegate
+            {
+                ownGameRefreshedForPlay = true;
+                try { StartPlay(); }
+                finally { ownGameRefreshedForPlay = false; }
+            });
+            return true;
         }
 
         /// <summary>
@@ -266,6 +338,12 @@ namespace Thornswood
         /// <param name="loud">True when somebody pressed a button, so failures get a box as well as a log line.</param>
         static void StartOwnGame(bool make, bool loud)
         {
+            StartOwnGame(make, loud, null);
+        }
+
+        /// <param name="then">Run on the window's thread once a bring-up-to-date has succeeded, or null. Not run when it fails, and never after a make, which restarts the launcher.</param>
+        static void StartOwnGame(bool make, bool loud, Action then)
+        {
             if (ownGameBusy) return;
             // The downgrade puts 1.6.1170's files into this folder, or, before
             // there is one, makes it from them itself when it is done (#1218).
@@ -290,6 +368,7 @@ namespace Thornswood
             DrawStatus();
             DrawOwnGame();
             Log(make ? "Making Thornswood's own Skyrim folder from what Vortex has deployed. Play comes back when it is done."
+                     : then != null ? "Vortex has deployed since Thornswood's own Skyrim folder was last brought up to date. Bringing it up to date now, and the game starts by itself when it is done."
                      : "Bringing Thornswood's own Skyrim folder up to date with what Vortex has deployed. Play comes back when it is done.");
 
             Config c = cfg;
@@ -401,6 +480,7 @@ namespace Thornswood
                         }
                         DrawStatus();
                         DrawOwnGame();
+                        if (fail == null && !make && then != null) then();
                     });
                 }
                 catch (Exception ex) { Swallow.Note("ShellOwnGame.StartOwnGame, finish BeginInvoke", ex); }

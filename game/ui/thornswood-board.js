@@ -10,7 +10,9 @@
 
   Everything this panel DOES it does by sending the ordinary lines, through
   window.thornswoodNet.say. There is no second protocol. The labels are
-  words. The lines are how the panel talks to the server.
+  words. The lines are how the panel talks to the server. A haul (#1393)
+  has no other way in: Send a haul and Confirm send /haul, which nobody is
+  told to type (Patrick, 4 Oct: no chat commands for anything people do).
 
   setData never opens the panel. The click does. A later setData redraws
   what is already open, and the plugin closes it once you walk away.
@@ -81,6 +83,9 @@
     '#' + ID + ' .line{display:flex;gap:8px;align-items:center;margin-bottom:8px}',
     '#' + ID + ' input{font-family:inherit;font-size:16px;color:#d9cfb4;background:rgba(0,0,0,.25);',
     '  border:1px solid rgba(198,170,109,.42);padding:8px 10px;width:100%;box-sizing:border-box}',
+    '#' + ID + ' input.pay{width:110px;flex:none}',
+    '#' + ID + ' select{font-family:inherit;font-size:16px;color:#d9cfb4;background:rgba(11,10,8,.94);',
+    '  border:1px solid rgba(198,170,109,.42);padding:8px 10px;flex:none}',
     '#' + ID + ' ::-webkit-scrollbar{width:10px;height:10px}',
     '#' + ID + ' ::-webkit-scrollbar-track{background:rgba(0,0,0,.25)}',
     '#' + ID + ' ::-webkit-scrollbar-thumb{background:rgba(198,170,109,.35);border:2px solid transparent;',
@@ -114,6 +119,9 @@
     if (!root) { return; }
     var keptNotice = field(ID + '-notice');
     var keptJob = field(ID + '-job');
+    var keptPay = field(ID + '-pay');
+    var keptDest = field(ID + '-dest');
+    var keptHaul = field(ID + '-haul');
     var title = root.querySelector('h2');
     var body = root.querySelector('.body');
     var b = data && data.board;
@@ -129,18 +137,19 @@
     if (!wall.length) { out += '<div class="none">Nothing on it.</div>'; }
     for (var i = 0; i < wall.length; i++) {
       var row = wall[i];
-      var kind = row.job ? 'Job' : 'Notice';
+      var kind = row.letter ? 'Letter' : (row.haul ? 'Haul' : (row.job ? 'Job' : 'Notice'));
       var who = row.taken ? ', taken by ' + esc(row.taken) : '';
       out += '<div class="row"><span class="nm"><b>' + esc(row.n) + '.</b> ' + kind +
         ', ' + esc(row.name) + who + '<br>' + esc(row.text) + '</span><span class="tools">';
       if (row.job && !row.taken && !row.mine) {
         out += '<button class="go" data-do="take" data-n="' + esc(row.n) + '">Take</button>';
       }
-      if (row.mine && !(row.job && row.taken)) {
+      if ((row.mine && !(row.job && row.taken)) || (row.haul && b.steward)) {
         out += '<button data-do="unpin" data-n="' + esc(row.n) + '">Take down</button>';
       }
       if (row.held) {
-        out += '<button data-do="drop" data-n="' + esc(row.n) + '">Put it back</button>';
+        out += '<button data-do="drop" data-n="' + esc(row.n) + '">' +
+          (row.haul ? 'Hand it back' : 'Put it back') + '</button>';
       }
       out += '</span></div>';
     }
@@ -161,6 +170,39 @@
     out += '<div class="line"><input id="' + ID + '-job" placeholder="the job">' +
       '<button class="go" data-do="job">Post a job</button></div>';
     out += '<div class="note">A notice is 20 gold. A job is 30 gold. The gold stays with the hold.</div>';
+    /*
+      A HAUL (#1393, docs/systems/trading-company.md): a job with a pay and a
+      town it goes to. The towns are every board but this one, from the
+      server.
+    */
+    var dests = b.dests || [];
+    if (dests.length) {
+      out += '<h3>Send a haul</h3>';
+      out += '<div class="line"><input class="pay" id="' + ID + '-pay" placeholder="pay">' +
+        '<select id="' + ID + '-dest">';
+      for (var d = 0; d < dests.length; d++) {
+        out += '<option value="' + esc(dests[d].hold) + '">' + esc(dests[d].where) + '</option>';
+      }
+      out += '</select></div>';
+      out += '<div class="line"><input id="' + ID + '-haul" placeholder="what it carries">' +
+        '<button class="go" data-do="haul">Send a haul</button></div>';
+      out += '<div class="note">30 gold for the board, and the pay, both held with this hold. ' +
+        'At the town it goes to, you or a steward confirm it on that board, and the hauler is paid. ' +
+        'The company keeps a tenth of the pay, and nothing under 10. Handed back or taken down ' +
+        'before then, the pay comes back to you and the 30 stays.</div>';
+    }
+    var come = b.arrivals || [];
+    if (come.length) {
+      out += '<h3>Hauls that came here</h3>';
+      for (var a = 0; a < come.length; a++) {
+        var h = come[a];
+        out += '<div class="row"><span class="nm">From ' + esc(h.where || h.from) + ', ' + esc(h.name) +
+          ', carried by ' + esc(h.hauler) + '<br>' + esc(h.text) + '<br>' + esc(h.hauler) + ' is paid ' +
+          esc(String(h.pay - h.kept)) + (h.kept ? ', and the company keeps ' + esc(String(h.kept)) : '') +
+          '.</span><span class="tools"><button class="go" data-do="done" data-from="' + esc(h.from) +
+          '" data-n="' + esc(h.n) + '">Confirm</button></span></div>';
+      }
+    }
     out += '<h3>Leave a price list</h3>';
     var lists = b.submit || [];
     if (!lists.length) { out += '<div class="none">No list you can leave.</div>'; }
@@ -174,6 +216,12 @@
     var jobBox = document.getElementById(ID + '-job');
     if (noticeBox && keptNotice) { noticeBox.value = keptNotice; }
     if (jobBox && keptJob) { jobBox.value = keptJob; }
+    var payBox = document.getElementById(ID + '-pay');
+    var destBox = document.getElementById(ID + '-dest');
+    var haulBox = document.getElementById(ID + '-haul');
+    if (payBox && keptPay) { payBox.value = keptPay; }
+    if (destBox && keptDest) { destBox.value = keptDest; }
+    if (haulBox && keptHaul) { haulBox.value = keptHaul; }
     var buttons = body.querySelectorAll('button[data-do]');
     for (var k = 0; k < buttons.length; k++) { buttons[k].onclick = onDo; }
   }
@@ -189,6 +237,18 @@
     if (verb === 'job') {
       var job = field(ID + '-job');
       if (job) { net('/job ' + job); }
+      return;
+    }
+    if (verb === 'haul') {
+      var pay = field(ID + '-pay').replace(/[^0-9]/g, '');
+      var dest = field(ID + '-dest');
+      var what = field(ID + '-haul');
+      if (pay && dest && what) { net('/haul ' + pay + ' ' + dest + ' ' + what); }
+      return;
+    }
+    if (verb === 'done' && n) {
+      var from = this.getAttribute('data-from');
+      if (from) { net('/haul done ' + from + ' ' + n); }
       return;
     }
     if (verb === 'take' && n) { net('/take ' + n); return; }

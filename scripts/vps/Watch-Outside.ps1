@@ -41,10 +41,12 @@
     domain    the registration has more than 30 days left, once a day.
               Registered 15 September 2026 through Cloudflare, runs out 15
               September 2027 (RDAP, rdap.org).
-    runner    GitHub lists the build runner, thornswood-vps, as online (gh,
-              REST, Patrick's own sign in). Without it no pull request gets
-              Launcher builds and nothing may merge. Three runs in a row,
-              because it restarts itself when it updates.
+    runner    GitHub lists every build runner as online: thornswood-vps and
+              the numbered ones beside it, thornswood-vps-2 and up
+              (Install-Runner.ps1 -Number, 4 October). gh, REST, Patrick's own
+              sign in. With none, no pull request gets Launcher builds and
+              nothing may merge; with some, the checks wait longer. Three
+              runs in a row, because a runner restarts itself when it updates.
     signing   the Azure Artifact Signing account answers with the durable
               identity the launcher pins (Signature.cs Identities). It asks
               for the profile's usages with an Azure sign in taken from az on
@@ -425,10 +427,14 @@ function Check-Domain($S) {
 function Check-Runner($S) {
   $r = Get-Runners $S.Repo
   if ($r.Error) { return (Wrong ('One could not ask GitHub: ' + $r.Error)) }
-  $mine = @($r.Runners | Where-Object { $_.Name -eq $S.RunnerName })
+  # The first runner and the numbered ones beside it (Install-Runner.ps1 -Number).
+  $mine = @($r.Runners | Where-Object { $_.Name -eq $S.RunnerName -or $_.Name -match ('^' + [regex]::Escape($S.RunnerName) + '-\d+$') })
   if ($mine.Count -eq 0) { return (Wrong ('GitHub lists no runner called ' + $S.RunnerName)) }
-  if ($mine[0].Status -ne 'online') { return (Wrong ('GitHub shows it ' + $mine[0].Status)) }
-  return (Ok ('online' + $(if ($mine[0].Busy) { ', running a job' } else { '' })))
+  $off = @($mine | Where-Object { $_.Status -ne 'online' })
+  if ($off.Count) { return (Wrong ('GitHub shows ' + (@($off | ForEach-Object { $_.Name + ' ' + $_.Status }) -join ', ') + ', of ' + $mine.Count)) }
+  $busy = @($mine | Where-Object { $_.Busy }).Count
+  if ($mine.Count -eq 1) { return (Ok ('online' + $(if ($busy) { ', running a job' } else { '' }))) }
+  return (Ok ('all ' + $mine.Count + ' online, ' + $busy + ' running a job'))
 }
 
 function Check-Signing($S) {
@@ -480,8 +486,8 @@ function Get-Checks($S) {
        Fix = 'The name servers are Cloudflare''s: check the A record for it in the Cloudflare dashboard.' },
     @{ Name = 'domain'; Say = ('The registration of ' + $S.SiteHost); Fails = 'runs out soon'; Recovers = 'was renewed'; Misses = 1; Back = 1; Every = 1440
        Fix = 'It is registered through Cloudflare: renew it there, under Domain Registration.' },
-    @{ Name = 'runner'; Say = ('The build runner, ' + $S.RunnerName + ','); Fails = 'is offline on GitHub'; Recovers = 'is online again'; Misses = 3; Back = 2; Every = 0
-       Fix = 'Until it is back no pull request gets its Launcher builds check, so nothing can be merged. .\scripts\deploy\Install-Runner.ps1 -Status says what the VPS sees.' },
+    @{ Name = 'runner'; Say = ('The build runners, ' + $S.RunnerName + ' and the numbered ones,'); Fails = 'are not all online on GitHub'; Recovers = 'are all online again'; Misses = 3; Back = 2; Every = 0
+       Fix = 'With none of them online no pull request gets its Launcher builds check, so nothing can be merged; with some, the checks wait longer. .\scripts\deploy\Install-Runner.ps1 -Status says what the VPS sees of the first, and -Number <n> -Status of the others.' },
     @{ Name = 'signing'; Say = ('Code signing (Azure Artifact Signing, account ' + $S.SignAccount + ')'); Fails = 'is not answering'; Recovers = 'answers again'; Misses = 3; Back = 2; Every = 0
        Fix = 'Until it answers no Ship can sign, dev included.' },
     @{ Name = 'nexus'; Say = 'The Nexus collection'; Fails = 'cannot be reached'; Recovers = 'is reachable again'; Misses = 2; Back = 2; Every = 60

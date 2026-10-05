@@ -5,7 +5,7 @@ quest journal does not open. The offer, the turn-in, and the unlock
 are the server's.
 
 A trader of that hold's [Merchant's Guild](merchants-guild.md) gives
-them. A steward does not. Staff do not. The traders are the actors
+them. Staff do not. The traders are the actors
 on [People who are not people](npcs.md). You speak to the trader.
 The server accepts the goods, because the actor's own scripts do
 not run.
@@ -33,8 +33,14 @@ puts the goods back and shuts the place. The cooldown does not start.
 You cannot take more from the place while the quest is unfinished.
 
 The rare mine is this second kind. Ebony, the gems, stalhrim, and
-heart stone are one place each. See [Miner](classes/miner.md). The
-rank on the seam still applies. These are the rest. A place holds
+heart stone are one place each, a building: ebony is Raven Rock Mine,
+stalhrim and emerald are Kolbjorn Barrow, heart stone is Coldcinder
+Cave, ruby is White Ridge Sanctum, and sapphire and amethyst are
+Highpoint Tower. Every vein of that seam inside the building is the
+place, and the same seam anywhere else stays shut. The trader's quest
+opens it and the cooldown below shuts it again. Nothing else opens
+it. See [Miner](classes/miner.md). The rank on the seam still
+applies. These are the rest. A place holds
 more than the asked count. You keep the extra. The rank on the work
 still applies.
 
@@ -117,13 +123,18 @@ not one wait for every quest.
 
 Scarce quests and scene quests from the tables above are in the
 server. The counts, the cooldowns, and the lineup are those tables.
-Supply is not. Scene gold is created when the quest is finished. It
-is not taken from a trader's purse. Walking away puts the goods back
-and does not start the cooldown. The rank on a scarce row still
-applies.
+No trader offers one in the game yet: speaking to a trader does not
+bring up the offer. Supply is not. Scene gold is created when the
+quest is finished. It is not taken from a trader's purse. Walking
+away puts the goods back and does not start the cooldown. The rank on
+a scarce row still applies.
 
-The one place each scarce row opens, and the sack, shelf, chest, urn,
-strongbox, ruin, cell, and hold a scene row names, are not written on
-this page. They are not bound, so those places stay shut. Every rare
-vein stays shut with them. A dragon is not a bounty. Papyrus quests
-do not run.
+The four miner rows are bound to the buildings named above, by each
+building's cell, and every other vein of those seams is shut. The
+cooldown is the server's, one for each person and quest, stamped at
+the turn-in. The open quests and the cooldowns are kept in memory, so
+a restart of the server clears them. The one place each other scarce
+row opens, and the sack, shelf, chest, urn, strongbox, ruin, cell, and
+hold a scene row names, are not written on this page. They are not
+bound, so those places stay shut. A dragon is not a bounty. Papyrus
+quests do not run.

@@ -20,6 +20,10 @@
 # shut out of every live Thornswood folder, at normal priority (never above)
 # and with Defender skipping its own folder, so a check takes minutes.
 # The label is what picks it; change it here and in Install-Runner together.
+# SEVERAL OF THEM since 4 October: one runner takes one job at a time, and
+# the queue reached an hour when the lanes opened pull requests in bursts.
+# Install-Runner.ps1 -Number <n> puts each one after the first beside it with
+# the same label, so a check goes to whichever is free.
 # Safe because the repository is private: nobody outside the team can open a
 # pull request that runs code on the box.
 #
@@ -64,7 +68,7 @@ on:
 permissions:
   contents: read
 # One run per branch at a time. A newer push cancels the run it replaces, so
-# the one runner is not stuck building a commit nobody wants.
+# no runner is left building a commit nobody wants.
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
@@ -120,7 +124,10 @@ jobs:
           .\scripts\dev\Check-Words.ps1
           if ($LASTEXITCODE -ne 0) { exit 1 }
           $failed = @()
-          foreach ($n in 'test-check-words.ps1', 'test-note-rules.ps1') {
+          # Issue #1081: Ship runs Check-Words before it builds. The harness
+          # plants one hit in a temp tree and a dry-run Ship must stop and
+          # name that hit.
+          foreach ($n in 'test-check-words.ps1', 'test-note-rules.ps1', 'test-ship-check-words.ps1') {
             Write-Host ("--- {0}" -f $n)
             & pwsh -NoProfile -File (Join-Path 'tests' $n)
             if ($LASTEXITCODE -ne 0) { $failed += $n; Write-Host ("::error file=tests/{0}::a writing check let a planted break through or reported an allowed line; the FAIL lines above say which" -f $n) }
@@ -252,33 +259,76 @@ jobs:
           # seconds when the token exchange or the profile lookup stalls,
           # never answers, or drops halfway, and the page says to try again.
           # $six is a historical name: the gate list grew well past six (#1368).
+          # Issue #1589: a line here with no comma after it ends the list, and
+          # every name below it only prints itself. test-gate-list.ps1 parses
+          # this step and fails on any harness named outside the list.
           $six = 'test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
+                 'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
                  'test-hand-install-retired.ps1',
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
                  'test-new-box-runbook.ps1', 'test-remote-header.ps1',
-                 'test-vps-defaults.ps1', 'test-deploy-artifact.ps1', 'test-deploy-records.js',
+                 'test-vps-defaults.ps1', 'test-runner-lock.ps1', 'test-deploy-artifact.ps1', 'test-deploy-records.js',
                  'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-own-folder-again.ps1', 'test-npc-runtime.js',
+                 'test-mold-key.js', 'test-putback-flora.js', 'test-staff-spells.js', 'test-join-pass-trust.js',
                  'test-npc-shared-runtime.js', 'test-npc-population-runtime.js',
                  'test-shared-resource-stock.js', 'test-resource-stock-integration.js',
                  'test-npc-death-policy.js', 'test-vortex-profile-state.ps1',
                  'test-books.js', 'test-guild-ledger-safety.js', 'test-book-review-regressions.js',
+                 'test-recipeless-craft.js',
                  'test-npc-merchant-purses.js', 'test-merchant-ledger-storage.js', 'test-npc-merchant-startup.js',
                  'test-dungeon-loot.js', 'test-dungeon-reward-safety.js', 'test-dungeon-reward-storage.js', 'test-one-mint.js',
                  'test-1373-scarce-scene.js',
+                 'test-nobody-makes.js',
                  'test-1378-shared-gather.js',
+                 'test-special-edition-only.js',
+                 'test-1374-letters.js',
+                 'test-1380-rare-mines.js',
+                 'test-unpin.js', 'test-coffers.js',
+                 'test-1383-injury.js',
+                 'test-1384-condition.js',
+                 'test-1385-perks.js',
+                 'test-1386-warrior.js',
+                 'test-1387-college.js',
+                 'test-python-defaults.js',
+                 'test-1388-apprentice.js',
+                 'test-launcher-help.js', 'test-classes-page.js',
+                 'test-1389-lists.js',
+                 'test-1603-beds.js',
+                 'test-1394-fares.js',
+                 'test-1635-ride-panel.js',
+                 'test-1393-company.js',
+                 'test-1398-fuel.js',
+                 'test-1630-journal-gui.js',
+                 'test-1629-party-gui.js',
+                 'test-1640-jarl-word.js',
+                 'test-table-install.js',
                  'test-secrets-fail-closed.js',
+                 'test-our-key-menus.js', 'test-slash-key.js', 'test-social-keys.js',
                  'test-site-auth.js',
                  'test-site-headers.js',
+                 'test-site-render.js', 'test-site-discovery.js',
+                 'test-home-status.js', 'test-seats.js', 'test-age-gate.js', 'test-download-hash.js',
+                 'test-download-button.js', 'test-gallery-ux.js', 'test-gallery.js', 'test-site-local.js',
+                 'test-session-cards.js', 'test-staff-bans.js', 'test-hub-staff-gallery.js', 'test-known-issues.js',
+                 'test-join-outage.js', 'test-join-pass-site.js', 'test-open-switch.js', 'test-component-readmes.js',
+                 'test-site-front-resilience.js', 'test-site-upload-guard.js',
+                 'test-report-limits.js', 'test-site-hangs.js',
+                 'test-backup-restore.ps1',
                  'test-content-release.ps1',
+                 'test-cooldown-sweep.js', 'test-voice-moved-clients.js',
                  'test-release-parity.ps1', 'test-dev-version.ps1', 'test-ship-launcher-reuse.ps1',
                  'test-server-stage-directories.ps1',
+                 'test-dev-settings-keys.ps1',
                  'test-dev-gamemode-notes.ps1',
+                 'test-package-release-dir.ps1', 'test-no-machine-files.ps1',
                  'test-main-runtime-startup.js',
                  'test-spawn-reply.js',
+                 'test-nightly-stray.ps1',
                  'test-discord-callback-hang.js',
-                 'test-member-role-wording.js'
-                 'test-page-changed.js'
+                 'test-member-role-wording.js',
+                 'test-page-changed.js',
+                 'test-gate-list.ps1'
           $failed = @()
           foreach ($n in $six) {
             $p = Join-Path 'tests' $n

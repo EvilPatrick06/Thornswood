@@ -218,7 +218,7 @@ if (pageLit && classesLit && profLit && treeLit && schoolsM) {
       what turns a visible error into a silent one.
     */
     const pick = src.slice(src.indexOf('  function pickProfession(state, prof, halfOrSchools) {'),
-                           src.indexOf('  function teach(state, teacherState, half) {'));
+                           src.indexOf('  function teach(state, teacherState, half'));
     yes('an unknown profession is refused with a reason', /return no\('no such profession'\)/.test(pick));
     yes('an unknown half is refused with a reason', /return no\('no such half of ' \+ p\.name\)/.test(pick));
     yes('and nothing is substituted when it refuses',

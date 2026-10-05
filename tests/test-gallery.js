@@ -140,6 +140,10 @@ function ask(method, where, headers, body) {
 // A short but valid PNG header, enough that what /shot serves back can be
 // compared to what went in byte for byte.
 const PNG = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da6360000002000154a24f0e0000000049454e44ae426082', 'hex');
+// And a JPEG's opening and end, for the launcher's .jpg: since #1585 the site
+// refuses (415) a file whose first bytes are not the kind its name says, so
+// PNG bytes named game-shot.jpg are no longer a stand-in for a screenshot.
+const JPG = Buffer.from('ffd8ffe000104a46494600010100000100010000ffd9', 'hex');
 
 const readJson = (f) => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'data', f), 'utf8')); } catch (e) { return null; } };
 
@@ -211,7 +215,7 @@ const readJson = (f) => { try { return JSON.parse(fs.readFileSync(path.join(dir,
 
     // ---- the launcher ticket -------------------------------------------------
     r = await ask('POST', upQ('game-shot.jpg', 'Ataxayk') + '&ticket=' + encodeURIComponent(ticket(MEMBER_ID, 'Ataxayk')),
-                  { 'content-type': 'image/jpeg' }, PNG);
+                  { 'content-type': 'image/jpeg' }, JPG);
     yes('the launcher can send one in with a valid ticket (' + r.status + ')', r.status === 200 && r.json && r.json.ok === true);
     const gameName = r.json ? r.json.name : '';
     pend = readJson('gallery-pending.json') || [];

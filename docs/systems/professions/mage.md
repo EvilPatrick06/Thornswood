@@ -68,6 +68,7 @@ A title is given in the world. See [Offices](../offices.md) and
 ## Where this is
 
 The profession, the five schools, the point totals, the three gates
-on a tome, and the 5 and 10 work are in the server. A semester at the
-College is written down as 2 extra points and is not applied. The
-magic page says what that semester is.
+on a tome, and the 5 and 10 work are in the server. So is a semester
+at the College: Study on the K panel's College page, in one of its
+rooms, hands a mage 2 more points once in 24 hours. The magic page
+says what that semester is.

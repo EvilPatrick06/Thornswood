@@ -372,10 +372,16 @@ SIX.forEach(function (d) {
   const lists = dd.split('\n').filter(function (l) {
     return /Get-ChildItem\s+(\(Join-Path \$App\b|(-LiteralPath\s+)?\$App\b)/.test(l);
   });
+  // Since #446 and #459 the site goes up as one artifact, and server.js is in
+  // it by name beside public and data, not by a copy of the folder it sits in.
+  const art = /New-ThornswoodArtifact -Component site [^\n]*-Paths ([^\n]+)/.exec(dd);
+  const artPaths = art ? (art[1].match(/'[^']+'/g) || []).map(function (q) { return q.slice(1, -1); }) : [];
   yes('Deploy-Docs.ps1 lists public, data and data/site, never the folder the README sits in',
       lists.length > 0 && lists.every(function (l) {
         return /Get-ChildItem \(Join-Path \$App '(public|data|data\/site)'\)/.test(l);
-      }) && dd.indexOf("Push (Join-Path $App 'server.js')") >= 0);
+      }) &&
+      artPaths.length > 0 && artPaths.indexOf('site/server.js') >= 0 &&
+      artPaths.every(function (q) { return /^site\/(server\.js|public|data)$/.test(q); }));
 
   const iv = read('scripts/deploy/Install-Voice.ps1') || '';
   const sent = (/foreach \(\$f in ('[^)]*')\)/.exec(iv) || [])[1];

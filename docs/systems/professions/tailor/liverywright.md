@@ -28,8 +28,8 @@ dress in a hold is the hostile marker on [The Thalmor](../../thalmor.md),
 which is not a crafting gate.
 
 College of Winterhold cloaks and robes that appear in the tailor lists
-are clothes. They do not make you a mage and they do not count as
-`/study`.
+are clothes. They do not make you a mage and they do not count as a
+semester at the College.
 
 ## What you are handed
 

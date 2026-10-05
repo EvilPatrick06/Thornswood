@@ -94,8 +94,9 @@ those 2, the spell is novice, and a novice spell needs nothing below
 it. They do not earn the mage's stored spell points. They do not pick
 schools on K. They do not receive the school's placed point.
 
-At the College, `/study` hands them 1 spell point in a semester, and
-it can only be spent on a novice spell of the school they were taught.
+At the College, Study on the K panel hands them 1 spell point in a
+semester, and it can only be spent on a novice spell of the school they
+were taught.
 A mage's semester is a different number, on that page.
 
 The third school a master mage picks for themselves is not this. That
@@ -120,7 +121,7 @@ See [Enchanter](professions/enchanter.md).
 
 | Master of | What the teaching is |
 | --- | --- |
-| Bulwark or Berserker | Novice combat for someone who is not a warrior. There is no recipe. The maneuvers a Warlord is supposed to open are not a list yet. |
+| Bulwark or Berserker | Novice combat for someone who is not a warrior: that half's novice maneuver, Set or Rush. There is no recipe. |
 | One school | Novice spells of that school, for someone who is not a mage. Two spells, from the tome. |
 | Blightbrewer or Physicker | Novice brewing of that half. The lab has no recipe rows, so novice is the bench, not a list. |
 | Hearthcook or Confectioner | The novice meals of that half. |
@@ -132,10 +133,11 @@ See [Enchanter](professions/enchanter.md).
 
 Repair kits follow the same halves. A Platewright's kit, an
 Edgewright's kit, and a Haberdasher's kit are the three repairs on
-[Durability](durability.md). The 120% repair is the correct half
-doing the work, which includes a master who has taken the sister half
-on far enough to be that half, and does not include an outside trade
-that is still only novice of the wrong half.
+[Durability](durability.md). The 120% repair is the half the person
+picked doing the work. The sister half never gives it, at any rank,
+even once a master has taken that half past novice, and neither does
+an outside trade (Patrick, 4 October). Everybody else repairs to
+100%.
 
 ## What teaching does not do
 
@@ -157,10 +159,28 @@ Picking a profession writes the sister half at novice. The craft gate
 allows that novice list, and it allows a taught half at novice, and
 it refuses both of them above novice by name.
 
-`teach` is in the rules and nothing in the world calls it. There is
-no command to take someone on, and no command to end it. When work is
-counted, the master is not passed in, so a sister half's count waits
-at the next threshold and never rises.
+A master takes someone on with `/apprentice <name>`. When they could
+take that person on in more than one half or school, the half goes
+after the name: `/apprentice Lina platewright`. The person accepts or
+refuses on the prompt, the same as a party or a trade, and nothing is
+recorded until they accept. The server reads which arrangement it is
+off the person: the other half of their own profession is the sister
+half, and a half or school of another profession is an outside trade.
+The master ends it with `/apprentice end <name>`. `/apprentice` on
+its own says who you took on, who took you on, and how many of your
+two outside trades are used.
+
+Both characters carry the arrangement, so it holds across a restart
+and with either of them offline. When work is counted, the master is
+passed in while they are still a master of that half and still list
+the person, so the sister half rises past the threshold it waited at.
+An outside trade that was ended stays counted, so it does not open a
+third.
 
 The two-spell cap, the two staff-spell cap, and the three gates on a
-tome are in the server. `/study` is not.
+tome are in the server. So is the semester: Study on the K panel's
+College page, in one of the College's rooms, hands a person a master
+has taught 1 point once in 24 hours. The server asks for that point as
+well as a place before a tome teaches them, because the semester is the
+only thing that hands them one; whether the places alone should be
+enough is asked on issue 1387. See [Magic and the College](magic.md).

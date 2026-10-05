@@ -40,16 +40,11 @@ same kind is refused. Founding is on the account, so another
 character on the same account does not get a second book. Any
 character on that account can open the book as its owner.
 
-On the tab, or typed the same way `/journal` matches J:
-
-`/book new business The Bee`
-
-`/book new faction The North Gate`
-
-The rest of the line is the name. A Dev may found one business and
-one faction without holding Business Owner or Faction Owner. Any
-other staff seat can found one only when they also hold that Discord
-role. They do not need the role to open a book that already exists.
+On the tab: type the name, then New business or New faction. A Dev
+may found one business and one faction without holding Business
+Owner or Faction Owner. Any other staff seat can found one only when
+they also hold that Discord role. They do not need the role to open a
+book that already exists.
 
 ## Roles
 
@@ -66,9 +61,11 @@ permissions away.
 | Speak | Write in the group's chat |
 
 A person who just accepted is on a role called Member. Member starts
-with Read and Speak. The owner changes that on the tab. Prices,
-invites, and roles are the tab. They are a poor fit for a slash
-command.
+with Read and Speak. The owner changes that on the tab: each role is
+a row, and each permission on it is a button that is lit while the
+role holds it. New role and Rename role are beside them. Prices,
+invites, and roles are the tab, and nothing in the book is typed into
+the chat.
 
 The owner can rename the book. The owner can disband it. A member
 can leave.
@@ -111,13 +108,14 @@ has never left yet has no time on the row.
 Online is the same fact a friend list already uses: they are in the
 world right now. Last played is new. It is a time, not a place.
 
-You invite the character in front of you, or by name the way
-`/friend` does. The offer stands for 45 seconds. They accept. Until
-they accept, they do not see the tab.
+You invite the character in front of you, or by name. Open J while
+looking at them, and the tab has Invite with their name on it. The
+name field beside it is for someone in the world who is not in front
+of you. The offer stands for 45 seconds. It comes up on their P
+prompt, which names the book, with Accept and Refuse. Until they
+accept, they do not see the tab.
 
-`/book invite` and the name. `/book leave` drops this character. If
-this account is in more than one book, the group's name follows
-leave.
+Leave on the tab drops this character from that book.
 
 A character may belong to more than one book. Founding is what the
 Discord role caps, not membership.
@@ -150,8 +148,14 @@ all, for everybody.
 ## Where this is
 
 The tab, the price list, the group role, and the group chat are in
-the server. The book is kept for the group and survives a restart.
-The time a character last left is kept too. J draws the tab only for
+the server. Everything in the book is done on J: founding, the price
+lines, the chat, inviting the person in front of you or by name,
+setting a role's permissions, renaming a role, removing someone,
+leaving, renaming and disbanding. The invite reads as one on the P
+prompt (#1591). The panel sends the server a line for each button;
+nobody is told to type it, and no help names it (#1630). The book is
+kept for the group and survives a restart. The time a character last
+left is kept too. J draws the tab only for
 a Discord account that holds Business Owner or Faction Owner, for a
 character who has accepted an invite, and for staff.
 

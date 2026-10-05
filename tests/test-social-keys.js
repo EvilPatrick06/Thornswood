@@ -87,12 +87,29 @@ function rig(opts) {
     'function journalKeyDown() { }\n' +
     'function journalKeyPressed() { }\n' +
     'function moldPress() { return false; }\n' +
+    // The sleep key is the mold's, on a person inside a building you hold
+    // (#1603), and nobody here holds one.
+    'const SLEEP_KEY = 22; function sleepPress() { return false; }\n' +
+    // The same key in the inventory (#1384); no inventory is open here.
+    'function repairPress() { return false; }\n' +
+    // The board, ride and merchant presses (#1430, #1394) answer only the
+    // game's Activate event, and the lock key (#1472) only X; none of the
+    // presses here is either. Each has its own harness.
+    'function boardPress() { return false; }\n' +
+    'function driverPress() { return false; }\n' +
+    'function merchantPress() { return false; }\n' +
+    'const LOCK_KEY = 45; function lockPress() { return false; }\n' +
+    // A warrior's maneuver key (#1386), 9, which nothing here presses.
+    'const MANEUVER_KEY = 10; function maneuverKeyPressed() { }\n' +
     'const COMMAND_KEY = 53; function commandKeyPressed() { }\n' +
     // The / and P watchers on the game's own menus are test-our-key-menus.js's.
     'const OFF_MENU = { openedBy: function () { return ""; }, shutFor: function () { }, keyDown: function () { } };\n' +
     'const statsOnSlash = OFF_MENU, magicOnP = OFF_MENU;\n' +
     'function busyMenuOpen() { for (const n of KEYBOARD_MENUS) { if (sp.Ui.isMenuOpen(n)) { return n; } } return ""; }\n' +
-    'function lookVerb(v) { verbs.push(v); }\n';
+    'function lookVerb(v) { verbs.push(v); }\n' +
+    // P on somebody not in your party asks them in (#1629). Nobody is looked
+    // at here, so P is the panel; test-1629-party-gui.js has the ask.
+    'function partyPress() { return false; }\n';
   new Function('sp', 'T', 'claims', 'say', 'guard', 'verbs', prelude + keys)(
     sp, T, claims, function (t) { w.logs.push(String(t)); }, guard, w.verbs);
   w.press = function (code) {

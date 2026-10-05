@@ -81,7 +81,7 @@
       left out when there is nothing to say.
 
     note: { text: '<the refusal, in plain words>', at: <ms>,
-            about: '<class|profession|spell|town|spend>' }
+            about: '<class|profession|spell|town|spend|perk>' }
       about says which pick the refusal answers, so the panel clears that
       pick and only that one. A note with no about is still shown.
 
@@ -97,6 +97,13 @@
     spells: { '<spell name>': true }     what the character actually holds
     spellPoints: <number>                what is left to spend
 
+    college: { gain: <number>, school: '<taught school>' | null,
+               opens: <ms>, hours: <number>, rooms: [ '<a room, in words>' ] }
+      A semester at the College (#1387), sent to anybody magic is open to: a
+      mage, or somebody a Master mage taught. opens is when the next semester
+      opens on the server's clock, 0 when one is open now. Study sends
+      'skills:pick study'; a refusal comes back as a note about 'study'.
+
     staff: { points: <number>, rank: '<Bladebinder rank>',
              mine: [ '<spell desc>' ], spells: [ [ desc, name, rank ] ] }
       An Enchanter's staff spells (#1128), sent to an Enchanter and nobody
@@ -108,6 +115,13 @@
     points: <number>                     free tree points
     placed: { '<sub-skill key>': <0..5> } the part of tree that was placed at
                                           creation and cannot be moved
+    perkClocks: { '<perk key>': { ready: <ms>, until: <ms> } }
+      The filled perks that wait between firings (#1385), only in the world.
+      ready is when it may fire again by the server's clock, 0 for never;
+      until is there on Font of Magic while it runs. Drawn beside the perk.
+      Font of Magic is the one perk a person starts: its Use button sends
+      'skills:pick perk fontofmagic', and a refusal comes back as a note
+      about 'perk'.
 */
 
 (function () {
@@ -178,23 +192,23 @@
       lead: 'Fifteen skills across health, magicka and stamina. A point goes in one at a time, and filling one grants its perk.',
       rows: [
         { key: 'health', name: 'Health', subs: [
-            { key: 'vitality', name: 'Vitality', desc: 'Most health', perk: 'Cheat Death: once a day a killing blow leaves you at one point of health.' },
-            { key: 'fortitude', name: 'Fortitude', desc: 'Regeneration', perk: 'Troll’s Blood: regeneration carries on in combat.' },
-            { key: 'might', name: 'Might', desc: 'Melee damage', perk: 'Devastating Blow: power attacks often stagger or knock down.' },
-            { key: 'resilience', name: 'Resilience', desc: 'Armour', perk: 'Unshakeable: no stagger while blocking.' },
-            { key: 'toughness', name: 'Toughness', desc: 'Poison and disease', perk: 'Purified Blood: no disease, and three quarters of poison shrugged off.' }] },
+            { key: 'vitality', name: 'Vitality', desc: 'Most health', perk: 'Cheat Death: once a day, the blow that would kill you leaves you at 1 health. Not in the game yet.' },
+            { key: 'fortitude', name: 'Fortitude', desc: 'Regeneration', perk: 'Troll’s Blood: during a fight, health returns at 2 a second.' },
+            { key: 'might', name: 'Might', desc: 'Melee damage', perk: 'Devastating Blow: a power attack deals 25% more.' },
+            { key: 'resilience', name: 'Resilience', desc: 'Armour', perk: 'Unshakeable: a block cannot stagger you. Not in the game yet.' },
+            { key: 'toughness', name: 'Toughness', desc: 'Poison and disease', perk: 'Purified Blood: disease does not take, and poison deals 25%.' }] },
         { key: 'magicka', name: 'Magicka', subs: [
-            { key: 'capacity', name: 'Capacity', desc: 'Most magicka', perk: 'Archmage’s Vessel: a burst of regeneration when nearly empty.' },
-            { key: 'clarity', name: 'Clarity', desc: 'Regeneration', perk: 'Leyline Attunement: full regeneration while casting.' },
-            { key: 'potency', name: 'Potency', desc: 'Spell effect, in the schools you hold', perk: 'Overcharge: one spell in seven lands double.' },
-            { key: 'ward', name: 'Ward', desc: 'Magic resistance', perk: 'Spellbreaker: one spell in four is absorbed and refills you.' },
-            { key: 'efficiency', name: 'Efficiency', desc: 'Cost, in the schools you hold', perk: 'Font of Magic: once a day, fifteen seconds of free casting.' }] },
+            { key: 'capacity', name: 'Capacity', desc: 'Most magicka', perk: 'Archmage’s Vessel: drop below a tenth of magicka and it returns to half, once a day.' },
+            { key: 'clarity', name: 'Clarity', desc: 'Regeneration', perk: 'Leyline Attunement: magicka still returns while you cast, at half the usual rate.' },
+            { key: 'potency', name: 'Potency', desc: 'Spell effect, in the schools you hold', perk: 'Overcharge: one spell in five deals double. Holding twice as long is not in the game yet.' },
+            { key: 'ward', name: 'Ward', desc: 'Magic resistance', perk: 'Spellbreaker: 20% of the magicka in a spell that hits you is added to yours.' },
+            { key: 'efficiency', name: 'Efficiency', desc: 'Cost, in the schools you hold', perk: 'Font of Magic: once a day, 15 seconds where a spell costs nothing. Use starts it.' }] },
         { key: 'stamina', name: 'Stamina', subs: [
-            { key: 'endurance', name: 'Endurance', desc: 'Most stamina', perk: 'Tireless: sprinting and power attacks cost half.' },
-            { key: 'vigor', name: 'Vigor', desc: 'Regeneration', perk: 'Second Wind: full stamina the instant it empties, once in five minutes.' },
-            { key: 'agility', name: 'Agility', desc: 'Speed', perk: 'Windwalker: a tenth faster, and no fall damage.' },
-            { key: 'burden', name: 'Burden', desc: 'Carry weight', perk: 'Pack Mule: no slowing until fifty pounds over.' },
-            { key: 'precision', name: 'Precision', desc: 'Critical and ranged', perk: 'Lethal Aim: ranged attacks ignore half of physical armour.' }] }
+            { key: 'endurance', name: 'Endurance', desc: 'Most stamina', perk: 'Tireless: running and swinging cost half stamina. Not in the game yet.' },
+            { key: 'vigor', name: 'Vigor', desc: 'Regeneration', perk: 'Second Wind: when stamina hits 0 it fills, once every 5 minutes.' },
+            { key: 'agility', name: 'Agility', desc: 'Speed', perk: 'Windwalker: +4 speed. A fall still hurts for now.' },
+            { key: 'burden', name: 'Burden', desc: 'Carry weight', perk: 'Pack Mule: being overloaded does not slow you. Not in the game yet.' },
+            { key: 'precision', name: 'Precision', desc: 'Critical chance, which the game ignores', perk: 'Lethal Aim: an arrow ignores half the armour it hits.' }] }
       ]
     },
     /*
@@ -208,7 +222,7 @@
     */
     spells: {
       title: 'Spell book',
-      lead: 'The spells of your two schools, by rank. A spell costs one point; points come with each rank.',
+      lead: 'The spells of your two schools, by rank. A spell costs one point; points come with each rank and with a semester at the College.',
       ranks: [{ key: 'novice', name: 'Novice' }, { key: 'advanced', name: 'Advanced' },
               { key: 'expert', name: 'Expert' }, { key: 'master', name: 'Master' }],
       schools: {
@@ -269,6 +283,16 @@
       */
       lead: 'What you can make right now, by the kind of thing it is. Your own half, your sister half, and anything a Master taught you, each as far as your rank in it reaches. Recipes Skyrim keeps behind a perk, a spell or something you have to be holding are not counted as open.',
       rows: []   // the server sends the halves and their families
+    },
+    /*
+      A semester at the College (#1387). How many points, which school and
+      when the next one opens are all the server's, under mine.college; this
+      is the title and the one sentence over the page.
+    */
+    college: {
+      title: 'College',
+      lead: 'Stand in one of the rooms of the College of Winterhold and press Study, and the College hands you spell points, once a semester. Anywhere else, it says no.',
+      rows: []
     },
     home: {
       title: 'Home',
@@ -377,6 +401,8 @@
     '#ts-skills .card .name{font-size:16.5px;color:#f6e9c8;display:flex;align-items:baseline;gap:12px}',
     '#ts-skills .card .desc{font-size:13px;line-height:1.5;color:rgba(217,207,180,.78);margin-top:4px}',
     '#ts-skills .card .inn{font-size:12.5px;color:rgba(217,207,180,.6);font-style:italic;margin-top:3px}',
+    '#ts-skills .card .guest{display:flex;align-items:center;gap:12px;font-size:13px;color:#d9cfb4;margin-top:5px}',
+    '#ts-skills .card .guest .stop{border:1px solid rgba(198,170,109,.55);color:#e9d19b;padding:1px 9px;font-size:11.5px;cursor:pointer}',
     '#ts-skills .tag{margin-left:auto;font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:#9fcf92;white-space:nowrap}',
     '#ts-skills .tag.gold{color:#e9d19b}',
     '#ts-skills .tag.dim{color:rgba(217,207,180,.5)}',
@@ -418,6 +444,10 @@
     '#ts-skills .plus{width:26px;height:26px;border:1px solid rgba(198,170,109,.55);color:#e9d19b;display:grid;place-items:center;',
     'font-size:18px;line-height:1;background:rgba(0,0,0,.25);cursor:pointer}',
     '#ts-skills .plus.off{opacity:.25;pointer-events:none}',
+    // A filled perk a person starts (Font of Magic): under the perk's words.
+    '#ts-skills .skill .use{grid-column:1/4;justify-self:start;margin-top:6px;padding:3px 14px;border:1px solid rgba(198,170,109,.55);',
+    'color:#e9d19b;background:rgba(0,0,0,.25);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer}',
+    '#ts-skills .skill .use.off{opacity:.35;pointer-events:none}',
     // foot: the hint on the left takes what is left and wraps; the buttons never shrink
     '#ts-skills .foot{grid-column:1/3;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:24px;',
     'padding:14px 32px;border-top:1px solid rgba(198,170,109,.22)}',
@@ -856,6 +886,25 @@
       });
     }
   }
+  /* The College page (#1387): the server's, under mine.college, or null when magic is not open to them. */
+  function collegeView() {
+    var got = mine && mine.college;
+    if (!got || typeof got !== 'object' || Array.isArray(got)) return null;
+    return got;
+  }
+  /* When a semester opens, as a time on this machine's clock: today, tomorrow, or the date. */
+  var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
+                'September', 'October', 'November', 'December'];
+  function whenOpens(ms) {
+    var d = new Date(ms);
+    var t = new Date();
+    var hm = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+    var day = new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime();
+    var then = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    if (then === day) return 'today at ' + hm;
+    if (then === day + 86400000) return 'tomorrow at ' + hm;
+    return d.getDate() + ' ' + MONTHS[d.getMonth()] + ' at ' + hm;
+  }
   /*
     THE STAFF SPELL PAGE, an Enchanter's spell book (#1128). The same three
     rules as the spell book above, over the Bladebinder rank the server sends
@@ -1113,6 +1162,8 @@
     if (section === 'tree') return 15;
     if (section === 'spells') return bookRows().length;
     if (section === 'staff') return staffRows().length;
+    // The College page is a page to read and one button.
+    if (section === 'college') return 0;
     // Nothing in the recipe book is picked, marked or sent, so there is no
     // row for the arrow keys to walk. Left and right still move sections.
     if (section === 'recipes') return 0;
@@ -1170,6 +1221,10 @@
     // An Enchanter's staff spells (#1128), right after the recipe book: the
     // server sends the page to an Enchanter and nobody else.
     if (staffBook()) sections.splice(sections.indexOf('recipes') + 1 || 1, 0, 'staff');
+    // The College (#1387), right after the spell book, or after Profession
+    // for somebody a Master mage taught: the server sends it to anybody
+    // magic is open to, and never while creating.
+    if (!creating() && collegeView()) sections.splice(sections.indexOf('spells') + 1 || 1, 0, 'college');
     /*
       Property, last, and only once there is something on it. Patrick,
       21 September: "once they claim a house or have a key to a house a property
@@ -1263,6 +1318,11 @@
       var m = markedCount();
       return { t: sp ? sp + ' to spend' : (m ? m + ' marked' : 'nothing yet'), c: sp ? 'need' : '' };
     }
+    if (sec === 'college') {
+      var cv = collegeView();
+      var opens = cv ? Number(cv.opens) || 0 : 0;
+      return opens > Date.now() ? { t: 'next ' + whenOpens(opens), c: '' } : { t: 'a semester is open', c: 'need' };
+    }
     if (sec === 'staff') {
       var sl = staffLeft();
       var sm = markedStaffDescs().length;
@@ -1333,6 +1393,7 @@
     else if (section === 'home') drawHome();
     else if (section === 'spells') drawSpells();
     else if (section === 'staff') drawStaff();
+    else if (section === 'college') drawCollege();
     else if (section === 'recipes') drawRecipes();
     else if (section === 'property') drawProperty();
     else if (section === 'review') drawReview();
@@ -1514,6 +1575,13 @@
     when somebody holds nothing and carries no key, and the button in the nav is
     drawn from whether the list arrived. There is nothing here that can put an
     empty page in front of anybody.
+
+    ONE THING IS SENT, AND IT IS A STOP (#1603). Under each place you hold are
+    the people you let sleep there tonight, and a Stop beside each name ends
+    that night: /sleephere stop <profile> <building>, through the same chat
+    line every panel uses. The server checks that the place is yours and draws
+    the page again. Letting somebody sleep there is the look prompt's key,
+    pressed while looking at them inside it.
   */
   function propertyRows() {
     var rows = DATA && DATA.property;
@@ -1554,9 +1622,58 @@
         : (r.by ? 'Held by ' + r.by + '. ' : 'Nobody holds it. ') +
           (r.locked ? 'Your key opens the door.'
                     : 'It is not locked, so your key is not needed yet.')));
+      if (r.mine) drawGuests(card, r);
       wrap.appendChild(card);
     });
     elBody.appendChild(wrap);
+  }
+
+  /* Who may sleep in a place you hold tonight, and a Stop for each. */
+  function drawGuests(card, r) {
+    var guests = Array.isArray(r.sleep) ? r.sleep : [];
+    card.appendChild(el('div', 'inn', guests.length
+      ? 'May sleep here tonight, for 8 hours from when you let them:'
+      : 'Nobody else may sleep here tonight. Look at somebody inside and press ' +
+        'the key the prompt shows to let them, for one night.'));
+    guests.forEach(function (gst) {
+      var row = el('div', 'guest');
+      row.appendChild(el('span', '', String(gst.name || 'somebody')));
+      var stop = el('span', 'stop', 'Stop');
+      stop.title = 'Stop letting ' + String(gst.name || 'them') + ' sleep at ' + String(r.name || 'this place');
+      stop.onclick = function (ev) {
+        ev.stopPropagation();
+        if (window.thornswoodNet && window.thornswoodNet.say) {
+          window.thornswoodNet.say('/sleephere stop ' + Number(gst.pid) + ' ' + String(r.b || ''));
+        }
+      };
+      row.appendChild(stop);
+      card.appendChild(row);
+    });
+  }
+
+  /*
+    The College page (#1387): what a semester hands this character, where it
+    is studied, and when the next one opens. Everything on it is the
+    server's. Study is the foot's button.
+  */
+  function drawCollege() {
+    var cv = collegeView();
+    if (!cv) return;
+    var gain = Number(cv.gain) || 0;
+    var hours = Number(cv.hours) || 0;
+    var opens = Number(cv.opens) || 0;
+    elBody.appendChild(el('p', 'lead', 'A semester is ' + hours + ' hours. Each one hands you ' + gain +
+      (gain === 1 ? ' spell point' : ' spell points') +
+      (cv.school ? ', and it buys a Novice spell of ' + cap(cv.school) + ', the school you were taught, from its tome.'
+                 : ', for the spell book.')));
+    var rooms = Array.isArray(cv.rooms) ? cv.rooms.map(String) : [];
+    if (rooms.length) {
+      elBody.appendChild(el('p', 'lead', 'The rooms that count: ' +
+        (rooms.length > 1 ? rooms.slice(0, -1).join(', ') + ' and ' + rooms[rooms.length - 1] : rooms[0]) + '.'));
+    }
+    elBody.appendChild(el('p', 'lead', opens > Date.now()
+      ? 'Your next semester opens ' + whenOpens(opens) + '.'
+      : 'A semester is open to you now.'));
   }
 
   function drawRecipes() {
@@ -1831,7 +1948,14 @@
                      (given ? '. ' + given + ' of these came with what you chose and do not move.' : '');
         plus.onclick = function (ev) { ev.stopPropagation(); spend(s.key); };
         row.appendChild(plus);
-        row.appendChild(el('div', 'sd' + (full ? ' lit' : ''), full ? s.perk : s.desc + '. ' + s.perk));
+        var clock = full ? perkClock(PERK_OF[s.key]) : '';
+        row.appendChild(el('div', 'sd' + (full ? ' lit' : ''), full ? s.perk + (clock ? ' ' + clock : '') : s.desc + '. ' + s.perk));
+        if (full && PERK_OF[s.key] === 'fontofmagic') {
+          var use = el('div', 'use' + (perkReady('fontofmagic') && !perkWaiting() ? '' : ' off'), 'Use');
+          use.title = 'Start Font of Magic';
+          use.onclick = function (ev) { ev.stopPropagation(); usePerk('fontofmagic'); };
+          row.appendChild(use);
+        }
         row.onclick = function () { rowAt = idx; draw(); };
         col.appendChild(row);
       });
@@ -1866,7 +1990,8 @@
     var line = status || hint();
     // The spell book's own button says Learn, because what it sends is not a
     // choice about who you are: it is the spells you marked, one pick each.
-    var label = (!cr && section === 'spells') ? 'Learn' : ((!cr && section === 'staff') ? 'Unlock' : 'Confirm');
+    var label = (!cr && section === 'spells') ? 'Learn' : ((!cr && section === 'staff') ? 'Unlock'
+      : ((!cr && section === 'college') ? 'Study' : 'Confirm'));
     // The recipe book sends nothing, the same way the tree's plus buttons are
     // the tree's own sending, so neither carries a Confirm.
     var showConfirm = cr ? section === 'review'
@@ -1907,8 +2032,12 @@
       // 0 is the server saying none; no number at all is the server saying
       // nothing, and the page does not put words in its mouth.
       var sp = spellPoints();
-      if (sp !== null && sp <= 0) return 'No spell points to spend. More come with every rank.';
+      if (sp !== null && sp <= 0) return 'No spell points to spend. More come with every rank and with a semester at the College.';
       return 'Mark the spells you want, then press Learn. One point each.';
+    }
+    if (section === 'college') {
+      if (studyWaiting()) return 'Sent. The server is checking.';
+      return 'Press Study in one of the College\'s rooms. Anywhere else, the College says no.';
     }
     if (section === 'staff') {
       if (staffWaiting()) return 'Sent. The server is checking.';
@@ -2013,10 +2142,34 @@
     draw();
   }
 
+  /*
+    Study, on the College page (#1387): one press, dark from the moment it
+    sends until the answer is back or LEARN_WAIT_MS has passed, the way
+    Learn is. Lit whatever the clock says: the server holds the clock and
+    says when the next semester opens if it is not open yet.
+  */
+  var studyAt = 0;
+  function studyWaiting() {
+    if (!studyAt) return false;
+    if (Date.now() - studyAt >= LEARN_WAIT_MS) { studyAt = 0; return false; }
+    for (var i = 0; i < pending.length; i++) if (pending[i].section === 'college') return true;
+    studyAt = 0;
+    return false;
+  }
+  function study() {
+    if (studyWaiting() || !collegeView()) return;
+    send('college', 'study');
+    studyAt = Date.now();
+    status = 'Sent. The server is checking.'; statusKind = '';
+    setTimeout(function () { if (!studyWaiting()) draw(); }, LEARN_WAIT_MS + 50);
+    draw();
+  }
+
   function canConfirm() {
     if (creating()) return section === 'review' && !!softHome();
     if (section === 'spells') return canLearn();
     if (section === 'staff') return canUnlockStaff();
+    if (section === 'college') return !!collegeView() && !studyWaiting();
     var p = picked[section];
     if (!p || !p.row) return false;
     if (section === 'class') return !haveClass();
@@ -2069,6 +2222,7 @@
     if (creating()) { begin(); return; }
     if (section === 'spells') { learn(); return; }
     if (section === 'staff') { unlockStaff(); return; }
+    if (section === 'college') { study(); return; }
     var p = picked[section];
     send(section, section === 'class' ? 'class ' + p.row : 'profession ' + p.row + ' ' + p.subs.join(','));
     status = 'Sent. The server is checking.'; statusKind = '';
@@ -2098,6 +2252,46 @@
   function spend(skill) {
     if (!mine || !(Number(mine.points) > 0)) return;
     send('tree', 'spend ' + skill);
+    status = 'Sent.'; statusKind = '';
+    draw();
+  }
+
+  /*
+    THE FILLED PERKS THAT WAIT (#1385). The server sends perkClocks: when each
+    one may fire again, by its clock, and until on Font of Magic while it
+    runs. Counted here against this machine's clock, which is near enough for
+    a day or five minutes, and redrawn whenever the server sends anything,
+    which it does the moment a perk fires and every time the panel opens.
+  */
+  var PERK_OF = { vitality: 'cheatdeath', capacity: 'archmagesvessel', efficiency: 'fontofmagic', vigor: 'secondwind' };
+  function clockOf(key) { return (key && mine && mine.perkClocks && mine.perkClocks[key]) || null; }
+  function waitWords(ms) {
+    var s = Math.max(1, Math.ceil(ms / 1000));
+    if (s < 120) return s + (s === 1 ? ' second' : ' seconds');
+    var m = Math.ceil(s / 60);
+    if (m < 120) return m + ' minutes';
+    return Math.ceil(m / 60) + ' hours';
+  }
+  function perkRunning(key) { var c = clockOf(key); return !!(c && Number(c.until) > Date.now()); }
+  function perkReady(key) {
+    var c = clockOf(key);
+    return !!c && !perkRunning(key) && !(Number(c.ready) > Date.now());
+  }
+  function perkClock(key) {
+    var c = clockOf(key);
+    if (!c) return '';
+    if (perkRunning(key)) return 'Running now.';
+    if (Number(c.ready) > Date.now()) return 'Back in ' + waitWords(Number(c.ready) - Date.now()) + '.';
+    return 'Ready.';
+  }
+  function perkWaiting() {
+    for (var i = 0; i < pending.length; i++) if (pending[i].section === 'perk') return true;
+    return false;
+  }
+  /* Use, on Font of Magic. The server decides; this only asks. */
+  function usePerk(key) {
+    if (perkWaiting() || !perkReady(key)) return;
+    send('perk', 'perk ' + key);
     status = 'Sent.'; statusKind = '';
     draw();
   }
@@ -2233,7 +2427,14 @@
         markedStaff[p.spell] = false;
         cleared = true;
       }
+      else if (p.section === 'college' && after.college && before && before.college &&
+               after.college.opens !== before.college.opens) {
+        // The server opened a semester and moved the clock: the points are
+        // in the spell book, and the chat says how many.
+        status = 'Studied. The next semester opens ' + whenOpens(Number(after.college.opens) || 0) + '.'; statusKind = 'ok';
+      }
       else if (p.section === 'tree') { status = 'Spent.'; statusKind = 'ok'; }
+      else if (p.section === 'perk' && perkRunning('fontofmagic')) { status = 'Font of Magic: for 15 seconds, a spell costs nothing.'; statusKind = 'ok'; }
       else done = false;
       if (done) picked[p.section] = null;
       else if (now - p.at < PENDING_MS) keep.push(p);
@@ -2266,7 +2467,7 @@
     list on PENDING_MS. The card stays as it was picked either way, so it can
     be sent again or replaced.
   */
-  var ABOUT_SECTION = { 'class': 'class', 'profession': 'profession', 'spell': 'spells', 'staffspell': 'staff', 'town': 'home', 'spend': 'tree' };
+  var ABOUT_SECTION = { 'class': 'class', 'profession': 'profession', 'spell': 'spells', 'staffspell': 'staff', 'town': 'home', 'spend': 'tree', 'perk': 'perk', 'study': 'college' };
   function refused(text, about) {
     status = 'No: ' + text + '.'; statusKind = 'no';
     if (!pending.length) return;

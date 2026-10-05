@@ -364,7 +364,10 @@ Yes 'RunUpdate: the self-update is its own phase' ($run -match 'PlayProgress\.Pl
 Yes 'RunUpdate closes it when it finishes and when it fails, before DrawStatus' (([regex]::Matches($run, 'PlayProgress\.End\(\);\s*(updatePending = false;\s*)?DrawStatus\(\)')).Count -eq 2)
 
 $sog = Read-Text (Join-Path $AppDir 'ShellOwnGame.cs')
-$start = Body $sog 'static void StartOwnGame('
+# The overload that does the work. Since #1584 StartOwnGame(make, loud) only
+# hands on to StartOwnGame(make, loud, then), which runs a step once the
+# bring-up-to-date Play asked for has finished.
+$start = Body $sog 'static void StartOwnGame(bool make, bool loud, Action then)'
 Yes 'StartOwnGame opens the button' ($start -match 'PlayProgress\.Begin\(OwnGame\.Phase, 0\)')
 Yes 'StartOwnGame closes it as soon as the work is over' ($start -match 'ownGameBusy = false;\s*PlayProgress\.End\(\);')
 

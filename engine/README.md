@@ -10,18 +10,17 @@ each half, with the file and line for each step.
 `.gitmodules:11-15` names the fork, `https://github.com/EvilPatrick06/skymp.git`,
 on the branch `thornswood/engine-changes`, at `engine/skymp`. The repository
 pins a commit, not the branch: `git submodule status` prints
-`1ed42585db413ea40e34a0c1927ff3e05a9346d8`, the commit `records\client-build.json:6`
-and `records\server-build.json:10` both name (issue #1200, 29 September). The
-server record hashes every server file of the build of that commit (issue
-#1214): the binary, `de3256be...`, the JavaScript half the server runs,
-`dist_back\skymp5-server.js`, `9bd548da...`, its map, and the rest
-`scripts\deploy\ServerBuild.ps1` names, so the client half and the server half
-are the same source. `Deploy-Server.ps1`, `Export-ServerPayload.ps1`,
-`Publish-Server.ps1` and the installer on the box refuse any server file that is
-not the recorded one until `New-ServerBuildRecord.ps1` records it (see
-"Rebuilding the same commit"), and the build check refuses a pull request whose
-pin and two records do not name one commit, or whose server record leaves a
-file out or names another commit for one (see "One engine").
+`ac044a49760cf7ee85f6ac1547cc244657509e78`, the source commit named by both
+`records\client-build.json` and `records\server-build.json`. The server
+executable was rebuilt from it to read every plugin into memory when the
+server starts (issue #1602); its SHA256 is
+`7477e037a3050d37619c4643d6fbe1a7d877b5248fbda8d64af142ddcdacce10`, built
+2026-10-04T20:50:16Z. The six client files keep their recorded bytes, because
+that commit changes no client source.
+`Deploy-Server.ps1`, `Export-ServerPayload.ps1`, `Publish-Server.ps1` and the
+installer refuse server files that differ from the record. The build check
+requires the pin and both records to name one source commit and the server
+record to include every artifact (see "One engine").
 
 `ignore = dirty` (`.gitmodules:15`) keeps a build inside the fork from showing
 as a change here. A different commit checked out in it still shows, and is

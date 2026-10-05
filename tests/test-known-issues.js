@@ -193,17 +193,18 @@ yes('the SkyMP table says what is still worth reporting',
 
 // ------------------------------------------------------------ the preview
 /* What a link to /known says when it is pasted into Discord. server.js is the
-   one a crawler reads, home.html the one the browser tab reads, and they are
-   meant to be the same list. */
+   one a crawler reads, the home page's script the one the browser tab reads,
+   and they are meant to be the same list. That script moved out of home.html
+   into home.js in #1479 (no inline script under the content security policy). */
 function blurb(rel) {
   const src = read(rel) || '';
   const m = src.match(/'\/known':\s*\[\s*'([^']*)',\s*'([^']*)'\s*\]/);
   return m ? m[2] : null;
 }
 const serverBlurb = blurb('server.js');
-const homeBlurb = blurb(path.join('public', 'home.html'));
+const homeBlurb = blurb(path.join('public', 'home.js'));
 yes('server.js has a /known preview', serverBlurb !== null);
-yes('home.html has a /known preview', homeBlurb !== null);
+yes('home.js has a /known preview', homeBlurb !== null);
 yes('the preview a crawler reads no longer calls the page permanent',
     serverBlurb !== null && !/permanent/i.test(serverBlurb) && !PROMISE.test(serverBlurb));
 yes('nor does the one the browser tab reads',

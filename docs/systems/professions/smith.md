@@ -31,6 +31,13 @@ for one grade poorer than the table. Poor Charcoal does not get
 poorer, so iron, steel, ancient nord, and skyforge steel still take
 Poor Charcoal there. Stalhrim at the skyforge takes briquette.
 
+A piece is the hottest metal it is named for or asks for an ingot of.
+Elven is refined moonstone and glass is refined malachite, as in
+Skyrim's own recipes. A piece with none of these metals in it, fur or
+leather or corundum or a lute, still burns one Poor Charcoal. Only
+the grade the piece asks for is burned. A hotter grade is not taken
+in its place, and Skyrim's own Charcoal counts as the Charcoal grade.
+
 Smelting an ingot is smith work, not anybody's. One row per ingot
 stays. Leather is the Platewright's. The duplicate rows, and the
 dragon and Daedric ingots, are in [Cut items](../cut-items.md).
@@ -46,8 +53,7 @@ The pickaxe, the woodcutter's axe, and the shovel already name a
 handle in their own records. They do not take a second one.
 
 A drum, a flute, and a lute are filed in the same family as the odd
-weapons, so the server currently asks them for a handle too. They
-should not. An instrument is not a haft.
+weapons, and they do not take a handle. An instrument is not a haft.
 
 Repair is a kit, not a temper. See [Durability](../durability.md).
 
@@ -67,10 +73,10 @@ half places one more.
 ## Where this is
 
 The recipe gates, the skyforge's advanced line, the charcoal, and
-the taking of one handle are in the server. The forge still burns
-the cheapest grade in the pack, Poor Charcoal first, and it does not
-read the table above. The ingredient column on
-the recipe pages still omits the handle, because the plugin record
-does. A drum, a flute, and a lute are asked for a handle by that same
-check. Mastercraft is not applied to a temper, because the temper
-never arrives.
+the taking of one handle are in the server. The forge, the skyforge,
+and the smelter burn the grade the table above names, and nothing is
+taken when the grade or the handle is missing. The ingredient column
+on the recipe pages still omits the handle, because the plugin record
+does. A temper is refused at the grindstone and the armour table, and
+it is not counted as work. The 120% repair waits on the Weapon Kit and
+the Armor Kit, which are not records in the plugin yet.

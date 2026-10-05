@@ -333,10 +333,14 @@ const WRITERS = {
   'property/giveNamed': [1, 'one named key or mold, KEY or MOLD'],
   'property/takeBlankMold': [1, 'only takes a mold away'],
   'property/nameFreshKey': [1, 'names one key off a stack, and the count is the same after'],
-  'property/takeGold': [1, 'takes a notice or job fee out and never puts any in (checked below)'],
+  'property/takeGold': [1, 'takes a notice, job or letter fee or a fare out and never puts any in (checked below)'],
+  'property/payOut': [1, 'a letter\'s held 15 back out of the ledger it was counted on, to its courier or its sender; payHeld is its one caller and takes the same off that ledger (#1374, checked below)'],
   'spoils/strip': [1, 'only takes things out of a container the world stocked'],
   'spoils/purse': [1, 'THE MINT: forty gold, once per character'],
-  'trade/moveById': [2, 'moves a pile from one pack to the other, one write each (section 4)']
+  'trade/moveById': [2, 'moves a pile from one pack to the other, one write each (section 4)'],
+  'trade/saleById': [2, 'a company sale (#1393): the things out of the seller\'s pack and out of the world with the seller\'s share in, and the price less the worker\'s cut out of the worker\'s pack, which is never less than the share; one write each (section 4)'],
+  'outer/markWoven': [1, 'names a garment a Master Weaver just made: units split off a plain stack of the same base, so no base is added and the count is the same after (#1398, test-1398-fuel.js)'],
+  'durability/writePack': [1, 'writes back a pack or chest it has just read: a stack renamed for its condition, or a kit or a broken piece taken away. No base is added and no count grows (test-1384-condition.js)']
 };
 
 const writes = {};
@@ -383,8 +387,11 @@ for (const at of Object.keys(WRITERS)) {
 }
 
 {
-  // Of all the writers, only two name gold: the mint that hands it out and
-  // the fee that takes it. A third one naming gold is a second mint until
+  // Of all the writers, only four name gold: the mint that hands it out,
+  // the fee that takes it, the ledger paying a letter's held pay back out
+  // (#1374), and a company sale (#1393), which puts the seller's share in
+  // and takes more than that out of the worker's pack in the same step,
+  // driven in section 4. A fifth one naming gold is a second mint until
   // somebody has read it.
   const namesGold = /\b(GOLD|GOLD_ID|goldId)\b|\b0x0*[fF]\b/;
   const naming = [];
@@ -393,9 +400,9 @@ for (const at of Object.keys(WRITERS)) {
     if (body !== null && namesGold.test(body)) { naming.push(at); }
   }
   naming.sort();
-  yes('of the writers, only purse and takeGold name gold' +
+  yes('of the writers, only purse, takeGold, payOut and a company sale name gold' +
       (naming.length ? ' (' + naming.join(', ') + ')' : ''),
-      naming.join(',') === 'property/takeGold,spoils/purse');
+      naming.join(',') === 'property/payOut,property/takeGold,spoils/purse,trade/saleById');
 }
 
 {
@@ -430,8 +437,10 @@ for (const at of Object.keys(WRITERS)) {
     case is there more gold afterwards than before.
 
     It does not refuse a negative amount, and a negative amount would add.
-    Nothing hands it one: its one caller passes a fee that is one of two
-    positive constants, which is checked here rather than trusted.
+    Nothing hands it one: the board passes a fee that is one of two positive
+    constants, a letter passes its fee and pay, and a ride (#1394) passes its
+    fare, which is one of three and is refused at 0 or less before takeGold is
+    reached. All are checked here rather than trusted.
   */
   const take = lift('  function takeGold(actorId, amount) {', '\n  }\n');
   yes('the fee taker is in the gamemode', take !== null);
@@ -460,11 +469,171 @@ for (const at of Object.keys(WRITERS)) {
   }
   const notice = /\bvar NOTICE_FEE = (\d+);/.exec(code);
   const job = /\bvar JOB_FEE = (\d+);/.exec(code);
-  yes('its one caller passes the fee, and the fee is NOTICE_FEE or JOB_FEE',
-      callers.join(',') === 'fee' &&
-      /\bvar fee = isJob \? JOB_FEE : NOTICE_FEE;/.test(code));
-  yes('and both fees are more than nothing',
-      !!notice && !!job && Number(notice[1]) > 0 && Number(job[1]) > 0);
+  const letterFee = /\bvar LETTER_FEE = (\d+);/.exec(code);
+  const letterPay = /\bvar LETTER_PAY = (\d+);/.exec(code);
+  /*
+    A HAUL (#1393). Posting a haul takes JOB_FEE and the pay, a whole number
+    above nothing, onto the ledger. It takes; it puts none in. A company
+    sale is the trade block's saleById, section 4. A night in a bed was a
+    caller too (#1392) until #1603: a night is paid in a trade now, and the
+    server takes no price for one.
+  */
+  yes('its four callers pass the fee, NOTICE_FEE or JOB_FEE, a letter\'s cost, LETTER_FEE and LETTER_PAY, a haul\'s cost, ' +
+      'JOB_FEE and the pay, and a ride\'s fare',
+      callers.slice().sort().join(',') === 'cost,cost,fee,price' &&
+      /\bvar fee = isJob \? JOB_FEE : NOTICE_FEE;/.test(code) &&
+      /\bvar cost = LETTER_FEE \+ LETTER_PAY;/.test(code) &&
+      /\bvar cost = JOB_FEE \+ pay;/.test(code));
+  const fares = ['FARE_FERRY', 'FARE_CARRIAGE_IN_HOLD', 'FARE_CARRIAGE', 'FARE_CROSSING'].map(function (n) {
+    const m = new RegExp('\\bvar ' + n + ' = (\\d+);').exec(code);
+    return m ? Number(m[1]) : 0;
+  });
+  yes('the fare is fare(), refused at 0 or less, and all four fares are more than nothing',
+      /\bvar price = fare\(from, to\);\s*\n(\s*\/\/[^\n]*\n)*\s*if \(!\(price > 0\)\) \{ return /.test(code) &&
+      fares.every(function (n) { return n > 0; }));
+  yes('and every one of those is more than nothing',
+      !!notice && !!job && Number(notice[1]) > 0 && Number(job[1]) > 0 &&
+      !!letterFee && !!letterPay && Number(letterFee[1]) > 0 && Number(letterPay[1]) > 0);
+  /*
+    A NIGHT IN A BED moves no gold since #1603: it is paid in a trade between
+    two people, and the server keeps no price. What #1392's book kept for a
+    holder who was away is only ever handed out, once, through payOut, and
+    nothing adds to it: the book reads it back as whole gold above nothing,
+    and no line in the gamemode writes a sum into it.
+  */
+  const load = lift('  function loadBedBook() {', '\n  }\n');
+  const kept = lift('  function payTakings(online) {', '\n  }\n');
+  yes('nothing takes a price for a night any more',
+      code.indexOf('function payNight(') === -1 && code.indexOf('function bedCmd(') === -1);
+  yes('the kept takings are read back as whole gold above nothing',
+      load !== null && /if \(\(Number\(tp\) \|\| 0\) > 0 && gold > 0 && Math\.floor\(gold\) === gold\) \{/.test(load));
+  yes('and they never grow: nothing writes a sum into them',
+      (code.match(/bedBook\.takings\[[^\]]+\] = /g) || []).length === 0 &&
+      kept !== null && /delete bedBook\.takings\[pid\];/.test(kept));
+  yes('and what was kept is handed over through payOut, then taken off the book',
+      kept !== null && /payOut\(online\[i\], gold\)/.test(kept) &&
+      kept.indexOf('payOut(online[i], gold)') < kept.indexOf('delete bedBook.takings[pid];'));
+}
+
+{
+  /*
+    payOut puts gold in a pack, so it is read the way takeGold is (#1374).
+    Its one caller is payHeld, which pays a letter's own held pay, never more
+    than that hold's ledger holds, takes the same count off the ledger, and
+    zeroes the pay so it is paid once. Driven here: packs plus ledger add up
+    to the same after a payout, and a ledger short of the pay pays nothing.
+  */
+  const calls = [];
+  const re = /\bpayOut\(/g;
+  let m2;
+  while ((m2 = re.exec(code)) !== null) {
+    if (code.slice(Math.max(0, m2.index - 9), m2.index) === 'function ') { continue; }
+    calls.push(where(m2.index));
+  }
+  /*
+    And the company (#1393). handHaul pays a haul's held gold, the hauler's
+    pay less the tenth or the poster's pay back, and haulTick what a haul
+    held for somebody who was away, each taking the same off the ledger
+    through withdraw, which never takes more than that haul holds. postHaul
+    gives back the cost it has just taken when the ledger would not take it
+    (test-1393-company.js).
+  */
+  yes('payOut\'s callers are payHeld, the takings #1392 kept for a holder, handed over once (#1603), and the haul (#1393)',
+      calls.slice().sort().join(',') ===
+      'property/handHaul,property/haulTick,property/payHeld,property/payTakings,property/postHaul');
+
+  /*
+    THE LEDGER GOES DOWN ONLY BY A PAYOUT (#1393). Coin comes off a ledger
+    in two places: payHeld, for a letter's 15, and withdraw. withdraw's
+    callers are handHaul and haulTick, and each hands the same count into a
+    pack, first, in the same function. So a ledger never goes down without
+    the same gold appearing in a pack, and packs plus ledgers add up after.
+  */
+  const down = [];
+  const reDown = /\bfunds\[[^\]]+\] = \(Number\(funds\[[^\]]+\]\) \|\| 0\) - /g;
+  let m3;
+  while ((m3 = reDown.exec(code)) !== null) { down.push(where(m3.index)); }
+  yes('a ledger is counted down in payHeld and withdraw, and nowhere else',
+      down.slice().sort().join(',') === 'property/payHeld,property/withdraw');
+  const wd = [];
+  const reWd = /\bwithdraw\(/g;
+  while ((m3 = reWd.exec(code)) !== null) {
+    if (code.slice(Math.max(0, m3.index - 9), m3.index) === 'function ') { continue; }
+    wd.push(where(m3.index));
+  }
+  const hand = bodyOf('property/handHaul');
+  const tick = bodyOf('property/haulTick');
+  yes('withdraw\'s callers are handHaul and haulTick, and each puts the same count in a pack before it',
+      wd.slice().sort().join(',') === 'property/handHaul,property/haulTick' &&
+      !!hand && hand.indexOf('payOut(to, amount)') > 0 && hand.indexOf('payOut(to, amount)') < hand.indexOf('withdraw(hold, amount,') &&
+      !!tick && tick.indexOf('payOut(to, owed)') > 0 && tick.indexOf('payOut(to, owed)') < tick.indexOf('withdraw(hold, owed,'));
+  const drive = ['noticeHolds', 'heldOn', 'mayWithdraw', 'withdraw', 'handHaul'].map(function (n) {
+    return lift('  function ' + n + '(', '\n  }\n');
+  });
+  const holds = lift('  var LEDGER_HOLDS = [', ';\n');
+  yes('the ledger\'s withdrawal and the haul\'s hand over are in the gamemode', drive.every(Boolean) && !!holds);
+  if (drive.every(Boolean) && holds) {
+    attempt('driving a haul\'s payout', function () {
+      const A = 0xff000058;
+      const store = {};
+      store[A] = { inventory: { entries: [{ baseId: GOLD, count: 5 }] }, profileId: 7 };
+      const funds = { riften: 110 };
+      const notices = { riften: [
+        { haul: true, job: true, pay: 80, dest: 'whiterun', taken: 7 },
+        { letter: true, job: true, pay: 15 }
+      ] };
+      funds.riften += 15;
+      const api = new Function('mp', 'GOLD_ID', 'funds', 'notices', 'plog', 'save', 'onlineActorOf',
+        holds + '\n' + lift('  function payOut(actorId, amount) {', '\n  }\n') + '\n' + drive.join('\n') + '\nreturn { handHaul: handHaul, withdraw: withdraw };')(
+        fakeMp(store), GOLD, funds, notices, function () { }, function () { },
+        function (pid) { return pid === 7 ? A : 0; });
+      const before = goldIn(store[A].inventory) + funds.riften;
+      const r = api.handHaul('riften', notices.riften[0], 7, 72, 'test', 'hauled');
+      yes('a haul\'s 72 goes from the ledger to the pack, and packs plus the ledger add up the same',
+          !r.why && !r.owed && goldIn(store[A].inventory) === 77 && funds.riften === 53 &&
+          goldIn(store[A].inventory) + funds.riften === before && notices.riften[0].pay === 0);
+      yes('what is left is the fee, the tenth and the letter\'s held 15, and the 15 cannot be withdrawn',
+          api.withdraw('riften', 39, 'x') === false && api.withdraw('riften', 38, 'x') === true && funds.riften === 15);
+      const away = { haul: true, job: true, pay: 40, dest: 'whiterun', taken: 9 };
+      notices.riften.push(away);
+      funds.riften += 40;
+      const r2 = api.handHaul('riften', away, 9, 40, 'test', 'back');
+      yes('to somebody away nothing leaves the ledger, and it stays held as owed',
+          !r2.why && r2.owed === true && funds.riften === 55 && away.owed === 40 && away.pay === 0 &&
+          api.withdraw('riften', 1, 'x') === false);
+    });
+  }
+  const pay = lift('  function payOut(actorId, amount) {', '\n  }\n');
+  const held = lift('  function payHeld(hold, n, actorId) {', '\n  }\n');
+  yes('the payout and the held pay are in the gamemode', pay !== null && held !== null);
+  if (pay !== null && held !== null) {
+    attempt('driving payHeld', function () {
+      const A = 0xff000058;
+      const store = {};
+      store[A] = { inventory: { entries: [{ baseId: GOLD, count: 5 }] } };
+      const ledger = { riften: 35 };
+      const api = new Function('mp', 'GOLD_ID', 'funds', 'plog',
+        pay + '\n' + held + '\nreturn { payHeld: payHeld, payOut: payOut };')(
+        fakeMp(store), GOLD, ledger, function () { });
+      const api2 = api.payHeld;
+      const letter = { letter: true, pay: 15 };
+      const before = goldIn(store[A].inventory) + ledger.riften;
+      yes('a letter\'s 15 goes from the ledger to the pack, and the total is the same',
+          api2('riften', letter, A) === 15 && goldIn(store[A].inventory) === 20 &&
+          ledger.riften === 20 && goldIn(store[A].inventory) + ledger.riften === before);
+      yes('and it is paid once', api2('riften', letter, A) === 0 && goldIn(store[A].inventory) === 20);
+      const short = { riften: 10 };
+      const api3 = new Function('mp', 'GOLD_ID', 'funds', 'plog',
+        pay + '\n' + held + '\nreturn payHeld;')(fakeMp(store), GOLD, short, function () { });
+      yes('a ledger short of the pay pays nothing',
+          api3('riften', { letter: true, pay: 15 }, A) === -1 &&
+          goldIn(store[A].inventory) === 20 && short.riften === 10);
+      yes('a notice holds nothing to pay', api2('riften', { pay: 15 }, A) === 0 &&
+          goldIn(store[A].inventory) === 20);
+      yes('payOut refuses a count that is not more than nothing',
+          api.payOut(A, 0) === false && api.payOut(A, -5) === false && goldIn(store[A].inventory) === 20);
+    });
+  }
 }
 
 // ------------------------------------- 3. no descriptor in the file is gold
@@ -567,6 +736,7 @@ function goldDescriptors(text) {
     'ITEMS.fishTrap': 'a fish trap refund, ITEMS',
     'rare': 'fire, frost or void salts, ITEMS',
     'seam.ore': 'ore, ORES_BY_BASE',
+    'extra.ore': 'the chance of one more ore off a swing, a row of ORES_BY_BASE (#1380)',
     'ITEMS.firewood': 'firewood, ITEMS',
     'ITEMS[grade]': 'charcoal, ITEMS',
     'ITEMS.butter': 'butter off the churn, ITEMS',
@@ -582,7 +752,8 @@ function goldDescriptors(text) {
     'hit.desc': 'the testers\' /give, out of the index built from these same tables',
     'GOLD_DESC': 'scene finish gold, the same named GOLD_DESC row the checked dungeon reward uses',
     'open.itemDesc': 'puts back the retrieval good the place row already handed over; not a coin',
-    'place.item': 'the unbound scene container good on the place row; not a coin'
+    'place.item': 'the unbound scene container good on the place row; not a coin',
+    'row.out': 'Grand Chef\'s second batch, the output of a Cook row of RECIPES_BY_ID (#1398), and section 5 says no recipe makes gold'
   };
   const re = /\baddItem\(\s*[^,()]+,\s*([^,]+?),/g;
   const unknown = [];
@@ -693,6 +864,25 @@ if (tradeBlock !== null) {
     yes('and a pile bigger than the pack is refused with nothing written',
         w.trade.moveById(A, B, [[GOLD, 500]]) === false &&
         w.gold(A) === 10 && w.gold(B) === 50);
+  });
+  /*
+    A SALE OUT OF SKYRIM (#1393). saleById is the trade block's other
+    writer: the seller's share in, the price less the worker's cut out. The
+    worker's pack loses more than the seller's gains, by the 10% that leaves
+    the server, so the total goes down and never up.
+  */
+  attempt('a company sale', function () {
+    const w = tradeWorld();
+    const A = w.person(0xff000001, [{ baseId: GOLD, count: 100 }]);
+    const B = w.person(0xff000002, [{ baseId: LEEK, count: 2 }]);
+    yes('a sale of 50: 40 to the seller, the worker pays 45, 5 leaves, the leek is gone, and nothing is made',
+        w.trade.saleById(B, A, [{ id: LEEK, c: 1, n: 'Leek' }], 40, 45) === true &&
+        w.gold(B) === 40 && w.gold(A) === 55 && w.gold(A) + w.gold(B) === 95 &&
+        w.store[B].inventory.entries.some(function (e) { return e.baseId === LEEK && e.count === 1; }));
+    yes('a share bigger than what the worker pays is refused with nothing written',
+        w.trade.saleById(B, A, [{ id: LEEK, c: 1, n: 'Leek' }], 30, 20) === false && w.gold(B) === 40 && w.gold(A) === 55);
+    yes('and a price bigger than the worker\'s pack is refused with nothing written',
+        w.trade.saleById(B, A, [{ id: LEEK, c: 1, n: 'Leek' }], 400, 500) === false && w.gold(B) === 40 && w.gold(A) === 55);
   });
   attempt('a trade with yourself', function () {
     const w = tradeWorld();

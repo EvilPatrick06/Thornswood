@@ -77,7 +77,7 @@ namespace Thornswood
                 "The profession, and which half of it you work, decides what you can make. The eight are Warrior, Mage, Alchemist, Cook, Smith, Enchanter, Tailor and Woodworker. The class decides where raw material comes from: only a Hunter loots an animal, only a Fisher fishes, only a Gatherer gathers, only a Miner mines and only a Farmer farms. You get one of each, for the life of the character."),
 
             new HelpItem("Character", "The tools come with the pick",
-                "A Miner is handed a pickaxe, a Farmer a shovel and a few crops to sow, and a Woodworker a woodcutter's axe, the moment they choose. A tool wears out. When it breaks or is lost, a smith forges the next one: nothing in the world hands one out."),
+                "A Miner is handed a pickaxe, a Farmer a shovel and a few crops to sow, a Fisher a crude fishing pole, and a Woodworker a woodcutter's axe, the moment they choose. A tool wears out. When it breaks or is lost, a smith forges the next one, and a woodwright makes the next pole: nothing in the world hands one out."),
 
             new HelpItem("Character", "K is your character",
                 "K opens your profession, your class, the recipe book and the skill tree. Skyrim's own levelling is off: rank comes from doing the work of your trade. The panel does not pause the world."),
@@ -117,10 +117,11 @@ namespace Thornswood
 
             // The two party items came from main (entry 336, #281).
             // tests\test-help-parties.js finds them by what they are about
-            // and holds every number, key and command in them to the gamemode,
-            // the plugin and the P panel.
+            // and holds every number, key and button in them to the gamemode,
+            // the plugin and the P panel. Nothing here tells anybody to type
+            // /party: P on somebody asks, and the P panel does the rest (#1629).
             new HelpItem("Chat and commands", "Parties",
-                "P, unless you have moved it on the Controls page, opens your friends and your party. To bring somebody in, press Enter and type /party and their name, or press Ask to party beside a friend who is online. They have forty five seconds to press Accept or Refuse on the prompt. A party holds up to six. /party on its own says who is in yours, and /party leave takes you out. Logging out takes you out too, and every party ends when the server restarts. The leader sees Kick and Lead beside each other person, and Disband. Everyone else sees Leave."),
+                "P, unless you have moved it on the Controls page, opens your friends and your party. To bring somebody in, look at them and press P, or press Ask to party beside a friend who is online. They have forty five seconds to press Accept or Refuse on the prompt. A party holds up to six. The P panel says who is in yours and how many of them are in the same place as you, and Leave there takes you out. Logging out takes you out too, and every party ends when the server restarts. The leader also sees Kick and Lead beside each other person, and Disband."),
 
             new HelpItem("Chat and commands", "Finding your party",
                 "Everybody in your party has their name in green above their head, a marker on your map, and an arrow on a strip under your compass with how far away they are. Green on the strip means the same place as you, gold means somewhere else. You cannot fast travel to the marker. Work done with somebody from your party in the same place counts 15 per cent more."),
@@ -131,6 +132,9 @@ namespace Thornswood
             // Issue #414: the asking staff block at the end of gamemode.js.
             new HelpItem("Chat and commands", "Getting staff: /helpme and /report",
                 "/helpme and a few words about what is wrong reaches staff: anybody from staff in the world is told at once, with where you are, and it goes to the staff channel in the Discord. /report, the person's name and what they did, reaches staff and nobody else. The game tells you whether it got through. If it did not, open a ticket in the Discord."),
+
+            new HelpItem("Chat and commands", "Stuck in the world: /stuck",
+                "Wedged in a wall or a rock and cannot walk out? /stuck takes you back a few steps to where you last stood safely, or to the nearest temple when there is no such spot. It works once every 5 minutes and not while you are dead, and in a fight it waits 15 seconds first, which moving or being hit cancels. It is only for being truly stuck: every use is logged for staff."),
 
             new HelpItem("Chat and commands", "Everything else is on /help",
                 "Type /help in the chat for a short menu, then /help talking, /help people, /help living, /help work, /help land or /help staff for one topic each. A word the server does not know is answered with the list of words it does."),
@@ -168,7 +172,7 @@ namespace Thornswood
             // The needs run on the server. tools\test-sunhelm-gone.js checks
             // every bar, command and source of warmth here against the gamemode.
             new HelpItem("In game", "You will get hungry, thirsty and cold",
-                "Eat, drink, rest and stay warm. Cold bites hardest in the north, up high and at night. A fire warms you and standing in one burns you, a roof keeps the weather off, and what you wear counts: fur is the warmest thing there is and metal the worst. The four bars in the bottom left corner are Hunger, Thirst, Rest and Temp, and /needs gives the numbers. /eat and /drink when you have something, /rest sit, /rest campfire, /rest inn or /rest bed, and /rest up to get going again."),
+                "Eat, drink, rest and stay warm. Cold bites hardest in the north, up high and at night. A fire warms you and standing in one burns you, a roof keeps the weather off, and what you wear counts: fur is the warmest thing there is and metal the worst. The four bars in the bottom left corner are Hunger, Thirst, Rest and Temp, and /needs gives the numbers. /eat and /drink when you have something. Sit down or lie down and the rest counts by itself: a seat by a fire beats a bare one, a bedroll by a fire beats both, and your own bed is best. A bed in somebody else's building counts when they let you sleep there or you carry its key."),
 
             new HelpItem("In game", "When you die",
                 "You wake at the temple of the hold you died in. A hold with no temple of its own sends you to the nearest temple or Hall of the Dead, and anywhere on Solstheim sends you to Raven Rock."),

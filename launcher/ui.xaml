@@ -540,6 +540,7 @@
                          RenderOptions.BitmapScalingMode="HighQuality" Visibility="Collapsed"/>
                   <TextBlock x:Name="TxtBrandSmall" Text="Thornswood" FontFamily="Constantia, Georgia" FontSize="17"
                              Typography.Capitals="SmallCaps" TextOptions.TextFormattingMode="Ideal"
+                             TextWrapping="Wrap" TextAlignment="Center"
                              Foreground="{DynamicResource Ink}" VerticalAlignment="Center"/>
                 </StackPanel>
                 <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="22,16,18,0"/>
@@ -1181,6 +1182,11 @@
                 <!-- Ready to launch (kept). Mods / Mod list share Scan and Fix's Issue list. -->
                 <TextBlock Text="Ready to launch" Style="{StaticResource Eyebrow}" Margin="0,30,0,11"/>
                 <StackPanel x:Name="StatusList"/>
+
+                <!-- Collection line: after the last Ready to launch row (Steam),
+                     before Bring it up to date from Vortex. Built in C# so a
+                     missing named control cannot take the page with it. -->
+                <StackPanel x:Name="DiagCollection" Margin="0,8,0,0"/>
 
                 <Border Style="{StaticResource Slab}" Padding="20,18" Margin="0,16,0,0">
                   <StackPanel>

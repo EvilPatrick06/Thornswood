@@ -812,10 +812,16 @@ try {
     # wait out the whole of -Wait, put the code back, wait it out again and
     # end red, which is a -CodeOnly run that stops the bot and never says
     # why. The log is made in front of the start now.
-    $null = RunWrapped "Stop-Service -Name 'ThornswoodTestBot'`r`n"
-    foreach ($p in @(Get-CimInstance Win32_Process -EA SilentlyContinue | Where-Object { $_.CommandLine -and $_.CommandLine.Contains($botRoot) })) {
-        if ($p.ProcessId -ne $PID) { Stop-Process -Id $p.ProcessId -Force -EA SilentlyContinue }
+    # The bot stopped first, service and any copy of it, so nothing is writing
+    # data\bot.log while it is taken away: a running bot opens its log for
+    # appending and makes it again, and then the run finds one there.
+    function Stop-TestBot {
+        $null = RunWrapped "Stop-Service -Name 'ThornswoodTestBot'`r`n"
+        foreach ($p in @(Get-CimInstance Win32_Process -EA SilentlyContinue | Where-Object { $_.CommandLine -and $_.CommandLine.Contains($botRoot) })) {
+            if ($p.ProcessId -ne $PID) { Stop-Process -Id $p.ProcessId -Force -EA SilentlyContinue }
+        }
     }
+    Stop-TestBot
     $gone = WaitFor { Remove-Item -LiteralPath $botLog -Force -EA SilentlyContinue; -not (Test-Path -LiteralPath $botLog) }
     Bot 'bot v5'
     $r = Deploy 'Install-Bot.ps1' $bot.Clone()
@@ -834,6 +840,15 @@ try {
     # and that used to be enough to skip making data\bot.log, so the path
     # everybody is told to look at did not exist. The run must leave it there,
     # and must still read the file this start really wrote.
+    #
+    # The bot v5 the case above started is still running, writing
+    # data\bot.log. In the nightly of 4 October (#1197) this case failed with
+    # the run saying SWAP OK, that it stopped the service and "a copy of the
+    # bot no service started" (python.exe), and nothing about making
+    # data\bot.log: the running bot held the file or wrote it again after it
+    # was taken away, so the run found one there. It is stopped here the way
+    # the case above does it, so "none in data" is what the run sees.
+    Stop-TestBot
     $besideCode = Join-Path $botRoot 'bot.log'
     Put $besideCode "[thornswood-bot] bot v5 watching 1 server, from the old place`r`n"
     $gone = WaitFor { Remove-Item -LiteralPath $botLog -Force -EA SilentlyContinue; -not (Test-Path -LiteralPath $botLog) }

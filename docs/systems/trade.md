@@ -61,9 +61,18 @@ seconds.
 A trade is a conversation. It is not saved. A restart does not
 remember the piles.
 
+## A sale out of Skyrim
+
+Somebody the [Free Skyrim Trading Company](trading-company.md) has
+taken on sees one more button, Buy for the company. Pressed, the
+trade is the company buying: what the other person puts up leaves
+Skyrim instead of crossing, and the gold the worker puts up is the
+price. Both see the split before they agree. Pressing it again makes
+it an ordinary trade. Either way both confirmations are cleared.
+
 ## Where this is
 
 The offer, the prompt, the names, the groups, the buttons, the
 distance, the two confirmations, the 24 lines, the 3 minutes, and
 the gold check are in the server. Accept and Refuse on that prompt
-are what a person presses.
+are what a person presses. So is Buy for the company.

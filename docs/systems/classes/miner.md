@@ -78,13 +78,36 @@ The seam comes back for everybody at once, not per person.
 | Gold | 20 minutes |
 | Corundum, silver | 10 minutes |
 | Clay, quarried stone, orichalcum, quicksilver, moonstone, malachite, shellbug | 30 minutes |
-| Ebony, the gems, stalhrim, heart stone | One place each. A scarce quest opens it. The counts and the cooldown are on [Custom quests](../quests.md). The rank on the seam still applies. A steward does not grant it. |
+| Ebony, the gems, stalhrim, heart stone | One place each, below. A scarce quest opens it. The counts and the cooldown are on [Custom quests](../quests.md). The rank on the seam still applies. |
 
 Clicking again while the pick is still in the air is not a second
 swing. Nothing is said. The ore is not given twice.
 
 Smelting the ore into an ingot is anybody's work, at a forge, and the
 forge burns a charcoal. See [Smith](../professions/smith.md).
+
+## The one place
+
+Each rare seam is one building. Every vein of that seam inside it is
+the place. The same seam anywhere else, in another building or on open
+ground, stays shut.
+
+| Seam | The one place |
+| --- | --- |
+| Ebony | Raven Rock Mine |
+| Stalhrim | Kolbjorn Barrow |
+| Heart stone | Coldcinder Cave |
+| Ruby | White Ridge Sanctum |
+| Sapphire | Highpoint Tower |
+| Emerald | Kolbjorn Barrow |
+| Amethyst | Highpoint Tower |
+
+A guild trader gives the scarce quest that opens it. Nothing else
+opens it. The place holds the count on [Custom quests](../quests.md),
+across all of its veins of that seam. Once you turn the quest in, the
+place is shut to you until that quest's cooldown ends. The cooldown
+is kept by the server and it is yours: another person holding the
+same quest still works the place.
 
 ## The salt quarry
 
@@ -123,33 +146,39 @@ Generated from the work tables by `scripts/dev/Write-SystemLists.js`. The same r
 
 | Name | Rank | Records | You receive | Yield novice, advanced, expert, master |
 | --- | --- | --- | --- | --- |
-| Clay | novice | 5 | Clay | 1-2, 1-3, 1-4, 1-5 |
-| Iron Ore | novice | 82 | Iron Ore | 1-2, 1-3, 1-4, 1-5 |
-| Quarried Stone | novice | 1 | Quarried Stone | 1-2, 1-3, 1-4, 1-5 |
-| Corundum Ore | advanced | 81 | Corundum Ore | 0-0, 1-3, 1-4, 1-5 |
-| Heart Stone | advanced | 4 | Heart Stone | 0-0, 1-3, 1-4, 1-5 |
-| Orichalcum Ore | advanced | 76 | Orichalcum Ore | 0-0, 1-3, 1-4, 1-5 |
-| Quicksilver Ore | advanced | 76 | Quicksilver Ore | 0-0, 1-3, 1-4, 1-5 |
-| Shellbug Chitin | advanced | 1 | Shellbug Chitin | 0-0, 1-3, 1-4, 1-5 |
-| Silver Ore | advanced | 76 | Silver Ore | 0-0, 1-3, 1-4, 1-5 |
-| Gold Ore | expert | 76 | Gold Ore | 0-0, 0-0, 1-4, 1-5 |
-| Malachite Ore | expert | 7 | Malachite Ore | 0-0, 0-0, 1-4, 1-5 |
-| Moonstone Ore | expert | 76 | Moonstone Ore | 0-0, 0-0, 1-4, 1-5 |
-| Amethyst | master | 3 | Amethyst | 0-0, 0-0, 0-0, 1-5 |
-| Ebony Ore | master | 6 | Ebony Ore | 0-0, 0-0, 0-0, 1-5 |
-| Emerald | master | 3 | Emerald | 0-0, 0-0, 0-0, 1-5 |
-| Ruby | master | 3 | Ruby | 0-0, 0-0, 0-0, 1-5 |
-| Sapphire | master | 3 | Sapphire | 0-0, 0-0, 0-0, 1-5 |
-| Stalhrim | master | 2 | Stalhrim | 0-0, 0-0, 0-0, 1-5 |
+| Clay | novice | 5 | Clay | 1-2, 1-2, 1-2, 1-2 |
+| Iron Ore | novice | 82 | Iron Ore | 1-2, 1-2, 1-2, 1-2 |
+| Quarried Stone | novice | 1 | Quarried Stone | 1-2, 1-2, 1-2, 1-2 |
+| Corundum Ore | advanced | 81 | Corundum Ore | 0-0, 1-2, 1-2, 1-2 |
+| Orichalcum Ore | advanced | 76 | Orichalcum Ore | 0-0, 1-2, 1-2, 1-2 |
+| Quicksilver Ore | advanced | 76 | Quicksilver Ore | 0-0, 1-2, 1-2, 1-2 |
+| Shellbug Chitin | advanced | 1 | Shellbug Chitin | 0-0, 1-2, 1-2, 1-2 |
+| Silver Ore | advanced | 76 | Silver Ore | 0-0, 1-2, 1-2, 1-2 |
+| Gold Ore | expert | 76 | Gold Ore | 0-0, 0-0, 1-2, 1-2 |
+| Malachite Ore | expert | 7 | Malachite Ore | 0-0, 0-0, 1-2, 1-2 |
+| Moonstone Ore | expert | 76 | Moonstone Ore | 0-0, 0-0, 1-2, 1-2 |
+| Amethyst | master | 3 | Amethyst | 0-0, 0-0, 0-0, 1-2 |
+| Ebony Ore | master | 6 | Ebony Ore | 0-0, 0-0, 0-0, 1-2 |
+| Emerald | master | 3 | Emerald | 0-0, 0-0, 0-0, 1-2 |
+| Heart Stone | master | 4 | Heart Stone | 0-0, 0-0, 0-0, 1-2 |
+| Ruby | master | 3 | Ruby | 0-0, 0-0, 0-0, 1-2 |
+| Sapphire | master | 3 | Sapphire | 0-0, 0-0, 0-0, 1-2 |
+| Stalhrim | master | 2 | Stalhrim | 0-0, 0-0, 0-0, 1-2 |
 
 <!-- detail:end -->
 
 ## Where this is
 
-The server still has 581 veins, a deposit of 20, yields that climb
-from 1-2 up to 1-5, heart stone forced to advanced, and a pickaxe of
-100 uses. Iron, gold, corundum and silver all come back in 10
-minutes. Ebony is 6 veins, the gems are 3 each, stalhrim is 2, heart
-stone is 4. A scarce quest is the only way in, and the one place is not
-bound, so every rare vein stays shut. A steward does not guard it. The table under
-Every record is that server book. The numbers above it are the plan.
+The server has 581 veins and a deposit of 20. A swing takes 1, and
+the chance of one more is the rank table above, out of the same 20.
+The common seams come back on the clock above. Heart stone is master.
+The pickaxe still has 100 uses. Each rare seam is bound to the
+building in the table under The one place, by that building's cell in
+`game/data/mine-buildings.json`, and every other vein of that seam is
+shut. A scarce quest is the only way in, and its cooldown starts at
+the turn-in. A swing at a scarce place gives 1, without the chance of
+one more. The open quest and the cooldown are kept in memory, so a
+restart of the server clears them. No trader offers the quest in the
+game yet, so every rare vein still answers shut in play. The table
+under Every record is that server book. The numbers above it are the
+plan.

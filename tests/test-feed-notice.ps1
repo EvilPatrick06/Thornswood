@@ -19,8 +19,8 @@
     - a feed older than the new fields, or with them null, still reads, and
       holds nothing
     - a document that was never read holds nothing
-    - a minimum that is not a version number holds nothing, although
-      Updater.IsNewer by itself calls "latest" newer than every build
+    - a minimum that is not a version number holds nothing, and since #1329
+      Updater.IsNewer by itself no longer calls "latest" newer either
     - a maintenance value that is not plainly on holds nothing, and a value
       that would have thrown as a bool reads without a word
 
@@ -247,7 +247,9 @@ Quiet 'S4 a minimum below this launcher' '{"minLauncher":"1.1.40"}'
 Quiet 'S4 an empty minimum' '{"minLauncher":""}'
 $n = Holds 'S4 a minimum with a leading v' '{"minLauncher":"v1.1.93"}'
 $n = Holds 'S4 a minimum written as a JSON number' '{"minLauncher":1.2}'
-Yes 'S4 Updater.IsNewer on its own calls "latest" newer than 1.1.92' ($UpdaterT::IsNewer('latest', $Running))
+# #1329: a version on either side that does not read as dotted numbers is not
+# an update. It used to be, which is why the notice reads the minimum itself.
+Yes ('S4 Updater.IsNewer on its own no longer calls "latest" newer than ' + $Running) (-not $UpdaterT::IsNewer('latest', $Running))
 Quiet 'S4 so a minimum of "latest" is not a version and holds nothing' '{"minLauncher":"latest"}'
 Quiet 'S4 a minimum of "1.1."' '{"minLauncher":"1.1."}'
 Quiet 'S4 a minimum with a part too long for an int' '{"minLauncher":"1.1.9999999999"}'

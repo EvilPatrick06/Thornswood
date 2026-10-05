@@ -10,12 +10,15 @@
   all, so on a machine where Vortex's state could not be read there was no
   card, no button and no word anywhere.
 
-  This holds three things to the source:
-    - Diagnostics puts the collection card first, with what was found;
+  This holds four things to the source:
+    - Diagnostics puts the collection card after the last Ready to launch
+      row and before Bring it up to date from Vortex, not under What the
+      launcher can see right now;
     - the bar above Play carries a not-confirmed note with the button when the
       revision cannot be read, and that note never shuts Play;
     - the bar's button opens the collection for the note, and still runs the
-      update when an update owns the bar.
+      update when an update owns the bar;
+    - Play still reaches the game when the collection is current.
 
   Read only. It reads source files and nothing else.
 */
@@ -29,6 +32,7 @@ const read = f => fs.readFileSync(path.join(APP, f), 'utf8').split(CR).join('');
 const SHELL = read('Shell.cs');
 const PAGES = read('Pages.cs');
 const PACKS = read('ShellPacks.cs');
+const XAML = fs.readFileSync(path.join(REPO_DIR, 'launcher', 'ui.xaml'), 'utf8').split(CR).join('');
 
 let pass = 0, fail = 0;
 const yes = (w, c) => {
@@ -36,13 +40,33 @@ const yes = (w, c) => {
   else { fail++; console.log('FAIL  ' + w); }
 };
 
-// ---- Diagnostics -----------------------------------------------------------
+// ---- Diagnostics placement -------------------------------------------------
+const pageAt = XAML.indexOf('x:Name="PageDiag"');
+const nextPage = XAML.indexOf('x:Name="PageGallery"');
+const diagXaml = pageAt >= 0 && nextPage > pageAt ? XAML.slice(pageAt, nextPage) : '';
+const statusList = diagXaml.indexOf('x:Name="StatusList"');
+const collectionHost = diagXaml.indexOf('x:Name="DiagCollection"');
+const vortexHead = diagXaml.indexOf('Text="Bring it up to date from Vortex"');
+const readingsHead = diagXaml.indexOf('Text="What the launcher can see right now"');
+yes('Diagnostics has the Ready to launch list, the collection host, and the Vortex section',
+    statusList >= 0 && collectionHost >= 0 && vortexHead >= 0);
+yes('the collection host sits after StatusList and before Bring it up to date from Vortex',
+    statusList >= 0 && collectionHost > statusList && vortexHead > collectionHost);
+yes('Bring it up to date from Vortex is still above What the launcher can see right now',
+    vortexHead >= 0 && readingsHead > vortexHead);
+yes('the collection host is not under the readings heading',
+    collectionHost >= 0 && readingsHead > collectionHost);
+
 const diag = PAGES.slice(PAGES.indexOf('static void BuildDiag()'));
-const clear = diag.indexOf('diagReadings.Children.Clear();');
-const card = diag.indexOf('diagReadings.Children.Add(CollectionStatusCard());');
+const hostClear = diag.indexOf('diagCollection.Children.Clear();');
+const card = diag.indexOf('diagCollection.Children.Add(CollectionStatusCard());');
+const readingsClear = diag.indexOf('diagReadings.Children.Clear();');
 const rows = diag.indexOf('diagReadings.Children.Add(ReadingRow(r));');
-yes('BuildDiag adds the collection card', card > 0);
-yes('it is added after the clear and before the readings, so it is first', clear >= 0 && card > clear && rows > card);
+yes('BuildDiag adds the collection card to the host after StatusList', card > 0);
+yes('that add is not into DiagReadings, so the line cannot sit under the Vortex section',
+    diag.indexOf('diagReadings.Children.Add(CollectionStatusCard());') < 0);
+yes('the host is filled before the readings are rebuilt',
+    hostClear >= 0 && card > hostClear && readingsClear > card && rows > readingsClear);
 
 const status = PACKS.slice(PACKS.indexOf('static UIElement CollectionStatusCard()'));
 yes('CollectionStatusCard exists', PACKS.indexOf('static UIElement CollectionStatusCard()') > 0);
@@ -53,13 +77,13 @@ yes('it is built on the card that has the Open the collection button',
 
 // ---- the note above Play ---------------------------------------------------
 yes('there is a flag for the note', SHELL.indexOf('static bool collectionNoteUp = false;') > 0);
-const unc = SHELL.slice(SHELL.indexOf('static bool CollectionUnconfirmed()'));
-yes('CollectionUnconfirmed exists', SHELL.indexOf('static bool CollectionUnconfirmed()') > 0);
+const unc = SHELL.slice(SHELL.indexOf('static bool CollectionUnconfirmed(int revision = -1)'));
+yes('CollectionUnconfirmed exists', unc.length < SHELL.length);
 yes('it is only true when CollectionProblem found nothing and the revision is unreadable',
-    /if \(CollectionProblem\(\)\.Length > 0\) return false;/.test(unc.slice(0, 800)) &&
-    /return Checks\.CollectionRevision\(cfg\) <= 0;/.test(unc.slice(0, 800)));
+    /if \(CollectionProblem\(revision\)\.Length > 0\) return false;/.test(unc.slice(0, 800)) &&
+    /return revision <= 0;/.test(unc.slice(0, 800)));
 
-const noteAt = SHELL.indexOf('bool unsure = CollectionUnconfirmed();');
+const noteAt = SHELL.indexOf('bool unsure = CollectionUnconfirmed(collectionRevision);');
 yes('DrawStatus asks it', noteAt > 0);
 const note = noteAt > 0 ? SHELL.slice(noteAt, SHELL.indexOf('// Wrong Skyrim build', noteAt)) : '';
 yes('the note says the mods could not be confirmed', note.indexOf('Your mods could not be confirmed') >= 0);

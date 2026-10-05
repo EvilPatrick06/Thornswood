@@ -2083,12 +2083,14 @@ namespace Thornswood
             PaintServerBoxes();
             chkAutoUpdate.IsChecked = cfg.AutoUpdate;
             txtVersion.Text = "launcher " + Updater.Version;
-            // Channel is already on the sidebar brand (Thornswood Dev). Do not
-            // also tag the version line; that leftover truncated as "dev bu".
+            // Channel is already on the sidebar brand (Thornswood over Dev).
+            // Do not also tag the version line; that leftover truncated as
+            // "dev bu". The one-line "Thornswood Dev" ran past the emblem in
+            // the 208 column; two lines keep the name and Dev both visible.
             if (cfg.IsDev)
             {
                 txtServer.Text = "Thornswood Dev";
-                if (txtBrandSmall != null) txtBrandSmall.Text = "Thornswood Dev";
+                if (txtBrandSmall != null) txtBrandSmall.Text = "Thornswood\nDev";
                 if (txtBrandBig != null) txtBrandBig.Text = "Thornswood Dev";
                 try { win.Title = "Thornswood Dev"; } catch (Exception ex) { Swallow.Note("Shell.ApplyConfig", ex); }
             }
@@ -2886,9 +2888,11 @@ namespace Thornswood
             // the card up: the folder holds 1.6.1170 itself and follows Vortex
             // whatever build the Steam copy is on.
             bool wrongBuild = Downgrade.Needed(cfg);
-            if (updateBar != null && btnInstallNow != null && ModsMissing() && !wrongBuild)
+            // One current observation per draw, with no stale cache between draws.
+            int collectionRevision = updateBar != null && btnInstallNow != null && !wrongBuild ? Checks.CollectionRevision(cfg) : 0;
+            if (updateBar != null && btnInstallNow != null && ModsMissing(collectionRevision) && !wrongBuild)
             {
-                ShowCollectionBar();
+                ShowCollectionBar(collectionRevision);
             }
             else if (collectionBarUp && updateBar != null && btnInstallNow != null)
             {
@@ -2906,7 +2910,7 @@ namespace Thornswood
             if (updateBar != null && btnInstallNow != null && !collectionBarUp && !updatePending &&
                 !wrongBuild && !playing && !playBar.Active)
             {
-                bool unsure = CollectionUnconfirmed();
+                bool unsure = CollectionUnconfirmed(collectionRevision);
                 if (unsure && (collectionNoteUp || updateBar.Visibility != Visibility.Visible))
                 {
                     txtUpdateTitle.Text = "Your mods could not be confirmed";
@@ -5117,6 +5121,7 @@ namespace Thornswood
                 if (updatePending) { Log("An update is going in. Play comes back when it is done."); return; }
                 if (collectionBarUp) { Log("The collection is not installed yet. Open it from the card above Play, then come back."); return; }
                 if (ownGameBusy) { Log("Thornswood's own Skyrim folder is being prepared. Play comes back when it is done."); return; }
+                if (OwnGameRefreshIfDue()) return;
                 if (feedNotice.Hold != null) { Log(feedNotice.Hold); return; }
 
                 if (!File.Exists(Paths.Loader)) { Log("skse64_loader.exe is missing from this build."); return; }
@@ -5562,7 +5567,7 @@ namespace Thornswood
         /// failed" over the top of the one message somebody in that state
         /// actually needs.
         /// </summary>
-        static string CollectionProblem()
+        static string CollectionProblem(int revision = -1)
         {
             if (string.IsNullOrEmpty(cfg.CollectionUrl)) return "";
             try
@@ -5589,7 +5594,7 @@ namespace Thornswood
                 // and ahead are different problems and get different words:
                 // behind means update, ahead means the server has not caught
                 // up with you yet and Play will refuse you on the load order.
-                int mine = Checks.CollectionRevision(cfg);
+                int mine = revision < 0 ? Checks.CollectionRevision(cfg) : revision;
                 int wants = Updater.FeedCollectionRevision;
                 if (mine > 0 && wants > 0)
                 {
@@ -5601,9 +5606,9 @@ namespace Thornswood
             return "";
         }
 
-        static bool ModsMissing()
+        static bool ModsMissing(int revision = -1)
         {
-            return CollectionProblem().Length > 0;
+            return CollectionProblem(revision).Length > 0;
         }
 
         static bool collectionBarUp = false;
@@ -5615,13 +5620,14 @@ namespace Thornswood
         /// True when CollectionProblem found nothing wrong only because it could
         /// not read which collection revision Vortex installed (Djinn, 2 Oct).
         /// </summary>
-        static bool CollectionUnconfirmed()
+        static bool CollectionUnconfirmed(int revision = -1)
         {
             if (string.IsNullOrEmpty(cfg.CollectionUrl)) return false;
             try
             {
-                if (CollectionProblem().Length > 0) return false;
-                return Checks.CollectionRevision(cfg) <= 0;
+                if (revision < 0) revision = Checks.CollectionRevision(cfg);
+                if (CollectionProblem(revision).Length > 0) return false;
+                return revision <= 0;
             }
             catch (Exception ex) { Swallow.Note("Shell.CollectionUnconfirmed", ex); return false; }
         }
@@ -5631,14 +5637,15 @@ namespace Thornswood
         /// bar, same button, different job, because a second card underneath a
         /// louder one is a card nobody reads.
         /// </summary>
-        static void ShowCollectionBar()
+        static void ShowCollectionBar(int revision = -1)
         {
-            string problem = CollectionProblem();
+            if (revision < 0) revision = Checks.CollectionRevision(cfg);
+            string problem = CollectionProblem(revision);
             bool stale = problem == "stale";
 
             if (stale)
             {
-                int mine = Checks.CollectionRevision(cfg);
+                int mine = revision;
                 int wants = Updater.FeedCollectionRevision;
                 txtUpdateTitle.Text = "Your mods need updating";
                 txtUpdateNote.Text =
@@ -5653,7 +5660,7 @@ namespace Thornswood
                 // person has done everything right and is further forward than
                 // the server; Play will still refuse them, on the load order,
                 // and without this that reads as their fault.
-                int mine = Checks.CollectionRevision(cfg);
+                int mine = revision;
                 int wants = Updater.FeedCollectionRevision;
                 txtUpdateTitle.Text = "The server has not caught up with you";
                 txtUpdateNote.Text =

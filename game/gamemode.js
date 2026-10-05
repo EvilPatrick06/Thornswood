@@ -815,587 +815,587 @@ function ensureProperties() {
 */
 // ==== ORES_BY_BASE, generated ====
   var ORES_BY_BASE = {
-    "10fc0e:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10ee64:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10ee3f:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10e101:Skyrim.esm": { "ore": "5acdc:Skyrim.esm", "name": "Ebony Ore", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
-    "10f0e7:Skyrim.esm": { "ore": "5acdc:Skyrim.esm", "name": "Ebony Ore", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
-    "10dcd2:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcd1:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcd0:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dccf:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcce:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dccd:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dccc:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dccb:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dcca:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dcc9:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dcc8:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dcc7:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dcc6:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dcc5:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dcc4:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dcc3:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dcc2:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dcc1:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcc0:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcbf:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcbe:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcbd:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcbc:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcbb:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcba:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcb9:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcb8:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcb7:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcb6:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcb5:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcb4:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcb3:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcb2:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcb1:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcb0:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcaf:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcae:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcad:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcac:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcab:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dcaa:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dca9:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dca8:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dca7:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dca6:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dca5:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dca4:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dca3:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dca2:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dca1:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dca0:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc9f:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc9e:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc9d:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc9c:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc9b:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc9a:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc99:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc98:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc97:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc96:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc95:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc94:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc93:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc92:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc91:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dc90:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dc8f:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dc8e:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dc8d:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc8c:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc8b:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc8a:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc89:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc88:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc87:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc86:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc85:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc84:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc83:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc82:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc81:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc80:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc7f:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc7e:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc7d:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc7c:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc7b:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc7a:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc79:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc78:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc77:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc76:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc75:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc74:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc73:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc72:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc71:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc70:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc6f:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc6e:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc6d:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dc6c:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dc6b:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dc6a:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dc69:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc68:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc67:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc66:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc65:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc64:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc63:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc62:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc61:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc60:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc5f:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc5e:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc5d:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc5c:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc5b:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc5a:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc59:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc58:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc57:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc56:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc55:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc54:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc53:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc52:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc51:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dc50:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dc4f:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dc4e:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dc4d:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc4c:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc4b:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc4a:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc49:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc48:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc47:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc46:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc45:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc44:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc43:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc42:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc41:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc40:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc3f:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc3e:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc3d:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc3c:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc3b:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc3a:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc39:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc38:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dc37:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dc36:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dc35:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dc34:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc33:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc32:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc31:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dc30:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc2f:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc2e:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc2d:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc2c:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc2b:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dc2a:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db89:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db88:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db87:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db86:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db85:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db84:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db83:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db82:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db81:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db80:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db7f:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db7e:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db7d:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db7c:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db7b:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10db7a:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10db79:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10db78:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db77:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db76:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db75:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db74:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db73:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db71:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db70:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db6f:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db6e:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db6d:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db6c:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db6b:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db6a:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db69:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db68:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db67:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db66:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db65:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db64:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db63:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db62:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db61:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10db60:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10db5f:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10db5e:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db5d:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db5c:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db5b:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db5a:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db59:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db58:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db57:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db55:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db54:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db53:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db52:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db51:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db50:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db4f:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db4e:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db4d:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db4c:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db4b:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db4a:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db49:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db48:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db47:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db46:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db45:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db44:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db43:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db42:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db41:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db40:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db3f:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db3e:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db3d:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db3c:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db3b:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db3a:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db39:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db38:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db37:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db36:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db35:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db34:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db33:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db32:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db31:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db30:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db2f:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db2e:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db2d:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db2c:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db2b:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db2a:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db29:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db28:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db27:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db26:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db25:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db24:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db23:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db22:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db21:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db20:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db1f:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db1e:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db1d:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db1c:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db1b:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db1a:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db19:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db18:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db17:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db16:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db15:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db14:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db13:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db12:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db11:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db10:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db0f:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db0e:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10db0d:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db0c:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db0b:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db0a:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db09:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db08:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db07:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db06:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db05:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db04:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db03:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db02:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db01:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10db00:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10daff:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dafe:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dafd:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dafc:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dafb:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dafa:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10daf9:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10daf8:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10daf7:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10daf6:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10daf5:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10daf4:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10daf3:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10daf2:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10daf1:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10daf0:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10daef:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10daee:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10daed:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10daec:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10daeb:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10daea:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dae9:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dae8:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dae7:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dae6:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dae5:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dae4:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dae3:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dae2:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dae1:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dae0:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dadf:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dade:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10dadd:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dadc:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dadb:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dada:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dad9:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dad8:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dad7:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dad6:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dad5:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dad4:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dad3:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dad2:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dad1:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dad0:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dacf:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dace:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dacd:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dacc:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dacb:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10daca:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dac9:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dac8:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dac7:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dac6:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10dac5:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dac4:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dac3:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dac2:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dac1:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dac0:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dabf:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dabe:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dabd:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dabc:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dabb:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10dab9:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10daa8:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10daa5:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10daa4:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10daa3:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10daa1:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10daa0:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10da9f:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10da9e:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10da9d:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10da9b:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10da97:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10da95:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d7c8:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d7aa:Skyrim.esm": { "ore": "5ace1:Skyrim.esm", "name": "Malachite Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d7a9:Skyrim.esm": { "ore": "5ace1:Skyrim.esm", "name": "Malachite Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d798:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d76f:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d749:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d710:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d6ff:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d4de:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d4db:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d4d5:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d4d0:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d4c4:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d130:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d098:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d096:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d095:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d094:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d093:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d092:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d091:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d090:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d08f:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d08e:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d08d:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d08c:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d08b:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d08a:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d089:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d088:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d087:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d086:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d085:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d084:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d083:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d082:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d081:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d080:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d07f:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d07e:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d07d:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d07c:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d07b:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d07a:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d079:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d078:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d077:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d076:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d075:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d074:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d073:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d072:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d071:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d070:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d06f:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d06e:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d06d:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d06c:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d06b:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d06a:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d069:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d068:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d067:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d066:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d065:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d064:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d063:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d062:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d061:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d060:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d05f:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d05e:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d05d:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d05c:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d05b:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d05a:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d059:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d058:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d057:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d056:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d055:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d054:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d053:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d052:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d051:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d050:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d04f:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d04e:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d04d:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d04c:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d04b:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d04a:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d049:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d047:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d046:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d045:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d044:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d043:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d040:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d03f:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d03e:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d03b:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d03a:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d039:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d038:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d037:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d036:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d035:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d034:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d032:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d031:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d030:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d02f:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d02e:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d02d:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d02c:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d027:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d026:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d025:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d024:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "10d023:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d022:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d021:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d020:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "10d01f:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d01e:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10d01d:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "10acc8:Skyrim.esm": { "ore": "5ace1:Skyrim.esm", "name": "Malachite Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "a2cb1:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "a2c85:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "a2c82:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "a2c81:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "a2c80:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "a2c7f:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "a2c7e:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "a2c7d:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "a2c7c:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "a2c7b:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "a2c79:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "a2c78:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "a2c77:Skyrim.esm": { "ore": "5ace1:Skyrim.esm", "name": "Malachite Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "a2c73:Skyrim.esm": { "ore": "5ace1:Skyrim.esm", "name": "Malachite Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "a2c6b:Skyrim.esm": { "ore": "5ace1:Skyrim.esm", "name": "Malachite Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "a2c68:Skyrim.esm": { "ore": "5ace1:Skyrim.esm", "name": "Malachite Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "a2c5b:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "a2c52:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "a2c4f:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "a2c4e:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "a2c4d:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "a2c4c:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "a2c4b:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "a2c46:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "a2c42:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "a2c36:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "a2c33:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "a2bfe:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 4], [1, 5]] },
-    "a2bfb:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "a2bf8:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "a2bf6:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "a2bed:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "a2bec:Skyrim.esm": { "ore": "5acdc:Skyrim.esm", "name": "Ebony Ore", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
-    "a2be6:Skyrim.esm": { "ore": "5acdc:Skyrim.esm", "name": "Ebony Ore", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
-    "a2be5:Skyrim.esm": { "ore": "5acdc:Skyrim.esm", "name": "Ebony Ore", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
-    "e2bc2:Skyrim.esm": { "ore": "5acdc:Skyrim.esm", "name": "Ebony Ore", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
-    "195a5:Dawnguard.esm": { "ore": "195aa:Dawnguard.esm", "name": "Shellbug Chitin", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "a14:HearthFires.esm": { "ore": "3043:HearthFires.esm", "name": "Clay", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "9f3:HearthFires.esm": { "ore": "3043:HearthFires.esm", "name": "Clay", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "9f2:HearthFires.esm": { "ore": "3043:HearthFires.esm", "name": "Clay", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "a511:HearthFires.esm": { "ore": "3043:HearthFires.esm", "name": "Clay", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "310b:HearthFires.esm": { "ore": "3043:HearthFires.esm", "name": "Clay", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "306b:HearthFires.esm": { "ore": "306c:HearthFires.esm", "name": "Quarried Stone", "rank": "novice", "yield": [[1, 2], [1, 3], [1, 4], [1, 5]] },
-    "3863e:Dragonborn.esm": { "ore": "17749:Dragonborn.esm", "name": "Heart Stone", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "3863d:Dragonborn.esm": { "ore": "17749:Dragonborn.esm", "name": "Heart Stone", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "377ee:Dragonborn.esm": { "ore": "2b06b:Dragonborn.esm", "name": "Stalhrim", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
-    "32cd6:Dragonborn.esm": { "ore": "2b06b:Dragonborn.esm", "name": "Stalhrim", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
-    "295cb:Dragonborn.esm": { "ore": "17749:Dragonborn.esm", "name": "Heart Stone", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] },
-    "28ea2:Dragonborn.esm": { "ore": "63b42:Skyrim.esm", "name": "Ruby", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
-    "28ea1:Dragonborn.esm": { "ore": "63b42:Skyrim.esm", "name": "Ruby", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
-    "28ea0:Dragonborn.esm": { "ore": "63b42:Skyrim.esm", "name": "Ruby", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
-    "28e9c:Dragonborn.esm": { "ore": "63b46:Skyrim.esm", "name": "Amethyst", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
-    "28e9b:Dragonborn.esm": { "ore": "63b46:Skyrim.esm", "name": "Amethyst", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
-    "28e9a:Dragonborn.esm": { "ore": "63b46:Skyrim.esm", "name": "Amethyst", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
-    "28e96:Dragonborn.esm": { "ore": "63b43:Skyrim.esm", "name": "Emerald", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
-    "28e95:Dragonborn.esm": { "ore": "63b43:Skyrim.esm", "name": "Emerald", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
-    "28e94:Dragonborn.esm": { "ore": "63b43:Skyrim.esm", "name": "Emerald", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
-    "28e92:Dragonborn.esm": { "ore": "63b44:Skyrim.esm", "name": "Sapphire", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
-    "28e90:Dragonborn.esm": { "ore": "63b44:Skyrim.esm", "name": "Sapphire", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
-    "28e8e:Dragonborn.esm": { "ore": "63b44:Skyrim.esm", "name": "Sapphire", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 5]] },
-    "1b659:Dragonborn.esm": { "ore": "17749:Dragonborn.esm", "name": "Heart Stone", "rank": "advanced", "yield": [[0, 0], [1, 3], [1, 4], [1, 5]] }
+    "10fc0e:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10ee64:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10ee3f:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10e101:Skyrim.esm": { "ore": "5acdc:Skyrim.esm", "name": "Ebony Ore", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 2]] },
+    "10f0e7:Skyrim.esm": { "ore": "5acdc:Skyrim.esm", "name": "Ebony Ore", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 2]] },
+    "10dcd2:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcd1:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcd0:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dccf:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcce:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dccd:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dccc:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dccb:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dcca:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dcc9:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dcc8:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dcc7:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dcc6:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dcc5:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dcc4:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dcc3:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dcc2:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dcc1:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcc0:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcbf:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcbe:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcbd:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcbc:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcbb:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcba:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcb9:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcb8:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcb7:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcb6:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcb5:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcb4:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcb3:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcb2:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcb1:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcb0:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcaf:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcae:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcad:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcac:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcab:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dcaa:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dca9:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dca8:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dca7:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dca6:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dca5:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dca4:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dca3:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dca2:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dca1:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dca0:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc9f:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc9e:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc9d:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc9c:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc9b:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc9a:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc99:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc98:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc97:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc96:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc95:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc94:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc93:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc92:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc91:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dc90:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dc8f:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dc8e:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dc8d:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc8c:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc8b:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc8a:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc89:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc88:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc87:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc86:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc85:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc84:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc83:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc82:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc81:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc80:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc7f:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc7e:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc7d:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc7c:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc7b:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc7a:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc79:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc78:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc77:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc76:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc75:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc74:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc73:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc72:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc71:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc70:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc6f:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc6e:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc6d:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dc6c:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dc6b:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dc6a:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dc69:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc68:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc67:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc66:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc65:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc64:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc63:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc62:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc61:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc60:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc5f:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc5e:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc5d:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc5c:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc5b:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc5a:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc59:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc58:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc57:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc56:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc55:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc54:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc53:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc52:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc51:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dc50:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dc4f:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dc4e:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dc4d:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc4c:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc4b:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc4a:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc49:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc48:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc47:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc46:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc45:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc44:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc43:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc42:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc41:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc40:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc3f:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc3e:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc3d:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc3c:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc3b:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc3a:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc39:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc38:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dc37:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dc36:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dc35:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dc34:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc33:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc32:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc31:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dc30:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc2f:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc2e:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc2d:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc2c:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc2b:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dc2a:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db89:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db88:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db87:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db86:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db85:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db84:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db83:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db82:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db81:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db80:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db7f:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db7e:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db7d:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db7c:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db7b:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10db7a:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10db79:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10db78:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db77:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db76:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db75:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db74:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db73:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db71:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db70:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db6f:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db6e:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db6d:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db6c:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db6b:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db6a:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db69:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db68:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db67:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db66:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db65:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db64:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db63:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db62:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db61:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10db60:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10db5f:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10db5e:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db5d:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db5c:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db5b:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db5a:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db59:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db58:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db57:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db55:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db54:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db53:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db52:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db51:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db50:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db4f:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db4e:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db4d:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db4c:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db4b:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db4a:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db49:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db48:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db47:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db46:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db45:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db44:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db43:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db42:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db41:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db40:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db3f:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db3e:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db3d:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db3c:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db3b:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db3a:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db39:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db38:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db37:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db36:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db35:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db34:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db33:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db32:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db31:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db30:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db2f:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db2e:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db2d:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db2c:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db2b:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db2a:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db29:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db28:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db27:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db26:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db25:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db24:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db23:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db22:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db21:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db20:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db1f:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db1e:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db1d:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db1c:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db1b:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db1a:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db19:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db18:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db17:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db16:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db15:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db14:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db13:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db12:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db11:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db10:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db0f:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db0e:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10db0d:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db0c:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db0b:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db0a:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db09:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db08:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db07:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db06:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db05:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db04:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db03:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db02:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db01:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10db00:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10daff:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dafe:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dafd:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dafc:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dafb:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dafa:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10daf9:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10daf8:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10daf7:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10daf6:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10daf5:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10daf4:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10daf3:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10daf2:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10daf1:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10daf0:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10daef:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10daee:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10daed:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10daec:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10daeb:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10daea:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dae9:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dae8:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dae7:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dae6:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dae5:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dae4:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dae3:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dae2:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dae1:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dae0:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dadf:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dade:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10dadd:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dadc:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dadb:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dada:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dad9:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dad8:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dad7:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dad6:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dad5:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dad4:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dad3:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dad2:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dad1:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dad0:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dacf:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dace:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dacd:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dacc:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dacb:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10daca:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dac9:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dac8:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dac7:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dac6:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10dac5:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dac4:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dac3:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dac2:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dac1:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dac0:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dabf:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dabe:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dabd:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dabc:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dabb:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10dab9:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10daa8:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10daa5:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10daa4:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10daa3:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10daa1:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10daa0:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10da9f:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10da9e:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10da9d:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10da9b:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10da97:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10da95:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d7c8:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d7aa:Skyrim.esm": { "ore": "5ace1:Skyrim.esm", "name": "Malachite Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d7a9:Skyrim.esm": { "ore": "5ace1:Skyrim.esm", "name": "Malachite Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d798:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d76f:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d749:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d710:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d6ff:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d4de:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d4db:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d4d5:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d4d0:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d4c4:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d130:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d098:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d096:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d095:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d094:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d093:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d092:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d091:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d090:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d08f:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d08e:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d08d:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d08c:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d08b:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d08a:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d089:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d088:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d087:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d086:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d085:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d084:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d083:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d082:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d081:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d080:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d07f:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d07e:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d07d:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d07c:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d07b:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d07a:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d079:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d078:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d077:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d076:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d075:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d074:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d073:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d072:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d071:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d070:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d06f:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d06e:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d06d:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d06c:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d06b:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d06a:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d069:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d068:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d067:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d066:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d065:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d064:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d063:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d062:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d061:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d060:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d05f:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d05e:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d05d:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d05c:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d05b:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d05a:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d059:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d058:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d057:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d056:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d055:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d054:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d053:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d052:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d051:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d050:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d04f:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d04e:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d04d:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d04c:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d04b:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d04a:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d049:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d047:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d046:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d045:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d044:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d043:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d040:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d03f:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d03e:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d03b:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d03a:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d039:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d038:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d037:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d036:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d035:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d034:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d032:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d031:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d030:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d02f:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d02e:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d02d:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d02c:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d027:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d026:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d025:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d024:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "10d023:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d022:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d021:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d020:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "10d01f:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d01e:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10d01d:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "10acc8:Skyrim.esm": { "ore": "5ace1:Skyrim.esm", "name": "Malachite Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "a2cb1:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "a2c85:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "a2c82:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "a2c81:Skyrim.esm": { "ore": "5acdf:Skyrim.esm", "name": "Silver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "a2c80:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "a2c7f:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "a2c7e:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "a2c7d:Skyrim.esm": { "ore": "5ace2:Skyrim.esm", "name": "Quicksilver Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "a2c7c:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "a2c7b:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "a2c79:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "a2c78:Skyrim.esm": { "ore": "5acdd:Skyrim.esm", "name": "Orichalcum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "a2c77:Skyrim.esm": { "ore": "5ace1:Skyrim.esm", "name": "Malachite Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "a2c73:Skyrim.esm": { "ore": "5ace1:Skyrim.esm", "name": "Malachite Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "a2c6b:Skyrim.esm": { "ore": "5ace1:Skyrim.esm", "name": "Malachite Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "a2c68:Skyrim.esm": { "ore": "5ace1:Skyrim.esm", "name": "Malachite Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "a2c5b:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "a2c52:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "a2c4f:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "a2c4e:Skyrim.esm": { "ore": "5ace0:Skyrim.esm", "name": "Moonstone Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "a2c4d:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "a2c4c:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "a2c4b:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "a2c46:Skyrim.esm": { "ore": "71cf3:Skyrim.esm", "name": "Iron Ore", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "a2c42:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "a2c36:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "a2c33:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "a2bfe:Skyrim.esm": { "ore": "5acde:Skyrim.esm", "name": "Gold Ore", "rank": "expert", "yield": [[0, 0], [0, 0], [1, 2], [1, 2]] },
+    "a2bfb:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "a2bf8:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "a2bf6:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "a2bed:Skyrim.esm": { "ore": "5acdb:Skyrim.esm", "name": "Corundum Ore", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "a2bec:Skyrim.esm": { "ore": "5acdc:Skyrim.esm", "name": "Ebony Ore", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 2]] },
+    "a2be6:Skyrim.esm": { "ore": "5acdc:Skyrim.esm", "name": "Ebony Ore", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 2]] },
+    "a2be5:Skyrim.esm": { "ore": "5acdc:Skyrim.esm", "name": "Ebony Ore", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 2]] },
+    "e2bc2:Skyrim.esm": { "ore": "5acdc:Skyrim.esm", "name": "Ebony Ore", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 2]] },
+    "195a5:Dawnguard.esm": { "ore": "195aa:Dawnguard.esm", "name": "Shellbug Chitin", "rank": "advanced", "yield": [[0, 0], [1, 2], [1, 2], [1, 2]] },
+    "a14:HearthFires.esm": { "ore": "3043:HearthFires.esm", "name": "Clay", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "9f3:HearthFires.esm": { "ore": "3043:HearthFires.esm", "name": "Clay", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "9f2:HearthFires.esm": { "ore": "3043:HearthFires.esm", "name": "Clay", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "a511:HearthFires.esm": { "ore": "3043:HearthFires.esm", "name": "Clay", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "310b:HearthFires.esm": { "ore": "3043:HearthFires.esm", "name": "Clay", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "306b:HearthFires.esm": { "ore": "306c:HearthFires.esm", "name": "Quarried Stone", "rank": "novice", "yield": [[1, 2], [1, 2], [1, 2], [1, 2]] },
+    "3863e:Dragonborn.esm": { "ore": "17749:Dragonborn.esm", "name": "Heart Stone", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 2]] },
+    "3863d:Dragonborn.esm": { "ore": "17749:Dragonborn.esm", "name": "Heart Stone", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 2]] },
+    "377ee:Dragonborn.esm": { "ore": "2b06b:Dragonborn.esm", "name": "Stalhrim", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 2]] },
+    "32cd6:Dragonborn.esm": { "ore": "2b06b:Dragonborn.esm", "name": "Stalhrim", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 2]] },
+    "295cb:Dragonborn.esm": { "ore": "17749:Dragonborn.esm", "name": "Heart Stone", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 2]] },
+    "28ea2:Dragonborn.esm": { "ore": "63b42:Skyrim.esm", "name": "Ruby", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 2]] },
+    "28ea1:Dragonborn.esm": { "ore": "63b42:Skyrim.esm", "name": "Ruby", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 2]] },
+    "28ea0:Dragonborn.esm": { "ore": "63b42:Skyrim.esm", "name": "Ruby", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 2]] },
+    "28e9c:Dragonborn.esm": { "ore": "63b46:Skyrim.esm", "name": "Amethyst", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 2]] },
+    "28e9b:Dragonborn.esm": { "ore": "63b46:Skyrim.esm", "name": "Amethyst", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 2]] },
+    "28e9a:Dragonborn.esm": { "ore": "63b46:Skyrim.esm", "name": "Amethyst", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 2]] },
+    "28e96:Dragonborn.esm": { "ore": "63b43:Skyrim.esm", "name": "Emerald", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 2]] },
+    "28e95:Dragonborn.esm": { "ore": "63b43:Skyrim.esm", "name": "Emerald", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 2]] },
+    "28e94:Dragonborn.esm": { "ore": "63b43:Skyrim.esm", "name": "Emerald", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 2]] },
+    "28e92:Dragonborn.esm": { "ore": "63b44:Skyrim.esm", "name": "Sapphire", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 2]] },
+    "28e90:Dragonborn.esm": { "ore": "63b44:Skyrim.esm", "name": "Sapphire", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 2]] },
+    "28e8e:Dragonborn.esm": { "ore": "63b44:Skyrim.esm", "name": "Sapphire", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 2]] },
+    "1b659:Dragonborn.esm": { "ore": "17749:Dragonborn.esm", "name": "Heart Stone", "rank": "master", "yield": [[0, 0], [0, 0], [0, 0], [1, 2]] }
   };
 
   // ==== end ORES_BY_BASE ====
@@ -1763,8 +1763,14 @@ function halfGate(actorId, half, rank, refusal) {
  * A yield has been handed out: count the work, and hand back the line about a
  * new rank when one was reached. Anything going wrong here costs a count, not
  * somebody's salt, so it is swallowed.
+ *
+ * n is how many pieces this one piece of work is, one when it is not given. A
+ * warrior's kill is the one caller that passes it (#1386): a dragon is 16
+ * pieces. It is still one swing for tiredness, the page's "the same rest cost
+ * as a swing of a pick", and the party bonus is 15% of the whole count.
  */
-function creditWork(actorId, key) {
+function creditWork(actorId, key, n) {
+  const pieces = (typeof n === 'number' && n >= 1) ? Math.floor(n) : 1;
   /*
     Every piece of work is also a piece of tiredness.
 
@@ -1816,14 +1822,14 @@ function creditWork(actorId, key) {
     listed together is a checkbox everybody ticks once and never thinks about
     again.
   */
-  let extra = false;
+  let extra = 0;
   try {
     const soc = globalThis.__thornswoodSocial;
     if (soc && soc.workBonus) {
       const over = soc.workBonus(actorId) - 1;
       if (over > 0) {
-        PARTY_BANK[actorId] = (PARTY_BANK[actorId] || 0) + over;
-        if (PARTY_BANK[actorId] >= 1) { PARTY_BANK[actorId] -= 1; extra = true; }
+        PARTY_BANK[actorId] = (PARTY_BANK[actorId] || 0) + over * pieces;
+        while (PARTY_BANK[actorId] >= 1) { PARTY_BANK[actorId] -= 1; extra++; }
       }
     }
   } catch (e) { }
@@ -1832,9 +1838,10 @@ function creditWork(actorId, key) {
   if (!c || !c.credit) { return null; }
   try {
     let line = c.credit(actorId, key);
-    if (extra) {
-      // The second piece's answer wins when it has one, because a rank raised
-      // by the bonus piece is the thing worth saying.
+    // Every piece after the first, and then the bonus pieces. A later
+    // piece's answer wins when it has one, because a rank raised by the last
+    // piece is the thing worth saying.
+    for (let i = 1; i < pieces + extra; i++) {
       const more = c.credit(actorId, key);
       if (more) { line = more; }
     }
@@ -3263,35 +3270,42 @@ const DEPOSIT_UNWRITABLE = {};
 /*
   How long a worked out seam takes to come back, by what it gives.
 
-  Patrick's two numbers, and the ores he named for each. Anything the list does
-  not name falls to the LONGER one, because a seam nobody has classified being
-  the cheapest tap in the province is the failure that matters.
-*/
-const DEPOSIT_BACK_MS = { quick: 10 * 60000, slow: 30 * 60000 };
-const DEPOSIT_QUICK = ['iron', 'gold', 'corundum', 'silver'];
-/*
-  THE SLOW LIST IS CHECKED FIRST, AND QUICKSILVER IS WHY.
+  The miner page's own table (docs/systems/classes/miner.md, "The seam"),
+  issue #1380: iron fifteen minutes, gold twenty, corundum and silver ten, and
+  thirty for clay, quarried stone, orichalcum, quicksilver, moonstone,
+  malachite and shellbug chitin. Until then it was Patrick's two numbers of
+  21 September, ten for iron, gold, corundum and silver and thirty for the
+  rest. Ebony, the gems, stalhrim and heart stone are not on it: each is one
+  place, opened by a scarce quest, and never reaches the deposit.
 
-  'Quicksilver' CONTAINS 'silver'. Matching the quick list first put a
-  quicksilver seam on the ten minute clock, which is one of the five Patrick
-  named for thirty. Caught by the harness on the first run, which is the only
-  reason it is not live: it reads perfectly and is wrong.
-
-  So the long list wins any tie, and the default is long too. Both point the
-  same way on purpose: a seam nobody has classified being the cheapest tap in
-  the province is the failure that matters.
+  BY THE WHOLE NAME, NEVER A PIECE OF ONE. 'Quicksilver Ore' contains
+  'silver', and matching pieces of names once put quicksilver on silver's ten
+  minutes. A name this table does not carry takes the LONGEST wait in it,
+  because a seam nobody has classified being the cheapest tap in the province
+  is the failure that matters.
 */
-const DEPOSIT_SLOW = ['moonstone', 'quicksilver', 'orichalcum', 'ebony', 'malachite'];
+const DEPOSIT_BACK_MIN = {
+  'iron ore': 15,
+  'gold ore': 20,
+  'corundum ore': 10,
+  'silver ore': 10,
+  'clay': 30,
+  'quarried stone': 30,
+  'orichalcum ore': 30,
+  'quicksilver ore': 30,
+  'moonstone ore': 30,
+  'malachite ore': 30,
+  'shellbug chitin': 30
+};
+const DEPOSIT_BACK_LONGEST = Math.max.apply(null, Object.keys(DEPOSIT_BACK_MIN).map(function (k) {
+  return DEPOSIT_BACK_MIN[k];
+}));
 
 function depositBackMs(name) {
-  const n = String(name || '').toLowerCase();
-  for (let i = 0; i < DEPOSIT_SLOW.length; i++) {
-    if (n.indexOf(DEPOSIT_SLOW[i]) !== -1) { return DEPOSIT_BACK_MS.slow; }
-  }
-  for (let j = 0; j < DEPOSIT_QUICK.length; j++) {
-    if (n.indexOf(DEPOSIT_QUICK[j]) !== -1) { return DEPOSIT_BACK_MS.quick; }
-  }
-  return DEPOSIT_BACK_MS.slow;
+  const n = String(name || '').toLowerCase().trim();
+  const min = Object.prototype.hasOwnProperty.call(DEPOSIT_BACK_MIN, n)
+    ? DEPOSIT_BACK_MIN[n] : DEPOSIT_BACK_LONGEST;
+  return min * 60000;
 }
 
 /**
@@ -3356,6 +3370,98 @@ function depositBackIn(refrId, backMs) {
   return 'It comes back in about ' + mins + (mins === 1 ? ' minute.' : ' minutes.');
 }
 
+/*
+  THE CHANCE OF ONE MORE. docs/systems/classes/miner.md, issue #1380.
+
+  A swing takes 1 ore of its seam and has a chance of one more. The chance
+  grows with the rank, and from advanced the extra can be the next tier up,
+  from expert two tiers up. One roll decides it, the three chances laid end to
+  end, so a swing never drops more than one extra:
+
+    rank      same ore   next tier   two tiers up
+    novice    5%
+    advanced  10%        2%
+    expert    15%        5%          1%
+    master    20%        8%          2%
+
+  The tiers are iron, clay and quarried stone; then corundum, silver,
+  orichalcum and quicksilver; then gold, moonstone and malachite. Inside a tier
+  each name is an equal chance. Ebony, the gems, stalhrim and heart stone are
+  never an extra, so a roll that would go past the third tier gives nothing,
+  and the same-ore roll still stands. Shellbug chitin is in no tier: its own
+  seam can give a second one, and no other seam ever gives it.
+
+  The extra comes out of the same seam of twenty, so a seam still holds twenty
+  ore in all, and it is the same swing and the same one piece of work.
+*/
+const ORE_EXTRA_PCT = [
+  [5, 0, 0],
+  [10, 2, 0],
+  [15, 5, 1],
+  [20, 8, 2]
+];
+const ORE_TIERS = [
+  ['Iron Ore', 'Clay', 'Quarried Stone'],
+  ['Corundum Ore', 'Silver Ore', 'Orichalcum Ore', 'Quicksilver Ore'],
+  ['Gold Ore', 'Moonstone Ore', 'Malachite Ore']
+];
+/*
+  ONE PLACE EACH, AND SHUT WITHOUT THE QUEST.
+
+  These seams are the scarce quest's, in the custom quests block at the foot
+  of this file. If that block ever fails to start, these answer shut rather
+  than falling through to the ordinary deposit, because a seam of twenty ebony
+  at every vein in the province is the one thing the plan rules out.
+*/
+const ORE_ONE_PLACE = ['Ebony Ore', 'Amethyst', 'Emerald', 'Ruby', 'Sapphire', 'Stalhrim', 'Heart Stone'];
+let ORE_DESC_BY_NAME = null;
+
+/* The ore a name gives, read off the seam table once, so no form id is typed here. */
+function oreDescByName(name) {
+  if (!ORE_DESC_BY_NAME) {
+    const found = {};
+    Object.keys(ORES_BY_BASE).forEach(function (base) {
+      const row = ORES_BY_BASE[base];
+      if (row && row.name && row.ore && !found[row.name]) { found[row.name] = row.ore; }
+    });
+    ORE_DESC_BY_NAME = found;
+  }
+  return ORE_DESC_BY_NAME[name] || '';
+}
+
+/**
+ * The extra ore of one swing, as { ore, name }, or null for none.
+ *
+ * roll is one number from 0 up to 1. Where it lands inside a tier's slice
+ * picks the name, so one roll is also the equal chance among that tier.
+ */
+function oreExtra(seam, step, roll) {
+  if (!seam || !seam.name || !seam.ore) { return null; }
+  if (ORE_ONE_PLACE.indexOf(seam.name) !== -1) { return null; }
+  const pct = ORE_EXTRA_PCT[step] || ORE_EXTRA_PCT[0];
+  const r = Number(roll) * 100;
+  if (!(r >= 0)) { return null; }
+  if (r < pct[0]) { return { ore: seam.ore, name: seam.name }; }
+  let tier = -1;
+  for (let t = 0; t < ORE_TIERS.length; t++) {
+    if (ORE_TIERS[t].indexOf(seam.name) !== -1) { tier = t; }
+  }
+  if (tier < 0) { return null; }
+  let lo = pct[0];
+  for (let up = 1; up <= 2; up++) {
+    const hi = lo + pct[up];
+    if (r < hi) {
+      const names = ORE_TIERS[tier + up];
+      if (!names) { return null; }
+      const name = names[Math.min(names.length - 1, Math.floor(((r - lo) / (hi - lo)) * names.length))];
+      const ore = oreDescByName(name);
+      return ore ? { ore: ore, name: name } : null;
+    }
+    lo = hi;
+  }
+  return null;
+}
+
 function mineOre(actorId, refrId, baseDesc) {
   if (!isVein(baseDesc)) return null;
   const seam = ORES_BY_BASE[baseDesc];
@@ -3375,8 +3481,10 @@ function mineOre(actorId, refrId, baseDesc) {
   if (tool) return tool;
 
   const rareQuests = globalThis.__thornswoodQuests;
-  if (rareQuests && rareQuests.isRareSeam && rareQuests.isRareSeam(seam)) {
-    return rareQuests.mineRare(actorId, refrId, seam);
+  const onePlace = ORE_ONE_PLACE.indexOf(seam.name) !== -1;
+  if (onePlace || (rareQuests && rareQuests.isRareSeam && rareQuests.isRareSeam(seam))) {
+    if (rareQuests && rareQuests.mineRare) { return rareQuests.mineRare(actorId, refrId, seam); }
+    return 'This place is shut.';
   }
 
   const step = rankStep(actorId, 'miner');
@@ -3512,6 +3620,15 @@ function mineOre(actorId, refrId, baseDesc) {
       notify(actorId, broken);
       say(actorId, broken);
       return;
+    }
+    /*
+      The chance of one more, out of the same seam. Given before it is taken,
+      so an extra the load order cannot hand over leaves the seam as it was.
+      If it was the last one there, this swing is the one that ends the seam.
+    */
+    const extra = oreExtra(seam, rankStep(actorId, 'miner'), Math.random());
+    if (extra && depositLeft(refrId, backMs) > 0 && addItem(actorId, extra.ore, 1)) {
+      if (takeFromDeposit(refrId, backMs) === 1) { took = 1; }
     }
     const rank = creditWork(actorId, 'mine');
     const worn = wearTool(actorId, 'miner');
@@ -5546,6 +5663,213 @@ function startChargenTimer() {
 ensureProperties();
 startChargenTimer();
 
+/*
+  HOW MANY PIECES ONE KILL IS WORTH TO A WARRIOR (#1386).
+
+  docs/systems/professions/warrior.md, "How much one kill is worth": a chicken
+  and a dragon are not the same fight, so the piece count follows how hard the
+  thing was. Until this, every kill was one piece.
+
+  BY THE RACE THE ENGINE SAYS THE BODY IS. Actor.GetRace in the fork follows
+  the actor's own template chain, the one the engine rolled when it spawned,
+  so it names the race the body really has (a bandit's base is often a
+  levelled template, and the hunt table's build script measured over a
+  thousand people whose own RNAM says fox). The race's editor id is read out
+  of RACES, the table of every RACE record in the load order, and looked up in
+  the lines below.
+
+  THE STRENGTH TABLE WINS OVER THE HUNTER LIST. Patrick's answer on #1386, 4
+  October: where the two disagree, the strength table is the one that counts.
+  So a bull netch is a grown netch, 8, though the hunter list calls it
+  advanced; a vale sabre cat and a snowy one are sabre cats, 2; an ice wolf is
+  a wolf, 1; and Karhu is a bear, 4. The hunter list's own rank (novice 1,
+  advanced 2, expert 4, master 8) counts only for a body on it whose race no
+  line here names, which today is none: every race in the load order has a
+  line, and the harness holds that.
+
+  THE TWO HALVES OF THE LINES. kinds is the page's own two tables, the
+  strength table and the person-shaped one, each word on the page with the
+  races it is in Skyrim. unnamed is every body neither table names, placed
+  against those lines by how hard it is in vanilla Skyrim (Patrick, 4 October:
+  "use suggested bands"); the page lists the same words under "Bodies neither
+  table names". A race nobody has placed yet, one a new plugin brings, is the
+  novice line, 1, until somebody places it.
+
+  A PERSON KILLED BY A PERSON IS STILL NOTHING. That test is in mp.onDeath and
+  is not this function's: nothing here is asked about a person's body.
+*/
+const WARRIOR_KILL = {
+  byRank: { novice: 1, advanced: 2, expert: 4, master: 8 },
+  kinds: [
+    // The strength table: novice, advanced, expert, master animal.
+    ['chicken', 1, ['ChickenRace', 'EE_ChickenAnimalRace01', 'OR_ChickenRace']],
+    ['rabbit', 1, ['HareRace']],
+    ['fox', 1, ['FoxRace']],
+    ['deer', 1, ['DeerRace', 'DLC1DeerGlowRace', 'ElkRace', 'WhiteStagRace']],
+    ['wolf', 1, ['WolfRace', 'C06WolfSpiritRace', 'ccBGSSSE036_BoneWolfCompanionRace']],
+    ['skeever', 1, ['SkeeverRace', 'SkeeverWhiteRace']],
+    ['mudcrab', 1, ['MudcrabRace', 'DLC2MudcrabSolstheimRace', 'ZWJ_Polymorph68_GiantMudcrabRace']],
+    ['goat', 1, ['GoatRace', 'GoatDomesticsRace', 'EE_GoatAnimalRace01']],
+    ['cow', 1, ['CowRace', 'EE_CowAnimalRace01']],
+    ['dog', 1, ['DogRace', 'DogCompanionRace', 'MG07DogRace', 'DA03BarbasDogRace', 'DLC1HuskyBareRace',
+                'DLC1HuskyArmoredRace', 'DLC1HuskyBareCompanionRace', 'DLC1HuskyArmoredCompanionRace']],
+    ['sabre cat', 2, ['SabreCatRace', 'SabreCatSnowyRace', 'DLC1SabreCatGlowRace']],
+    ['troll', 2, ['TrollRace', 'TrollFrostRace', 'DLC1TrollRaceArmored', 'DLC1TrollFrostRaceArmored']],
+    ['spider', 2, ['FrostbiteSpiderRace', 'FrostbiteSpiderRaceGiant', 'FrostbiteSpiderRaceLarge',
+                   'DLC2ExpSpiderBaseRace', 'DLC2ExpSpiderPackmuleRace']],
+    ['horse', 2, ['HorseRace', 'CartHorseRace']],
+    ['horker', 2, ['HorkerRace']],
+    ['netch calf', 2, ['DLC2NetchCalfRace']],
+    ['bear', 4, ['BearBlackRace', 'BearBrownRace', 'BearSnowRace']],
+    ['chaurus', 4, ['ChaurusRace', 'ChaurusReaperRace', 'DLC1_BF_ChaurusRace', 'DLC1ChaurusHunterRace']],
+    ['mammoth', 8, ['MammothRace']],
+    ['a grown netch', 8, ['DLC2NetchRace']],
+    // The person-shaped table. A bandit, a guard and a forsworn are all the
+    // people's races, a vampire and a child of them included.
+    ['bandit, guard, forsworn', 2, ['ArgonianRace', 'ArgonianRaceVampire', 'BretonRace', 'BretonRaceChild',
+      'BretonRaceChildVampire', 'BretonRaceVampire', 'DarkElfRace', 'DarkElfRaceVampire', 'DLC1NordRace',
+      'ElderRace', 'ElderRaceVampire', 'HighElfRace', 'HighElfRaceVampire', 'ImperialRace', 'ImperialRaceChild',
+      'ImperialRaceVampire', 'KhajiitRace', 'KhajiitRaceVampire', 'NordRace', 'NordRaceAstrid', 'NordRaceChild',
+      'NordRaceVampire', 'OrcRace', 'OrcRaceVampire', 'RedguardRace', 'RedguardRaceChild', 'RedguardRaceVampire',
+      'WoodElfRace', 'WoodElfRaceVampire']],
+    ['skeleton', 2, ['SkeletonRace', 'SkeletonArmorRace', 'SkeletonNecroRace', 'SkeletonNecroPriestRace',
+      'DLC1BlackSkeletonRace', 'DLC1SoulCairnSkeletonArmorRace', 'DLC1SoulCairnSkeletonNecroRace',
+      'RigidSkeletonRace', 'DLC2RigidSkeletonRace']],
+    ['draugr', 4, ['DraugrRace', 'DraugrMagicRace', 'DLC2HulkingDraugrRace', 'testDraugrRace']],
+    ['falmer', 4, ['FalmerRace', 'FalmerFrozenVampRace']],
+    ['hagraven', 4, ['HagravenRace']],
+    ['giant', 8, ['GiantRace', 'C00GiantOutsideWhiterunRace', 'DLC2GhostFrostGiantRace']],
+    ['dragon priest', 8, ['DragonPriestRace', 'DLC2AcolyteDragonPriestRace']],
+    ['centurion', 8, ['DwarvenCenturionRace', 'DLC1LD_ForgemasterRace']],
+    ['lurker', 8, ['DLC2LurkerRace']],
+    ['dragon', 16, ['AlduinRace', 'DragonRace', 'DragonBlackRace', 'DLC2DragonBlackRace', 'UndeadDragonRace',
+      'DLC1UndeadDragonRace', 'dlc2SpectralDragonRace', 'DragonRaceLokjun']]
+  ],
+  unnamed: [
+    // With the novice line.
+    ['riekling of Solstheim', 1, ['DLC2RieklingRace', 'DLC2ThirskRieklingRace']],
+    ['ash hopper', 1, ['DLC2AshHopperRace']],
+    ['slaughterfish', 1, ['SlaughterfishRace']],
+    ['nix-hound', 1, ['ccBGSSSE035_NixHoundCompanionRace']],
+    ['shade', 1, ['WispShadeRace']],
+    ['witchlight', 1, ['WitchlightRace']],
+    ['soul wisp', 1, ['DLC1SoulCairnSoulWispRace']],
+    ['swarm', 1, ['SwarmRace', 'SprigganSwarmRace']],
+    ['mannequin', 1, ['ManakinRace']],
+    ['a creature a spell conjures', 1, [
+      'ODN_Con_Daedra_Race_ConjureClannfear', 'ODN_Con_Daedra_Race_ConjureClannroth',
+      'ODN_Con_Daedra_Race_ConjureDaedroth', 'ODN_Con_Daedra_Race_ConjureXivilai',
+      'ODN_Con_Undead_Race_ConjureDreadShade', 'ODN_Con_Undead_Race_ConjureGloomWraith',
+      'ODN_Con_Undead_Race_ConjureSanctifiedWraith', 'TVR_Demon_Race_ConjureGremlin',
+      'TVR_Demon_Race_ConjureLeviathan', 'TVR_Demon_Race_ConjureOathbreaker', 'TVR_Demon_Race_ConjureRavagor',
+      'TVR_Demon_Race_ConjureTempleGrim', 'TVR_Primal_Race_CallHoundOfHircine', 'TVR_Primal_Race_CallRaven',
+      'TVR_Primal_Race_CallSnakes', 'TVR_Primal_Race_CallSnowLeopard', 'TVR_Primal_Race_CallWolf',
+      'TVR_Totem_Race_EyesInTheSky', 'TVR_Totem_Race_Totem', 'TVR_Verdant_Race_ForceOfNature',
+      'TVR_Verdant_Race_Wildshape', 'TVR_Warrior_Race_Fylgja', 'TVR_Warrior_Race_FylgjaStorm',
+      'WB_ConjureBearTotem_Race', 'WB_ConjureCatTotem_Race', 'WB_ConjureCraftlord_Race',
+      'WB_ConjureDeadeyeCaptain_Race', 'WB_ConjureKyrkrim_Race', 'WB_FeralSpirit_Race', 'WB_Lich_Race',
+      'WB_NetherLich_Race', 'WB_Skinwalker_Race', '0_CombatBlue', '0_JarBOMBA', '0_PuppetmanRace',
+      '0_SkeleGiantRace']],
+    ['a race that is not a creature', 1, ['DefaultRace', 'TestRace', 'InvisibleRace', 'dunMiddenEmptyRace',
+      'DLC2FakeCoffinRace', 'DLC2dunInstrumentsRace']],
+    // With the advanced line and the people's line.
+    ['spriggan', 2, ['SprigganRace', 'DLC2SprigganBurntRace']],
+    ['dwarven spider', 2, ['DwarvenSpiderRace']],
+    ['ice wraith', 2, ['IceWraithRace', 'DLC2dunKarstaagIceWraithRace']],
+    ['death hound', 2, ['DLC1DeathHoundRace', 'DLC1DeathHoundCompanionRace']],
+    ['bristleback', 2, ['DLC2BoarRace', '1BoarRideRace']],
+    ['riekling on a bristleback', 2, ['DLC2MountedRieklingRace']],
+    ['ash spawn', 2, ['DLC2AshSpawnRace']],
+    ['magic anomaly', 2, ['MagicAnomalyRace']],
+    ['boneman', 2, ['DLC01SoulCairnBonemanRace']],
+    ['the afflicted', 2, ['DA13AfflictedRace']],
+    ['a riekling of the riekling people', 2, ['1RieklingBlueRace', '1RieklingBlueRaceVampire',
+      '1RieklingPurpleRace', '1RieklingPurpleRaceVampire', '1NpcRieklingBlueRace', '1NpcRieklingBlueRace2',
+      '1NpcRieklingBlueRaceVampire', '1NpcRieklingPurpleRace', '1NpcRieklingPurpleRace2',
+      '1NpcRieklingPurpleRaceVampire']],
+    // With the expert line, beside the draugr and the falmer.
+    ['atronach', 4, ['AtronachFlameRace', 'AtronachFrostRace', 'AtronachStormRace']],
+    ['dwarven sphere', 4, ['DwarvenSphereRace']],
+    ['dwarven ballista', 4, ['DLC2DwarvenBallistaRace']],
+    ['gargoyle', 4, ['DLC1GargoyleRace', 'DLC1GargoyleVariantGreenRace', 'DLC1GargoyleVariantBossRace']],
+    ['dremora', 4, ['DremoraRace', 'DLC2DremoraRace']],
+    ['snow elf', 4, ['SnowElfRace']],
+    ['ash guardian', 4, ['dlc2AshGuardianRace']],
+    ['seeker', 4, ['DLC2SeekerRace']],
+    ['wispmother', 4, ['WispRace']],
+    ['spriggan matron', 4, ['SprigganMatronRace', 'SprigganEarthMotherRace']],
+    ['keeper', 4, ['DLC1SoulCairnKeeperRace']],
+    // With the giants.
+    ['werewolf', 8, ['WerewolfBeastRace']],
+    ['werebear', 8, ['DLC2WerebearBeastRace']],
+    ['vampire lord', 8, ['DLC1VampireBeastRace']],
+    ['Miraak', 8, ['DLC2MiraakRace']]
+  ],
+  fallback: 1
+};
+
+/** The line a race is on: its pieces, or 0 when no line names it. The lookup
+ *  is built once, by lower case editor id. */
+function warriorRaceBand(raceEdid) {
+  if (!WARRIOR_KILL.byRace) {
+    const map = {};
+    const all = WARRIOR_KILL.kinds.concat(WARRIOR_KILL.unnamed);
+    for (let i = 0; i < all.length; i++) {
+      for (let j = 0; j < all[i][2].length; j++) { map[all[i][2][j].toLowerCase()] = all[i][1]; }
+    }
+    WARRIOR_KILL.byRace = map;
+  }
+  const race = String(raceEdid || '').toLowerCase();
+  return (race && Object.prototype.hasOwnProperty.call(WARRIOR_KILL.byRace, race)) ? WARRIOR_KILL.byRace[race] : 0;
+}
+
+/** The pieces one kill is worth: the race's line, else the hunter list's rank
+ *  for a base on it, else the novice line. Pure, so the harness can ask it
+ *  about any body. */
+function warriorPieces(baseDesc, raceEdid) {
+  const band = warriorRaceBand(raceEdid);
+  if (band) { return band; }
+  const base = String(baseDesc || '');
+  if (base && Object.prototype.hasOwnProperty.call(HUNTS_BY_BASE, base)) {
+    const rank = HUNTS_BY_BASE[base].rank;
+    if (Object.prototype.hasOwnProperty.call(WARRIOR_KILL.byRank, rank)) {
+      return WARRIOR_KILL.byRank[rank];
+    }
+  }
+  return WARRIOR_KILL.fallback;
+}
+
+/** The editor id of the race the engine says this actor is, or '' when it
+ *  cannot say. The descriptor is read as the engine writes it and, failing
+ *  that, with its hex put the way RACES writes it. */
+function raceEdidOf(actorId) {
+  let desc = '';
+  try {
+    const r = mp.callPapyrusFunction('method', 'Actor', 'GetRace',
+      { type: 'form', desc: mp.getDescFromId(actorId) }, []);
+    desc = (r && r.desc) ? String(r.desc) : '';
+  } catch (e) {
+    return '';
+  }
+  const items = (typeof RACES !== 'undefined' && RACES && RACES.items) ? RACES.items : null;
+  if (!desc || !items) { return ''; }
+  let row = Object.prototype.hasOwnProperty.call(items, desc) ? items[desc] : null;
+  if (!row) {
+    const at = desc.indexOf(':');
+    const hex = at > 0 ? parseInt(desc.slice(0, at), 16) : NaN;
+    const again = isNaN(hex) ? '' : hex.toString(16) + desc.slice(at);
+    row = (again && Object.prototype.hasOwnProperty.call(items, again)) ? items[again] : null;
+  }
+  return row ? String(row.e || '') : '';
+}
+
+/** How many pieces killing this actor is worth to a warrior. */
+function killPieces(actorId) {
+  let base = '';
+  try { base = String(mp.get(actorId, 'baseDesc') || ''); } catch (e) { base = ''; }
+  return warriorPieces(base, raceEdidOf(actorId));
+}
+
 /**
  * Set the arrival point at the moment of death, while we still know where the
  * body fell. The engine reads spawnPoint when the respawn timer expires.
@@ -5556,6 +5880,23 @@ startChargenTimer();
  * a person.
  */
 mp.onDeath = guard('onDeath', function (actorId, killerId) {
+  /*
+    A BLOW THE SERVER LANDED ITSELF STILL HAS A KILLER (#1386). The extra
+    damage of a warrior's Heavy or Wreck is written by the maneuvers block
+    after the engine's own hit, and the engine kills with no killer when a
+    write takes health to nothing. The maneuvers block remembers whose blow
+    that was for a moment, and it is asked here, before anything reads the
+    killer.
+  */
+  if (!killerId) {
+    try {
+      var blowBy = globalThis.__thornswoodManeuvers;
+      if (blowBy && blowBy.killerOf) { killerId = blowBy.killerOf(actorId) || killerId; }
+      // The same for a skill perk's extra blow (#1385).
+      var perkBy = globalThis.__thornswoodPerks;
+      if (!killerId && perkBy && perkBy.killerOf) { killerId = perkBy.killerOf(actorId) || killerId; }
+    } catch (eBlow) { }
+  }
   let npcDeath = false;
   try { npcDeath = !(Number(mp.get(actorId, 'profileId')) > 0); } catch (e) { return; }
   /*
@@ -5664,7 +6005,10 @@ mp.onDeath = guard('onDeath', function (actorId, killerId) {
         var ch = globalThis.__thornswoodCharacter;
         var st = (ch && ch.stateOf) ? ch.stateOf(kid) : null;
         if (st && st.prof === 'warrior' && st.half) {
-          var raised = creditWork(kid, st.half);
+          // As many pieces as the body was hard (killPieces, over this
+          // handler, #1386): a chicken is 1 and a dragon 16. Whatever the
+          // body carried staying in the pack is the hunt, not a piece more.
+          var raised = creditWork(kid, st.half, killPieces(actorId));
           if (raised) {
             notify(kid, raised);
             say(kid, raised);
@@ -5690,6 +6034,15 @@ mp.onDeath = guard('onDeath', function (actorId, killerId) {
   let pid = 0;
   try { pid = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pid = 0; }
   if (!(pid > 0)) { return; }
+
+  /*
+    THE WOUNDS COME WITH YOU (#1383, death.md): the record stays as it was,
+    and only the bleed stops, in the injury and disease block's died().
+  */
+  try {
+    const hurt = globalThis.__thornswoodHurt;
+    if (hurt && hurt.died) { hurt.died(actorId); }
+  } catch (eHurt) { log('injury: a death threw:', eHurt); }
 
   const site = {
     desc: mp.get(actorId, 'worldOrCellDesc'),
@@ -6283,9 +6636,14 @@ function isStation(baseDesc) {
   The ranks under "What you cannot do" on the gatherer page are the
   ones applied here. A produce already on the generated ladder keeps
   that rank, and the row hands that ladder ingredient, one of it,
-  rather than the sack a Papyrus script would have opened. Rot scale,
-  screaming maw and thorn hook are not on the ladder, so they keep
-  their own produce.
+  rather than the sack a Papyrus script would have opened.
+
+  Rot scale, screaming maw and thorn hook are not here. They are
+  Update.esm's Creation Club records (306a to 306f), harvests.json files
+  them as left out for that reason, and Thornswood is Special Edition
+  only (#479, Patrick, 4 Oct: it still stands), so nobody is handed one.
+  records/update-creation-club.json names them and
+  tests/test-special-edition-only.js holds this table to it.
 
   Cabbage, carrot, gourds, leek, potato and wheat stay the farmer's.
   A clam and a fish stay the fisher's. A coin purse and an estate key
@@ -6318,12 +6676,9 @@ const GATHER_UNRANKED = {
   "110c2:HearthFires.esm": { "produce": "4da00:Skyrim.esm", "name": "Fly Amanita", "rank": "advanced" },
   "110c9:HearthFires.esm": { "produce": "6f950:Skyrim.esm", "name": "Scaly Pholiota", "rank": "advanced" },
   "110ca:HearthFires.esm": { "produce": "1b3bd:Skyrim.esm", "name": "Snowberries", "rank": "advanced" },
-  "306b:Update.esm": { "produce": "306d:Update.esm", "name": "Rot Scale", "rank": "advanced" },
   "10469:HearthFires.esm": { "produce": "2f44c:Skyrim.esm", "name": "Nightshade", "rank": "expert" },
   "110c3:HearthFires.esm": { "produce": "4da20:Skyrim.esm", "name": "Bleeding Crown", "rank": "expert" },
-  "110c7:HearthFires.esm": { "produce": "4da25:Skyrim.esm", "name": "Blisterwort", "rank": "expert" },
-  "306a:Update.esm": { "produce": "306e:Update.esm", "name": "Screaming Maw", "rank": "expert" },
-  "306c:Update.esm": { "produce": "306f:Update.esm", "name": "Thorn Hook", "rank": "expert" }
+  "110c7:HearthFires.esm": { "produce": "4da25:Skyrim.esm", "name": "Blisterwort", "rank": "expert" }
 };
 
 /** The row for a base, out of the generated table or the hand list beside it,
@@ -6696,10 +7051,20 @@ function bless(actorId, baseDesc) {
     if (d === baseDesc) continue;
     spellOn(actorId, SHRINES[d].spell, false);
   }
+  /*
+    A SHRINE IN A TEMPLE IS ALSO THE TEMPLE RITE (#1383): it clears ordinary
+    disease, sets a break and puts a crooked heal right, and the injury and
+    disease block answers whether this shrine stands in a temple.
+  */
+  let rite = '';
+  try {
+    const hurt = globalThis.__thornswoodHurt;
+    rite = (hurt && hurt.rite) ? hurt.rite(actorId) : '';
+  } catch (e) { log('injury: the temple rite threw:', e); }
   if (!spellOn(actorId, shrine.spell, true)) {
-    return 'The shrine of ' + shrine.who + ' does not answer.';
+    return 'The shrine of ' + shrine.who + ' does not answer.' + (rite ? ' ' + rite : '');
   }
-  return 'You take the blessing of ' + shrine.who + '.';
+  return 'You take the blessing of ' + shrine.who + '.' + (rite ? ' ' + rite : '');
 }
 
 /**
@@ -8210,10 +8575,34 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     try { prop.touchedBox(casterRefrId, refrId); } catch (e) { }
   }
 
+  /*
+    THE DULL CLOCK, AND A DROPPED PIECE PICKED UP AGAIN (#1384). See the
+    durability block. A container in a held building loses what its days
+    have taken before the engine sends what is in it, and a piece somebody
+    dropped gets the condition it went down with. It refuses nothing.
+  */
+  const wear = globalThis.__thornswoodDurability;
+  if (wear && wear.pressed) {
+    try { wear.pressed(casterRefrId, refrId, baseDesc); } catch (e) {
+      log('the durability press threw, so the press goes on:', e);
+    }
+  }
+
   if (prop && prop.touchedBench) {
     // Which bench they just pressed, for /key. Costs one hash lookup and is
     // passed over inside touchedBench for anything that is not a bench.
     try { prop.touchedBench(casterRefrId, baseDesc); } catch (e) { }
+  }
+
+  /*
+    WHICH BED THEY JUST PRESSED, for /rest bed (#1392). The bed is the one the
+    engine handed over here, never the word somebody types. One remembered
+    lookup per base, and nothing is written for a press on anything that is
+    not a bed. The press goes on, so the engine still lays them down.
+  */
+  const beds = globalThis.__thornswoodBeds;
+  if (beds && beds.touched) {
+    try { beds.touched(casterRefrId, refrId, baseDesc); } catch (e) { }
   }
 
   let message = null;
@@ -8520,7 +8909,9 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
 // never fires the event. Those rows carry "fires": false in tools\recipes.json
 // and are not in the table below. Nothing here can gate tempering, and the
 // Smith's Mastercraft perk on the public page is about tempering, so that perk
-// is not enforced by this gate and cannot be.
+// is not enforced by this gate and cannot be. A temper does reach the server
+// now, with no recipe, and recipelessCraft refuses it (#1384): repair is a
+// kit, and Mastercraft is the 120% repair (docs/systems/durability.md).
 // ---------------------------------------------------------------------------
 
 /*
@@ -26269,47 +26660,105 @@ function benchGate(actorId, baseDesc) {
 
   Keyed off the family the recipe table already puts on every owned row, so this
   list is checked against real data rather than against a memory of what Skyrim
-  contains: crafttest.js counts the rows in each of these families and fails if
+  contains: tests\test-1398-fuel.js counts the rows in each of these families and fails if
   a family here matches nothing, because a family name that has been renamed
   under it would turn this rule off without a word.
 */
 const HANDLE_DESC = '15490:Thornswood-Content.esp';
 /*
-  Charcoal for the forge fire. Same shape as the handle rule: not a CNTO on the
-  COBJ (that would couple us to every smithing plugin), taken here when the
-  craft is allowed. Ordered cheapest grade first so a novice Charburner's Poor
-  Charcoal is what goes, and vanilla charcoal is last as a fallback.
+  CHARCOAL FOR THE FIRE, BY GRADE (#1398).
+
+  docs/systems/professions/smith.md: "Every forge and every skyforge burns one
+  charcoal. No charcoal of the grade the metal asks for, the piece is not
+  made." Then the grade table, the smelter at the same grade as its metal, and
+  the skyforge one grade poorer. Which grade each recipe asks for is
+  FUEL_BY_RECIPE below, worked out of game\data\recipes.json by
+  scripts\dev\Build-FuelTable.js, because the rows the server carries name
+  neither their bench nor their metal. The rule before this read a bench off
+  the row, no installed row carries one, and so no forge took any charcoal.
+
+  The same shape as the handle: not an ingredient on the record, which would
+  couple this to every smithing plugin, but taken here once the craft is
+  allowed.
+
+  THE GRADE THE TABLE NAMES, AND ONLY THAT GRADE. It used to burn the cheapest
+  piece in the pack, Poor Charcoal first, whatever the metal. A hotter grade
+  is not burned in place of the one asked for: the page says no charcoal of
+  that grade, no piece. Skyrim's own Charcoal is the Charcoal grade, by its
+  name, as it was always taken here.
 */
-const CHARCOAL_DESCS = [
-  ITEMS.charcoalT1,
-  ITEMS.charcoalT2,
-  ITEMS.charcoalT3,
-  ITEMS.charcoalT4,
-  ITEMS.charcoal
+const CHARCOAL_GRADES = [
+  null,
+  { name: 'Poor Charcoal', descs: [ITEMS.charcoalT1] },
+  { name: 'Charcoal', descs: [ITEMS.charcoalT2, ITEMS.charcoal] },
+  { name: 'Charcoal Briquette', descs: [ITEMS.charcoalT3] },
+  { name: 'Coke', descs: [ITEMS.charcoalT4] }
 ];
-const CHARCOAL_BENCHES = {
-  CraftingSmithingForge: true,
-  CraftingSmithingSkyforge: true
-};
 
-/** True when this recipe is beaten out at a forge that burns charcoal. */
-function wantsCharcoal(row) {
-  if (!row || typeof row !== 'object') { return false; }
-  return !!CHARCOAL_BENCHES[String(row.benchName || '')];
+// ==== FUEL_BY_RECIPE, generated ====
+/* Built by scripts\dev\Build-FuelTable.js out of game\data\recipes.json. Do not hand edit.
+   329 recipes at a forge, a skyforge or a smelter, out of 3706.
+   177 burn Poor Charcoal, 74 Charcoal, 60 Charcoal Briquette and 18 Coke.
+   Recipe desc -> [grade 1 to 4, the metal that asks for it or nothing, the bench]. */
+const FUEL_BY_RECIPE = {"108cf8:Skyrim.esm":[2,"dwarven","forge"],"108cf9:Skyrim.esm":[3,"ebony","forge"],"108cfa:Skyrim.esm":[2,"elven","forge"],"108cfb:Skyrim.esm":[3,"glass","forge"],"108cfc:Skyrim.esm":[2,"orcish","forge"],"10dd28:Skyrim.esm":[2,"dwarven","smelter"],"1548d:Thornswood-Content.esp":[1,"iron","forge"],"1548e:Thornswood-Content.esp":[1,"iron","forge"],"15492:Thornswood-Content.esp":[1,"iron","forge"],"15496:Thornswood-Content.esp":[1,"iron","forge"],"15497:Thornswood-Content.esp":[1,"iron","forge"],"1838:PlayFluteLuteDrum.esp":[1,"","forge"],"19f8c:Playable Rieklings.esp":[1,"","forge"],"19f8d:Playable Rieklings.esp":[1,"","forge"],"19f8e:Playable Rieklings.esp":[1,"","forge"],"19f8f:Playable Rieklings.esp":[1,"iron","forge"],"19f97:Playable Rieklings.esp":[1,"iron","forge"],"19f9d:Playable Rieklings.esp":[1,"iron","forge"],"19fb4:Playable Rieklings.esp":[1,"steel","forge"],"19fb7:Playable Rieklings.esp":[1,"steel","forge"],"19fb8:Playable Rieklings.esp":[1,"steel","forge"],"1d90:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"1f24f:FishingInSkyrim.esp":[1,"iron","forge"],"1f252:FishingInSkyrim.esp":[3,"ebony","forge"],"214aa:Hothtrooper44_ArmorCompilation.esp":[1,"steel","skyforge"],"2180d:FishingInSkyrim.esp":[1,"steel","forge"],"22fe:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23062:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23063:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23190:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"23195:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"2319a:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"2319f:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"231a9:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231ae:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231b3:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231b8:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231c6:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c8:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c9:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231ca:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cb:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cc:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cd:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231ce:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cf:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d0:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d1:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d2:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d3:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d4:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d5:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d6:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d8:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d9:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"238fd:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"238fe:Hothtrooper44_ArmorCompilation.esp":[2,"silver","forge"],"23900:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"23907:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23908:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"2390e:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"23918:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23919:Hothtrooper44_ArmorCompilation.esp":[2,"silver","forge"],"23a0a:Playable Rieklings.esp":[1,"","forge"],"286a:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"2b04f:Dragonborn.esm":[1,"iron","forge"],"2b050:Dragonborn.esm":[1,"iron","forge"],"2b051:Dragonborn.esm":[1,"iron","forge"],"2b052:Dragonborn.esm":[1,"","forge"],"2b053:Dragonborn.esm":[1,"iron","forge"],"2b054:Dragonborn.esm":[1,"iron","forge"],"2b055:Dragonborn.esm":[1,"","forge"],"2b056:Dragonborn.esm":[1,"","forge"],"2b057:Dragonborn.esm":[1,"","forge"],"2b058:Dragonborn.esm":[1,"iron","forge"],"2b05a:Dragonborn.esm":[1,"iron","forge"],"2b05b:Dragonborn.esm":[1,"iron","forge"],"2b05c:Dragonborn.esm":[1,"iron","forge"],"2b065:Dragonborn.esm":[3,"nordic","forge"],"2b066:Dragonborn.esm":[3,"nordic","forge"],"2b067:Dragonborn.esm":[3,"nordic","forge"],"2b068:Dragonborn.esm":[3,"nordic","forge"],"2b069:Dragonborn.esm":[3,"nordic","forge"],"2b06a:Dragonborn.esm":[4,"stalhrim","forge"],"2b06c:Dragonborn.esm":[4,"stalhrim","forge"],"2b06d:Dragonborn.esm":[4,"stalhrim","forge"],"2b06e:Dragonborn.esm":[4,"stalhrim","forge"],"2b06f:Dragonborn.esm":[4,"stalhrim","forge"],"2b070:Dragonborn.esm":[4,"stalhrim","forge"],"2b071:Dragonborn.esm":[4,"stalhrim","forge"],"2b072:Dragonborn.esm":[4,"stalhrim","forge"],"2b075:Dragonborn.esm":[4,"stalhrim","forge"],"2b076:Dragonborn.esm":[4,"stalhrim","forge"],"2b077:Dragonborn.esm":[4,"stalhrim","forge"],"2b078:Dragonborn.esm":[4,"stalhrim","forge"],"2b079:Dragonborn.esm":[4,"stalhrim","forge"],"2b07a:Dragonborn.esm":[4,"stalhrim","forge"],"2b07b:Dragonborn.esm":[4,"stalhrim","forge"],"2b07c:Dragonborn.esm":[4,"stalhrim","forge"],"2b07d:Dragonborn.esm":[4,"stalhrim","forge"],"2b07e:Dragonborn.esm":[3,"nordic","forge"],"2b07f:Dragonborn.esm":[3,"nordic","forge"],"2b080:Dragonborn.esm":[3,"nordic","forge"],"2b081:Dragonborn.esm":[3,"nordic","forge"],"2b082:Dragonborn.esm":[3,"nordic","forge"],"2b083:Dragonborn.esm":[3,"nordic","forge"],"2b084:Dragonborn.esm":[3,"nordic","forge"],"2b085:Dragonborn.esm":[3,"nordic","forge"],"2dd7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"2de4:PlayFluteLuteDrum.esp":[1,"","forge"],"2de5:PlayFluteLuteDrum.esp":[1,"","forge"],"372fe:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"372ff:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37300:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37301:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37306:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37307:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37308:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37309:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"3cf53:Dragonborn.esm":[3,"nordic","forge"],"3cf54:Dragonborn.esm":[4,"stalhrim","forge"],"3d2dd:Dragonborn.esm":[1,"iron","forge"],"490d86:Immersive Weapons.esp":[1,"","forge"],"491dc0:Immersive Weapons.esp":[3,"glass","forge"],"491dc4:Immersive Weapons.esp":[3,"glass","forge"],"53b3:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"53b5:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"53b7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"6aa09:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"77100a:Immersive Weapons.esp":[1,"steel","forge"],"82ebf:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec0:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec1:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec2:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"844:MoreCraftableEquipment.esp":[1,"","forge"],"848:MoreCraftableEquipment.esp":[1,"","forge"],"849:MoreCraftableEquipment.esp":[1,"","forge"],"855:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"856:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"857:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"858:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"85f:MoreCraftableEquipment.esp":[1,"steel","forge"],"860:MoreCraftableEquipment.esp":[1,"steel","forge"],"861:MoreCraftableEquipment.esp":[1,"steel","forge"],"863:MoreCraftableEquipment.esp":[1,"steel","forge"],"866:MoreCraftableEquipment.esp":[1,"steel","forge"],"867:MoreCraftableEquipment.esp":[1,"steel","forge"],"868:MoreCraftableEquipment.esp":[1,"iron","forge"],"869:MoreCraftableEquipment.esp":[1,"iron","forge"],"874:MoreCraftableEquipment.esp":[2,"falmer","forge"],"87b:MoreCraftableEquipment.esp":[2,"falmer","forge"],"87c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88d:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88e:MoreCraftableEquipment.esp":[2,"falmer","forge"],"897:MoreCraftableEquipment.esp":[2,"falmer","forge"],"89c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8a9:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8aa:MoreCraftableEquipment.esp":[1,"","forge"],"8ab:MoreCraftableEquipment.esp":[1,"","forge"],"8ac:MoreCraftableEquipment.esp":[1,"","forge"],"8ad:MoreCraftableEquipment.esp":[1,"","forge"],"8d0:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d1:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d2:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d3:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d4:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d5:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d6:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d7:MoreCraftableEquipment.esp":[1,"","forge"],"8d8:MoreCraftableEquipment.esp":[1,"","forge"],"8d9:MoreCraftableEquipment.esp":[1,"","forge"],"8db:MoreCraftableEquipment.esp":[1,"iron","forge"],"8f0:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f7:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f8:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f9:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8fa:MoreCraftableEquipment.esp":[1,"steel","forge"],"8fc:MoreCraftableEquipment.esp":[1,"iron","forge"],"900:MoreCraftableEquipment.esp":[2,"silver","forge"],"901:MoreCraftableEquipment.esp":[2,"silver","forge"],"94185a:Immersive Weapons.esp":[3,"glass","forge"],"9cf:Update.esm":[1,"steel","forge"],"9d0:Update.esm":[1,"steel","forge"],"9d1:Update.esm":[1,"steel","forge"],"9d2:Update.esm":[1,"steel","forge"],"9d3:Update.esm":[1,"steel","forge"],"9e775:Playable Rieklings.esp":[1,"","forge"],"a30c3:Skyrim.esm":[1,"iron","smelter"],"a30cb:Skyrim.esm":[1,"","smelter"],"a30d3:Skyrim.esm":[3,"ebony","smelter"],"a30d4:Skyrim.esm":[1,"","smelter"],"a30d9:Skyrim.esm":[2,"elven","smelter"],"a30da:Skyrim.esm":[3,"glass","smelter"],"a30db:Skyrim.esm":[2,"orcish","smelter"],"a30dc:Skyrim.esm":[1,"","smelter"],"a30dd:Skyrim.esm":[2,"silver","smelter"],"a30e4:Skyrim.esm":[1,"steel","smelter"],"a5cd6:Skyrim.esm":[1,"steel","forge"],"ab72:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab73:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab74:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab75:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"b64f:Dawnguard.esm":[1,"iron","forge"],"b650:Dawnguard.esm":[1,"steel","forge"],"b651:Dawnguard.esm":[3,"ebony","forge"],"b652:Dawnguard.esm":[2,"dwarven","forge"],"b653:Dawnguard.esm":[3,"glass","forge"],"b654:Dawnguard.esm":[2,"orcish","forge"],"b655:Dawnguard.esm":[2,"elven","forge"],"bc99a:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"c74736:Immersive Weapons.esp":[2,"silver","forge"],"c74737:Immersive Weapons.esp":[2,"silver","forge"],"da0c03:Update.esm":[1,"","smelter"],"da769:Skyrim.esm":[1,"iron","forge"],"da76a:Skyrim.esm":[1,"iron","forge"],"da76b:Skyrim.esm":[1,"iron","forge"],"da76c:Skyrim.esm":[1,"iron","forge"],"da76d:Skyrim.esm":[1,"iron","forge"],"da76e:Skyrim.esm":[1,"iron","forge"],"da76f:Skyrim.esm":[1,"iron","forge"],"db28e:Skyrim.esm":[1,"","forge"],"db28f:Skyrim.esm":[1,"iron","forge"],"db290:Skyrim.esm":[1,"iron","forge"],"db291:Skyrim.esm":[1,"iron","forge"],"db292:Skyrim.esm":[1,"iron","forge"],"db293:Skyrim.esm":[1,"iron","forge"],"db5d3:Skyrim.esm":[1,"","forge"],"db5d4:Skyrim.esm":[1,"","forge"],"db5d5:Skyrim.esm":[1,"","forge"],"db5d6:Skyrim.esm":[1,"","forge"],"db5d7:Skyrim.esm":[1,"steel","forge"],"db896:Skyrim.esm":[1,"steel","forge"],"db897:Skyrim.esm":[1,"steel","forge"],"db898:Skyrim.esm":[1,"steel","forge"],"db899:Skyrim.esm":[2,"orcish","forge"],"db89a:Skyrim.esm":[2,"orcish","forge"],"db89b:Skyrim.esm":[1,"steel","forge"],"db89c:Skyrim.esm":[2,"orcish","forge"],"db89d:Skyrim.esm":[2,"orcish","forge"],"db89e:Skyrim.esm":[1,"steel","forge"],"db89f:Skyrim.esm":[2,"orcish","forge"],"db8a0:Skyrim.esm":[2,"orcish","forge"],"db8a1:Skyrim.esm":[2,"orcish","forge"],"db8a3:Skyrim.esm":[2,"dwarven","forge"],"db8a4:Skyrim.esm":[2,"dwarven","forge"],"db8a5:Skyrim.esm":[2,"dwarven","forge"],"db8a6:Skyrim.esm":[2,"dwarven","forge"],"db8a7:Skyrim.esm":[2,"dwarven","forge"],"db8a8:Skyrim.esm":[2,"dwarven","forge"],"db8a9:Skyrim.esm":[2,"dwarven","forge"],"db8aa:Skyrim.esm":[2,"elven","forge"],"db8ab:Skyrim.esm":[2,"elven","forge"],"db8ac:Skyrim.esm":[2,"elven","forge"],"db8ad:Skyrim.esm":[2,"elven","forge"],"db8ae:Skyrim.esm":[2,"elven","forge"],"db8af:Skyrim.esm":[2,"elven","forge"],"db8b0:Skyrim.esm":[2,"elven","forge"],"db8b1:Skyrim.esm":[3,"glass","forge"],"db8b2:Skyrim.esm":[3,"glass","forge"],"db8b3:Skyrim.esm":[3,"glass","forge"],"db8b4:Skyrim.esm":[3,"glass","forge"],"db8b5:Skyrim.esm":[3,"glass","forge"],"db8b6:Skyrim.esm":[3,"glass","forge"],"db8b7:Skyrim.esm":[3,"glass","forge"],"db8b8:Skyrim.esm":[3,"ebony","forge"],"db8b9:Skyrim.esm":[3,"ebony","forge"],"db8ba:Skyrim.esm":[3,"ebony","forge"],"db8bb:Skyrim.esm":[3,"ebony","forge"],"db8bc:Skyrim.esm":[3,"ebony","forge"],"db8bd:Skyrim.esm":[3,"ebony","forge"],"db8be:Skyrim.esm":[3,"ebony","forge"],"dc9f5:Skyrim.esm":[1,"steel","forge"],"dc9f6:Skyrim.esm":[1,"steel","forge"],"dc9f7:Skyrim.esm":[1,"steel","forge"],"dc9f8:Skyrim.esm":[1,"steel","forge"],"dc9f9:Skyrim.esm":[1,"steel","forge"],"dc9fa:Skyrim.esm":[2,"elven","forge"],"dc9fb:Skyrim.esm":[2,"elven","forge"],"dc9fc:Skyrim.esm":[2,"elven","forge"],"dc9fd:Skyrim.esm":[2,"elven","forge"],"dc9fe:Skyrim.esm":[2,"elven","forge"],"dc9ff:Skyrim.esm":[1,"iron","forge"],"dca00:Skyrim.esm":[1,"iron","forge"],"dca01:Skyrim.esm":[1,"","forge"],"dca02:Skyrim.esm":[1,"","forge"],"dca03:Skyrim.esm":[1,"","forge"],"dca04:Skyrim.esm":[1,"","forge"],"dca05:Skyrim.esm":[1,"steel","forge"],"dca06:Skyrim.esm":[1,"steel","forge"],"dca07:Skyrim.esm":[1,"steel","forge"],"dca08:Skyrim.esm":[1,"steel","forge"],"dca0e:Skyrim.esm":[3,"glass","forge"],"dca0f:Skyrim.esm":[3,"glass","forge"],"dca10:Skyrim.esm":[3,"glass","forge"],"dca11:Skyrim.esm":[3,"glass","forge"],"dca12:Skyrim.esm":[3,"glass","forge"],"dd975:Skyrim.esm":[1,"steel","forge"],"dd977:Skyrim.esm":[1,"steel","forge"],"dd978:Skyrim.esm":[1,"steel","forge"],"dd979:Skyrim.esm":[2,"dwarven","forge"],"dd97a:Skyrim.esm":[2,"dwarven","forge"],"dd97b:Skyrim.esm":[2,"dwarven","forge"],"dd97c:Skyrim.esm":[2,"dwarven","forge"],"dd97d:Skyrim.esm":[2,"dwarven","forge"],"dd97e:Skyrim.esm":[1,"steel","forge"],"dd97f:Skyrim.esm":[1,"steel","forge"],"dd980:Skyrim.esm":[1,"steel","forge"],"dd981:Skyrim.esm":[1,"steel","forge"],"dd983:Skyrim.esm":[2,"orcish","forge"],"dd984:Skyrim.esm":[2,"orcish","forge"],"dd985:Skyrim.esm":[2,"orcish","forge"],"dd986:Skyrim.esm":[2,"orcish","forge"],"dd987:Skyrim.esm":[2,"orcish","forge"],"dd988:Skyrim.esm":[3,"ebony","forge"],"dd989:Skyrim.esm":[3,"ebony","forge"],"dd98a:Skyrim.esm":[3,"ebony","forge"],"dd98b:Skyrim.esm":[3,"ebony","forge"],"dd98c:Skyrim.esm":[3,"ebony","forge"],"f46cc:Skyrim.esm":[1,"ancient nord","skyforge"],"f46cd:Skyrim.esm":[1,"ancient nord","skyforge"],"f46cf:Skyrim.esm":[1,"ancient nord","skyforge"],"f46d0:Skyrim.esm":[1,"ancient nord","skyforge"],"f6f2a:Skyrim.esm":[1,"steel","forge"],"f74d:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"f813:Dawnguard.esm":[1,"steel","forge"],"f814:Dawnguard.esm":[2,"dwarven","forge"]};
+// ==== end FUEL_BY_RECIPE ====
+
+/** The fuel a recipe burns, { grade, metal, bench }, or null when it burns none. */
+function fuelFor(recipeDesc) {
+  if (!Object.prototype.hasOwnProperty.call(FUEL_BY_RECIPE, recipeDesc)) { return null; }
+  const f = FUEL_BY_RECIPE[recipeDesc];
+  const grade = Number(f && f[0]);
+  if (!CHARCOAL_GRADES[grade]) { return null; }
+  return { grade: grade, metal: String(f[1] || ''), bench: String(f[2] || 'forge') };
 }
 
-/** Take one piece of any charcoal grade. Returns true when something went. */
-function takeCharcoal(actorId) {
-  for (let i = 0; i < CHARCOAL_DESCS.length; i++) {
-    const desc = CHARCOAL_DESCS[i];
-    if (!desc) { continue; }
-    if (takeItem(actorId, desc, 1)) { return true; }
+/** How many of one item a pack holds, every stack of it counted. */
+function packCount(actorId, itemDesc) {
+  const baseId = idOf(itemDesc);
+  if (!baseId) { return 0; }
+  let inv = null;
+  try { inv = mp.get(actorId, 'inventory'); } catch (e) { return 0; }
+  const entries = (inv && inv.entries) || [];
+  let n = 0;
+  for (let i = 0; i < entries.length; i++) {
+    if (entries[i] && entries[i].baseId === baseId) { n += Number(entries[i].count) || 0; }
   }
-  return false;
+  return n;
 }
 
+/** The charcoal of exactly that grade in this pack, or '' when there is none. */
+function charcoalHeld(actorId, grade) {
+  const g = CHARCOAL_GRADES[grade];
+  if (!g) { return ''; }
+  for (let i = 0; i < g.descs.length; i++) {
+    if (g.descs[i] && packCount(actorId, g.descs[i]) > 0) { return g.descs[i]; }
+  }
+  return '';
+}
 
-const HAFTED_FAMILIES = ['War axes', 'Battleaxes', 'Warhammers', 'Maces', 'Other weapons'];
+/** What is said when the grade a piece asks for is not in the pack. */
+function fuelRefusal(fuel) {
+  const grade = CHARCOAL_GRADES[fuel.grade].name;
+  const metal = fuel.metal.replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); });
+  let first;
+  if (fuel.bench === 'smelter') {
+    first = metal ? 'Smelting ' + metal + ' burns ' + grade : 'A smelter burns ' + grade;
+  } else {
+    const at = fuel.bench === 'skyforge' ? 'the skyforge' : 'a forge';
+    first = metal ? metal + ' at ' + at + ' burns ' + grade
+                  : (fuel.bench === 'skyforge' ? 'The skyforge' : 'A forge') + ' burns ' + grade;
+  }
+  return first + ', and you have none. A Charburner makes it from firewood at a kiln.';
+}
+
+/*
+  The four hafted families on the smith page: a war axe, a battleaxe, a
+  warhammer and a mace are a metal head on a wooden haft. Other weapons was
+  on this list too, and in the table that family is the woodcutter's axe and
+  the drum, the flute and the lute, so the instruments were asked for a
+  handle (#1398). An instrument is not a haft.
+*/
+const HAFTED_FAMILIES = ['War axes', 'Battleaxes', 'Warhammers', 'Maces'];
 
 /** True when this recipe makes something fitted to a wooden handle. */
 function wantsAHandle(row) {
@@ -26326,6 +26775,107 @@ function wantsAHandle(row) {
     if (HAFTED_FAMILIES[i] === family) { return true; }
   }
   return false;
+}
+
+/*
+  WHAT A MASTER'S CRAFT GIVES ON TOP (#1398).
+
+  Grand Chef, docs/systems/professions/cook.md: "At master, either half. Every
+  batch yields two instead of one. The craft is still one piece of work toward
+  the next rank." So a Cook row made by somebody holding the perk hands over
+  the batch a second time, once the engine has added the first, and the work
+  is credited once, by the caller, as before.
+
+  Master Weaver, docs/systems/professions/tailor.md: clothing a master tailor
+  makes keeps the weather off. Which garment is one is written on it, the way
+  durability writes a condition and a key its house: the fresh garment is
+  named with the needs block's mark in front, and the needs block reads the
+  mark off what is worn. The hidden armour half is not here: the page gives
+  it no rating, and the server cannot reach a garment's armour (see the note
+  over the durability block).
+
+  The perk is the progression block's own answer (perks), so it is held at
+  master in the half somebody picked and nowhere else.
+*/
+function holdsPerk(actorId, key) {
+  const P = globalThis.__thornswoodProgression;
+  const C = globalThis.__thornswoodCharacter;
+  if (!P || !P.perks || !C || !C.stateOf) { return false; }
+  try { return P.perks(C.stateOf(actorId)).indexOf(key) !== -1; } catch (e) { return false; }
+}
+
+/** Name n plain units of a garment just made as a master weaver's. Answers how many. */
+function markWoven(actorId, outDesc, name, n) {
+  const N = globalThis.__thornswoodNeeds;
+  const mark = N && N.NEEDS && N.NEEDS.wear && N.NEEDS.wear.woven ? N.NEEDS.wear.woven.mark : '';
+  const baseId = idOf(outDesc);
+  if (!mark || !baseId || !(n > 0)) { return 0; }
+  let inv = null;
+  try { inv = mp.get(actorId, 'inventory'); } catch (e) { return 0; }
+  const entries = (inv && inv.entries) || [];
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (!e || e.baseId !== baseId || e.name || e.worn || e.wornLeft || !(e.count > 0)) { continue; }
+    const take = Math.min(n, e.count);
+    const named = {};
+    for (const k in e) { if (Object.prototype.hasOwnProperty.call(e, k)) { named[k] = e[k]; } }
+    named.count = take;
+    named.name = mark + String(name || 'Garment');
+    e.count -= take;
+    if (e.count <= 0) { entries.splice(i, 1); }
+    entries.push(named);
+    try { mp.set(actorId, 'inventory', { entries: entries }); } catch (e2) { return 0; }
+    return take;
+  }
+  return 0;
+}
+
+/*
+  WHEN THE OUTPUT IS IN THE PACK. The gamemode is asked before the engine does
+  anything: CraftEvent::Fire runs mp.onCraft, and only when it was not refused
+  does OnFireSuccess take the inputs and add the output, in the same
+  server.tick() call (the fork's CraftEvent.cpp, and index.ts, which awaits a
+  timer between ticks). So a timer set here runs after the engine has finished,
+  whatever its length, and nothing about it is a race; 0 says that.
+
+  What the timer cannot assume is that the engine succeeded. RemoveItems throws
+  when the server does not hold what the client said went in ("Source
+  inventory doesn't have enough", seen on the dev server on 23 September),
+  after the gamemode already said yes. So the count of the output is taken now,
+  and the second batch and the mark are given only if the craft's own n
+  arrived. Otherwise a craft the engine refused would hand a Grand Chef a free
+  batch, or name a garment the master did not make.
+*/
+const MASTER_CRAFT_AFTER_MS = 0;
+
+/** After an allowed craft: Grand Chef's and Master Chemist's second batch, and Master Weaver's mark. */
+function masterCraft(actorId, row, count) {
+  if (!row || typeof row !== 'object' || !row.out) { return; }
+  const n = Number(count) > 0 ? Math.floor(Number(count)) : (Number(row.makes) || 1);
+  const chef = row.owner === 'Cook' && holdsPerk(actorId, 'grandchef');
+  const weaver = row.owner === 'Tailor' && row.type === 'ARMO' && holdsPerk(actorId, 'masterweaver');
+  const chemist = row.owner === 'Alchemist' && holdsPerk(actorId, 'masterchemist');
+  if (!chef && !weaver && !chemist) { return; }
+  const before = packCount(actorId, row.out);
+  setTimeout(function () {
+    if (packCount(actorId, row.out) < before + n) {
+      log(actorId.toString(16), 'made no', row.name, 'after all (the engine refused the craft), so no master work is added');
+      return;
+    }
+    if (chef || chemist) {
+      try {
+        addItem(actorId, row.out, n);
+        log(actorId.toString(16), 'is a', chef ? 'Grand Chef:' : 'Master Chemist:',
+            'a second batch of', n, row.name);
+      } catch (e) { log('the second batch of', row.name, 'was not handed over:', e); }
+    }
+    if (weaver) {
+      try {
+        const done = markWoven(actorId, row.out, row.name, n);
+        log(actorId.toString(16), 'is a Master Weaver:', done, row.name, 'woven');
+      } catch (e) { log('the woven garment', row.name, 'was not named:', e); }
+    }
+  }, MASTER_CRAFT_AFTER_MS);
 }
 
 function onCraftRoll(actorId, roll) {
@@ -26489,9 +27039,15 @@ function craftAnswer(actorId, row) {
   // a conversation rather than a menu.'
   const sister = s.half ? P.sisterOf(s.prof, s.half) : null;
   if (sister && sister === half) {
-    out.refusal = 'A ' + made + ' is ' + halfName + ' work past novice, and ' + halfName +
-                  ' is your sister half. You get the novice of it for nothing and no ' +
-                  'further. A Master ' + halfName + ' can take you on.';
+    // Taken on by a Master who still stands (#1388): the rank is the wall now.
+    const climbing = !!(C.masterFor && C.masterFor(actorId, s, half));
+    out.refusal = climbing
+      ? 'A ' + made + ' is ' + rankWord(rank) + ' ' + halfName + '\'s work and you are ' +
+        rankWord(P.rankOf(s, half) || 'novice') + ' ' + halfName + '. A Master took you on in it, ' +
+        'so rank comes from doing the work.'
+      : 'A ' + made + ' is ' + halfName + ' work past novice, and ' + halfName +
+        ' is your sister half. You get the novice of it for nothing and no ' +
+        'further. A Master ' + halfName + ' can take you on with /apprentice.';
     return out;
   }
 
@@ -26557,11 +27113,11 @@ function craftAnswer(actorId, row) {
   of armour with no recipe behind it is an enchantment, because every forge
   craft HAS a recipe and would never reach this path.
 
-  THE RANK IS NOT SET HERE, and that is a knob rather than an oversight. There
-  is no record to carry a rank, so every brew and every enchantment is novice
-  work to anybody who holds the profession. Whether a Master should brew
-  something a novice cannot is a question for the rulebook, and it needs a
-  record or a table before it can be answered.
+  THE RANK IS NOT ON A RECORD. There is no record to carry one, so the rank
+  is the table's: the mixtures and enchantments pages give every effect a
+  rank, and MIXTURES and ENCHANTMENTS below carry them (#1389). They can only
+  be asked once the engine names the effects, and until it does every brew
+  and every enchantment is novice work to anybody who holds the profession.
 */
 var RECIPELESS = {
   ALCH: { prof: 'alchemist', made: 'a potion', verb: 'brew' },
@@ -26569,7 +27125,254 @@ var RECIPELESS = {
   ARMO: { prof: 'enchanter', made: 'enchanted armour', verb: 'enchant' }
 };
 
-function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
+/*
+  THE TWO SHORT LISTS (#1389): what a lab may brew, docs/systems/mixtures.md,
+  and what an arcane enchanter may put on a piece, docs/systems/enchantments.md.
+  An effect that is not named on its page is refused, even when the vanilla
+  menu would make it.
+
+  KEYED BY THE MAGIC EFFECT, the MGEF record, because that is the one thing a
+  brew and an enchantment are made of. A brewed bottle is a form only the
+  brewing client has (above 0xff000000), and an enchanted piece keeps its own
+  record with a new enchantment hung on it (the ExtraEnchantment the fork's
+  inventory.ts already reads), so neither has a record the server can look up.
+  The effects inside them are plugin records, and the same ids on both sides.
+  The ids are Skyrim.esm's, as UESP lists them for each effect: the alchemy
+  effect for a mixture and the enchanting effect for an enchantment, which are
+  two different records with the same name (Resist Fire, Fear).
+
+  WHAT THE ENGINE PASSES TODAY, read in the fork at the pinned commit
+  (engine/skymp ac044a49): mp.onCraft gets five numbers and nothing else. The
+  client's craft message carries the bench, the inputs by base id and count,
+  and the base id of what arrived in the pack (craftService.ts,
+  CraftItemMessage.h); CraftService asks the gamemode with recipeId 0 and the
+  bench (CraftService.cpp, CraftEvent.cpp). No effect, no enchantment and not
+  even the inputs reach the gamemode. So these lists are asked only when the
+  engine hands over the effects as a sixth argument, an array of MGEF form ids;
+  what the fork has to do for that is written on #1389. Until then a brew and
+  an enchantment go through as they always have, and the log says the lists
+  were not asked.
+
+  The same rank rules as every recipe: craftAnswer is asked of each effect as
+  if it were a row, so the half that owns it, the sister half at novice and a
+  taught half at novice all answer the way they do at a forge.
+*/
+var MIXTURES = {
+  // Medicine, Physicker.
+  '3eb15:Skyrim.esm': { name: 'Restore Health', half: 'physicker', rank: 'novice' },
+  '3eb16:Skyrim.esm': { name: 'Restore Stamina', half: 'physicker', rank: 'novice' },
+  '3eb17:Skyrim.esm': { name: 'Restore Magicka', half: 'physicker', rank: 'novice' },
+  '3eaf3:Skyrim.esm': { name: 'Fortify Health', half: 'physicker', rank: 'advanced' },
+  '3eaf9:Skyrim.esm': { name: 'Fortify Stamina', half: 'physicker', rank: 'advanced' },
+  '3eaf8:Skyrim.esm': { name: 'Fortify Magicka', half: 'physicker', rank: 'advanced' },
+  'ae723:Skyrim.esm': { name: 'Cure Disease', half: 'physicker', rank: 'advanced' },
+  '3eaea:Skyrim.esm': { name: 'Resist Fire', half: 'physicker', rank: 'expert' },
+  '3eaeb:Skyrim.esm': { name: 'Resist Frost', half: 'physicker', rank: 'expert' },
+  '3eaec:Skyrim.esm': { name: 'Resist Shock', half: 'physicker', rank: 'expert' },
+  '3eb01:Skyrim.esm': { name: 'Fortify Carry Weight', half: 'physicker', rank: 'expert' },
+  '3eb06:Skyrim.esm': { name: 'Regenerate Health', half: 'physicker', rank: 'master' },
+  '3eb08:Skyrim.esm': { name: 'Regenerate Stamina', half: 'physicker', rank: 'master' },
+  '3eb07:Skyrim.esm': { name: 'Regenerate Magicka', half: 'physicker', rank: 'master' },
+  // Poison, Blightbrewer.
+  '3eb42:Skyrim.esm': { name: 'Damage Health', half: 'blightbrewer', rank: 'novice' },
+  '3a2c6:Skyrim.esm': { name: 'Damage Stamina', half: 'blightbrewer', rank: 'novice' },
+  '3a2b6:Skyrim.esm': { name: 'Damage Magicka', half: 'blightbrewer', rank: 'novice' },
+  '10aa4a:Skyrim.esm': { name: 'Lingering Damage Health', half: 'blightbrewer', rank: 'advanced' },
+  '73f23:Skyrim.esm': { name: 'Ravage Stamina', half: 'blightbrewer', rank: 'advanced' },
+  '73f27:Skyrim.esm': { name: 'Ravage Magicka', half: 'blightbrewer', rank: 'advanced' },
+  '73f2d:Skyrim.esm': { name: 'Weakness to Fire', half: 'blightbrewer', rank: 'expert' },
+  '73f2e:Skyrim.esm': { name: 'Weakness to Frost', half: 'blightbrewer', rank: 'expert' },
+  '73f2f:Skyrim.esm': { name: 'Weakness to Shock', half: 'blightbrewer', rank: 'expert' },
+  '90042:Skyrim.esm': { name: 'Weakness to Poison', half: 'blightbrewer', rank: 'expert' },
+  '73f30:Skyrim.esm': { name: 'Paralysis', half: 'blightbrewer', rank: 'master' },
+  '73f20:Skyrim.esm': { name: 'Fear', half: 'blightbrewer', rank: 'master' }
+};
+
+var ENCHANTMENTS = {
+  // On a weapon, Bladebinder.
+  '4605a:Skyrim.esm': { name: 'Fire Damage', half: 'bladebinder', rank: 'novice' },
+  '4605b:Skyrim.esm': { name: 'Frost Damage', half: 'bladebinder', rank: 'novice' },
+  '4605c:Skyrim.esm': { name: 'Shock Damage', half: 'bladebinder', rank: 'novice' },
+  '5b452:Skyrim.esm': { name: 'Soul Trap', half: 'bladebinder', rank: 'novice' },
+  'aa155:Skyrim.esm': { name: 'Absorb Health', half: 'bladebinder', rank: 'advanced' },
+  'aa157:Skyrim.esm': { name: 'Absorb Stamina', half: 'bladebinder', rank: 'advanced' },
+  'aa156:Skyrim.esm': { name: 'Absorb Magicka', half: 'bladebinder', rank: 'advanced' },
+  // The cheaper copies the Drainheart Sword and the Drainspell Bow teach.
+  // Same names, so the same rows; asked on #1389.
+  '10f21f:Skyrim.esm': { name: 'Absorb Stamina', half: 'bladebinder', rank: 'advanced' },
+  '10f221:Skyrim.esm': { name: 'Absorb Magicka', half: 'bladebinder', rank: 'advanced' },
+  '5b46b:Skyrim.esm': { name: 'Turn Undead', half: 'bladebinder', rank: 'advanced' },
+  'acbb5:Skyrim.esm': { name: 'Banish', half: 'bladebinder', rank: 'expert' },
+  '5b451:Skyrim.esm': { name: 'Fear', half: 'bladebinder', rank: 'expert' },
+  'acbb6:Skyrim.esm': { name: 'Paralyze', half: 'bladebinder', rank: 'master' },
+  // On armour and clothing, Wardweaver.
+  '493aa:Skyrim.esm': { name: 'Fortify Health', half: 'wardweaver', rank: 'novice' },
+  '49507:Skyrim.esm': { name: 'Fortify Stamina', half: 'wardweaver', rank: 'novice' },
+  '49504:Skyrim.esm': { name: 'Fortify Magicka', half: 'wardweaver', rank: 'novice' },
+  '48c8b:Skyrim.esm': { name: 'Resist Fire', half: 'wardweaver', rank: 'advanced' },
+  '48f45:Skyrim.esm': { name: 'Resist Frost', half: 'wardweaver', rank: 'advanced' },
+  '49295:Skyrim.esm': { name: 'Resist Shock', half: 'wardweaver', rank: 'advanced' },
+  '7a0f4:Skyrim.esm': { name: 'Fortify Carry Weight', half: 'wardweaver', rank: 'advanced' },
+  '92a57:Skyrim.esm': { name: 'Muffle', half: 'wardweaver', rank: 'expert' },
+  '92a48:Skyrim.esm': { name: 'Waterbreathing', half: 'wardweaver', rank: 'expert' },
+  '7a0f8:Skyrim.esm': { name: 'Fortify Health Regen', half: 'wardweaver', rank: 'master' },
+  '7a105:Skyrim.esm': { name: 'Fortify Stamina Regen', half: 'wardweaver', rank: 'master' },
+  '7a0fd:Skyrim.esm': { name: 'Fortify Magicka Regen', half: 'wardweaver', rank: 'master' }
+};
+
+/*
+  TWIN SOULS IS THE SECOND SLOT. enchantments.md: "One enchantment on a piece,
+  until Twin Souls at master, which is two." Three is never.
+*/
+var ENCHANT_SLOTS = 1;
+var TWIN_SOULS_SLOTS = 2;
+
+var OFF_THE_MIXTURES = 'A lab here brews only what the mixtures list names, and that brew carries an effect that is not on it.';
+var OFF_THE_ENCHANTMENTS = 'An arcane enchanter here puts on only what the enchantments list names, and that enchantment is not on it.';
+
+/**
+ * What the two lists say about a brew or an enchantment made of these magic
+ * effects (MGEF form ids, as the engine reports them).
+ *
+ * want is the profession the bench belongs to ('alchemist', 'enchanter'), or
+ * null for a bench nobody has classified, which takes each effect from
+ * whichever list names it. state is the character, already read.
+ *
+ * Returns { refusal, credit }: refusal is the sentence that stops the craft,
+ * credit the half the one piece of work counts under. A batch is one piece
+ * however many effects it carries. It goes to the person's own half when one
+ * of the effects is that half's, and otherwise to the half of the first
+ * effect (a mixed batch is asked on #1389).
+ */
+function listAnswer(actorId, want, effects, state) {
+  var out = { refusal: null, credit: null };
+  var table = want === 'alchemist' ? MIXTURES : (want === 'enchanter' ? ENCHANTMENTS : null);
+  var offList = want === 'enchanter' ? OFF_THE_ENCHANTMENTS : OFF_THE_MIXTURES;
+
+  var rows = [];
+  var seen = {};
+  for (var i = 0; i < effects.length; i++) {
+    var desc = null;
+    try { desc = mp.getDescFromId(Number(effects[i]) || 0); } catch (e) { desc = null; }
+    if (desc && Object.prototype.hasOwnProperty.call(seen, desc)) { continue; }
+    var from = table;
+    if (!from && desc) {
+      from = Object.prototype.hasOwnProperty.call(MIXTURES, desc) ? MIXTURES
+           : (Object.prototype.hasOwnProperty.call(ENCHANTMENTS, desc) ? ENCHANTMENTS : null);
+    }
+    // An effect the server cannot name is not one the list names.
+    if (!desc || !from || !Object.prototype.hasOwnProperty.call(from, desc)) {
+      out.refusal = (from === ENCHANTMENTS) ? OFF_THE_ENCHANTMENTS : offList;
+      return out;
+    }
+    seen[desc] = true;
+    rows.push({ desc: desc, effect: from[desc], enchant: from === ENCHANTMENTS });
+  }
+  // A bottle or a piece with nothing on it is not something the menu makes.
+  if (!rows.length) {
+    out.refusal = offList;
+    return out;
+  }
+
+  var enchantments = 0;
+  for (var k = 0; k < rows.length; k++) { if (rows[k].enchant) { enchantments++; } }
+  if (enchantments > TWIN_SOULS_SLOTS) {
+    out.refusal = 'No piece here holds more than ' + TWIN_SOULS_SLOTS + ' enchantments.';
+    return out;
+  }
+  if (enchantments > ENCHANT_SLOTS && !holdsPerk(actorId, 'twinsouls')) {
+    out.refusal = 'Two enchantments on one piece is Twin Souls, and that is a master ' +
+                  'Enchanter\'s. You can put one on.';
+    return out;
+  }
+
+  for (var j = 0; j < rows.length; j++) {
+    var effect = rows[j].effect;
+    var row = {
+      name: rows[j].enchant
+        ? 'piece enchanted with ' + effect.name
+        : 'bottle of ' + effect.name,
+      owner: rows[j].enchant ? 'Enchanter' : 'Alchemist',
+      half: effect.half,
+      rank: effect.rank
+    };
+    var answer = craftAnswer(actorId, row);
+    if (answer.refusal) {
+      out.refusal = answer.refusal;
+      return out;
+    }
+    if (answer.credit && (!out.credit || (state && answer.credit === state.half))) {
+      out.credit = answer.credit;
+    }
+  }
+  return out;
+}
+
+/*
+  AND THE SECOND SLOT HAS TO BE IN THE MENU. The game's enchanting menu offers a
+  second enchantment only to somebody holding its Extra Effect perk
+  (58f7f:Skyrim.esm), and nothing hands that out here, so without this Twin
+  Souls would be a rule with no slot behind it. The server cannot add a perk
+  to an actor (the fork has no AddPerk), so the number of slots travels to the
+  owner in this property and the updateOwner script puts the perk on, or takes
+  it off, when the number changes. updateOwner runs every frame, so it acts
+  only on a change, the way the swing and the alert scripts do.
+
+  Written by the character block whenever it writes the character, and put
+  back on every spawn with the spells (grantKnown), because a session starts
+  from a save that holds no perks.
+*/
+var ENCHANT_SLOTS_PROPERTY = 'thornswoodEnchantSlots';
+var EXTRA_EFFECT_PERK = 0x58f7f;
+
+function enchantSlotsScript() {
+  return [
+    '(function(){',
+    '  var slots = ctx.value === ' + TWIN_SOULS_SLOTS + ' ? ' + TWIN_SOULS_SLOTS + ' : ' + ENCHANT_SLOTS + ';',
+    '  var st = ctx.state;',
+    '  if (st.thornswoodEnchantSlots === slots) { return; }',
+    '  st.thornswoodEnchantSlots = slots;',
+    '  var sp = ctx.sp;',
+    '  var pc = sp.Game.getPlayer();',
+    '  var perk = sp.Perk.from(sp.Game.getFormEx(' + EXTRA_EFFECT_PERK + '));',
+    '  if (slots === ' + TWIN_SOULS_SLOTS + ') { pc.addPerk(perk); } else { pc.removePerk(perk); }',
+    '})();'
+  ].join('\n');
+}
+
+try {
+  mp.makeProperty(ENCHANT_SLOTS_PROPERTY, {
+    isVisibleByOwner: true,
+    isVisibleByNeighbors: false,
+    updateOwner: enchantSlotsScript(),
+    updateNeighbor: ''
+  });
+} catch (e) {
+  // Made by a previous load. makeProperty cannot change a property already
+  // made, so a changed script needs a restart, which a deploy is.
+}
+
+/** How many enchantments this character may put on one piece. */
+function enchantSlots(state) {
+  var P = globalThis.__thornswoodProgression;
+  var held = (P && P.perks && state) ? P.perks(state) : [];
+  return held.indexOf('twinsouls') !== -1 ? TWIN_SOULS_SLOTS : ENCHANT_SLOTS;
+}
+
+/** Hand the owner the number of enchantment slots, when it has changed. */
+function handEnchantSlots(actorId, state) {
+  var slots = enchantSlots(state);
+  var had = null;
+  try { had = mp.get(actorId, ENCHANT_SLOTS_PROPERTY); } catch (e) { had = null; }
+  if (had === slots) { return; }
+  try {
+    mp.set(actorId, ENCHANT_SLOTS_PROPERTY, slots);
+  } catch (e) {
+    log(actorId.toString(16), 'was not handed', slots, 'enchantment slots:', e);
+  }
+}
+
+function recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects) {
   /*
     WHAT MADE IT, NOT WHAT IT IS.
 
@@ -26601,7 +27404,13 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
     Found by the audit of 21 September, all three.
   */
   var RUNTIME = 0xff000000;
-  var madeFromNothing = (Number(craftedItemBaseId) || 0) >= RUNTIME;
+  /*
+    OR THE ENGINE SAYS WHAT WENT INTO IT (#1389). An enchanted piece keeps its
+    own record and only its enchantment is new, so the id of what arrived is
+    under the line; the effects the engine hands over are what mark it as an
+    enchantment, and the bench says whose. Today's engine hands over none.
+  */
+  var madeFromNothing = (Number(craftedItemBaseId) || 0) >= RUNTIME || Array.isArray(effects);
 
   if (!madeFromNothing) {
     /*
@@ -26675,6 +27484,29 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
       benchKey = '';
     }
     var tempering = benchKey === '88108:Skyrim.esm' || benchKey === 'adb78:Skyrim.esm';
+    /*
+      A TEMPER IS REFUSED, AND IT IS NOT WORK (#1384). Tempering at the
+      sharpening wheel and the armour table is cut: its 1809 rows are in
+      docs/systems/cut-items.md, held so an event can bring one back, and a
+      piece is mended with a kit (the durability block). Every craft
+      that reaches this line at one of those two benches is a temper, because
+      every recipe either of them carries is one.
+
+      It used to be let through, and it did nothing for anybody: the engine
+      then took the plain piece and the ingot and handed a plain piece back
+      (CraftEvent::OnFireSuccess carries no temper level), so the person lost
+      an ingot, and a piece whose condition is in its name was not found at
+      all. Refused here, they keep the ingot, and nothing is credited.
+    */
+    if (tempering) {
+      var noTemper = 'Tempering is not done here. A piece is mended with a repair kit: ' +
+                     'with one in your pack, your inventory names the key that mends a piece.';
+      notify(actorId, noTemper);
+      say(actorId, noTemper);
+      log(actorId.toString(16), 'was refused a temper of', craftedItemBaseId.toString(16),
+          'at bench', benchKey);
+      return false;
+    }
     var outDesc = null;
     if (benchKey && !tempering) {
       try { outDesc = mp.getDescFromId(craftedItemBaseId); } catch (e) { outDesc = null; }
@@ -26823,19 +27655,57 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
   }
 
   /*
-    AND THE WORK COUNTS, which it did not.
-
-    creditWork is the only road to addWork and addWork is the only road to
-    rankUp, so a half whose work is never credited can never leave novice. Every
-    other verb in the file credits: the recipe gate, the sawing station and the
-    kiln. This one allowed the craft with a bare return, so a Blightbrewer could
-    brew for the rest of their life and stay a novice for ever.
+    THE LISTS (#1389). With the effects in hand, each one is asked of the page
+    that names it, at the rank that page gives it, and the work goes to the
+    half that owns it. Without them, which is every craft on the engine at the
+    pinned commit, nothing here can tell one brew from another, so the bench
+    and the profession above are the whole of the gate, as before.
   */
-  try {
-    var ch = globalThis.__thornswoodCharacter;
-    if (ch && ch.credit) { ch.credit(actorId, half); }
-  } catch (e) {
-    log('could not credit', half, 'for a recipeless craft:', e);
+  if (Array.isArray(effects)) {
+    var listed = listAnswer(actorId, want, effects, s);
+    if (listed.refusal) {
+      notify(actorId, listed.refusal);
+      say(actorId, listed.refusal);
+      log(actorId.toString(16), 'was refused a', want === 'enchanter' ? 'enchantment' : 'brew',
+          'at bench', (workbenchId || 0).toString(16), 'carrying', JSON.stringify(effects) + ':',
+          listed.refusal);
+      return false;
+    }
+    if (listed.credit) { half = listed.credit; }
+  } else {
+    log(actorId.toString(16), 'worked at bench', (workbenchId || 0).toString(16),
+        '(' + (whatBench || 'unknown bench') + ') and the engine named no effects,',
+        'so the mixtures and enchantments lists were not asked (#1389)');
+  }
+
+  /*
+    AND THE WORK COUNTS, one piece for one batch (#1389, mixtures.md "One
+    successful batch is one piece of work"), through creditWork like every
+    other piece of work in the file: it costs the rest a piece costs, the party
+    bonus counts, and the line about a new rank is said. It used to go straight
+    to the character block's credit, which counted the piece and dropped the
+    rank line on the floor.
+  */
+  var raised = creditWork(actorId, half);
+  if (raised) {
+    notify(actorId, raised);
+    say(actorId, raised);
+  }
+
+  /*
+    MASTER CHEMIST, alchemist.md: "Every batch yields two instead of one. One
+    craft is still one piece of work." The same road as Grand Chef's second
+    batch: once the engine has put the first bottle in the pack, the second
+    goes on the same stack. A brewed bottle's id is the runtime form the
+    brewing client made, and its descriptor is that id with no plugin, which
+    getIdFromDesc turns back into the same number.
+  */
+  if (want === 'alchemist' && (Number(craftedItemBaseId) || 0) >= RUNTIME) {
+    var brewed = null;
+    try { brewed = mp.getDescFromId(craftedItemBaseId); } catch (e) { brewed = null; }
+    if (brewed) {
+      masterCraft(actorId, { out: brewed, name: 'brew', owner: 'Alchemist', makes: 1 }, 1);
+    }
   }
   return;
 }
@@ -26852,13 +27722,30 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId) {
 const KEY_RECIPE = '15497:Thornswood-Content.esp';
 const KEY_NAME_DELAY = 250;
 
-mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId) {
+mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {
+  /*
+    TOO SICK OR TOO HURT TO WORK (#1383), asked before anything else, brews
+    and tempering included: a disease that has turned bad refuses every
+    craft, and a broken arm or a missing hand refuses a bench that takes two.
+    The injury and disease block answers. The materials stay in the pack.
+  */
+  const hurt = globalThis.__thornswoodHurt;
+  if (hurt && hurt.craftRefusal) {
+    let unfit = '';
+    try { unfit = hurt.craftRefusal(actorId, workbenchId); } catch (e) { log('injury: the craft check threw:', e); }
+    if (unfit) {
+      notify(actorId, unfit);
+      say(actorId, unfit);
+      return false;
+    }
+  }
+
   /*
     NO RECIPE AT ALL, which the fork now reports rather than dropping.
     Everything below this line assumes a recipe id that names a record.
   */
   if (!recipeId) {
-    return recipelessCraft(actorId, craftedItemBaseId, workbenchId);
+    return recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects);
   }
 
   /*
@@ -26906,6 +27793,30 @@ mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recip
   if (answer.note) {
     notify(actorId, answer.note);
     say(actorId, answer.note);
+  }
+
+  /*
+    THE FUEL AND THE HANDLE ARE ASKED FOR BEFORE ANYTHING IS TAKEN (#1398), so
+    a refusal for one never costs the other, and a key is never named for a
+    craft that did not happen. They are taken below, once nothing can refuse.
+  */
+  const fuel = fuelFor(desc);
+  const coal = fuel ? charcoalHeld(actorId, fuel.grade) : '';
+  if (fuel && !coal) {
+    const no = fuelRefusal(fuel);
+    notify(actorId, no);
+    say(actorId, no);
+    log(actorId.toString(16), 'was refused', desc, '(' + row.name + '): no', CHARCOAL_GRADES[fuel.grade].name);
+    return false;
+  }
+  const hafted = wantsAHandle(row);
+  if (hafted && packCount(actorId, HANDLE_DESC) < 1) {
+    const no = 'A ' + String(row.name || 'that') + ' is fitted to a wooden handle and you ' +
+               'have none. A woodworker cuts them from firewood at a kiln.';
+    notify(actorId, no);
+    say(actorId, no);
+    log(actorId.toString(16), 'was refused', desc, '(' + row.name + '): no handle');
+    return false;
   }
 
   /*
@@ -26977,33 +27888,23 @@ ecipes.json are hafted, and 126 of those are rows the server is
     handle were free. It is worth five gold and a novice woodworker's minute, so
     the error is small, but it is an error and not a rounding.
 
-    THE FIVE FAMILIES. A haft is a shaft you hold in two hands or one, with the
-    weight at the end: war axes, battleaxes, warhammers, maces, and the eight
-    rows the table files under Other weapons, which is where the woodcutter's
-    axe lives. Swords, greatswords and daggers are a tang and a grip rather than
-    a haft. Bows and staves are wooden through and through, which is a different
-    thing from having a handle fitted to them, and a bow that wanted a handle
-    would read as a mistake to anybody holding one.
+    THE FOUR FAMILIES. A haft is a shaft you hold in two hands or one, with the
+    weight at the end: war axes, battleaxes, warhammers and maces, the four the
+    smith page names. Other weapons was a fifth, and in the table it is the
+    woodcutter's axe, which names its handle in its own record, and the drum,
+    the flute and the lute, which are not hafted (#1398). Swords, greatswords
+    and daggers are a tang and a grip rather than a haft. Bows and staves are
+    wooden through and through, which is a different thing from having a
+    handle fitted to them, and a bow that wanted a handle would read as a
+    mistake to anybody holding one.
   */
-  if (!answer.refusal && wantsCharcoal(row)) {
-    if (!takeCharcoal(actorId)) {
-      const no = 'A forge burns charcoal, and you have none. A Charburner makes it from firewood at a kiln.';
-      notify(actorId, no);
-      say(actorId, no);
-      log(actorId.toString(16), 'was refused', desc, '(' + row.name + '): no charcoal');
-      return false;
-    }
+  if (coal && !takeItem(actorId, coal, 1)) {
+    log(actorId.toString(16), 'was refused', desc, '(' + row.name + '): the charcoal could not be taken');
+    return false;
   }
-
-  if (!answer.refusal && wantsAHandle(row)) {
-    if (!takeItem(actorId, HANDLE_DESC, 1)) {
-      const no = 'A ' + String(row.name || 'that') + ' is fitted to a wooden handle and you ' +
-                 'have none. A woodworker cuts them from firewood at a kiln.';
-      notify(actorId, no);
-      say(actorId, no);
-      log(actorId.toString(16), 'was refused', desc, '(' + row.name + '): no handle');
-      return false;
-    }
+  if (hafted && !takeItem(actorId, HANDLE_DESC, 1)) {
+    log(actorId.toString(16), 'was refused', desc, '(' + row.name + '): the handle could not be taken');
+    return false;
   }
 
   if (answer.credit) {
@@ -27013,6 +27914,7 @@ ecipes.json are hafted, and 126 of those are rows the server is
       say(actorId, raised);
     }
   }
+  masterCraft(actorId, row, count);
   return;
 });
 
@@ -27829,6 +28731,15 @@ log('gamemode loaded:',
           if (dvid) devRoleIds[dvid] = true;
         }
       }
+      // The trading company's Discord role (#1393), from the same answer.
+      // An application like a Jarl's: asked for in Discord, given by a person.
+      var companyIds = {};
+      if (Array.isArray(doc.companyProfiles)) {
+        for (var co = 0; co < doc.companyProfiles.length; co++) {
+          var coid = Number(doc.companyProfiles[co]);
+          if (coid) companyIds[coid] = true;
+        }
+      }
       var accounts = {};
       if (Array.isArray(doc.people)) {
         for (var pe = 0; pe < doc.people.length; pe++) {
@@ -27840,7 +28751,7 @@ log('gamemode loaded:',
           }
         }
       }
-      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, jarlIds: jarlIds, staffRoleIds: staffRoleIds, devRoleIds: devRoleIds, businessIds: businessIds, factionIds: factionIds, accounts: accounts, count: Object.keys(ids).length };
+      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, jarlIds: jarlIds, staffRoleIds: staffRoleIds, devRoleIds: devRoleIds, businessIds: businessIds, factionIds: factionIds, companyIds: companyIds, accounts: accounts, count: Object.keys(ids).length };
     } catch (e) {
       list = null;
     }
@@ -27903,6 +28814,16 @@ log('gamemode loaded:',
 (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodIsJarl = function (profileId) {
     var l = load();
     return passProved(profileId) && !!(l && l.jarlIds && l.jarlIds[Number(profileId)]);
+  };
+
+  /*
+    The Free Skyrim Trading Company's Discord role on the account (#1393).
+    Accepted on an application in Discord, the same shape as a Jarl's. It is
+    what lets a character handle a company sale, in the property block.
+  */
+  (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodIsCompany = function (profileId) {
+    var l = load();
+    return passProved(profileId) && !!(l && l.companyIds && l.companyIds[Number(profileId)]);
   };
 
   /*
@@ -28143,6 +29064,7 @@ log('gamemode loaded:',
       businessOwnerProfiles: merged(doc.businessOwnerProfiles, had.businessOwnerProfiles),
       factionOwnerProfiles: merged(doc.factionOwnerProfiles, had.factionOwnerProfiles),
       devRoleProfiles: merged(doc.devRoleProfiles, had.devRoleProfiles),
+      companyProfiles: merged(doc.companyProfiles, had.companyProfiles),
       people: people
     };
   }
@@ -28255,6 +29177,7 @@ log('gamemode loaded:',
             doc.businessOwnerProfiles = kept.businessOwnerProfiles;
             doc.factionOwnerProfiles = kept.factionOwnerProfiles;
             doc.devRoleProfiles = kept.devRoleProfiles;
+            doc.companyProfiles = kept.companyProfiles;
             doc.people = kept.people;
             note(doc.failedProfiles.length + ' profiles could not be checked with Discord ' +
                  'and keep the standing they had' +
@@ -28273,6 +29196,10 @@ log('gamemode loaded:',
               businessOwnerProfiles: Array.isArray(doc.businessOwnerProfiles) ? doc.businessOwnerProfiles : [],
               factionOwnerProfiles: Array.isArray(doc.factionOwnerProfiles) ? doc.factionOwnerProfiles : [],
               devRoleProfiles: Array.isArray(doc.devRoleProfiles) ? doc.devRoleProfiles : [],
+              // The Free Skyrim Trading Company's role (#1393), for a
+              // company sale. Without this line the door read a list it
+              // never wrote.
+              companyProfiles: Array.isArray(doc.companyProfiles) ? doc.companyProfiles : [],
               people: doc.people || [],
               // Staff bans with why and until (#412), from the site's own
               // file rather than Discord, so they are fresh even when the
@@ -29992,6 +30919,7 @@ log('gamemode loaded:',
     mageMasterSpells: 2,  // more at Master, alongside the third school
     collegeSemester: 2,   // points a mage earns per semester at the College
     outsiderSemester: 1,  // points a non-mage earns per semester, novice only
+    semesterHours: 24,    // a semester is a day of real time (magic.md, #1387)
     outsiderSpells: 2,    // the most spells a non-mage can ever hold
     // An Enchanter's staff spells, built the way a mage's spells are (#1128):
     enchanterStartStaff: 2,   // staff spell points an Enchanter begins with
@@ -30486,6 +31414,32 @@ log('gamemode loaded:',
     },
 
     /*
+      WHAT A FILLED PERK PUTS ON THE SAME MAP (#1385). docs/systems/skill-tree.md.
+
+      Two of the fifteen perks are a number the client already knows how to
+      set, so they ride the totals treeApplies sends, on top of the points that
+      filled them. Everything else a filled perk does is in the skill perks
+      block, after the character block, because it is something that happens
+      rather than a number that stands. Font of Magic rides the same map for
+      its 15 seconds, but out of that block (withPerks in the character
+      block), because it is a number that stands only while it runs.
+
+        windwalker     Windwalker, +4 speed. add: on top of Agility's own.
+        purifiedblood  Purified Blood: disease does not take, and poison deals
+                       25%. The game's own resistances, brought UP TO what the
+                       page says: DiseaseResist 100 is no disease at all, and
+                       PoisonResist 75 is poison dealing a quarter. upTo, not
+                       add, so Toughness's own five points are not counted a
+                       second time and the per point numbers above stay the
+                       only per point numbers. What the race already resists
+                       still comes on top, as far as the game lets it.
+    */
+    perkApplies: {
+      windwalker:    { add: { speedMult: 4 } },
+      purifiedblood: { upTo: { diseaseResist: 100, poisonResist: 75 } }
+    },
+
+    /*
       FARMING, AND EVERY ONE OF THESE NUMBERS IS INVENTED.
 
       Patrick, 20 September: 'there is no system for claiming plots for farming,
@@ -30603,6 +31557,15 @@ log('gamemode loaded:',
                  The sister half is added at novice the moment half is chosen.
       taught     ['hearthcook']                 halves learned from a Master
                  of another profession, novice only, at most LIMITS.secondaries
+      untaught   ['hearthcook']                 outside trades a Master ended.
+                 Still counted: two in a life, and ending one does not open a
+                 third (#1388)
+      masters    { platewright: { id, name, at } }  who took this character
+                 on, by the half: the sister half past novice, or an outside
+                 trade they taught. id is the Master's actor (#1388)
+      apprentices [{ id, name, half, kind, at }]  the people this Master took
+                 on, a row per person and half; kind is 'sister' or
+                 'outside' (#1388)
       spells     { points: 2, known: [...] }    a mage's spell points and spells
       staffSpells ['12fcd:Skyrim.esm', ...]     the staff spells unlocked, by the
                  spell's form id desc: what a staff may bind (#967, #1128)
@@ -30778,6 +31741,19 @@ log('gamemode loaded:',
       }
     }
 
+    // What a filled perk adds (#1385), out of TUNING.perkApplies.
+    var filled = perks(s);
+    for (var f = 0; f < filled.length; f++) {
+      var pa = own(TUNING.perkApplies, filled[f]) ? TUNING.perkApplies[filled[f]] : null;
+      if (!pa) { continue; }
+      for (var ak in (pa.add || {})) {
+        if (own(pa.add, ak)) { out[ak] = (own(out, ak) ? out[ak] : 0) + pa.add[ak]; }
+      }
+      for (var uk in (pa.upTo || {})) {
+        if (own(pa.upTo, uk) && !(out[uk] >= pa.upTo[uk])) { out[uk] = pa.upTo[uk]; }
+      }
+    }
+
     var held = schoolsOf(s);
     for (var name in TUNING.spreadOverSchools) {
       if (!own(TUNING.spreadOverSchools, name) || !own(out, name)) { continue; }
@@ -30874,26 +31850,98 @@ log('gamemode loaded:',
 
   /**
     A Master of a half teaches somebody from ANOTHER profession that half, at
-    novice, and never further. At most LIMITS.secondaries times. The sister
-    half does not count and cannot be taught this way, because it is already
-    known; going past novice in it is rankUp under a Master of it, below.
+    novice, and never further: an outside trade (apprenticeship.md). At most
+    LIMITS.secondaries in a life. An outside trade a Master ended stays
+    counted in untaught, so ending one never opens a third. The sister half
+    does not count and cannot be taught this way, because it is already
+    known; going past novice in it is takeOn below, and then rankUp.
+
+    The reasons are written to the Master, because the Master is the one who
+    asked: they are what /apprentice says back (#1388). who, when it is
+    given, is the Master as the server records them, { id, name, at }, so the
+    Master who taught it is the one who can end it.
   */
-  function teach(state, teacherState, half) {
+  function teach(state, teacherState, half, who) {
     var s = clone(state);
-    if (!s.prof) { return no('choose your own profession before learning anybody else’s'); }
+    if (!s.taught) { s.taught = []; }
+    if (!s.prof) { return no('they have not picked a profession of their own yet, so there is nothing to teach onto'); }
     var tp = teacherState && teacherState.prof;
-    if (!tp || halvesOf(tp).indexOf(half) === -1) { return no('the teacher does not work that half'); }
-    if (rankOf(teacherState, half) !== 'master') { return no('only a Master can teach, and they are not one in that half'); }
+    if (!tp || halvesOf(tp).indexOf(half) === -1) { return no('you do not work that half'); }
+    if (rankOf(teacherState, half) !== 'master') { return no('only a Master can teach, and you are not one in that half'); }
     if (halvesOf(s.prof).indexOf(half) !== -1) {
-      return no('that is your own profession; a Master of it can raise your rank, not teach you the basics');
+      return no('that is in their own profession, so it is not an outside trade: a Master of their own profession cannot use the outside trade rules on them');
     }
-    if (s.taught.indexOf(half) !== -1) { return no('you already know that'); }
-    if (s.taught.length >= LIMITS.secondaries) {
-      return no('you may only learn ' + LIMITS.secondaries + ' other trades, and you have');
+    if (s.taught.indexOf(half) !== -1) { return no('they already know that'); }
+    if (s.taught.length + (s.untaught || []).length >= LIMITS.secondaries) {
+      return no('they have had their ' + LIMITS.secondaries + ' outside trades, and that is all there is in a life');
     }
     s.taught.push(half);
     s.ranks[half] = 'novice';
+    if (who) {
+      if (!s.masters) { s.masters = {}; }
+      s.masters[half] = who;
+    }
     return yes(s);
+  }
+
+  /**
+    A Master takes somebody on in their sister half (apprenticeship.md, "The
+    sister half"). It costs nothing and it is not one of the two outside
+    trades. Until it is recorded, work in that half counts and waits at the
+    next threshold; while it stands, creditWork is handed the Master and the
+    half climbs the whole ladder through rankUp. who is the Master as the
+    server records them, { id, name, at }. The reasons are written to the
+    Master, as teach's are.
+  */
+  function takeOn(state, masterState, half, who) {
+    var s = clone(state);
+    if (!s.prof) { return no('they have not picked a profession of their own yet'); }
+    if (s.half === half || (s.schools || []).indexOf(half) !== -1) {
+      return no('that is their own ' + (s.half === half ? 'half' : 'school') + ', and it climbs on their own work');
+    }
+    var sister = s.half ? sisterOf(s.prof, s.half) : null;
+    if (!sister || sister !== half) { return no('that is not their sister half'); }
+    if (rankOf(masterState, half) !== 'master') {
+      return no('only a Master of that half can take somebody on in it, and you are not one');
+    }
+    if (rankOf(s, half) === 'master') { return no('they are a Master of it already'); }
+    if (s.masters && own(s.masters, half)) { return no('they already have a Master in that'); }
+    if (!s.masters) { s.masters = {}; }
+    s.masters[half] = who || {};
+    return yes(s);
+  }
+
+  /**
+    The Master ends it (apprenticeship.md). The sister half keeps every rank
+    already earned; further ranks stop and the count waits at the next
+    threshold again, because creditWork is no longer handed a Master. An
+    outside trade loses its novice list, and stays counted in untaught, so
+    ending one does not open a third. masterId is whoever is ending it: only
+    the Master on the record can. The answer carries ended, 'sister' or
+    'outside', so the caller can say which.
+  */
+  function release(state, half, masterId) {
+    var s = clone(state);
+    var rec = (s.masters && own(s.masters, half)) ? s.masters[half] : null;
+    if (!rec || (masterId !== undefined && masterId !== null && rec.id !== masterId)) {
+      return no('they are not your apprentice in that');
+    }
+    delete s.masters[half];
+    var out;
+    var at = (s.taught || []).indexOf(half);
+    if (at !== -1) {
+      s.taught.splice(at, 1);
+      if (own(s.ranks, half)) { delete s.ranks[half]; }
+      if (s.work && own(s.work, half)) { delete s.work[half]; }
+      if (!s.untaught) { s.untaught = []; }
+      s.untaught.push(half);
+      out = yes(s);
+      out.ended = 'outside';
+      return out;
+    }
+    out = yes(s);
+    out.ended = 'sister';
+    return out;
   }
 
   /**
@@ -31150,21 +32198,18 @@ log('gamemode loaded:',
 
   /**
     Does the book they already hold have anything of that rank in that school.
-    A spell a tome taught that SPELLS does not list (a mod's) counts by the
-    school and rank recorded beside it in spells.tomes when it was learned.
+    Only the book's own spells count: a spell SPELLS does not list is never
+    granted (#1387), and bookClean takes out any a tome taught before that.
   */
   function knowsRank(state, school, rank) {
     var s = state || fresh();
     var known = (s.spells && s.spells.known) || [];
     var book = own(SPELLS, school) ? SPELLS[school] : {};
     var names = (own(book, rank) && book[rank]) || [];
-    var tomes = (s.spells && s.spells.tomes) || {};
     for (var i = 0; i < known.length; i++) {
       for (var j = 0; j < names.length; j++) {
         if (known[i] === names[j]) { return true; }
       }
-      var t = own(tomes, known[i]) ? tomes[known[i]] : null;
-      if (t && t.school === school && t.rank === rank) { return true; }
     }
     return false;
   }
@@ -31185,18 +32230,29 @@ log('gamemode loaded:',
     Spell points to spend right now.
 
     A mage's are stored and earned: two at the start, one with every rank,
-    two more at Master. Everybody else has no stored points and never earns
-    one, because nothing in the rulebook gives them one; what they have is
-    the cap, 'a cap on how many spells anyone can learn that way', and what
-    is left of it is what they can spend. So the same question answers both
-    kinds and the cap cannot be got round by holding points.
+    two more at Master, and LIMITS.collegeSemester with every semester at
+    the College (study).
+
+    Somebody a Master mage taught earns theirs the one way the rulebook
+    gives them, LIMITS.outsiderSemester with every semester at the College,
+    and holds LIMITS.outsiderSpells spells at most: 'a cap on how many
+    spells anyone can learn that way'. So what they can spend is the smaller
+    of the points they hold and the places left under the cap, and the cap
+    cannot be got round by holding points. Until #1387 applied the semester
+    nothing gave them a point, and the places alone were what they spent;
+    whether the places alone should still be enough is asked on #1387, and
+    placesLeft(s) on its own in the line below is that answer.
   */
+  function placesLeft(s) {
+    var known = (s.spells && s.spells.known) || [];
+    return Math.max(0, LIMITS.outsiderSpells - known.length);
+  }
+
   function spellPoints(state) {
     var s = state || fresh();
     if (s.prof === 'mage') { return (s.spells && s.spells.points) || 0; }
     if (!schoolsOf(s).length) { return 0; }
-    var known = (s.spells && s.spells.known) || [];
-    return Math.max(0, LIMITS.outsiderSpells - known.length);
+    return Math.min(Number(s.spells && s.spells.points) || 0, placesLeft(s));
   }
 
   /**
@@ -31287,9 +32343,11 @@ log('gamemode loaded:',
   function addToBook(s, spell) {
     if (!s.spells) { s.spells = { points: 0, known: [] }; }
     if (!s.spells.known) { s.spells.known = []; }
-    // A mage spends a stored point. Everybody else spends a place under the
-    // cap, which is the push below and nothing else.
-    if (s.prof === 'mage') { s.spells.points -= 1; }
+    // A stored point is spent, a mage's or a semester's (#1387), and the
+    // push below takes one of the places under the cap of somebody a Master
+    // mage taught. A taught school never leaves Novice and is their only
+    // school, so a semester's point only ever buys a Novice spell of it.
+    if ((Number(s.spells.points) || 0) > 0) { s.spells.points -= 1; }
     s.spells.known.push(spell.name);
 
     /*
@@ -31337,9 +32395,10 @@ log('gamemode loaded:',
 
     A tome's spell is the book's own entry when SPELL_IDS has its form id, so
     the rulebook decides a spell it lists. A spell it does not list (the magic
-    mods' own) comes with the school and rank the tomes block read out of the
-    game's records, and is written into spells.tomes beside the name so the
-    rank below can be asked of it later.
+    mods' own) is refused, whatever school and rank the tomes block read out
+    of the game's records: only the book is granted (magic.md, #1387). Until
+    that rule such a spell was written into the book with its school and rank
+    in spells.tomes; bookClean takes those back out.
   */
 
   /** Skyrim's minimum skill level to a rank: Apprentice and Adept are both Advanced, as SPELLS sorts them. */
@@ -31377,10 +32436,12 @@ log('gamemode loaded:',
     var school = word(spell.school);
     if (spellPoints(s) <= 0) {
       var because = s.prof === 'mage'
-        ? 'a mage earns one with every rank'
-        : (schoolsOf(s).length
-          ? 'anybody who is not a Mage holds ' + LIMITS.outsiderSpells + ' spells at most'
-          : 'magic is not yours until a Master mage takes you on');
+        ? 'a mage earns one with every rank, and ' + LIMITS.collegeSemester + ' with a semester at the College'
+        : (!schoolsOf(s).length
+          ? 'magic is not yours until a Master mage takes you on'
+          : (placesLeft(s) <= 0
+            ? 'anybody who is not a Mage holds ' + LIMITS.outsiderSpells + ' spells at most'
+            : 'anybody who is not a Mage earns one with a semester at the College'));
       out.push({ what: 'points', why: 'a spell point to spend, and you have none (' + because + ')' });
     }
     var have = rankOf(s, spell.school);
@@ -31408,19 +32469,105 @@ log('gamemode loaded:',
     }
     var s = clone(state);
     if (knowsSpell(s, spell.name)) { return no('you already know that one'); }
+    var listed = spellAt(spell.name);
+    if (!listed || listed.school !== spell.school || listed.rank !== spell.rank) {
+      var off = no(OFF_BOOK);
+      off.offBook = true;
+      return off;
+    }
     var missing = tomeMissing(s, spell);
     if (missing.length) {
       var r = no('missing ' + missing.map(function (m) { return m.what; }).join(', '));
       r.missing = missing;
       return r;
     }
-    var listed = spellAt(spell.name);
-    if (!listed || listed.school !== spell.school || listed.rank !== spell.rank) {
-      if (!s.spells) { s.spells = { points: 0, known: [] }; }
-      if (!s.spells.tomes) { s.spells.tomes = {}; }
-      s.spells.tomes[spell.name] = { school: spell.school, rank: spell.rank };
-    }
     return addToBook(s, spell);
+  }
+
+  var OFF_BOOK = 'it is not in the College\'s book, and only the book\'s spells are granted here';
+
+  /*
+    ONLY THE BOOK IS GRANTED (#1387). A spell a tome taught before that rule
+    (#1026 wrote a magic mod's spell into the book, its school and rank in
+    spells.tomes) comes back out: the name leaves known and tomes, and a mage
+    has the spell point it cost back. Somebody a Master mage taught has the
+    place back, because the cap counts the names. The college block takes the
+    spell itself off the character.
+  */
+  function bookClean(state) {
+    var s = clone(state);
+    var known = (s.spells && s.spells.known) || [];
+    var keep = [], gone = [];
+    for (var i = 0; i < known.length; i++) {
+      if (spellAt(known[i])) { keep.push(known[i]); } else { gone.push(known[i]); }
+    }
+    var out = yes(s);
+    out.removed = gone;
+    if (!gone.length) { return out; }
+    s.spells.known = keep;
+    if (s.spells.tomes) {
+      for (var j = 0; j < gone.length; j++) { delete s.spells.tomes[gone[j]]; }
+      if (!Object.keys(s.spells.tomes).length) { delete s.spells.tomes; }
+    }
+    if (s.prof === 'mage') { s.spells.points = (Number(s.spells.points) || 0) + gone.length; }
+    return out;
+  }
+
+  /*
+    A SEMESTER AT THE COLLEGE (#1387). docs/systems/magic.md, "A semester".
+
+    A semester is LIMITS.semesterHours of real time. Studying in the College
+    hands a mage LIMITS.collegeSemester spell points, and somebody a Master
+    mage took on (teach, /apprentice) LIMITS.outsiderSemester, which only
+    buys a Novice spell of the school they were taught because that is the
+    only school they have and it never leaves Novice. Nobody else is handed
+    anything. It does not fire again until LIMITS.semesterHours have passed
+    since the last one that did; studied is that moment, stored on the
+    character, so logging out and a restart do not reset it. Where somebody
+    stands is the college block's to say, not a rule: this is handed the
+    time and answers from the state alone.
+
+    Nothing here is typed. The College page on K sends it (Patrick, 4 Oct:
+    no commands for things people do).
+  */
+  function semesterOpens(state) {
+    var last = Number(state && state.studied) || 0;
+    return last ? last + LIMITS.semesterHours * 3600000 : 0;
+  }
+
+  function hoursAndMinutes(ms) {
+    var m = Math.max(1, Math.ceil((Number(ms) || 0) / 60000));
+    var h = Math.floor(m / 60);
+    m = m % 60;
+    var parts = [];
+    if (h) { parts.push(h + (h === 1 ? ' hour' : ' hours')); }
+    if (m) { parts.push(m + (m === 1 ? ' minute' : ' minutes')); }
+    return parts.join(' and ');
+  }
+
+  function study(state, now) {
+    var s = clone(state);
+    var t = Number(now) || 0;
+    var mage = s.prof === 'mage';
+    if (mage && !(s.schools || []).length) { return no('pick your schools first'); }
+    if (!mage && !schoolsOf(s).length) {
+      return no('the College hands spell points to a mage, or to somebody a Master mage has taken on, and magic is not yours yet');
+    }
+    var opens = semesterOpens(s);
+    if (opens && t < opens) {
+      var r = no('a semester is ' + LIMITS.semesterHours + ' hours, and your next one opens in ' +
+                 hoursAndMinutes(Math.min(LIMITS.semesterHours * 3600000, opens - t)));
+      r.wait = opens - t;
+      return r;
+    }
+    if (!s.spells) { s.spells = { points: 0, known: [] }; }
+    var gain = mage ? LIMITS.collegeSemester : LIMITS.outsiderSemester;
+    s.spells.points = (Number(s.spells.points) || 0) + gain;
+    s.studied = t;
+    var out = yes(s);
+    out.gained = gain;
+    out.school = mage ? null : schoolsOf(s)[0];
+    return out;
   }
 
   /*
@@ -31650,6 +32797,7 @@ log('gamemode loaded:',
     TABLE: TABLE, SPELLS: SPELLS, SPELL_IDS: SPELL_IDS, TUNING: TUNING,
     fresh: fresh, clone: clone,
     pickClass: pickClass, pickProfession: pickProfession, teach: teach,
+    takeOn: takeOn, release: release,
     rankUp: rankUp, pickThirdSchool: pickThirdSchool, spendPoint: spendPoint,
     perks: perks, canWork: canWork, canDo: canDo,
     halvesOf: halvesOf, sisterOf: sisterOf, classFor: classFor,
@@ -31660,6 +32808,8 @@ log('gamemode loaded:',
     knowsSpell: knowsSpell, schoolsOf: schoolsOf,
     rankForLevel: rankForLevel, spellByDesc: spellByDesc,
     tomeMissing: tomeMissing, learnFromTome: learnFromTome,
+    study: study, bookClean: bookClean, semesterOpens: semesterOpens, hoursAndMinutes: hoursAndMinutes,
+    placesLeft: placesLeft, OFF_BOOK: OFF_BOOK,
     STAFF_HALF: STAFF_HALF, isEnchanter: isEnchanter, staffTaught: staffTaught,
     staffKnown: staffKnown, knowsStaff: knowsStaff, staffPoints: staffPoints,
     staffMissing: staffMissing, pickStaffSpell: pickStaffSpell,
@@ -34949,6 +36099,22 @@ log('gamemode loaded:',
   var GOLD_ID = 0x0000000F;
   var NOTICE_FEE = 20;
   var JOB_FEE = 30;
+  /*
+    A LETTER, #1374. 35 gold up front, the same for everybody. LETTER_FEE is
+    the board's and stays on the hold's ledger like a notice's. LETTER_PAY is
+    the courier's: it is counted on the same ledger while the letter is up and
+    paid back out of it, to the courier on delivery or to the sender on an
+    /unpin. It is the sender's gold moved, never new gold. There is no
+    courier cooldown; the sender's gold is the limit.
+
+    LETTER_REACH is the trade's 700 units, about 10 metres, which is the reach
+    the page gives a delivery. deliver reads the trade block's own number when
+    that block is loaded, so the two cannot drift apart.
+  */
+  var LETTER_FEE = 20;
+  var LETTER_PAY = 15;
+  var LETTER_CHARS = 300;
+  var LETTER_REACH = 700;
 
   function loadPart(key, fallback) {
     try {
@@ -35111,6 +36277,103 @@ log('gamemode loaded:',
   }
 
   /*
+    COIN ONTO A HOLD'S LEDGER, FROM WHATEVER TOOK IT (#1394).
+
+    The notice and job fees count themselves where they are taken, in post
+    below. A carriage or ferry fare is taken by the carriages block, and the
+    company's haul (#1393) will be another, so the counting is one function
+    with a reason rather than each of them reaching into funds. The coin has
+    already left a pack when this is called: this counts it, the way a
+    notice fee is counted, and creates nothing.
+
+    The ten holds are the ten every ledger in this file uses. Any other name
+    is refused rather than opened, so a slip in a caller cannot start a
+    treasury nobody can find. So is anything but a whole number above 0:
+    taking coin back off a ledger is a payout, and that is its own word.
+  */
+  var LEDGER_HOLDS = ['whiterun', 'solitude', 'riften', 'markarth', 'windhelm',
+                      'falkreath', 'morthal', 'dawnstar', 'winterhold', 'ravenrock'];
+
+  function deposit(hold, amount, reason) {
+    var key = String(hold || '').toLowerCase();
+    var n = Number(amount);
+    if (LEDGER_HOLDS.indexOf(key) < 0) { return false; }
+    if (!Number.isInteger(n) || n <= 0) { return false; }
+    funds[key] = (Number(funds[key]) || 0) + n;
+    save();
+    plog(n, 'gold onto', key + '\'s ledger:', String(reason || 'no reason given'));
+    return true;
+  }
+
+  /*
+    COIN OFF A HOLD'S LEDGER (#1393), deposit's other half.
+
+    Only the payouts docs/systems/trading-company.md names take coin off a
+    ledger: a haul's pay to its hauler, and a haul's pay back to its poster.
+    A letter's 15 is the other, and payHeld pays that. The caller puts the
+    same count back into a pack in the same step (payOut), so the coin was
+    already in the world: this counts it off, and creates nothing.
+
+    HELD PAY STAYS ON THE LEDGER. An open letter's 15 (#1374: letter, not
+    down, pay above 0) and an open haul's pay are counted here until they
+    are paid or handed back, and so is a haul's gold owed to somebody who was
+    away when it came down (owed, see handHaul). A withdrawal never takes
+    them: what is left after it is never less than what is still held, so a
+    courier or a hauler is never refused because the ledger was spent.
+    `releasing` is the one letter or haul on this hold's board whose own held
+    gold this is, so paying a haul out of its own pay is not refused for
+    being held, and never more than it holds.
+
+    mayWithdraw answers why not, or '' when it may. withdraw takes it off
+    and answers true, or false with nothing changed.
+  */
+  /** What one notice holds on its ledger: an open letter's or haul's pay, or a haul's owed gold. */
+  function noticeHolds(x) {
+    if (!x || !(x.letter || x.haul)) { return 0; }
+    var owed = x.haul ? (Math.floor(Number(x.owed)) || 0) : 0;
+    if (owed > 0) { return owed; }
+    if (x.down) { return 0; }
+    var pay = Math.floor(Number(x.pay)) || 0;
+    return pay > 0 ? pay : 0;
+  }
+
+  function heldOn(hold, releasing) {
+    var list = notices[hold] || [];
+    var held = 0;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] !== releasing) { held += noticeHolds(list[i]); }
+    }
+    return held;
+  }
+
+  function mayWithdraw(hold, amount, releasing) {
+    var key = String(hold || '').toLowerCase();
+    var n = Number(amount);
+    if (LEDGER_HOLDS.indexOf(key) < 0) { return 'that is not one of the ten ledgers.'; }
+    if (!Number.isInteger(n) || n <= 0) { return 'that is not a whole number of gold.'; }
+    if (releasing) {
+      if ((notices[key] || []).indexOf(releasing) < 0 || !noticeHolds(releasing)) { return 'that is not held on ' + key + '\'s ledger.'; }
+      if (n > noticeHolds(releasing)) { return 'that is more than it holds.'; }
+    }
+    var have = Number(funds[key]) || 0;
+    var held = heldOn(key, releasing || null);
+    if (have - n < held) {
+      return key + '\'s ledger has ' + have + ' gold, and ' + held + ' of it is held for letters and hauls.';
+    }
+    return '';
+  }
+
+  function withdraw(hold, amount, reason, releasing) {
+    if (mayWithdraw(hold, amount, releasing)) { return false; }
+    var key = String(hold).toLowerCase();
+    var n = Number(amount);
+    funds[key] = (Number(funds[key]) || 0) - n;
+    save();
+    plog(n, 'gold off', key + '\'s ledger:', String(reason || 'no reason given'));
+    return true;
+  }
+
+  /*
     ------------------------------------------------------------------- rent
 
     A rented property is the same claim with an amount and a clock. The server
@@ -35203,6 +36466,659 @@ log('gamemode loaded:',
     toProfile(profileId, nameOf(building) + ' pays ' + amount + ' gold every 7 days now.');
     return true;
   }
+
+  /*
+    ------------------------------------------------------------------- beds
+
+    WHOSE BED IT IS DECIDES THE REST, AND A BED IS ONE THE SERVER SAW
+    (#1392, #1603).
+
+    Patrick's answers on #1603, 4 Oct. The holder names who may sleep there,
+    with buttons and not commands. A night is 8 hours. Nobody sells a night
+    through the server: "they pay from a regular trade and then the owner can
+    grant bed access". And the rest goes by common sense, up to your own bed:
+
+      what you are resting on                            an hour   kind
+      a seat                                               20      sit
+      a bed or bedroll nobody can lend you                 25      rough
+      a seat with a fire in reach                          35      campfire
+      a bed or bedroll nobody can lend you, by a fire      45      camp
+      a bed you are allowed in: a guest, a key, a deed     50      inn
+      your own bed                                         80      bed
+
+    The numbers live in NEEDS.recover in the needs block, and this hands it
+    the kind. docs/systems/exhaustion.md has the same table.
+
+    WHO IS ALLOWED. The holder sleeps in their own bed. A guest is somebody
+    the holder looked at inside the building and let sleep there with the
+    look prompt's key (sleepHere, below), for one night. Anybody carrying the
+    building's key or its deed is allowed too, the two things that already
+    open its locked door (mayPass). A bed in a building somebody else holds,
+    who has let you do none of those, is refused. A bed in a building nobody
+    holds, or out of doors, is nobody's to lend, and that is the 25, or the
+    45 by a fire. A bedroll is a bed here: whose it is decides the rate, not
+    what it is made of.
+
+    A GUEST IS ONE NIGHT, NIGHT_MS from when the holder pressed the key, in
+    every bed of that building. One night rather than until taken back,
+    because a night is what was paid for in the trade, and the holder does
+    not have to remember to end it. Somebody who lives there carries a key.
+    The holder can end a night sooner, from the look prompt or from the
+    property page in the K panel. A guest names the holder who let them in,
+    so a building that changes hands does not keep the last holder's guests.
+
+    HOW THE SERVER KNOWS A BED OR A SEAT. mp.onActivate is handed the
+    furniture when somebody presses it, the same way it is handed a door, and
+    the base's own record says what it is: a FURN whose editor id names a
+    bed, a bedroll, or a chair, bench, stool or throne, read once per base
+    through mp.lookupEspmRecordById and remembered. Any other FURN is
+    furniture and nothing more: a forge, a chopping block, a lean. /rest then
+    asks what this person last pressed and whether they are still within
+    BED_REACH of it in the same cell. The word after /rest is not asked, and
+    neither is the client's own guess at furniture: the plugin says /rest bed
+    when somebody lies down and /rest sit when they sit, and the server
+    answers by what was pressed. The building is the bed's own cell, the same
+    way the take limit finds whose a chest is, because a building here is its
+    interior cell.
+
+    A FIRE IN REACH is the distance the client already reports for warmth,
+    the needs block's own n.fire (docs/systems/temperature.md): a fire close
+    enough to warm you is close enough to rest by.
+
+    WHILE THE PLACE IS TRUE. Every BED_EVERY_MS the places people are resting
+    in are measured again: walk away, lose the key, let the night run out,
+    move off from the fire, and the rest stops or changes rate. Somebody who
+    comes into the world already resting in a place the server did not see
+    them take stops too, and sits or lies down again. A restart forgets who
+    lay down where, and that is the case it catches.
+
+    NO GOLD MOVES FOR A NIGHT. It is paid in a trade between two people, and
+    the server keeps no price. The book is beds.json beside the register
+    rather than a field on a claim, so the register's own reader and writer
+    are untouched. #1392's book held prices, paid nights and gold kept for a
+    holder who was away. The prices are gone. A night already paid is carried
+    over as a guest of whoever held the building, to the end of that night.
+    Kept gold is handed to its holder once, the next time they are in the
+    world, and leaves the book then. Nothing adds to it any more.
+  */
+  // INVENTED: far enough to stand beside a double bed and press it, near
+  // enough that the next room's bed is not this one.
+  var BED_REACH = 200;
+  // Patrick, #1603: a night is 8 hours, the time the Rest clock takes to empty.
+  var NIGHT_MS = 8 * 3600000;
+  var BED_EVERY_MS = 5000;
+  var LYING_FORGET_MS = 48 * 3600000;
+  var GUEST_NAME_MAX = 64;
+  /* A bed by its editor id. Bedrolls first, since they say bed too. The
+     others are words that hold the letters and are not beds. */
+  var BEDROLL_EDID = /bedroll/i;
+  var BED_EDID = /bed/i;
+  var NOT_BED_EDID = /bedside|embed|riverbed|flowerbed/i;
+  /* A seat by its editor id, the same way. A workbench is a bench to the
+     letters and a crafting station to everybody else. */
+  var SEAT_EDID = /chair|bench|stool|throne/i;
+  var NOT_SEAT_EDID = /workbench|crafting/i;
+  /* Every kind of rest this hands the needs block, and 'bedroll', the kind
+     #1392 handed out, so somebody still resting at it is got up the same way. */
+  var REST_KINDS = { sit: true, rough: true, campfire: true, camp: true, inn: true, bed: true,
+                     bedroll: true };
+
+  function bedHas(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
+
+  /* Who pressed which furniture, who is resting on what, and who has been
+     seen since coming in. On globalThis, so a hot reload keeps them. */
+  if (!g.__thornswoodBedState) {
+    g.__thornswoodBedState = { pressed: {}, lying: {}, seen: {} };
+  }
+  var bedState = g.__thornswoodBedState;
+
+  // ------------------------------------------------------------ the book --
+
+  function bedBookPath() {
+    var path = require('path');
+    return path.join(path.dirname(registerPath()), 'beds.json');
+  }
+
+  /* Rebuilt field by field, the same discipline as the register: a guest is
+     a holder, a time and a name, and kept takings are gold. */
+  function loadBedBook() {
+    var out = { guests: {}, takings: {} };
+    var raw = null;
+    try { raw = JSON.parse(require('fs').readFileSync(bedBookPath(), 'utf8')); }
+    catch (e) { return out; }
+    if (!raw || typeof raw !== 'object') { return out; }
+    var now = Date.now();
+    var carried = 0;
+    function add(b, who, by, at, name) {
+      if (!b || b === '__proto__' || who === '__proto__') { return false; }
+      if (!((Number(who) || 0) > 0) || !(by > 0) || !(at > 0) || (now - at) >= NIGHT_MS) { return false; }
+      if (!bedHas(out.guests, b)) { out.guests[b] = {}; }
+      if (bedHas(out.guests[b], who)) { return false; }
+      out.guests[b][who] = { by: by, at: at, name: String(name || '').slice(0, GUEST_NAME_MAX) };
+      return true;
+    }
+    var guests = (raw.guests && typeof raw.guests === 'object') ? raw.guests : {};
+    for (var b in guests) {
+      if (!bedHas(guests, b) || !guests[b] || typeof guests[b] !== 'object') { continue; }
+      for (var who in guests[b]) {
+        var gst = bedHas(guests[b], who) ? guests[b][who] : null;
+        if (!gst || typeof gst !== 'object') { continue; }
+        add(b, who, Number(gst.by) || 0, Number(gst.at) || 0, gst.name);
+      }
+    }
+    // #1392's paid nights, to their end, as guests of whoever held the building.
+    var nights = (raw.nights && typeof raw.nights === 'object') ? raw.nights : {};
+    for (var nb in nights) {
+      if (!bedHas(nights, nb) || !nights[nb] || typeof nights[nb] !== 'object' ||
+          !bedHas(claims, nb)) { continue; }
+      for (var nw in nights[nb]) {
+        if (bedHas(nights[nb], nw) &&
+            add(nb, nw, Number(claims[nb].by) || 0, Number(nights[nb][nw]) || 0, '')) { carried++; }
+      }
+    }
+    var takings = (raw.takings && typeof raw.takings === 'object') ? raw.takings : {};
+    for (var tp in takings) {
+      if (!bedHas(takings, tp) || tp === '__proto__') { continue; }
+      var gold = Number(takings[tp]) || 0;
+      if ((Number(tp) || 0) > 0 && gold > 0 && Math.floor(gold) === gold) {
+        out.takings[tp] = gold;
+      }
+    }
+    if (raw.prices || raw.nights) {
+      plog('the bed book from before #1603: night prices dropped,', carried,
+           'paid nights carried over as guests, kept gold waits for its holders');
+      out.old = true;
+    }
+    return out;
+  }
+
+  /* Nights that have run out leave the book. Answers the holders whose
+     guests changed, so their property page can be drawn again. */
+  function pruneGuests() {
+    var now = Date.now();
+    var gone = {};
+    for (var b in bedBook.guests) {
+      if (!bedHas(bedBook.guests, b)) { continue; }
+      var row = bedBook.guests[b];
+      for (var who in row) {
+        if (bedHas(row, who) && (now - row[who].at) >= NIGHT_MS) {
+          gone[row[who].by] = true;
+          delete row[who];
+        }
+      }
+      if (!Object.keys(row).length) { delete bedBook.guests[b]; }
+    }
+    return gone;
+  }
+
+  function saveBedBook() {
+    try {
+      var fs = require('fs');
+      var file = bedBookPath();
+      try { fs.mkdirSync(require('path').dirname(file), { recursive: true }); } catch (e) { }
+      fs.writeFileSync(file, JSON.stringify({ guests: bedBook.guests, takings: bedBook.takings }, null, 1));
+    } catch (e) {
+      plog('could not write the bed book:', e);
+    }
+  }
+
+  var bedBook = loadBedBook();
+  // The old shape is written over once, so the file says what the server does.
+  if (bedBook.old) { delete bedBook.old; saveBedBook(); }
+
+  // ------------------------------------------------------------ the beds --
+
+  function textOf(v) {
+    if (typeof v === 'string') { return v; }
+    var out = '';
+    if (v && typeof v.length === 'number') {
+      for (var i = 0; i < v.length && v[i]; i++) { out += String.fromCharCode(v[i]); }
+    }
+    return out;
+  }
+
+  /* 'bed', 'roll', 'seat', 'furn' for any other furniture, or '' for
+     anything that is not furniture, asked of the engine once per base and
+     kept. An answer the engine could not give is '', not a bed. */
+  var bedKinds = {};
+  function bedKind(baseDesc) {
+    baseDesc = String(baseDesc || '');
+    if (!baseDesc) { return ''; }
+    if (bedHas(bedKinds, baseDesc)) { return bedKinds[baseDesc]; }
+    var kind = '';
+    try {
+      var res = mp.lookupEspmRecordById(idOf(baseDesc));
+      var rec = res && res.record;
+      if (rec && String(rec.type) === 'FURN') {
+        var edid = textOf(rec.editorId);
+        var fields = rec.fields || [];
+        for (var i = 0; !edid && i < fields.length; i++) {
+          if (fields[i] && String(fields[i].type) === 'EDID') { edid = textOf(fields[i].data); }
+        }
+        kind = 'furn';
+        if (BEDROLL_EDID.test(edid)) { kind = 'roll'; }
+        else if (BED_EDID.test(edid) && !NOT_BED_EDID.test(edid)) { kind = 'bed'; }
+        else if (SEAT_EDID.test(edid) && !NOT_SEAT_EDID.test(edid)) { kind = 'seat'; }
+      }
+    } catch (e) { kind = ''; }
+    bedKinds[baseDesc] = kind;
+    return kind;
+  }
+
+  /* Called from onActivate for every press. Writes only for furniture. */
+  function bedTouched(actorId, refrId, baseDesc) {
+    var kind = bedKind(baseDesc);
+    if (!kind || !actorId || !refrId) { return; }
+    bedState.pressed[actorId] = { ref: refrId, roll: kind === 'roll', what: kind, at: Date.now() };
+  }
+
+  function stillAt(actorId, refrId) {
+    var d = distanceTo(actorId, refrId);
+    return d >= 0 && d <= BED_REACH;
+  }
+
+  function isBuilding(cell) {
+    return !!cell && (bedHas(BUILDING_NAME, cell) || bedHas(claims, cell));
+  }
+
+  /* The building a bed stands in, which is its cell when that is one. */
+  function bedBuilding(refrId) {
+    var cell = '';
+    try { cell = String(mp.get(refrId, 'worldOrCellDesc') || ''); } catch (e) { cell = ''; }
+    return isBuilding(cell) ? cell : '';
+  }
+
+  /* This person's night at this building, or null. See the block. */
+  function guestOf(building, held, profileId) {
+    if (!held || !profileId || !bedHas(bedBook.guests, building)) { return null; }
+    var row = bedBook.guests[building];
+    var gst = bedHas(row, profileId) ? row[profileId] : null;
+    if (!gst || gst.by !== held.by || (Date.now() - gst.at) >= NIGHT_MS) { return null; }
+    return gst;
+  }
+
+  /* The holder, a guest tonight, or somebody carrying its key or its deed. */
+  function allowedIn(actorId, profileId, building, held) {
+    if (!held) { return false; }
+    if (profileId && held.by === profileId) { return true; }
+    if (guestOf(building, held, profileId)) { return true; }
+    if (holdsKey(actorId, building)) { return true; }
+    if (holdsDeed(actorId, building)) { return true; }
+    return false;
+  }
+
+  /* A fire close enough to warm this person, by the distance their client
+     reports for warmth. See the block. */
+  function fireNear(actorId) {
+    var needs = g.__thornswoodNeeds;
+    if (!needs || !needs.settle) { return false; }
+    var n = null;
+    try { n = needs.settle(actorId); } catch (e) { return false; }
+    return !!n && typeof n.fire === 'number' && n.fire >= 0;
+  }
+
+  /*
+    What this bed is to this person: a kind of rest, or a refusal. Asked
+    when they lie down and again on every tick. See the table in the block.
+  */
+  function bedVerdict(actorId, profileId, ref) {
+    var building = bedBuilding(ref);
+    var held = building ? holderOf(building) : null;
+    var out = { building: building, held: held, kind: '', line: '', guest: null };
+    if (!held) {
+      out.kind = fireNear(actorId) ? 'camp' : 'rough';
+      return out;
+    }
+    if (profileId && held.by === profileId) {
+      out.kind = 'bed';
+      return out;
+    }
+    if (allowedIn(actorId, profileId, building, held)) {
+      out.kind = 'inn';
+      out.guest = guestOf(building, held, profileId);
+      return out;
+    }
+    out.line = nameOf(building) + ' is ' + held.name + '\'s, and they have not let you ' +
+               'sleep there. A night there is theirs to give.';
+    return out;
+  }
+
+  function personName(actorId) {
+    try {
+      var a = mp.get(actorId, 'appearance');
+      if (a && a.name) { return String(a.name); }
+    } catch (e) { }
+    return 'somebody';
+  }
+
+  function profileOf(actorId) {
+    try { return Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { return 0; }
+  }
+
+  function onlineActorOf(profileId) {
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return 0; }
+    for (var i = 0; i < online.length; i++) {
+      if (profileOf(online[i]) === profileId) { return online[i]; }
+    }
+    return 0;
+  }
+
+  function tellBed(actorId, line) {
+    try { notify(actorId, line); } catch (e) { }
+    try { say(actorId, line); } catch (e) { }
+  }
+
+  /*
+    /rest, whatever word follows it. Answers the line to say, or '' for
+    nothing. The plugin says /rest bed when somebody lies down and /rest sit
+    when they sit on any other furniture, and this answers by what they
+    pressed: a bed or a bedroll is the bed's verdict, a seat is a seat, and
+    other furniture (a forge, a chopping block) is not a rest and is answered
+    with nothing, because the plugin says sit at every piece of furniture that
+    is not a bed and the server is what tells them apart.
+  */
+  function bedRest(actorId, profileId) {
+    var needs = g.__thornswoodNeeds;
+    if (!needs || !needs.resting) { return 'That is not running on this server.'; }
+    if (!actorId || !profileId) {
+      return 'The server cannot find your character right now. Give it a moment and try again.';
+    }
+    var p = bedHas(bedState.pressed, actorId) ? bedState.pressed[actorId] : null;
+    if (!p || !stillAt(actorId, p.ref)) {
+      return 'There is nothing here to rest on. Sit down or lie down and it counts; saying the word does not.';
+    }
+    if (p.what === 'furn') { return ''; }
+    var e = { ref: p.ref, roll: !!p.roll, seat: p.what === 'seat', kind: '', guestAt: 0,
+              at: Date.now() };
+    if (e.seat) {
+      e.kind = fireNear(actorId) ? 'campfire' : 'sit';
+    } else {
+      var v = bedVerdict(actorId, profileId, p.ref);
+      if (v.line) { return v.line; }
+      e.kind = v.kind;
+      e.guestAt = v.guest ? v.guest.at : 0;
+    }
+    bedState.lying[actorId] = e;
+    var line = needs.resting(actorId, e.kind);
+    // Sitting down says nothing: people sit at every table in every inn, and
+    // the Rest bar is what shows it counting.
+    if (e.seat) { return ''; }
+    return line || 'You are resting.';
+  }
+
+  /* They got up, or rest somewhere else now. Answers 'seat' when it was a
+     seat they got off, so getting up from one is not said either. */
+  function bedOff(actorId) {
+    var e = bedHas(bedState.lying, actorId) ? bedState.lying[actorId] : null;
+    delete bedState.lying[actorId];
+    return (e && e.seat) ? 'seat' : '';
+  }
+
+  /* Off a place the server no longer counts, without touching any other
+     kind of rest they may have started since. */
+  function getUp(actorId, needs) {
+    delete bedState.lying[actorId];
+    if (!needs || !needs.settle || !needs.resting) { return false; }
+    var n = null;
+    try { n = needs.settle(actorId); } catch (e) { return false; }
+    if (!n || !REST_KINDS[n.resting]) { return false; }
+    try { needs.resting(actorId, ''); } catch (e) { return false; }
+    return true;
+  }
+
+  /* '' while the place still counts, at whatever rate it counts now,
+     otherwise the line to say. */
+  function stillLying(actorId, e, needs) {
+    if (!stillAt(actorId, e.ref)) {
+      return e.seat ? 'You have left the seat, so you are not resting on it now.'
+                    : 'You have left the bed, so you are not resting in it now.';
+    }
+    var v = null;
+    var kind = '';
+    if (e.seat) {
+      kind = fireNear(actorId) ? 'campfire' : 'sit';
+    } else {
+      v = bedVerdict(actorId, profileOf(actorId), e.ref);
+      kind = v.kind;
+    }
+    if (kind) {
+      if (v) { e.guestAt = v.guest ? v.guest.at : 0; }
+      if (kind === e.kind) { return ''; }
+      // Still a place they may rest, at another rate: a key handed over in the
+      // night, a key lost with the night still given, a fire reached or left.
+      e.kind = kind;
+      try { needs.resting(actorId, kind); } catch (err) { }
+      return '';
+    }
+    if (e.guestAt && v.building && v.held) {
+      return (Date.now() - e.guestAt) >= NIGHT_MS
+        ? ('Your night at ' + nameOf(v.building) + ' is over.')
+        : (v.held.name + ' has stopped letting you sleep at ' + nameOf(v.building) + '.');
+    }
+    return v.line || 'That bed does not count for you now.';
+  }
+
+  /*
+    Gold #1392 kept for a holder who was away, into their pack now they are
+    here. Once: it leaves the book as it is handed over, and nothing adds to
+    the book any more.
+  */
+  function payTakings(online) {
+    var owed = false;
+    for (var k in bedBook.takings) { if (bedHas(bedBook.takings, k)) { owed = true; break; } }
+    if (!owed) { return; }
+    var changed = false;
+    for (var i = 0; i < online.length; i++) {
+      var pid = profileOf(online[i]);
+      if (!pid || !bedHas(bedBook.takings, pid)) { continue; }
+      var gold = Number(bedBook.takings[pid]) || 0;
+      if (gold > 0 && !payOut(online[i], gold)) { continue; }
+      delete bedBook.takings[pid];
+      changed = true;
+      if (gold > 0) {
+        plog('handed', gold, 'gold of nights to', personName(online[i]));
+        tellBed(online[i], 'While you were away, ' + gold + ' gold was paid for nights in your beds. ' +
+                           'It is in your pack.');
+      }
+    }
+    if (changed) { saveBedBook(); }
+  }
+
+  /* The holder's K panel again, so its property page shows tonight's guests. */
+  function redrawPanel(actorId) {
+    var c = g.__thornswoodCharacter;
+    if (!actorId || !c || !c.stateOf || !c.writeState) { return; }
+    var s = c.stateOf(actorId);
+    if (s) { c.writeState(actorId, s); }
+  }
+
+  function bedTick() {
+    var needs = g.__thornswoodNeeds;
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
+    var on = {};
+    for (var i = 0; i < online.length; i++) { on[online[i]] = true; }
+    for (var s in bedState.seen) {
+      if (bedHas(bedState.seen, s) && !on[s]) { delete bedState.seen[s]; }
+    }
+    for (var p in bedState.pressed) {
+      if (bedHas(bedState.pressed, p) && !on[p] && !bedHas(bedState.lying, p)) {
+        delete bedState.pressed[p];
+      }
+    }
+    // Come into the world resting in a place nobody saw them take.
+    for (var j = 0; j < online.length; j++) {
+      var id = online[j];
+      if (bedState.seen[id]) { continue; }
+      bedState.seen[id] = true;
+      if (bedHas(bedState.lying, id)) { continue; }
+      if (getUp(id, needs)) {
+        plog(personName(id), 'came in resting in a place the server did not see, so they are up');
+      }
+    }
+    var now = Date.now();
+    for (var k in bedState.lying) {
+      if (!bedHas(bedState.lying, k)) { continue; }
+      var e = bedState.lying[k];
+      var who = Number(k);
+      if (!on[k]) {
+        if ((now - e.at) > LYING_FORGET_MS) { delete bedState.lying[k]; }
+        continue;
+      }
+      var why = stillLying(who, e, needs);
+      if (why) {
+        getUp(who, needs);
+        tellBed(who, why);
+      }
+    }
+    payTakings(online);
+    // A night that ran out leaves the book and the holder's property page.
+    var ended = pruneGuests();
+    var changed = false;
+    for (var h in ended) {
+      if (bedHas(ended, h)) { changed = true; redrawPanel(onlineActorOf(Number(h))); }
+    }
+    if (changed) { saveBedBook(); }
+  }
+
+  // ---------------------------------------------------------- the guests --
+
+  /* The guests of a building tonight, by name, for the property page. */
+  function guestsOf(building) {
+    var held = holderOf(building);
+    var out = [];
+    if (!held || !bedHas(bedBook.guests, building)) { return out; }
+    var row = bedBook.guests[building];
+    for (var who in row) {
+      if (!bedHas(row, who) || !guestOf(building, held, Number(who))) { continue; }
+      out.push({ pid: Number(who), name: row[who].name || 'somebody who paid for the night' });
+    }
+    out.sort(function (a, b) { return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0); });
+    return out;
+  }
+
+  /*
+    For the look prompt, asked by the social block's near list for each two
+    people in the same cell: 0 when the first cannot let the second sleep
+    there, 1 when they can, 2 when they already have.
+  */
+  function sleepMark(holderPid, guestPid, cell) {
+    if (!holderPid || !guestPid || holderPid === guestPid || !bedHas(claims, cell)) { return 0; }
+    var held = holderOf(cell);
+    if (!held || held.by !== holderPid) { return 0; }
+    return guestOf(cell, held, guestPid) ? 2 : 1;
+  }
+
+  /* The night ends now. The guest is told, and got up if they are lying in
+     one of its beds and nothing else lets them stay. */
+  function endGuest(building, pid, line) {
+    if (bedHas(bedBook.guests, building)) { delete bedBook.guests[building][pid]; }
+    saveBedBook();
+    var guest = onlineActorOf(pid);
+    if (!guest) { return; }
+    var needs = g.__thornswoodNeeds;
+    var e = bedHas(bedState.lying, guest) ? bedState.lying[guest] : null;
+    var why = (e && !e.seat && bedBuilding(e.ref) === building) ? stillLying(guest, e, needs) : '';
+    if (why) { getUp(guest, needs); }
+    tellBed(guest, why || line);
+  }
+
+  /*
+    THE HOLDER LETS SOMEBODY SLEEP THERE, OR STOPS (#1603).
+
+    Patrick: the holder names who may sleep there, "with buttons and GUI, not
+    commands". The look prompt draws "Let sleep here" while a holder looks at
+    somebody inside a building they hold, and its key sends /sleephere with
+    that person's form id, the way the trade key sends /trade. Pressed on a
+    guest, it ends their night. The property page in the K panel sends
+    /sleephere stop <profile> <building> beside each guest's name. Nobody
+    types either, and help never names them.
+
+    Everything is measured here: the building is the cell the holder stands
+    in, the holder is the register's, and the guest is in that same cell.
+  */
+  function sleepHere(parts, actorId, profileId, toProfile) {
+    var raw = String((parts && parts[1]) || '');
+    if (raw === 'stop') { return stopGuest(parts, actorId, profileId, toProfile); }
+    var them = /^[0-9a-f]{1,8}$/i.test(raw) ? parseInt(raw, 16) : 0;
+    var cell = '';
+    try { cell = String(mp.get(actorId, 'worldOrCellDesc') || ''); } catch (e) { cell = ''; }
+    var building = isBuilding(cell) ? cell : '';
+    var held = building ? holderOf(building) : null;
+    if (!held || !profileId || held.by !== profileId) {
+      toProfile(profileId, building
+        ? ('Only whoever holds ' + nameOf(building) + ' lets people sleep there.')
+        : 'Stand inside a building you hold to let somebody sleep there.');
+      return true;
+    }
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
+    var theirs = '';
+    if (them && them !== actorId && online.indexOf(them) !== -1) {
+      try { theirs = String(mp.get(them, 'worldOrCellDesc') || ''); } catch (e) { theirs = ''; }
+    }
+    var pid = (theirs === cell) ? profileOf(them) : 0;
+    var name = nameOf(building);
+    if (!pid || pid === profileId) {
+      toProfile(profileId, 'Look at somebody inside ' + name + ' with you, then press the key.');
+      return true;
+    }
+    var who = personName(them);
+    if (guestOf(building, held, pid)) {
+      endGuest(building, pid, held.name + ' has stopped letting you sleep at ' + name + '.');
+      plog(held.name, 'stopped letting', who, 'sleep at', name);
+      toProfile(profileId, who + ' may no longer sleep at ' + name + '.');
+      redrawPanel(actorId);
+      return true;
+    }
+    if (!bedHas(bedBook.guests, building)) { bedBook.guests[building] = {}; }
+    bedBook.guests[building][pid] = { by: held.by, at: Date.now(), name: who.slice(0, GUEST_NAME_MAX) };
+    saveBedBook();
+    plog(held.name, 'let', who, 'sleep at', name, 'for a night');
+    toProfile(profileId, who + ' may sleep at ' + name + ' for one night, 8 hours from now. ' +
+                         'Look at them and press the same key to end it sooner.');
+    tellBed(them, held.name + ' lets you sleep at ' + name + ' tonight. Lie down in any of its beds.');
+    redrawPanel(actorId);
+    return true;
+  }
+
+  /* /sleephere stop <profile> <building>, from the property page. */
+  function stopGuest(parts, actorId, profileId, toProfile) {
+    var pid = Number((parts && parts[2]) || 0) || 0;
+    var building = (parts && parts.length > 3) ? parts.slice(3).join(' ') : '';
+    var held = building ? holderOf(building) : null;
+    if (!held || !profileId || held.by !== profileId) {
+      toProfile(profileId, building && isBuilding(building)
+        ? ('Only whoever holds ' + nameOf(building) + ' lets people sleep there.')
+        : 'That is not a building you hold.');
+      return true;
+    }
+    var name = nameOf(building);
+    var gst = guestOf(building, held, pid);
+    if (!gst) {
+      toProfile(profileId, 'Nobody by that name is sleeping at ' + name + ' tonight.');
+      redrawPanel(actorId);
+      return true;
+    }
+    var who = gst.name || 'Your guest';
+    endGuest(building, pid, held.name + ' has stopped letting you sleep at ' + name + '.');
+    plog(held.name, 'stopped letting', who, 'sleep at', name);
+    toProfile(profileId, who + ' may no longer sleep at ' + name + '.');
+    redrawPanel(actorId);
+    return true;
+  }
+
+  if (g.__thornswoodBedTimer) { try { clearInterval(g.__thornswoodBedTimer); } catch (e) { } }
+  g.__thornswoodBedTimer = setInterval(
+    (typeof guard === 'function') ? guard('bedTick', bedTick) : bedTick, BED_EVERY_MS);
+
+  g.__thornswoodBeds = {
+    touched: bedTouched, rest: bedRest, off: bedOff, tick: bedTick,
+    sleepHere: sleepHere, mark: sleepMark, guestsOf: guestsOf,
+    kindOf: bedKind, verdict: bedVerdict, book: function () { return bedBook; },
+    state: bedState, BED_REACH: BED_REACH, NIGHT_MS: NIGHT_MS, BED_EVERY_MS: BED_EVERY_MS
+  };
 
 
   /*
@@ -35318,6 +37234,28 @@ log('gamemode loaded:',
   };
 
   /*
+    RAVEN ROCK, THE TENTH BOARD, #1374. The page: "Raven Rock's board starts
+    at that town's inn until a steward walks it somewhere better."
+
+    Vanilla Skyrim has one inn in Raven Rock, The Retching Netch, in
+    Dragonborn.esm. Its interior cell is 17ec0:Dragonborn.esm
+    (DLC2RRTheRetchingNetch in game/data/doors.json). The point is where its
+    innkeeper, Geldis Sadri, is placed (ref 18291:Dragonborn.esm in
+    game/data/merchant-traders.json), which is the spot
+    game/data/guild-sites.json already gives Raven Rock's guild site and
+    docs/systems/merchants-guild.md calls where that town's board starts.
+
+    Raven Rock is not in the chargen table, so the inn fallback in
+    seededBoards never found it and only nine boards were ever seeded. A town
+    in here is seeded only when that table did not already give it a board.
+    A steward's /board move takes it over for good, the same as any other
+    board, because seedBoards keeps a placed board whatever the seeding says.
+  */
+  var BOARD_INNS = {
+    ravenrock: { cell: '17ec0:Dragonborn.esm', pos: [-39, -178.2, 0], where: 'Raven Rock' }
+  };
+
+  /*
     WHICH SEEDING A BOARD IS STANDING ON, AND WHY A NUMBER RATHER THAN A FLAG.
 
     boards is SAVED, in the register beside the claims and the notices, and it
@@ -35410,6 +37348,12 @@ log('gamemode loaded:',
     } catch (e) {
       plog('could not seed the boards from the town table:', e);
     }
+    for (var inn in BOARD_INNS) {
+      if (!Object.prototype.hasOwnProperty.call(BOARD_INNS, inn) || out[inn]) { continue; }
+      var at = BOARD_INNS[inn];
+      out[inn] = { cell: at.cell, pos: [at.pos[0], at.pos[1], at.pos[2]],
+                   where: at.where || inn, seed: BOARD_SEED };
+    }
     return out;
   }
 
@@ -35474,11 +37418,13 @@ log('gamemode loaded:',
         wall.push({
           n: i + 1,
           job: !!n.job,
+          letter: !!n.letter,
           name: n.name || 'somebody',
-          text: n.text || '',
+          text: n.letter ? sealed(n) : (n.haul ? haulText(n) : (n.text || '')),
           taken: n.taken ? (n.takenName || 'somebody') : '',
           mine: Number(n.by) === Number(profileId),
-          held: !!(n.job && Number(n.taken) === Number(profileId))
+          held: !!(n.job && Number(n.taken) === Number(profileId)),
+          haul: !!n.haul
         });
       }
       for (var h in notices) {
@@ -35487,8 +37433,40 @@ log('gamemode loaded:',
         for (var j = 0; j < rows.length; j++) {
           var job = rows[j];
           if (job.job && Number(job.taken) === Number(profileId) && !job.down) {
-            mine.push({ hold: h, n: j + 1, text: job.text || '', name: job.name || 'somebody' });
+            mine.push({ hold: h, n: j + 1, text: job.letter ? sealed(job) : (job.haul ? haulText(job) : (job.text || '')),
+                        name: job.name || 'somebody' });
           }
+        }
+      }
+    }
+    /*
+      THE HAUL'S TWO BUTTONS (#1393). Send a haul needs the towns it can go
+      to, every board but this one. Confirm needs the hauls that came here:
+      taken, not down, and for the person who posted it or a steward, the
+      two confirmHaul lets through. A steward also takes a haul down from
+      the wall, which unpin lets them do.
+    */
+    var steward = here && isSteward(profileId, actorId);
+    var dests = [];
+    var arrivals = [];
+    if (here) {
+      for (var d = 0; d < LEDGER_HOLDS.length; d++) {
+        var to = LEDGER_HOLDS[d];
+        if (to === hold || !Object.prototype.hasOwnProperty.call(boards, to)) { continue; }
+        dests.push({ hold: to, where: (boards[to] && boards[to].where) || to });
+      }
+      for (var f = 0; f < LEDGER_HOLDS.length; f++) {
+        var from = LEDGER_HOLDS[f];
+        var sent = notices[from] || [];
+        for (var a = 0; a < sent.length; a++) {
+          var hl = sent[a];
+          if (!hl || !hl.haul || hl.down || hl.dest !== hold || !hl.taken) { continue; }
+          if (Number(hl.by) !== Number(profileId) && !steward) { continue; }
+          if (Number(hl.taken) === Number(profileId)) { continue; }
+          var hp = Math.floor(Number(hl.pay)) || 0;
+          arrivals.push({ from: from, where: (boards[from] && boards[from].where) || from,
+                          n: a + 1, name: hl.name || 'somebody', text: hl.text || '',
+                          hauler: hl.takenName || 'somebody', pay: hp, kept: haulTenth(hp) });
         }
       }
     }
@@ -35511,7 +37489,10 @@ log('gamemode loaded:',
       paid: Number(funds[hold]) || 0,
       wall: wall,
       jobs: mine,
-      submit: submit
+      submit: submit,
+      steward: steward,
+      dests: dests,
+      arrivals: arrivals
     };
   }
 
@@ -35519,6 +37500,16 @@ log('gamemode loaded:',
   function moveBoard(hold, actorId, profileId, toProfile) {
     if (!isSteward(profileId)) {
       toProfile(profileId, 'Only a steward moves a board.');
+      return true;
+    }
+    /*
+      ONLY A BOARD THAT IS THERE, #1374. One board a town, ten towns. This
+      took any word, so '/board move whiterum' saved an eleventh board that no
+      hold's ledger knows about.
+    */
+    if (!Object.prototype.hasOwnProperty.call(boards, hold)) {
+      toProfile(profileId, 'No board in ' + hold + '. The boards are ' +
+                Object.keys(boards).join(', ') + '.');
       return true;
     }
     var cell = null, pos = null;
@@ -35571,6 +37562,68 @@ log('gamemode loaded:',
       }
     }
     return false;
+  }
+
+  /*
+    THE LEDGER PAYING OUT, and only a letter's held courier pay, #1374.
+
+    takeGold destroys a fee from a pack and the fee is counted on the hold's
+    ledger. This is the other half docs/systems/gold.md describes: it creates
+    the same count back into a pack, and payHeld takes it off that ledger in
+    the same step, so the coin was already in the world and packs plus ledger
+    add up to the same after. payHeld pays a letter's own `pay`, which
+    postLetter took from the sender, never more than the ledger holds. Its
+    other caller is payTakings in the beds, which hands a holder the gold
+    #1392 kept for them while they were away, once (#1603).
+  */
+  function payOut(actorId, amount) {
+    var count = Math.floor(Number(amount) || 0);
+    if (!(count > 0)) { return false; }
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return false; }
+    var entries = (inv && inv.entries) || [];
+    var put = false;
+    for (var i = 0; i < entries.length && !put; i++) {
+      var e = entries[i];
+      if (e && e.baseId === GOLD_ID) { e.count = (Number(e.count) || 0) + count; put = true; }
+    }
+    if (!put) { entries.push({ baseId: GOLD_ID, count: count }); }
+    try { mp.set(actorId, 'inventory', { entries: entries }); } catch (e2) { return false; }
+    return true;
+  }
+
+  /*
+    A letter's held pay, out of its hold's ledger into one pack. Answers what
+    was paid, 0 when nothing is held, or -1 when it could not be paid and
+    nothing changed. n.pay goes to 0 once paid, so it is paid once.
+  */
+  function payHeld(hold, n, actorId) {
+    var amount = (n && n.letter) ? (Math.floor(Number(n.pay)) || 0) : 0;
+    if (!(amount > 0)) { return 0; }
+    if ((Number(funds[hold]) || 0) < amount) {
+      plog('a letter in', hold, 'holds', amount, 'and the ledger has only', funds[hold], '; nothing paid');
+      return -1;
+    }
+    if (!payOut(actorId, amount)) { return -1; }
+    funds[hold] = (Number(funds[hold]) || 0) - amount;
+    n.pay = 0;
+    return amount;
+  }
+
+  /* What anybody but the person it is for reads of a letter: who it is for. */
+  function sealed(n) {
+    return 'A sealed letter for ' + (n.to || 'somebody');
+  }
+
+  /*
+    The letter's name against a character's. The whole name, or its first
+    words, so 'Lydia' reaches Lydia Stormblade and 'Ly' reaches nobody.
+  */
+  function nameIs(to, name) {
+    var a = String(to || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    var b = String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    if (!a || !b) { return false; }
+    return b === a || b.indexOf(a + ' ') === 0;
   }
 
   function post(parts, actorId, profileId, toProfile, isJob) {
@@ -35690,9 +37743,9 @@ log('gamemode loaded:',
     for (var i = list.length - 1; i >= 0 && shown < 10; i--) {
       var n = list[i];
       if (n.down) { continue; }
-      lines.push('[' + (i + 1) + '] ' +
-                 (n.job ? (n.taken ? 'job, taken: ' : 'job: ') : '') +
-                 n.name + ': ' + n.text);
+      lines.push('[' + (i + 1) + '] ' + (n.letter
+        ? 'letter for ' + n.to + ', from ' + n.name + (n.taken ? ', taken by ' + n.takenName : '')
+        : (n.job ? (n.taken ? 'job, taken: ' : 'job: ') : '') + n.name + ': ' + (n.haul ? haulText(n) : n.text)));
       shown++;
     }
     var more = up > shown
@@ -35757,6 +37810,23 @@ log('gamemode loaded:',
     n.takenName = who;
     n.takenAt = Date.now();
     save();
+    if (n.letter) {
+      plog(who, 'took a letter for', n.to, 'in', hold);
+      toProfile(profileId, 'You take the letter for ' + n.to + ', from ' + n.name + '. It is sealed. ' +
+                'Find ' + n.to + ' and /deliver it within about 10 metres, and the ' +
+                (Number(n.pay) || 0) + ' gold is yours.');
+      refreshPanel(actorId);
+      return true;
+    }
+    if (n.haul) {
+      var tenth = haulTenth(n.pay);
+      plog(who, 'took a haul in', hold, 'to', n.dest + ':', n.text);
+      toProfile(profileId, 'You take the haul to ' + n.dest + ': ' + n.text + '. At ' + n.dest + '\'s board, ' +
+                n.name + ' or a steward confirms it on the board, and ' +
+                (n.pay - tenth) + ' gold is yours. The company keeps ' + tenth + '.');
+      refreshPanel(actorId);
+      return true;
+    }
     plog(who, 'took a job in', hold + ':', n.text);
     toProfile(profileId, 'You take it: ' + n.text + '. Go and see ' + n.name + ' about it.');
     refreshPanel(actorId);
@@ -35771,8 +37841,10 @@ log('gamemode loaded:',
       var list = notices[hold];
       for (var i = 0; i < list.length; i++) {
         var n = list[i];
-        if (n.job && n.taken === profileId) {
-          lines.push(hold + ': ' + n.text + ' (for ' + n.name + ')');
+        if (n.job && n.taken === profileId && !n.down) {
+          lines.push(hold + ': ' + (n.letter ? sealed(n) + ', from ' + n.name
+                                             : (n.haul ? '[' + (i + 1) + '] ' + haulText(n) : n.text) +
+                                               ' (for ' + n.name + ')'));
         }
       }
     }
@@ -35796,10 +37868,17 @@ log('gamemode loaded:',
       return true;
     }
     var n = list[at];
-    if (!n.job || n.taken !== profileId) {
+    if (!n.job || n.taken !== profileId || n.down) {
       toProfile(profileId, 'That is not one of yours.');
       return true;
     }
+    /*
+      A HAUL DROPPED IS A HAUL ENDED, #1393. docs/systems/trading-company.md:
+      on a drop the pay returns to the poster's pack and the ledger goes down
+      by that pay, and the fee stays. A haul with its pay gone cannot sit on
+      the board for somebody else, so it comes down.
+    */
+    if (n.haul) { return cancelHaul(hold, at, n, 'drop', actorId, profileId, toProfile); }
     n.taken = 0;
     n.takenName = null;
     save();
@@ -35864,19 +37943,611 @@ log('gamemode loaded:',
       toProfile(profileId, 'That one is already down.');
       return true;
     }
-    if (n.by !== profileId) {
+    /*
+      A STEWARD CANCELS A HAUL, #1393, open or taken, at the board it was
+      posted on. The pay goes back to the poster and the fee stays, the same
+      as the poster's own /unpin before anybody has taken it.
+    */
+    var stewardHaul = !!n.haul && isSteward(profileId, actorId);
+    if (n.by !== profileId && !stewardHaul) {
       toProfile(profileId, 'That is not yours to take down.');
       return true;
     }
-    if (n.job && n.taken) {
+    if (n.job && n.taken && !stewardHaul) {
       toProfile(profileId, n.takenName + ' has taken that job. It can come down once they hand it back.');
       return true;
     }
+    if (n.haul) {
+      return cancelHaul(hold, at, n, Number(n.by) === Number(profileId) ? 'own' : 'steward',
+                        actorId, profileId, toProfile);
+    }
+    /*
+      A LETTER'S PAY COMES BACK, #1374. The board fee stays, like any
+      notice's. The courier's 15 was only held, and with nobody to carry it
+      it is the sender's again. Paid before it comes down, so a pack that
+      cannot be written leaves the letter up and the 15 still held.
+    */
+    var back = n.letter ? payHeld(hold, n, actorId) : 0;
+    if (back < 0) {
+      toProfile(profileId, 'That did not work. The letter is still up.');
+      return true;
+    }
     takedown(hold, at, profileId);
+    if (n.letter) {
+      plog(n.name, 'took down a letter for', n.to, 'in', hold, 'and had', back, 'back');
+      toProfile(profileId, 'You take the letter down. The ' + back + ' gold for the courier comes back ' +
+                'to you. The fee stays with ' + hold + '.');
+      refreshPanel(actorId);
+      return true;
+    }
     plog(n.name, 'took down', n.job ? 'a job' : 'a notice', 'in', hold + ':', n.text);
     toProfile(profileId, 'You take it down. The fee stays with ' + hold + '.');
     refreshPanel(actorId);
     return true;
+  }
+
+  /*
+    ------------------------------------------------------------- a letter
+
+        /letter Lydia Meet me at the Drunken Huntsman at dusk.
+        /letter "Lydia Stormblade" Meet me at the Drunken Huntsman at dusk.
+
+    #1374, as docs/systems/noticeboards.md has it. A letter is a job with a
+    named person at the other end, written standing at the board. The words
+    are up to 300 characters, the same cap as /ooc; a longer one is refused
+    before any gold is taken rather than cut, because the sender paid for the
+    whole letter. The name is one word, or several in double quotes.
+
+    THE WORDS ARE SEALED. Only /deliver hands them to anybody. The wall, the
+    panel, /jobs and the taking line say who it is for and from whom, and the
+    log does not record them either.
+  */
+  function postLetter(parts, actorId, profileId, toProfile) {
+    var hold = boardHere(actorId);
+    if (!hold) {
+      toProfile(profileId, 'Stand at a hold\'s notice board to write a letter there.');
+      return true;
+    }
+    var rest = (parts && parts.length > 1) ? parts.slice(1).join(' ').trim() : '';
+    var to = '', words = '';
+    if (rest.charAt(0) === '"') {
+      var shut = rest.indexOf('"', 1);
+      if (shut > 1) { to = rest.slice(1, shut).trim(); words = rest.slice(shut + 1).trim(); }
+    } else {
+      var gap = rest.indexOf(' ');
+      to = gap < 0 ? rest : rest.slice(0, gap);
+      words = gap < 0 ? '' : rest.slice(gap + 1).trim();
+    }
+    if (!to) {
+      toProfile(profileId, 'Say who it is for, then what it says: /letter <name> <words>.');
+      return true;
+    }
+    if (!words) {
+      toProfile(profileId, 'Say what the letter says.');
+      return true;
+    }
+    if (words.length > LETTER_CHARS) {
+      toProfile(profileId, 'A letter is up to ' + LETTER_CHARS + ' characters. That one is ' +
+                words.length + '. Nothing was taken.');
+      return true;
+    }
+    var cost = LETTER_FEE + LETTER_PAY;
+    if (!takeGold(actorId, cost)) {
+      toProfile(profileId, 'A letter costs ' + cost + ' gold and you do not have it.');
+      return true;
+    }
+    var who = 'somebody';
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      if (ap && ap.name) { who = String(ap.name); }
+    } catch (e) { }
+    if (!notices[hold]) { notices[hold] = []; }
+    notices[hold].push({ by: profileId, name: who, text: words, at: Date.now(),
+                         job: true, letter: true, to: to, pay: LETTER_PAY, taken: 0 });
+    funds[hold] = (Number(funds[hold]) || 0) + cost;
+    save();
+    plog(who, 'posted a letter for', to, 'in', hold, 'for', cost, 'gold');
+    toProfile(profileId, 'Your letter for ' + to + ' is on the board in ' + hold + '. That cost ' + cost +
+              ' gold: ' + LETTER_FEE + ' for the board, and ' + LETTER_PAY +
+              ' held for whoever carries it.');
+    refreshPanel(actorId);
+    return true;
+  }
+
+  /*
+        /deliver Lydia      or the form id the crosshair gives, as /trade takes
+
+    Every letter the courier carries for that person goes over at once,
+    within the trade reach. The name is what is checked and nothing else: the
+    server does not judge what a letter says, and a wrong person is refused
+    with the letter still in the courier's hands. The person it is for is told
+    the words, who wrote them and who brought them. The courier is paid each
+    letter's held 15 out of the ledger it was counted on, and the letter comes
+    off the wall the way an /unpin does, keeping its number.
+  */
+  function deliver(parts, actorId, profileId, toProfile) {
+    var carried = [];
+    for (var h in notices) {
+      if (!Object.prototype.hasOwnProperty.call(notices, h)) { continue; }
+      var list = notices[h] || [];
+      for (var i = 0; i < list.length; i++) {
+        var n = list[i];
+        if (n && n.letter && !n.down && Number(n.taken) === Number(profileId)) {
+          carried.push({ hold: h, at: i, n: n });
+        }
+      }
+    }
+    if (!carried.length) {
+      toProfile(profileId, 'You are not carrying a letter. Take one off a board first.');
+      return true;
+    }
+    var want = (parts && parts.length > 1) ? parts.slice(1).join(' ').trim() : '';
+    if (!want) {
+      toProfile(profileId, 'Say who you are handing it to: /deliver and their name, standing with them.');
+      return true;
+    }
+    var soc = g.__thornswoodSocial;
+    if (!soc || !soc.findPerson || !soc.nameOfPerson || !soc.profileOf) {
+      toProfile(profileId, 'That is not running on this server.');
+      return true;
+    }
+    var found = soc.findPerson(want);
+    if (!found || !found.actorId) {
+      toProfile(profileId, (found && found.why) || 'Nobody here by that name.');
+      return true;
+    }
+    var them = found.actorId;
+    if (them === actorId) { toProfile(profileId, 'That is you.'); return true; }
+    if (!letterReach(actorId, them)) {
+      toProfile(profileId, 'Stand closer. A letter is handed over within about 10 metres.');
+      return true;
+    }
+    var theirName = soc.nameOfPerson(them);
+    var theirPid = Number(soc.profileOf(them)) || 0;
+    if (!theirPid) {
+      // Nobody to hand the words to, so nothing is paid and nothing comes down.
+      toProfile(profileId, 'The server cannot tell who that is right now. Try again in a moment.');
+      return true;
+    }
+    var mine = [];
+    var fors = [];
+    for (var k = 0; k < carried.length; k++) {
+      if (nameIs(carried[k].n.to, theirName)) { mine.push(carried[k]); }
+      else if (fors.indexOf(carried[k].n.to) === -1) { fors.push(carried[k].n.to); }
+    }
+    if (!mine.length) {
+      toProfile(profileId, 'That is ' + theirName + '. What you carry is for ' + fors.join(', ') + '.');
+      return true;
+    }
+    var courier = soc.nameOfPerson(actorId);
+    var paid = 0;
+    var handed = 0;
+    for (var m = 0; m < mine.length; m++) {
+      var c = mine[m];
+      var got = payHeld(c.hold, c.n, actorId);
+      if (got < 0) {
+        toProfile(profileId, 'That did not work. You still have the letter for ' + c.n.to + '.');
+        continue;
+      }
+      paid += got;
+      c.n.delivered = Date.now();
+      c.n.deliveredTo = theirPid;
+      takedown(c.hold, c.at, profileId);
+      handed++;
+      plog(courier, 'handed', theirName, 'a letter from', c.n.name, 'off the board in', c.hold,
+           'and was paid', got);
+      toProfile(theirPid, 'A letter from ' + c.n.name + ', handed to you by ' + courier + ':\n' + c.n.text);
+    }
+    if (handed) {
+      toProfile(profileId, 'You hand ' + theirName + (handed === 1 ? ' the letter. ' : ' ' + handed +
+                ' letters. ') + paid + ' gold is yours.');
+      refreshPanel(actorId);
+      refreshPanel(them);
+    }
+    return true;
+  }
+
+  /* Within the trade's reach of each other, in the same cell. */
+  function letterReach(a, b) {
+    var reach = LETTER_REACH;
+    try {
+      var tr = g.__thornswoodTrade;
+      if (tr && tr.TRADE && Number(tr.TRADE.reach) > 0) { reach = Number(tr.TRADE.reach); }
+    } catch (e) { }
+    try {
+      var ca = String(mp.get(a, 'worldOrCellDesc') || '');
+      var cb = String(mp.get(b, 'worldOrCellDesc') || '');
+      if (!ca || ca !== cb) { return false; }
+      var pa = mp.get(a, 'pos'), pb = mp.get(b, 'pos');
+      if (!pa || !pb) { return false; }
+      var dx = pa[0] - pb[0], dy = pa[1] - pb[1], dz = pa[2] - pb[2];
+      return (dx * dx + dy * dy + dz * dz) <= reach * reach;
+    } catch (e2) { return false; }
+  }
+
+  /*
+    ------------------------------------------------------------- a haul
+
+    NOBODY TYPES THESE. Patrick, 4 Oct: no chat commands for anything people
+    do, only buttons and GUI. The board panel (game/ui/thornswood-board.js)
+    sends them, the way it sends /job and /take:
+
+        /haul 80 riften a crate of iron ingots    Send a haul, at the board it leaves from
+        /haul done whiterun 4                     Confirm, at the board it went to
+
+    so /haul is in WORDS and kept out of PLAYER_WORDS, and nothing a person
+    reads names it.
+
+    #1393, as docs/systems/trading-company.md has it. A haul is a job on a
+    board with a pay and a destination hold. Posting it takes the job fee,
+    30, and the pay in full, never halved, and both go onto the posting
+    hold's ledger. The pay is held there the way a letter's 15 is, until the
+    haul is confirmed or taken down.
+
+    /take and /jobs treat it as any job. It comes down before it is delivered
+    three ways, and each hands the pay back out of the ledger to the poster
+    and keeps the fee (cancelHaul): the hauler's /dropjob, the poster's /unpin
+    before anybody has taken it, and a steward's /unpin at the posting board,
+    open or taken. Nothing was delivered, so the company keeps no tenth.
+
+    On a confirm, by the poster or a steward, standing at the board the haul
+    named, the company keeps a tenth of the pay, rounded down, and nothing
+    under 10 gold. The hauler is handed the rest out of the ledger, so the
+    ledger drops by what the hauler received and keeps the fee and the tenth.
+    It is the poster's gold moving, never new gold.
+
+    AN ORDINARY JOB IS NOT A HAUL. A confirm answers only a job posted as a
+    haul, and the taker of an ordinary job is still paid nothing by the
+    server.
+
+    SOMEBODY AWAY IS PAID WHEN THEY ARE BACK. The server hands gold to a pack,
+    and a pack is written only while its owner is in the world. When the
+    hauler on a confirm, or the poster on a drop or a steward's cancel, is
+    away, the haul still comes down, and what is theirs stays held on the
+    ledger as owed to them (handHaul). haulTick hands it over the next time
+    they are in the world, the way a bed's takings wait for a holder who is
+    away (#1392). Nothing else can spend it in the meantime.
+  */
+  var HAUL_TENTH_FROM = 10;
+  var HAUL_EVERY_MS = 5000;
+
+  /** The company's tenth of a pay: rounded down, and nothing under 10. */
+  function haulTenth(pay) {
+    var p = Math.floor(Number(pay)) || 0;
+    return p < HAUL_TENTH_FROM ? 0 : Math.floor(p / 10);
+  }
+
+  /** A haul's line on the wall, the panel and /jobs: where it goes and the pay. */
+  function haulText(n) {
+    return 'haul to ' + n.dest + ' for ' + (Math.floor(Number(n.pay)) || 0) + ' gold: ' + (n.text || '');
+  }
+
+  /* What a person is told when the panel's line is short of something. */
+  var HAUL_HOW = 'A haul is sent from the notice board: click the board, and fill in Send a haul. ' +
+                 'It is confirmed on the board of the hold it went to.';
+
+  function haulCmd(parts, actorId, profileId, toProfile) {
+    var first = (parts && parts.length > 1) ? String(parts[1]).trim().toLowerCase() : '';
+    if (first === 'done') { return confirmHaul(parts, actorId, profileId, toProfile); }
+    if (!first) {
+      toProfile(profileId, HAUL_HOW);
+      return true;
+    }
+    return postHaul(parts, actorId, profileId, toProfile);
+  }
+
+  function postHaul(parts, actorId, profileId, toProfile) {
+    var hold = boardHere(actorId);
+    if (!hold) {
+      toProfile(profileId, 'Stand at the board of the hold you are sending from to post a haul.');
+      return true;
+    }
+    var word = String(parts[1] || '').trim();
+    var pay = /^\d+$/.test(word) ? Number(word) : 0;
+    if (!(pay > 0) || !Number.isSafeInteger(pay)) {
+      toProfile(profileId, 'The pay is a whole number of gold, above nothing. ' + HAUL_HOW);
+      return true;
+    }
+    var dest = String(parts[2] || '').trim().toLowerCase();
+    if (LEDGER_HOLDS.indexOf(dest) < 0 || !Object.prototype.hasOwnProperty.call(boards, dest)) {
+      toProfile(profileId, 'A haul goes to one of the ten towns: ' + LEDGER_HOLDS.join(', ') + '.');
+      return true;
+    }
+    if (dest === hold) {
+      toProfile(profileId, 'A haul goes from one hold to another, and this is ' + hold + '\'s board.');
+      return true;
+    }
+    var text = parts.slice(3).join(' ').trim();
+    if (!text) {
+      toProfile(profileId, 'Say what it carries. ' + HAUL_HOW);
+      return true;
+    }
+    var cost = JOB_FEE + pay;
+    if (!Number.isSafeInteger(cost) || !takeGold(actorId, cost)) {
+      toProfile(profileId, 'That costs ' + cost + ' gold, ' + JOB_FEE + ' for the board and the ' + pay +
+                ' pay, and you do not have it. Nothing was taken.');
+      return true;
+    }
+    var who = 'somebody';
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      if (ap && ap.name) { who = String(ap.name); }
+    } catch (e) { }
+    if (!notices[hold]) { notices[hold] = []; }
+    notices[hold].push({ by: profileId, name: who, text: text, at: Date.now(),
+                         job: true, haul: true, dest: dest, pay: pay, taken: 0 });
+    // deposit saves the notice with the coin, so the two cannot part.
+    if (!deposit(hold, cost, 'a haul to ' + dest + ': the ' + JOB_FEE + ' fee, and ' + pay + ' pay held')) {
+      notices[hold].pop();
+      payOut(actorId, cost);
+      toProfile(profileId, 'That did not work. Nothing was taken.');
+      return true;
+    }
+    plog(who, 'posted a haul in', hold, 'to', dest, 'for', pay, 'gold and the', JOB_FEE, 'fee');
+    toProfile(profileId, 'Your haul to ' + dest + ' is on the board in ' + hold + ', number ' +
+              notices[hold].length + '. That cost ' + cost + ' gold: ' + JOB_FEE + ' for the board, and the ' +
+              pay + ' pay, held until it is confirmed at ' + dest + '.');
+    refreshPanel(actorId);
+    return true;
+  }
+
+  function confirmHaul(parts, actorId, profileId, toProfile) {
+    var standing = boardHere(actorId);
+    if (!standing) {
+      toProfile(profileId, 'Stand at the board of the hold the haul went to.');
+      return true;
+    }
+    var from = String(parts[2] || '').trim().toLowerCase();
+    var num = Number(parts[3] || 0);
+    if (LEDGER_HOLDS.indexOf(from) < 0 || !Number.isInteger(num) || num < 1) {
+      toProfile(profileId, 'That haul is not on any board. ' + HAUL_HOW);
+      return true;
+    }
+    var at = num - 1;
+    var n = (notices[from] || [])[at];
+    if (!n) {
+      toProfile(profileId, 'There is no number ' + num + ' on ' + from + '\'s board.');
+      return true;
+    }
+    if (!n.haul) {
+      toProfile(profileId, 'That is not a haul. What an ordinary job is worth is between the two people, ' +
+                'and the server pays nothing for it.');
+      return true;
+    }
+    if (n.down) {
+      toProfile(profileId, 'That haul is already paid or taken down.');
+      return true;
+    }
+    if (standing !== n.dest) {
+      toProfile(profileId, 'That haul goes to ' + n.dest + '. It is confirmed at ' + n.dest + '\'s board.');
+      return true;
+    }
+    if (Number(n.by) !== Number(profileId) && !isSteward(profileId, actorId)) {
+      toProfile(profileId, 'Only the person who posted it, or a steward, confirms a haul.');
+      return true;
+    }
+    if (!n.taken) {
+      toProfile(profileId, 'Nobody has taken that haul.');
+      return true;
+    }
+    if (Number(n.taken) === Number(profileId)) {
+      toProfile(profileId, 'The hauler does not confirm their own haul. The person who posted it, or a steward, does.');
+      return true;
+    }
+    var pay = Math.floor(Number(n.pay)) || 0;
+    var tenth = haulTenth(pay);
+    var got = pay - tenth;
+    var r = handHaul(from, n, Number(n.taken), got,
+                     'haul ' + num + ' to ' + n.dest + ' delivered, ' + tenth + ' kept for the company', 'hauled');
+    if (r.why) {
+      plog('a haul in', from, 'could not be paid:', r.why);
+      toProfile(profileId, 'That did not work: ' + r.why + ' Nothing was paid.');
+      return true;
+    }
+    n.paid = got;
+    n.kept = tenth;
+    n.done = Date.now();
+    n.doneBy = profileId;
+    takedown(from, at, profileId);
+    var hauled = n.takenName || 'The hauler';
+    var kept = tenth ? ', and the company keeps ' + tenth + '.' : '. Under 10 gold, the company keeps nothing.';
+    if (r.owed) {
+      plog(hauled, 'is owed', got, 'for a haul from', from, 'to', n.dest, 'and the company kept', tenth);
+      toProfile(profileId, 'The haul from ' + from + ' is in: ' + n.text + '. ' + hauled + ' is away, so the ' + got +
+                ' gold is held on ' + from + '\'s ledger for them until they are next in the world' + kept);
+    } else {
+      plog(hauled, 'was paid', got, 'for a haul from', from, 'to', n.dest, 'and the company kept', tenth);
+      toProfile(profileId, 'The haul from ' + from + ' is in: ' + n.text + '. ' + hauled + ' is paid ' + got +
+                ' gold out of ' + from + '\'s ledger' + kept);
+      toProfile(n.taken, 'Your haul to ' + n.dest + ' is confirmed. ' + got + ' gold is in your pack.' +
+                (tenth ? ' The company kept ' + tenth + '.' : ''));
+    }
+    if (Number(n.by) !== Number(profileId)) {
+      toProfile(n.by, 'Your haul to ' + n.dest + ' was confirmed by a steward. ' + hauled + ' ' +
+                (r.owed ? 'is owed ' : 'was paid ') + got + '.');
+    }
+    refreshPanel(actorId);
+    if (r.to) { refreshPanel(r.to); }
+    return true;
+  }
+
+  /*
+    A haul's held gold to one person: `amount` of what n holds on `hold`'s
+    ledger, to the profile `toPid`. In the world, it goes into their pack now
+    and the same comes off the ledger. Away, nothing leaves the ledger: n holds
+    it as owed to them, and haulTick hands it over when they are next in the
+    world. Either way n.pay is 0 after, so the haul is paid once. `owedFor` is
+    'hauled' or 'back', for the line they read then.
+
+    Answers { why } with nothing changed when it cannot, otherwise { owed } and
+    the actor it was paid to, { to }.
+  */
+  function handHaul(hold, n, toPid, amount, reason, owedFor) {
+    var why = mayWithdraw(hold, amount, n);
+    if (why) { return { why: why }; }
+    var to = onlineActorOf(toPid);
+    if (!to) {
+      n.pay = 0;
+      n.owed = amount;
+      n.owedTo = toPid;
+      n.owedFor = owedFor;
+      save();
+      plog(amount, 'gold held on', hold + '\'s ledger for', toPid, 'until they are in the world:', reason);
+      return { owed: true, to: 0 };
+    }
+    if (!payOut(to, amount)) { return { why: 'their pack could not be written.' }; }
+    withdraw(hold, amount, reason, n);
+    n.pay = 0;
+    return { owed: false, to: to };
+  }
+
+  /*
+    What a haul owes somebody who was away, into their pack now they are in
+    the world, and off the ledger it was held on. A ledger that cannot pay it
+    is written to the log once a boot, and the gold stays held.
+  */
+  var haulShort = {};
+  function haulTick() {
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
+    if (!online.length) { return; }
+    var here = {};
+    for (var i = 0; i < online.length; i++) {
+      var pid = profileOf(online[i]);
+      if (pid) { here[pid] = online[i]; }
+    }
+    for (var h = 0; h < LEDGER_HOLDS.length; h++) {
+      var hold = LEDGER_HOLDS[h];
+      var list = notices[hold] || [];
+      for (var j = 0; j < list.length; j++) {
+        var n = list[j];
+        var owed = (n && n.haul) ? (Math.floor(Number(n.owed)) || 0) : 0;
+        if (!(owed > 0) || !here[Number(n.owedTo)]) { continue; }
+        var to = here[Number(n.owedTo)];
+        var why = mayWithdraw(hold, owed, n);
+        if (why) {
+          if (!haulShort[hold + ':' + j]) {
+            haulShort[hold + ':' + j] = true;
+            plog('haul', j + 1, 'in', hold, 'owes', owed, 'and cannot pay it:', why);
+          }
+          continue;
+        }
+        if (!payOut(to, owed)) { continue; }
+        withdraw(hold, owed, 'haul ' + (j + 1) + ' to ' + n.dest + ', held for somebody who was away', n);
+        n.owed = 0;
+        save();
+        var line = n.owedFor === 'hauled'
+          ? 'While you were away, your haul to ' + n.dest + ' was confirmed. ' + owed + ' gold is in your pack.' +
+            ((Number(n.kept) || 0) ? ' The company kept ' + n.kept + '.' : '')
+          : 'While you were away, your haul to ' + n.dest + ' came down. The ' + owed +
+            ' gold pay is back in your pack. The fee stays with ' + hold + '.';
+        plog('handed', owed, 'gold of a haul in', hold, 'to', personName(to));
+        try { notify(to, line); } catch (e2) { }
+        try { say(to, line); } catch (e3) { }
+      }
+    }
+  }
+
+  if (g.__thornswoodHaulTimer) { try { clearInterval(g.__thornswoodHaulTimer); } catch (e) { } }
+  g.__thornswoodHaulTimer = setInterval(
+    (typeof guard === 'function') ? guard('haulTick', haulTick) : haulTick, HAUL_EVERY_MS);
+
+  /*
+    A haul comes down before it is delivered: the hauler's /dropjob, the
+    poster's /unpin before anybody has taken it, or a steward's /unpin at the
+    posting board, open or taken. `how` is 'drop', 'own' or 'steward'. The
+    pay goes back out of the ledger to the poster, held for them while they
+    are away (handHaul), and the fee stays. Nothing was delivered, so the
+    company's tenth is not taken. Who may has been settled by the caller.
+  */
+  function cancelHaul(hold, at, n, how, actorId, profileId, toProfile) {
+    var pay = Math.floor(Number(n.pay)) || 0;
+    var owed = false;
+    if (pay > 0) {
+      var r = handHaul(hold, n, Number(n.by), pay,
+                       'a haul to ' + n.dest + ' taken down, the pay back to ' + n.name, 'back');
+      if (r.why) {
+        toProfile(profileId, 'That did not work: ' + r.why + ' The haul is still up' +
+                  (how === 'drop' ? ', and still yours.' : '.'));
+        return true;
+      }
+      owed = r.owed;
+    }
+    n.back = pay;
+    takedown(hold, at, profileId);
+    var later = owed ? ' when they are next in the world' : '';
+    var fee = 'The fee stays with ' + hold + '.';
+    plog(how === 'drop' ? (n.takenName || 'the hauler') + ' dropped' : (how === 'own' ? n.name : 'a steward') + ' took down',
+         'a haul to', n.dest, 'in', hold, 'and', pay, owed ? 'is held for' : 'went back to', n.name);
+    if (how === 'own') {
+      toProfile(profileId, 'You take the haul down. The ' + pay + ' gold pay comes back to you. ' + fee);
+    } else if (how === 'drop') {
+      toProfile(profileId, 'You hand the haul to ' + n.dest + ' back. It comes down, and the ' + pay +
+                ' gold pay goes back to ' + n.name + later + '. ' + fee);
+      if (!owed) {
+        toProfile(n.by, (n.takenName || 'The hauler') + ' handed your haul to ' + n.dest + ' back. The ' + pay +
+                  ' gold pay is back in your pack. ' + fee);
+      }
+    } else {
+      toProfile(profileId, 'You take ' + n.name + '\'s haul to ' + n.dest + ' down. The ' + pay +
+                ' gold pay goes back to them' + later + '. ' + fee);
+      if (!owed) {
+        toProfile(n.by, 'A steward took your haul to ' + n.dest + ' down. The ' + pay +
+                  ' gold pay is back in your pack. ' + fee);
+      }
+    }
+    if (how !== 'drop' && n.taken && Number(n.taken) !== Number(profileId)) {
+      toProfile(n.taken, 'The haul to ' + n.dest + ' you took was taken down by a steward. It is off your list.');
+    }
+    refreshPanel(actorId);
+    return true;
+  }
+
+  /*
+    ------------------------------------------- a sale out of Skyrim
+
+    #1393, docs/systems/trading-company.md "Sales that leave the world". At a
+    company event somebody sells a thing out of Skyrim. The company buys it
+    through the worker who handles the sale, and the thing leaves the world.
+    It does not come back into a chest.
+
+    IT IS A TRADE, ON THE TRADE PANEL. Patrick, 4 Oct: no chat commands for
+    anything people do. The worker and the seller open an ordinary trade with
+    the key on the look prompt, and the worker presses Buy for the company on
+    the panel. The trade block moves it (saleSwap there). These two are the
+    company's half of it: the cuts, and who may.
+
+    AN ITEM HAS NO GOLD PRICE OF ITS OWN. The price is the gold the worker
+    puts up and the two of them agree to on the panel, the way any trade is
+    agreed. Any change to either side takes both agreements back.
+
+    THE CUTS. The worker takes 10% of the price, rounded down, and another 10%
+    leaves the server. The seller receives the rest. Under 10 gold neither cut
+    is taken and the seller receives the whole price. The price comes out of
+    the worker's pack, the company's coin in their hands, and the worker's own
+    10% is never taken from it, so the worker pays the price less their cut.
+    No coin is created and none goes onto a ledger: the 10% that leaves is
+    destroyed. Where the price comes from is asked on #1393.
+
+    WHO MAY. A character on an account the company has taken on: the Discord
+    role an application in Discord leads to (__thornswoodIsCompany), or an
+    admin testing the chain, the same as a Jarl.
+  */
+  var SALE_CUT_FROM = 10;
+
+  /** A price split: the worker's 10%, the 10% that leaves, and the seller's rest. */
+  function saleCuts(price) {
+    var p = Math.floor(Number(price)) || 0;
+    if (p < SALE_CUT_FROM) { return { price: p, worker: 0, gone: 0, seller: p }; }
+    var tenth = Math.floor(p / 10);
+    return { price: p, worker: tenth, gone: tenth, seller: p - tenth - tenth };
+  }
+
+  function inCompany(profileId) {
+    var adm = g['__thornswoodIsAdmin'];
+    try { if (typeof adm === 'function' && adm(profileId)) { return true; } } catch (e) { }
+    var fn = g['__thornswoodIsCompany'];
+    try { return typeof fn === 'function' && !!fn(profileId); } catch (e2) { return false; }
   }
 
   function command(word, parts, actorId, profileId, toProfile) {
@@ -35900,6 +38571,7 @@ log('gamemode loaded:',
     if (word === '/evict') { return evict(actorId, profileId, toProfile); }
     if (word === '/box') { return boxCmd(parts, actorId, profileId, toProfile); }
     if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile); }
+    if (word === '/sleephere') { return sleepHere(parts, actorId, profileId, toProfile); }
     if (word === '/notice') { return post(parts, actorId, profileId, toProfile, false); }
     if (word === '/job') { return post(parts, actorId, profileId, toProfile, true); }
     if (word === '/board') { return board(parts, actorId, profileId, toProfile); }
@@ -35907,6 +38579,9 @@ log('gamemode loaded:',
     if (word === '/jobs') { return jobs(profileId, toProfile); }
     if (word === '/dropjob') { return dropJob(parts, actorId, profileId, toProfile); }
     if (word === '/unpin') { return unpin(parts, actorId, profileId, toProfile); }
+    if (word === '/letter') { return postLetter(parts, actorId, profileId, toProfile); }
+    if (word === '/deliver') { return deliver(parts, actorId, profileId, toProfile); }
+    if (word === '/haul') { return haulCmd(parts, actorId, profileId, toProfile); }
     return false;
   }
 
@@ -36063,6 +38738,9 @@ log('gamemode loaded:',
     claims: function () { return claims; },
     isJarl: isJarl, isSteward: isSteward,
     touchedBox: touchedBox, putIn: putIn, holdOfBox: holdOfBox,
+    deposit: deposit, takeGold: takeGold, LEDGER_HOLDS: LEDGER_HOLDS,
+    withdraw: withdraw, mayWithdraw: mayWithdraw, heldOn: heldOn,
+    haulTenth: haulTenth, haulTick: haulTick, saleCuts: saleCuts, inCompany: inCompany,
     holdStanding: holdStanding,
     rentDue: rentDue, funds: function () { return funds; },
     boxes: function () { return boxes; },
@@ -36076,6 +38754,510 @@ log('gamemode loaded:',
        Object.keys(claims).length, 'claim(s)');
 })();
 // ==== end thornswood property ====
+
+// ==== thornswood carriages ====
+/*
+  CARRIAGES AND FERRIES: THE ROUTE LIST, THE FARE, AND THE ONE MOVE (#1394).
+
+  docs/systems/carriages.md is the design and every number here is from it.
+  You stand within 400 of the driver and press E on him, and a panel of his
+  stops and fares opens. A ferry is 10 gold, Solstheim's own ferry included.
+  A carriage is 10 to a stop in the same hold and 20 to another hold. 40 is
+  only the crossing between the mainland and Solstheim, the Northern Maiden
+  between Windhelm and Raven Rock (Patrick, 4 Oct, on #1394). The fare
+  goes onto the ledger of the hold the stop you leave from is in, counted the
+  way a notice fee is counted (deposit, in the property block). A pack that is
+  short does not move and loses nothing. Fast travel stays off: nothing here
+  offers the map, and there is no word that skips the driver.
+
+  THE PANEL, NOT A COMMAND (#1635; Patrick, 4 Oct: no chat commands for
+  what people do). E on a driver sends /ride e <id> from the front plugin.
+  The server answers by publishing that driver's stops and fares on
+  PANEL_PROPERTY, which game/ui/thornswood-ride.js draws, and each stop's
+  Ride button sends /ride and the stop. Nobody is told to type either line,
+  and no help names /ride. A refusal is said in the chat and drawn on the
+  panel, which stays up. A ride that goes closes it.
+
+  THE MOD'S OWN RIDE DOES NOT LAND, READ IN THE FORK. MovementValidation
+  in skymp5-server refuses any move a client reports that changes the cell or
+  the world, or covers 4096 units or more, and sends the person back to where
+  the server had them. The carriage mod's fade moves the person on their own
+  machine and nowhere else, so on this server its ride ends where it began.
+  So the move is the server's: one locationalData set, the call /tp and
+  arriving from creation make. That is the one position change the page asks
+  for, and nothing moves anybody a second time on top of it.
+
+  WHERE THE STOPS COME FROM. The driver at every stop is a placed person in
+  game/data/npc-population.json with the role transport: the collection's own
+  carriage and ferry workers, read out of the plugins by
+  scripts/dev/Build-NpcPopulation.py. Each row below is one of those, with its
+  reference, base, world, spot and hold copied across, and
+  tests/test-1394-fares.js fails when the two drift apart. You land on the
+  driver's own spot at the other end, the way MoveTo onto an actor lands.
+  Which water a ferryman works is the mod's: KmodFerryRoute1 to 4 in
+  cast.json, which the mod's own page calls the North Coast, Lake Honrich,
+  Lake Ilinalta and Solstheim, and a ferryman there goes to any stop on his
+  water. Gjalund Salt-Sage is Dragonborn's ship between Windhelm and Raven
+  Rock, the Northern Maiden.
+
+  TWO WITH NO FACTION IN THE REPO. Thors is the one carriage driver in
+  Winterhold town, from the mod's fix that "adds a carriage to Winterhold".
+  Rolf is the Dragon Bridge ferryman the same fix added "beneath the bridge,
+  on the Karth River", and the Karth is North Coast water. Both are on the
+  issue to check against their factions in the plugin.
+
+  WHAT IS NOT HERE. The mod also puts people down where nobody drives from:
+  the villages, the Hearthfire homes, the Thalmor Embassy, the small ferry
+  landings. Landing there needs the mod's own markers, the repo does not have
+  their positions, and so those are not on this list yet. A ride to one is
+  refused before any gold moves.
+
+  THE HOLD IS THE STOP'S, written on the row. It is never worked out from
+  where the person came from, so Solitude's carriage is Solitude's whoever
+  walks up to it, a ride that started at the embassy included: the embassy
+  is not a hold and has no ledger (docs/systems/embassy.md).
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+  function plog() {
+    var a = Array.prototype.slice.call(arguments);
+    a.unshift('[carriages]');
+    console.log(a.join(' '));
+  }
+
+  /*
+    The fares, Patrick's answers on #1394 (4 Oct). A ferry is 10, Solstheim's
+    own ferry between Raven Rock, Skaal Village and Tel Mithryn included. A
+    carriage is 10 to a stop in the same hold and 20 to another hold. 40 is
+    only the crossing between the mainland and Solstheim.
+  */
+  var FARE_FERRY = 10;
+  var FARE_CARRIAGE_IN_HOLD = 10;
+  var FARE_CARRIAGE = 20;
+  var FARE_CROSSING = 40;
+  /* Solstheim's world. A ride with one end in it and the other not is the crossing. */
+  var SOLSTHEIM = '800:Dragonborn.esm';
+
+  /* The same reach as a notice board. */
+  var RIDE_REACH = 400;
+
+  var RIDE_LINES = {
+    carriage: { kind: 'carriage', what: 'the carriage' },
+    coast: { kind: 'ferry', what: 'the North Coast ferry' },
+    honrich: { kind: 'ferry', what: 'the Lake Honrich ferry' },
+    ilinalta: { kind: 'ferry', what: 'the Lake Ilinalta ferry' },
+    solstheim: { kind: 'ferry', what: 'the Solstheim ferry' },
+    maiden: { kind: 'ferry', what: 'the Northern Maiden' }
+  };
+
+  var RIDE_STOPS = [
+    // The carriage, one in every hold.
+    { key: 'carriage:whiterun', line: 'carriage', name: 'Whiterun', hold: 'whiterun', driver: 'Bjorlam',
+      ref: 'bbf6d:CFTO.esp', base: '6ae98:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [17527.8, -12395.6, -4753.2], rot: 108.9 },
+    { key: 'carriage:solitude', line: 'carriage', name: 'Solitude', hold: 'solitude', driver: 'Thaer',
+      ref: 'bbf76:CFTO.esp', base: '6ae97:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-73260.4, 99388.7, -10910], rot: 60 },
+    { key: 'carriage:windhelm', line: 'carriage', name: 'Windhelm', hold: 'windhelm', driver: 'Alfarinn',
+      ref: 'bbf6e:CFTO.esp', base: '6ae99:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [136396.2, 25084.2, -12805.3], rot: 199.6 },
+    { key: 'carriage:riften', line: 'carriage', name: 'Riften', hold: 'riften', driver: 'Sigaar',
+      ref: 'bbf7f:CFTO.esp', base: '6ae96:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [173633.8, -91556.8, 11131.7], rot: 319.9 },
+    { key: 'carriage:markarth', line: 'carriage', name: 'Markarth', hold: 'markarth', driver: 'Kibell',
+      ref: '9d8bf:CFTO.esp', base: '6ae95:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-169393.6, 4767.4, -4098.1], rot: 0 },
+    { key: 'carriage:falkreath', line: 'carriage', name: 'Falkreath', hold: 'falkreath', driver: 'Tulinn',
+      ref: 'bbf90:CFTO.esp', base: 'bbf8f:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-34633, -90053, -2987.1], rot: 177.6 },
+    { key: 'carriage:morthal', line: 'carriage', name: 'Morthal', hold: 'morthal', driver: 'Wilhod',
+      ref: 'bbf8e:CFTO.esp', base: 'bbf8c:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-39903.4, 71131.3, -13872], rot: 0 },
+    { key: 'carriage:dawnstar', line: 'carriage', name: 'Dawnstar', hold: 'dawnstar', driver: 'Berud',
+      ref: 'bbf91:CFTO.esp', base: 'bbf8d:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [26827, 101305.6, -13255.7], rot: 97.4 },
+    { key: 'carriage:winterhold', line: 'carriage', name: 'Winterhold', hold: 'winterhold', driver: 'Thors',
+      ref: '1c355d:CFTO.esp', base: '1be45a:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [110568, 99564.5, -9024], rot: 54.4 },
+    // The North Coast ferry. Dragon Bridge is the fix's ferryman on the Karth.
+    { key: 'coast:solitudelighthouse', line: 'coast', name: 'Solitude Lighthouse', hold: 'solitude', driver: 'Perius',
+      ref: '14c5b:CFTO.esp', base: '14c5a:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-48717.7, 126815.7, -13954.9], rot: 165.2 },
+    { key: 'coast:solitude', line: 'coast', name: 'Solitude', hold: 'solitude', driver: 'Jolf',
+      ref: 'fb18:CFTO.esp', base: 'aa08:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-63395.9, 94449.8, -13886], rot: 63 },
+    { key: 'coast:dragonbridge', line: 'coast', name: 'Dragon Bridge', hold: 'solitude', driver: 'Rolf',
+      ref: '2d4c0a:CFTO.esp', base: '2d4c09:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-98560.9, 79317.5, -13937.9], rot: 319.9 },
+    { key: 'coast:morthal', line: 'coast', name: 'Morthal', hold: 'morthal', driver: 'Radding',
+      ref: 'aa0c:CFTO.esp', base: 'aa0b:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-36760.3, 65864.9, -13940.7], rot: 85.9 },
+    { key: 'coast:dawnstar', line: 'coast', name: 'Dawnstar', hold: 'dawnstar', driver: 'Harlaug',
+      ref: '14ca2:CFTO.esp', base: 'aa07:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [31426.5, 105934.5, -13955.6], rot: 159.5 },
+    { key: 'coast:winterhold', line: 'coast', name: 'Winterhold', hold: 'winterhold', driver: 'Jollsen',
+      ref: '153f0c:CFTO.esp', base: '158ffc:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [102132.8, 113494, -13955], rot: 149 },
+    { key: 'coast:windhelm', line: 'coast', name: 'Windhelm', hold: 'windhelm', driver: 'Gort',
+      ref: 'fb1b:CFTO.esp', base: 'aa09:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [140249.9, 34021.2, -13934.7], rot: 225 },
+    // The Lake Honrich ferry.
+    { key: 'honrich:riften', line: 'honrich', name: 'Riften', hold: 'riften', driver: 'Heirmir',
+      ref: 'fb29:CFTO.esp', base: 'fb28:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [167248.5, -96459.3, 10688], rot: 270 },
+    { key: 'honrich:heartwoodmill', line: 'honrich', name: 'Heartwood Mill', hold: 'riften', driver: 'Thalldar',
+      ref: 'fb25:CFTO.esp', base: 'fb24:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [134591.4, -95769.6, 10668.8], rot: 90 },
+    { key: 'honrich:ivarstead', line: 'honrich', name: 'Ivarstead', hold: 'riften', driver: 'Haennr',
+      ref: '14c53:CFTO.esp', base: '14c52:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [78620.3, -68798.6, 10638.9], rot: 291.2 },
+    // The Lake Ilinalta ferry.
+    { key: 'ilinalta:brittleshinpass', line: 'ilinalta', name: 'Brittleshin Pass', hold: 'falkreath', driver: 'Rinlen',
+      ref: '2e1e7:CFTO.esp', base: '2e1e6:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-19319.6, -54007.7, 637.1], rot: 137.5 },
+    { key: 'ilinalta:guardianstones', line: 'ilinalta', name: 'Guardian Stones', hold: 'falkreath', driver: 'Bryst',
+      ref: '332f6:CFTO.esp', base: '332f5:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [124.1, -60292.9, 608], rot: 143.2 },
+    { key: 'ilinalta:halfmoonmill', line: 'ilinalta', name: 'Half-Moon Mill', hold: 'falkreath', driver: 'Hisygg',
+      ref: '332ef:CFTO.esp', base: '332ed:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-40803.1, -57902.2, 814.6], rot: 97.4 },
+    // The Solstheim ferry.
+    { key: 'solstheim:ravenrock', line: 'solstheim', name: 'Raven Rock', hold: 'ravenrock', driver: 'Maslyn',
+      ref: '14c6f:CFTO.esp', base: '14c6e:CFTO.esp', world: '800:Dragonborn.esm',
+      pos: [28344.6, 34630.7, 306.5], rot: 122.2 },
+    { key: 'solstheim:telmithryn', line: 'solstheim', name: 'Tel Mithryn', hold: 'ravenrock', driver: 'Bildul',
+      ref: '14c79:CFTO.esp', base: '14c78:CFTO.esp', world: '800:Dragonborn.esm',
+      pos: [72037.3, 20210.9, 305.7], rot: 182.4 },
+    { key: 'solstheim:skaalvillage', line: 'solstheim', name: 'Skaal Village', hold: 'ravenrock', driver: 'Gauldis',
+      ref: '14c6d:CFTO.esp', base: '14c6c:CFTO.esp', world: '800:Dragonborn.esm',
+      pos: [79945.4, 70832.3, 308], rot: 91.7 },
+    // The Northern Maiden, Gjalund Salt-Sage's ship.
+    { key: 'maiden:windhelm', line: 'maiden', name: 'Windhelm', hold: 'windhelm', driver: 'Gjalund Salt-Sage',
+      ref: '182af:Dragonborn.esm', base: '182ae:Dragonborn.esm', world: '3c:Skyrim.esm',
+      pos: [141310, 34083.7, -13995.5], rot: 353.4 },
+    { key: 'maiden:ravenrock', line: 'maiden', name: 'Raven Rock', hold: 'ravenrock', driver: 'Gjalund Salt-Sage',
+      ref: '2582c:Dragonborn.esm', base: '2582b:Dragonborn.esm', world: '800:Dragonborn.esm',
+      pos: [28928.7, 33144.2, 309.9], rot: 73.1 }
+  ];
+
+  var HOLD_NAMES = {
+    whiterun: 'Whiterun', solitude: 'Solitude', riften: 'Riften', markarth: 'Markarth',
+    windhelm: 'Windhelm', falkreath: 'Falkreath', morthal: 'Morthal', dawnstar: 'Dawnstar',
+    winterhold: 'Winterhold', ravenrock: 'Raven Rock'
+  };
+
+  function stopByKey(key) {
+    for (var i = 0; i < RIDE_STOPS.length; i++) {
+      if (RIDE_STOPS[i].key === key) { return RIDE_STOPS[i]; }
+    }
+    return null;
+  }
+
+  function stopByBase(base) {
+    var want = String(base || '').toLowerCase();
+    if (!want) { return null; }
+    for (var i = 0; i < RIDE_STOPS.length; i++) {
+      if (RIDE_STOPS[i].base && RIDE_STOPS[i].base.toLowerCase() === want) { return RIDE_STOPS[i]; }
+    }
+    return null;
+  }
+
+  /** The gold for a ride, or 0 when the list has no such ride. */
+  function fare(from, to) {
+    if (!from || !to || from === to || from.line !== to.line) { return 0; }
+    // Nobody drives from a stop with no driver standing at it.
+    if (!from.driver) { return 0; }
+    var line = Object.prototype.hasOwnProperty.call(RIDE_LINES, from.line) ? RIDE_LINES[from.line] : null;
+    if (!line) { return 0; }
+    if ((from.world === SOLSTHEIM) !== (to.world === SOLSTHEIM)) { return FARE_CROSSING; }
+    if (line.kind === 'ferry') { return FARE_FERRY; }
+    return from.hold === to.hold ? FARE_CARRIAGE_IN_HOLD : FARE_CARRIAGE;
+  }
+
+  /** Every stop this one's driver goes to. */
+  function destinations(from) {
+    var out = [];
+    for (var i = 0; i < RIDE_STOPS.length; i++) {
+      if (fare(from, RIDE_STOPS[i]) > 0) { out.push(RIDE_STOPS[i]); }
+    }
+    return out;
+  }
+
+  /** Where something is: its cell or world and its point, or null. */
+  function placeOf(id) {
+    var cell = null, pos = null;
+    try { cell = mp.get(id, 'worldOrCellDesc'); } catch (e) { return null; }
+    try { pos = mp.get(id, 'pos'); } catch (e) { return null; }
+    if (typeof cell !== 'string' || !cell || !pos || pos.length !== 3) { return null; }
+    var p = [Number(pos[0]), Number(pos[1]), Number(pos[2])];
+    if (!p.every(Number.isFinite)) { return null; }
+    return { cell: cell, pos: p };
+  }
+
+  function apart(a, b) {
+    var dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
+    return Math.sqrt(dx * dx + dy * dy + dz * dz);
+  }
+
+  /*
+    Somebody pressed E on a driver, and the front plugin said which one.
+    Believed only as far as the server can check it: the actor has to be one
+    of the drivers on the list, by its base, and the person has to be within
+    reach of where that actor is now. Null when it is not a driver at all.
+
+    A press lasts for as long as that driver is within reach. The panel it
+    opens stays up that long (the front plugin closes it when you walk off),
+    so its Ride has to mean him for as long, even for a driver who has
+    wandered off his spot. Out of his reach, or with him gone, it is
+    forgotten.
+  */
+  var pressedBy = {};
+
+  function pressDriver(actorId, driverId) {
+    var base = '';
+    try { base = String(mp.get(driverId, 'baseDesc') || ''); } catch (e) { base = ''; }
+    var stop = stopByBase(base);
+    if (!stop) { return null; }
+    var me = placeOf(actorId), them = placeOf(driverId);
+    if (!me || !them || me.cell !== them.cell || apart(me.pos, them.pos) > RIDE_REACH) {
+      return { stop: stop, far: true };
+    }
+    pressedBy[actorId] = { stop: stop.key, driver: driverId, at: Date.now() };
+    return { stop: stop, far: false };
+  }
+
+  /** The stop this person is standing at, or null. */
+  function stopHere(actorId) {
+    var me = placeOf(actorId);
+    if (!me) { return null; }
+    var p = Object.prototype.hasOwnProperty.call(pressedBy, actorId) ? pressedBy[actorId] : null;
+    if (p) {
+      var s = stopByKey(p.stop);
+      var them = placeOf(p.driver);
+      var base = '';
+      try { base = String(mp.get(p.driver, 'baseDesc') || ''); } catch (e) { base = ''; }
+      if (s && them && stopByBase(base) === s && them.cell === me.cell &&
+          apart(me.pos, them.pos) <= RIDE_REACH) {
+        return s;
+      }
+      delete pressedBy[actorId];
+    }
+    /*
+      Otherwise the driver himself, or his spot. The population block keeps a
+      kept driver on his own placed reference, so the server can read where he
+      stands now; a driver it cannot read is measured from his spot.
+    */
+    var best = null, bestD = RIDE_REACH;
+    for (var i = 0; i < RIDE_STOPS.length; i++) {
+      var stop = RIDE_STOPS[i];
+      if (!stop.driver || stop.world !== me.cell) { continue; }
+      var d = apart(me.pos, stop.pos);
+      var live = driverNow(stop);
+      if (live && live.cell === me.cell) { d = Math.min(d, apart(me.pos, live.pos)); }
+      if (d <= bestD) { bestD = d; best = stop; }
+    }
+    return best;
+  }
+
+  function driverNow(stop) {
+    var id = 0;
+    try { id = Number(mp.getIdFromDesc(stop.ref)) || 0; } catch (e) { id = 0; }
+    return id > 0 ? placeOf(id) : null;
+  }
+
+  function simple(text) {
+    return String(text || '').toLowerCase().replace(/[^a-z]/g, '');
+  }
+
+  /* The stop they named, out of the ones this driver goes to: the whole name,
+     or the start of exactly one. */
+  function pick(list, wanted) {
+    var w = simple(wanted);
+    if (!w) { return null; }
+    var i;
+    for (i = 0; i < list.length; i++) {
+      if (simple(list[i].name) === w) { return list[i]; }
+    }
+    var hits = [];
+    for (i = 0; i < list.length; i++) {
+      if (simple(list[i].name).indexOf(w) === 0) { hits.push(list[i]); }
+    }
+    return hits.length === 1 ? hits[0] : null;
+  }
+
+  /*
+    THE PANEL'S VIEW, seen by its owner only, the way the repair and the
+    merchant panels' are. The owner's script hands it to the page, and
+    game/ui/thornswood-ride.js draws it. A view with open set asks for the
+    panel (the front plugin opens it once the mod's own conversation has
+    closed), and open false closes it. at moves on every send, so a second
+    press draws it again even when nothing in it changed.
+  */
+  var PANEL_PROPERTY = 'thornswoodRideView';
+  var panelScript = [
+    '(function(){',
+    '  try {',
+    '    var v = ctx.value;',
+    '    if (!v || typeof v !== "object") { return; }',
+    '    var st = ctx.state;',
+    '    if (!st) { return; }',
+    '    if (st.thornswoodRideAt === v.at) { return; }',
+    '    st.thornswoodRideAt = v.at;',
+    '    var body = JSON.stringify(v);',
+    '    var src = "(function(){try{" +',
+    '      "var d=" + body + ";window.thornswoodRideView=d;" +',
+    '      "if(window.thornswoodRide&&window.thornswoodRide.setData){window.thornswoodRide.setData(d);}" +',
+    '      "}catch(e){}})();";',
+    '    try { ctx.sp.browser.executeJavaScript(src); } catch (e) { }',
+    '  } catch (e) { }',
+    '})();'
+  ].join('\n');
+  try {
+    mp.makeProperty(PANEL_PROPERTY, {
+      isVisibleByOwner: true, isVisibleByNeighbors: false,
+      updateOwner: panelScript, updateNeighbor: ''
+    });
+  } catch (e) { /* made by an earlier load. harmless. */ }
+
+  /** What the panel shows at this stop: the driver, his stops and their fares. */
+  function panelView(from, note) {
+    var list = destinations(from);
+    var stops = [];
+    for (var i = 0; i < list.length; i++) { stops.push({ name: list[i].name, fare: fare(from, list[i]) }); }
+    return {
+      open: true, driver: from.driver, what: RIDE_LINES[from.line].what, from: from.name,
+      ledger: HOLD_NAMES[from.hold] || from.hold, stops: stops, note: note || ''
+    };
+  }
+
+  var shownAt = 0;
+  function show(actorId, view) {
+    var payload = JSON.parse(JSON.stringify(view));
+    shownAt = Math.max(Date.now(), shownAt + 1);
+    payload.at = shownAt;
+    try { mp.set(actorId, PANEL_PROPERTY, payload); } catch (e) {
+      plog('could not send the ride panel to', Number(actorId).toString(16) + ':', e);
+    }
+  }
+
+  /* Whether the pack can pay, by the same test takeGold makes: one stack of
+     coin with the whole fare in it. Read only. */
+  function canPay(actorId, amount) {
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return false; }
+    var entries = (inv && inv.entries) || [];
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (e && e.baseId === 0x0000000F && (Number(e.count) || 0) >= amount) { return true; }
+    }
+    return false;
+  }
+
+  function moveTo(actorId, stop) {
+    mp.set(actorId, 'locationalData', {
+      cellOrWorldDesc: stop.world,
+      pos: [stop.pos[0], stop.pos[1], stop.pos[2]],
+      rot: [0, 0, stop.rot]
+    });
+  }
+
+  function answer(line, from, went) {
+    return { line: line, from: from, went: !!went };
+  }
+
+  /** A ride, and the move when it goes: the line to say back, the stop it was asked at, and whether it went. */
+  function ride(actorId, profileId, wanted) {
+    var from = stopHere(actorId);
+    if (!from) { return answer('Walk up to a carriage or ferry driver first.', null); }
+    if (!wanted) { return answer('', from); }
+    var to = pick(destinations(from), wanted);
+    if (!to) { return answer('No ride to ' + wanted + ' from here.', from); }
+    var price = fare(from, to);
+    // Never 0 or less: destinations() offers only rides with a fare, and an
+    // amount below 1 would make takeGold add rather than take.
+    if (!(price > 0)) { return answer('No ride to ' + wanted + ' from here.', from); }
+    var prop = g.__thornswoodProperty;
+    if (!prop || typeof prop.takeGold !== 'function' || typeof prop.deposit !== 'function') {
+      plog('a ride was asked for and the hold ledger is not loaded');
+      return answer('The hold\'s ledger is not running on this server, so nobody rides. Say so in the dev channel.', from);
+    }
+    // A pack that is short keeps all of it and stays where it is.
+    if (!canPay(actorId, price)) {
+      return answer('The ride to ' + to.name + ' is ' + price + ' gold and you do not have it. Nothing was taken.', from);
+    }
+    /*
+      THE MOVE, THEN THE FARE, so a move the server could not make costs
+      nothing and no coin ever has to go back into a pack. The pack was read a
+      line ago and nothing between here and there touches it, so takeGold
+      finds what canPay found. If writing the pack fails all the same, there
+      is no fare and so no ride: they go back to the stop they left.
+    */
+    try {
+      moveTo(actorId, to);
+    } catch (e) {
+      plog('profile', profileId, 'could not be moved from', from.key, 'to', to.key + ':', e);
+      return answer('The ride did not go, and nothing was taken. Say so in the dev channel.', from);
+    }
+    if (!prop.takeGold(actorId, price)) {
+      try { moveTo(actorId, from); } catch (e2) { }
+      plog('profile', profileId, 'rode from', from.key, 'to', to.key,
+           'and the fare could not be taken, so they were put back');
+      return answer('The fare could not be taken, so the ride did not go. Nothing was taken.', from);
+    }
+    delete pressedBy[actorId];
+    var what = RIDE_LINES[from.line].what;
+    if (!prop.deposit(from.hold, price, 'fare, ' + from.name + ' to ' + to.name + ' by ' + what +
+                      ', profile ' + profileId)) {
+      plog('profile', profileId, 'paid', price, 'at', from.key, 'and', from.hold, 'took no deposit');
+    }
+    plog('profile', profileId, 'rode', what, 'from', from.name, 'to', to.name, 'for', price,
+         'gold, onto', from.hold + '\'s ledger');
+    return answer('You pay the ' + price + ' gold fare and ride to ' + to.name + '.', from, true);
+  }
+
+  /*
+    /ride e <id>          the front plugin, when somebody presses E on a
+                          driver: his panel opens
+    /ride <stop>          the panel's Ride button: pay and go
+    /ride                 the panel of the driver you are at
+    Nobody is told to type any of them (#1635).
+  */
+  function command(parts, actorId, profileId, toProfile) {
+    if (!actorId) {
+      toProfile(profileId, 'You are not in the world yet.');
+      return true;
+    }
+    var first = String((parts && parts[1]) || '').toLowerCase();
+    if (first === 'e' && parts.length === 3 && /^[0-9a-f]+$/i.test(String(parts[2]))) {
+      var pressed = pressDriver(actorId, parseInt(parts[2], 16) >>> 0);
+      // Not a driver: the press was for something else, so nothing to say.
+      if (!pressed) { return true; }
+      if (pressed.far) {
+        toProfile(profileId, 'Walk up to ' + pressed.stop.driver + ' first.');
+        return true;
+      }
+      show(actorId, panelView(pressed.stop, ''));
+      return true;
+    }
+    var done = ride(actorId, profileId, (parts || []).slice(1).join(' ').trim());
+    if (done.line) { toProfile(profileId, done.line); }
+    // A ride that went, or no driver here, closes the panel. A refusal is
+    // drawn on it, and it stays up.
+    show(actorId, done.went || !done.from ? { open: false } : panelView(done.from, done.line));
+    return true;
+  }
+
+  g.__thornswoodCarriages = {
+    STOPS: RIDE_STOPS, LINES: RIDE_LINES, REACH: RIDE_REACH, SOLSTHEIM: SOLSTHEIM,
+    FARE_FERRY: FARE_FERRY, FARE_CARRIAGE_IN_HOLD: FARE_CARRIAGE_IN_HOLD, FARE_CARRIAGE: FARE_CARRIAGE,
+    FARE_CROSSING: FARE_CROSSING, PANEL_PROPERTY: PANEL_PROPERTY,
+    stopByKey: stopByKey, stopByBase: stopByBase, fare: fare, destinations: destinations,
+    stopHere: stopHere, pressDriver: pressDriver, panelView: panelView, ride: ride, command: command
+  };
+  plog('ready,', RIDE_STOPS.length, 'stops on', Object.keys(RIDE_LINES).length, 'lines');
+})();
+// ==== end thornswood carriages ====
 
 // ==== thornswood spoils ====
 /*
@@ -37944,6 +41126,9 @@ log('gamemode loaded:',
   function propertyView(actorId, profileId) {
     var W = g.__thornswoodProperty;
     if (!W || !W.holderOf) { return null; }
+    // Who may sleep in each place you hold tonight, with a Stop beside each
+    // name (#1603). See guestsOf in the beds, in the property block.
+    var B = g.__thornswoodBeds;
     var rows = [], seen = {};
     try {
       var claims = W.claims();
@@ -37953,7 +41138,8 @@ log('gamemode loaded:',
         if (!held || held.by !== profileId) { continue; }
         seen[b] = true;
         rows.push({ name: W.nameOf(b), mine: true, locked: !!held.locked,
-                    keyed: W.holdsKey(actorId, b) });
+                    keyed: W.holdsKey(actorId, b), b: b,
+                    sleep: (B && B.guestsOf) ? B.guestsOf(b) : [] });
       }
       // Then the places somebody let you into. A key to a building you already
       // hold is not a second row: it is the same house and the row above says
@@ -38020,6 +41206,105 @@ log('gamemode loaded:',
     return out;
   }
 
+  /*
+    And what a warrior's maneuver adds while it lasts (#1386): Rush's +4
+    speed for five seconds. Folded into the same map for the same reason the
+    needs are: the client SETS each value to the total it is given, so a
+    second map would overwrite the first. The maneuvers block loads after
+    this one and is asked at write time.
+  */
+  function withManeuvers(actorId, base) {
+    var mv = g.__thornswoodManeuvers;
+    if (!mv || !mv.effects || !actorId) { return base; }
+    var add = null;
+    try { add = mv.effects(actorId); } catch (e) { return base; }
+    if (!add) { return base; }
+    var out = {};
+    for (var k in base) {
+      if (Object.prototype.hasOwnProperty.call(base, k)) { out[k] = base[k]; }
+    }
+    for (var av in add) {
+      if (!Object.prototype.hasOwnProperty.call(add, av)) { continue; }
+      out[av] = (Object.prototype.hasOwnProperty.call(out, av) ? out[av] : 0) + add[av];
+    }
+    return out;
+  }
+
+  /*
+    And what a running skill perk adds while it lasts (#1385): Font of
+    Magic's 15 seconds of free spells, on each school's cost value. Folded in
+    for the same reason as the maneuvers, and asked at write time because the
+    skill perks block loads after this one.
+  */
+  function withPerks(actorId, base) {
+    var pk = g.__thornswoodPerks;
+    if (!pk || !pk.effects || !actorId) { return base; }
+    var add = pk.effects(actorId);
+    if (!add) { return base; }
+    var out = {};
+    for (var k in base) {
+      if (Object.prototype.hasOwnProperty.call(base, k)) { out[k] = base[k]; }
+    }
+    for (var av in add) {
+      if (!Object.prototype.hasOwnProperty.call(add, av)) { continue; }
+      out[av] = (Object.prototype.hasOwnProperty.call(out, av) ? out[av] : 0) + add[av];
+    }
+    return out;
+  }
+
+  /*
+    And restoration strain while it lasts (#1387): the rising cost and the
+    20 seconds refused, from the college block, folded in for the same
+    reason as the maneuvers and asked at write time for the same reason.
+  */
+  function withCollege(actorId, base) {
+    var co = g.__thornswoodCollege;
+    if (!co || !co.effects || !actorId) { return base; }
+    var add = co.effects(actorId);
+    if (!add) { return base; }
+    var out = {};
+    for (var k in base) {
+      if (Object.prototype.hasOwnProperty.call(base, k)) { out[k] = base[k]; }
+    }
+    for (var av in add) {
+      if (!Object.prototype.hasOwnProperty.call(add, av)) { continue; }
+      out[av] = (Object.prototype.hasOwnProperty.call(out, av) ? out[av] : 0) + add[av];
+    }
+    return out;
+  }
+
+  /* The College page on K (#1387): what a semester hands this character and when the next one opens. */
+  function collegeView(s) {
+    var co = g.__thornswoodCollege;
+    return (co && co.view) ? co.view(s) : null;
+  }
+
+  /*
+    The map the client applies, folded the way forPanel folds it: the tree,
+    the needs, a running maneuver, a running perk and restoration strain
+    (#1387). The maneuvers block
+    reads its stamina to know a person's real most (#1386): the tree's
+    Endurance and the needs' penalties are on it. A change to the fold in
+    forPanel is a change here too.
+  */
+  function effectsOf(actorId) {
+    return withCollege(actorId, withPerks(actorId, withManeuvers(actorId, withNeeds(actorId, P.treeApplies(stateOf(actorId))))));
+  }
+
+  /*
+    A warrior's maneuvers, for the panel the maneuver key opens (#1386). The
+    maneuvers block owns the rows and loads after this one, so it is asked at
+    write time; absent for somebody who holds none.
+  */
+  function maneuversView(actorId, s) {
+    var mv = g.__thornswoodManeuvers;
+    if (!mv || !mv.view || !actorId) { return null; }
+    try { return mv.view(actorId, s); } catch (e) {
+      clog('the maneuvers view threw for', actorId.toString(16) + ':', e);
+      return null;
+    }
+  }
+
   function needsView(actorId) {
     var n = g.__thornswoodNeeds;
     if (!n || !actorId) { return null; }
@@ -38067,7 +41352,9 @@ log('gamemode loaded:',
         that counted. One map, one total, and a penalty is simply a negative
         number in it. See the needs block at the end of this file.
       */
-      effects: withNeeds(actorId, P.treeApplies(s)),
+      effects: withManeuvers(actorId, withNeeds(actorId, P.treeApplies(s))),
+      // What the maneuver key draws. See maneuversView.
+      maneuvers: maneuversView(actorId, s),
       /*
         The three meters, for the panel to draw. Absent entirely when there is
         no character in hand or the needs block is not loaded, so a page from
@@ -38078,6 +41365,8 @@ log('gamemode loaded:',
       // name and spellPoints as a number; both names are the client's.
       spells: spellMap(s),
       spellPoints: P.spellPoints(s),
+      // The College page: absent for somebody magic is not open to.
+      college: collegeView(s),
       // Rank and progress per key. See workView.
       work: workView(s),
       home: s.home || null,
@@ -38089,6 +41378,10 @@ log('gamemode loaded:',
       creating: !!creating,
       towns: (creating && chargen) ? chargen.towns() : []
     };
+    // And a running skill perk on top of all of that (#1385): see withPerks.
+    view.effects = withPerks(actorId, view.effects);
+    // And restoration strain while it lasts (#1387): see withCollege.
+    view.effects = withCollege(actorId, view.effects);
     /*
       The recipe book, and only in the world. Creation is about choosing who
       you are, and a page counting what a half you have not picked yet could
@@ -38106,6 +41399,14 @@ log('gamemode loaded:',
       var SS = g.__thornswoodStaffSpells;
       var staff = (SS && SS.view) ? SS.view(P, s) : null;
       if (staff) { view.staff = staff; }
+      /*
+        When each filled perk that waits is ready again, and Font of Magic
+        while it runs (#1385), so the K panel can say so beside the perk. The
+        skill perks block owns the clocks and loads after this one.
+      */
+      var PKV = g.__thornswoodPerks;
+      var perkClocks = (PKV && PKV.clocks && actorId) ? PKV.clocks(actorId, s) : null;
+      if (perkClocks) { view.perkClocks = perkClocks; }
     }
     // Left out entirely when there is nothing to say, per the contract.
     var climbing = progressView(s);
@@ -38250,6 +41551,9 @@ log('gamemode loaded:',
     } catch (e) {
       clog('could not write', actorId.toString(16), e);
     }
+    // Twin Souls is a second enchantment slot in the menu (#1389). It lives
+    // beside the craft gate, outside this block, the way spellOn does.
+    if (typeof handEnchantSlots === 'function') { handEnchantSlots(actorId, s); }
     return s;
   }
 
@@ -38412,7 +41716,9 @@ log('gamemode loaded:',
 
   function credit(actorId, key) {
     var s = stateOf(actorId);
-    var r = P.creditWork(s, key);
+    // The Master who took them on in this half, when one still stands, so a
+    // sister half's count rises past the threshold it waits at (#1388).
+    var r = P.creditWork(s, key, masterFor(actorId, s, P.classFor(key) || key));
     if (!r.ok) { return null; }
     writeState(actorId, r.state);
     return raiseLines(actorId, r);
@@ -38459,16 +41765,14 @@ log('gamemode loaded:',
     had no form id for it all end up in the same place.
   */
   function grantKnown(actorId) {
+    // Only the book is granted (#1387): what it does not list comes off
+    // first, out of the book and off the character, in the college block.
+    var college = g.__thornswoodCollege;
+    if (college && college.cleanAtLogin) { college.cleanAtLogin(actorId); }
     var s = stateOf(actorId);
     var known = (s.spells && s.spells.known) || [];
-    // A spell a tome taught that the book does not list (#1026) has no name
-    // in SPELL_IDS; the engine put it on the character when the tome was read
-    // and keeps it in learnedSpells, so it is skipped here, not logged as
-    // missing on every spawn.
-    var tomes = (s.spells && s.spells.tomes) || {};
     var n = 0;
     for (var i = 0; i < known.length; i++) {
-      if (P.has(tomes, known[i])) { continue; }
       if (grantSpell(actorId, known[i], true)) { n++; }
     }
     if (known.length) {
@@ -38492,7 +41796,343 @@ log('gamemode loaded:',
     if (staff.length) {
       clog('spawn:', put, 'of', staff.length, 'staff spells put back on', actorId.toString(16));
     }
+    // And the second enchantment slot Twin Souls gives (#1389): a session
+    // starts from a save with no perks on it.
+    if (typeof handEnchantSlots === 'function') { handEnchantSlots(actorId, s); }
     return n;
+  }
+
+  /*
+    MASTERS AND APPRENTICES (#1388, #1147). docs/systems/apprenticeship.md.
+
+      /apprentice                       who you took on, and who took you on
+      /apprentice <name> [half]         a Master offers to take somebody on
+      /apprentice end <name> [half]     the Master ends it
+
+    The name can be the form id the crosshair hands over, the same as /party
+    and /trade. The half is needed only when the Master could take that
+    person on in more than one.
+
+    The Master offers and the person answers, the way a party or a trade is
+    asked: the offer stands in the social block's offers for its seconds, and
+    /yes or Accept on the prompt lands it in acceptApprentice below. Taking
+    somebody on is the Master's decision and nobody is owed it. The person
+    saying yes is the other half of the agreement, and it matters most for an
+    outside trade, which is one of only two in a life.
+
+    WHICH ARRANGEMENT is read off the person, never chosen: the other half of
+    their own profession is the sister half (P.takeOn), and a half or school
+    of another profession is an outside trade (P.teach). Their own half, and
+    anything else inside their own profession, the rules refuse and say why.
+
+    WHAT IS RECORDED, on both sides, so either can be read with the other
+    offline. The person carries masters[half] = { id, name, at }, the Master's
+    actor. The Master carries apprentices, a row per person and half. Work is
+    counted against the Master's own record: credit() hands the rules the
+    Master only while that Master is still a Master of the half and still
+    lists the person. Ending it takes the row off both, and nothing else
+    raises a rank: there is no fee, and no gold buys one.
+  */
+
+  /** A half or a school by what somebody typed, its key, its name or the launcher's word for it, or null. */
+  function halfKey(word) {
+    var w = mapHalf(word);
+    if (!w) { return null; }
+    var T = P.TABLE;
+    if (T.schools.indexOf(w) !== -1) { return w; }
+    for (var prof in T.professions) {
+      if (!P.has(T.professions, prof)) { continue; }
+      if (P.has(T.professions[prof].halves, w)) { return w; }
+    }
+    return null;
+  }
+
+  /** The name over somebody's head, through the social block when it is loaded. */
+  function personName(actorId) {
+    var soc = g.__thornswoodSocial;
+    try { if (soc && soc.nameOfPerson) { return soc.nameOfPerson(actorId); } } catch (e) { }
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      if (ap && ap.name) { return String(ap.name); }
+    } catch (e2) { }
+    return 'somebody';
+  }
+
+  /** Does this Master's own record still list that person in that half. */
+  function lists(masterState, learnerId, half) {
+    var rows = (masterState && masterState.apprentices) || [];
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i] && rows[i].id === learnerId && rows[i].half === half) { return true; }
+    }
+    return false;
+  }
+
+  /*
+    The Master to hand the rules when work in a half is counted, or null.
+
+    Read off the Master's own record every time, online or not: a Master who
+    ended it, or whose character is gone, hands nothing, and the count waits
+    at the threshold again. Ranks already earned are in the person's own
+    record and are not touched.
+  */
+  function masterFor(actorId, s, key) {
+    var rec = (s && s.masters && P.has(s.masters, key)) ? s.masters[key] : null;
+    if (!rec || !rec.id || rec.id === actorId) { return null; }
+    var ms = readState(rec.id);
+    if (!ms || P.rankOf(ms, key) !== 'master' || !lists(ms, actorId, key)) { return null; }
+    return ms;
+  }
+
+  /** Every half and school somebody holds at Master. A class is not taught. */
+  function mastered(ms) {
+    var out = [];
+    var ranks = (ms && ms.ranks) || {};
+    for (var k in ranks) {
+      if (!P.has(ranks, k) || ranks[k] !== 'master') { continue; }
+      if (P.has(P.TABLE.classes, k)) { continue; }
+      out.push(k);
+    }
+    return out;
+  }
+
+  /*
+    The rules' answer for one half, as the arrangement it is for that person.
+    A record of a Master that no longer stands (ended on their side, or the
+    character gone) is not in the way of a new one.
+  */
+  function arrange(learnerId, ls, ms, half, who) {
+    var own = ls && (ls.half === half || (ls.schools || []).indexOf(half) !== -1);
+    var sister = (ls && ls.half) ? P.sisterOf(ls.prof, ls.half) : null;
+    var r;
+    if (own || (sister && sister === half)) {
+      var s = ls;
+      if (s && s.masters && P.has(s.masters, half) && !masterFor(learnerId, s, half)) {
+        s = P.clone(s);
+        delete s.masters[half];
+      }
+      r = P.takeOn(s, ms, half, who);
+      r.kind = 'sister';
+      return r;
+    }
+    r = P.teach(ls, ms, half, who);
+    r.kind = 'outside';
+    return r;
+  }
+
+  /** What /apprentice on its own says: both sides of every arrangement this character is in. */
+  function standing(actorId) {
+    var s = stateOf(actorId);
+    var out = [];
+    var rows = s.apprentices || [];
+    if (rows.length) {
+      var took = [];
+      for (var i = 0; i < rows.length; i++) { took.push(rows[i].name + ' in ' + nameOf(rows[i].half)); }
+      out.push('You have taken on ' + took.join(', ') + '.');
+    }
+    var masters = s.masters || {};
+    var sister = s.half ? P.sisterOf(s.prof, s.half) : null;
+    for (var half in masters) {
+      if (!P.has(masters, half)) { continue; }
+      var who = (masters[half] && masters[half].name) || 'somebody';
+      if ((s.taught || []).indexOf(half) !== -1) {
+        out.push(who + ' taught you novice ' + nameOf(half) + '.');
+      } else {
+        out.push(who + ' has taken you on in ' + nameOf(half) +
+                 (masterFor(actorId, s, half) ? ', your sister half.' : ', and that no longer stands.'));
+      }
+    }
+    if (sister && !(P.has(masters, sister) && masterFor(actorId, s, sister)) && P.rankOf(s, sister) !== 'master') {
+      out.push(nameOf(sister) + ', your sister half, waits at ' + (P.rankOf(s, sister) || 'novice') +
+               ' until a Master of it takes you on.');
+    }
+    if (s.prof) {
+      var used = (s.taught || []).length + (s.untaught || []).length;
+      out.push(used + ' of your ' + P.TABLE.limits.secondaries + ' outside trades used in this life.');
+    }
+    out.push('A Master takes somebody on with /apprentice <name>, and ends it with /apprentice end <name>.');
+    return out.join(' ');
+  }
+
+  /** A Master offers. Returns the line for the Master. */
+  function offerIt(actorId, words) {
+    var half = null;
+    if (words.length > 1) {
+      half = halfKey(words[words.length - 1]);
+      if (half) { words = words.slice(0, -1); }
+    }
+    var soc = g.__thornswoodSocial;
+    if (!soc || !soc.findPerson || !soc.offer) {
+      return 'Asking somebody is not running on this server right now. Say so in the dev channel.';
+    }
+    var found = soc.findPerson(words.join(' '));
+    if (!found.actorId) { return found.why; }
+    var them = found.actorId;
+    if (them === actorId) { return 'That is you.'; }
+    var ms = stateOf(actorId);
+    var ls = stateOf(them);
+    var name = personName(them);
+    var mine = mastered(ms);
+    if (!mine.length) { return 'Only a Master takes anybody on, and you are not a Master of any half or school yet.'; }
+    if (!half) {
+      var can = [];
+      for (var i = 0; i < mine.length; i++) {
+        if (arrange(them, ls, ms, mine[i], null).ok) { can.push(mine[i]); }
+      }
+      if (can.length > 1) {
+        var named = [];
+        for (var j = 0; j < can.length; j++) { named.push(nameOf(can[j])); }
+        return 'You could take ' + name + ' on in ' + named.join(' or ') + '. Say which: /apprentice ' +
+               name + ' ' + can[0] + '.';
+      }
+      // One that works, or none, in which case the rules say why about the
+      // first half they hold at Master.
+      half = can.length ? can[0] : mine[0];
+    }
+    var r = arrange(them, ls, ms, half, null);
+    if (!r.ok) { return 'No: ' + r.why + '.'; }
+    var refused = soc.offer('apprentice', actorId, them);
+    if (refused) { return refused; }
+    var pid = soc.profileOf ? soc.profileOf(them) : 0;
+    var o = (soc.offers && pid) ? soc.offers[pid] : null;
+    if (o) { o.master = actorId; o.half = half; }
+    var me = personName(actorId);
+    var asked = (r.kind === 'sister')
+      ? me + ' offers to take you on in ' + nameOf(half) + ', your sister half, so it can climb past novice. ' +
+        'It costs nothing and it is not one of your two outside trades.'
+      : me + ' offers to teach you novice ' + nameOf(half) + '. It is one of your two outside trades for life, ' +
+        'it never climbs past novice, and if it is ended the place does not come back.';
+    try { if (typeof say === 'function') { say(them, asked + ' Accept or refuse on the prompt.'); } } catch (e) { }
+    try { if (typeof notify === 'function') { notify(them, me + ' offers to take you on'); } } catch (e2) { }
+    try { if (soc.push) { soc.push(them); soc.push(actorId); } } catch (e3) { }
+    var secs = (soc.SOCIAL && soc.SOCIAL.offerFor) ? Math.round(soc.SOCIAL.offerFor / 1000) : 45;
+    return 'Asked ' + name + ' to be your apprentice in ' + nameOf(half) + '. They have ' + secs + ' seconds.';
+  }
+
+  /*
+    The person said yes. The offer is checked again from the start, because
+    anything can have moved in the seconds it stood, and only then is either
+    side written. Returns { learner, master }: the line for each.
+  */
+  function acceptApprentice(actorId, masterId, o) {
+    var half = o && o.half;
+    if (!half || !o.master || o.master !== masterId) {
+      return { learner: 'That offer came from another of their characters, and it has gone.', master: '' };
+    }
+    var ls = stateOf(actorId);
+    var ms = stateOf(masterId);
+    var who = { id: masterId, name: personName(masterId), at: Date.now() };
+    var r = arrange(actorId, ls, ms, half, who);
+    if (!r.ok) {
+      return { learner: 'That cannot be done now, and ' + who.name + ' has been told why.',
+               master: 'No: ' + r.why + '.' };
+    }
+    var name = personName(actorId);
+    writeState(actorId, r.state);
+    var m2 = P.clone(ms);
+    var rows = [];
+    var had = m2.apprentices || [];
+    for (var i = 0; i < had.length; i++) {
+      if (had[i] && !(had[i].id === actorId && had[i].half === half)) { rows.push(had[i]); }
+    }
+    rows.push({ id: actorId, name: name, half: half, kind: r.kind, at: who.at });
+    m2.apprentices = rows;
+    writeState(masterId, m2);
+    clog(masterId.toString(16), 'took', actorId.toString(16), 'on in', half, '(' + r.kind + ')');
+    if (r.kind === 'sister') {
+      return { learner: who.name + ' has taken you on in ' + nameOf(half) + '. Work in it climbs past novice now, ' +
+                        'and the ranks you earn stay yours if it ends.',
+               master: name + ' is your apprentice in ' + nameOf(half) + '. /apprentice end ' + name + ' ends it.' };
+    }
+    var school = P.TABLE.schools.indexOf(half) !== -1;
+    return { learner: who.name + ' taught you novice ' + nameOf(half) + '. ' +
+                      (school ? 'You can learn ' + P.TABLE.limits.outsiderSpells + ' novice spells of it, each from its tome ' +
+                                'with a spell point a semester at the College hands you'
+                              : 'It is in your recipe book on K') +
+                      ', and it never climbs past novice. It is one of your two outside trades.',
+             master: 'You taught ' + name + ' novice ' + nameOf(half) + '. /apprentice end ' + name + ' ends it.' };
+  }
+
+  /** The Master ends it. Returns the line for the Master. */
+  function endIt(actorId, words) {
+    var ms = stateOf(actorId);
+    var rows = ms.apprentices || [];
+    if (!rows.length) { return 'You have taken nobody on.'; }
+    var half = null;
+    if (words.length > 1) {
+      half = halfKey(words[words.length - 1]);
+      if (half) { words = words.slice(0, -1); }
+    }
+    var want = words.join(' ').trim().toLowerCase();
+    if (!want) { return 'End whose? /apprentice end <name>, and the half when they are with you in two.'; }
+    var asId = parseInt(want, 16);
+    var exact = [], part = [];
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      if (!row || (half && row.half !== half)) { continue; }
+      var n = String(row.name || '').toLowerCase();
+      if ((isFinite(asId) && row.id === asId) || n === want) { exact.push(row); }
+      else if (n.indexOf(want) === 0) { part.push(row); }
+    }
+    var hit = exact.length ? exact : part;
+    if (!hit.length) { return 'Nobody you have taken on answers to that.'; }
+    for (var j = 1; j < hit.length; j++) {
+      if (hit[j].id !== hit[0].id) { return 'More than one of yours answers to that. Use more of the name.'; }
+    }
+    if (hit.length > 1) {
+      var named = [];
+      for (var k = 0; k < hit.length; k++) { named.push(nameOf(hit[k].half)); }
+      return hit[0].name + ' is with you in ' + named.join(' and ') + '. Say which: /apprentice end ' +
+             hit[0].name + ' ' + hit[0].half + '.';
+    }
+    var end = hit[0];
+    var ended = null;
+    var ls = readState(end.id);
+    if (ls) {
+      var r = P.release(ls, end.half, actorId);
+      if (r.ok) {
+        writeState(end.id, r.state);
+        ended = r.ended;
+      }
+    }
+    var m2 = P.clone(ms);
+    var keep = [];
+    for (var m = 0; m < rows.length; m++) {
+      if (rows[m] && !(rows[m].id === end.id && rows[m].half === end.half)) { keep.push(rows[m]); }
+    }
+    m2.apprentices = keep;
+    writeState(actorId, m2);
+    clog(actorId.toString(16), 'ended', end.id.toString(16), 'in', end.half, '(' + (ended || 'their side was already gone') + ')');
+    var me = personName(actorId);
+    var told = (ended === 'outside')
+      ? me + ' has ended your teaching in ' + nameOf(end.half) + ', and its novice list is gone. It still counts as ' +
+        'one of your two outside trades.'
+      : me + ' has ended your apprenticeship in ' + nameOf(end.half) + '. The ranks you earned in it stay; past them ' +
+        'the count waits again until a Master takes you on.';
+    if (!ended) {
+      // Their own record no longer named this Master in that half, or their
+      // character is gone: there was nothing on their side to end.
+      return 'You took ' + end.name + ' off your list. Their side no longer named you in ' +
+             nameOf(end.half) + ', so nothing else changed.';
+    }
+    try { if (typeof say === 'function') { say(end.id, told); } } catch (e) { }
+    if (ended === 'outside') {
+      return 'You ended ' + end.name + '\'s novice ' + nameOf(end.half) + '. It is gone from their book, and it ' +
+             'still counts as one of their two outside trades.';
+    }
+    return 'You ended ' + end.name + '\'s apprenticeship in ' + nameOf(end.half) + '. The ranks they earned stay.';
+  }
+
+  /** /apprentice, every form of it. Answers through toProfile and always handles the word. */
+  function apprenticeCommand(parts, actorId, profileId, toProfile) {
+    if (!actorId) {
+      toProfile(profileId, 'The server cannot find your character right now. Give it a moment and try again.');
+      return;
+    }
+    var words = parts.slice(1);
+    var first = String(words[0] || '').toLowerCase();
+    if (!words.length || first === 'list') { toProfile(profileId, standing(actorId)); return; }
+    if (first === 'end') { toProfile(profileId, endIt(actorId, words.slice(1))); return; }
+    toProfile(profileId, offerIt(actorId, words));
   }
 
   /*
@@ -38531,9 +42171,11 @@ log('gamemode loaded:',
     if (word === '/plant' || word === '/claim' || word === '/plot' ||
         word === '/deed' || word === '/deeds' || word === '/lock' ||
         word === '/unlock' || word === '/mold' || word === '/moldhere' || word === '/key' ||
-        word === '/steward' || word === '/evict' || word === '/box' ||
-        word === '/rent' || word === '/notice' || word === '/job' ||
+        word === '/jarl' || word === '/steward' || word === '/evict' || word === '/box' ||
+        word === '/rent' || word === '/sleephere' || word === '/notice' || word === '/job' ||
         word === '/board' || word === '/take' || word === '/jobs' ||
+        word === '/haul' ||
+        word === '/letter' || word === '/deliver' ||
         word === '/dropjob' || word === '/unpin') {
       if (!actorId) {
         toProfile(profileId, 'The server cannot find your character right now. Give it a moment and try again.');
@@ -38580,6 +42222,12 @@ log('gamemode loaded:',
         clog('the farming word', word, 'threw:', eFarm);
         toProfile(profileId, 'That did not work. Say what you were standing next to in the dev channel.');
       }
+      return true;
+    }
+
+    // Masters and apprentices (#1388): see apprenticeCommand above.
+    if (word === '/apprentice') {
+      apprenticeCommand(parts, actorId, profileId, toProfile);
       return true;
     }
 
@@ -38633,6 +42281,29 @@ log('gamemode loaded:',
         toProfile(profileId, pushed
           ? 'Closed. Press K when you want it back; nothing has been chosen.'
           : 'Closed. Press K to open it again.');
+        return true;
+      }
+      /*
+        A filled perk's Use button on the K panel (#1385): Font of Magic. The
+        skill perks block decides and keeps the clock, so nothing about the
+        character changes here. A refusal is answered like any other pick, as
+        a note about 'perk' and the same line in the chat.
+      */
+      if (what === 'perk') {
+        var PKU = g.__thornswoodPerks;
+        var used = (PKU && PKU.use) ? PKU.use(actorId, s, parts[2])
+          : { ok: false, why: 'perks are not running on this server right now' };
+        if (!used.ok) {
+          toProfile(profileId, 'No: ' + used.why + '.');
+          s.note = { text: used.why, at: Date.now(), about: 'perk' };
+          writeState(actorId, s, true);
+          clog(word, parts.slice(1).join(' '), 'for', actorId.toString(16), 'refused:', used.why);
+          return true;
+        }
+        // An earlier refusal is answered now, as an accepted pick clears it.
+        if (s.note) { s.note = null; writeState(actorId, s, true); }
+        toProfile(profileId, used.line);
+        clog(word, parts.slice(1).join(' '), 'for', actorId.toString(16), 'accepted');
         return true;
       }
       if (what === 'class') {
@@ -38708,6 +42379,16 @@ log('gamemode loaded:',
         r = (SS && SS.unlock) ? SS.unlock(P, s, parts.slice(2).join(' '))
           : { ok: false, why: 'staff spells are not running on this server right now' };
         if (r.ok) { staffPicked = r.spell; }
+      } else if (what === 'study') {
+        /*
+          A semester at the College (#1387): the Study button on the K
+          panel's College page sends this. The college block says whether
+          they are in one of the rooms, and the rules hand out the points.
+        */
+        about = 'study';
+        var CO = g.__thornswoodCollege;
+        r = (CO && CO.study) ? CO.study(actorId, s)
+          : { ok: false, why: 'the College is not running on this server right now' };
       } else if (what === 'spend') {
         about = 'spend';
         r = P.spendPoint(s, String(parts[2] || '').toLowerCase(), parts[3]);
@@ -38737,6 +42418,18 @@ log('gamemode loaded:',
     r.state.note = null;
     var st = writeState(actorId, r.state);
     clog(word, parts.slice(1).join(' '), 'for', actorId.toString(16), 'accepted');
+
+    /*
+      A point spent says what it did when that is more than the panel shows
+      (#1385): the perk, the moment a sub-skill fills, and for Precision, that
+      the game ignores critical chance. The skill perks block words both.
+    */
+    if (about === 'spend') {
+      var PK = g.__thornswoodPerks;
+      var spentIn = String((word === '/pick' ? parts[2] : parts[1]) || '').toLowerCase();
+      var spentLine = (PK && PK.spendLine) ? PK.spendLine(st, spentIn) : '';
+      if (spentLine) { toProfile(profileId, spentLine); }
+    }
 
     /*
       A NEW FARMER GETS SEED. Patrick, 20 September: 'to make it so they can
@@ -38814,6 +42507,8 @@ log('gamemode loaded:',
       with no form id yet is in the book and not in the hands, which
       grantSpell says in the log and nothing else notices.
     */
+    if (about === 'study' && r.line) { toProfile(profileId, r.line); }
+
     if (spellPicked) {
       grantSpell(actorId, spellPicked, true);
       toProfile(profileId, 'You learn ' + spellPicked + '.');
@@ -38874,11 +42569,1619 @@ log('gamemode loaded:',
     beginCreation: beginCreation, updateOwnerScript: updateOwnerScript,
     gate: gate, gateHalf: gateHalf, credit: credit,
     grantSpell: grantSpell, grantKnown: grantKnown, nameOf: nameOf, raiseLines: raiseLines,
+    acceptApprentice: acceptApprentice, masterFor: masterFor, effectsOf: effectsOf,
     rankOf: function (actorId, key) { return P.rankOf(stateOf(actorId), key); }
   };
   clog('ready');
 })();
 // ==== end thornswood character ====
+
+// ==== thornswood skill perks ====
+/*
+  THE FILLED PERKS OF THE SKILL TREE (#1385).
+
+  docs/systems/skill-tree.md is the table. Five points fill a sub-skill and a
+  filled one grants its perk. Which perks somebody holds is never stored: it
+  is P.perks over the tree, so the points are the whole of it. What is stored
+  is when a perk that waits may fire again, and that is this block's.
+
+  WHAT EACH ONE DOES HERE, AND WHAT THE SERVER CANNOT DO.
+    Cheat Death        NOT IN THE GAME YET. The engine ends somebody the
+                       moment a write takes health to nothing
+                       (MpActor::SetPercentages calls Kill), and Kill sends
+                       the death to every machine before mp.onDeath is asked
+                       (SendAndSetDeathState, then DeathEvent). So by the time
+                       the server hears of it you are already dead, and
+                       standing the body back up would be a death undone,
+                       which is a band-aid (Developer-Guide.md, "Fix the
+                       cause"). The engine has to ask before it kills.
+                       cheatDeath() is the answer it will get, and the clock
+                       is kept now, so that engine change is all that is left.
+    Troll's Blood      During a fight, 2 health a second, through the engine's
+                       own Actor.RestoreActorValue, so in the engine's own
+                       units, the ones every blow is dealt in. A fight is a hit
+                       landed or taken, or health falling, in the last 15
+                       seconds: the signs and the 15 seconds /stuck reads.
+    Devastating Blow   A power attack takes a quarter again of what it took,
+                       measured the way the maneuvers measure a Heavy blow.
+    Unshakeable        NOT HERE. A block that staggers you is an animation on
+                       your own machine. The server sends no such stagger and
+                       cannot stop one. It needs the client plugin.
+    Purified Blood     The game's own disease and poison resistance, through
+                       the tree's totals (TUNING.perkApplies). A disease the
+                       server itself gives asks holds(actorId, 'purifiedblood').
+    Archmage's Vessel  Once a day, magicka under a tenth is set to half.
+    Leyline Attunement While magicka is falling, which is the one sign of a
+                       cast the server holds, it comes back at half the usual
+                       rate: the race's own rate (RACE DATA, as the engine
+                       reads it) raised by the tree's Clarity, as the client
+                       raises it.
+    Overcharge         Every fifth spell of yours that takes health takes as
+                       much again. The other half, a spell that holds twice as
+                       long, is a magic effect on the machine that runs it and
+                       is NOT HERE.
+    Spellbreaker       A spell that hits you gives you a fifth of what it
+                       costs, its SPIT cost as the record carries it. A
+                       concentration spell's cost is a second of it, so it
+                       counts once a second.
+    Font of Magic      Once a day, from the Use button beside it on the K
+                       panel: for 15 seconds each school's cost value (<School>Mod, the value the game's own
+                       Fortify <School> enchantments raise, a percent off what
+                       a spell costs) is 100 more, which is the game itself
+                       making a spell free. It rides the totals map the client
+                       already applies, the way a warrior's Rush does, through
+                       effects() below and withPerks in the character block.
+                       So the game never takes the magicka at all, and a spell
+                       you could not have afforded can be cast.
+    Tireless           NOT HERE. What running and a swing cost is worked out
+                       on your own machine. It needs the client plugin.
+    Second Wind        Stamina that reaches nothing fills, once every 5
+                       minutes.
+    Windwalker         +4 speed, through the tree's totals. The fall half is
+                       NOT HERE: a fall is taken on your own machine.
+    Pack Mule          NOT HERE. Being slowed by weight is the game's own, on
+                       your machine. It needs the client plugin.
+    Lethal Aim         An arrow or a bolt takes what it would have taken
+                       against half the armour: the engine's own armour sum
+                       (TES5DamageFormula, worn ARMO and their enchantments),
+                       worked again with half of it.
+
+  PRECISION. The client puts critical chance on the character and nothing
+  reads it. The server works out every blow in TES5DamageFormula, and there is
+  no critical hit in that sum at all. So the answer to a point put in
+  Precision says so, and nothing here calls a hit a critical one.
+
+  NOTHING HERE IS A COMMAND (Patrick, 4 Oct: things people do are buttons and
+  GUI, not chat commands). Font of Magic, the one perk a person starts, is the
+  Use button beside it on the K panel. The panel sends 'skills:pick perk
+  fontofmagic', which reaches the server as /pick perk fontofmagic, the route
+  every other press on that panel travels, and no person is told to type it.
+  What a waiting perk's clock says is on the panel too: perkClocks in the
+  character block's view, out of clocks() below.
+
+  THE CLOCKS LIVE ON THE CHARACTER, in PERK_PROPERTY, and the clock is written
+  before the perk fires. A restart or a relog reads the same clock, and a
+  clock that cannot be written does not fire, so nothing fires twice. A day is
+  24 real hours from the moment it fired. Font of Magic's 15 seconds are
+  not kept: its end is a timer in memory. The day it spent is still spent.
+  The view the client last got is kept on the character, so a restart inside
+  those 15 seconds leaves the free spells on until the panel is next sent
+  (issue #1642, the same for a warrior's Rush).
+
+  EVERY TIME ONE FIRES it is a line in thornswood.log, "perks: <name> fired
+  for <actor>", which is the record the page asks for. Troll's Blood and
+  Leyline Attunement say it once a fight and once a cast, not every second.
+
+  STACKING. A Devastating Blow and a warrior's Heavy on one blow each take
+  their quarter of what the blow took before them, so they multiply. The two
+  blocks measure the same blow one after the other.
+*/
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+  var P = g.__thornswoodProgression;
+  if (!P) { console.log('[thornswood perks] the rules block is missing, nothing registered'); return; }
+
+  var PERK_PROPERTY = 'thornswoodPerks';
+  var SECOND = 1000;
+  var MINUTE = 60 * SECOND;
+  var DAY = 24 * 60 * MINUTE;
+  var FIGHT_MS = 15 * SECOND;     // the 15 seconds /stuck counts as a fight
+  var TICK_MS = 250;
+  var HELD_MS = 2000;             // how long who holds what is trusted
+
+  /*
+    The page's table, one row a perk. say is the page's own sentence; not is
+    what of it the game does not do yet, said wherever the perk is named, and
+    none marks a perk of which nothing is in the game yet.
+  */
+  var PERKS = {
+    cheatdeath:        { name: 'Cheat Death', skill: 'vitality', every: DAY, health: 1, none: true,
+                         say: 'Once a day, the blow that would kill you leaves you at 1 health.',
+                         not: 'That is not in the game yet: the engine ends you the moment health reaches nothing, before the server is asked.' },
+    trollsblood:       { name: 'Troll\'s Blood', skill: 'fortitude', perSecond: 2,
+                         say: 'During a fight, health returns at 2 a second.' },
+    devastatingblow:   { name: 'Devastating Blow', skill: 'might', more: 0.25,
+                         say: 'A power attack deals 25% more.' },
+    unshakeable:       { name: 'Unshakeable', skill: 'resilience', none: true,
+                         say: 'A block cannot stagger you.',
+                         not: 'That is not in the game yet: the stagger is played on your own machine, where the server cannot stop it.' },
+    purifiedblood:     { name: 'Purified Blood', skill: 'toughness',
+                         say: 'Disease does not take. Poison deals 25%.' },
+    archmagesvessel:   { name: 'Archmage\'s Vessel', skill: 'capacity', every: DAY, below: 0.1, to: 0.5,
+                         say: 'Drop below a tenth of magicka and it returns to half, once a day.' },
+    leylineattunement: { name: 'Leyline Attunement', skill: 'clarity', rate: 0.5,
+                         say: 'Magicka still returns while you cast, at half the usual rate.' },
+    overcharge:        { name: 'Overcharge', skill: 'potency', inEvery: 5, more: 1,
+                         say: 'One spell in five deals double, or holds twice as long.',
+                         not: 'Holding twice as long is not in the game yet: only the damage is doubled.' },
+    spellbreaker:      { name: 'Spellbreaker', skill: 'ward', share: 0.2,
+                         say: '20% of the magicka in a spell that hits you is added to yours.' },
+    fontofmagic:       { name: 'Font of Magic', skill: 'efficiency', every: DAY, seconds: 15, costOff: 100,
+                         say: 'Once a day, 15 seconds where a spell costs nothing. Press Use beside it on the K panel to start it.' },
+    tireless:          { name: 'Tireless', skill: 'endurance', none: true,
+                         say: 'Running and swinging cost half stamina.',
+                         not: 'That is not in the game yet: what running and a swing cost is worked out on your own machine.' },
+    secondwind:        { name: 'Second Wind', skill: 'vigor', every: 5 * MINUTE,
+                         say: 'When stamina hits 0 it fills, once every 5 minutes.' },
+    windwalker:        { name: 'Windwalker', skill: 'agility',
+                         say: '+4 speed, and a fall deals no damage.',
+                         not: 'The speed is yours. A fall still hurts for now: it is taken on your own machine.' },
+    packmule:          { name: 'Pack Mule', skill: 'burden', none: true,
+                         say: 'Being overloaded does not slow you.',
+                         not: 'That is not in the game yet: the slowing is the game\'s own, on your machine.' },
+    lethalaim:         { name: 'Lethal Aim', skill: 'precision', armour: 0.5,
+                         say: 'An arrow ignores half the armour it hits.' }
+  };
+  var ORDER = ['cheatdeath', 'trollsblood', 'devastatingblow', 'unshakeable', 'purifiedblood',
+               'archmagesvessel', 'leylineattunement', 'overcharge', 'spellbreaker', 'fontofmagic',
+               'tireless', 'secondwind', 'windwalker', 'packmule', 'lethalaim'];
+
+  var CRIT_LINE = 'Critical chance is put on your character, and the game ignores it: the server ' +
+                  'works out what every blow deals and there is no critical hit in that.';
+
+  function plog() {
+    var a = Array.prototype.slice.call(arguments);
+    var line = 'perks: ' + a.join(' ');
+    if (typeof log === 'function') { log(line); } else { console.log('[thornswood] ' + line); }
+  }
+  // say() is the file's own: it finds the profile and posts the line, and
+  // answers nothing when there is nobody to tell.
+  function tell(actorId, text) { say(actorId, text); }
+  function has(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
+  function hex(id) { return (Number(id) >>> 0).toString(16); }
+  function now() { return Date.now(); }
+  function selfOf(id) { return { type: 'form', desc: mp.getDescFromId(id) }; }
+  function personOf(id) {
+    try { return Number(mp.get(id, 'profileId')) > 0; } catch (e) { return false; }
+  }
+  function deadOf(id) {
+    try { return !!mp.get(id, 'isDead'); } catch (e) { return true; }
+  }
+  function pct(id) {
+    try {
+      var p = mp.get(id, 'percentages');
+      if (!p) { return null; }
+      var out = { health: Number(p.health), magicka: Number(p.magicka), stamina: Number(p.stamina) };
+      return (isNaN(out.health) || isNaN(out.magicka) || isNaN(out.stamina)) ? null : out;
+    } catch (e) { return null; }
+  }
+  function setPct(id, health, magicka, stamina) {
+    try {
+      mp.set(id, 'percentages', { health: health, magicka: magicka, stamina: stamina });
+      return true;
+    } catch (e) {
+      plog('could not write the percentages of', hex(id) + ':', e);
+      return false;
+    }
+  }
+  /* The engine's own Actor.RestoreActorValue: an amount in the engine's units. */
+  function restore(id, what, amount) {
+    try {
+      mp.callPapyrusFunction('method', 'Actor', 'RestoreActorValue', selfOf(id), [what, amount]);
+      return true;
+    } catch (e) {
+      plog('could not restore', what, 'on', hex(id) + ':', e);
+      return false;
+    }
+  }
+  function wait(ms) {
+    var s = Math.max(1, Math.ceil(ms / 1000));
+    if (s < 120) { return s + (s === 1 ? ' second' : ' seconds'); }
+    var m = Math.ceil(s / 60);
+    if (m < 120) { return m + ' minutes'; }
+    return Math.ceil(m / 60) + ' hours';
+  }
+
+  // ------------------------------------------------------ who holds what --
+  function stateOf(id) {
+    var ch = g.__thornswoodCharacter;
+    return (ch && ch.stateOf) ? ch.stateOf(id) : null;
+  }
+  function heldIn(s) {
+    var out = {};
+    if (!s) { return out; }
+    var list = P.perks(s);
+    for (var i = 0; i < list.length; i++) { if (has(PERKS, list[i])) { out[list[i]] = true; } }
+    return out;
+  }
+
+  /*
+    The runtime half, on globalThis so a hot reload keeps it. Nothing in here
+    is a clock that matters across a restart: those are on the character.
+      held   actor -> { at, keys, rate }   who holds what, read every HELD_MS
+      last   actor -> { h, m, at }         the shares last seen, for the tick
+      fight  actor -> when they last hit, were hit, or lost health
+      font   actor -> { until }            a Font of Magic that is running
+      troll  actor -> { at, said }         Troll's Blood's second, and its fight
+      ley    actor -> when Leyline Attunement last gave
+      spells actor -> how many spells of theirs have landed towards Overcharge
+      sb     'target:caster:spell' -> when a concentration spell last gave
+      blow   actor -> { by, at }           whose blow, when this block's write killed
+  */
+  var ST = g.__thornswoodPerkState;
+  if (!ST || typeof ST !== 'object') {
+    ST = g.__thornswoodPerkState = { held: {}, last: {}, fight: {}, font: {}, troll: {}, ley: {},
+                                     spells: {}, sb: {}, blow: {} };
+  }
+
+  function heldOf(id, t) {
+    var c = ST.held[id];
+    if (c && t - c.at < HELD_MS) { return c.keys; }
+    var s = personOf(id) ? stateOf(id) : null;
+    var keys = heldIn(s);
+    var rate = 0;
+    if (keys.leylineattunement) { rate = Number(P.treeApplies(s).magickaRateMult) || 0; }
+    ST.held[id] = { at: t, keys: keys, rate: rate };
+    return keys;
+  }
+
+  /** Does this character hold that perk right now. Read fresh, for any block. */
+  function holds(actorId, key) {
+    if (!actorId || !has(PERKS, key) || !personOf(actorId)) { return false; }
+    return !!heldIn(stateOf(actorId))[key];
+  }
+
+  // ------------------------------------------------------------- the clocks --
+  try {
+    mp.makeProperty(PERK_PROPERTY, {
+      isVisibleByOwner: false, isVisibleByNeighbors: false,
+      updateOwner: '', updateNeighbor: ''
+    });
+  } catch (e) { /* made by an earlier load. harmless. */ }
+
+  /*
+    One character's clocks. Never set reads as null and is an empty record.
+    A read that throws is null here: a clock that cannot be read does not
+    fire, the same as one that cannot be written, because an empty record in
+    its place would hand the day back.
+  */
+  function record(id) {
+    var v = null;
+    try {
+      v = mp.get(id, PERK_PROPERTY);
+    } catch (e) {
+      plog('could not read the clocks of', hex(id) + ':', e);
+      return null;
+    }
+    if (!v || typeof v !== 'object' || v.v !== 1) { v = { v: 1 }; }
+    if (!v.ready || typeof v.ready !== 'object') { v.ready = {}; }
+    if (!v.fired || typeof v.fired !== 'object') { v.fired = {}; }
+    return v;
+  }
+  function readyAt(id, key) {
+    var rec = record(id);
+    return rec ? (Number(rec.ready[key]) || 0) : 0;
+  }
+
+  /* Take the clock. Written first; the perk fires only once it is written. */
+  function take(id, key, t) {
+    var rec = record(id);
+    if (!rec || (Number(rec.ready[key]) || 0) > t) { return false; }
+    rec.ready[key] = t + PERKS[key].every;
+    rec.fired[key] = (Number(rec.fired[key]) || 0) + 1;
+    try {
+      mp.set(id, PERK_PROPERTY, rec);
+    } catch (e) {
+      plog('could not write the', PERKS[key].name, 'clock of', hex(id) + ', so it does not fire:', e);
+      return false;
+    }
+    return true;
+  }
+
+  function fired(id, key, more) {
+    plog(PERKS[key].name, 'fired for', hex(id) + (more ? ' ' + more : ''));
+  }
+
+  // ------------------------------------------------------------ Cheat Death --
+  /*
+    THE ONE CHECK THE ENGINE'S DEATH WILL ASK, once the engine asks before it
+    kills (see Cheat Death at the top of this block). True when Cheat Death
+    takes this death: the clock is written first and the person is told, and
+    the engine is to leave them at 1 health instead of killing them. False is
+    an ordinary death. Nothing calls it yet, and mp.onDeath must not: by then
+    the death has been sent.
+  */
+  function cheatDeath(actorId) {
+    if (!actorId || !personOf(actorId)) { return false; }
+    if (!heldIn(stateOf(actorId)).cheatdeath) { return false; }
+    if (!take(actorId, 'cheatdeath', now())) { return false; }
+    fired(actorId, 'cheatdeath');
+    tell(actorId, 'Cheat Death. The blow that would have killed you leaves you at ' +
+                  PERKS.cheatdeath.health + ' health. It comes back in 24 hours.');
+    return true;
+  }
+
+  // -------------------------------------------------------------- the hits --
+  var kinds = {};
+  var records = {};
+  var gmst = null;
+
+  function lookup(id) {
+    if (!id) { return null; }
+    if (has(records, id)) { return records[id]; }
+    var r = null;
+    try { r = mp.lookupEspmRecordById(id) || null; } catch (e) { r = null; }
+    records[id] = r;
+    return r;
+  }
+  function typeOf(r) { return (r && r.record) ? String(r.record.type || '') : ''; }
+  function fieldOf(r, type) {
+    var fields = (r && r.record && r.record.fields) || [];
+    for (var i = 0; i < fields.length; i++) {
+      if (fields[i] && String(fields[i].type) === type) { return fields[i].data || []; }
+    }
+    return null;
+  }
+  function u32(b, at) {
+    if (!b || b.length < at + 4) { return null; }
+    return (b[at] | (b[at + 1] << 8) | (b[at + 2] << 16)) + b[at + 3] * 0x1000000;
+  }
+  function f32(b, at) {
+    if (!b || b.length < at + 4) { return NaN; }
+    var view = new DataView(new ArrayBuffer(4));
+    for (var i = 0; i < 4; i++) { view.setUint8(i, b[at + i]); }
+    return view.getFloat32(0, true);
+  }
+  function globalOf(r, local) {
+    if (!r || typeof r.toGlobalRecordId !== 'function') { return local || 0; }
+    try { return Number(r.toGlobalRecordId(local)) || 0; } catch (e) { return 0; }
+  }
+  function idOfForm(v) {
+    if (typeof v === 'number') { return v; }
+    if (v && v.desc) {
+      try { return Number(mp.getIdFromDesc(String(v.desc))) || 0; } catch (e) { return 0; }
+    }
+    return 0;
+  }
+
+  /* What landed the hit: 'spell', 'bow' (a bow or a crossbow), 'melee', or ''. */
+  function kindOf(id) {
+    if (!id) { return ''; }
+    if (has(kinds, id)) { return kinds[id]; }
+    var kind = '';
+    if (id === 0x1f4) {
+      kind = 'melee';
+    } else {
+      var r = lookup(id);
+      var type = typeOf(r);
+      if (type === 'SPEL') { kind = 'spell'; }
+      else if (type === 'WEAP') {
+        // WEAP DNAM: the animation type is the first byte. Bow 7, crossbow 9.
+        var dnam = fieldOf(r, 'DNAM');
+        var anim = dnam && dnam.length ? dnam[0] : -1;
+        kind = (anim === 7 || anim === 9) ? 'bow' : 'melee';
+      }
+    }
+    kinds[id] = kind;
+    return kind;
+  }
+
+  /*
+    WHAT A SPELL COSTS, as the record carries it: SPIT's first four bytes. All
+    85 spells in the book carry one (game/data/spells.json, built from the
+    same field). The cast type is at 16, and 2 is concentration.
+  */
+  var spellCosts = {};
+  function spellOf(id) {
+    if (has(spellCosts, id)) { return spellCosts[id]; }
+    var spit = fieldOf(lookup(id), 'SPIT');
+    var cost = u32(spit, 0);
+    var info = { id: id, cost: cost || 0, concentration: u32(spit, 16) === 2 };
+    if (!info.cost) { plog('the spell', hex(id), 'carries no cost, so Spellbreaker gives nothing for it'); }
+    spellCosts[id] = info;
+    return info;
+  }
+
+  /*
+    THE ARMOUR, the way the engine sums it (TES5DamageFormula,
+    CalcOpponentArmorRating): each worn ARMO's DNAM rating over 100, and each
+    of its enchantment's effects whose primary value is DamageResist (39, MGEF
+    DATA at 0x44) by its magnitude. The penalty is the engine's too, out of
+    the two game settings it reads.
+  */
+  var DAMAGE_RESIST = 39;
+  function settings() {
+    if (gmst) { return gmst; }
+    var cap = f32(fieldOf(lookup(0x37deb), 'DATA'), 0);     // fMaxArmorRating
+    var scale = f32(fieldOf(lookup(0x21a72), 'DATA'), 0);   // fArmorScalingFactor
+    gmst = (isFinite(cap) && isFinite(scale) && scale > 0) ? { cap: cap, scale: scale } : { broken: true };
+    if (gmst.broken) { plog('the two armour settings could not be read, so Lethal Aim adds nothing'); }
+    return gmst;
+  }
+  function enchantArmour(enchId) {
+    var r = lookup(enchId);
+    var fields = (r && r.record && r.record.fields) || [];
+    var total = 0, av = -1;
+    for (var i = 0; i < fields.length; i++) {
+      var f = fields[i];
+      if (!f) { continue; }
+      if (String(f.type) === 'EFID') {
+        var mgef = lookup(globalOf(r, u32(f.data, 0)));
+        var data = fieldOf(mgef, 'DATA');
+        var n = u32(data, 0x44);
+        av = n === null ? -1 : (n | 0);
+      } else if (String(f.type) === 'EFIT') {
+        var mag = f32(f.data, 0);
+        if (av === DAMAGE_RESIST && isFinite(mag)) { total += mag; }
+        av = -1;
+      }
+    }
+    return total;
+  }
+  function armourOf(target) {
+    var eq = null;
+    try { eq = mp.get(target, 'equipment'); } catch (e) { return 0; }
+    var entries = (eq && eq.inv && eq.inv.entries) || (eq && eq.entries) || [];
+    var total = 0;
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (!e || !e.baseId || !(e.worn || e.wornLeft)) { continue; }
+      var r = lookup(e.baseId);
+      if (typeOf(r) !== 'ARMO') { continue; }
+      var rating = u32(fieldOf(r, 'DNAM'), 0);
+      if (rating !== null) { total += rating / 100; }
+      var ench = u32(fieldOf(r, 'EITM'), 0);
+      if (ench) { total += enchantArmour(globalOf(r, ench)); }
+    }
+    return total;
+  }
+  /* What a blow against this much armour keeps, out of 1. */
+  function penalty(armour, set) {
+    return (100 - Math.min(armour * set.scale, set.cap)) / 100;
+  }
+  /* What Lethal Aim adds to a bow hit that took this much. */
+  function lethalExtra(target, took) {
+    var set = settings();
+    if (set.broken) { return 0; }
+    var armour = armourOf(target);
+    if (!(armour > 0)) { return 0; }
+    var full = penalty(armour, set);
+    var half = penalty(armour * PERKS.lethalaim.armour, set);
+    if (!(full > 0)) { return 0; }
+    return took * (half / full - 1);
+  }
+
+  /*
+    WHAT A HIT TOOK, MEASURED. The same way the maneuvers measure it: OnHit
+    comes before the engine's damage, so health is read at the event and again
+    on the next turn, and the difference is the blow. A hit the engine threw
+    away took nothing and changes nothing.
+  */
+  var pending = {};
+  var queued = false;
+
+  function hit(targetId, aggressor, source, power, bash) {
+    var target = Number(targetId) || 0;
+    if (!target) { return; }
+    var t = now();
+    var by = idOfForm(aggressor);
+    if (personOf(target)) { ST.fight[target] = t; }
+    if (by && by !== target && personOf(by)) { ST.fight[by] = t; }
+    var open = pending[target];
+    if (open && open.length && open[open.length - 1].after === null) {
+      open[open.length - 1].after = (pct(target) || { health: -1 }).health;
+    }
+    var kind = kindOf(idOfForm(source));
+
+    // Spellbreaker is on the one hit, now.
+    if (kind === 'spell' && heldOf(target, t).spellbreaker) { breakSpell(target, by, idOfForm(source), t); }
+
+    if (!by || by === target || !personOf(by)) { return; }
+    var mine = heldOf(by, t);
+    var e = { before: -1, after: null, by: by, more: 0, overcharge: false, aim: false };
+    if (kind === 'melee' && power && !bash && mine.devastatingblow) { e.more = PERKS.devastatingblow.more; }
+    if (kind === 'spell' && mine.overcharge) { e.overcharge = true; }
+    if (kind === 'bow' && mine.lethalaim) { e.aim = true; }
+    if (!e.more && !e.overcharge && !e.aim) { return; }
+    var p = pct(target);
+    e.before = p ? p.health : -1;
+    if (!(e.before > 0)) { return; }
+    if (!pending[target]) { pending[target] = []; }
+    pending[target].push(e);
+    if (!queued) {
+      queued = true;
+      setTimeout((typeof guard === 'function') ? guard('perkHits', flush) : flush, 0);
+    }
+  }
+
+  function breakSpell(target, by, spellId, t) {
+    var info = spellOf(spellId);
+    if (!(info.cost > 0)) { return; }
+    if (info.concentration) {
+      var key = target + ':' + by + ':' + spellId;
+      if (t - (ST.sb[key] || 0) < SECOND) { return; }
+      ST.sb[key] = t;
+    }
+    var gain = info.cost * PERKS.spellbreaker.share;
+    if (restore(target, 'Magicka', gain)) {
+      fired(target, 'spellbreaker', '(' + (Math.round(gain * 10) / 10) + ' magicka from ' + hex(spellId) + ')');
+    }
+  }
+
+  function setHealth(target, h, change, killer) {
+    var next = h + change;
+    if (next > 1) { next = 1; }
+    if (next <= 0) {
+      next = 0;
+      // The engine kills on this write with nobody named; mp.onDeath asks.
+      if (killer) { ST.blow[target] = { by: killer, at: now() }; }
+    }
+    var p = pct(target);
+    if (!p) { return; }
+    setPct(target, next, p.magicka, p.stamina);
+  }
+
+  function flush() {
+    queued = false;
+    var all = pending;
+    pending = {};
+    for (var k in all) {
+      if (!has(all, k)) { continue; }
+      var target = Number(k);
+      var list = all[k];
+      var p = pct(target);
+      var h = p ? p.health : -1;
+      if (list.length && list[list.length - 1].after === null) { list[list.length - 1].after = h; }
+      var change = 0, killer = 0;
+      for (var i = 0; i < list.length; i++) {
+        var e = list[i];
+        var took = e.before - e.after;
+        if (!(e.after >= 0) || !(took > 0)) { continue; }
+        if (e.more) {
+          change -= took * e.more;
+          killer = e.by;
+          fired(e.by, 'devastatingblow');
+        }
+        if (e.aim) {
+          var extra = lethalExtra(target, took);
+          if (extra > 0) {
+            change -= extra;
+            killer = e.by;
+            fired(e.by, 'lethalaim');
+          }
+        }
+        if (e.overcharge) {
+          var n = (ST.spells[e.by] || 0) + 1;
+          if (n >= PERKS.overcharge.inEvery) {
+            n = 0;
+            change -= took * PERKS.overcharge.more;
+            killer = e.by;
+            fired(e.by, 'overcharge');
+            tell(e.by, 'Overcharge: that spell lands double.');
+          }
+          ST.spells[e.by] = n;
+        }
+      }
+      if (h > 0 && change !== 0) { setHealth(target, h, change, killer); }
+    }
+  }
+
+  /** Whose blow it was, when this block's own write was the killing one. */
+  function killerOf(target) {
+    var b = has(ST.blow, target) ? ST.blow[target] : null;
+    if (!b) { return 0; }
+    delete ST.blow[target];
+    return (now() - b.at) < 2000 ? b.by : 0;
+  }
+
+  // -------------------------------------------------------------- the tick --
+  /*
+    THE MAGICKA, THE STAMINA AND THE HEALTH, four times a second, for the
+    people who hold a perk that watches them. The client reports both and the server keeps
+    the share; this reads that share and writes it back up. RACE DATA at 88 is
+    the race's own magicka rate, a percent of the most there is each second.
+  */
+  var raceRates = {};
+  function raceRate(id) {
+    var raceId = 0;
+    try { raceId = Number((mp.get(id, 'appearance') || {}).raceId) || 0; } catch (e) { raceId = 0; }
+    if (!raceId) { return 0; }
+    if (!has(raceRates, raceId)) {
+      var rate = f32(fieldOf(lookup(raceId), 'DATA'), 88);
+      raceRates[raceId] = (isFinite(rate) && rate > 0) ? rate : 0;
+      if (!raceRates[raceId]) { plog('the race', hex(raceId), 'has no magicka rate to read, so Leyline Attunement gives nothing'); }
+    }
+    return raceRates[raceId];
+  }
+
+  function inFight(id, t) { return has(ST.fight, id) && t - ST.fight[id] < FIGHT_MS; }
+
+  function one(id, t) {
+    var mine = heldOf(id, t);
+    if (!mine.trollsblood && !mine.archmagesvessel && !mine.leylineattunement && !mine.secondwind) {
+      delete ST.last[id];
+      return;
+    }
+    if (deadOf(id)) { delete ST.last[id]; return; }
+    var p = pct(id);
+    if (!p) { return; }
+    var last = has(ST.last, id) ? ST.last[id] : null;
+    if (last && p.health < last.h - 0.0001) { ST.fight[id] = t; }
+    var m = p.magicka, st = p.stamina, changed = false, clocked = false;
+
+    if (mine.secondwind && st <= 0.001 && take(id, 'secondwind', t)) {
+      st = 1;
+      changed = true;
+      clocked = true;
+      fired(id, 'secondwind');
+      tell(id, 'Second Wind: your stamina fills. It comes back in 5 minutes.');
+    }
+    if (mine.archmagesvessel && m < PERKS.archmagesvessel.below && take(id, 'archmagesvessel', t)) {
+      m = PERKS.archmagesvessel.to;
+      changed = true;
+      clocked = true;
+      fired(id, 'archmagesvessel');
+      tell(id, 'Archmage\'s Vessel: your magicka returns to half. It comes back in 24 hours.');
+    }
+    if (mine.leylineattunement && last && m < last.m - 0.0005 && m < 1) {
+      var rate = raceRate(id) * (100 + ((ST.held[id] && ST.held[id].rate) || 0)) / 100;
+      var add = PERKS.leylineattunement.rate * (rate / 100) * Math.min(t - last.at, SECOND) / 1000;
+      if (add > 0) {
+        m = Math.min(1, m + add);
+        changed = true;
+        if (t - (ST.ley[id] || 0) > 2 * SECOND) { fired(id, 'leylineattunement'); }
+        ST.ley[id] = t;
+      }
+    }
+    if (changed) { setPct(id, p.health, m, st); }
+    // A clock that moved is on the K panel, so the panel is sent it now.
+    if (clocked) { push(id); }
+    ST.last[id] = { h: p.health, m: m, at: t };
+
+    if (mine.trollsblood && inFight(id, t) && p.health < 1) {
+      var tr = has(ST.troll, id) ? ST.troll[id] : (ST.troll[id] = { at: 0, said: 0 });
+      if (t - tr.at >= SECOND) {
+        tr.at = t;
+        if (restore(id, 'Health', PERKS.trollsblood.perSecond) && t - tr.said > FIGHT_MS) {
+          fired(id, 'trollsblood');
+        }
+        tr.said = t;
+      }
+    }
+  }
+
+  function tick() {
+    var t = now();
+    var online = [];
+    online = mp.get(0, 'onlinePlayers') || [];
+    var here = {};
+    for (var i = 0; i < online.length; i++) {
+      here[online[i]] = true;
+      try { one(online[i], t); } catch (e) { plog('the tick threw for', hex(online[i]) + ':', e); }
+    }
+    var maps = [ST.held, ST.last, ST.font, ST.troll, ST.ley, ST.fight];
+    for (var j = 0; j < maps.length; j++) {
+      for (var k in maps[j]) { if (has(maps[j], k) && !here[k]) { delete maps[j][k]; } }
+    }
+    for (var key in ST.sb) { if (has(ST.sb, key) && t - ST.sb[key] > 5 * SECOND) { delete ST.sb[key]; } }
+    for (var b in ST.blow) { if (has(ST.blow, b) && t - ST.blow[b].at > 5 * SECOND) { delete ST.blow[b]; } }
+  }
+
+  // ------------------------------------------------------------- the words --
+  function about(key) {
+    var p = PERKS[key];
+    return p.name + ': ' + p.say + (p.not ? ' ' + p.not : '');
+  }
+
+  /*
+    FONT OF MAGIC, from the Use button on the K panel. Answers { ok, why } the
+    way every pick on that panel is answered: why is the refusal in plain
+    words, said as 'No: <why>.' in the chat and under the panel, and line is
+    what to say when it starts. The day is spent only once the redraw that
+    carries the free spells can be sent.
+  */
+  function startFont(actorId, s) {
+    var key = 'fontofmagic';
+    if (!heldIn(s)[key]) { return { ok: false, why: 'Font of Magic comes with five points in Efficiency' }; }
+    if (deadOf(actorId)) { return { ok: false, why: 'not while you are down' }; }
+    var t = now();
+    if (has(ST.font, actorId) && ST.font[actorId].until > t) {
+      return { ok: false, why: 'Font of Magic is running, ' + wait(ST.font[actorId].until - t) + ' left' };
+    }
+    var at = readyAt(actorId, key);
+    if (at > t) { return { ok: false, why: 'Font of Magic comes back in ' + wait(at - t) }; }
+    if (!canPush()) { return { ok: false, why: 'Font of Magic cannot reach your character right now' }; }
+    if (!take(actorId, key, t)) { return { ok: false, why: 'Font of Magic could not be started' }; }
+    var ms = PERKS.fontofmagic.seconds * SECOND;
+    var until = t + ms;
+    ST.font[actorId] = { until: until };
+    push(actorId);
+    var end = function () {
+      // Only this start's own end: a later start keeps its own 15 seconds.
+      if (has(ST.font, actorId) && ST.font[actorId].until !== until) { return; }
+      delete ST.font[actorId];
+      push(actorId);
+      tell(actorId, 'Font of Magic has run out.');
+    };
+    setTimeout((typeof guard === 'function') ? guard('fontOfMagicEnd', end) : end, ms + 50);
+    fired(actorId, key);
+    return { ok: true, line: 'Font of Magic: for 15 seconds, a spell costs nothing. It comes back in 24 hours.' };
+  }
+
+  /*
+    A press of a perk's button on the K panel: /pick perk <key>. Font of Magic
+    is the one perk the page has somebody start; every other perk fires by
+    itself, so its key is refused.
+  */
+  function use(actorId, s, word) {
+    var key = String(word || '').toLowerCase();
+    if (key === 'fontofmagic') { return startFont(actorId, s); }
+    return { ok: false, why: has(PERKS, key) ? PERKS[key].name + ' fires by itself' : 'there is no perk by that name' };
+  }
+
+  /*
+    WHAT THE K PANEL SHOWS OF THE CLOCKS, for the perks this character holds
+    that wait between firings: { <key>: { ready: <ms> } }, and until: <ms> on
+    Font of Magic while it runs. ready is when it may fire again, 0 for never
+    fired. Times, not time left, so the view is the same until a perk fires
+    and the panel counts down against its own clock. Cheat Death is left out:
+    nothing in the game fires it yet. null when there is nothing to show.
+  */
+  function clocks(actorId, s) {
+    var mine = heldIn(s);
+    var out = null;
+    for (var i = 0; i < ORDER.length; i++) {
+      var k = ORDER[i];
+      if (!mine[k] || !PERKS[k].every || PERKS[k].none) { continue; }
+      out = out || {};
+      out[k] = { ready: readyAt(actorId, k) };
+      if (k === 'fontofmagic' && has(ST.font, actorId) && ST.font[actorId].until > now()) {
+        out[k].until = ST.font[actorId].until;
+      }
+    }
+    return out;
+  }
+
+  /*
+    WHAT A RUNNING PERK ADDS TO THE CLIENT'S MAP: Font of Magic's 15 seconds,
+    100 on every school's cost value. The character block folds this into the
+    totals it sends (withPerks), beside a warrior's Rush, because the client
+    SETS each value to the total it is given. Every school, not only the ones
+    held: the page says a spell costs nothing, whichever school it is. The
+    names are the progression block's own, TUNING.schoolValues.
+  */
+  function effects(actorId) {
+    var f = has(ST.font, actorId) ? ST.font[actorId] : null;
+    if (!f || !(f.until > now())) { return null; }
+    var schools = (P.TUNING && P.TUNING.schoolValues) || {};
+    var out = null;
+    for (var school in schools) {
+      if (!has(schools, school) || !schools[school].cost) { continue; }
+      out = out || {};
+      out[schools[school].cost] = PERKS.fontofmagic.costOff;
+    }
+    return out;
+  }
+
+  /*
+    The client's skill tree hand sets the totals map on the panel view, and
+    the map is rebuilt from the state on every write, so a redraw is the one
+    way to send Font of Magic and to take it off again. The same as Rush.
+  */
+  function canPush() {
+    var ch = g.__thornswoodCharacter;
+    return !!(ch && ch.writeState && ch.stateOf);
+  }
+  function push(actorId) {
+    if (!canPush()) { return; }
+    var ch = g.__thornswoodCharacter;
+    try { ch.writeState(actorId, ch.stateOf(actorId), true); } catch (e) { plog('could not redraw', hex(actorId) + ':', e); }
+  }
+
+  function treeOf(skill) {
+    for (var attr in P.TABLE.tree) {
+      if (has(P.TABLE.tree, attr) && has(P.TABLE.tree[attr].skills, skill)) { return attr; }
+    }
+    return '';
+  }
+
+  /*
+    What a point spent says once it is in: the perk the moment a sub-skill
+    fills, and, for Precision, every time, that the game ignores critical
+    chance. Nothing for any other point: the panel shows those.
+  */
+  function spendLine(s, skill) {
+    var key = '';
+    for (var i = 0; i < ORDER.length; i++) { if (PERKS[ORDER[i]].skill === skill) { key = ORDER[i]; } }
+    if (!key || !s || !s.tree) { return ''; }
+    var bits = [];
+    if ((s.tree[skill] || 0) >= P.TABLE.limits.skillCap) {
+      var attr = treeOf(skill);
+      bits.push(P.TABLE.tree[attr].skills[skill].name + ' is full. ' + about(key));
+    }
+    if (skill === 'precision') { bits.push(CRIT_LINE); }
+    return bits.join(' ');
+  }
+
+  if (g.__thornswoodPerkTimer) { clearInterval(g.__thornswoodPerkTimer); }
+  g.__thornswoodPerkTimer = setInterval((typeof guard === 'function') ? guard('perkTick', tick) : tick, TICK_MS);
+
+  g.__thornswoodPerks = {
+    PERKS: PERKS, ORDER: ORDER, PROPERTY: PERK_PROPERTY, CRIT_LINE: CRIT_LINE, FIGHT_MS: FIGHT_MS,
+    holds: holds, cheatDeath: cheatDeath, hit: hit, flush: flush, killerOf: killerOf, tick: tick,
+    use: use, clocks: clocks, spendLine: spendLine, effects: effects, armourOf: armourOf,
+    lethalExtra: lethalExtra, readyAt: readyAt, state: ST
+  };
+  console.log('[thornswood perks] ready: ' + ORDER.length + ' perks');
+})();
+// ==== end thornswood skill perks ====
+
+// ==== thornswood warrior maneuvers ====
+/*
+  A WARRIOR'S MANEUVERS (#1386).
+
+  docs/systems/professions/warrior.md, "Maneuvers", is the table, and the two
+  half pages name the rows: Set, Plant, Cover and Wall hold a line, Rush,
+  Heavy, Break and Wreck break one. Until this nothing in combat read the word
+  Bulwark or Berserker at all. The rows here are the page's rows and no more:
+  the stamina, how long each lasts and the wait before it again.
+
+  WHO HOLDS WHICH ROW. The page: "You have the rows at your rank and below, on
+  your half." The sister half has its novice row only, and only once a Warlord
+  has taken you on. An outside trade, novice combat a Warlord taught somebody
+  who is not a warrior, is the novice row and no further. held() is that, and
+  nothing else decides it.
+
+  STAMINA IS SPENT WHEN THE MANEUVER STARTS, AND WITHOUT IT NOTHING HAPPENS.
+  15 stamina is 15 of the person's real most, the skill tree's Endurance
+  included (Patrick, 4 October: "it should scale"). spend() says how that is
+  worked out.
+
+  NOBODY TYPES ONE. Patrick, 4 October: no chat commands for anything people
+  do. The maneuver key opens a panel the front plugin draws
+  (game/ui/thornswood-maneuvers.js), and a pick there sends /maneuver <name>
+  through the same relay the trade and party keys use. That line is internal:
+  no help text names it. view() is what the panel draws from, folded into the
+  character panel's view the way effects() is.
+
+  WHAT THE SERVER APPLIES, AND WHAT IT CANNOT. Everything here is the server's
+  own: the stamina, the clocks, the refusals, and health through the engine's
+  percentages. Some of the rows are the game's to do on somebody's own machine
+  and the server cannot reach them from here. Each start line says which, so
+  nobody is told an effect is on when it is not, and the issue lists them:
+    Set     halving what a block costs. The game works that cost out on the
+            blocker's machine. Only the stamina and the clocks are real.
+    Plant   not being staggered. A stagger is an animation on the machine that
+            animates you; the server refuses the staggers it sends itself
+            (Break and Wreck), and no other.
+    Cover   20% less damage for one person while you block. Applied here, by
+            giving back a fifth of what each hit took. The block is read from
+            the animation events the engine is sent (blockStart, blockStop),
+            sampled ten times a second.
+    Wall    20% less damage for you and your party within 3 metres. Applied
+            here, the same way.
+    Rush    +4 speed for 5 seconds. Sent through the map the client's skill
+            tree hand already sets (thornswood-front.js, treeApplyNow), so no
+            client change is needed for it.
+    Heavy   25% more on the next power attack within 8 seconds. Applied here,
+            by taking a quarter again of what that hit took.
+    Break   the next hit within 8 seconds staggers. Sent to a person's own
+            game with Debug.SendAnimationEvent; a creature is animated by
+            whoever hosts it and the server cannot reach that machine, so a
+            creature takes no stagger yet.
+    Wreck   50% more on the next power attack within 8 seconds, and it
+            staggers, both as above.
+
+  A BLOW THAT KILLS OUTRIGHT IS NOT SOFTENED. The engine applies a hit's
+  damage after the OnHit event and kills on the spot when that takes health
+  to nothing, so a fifth cannot be given back to somebody already dead. Exact
+  damage would need the engine's damage formula to ask, which is an engine
+  change.
+
+  THE CLOCKS LIVE IN MEMORY, on globalThis so a hot reload keeps them. A
+  restart clears every wait and every armed blow, which at three minutes at
+  most is nothing worth a property write.
+*/
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+  var P = g.__thornswoodProgression;
+  if (!P) { console.log('[thornswood maneuvers] the rules block is missing, nothing registered'); return; }
+
+  function mlog() {
+    var a = Array.prototype.slice.call(arguments);
+    console.log('[thornswood maneuvers] ' + a.join(' '));
+  }
+
+  var RANKS = ['novice', 'advanced', 'expert', 'master'];
+
+  /*
+    The table on the page, row for row. seconds is how long it lasts. Break
+    and Wreck wait for the blow they name for 8 seconds, the window Heavy has
+    (Patrick's answer on #1386, 4 October).
+  */
+  var MANEUVERS = {
+    set:     { name: 'Set',   half: 'bulwark',   rank: 'novice',   stamina: 15, cooldown: 45,  seconds: 8 },
+    plant:   { name: 'Plant', half: 'bulwark',   rank: 'advanced', stamina: 20, cooldown: 60,  seconds: 8 },
+    cover:   { name: 'Cover', half: 'bulwark',   rank: 'expert',   stamina: 25, cooldown: 90,  seconds: 8,  less: 0.2, metres: 3 },
+    wall:    { name: 'Wall',  half: 'bulwark',   rank: 'master',   stamina: 40, cooldown: 180, seconds: 10, less: 0.2, metres: 3 },
+    rush:    { name: 'Rush',  half: 'berserker', rank: 'novice',   stamina: 15, cooldown: 30,  seconds: 5,  speed: 4 },
+    heavy:   { name: 'Heavy', half: 'berserker', rank: 'advanced', stamina: 20, cooldown: 45,  seconds: 8,  more: 0.25 },
+    'break': { name: 'Break', half: 'berserker', rank: 'expert',   stamina: 25, cooldown: 60,  seconds: 8 },
+    wreck:   { name: 'Wreck', half: 'berserker', rank: 'master',   stamina: 40, cooldown: 120, seconds: 8,  more: 0.5 }
+  };
+  var ORDER = ['set', 'plant', 'cover', 'wall', 'rush', 'heavy', 'break', 'wreck'];
+  var HALF_NAME = { bulwark: 'Bulwark', berserker: 'Berserker' };
+
+  // Seventy units to a metre, the party strip's measure (see MOLD_REACH).
+  var UNITS_PER_METRE = 70;
+
+  function has(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
+  function rankAt(r) { return RANKS.indexOf(r); }
+  function aRank(r) {
+    var w = String(r || 'novice');
+    return (/^[aeiou]/.test(w) ? 'an ' : 'a ') + w;
+  }
+  function noviceOf(half) {
+    for (var i = 0; i < ORDER.length; i++) {
+      var m = MANEUVERS[ORDER[i]];
+      if (m.half === half && m.rank === 'novice') { return m.name; }
+    }
+    return '';
+  }
+
+  // -------------------------------------------------------------- the rules --
+  /*
+    HAS A WARLORD TAKEN YOU ON FOR YOUR SISTER HALF. /apprentice records it
+    (#1388), and the character block's masterFor says whether that Master's
+    own record still stands. A sister half already past novice counts as
+    well: rankUp only lets it climb under a Master of it, and the ranks
+    earned under one stay after it ends (apprenticeship.md).
+  */
+  function takenOn(s, actorId) {
+    if (!s || s.prof !== 'warrior' || !s.half) { return false; }
+    var sister = P.sisterOf('warrior', s.half);
+    if (!sister) { return false; }
+    var r = P.rankOf(s, sister);
+    if (r && rankAt(r) > 0) { return true; }
+    var ch = g.__thornswoodCharacter;
+    try { return !!(actorId && ch && ch.masterFor && ch.masterFor(actorId, s, sister)); } catch (e) { return false; }
+  }
+
+  /** Every row this character holds, as { key: true }. Pure. */
+  function held(s, sisterTaken) {
+    var out = {};
+    if (!s) { return out; }
+    for (var i = 0; i < ORDER.length; i++) {
+      var key = ORDER[i];
+      var m = MANEUVERS[key];
+      var rank = P.rankOf(s, m.half);
+      if (!rank) { continue; }
+      if (s.prof === 'warrior' && s.half === m.half) {
+        if (rankAt(m.rank) <= rankAt(rank)) { out[key] = true; }
+        continue;
+      }
+      if (m.rank !== 'novice') { continue; }
+      if (s.prof === 'warrior' && P.sisterOf('warrior', s.half) === m.half) {
+        if (sisterTaken) { out[key] = true; }
+        continue;
+      }
+      if ((s.taught || []).indexOf(m.half) !== -1) { out[key] = true; }
+    }
+    return out;
+  }
+
+  /** Why this character does not hold that row, in one sentence. */
+  function whyNot(s, key) {
+    var m = MANEUVERS[key];
+    var halfName = HALF_NAME[m.half];
+    var rank = s ? P.rankOf(s, m.half) : null;
+    if (s && s.prof === 'warrior' && s.half === m.half) {
+      return m.name + ' is for ' + aRank(m.rank) + ' ' + halfName + '. You are ' +
+             aRank(rank) + ' ' + halfName + '.';
+    }
+    if (s && s.prof === 'warrior' && s.half && P.sisterOf('warrior', s.half) === m.half) {
+      if (m.rank !== 'novice') {
+        return halfName + ' is your sister half, and a sister half has its novice row and no more: ' +
+               noviceOf(m.half) + '.';
+      }
+      return halfName + ' is your sister half. Its novice maneuver opens when a Warlord takes you on.';
+    }
+    if (rank && s && (s.taught || []).indexOf(m.half) !== -1) {
+      return halfName + ' was taught to you as an outside trade, and that is its novice row and no further: ' +
+             noviceOf(m.half) + '.';
+    }
+    return m.name + ' is a ' + halfName + ' maneuver. It belongs to a warrior, and a Warlord can teach ' +
+           'novice combat to somebody who is not one.';
+  }
+
+  // ------------------------------------------------------------ the world --
+  /*
+    cool  actor -> { key: when it is ready again }
+    on    actor -> what is running or armed: a window's end for set, plant,
+          wall, rush, heavy, break and wreck; { until, who } for cover
+    block actor -> whether that bulwark is blocking, as last seen
+    blow  actor -> { by, at }: who landed the server's own last blow on it
+  */
+  var ST = g.__thornswoodManeuverState;
+  if (!ST || typeof ST !== 'object') {
+    ST = g.__thornswoodManeuverState = { cool: {}, on: {}, block: {}, blow: {} };
+  }
+
+  function now() { return Date.now(); }
+  function selfOf(id) { return { type: 'form', desc: mp.getDescFromId(id) }; }
+  function personOf(id) {
+    try { return Number(mp.get(id, 'profileId')) > 0; } catch (e) { return false; }
+  }
+  function deadOf(id) {
+    try { return !!mp.get(id, 'isDead'); } catch (e) { return true; }
+  }
+  function onlineOf(id) {
+    try { return !!mp.get(id, 'isOnline'); } catch (e) { return false; }
+  }
+  function share(id, which) {
+    try {
+      var p = mp.get(id, 'percentages');
+      var v = p ? Number(p[which]) : NaN;
+      return isNaN(v) ? -1 : v;
+    } catch (e) { return -1; }
+  }
+  function near(a, b, metres) {
+    try {
+      if (String(mp.get(a, 'worldOrCellDesc') || '') !== String(mp.get(b, 'worldOrCellDesc') || '')) { return false; }
+      var p = mp.get(a, 'pos');
+      var q = mp.get(b, 'pos');
+      var dx = p[0] - q[0], dy = p[1] - q[1], dz = p[2] - q[2];
+      var r = metres * UNITS_PER_METRE;
+      return dx * dx + dy * dy + dz * dz <= r * r;
+    } catch (e) { return false; }
+  }
+  function onOf(id, make) {
+    if (!has(ST.on, id)) {
+      if (!make) { return null; }
+      ST.on[id] = {};
+    }
+    return ST.on[id];
+  }
+  function readyAt(id, key) {
+    return (has(ST.cool, id) && has(ST.cool[id], key)) ? ST.cool[id][key] : 0;
+  }
+  function seconds(ms) {
+    var n = Math.max(1, Math.ceil(ms / 1000));
+    return n + (n === 1 ? ' second' : ' seconds');
+  }
+  function nameOf(id) {
+    var soc = g.__thornswoodSocial;
+    try { if (soc && soc.nameOfPerson) { return soc.nameOfPerson(id) || 'them'; } } catch (e) { }
+    return 'them';
+  }
+
+  /*
+    STAMINA, SPENT WHEN THE MANEUVER STARTS, AS A SHARE OF THE PERSON'S REAL
+    MOST. Patrick's answer on #1386, 4 October: the cost "should scale" with
+    the skill tree. Measured in the fork before this was written:
+
+      The engine holds stamina only as a share, 0 to 1, of a most it works out
+      from the records (GetBaseActorValues.cpp): the race's starting stamina,
+      RACE DATA at byte 44, plus the person's NPC_ stamina offset, ACBS at
+      byte 6, and 100 when that comes to nothing. The client is handed that
+      same number as its base stamina when it spawns (remoteServer.ts).
+
+      The skill tree hand then SETS the base to that plus the map the
+      character panel sends (thornswood-front.js, treeApplyNow): Endurance's
+      +10 a point, less what hunger, thirst, tiredness and cold take off. The
+      share the client reports back, and the share a server write moves it to
+      (setActorValuePercentage in actorvalues.ts), are both of that bigger
+      most.
+
+    So Actor.DamageActorValue, which divides by the engine's most, took 15 of
+    the race's stamina: on a character with Endurance that was more than 15
+    off the bar they see. Here the most is the engine's own from the same two
+    records, plus the stamina in the map the client applies, and the cost is
+    the amount over that, written as a share. Without that much nothing is
+    written and false comes back; the old code took the stamina first and put
+    it back after. A record that cannot be read answers null and starts
+    nothing, with a line in the log.
+
+    Stamina a potion or an enchanted piece of gear adds is not counted: the
+    server does not see the effects running on somebody's character.
+  */
+  function fieldOf(id, type) {
+    var res = null;
+    try { res = id ? mp.lookupEspmRecordById(id) : null; } catch (e) { return null; }
+    var fields = (res && res.record && res.record.fields) || [];
+    for (var i = 0; i < fields.length; i++) {
+      if (fields[i] && fields[i].type === type && fields[i].data) { return Buffer.from(fields[i].data); }
+    }
+    return null;
+  }
+
+  /** The engine's own most, the way GetBaseActorValues works it out for a
+      person: their race and their base, which for a person is the NPC_ record
+      every character is made from (0x7) and carries no template. 0 when the
+      records cannot be read. */
+  function engineStamina(actorId) {
+    var raceId = 0, baseId = 0;
+    try {
+      var r = mp.callPapyrusFunction('method', 'Actor', 'GetRace', selfOf(actorId), []);
+      raceId = (r && r.desc) ? (Number(mp.getIdFromDesc(String(r.desc))) || 0) : 0;
+      baseId = Number(mp.getIdFromDesc(String(mp.get(actorId, 'baseDesc') || ''))) || 0;
+    } catch (e) {
+      mlog('could not ask the race and base of', actorId.toString(16) + ':', e);
+      return 0;
+    }
+    var race = fieldOf(raceId, 'DATA');
+    var npc = fieldOf(baseId, 'ACBS');
+    if (!race || race.length < 48 || !npc || npc.length < 8) {
+      mlog('no RACE DATA or NPC_ ACBS for', actorId.toString(16), '(race', raceId.toString(16) + ', base', baseId.toString(16) + ')');
+      return 0;
+    }
+    var most = race.readFloatLE(44) + npc.readInt16LE(6);
+    return most > 0 ? most : 100;
+  }
+
+  /** The person's real most stamina: the engine's, plus what the map the
+      client applies adds to it or takes off. NaN when it cannot be read. */
+  function mostStamina(actorId) {
+    var base = engineStamina(actorId);
+    if (!(base > 0)) { return NaN; }
+    var ch = g.__thornswoodCharacter;
+    if (!ch || !ch.effectsOf) { return NaN; }
+    var map = null;
+    try { map = ch.effectsOf(actorId); } catch (e) {
+      mlog('could not read the skill tree map of', actorId.toString(16) + ':', e);
+      return NaN;
+    }
+    return base + ((map && typeof map.stamina === 'number') ? map.stamina : 0);
+  }
+
+  /** true when spent, false when there is not that much, null when the
+      stamina cannot be read. */
+  function spend(actorId, amount) {
+    var p = null;
+    try { p = mp.get(actorId, 'percentages'); } catch (e) { p = null; }
+    var before = p ? Number(p.stamina) : NaN;
+    if (!(before >= 0)) { return null; }
+    var most = mostStamina(actorId);
+    if (isNaN(most)) { return null; }
+    // Hunger, thirst, tiredness and cold together can take the whole of it.
+    if (!(most > 0)) { return false; }
+    var cost = amount / most;
+    if (before < cost) { return false; }
+    try {
+      mp.set(actorId, 'percentages', { health: Number(p.health), magicka: Number(p.magicka), stamina: before - cost });
+    } catch (e) {
+      mlog('could not take stamina from', actorId.toString(16) + ':', e);
+      return null;
+    }
+    return true;
+  }
+
+  /* The one person Cover is for: the nearest within 3 metres, not yourself. */
+  function coverWho(actorId) {
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return 0; }
+    var best = 0, bestD = Infinity;
+    var mine = null;
+    try { mine = mp.get(actorId, 'pos'); } catch (e) { return 0; }
+    for (var i = 0; i < online.length; i++) {
+      var id = online[i];
+      if (id === actorId || deadOf(id) || !near(actorId, id, MANEUVERS.cover.metres)) { continue; }
+      var q = null;
+      try { q = mp.get(id, 'pos'); } catch (e) { continue; }
+      var d = (q[0] - mine[0]) * (q[0] - mine[0]) + (q[1] - mine[1]) * (q[1] - mine[1]) + (q[2] - mine[2]) * (q[2] - mine[2]);
+      if (d < bestD) { bestD = d; best = id; }
+    }
+    return best;
+  }
+
+  /*
+    The client's skill tree hand sets the effects map on the panel view, and
+    the map is rebuilt from the state on every write. A redraw is the one way
+    to send Rush's speed and to take it off again.
+  */
+  function push(actorId) {
+    var ch = g.__thornswoodCharacter;
+    if (!ch || !ch.writeState || !ch.stateOf) { return; }
+    try { ch.writeState(actorId, ch.stateOf(actorId), true); } catch (e) { mlog('could not redraw', actorId.toString(16) + ':', e); }
+  }
+
+  /** What a running maneuver adds to the client's map: Rush's speed. */
+  function effects(actorId) {
+    var rec = onOf(actorId, false);
+    if (!rec || !rec.rush || rec.rush <= now()) { return null; }
+    return { speedMult: MANEUVERS.rush.speed };
+  }
+
+  /*
+    WHAT THE MANEUVER KEY DRAWS: the rows this character holds, in the page's
+    order, each with its stamina and whether its wait is over. Null for
+    somebody who holds none, so the view carries nothing for them. ready is
+    the only part that moves, and it moves twice a use: a start redraws the
+    panel (push in use) and so does the end of the wait (tick), so the view
+    never changes with the clock and a counter's write still redraws nothing.
+  */
+  function view(actorId, s) {
+    if (!s) { return null; }
+    var mine = held(s, takenOn(s, actorId));
+    var t = now();
+    var out = [];
+    for (var i = 0; i < ORDER.length; i++) {
+      var key = ORDER[i];
+      if (!mine[key]) { continue; }
+      var m = MANEUVERS[key];
+      out.push({ key: key, name: m.name, stamina: m.stamina, cooldown: m.cooldown, ready: !(readyAt(actorId, key) > t) });
+    }
+    return out.length ? out : null;
+  }
+
+  var STARTED = {
+    set: 'Set, for 8 seconds. Halving what a block costs is not in the game yet, so for now this spends the stamina and starts the wait.',
+    plant: 'Plant, for 8 seconds. A Break or a Wreck does not stagger you. Other staggers still land: stopping those is not in the game yet.',
+    wall: 'Wall, for 10 seconds. You, and your party within 3 metres of you, take 20% less damage.',
+    rush: 'Rush: +4 speed for 5 seconds.',
+    heavy: 'Heavy. Your next power attack in the next 8 seconds deals 25% more.',
+    'break': 'Break. Your next hit in the next 8 seconds staggers a person. Staggering a creature is not in the game yet.',
+    wreck: 'Wreck. Your next power attack in the next 8 seconds deals 50% more, and staggers a person. Staggering a creature is not in the game yet.'
+  };
+
+  /** What you hold and when each is ready, for a /maneuver with no name. */
+  function listLine(actorId, mine) {
+    var bits = [];
+    var t = now();
+    for (var i = 0; i < ORDER.length; i++) {
+      var key = ORDER[i];
+      if (!mine[key]) { continue; }
+      var m = MANEUVERS[key];
+      var ready = readyAt(actorId, key);
+      bits.push(m.name + ' (' + m.stamina + ' stamina, ' + (ready > t ? 'ready in ' + seconds(ready - t) : 'ready') + ')');
+    }
+    if (!bits.length) {
+      return 'You have no maneuvers. They are a warrior\'s, on the half you picked, at your rank and below. ' +
+             'A Warlord can teach the novice row to somebody who is not a warrior.';
+    }
+    return 'Your maneuvers: ' + bits.join(', ') + '.';
+  }
+
+  /** /maneuver <name>, as the maneuver panel sends it. Answers the line to
+      say, always. */
+  function use(actorId, word) {
+    var key = String(word || '').trim().toLowerCase();
+    var ch = g.__thornswoodCharacter;
+    if (!ch || !ch.stateOf) { return 'Maneuvers are not running on this server right now. Say so in the dev channel.'; }
+    var s = ch.stateOf(actorId);
+    var mine = held(s, takenOn(s, actorId));
+    if (!key || key === 'list') { return listLine(actorId, mine); }
+    if (!has(MANEUVERS, key)) {
+      return 'There is no maneuver by that name. There are eight: Set, Plant, Cover, Wall, Rush, Heavy, Break and Wreck.';
+    }
+    var m = MANEUVERS[key];
+    if (!mine[key]) { return whyNot(s, key); }
+    if (deadOf(actorId)) { return 'Not while you are down.'; }
+    var t = now();
+    var ready = readyAt(actorId, key);
+    if (ready > t) { return m.name + ' is ready again in ' + seconds(ready - t) + '.'; }
+    var who = 0;
+    if (key === 'cover') {
+      who = coverWho(actorId);
+      if (!who) { return 'Cover is for one person within 3 metres of you, and nobody is.'; }
+    }
+    var paid = spend(actorId, m.stamina);
+    if (paid === null) {
+      return 'Your stamina could not be read just now, so ' + m.name + ' did not start. Say so in the dev channel.';
+    }
+    if (!paid) {
+      return m.name + ' takes ' + m.stamina + ' stamina, and you do not have it. Nothing happens.';
+    }
+    if (!has(ST.cool, actorId)) { ST.cool[actorId] = {}; }
+    ST.cool[actorId][key] = t + m.cooldown * 1000;
+    var rec = onOf(actorId, true);
+    if (key === 'cover') {
+      rec.cover = { until: t + m.seconds * 1000, who: who };
+      ST.block[actorId] = false;
+      mlog(actorId.toString(16), 'Cover on', who.toString(16));
+      push(actorId);
+      return 'Cover on ' + nameOf(who) + ', for 8 seconds. While you block within 3 metres of them, they take 20% less damage.';
+    }
+    rec[key] = t + m.seconds * 1000;
+    mlog(actorId.toString(16), m.name);
+    // The panel's row turns to waiting, and Rush's speed goes on.
+    push(actorId);
+    if (key === 'rush') {
+      setTimeout(function () { push(actorId); }, m.seconds * 1000 + 50);
+    }
+    return STARTED[key];
+  }
+
+  // -------------------------------------------------------------- the hits --
+  /*
+    WHAT A HIT TOOK, MEASURED RATHER THAN GUESSED. OnHit fires before the
+    engine works out the damage (ActionListener::OnWeaponHit sends it first,
+    then CalculateDamage and NetSetPercentages, in the same call). So the
+    target's health is read at the event, and read again once the engine is
+    done: at the next hit on the same target, or on the next turn of the event
+    loop, whichever is first. The difference is what that one hit took, and
+    the maneuver works on that: a fifth given back, a quarter or a half taken
+    again. A hit the engine then threw away (too fast, a splash) took nothing,
+    so nothing is changed and a Heavy or a Wreck it would have spent is armed
+    again.
+  */
+  var pending = {};
+  var queued = false;
+
+  function idOfForm(v) {
+    if (typeof v === 'number') { return v; }
+    if (v && v.desc) {
+      try { return Number(mp.getIdFromDesc(String(v.desc))) || 0; } catch (e) { return 0; }
+    }
+    return 0;
+  }
+  function isSpell(v) {
+    if (!v || !v.desc) { return false; }
+    try {
+      var r = mp.lookupEspmRecordById(mp.getIdFromDesc(String(v.desc)));
+      return !!(r && r.record && String(r.record.type) === 'SPEL');
+    } catch (e) { return false; }
+  }
+
+  /* Whether that bulwark is blocking, from the last animation event the
+     engine was sent. Moving clears that event, so what was last seen holds. */
+  function blocking(holder) {
+    var ev = '';
+    try { ev = String(mp.get(holder, 'lastAnimEvent') || '').toLowerCase(); } catch (e) { ev = ''; }
+    if (ev === 'blockstart') { ST.block[holder] = true; }
+    else if (ev === 'blockstop') { ST.block[holder] = false; }
+    return !!ST.block[holder];
+  }
+
+  function samePartyNear(holder, target) {
+    var soc = g.__thornswoodSocial;
+    if (!soc || !soc.partyOf || !soc.profileOf) { return false; }
+    var mine = soc.profileOf(holder);
+    var theirs = soc.profileOf(target);
+    if (!mine || !theirs) { return false; }
+    var p = soc.partyOf(mine);
+    if (!p || !p.members || p.members.indexOf(theirs) === -1) { return false; }
+    return near(holder, target, MANEUVERS.wall.metres);
+  }
+
+  /* 20% less for this target, from a Wall or a Cover. Two of them on one
+     person is still 20%: the rows say less damage, not less again. */
+  function shielded(target, t) {
+    for (var k in ST.on) {
+      if (!has(ST.on, k)) { continue; }
+      var holder = Number(k);
+      var rec = ST.on[k];
+      if (rec.wall && rec.wall > t && !deadOf(holder)) {
+        if (holder === target || samePartyNear(holder, target)) { return MANEUVERS.wall.less; }
+      }
+      if (rec.cover && rec.cover.until > t && rec.cover.who === target && !deadOf(holder) &&
+          blocking(holder) && near(holder, target, MANEUVERS.cover.metres)) {
+        return MANEUVERS.cover.less;
+      }
+    }
+    return 0;
+  }
+
+  function anyOn() {
+    for (var k in ST.on) { if (has(ST.on, k)) { return true; } }
+    return false;
+  }
+
+  function hit(targetId, aggressor, source, power, blocked) {
+    var target = Number(targetId) || 0;
+    if (!target) { return; }
+    // A hit on a target with a blow still open closes that blow first.
+    var open = pending[target];
+    if (open && open.length && open[open.length - 1].after === null) {
+      open[open.length - 1].after = share(target, 'health');
+    }
+    if (!anyOn()) { return; }
+    var t = now();
+    var by = idOfForm(aggressor);
+    // A bulwark's own blocked hit is a block seen.
+    if (blocked && has(ST.on, target) && ST.on[target].cover) { ST.block[target] = true; }
+
+    var e = { before: -1, after: null, by: by, more: 0, less: 0, stagger: false, used: [] };
+    var a = (by && has(ST.on, by)) ? ST.on[by] : null;
+    if (a && !isSpell(source)) {
+      if (power && a.wreck && a.wreck > t) {
+        e.more = MANEUVERS.wreck.more; e.stagger = true;
+        e.used.push({ key: 'wreck', v: a.wreck }); delete a.wreck;
+      } else if (power && a.heavy && a.heavy > t) {
+        e.more = MANEUVERS.heavy.more;
+        e.used.push({ key: 'heavy', v: a.heavy }); delete a.heavy;
+      }
+      if (!e.stagger && a['break'] && a['break'] > t) {
+        e.stagger = true;
+        e.used.push({ key: 'break', v: a['break'] }); delete a['break'];
+      }
+    }
+    e.less = shielded(target, t);
+    if (!e.more && !e.less && !e.stagger) { return; }
+    e.before = share(target, 'health');
+    if (!(e.before > 0)) { rearm(e); return; }
+    if (!pending[target]) { pending[target] = []; }
+    pending[target].push(e);
+    if (!queued) {
+      queued = true;
+      setTimeout(guard('maneuverHits', flush), 0);
+    }
+  }
+
+  /* A blow that took nothing gives back what it would have spent, while its
+     window is still open. */
+  function rearm(e) {
+    if (!e.by || !e.used.length) { return; }
+    var rec = onOf(e.by, true);
+    for (var i = 0; i < e.used.length; i++) {
+      var u = e.used[i];
+      if (u.v <= now()) { continue; }
+      if (!rec[u.key]) { rec[u.key] = u.v; }
+    }
+  }
+
+  function setHealth(target, h, change, killer) {
+    var next = h + change;
+    if (next > 1) { next = 1; }
+    if (next <= 0) {
+      next = 0;
+      // The engine kills on this write with nobody named; mp.onDeath asks.
+      if (killer) { ST.blow[target] = { by: killer, at: now() }; }
+    }
+    try {
+      var p = mp.get(target, 'percentages');
+      mp.set(target, 'percentages', { health: next, magicka: Number(p.magicka), stamina: Number(p.stamina) });
+    } catch (e) {
+      mlog('could not write the health of', target.toString(16) + ':', e);
+    }
+  }
+
+  /*
+    A STAGGER IS AN ANIMATION, AND THE SERVER CAN SEND ONE ONLY TO A PERSON.
+    Debug.SendAnimationEvent in the fork runs on the machine of the actor it
+    names, and only when that actor is somebody's own character
+    (SpSnippet::Execute returns for anything else). A person hit by Break or
+    Wreck staggers in their own game; a creature does not yet. Plant refuses
+    this stagger.
+  */
+  function staggerOf(target) {
+    if (!personOf(target) || deadOf(target)) { return; }
+    var rec = onOf(target, false);
+    if (rec && rec.plant && rec.plant > now()) { return; }
+    try {
+      mp.callPapyrusFunction('global', 'Debug', 'SendAnimationEvent', null, [selfOf(target), 'staggerStart']);
+    } catch (e) {
+      mlog('could not stagger', target.toString(16) + ':', e);
+    }
+  }
+
+  function flush() {
+    queued = false;
+    var all = pending;
+    pending = {};
+    for (var k in all) {
+      if (!has(all, k)) { continue; }
+      var target = Number(k);
+      var list = all[k];
+      var h = share(target, 'health');
+      if (list.length && list[list.length - 1].after === null) { list[list.length - 1].after = h; }
+      var change = 0, killer = 0, stagger = false;
+      for (var i = 0; i < list.length; i++) {
+        var e = list[i];
+        var took = e.before - e.after;
+        if (!(e.after >= 0) || !(took > 0)) { rearm(e); continue; }
+        if (e.less) { change += took * e.less; }
+        if (e.more) { change -= took * e.more; killer = e.by; }
+        if (e.stagger) { stagger = true; }
+      }
+      if (h > 0 && change !== 0) { setHealth(target, h, change, killer); }
+      if (stagger) { staggerOf(target); }
+    }
+  }
+
+  /** Whose blow it was, when the server's own write was the killing one. */
+  function killerOf(target) {
+    var b = has(ST.blow, target) ? ST.blow[target] : null;
+    if (!b) { return 0; }
+    delete ST.blow[target];
+    return (now() - b.at) < 2000 ? b.by : 0;
+  }
+
+  // -------------------------------------------------------------- the tick --
+  /* Ten times a second while anything runs: a Cover's block is watched, and
+     what has run out is taken off. A wait that ends redraws the panel, so the
+     maneuver key shows that row ready again. Nothing to do costs one empty
+     loop. */
+  function tick() {
+    var t = now();
+    for (var c in ST.cool) {
+      if (!has(ST.cool, c)) { continue; }
+      var ended = false, waiting = false;
+      for (var w in ST.cool[c]) {
+        if (!has(ST.cool[c], w)) { continue; }
+        if (ST.cool[c][w] <= t) { delete ST.cool[c][w]; ended = true; } else { waiting = true; }
+      }
+      if (!waiting) { delete ST.cool[c]; }
+      if (ended && onlineOf(Number(c))) { push(Number(c)); }
+    }
+    for (var k in ST.on) {
+      if (!has(ST.on, k)) { continue; }
+      var holder = Number(k);
+      var rec = ST.on[k];
+      if (rec.cover && rec.cover.until > t) { blocking(holder); }
+      if (rec.cover && rec.cover.until <= t) { delete rec.cover; delete ST.block[holder]; }
+      var timed = ['set', 'plant', 'wall', 'rush', 'heavy', 'break', 'wreck'];
+      for (var i = 0; i < timed.length; i++) {
+        if (rec[timed[i]] && rec[timed[i]] <= t) { delete rec[timed[i]]; }
+      }
+      var left = false;
+      for (var f in rec) { if (has(rec, f)) { left = true; break; } }
+      if (!left) { delete ST.on[k]; }
+    }
+    for (var b in ST.blow) {
+      if (has(ST.blow, b) && t - ST.blow[b].at > 5000) { delete ST.blow[b]; }
+    }
+  }
+
+  if (g.__thornswoodManeuverTimer) { try { clearInterval(g.__thornswoodManeuverTimer); } catch (e) { } }
+  g.__thornswoodManeuverTimer = setInterval(guard('maneuverTick', tick), 100);
+
+  g.__thornswoodManeuvers = {
+    MANEUVERS: MANEUVERS, ORDER: ORDER,
+    held: held, takenOn: takenOn, whyNot: whyNot, mostStamina: mostStamina,
+    use: use, effects: effects, view: view, hit: hit, flush: flush, killerOf: killerOf, tick: tick,
+    state: ST
+  };
+  mlog('ready:', ORDER.length, 'maneuvers');
+})();
+
+/*
+  Every hit the engine takes, heard for the maneuvers above (#1386). It never
+  answers false: the engine does not read what this family answers, and the
+  list over mp.onTakeItem says why nothing here may try.
+*/
+mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, aggressor, source, projectile, power, sneak, bash, blocked) {
+  // The wear and the break chance at 0% (#1384), in the durability block.
+  // First and on its own, so neither half can stop the other.
+  var wear = globalThis.__thornswoodDurability;
+  if (wear && wear.onHit) {
+    try { wear.onHit(targetId, aggressor, source, blocked); } catch (e) { log('durability: the hit threw:', e); }
+  }
+  // The filled skill perks (#1385), before the maneuvers: each measures the
+  // blow on the next turn, and this way round the perks block reads it first.
+  var pk = globalThis.__thornswoodPerks;
+  if (pk && pk.hit) {
+    try { pk.hit(targetId, aggressor, source, power, bash); } catch (e) { log('perks: the hit threw:', e); }
+  }
+  // A reanimate spell on a person's body (#1387), in the college block,
+  // on its own for the same reason.
+  var college = globalThis.__thornswoodCollege;
+  if (college && college.hit) {
+    try { college.hit(targetId, aggressor, source); } catch (e) { log('college: the hit threw:', e); }
+  }
+  var mv = globalThis.__thornswoodManeuvers;
+  if (mv && mv.hit) { mv.hit(targetId, aggressor, source, power, blocked); }
+  // A healing spell landing on somebody's wounds (#1383), in the injury and
+  // disease block. On its own, so the two above cannot stop it.
+  var hurt = globalThis.__thornswoodHurt;
+  if (hurt && hurt.hit) {
+    try { hurt.hit(targetId, aggressor, source); } catch (e) { log('injury: the hit threw:', e); }
+  }
+});
+// ==== end thornswood warrior maneuvers ====
+
 
 // ==== thornswood spell tomes ====
 /*
@@ -39173,9 +44476,576 @@ log('gamemode loaded:',
              word(spell.school) + '. It cost a spell point.' + staffLine + (raised ? ' ' + raised : '') };
   }
 
-  g.__thornswoodTomes = { tomeSpell: tomeSpell, read: read, refusalLine: refusalLine };
+  /*
+    The record readers, for the college block (#1387): what kind of spell is
+    on a character, and whether a spell raises the dead.
+  */
+  g.__thornswoodTomes = {
+    tomeSpell: tomeSpell, read: read, refusalLine: refusalLine, nameOf: nameOf,
+    schoolAndRank: function (spellRes) { return schoolAndRank(g.__thornswoodProgression, spellRes); },
+    record: { lookup: lookup, field: field, fieldsOf: fieldsOf, u32: u32, globalOf: globalOf }
+  };
 })();
 // ==== end thornswood spell tomes ====
+
+// ==== thornswood college ====
+/*
+  THE COLLEGE, THE BOOK, A THRALL OF A PERSON, AND RESTORATION STRAIN (#1387).
+  docs/systems/magic.md, docs/systems/potions.md and
+  docs/systems/professions/mage/conjuration.md.
+
+  Four rules the progression block cannot keep on its own, because each one
+  needs the world: where somebody is standing, what is on their character,
+  whose body a spell landed on, and when a spell was cast.
+
+  A SEMESTER. Studying at the College hands out spell points once a
+  semester; P.study holds the numbers and the clock, and keeps the moment on
+  the character, so a relog or a restart does not reset it. This block says
+  whether somebody is in a room magic.md names: the Hall of the Elements,
+  the courtyard, the Hall of Countenance, the Hall of Attainment or the
+  Arcanaeum. Anywhere else refuses. Nobody types anything: the College page
+  on K has a Study button, which reaches the server as /pick study, the way
+  the rest of that panel's buttons do (Patrick, 4 Oct: no commands for
+  things people do).
+
+  ONLY THE BOOK IS GRANTED. A spell of the five schools that the book
+  (SPELLS, by its form id in SPELL_IDS) does not list is not a college spell
+  and is not granted. Three doors let one in, and each is shut here:
+    a tome   learnFromTome refuses it now, and the engine keeps the tome
+             and takes the spell back off the client (mp.onReadBook).
+    a tome, before this rule   #1026 taught them and the engine recorded
+             them on the character. cleanAtLogin takes them off at the next
+             login, out of the engine's own list (Actor.GetNthSpell), and
+             P.bookClean takes the name out of the book and gives a mage the
+             point back.
+    a menu   a mod's spell menu runs inside the client's own game, so the
+             server never hears of the spell until it is put in a hand: the
+             equipment update names it (mp.onUpdateEquipmentAttempt). The
+             engine cannot take back a spell it never recorded (Actor
+             .RemoveSpell sends nothing for one), so the server tells that
+             client to, through TAKE_PROPERTY, the way PUTBACK_PROPERTY tells
+             a client to put back a plant it was refused. A spawn takes it
+             off as well, because the client rebuilds its spells from the
+             server's list every time it spawns (remoteServer.ts).
+  Kept, because none of them is a spell of the book's kind: a disease, a
+  power or an ability (SPIT type), a shrine blessing, the instruments, and a
+  staff spell the staff rules unlocked (staffKnown), which the staff block
+  owns.
+
+  NO THRALL OF A PERSON. Dead Thrall, Revenant and the reanimate spells used
+  on a person's character are a death or a change for good, and they need
+  everyone's yes (magic.md, death.md). The server has no record of a yes, so
+  it refuses them on a person, every time. A spell cannot be refused before
+  it lands: the engine hears a cast after the client has made it
+  (ActionListener::OnSpellCast) and a hit after it has landed
+  (onPapyrusEvent:OnHit). So the refusal is the server's answer to the hit:
+  the caster is told, staff can read it in the log, and every machine that
+  sees the body is told to put it back down (LAYDOWN_PROPERTY), which is
+  what the server already holds it as. Anything the spell's effects list
+  that is the game's Reanimate archetype counts, so a scroll does too. A
+  body the world placed is the spell working as written.
+
+  RESTORATION STRAIN (potions.md). Inside 30 seconds, each restoration spell
+  after the first costs 25% more magicka than the last; after the fourth,
+  the next is refused for 20 seconds, and stamina and health recovery sit at
+  the weary cold numbers for those 20 seconds. The engine does not let the
+  server refuse a cast, so the cost is the lever: each school's cost value
+  (RestorationMod, the value the game's own Fortify Restoration moves,
+  'spells cost X% less') goes down by what the page asks, through the
+  effects map the client already applies, and while refused it goes down far
+  enough that no magicka pays for a restoration spell. Withered is not here:
+  it needs a cooked meal (#1382) and a share of max health, and the map
+  carries amounts.
+*/
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+  var P = g.__thornswoodProgression;
+  var T = g.__thornswoodTomes;
+  if (!P || !T || !T.record) { console.log('[college] the rules or the tomes block is missing, nothing registered'); return; }
+  var L = P.TABLE.limits;
+  var R = T.record;
+
+  function clog() {
+    var a = Array.prototype.slice.call(arguments);
+    a.unshift('[college]');
+    console.log(a.join(' '));
+  }
+  function own(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
+  function hex(id) { return (Number(id) >>> 0).toString(16); }
+  function now() { return Date.now(); }
+  function personOf(id) {
+    try { return Number(mp.get(id, 'profileId')) > 0; } catch (e) { return false; }
+  }
+  function idOfDesc(desc) {
+    try { return Number(mp.getIdFromDesc(String(desc))) || 0; } catch (e) { return 0; }
+  }
+  function descOfId(id) {
+    try { return String(mp.getDescFromId(id) || ''); } catch (e) { return ''; }
+  }
+  function char() { return g.__thornswoodCharacter || null; }
+  function tell(actorId, line) {
+    try { if (typeof say === 'function') { say(actorId, line); } } catch (e) { }
+  }
+
+  // ----------------------------------------------------------- the rooms --
+  /*
+    The four halls are interior cells, read out of game/data/doors.json (the
+    cells table there is built from the plugins by tools/Build-DoorTable.py).
+  */
+  var HALLS = {
+    '1380e:Skyrim.esm': 'the Hall of the Elements',
+    '1380f:Skyrim.esm': 'the Hall of Countenance',
+    'cab91:Skyrim.esm': 'the Hall of Attainment',
+    '13810:Skyrim.esm': 'the Arcanaeum'
+  };
+  var ROOM_LIST = ['the Hall of the Elements', 'the courtyard', 'the Hall of Countenance',
+                   'the Hall of Attainment', 'the Arcanaeum'];
+  var ROOMS = ROOM_LIST.slice(0, -1).join(', ') + ' or ' + ROOM_LIST[ROOM_LIST.length - 1];
+
+  /*
+    THE COURTYARD is open ground in Tamriel, with no cell of its own to ask
+    for. The doors out of the four halls stand in it, and Skyrim's open
+    ground comes in cells 4096 units a side, so the courtyard is the cells
+    those doors stand in, measured off the doors themselves the first time
+    anybody studies. Every door below is the outside half of a door into one
+    of the four halls (game/data/doors.json: its 'to' is a door in a hall).
+  */
+  var OUTSIDE_DOORS = [
+    '177f3:Skyrim.esm', '8392e:Skyrim.esm',   // the Hall of Countenance
+    '177f9:Skyrim.esm',                       // the Hall of the Elements
+    '83929:Skyrim.esm', '177f1:Skyrim.esm',   // the Hall of Attainment
+    '107f00:Skyrim.esm', '107f01:Skyrim.esm'  // the Arcanaeum
+  ];
+  var CELL = 4096;
+  var yard = null;
+
+  function courtyard() {
+    if (yard) { return yard; }
+    var world = '', x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, n = 0;
+    for (var i = 0; i < OUTSIDE_DOORS.length; i++) {
+      var id = idOfDesc(OUTSIDE_DOORS[i]);
+      var p = null, w = '';
+      try { p = mp.get(id, 'pos'); w = String(mp.get(id, 'worldOrCellDesc') || ''); } catch (e) { p = null; }
+      if (!id || !p || !w) { continue; }
+      if (world && w !== world) { continue; }
+      world = w;
+      var gx = Math.floor(p[0] / CELL), gy = Math.floor(p[1] / CELL);
+      x0 = Math.min(x0, gx); x1 = Math.max(x1, gx); y0 = Math.min(y0, gy); y1 = Math.max(y1, gy);
+      n++;
+    }
+    if (!n) {
+      clog('none of the doors out of the halls could be read, so the courtyard is not counted yet');
+      return null;
+    }
+    yard = { world: world, x0: x0, x1: x1, y0: y0, y1: y1 };
+    clog('the courtyard is', world, 'cells', x0 + '..' + x1, 'by', y0 + '..' + y1, 'from', n, 'doors');
+    return yard;
+  }
+
+  /** The room somebody is standing in, as a person would say it, or '' outside the College. */
+  function placeOf(actorId) {
+    var cell = '';
+    try { cell = String(mp.get(actorId, 'worldOrCellDesc') || ''); } catch (e) { return ''; }
+    if (own(HALLS, cell)) { return HALLS[cell]; }
+    var y = courtyard();
+    if (!y || cell !== y.world) { return ''; }
+    var p = null;
+    try { p = mp.get(actorId, 'pos'); } catch (e) { return ''; }
+    if (!p) { return ''; }
+    var gx = Math.floor(p[0] / CELL), gy = Math.floor(p[1] / CELL);
+    return (gx >= y.x0 && gx <= y.x1 && gy >= y.y0 && gy <= y.y1) ? 'the courtyard' : '';
+  }
+
+  // ---------------------------------------------------------- a semester --
+  /*
+    The Study button. Answers what P.study answers, with line, the words for
+    the chat, on a yes. The rules go first, so somebody with no magic, or a
+    semester that is not open yet, is told that wherever they are.
+  */
+  function study(actorId, s) {
+    var r = P.study(s, now());
+    if (!r.ok) { return r; }
+    var where = placeOf(actorId);
+    if (!where) {
+      return { ok: false, why: 'you can only study in the College of Winterhold: ' + ROOMS };
+    }
+    var left = P.spellPoints(r.state);
+    var got = r.gained + (r.gained === 1 ? ' spell point' : ' spell points');
+    r.line = 'A semester at the College, in ' + where + ': ' + got +
+      (r.school ? ', for a Novice spell of ' + r.school.charAt(0).toUpperCase() + r.school.slice(1) + ' from its tome' : '') +
+      '. ' + (left ? 'You have ' + left + ' to spend.'
+                   : 'You have none to spend: you hold ' + L.outsiderSpells + ' spells, the most anybody who is not a Mage holds.') +
+      ' The next semester opens in ' + L.semesterHours + ' hours.';
+    clog(hex(actorId), 'studied in', where, '+' + r.gained);
+    return r;
+  }
+
+  /** What the College page on K draws, or null for somebody magic is not open to. */
+  function view(s) {
+    if (!s) { return null; }
+    var mage = s.prof === 'mage';
+    var schools = P.schoolsOf(s);
+    if (!schools.length) { return null; }
+    return {
+      gain: mage ? L.collegeSemester : L.outsiderSemester,
+      school: mage ? null : schools[0],
+      opens: P.semesterOpens(s),
+      hours: L.semesterHours,
+      rooms: ROOM_LIST.slice()
+    };
+  }
+
+  // ------------------------------------------------------- only the book --
+  var SPELL_TYPE = 0;   // SPIT type: 0 a spell, 1 a disease, 2 a power, 3 a lesser power, 4 an ability
+
+  /*
+    What a SPEL record is: { name, type, school }, school null when it is not
+    one of the five. Memoed by id, because a record never changes under a
+    running server.
+  */
+  var kinds = {};
+  function spellKind(id) {
+    var key = String(id);
+    if (own(kinds, key)) { return kinds[key]; }
+    var out = null;
+    var res = R.lookup(id);
+    if (res && res.record && String(res.record.type) === 'SPEL') {
+      var sr = T.schoolAndRank(res);
+      var t = R.u32(R.field(res, 'SPIT'), 8);
+      out = { name: T.nameOf(res, descOfId(id)), type: t === null ? -1 : t, school: sr ? sr.school : null };
+    }
+    kinds[key] = out;
+    return out;
+  }
+
+  /** True when this spell on this character is one the book does not grant. */
+  function offBook(s, desc, kind) {
+    if (!kind || kind.type !== SPELL_TYPE || !kind.school) { return false; }
+    if (P.spellByDesc(desc)) { return false; }
+    if (P.staffKnown && P.staffKnown(s).indexOf(desc) !== -1) { return false; }
+    if (typeof INSTRUMENT_SPELL !== 'undefined' && String(INSTRUMENT_SPELL).toLowerCase() === String(desc).toLowerCase()) { return false; }
+    return true;
+  }
+
+  var TAKE_PROPERTY = 'thornswoodTakeSpell';
+
+  /*
+    Edge triggered on v.at through ctx.state, because updateOwner runs every
+    frame (see SWING_PROPERTY): one removal per order, never a loop. The
+    stamp is kept only once the character was there to take it from.
+  */
+  function takeScript() {
+    return [
+      '(function(){',
+      '  try {',
+      '    var v = ctx.value;',
+      '    if (!v || !v.at || !v.ids || !v.ids.length) { return; }',
+      '    var st = ctx.state;',
+      '    if (!st || st.thornswoodTakeAt === v.at) { return; }',
+      '    var sp = ctx.sp;',
+      '    var pc = sp.Game.getPlayer();',
+      '    if (!pc) { return; }',
+      '    st.thornswoodTakeAt = v.at;',
+      '    for (var i = 0; i < v.ids.length; i++) {',
+      '      var spell = sp.Spell.from(sp.Game.getFormEx(v.ids[i]));',
+      '      if (spell && pc.hasSpell(spell)) { pc.removeSpell(spell); }',
+      '    }',
+      '  } catch (e) { }',
+      '})();'
+    ].join('\n');
+  }
+
+  /*
+    At login, once (grantKnown calls this before it puts the book back on):
+    the book's names first, then what the engine holds on the character.
+    Answers the descs taken off.
+  */
+  function cleanAtLogin(actorId) {
+    var C = char();
+    if (!C || !C.stateOf) { return []; }
+    var s = C.stateOf(actorId);
+    var book = P.bookClean(s);
+    if (book.removed.length) {
+      C.writeState(actorId, book.state);
+      s = book.state;
+      clog(hex(actorId), 'book: took out', book.removed.join(', '));
+    }
+    var self = { type: 'form', desc: descOfId(actorId) };
+    var count = 0;
+    try { count = Number(mp.callPapyrusFunction('method', 'Actor', 'GetSpellCount', self, [])) || 0; }
+    catch (e) { clog(hex(actorId), 'could not read the spells on the character:', e); count = 0; }
+    var gone = [], names = [];
+    for (var i = 0; i < count; i++) {
+      var r = null;
+      try { r = mp.callPapyrusFunction('method', 'Actor', 'GetNthSpell', self, [i]); } catch (e) { r = null; }
+      var desc = (r && r.desc) ? String(r.desc) : '';
+      var id = desc ? idOfDesc(desc) : 0;
+      var kind = id ? spellKind(id) : null;
+      if (id && offBook(s, desc, kind)) { gone.push(desc); names.push(kind.name); }
+    }
+    for (var j = 0; j < gone.length; j++) {
+      if (typeof spellOn === 'function') { spellOn(actorId, gone[j], false); }
+    }
+    if (gone.length) { clog(hex(actorId), 'took off', gone.join(', ')); }
+    var told = book.removed.concat(names.filter(function (n) { return book.removed.indexOf(n) === -1; }));
+    if (told.length) {
+      tell(actorId, told.join(', ') + (told.length === 1 ? ' is' : ' are') + ' not in the College\'s book, so ' +
+           (told.length === 1 ? 'it was' : 'they were') + ' taken back. Only the book\'s spells are granted here' +
+           (s.prof === 'mage' && book.removed.length ? ', and the spell points they cost are yours again.' : '.'));
+    }
+    // An order from the last session is done with: the client rebuilt its
+    // spells from the server's list when it spawned. Cleared so it never
+    // replays.
+    var order = null;
+    try { order = mp.get(actorId, TAKE_PROPERTY); } catch (e) { order = null; }
+    if (order && order.at) {
+      try { mp.set(actorId, TAKE_PROPERTY, { ids: [], at: 0 }); } catch (e) { }
+    }
+    return gone;
+  }
+
+  /*
+    What is in somebody's hands, every time their equipment changes. Only
+    the two hands: a spell of the book's kind is cast from a hand, and the
+    voice slot holds powers. An update with the same two spells as the last
+    is one comparison.
+  */
+  var inHands = {};
+  function equipped(actorId, eq) {
+    if (!eq || typeof eq !== 'object') { return; }
+    var ids = [Number(eq.leftSpell) || 0, Number(eq.rightSpell) || 0];
+    var key = ids.join(',');
+    if (inHands[actorId] === key) { return; }
+    inHands[actorId] = key;
+    if ((!ids[0] && !ids[1]) || !personOf(actorId)) { return; }
+    var C = char();
+    if (!C || !C.stateOf) { return; }
+    var s = C.stateOf(actorId);
+    var take = [], names = [];
+    for (var i = 0; i < ids.length; i++) {
+      if (!ids[i] || take.indexOf(ids[i]) !== -1) { continue; }
+      var desc = descOfId(ids[i]);
+      var kind = desc ? spellKind(ids[i]) : null;
+      if (desc && offBook(s, desc, kind)) { take.push(ids[i]); names.push(kind.name); }
+    }
+    if (!take.length) { return; }
+    try { mp.set(actorId, TAKE_PROPERTY, { ids: take, at: now() }); } catch (e) { clog(hex(actorId), 'could not order', names.join(', '), 'taken back:', e); return; }
+    clog(hex(actorId), 'held', names.join(', '), 'from outside the book; taken back');
+    tell(actorId, names.join(' and ') + (names.length === 1 ? ' is' : ' are') + ' not in the College\'s book, so ' +
+         (names.length === 1 ? 'it is' : 'they are') + ' taken back. Only the book\'s spells are granted here.');
+  }
+
+  // -------------------------------------------------- no thrall of a person --
+  var REANIMATE = 22;   // MGEF DATA archetype at offset 0x40 (libespm MGEF.h): Reanimate
+
+  /*
+    Does this spell, scroll or staff raise the dead: any of its effects is the
+    Reanimate archetype. A staff's effects are its enchantment's (EITM).
+    Memoed by id.
+  */
+  var raises = {};
+  function reanimates(id) {
+    var key = String(id);
+    if (own(raises, key)) { return raises[key]; }
+    var out = false;
+    var res = R.lookup(id);
+    var type = res && res.record ? String(res.record.type) : '';
+    if (type === 'WEAP') {
+      var ench = R.u32(R.field(res, 'EITM'), 0);
+      res = ench ? R.lookup(R.globalOf(res, ench)) : null;
+      type = res && res.record ? String(res.record.type) : '';
+    }
+    if (type === 'SPEL' || type === 'SCRL' || type === 'ENCH') {
+      var efids = R.fieldsOf(res, 'EFID');
+      for (var i = 0; i < efids.length && !out; i++) {
+        var mgef = R.lookup(R.globalOf(res, R.u32(efids[i], 0)));
+        out = R.u32(R.field(mgef, 'DATA'), 0x40) === REANIMATE;
+      }
+    }
+    raises[key] = out;
+    return out;
+  }
+
+  var LAYDOWN_PROPERTY = 'thornswoodLaidDown';
+
+  /*
+    On every machine that sees the body: put it back down, once per order,
+    and only while the server holds it dead (ctx.get('isDead') is the
+    server's word). The same two calls the client's own death sync makes for
+    somebody else's body (deathService.ts, killActor).
+  */
+  function laydownScript() {
+    return [
+      '(function(){',
+      '  try {',
+      '    var v = ctx.value;',
+      '    if (!v || !v.at) { return; }',
+      '    var st = ctx.state;',
+      '    if (!st || st.thornswoodLaidAt === v.at) { return; }',
+      '    if (!ctx.get("isDead")) { return; }',
+      '    var a = ctx.sp.Actor.from(ctx.refr);',
+      '    if (!a) { return; }',
+      '    st.thornswoodLaidAt = v.at;',
+      '    if (!a.isDead()) { a.endDeferredKill(); a.kill(null); }',
+      '  } catch (e) { }',
+      '})();'
+    ].join('\n');
+  }
+
+  /*
+    Every hit, from the one OnHit handler. A reanimate spell on a person's
+    body is refused: the body goes back down and the caster is told. Answers
+    true when it refused.
+  */
+  function hit(targetId, aggressor, source) {
+    var srcId = (source && source.desc) ? idOfDesc(source.desc) : 0;
+    if (!srcId || !reanimates(srcId)) { return false; }
+    var target = Number(targetId) || 0;
+    if (!target || !personOf(target)) { return false; }
+    var caster = (aggressor && aggressor.desc) ? idOfDesc(aggressor.desc) : 0;
+    var book = P.spellByDesc(source.desc);
+    var name = book ? book.name : 'That spell';
+    try { mp.set(target, LAYDOWN_PROPERTY, { at: now() }); } catch (e) { clog('could not lay down', hex(target) + ':', e); }
+    clog(caster ? hex(caster) : 'something', 'cast', name, '(' + source.desc + ') on the body of', hex(target), '- refused, a person');
+    if (caster && personOf(caster)) {
+      tell(caster, name + ' does not take a person. Raising somebody\'s character is a death or a change for good, ' +
+           'and it needs everyone\'s yes out of character first, so the body stays down.');
+    }
+    return true;
+  }
+
+  // ------------------------------------------------- restoration strain --
+  /*
+    potions.md, Restoration strain, and the weary cold row of
+    temperature.md for the 20 seconds (TEMP_COST.cold.weary in the needs
+    block: -20 stamina recovery, which the page applies to health recovery
+    too).
+  */
+  var STRAIN = {
+    window: 30,      // seconds from the first restoration cast
+    rise: 0.25,      // each one after the first costs this much more than the last
+    casts: 4,        // the fifth inside the window is refused
+    refused: 20,     // seconds
+    weary: -20,      // stamina and health recovery, percent, while refused
+    shut: 1000000    // RestorationMod while refused: costs 10001 times as much
+  };
+
+  var strain = {};   // actorId -> { start, n, until }
+
+  /* The book's school when the book lists it, else the record's. Memoed by id. */
+  var restoration = {};
+  function isRestoration(id) {
+    var key = String(id);
+    if (own(restoration, key)) { return restoration[key]; }
+    var desc = descOfId(id);
+    var book = desc ? P.spellByDesc(desc) : null;
+    var kind = book ? null : spellKind(id);
+    restoration[key] = book ? book.school === 'restoration'
+      : (!!kind && kind.type === SPELL_TYPE && kind.school === 'restoration');
+    return restoration[key];
+  }
+
+  /** What the strain puts on the client's map now, or null. */
+  function effects(actorId, at) {
+    var rec = own(strain, actorId) ? strain[actorId] : null;
+    var t = at || now();
+    if (!rec) { return null; }
+    // A refusal that has run its 20 seconds ends the window with it.
+    if (rec.until) {
+      return rec.until > t ? { RestorationMod: -STRAIN.shut, staminaRateMult: STRAIN.weary, healRateMult: STRAIN.weary } : null;
+    }
+    if (rec.n > 0 && t < rec.start + STRAIN.window * 1000) {
+      return { RestorationMod: -Math.round((Math.pow(1 + STRAIN.rise, rec.n) - 1) * 10000) / 100 };
+    }
+    return null;
+  }
+
+  function push(actorId) {
+    var C = char();
+    if (!C || !C.writeState || !C.stateOf) { return; }
+    try { C.writeState(actorId, C.stateOf(actorId), true); } catch (e) { clog('could not redraw', hex(actorId) + ':', e); }
+  }
+
+  /*
+    Every cast, from the OnSpellCast handler. Only a person's, and only a
+    restoration spell. The window and the refusal each end on their own
+    clock, and the map is written again when they do.
+  */
+  function cast(casterId, spell, at) {
+    var actorId = Number(casterId) || 0;
+    var id = (spell && spell.desc) ? idOfDesc(spell.desc) : 0;
+    if (!actorId || !id || !personOf(actorId) || !isRestoration(id)) { return null; }
+    var t = at || now();
+    var rec = own(strain, actorId) ? strain[actorId] : null;
+    if (rec && rec.until > t) {
+      clog(hex(actorId), 'cast', spell.desc, 'while restoration is refused; the cost did not stop it');
+      return rec;
+    }
+    if (!rec || rec.until || t >= rec.start + STRAIN.window * 1000) {
+      rec = strain[actorId] = { start: t, n: 0, until: 0 };
+      setTimeout(guardOf('strainWindow', function () {
+        if (strain[actorId] === rec && !rec.until) { delete strain[actorId]; push(actorId); }
+      }), STRAIN.window * 1000 + 50);
+    }
+    rec.n++;
+    if (rec.n >= STRAIN.casts) {
+      rec.until = t + STRAIN.refused * 1000;
+      clog(hex(actorId), 'restoration refused for', STRAIN.refused, 'seconds after', rec.n, 'casts');
+      tell(actorId, 'Your restoration is strained: for ' + STRAIN.refused + ' seconds no restoration spell takes, ' +
+           'and your stamina and health come back slower.');
+      setTimeout(guardOf('strainRefused', function () {
+        if (strain[actorId] === rec) { delete strain[actorId]; push(actorId); }
+      }), STRAIN.refused * 1000 + 50);
+    }
+    push(actorId);
+    return rec;
+  }
+
+  function guardOf(name, fn) { return (typeof guard === 'function') ? guard(name, fn) : fn; }
+
+  // ------------------------------------------------------------ register --
+  try {
+    mp.makeProperty(TAKE_PROPERTY, {
+      isVisibleByOwner: true,
+      isVisibleByNeighbors: false,
+      updateOwner: takeScript(),
+      updateNeighbor: ''
+    });
+    mp.makeProperty(LAYDOWN_PROPERTY, {
+      isVisibleByOwner: false,
+      isVisibleByNeighbors: true,
+      updateOwner: '',
+      updateNeighbor: laydownScript()
+    });
+  } catch (e) {
+    // already made by a previous load; a changed script needs a restart,
+    // which a deploy is.
+  }
+
+  g.__thornswoodCollege = {
+    HALLS: HALLS, OUTSIDE_DOORS: OUTSIDE_DOORS, STRAIN: STRAIN, REANIMATE: REANIMATE,
+    TAKE_PROPERTY: TAKE_PROPERTY, LAYDOWN_PROPERTY: LAYDOWN_PROPERTY,
+    placeOf: placeOf, courtyard: courtyard, study: study, view: view,
+    spellKind: spellKind, offBook: offBook, cleanAtLogin: cleanAtLogin, equipped: equipped,
+    reanimates: reanimates, hit: hit,
+    isRestoration: isRestoration, cast: cast, effects: effects, strain: strain,
+    takeScript: takeScript, laydownScript: laydownScript
+  };
+  clog('ready');
+})();
+
+/*
+  What somebody holds, every time it changes (#1387): a spell the book does
+  not list is taken back, in the college block. It returns nothing: the
+  engine has already decided by the time this fires, and its OnFireBlocked
+  is not written, so a false here would only log a warning.
+*/
+mp.onUpdateEquipmentAttempt = guard('onUpdateEquipmentAttempt', function (actorId, equipment) {
+  var college = globalThis.__thornswoodCollege;
+  if (college && college.equipped) { college.equipped(actorId, equipment); }
+});
+// ==== end thornswood college ====
 
 // ==== thornswood staff spells ====
 /*
@@ -39992,11 +45862,13 @@ function thornswoodBooks(env) {
     if (Number(hit.pid) === Number(pid)) { return 'That is you.'; }
     if (memberOf(taken.book, hit.pid)) { return 'They are already in it.'; }
     pending[hit.pid] = { bookId: taken.book.id, from: Number(pid), at: now() };
+    // The P prompt says which book it is, "the business The Bee" (#1591).
+    var about = 'the ' + taken.book.kind + ' ' + taken.book.name;
     var asked = '';
-    if (env.offer) { asked = env.offer(actorId, hit.actorId) || ''; }
+    if (env.offer) { asked = env.offer(actorId, hit.actorId, about) || ''; }
     else {
       var soc = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodSocial;
-      if (soc && soc.offer && hit.actorId) { asked = soc.offer('book', actorId, hit.actorId) || ''; }
+      if (soc && soc.offer && hit.actorId) { asked = soc.offer('book', actorId, hit.actorId, about) || ''; }
     }
     if (asked) { delete pending[hit.pid]; return asked; }
     refresh();
@@ -40464,7 +46336,7 @@ function thornswoodBooks(env) {
       if (!bits[0] || bits.length > 3) { return 'Name the line, then the buy and the sell. A blank is -.'; }
       return setPrice(taken.book, bits[0], bits[1], bits[2]);
     }
-    return 'book: new business <name>, new faction <name>, invite, leave. The rest is on J.';
+    return 'The group book is on J.';
   }
 
   function view(pid, textOff) {
@@ -40506,9 +46378,15 @@ function thornswoodBooks(env) {
         }
       }
       var roleNames = [];
+      var roleRows = [];
       if (hasPerm(b, pid, 'Roles')) {
         var roles = b.roles || [];
-        for (var rr = 0; rr < roles.length; rr++) { roleNames.push(roles[rr].name); }
+        for (var rr = 0; rr < roles.length; rr++) {
+          roleNames.push(roles[rr].name);
+          // What each role may do, so J switches a permission on and off
+          // rather than anybody typing the list (#1630).
+          roleRows.push({ name: roles[rr].name, perms: (roles[rr].perms || []).slice() });
+        }
       }
       books.push({
         id: b.id,
@@ -40526,13 +46404,15 @@ function thornswoodBooks(env) {
         chat: chat,
         priceList: prices,
         submitted: read ? submittedHolds(b.id) : [],
-        roleNames: roleNames
+        roleNames: roleNames,
+        roles: roleRows
       });
     }
     return {
       show: true,
       canBusiness: !!((r.business || r.dev) && !ownsKind(r.account, 'business')),
       canFaction: !!((r.faction || r.dev) && !ownsKind(r.account, 'faction')),
+      permNames: PERMS.slice(),
       books: books
     };
   }
@@ -40649,11 +46529,29 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/helpme', '/help-me', '/report',
                // Out of a wedged spot; see the stuck block after it.
                '/stuck',
+               // A carriage or ferry (#1394). E on a driver sends /ride e <id>,
+               // and the ride panel's buttons send /ride and the stop (#1635).
+               // Never typed, and so deliberately NOT in PLAYER_WORDS. See the
+               // carriages block.
+               '/ride',
                '/pick', '/spend',
+               // A warrior's maneuver, sent by the panel the maneuver key
+               // opens (#1386). Never typed, and no help names it: Patrick,
+               // 4 October, no chat commands for anything people do. See the
+               // maneuvers block.
+               '/maneuver',
+               // A Master taking somebody on, and ending it (#1388). See the
+               // character block.
+               '/apprentice',
                '/plant', '/claim', '/plot',
                '/deed', '/deeds', '/lock', '/unlock', '/mold', '/key',
                '/jarl', '/steward', '/evict', '/box', '/rent',
                '/notice', '/job', '/board', '/take', '/jobs', '/dropjob', '/unpin',
+               '/letter', '/deliver',
+               // A haul (#1393). Sent by the board panel's Send a haul and
+               // Confirm buttons, never typed, and so deliberately NOT in
+               // PLAYER_WORDS. See the property block.
+               '/haul',
                '/tp', '/goto', '/face', '/restart', '/shutdown', '/tspicks',
                // Playtesters', like /tp, and gated the same way. Deliberately
                // absent from PLAYER_WORDS: naming them in /help would be an
@@ -40668,6 +46566,9 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/banaccount', '/unbanaccount', '/pk',
                // An admin undoing a PK made by mistake (#1010, 29 September).
                '/unpk',
+               // A wound, a disease or an agreed loss written onto somebody
+               // by staff (#1383). See the injury and disease block.
+               '/hurt',
                /*
                  NOT A COMMAND ANYBODY TYPES. The client reports each fall of
                  the axe with it, because the server sees a press and Skyrim's
@@ -40680,8 +46581,14 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/chopped',
                // Hunger, thirst and exhaustion. See the needs block at the end
                // of this file; the numbers there are invented and meant to be
-               // argued with.
+               // argued with. /rest is the plugin's, sent when somebody sits
+               // or lies down, and never typed (#1603); see bedRest.
                '/needs', '/rest', '/eat', '/drink', '/bard',
+               // The repair panel (#1384): sent by the inventory key and by
+               // the panel's buttons, never typed. See the durability block,
+               // after the take limit. Deliberately absent from PLAYER_WORDS:
+               // nothing people do is a command (Patrick, 4 October).
+               '/repair',
                // The client's weather report and its "I am on fire". Never typed; see
                // the branches.
                '/place', '/burn', '/ate',
@@ -40694,11 +46601,16 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // The mold key: a blank pressed into the door under the
                // crosshair. Sent by the plugin, not typed; see moldHere.
                '/moldhere',
+               // A holder letting the person under the crosshair sleep there,
+               // or the property page ending a guest's night (#1603). Sent by
+               // the plugin and the K panel, never typed; see sleepHere.
+               '/sleephere',
                // The client's load order, every two minutes. Sent by the front
                // plugin, never typed; see the load order refusal block.
                '/loadorder',
                // Friends, parties, mutes, trade and journals. See the
-               // social block at the end of this file.
+               // social block at the end of this file. /journal and /book
+               // are the J panel's lines, never typed (#1630).
                '/friend', '/party', '/mute', '/trade', '/journal', '/book', '/merchant',
                '/yes', '/no',
                // The dice. Rolled here now rather than on the roller's own
@@ -40725,17 +46637,25 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // the steward half answers "only a steward sets rent"
                       // to everybody else.
                       '/box', '/rent', '/notice', '/job', '/board',
-                      '/take', '/jobs', '/dropjob', '/unpin', '/help',
+                      '/take', '/jobs', '/dropjob', '/unpin', '/letter', '/deliver', '/help',
                       // Everybody's, and they need to be findable: a meter
-                      // nobody knows how to act on is only a penalty.
-                      '/needs', '/rest', '/eat', '/drink', '/bard',
+                      // nobody knows how to act on is only a penalty. Not
+                      // /rest: sitting or lying down is how you rest (#1603).
+                      '/needs', '/eat', '/drink', '/bard',
                       // Everybody's, and the one thing a person in trouble
                       // must be able to find: asking staff, and getting
                       // out of a wedged spot (#414).
                       '/helpme', '/report', '/stuck',
                       // Everybody's, and they have to be findable: a key
-                      // prompt nobody sees is a feature nobody has.
-                      '/friend', '/party', '/mute', '/hidename', '/trade', '/journal', '/book', '/merchant',
+                      // prompt nobody sees is a feature nobody has. Not
+                      // /party: P on somebody asks and the P panel runs the
+                      // party, and nobody is told to type it (#1629). Not
+                      // /journal or /book: J sends those lines and nobody is
+                      // told to type them (#1630).
+                      '/friend', '/mute', '/hidename', '/trade', '/merchant',
+                      // Everybody's: a Master takes somebody on with it, and
+                      // anybody can ask who took them on (#1388).
+                      '/apprentice',
                       '/yes', '/no', '/roll'];
 
 // ---------------------------------------------------------------------------
@@ -41497,13 +47417,14 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
   function round1(v) { return Math.round(Number(v) * 10) / 10; }
 
   /*
-    The journal verbs, which the J panel speaks and a person can type.
+    The journal verbs, which the J panel speaks.
 
     Patrick asked for "multiple journals, pages inside them, and sharing
     either a whole journal or a single page with a friend", so the shape is
     journal, page, share, and the panel sends exactly these lines rather than
     having a protocol of its own. That is the same choice the K panel made
-    with /pick: one way in, and a person who would rather type can.
+    with /pick: one way in. Nobody is told to type them and no help names
+    them (Patrick, 4 Oct: buttons, not commands; #1630).
 
     The separator is two colons because a page has a title and a body and a
     body has newlines in it, and the chat socket is line based. Everything
@@ -41514,7 +47435,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     var s = soc.stateOf(actorId);
 
     if (!verb || verb === 'list') {
-      if (!s.journals.length) { return 'No journals yet. /journal new <title>, or press J.'; }
+      if (!s.journals.length) { return 'No journals yet. J opens them, and New journal starts one.'; }
       var names = [];
       for (var i = 0; i < s.journals.length; i++) {
         names.push(s.journals[i].title + ' (' + s.journals[i].pages.length + ')');
@@ -41706,7 +47627,10 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       and the world hooks replace them rather than joining them.
 
       /needs   what the three meters say
-      /rest    sit, campfire, inn or bed; /rest up to stop
+      /rest    sent by the plugin when somebody sits or lies down, and
+               /rest up when they get off; never typed (#1603). What counts
+               is what the server saw them press; see "beds" in the property
+               block.
       /eat     a meal; /drink water; /drink ale for the good and the bad of it
       /bard    say you are playing, which helps everyone resting near you
     */
@@ -41768,6 +47692,34 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       var bn = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodNeeds;
       if (bn && bn.setBurning && actorId) {
         try { bn.setBurning(actorId, String(parts[1] || '') === '1'); } catch (e) { }
+      }
+      /*
+        AND THE SAME TWO REPORTS TIME THE FIRE, so a fire that dealt 30 or
+        more is a bad burn afterwards (#1383). See burning() in the injury
+        and disease block.
+      */
+      var burnt = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodHurt;
+      if (burnt && burnt.burning && actorId) {
+        try {
+          var burnLine = burnt.burning(actorId, String(parts[1] || '') === '1');
+          if (burnLine) { toProfile(profileId, burnLine); }
+        } catch (e) { log('/burn could not time the fire:', e); }
+      }
+      return true;
+    }
+
+    /*
+      A carriage or ferry (#1394). Sent by the front plugin as /ride e <id>
+      when somebody presses E on a driver, and as /ride and the stop by the
+      ride panel's buttons (#1635); nobody types it. The carriages block
+      answers it, and takes the fare onto the hold's ledger.
+    */
+    if (word === '/ride') {
+      var rides = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodCarriages;
+      if (!rides) { toProfile(profileId, 'That is not running on this server.'); return true; }
+      try { rides.command(parts, actorId, profileId, toProfile); } catch (eRide) {
+        log('/ride threw:', eRide);
+        toProfile(profileId, 'That did not work. Say so in the dev channel.');
       }
       return true;
     }
@@ -41867,6 +47819,14 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           if (!tr || !tr.begin) { toProfile(profileId, 'Trading is not running on this server.'); return true; }
           var started = tr.begin(themActor, actorId);
           if (started) { toProfile(profileId, started); return true; }
+        } else if (o.kind === 'apprentice') {
+          /* A Master offered to take this person on (#1388). The character
+             block holds the record, so it checks again and writes both. */
+          var chAp = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodCharacter;
+          if (!chAp || !chAp.acceptApprentice) { toProfile(profileId, 'That is not running on this server.'); return true; }
+          var tookOn = chAp.acceptApprentice(actorId, themActor, o);
+          toProfile(profileId, tookOn.learner);
+          if (tookOn.master) { say(themActor, tookOn.master); }
         }
         soc.push(actorId);
         if (themActor) { soc.push(themActor); }
@@ -41881,7 +47841,11 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       }
 
       /* /party with nothing after it is about your own party rather than
-         about somebody else, so those two go first. */
+         about somebody else, so those two go first.
+
+         Every /party line is sent by P on somebody (an ask with their form
+         id) or by a button on the P panel (leave, disband, kick, lead, and an
+         ask beside a friend). Nobody is told to type one (#1629). */
       // Opening or mounting a panel requests its owner's current view (#1275).
       if (word === '/party' && rest === 'refresh') {
         soc.push(actorId, true);
@@ -41889,7 +47853,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       }
       if (word === '/party' && (rest === '' || rest === 'list')) {
         var pp = soc.partyOf(mine);
-        if (!pp) { toProfile(profileId, 'You are not in a party. Look at somebody and press the party key, or /party <name>.'); return true; }
+        if (!pp) { toProfile(profileId, 'You are not in a party. Look at somebody and press the party key to ask them.'); return true; }
         var names = [];
         for (var pi = 0; pi < pp.members.length; pi++) {
           var pa = soc.actorForProfile(pp.members[pi]);
@@ -42018,12 +47982,14 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         var live = tr2.tradeOf(actorId);
         var verb = String(parts[1] || '').toLowerCase();
         if (live || verb === 'cancel' || verb === 'ok' || verb === 'add' ||
-            verb === 'remove' || verb === 'gold' || verb === 'pack') {
+            verb === 'remove' || verb === 'gold' || verb === 'pack' || verb === 'sale') {
           if (!live) { toProfile(profileId, 'You are not trading.'); return true; }
           var out = '';
           if (verb === 'cancel') { out = tr2.cancel(actorId); }
           else if (verb === 'ok') { out = tr2.confirm(actorId); }
           else if (verb === 'gold') { out = tr2.gold(actorId, parts[2]); }
+          // The panel's Buy for the company (#1393). Never typed.
+          else if (verb === 'sale') { out = tr2.sale(actorId); }
           else if (verb === 'remove') {
             var rbits = parts.slice(2);
             var rn = 0;
@@ -42073,6 +48039,15 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         return true;
       }
 
+      /* Somebody already in your party is not asked again. P draws "Party
+         menu" over them rather than an ask, and this is the server's own
+         check of the same thing, for an ask that left as they joined. */
+      var askerParty = word === '/party' ? soc.partyOf(mine) : null;
+      if (askerParty && askerParty.members.indexOf(theirPid) !== -1) {
+        toProfile(profileId, theirName + ' is already in your party.');
+        return true;
+      }
+
       var kind = word === '/friend' ? 'friend' : (word === '/party' ? 'party' : 'trade');
       var refused = soc.offer(kind, actorId, them);
       if (refused) { toProfile(profileId, refused); return true; }
@@ -42085,6 +48060,20 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                 Math.round(soc.SOCIAL.offerFor / 1000) + ' seconds.');
       soc.push(actorId);
       soc.push(them);
+      return true;
+    }
+
+    // A warrior's maneuvers (#1386), as the maneuver panel sends them; nobody
+    // is told to type it. See the maneuvers block, after the character
+    // block, for what each one does and what the server cannot.
+    if (word === '/maneuver') {
+      var mvs = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodManeuvers;
+      if (!mvs || !mvs.use) {
+        toProfile(profileId, 'Maneuvers are not running on this server right now. Say so in the dev channel.');
+        return true;
+      }
+      if (!needCharacter()) { return true; }
+      toProfile(profileId, mvs.use(actorId, parts[1]));
       return true;
     }
 
@@ -42144,17 +48133,31 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       if (word === '/bard') { toProfile(profileId, needs.bard(actorId)); return true; }
       if (word === '/rest') {
         var where = String(parts[1] || '').toLowerCase();
+        var beds = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodBeds;
         if (where === 'up' || where === 'stop') {
+          var was = String(needs.settle(actorId).resting || '');
+          var off = (beds && beds.off) ? beds.off(actorId) : '';
           needs.resting(actorId, '');
-          toProfile(profileId, 'You get up.');
+          // Said only when there was a rest to get up from, and not off a
+          // seat: the plugin sends this at every piece of furniture it gets
+          // off, and people sit at every table (#1603).
+          if (was && off !== 'seat') { toProfile(profileId, 'You get up.'); }
           return true;
         }
-        if (!where) {
-          toProfile(profileId, 'Rest where? sit, campfire, inn or bed. /rest up to get going again.');
+        /*
+          WHAT WAS PRESSED, NEVER THE WORD (#1392, #1607, #1603). The plugin
+          says /rest bed when somebody lies down and /rest sit when they sit,
+          and the beds in the property block answer by the furniture the server
+          saw them press and whether they are still at it: a seat, a seat by a
+          fire, a bed by whose it is. Nobody types this, and help never names
+          it. See "beds" in the property block.
+        */
+        if (!beds || !beds.rest) {
+          toProfile(profileId, 'Beds are not running on this server right now. Say so in the dev channel.');
           return true;
         }
-        var said = needs.resting(actorId, where);
-        toProfile(profileId, said || ('There is no resting at a ' + where + '. Try sit, campfire, inn or bed.'));
+        var restSaid = beds.rest(actorId, Number(profileId) || 0);
+        if (restSaid) { toProfile(profileId, restSaid); }
         return true;
       }
       // /eat and /drink
@@ -42640,6 +48643,18 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       the unknown-command reply below did not: it advertised /tp to
       everybody and then refused them. Both read the same list now.
     */
+    // The repair panel (#1384), from the inventory key or a button on the
+    // panel. The work is in the durability block; this only hands it the
+    // character and the words after /repair.
+    if (word === '/repair') {
+      if (!needCharacter()) { return; }
+      var wear = g.__thornswoodDurability;
+      if (!wear) { toProfile(profileId, 'Repair is not running on this server.'); return; }
+      var mended = wear.panel(actorId, parts.slice(1));
+      if (mended) { toProfile(profileId, mended); }
+      return;
+    }
+
     // Out of a wedged spot (#414). The work is in the stuck block at the end
     // of this file; this only hands it the character.
     if (word === '/stuck') {
@@ -42690,11 +48705,12 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       if (topic === 'people' || topic === 'friends' || topic === 'party') {
         toProfile(profileId,
           'Look at somebody and press Y to ask them to be friends, H to offer a ' +
-          'trade, L to stop hearing them. P opens your friends and your party; ' +
+          'trade, L to stop hearing them, P to ask them to party. P opens your ' +
+          'friends and party; ' +
           'J opens your journals, and a group book beside them when this character ' +
           'is in one or the Discord account may found one. A Dev may found one of each. ' +
-          '/book new business <name> and /book new faction <name> start one. ' +
-          '/book leave drops this character. ' +
+          'New business and New faction on that tab start one, and Leave there ' +
+          'drops this character. ' +
           'Work done with your party in the same place ' +
           'counts for more. /yes and /no answer whatever somebody has asked you.');
         return;
@@ -42702,8 +48718,10 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       if (topic === 'living' || topic === 'needs' || topic === 'food') {
         toProfile(profileId,
           'The four bars are food, water, rest and how warm you are. /eat and ' +
-          '/drink when you have something, /rest sit, /rest campfire, /rest inn ' +
-          'or /rest bed, and /rest up to get going again. Fires warm you and ' +
+          '/drink when you have something. Sit down or lie down and you rest: a ' +
+          'seat by a fire is better than a bare one, a bedroll by a fire better ' +
+          'still, and your own bed best of all. A bed in somebody else\'s building ' +
+          'counts when they have let you sleep there or you carry its key. Fires warm you and ' +
           'standing in one burns you. What you are wearing matters: fur is the ' +
           'warmest thing there is and metal is the worst.');
         return;
@@ -42711,8 +48729,14 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       if (topic === 'work' || topic === 'trade' || topic === 'class') {
         toProfile(profileId,
           'K opens your profession, your class and your skill tree. Work at what ' +
-          'you chose and the rank climbs on its own. /plot says what is in the ' +
-          'ground in front of you and whose farm it is, /plant sows it.');
+          'you chose and the rank climbs on its own. Your sister half stops at ' +
+          'novice until a Master of it takes you on: a Master types /apprentice ' +
+          '<name>, and /apprentice end <name> ends it. /apprentice on its own ' +
+          'says who took you on. /plot says what is in the ' +
+          'ground in front of you and whose farm it is, /plant sows it. A ' +
+          'warrior\'s maneuvers open on the maneuver key, which the ' +
+          'launcher\'s Controls page names. ' +
+          'A repair kit is used from your inventory.');
         return;
       }
       if (topic === 'land' || topic === 'home' || topic === 'deed') {
@@ -42720,7 +48744,9 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           '/claim at a plot takes the farm around it; /claim at a door you have ' +
           'just opened takes the building and hands you the deed. /deed lists ' +
           'what you hold, /lock and /unlock turn the lock, /rent says what a ' +
-          'place costs. A smith says /mold at a door with the holder standing ' +
+          'place costs. To let somebody sleep in a building you hold, look at ' +
+          'them inside it and press the key the prompt shows. ' +
+          'A smith says /mold at a door with the holder standing ' +
           'there, and /key at a forge with the mold in hand.');
         return;
       }
@@ -43437,8 +49463,9 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
                   handle in the pack; a brew or an enchantment by somebody
                   whose trade is not that bench's; and a craft that matched no
                   recipe but makes an item a recipe here owns, asked the same
-                  race, profession and rank question (tempering still comes
-                  through). A refusal keeps their materials.
+                  race, profession and rank question; and a temper at the
+                  sharpening wheel or the armour table (#1384). A refusal
+                  keeps their materials.
     onPutItem     Putting into a container. mp.onPutItem refuses anything but
                   coin into a hold's box, and says nothing about any other
                   container.
@@ -43453,13 +49480,18 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
                   the event is raised for Gold001.
     onDeath       Anything dying. mp.onDeath never refuses. It logs a person's
                   death with the killer's id, and that line is the only record
-                  of a fight this file keeps. The hits before it do raise an
-                  event, onPapyrusEvent:OnHit, but nothing here listens to it
-                  yet (THE PAPYRUS FAMILY, below).
+                  of a fight this file keeps. The hits before it raise
+                  onPapyrusEvent:OnHit, which only the warrior maneuvers and
+                  the break chance in the durability block listen to (THE
+                  PAPYRUS FAMILY, below).
     onRespawn     Logged by mp.onRespawn, never refused.
-    onEatItem     Eating or drinking something in the pack. No handler: the
-                  engine applies a potion's effects. The needs block hears
-                  about eating from the client's /ate line instead.
+    onEatItem     Eating or drinking something in the pack. The engine
+                  raises it from the client's equip message once it has
+                  checked the pack holds the thing (MpActor::OnEquip), then
+                  takes one out and applies a potion's effects. mp.onEatItem
+                  in the injury and disease block hears it for a potion of
+                  cure disease (#1383) and never refuses. The needs block
+                  hears about eating from the client's /ate line instead.
     onReadBook    Reading a book. A spell tome teaches only under the Mage
                   rules (a spell point, the rank, a spell of the rank below),
                   and mp.onReadBook refuses it otherwise, keeping the tome
@@ -43476,10 +49508,13 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
                   weight, to 0 to 100 and drops any field the engine does not
                   know (BODY SHAPE, below, #993). It always returns true.
     onUpdateEquipmentAttempt
-                  What somebody is wearing. No handler, and the same warning
-                  about false. The engine checks it itself, by
-                  equipmentSpellCheckEnabled and equipmentSlotCheckEnabled in
-                  server-settings.json.
+                  What somebody is wearing, once the engine has taken it, and
+                  the same warning about false. The engine checks it itself,
+                  by equipmentSpellCheckEnabled and equipmentSlotCheckEnabled
+                  in server-settings.json. mp.onUpdateEquipmentAttempt hears it
+                  for the college block (#1387), which takes back a spell the
+                  book does not list from somebody's hands, and it returns
+                  nothing.
 
   THE PAPYRUS FAMILY, mp['onPapyrusEvent:<Name>']. Every Papyrus event the
   engine sends goes through MpForm::SendPapyrusEvent, which wraps it in a
@@ -43533,9 +49568,14 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   the world's Papyrus scripts. So on a false the hit still lands, the spell
   was already cast and the item was already added, and all that is stopped is
   the event reaching a lever's or a quest's own script. That is why nothing
-  here may ever return false to this family. Nothing here listens to any of
-  it yet, and the engine does not build the arguments for a name mp has no
-  function for, so the family costs this file nothing today.
+  here may ever return false to this family. This file listens to two
+  names: OnHit, for the warrior maneuvers (#1386), the break chance at 0% in
+  the durability block (#1384), a wound in the injury block (#1383) and a
+  reanimate spell on a person's body (#1387); and OnSpellCast, one handler
+  in the injury block, for a healing spell (#1383) and restoration strain
+  (#1387). The engine does not build the
+  arguments for a name mp has no function for, so the rest of the family
+  costs this file nothing.
 
   WHAT THE ENGINE ANSWERS WITH NO EVENT AT ALL. Movement, animation, animation
   variables, health, magicka and stamina, bow shots (one arrow is taken),
@@ -43585,10 +49625,14 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   everybody at once, so every other take is watched and let through.
 
   Hits are a different case: nothing here can refuse one, only hear it,
-  through onPapyrusEvent:OnHit. Nothing listens to it yet. It is raised for
-  every blow the engine takes, a hosted bandit's as much as a person's, so
-  which blows are worth a line, one person hitting another being the obvious
-  one, belongs to the same decision.
+  through onPapyrusEvent:OnHit. The warrior maneuvers listen to it (#1386)
+  and change what a hit took only after the engine has applied it, and the
+  durability block hears it for the break chance at 0% (#1384), and the
+  college block for a reanimate spell landing on a person's body (#1387),
+  which it answers by putting the body back down; none of them logs a
+  blow. It is raised for every blow the engine takes, a hosted bandit's as
+  much as a person's, so which blows are worth a line, one person hitting
+  another being the obvious one, belongs to the same decision.
 */
 
 /*
@@ -43679,6 +49723,14 @@ mp.onTakeItem = guard('onTakeItem', function (sourceRefrId, actorId, baseId, cou
 mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
   log('drop:', auditPerson(actorId), 'dropped', Number(count) || 0, auditItem(baseId),
       'in', auditCell(actorId));
+  // A piece's condition is in its name and the ground keeps no name, so the
+  // durability block remembers it for the pickup (#1384).
+  var wear = globalThis.__thornswoodDurability;
+  if (wear && wear.dropped) {
+    try { wear.dropped(actorId, Number(baseId) || 0, count); } catch (e) {
+      log('durability: the drop threw:', e);
+    }
+  }
 });
 
 /*
@@ -44021,6 +50073,953 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 })();
 // end of the take limit
 
+// ==== thornswood durability ====
+/*
+  CONDITION, REPAIR KITS AND THE DULL CLOCK (#1384).
+
+  docs/systems/durability.md is the design and the Dull section of
+  docs/systems/gold.md is the clock. In short: a worn piece runs from 0% to
+  120%. A kit mends it, to 120% when the half that makes that kit does the
+  work and to 100% for anybody else. At 0% a piece that is being worn has a
+  10% chance to break on a hit. A piece sitting in a shop chest or a house
+  container loses 5% of its condition per real day; a pack does not, and
+  worn gear does not: worn gear loses 1% a hit instead (Patrick, 4 October).
+
+  WHAT HAS A CONDITION. A weapon, a piece of armour and a piece of clothing:
+  a WEAP record, and an ARMO record that is not jewellery. Those are the
+  three things the three kits mend. A ring, an amulet or a circlet is on no
+  kit's list, so it carries none. The pickaxe, the woodcutter's axe and the
+  shovel wear out by use in the tool block (wearTool) and carry none either,
+  because two clocks on one pickaxe is one too many. Ammunition is not a
+  piece. Armour or clothing is the record's own armour type in BOD2 (light
+  and heavy are armour, clothing is clothing), read once per base and kept.
+
+  WHERE THE NUMBER LIVES: ON THE ITEM, IN ITS NAME. An entry in a pack or a
+  chest is a base and a count and whatever extra the engine keeps beside
+  them (Inventory.h in the fork: health, enchantment, name, worn and the
+  rest). Two entries that differ in any of those are two stacks, and the
+  engine carries that extra wherever the entry goes: into a chest, out of
+  it, onto a body, and across a restart. So a piece at 100% is plain, and
+  any other condition is written on the end of its name, "Iron Sword (85%)".
+  The person sees it in their own inventory, two swords at different
+  conditions are two lines they can tell apart, and nothing here has to
+  follow an item from place to place. A deed, a mold and a key already carry
+  which house they belong to the same way (the property block).
+
+  Not the health extra, which looks like the obvious home. The client rounds
+  it to a tenth and throws 1.0 away (inventory.ts in the fork), so 95% could
+  not be kept, and Skyrim reads health as the temper level, so 120% would
+  show as "Superior" and hit as one. And not a table in this file keyed by
+  pack and base: two identical swords are one stack to the engine, so a
+  table could never say which of the two left when one was put in a chest.
+
+  THREE THINGS IN THE ENGINE MAKE A FRESH, PLAIN ENTRY, and a plain entry
+  reads as 100%, so each of them would be a free repair:
+    a drop. MpActor::DropItem places the bare record, so the name is lost.
+          dropped() remembers the condition that went down and the pickup
+          puts it back on (pressed()).
+    a trade. moveById in the trade block writes a base and a count and
+          nothing else. That is #1594, its own issue, because it drops
+          every name, a key's and a deed's included.
+    a craft. CraftEvent::OnFireSuccess takes away plain entries and adds a
+          plain one. A temper is refused (recipelessCraft), so it is not a
+          way round this. Enchanting a piece that is not at 100% fails in
+          the engine, because the plain piece it asks to take is not there.
+
+  THE DULL CLOCK IS THE CHEST'S, NOT THE ITEM'S. A container in a building
+  somebody holds (a shop is a claimed building, and so is a house) starts a
+  clock the first time it is opened, written on the reference so it
+  survives a restart. Every real day after that, everything with a
+  condition inside it loses 5%. The loss is applied when the chest is
+  opened, before the engine sends what is in it, so a person sees the right
+  number; a chest nobody opens does not need to be right until somebody
+  does. Opening it never moves the clock, so it does not reset the day, and
+  taking a piece out and putting it back does not either: whatever is in
+  the chest when its day turns loses the 5%.
+
+  WHAT A HIT REACHES, Patrick's answers of 4 October on #1384. Each hit
+  reaches every worn piece of armour and clothing on the person hit, the
+  weapon the hit was landed with, and, when the hit was blocked, the weapon
+  that blocked it (the shield, when one is worn, is armour and already
+  counted). A weapon is not reached when its holder is hit. A piece the hit
+  reaches loses WEAR_PER_HIT; one already at 0% rolls the break chance
+  instead, and a broken piece is gone. Only people's gear wears: nothing
+  here gives a bandit's sword a condition. The hit arrives through
+  onPapyrusEvent:OnHit, whose one handler is at the end of the warrior
+  maneuvers block and hands it to onHit here.
+
+  WHAT IS WORN IS MATCHED TO THE PACK BY THE NAME WITHOUT THE CONDITION.
+  What is worn is read off the equipment, which the client sends, and the
+  client never takes in a new condition on a piece it already holds:
+  skymp5-client's namesEqual (sync/inventory.ts in the fork) drops a
+  trailing "(...)" from both names before comparing, so "Iron Sword (85%)"
+  and "Iron Sword (84%)" are one entry to it and its diff applies nothing.
+  Its equipment keeps naming the piece as it was when it arrived, so a
+  match on the whole name finds the piece once and loses it after the
+  first hit. sameName compares the way the client does.
+
+  THE KITS. A kit is a MISC record and a recipe in Thornswood-Content.esp
+  (scripts/mods/Add-ContentRecords.py). KITS says what each one mends,
+  whose it is, and its record; a server whose plugin does not carry the
+  record yet resolves it to 0, and the panel says no kit has been made.
+  repairTo and repairWithKit are what the rest of the file uses, so the fuel
+  and master work (#1398) can rely on them: repairTo is the number a kit
+  mends to for this person, and repairWithKit is the whole repair.
+
+  THE REPAIR IS A PANEL, NOT A COMMAND (Patrick, 4 October: no chat
+  commands for what people do). With a kit in the pack, the inventory shows
+  a key; the key sends /repair, and panel() answers by publishing the view
+  on PANEL_PROPERTY, which draws game/ui/thornswood-repair.js. Each row's
+  button sends /repair mend with that piece. Nobody is told to type either.
+
+  NOTHING HERE TOUCHES A NUMBER ON THE PAGE. 120% does not yet add 5% to a
+  weapon's damage or an armour piece's rating: the server works damage out
+  in the fork's TES5DamageFormula, which this file cannot reach.
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+
+  var CONDITION = {
+    // The bottom. A worn piece here can break on a hit.
+    lowest: 0,
+    // A sound piece: every piece as it is made, and a repair by anybody.
+    sound: 100,
+    // The repair of the half that makes the kit.
+    highest: 120
+  };
+  // gold.md, Dull: 5% of its condition per real day.
+  var DULL_PER_DAY = 5;
+  var DAY_MS = 24 * 60 * 60 * 1000;
+  // durability.md: at 0%, a worn piece has a 10% chance to break on a hit.
+  var BREAK_CHANCE = 0.10;
+  // Patrick, 4 October (#1384): a worn piece loses condition per hit. 1% a
+  // hit, written on durability.md.
+  var WEAR_PER_HIT = 1;
+  // BOD2 slot 39, the shield. A shield blocks for its holder, so a blocked
+  // hit reaches it, and it is armour, so every hit already does.
+  var SHIELD_SLOT = 1 << 9;
+  /*
+    A dropped thing lies on the ground two minutes before the engine deletes
+    it (MpActor::DropItem, kDeletionTimeSeconds), so its condition is kept a
+    little longer than that and no longer.
+  */
+  var DROP_KEEP_MS = 3 * 60 * 1000;
+  // The pickup is added after onActivate returns. Same wait a fresh key is
+  // named after (KEY_NAME_DELAY).
+  var PICKUP_DELAY_MS = 250;
+  // MpForm::IsEspmForm: below this a reference was placed by a plugin, above
+  // it the server made it, which is what a drop makes.
+  var RUNTIME = 0xff000000;
+  // Where a container's dull clock is written, on the reference itself.
+  var CLOCK_PROPERTY = 'thornswoodDull';
+  // The repair panel's view, the owner's only (game/ui/thornswood-repair.js).
+  var PANEL_PROPERTY = 'thornswoodRepairView';
+
+  /*
+    THE THREE KITS, by what they mend. half is the half that makes it and
+    repairs to 120%; maker is that half as a person reads it. item is the
+    kit's MISC record in Thornswood-Content.esp (Add-ContentRecords.py).
+    Only the half the person picked repairs to 120%, never the sister half at
+    any rank (Patrick, 4 October).
+  */
+  var KITS = {
+    weapon:   { name: 'Weapon Kit', half: 'edgewright',  maker: 'Edgewright',  item: '154b0:Thornswood-Content.esp' },
+    armour:   { name: 'Armor Kit',  half: 'platewright', maker: 'Platewright', item: '154b1:Thornswood-Content.esp' },
+    clothing: { name: 'Sewing Kit', half: 'haberdasher', maker: 'Haberdasher', item: '154b2:Thornswood-Content.esp' }
+  };
+
+  // " (85%)" on the end of a name.
+  var SUFFIX = / \((\d{1,3})%\)$/;
+
+  /*
+    Jewellery, by the keywords Skyrim.esm gives it: ArmorJewelry,
+    VendorItemJewelry, ClothingRing, ClothingNecklace and ClothingCirclet. A
+    keyword in KWDA is the id as the plugin wrote it, and Skyrim.esm is
+    master 0 in every plugin that names it, so these are the same number in
+    any plugin. A piece whose only slots are the amulet, the ring and the
+    circlet is jewellery too, for a mod that forgot the keyword.
+  */
+  var JEWELLERY_KEYWORDS = [0x6bbe9, 0x8f95a, 0x10cd09, 0x10cd0a, 0x10cd08];
+  var JEWELLERY_SLOTS = (1 << 5) | (1 << 6) | (1 << 12);
+
+  function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+
+  function u32(bytes, at) {
+    if (!bytes || bytes.length < at + 4) { return -1; }
+    return ((bytes[at] | (bytes[at + 1] << 8) | (bytes[at + 2] << 16)) >>> 0) +
+           (bytes[at + 3] * 0x1000000);
+  }
+
+  function clamp(n) {
+    n = Math.round(Number(n) || 0);
+    if (n < CONDITION.lowest) { return CONDITION.lowest; }
+    if (n > CONDITION.highest) { return CONDITION.highest; }
+    return n;
+  }
+
+  /** The condition written on an entry, or 100 for a plain one. */
+  function conditionOf(entry) {
+    var m = SUFFIX.exec(String((entry && entry.name) || ''));
+    return m ? clamp(m[1]) : CONDITION.sound;
+  }
+
+  /*
+    Two entries the engine counts as one stack: the same base and the same
+    extra (Inventory::Entry::EqualExceptCount). worn and wornLeft read false
+    when they are missing, as the engine reads them.
+  */
+  var EXTRA = ['health', 'enchantmentId', 'maxCharge', 'removeEnchantmentOnUnequip',
+               'chargePercent', 'name', 'soul', 'poisonId', 'poisonCount'];
+  function sameStack(a, b) {
+    if (!a || !b || a.baseId !== b.baseId) { return false; }
+    for (var i = 0; i < EXTRA.length; i++) {
+      if (a[EXTRA[i]] !== b[EXTRA[i]]) { return false; }
+    }
+    return !!a.worn === !!b.worn && !!a.wornLeft === !!b.wornLeft;
+  }
+
+  function copy(entry) {
+    var out = {};
+    for (var k in entry) { if (own(entry, k)) { out[k] = entry[k]; } }
+    return out;
+  }
+
+  /** Stacks that have become the same stack folded into one, empties dropped. */
+  function folded(entries) {
+    var out = [];
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (!e || !(Number(e.count) > 0)) { continue; }
+      var into = -1;
+      for (var j = 0; j < out.length; j++) {
+        if (sameStack(out[j], e)) { into = j; break; }
+      }
+      if (into >= 0) { out[into].count += e.count; } else { out.push(e); }
+    }
+    return out;
+  }
+
+  function aWord(name) {
+    return (/^[aeiou]/i.test(String(name)) ? 'an ' : 'a ') + name;
+  }
+
+  function create(api) {
+    var kits = api.kits || KITS;
+    var kinds = {};
+    var shields = {};
+    var names = {};
+    // Pieces that went onto the ground and what they were at, oldest first.
+    var drops = [];
+
+    /*
+      What kind of piece a base is: 'weapon', 'armour', 'clothing', or ''
+      for a thing that has no condition. Asked once per base. A record that
+      cannot be read has none, because not knowing what a thing is has to
+      mean not touching it.
+    */
+    function pieceKind(baseId) {
+      if (!baseId) { return ''; }
+      if (own(kinds, baseId)) { return kinds[baseId]; }
+      var kind = '';
+      try { kind = readKind(baseId); } catch (e) { kind = ''; }
+      kinds[baseId] = kind;
+      return kind;
+    }
+
+    function readKind(baseId) {
+      if (api.isTool && api.isTool(baseId)) { return ''; }
+      var rec = api.recordOf(baseId);
+      if (!rec || !rec.type) { return ''; }
+      var type = String(rec.type);
+      if (type === 'WEAP') { return 'weapon'; }
+      if (type !== 'ARMO') { return ''; }
+      var fields = rec.fields || [];
+      var slots = -1, armourType = -1, keywords = [];
+      for (var i = 0; i < fields.length; i++) {
+        var f = fields[i];
+        if (!f) { continue; }
+        var t = String(f.type);
+        if (t === 'BOD2') {
+          slots = u32(f.data, 0);
+          armourType = u32(f.data, 4);
+        } else if (t === 'BODT' && slots < 0) {
+          slots = u32(f.data, 0);
+          armourType = u32(f.data, 8);
+        } else if (t === 'KWDA') {
+          for (var k = 0; k + 4 <= (f.data || []).length; k += 4) { keywords.push(u32(f.data, k)); }
+        }
+      }
+      for (var j = 0; j < keywords.length; j++) {
+        if (JEWELLERY_KEYWORDS.indexOf(keywords[j]) !== -1) { return ''; }
+      }
+      if (slots > 0 && (slots & ~JEWELLERY_SLOTS) === 0) { return ''; }
+      if (slots > 0 && (slots & SHIELD_SLOT)) { shields[baseId] = true; }
+      if (armourType === 0 || armourType === 1) { return 'armour'; }
+      if (armourType === 2) { return 'clothing'; }
+      return '';
+    }
+
+    /*
+      What a piece is called with nothing written on it. The recipe table
+      first, which holds the names Skyrim's own string files give; then the
+      record's FULL when it is real text; then its editor id, spaced out.
+    */
+    function baseName(baseId) {
+      if (own(names, baseId)) { return names[baseId]; }
+      var name = '';
+      try { name = String(api.nameOf(baseId) || ''); } catch (e) { name = ''; }
+      if (!name) {
+        var rec = null;
+        try { rec = api.recordOf(baseId); } catch (e) { rec = null; }
+        var fields = (rec && rec.fields) || [];
+        var edid = '';
+        for (var i = 0; i < fields.length; i++) {
+          var f = fields[i];
+          if (!f) { continue; }
+          var text = '';
+          var data = f.data || [];
+          for (var b = 0; b < data.length; b++) {
+            var c = Number(data[b]);
+            if (!c) { break; }
+            if (c < 32 || c > 126) { text = ''; break; }
+            text += String.fromCharCode(c);
+          }
+          if (!/[A-Za-z]/.test(text)) { continue; }
+          if (f.type === 'FULL' && !name) { name = text; }
+          if (f.type === 'EDID' && !edid) { edid = text; }
+        }
+        if (!name && edid) { name = edid.replace(/([a-z0-9])([A-Z])/g, '$1 $2'); }
+      }
+      names[baseId] = name || 'Piece';
+      return names[baseId];
+    }
+
+    /** The name a person reads for this entry, without the condition. */
+    function bareName(entry) {
+      var bare = String((entry && entry.name) || '').replace(SUFFIX, '');
+      return bare || baseName(entry.baseId);
+    }
+
+    /** A copy of the entry at that condition, its name written to match. */
+    function withCondition(entry, cond) {
+      var out = copy(entry);
+      var bare = String(entry.name || '').replace(SUFFIX, '');
+      cond = clamp(cond);
+      if (cond === CONDITION.sound) {
+        if (!bare || bare === baseName(entry.baseId)) { delete out.name; } else { out.name = bare; }
+      } else {
+        out.name = (bare || baseName(entry.baseId)) + ' (' + cond + '%)';
+      }
+      return out;
+    }
+
+    /** The entries with n units of entries[i] set to that condition. */
+    function setUnits(entries, i, n, cond) {
+      var out = entries.map(copy);
+      var e = out[i];
+      n = Math.min(n, Number(e.count) || 0);
+      if (n <= 0) { return out; }
+      var changed = withCondition(e, cond);
+      changed.count = n;
+      e.count -= n;
+      out.push(changed);
+      return folded(out);
+    }
+
+    /** The entries with one unit of entries[i] taken away. */
+    function takeUnit(entries, i) {
+      var out = entries.map(copy);
+      out[i].count -= 1;
+      return folded(out);
+    }
+
+    function piecesIn(entries) {
+      var out = [];
+      for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        if (!e || !(Number(e.count) > 0)) { continue; }
+        var kind = pieceKind(e.baseId);
+        if (!kind) { continue; }
+        out.push({ i: i, entry: e, kind: kind, cond: conditionOf(e), name: bareName(e) });
+      }
+      return out;
+    }
+
+    function kitId(key) {
+      var kit = kits[key];
+      if (!kit || !kit.item) { return 0; }
+      try { return api.idOf(kit.item) || 0; } catch (e) { return 0; }
+    }
+
+    /*
+      THE NUMBER A KIT MENDS TO, for this person. The half that makes that
+      kit mends to 120; anybody else, the other half of the same profession
+      included, mends to 100. The half is the one they picked, so a sister
+      half held at novice is not it.
+    */
+    function repairTo(state, key) {
+      var kit = kits[key];
+      if (!kit) { return CONDITION.sound; }
+      return (state && state.half === kit.half) ? CONDITION.highest : CONDITION.sound;
+    }
+
+    function heldOf(entries, id) {
+      var n = 0;
+      for (var i = 0; i < entries.length; i++) {
+        if (entries[i] && entries[i].baseId === id) { n += Number(entries[i].count) || 0; }
+      }
+      return n;
+    }
+
+    /*
+      A REPAIR. pick is the row the panel's button names: the base, the
+      condition and the name without it. One kit of the kind that mends it is
+      used up, and one unit of the piece comes out at repairTo. Answers
+      { ok, line } and, when it worked, from, to, kit and baseId. Nothing is
+      taken when anything is refused.
+    */
+    function repairWithKit(actorId, pick) {
+      function no(line) { return { ok: false, line: line }; }
+      var entries = api.inventory(actorId);
+      if (!entries) { return no('The server cannot read your pack right now. Try again in a moment.'); }
+      pick = pick || {};
+      var p = null;
+      var all = piecesIn(entries);
+      for (var f = 0; f < all.length; f++) {
+        if (all[f].entry.baseId === pick.baseId && all[f].cond === Number(pick.cond) &&
+            all[f].name === String(pick.name || '')) { p = all[f]; break; }
+      }
+      if (!p) { return no('That piece is not in your pack any more.'); }
+      var kit = kits[p.kind];
+      var id = kitId(p.kind);
+      if (!id) {
+        return no('Your ' + p.name + ' is mended with ' + aWord(kit.name) +
+                  ', and no ' + kit.name + ' has been made in the world yet.');
+      }
+      var k = -1;
+      for (var i = 0; i < entries.length; i++) {
+        if (entries[i] && entries[i].baseId === id && Number(entries[i].count) > 0) { k = i; break; }
+      }
+      if (k < 0) {
+        var maker = aWord(kit.maker);
+        return no('Your ' + p.name + ' is mended with ' + aWord(kit.name) + ', and you have none. ' +
+                  maker.charAt(0).toUpperCase() + maker.slice(1) + ' makes them.');
+      }
+      var state = null;
+      try { state = api.stateOf(actorId); } catch (e) { state = null; }
+      var to = repairTo(state, p.kind);
+      if (p.cond >= to) {
+        return no('Your ' + p.name + ' is at ' + p.cond + '%. A repair by you would not raise it.');
+      }
+      // One kit out, then one unit of the piece mended. The kit is never the
+      // piece (a kit is a MISC), so p.i still points at the piece.
+      var next = entries.map(copy);
+      next[k].count -= 1;
+      next = setUnits(next, p.i, 1, to);
+      if (!api.setInventory(actorId, next)) {
+        return no('The repair could not be written. Nothing was used. Try again in a moment.');
+      }
+      api.log('durability:', actorId.toString(16), 'mended', p.name, 'from', p.cond + '%', 'to',
+              to + '%', 'with', aWord(kit.name));
+      return { ok: true, from: p.cond, to: to, kit: p.kind, baseId: p.entry.baseId,
+               line: 'Your ' + p.name + ' is at ' + to + '% now. The ' + kit.name + ' is used up.' };
+    }
+
+    /*
+      WHAT THE PANEL SHOWS. A row for every piece carried that is not at
+      100%, and for every sound piece this person's kit would raise (the
+      half that makes a kit mends to 120%), worst first; pieces of one base
+      at one condition under one name are one row. Each row says which kit
+      mends it, the number a repair by this person comes out at, and whether
+      that kit is in the pack. The kits are listed with how many are carried
+      and whether the world has the record at all.
+    */
+    function view(actorId) {
+      var entries = api.inventory(actorId);
+      if (!entries) {
+        return { open: true, rows: [], kits: [],
+                 note: 'The server cannot read your pack right now. Try again in a moment.' };
+      }
+      var state = null;
+      try { state = api.stateOf(actorId); } catch (e) { state = null; }
+      var held = {};
+      var kitRows = [];
+      for (var key in kits) {
+        if (!own(kits, key)) { continue; }
+        var id = kitId(key);
+        held[key] = id ? heldOf(entries, id) : 0;
+        kitRows.push({ kind: key, name: kits[key].name, maker: kits[key].maker,
+                       count: held[key], made: !!id });
+      }
+      var rows = [];
+      var byKey = {};
+      var pieces = piecesIn(entries);
+      for (var i = 0; i < pieces.length; i++) {
+        var p = pieces[i];
+        var to = repairTo(state, p.kind);
+        if (p.cond === CONDITION.sound && to <= CONDITION.sound) { continue; }
+        var n = Number(p.entry.count) || 0;
+        var worn = !!(p.entry.worn || p.entry.wornLeft);
+        var rowKey = p.entry.baseId + '|' + p.cond + '|' + p.name;
+        if (own(byKey, rowKey)) {
+          byKey[rowKey].count += n;
+          byKey[rowKey].worn = byKey[rowKey].worn || worn;
+          continue;
+        }
+        var row = { base: p.entry.baseId.toString(16), cond: p.cond, name: p.name, count: n, worn: worn,
+                    kind: p.kind, kit: kits[p.kind].name, maker: kits[p.kind].maker, to: to,
+                    can: p.cond < to && held[p.kind] > 0 };
+        byKey[rowKey] = row;
+        rows.push(row);
+      }
+      rows.sort(function (a, b) { return a.cond - b.cond; });
+      return { open: true, rows: rows, kits: kitRows };
+    }
+
+    /*
+      WHAT THE PANEL AND THE INVENTORY KEY SEND, as the words after /repair.
+      Nothing, the key: draw the panel. 'mend <base in hex> <condition>
+      <name>', a row's button: mend that piece, then draw the panel again.
+      Answers the line to say in the chat, or '' for none.
+    */
+    function panel(actorId, words) {
+      words = words || [];
+      var line = '';
+      if (String(words[0] || '').toLowerCase() === 'mend') {
+        line = repairWithKit(actorId, {
+          baseId: parseInt(String(words[1] || ''), 16) || 0,
+          cond: Number(words[2]),
+          name: words.slice(3).join(' ')
+        }).line;
+      }
+      api.show(actorId, view(actorId));
+      return line;
+    }
+
+    /*
+      A CONTAINER WAS OPENED. If it stands in a building somebody holds, its
+      clock is read and whatever days have turned since it was last applied
+      come off everything in it with a condition. A container in no held
+      building has no clock: a chest in a cave is not a shop.
+    */
+    function opened(containerId) {
+      var held = false;
+      try { held = !!api.held(containerId); } catch (e) { held = false; }
+      var clock = null;
+      try { clock = api.clockOf(containerId); } catch (e) { clock = null; }
+      if (!held) {
+        if (clock && Number(clock.at) > 0) { api.setClock(containerId, null); }
+        return 0;
+      }
+      var t = api.now();
+      if (!clock || !(Number(clock.at) > 0)) {
+        api.setClock(containerId, { at: t, days: 0 });
+        return 0;
+      }
+      var days = Math.floor((t - Number(clock.at)) / DAY_MS);
+      var turned = days - (Number(clock.days) || 0);
+      if (turned <= 0) { return 0; }
+      var lose = turned * DULL_PER_DAY;
+      var entries = api.inventory(containerId) || [];
+      var next = [];
+      var dulled = 0;
+      for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        if (!e || !(Number(e.count) > 0)) { continue; }
+        var cond = pieceKind(e.baseId) ? conditionOf(e) : -1;
+        if (cond <= CONDITION.lowest) { next.push(copy(e)); continue; }
+        next.push(withCondition(e, Math.max(CONDITION.lowest, cond - lose)));
+        dulled += Number(e.count) || 0;
+      }
+      if (dulled && !api.setInventory(containerId, folded(next))) {
+        // Not written, so the clock stays where it was and the next opening tries again.
+        return 0;
+      }
+      api.setClock(containerId, { at: Number(clock.at), days: days });
+      if (dulled) {
+        api.log('durability:', dulled, 'piece(s) in container', containerId.toString(16),
+                'lost', lose + '%', 'over', turned, 'day(s)');
+      }
+      return dulled;
+    }
+
+    /*
+      A HIT LANDED. targetId was hit, by aggressorId, with the weapon sourceId
+      (a base id, or 0 for a fist or a spell), and blocked is the flag the
+      client sent with it. Nothing here can stop the hit; it only wears what
+      the hit reaches (the block comment says what that is) and breaks a
+      piece at 0% on the roll. Answers the names of what broke.
+    */
+    function hit(targetId, aggressorId, sourceId, blocked) {
+      var said = [];
+      if (aggressorId && sourceId && api.isPerson(aggressorId) && pieceKind(sourceId) === 'weapon') {
+        said = said.concat(wear(aggressorId, function (worn) {
+          return inHand(worn.filter(function (w) { return w.baseId === sourceId; }));
+        }));
+      }
+      if (targetId && api.isPerson(targetId)) {
+        said = said.concat(wear(targetId, function (worn) {
+          var body = worn.filter(function (w) {
+            var kind = pieceKind(w.baseId);
+            return kind === 'armour' || kind === 'clothing';
+          });
+          if (!blocked || body.some(function (w) { return !!shields[w.baseId]; })) { return body; }
+          return body.concat(inHand(worn.filter(function (w) { return pieceKind(w.baseId) === 'weapon'; })));
+        }));
+      }
+      return said;
+    }
+
+    /*
+      One weapon out of those worn that could be it: the right hand's, else
+      the left's. A hit is landed or blocked with one weapon, and two of the
+      same sword, one in each hand, are still one hit.
+    */
+    function inHand(list) {
+      for (var i = 0; i < list.length; i++) { if (list[i].worn) { return [list[i]]; } }
+      return list.length ? [list[0]] : [];
+    }
+
+    /*
+      The same piece by name, the way the client compares: the condition is
+      not part of it, and no name at all is the base's own name (see WHAT IS
+      WORN IS MATCHED TO THE PACK in the block comment).
+    */
+    function sameName(entry, wornName) {
+      var a = String(entry.name || '').replace(SUFFIX, '');
+      var b = String(wornName || '').replace(SUFFIX, '');
+      if (a === b) { return true; }
+      var plain = baseName(entry.baseId);
+      return (!a && b === plain) || (!b && a === plain);
+    }
+
+    /*
+      The pack's entry for a worn thing. What is worn is read off the
+      equipment, which is what the client dresses from, and the condition off
+      the pack. When the worn thing names itself, a stack of that name; of
+      those, the one the pack has flagged worn in the same hand, else any
+      flagged worn, else the first.
+    */
+    function packEntryFor(entries, w) {
+      var at = -1, best = -1;
+      var named = typeof w.name === 'string';
+      for (var k = 0; k < entries.length; k++) {
+        var e = entries[k];
+        if (!e || e.baseId !== w.baseId || !(Number(e.count) > 0)) { continue; }
+        if (named && !sameName(e, w.name)) { continue; }
+        var score = (!!e.worn === !!w.worn && !!e.wornLeft === !!w.wornLeft) ? 2 : ((e.worn || e.wornLeft) ? 1 : 0);
+        if (score > best) { at = k; best = score; }
+      }
+      return at;
+    }
+
+    /*
+      ONE HIT ON ONE PERSON'S GEAR. pick chooses, out of what they wear that
+      has a condition, the pieces this hit reaches. Each one above 0% loses
+      WEAR_PER_HIT; each one at 0% rolls the break chance. One write for the
+      lot, and nothing said or logged unless it was written.
+    */
+    function wear(actorId, pick) {
+      var worn = [];
+      try { worn = api.worn(actorId) || []; } catch (e) { worn = []; }
+      var due = pick(worn.filter(function (w) { return w && w.baseId && pieceKind(w.baseId); }));
+      if (!due.length) { return []; }
+      var entries = api.inventory(actorId);
+      if (!entries) { return []; }
+      var gone = [];
+      var worse = 0;
+      for (var j = 0; j < due.length; j++) {
+        var at = packEntryFor(entries, due[j]);
+        if (at < 0) { continue; }
+        var cond = conditionOf(entries[at]);
+        if (cond > CONDITION.lowest) {
+          entries = setUnits(entries, at, 1, cond - WEAR_PER_HIT);
+          worse++;
+          continue;
+        }
+        if (!(api.random() < BREAK_CHANCE)) { continue; }
+        gone.push(bareName(entries[at]));
+        entries = takeUnit(entries, at);
+      }
+      if (!gone.length && !worse) { return []; }
+      if (!api.setInventory(actorId, entries)) { return []; }
+      for (var n = 0; n < gone.length; n++) {
+        api.say(actorId, 'Your ' + gone[n] + ' broke. It was at 0%, and a kit would have mended it.');
+      }
+      if (gone.length) {
+        api.log('durability:', actorId.toString(16), 'broke', gone.join(', '), 'on a hit at 0%');
+      }
+      return gone;
+    }
+
+    /*
+      A hit as the engine sends it: the target's id, then the aggressor and
+      the weapon or spell as { type, desc } (THE PAPYRUS FAMILY, over
+      mp.onTakeItem), and the client's blocked flag. The one OnHit handler,
+      in the warrior maneuvers block, hands it here.
+    */
+    function onHit(targetId, aggressor, source, blocked) {
+      function idFrom(v) {
+        if (typeof v === 'number') { return v; }
+        if (v && v.desc) { return api.idOf(v.desc) || 0; }
+        return 0;
+      }
+      return hit(Number(targetId) || 0, idFrom(aggressor), idFrom(source), !!blocked);
+    }
+
+    function forgetOldDrops() {
+      var t = api.now();
+      while (drops.length && t - drops[0].at > DROP_KEEP_MS) { drops.shift(); }
+    }
+
+    function remember(cell, baseId, cond, n) {
+      if (cond === CONDITION.sound || !(n > 0)) { return; }
+      forgetOldDrops();
+      drops.push({ cell: cell, baseId: baseId, cond: cond, n: n, at: api.now() });
+    }
+
+    /*
+      A PIECE IS GOING ONTO THE GROUND. Called before the engine takes it
+      out of the pack. When every stack of that base is at one condition,
+      that is what went down. When they differ, the pack is read again once
+      the drop is done, and the stack that got smaller is the one.
+    */
+    function dropped(actorId, baseId, count) {
+      if (!pieceKind(baseId)) { return; }
+      var entries = api.inventory(actorId) || [];
+      var stacks = entries.filter(function (e) { return e && e.baseId === baseId && Number(e.count) > 0; });
+      if (!stacks.length) { return; }
+      var cell = api.cellOf(actorId);
+      var n = Math.max(1, Number(count) || 1);
+      var first = conditionOf(stacks[0]);
+      var one = stacks.every(function (e) { return conditionOf(e) === first; });
+      if (one) { remember(cell, baseId, first, n); return; }
+      var before = stacks.map(function (e) { return { entry: copy(e), count: Number(e.count) || 0 }; });
+      api.later(function () {
+        var after = api.inventory(actorId) || [];
+        for (var i = 0; i < before.length; i++) {
+          var left = 0;
+          for (var j = 0; j < after.length; j++) {
+            if (sameStack(after[j], before[i].entry)) { left += Number(after[j].count) || 0; }
+          }
+          if (left < before[i].count) {
+            remember(cell, baseId, conditionOf(before[i].entry), before[i].count - left);
+            return;
+          }
+        }
+      }, 0);
+    }
+
+    function plainCount(entries, baseId) {
+      var n = 0;
+      for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        if (e && e.baseId === baseId && !e.name && !e.worn && !e.wornLeft) { n += Number(e.count) || 0; }
+      }
+      return n;
+    }
+
+    /*
+      SOMETHING WAS PRESSED. A container is the dull clock. A piece lying on
+      the ground that the server made, which is what a drop makes, is
+      matched to the drop that left it there, and once it is in the pack its
+      condition goes back on. Only as many as the pickup added: a plain
+      sword that was already in the pack is not touched.
+    */
+    function pressed(actorId, refrId, baseDesc) {
+      if (api.isContainer(baseDesc)) { return opened(refrId); }
+      if (!(Number(refrId) >= RUNTIME) || !drops.length) { return 0; }
+      var baseId = api.idOf(baseDesc);
+      if (!pieceKind(baseId)) { return 0; }
+      forgetOldDrops();
+      var cell = api.cellOf(refrId);
+      var at = -1;
+      for (var i = 0; i < drops.length; i++) {
+        if (drops[i].baseId === baseId && drops[i].cell === cell) { at = i; break; }
+      }
+      if (at < 0) { return 0; }
+      var rec = drops.splice(at, 1)[0];
+      var before = plainCount(api.inventory(actorId) || [], baseId);
+      api.later(function () {
+        var entries = api.inventory(actorId);
+        if (!entries) { return; }
+        var gained = plainCount(entries, baseId) - before;
+        var n = Math.min(rec.n, gained);
+        if (n <= 0) { return; }
+        for (var j = 0; j < entries.length; j++) {
+          var e = entries[j];
+          if (e && e.baseId === baseId && !e.name && !e.worn && !e.wornLeft && Number(e.count) > 0) {
+            if (api.setInventory(actorId, setUnits(entries, j, n, rec.cond))) {
+              api.log('durability:', actorId.toString(16), 'picked up', n, bareName(e),
+                      'and it is back at', rec.cond + '%');
+            }
+            return;
+          }
+        }
+      }, PICKUP_DELAY_MS);
+      return 0;
+    }
+
+    return {
+      CONDITION: CONDITION, DULL_PER_DAY: DULL_PER_DAY, DAY_MS: DAY_MS,
+      BREAK_CHANCE: BREAK_CHANCE, WEAR_PER_HIT: WEAR_PER_HIT, KITS: kits,
+      pieceKind: pieceKind, conditionOf: conditionOf, withCondition: withCondition,
+      repairTo: repairTo, repairWithKit: repairWithKit, view: view, panel: panel,
+      opened: opened, hit: hit, onHit: onHit, dropped: dropped, pressed: pressed
+    };
+  }
+
+  g.__thornswoodDurabilityCreate = create;
+  g.__thornswoodDurabilityKits = KITS;
+  if (typeof mp === 'undefined' || !mp) { return; }
+
+  try {
+    mp.makeProperty(CLOCK_PROPERTY, {
+      isVisibleByOwner: false, isVisibleByNeighbors: false,
+      updateOwner: '', updateNeighbor: ''
+    });
+  } catch (e) { /* made by an earlier load. harmless. */ }
+
+  /*
+    THE REPAIR PANEL'S VIEW, seen by its owner only. The owner's script hands
+    it to the page, the way the merchant panel's does, and
+    game/ui/thornswood-repair.js draws it; a view with open set opens it. at
+    moves on every send, so the key pressed again draws the panel again
+    even when nothing in it changed.
+  */
+  var panelScript = [
+    '(function(){',
+    '  try {',
+    '    var v = ctx.value;',
+    '    if (!v || typeof v !== "object") { return; }',
+    '    var st = ctx.state;',
+    '    if (!st) { return; }',
+    '    if (st.thornswoodRepairAt === v.at) { return; }',
+    '    st.thornswoodRepairAt = v.at;',
+    '    var body = JSON.stringify(v);',
+    '    var src = "(function(){try{" +',
+    '      "var d=" + body + ";window.thornswoodRepairView=d;" +',
+    '      "if(window.thornswoodRepair&&window.thornswoodRepair.setData){window.thornswoodRepair.setData(d);}" +',
+    '      "}catch(e){}})();";',
+    '    try { ctx.sp.browser.executeJavaScript(src); } catch (e) { }',
+    '  } catch (e) { }',
+    '})();'
+  ].join('\n');
+  try {
+    mp.makeProperty(PANEL_PROPERTY, {
+      isVisibleByOwner: true, isVisibleByNeighbors: false,
+      updateOwner: panelScript, updateNeighbor: ''
+    });
+  } catch (e) { /* made by an earlier load. harmless. */ }
+  var shownAt = 0;
+
+  /*
+    Display names by record, out of the recipe table, built once: every
+    weapon, armour and garment anybody can make is the output of a row
+    there, under the name Skyrim's own string files give it. Not the two
+    names tables /give reads: they name gold too, and test-one-mint.js keeps
+    them to /give alone.
+  */
+  var displayNames = null;
+  function displayName(baseId) {
+    if (!displayNames) {
+      displayNames = {};
+      var rows = (typeof RECIPES_BY_ID !== 'undefined' && RECIPES_BY_ID) ? RECIPES_BY_ID : {};
+      for (var k in rows) {
+        if (!own(rows, k)) { continue; }
+        var row = rows[k];
+        if (row && row.out && row.name && !own(displayNames, row.out)) { displayNames[row.out] = row.name; }
+      }
+    }
+    var desc = '';
+    try { desc = String(mp.getDescFromId(baseId) || ''); } catch (e) { desc = ''; }
+    return desc && own(displayNames, desc) ? displayNames[desc] : '';
+  }
+
+  /*
+    The one write into a pack or a chest. Every caller hands back entries it
+    has just read from the same pack or chest: a stack renamed for its
+    condition, or a kit or a broken piece taken away. No base is added and
+    no count grows.
+  */
+  function writePack(id, entries) {
+    try { mp.set(id, 'inventory', { entries: entries }); return true; } catch (e) {
+      log('durability: could not write the inventory of', Number(id).toString(16) + ':', e);
+      return false;
+    }
+  }
+
+  function entriesOf(id) {
+    try {
+      var inv = mp.get(id, 'inventory');
+      return ((inv && inv.entries) || []).map(copy);
+    } catch (e) { return null; }
+  }
+
+  g.__thornswoodDurability = create({
+    now: function () { return Date.now(); },
+    random: Math.random,
+    later: function (fn, ms) { setTimeout(fn, ms); },
+    inventory: entriesOf,
+    setInventory: writePack,
+    worn: function (id) {
+      try {
+        var eq = mp.get(id, 'equipment');
+        var ee = eq && ((eq.inv && eq.inv.entries) || eq.entries);
+        if (ee) { return ee.filter(function (e) { return e && (e.worn || e.wornLeft); }); }
+      } catch (e) { }
+      return (entriesOf(id) || []).filter(function (e) { return e && (e.worn || e.wornLeft); });
+    },
+    recordOf: function (baseId) {
+      var res = mp.lookupEspmRecordById(baseId);
+      return (res && res.record) || null;
+    },
+    nameOf: displayName,
+    idOf: idOf,
+    stateOf: function (actorId) {
+      var C = g.__thornswoodCharacter;
+      return (C && C.stateOf) ? C.stateOf(actorId) : null;
+    },
+    isPerson: function (id) {
+      try { return (Number(mp.get(id, 'profileId')) || 0) > 0; } catch (e) { return false; }
+    },
+    isTool: function (baseId) {
+      var sp = g.__thornswoodSpoils;
+      return !!(sp && sp.isTool && sp.isTool(baseId));
+    },
+    held: function (containerId) {
+      var prop = g.__thornswoodProperty;
+      if (!prop || !prop.holderOf) { return false; }
+      var cell = String(mp.get(containerId, 'worldOrCellDesc') || '');
+      var by = cell ? prop.holderOf(cell) : null;
+      return !!(by && Number(by.by) > 0);
+    },
+    isContainer: kindIsContainer,
+    cellOf: function (id) {
+      try { return String(mp.get(id, 'worldOrCellDesc') || ''); } catch (e) { return ''; }
+    },
+    clockOf: function (id) { return mp.get(id, CLOCK_PROPERTY) || null; },
+    // No clock is written as a clock that never started, rather than as null.
+    setClock: function (id, clock) {
+      try { mp.set(id, CLOCK_PROPERTY, clock || { at: 0, days: 0 }); } catch (e) {
+        log('durability: could not write the clock of container', Number(id).toString(16) + ':', e);
+      }
+    },
+    show: function (id, v) {
+      var payload = JSON.parse(JSON.stringify(v || { open: false }));
+      shownAt = Math.max(Date.now(), shownAt + 1);
+      payload.at = shownAt;
+      try { mp.set(id, PANEL_PROPERTY, payload); } catch (e) {
+        log('durability: could not send the repair panel to', Number(id).toString(16) + ':', e);
+      }
+    },
+    say: say,
+    log: log
+  });
+})();
+// ==== end thornswood durability ====
+
 
 // ==== thornswood needs: hunger, thirst and exhaustion ====
 /*
@@ -44237,7 +51236,12 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       and every one of them slides down to the place's own number as you walk
       away.
     */
-    fire: { at: 34, reach: 300 },
+    /*
+      master is a Master Carver's fire or kiln (#1398):
+      docs/systems/professions/woodworker.md, "the hottest the warmth rules
+      allow: +48 at your feet, and still 0 at 300". See carverFire().
+    */
+    fire: { at: 34, master: 48, reach: 300 },
 
     /*
       AND IT SPREADS.
@@ -44309,7 +51313,14 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       material: { fur: 1.0, leather: 0.75, light: 0.55, cloth: 0.5,
                   heavy: 0.45, none: 0 },
       most: 0.8,
-      heat: 0.5
+      heat: 0.5,
+      /*
+        A Master Weaver's garment (#1398): "ignores 4 degrees of exposure on
+        top of the table", docs/systems/temperature.md. mark is what the craft
+        writes in front of its name, which is how a worn one is known. See
+        weathered().
+      */
+      woven: { degrees: 4, mark: 'Master-Woven ' }
     },
 
     /*
@@ -44370,12 +51381,19 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     /*
       Recovery, per real hour, by where somebody is resting.
 
-      A bed is four times a chair, which is what makes going to an inn worth
-      the walk. The bard is added on top of whatever the place already gives,
-      so a bard in an inn is 75 an hour and is the best rest in the game, which
-      is the point Grim was making.
+      Patrick's ladder on #1603, "use some common sense": a bed is better than
+      a campfire, a bed or bedroll nobody lends you is a little better than
+      sitting, a campfire with a bedroll is better than a campfire alone, and
+      so on up to your own bed. So: a seat 20, a bed or bedroll nobody can lend
+      you 25 (rough), a seat with a fire in reach 35 (campfire), rough with a
+      fire in reach 45 (camp), a bed you are allowed in 50 (inn: a guest, or a
+      key or deed carried), your own bed 80. The bard is added on top of
+      whatever the place already gives.
+
+      Which kind somebody gets is the beds' answer in the property block, by
+      what the server saw them press, never the word after /rest (#1392, #1607).
     */
-    recover: { sit: 20, campfire: 35, inn: 50, bed: 80 },
+    recover: { sit: 20, rough: 25, campfire: 35, camp: 45, inn: 50, bed: 80 },
     bard: 25,
 
     /*
@@ -44733,7 +51751,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   function warmthTarget(actorId, n) {
     var raw = NEEDS.place[n.place];
     if (typeof raw !== 'number') { raw = NEEDS.comfort; }
-    raw = raw + outdoorSeason(n) + exposure(n) + fireWarmth(n) + waterKind(actorId, n);
+    raw = raw + outdoorSeason(n) + weathered(actorId, n) + fireWarmth(n, actorId) + waterKind(actorId, n);
     if (raw < 0) { raw = 0; }
     if (raw > 100) { raw = 100; }
     if (raw === NEEDS.comfort) { return raw; }
@@ -44785,13 +51803,67 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     A fire is not gated on the roof, because a campfire in a blizzard is the
     whole point of a campfire.
   */
-  function fireWarmth(n) {
+  function fireWarmth(n, actorId) {
     if (!n) { return 0; }
     var d = Number(n.fire);
     if (!isFinite(d) || d < 0) { return 0; }
     var reach = NEEDS.fire.reach || 1;
     if (d >= reach) { return 0; }
-    return NEEDS.fire.at * (1 - (d / reach));
+    var at = (actorId && carverFire(actorId)) ? NEEDS.fire.master : NEEDS.fire.at;
+    return at * (1 - (d / reach));
+  }
+
+  /*
+    MASTER CARVER'S FIRE (#1398).
+
+    docs/systems/professions/woodworker.md: fires and kilns a master
+    woodworker builds or works are the hottest the warmth rules allow, 48 at
+    your feet and still nothing at 300, where any other fire is 34.
+
+    The server cannot see which fire is which: the client says only how far
+    the nearest one is. So a fire is a Master Carver's while one is working
+    it: a master woodworker who is within reach of a fire, and you within
+    reach of them in the same cell. That is the master's own fire, the kiln
+    they burn at, and whoever is standing at it with them. Nobody builds a
+    fire in this world yet, so working one is the whole of it today.
+
+    The perk is the progression block's own answer, held at master in the
+    half somebody picked. Nothing loaded answers no, which is an ordinary fire.
+  */
+  function perkHeld(actorId, key) {
+    var P = g.__thornswoodProgression;
+    var C = g.__thornswoodCharacter;
+    if (!P || !P.perks || !C || !C.stateOf) { return false; }
+    try { return P.perks(C.stateOf(actorId)).indexOf(key) !== -1; } catch (e) { return false; }
+  }
+
+  function carverFire(actorId) {
+    if (perkHeld(actorId, 'mastercarver')) { return true; }
+    var reach = NEEDS.fire.reach || 1;
+    var online = [];
+    try { online = mp.getOnlinePlayers() || []; } catch (e) { return false; }
+    if (online.length < 2) { return false; }
+    var here = null, cell = '';
+    try {
+      here = mp.get(actorId, 'pos');
+      cell = String(mp.get(actorId, 'worldOrCellDesc') || '');
+    } catch (e) { return false; }
+    if (!here || !cell) { return false; }
+    for (var i = 0; i < online.length; i++) {
+      var them = online[i];
+      if (them === actorId) { continue; }
+      try {
+        if (String(mp.get(them, 'worldOrCellDesc') || '') !== cell) { continue; }
+        var p = mp.get(them, 'pos');
+        if (!p) { continue; }
+        var dx = p[0] - here[0], dy = p[1] - here[1], dz = p[2] - here[2];
+        if ((dx * dx + dy * dy + dz * dz) >= reach * reach) { continue; }
+      } catch (e) { continue; }
+      var theirs = read(them);
+      if (!theirs || !(theirs.fire >= 0) || theirs.fire >= reach) { continue; }
+      if (perkHeld(them, 'mastercarver')) { return true; }
+    }
+    return false;
   }
 
   /*
@@ -45115,8 +52187,50 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     return out;
   }
 
+  /*
+    MASTER WEAVER'S HALF OF THE WEATHER (#1398).
+
+    docs/systems/professions/tailor.md: clothing a master tailor makes keeps
+    the weather off, and temperature.md says how much: 4 degrees of exposure
+    ignored, on top of the clothing table. It does not become fur, so
+    insulation() is not touched; the 4 come off what the weather, the wind,
+    the night and the height are taking, and never turn them into warmth.
+
+    A woven garment is one whose name starts with NEEDS.wear.woven.mark, which
+    the craft writes on it (markWoven, beside mp.onCraft). One worn is enough
+    and two do not ignore 8. A piece with an enchantment on it is not one: the
+    enchanting table lets anybody name a piece, and the engine only enchants a
+    plain one, which a woven garment is not.
+  */
+  function wovenWorn(actorId) {
+    var mark = NEEDS.wear.woven.mark;
+    var entries = wornEntries(actorId);
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (!e || !e.worn || e.enchantmentId) { continue; }
+      if (typeof e.name === 'string' && e.name.indexOf(mark) === 0) { return true; }
+    }
+    return false;
+  }
+
+  function weathered(actorId, n) {
+    var off = exposure(n);
+    if (!(off < 0) || !wovenWorn(actorId)) { return off; }
+    return Math.min(0, off + NEEDS.wear.woven.degrees);
+  }
+
   function insulation(actorId) {
     var total = 0;
+    /*
+      A BAD BURN HALVES WHAT IS WORN (#1383): injury.md, clothing on that part
+      counts at half for warmth until it heals. The injury block says which
+      parts and how much.
+    */
+    var burnt = null;
+    try {
+      var H = g.__thornswoodHurt;
+      burnt = (H && H.burntWear) ? H.burntWear(actorId) : null;
+    } catch (eBurn) { burnt = null; }
     try {
       var entries = wornEntries(actorId);
       for (var i = 0; i < entries.length; i++) {
@@ -45129,6 +52243,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         var parts = String(row.c || '').split(',');
         for (var p = 0; p < parts.length; p++) {
           var w = NEEDS.wear.perPart[parts[p]];
+          if (w && burnt && (burnt.all || burnt[parts[p]])) { w = w * burnt.counts; }
           if (w) { total += w * mat; }
         }
       }
@@ -45211,14 +52326,38 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         out[av] = (Object.prototype.hasOwnProperty.call(out, av) ? out[av] : 0) + cost[av];
       }
     }
+    /*
+      A DISEASE READS AS THE METER IT IS CLOSEST TO (#1383). disease.md: ill is
+      the weary penalties of that meter and bad is the bad ones, so the meter
+      counts as at least that band while it lasts, the way a hangover counts
+      rest as weary. The injury block answers which, and what a broken or
+      crooked limb and an agreed loss add on top.
+    */
+    var hurt = { floors: {}, add: {} };
+    try {
+      var H = g.__thornswoodHurt;
+      if (H && H.forNeeds) { hurt = H.forNeeds(actorId) || hurt; }
+    } catch (eHurt) { }
+    var floors = hurt.floors || {};
+    var order = ['fine', 'weary', 'bad', 'spent'];
+    function atLeast(band, floor) {
+      return (floor && order.indexOf(floor) > order.indexOf(band)) ? floor : band;
+    }
     var meters = ['food', 'drink', 'rest'];
     for (var i = 0; i < meters.length; i++) {
-      add(COST[meters[i]][bandOf(n[meters[i]])] || {});
+      add(COST[meters[i]][atLeast(bandOf(n[meters[i]]), floors[meters[i]])] || {});
     }
     // And temperature, which is read as a distance from comfort in either
-    // direction rather than as a level. See TEMP_COST.
+    // direction rather than as a level. See TEMP_COST. A chill is the cold
+    // side's: on top of the heat when somebody chilled stands at a forge.
     var t = tempBand(typeof n.temp === 'number' ? n.temp : NEEDS.comfort);
-    add((t.cold ? TEMP_COST.cold : TEMP_COST.hot)[t.name] || {});
+    if (t.cold || t.name === 'fine') {
+      add(TEMP_COST.cold[atLeast(t.name, floors.cold)] || {});
+    } else {
+      add(TEMP_COST.hot[t.name] || {});
+      if (floors.cold) { add(TEMP_COST.cold[floors.cold] || {}); }
+    }
+    add(hurt.add || {});
     return out;
   }
 
@@ -45254,8 +52393,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       tempTarget: Math.round(warmthTarget(actorId, n)),
       roof: !!n.roof, night: !!n.night,
       fireAway: (typeof n.fire === 'number' && n.fire >= 0) ? Math.round(n.fire) : -1,
-      fireWorth: Math.round(fireWarmth(n)),
-      exposure: Math.round(exposure(n)),
+      fireWorth: Math.round(fireWarmth(n, actorId)),
+      exposure: Math.round(weathered(actorId, n)),
       cover: Math.round(insulation(actorId) * 100),
       worn: wornList(actorId)
     };
@@ -45919,7 +53058,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     ate: ate, resting: resting, worked: worked, bard: bard, arrived: arrived,
     place: place, tooTiredToCraft: tooTiredToCraft,
     setBurning: setBurning, catchFire: catchFire,
-    fresh: fresh, clamp: clamp
+    fresh: fresh, clamp: clamp,
+    // The meters as last settled, without settling them again (#1383).
+    read: read
   };
 
   nlog('ready: food empties in', Math.round(100 / NEEDS.drain.food) + 'h,',
@@ -45927,6 +53068,1111 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
        'rest in', Math.round(100 / NEEDS.drain.rest) + 'h');
 })();
 // ==== end thornswood needs ====
+
+// ==== thornswood injury and disease ====
+/*
+  ============================================================================
+  WOUNDS AND DISEASE, ON THE CHARACTER THE WAY HUNGER IS (#1383).
+
+  docs/systems/injury.md and docs/systems/disease.md are the design, and every
+  number below is one of theirs, named where it is used. A wound and a disease
+  are a short list on the character, in the thornswoodHurt property, ticked by
+  this server. Not a mod script and not the old survival mod: nothing here
+  runs on the client except the lines that draw what you have.
+
+  WHAT THE SERVER CAN SEE, AND SO WHAT STARTS EACH ONE TODAY.
+
+    A burn     the client says when it catches fire and when the fire goes out
+               (/burn, the same report the spreading uses), and the coals deal
+               BURN_PER_SECOND a second on that client while it burns. So the
+               server times the fire and knows what it dealt.
+    A chill    an hour of sleep on open ground, read off the rest the needs
+               block already holds (resting at the sitting rate, with no roof
+               over you), or an hour at spent cold, read off its temperature.
+    Wound fever and bite sickness
+               a cut, a bite or a bad burn left untreated for 10 minutes.
+    Food sickness and fouled water
+               what somebody ate or drank, which is the meal and drink work
+               (#1382). It calls exposed() with what it was, and the chances
+               are here, beside the disease they start.
+    A cut, a break, a bite
+               the page does not say which blow opens which, so nothing in the
+               world opens one yet. The question is on #1383. Staff give one
+               with /hurt for a scene, and everything after that is real.
+
+  GOING DOWN IS NOT HERE, AND WHY. Health reaching zero is the engine's death.
+  MpActor::Kill applies the death, sends it to every client and starts the
+  respawn timer before mp.onDeath is told anything, so there is no moment in
+  which this file could say "down, not dead". Faking one by standing the body
+  back up afterwards would be the band-aid the guide bans. What the fork has
+  to expose is written on #1383. Until then a bleed that empties your health
+  is a death with no killer, the world's, and the temple keeps your wounds.
+  ============================================================================
+*/
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+
+  function hlog() {
+    var a = ['[thornswood hurt]'];
+    for (var i = 0; i < arguments.length; i++) { a.push(arguments[i]); }
+    try { console.log(a.join(' ')); } catch (e) { }
+  }
+
+  var HURT_PROPERTY = 'thornswoodHurt';
+  var MIN = 60000;
+  var DAY = 24 * 60 * MIN;
+
+  /*
+    THE NUMBERS, ALL OF THEM OFF THE TWO PAGES.
+
+    injury.md: a cut bleeds 2 a second until stopped and torn cloth slows it
+    to 1. Left open 10 minutes, wound fever is 40%, 10% with a bandage, 5% with
+    a poultice. A bite is a cut and bite sickness, 25% if it is closed inside
+    the 10 minutes and 60% if it is not. A break heals in 3 real days looked
+    after and crooked in 3 days ignored. A burn is bad at 30 health dealt,
+    halves the warmth of what is worn and heals in a day. A missing eye is
+    -20% damage with a bow or a spell.
+
+    disease.md: caught is 10 minutes with no penalty, bad is another 20
+    untreated, and the three durations.
+  */
+  var HURT = {
+    bleed: { open: 2, cloth: 1 },
+    feverAfter: 10,
+    fever: { open: 0.40, bandage: 0.10, poultice: 0.05 },
+    bite: { closed: 0.25, open: 0.60 },
+    breakDays: 3,
+    /*
+      The broken limb and the crooked one, as the engine actor values the
+      skills panel already carries. attackDamageMult is a multiplier, which is
+      why its numbers are small (see TUNING.perPoint). "A block costs twice the
+      stamina" and "sprint is refused" are not actor values and are not here:
+      the issue says what they need.
+    */
+    broken: { arm: { attackDamageMult: -0.15 }, leg: { speedMult: -8 } },
+    crooked: { arm: { attackDamageMult: -0.05 }, leg: { speedMult: -4 } },
+    /*
+      BURN_PER_SECOND in thornswood-front.js is what the coals deal a second
+      and has to be the same number, because the server works out what a fire
+      dealt from how long it burned.
+    */
+    burn: { perSecond: 7, bad: 30, healDays: 1, warmth: 0.5 },
+    /*
+      Bow damage and spell damage. The bow is MarksmanPowerMod; a spell that
+      does damage is the destruction school, DestructionPowerMod, the name
+      schoolValues in the progression block sends. Both are per cent.
+    */
+    eye: { MarksmanPowerMod: -20, DestructionPowerMod: -20 },
+    // The most wounds one record holds, so a run of /hurt cannot grow it for ever.
+    most: 12
+  };
+
+  /*
+    THE FIVE, AND WHICH METER EACH ONE IS CLOSEST TO.
+
+    "Ill. The weary penalties of the closest meter: cold for a chill, hunger
+    for food sickness, thirst for fouled water, and both hunger and rest for a
+    fever." Read the way the drink page reads a hangover: the meter counts as
+    at least weary while you are ill, and at least bad while you are badly ill,
+    so a disease never stacks a second copy of a penalty you already have.
+
+    lasts is minutes, and from says what it is counted from: a chill clears in
+    2 hours from catching it; food sickness and fouled water last 30 and 45
+    minutes once they show. 0 lasts until cured. bad is whether 20 untreated
+    minutes after showing make it bad.
+
+    Bite sickness is not on the page's list of closest meters. It is a wound
+    disease that turns bad the way a fever does, so it reads as a fever does
+    until #1383 says otherwise.
+  */
+  var DISEASE = {
+    chill:  { name: 'chill', meters: { cold: true }, lasts: 120, from: 'caught', bad: false },
+    food:   { name: 'food sickness', meters: { food: true }, lasts: 30, from: 'ill', bad: false },
+    fouled: { name: 'fouled water', meters: { drink: true }, lasts: 45, from: 'ill', bad: false },
+    fever:  { name: 'wound fever', meters: { food: true, rest: true }, lasts: 0, from: 'ill', bad: true },
+    bite:   { name: 'bite sickness', meters: { food: true, rest: true }, lasts: 0, from: 'ill', bad: true }
+  };
+  var CAUGHT_MIN = 10;
+  var BAD_AFTER_MIN = 20;
+  // An hour of sleep on open ground, or an hour at spent cold. Shorter does not catch it.
+  var CHILL_AFTER_MIN = 60;
+
+  /*
+    WHAT STARTS FOOD SICKNESS AND FOULED WATER, which the meal and drink work
+    (#1382) reports through exposed(). disease.md: raw meat or fish 40%,
+    eating at 90 hunger or above always; marsh, a puddle or standing water
+    80%, the sea 40%, a river unboiled 15%. Boiled water is no risk at all,
+    so it is never reported.
+  */
+  var EXPOSED = {
+    food: { raw: 0.40, full: 1 },
+    fouled: { marsh: 0.80, puddle: 0.80, standing: 0.80, sea: 0.40, river: 0.15 }
+  };
+
+  /*
+    WHICH HEALING SPELLS DO WHAT. injury.md, who treats what: novice
+    restoration stops a bleed; advanced and up closes a cut; an expert
+    healing spell sets a break that is already splinted. The rank is the
+    spell's own, out of the progression block's book (spellByDesc), so a
+    spell moving rank there moves it here too. self is a spell cast on
+    yourself, heard as a cast; the other two land on somebody else and are
+    heard as a hit.
+  */
+  var HEALING = {
+    'Healing': { self: true },
+    'Fast Healing': { self: true },
+    'Close Wounds': { self: true },
+    'Grand Healing': { self: true },
+    'Guardian Circle': { self: true },
+    'Healing Hands': { self: false },
+    'Heal Other': { self: false }
+  };
+  var RANKS = ['novice', 'advanced', 'expert', 'master'];
+
+  /*
+    THE POTION OF CURE DISEASE. The one ALCH record in this load order whose
+    effect is Cure Disease, CureDisease in Skyrim.esm (game\data\food.json).
+    A potion somebody brews has no record (it is made above 0xff000000) and
+    the server cannot read what it does yet; the issue says what that needs.
+  */
+  var CURE_DISEASE = ['ae723:Skyrim.esm'];
+
+  /*
+    BENCHES THAT TAKE BOTH HANDS, by the keyword a bench carries (BENCH_BY_BASE).
+    A broken arm and a missing hand refuse these. The page does not list them,
+    so this is a question on #1383: the forges, the armour table, the wheel,
+    the smelter, the tanning rack, the loom and the kiln. Cooking, brewing and
+    enchanting are not on it.
+  */
+  var TWO_HANDS = {
+    '88105:Skyrim.esm': 'the forge',
+    'f46ce:Skyrim.esm': 'the Skyforge',
+    'adb78:Skyrim.esm': 'the armour table',
+    '88108:Skyrim.esm': 'the sharpening wheel',
+    'a5cce:Skyrim.esm': 'the smelter',
+    '7866a:Skyrim.esm': 'the tanning rack',
+    'f806:Dawnguard.esm': 'the forge',
+    '5756:Dawnguard.esm': 'the forge',
+    '6ce000:Update.esm': 'the loom',
+    '1547f:Thornswood-Content.esp': 'the kiln'
+  };
+
+  function has(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
+  function num(v, d) { v = Number(v); return isFinite(v) ? v : d; }
+
+  // ------------------------------------------------------------ the record --
+
+  function fresh() {
+    return { wounds: [], ills: [], crooked: {}, agreed: {}, cold: 0, ground: 0, show: [] };
+  }
+
+  /*
+    Rebuilt field by field, the same discipline as the needs block: this is
+    where JSON somebody else wrote becomes things this file does arithmetic
+    on, and a field not named here is dropped.
+  */
+  function read(actorId) {
+    var v = null;
+    try { v = mp.get(actorId, HURT_PROPERTY); } catch (e) { v = null; }
+    var out = fresh();
+    if (!v || typeof v !== 'object') { return out; }
+    var ws = Array.isArray(v.wounds) ? v.wounds : [];
+    for (var i = 0; i < ws.length && out.wounds.length < HURT.most; i++) {
+      var w = ws[i];
+      if (!w || typeof w !== 'object') { continue; }
+      var k = String(w.k || '');
+      if (k !== 'cut' && k !== 'bite' && k !== 'break' && k !== 'burn') { continue; }
+      out.wounds.push({
+        k: k, at: num(w.at, 0),
+        limb: (w.limb === 'leg') ? 'leg' : 'arm',
+        bleed: !!w.bleed, cloth: !!w.cloth, bandage: !!w.bandage,
+        poultice: !!w.poultice, closed: !!w.closed, rolled: !!w.rolled,
+        splint: !!w.splint, set: num(w.set, 0), dealt: num(w.dealt, 0)
+      });
+    }
+    var is = Array.isArray(v.ills) ? v.ills : [];
+    for (var j = 0; j < is.length; j++) {
+      var d = is[j];
+      if (!d || typeof d !== 'object' || !has(DISEASE, String(d.k || ''))) { continue; }
+      out.ills.push({ k: String(d.k), at: num(d.at, 0), cold: !!d.cold, told: String(d.told || '') });
+    }
+    var cr = (v.crooked && typeof v.crooked === 'object') ? v.crooked : {};
+    if (num(cr.arm, 0) > 0) { out.crooked.arm = num(cr.arm, 0); }
+    if (num(cr.leg, 0) > 0) { out.crooked.leg = num(cr.leg, 0); }
+    var ag = (v.agreed && typeof v.agreed === 'object') ? v.agreed : {};
+    ['hand', 'eye', 'scar'].forEach(function (part) {
+      var a = ag[part];
+      if (!a || typeof a !== 'object' || !(num(a.at, 0) > 0)) { return; }
+      out.agreed[part] = { at: num(a.at, 0), by: String(a.by || ''),
+                           text: String(a.text || '').replace(/[<>&"]/g, '').slice(0, 200) };
+    });
+    out.cold = num(v.cold, 0);
+    out.ground = num(v.ground, 0);
+    out.show = Array.isArray(v.show) ? v.show.map(String) : [];
+    return out;
+  }
+
+  function write(actorId, rec) {
+    rec.show = lines(rec, Date.now());
+    try { mp.set(actorId, HURT_PROPERTY, rec); return true; }
+    catch (e) { hlog('could not write', actorId.toString(16) + ':', e); return false; }
+  }
+
+  // ------------------------------------------------------------ the clocks --
+
+  function minutesSince(at, now) { return (now - at) / MIN; }
+
+  /* caught, ill or bad. disease.md, "How sick". */
+  function stageOf(ill, now) {
+    var m = minutesSince(ill.at, now);
+    if (m < CAUGHT_MIN) { return 'caught'; }
+    if (DISEASE[ill.k].bad && m >= CAUGHT_MIN + BAD_AFTER_MIN) { return 'bad'; }
+    return 'ill';
+  }
+
+  /* Whether this one has run its course on its own. */
+  function runOut(ill, now) {
+    var d = DISEASE[ill.k];
+    if (!d.lasts) { return false; }
+    var start = (d.from === 'caught') ? ill.at : ill.at + CAUGHT_MIN * MIN;
+    return now >= start + d.lasts * MIN;
+  }
+
+  function hasIll(rec, k) {
+    for (var i = 0; i < rec.ills.length; i++) { if (rec.ills[i].k === k) { return true; } }
+    return false;
+  }
+
+  // ---------------------------------------------------------- resistance --
+
+  function stateOf(actorId) {
+    var C = g.__thornswoodCharacter;
+    try { return (C && C.stateOf) ? C.stateOf(actorId) : null; } catch (e) { return null; }
+  }
+
+  /*
+    TOUGHNESS. disease.md: each point adds disease resistance, and filled,
+    Purified Blood means no disease takes. Purified Blood is the perks block's
+    answer (holds), which is how it asks a disease the server gives to work.
+    What a point is worth is the skill tree's own number
+    (TUNING.perPoint.toughness.diseaseResist), the one the client puts on the
+    actor, so the two cannot disagree.
+  */
+  function chanceFor(actorId, chance) {
+    var K = g.__thornswoodPerks;
+    try { if (K && K.holds && K.holds(actorId, 'purifiedblood')) { return 0; } } catch (e) { }
+    var P = g.__thornswoodProgression;
+    var s = stateOf(actorId);
+    if (!P || !s) { return chance; }
+    var pts = (s.tree && has(s.tree, 'toughness')) ? num(s.tree.toughness, 0) : 0;
+    var per = 0;
+    try { per = num(P.TUNING.perPoint.toughness.diseaseResist, 0); } catch (e) { per = 0; }
+    var resist = Math.min(100, Math.max(0, pts * per));
+    return chance * (1 - resist / 100);
+  }
+
+  /* One roll at a disease. True when it took. A kind already held is not caught twice. */
+  function catchIll(actorId, rec, k, chance, now) {
+    if (!has(DISEASE, k) || hasIll(rec, k)) { return false; }
+    var c = chanceFor(actorId, chance);
+    if (!(c > 0) || Math.random() >= c) { return false; }
+    rec.ills.push({ k: k, at: now, cold: false, told: '' });
+    hlog(actorId.toString(16), 'caught', DISEASE[k].name);
+    return true;
+  }
+
+  // ------------------------------------------------------- what it costs --
+
+  var ORDER = ['fine', 'weary', 'bad', 'spent'];
+  function worse(a, b) {
+    if (!b) { return a; }
+    return ORDER.indexOf(b) > ORDER.indexOf(a) ? b : a;
+  }
+
+  /*
+    What the needs block reads (#1383, "nothing in the needs block reads a
+    disease"): the band each meter counts as at least, and the actor values
+    the wounds and an agreed loss add.
+  */
+  function forNeeds(actorId) {
+    var rec = read(actorId);
+    var now = Date.now();
+    var floors = {};
+    for (var i = 0; i < rec.ills.length; i++) {
+      var stage = stageOf(rec.ills[i], now);
+      if (stage === 'caught') { continue; }
+      var band = (stage === 'bad') ? 'bad' : 'weary';
+      var ms = DISEASE[rec.ills[i].k].meters;
+      for (var m in ms) {
+        if (has(ms, m)) { floors[m] = worse(floors[m] || 'fine', band); }
+      }
+    }
+    var add = {};
+    function plus(cost) {
+      for (var av in cost) {
+        if (has(cost, av)) { add[av] = (has(add, av) ? add[av] : 0) + cost[av]; }
+      }
+    }
+    var limbs = {};
+    for (var w = 0; w < rec.wounds.length; w++) {
+      if (rec.wounds[w].k === 'break') { limbs[rec.wounds[w].limb] = true; }
+    }
+    if (limbs.arm) { plus(HURT.broken.arm); }
+    if (limbs.leg) { plus(HURT.broken.leg); }
+    if (rec.crooked.arm) { plus(HURT.crooked.arm); }
+    if (rec.crooked.leg) { plus(HURT.crooked.leg); }
+    if (rec.agreed.eye) { plus(HURT.eye); }
+    return { floors: floors, add: add };
+  }
+
+  /*
+    THE BURN ON WHAT YOU WEAR. injury.md: clothing on that part counts at half
+    for warmth until it heals. The server is not told where the fire touched
+    and the client puts the flames on the whole body, so it is everything
+    worn, which is a question on #1383. The needs block's insulation() asks.
+  */
+  function burntWear(actorId) {
+    var rec = read(actorId);
+    for (var i = 0; i < rec.wounds.length; i++) {
+      var w = rec.wounds[i];
+      if (w.k === 'burn' && w.dealt >= HURT.burn.bad) { return { all: true, counts: HURT.burn.warmth }; }
+    }
+    return null;
+  }
+
+  // ------------------------------------------------------ what you see --
+
+  var WORDS = {
+    chill: 'Chilled', food: 'Food sickness', fouled: 'Fouled water',
+    fever: 'Wound fever', bite: 'Bite sickness'
+  };
+
+  /* The short lines the left edge of the screen draws. A disease still in
+     its caught window is not one of them: "a cure in that window and it
+     never shows". */
+  function lines(rec, now) {
+    var out = [];
+    var bleeding = 0, slowed = true;
+    for (var i = 0; i < rec.wounds.length; i++) {
+      var w = rec.wounds[i];
+      if ((w.k === 'cut' || w.k === 'bite') && w.bleed) { bleeding++; if (!w.cloth) { slowed = false; } }
+    }
+    if (bleeding) { out.push(slowed ? 'Bleeding, slowed' : 'Bleeding'); }
+    for (var j = 0; j < rec.wounds.length; j++) {
+      var x = rec.wounds[j];
+      if (x.k === 'cut' && !x.bleed) { out.push(x.closed ? 'Cut, closed' : (x.bandage ? 'Cut, bandaged' : 'Open cut')); }
+      if (x.k === 'bite' && !x.bleed) { out.push((x.closed || x.bandage) ? 'Bite, closed' : 'Open bite'); }
+      if (x.k === 'break') {
+        out.push('Broken ' + x.limb + (x.set ? ', set' : (x.splint ? ', splinted' : '')));
+      }
+      if (x.k === 'burn' && x.dealt >= HURT.burn.bad) { out.push('Bad burn'); }
+    }
+    if (rec.crooked.arm) { out.push('Crooked arm'); }
+    if (rec.crooked.leg) { out.push('Crooked leg'); }
+    if (rec.agreed.hand) { out.push('Missing hand'); }
+    if (rec.agreed.eye) { out.push('Missing eye'); }
+    for (var k = 0; k < rec.ills.length; k++) {
+      var stage = stageOf(rec.ills[k], now);
+      if (stage === 'caught') { continue; }
+      out.push(WORDS[rec.ills[k].k] + (stage === 'bad' ? ', bad' : ''));
+    }
+    return out;
+  }
+
+  function tell(actorId, line) {
+    if (!line) { return; }
+    try { notify(actorId, line); } catch (e) { }
+    try { say(actorId, line); } catch (e) { }
+  }
+
+  /*
+    A CHANGE HAS TO REACH THE CHARACTER, for the reason written over
+    pushEffects in the needs block: the costs ride on the skills panel, and
+    the panel is only written when the character changes. So a disease that
+    shows, worsens or clears, and a wound that comes or goes, asks the
+    character block to redraw.
+  */
+  function redraw(actorId) {
+    try {
+      var c = g.__thornswoodCharacter;
+      if (!c || !c.stateOf || !c.writeState) { return; }
+      var s = c.stateOf(actorId);
+      if (s) { c.writeState(actorId, s, true); }
+    } catch (e) { }
+  }
+
+  // ---------------------------------------------------------- the tick --
+
+  /*
+    WHAT THE NEEDS BLOCK KNOWS ABOUT WHERE YOU ARE. Read, never written: the
+    chill is caught and cleared by the rest and the warmth that block already
+    keeps. A bed is the beds' answer in the property block (#1392), a fire is
+    the distance the client reports. read, not settle: the needs tick settles
+    every 20 seconds, and a clock an hour long needs nothing fresher, nor a
+    second write of that property.
+  */
+  function needsNow(actorId) {
+    var N = g.__thornswoodNeeds;
+    if (!N || !N.read) { return null; }
+    try { return N.read(actorId); } catch (e) { return null; }
+  }
+
+  // The rest kinds that are lying in a bed or a bedroll (NEEDS.recover), and
+  // bedroll for a record stored before the ladder.
+  var IN_BED = { rough: true, camp: true, inn: true, bed: true, bedroll: true };
+
+  var ILL_WORDS = {
+    chill: 'A chill has settled in. A fire, a bed or getting warm again will shake it.',
+    food: 'Your stomach turns. Food sickness, for a while.',
+    fouled: 'The water was bad. You are sick with it for a while.',
+    fever: 'Wound fever. A potion of cure disease or a temple shrine will clear it.',
+    bite: 'The bite has gone bad: bite sickness. A potion of cure disease or a temple shrine will clear it.'
+  };
+
+  /*
+    Bring one person's record up to now. Answers the lines worth saying and
+    whether anything changed. Everything is worked from real time, the way the
+    needs are, so a restart, a slow tick or a night away all land on the same
+    answer.
+  */
+  function step(actorId, rec, now) {
+    var said = [];
+    var changed = false;
+    var n = needsNow(actorId);
+    var N = g.__thornswoodNeeds;
+
+    /*
+      THE CHILL. An hour of sleep on open ground: resting at the sitting rate,
+      a seat with no fire in reach (exhaustion.md, "sleeping on open ground is
+      sitting, 20 an hour"), with no roof and not indoors. Or an hour at spent
+      cold. Each clock starts again once it has caught.
+    */
+    if (n && N) {
+      var open = n.resting === 'sit' && !n.roof && !!n.place && n.place !== 'indoors';
+      if (open) {
+        if (!rec.ground) { rec.ground = now; changed = true; }
+        else if (minutesSince(rec.ground, now) >= CHILL_AFTER_MIN) {
+          catchIll(actorId, rec, 'chill', 1, now);
+          rec.ground = now; changed = true;
+        }
+      } else if (rec.ground) { rec.ground = 0; changed = true; }
+
+      var t = N.tempBand ? N.tempBand(n.temp) : { name: 'fine', cold: false };
+      if (t.cold && t.name === 'spent') {
+        if (!rec.cold) { rec.cold = now; changed = true; }
+        else if (minutesSince(rec.cold, now) >= CHILL_AFTER_MIN) {
+          catchIll(actorId, rec, 'chill', 1, now);
+          rec.cold = now; changed = true;
+        }
+      } else if (rec.cold) { rec.cold = 0; changed = true; }
+    }
+
+    /*
+      THE WOUNDS' OWN CLOCKS. At 10 minutes a cut, a bite and a bad burn roll
+      wound fever, and a bite rolls bite sickness. A cut or a bite whose bleed
+      has stopped and whose rolls are done has nothing left to do and leaves
+      the list. A break heals 3 days after it was set, or crooked 3 days after
+      it happened if nobody set it. A burn heals in a day.
+    */
+    var keep = [];
+    for (var i = 0; i < rec.wounds.length; i++) {
+      var w = rec.wounds[i];
+      var m = minutesSince(w.at, now);
+      if ((w.k === 'cut' || w.k === 'bite') && !w.rolled && m >= HURT.feverAfter) {
+        if (!w.closed) {
+          var fc = w.poultice ? HURT.fever.poultice : (w.bandage ? HURT.fever.bandage : HURT.fever.open);
+          catchIll(actorId, rec, 'fever', fc, now);
+        }
+        if (w.k === 'bite') {
+          catchIll(actorId, rec, 'bite', (w.closed || w.bandage) ? HURT.bite.closed : HURT.bite.open, now);
+        }
+        w.rolled = true; changed = true;
+      }
+      if ((w.k === 'cut' || w.k === 'bite') && w.rolled && !w.bleed) { changed = true; continue; }
+      if (w.k === 'burn') {
+        if (!w.rolled && m >= HURT.feverAfter) {
+          var bc = w.poultice ? HURT.fever.poultice : (w.bandage ? HURT.fever.bandage : HURT.fever.open);
+          catchIll(actorId, rec, 'fever', bc, now);
+          w.rolled = true; changed = true;
+        }
+        if (now - w.at >= HURT.burn.healDays * DAY) {
+          said.push('The burn has healed.'); changed = true; continue;
+        }
+      }
+      if (w.k === 'break') {
+        if (w.set && now - w.set >= HURT.breakDays * DAY) {
+          said.push('Your broken ' + w.limb + ' has healed.'); changed = true; continue;
+        }
+        if (!w.set && now - w.at >= HURT.breakDays * DAY) {
+          rec.crooked[w.limb] = now;
+          said.push('Your broken ' + w.limb + ' has healed crooked. A master physicker or a temple shrine can put it right.');
+          changed = true; continue;
+        }
+      }
+      keep.push(w);
+    }
+    rec.wounds = keep;
+
+    /*
+      THE DISEASES. A chill clears at a fire, in a bed, or once you are warm
+      again after being cold, and on its own after 2 hours. Food sickness and
+      fouled water pass. A fever and bite sickness wait for a cure. Each says
+      so once when it shows and once when it turns bad.
+    */
+    var ills = [];
+    for (var j = 0; j < rec.ills.length; j++) {
+      var ill = rec.ills[j];
+      var d = DISEASE[ill.k];
+      if (runOut(ill, now)) {
+        if (stageOf(ill, now) !== 'caught') { said.push('The ' + d.name + ' has passed.'); }
+        changed = true; continue;
+      }
+      if (ill.k === 'chill' && n && N) {
+        var tb = N.tempBand ? N.tempBand(n.temp) : { name: 'fine', cold: false };
+        var reach = (N.NEEDS && N.NEEDS.fire) ? N.NEEDS.fire.reach : 300;
+        var fire = typeof n.fire === 'number' && n.fire >= 0 && n.fire < reach;
+        // Any bed or bedroll, whoever's: the ladder's rough, camp, inn and bed (#1603).
+        var bed = has(IN_BED, n.resting);
+        var warm = tb.name === 'fine' && ill.cold;
+        if (fire || bed || warm) {
+          if (stageOf(ill, now) !== 'caught') {
+            said.push(fire ? 'The fire shakes the chill off.'
+              : (bed ? 'The bed shakes the chill off.' : 'You are warm again and the chill is gone.'));
+          }
+          changed = true; continue;
+        }
+        if (tb.cold && tb.name !== 'fine' && !ill.cold) { ill.cold = true; changed = true; }
+      }
+      var stage = stageOf(ill, now);
+      if (stage !== 'caught' && ill.told !== stage) {
+        said.push(stage === 'bad'
+          ? ('The ' + d.name + ' is worse. You cannot work at a bench like this, and waiting will not clear it.')
+          : ILL_WORDS[ill.k]);
+        ill.told = stage; changed = true;
+      }
+      ills.push(ill);
+    }
+    rec.ills = ills;
+    return { said: said, changed: changed };
+  }
+
+  var TICK_MS = 10000;
+
+  /*
+    The lines last written are what the screen and the panel last saw, so a
+    change in them is what asks for a redraw. A clock that moved and changed
+    nothing on screen is written without one.
+  */
+  function tick() {
+    var online = [];
+    try { online = mp.getOnlinePlayers() || []; } catch (e) { return; }
+    var now = Date.now();
+    for (var i = 0; i < online.length; i++) {
+      var who = online[i];
+      try {
+        var rec = read(who);
+        var was = rec.show.join('|');
+        var r = step(who, rec, now);
+        var shown = lines(rec, now).join('|');
+        if (r.changed || shown !== was) { write(who, rec); }
+        if (shown !== was) { redraw(who); }
+        for (var k = 0; k < r.said.length; k++) { tell(who, r.said[k]); }
+      } catch (e) { hlog('tick', who, e); }
+    }
+  }
+
+  /*
+    THE BLEED, every second, for whoever is bleeding. One bleed a person,
+    however many cuts: 2 a second, or 1 when every open one is wrapped in torn
+    cloth. Taken with the engine's own DamageActorValue, which knows the
+    person's most health, so nothing here has to. A bleed that empties it is
+    the engine's death with no killer: see the top of this block.
+  */
+  var BLEED_MS = 1000;
+
+  function bleedRate(rec) {
+    var rate = 0;
+    for (var i = 0; i < rec.wounds.length; i++) {
+      var w = rec.wounds[i];
+      if ((w.k === 'cut' || w.k === 'bite') && w.bleed) {
+        rate = Math.max(rate, w.cloth ? HURT.bleed.cloth : HURT.bleed.open);
+      }
+    }
+    return rate;
+  }
+
+  function bleedTick() {
+    var online = [];
+    try { online = mp.getOnlinePlayers() || []; } catch (e) { return; }
+    for (var i = 0; i < online.length; i++) {
+      var who = online[i];
+      var dead = false;
+      try { dead = !!mp.get(who, 'isDead'); } catch (e) { continue; }
+      if (dead) { continue; }
+      var rate = bleedRate(read(who));
+      if (!rate) { continue; }
+      try {
+        mp.callPapyrusFunction('method', 'Actor', 'DamageActorValue',
+          { type: 'form', desc: mp.getDescFromId(who) }, ['Health', rate]);
+      } catch (e) { hlog('could not bleed', who.toString(16) + ':', e); }
+    }
+  }
+
+  // -------------------------------------------------------- the wounds --
+
+  function blank(k, limb, now) {
+    return { k: k, at: now, limb: limb === 'leg' ? 'leg' : 'arm', bleed: false, cloth: false,
+             bandage: false, poultice: false, closed: false, rolled: false,
+             splint: false, set: 0, dealt: 0 };
+  }
+
+  /* A cut, a bite or a break, opened now. Answers what to tell them, or '' when the record is full. */
+  function wound(actorId, k, limb, now) {
+    if (k !== 'cut' && k !== 'bite' && k !== 'break') { return ''; }
+    var rec = read(actorId);
+    now = now || Date.now();
+    if (rec.wounds.length >= HURT.most) { return ''; }
+    var w = blank(k, limb, now);
+    var line = '';
+    if (k === 'cut') { w.bleed = true; line = 'You are cut and bleeding.'; }
+    else if (k === 'bite') { w.bleed = true; line = 'You are bitten and bleeding.'; }
+    else { line = 'Your ' + w.limb + ' is broken.'; }
+    rec.wounds.push(w);
+    write(actorId, rec);
+    redraw(actorId);
+    return line;
+  }
+
+  /*
+    THE FIRE, TIMED. The client reports /burn 1 when it catches and every few
+    seconds while it burns, and /burn 0 when it goes out. A report after a
+    long silence is a new fire. What it dealt is the seconds it burned at the
+    coals' rate; 30 or more is a bad burn. Answers what to tell them, or ''.
+  */
+  // actorId -> { from, last }. On globalThis, so a hot reload mid fire keeps its start.
+  if (!g.__thornswoodHurtFires) { g.__thornswoodHurtFires = {}; }
+  var fires = g.__thornswoodHurtFires;
+  var FIRE_GAP_MS = 6000;  // the needs block lets go of a silent client after three of its beats
+
+  function burning(actorId, on, now) {
+    now = now || Date.now();
+    var f = has(fires, actorId) ? fires[actorId] : null;
+    if (on) {
+      if (!f || (now - f.last) > FIRE_GAP_MS) { fires[actorId] = { from: now, last: now }; }
+      else { f.last = now; }
+      return '';
+    }
+    if (!f) { return ''; }
+    delete fires[actorId];
+    var seconds = Math.max(1, Math.round((now - f.from) / 1000));
+    var dealt = seconds * HURT.burn.perSecond;
+    if (dealt < HURT.burn.bad) { return ''; }
+    var rec = read(actorId);
+    var had = null;
+    for (var i = 0; i < rec.wounds.length; i++) { if (rec.wounds[i].k === 'burn') { had = rec.wounds[i]; } }
+    if (had) {
+      // One burn on a body, and the newest fire starts its day and its 10 minutes again.
+      had.at = now; had.dealt = Math.max(had.dealt, dealt); had.rolled = false;
+      had.bandage = false; had.poultice = false;
+    } else if (rec.wounds.length < HURT.most) {
+      var b = blank('burn', '', now);
+      b.dealt = dealt;
+      rec.wounds.push(b);
+    }
+    write(actorId, rec);
+    redraw(actorId);
+    hlog(actorId.toString(16), 'burnt for', seconds, 'seconds,', dealt, 'health');
+    return 'That fire burnt you badly. What you wear keeps half its warmth until the burn heals, in a day.';
+  }
+
+  /*
+    WHAT ONE HEALING SPELL DOES, by the spell's own rank. Answers a line, or ''
+    when it changed nothing.
+  */
+  function healed(actorId, rank) {
+    var at = RANKS.indexOf(rank);
+    if (at < 0) { return ''; }
+    var rec = read(actorId);
+    var did = [];
+    for (var i = 0; i < rec.wounds.length; i++) {
+      var w = rec.wounds[i];
+      if (w.k === 'cut' || w.k === 'bite') {
+        if (at >= 1 && !w.closed) { w.closed = true; w.bleed = false; did.push('closed'); }
+        else if (w.bleed) { w.bleed = false; did.push('stopped'); }
+      }
+      if (w.k === 'break' && at >= 2 && w.splint && !w.set) { w.set = Date.now(); did.push('set'); }
+    }
+    if (!did.length) { return ''; }
+    write(actorId, rec);
+    redraw(actorId);
+    if (did.indexOf('set') !== -1) { return 'The spell sets the splinted bone. It heals in 3 days.'; }
+    if (did.indexOf('closed') !== -1) { return 'The spell closes the wound.'; }
+    return 'The spell stops the bleeding. The wound is still open.';
+  }
+
+  function spellRank(source) {
+    var P = g.__thornswoodProgression;
+    var desc = (source && typeof source === 'object') ? String(source.desc || '') : String(source || '');
+    if (!P || !P.spellByDesc || !desc) { return null; }
+    var sp = null;
+    try { sp = P.spellByDesc(desc); } catch (e) { sp = null; }
+    if (!sp || !has(HEALING, sp.name)) { return null; }
+    return { name: sp.name, rank: sp.rank, self: HEALING[sp.name].self };
+  }
+
+  function personal(id) {
+    try { return Number(mp.get(id, 'profileId')) > 0; } catch (e) { return false; }
+  }
+
+  /* A cast, heard from onPapyrusEvent:OnSpellCast: a healing spell on yourself. */
+  function cast(casterId, spell) {
+    var s = spellRank(spell);
+    if (!s || !s.self || !personal(casterId)) { return; }
+    tell(casterId, healed(casterId, s.rank));
+  }
+
+  /* A hit, heard from onPapyrusEvent:OnHit: a healing spell landing on somebody. */
+  function hit(targetId, aggressor, source) {
+    var s = spellRank(source);
+    if (!s || s.self || !personal(targetId)) { return; }
+    tell(targetId, healed(targetId, s.rank));
+  }
+
+  // --------------------------------------------------------- the cures --
+
+  /* The one furthest along, then the oldest. Answers it, or null. */
+  function cureOne(rec, now) {
+    var best = -1, bestStage = -1;
+    for (var i = 0; i < rec.ills.length; i++) {
+      var st = ['caught', 'ill', 'bad'].indexOf(stageOf(rec.ills[i], now));
+      if (st > bestStage || (st === bestStage && rec.ills[i].at < rec.ills[best].at)) { best = i; bestStage = st; }
+    }
+    if (best < 0) { return null; }
+    return { ill: rec.ills.splice(best, 1)[0], shown: bestStage > 0 };
+  }
+
+  /*
+    SOMETHING DRUNK FROM THE PACK (mp.onEatItem, below). A potion of cure
+    disease clears one ordinary disease. It is still the thirst sip, which the
+    needs block gives from the client's /ate line. Answers a line, or ''.
+  */
+  function swallowed(actorId, baseId) {
+    var cure = false;
+    for (var i = 0; i < CURE_DISEASE.length; i++) {
+      var id = 0;
+      try { id = idOf(CURE_DISEASE[i]); } catch (e) { id = 0; }
+      if (id && id === baseId) { cure = true; }
+    }
+    if (!cure) { return ''; }
+    var rec = read(actorId);
+    var gone = cureOne(rec, Date.now());
+    if (!gone) { return ''; }
+    write(actorId, rec);
+    redraw(actorId);
+    hlog(actorId.toString(16), 'cured of', DISEASE[gone.ill.k].name, 'by a potion');
+    return gone.shown ? ('The ' + DISEASE[gone.ill.k].name + ' is gone.') : '';
+  }
+
+  /*
+    THE TEMPLE RITE: a shrine pressed inside one of the temples the wake uses
+    (the stuck block's TEMPLES, the same cells). injury.md and disease.md: a
+    temple sets breaks, clears a crooked heal and clears ordinary disease, and
+    does not clear an agreed loss. A wayside shrine is a blessing only. That
+    reading is a question on #1383. Answers a line, or ''.
+  */
+  function inTemple(actorId) {
+    var cell = '';
+    try { cell = String(mp.get(actorId, 'worldOrCellDesc') || '').toLowerCase(); } catch (e) { return false; }
+    var S = g.__thornswoodStuck;
+    var list = (S && S.TEMPLES) || [];
+    for (var i = 0; i < list.length; i++) {
+      if (cell && String(list[i].desc || '').toLowerCase() === cell) { return true; }
+    }
+    return false;
+  }
+
+  function rite(actorId) {
+    if (!inTemple(actorId)) { return ''; }
+    var rec = read(actorId);
+    var did = [];
+    if (rec.ills.length) { rec.ills = []; did.push('the sickness'); }
+    var set = false;
+    for (var i = 0; i < rec.wounds.length; i++) {
+      if (rec.wounds[i].k === 'break' && !rec.wounds[i].set) { rec.wounds[i].set = Date.now(); set = true; }
+    }
+    if (set) { did.push('the break'); }
+    if (rec.crooked.arm || rec.crooked.leg) { rec.crooked = {}; did.push('the crooked bone'); }
+    if (!did.length) { return ''; }
+    write(actorId, rec);
+    redraw(actorId);
+    hlog(actorId.toString(16), 'had the temple rite:', did.join(', '));
+    return 'The temple sees to ' + did.join(' and ') + '.';
+  }
+
+  /*
+    EXPOSED, for the meal and drink work (#1382): somebody ate raw meat or
+    fish ('food', 'raw'), ate at 90 hunger or above ('food', 'full'), or drank
+    from a source with a risk ('fouled', 'marsh' and the rest of EXPOSED). The
+    chance is EXPOSED's. Answers whether it took, which is not something to
+    tell them: a disease in its caught window does not show.
+  */
+  function exposed(actorId, kind, source) {
+    var row = has(EXPOSED, kind) ? EXPOSED[kind] : null;
+    if (!row || !has(row, source)) { return false; }
+    var rec = read(actorId);
+    var took = catchIll(actorId, rec, kind, row[source], Date.now());
+    if (took) { write(actorId, rec); }
+    return took;
+  }
+
+  /*
+    THE BENCH. disease.md: while a disease is bad, crafting is refused.
+    injury.md: a broken arm, and a missing hand for good, refuse crafting that
+    needs both hands. Answers the refusal, or ''. workbenchId is the bench
+    reference the craft was made at.
+  */
+  function craftRefusal(actorId, workbenchId) {
+    var rec = read(actorId);
+    var now = Date.now();
+    for (var i = 0; i < rec.ills.length; i++) {
+      if (stageOf(rec.ills[i], now) === 'bad') {
+        return 'You are too sick to work: the ' + DISEASE[rec.ills[i].k].name +
+               ' is bad. A potion of cure disease or a temple shrine clears it.';
+      }
+    }
+    var arm = false;
+    for (var j = 0; j < rec.wounds.length; j++) {
+      if (rec.wounds[j].k === 'break' && rec.wounds[j].limb === 'arm') { arm = true; }
+    }
+    if (!arm && !rec.agreed.hand) { return ''; }
+    var kw = '';
+    try {
+      var base = mp.get(workbenchId, 'baseDesc');
+      kw = (typeof BENCH_BY_BASE !== 'undefined' && has(BENCH_BY_BASE, base)) ? BENCH_BY_BASE[base] : '';
+    } catch (e) { kw = ''; }
+    if (!kw || !has(TWO_HANDS, kw)) { return ''; }
+    return rec.agreed.hand
+      ? ('Work at ' + TWO_HANDS[kw] + ' takes two hands, and you have one.')
+      : ('Work at ' + TWO_HANDS[kw] + ' takes two hands, and your arm is broken.');
+  }
+
+  /*
+    A DEATH. The temple stopped the death and did not wash the cuts
+    (death.md), so every wound and disease stays on the record. The bleed
+    stops: the wake is the death being stopped, and a cut still bleeding in
+    the temple would kill again before anybody could reach it. Whether the
+    wake should stop it is a question on #1383. The fire goes out with the body.
+  */
+  function died(actorId) {
+    delete fires[actorId];
+    var rec = read(actorId);
+    var any = false;
+    for (var i = 0; i < rec.wounds.length; i++) {
+      if (rec.wounds[i].bleed) { rec.wounds[i].bleed = false; any = true; }
+    }
+    if (any) { write(actorId, rec); }
+  }
+
+  /*
+    THE SCAR, the line other people are told when they look at you
+    (injury.md). The social block puts it on the look prompt.
+  */
+  function scarOf(actorId) {
+    var rec = read(actorId);
+    return rec.agreed.scar ? rec.agreed.scar.text : '';
+  }
+
+  // ------------------------------------------------------ staff, /hurt --
+
+  /*
+    /hurt <person> [what], for staff, through the staff block. A
+    Gamemaster's scene needs a wound before the world opens one, and an
+    agreed loss is agreed out of character, so staff are the ones who write
+    it down. words are the words after the person. Answers { staff, them }.
+
+      /hurt <person>                         what they have
+      /hurt <person> cut | bite | break arm | break leg
+      /hurt <person> chill | food | fouled | fever | bitesick
+                                             caught now, with no roll
+      /hurt <person> agreed hand | eye | scar <what people are told>
+                                             they said yes, out of character
+      /hurt <person> unagree hand | eye | scar   written down by mistake
+      /hurt <person> clear                   every wound and disease, not an agreed loss
+  */
+  var STAFF_ILLS = { chill: 'chill', food: 'food', fouled: 'fouled', fever: 'fever', bitesick: 'bite' };
+
+  function summary(rec, now) {
+    var l = lines(rec, now);
+    for (var i = 0; i < rec.ills.length; i++) {
+      if (stageOf(rec.ills[i], now) === 'caught') { l.push(DISEASE[rec.ills[i].k].name + ' (caught, not showing yet)'); }
+    }
+    if (rec.agreed.scar) { l.push('a scar: ' + rec.agreed.scar.text); }
+    return l.length ? l.join(', ') + '.' : 'nothing.';
+  }
+
+  function staff(actorId, words, byName) {
+    var w = (words || []).map(function (s) { return String(s); });
+    var what = String(w[0] || '').toLowerCase();
+    var rec = read(actorId);
+    var now = Date.now();
+    if (!what) { return { staff: 'They have ' + summary(rec, now), them: '' }; }
+    if (what === 'cut' || what === 'bite' || what === 'break') {
+      var limb = String(w[1] || '').toLowerCase();
+      if (what === 'break' && limb !== 'arm' && limb !== 'leg') {
+        return { staff: 'Break which? /hurt <person> break arm, or break leg.', them: '' };
+      }
+      var line = wound(actorId, what, limb, now);
+      return line ? { staff: 'Done. They have ' + summary(read(actorId), now), them: line }
+                  : { staff: 'They already carry as many wounds as the record holds.', them: '' };
+    }
+    if (has(STAFF_ILLS, what)) {
+      var k = STAFF_ILLS[what];
+      if (hasIll(rec, k)) { return { staff: 'They already have ' + DISEASE[k].name + '.', them: '' }; }
+      rec.ills.push({ k: k, at: now, cold: false, told: '' });
+      write(actorId, rec);
+      return { staff: 'Done. The ' + DISEASE[k].name + ' shows in ' + CAUGHT_MIN + ' minutes unless it is cured first.', them: '' };
+    }
+    if (what === 'agreed' || what === 'unagree') {
+      var part = String(w[1] || '').toLowerCase();
+      if (part !== 'hand' && part !== 'eye' && part !== 'scar') {
+        return { staff: what === 'agreed' ? 'Agreed what? hand, eye, or scar <what people are told>.' : 'Which? hand, eye, or scar.', them: '' };
+      }
+      if (what === 'unagree') {
+        if (!rec.agreed[part]) { return { staff: 'There is no agreed ' + part + ' on them.', them: '' }; }
+        delete rec.agreed[part];
+        write(actorId, rec);
+        redraw(actorId);
+        return { staff: 'Taken off the record.', them: 'Staff took the agreed ' + part + ' off your character.' };
+      }
+      // Drawn on other people's screens, so nothing in it can be markup.
+      var text = w.slice(2).join(' ').replace(/[<>&"]/g, '').trim().slice(0, 200);
+      if (part === 'scar' && !text) {
+        return { staff: 'What is the scar? /hurt <person> agreed scar <what people are told when they look at you>.', them: '' };
+      }
+      rec.agreed[part] = { at: now, by: String(byName || ''), text: text };
+      write(actorId, rec);
+      redraw(actorId);
+      var told = {
+        hand: 'Your character has lost a hand, as you agreed. Work that takes two hands is closed to you.',
+        eye: 'Your character has lost an eye, as you agreed. A bow or a spell does a fifth less damage.',
+        scar: 'Your character carries a scar, as you agreed. People who look at you are told: ' + text
+      };
+      return { staff: 'Written down.', them: told[part] };
+    }
+    if (what === 'clear') {
+      rec.wounds = []; rec.ills = []; rec.crooked = {}; rec.cold = 0; rec.ground = 0;
+      write(actorId, rec);
+      redraw(actorId);
+      return { staff: 'Cleared. An agreed loss stays.', them: 'Staff cleared your wounds and sickness.' };
+    }
+    return { staff: 'That is not something /hurt knows. cut, bite, break arm, break leg, chill, food, ' +
+                    'fouled, fever, bitesick, agreed, unagree, clear.', them: '' };
+  }
+
+  // ------------------------------------------------------- the screen --
+
+  /*
+    WHAT YOU HAVE, ON THE LEFT EDGE. An updateOwner script, like the needs
+    bars, so it ships with the gamemode and needs no release. Edge triggered
+    on the lines, because updateOwner runs every frame. Nothing is drawn while
+    there is nothing to say. Left of the middle of the screen, because the
+    corners are taken: the game's notifications top left, the chat and the
+    needs bars bottom left, the voice mark top right.
+  */
+  function hudScript() {
+    var CSS = 'position:fixed;left:18px;top:40%;z-index:2147483500;' +
+              'pointer-events:none;font-family:Georgia,serif;font-size:20px;' +
+              'letter-spacing:.04em;color:#e0a98f;' +
+              'background:rgba(12,10,8,.62);border:2px solid rgba(0,0,0,.65);' +
+              'border-radius:10px;padding:9px 16px 11px;' +
+              'text-shadow:0 2px 4px rgba(0,0,0,.95)';
+    return [
+      '(function(){',
+      '  try {',
+      '    var v = ctx.value;',
+      '    var st = ctx.state;',
+      '    if (!st) { return; }',
+      '    var show = (v && v.show && v.show.length) ? v.show : [];',
+      '    var sig = "hurt:" + show.join("|");',
+      '    if (st.thornswoodHurtHud === sig) { return; }',
+      '    st.thornswoodHurtHud = sig;',
+      '    var html = "";',
+      '    for (var i = 0; i < show.length; i++) {',
+      '      html += "<div>" + String(show[i]).replace(/[<>&]/g, "") + "</div>";',
+      '    }',
+      '    var src = "(function(){try{" +',
+      '      "var d=document.getElementById(\'ts-hurt\');" +',
+      '      "if(!d){d=document.createElement(\'div\');d.id=\'ts-hurt\';" +',
+      '      "d.style.cssText=" + ' + JSON.stringify(JSON.stringify(CSS)) + ' + ";" +',
+      '      "document.body.appendChild(d);}" +',
+      '      "d.innerHTML=" + JSON.stringify(html) + ";" +',
+      '      "d.style.display=" + JSON.stringify(html ? "" : "none") + ";" +',
+      '      "}catch(e){}})();";',
+      '    try { ctx.sp.browser.executeJavaScript(src); } catch (e) { }',
+      '  } catch (e) { }',
+      '})();'
+    ].join('\n');
+  }
+
+  try {
+    mp.makeProperty(HURT_PROPERTY, {
+      // The owner draws it. A neighbour is told only the scar, on the look prompt.
+      isVisibleByOwner: true,
+      isVisibleByNeighbors: false,
+      updateOwner: hudScript(),
+      updateNeighbor: ''
+    });
+  } catch (e) {
+    // Already made by a previous load. The script cannot change until a restart, which a deploy is.
+  }
+
+  /*
+    A POTION DRUNK FROM THE PACK, heard for the potion of cure disease. This
+    is the engine's own record of the drink, not the client's /ate line: it
+    is raised only once the server has checked the pack holds the potion, and
+    it is the same message that takes it out (MpActor::OnEquip). So nobody
+    cures a disease by saying they drank something. It never refuses: the
+    engine takes the potion whatever this answers.
+  */
+  mp.onEatItem = guard('onEatItem', function (actorId, baseId) {
+    try { tell(actorId, swallowed(actorId, Number(baseId) || 0)); } catch (e) { hlog('the drink threw:', e); }
+  });
+
+  /*
+    EVERY SPELL CAST, heard for the healing spells above. The engine reads
+    nothing this family answers (the list over mp.onTakeItem), so it answers
+    nothing. A block that needs to hear casts as well adds its call here
+    rather than a second handler, which would replace this one.
+  */
+  mp['onPapyrusEvent:OnSpellCast'] = guard('onPapyrusEvent:OnSpellCast', function (casterId, spell) {
+    try { cast(casterId, spell); } catch (e) { hlog('the cast threw:', e); }
+    // Restoration strain (#1387), in the college block, on its own.
+    var college = g.__thornswoodCollege;
+    if (college && college.cast) {
+      try { college.cast(casterId, spell); } catch (e) { hlog('the strain threw:', e); }
+    }
+  });
+
+  if (g.__thornswoodHurtTimer) { try { clearInterval(g.__thornswoodHurtTimer); } catch (e) { } }
+  g.__thornswoodHurtTimer = setInterval(guard('hurtTick', tick), TICK_MS);
+  if (g.__thornswoodBleedTimer) { try { clearInterval(g.__thornswoodBleedTimer); } catch (e) { } }
+  g.__thornswoodBleedTimer = setInterval(guard('bleedTick', bleedTick), BLEED_MS);
+
+  g.__thornswoodHurt = {
+    HURT: HURT, DISEASE: DISEASE, EXPOSED: EXPOSED, HEALING: HEALING, TWO_HANDS: TWO_HANDS,
+    CURE_DISEASE: CURE_DISEASE, CAUGHT_MIN: CAUGHT_MIN, BAD_AFTER_MIN: BAD_AFTER_MIN,
+    CHILL_AFTER_MIN: CHILL_AFTER_MIN,
+    read: read, write: write, step: step, tick: tick, bleedTick: bleedTick, bleedRate: bleedRate,
+    stageOf: stageOf, lines: lines, chanceFor: chanceFor,
+    forNeeds: forNeeds, burntWear: burntWear, wound: wound, burning: burning,
+    healed: healed, cast: cast, hit: hit, swallowed: swallowed, rite: rite,
+    exposed: exposed, craftRefusal: craftRefusal, died: died, scarOf: scarOf, staff: staff
+  };
+
+  hlog('ready: wounds and the five diseases, every', TICK_MS / 1000, 'seconds, and the bleed every second');
+})();
+// ==== end thornswood injury and disease ====
 
 // ==== thornswood social: friends, parties, mutes and journals ====
 /*
@@ -46210,10 +54456,19 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       try { pos = mp.get(id, 'pos'); cell = String(mp.get(id, 'worldOrCellDesc') || ''); }
       catch (e) { continue; }
       if (!pos || !cell) { continue; }
-      at.push({ id: id, pos: pos, cell: cell, pid: profileOf(id), name: nameOfPerson(id) });
+      /*
+        And the scar they agreed to (#1383): injury.md, a line other people
+        are told when they look at you. The look prompt draws it.
+      */
+      var scar = '';
+      try { scar = (g.__thornswoodHurt && g.__thornswoodHurt.scarOf) ? g.__thornswoodHurt.scarOf(id) : ''; } catch (eScar) { scar = ''; }
+      at.push({ id: id, pos: pos, cell: cell, pid: profileOf(id), name: nameOfPerson(id), scar: scar });
     }
 
     var reach = SOCIAL.nearReach * SOCIAL.nearReach;
+    // Whether the look prompt offers "Let sleep here" (#1603). See sleepMark
+    // in the beds, in the property block.
+    var beds = g.__thornswoodBeds;
     for (var a = 0; a < at.length; a++) {
       var me = at[a];
       var s = read(me.id) || fresh();
@@ -46233,8 +54488,11 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
           f: s.friends[them.pid] ? 1 : 0,
           m: s.muted[them.pid] ? 1 : 0,
           h: (s.namesAll || (s.namesOff && s.namesOff[them.pid])) ? 1 : 0,
-          y: (party && party.members.indexOf(them.pid) !== -1) ? 1 : 0
+          y: (party && party.members.indexOf(them.pid) !== -1) ? 1 : 0,
+          s: (beds && beds.mark) ? beds.mark(me.pid, them.pid, me.cell) : 0
         };
+        // c, not s: s is the holder's sleep key (#1603).
+        if (them.scar) { w[them.id.toString(16)].c = them.scar; }
       }
       var sig = JSON.stringify(w) + (s.namesAll ? ':all' : '');
       if (nearWas[me.id] === sig) { continue; }
@@ -46363,14 +54621,16 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     In memory rather than on the character, because an offer that survived a
     restart would be a request from somebody who is not here any more.
   */
-  var offers = {};   // toProfileId -> { kind, from, fromName, at }
+  var offers = {};   // toProfileId -> { kind, from, fromName, at, about }
 
-  function offer(kind, fromActor, toActor) {
+  // about: what a book invite is into, for the P prompt (#1591).
+  function offer(kind, fromActor, toActor, about) {
     var fromPid = profileOf(fromActor);
     var toPid = profileOf(toActor);
     if (!fromPid || !toPid) { return 'That person is not here.'; }
     if (fromPid === toPid) { return 'That is you.'; }
-    offers[toPid] = { kind: kind, from: fromPid, fromName: nameOfPerson(fromActor), at: Date.now() };
+    offers[toPid] = { kind: kind, from: fromPid, fromName: nameOfPerson(fromActor), at: Date.now(),
+                      about: about ? String(about) : '' };
     return '';
   }
 
@@ -46864,7 +55124,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       together: partyNear(actorId),
       bonus: Math.round(SOCIAL.partyBonus * 100),
       namesAll: !!s.namesAll,
-      offer: offerNow ? { kind: offerNow.kind, from: offerNow.from, name: offerNow.fromName } : null,
+      offer: offerNow ? { kind: offerNow.kind, from: offerNow.from, name: offerNow.fromName,
+                          about: offerNow.about || '' } : null,
       journals: s.journals,
       shared: sharedWithMe(actorId),
       muted: s.muted,
@@ -47119,7 +55380,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var t = {
       a: aActor, b: bActor,
       offerA: [], offerB: [], goldA: 0, goldB: 0,
-      okA: false, okB: false, at: Date.now()
+      okA: false, okB: false, at: Date.now(),
+      // The company worker buying, when it is a sale out of Skyrim (#1393).
+      sale: 0
     };
     open[aActor] = t; open[bActor] = t;
     trades.push(t);
@@ -47346,6 +55609,60 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     return '';
   }
 
+  /*
+    A SALE OUT OF SKYRIM, #1393, docs/systems/trading-company.md. At a company
+    event somebody sells a thing out of Skyrim, and the company buys it
+    through a worker. Patrick, 4 Oct: no chat commands for anything people
+    do. So it is this panel: the two open an ordinary trade with the key, and
+    the worker presses Buy for the company. Then what the other person puts
+    up leaves the world instead of crossing, and the gold the worker puts up
+    is the price the two of them agree, split by the property block's
+    saleCuts (saleSwap). Pressing it again makes it an ordinary trade. Either
+    way both agreements are taken back, the same as any change to a pile.
+
+    Only a worker the company has taken on presses it: the property block's
+    inCompany, the Discord role an application leads to, or an admin testing
+    the chain.
+  */
+  function companyOf(actorId) {
+    var pr = g.__thornswoodProperty;
+    var pid = 0;
+    try { pid = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pid = 0; }
+    return !!(pid && pr && pr.inCompany && pr.inCompany(pid));
+  }
+
+  function sale(actorId) {
+    var t = tradeOf(actorId);
+    if (!t) { return 'You are not trading.'; }
+    if (t.sale === actorId) {
+      t.sale = 0;
+      unconfirm(t); push(t);
+      try { say(other(t, actorId), nameOf(actorId) + ' is not buying for the company now. It is an ordinary trade.'); }
+      catch (e) { }
+      return '';
+    }
+    if (t.sale) { return nameOf(t.sale) + ' is already buying for the company.'; }
+    if (!companyOf(actorId)) {
+      return 'Only somebody the Free Skyrim Trading Company has taken on buys for it. It is an application, in Discord.';
+    }
+    t.sale = actorId;
+    unconfirm(t); push(t);
+    try {
+      say(other(t, actorId), nameOf(actorId) + ' is buying for the Free Skyrim Trading Company. ' +
+          'What you put up leaves Skyrim and does not come back.');
+    } catch (e2) { }
+    return '';
+  }
+
+  /* The split of the price as the panel shows it to either side. */
+  function saleView(t, actorId) {
+    var pr = g.__thornswoodProperty;
+    var price = t.sale === t.a ? t.goldA : t.goldB;
+    var cuts = (pr && pr.saleCuts) ? pr.saleCuts(price) : { price: price, worker: 0, gone: 0, seller: price };
+    return { mine: t.sale === actorId, worker: nameOf(t.sale), price: cuts.price,
+             cut: cuts.worker, gone: cuts.gone, seller: cuts.seller };
+  }
+
   function confirm(actorId) {
     var t = tradeOf(actorId);
     if (!t) { return 'You are not trading.'; }
@@ -47374,6 +55691,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       unconfirm(t); push(t);
       return 'You have moved too far apart.';
     }
+    if (t.sale) { return saleSwap(t); }
     var GOLD = (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F;
 
     var sides = [
@@ -47426,6 +55744,125 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     tlog(nameOf(t.a), 'and', nameOf(t.b), 'traded:', whatA, 'for', whatB);
     close(t, '');
     return '';
+  }
+
+  /*
+    The company's swap (#1393). Everything is asked again here, the same as
+    swap: the worker still buys for the company, the worker's side is gold
+    and nothing else, the seller's side is things and no gold, and each
+    still holds what they put up. Then one write each (saleById): the things
+    out of the seller's pack and out of the world with the seller's share
+    in, and the price less the worker's own cut out of the worker's pack.
+    The 10% that leaves is in neither pack. Never half.
+  */
+  function saleSwap(t) {
+    var GOLD = (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F;
+    var pr = g.__thornswoodProperty;
+    var worker = t.sale;
+    var seller = other(t, worker);
+    var price = worker === t.a ? t.goldA : t.goldB;
+    var asked = seller === t.a ? t.goldA : t.goldB;
+    var things = sideOf(t, seller);
+    function refuse(why) { unconfirm(t); push(t); return why; }
+    if (!pr || !pr.saleCuts) { return refuse('That is not running on this server.'); }
+    if (!companyOf(worker)) { return refuse(nameOf(worker) + ' cannot buy for the company now.'); }
+    if (sideOf(t, worker).length) {
+      return refuse('The company pays in gold. ' + nameOf(worker) + ' takes their things off the table.');
+    }
+    if (asked > 0) { return refuse('Only the company pays in a sale. ' + nameOf(seller) + ' takes their gold off the table.'); }
+    if (!things.length) { return refuse(nameOf(seller) + ' has put up nothing to sell.'); }
+    if (!(price > 0)) { return refuse(nameOf(worker) + ' has put up no gold for it.'); }
+    if (price > holding(worker, GOLD)) { return refuse(nameOf(worker) + ' does not have that gold any more.'); }
+    for (var i = 0; i < things.length; i++) {
+      if (things[i].c > holding(seller, things[i].id)) {
+        return refuse(nameOf(seller) + ' does not have the ' + things[i].n + ' any more.');
+      }
+    }
+    var cuts = pr.saleCuts(price);
+    var cost = cuts.price - cuts.worker;
+    if (!saleById(seller, worker, things, cuts.seller, cost)) {
+      return refuse('Something went wrong moving it. Nothing was taken.');
+    }
+    var what = describe(things, 0);
+    var me = nameOf(worker), them = nameOf(seller);
+    try {
+      say(seller, 'Sold to the Free Skyrim Trading Company for ' + cuts.price + ' gold. ' + what +
+          ' left Skyrim. ' + (cuts.worker
+            ? 'You receive ' + cuts.seller + ': ' + cuts.worker + ' went to ' + me + ' for handling it, and ' +
+              cuts.gone + ' left the world.'
+            : 'Under 10 gold nothing is cut, and you receive the whole ' + cuts.price + '.'));
+      say(worker, 'Bought for the company at ' + cuts.price + ' gold. ' + what + ' left Skyrim. ' + (cuts.worker
+            ? 'It cost you ' + cost + ': your ' + cuts.worker + ' for handling it stays with you, ' + cuts.gone +
+              ' left the world, and ' + them + ' received ' + cuts.seller + '.'
+            : 'Under 10 gold nothing is cut: ' + them + ' received the whole ' + cuts.price + '.'));
+    } catch (e) { }
+    tlog(me, 'bought', them + '\'s', what, 'for the company at', cuts.price, 'gold:', cuts.seller, 'to the seller,',
+         cuts.worker, 'to the worker,', cuts.gone, 'destroyed, and the things left the world');
+    close(t, '');
+    return '';
+  }
+
+  /*
+    A pack's entries less [baseId, count] pairs, or null when they are not
+    all there. An entry that is only partly taken keeps everything else it
+    had.
+  */
+  function withoutPairs(entries, pairs) {
+    var out = entries.slice();
+    for (var i = 0; i < pairs.length; i++) {
+      var baseId = pairs[i][0], left = pairs[i][1];
+      for (var k = 0; k < out.length && left > 0; k++) {
+        if (!out[k] || out[k].baseId !== baseId) { continue; }
+        var had = out[k].count || 1;
+        var take = Math.min(left, had);
+        var rest = {};
+        for (var f in out[k]) { if (Object.prototype.hasOwnProperty.call(out[k], f)) { rest[f] = out[k][f]; } }
+        rest.count = had - take;
+        out[k] = rest;
+        left -= take;
+      }
+      if (left > 0) { return null; }
+    }
+    var keep = [];
+    for (var j = 0; j < out.length; j++) {
+      if (out[j] && (out[j].count || 0) > 0) { keep.push(out[j]); }
+    }
+    return keep;
+  }
+
+  /*
+    A company sale's two packs, one write each, or nothing at all (#1393).
+    The seller's: the things out, and out of the world, and their share in.
+    The worker's: the price less their own cut out. Gold in the seller's
+    pack goes up by less than the worker's goes down; the difference is the
+    10% that leaves the server.
+  */
+  function saleById(sellerActor, workerActor, things, share, cost) {
+    var GOLD = (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F;
+    var sellerInv, workerInv;
+    try {
+      sellerInv = mp.get(sellerActor, 'inventory') || { entries: [] };
+      workerInv = mp.get(workerActor, 'inventory') || { entries: [] };
+    } catch (e) { return false; }
+    var pairs = [];
+    for (var i = 0; i < things.length; i++) { pairs.push([things[i].id, things[i].c]); }
+    var gone = withoutPairs((sellerInv.entries || []).slice(), pairs);
+    var paid = withoutPairs((workerInv.entries || []).slice(), [[GOLD, cost]]);
+    if (!gone || !paid || !(share > 0) || !(cost >= share)) { return false; }
+    var landed = false;
+    for (var k = 0; k < gone.length; k++) {
+      if (gone[k] && gone[k].baseId === GOLD && !gone[k].worn) {
+        gone[k] = { baseId: GOLD, count: (gone[k].count || 1) + share };
+        landed = true;
+        break;
+      }
+    }
+    if (!landed) { gone.push({ baseId: GOLD, count: share }); }
+    try {
+      mp.set(sellerActor, 'inventory', { entries: gone });
+      mp.set(workerActor, 'inventory', { entries: paid });
+    } catch (e2) { return false; }
+    return true;
   }
 
   function describe(items, goldN) {
@@ -47501,6 +55938,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       theyAgreed: meA ? t.okB : t.okA,
       pack: carrying(actorId),
       heldGold: holding(actorId, (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F),
+      // A sale out of Skyrim (#1393): the split, and whether this side may
+      // press Buy for the company.
+      sale: t.sale ? saleView(t, actorId) : null,
+      canBuy: (!t.sale || t.sale === actorId) && companyOf(actorId),
       at: Date.now()
     };
   }
@@ -47576,7 +56017,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
   g.__thornswoodTrade = {
     TRADE: TRADE,
-    begin: begin, add: add, remove: remove, gold: gold,
+    begin: begin, add: add, remove: remove, gold: gold, sale: sale, saleById: saleById,
     confirm: confirm, cancel: cancel, tradeOf: tradeOf,
     carrying: carrying, labelOf: labelOf, within: within,
     view: view, push: push, refresh: refresh, tick: tick, swap: swap, moveById: moveById,
@@ -48905,6 +57346,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     /pk <person> <why>                    the character dies for good (#1010)
     /unpk <person or character> <why>     an admin undoes a PK made by mistake
     /note <person> <text>                 kept against them, for staff to read
+    /hurt <person> [what]                 a wound, a disease or an agreed loss on
+                                          them, for a scene or a yes given out of
+                                          character, or what they carry (#1383;
+                                          the injury and disease block says what)
 
   One character or the whole account, and PK, are Patrick's of 28 September
   (#1010). A PK is not a ban: the character can never be played or picked
@@ -48960,7 +57405,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
   var WORDS_STAFF = ['/kick', '/freeze', '/unfreeze', '/bring', '/goto',
                      '/silence', '/unsilence', '/warn', '/spawnat',
-                     '/ban', '/unban', '/note', '/banaccount', '/unbanaccount', '/pk', '/unpk'];
+                     '/ban', '/unban', '/note', '/banaccount', '/unbanaccount', '/pk', '/unpk',
+                     '/hurt'];
   var BAN_SWEEP_MS = 10000;        // how often online people are checked against bans
   var SITE_WAIT_MS = 8000;
   // Everybody's (or a playtester's) words that staff can also aim at a person.
@@ -49737,6 +58183,16 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
     // Everything below needs the person in the world.
     if (!them.actorId) { tell(pid, them.why); return true; }
+
+    if (word === '/hurt') {
+      var hurt = g.__thornswoodHurt;
+      if (!hurt || !hurt.staff) { tell(pid, 'Wounds and disease are not running on this server.'); return true; }
+      var hurtSaid = hurt.staff(them.actorId, them.rest || [], me);
+      tell(pid, them.name + ': ' + hurtSaid.staff);
+      if (hurtSaid.them) { tell(them.pid, hurtSaid.them); }
+      if ((them.rest || []).length) { record('hurt', pid, me, them.pid, them.name, reason, 0); }
+      return true;
+    }
 
     if (word === '/warn') {
       if (!reason) { tell(pid, 'Warn them about what? /warn ' + them.name + ' <what they did>.'); return true; }
@@ -51529,9 +59985,10 @@ try {
   docs/systems/quests.md. Supply is not this block. Scene gold is created
   with addItem. It is not taken from a trader purse.
 
-  The page does not name the one world reference a scarce place uses, or
-  the sack, shelf, chest, urn, cell, or hold a scene row names. Those stay
-  unbound. A rare vein stays shut until its one place is bound. Which gem
+  The rare mine is bound: RARE_PLACES below is the one building each rare
+  seam is, and every vein of that seam anywhere else stays shut. The page
+  does not name the place the other scarce rows use, or the sack, shelf,
+  chest, urn, cell, or hold a scene row names. Those stay unbound. Which gem
   a trader names, among the four on the miner page, is likewise not said.
 */
 (function () {
@@ -51546,6 +60003,32 @@ try {
     'Sapphire': 'gem',
     'Stalhrim': 'stalhrim',
     'Heart Stone': 'heartstone'
+  };
+  /*
+    THE ONE PLACE EACH RARE SEAM IS (#1380).
+
+    Patrick, 4 Oct: ebony is Raven Rock Mine, stalhrim Kolbjorn Barrow, heart
+    stone Coldcinder Cave, ruby White Ridge Sanctum, sapphire Highpoint Tower,
+    emerald Kolbjorn Barrow, amethyst Highpoint Tower. A place is the
+    building, keyed by its cell as game/data/mine-buildings.json keys it, so
+    every vein of that seam inside it is the place (thirteen ebony in Raven
+    Rock Mine) and the same seam in any other building or on open ground is
+    shut. The trader's scarce quest is the only way in. Once it is turned in
+    the place is shut to that person until the quest's cooldown ends, which
+    turnIn stamps below. No steward has any part in it.
+  */
+  var RARE_PLACES = {
+    ebony: { cell: '142fc:Dragonborn.esm' },
+    stalhrim: { cell: '142ee:Dragonborn.esm' },
+    heartstone: { cell: '3929e:Dragonborn.esm' },
+    gem: {
+      cells: {
+        Ruby: '3c7f5:Dragonborn.esm',
+        Sapphire: '184f0:Dragonborn.esm',
+        Emerald: '142ee:Dragonborn.esm',
+        Amethyst: '184f0:Dragonborn.esm'
+      }
+    }
   };
   var SCARCE = [
     { id: 'ebony', name: 'The ebony', who: 'Miner, master', classKey: 'miner', rank: 'master', ask: 4, holds: 12, hours: 24, scarce: true },
@@ -51666,12 +60149,10 @@ try {
       var open = held && held.open[id];
       if (!open) return 'This place is shut.';
       var place = places[id] || {};
-      if (row.gems) {
-        if (seam.name !== open.gem) return 'This place is shut.';
-        if (!place.refs || place.refs[open.gem] !== refrId) return 'This place is shut.';
-      } else if (place.ref !== refrId) {
-        return 'This place is shut.';
-      }
+      if (row.gems && seam.name !== open.gem) return 'This place is shut.';
+      var cell = row.gems ? (place.cells && place.cells[open.gem]) : place.cell;
+      var veinCell = deps.cellOf ? deps.cellOf(refrId) : '';
+      if (!cell || veinCell !== cell) return 'This place is shut.';
       if (open.drawn >= row.holds) return 'This place has nothing left until you turn the work in.';
       return null;
     }
@@ -51865,6 +60346,9 @@ try {
           } catch (e) { return ''; }
         },
         traderHold: function () { return ''; }
+      });
+      Object.keys(RARE_PLACES).forEach(function (id) {
+        globalThis.__thornswoodQuests.bindPlace(id, RARE_PLACES[id]);
       });
     } catch (e) {
       try { log('custom quests failed to start:', e); } catch (e2) {}
