@@ -288,12 +288,26 @@ function log() {
  * (HeldKeyRelease), so nothing stays held. thornswood-front.js measured the
  * same and gives the code path, in its note on typing over wantTyping.
  *
- * So with the wheel up only the page hears a key. The page used to close the
- * wheel on this letter, and one tap then opened the wheel and shut it again
- * before it was drawn; it only swallows the letter now. The branches of the
- * keys handler below that shut an open wheel on OPEN_KEY or CLOSE_KEY are not
- * reached while focus is up (#1852). This comment used to say the opposite,
- * that buttonEvent keeps arriving the whole time the wheel is up (#1675).
+ * So with the wheel up only the page hears a key, and the page closes it on
+ * this letter, on CLOSE_KEY's letter and on Escape by sending __close
+ * (#1852). The branches of the keys handler below that shut an open wheel on
+ * OPEN_KEY or CLOSE_KEY are reached only while the wheel is drawn without the
+ * keyboard, which is the front's two minute cap taking the claim back. This
+ * comment used to say the opposite, that buttonEvent keeps arriving the whole
+ * time the wheel is up (#1675).
+ *
+ * An earlier page closed the wheel on this letter too, and a log of
+ * 25 September has one tap opening the wheel and shutting it again before it
+ * was drawn. The client records/client-build.json names (fork a247ef27)
+ * cannot do that. ProcessKeyboardData compares every keyboard snapshot with
+ * the last one whoever has focus, and OnKeyStateChange hands the page a
+ * change only while the browser has focus. The snapshot is read in the same
+ * GetDeviceData call that hands the game the key going down (the game's
+ * buffer is read first and the snapshot right after it), or in an earlier
+ * call. So by the time this file hears the press and the wheel takes the
+ * keyboard, the snapshot already has the key down, or missed a tap that
+ * quick altogether, and the page hears at most the key coming up.
+ * tests/test-1852-wheel-keys.js plays that path through.
  */
 const LETTERS = {
   30: 'a', 48: 'b', 46: 'c', 32: 'd', 18: 'e', 33: 'f', 34: 'g', 35: 'h',
@@ -334,7 +348,8 @@ function pushWheel() {
      JSON.stringify(EMOTES) + ',' +
      JSON.stringify(slots) + ',' +
      JSON.stringify(LETTERS[OPEN_KEY] || '') + ',' +
-     JSON.stringify(LETTERS[STOP_KEY] || 'n') + ')');
+     JSON.stringify(LETTERS[STOP_KEY] || 'n') + ',' +
+     JSON.stringify(LETTERS[CLOSE_KEY] || '') + ')');
 }
 
 function saveSlots() {
@@ -697,6 +712,7 @@ sp.on('buttonEvent', guard('keys', (e) => {
   if (!open && gameIsBusy()) { return; }
 
   if (e.code === OPEN_KEY) {
+    // Open here means drawn without the keyboard: see the note over LETTERS.
     if (open) { setOpen(false); return; }
     if (gameIsBusy()) { return; }
     if (inCreationRoom()) {
