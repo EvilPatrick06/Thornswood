@@ -278,15 +278,22 @@ function log() {
  * The letter a scan code prints, so the page can swallow the key that opened
  * the wheel instead of typing it into whatever has focus.
  *
- * It used to close the wheel on that key as well, because the comment here
- * said this file stops hearing the keyboard once the wheel raises browser
- * focus. That was wrong. DInputHook feeds plugins from the keyboard snapshot
- * and only withholds the buffer from the game, so buttonEvent keeps arriving
- * the whole time the wheel is up. With both ends deciding, one tap opened the
- * wheel and shut it again before it was drawn.
+ * While the wheel is up it holds browser focus, and no key press reaches this
+ * file as a buttonEvent. DInputHook::GetDeviceData in the fork does read the
+ * keyboard and call ProcessKeyboardData whoever has focus, but that feeds
+ * OnKeyStateChange in the fork's main.cpp, which returns unless the browser
+ * has focus and then only injects the key into the page. buttonEvent comes
+ * from the game's own input events, and with focus up the game's buffer gets
+ * no key downs; since #898 it gets only the key up of a key it already held
+ * (HeldKeyRelease), so nothing stays held. thornswood-front.js measured the
+ * same and gives the code path, in its note on typing over wantTyping.
  *
- * Opening and closing is decided here now, in one place, by the end that knows
- * whether the wheel is already up.
+ * So with the wheel up only the page hears a key. The page used to close the
+ * wheel on this letter, and one tap then opened the wheel and shut it again
+ * before it was drawn; it only swallows the letter now. The branches of the
+ * keys handler below that shut an open wheel on OPEN_KEY or CLOSE_KEY are not
+ * reached while focus is up (#1852). This comment used to say the opposite,
+ * that buttonEvent keeps arriving the whole time the wheel is up (#1675).
  */
 const LETTERS = {
   30: 'a', 48: 'b', 46: 'c', 32: 'd', 18: 'e', 33: 'f', 34: 'g', 35: 'h',
@@ -470,9 +477,9 @@ function setOpen(v) {
  *     'Debug.sendAnimationEvent' can't be called in this context
  *
  * The keyboard shortcuts failed for the same reason by a longer road: opening
- * the wheel raises browser focus, DirectInput stops reaching the game, so
- * buttonEvent goes quiet and the page handles the digits instead, sending them
- * back down the same message path.
+ * the wheel raises browser focus, the game gets no key downs, so buttonEvent
+ * goes quiet and the page handles the digits instead, sending them back down
+ * the same message path. The note over LETTERS has the fork's code path.
  *
  * Parking the name here and playing it from the update handler puts the call
  * where the VM is. The wait is at most one frame.
