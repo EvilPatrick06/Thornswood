@@ -194,11 +194,28 @@ const CULTURE_KEEP = new Set([
   'Wolf Sword'
 ]);
 
+// The fishing poles here are Thornswood-Content.esp's own (#1379). Until
+// 5 October this named the fishing mod's three instead, which the first pass
+// kept before ours existed; they are in CUT_SINCE below.
 const GOODS_KEEP = new Set([
   'Woodcutter\'s Axe', 'Shovel', 'Pickaxe',
-  'Fishing Pole - Crude', 'Fishing Pole - Fine', 'Fishing Pole - Master',
+  'Crude Fishing Pole', 'Fine Fishing Pole', 'Master Fishing Pole', 'Fish Trap',
   'Drum', 'Flute', 'Lute', 'Key', 'Key Mold'
 ]);
+
+// CUT SINCE THE FIRST PASS. A row cut by a decision taken after the rules
+// sorted the table, by its recipe id, with the reason the cut file gives it.
+// On a table that is already cut the rules do not run (see the top), so this
+// is where a later cut is written: each one not yet in the cut file is added
+// to it. On a table with nothing cut these are cut before the rules run.
+const MOD_POLE = 'The fishing mod\'s pole. The fisher page plans Thornswood-Content.esp\'s three poles ' +
+  'and says the fishing mod\'s rows are not the plan; only ours fish (TOOLS in the gamemode). ' +
+  'Not found and not made (issue #1766).';
+const CUT_SINCE = {
+  '1f24f:FishingInSkyrim.esp': MOD_POLE,
+  '2180d:FishingInSkyrim.esp': MOD_POLE,
+  '1f252:FishingInSkyrim.esp': MOD_POLE + ' It also asked for dragon bone, which is cut.'
+};
 
 function plainWeapon(name, family) {
   const type = WEAPON_TYPE[family];
@@ -241,6 +258,10 @@ function record(row, disposition, why) {
   if (disposition === 'keep') { kept.push(item); }
   else { cuts.push(item); }
 }
+
+owned.forEach(function (row) {
+  if (CUT_SINCE[row._id]) { record(row, 'cut', CUT_SINCE[row._id]); }
+});
 
 owned.forEach(function (row) {
   if (row.fires === false) {
@@ -439,6 +460,35 @@ Object.keys(smeltByName).forEach(function (name) {
 
 const outCuts = ALREADY_CUT ? cutFile.items.slice() :
   cuts.filter(function (item) { return item.disposition !== 'keep' && item.disposition !== 'cook'; });
+
+// A later cut the file does not hold yet, on a table that is already cut.
+let cutSinceAdded = 0;
+if (ALREADY_CUT) {
+  const inFile = {};
+  outCuts.forEach(function (item) { inFile[item.id] = true; });
+  Object.keys(CUT_SINCE).forEach(function (id) {
+    if (inFile[id]) { return; }
+    const row = recipes.recipes[id];
+    if (!row) {
+      console.log('CUT_SINCE names ' + id + ', which the recipe table does not have, so it is not added');
+      return;
+    }
+    outCuts.push({
+      id: id,
+      name: clean(row.name || row.editorId || ''),
+      plugin: clean(row.plugin || ''),
+      half: clean(row.half || ''),
+      owner: clean(row.owner || ''),
+      family: clean(row.family || ''),
+      rank: clean(row.rank || ''),
+      fires: row.fires === false ? false : true,
+      disposition: 'cut',
+      why: CUT_SINCE[id]
+    });
+    cutSinceAdded++;
+    console.log('cut since the first pass, added: ' + id + ' ' + clean(row.name));
+  });
+}
 outCuts.sort(function (a, b) {
   if (a.disposition !== b.disposition) { return a.disposition < b.disposition ? -1 : 1; }
   if (a.why !== b.why) { return a.why < b.why ? -1 : 1; }
@@ -457,9 +507,9 @@ function countBy(list, key) {
 
 const byDisp = countBy(outCuts, 'disposition');
 const keptCraft = kept.filter(function (item) { return item.disposition === 'keep'; });
-// The rows the first pass left in the open book. That pass is the one the count
-// describes, so a table that is already cut keeps the number the file has.
-const keptCount = ALREADY_CUT ? cutFile.counts.kept : keptCraft.length;
+// The rows the first pass left in the open book, less any cut since. On a table
+// that is already cut that is the file's number, less what CUT_SINCE adds now.
+const keptCount = ALREADY_CUT ? cutFile.counts.kept - cutSinceAdded : keptCraft.length;
 
 let md = '';
 md += '# Cut items\n\n';
@@ -487,7 +537,8 @@ md += 'The name that stays is the plain one, such as Iron Sword. Cutlass, katana
 md += 'None of those shapes are standing company wares. A company event can bring one named shape back for that event, and then it leaves again.\n\n';
 md += 'One set per culture. Bosmer keeps the plain set, not the engraved or the reinforced. Stormcloak keeps the plain cuirass and helmet. Forsworn keeps one set, a sword and an axe. Dawnguard keeps one light set and one heavy set. Tribunal keeps the black heavy set and the black light set. Wolf keeps the wolf set and the Wolf Sword. The other colors and the officer and heroic variants are cut.\n\n';
 md += 'Named uniques, Chillrend and Dawnbreaker and the rest, are cut. They are not found either. A piece named for a Daedric prince is cut with the Daedric.\n\n';
-md += 'The kiln stays: poor charcoal, the tool handle, charcoal, briquette, and coke. The woodcutter\'s axe, the shovel, the fishing poles, and the drum, flute and lute stay.\n\n';
+md += 'The kiln stays: poor charcoal, the tool handle, charcoal, briquette, and coke. The woodcutter\'s axe, the shovel, Thornswood\'s three fishing poles and the fish trap, and the drum, flute and lute stay. ';
+md += 'The fishing mod\'s three poles are cut: the [fisher](classes/fisher.md) page plans our own, and the mod\'s master pole asked for dragon bone.\n\n';
 md += 'Dragonbone, dragonscale, dragonplate, dragonsteel, Alduin scale, Daedric, and Aetherium are cut, including the ingots.\n\n';
 md += 'Glass, ebony, and stalhrim stay craftable. They are the scarce metals. Stalhrim keeps both the heavy set and the light set.\n\n';
 md += 'Cloaks and capes stay, all of them. A second plugin row of the same cloak is a duplicate and is cut. Clothing, robes, hats, shoes, gloves and aprons stay with the tailor. They are not extra armour. That includes the five colors of Tribunal unarmored clothes. Those are garments, not a second suit of plate.\n\n';

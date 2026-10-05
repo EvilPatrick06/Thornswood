@@ -2,10 +2,10 @@
   "builtFrom": "game/data/recipes.json",
   "note": "References held out of the open craft book. recipes.json is not edited by the script that writes this file.",
   "counts": {
-    "cut": 3318,
+    "cut": 3321,
     "embassy": 15,
     "thalmor": 9,
-    "kept": 596
+    "kept": 593
   },
   "rieklingKept": [
     "Riekling Fur Armour",
@@ -39834,6 +39834,42 @@
       "fires": false,
       "disposition": "cut",
       "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
+    },
+    {
+      "id": "1f24f:FishingInSkyrim.esp",
+      "name": "Fishing Pole - Crude",
+      "plugin": "FishingInSkyrim.esp",
+      "half": "Woodwright",
+      "owner": "Woodworker",
+      "family": "Other goods",
+      "rank": "novice",
+      "fires": true,
+      "disposition": "cut",
+      "why": "The fishing mod's pole. The fisher page plans Thornswood-Content.esp's three poles and says the fishing mod's rows are not the plan; only ours fish (TOOLS in the gamemode). Not found and not made (issue #1766)."
+    },
+    {
+      "id": "2180d:FishingInSkyrim.esp",
+      "name": "Fishing Pole - Fine",
+      "plugin": "FishingInSkyrim.esp",
+      "half": "Woodwright",
+      "owner": "Woodworker",
+      "family": "Other goods",
+      "rank": "expert",
+      "fires": true,
+      "disposition": "cut",
+      "why": "The fishing mod's pole. The fisher page plans Thornswood-Content.esp's three poles and says the fishing mod's rows are not the plan; only ours fish (TOOLS in the gamemode). Not found and not made (issue #1766)."
+    },
+    {
+      "id": "1f252:FishingInSkyrim.esp",
+      "name": "Fishing Pole - Master",
+      "plugin": "FishingInSkyrim.esp",
+      "half": "Woodwright",
+      "owner": "Woodworker",
+      "family": "Other goods",
+      "rank": "master",
+      "fires": true,
+      "disposition": "cut",
+      "why": "The fishing mod's pole. The fisher page plans Thornswood-Content.esp's three poles and says the fishing mod's rows are not the plan; only ours fish (TOOLS in the gamemode). Not found and not made (issue #1766). It also asked for dragon bone, which is cut."
     },
     {
       "id": "dc9f5:Skyrim.esm",

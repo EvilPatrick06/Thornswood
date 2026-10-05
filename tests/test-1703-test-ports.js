@@ -35,6 +35,17 @@
 //      else holds and takes one its site does hold;
 //   6. three copies of test-staff-bans.js started at the same moment all pass.
 //
+// #1755, the same for the five PowerShell harnesses that start the site
+// (test-feed-store, test-record-sync, test-release-baseline, test-scrub-feed,
+// test-site-assets). Each read the child's output away with ReadToEndAsync()
+// and polled the port. This also checks:
+//   7. every .ps1 harness that starts server.js has Wait-OwnLine, waits on the
+//      site's own line with it, and neither polls the port nor drains the
+//      site's output before that line; the GitHub stand-in and the game
+//      server stand-in say their own line and are waited on the same way;
+//   8. Wait-OwnLine, lifted out of each and run in pwsh, refuses a port
+//      somebody else holds and takes one its site does hold.
+//
 // HARNESS_ROOT points it at another copy of the repository, which is how it
 // was shown to fail on the harnesses before the change.
 //
@@ -155,6 +166,42 @@ for (const f of TWELVE) {
       /await listening\(\w+, \w+\)/.test(text[f]));
 }
 
+// ------------------------------------------ the PowerShell harnesses (#1755)
+const psFiles = fs.readdirSync(path.join(REPO_DIR, 'tests')).filter((n) => /^test-.*\.ps1$/.test(n)).sort().map((n) => 'tests/' + n);
+const psText = {};
+for (const f of psFiles) { psText[f] = read(path.join(REPO_DIR, f)).replace(/^\uFEFF/, ''); }
+const psSites = psFiles.filter((f) => /THORNSWOOD_DOCS_PORT/.test(psText[f]));
+const FIVE = ['tests/test-feed-store.ps1', 'tests/test-record-sync.ps1', 'tests/test-release-baseline.ps1',
+  'tests/test-scrub-feed.ps1', 'tests/test-site-assets.ps1'];
+console.log('\nthe PowerShell harnesses that start the site (' + psSites.length + '):');
+yes('they are the five #1755 found', psSites.length === FIVE.length && FIVE.every((f) => psSites.indexOf(f) >= 0));
+// The function, from its line to the brace that closes it at the margin.
+function psLift(src) {
+  const m = /^function Wait-OwnLine\([\s\S]*?\n\}\n/m.exec(src);
+  return m ? m[0] : null;
+}
+const psWaits = {};
+for (const f of psSites) {
+  const fn = psLift(psText[f]);
+  psWaits[f] = fn;
+  const rest = fn ? psText[f].replace(fn, '') : psText[f];
+  yes(f + ' has Wait-OwnLine and waits on the site\'s own line with it',
+      !!fn && /Wait-OwnLine \$\w+ \$[\w:]+(\[\$\w+\.Id\])? '\[thornswood-docs\]' \$\w+ 'the site'/.test(rest));
+  yes(f + ' neither polls the port nor drains the site\'s output before its line',
+      !/function Up\(/.test(rest) && !/for \(\$i = 0; \$i -lt 100/.test(rest) && rest.indexOf('StandardOutput.ReadToEndAsync()') < 0);
+}
+yes('the five carry the same Wait-OwnLine', psSites.every((f) => psWaits[f] && psWaits[f] === psWaits[psSites[0]]));
+{
+  const sa = psText['tests/test-site-assets.ps1'] || '';
+  yes('test-site-assets.ps1: the GitHub stand-in says its own line, and is waited on',
+      /\.listen\(port, '127\.0\.0\.1', \(\) => console\.log\('\[github\] listening on 127\.0\.0\.1:' \+ port\)\)/.test(sa) &&
+      /Wait-OwnLine \$ghProc \$script:errOf\[\$ghProc\.Id\] '\[github\]' \$ghPort/.test(sa));
+  const rs = psText['tests/test-record-sync.ps1'] || '';
+  yes('test-record-sync.ps1: the game server stand-in says its own line, and is waited on',
+      /console\.log\('\[game\] listening on 127\.0\.0\.1:\$gamePort'\)/.test(rs) &&
+      /Wait-OwnLine \$gp \$gpErr '\[game\]' \$gamePort/.test(rs));
+}
+
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-1703-'));
 for (const n of ['voice-server.js', 'headlines.js']) {
   fs.copyFileSync(path.join(REPO_DIR, 'voice', n), path.join(scratch, n));
@@ -234,6 +281,62 @@ function runHarness(rel) {
         said.indexOf('something else already holds port ' + held) === 0);
   }
   other.close();
+
+  // The same for each PowerShell harness's Wait-OwnLine, run in pwsh.
+  const pwsh = await new Promise((ok) => {
+    const c = spawn('pwsh', ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.Major']);
+    c.on('error', () => ok(false)); c.on('exit', (code) => ok(code === 0));
+  });
+  yes('pwsh is on this machine, so the PowerShell waits can be run', pwsh);
+  function psWait(f, port) {
+    const driver = path.join(scratch, 'wait-' + path.basename(f, '.ps1') + '.ps1');
+    fs.writeFileSync(driver, psWaits[f] + [
+      '$port = [int]$env:WAIT_PORT',
+      '$psi = New-Object Diagnostics.ProcessStartInfo',
+      '$psi.FileName = $env:WAIT_NODE; $psi.Arguments = \'"server.js"\'; $psi.WorkingDirectory = $env:WAIT_SITE',
+      '$psi.UseShellExecute = $false; $psi.CreateNoWindow = $true; $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true',
+      '$psi.EnvironmentVariables[\'THORNSWOOD_DOCS_PORT\'] = [string]$port',
+      '$psi.EnvironmentVariables[\'THORNSWOOD_DOCS_LOCAL\'] = \'1\'',
+      '$p = [Diagnostics.Process]::Start($psi); $e = $p.StandardError.ReadToEndAsync()',
+      '$why = Wait-OwnLine $p $e \'[thornswood-docs]\' $port \'the site\'',
+      'Write-Output (\'WHY:\' + $why)',
+      'if (-not $why) {',
+      '  try { $r = [Net.HttpWebRequest]::Create("http://127.0.0.1:$port/api/public").GetResponse(); $b = (New-Object IO.StreamReader($r.GetResponseStream())).ReadToEnd(); Write-Output (\'STATUS:\' + [int]$r.StatusCode + \' \' + $b.Contains(\'not this run\')); $r.Close() }',
+      '  catch { Write-Output (\'STATUS:0 \' + $_.Exception.Message) }',
+      '}',
+      'if (-not $p.HasExited) { $p.Kill() }',
+      ''].join('\n'));
+    return new Promise((ok) => {
+      const c = spawn('pwsh', ['-NoProfile', '-File', driver], {
+        env: Object.assign({}, process.env, { WAIT_PORT: String(port), WAIT_NODE: process.execPath, WAIT_SITE: siteDir }) });
+      let out = '';
+      c.stdout.on('data', (d) => { out += d; }); c.stderr.on('data', (d) => { out += d; });
+      c.on('exit', () => ok(out));
+    });
+  }
+  if (pwsh) {
+    const psOther = http.createServer((q, r) => { r.writeHead(200); r.end('not this run'); });
+    await new Promise((r) => psOther.listen(0, '127.0.0.1', r));
+    const psHeld = psOther.address().port;
+    for (const f of psSites) {
+      if (!psWaits[f]) { continue; }
+      const out = await psWait(f, psHeld);
+      const why = ((/WHY:(.*)/.exec(out) || [])[1] || out.trim().split(/\r?\n/).pop() || '').trim();
+      yes(f + ': with another server on its port, Wait-OwnLine fails and says so ("' + why + '")',
+          why.indexOf('something else already holds port ' + psHeld) === 0);
+    }
+    psOther.close();
+    const firstPs = psSites.filter((f) => !!psWaits[f])[0];
+    if (firstPs) {
+      const port = await new Promise((ok) => {
+        const s = net.createServer();
+        s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => ok(p)); });
+      });
+      const out = await psWait(firstPs, port);
+      yes('on a port the site holds, Wait-OwnLine ends and the site answers there (' + out.trim().split(/\r?\n/).join(' | ') + ')',
+          /WHY:\s*(\r?\n|$)/.test(out) && /STATUS:200 False/.test(out));
+    }
+  }
 
   // A site on its own port: the wait ends, and what answers is that site.
   const firstSite = TWELVE.filter((f) => !!siteWaits[f])[0];

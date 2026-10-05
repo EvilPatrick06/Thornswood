@@ -180,9 +180,11 @@ try {
     # PowerShell scripts rather than .cmd files: a .cmd runs through cmd.exe,
     # which splits an unquoted argument at an ampersand, and a temp folder can
     # have one in its path. The real ssh and scp are programs and take it whole.
+    # Each answers as the box does when all is well: the installer's last line,
+    # and the dev door script's (#1336, which a dev publish now stops without).
     foreach ($n in 'ssh', 'scp') {
         [IO.File]::WriteAllText((Join-Path $bin ($n + '.ps1')),
-            "[IO.File]::AppendAllText(`$env:TS_PUB_CALLS, ('$n ' + (`$args -join ' ') + [Environment]::NewLine))`r`n'INSTALL OK'`r`nexit 0`r`n")
+            "[IO.File]::AppendAllText(`$env:TS_PUB_CALLS, ('$n ' + (`$args -join ' ') + [Environment]::NewLine))`r`n'INSTALL OK'`r`n'DOOR CARRIED'`r`nexit 0`r`n")
     }
     $env:PATH = $bin + ';' + $oldPath
     $env:TS_PUB_CALLS = $log

@@ -88,6 +88,40 @@ function Put([string]$path, [string]$text) {
 }
 function Read-Json([string]$path) { return (([IO.File]::ReadAllText($path)) -replace '^﻿', '') | ConvertFrom-Json }
 function Free-Port { $l = New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback, 0); $l.Start(); $p = $l.LocalEndpoint.Port; $l.Stop(); return $p }
+# The port came from the system and was let go, so another run beside this one
+# can take it before the child binds it, the fault #1727 fixed in the .js
+# harnesses (#1755). Nothing asks the port anything until the child itself has
+# said on its output that it is listening there. A child that closes its output
+# first has stopped, and EADDRINUSE on its errors means something else holds
+# the port. $err is the task already draining the child's errors. Answers ''
+# once the line has come, otherwise why it did not.
+function Wait-OwnLine($proc, $err, [string]$mark, [int]$port, [string]$what) {
+    $deadline = [DateTime]::UtcNow.AddSeconds(20)
+    $seen = New-Object 'System.Collections.Generic.List[string]'
+    while ($true) {
+        $left = [int][Math]::Max(0, ($deadline - [DateTime]::UtcNow).TotalMilliseconds)
+        $read = $proc.StandardOutput.ReadLineAsync()
+        if (-not $read.Wait($left)) { return ('{0} did not say it was listening on port {1} within 20 seconds' -f $what, $port) }
+        $got = $read.Result
+        if ($null -eq $got) {
+            [void]$proc.WaitForExit(5000)
+            $said = ''
+            if ($err.Wait(5000)) { $said = ([string]$err.Result).Trim() }
+            $code = '?'
+            if ($proc.HasExited) { $code = $proc.ExitCode }
+            if ($said -match 'EADDRINUSE') {
+                return ('something else already holds port {0}, so {1} stopped (exit {2}) before it was listening' -f $port, $what, $code)
+            }
+            return ('{0} stopped (exit {1}) before it was listening: {2} {3}' -f $what, $code, ($seen -join ' '), $said)
+        }
+        $seen.Add($got)
+        if ($got.StartsWith($mark + ' listening on ') -and $got.EndsWith(':' + $port)) {
+            # Drained from here on, so a chatty child never blocks on a full pipe.
+            $null = $proc.StandardOutput.ReadToEndAsync()
+            return ''
+        }
+    }
+}
 
 $node = Get-Command node -ErrorAction SilentlyContinue
 Yes 'node is on PATH, for the copy of the site and the stand-in game server' ($null -ne $node)
@@ -168,7 +202,7 @@ $psi.UseShellExecute = $false; $psi.CreateNoWindow = $true; $psi.RedirectStandar
 $psi.EnvironmentVariables['THORNSWOOD_DOCS_PORT'] = [string]$sitePort
 $psi.EnvironmentVariables['THORNSWOOD_DOCS_LOCAL'] = '1'
 $psi.EnvironmentVariables['THORNSWOOD_CHAT_DIR'] = (Join-Path $site 'chat')
-$sp = [Diagnostics.Process]::Start($psi); $null = $sp.StandardOutput.ReadToEndAsync(); $null = $sp.StandardError.ReadToEndAsync()
+$sp = [Diagnostics.Process]::Start($psi); $spErr = $sp.StandardError.ReadToEndAsync()
 $script:procs += $sp
 $siteUrl = "http://127.0.0.1:$sitePort"
 $at = "$siteUrl/feed/assets/"
@@ -176,19 +210,19 @@ $at = "$siteUrl/feed/assets/"
 $gamePort = Free-Port
 $gameJs = Join-Path $T 'game-server.js'
 Put $gameJs ("require('http').createServer(function (q, s) { s.setHeader('Content-Type', 'application/json'); " +
-             "s.end(JSON.stringify({ mods: [{ filename: 'ours.esp', size: 1, crc32: 1 }] })); }).listen($gamePort, '127.0.0.1');")
+             "s.end(JSON.stringify({ mods: [{ filename: 'ours.esp', size: 1, crc32: 1 }] })); })" +
+             ".listen($gamePort, '127.0.0.1', function () { console.log('[game] listening on 127.0.0.1:$gamePort'); });")
 $gpsi = New-Object Diagnostics.ProcessStartInfo
 $gpsi.FileName = $node.Source; $gpsi.Arguments = '"' + $gameJs + '"'
 $gpsi.UseShellExecute = $false; $gpsi.CreateNoWindow = $true; $gpsi.RedirectStandardOutput = $true; $gpsi.RedirectStandardError = $true
-$gp = [Diagnostics.Process]::Start($gpsi); $null = $gp.StandardOutput.ReadToEndAsync(); $null = $gp.StandardError.ReadToEndAsync()
+$gp = [Diagnostics.Process]::Start($gpsi); $gpErr = $gp.StandardError.ReadToEndAsync()
 $script:procs += $gp
-$up = $false
-for ($i = 0; $i -lt 100 -and -not $up; $i++) {
-    try { $q = [Net.HttpWebRequest]::Create("$siteUrl/feed/version.json").GetResponse(); $q.Close(); $up = $true }
-    catch [Net.WebException] { if ($_.Exception.Response) { $up = $true } else { Start-Sleep -Milliseconds 100 } }
-}
-Yes 'a copy of site\server.js serves the stand-in site' $up
-if (-not $up) { Done }
+$why = Wait-OwnLine $sp $spErr '[thornswood-docs]' $sitePort 'the site'
+Yes 'a copy of site\server.js serves the stand-in site' ($why -eq '')
+if ($why) { Write-Host "      $why"; Done }
+$why = Wait-OwnLine $gp $gpErr '[game]' $gamePort 'the game server stand-in'
+Yes 'and the game server stand-in is listening' ($why -eq '')
+if ($why) { Write-Host "      $why"; Done }
 
 # ---- the build and the publisher ----------------------------------------------
 $fake = Join-Path $T 'repo'

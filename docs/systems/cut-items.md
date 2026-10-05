@@ -14,7 +14,7 @@ An item in this file is not found in the world and not made at a public bench. T
 | embassy | Not found in Skyrim. The embassy roll may craft it. |
 | thalmor | Not found. Someone on the Thalmor remnant roll may craft it. |
 
-Counts in this file: cut 3318, embassy 15, thalmor 9. Rows this pass left in the open book, or on a lock that is not a cut: 596.
+Counts in this file: cut 3321, embassy 15, thalmor 9. Rows this pass left in the open book, or on a lock that is not a cut: 593.
 
 The rules below sorted the recipe table once, before anything was cut. The recipe build (`scripts/dev/Build-RecipeTable.ps1`) reads [cut-items.json](cut-items.json), so the table it writes is already cut, and `scripts/dev/Write-CutItems.js` run on that table writes this page from the list it has instead of sorting the table again.
 
@@ -28,7 +28,7 @@ One set per culture. Bosmer keeps the plain set, not the engraved or the reinfor
 
 Named uniques, Chillrend and Dawnbreaker and the rest, are cut. They are not found either. A piece named for a Daedric prince is cut with the Daedric.
 
-The kiln stays: poor charcoal, the tool handle, charcoal, briquette, and coke. The woodcutter's axe, the shovel, the fishing poles, and the drum, flute and lute stay.
+The kiln stays: poor charcoal, the tool handle, charcoal, briquette, and coke. The woodcutter's axe, the shovel, Thornswood's three fishing poles and the fish trap, and the drum, flute and lute stay. The fishing mod's three poles are cut: the [fisher](classes/fisher.md) page plans our own, and the mod's master pole asked for dragon bone.
 
 Dragonbone, dragonscale, dragonplate, dragonsteel, Alduin scale, Daedric, and Aetherium are cut, including the ingots.
 
@@ -112,7 +112,7 @@ Not found. A person on the remnant roll may make them. Wearing them is still the
 
 Not found and not made. Held here so the reference can come back.
 
-3318 references.
+3321 references.
 
 | Item | Id | Half | Why |
 | --- | --- | --- | --- |
@@ -3434,4 +3434,7 @@ Not found and not made. Held here so the reference can come back.
 | Yokudan Shotel | `815:YokuWeapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Zahkriisos | `250e6:Dragonborn.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Zephyr | `f37e:Dawnguard.esm` | Woodwright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Fishing Pole - Crude | `1f24f:FishingInSkyrim.esp` | Woodwright | The fishing mod's pole. The fisher page plans Thornswood-Content.esp's three poles and says the fishing mod's rows are not the plan; only ours fish (TOOLS in the gamemode). Not found and not made (issue #1766). |
+| Fishing Pole - Fine | `2180d:FishingInSkyrim.esp` | Woodwright | The fishing mod's pole. The fisher page plans Thornswood-Content.esp's three poles and says the fishing mod's rows are not the plan; only ours fish (TOOLS in the gamemode). Not found and not made (issue #1766). |
+| Fishing Pole - Master | `1f252:FishingInSkyrim.esp` | Woodwright | The fishing mod's pole. The fisher page plans Thornswood-Content.esp's three poles and says the fishing mod's rows are not the plan; only ours fish (TOOLS in the gamemode). Not found and not made (issue #1766). It also asked for dragon bone, which is cut. |
 

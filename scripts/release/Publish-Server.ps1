@@ -502,6 +502,15 @@ Invoke-Installer $instArgs
   in /dev, so a rotated key still reaches dev and the list stays the dev one.
   allowed.json is copied only when dev has none, so the Owner has commands
   on a fresh dev root until its door fetches its own. Nothing else is touched.
+
+  NOTHING TO CARRY STOPS THE PUBLISH (#1336). A live root with no private
+  folder, no door.json, one that does not read, or one without the address,
+  the key or the join pass key used to be a line in green and a publish that
+  went on to say it was done, with the dev door still on whatever key it had
+  before the live one was rotated. Now the dev door is left as it was, the
+  script says which of those it was and ends DOOR NOT CARRIED, and the
+  publish stops there with exit 1. The dev server it installed is up; its
+  door is what was not done. Only names are said, never a value.
 #>
 if ($IsDev) {
     Head 'The roster'
@@ -512,37 +521,50 @@ if ($IsDev) {
 $ProgressPreference = 'SilentlyContinue'
 $live = 'C:\Thornswood-Server\private'
 $dev  = '@@DEVROOT@@\private'
-if (-not (Test-Path -LiteralPath $live)) {
-    'the live server has no private folder, so there is no roster to copy'
+# What the dev door needs from live, each named when it is not there, and
+# nothing on dev touched then (#1336). Names only: no value is printed.
+$liveDoor = Join-Path $live 'door.json'
+$d = $null
+$why = ''
+if (-not (Test-Path -LiteralPath $live)) { $why = 'the live server has no private folder' }
+elseif (-not (Test-Path -LiteralPath $liveDoor)) { $why = 'the live server has no door.json' }
+else {
+    try { $d = Get-Content -LiteralPath $liveDoor -Raw | ConvertFrom-Json } catch { $why = 'the live door.json could not be read' }
+    if (-not $why -and $null -eq $d) { $why = 'the live door.json is empty' }
+    if (-not $why) {
+        $lack = @()
+        foreach ($k in 'site', 'key', 'passKey') { if (-not [string]$d.$k) { $lack += $k } }
+        if ($lack.Count) { $why = 'the live door.json has no ' + ($lack -join ' and no ') }
+    }
+}
+if ($why) {
+    $why + ', so the dev door was left as it was'
+    'DOOR NOT CARRIED'
 } else {
     New-Item -ItemType Directory -Path $dev -Force | Out-Null
-    $liveDoor = Join-Path $live 'door.json'
-    if (Test-Path -LiteralPath $liveDoor) {
-        try {
-            $d = Get-Content -LiteralPath $liveDoor -Raw | ConvertFrom-Json
-            $site = ([string]$d.site).TrimEnd('/')
-            if ($site -and $site -notmatch '/dev$') { $site = $site + '/dev' }
-            $d | Add-Member -NotePropertyName site -NotePropertyValue $site -Force
-            [IO.File]::WriteAllText((Join-Path $dev 'door.json'), ($d | ConvertTo-Json),
-                (New-Object Text.UTF8Encoding($false)))
-            "dev door.json has the live key and asks $site/api/allowed"
-        } catch {
-            'the live door.json could not be read, so the dev one was left as it was'
-        }
-    } else {
-        'the live server has no door.json, so the dev one was left as it was'
-    }
+    $site = ([string]$d.site).TrimEnd('/')
+    if ($site -notmatch '/dev$') { $site = $site + '/dev' }
+    $d | Add-Member -NotePropertyName site -NotePropertyValue $site -Force
+    [IO.File]::WriteAllText((Join-Path $dev 'door.json'), ($d | ConvertTo-Json),
+        (New-Object Text.UTF8Encoding($false)))
+    "dev door.json has the live key and join pass key and asks $site/api/allowed"
     $devList = Join-Path $dev 'allowed.json'
     if (-not (Test-Path -LiteralPath $devList) -and (Test-Path -LiteralPath (Join-Path $live 'allowed.json'))) {
         Copy-Item -LiteralPath (Join-Path $live 'allowed.json') -Destination $devList -Force
         'dev had no allowed.json, so it starts from the live one until its door fetches the dev list'
     }
+    'DOOR CARRIED'
 }
 '@
     $seed = $seed.Replace('@@DEVROOT@@', $VpsRoot.TrimEnd('\'))
     $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($seed))
-    $out = Invoke-ThornswoodNative { & ssh @ssh $target "powershell -NoProfile -EncodedCommand $enc" }
-    foreach ($line in @($out)) { Say "  $line" 'Green' }
+    $out = @(Invoke-ThornswoodNative { & ssh @ssh $target "powershell -NoProfile -EncodedCommand $enc" } | ForEach-Object { "$_".Trim() })
+    $carried = $out -contains 'DOOR CARRIED'
+    foreach ($line in $out) { Say "  $line" $(if ($carried) { 'Green' } else { 'Red' }) }
+    if (-not $carried) {
+        Die ("the dev server is installed and answering, but its door was not given the live server's keys, so a rotated key does not reach it. " +
+             "The line above says what was missing on live. Put it right there (.\scripts\ops\Set-Door.ps1 -Connect writes the live door.json), then publish to dev again.")
+    }
 }
 
 # ---------------------------------------------------------------- verify -----
