@@ -300,7 +300,7 @@ if (missing.length === 0 && fees && seeding && PASSAGES) {
     w.move(ALICE, TAMRIEL, WHITERUN);
 
     said = s.say(ALICE, '/letter');
-    yes('P2 a letter with no name is refused', /Say who it is for/.test(said) && w.gold(ALICE) === 200);
+    yes('P2 a letter with no name is refused', /Say who the letter is for/.test(said) && w.gold(ALICE) === 200);
     said = s.say(ALICE, '/letter Lydia');
     yes('P2 and one with no words', /Say what the letter says/.test(said) && w.gold(ALICE) === 200);
     said = s.say(ALICE, '/letter Lydia ' + 'x'.repeat(301));
@@ -365,7 +365,8 @@ if (missing.length === 0 && fees && seeding && PASSAGES) {
     w.move(BOB, TAMRIEL, [WHITERUN[0] + 300, WHITERUN[1], WHITERUN[2]]);
     w.move(LYDIA, TAMRIEL, [WHITERUN[0] + 1200, WHITERUN[1], WHITERUN[2]]);
     w.move(CYRUS, TAMRIEL, [WHITERUN[0] + 400, WHITERUN[1], WHITERUN[2]]);
-    yes('D2 /deliver with nobody named asks who', /Say who you are handing it to/.test(s.say(BOB, '/deliver')));
+    yes('D2 /deliver with nobody named points at the look prompt',
+        /Look at the person the letter is for, and use the key the prompt shows/.test(s.say(BOB, '/deliver')));
     said = s.say(BOB, '/deliver Cyrus');
     yes('D3 a wrong person is refused, and the letter stays with the courier',
         /That is Cyrus. What you carry is for Lydia/.test(said) && !s.notices().whiterun[0].down &&
@@ -463,8 +464,9 @@ if (missing.length === 0 && fees && seeding && PASSAGES) {
     const m = new RegExp('const ' + name + ' = \\[([\\s\\S]*?)\\];').exec(gm);
     return m ? m[1] : '';
   }
-  yes('the server answers /letter and /deliver, and /help names them',
-      /'\/letter', '\/deliver'/.test(list('WORDS')) && list('PLAYER_WORDS').indexOf("'/letter', '/deliver'") !== -1);
+  yes('the server answers /letter and /deliver, which the board panel and the look prompt send, and no help names them (#1595)',
+      /'\/letter', '\/deliver'/.test(list('WORDS')) && list('PLAYER_WORDS').indexOf("'/letter'") === -1 &&
+      list('PLAYER_WORDS').indexOf("'/deliver'") === -1);
   yes('the chat hands both to the property block with the other board words',
       /word === '\/letter' \|\| word === '\/deliver' \|\|\s*word === '\/dropjob' \|\| word === '\/unpin'\) \{/.test(gm));
   yes('the property block answers both',
