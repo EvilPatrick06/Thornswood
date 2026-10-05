@@ -46,8 +46,23 @@ jobs:
           # A hit names the file, the line and the rule and never the value,
           # because anybody on the repository can read this log. A known
           # non-secret goes in scripts\dev\Check-Secrets.allow.txt with its reason.
-          .\scripts\dev\Check-Secrets.ps1
-          exit $LASTEXITCODE
+          #
+          # And the engine fork's own files (issue #1326). The checkout leaves
+          # engine\skymp empty, so it is fetched here at the commit this
+          # repository pins, shallow (a few seconds), read with the tree, and
+          # taken out again, so every step after this one sees the checkout it
+          # always did. -Submodules Require: a fork that did not arrive is not
+          # a pass. core.longpaths, because the fork's deepest path is 230
+          # characters before the runner's folder goes in front of it. The
+          # build on every pull request leaves it out and says so.
+          git -c core.longpaths=true submodule update --init --depth 1 engine/skymp
+          $fetched = ($LASTEXITCODE -eq 0)
+          if (-not $fetched) { Write-Host '::error file=.gitmodules::engine/skymp could not be fetched at its pin, so the fork was not scanned' }
+          .\scripts\dev\Check-Secrets.ps1 -Submodules Require
+          $code = $LASTEXITCODE
+          git -c core.longpaths=true submodule deinit -q -f engine/skymp
+          if ($code -eq 0 -and -not $fetched) { $code = 1 }
+          exit $code
 
       - name: Parse every PowerShell script
         if: ${{ !cancelled() }}
