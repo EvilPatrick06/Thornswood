@@ -63,7 +63,8 @@
   cursor rule restyles nothing.
 
   THE CONTRACT with thornswood-front.js, unchanged from the first cut:
-    window.thornswoodSkills = { open, close, toggle, isOpen, setData, takeOn }
+    window.thornswoodSkills = { open, close, toggle, isOpen, setData, takeOn, setKey }
+    setKey(name)    SkillsKey's name, K unless it is bound elsewhere (#1919)
     page -> plugin  'skills:ready' | 'skills:opened' | 'skills:closed' |
                     'skills:refresh' | 'skills:pick <words>'
     the plugin turns 'skills:pick X' into the chat line '/pick X'
@@ -428,6 +429,7 @@
   var tableGen = 0;        // bumped when a table arrives from the server, so a redraw is forced
   var drawnKey = '';       // JSON of what head, nav and body were last drawn from
   var footKey = '';        // the same for the foot
+  var keyName = 'K';       // SkillsKey as bound, until the front says otherwise (#1919)
   var progRows = [];       // the value half of each progress line on the page, in order
   var progKey = '';        // the same for those lines: their words, so a tick writes once
   var candidate = null;    // who the look prompt's K opened the page on: { id, name, halves: [{ h, k }] } (#1634)
@@ -2608,7 +2610,7 @@
       : (section !== 'tree' && section !== 'recipes' && section !== 'property' && section !== 'office' &&
          section !== 'apprentice' && section !== 'body');
     var shut = closeWord();
-    var key = JSON.stringify([line, statusKind, can, label, showConfirm, cr, shut]);
+    var key = JSON.stringify([line, statusKind, can, label, showConfirm, cr, shut, keyName]);
     if (key === footKey) return;
     footKey = key;
     elStatus.className = 'status' + (statusKind ? ' ' + statusKind : '');
@@ -2622,7 +2624,8 @@
     // does not any more.
     elClose.className = 'tsbtn ghost' + ((cr && quitArmed) ? ' danger' : '');
     elCloseLabel.textContent = shut;
-    elCloseKey.style.display = cr ? 'none' : '';
+    elCloseKey.textContent = keyName;
+    elCloseKey.style.display = (cr || !keyName) ? 'none' : '';
     elHelp.style.display = cr ? 'none' : '';
   }
 
@@ -3174,6 +3177,26 @@
     if (e.target && e.target.tagName === 'INPUT' && e.key !== 'Escape') return;
     var n = countRows();
     if (e.key === 'Escape') { closeByHand(); e.preventDefault(); return; }
+    /*
+      K closes it too, as the K on the Close button says (#1919). The
+      front's K branch, which toggles the panel, waits for a buttonEvent that
+      does not come while the panel holds the keyboard, so K did nothing
+      here: the same fault as J on the journal (#530) and G on the wheel
+      (#1852). K is SkillsKey as bound, handed over with setKey. Not in the
+      rent box (above), not a repeat, and not with Ctrl, Alt or the Windows
+      key held. While creating it puts the panel down the way Escape does.
+
+      The tap of K that opens the panel cannot also close it: the fork reads
+      the keyboard for this page in the same call that hands the game K
+      going down, or an earlier one, so by the time the front hears K and the
+      panel takes the keyboard, K is already down there and this page hears
+      at most K coming up (the note over LETTERS in
+      game/plugins/thornswood-emotes.js has the code path).
+    */
+    if (keyName && !e.repeat && !e.ctrlKey && !e.altKey && !e.metaKey &&
+        String(e.key || '').toUpperCase() === keyName.toUpperCase()) {
+      closeByHand(); e.preventDefault(); return;
+    }
     if (e.key === 'Enter') {
       if (section === 'tree') {
         var flat = [];
@@ -3244,6 +3267,17 @@
       if (root.className === 'gone') { api.open(); } else { closeByHand(); }
     },
     isOpen: function () { return root.className !== 'gone'; },
+    /*
+      SkillsKey's name, handed over by the front when this page says it is
+      ready. A key the front has no name for (#57, say) is not one this page
+      can hear, so Escape and Close are the way out then, and the Close
+      button shows no key.
+    */
+    setKey: function (name) {
+      var k = String(name == null ? '' : name);
+      keyName = k.charAt(0) === '#' ? '' : k;
+      drawFoot();
+    },
     /*
       The look prompt's K on somebody a Master could take on (#1634): the
       front hands over the form id under the crosshair, the name, and the
