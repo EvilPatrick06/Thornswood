@@ -521,6 +521,39 @@ $HALVES_WITH_NO_RECIPES = [ordered]@{
 # server is never asked about and it is left out of the gamemode block.
 $BENCHES_THE_SERVER_NEVER_SEES = @('adb78:Skyrim.esm', '88108:Skyrim.esm')
 
+# WHAT A LIGHT PLUGIN HOLDS (#1715). An engine that loads no light plugin has
+# none of their records: not the recipe (CraftService::FindRecipe walks the
+# server's own load order), not the bench (every loom is
+# MoreCraftableEquipment.esp's, and the loom keyword 6ce000:Update.esm is a
+# record that plugin adds under Update.esm's numbering), not an output or an
+# input the light plugin makes. Measured on 4 and 5 October: 255 open-book
+# rows needed one, MoreCraftableEquipment.esp's and Gourmet.esp's and the
+# Bandage at the loom, and the server was never asked about any of them.
+# Patrick, 5 October (#1715): keep them, and the server learns light plugins.
+# So a row that needs a light plugin fires once the engine this release
+# records loads them, "lightPlugins": true in records\server-build.json
+# (scripts\deploy\ServerOrder.ps1 reads it, the same flag Deploy-Gamemode
+# lists light plugins by), and does not fire before. Which plugin a record
+# needs is the one that first holds it in the load order, which is how the
+# injected loom keyword is caught.
+. (Join-Path $PSScriptRoot '..\deploy\ServerOrder.ps1')
+$ENGINE_LOADS_LIGHT = Test-ThornswoodEngineLoadsLight (Join-Path $PSScriptRoot '..\..\records\server-build.json')
+
+# The light plugin a recipe needs, or '' when it needs none: the first plugin
+# in the load order that holds the recipe, its bench, its output or an input,
+# when that plugin is light. $firstIn maps a desc to that plugin, $isLight a
+# plugin to whether it is light; a desc no scanned record holds goes by the
+# plugin its numbering names.
+function Get-RecipeLightPlugin($r, [hashtable]$firstIn, [hashtable]$isLight) {
+    $descs = @($r.Desc, $r.BenchDesc, $r.OutDesc) + @($r.InputList | ForEach-Object { $_.Desc })
+    foreach ($d in $descs) {
+        if (-not $d) { continue }
+        $pl = if ($firstIn.ContainsKey($d)) { $firstIn[$d] } else { ([string]$d).Split(':', 2)[1] }
+        if ($pl -and $isLight.ContainsKey($pl) -and $isLight[$pl]) { return $pl }
+    }
+    return ''
+}
+
 # WHICH CONDITION FUNCTIONS THE SERVER CAN ACTUALLY EVALUATE. Read out of
 # C:\Thornswood-Dev\skymp on 20 September, one file per number:
 # skymp5-server/cpp/server_guest_lib/condition_functions/*.cpp, each with a
@@ -2812,6 +2845,10 @@ $perPluginRecipes = @{}
 # back into any plugin's own numbering afterwards. The search for what hands
 # out an item needs that and it runs after the scan.
 $pluginMasters = @{}
+# For Get-RecipeLightPlugin (#1715): each plugin's lightness from its header,
+# and the first plugin that holds each record.
+$pluginIsLight = @{}
+$recordFirstIn = @{}
 $seenTwice = New-Object 'System.Collections.Generic.List[string]'
 
 foreach ($pl in $order) {
@@ -2821,6 +2858,7 @@ foreach ($pl in $order) {
     if ([System.Text.Encoding]::ASCII.GetString($b, 0, 4) -ne 'TES4') { Bad "not a plugin: $path"; continue }
     $headerSize = [int][BitConverter]::ToUInt32($b, 4)
     $localized  = [bool]([BitConverter]::ToUInt32($b, 8) -band 0x80)
+    $pluginIsLight[$pl] = ($pl -match '\.esl$') -or (([BitConverter]::ToUInt32($b, 8) -band 0x200) -ne 0)
     $masters    = Get-PluginMasters $b $headerSize
     $pluginMasters[$pl] = $masters
     $strTable = $null
@@ -2989,6 +3027,7 @@ foreach ($pl in $order) {
                     }
 
                     $desc = DescOf $formId $masters $pl
+                    if (-not $recordFirstIn.ContainsKey($desc)) { $recordFirstIn[$desc] = $pl }
 
                     if ($label -eq 'COBJ') {
                         if ($recipes.Contains($desc)) {
@@ -3338,6 +3377,7 @@ $noOutput = 0
 $unresolvedOut = New-Object 'System.Collections.Generic.List[string]'
 $namelessOut = @{}
 $outTypeCount = @{}
+$script:lightRows = 0
 
 foreach ($desc in $recipes.Keys) {
     $r = $recipes[$desc]
@@ -3610,6 +3650,12 @@ foreach ($desc in $recipes.Keys) {
     foreach ($b in $BENCHES_THE_SERVER_NEVER_SEES) {
         if ($r.BenchDesc -eq $b) { $fires = $false }
     }
+    # A row that needs a light plugin fires only on an engine that loads them.
+    $lightNeeded = Get-RecipeLightPlugin $r $recordFirstIn $pluginIsLight
+    if ($lightNeeded) {
+        $script:lightRows++
+        if (-not $ENGINE_LOADS_LIGHT) { $fires = $false }
+    }
 
     # What the recipe asks of the person before the game will even list it.
     # A row with nothing here is one a character created this morning, carrying
@@ -3796,6 +3842,8 @@ foreach ($desc in $owned.Keys) {
 }
 $firingOwned = 0
 foreach ($desc in $owned.Keys) { if ($owned[$desc].Fires) { $firingOwned++ } }
+Note ("{0} owned row(s) need a light plugin; they {1} (lightPlugins in records\server-build.json, #1715)" -f $script:lightRows,
+      $(if ($ENGINE_LOADS_LIGHT) { 'fire, because the engine this release records loads light plugins' } else { 'do not fire, because the engine this release records loads no light plugin' }))
 Note ("{0} of the {1} owned rows the server is asked about carry at least one condition" -f $rowsWithConditions, $firingOwned)
 foreach ($f in ($condFuncRows.Keys | Sort-Object { -$condFuncRows[$_] })) {
     $tail = 'the server evaluates this one itself'
