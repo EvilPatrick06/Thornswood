@@ -426,6 +426,24 @@ namespace Thornswood
 
         static string Shares() { string f = Path.Combine(OwnGame.Dir, "shared.txt"); return File.Exists(f) ? File.ReadAllText(f) : ""; }
 
+        // The stamp CheckShared holds a shared archive to (file id, size,
+        // change time in 100 ns ticks), read by its own StampOf, and the
+        // line shared.txt keeps for it. Printed when the written-through scene
+        // misses the copy (#1707), to measure why.
+        static string StampNow(string path)
+        {
+            MethodInfo m = typeof(OwnGame).GetMethod("StampOf", BindingFlags.NonPublic | BindingFlags.Static);
+            if (m == null) return "(no StampOf)";
+            try { return Convert.ToString(m.Invoke(null, new object[] { path })); }
+            catch (Exception ex) { return "(" + (ex.InnerException ?? ex).Message + ")"; }
+        }
+        static string OnRecord(string rel)
+        {
+            foreach (string l in Shares().Split('\n'))
+                if (l.TrimEnd('\r').EndsWith("|" + rel, StringComparison.OrdinalIgnoreCase)) return l.TrimEnd('\r');
+            return "(no line)";
+        }
+
 
         // A fake Steam copy, under this scene's temp folder, never a real
         // Steam library. The exe is 1.6.1170's size and the master is the
@@ -651,12 +669,18 @@ namespace Thornswood
             // the way a manual mod or another launcher's downgrade puts one in.
             string other = Path.Combine(s.Dir, "other.bsa");
             Archive(other, "MODDED-MESH");
+            string recorded = OnRecord(Mesh), before = StampNow(Path.Combine(own, Mesh));
             File.Copy(other, Path.Combine(s.Game, Mesh), true);
+            long clock = DateTime.UtcNow.ToFileTimeUtc();
+            string after = StampNow(Path.Combine(own, Mesh));
             Yes("(copying over the Steam copy's archive changed the one in Thornswood's folder too)", Text(Path.Combine(own, Mesh)) == "MODDED-MESH");
 
             var steamNow = Snap(s.Game);
             string said = OwnGame.CheckShared(OwnGame.Source(s.Cfg), null);
             Yes("the check before Play finds it and names it", said != null && said.Contains("Skyrim - Meshes0.bsa") && Clean(said));
+            if (said == null)
+                Console.WriteLine("      the check found nothing changed (#1707). On record: " + recorded + ". Before the copy: " + before +
+                                  ". After it: " + after + ". The clock just after it: " + clock + ".");
             Yes("and says the Downgrade puts it right", said != null && said.Contains("Press Downgrade"));
             Yes("it goes on record as changed, so Play stays shut", OwnGame.Changed().Contains(Mesh));
             Yes("and the Downgrade card comes up", Downgrade.Needed(s.Cfg));
