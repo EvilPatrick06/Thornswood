@@ -33,8 +33,8 @@
        note passes Ship's own rules, and Restore-Box.ps1 refuses a backup it
        cannot use before it reaches for ssh.
     5. the box-side half, under Windows PowerShell 5.1 as on the VPS: the real
-       vps-nightly-backup.ps1 takes the site's uploads (only the small files
-       once the folder is over its budget) and feed store (not its downloads)
+       vps-nightly-backup.ps1 takes every site upload even over its advisory
+       threshold, and the feed store (not its downloads)
        from a scratch site, and the real vps-restore-services.ps1
        puts every piece back into scratch folders, keeps what was there
        aside, locks the bot's settings, compares the gamemode, refuses a
@@ -474,7 +474,7 @@ try {
     Yes '  and not the feeds'' downloads' (@($names | Where-Object { $_ -like 'site/feed*/assets/*' }).Count -eq 0)
     Yes '  and a recording in uploads while the folder is under its budget' ($names -contains 'site/uploads/rec/recording.mp4')
 
-    # Over its budget, uploads keeps the pictures and names what it left out.
+    # The advisory threshold must not omit a recording from recovery.
     $tight = Join-Path $work 'backups-tight'
     $code = Run $ps51 (Join-Path $scriptsDir 'vps\vps-nightly-backup.ps1') @(
         '-GameRoot', $game, '-DevGameRoot', $gameDev, '-SiteRoot', $site, '-BotRoot', $bot,
@@ -482,9 +482,18 @@ try {
     $tz = @(Get-ChildItem -LiteralPath $tight -Filter 'thornswood-*.zip' -File -EA SilentlyContinue)
     $tnames = @()
     if ($tz.Count) { $z = [IO.Compression.ZipFile]::OpenRead($tz[0].FullName); $tnames = @($z.Entries | ForEach-Object { $_.FullName -replace '\\', '/' }); $z.Dispose() }
-    Yes "over its budget, uploads keeps the pictures and leaves the recording out, and says so (exit $code)" (
-        $code -eq 0 -and $tnames -contains 'site/uploads/shot-1.png' -and $tnames -notcontains 'site/uploads/rec/recording.mp4' -and
-        (Said 'site\\uploads is 11 MB, over 5: took the 2 file\(s\) of 10 MB or less, left out 1 bigger'))
+    Yes "over its advisory threshold, uploads keeps pictures, metadata and the recording (exit $code)" (
+        $code -eq 0 -and $tz.Count -eq 1 -and $tnames -contains 'site/uploads/shot-1.png' -and
+        $tnames -contains 'site/uploads/uploads.json' -and $tnames -contains 'site/uploads/rec/recording.mp4' -and
+        (Said 'uploads exceed the advisory threshold of 5 MB; every file will be taken'))
+    if ($tz.Count) {
+        $tightRestored = Join-Path $work 'tight-restored'
+        $code = Run $ps51 (Join-Path $scriptsDir 'vps\Restore-Backup.ps1') @('-Backup', $tz[0].FullName, '-To', $tightRestored, '-NoPause')
+        $recording = Join-Path $tightRestored 'site\uploads\rec\recording.mp4'
+        Yes "the over-threshold recording restores with its original bytes (exit $code)" (
+            $code -eq 0 -and (Test-Path -LiteralPath $recording) -and (Get-Item -LiteralPath $recording).Length -eq 11MB -and
+            (Get-FileHash -LiteralPath $recording).Hash -eq (Get-FileHash -LiteralPath (Join-Path $site 'uploads\rec\recording.mp4')).Hash)
+    }
 
     $unpacked = Join-Path $work 'unpacked'
     $code = Run $ps51 (Join-Path $scriptsDir 'vps\Restore-Backup.ps1') @('-Backup', $zip[0].FullName, '-To', $unpacked, '-NoPause')
