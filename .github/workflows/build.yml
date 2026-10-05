@@ -335,6 +335,7 @@ jobs:
                  'test-1831-dead-waits.js',
                  'test-1766-fishing-mod-poles.js',
                  'test-1826-stock-wait-seconds.js',
+                 'test-1887-shared-waits.js',
                  'test-1622-recipe-generator.js',
                  'test-1007-worldspaces.js',
                  'test-1714-cut-file.js',
