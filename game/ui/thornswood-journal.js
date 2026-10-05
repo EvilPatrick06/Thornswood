@@ -39,6 +39,7 @@
   var editing = false;
   var readingShared = -1;
   var openGroup = '';
+  var onBoards = false;  // the Boards tab is what the right side shows (issue 1627)
 
   function tell(what) {
     try { window.skyrimPlatform.sendMessage('thornswood-front', 'journal:' + what); }
@@ -285,6 +286,7 @@
         }
       }
     }
+    html += boardsSide();
     side.innerHTML = html;
 
     var items = side.querySelectorAll('button[data-book],button[data-new],button[data-shared]');
@@ -335,6 +337,83 @@
         draw();
       };
     }
+    var boardBtns = side.querySelectorAll('button[data-board]');
+    for (var bb = 0; bb < boardBtns.length; bb++) {
+      boardBtns[bb].onclick = function () {
+        onBoards = true;
+        openBook = '';
+        readingShared = -1;
+        openPage = '';
+        editing = false;
+        openGroup = '';
+        net('/board ' + this.getAttribute('data-board'));
+        draw();
+      };
+    }
+  }
+
+  /*
+    BOARDS (issue 1627). Every town's notice board, read only, from anywhere, and
+    the jobs you have taken under it. It was /board <hold> and /jobs, typed;
+    Patrick, 4 Oct: nothing people do is a chat command. Picking a town sends
+    /board <town>, which nobody is told to type, and the server answers by
+    putting that board in this panel's data (boards.read). Which town is
+    lit is the server's answer, not a guess here, so after a restart none is.
+    Posting, taking and handing back stay at the board itself, on its panel.
+  */
+  function boardsShown() {
+    return onBoards && !openBook && !openGroup && readingShared < 0;
+  }
+
+  function boardsSide() {
+    var bv = data && data.boards;
+    var towns = (bv && bv.list) || [];
+    if (!towns.length) { return ''; }
+    var reading = (bv.read && bv.read.hold) || '';
+    var html = '<h3>Boards</h3>';
+    for (var i = 0; i < towns.length; i++) {
+      html += '<button class="item' + (boardsShown() && towns[i].hold === reading ? ' sel' : '') +
+              '" data-board="' + esc(towns[i].hold) + '">' + esc(towns[i].where || towns[i].hold) + '</button>';
+    }
+    return html;
+  }
+
+  function drawBoards(main) {
+    var bv = data && data.boards;
+    var read = bv && bv.read;
+    if (!read) {
+      main.innerHTML = '<div class="none">Pick a town under Boards to read its notice board.</div>';
+      return;
+    }
+    var out = '<div class="from">The notice board in ' + esc(read.where || read.hold) +
+              '. Post, take and hand back at the board itself.</div>';
+    var wall = read.wall || [];
+    if (!wall.length) { out += '<div class="none">Nothing on it.</div>'; }
+    for (var i = 0; i < wall.length; i++) {
+      var row = wall[i];
+      var kind = row.letter ? 'Letter' : (row.haul ? 'Haul' : (row.job ? 'Job' : 'Notice'));
+      out += '<div style="margin-bottom:14px"><b>' + esc(row.n) + '. ' + kind + ', ' + esc(row.name) +
+             (row.taken ? ', taken by ' + esc(row.taken) : '') + '</b>' +
+             '<div class="read">' + esc(row.text) + '</div></div>';
+    }
+    var older = Number(read.older) || 0;
+    if (older > 0) {
+      out += '<div class="none">' + older + (older === 1 ? ' older one is' : ' older ones are') +
+             ' up and not on the wall.</div>';
+    }
+    var jobs = (bv && bv.jobs) || [];
+    out += '<h3 style="margin-top:20px">Your jobs</h3>';
+    if (!jobs.length) { out += '<div class="none">You have taken none.</div>'; }
+    for (var j = 0; j < jobs.length; j++) {
+      var job = jobs[j];
+      var what = job.letter ? 'Letter' : (job.haul ? 'Haul' : 'Job');
+      out += '<div style="margin-bottom:14px"><b>' + esc(job.where || job.hold) + ', ' + esc(job.n) + '. ' +
+             what + ', for ' + esc(job.name) + '</b><div class="read">' + esc(job.text) + '</div></div>';
+    }
+    if (jobs.length) {
+      out += '<div class="none">A job is handed back at the board it came from.</div>';
+    }
+    main.innerHTML = out;
   }
 
   function groupBook() {
@@ -528,6 +607,7 @@
 
     var book = bookOf(openBook);
     if (!book) {
+      if (boardsShown()) { drawBoards(main); return; }
       main.innerHTML = '<div class="none">Pick a journal on the left, or start one.</div>';
       return;
     }

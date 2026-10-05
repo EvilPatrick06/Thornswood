@@ -126,7 +126,7 @@ namespace Thornswood
                 "Everybody in your party has their name in green above their head, a marker on your map, and an arrow on a strip under your compass with how far away they are. Green on the strip means the same place as you, gold means somewhere else. You cannot fast travel to the marker. Work done with somebody from your party in the same place counts 15 per cent more."),
 
             new HelpItem("Chat and commands", "Journals",
-                "J opens your journals and their pages. You can type a title and a page. You can share a whole journal, or one page of it, with a friend, including one who is not online. They see a shared page while you are in the world."),
+                "J opens your journals and their pages. You can type a title and a page. You can share a whole journal, or one page of it, with a friend, including one who is not online. They see a shared page while you are in the world. Under Boards, J also shows any town's notice board, read only, and the jobs you have taken."),
 
             // Issue #414: the asking staff block at the end of gamemode.js.
             new HelpItem("Chat and commands", "Getting staff: /helpme and /report",

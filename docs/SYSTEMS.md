@@ -31,8 +31,8 @@ of these:
 - the prompt that answers an offer with Accept and Refuse, and the P
   panel of friends and the party;
 - a panel: K for the profession, the class and the skill tree, J for
-  journals and group books, the notice board, the trade window, a
-  trader's wares;
+  journals, group books and every town's notice board, the notice
+  board itself, the trade window, a trader's wares;
 - activating the thing itself in the world: E on a board, a driver or
   a trader, lying down in a bed.
 
