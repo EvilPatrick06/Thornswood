@@ -255,6 +255,24 @@ if (-not (Test-Path -LiteralPath $Dist)) {
     )
 }
 
+# The collection revision check further down reads its numbers through
+# scripts\mods\LoadOrder.ps1. A checkout without that file used to skip the
+# whole check without a word (#1814), the same kind of silent skip #1336 took
+# out of the server publish chain, and a check that cannot run has not
+# checked anything. So a missing file stops here, before anything is written,
+# and -IgnoreRevision is the way past it, as it is for an unreadable revision.
+$lo = [IO.Path]::GetFullPath((Join-Path $Here '..\mods\LoadOrder.ps1'))
+if (-not (Test-Path -LiteralPath $lo) -and -not $IgnoreRevision) {
+    Write-Host ''
+    Write-Host "  STOP. $lo is not here, so the collection revision cannot be checked." -ForegroundColor Red
+    Write-Host '  It reads the revision this machine has and the one Vortex knows is out, and' -ForegroundColor Red
+    Write-Host '  the server''s load order is derived from what Vortex has deployed here.' -ForegroundColor Red
+    Write-Host ''
+    Write-Host '  Nothing was written. Put the file back from git, then run this again.' -ForegroundColor Yellow
+    Write-Host '  -IgnoreRevision if you mean to deploy without the check.' -ForegroundColor DarkGray
+    throw "$lo is missing, so the collection revision was not checked. Nothing was written."
+}
+
 # How many the server holds at once, read before anything is written, so a
 # number the engine would refuse stops this with the build untouched.
 # MaxOnline.ps1 says where the number lives (records\most-online.json) and why.
@@ -362,8 +380,12 @@ $wanted = if ($MinimalLoadOrder) {
 # It refuses rather than warns, because a warning in the middle of a long run
 # is a line nobody reads. -IgnoreRevision is there for the case where the
 # answer is genuinely "yes I know, do it anyway".
-$lo = Join-Path $PSScriptRoot '..\mods\LoadOrder.ps1'
-if (Test-Path -LiteralPath $lo) {
+# $lo is the file the check before the first write made sure is here, or that
+# -IgnoreRevision let this run go on without.
+if (-not (Test-Path -LiteralPath $lo)) {
+    Write-Host ("  collection revision NOT checked: {0} is missing, carrying on because -IgnoreRevision" -f $lo) -ForegroundColor Yellow
+}
+else {
     . $lo
     $cfgPath = Join-Path (Split-Path -Parent $Data) 'config.json'
     if (-not (Test-Path -LiteralPath $cfgPath)) { $cfgPath = Join-Path (Find-Root) 'config.json' }
