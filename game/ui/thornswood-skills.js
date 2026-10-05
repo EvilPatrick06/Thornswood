@@ -134,6 +134,21 @@
       Font of Magic is the one perk a person starts: its Use button sends
       'skills:pick perk fontofmagic', and a refusal comes back as a note
       about 'perk'.
+
+    officePage: { jarl, may, name, steward: <bool>,
+                  stewards: [ { pid, name } ], people: [ { pid, name } ],
+                  door: { name, by, rent: { amount, every, owed } | null } | null,
+                  box: { hold } | null, boards: [ { hold, where } ] }
+      The offices (#1638), sent to a character that holds the Jarl office or
+      may take it, or is a steward, and to nobody else. jarl: this character
+      holds it; may: it may take it; name: it names stewards; steward: it
+      evicts, sets rent, marks a box and moves a board. people are the ones
+      in the world a Jarl could name, by name with the profile id the button
+      sends. door and box are what the steward opened in the last minute.
+      Its buttons send the server's own lines through the chat line, the way
+      the property page's Stop does: /jarl, /steward <pid>, /steward -<pid>,
+      /evict, /rent <gold>, /rent -, /box <hold> and /board move <hold>. The
+      answers come back in the chat, and the page is written again.
 */
 
 (function () {
@@ -315,6 +330,16 @@
       lead: 'A Master can take you on in your sister half, so it climbs past novice, or teach you the novice work of a half from another profession, twice in a life. Either of you can end it here.',
       rows: []
     },
+    /*
+      The offices (#1638). Who holds what, and what is at the door and the
+      container are the server's, under mine.officePage; this is the title
+      and the one sentence over the page.
+    */
+    office: {
+      title: 'Office',
+      lead: 'The office on this character. A Jarl names the stewards. A steward ends a claim and sets the rent at a door, makes a container a hold\'s box, and moves a hold\'s notice board.',
+      rows: []
+    },
     home: {
       title: 'Home',
       lead: 'Where you wake up. The inn keeps a room for you, and it is where you come back to.',
@@ -431,6 +456,11 @@
     '#ts-skills .card .act{flex:0 0 auto;margin-left:auto;border:1px solid rgba(198,170,109,.55);color:#e9d19b;padding:1px 9px;',
     'font-size:11.5px;white-space:nowrap;cursor:pointer}',
     '#ts-skills .card .act.armed{border-color:#e9a27a;color:#f6c9b0;background:rgba(120,40,30,.45)}',
+    // The Office page (#1638): its rows are guest rows, and these wrap.
+    '#ts-skills .card .guest.wrap{flex-wrap:wrap;gap:8px}',
+    '#ts-skills .card .guest .who{flex:1;min-width:160px}',
+    '#ts-skills .card .guest .dim{color:rgba(217,207,180,.5)}',
+    '#ts-skills .card .guest input{width:80px;font-family:inherit;font-size:13px;color:#d9cfb4;background:rgba(0,0,0,.25);border:1px solid rgba(198,170,109,.42);padding:1px 6px}',
     '#ts-skills .tag{margin-left:auto;font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:#9fcf92;white-space:nowrap}',
     '#ts-skills .tag.gold{color:#e9d19b}',
     '#ts-skills .tag.dim{color:rgba(217,207,180,.5)}',
@@ -936,6 +966,12 @@
     if (!got || typeof got !== 'object' || Array.isArray(got)) return null;
     return got;
   }
+  /* The Office page (#1638): the server's, under mine.officePage, or null for somebody with no office. */
+  function officePage() {
+    var got = mine && mine.officePage;
+    if (!got || typeof got !== 'object' || Array.isArray(got)) return null;
+    return got;
+  }
   /* When a semester opens, as a time on this machine's clock: today, tomorrow, or the date. */
   var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
                 'September', 'October', 'November', 'December'];
@@ -1216,6 +1252,8 @@
     // Nothing on the property page is picked, marked or sent either. It is a
     // list of what is already true.
     if (section === 'property') return 0;
+    // The Office page is buttons beside what is true; nothing is marked.
+    if (section === 'office') return 0;
     return rows().length + (laterOffered(section) ? 1 : 0);
   }
   /* Another section: the top row, and the status line back to the hint. */
@@ -1272,6 +1310,9 @@
     // for somebody a Master mage taught: the server sends it to anybody
     // magic is open to, and never while creating.
     if (!creating() && collegeView()) sections.splice(sections.indexOf('spells') + 1 || 1, 0, 'college');
+    // The offices (#1638), for a character that holds one or may take one:
+    // the server sends the page to them and nobody else, never while creating.
+    if (!creating() && officePage()) sections.push('office');
     /*
       Property, last, and only once there is something on it. Patrick,
       21 September: "once they claim a house or have a key to a house a property
@@ -1380,6 +1421,12 @@
       if (apB.length) return { t: apB.length === 1 ? 'taken on by ' + apB[0].name : apB.length + ' Masters', c: 'set' };
       return { t: apV ? (Number(apV.used) || 0) + ' of ' + (Number(apV.of) || 0) + ' trades used' : 'nobody yet', c: '' };
     }
+    if (sec === 'office') {
+      var ov = officePage();
+      if (ov && ov.jarl) return { t: 'Jarl', c: 'set' };
+      if (ov && ov.may) return { t: 'may take the office', c: 'need' };
+      return { t: 'steward', c: 'set' };
+    }
     if (sec === 'staff') {
       var sl = staffLeft();
       var sm = markedStaffDescs().length;
@@ -1454,6 +1501,7 @@
     else if (section === 'apprentice') drawApprentice();
     else if (section === 'recipes') drawRecipes();
     else if (section === 'property') drawProperty();
+    else if (section === 'office') drawOffice();
     else if (section === 'review') drawReview();
     else drawTree();
   }
@@ -1707,6 +1755,172 @@
       row.appendChild(stop);
       card.appendChild(row);
     });
+  }
+
+  /*
+    THE OFFICE PAGE (#1638).
+
+    Patrick, 4 Oct: no commands for things people do, and a Jarl and a
+    steward are people. So the offices are buttons here, on the character
+    that holds one: Take the office, name a steward by picking somebody in
+    the world, Remove beside a steward, and for a steward Evict and the rent
+    at the door they just opened, the container they just opened made a
+    hold's box, and a board moved to where they stand.
+
+    EVERYTHING ON IT IS THE SERVER'S. Who holds what, who is in the world,
+    the door and the container are mine.officePage, and each button sends
+    the server's own line through the chat line every panel uses, the way
+    the property page's Stop does. The server checks it all again and
+    answers in the chat, and writes the page again.
+
+    A PERSON IS PICKED, NOT TYPED. Two characters can share a name, so a row
+    carries the profile id the server sent with the name, and Name steward
+    sends that id. The id is shown, small, so two of one name can be told
+    apart.
+
+    THE TWO THAT CANNOT BE PUT BACK ASK TWICE. Evict ends somebody's claim
+    and moving a board leaves it wherever the steward is standing, so the
+    first press says what a second press does, and the second sends it.
+  */
+  function officeSay(line) {
+    if (window.thornswoodNet && window.thornswoodNet.say) window.thornswoodNet.say(line);
+    status = 'Sent. The server answers in the chat.'; statusKind = '';
+    drawFoot();
+  }
+
+  /* A button on the Office page. With twice, the first press only says what the second does. */
+  function officeButton(text, line, twice) {
+    var b = el('span', 'stop', text);
+    var armed = false;
+    b.onclick = function (ev) {
+      if (ev && ev.stopPropagation) ev.stopPropagation();
+      if (twice && !armed) { armed = true; b.textContent = twice; return; }
+      var said = typeof line === 'function' ? line() : line;
+      if (said) officeSay(said);
+    };
+    return b;
+  }
+
+  function officeRow(card, who, extra, buttons) {
+    var row = el('div', 'guest wrap');
+    var name = el('span', 'who', who);
+    if (extra) name.appendChild(el('span', 'dim', ' ' + extra));
+    row.appendChild(name);
+    (buttons || []).forEach(function (b) { row.appendChild(b); });
+    card.appendChild(row);
+    return row;
+  }
+
+  function drawOffice() {
+    var o = officePage();
+    if (!o) return;
+    var wrap = el('div', 'cards');
+
+    // The office on this character.
+    var seat = el('div', 'card' + (o.jarl ? ' mine' : ''));
+    var head = el('div', 'name', o.jarl ? 'Jarl' : (o.may ? 'The Jarl office' : 'Steward'));
+    if (o.jarl) head.appendChild(el('span', 'tag', 'held'));
+    seat.appendChild(head);
+    seat.appendChild(el('div', 'desc', o.jarl
+      ? 'This character holds the Jarl office. Another character on the account stays as it is.'
+      : (o.may ? 'This character may take the Jarl office. It is on the character, not the account, so another character on the account stays as it is.'
+               : 'A Jarl named you a steward.')));
+    if (o.may) officeRow(seat, '', '', [officeButton('Take the office', '/jarl')]);
+    wrap.appendChild(seat);
+
+    // The stewards, and naming one.
+    var st = el('div', 'card');
+    st.appendChild(el('div', 'name', 'Stewards'));
+    var stewards = Array.isArray(o.stewards) ? o.stewards : [];
+    if (!stewards.length) st.appendChild(el('div', 'inn', 'No stewards yet.'));
+    stewards.forEach(function (w) {
+      var pid = Number(w.pid) || 0;
+      officeRow(st, w.name ? String(w.name) : 'Profile ' + pid, w.name ? 'profile ' + pid : 'not in the world now',
+                o.name ? [officeButton('Remove', '/steward -' + pid)] : []);
+    });
+    if (o.name) {
+      var people = Array.isArray(o.people) ? o.people : [];
+      st.appendChild(el('div', 'inn', people.length
+        ? 'Name a steward from the people in the world now:'
+        : 'Nobody else is in the world now to name a steward.'));
+      people.forEach(function (p) {
+        var pid = Number(p.pid) || 0;
+        officeRow(st, String(p.name || 'somebody'), 'profile ' + pid, [officeButton('Name steward', '/steward ' + pid)]);
+      });
+    }
+    wrap.appendChild(st);
+
+    if (o.steward) {
+      wrap.appendChild(officeDoor(o.door));
+      wrap.appendChild(officeBox(o.box, o.boards));
+      wrap.appendChild(officeBoards(o.boards));
+    }
+    elBody.appendChild(wrap);
+  }
+
+  /* The door the steward opened in the last minute: evict, and the rent. */
+  function officeDoor(d) {
+    var card = el('div', 'card');
+    card.appendChild(el('div', 'name', d ? String(d.name || 'This building') : 'At a door'));
+    if (!d) {
+      card.appendChild(el('div', 'desc', 'Open the door of a building, then open this page within a minute, to end a claim on it or set its rent.'));
+      return card;
+    }
+    var r = d.rent;
+    card.appendChild(el('div', 'desc', (d.by ? 'Held by ' + d.by + '. ' : 'Nobody holds it. ') +
+      (r ? 'Rent ' + r.amount + ' gold every ' + r.every + ' days, ' + r.owed + ' owed.' : 'No rent on it.')));
+    if (!d.by) return card;
+    officeRow(card, '', '', [officeButton('Evict', '/evict', 'Press again to end ' + d.by + '\'s claim')]);
+    var input = document.createElement('input');
+    input.placeholder = 'gold';
+    var set = officeButton('Set rent', function () {
+      var n = Number(String(input.value || '').trim());
+      if (!(n > 0) || Math.floor(n) !== n) {
+        status = 'The rent is a whole number of gold above 0.'; statusKind = 'no';
+        drawFoot();
+        return '';
+      }
+      return '/rent ' + n;
+    });
+    input.onkeydown = function (ev) { if (ev && ev.key === 'Enter') set.onclick(ev); };
+    var buttons = [input, set];
+    if (r) buttons.push(officeButton('No rent', '/rent -'));
+    officeRow(card, 'Rent every 7 days', '', buttons);
+    return card;
+  }
+
+  /* The container the steward opened in the last minute, made a hold's box. */
+  function officeBox(b, boards) {
+    var card = el('div', 'card');
+    card.appendChild(el('div', 'name', 'A hold\'s box'));
+    if (!b) {
+      card.appendChild(el('div', 'desc', 'Open a container, then open this page within a minute, to make it a hold\'s box. Only gold goes in a box. Each hold\'s notice board is its box already.'));
+      return card;
+    }
+    var list = Array.isArray(boards) ? boards : [];
+    var whose = b.hold ? String(b.hold) : '';
+    list.forEach(function (h) { if (h.hold === b.hold && h.where) whose = String(h.where); });
+    card.appendChild(el('div', 'desc', whose
+      ? 'The container you just opened is ' + whose + '\'s box. Press a hold to make it that hold\'s instead.'
+      : 'The container you just opened is nobody\'s box. Press a hold to make it that hold\'s.'));
+    var row = officeRow(card, '', '', []);
+    list.forEach(function (h) {
+      row.appendChild(officeButton(String(h.where || h.hold), '/box ' + String(h.hold)));
+    });
+    return card;
+  }
+
+  /* Any of the boards, moved to where the steward stands. */
+  function officeBoards(boards) {
+    var card = el('div', 'card');
+    card.appendChild(el('div', 'name', 'The notice boards'));
+    card.appendChild(el('div', 'desc', 'Stand where a board should go and press its town. It moves to where you stand, and its box with it.'));
+    var row = officeRow(card, '', '', []);
+    (Array.isArray(boards) ? boards : []).forEach(function (h) {
+      var where = String(h.where || h.hold);
+      row.appendChild(officeButton(where, '/board move ' + String(h.hold), 'Press again to move ' + where + '\'s board here'));
+    });
+    return card;
   }
 
   /*
@@ -2150,7 +2364,8 @@
     // The recipe book sends nothing, the same way the tree's plus buttons are
     // the tree's own sending, so neither carries a Confirm.
     var showConfirm = cr ? section === 'review'
-      : (section !== 'tree' && section !== 'recipes' && section !== 'property' && section !== 'apprentice');
+      : (section !== 'tree' && section !== 'recipes' && section !== 'property' && section !== 'office' &&
+         section !== 'apprentice');
     var shut = closeWord();
     var key = JSON.stringify([line, statusKind, can, label, showConfirm, cr, shut]);
     if (key === footKey) return;
@@ -2199,6 +2414,7 @@
       if (studyWaiting()) return 'Sent. The server is checking.';
       return 'Press Study in one of the College\'s rooms. Anywhere else, the College says no.';
     }
+    if (section === 'office') return 'Each button is checked again by the server, and it answers in the chat.';
     if (section === 'staff') {
       if (staffWaiting()) return 'Sent. The server is checking.';
       if (markedStaffDescs().length) return 'Unlock sends the staff spells you marked, one staff spell point each.';
@@ -2706,6 +2922,9 @@
   */
   function onKey(e) {
     if (root.className === 'gone') return;
+    // A number being typed into the Office page's rent (#1638) is the box's,
+    // Enter and the arrows included. Escape still closes.
+    if (e.target && e.target.tagName === 'INPUT' && e.key !== 'Escape') return;
     var n = countRows();
     if (e.key === 'Escape') { closeByHand(); e.preventDefault(); return; }
     if (e.key === 'Enter') {

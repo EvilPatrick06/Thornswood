@@ -36110,7 +36110,11 @@ log('gamemode loaded:',
     /box whiterun      make the container you are at the hold's box
     /box               say which hold's box you are standing at
 
-    A steward's word, because designating the city's treasury is city business.
+    A steward's, because designating the city's treasury is city business.
+    Sent by the Office page of the K panel (#1638), which offers the ten
+    holds for the container the steward just opened, never typed. Only one of
+    the ten is taken, the same as a board: any other word would start a box
+    no hold's ledger knows about.
   */
   function boxCmd(parts, actorId, profileId, toProfile) {
     var at = boxAt(actorId);
@@ -36154,7 +36158,11 @@ log('gamemode loaded:',
       return true;
     }
     if (!at) {
-      toProfile(profileId, 'Open the container you mean, then say that again.');
+      toProfile(profileId, 'Open the container, then press the hold on the Office page of K within a minute.');
+      return true;
+    }
+    if (LEDGER_HOLDS.indexOf(arg) < 0) {
+      toProfile(profileId, 'No hold called ' + arg + '. The holds are ' + LEDGER_HOLDS.join(', ') + '.');
       return true;
     }
     boxes[arg] = at;
@@ -36162,6 +36170,7 @@ log('gamemode loaded:',
     save();
     plog('a steward made', at.toString(16), 'the box for', arg);
     toProfile(profileId, 'That container is ' + arg + '\'s box now. Rent and fees go in it.');
+    redrawPanel(actorId);
     return true;
   }
 
@@ -36353,11 +36362,17 @@ log('gamemode loaded:',
     /rent            what this place costs, and what is owed on it
     /rent 50         a steward sets it, per week
     /rent -          a steward waives it
+
+    Sent by Set rent and No rent on the Office page of the K panel (#1638),
+    never typed; the page shows a steward what is owed at the door they just
+    opened. See officeView.
   */
+  var OFFICE_AT_DOOR = 'Open the door of the building, then press the button on the Office page of K within a minute.';
+
   function rentCmd(parts, actorId, profileId, toProfile) {
     var building = here(actorId);
     if (!building) {
-      toProfile(profileId, 'Stand at the door and open it, then say that again.');
+      toProfile(profileId, OFFICE_AT_DOOR);
       return true;
     }
     var held = holderOf(building);
@@ -36375,7 +36390,7 @@ log('gamemode loaded:',
       return true;
     }
 
-    if (!isSteward(profileId)) {
+    if (!isSteward(profileId, actorId)) {
       toProfile(profileId, 'Only a steward sets rent.');
       return true;
     }
@@ -36388,17 +36403,19 @@ log('gamemode loaded:',
       save();
       plog('a steward waived the rent on', nameOf(building));
       toProfile(profileId, 'No rent on ' + nameOf(building) + ' now.');
+      redrawPanel(actorId);
       return true;
     }
     var amount = Number(arg) || 0;
     if (amount <= 0) {
-      toProfile(profileId, 'Give an amount in gold, or - to waive it.');
+      toProfile(profileId, 'The rent is a number of gold above 0.');
       return true;
     }
     held.rent = { amount: amount, everyDays: 7, owed: 0, since: Date.now() };
     save();
     plog('a steward set the rent on', nameOf(building), 'to', amount);
     toProfile(profileId, nameOf(building) + ' pays ' + amount + ' gold every 7 days now.');
+    redrawPanel(actorId);
     return true;
   }
 
@@ -37431,9 +37448,13 @@ log('gamemode loaded:',
     };
   }
 
-  /** A steward moves a hold's board to where they stand. */
+  /*
+    A steward moves a hold's board to where they stand. Move it here, beside
+    each board on the Office page of the K panel, sends /board move <hold>
+    (#1638); nobody types it.
+  */
   function moveBoard(hold, actorId, profileId, toProfile) {
-    if (!isSteward(profileId)) {
+    if (!isSteward(profileId, actorId)) {
       toProfile(profileId, 'Only a steward moves a board.');
       return true;
     }
@@ -37608,7 +37629,7 @@ log('gamemode loaded:',
     // /board here moves it, and only a steward may.
     if (arg === 'here') {
       if (!standing) {
-        toProfile(profileId, 'Say which hold: /board here needs you at the board you are moving.');
+        toProfile(profileId, 'Stand at the board you are moving.');
         return true;
       }
       return moveBoard(standing, actorId, profileId, toProfile);
@@ -37631,7 +37652,7 @@ log('gamemode loaded:',
       var which = (parts && parts.length > 2)
         ? String(parts[2]).trim().toLowerCase() : standing;
       if (!which) {
-        toProfile(profileId, 'Say which board: /board move <hold>, standing where you want it.');
+        toProfile(profileId, 'Pick the board to move on the Office page of K, standing where you want it.');
         return true;
       }
       return moveBoard(which, actorId, profileId, toProfile);
@@ -38527,17 +38548,22 @@ log('gamemode loaded:',
         /steward 1893288986      name one
         /steward -1893288986     take it back
 
+    Sent by the Office page of the K panel (#1638), never typed: Name steward
+    beside a person in the world, Remove beside a steward. See officeView.
+
     A PROFILE ID AND NOT A NAME, and that is a limit rather than a choice: two
     characters can carry the same name and this block has no way to tell them
-    apart. The id is what the register keys on everywhere else. It is on the
-    person's own K panel, so asking somebody for theirs is a sentence.
+    apart. The id is what the register keys on everywhere else, and the page
+    sends the id of the person picked, so picking somebody by name on the page
+    still names exactly that person.
   */
   /*
     Seat the Jarl office on THIS character.
 
         /jarl
 
-    Discord Jarl (or admin) eligibility is required. The office is the
+    Sent by Take the office on the Office page of the K panel (#1638), never
+    typed. Discord Jarl (or admin) eligibility is required. The office is the
     character property, so a second character on the same account stays
     ordinary. Admins may seat without the Discord role so the first
     office can be placed out of character (#397).
@@ -38582,7 +38608,7 @@ log('gamemode loaded:',
     if (!arg) {
       toProfile(profileId, who.length
         ? 'Stewards: ' + who.join(', ') + '.'
-        : 'No stewards. A jarl names one with /steward and their profile id.');
+        : 'No stewards. A Jarl names one on the Office page of K.');
       return true;
     }
 
@@ -38594,26 +38620,42 @@ log('gamemode loaded:',
     var drop = arg.charAt(0) === '-';
     var pid = Number(drop ? arg.slice(1) : arg) || 0;
     if (!pid) {
-      toProfile(profileId, 'That is not a profile id. It is the number on the K panel.');
+      toProfile(profileId, 'That is not a profile id.');
       return true;
     }
 
     var at = stewards.indexOf(pid);
+    // The person picked on the page, by name when they are in the world.
+    var them = onlineActorOf(pid);
+    var who = them ? personName(them) : 'Profile ' + pid;
     if (drop) {
-      if (at === -1) { toProfile(profileId, pid + ' is not a steward.'); return true; }
+      if (at === -1) { toProfile(profileId, who + ' is not a steward.'); return true; }
       stewards.splice(at, 1);
       save();
       plog('a jarl took the stewardship back from', pid);
-      toProfile(profileId, pid + ' is no longer a steward.');
+      toProfile(profileId, who + ' is no longer a steward.');
+      officeRedraw(actorId, pid);
       return true;
     }
 
-    if (at !== -1) { toProfile(profileId, pid + ' is already a steward.'); return true; }
+    if (at !== -1) { toProfile(profileId, who + ' is already a steward.'); return true; }
     stewards.push(pid);
     save();
     plog('a jarl named', pid, 'steward');
-    toProfile(profileId, pid + ' is a steward now.');
+    toProfile(profileId, who + ' is a steward now.');
+    officeRedraw(actorId, pid);
     return true;
+  }
+
+  /*
+    The Office page again (#1638): the K panel of whoever pressed, and of the
+    person a steward was named or removed, when they are in the world, so the
+    page in front of each of them says what is true now.
+  */
+  function officeRedraw(actorId, pid) {
+    redrawPanel(actorId);
+    var them = pid ? onlineActorOf(pid) : 0;
+    if (them && them !== actorId) { redrawPanel(them); }
   }
 
   /*
@@ -38630,13 +38672,13 @@ log('gamemode loaded:',
     rather than being written.
   */
   function evict(actorId, profileId, toProfile) {
-    if (!isSteward(profileId)) {
+    if (!isSteward(profileId, actorId)) {
       toProfile(profileId, 'Only a steward ends a claim.');
       return true;
     }
     var building = here(actorId);
     if (!building) {
-      toProfile(profileId, 'Stand at the door and open it, then say that again.');
+      toProfile(profileId, OFFICE_AT_DOOR);
       return true;
     }
     var held = holderOf(building);
@@ -38651,7 +38693,107 @@ log('gamemode loaded:',
     plog('a steward ended', was + '\'s claim on', nameOf(building));
     toProfile(profileId, 'You end ' + was + '\'s claim on ' + nameOf(building) +
               '. What is inside is untouched, and any key they hold still works.');
+    redrawPanel(actorId);
     return true;
+  }
+
+  /*
+    THE OFFICE PAGE ON K (#1638).
+
+    Patrick, 4 Oct: no commands for things people do, and a Jarl and a
+    steward are people in the world (offices.md: "A steward is not staff").
+    So the offices' powers are buttons on a page of the K panel, for the
+    character that may hold one: Take the office; name a steward by picking
+    a person in the world, and remove one; evict and set or clear the rent at
+    the door the steward just opened, with what is owed there; make the
+    container they just opened a hold's box; and move any of the ten boards
+    to where they stand. Each button sends the line the command was (/jarl,
+    /steward, /evict, /rent, /box, /board move), and every rule is checked
+    again when it arrives. This only says what is true, so the page can draw
+    it.
+
+    "Just opened" is the same minute the lines have always used (here and
+    boxAt): the door or container is read when the panel is written, and K
+    asks for that the moment it opens.
+
+    THE STATE IS HANDED IN, NEVER READ. This is called from the character
+    block's writeState, and that block's stateOf writes a character it has
+    not seen through writeState, so reading it from here would ask for
+    itself. So the office is worked out from s, the way isJarl and isSteward
+    work it out, and the two are held together by tests/test-1638-office.js.
+
+    Null for anybody who holds no office and could not take one, and then the
+    page is not drawn at all.
+  */
+  var OFFICE_PEOPLE_MAX = 40;
+
+  function officeView(actorId, profileId, s) {
+    var pid = Number(profileId) || 0;
+    if (!pid || !actorId) { return null; }
+    var adm = g['__thornswoodIsAdmin'];
+    var fn = g['__thornswoodIsJarl'];
+    var admin = false, role = false;
+    try { admin = typeof adm === 'function' && !!adm(pid); } catch (e) { admin = false; }
+    try { role = typeof fn === 'function' && !!fn(pid); } catch (e2) { role = false; }
+    var holds = !!(s && s.office === 'jarl');
+    var jarl = admin || (role && holds);                     // isJarl
+    var steward = jarl || stewards.indexOf(pid) !== -1;      // isSteward
+    if (!admin && !role && !steward) { return null; }
+
+    // Who is in the world, by profile, named the way a guest is named.
+    var names = {};
+    var order = [];
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e3) { online = []; }
+    for (var i = 0; i < online.length; i++) {
+      var op = profileOf(online[i]);
+      var nm = '';
+      try {
+        var ap = mp.get(online[i], 'appearance');
+        if (ap && ap.name) { nm = String(ap.name); }
+      } catch (e4) { nm = ''; }
+      if (!op || !nm || Object.prototype.hasOwnProperty.call(names, op)) { continue; }
+      names[op] = nm;
+      order.push(op);
+    }
+
+    var view = { jarl: holds, may: (admin || role) && !holds, name: jarl, steward: steward,
+                 stewards: [], people: [], door: null, box: null, boards: [] };
+    for (var k = 0; k < stewards.length; k++) {
+      view.stewards.push({ pid: stewards[k],
+                           name: Object.prototype.hasOwnProperty.call(names, stewards[k]) ? names[stewards[k]] : '' });
+    }
+    if (jarl) {
+      // Anybody in the world who is not a steward already, by name. The id
+      // goes with the name, because the id is what the button sends.
+      for (var j = 0; j < order.length; j++) {
+        if (order[j] === pid || stewards.indexOf(order[j]) !== -1) { continue; }
+        view.people.push({ pid: order[j], name: names[order[j]] });
+      }
+      view.people.sort(function (a, b) {
+        return a.name < b.name ? -1 : (a.name > b.name ? 1 : a.pid - b.pid);
+      });
+      view.people = view.people.slice(0, OFFICE_PEOPLE_MAX);
+    }
+    if (!steward) { return view; }
+
+    var building = here(actorId);
+    if (building) {
+      var held = holderOf(building);
+      if (held && held.rent) { rentDue(); }
+      view.door = { name: nameOf(building), by: held ? held.name : null,
+                    rent: (held && held.rent) ? { amount: Number(held.rent.amount) || 0,
+                                                  every: Number(held.rent.everyDays) || 7,
+                                                  owed: Number(held.rent.owed) || 0 } : null };
+    }
+    var at = boxAt(actorId);
+    if (at) { view.box = { hold: holdOfBox(at) || null }; }
+    for (var h = 0; h < LEDGER_HOLDS.length; h++) {
+      var bh = LEDGER_HOLDS[h];
+      if (!Object.prototype.hasOwnProperty.call(boards, bh)) { continue; }
+      view.boards.push({ hold: bh, where: (boards[bh] && boards[bh].where) || bh });
+    }
+    return view;
   }
 
   ready();
@@ -38671,7 +38813,7 @@ log('gamemode loaded:',
     coversGround: coversGround, groundHere: groundHere,
     DOOR_PROPERTY: DOOR_PROPERTY,
     claims: function () { return claims; },
-    isJarl: isJarl, isSteward: isSteward,
+    isJarl: isJarl, isSteward: isSteward, officeView: officeView,
     touchedBox: touchedBox, putIn: putIn, holdOfBox: holdOfBox,
     deposit: deposit, takeGold: takeGold, LEDGER_HOLDS: LEDGER_HOLDS,
     withdraw: withdraw, mayWithdraw: mayWithdraw, heldOn: heldOn,
@@ -38695,12 +38837,23 @@ log('gamemode loaded:',
   CARRIAGES AND FERRIES: THE ROUTE LIST, THE FARE, AND THE ONE MOVE (#1394).
 
   docs/systems/carriages.md is the design and every number here is from it.
-  You stand within 400 of the driver and name the stop. A ferry is 10 gold, a
-  carriage 20, and either one is 40 when Raven Rock is at either end. The fare
+  You stand within 400 of the driver and press E on him, and a panel of his
+  stops and fares opens. A ferry is 10 gold, Solstheim's own ferry included.
+  A carriage is 10 to a stop in the same hold and 20 to another hold. 40 is
+  only the crossing between the mainland and Solstheim, the Northern Maiden
+  between Windhelm and Raven Rock (Patrick, 4 Oct, on #1394). The fare
   goes onto the ledger of the hold the stop you leave from is in, counted the
   way a notice fee is counted (deposit, in the property block). A pack that is
   short does not move and loses nothing. Fast travel stays off: nothing here
   offers the map, and there is no word that skips the driver.
+
+  THE PANEL, NOT A COMMAND (#1635; Patrick, 4 Oct: no chat commands for
+  what people do). E on a driver sends /ride e <id> from the front plugin.
+  The server answers by publishing that driver's stops and fares on
+  PANEL_PROPERTY, which game/ui/thornswood-ride.js draws, and each stop's
+  Ride button sends /ride and the stop. Nobody is told to type either line,
+  and no help names /ride. A refusal is said in the chat and drawn on the
+  panel, which stays up. A ride that goes closes it.
 
   THE MOD'S OWN RIDE DOES NOT LAND, READ IN THE FORK. MovementValidation
   in skymp5-server refuses any move a client reports that changes the cell or
@@ -38750,20 +38903,21 @@ log('gamemode loaded:',
     console.log(a.join(' '));
   }
 
+  /*
+    The fares, Patrick's answers on #1394 (4 Oct). A ferry is 10, Solstheim's
+    own ferry between Raven Rock, Skaal Village and Tel Mithryn included. A
+    carriage is 10 to a stop in the same hold and 20 to another hold. 40 is
+    only the crossing between the mainland and Solstheim.
+  */
   var FARE_FERRY = 10;
+  var FARE_CARRIAGE_IN_HOLD = 10;
   var FARE_CARRIAGE = 20;
-  var FARE_RAVEN_ROCK = 40;
+  var FARE_CROSSING = 40;
+  /* Solstheim's world. A ride with one end in it and the other not is the crossing. */
+  var SOLSTHEIM = '800:Dragonborn.esm';
 
   /* The same reach as a notice board. */
   var RIDE_REACH = 400;
-
-  /*
-    How long after pressing E on a driver /ride still means that driver. A
-    minute, the same as a door for /claim (DOOR_MEMORY_MS). It only matters
-    for a driver who has wandered off his spot, because a person within reach
-    of the spot itself is at the stop whether they pressed anything or not.
-  */
-  var DRIVER_MEMORY_MS = 60000;
 
   var RIDE_LINES = {
     carriage: { kind: 'carriage', what: 'the carriage' },
@@ -38846,7 +39000,7 @@ log('gamemode loaded:',
       ref: '332ef:CFTO.esp', base: '332ed:CFTO.esp', world: '3c:Skyrim.esm',
       pos: [-40803.1, -57902.2, 814.6], rot: 97.4 },
     // The Solstheim ferry.
-    { key: 'solstheim:ravenrock', line: 'solstheim', name: 'Raven Rock', hold: 'ravenrock', driver: 'Maslyn', ravenRock: true,
+    { key: 'solstheim:ravenrock', line: 'solstheim', name: 'Raven Rock', hold: 'ravenrock', driver: 'Maslyn',
       ref: '14c6f:CFTO.esp', base: '14c6e:CFTO.esp', world: '800:Dragonborn.esm',
       pos: [28344.6, 34630.7, 306.5], rot: 122.2 },
     { key: 'solstheim:telmithryn', line: 'solstheim', name: 'Tel Mithryn', hold: 'ravenrock', driver: 'Bildul',
@@ -38859,7 +39013,7 @@ log('gamemode loaded:',
     { key: 'maiden:windhelm', line: 'maiden', name: 'Windhelm', hold: 'windhelm', driver: 'Gjalund Salt-Sage',
       ref: '182af:Dragonborn.esm', base: '182ae:Dragonborn.esm', world: '3c:Skyrim.esm',
       pos: [141310, 34083.7, -13995.5], rot: 353.4 },
-    { key: 'maiden:ravenrock', line: 'maiden', name: 'Raven Rock', hold: 'ravenrock', driver: 'Gjalund Salt-Sage', ravenRock: true,
+    { key: 'maiden:ravenrock', line: 'maiden', name: 'Raven Rock', hold: 'ravenrock', driver: 'Gjalund Salt-Sage',
       ref: '2582c:Dragonborn.esm', base: '2582b:Dragonborn.esm', world: '800:Dragonborn.esm',
       pos: [28928.7, 33144.2, 309.9], rot: 73.1 }
   ];
@@ -38893,8 +39047,9 @@ log('gamemode loaded:',
     if (!from.driver) { return 0; }
     var line = Object.prototype.hasOwnProperty.call(RIDE_LINES, from.line) ? RIDE_LINES[from.line] : null;
     if (!line) { return 0; }
-    if (from.ravenRock || to.ravenRock) { return FARE_RAVEN_ROCK; }
-    return line.kind === 'ferry' ? FARE_FERRY : FARE_CARRIAGE;
+    if ((from.world === SOLSTHEIM) !== (to.world === SOLSTHEIM)) { return FARE_CROSSING; }
+    if (line.kind === 'ferry') { return FARE_FERRY; }
+    return from.hold === to.hold ? FARE_CARRIAGE_IN_HOLD : FARE_CARRIAGE;
   }
 
   /** Every stop this one's driver goes to. */
@@ -38927,6 +39082,12 @@ log('gamemode loaded:',
     Believed only as far as the server can check it: the actor has to be one
     of the drivers on the list, by its base, and the person has to be within
     reach of where that actor is now. Null when it is not a driver at all.
+
+    A press lasts for as long as that driver is within reach. The panel it
+    opens stays up that long (the front plugin closes it when you walk off),
+    so its Ride has to mean him for as long, even for a driver who has
+    wandered off his spot. Out of his reach, or with him gone, it is
+    forgotten.
   */
   var pressedBy = {};
 
@@ -38948,7 +39109,7 @@ log('gamemode loaded:',
     var me = placeOf(actorId);
     if (!me) { return null; }
     var p = Object.prototype.hasOwnProperty.call(pressedBy, actorId) ? pressedBy[actorId] : null;
-    if (p && Date.now() - p.at <= DRIVER_MEMORY_MS) {
+    if (p) {
       var s = stopByKey(p.stop);
       var them = placeOf(p.driver);
       var base = '';
@@ -38957,6 +39118,7 @@ log('gamemode loaded:',
           apart(me.pos, them.pos) <= RIDE_REACH) {
         return s;
       }
+      delete pressedBy[actorId];
     }
     /*
       Otherwise the driver himself, or his spot. The population block keeps a
@@ -39001,13 +39163,59 @@ log('gamemode loaded:',
     return hits.length === 1 ? hits[0] : null;
   }
 
-  function offer(from) {
+  /*
+    THE PANEL'S VIEW, seen by its owner only, the way the repair and the
+    merchant panels' are. The owner's script hands it to the page, and
+    game/ui/thornswood-ride.js draws it. A view with open set asks for the
+    panel (the front plugin opens it once the mod's own conversation has
+    closed), and open false closes it. at moves on every send, so a second
+    press draws it again even when nothing in it changed.
+  */
+  var PANEL_PROPERTY = 'thornswoodRideView';
+  var panelScript = [
+    '(function(){',
+    '  try {',
+    '    var v = ctx.value;',
+    '    if (!v || typeof v !== "object") { return; }',
+    '    var st = ctx.state;',
+    '    if (!st) { return; }',
+    '    if (st.thornswoodRideAt === v.at) { return; }',
+    '    st.thornswoodRideAt = v.at;',
+    '    var body = JSON.stringify(v);',
+    '    var src = "(function(){try{" +',
+    '      "var d=" + body + ";window.thornswoodRideView=d;" +',
+    '      "if(window.thornswoodRide&&window.thornswoodRide.setData){window.thornswoodRide.setData(d);}" +',
+    '      "}catch(e){}})();";',
+    '    try { ctx.sp.browser.executeJavaScript(src); } catch (e) { }',
+    '  } catch (e) { }',
+    '})();'
+  ].join('\n');
+  try {
+    mp.makeProperty(PANEL_PROPERTY, {
+      isVisibleByOwner: true, isVisibleByNeighbors: false,
+      updateOwner: panelScript, updateNeighbor: ''
+    });
+  } catch (e) { /* made by an earlier load. harmless. */ }
+
+  /** What the panel shows at this stop: the driver, his stops and their fares. */
+  function panelView(from, note) {
     var list = destinations(from);
-    var bits = [];
-    for (var i = 0; i < list.length; i++) { bits.push(list[i].name + ' ' + fare(from, list[i])); }
-    return from.driver + ' runs ' + RIDE_LINES[from.line].what + ' from ' + from.name +
-      '. Say /ride and the stop: ' + bits.join(', ') + ' gold. The fare goes to ' +
-      (HOLD_NAMES[from.hold] || from.hold) + '\'s ledger.';
+    var stops = [];
+    for (var i = 0; i < list.length; i++) { stops.push({ name: list[i].name, fare: fare(from, list[i]) }); }
+    return {
+      open: true, driver: from.driver, what: RIDE_LINES[from.line].what, from: from.name,
+      ledger: HOLD_NAMES[from.hold] || from.hold, stops: stops, note: note || ''
+    };
+  }
+
+  var shownAt = 0;
+  function show(actorId, view) {
+    var payload = JSON.parse(JSON.stringify(view));
+    shownAt = Math.max(Date.now(), shownAt + 1);
+    payload.at = shownAt;
+    try { mp.set(actorId, PANEL_PROPERTY, payload); } catch (e) {
+      plog('could not send the ride panel to', Number(actorId).toString(16) + ':', e);
+    }
   }
 
   /* Whether the pack can pay, by the same test takeGold makes: one stack of
@@ -39031,27 +39239,29 @@ log('gamemode loaded:',
     });
   }
 
-  /** A ride: the line to say back, and the move when it goes. */
+  function answer(line, from, went) {
+    return { line: line, from: from, went: !!went };
+  }
+
+  /** A ride, and the move when it goes: the line to say back, the stop it was asked at, and whether it went. */
   function ride(actorId, profileId, wanted) {
     var from = stopHere(actorId);
-    if (!from) {
-      return 'Stand at a carriage or ferry driver, then say /ride and where you are going.';
-    }
-    if (!wanted) { return offer(from); }
+    if (!from) { return answer('Walk up to a carriage or ferry driver first.', null); }
+    if (!wanted) { return answer('', from); }
     var to = pick(destinations(from), wanted);
-    if (!to) { return 'No ride to ' + wanted + ' from here. ' + offer(from); }
+    if (!to) { return answer('No ride to ' + wanted + ' from here.', from); }
     var price = fare(from, to);
     // Never 0 or less: destinations() offers only rides with a fare, and an
     // amount below 1 would make takeGold add rather than take.
-    if (!(price > 0)) { return 'No ride to ' + wanted + ' from here. ' + offer(from); }
+    if (!(price > 0)) { return answer('No ride to ' + wanted + ' from here.', from); }
     var prop = g.__thornswoodProperty;
     if (!prop || typeof prop.takeGold !== 'function' || typeof prop.deposit !== 'function') {
       plog('a ride was asked for and the hold ledger is not loaded');
-      return 'The hold\'s ledger is not running on this server, so nobody rides. Say so in the dev channel.';
+      return answer('The hold\'s ledger is not running on this server, so nobody rides. Say so in the dev channel.', from);
     }
     // A pack that is short keeps all of it and stays where it is.
     if (!canPay(actorId, price)) {
-      return 'The ride to ' + to.name + ' is ' + price + ' gold and you do not have it. Nothing was taken.';
+      return answer('The ride to ' + to.name + ' is ' + price + ' gold and you do not have it. Nothing was taken.', from);
     }
     /*
       THE MOVE, THEN THE FARE, so a move the server could not make costs
@@ -39064,13 +39274,13 @@ log('gamemode loaded:',
       moveTo(actorId, to);
     } catch (e) {
       plog('profile', profileId, 'could not be moved from', from.key, 'to', to.key + ':', e);
-      return 'The ride did not go, and nothing was taken. Say so in the dev channel.';
+      return answer('The ride did not go, and nothing was taken. Say so in the dev channel.', from);
     }
     if (!prop.takeGold(actorId, price)) {
       try { moveTo(actorId, from); } catch (e2) { }
       plog('profile', profileId, 'rode from', from.key, 'to', to.key,
            'and the fare could not be taken, so they were put back');
-      return 'The fare could not be taken, so the ride did not go. Nothing was taken.';
+      return answer('The fare could not be taken, so the ride did not go. Nothing was taken.', from);
     }
     delete pressedBy[actorId];
     var what = RIDE_LINES[from.line].what;
@@ -39080,13 +39290,15 @@ log('gamemode loaded:',
     }
     plog('profile', profileId, 'rode', what, 'from', from.name, 'to', to.name, 'for', price,
          'gold, onto', from.hold + '\'s ledger');
-    return 'You pay the ' + price + ' gold fare and ride to ' + to.name + '.';
+    return answer('You pay the ' + price + ' gold fare and ride to ' + to.name + '.', from, true);
   }
 
   /*
-    /ride                 at a driver: where this driver goes, and the fares
-    /ride <stop>          at a driver: pay and go
-    /ride e <id>          the front plugin, when somebody presses E on a driver
+    /ride e <id>          the front plugin, when somebody presses E on a
+                          driver: his panel opens
+    /ride <stop>          the panel's Ride button: pay and go
+    /ride                 the panel of the driver you are at
+    Nobody is told to type any of them (#1635).
   */
   function command(parts, actorId, profileId, toProfile) {
     if (!actorId) {
@@ -39098,19 +39310,27 @@ log('gamemode loaded:',
       var pressed = pressDriver(actorId, parseInt(parts[2], 16) >>> 0);
       // Not a driver: the press was for something else, so nothing to say.
       if (!pressed) { return true; }
-      toProfile(profileId, pressed.far ? 'Walk up to ' + pressed.stop.driver + ' first.' : offer(pressed.stop));
+      if (pressed.far) {
+        toProfile(profileId, 'Walk up to ' + pressed.stop.driver + ' first.');
+        return true;
+      }
+      show(actorId, panelView(pressed.stop, ''));
       return true;
     }
-    toProfile(profileId, ride(actorId, profileId, (parts || []).slice(1).join(' ').trim()));
+    var done = ride(actorId, profileId, (parts || []).slice(1).join(' ').trim());
+    if (done.line) { toProfile(profileId, done.line); }
+    // A ride that went, or no driver here, closes the panel. A refusal is
+    // drawn on it, and it stays up.
+    show(actorId, done.went || !done.from ? { open: false } : panelView(done.from, done.line));
     return true;
   }
 
   g.__thornswoodCarriages = {
-    STOPS: RIDE_STOPS, LINES: RIDE_LINES, REACH: RIDE_REACH,
-    FARE_FERRY: FARE_FERRY, FARE_CARRIAGE: FARE_CARRIAGE, FARE_RAVEN_ROCK: FARE_RAVEN_ROCK,
-    DRIVER_MEMORY_MS: DRIVER_MEMORY_MS,
+    STOPS: RIDE_STOPS, LINES: RIDE_LINES, REACH: RIDE_REACH, SOLSTHEIM: SOLSTHEIM,
+    FARE_FERRY: FARE_FERRY, FARE_CARRIAGE_IN_HOLD: FARE_CARRIAGE_IN_HOLD, FARE_CARRIAGE: FARE_CARRIAGE,
+    FARE_CROSSING: FARE_CROSSING, PANEL_PROPERTY: PANEL_PROPERTY,
     stopByKey: stopByKey, stopByBase: stopByBase, fare: fare, destinations: destinations,
-    stopHere: stopHere, pressDriver: pressDriver, ride: ride, command: command
+    stopHere: stopHere, pressDriver: pressDriver, panelView: panelView, ride: ride, command: command
   };
   plog('ready,', RIDE_STOPS.length, 'stops on', Object.keys(RIDE_LINES).length, 'lines');
 })();
@@ -41393,6 +41613,15 @@ log('gamemode loaded:',
       try { pid = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pid = 0; }
       var held = propertyView(actorId, pid);
       if (held) { view.property = held; }
+      /*
+        The Office page (#1638), for a character that holds an office or may
+        take one, and left off for everybody else. The property block owns
+        the offices; it is handed s, because asking stateOf from inside
+        writeState would ask for itself. See officeView.
+      */
+      var W = g.__thornswoodProperty;
+      var desk = (W && W.officeView) ? W.officeView(actorId, pid, s) : null;
+      if (desk) { view.officePage = desk; }
     }
     var sig = drawn(view);
     var sending = !!redraw || lastDrawn[actorId] !== sig;
@@ -46525,7 +46754,10 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/helpme', '/help-me', '/report',
                // Out of a wedged spot; see the stuck block after it.
                '/stuck',
-               // A carriage or ferry, at the driver (#1394). See the carriages block.
+               // A carriage or ferry (#1394). E on a driver sends /ride e <id>,
+               // and the ride panel's buttons send /ride and the stop (#1635).
+               // Never typed, and so deliberately NOT in PLAYER_WORDS. See the
+               // carriages block.
                '/ride',
                '/pick', '/spend',
                // A warrior's maneuver, sent by the panel the maneuver key
@@ -46540,6 +46772,10 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/apprentice',
                '/plant', '/claim', '/plot',
                '/deed', '/deeds', '/lock', '/unlock', '/mold', '/key',
+               // The offices' powers (#1638). Sent by the Office page of the
+               // K panel, never typed, and so deliberately NOT in
+               // PLAYER_WORDS: Patrick, 4 October, no chat commands for
+               // anything people do, and a Jarl and a steward are people.
                '/jarl', '/steward', '/evict', '/box', '/rent',
                '/notice', '/job', '/board', '/take', '/jobs', '/dropjob', '/unpin',
                '/letter', '/deliver',
@@ -46619,19 +46855,10 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
 */
 const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       '/deed', '/lock', '/unlock', '/mold', '/key',
-                      // Named to everybody on purpose. /steward with no
-                      // argument says who holds the office, which is a thing
-                      // anybody in a hold should be able to find out, and
-                      // /evict answers "only a steward ends a claim" to
-                      // everybody else, which is the rule stated rather than
-                      // a power hidden.
-                      '/jarl', '/steward', '/evict',
-                      // The board and the box are everybody's. /rent with no
-                      // argument says what a place costs, which is the first
-                      // thing somebody standing at a door wants to know, and
-                      // the steward half answers "only a steward sets rent"
-                      // to everybody else.
-                      '/box', '/rent', '/notice', '/job', '/board',
+                      // Not /jarl, /steward, /evict, /box or /rent: the
+                      // offices' powers are buttons on the Office page of K
+                      // (#1638), and the board panel says what the box holds.
+                      '/notice', '/job', '/board',
                       '/take', '/jobs', '/dropjob', '/unpin', '/letter', '/deliver', '/help',
                       // Everybody's, and they need to be findable: a meter
                       // nobody knows how to act on is only a penalty. Not
@@ -46641,8 +46868,6 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // must be able to find: asking staff, and getting
                       // out of a wedged spot (#414).
                       '/helpme', '/report', '/stuck',
-                      // Everybody's: the way between holds is a driver (#1394).
-                      '/ride',
                       // Everybody's, and they have to be findable: a key
                       // prompt nobody sees is a feature nobody has. Not
                       // /party: P on somebody asks and the P panel runs the
@@ -47703,9 +47928,10 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     }
 
     /*
-      A carriage or ferry (#1394), said at the driver, or sent by the front
-      plugin as /ride e <id> when somebody presses E on one. The carriages
-      block answers it, and takes the fare onto the hold's ledger.
+      A carriage or ferry (#1394). Sent by the front plugin as /ride e <id>
+      when somebody presses E on a driver, and as /ride and the stop by the
+      ride panel's buttons (#1635); nobody types it. The carriages block
+      answers it, and takes the fare onto the hold's ledger.
     */
     if (word === '/ride') {
       var rides = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodCarriages;
@@ -48736,8 +48962,8 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         toProfile(profileId,
           '/claim at a plot takes the farm around it; /claim at a door you have ' +
           'just opened takes the building and hands you the deed. /deed lists ' +
-          'what you hold, /lock and /unlock turn the lock, /rent says what a ' +
-          'place costs. To let somebody sleep in a building you hold, look at ' +
+          'what you hold, /lock and /unlock turn the lock. A Jarl or a steward ' +
+          'has an Office page on K. To let somebody sleep in a building you hold, look at ' +
           'them inside it and press the key the prompt shows. ' +
           'A smith says /mold at a door with the holder standing ' +
           'there, and /key at a forge with the mold in hand.');
