@@ -14,6 +14,12 @@
 // (section 13) want the directions to lead to the source of what actually
 // ships. When New-ClientBuildRecord.ps1 or New-ServerBuildRecord.ps1 records a
 // new fork commit, this fails until THIRD-PARTY.md and credits.md name it.
+// tests\test-one-engine.js holds the engine\skymp pin to those two records, so
+// the pin, the records and both pages name one commit. It runs in the build
+// check on every pull request since #1720. Run only at night, it let one pull
+// request after another move the pin and the records on 3 and 4 October
+// (#1568 to #1573) while THIRD-PARTY.md kept naming df2ae1f1, and nothing on
+// those pull requests said so; #1689 put both pages right.
 //
 // Measured when it was written, on 24 September: the three WebView2 files are
 // byte for byte Microsoft.Web.WebView2 1.0.2903.40 from nuget.org, the six
@@ -297,6 +303,7 @@ if (cb) {
   yes('the credits page links the fork', C.indexOf(forkUrl) >= 0);
   yes('the credits page names the fork branch', C.indexOf(String(cb.forkBranch)) >= 0);
   yes('the credits page names the recorded client commit, ' + commit, commit.length >= 7 && C.indexOf(commit) >= 0);
+  yes('the credits page names the upstream base, ' + cb.upstreamBase, !!cb.upstreamBase && C.indexOf(String(cb.upstreamBase)) >= 0);
 }
 yes('client-build.json records six client files', cbFiles.length === 6);
 
