@@ -101,6 +101,9 @@ function rig(opts) {
     'const LOCK_KEY = 45; function lockPress() { return false; }\n' +
     // A warrior's maneuver key (#1386), 9, which nothing here presses.
     'const MANEUVER_KEY = 10; function maneuverKeyPressed() { }\n' +
+    // K on a person a Master could take on (#1634), asked ahead of K; nobody
+    // is looked at here. test-1634-apprentice-gui.js has what it does.
+    'const APPRENTICE_KEY = 37; function apprenticePress() { return false; }\n' +
     'const COMMAND_KEY = 53; function commandKeyPressed() { }\n' +
     // The / and P watchers on the game's own menus are test-our-key-menus.js's.
     'const OFF_MENU = { openedBy: function () { return ""; }, shutFor: function () { }, keyDown: function () { } };\n' +
