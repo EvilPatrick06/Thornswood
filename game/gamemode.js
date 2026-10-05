@@ -4026,6 +4026,11 @@ function burnCharcoal(actorId, refrId) {
   const tool = toolGate(actorId, 'woodworker');
   if (tool) return tool;
 
+  // Too tired to burn anything (#1676), the gate every bench asks.
+  const needs = globalThis.__thornswoodNeeds;
+  const tired = (needs && needs.craftRefusal) ? needs.craftRefusal(actorId) : '';
+  if (tired) return tired;
+
   const wait = cooldownLeft(actorId, refrId);
   if (wait > 0) return 'The kiln is still burning. ' + wait + ' seconds.';
 
@@ -27792,6 +27797,22 @@ mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recip
   }
 
   /*
+    TOO TIRED TO MAKE ANYTHING (#1676), asked here for the same reason, every
+    bench, brews, enchanting and tempering included: exhaustion.md, "Under
+    15, crafting is refused". The needs block has had the gate since the
+    first commit of this repository and nothing asked it. It answers the
+    line. The materials stay in the pack.
+  */
+  const needs = globalThis.__thornswoodNeeds;
+  const tired = (needs && needs.craftRefusal) ? needs.craftRefusal(actorId) : '';
+  if (tired) {
+    notify(actorId, tired);
+    say(actorId, tired);
+    log(actorId.toString(16), 'was refused a craft at bench', (workbenchId || 0).toString(16) + ':', tired);
+    return false;
+  }
+
+  /*
     NO RECIPE AT ALL, which the fork now reports rather than dropping.
     Everything below this line assumes a recipe id that names a record.
   */
@@ -36147,6 +36168,13 @@ log('gamemode loaded:',
     if (!forgeHere(parts, actorId)) {
       toProfile(profileId, 'Stand at a forge and look at it, then press the key the line ' +
                            'under the crosshair names.');
+      return true;
+    }
+    // Too tired to cut it (#1676), the gate every bench asks.
+    var needs = g.__thornswoodNeeds;
+    var tired = (needs && needs.craftRefusal) ? needs.craftRefusal(actorId) : '';
+    if (tired) {
+      toProfile(profileId, tired);
       return true;
     }
     var building = moldInHand(actorId);
@@ -54039,6 +54067,19 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   }
 
   /*
+    The line a craft is refused with when tooTiredToCraft says so, or ''
+    (#1676). exhaustion.md: "Under 15, crafting is refused." Every way of
+    making something asks this one: a bench's own menu (mp.onCraft), a key
+    cut at a forge, and a kiln burned by pressing it. Mining, chopping,
+    fishing and the other class verbs do not.
+  */
+  function craftRefusal(actorId) {
+    if (!tooTiredToCraft(actorId)) { return ''; }
+    return 'You are too tired to make anything: your Rest is under ' + CRAFT_REST + '. ' +
+           'Sit down, or lie down in a bed, first.';
+  }
+
+  /*
     A band crossing is the only thing worth interrupting somebody for.
 
     The same rule the seam and the chopping block settled on: a line every time
@@ -54545,7 +54586,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     bandOf: bandOf, tempBand: tempBand, consumed: consumed,
     settle: settle, view: view, effects: effects,
     ate: ate, resting: resting, worked: worked, bard: bard,
-    place: place, tooTiredToCraft: tooTiredToCraft,
+    place: place, tooTiredToCraft: tooTiredToCraft, craftRefusal: craftRefusal,
     setBurning: setBurning, catchFire: catchFire,
     fresh: fresh, clamp: clamp,
     // The meters as last settled, without settling them again (#1383).
