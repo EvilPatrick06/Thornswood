@@ -5970,6 +5970,15 @@ mp.onDeath = guard('onDeath', function (actorId, killerId) {
   try { pid = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pid = 0; }
   if (!(pid > 0)) { return; }
 
+  /*
+    THE WOUNDS COME WITH YOU (#1383, death.md): the record stays as it was,
+    and only the bleed stops, in the injury and disease block's died().
+  */
+  try {
+    const hurt = globalThis.__thornswoodHurt;
+    if (hurt && hurt.died) { hurt.died(actorId); }
+  } catch (eHurt) { log('injury: a death threw:', eHurt); }
+
   const site = {
     desc: mp.get(actorId, 'worldOrCellDesc'),
     pos: mp.get(actorId, 'pos'),
@@ -6975,10 +6984,20 @@ function bless(actorId, baseDesc) {
     if (d === baseDesc) continue;
     spellOn(actorId, SHRINES[d].spell, false);
   }
+  /*
+    A SHRINE IN A TEMPLE IS ALSO THE TEMPLE RITE (#1383): it clears ordinary
+    disease, sets a break and puts a crooked heal right, and the injury and
+    disease block answers whether this shrine stands in a temple.
+  */
+  let rite = '';
+  try {
+    const hurt = globalThis.__thornswoodHurt;
+    rite = (hurt && hurt.rite) ? hurt.rite(actorId) : '';
+  } catch (e) { log('injury: the temple rite threw:', e); }
   if (!spellOn(actorId, shrine.spell, true)) {
-    return 'The shrine of ' + shrine.who + ' does not answer.';
+    return 'The shrine of ' + shrine.who + ' does not answer.' + (rite ? ' ' + rite : '');
   }
-  return 'You take the blessing of ' + shrine.who + '.';
+  return 'You take the blessing of ' + shrine.who + '.' + (rite ? ' ' + rite : '');
 }
 
 /**
@@ -27638,6 +27657,23 @@ const KEY_NAME_DELAY = 250;
 
 mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {
   /*
+    TOO SICK OR TOO HURT TO WORK (#1383), asked before anything else, brews
+    and tempering included: a disease that has turned bad refuses every
+    craft, and a broken arm or a missing hand refuses a bench that takes two.
+    The injury and disease block answers. The materials stay in the pack.
+  */
+  const hurt = globalThis.__thornswoodHurt;
+  if (hurt && hurt.craftRefusal) {
+    let unfit = '';
+    try { unfit = hurt.craftRefusal(actorId, workbenchId); } catch (e) { log('injury: the craft check threw:', e); }
+    if (unfit) {
+      notify(actorId, unfit);
+      say(actorId, unfit);
+      return false;
+    }
+  }
+
+  /*
     NO RECIPE AT ALL, which the fork now reports rather than dropping.
     Everything below this line assumes a recipe id that names a record.
   */
@@ -43992,6 +44028,12 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
   }
   var mv = globalThis.__thornswoodManeuvers;
   if (mv && mv.hit) { mv.hit(targetId, aggressor, source, power, blocked); }
+  // A healing spell landing on somebody's wounds (#1383), in the injury and
+  // disease block. On its own, so the two above cannot stop it.
+  var hurt = globalThis.__thornswoodHurt;
+  if (hurt && hurt.hit) {
+    try { hurt.hit(targetId, aggressor, source); } catch (e) { log('injury: the hit threw:', e); }
+  }
 });
 // ==== end thornswood warrior maneuvers ====
 
@@ -46376,6 +46418,9 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/banaccount', '/unbanaccount', '/pk',
                // An admin undoing a PK made by mistake (#1010, 29 September).
                '/unpk',
+               // A wound, a disease or an agreed loss written onto somebody
+               // by staff (#1383). See the injury and disease block.
+               '/hurt',
                /*
                  NOT A COMMAND ANYBODY TYPES. The client reports each fall of
                  the axe with it, because the server sees a press and Skyrim's
@@ -47495,6 +47540,18 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       var bn = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodNeeds;
       if (bn && bn.setBurning && actorId) {
         try { bn.setBurning(actorId, String(parts[1] || '') === '1'); } catch (e) { }
+      }
+      /*
+        AND THE SAME TWO REPORTS TIME THE FIRE, so a fire that dealt 30 or
+        more is a bad burn afterwards (#1383). See burning() in the injury
+        and disease block.
+      */
+      var burnt = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodHurt;
+      if (burnt && burnt.burning && actorId) {
+        try {
+          var burnLine = burnt.burning(actorId, String(parts[1] || '') === '1');
+          if (burnLine) { toProfile(profileId, burnLine); }
+        } catch (e) { log('/burn could not time the fire:', e); }
       }
       return true;
     }
@@ -49261,9 +49318,13 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
                   the break chance in the durability block listen to (THE
                   PAPYRUS FAMILY, below).
     onRespawn     Logged by mp.onRespawn, never refused.
-    onEatItem     Eating or drinking something in the pack. No handler: the
-                  engine applies a potion's effects. The needs block hears
-                  about eating from the client's /ate line instead.
+    onEatItem     Eating or drinking something in the pack. The engine
+                  raises it from the client's equip message once it has
+                  checked the pack holds the thing (MpActor::OnEquip), then
+                  takes one out and applies a potion's effects. mp.onEatItem
+                  in the injury and disease block hears it for a potion of
+                  cure disease (#1383) and never refuses. The needs block
+                  hears about eating from the client's /ate line instead.
     onReadBook    Reading a book. A spell tome teaches only under the Mage
                   rules (a spell point, the rank, a spell of the rank below),
                   and mp.onReadBook refuses it otherwise, keeping the tome
@@ -51986,6 +52047,16 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
   function insulation(actorId) {
     var total = 0;
+    /*
+      A BAD BURN HALVES WHAT IS WORN (#1383): injury.md, clothing on that part
+      counts at half for warmth until it heals. The injury block says which
+      parts and how much.
+    */
+    var burnt = null;
+    try {
+      var H = g.__thornswoodHurt;
+      burnt = (H && H.burntWear) ? H.burntWear(actorId) : null;
+    } catch (eBurn) { burnt = null; }
     try {
       var entries = wornEntries(actorId);
       for (var i = 0; i < entries.length; i++) {
@@ -51998,6 +52069,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         var parts = String(row.c || '').split(',');
         for (var p = 0; p < parts.length; p++) {
           var w = NEEDS.wear.perPart[parts[p]];
+          if (w && burnt && (burnt.all || burnt[parts[p]])) { w = w * burnt.counts; }
           if (w) { total += w * mat; }
         }
       }
@@ -52080,14 +52152,38 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         out[av] = (Object.prototype.hasOwnProperty.call(out, av) ? out[av] : 0) + cost[av];
       }
     }
+    /*
+      A DISEASE READS AS THE METER IT IS CLOSEST TO (#1383). disease.md: ill is
+      the weary penalties of that meter and bad is the bad ones, so the meter
+      counts as at least that band while it lasts, the way a hangover counts
+      rest as weary. The injury block answers which, and what a broken or
+      crooked limb and an agreed loss add on top.
+    */
+    var hurt = { floors: {}, add: {} };
+    try {
+      var H = g.__thornswoodHurt;
+      if (H && H.forNeeds) { hurt = H.forNeeds(actorId) || hurt; }
+    } catch (eHurt) { }
+    var floors = hurt.floors || {};
+    var order = ['fine', 'weary', 'bad', 'spent'];
+    function atLeast(band, floor) {
+      return (floor && order.indexOf(floor) > order.indexOf(band)) ? floor : band;
+    }
     var meters = ['food', 'drink', 'rest'];
     for (var i = 0; i < meters.length; i++) {
-      add(COST[meters[i]][bandOf(n[meters[i]])] || {});
+      add(COST[meters[i]][atLeast(bandOf(n[meters[i]]), floors[meters[i]])] || {});
     }
     // And temperature, which is read as a distance from comfort in either
-    // direction rather than as a level. See TEMP_COST.
+    // direction rather than as a level. See TEMP_COST. A chill is the cold
+    // side's: on top of the heat when somebody chilled stands at a forge.
     var t = tempBand(typeof n.temp === 'number' ? n.temp : NEEDS.comfort);
-    add((t.cold ? TEMP_COST.cold : TEMP_COST.hot)[t.name] || {});
+    if (t.cold || t.name === 'fine') {
+      add(TEMP_COST.cold[atLeast(t.name, floors.cold)] || {});
+    } else {
+      add(TEMP_COST.hot[t.name] || {});
+      if (floors.cold) { add(TEMP_COST.cold[floors.cold] || {}); }
+    }
+    add(hurt.add || {});
     return out;
   }
 
@@ -52788,7 +52884,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     ate: ate, resting: resting, worked: worked, bard: bard, arrived: arrived,
     place: place, tooTiredToCraft: tooTiredToCraft,
     setBurning: setBurning, catchFire: catchFire,
-    fresh: fresh, clamp: clamp
+    fresh: fresh, clamp: clamp,
+    // The meters as last settled, without settling them again (#1383).
+    read: read
   };
 
   nlog('ready: food empties in', Math.round(100 / NEEDS.drain.food) + 'h,',
@@ -52796,6 +52894,1106 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
        'rest in', Math.round(100 / NEEDS.drain.rest) + 'h');
 })();
 // ==== end thornswood needs ====
+
+// ==== thornswood injury and disease ====
+/*
+  ============================================================================
+  WOUNDS AND DISEASE, ON THE CHARACTER THE WAY HUNGER IS (#1383).
+
+  docs/systems/injury.md and docs/systems/disease.md are the design, and every
+  number below is one of theirs, named where it is used. A wound and a disease
+  are a short list on the character, in the thornswoodHurt property, ticked by
+  this server. Not a mod script and not the old survival mod: nothing here
+  runs on the client except the lines that draw what you have.
+
+  WHAT THE SERVER CAN SEE, AND SO WHAT STARTS EACH ONE TODAY.
+
+    A burn     the client says when it catches fire and when the fire goes out
+               (/burn, the same report the spreading uses), and the coals deal
+               BURN_PER_SECOND a second on that client while it burns. So the
+               server times the fire and knows what it dealt.
+    A chill    an hour of sleep on open ground, read off the rest the needs
+               block already holds (resting at the sitting rate, with no roof
+               over you), or an hour at spent cold, read off its temperature.
+    Wound fever and bite sickness
+               a cut, a bite or a bad burn left untreated for 10 minutes.
+    Food sickness and fouled water
+               what somebody ate or drank, which is the meal and drink work
+               (#1382). It calls exposed() with what it was, and the chances
+               are here, beside the disease they start.
+    A cut, a break, a bite
+               the page does not say which blow opens which, so nothing in the
+               world opens one yet. The question is on #1383. Staff give one
+               with /hurt for a scene, and everything after that is real.
+
+  GOING DOWN IS NOT HERE, AND WHY. Health reaching zero is the engine's death.
+  MpActor::Kill applies the death, sends it to every client and starts the
+  respawn timer before mp.onDeath is told anything, so there is no moment in
+  which this file could say "down, not dead". Faking one by standing the body
+  back up afterwards would be the band-aid the guide bans. What the fork has
+  to expose is written on #1383. Until then a bleed that empties your health
+  is a death with no killer, the world's, and the temple keeps your wounds.
+  ============================================================================
+*/
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+
+  function hlog() {
+    var a = ['[thornswood hurt]'];
+    for (var i = 0; i < arguments.length; i++) { a.push(arguments[i]); }
+    try { console.log(a.join(' ')); } catch (e) { }
+  }
+
+  var HURT_PROPERTY = 'thornswoodHurt';
+  var MIN = 60000;
+  var DAY = 24 * 60 * MIN;
+
+  /*
+    THE NUMBERS, ALL OF THEM OFF THE TWO PAGES.
+
+    injury.md: a cut bleeds 2 a second until stopped and torn cloth slows it
+    to 1. Left open 10 minutes, wound fever is 40%, 10% with a bandage, 5% with
+    a poultice. A bite is a cut and bite sickness, 25% if it is closed inside
+    the 10 minutes and 60% if it is not. A break heals in 3 real days looked
+    after and crooked in 3 days ignored. A burn is bad at 30 health dealt,
+    halves the warmth of what is worn and heals in a day. A missing eye is
+    -20% damage with a bow or a spell.
+
+    disease.md: caught is 10 minutes with no penalty, bad is another 20
+    untreated, and the three durations.
+  */
+  var HURT = {
+    bleed: { open: 2, cloth: 1 },
+    feverAfter: 10,
+    fever: { open: 0.40, bandage: 0.10, poultice: 0.05 },
+    bite: { closed: 0.25, open: 0.60 },
+    breakDays: 3,
+    /*
+      The broken limb and the crooked one, as the engine actor values the
+      skills panel already carries. attackDamageMult is a multiplier, which is
+      why its numbers are small (see TUNING.perPoint). "A block costs twice the
+      stamina" and "sprint is refused" are not actor values and are not here:
+      the issue says what they need.
+    */
+    broken: { arm: { attackDamageMult: -0.15 }, leg: { speedMult: -8 } },
+    crooked: { arm: { attackDamageMult: -0.05 }, leg: { speedMult: -4 } },
+    /*
+      BURN_PER_SECOND in thornswood-front.js is what the coals deal a second
+      and has to be the same number, because the server works out what a fire
+      dealt from how long it burned.
+    */
+    burn: { perSecond: 7, bad: 30, healDays: 1, warmth: 0.5 },
+    /*
+      Bow damage and spell damage. The bow is MarksmanPowerMod; a spell that
+      does damage is the destruction school, DestructionPowerMod, the name
+      schoolValues in the progression block sends. Both are per cent.
+    */
+    eye: { MarksmanPowerMod: -20, DestructionPowerMod: -20 },
+    // The most wounds one record holds, so a run of /hurt cannot grow it for ever.
+    most: 12
+  };
+
+  /*
+    THE FIVE, AND WHICH METER EACH ONE IS CLOSEST TO.
+
+    "Ill. The weary penalties of the closest meter: cold for a chill, hunger
+    for food sickness, thirst for fouled water, and both hunger and rest for a
+    fever." Read the way the drink page reads a hangover: the meter counts as
+    at least weary while you are ill, and at least bad while you are badly ill,
+    so a disease never stacks a second copy of a penalty you already have.
+
+    lasts is minutes, and from says what it is counted from: a chill clears in
+    2 hours from catching it; food sickness and fouled water last 30 and 45
+    minutes once they show. 0 lasts until cured. bad is whether 20 untreated
+    minutes after showing make it bad.
+
+    Bite sickness is not on the page's list of closest meters. It is a wound
+    disease that turns bad the way a fever does, so it reads as a fever does
+    until #1383 says otherwise.
+  */
+  var DISEASE = {
+    chill:  { name: 'chill', meters: { cold: true }, lasts: 120, from: 'caught', bad: false },
+    food:   { name: 'food sickness', meters: { food: true }, lasts: 30, from: 'ill', bad: false },
+    fouled: { name: 'fouled water', meters: { drink: true }, lasts: 45, from: 'ill', bad: false },
+    fever:  { name: 'wound fever', meters: { food: true, rest: true }, lasts: 0, from: 'ill', bad: true },
+    bite:   { name: 'bite sickness', meters: { food: true, rest: true }, lasts: 0, from: 'ill', bad: true }
+  };
+  var CAUGHT_MIN = 10;
+  var BAD_AFTER_MIN = 20;
+  // An hour of sleep on open ground, or an hour at spent cold. Shorter does not catch it.
+  var CHILL_AFTER_MIN = 60;
+
+  /*
+    WHAT STARTS FOOD SICKNESS AND FOULED WATER, which the meal and drink work
+    (#1382) reports through exposed(). disease.md: raw meat or fish 40%,
+    eating at 90 hunger or above always; marsh, a puddle or standing water
+    80%, the sea 40%, a river unboiled 15%. Boiled water is no risk at all,
+    so it is never reported.
+  */
+  var EXPOSED = {
+    food: { raw: 0.40, full: 1 },
+    fouled: { marsh: 0.80, puddle: 0.80, standing: 0.80, sea: 0.40, river: 0.15 }
+  };
+
+  /*
+    WHICH HEALING SPELLS DO WHAT. injury.md, who treats what: novice
+    restoration stops a bleed; advanced and up closes a cut; an expert
+    healing spell sets a break that is already splinted. The rank is the
+    spell's own, out of the progression block's book (spellByDesc), so a
+    spell moving rank there moves it here too. self is a spell cast on
+    yourself, heard as a cast; the other two land on somebody else and are
+    heard as a hit.
+  */
+  var HEALING = {
+    'Healing': { self: true },
+    'Fast Healing': { self: true },
+    'Close Wounds': { self: true },
+    'Grand Healing': { self: true },
+    'Guardian Circle': { self: true },
+    'Healing Hands': { self: false },
+    'Heal Other': { self: false }
+  };
+  var RANKS = ['novice', 'advanced', 'expert', 'master'];
+
+  /*
+    THE POTION OF CURE DISEASE. The one ALCH record in this load order whose
+    effect is Cure Disease, CureDisease in Skyrim.esm (game\data\food.json).
+    A potion somebody brews has no record (it is made above 0xff000000) and
+    the server cannot read what it does yet; the issue says what that needs.
+  */
+  var CURE_DISEASE = ['ae723:Skyrim.esm'];
+
+  /*
+    BENCHES THAT TAKE BOTH HANDS, by the keyword a bench carries (BENCH_BY_BASE).
+    A broken arm and a missing hand refuse these. The page does not list them,
+    so this is a question on #1383: the forges, the armour table, the wheel,
+    the smelter, the tanning rack, the loom and the kiln. Cooking, brewing and
+    enchanting are not on it.
+  */
+  var TWO_HANDS = {
+    '88105:Skyrim.esm': 'the forge',
+    'f46ce:Skyrim.esm': 'the Skyforge',
+    'adb78:Skyrim.esm': 'the armour table',
+    '88108:Skyrim.esm': 'the sharpening wheel',
+    'a5cce:Skyrim.esm': 'the smelter',
+    '7866a:Skyrim.esm': 'the tanning rack',
+    'f806:Dawnguard.esm': 'the forge',
+    '5756:Dawnguard.esm': 'the forge',
+    '6ce000:Update.esm': 'the loom',
+    '1547f:Thornswood-Content.esp': 'the kiln'
+  };
+
+  function has(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
+  function num(v, d) { v = Number(v); return isFinite(v) ? v : d; }
+
+  // ------------------------------------------------------------ the record --
+
+  function fresh() {
+    return { wounds: [], ills: [], crooked: {}, agreed: {}, cold: 0, ground: 0, show: [] };
+  }
+
+  /*
+    Rebuilt field by field, the same discipline as the needs block: this is
+    where JSON somebody else wrote becomes things this file does arithmetic
+    on, and a field not named here is dropped.
+  */
+  function read(actorId) {
+    var v = null;
+    try { v = mp.get(actorId, HURT_PROPERTY); } catch (e) { v = null; }
+    var out = fresh();
+    if (!v || typeof v !== 'object') { return out; }
+    var ws = Array.isArray(v.wounds) ? v.wounds : [];
+    for (var i = 0; i < ws.length && out.wounds.length < HURT.most; i++) {
+      var w = ws[i];
+      if (!w || typeof w !== 'object') { continue; }
+      var k = String(w.k || '');
+      if (k !== 'cut' && k !== 'bite' && k !== 'break' && k !== 'burn') { continue; }
+      out.wounds.push({
+        k: k, at: num(w.at, 0),
+        limb: (w.limb === 'leg') ? 'leg' : 'arm',
+        bleed: !!w.bleed, cloth: !!w.cloth, bandage: !!w.bandage,
+        poultice: !!w.poultice, closed: !!w.closed, rolled: !!w.rolled,
+        splint: !!w.splint, set: num(w.set, 0), dealt: num(w.dealt, 0)
+      });
+    }
+    var is = Array.isArray(v.ills) ? v.ills : [];
+    for (var j = 0; j < is.length; j++) {
+      var d = is[j];
+      if (!d || typeof d !== 'object' || !has(DISEASE, String(d.k || ''))) { continue; }
+      out.ills.push({ k: String(d.k), at: num(d.at, 0), cold: !!d.cold, told: String(d.told || '') });
+    }
+    var cr = (v.crooked && typeof v.crooked === 'object') ? v.crooked : {};
+    if (num(cr.arm, 0) > 0) { out.crooked.arm = num(cr.arm, 0); }
+    if (num(cr.leg, 0) > 0) { out.crooked.leg = num(cr.leg, 0); }
+    var ag = (v.agreed && typeof v.agreed === 'object') ? v.agreed : {};
+    ['hand', 'eye', 'scar'].forEach(function (part) {
+      var a = ag[part];
+      if (!a || typeof a !== 'object' || !(num(a.at, 0) > 0)) { return; }
+      out.agreed[part] = { at: num(a.at, 0), by: String(a.by || ''),
+                           text: String(a.text || '').replace(/[<>&"]/g, '').slice(0, 200) };
+    });
+    out.cold = num(v.cold, 0);
+    out.ground = num(v.ground, 0);
+    out.show = Array.isArray(v.show) ? v.show.map(String) : [];
+    return out;
+  }
+
+  function write(actorId, rec) {
+    rec.show = lines(rec, Date.now());
+    try { mp.set(actorId, HURT_PROPERTY, rec); return true; }
+    catch (e) { hlog('could not write', actorId.toString(16) + ':', e); return false; }
+  }
+
+  // ------------------------------------------------------------ the clocks --
+
+  function minutesSince(at, now) { return (now - at) / MIN; }
+
+  /* caught, ill or bad. disease.md, "How sick". */
+  function stageOf(ill, now) {
+    var m = minutesSince(ill.at, now);
+    if (m < CAUGHT_MIN) { return 'caught'; }
+    if (DISEASE[ill.k].bad && m >= CAUGHT_MIN + BAD_AFTER_MIN) { return 'bad'; }
+    return 'ill';
+  }
+
+  /* Whether this one has run its course on its own. */
+  function runOut(ill, now) {
+    var d = DISEASE[ill.k];
+    if (!d.lasts) { return false; }
+    var start = (d.from === 'caught') ? ill.at : ill.at + CAUGHT_MIN * MIN;
+    return now >= start + d.lasts * MIN;
+  }
+
+  function hasIll(rec, k) {
+    for (var i = 0; i < rec.ills.length; i++) { if (rec.ills[i].k === k) { return true; } }
+    return false;
+  }
+
+  // ---------------------------------------------------------- resistance --
+
+  function stateOf(actorId) {
+    var C = g.__thornswoodCharacter;
+    try { return (C && C.stateOf) ? C.stateOf(actorId) : null; } catch (e) { return null; }
+  }
+
+  /*
+    TOUGHNESS. disease.md: each point adds disease resistance, and filled,
+    Purified Blood means no disease takes. Purified Blood is the perks block's
+    answer (holds), which is how it asks a disease the server gives to work.
+    What a point is worth is the skill tree's own number
+    (TUNING.perPoint.toughness.diseaseResist), the one the client puts on the
+    actor, so the two cannot disagree.
+  */
+  function chanceFor(actorId, chance) {
+    var K = g.__thornswoodPerks;
+    try { if (K && K.holds && K.holds(actorId, 'purifiedblood')) { return 0; } } catch (e) { }
+    var P = g.__thornswoodProgression;
+    var s = stateOf(actorId);
+    if (!P || !s) { return chance; }
+    var pts = (s.tree && has(s.tree, 'toughness')) ? num(s.tree.toughness, 0) : 0;
+    var per = 0;
+    try { per = num(P.TUNING.perPoint.toughness.diseaseResist, 0); } catch (e) { per = 0; }
+    var resist = Math.min(100, Math.max(0, pts * per));
+    return chance * (1 - resist / 100);
+  }
+
+  /* One roll at a disease. True when it took. A kind already held is not caught twice. */
+  function catchIll(actorId, rec, k, chance, now) {
+    if (!has(DISEASE, k) || hasIll(rec, k)) { return false; }
+    var c = chanceFor(actorId, chance);
+    if (!(c > 0) || Math.random() >= c) { return false; }
+    rec.ills.push({ k: k, at: now, cold: false, told: '' });
+    hlog(actorId.toString(16), 'caught', DISEASE[k].name);
+    return true;
+  }
+
+  // ------------------------------------------------------- what it costs --
+
+  var ORDER = ['fine', 'weary', 'bad', 'spent'];
+  function worse(a, b) {
+    if (!b) { return a; }
+    return ORDER.indexOf(b) > ORDER.indexOf(a) ? b : a;
+  }
+
+  /*
+    What the needs block reads (#1383, "nothing in the needs block reads a
+    disease"): the band each meter counts as at least, and the actor values
+    the wounds and an agreed loss add.
+  */
+  function forNeeds(actorId) {
+    var rec = read(actorId);
+    var now = Date.now();
+    var floors = {};
+    for (var i = 0; i < rec.ills.length; i++) {
+      var stage = stageOf(rec.ills[i], now);
+      if (stage === 'caught') { continue; }
+      var band = (stage === 'bad') ? 'bad' : 'weary';
+      var ms = DISEASE[rec.ills[i].k].meters;
+      for (var m in ms) {
+        if (has(ms, m)) { floors[m] = worse(floors[m] || 'fine', band); }
+      }
+    }
+    var add = {};
+    function plus(cost) {
+      for (var av in cost) {
+        if (has(cost, av)) { add[av] = (has(add, av) ? add[av] : 0) + cost[av]; }
+      }
+    }
+    var limbs = {};
+    for (var w = 0; w < rec.wounds.length; w++) {
+      if (rec.wounds[w].k === 'break') { limbs[rec.wounds[w].limb] = true; }
+    }
+    if (limbs.arm) { plus(HURT.broken.arm); }
+    if (limbs.leg) { plus(HURT.broken.leg); }
+    if (rec.crooked.arm) { plus(HURT.crooked.arm); }
+    if (rec.crooked.leg) { plus(HURT.crooked.leg); }
+    if (rec.agreed.eye) { plus(HURT.eye); }
+    return { floors: floors, add: add };
+  }
+
+  /*
+    THE BURN ON WHAT YOU WEAR. injury.md: clothing on that part counts at half
+    for warmth until it heals. The server is not told where the fire touched
+    and the client puts the flames on the whole body, so it is everything
+    worn, which is a question on #1383. The needs block's insulation() asks.
+  */
+  function burntWear(actorId) {
+    var rec = read(actorId);
+    for (var i = 0; i < rec.wounds.length; i++) {
+      var w = rec.wounds[i];
+      if (w.k === 'burn' && w.dealt >= HURT.burn.bad) { return { all: true, counts: HURT.burn.warmth }; }
+    }
+    return null;
+  }
+
+  // ------------------------------------------------------ what you see --
+
+  var WORDS = {
+    chill: 'Chilled', food: 'Food sickness', fouled: 'Fouled water',
+    fever: 'Wound fever', bite: 'Bite sickness'
+  };
+
+  /* The short lines the left edge of the screen draws. A disease still in
+     its caught window is not one of them: "a cure in that window and it
+     never shows". */
+  function lines(rec, now) {
+    var out = [];
+    var bleeding = 0, slowed = true;
+    for (var i = 0; i < rec.wounds.length; i++) {
+      var w = rec.wounds[i];
+      if ((w.k === 'cut' || w.k === 'bite') && w.bleed) { bleeding++; if (!w.cloth) { slowed = false; } }
+    }
+    if (bleeding) { out.push(slowed ? 'Bleeding, slowed' : 'Bleeding'); }
+    for (var j = 0; j < rec.wounds.length; j++) {
+      var x = rec.wounds[j];
+      if (x.k === 'cut' && !x.bleed) { out.push(x.closed ? 'Cut, closed' : (x.bandage ? 'Cut, bandaged' : 'Open cut')); }
+      if (x.k === 'bite' && !x.bleed) { out.push((x.closed || x.bandage) ? 'Bite, closed' : 'Open bite'); }
+      if (x.k === 'break') {
+        out.push('Broken ' + x.limb + (x.set ? ', set' : (x.splint ? ', splinted' : '')));
+      }
+      if (x.k === 'burn' && x.dealt >= HURT.burn.bad) { out.push('Bad burn'); }
+    }
+    if (rec.crooked.arm) { out.push('Crooked arm'); }
+    if (rec.crooked.leg) { out.push('Crooked leg'); }
+    if (rec.agreed.hand) { out.push('Missing hand'); }
+    if (rec.agreed.eye) { out.push('Missing eye'); }
+    for (var k = 0; k < rec.ills.length; k++) {
+      var stage = stageOf(rec.ills[k], now);
+      if (stage === 'caught') { continue; }
+      out.push(WORDS[rec.ills[k].k] + (stage === 'bad' ? ', bad' : ''));
+    }
+    return out;
+  }
+
+  function tell(actorId, line) {
+    if (!line) { return; }
+    try { notify(actorId, line); } catch (e) { }
+    try { say(actorId, line); } catch (e) { }
+  }
+
+  /*
+    A CHANGE HAS TO REACH THE CHARACTER, for the reason written over
+    pushEffects in the needs block: the costs ride on the skills panel, and
+    the panel is only written when the character changes. So a disease that
+    shows, worsens or clears, and a wound that comes or goes, asks the
+    character block to redraw.
+  */
+  function redraw(actorId) {
+    try {
+      var c = g.__thornswoodCharacter;
+      if (!c || !c.stateOf || !c.writeState) { return; }
+      var s = c.stateOf(actorId);
+      if (s) { c.writeState(actorId, s, true); }
+    } catch (e) { }
+  }
+
+  // ---------------------------------------------------------- the tick --
+
+  /*
+    WHAT THE NEEDS BLOCK KNOWS ABOUT WHERE YOU ARE. Read, never written: the
+    chill is caught and cleared by the rest and the warmth that block already
+    keeps. A bed is the beds' answer in the property block (#1392), a fire is
+    the distance the client reports. read, not settle: the needs tick settles
+    every 20 seconds, and a clock an hour long needs nothing fresher, nor a
+    second write of that property.
+  */
+  function needsNow(actorId) {
+    var N = g.__thornswoodNeeds;
+    if (!N || !N.read) { return null; }
+    try { return N.read(actorId); } catch (e) { return null; }
+  }
+
+  // The rest kinds that are lying in a bed or a bedroll (NEEDS.recover), and
+  // bedroll for a record stored before the ladder.
+  var IN_BED = { rough: true, camp: true, inn: true, bed: true, bedroll: true };
+
+  var ILL_WORDS = {
+    chill: 'A chill has settled in. A fire, a bed or getting warm again will shake it.',
+    food: 'Your stomach turns. Food sickness, for a while.',
+    fouled: 'The water was bad. You are sick with it for a while.',
+    fever: 'Wound fever. A potion of cure disease or a temple shrine will clear it.',
+    bite: 'The bite has gone bad: bite sickness. A potion of cure disease or a temple shrine will clear it.'
+  };
+
+  /*
+    Bring one person's record up to now. Answers the lines worth saying and
+    whether anything changed. Everything is worked from real time, the way the
+    needs are, so a restart, a slow tick or a night away all land on the same
+    answer.
+  */
+  function step(actorId, rec, now) {
+    var said = [];
+    var changed = false;
+    var n = needsNow(actorId);
+    var N = g.__thornswoodNeeds;
+
+    /*
+      THE CHILL. An hour of sleep on open ground: resting at the sitting rate,
+      a seat with no fire in reach (exhaustion.md, "sleeping on open ground is
+      sitting, 20 an hour"), with no roof and not indoors. Or an hour at spent
+      cold. Each clock starts again once it has caught.
+    */
+    if (n && N) {
+      var open = n.resting === 'sit' && !n.roof && !!n.place && n.place !== 'indoors';
+      if (open) {
+        if (!rec.ground) { rec.ground = now; changed = true; }
+        else if (minutesSince(rec.ground, now) >= CHILL_AFTER_MIN) {
+          catchIll(actorId, rec, 'chill', 1, now);
+          rec.ground = now; changed = true;
+        }
+      } else if (rec.ground) { rec.ground = 0; changed = true; }
+
+      var t = N.tempBand ? N.tempBand(n.temp) : { name: 'fine', cold: false };
+      if (t.cold && t.name === 'spent') {
+        if (!rec.cold) { rec.cold = now; changed = true; }
+        else if (minutesSince(rec.cold, now) >= CHILL_AFTER_MIN) {
+          catchIll(actorId, rec, 'chill', 1, now);
+          rec.cold = now; changed = true;
+        }
+      } else if (rec.cold) { rec.cold = 0; changed = true; }
+    }
+
+    /*
+      THE WOUNDS' OWN CLOCKS. At 10 minutes a cut, a bite and a bad burn roll
+      wound fever, and a bite rolls bite sickness. A cut or a bite whose bleed
+      has stopped and whose rolls are done has nothing left to do and leaves
+      the list. A break heals 3 days after it was set, or crooked 3 days after
+      it happened if nobody set it. A burn heals in a day.
+    */
+    var keep = [];
+    for (var i = 0; i < rec.wounds.length; i++) {
+      var w = rec.wounds[i];
+      var m = minutesSince(w.at, now);
+      if ((w.k === 'cut' || w.k === 'bite') && !w.rolled && m >= HURT.feverAfter) {
+        if (!w.closed) {
+          var fc = w.poultice ? HURT.fever.poultice : (w.bandage ? HURT.fever.bandage : HURT.fever.open);
+          catchIll(actorId, rec, 'fever', fc, now);
+        }
+        if (w.k === 'bite') {
+          catchIll(actorId, rec, 'bite', (w.closed || w.bandage) ? HURT.bite.closed : HURT.bite.open, now);
+        }
+        w.rolled = true; changed = true;
+      }
+      if ((w.k === 'cut' || w.k === 'bite') && w.rolled && !w.bleed) { changed = true; continue; }
+      if (w.k === 'burn') {
+        if (!w.rolled && m >= HURT.feverAfter) {
+          var bc = w.poultice ? HURT.fever.poultice : (w.bandage ? HURT.fever.bandage : HURT.fever.open);
+          catchIll(actorId, rec, 'fever', bc, now);
+          w.rolled = true; changed = true;
+        }
+        if (now - w.at >= HURT.burn.healDays * DAY) {
+          said.push('The burn has healed.'); changed = true; continue;
+        }
+      }
+      if (w.k === 'break') {
+        if (w.set && now - w.set >= HURT.breakDays * DAY) {
+          said.push('Your broken ' + w.limb + ' has healed.'); changed = true; continue;
+        }
+        if (!w.set && now - w.at >= HURT.breakDays * DAY) {
+          rec.crooked[w.limb] = now;
+          said.push('Your broken ' + w.limb + ' has healed crooked. A master physicker or a temple shrine can put it right.');
+          changed = true; continue;
+        }
+      }
+      keep.push(w);
+    }
+    rec.wounds = keep;
+
+    /*
+      THE DISEASES. A chill clears at a fire, in a bed, or once you are warm
+      again after being cold, and on its own after 2 hours. Food sickness and
+      fouled water pass. A fever and bite sickness wait for a cure. Each says
+      so once when it shows and once when it turns bad.
+    */
+    var ills = [];
+    for (var j = 0; j < rec.ills.length; j++) {
+      var ill = rec.ills[j];
+      var d = DISEASE[ill.k];
+      if (runOut(ill, now)) {
+        if (stageOf(ill, now) !== 'caught') { said.push('The ' + d.name + ' has passed.'); }
+        changed = true; continue;
+      }
+      if (ill.k === 'chill' && n && N) {
+        var tb = N.tempBand ? N.tempBand(n.temp) : { name: 'fine', cold: false };
+        var reach = (N.NEEDS && N.NEEDS.fire) ? N.NEEDS.fire.reach : 300;
+        var fire = typeof n.fire === 'number' && n.fire >= 0 && n.fire < reach;
+        // Any bed or bedroll, whoever's: the ladder's rough, camp, inn and bed (#1603).
+        var bed = has(IN_BED, n.resting);
+        var warm = tb.name === 'fine' && ill.cold;
+        if (fire || bed || warm) {
+          if (stageOf(ill, now) !== 'caught') {
+            said.push(fire ? 'The fire shakes the chill off.'
+              : (bed ? 'The bed shakes the chill off.' : 'You are warm again and the chill is gone.'));
+          }
+          changed = true; continue;
+        }
+        if (tb.cold && tb.name !== 'fine' && !ill.cold) { ill.cold = true; changed = true; }
+      }
+      var stage = stageOf(ill, now);
+      if (stage !== 'caught' && ill.told !== stage) {
+        said.push(stage === 'bad'
+          ? ('The ' + d.name + ' is worse. You cannot work at a bench like this, and waiting will not clear it.')
+          : ILL_WORDS[ill.k]);
+        ill.told = stage; changed = true;
+      }
+      ills.push(ill);
+    }
+    rec.ills = ills;
+    return { said: said, changed: changed };
+  }
+
+  var TICK_MS = 10000;
+
+  /*
+    The lines last written are what the screen and the panel last saw, so a
+    change in them is what asks for a redraw. A clock that moved and changed
+    nothing on screen is written without one.
+  */
+  function tick() {
+    var online = [];
+    try { online = mp.getOnlinePlayers() || []; } catch (e) { return; }
+    var now = Date.now();
+    for (var i = 0; i < online.length; i++) {
+      var who = online[i];
+      try {
+        var rec = read(who);
+        var was = rec.show.join('|');
+        var r = step(who, rec, now);
+        var shown = lines(rec, now).join('|');
+        if (r.changed || shown !== was) { write(who, rec); }
+        if (shown !== was) { redraw(who); }
+        for (var k = 0; k < r.said.length; k++) { tell(who, r.said[k]); }
+      } catch (e) { hlog('tick', who, e); }
+    }
+  }
+
+  /*
+    THE BLEED, every second, for whoever is bleeding. One bleed a person,
+    however many cuts: 2 a second, or 1 when every open one is wrapped in torn
+    cloth. Taken with the engine's own DamageActorValue, which knows the
+    person's most health, so nothing here has to. A bleed that empties it is
+    the engine's death with no killer: see the top of this block.
+  */
+  var BLEED_MS = 1000;
+
+  function bleedRate(rec) {
+    var rate = 0;
+    for (var i = 0; i < rec.wounds.length; i++) {
+      var w = rec.wounds[i];
+      if ((w.k === 'cut' || w.k === 'bite') && w.bleed) {
+        rate = Math.max(rate, w.cloth ? HURT.bleed.cloth : HURT.bleed.open);
+      }
+    }
+    return rate;
+  }
+
+  function bleedTick() {
+    var online = [];
+    try { online = mp.getOnlinePlayers() || []; } catch (e) { return; }
+    for (var i = 0; i < online.length; i++) {
+      var who = online[i];
+      var dead = false;
+      try { dead = !!mp.get(who, 'isDead'); } catch (e) { continue; }
+      if (dead) { continue; }
+      var rate = bleedRate(read(who));
+      if (!rate) { continue; }
+      try {
+        mp.callPapyrusFunction('method', 'Actor', 'DamageActorValue',
+          { type: 'form', desc: mp.getDescFromId(who) }, ['Health', rate]);
+      } catch (e) { hlog('could not bleed', who.toString(16) + ':', e); }
+    }
+  }
+
+  // -------------------------------------------------------- the wounds --
+
+  function blank(k, limb, now) {
+    return { k: k, at: now, limb: limb === 'leg' ? 'leg' : 'arm', bleed: false, cloth: false,
+             bandage: false, poultice: false, closed: false, rolled: false,
+             splint: false, set: 0, dealt: 0 };
+  }
+
+  /* A cut, a bite or a break, opened now. Answers what to tell them, or '' when the record is full. */
+  function wound(actorId, k, limb, now) {
+    if (k !== 'cut' && k !== 'bite' && k !== 'break') { return ''; }
+    var rec = read(actorId);
+    now = now || Date.now();
+    if (rec.wounds.length >= HURT.most) { return ''; }
+    var w = blank(k, limb, now);
+    var line = '';
+    if (k === 'cut') { w.bleed = true; line = 'You are cut and bleeding.'; }
+    else if (k === 'bite') { w.bleed = true; line = 'You are bitten and bleeding.'; }
+    else { line = 'Your ' + w.limb + ' is broken.'; }
+    rec.wounds.push(w);
+    write(actorId, rec);
+    redraw(actorId);
+    return line;
+  }
+
+  /*
+    THE FIRE, TIMED. The client reports /burn 1 when it catches and every few
+    seconds while it burns, and /burn 0 when it goes out. A report after a
+    long silence is a new fire. What it dealt is the seconds it burned at the
+    coals' rate; 30 or more is a bad burn. Answers what to tell them, or ''.
+  */
+  // actorId -> { from, last }. On globalThis, so a hot reload mid fire keeps its start.
+  if (!g.__thornswoodHurtFires) { g.__thornswoodHurtFires = {}; }
+  var fires = g.__thornswoodHurtFires;
+  var FIRE_GAP_MS = 6000;  // the needs block lets go of a silent client after three of its beats
+
+  function burning(actorId, on, now) {
+    now = now || Date.now();
+    var f = has(fires, actorId) ? fires[actorId] : null;
+    if (on) {
+      if (!f || (now - f.last) > FIRE_GAP_MS) { fires[actorId] = { from: now, last: now }; }
+      else { f.last = now; }
+      return '';
+    }
+    if (!f) { return ''; }
+    delete fires[actorId];
+    var seconds = Math.max(1, Math.round((now - f.from) / 1000));
+    var dealt = seconds * HURT.burn.perSecond;
+    if (dealt < HURT.burn.bad) { return ''; }
+    var rec = read(actorId);
+    var had = null;
+    for (var i = 0; i < rec.wounds.length; i++) { if (rec.wounds[i].k === 'burn') { had = rec.wounds[i]; } }
+    if (had) {
+      // One burn on a body, and the newest fire starts its day and its 10 minutes again.
+      had.at = now; had.dealt = Math.max(had.dealt, dealt); had.rolled = false;
+      had.bandage = false; had.poultice = false;
+    } else if (rec.wounds.length < HURT.most) {
+      var b = blank('burn', '', now);
+      b.dealt = dealt;
+      rec.wounds.push(b);
+    }
+    write(actorId, rec);
+    redraw(actorId);
+    hlog(actorId.toString(16), 'burnt for', seconds, 'seconds,', dealt, 'health');
+    return 'That fire burnt you badly. What you wear keeps half its warmth until the burn heals, in a day.';
+  }
+
+  /*
+    WHAT ONE HEALING SPELL DOES, by the spell's own rank. Answers a line, or ''
+    when it changed nothing.
+  */
+  function healed(actorId, rank) {
+    var at = RANKS.indexOf(rank);
+    if (at < 0) { return ''; }
+    var rec = read(actorId);
+    var did = [];
+    for (var i = 0; i < rec.wounds.length; i++) {
+      var w = rec.wounds[i];
+      if (w.k === 'cut' || w.k === 'bite') {
+        if (at >= 1 && !w.closed) { w.closed = true; w.bleed = false; did.push('closed'); }
+        else if (w.bleed) { w.bleed = false; did.push('stopped'); }
+      }
+      if (w.k === 'break' && at >= 2 && w.splint && !w.set) { w.set = Date.now(); did.push('set'); }
+    }
+    if (!did.length) { return ''; }
+    write(actorId, rec);
+    redraw(actorId);
+    if (did.indexOf('set') !== -1) { return 'The spell sets the splinted bone. It heals in 3 days.'; }
+    if (did.indexOf('closed') !== -1) { return 'The spell closes the wound.'; }
+    return 'The spell stops the bleeding. The wound is still open.';
+  }
+
+  function spellRank(source) {
+    var P = g.__thornswoodProgression;
+    var desc = (source && typeof source === 'object') ? String(source.desc || '') : String(source || '');
+    if (!P || !P.spellByDesc || !desc) { return null; }
+    var sp = null;
+    try { sp = P.spellByDesc(desc); } catch (e) { sp = null; }
+    if (!sp || !has(HEALING, sp.name)) { return null; }
+    return { name: sp.name, rank: sp.rank, self: HEALING[sp.name].self };
+  }
+
+  function personal(id) {
+    try { return Number(mp.get(id, 'profileId')) > 0; } catch (e) { return false; }
+  }
+
+  /* A cast, heard from onPapyrusEvent:OnSpellCast: a healing spell on yourself. */
+  function cast(casterId, spell) {
+    var s = spellRank(spell);
+    if (!s || !s.self || !personal(casterId)) { return; }
+    tell(casterId, healed(casterId, s.rank));
+  }
+
+  /* A hit, heard from onPapyrusEvent:OnHit: a healing spell landing on somebody. */
+  function hit(targetId, aggressor, source) {
+    var s = spellRank(source);
+    if (!s || s.self || !personal(targetId)) { return; }
+    tell(targetId, healed(targetId, s.rank));
+  }
+
+  // --------------------------------------------------------- the cures --
+
+  /* The one furthest along, then the oldest. Answers it, or null. */
+  function cureOne(rec, now) {
+    var best = -1, bestStage = -1;
+    for (var i = 0; i < rec.ills.length; i++) {
+      var st = ['caught', 'ill', 'bad'].indexOf(stageOf(rec.ills[i], now));
+      if (st > bestStage || (st === bestStage && rec.ills[i].at < rec.ills[best].at)) { best = i; bestStage = st; }
+    }
+    if (best < 0) { return null; }
+    return { ill: rec.ills.splice(best, 1)[0], shown: bestStage > 0 };
+  }
+
+  /*
+    SOMETHING DRUNK FROM THE PACK (mp.onEatItem, below). A potion of cure
+    disease clears one ordinary disease. It is still the thirst sip, which the
+    needs block gives from the client's /ate line. Answers a line, or ''.
+  */
+  function swallowed(actorId, baseId) {
+    var cure = false;
+    for (var i = 0; i < CURE_DISEASE.length; i++) {
+      var id = 0;
+      try { id = idOf(CURE_DISEASE[i]); } catch (e) { id = 0; }
+      if (id && id === baseId) { cure = true; }
+    }
+    if (!cure) { return ''; }
+    var rec = read(actorId);
+    var gone = cureOne(rec, Date.now());
+    if (!gone) { return ''; }
+    write(actorId, rec);
+    redraw(actorId);
+    hlog(actorId.toString(16), 'cured of', DISEASE[gone.ill.k].name, 'by a potion');
+    return gone.shown ? ('The ' + DISEASE[gone.ill.k].name + ' is gone.') : '';
+  }
+
+  /*
+    THE TEMPLE RITE: a shrine pressed inside one of the temples the wake uses
+    (the stuck block's TEMPLES, the same cells). injury.md and disease.md: a
+    temple sets breaks, clears a crooked heal and clears ordinary disease, and
+    does not clear an agreed loss. A wayside shrine is a blessing only. That
+    reading is a question on #1383. Answers a line, or ''.
+  */
+  function inTemple(actorId) {
+    var cell = '';
+    try { cell = String(mp.get(actorId, 'worldOrCellDesc') || '').toLowerCase(); } catch (e) { return false; }
+    var S = g.__thornswoodStuck;
+    var list = (S && S.TEMPLES) || [];
+    for (var i = 0; i < list.length; i++) {
+      if (cell && String(list[i].desc || '').toLowerCase() === cell) { return true; }
+    }
+    return false;
+  }
+
+  function rite(actorId) {
+    if (!inTemple(actorId)) { return ''; }
+    var rec = read(actorId);
+    var did = [];
+    if (rec.ills.length) { rec.ills = []; did.push('the sickness'); }
+    var set = false;
+    for (var i = 0; i < rec.wounds.length; i++) {
+      if (rec.wounds[i].k === 'break' && !rec.wounds[i].set) { rec.wounds[i].set = Date.now(); set = true; }
+    }
+    if (set) { did.push('the break'); }
+    if (rec.crooked.arm || rec.crooked.leg) { rec.crooked = {}; did.push('the crooked bone'); }
+    if (!did.length) { return ''; }
+    write(actorId, rec);
+    redraw(actorId);
+    hlog(actorId.toString(16), 'had the temple rite:', did.join(', '));
+    return 'The temple sees to ' + did.join(' and ') + '.';
+  }
+
+  /*
+    EXPOSED, for the meal and drink work (#1382): somebody ate raw meat or
+    fish ('food', 'raw'), ate at 90 hunger or above ('food', 'full'), or drank
+    from a source with a risk ('fouled', 'marsh' and the rest of EXPOSED). The
+    chance is EXPOSED's. Answers whether it took, which is not something to
+    tell them: a disease in its caught window does not show.
+  */
+  function exposed(actorId, kind, source) {
+    var row = has(EXPOSED, kind) ? EXPOSED[kind] : null;
+    if (!row || !has(row, source)) { return false; }
+    var rec = read(actorId);
+    var took = catchIll(actorId, rec, kind, row[source], Date.now());
+    if (took) { write(actorId, rec); }
+    return took;
+  }
+
+  /*
+    THE BENCH. disease.md: while a disease is bad, crafting is refused.
+    injury.md: a broken arm, and a missing hand for good, refuse crafting that
+    needs both hands. Answers the refusal, or ''. workbenchId is the bench
+    reference the craft was made at.
+  */
+  function craftRefusal(actorId, workbenchId) {
+    var rec = read(actorId);
+    var now = Date.now();
+    for (var i = 0; i < rec.ills.length; i++) {
+      if (stageOf(rec.ills[i], now) === 'bad') {
+        return 'You are too sick to work: the ' + DISEASE[rec.ills[i].k].name +
+               ' is bad. A potion of cure disease or a temple shrine clears it.';
+      }
+    }
+    var arm = false;
+    for (var j = 0; j < rec.wounds.length; j++) {
+      if (rec.wounds[j].k === 'break' && rec.wounds[j].limb === 'arm') { arm = true; }
+    }
+    if (!arm && !rec.agreed.hand) { return ''; }
+    var kw = '';
+    try {
+      var base = mp.get(workbenchId, 'baseDesc');
+      kw = (typeof BENCH_BY_BASE !== 'undefined' && has(BENCH_BY_BASE, base)) ? BENCH_BY_BASE[base] : '';
+    } catch (e) { kw = ''; }
+    if (!kw || !has(TWO_HANDS, kw)) { return ''; }
+    return rec.agreed.hand
+      ? ('Work at ' + TWO_HANDS[kw] + ' takes two hands, and you have one.')
+      : ('Work at ' + TWO_HANDS[kw] + ' takes two hands, and your arm is broken.');
+  }
+
+  /*
+    A DEATH. The temple stopped the death and did not wash the cuts
+    (death.md), so every wound and disease stays on the record. The bleed
+    stops: the wake is the death being stopped, and a cut still bleeding in
+    the temple would kill again before anybody could reach it. Whether the
+    wake should stop it is a question on #1383. The fire goes out with the body.
+  */
+  function died(actorId) {
+    delete fires[actorId];
+    var rec = read(actorId);
+    var any = false;
+    for (var i = 0; i < rec.wounds.length; i++) {
+      if (rec.wounds[i].bleed) { rec.wounds[i].bleed = false; any = true; }
+    }
+    if (any) { write(actorId, rec); }
+  }
+
+  /*
+    THE SCAR, the line other people are told when they look at you
+    (injury.md). The social block puts it on the look prompt.
+  */
+  function scarOf(actorId) {
+    var rec = read(actorId);
+    return rec.agreed.scar ? rec.agreed.scar.text : '';
+  }
+
+  // ------------------------------------------------------ staff, /hurt --
+
+  /*
+    /hurt <person> [what], for staff, through the staff block. A
+    Gamemaster's scene needs a wound before the world opens one, and an
+    agreed loss is agreed out of character, so staff are the ones who write
+    it down. words are the words after the person. Answers { staff, them }.
+
+      /hurt <person>                         what they have
+      /hurt <person> cut | bite | break arm | break leg
+      /hurt <person> chill | food | fouled | fever | bitesick
+                                             caught now, with no roll
+      /hurt <person> agreed hand | eye | scar <what people are told>
+                                             they said yes, out of character
+      /hurt <person> unagree hand | eye | scar   written down by mistake
+      /hurt <person> clear                   every wound and disease, not an agreed loss
+  */
+  var STAFF_ILLS = { chill: 'chill', food: 'food', fouled: 'fouled', fever: 'fever', bitesick: 'bite' };
+
+  function summary(rec, now) {
+    var l = lines(rec, now);
+    for (var i = 0; i < rec.ills.length; i++) {
+      if (stageOf(rec.ills[i], now) === 'caught') { l.push(DISEASE[rec.ills[i].k].name + ' (caught, not showing yet)'); }
+    }
+    if (rec.agreed.scar) { l.push('a scar: ' + rec.agreed.scar.text); }
+    return l.length ? l.join(', ') + '.' : 'nothing.';
+  }
+
+  function staff(actorId, words, byName) {
+    var w = (words || []).map(function (s) { return String(s); });
+    var what = String(w[0] || '').toLowerCase();
+    var rec = read(actorId);
+    var now = Date.now();
+    if (!what) { return { staff: 'They have ' + summary(rec, now), them: '' }; }
+    if (what === 'cut' || what === 'bite' || what === 'break') {
+      var limb = String(w[1] || '').toLowerCase();
+      if (what === 'break' && limb !== 'arm' && limb !== 'leg') {
+        return { staff: 'Break which? /hurt <person> break arm, or break leg.', them: '' };
+      }
+      var line = wound(actorId, what, limb, now);
+      return line ? { staff: 'Done. They have ' + summary(read(actorId), now), them: line }
+                  : { staff: 'They already carry as many wounds as the record holds.', them: '' };
+    }
+    if (has(STAFF_ILLS, what)) {
+      var k = STAFF_ILLS[what];
+      if (hasIll(rec, k)) { return { staff: 'They already have ' + DISEASE[k].name + '.', them: '' }; }
+      rec.ills.push({ k: k, at: now, cold: false, told: '' });
+      write(actorId, rec);
+      return { staff: 'Done. The ' + DISEASE[k].name + ' shows in ' + CAUGHT_MIN + ' minutes unless it is cured first.', them: '' };
+    }
+    if (what === 'agreed' || what === 'unagree') {
+      var part = String(w[1] || '').toLowerCase();
+      if (part !== 'hand' && part !== 'eye' && part !== 'scar') {
+        return { staff: what === 'agreed' ? 'Agreed what? hand, eye, or scar <what people are told>.' : 'Which? hand, eye, or scar.', them: '' };
+      }
+      if (what === 'unagree') {
+        if (!rec.agreed[part]) { return { staff: 'There is no agreed ' + part + ' on them.', them: '' }; }
+        delete rec.agreed[part];
+        write(actorId, rec);
+        redraw(actorId);
+        return { staff: 'Taken off the record.', them: 'Staff took the agreed ' + part + ' off your character.' };
+      }
+      // Drawn on other people's screens, so nothing in it can be markup.
+      var text = w.slice(2).join(' ').replace(/[<>&"]/g, '').trim().slice(0, 200);
+      if (part === 'scar' && !text) {
+        return { staff: 'What is the scar? /hurt <person> agreed scar <what people are told when they look at you>.', them: '' };
+      }
+      rec.agreed[part] = { at: now, by: String(byName || ''), text: text };
+      write(actorId, rec);
+      redraw(actorId);
+      var told = {
+        hand: 'Your character has lost a hand, as you agreed. Work that takes two hands is closed to you.',
+        eye: 'Your character has lost an eye, as you agreed. A bow or a spell does a fifth less damage.',
+        scar: 'Your character carries a scar, as you agreed. People who look at you are told: ' + text
+      };
+      return { staff: 'Written down.', them: told[part] };
+    }
+    if (what === 'clear') {
+      rec.wounds = []; rec.ills = []; rec.crooked = {}; rec.cold = 0; rec.ground = 0;
+      write(actorId, rec);
+      redraw(actorId);
+      return { staff: 'Cleared. An agreed loss stays.', them: 'Staff cleared your wounds and sickness.' };
+    }
+    return { staff: 'That is not something /hurt knows. cut, bite, break arm, break leg, chill, food, ' +
+                    'fouled, fever, bitesick, agreed, unagree, clear.', them: '' };
+  }
+
+  // ------------------------------------------------------- the screen --
+
+  /*
+    WHAT YOU HAVE, ON THE LEFT EDGE. An updateOwner script, like the needs
+    bars, so it ships with the gamemode and needs no release. Edge triggered
+    on the lines, because updateOwner runs every frame. Nothing is drawn while
+    there is nothing to say. Left of the middle of the screen, because the
+    corners are taken: the game's notifications top left, the chat and the
+    needs bars bottom left, the voice mark top right.
+  */
+  function hudScript() {
+    var CSS = 'position:fixed;left:18px;top:40%;z-index:2147483500;' +
+              'pointer-events:none;font-family:Georgia,serif;font-size:20px;' +
+              'letter-spacing:.04em;color:#e0a98f;' +
+              'background:rgba(12,10,8,.62);border:2px solid rgba(0,0,0,.65);' +
+              'border-radius:10px;padding:9px 16px 11px;' +
+              'text-shadow:0 2px 4px rgba(0,0,0,.95)';
+    return [
+      '(function(){',
+      '  try {',
+      '    var v = ctx.value;',
+      '    var st = ctx.state;',
+      '    if (!st) { return; }',
+      '    var show = (v && v.show && v.show.length) ? v.show : [];',
+      '    var sig = "hurt:" + show.join("|");',
+      '    if (st.thornswoodHurtHud === sig) { return; }',
+      '    st.thornswoodHurtHud = sig;',
+      '    var html = "";',
+      '    for (var i = 0; i < show.length; i++) {',
+      '      html += "<div>" + String(show[i]).replace(/[<>&]/g, "") + "</div>";',
+      '    }',
+      '    var src = "(function(){try{" +',
+      '      "var d=document.getElementById(\'ts-hurt\');" +',
+      '      "if(!d){d=document.createElement(\'div\');d.id=\'ts-hurt\';" +',
+      '      "d.style.cssText=" + ' + JSON.stringify(JSON.stringify(CSS)) + ' + ";" +',
+      '      "document.body.appendChild(d);}" +',
+      '      "d.innerHTML=" + JSON.stringify(html) + ";" +',
+      '      "d.style.display=" + JSON.stringify(html ? "" : "none") + ";" +',
+      '      "}catch(e){}})();";',
+      '    try { ctx.sp.browser.executeJavaScript(src); } catch (e) { }',
+      '  } catch (e) { }',
+      '})();'
+    ].join('\n');
+  }
+
+  try {
+    mp.makeProperty(HURT_PROPERTY, {
+      // The owner draws it. A neighbour is told only the scar, on the look prompt.
+      isVisibleByOwner: true,
+      isVisibleByNeighbors: false,
+      updateOwner: hudScript(),
+      updateNeighbor: ''
+    });
+  } catch (e) {
+    // Already made by a previous load. The script cannot change until a restart, which a deploy is.
+  }
+
+  /*
+    A POTION DRUNK FROM THE PACK, heard for the potion of cure disease. This
+    is the engine's own record of the drink, not the client's /ate line: it
+    is raised only once the server has checked the pack holds the potion, and
+    it is the same message that takes it out (MpActor::OnEquip). So nobody
+    cures a disease by saying they drank something. It never refuses: the
+    engine takes the potion whatever this answers.
+  */
+  mp.onEatItem = guard('onEatItem', function (actorId, baseId) {
+    try { tell(actorId, swallowed(actorId, Number(baseId) || 0)); } catch (e) { hlog('the drink threw:', e); }
+  });
+
+  /*
+    EVERY SPELL CAST, heard for the healing spells above. The engine reads
+    nothing this family answers (the list over mp.onTakeItem), so it answers
+    nothing. A block that needs to hear casts as well adds its call here
+    rather than a second handler, which would replace this one.
+  */
+  mp['onPapyrusEvent:OnSpellCast'] = guard('onPapyrusEvent:OnSpellCast', function (casterId, spell) {
+    try { cast(casterId, spell); } catch (e) { hlog('the cast threw:', e); }
+  });
+
+  if (g.__thornswoodHurtTimer) { try { clearInterval(g.__thornswoodHurtTimer); } catch (e) { } }
+  g.__thornswoodHurtTimer = setInterval(guard('hurtTick', tick), TICK_MS);
+  if (g.__thornswoodBleedTimer) { try { clearInterval(g.__thornswoodBleedTimer); } catch (e) { } }
+  g.__thornswoodBleedTimer = setInterval(guard('bleedTick', bleedTick), BLEED_MS);
+
+  g.__thornswoodHurt = {
+    HURT: HURT, DISEASE: DISEASE, EXPOSED: EXPOSED, HEALING: HEALING, TWO_HANDS: TWO_HANDS,
+    CURE_DISEASE: CURE_DISEASE, CAUGHT_MIN: CAUGHT_MIN, BAD_AFTER_MIN: BAD_AFTER_MIN,
+    CHILL_AFTER_MIN: CHILL_AFTER_MIN,
+    read: read, write: write, step: step, tick: tick, bleedTick: bleedTick, bleedRate: bleedRate,
+    stageOf: stageOf, lines: lines, chanceFor: chanceFor,
+    forNeeds: forNeeds, burntWear: burntWear, wound: wound, burning: burning,
+    healed: healed, cast: cast, hit: hit, swallowed: swallowed, rite: rite,
+    exposed: exposed, craftRefusal: craftRefusal, died: died, scarOf: scarOf, staff: staff
+  };
+
+  hlog('ready: wounds and the five diseases, every', TICK_MS / 1000, 'seconds, and the bleed every second');
+})();
+// ==== end thornswood injury and disease ====
 
 // ==== thornswood social: friends, parties, mutes and journals ====
 /*
@@ -53071,7 +54269,13 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       try { pos = mp.get(id, 'pos'); cell = String(mp.get(id, 'worldOrCellDesc') || ''); }
       catch (e) { continue; }
       if (!pos || !cell) { continue; }
-      at.push({ id: id, pos: pos, cell: cell, pid: profileOf(id), name: nameOfPerson(id) });
+      /*
+        And the scar they agreed to (#1383): injury.md, a line other people
+        are told when they look at you. The look prompt draws it.
+      */
+      var scar = '';
+      try { scar = (g.__thornswoodHurt && g.__thornswoodHurt.scarOf) ? g.__thornswoodHurt.scarOf(id) : ''; } catch (eScar) { scar = ''; }
+      at.push({ id: id, pos: pos, cell: cell, pid: profileOf(id), name: nameOfPerson(id), scar: scar });
     }
 
     var reach = SOCIAL.nearReach * SOCIAL.nearReach;
@@ -53100,6 +54304,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
           y: (party && party.members.indexOf(them.pid) !== -1) ? 1 : 0,
           s: (beds && beds.mark) ? beds.mark(me.pid, them.pid, me.cell) : 0
         };
+        // c, not s: s is the holder's sleep key (#1603).
+        if (them.scar) { w[them.id.toString(16)].c = them.scar; }
       }
       var sig = JSON.stringify(w) + (s.namesAll ? ':all' : '');
       if (nearWas[me.id] === sig) { continue; }
@@ -55950,6 +57156,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     /pk <person> <why>                    the character dies for good (#1010)
     /unpk <person or character> <why>     an admin undoes a PK made by mistake
     /note <person> <text>                 kept against them, for staff to read
+    /hurt <person> [what]                 a wound, a disease or an agreed loss on
+                                          them, for a scene or a yes given out of
+                                          character, or what they carry (#1383;
+                                          the injury and disease block says what)
 
   One character or the whole account, and PK, are Patrick's of 28 September
   (#1010). A PK is not a ban: the character can never be played or picked
@@ -56005,7 +57215,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
   var WORDS_STAFF = ['/kick', '/freeze', '/unfreeze', '/bring', '/goto',
                      '/silence', '/unsilence', '/warn', '/spawnat',
-                     '/ban', '/unban', '/note', '/banaccount', '/unbanaccount', '/pk', '/unpk'];
+                     '/ban', '/unban', '/note', '/banaccount', '/unbanaccount', '/pk', '/unpk',
+                     '/hurt'];
   var BAN_SWEEP_MS = 10000;        // how often online people are checked against bans
   var SITE_WAIT_MS = 8000;
   // Everybody's (or a playtester's) words that staff can also aim at a person.
@@ -56782,6 +57993,16 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
     // Everything below needs the person in the world.
     if (!them.actorId) { tell(pid, them.why); return true; }
+
+    if (word === '/hurt') {
+      var hurt = g.__thornswoodHurt;
+      if (!hurt || !hurt.staff) { tell(pid, 'Wounds and disease are not running on this server.'); return true; }
+      var hurtSaid = hurt.staff(them.actorId, them.rest || [], me);
+      tell(pid, them.name + ': ' + hurtSaid.staff);
+      if (hurtSaid.them) { tell(them.pid, hurtSaid.them); }
+      if ((them.rest || []).length) { record('hurt', pid, me, them.pid, them.name, reason, 0); }
+      return true;
+    }
 
     if (word === '/warn') {
       if (!reason) { tell(pid, 'Warn them about what? /warn ' + them.name + ' <what they did>.'); return true; }

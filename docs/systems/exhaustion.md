@@ -85,6 +85,8 @@ rest. The fire is the distance the game already reports for warmth.
 All of it is measured again every 5 seconds, so walking away, losing a
 key, a night running out or moving away from the fire stops the rest
 or changes its rate. See [Property](property.md). Tea and skooma are
-not items the needs block knows. Open-ground sleep is not a chill.
+not items the needs block knows. Sleeping on open ground, an hour on a
+seat with no roof over you and no fire in reach, starts a chill. See
+[Disease](disease.md).
 The craft gate has not been extended to mining or chopping, and this
 plan does not extend it.

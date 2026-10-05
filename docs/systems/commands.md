@@ -105,6 +105,7 @@ These stay commands.
 | `/kick`, `/freeze`, `/unfreeze`, `/bring`, `/goto <person>`, `/silence`, `/unsilence`, `/warn`, `/spawnat`, and `/give`, `/spawn` and `/tp` aimed at a person | Staff: Owner, Dev, Gamemaster, Moderator, Loremaster, the admins and the dev list, on a proven connection with a join pass | Moderation in the world | The staff block's `command`, `gamemode.js:53418` | The staff block's header (52661); [Voice](voice.md) for silence |
 | `/ban`, `/unban`, `/banaccount`, `/unbanaccount`, `/pk`, `/note` | Staff | Bans, a character killed for good, and notes, kept on the site | `gamemode.js:53478` | The staff pages on the site (`site/public/hub.js`) |
 | `/unpk` | Admins only | Undoes a PK made by mistake | `gamemode.js:53477` | The staff pages on the site |
+| `/hurt <person> [what]` | Staff | A cut, a bite, a break or a disease for a scene, an agreed loss written down after a yes given out of character, or what somebody carries (#1383) | The staff block's `command`, which hands it to `staff` in the injury and disease block | The staff block's header; [Injury](injury.md) |
 | `/restart`, `/shutdown` | Nobody | Answers that restarts are not run from chat | `gamemode.js:45207` | Nowhere |
 | `/close` (Discord) | Staff | Closes a ticket | `bot/bot.py:1440` | Discord's own command list |
 | `/live-smoke start`, `reset`, `refresh`, `report` (Discord) | Owner, Dev and Lead Gamemaster | The Live smoke checklist in #test-tasks | `bot/bot.py:2565` | Discord's own command list |
@@ -122,7 +123,7 @@ client reports what only it can see. They stay.
 | `/face done`, `/racemenu` | The front plugin | The race menu closed, or is up | `gamemode.js:44425`, `44441` |
 | `/modset` | The front plugin | Mod settings menu values that changed | `gamemode.js:44463` |
 | `/ate <id>` | The front plugin | Something was eaten or drunk | `gamemode.js:44546` |
-| `/place`, `/burn` | The front plugin | Where you stand for warmth, and being on fire | `gamemode.js:44558`, `44580` |
+| `/place`, `/burn` | The front plugin | Where you stand for warmth, and being on fire, which is also timed for a burn wound | `gamemode.js:44558`, `44580` |
 | `/chopped` | The front plugin | A fall of the axe at a chopping block | `gamemode.js:45042` |
 | `/loadorder` | The front plugin | The client's load order | `gamemode.js:45054` |
 | `/tspicks <n>` | The front plugin | Lockpicks that broke | `gamemode.js:45064` |
