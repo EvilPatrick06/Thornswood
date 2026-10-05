@@ -47,7 +47,10 @@
   server's own, like every switch, and change on live only when the person
   deploying asks in that run: Deploy-Server.ps1 -RequirePass on|off, -Devs,
   -Playtesters, set on the box by the carry ($Asked, below), the way
-  Deploy-DevGamemode.ps1 -RequirePass sets dev's.
+  Deploy-DevGamemode.ps1 -RequirePass sets dev's. A server install takes the
+  join pass the same way (#1804): Publish-Server.ps1 -RequirePass on|off,
+  which Install-ThornswoodServer.ps1 sets over the running server's, or into
+  a first install's.
 
   Everything else stays as the running server has it: every other thornswood
   switch (the load order refusal, the join pass), npcSettings, the role lists,
@@ -175,17 +178,19 @@ function Compare-ThornswoodCarried($Before, $After, [string[]]$Keys) {
   one way to turn it off, and anything that is neither true nor false holds.
   A server whose settings hold neither would change what it does the moment a
   new gamemode reached it, with nobody having asked, so Deploy-Server's carry
-  refuses one until Deploy-Server.ps1 -RequirePass says which (#1223). Returns
+  refuses one until Deploy-Server.ps1 -RequirePass says which (#1223), and
+  Install-ThornswoodServer.ps1 until Publish-Server.ps1 -RequirePass does
+  (#1804). $Script is the one that says which, as the reason names it. Returns
   '' for true or false, otherwise the reason, which names the key and not its
   value.
 #>
-function Get-ThornswoodPassSwitchProblem($Settings) {
+function Get-ThornswoodPassSwitchProblem($Settings, [string]$Script = '.\scripts\deploy\Deploy-Server.ps1') {
     $names = Get-ThornswoodSettingNames $Settings
     if ($names -contains 'thornswoodRequirePass' -and $Settings.thornswoodRequirePass -is [bool]) { return '' }
     $had = 'missing'
     if ($names -contains 'thornswoodRequirePass') { $had = 'neither true nor false' }
     return ('thornswoodRequirePass is ' + $had + ' on this server and this run did not say which, and the gamemode reads ' +
-            'that as on (#1319). Say which with .\scripts\deploy\Deploy-Server.ps1 -RequirePass on, or off.')
+            'that as on (#1319). Say which with ' + $Script + ' -RequirePass on, or off.')
 }
 
 <#

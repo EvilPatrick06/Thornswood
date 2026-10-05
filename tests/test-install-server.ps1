@@ -52,6 +52,11 @@
       back before anything starts (INSTALL ROLLED BACK)
     - issue #1214: a payload with no build record is refused, and so is a
       Publish-Server whose zip holds a binary the record does not name
+    - issue #1804: a running server with no join pass switch is INSTALL
+      REFUSED with the root as it was and the same process answering, and
+      with -RequirePass on it is INSTALL OK with the switch set and read
+      back; a first install of a payload with none is refused, and goes in
+      with -RequirePass off. The payloads here carry a switch otherwise.
 
   Connects to nothing but 127.0.0.1.
 #>
@@ -96,6 +101,7 @@ $pub = [IO.File]::ReadAllText($publish)
 Yes 'Publish-Server no longer stops the server before it copies' ($pub -notmatch 'Stop-ScheduledTask' -and $pub -notmatch 'stopRemote')
 Yes 'and no longer throws the world away over ssh before the install' ($pub -notmatch "Remove-Item -LiteralPath '\`$VpsRoot\\world'")
 Yes 'and sends the zip''s hash for the installer to check' ($pub -match '-ZipSha256 \$zipSum')
+Yes 'and hands the installer -RequirePass when it is given one (#1804)' ($pub -match '\$instArgs \+= " -RequirePass \$RequirePass"')
 
 # ---- run, against a scratch folder ------------------------------------------
 $node = Get-Command node -CommandType Application -EA SilentlyContinue | Select-Object -First 1
@@ -384,7 +390,7 @@ function RecordText([string]$Binary, [string]$Js = $stubJs) {
 function Payload {
     param([string]$Gamemode = '// v2', [string[]]$Order = @('Skyrim.esm', 'A.esp'), [string[]]$Carry = @('Skyrim.esm', 'A.esp'),
           [string]$Binary = 'binary v2', [string]$RecordFor = '', [string]$RecordJs = '', [string]$Shipped = 'shipped v2', [int]$Port = $P,
-          [string]$ForRoot = $root, [hashtable]$Settings = @{}, [switch]$NoRecord, [string]$Stray = '', [string]$Js = '')
+          [string]$ForRoot = $root, [hashtable]$Settings = @{}, [switch]$NoRecord, [string]$Stray = '', [string]$Js = '', [switch]$NoPass)
     $script:zipN++
     $dir = Join-Path $work ('payload-' + $script:zipN)
     foreach ($n in $Carry) { Put (Join-Path $dir ('plugins\' + $n)) ('plugin ' + $n) }
@@ -400,6 +406,9 @@ function Payload {
     Put (Join-Path $dir 'data\shipped.txt') $Shipped
     $far = ($ForRoot -replace '\\', '/') + '/plugins/'
     $st = [ordered]@{ port = $Port; name = 'Thornswood Test'; dataDir = 'data'; loadOrder = @($Order | ForEach-Object { $far + $_ }) }
+    # A join pass switch, so a first install of it is not refused (#1804).
+    # No build carries one since #1223; -NoPass is that payload.
+    if (-not $NoPass) { $st['thornswoodRequirePass'] = $true }
     foreach ($k in $Settings.Keys) { $st[$k] = $Settings[$k] }
     Put (Join-Path $dir 'server-settings.json') ($st | ConvertTo-Json -Depth 8)
     $zip = Join-Path $work ('payload-' + $script:zipN + '.zip')
@@ -636,6 +645,37 @@ try {
     Yes '  and the folder that was refused is kept to read' ($kept.Count -ge 1 -and (Get (Join-Path $kept[-1] 'gamemode.js')) -eq '// v6 moved under it')
     if ($script:fail -gt $failed) { Show }
 
+    # ---- a running server with no join pass switch (#1804) ---------------------
+    # The gamemode reads a missing switch as on (#1319), so this server would
+    # start holding the moment the new gamemode reached it. Refused before
+    # anything stops, though the payload carries a switch: the running
+    # server's settings are the ones carried. -RequirePass on goes through.
+    $none = SettingsOf $root
+    $none.PSObject.Properties.Remove('thornswoodRequirePass')
+    Put (Join-Path $root 'server-settings.json') ($none | ConvertTo-Json -Depth 8)
+    $none = SettingsOf $root
+    $before = Tree $root
+    $running = Owner $P
+    $out = Install (Payload -Gamemode '// v7 no pass') @()
+    $failed = $script:fail
+    Yes 'an install over a server with no join pass switch is INSTALL REFUSED (#1804)' (($out -contains 'INSTALL REFUSED') -and $script:lastCode -ne 0)
+    Yes '  and says which switch, and how to give one' (
+        (($out -join "`n") -match 'thornswoodRequirePass is missing on this server') -and (($out -join "`n") -match 'Publish-Server\.ps1 -RequirePass on, or off'))
+    Yes '  and the root is byte for byte as it was, with no stage left' (((Tree $root) -eq $before) -and @(Beside '.stage-*').Count -eq 0)
+    Yes '  and the same server process is still answering' (((Owner $P) -eq $running) -and (Answers $P))
+    if ($script:fail -gt $failed) { Show }
+    $out = Install (Payload -Gamemode '// v7 pass on') @('-RequirePass on')
+    $failed = $script:fail
+    $after = SettingsOf $root
+    Yes '  and with -RequirePass on it is INSTALL OK, answering as a new process' (
+        ($out -contains 'INSTALL OK') -and (WaitUp $P) -and ((Owner $P) -ne $running) -and (Get (Join-Path $root 'gamemode.js')) -eq '// v7 pass on')
+    Yes '  with the switch true, said, and read back as asked' (
+        $after.thornswoodRequirePass -eq $true -and (($out -join "`n") -match 'set as this run asked: thornswoodRequirePass') -and
+        (($out -join "`n") -match 'read back: every setting outside this release is the one the server had'))
+    Yes ('  and every other setting the server''s own: ' + ((@(Carried $none $after) | Where-Object { $_ -ne 'thornswoodRequirePass' }) -join ', ')) (
+        @(Carried $none $after | Where-Object { $_ -ne 'thornswoodRequirePass' }).Count -eq 0)
+    if ($script:fail -gt $failed) { Show }
+
     # A first install has no server to keep settings from, so the payload's
     # are held to what no server should start with.
     $fresh = Join-Path $box 'Fresh\Thornswood-Server'
@@ -645,6 +685,19 @@ try {
     $failed = $script:fail
     Yes 'a first install of a payload whose npcSettings has a default key is INSTALL REFUSED' (
         ($out -contains 'INSTALL REFUSED') -and (($out -join "`n") -match 'refuses every NPC') -and -not (Test-Path -LiteralPath $fresh))
+    if ($script:fail -gt $failed) { Show }
+    # And one with no join pass switch, as every build is since #1223 (#1804).
+    $fz = Payload -ForRoot $fresh -NoPass
+    $out = RunWrapped ("& '" + $installer.Replace("'", "''") + "' -Zip '" + $fz.Replace("'", "''") + "' -Root '" + $fresh.Replace("'", "''") +
+                       "' -NoTask -AllowGamingPc`r`nexit `$LASTEXITCODE`r`n")
+    $failed = $script:fail
+    Yes 'a first install of a payload with no join pass switch is INSTALL REFUSED (#1804)' (
+        ($out -contains 'INSTALL REFUSED') -and (($out -join "`n") -match 'thornswoodRequirePass is missing') -and
+        (($out -join "`n") -match 'Publish-Server\.ps1 -RequirePass on, or off') -and -not (Test-Path -LiteralPath $fresh))
+    $out = RunWrapped ("& '" + $installer.Replace("'", "''") + "' -Zip '" + $fz.Replace("'", "''") + "' -Root '" + $fresh.Replace("'", "''") +
+                       "' -NoTask -AllowGamingPc -RequirePass off`r`nexit `$LASTEXITCODE`r`n")
+    Yes '  and with -RequirePass off it is INSTALL OK, with the switch false' (
+        ($out -contains 'INSTALL OK') -and (SettingsOf $fresh).thornswoodRequirePass -eq $false)
     if ($script:fail -gt $failed) { Show }
 
     # ---- a root something is holding -------------------------------------------

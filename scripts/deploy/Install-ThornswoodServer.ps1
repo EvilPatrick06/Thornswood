@@ -48,6 +48,18 @@
   folder back before anything is started: INSTALL ROLLED BACK. A put-back
   carries the running settings into the folder it brings back the same way.
 
+  THE JOIN PASS SWITCH IS TRUE OR FALSE, OR NOTHING IS STOPPED (#1804). The
+  gamemode holds every session until its join pass arrives unless
+  thornswoodRequirePass is false, so a missing or odd value reads as on
+  (#1319), and a server with such a value would start holding the moment a
+  new gamemode reached it, with nobody having asked. In step 1 a stage whose
+  settings hold neither true nor false is refused, a running server's and a
+  first install's alike, and the reason names -RequirePass on|off, which
+  Publish-Server.ps1 passes here and this sets over the running server's (or
+  into the payload's, on a first install) and lets the read-back find moved.
+  No build carries the switch (#1223), so a first install always needs it.
+  Deploy-Server.ps1 and Deploy-DevGamemode.ps1 refuse the same way.
+
   The newest two .prev folders are kept, and the last .failed one to read.
   -PutBack puts the newest .prev folder back the same way, keeping what it
   took out as <root>.undone-<stamp>. The renames keep every path the task and
@@ -70,6 +82,13 @@ param(
     [switch]$PutBack,
     # How long a started server has to answer before the previous one goes back.
     [int]$Wait = 60,
+    # thornswoodRequirePass for the server this installs: on holds a session
+    # until its join pass arrives, off lets it act meanwhile. Set over the
+    # running server's, or into a first install's; left off, the running
+    # server keeps its own, and a server with neither true nor false is
+    # refused (#1804, see the header). Publish-Server.ps1 -RequirePass passes it.
+    [ValidateSet('', 'on', 'off')]
+    [string]$RequirePass = '',
     # How many <root>.prev-<stamp> folders to keep.
     [int]$Keep = 2,
     # Lets tests\test-install-server.ps1 run this on a machine with the game on
@@ -119,6 +138,17 @@ if (-not (Test-Path -LiteralPath $settingsLib)) {
     Finish 'INSTALL REFUSED' 1
 }
 . $settingsLib
+# What this run asked the settings to become (#1804): the join pass switch,
+# when -RequirePass was given. A put-back carries the running server's
+# settings into the folder it brings back and sets nothing, so asking with
+# it would be a switch that does nothing; it is refused instead.
+$asked = New-Object PSObject -Property (New-ThornswoodAsked $RequirePass)
+$askedKeys = @(Get-ThornswoodSettingNames $asked)
+$passScript = '.\scripts\release\Publish-Server.ps1'
+if ($PutBack -and $askedKeys.Count) {
+    Say '-PutBack sets no setting: it puts the previous folder back with the running server''s own settings. Run it without -RequirePass. Nothing was changed.' 'Red'
+    Finish 'INSTALL REFUSED' 1
+}
 # Which server files the record holds, and holding them (#1214): beside this
 # script too, sent with it.
 $buildLib = Join-Path $here 'ServerBuild.ps1'
@@ -363,13 +393,23 @@ if (-not $PutBack) {
     if (Test-Path -LiteralPath $runPath) {
         try { $script:running = [IO.File]::ReadAllText($runPath) | ConvertFrom-Json }
         catch { Refuse @("the settings $Root runs on do not parse ($($_.Exception.Message)), so they cannot be carried across") }
-        $m = Join-ThornswoodServerSettings $script:running $s $ThornswoodInstallKeys
+        $m = Join-ThornswoodServerSettings $script:running $s $ThornswoodInstallKeys $asked
         foreach ($l in $m.Said) { Say $l 'Cyan' }
         $s = $m.Settings
+        # Before the file is written, so a refusal leaves only the stage to clear.
+        $passWhy = Get-ThornswoodPassSwitchProblem $s $passScript
+        if ($passWhy) { Refuse @($passWhy) }
         [IO.File]::WriteAllText($settingsPath, (ConvertTo-Json -InputObject $s -Depth 30), (New-Object Text.UTF8Encoding($false)))
     } else {
-        $first = @(Get-ThornswoodServerSettingsProblems $s)
-        if ($first.Count) { Refuse @($first | ForEach-Object { "the payload's settings have $_, and there is no server here whose own settings would be kept instead" }) }
+        foreach ($k in $askedKeys) {
+            $s | Add-Member -NotePropertyName $k -NotePropertyValue $asked.$k -Force
+            Say "set as this run asked: $k" 'Cyan'
+        }
+        $first = @(Get-ThornswoodServerSettingsProblems $s | ForEach-Object { "the payload's settings have $_, and there is no server here whose own settings would be kept instead" })
+        $passWhy = Get-ThornswoodPassSwitchProblem $s $passScript
+        if ($passWhy) { $first += $passWhy }
+        if ($first.Count) { Refuse $first }
+        if ($askedKeys.Count) { [IO.File]::WriteAllText($settingsPath, (ConvertTo-Json -InputObject $s -Depth 30), (New-Object Text.UTF8Encoding($false))) }
         Say "there are no settings in $Root yet, so the payload's are its first" 'DarkGray'
     }
 
@@ -544,7 +584,8 @@ if ($hadRoot -and $null -ne $script:running) {
     try { $was = [IO.File]::ReadAllText((Join-Path $aside 'server-settings.json')) | ConvertFrom-Json } catch { }
     try { $now = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { }
     $moved = @('server-settings.json, which cannot be read')
-    if ($null -ne $was -and $null -ne $now) { $moved = @(Compare-ThornswoodCarried $was $now $ThornswoodInstallKeys) }
+    # What this run asked for (#1804) moved on purpose, as the release's keys did.
+    if ($null -ne $was -and $null -ne $now) { $moved = @(Compare-ThornswoodCarried $was $now @($ThornswoodInstallKeys + $askedKeys)) }
     if ($moved.Count) {
         Say ('read back: ' + ($moved -join ', ') + ' would not be what the server had, so nothing is started and the previous folder goes back') 'Red'
         GoBack 'the folder whose settings did not read back'
