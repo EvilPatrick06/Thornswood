@@ -438,6 +438,13 @@
     /** The service's id for this connection, 0 until the welcome arrives. */
     peer: function () { return peerId; },
 
+    /**
+     * The join token this page holds now, the freshest setToken gave it.
+     * Voice sends it with its ask for the relay list, which the service hands
+     * only to somebody whose token checks out (#1307).
+     */
+    token: function () { return TOKEN; },
+
     isUp: function () { return !!(ws && ws.readyState === 1 && joined); },
 
     /**

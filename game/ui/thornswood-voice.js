@@ -706,7 +706,16 @@
   function refreshIce() {
     if (!cfg || !cfg.host) { return; }
     try {
-      fetch(String((window.THORNSWOOD || {}).base || ('http://' + cfg.host + ':' + cfg.port)).replace(/\/+$/, '') + '/ice')
+      /*
+        With the join token, because the service hands the relay only to
+        somebody whose token checks out (#1307), and everybody else the STUN
+        list. In the body, so it is never in an address; plain text, so the
+        fetch needs no preflight from this page's null origin.
+      */
+      var n = net();
+      var tok = (n && typeof n.token === 'function') ? n.token() : String((window.THORNSWOOD || {}).token || '');
+      fetch(String((window.THORNSWOOD || {}).base || ('http://' + cfg.host + ':' + cfg.port)).replace(/\/+$/, '') + '/ice',
+            { method: 'POST', body: JSON.stringify({ token: tok }) })
         .then(function (r) { return r.json(); })
         .then(function (d) {
           if (d && d.iceServers && d.iceServers.length) {
