@@ -36994,8 +36994,26 @@ log('gamemode loaded:',
     in are measured again: walk away, lose the key, let the night run out,
     move off from the fire, and the rest stops or changes rate. Somebody who
     comes into the world already resting in a place the server did not see
-    them take stops too, and sits or lies down again. A restart forgets who
-    lay down where, and that is the case it catches.
+    them take stops too, and sits or lies down again.
+
+    THE PLACE ENDS WITH THE SESSION (#1734). Nobody comes back into the world
+    sitting or lying down, so the beds let go of where somebody sat or lay on
+    the first tick that finds them gone, with who was seen and what they
+    pressed. Coming back is then the same first sight as after a restart: up,
+    once the needs block has counted a night in a bed (#1606, settle's
+    arrival). Measured in the fork (engine/skymp at 0460584): the
+    only thing that puts a client's own character into furniture is the
+    server's answer to a press (MpObjectReference::ProcessActivateNormal,
+    FURN, SendOpenContainer, and the client's onOpenContainerMessage
+    activating it). Who occupies a piece of furniture is held in memory and
+    is not saved. PartOne::SetUserActor, which hands a reconnecting client its
+    character, clears the last animation as well. On the client,
+    thornswood-front.js's restSent starts false. Until #1734 the beds kept
+    the record for 48 hours offline (LYING_FORGET_MS) and the first sight
+    passed over anybody still in it. So somebody who logged out on a seat
+    and came back without a restart was counted resting at the seat's rate
+    while standing beside it, and was told they had left it when they walked
+    off.
 
     NO GOLD MOVES FOR A NIGHT. It is paid in a trade between two people, and
     the server keeps no price. The book is beds.json beside the register
@@ -37012,7 +37030,6 @@ log('gamemode loaded:',
   // Patrick, #1603: a night is 8 hours, the time the Rest clock takes to empty.
   var NIGHT_MS = 8 * 3600000;
   var BED_EVERY_MS = 5000;
-  var LYING_FORGET_MS = 48 * 3600000;
   var GUEST_NAME_MAX = 64;
   /* A bed by its editor id. Bedrolls first, since they say bed too. The
      others are words that hold the letters and are not beds. */
@@ -37415,15 +37432,20 @@ log('gamemode loaded:',
     try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
     var on = {};
     for (var i = 0; i < online.length; i++) { on[online[i]] = true; }
+    // Gone from the world, and off whatever they pressed or rested on with
+    // it (#1734): THE PLACE ENDS WITH THE SESSION, in the block.
     for (var s in bedState.seen) {
       if (bedHas(bedState.seen, s) && !on[s]) { delete bedState.seen[s]; }
     }
     for (var p in bedState.pressed) {
-      if (bedHas(bedState.pressed, p) && !on[p] && !bedHas(bedState.lying, p)) {
-        delete bedState.pressed[p];
-      }
+      if (bedHas(bedState.pressed, p) && !on[p]) { delete bedState.pressed[p]; }
     }
-    // Come into the world resting in a place nobody saw them take.
+    for (var l in bedState.lying) {
+      if (bedHas(bedState.lying, l) && !on[l]) { delete bedState.lying[l]; }
+    }
+    // Come into the world resting in a place nobody saw them take: after a
+    // restart, or back from a logout. A place they took this session, before
+    // this first sight of them, stays.
     for (var j = 0; j < online.length; j++) {
       var id = online[j];
       if (bedState.seen[id]) { continue; }
@@ -37446,10 +37468,6 @@ log('gamemode loaded:',
       if (!bedHas(bedState.lying, k)) { continue; }
       var e = bedState.lying[k];
       var who = Number(k);
-      if (!on[k]) {
-        if ((now - e.at) > LYING_FORGET_MS) { delete bedState.lying[k]; }
-        continue;
-      }
       // Up off the ground, which is no news, the way getting off a chair is not.
       if (e.ground && !sitsOnGround(who)) { getUp(who, needs); continue; }
       var why = stillLying(who, e, needs);
