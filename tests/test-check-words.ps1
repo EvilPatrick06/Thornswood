@@ -155,7 +155,6 @@ try {
     Put $tmp 'site/data/help.md' @('Fine.', 'Lorem ipsum dolor sit amet.')
     Put $tmp 'site/public/home.html' @('<html>', '<body>', '<p>one &mdash; two</p>', '</body>', '</html>')
     Put $tmp 'site/public/index.html' @('<p>Players Report; only staff Accept.</p>')
-    Put $tmp 'voice/public/index.html' @('<p>fine</p>', ('<p>a' + $em + 'b</p>'))
     # #428: the world is open by application, so a closed playtest is a hit,
     # in either spelling, while a plain playtest and the role stay allowed.
     Put $tmp 'installer/READ ME FIRST.txt' @('A server in alpha.', 'Still a Closed Playtest here.', 'An alpha playtester, and a playtest.', 'A closed-playtest one.')
@@ -185,7 +184,6 @@ try {
         'site/data/help.md:2:placeholder',
         'site/public/home.html:3:em-dash',
         'site/public/index.html:1:banned-word',
-        'voice/public/index.html:2:em-dash',
         'installer/READ ME FIRST.txt:2:open-alpha', 'installer/READ ME FIRST.txt:4:open-alpha',
         'installer/setup/README.md:2:names-person',
         'docs/NEW.md:1:placeholder',
@@ -211,7 +209,7 @@ try {
     Yes ('a hit exits 1 (exit ' + $s.Code + ')') ($s.Code -eq 1)
     Yes 'a file with a byte order mark is read through it' ($s.Hits -contains 'launcher/ui.xaml:2:em-dash')
     Yes 'any Markdown file is read, not only named ones (docs/NEW.md)' ($s.Hits -contains 'docs/NEW.md:1:placeholder')
-    Yes 'a public page other than home is read (site and voice index.html)' (($s.Hits -contains 'site/public/index.html:1:banned-word') -and ($s.Hits -contains 'voice/public/index.html:2:em-dash'))
+    Yes 'a public page other than home is read (site index.html)' ($s.Hits -contains 'site/public/index.html:1:banned-word')
     Yes 'lore, the archive and code files are not read' (@($s.Hits | Where-Object { $_ -like 'lore/*' -or $_ -like 'docs/archive/*' -or $_ -like 'game/*' }).Count -eq 0)
     Yes 'a name is a hit in a component README and README.md, and not on other pages (SECURITY.md:6)' (($s.Hits -contains 'installer/setup/README.md:2:names-person') -and ($s.Hits -contains 'README.md:8:names-person') -and ($s.Hits -notcontains 'SECURITY.md:6:names-person'))
     Yes 'closed playtest is a hit in any case, space or hyphen, an alpha playtester is not (#428)' (($s.Hits -contains 'installer/READ ME FIRST.txt:2:open-alpha') -and ($s.Hits -contains 'installer/READ ME FIRST.txt:4:open-alpha') -and ($s.Hits -notcontains 'installer/READ ME FIRST.txt:3:open-alpha'))
@@ -250,7 +248,6 @@ try {
     Put $tmp 'site/data/help.md' @('Fine.')
     Put $tmp 'site/public/home.html' @('<p>one, two</p>')
     Put $tmp 'site/public/index.html' @('<p>Anyone can Report; only staff Accept.</p>')
-    Put $tmp 'voice/public/index.html' @('<p>fine</p>')
     Put $tmp 'installer/READ ME FIRST.txt' @('A server in alpha, open by application.')
     Put $tmp 'installer/setup/README.md' @('# Setup', 'Decided on 28 Sep.')
     Put $tmp 'docs/NEW.md' @('Written.')

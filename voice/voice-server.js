@@ -60,7 +60,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -698,9 +698,9 @@ setInterval(() => {
   so nothing arrives out of order.
 
   What is left to grow is that reliable traffic, for a socket that never
-  reads. Past QUEUE_CEILING it is closed and left to reconnect, which all
-  three pages already do: voice.js after five seconds, the launcher's voice
-  host after two, the chat overlay on its own retry. The gamemode's rows come
+  reads. Past QUEUE_CEILING it is closed and left to reconnect, which both
+  pages already do: the launcher's voice host after two seconds, the chat
+  overlay on its own retry. The gamemode's rows come
   out about the size they went in, so the 200,000 byte /positions limit keeps
   one position message under about 200 KB, a fifth of the ceiling, and a
   single tick does not trip it. Since each person is sent only the people
@@ -1152,8 +1152,8 @@ function snapshot() {
       else". The gamemode sends the party id with each row for this.
 
   A missing row is already silence on every client. The overlay
-  (ts-ui/thornswood-voice.js), the launcher's voice host and the plain
-  browser page all replace their table with each message and set the gain to
+  (ts-ui/thornswood-voice.js) and the launcher's voice host both replace
+  their table with each message and set the gain to
   nothing for a person with no row, exactly as for another cell. So no client
   changes, and nobody needs a "you left their range" message: the next view
   simply does not have them in it. Connections are still opened and closed by
@@ -1235,8 +1235,8 @@ function viewsOf(snap) {
   only the rows that differ from what that peer holds and the ids that have
   left its view in gone (out of range, another cell, gone stale, logged
   off), and nothing at all when neither. Every client applies moved on top of
-  the table the last pos gave it: launcher/voice-host.html,
-  game/ui/thornswood-voice.js and voice/public/voice.js.
+  the table the last pos gave it: launcher/voice-host.html and
+  game/ui/thornswood-voice.js.
 
   A tick skipped for a backed socket (sendLossy) leaves that peer holding
   something older than this side thinks, so its record is dropped and the
@@ -1425,7 +1425,6 @@ function readBody(req, res, limit, then) {
 }
 
 // ------------------------------------------------------------------ http ---
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
 
 /*
   Who is allowed to connect at all, and who they are once they have.
@@ -1761,7 +1760,7 @@ const server = http.createServer((req, res) => {
   }
 
   // The path, with any query string cut off. This has to happen before the
-  // comparisons below: the launcher opens the page as /?profile=2&ptt=... and
+  // comparisons below: the launcher once opened a page as /?profile=2&ptt=... and
   // a plain req.url === '/' test does not match that, so the old code fell
   // through to the file reader, asked the disk for a file named '/', and
   // answered every single person with 'not found'.
@@ -2019,14 +2018,16 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  let file = (route === '/' || route === '') ? '/index.html' : route;
-  if (file.indexOf('..') !== -1) { res.writeHead(400).end('no'); return; }
-  const full = path.join(HERE, 'public', file);
-  fs.readFile(full, (err, data) => {
-    if (err) { res.writeHead(404).end('not found'); return; }
-    res.writeHead(200, { 'content-type': TYPES[path.extname(full)] || 'application/octet-stream' });
-    res.end(data);
-  });
+  /*
+    NO PAGE (#1822). This served a plain browser page of its own from public\
+    at /, so https://thornswood.net/voice/ and /voice-dev/. It opened its
+    socket with no join token and had no way to get one, so once live and dev
+    refused a join without one it could never get in, and since #1337 its
+    handshake was refused before it opened. Nothing linked to it. The two
+    clients are the launcher's voice page and the game's overlay, both loaded
+    off disk, so the page and this route went.
+  */
+  res.writeHead(404).end('not found');
 });
 
 /*
@@ -2040,12 +2041,14 @@ const server = http.createServer((req, res) => {
   a socket borrows nothing of the visitor's; what it gets is each visitor's
   browser, from that visitor's address, as a client for free.
 
-  So a browser's socket must come from this service's own page: an Origin
-  that names the host the request was made to, straight or through Caddy,
-  which passes Host on as it came. The game's pages and the launcher's voice
-  page are loaded off disk and say null (file:// in older Chromium), and are
-  let in. No Origin at all is not a browser (a harness, a script), which this
-  was never meant to stop. Anything else is refused before the handshake.
+  So a browser's socket must come from the game's pages or the launcher's
+  voice page, which are loaded off disk and say null (file:// in older
+  Chromium), and are let in. No Origin at all is not a browser (a harness, a
+  script), which this was never meant to stop. Anything else is refused
+  before the handshake. An Origin naming the host the request was made to
+  was let in too, for the page this service served of its own, until that
+  page went (#1822); a page on this host is now refused like any other
+  website's.
 
   What this cannot close: a sandboxed frame on any website also says null,
   and nothing in the request tells it apart from the game's own page.
@@ -2054,11 +2057,7 @@ function originAllowed(req) {
   const o = req.headers.origin;
   if (o === undefined) return true;
   const s = String(o).trim().toLowerCase();
-  if (s === 'null' || s === 'file://') return true;
-  let page, asked;
-  try { page = new URL(s); asked = new URL(page.protocol + '//' + String(req.headers.host || '')); }
-  catch (e) { return false; }
-  return !!asked.host && page.host === asked.host;
+  return s === 'null' || s === 'file://';
 }
 let originRefused = 0;
 let originSaidAt = 0;
@@ -2125,7 +2124,7 @@ server.on('upgrade', (req, socket, head) => {
     if (Date.now() - originSaidAt > 60000) {
       originSaidAt = Date.now();
       console.log('[voice] refused a socket opened by a page on ' + JSON.stringify(String(req.headers.origin).slice(0, 100)) +
-                  ' (' + originRefused + ' refused so far): only this service\'s own page and the game\'s may open one');
+                  ' (' + originRefused + ' refused so far): only the game\'s pages and the launcher\'s may open one');
     }
     // The HTTP server took its own error listener off this socket when it
     // handed the upgrade over, so without one a refused page that has

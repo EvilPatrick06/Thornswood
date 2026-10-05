@@ -69,11 +69,7 @@ const reaches = [];
   const quiet = range ? (range[1].match(/quiet:\s*[\d.]+/g) || []).map(s => Number(s.split(':')[1])) : [];
   yes('the launcher voice host range table is where it was (' + quiet.join(', ') + ' m)', quiet.length === 3);
   reaches.push(...quiet);
-
-  const page = read(path.join(__dirname, 'public', 'voice.js'));
-  const max = /const MAX_DISTANCE = ([\d.]+)/.exec(page);
-  yes('the browser page range is where it was (' + (max ? max[1] : '?') + ' m)', !!max);
-  if (max) { reaches.push(Number(max[1])); }
+  // The service's own browser page was a third client until it went (#1822).
 }
 const REACH = Math.max(...reaches);          // metres, the furthest any client hears
 const REACH_UNITS = REACH * UNITS_PER_METRE;
