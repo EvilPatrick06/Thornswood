@@ -36,6 +36,7 @@
 */
 const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
+const crypto = require('crypto');
 const os = require('os');
 const path = require('path');
 const http = require('http');
@@ -73,6 +74,15 @@ async function until(cond, ms) {
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-command-ack-'));
 fs.copyFileSync(VOICE, path.join(dir, 'voice-server.js'));
 fs.copyFileSync(path.join(path.dirname(VOICE), 'headlines.js'), path.join(dir, 'headlines.js'));
+// Every join proves itself since #1303, so this harness signs its own join
+// tokens with a key it puts beside its copy of the service.
+const KEY = crypto.randomBytes(32).toString('hex');
+fs.writeFileSync(path.join(dir, 'token-key.txt'), KEY);
+function tokenFor(pid) {
+  const body = String(pid) + '.' + String(Date.now() + 3600000);
+  return 'v1.' + body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
 /*
   A port of this run's own (#1703). Builds run side by side on the VPS, and
   with a fixed number one run's requests can be answered by another run's
@@ -125,7 +135,6 @@ async function startVoice() {
     cwd: dir,
     env: Object.assign({}, process.env, {
       THORNSWOOD_VOICE_PORT: String(PORT),
-      THORNSWOOD_VOICE_AUTH: 'off',
       THORNSWOOD_SITE: '',
       THORNSWOOD_CHAT_DIR: path.join(dir, 'chat'),
     }),
@@ -158,7 +167,7 @@ function join(profileId, name) {
     const ws = new WebSocket('ws://127.0.0.1:' + PORT + '/');
     const heard = [];
     sockets.push(ws);
-    ws.onopen = () => ws.send(JSON.stringify({ t: 'join', profileId: profileId, name: name }));
+    ws.onopen = () => ws.send(JSON.stringify({ t: 'join', profileId: profileId, name: name, token: tokenFor(profileId) }));
     ws.onmessage = (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
       if (m.t === 'welcome') { done({ ws: ws, heard: heard, say: (text) => ws.send(JSON.stringify({ t: 'chat', text: text })) }); }

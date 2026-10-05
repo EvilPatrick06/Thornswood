@@ -365,12 +365,14 @@ section(function () {
 // ---------------------------------------------------------------- 6. voice and the feed
 section(function () {
   const code = voice.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-  yes('voice: a join that cannot prove itself is refused when the game server requires the pass, whatever THORNSWOOD_VOICE_AUTH says',
-      /if \(AUTH === 'on' \|\| gameRequiresPass\) \{/.test(code));
-  yes('voice: the switch is read off every /positions, and turning it on closes the unproven connections',
-      /const wants = doc\.requirePass === true;\s*if \(wants && !gameRequiresPass\) closeUnproven\(/.test(code) && /gameRequiresPass = wants;/.test(code));
-  const close = fnText(voice, 'function closeUnproven(');
-  yes('voice: closeUnproven leaves proven connections alone', /if \(p\.proven\) continue;/.test(close) && /p\.ws\.close\(\)/.test(close));
+  // Since #1303 a join that cannot prove itself is refused whatever the game
+  // server's switch says, so the switch has nothing left to turn on here.
+  const onJoin = fnText(code, 'function onJoin(');
+  yes('voice: a join that cannot prove itself is refused, with no setting and no switch in the way',
+      /\} else \{[\s\S]*?REFUSED a join for profile[\s\S]*?ws\.send\(\{ t: 'denied', why: why \}\);[\s\S]*?return 0;\s*\}/.test(onJoin) &&
+      !/AUTH|gameRequiresPass/.test(onJoin));
+  yes('voice: nothing reads the switch off /positions any more, and nothing is left to close',
+      !/gameRequiresPass|closeUnproven|doc\.requirePass ===/.test(code));
   // peerName, run.
   const pn = fnText(voice, 'function peerName(');
   const box = { String: String, positions: new Map([[700, { name: 'Bjorn Iron-Hand' }]]) };
