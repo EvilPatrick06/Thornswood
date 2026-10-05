@@ -33413,6 +33413,28 @@ log('gamemode loaded:',
   }
 
   /*
+    THE LINE AT A PLOT (#1636). Patrick, 4 October: no chat commands for
+    anything people do. With a crop under the crosshair, a line says what is
+    in the ground and whose farm it is, and names the two things to do
+    there: E sows it, the press that has sown since 21 September, and the
+    lock key claims the farm around it. The client can read neither the plot
+    (the property above is nobody's to see) nor the claims, so it asks: a
+    crop under the crosshair sends /plot and that crop's id, and the answer
+    is written here to that person alone, for their client to draw. It is
+    an answer to a look, so it is written only when asked and never on a
+    timer.
+  */
+  var PLOT_LINE_PROPERTY = 'thornswoodPlotLine';
+  try {
+    mp.makeProperty(PLOT_LINE_PROPERTY, {
+      isVisibleByOwner: true,
+      isVisibleByNeighbors: false,
+      updateOwner: plotLineScript(),
+      updateNeighbor: ''
+    });
+  } catch (e) { }
+
+  /*
     What is sown here, or null for an empty plot. Who sowed it, what was sown,
     when, how long it takes and what it pays.
 
@@ -34021,7 +34043,7 @@ log('gamemode loaded:',
     var held = claimCovering(ground);
     if (held && held.by !== mine) {
       return 'This farm is held by ' + held.name + '. Ask them for what you ' +
-             'need, or claim ground of your own with /claim.';
+             'need, or claim ground nobody holds.';
     }
 
     if (!rankOk(step, baseDesc)) {
@@ -34082,7 +34104,7 @@ log('gamemode loaded:',
     var held = claimCovering(ground);
     if (held && held.by !== mine) {
       return 'This farm is held by ' + held.name + '. Ask before you sow here, or ' +
-             'claim ground of your own with /claim.';
+             'claim ground nobody holds.';
     }
 
     if (!takeItem(actorId, crop.produce, 1)) {
@@ -34194,7 +34216,7 @@ log('gamemode loaded:',
     var held = claimCovering(ground);
     if (held && held.by !== mine && plot.by !== mine) {
       return 'This farm is held by ' + held.name + '. Ask them for what you ' +
-             'need, or claim ground of your own with /claim.';
+             'need, or claim ground nobody holds.';
     }
 
     if (!rankOk(step, plot.crop)) {
@@ -34268,7 +34290,7 @@ log('gamemode loaded:',
     var mine = profileOf(actorId);
     if (!mine) {
       toProfile(profileId, 'The server cannot tell who you are right now. ' +
-                           'Give it a moment and say /plant again.');
+                           'Give it a moment and try again.');
       return;
     }
 
@@ -34276,7 +34298,7 @@ log('gamemode loaded:',
     var found = nearestPlot(actorId, true);
     if (!found) {
       toProfile(profileId, 'No plot within reach. Stand next to the ground you ' +
-                           'mean to sow and say /plant again.');
+                           'mean to sow.');
       return;
     }
     var crop = CROPS[found.base];
@@ -34304,7 +34326,7 @@ log('gamemode loaded:',
     var ground = groundOf(found.refrId);
     if (!ground) {
       toProfile(profileId, 'The server cannot tell which ground that plot stands on. ' +
-                           'Move a step and say /plant again.');
+                           'Move a step and try again.');
       return;
     }
     var held = claimCovering(ground);
@@ -34314,7 +34336,7 @@ log('gamemode loaded:',
     // trap rather than a rule.
     if (held && held.by !== mine) {
       toProfile(profileId, 'This farm is held by ' + held.name + '. Ask before you ' +
-                           'sow here, or claim ground of your own with /claim.');
+                           'sow here, or claim ground nobody holds.');
       return;
     }
 
@@ -34353,30 +34375,35 @@ log('gamemode loaded:',
     standing in a farm, and what is claimed is a farm rather than a district.
 
     The boundary is a circle with nothing drawn on it, which is why the answer
-    says how to find it: /plot at any plot says whether that plot is inside.
+    says how to find it: the line at any plot says whether that plot is inside.
+
+    THE PLOT IS THE ONE LOOKED AT (#1636). The lock key at a plot sends /claim
+    and that plot's id, and plotAt checks it; with no id it is the nearest
+    plot in reach, as it always was.
   */
-  function claim(actorId, profileId, toProfile) {
+  function claim(actorId, profileId, toProfile, parts) {
     var refused = classGate(actorId, 'farm');
     if (refused) { toProfile(profileId, refused); return; }
 
     var mine = profileOf(actorId);
     if (!mine) {
       toProfile(profileId, 'The server cannot tell who you are right now. ' +
-                           'Give it a moment and say /claim again.');
+                           'Give it a moment and try again.');
       return;
     }
 
-    var found = nearestPlot(actorId);
+    var named = !!(parts && parts[1]);
+    var found = named ? plotAt(parts, actorId) : nearestPlot(actorId);
     if (!found) {
       toProfile(profileId, 'No plot within reach, and a claim is the ground around a ' +
                            'plot. Stand in the farm you mean to take, next to one of ' +
-                           'its crops, and say /claim again.');
+                           'its crops, and look at it.');
       return;
     }
     var ground = groundOf(found.refrId);
     if (!ground) {
       toProfile(profileId, 'The server cannot tell which ground that plot stands on. ' +
-                           'Move a step and say /claim again.');
+                           'Move a step and try again.');
       return;
     }
 
@@ -34412,7 +34439,7 @@ log('gamemode loaded:',
 
     toProfile(profileId, 'You claim this farm, the ground around that plot' +
               (released ? ', and the farm you held before is let go' : '') +
-              '. Say /plot at a plot to see whether it is inside. It is yours while ' +
+              '. The line at a plot says whether it is inside. It is yours while ' +
               'you work it, and it lapses after ' + tuning().claimLapseDays +
               ' days with nothing done on it.');
   }
@@ -34426,16 +34453,23 @@ log('gamemode loaded:',
     var found = nearestPlot(actorId);
     if (!found) {
       toProfile(profileId, 'No plot within reach. Stand on the ground you mean ' +
-                           'to look at and say /plot again.');
+                           'to look at.');
       return;
     }
-    /*
-      Whose it is, said in three ways and never guessed. A claim that cannot be
-      read is its own sentence rather than 'nobody holds this ground', because
-      this is the command a person uses to find the edge of a farm and an answer
-      that says nobody holds ground that somebody holds is how a tester walks off
-      with another person's crop in good faith.
-    */
+    toProfile(profileId, plotWords(actorId, found));
+  }
+
+  /*
+    What is in the ground at this plot and whose it is, as one sentence: the
+    typed /plot's answer, and the line at a plot (#1636).
+
+    Whose it is, said in three ways and never guessed. A claim that cannot be
+    read is its own sentence rather than 'nobody holds this ground', because
+    this is how a person finds the edge of a farm and an answer that says
+    nobody holds ground that somebody holds is how a tester walks off with
+    another person's crop in good faith.
+  */
+  function plotWords(actorId, found) {
     var ground = groundOf(found.refrId);
     var whose;
     if (!ground) {
@@ -34449,15 +34483,130 @@ log('gamemode loaded:',
     }
     var plot = readPlot(found.refrId);
     if (!plot) {
-      toProfile(profileId, 'A ' + CROPS[found.base].name + ' plot, and nothing sown in it. ' + whose);
-      return;
+      // A plot nobody ever worked still holds what the world put there, and
+      // the first press brings it in (see neverWorked).
+      var named = aOrAn(CROPS[found.base].name);
+      if (neverWorked(found.refrId)) {
+        return named.charAt(0).toUpperCase() + named.slice(1) +
+               ' standing from before anybody farmed here. ' + whose;
+      }
+      return named.charAt(0).toUpperCase() + named.slice(1) + ' plot, and nothing sown in it. ' + whose;
     }
     var left = minutesLeft(plot);
     if (left > 0) {
-      toProfile(profileId, CROPS[plot.crop].name + ' growing, ' + minutes(left) + ' to go. ' + whose);
-      return;
+      return CROPS[plot.crop].name + ' growing, ' + minutes(left) + ' to go. ' + whose;
     }
-    toProfile(profileId, CROPS[plot.crop].name + ' ready to bring in. ' + whose);
+    return CROPS[plot.crop].name + ' ready to bring in. ' + whose;
+  }
+
+  /*
+    THE PLOT THE LINE OR THE KEY NAMES (#1636), by the id the client sends
+    after /plot or /claim, the way the mold key sends a door's. The id is a
+    hint and this is the gate: a reference whose base is a crop, in the same
+    cell as the person and within LOOK_REACH of them by the server's own
+    reckoning. 400 for the reasons MOLD_REACH in the property block gives:
+    the crosshair reaches from a camera behind the character, a plot's
+    position is its own origin, and the server's position is a moment behind.
+    Null for anything else.
+  */
+  var LOOK_REACH = 400;
+
+  function plotAt(parts, actorId) {
+    var raw = String((parts && parts[1]) || '');
+    if (!/^[0-9a-f]{1,8}$/i.test(raw)) { return null; }
+    var refrId = parseInt(raw, 16);
+    var base = '';
+    try { base = String(mp.get(refrId, 'baseDesc') || ''); } catch (e) { return null; }
+    if (!P.has(CROPS, base)) { return null; }
+    var at = where(actorId);
+    var ground = groundOf(refrId);
+    if (!at || !ground || at.cell !== ground.cell) { return null; }
+    var dz = ground.pos[2] - at.pos[2];
+    if (flatDistance2(ground.pos, at.pos) + dz * dz > LOOK_REACH * LOOK_REACH) { return null; }
+    return { refrId: refrId, base: base };
+  }
+
+  /** 'a Cabbage', 'an Ash Yam'. */
+  function aOrAn(name) { return (/^[aeiou]/i.test(name) ? 'an ' : 'a ') + name; }
+
+  /** Does this pack hold the crop this plot is sown with, its own seed. */
+  function carriesSeed(actorId, base) {
+    var id = idOf(CROPS[base].produce);
+    if (!id) { return false; }
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return false; }
+    var entries = (inv && inv.entries) || [];
+    for (var i = 0; i < entries.length; i++) {
+      if (entries[i] && entries[i].baseId === id && entries[i].count > 0) { return true; }
+    }
+    return false;
+  }
+
+  /*
+    The line at a plot, written to the person looking at it (#1636).
+
+      hex  the plot it is for, so a line never shows at another
+      t    what is in the ground and whose farm it is, plotWords
+      e    'Sow a Cabbage' when pressing it would sow it: empty, worked
+           before, and this person a farmer with the shovel, the rank and
+           the crop in the pack, on ground nobody else holds; else ''
+      x    'Claim this farm' when the lock key would claim it: a farmer, on
+           ground nobody holds and that runs into nobody's farm; with 'and
+           let your other one go' when they hold one already; else ''
+
+    The rules stay in sowAt and claim, which the press and the key reach.
+    This only says which of them would go through, so nothing is offered
+    that would be refused. A plot that is not one or is out of reach writes
+    a line with no words, which takes it down.
+  */
+  var plotLineStamp = 0;
+
+  function plotLine(actorId, profileId, parts) {
+    var found = plotAt(parts, actorId);
+    plotLineStamp = Math.max(plotLineStamp + 1, Date.now());
+    var line = { at: plotLineStamp, hex: String((parts && parts[1]) || '').toLowerCase(),
+                 t: '', e: '', x: '' };
+    if (found) {
+      line.t = plotWords(actorId, found);
+      var mine = profileOf(actorId);
+      var ground = groundOf(found.refrId);
+      var held = ground ? claimCovering(ground) : null;
+      var farmer = !classGate(actorId, 'farm');
+      if (farmer && mine && ground && !toolGate(actorId, 'farmer') && !readPlot(found.refrId) &&
+          !neverWorked(found.refrId) && (!held || held.by === mine) &&
+          rankOk(rankStep(actorId, 'farmer'), found.base) && carriesSeed(actorId, found.base)) {
+        line.e = 'Sow ' + aOrAn(CROPS[found.base].name);
+      }
+      if (farmer && mine && ground && !held && !claimTooClose(ground, mine)) {
+        line.x = P.has(claims, String(mine)) ? 'Claim this farm and let your other one go'
+                                             : 'Claim this farm';
+      }
+    }
+    try {
+      mp.set(actorId, PLOT_LINE_PROPERTY, line);
+    } catch (e) {
+      flog('could not write the plot line for', actorId.toString(16) + ':', e);
+    }
+  }
+
+  /*
+    The client half: the line where the front plugin reads it (lockKeyNow
+    there), on the client's own clock from when a new stamp arrives.
+  */
+  function plotLineScript() {
+    return [
+      '(function(){',
+      '  try {',
+      '    var v = ctx.value;',
+      '    if (!v || typeof v !== "object") { return; }',
+      '    var was = globalThis.thornswoodPlotLine;',
+      '    if (was && was.stamp === v.at) { return; }',
+      '    globalThis.thornswoodPlotLine = { stamp: v.at, seen: Date.now(),',
+      '      hex: String(v.hex || ""), t: String(v.t || ""), e: String(v.e || ""),',
+      '      x: String(v.x || "") };',
+      '  } catch (e) { }',
+      '})();'
+    ].join('\n');
   }
 
   function listOf(items) {
@@ -34498,7 +34647,7 @@ log('gamemode loaded:',
     var who = profileOf(actorId);
     if (who) { seeded[String(who)] = Date.now(); saveClaims(); }
     flog(actorId.toString(16), 'was handed', given.join(', '));
-    return 'You start with ' + listOf(given) + ' to sow. Stand by a plot and say /plant.';
+    return 'You start with ' + listOf(given) + ' to sow. Look at an empty plot of one of them and press it.';
   }
 
   /** Does this pack hold anything at all that could be sown? */
@@ -34576,15 +34725,46 @@ log('gamemode loaded:',
     return { days: Math.max(0, Math.ceil(left / 86400000)), reach: tuning().claimRadius };
   }
 
+  /*
+    A press on a crop, and then the line at it drawn again for whoever
+    pressed it (#1636): sowing or bringing in changes what is in the ground,
+    so the line says so now rather than at the next ask. Only when the line
+    they have is for this plot; nobody else's line moves.
+  */
+  function press(actorId, refrId, baseDesc) {
+    var said = activate(actorId, refrId, baseDesc);
+    var v = null;
+    try { v = mp.get(actorId, PLOT_LINE_PROPERTY); } catch (e) { v = null; }
+    var hex = (refrId >>> 0).toString(16);
+    if (v && typeof v === 'object' && v.hex === hex) {
+      plotLine(actorId, profileOf(actorId), ['/plot', hex]);
+    }
+    return said;
+  }
+
+  /*
+    /claim and /plot with a plot's id after them are what the client sends at
+    a plot (#1636): the lock key, and the look that asks for the line. Nobody
+    is told to type any of the three. A claim draws the line again, so the
+    key's word is the one that is true after it.
+  */
   function command(word, parts, actorId, profileId, toProfile) {
     if (word === '/plant') { plant(actorId, profileId, toProfile); return; }
-    if (word === '/claim') { claim(actorId, profileId, toProfile); return; }
-    if (word === '/plot') { report(actorId, profileId, toProfile); return; }
+    if (word === '/claim') {
+      claim(actorId, profileId, toProfile, parts);
+      if (parts && parts[1]) { plotLine(actorId, profileId, parts); }
+      return;
+    }
+    if (word === '/plot') {
+      if (parts && parts[1]) { plotLine(actorId, profileId, parts); return; }
+      report(actorId, profileId, toProfile);
+      return;
+    }
   }
 
   g.__thornswoodFarming = {
     PROPERTY: PLOT_PROPERTY,
-    activate: activate, command: command, giveSeeds: giveSeeds,
+    activate: press, command: command, giveSeeds: giveSeeds,
     readPlot: readPlot, claimCovering: claimCovering, groundOf: groundOf,
     farmOf: farmOf
   };
@@ -35142,6 +35322,15 @@ log('gamemode loaded:',
     if (!v || typeof v !== 'object') { return null; }
     if ((Date.now() - (Number(v.at) || 0)) > DOOR_MEMORY_MS) { return null; }
     return v.ground || null;
+  }
+
+  /** The building whose door has this form id, in hex the way the keys send it, or null. */
+  function doorOfId(raw) {
+    raw = String(raw || '');
+    if (!/^[0-9a-f]{1,8}$/i.test(raw)) { return null; }
+    var desc = '';
+    try { desc = String(mp.getDescFromId(parseInt(raw, 16)) || ''); } catch (e) { desc = ''; }
+    return desc ? buildingOf(desc) : null;
   }
 
   /** The building of the door they last opened, or null with the reason. */
@@ -38872,6 +39061,10 @@ log('gamemode loaded:',
       // and farming answers it, which is what keeps /claim meaning one thing in
       // a field and another on a doorstep without either of them guessing.
       if (!here(actorId)) { return false; }
+      // And the lock key names what it was pressed at (#1636): a plot's id is
+      // farming's even a minute after a door, so a farmer who walks out of
+      // the house to a field claims the field and not the house.
+      if (parts && parts[1] && !doorOfId(parts[1])) { return false; }
       claim(actorId, profileId, toProfile);
       doorLine(actorId, profileId);
       return true;
@@ -47714,7 +47907,9 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
   /restart, /shutdown and /tspicks are theirs, and naming them to everybody is
   an invitation rather than a help.
 */
-const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
+// Not /plot, /plant or /claim: a farm is worked and claimed at the plot, and
+// a building at its door, with the line under the crosshair (#1636, #1637).
+const PLAYER_WORDS = ['/ooc', '/where',
                       // Not /jarl, /steward, /evict, /box or /rent: the
                       // offices' powers are buttons on the Office page of K
                       // (#1638), and the board panel says what the box holds.
@@ -49859,8 +50054,8 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
           'you chose and the rank climbs on its own. Your sister half stops at ' +
           'novice until a Master of it takes you on: a Master looks at you and ' +
           'presses the key the prompt names. K lists who took you on and who you ' +
-          'took on, and either of you can end it there. /plot says what is in the ' +
-          'ground in front of you and whose farm it is, /plant sows it. A ' +
+          'took on, and either of you can end it there. At a crop, a line says ' +
+          'what is sown and whose farm it is. A ' +
           'warrior\'s maneuvers open on the maneuver key, which the ' +
           'launcher\'s Controls page names. ' +
           'A repair kit is used from your inventory.');
@@ -49868,9 +50063,9 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       }
       if (topic === 'land' || topic === 'home' || topic === 'deed') {
         toProfile(profileId,
-          '/claim at a plot takes the farm around it. At a door you just opened, ' +
-          'a line names a key, X unless you changed it: it claims a building ' +
-          'nobody holds, and locks or unlocks one you hold. K lists what you ' +
+          'At a door you just opened, a line names a key, X unless you changed ' +
+          'it: it claims a building nobody holds, and locks or unlocks one you ' +
+          'hold. At a crop the same key claims the farm around it. K lists what you ' +
           'hold and the rent owed. A Jarl or a steward has an Office page on K. ' +
           'To let somebody sleep in a building you hold, look at them inside ' +
           'it and press the key the prompt shows. A blank key mold goes into a ' +
