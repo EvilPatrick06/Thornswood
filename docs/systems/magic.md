@@ -141,5 +141,9 @@ disease, a power, an ability, a shrine blessing, the instruments, and a
 staff spell the staff rules unlocked are not spells of the book and
 stay.
 
+A tome whose spell has no school at all is refused the same way, with
+the same line, and the tome is kept: the Oghma Infinium, which a mod
+makes teach Dragon Knowledge, and the fishing mod's four cheat books.
+
 The server refuses Dead Thrall and every spell that raises the dead on
 a person's body. See [Conjuration](professions/mage/conjuration.md).
