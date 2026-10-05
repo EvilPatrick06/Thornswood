@@ -18,6 +18,9 @@ $Root = $tmp; $DistDir = Join-Path $tmp 'dist'; $GameDir = Join-Path $tmp 'Game'
 [IO.Directory]::CreateDirectory((Join-Path $GameDir 'Data')) | Out-Null
 function Get-LoadOrderManifestUrl($root) { 'fixture' }
 function Get-LoadOrderManifest($url) { return ,@('Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm', 'Thornswood-Content.esp') }
+# The whole manifest Publish-Update reads since #1715: a server that loads no
+# light plugin, so no light list and the whole order is the full one.
+function Get-LoadOrderManifestDoc($url) { $f = [string[]](Get-LoadOrderManifest $url); return [pscustomobject]@{ Full = $f; Light = [string[]]@(); All = $f } }
 foreach ($name in (Get-LoadOrderManifest 'fixture') + @('FNIS.esp')) {
     $b = [byte[]]::new(24)
     [Text.Encoding]::ASCII.GetBytes('TES4').CopyTo($b, 0)
