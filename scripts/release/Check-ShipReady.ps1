@@ -352,7 +352,7 @@ Ready 'the .NET Framework 4 compiler is here' ($null -ne $csc) $csc `
 $node = $null
 try { $node = (Get-Command node -EA Stop).Source } catch { }
 Ready 'node is on the path' ($null -ne $node) $(if ($node) { (& node --version 2>$null) } else { '' }) `
-  'Install Node from nodejs.org; the gamemode and the site are checked with it'
+  'Install Node from nodejs.org; the gamemode and the site are checked with it, and Ship refuses a game folder without it because SkyUI''s menus are read with it (#1913)'
 
 # ------------------------------------------------------------- the signing --
 Head 'Signing'
