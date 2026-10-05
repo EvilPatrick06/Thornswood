@@ -51437,18 +51437,18 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   pack and base: two identical swords are one stack to the engine, so a
   table could never say which of the two left when one was put in a chest.
 
-  THREE THINGS IN THE ENGINE MAKE A FRESH, PLAIN ENTRY, and a plain entry
+  TWO THINGS IN THE ENGINE MAKE A FRESH, PLAIN ENTRY, and a plain entry
   reads as 100%, so each of them would be a free repair:
     a drop. MpActor::DropItem places the bare record, so the name is lost.
           dropped() remembers the condition that went down and the pickup
           puts it back on (pressed()).
-    a trade. moveById in the trade block writes a base and a count and
-          nothing else. That is #1594, its own issue, because it drops
-          every name, a key's and a deed's included.
     a craft. CraftEvent::OnFireSuccess takes away plain entries and adds a
           plain one. A temper is refused (recipelessCraft), so it is not a
           way round this. Enchanting a piece that is not at 100% fails in
           the engine, because the plain piece it asks to take is not there.
+  A trade was a third, and it was this file's: moveById in the trade block
+  wrote a base and a count and nothing else. It moves a piece with its name
+  now, and leaves every other stack's alone (#1594).
 
   THE DULL CLOCK IS THE CHEST'S, NOT THE ITEM'S. A container in a building
   somebody holds (a shop is a claimed building, and so is a house) starts a
@@ -57294,7 +57294,62 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     return bits.length ? bits.join(', ') : 'nothing';
   }
 
-  /** Move [baseId, count] pairs from one pack to another, or nothing at all. */
+  /*
+    WHAT A STACK CARRIES BESIDE ITS BASE AND COUNT (#1594). The engine keeps
+    an extra on every inventory entry (Inventory::ExtraData in the fork) and
+    reads and writes it as fields on the entry, beside baseId and count. A
+    key's, a deed's and a mold's house is its name (the property block), a
+    piece's condition is written on its name (the durability block), a
+    Master-Woven garment is named, and an enchanted piece carries its
+    enchantment and charge. The engine keeps all of it through mp.set; what
+    used to drop it was moveById writing { baseId, count } back on both
+    packs.
+
+    So a piece moves with every field it carries, the rest of a stack it is
+    taken from keeps every field it had, and it lands on a stack the
+    receiver already holds only when that stack is the same in every field,
+    which is how the engine stacks (Inventory::Entry::EqualExceptCount).
+    Being worn belongs to whoever wears it, so a piece arrives not worn.
+  */
+  var EXTRA = ['health', 'enchantmentId', 'maxCharge', 'removeEnchantmentOnUnequip',
+               'chargePercent', 'name', 'soul', 'poisonId', 'poisonCount'];
+
+  /* One stack to the engine: the same base and extra, worn the same way. */
+  function sameStack(a, b) {
+    if (!a || !b || a.baseId !== b.baseId) { return false; }
+    for (var i = 0; i < EXTRA.length; i++) {
+      if (a[EXTRA[i]] !== b[EXTRA[i]]) { return false; }
+    }
+    return !!a.worn === !!b.worn && !!a.wornLeft === !!b.wornLeft;
+  }
+
+  /* An entry at another count, carrying all it carried. Handed over, it is not worn any more. */
+  function withCount(entry, count, handedOver) {
+    var out = {};
+    for (var f in entry) {
+      if (!Object.prototype.hasOwnProperty.call(entry, f)) { continue; }
+      if (handedOver && (f === 'worn' || f === 'wornLeft')) { continue; }
+      out[f] = entry[f];
+    }
+    out.count = count;
+    return out;
+  }
+
+  /* Pieces into a pack: onto the stack they are the same as, or a stack of their own. */
+  function land(into, piece) {
+    for (var k = 0; k < into.length; k++) {
+      if (sameStack(into[k], piece)) {
+        into[k] = withCount(into[k], (into[k].count || 1) + piece.count, false);
+        return;
+      }
+    }
+    into.push(piece);
+  }
+
+  /*
+    Move [baseId, count] pairs from one pack to another, or nothing at all,
+    each piece with everything it carries (above).
+  */
   function moveById(fromActor, toActor, pairs) {
     var fromInv, toInv;
     try {
@@ -57306,24 +57361,18 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
     var i, k;
     for (i = 0; i < pairs.length; i++) {
-      var baseId = pairs[i][0], want = pairs[i][1];
-      var left = want;
+      var baseId = pairs[i][0], left = pairs[i][1];
+      var moving = [];
       for (k = 0; k < out.length && left > 0; k++) {
         if (!out[k] || out[k].baseId !== baseId) { continue; }
-        var take = Math.min(left, out[k].count || 1);
-        out[k] = { baseId: baseId, count: (out[k].count || 1) - take };
+        var had = out[k].count || 1;
+        var take = Math.min(left, had);
+        moving.push(withCount(out[k], take, true));
+        out[k] = withCount(out[k], had - take, false);
         left -= take;
       }
       if (left > 0) { return false; }
-      var landed = false;
-      for (k = 0; k < into.length; k++) {
-        if (into[k] && into[k].baseId === baseId && !into[k].worn) {
-          into[k] = { baseId: baseId, count: (into[k].count || 1) + want };
-          landed = true;
-          break;
-        }
-      }
-      if (!landed) { into.push({ baseId: baseId, count: want }); }
+      for (k = 0; k < moving.length; k++) { land(into, moving[k]); }
     }
     var keep = [];
     for (i = 0; i < out.length; i++) {
