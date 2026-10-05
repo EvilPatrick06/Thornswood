@@ -25,6 +25,16 @@
 //      pass, which is what failed on the VPS. Before the change, two copies
 //      at once failed in three runs of six on one machine.
 //
+// #1727, the same for the site. Twelve harnesses took a port from the system,
+// let it go, started site\server.js on it and polled the port until
+// something answered, so in that moment another run could take the port and
+// answer as their site. This also checks:
+//   4. every harness that starts server.js waits for its own site's line
+//      before asking the port anything, and none polls the port to find out;
+//   5. the wait in each of the twelve, lifted out, refuses a port somebody
+//      else holds and takes one its site does hold;
+//   6. three copies of test-staff-bans.js started at the same moment all pass.
+//
 // HARNESS_ROOT points it at another copy of the repository, which is how it
 // was shown to fail on the harnesses before the change.
 //
@@ -119,9 +129,44 @@ for (const f of starters) {
       !!waits[f] && /await listening\(srv, (PORT|port)\)/.test(text[f]));
 }
 
+// ------------------------------------------------------ the site's own word
+const sites = files.filter((f) => f !== SELF && /spawn\(/.test(text[f]) && /THORNSWOOD_DOCS_PORT/.test(text[f]));
+const TWELVE = ['tests/test-bans-pk.js', 'tests/test-discord-callback-hang.js', 'tests/test-for-bot-folder.js',
+  'tests/test-help-report.js', 'tests/test-home-html.js', 'tests/test-report-limits.js', 'tests/test-site-auth.js',
+  'tests/test-site-discovery.js', 'tests/test-site-hangs.js', 'tests/test-site-render.js', 'tests/test-staff-bans.js',
+  'tests/test-submit-answers.js'];
+console.log('\nthe harnesses that start the site (' + sites.length + '):');
+yes('there are the twelve #1727 found, and the five that already waited for the site\'s line',
+    TWELVE.concat(['tests/test-deploy-records.js', 'tests/test-gallery.js', 'tests/test-hub-staff-gallery.js',
+                   'tests/test-site-headers.js', 'tests/test-site-local.js']).every((f) => sites.indexOf(f) >= 0));
+// Waiting on the site's own line is "await listening(...)" here, or reading
+// the child's "listening on " line, as the five did before #1727. waitUp()
+// was the connect loop seven of the twelve polled the port with.
+for (const f of sites) {
+  const own = /await listening\(\w+, \w+\)/.test(text[f]) || text[f].indexOf("'listening on ") >= 0;
+  yes(f + ' waits for its own site to say it is listening, with no waitUp() poll of the port',
+      own && !/function waitUp\(/.test(text[f]));
+}
+const siteWaits = {};
+for (const f of TWELVE) {
+  siteWaits[f] = lift(text[f]);
+  yes(f + ' has the wait for the site\'s own line, and waits on it',
+      !!siteWaits[f] && /\[thornswood-docs\\\] listening on/.test(String(siteWaits[f])) &&
+      /await listening\(\w+, \w+\)/.test(text[f]));
+}
+
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-1703-'));
 for (const n of ['voice-server.js', 'headlines.js']) {
   fs.copyFileSync(path.join(REPO_DIR, 'voice', n), path.join(scratch, n));
+}
+const siteDir = path.join(scratch, 'site');
+fs.mkdirSync(siteDir);
+fs.copyFileSync(path.join(REPO_DIR, 'site', 'server.js'), path.join(siteDir, 'server.js'));
+function site(port) {
+  const srv = spawn(process.execPath, ['server.js'], { cwd: siteDir,
+    env: Object.assign({}, process.env, { THORNSWOOD_DOCS_PORT: String(port), THORNSWOOD_DOCS_LOCAL: '1' }) });
+  srv.stdout.on('data', () => {}); srv.stderr.on('data', () => {});
+  return srv;
 }
 function voice(port) {
   const srv = spawn(process.execPath, ['voice-server.js'], { cwd: scratch,
@@ -178,7 +223,33 @@ function runHarness(rel) {
     yes(f + ': with another server on its port, the wait fails and says so ("' + said + '")',
         said.indexOf('something else already holds port ' + held) === 0);
   }
+  // The same for each of the twelve site harnesses' waits.
+  for (const f of TWELVE) {
+    if (!siteWaits[f]) { continue; }
+    const srv = site(held);
+    let said = '';
+    try { await siteWaits[f](srv, held); said = 'took it'; } catch (e) { said = e.message.split('\n')[0]; }
+    await gone(srv);
+    yes(f + ': with another server on its port, the wait fails and says so ("' + said + '")',
+        said.indexOf('something else already holds port ' + held) === 0);
+  }
   other.close();
+
+  // A site on its own port: the wait ends, and what answers is that site.
+  const firstSite = TWELVE.filter((f) => !!siteWaits[f])[0];
+  if (firstSite) {
+    const port = await new Promise((ok) => {
+      const s = net.createServer();
+      s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => ok(p)); });
+    });
+    const srv = site(port);
+    let up = false;
+    try { await siteWaits[firstSite](srv, port); up = true; } catch (e) { console.log('      ' + e.message); }
+    const h = up ? await get(port, '/api/public') : { status: 0, body: '' };
+    yes('on a port the site holds, the wait ends and the site answers there',
+        up && h.status === 200 && h.body.indexOf('not this run') < 0);
+    await gone(srv);
+  }
 
   // And the service's own port: the wait ends, and what answers is this service.
   const first = starters.filter((f) => !!waits[f])[0];
@@ -206,6 +277,17 @@ function runHarness(rel) {
         r.code === 0 && / 0 failed$/.test(tail));
     if (r.code !== 0) {
       for (const l of r.out.split(/\r?\n/).filter((x) => /^FAIL|^ {6}\S/.test(x))) { console.log('      copy ' + (i + 1) + ' said: ' + l.trim()); }
+    }
+  }
+
+  const siteRuns = await Promise.all([1, 2, 3].map(() => runHarness('tests/test-staff-bans.js')));
+  for (let i = 0; i < siteRuns.length; i++) {
+    const r = siteRuns[i];
+    const tail = (r.out.trim().split(/\r?\n/).pop() || '');
+    yes('test-staff-bans.js, copy ' + (i + 1) + ' of ' + siteRuns.length + ' started together, passes (' + tail + ')',
+        r.code === 0 && / 0 failed$/.test(tail));
+    if (r.code !== 0) {
+      for (const l of r.out.split(/\r?\n/).filter((x) => /^FAIL/.test(x))) { console.log('      copy ' + (i + 1) + ' said: ' + l.trim()); }
     }
   }
 

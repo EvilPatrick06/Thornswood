@@ -18,6 +18,39 @@ function ask(port, route, headers = {}, method = 'GET') {
     req.on('error', reject); req.setTimeout(5000, () => req.destroy(new Error('HTTP timeout'))); req.end();
   });
 }
+/*
+  Waits for the site's own "[thornswood-docs] listening on ...:port" line, so
+  nothing is asked of the port before this run's site holds it (#1727). The
+  port came from the system and was let go again, and builds run side by side
+  on the VPS: if something takes it in between, the site stops on EADDRINUSE,
+  and polling the port would have read whatever holds it as this site. The
+  error says which, with what the site printed.
+*/
+function listening(srv, port) {
+  return new Promise((ok, bad) => {
+    let out = '';
+    const said = (d) => {
+      out += d;
+      const m = /\[thornswood-docs\] listening on \S+:(\d+)/.exec(out);
+      if (m && Number(m[1]) === port) { end(null); }
+    };
+    const more = (d) => { out += d; };
+    const gone = (code) => end(new Error((/EADDRINUSE/.test(out) ? 'something else already holds port ' + port + ', so ' : '') +
+                                         'the site stopped (exit ' + code + ') before it was listening. It printed:\n' + out));
+    const late = setTimeout(() => end(new Error('the site did not say it was listening on ' + port +
+                                                ' within fifteen seconds. It printed:\n' + out)), 15000);
+    function end(err) {
+      clearTimeout(late);
+      srv.stdout.removeListener('data', said);
+      srv.stderr.removeListener('data', more);
+      srv.removeListener('close', gone);
+      if (err) { bad(err); } else { ok(); }
+    }
+    srv.stdout.on('data', said);
+    srv.stderr.on('data', more);
+    srv.on('close', gone);
+  });
+}
 async function main() {
   fs.copyFileSync(path.join(app, 'server.js'), path.join(work, 'server.js'));
   fs.cpSync(path.join(app, 'public'), path.join(work, 'public'), {recursive:true});
@@ -35,7 +68,7 @@ async function main() {
   server = spawn(process.execPath, [path.join(work, 'server.js')], {cwd:work,
     env:{...process.env, THORNSWOOD_DOCS_LOCAL:'1', THORNSWOOD_DOCS_PORT:String(port)}, stdio:'pipe'});
   let log = ''; server.stdout.on('data', b => log += b); server.stderr.on('data', b => log += b);
-  for (let i=0;i<100 && !log.includes('Thornswood docs');i++) await new Promise(r=>setTimeout(r,50));
+  await listening(server, port);
   const titles = new Set(), descriptions = new Set();
   for (const route of routes) {
     const r = await ask(port, route, {host:'untrusted.example', accept:'text/html'});
