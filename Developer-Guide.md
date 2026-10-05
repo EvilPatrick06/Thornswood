@@ -726,9 +726,11 @@ thing itself activated, never a line typed in the chat. Staff and dev
 commands stay commands. So do `/stuck` and the lines that reach staff,
 `/helpme` and `/report`, and help text names them (Patrick, later on
 4 Oct: "change it to except the /stuck and the ones for getting help
-from GMs"). Never add another chat command for people. A panel may send
-the server a line, but no person is told to type it and help text never
-lists it. [docs/SYSTEMS.md](docs/SYSTEMS.md), "Buttons, not
+from GMs"). So do the ways of saying a line, `/me`, `/do`, `/w`, `/s`,
+`/y` and `/ooc`, and `/roll`, with no buttons for them (Patrick, 4 Oct:
+"Allow those commands and don't do buttons"). Never add another chat
+command for people. A panel may send the server a line, but no person
+is told to type it and help text never lists it. [docs/SYSTEMS.md](docs/SYSTEMS.md), "Buttons, not
 commands", is the rule and what counts as a button;
 [docs/systems/commands.md](docs/systems/commands.md) lists every command
 there is today and the issue that converts each one that does not stay.
