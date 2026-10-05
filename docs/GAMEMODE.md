@@ -44,7 +44,7 @@ at load, which is why it can reach blocks that sit below it.
 | 1-35 | Header and one-line tables | The contract (1-21), then `DATA`, `STATIONS`, `ITEMS`, `WATERS`, `WEATHER`, `WARMTH`, `FOODS`, `RACES` (23-30), each one line. See "Generated tables". |
 | 37-334 | Small helpers and logging | `rollLog` (82), `sayLogState` (110), `logPath` (124), `log` (139); `gamemodeId` (208), which logs the git blob id of the loading file (222); `voicePort` (249), `guard` (267), `notify` (294), `say` (312). |
 | 335-638 | Respawn resolution | A port of `respawnResolver.ts`: `arrive` (391), `resolveArrival` (415). `ensureProperties` (467) declares the actor properties the early blocks use. |
-| 639-1497 | Gathering stations | `ORES_BY_BASE` (686-1271), cooldowns (`COOLDOWN_MS` 1285, `MINE_COOLDOWN_MS` 1334), `addItem`, `takeItem` (1436-1493). |
+| 639-1497 | Gathering stations | `ORES_BY_BASE` (686-1271), the stations' cooldown (`COOLDOWN_MS` 1285), `addItem`, `takeItem` (1436-1493). |
 | 1498-1650 | Class and profession gates | `classGate` (1515), `halfGate` (1530), `creditWork` (1549), `rankStep` (1639). |
 | 1651-3617 | Starting tools, mining, chopping, charcoal | `TOOLS` (1739) and tool wear (1810-2113); salt (`mineSalt` 2114); the swing animation (2632-2898); ore deposits (`DEPOSIT_SIZE` 2255, 2959-3058); `mineOre` (3059); chopping blocks (3342-3549, `chopWood` 3463); the kiln (`burnCharcoal` 3553). |
 | 3618-5070 | Character creation (chargen) | See "Character creation" below. |

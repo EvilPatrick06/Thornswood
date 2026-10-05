@@ -1415,58 +1415,13 @@ const RANK_LADDER = ['novice', 'advanced', 'expert', 'master'];
 const COOLDOWN_MS = 20000;
 
 /*
-  HOW LONG A SEAM IS DONE FOR, BY THE RANK THAT SEAM ASKS FOR.
-
-  THE RULEBOOK DOES NOT SET THESE. classes.md says rank decides which source
-  somebody may work and how much it gives, and says nothing about how often.
-  These are invented, they are first numbers for the dev server, and they are
-  here rather than inside mineOre so that changing the pace of every seam in
-  the province is one edit in one place.
-
-  WHY THE TWENTY SECONDS ABOVE COULD NOT STAY. COOLDOWN_MS was sized for the
-  one salt quarry this server placed and the kiln beside it, and mineOre took
-  it for all 581 seams because it was the number already there. Nothing else
-  limits a seam: MineOreScript never runs on this server or on the client, for
-  the two reasons written out over the scripted activators further down, so no
-  vein is ever depleted and none ever reloots, and onActivate returns false for
-  a seam, so the engine does nothing either. The cooldown is the entire supply.
-
-  Measured on 20 September against the built table. A Master Miner takes 1 to 5
-  off any master seam, three a strike on average. At twenty seconds that is 540
-  ebony an hour off the one seam at 10e101:Skyrim.esm, and at the emerald seam
-  28e95:Dragonborn.esm, where the ore is 600 gold, three a strike every twenty
-  seconds is about 324,000 gold an hour off a single reference. Vanilla gives
-  three strikes and then locks the vein for 30 in game days.
-
-  The plant half of this work gave itself ten minutes, near enough the hour the
-  engine reloots a FLOR in. An ore vein's own reloot is 30 in game days, which
-  at the default timescale is a day and a half of real time, and a tester who
-  saw a seam come back once a weekend would never see the ladder work at all.
-  So these sit between the two, by what the seam is worth:
-
-    novice    ten minutes, the same wait a picked plant gets. Iron is 2 gold
-              and a novice takes 1 to 2, so one seam is about 18 gold an hour,
-              which is the pace the plants already run at.
-    advanced  half an hour. Corundum, orichalcum, quicksilver, silver, 20 to
-              25 gold, and 310 of the 581 seams.
-    expert    an hour. Moonstone, malachite, gold ore, 30 to 50 gold.
-    master    four hours. The emerald seam above now gives about 1,800 gold
-              every four hours instead of 324,000 an hour, and all 24 master
-              seams worked in one circuit, including the six on Solstheim, come
-              to about 15,000 gold before the first of them is ready again.
-
-  The wait is kept per character and per reference in the same map the quarry
-  and the plants use, and that map is memory: a server restart or a hot reload
-  of this file clears every cooldown in it. That is true of the ten minutes on
-  a plant as well, and it is the first thing to know before these numbers are
-  argued about, because a four hour wait that a restart wipes is not four hours.
+  A SEAM HAS NO WAIT OF ITS OWN HERE. MINE_COOLDOWN_MS, until #1413, refused
+  the person who struck a seam for ten minutes to four hours by its rank, kept
+  per character in lastUse. #1413 put the seams on a deposit instead,
+  twenty in a seam and one a swing, back for everybody at once on Patrick's
+  clock (miner.md, and the comment in mineOre), and nothing read the table after
+  that. It came out in #1831.
 */
-const MINE_COOLDOWN_MS = {
-  novice: 600000,
-  advanced: 1800000,
-  expert: 3600000,
-  master: 14400000
-};
 
 const lastUse = new Map();   // "actorId:refrId" -> timestamp
 
@@ -1483,8 +1438,8 @@ const lastUse = new Map();   // "actorId:refrId" -> timestamp
   The rivers, the hanging game and the carcasses kept their rows here until
   #1413. Since then they wait on the shared resource stock, on the record and
   for everybody (createSharedResourceStock), and the seams are deposits, so no
-  row here is asked about against MINE_COOLDOWN_MS or the fish, game or hunt
-  tables any more (#1641).
+  row here is asked about against the seams' old waits or the fish, game or
+  hunt tables any more (#1641, #1831).
 
   A row older than the longest wait anybody asks about gives the answer a
   missing row gives, which is ready, because cooldownLeft reads a missing row
@@ -1524,7 +1479,7 @@ function forgetOldUses(now) {
  *  start a cooldown, or walking up to a kiln without firewood locks you out.
  *  spanMs is how long this source stays worked out and defaults to the twenty
  *  seconds the stations use, because the quarry and the kiln were the only two
- *  callers when this was written. A seam passes its own off MINE_COOLDOWN_MS. */
+ *  callers when this was written. */
 function cooldownLeft(actorId, refrId, spanMs) {
   const span = spanMs || COOLDOWN_MS;
   const prev = lastUse.get(actorId + ':' + refrId) || 0;
@@ -2441,18 +2396,16 @@ function isVein(baseDesc) {
  * runs on this server or on the client. So a Miner could work the one quarry
  * and walked past every seam in the province.
  *
- * The shape is mineSalt's, line for line, and the four differences are the
+ * The shape is mineSalt's, line for line, and the differences are the
  * table's doing. The yield is the pair for the miner's rank instead of
  * randInt(1, 2 + step). A pair of zeroes is refused by name rather than handed
  * a smaller pile, so a Novice at an ebony seam is told what it takes rather
  * than left to work out why nothing came off it. There is no rare-drop roll:
  * the quarry has one because salt is the only thing a salt seam can give, and
- * a seam here already gives what it is made of. And the wait between two
- * strikes is the seam's own, off MINE_COOLDOWN_MS, ten minutes at an iron vein
- * and four hours at a gem geode, where the quarry's is a flat twenty seconds.
- * That last one is not a refinement: it is the only limit on 581 seams the
- * engine never depletes, and the case for the numbers is written over the
- * table itself.
+ * a seam here already gives what it is made of. And a seam has no wait of its
+ * own between two strikes, where the quarry's is a flat twenty seconds: it is a
+ * deposit, written out below, and that deposit is the only limit on 581 seams
+ * the engine never depletes.
  */
 
 /*
@@ -6459,8 +6412,7 @@ var FISH_BY_BASE = {
   somebody may work and how much it gives. It puts no number on either. These
   are invented, they are first numbers for the dev server, and they are here in
   one block so that changing the pace of every river in the province is one edit
-  in one place, which is the arrangement MINE_COOLDOWN_MS near the top of this
-  file is written under.
+  in one place.
 
   cooldownMs, by the rank the record asks for. The plants give themselves ten
   minutes, near enough the hour the engine reloots a FLOR in, and a salmon is a
@@ -6585,8 +6537,7 @@ var GAME_BY_BASE = {
   somebody may work and how much it gives. It puts no number on either. These
   are invented, they are first numbers for the dev server, and they are in one
   block so that changing the pace of every meat rack in the province is one edit
-  in one place, which is the arrangement FISH_TUNING above and MINE_COOLDOWN_MS
-  near the top of this file are both written under.
+  in one place, which is the arrangement FISH_TUNING above is written under.
 
   cooldownMs, by the rank the record asks for. It is FISH_TUNING's ladder to the
   minute, and deliberately so rather than by coincidence: a hanging pheasant and
@@ -8185,9 +8136,8 @@ var HUNTS_BY_BASE = {
 // ==== end HUNTS_BY_BASE ====
 
 /*
-  HOW LONG A BODY LIES THERE AND HOW LONG IT IS DONE FOR. THE RULEBOOK SETS
-  NEITHER, AND THE FIRST OF THE TWO IS THE ENGINE'S NUMBER UNTIL THIS FILE SETS
-  IT.
+  HOW LONG A BODY LIES THERE. THE RULEBOOK DOES NOT SET IT, AND IT IS THE
+  ENGINE'S NUMBER UNTIL THIS FILE SETS IT.
 
   THE PREMISE THIS BLOCK USED TO REST ON WAS FALSE, MEASURED IN THE FORK ON
   20 SEPTEMBER. It said a body never comes back, lies there until the cell resets
@@ -8212,8 +8162,7 @@ var HUNTS_BY_BASE = {
       Walk over half a minute after the kill and the press did nothing, said
       nothing and looked exactly like a server that had never heard of hunting.
 
-  SO THE BODY IS GIVEN A LENGTH AND THE WAIT IS GIVEN A LADDER, and both numbers
-  are invented, both are first numbers for the dev server, and both are here.
+  SO THE BODY IS GIVEN A LENGTH, an invented first number for the dev server.
 
   bodySeconds, how long a carcass lies there before the animal stands back up.
   Five minutes. It is written onto the dying actor in mp.onDeath, which runs
@@ -8225,31 +8174,16 @@ var HUNTS_BY_BASE = {
   and on nothing else, so bandits, guards and dragons keep the engine's twenty
   five seconds and no other part of the server changes pace.
 
-  cooldownMs, how long that hunter is done with that reference, by the rank the
-  body asks for. A body refills now, which is the thing that was wrong before, so
-  the wait is the pace of a source that refills and belongs on the same ladder
-  the seams and the rivers already use: ten minutes, half an hour, an hour, four
-  hours. Four hours stays at the top where it was, on the bodies worth the most,
-  and the commonest animals in Skyrim, the fox and the wolf and the goat and the
-  deer and the elk, come back on the ten minutes a picked plant gets rather than
-  locking a hunter out of the road they walk. A rank this file does not know
-  falls back to the four hours rather than the ten minutes, for the reason the
-  rivers do: a row carrying a rank nobody knows must not be the cheapest tap in
-  the game.
-
-  Since #1413 a carcass is dressed once a life on the shared resource stock
-  (stock.dress), so these waits are not kept in the lastUse map. bodySeconds is
-  written into the actor's change form by the engine, so it outlives a reload
-  and is re-set on every death anyway.
+  A body has no wait by rank. Until #1413 this table also had cooldownMs, how
+  long one hunter was done with one reference, ten minutes to four hours by the
+  rank of the body. Since #1413 a carcass is dressed once a life, by whoever
+  dresses it first, on the shared resource stock (stock.dress), and the next life
+  is the next body, so nothing read those waits and they came out in #1831.
+  bodySeconds is written into the actor's change form by the engine, so it
+  outlives a reload and is re-set on every death anyway.
 */
 const HUNT_TUNING = {
-  bodySeconds: 300,
-  cooldownMs: {
-    novice: 600000,
-    advanced: 1800000,
-    expert: 3600000,
-    master: 14400000
-  }
+  bodySeconds: 300
 };
 
 /** True when this base is one of the animals in the generated table above.
@@ -8306,7 +8240,8 @@ function saidInOrder(parts) {
  *
  * THE ORDER OF THE CHECKS, AND THE ONE THAT IS NOT WHERE IT LOOKS LIKE IT
  * BELONGS. Type, then dead, then the table, then the class, then the rank, then
- * the wait. The class gate sits BELOW the table lookup, which is the opposite
+ * the body taken once a life on the shared stock. The class gate sits BELOW the
+ * table lookup, which is the opposite
  * of where a gate usually goes and is the same order mineOre and harvest()
  * already use. It matters here more than it does there. This function is
  * reached by a press on anything no other branch claimed, which is every dead
@@ -8365,15 +8300,6 @@ function loot(actorId, refrId, baseDesc) {
     return 'This ' + body.name + ' takes ' + rankWord(body.rank) +
            ' Hunter. Work the bodies you can until you are one.';
   }
-
-  // The wait is the body's own, by the rank it asks for, because a body does
-  // grow back: the animal at this reference stands up again after the seconds
-  // HUNT_TUNING.bodySeconds writes onto it at death. A rank the table does not
-  // name falls back to the longest wait rather than the shortest, the same way
-  // the rivers and the seams do. The case for every one of the numbers is
-  // written over HUNT_TUNING.
-  const span = Object.prototype.hasOwnProperty.call(HUNT_TUNING.cooldownMs, body.rank)
-    ? HUNT_TUNING.cooldownMs[body.rank] : HUNT_TUNING.cooldownMs.master;
 
   // The pair is how many of EACH thing the body gives, rolled once for each,
   // so a deer hands over its meat and its hide in the same press and a master

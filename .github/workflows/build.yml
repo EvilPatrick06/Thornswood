@@ -332,6 +332,7 @@ jobs:
                  'test-voice-reconnect.js',
                  'test-1398-fuel.js',
                  'test-1398-weaver.js',
+                 'test-1831-dead-waits.js',
                  'test-1766-fishing-mod-poles.js',
                  'test-1622-recipe-generator.js',
                  'test-1714-cut-file.js',
