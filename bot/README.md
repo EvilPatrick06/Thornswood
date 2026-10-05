@@ -278,6 +278,16 @@ waits for it to say it is watching the server. If it does not, the old files
 go back and it is started on those. Python, the libraries, the token and the
 service itself are left alone.
 
+So a library moved in `requirements.txt`, by a Dependabot pull request or by
+hand, does not reach the box with `-CodeOnly`: that sends the file and leaves
+`py-libs` as it was. The full run, `.\scripts\deploy\Install-Bot.ps1 -NoToken`,
+installs the pinned versions into a new `py-libs` and swaps it in with the
+code, so a bump that stops the bot from starting puts the old libraries back.
+The pull request build only parses the bot; the nightly runs its harnesses.
+So before merging a bump, install the new pins and run `bot\test-*.py` on
+them, the way [Setting up a machine](../Developer-Guide.md#setting-up-a-machine)
+installs them (#1401).
+
 What goes up with it: `bot.py`, `card.py`, the channel ids, the card artwork,
 `requirements.txt`, and `live-smoke-discord-export.json`, which `bot.py` reads
 from beside itself for the live smoke. A file the bot reads and this list does
