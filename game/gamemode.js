@@ -29379,14 +29379,25 @@ log('gamemode loaded:',
     }
     if (!doc || !Array.isArray(doc.mods)) return SRC + ' has no mods list';
 
-    var mods = doc.mods.filter(function (m) {
-      return m && typeof m.filename === 'string' && PLUGIN.test(m.filename);
-    });
+    function plugin(m) { return m && typeof m.filename === 'string' && PLUGIN.test(m.filename); }
+    var mods = doc.mods.filter(plugin);
+    // The light plugins, in light index order (#1715). The engine writes
+    // them apart from mods once it loads light plugins: it reads which are
+    // light from each header (the ESL flag, 0x200, or an .esl name), and
+    // mods stays the full plugins because the client's own check walks it
+    // position by position against Game.getModName, which counts full
+    // plugins only. Read here, never decided again from the files, so the
+    // server's answer is the one the launcher holds every machine's light
+    // order to. An engine that loads no light plugin writes none.
+    var light = Array.isArray(doc.light) ? doc.light.filter(plugin) : [];
 
     var out = {
       versionMajor: doc.versionMajor || 1,
       mods: mods,
+      // The whole order, full and light together, the order the launcher
+      // puts a plugin list into when there is a light list.
       loadOrder: Array.isArray(doc.loadOrder) ? doc.loadOrder : mods.map(function (m) { return m.filename; }),
+      light: light,
       // Which of those the launcher's Fix may fetch from /plugins/ (#1180).
       // The client reads mods and loadOrder only.
       served: mods.filter(function (m) { return OURS[m.filename.toLowerCase()]; })
@@ -29407,6 +29418,7 @@ log('gamemode loaded:',
     var dropped = doc.mods.length - mods.length;
     console.log('[thornswood] load order manifest published at /api/servers/' + KEY +
                 '/manifest.json, ' + mods.length + ' plugins' +
+                (light.length ? ' and ' + light.length + ' light plugins' : '') +
                 (dropped > 0 ? ' (' + dropped + ' archive entries left out)' : ''));
     try { publishFiles(mods); } catch (e) { console.log('[thornswood] could not publish the plugin files: ' + e.message); }
     return '';
