@@ -308,11 +308,12 @@ if (block && RECIPES && ADMIN_ITEMS) {
       const told = [];
       const claims = {};
       if (held) { claims[building] = held; }
+      // The Office page on K (#1638) redraws after an eviction; nothing here draws.
       const fn = new Function('globalThis', 'isSteward', 'here', 'holderOf', 'nameOf', 'claims', 'save', 'pushAll', 'plog',
-        evictSrc + '\nreturn evict;');
+        'redrawPanel', 'OFFICE_AT_DOOR', evictSrc + '\nreturn evict;');
       const evict = fn({ __thornswoodEmbassy: E }, function () { return true; }, function () { return building; },
         function () { return claims[building] || null; }, function (b) { return b; }, claims,
-        function () { }, function () { }, function () { });
+        function () { }, function () { }, function () { }, function () { }, 'Stand at the door.');
       evict(0x14, STEWARD, function (p, line) { told.push(line); });
       return { told: told.join(' '), claims: claims };
     }
