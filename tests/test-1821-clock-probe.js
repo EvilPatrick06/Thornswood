@@ -27,6 +27,32 @@ function freePort() {
   return new Promise((ok, bad) => { const s = net.createServer(); s.on('error', bad);
     s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => ok(p)); }); });
 }
+/* Waits for srv's own "listening on ...:port" line, or says why it stopped. */
+function listening(srv, port) {
+  return new Promise((ok, bad) => {
+    let out = '';
+    const said = (d) => {
+      out += d;
+      const m = /\[voice\] listening on \S+:(\d+)/.exec(out);
+      if (m && Number(m[1]) === port) { end(null); }
+    };
+    const more = (d) => { out += d; };
+    const gone = (code) => end(new Error((/EADDRINUSE/.test(out) ? 'something else already holds port ' + port + ', so ' : '') +
+                                         'the voice service stopped (exit ' + code + ') before it was listening. It printed:\n' + out));
+    const late = setTimeout(() => end(new Error('the voice service did not say it was listening on ' + port +
+                                                ' within fifteen seconds. It printed:\n' + out)), 15000);
+    function end(err) {
+      clearTimeout(late);
+      srv.stdout.removeListener('data', said);
+      srv.stderr.removeListener('data', more);
+      srv.removeListener('exit', gone);
+      if (err) { bad(err); } else { ok(); }
+    }
+    srv.stdout.on('data', said);
+    srv.stderr.on('data', more);
+    srv.on('exit', gone);
+  });
+}
 let SITE = '';
 function site() {
   return new Promise((ok) => { const s = http.createServer((q, r) => { q.resume(); q.on('end', () => r.end('{"ok":true}')); });
@@ -45,10 +71,8 @@ async function start() {
     THORNSWOOD_CHAT_DIR: path.join(dir, 'chat') }) });
   const s = { port: port, srv: srv, log: '' };
   srv.stderr.on('data', (d) => { s.log += d; });
-  await new Promise((ok, bad) => {
-    srv.stdout.on('data', (d) => { s.log += d; if (/\[voice\] listening on \S+:\d+/.test(s.log)) { ok(); } });
-    srv.on('exit', (c) => bad(new Error('exit ' + c + ': ' + s.log)));
-  });
+  srv.stdout.on('data', (d) => { s.log += d; });
+  await listening(srv, port);
   return s;
 }
 const stop = (s) => new Promise((ok) => { s.srv.once('close', ok); s.srv.kill(); });
@@ -87,7 +111,7 @@ const tally = (list) => { const t = {}; for (const x of list) { t[x] = (t[x] || 
   }
   ds.sort((x, y) => x - y);
   console.log('PROBE clocks: here minus a child\'s reading it sent here, 100 children: min ' + ds[0] + ' ms, median ' + ds[50] +
-              ', max ' + ds[99] + '; below zero, so the child's clock ahead of this one's, ' + ds.filter((d) => d < 0).length);
+              ', max ' + ds[99] + '; below zero, so the child clock ahead of this one, ' + ds.filter((d) => d < 0).length);
   console.log('PROBE clocks, the lowest ten: ' + ds.slice(0, 10).join(' '));
   SITE = await site();
   // 2. The old way: a token signed here the moment the service says it is listening.
