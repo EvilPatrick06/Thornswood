@@ -9390,6 +9390,9 @@
   */
   let dumpedOrder = false;
   let orderToReport = null;
+  // The light plugins, for the light half of the report (#1715). Null on a
+  // build without the light index, which then sends the full half alone.
+  let lightToReport = null;
   sp.on('update', guard('loadorder', () => {
     if (dumpedOrder) { return; }
     dumpedOrder = true;
@@ -9416,6 +9419,8 @@
           const name = sp.Game.getLightModName(i);
           if (name) { light.push(name); }
         }
+        // Before the write, as for the full list.
+        lightToReport = light.slice();
         fs.writeFileSync('Data/Platform/thornswood-plugins-light.txt',
                          light.join('\n') + '\n');
       } catch (e2) {
@@ -9478,33 +9483,49 @@
   */
   const LOAD_ORDER_RESEND_MS = 120000;
   const orderMarks = [];
+  const lightMarks = [];
   let orderSentAt = 0;
+  function markOf(name) {
+    let mark = loadOrderMark(name);
+    if (LOAD_ORDER_STOREFRONT.indexOf(String(name).toLowerCase()) < 0) {
+      try {
+        const info = sp.getFileInfo(name);
+        if (info) { mark = loadOrderMark(name, info.size, info.crc32); }
+      } catch (e) {
+        log('could not read ' + name + ' for the load order report, sent by name only:', e);
+      }
+    }
+    return mark;
+  }
+  // One list after the other, under its own word: the server holds the
+  // light plugins to its light list, where a light index is a place (#1715).
+  function sendMarks(word, marks) {
+    const total = marks.length;
+    for (let from = 0; from < total; from += LOAD_ORDER_CHUNK) {
+      tellServer(word + ' ' + total + ' ' + from + ' ' + marks.slice(from, from + LOAD_ORDER_CHUNK).join(''));
+    }
+  }
   sp.on('update', guard('loadorderreport', () => {
     if (!orderToReport) { return; }
     if (orderMarks.length < orderToReport.length) {
-      const name = orderToReport[orderMarks.length];
-      let mark = loadOrderMark(name);
-      if (LOAD_ORDER_STOREFRONT.indexOf(String(name).toLowerCase()) < 0) {
-        try {
-          const info = sp.getFileInfo(name);
-          if (info) { mark = loadOrderMark(name, info.size, info.crc32); }
-        } catch (e) {
-          log('could not read ' + name + ' for the load order report, sent by name only:', e);
-        }
-      }
-      orderMarks.push(mark);
+      orderMarks.push(markOf(orderToReport[orderMarks.length]));
+      return;
+    }
+    if (lightToReport && lightMarks.length < lightToReport.length) {
+      lightMarks.push(markOf(lightToReport[lightMarks.length]));
       return;
     }
     const now = Date.now();
     if (orderSentAt && now - orderSentAt < LOAD_ORDER_RESEND_MS) { return; }
     const first = !orderSentAt;
     orderSentAt = now;
-    const total = orderMarks.length;
-    for (let from = 0; from < total; from += LOAD_ORDER_CHUNK) {
-      tellServer('/loadorder ' + total + ' ' + from + ' ' +
-                 orderMarks.slice(from, from + LOAD_ORDER_CHUNK).join(''));
+    sendMarks('/loadorder', orderMarks);
+    if (lightToReport) { sendMarks('/loadorderlight', lightMarks); }
+    if (first) {
+      say('reported ' + orderMarks.length + ' plugins' +
+          (lightToReport ? ' and ' + lightMarks.length + ' light plugins' : '') +
+          ' to the server to check against its own');
     }
-    if (first) { say('reported ' + total + ' plugins to the server to check against its own'); }
   }));
 
   /*

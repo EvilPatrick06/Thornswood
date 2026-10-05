@@ -72,9 +72,15 @@ yes('and so is the name alone', mark('Riften Expansion.esp') !== mark('Riften Ex
       launcher.length > 0 && JSON.stringify(launcher) === JSON.stringify(plugin));
 
   yes('the front sends the list as /loadorder <total> <from> <marks>',
-      /tellServer\('\/loadorder ' \+ total \+ ' ' \+ from \+ ' ' \+/.test(front));
+      /tellServer\(word \+ ' ' \+ total \+ ' ' \+ from \+ ' ' \+/.test(front) && /sendMarks\('\/loadorder', orderMarks\);/.test(front));
   yes('it reads each plugin with getFileInfo, one a frame', /sp\.getFileInfo\(name\)/.test(front) &&
-      /orderMarks\.push\(mark\);\s*return;/.test(front));
+      /orderMarks\.push\(markOf\(orderToReport\[orderMarks\.length\]\)\);\s*return;/.test(front));
+  // #1715: the light plugins the same way, after the full ones, under their
+  // own word, from the list it writes to thornswood-plugins-light.txt.
+  yes('and the light plugins as /loadorderlight, one a frame, after the full ones',
+      /lightMarks\.push\(markOf\(lightToReport\[lightMarks\.length\]\)\);\s*return;/.test(front) &&
+      /if \(lightToReport\) \{ sendMarks\('\/loadorderlight', lightMarks\); \}/.test(front) &&
+      /lightToReport = light\.slice\(\);\s*fs\.writeFileSync\('Data\/Platform\/thornswood-plugins-light\.txt'/.test(front));
   yes('the list it sends is the one it writes to thornswood-loadorder.txt, taken before the write',
       /orderToReport = names\.slice\(\);\s*fs\.writeFileSync\('Data\/Platform\/thornswood-loadorder\.txt',\s*names\.join/.test(front));
   const resend = /const LOAD_ORDER_RESEND_MS = (\d+);/.exec(front);
@@ -87,7 +93,7 @@ yes('and so is the name alone', mark('Riften Expansion.esp') !== mark('Riften Ex
   const n = chunk ? Number(chunk[1]) : 0;
   const voice = fs.readFileSync(VOICE, 'utf8');
   const cap = /msg\.text == null \? '' : msg\.text\)\.slice\(0, (\d+)\)/.exec(voice);
-  const longest = '/loadorder 4096 4032 ' + new Array(n + 1).join('fffff');
+  const longest = '/loadorderlight 4096 4032 ' + new Array(n + 1).join('fffff');
   yes('a full line fits under the voice service\u2019s chat cap (' + longest.length + ' of ' +
       (cap ? cap[1] : '?') + ')', n > 0 && !!cap && longest.length < Number(cap[1]));
 }
@@ -104,12 +110,12 @@ yes('the refusal block is in the gamemode', a >= 0 && b > a);
   const player = /^const PLAYER_WORDS = (\[[\s\S]*?\]);$/m.exec(src);
   const W = words ? new Function('return ' + words[1])() : [];
   const P = player ? new Function('return ' + player[1])() : [];
-  yes('/loadorder is a word the server answers', W.indexOf('/loadorder') >= 0);
-  yes('and /help never offers it to anybody', P.indexOf('/loadorder') < 0);
-  yes('handle() hands it to the refusal block with the character',
-      /word === '\/loadorder'[\s\S]{0,400}lo\.take\(profileId, parts, actorId,/.test(code));
+  yes('/loadorder and /loadorderlight are words the server answers', W.indexOf('/loadorder') >= 0 && W.indexOf('/loadorderlight') >= 0);
+  yes('and /help never offers either to anybody', P.indexOf('/loadorder') < 0 && P.indexOf('/loadorderlight') < 0);
+  yes('handle() hands both to the refusal block with the character',
+      /word === '\/loadorder' \|\| word === '\/loadorderlight'[\s\S]{0,400}lo\.take\(profileId, parts, actorId,/.test(code));
   yes('a held report never says "your character is not back" to somebody who typed nothing',
-      /word !== '\/loadorder'/.test(code));
+      /word !== '\/loadorder'/.test(code) && /word !== '\/loadorderlight'/.test(code));
   yes('the manifest block keeps the published list for it',
       /globalThis\.__thornswoodManifestMods = mods;/.test(code));
 }
@@ -131,13 +137,13 @@ function manifest(count) {
 }
 
 /* What the front plugin would send for this list: the same marks, the same lines. */
-function linesFor(list) {
+function linesFor(list, word) {
   const marks = list.map(function (m) {
     return STOREFRONT.indexOf(m.filename.toLowerCase()) >= 0 ? mark(m.filename) : mark(m.filename, m.size, m.crc32);
   });
   const out = [];
   for (let from = 0; from < marks.length; from += 64) {
-    out.push('/loadorder ' + marks.length + ' ' + from + ' ' + marks.slice(from, from + 64).join(''));
+    out.push((word || '/loadorder') + ' ' + marks.length + ' ' + from + ' ' + marks.slice(from, from + 64).join(''));
   }
   return out;
 }
@@ -185,6 +191,59 @@ function rig(settings, mods) {
 
 if (a >= 0 && b > a) {
   const mods = manifest(48);
+
+  // ---- the light plugins (#1715) ----
+  {
+    const LIGHT = ['_ResourcePack.esl', 'Expressive Facegen Morphs.esl', 'KhisartinBeards.esp', 'HammerHair.esp']
+      .map(function (n, i) { return { filename: n, size: 500 + i, crc32: 900 + i }; });
+    let r = rig({}, mods);
+    r.box.__thornswoodManifestLight = LIGHT;
+    r.send(20, linesFor(mods));
+    yes('light: a light list in the server’s order is passed', r.send(20, linesFor(LIGHT, '/loadorderlight')) === null && r.told.length === 0);
+    const swapped = LIGHT.slice(); swapped[2] = LIGHT[3]; swapped[3] = LIGHT[2];
+    const v = r.send(21, linesFor(swapped, '/loadorderlight'));
+    yes('light: two light plugins swapped are refused at light position 2, naming the server’s plugin there',
+        !!v && v.light === true && v.at === 2 && v.theirs === 'KhisartinBeards.esp');
+    yes('light: told in one sentence that names the light position',
+        r.told.length === 1 && r.told[0].indexOf('light position 2') >= 0 && r.told[0].indexOf('KhisartinBeards.esp') >= 0);
+    r = rig({ thornswoodLoadOrderRefuse: true }, mods);
+    r.box.__thornswoodManifestLight = LIGHT;
+    const cut = r.send(22, linesFor(LIGHT.slice(0, 2), '/loadorderlight'));
+    r.fire();
+    yes('light: a light list cut short is refused, and with refusing on the session ends',
+        !!cut && cut.at === 2 && r.kicked.length === 1);
+    r = rig({}, mods);
+    r.box.__thornswoodManifestLight = null;
+    yes('light: a server with no light list judges nothing by the light report',
+        r.send(23, linesFor(swapped, '/loadorderlight')) === null && r.told.length === 0);
+    // The sweep: a server with a light list needs both reports.
+    r = rig({}, mods);
+    r.box.__thornswoodManifestLight = LIGHT;
+    const t0 = 1000000;
+    r.relay(t0, 0);
+    r.online = [{ actorId: 0xff000a01, profileId: 24 }];
+    r.sweep(t0);
+    r.send(24, linesFor(mods));
+    r.relay(t0 + 300001, 0);
+    yes('light: a server with a light list counts a profile with only the full report as not reported',
+        r.sweep(t0 + 300001).indexOf(24) >= 0);
+    r = rig({}, mods);
+    r.box.__thornswoodManifestLight = LIGHT;
+    r.relay(t0, 0);
+    r.online = [{ actorId: 0xff000a01, profileId: 25 }];
+    r.sweep(t0);
+    r.send(25, linesFor(mods));
+    r.send(25, linesFor(LIGHT, '/loadorderlight'));
+    r.relay(t0 + 300001, 0);
+    yes('light: and with both reports it is reported', r.sweep(t0 + 300001).length === 0);
+    r = rig({}, mods);
+    r.relay(t0, 0);
+    r.online = [{ actorId: 0xff000a01, profileId: 26 }];
+    r.sweep(t0);
+    r.send(26, linesFor(mods));
+    r.relay(t0 + 300001, 0);
+    yes('light: a server with no light list needs the full report only, as before', r.sweep(t0 + 300001).length === 0);
+  }
 
   {
     const r = rig({}, mods);

@@ -115,9 +115,15 @@ if (block) {
 
   // What an engine that loads no light plugin writes: no light list.
   const b = run({ versionMajor: 1, mods: FULL.map(entry), loadOrder: FULL });
-  yes("an engine that writes no light list: light is published empty and mods is every plugin",
-      !!b.manifest && Array.isArray(b.manifest.light) && b.manifest.light.length === 0 &&
-      JSON.stringify(names(b.manifest.mods)) === JSON.stringify(FULL));
+  // The client compares its light plugins with the server's only when the
+  // manifest has the list (loadOrderCheck.ts in the fork), so an empty list
+  // here would tell everybody with a light plugin they have more than the
+  // server.
+  yes("an engine that writes no light list: no light list is published, and mods is every plugin",
+      !!b.manifest && !("light" in b.manifest) && JSON.stringify(names(b.manifest.mods)) === JSON.stringify(FULL));
+  yes("  and the refusal block is told there is none",
+      b.box.__thornswoodManifestLight === null && Array.isArray(a.box.__thornswoodManifestLight) &&
+      JSON.stringify(names(a.box.__thornswoodManifestLight)) === JSON.stringify(LIGHT));
   yes("  and the log says nothing about light plugins",
       b.log.some(function (l) { return /, 8 plugins/.test(l); }) && !b.log.some(function (l) { return /light plugins/.test(l); }));
 

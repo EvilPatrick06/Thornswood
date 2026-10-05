@@ -29171,8 +29171,13 @@ log('gamemode loaded:',
     // position by position against Game.getModName, which counts full
     // plugins only. Read here, never decided again from the files, so the
     // server's answer is the one the launcher holds every machine's light
-    // order to. An engine that loads no light plugin writes none.
-    var light = Array.isArray(doc.light) ? doc.light.filter(plugin) : [];
+    // order to. An engine that loads no light plugin writes none, and then
+    // none is published either: the client compares its light plugins with
+    // the server's only when the manifest has the list, so an empty one
+    // would tell everybody with a light plugin they have more than the
+    // server.
+    var hasLight = Array.isArray(doc.light);
+    var light = hasLight ? doc.light.filter(plugin) : [];
 
     var out = {
       versionMajor: doc.versionMajor || 1,
@@ -29180,12 +29185,12 @@ log('gamemode loaded:',
       // The whole order, full and light together, the order the launcher
       // puts a plugin list into when there is a light list.
       loadOrder: Array.isArray(doc.loadOrder) ? doc.loadOrder : mods.map(function (m) { return m.filename; }),
-      light: light,
       // Which of those the launcher's Fix may fetch from /plugins/ (#1180).
-      // The client reads mods and loadOrder only.
+      // The client reads mods, loadOrder and, when it is there, light.
       served: mods.filter(function (m) { return OURS[m.filename.toLowerCase()]; })
                   .map(function (m) { return m.filename; })
     };
+    if (hasLight) { out.light = light; }
 
     try {
       fs.mkdirSync(DIR, { recursive: true });
@@ -29197,6 +29202,9 @@ log('gamemode loaded:',
     // Kept for the load order refusal below, which compares what a client
     // reports against exactly the list the client itself is compared with.
     globalThis.__thornswoodManifestMods = mods;
+    // And the light list, null when the engine loads no light plugin, for
+    // the same refusal's light half.
+    globalThis.__thornswoodManifestLight = hasLight ? light : null;
 
     var dropped = doc.mods.length - mods.length;
     console.log('[thornswood] load order manifest published at /api/servers/' + KEY +
@@ -29367,6 +29375,16 @@ log('gamemode loaded:',
   complete report is treated the way a list that differs is: told, and refused
   when refusing is on. A partial report is no report.
 
+  THE LIGHT PLUGINS TOO (#1715). Once the engine loads light plugins the
+  manifest carries their list, in light index order, and a light form id is
+  0xFE000000 | (light index << 12) | local id, so a light plugin out of place
+  names another plugin's form. The front plugin sends its light list the same
+  way, as /loadorderlight, and it is held to the server's light list the same
+  way the full one is held to mods: the same marks, the same verdict, the
+  same sentence naming the light position. A server whose manifest has no
+  light list takes the report and judges nothing by it; one that has a list
+  needs both reports before a profile counts as reported.
+
   THE SERVER'S OWN FAILURES NEVER REFUSE ANYBODY. When this server cannot do
   the check, it logs and lets them stay: no manifest published, or the command
   relay from the voice service not answering (the report rides it, so the
@@ -29412,7 +29430,8 @@ log('gamemode loaded:',
 
   /** The one sentence, both ways round. */
   function loadOrderSentence(verdict, refusing) {
-    return 'Your plugins are not the server\'s from position ' + verdict.at +
+    return (verdict.light ? 'Your light plugins are not the server\'s from light position '
+                          : 'Your plugins are not the server\'s from position ') + verdict.at +
            ', where the server has ' + verdict.theirs + ', so ' +
            (refusing ? 'this session is being ended before anything goes wrong: '
                      : 'what you see may not be what the server means: close the game, ') +
@@ -29440,6 +29459,9 @@ log('gamemode loaded:',
   */
   if (!g.__thornswoodLoadOrderSeen) { g.__thornswoodLoadOrderSeen = { reported: {}, online: {}, last: {} }; }
   var seen = g.__thornswoodLoadOrderSeen;
+  // reportedLight: profile -> when its last complete light report arrived
+  // (#1715). Added beside an older reload's object rather than replacing it.
+  if (!seen.reportedLight) { seen.reportedLight = {}; }
 
   var GRACE_MS = 300000;          // online this long with no complete report: no report
   var REPORT_BEFORE_MS = 600000;  // a report this long before the character arrived still counts
@@ -29490,6 +29512,8 @@ log('gamemode loaded:',
     verdict once the whole list is in, and undefined until then.
   */
   function take(profileId, words, actorId, tell) {
+    var light = String(words[0]).toLowerCase() === '/loadorderlight';
+    var key = (light ? 'light ' : '') + profileId;
     var total = Number(words[1]);
     var from = Number(words[2]);
     var marks = String(words[3] || '').match(/[0-9a-f]{5}/gi) || [];
@@ -29499,18 +29523,25 @@ log('gamemode loaded:',
     for (var k in parts) {
       if (Object.prototype.hasOwnProperty.call(parts, k) && now - parts[k].at > WAIT_MS) { delete parts[k]; }
     }
-    var p = parts[profileId];
-    if (from === 0) { p = parts[profileId] = { total: total, marks: [], at: now }; }
+    var p = parts[key];
+    if (from === 0) { p = parts[key] = { total: total, marks: [], at: now }; }
     if (!p || p.total !== total || p.marks.length !== from) {
-      console.log('[thornswood] load order report from profile ' + profileId +
+      console.log('[thornswood] ' + (light ? 'light ' : '') + 'load order report from profile ' + profileId +
                   ' arrived out of order, so it was not checked');
-      delete parts[profileId];
+      delete parts[key];
       return undefined;
     }
     p.marks = p.marks.concat(marks);
     p.at = now;
     if (p.marks.length < total) { return undefined; }
-    delete parts[profileId];
+    delete parts[key];
+    if (light) {
+      seen.reportedLight[profileId] = now;
+      var lightMods = g.__thornswoodManifestLight;
+      // An engine that loads no light plugin: nothing to hold the list to.
+      if (!Array.isArray(lightMods)) { return null; }
+      return judge(profileId, actorId, tell, lightMods, p.marks.slice(0, total), total, true, now);
+    }
     seen.reported[profileId] = now;
 
     var mods = g.__thornswoodManifestMods;
@@ -29520,30 +29551,41 @@ log('gamemode loaded:',
       return undefined;
     }
 
-    var verdict = loadOrderVerdict(mods, p.marks.slice(0, total));
+    return judge(profileId, actorId, tell, mods, p.marks.slice(0, total), total, false, now);
+  }
+
+  /*
+    The verdict on one complete list, full or light, said and acted on.
+    The same for both: they differ only in the list held to and the words.
+  */
+  function judge(profileId, actorId, tell, mods, marks, total, light, now) {
+    var what = light ? 'light load order' : 'load order';
+    var verdict = loadOrderVerdict(mods, marks);
     if (!verdict) {
-      if (fresh(profileId, 'match', now)) {
-        console.log('[thornswood] load order of profile ' + profileId + ' matches the server\'s, ' +
-                    mods.length + ' plugins' +
+      if (fresh(profileId, (light ? 'light ' : '') + 'match', now)) {
+        console.log('[thornswood] ' + what + ' of profile ' + profileId + ' matches the server\'s, ' +
+                    mods.length + (light ? ' light plugins' : ' plugins') +
                     (total > mods.length ? ' and ' + (total - mods.length) + ' after them' : ''));
       }
       return null;
     }
+    if (light) { verdict.light = true; }
+    var at = (light ? 'light at ' : 'at ') + verdict.at;
 
     var refuse = refusing();
     if (!refuse) {
-      if (fresh(profileId, 'at ' + verdict.at, now)) {
+      if (fresh(profileId, at, now)) {
         tell(loadOrderSentence(verdict, false));
-        console.log('[thornswood] WOULD REFUSE profile ' + profileId + ': load order differs at ' +
+        console.log('[thornswood] WOULD REFUSE profile ' + profileId + ': ' + what + ' differs at ' +
                     verdict.at + ', where the server has ' + verdict.theirs +
                     '. Watching only, they stayed (thornswoodLoadOrderRefuse is not true).');
       }
       return verdict;
     }
-    seen.last[profileId] = { key: 'at ' + verdict.at, at: now };
+    seen.last[profileId] = { key: at, at: now };
     var told = loadOrderSentence(verdict, true);
     tell(told);
-    console.log('[thornswood] refusing profile ' + profileId + ': load order differs at ' +
+    console.log('[thornswood] refusing profile ' + profileId + ': ' + what + ' differs at ' +
                 verdict.at + ', where the server has ' + verdict.theirs);
     refuseLater(profileId, actorId, told);
     return verdict;
@@ -29583,6 +29625,11 @@ log('gamemode loaded:',
       if (poll.failAt && poll.failAt > e.clock) { e.clock = poll.failAt; }
       if (e.judged) { continue; }
       var r = seen.reported[pid] || 0;
+      // A server with a light list needs the light report as well (#1715).
+      if (Array.isArray(g.__thornswoodManifestLight)) {
+        var rl = seen.reportedLight[pid] || 0;
+        r = rl ? Math.min(r, rl) : 0;
+      }
       if (r && r >= e.joined - REPORT_BEFORE_MS) { continue; }
       if (now - e.clock < GRACE_MS) { continue; }
       e.judged = true;
@@ -29605,6 +29652,10 @@ log('gamemode loaded:',
     for (var q in seen.reported) {
       if (Object.prototype.hasOwnProperty.call(seen.reported, q) && !here[q] &&
           now - seen.reported[q] > REPORT_BEFORE_MS) { delete seen.reported[q]; }
+    }
+    for (var ql in seen.reportedLight) {
+      if (Object.prototype.hasOwnProperty.call(seen.reportedLight, ql) && !here[ql] &&
+          now - seen.reportedLight[ql] > REPORT_BEFORE_MS) { delete seen.reportedLight[ql]; }
     }
     return judged;
   }
@@ -48156,7 +48207,8 @@ const WORDS = ['/ooc', '/o',
                '/sleephere',
                // The client's load order, every two minutes. Sent by the front
                // plugin, never typed; see the load order refusal block.
-               '/loadorder',
+               // Its light plugins too, as /loadorderlight (#1715).
+               '/loadorder', '/loadorderlight',
                // Friends, parties, mutes, trade and journals. See the
                // social block at the end of this file. /journal and /book
                // are the J panel's lines, never typed (#1630). /hidename too,
@@ -48518,7 +48570,7 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
     // Said once, and never for the client's own lines: /face, /ate, a
     // broken lockpick and the load order report are not things anybody typed.
     if (!q.told && word !== '/face' && word !== '/ate' && word !== '/tspicks' &&
-        word !== '/loadorder' && word !== '/racedown') {
+        word !== '/loadorder' && word !== '/loadorderlight' && word !== '/racedown') {
       q.told = true;
       toProfile(profileId, 'Your character is not back in the world yet. That will run ' +
                            'as soon as you arrive.');
@@ -49763,7 +49815,7 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
     // The client's load order, a line of it at a time. Not a human command:
     // it answers nothing until the whole list is in, and then only when it
     // differs from the server's. See the load order refusal block.
-    if (word === '/loadorder') {
+    if (word === '/loadorder' || word === '/loadorderlight') {
       try {
         var lo = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodLoadOrder;
         if (lo && lo.take) {

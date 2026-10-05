@@ -263,10 +263,13 @@ namespace Thornswood
                     else
                     {
                         // The light order, the same walk over the light
-                        // plugins (#1715). The game itself shows nothing when
-                        // it differs: every light form id the server stores
-                        // just names another plugin's form, a beard turns into
-                        // nothing, and the person sees a face that is wrong.
+                        // plugins (#1715). When it differs every light form id
+                        // the server stores names another plugin's form, a
+                        // beard turns into nothing, and the person sees a face
+                        // that is wrong. The client built from the fork since
+                        // #1715 compares the light list too and shows LOAD
+                        // ORDER ERROR, and the server ends the session when
+                        // refusing is on; this says it before Play.
                         List<string> serverLight = Names(manifestLight);
                         if (serverLight.Count > 0)
                         {
