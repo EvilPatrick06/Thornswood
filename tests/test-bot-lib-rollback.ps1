@@ -37,10 +37,26 @@ Yes 'Install-Bot installs into py-libs with pip --target, and the smoke export s
     -not $install.Contains('''bot/live-smoke-discord-export.json'''))
 Yes 'the swap is told to put py-libs back with the code' ($install.Contains('$Dirs = @(''''py-libs'''')') -and $swap.Contains('$moveRels'))
 
-$py = (Get-Command py -EA SilentlyContinue | Select-Object -First 1).Source
+# The python the bot runs on: python on the PATH, the one Bot-Service.ps1
+# hands the service and Install-Bot.ps1 installs for all users (3.12 on the
+# VPS), else whatever py -3 finds. Taken by its full path, so the swap below
+# starts the same one. Until #1880 this asked py for 3.9, which neither the
+# bot nor the VPS has, so on the build runner it stopped at the first wheel.
+$py = ''
+foreach ($c in @(@('python'), @('py', '-3'))) {
+    if (-not (Get-Command $c[0] -CommandType Application -EA SilentlyContinue)) { continue }
+    $pre = @($c | Select-Object -Skip 1)
+    $o = ''
+    try { $o = "$(& $c[0] @pre -c 'import sys; print(sys.executable)' 2>$null | Select-Object -Last 1)".Trim() } catch { }
+    if ($LASTEXITCODE -eq 0 -and $o -and (Test-Path -LiteralPath $o)) { $py = $o; break }
+}
+if ($py) {
+    $null = & $py -m pip --version 2>$null
+    if ($LASTEXITCODE -ne 0) { $py = '' }
+}
 $ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 if (-not $py -or -not (Test-Path -LiteralPath $ps51)) {
-    Write-Host 'SKIP  needs py and Windows PowerShell 5.1'
+    Write-Host 'SKIP  needs a python 3 with pip, and Windows PowerShell 5.1'
     Done
 }
 
@@ -77,7 +93,7 @@ $makerLines = @(
 )
 [IO.File]::WriteAllLines($maker, $makerLines)
 function Wheel([string]$ver, [string]$dest) {
-    & $py -3.9 $maker $ver $dest
+    & $py $maker $ver $dest
     if ($LASTEXITCODE -ne 0) { throw "could not build wheel $ver" }
 }
 $w1 = Join-Path $work 'thornslib-1.0.0-py3-none-any.whl'
@@ -88,7 +104,7 @@ Wheel '2.0.0' $w2
 function PipTarget([string]$wheel, [string]$dest, [string]$req) {
     New-Item -ItemType Directory -Force -Path $dest | Out-Null
     [IO.File]::WriteAllText($req, ($wheel + "`r`n"))
-    & $py -3.9 -m pip install --quiet --disable-pip-version-check --upgrade --target $dest --no-index -r $req
+    & $py -m pip install --quiet --disable-pip-version-check --upgrade --target $dest --no-index -r $req
     if ($LASTEXITCODE -ne 0) { throw "pip --target failed for $dest" }
 }
 PipTarget $w1 (Join-Path $rootBot 'py-libs') (Join-Path $work 'req-old.txt')
@@ -139,7 +155,7 @@ $childLines = @(
     '  $out = Join-Path $Root ''run-out.txt'''
     '  $err = Join-Path $Root ''run-err.txt'''
     '  $bot = Join-Path $Root ''bot.py'''
-    '  $p = Start-Process -FilePath ''__PY__'' -ArgumentList @(''-3.9'', $bot) -WorkingDirectory $Root -Wait -PassThru -NoNewWindow -RedirectStandardOutput $out -RedirectStandardError $err'
+    '  $p = Start-Process -FilePath ''__PY__'' -ArgumentList @($bot) -WorkingDirectory $Root -Wait -PassThru -NoNewWindow -RedirectStandardOutput $out -RedirectStandardError $err'
     '  $text = '''''
     '  if (Test-Path -LiteralPath $out) { $text = [IO.File]::ReadAllText($out) }'
     '  if (Test-Path -LiteralPath $err) { $text += [IO.File]::ReadAllText($err) }'
