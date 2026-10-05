@@ -113,16 +113,20 @@ function Collection([string]$path, $rules) {
 # and bytes with no CURRENT read as nothing there. So state.v2 is written as
 # LevelDB by tests\fixtures\vortex-state-rows.py, the writer the reader's own
 # fixtures use, once every case is named (Write-VortexState). The rows go in
-# the log, as Vortex writes a change before compaction, because the folder is
-# still found by reading state as text, which only the log keeps whole (#1902).
+# the compressed table, as Vortex leaves state after compaction, and -InLog
+# puts them in the log, as Vortex writes a change before compaction. Since
+# #1902 the folder is found through the same reader, so both find it; before,
+# the mod ids were matched as raw bytes, which only the log keeps whole.
 $appDatas = Join-Path $root 'appdata'
 $vortexState = [ordered]@{}
-function VortexAppData([string]$name, [string]$modId, [int]$rev) {
+function VortexAppData([string]$name, [string]$modId, [int]$rev, [switch]$InLog) {
     $ad = Join-Path $appDatas $name
     $key = "persistent###mods###skyrimse###$modId###attributes###"
-    $vortexState[$name] = [ordered]@{ table = @(); log = @(
+    $rows = @(
         [pscustomobject]@{ key = $key + 'collectionSlug'; value = '"7essxf"' },
-        [pscustomobject]@{ key = $key + 'revisionNumber'; value = [string]$rev }) }
+        [pscustomobject]@{ key = $key + 'revisionNumber'; value = [string]$rev })
+    if ($InLog) { $vortexState[$name] = [ordered]@{ table = @(); log = $rows } }
+    else { $vortexState[$name] = [ordered]@{ table = $rows; log = @() } }
     $mod = Join-Path $ad ('Vortex\skyrimse\mods\' + $modId)
     $null = New-Item -ItemType Directory -Force -Path $mod
     return [pscustomobject]@{ AppData = $ad; Mod = $mod }
@@ -325,6 +329,9 @@ try {
     $newMachine = VortexAppData 'AppDataNew' 'vortex_collection_ZRT7NjhN_' 5
     $appDataNew = $newMachine.AppData
     Collection (Join-Path $newMachine.Mod 'collection.json') $chain
+    # The same with the keys still in the log, not yet compacted.
+    $logMachine = VortexAppData 'AppDataNewLog' 'vortex_collection_ZRT7NjhN_' 5 -InLog
+    Collection (Join-Path $logMachine.Mod 'collection.json') $chain
     Write-VortexState
 
     # Everything the runs may read, so the last check can prove none was written.
@@ -422,6 +429,16 @@ try {
         Yes 'the vortex_collection_<id> folder is found through state (exit 0)' ($r.Code -eq 0)
         Yes 'and the revision reads from state, not the folder name' (Has $r.Out 'revision 5,')
         Yes 'and the folder it read is the opaque one Vortex writes now' (Has $r.Out 'vortex_collection_ZRT7NjhN_')
+        # #1902: with the keys in a compacted table the raw reader found no mod
+        # id, and this said "SKIP  Vortex on this machine has no revision of
+        # collection '7essxf' installed" and exited 0 without checking a rule.
+        Yes 'and with the keys in a compacted table it does not skip' (-not (Has $r.Out 'SKIP'))
+
+        $env:APPDATA = $logMachine.AppData
+        $r = Run @('-Root', $machine)
+        Yes 'with the keys still in the log, the folder is found as well (exit 0)' ($r.Code -eq 0)
+        Yes 'and the revision and the folder are the same' `
+            ((Has $r.Out 'revision 5,') -and (Has $r.Out 'vortex_collection_ZRT7NjhN_') -and -not (Has $r.Out 'SKIP'))
 
         # The JSON only inside Vortex's export archive. Measured on the
         # shipping machine on 27 September: the default path stopped with
