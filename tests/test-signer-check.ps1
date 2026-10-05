@@ -268,11 +268,13 @@ try {
     )
     foreach ($c in $candidates) {
         if (-not (Test-Path -LiteralPath $c)) { continue }
-        $s = Get-AuthenticodeSignature -LiteralPath $c
+        # $sig, not $s: PowerShell names are not case sensitive, and $s is $S,
+        # the Signature type that MicrosoftRefusal is read from further down.
+        $sig = Get-AuthenticodeSignature -LiteralPath $c
         # Embedded, not from a catalog: a catalog signature is not in the file.
         $embedded = $false
         try { $null = [Security.Cryptography.X509Certificates.X509Certificate]::CreateFromSignedFile($c); $embedded = $true } catch { $embedded = $false }
-        if ($s.Status -eq 'Valid' -and $embedded) { $other = $c; break }
+        if ($sig.Status -eq 'Valid' -and $embedded) { $other = $c; break }
     }
     if ($other) {
         $r = Check $other $Signer

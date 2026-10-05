@@ -388,8 +388,16 @@ else:
                 '-Out', out,
                 '-KeyFile', os.path.join(box, 'no-key.txt'),
                 '-Plain']
+        # Windows PowerShell as the scheduled task starts it, with its own
+        # module path. Run from the nightly's pwsh step, this process inherits
+        # PSModulePath with PowerShell 7's module folders first, and 5.1 then
+        # autoloads 7's Microsoft.PowerShell.Security for Set-Acl, cannot load
+        # it, and stops (5 October nightly, K1). With no PSModulePath, 5.1
+        # builds its own. Windows names are not case sensitive, and Python
+        # keeps them in capitals there, so the name is matched the same way.
+        env = {k: v for k, v in os.environ.items() if k.upper() != 'PSMODULEPATH'}
         r = subprocess.run(args, stdout=subprocess.PIPE,
-                           stderr=subprocess.STDOUT, timeout=300)
+                           stderr=subprocess.STDOUT, timeout=300, env=env)
         zips = []
         if os.path.isdir(out):
             zips = [n for n in os.listdir(out)

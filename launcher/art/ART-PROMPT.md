@@ -33,8 +33,9 @@ Deliver exactly:
     painted or rendered at this size, never upscaled from a smaller file
 
 The floor below which the build has to enlarge the picture is 4450 x 3005.
-Anything smaller is soft on every screen. What is in this folder today is
-1536 x 1024, which is 8.5 times too few pixels.
+Anything smaller is soft on every screen. The picture the build uses today,
+`thornswood-mainmenu-1535.png`, is 1535 x 1024, which is 8.5 times too few
+pixels.
 
 The aspect is 77:52, which is 1.48077. It is NOT 3:2. The menu plane measured
 from `meshes\interface\logo\logo.nif` is drawn at 1.4807558229, and a 3:2 picture
@@ -76,9 +77,10 @@ appear across 5.45 percent and 11.36 percent of the screen height.
 
 ## Still not settled
 
-The plane is drawn at 105 percent of the screen width. That figure appears once
-in the repo, in a docstring, and was eyeballed. Every percentage above scales
-with it. One dev build with a ruler burned into the picture settles it.
+The plane is drawn at 105 percent of the screen width. That figure came from
+the build script's 16 Sep docstring, measured by eye against a calibration grid,
+and nothing has checked it since. Every percentage above scales with it. One dev
+build with a ruler burned into the picture settles it.
 
 ## No frame, no vignette
 
@@ -89,8 +91,9 @@ A darkened edge shows up unevenly for the same reason.
 
 ## What happens next
 
-Run `scripts\dev\Build-Backdrop.py <picture.png>` and it becomes
-`Data\textures\interface\objects\Mainmenuwallpaper.dds`. Read `BACKDROP-SPEC.md`
-first: the script still aims at 3:2, still writes a single mip level, and still
-defaults to the Steam folder rather than the game folder the launcher runs from.
-Those three changes are specified there and none of them is made yet.
+Run `python scripts\dev\Build-Backdrop.py <picture.png>` and it writes
+`game\menu\Mainmenuwallpaper.dds`: cropped to 77:52, 4096 x 4096 BC7 with 13 mip
+levels, the picture in the top 3005 rows. Go.ps1 copies it into every game
+folder as `Data\textures\interface\objects\Mainmenuwallpaper.dds` and Ship
+carries it. `BACKDROP-SPEC.md` says what the script needs (D.4) and how the
+result is checked ("What is built today", at the top).

@@ -190,8 +190,13 @@ namespace Thornswood
             catch { return false; }
         }
 
-        /// <summary>What the check row should say about the build.</summary>
-        public static string Describe(Config cfg) { return Describe(cfg, Paths.Exe); }
+        /// <summary>
+        /// What the check row should say about the build. Of Paths.SkyrimExe,
+        /// the Steam copy's while the own folder is chosen and not made, which
+        /// is the build Needed asks about then: Paths.Exe is under
+        /// Profile\Payload and said "missing" (#1235).
+        /// </summary>
+        public static string Describe(Config cfg) { return Describe(cfg, Paths.SkyrimExe); }
 
         public static string Describe(Config cfg, string exe)
         {
