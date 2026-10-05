@@ -2,8 +2,8 @@
   Publish-Pack.ps1
 
   Builds the optional packs listed in optional-packs.txt, sends them to the
-  site, and adds them to version.json so the Add-ons tab in every launcher
-  offers them.
+  site, and adds them to version.json so every launcher offers them under
+  Add-ons on its Diagnostics page.
 
       .\scripts\release\Publish-Pack.ps1
       .\scripts\release\Publish-Pack.ps1 -Only hd-textures
@@ -66,7 +66,7 @@ function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
 
-# Which pack urls a launcher can actually download. The Add-ons tab fetches an
+# Which pack urls a launcher can actually download. Add-ons on Diagnostics fetches an
 # optional pack through the same Updater code as a required one, so the rule
 # Publish-Update.ps1 holds required packs to is the rule here too.
 . (Join-Path $Here 'Feed-Rules.ps1')
@@ -245,7 +245,7 @@ $doc = $raw | ConvertFrom-Json
 
 # Nobody is offered a pack they cannot fetch. Feed-Rules.ps1 has the rule and
 # says why: a launcher downloads every pack from the url the feed gives, so
-# anything but the thornswood.net feed path answers 404 on the Add-ons tab.
+# anything but the thornswood.net feed path answers 404 under Add-ons.
 $feedRepo = Get-FeedRepo $doc
 $offFeed = @($built | Where-Object { -not (Test-FeedPackUrl $_.Url $feedRepo) })
 if ($offFeed.Count) {
@@ -299,6 +299,6 @@ if ($mirrorWhy) {
 # ==== end thornswood pack site feed ====
 
 Head 'Done'
-Say ("  " + $built.Count + " pack(s) live. They show on the Add-ons tab of the Mods page.") 'Green'
+Say ("  " + $built.Count + " pack(s) live. They show under Add-ons on the launcher's Diagnostics page.") 'Green'
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

@@ -354,6 +354,7 @@ jobs:
                  'test-1323-door-limits.js',
                  'test-1330-webview2-signature.js',
                  'test-1352-site-answer-limit.js',
+                 'test-1170-addons-on-rail.js',
                  'test-1351-unmasked-frames.js',
                  'test-1349-relay-shapes.js',
                  'test-table-install.js',

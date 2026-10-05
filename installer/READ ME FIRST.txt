@@ -46,7 +46,7 @@ Installing
    is a few gigabytes, so give it a while.
 
 3. Install the collection in Vortex. The link is on
-   https://thornswood.net/downloads and on the launcher's Add-ons page. This
+   https://thornswood.net/downloads and on the launcher's Diagnostics page. This
    is not optional: without it you have a launcher and no mods, and the
    server turns you away when you press Play.
 
