@@ -24,6 +24,9 @@
 
   Against an older server.js (SITE=...) the timing checks fail, which is the
   point: that is the "before".
+
+  Every time checked here is read off a clock the harness keeps (#1674), not
+  the machine's, so a busy machine cannot move a number.
 */
 const fs = require('fs');
 const path = require('path');
@@ -41,7 +44,57 @@ function yes(what, cond) {
 }
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const sorted = (a) => (Array.isArray(a) ? a.slice().sort((x, y) => x - y) : a);
-const near = (v, want, slack) => v >= want - slack && v <= want + slack;
+
+/*
+  THE HARNESS'S CLOCK (#1674). These checks used to time node's own clock
+  with 150 ms to spare: Retry-After 2 had to come out between 1850 and 2150.
+  A machine busy enough to hold this process for longer than that between two
+  lines (4 October, several agents building at once) failed 2 of the 32 with
+  nothing wrong in server.js, and the nightly run would have gone red for it.
+
+  So the pieces lifted out of server.js, and the pretend Discord, are handed
+  this Date, setTimeout and clearTimeout in place of node's. Time moves only
+  when onClock moves it: everything that can happen without time passing
+  happens first, then the clock jumps to the next timer due and runs it. How
+  long the machine takes between two lines no longer counts, so every number
+  below is the one server.js means, exactly. It starts on a whole second, so
+  a Retry-After written as a date (whole seconds) loses nothing.
+*/
+const clock = { now: Date.UTC(2026, 9, 5, 12, 0, 0), seq: 0, timers: [] };
+class ClockDate extends Date {
+  constructor(...a) { if (a.length) super(...a); else super(clock.now); }
+  static now() { return clock.now; }
+}
+function clockSetTimeout(fn, ms) {
+  const t = { at: clock.now + Math.max(0, Number(ms) || 0), seq: clock.seq++, fn: fn };
+  clock.timers.push(t);
+  return t;
+}
+function clockClearTimeout(t) {
+  const i = clock.timers.indexOf(t);
+  if (i >= 0) clock.timers.splice(i, 1);
+}
+/** What `p` settles to, run on the harness's clock. */
+async function onClock(p) {
+  let done = false, threw = false, value;
+  p.then(function (v) { done = true; value = v; }, function (e) { done = true; threw = true; value = e; });
+  for (;;) {
+    // Node runs every promise that can go on before it gets here.
+    await new Promise(function (r) { setImmediate(r); });
+    if (done) break;
+    if (!clock.timers.length) {
+      const e = new Error('never answered: a lookup that never comes back held it, with nothing left on the clock to wait for');
+      e.hang = true;
+      throw e;
+    }
+    clock.timers.sort(function (a, b) { return a.at - b.at || a.seq - b.seq; });
+    const t = clock.timers.shift();
+    clock.now = t.at;
+    t.fn();
+  }
+  if (threw) throw value;
+  return value;
+}
 
 // A route that waits forever on a lookup leaves node with nothing to do, and
 // node then exits 0 without a word. That must read as a failure.
@@ -84,16 +137,18 @@ yes('the /api/allowed route is in server.js', route.indexOf('return sendJson(res
 /*
   A pretend Discord. answer(path) says { ms, status, headers, body } for each
   request; asked lists every path that really went out. Each call makes a
-  fresh discordGet with its own quiet-until, the way a fresh site starts.
+  fresh discordGet with its own quiet-until, the way a fresh site starts,
+  with nothing waiting on the harness's clock.
 */
 function discord(answer) {
   const asked = [];
+  clock.timers.length = 0;
   const https = {
     get: function (opts, cb) {
       asked.push(opts.path);
       const a = answer(opts.path) || {};
       const on = {};
-      setTimeout(function () {
+      clockSetTimeout(function () {
         cb({ statusCode: a.status || 200, headers: a.headers || {}, on: function (ev, fn) { on[ev] = fn; } });
         if (on.data) on.data(a.body === undefined ? '{}' : (typeof a.body === 'string' ? a.body : JSON.stringify(a.body)));
         if (on.end) on.end();
@@ -101,10 +156,11 @@ function discord(answer) {
       return { setTimeout: function () { }, on: function () { }, destroy: function () { } };
     }
   };
-  const api = getSrc ? new Function('cfg', 'https', 'console',
+  const api = getSrc ? new Function('cfg', 'https', 'console', 'Date', 'setTimeout', 'clearTimeout',
     getSrc + '\nreturn { discordGet: discordGet, discordQuietMs: discordQuietMs,' +
     ' quietFor: function () { return discordQuietUntil - Date.now(); } };')(
-      { discord: { botToken: 't', guildId: 'g' } }, https, { error: function () { } })
+      { discord: { botToken: 't', guildId: 'g' } }, https, { error: function () { } },
+      ClockDate, clockSetTimeout, clockClearTimeout)
     // An older server.js: a plain discordGet with no quiet-until, so the old
     // route is timed on the same pretend Discord.
     : { discordGet: function (p) {
@@ -135,15 +191,17 @@ async function ask(linked, api, budget) {
   let sent = null;
   const src = budget ? forDoorSrc.replace(/const DOOR_BUDGET_MS = \d+;/, 'const DOOR_BUDGET_MS = ' + budget + ';') : forDoorSrc;
   const standingsForDoor = src
-    ? new Function('standingCached', 'discordQuietMs', src + '\nreturn standingsForDoor;')(
-        api.standingCached, api.discordQuietMs)
+    ? new Function('standingCached', 'discordQuietMs', 'Date', 'setTimeout', 'clearTimeout',
+        src + '\nreturn standingsForDoor;')(
+        api.standingCached, api.discordQuietMs, ClockDate, clockSetTimeout, clockClearTimeout)
     : undefined;
   const run = new Function(
     'route', 'devDoor', 'req', 'res', 'cfg', 'url', 'sameSecret', 'sendJson',
     'jsonFile', 'LINKED', 'standingCached', 'keyInAddress', 'standingsForDoor', 'activeBans', 'pkProfiles',
+    'Date', 'setTimeout', 'clearTimeout',
     'return (async function () {\n' + route + '\n})();');
-  const t0 = Date.now();
-  await run('/api/allowed', false,
+  const t0 = clock.now;
+  await onClock(run('/api/allowed', false,
     { method: 'GET', headers: { 'x-thornswood-key': 'k' } }, {}, { botKey: 'k' },
     { searchParams: { get: function () { return 'k'; } } },
     function (a, b) { return a === b; },
@@ -152,8 +210,9 @@ async function ask(linked, api, budget) {
     // No staff bans here (#412); test-staff-bans.js runs them.
     api.standingCached, new Set(), standingsForDoor, function () { return []; },
     // Nobody killed for good here (#1010); test-bans-pk.js runs that.
-    function () { return []; });
-  if (sent) sent.ms = Date.now() - t0;
+    function () { return []; },
+    ClockDate, clockSetTimeout, clockClearTimeout));
+  if (sent) sent.ms = clock.now - t0;
   return sent;
 }
 
@@ -169,29 +228,29 @@ function five() {
   // ================================================== discordGet's quiet-until
   async function once(a) {
     const api = discord(function () { return a; });
-    const r = api.discordGet ? await api.discordGet('/x') : {};
+    const r = api.discordGet ? await onClock(api.discordGet('/x')) : {};
     return { r: r, quiet: api.quietFor(), api: api };
   }
   let o = await once({ status: 429, headers: { 'retry-after': '2' } });
   yes('a 429 is still reported as rate limited by Discord', o.r.status === 429 && o.r.why === 'rate limited by Discord');
-  yes('and Retry-After in seconds sets the quiet time', near(o.quiet, 2000, 150));
-  const again = o.api.discordGet ? await o.api.discordGet('/y') : {};
+  yes('and Retry-After in seconds sets the quiet time', o.quiet === 2000);
+  const again = o.api.discordGet ? await onClock(o.api.discordGet('/y')) : {};
   yes('while quiet, discordGet answers rate limited without asking Discord',
       again.status === 429 && again.why === 'rate limited by Discord' && same(o.api.asked, ['/api/v10/x']));
 
   o = await once({ status: 429, headers: { 'x-ratelimit-reset-after': '1.5' } });
-  yes('x-ratelimit-reset-after is read when Retry-After is missing', near(o.quiet, 1500, 150));
+  yes('x-ratelimit-reset-after is read when Retry-After is missing', o.quiet === 1500);
   o = await once({ status: 429, body: { message: 'You are being rate limited.', retry_after: 0.8, global: false } });
-  yes('retry_after in the body is read when no header says', near(o.quiet, 800, 150));
-  o = await once({ status: 429, headers: { 'retry-after': new Date(Date.now() + 3000).toUTCString() } });
-  yes('Retry-After as a date is read too', near(o.quiet, 3000, 1200));
+  yes('retry_after in the body is read when no header says', o.quiet === 800);
+  o = await once({ status: 429, headers: { 'retry-after': new Date(clock.now + 3000).toUTCString() } });
+  yes('Retry-After as a date is read too', o.quiet === 3000);
   o = await once({ status: 429 });
-  yes('a 429 that says nothing still backs off for a second', near(o.quiet, 1000, 150));
+  yes('a 429 that says nothing still backs off for a second', o.quiet === 1000);
   o = await once({ status: 429, headers: { 'retry-after': '99999' } });
-  yes('a wait longer than a minute is held to a minute', near(o.quiet, 60000, 150));
+  yes('a wait longer than a minute is held to a minute', o.quiet === 60000);
   o = await once({ status: 200, headers: { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset-after': '0.5' }, body: { user: { id: '1' } } });
   yes('the last call before a limit still answers', o.r.ok === true);
-  yes('and x-ratelimit-remaining 0 waits out x-ratelimit-reset-after before the next', near(o.quiet, 500, 150));
+  yes('and x-ratelimit-remaining 0 waits out x-ratelimit-reset-after before the next', o.quiet === 500);
   o = await once({ status: 200, headers: { 'x-ratelimit-remaining': '3', 'x-ratelimit-reset-after': '0.5' }, body: {} });
   yes('with calls left there is no quiet time', o.quiet <= 0);
   o = await once({ status: 404 });
@@ -244,7 +303,7 @@ function five() {
 
   // ========================================== a lookup that never comes back
   // Discord hangs on d2. The route still answers inside the budget (300ms
-  // here, so the test is quick) and names d2 as not checked.
+  // here) and names d2 as not checked.
   api = discord(function (p) {
     if (/\/d2$/.test(p)) return { ms: 60000, status: 200, body: {} };
     return { ms: 10, status: 200, body: { user: { id: p } } };
@@ -254,7 +313,7 @@ function five() {
   })(api.standingCached);
   got = await ask(five(), api, 300);
   b = got ? got.body : {};
-  yes('a lookup that hangs does not hold the answer past the budget', got && got.ms < 1000);
+  yes('a lookup that hangs does not hold the answer past the budget', got && got.ms <= 300);
   yes('the others are listed', same(sorted(b.profiles), [101, 103, 104, 105]));
   yes('and the one that hung is in failedProfiles, with why',
       same(b.failedProfiles, [102]) && b.lookupFailedWhy === 'ran out of time asking Discord');
@@ -265,7 +324,7 @@ function five() {
   process.exit(fail ? 1 : 0);
 })().catch((e) => {
   finished = true;
-  console.log('FAIL  the harness threw: ' + (e && e.stack || e));
+  console.log('FAIL  ' + (e && e.hang ? 'the route ' + e.message : 'the harness threw: ' + (e && e.stack || e)));
   console.log('');
   console.log(pass + ' passed, ' + (fail + 1) + ' failed');
   process.exit(1);
