@@ -20,6 +20,10 @@
 # shut out of every live Thornswood folder, at normal priority (never above)
 # and with Defender skipping its own folder, so a check takes minutes.
 # The label is what picks it; change it here and in Install-Runner together.
+# SEVERAL OF THEM since 4 October: one runner takes one job at a time, and
+# the queue reached an hour when the lanes opened pull requests in bursts.
+# Install-Runner.ps1 -Number <n> puts each one after the first beside it with
+# the same label, so a check goes to whichever is free.
 # Safe because the repository is private: nobody outside the team can open a
 # pull request that runs code on the box.
 #
@@ -64,7 +68,7 @@ on:
 permissions:
   contents: read
 # One run per branch at a time. A newer push cancels the run it replaces, so
-# the one runner is not stuck building a commit nobody wants.
+# no runner is left building a commit nobody wants.
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
@@ -264,7 +268,7 @@ jobs:
                  'test-hand-install-retired.ps1',
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
                  'test-new-box-runbook.ps1', 'test-remote-header.ps1',
-                 'test-vps-defaults.ps1', 'test-deploy-artifact.ps1', 'test-deploy-records.js',
+                 'test-vps-defaults.ps1', 'test-runner-lock.ps1', 'test-deploy-artifact.ps1', 'test-deploy-records.js',
                  'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-own-folder-again.ps1', 'test-npc-runtime.js',
                  'test-npc-shared-runtime.js', 'test-npc-population-runtime.js',
                  'test-shared-resource-stock.js', 'test-resource-stock-integration.js',

@@ -76,7 +76,9 @@
               cannot tell hung from idle. That was the 18 September case.
     backup    the Thornswood Backup task's last result, and a backup file in
               C:\Thornswood-Backup less than 26 hours old
-    runner    the build runner's Windows service is running
+    runner    every build runner's Windows service is running: the first,
+              thornswood-vps, and the numbered ones Install-Runner.ps1
+              -Number puts beside it (4 October)
 
   The two dev ones are here because the box has been watching them since 16
   September and this file did not know. vps-dev-instance.ps1, which runs ON
@@ -315,14 +317,15 @@ function HealthProblem($url) {
   }
 }
 
-# '' when every service matching the name is running, else why not.
+# '' when every service matching the name is running, else why not. Where
+# the name matches several, the build runners, it says which are not.
 function ServiceProblem($name) {
   $s = @(Get-Service -Name $name -EA SilentlyContinue)
   if ($s.Count -eq 0) { return 'its Windows service is not installed' }
-  foreach ($one in $s) {
-    if ("$($one.Status)" -ne 'Running') { return ('its Windows service is ' + $one.Status) }
-  }
-  return ''
+  $down = @($s | Where-Object { "$($_.Status)" -ne 'Running' })
+  if (-not $down.Count) { return '' }
+  if ($s.Count -eq 1) { return ('its Windows service is ' + $down[0].Status) }
+  return ('of its ' + $s.Count + ' Windows services, ' + (@($down | ForEach-Object { $_.Name + ' is ' + $_.Status }) -join ', '))
 }
 
 # '' when the nightly backup's task last ran clean and a backup file is
@@ -581,10 +584,11 @@ $checks = @(
 )
 
 # Told about and never restarted. The runner's service name is the one
-# Install-Runner.ps1 registers, actions.runner.<owner>-<repo>.<runner name>.
+# Install-Runner.ps1 registers, actions.runner.<owner>-<repo>.<runner name>,
+# and the name ends in -<n> for every runner after the first.
 $tellOnly = @(
   @{ Name = 'backup'; Say = 'The nightly backup'; Fails = 'is failing'; Recovers = 'is working again'; Backup = 'Thornswood Backup'; Folder = 'C:\Thornswood-Backup'; Hours = 26 },
-  @{ Name = 'runner'; Say = 'The build runner (Launcher builds on thornswood-vps)'; Service = 'actions.runner.*.thornswood-vps' }
+  @{ Name = 'runner'; Say = 'The build runner (Launcher builds on thornswood-vps and every numbered one)'; Service = 'actions.runner.*.thornswood-vps*' }
 )
 
 # What is wrong with one of $checks when it does not answer, in words.
