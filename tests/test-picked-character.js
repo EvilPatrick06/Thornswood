@@ -75,6 +75,7 @@ function num(name) {
 }
 const FNS = {
   faceMark: fnOf('function faceMark(a) {'),
+  hasStoredAppearance: fnOf('function hasStoredAppearance(a) {'),
   chargenOf: fnOf('function chargenOf(actorId) {'),
   setChargen: fnOf('function setChargen(actorId, state) {'),
   tellOnce: fnOf('function tellOnce(actorId, step, text) {'),
