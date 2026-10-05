@@ -549,132 +549,56 @@
   }
 
   /*
-    RIEKLING / GOBLIN CLOTHES REMOUNT (#614)
+    ------------------------------------------- which race the body is (#614)
 
-    Patrick via Smeagle: any clothes a Goblin/Riekling wears break on
-    rejoin or leaving a building. Neck placement and transparency. Not
-    race-default gear only, and not a list of clothing form ids.
+    Patrick via Smeagle: any clothes a Goblin or Riekling wears break on rejoin
+    or leaving a building, the neck sits wrong and the body shows through. What
+    answered it took every worn piece off and put it back on at each cell
+    change, and that is what left people undressed at a door and on arriving
+    in their home town (4 October), so it is gone and the cause is measured
+    here instead.
 
-    Equipment still reads as equipped. The 3D remount is what fails:
-    after appearance queueNiNodeUpdate on spawn, or after a cell load
-    rebuilds the body, armor addons for these races sit on the wrong
-    neck and show through. Human races do not show it the same way.
+    The lead: skymp5-client sets the race on the character's base record
+    (TESModPlatform.setNpcRace in applyAppearanceCommon) and never on the
+    character itself, so after the body is rebuilt the body and the clothes can
+    be built for two different races. This writes both down each time the cell
+    changes, for everybody, and changes nothing: the character's own race
+    (Actor.GetRace) and its base record's (ActorBase.GetRace). One line a cell.
 
-    So this remounts what is ALREADY worn: silent unequip+equip of each
-    equipped Armor, then queueNiNodeUpdate. Race is matched by name
-    (Riekling / Goblin), never by inventing outfit form ids.
-
-    Race-table confirm (game/data/races.json from Playable Rieklings.esp):
-    playable FULL NAMEs are only "Riekling Blue" and "Riekling Purple".
-    No playable race uses a bare Goblin FULL NAME. /riekling|goblin/i
-    covers both; no matcher widen.
+    Four times a second, not every frame (#963): the old remount check was the
+    costliest handler in the frame when it read the race on every one.
   */
-  function raceNeedsClothesRemount(ac) {
-    if (!ac) { return false; }
-    let race = null;
-    try { race = ac.getRace(); } catch (e) { return false; }
-    if (!race) { return false; }
-    let name = "";
-    try { name = String(race.getName() || ""); } catch (e) { name = ""; }
-    return /riekling|goblin/i.test(name);
+  let raceReadCell = -1;
+  let raceReadAt = 0;
+  function raceName(race) {
+    if (!race) { return 'none'; }
+    let name = '';
+    try { name = String(race.getName() || ''); } catch (e) { name = ''; }
+    let id = 0;
+    try { id = race.getFormID(); } catch (e) { id = 0; }
+    return (name || '(no name)') + ' ' + id.toString(16);
   }
-
-  function remountWornClothes(why) {
-    let pc = null;
-    try { pc = sp.Game.getPlayer(); } catch (e) { return 0; }
-    if (!pc) { return 0; }
-    const ac = sp.Actor.from(pc);
-    if (!ac) { return 0; }
-    if (!raceNeedsClothesRemount(ac)) { return 0; }
-    let nItems = 0;
-    try { nItems = pc.getNumItems(); } catch (e) { return 0; }
-    let put = 0;
-    for (let i = 0; i < nItems; i++) {
-      let form = null;
-      try { form = pc.getNthForm(i); } catch (e) { continue; }
-      if (!form) { continue; }
-      let armo = null;
-      try { armo = sp.Armor.from(form); } catch (e) { armo = null; }
-      if (!armo) { continue; }
-      let on = false;
-      try { on = ac.isEquipped(form); } catch (e) { on = false; }
-      if (!on) { continue; }
-      try {
-        ac.unequipItem(form, false, true);
-        ac.equipItem(form, false, true);
-        put++;
-      } catch (e) {
-        log("could not remount clothes item: " + e);
-      }
-    }
-    try { ac.queueNiNodeUpdate(); } catch (e) {
-      log("could not queueNiNodeUpdate after clothes remount: " + e);
-    }
-    if (put) { log("remounted " + put + " worn armour for " + (why || "race")); }
-    return put;
-  }
-
-  let clothesRemountCell = -1;
-  let clothesRemountLast = 0;
-  const CLOTHES_REMOUNT_CELL_GAP = 1200;
-  /*
-    FOUR TIMES A SECOND, NOT EVERY FRAME (#963). The dev front log of
-    28 September had this as the costliest handler in the frame: 599 ms in
-    30 s over 1274 frames, getPlayer, Actor.from, getRace and the race's name
-    on every one of them, for everybody, goblin or not. A cell change is
-    still seen within a quarter of a second, and the remount itself waits
-    0.4 s for the cell to settle anyway.
-  */
-  const CLOTHES_REMOUNT_TICK_MS = 250;
-  let clothesRemountTickAt = 0;
-  function clothesRemountTick() {
+  function raceReadTick() {
     const at = Date.now();
-    if (at - clothesRemountTickAt < CLOTHES_REMOUNT_TICK_MS) { return; }
-    clothesRemountTickAt = at;
+    if (at - raceReadAt < 250) { return; }
+    raceReadAt = at;
     let pc = null;
     try { pc = sp.Game.getPlayer(); } catch (e) { return; }
     if (!pc) { return; }
-    const ac = sp.Actor.from(pc);
-    if (!raceNeedsClothesRemount(ac)) { return; }
     let cellId = 0;
     try {
       const cell = pc.getParentCell();
       cellId = cell ? cell.getFormID() : 0;
     } catch (e) { cellId = 0; }
-    if (!cellId) { return; }
-    if (cellId === clothesRemountCell) { return; }
-    const now = Date.now();
-    // First sighting of a cell: remember it. Remount on the *change*.
-    if (clothesRemountCell === -1) {
-      clothesRemountCell = cellId;
-      return;
-    }
-    if (now - clothesRemountLast < CLOTHES_REMOUNT_CELL_GAP) { return; }
-    clothesRemountCell = cellId;
-    clothesRemountLast = now;
-    // Cell loads finish a beat after getParentCell moves. Wait, then remount.
-    try {
-      sp.Utility.wait(0.4).then(guard("clothes remount cell", function () {
-        remountWornClothes("cell");
-      }));
-    } catch (e) {
-      remountWornClothes("cell-now");
-    }
-  }
-
-  function scheduleSpawnClothesRemount() {
-    // Spawn/rejoin: appearance and equipment settle on different clocks.
-    // A few remounts cover slow loads without inventing outfit form ids.
-    const delays = [0.8, 2.5, 6.0];
-    for (let i = 0; i < delays.length; i++) {
-      (function (ms) {
-        try {
-          sp.Utility.wait(ms).then(guard("clothes remount spawn", function () {
-            remountWornClothes("spawn+" + Math.round(ms * 1000));
-          }));
-        } catch (e) { }
-      })(delays[i]);
-    }
+    if (!cellId || cellId === raceReadCell) { return; }
+    raceReadCell = cellId;
+    let own = null, base = null;
+    try { own = sp.Actor.from(pc).getRace(); } catch (e) { own = null; }
+    try { base = sp.ActorBase.from(pc.getBaseObject()).getRace(); } catch (e) { base = null; }
+    let same = false;
+    try { same = !!own && !!base && own.getFormID() === base.getFormID(); } catch (e) { same = false; }
+    log('race at cell ' + cellId.toString(16) + ': the character ' + raceName(own) +
+        ', its base record ' + raceName(base) + (same ? '' : ', NOT THE SAME'));
   }
 
   /*
@@ -4208,7 +4132,7 @@
     } catch (err) { }
   });
 
-  sp.on('update', guard('clothes remount', clothesRemountTick));
+  sp.on('update', guard('race read', raceReadTick));
 
   // The fire probe's cell walk, a slice a frame (#976). See walkCellSlice.
   sp.on('update', guard('fire walk', fireWalkTick));
@@ -7451,7 +7375,6 @@
         is the same reason the flag above is set here.
       */
       wearTheShift();
-      scheduleSpawnClothesRemount();
       // Cleared again on the way out, below. Nothing in the shipped client
       // bundle reads this today, so it costs nothing either way, but a flag
       // that is only ever set true is a flag that lies the moment anything
