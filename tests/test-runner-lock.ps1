@@ -56,7 +56,7 @@ function HereOf([string]$name) {
 }
 $lib = HereOf 'lockLib'
 $all = HereOf 'lockAll'
-Yes 'the locks are one block the install and -Lock both send' ([bool]$lib -and [bool]$all -and $text.Contains('$lockAll = $lockLib + @'''))
+Yes 'the locks are one block the install and -Lock both send' ([bool]$lib -and [bool]$all -and $text.Contains('$lockAll = $lockLib + $watcherLib + @'''))
 
 # ---- the names -Number gives ------------------------------------------------------
 Yes '-Number is a parameter, 1 to 99' ($text -match '\[ValidateRange\(1, 99\)\]\[int\]\$Number = 1')
@@ -64,7 +64,6 @@ $names = @{
     Root = "\`$Root = 'C:\\Thornswood-Runner' \+ \`$Number"
     Account = "\`$Account = 'thornswood-runner' \+ \`$Number"
     RunnerName = "\`$RunnerName = 'thornswood-vps-' \+ \`$Number"
-    TaskName = "\`$TaskName = 'Thornswood Runner ' \+ \`$Number \+ ' Priority'"
 }
 foreach ($k in $names.Keys) {
     Yes "  from 2 up, $k gets the number unless it is given" ($text -match ("if \(-not \`$PSBoundParameters\.ContainsKey\('" + $k + "'\)\)\s*\{ " + $names[$k] + ' \}'))
@@ -74,10 +73,11 @@ foreach ($k in $names.Keys) {
 $numIf = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.IfStatementAst] -and "$($n.Clauses[0].Item1)" -eq '$Number -gt 1' }, $true))
 $got = @()
 if ($numIf.Count) {
-    $defaults = "`$Root = 'C:\Thornswood-Runner'; `$Account = 'thornswood-runner'; `$RunnerName = 'thornswood-vps'; `$TaskName = 'Thornswood Runner Priority'"
-    $got = @(& ([scriptblock]::Create("param(`$Number) $defaults`n" + $numIf[0].Extent.Text + "`n@(`$Root, `$Account, `$RunnerName, `$TaskName)")) 2)
+    # Its priority task, Thornswood Runner 2 Priority, went with #1969.
+    $defaults = "`$Root = 'C:\Thornswood-Runner'; `$Account = 'thornswood-runner'; `$RunnerName = 'thornswood-vps'"
+    $got = @(& ([scriptblock]::Create("param(`$Number) $defaults`n" + $numIf[0].Extent.Text + "`n@(`$Root, `$Account, `$RunnerName)")) 2)
 }
-Yes ('  run with -Number 2 it gives the names the second runner has (' + ($got -join ', ') + ')') (($got -join '|') -eq 'C:\Thornswood-Runner2|thornswood-runner2|thornswood-vps-2|Thornswood Runner 2 Priority')
+Yes ('  run with -Number 2 it gives the names the second runner has (' + ($got -join ', ') + ')') (($got -join '|') -eq 'C:\Thornswood-Runner2|thornswood-runner2|thornswood-vps-2')
 Yes '  the 99th account name fits the 20 characters a local account may have' (('thornswood-runner' + 99).Length -le 20)
 Yes '  every runner keeps the one label build.yml asks for' ($text -notmatch '\$Label\s*=\s*[^\r\n]*\$Number')
 
@@ -85,7 +85,7 @@ Yes '  every runner keeps the one label build.yml asks for' ($text -notmatch '\$
 $lockAt = $text.IndexOf('Lock-RunnerRoot `$root `$acct')
 $cfgAt = $text.IndexOf('& .\config.cmd --unattended')
 Yes 'the install locks its own folder before config.cmd writes the credentials into it' ($lockAt -gt 0 -and $cfgAt -gt $lockAt)
-Yes '  and sends the locks with the install' ($text.Contains('-Script ($lockLib + "`n" + @"'))
+Yes '  and sends the locks with the install' ($text.Contains('-Script ($lockLib + $watcherLib + "`n" + @"'))
 $installAt = $text.IndexOf('# ----------------------------------------------------------------- install --')
 $lockMode = $text.IndexOf('if ($Lock) {')
 Yes '-Lock is its own mode, before the install' ($lockMode -gt 0 -and $installAt -gt $lockMode)
