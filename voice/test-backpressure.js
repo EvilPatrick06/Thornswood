@@ -85,7 +85,6 @@ function tokenFor(pid) {
   return body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
-try { fs.mkdirSync(path.join(dir, 'public')); } catch (e) { }
 
 /*
   The probe, preloaded into the service with -r.
