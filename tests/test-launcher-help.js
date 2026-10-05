@@ -191,7 +191,7 @@ function arrayLiteral(src, name) {
   catch (e) { return null; }
 }
 const everybody = arrayLiteral(gm, 'PLAYER_WORDS');
-yes('the gamemode\'s list of everybody\'s commands can be read', Array.isArray(everybody) && everybody.length > 10);
+yes('the gamemode\'s list of everybody\'s commands can be read', Array.isArray(everybody) && everybody.indexOf('/helpme') !== -1);
 {
   const named = {};
   const rx = /(^|[\s(,;])(\/[a-z]+)\b/g;

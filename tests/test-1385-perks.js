@@ -577,7 +577,7 @@ yes('the log says it once a cast', logged('Leyline Attunement') === 1);
   const pw = /^const PLAYER_WORDS = (\[[\s\S]*?\]);$/m.exec(gm);
   const PW = pw ? new Function('return ' + pw[1])() : [];
   yes('no person is given a command for a perk: /perk is not a word, not routed, and no line names it',
-    W.length > 10 && PW.length > 10 && W.indexOf('/perk') === -1 && PW.indexOf('/perk') === -1 &&
+    W.length > 10 && PW.indexOf('/helpme') !== -1 && W.indexOf('/perk') === -1 && PW.indexOf('/perk') === -1 &&
     gm.indexOf("word === '/perk'") === -1 && !/\/perk\b/.test(perks) && !/\/perk\b/.test(panel));
   yes('/spend answers with the skill perks block\'s line', /PK\.spendLine\(st, spentIn\)/.test(gm));
   yes('the OnHit handler hands the hit to the perks before the maneuvers, and never answers false',

@@ -65,7 +65,7 @@ function list(name) {
 }
 const WORDS = list('WORDS');
 const PLAYER_WORDS = list('PLAYER_WORDS');
-yes('WORDS and PLAYER_WORDS read', !!WORDS && !!PLAYER_WORDS && PLAYER_WORDS.length > 10);
+yes('WORDS and PLAYER_WORDS read', !!WORDS && !!PLAYER_WORDS && PLAYER_WORDS.indexOf('/helpme') !== -1);
 if (WORDS && PLAYER_WORDS) {
   const told = SIX.filter(function (w) { return PLAYER_WORDS.indexOf(w) !== -1; });
   yes('none of the six is on the list named to everybody' + (told.length ? ' (still: ' + told.join(', ') + ')' : ''),
@@ -114,7 +114,7 @@ if (helpBlock) {
 const social = lift('// ==== thornswood social:', '// ==== end thornswood social ====');
 const trade = lift('// ==== thornswood trade ====', '// ==== end thornswood trade ====');
 const ca = src.indexOf("    if (word === '/friend' || word === '/party' || word === '/mute' ||");
-const cb = ca < 0 ? -1 : src.indexOf("    if (word === '/needs' || word === '/rest'", ca);
+const cb = ca < 0 ? -1 : src.indexOf("    if (word === '/rest') {", ca);
 const commands = (ca >= 0 && cb > ca) ? src.slice(ca, cb) : null;
 yes('the social block, the trade block and the social commands are in the gamemode',
     !!social && !!trade && !!commands);

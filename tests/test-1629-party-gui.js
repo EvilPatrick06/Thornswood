@@ -202,7 +202,7 @@ if (keys && menus && partyPress && lookVerb) {
 const social = slice(gm, '// ==== thornswood social:', '// ==== end thornswood social ====');
 const trade = slice(gm, '// ==== thornswood trade ====', '// ==== end thornswood trade ====');
 const ca = gm.indexOf("    if (word === '/friend' || word === '/party' || word === '/mute' ||");
-const cb = ca < 0 ? -1 : gm.indexOf("    if (word === '/needs' || word === '/rest'", ca);
+const cb = ca < 0 ? -1 : gm.indexOf("    if (word === '/rest') {", ca);
 const branch = (ca >= 0 && cb >= 0) ? gm.slice(ca, cb) : null;
 yes('the social and trade blocks and the social branch of handle are in the gamemode',
     social !== null && trade !== null && branch !== null);
@@ -346,7 +346,7 @@ if (social && trade && branch) {
   try { named = pw ? new Function('return ' + code(pw[1]))() : []; } catch (e) { named = []; }
   try { answered = ww ? new Function('return ' + code(ww[1]))() : []; } catch (e) { answered = []; }
   yes('W1 /party is not in the list of words named to everybody',
-      named.length > 10 && named.indexOf('/party') === -1);
+      named.indexOf('/helpme') !== -1 && named.indexOf('/party') === -1);
   yes('W1 and the server still answers the line the key and the panel send',
       answered.indexOf('/party') !== -1);
   yes('W2 the reply to an unknown word reads that same list',

@@ -18,7 +18,7 @@ categories.
 N stands you up. The middle of the wheel, marked STOP, stands you
 up and closes the wheel. Escape closes it without playing anything.
 
-Fifty nine emotes.
+Sixty emotes.
 
 Ache, Agitated, Applaud, Arms crossed, At ease, Attention, Bar drink,
 Blessing, Bow, Cheer, Chop wood, Clean blade, Come here, Crouch warm,
@@ -26,20 +26,30 @@ Dance, Drink, Drink potion, Drum, Eat, Examine, Flute, Get attention,
 Give, Grave bow, Hard clap, Hoe, Horn, Jig, Kneel, Laugh, Lean,
 Ledger, Long clap, Look far, Lute, Nervous, Oath, Ovation, Pick up,
 Point, Point farther, Point yonder, Pray, Read, Read book, Reel,
-Salute, Sit, Slow clap, Study, Surrender, Sweep, Take, Warm arms,
+Salute, Sing, Sit, Slow clap, Study, Surrender, Sweep, Take, Warm arms,
 Warm close, Warm hands, Wave, Wipe brow, Write.
 
 Chop wood, Drink, Eat, Drink potion, and Hoe on the wheel do not
-perform the woodcutter's verb, `/drink`, `/eat`, or a potion. Those
-are the words and the presses. The wheel is the animation.
+perform the woodcutter's verb, a meal, a drink, or a potion. Those
+are the presses and the items. The wheel is the animation.
 
-The lute, the flute, and the drum do not count as `/bard`. Bardic
-rest is the word, on [People beside you](people.md). `/bard` does
-not float above the head. A line that should be seen does, and it
-is typed. Each of those three plays only when that instrument is in
-your inventory. The wheel will not start one you do not have, and
-none of the wheel's idles start on their own when you load in or
+The lute, the flute, the drum, and Sing are the bard. Playing one of
+them helps everybody resting in the same place, on
+[People beside you](people.md). Patrick, 4 Oct: "if they do an emote
+with an instrument have that count as /bard, and also add a singing
+emote for people that are only singing". Each of the three
+instruments plays only when that instrument is in your inventory.
+The wheel will not start one you do not have, and the server counts
+it only while the instrument is in the pack. Sing needs nothing.
+None of the wheel's idles start on their own when you load in or
 walk through a door.
+
+Skyrim has no singing animation: its bards sing over the lute. Sing
+is the base game's happy talking, the nearest there is.
+
+Sit is sitting on the ground, and the ground is a seat. It counts
+for rest the way a chair does, and by a fire it is a campfire. See
+[Exhaustion](exhaustion.md).
 
 ## Above the head
 
@@ -55,11 +65,14 @@ a drink, or a meal.
 
 ## Where this is
 
-The wheel, the fifty nine emotes, the eight quick slots, the search,
+The wheel, the sixty emotes, the eight quick slots, the search,
 the alphabetical list, and the number keys are in the server. The
 lute, the flute, and the drum play only with that instrument in the
-inventory. A wheel idle does not start on its own on a load or a door.
-The slots are remembered on the machine. Chop wood on the wheel is not a
+inventory. The server counts the lute, the flute and the drum with the
+instrument in the pack, and Sing, as the bard, and Sit as a seat, from
+the last animation the game sent for the person, which ends when they
+stand up, walk or play anything else. A wheel idle does not start on
+its own on a load or a door. The slots are remembered on the machine. Chop wood on the wheel is not a
 chop. Playing an emote puts its name on the one line above the head,
 the same reach and the same 6 seconds as a plain line. It does not
 also print in the box. Standing up does not put a name there.

@@ -186,7 +186,7 @@ if (probe && WORDS) {
     yes('a meal, a closed race menu and a broken lockpick wait too',
         r.api.held[8] && r.api.held[8].lines.length === 3);
     yes('without telling anybody, because nobody typed them', notices(r, 8) === 0);
-    r.api.dispatch(line(8, '/needs'));
+    r.api.dispatch(line(8, '/stuck'));
     yes('the first line somebody did type gets the notice', notices(r, 8) === 1);
   }
 

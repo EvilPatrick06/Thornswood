@@ -50,7 +50,7 @@ date. Update it in Vortex.
 
 | Mod | Plugin file | Where it stands |
 |---|---|---|
-| SunHelm Survival | SunHelmSurvival.esp | Out. It polled on a timer, the one script type still running, and wrote health, stamina, magicka and carry weight against a server that crops and corrects them. Hunger, thirst, rest and warmth run on the server instead: they are the four bars in the bottom left corner, and /needs gives the numbers |
+| SunHelm Survival | SunHelmSurvival.esp | Out. It polled on a timer, the one script type still running, and wrote health, stamina, magicka and carry weight against a server that crops and corrects them. Hunger, thirst, rest and warmth run on the server instead: they are the four bars in the bottom left corner, and the Body page on K gives the numbers |
 | SunHelm Diseases | SunHelmDiseases.esp | Out. It did the same as SunHelm Survival, and it depends on SunHelm. Diseases have not been rebuilt on the server |
 | Embers XD, SunHelm patch | Embers XD - Patch - SunHelm Survival.esp | Out. It patches SunHelm and cannot load without it. Embers XD itself stays |
 | Respawn - Death Overhaul | Respawn - Death Overhaul.esp | Out. It set you essential and ran its own death handler. Death cannot complete on your own machine and the server owns respawn, so it could only fight the server |
