@@ -117,6 +117,24 @@ function Compare-ThornswoodCarried($Before, $After, [string[]]$Keys) {
 }
 
 <#
+  The join pass hold (#410) fails closed in the gamemode (#1319): false is the
+  one way to turn it off, and anything that is neither true nor false holds.
+  A server whose settings hold neither would change what it does the moment a
+  new gamemode reached it, with nobody having asked, so Deploy-Server's carry
+  refuses one until Deploy-Gamemode.ps1 -RequirePass says which. Returns ''
+  for true or false, otherwise the reason, which names the key and not its
+  value.
+#>
+function Get-ThornswoodPassSwitchProblem($Settings) {
+    $names = Get-ThornswoodSettingNames $Settings
+    if ($names -contains 'thornswoodRequirePass' -and $Settings.thornswoodRequirePass -is [bool]) { return '' }
+    $had = 'missing'
+    if ($names -contains 'thornswoodRequirePass') { $had = 'neither true nor false' }
+    return ('thornswoodRequirePass is ' + $had + ' on this server and in the release, and the gamemode reads ' +
+            'that as on (#1319). Say which with .\scripts\deploy\Deploy-Gamemode.ps1 -RequirePass on, or off, then deploy again.')
+}
+
+<#
   What makes a settings file wrong to send at all, whatever it is carried
   into. Any channel: an npcSettings "default" key, which the engine reads as a
   plugin name and so refuses every NPC (#879). -Channel main: anything that is
@@ -164,7 +182,15 @@ if ($null -eq $run -or $null -eq $rel) {
 } else {
   $m = Join-ThornswoodServerSettings $run $rel $ReleaseKeys
   foreach ($l in $m.Said) { $l }
-  [IO.File]::WriteAllText($sp, (ConvertTo-Json -InputObject $m.Settings -Depth 30), (New-Object Text.UTF8Encoding($false)))
-  'CARRIED ' + (Get-FileHash -LiteralPath $sp -Algorithm SHA256).Hash.ToLowerInvariant()
+  $passWhy = Get-ThornswoodPassSwitchProblem $m.Settings
+  if ($passWhy) {
+    $passWhy
+    Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
+    'the stage is cleared and the server was not touched'
+    'CARRY REFUSED'
+  } else {
+    [IO.File]::WriteAllText($sp, (ConvertTo-Json -InputObject $m.Settings -Depth 30), (New-Object Text.UTF8Encoding($false)))
+    'CARRIED ' + (Get-FileHash -LiteralPath $sp -Algorithm SHA256).Hash.ToLowerInvariant()
+  }
 }
 '@

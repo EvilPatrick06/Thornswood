@@ -217,17 +217,28 @@ refusedCase('a pass for the right profile sent under the wrong one', function (r
 }
 
 {
-  const r = rig({ thornswoodServer: 'dev' });
+  const r = rig({ thornswoodServer: 'dev', thornswoodRequirePass: false });
   online(r, [[0xff000a01, 700]]);
   r.sweep(T0);
   r.sweep(T0 + 181000);
   r.fire();
-  yes('no thornswoodRequirePass: the session is still refused',
+  yes('thornswoodRequirePass false: the session is still refused',
       r.kicked.length === 1 && r.kicked[0] === 7);
   yes('and told to update, with no WOULD REFUSE that lets them stay',
       r.told.length === 1 && r.told[0].indexOf('700: ') === 0 && /Thornswood launcher/.test(r.told[0]) && /update/.test(r.told[0]) &&
       r.logged.some(function (s) { return /refusing profile 700: no valid join pass in 181s online/.test(s); }) &&
       !r.logged.some(function (s) { return /WOULD REFUSE/.test(s); }));
+}
+
+{
+  // Absent is the hold on (#1319): told why it is held, then refused.
+  const r = rig({ thornswoodServer: 'dev' });
+  online(r, [[0xff000a01, 700]]);
+  r.sweep(T0);
+  r.sweep(T0 + 181000);
+  r.fire();
+  yes('no thornswoodRequirePass: held, told why, and refused at the grace',
+      r.kicked.length === 1 && r.kicked[0] === 7 && r.told.length === 2 && r.told[0] === '700: ' + r.jp.waiting);
 }
 
 {
