@@ -744,7 +744,9 @@ Every rule in this file binds them the same as a person. They share notes
 through an Obsidian vault at `C:\Thornswood Vault\Thornswood` on that machine
 (`wiki/status.md` is what is true now); the vault is for coordinating, and
 the board is still the one record of work. They mark what they are on with a
-`claimed: <lane>` label and the board card moved to In Progress. Their
+`claimed: <lane>` label and the board card moved to In Progress. When the
+issue closes, `.github\workflows\drop-claims.yml` takes every `claimed:`
+label off it (#1863), so a lane's finish step need not. Their
 branches carry the lane's name (`launcher/`, `website/`, `github/` and so on).
 On the shipping machine `C:\Users\evilp\Downloads\Thornswood-Repo` is shared
 by all of them and sits detached at `origin/main`, because lanes build from
