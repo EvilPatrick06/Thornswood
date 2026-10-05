@@ -9,9 +9,10 @@ require standing there.
 The object is the message board. One stands at each of the nine spots.
 You are at it when you are within 400 of that board. Click the board.
 
-A steward moves it. `/board move whiterun`, standing where it should
-be. `/board here` moves the one you are already at. A board a steward
-has walked to is saved, and a later seeding does not put it back.
+A steward moves it. Standing where it should be, they press its town
+under the notice boards on the Office page of the K panel, and press
+again. A board a steward has walked to is saved, and a later seeding
+does not put it back.
 
 The nine mainland towns have a spot each: Solitude, Whiterun, Riften,
 Windhelm, Markarth, Falkreath, Morthal, Dawnstar, Winterhold. Raven
@@ -98,12 +99,12 @@ somebody has taken stays up until they hand it back.
 The board is a panel. Stand at the message board and click it. Notices, jobs,
 taking one, taking your own down, handing a job back, and leaving a
 price list are on that panel. Walking away closes it. The panel sends
-the same words the server already answers. A steward still moves a
-board with `/board move` or `/board here`.
+the same words the server already answers. A steward moves a board
+from the Office page of the K panel. See [Offices](offices.md).
 
 Fees of 20 and 30, the reach of 400, the newest 10, the gaps, `/unpin`,
-`/take`, `/dropjob`, and steward `/board move` and `/board here` are
-in the server. The fee lands on the hold's ledger. A steward moves one
+`/take`, `/dropjob`, and a steward moving a board are in the
+server. The fee lands on the hold's ledger. A steward moves one
 of the ten boards; any other name is refused.
 
 Letters are in the server: `/letter`, the 35, the 300 characters, the
