@@ -1476,21 +1476,27 @@ const lastUse = new Map();   // "actorId:refrId" -> timestamp
   From the To Do List: "Any cache keyed by something unbounded gets an eviction
   rule: a size cap, an age sweep, or removal when the session ends." Every press
   that gives something adds a row here, one per character and per reference:
-  the quarry, the kiln, every plant, every river, the hanging game and every
-  carcass. Nothing ever took one out, so the map was bounded only by how long
-  the server had been up. Measured on 24 September: about 140 bytes a row.
+  the quarry, the kiln, every plant, every churn, nest, hive and cow. Nothing
+  ever took one out, so the map was bounded only by how long the server had
+  been up. Measured on 24 September: about 140 bytes a row.
+
+  The rivers, the hanging game and the carcasses kept their rows here until
+  #1413. Since then they wait on the shared resource stock, on the record and
+  for everybody (createSharedResourceStock), and the seams are deposits, so no
+  row here is asked about against MINE_COOLDOWN_MS or the fish, game or hunt
+  tables any more (#1641).
 
   A row older than the longest wait anybody asks about gives the answer a
   missing row gives, which is ready, because cooldownLeft reads a missing row
   as a stamp at time zero. So dropping those rows changes no answer anybody
   gets, and that is the whole rule. It is not removal when somebody leaves: a
-  four hour wait on a master fishing spot has to outlast logging out and back.
+  ten minute wait on a picked plant has to outlast logging out and back.
 
-  The longest wait is read off the tables rather than typed here. A number
-  typed here that ever fell below one of them would hand a spot back early,
-  and those four hours are the only limit on it. A new table of waits that
-  stamps this map goes in longestWaitMs, and test-cooldown-sweep.js fails
-  until it does.
+  The longest wait is read off the constants rather than typed here. A number
+  typed here that ever fell below one of them would hand a source back early.
+  A new wait that stamps this map goes in longestWaitMs, and
+  test-cooldown-sweep.js fails until it does. A table that no row here is read
+  against stays out of it, or rows are kept for hours nothing asks about.
 
   The sweep runs when a stamp takes the map past a mark, not on a timer. A
   stamp is the only way a row gets in, so this bounds the map without another
@@ -1502,13 +1508,7 @@ const LAST_USE_SWEEP_FROM = 5000;
 let lastUseSweepAt = LAST_USE_SWEEP_FROM;
 
 function longestWaitMs() {
-  let most = Math.max(COOLDOWN_MS, HARVEST_COOLDOWN_MS);
-  const tables = [MINE_COOLDOWN_MS, FISH_TUNING.cooldownMs,
-                  GAME_TUNING.cooldownMs, HUNT_TUNING.cooldownMs];
-  for (const t of tables) {
-    for (const k of Object.keys(t)) most = Math.max(most, Number(t[k]) || 0);
-  }
-  return most;
+  return Math.max(COOLDOWN_MS, HARVEST_COOLDOWN_MS);
 }
 
 /** Drops every row older than the longest wait, and moves the mark. */
@@ -6475,10 +6475,9 @@ var FISH_BY_BASE = {
     master    four hours. The one slaughterfish egg nest record, which sits
               underwater in water slaughterfish are in.
 
-  This map is kept in memory, in the same lastUse map the quarry and the plants
-  use, so a server restart or a hot reload of this file clears every wait in it.
-  That is true of the ten minutes on a plant as well and it is the first thing
-  to know before these numbers are argued about.
+  Since #1413 the wait is kept on the record itself, in the shared resource
+  stock (createSharedResourceStock), for everybody at once, and not in the
+  lastUse map the quarry and the plants use.
 
   yieldByStep, the least and the most one press gives, novice first. The records
   hand over exactly one of their produce when the engine picks them, so the
@@ -6602,9 +6601,8 @@ var GAME_BY_BASE = {
               so that a record added to it later is not also a record with no
               wait at all.
 
-  This map is kept in memory, in the same lastUse map the quarry, the plants and
-  the rivers use, so a server restart or a hot reload of this file clears every
-  wait in it.
+  Since #1413 the wait is kept on the record itself, in the shared resource
+  stock, the same as the rivers', and not in the lastUse map.
 
   yieldByStep, the least and the most one press gives, novice first. The records
   hand over exactly one of their produce when the engine picks them, so the
@@ -8260,12 +8258,10 @@ var HUNTS_BY_BASE = {
   rivers do: a row carrying a rank nobody knows must not be the cheapest tap in
   the game.
 
-  Kept in memory, in the same lastUse map the seams, the plants and the rivers
-  use, so a server restart or a hot reload of this file clears it. That is worth
-  knowing before the numbers are argued about: a four hour wait a restart wipes
-  is not four hours. bodySeconds is not kept there. It is written into the
-  actor's change form by the engine, so it outlives a reload and is re-set on
-  every death anyway.
+  Since #1413 a carcass is dressed once a life on the shared resource stock
+  (stock.dress), so these waits are not kept in the lastUse map. bodySeconds is
+  written into the actor's change form by the engine, so it outlives a reload
+  and is re-set on every death anyway.
 */
 const HUNT_TUNING = {
   bodySeconds: 300,
