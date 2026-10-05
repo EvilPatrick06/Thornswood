@@ -595,12 +595,11 @@ function bytesFor(n) {
   return (b / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
-/* Straight to a file on the person's machine, made in the browser out of text
-   it already has. No round trip, and it works for the server slice too, which
-   was never a file anywhere. */
-function downloadText(name, text) {
+/* Straight to a file on the person's machine, made in the browser out of
+   what it already has. No round trip, and it works for the server slice too,
+   which was never a file anywhere. */
+function downloadBlob(name, blob) {
   try {
-    var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = name;
@@ -610,6 +609,243 @@ function downloadText(name, text) {
       try { URL.revokeObjectURL(a.href); document.body.removeChild(a); } catch (e) { }
     }, 0);
   } catch (e) { saidNow('could not download'); }
+}
+
+function downloadText(name, text) {
+  downloadBlob(name, new Blob([text], { type: 'text/plain;charset=utf-8' }));
+}
+
+/* --------------------------------------------------- download all (zip) -- */
+/*
+  Every file under one session in one download, asked for by Patrick on
+  5 October: a crash report meant pressing Download nine times and getting
+  nine loose files with the session's first eight characters in front of each.
+
+  The zip is made here in the browser, out of the same text the page shows,
+  so the site sends nothing new and a log reads the same in the zip as it does
+  on the page. The files are stored, not compressed: a session's logs are
+  capped at about a megabyte on the server, so compressing would save a
+  moment and cost a library or an asynchronous stream on every browser.
+
+  Inside is one folder named like the zip, so opening it does not scatter a
+  dozen files across somebody's Downloads folder.
+*/
+
+/* CRC-32 as zip wants it (the IEEE polynomial, reflected). */
+function crc32(bytes) {
+  var table = [];
+  for (var n = 0; n < 256; n++) {
+    var c = n;
+    for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    table[n] = c >>> 0;
+  }
+  var crc = 0xFFFFFFFF;
+  for (var i = 0; i < bytes.length; i++) crc = table[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+/* A moment as the two 16-bit MS-DOS fields a zip entry carries, in the
+   viewer's own time, which is what an unzipped file shows. Zip cannot say
+   anything before 1980 or after 2107, and a bad time becomes now. */
+function dosStamp(ms) {
+  var t = new Date(Number(ms));
+  if (isNaN(t.getTime())) t = new Date();
+  var y = Math.min(2107, Math.max(1980, t.getFullYear()));
+  return {
+    time: (t.getHours() << 11) | (t.getMinutes() << 5) | (t.getSeconds() >> 1),
+    date: ((y - 1980) << 9) | ((t.getMonth() + 1) << 5) | t.getDate()
+  };
+}
+
+/* A zip of text files, each [{ name, text }] stored as UTF-8 with its name
+   marked UTF-8 (general purpose bit 11) so a name outside ASCII survives.
+   Returns the bytes. */
+function zipStore(files, when) {
+  var enc = new TextEncoder();
+  var stamp = dosStamp(when);
+  var parts = [];
+  var central = [];
+  var offset = 0;
+  files.forEach(function (f) {
+    var name = enc.encode(String(f.name));
+    var data = enc.encode(String(f.text == null ? '' : f.text));
+    var crc = crc32(data);
+
+    var local = new Uint8Array(30 + name.length);
+    var l = new DataView(local.buffer);
+    l.setUint32(0, 0x04034b50, true);   // local file header
+    l.setUint16(4, 20, true);           // version needed: 2.0
+    l.setUint16(6, 0x0800, true);       // the name is UTF-8
+    l.setUint16(8, 0, true);            // stored
+    l.setUint16(10, stamp.time, true);
+    l.setUint16(12, stamp.date, true);
+    l.setUint32(14, crc, true);
+    l.setUint32(18, data.length, true); // compressed size
+    l.setUint32(22, data.length, true); // size
+    l.setUint16(26, name.length, true);
+    l.setUint16(28, 0, true);           // no extra field
+    local.set(name, 30);
+
+    var cd = new Uint8Array(46 + name.length);
+    var c = new DataView(cd.buffer);
+    c.setUint32(0, 0x02014b50, true);   // central directory header
+    c.setUint16(4, 20, true);           // made by: 2.0
+    c.setUint16(6, 20, true);           // version needed: 2.0
+    c.setUint16(8, 0x0800, true);
+    c.setUint16(10, 0, true);
+    c.setUint16(12, stamp.time, true);
+    c.setUint16(14, stamp.date, true);
+    c.setUint32(16, crc, true);
+    c.setUint32(20, data.length, true);
+    c.setUint32(24, data.length, true);
+    c.setUint16(28, name.length, true);
+    c.setUint16(30, 0, true);           // extra
+    c.setUint16(32, 0, true);           // comment
+    c.setUint16(34, 0, true);           // disk
+    c.setUint16(36, 1, true);           // internal attributes: text
+    c.setUint32(38, 0, true);           // external attributes
+    c.setUint32(42, offset, true);      // where its local header is
+    cd.set(name, 46);
+
+    parts.push(local, data);
+    central.push(cd);
+    offset += local.length + data.length;
+  });
+
+  var cdSize = 0;
+  central.forEach(function (b) { cdSize += b.length; });
+  var end = new Uint8Array(22);
+  var e = new DataView(end.buffer);
+  e.setUint32(0, 0x06054b50, true);     // end of central directory
+  e.setUint16(8, files.length, true);   // entries on this disk
+  e.setUint16(10, files.length, true);  // entries in all
+  e.setUint32(12, cdSize, true);
+  e.setUint32(16, offset, true);        // where the central directory starts
+
+  var all = parts.concat(central, [end]);
+  var total = 0;
+  all.forEach(function (b) { total += b.length; });
+  var out = new Uint8Array(total);
+  var at = 0;
+  all.forEach(function (b) { out.set(b, at); at += b.length; });
+  return out;
+}
+
+/* The two files the page makes rather than receives, named the same wherever
+   they are saved from. */
+function serverLogName(d) {
+  return 'server-' + (d && d.channel === 'dev' ? 'dev' : 'main') + '.log';
+}
+function chatFileName(row) {
+  return 'chat-' + (row && row.profile ? row.profile : 'unknown') + '.txt';
+}
+
+/* What they said as plain text, so it reads in a text editor rather than as
+   the page's markup, and still makes sense away from the page: whose, and
+   when. */
+function chatText(chat) {
+  return (chat || []).map(function (l) {
+    return new Date(l.at).toLocaleString() +
+      (l.kind === 'command' ? '  [command]' : '') +
+      (l.proven ? '' : '  [unproven]') +
+      (l.mode ? '  [' + l.mode + ']' : '') +
+      '  ' + (l.name || '(no name)') + ': ' + (l.text || '');
+  }).join('\n');
+}
+
+/* Every file More details shows for one session, in the order it shows them:
+   the logs from that machine, the game server's lines for the window, and
+   what they said. */
+function sessionFiles(d, row) {
+  var files = [];
+  var client = (d && d.client) || {};
+  Object.keys(client).forEach(function (n) {
+    files.push({ name: n, text: String(client[n]) });
+  });
+  var srv = ((d && d.server) || []).join('\n');
+  if (srv) files.push({ name: serverLogName(d), text: srv });
+  var chat = (d && d.chat) || [];
+  if (chat.length) files.push({ name: chatFileName(row), text: chatText(chat) });
+  return files;
+}
+
+/*
+  Where the logs came from, as a file of its own in the zip, because the zip
+  is the thing that gets passed on and the page is not.
+
+  The checksums are the ones the site took when the logs arrived, over the
+  same text that is in the zip, so a log from this zip can be checked against
+  the copy on the server later. The server lines and the chat are cut from
+  the game server's and the voice service's own logs at the moment of the
+  download, so they carry none.
+*/
+function provenanceText(sid, d) {
+  if (!d || !d.sent) return '';
+  var lines = [
+    'Session ' + sid,
+    'Sent by Discord id ' + (d.sent.who || 'unknown') + ', taken off the signed ticket, not the upload',
+    'Arrived ' + (d.sent.at ? new Date(d.sent.at).toISOString() : 'at an unknown time'),
+    'Size ' + bytesFor(d.sent.bytes),
+    d.sent.resent
+      ? 'A further set was sent ' + d.sent.resent + ' time(s) and refused. These are the first.'
+      : 'No further set was sent for this session.',
+    d.keep ? 'Held on the server past the year.' : 'Ages out on the server after a year unless it is held.',
+    '',
+    'SHA-256 of each log from that machine, as the site stored it:'
+  ];
+  var sums = d.sent.sha256 || {};
+  Object.keys(sums).forEach(function (n) { lines.push('  ' + sums[n] + '  ' + n); });
+  lines.push('');
+  lines.push('The server log and the chat were cut from the game server\'s and the voice');
+  lines.push('service\'s own logs when this zip was made, so they have no checksum here.');
+  return lines.join('\n') + '\n';
+}
+
+/* The name the zip and its folder share: the first eight characters of the
+   session id, the character, and the day the session started. */
+function sessionZipStem(sid, row) {
+  var ms = row ? sessionAt(row) : 0;
+  var day = 'undated';
+  if (ms) {
+    var t = new Date(ms);
+    var two = function (v) { return (v < 10 ? '0' : '') + v; };
+    day = t.getFullYear() + '-' + two(t.getMonth() + 1) + '-' + two(t.getDate());
+  }
+  var stem = String(sid).slice(0, 8) + '-' +
+    (row && row.profile ? row.profile : 'no-character') + '-' + day;
+  return stem.replace(/[^A-Za-z0-9._-]/g, '-');
+}
+
+/* The Download all button: ask for the session, zip what comes back, save it. */
+function downloadSessionZip(b) {
+  var sid = b.dataset.s, who = b.dataset.w;
+  var row = null;
+  for (var i = 0; i < S.sessions.length; i++) {
+    if (S.sessions[i].session === sid) { row = S.sessions[i]; break; }
+  }
+  var was = b.textContent;
+  b.disabled = true;
+  b.textContent = 'Fetching...';
+  api('/api/session-logs?session=' + encodeURIComponent(sid) + '&who=' + encodeURIComponent(who))
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(function (d) {
+      b.disabled = false;
+      b.textContent = was;
+      var files = sessionFiles(d, row);
+      if (!files.length) { saidNow('nothing to download for that session'); return; }
+      var prov = provenanceText(sid, d);
+      if (prov) files.push({ name: 'provenance.txt', text: prov });
+      var stem = sessionZipStem(sid, row);
+      files.forEach(function (f) { f.name = stem + '/' + f.name; });
+      var when = (d.sent && d.sent.at) || (row && (row.end || row.start)) || Date.now();
+      downloadBlob(stem + '.zip', new Blob([zipStore(files, when)], { type: 'application/zip' }));
+      saidNow('downloaded ' + files.length + ' file(s) in ' + stem + '.zip');
+    })
+    .catch(function (e) {
+      b.disabled = false;
+      b.textContent = was;
+      saidNow(e === 404 ? 'the site has no record of that session' : 'could not fetch the logs');
+    });
 }
 
 /* Every log kept for this session, so the download names cannot collide and
@@ -752,7 +988,7 @@ function drawLogs(box, sid, d) {
 
   var srv = (d.server || []).join('\n');
   if (srv) {
-    var sn = 'server-' + (d.channel === 'dev' ? 'dev' : 'main') + '.log';
+    var sn = serverLogName(d);
     LOGS[sid][sn] = srv;
     out += logFileHtml(sid, sn, srv);
   } else {
@@ -784,14 +1020,8 @@ function drawLogs(box, sid, d) {
        than the page's markup. Registered under a name that says whose and
        from when, because it lands in somebody's downloads folder beside the
        logs and has to still make sense there. */
-    var cn = 'chat-' + (row && row.profile ? row.profile : 'unknown') + '.txt';
-    LOGS[sid][cn] = chat.map(function (l) {
-      return new Date(l.at).toLocaleString() +
-        (l.kind === 'command' ? '  [command]' : '') +
-        (l.proven ? '' : '  [unproven]') +
-        (l.mode ? '  [' + l.mode + ']' : '') +
-        '  ' + (l.name || '(no name)') + ': ' + (l.text || '');
-    }).join('\n');
+    var cn = chatFileName(row);
+    LOGS[sid][cn] = chatText(chat);
 
     out += '<details class="logf">' +
       '<summary>' +
@@ -937,6 +1167,9 @@ function sessionTable(rows) {
     '<tr class="morerow"><td colspan="6">' +
       '<div class="moreWrap">' +
         '<button class="btn small moreBtn" data-s="' + esc(s.session) + '" data-w="' + esc(s.who) + '">More details</button>' +
+        /* Every file More details would show, in one zip, without opening
+           it first. */
+        '<button class="btn small zipBtn" data-s="' + esc(s.session) + '" data-w="' + esc(s.who) + '">Download all</button>' +
         /* Kept as evidence moved INSIDE More details, beside the provenance
            it belongs to. It was a second button on every row and it earned
            nothing there: it is not about this session, it is about the copy
@@ -957,6 +1190,11 @@ function sessionTable(rows) {
    draw, and again each time a card is opened, because a card's table is in
    the page from the start and only hidden by details. */
 function wireMore(root) {
+  each(root, 'button.zipBtn', function (b) {
+    if (b.dataset.wired) return;
+    b.dataset.wired = '1';
+    b.onclick = function () { downloadSessionZip(b); };
+  });
   each(root, 'button.moreBtn', function (b) {
     if (b.dataset.wired) return;
     b.dataset.wired = '1';
@@ -1163,7 +1401,8 @@ function drawSessions() {
     'which character, which build, and where they got to. Where reads Launcher ' +
     'when no character was ever picked, which means the session never reached ' +
     'either world. More details under a session fetches the logs from that ' +
-    'machine and the game server\'s own lines for that window. ' +
+    'machine and the game server\'s own lines for that window, and Download ' +
+    'all beside it saves every one of those files in one zip. ' +
     'The launcher sends both ends of every session, so a session appears as ' +
     'somebody starts and fills in when they stop. One still open is somebody ' +
     'playing right now, or a machine that never got the closing word out. ' +
