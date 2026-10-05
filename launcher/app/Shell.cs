@@ -2332,7 +2332,7 @@ namespace Thornswood
                 }
                 Log(shown
                     ? "The needs bars are shown. It applies next time the game starts."
-                    : "The needs bars are hidden. Type /needs in chat to see them. It applies next time the game starts.");
+                    : "The needs bars are hidden. The Body page on K shows the numbers. It applies next time the game starts.");
             };
 
             tabPlugins.Click += delegate { modTab = 0; BuildModList(); };
