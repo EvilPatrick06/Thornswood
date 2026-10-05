@@ -200,6 +200,11 @@ class Posted(object):
             yield m
 
 
+# A ticket thread hangs off the channel the panel opens them in, which is
+# what close_here asks before anything else (#1776).
+Ticket.parent = Posted(bot.TICKETS[0])
+
+
 class Server(object):
     def __init__(self, channels=()):
         self.id = 1
