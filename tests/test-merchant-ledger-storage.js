@@ -8,6 +8,7 @@ try {
   const settings={privDir:path.join(root,'private'),dataDir:path.join(root,'served')};
   const file=path.join(settings.privDir,'merchant-ledger.json');
   const storage=ctx.createPrivateMerchantLedger(fs,path,settings,['1:Skyrim.esm']);
+  assert.equal(storage.namespace.split(':').slice(1).join(':'),path.sep==='\\'?file.toLowerCase():file,'world identity follows filesystem case semantics');
   const props=new Map();
   const api={makeProperty(){},getIdFromDesc:()=>1,getNpcAIState:()=>({isHuman:false}),
     get:(id,p)=>p==='baseDesc'?'a:Skyrim.esm':props.get(id),set:(id,p,v)=>props.set(id,JSON.parse(JSON.stringify(v)))};

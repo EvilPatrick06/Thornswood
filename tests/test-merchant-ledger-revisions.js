@@ -11,7 +11,12 @@ vm.runInContext(src.slice(src.indexOf('// NPC MERCHANT PURSES BEGIN'), src.index
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tw-merchant-revisions-'));
 try {
   const settings = {privDir: path.join(root, 'private'), dataDir: path.join(root, 'served')};
-  const storage = ctx.createPrivateMerchantLedger(fs, path, settings, ['1:Skyrim.esm']);
+  const write = (name,bytes) => {
+    fs.mkdirSync(settings.privDir,{recursive:true});
+    const file=path.join(settings.privDir,name+'-ledger.json');
+    fs.writeFileSync(file+'.tmp',bytes); fs.renameSync(file+'.tmp',file); return true;
+  };
+  const storage = ctx.createPrivateMerchantLedger(fs, path, settings, ['1:Skyrim.esm'], write);
   const props = new Map();
   const api = {makeProperty() {}, getIdFromDesc: () => 1, getNpcAIState: () => ({isHuman: false}),
     get: (id, key) => key === 'baseDesc' ? 'a:Skyrim.esm' : props.get(id),
@@ -38,13 +43,21 @@ try {
   assert.equal(restarted.pendingRecords().length, 0);
   assert.equal(restarted.prepare(1).purse, 247);
   const io = Object.create(fs); io.renameSync = () => {throw new Error('rename denied');};
-  const broken = ctx.createNpcMerchantPurses(api, data, ctx.createPrivateMerchantLedger(io, path, settings));
+  const broken = ctx.createNpcMerchantPurses(api, data, {durable:true,load:()=>storage.load(),save:()=>{throw new Error('rename denied');}});
   assert.throws(() => broken.compareAndCommit(1, 2, {...done, purse: 0}), /rename denied/);
   assert.equal(ctx.createNpcMerchantPurses(api, data, storage).prepare(1).purse, 247, 'failed durable replacement leaves the previous ledger intact');
   const ambiguousStorage = {load: () => storage.load(), save: () => undefined, durable: true};
   const ambiguous = ctx.createNpcMerchantPurses(api, data, ambiguousStorage);
   assert.throws(() => ambiguous.compareAndCommit(1, 2, {...done, purse: 0}), /acknowledgement/);
   assert.throws(() => ambiguous.prepare(1), /unavailable/, 'missing save acknowledgement revokes admission');
+  const oldStorage=ctx.createPrivateMerchantLedger(fs,path,settings);
+  assert.equal(oldStorage.durable,false,'the old rename writer cannot acknowledge transaction reservations');
+  const oldPurse=ctx.createNpcMerchantPurses(api,data,oldStorage);
+  assert.throws(()=>oldPurse.compareAndCommit(1,2,{...done,purse:0}),/acknowledgement/);
+  props.clear();
+  const initializing=ctx.createNpcMerchantPurses(api,data,{durable:true,load:()=>({version:1,entries:{'1:Skyrim.esm':null}}),save:()=>{throw new Error('initial ack lost');}});
+  assert.throws(()=>initializing.prepare(1),/initial ack lost/);
+  assert.throws(()=>initializing.prepare(1),/unavailable/,'ambiguous initialization also revokes retained service');
   console.log('PASS merchant durable revisions, stale offer/settlement refusal, restart, pending isolation and persistence failure');
 } finally {
   const full = path.resolve(root);
