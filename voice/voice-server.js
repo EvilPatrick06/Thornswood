@@ -22,6 +22,7 @@
 
 const http = require('http');
 const crypto = require('crypto');
+const net = require('net');
 const fs = require('fs');
 const path = require('path');
 const headlines = require('./headlines');
@@ -59,7 +60,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -1276,6 +1277,91 @@ function isLoopback(req) {
 }
 
 /*
+  HOW OFTEN ONE PLACE MAY ASK FOR A TOKEN OR OPEN A SOCKET (#1323).
+
+  Neither door counted anything. Measured on 5 October: sixty POST /token and
+  sixty socket handshakes from one address, one after another, were every one
+  answered. Each /token is an HMAC and a request to the site, and each socket
+  is a peer, a roster sent to everybody, and a place in every position tick.
+
+  So each door takes so many a minute from one place, and past that answers
+  429 with Retry-After, never a quiet drop. The rules are the site's own
+  limiters' (site/server.js, the report and login limits). A place is the
+  socket's address or, behind Caddy, the last X-Forwarded-For hop, which is
+  the one Caddy wrote, believed only when the socket is loopback. An IPv6
+  address counts as its /64, because one home is handed a whole /64. The
+  table holds only a hash of it, under a key made at each start. Only what
+  was let in counts, so a script hammering on a refusal does not keep the
+  people behind the same address locked out. This machine itself, loopback
+  with nobody's address forwarded, is not counted: the box's own scripts and
+  the harnesses.
+
+  The launcher asks for a token when Play is pressed, every thirty minutes,
+  and after a refusal at most every thirty seconds (Voice.cs RenewToken), so
+  twenty a minute is several people behind one address. A page that lost its
+  socket tries again after one to thirty seconds (thornswood-chat.js) or two
+  to sixty (voice-host.html), so sixty sockets a minute is several people
+  reconnecting at once. Both are settings, so they can be tuned on the box
+  without a release.
+*/
+const TOKEN_PER_MINUTE = Number(process.env.THORNSWOOD_TOKEN_PER_MINUTE) || 20;
+const SOCKETS_PER_MINUTE = Number(process.env.THORNSWOOD_SOCKETS_PER_MINUTE) || 60;
+const doorSalt = crypto.randomBytes(32);
+const tokenDoor = { name: 'token requests', max: TOKEN_PER_MINUTE, seen: new Map(), saidAt: 0 };
+const socketDoor = { name: 'sockets', max: SOCKETS_PER_MINUTE, seen: new Map(), saidAt: 0 };
+
+/* Where a request comes from, the way site/server.js clientAddr reads it. */
+function clientAddr(req) {
+  const sock = String((req.socket && req.socket.remoteAddress) || '');
+  let addr = sock;
+  if (/^(127\.|::1$|::ffff:127\.)/i.test(sock)) {
+    const hops = String(req.headers['x-forwarded-for'] || '').split(',')
+      .map((s) => s.trim()).filter(Boolean);
+    if (hops.length) addr = hops[hops.length - 1];
+  }
+  return addr.toLowerCase().replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/, '');
+}
+
+/* Seconds to wait before this one may come in, or 0 when it is let in, and
+   then it is counted. */
+function doorWait(door, req, now) {
+  let addr = clientAddr(req);
+  if (/^(127\.|::1$)/.test(addr)) return 0;
+  if (net.isIPv6(addr)) {
+    const halves = addr.split('%')[0].split('::');
+    const head = halves[0] ? halves[0].split(':') : [];
+    const tail = halves.length > 1 && halves[1] ? halves[1].split(':') : [];
+    const gap = halves.length > 1 ? Math.max(0, 8 - head.length - tail.length) : 0;
+    addr = head.concat(new Array(gap).fill('0'), tail).slice(0, 4)
+      .map((g) => (parseInt(g, 16) || 0).toString(16)).join(':') + '::/64';
+  }
+  const key = crypto.createHmac('sha256', doorSalt).update(addr).digest('hex').slice(0, 32);
+  const list = (door.seen.get(key) || []).filter((t) => t > now - 60000);
+  if (list.length >= door.max) {
+    door.seen.set(key, list);
+    if (now - door.saidAt > 60000) {
+      door.saidAt = now;
+      console.log('[voice] one address passed ' + door.max + ' ' + door.name +
+                  ' in a minute, so it is answered 429 until the minute is up');
+    }
+    return Math.max(1, Math.ceil((list[0] + 60000 - now) / 1000));
+  }
+  list.push(now);
+  door.seen.set(key, list);
+  return 0;
+}
+// Places whose minute is over are forgotten.
+setInterval(() => {
+  const cut = Date.now() - 60000;
+  for (const door of [tokenDoor, socketDoor]) {
+    for (const [key, list] of door.seen) {
+      const kept = list.filter((t) => t > cut);
+      if (kept.length) door.seen.set(key, kept); else door.seen.delete(key);
+    }
+  }
+}, 60000);
+
+/*
   AN OVERSIZED BODY IS ANSWERED, NOT DROPPED.
 
   This used to call req.destroy() the moment the body went over the limit,
@@ -1613,6 +1699,13 @@ const server = http.createServer((req, res) => {
     profileId on its own proves nothing, which was the whole problem.
   */
   if (req.method === 'POST' && route === '/token') {
+    // So many a minute from one place (#1323); see doorWait.
+    const tokenWait = doorWait(tokenDoor, req, Date.now());
+    if (tokenWait) {
+      res.writeHead(429, { 'content-type': 'text/plain', 'retry-after': String(tokenWait) });
+      res.end('Too many token requests from this address. Try again in ' + tokenWait + ' seconds.');
+      return;
+    }
     readBody(req, res, 4000, (doc) => {
       const pid = Number(doc.profileId) || 0;
       if (pid <= 0) { res.writeHead(400).end('no profileId'); return; }
@@ -1892,6 +1985,15 @@ server.on('upgrade', (req, socket, head) => {
     // service. The socket is being closed either way.
     socket.on('error', () => { });
     socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+    return;
+  }
+  // So many a minute from one place (#1323); see doorWait.
+  const socketWait = doorWait(socketDoor, req, Date.now());
+  if (socketWait) {
+    // An error listener for the reason given over the 403 just above.
+    socket.on('error', () => { });
+    socket.end('HTTP/1.1 429 Too Many Requests\r\nRetry-After: ' + socketWait +
+               '\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
     return;
   }
   const key = req.headers['sec-websocket-key'];
