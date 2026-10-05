@@ -32561,6 +32561,19 @@ log('gamemode loaded:',
         ? 'pick your schools first'
         : 'magic is not yours yet: a Master mage has to take you on first');
     }
+    /*
+      Somebody a Master mage taught learns a spell only from its tome (#1149):
+      "needs the spellbook AND a Master Mage willing to apprentice them" (the
+      rulebook, #391), "learned from the tome" (magic.md, apprenticeship.md).
+      The K panel draws the book for a mage only, but this is the line it
+      sends, and typed by hand it took the spell with no tome at all. The
+      tome is read through learnFromTome, which asks the same gates and a
+      place under the cap.
+    */
+    if (s.prof !== 'mage') {
+      return no('read the tome of ' + spell.name + ' to learn it, because somebody a Master mage taught ' +
+                'learns spells from their tomes and only a Mage picks them on K');
+    }
     if (mine.indexOf(spell.school) === -1) {
       return no(spell.school + ' is not one of your schools');
     }
