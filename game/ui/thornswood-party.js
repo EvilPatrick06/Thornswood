@@ -332,6 +332,7 @@
       '<div class="body" id="' + ID + '-body"></div>' +
       '<div class="foot"><span id="' + ID + '-foot"></span>' +
       '<span style="flex:1"></span>' +
+      '<button id="' + ID + '-help">Help</button>' +
       '<button id="' + ID + '-close">Close</button></div>' +
       '</div>';
     document.body.appendChild(root);
@@ -339,6 +340,7 @@
     askEl.id = 'ts-ask';
     document.body.appendChild(askEl);
     root.querySelector('#' + ID + '-close').onclick = close;
+    root.querySelector('#' + ID + '-help').onclick = help;
 
     /*
       Escape closes it, and the page has to handle that itself.
@@ -594,6 +596,17 @@
   }
 
   function toggle() { if (shown) { close(); } else { open(); } }
+
+  /*
+    Help, beside Close (#1633): the help panel on its People topic, and this
+    one put down. Patrick's answer on #1633: a Help button on the K, P and J
+    panels as well as the help key. The help opens first, so the keyboard is
+    never let go between the two.
+  */
+  function help() {
+    try { if (window.thornswoodHelp) { window.thornswoodHelp.open('people'); } } catch (e) { }
+    close();
+  }
 
   window.thornswoodParty = {
     open: open,

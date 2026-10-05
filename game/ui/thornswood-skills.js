@@ -647,6 +647,7 @@
       '<div class="nav"></div>' +
       '<div class="body"></div>' +
       '<div class="foot"><div class="status"></div><div class="btns">' +
+        '<div class="tsbtn ghost" data-act="help">Help</div>' +
         '<div class="tsbtn ghost" data-act="close"><span>Close</span><span class="key">K</span></div>' +
         '<div class="tsbtn primary" data-act="confirm">Confirm</div>' +
       '</div></div>' +
@@ -660,6 +661,9 @@
   var elStatus = root.querySelector('.status');
   var elConfirm = root.querySelector('[data-act="confirm"]');
   var elClose = root.querySelector('[data-act="close"]');
+  // Help (#1633), beside Close: the help panel, and this one put down. Never
+  // while creating, where this panel is the whole of what there is to do.
+  var elHelp = root.querySelector('[data-act="help"]');
   // The word inside the Close button, so drawFoot can say Close Skyrim while
   // creating without rebuilding the button or losing its key cap.
   var elCloseLabel = elClose.querySelector('span');
@@ -2573,6 +2577,7 @@
     elClose.className = 'tsbtn ghost' + ((cr && quitArmed) ? ' danger' : '');
     elCloseLabel.textContent = shut;
     elCloseKey.style.display = cr ? 'none' : '';
+    elHelp.style.display = cr ? 'none' : '';
   }
 
   function hint() {
@@ -3160,6 +3165,12 @@
   window.addEventListener('keydown', onKey, true);
   elConfirm.onclick = confirm;
   elClose.onclick = function () { closeButton(); };
+  // The help opens first, so the keyboard is never let go between the two.
+  elHelp.onclick = function () {
+    if (creating()) return;
+    try { if (window.thornswoodHelp) { window.thornswoodHelp.open('work'); } } catch (e) { }
+    api.close();
+  };
 
   // ---------------------------------------------------------------- api --
   var api = {
