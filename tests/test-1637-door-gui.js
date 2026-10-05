@@ -434,14 +434,16 @@ function keys(p) { return pack(p).filter(function (e) { return e.baseId === idOf
     }
     function text(n) { return [n.textContent].concat(n.kids.map(text)).join(' '); }
     const body = node('div');
-    const DATA = { property: [
+    // The rows are on the panel view, mine.property, where writeState puts
+    // them (#1717); tests/test-1717-property-page.js runs that whole road.
+    const mine = { property: [
       { name: 'Honeyside', mine: true, locked: false, keyed: false, b: HOME, sleep: [],
         rent: { amount: 50, every: 7, owed: 50 } },
       { name: 'The Shop', mine: true, locked: true, keyed: true, b: SHOP, sleep: [], rent: null },
       { name: 'Your farm', mine: true, farm: true, days: 9, reach: 1200 }
     ] };
-    new Function('document', 'elBody', 'DATA', 'window', parts.join('\n') + '\ndrawProperty();')(
-      { createElement: node }, body, DATA, {});
+    new Function('document', 'elBody', 'mine', 'window', parts.join('\n') + '\ndrawProperty();')(
+      { createElement: node }, body, mine, {});
     const all = text(body);
     yes('P6 the page says the rent and what is owed on it',
         /Rent is 50 gold every 7 days, 50 gold owed now\./.test(all) && /No rent on it\./.test(all));

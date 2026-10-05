@@ -135,6 +135,16 @@
       'skills:pick perk fontofmagic', and a refusal comes back as a note
       about 'perk'.
 
+    property: [ { name, mine: <bool>, locked, keyed, b, by,
+                  rent: { amount, every, owed } | null,
+                  sleep: [ { pid, name } ], farm, days, reach } ]
+      The property page (#1637, #1603), sent once somebody holds a building
+      or a farm or carries a key to one, and left out otherwise: the page is
+      drawn from whether this arrived. mine is a place you hold, b is its
+      building id, and sleep is tonight's guests there; Stop beside a guest
+      sends '/sleephere stop <pid> <b>' through window.thornswoodNet.say.
+      A farm row has farm, days and reach and nothing else.
+
     officePage: { jarl, may, name, steward: <bool>,
                   stewards: [ { pid, name } ], people: [ { pid, name } ],
                   door: { name, by, rent: { amount, every, owed } | null } | null,
@@ -328,6 +338,15 @@
     apprentice: {
       title: 'Masters and apprentices',
       lead: 'A Master can take you on in your sister half, so it climbs past novice, or teach you the novice work of a half from another profession, twice in a life. Either of you can end it here.',
+      rows: []
+    },
+    /*
+      The property page (#1637, #1603). What you hold and carry a key to is
+      the server's, under mine.property; this is the title and nothing else,
+      because the page draws its own line over the cards.
+    */
+    property: {
+      title: 'Property',
       rows: []
     },
     /*
@@ -1682,6 +1701,12 @@
     drawn from whether the list arrived. There is nothing here that can put an
     empty page in front of anybody.
 
+    THE LIST IS mine.property, on the panel view with everything else the
+    server says (writeState in the character block puts it there). From the
+    first cut until #1717 this read DATA.property, which is this page's own
+    section table and never carries it, so the page was never drawn for
+    anybody.
+
     WHAT YOU HOLD IS HERE AND NOT BEHIND A TYPED /deed (#1637): each building
     with what rent is owed on it, and your farm, which is ground with no
     building on it and lapses on the same 14 days. Claiming, locking and
@@ -1696,8 +1721,8 @@
     pressed while looking at them inside it.
   */
   function propertyRows() {
-    var rows = DATA && DATA.property;
-    return (rows && rows.length) ? rows : [];
+    var rows = mine && mine.property;
+    return (Array.isArray(rows) && rows.length) ? rows : [];
   }
 
   function drawProperty() {
