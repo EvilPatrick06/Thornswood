@@ -42,11 +42,17 @@ const { spawn } = require('child_process');
 const VOICE = process.env.VOICE || path.join(REPO_DIR, 'voice', 'voice-server.js');
 
 let pass = 0, fail = 0;
-function yes(what, cond) {
+function yes(what, cond, why) {
   if (cond) { pass++; console.log('PASS  ' + what); }
-  else { fail++; console.log('FAIL  ' + what); }
+  else { fail++; console.log('FAIL  ' + what + (why ? '\n      ' + why : '')); }
 }
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/*
+  How long any one answer is waited for before the wait gives up and says
+  what did not come. Each check waits for the thing it reads (#1926), so this
+  only ends a wait on a service that is stuck, as listening() does.
+*/
+const BOUND_MS = 15000;
 
 /*
   A port of this run's own (#1703). Builds run side by side on the VPS, and
@@ -116,12 +122,33 @@ function textFrame(obj) {
   return Buffer.concat([head, key, body]);
 }
 
-/* A raw handshake with the headers given: { status, joined, closed }. */
+/*
+  A raw handshake with the headers given: { status, joined, closed, late }.
+  It resolves on what the checks read: the welcome to its join, or the
+  socket's end. It used to give every handshake 400 ms and read whatever had
+  come by then, so on a busy machine a welcome or a close that came later
+  read as a page refused or a socket left open (#1926). BOUND_MS with
+  neither is a stuck service, and late then says what did not come.
+*/
 function knock(port, headers, pid) {
   return new Promise((ok) => {
     const s = net.connect(port, '127.0.0.1');
-    const me = { status: 0, joined: false, closed: false };
+    const me = { status: 0, joined: false, closed: false, late: '' };
     let buf = Buffer.alloc(0);
+    let settled = false;
+    const done = () => {
+      if (settled) { return; }
+      settled = true;
+      clearTimeout(bound);
+      s.destroy();
+      ok(me);
+    };
+    const bound = setTimeout(() => {
+      me.late = me.status === 101 ? 'no welcome to its join within ' + BOUND_MS / 1000 + ' s'
+              : me.status ? 'answered ' + me.status + ' and the socket still open after ' + BOUND_MS / 1000 + ' s'
+              : 'no answer to the handshake within ' + BOUND_MS / 1000 + ' s';
+      done();
+    }, BOUND_MS);
     s.on('connect', () => {
       let h = 'GET / HTTP/1.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\n' +
               'Sec-WebSocket-Key: ' + crypto.randomBytes(16).toString('base64') + '\r\n' +
@@ -138,11 +165,11 @@ function knock(port, headers, pid) {
         buf = buf.slice(i + 4);
         if (me.status === 101) { s.write(textFrame({ t: 'join', profileId: pid, name: 'P' + pid })); }
       }
-      if (buf.indexOf('"welcome"') >= 0) { me.joined = true; }
+      if (buf.indexOf('"welcome"') >= 0) { me.joined = true; done(); }
     });
-    s.on('close', () => { me.closed = true; });
+    // Only a close the service made counts; the destroy in done() comes after.
+    s.on('close', () => { if (!settled) { me.closed = true; done(); } });
     s.on('error', () => { });
-    setTimeout(() => { s.destroy(); ok(me); }, 400);
   });
 }
 
@@ -158,6 +185,8 @@ function knock(port, headers, pid) {
   let srvLog = '';
   srv.stdout.on('data', (d) => { srvLog += d; });
   srv.stderr.on('data', (d) => { srvLog += d; });
+  // Once it has gone and every line it wrote has been read ('close').
+  const srvClosed = new Promise((ok) => srv.once('close', ok));
   await listening(srv, PORT);
   const HOST = '127.0.0.1:' + PORT;
   let pid = 100;
@@ -177,7 +206,7 @@ function knock(port, headers, pid) {
     if (host === 'thornswood.net') { h['X-Forwarded-For'] = '203.0.113.7'; }
     const r = await knock(PORT, h, ++pid);
     yes(what + ' (' + origin + ') is refused with 403 (' + r.status + '), not joined, and closed',
-        r.status === 403 && !r.joined && r.closed);
+        r.status === 403 && !r.joined && r.closed, r.late);
   }
 
   /*
@@ -186,21 +215,31 @@ function knock(port, headers, pid) {
     upgrade, so an error there with nobody listening stopped the service:
     in the first version of this change, 300 such handshakes ended it with
     "Error: write ECONNRESET".
+
+    Each one is made once the one before it is gone at this end. Then a page
+    that may come in knocks and joins. All 200 have reached the service before
+    that handshake does, and its welcome takes two answers more, so a stop
+    they cause has come by then. This used to read whether the service had
+    stopped 300 ms after the last of them instead (#1926).
   */
   let exited = null;
   srv.on('exit', (code) => { exited = code; });
   for (let i = 0; i < 200 && exited === null; i++) {
-    const c = net.connect(PORT, '127.0.0.1', () => {
-      c.write('GET / HTTP/1.1\r\nHost: ' + HOST + '\r\nOrigin: https://evil.example\r\nUpgrade: websocket\r\n' +
-              'Connection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: ' +
-              crypto.randomBytes(16).toString('base64') + '\r\n\r\n');
-      c.resetAndDestroy();
+    await new Promise((gone) => {
+      const c = net.connect(PORT, '127.0.0.1', () => {
+        c.write('GET / HTTP/1.1\r\nHost: ' + HOST + '\r\nOrigin: https://evil.example\r\nUpgrade: websocket\r\n' +
+                'Connection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: ' +
+                crypto.randomBytes(16).toString('base64') + '\r\n\r\n');
+        c.resetAndDestroy();
+      });
+      c.on('error', () => { });
+      c.on('close', gone);
     });
-    c.on('error', () => { });
-    await wait(5);
   }
-  await wait(300);
-  yes('200 refused pages that hang up at once leave the service running', exited === null);
+  const next = await knock(PORT, { Host: HOST }, ++pid);
+  yes('200 refused pages that hang up at once leave the service running, and the next page joins (' + next.status + ')',
+      exited === null && next.status === 101 && next.joined,
+      exited !== null ? 'the service stopped (exit ' + exited + ')' : next.late);
 
   console.log('\nthe game\'s pages and the launcher\'s:');
   for (const [what, origin, host] of [
@@ -210,26 +249,38 @@ function knock(port, headers, pid) {
     const h = { Host: host, Origin: origin };
     if (host === 'thornswood.net') { h['X-Forwarded-For'] = '203.0.113.7'; }
     const r = await knock(PORT, h, ++pid);
-    yes(what + ' (' + origin + ') is let in and joins (' + r.status + ')', r.status === 101 && r.joined);
+    yes(what + ' (' + origin + ') is let in and joins (' + r.status + ')', r.status === 101 && r.joined, r.late);
   }
   const bare = await knock(PORT, { Host: HOST }, ++pid);
-  yes('no Origin at all, which is not a browser, is let in and joins (' + bare.status + ')', bare.status === 101 && bare.joined);
+  yes('no Origin at all, which is not a browser, is let in and joins (' + bare.status + ')',
+      bare.status === 101 && bare.joined, bare.late);
   const nodePid = ++pid;
   const node = new WebSocket('ws://' + HOST + '/', ['thornswood', tokenFor(nodePid)]);
-  let welcomed = false;
-  node.onmessage = (e) => { if (/"welcome"/.test(String(e.data))) { welcomed = true; } };
-  await new Promise((ok) => { node.onopen = ok; node.onerror = ok; });
-  node.send(JSON.stringify({ t: 'join', profileId: nodePid, name: 'Harness' }));
-  await wait(200);
-  yes('and so is node\'s own WebSocket, as every harness uses', welcomed);
+  // Its welcome, or the socket ending without one, or BOUND_MS of neither.
+  // It used to read 200 ms after the join was sent (#1926).
+  const nodeWhy = await new Promise((ok) => {
+    const bound = setTimeout(() => ok('no welcome within ' + BOUND_MS / 1000 + ' s'), BOUND_MS);
+    const end = (why) => { clearTimeout(bound); ok(why); };
+    node.onopen = () => node.send(JSON.stringify({ t: 'join', profileId: nodePid, name: 'Harness' }));
+    node.onmessage = (e) => { if (/"welcome"/.test(String(e.data))) { end(''); } };
+    node.onclose = (e) => end('the socket closed without a welcome (' + e.code + ')');
+  });
+  yes('and so is node\'s own WebSocket, as every harness uses', !nodeWhy, nodeWhy);
   try { node.close(); } catch (e) { }
 
+  /*
+    The log is read once the service has gone and every line it wrote has
+    come through its pipe. A line is written before the answer it goes with,
+    but on another pipe, and on a busy machine the answer can come first
+    (#1867).
+  */
+  if (exited === null) { srv.kill(); }
+  await srvClosed;
   console.log('\nthe log:');
   const said = srvLog.split('\n').filter((l) => /refused a socket opened by a page on/.test(l));
   yes('the refusal is in the log once, not once per socket (' + said.length + ')', said.length === 1 &&
       /"https:\/\/evil\.example"/.test(said[0]));
 
-  await new Promise((ok) => { srv.once('exit', ok); srv.kill(); });
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);
 })().catch((e) => { console.log('FAIL  the harness itself: ' + (e && e.stack || e)); process.exit(1); });
