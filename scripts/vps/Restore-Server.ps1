@@ -27,7 +27,11 @@
              published last, and on the first rehearsal (28 September) it was
              a dev one: a live restore kept port 7787 and the name
              Thornswood Dev, so the live server would have come back as the
-             dev one.
+             dev one. The join pass switch and the written role lists,
+             thornswoodRequirePass, thornswoodDevs and thornswoodPlaytesters,
+             come from the backup too (#1845): they are the server's own and
+             no build carries them (#1223), so the payload's would be nobody's
+             choice. Those three are named and their values never printed.
 
   Whatever world and private the folder already had is moved aside into
   world-before-restore-<stamp> inside it, never deleted.
@@ -256,23 +260,28 @@ $s = $utf8.GetString($bytes) | ConvertFrom-Json
 if (-not $s.loadOrder) { Die 'server-settings.json has no loadOrder.' }
 
 # Which server this is comes from the backup, not from whichever channel's
-# payload was unpacked here (see the note at the top).
+# payload was unpacked here (see the note at the top). So do the join pass
+# switch and the written role lists (#1845), which are said by name only.
 $named = 0
+$byNameOnly = @('thornswoodRequirePass', 'thornswoodDevs', 'thornswoodPlaytesters')
 $srcSettings = Join-Path $src 'server-settings.json'
 if (Test-Path -LiteralPath $srcSettings) {
   $b = $null
   try { $b = [IO.File]::ReadAllText($srcSettings) -replace '^\uFEFF', '' | ConvertFrom-Json } catch { $b = $null }
   if ($b) {
-    foreach ($k in 'port', 'name', 'thornswoodVoicePort', 'thornswoodServer', 'thornswoodLoadOrderRefuse') {
+    foreach ($k in @('port', 'name', 'thornswoodVoicePort', 'thornswoodServer', 'thornswoodLoadOrderRefuse') + $byNameOnly) {
       $has = $s.PSObject.Properties.Name -contains $k
       $want = $b.PSObject.Properties.Name -contains $k
+      $quiet = $byNameOnly -contains $k
       if ($want) {
         if (-not $has) {
-          Say ("  {0}: {1} from the backup, the folder had none" -f $k, (ConvertTo-Json $b.$k -Compress)) 'Yellow'
+          if ($quiet) { Say "  $k from the backup, the folder had none" 'Yellow' }
+          else { Say ("  {0}: {1} from the backup, the folder had none" -f $k, (ConvertTo-Json $b.$k -Compress)) 'Yellow' }
           $s | Add-Member -NotePropertyName $k -NotePropertyValue $b.$k; $named++
         }
         elseif ((ConvertTo-Json $s.$k -Compress) -ne (ConvertTo-Json $b.$k -Compress)) {
-          Say ("  {0}: {1} from the backup, was {2}" -f $k, (ConvertTo-Json $b.$k -Compress), (ConvertTo-Json $s.$k -Compress)) 'Yellow'
+          if ($quiet) { Say "  $k from the backup, the folder's was different" 'Yellow' }
+          else { Say ("  {0}: {1} from the backup, was {2}" -f $k, (ConvertTo-Json $b.$k -Compress), (ConvertTo-Json $s.$k -Compress)) 'Yellow' }
           $s.$k = $b.$k; $named++
         }
       } elseif ($has) {

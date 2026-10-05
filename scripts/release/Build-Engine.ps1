@@ -7,6 +7,7 @@
 
       .\scripts\release\Build-Engine.ps1                first time: checks, configures, builds
       .\scripts\release\Build-Engine.ps1 -Check         says what is missing, changes nothing
+      .\scripts\release\Build-Engine.ps1 -Jobs 2        two projects at a time, whatever is free
 
   WHY THIS EXISTS. Until 25 September a dev Ship worked only on Patrick's
   machine: Ship checks the client runtime against records\client-build.json,
@@ -33,6 +34,10 @@
        its own (subst) for configure and build, removed again at the end.
     4. Builds everything, Release. After the first time only what changed is
        rebuilt, so a fork change that touches the client bundle is quick.
+       It compiles as many projects at once as the memory free allows, two
+       compilers each, or -Jobs of them (EngineJobs.ps1 says how many and
+       why, issue #1203). A compile that runs the machine out of memory says
+       so and gives the line to build with fewer.
     5. Compares the six client files with records\client-build.json, the check
        Ship makes, and says whether this build is the recorded one.
 
@@ -46,6 +51,10 @@ param(
     [switch]$Check,
     [string]$SkyrimDir = 'C:\Thornswood\Game',
     [string]$Fork = (& (Join-Path $PSScriptRoot 'Where.ps1') Engine),
+    # Projects compiled at once, two compilers each. 0, the default, works
+    # it out from the memory free when the build starts (EngineJobs.ps1).
+    [ValidateRange(0, 64)]
+    [int]$Jobs = 0,
     [switch]$NoPause
 )
 
@@ -55,14 +64,22 @@ function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Ok($m) { Write-Host ('  ok       ' + $m) -ForegroundColor Green }
 function Miss($m) { Write-Host ('  MISSING  ' + $m) -ForegroundColor Red }
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
+. (Join-Path $PSScriptRoot 'EngineJobs.ps1')
 # Native tools write progress to stderr; the exit code alone decides. Their
 # output is written to the screen, not returned: returned, every line cmake
 # printed came back with the code, "$code -ne 0" was true for any configure
 # or build that printed anything, and a configure that succeeded stopped with
 # "cmake configure exited with ... 0" (found building for #919).
+# $script:RunOutOfMemory is the first out of memory error the tool printed,
+# or '' (#1203), so a failed build can say the machine ran out.
 function Run {
     $ErrorActionPreference = 'Continue'
-    & $args[0] @($args | Select-Object -Skip 1) 2>&1 | ForEach-Object { Write-Host $_ }
+    $script:RunOutOfMemory = ''
+    & $args[0] @($args | Select-Object -Skip 1) 2>&1 | ForEach-Object {
+        $oom = Get-EngineOutOfMemoryCode ([string]$_)
+        if ($oom -and -not $script:RunOutOfMemory) { $script:RunOutOfMemory = $oom }
+        Write-Host $_
+    }
     return [int]$LASTEXITCODE
 }
 
@@ -229,9 +246,23 @@ if ($Check) {
 # ---- 4. build ---------------------------------------------------------------
 Head 'Build'
 Say '  Release, everything (only what changed, after the first time)'
+# Projects at once from the memory free, not a bare /m, which started one per
+# core and ran a busy machine out of memory (#1203, EngineJobs.ps1).
+$free = Get-EngineFreeBytes
+$atOnce = $Jobs
+if ($atOnce -lt 1) {
+    $atOnce = Get-EngineJobs $free ([Environment]::ProcessorCount)
+    Say ('  {0} project(s) at once, {1} compilers each, for {2:N1} GB free (-Jobs sets it)' -f $atOnce, $EngineCompilersPerJob, ($free / 1GB))
+} else {
+    Say ('  {0} project(s) at once, {1} compilers each, as -Jobs says ({2:N1} GB free)' -f $atOnce, $EngineCompilersPerJob, ($free / 1GB))
+}
+$jobArgs = Get-EngineMSBuildArgs $atOnce
 # '--' is quoted: bare, PowerShell takes it as the end of Run's own
 # parameters and drops it, and cmake then refuses /m as its own argument.
-$code = Run $cmake --build $build --config Release '--' /m /v:minimal /nologo
+$code = Run $cmake --build $build --config Release '--' @jobArgs /v:minimal /nologo
+if ($code -ne 0 -and $script:RunOutOfMemory) {
+    Die (Get-EngineOutOfMemoryAdvice $script:RunOutOfMemory $atOnce $free (Get-EngineAgainLine '.\scripts\release\Build-Engine.ps1' $PSBoundParameters))
+}
 if ($code -ne 0) { Die "the build exited with $code. The errors are above; the first one is usually the only real one." }
 Ok 'built'
 

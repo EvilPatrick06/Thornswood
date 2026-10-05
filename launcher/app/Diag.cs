@@ -202,7 +202,11 @@ namespace Thornswood
             Add("theme", cfg.Theme);
             s.AppendLine();
 
-            try { Add("game exe", new FileInfo(Paths.Exe).Length.ToString("n0") + " bytes"); } catch (Exception ex) { Swallow.Note("Diag.Summary, game exe size", ex); }
+            // The game's facts from Paths.Skyrim: the Steam copy while the own
+            // folder is chosen and not made, when Paths.Game is Profile\Payload
+            // and has no game in it (#1235). The client is Game's either way.
+            if (Paths.OwnFirst) Add("game read from", Paths.Skyrim + " (the own folder is not made yet)");
+            try { Add("game exe", new FileInfo(Paths.SkyrimExe).Length.ToString("n0") + " bytes"); } catch (Exception ex) { Swallow.Note("Diag.Summary, game exe size", ex); }
             Add("expected exe", cfg.ExpectedExeBytes.ToString("n0") + " bytes");
             Add("multiplayer client", File.Exists(Paths.MpClient) ? "present" : "MISSING");
             Add("plugins enabled", Checks.EnabledPlugins().ToString());
@@ -237,9 +241,14 @@ namespace Thornswood
             s.AppendLine("-----------------------");
             try
             {
-                string dir = Path.Combine(Paths.Game, "Data\\SKSE\\Plugins");
-                if (Directory.Exists(dir))
+                // Two folders while the own folder is chosen and not made: the
+                // Steam copy's, what Vortex deployed, and Payload's,
+                // Thornswood's own. Each is named so a report says which.
+                string[] dirs = Paths.SksePluginDirs;
+                foreach (string dir in dirs)
                 {
+                    if (dirs.Length > 1) s.AppendLine("in " + dir);
+                    if (!Directory.Exists(dir)) continue;
                     var files = Directory.GetFiles(dir, "*.dll");
                     Array.Sort(files);
                     foreach (string f in files) s.AppendLine(Path.GetFileName(f));

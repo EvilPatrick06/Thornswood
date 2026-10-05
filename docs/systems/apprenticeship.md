@@ -92,10 +92,11 @@ takes them on. That school is one of the two outside trades. It is
 one school, not a second and a third.
 
 They hold 2 spells at most, novice, learned from the tome. The three
-gates on [Magic and the College](magic.md) still apply: a place under
-those 2, the spell is novice, and a novice spell needs nothing below
-it. They do not earn the mage's stored spell points. They do not pick
-schools on K. They do not receive the school's placed point.
+gates on [Magic and the College](magic.md) still apply: a semester's
+point and a place under those 2, the spell is novice, and a novice
+spell needs nothing below it. They do not earn the mage's stored spell
+points. They do not pick schools on K. They do not receive the
+school's placed point.
 
 At the College, Study on the K panel hands them 1 spell point in a
 semester, and it can only be spent on a novice spell of the school they
@@ -189,5 +190,5 @@ tome are in the server. So is the semester: Study on the K panel's
 College page, in one of the College's rooms, hands a person a master
 has taught 1 point once in 24 hours. The server asks for that point as
 well as a place before a tome teaches them, because the semester is the
-only thing that hands them one; whether the places alone should be
-enough is asked on issue 1387. See [Magic and the College](magic.md).
+only thing that hands them one. Patrick decided on 4 October that they
+need both (issue 1387). See [Magic and the College](magic.md).

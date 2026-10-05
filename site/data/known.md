@@ -75,7 +75,7 @@ Position and cell. Health, magicka and stamina. Death and respawn, including whe
 
 The server and every machine must carry the same plugins in the same order with the same bytes. The launcher compares every plugin's size and checksum with the server's list when it starts, and the game runs the same comparison at login. One machine out of step gets LOAD ORDER ERROR and cannot connect.
 
-If the launcher says a plugin differs, press **Fix**. It downloads the server's copy of that plugin and puts it in place, and **Scan** runs the comparison again. Nothing in your Vortex profile has to change for that.
+If the launcher says a plugin differs, press **Fix**. When it is Thornswood's own plugin, Fix downloads the server's copy and puts it in place, and **Scan** runs the comparison again. When it is another author's mod, the server does not hand it out: Scan and Fix name the mod, and updating the Thornswood collection or reinstalling that mod in Vortex puts it right.
 
 If the game turns you away with LOAD ORDER ERROR, quit it and press **Scan**, then **Fix**. The launcher compares your order with the server's position by position, names the first place they differ, and Fix puts the server's order into this build's plugin list. That one downloads nothing. Do not play on and do not report anything else from that session: your machine is resolving objects to different things from everybody else's, so whatever you see next is not evidence.
 

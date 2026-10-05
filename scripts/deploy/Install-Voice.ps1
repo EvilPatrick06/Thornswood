@@ -100,14 +100,16 @@ if ($Remove) {
 }
 
 # What goes up is the voice artifact (issue #459, Artifact.ps1): the service
-# and its page as the commit holds them, in one zip named by commit and hash.
-# Built here, before anything asks the box what it runs, because a service,
-# page or log roller with uncommitted changes is refused with the box
-# untouched (#1121). Sent under "files" below.
+# as the commit holds it, in one zip named by commit and hash. Built here,
+# before anything asks the box what it runs, because a service or log roller
+# with uncommitted changes is refused with the box untouched (#1121). Sent
+# under "files" below. The service serves no page since #1822, so public\ is
+# not sent; a box installed before that keeps its old public\ folder, which
+# nothing reads.
 . (Join-Path $Here 'Artifact.ps1')
 $artifact = $null
 if (-not $PutBack -and -not $Remove -and -not $Restart) {
-    $artifact = New-ThornswoodArtifact -Component voice -RepoDir (Join-Path $Here '..\..') -Paths 'voice/voice-server.js', 'voice/headlines.js', 'voice/public' `
+    $artifact = New-ThornswoodArtifact -Component voice -RepoDir (Join-Path $Here '..\..') -Paths 'voice/voice-server.js', 'voice/headlines.js' `
         -AlsoSends 'scripts/vps/Roll-Log.ps1'
     Say ('artifact ' + (Format-ThornswoodArtifact $artifact)) 'DarkGray'
 }
@@ -184,7 +186,7 @@ Assert-ThornswoodSourceIntegrity -Artifact $artifact -RepoDir (Join-Path $Here '
 Send-ThornswoodArtifact -Artifact $artifact -Target $target -SshArgs $ssh
 $src = Join-Path $artifact.Folder 'voice'
 }
-foreach ($f in 'voice-server.js', 'headlines.js', 'public\index.html', 'public\voice.js') {
+foreach ($f in 'voice-server.js', 'headlines.js') {
     if (-not (Test-Path -LiteralPath (Join-Path $src $f))) { Die "not found: $(Join-Path $src $f)" }
 }
 
@@ -248,15 +250,13 @@ if (-not $PutBack) {
     # The roller the task runs in front of the service. See Roll-Log.ps1 for
     # why a log cmd holds open can only be rolled at start.
     $send['roll-log.ps1'] = Join-Path $Here '..\vps\Roll-Log.ps1'
-    $send['public/index.html'] = Join-Path $src 'public\index.html'
-    $send['public/voice.js'] = Join-Path $src 'public\voice.js'
     # A stage a run that died part way left behind was never swapped in.
     $made = @(Remote @"
-New-Item -ItemType Directory -Force -Path '$Root\public' | Out-Null
+New-Item -ItemType Directory -Force -Path '$Root' | Out-Null
 Get-ChildItem -LiteralPath '$Root' -Directory -Force -EA SilentlyContinue |
   Where-Object { `$_.Name -like '.stage-*' } |
   ForEach-Object { Remove-Item -LiteralPath `$_.FullName -Recurse -Force -EA SilentlyContinue }
-New-Item -ItemType Directory -Force -Path '$Root\$stageName\public' | Out-Null
+New-Item -ItemType Directory -Force -Path '$Root\$stageName' | Out-Null
 'ready'
 "@ | ForEach-Object { "$_".Trim() })
     if ($made -notcontains 'ready') { Die "could not make $Root\$stageName up there. Voice was not touched." }

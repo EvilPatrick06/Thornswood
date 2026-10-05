@@ -37,7 +37,6 @@ function yes(what, cond) {
 const UI = path.join(REPO_DIR, 'game', 'ui');
 const overlay = fs.readFileSync(path.join(UI, 'thornswood-voice.js'), 'utf8');
 const chat = fs.readFileSync(path.join(UI, 'thornswood-chat.js'), 'utf8');
-const plain = fs.readFileSync(path.join(REPO_DIR, 'voice', 'public', 'voice.js'), 'utf8');
 
 /* Lift a function out of a page by name, braces balanced. */
 function lift(src, head) {
@@ -101,22 +100,8 @@ function lift(src, head) {
       /setTargetAtTime/.test(overlay) && !/rec\.gain\.gain\.value = 1/.test(overlay));
 }
 
-// ------------------------------------------------- the plain browser page
-{
-  const levelFor = lift(plain, 'function levelFor(');
-  yes('the standalone page works its level out too', !!levelFor);
-  if (levelFor) {
-    const f = new Function(
-      'isFinite', 'Number',
-      'const REF_DISTANCE = 4; const MAX_DISTANCE = 30;\n' +
-      levelFor + '\nreturn levelFor;')(isFinite, Number);
-    yes('full strength up close', f(1) === 1);
-    yes('and silent past its limit, which it never was before', f(31) === 0);
-    yes('with something in between', f(12) > 0 && f(12) < 1);
-  }
-  yes('and its panner stops attenuating as well', /panner\.rolloffFactor = 0;/.test(plain));
-  yes('with no maxDistance left on it', !/panner\.maxDistance/.test(plain));
-}
+// The plain browser page the service once served had the same fault and the
+// same fix, until the page went (#1822).
 
 // -------------------------------------------------------- the relay handoff
 {

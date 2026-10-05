@@ -18,7 +18,7 @@ you may take out of the world.
 
 | Class | The verb | The list |
 | --- | --- | --- |
-| [Hunter](classes/hunter.md) | Loot an animal body | 112 names, 361 placed bodies |
+| [Hunter](classes/hunter.md) | Loot an animal body | 92 names, 336 placed bodies |
 | [Fisher](classes/fisher.md) | A pole, then press E at the water | 15 spots stand today. The plan places a hold's worth |
 | [Gatherer](classes/gatherer.md) | Take a reagent | 46 names, 105 placed plants |
 | [Miner](classes/miner.md) | Swing a pickaxe at a seam | 18 names, 581 veins |
@@ -51,7 +51,8 @@ is also handed seed. See [Creation](creation.md).
 ## Where this is
 
 The five verbs, the pick, the shovel, the axe, the rank gates and
-the lists are in the server. A fishing pole is not required, and the
-new water is not placed. The numbers for how long a seam, a plant, a
-fish and a crop take are on each class page. They are the plan's
-numbers. The tools in the server have 100 uses. The plan is 50.
+the lists are in the server. The fishing verb refuses without a
+pole, and the new water is not placed. The numbers for how long a
+seam, a plant, a fish and a crop take are on each class page. They
+are the plan's numbers. Every tool in the server has 50 uses: the
+pick, the shovel, the axe, the pole, and the one handed at the pick.

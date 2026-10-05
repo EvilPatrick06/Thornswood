@@ -192,14 +192,15 @@ try {
     Yes 'a browser closed before its answers arrive ignores them (generation checked in every late callback)' (([regex]::Matches($mm, 'if \(gen != generation\) return;')).Count -ge 4)
 
     # --------------------------------------------- 4. voice quality kept
-    $panners = @('launcher\voice-host.html', 'voice\public\voice.js', 'game\ui\thornswood-voice.js')
+    # Two clients since the service's own page went (#1822).
+    $panners = @('launcher\voice-host.html', 'game\ui\thornswood-voice.js')
     $allHrtf = $true; $count = 0
     foreach ($p in $panners) {
         $t = Read $p
         foreach ($x in [regex]::Matches($t, "panningModel\s*=\s*'([^']+)'")) { $count++; if ($x.Groups[1].Value -ne 'HRTF') { $allHrtf = $false } }
         if ($t -match 'equalpower') { $allHrtf = $false }
     }
-    Yes "voice: every panner is HRTF, none switched to the cheaper equalpower ($count panners in 3 files)" ($allHrtf -and $count -eq 3)
+    Yes "voice: every panner is HRTF, none switched to the cheaper equalpower ($count panners in 2 files)" ($allHrtf -and $count -eq 2)
 
     # --------------------------------------------- 5. half-rate updates off
     $settings = $Api::SettingsFile()

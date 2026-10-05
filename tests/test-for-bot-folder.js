@@ -84,7 +84,6 @@ const KEY = crypto.randomBytes(16).toString('hex');
 
 async function start() {
   const PORT = await freePort();
-  const DEAD = await freePort();
   const srv = spawn(process.execPath, ['server.js'], {
     cwd: dir,
     env: Object.assign({}, process.env, { THORNSWOOD_DOCS_PORT: String(PORT), THORNSWOOD_DOCS_LOCAL: '1' })
@@ -95,7 +94,7 @@ async function start() {
   const base = 'http://127.0.0.1:' + PORT;
   let up = false;
   try { await listening(srv, PORT); up = true; } catch (e) { said = e.message; }
-  return { srv, base, up, said: () => said, DEAD };
+  return { srv, base, up, said: () => said };
 }
 // A site that already stopped has no exit to wait for.
 function stop(s) {
@@ -110,10 +109,13 @@ function stop(s) {
   try {
     fs.copyFileSync(SRC, path.join(dir, 'server.js'));
     fs.mkdirSync(DATA, { recursive: true });
-    const deadPort = await freePort();
+    // The game check knocks on port 1 (#1816): the system never hands it out
+    // for a listen on 0 and no harness listens on a fixed port
+    // (test-1703-test-ports.js), so no run beside this one can take it and
+    // make the game read as up. A port taken from the system and let go could be.
     fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({
       password: '', secret: crypto.randomBytes(32).toString('hex'), botKey: KEY,
-      gameCheckPort: deadPort, onlineFile: path.join(dir, 'online.json'),
+      gameCheckPort: 1, onlineFile: path.join(dir, 'online.json'),
       discord: { clientId: '', clientSecret: '', botToken: '', guildId: '', invite: '' }
     }));
     const was = {

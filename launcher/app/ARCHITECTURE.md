@@ -171,7 +171,10 @@ menu this session. Writes `Profile\launcher.log` through Log and
 `Paths.cs:71 Init()` from where the exe is. `Collection` says which shape the
 install is; `OwnFirst` that its own folder was chosen at install and is not
 made yet, when `Game` is `Profile\Payload` (#1226); `SteamCopy` is the Steam
-copy, read for the game's build before the folder exists. Owns no files.
+copy, read for the game's build before the folder exists. `Skyrim` is the
+folder the facts about the game are read from (its exe, the script extender,
+their plugins with `SksePluginDirs`): the Steam copy while `OwnFirst`, `Game`
+otherwise, and never a path anything writes to (#1235). Owns no files.
 
 **Acceptance** (Acceptance.cs). `Profile\accepted.json`, the same file the
 setup program writes when the terms, the privacy policy and the rules are
@@ -215,7 +218,7 @@ this process has gone and keeps the old one until the new one has started
 (see SelfSwap below). `Version` at the top of the file is the launcher's
 version, moved by `scripts\release\Bump-Version.ps1` before a Ship. In the launcher,
 `ShellUpdate.cs:28 CheckUpdatesBackground()` asks, `OnVersionDoc` decides,
-`ShellUpdate.cs:367 RunUpdate()` installs, and `ShellUpdate.cs:48 CheckFailed()` keeps
+`ShellUpdate.cs:369 RunUpdate()` installs, and `ShellUpdate.cs:48 CheckFailed()` keeps
 Play shut and asks again every thirty seconds when the source does not answer.
 Every document that was read also goes to `ShellUpdate.cs:77 ShowNotice()`, which
 asks FeedNotice what the bar above Play says and whether Play is held.
@@ -306,14 +309,16 @@ In the shared shape Apply does nothing, because Vortex owns those folders
 there.
 
 **Verify and LoadOrder** (Verify.cs, LoadOrder.cs). Whether this install's
-plugin list is the server's. `Verify.cs:74 Run()` reads, and writes nothing:
+plugin list is the server's. `Verify.cs:79 Run()` reads, and writes nothing:
 the shipped reference `Profile\Default\plugins.txt`, the live list
 `Profile\LocalAppData\plugins.txt`, the server's manifest over HTTP on its
 resources port (3000 for the main server, 7788 for dev), and the size and
 CRC of each plugin. Only the Fix button writes: the reference list into the
-live one, a plugin fetched from the server (the old one kept in
-`Profile\Replaced`), and other servers' files moved into `Profile\Isolated`.
-`Verify.cs:968 DeployPersonal()` copies `<Root>\Your Mods` into `Game\Data`.
+live one, Thornswood's own plugin fetched from the server when its bytes
+differ (the old one kept in `Profile\Replaced`; the server hands out no other
+author's plugin, #1180), and other servers' files moved into
+`Profile\Isolated`.
+`Verify.cs:1019 DeployPersonal()` copies `<Root>\Your Mods` into `Game\Data`.
 
 **Vortex profile state** (VortexProfileState.cs). Checks and the PowerShell
 load-order scripts share this reader for the named Skyrim profile. It reads
@@ -426,7 +431,7 @@ are not (`ClientRuntime.cs:206 Heal()`).
 **Downgrade** (Downgrade.cs). Gets Skyrim 1.6.1170's own files through
 Steam's own console, after asking, since it takes over Steam's window and the
 keyboard; the question shows the three console lines
-(`Downgrade.cs:215 Commands()`). They go into Thornswood's own folder
+(`Downgrade.cs:220 Commands()`). They go into Thornswood's own folder
 (`OwnGameShare.cs:451 TakePinned()`), or, before it has one, the folder is
 made from them. The Steam copy is never written (#1218).
 

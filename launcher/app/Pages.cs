@@ -19,7 +19,7 @@ namespace Thornswood
     {
         static TextBlock txtSrvAddress, txtSrvState, txtSrvPingNote,
                          txtBuildHead, txtBuildSummary, txtDiagNote, txtThemeNote;
-        static StackPanel srvPingBars, srvRows, buildBars, buildRows, controlsList, diagReadings, diagCollection;
+        static StackPanel srvPingBars, srvRows, buildBars, buildRows, controlsList, diagReadings, diagCollection, diagAddons;
         static Button btnSrvCopy, btnSrvRetest, btnBuildRefresh, btnDiagBundle, btnDiagOpen;
 
         // -1 marks a test that got no answer, which is worth drawing as a gap
@@ -38,6 +38,7 @@ namespace Thornswood
             buildBars = F<StackPanel>("BuildBars"); buildRows = F<StackPanel>("BuildRows");
             controlsList = F<StackPanel>("ControlsList"); diagReadings = F<StackPanel>("DiagReadings");
             diagCollection = F<StackPanel>("DiagCollection");
+            diagAddons = F<StackPanel>("DiagAddons");
             btnSrvCopy = F<Button>("BtnSrvCopy"); btnSrvRetest = F<Button>("BtnSrvRetest");
             btnBuildRefresh = F<Button>("BtnBuildRefresh");
             btnDiagBundle = F<Button>("BtnDiagBundle"); btnDiagOpen = F<Button>("BtnDiagOpen");
@@ -162,11 +163,18 @@ namespace Thornswood
             if (buildRows == null) return;
 
             int plugins = Checks.EnabledPlugins();
+            // The game's facts come from Paths.Skyrim, which is the Steam copy
+            // while the own folder is chosen and not made: Paths.Game is then
+            // Profile\Payload, and read there the game and the script extender
+            // were "missing" until the folder was made (#1235).
             int skse = 0;
             try
             {
-                string d = Path.Combine(Paths.Game, "Data\\SKSE\\Plugins");
-                if (Directory.Exists(d)) skse = Directory.GetFiles(d, "*.dll").Length;
+                var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (string d in Paths.SksePluginDirs)
+                    if (Directory.Exists(d))
+                        foreach (string f in Directory.GetFiles(d, "*.dll")) names.Add(Path.GetFileName(f));
+                skse = names.Count;
             }
             catch (Exception ex) { Swallow.Note("Pages.BuildInstalled, SKSE plugins", ex); }
 
@@ -176,10 +184,10 @@ namespace Thornswood
 
             buildRows.Children.Clear();
             long exe = 0;
-            try { exe = new FileInfo(Paths.Exe).Length; } catch (Exception ex) { Swallow.Note("Pages.BuildInstalled, game exe size", ex); }
+            try { exe = new FileInfo(Paths.SkyrimExe).Length; } catch (Exception ex) { Swallow.Note("Pages.BuildInstalled, game exe size", ex); }
             buildRows.Children.Add(Fact("Skyrim", exe == cfg.ExpectedExeBytes ? "1.6.1170, the version the mods expect" : "not the expected build", false));
             buildRows.Children.Add(Fact("Script extender",
-                File.Exists(Path.Combine(Paths.Game, "skse64_1_6_1170.dll")) ? "skse64 2.2.6" : "missing", false));
+                File.Exists(Path.Combine(Paths.Skyrim, "skse64_1_6_1170.dll")) ? "skse64 2.2.6" : "missing", false));
             buildRows.Children.Add(Fact("Multiplayer client", File.Exists(Paths.MpClient) ? "SkyMP" : "missing", false));
             buildRows.Children.Add(Fact("Plugins the server sees", plugins.ToString(), false));
             buildRows.Children.Add(Fact("Script extender plugins", skse.ToString(), false));
@@ -590,6 +598,9 @@ namespace Thornswood
                 // section.
                 diagCollection.Children.Add(CollectionStatusCard());
             }
+
+            // The optional packs, under the collection card (#1170).
+            DrawAddons();
 
             diagReadings.Children.Clear();
 

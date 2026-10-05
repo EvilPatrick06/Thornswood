@@ -297,8 +297,10 @@ jobs:
                  'test-1383-treatments.js',
                  'test-1384-condition.js',
                  'test-1385-perks.js',
+                 'test-1127-unplaceable-tomes.js',
                  'test-1386-warrior.js',
                  'test-1387-college.js',
+                 'test-1148-semester-points.js',
                  'test-1149-pick-spell-tome.js',
                  'test-python-defaults.js',
                  'test-1388-apprentice.js',
@@ -312,6 +314,7 @@ jobs:
                  'test-1676-rest-gate.js',
                  'test-1733-injury-gate.js',
                  'test-1767-creation-tools.js',
+                 'test-1588-tools-50.js',
                  'test-1741-encoding.js',
                  'test-1634-apprentice-gui.js',
                  'test-1637-door-gui.js',
@@ -330,10 +333,14 @@ jobs:
                  'test-1398-fuel.js',
                  'test-1398-weaver.js',
                  'test-1766-fishing-mod-poles.js',
+                 'test-1826-stock-wait-seconds.js',
                  'test-1622-recipe-generator.js',
                  'test-1714-cut-file.js',
                  'test-1713-bench-table.js',
                  'test-1712-builders-skip-off.js',
+                 'test-1787-ore-eol.js',
+                 'test-1828-harvest-spell-eol.js',
+                 'test-1808-hunt-not-a-body.js',
                  'test-1628-social-gui.js',
                  'test-1630-journal-gui.js',
                  'test-1629-party-gui.js',
@@ -348,16 +355,25 @@ jobs:
                  'test-1703-test-ports.js',
                  'test-1721-social-tick.js',
                  'test-1307-ice-relay.js',
+                 'test-1821-ice-on-socket.js',
+                 'test-1822-voice-page-gone.js',
                  'test-1336-missing-stops.ps1',
+                 'test-1223-live-pass-asked.ps1',
+                 'test-1814-loadorder-missing.ps1',
                  'test-1367-cross-site.js',
                  'test-1326-engine-secrets.ps1',
+                 'test-1203-engine-jobs.ps1',
                  'test-1321-socket-origin.js',
                  'test-1323-door-limits.js',
                  'test-1330-webview2-signature.js',
                  'test-1352-site-answer-limit.js',
+                 'test-1235-skyrim-facts.js',
+                 'test-1170-addons-on-rail.js',
                  'test-1351-unmasked-frames.js',
                  'test-1349-relay-shapes.js',
                  'test-1033-pulse-cost.js',
+                 'test-1180-own-plugins.js',
+                 'test-1075-script-citations.js',
                  'test-table-install.js',
                  'test-secrets-fail-closed.js',
                  'test-our-key-menus.js', 'test-slash-key.js', 'test-social-keys.js',
@@ -442,7 +458,7 @@ jobs:
           # the plugins and the overlays.
           $files = @(Get-ChildItem -Path scripts -Filter *.js -File -Recurse) + @(Get-ChildItem -Path game -Filter *.js -File) +
                    @(Get-ChildItem -Path game\plugins, game\ui -Filter *.js -File -ErrorAction SilentlyContinue) +
-                   @(Get-ChildItem -Path site\server.js, voice\voice-server.js, voice\public\voice.js -File)
+                   @(Get-ChildItem -Path site\server.js, voice\voice-server.js -File)
           foreach ($f in $files) {
             & node --check $f.FullName 2>&1 | Out-Null
             if ($LASTEXITCODE -ne 0) {

@@ -172,7 +172,7 @@ Generated from the work tables by `scripts/dev/Write-SystemLists.js`. The same r
 The server has 581 veins and a deposit of 20. A swing takes 1, and
 the chance of one more is the rank table above, out of the same 20.
 The common seams come back on the clock above. Heart stone is master.
-The pickaxe still has 100 uses. Each rare seam is bound to the
+The pickaxe has 50 uses. Each rare seam is bound to the
 building in the table under The one place, by that building's cell in
 `game/data/mine-buildings.json`, and every other vein of that seam is
 shut. A scarce quest is the only way in, and its cooldown starts at

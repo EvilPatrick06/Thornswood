@@ -46,6 +46,15 @@
 //   8. Wait-OwnLine, lifted out of each and run in pwsh, refuses a port
 //      somebody else holds and takes one its site does hold.
 //
+// #1816, the port the site checks for the game. The site calls the game up
+// when a connect to cfg.gameCheckPort succeeds (pollGame in server.js), and
+// seven site harnesses handed it a port they took from the system and let
+// go, so another run that took the port made the game read as up. This also
+// checks:
+//   9. every harness that starts the site and sets its gameCheckPort sets it
+//      to 1, which the system never hands out for a listen on 0 and which no
+//      harness listens on (1. above), so no run can take it.
+//
 // HARNESS_ROOT points it at another copy of the repository, which is how it
 // was shown to fail on the harnesses before the change.
 //
@@ -200,6 +209,45 @@ yes('the five carry the same Wait-OwnLine', psSites.every((f) => psWaits[f] && p
   yes('test-record-sync.ps1: the game server stand-in says its own line, and is waited on',
       /console\.log\('\[game\] listening on 127\.0\.0\.1:\$gamePort'\)/.test(rs) &&
       /Wait-OwnLine \$gp \$gpErr '\[game\]' \$gamePort/.test(rs));
+}
+
+// ------------------------------------- the game port the site checks (#1816)
+// The value each harness gives gameCheckPort: `gameCheckPort: X` in a .js
+// config, `gameCheckPort = X` in a .ps1 one. X is port 1 when it is 1, or a
+// name the file only ever sets to 1.
+function gamePorts(src, ps) {
+  const out = [];
+  const re = ps ? /\bgameCheckPort\s*=\s*([^;\s}]+)/g : /\bgameCheckPort\s*:\s*([^,}\n]+)/g;
+  let m;
+  while ((m = re.exec(src))) { out.push(m[1].trim()); }
+  return out;
+}
+function portOne(src, v, ps) {
+  if (v === '1') { return true; }
+  const n = (ps ? /^\$(\w+)$/ : /^([A-Za-z_$][\w$]*)$/).exec(v);
+  if (!n) { return false; }
+  const sets = [];
+  const re = new RegExp((ps ? '\\$' : '\\b') + n[1].replace(/\$/g, '\\$') + '\\s*=(?!=)\\s*([^;\\n]+)', 'g');
+  let m;
+  while ((m = re.exec(src))) { sets.push(m[1].trim()); }
+  return sets.length > 0 && sets.every((x) => x === '1');
+}
+const gameSites = sites.filter((f) => /\bgameCheckPort\b/.test(text[f]))
+  .concat(psSites.filter((f) => /\bgameCheckPort\b/.test(psText[f])));
+const SEVEN = ['tests/test-site-assets.ps1', 'tests/test-feed-store.ps1', 'tests/test-record-sync.ps1',
+  'tests/test-release-baseline.ps1', 'tests/test-scrub-feed.ps1', 'tests/test-report-limits.js', 'tests/test-for-bot-folder.js'];
+console.log('\nthe game port each site harness gives its site (' + gameSites.length + '):');
+yes('they include the seven #1816 found', SEVEN.every((f) => gameSites.indexOf(f) >= 0));
+// The check itself, on the lines this issue took out.
+yes('it would have caught $dead from a listener let go, and DEAD from freePort()',
+    !portOne('$l.Start(); $dead = $l.LocalEndpoint.Port; $l.Stop()\n', '$dead', true) &&
+    !portOne('const DEAD = await freePort();\n', 'DEAD', false) &&
+    portOne('$dead = 1\n', '$dead', true) && portOne('const DEAD = 1;\n', 'DEAD', false));
+for (const f of gameSites) {
+  const ps = /\.ps1$/.test(f);
+  const vs = gamePorts(ps ? psText[f] : text[f], ps);
+  yes(f + ' gives its site port 1 to check for the game (' + vs.join(', ') + ')',
+      vs.length > 0 && vs.every((v) => portOne(ps ? psText[f] : text[f], v, ps)));
 }
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-1703-'));

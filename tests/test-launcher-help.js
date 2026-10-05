@@ -643,9 +643,12 @@ function between(src, from, to) {
       /another server's files and stray Creation Club plugins aside, never deleting them/.test(fixItem));
   yes('Fix puts missing plugins back from Vortex, and the page says so',
       /restoring missing plugins from Vortex/.test(fix) && /puts back plugins Vortex has/.test(fixItem));
-  yes('Fix fetches the server\'s copy of a plugin whose bytes differ, and the page says so',
-      /The server's copy of every plugin whose bytes are not its own/.test(fix) &&
-      /downloads the server's copy of any plugin whose bytes differ/.test(fixItem));
+  // #1180: the server hands out Thornswood's own plugin and nobody else's.
+  yes('Fix fetches the server\'s copy of our own plugin, names the Vortex mod for another author\'s, and the page says so',
+      /The server's copy of our own plugin when its bytes are not the/.test(fix) &&
+      /if \(!i\.Served\)[\s\S]{0,200}FromVortex\(cfg, i\.Plugin\)/.test(verify) &&
+      /downloads the server's copy of Thornswood's own plugin when its bytes differ/.test(fixItem) &&
+      /names the mod to update or reinstall in Vortex when another author's plugin differs/.test(fixItem));
 
   const logs = item('If it breaks', 'Sending your logs');
   yes('Build the report is on the Diagnostics page, and the page names it',
@@ -694,7 +697,8 @@ function between(src, from, to) {
   yes('help.md sends people to Diagnostics for Scan and Fix', /open Diagnostics in the launcher and press Scan/.test(md));
   yes('help.md says what Fix does, in the same words as the page',
       /puts your plugin list in the server's order/.test(md) &&
-      /downloads the server's copy of\s+any plugin whose bytes differ/.test(md));
+      /downloads the server's copy of\s+Thornswood's own plugin when its bytes differ/.test(md) &&
+      /names the mod to update or\s+reinstall in Vortex when another author's plugin differs/.test(md));
   yes('help.md says to send the logs with Build the report', /Diagnostics and press\s+Build the report/.test(md));
   const logsPage = /\bLogs page\b|\bServer page\b/.exec(md);
   yes('help.md sends nobody to a page the rail no longer shows' + (logsPage ? ' (says "' + logsPage[0] + '")' : ''), !logsPage);

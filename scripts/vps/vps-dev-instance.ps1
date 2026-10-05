@@ -21,7 +21,7 @@
 #   private starts with an empty characters.json and nothing else, and
 #   Publish-Server.ps1 -Channel dev writes dev's own door.json, asking the dev
 #   list, on its first run (#964).
-#   Voice is copied by name, the program, its page and the log roller, and
+#   Voice is copied by name, the program and the log roller, and
 #   nothing else: never live's chat logs, token-key.txt (dev voice makes its
 #   own), turn-key.txt or the old secret.txt.
 #   Dev voice starts with auth on and bound to 127.0.0.1, the way live runs,
@@ -136,11 +136,11 @@ if (Test-Path $liveVoice) {
     if (-not (Test-Path $devVoice)) { New-Item -ItemType Directory -Path $devVoice | Out-Null }
     Lock-Dir $devVoice
     Say "  $devVoice is SYSTEM's and Administrators' only"
-    # By name: the program and the roller, then the page. Nothing else in
-    # live's folder is dev's to have.
+    # By name: the program and the roller. Nothing else in live's folder is
+    # dev's to have, the page live may still keep in public included: the
+    # service serves none since #1822.
     & robocopy $liveVoice $devVoice voice-server.js roll-log.ps1 /XF *.log *.log.* /NFL /NDL /NJH /NJS /NP | Out-Null
-    & robocopy (Join-Path $liveVoice 'public') (Join-Path $devVoice 'public') /E /XF *.log *.log.* /NFL /NDL /NJH /NJS /NP | Out-Null
-    Say ("  voice program and page copied (robocopy code {0})" -f $LASTEXITCODE)
+    Say ("  voice program copied (robocopy code {0})" -f $LASTEXITCODE)
     # The settings come from the environment. A run file sets them, so the
     # task command stays free of cmd's quoting rules. Auth on and loopback,
     # as live runs; Install-Voice.ps1 -Root C:\Thornswood-Voice-Dev keeps both.
