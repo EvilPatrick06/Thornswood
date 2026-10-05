@@ -320,6 +320,7 @@ jobs:
                  'test-1638-office.js',
                  'test-1631-needs-gui.js',
                  'test-1642-effects-restart.js',
+                 'test-1730-forced-panel.js',
                  'test-1717-property-page.js',
                  'test-1703-test-ports.js',
                  'test-table-install.js',
