@@ -190,7 +190,9 @@ Generated from the work tables by `scripts/dev/Write-SystemLists.js`. The same r
 ## Where this is
 
 The verb, the 5 minutes, the rank on the row, and the yields are in the
-server. The list is that table.
+server. The list is that table. A rack's wait is kept on the rack and
+shared by every hunter (#1413), and a picked-clean rack says how long
+is left in minutes and hours (#1826).
 
 A body that never lies on the ground is not on the list, whatever its
 race (#1808): a spirit, an animal a spell brings, a mod's hidden actor
