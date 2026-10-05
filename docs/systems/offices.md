@@ -24,8 +24,10 @@ See [Death](death.md).
 
 A Jarl names stewards. The office is on the character, not a Discord
 role by itself. A steward is the only one who evicts, sets rent, names
-the hold's box, and moves the notice board. See [Property](property.md)
-and [Notice boards](noticeboards.md).
+the hold's box, and moves the notice board, and a Jarl counts as a
+steward. All of it is buttons on the Office page of the K panel, and
+nothing is typed. See [Property](property.md) and
+[Notice boards](noticeboards.md).
 
 The [Merchant's Guild](merchants-guild.md) is the merchant NPCs.
 It has no joinable roll or factor appointment for people.
@@ -78,6 +80,18 @@ only the payouts on the trading company page leave it.
 ## Where this is
 
 Jarl and steward are in the server, including eviction, rent, the box,
-and the board. Housecarl, thane, captain, and priest are the public
+and the board. They are the Office page of the K panel, which only a
+character that holds an office or may take one sees. On an account with
+the Discord Jarl role, or an admin's, it offers Take the office. A Jarl
+names a steward by picking somebody in the world from a list of names,
+and removes one with Remove beside the name; a steward is kept by
+profile, and the list shows the profile beside the name, so two
+characters with one name are told apart. A steward sees the door they
+opened in the last minute, who holds it and the rent owed there, with
+Evict, Set rent and No rent; the container they opened in the last
+minute, with the ten holds to make it that hold's box; and the ten
+boards, each moved to where the steward stands. Evict and moving a
+board ask for a second press. The server checks every press again and
+answers in the chat. Housecarl, thane, captain, and priest are the public
 rules and no command. Ambassador and Archmage of the College are this
 plan and no command.
