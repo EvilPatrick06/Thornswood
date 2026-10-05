@@ -37,11 +37,58 @@ const { spawn } = require('child_process');
 const VOICE = process.env.VOICE || path.join(REPO_DIR, 'voice', 'voice-server.js');
 
 let pass = 0, fail = 0;
-function yes(what, cond) {
+function yes(what, cond, why) {
   if (cond) { pass++; console.log('PASS  ' + what); }
-  else { fail++; console.log('FAIL  ' + what); }
+  else { fail++; console.log('FAIL  ' + what + (why ? '\n      ' + why : '')); }
 }
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/*
+  How long any one answer is waited for before the wait gives up and says
+  what did not come. Each check waits for the thing it reads (#1926), so this
+  only ends a wait on a service that is stuck, as listening() does.
+*/
+const BOUND_MS = 15000;
+
+/*
+  Waits on what a socket has been sent (#1926). me.until(test, what)
+  resolves '' once test() holds, checked again as each frame and the close
+  come in, or else why it never will: the socket closed without it, or
+  BOUND_MS went by. Each check here used to read 200 or 300 ms after
+  sending, so on a busy machine an answer that came later read as missing.
+  me.heard() is called on every frame and on the close.
+*/
+function waiter(me) {
+  const waits = [];
+  me.heard = () => { for (const w of waits.slice()) { w(); } };
+  me.until = (test, what) => new Promise((ok) => {
+    let bound = null;
+    const check = () => {
+      if (test()) { end(''); } else if (me.closed) { end('the socket closed without ' + what); }
+    };
+    const end = (why) => {
+      clearTimeout(bound);
+      const i = waits.indexOf(check);
+      if (i >= 0) { waits.splice(i, 1); }
+      ok(why);
+    };
+    bound = setTimeout(() => end('no ' + what + ' within ' + BOUND_MS / 1000 + ' s'), BOUND_MS);
+    waits.push(check);
+    check();
+  });
+  return me;
+}
+
+/*
+  A page's own ping, answered once the service has handled everything that
+  socket sent before it, and written after everything it sent that socket
+  before it (#519). So once the pong is in, nothing the service sent this
+  socket before it is still to come.
+*/
+function settle(me, who) {
+  const mark = me.msgs.length;
+  me.send({ t: 'ping' });
+  return me.until(() => me.msgs.slice(mark).some((m) => m.t === 'pong'), 'pong to a ping from ' + who);
+}
 
 /*
   A port of this run's own (#1703). Builds run side by side on the VPS, and
@@ -104,8 +151,10 @@ async function raw(port, pid) {
   const token = await joinToken(port, pid);
   return new Promise((ok, bad) => {
     const s = net.connect(port, '127.0.0.1');
-    const me = { sock: s, frames: [], msgs: [], closed: false };
+    const me = waiter({ sock: s, frames: [], msgs: [], closed: false,
+                        send: (o) => s.write(textFrame(o, true)) });
     let buf = Buffer.alloc(0), up = false;
+    const shake = setTimeout(() => bad(new Error('no answer to the handshake for ' + pid + ' within ' + BOUND_MS / 1000 + ' s')), BOUND_MS);
     s.on('connect', () => {
       s.write('GET / HTTP/1.1\r\nHost: 127.0.0.1:' + port + '\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n' +
               'Sec-WebSocket-Version: 13\r\nSec-WebSocket-Key: ' + crypto.randomBytes(16).toString('base64') + '\r\n' +
@@ -116,23 +165,31 @@ async function raw(port, pid) {
       if (!up) {
         const i = buf.indexOf('\r\n\r\n');
         if (i < 0) { return; }
+        clearTimeout(shake);
         if (!/^HTTP\/1\.1 101/.test(buf.slice(0, i).toString())) { bad(new Error('no 101')); return; }
         buf = buf.slice(i + 4); up = true; ok(me);
       }
+      const had = me.frames.length;
       for (;;) {
-        if (buf.length < 2) { return; }
+        if (buf.length < 2) { break; }
         let len = buf[1] & 0x7f, off = 2;
-        if (len === 126) { if (buf.length < 4) { return; } len = buf.readUInt16BE(2); off = 4; }
-        else if (len === 127) { if (buf.length < 10) { return; } len = Number(buf.readBigUInt64BE(2)); off = 10; }
-        if (buf.length < off + len) { return; }
+        if (len === 126) { if (buf.length < 4) { break; } len = buf.readUInt16BE(2); off = 4; }
+        else if (len === 127) { if (buf.length < 10) { break; } len = Number(buf.readBigUInt64BE(2)); off = 10; }
+        if (buf.length < off + len) { break; }
         const op = buf[0] & 0x0f;
         const body = buf.slice(off, off + len);
         buf = buf.slice(off + len);
         me.frames.push({ op: op, body: body });
         if (op === 1) { try { me.msgs.push(JSON.parse(body.toString('utf8'))); } catch (e) { } }
       }
+      if (me.frames.length > had) { me.heard(); }
     });
-    s.on('close', () => { me.closed = true; });
+    s.on('close', () => {
+      clearTimeout(shake);
+      if (!up) { bad(new Error('the socket for ' + pid + ' closed before the handshake was answered')); }
+      me.closed = true;
+      me.heard();
+    });
     s.on('error', () => { });
   });
 }
@@ -212,52 +269,63 @@ function joinToken(port, pid) {
   console.log('masked, as a browser sends it:');
   const a = await raw(PORT, 1);
   a.sock.write(textFrame({ t: 'join', profileId: 1, name: 'Alva' }, true));
-  await wait(200);
-  yes('a masked join is welcomed', a.msgs.some((m) => m.t === 'welcome'));
+  let why = await a.until(() => a.msgs.some((m) => m.t === 'welcome'), 'welcome');
+  yes('a masked join is welcomed', !why, why);
 
+  /*
+    A check that something did not come reads once the socket it would have
+    come on has closed, or once a pong on it says everything sent before has
+    arrived.
+  */
   console.log('\nunmasked:');
   const b = await raw(PORT, 2);
   b.sock.write(textFrame({ t: 'join', profileId: 2, name: 'Brand' }, false));
-  await wait(300);
-  yes('an unmasked join is not welcomed', !b.msgs.some((m) => m.t === 'welcome'));
+  why = await b.until(() => b.closed, 'close');
+  yes('an unmasked join is not welcomed', !why && !b.msgs.some((m) => m.t === 'welcome'), why);
   yes('it is answered with a close frame carrying 1002, a protocol error (' + closeCode(b) + ')', closeCode(b) === 1002);
-  yes('and the socket is closed', b.closed);
+  yes('and the socket is closed', b.closed, why);
+  why = await settle(a, 'Alva');
   const last = a.msgs.filter((m) => m.t === 'peers').pop();
-  yes('nobody in the room ever saw it join', !!last && last.peers.length === 1 &&
-      !a.msgs.some((m) => m.t === 'peers' && m.peers.some((p) => p.profileId === 2)));
+  yes('nobody in the room ever saw it join', !why && !!last && last.peers.length === 1 &&
+      !a.msgs.some((m) => m.t === 'peers' && m.peers.some((p) => p.profileId === 2)), why);
 
   console.log('\nsomebody already in the room who sends one unmasked frame:');
   const c = await raw(PORT, 3);
   c.sock.write(textFrame({ t: 'join', profileId: 3, name: 'Cyra' }, true));
-  await wait(200);
-  yes('joins masked and is in the room', c.msgs.some((m) => m.t === 'welcome') &&
-      a.msgs.some((m) => m.t === 'peers' && m.peers.some((p) => p.profileId === 3)));
+  why = await c.until(() => c.msgs.some((m) => m.t === 'welcome'), 'welcome') ||
+        await a.until(() => a.msgs.some((m) => m.t === 'peers' && m.peers.some((p) => p.profileId === 3)),
+                      'roster with Cyra in it, to Alva');
+  yes('joins masked and is in the room', !why, why);
   const mark = a.msgs.length;
   c.sock.write(textFrame({ t: 'chat', text: 'unmasked words' }, false));
-  await wait(300);
-  yes('is closed with 1002 (' + closeCode(c) + ')', closeCode(c) === 1002 && c.closed);
-  yes('and the line reaches nobody', !a.msgs.slice(mark).some((m) => m.t === 'chat' && m.text === 'unmasked words'));
+  why = await c.until(() => c.closed, 'close');
+  yes('is closed with 1002 (' + closeCode(c) + ')', closeCode(c) === 1002 && c.closed, why);
+  // The roster that says Cyra left, then a pong after it, so a line of hers
+  // to Alva would be in by then.
+  const leftWhy = await a.until(() => a.msgs.slice(mark).some((m) => m.t === 'peers' && !m.peers.some((p) => p.profileId === 3)),
+                                'roster without Cyra, to Alva') || await settle(a, 'Alva');
+  yes('and the line reaches nobody', !leftWhy && !a.msgs.slice(mark).some((m) => m.t === 'chat' && m.text === 'unmasked words'), leftWhy);
   const after = a.msgs.slice(mark).filter((m) => m.t === 'peers').pop();
-  yes('and leaves the room', !!after && !after.peers.some((p) => p.profileId === 3));
+  yes('and leaves the room', !!after && !after.peers.some((p) => p.profileId === 3), leftWhy);
 
   console.log('\nan unmasked ping:');
   const d = await raw(PORT, 5);
   d.sock.write(Buffer.from([0x89, 0x00]));
-  await wait(300);
-  yes('gets no pong', !d.frames.some((f) => f.op === 0xa));
-  yes('only the close, 1002 (' + closeCode(d) + ')', closeCode(d) === 1002 && d.closed);
+  why = await d.until(() => d.closed, 'close');
+  yes('gets no pong', !why && !d.frames.some((f) => f.op === 0xa), why);
+  yes('only the close, 1002 (' + closeCode(d) + ')', closeCode(d) === 1002 && d.closed, why);
 
   console.log('\nthe browser\'s own WebSocket, which masks everything:');
-  const got = [];
   const ws = new WebSocket('ws://127.0.0.1:' + PORT + '/', ['thornswood', await joinToken(PORT, 4)]);
-  ws.onmessage = (e) => { try { got.push(JSON.parse(e.data)); } catch (x) { } };
-  await new Promise((ok) => { ws.onopen = ok; ws.onerror = ok; });
-  ws.send(JSON.stringify({ t: 'join', profileId: 4, name: 'Dagny' }));
-  await wait(200);
+  const page = waiter({ msgs: [], closed: false });
+  ws.onmessage = (e) => { try { page.msgs.push(JSON.parse(e.data)); } catch (x) { } page.heard(); };
+  ws.onclose = () => { page.closed = true; page.heard(); };
+  ws.onopen = () => ws.send(JSON.stringify({ t: 'join', profileId: 4, name: 'Dagny' }));
+  why = await page.until(() => page.msgs.some((m) => m.t === 'welcome'), 'welcome');
+  yes('joins', !why, why);
   ws.send(JSON.stringify({ t: 'chat', text: 'masked words' }));
-  await wait(300);
-  yes('joins', got.some((m) => m.t === 'welcome'));
-  yes('and its line reaches the room', a.msgs.some((m) => m.t === 'chat' && m.text === 'masked words'));
+  why = await a.until(() => a.msgs.some((m) => m.t === 'chat' && m.text === 'masked words'), 'line from Dagny, to Alva');
+  yes('and its line reaches the room', !why, why);
 
   try { ws.close(); a.sock.destroy(); } catch (e) { }
   await new Promise((ok) => { srv.once('exit', ok); srv.kill(); });

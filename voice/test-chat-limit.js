@@ -37,6 +37,13 @@ function yes(what, cond) {
   else { fail++; console.log('FAIL  ' + what); }
 }
 
+/*
+  How long any one answer is waited for before the wait gives up and says
+  what did not come. Each check waits for the thing it reads (#1926), so this
+  only ends a wait on a service that is stuck, as listening() does.
+*/
+const BOUND_MS = 15000;
+
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-chatlimit-'));
 fs.copyFileSync(path.join(__dirname, 'voice-server.js'), path.join(dir, 'voice-server.js'));
 fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
@@ -129,25 +136,57 @@ async function ready() {
   });
   srv.stdout.on('data', (d) => { log += d; });
   srv.stderr.on('data', (d) => { log += d; });
+  // Once it has gone and every line it wrote has been read ('close').
+  srvClosed = new Promise((ok) => srv.once('close', ok));
   await listening(srv, PORT);
   const r = await fetch('http://127.0.0.1:' + PORT + '/health');
   if (!r.ok) { throw new Error('the service answered /health with ' + r.status + '. log:\n' + log); }
   return await r.json();
 }
+let srvClosed = null;
 
 /* A joined socket that keeps every chat message it is sent. */
 function person(profileId, name) {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket('ws://127.0.0.1:' + PORT + '/', ['thornswood', tokenFor(profileId)]);
-    const me = { ws: ws, peer: 0, chat: [] };
+    const me = { ws: ws, name: name, peer: 0, chat: [], pongs: [], closed: null };
+    me.closed = new Promise((ok) => { ws.addEventListener('close', ok); });
     ws.onopen = () => ws.send(JSON.stringify({ t: 'join', profileId: profileId, name: name }));
     ws.onmessage = (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
       if (m.t === 'welcome') { me.peer = m.peer; resolve(me); return; }
       if (m.t === 'chat') { me.chat.push(m); }
+      if (m.t === 'pong') { const p = me.pongs.shift(); if (p) { p(); } }
     };
     ws.onerror = () => reject(new Error('socket error joining as ' + name));
     setTimeout(() => reject(new Error('no welcome for ' + name + ' in four seconds')), 4000);
+  });
+}
+
+/*
+  A page's own ping, answered once the service has handled everything this
+  socket sent before it, and written after everything it sent this socket
+  before it (#519). So once the pong is in, every line this person sent has
+  been let through or dropped, and everything sent to them before it has
+  come. Each check here used to read 300 to 600 ms after sending instead,
+  so on a busy machine a line or a notice that came later read as missing
+  (#1926).
+*/
+function settle(p) {
+  return new Promise((ok, bad) => {
+    const late = setTimeout(() => bad(new Error('no pong to a ping from ' + p.name + ' within ' + BOUND_MS / 1000 + ' s')), BOUND_MS);
+    p.pongs.push(() => { clearTimeout(late); ok(); });
+    p.ws.send(JSON.stringify({ t: 'ping' }));
+  });
+}
+
+/* Closed, and resolved once the service has answered the close frame and
+   the socket is gone. */
+function shut(p) {
+  return new Promise((ok, bad) => {
+    const late = setTimeout(() => bad(new Error('the socket of ' + p.name + ' was not closed within ' + BOUND_MS / 1000 + ' s')), BOUND_MS);
+    p.closed.then(() => { clearTimeout(late); ok(); });
+    p.ws.close();
   });
 }
 
@@ -162,12 +201,16 @@ const notices = (p) => p.chat.filter((m) => m.from === 0);
 
   const loud = await person(11, 'Loud');
   const quiet = await person(12, 'Quiet');
-  await wait(200);
 
   // ---- twenty lines at once ------------------------------------------------
+  /*
+    Loud's pong says all twenty have been let through or dropped; Quiet's,
+    asked after that, says every line that went to Quiet has come.
+  */
   const t0 = Date.now();
   for (let i = 1; i <= 20; i++) { say(loud, 'line ' + i); }
-  await wait(600);
+  await settle(loud);
+  await settle(quiet);
 
   const heard = from(quiet, loud).map((m) => m.text);
   console.log('  the room heard ' + heard.length + ' of twenty: ' + JSON.stringify(heard));
@@ -192,7 +235,7 @@ const notices = (p) => p.chat.filter((m) => m.from === 0);
   /* Emptied first, so what is read below is only what this sends. */
   await fetch('http://127.0.0.1:' + PORT + '/commands');
   for (let i = 1; i <= 20; i++) { say(loud, '/chopped'); }
-  await wait(400);
+  await settle(loud);
   const cmds = (await (await fetch('http://127.0.0.1:' + PORT + '/commands')).json()).commands;
   yes('twenty slash lines from somebody slowed all reach the game server (' + cmds.length + ')',
       cmds.length === 20 && cmds.every((c) => c.text === '/chopped' && c.profileId === 11));
@@ -200,7 +243,8 @@ const notices = (p) => p.chat.filter((m) => m.from === 0);
 
   // ---- one person's flood slows nobody else ----------------------------------
   for (let i = 1; i <= 3; i++) { say(quiet, 'quiet ' + i); }
-  await wait(300);
+  await settle(quiet);
+  await settle(loud);
   yes('somebody else still gets their three lines out while the first is slowed',
       from(loud, quiet).length === 3 && from(quiet, quiet).length === 3);
 
@@ -215,31 +259,44 @@ const notices = (p) => p.chat.filter((m) => m.from === 0);
       saidByLoud.length === 5);
   yes('and every slash line is still in it',
       lines.filter((l) => l.kind === 'command' && l.profileId === 11).length === 20);
-  yes('the service log says who was slowed, once', (log.match(/slowed peer/g) || []).length === 1);
 
   // ---- the bucket refills ------------------------------------------------------
   /*
     One line comes back every 1500ms. 1800ms after the flood there is one, and
     only one, whatever else happened in between. Eleven sent then: the first
     goes, the other ten are dropped, and because a line went through this is a
-    new time of being slowed, so they are told again, once.
+    new time of being slowed, so they are told again, once. The pause here
+    is for time itself, which is what refills the bucket (#1926).
   */
   const until = t0 + 1800 - Date.now();
   if (until > 0) { await wait(until); }
   const before = from(quiet, loud).length;
   const sentAt = Date.now() - t0;
   for (let i = 1; i <= 11; i++) { say(loud, 'again ' + i); }
-  await wait(400);
+  await settle(loud);
+  await settle(quiet);
   const after = from(quiet, loud).slice(before).map((m) => m.text);
   console.log('  eleven more sent ' + sentAt + 'ms after the flood, and the room heard: ' + JSON.stringify(after));
   yes('a second and a half later one line gets through again', JSON.stringify(after) === JSON.stringify(['again 1']));
   yes('and a new flood after that is told once more, so the notice is per time slowed',
       notices(loud).length === 2);
 
-  try { loud.ws.close(); } catch (e) { }
-  try { quiet.ws.close(); } catch (e) { }
-  await wait(200);
+  // Once the service has answered both closes, not 200 ms after them.
+  await shut(loud);
+  await shut(quiet);
   yes('the service is still up', (await (await fetch('http://127.0.0.1:' + PORT + '/health')).json()).ok === true);
+
+  /*
+    The service's log is read once it has gone and every line it wrote has
+    come through its pipe. The line is written before the notice it goes
+    with, but on another pipe, and on a busy machine the notice can come
+    first (#1867). Once for each time somebody was slowed: the flood and the
+    eleven after it.
+  */
+  srv.kill();
+  await srvClosed;
+  yes('the service log says who was slowed, once each time (' + (log.match(/slowed peer/g) || []).length + ')',
+      (log.match(/slowed peer/g) || []).length === 2);
 
   console.log('');
   console.log(pass + ' passed, ' + fail + ' failed');

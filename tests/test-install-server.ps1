@@ -461,7 +461,13 @@ try {
 
     # What a server that has been running has, that no payload brings.
     Put (Join-Path $root 'world\w.txt') 'every character'
-    Put (Join-Path $root 'private\door.json') '{ "site": "x" }'
+    # The door a live server has: an address, a key and a join pass key, all
+    # made up here. Since #1807 (#1336) a dev publish carries the key and the
+    # join pass key from this file to the dev door and stops, DOOR NOT
+    # CARRIED, when any of the three is missing; a door with only a site
+    # stopped both dev publishes below (#1905).
+    $liveDoor = [ordered]@{ site = 'https://door.harness.invalid'; key = 'harness-door-key-not-a-real-one'; passKey = 'harness-pass-key-not-a-real-one' }
+    Put (Join-Path $root 'private\door.json') ($liveDoor | ConvertTo-Json)
     Put (Join-Path $root 'data\book.txt') 'the character book'
     Put (Join-Path $root 'thornswood.log') 'the gamemode log'
     $before = Tree $root
@@ -749,8 +755,9 @@ try {
         $global:TsScpFail = ''
 
         # ssh and scp, for the box under $box. The fixed paths Publish-Server
-        # names on C:\ land in the scratch folder, and the live root it reads
-        # the roster from is the scratch one, which has none.
+        # names on C:\ land in the scratch folder, so the live root its door
+        # seed reads private\door.json from is the scratch one, $root, with
+        # the made-up door written above (#1905).
         function MapFar([string]$s) {
             foreach ($p in 'C:\thornswood-server.zip', 'C:\Install-ThornswoodServer.ps1', 'C:\ServerSettings.ps1', 'C:\ServerBuild.ps1', 'C:\Roll-Log.ps1', 'C:\Thornswood-Server\') {
                 $to = Join-Path $global:TsBox.Box $p.Substring(3)
@@ -810,9 +817,20 @@ try {
             return $global:LASTEXITCODE
         }
 
+        # The dev door after a publish, read back: the live key and join pass
+        # key, and the live address with /dev on it, once (#1336, #1905).
+        function DevDoorOk {
+            $f = Join-Path $devRoot 'private\door.json'
+            if (-not (Test-Path -LiteralPath $f)) { return $false }
+            $d = Get-Content -LiteralPath $f -Raw | ConvertFrom-Json
+            return ($d.key -eq $liveDoor.key -and $d.passKey -eq $liveDoor.passKey -and $d.site -eq ($liveDoor.site + '/dev'))
+        }
+
         $code = Publish (Payload -Port $D -ForRoot $devRoot -Gamemode '// dev v1') @()
         $failed = $script:fail
         Yes 'Publish-Server puts a first dev server up and exits 0' ($code -eq 0 -and (WaitUp $D))
+        Yes '  and says DOOR CARRIED' (@($script:lastOut | ForEach-Object { $_.Trim() }) -contains 'DOOR CARRIED')
+        Yes '  and the dev door.json has the live key and join pass key, and the live site ending in /dev' (DevDoorOk)
         if ($script:fail -gt $failed) { Show }
         # The dev server's own switches, the ones dev rollout 6 lost (#1222).
         $devOwn = SettingsOf $devRoot
@@ -873,6 +891,8 @@ try {
             (Carried $devOwn $devAfter).Count -eq 0 -and $devAfter.thornswoodServer -eq 'dev' -and $devAfter.thornswoodLoadOrderRefuse -eq $true -and
             $devAfter.thornswoodRequirePass -eq $false -and $devAfter.name -eq 'Thornswood Dev' -and (Js $devAfter.npcSettings) -eq '{}')
         Yes '  and takes the release''s load order' (@($devAfter.loadOrder).Count -eq 3)
+        Yes '  and says DOOR CARRIED again, with the dev door.json read back as before, /dev not added twice' (
+            (@($script:lastOut | ForEach-Object { $_.Trim() }) -contains 'DOOR CARRIED') -and (DevDoorOk))
         if ($script:fail -gt $failed) { Show }
 
         $code = Publish '' @('PutBack')

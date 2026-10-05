@@ -271,21 +271,28 @@ namespace Thornswood
                 field == "attributes###newestFileId" || field == "attributes###newestVersion" :
                 field == "info###collection###slug" || field == "info###revisionNumber";
         }
-        public static int CollectionRevision(string stateDir, string slug)
-        {
-            if (string.IsNullOrEmpty(slug)) return 0;
-            var values = CurrentValues(stateDir, CollectionKey);
-            int best = 0;
-            bool subscriberFound = false;
+        // A revision Vortex stores either as a bare number or as a JSON string.
+        static int Revision(string json) {
+            int number = Positive(json);
+            return number > 0 ? number : Positive(StringValue(json));
+        }
+        // One installed mod tied to a slug: Prefix is its attributes###, and
+        // Revision is the cached revision's info### it links to when the mod
+        // was authored here, or null when it was subscribed to.
+        sealed class Tie { public string Mod, Prefix, Revision; }
+        // The installed revision, the newest one and the mod ids all read
+        // through this one tie, so the folder Check-CollectionRules opens is
+        // the mod whose revision is reported (#1902).
+        static List<Tie> Ties(Dictionary<string, Value> values, string slug) {
+            var ties = new List<Tie>();
             foreach (var pair in values) {
                 if (!pair.Key.StartsWith(Mods, StringComparison.Ordinal) ||
                     !pair.Key.EndsWith("###collectionSlug", StringComparison.Ordinal) || pair.Value.Text == null) continue;
                 if (StringValue(pair.Value.Text) != slug) continue;
-                subscriberFound = true;
                 string prefix = pair.Key.Substring(0, pair.Key.Length - "collectionSlug".Length);
-                best = Math.Max(best, Positive(Text(values, prefix + "revisionNumber")));
+                ties.Add(new Tie { Mod = ModId(prefix), Prefix = prefix });
             }
-            if (subscriberFound) return best;
+            if (ties.Count > 0) return ties;
             // Locally authored collections lack subscriber attributes. Only their
             // explicit cache link counts, never an ordinary mod or cached download.
             foreach (var pair in values) {
@@ -297,16 +304,65 @@ namespace Thornswood
                 if (id <= 0) continue;
                 string revision = Revisions + id.ToString(System.Globalization.CultureInfo.InvariantCulture) + "###info###";
                 if (StringValue(Text(values, revision + "collection###slug")) != slug) continue;
-                string cachedNumber = Text(values, revision + "revisionNumber");
-                int number = Positive(cachedNumber);
-                if (number <= 0 && cachedNumber == null) {
-                    string version = Text(values, prefix + "newestVersion");
-                    number = Positive(version);
-                    if (number <= 0) number = Positive(StringValue(version));
+                ties.Add(new Tie { Mod = ModId(prefix), Prefix = prefix, Revision = revision });
+            }
+            return ties;
+        }
+        static string ModId(string prefix) {
+            return prefix.Substring(Mods.Length, prefix.Length - Mods.Length - "###attributes###".Length);
+        }
+        static int Installed(Dictionary<string, Value> values, string slug) {
+            int best = 0;
+            foreach (Tie tie in Ties(values, slug)) {
+                if (tie.Revision == null) {
+                    best = Math.Max(best, Positive(Text(values, tie.Prefix + "revisionNumber")));
+                    continue;
                 }
+                string cachedNumber = Text(values, tie.Revision + "revisionNumber");
+                int number = Positive(cachedNumber);
+                if (number <= 0 && cachedNumber == null) number = Revision(Text(values, tie.Prefix + "newestVersion"));
                 best = Math.Max(best, number);
             }
             return best;
+        }
+        public static int CollectionRevision(string stateDir, string slug)
+        {
+            if (string.IsNullOrEmpty(slug)) return 0;
+            return Installed(CurrentValues(stateDir, CollectionKey), slug);
+        }
+        // The newest revision Vortex knows of for a slug: the newestVersion it
+        // records against the tied mod, any cached revision of the slug, and
+        // the installed revision as the floor. Read from current state, so
+        // compaction cannot hide it and a superseded or deleted value does
+        // not count (#1902). Another mod's newestVersion is its own version,
+        // never this collection's revision.
+        public static int CollectionNewest(string stateDir, string slug)
+        {
+            if (string.IsNullOrEmpty(slug)) return 0;
+            var values = CurrentValues(stateDir, CollectionKey);
+            int best = Installed(values, slug);
+            foreach (Tie tie in Ties(values, slug))
+                best = Math.Max(best, Revision(Text(values, tie.Prefix + "newestVersion")));
+            foreach (var pair in values) {
+                if (!pair.Key.StartsWith(Revisions, StringComparison.Ordinal) ||
+                    !pair.Key.EndsWith("###info###collection###slug", StringComparison.Ordinal) || pair.Value.Text == null) continue;
+                if (StringValue(pair.Value.Text) != slug) continue;
+                string prefix = pair.Key.Substring(0, pair.Key.Length - "collection###slug".Length);
+                best = Math.Max(best, Positive(Text(values, prefix + "revisionNumber")));
+            }
+            return best;
+        }
+        // The installed collection's mod ids, which name its staging folder
+        // now that the folder is not named for the slug. Empty when no mod is
+        // tied to it (#1902).
+        public static string[] CollectionModIds(string stateDir, string slug)
+        {
+            var ids = new List<string>();
+            if (string.IsNullOrEmpty(slug)) return ids.ToArray();
+            foreach (Tie tie in Ties(CurrentValues(stateDir, CollectionKey), slug))
+                if (!ids.Contains(tie.Mod)) ids.Add(tie.Mod);
+            ids.Sort(StringComparer.Ordinal);
+            return ids.ToArray();
         }
         static string JsonString(string json) {
             json = json.Trim(' ', '\t', '\r', '\n');

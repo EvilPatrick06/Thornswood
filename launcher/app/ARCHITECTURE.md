@@ -113,7 +113,7 @@ it says a pool thread.
 | 13 | `Shell.cs:357 Discord.SendPendingLogs` | Pool thread. A session that ended without sending its logs (`Profile\logs-pending.txt` still there) sends them now, before a new game start truncates them. |
 | 14 | `Shell.cs:363 AutoJoin.Ensure` | Makes `Game\Data\Platform\Plugins\skymp5-client-settings.txt` when there is none (`AutoJoin.cs:52 Ensure()`). |
 | 15 | `Shell.cs:372 Checks.GameRunning` | A game still running from before the launcher was restarted is taken over: `Shell.cs:382 Hold.Take` holds our files again and nothing is pulled apart under it. Otherwise `Shell.cs:387 Swap.Restore` takes off any redirect a crash left and `Shell.cs:388 Keep.TakeNote` deletes a stale session note. |
-| 16 | `Shell.cs:390 Leaks.Clean` | Deletes the one sign in file a 16 Sep installer shipped, matched by hash. Then `Shell.cs:399 ThornIni.Ensure` writes `Game\Data\SKSE\Plugins\Thornswood.ini` from the template if it is missing, and `Shell.cs:400 ThornIni.UndoShippedFov` runs once per install. A pool thread runs `OwnGame.CleanSteamCopy`, which once the folder is made takes Thornswood's files out of the Steam copy, once, and removes a leftover `Profile\Payload`. Before the folder exists and when no downgrade is needed (`SteamUpdates.LooksAtStart`), `HoldSteamUpdatesOnStart` logs Steam's Updates setting for the Steam copy of Skyrim and sets it when it does not hold the version (see SteamUpdates below). |
+| 16 | `Shell.cs:390 Leaks.Clean` | Deletes the one sign in file a 16 Sep installer shipped, matched by hash, and, in Thornswood's own folder only, each mod menu setting, window layout and note of the machine that ships that the dev records of 28 and 29 Sep handed out, while it is still the bytes they handed out (#1252). Then `Shell.cs:399 ThornIni.Ensure` writes `Game\Data\SKSE\Plugins\Thornswood.ini` from the template if it is missing, and `Shell.cs:400 ThornIni.UndoShippedFov` runs once per install. A pool thread runs `OwnGame.CleanSteamCopy`, which once the folder is made takes Thornswood's files out of the Steam copy, once, and removes a leftover `Profile\Payload`. Before the folder exists and when no downgrade is needed (`SteamUpdates.LooksAtStart`), `HoldSteamUpdatesOnStart` logs Steam's Updates setting for the Steam copy of Skyrim and sets it when it does not hold the version (see SteamUpdates below). |
 | 17 | `Shell.cs:404 Keep.Unpark` | Puts back plugins a crashed session left parked. Then `Shell.cs:408 Keep.Seed` fills `Profile\Keep` from pack records for files it has no copy of yet. |
 | 18 | `Shell.cs:417 Display.MatchScreen` | Unless Lock resolution is ticked: the game's resolution and menu scale follow the screen (`Shell.cs:423 Display.ScaleMenus`). |
 | 19 | `Shell.cs:437 Icons.Ensure` | Pool thread. The shortcut icon follows the exe. `Shell.cs:454 ClearLeftovers` (pool) ends a windowless Skyrim over three minutes old. `Shell.cs:468 Uninstall.DropScratch` (pool) deletes the installer's leftover `Thornswood-setup` folder. |
@@ -321,7 +321,9 @@ author's plugin, #1180), and other servers' files moved into
 `Verify.cs:1019 DeployPersonal()` copies `<Root>\Your Mods` into `Game\Data`.
 
 **Vortex profile state** (VortexProfileState.cs). Checks and the PowerShell
-load-order scripts share this reader for the named Skyrim profile. It reads
+load-order scripts share this reader for the named Skyrim profile and for the
+collection: the revision installed, the newest revision Vortex knows of, and
+the mod ids that name its staging folder (#1582, #1902). It reads
 the current LevelDB manifest, compressed tables and sequenced log records
 without opening or writing the database. Deleted, ambiguous, corrupt or
 incomplete profile metadata is refused. Finish deployment and close Vortex
@@ -500,7 +502,7 @@ launcher. It has its own Profile, and makes its own `Game` folder the same way
 from its own Settings, under Maintenance.
 
 **Smaller pieces.** Stats.cs (`Profile\stats.txt`), Leaks.cs (the shipped sign
-in file), Icons.cs (the shortcut icon), BrowserArgs.cs (switches for the
+in file, and what the 28 and 29 Sep dev records handed out), Icons.cs (the shortcut icon), BrowserArgs.cs (switches for the
 launcher's WebView2 browsers, such as no mDNS in the voice browser), Stall.cs and Waiting.cs
 (section 1), Diag.cs (`Profile\Reports`), Files.cs (saves and logs for the
 pages), Secrets.cs (DPAPI and locking a file to this account), Junction.cs

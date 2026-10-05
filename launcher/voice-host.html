@@ -408,6 +408,12 @@ function onPeers(list) {
   var seen = {};
   list.forEach(function (p) {
     if (p.peer === myPeer) return;
+    // A game chat socket whose launcher holds the audio says it carries no
+    // voice. Its overlay answers nothing, so a connection to it waited on
+    // its offer for good and counted in the peers this page reports. None
+    // is built, and one this page had is dropped below as if they had left
+    // (#1925).
+    if (p.voice === false) return;
     seen[p.peer] = true;
     var had = conns.get(p.peer);
     if (p.mode) { lastMode[p.peer] = p.mode; }
@@ -502,7 +508,8 @@ function onSdp(m) {
   // that names somebody to this socket before anything they send it, and
   // onPeers opens everybody on a roster before the next message is read.
   // tests/test-1869-voice-negotiation.js measures it on a socket that is
-  // backed up as well. So this only turns away what no page sends.
+  // backed up as well. So this only turns away what was still on its way
+  // from a peer that has since left or said it carries no voice (#1925).
   if (!rec) return;
   var collision = m.sdp.type === 'offer' &&
                   (rec.makingOffer || rec.pc.signalingState !== 'stable');

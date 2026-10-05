@@ -71,6 +71,13 @@ function yes(what, cond) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const MB = (n) => (n / 1048576).toFixed(2) + ' MB';
 
+/*
+  How long any one answer is waited for before the wait gives up and says
+  what did not come. Each check waits for the thing it reads (#1926), so this
+  only ends a wait on a service that is stuck, as listening() does.
+*/
+const BOUND_MS = 15000;
+
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-backpressure-'));
 fs.copyFileSync(SERVER, path.join(dir, 'voice-server.js'));
 fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
@@ -242,8 +249,18 @@ function bodyOf(n) {
   })) });
 }
 const BODY = bodyOf(0);
+// The newest feed sent, so its answer can be waited for once the feeding stops.
+let lastFeed = Promise.resolve();
 function feed() {
-  return fetch(BASE + '/positions', { method: 'POST', body: bodyOf(++step) }).catch(() => { });
+  lastFeed = fetch(BASE + '/positions', { method: 'POST', body: bodyOf(++step) }).catch(() => { });
+  return lastFeed;
+}
+
+/* Resolves once the probe has printed n more samples, each taken after the
+   one before, so what it reports covers the moment this was called. */
+function probed(n) {
+  const from = probes.length;
+  return until('probe samples', () => probes.length >= from + n, BOUND_MS);
 }
 
 const opened = [];
@@ -385,11 +402,26 @@ yes('only the roster is sent newest-only',
   // puts behind a socket that does not read.
   let posBytes = 0;
   const heard = [];
+  // Pongs to its own page pings, and the largest gone list it was sent.
+  let appPongs = 0, mostGone = 0;
   read(R, (m) => {
     if (m.t === 'peers') roster = m.peers;
     if (m.t === 'pos' || m.t === 'moved') { got.push(Date.now()); posBytes = Math.max(posBytes, JSON.stringify(m).length); }
+    if (m.t === 'moved' && Array.isArray(m.gone)) mostGone = Math.max(mostGone, m.gone.length);
     if (m.t === 'chat') heard.push(m);
+    if (m.t === 'pong') appPongs++;
   });
+  /*
+    A page's own ping from R, answered once the service has handled
+    everything sent to it before, and written after everything it sent R
+    before (#519). Once the pong is in, nothing sent to R before is still to
+    come.
+  */
+  const settleR = () => {
+    const n = appPongs;
+    send(R, { t: 'ping' });
+    return until('pong', () => appPongs > n, BOUND_MS);
+  };
   send(R, { t: 'join', profileId: 100000, name: 'keeps up' });
 
   // Somebody who has stopped reading. Joined, then never read again.
@@ -412,7 +444,8 @@ yes('only the roster is sent newest-only',
   yes('a socket that never reads backs the service up, so the rest of this means something', backedAt > 0);
   if (!backedAt) { throw new Error('nothing backed up in 25 s. log:\n' + log); }
 
-  // Six seconds of it: thirty ticks the old code would have queued.
+  // Six seconds of it: thirty ticks the old code would have queued. A pause
+  // for time itself, which stays: growth over time is what is measured.
   const gotBefore = got.length;
   await sleep(6000);
   const gotDuring = got.length - gotBefore;
@@ -477,7 +510,9 @@ yes('only the roster is sent newest-only',
   const staysName = ('Somebody passing through 0 ').padEnd(40, 'x');
   for (const c of crowd) { if (c !== stays) { try { c.destroy(); } catch (e) { } } }
   const empty = await until('emptied', () => roster.length === 3, 5000);
-  await sleep(600);
+  // Two samples more from the probe, so the peak read below covers the
+  // room emptying. It used to wait 600 ms for them (#1926).
+  await probed(2);
   const peakR = Math.max.apply(null, probes.slice(markR).map((p) => p.queue));
   const hR = await health();
   console.log('      ' + BURST + ' joined and ' + (BURST - 1) + ' left: queue ' + MB(baseQueue) +
@@ -540,7 +575,11 @@ yes('only the roster is sent newest-only',
     await sleep(80);
     closed = (await health()).peers === 2;
   }
-  await sleep(300);
+  // The service's line, which comes on its own pipe and can come after the
+  // close is seen in /health (#1867), and a probe sample after the close.
+  // It used to read 300 ms after the close (#1926).
+  if (closed) { await until('the log line', () => /queue passed \d+ bytes/.test(log), BOUND_MS); }
+  await probed(1);
   const hB = await health();
   const peakB = Math.max.apply(null, probes.slice(markB).map((p) => p.queue));
   console.log('      ' + sent + ' offers of 60 KB relayed to it, peak queue ' + MB(peakB));
@@ -556,9 +595,10 @@ yes('only the roster is sent newest-only',
   yes('at the first write past the ceiling, not far beyond it',
       Math.max(peakB, atClose) <= CEILING + offer.length + 1024);
   yes('health counts the close', hB.closedBacklogged === 1);
+  // Three more ticks to the one who keeps up, as they come, not counted
+  // after a second (#1926).
   const gotAt = got.length;
-  await sleep(1000);
-  yes('the rest of the room carries on', got.length - gotAt >= 3);
+  yes('the rest of the room carries on', await until('three ticks', () => got.length - gotAt >= 3, BOUND_MS));
 
   /*
     A socket closed in the middle of its own read.
@@ -598,7 +638,10 @@ yes('only the roster is sent newest-only',
   const gone = await until('closed', async () => (await health()).closedBacklogged === 2 &&
       !roster.some((p) => p.profileId === 100003), 10000);
   const tookMs = Date.now() - wroteAt;
-  await sleep(500);
+  // R's pong, so every line that went to R before it has come, and the chat
+  // log, written before each line is sent, holds them. It used to read
+  // 500 ms after the close (#1926).
+  const settled = await settleR();
 
   const fromIt = heard.filter((m) => m.from === self);
   const asNobody = fromIt.filter((m) => !m.profileId);
@@ -620,7 +663,7 @@ yes('only the roster is sent newest-only',
               tookMs + ' ms');
 
   yes('a socket that sends itself enough to pass the ceiling is closed', gone);
-  yes('nothing it sent after the close reaches the room as nobody', gone && asNobody.length === 0);
+  yes('nothing it sent after the close reaches the room as nobody', gone && settled && asNobody.length === 0);
   yes('no more of its lines reach the room than the chat limit allows (' + allowed + ')',
       gone && fromIt.length <= allowed);
   yes('the chat log says who sent every line and command in it',
@@ -643,26 +686,46 @@ yes('only the roster is sent newest-only',
   const PINGS = 1500000;
   const flood = Buffer.alloc(PING.length * PINGS);
   for (let i = 0; i < PINGS; i++) PING.copy(flood, i * PING.length);
-  await sleep(500);
+  // A sample taken since it joined, for what the service held before.
+  await probed(2);
   const markP = probes.length;
   const heldBefore = probes[probes.length - 1].held;
-  S4.write(flood);
-  await sleep(4000);
+  /*
+    A line said after the flood, in the same stream, so R hears it once the
+    service has read every ping before it; then two samples more, so the
+    probe has looked at what that left held. It used to measure four seconds
+    from the write, which a busy machine can need more than to read the
+    flood (#1926).
+  */
+  S4.write(Buffer.concat([flood, frameOf({ t: 'chat', text: 'after the pings' })]));
+  const readAll = await until('the line after the pings', () => heard.some((m) => m.text === 'after the pings'), 4 * BOUND_MS);
+  await probed(2);
   const during = probes.slice(markP);
   const peakHeld = Math.max.apply(null, during.map((p) => p.held));
   const peakP = Math.max.apply(null, during.map((p) => p.queue));
   const hP = await health();
   console.log('      ' + (flood.length / 1048576).toFixed(1) + ' MB of pings from it: held ' + MB(heldBefore) +
               ' before, peak ' + MB(peakHeld) + ', peak queue ' + MB(peakP));
+  yes('the service read the whole flood', readAll);
   yes('a flood of pings from a socket that never reads is not answered into memory',
       during.length > 0 && peakHeld - heldBefore < 16 * 1024 * 1024);
   yes('and its queue stays under the ceiling', during.length > 0 && peakP <= CEILING);
   yes('nor is it closed for pinging', hP.peers === 3 && hP.closedBacklogged === 2);
-  /* A few, spaced out: the socket that keeps up is backed for the instant
-     between a tick and its drain, and a ping landing then is not answered. */
-  for (let i = 0; i < 5 && !R.pongs; i++) { R.write(PING); await sleep(150); }
-  yes('a socket that reads is still answered',
-      await until('pong', () => (R.pongs || 0) > 0, 3000));
+  /*
+    The socket that keeps up is backed for the instant between a tick and
+    its drain, and a ping landing then is rightly not answered. This used to
+    send up to five, 150 ms apart, hoping one missed that instant (#1926).
+    Instead the feed stops, so the tick has nothing more to send R once its
+    rows have gone stale (STALE_MS) and R has read that: nothing is written
+    to R after it, R is not backed, and one ping is answered.
+  */
+  clearInterval(feeding);
+  feeding = null;
+  await lastFeed;
+  const stale = await until('the rows gone stale', () => mostGone >= ROWS, BOUND_MS);
+  R.write(PING);
+  yes('a socket that reads is still answered (its rows went stale first: ' + stale + ')',
+      stale && await until('pong', () => (R.pongs || 0) > 0, BOUND_MS));
 
   console.log('');
   console.log(pass + ' passed, ' + fail + ' failed');

@@ -47,6 +47,13 @@ function check(what, got, want) {
   ok ? pass++ : fail++;
 }
 
+/*
+  How long any one answer is waited for before the wait gives up and says
+  what did not come. Each check waits for the thing it reads (#1926), so this
+  only ends a wait on a service that is stuck, as listening() does.
+*/
+const BOUND_MS = 15000;
+
 const b64url = (b) => b.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const mac = (key, body) => b64url(crypto.createHmac('sha256', key).update(body).digest());
 // A token as the service makes them, minted at a time of this file's choosing.
@@ -263,14 +270,32 @@ async function ready() {
   check('the same token again, while its connection is still open, is refused: it was copied',
         [again.status, /already used/.test(again.body)], [403, true]);
   check('  and tells whoever presented it nothing about when', /\d{4}-\d\d-\d\dT/.test(again.body), false);
+  /*
+    Each of these waits for the service to have done the thing it reads: the
+    pong to a page's own ping, which it sends once it has handled the second
+    join before it (#519), and the socket's close, which comes once it has
+    answered the close frame and let the connection go. They used to read
+    300 ms after sending (#1926). BOUND_MS with neither is a stuck service,
+    and the check then shows what did not come.
+  */
   first.ws.send(JSON.stringify({ t: 'join', profileId: 4242, name: 'a second join on the same socket' }));
-  await new Promise((r) => setTimeout(r, 300));
+  first.ws.send(JSON.stringify({ t: 'ping' }));
+  const ponged = await new Promise((ok) => {
+    const late = setTimeout(() => ok('no pong within ' + BOUND_MS / 1000 + ' s'), BOUND_MS);
+    first.ws.addEventListener('message', (ev) => {
+      let m = null; try { m = JSON.parse(ev.data); } catch (e) { }
+      if (m && m.t === 'pong') { clearTimeout(late); ok(''); }
+    });
+  });
   const h1 = await (await fetch('http://127.0.0.1:' + PORT + '/health')).json();
-  check('a second join on that connection is not a second person in the room', h1.peers, 1);
-  first.ws.close();
-  await new Promise((r) => setTimeout(r, 300));
+  check('a second join on that connection is not a second person in the room', ponged || h1.peers, 1);
+  const shut = await new Promise((ok) => {
+    const late = setTimeout(() => ok('the socket not closed within ' + BOUND_MS / 1000 + ' s'), BOUND_MS);
+    first.ws.addEventListener('close', () => { clearTimeout(late); ok(''); });
+    first.ws.close();
+  });
   check('and once that connection has closed, its token still opens nothing',
-        (await handshake('thornswood, ' + t2)).status, 403);
+        shut || (await handshake('thornswood, ' + t2)).status, 403);
 
   const noTok = await handshake(null);
   check('no token at all: 403 before any socket, and the reason', [noTok.status, noTok.body.trim()], [403, 'no: no token']);
