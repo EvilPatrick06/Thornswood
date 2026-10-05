@@ -5,15 +5,30 @@
   pull request without paying for minutes. Run it from this machine; it
   does the remote half over ssh, the same way Install-Backup.ps1 does.
 
-      .\scripts\deploy\Install-Runner.ps1            install it, or put it right
-      .\scripts\deploy\Install-Runner.ps1 -Status    what is there and whether GitHub sees it
-      .\scripts\deploy\Install-Runner.ps1 -Remove    take it off the box and off GitHub
+      .\scripts\deploy\Install-Runner.ps1              install the first one, or put it right
+      .\scripts\deploy\Install-Runner.ps1 -Number 3    the third, beside the others
+      .\scripts\deploy\Install-Runner.ps1 -Status      what is there and whether GitHub sees it
+      .\scripts\deploy\Install-Runner.ps1 -Remove      take it off the box and off GitHub
+      .\scripts\deploy\Install-Runner.ps1 -Lock        lock every runner on the box again,
+                                                    touching no runner and no job
 
   WHY. Every run of .github\workflows\build.yml has failed in seconds since
   02:10 on 25 September, because GitHub's own runners are blocked on billing.
   Decided by Patrick on 25 September (issue #437): a runner on the VPS rather
   than paying for minutes. build.yml asks for [self-hosted, Windows,
-  thornswood-vps], which is this runner and nothing else.
+  thornswood-vps], which is every runner this puts there and nothing else.
+
+  SEVERAL OF THEM. A runner takes one job at a time. On 4 October the queue
+  was an hour long: eleven checks waiting while one ran, because the lanes
+  open pull requests in bursts (five in seven seconds at 17:46) and every
+  merge to main runs the check again. Patrick added a second runner that
+  evening and asked for more. -Number n puts the nth beside the others: its
+  own folder, account, runner name and priority task, each with the number
+  on the end (C:\Thornswood-Runner3, thornswood-runner3, thornswood-vps-3,
+  Thornswood Runner 3 Priority), and the same label, so GitHub hands a
+  waiting job to whichever is free. 1 is the first, with the names it has
+  always had. -Status and -Remove take -Number the same way; -Lock does
+  every runner on the box.
 
   WHAT IT DOES ON THE BOX, in order:
     1. Checks what the build check needs is there: pwsh, node, python and git
@@ -24,7 +39,8 @@
        never printed, stored or sent anywhere.
     3. Denies that account every C:\Thornswood-* folder but its own, so a job
        cannot read the site's config, the bot's token or the backups, and
-       cannot write into anything live.
+       cannot write into anything live. And locks its own folder to SYSTEM,
+       Administrators and that account (below).
     4. Downloads a pinned actions/runner win-x64 zip (version + SHA-256
        hardcoded below, #1372), checked against that pin, and registers it as a
        service that runs as that account.
@@ -40,14 +56,36 @@
   gh api -X POST repos/<repo>/actions/runners/registration-token. The token
   lasts an hour and is never printed.
 
+  ITS OWN FOLDER TAKES NOTHING FROM C:\. A folder made under C:\ inherits
+  Windows' rule that BUILTIN\Users may read it, and every service account on
+  the box is in Users, every other runner's included. A runner's folder holds
+  the credentials GitHub gave it (.runner, .credentials), so until 4 October
+  the first runner's account could read the second's: the second's install
+  shut its own account out of the first's folder, and nothing shut the first
+  out of the second's, which did not exist when the first was installed. Now
+  each runner's folder is locked the way #1105 locked the server folders:
+  inheritance off, SYSTEM and Administrators Full Control, its own account
+  Modify, and nobody else, which holds for runners added later as well.
+
+  -LOCK puts that right on a box as it is, without replacing anything: for
+  every runner service there, it locks the runner's folder, and shuts its
+  account out of every C:\Thornswood-* folder but its own, saying which it
+  had to close. No service is stopped and no job is touched. An install ends
+  by doing the same for every runner, so adding one leaves all of them
+  locked.
+
   Safe to run again. An existing runner is replaced, the account keeps its
   name and gets a new password, and the folder denials are made again.
+  Replacing one stops the job it is running; -Lock does not.
 #>
 [CmdletBinding()]
 param(
   [string]$VpsHost    = '',
   [string]$VpsUser    = '',
   [string]$Repo       = 'EvilPatrick06/Thornswood',
+  # Which runner. 1 is the first, with the names below; from 2 up, the four
+  # names after it get the number on the end unless they are given.
+  [ValidateRange(1, 99)][int]$Number = 1,
   [string]$Root       = 'C:\Thornswood-Runner',
   [string]$Account    = 'thornswood-runner',
   [string]$RunnerName = 'thornswood-vps',
@@ -56,6 +94,7 @@ param(
   [string]$TaskName   = 'Thornswood Runner Priority',
   [switch]$Status,
   [switch]$Remove,
+  [switch]$Lock,
   [switch]$NoPause
 )
 
@@ -67,6 +106,16 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here '..\vps\Send-Secret.ps1')
 if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
+
+# The nth runner's names, the header's SEVERAL OF THEM. A name given on the
+# command line wins. 'thornswood-runner99' is 19 characters, inside the 20 a
+# local account may have.
+if ($Number -gt 1) {
+  if (-not $PSBoundParameters.ContainsKey('Root'))       { $Root = 'C:\Thornswood-Runner' + $Number }
+  if (-not $PSBoundParameters.ContainsKey('Account'))    { $Account = 'thornswood-runner' + $Number }
+  if (-not $PSBoundParameters.ContainsKey('RunnerName')) { $RunnerName = 'thornswood-vps-' + $Number }
+  if (-not $PSBoundParameters.ContainsKey('TaskName'))   { $TaskName = 'Thornswood Runner ' + $Number + ' Priority' }
+}
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
@@ -101,6 +150,84 @@ function Invoke-Gh {
 
 $service = 'actions.runner.' + $Repo.Replace('/', '-') + '.' + $RunnerName
 
+# ------------------------------------------------------------- the locks --
+# Run on the box, by the install for its own folder and by -Lock and the end
+# of every install for each runner there (the header's ITS OWN FOLDER TAKES
+# NOTHING FROM C:\ and -LOCK). Windows PowerShell 5.1 turns a native
+# program's stderr into an error record, so these run with Continue and judge
+# icacls by its exit code (#941).
+$lockLib = @'
+$broadSids = @('S-1-5-32-545', 'S-1-1-0', 'S-1-5-11', 'S-1-3-0')
+function Lock-RunnerRoot([string]$root, [string]$acct) {
+  $ErrorActionPreference = 'Continue'
+  $out = & icacls.exe $root /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' ($acct + ':(OI)(CI)M') /C /Q 2>&1
+  if ($LASTEXITCODE -ne 0) { throw ('icacls could not give ' + $root + ' its rules: ' + (($out | ForEach-Object { "$_" }) -join ' ')) }
+  $out = & icacls.exe $root /inheritance:r /C /Q 2>&1
+  if ($LASTEXITCODE -ne 0) { throw ('icacls could not stop ' + $root + ' taking rules from C:\: ' + (($out | ForEach-Object { "$_" }) -join ' ')) }
+  $null = & icacls.exe $root /remove:g '*S-1-5-32-545' '*S-1-1-0' '*S-1-5-11' '*S-1-3-0' /C /Q 2>&1
+  # Read back: nothing taken from C:\, and nothing broad left on it.
+  $acl = Get-Acl -LiteralPath $root
+  $open = @($acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) |
+            Where-Object { "$($_.AccessControlType)" -eq 'Allow' -and $broadSids -contains $_.IdentityReference.Value })
+  if (-not $acl.AreAccessRulesProtected -or $open.Count) {
+    throw ($root + ' is still open: ' + $(if (-not $acl.AreAccessRulesProtected) { 'it takes rules from C:\' } else { (@($open | ForEach-Object { $_.IdentityReference.Value }) -join ', ') + ' may read it' }))
+  }
+  # By name where Windows still knows the account, by SID where it does not
+  # (a runner taken off since leaves its deny behind).
+  $who = @($acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) |
+           Where-Object { "$($_.AccessControlType)" -eq 'Allow' } |
+           ForEach-Object { $n = $_.IdentityReference.Value; try { $n = ("$($_.IdentityReference.Translate([Security.Principal.NTAccount]))" -split '\\')[-1] } catch { }; $n } | Sort-Object -Unique)
+  $root + ' is locked: only ' + ($who -join ', ') + ' may use it'
+}
+# Shuts the account out of every C:\Thornswood-* folder but its own, and says
+# which of them it could have read until now: one with a rule letting it or
+# Users, Everyone or Authenticated Users in, and no deny for it. An account
+# may be given as *<SID>, the way icacls takes one. $parent is C:\ except in
+# tests\test-runner-lock.ps1, which runs both of these on scratch folders.
+function Close-RunnerAccount([string]$acct, [string]$own, [string]$parent = 'C:\') {
+  $ErrorActionPreference = 'Continue'
+  $sid = ''
+  if ($acct.StartsWith('*')) { $sid = $acct.Substring(1) }
+  else { try { $sid = (New-Object Security.Principal.NTAccount($acct)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { } }
+  if (-not $sid) { throw ('there is no account called ' + $acct + ' on this box') }
+  $had = 0; $shut = 0; $wasOpen = @()
+  foreach ($d in @(Get-ChildItem -LiteralPath $parent -Directory -Filter 'Thornswood-*' -EA SilentlyContinue)) {
+    if ($d.FullName -eq $own) { continue }
+    $rules = $null
+    try { $rules = @((Get-Acl -LiteralPath $d.FullName).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) } catch { }
+    if ($null -ne $rules -and @($rules | Where-Object { "$($_.AccessControlType)" -eq 'Deny' -and $_.IdentityReference.Value -eq $sid }).Count) { $had++; continue }
+    $open = ($null -eq $rules) -or @($rules | Where-Object { "$($_.AccessControlType)" -eq 'Allow' -and ($broadSids -contains $_.IdentityReference.Value -or $_.IdentityReference.Value -eq $sid) }).Count
+    $null = & icacls.exe $d.FullName /deny ($acct + ':(OI)(CI)F') /C /Q 2>&1
+    if ($LASTEXITCODE -ne 0) { throw ('icacls could not shut ' + $acct + ' out of ' + $d.FullName) }
+    if ($open) { $wasOpen += $d.FullName } else { $shut++ }
+  }
+  foreach ($w in $wasOpen) { $acct + ' COULD READ ' + $w + ' until now; shut out of it' }
+  $acct + ': already shut out of ' + $had + ' folder(s)' + $(if ($shut) { ', and a deny added on ' + $shut + ' that were closed to it anyway' } else { '' })
+}
+'@
+
+# Every runner service on the box, by what Windows says it is: its folder is
+# the one its RunnerService.exe is in, its account the one it runs as.
+$lockAll = $lockLib + @'
+
+$ErrorActionPreference = 'Continue'
+$bad = 0
+$services = @(Get-CimInstance Win32_Service -Filter "Name LIKE 'actions.runner.%'" -EA SilentlyContinue)
+if (-not $services.Count) { 'no runner service on this box' }
+foreach ($svc in $services) {
+  $exe = ('' + $svc.PathName).Trim().Trim('"')
+  $root = Split-Path -Parent (Split-Path -Parent $exe)
+  $acct = (('' + $svc.StartName) -split '\\')[-1]
+  if ($root -notlike 'C:\Thornswood-Runner*') { $svc.Name + ' runs from ' + $exe + ', not a C:\Thornswood-Runner folder, so it was left alone'; $bad++; continue }
+  if (-not $acct -or $acct -match '^(LocalSystem|LocalService|NetworkService)$') { $svc.Name + ' runs as ' + $svc.StartName + ', not an account of its own, so it was left alone'; $bad++; continue }
+  try {
+    Lock-RunnerRoot $root $acct
+    Close-RunnerAccount $acct $root
+  } catch { 'NOT LOCKED: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ }
+}
+if ($bad) { exit 1 }
+'@
+
 # ------------------------------------------------------------------ status --
 if ($Status) {
   Head 'On the VPS'
@@ -113,6 +240,11 @@ if (`$s) { 'service   ' + `$s.Status + ', starts ' + `$s.StartType } else { 'ser
 if (`$w) { 'runs as   ' + `$w.StartName }
 foreach (`$p in (Get-Process Runner.Listener, Runner.Worker)) { 'process   ' + `$p.ProcessName + ' at ' + `$p.PriorityClass }
 if (Get-LocalUser -Name '$Account') { 'account   $Account' } else { 'account   NOT THERE' }
+if (Test-Path '$Root') {
+  `$a = Get-Acl -LiteralPath '$Root'
+  `$wide = @(`$a.GetAccessRules(`$true, `$true, [Security.Principal.SecurityIdentifier]) | Where-Object { "`$(`$_.AccessControlType)" -eq 'Allow' -and @('S-1-5-32-545', 'S-1-1-0', 'S-1-5-11', 'S-1-3-0') -contains `$_.IdentityReference.Value })
+  if (`$a.AreAccessRulesProtected -and -not `$wide.Count) { 'folder    locked: takes nothing from C:\' } else { 'folder    OPEN to every account on the box: -Lock locks it' }
+}
 if (Get-ScheduledTask -TaskName '$TaskName') { 'priority  task registered' } else { 'priority  task NOT REGISTERED' }
 "@ | ForEach-Object { Say "  $_" }
   Head 'On GitHub'
@@ -153,6 +285,16 @@ Remove-LocalUser -Name '$Account' -EA SilentlyContinue
 Remove-Item -LiteralPath '$Root' -Recurse -Force -EA SilentlyContinue
 if (Test-Path '$Root') { 'the folder is still there, something holds a file in it' } else { 'runner, account, task and folder removed' }
 "@ | ForEach-Object { Say "  $_" }
+  Done
+}
+
+# -------------------------------------------------------------------- lock --
+if ($Lock) {
+  Head 'Every runner on the box, locked'
+  $said = @(Remote $lockAll)
+  $code = $LASTEXITCODE
+  $said | ForEach-Object { Say "  $_" }
+  if ($code -ne 0) { Die "the lock did not finish for every runner (exit $code); the lines above say which." }
   Done
 }
 
@@ -200,7 +342,7 @@ Head 'Installing it on the VPS'
 # command line and in no file on either machine. Until then it was written
 # into this script, which is long enough to go up as a file, so it sat in
 # C:\Windows\Temp on the VPS while the install ran.
-$out = Invoke-ThornswoodSecretRemote -Target $target -SshArgs $ssh -Secret $token -Script @"
+$out = Invoke-ThornswoodSecretRemote -Target $target -SshArgs $ssh -Secret $token -Script ($lockLib + "`n" + @"
 `$ErrorActionPreference = 'Stop'
 `$regToken = `$ThornswoodSecret; `$ThornswoodSecret = `$null
 if (-not `$regToken) { throw 'NOTHING ARRIVED on standard input, so there is no registration token. Nothing was installed.' }
@@ -251,6 +393,8 @@ if (Test-Path (Join-Path `$root '.runner')) {
   Remove-Item -LiteralPath (Join-Path `$root '.runner'), (Join-Path `$root '.credentials'), (Join-Path `$root '.credentials_rsaparams') -Force -EA SilentlyContinue
 }
 if (-not (Test-Path `$root)) { New-Item -ItemType Directory -Path `$root -Force | Out-Null }
+# Locked before config.cmd writes GitHub's credentials into it.
+Lock-RunnerRoot `$root `$acct
 
 # The runner itself, checked before it is unpacked.
 if (-not (Test-Path (Join-Path `$root 'bin\Runner.Listener.exe')) -or -not (Test-Path (Join-Path `$root 'version-$version.txt'))) {
@@ -312,7 +456,7 @@ Start-Sleep -Seconds 5
 `$s = Get-Service -Name `$svc -EA SilentlyContinue
 if (`$s) { 'service ' + `$s.Status } else { 'SERVICE NOT FOUND' }
 foreach (`$p in (Get-Process Runner.Listener -EA SilentlyContinue)) { 'listener at ' + `$p.PriorityClass }
-"@
+"@)
 $out | ForEach-Object { Say "  $_" }
 $token = $null
 if ("$out" -notmatch 'service Running') { Die 'The runner service is not running. The lines above say where it stopped; .\scripts\deploy\Install-Runner.ps1 -Status shows what is there.' }
@@ -323,6 +467,13 @@ $r = (Invoke-Gh api "repos/$Repo/actions/runners" | Out-String) | ConvertFrom-Js
 $mine = @($r.runners | Where-Object { $_.name -eq $RunnerName })
 if (-not $mine.Count) { Die "The service runs but GitHub does not list a runner called $RunnerName yet. Give it a minute and run -Status." }
 Say ('  ' + $mine[0].name + ' is ' + $mine[0].status) 'Green'
+
+# Every runner, this one included, so adding one leaves all of them locked.
+Head 'Every runner on the box, locked'
+$said = @(Remote $lockAll)
+$code = $LASTEXITCODE
+$said | ForEach-Object { Say "  $_" }
+if ($code -ne 0) { Die "the runner is installed, but the lock did not finish for every runner (exit $code); the lines above say which. .\scripts\deploy\Install-Runner.ps1 -Lock tries again without touching any runner." }
 Say ''
-Say '  The build check runs on it from the next push to a pull request, and the nightly checks every night.' 'Gray'
+Say '  GitHub hands it a waiting build check, nightly or release build as soon as it is free.' 'Gray'
 Done
