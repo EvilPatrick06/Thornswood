@@ -150,7 +150,7 @@ if (block) {
     const dropped = 0xff000123;  // above it: a person put it there
     const swordNo = api.activate(1, placed, 'sword:Skyrim.esm');
     yes('a sword Bethesda left on a table does not come up',
-        /not left here by a player/.test(swordNo || '') && /not off the ground/.test(swordNo || ''));
+        /put here by the world, not left by a person/.test(swordNo || '') && /not off the ground/.test(swordNo || ''));
     yes('a sword somebody dropped does', api.activate(1, dropped, 'sword:Skyrim.esm') === null);
     yes('and bread on a table is still bread',
         api.activate(1, placed, 'bread:Skyrim.esm') === null);
@@ -178,7 +178,7 @@ if (block) {
 
     const no = g5.activate(7, placed, 'd790c:Skyrim.esm');
     yes('a coin purse in the world does not come up',
-        /coin purse/.test(no || '') && /not left here by a player/.test(no || '') &&
+        /coin purse/.test(no || '') && /put here by the world, not left by a person/.test(no || '') &&
         /not off the ground/.test(no || ''));
     yes('and it is put back on the screen of the person who pressed it',
         g5.putBacks.length === 1 && g5.putBacks[0][0] === 7 && g5.putBacks[0][1] === placed);
@@ -252,8 +252,8 @@ if (block) {
       ready = true;
       for (const d of (lazy.PURSES || [])) { kinds[realId(d)] = 'FLOR'; }
       const second = lazy.activate(3, placed2, 'd790c:Skyrim.esm');
-      yes('the same purse pressed after idOf works is refused as a player-less purse',
-          /coin purse/.test(second || '') && /not left here by a player/.test(second || ''));
+      yes('the same purse pressed after idOf works is refused as a purse no person left',
+          /coin purse/.test(second || '') && /put here by the world, not left by a person/.test(second || ''));
     }
   }
 

@@ -449,8 +449,12 @@ and are listed below.
 - `private\door.log` in the game server's folder is not rolled or trimmed.
   The gamemode appends a line each time the door decides about somebody, and
   the file grows until somebody moves it.
-- `.\scripts\vps\Get-Logs.ps1` reads only the current file. After a restart, last
-  night's crash may be in `.1` beside it.
+- `.\scripts\vps\Get-Logs.ps1` brings down the current file of each log and,
+  for every log that rolls (server, thornswood, voice, site and bot), the
+  rolled `.1` to `.5` the box has, under the same names, so last night's
+  crash in `.1` comes down with the rest. `door.log` does not roll, so only
+  its current file comes. Each file is the last 4000 lines unless `-Lines` or
+  `-All` asks for more.
 - The site's /sessions page reads a session's game server lines out of
   `server.log` and, when that is shorter than 4 MB, out of the end of
   `server.log.1` and the older ones behind it, so a session from before a
