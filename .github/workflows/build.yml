@@ -440,7 +440,7 @@ jobs:
           # the plugins and the overlays.
           $files = @(Get-ChildItem -Path scripts -Filter *.js -File -Recurse) + @(Get-ChildItem -Path game -Filter *.js -File) +
                    @(Get-ChildItem -Path game\plugins, game\ui -Filter *.js -File -ErrorAction SilentlyContinue) +
-                   @(Get-ChildItem -Path site\server.js, voice\voice-server.js, voice\public\voice.js -File)
+                   @(Get-ChildItem -Path site\server.js, voice\voice-server.js -File)
           foreach ($f in $files) {
             & node --check $f.FullName 2>&1 | Out-Null
             if ($LASTEXITCODE -ne 0) {

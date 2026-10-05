@@ -133,3 +133,9 @@ voice service lets a connection in only with a join token, and it
 makes one only when the site says that Discord account owns the
 character. While the site cannot answer, nobody new gets into voice
 or the chat; a connection already in stays in (#1303, #1315).
+
+Voice has two clients: the launcher's voice page and the game's
+overlay. The voice service also served a plain browser page of its
+own at https://thornswood.net/voice/ until #1822. It had no way to
+get a join token, because it could not sign in to Discord, so it
+could never get in. Nothing linked to it, and it is gone.
