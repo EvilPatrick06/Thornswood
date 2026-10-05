@@ -1482,9 +1482,15 @@
     character choice comes back with the sentence on it and no place in line.
     Nothing connects again until the person picks a character (relogAs). In
     update only (quitToMainMenu is Papyrus).
+
+    What it ends is the connection, so that is what it asks about: a game that
+    has already closed its own (moved out, or ended once already) has nothing
+    to end, and one that picked again and is still loading into the world has.
   */
   function sessionEnded(sentence) {
-    if (afkGone) { return; }
+    let up = false;
+    try { up = !!sp.mpClientPlugin.isConnected(); } catch (e) { up = false; }
+    if (!up) { log('session: the server ended a session this game had already closed'); return; }
     afkGone = true;
     const me = PROFILE;
     log('session: the server ended it ("' + sentence + '"), so the connection is closed and the game goes ' +
@@ -8767,7 +8773,7 @@
     // The server is ending this session (#1157), from the relay; the move
     // itself needs update, where quitToMainMenu can run. See sessionEnded.
     if (what === 'session:end') {
-      if (!afkGone && !sessionEndAsked) { sessionEndAsked = String(a[2] || 'The server ended this session.'); }
+      if (!sessionEndAsked) { sessionEndAsked = String(a[2] || 'The server ended this session.'); }
       return;
     }
     // The pick, asking for a seat first (#481); see the line block.

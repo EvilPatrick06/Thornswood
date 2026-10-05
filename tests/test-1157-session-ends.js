@@ -458,13 +458,21 @@ const SENTENCE = 'Thornswood is full: 25 people are in the world, the most it ho
   G.api.relogAs(4242);
   yes('picking a character is what connects again, once', G.net.created === 1 && G.net.up === true &&
       G.box.sp.storage.authGameData && G.box.sp.storage.authGameData.local.profileId === 4242);
+  G.api.endAsked = SENTENCE;
+  G.update();
+  yes('refused again while the world is still loading after that pick: ended again, before any kick',
+      G.net.destroyed === 2 && G.net.up === false && G.quit === 2 && G.box.menuAgain && G.box.menuAgain.ended === SENTENCE);
+  G.pass(5 * 60000);
+  yes('and again nothing connects by itself', G.net.created === 1);
+  G.api.relogAs(4242);
   G.box.globalThis.__thornswoodInWorld = true;
   G.pass(1000);
-  yes('back in the world, a later end works again', !G.api.gone);
+  yes('back in the world, the idle clock runs again', !G.api.gone);
 }
 
 yes('the front takes session:end from the relay into update, with the sentence',
-    /if \(what === 'session:end'\) \{\s*if \(!afkGone && !sessionEndAsked\) \{ sessionEndAsked = String\(a\[2\] \|\| /.test(front));
+    /if \(what === 'session:end'\) \{\s*if \(!sessionEndAsked\) \{ sessionEndAsked = String\(a\[2\] \|\| /.test(front));
+yes('and ends only a connection that is up', /function sessionEnded\(sentence\) \{\s*let up = false;\s*try \{ up = !!sp\.mpClientPlugin\.isConnected\(\); \}/.test(front));
 yes('the page is given the sentence, and no place in line',
     /if \(menuAgain\.ended\) \{ list\.ended = String\(menuAgain\.ended\); \} else \{ list\.away = menuAgain; \}/.test(front));
 yes('picking on the way back connects again through relogAs', /if \(menuAgain\) \{ relogAs\(id\); \}/.test(front));
