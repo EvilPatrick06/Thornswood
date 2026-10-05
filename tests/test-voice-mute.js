@@ -140,7 +140,7 @@ const BESIDE = { pos: [0, 0, 0], angleZ: 0, cell: 'c' };
 /* A page configured as profile 1 and joined, with one other person, 123. */
 function joined(others) {
   const p = hostPage();
-  p.tell({ t: 'config', host: 'voice.test', port: '7778', profileId: ME, token: 't' });
+  p.tell({ t: 'config', host: 'voice.test', port: '7778', profileId: ME, token: 't', base: 'https://voice.test/voice' });
   const ws = p.sockets[p.sockets.length - 1];
   ws.onopen();
   p.serve({ t: 'welcome', peer: 1 });
@@ -195,7 +195,7 @@ function joined(others) {
 // --------------------------------------- somebody already muted connects
 {
   const p = hostPage();
-  p.tell({ t: 'config', host: 'voice.test', port: '7778', profileId: ME, token: 't' });
+  p.tell({ t: 'config', host: 'voice.test', port: '7778', profileId: ME, token: 't', base: 'https://voice.test/voice' });
   p.sockets[0].onopen();
   p.tell({ t: 'muted', list: '123' });
   p.serve({ t: 'welcome', peer: 1 });

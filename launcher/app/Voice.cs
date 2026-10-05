@@ -610,21 +610,25 @@ namespace Thornswood
                 return "";
             }
 
-            // Through Caddy when one is configured, the raw port otherwise.
-            string url = (conf == null ? ("http://" + host + ":" + port) : conf.VoiceBase()) + "/token";
+            // Through Caddy, the only way in (#1304). With no config yet there
+            // is no address at all, so no token.
+            if (conf == null)
+            {
+                if (log != null) log("Voice: no voice address yet, so no join token.");
+                return "";
+            }
+            string url = conf.VoiceBase() + "/token";
 
             // The ticket only ever goes over https (To Do 144). It is a thirty
             // day credential, as good as this person's Discord account to the
             // site, and it sits under DPAPI on disk; every other place that
             // sends it goes to Discord.Site, which is https. This one follows
-            // VoiceBase, and VoiceBase falls back to http://address:port
-            // whenever VoiceUrl is empty: a new install until its first
-            // update check has filled it in, and the rollback the feed can
-            // order by sending voiceUrl empty. Both posted the ticket here in
-            // the clear. No token means no connection: the service refuses it
-            // (#1303). The page asks again before its next try, so a session
-            // that started before the update check gets its token once the
-            // feed has filled the https address in.
+            // VoiceBase, which fell back to http://address:port whenever
+            // VoiceUrl was empty: a new install until its first update check
+            // had filled it in, and the rollback the feed could order by
+            // sending voiceUrl empty. Both would have posted the ticket here in
+            // the clear. VoiceBase is always https since #1304, and this check
+            // stays so nothing but https ever carries the ticket.
             if (!url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             {
                 if (log != null) log("Voice: no join token, because the voice address is not https and the Discord ticket only goes over https. Voice may be refused.");
@@ -884,8 +888,10 @@ namespace Thornswood
             // base and socket are what the page should use. host and port stay on
             // the message so an older page, or one that has not been rebuilt,
             // carries on building the url the way it always did.
-            string vbase = conf == null ? ("http://" + host + ":" + port) : conf.VoiceBase();
-            string vsock = conf == null ? ("ws://" + host + ":" + port + "/") : conf.VoiceSocket();
+            // Always https and wss (#1304); Configure returns before this with
+            // no config, so the built-in address is only there for the compiler.
+            string vbase = conf == null ? Config.Voice : conf.VoiceBase();
+            string vsock = conf == null ? ("wss://" + Config.Voice.Substring(8) + "/") : conf.VoiceSocket();
             Post("{\"t\":\"config\",\"host\":\"" + host + "\",\"port\":\"" + port +
                  "\",\"profileId\":" + profile + ",\"name\":\"\"" +
                  ",\"base\":\"" + JsonEscape(vbase) + "\"" +

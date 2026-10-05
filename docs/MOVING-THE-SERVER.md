@@ -215,7 +215,8 @@ typed on a command line or written on this page.
    29 September `https://thornswood.net/voice/health` said auth on, bind
    127.0.0.1, no relay and chat range off; read it again on the day and pass
    what it says. On a new box there is nothing running for Install-Voice to
-   keep, so without -Bind it falls back to every address. Auth needs no
+   keep; loopback is its default since #1304, so `-Bind 127.0.0.1` only says
+   so out loud, and no firewall rule is opened for the port. Auth needs no
    flag: since #1303 the service refuses every join that cannot prove
    itself.
 8. **The dev game server and dev voice**, copied from the live ones onto their

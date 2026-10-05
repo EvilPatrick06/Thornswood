@@ -37,7 +37,11 @@ $env:THORNSWOOD_VOICE_PORT = '7900'; $env:THORNSWOOD_VOICE_BIND = '127.0.0.1'; n
 ```
 
 then open http://127.0.0.1:7900/health. It reads `THORNSWOOD_VOICE_PORT`
-(7778 when unset), `THORNSWOOD_VOICE_BIND` (every address when unset),
+(7778 when unset), `THORNSWOOD_VOICE_BIND` (loopback when unset since #1304;
+`0.0.0.0` answers every interface, and even then `/token` and the handshake
+refuse anything that did not come over TLS: straight off the network, or
+through a proxy whose `X-Forwarded-Proto` is not https, and a token that came
+that way is spent),
 `THORNSWOOD_CHAT_RANGE` (off when
 unset, though Install-Voice.ps1 sets it on for live and dev: every typed
 line goes to everybody; `on` keeps a line to the same cell

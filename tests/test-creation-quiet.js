@@ -322,7 +322,8 @@ function chatPage() {
   // moment later, the way the launcher's fetch does, as a timer here.
   let minted = 0;
   const win = {
-    THORNSWOOD: { host: 'voice.test', port: 7778, profileId: 7, name: 'Traveller', token: 't' },
+    // The https address the launcher writes; there is no ws:// fallback (#1304).
+    THORNSWOOD: { host: 'voice.test', port: 7778, profileId: 7, name: 'Traveller', token: 't', base: 'https://voice.test/voice' },
     thornswoodChat: { add: function (parts) { notes.push(parts.map(function (r) { return r.text; }).join('')); } },
     skyrimPlatform: { sendMessage: function (to, what) {
       if (to !== 'thornswood-front' || String(what).indexOf('token? ') !== 0) { return; }

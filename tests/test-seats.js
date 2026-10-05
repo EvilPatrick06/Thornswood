@@ -440,7 +440,8 @@ yes('a number that is not a whole number is no number', rig({ thornswoodMostOnli
   const drawn = [];
   let sock = null;
   const win = {
-    THORNSWOOD: { host: 'h', port: 1, profileId: 5, token: 't' },
+    // The https address the launcher writes; there is no ws:// fallback (#1304).
+    THORNSWOOD: { host: 'h', port: 1, profileId: 5, token: 't', base: 'https://h.test/voice' },
     thornswoodChat: { add: function (parts) { drawn.push(parts); } },
     skyrimPlatform: { sendMessage: function () { } }
   };

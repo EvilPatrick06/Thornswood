@@ -253,8 +253,9 @@ The harnesses are `tests\test-deploy-swaps.ps1`,
   falling back to 7778 (`gamemode.js:253-258,10641`, `Install-Voice.ps1:8-12`).
   `Deploy-DevGamemode.ps1` sets 7789 for dev (`Deploy-DevGamemode.ps1:110-114`).
 - **Launcher to voice:** the voice page holds a WebSocket to `voiceUrl`
-  (`https://thornswood.net/voice` or `/voice-dev`) or, with that empty, the raw
-  port. Audio goes between people directly (`Install-Voice.ps1:8-12`). The
+  (`https://thornswood.net/voice` or `/voice-dev`), or with that empty the same
+  built-in address, never the raw port: the service listens on loopback and
+  takes a join token only over wss (#1304). Audio goes between people directly (`Install-Voice.ps1:8-12`). The
   page and the game's chat each offer a join token of their own with the
   handshake, minted by the launcher for that one connection (#1337, #1322).
 - **Bot to site:** `/api/ticket` with the site's `botKey` (`bot.py:27,277`).
