@@ -125,7 +125,12 @@ to be saved. The purse and shelf then change together in the ledger,
 and the incoming inventory is credited. Completion waits for its exact
 saved receipt. Other inventory earned or spent during the save is kept.
 Item names, condition, charge and other inventory details stay with the
-goods. A reload resumes the saved offer without paying twice.
+goods. A reload resumes the saved offer without paying twice. The record limit is
+512 KiB. Before removing anything, the server reserves space for both
+recovery inventory snapshots at their full 128 KiB limits. After the
+outgoing inventory is saved, its redundant snapshots are retired in the
+same durable commit as the merchant's purse and stock. A trade whose
+complete recovery record cannot fit is refused before anything is taken.
 
 At most 25 transfers may wait across the server, including offline
 characters and unloaded traders. One person and one trader may each

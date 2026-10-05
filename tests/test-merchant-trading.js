@@ -254,10 +254,30 @@ replacedCharacter.purses.compareAndCommit=(...args)=>{
   return result;
 };
 open(replacedCharacter.api);
-assert.match(replacedCharacter.api.command({actorId:10,profileId:7,parts:['/merchant','supply','Iron','Ingot']}).text,/cooldown cannot be verified/);
+assert.match(replacedCharacter.api.command({actorId:10,profileId:7,parts:['/merchant','supply','Iron','Ingot']}).text,/not yours/);
 assert.equal(replacedCharacter.world.inv[10][100],8);
 assert.equal(replacedCharacter.purses.prepare(1).purse,250);
 assert.equal(replacedCharacter.purses.prepare(1).pending,undefined);
+replacedCharacter.world.transfer.identity=(id)=>({desc:id.toString(16)+':Skyrim.esm',profileId:7});
+expired=replacedCharacter.purses.prepare(1);expired.supply={'old':1};replacedCharacter.purses.commit(1,expired);
+assert.match(replacedCharacter.api.command({actorId:10,profileId:7,parts:['/merchant','sell','1','Iron','Ingot']}).text,/not yours/);
+assert.equal(replacedCharacter.world.inv[10][100],8);
+assert.equal(replacedCharacter.purses.prepare(1).purse,250);
+
+const reentrantCleanup=service({on:true},250);
+expired=reentrantCleanup.purses.prepare(1);expired.supply={'old':1};reentrantCleanup.purses.commit(1,expired);
+open(reentrantCleanup.api);
+const fencedCommit=reentrantCleanup.purses.compareAndCommit.bind(reentrantCleanup.purses);
+let nestedCleanup=null;
+reentrantCleanup.purses.compareAndCommit=(...args)=>{
+  if(!nestedCleanup)nestedCleanup=reentrantCleanup.api.command({actorId:10,profileId:7,parts:['/merchant','sell','1','Iron','Ingot']});
+  return fencedCommit(...args);
+};
+assert.match(reentrantCleanup.api.command({actorId:10,profileId:7,parts:['/merchant','sell','1','Iron','Ingot']}).text,/Sold 1/);
+assert.match(nestedCleanup.text,/offer changed/);
+assert.equal(reentrantCleanup.world.inv[10][100],7);
+assert.equal(reentrantCleanup.purses.prepare(1).stock[0].count,1);
+
 
 // Unidentified old completions retain their window. Old pending supplies
 // finish under their original key without attributing them to somebody new.

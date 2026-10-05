@@ -340,26 +340,20 @@ function createMerchantTrading(deps) {
     if (nextPurse < 0 || nextPurse > MAX_GOLD) return fail('That price cannot be verified.');
     var moved;
     try {
-      // Expired cooldowns have no remaining ownership claim. Remove them in
-      // one acknowledged revision before sizing any new durable intent.
-      var cleanedSupply = JSON.parse(JSON.stringify(state.supply || {}));
-      var removedSupply = false, at = now();
-      Object.keys(cleanedSupply).forEach(function (key) {
-        var stamp = cleanedSupply[key];
-        if (Number.isSafeInteger(stamp) && stamp > 0 && at - stamp >= SUPPLY_WAIT) {
-          delete cleanedSupply[key]; removedSupply = true;
-        }
-      });
-      if (removedSupply) {
-        try {
-          state = purses.compareAndCommit(merchantId, state.revision || 0,
-            Object.assign({}, state, {supply:cleanedSupply}));
-        } catch (error) {
-          active = false; sessions.clear(); settlement.shutdown();
-          throw error;
-        }
-        if (!state || !active) return fail('The offer changed. Choose the trade again.');
+      // Capture every trade's authenticated native character before a save
+      // can publish a projection or reenter another request.
+      var tradingHuman = transfer.identity(actorId);
+      if (!tradingHuman || tradingHuman.profileId !== profileId) return fail('That request is not yours.');
+      try {
+        state = settlement.pruneSupplyHistory(merchantId, state, SUPPLY_WAIT);
+      } catch (error) {
+        active = false; sessions.clear(); settlement.shutdown();
+        throw error;
       }
+      if (!state || !active) return fail('The offer changed. Choose the trade again.');
+      var currentHuman = transfer.identity(actorId);
+      if (!currentHuman || currentHuman.desc !== tradingHuman.desc || currentHuman.profileId !== tradingHuman.profileId)
+        return fail('That request is not yours.');
       var expected = SETTLEMENT.inventory(transfer.inventory(actorId));
       var outgoing = SETTLEMENT.takeEntries(expected, npcBuys ? resolved.baseId : GOLD_BASE, npcBuys ? asked.count : gold);
       var stock = stockCopy(state.stock), credit;
