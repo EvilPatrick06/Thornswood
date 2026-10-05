@@ -88,8 +88,40 @@ is not a hidden stat.
 
 ## Where this is
 
-Not in the server. Health reaching zero is the engine's death, and the
-wake is the temple with no wound record. The fire damage of about 7 a
-second is in the server and is not yet a burn wound afterwards. The
-rules on agreed lasting harm are on the site and are not a record on
-the character.
+The wound record is in the server, on the character. It survives a
+restart and a death. A cut and a bite bleed 2 a second, or 1 in torn
+cloth, through the engine's own damage. At 10 minutes an open cut, an
+open bite and an untreated bad burn roll wound fever at 40%, 10%
+bandaged, 5% with a poultice. A bite rolls bite sickness at 25% closed
+and 60% open. A break costs what this page says. Set, it heals in 3
+days. Nobody sets it and it heals crooked in 3 days, a lasting -4
+speed or -0.05 melee damage until a temple puts it right. The fire is
+timed from the client's own reports at 7 a second: one that dealt 30
+or more is a bad burn, what you wear counts at half for warmth, and it
+heals in a day.
+
+What treats a wound today: a healing spell by its own rank (novice
+stops a bleed, advanced and up closes a cut, expert sets a splinted
+break), and a shrine pressed inside one of the temples the wake uses,
+which sets breaks and clears a crooked heal. A broken arm and a missing
+hand refuse the forges, the armour table, the wheel, the smelter, the
+tanning rack, the loom and the kiln. A missing eye is -20% damage with
+a bow and with destruction. A scar is a line on the look prompt.
+
+An agreed loss is written onto the character by staff with /hurt,
+because the yes is given out of character. Staff can also give a cut,
+a bite or a break with it for a scene.
+
+Not in yet:
+
+- Going down. Health reaching zero is still the engine's death, applied
+  before the server hears of it. The fork has to ask the server first,
+  and #1383 says what it has to expose. Until then a bleed that empties
+  your health is a death with no killer, and the wake stops the bleed.
+- What opens a cut, a break or a bite in the world. This page does not
+  say which blow does it. The question is on #1383.
+- Bandages, splints, poultices, torn cloth and the physicker's remedy.
+  None of them is an item yet, and setting a bone is not yet something
+  a physicker can do.
+- A block costing twice the stamina, and sprint refused on a broken
+  leg. Neither is an actor value the server can send.
