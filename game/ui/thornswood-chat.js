@@ -91,6 +91,76 @@
     }
   }
 
+  /*
+    WHAT VOICE MISSED BEFORE IT GOT ON (#1869).
+
+    Nothing orders this socket joining the room against the game's voice
+    overlay getting on it. The socket joins as soon as it has a token: at
+    the character choice, for somebody waiting in line (#481, #1142), and
+    otherwise whenever the launcher hands one over. The overlay gets on when
+    the voice plugin first configures it, about two seconds after the
+    overlays go in. The service sends the roster when somebody joins or
+    leaves and at no other time, and everybody already in the room builds a
+    connection to this one off that roster and sends its offer at once.
+    Whatever came before voice was listening went to fanout and so nowhere:
+    the overlay had nobody to open until the next join or leave, and then
+    its own offer met a peer still waiting on the answer to the one it had
+    sent, which the impolite side of a pair ignores. Neither ever answered
+    the other. tests/test-1869-voice-negotiation.js runs both pages through
+    the real service in that order.
+
+    So until voice gets on (board, below), the newest roster and the offers
+    and candidates sent to this connection are kept, and board hands them
+    over in that order before anything new. The service always writes the
+    roster that names somebody before anything they send here, so the
+    overlay opens a peer before it hears from them, as it does live. A newer
+    roster replaces the old one, and what is kept from somebody it no longer
+    names goes, because they left and their peer id is never handed out
+    again. A new connection starts with nothing kept: the room offers to its
+    new peer id. Once voice is on, nothing is kept: it hears everything from
+    then on, across reconnects, and in relay mode it has stepped off for good.
+
+    A connection gathers a handful of candidates and sends one offer before
+    it hears an answer, so a hundred from one peer is not a connection
+    being made. Nothing more from that peer is kept, and the log says so
+    once.
+  */
+  var HELD_FROM_ONE = 100;
+  var heldRoom = null;
+  var heldSignals = [];
+  var boarded = false;
+  var saidTooMany = false;
+
+  function keep(msg) {
+    if (boarded) return;
+    if (msg.t === 'peers') {
+      heldRoom = msg;
+      var named = {};
+      var list = msg.peers || [];
+      for (var i = 0; i < list.length; i++) { named[list[i].peer] = true; }
+      heldSignals = heldSignals.filter(function (s) { return named[s.from]; });
+      return;
+    }
+    if (msg.t !== 'sdp' && msg.t !== 'ice') return;
+    var fromThem = 0;
+    for (var j = 0; j < heldSignals.length; j++) {
+      if (heldSignals[j].from === msg.from) fromThem++;
+    }
+    if (fromThem >= HELD_FROM_ONE) {
+      if (!saidTooMany) {
+        saidTooMany = true;
+        try { console.log('[chat] peer ' + msg.from + ' sent ' + HELD_FROM_ONE + ' offers and candidates before voice was on; no more are kept'); } catch (e) { }
+      }
+      return;
+    }
+    heldSignals.push(msg);
+  }
+
+  function forget() {
+    heldRoom = null;
+    heldSignals = [];
+  }
+
   function chat() { return window.thornswoodChat; }
 
   /*
@@ -199,6 +269,7 @@
         tries = 0;
         joined = true;
         peerId = Number(msg.peer) || 0;
+        forget();
         fanout(msg);
         if (!renaming) note('Chat is on. Press enter to talk.', C_SYS);
         renaming = false;
@@ -226,8 +297,9 @@
         return;
       }
 
-      // Anything that is not chat belongs to whoever else is on this socket.
-      if (msg.t !== 'chat') { fanout(msg); return; }
+      // Anything that is not chat belongs to whoever else is on this socket,
+      // and what voice needs is kept until it is on (keep).
+      if (msg.t !== 'chat') { keep(msg); fanout(msg); return; }
 
       /*
         The line at the menu (#481): the game server's word on this person's
@@ -297,6 +369,7 @@
     if (joined && !renaming) note('Chat lost the server. Trying again.', C_WARN);
     joined = false;
     peerId = 0;
+    forget();
     fanout({ t: '__closed' });
     retry();
   }
@@ -451,9 +524,29 @@
                ready: ws ? ws.readyState : -1, queued: queue.length };
     },
 
-    /** Whoever else wants the socket. Voice is the only one so far. */
+    /** Whoever else wants the socket, as the line at the character choice
+        does. Voice gets on with board, below. */
     on: function (fn) {
       if (typeof fn === 'function') { listeners.push(fn); }
+    },
+
+    /*
+      How voice gets on (#1869): on, and first everything kept for it since
+      this connection joined, the newest roster and then the offers and
+      candidates in the order they came. See keep.
+    */
+    board: function (fn) {
+      if (typeof fn !== 'function') return;
+      listeners.push(fn);
+      if (boarded) return;
+      boarded = true;
+      var missed = (heldRoom ? [heldRoom] : []).concat(heldSignals);
+      forget();
+      for (var i = 0; i < missed.length; i++) {
+        try { fn(missed[i]); } catch (e) {
+          try { console.log('[chat] listener threw: ' + e); } catch (e2) { }
+        }
+      }
     },
 
     /*
