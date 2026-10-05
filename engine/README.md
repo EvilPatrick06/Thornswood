@@ -119,12 +119,32 @@ cmake -S engine\skymp -B engine\skymp\build -G "Visual Studio 17 2022" -A x64 `
 These are the settings read off the shipping machine's `CMakeCache.txt` on
 24 September (`docs\OWNERSHIP.md:68-71`) and used again for the configure at
 `engine\skymp` on 25 September, which took 24.2 seconds
-(`docs\archive\todo-list-2026-09-25.md:2987`). NOT CHECKED against the fork's
-own `CMakeLists.txt`: the submodule was not fetched where this page was
-written. `OFFLINE_MODE`, `BUILD_CLIENT`, `BUILD_SKYRIM_PLATFORM` and
-`SKYRIM_DIR` are named in that cache reading; the variable carrying the
-triplet is assumed to be `VCPKG_TARGET_TRIPLET`. Check both against
-`engine\skymp\CMakeLists.txt` and the `cmake` folder beside it.
+(`docs\archive\todo-list-2026-09-25.md:2987`). On 5 October (issue #1357)
+each one was read against the fork's own CMake files at 0460584e, the
+commit pinned that day:
+
+| Setting | Where the fork reads it | Without it |
+| --- | --- | --- |
+| `-G "Visual Studio 17 2022"` | `CMakeLists.txt:78-83` stops the configure with any other generator when the compiler is MSVC | stops |
+| `-A x64` | CMake's own platform switch; the triplet below is x64 too (`overlay_triplets\x64-windows-sp.cmake:1`) | the generator's default |
+| `CMAKE_TOOLCHAIN_FILE` | `CMakeLists.txt:28-35` sets it itself before `project()`: the fork's `vcpkg\scripts\buildsystems\vcpkg.cmake`, or `C:/vcpkg/...` when the environment has `CI=true` on Windows. The value passed is not the one used; off a CI machine they are the same file | the same file |
+| `VCPKG_TARGET_TRIPLET` | `CMakeLists.txt:7-15`, from `overlay_triplets` (`:17`) | `x64-windows-sp` on Windows |
+| `OFFLINE_MODE` | `option`, `CMakeLists.txt:94`: offline mode in the server and client settings files the build generates | ON |
+| `BUILD_CLIENT` | `option`, `CMakeLists.txt:90`; `skymp5-client\CMakeLists.txt:5` builds the bundle only when it is on | ON |
+| `BUILD_SKYRIM_PLATFORM` | `option`, `CMakeLists.txt:92`; `skyrim-platform\CMakeLists.txt:3` | ON |
+| `SKYRIM_DIR` | `option`, `CMakeLists.txt:117`; a folder with no `SkyrimSE.exe` in it stops the configure (`:138-142`) | the server settings get no plugin paths (`:133-135`) |
+
+So every name is one the fork reads, and all but `SKYRIM_DIR` repeat what the
+fork does without them; they are passed so a changed default upstream does
+not quietly change our build. The fork also stops unless the build folder is
+`<fork>\build` (`CMakeLists.txt:46-56`), and asks for CMake 3.19 or newer
+(`:74`).
+
+NOT CHECKED: that this line configures cleanly at the current pin, and with
+which CMake version. That needs Windows, Visual Studio and a Skyrim folder,
+and the reading above had none of them. `Build-Engine.ps1` runs this line;
+whoever runs it next puts `cmake --version` and the configure's last line
+here.
 
 Never move a configured build folder: CMake writes absolute paths into it,
 which is why the move to `engine\skymp` needed this configure again.
@@ -174,10 +194,12 @@ The client runtime is six files (`New-ClientBuildRecord.ps1:50-57`):
 `MpClientPlugin.dll`, `SkyrimPlatform.dll`, `SkyrimPlatformImpl.dll`,
 `SkyrimPlatformCEF.exe.hidden`, `skymp5-client.js` and `TESModPlatform.pex`.
 The bundle comes from `npx webpack` in `engine\skymp\skymp5-client`; the other
-five from the native build with `BUILD_CLIENT` and `BUILD_SKYRIM_PLATFORM` on.
-NOT CHECKED here: which MSBuild targets produce the five, and that webpack
-writes into `build\dist\client`, which is where `Where.ps1 ClientDist` and
-every script below look.
+five from the native build with `BUILD_SKYRIM_PLATFORM` on (MpClientPlugin is
+built on Windows whatever `BUILD_CLIENT` says, `skymp5-server\cpp\CMakeLists.txt:9-22`).
+The bundle goes into `build\dist\client\Data\Platform\Plugins`
+(`skymp5-client\webpack.config.js:8-9`), and `build\dist\client` is where
+`Where.ps1 ClientDist` and every script below look. NOT CHECKED here: which
+MSBuild targets produce the five and which step puts them in that folder.
 
 Then, in order:
 
