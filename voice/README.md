@@ -79,6 +79,11 @@ off the command line `Install-Voice.ps1` builds, `turn-key.txt` beside the
 service, put there by hand. Unless both are there, `/ice` offers STUN only; with
 neither, `/health` says `turn: none`, which is how every box runs today.
 `Install-Voice.ps1 -TurnUrl` sets the address. `test-turn-key.js` covers it.
+With a relay set, `/ice` hands its entry only to a page that POSTs the join
+token it holds (`{"token": ...}`, which the game's voice overlay and the
+launcher's voice page do) and to this machine itself, which is how
+`Install-Voice.ps1` reads the running relay; anybody else gets the STUN list
+(#1307).
 
 ## Where it runs
 

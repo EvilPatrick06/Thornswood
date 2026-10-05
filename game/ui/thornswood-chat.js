@@ -471,6 +471,16 @@
     /** The service's id for this connection, 0 until the welcome arrives. */
     peer: function () { return peerId; },
 
+    /**
+     * The join token this page holds now, the freshest setToken gave it, or
+     * else the one its connection was opened with. Voice sends it with its
+     * ask for the relay list, which the service hands only to somebody whose
+     * token checks out (#1307). A token opens one connection (#1322), so the
+     * one in hand is usually the spent one, which /ice still takes for the
+     * two minutes it is good for.
+     */
+    token: function () { return TOKEN || SPENT; },
+
     isUp: function () { return !!(ws && ws.readyState === 1 && joined); },
 
     /**

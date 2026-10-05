@@ -60,7 +60,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-token-once-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-token-once-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -1311,11 +1311,18 @@ function clientAddr(req) {
   return addr.toLowerCase().replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/, '');
 }
 
+/* This machine itself: loopback, with nobody's address forwarded. Caddy
+   always writes the sender in X-Forwarded-For, so what it carries in is the
+   sender, not here. */
+function fromHere(req) {
+  return /^(127\.|::1$)/.test(clientAddr(req));
+}
+
 /* Seconds to wait before this one may come in, or 0 when it is let in, and
    then it is counted. */
 function doorWait(door, req, now) {
+  if (fromHere(req)) return 0;
   let addr = clientAddr(req);
-  if (/^(127\.|::1$)/.test(addr)) return 0;
   if (net.isIPv6(addr)) {
     const halves = addr.split('%')[0].split('::');
     const head = halves[0] ? halves[0].split(':') : [];
@@ -1585,9 +1592,8 @@ const TURN_URL = String(process.env.THORNSWOOD_TURN_URL || '').trim();
   from it, and the only symptom is the same pair of people still not hearing
   each other.
 
-  Not settled by this: which relay, and who may have its credential. /ice
-  answers anybody who asks, so a relay switched on while that is true is a
-  relay for a stranger too.
+  Not settled by this: which relay. Who may have its credential is settled
+  at /ice (#1307): somebody whose join token checks out, and this machine.
 */
 const TURN_KEY_FILE = path.join(HERE, 'turn-key.txt');
 function readTurnKey(file) {
@@ -1892,10 +1898,16 @@ const server = http.createServer((req, res) => {
   /*
     The ICE list, for whichever page is about to build a peer connection.
 
-    Answered to anyone who asks. It carries no secret: with the REST scheme the
-    credential is derived and short lived, and it is no use without also being
-    able to reach the relay. The pages that ask are the same pages this service
-    already serves.
+    THE RELAY ONLY TO SOMEBODY WHO HAS PROVED WHO THEY ARE (#1307). This was
+    answered whole to anyone who asked, relay credential included: measured
+    on 5 October, a stranger with no token was handed a working username and
+    password for the relay, and a relay carries its bandwidth bill for
+    whoever holds one. Now the STUN list goes to anybody, as it always did,
+    and the relay entry only to a page that sends the join token it already
+    holds (POST, {"token": ...}, in the body so it is never in an address),
+    or to this machine itself, which is how Install-Voice.ps1 reads the relay
+    that is running before it reinstalls. A plain GET from anywhere else is
+    the STUN list, which is what every box has served while no relay is set.
   */
   if (route === '/ice') {
     /*
@@ -1911,15 +1923,24 @@ const server = http.createServer((req, res) => {
       This gives away nothing that was not already public. CORS is a rule about
       what a PAGE may read, not about who may ask: anything that can make an
       HTTP request to this service could already read this route, header or no
-      header. What the route hands out is the STUN list plus, when a relay is
-      configured, a credential that is derived and short lived under the REST
-      scheme. The static credential case is the one to keep an eye on, and it
-      is no more exposed by this line than it was by curl.
+      header. What decides whether the answer holds a relay credential is the
+      token, above, not the page. A POST whose body is plain text is a simple
+      request, so the page's fetch needs no preflight either.
     */
-    res.writeHead(200, { 'content-type': 'application/json',
-                         'cache-control': 'no-store',
-                         'access-control-allow-origin': '*' });
-    res.end(JSON.stringify({ iceServers: iceServers() }));
+    const answer = (relay) => {
+      res.writeHead(200, { 'content-type': 'application/json',
+                           'cache-control': 'no-store',
+                           'access-control-allow-origin': '*' });
+      res.end(JSON.stringify({ iceServers: relay ? iceServers() : STUN.slice() }));
+    };
+    if (req.method === 'POST') {
+      readBody(req, res, 4000, (doc) => {
+        const tok = readToken(doc && doc.token);
+        answer(fromHere(req) || !!(tok && !tok.expired));
+      });
+      return;
+    }
+    answer(fromHere(req));
     return;
   }
 
