@@ -28585,7 +28585,8 @@ log('gamemode loaded:',
 //
 //     { "enforce": false, "profiles": [123, 456], "devProfiles": [123], "note": "..." }
 //
-// enforce      false logs and lets everyone in. true kicks anybody not listed.
+// enforce      false logs and lets everyone in. true tells anybody not listed
+//              why and ends their session (turnAway, #1894).
 // profiles     the profileId of each person allowed in. The launcher shows a
 //              person's profile id on the Diagnostics page.
 // devProfiles  the subset who also hold the dev or admin role. Read by
@@ -28601,10 +28602,12 @@ log('gamemode loaded:',
 
   var dataDir = 'data';
   var privDir = 'private';
+  var serverKind = 'main';
   try {
     var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
     if (cfg && cfg.dataDir) dataDir = String(cfg.dataDir);
     if (cfg && cfg.privDir) privDir = String(cfg.privDir);
+    if (cfg && cfg.thornswoodServer) serverKind = String(cfg.thornswoodServer).trim().toLowerCase() || 'main';
   } catch (e) { }
 
 
@@ -28737,7 +28740,29 @@ log('gamemode loaded:',
           }
         }
       }
-      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, jarlIds: jarlIds, staffRoleIds: staffRoleIds, devRoleIds: devRoleIds, businessIds: businessIds, factionIds: factionIds, companyIds: companyIds, accounts: accounts, count: Object.keys(ids).length };
+      // Banned (#412) or dead for good (#1010): the site leaves these off
+      // the list and sends them in the same answer, and the staff block ends
+      // the session saying which and why. Profile -> until (0: no end).
+      var barred = {};
+      if (Array.isArray(doc.pk)) {
+        for (var bk = 0; bk < doc.pk.length; bk++) {
+          var kn = Number(doc.pk[bk]);
+          if (kn) barred[kn] = 0;
+        }
+      }
+      if (Array.isArray(doc.bans)) {
+        for (var bb = 0; bb < doc.bans.length; bb++) {
+          var ban = doc.bans[bb] || {};
+          var bu = Number(ban.until) || 0;
+          var bps = Array.isArray(ban.profiles) ? ban.profiles : [];
+          for (var bq = 0; bq < bps.length; bq++) {
+            var bn = Number(bps[bq]);
+            // The one that lasts longest; 0 lasts for good.
+            if (bn && barred[bn] !== 0) barred[bn] = bu ? Math.max(barred[bn] || 0, bu) : 0;
+          }
+        }
+      }
+      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, jarlIds: jarlIds, staffRoleIds: staffRoleIds, devRoleIds: devRoleIds, businessIds: businessIds, factionIds: factionIds, companyIds: companyIds, accounts: accounts, barred: barred, count: Object.keys(ids).length };
     } catch (e) {
       list = null;
     }
@@ -28885,6 +28910,58 @@ log('gamemode loaded:',
   */
   var letIn = {};
 
+  /*
+    TOLD WHY, AND THE SESSION STAYS ENDED (#1894).
+
+    This kicked at once and said nothing. skymp5-client connects again after
+    every disconnect and logs in as the same character, so the same session
+    came straight back, was judged again once it was seen, and was kicked
+    again, and the person was never told why. Every other place that ends a
+    session on purpose says why first (#1157): the sentence in their chat, the
+    same sentence as { end } on the line their character choice reads, so
+    their game closes its own connection and goes back to the choice with it,
+    and the kick a few seconds later for a game that does not close itself.
+    The door does the same, after the same five seconds as the join pass.
+
+    The dev server's list is its staff only (/dev/api/allowed), so applying
+    is not what somebody turned away there needs to do. And somebody off the
+    list because they are banned or their character is dead for good is left
+    to the staff block, which ends the session with that and its reason: the
+    door ticks every two seconds and the ban sweep every ten, so the door
+    would end it first and tell a banned person to apply.
+  */
+  var TURN_AWAY_MS = 5000;
+  var TURNED_AWAY = serverKind === 'dev'
+    ? 'You are not on the list of people who may play on the dev server, which is for staff, so the ' +
+      'session is being ended. To play Thornswood, open the Thornswood launcher, not Thornswood Dev, and press Play.'
+    : 'You are not on the list of people who may play on Thornswood, so the session is being ended. ' +
+      'Read thornswood.net/join to apply, and press Play in the launcher once you are accepted.';
+
+  function turnAway(pid, actorId) {
+    if (pid) {
+      var tell = g.__thornswoodToProfile;
+      var line = g.__thornswoodSayLine;
+      if (typeof tell === 'function') { tell(pid, TURNED_AWAY); }
+      if (typeof line === 'function') { line(pid, { end: TURNED_AWAY }); }
+    }
+    note('turning away profile ' + (pid || 'unknown') + ' (actor ' + actorId.toString(16) + ')' +
+         (pid ? ', told why' : ', with no profile to tell why'));
+    setTimeout(function () {
+      var userId = -1;
+      try { userId = mp.getUserByActor(actorId); } catch (e) { userId = -1; }
+      if (userId === undefined || userId === null || userId < 0) {
+        note('profile ' + (pid || 'unknown') + ' had already gone when the kick came');
+        return;
+      }
+      try {
+        mp.kick(userId);
+        note('turned away profile ' + (pid || 'unknown') + ' (actor ' + actorId.toString(16) + ')');
+      } catch (e) {
+        note('could not turn away profile ' + (pid || 'unknown') + ': ' + e);
+      }
+    }, TURN_AWAY_MS);
+  }
+
   function tick() {
     var conf = load();
     if (!conf) return;                       // no allowed.json, door is off
@@ -28939,19 +29016,12 @@ log('gamemode loaded:',
         continue;
       }
 
-      var userId = -1;
-      try { userId = mp.getUserByActor(actorId); } catch (e) { userId = -1; }
-      if (userId < 0) {
-        note('turning away profile ' + (pid || 'unknown') +
-             ' but could not find their connection, so they stayed');
+      var bar = pid ? conf.barred[pid] : undefined;
+      if (bar !== undefined && (!bar || bar > now)) {
+        note('profile ' + pid + ' is banned or dead for good, so the staff block ends the session and says why');
         continue;
       }
-      try {
-        mp.kick(userId);
-        note('turned away profile ' + (pid || 'unknown') + ' (actor ' + actorId.toString(16) + ')');
-      } catch (e) {
-        note('could not turn away profile ' + (pid || 'unknown') + ': ' + e);
-      }
+      turnAway(pid, actorId);
     }
   }
 
