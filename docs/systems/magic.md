@@ -58,16 +58,17 @@ is not work and is not a rank.
 
 A semester is 24 hours of real time.
 
-Stand in the College and say `/study`. The rooms that count are the
-Hall of the Elements, the courtyard, the Hall of Countenance, the Hall
-of Attainment, and the Arcanaeum. Anywhere else refuses.
+Stand in the College, press K, open College and press Study. The
+rooms that count are the Hall of the Elements, the courtyard, the Hall
+of Countenance, the Hall of Attainment, and the Arcanaeum. Anywhere
+else refuses. Nothing is typed.
 
 A mage receives 2 spell points.
 
 A person a master has taught receives 1, and it can only be spent on a
 novice spell of the school they were taught.
 
-The word will not fire again until 24 hours have passed. Logging out
+Study gives nothing again until 24 hours have passed. Logging out
 does not reset it. The College does not have to be held by you. The
 doors follow [Property](property.md): if the Archmage's office holds
 the halls, you need to be let in.
@@ -114,10 +115,27 @@ The book, the points, the tomes, and the three gates are in the
 server. A dungeon chest can put a novice or a master tome in the pack.
 Reading it still has to pass the three gates. Picking a master spell
 on K spends the tome. See [Dungeon loot](dungeon-loot.md).
-`collegeSemester` is 2 and `outsiderSemester` is 1, and
-neither is applied: there is no `/study` and no test that you are
-in the College.
 
-Mod spell menus are not stripped. A character can still be handed a
-spell the book does not list, by the game's own menus, and the server
-does not take it back yet. The plan is that only the book is granted.
+A semester is in the server. The College page on K has the Study
+button. The server checks the room: the four halls by their cells, and
+the courtyard as the open ground the halls' outside doors stand in. A
+mage receives 2 points and a person a master has taught receives 1.
+The moment is kept on the character, so logging out and a restart do
+not reset the 24 hours.
+
+A person a master has taught needs a semester's point as well as one
+of their 2 places to learn a spell from a tome, because the semester is
+the only thing that hands them a point. Whether the places alone should
+be enough is asked on issue 1387.
+
+Only the book is granted. A tome of a spell the book does not list is
+refused, and the tome is kept. A spell like that which a tome taught
+before this comes off the character at the next login, and a mage has
+the point back. A spell a mod's menu hands out is taken back the moment
+it is put in a hand, and the client drops it at every spawn as well. A
+disease, a power, an ability, a shrine blessing, the instruments, and a
+staff spell the staff rules unlocked are not spells of the book and
+stay.
+
+The server refuses Dead Thrall and every spell that raises the dead on
+a person's body. See [Conjuration](professions/mage/conjuration.md).
