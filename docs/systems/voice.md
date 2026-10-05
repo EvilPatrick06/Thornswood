@@ -139,3 +139,17 @@ overlay. The voice service also served a plain browser page of its
 own at https://thornswood.net/voice/ until #1822. It had no way to
 get a join token, because it could not sign in to Discord, so it
 could never get in. Nothing linked to it, and it is gone.
+
+Both clients connect to everybody the service names on its roster,
+and both offer again whenever their own side changes, as when the
+microphone opens. When two offers cross, the one who joined first
+ignores the other's and the later one gives way and answers. The
+service always sends the roster that names somebody before anything
+that person sends, even to a connection that has fallen behind. The
+game's overlay shares the chat's connection, which can join before
+the overlay is listening: at the character choice, or when the
+launcher's join token comes back first. Until the overlay listens,
+the chat keeps the newest roster and the offers sent to it, and hands
+them over in that order (#1869).
+`tests/test-1869-voice-negotiation.js` runs both clients through the
+real service.

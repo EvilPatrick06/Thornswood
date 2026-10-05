@@ -73,6 +73,8 @@ function page(withAudio) {
   const net = {
     post: function () { return true; },
     on: function (fn) { listeners.push(fn); },
+    // How the overlay gets on since #1869. Nothing was kept for it here.
+    board: function (fn) { listeners.push(fn); },
     off: function (fn) {
       for (let i = listeners.length - 1; i >= 0; i--) {
         if (listeners[i] === fn) { listeners.splice(i, 1); }
