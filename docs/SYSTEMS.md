@@ -117,8 +117,8 @@ lists every recipe: the name, the rank, what it asks for, and
 whether the server is asked. An item has no gold price.
 
 [Masters and apprentices](systems/apprenticeship.md). The sister half
-past novice, and the two outside trades. A master decides, and can
-end it.
+past novice, and the two outside trades. A master decides, and either
+of you can end it.
 
 [Durability](systems/durability.md). Weapon Kit, Armor Kit, Sewing
 Kit. The right half repairs to 120%. Anyone else repairs to 100%.
