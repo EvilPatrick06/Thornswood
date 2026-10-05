@@ -428,7 +428,12 @@ function StartIt {
             'the task is back as it was before this install'
         } else {
             `$action = New-ScheduledTaskAction -Execute "`$env:SystemRoot\System32\cmd.exe" -Argument `$cmd -WorkingDirectory '$Root'
-            `$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
+            # Priority 4, normal, not Task Scheduler's default of 7 (#1968):
+            # without it node, started by this task's cmd.exe, inherits
+            # BelowNormal, I/O priority 1 (low) and memory priority 2, which
+            # held the game server's reads back (#1931). 4 gives Normal, 2
+            # and 5. tests\test-service-task-priority.ps1 measures all three.
+            `$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -Priority 4
             `$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
             Register-ScheduledTask -TaskName '$TaskName' -Action `$action -Trigger (New-ScheduledTaskTrigger -AtStartup) -Settings `$settings -Principal `$principal | Out-Null
         }
