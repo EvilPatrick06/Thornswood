@@ -74,8 +74,9 @@ stool, creep cluster, namira's rot, and white cap are novice. Canis root,
 deathbell, dragon's tongue, fly amanita, giant lichen, glowing
 mushroom, mora tapinella, scaly pholiota, snowberry, and swamp fungal
 pod are advanced. Bleeding
-crown, blisterwort, and nightshade are expert. Rot scale is advanced.
-Screaming maw and thorn hook are expert.
+crown, blisterwort, and nightshade are expert. Rot scale, screaming
+maw and thorn hook are Creation Club plants, and Thornswood is Special
+Edition only, so nobody gathers them.
 
 Cabbage, carrot, gourds, leek, potato, and wheat are the farmer's
 crops. A chickens' nest and a churn are farmer verbs. A beehive is

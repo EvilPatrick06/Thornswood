@@ -82,9 +82,8 @@ const RANK_OF = {
   'Red Mountain Flower': 'advanced', 'Canis Root': 'advanced', 'Deathbell': 'advanced',
   "Dragon's Tongue": 'advanced', 'Fly Amanita': 'advanced', 'Giant Lichen': 'advanced',
   'Glowing Mushroom': 'advanced', 'Mora Tapinella': 'advanced', 'Scaly Pholiota': 'advanced',
-  'Snowberries': 'advanced', 'Swamp Fungal Pod': 'advanced', 'Rot Scale': 'advanced',
-  'Bleeding Crown': 'expert', 'Blisterwort': 'expert', 'Nightshade': 'expert',
-  'Screaming Maw': 'expert', 'Thorn Hook': 'expert'
+  'Snowberries': 'advanced', 'Swamp Fungal Pod': 'advanced',
+  'Bleeding Crown': 'expert', 'Blisterwort': 'expert', 'Nightshade': 'expert'
 };
 const NOT_A_GATHER = {
   'Cabbage': 'farmer', 'Carrot': 'farmer', 'Gourds': 'farmer', 'Leek': 'farmer',
@@ -93,13 +92,14 @@ const NOT_A_GATHER = {
   'Coin Purse': 'not a harvest',
   'Mammoth Cheese': 'off every ladder', 'Mead Barrel': 'off every ladder',
   'Beehive': 'farmer verb', "Chickens' Nest": 'farmer verb', 'Churn': 'farmer verb',
-  'Horker': 'not on the gatherer page'
+  'Horker': 'not on the gatherer page',
+  // Update.esm's Creation Club records: Special Edition only (#479).
+  'Rot Scale': 'a Creation Club record', 'Screaming Maw': 'a Creation Club record',
+  'Thorn Hook': 'a Creation Club record'
 };
-const OWN_PRODUCE = {
-  'Rot Scale': '306d:Update.esm',
-  'Screaming Maw': '306e:Update.esm',
-  'Thorn Hook': '306f:Update.esm'
-};
+// The three that kept a produce of their own were the Creation Club roots,
+// and they are off the gatherer now, so no unranked row keeps its own.
+const OWN_PRODUCE = {};
 
 const unrankedNames = [];
 unrankedPage.split('\n').forEach(function (line) {
