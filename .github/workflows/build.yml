@@ -297,6 +297,7 @@ jobs:
                  'test-1383-treatments.js',
                  'test-1384-condition.js',
                  'test-1385-perks.js',
+                 'test-1127-unplaceable-tomes.js',
                  'test-1386-warrior.js',
                  'test-1387-college.js',
                  'test-1149-pick-spell-tome.js',
