@@ -42752,20 +42752,34 @@ log('gamemode loaded:',
   }
 
   /*
-    THE PANEL'S OWN ASK, as writeState's redraw (#1642). The panel sends
-    /pick refresh once it is in and each time it opens, and the answer is sent
-    whether anything changed or not. It also carries when it was asked
-    (view.asked), because the client's script draws nothing when the value
-    matches the one it last handed the page (updateOwnerScript), and it
-    counts a value as handed even while the page has no panel to take it.
-    The view sent when somebody arrives (arrival, below) goes before the
-    page is up, and the refresh a few seconds later often answers the same
-    view. Without the time the script would drop that answer as drawn
-    already, and the panel would stay empty with the skill tree's totals off
-    the character. drawn() is worked out before the time is added, so the
-    signature that holds back an unchanged write does not count it.
+    A REDRAW REACHES THE PAGE (#1730). writeState's redraw is a write the
+    page has to take whether anything on the panel changed or not: the
+    panel's own ask (/pick refresh, sent once it is in and each time it
+    opens), a refusal, the creation hall's reminder (beginCreation), an
+    effect starting or ending. Measured along the way: the engine sends
+    every write (CustomPropertyBinding::Set in the fork has no comparison),
+    and the page draws whatever setData is handed and opens when open() is
+    called. What held a repeated one back is the client's script
+    (updateOwnerScript): it runs every frame, so it cannot tell a second
+    write of the same value from the next frame, and it draws only a value
+    unlike the one it last handed the page. A reminder is the same value as
+    the reminder before it, so the panel stayed shut for somebody who closed
+    it while choosing until something else on it moved. The same held back a
+    refresh answering the view sent before the page was in (#1642).
+
+    So a redraw carries asked, a number later than any redraw before it on
+    this server, and the script draws it once. It sits on the value beside
+    the panel and not inside it, because it is about the write and not about
+    the panel: the page draws from the panel (viewKey in thornswood-skills.js),
+    and a refusal or a reminder must not tear its cards down. drawn() never
+    sees it, so the signature that holds back an unchanged write does not
+    count it, and every other write leaves it off.
   */
-  var ASKED = 'asked';
+  var lastAsked = 0;
+  function askedNow() {
+    lastAsked = Math.max(Date.now(), lastAsked + 1);
+    return lastAsked;
+  }
 
   function writeState(actorId, s, redraw) {
     s.v = 1;
@@ -42796,6 +42810,7 @@ log('gamemode loaded:',
     }
     var sig = drawn(view);
     var sending = !!redraw || lastDrawn[actorId] !== sig;
+    delete s.asked;   // only the redraw below carries one (#1730)
     if (sending) {
       /*
         The Body page (#1631): the meters, the warmth with its working out
@@ -42807,7 +42822,7 @@ log('gamemode loaded:',
       */
       var N = g.__thornswoodNeeds;
       if (view && !view.creating && N && N.view) { view.body = N.view(actorId); }
-      if (redraw === ASKED) { view.asked = Date.now(); }
+      if (redraw) { s.asked = askedNow(); }
       s.panel = view;
     } else {
       // A counter and nothing else. The record is written; the panel is not
@@ -43662,8 +43677,8 @@ log('gamemode loaded:',
       if (what === 'refresh') {
         // A refresh asks for the panel outright, so it is sent whether
         // anything changed or not: that is the whole point of the command.
-        // And drawn whether anything changed or not: see ASKED.
-        writeState(actorId, s, ASKED);   // the write is what fires updateOwner
+        // And drawn whether anything changed or not: see askedNow.
+        writeState(actorId, s, true);   // the write is what fires updateOwner
         return true;
       }
       /*
@@ -43980,7 +43995,8 @@ log('gamemode loaded:',
     // Always a redraw. A reminder is the same state as the reminder before it,
     // so a write that only goes out when something changed would send the
     // first one and none of the others, and the panel would never re-open for
-    // somebody who closed it while they were still choosing.
+    // somebody who closed it while they were still choosing. A redraw carries
+    // asked, so the client's script draws it and opens the panel (#1730).
     writeState(actorId, stateOf(actorId), true);
   }
 
