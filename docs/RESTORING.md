@@ -16,7 +16,7 @@ start the restored server and connect to it; see the end of that section.
 | --- | --- |
 | `Thornswood Backup` | a task on the VPS, 03:15 nightly, `scripts\vps\vps-nightly-backup.ps1` |
 | `C:\Thornswood-Backup` | where they land on the box, seven daily and four weekly |
-| `scripts\vps\Fetch-Backups.ps1` | brings them here, run on Patrick's machine; `-Schedule` makes that a daily task at 04:15 |
+| `scripts\vps\Fetch-Backups.ps1` | brings them here, run on Patrick's machine, into `local\backups` in the repository folder (`C:\Users\evilp\Downloads\Thornswood-Repo\local\backups` on One, since 5 October); `-Schedule` makes that a daily task at 04:15 |
 | `Thornswood Fetch Backups` | that task, on Patrick's machine (One), keeping 30 days and never fewer than seven, logging to `fetch.log` beside them |
 | `scripts\vps\Restore-Backup.ps1` | checks and unpacks one; `-CheckOnly` fails a backup with no characters in it |
 | `scripts\vps\Restore-Server.ps1` | puts one back into a server folder and checks the load order resolves and the characters are there |
@@ -88,9 +88,10 @@ The common case, and it does not need the server stopped for long.
 1. Find which profile id. `.\scripts\ops\Chargen-Log.ps1` prints a
    `chargen <actor> profile <id>` line for each character, or the person's
    launcher shows it.
-2. Get a backup from before it went wrong.
+2. Get a backup from before it went wrong. The fetched ones are in
+   `local\backups` in the repository folder; this runs from that folder:
    ```powershell
-   .\scripts\vps\Restore-Backup.ps1 -Backup "$env:USERPROFILE\Downloads\Thornswood-Backups\thornswood-<stamp>.zip.enc" -To C:\restore-check
+   .\scripts\vps\Restore-Backup.ps1 -Backup ".\local\backups\thornswood-<stamp>.zip.enc" -To C:\restore-check
    ```
 3. Find the character's file. Characters are not named by profile id: each is
    a slot, `game\world\changeForms\0.json`, `1.json` and so on, with the
@@ -134,8 +135,8 @@ rehearsal, or a real move, that loses it is acceptable. In short:
 1. **A new box**, steps 1 to 8 there: the box, its ssh server, Set-Vps, the
    key, Bootstrap-VPS, the live server program installed and not started,
    voice, and the dev instance. Start nothing else.
-2. **The newest backup that opens**, from `Downloads\Thornswood-Backups` on
-   Patrick's machine, where Fetch-Backups.ps1 brings them every day:
+2. **The newest backup that opens**, from `local\backups` in the repository
+   folder on Patrick's machine, where Fetch-Backups.ps1 brings them every day:
    ```powershell
    .\scripts\vps\Restore-Box.ps1 -Backup <newest>.zip.enc -Check
    ```
@@ -225,12 +226,14 @@ server program went in by unzipping the payload instead. On that day `TEMP`
 was pointed at the task's temp folder by hand, because both scripts decrypted
 into `%TEMP%`. They take `-Work` now, and the commands below pass it. Left
 out, `-Work` is still `%TEMP%`. The decrypted zip and the unpacked backup are
-deleted before either script exits, including when it refuses.
+deleted before either script exits, including when it refuses. The backups
+were in `Downloads\Thornswood-Backups` that day; since 5 October they are in
+`local\backups` in the repository folder, and the line below says so.
 
 ```powershell
 $W   = 'C:\ThornswoodTemps&Worktrees\temp\401\work'
 $key = "$env:USERPROFILE\Documents\thornswood-backup-key.txt"
-$bk  = (Get-ChildItem "$env:USERPROFILE\Downloads\Thornswood-Backups\thornswood-*.zip.enc" | Sort-Object Name -Descending | Select-Object -First 1).FullName
+$bk  = (Get-ChildItem 'C:\Users\evilp\Downloads\Thornswood-Repo\local\backups\thornswood-*.zip.enc' | Sort-Object Name -Descending | Select-Object -First 1).FullName
 $R   = 'C:\ThornswoodTemps&Worktrees\temp\401\restore'
 .\scripts\vps\Restore-Backup.ps1 -Backup $bk -KeyFile $key -CheckOnly -Work $W -NoPause
 .\scripts\vps\Restore-Backup.ps1 -Backup $bk -KeyFile $key -To "$R\unpacked" -Work $W -NoPause

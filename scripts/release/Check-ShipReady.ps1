@@ -6,7 +6,7 @@
       .\scripts\release\Check-ShipReady.ps1              the main channel
       .\scripts\release\Check-ShipReady.ps1 -Channel dev the dev channel
       .\scripts\release\Check-ShipReady.ps1 -NoVps       skip the two checks that ask the VPS
-      .\scripts\release\Check-ShipReady.ps1 -Channel dev -Root C:\Thornswood-Release-DevBuild
+      .\scripts\release\Check-ShipReady.ps1 -Channel dev -Root C:\Users\evilp\Downloads\Thornswood-Repo\local\release-devbuild
                                                     a folder this machine has not recorded
 
   WHICH FOLDER (#1692). The one this machine builds the channel's release

@@ -409,7 +409,7 @@ by hand, and no secret is written into the repository.
 | The client runtime `records\client-build.json` names | only in the dev game folder, `C:\Thornswood-DevBuild\Game`. The build copies in `Downloads\Thornswood-ClientBuild-<commit>` are older builds, and the shared clone's `engine\skymp\build` does not match the record | The script fetches the zip of the recorded commit from the site's feed (`clientRuntime` in `/feed-dev/version.json` or `/feed/version.json`), checks it against the feed's sha256 and every file against the record, and puts the six files in the build folder. A commit on neither feed is built: `.\scripts\release\Setup-ShipMachine.ps1 -Rebuild`, or `.\scripts\release\Build-Engine.ps1` |
 | The game folder the Ship packs, `<root>-DevBuild\Game` | built by the dev launcher from what Vortex deployed | Skyrim Special Edition on Steam, Vortex with a profile named Thornswood and the Thornswood collection installed and deployed, the launcher from thornswood.net, then the dev build and its own game folder (Setting up a machine, above). A person does this; it needs a Nexus account, not Patrick's |
 | The collection itself | Nexus collection `7essxf`, curated from Patrick's Nexus account in his Vortex | Any machine installs it. Only publishing a new revision needs his account (`docs\OWNERSHIP.md`) |
-| Backups | the originals on the VPS, `C:\Thornswood-Backup`, and copies fetched to One's `Downloads\Thornswood-Backups`; the passphrase on the VPS and in One's Documents | Not needed to Ship. `.\scripts\vps\Fetch-Backups.ps1` brings them down to any machine the VPS knows |
+| Backups | the originals on the VPS, `C:\Thornswood-Backup`, and copies fetched to `local\backups` in One's repository folder (`.\scripts\release\Where.ps1 Backups`); the passphrase on the VPS and in One's Documents | Not needed to Ship. `.\scripts\vps\Fetch-Backups.ps1` brings them down to any machine the VPS knows |
 
 #### Your own signing sign in
 
@@ -535,10 +535,13 @@ Ship builds a channel's release from one folder on each machine: the main
 install for main and `<Root>-DevBuild` for dev, unless the machine has
 recorded another (issue #1692). On a machine whose Vortex deploys into the
 dev build's game folder (docs/COLLECTION-REVISION-2.md step 8), record the
-release folder once:
+release folder once. On One it is `local\release-devbuild` in the
+repository folder since 5 Oct, because Thornswood work on One lives only in
+the repository, the vault and `C:\ThornswoodTemps&Worktrees` (Patrick); give
+the whole path, since every clone and worktree reads what is recorded:
 
 ```
-.\scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root C:\Thornswood-Release-DevBuild
+.\scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root C:\Users\evilp\Downloads\Thornswood-Repo\local\release-devbuild
 ```
 
 It writes the file `.\scripts\release\Where.ps1 ShipRoots` names, in this
@@ -546,6 +549,11 @@ machine's own data, so every clone and worktree reads it, and Ship,
 Check-ShipReady and Build-Generated then take that folder without `-Root`.
 Ship and Check-ShipReady refuse a folder Vortex deploys into, before
 anything is built.
+
+Moving a release folder means building its generated files once more
+afterwards, `.\scripts\mods\Build-Generated.ps1 -Channel dev`, because
+`generated.txt` records the game folder they were built for and Ship
+refuses them for any other.
 
 `tests\test-ship-machine.ps1` walks this section: every script it names is
 in the repository with the parameters it is given, the template holds paths
@@ -1544,6 +1552,8 @@ folder went:
 | `setup-stub.exe`, `setup-stub.pdb` | `out` | The setup program, compiled by Build-Launcher | Package-Thornswood, Ship |
 | `thornswood-front.zip` | `local` | The front build, made outside the repository | Go |
 | `mod-audit.json` | `local` | What Audit-Mods found last time | Audit-Mods |
+| `backups` | `local` | The backups brought off the VPS, since 5 Oct (`Downloads\Thornswood-Backups` before). Secrets are inside them | Fetch-Backups, Backup-Server, Clean-Everything |
+| `release-devbuild` | `local`, on One | The folder One's dev release is built from, since 5 Oct, recorded by Setup-ShipMachine -Root | Ship, Check-ShipReady, Build-Generated |
 | `backup-key.txt` | `local` | A copy of the backup passphrase, a secret. Documents is where it really lives | Restore-Backup | Who holds each thing Thornswood cannot run without, and who the
 second holder is, is `docs\OWNERSHIP.md`.
 
@@ -2337,7 +2347,7 @@ says **not enforced** where nothing checks it.
 | Site `botKey`, which is also the door key | `botKey` in `C:\Thornswood-Docs\config.json`. The same value is `THORNSWOOD_KEY` in `C:\Thornswood-Bot\bot.env.json`, and `key` in `C:\Thornswood-Server\private\door.json` and `C:\Thornswood-Server-Dev\private\door.json` | The site's `/api/ticket` (the bot filing tickets), `/api/roster` (the game server sending its character book) and `/api/allowed` and `/dev/api/allowed` (the door's list). Each answers 401 without it. Whoever holds it can read every allowed person's name and profile ids, the admins' included. | Anyone with VPS access: `Install-Bot.ps1 -RotateKey`, then `Deploy-Docs.ps1` so the site loads it, then `Set-Door.ps1 -Connect` and `Set-Door.ps1 -Connect -Root C:\Thornswood-Server-Dev -Site https://thornswood.net/dev`. Skip the last two and both doors are refused on their next fetch. |
 | Site `secret` | `secret` in `C:\Thornswood-Docs\config.json`. The site makes it on its first start. | Signs the site's Discord sign in cookie and the ticket every launcher keeps in `Profile\discord.txt`. Whoever holds it can pass as any Discord account, to the site and to the launcher's check in. | Anyone with VPS access, and there is no script: delete that line and restart the site with `Deploy-Docs.ps1`, which makes a new one. Everybody is signed out of the site and every launcher has to link Discord again. |
 | Discord client secret | `discord.clientSecret` in `C:\Thornswood-Docs\config.json` | Discord sign in on the site: with the client id it turns a sign in into who somebody is. | The Discord application's owner resets it in the developer portal (OAuth2). Then `Set-DiscordLogin.ps1` takes it at a prompt and restarts the site. |
-| Discord bot token | `discord.botToken` in `C:\Thornswood-Docs\config.json` and `DISCORD_TOKEN` in `C:\Thornswood-Bot\bot.env.json`, the same token in both | Everything the bot may do in the Discord, and the site's reading of who holds which role, which is what decides who may play. | The application's owner resets it in the developer portal (Bot, Reset Token). Then `.\scripts\deploy\Rotate-BotToken.ps1`, one command: it asks at a prompt, writes both files or neither, restarts the bot and the site, and `-Check` afterwards says whether each file holds a token without showing it. `Install-Bot.ps1` and `Set-DiscordLogin.ps1` write it through the same writer, `scripts\vps\Write-BotToken.ps1`, so either one also updates both. Every backup made before the reset still holds the old token: the nightly ones in `C:\Thornswood-Backup` on the VPS and anything brought down to `Downloads\Thornswood-Backups`. |
+| Discord bot token | `discord.botToken` in `C:\Thornswood-Docs\config.json` and `DISCORD_TOKEN` in `C:\Thornswood-Bot\bot.env.json`, the same token in both | Everything the bot may do in the Discord, and the site's reading of who holds which role, which is what decides who may play. | The application's owner resets it in the developer portal (Bot, Reset Token). Then `.\scripts\deploy\Rotate-BotToken.ps1`, one command: it asks at a prompt, writes both files or neither, restarts the bot and the site, and `-Check` afterwards says whether each file holds a token without showing it. `Install-Bot.ps1` and `Set-DiscordLogin.ps1` write it through the same writer, `scripts\vps\Write-BotToken.ps1`, so either one also updates both. Every backup made before the reset still holds the old token: the nightly ones in `C:\Thornswood-Backup` on the VPS and anything brought down to `local\backups` in the repository folder. |
 | #news webhook | `C:\Thornswood-Bot\webhooks\news.txt` on the VPS, read over ssh by every machine that ships (`Discord-Hook.ps1`); `bot\news-webhook.txt` on a machine only as the fallback when the VPS cannot be asked | Posting in #news as the bot, for anybody holding the URL. | Delete the webhook called Thornswood in #news (Edit Channel, Integrations, Webhooks), make a new one, and put its URL in that file. |
 | Dev updates webhook | `C:\Thornswood-Bot\webhooks\dev.txt` on the VPS, read the same way; `bot\dev-webhook.txt` only as the fallback | Posting in the dev updates channel as the bot, for anybody holding the URL. | Delete it in that channel's Integrations, Webhooks, make a new one, and give its URL to `Set-DevNews.ps1`, which checks it points at the dev channel before it saves anything. |
 | Watchdog alerts webhook | `C:\Thornswood-Watch\alerts-webhook.txt` on the VPS, readable by SYSTEM and Administrators only, and `%LOCALAPPDATA%\Thornswood\Watch-Outside\alerts-webhook.txt` on One | Posting in the staff channel, for anybody holding the URL. The watchdog uses it only when the bot is down or silent. | Delete it in the staff channel's Integrations, Webhooks, make a new one, and give its URL to `.\scripts\vps\Watch-Services.ps1 -SetWebhook`, which asks at a prompt and posts a test message, and on One to `.\scripts\vps\Watch-Outside.ps1 -SetWebhook`, which keeps its own copy for when the VPS cannot be reached (issue #448). |
@@ -2374,8 +2384,8 @@ does not know a listed profile id and not somebody who does.
 of the feed on every publish, so those copies keep whatever they last read. It
 opens nothing either way.
 
-**Copies.** The nightly backups, on the box and in `Downloads\Thornswood-Backups`
-once `Fetch-Backups.ps1` has brought them down, are encrypted with the
+**Copies.** The nightly backups, on the box and in `local\backups` in the
+repository folder once `Fetch-Backups.ps1` has brought them down, are encrypted with the
 passphrase. `Backup-Server.ps1` makes a plain zip in that same folder, with
 the site's config, the bot and voice folders whole and every game server's
 `private` folder, so a machine that has run it holds every VPS secret above
