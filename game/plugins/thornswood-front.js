@@ -1879,8 +1879,8 @@
     the J journal.
 
     The trade window's close hides it and leaves the trade to the server: the
-    next change to either pile draws it again, and /trade cancel in the chat
-    still walks away. The wheel's name is the one it has always had here. The
+    next change to either pile draws it again, and so does H, or Trade on the
+    P panel, while the trade stands (#1628), which puts Walk away back. The wheel's name is the one it has always had here. The
     select window is only ever capped once its choice is no longer up.
   */
   const CAP_CLOSES = {
