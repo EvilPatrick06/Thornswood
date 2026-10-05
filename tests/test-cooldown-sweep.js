@@ -10,6 +10,8 @@
 // is older than the longest wait any caller asks about, which is exactly when
 // the row stops changing any answer, so this checks both halves of that: the
 // map stays bounded, and no answer anybody gets is different after a sweep.
+// It also checks the longest wait is worked out from the waits a row is really
+// asked about, no more and no fewer (#1641).
 //
 // characters.json was written in place, and writeFileSync empties a file
 // before it fills it, so a server stopped halfway left a book the next start
@@ -66,10 +68,14 @@ const startAt = src.indexOf('const COOLDOWN_MS = 20000;');
 const stampFn = startAt < 0 ? null : fnBody(src.slice(startAt), 'function stampCooldown(');
 const block = (startAt >= 0 && stampFn)
   ? src.slice(startAt, src.indexOf(stampFn, startAt) + stampFn.length) : null;
+// The block holds COOLDOWN_MS; the plants' wait is defined with the farming.
+// The fish, game and hunt tables are handed in too although longestWaitMs no
+// longer reads them, so one that reads them again fails C1 and C2 by name
+// rather than stopping on a ReferenceError.
 const tables = ['HARVEST_COOLDOWN_MS', 'FISH_TUNING', 'GAME_TUNING', 'HUNT_TUNING'].map(constOf);
 
 yes('the cooldown block is in the gamemode', block !== null);
-yes('and so are the four tables of waits it reads', tables.every(function (t) { return t !== null; }));
+yes('and so are the waits it is checked against', tables.every(function (t) { return t !== null; }));
 
 /* The real block, with a clock, and a Map that counts how often it is walked. */
 function rig(start) {
@@ -92,14 +98,18 @@ function rig(start) {
 }
 
 const HOUR = 3600000;
+const MINUTE = 60000;
 
 if (block !== null && tables.every(function (t) { return t !== null; })) {
 
-  // C1: the longest wait comes off the tables, and today it is four hours.
+  // C1: the longest wait comes off the constants, and today it is the ten
+  // minutes on a picked plant. It was the four hours on a master fishing spot
+  // until #1413 moved the rivers, the racks and the carcasses to the shared
+  // stock; after that it kept rows four hours nothing asked about (#1641).
   {
     const r = rig();
     yes('C1 the longest wait is worked out, not typed', r.longest !== null);
-    yes('C1 and it is the four hours on a master spot', r.longest !== null && r.longest() === 4 * HOUR);
+    yes('C1 and it is the ten minutes on a picked plant', r.longest !== null && r.longest() === 10 * MINUTE);
   }
 
   // C2: every table a cooldown is read against is one longestWaitMs reads.
@@ -137,6 +147,45 @@ if (block !== null && tables.every(function (t) { return t !== null; })) {
     });
     yes('C2 and longestWaitMs reads every one of them' +
         (missing.length ? ' (missing: ' + missing.join(', ') + ')' : ''), missing.length === 0);
+    // And nothing else: a table no row is read against keeps every row as long
+    // as its longest wait for nothing (#1641).
+    const extra = [];
+    const read = /\b([A-Z][A-Z0-9_]*)\.cooldownMs\b|\b((?:[A-Z][A-Z0-9_]*_)?COOLDOWN_MS)\b/g;
+    let e;
+    while (longestBody && (e = read.exec(longestBody)) !== null) {
+      const k = e[1] || e[2];
+      if (!named[k] && extra.indexOf(k) < 0) extra.push(k);
+    }
+    yes('C2 and longestWaitMs reads no wait a row is never asked about' +
+        (extra.length ? ' (extra: ' + extra.join(', ') + ')' : ''), !!longestBody && extra.length === 0);
+
+    // The writers. Every function that stamps a row reads its own wait in the
+    // same function, so the scan above sees the wait of every row there is.
+    // A stamp with its wait read somewhere else would slip past the scan.
+    const writers = [];
+    const stamp = /stampCooldown\(/g;
+    let w;
+    while ((w = stamp.exec(code)) !== null) {
+      const a = code.lastIndexOf('\nfunction ', w.index);
+      const b = code.indexOf('\n}\n', w.index);
+      if (a < 0 || b < 0) continue;
+      const head = code.slice(a + 1, code.indexOf('(', a));
+      if (head === 'function stampCooldown') continue;
+      const body = code.slice(a, b);
+      writers.push({ name: head.replace('function ', ''), reads: /cooldownLeft\(|lastUse\.get\(/.test(body) });
+    }
+    console.log('      functions that stamp lastUse: ' + writers.map(function (x) { return x.name; }).join(', '));
+    const blind = writers.filter(function (x) { return !x.reads; }).map(function (x) { return x.name; });
+    yes('C2 something still stamps lastUse (' + writers.length + ')', writers.length > 0);
+    yes('C2 and every one reads its own wait where it stamps' +
+        (blind.length ? ' (not: ' + blind.join(', ') + ')' : ''), blind.length === 0);
+    // The rivers, the racks, the carcasses and the seams write no row at all.
+    const notWriters = ['function fish(', 'function game(', 'function loot(', 'function mineOre('].filter(function (h) {
+      const body = fnBody(code, h);
+      return !!body && !/stampCooldown\(|lastUse\.|cooldownLeft\(/.test(body);
+    });
+    yes('C2 and the rivers, the racks, the carcasses and the seams keep nothing in lastUse (' +
+        notWriters.length + ' of 4)', notWriters.length === 4);
   }
 
   // C3: one way in. The plants used to set their row directly, past the rule.
@@ -149,8 +198,8 @@ if (block !== null && tables.every(function (t) { return t !== null; })) {
 
   // C4: THE POINT. Fifty thousand presses over fifty hours, one every 3.6
   // seconds, each on a different reference. Without the rule the map ends at
-  // fifty thousand rows; with it, it never holds much more than two four hour
-  // windows' worth.
+  // fifty thousand rows; with it, it never holds much more than the five
+  // thousand a sweep starts at.
   {
     const r = rig();
     let most = 0;
@@ -161,22 +210,23 @@ if (block !== null && tables.every(function (t) { return t !== null; })) {
     }
     console.log('      after 50,000 presses the map holds ' + r.map.size + ', at most ' + most);
     yes('C4 fifty hours of presses do not leave fifty thousand rows', r.map.size < 10000);
-    yes('C4 and it never held more than two windows of four hours', most < 10000);
+    yes('C4 and it never held much more than the mark a sweep starts at', most < 10000);
   }
 
   // C5: no answer changes across a sweep. Rows of every age from nothing to
-  // six hours, asked about with every wait in the tables, before and after.
+  // half an hour, asked about with every wait a row is read against (the
+  // stations' twenty seconds and the plants' ten minutes), before and after.
   {
     const r = rig();
     const T0 = r.clock.now;
-    const spans = [20000, 600000, 1800000, 3600000, 4 * HOUR];
+    const spans = [20000, 10 * MINUTE];
     const rows = [];
     for (let i = 0; i < 360; i++) {
-      r.clock.now = T0 + i * 60000;           // one a minute for six hours
+      r.clock.now = T0 + i * 5000;            // one every five seconds for half an hour
       r.stamp(0xff000900, 0x200000 + i);
       rows.push(0x200000 + i);
     }
-    const askAt = T0 + 6 * HOUR;
+    const askAt = T0 + 30 * MINUTE;
     r.clock.now = askAt;
     function answers() {
       return rows.map(function (ref) {
@@ -184,7 +234,7 @@ if (block !== null && tables.every(function (t) { return t !== null; })) {
       }).join(';');
     }
     const before = answers();
-    const stale = rows.filter(function (ref, i) { return askAt - (T0 + i * 60000) > 4 * HOUR; }).length;
+    const stale = rows.filter(function (ref, i) { return askAt - (T0 + i * 5000) > 10 * MINUTE; }).length;
     let filler = 0;
     while (r.map.has('4278192384:' + rows[0]) && filler < 20000) {
       r.stamp(0xff000a00, 0x300000 + filler);  // same moment, so the answers still match
@@ -193,13 +243,12 @@ if (block !== null && tables.every(function (t) { return t !== null; })) {
     const after = answers();
     const gone = rows.filter(function (ref) { return !r.map.has('4278192384:' + ref); }).length;
     yes('C5 a sweep ran once the map passed the mark', gone > 0);
-    yes('C5 it took exactly the rows older than four hours (' + gone + ' of ' + stale + ')', gone === stale);
+    yes('C5 it took exactly the rows older than ten minutes (' + gone + ' of ' + stale + ')', gone === stale);
     yes('C5 and every answer for every wait is the same after it as before', before === after);
-    // The one Patrick's economy leans on: a master spot three hours and
-    // fifty-nine minutes into its four hours is still refused.
-    const master = rows[121];                  // stamped at T0 + 2:01, six hours on is 3:59 later
-    yes('C5 a master spot stamped 3h59m ago still has a minute to go',
-        r.left(0xff000900, master, 4 * HOUR) === 60);
+    // A plant picked nine minutes and fifty-five seconds ago is still refused.
+    const plant = rows[241];                   // stamped at T0 + 20:05, half an hour on is 9:55 later
+    yes('C5 a plant picked 9m55s ago still has five seconds to go',
+        r.map.has('4278192384:' + plant) && r.left(0xff000900, plant, 10 * MINUTE) === 5);
   }
 
   // C6: the press that pushes the map past the mark keeps its own row.
