@@ -224,9 +224,20 @@ function pluginUses(buf, cc, base, self) {
   is the record of, and the list in it of what its script left out and why
   (harvests.json "unranked", hunts.json "skipped") may name one too: that is
   where a Creation Club record is written down as left out.
+
+  npc-population.json writes its left out rows beside the kept ones, row by
+  row, all on one line: a row with keep false is a placement the script left
+  out, with its reason, and the gamemode hands that ref to the engine as a
+  placement exclusion (NPC_POPULATION_DATA.cut, setNpcPlacementExclusions),
+  which is what keeps it out of the world. Update.esm places twenty refs of
+  the bone wolf, 3025:Update.esm, each deleted or switched off from the
+  start, and all twenty are cut rows (#479, #1413). So in that file a row with keep false may name one,
+  and a kept row, or anything else in it, may not. LEFT_OUT_ROWS says which
+  list and which rows.
 */
 const DESCRIBE_ONLY = ['WARMTH', 'RACES', 'BUILDING_BY_DOOR', 'BUILDING_NAME'];
 const DESCRIBE_ONLY_FILES = ['warmth.json', 'races.json', 'doors.json', 'harvests.json#unranked', 'hunts.json#skipped'];
+const LEFT_OUT_ROWS = { 'npc-population.json': { list: 'npcs', leftOut: function (row) { return row && row.keep === false; } } };
 
 /** The table a line of gamemode.js sits in: the nearest declaration at or above it. */
 function tableAt(lines, i) {
@@ -271,8 +282,13 @@ function gamemodeUses(cc, files, all) {
   for (const entry of files) {
     // A path, or { name, text } for text that is not on disk.
     const f = typeof entry === 'string' ? entry : entry.name;
-    const lines = (typeof entry === 'string' ? fs.readFileSync(f, 'latin1') : String(entry.text)).split('\n');
+    const text = typeof entry === 'string' ? fs.readFileSync(f, 'latin1') : String(entry.text);
+    const lines = text.split('\n');
     const base = path.basename(f).toLowerCase();
+    if (LEFT_OUT_ROWS[base]) {
+      rowHits(cc, f, base, text, all, hits);
+      continue;
+    }
     for (let i = 0; i < lines.length; i++) {
       let m;
       re.lastIndex = 0;
@@ -305,6 +321,47 @@ function gamemodeUses(cc, files, all) {
   return hits;
 }
 
+/**
+ * The hits in a file LEFT_OUT_ROWS names, read as JSON rather than by line:
+ * a key in a row its rule calls left out is allowed, a key anywhere else is
+ * not. A file that does not read as JSON is judged whole, every hit refused.
+ */
+function rowHits(cc, f, base, text, all, hits) {
+  const rule = LEFT_OUT_ROWS[base];
+  const re = /\b([0-9a-f]{1,8}):([^"'|,:<>\r\n]{1,80}?\.es[mlp])\b/gi;
+  let data = null;
+  try { data = JSON.parse(text.replace(/^\uFEFF|^\u00EF\u00BB\u00BF/, '')); } catch (e) { data = null; }
+  function scan(value, leftOut, where) {
+    if (typeof value === 'string') {
+      let m;
+      re.lastIndex = 0;
+      while ((m = re.exec(value))) {
+        const plugin = m[2].trim();
+        const low = m[1].toLowerCase().replace(/^0+(?=.)/, '');
+        let why = '';
+        if (isCreation(plugin)) { why = 'a Creation Club file'; }
+        else if (plugin.toLowerCase() === 'update.esm' && cc[low]) { why = cc[low]; }
+        else { continue; }
+        const allowed = leftOut && why !== 'a Creation Club file';
+        if (allowed && !all) { continue; }
+        hits.push({ file: path.relative(REPO, f), line: where, key: m[0], why: why, table: base, allowed: allowed });
+      }
+    } else if (Array.isArray(value)) {
+      for (const v of value) { scan(v, leftOut, where); }
+    } else if (value && typeof value === 'object') {
+      for (const k of Object.keys(value)) { scan(value[k], leftOut, where); }
+    }
+  }
+  if (!data) { scan(text, false, 1); return; }
+  for (const k of Object.keys(data)) {
+    if (k === rule.list && Array.isArray(data[k])) {
+      data[k].forEach(function (row) { scan(row, rule.leftOut(row), 1); });
+    } else {
+      scan(data[k], false, 1);
+    }
+  }
+}
+
 /** The enabled names of a plugins.txt, in order. */
 function enabledOf(text) {
   const out = [];
@@ -319,7 +376,7 @@ function enabledOf(text) {
 
 module.exports = {
   isCreation, readHeader, subrecords, records, creationRecords, baseReferences, pluginUses,
-  gamemodeUses, enabledOf, DESCRIBE_ONLY, DESCRIBE_ONLY_FILES
+  gamemodeUses, enabledOf, DESCRIBE_ONLY, DESCRIBE_ONLY_FILES, LEFT_OUT_ROWS
 };
 
 // ------------------------------------------------------------------ the run

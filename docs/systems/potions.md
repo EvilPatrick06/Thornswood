@@ -29,6 +29,17 @@ the 30 minutes, clears it. A potion does not clear it.
 
 ## Where this is
 
-The sip of 5 is in the server. The windows, the falling heal, the
-strain and withered are not. Potions currently stack as the game
-allows, plus thirst.
+The sip of 5 and restoration strain are in the server. The server hears
+every restoration spell a person casts. It cannot refuse a cast,
+because the game casts it before the server hears of it, so the strain
+is the price: the second costs 25% more, the third 25% more again, and
+after the fourth the price is past any magicka for 20 seconds, with
+stamina and health recovery at -20%. The price moves through the value
+the game's own Fortify Restoration moves. Nobody has yet cast five in a
+row in the game to read the magicka each one asked for.
+
+The diminishing potions and withered are not in the server. Potions
+currently stack as the game allows, plus thirst. Withered waits for
+the cooked meal on [Food](food.md), and its 80% of max health and
+magicka needs the client to apply a share, where what the server sends
+today is amounts.

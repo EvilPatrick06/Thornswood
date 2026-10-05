@@ -83,7 +83,7 @@
   const OVERLAYS = ['thornswood-chat.js', 'thornswood-emotes.js', 'thornswood-voice.js',
                     'thornswood-skills.js', 'thornswood-party.js',
                     'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js',
-                    'thornswood-repair.js', 'thornswood-maneuvers.js', 'thornswood-afk.js'];
+                    'thornswood-repair.js', 'thornswood-maneuvers.js', 'thornswood-ride.js', 'thornswood-afk.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -361,6 +361,16 @@
   */
   const SLEEP_KEY   = MOLD_KEY;
   /*
+    A Master's "Take on as apprentice" on the look prompt (#1634). K, THE
+    SKILLS KEY, and not a new one: every letter is already Skyrim's or ours,
+    and what it does is open the K panel anyway, on its Masters and
+    apprentices page with the person under the crosshair and a Take on for
+    each half the server says could be meant. Only while the server's near
+    list puts the row there; the rest of the time K is K. See
+    apprenticePress.
+  */
+  const APPRENTICE_KEY = SKILLS_KEY;
+  /*
     A warrior's maneuvers (#1386): opens the maneuver panel. 9, scan code 10:
     1 to 8 are the emote slots and the game's own hotkeys, and every letter is
     already one of ours or the game's.
@@ -384,8 +394,28 @@
   const MUTE_NAME = keyName(MUTE_KEY);
   const MOLD_NAME = keyName(MOLD_KEY);
   const SLEEP_NAME = keyName(SLEEP_KEY);
+  const APPRENTICE_NAME = keyName(APPRENTICE_KEY);
   const LOCK_NAME = keyName(LOCK_KEY);
   const MANEUVER_NAME = keyName(MANEUVER_KEY);
+  /*
+    HANDING OVER A LETTER (#1595). Patrick, 4 Oct: /deliver becomes a key on
+    the look prompt, shown while you carry a letter for the person under the
+    crosshair. Which key was not said; the question is on #1595 and this is
+    its suggested answer: E, Skyrim's own Activate, on that person, the way E
+    works on a board, a driver or a trader. Every letter is already Skyrim's
+    or ours, and U, the one other key a person under the crosshair can have,
+    is the holder's Let sleep here (#1603), which can be up at the same time.
+    0 means the Activate control, wherever the person has bound it; a scan
+    code here (MOLD_KEY, say) puts it on that key instead.
+  */
+  const DELIVER_KEY = 0;
+  function deliverName() {
+    if (DELIVER_KEY) { return keyName(DELIVER_KEY); }
+    let code = 0;
+    try { code = sp.Input.getMappedKey('Activate', 0); } catch (e) { code = 0; }
+    // 18 is E, Skyrim's own default for Activate, when the game does not say.
+    return keyName(code > 0 && code < 256 ? code : 18);
+  }
 
   const ESC = 1;
 
@@ -1879,15 +1909,15 @@
     the J journal.
 
     The trade window's close hides it and leaves the trade to the server: the
-    next change to either pile draws it again, and /trade cancel in the chat
-    still walks away. The wheel's name is the one it has always had here. The
+    next change to either pile draws it again, and so does H, or Trade on the
+    P panel, while the trade stands (#1628), which puts Walk away back. The wheel's name is the one it has always had here. The
     select window is only ever capped once its choice is no longer up.
   */
   const CAP_CLOSES = {
     skills: 'thornswoodSkills', party: 'thornswoodParty', journal: 'thornswoodJournal',
     board: 'thornswoodBoard', repair: 'thornswoodRepair',
     trade: 'thornswoodTrade', merchant: 'thornswoodMerchant', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
-    afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers'
+    afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers', ride: 'thornswoodRide'
   };
 
   T.claimFocus = function (who, on) {
@@ -2901,9 +2931,15 @@
     raceWasOpen = open;
     if (!open) {
       raceToldAt = 0;
-      // Not when the menu went because the game is being closed: a face
-      // left half made is not a face done. See closeGame.
-      if (closingGame) { log('the race menu closed with the game closing, not telling the server'); return; }
+      // closingGame is F10 twice or the quit paths. A face left half made
+      // is not /face done, so that word is not sent. The server still has
+      // to learn the menu is down: if faceOpenAt stays set, a player who
+      // is still connected is never asked again. /racedown is that fact.
+      if (closingGame) {
+        log('the race menu closed with the game closing, telling the server it is down');
+        tellServer('/racedown');
+        return;
+      }
       log('the race menu closed, telling the server');
       tellServer('/face done');
     }
@@ -4491,7 +4527,8 @@
 
   /** Draw or clear the little panel that names them and the three keys. */
   function drawPrompt(row) {
-    const sig = row ? (row.n + '|' + row.f + '|' + row.m + '|' + row.y + '|' + (row.s || 0) + '|' + (row.c || '')) : '';
+    const sig = row ? (row.n + '|' + row.f + '|' + row.m + '|' + row.y + '|' + (row.s || 0) + '|' + (row.c || '') +
+                       '|' + (row.d || 0) + '|' + (row.a ? JSON.stringify(row.a) : '')) : '';
     if (sig === lookingSig) { return; }
     lookingSig = sig;
     if (!row) {
@@ -4528,7 +4565,14 @@
       // Only for a holder looking at somebody inside a building they hold:
       // the server's near list says so (#1603). See sleepPress.
       (row.s ? keyRow(SLEEP_NAME, row.s === 2 ? 'Stop letting sleep here' : 'Let sleep here',
-                      row.s === 2) : '');
+                      row.s === 2) : '') +
+      // Only while you carry a letter for them: the near list's d (#1595).
+      // See deliverPress.
+      (row.d ? keyRow(deliverName(), 'Hand over the letter', false) : '') +
+      // Only for a Master looking at somebody they could take on: the
+      // server's near list says so, with the halves (#1634). See
+      // apprenticePress.
+      (Array.isArray(row.a) && row.a.length ? keyRow(APPRENTICE_NAME, 'Take on as apprentice', false) : '');
 
     T.js('(function(){try{' +
          'var d=document.getElementById("ts-look");' +
@@ -4594,7 +4638,8 @@
 
     P and J are Patrick's own choices and are the exception: those two open
     their panels whether or not anybody is being looked at, because a party
-    menu you can only open by staring at a friend is not a menu.
+    menu you can only open by staring at a friend is not a menu. P on
+    somebody who is not in your party asks them in instead (partyPress).
   */
   function lookVerb(cmd) {
     if (!lookingAt) { return false; }
@@ -4616,6 +4661,24 @@
     the line arrives. Answers whether it was used, so the key falls through
     when it was not.
   */
+  /*
+    Hand the person under the crosshair the letters you carry for them
+    (#1595). Only while the prompt offers it, which is the server's near list
+    saying you carry one for them, and deliver measures the name, the reach
+    and the cell again when the line arrives. Answers whether it was used,
+    so an E on anybody else goes on to the board, the driver or the trader.
+  */
+  function deliverPress(e) {
+    if (!e || !lookingAt) { return false; }
+    if (DELIVER_KEY ? e.code !== DELIVER_KEY : e.userEventName !== 'Activate') { return false; }
+    if (claims.chat) { return false; }
+    if (busyMenuOpenNow()) { return false; }
+    const near = nearList();
+    const row = (near && Object.prototype.hasOwnProperty.call(near, lookingAt)) ? near[lookingAt] : null;
+    if (!row || !row.d) { return false; }
+    return lookVerb('deliver');
+  }
+
   function sleepPress() {
     if (!lookingAt) { return false; }
     if (claims.chat) { return false; }
@@ -4625,6 +4688,72 @@
     if (!row || !row.s) { return false; }
     return lookVerb('sleephere');
   }
+
+  /*
+    Take the person under the crosshair on as an apprentice (#1634). Only
+    while the prompt offers it, which is the server's near list naming the
+    halves this Master could take them on in. Nothing is sent from here:
+    the K panel opens on Masters and apprentices with that person and a
+    Take on for each half, and its button sends the line, so the choice of
+    half is made before the offer goes. The server asks every rule again
+    when it arrives. Answers whether it was used, so K falls through to
+    opening or closing the panel when it was not.
+  */
+  function apprenticePress() {
+    if (!lookingAt) { return false; }
+    if (claims.chat) { return false; }
+    if (T.hasFocus('skills')) { return false; }
+    if (busyMenuOpenNow()) { return false; }
+    const near = nearList();
+    const row = (near && Object.prototype.hasOwnProperty.call(near, lookingAt)) ? near[lookingAt] : null;
+    if (!row || !Array.isArray(row.a) || !row.a.length) { return false; }
+    const who = { id: lookingAt, name: String(row.n || ''), halves: row.a };
+    T.js('try{if(window.thornswoodSkills&&window.thornswoodSkills.takeOn){' +
+         'window.thornswoodSkills.takeOn(' + JSON.stringify(who) + ');}}catch(e){}');
+    say('take on as apprentice: ' + lookingAt);
+    return true;
+  }
+
+  /*
+    P on somebody who is not in your party asks them in (#1629), the way Y
+    sends /friend: the prompt says "Ask to party" for exactly them, from the
+    near list's y flag. On a party member the prompt says "Party menu", and
+    with nobody looked at there is no prompt; either way this answers false
+    and the key opens the panel. Nobody types /party any more (Patrick,
+    4 Oct: buttons, not commands); this and the P panel are what send it,
+    and the server checks the ask again when it arrives.
+
+    No menu check here. The key handler has already made it for P, and the
+    game's Quick Magic, which this same press opened, is let through there
+    and shut by magicOnP; asking busyMenuOpenNow would refuse every press.
+  */
+  function partyPress() {
+    if (!lookingAt) { return false; }
+    const near = nearList();
+    const row = (near && Object.prototype.hasOwnProperty.call(near, lookingAt)) ? near[lookingAt] : null;
+    if (!row || row.y) { return false; }
+    return lookVerb('party');
+  }
+
+  /*
+    Who is in front of you, for the group book on J (#1630). factions.md: "You
+    invite the character in front of you, or by name". The J panel cannot see
+    the crosshair, so as it opens it is told who the look prompt is drawn
+    for: the same form id Y, H and L send, and the name the server put on the
+    near list. Its group tab then offers Invite with that name, and the line
+    it sends is /book invite with the id, which the server checks again.
+    Nobody in front clears it, so the button is there only while it applies.
+    A listener of its own, so the J key handling (#1016) is left alone.
+  */
+  sp.on('browserMessage', guard('journal facing', (event) => {
+    const a = event && event.arguments;
+    if (!a || a[0] !== 'thornswood-front' || a[1] !== 'journal:opened') { return; }
+    const near = nearList();
+    const row = (lookingAt && near && Object.prototype.hasOwnProperty.call(near, lookingAt)) ? near[lookingAt] : null;
+    const facing = row ? { id: lookingAt, name: String(row.n || '') } : null;
+    T.js('try{if(window.thornswoodJournal&&window.thornswoodJournal.setFacing){' +
+         'window.thornswoodJournal.setFacing(' + JSON.stringify(facing) + ');}}catch(e){}');
+  }));
 
   /*
     ------------------------------------------ a key mold, into a door's lock
@@ -4704,13 +4833,18 @@
     return moldBase > 0;
   }
 
-  /** How many of the Key Molds carried have a name, which is a door's. 0 when it cannot tell. */
-  function stampedMolds(pc) {
+  /*
+    How many of the Key Molds carried have a name, which is a door's. 0 when
+    it cannot tell. base is the Key Mold's runtime id when the caller has its
+    own (the lock key at a forge, #1637), and moldBase otherwise.
+  */
+  function stampedMolds(pc, base) {
+    const want = base || moldBase;
     let named = 0;
     try {
       const changes = sp.getExtraContainerChanges(pc.getFormID()) || [];
       for (let i = 0; i < changes.length; i++) {
-        if (!changes[i] || changes[i].baseId !== moldBase) { continue; }
+        if (!changes[i] || changes[i].baseId !== want) { continue; }
         const lists = changes[i].extendDataList || [];
         for (let j = 0; j < lists.length; j++) {
           let n = 1, name = false;
@@ -4830,21 +4964,6 @@
     return true;
   }
 
-
-  /*
-    Lock the door you last opened. Patrick on #615: /lock should be a key
-    press that is logged to the server as /lock when pressed. The server
-    keeps every rule /lock already has (stand at the door, be the holder or
-    carry the deed). Unlock stays the typed /unlock.
-  */
-  function lockPress() {
-    if (!T.ready) { return false; }
-    if (claims.chat) { return false; }
-    if (busyMenuOpenNow()) { return false; }
-    tellServer('/lock');
-    say('pressed ' + LOCK_NAME + ' for /lock');
-    return true;
-  }
   sp.on('update', guard('mold', () => {
     const now = Date.now();
     if (now - moldAt < MOLD_EVERY) { return; }
@@ -4858,6 +4977,297 @@
     if (KEYBOARD_MENUS.indexOf(String((e && e.name) || '')) === -1) { return; }
     moldDoor = '';
     drawMold(false);
+  }));
+
+  /*
+    ------------------------------------- the lock key: a door, a forge (#1637)
+
+    Patrick, 4 October: no chat commands for anything people do, only
+    buttons and GUI. The lock key (X unless LockKey moved it) used to send
+    /lock at whatever door was opened last, and claiming, unlocking and
+    cutting a key were typed. Now it does what one line under the crosshair
+    says, and only while that line is up:
+
+      a door of the building you just     Claim when nobody holds it, Lock or
+      opened                              Unlock when it is yours. The
+                                          suggested answer on #1637: one key,
+                                          and the line says which it will do.
+      a forge, carrying a key mold that   Cut a key.
+      has been pressed into a door
+      a crop (#1636)                      What is in the ground and whose farm
+                                          it is, E's Sow a Cabbage when the
+                                          press would sow it, and Claim this
+                                          farm when the key would claim it.
+
+    THE DOOR'S WORD IS THE SERVER'S. Which building a door belongs to, who
+    holds it and whether it is locked are all in the register, so the server
+    writes thornswoodDoorLine on every door of a building somebody opens and
+    after every press (doorLine in the property block): the word, the name,
+    and that building's doors by form id. The line is up while one of those
+    doors is under the crosshair, either half of a front door, for as long as
+    the server still takes it as the door just opened.
+
+    THE FORGE IS KNOWN BY ITS BASE, the six forges of the bench table in the
+    gamemode (BENCH_BY_BASE rows for CraftingSmithingForge), resolved by file
+    and local id like the drivers below, and held to that table by
+    tests/test-1637-door-gui.js. The mold is a Key Mold with a door's name on
+    it, counted the way the mold key counts them.
+
+    A CROP ASKS (#1636). A plot's state is on the plot, where nobody's client
+    can read it, and whose farm it is is in the claims file. So a crop that
+    stays under the crosshair for a second look sends /plot and its id, and
+    the server writes the answer on thornswoodPlotLine (plotLine in the
+    farming block) for this person alone. Asked again every PLOT_ASK_MS while
+    it is looked at, so the minutes move, and never for a crop only swept
+    past. The crops are known by base, every base CROPS answers in the
+    gamemode, held to that table by tests/test-1636-farm-gui.js.
+
+    The key sends /claim, /lock, /unlock or /key with the id under the
+    crosshair. Those are the lines the server always answered, nobody is told
+    to type them, and the server checks everything again: the door just
+    opened, the holder, the smith, the forge, the mold and the ingot, and at
+    a plot the class, the reach and whose ground it is.
+
+    Never over a menu or while the chat has the keyboard, on the crosshair
+    poll's beat, and down the moment a menu takes the keyboard, for the
+    reasons the mold line gives.
+  */
+  const LOCK_EVERY = 320;
+  // The mold line's look, a line lower, so the two never sit on each other:
+  // a holder carrying a blank who looks at their own door has both.
+  const LOCK_CSS =
+    'position:fixed;left:50%;top:67%;transform:translateX(-50%);z-index:2147482900;' +
+    'pointer-events:none;white-space:nowrap;' +
+    'font-family:"Palatino Linotype",Palatino,Georgia,serif;font-size:19px;letter-spacing:.03em;' +
+    'color:#d9cfb4;background:rgba(11,10,8,.72);border:1px solid rgba(198,170,109,.42);' +
+    'padding:8px 16px 9px;text-shadow:0 2px 4px rgba(0,0,0,.95)';
+  const FORGE_BASES = [
+    ['Skyrim.esm', 0x1a2ad], ['Skyrim.esm', 0xbf9e1], ['Skyrim.esm', 0xcae0b],
+    ['Dragonborn.esm', 0x2b074], ['Dragonborn.esm', 0x3cf6e], ['North Keep.esp', 0x21152]
+  ];
+  const CROP_BASES = [
+    ['Skyrim.esm', 0xbcf48], ['Skyrim.esm', 0xbb952], ['Skyrim.esm', 0xbcf47],
+    ['Skyrim.esm', 0xbe3e6], ['Skyrim.esm', 0xbb953], ['Dragonborn.esm', 0x206e8],
+    ['JKs Skyrim.esp', 0x2493e], ['JKs Skyrim.esp', 0x2493d], ['JKs Skyrim.esp', 0x2c91],
+    ['JKs Skyrim.esp', 0x3274], ["JK's Whiterun's Outskirts.esp", 0x1503ff],
+    ["JK's Whiterun's Outskirts.esp", 0x18d5d7], ["JK's Whiterun's Outskirts.esp", 0x141081],
+    ["JK's Whiterun's Outskirts.esp", 0x141088]
+  ];
+  const PLOT_ASK_MS = 10000;     // asked again this often while one crop is looked at
+  const PLOT_LINE_MS = 30000;    // an answer older than this is not drawn
+  let lockAt = 0;
+  let lockShown = '';      // what the line says while it is up, '' while it is down
+  let lockSentFor = '';
+  let lockSentAt = 0;
+  let forgeIds = null;     // null not found yet, else { runtime id: true }
+  let cropIds = null;
+  let keyMoldId = -1;      // -1 not asked yet, 0 not in this build, else the Key Mold's runtime id
+  let plotLookHex = '';    // the crop under the crosshair at the last look
+  let plotAskedFor = '';
+  let plotAskedAt = 0;
+
+  /* A list of bases by file and local id as runtime ids, or null until the world answers for any. */
+  function basesOf(list) {
+    const out = {};
+    let found = 0;
+    for (let i = 0; i < list.length; i++) {
+      try {
+        const form = sp.Game.getFormFromFile(list[i][1], list[i][0]);
+        const id = form ? (form.getFormID() >>> 0) : 0;
+        if (id) { out[id] = true; found++; }
+      } catch (err) { }
+    }
+    return found ? { ids: out, found: found } : null;
+  }
+
+  // Remembered once the world answers for any of them; asked again until then.
+  function forgeIdSet() {
+    if (forgeIds) { return forgeIds; }
+    const got = basesOf(FORGE_BASES);
+    if (!got) { return {}; }
+    forgeIds = got.ids;
+    say('forges for the lock key: ' + got.found + ' of ' + FORGE_BASES.length + ' bases found');
+    return forgeIds;
+  }
+
+  function cropIdSet() {
+    if (cropIds) { return cropIds; }
+    const got = basesOf(CROP_BASES);
+    if (!got) { return {}; }
+    cropIds = got.ids;
+    say('crops for the line at a plot: ' + got.found + ' of ' + CROP_BASES.length + ' bases found');
+    return cropIds;
+  }
+
+  /** The server's answer for this crop, while it is new enough to draw. */
+  function plotLineNow(hex) {
+    let v = null;
+    try { v = globalThis.thornswoodPlotLine; } catch (e) { v = null; }
+    if (!v || typeof v !== 'object' || v.hex !== hex) { return null; }
+    if (Date.now() - (Number(v.seen) || 0) > PLOT_LINE_MS) { return null; }
+    return v;
+  }
+
+  /*
+    Ask the server about the crop under the crosshair: on the second look at
+    the same one, so a crop swept past is never asked about, and then every
+    PLOT_ASK_MS for as long as it stays there.
+  */
+  function askPlot(hex) {
+    const t = Date.now();
+    if (hex !== plotLookHex) { plotLookHex = hex; return; }
+    const v = plotLineNow(hex);
+    if (v && t - (Number(v.seen) || 0) < PLOT_ASK_MS) { return; }
+    if (hex === plotAskedFor && t - plotAskedAt < PLOT_ASK_MS) { return; }
+    plotAskedFor = hex;
+    plotAskedAt = t;
+    tellServer('/plot ' + hex);
+  }
+
+  function keyMoldNow() {
+    if (keyMoldId >= 0) { return keyMoldId; }
+    try {
+      if (!sp.Game.getPlayer()) { return 0; }
+      const item = sp.Game.getFormFromFile(MOLD_ITEM, MOLD_FILE);
+      keyMoldId = item ? (item.getFormID() >>> 0) : 0;
+    } catch (e) {
+      // Not remembered. A throw is not an answer, so it is asked again.
+      return 0;
+    }
+    return keyMoldId;
+  }
+
+  /** The line the server wrote for the door just opened, while it still counts. */
+  function doorLineNow() {
+    let v = null;
+    try { v = globalThis.thornswoodDoorLine; } catch (e) { v = null; }
+    if (!v || typeof v !== 'object' || !v.x || !Array.isArray(v.d)) { return null; }
+    if (Date.now() - (Number(v.seen) || 0) > (Number(v.left) || 0)) { return null; }
+    return v;
+  }
+
+  const LOCK_WORDS = { claim: 'Claim ', lock: 'Lock ', unlock: 'Unlock ' };
+
+  /** What the lock key would do right now: { hex, verb, words }, or null. */
+  function lockKeyNow() {
+    if (anyClaim()) { return null; }
+    let ref = null;
+    try { ref = sp.Game.getCurrentCrosshairRef(); } catch (e) { ref = null; }
+    if (!ref) { return null; }
+    let type = 0, baseId = 0, hex = '';
+    try {
+      const b = ref.getBaseObject();
+      type = b ? b.getType() : 0;
+      baseId = b ? (b.getFormID() >>> 0) : 0;
+      hex = (ref.getFormID() >>> 0).toString(16);
+    } catch (e) { return null; }
+    if (type === DOOR_TYPE) {
+      const v = doorLineNow();
+      if (!v || v.d.indexOf(hex) === -1 ||
+          !Object.prototype.hasOwnProperty.call(LOCK_WORDS, v.x)) { return null; }
+      if (busyMenuOpenNow()) { return null; }
+      return { hex: hex, verb: v.x, words: LOCK_WORDS[v.x] + String(v.n || 'this building') };
+    }
+    if (baseId && cropIdSet()[baseId]) {
+      if (busyMenuOpenNow()) { return null; }
+      const p = plotLineNow(hex);
+      return { hex: hex, plot: true, verb: p && p.x ? 'claim' : '', words: p ? p.x : '',
+               info: p ? p.t : '', e: p ? p.e : '' };
+    }
+    if (!baseId || !forgeIdSet()[baseId]) { return null; }
+    const mold = keyMoldNow();
+    if (!mold) { return null; }
+    if (busyMenuOpenNow()) { return null; }
+    let pc = null, carried = 0;
+    try {
+      pc = sp.Game.getPlayer();
+      const form = sp.Game.getFormEx(mold);
+      carried = (pc && form) ? pc.getItemCount(form) : 0;
+    } catch (e) { carried = 0; }
+    if (!(carried > 0) || !(stampedMolds(pc, mold) > 0)) { return null; }
+    return { hex: hex, verb: 'key', words: 'Cut a key from your key mold' };
+  }
+
+  function plainWords(text) { return String(text || '').replace(/[<>&"]/g, ''); }
+  function lockRow(key, words) {
+    return '<div style="margin-top:2px"><span style="display:inline-block;min-width:26px;' +
+      'text-align:center;margin-right:12px;padding:1px 7px;border:1px solid rgba(233,209,155,.55);' +
+      'border-bottom-width:2px;border-radius:3px;background:rgba(0,0,0,.35);color:#e9d19b">' +
+      key + '</span>' + plainWords(words) + '</div>';
+  }
+
+  /*
+    The line up with what lockKeyNow found, or down for nothing: at a plot
+    the server's words first and then a row for each key that does
+    something there, E before the lock key; at a door or a forge the lock
+    key's row alone. Only remembered once the page has taken it.
+  */
+  function drawLock(now) {
+    const info = now && now.info ? plainWords(now.info) : '';
+    const rows = [];
+    if (now && now.e) { rows.push(lockRow('E', now.e)); }
+    if (now && now.words) { rows.push(lockRow(LOCK_NAME, now.words)); }
+    const html = (info ? '<div style="font-size:16px;color:#c9b99a;margin-bottom:3px">' + info + '</div>' : '') +
+                 rows.join('');
+    if (html === lockShown) { return; }
+    if (!html) {
+      if (T.js('try{var d=document.getElementById("ts-lock");if(d){d.style.display="none";}}catch(e){}')) {
+        lockShown = '';
+      }
+      return;
+    }
+    if (T.js('(function(){try{' +
+             'var d=document.getElementById("ts-lock");' +
+             'if(!d){d=document.createElement("div");d.id="ts-lock";' +
+             'd.style.cssText=' + JSON.stringify(LOCK_CSS) + ';' +
+             'document.body.appendChild(d);}' +
+             'd.innerHTML=' + JSON.stringify(html) + ';' +
+             'd.style.display="";' +
+             '}catch(e){}})();')) {
+      lockShown = html;
+    }
+  }
+
+  function lockLook() {
+    if (!T.ready) { lockShown = ''; return; }
+    const now = lockKeyNow();
+    if (now && now.plot) { askPlot(now.hex); } else { plotLookHex = ''; }
+    drawLock(now);
+  }
+
+  /*
+    The key. Asked again at the moment it goes down, so what is sent is what
+    is under the crosshair at the press. Answers whether it was used, so the
+    key falls through when no line is up. The same word for the same thing
+    once in a second and a half, so a double press is not a second answer.
+  */
+  function lockPress() {
+    if (!T.ready) { return false; }
+    if (claims.chat) { return false; }
+    const now = lockKeyNow();
+    drawLock(now);
+    if (!now || !now.verb) { return false; }
+    const sig = now.verb + ' ' + now.hex;
+    const t = Date.now();
+    if (sig === lockSentFor && t - lockSentAt < 1500) { return true; }
+    lockSentFor = sig;
+    lockSentAt = t;
+    tellServer('/' + sig);
+    say('pressed ' + LOCK_NAME + ' for /' + sig);
+    return true;
+  }
+
+  sp.on('update', guard('lock line', () => {
+    const now = Date.now();
+    if (now - lockAt < LOCK_EVERY) { return; }
+    lockAt = now;
+    lockLook();
+  }));
+
+  sp.on('menuOpen', guard('lock menu', (e) => {
+    if (!lockShown) { return; }
+    if (KEYBOARD_MENUS.indexOf(String((e && e.name) || '')) === -1) { return; }
+    drawLock(null);
   }));
 
   /*
@@ -7014,15 +7424,17 @@
   }
 
   /*
-    A CARRIAGE OR FERRY DRIVER ASKS THE SERVER (#1394).
+    A CARRIAGE OR FERRY DRIVER OPENS HIS PANEL (#1394, #1635).
 
     Pressing E on a driver opens the carriage mod's own talk, and that talk
     does not know the hold's ledger: its ride is a fade on this machine that
     the server undoes, because the server refuses a move it did not make.
     So the same press also tells the server which driver it was, as
-    /ride e <id>, the way the merchant press does, and the server answers in
-    the chat with where this driver goes and what each stop costs. /ride and
-    the stop, said there, is the ride that counts.
+    /ride e <id>, the way the merchant press does, and the server answers
+    with where this driver goes and what each stop costs, which
+    game/ui/thornswood-ride.js draws. A stop's Ride button there is the ride
+    that counts. Nobody types a line (Patrick, 4 Oct: no chat commands for
+    what people do).
 
     THE DRIVERS ARE KNOWN BY THEIR BASE, the same rows as the carriages block
     in the gamemode (tests/test-1394-fares.js holds the two lists together).
@@ -7044,6 +7456,46 @@
     ['CFTO.esp', 0x14c6c], ['Dragonborn.esm', 0x182ae], ['Dragonborn.esm', 0x2582b]
   ];
   let rideDriverIds = null;
+
+  /*
+    THE RIDE PANEL WAITS FOR THE MOD'S CONVERSATION (#1635). The same E opens
+    the carriage mod's own talk, the Dialogue Menu, and a panel that took the
+    keyboard while that is up would leave the talk with no keys. So the
+    panel is up only while no menu is. When the page says the server's view
+    has come ('ride:wants'), it opens at once if no menu is open, or when the
+    menu that is open closes. A menu the game raises over the panel (the
+    talk opening after the server answered, a load screen) closes the panel,
+    and it waits again. It is over when you walk out of reach of the driver
+    you pressed, the reach the server measures (RIDE_REACH in the carriages
+    block), and when the page closes it: Step back, Escape, or the server
+    after a ride that went. The driver is kept as his local form id, never
+    as a form, and asked for in the frame it is used.
+  */
+  const RIDE_REACH = 400;
+  let rideDriver = 0;
+  let rideState = '';
+  let rideWatchAt = 0;
+
+  function rideInReach() {
+    if (!rideDriver) { return false; }
+    try {
+      const pc = sp.Game.getPlayer();
+      const ref = sp.ObjectReference.from(sp.Game.getFormEx(rideDriver));
+      if (!pc || !ref) { return false; }
+      const dx = pc.getPositionX() - ref.getPositionX();
+      const dy = pc.getPositionY() - ref.getPositionY();
+      const dz = pc.getPositionZ() - ref.getPositionZ();
+      return Math.sqrt(dx * dx + dy * dy + dz * dz) <= RIDE_REACH;
+    } catch (err) { return false; }
+  }
+
+  // except: the menu that is closing right now, which is not in the way.
+  function rideOpenIfFree(except) {
+    if (rideState !== 'waiting') { return; }
+    if (!rideInReach()) { rideState = ''; return; }
+    if (busyMenuOpenNow(except)) { return; }
+    T.js('try{window.thornswoodRide&&window.thornswoodRide.open();}catch(e){}');
+  }
 
   function rideDriverIdSet() {
     if (rideDriverIds) { return rideDriverIds; }
@@ -7077,17 +7529,39 @@
     } catch (err) { return false; }
     if (!baseId || !rideDriverIdSet()[baseId]) { return false; }
     let hex = '';
+    let localId = 0;
     try {
       const convert = globalThis.thornswoodSocialServerId;
-      const localId = ref.getFormID() >>> 0;
+      localId = ref.getFormID() >>> 0;
       const serverId = typeof convert === 'function' ? (convert(localId) >>> 0) : localId;
       if (serverId) { hex = serverId.toString(16); }
     } catch (err) { hex = ''; }
     if (!hex) { return false; }
+    rideDriver = localId;
     tellServer('/ride e ' + hex);
     say('asked the server where driver ' + hex + ' goes');
     return true;
   }
+
+  sp.on('menuOpen', guard('ride panel waits', (e) => {
+    if (rideState !== 'up' || !e || SELF_OPENING_MENUS.indexOf(e.name) < 0) { return; }
+    rideState = 'waiting';
+    T.js('try{window.thornswoodRide&&window.thornswoodRide.close();}catch(e){}');
+  }));
+
+  sp.on('menuClose', guard('ride panel opens', (e) => {
+    rideOpenIfFree(e && e.name ? e.name : '');
+  }));
+
+  sp.on('update', guard('ride distance', () => {
+    if (!rideState) { return; }
+    const now = Date.now();
+    if (now - rideWatchAt < 250) { return; }
+    rideWatchAt = now;
+    if (rideInReach()) { return; }
+    rideState = '';
+    T.js('try{window.thornswoodRide&&window.thornswoodRide.close();}catch(e){}');
+  }));
 
   function merchantPress(e) {
     if (!e || e.userEventName !== 'Activate') { return false; }
@@ -7211,6 +7685,9 @@
 
     if (!T.ready) return;
 
+    // E on somebody you carry a letter for hands it over (#1595), before the
+    // trader's E below takes any press on a person.
+    if (deliverPress(e)) return;
     if (boardPress(e)) return;
     if (driverPress(e)) return;
     if (merchantPress(e)) return;
@@ -7227,7 +7704,8 @@
     */
     /*
       The social keys. The three verbs need somebody under the crosshair and
-      say nothing when there is not; P and J open their panels regardless.
+      say nothing when there is not; P and J open their panels regardless,
+      except that P on somebody not in your party asks them in.
     */
     // The mold key, and only while a door is under the crosshair and a Key
     // Mold is in the pack. Otherwise it is not used and goes on down the list.
@@ -7274,8 +7752,13 @@
     if (e.code === TRADE_KEY) { lookVerb('trade'); return; }
     if (e.code === MUTE_KEY) { lookVerb('mute'); return; }
     if (e.code === PARTY_KEY) {
-      T.js('try{window.thornswoodParty&&window.thornswoodParty.toggle();}catch(e){}');
-      // The game took this same press as its Quick Magic: shut that menu.
+      // On somebody not in your party it asks them (#1629); otherwise, or
+      // while the panel is up and P is closing it, it is the panel.
+      if (T.hasFocus('party') || !partyPress()) {
+        T.js('try{window.thornswoodParty&&window.thornswoodParty.toggle();}catch(e){}');
+      }
+      // The game took this same press as its Quick Magic: shut that menu,
+      // whichever of the two P did.
       magicOnP.shutFor(e);
       return;
     }
@@ -7289,6 +7772,8 @@
 
     if (e.code === MANEUVER_KEY) { maneuverKeyPressed(); return; }
 
+    // K on a person a Master could take on opens K on them (#1634).
+    if (e.code === APPRENTICE_KEY && apprenticePress()) { return; }
     if (e.code === SKILLS_KEY) {
       if (claims.chat) { return; }
       const busyNow = busyMenuOpen();
@@ -7906,7 +8391,7 @@
     the key's update.
 
     closingGame goes up first, so the race menu closing as the game comes
-    apart is not told to the server as a finished face.
+    apart is told as /racedown, not as a finished face.
   */
   function closeGame(from) {
     closingGame = true;
@@ -8185,6 +8670,15 @@
       log('the merchant panel is in');
       return;
     }
+    // The ride panel (#1635): see THE RIDE PANEL WAITS above.
+    if (what === 'ride:wants') { rideState = 'waiting'; rideOpenIfFree(''); return; }
+    if (what === 'ride:opened') { rideState = 'up'; T.claimFocus('ride', true); return; }
+    if (what === 'ride:closed') {
+      T.claimFocus('ride', false);
+      if (rideState === 'up') { rideState = ''; }
+      return;
+    }
+    if (what === 'ride:ready') { log('the ride panel is in'); return; }
     if (what === 'party:ready' || what === 'journal:ready' || what === 'trade:ready' || what === 'board:ready') {
       tellServer(what === 'trade:ready' ? '/trade refresh' : '/party refresh');
       log('the ' + what.split(':')[0] + ' panel is in');

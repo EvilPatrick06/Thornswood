@@ -233,6 +233,9 @@ function rig(opts) {
     // The sleep key is the mold's, on a person (#1603). Nobody is looked at here.
     'const SLEEP_KEY = 22;\n' +
     'function sleepPress() { return false; }\n' +
+    // Hand over the letter (#1595), Activate on somebody you carry a letter
+    // for. Nobody is looked at here; test-1595-deliver.js has the press.
+    'function deliverPress() { return false; }\n' +
     // The same key's check in the inventory (#1384). No inventory is open
     // here, so it passes every key on as well.
     "function repairPress() { return false; }\n" +

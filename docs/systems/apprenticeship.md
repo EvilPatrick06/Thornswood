@@ -34,9 +34,10 @@ not your profession's other name. You remain the half you picked.
 
 Taking you on is the master's decision. Nobody is owed it. There is
 no fee, and there is no distance written down. It is an agreement the
-master makes, and the server records it. They can end it. Ranks you
-already earned on that half stay. Further ranks stop, and the count
-waits at the next threshold again.
+master makes, and the server records it. Either of you can end it: the
+master, or you (Patrick, 4 October). Ranks you already earned on that
+half stay. Further ranks stop, and the count waits at the next
+threshold again.
 
 The sister half does not hand you that half's placed skill point.
 You get the placed point of the half you picked, and no second line
@@ -79,8 +80,10 @@ half's placed point. It does not give you the class that feeds the
 trade. A smith taught to cook is not a farmer. A tailor taught a
 school is not a mage.
 
-Two in a life. A master can end one. Ending it takes the novice list
-away. It does not open a third.
+Two in a life. Either of you can end one. Ending it takes the novice
+list away. A taught school or a taught Bladebinder keeps the spells
+already learned from it, and no new one can be learned (Patrick,
+4 October). It does not open a third.
 
 ## A mage teaching someone who is not a mage
 
@@ -94,8 +97,9 @@ those 2, the spell is novice, and a novice spell needs nothing below
 it. They do not earn the mage's stored spell points. They do not pick
 schools on K. They do not receive the school's placed point.
 
-At the College, `/study` hands them 1 spell point in a semester, and
-it can only be spent on a novice spell of the school they were taught.
+At the College, Study on the K panel hands them 1 spell point in a
+semester, and it can only be spent on a novice spell of the school they
+were taught.
 A mage's semester is a different number, on that page.
 
 The third school a master mage picks for themselves is not this. That
@@ -158,16 +162,20 @@ Picking a profession writes the sister half at novice. The craft gate
 allows that novice list, and it allows a taught half at novice, and
 it refuses both of them above novice by name.
 
-A master takes someone on with `/apprentice <name>`. When they could
-take that person on in more than one half or school, the half goes
-after the name: `/apprentice Lina platewright`. The person accepts or
-refuses on the prompt, the same as a party or a trade, and nothing is
-recorded until they accept. The server reads which arrangement it is
-off the person: the other half of their own profession is the sister
-half, and a half or school of another profession is an outside trade.
-The master ends it with `/apprentice end <name>`. `/apprentice` on
-its own says who you took on, who took you on, and how many of your
-two outside trades are used.
+Nothing here is typed. A master looking at somebody they could take
+on sees a row for it on the look prompt, Take on as apprentice, named
+K. K then opens the Masters and apprentices page of the K panel on that
+person, with a Take on button for each half or school it could be, so
+a master of two picks which there. The person accepts or refuses on
+the prompt, the same as a party or a trade, and nothing is recorded
+until they accept. The server reads which arrangement it is off the
+person: the other half of their own profession is the sister half, and
+a half or school of another profession is an outside trade.
+
+The same page lists who you took on and who took you on, each with
+End, and how many of your two outside trades are used. Either of you
+ends it there, and End asks twice. The buttons send the server a line,
+and no help text names it.
 
 Both characters carry the arrangement, so it holds across a restart
 and with either of them offline. When work is counted, the master is
@@ -177,4 +185,9 @@ An outside trade that was ended stays counted, so it does not open a
 third.
 
 The two-spell cap, the two staff-spell cap, and the three gates on a
-tome are in the server. `/study` is not.
+tome are in the server. So is the semester: Study on the K panel's
+College page, in one of the College's rooms, hands a person a master
+has taught 1 point once in 24 hours. The server asks for that point as
+well as a place before a tome teaches them, because the semester is the
+only thing that hands them one; whether the places alone should be
+enough is asked on issue 1387. See [Magic and the College](magic.md).

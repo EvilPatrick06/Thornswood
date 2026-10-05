@@ -33,7 +33,8 @@ then open http://127.0.0.1:7900/health. It reads `THORNSWOOD_VOICE_PORT`
 (7778 when unset), `THORNSWOOD_VOICE_BIND` (every address when unset),
 `THORNSWOOD_VOICE_AUTH` (`log` when unset: a join that cannot prove itself is
 let in and written down; `on` refuses it), `THORNSWOOD_CHAT_RANGE` (off when
-unset: every typed line goes to everybody; `on` keeps a line to the same cell
+unset, though Install-Voice.ps1 sets it on for live and dev: every typed
+line goes to everybody; `on` keeps a line to the same cell
 and 4000 units, a number sets the units, and /me, /do, /w and /s work),
 `THORNSWOOD_CHAT_BURST` and `THORNSWOOD_CHAT_REFILL_MS` (5 and 1500 when
 unset: how many said lines one connection gets out at once, and how often it
@@ -42,8 +43,11 @@ unset, nobody is asked whether a join owns the profile it claims). `/health`
 reports
 the `BUILD` string at the top of the file, which is the only way to tell from
 outside which copy is running, so change it whenever behaviour changes. The
-harnesses run the real file in a temporary folder on a spare port and need
-nothing else: `node voice\test-auth.js` and the rest.
+harnesses run the real file in a temporary folder on a port the system hands
+out, and ask it nothing until that copy has said it is listening there,
+because several builds run at once on the VPS and a fixed port let one run
+answer another (#1703). They need nothing else: `node voice\test-auth.js` and
+the rest.
 
 A TURN relay, for the pairs of people who cannot reach each other directly,
 is `THORNSWOOD_TURN_URL`. Its key is `THORNSWOOD_TURN_SECRET` or, so it stays

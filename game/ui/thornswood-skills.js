@@ -63,7 +63,7 @@
   cursor rule restyles nothing.
 
   THE CONTRACT with thornswood-front.js, unchanged from the first cut:
-    window.thornswoodSkills = { open, close, toggle, isOpen, setData }
+    window.thornswoodSkills = { open, close, toggle, isOpen, setData, takeOn }
     page -> plugin  'skills:ready' | 'skills:opened' | 'skills:closed' |
                     'skills:refresh' | 'skills:pick <words>'
     the plugin turns 'skills:pick X' into the chat line '/pick X'
@@ -97,6 +97,25 @@
     spells: { '<spell name>': true }     what the character actually holds
     spellPoints: <number>                what is left to spend
 
+    college: { gain: <number>, school: '<taught school>' | null,
+               opens: <ms>, hours: <number>, rooms: [ '<a room, in words>' ] }
+      A semester at the College (#1387), sent to anybody magic is open to: a
+      mage, or somebody a Master mage taught. opens is when the next semester
+      opens on the server's clock, 0 when one is open now. Study sends
+      'skills:pick study'; a refusal comes back as a note about 'study'.
+
+    apprentice: { took: [ { id, name, half, kind } ], by: [ { id, name, half, kind, stands } ],
+                  mastered: [ '<half>' ], sister: { half, rank } | null, used: <n>, of: <n> }
+      Masters and apprentices (#1634), sent to anybody with a profession.
+      took is who you took on, by is who took you on, kind is 'sister' or
+      'outside', and id is the form id in hex. Each row has End, which sends
+      '/apprentice end <id> <half>' or '/apprentice leave <half>' through
+      window.thornswoodNet.say, the way the property page's Stop does. The
+      look prompt's K hands takeOn the person under the crosshair,
+      { id, name, halves: [ { h, k } ] }, and Take on sends
+      '/apprentice <id> <half>'. The server answers in the chat and by
+      rewriting this.
+
     staff: { points: <number>, rank: '<Bladebinder rank>',
              mine: [ '<spell desc>' ], spells: [ [ desc, name, rank ] ] }
       An Enchanter's staff spells (#1128), sent to an Enchanter and nobody
@@ -115,6 +134,31 @@
       Font of Magic is the one perk a person starts: its Use button sends
       'skills:pick perk fontofmagic', and a refusal comes back as a note
       about 'perk'.
+
+    property: [ { name, mine: <bool>, locked, keyed, b, by,
+                  rent: { amount, every, owed } | null,
+                  sleep: [ { pid, name } ], farm, days, reach } ]
+      The property page (#1637, #1603), sent once somebody holds a building
+      or a farm or carries a key to one, and left out otherwise: the page is
+      drawn from whether this arrived. mine is a place you hold, b is its
+      building id, and sleep is tonight's guests there; Stop beside a guest
+      sends '/sleephere stop <pid> <b>' through window.thornswoodNet.say.
+      A farm row has farm, days and reach and nothing else.
+
+    officePage: { jarl, may, name, steward: <bool>,
+                  stewards: [ { pid, name } ], people: [ { pid, name } ],
+                  door: { name, by, rent: { amount, every, owed } | null } | null,
+                  box: { hold } | null, boards: [ { hold, where } ] }
+      The offices (#1638), sent to a character that holds the Jarl office or
+      may take it, or is a steward, and to nobody else. jarl: this character
+      holds it; may: it may take it; name: it names stewards; steward: it
+      evicts, sets rent, marks a box and moves a board. people are the ones
+      in the world a Jarl could name, by name with the profile id the button
+      sends. door and box are what the steward opened in the last minute.
+      Its buttons send the server's own lines through the chat line, the way
+      the property page's Stop does: /jarl, /steward <pid>, /steward -<pid>,
+      /evict, /rent <gold>, /rent -, /box <hold> and /board move <hold>. The
+      answers come back in the chat, and the page is written again.
 */
 
 (function () {
@@ -215,7 +259,7 @@
     */
     spells: {
       title: 'Spell book',
-      lead: 'The spells of your two schools, by rank. A spell costs one point; points come with each rank.',
+      lead: 'The spells of your two schools, by rank. A spell costs one point; points come with each rank and with a semester at the College.',
       ranks: [{ key: 'novice', name: 'Novice' }, { key: 'advanced', name: 'Advanced' },
               { key: 'expert', name: 'Expert' }, { key: 'master', name: 'Master' }],
       schools: {
@@ -277,6 +321,44 @@
       lead: 'What you can make right now, by the kind of thing it is. Your own half, your sister half, and anything a Master taught you, each as far as your rank in it reaches. Recipes Skyrim keeps behind a perk, a spell or something you have to be holding are not counted as open.',
       rows: []   // the server sends the halves and their families
     },
+    /*
+      A semester at the College (#1387). How many points, which school and
+      when the next one opens are all the server's, under mine.college; this
+      is the title and the one sentence over the page.
+    */
+    college: {
+      title: 'College',
+      lead: 'Stand in one of the rooms of the College of Winterhold and press Study, and the College hands you spell points, once a semester. Anywhere else, it says no.',
+      rows: []
+    },
+    /*
+      Masters and apprentices (#1634). Who is whose is the server's, under
+      mine.apprentice; this is the title and the sentence over the page.
+    */
+    apprentice: {
+      title: 'Masters and apprentices',
+      lead: 'A Master can take you on in your sister half, so it climbs past novice, or teach you the novice work of a half from another profession, twice in a life. Either of you can end it here.',
+      rows: []
+    },
+    /*
+      The property page (#1637, #1603). What you hold and carry a key to is
+      the server's, under mine.property; this is the title and nothing else,
+      because the page draws its own line over the cards.
+    */
+    property: {
+      title: 'Property',
+      rows: []
+    },
+    /*
+      The offices (#1638). Who holds what, and what is at the door and the
+      container are the server's, under mine.officePage; this is the title
+      and the one sentence over the page.
+    */
+    office: {
+      title: 'Office',
+      lead: 'The office on this character. A Jarl names the stewards. A steward ends a claim and sets the rent at a door, makes a container a hold\'s box, and moves a hold\'s notice board.',
+      rows: []
+    },
     home: {
       title: 'Home',
       lead: 'Where you wake up. The inn keeps a room for you, and it is where you come back to.',
@@ -322,6 +404,9 @@
   var footKey = '';        // the same for the foot
   var progRows = [];       // the value half of each progress line on the page, in order
   var progKey = '';        // the same for those lines: their words, so a tick writes once
+  var candidate = null;    // who the look prompt's K opened the page on: { id, name, halves: [{ h, k }] } (#1634)
+  var endArmed = null;     // an End pressed once, waiting for the second press: { key, at }
+  var apprSent = null;     // an End sent and not yet answered: { key, name, at }
 
   // ------------------------------------------------------------------ css --
   /*
@@ -386,6 +471,15 @@
     '#ts-skills .card .inn{font-size:12.5px;color:rgba(217,207,180,.6);font-style:italic;margin-top:3px}',
     '#ts-skills .card .guest{display:flex;align-items:center;gap:12px;font-size:13px;color:#d9cfb4;margin-top:5px}',
     '#ts-skills .card .guest .stop{border:1px solid rgba(198,170,109,.55);color:#e9d19b;padding:1px 9px;font-size:11.5px;cursor:pointer}',
+    // Take on and End on Masters and apprentices (#1634); End asks twice, in Close Skyrim's colours.
+    '#ts-skills .card .act{flex:0 0 auto;margin-left:auto;border:1px solid rgba(198,170,109,.55);color:#e9d19b;padding:1px 9px;',
+    'font-size:11.5px;white-space:nowrap;cursor:pointer}',
+    '#ts-skills .card .act.armed{border-color:#e9a27a;color:#f6c9b0;background:rgba(120,40,30,.45)}',
+    // The Office page (#1638): its rows are guest rows, and these wrap.
+    '#ts-skills .card .guest.wrap{flex-wrap:wrap;gap:8px}',
+    '#ts-skills .card .guest .who{flex:1;min-width:160px}',
+    '#ts-skills .card .guest .dim{color:rgba(217,207,180,.5)}',
+    '#ts-skills .card .guest input{width:80px;font-family:inherit;font-size:13px;color:#d9cfb4;background:rgba(0,0,0,.25);border:1px solid rgba(198,170,109,.42);padding:1px 6px}',
     '#ts-skills .tag{margin-left:auto;font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:#9fcf92;white-space:nowrap}',
     '#ts-skills .tag.gold{color:#e9d19b}',
     '#ts-skills .tag.dim{color:rgba(217,207,180,.5)}',
@@ -869,6 +963,47 @@
       });
     }
   }
+  /* Masters and apprentices (#1634): the server's, under mine.apprentice, or null with no profession. */
+  function apprView() {
+    var got = mine && mine.apprentice;
+    if (!got || typeof got !== 'object' || Array.isArray(got)) return null;
+    return got;
+  }
+  function apprList(field) {
+    var v = apprView();
+    return (v && Array.isArray(v[field])) ? v[field] : [];
+  }
+  /* A school or Bladebinder: ending it leaves the spells learned from it (Patrick, on #1388). */
+  function spellHalf(key) {
+    var r = rowOf('profession', 'mage');
+    var schools = r ? (r.subs || []).map(function (s) { return s.key; }) : [];
+    return schools.indexOf(key) >= 0 || key === 'bladebinder';
+  }
+  /* The College page (#1387): the server's, under mine.college, or null when magic is not open to them. */
+  function collegeView() {
+    var got = mine && mine.college;
+    if (!got || typeof got !== 'object' || Array.isArray(got)) return null;
+    return got;
+  }
+  /* The Office page (#1638): the server's, under mine.officePage, or null for somebody with no office. */
+  function officePage() {
+    var got = mine && mine.officePage;
+    if (!got || typeof got !== 'object' || Array.isArray(got)) return null;
+    return got;
+  }
+  /* When a semester opens, as a time on this machine's clock: today, tomorrow, or the date. */
+  var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
+                'September', 'October', 'November', 'December'];
+  function whenOpens(ms) {
+    var d = new Date(ms);
+    var t = new Date();
+    var hm = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+    var day = new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime();
+    var then = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    if (then === day) return 'today at ' + hm;
+    if (then === day + 86400000) return 'tomorrow at ' + hm;
+    return d.getDate() + ' ' + MONTHS[d.getMonth()] + ' at ' + hm;
+  }
   /*
     THE STAFF SPELL PAGE, an Enchanter's spell book (#1128). The same three
     rules as the spell book above, over the Bladebinder rank the server sends
@@ -1126,12 +1261,18 @@
     if (section === 'tree') return 15;
     if (section === 'spells') return bookRows().length;
     if (section === 'staff') return staffRows().length;
+    // The College page is a page to read and one button.
+    if (section === 'college') return 0;
+    // Masters and apprentices: its buttons are on its cards.
+    if (section === 'apprentice') return 0;
     // Nothing in the recipe book is picked, marked or sent, so there is no
     // row for the arrow keys to walk. Left and right still move sections.
     if (section === 'recipes') return 0;
     // Nothing on the property page is picked, marked or sent either. It is a
     // list of what is already true.
     if (section === 'property') return 0;
+    // The Office page is buttons beside what is true; nothing is marked.
+    if (section === 'office') return 0;
     return rows().length + (laterOffered(section) ? 1 : 0);
   }
   /* Another section: the top row, and the status line back to the hint. */
@@ -1162,7 +1303,8 @@
   function viewKey() {
     var v = null;
     if (mine) { v = {}; for (var k in mine) if (!NOT_DRAWN[k]) v[k] = mine[k]; }
-    return JSON.stringify([tableGen, sections, section, rowAt, picked, later, marked, markedStaff, v, progressShape()]);
+    return JSON.stringify([tableGen, sections, section, rowAt, picked, later, marked, markedStaff, v, progressShape(),
+                           candidate, endArmed]);
   }
 
   function draw() {
@@ -1183,6 +1325,13 @@
     // An Enchanter's staff spells (#1128), right after the recipe book: the
     // server sends the page to an Enchanter and nobody else.
     if (staffBook()) sections.splice(sections.indexOf('recipes') + 1 || 1, 0, 'staff');
+    // The College (#1387), right after the spell book, or after Profession
+    // for somebody a Master mage taught: the server sends it to anybody
+    // magic is open to, and never while creating.
+    if (!creating() && collegeView()) sections.splice(sections.indexOf('spells') + 1 || 1, 0, 'college');
+    // The offices (#1638), for a character that holds one or may take one:
+    // the server sends the page to them and nobody else, never while creating.
+    if (!creating() && officePage()) sections.push('office');
     /*
       Property, last, and only once there is something on it. Patrick,
       21 September: "once they claim a house or have a key to a house a property
@@ -1191,6 +1340,9 @@
       somebody holds nothing and carries no key, so the button appearing IS the
       server having something to say. Nothing here decides it.
     */
+    // Masters and apprentices (#1634), before Property: the server sends it to
+    // anybody with a profession, and the look prompt's K opens it on a person.
+    if (!creating() && (apprView() || candidate)) sections.push('apprentice');
     if (propertyRows().length) sections.push('property');
     if (sections.indexOf(section) < 0) section = sections[0];
     var n = countRows();
@@ -1276,6 +1428,24 @@
       var m = markedCount();
       return { t: sp ? sp + ' to spend' : (m ? m + ' marked' : 'nothing yet'), c: sp ? 'need' : '' };
     }
+    if (sec === 'college') {
+      var cv = collegeView();
+      var opens = cv ? Number(cv.opens) || 0 : 0;
+      return opens > Date.now() ? { t: 'next ' + whenOpens(opens), c: '' } : { t: 'a semester is open', c: 'need' };
+    }
+    if (sec === 'apprentice') {
+      if (candidate) return { t: 'take on ' + candidate.name, c: 'need' };
+      var apT = apprList('took'), apB = apprList('by'), apV = apprView();
+      if (apT.length) return { t: apT.length + (apT.length === 1 ? ' apprentice' : ' apprentices'), c: 'set' };
+      if (apB.length) return { t: apB.length === 1 ? 'taken on by ' + apB[0].name : apB.length + ' Masters', c: 'set' };
+      return { t: apV ? (Number(apV.used) || 0) + ' of ' + (Number(apV.of) || 0) + ' trades used' : 'nobody yet', c: '' };
+    }
+    if (sec === 'office') {
+      var ov = officePage();
+      if (ov && ov.jarl) return { t: 'Jarl', c: 'set' };
+      if (ov && ov.may) return { t: 'may take the office', c: 'need' };
+      return { t: 'steward', c: 'set' };
+    }
     if (sec === 'staff') {
       var sl = staffLeft();
       var sm = markedStaffDescs().length;
@@ -1346,8 +1516,11 @@
     else if (section === 'home') drawHome();
     else if (section === 'spells') drawSpells();
     else if (section === 'staff') drawStaff();
+    else if (section === 'college') drawCollege();
+    else if (section === 'apprentice') drawApprentice();
     else if (section === 'recipes') drawRecipes();
     else if (section === 'property') drawProperty();
+    else if (section === 'office') drawOffice();
     else if (section === 'review') drawReview();
     else drawTree();
   }
@@ -1528,6 +1701,18 @@
     drawn from whether the list arrived. There is nothing here that can put an
     empty page in front of anybody.
 
+    THE LIST IS mine.property, on the panel view with everything else the
+    server says (writeState in the character block puts it there). From the
+    first cut until #1717 this read DATA.property, which is this page's own
+    section table and never carries it, so the page was never drawn for
+    anybody.
+
+    WHAT YOU HOLD IS HERE AND NOT BEHIND A TYPED /deed (#1637): each building
+    with what rent is owed on it, and your farm, which is ground with no
+    building on it and lapses on the same 14 days. Claiming, locking and
+    unlocking are the lock key at the door, so the page says where that is
+    rather than naming a word to type.
+
     ONE THING IS SENT, AND IT IS A STOP (#1603). Under each place you hold are
     the people you let sleep there tonight, and a Stop beside each name ends
     that night: /sleephere stop <profile> <building>, through the same chat
@@ -1536,15 +1721,16 @@
     pressed while looking at them inside it.
   */
   function propertyRows() {
-    var rows = DATA && DATA.property;
-    return (rows && rows.length) ? rows : [];
+    var rows = mine && mine.property;
+    return (Array.isArray(rows) && rows.length) ? rows : [];
   }
 
   function drawProperty() {
     var pRows = propertyRows();
     if (!pRows.length) {
       elBody.appendChild(el('p', 'lead',
-        'You hold nothing and carry no keys. Open a door and say /claim: it costs nothing.'));
+        'You hold nothing and carry no keys. Open the door of a building nobody holds and ' +
+        'press the key the line under the crosshair names: claiming costs nothing.'));
       return;
     }
     var pHeld = 0;
@@ -1565,12 +1751,21 @@
     pRows.forEach(function (r) {
       var card = el('div', 'card' + (r.mine ? ' mine' : ' off'));
       var name = el('div', 'name', String(r.name || 'somewhere'));
-      name.appendChild(el('span', 'tag', r.mine ? 'yours' : 'key only'));
+      name.appendChild(el('span', 'tag', r.farm ? 'farm' : (r.mine ? 'yours' : 'key only')));
       card.appendChild(name);
+      if (r.farm) {
+        var days = Number(r.days) || 0;
+        card.appendChild(el('div', 'desc', 'The ground ' + (Number(r.reach) || 0) +
+          ' out from the plot you claimed it at. Sowing or bringing something in keeps it; ' +
+          'with nothing done on it, it goes back in ' + days + (days === 1 ? ' day.' : ' days.')));
+        wrap.appendChild(card);
+        return;
+      }
       card.appendChild(el('div', 'desc', r.mine
-        ? (r.locked ? 'Locked. Anybody without a key has to pick it.'
-                    : 'Unlocked. Say /lock at the door to turn it.') +
-          (r.keyed ? ' You are carrying a key to it as well.' : '')
+        ? (r.locked ? 'Locked. Anybody without a key has to pick it. Open its door and the ' +
+                      'key the line names unlocks it.'
+                    : 'Unlocked. Open its door and the key the line names locks it.') +
+          (r.keyed ? ' You are carrying a key to it as well.' : '') + rentLine(r.rent)
         : (r.by ? 'Held by ' + r.by + '. ' : 'Nobody holds it. ') +
           (r.locked ? 'Your key opens the door.'
                     : 'It is not locked, so your key is not needed yet.')));
@@ -1578,6 +1773,14 @@
       wrap.appendChild(card);
     });
     elBody.appendChild(wrap);
+  }
+
+  /* The rent on a place you hold, and what is owed on it now (#1637). */
+  function rentLine(rent) {
+    if (!rent) return ' No rent on it.';
+    var owed = Number(rent.owed) || 0;
+    return ' Rent is ' + (Number(rent.amount) || 0) + ' gold every ' + (Number(rent.every) || 7) +
+      ' days, ' + (owed ? owed + ' gold owed now.' : 'and nothing is owed now.');
   }
 
   /* Who may sleep in a place you hold tonight, and a Stop for each. */
@@ -1601,6 +1804,294 @@
       row.appendChild(stop);
       card.appendChild(row);
     });
+  }
+
+  /*
+    THE OFFICE PAGE (#1638).
+
+    Patrick, 4 Oct: no commands for things people do, and a Jarl and a
+    steward are people. So the offices are buttons here, on the character
+    that holds one: Take the office, name a steward by picking somebody in
+    the world, Remove beside a steward, and for a steward Evict and the rent
+    at the door they just opened, the container they just opened made a
+    hold's box, and a board moved to where they stand.
+
+    EVERYTHING ON IT IS THE SERVER'S. Who holds what, who is in the world,
+    the door and the container are mine.officePage, and each button sends
+    the server's own line through the chat line every panel uses, the way
+    the property page's Stop does. The server checks it all again and
+    answers in the chat, and writes the page again.
+
+    A PERSON IS PICKED, NOT TYPED. Two characters can share a name, so a row
+    carries the profile id the server sent with the name, and Name steward
+    sends that id. The id is shown, small, so two of one name can be told
+    apart.
+
+    THE TWO THAT CANNOT BE PUT BACK ASK TWICE. Evict ends somebody's claim
+    and moving a board leaves it wherever the steward is standing, so the
+    first press says what a second press does, and the second sends it.
+  */
+  function officeSay(line) {
+    if (window.thornswoodNet && window.thornswoodNet.say) window.thornswoodNet.say(line);
+    status = 'Sent. The server answers in the chat.'; statusKind = '';
+    drawFoot();
+  }
+
+  /* A button on the Office page. With twice, the first press only says what the second does. */
+  function officeButton(text, line, twice) {
+    var b = el('span', 'stop', text);
+    var armed = false;
+    b.onclick = function (ev) {
+      if (ev && ev.stopPropagation) ev.stopPropagation();
+      if (twice && !armed) { armed = true; b.textContent = twice; return; }
+      var said = typeof line === 'function' ? line() : line;
+      if (said) officeSay(said);
+    };
+    return b;
+  }
+
+  function officeRow(card, who, extra, buttons) {
+    var row = el('div', 'guest wrap');
+    var name = el('span', 'who', who);
+    if (extra) name.appendChild(el('span', 'dim', ' ' + extra));
+    row.appendChild(name);
+    (buttons || []).forEach(function (b) { row.appendChild(b); });
+    card.appendChild(row);
+    return row;
+  }
+
+  function drawOffice() {
+    var o = officePage();
+    if (!o) return;
+    var wrap = el('div', 'cards');
+
+    // The office on this character.
+    var seat = el('div', 'card' + (o.jarl ? ' mine' : ''));
+    var head = el('div', 'name', o.jarl ? 'Jarl' : (o.may ? 'The Jarl office' : 'Steward'));
+    if (o.jarl) head.appendChild(el('span', 'tag', 'held'));
+    seat.appendChild(head);
+    seat.appendChild(el('div', 'desc', o.jarl
+      ? 'This character holds the Jarl office. Another character on the account stays as it is.'
+      : (o.may ? 'This character may take the Jarl office. It is on the character, not the account, so another character on the account stays as it is.'
+               : 'A Jarl named you a steward.')));
+    if (o.may) officeRow(seat, '', '', [officeButton('Take the office', '/jarl')]);
+    wrap.appendChild(seat);
+
+    // The stewards, and naming one.
+    var st = el('div', 'card');
+    st.appendChild(el('div', 'name', 'Stewards'));
+    var stewards = Array.isArray(o.stewards) ? o.stewards : [];
+    if (!stewards.length) st.appendChild(el('div', 'inn', 'No stewards yet.'));
+    stewards.forEach(function (w) {
+      var pid = Number(w.pid) || 0;
+      officeRow(st, w.name ? String(w.name) : 'Profile ' + pid, w.name ? 'profile ' + pid : 'not in the world now',
+                o.name ? [officeButton('Remove', '/steward -' + pid)] : []);
+    });
+    if (o.name) {
+      var people = Array.isArray(o.people) ? o.people : [];
+      st.appendChild(el('div', 'inn', people.length
+        ? 'Name a steward from the people in the world now:'
+        : 'Nobody else is in the world now to name a steward.'));
+      people.forEach(function (p) {
+        var pid = Number(p.pid) || 0;
+        officeRow(st, String(p.name || 'somebody'), 'profile ' + pid, [officeButton('Name steward', '/steward ' + pid)]);
+      });
+    }
+    wrap.appendChild(st);
+
+    if (o.steward) {
+      wrap.appendChild(officeDoor(o.door));
+      wrap.appendChild(officeBox(o.box, o.boards));
+      wrap.appendChild(officeBoards(o.boards));
+    }
+    elBody.appendChild(wrap);
+  }
+
+  /* The door the steward opened in the last minute: evict, and the rent. */
+  function officeDoor(d) {
+    var card = el('div', 'card');
+    card.appendChild(el('div', 'name', d ? String(d.name || 'This building') : 'At a door'));
+    if (!d) {
+      card.appendChild(el('div', 'desc', 'Open the door of a building, then open this page within a minute, to end a claim on it or set its rent.'));
+      return card;
+    }
+    var r = d.rent;
+    card.appendChild(el('div', 'desc', (d.by ? 'Held by ' + d.by + '. ' : 'Nobody holds it. ') +
+      (r ? 'Rent ' + r.amount + ' gold every ' + r.every + ' days, ' + r.owed + ' owed.' : 'No rent on it.')));
+    if (!d.by) return card;
+    officeRow(card, '', '', [officeButton('Evict', '/evict', 'Press again to end ' + d.by + '\'s claim')]);
+    var input = document.createElement('input');
+    input.placeholder = 'gold';
+    var set = officeButton('Set rent', function () {
+      var n = Number(String(input.value || '').trim());
+      if (!(n > 0) || Math.floor(n) !== n) {
+        status = 'The rent is a whole number of gold above 0.'; statusKind = 'no';
+        drawFoot();
+        return '';
+      }
+      return '/rent ' + n;
+    });
+    input.onkeydown = function (ev) { if (ev && ev.key === 'Enter') set.onclick(ev); };
+    var buttons = [input, set];
+    if (r) buttons.push(officeButton('No rent', '/rent -'));
+    officeRow(card, 'Rent every 7 days', '', buttons);
+    return card;
+  }
+
+  /* The container the steward opened in the last minute, made a hold's box. */
+  function officeBox(b, boards) {
+    var card = el('div', 'card');
+    card.appendChild(el('div', 'name', 'A hold\'s box'));
+    if (!b) {
+      card.appendChild(el('div', 'desc', 'Open a container, then open this page within a minute, to make it a hold\'s box. Only gold goes in a box. Each hold\'s notice board is its box already.'));
+      return card;
+    }
+    var list = Array.isArray(boards) ? boards : [];
+    var whose = b.hold ? String(b.hold) : '';
+    list.forEach(function (h) { if (h.hold === b.hold && h.where) whose = String(h.where); });
+    card.appendChild(el('div', 'desc', whose
+      ? 'The container you just opened is ' + whose + '\'s box. Press a hold to make it that hold\'s instead.'
+      : 'The container you just opened is nobody\'s box. Press a hold to make it that hold\'s.'));
+    var row = officeRow(card, '', '', []);
+    list.forEach(function (h) {
+      row.appendChild(officeButton(String(h.where || h.hold), '/box ' + String(h.hold)));
+    });
+    return card;
+  }
+
+  /* Any of the boards, moved to where the steward stands. */
+  function officeBoards(boards) {
+    var card = el('div', 'card');
+    card.appendChild(el('div', 'name', 'The notice boards'));
+    card.appendChild(el('div', 'desc', 'Stand where a board should go and press its town. It moves to where you stand, and its box with it.'));
+    var row = officeRow(card, '', '', []);
+    (Array.isArray(boards) ? boards : []).forEach(function (h) {
+      var where = String(h.where || h.hold);
+      row.appendChild(officeButton(where, '/board move ' + String(h.hold), 'Press again to move ' + where + '\'s board here'));
+    });
+    return card;
+  }
+
+  /*
+    The College page (#1387): what a semester hands this character, where it
+    is studied, and when the next one opens. Everything on it is the
+    server's. Study is the foot's button.
+  */
+  function drawCollege() {
+    var cv = collegeView();
+    if (!cv) return;
+    var gain = Number(cv.gain) || 0;
+    var hours = Number(cv.hours) || 0;
+    var opens = Number(cv.opens) || 0;
+    elBody.appendChild(el('p', 'lead', 'A semester is ' + hours + ' hours. Each one hands you ' + gain +
+      (gain === 1 ? ' spell point' : ' spell points') +
+      (cv.school ? ', and it buys a Novice spell of ' + cap(cv.school) + ', the school you were taught, from its tome.'
+                 : ', for the spell book.')));
+    var rooms = Array.isArray(cv.rooms) ? cv.rooms.map(String) : [];
+    if (rooms.length) {
+      elBody.appendChild(el('p', 'lead', 'The rooms that count: ' +
+        (rooms.length > 1 ? rooms.slice(0, -1).join(', ') + ' and ' + rooms[rooms.length - 1] : rooms[0]) + '.'));
+    }
+    elBody.appendChild(el('p', 'lead', opens > Date.now()
+      ? 'Your next semester opens ' + whenOpens(opens) + '.'
+      : 'A semester is open to you now.'));
+  }
+
+  /*
+    MASTERS AND APPRENTICES (#1634). Everything on it is the server's, under
+    mine.apprentice, except the person the look prompt's K opened it on
+    (candidate, from api.takeOn). Three things are sent, each through the
+    chat line every panel uses and none of them typed by anybody: Take on
+    (/apprentice <id> <half>), End beside somebody you took on
+    (/apprentice end <id> <half>), and End beside a Master who took you on
+    (/apprentice leave <half>; Patrick on #1388, either of you can end it).
+    End asks twice, the way Close Skyrim does, because an outside trade that
+    ends still counts as one of the two. The server checks all of it again
+    and answers in the chat, and a row that ends leaves the page when the
+    server writes the property.
+  */
+  function drawApprentice() {
+    var v = apprView();
+    var took = apprList('took');
+    var by = apprList('by');
+    if (v) {
+      var bar = el('div', 'spellbar');
+      bar.appendChild(el('div', 'spellpts', (Number(v.used) || 0) + ' of your ' + (Number(v.of) || 0) +
+        ' outside trades used in this life'));
+      bar.appendChild(el('div', 'spellnote', 'Your sister half does not count toward them.'));
+      elBody.appendChild(bar);
+    }
+    var wrap = el('div', 'cards');
+    if (candidate) {
+      var card = el('div', 'card chosen');
+      var nm = el('div', 'name', candidate.name);
+      nm.appendChild(el('span', 'tag gold', 'in front of you'));
+      card.appendChild(nm);
+      card.appendChild(el('div', 'desc', 'They say yes or no on their own prompt, and nothing is recorded until they say yes.'));
+      candidate.halves.forEach(function (h) {
+        var line = el('div', 'guest');
+        line.appendChild(el('span', '', h.k === 'sister'
+          ? nameOf('profession', h.h) + ', their sister half. It climbs past novice on their own work while you stand as their Master, and costs them nothing.'
+          : 'Novice ' + nameOf('profession', h.h) + ', an outside trade. It never climbs past novice, and it is one of only two they can ever take.'));
+        var go = el('span', 'act', 'Take on');
+        go.onclick = function (ev) { ev.stopPropagation(); takeOnPress(h.h); };
+        line.appendChild(go);
+        card.appendChild(line);
+      });
+      wrap.appendChild(card);
+    }
+    if (took.length) wrap.appendChild(el('div', 'rankhead', 'You took on'));
+    took.forEach(function (r) {
+      var half = nameOf('profession', r.half);
+      apprCard(wrap, 'took:' + r.id + ':' + r.half, r.name, half,
+        r.kind === 'sister' ? 'Their sister half. Ending it keeps every rank they earned in it; past them, their count waits again.'
+        : (r.kind === 'outside' ? 'Novice ' + half + ', an outside trade. Ending it takes its novice list from them' +
+                                  (spellHalf(r.half) ? ', the spells they already learned from it stay' : '') +
+                                  ', and it still counts as one of their two.'
+                                : 'Either of you can end it.'),
+        '/apprentice end ' + r.id + ' ' + r.half);
+    });
+    if (by.length) wrap.appendChild(el('div', 'rankhead', 'Took you on'));
+    by.forEach(function (r) {
+      var half = nameOf('profession', r.half);
+      apprCard(wrap, 'by:' + r.half, r.name, half,
+        r.kind === 'outside'
+          ? 'Novice ' + half + ', an outside trade they taught you. Ending it takes its novice list away' +
+            (spellHalf(r.half) ? ', the spells you already learned from it stay' : '') + ', and it still counts as one of your two.'
+          : (r.stands ? 'Your sister half, past novice while they stand as your Master. Ending it keeps every rank you earned in it.'
+                      : 'Your sister half. This no longer stands: they no longer list you, or are no longer a Master of it, ' +
+                        'so it climbs no further. End clears it from your side.'),
+        '/apprentice leave ' + r.half);
+    });
+    if (wrap.children.length) elBody.appendChild(wrap);
+    if (!v) return;
+    var notes = [];
+    if (!took.length && !by.length && !candidate) notes.push('Nobody has taken you on, and you have taken nobody on.');
+    if (v.sister && v.sister.half) {
+      notes.push(nameOf('profession', v.sister.half) + ', your sister half, waits at ' +
+        (RANK_NAMES[v.sister.rank] || cap(v.sister.rank) || 'Novice') + ' until a Master of it takes you on.');
+    }
+    var ms = Array.isArray(v.mastered) ? v.mastered.map(function (k) { return nameOf('profession', k); }) : [];
+    if (ms.length) {
+      notes.push('You are a Master of ' + (ms.length > 1 ? ms.slice(0, -1).join(', ') + ' and ' + ms[ms.length - 1] : ms[0]) +
+        '. Look at somebody: when you could take them on, the prompt says so, and its key opens this page on them.');
+    }
+    notes.forEach(function (t) { elBody.appendChild(el('p', 'lead', t)); });
+  }
+  /* One arrangement: who, which half, what ending it does, and its End. */
+  function apprCard(wrap, key, name, half, desc, line) {
+    var card = el('div', 'card');
+    var nm = el('div', 'name', String(name || 'somebody'));
+    nm.appendChild(el('span', 'tag', half));
+    card.appendChild(nm);
+    var row = el('div', 'guest');
+    row.appendChild(el('span', '', desc));
+    var armed = !!(endArmed && endArmed.key === key && Date.now() - endArmed.at < END_ARM_MS);
+    var end = el('span', 'act' + (armed ? ' armed' : ''), armed ? 'Press again to end' : 'End');
+    end.onclick = function (ev) { ev.stopPropagation(); endPress(key, line, String(name || 'them')); };
+    row.appendChild(end);
+    card.appendChild(row);
+    wrap.appendChild(card);
   }
 
   function drawRecipes() {
@@ -1917,11 +2408,13 @@
     var line = status || hint();
     // The spell book's own button says Learn, because what it sends is not a
     // choice about who you are: it is the spells you marked, one pick each.
-    var label = (!cr && section === 'spells') ? 'Learn' : ((!cr && section === 'staff') ? 'Unlock' : 'Confirm');
+    var label = (!cr && section === 'spells') ? 'Learn' : ((!cr && section === 'staff') ? 'Unlock'
+      : ((!cr && section === 'college') ? 'Study' : 'Confirm'));
     // The recipe book sends nothing, the same way the tree's plus buttons are
     // the tree's own sending, so neither carries a Confirm.
     var showConfirm = cr ? section === 'review'
-      : (section !== 'tree' && section !== 'recipes' && section !== 'property');
+      : (section !== 'tree' && section !== 'recipes' && section !== 'property' && section !== 'office' &&
+         section !== 'apprentice');
     var shut = closeWord();
     var key = JSON.stringify([line, statusKind, can, label, showConfirm, cr, shut]);
     if (key === footKey) return;
@@ -1958,9 +2451,19 @@
       // 0 is the server saying none; no number at all is the server saying
       // nothing, and the page does not put words in its mouth.
       var sp = spellPoints();
-      if (sp !== null && sp <= 0) return 'No spell points to spend. More come with every rank.';
+      if (sp !== null && sp <= 0) return 'No spell points to spend. More come with every rank and with a semester at the College.';
       return 'Mark the spells you want, then press Learn. One point each.';
     }
+    if (section === 'apprentice') {
+      if (candidate) return 'Take on asks them. They answer on their own prompt.';
+      if (apprList('took').length || apprList('by').length) return 'End asks twice. Either of you can end it, and the ranks earned stay.';
+      return 'A Master takes somebody on by looking at them and pressing the key the prompt names.';
+    }
+    if (section === 'college') {
+      if (studyWaiting()) return 'Sent. The server is checking.';
+      return 'Press Study in one of the College\'s rooms. Anywhere else, the College says no.';
+    }
+    if (section === 'office') return 'Each button is checked again by the server, and it answers in the chat.';
     if (section === 'staff') {
       if (staffWaiting()) return 'Sent. The server is checking.';
       if (markedStaffDescs().length) return 'Unlock sends the staff spells you marked, one staff spell point each.';
@@ -2064,10 +2567,89 @@
     draw();
   }
 
+  /*
+    Study, on the College page (#1387): one press, dark from the moment it
+    sends until the answer is back or LEARN_WAIT_MS has passed, the way
+    Learn is. Lit whatever the clock says: the server holds the clock and
+    says when the next semester opens if it is not open yet.
+  */
+  var studyAt = 0;
+  function studyWaiting() {
+    if (!studyAt) return false;
+    if (Date.now() - studyAt >= LEARN_WAIT_MS) { studyAt = 0; return false; }
+    for (var i = 0; i < pending.length; i++) if (pending[i].section === 'college') return true;
+    studyAt = 0;
+    return false;
+  }
+  function study() {
+    if (studyWaiting() || !collegeView()) return;
+    send('college', 'study');
+    studyAt = Date.now();
+    status = 'Sent. The server is checking.'; statusKind = '';
+    setTimeout(function () { if (!studyWaiting()) draw(); }, LEARN_WAIT_MS + 50);
+    draw();
+  }
+
+  /*
+    Masters and apprentices (#1634). Take on goes at once: the person still
+    has to say yes on their own prompt. End arms on the first press and
+    sends on a second inside END_ARM_MS; a first press on its own disarms,
+    so a stray click ends nothing. Both send through the chat line the way
+    the property page's Stop does, and the server answers in the chat.
+  */
+  var END_ARM_MS = 5000;
+  function sayLine(line) {
+    try {
+      if (window.thornswoodNet && window.thornswoodNet.say) { window.thornswoodNet.say(line); return true; }
+    } catch (e) { }
+    status = 'The connection is loading. Try again in a moment.'; statusKind = 'no';
+    return false;
+  }
+  function takeOnPress(half) {
+    if (!candidate) return;
+    var who = candidate;
+    if (!sayLine('/apprentice ' + who.id + ' ' + half)) { draw(); return; }
+    candidate = null;
+    status = 'Asked ' + who.name + '. They answer on their own prompt; if the server cannot ask, the chat says why.';
+    statusKind = '';
+    draw();
+  }
+  function endPress(key, line, name) {
+    var now = Date.now();
+    if (!(endArmed && endArmed.key === key && now - endArmed.at < END_ARM_MS)) {
+      endArmed = { key: key, at: now };
+      setTimeout(function () {
+        if (endArmed && endArmed.key === key && Date.now() - endArmed.at >= END_ARM_MS) { endArmed = null; draw(); }
+      }, END_ARM_MS + 50);
+      draw();
+      return;
+    }
+    endArmed = null;
+    if (!sayLine(line)) { draw(); return; }
+    apprSent = { key: key, name: name, at: now };
+    status = 'Sent. The server answers in the chat.'; statusKind = '';
+    draw();
+  }
+  /* An End is answered when its row is gone from what the server sent. A refusal is a line in the chat. */
+  function apprAnswered() {
+    if (!apprSent) return;
+    var left = false;
+    apprList('took').forEach(function (r) { if ('took:' + r.id + ':' + r.half === apprSent.key) left = true; });
+    apprList('by').forEach(function (r) { if ('by:' + r.half === apprSent.key) left = true; });
+    if (!left) {
+      status = 'Ended with ' + apprSent.name + '. The chat says what it changed.'; statusKind = 'ok';
+      apprSent = null;
+      return;
+    }
+    // Still there long after: it was refused, the chat said why, and the page stops listening for it.
+    if (Date.now() - apprSent.at >= PENDING_MS) apprSent = null;
+  }
+
   function canConfirm() {
     if (creating()) return section === 'review' && !!softHome();
     if (section === 'spells') return canLearn();
     if (section === 'staff') return canUnlockStaff();
+    if (section === 'college') return !!collegeView() && !studyWaiting();
     var p = picked[section];
     if (!p || !p.row) return false;
     if (section === 'class') return !haveClass();
@@ -2120,6 +2702,7 @@
     if (creating()) { begin(); return; }
     if (section === 'spells') { learn(); return; }
     if (section === 'staff') { unlockStaff(); return; }
+    if (section === 'college') { study(); return; }
     var p = picked[section];
     send(section, section === 'class' ? 'class ' + p.row : 'profession ' + p.row + ' ' + p.subs.join(','));
     status = 'Sent. The server is checking.'; statusKind = '';
@@ -2324,6 +2907,12 @@
         markedStaff[p.spell] = false;
         cleared = true;
       }
+      else if (p.section === 'college' && after.college && before && before.college &&
+               after.college.opens !== before.college.opens) {
+        // The server opened a semester and moved the clock: the points are
+        // in the spell book, and the chat says how many.
+        status = 'Studied. The next semester opens ' + whenOpens(Number(after.college.opens) || 0) + '.'; statusKind = 'ok';
+      }
       else if (p.section === 'tree') { status = 'Spent.'; statusKind = 'ok'; }
       else if (p.section === 'perk' && perkRunning('fontofmagic')) { status = 'Font of Magic: for 15 seconds, a spell costs nothing.'; statusKind = 'ok'; }
       else done = false;
@@ -2358,7 +2947,7 @@
     list on PENDING_MS. The card stays as it was picked either way, so it can
     be sent again or replaced.
   */
-  var ABOUT_SECTION = { 'class': 'class', 'profession': 'profession', 'spell': 'spells', 'staffspell': 'staff', 'town': 'home', 'spend': 'tree', 'perk': 'perk' };
+  var ABOUT_SECTION = { 'class': 'class', 'profession': 'profession', 'spell': 'spells', 'staffspell': 'staff', 'town': 'home', 'spend': 'tree', 'perk': 'perk', 'study': 'college' };
   function refused(text, about) {
     status = 'No: ' + text + '.'; statusKind = 'no';
     if (!pending.length) return;
@@ -2382,6 +2971,9 @@
   */
   function onKey(e) {
     if (root.className === 'gone') return;
+    // A number being typed into the Office page's rent (#1638) is the box's,
+    // Enter and the arrows included. Escape still closes.
+    if (e.target && e.target.tagName === 'INPUT' && e.key !== 'Escape') return;
     var n = countRows();
     if (e.key === 'Escape') { closeByHand(); e.preventDefault(); return; }
     if (e.key === 'Enter') {
@@ -2440,12 +3032,33 @@
       if (root.className === 'gone') return;
       root.className = 'gone';
       quitArmed = 0;   // a panel put down with Close Skyrim armed comes back unarmed
+      candidate = null;   // the person the look prompt opened it on is that moment's, not the next
+      endArmed = null;
       tell('closed');
     },
     toggle: function () {
       if (root.className === 'gone') { api.open(); } else { closeByHand(); }
     },
     isOpen: function () { return root.className !== 'gone'; },
+    /*
+      The look prompt's K on somebody a Master could take on (#1634): the
+      front hands over the form id under the crosshair, the name, and the
+      halves the server's near list says could be meant, and the panel opens
+      on Masters and apprentices with a Take on for each. Never while
+      creating.
+    */
+    takeOn: function (who) {
+      if (creating() || !who || typeof who !== 'object') return;
+      var halves = (Array.isArray(who.halves) ? who.halves : []).filter(function (h) {
+        return h && typeof h.h === 'string' && /^[a-z]+$/.test(h.h);
+      }).map(function (h) { return { h: h.h, k: h.k === 'sister' ? 'sister' : 'outside' }; });
+      var id = String(who.id || '');
+      if (!/^[0-9a-f]+$/i.test(id) || !halves.length) return;
+      candidate = { id: id, name: String(who.name || 'Somebody'), halves: halves };
+      endArmed = null;
+      goTo('apprentice');
+      if (root.className === 'gone') api.open(); else draw();
+    },
     /*
       What the server sent. The property carries the whole stored state with
       the view for this panel nested under .panel; the first cut read the top
@@ -2458,6 +3071,7 @@
         var before = mine;
         mine = (got.panel && typeof got.panel === 'object') ? got.panel : got;
         answered(before, mine);
+        apprAnswered();
         // A note is new when its time, its words or what it is about
         // changed: two refusals from one Confirm can carry the same
         // millisecond, and two picks can be refused in the same words.

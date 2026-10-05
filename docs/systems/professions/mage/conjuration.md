@@ -53,7 +53,15 @@ a dremora. Dremora is not a people you can pick. See
 
 ## Where this is
 
-These 20 names are the server's book. Nothing in the server yet
-refuses Dead Thrall when the target is a person. The refusal is the
-rule on [Death](../../death.md), kept by the people in the scene,
-until a check exists.
+These 20 names are the server's book.
+
+The server refuses Dead Thrall on a person's body, and every other
+spell that raises the dead: Raise Zombie, Reanimate Corpse, Revenant,
+Dread Zombie, and a scroll or a staff of one. It knows them by the
+game's own Reanimate effect, so a mod's raising spell counts too. A
+spell is cast before the server hears of it, so the refusal is its
+answer the moment the spell lands: the caster is told, and every
+machine that sees the body puts it back down. The person's character
+is not touched. A body the world placed is the spell working as
+written. The yes on [Death](../../death.md) has no record in the
+server, so the server cannot see one, and refuses every time.

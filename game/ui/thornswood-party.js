@@ -23,10 +23,11 @@
     window.thornswoodParty = { open, close, toggle, isOpen, setData }
     page -> plugin  'party:ready' | 'party:opened' | 'party:closed'
 
-  Everything this panel DOES it does by sending the ordinary chat commands,
-  through window.thornswoodNet.say: /friend, /party, /mute, /yes, /no. There is
-  no second protocol. A person who would rather type has every button on this
-  panel available to them, and the panel cannot do anything they could not.
+  Everything this panel DOES it does by sending the server the lines its
+  commands were, through window.thornswoodNet.say: /friend, /trade, /party,
+  /mute, /hidename, /yes, /no. There is no second protocol, and the panel
+  cannot do anything those lines could not. Nobody is told to type them
+  (#1628): this panel, the look prompt and the trade window are the way in.
 */
 (function () {
   if (window.thornswoodParty) { return; }
@@ -378,7 +379,8 @@
       var what = data.offer.kind === 'friend' ? 'wants to be friends'
         : (data.offer.kind === 'party' ? 'is asking you to join their party'
         : (data.offer.kind === 'apprentice' ? 'offers to take you on as an apprentice'
-                                            : 'is offering to trade'));
+        : (data.offer.kind === 'book' ? 'invites you into ' + esc(data.offer.about || 'a group book')
+                                            : 'is offering to trade')));
       html += '<div class="ask"><span class="who"><span class="kicker">Request</span><b>' + esc(data.offer.name) +
               '</b> ' + what + '</span>' +
               '<button class="go" data-do="yes">Accept</button>' +
@@ -394,8 +396,8 @@
 
     html += '<div><h3>Your party</h3>';
     if (!data.party || !data.party.length) {
-      html += '<div class="none">Not in a party. Look at somebody and press the party key, ' +
-              'or use the Ask button on a friend below.</div>';
+      html += '<div class="none">Not in a party. Look at somebody and press the party key to ' +
+              'ask them, or press Ask to party beside a friend below.</div>';
     } else {
       for (var i = 0; i < data.party.length; i++) {
         var m = data.party[i];
@@ -424,6 +426,12 @@
     if (!data.friends || !data.friends.length) {
       html += '<div class="none">Nobody yet. Look at somebody and press the friend key.</div>';
     } else {
+      /*
+        EVERY BUTTON ON A FRIEND'S ROW SENDS THEIR PROFILE ID (#1695), never
+        the name drawn there. The list is kept by profile, and a friend whose
+        character ended comes back as the same profile under a new name; the
+        server finds whoever that profile is playing now.
+      */
       for (var j = 0; j < data.friends.length; j++) {
         var f = data.friends[j];
         var friendId = f.p != null ? f.p : f.name;
@@ -434,17 +442,58 @@
                 (f.textOff ? '<span class="tag m">text</span>' : '') +
                 (f.nameOff ? '<span class="tag m">name</span>' : '') +
                 '<span class="tools">' +
-                (f.on && !f.party ? '<button data-do="ask" data-who="' + esc(f.name) + '">Ask to party</button>' : '') +
-                '<button data-do="mute" data-who="' + esc(f.name) + '">' + (f.muted ? 'Unmute' : 'Mute') + '</button>' +
+                (f.on && !f.party ? '<button data-do="ask" data-who="' + esc(friendId) + '">Ask to party</button>' : '') +
+                '<button data-do="mute" data-who="' + esc(friendId) + '">' + (f.muted ? 'Unmute' : 'Mute') + '</button>' +
                 '<button data-do="mtext" data-who="' + esc(friendId) + '">' + (f.textOff ? 'Read' : 'Text') + '</button>' +
                 '<button data-do="mname" data-who="' + esc(friendId) + '">' + (f.nameOff ? 'Show' : 'Name') + '</button>' +
-                '<button data-do="drop" data-who="' + esc(f.name) + '">Remove</button>' +
+                '<button data-do="drop" data-who="' + esc(friendId) + '">Remove</button>' +
                 '</span></div>';
       }
     }
     html += '<div class="row" style="border:none;background:none;padding-left:2px">' +
             '<span class="nm">' + (data.namesAll ? 'Every name above a head is hidden.' : 'Names above heads are shown.') +
             '</span><button data-do="nameall">' + (data.namesAll ? 'Show names' : 'Hide every name') + '</button></div>';
+    html += '</div>';
+
+    /*
+      NEAR YOU AND MUTED AND HIDDEN (#1628). Everything the look prompt's
+      keys do, and text and a name for somebody who is not a friend, without
+      a line typed in the chat. Near you is the server's near list, the one
+      the look prompt reads; Add friend and Trade send the form id the way Y
+      and H do, and the three switches send the profile id the friend rows
+      send. Muted and hidden is everybody switched off, friend or not, here
+      or not, so each one can be switched back on.
+    */
+    html += '<div><h3>Near you</h3>';
+    if (!data.near || !data.near.length) {
+      html += '<div class="none">Nobody close enough to look at.</div>';
+    } else {
+      for (var ni = 0; ni < data.near.length; ni++) {
+        var nr = data.near[ni];
+        html += '<div class="row"><span class="nm">' + esc(nr.name) + '</span>' +
+                (nr.friend ? '<span class="tag">friend</span>' : '') +
+                (nr.party ? '<span class="tag p">party</span>' : '') +
+                '<span class="tools">' +
+                (nr.friend ? '' : '<button data-do="befriend" data-who="' + esc(nr.id) + '">Add friend</button>') +
+                '<button data-do="trade" data-who="' + esc(nr.id) + '">Trade</button>' +
+                switches(nr) +
+                '</span></div>';
+      }
+    }
+    html += '</div>';
+
+    html += '<div><h3>Muted and hidden</h3>';
+    if (!data.hidden || !data.hidden.length) {
+      html += '<div class="none">Nobody. Mute stops their voice, Text their lines in the chat, ' +
+              'and Name the name above their head, for you alone.</div>';
+    } else {
+      for (var hi = 0; hi < data.hidden.length; hi++) {
+        var hr = data.hidden[hi];
+        html += '<div class="row"><span class="dot' + (hr.on ? ' on' : '') + '"></span>' +
+                '<span class="nm">' + esc(hr.name) + '</span>' +
+                '<span class="tools">' + switches(hr) + '</span></div>';
+      }
+    }
     html += '</div>';
 
     /*
@@ -490,14 +539,25 @@
         else if (verb === 'mname') { net('/hidename ' + who); }
         else if (verb === 'nameall') { net('/hidename all'); }
         else if (verb === 'drop') { net('/friend remove ' + who); }
+        else if (verb === 'befriend') { net('/friend ' + who); }
+        else if (verb === 'trade') { net('/trade ' + who); }
       };
     }
   }
 
-  function offerWords(kind) {
+  /* Mute, Text and Name for one person, by profile id, the way a friend's are. */
+  function switches(r) {
+    return '<button data-do="mute" data-who="' + esc(r.p) + '">' + (r.muted ? 'Unmute' : 'Mute') + '</button>' +
+           '<button data-do="mtext" data-who="' + esc(r.p) + '">' + (r.textOff ? 'Read' : 'Text') + '</button>' +
+           '<button data-do="mname" data-who="' + esc(r.p) + '">' + (r.nameOff ? 'Show' : 'Name') + '</button>';
+  }
+
+  function offerWords(kind, about) {
     if (kind === 'friend') { return 'wants to be friends.'; }
     if (kind === 'party') { return 'is asking you to join their party.'; }
     if (kind === 'apprentice') { return 'offers to take you on as an apprentice.'; }
+    // A group book invite, "the business The Bee" (#1591). Accept joins it.
+    if (kind === 'book') { return 'invites you into ' + esc(about || 'a group book') + '.'; }
     return 'is offering to trade.';
   }
 
@@ -506,7 +566,7 @@
     if (!data || !data.offer) { askEl.innerHTML = ''; return; }
     askEl.innerHTML =
       '<div class="card"><span class="who"><span class="kicker">Request</span><b>' + esc(data.offer.name) + '</b> ' +
-      offerWords(data.offer.kind) + '</span>' +
+      offerWords(data.offer.kind, data.offer.about) + '</span>' +
       '<button class="go" data-do="yes">Accept</button>' +
       '<button data-do="no">Refuse</button></div>';
     var buttons = askEl.querySelectorAll('button[data-do]');

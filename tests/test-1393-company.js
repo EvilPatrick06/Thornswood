@@ -82,8 +82,8 @@ function fn(name) {
 }
 
 const NAMES = ['takeGold', 'payOut', 'payHeld', 'sealed', 'nameIs', 'post', 'board', 'take',
-               'jobs', 'dropJob', 'takedown', 'unpin', 'postLetter', 'deliver', 'letterReach',
-               'boardHere', 'nearestBoard', 'boardPanel', 'moveBoard', 'command',
+               'jobsOf', 'dropJob', 'takedown', 'unpin', 'postLetter', 'deliver', 'letterReach',
+               'boardHere', 'nearestBoard', 'wallOf', 'boardPanel', 'boardsView', 'moveBoard', 'command',
                'noticeHolds', 'heldOn', 'mayWithdraw', 'withdraw',
                'haulTenth', 'haulText', 'haulCmd', 'postHaul', 'confirmHaul', 'handHaul', 'haulTick', 'cancelHaul',
                'saleCuts', 'inCompany',
@@ -210,6 +210,7 @@ function boot(reg, w, opts) {
     'var HAUL_TENTH_FROM = ' + HAUL_FROM + ';',
     'var SALE_CUT_FROM = ' + SALE_FROM + ';',
     'var haulShort = {};',
+    'var boardReads = {};',
     HAUL_HOW,
     fees,
     ledger,
@@ -222,7 +223,8 @@ function boot(reg, w, opts) {
   ];
   NAMES.forEach(function (n) { body.push(lifted[n]); });
   body.push('return { boards: boards, funds: function () { return funds; }, notices: function () { return notices; }, ' +
-            'command: command, boardPanel: boardPanel, deposit: deposit, withdraw: withdraw, mayWithdraw: mayWithdraw, ' +
+            'command: command, boardPanel: boardPanel, boardsView: boardsView, ' +
+            'deposit: deposit, withdraw: withdraw, mayWithdraw: mayWithdraw, ' +
             'heldOn: heldOn, haulTenth: haulTenth, haulTick: haulTick, saleCuts: saleCuts, inCompany: inCompany };');
   const make = new Function('reg', 'mp', 'plog', 'loadPart', 'PASSAGES', 'g', 'isSteward', 'say', 'notify', body.join('\n'));
   const api = make(reg, w.mp, function () { },
@@ -267,6 +269,14 @@ function boot(reg, w, opts) {
 
 /* Every line a person was told, through the board or the trade. */
 const EVERY_LINE = [];
+
+/* What J's Boards tab shows somebody once they pick a town there (#1627). */
+function onJ(s, p, hold) {
+  const said = s.say(p, '/board ' + hold);
+  const v = s.boardsView(p.pid);
+  v.said = said;
+  return v;
+}
 
 const ALICE = { actor: 0xff000101, pid: 101, name: 'Alice', gold: 200 };
 const BOB = { actor: 0xff000102, pid: 102, name: 'Bob', gold: 10 };
@@ -365,9 +375,11 @@ attempt('a haul, start to finish', function () {
   yes('H6 it is a job, a haul, with the pay and the destination', n.job === true && n.haul === true &&
       n.pay === 80 && n.dest === 'riften' && n.text === CRATE && !n.taken);
   yes('H6 the total of packs and ledgers has not moved', total(w, s, everybody) === start);
-  const wall = s.say(CYRUS, '/board');
-  yes('H7 the wall shows it as a job, with the pay and the destination',
-      wall.indexOf('[1] job: Alice: haul to riften for 80 gold: ' + CRATE) !== -1);
+  const wall = onJ(s, CYRUS, 'whiterun');
+  yes('H7 the wall shows it as a job, with the pay and the destination, on J from anywhere',
+      wall.said === '' && wall.read.hold === 'whiterun' && wall.read.wall.length === 1 &&
+      wall.read.wall[0].n === 1 && wall.read.wall[0].job === true && wall.read.wall[0].haul === true &&
+      wall.read.wall[0].name === 'Alice' && wall.read.wall[0].text === 'haul to riften for 80 gold: ' + CRATE);
   const panel = s.boardPanel(CYRUS.actor, CYRUS.pid);
   yes('H7 and so does the panel', panel && panel.wall[0].job === true &&
       panel.wall[0].text === 'haul to riften for 80 gold: ' + CRATE);
@@ -380,8 +392,11 @@ attempt('a haul, start to finish', function () {
       /72 gold is yours/.test(said) &&
       /company keeps 8/.test(said) && s.notices().whiterun[0].taken === BOB.pid);
   yes('T3 one taker', /Bob has that one/.test(s.say(CYRUS, '/take 1')));
-  yes('T4 it is on the hauler\'s /jobs with its number',
-      /whiterun: \[1\] haul to riften for 80 gold: a crate of iron ingots \(for Alice\)/.test(s.say(BOB, '/jobs')));
+  const bobs = onJ(s, BOB, 'riften').jobs;
+  yes('T4 it is in the hauler\'s Your jobs with its number, wherever they are reading',
+      bobs.length === 1 && bobs[0].hold === 'whiterun' && bobs[0].n === 1 && bobs[0].haul === true &&
+      bobs[0].name === 'Alice' && bobs[0].text === 'haul to riften for 80 gold: a crate of iron ingots');
+  yes('T4 and on the board panel, where Hand it back is', s.boardPanel(BOB.actor, BOB.pid).jobs.length === 1);
 
   // Confirming.
   said = s.say(ALICE, '/haul done whiterun 1');
@@ -416,7 +431,7 @@ attempt('a haul, start to finish', function () {
   yes('C6 the total of packs and ledgers has not moved: the pay was moved, not made', total(w, s, everybody) === start);
   said = s.say(ALICE, '/haul done whiterun 1');
   yes('C7 it is paid once', /already paid or taken down/.test(said) && w.gold(BOB) === 82 && s.funds().whiterun === 38);
-  yes('C8 the wall no longer shows it', /Nothing on the board in whiterun/.test(s.say(CYRUS, '/board whiterun')));
+  yes('C8 the wall no longer shows it', onJ(s, CYRUS, 'whiterun').read.wall.length === 0);
 });
 
 // ------------------------------------------- somebody paid who is away
@@ -564,7 +579,7 @@ attempt('taking a haul down', function () {
       (s.told[ALICE.pid] || []).some(function (m) { return /Bob handed your haul to riften back. The 50 gold pay is back in your pack/.test(m); }) &&
       s.heldOn('whiterun', null) === 0 && total(w, s, everybody) === start);
   yes('U5 it is off the hauler\'s list and nobody can take it now',
-      /no jobs/.test(s.say(BOB, '/jobs')) && /has been taken down/.test(s.say(CYRUS, '/take 2')));
+      onJ(s, BOB, 'whiterun').jobs.length === 0 && /has been taken down/.test(s.say(CYRUS, '/take 2')));
   yes('U5 and a second drop or a confirm pays nothing more',
       /not one of yours/.test(s.say(BOB, '/dropjob 2')) && w.gold(ALICE) === 140 && s.funds().whiterun === 60);
 
@@ -822,7 +837,7 @@ attempt('a company sale', function () {
   yes('S19 the trade panel has the button for a worker, sends the line, and shows the split to both',
       trade.indexOf("net('/trade sale')") !== -1 && /data\.canBuy/.test(trade) && /Buy for the company/.test(trade) &&
       /saleLine\(data\.sale\)/.test(trade) && /leaves the world/.test(trade));
-  const branch = slice(gm, "      if (word === '/trade') {", "      var found = soc.findPerson(rest);");
+  const branch = slice(gm, "      if (word === '/trade') {", "      if (!found.actorId) { toProfile(profileId, found.why); return true; }");
   yes('S20 the chat block hands the panel\'s line to the trade block',
       !!branch && /verb === 'sale'\) \{ out = tr2\.sale\(actorId\); \}/.test(branch) && /verb === 'pack' \|\| verb === 'sale'/.test(branch));
   ctxSaid(s.ctx);
@@ -848,8 +863,10 @@ attempt('the wiring', function () {
   yes('W4 the property block hands out withdraw, the cuts and who is in the company',
       /withdraw: withdraw, mayWithdraw: mayWithdraw/.test(prop) && /saleCuts: saleCuts, inCompany: inCompany/.test(prop) &&
       !/acceptSale/.test(gm));
-  yes('W5 nobody was told to type /haul, /company or /trade sale',
-      EVERY_LINE.length > 50 && EVERY_LINE.every(function (m) { return !/\/haul|\/company|\/trade sale/.test(String(m)); }));
+  yes('W5 nobody was told to type /haul, /company or /trade sale, nor a board word (#1627)',
+      EVERY_LINE.length > 50 && EVERY_LINE.every(function (m) {
+        return !/\/haul|\/company|\/trade sale|\/board|\/jobs?\b|\/take|\/unpin|\/dropjob|\/notice/.test(String(m));
+      }));
 
   const door = slice(gm, '// ==== thornswood door ====', '// ==== end thornswood door ====');
   yes('W6 the door reads companyProfiles and answers __thornswoodIsCompany only for a proved profile',

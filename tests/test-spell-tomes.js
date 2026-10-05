@@ -18,11 +18,12 @@
 //      and the chat line names exactly the ones missing
 //   C. a tome that passes teaches: the spell is in the book, a point is spent,
 //      the handler lets the engine teach it, and the line says so
-//   D. somebody a Master mage taught spends places under the cap and is
-//      refused once the cap is reached, saying why
-//   E. a spell the rulebook does not list takes its school and rank from the
-//      game's records: the half cost perk first, the effects second, and a
-//      spell with neither is refused and logged
+//   D. somebody a Master mage taught spends a semester's point (#1387) and a
+//      place under the cap, and is refused once the cap is reached, saying why
+//   E. a spell the rulebook does not list is refused (#1387: only the book is
+//      granted), whatever school and rank the game's records give it: the
+//      half cost perk first, the effects second; a spell with neither is
+//      refused and logged
 //   F. a spell already in the book is not charged for again
 //
 // Read only.
@@ -156,6 +157,7 @@ function server(store) {
   vm.runInContext(STAFF, ctx, { filename: 'gamemode.js staff spells' });
   return {
     said: said, logs: logs, C: ctx.__thornswoodCharacter, P: ctx.__thornswoodProgression,
+    T: ctx.__thornswoodTomes,
     read: function (actor, desc) { said.length = 0; return ctx.mp.onReadBook(actor, idFor(desc)); },
     chat: function (actor) { return said.filter(function (x) { return x.id === actor && x.how === 'chat'; }); }
   };
@@ -231,7 +233,7 @@ function points(actor) { const s = srv.C.stateOf(actor); return (s.spells && s.s
   const b3 = srv.read(M2, 't-sparks:Skyrim.esm');
   const l3 = (srv.chat(M2)[0] || {}).text || '';
   yes('B points only: a mage with no spell point left is refused Sparks (' + l3 + ')',
-      b3 === false && /a spell point to spend, and you have none \(a mage earns one with every rank\)/.test(l3) &&
+      b3 === false && /a spell point to spend, and you have none \(a mage earns one with every rank, and 2 with a semester at the College\)/.test(l3) &&
       !/rank in/.test(l3) && !/already know/.test(l3));
 
   // Below only: an Advanced Destruction mage with a point and no Novice Destruction spell.
@@ -279,13 +281,23 @@ function points(actor) { const s = srv.C.stateOf(actor); return (s.spells && s.s
   const teacher = { prof: 'mage', ranks: { destruction: 'master' } };
   s = P.teach(s, teacher, 'destruction').state;
   put(T, s);
-  yes('D a Smith a Master mage taught Destruction reads Flames and learns it', srv.read(T, 't-flames:Skyrim.esm') === undefined &&
-      book(T).indexOf('Flames') !== -1);
-  yes('D  and Sparks, the second place under the cap', srv.read(T, 't-sparks:Skyrim.esm') === undefined &&
+  const DAY = 24 * 3600000;
+  const t0 = 1800000000000;
+  const b0 = srv.read(T, 't-flames:Skyrim.esm');
+  const l0 = (srv.chat(T)[0] || {}).text || '';
+  yes('D a Smith a Master mage taught Destruction needs a semester at the College before a tome teaches them (' + l0 + ')',
+      b0 === false && book(T).length === 0 && /anybody who is not a Mage earns one with a semester at the College/.test(l0));
+  function semester(at) { put(T, P.study(srv.C.stateOf(T), at).state); }
+  semester(t0);
+  yes('D  and after one, reads Flames and learns it', srv.read(T, 't-flames:Skyrim.esm') === undefined &&
+      book(T).indexOf('Flames') !== -1 && points(T) === 0);
+  semester(t0 + DAY);
+  yes('D  and Sparks, the second place under the cap, after the next', srv.read(T, 't-sparks:Skyrim.esm') === undefined &&
       book(T).indexOf('Sparks') !== -1);
+  semester(t0 + 2 * DAY);
   const back = srv.read(T, 't-frostbite:Skyrim.esm');
   const line = (srv.chat(T)[0] || {}).text || '';
-  yes('D  the third is refused: the cap is the spell points, and the line says so (' + line + ')',
+  yes('D  the third is refused even with a semester\'s point: the cap holds, and the line says so (' + line + ')',
       back === false && book(T).indexOf('Frostbite') === -1 &&
       /anybody who is not a Mage holds 2 spells at most/.test(line));
   const b2 = srv.read(T, 't-fireball:Skyrim.esm');
@@ -300,29 +312,27 @@ function points(actor) { const s = srv.C.stateOf(actor); return (s.spells && s.s
   mage(M, ['destruction', 'conjuration'], function (x) {
     x.ranks.destruction = 'advanced'; x.spells.points = 3; x.spells.known = ['Flames'];
   });
-  const T1 = srv.P && srv.read(M, 't-firehand:Odin.esp');
-  const line = (srv.chat(M)[0] || {}).text || '';
+  const fh = srv.T.tomeSpell(idFor('t-firehand:Odin.esp'));
   yes('E a mod spell takes its school and rank from its half cost perk (DestructionAdept50 is Advanced Destruction)',
-      T1 === undefined && /Firehand, Advanced Destruction/.test(line));
+      fh && fh.name === 'Firehand' && fh.school === 'destruction' && fh.rank === 'advanced');
+  const T1 = srv.read(M, 't-firehand:Odin.esp');
+  const line = (srv.chat(M)[0] || {}).text || '';
   const st = srv.C.stateOf(M);
-  yes('E  it is in the book, and its school and rank are recorded beside it',
-      book(M).indexOf('Firehand') !== -1 && st.spells.tomes && st.spells.tomes.Firehand &&
-      st.spells.tomes.Firehand.school === 'destruction' && st.spells.tomes.Firehand.rank === 'advanced');
-  yes('E  and it counts as the Advanced spell below an Expert one',
-      P.tomeMissing(st, { name: 'Icy Spear', school: 'destruction', rank: 'expert' })
-        .filter(function (m) { return m.what === 'below'; }).length === 0);
+  yes('E  and it is refused all the same: only the book is granted (#1387), the tome is kept and nothing is spent (' + line + ')',
+      T1 === false && /You cannot learn Firehand from this tome: it is not in the College's book/.test(line) &&
+      /You keep the tome/.test(line) && book(M).indexOf('Firehand') === -1 && points(M) === 3 && !st.spells.tomes && clean(line));
   srv.logs.length = 0;
   srv.C.grantKnown(M);
-  yes('E  and putting known spells back at a spawn skips it rather than looking for it in SPELL_IDS',
+  yes('E  and putting known spells back at a spawn puts back the book and nothing else',
       srv.logs.some(function (l) { return /Flames/.test(l); }) &&
       !srv.logs.some(function (l) { return /Firehand/.test(l); }));
 
+  const hm = srv.T.tomeSpell(idFor('t-houndmaster:Odin.esp'));
   const b2 = srv.read(M, 't-houndmaster:Odin.esp');
   const l2 = (srv.chat(M)[0] || {}).text || '';
-  yes('E a perk that names no school falls back to the effects: the highest level of a school decides (Expert Conjuration) (' + l2 + ')',
-      b2 === false && /Conjure Houndmaster \(Expert Conjuration\)/.test(l2) &&
-      /Expert rank in Conjuration, and you are Novice in it/.test(l2) &&
-      /an Advanced Conjuration spell you already know/.test(l2));
+  yes('E a perk that names no school falls back to the effects: the highest level of a school decides (Expert Conjuration), and it is refused as off the book (' + l2 + ')',
+      hm && hm.school === 'conjuration' && hm.rank === 'expert' &&
+      b2 === false && /You cannot learn Conjure Houndmaster from this tome: it is not in the College's book/.test(l2));
 
   const b3 = srv.read(M, 't-strange:Odin.esp');
   const l3 = (srv.chat(M)[0] || {}).text || '';

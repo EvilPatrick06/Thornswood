@@ -75,6 +75,8 @@ const PIECES = {
   takeGold: 'function takeGold(actorId, amount) {',
   post: 'function post(parts, actorId, profileId, toProfile, isJob) {',
   board: 'function board(parts, actorId, profileId, toProfile) {',
+  // What the wall shows, on the board's panel and on J (#1627).
+  wallOf: 'function wallOf(hold, profileId) {',
   take: 'function take(parts, actorId, profileId, toProfile) {',
   dropJob: 'function dropJob(parts, actorId, profileId, toProfile) {',
   takedown: 'function takedown(hold, at, byWhom) {',
@@ -150,10 +152,11 @@ function boot(dir, eng) {
     'var GOLD_ID = ' + GOLD + ';',
     'var NOTICE_FEE = ' + NOTICE_FEE + ';',
     'var JOB_FEE = ' + JOB_FEE + ';',
+    'var boardReads = {};',
     'var g = { __thornswoodSocial: { push: function (actorId, now) { pushed.push(actorId); } } };'
   ];
   for (const k in lifted) { body.push(lifted[k]); }
-  body.push('return { post: post, board: board, take: take, dropJob: dropJob, ' +
+  body.push('return { post: post, board: board, take: take, dropJob: dropJob, wallOf: wallOf, ' +
             'unpin: unpin, takedown: takedown, save: save, ' +
             'notices: function () { return notices; }, ' +
             'funds: function () { return funds; } };');
@@ -181,6 +184,14 @@ function boot(dir, eng) {
   return api;
 }
 
+/* The wall as the server hands it to the panel and J: the rows, and the older count. */
+function wall(s, p) { return s.wallOf('whiterun', p.pid); }
+function row(w, n) {
+  for (let i = 0; i < w.rows.length; i++) { if (w.rows[i].n === n) { return w.rows[i]; } }
+  return null;
+}
+function shows(w, text) { return w.rows.some(function (r) { return r.text === text; }); }
+
 let dir = null;
 if (missing.length === 0) {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-unpin-'));
@@ -201,9 +212,10 @@ try {
       yes('U1 and the poster\'s board panel is drawn again', s1.pushed.indexOf(ALICE.actor) !== -1);
 
       const s2 = boot(dir, eng);
-      const read = s2.say(BOB, '/board');
+      const read = wall(s2, BOB);
       yes('U1 after a restart the notice is still on the board',
-          read.indexOf('[1] Alice: Room to let at the Bannered Mare') !== -1);
+          !!row(read, 1) && row(read, 1).name === 'Alice' && !row(read, 1).job &&
+          row(read, 1).text === 'Room to let at the Bannered Mare');
       yes('U1 and the hold still has the fee', s2.funds().whiterun === NOTICE_FEE);
       yes('U1 and the coin stayed taken', eng.gold(ALICE) === 200 - NOTICE_FEE);
     }
@@ -247,12 +259,13 @@ try {
 
     // U5: THE NUMBERS DO NOT MOVE. [3] still means Bob's job.
     {
-      const read = s.say(CYRUS, '/board');
+      const read = wall(s, CYRUS);
       yes('U5 the board no longer shows what came down',
-          read.indexOf('Clear the cellar') === -1 && read.indexOf('[2]') === -1);
+          !shows(read, 'Clear the cellar') && !row(read, 2));
       yes('U5 and the others keep the numbers they had',
-          read.indexOf('[3] job: Bob: Fetch firewood') !== -1 &&
-          read.indexOf('[1] Alice: Room to let') !== -1);
+          !!row(read, 3) && row(read, 3).job && !row(read, 3).taken && row(read, 3).name === 'Bob' &&
+          row(read, 3).text === 'Fetch firewood' &&
+          !!row(read, 1) && row(read, 1).name === 'Alice' && /^Room to let/.test(row(read, 1).text));
       const gap = s.say(CYRUS, '/take', '2');
       yes('U5 the number that came down cannot be taken',
           gap.indexOf('taken down') !== -1 && !s.notices().whiterun[1].taken);
@@ -264,11 +277,12 @@ try {
     // U6: and all of that survives a restart.
     {
       s = boot(dir, eng);
-      const read = s.say(BOB, '/board');
+      const read = wall(s, BOB);
       yes('U6 after a restart what came down is still down',
-          read.indexOf('Clear the cellar') === -1 && !!s.notices().whiterun[1].down);
+          !shows(read, 'Clear the cellar') && !!s.notices().whiterun[1].down);
       yes('U6 and the list kept its gap rather than closing it',
-          s.notices().whiterun.length === 3 && read.indexOf('[3] job, taken: Bob') !== -1);
+          s.notices().whiterun.length === 3 && !!row(read, 3) && row(read, 3).name === 'Bob' &&
+          row(read, 3).taken === 'Cyrus' && row(read, 3).mine === true);
       yes('U6 and the register says who took it down',
           s.notices().whiterun[1].downBy === ALICE.pid);
     }
@@ -279,8 +293,9 @@ try {
       yes('U7 something already down says so', twice.indexOf('already down') !== -1);
       const none = s.say(ALICE, '/unpin', '9');
       const word = s.say(ALICE, '/unpin', 'cellar');
-      yes('U7 a number that is not on the board is refused, and so is a word',
-          none.indexOf('by its number') !== -1 && word.indexOf('by its number') !== -1);
+      yes('U7 a number that is not on the board is refused, and so is a word, naming no command',
+          none.indexOf('not on the board') !== -1 && word.indexOf('not on the board') !== -1 &&
+          none.indexOf('/') === -1);
       eng.standAt(null);
       const away = s.say(ALICE, '/unpin', '1');
       yes('U7 away from a board nothing comes down',
@@ -297,9 +312,8 @@ try {
       s.say(ALICE, '/unpin', '1');
       s.say(CYRUS, '/dropjob', '3');
       s.say(BOB, '/unpin', '3');
-      const read = s.say(ALICE, '/board');
-      yes('U8 a board with everything taken down says there is nothing on it',
-          read.indexOf('Nothing on the board in whiterun') !== -1);
+      const read = wall(s, ALICE);
+      yes('U8 a board with everything taken down has nothing on it', read.rows.length === 0 && read.older === 0);
     }
 
     /*
@@ -313,12 +327,12 @@ try {
         const b = boot(dir2, e2);
         for (let i = 1; i <= 12; i++) { b.say(ALICE, '/notice', 'Notice ' + i); }
         b.say(ALICE, '/unpin', '12');
-        const read = b.say(BOB, '/board');
-        yes('U9 the newest one taken down is not shown', read.indexOf('[12]') === -1);
+        const read = wall(b, BOB);
+        yes('U9 the newest one taken down is not shown', !row(read, 12));
         yes('U9 the ten shown are the ten newest still up',
-            read.indexOf('[11]') !== -1 && read.indexOf('[2]') !== -1 &&
-            read.indexOf('[1]') === -1);
-        yes('U9 and it says one older, not two', read.indexOf('(1 older') !== -1);
+            read.rows.length === 10 && !!row(read, 11) && !!row(read, 2) && !row(read, 1) &&
+            read.rows[0].n === 11);
+        yes('U9 and it says one older, not two', read.older === 1);
       } finally {
         fs.rmSync(dir2, { recursive: true, force: true });
       }
@@ -375,8 +389,8 @@ try {
   }
   yes('/unpin is in the list of words the server answers',
       list('WORDS').indexOf('/unpin') !== -1);
-  yes('and in the list everybody is told about, like the rest of the board',
-      list('PLAYER_WORDS').indexOf('/unpin') !== -1);
+  yes('and in no list anybody is told about: Take down on the board panel sends it (#1627)',
+      list('PLAYER_WORDS').indexOf('/unpin') === -1);
 }
 
 console.log('');

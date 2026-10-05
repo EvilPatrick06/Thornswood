@@ -226,15 +226,15 @@ yes('the gamemode\'s list of everybody\'s commands can be read', Array.isArray(e
 
 // ---------------------------------------------------------- the chat box
 /*
-  The chat box is server wide as it ships: the voice service sends every plain
-  line to every peer. Entry 150 reached main as a setting, THORNSWOOD_CHAT_RANGE,
-  that keeps a line to the people near and ships off, so the old loop is still
-  there for the off case and finding it proves nothing on its own. What the
-  page stands on is the default: off in the voice service when nothing sets
-  it, and off in Install-Voice.ps1, which is what sets it on the box. Turn
-  either default on and this fails, and the page has to change with it rather
-  than going on saying the old thing. Turning it on by hand for one install is
-  Patrick's call and is not in the repository, so no harness can see it.
+  The chat box is local as it ships since 4 Oct: Install-Voice.ps1 sets
+  THORNSWOOD_CHAT_RANGE on for live and dev (Patrick: local chat "should have
+  went out with the other changes to live"), and the voice service then sends a
+  plain line only to the people hearers() finds in the same cell and within
+  the range. The old loop to every peer is still there for a service with the
+  setting off, so finding it proves nothing on its own. What the page stands
+  on is the default Install-Voice.ps1 installs with, and that a later install
+  keeps what is running. Turn the default off and this fails, and the page has
+  to change with it rather than going on saying the old thing.
 */
 {
   const c = vserver.indexOf("if (msg.t === 'chat') {");
@@ -244,15 +244,27 @@ yes('the gamemode\'s list of everybody\'s commands can be read', Array.isArray(e
   try { rangeOf = fr ? new Function(fr[0] + '\nreturn chatRangeOf;')() : null; } catch (e) { rangeOf = null; }
   yes('the voice service reads its chat range from THORNSWOOD_CHAT_RANGE',
       /const CHAT_RANGE = chatRangeOf\(process\.env\.THORNSWOOD_CHAT_RANGE\);/.test(vserver) && !!rangeOf);
-  yes('and an unset or off range is no range at all, so every line goes to everybody',
-      !!rangeOf && rangeOf(undefined) === 0 && rangeOf('') === 0 && rangeOf('off') === 0);
-  yes('Install-Voice.ps1 installs the voice service with the range off',
-      /\[string\]\$ChatRange = 'off'/.test(vinstall) &&
+  yes('and on is the same 4000 units /ooc uses, while unset or off is no range at all',
+      !!rangeOf && rangeOf('on') === 4000 && rangeOf(undefined) === 0 && rangeOf('') === 0 && rangeOf('off') === 0);
+  yes('Install-Voice.ps1 installs the voice service with the range on',
+      /\[string\]\$ChatRange = 'on'/.test(vinstall) &&
       /set THORNSWOOD_CHAT_RANGE=\$ChatRange/.test(vinstall));
-  yes('the voice service still sends a plain chat line to every peer when the range is off',
-      /for \(const \[, p\] of peers\) \{/.test(block) && /p\.ws\.send\(out\)/.test(block));
-  yes('so the page says a chat line goes to everybody connected',
-      /goes to everybody connected/.test(item('Chat and commands', 'The chat box')));
+  // Since #1406 a plain line goes out through deliver(), which also puts the
+  // line above the head for those close enough and skips anybody who has
+  // blocked the sender. With the range off it is still every peer.
+  const everyone = block.indexOf('for (const [, p] of peers) deliver(p);');
+  yes('a plain line goes out through deliver(), and to every peer only when the range is off',
+      everyone > block.indexOf('if (CHAT_RANGE) {') && block.indexOf('if (CHAT_RANGE) {') >= 0 &&
+      /function deliver\(p\) \{[\s\S]*?p\.ws\.send\(copy\);/.test(block));
+  yes('and a later install keeps whatever range is running, off included',
+      /\$chatExplicit -and "\$current" -match ';chat=\(\\d\+\)'/.test(vinstall) &&
+      /if \(\$ChatRange -eq '0'\) \{ \$ChatRange = 'off' \}/.test(vinstall));
+  yes('with a range, a plain chat line goes only to the people hearers() finds near',
+      /if \(CHAT_RANGE\) \{\s*const heard = hearers\(myId, me, chatReach\('say'\)\);/.test(block) &&
+      /them\.cell !== mine\.cell/.test(vserver) && /> reach \* reach\) continue;/.test(vserver));
+  yes('so the page says a chat line reaches the people near you, in the same place and within about 60 metres',
+      /reaches the people near you, in the same place and within about 60 metres/.test(item('Chat and commands', 'The chat box')) &&
+      !/everybody connected/.test(item('Chat and commands', 'The chat box')));
   yes('and that a slash line is a command, which the voice service holds back',
       /text\.charAt\(0\) === '\/'/.test(block) &&
       /starts with a slash is a command/.test(item('Chat and commands', 'The chat box')));
@@ -412,10 +424,12 @@ function tableNames(src, name) {
       purse > 0 && item('Character', 'What you start with').indexOf(purse + ' gold, once') !== -1);
 
   const tools = [];
-  const tr = /^  (miner|woodworker|farmer): \{\n    give: '[^']+',\n    accept: [\s\S]*?name: '((?:[^'\\]|\\.)*)'/gm;
+  // Every TOOLS row with a give, which is handed over at the pick: the
+  // miner's, woodworker's and farmer's, and the fisher's pole since #1379.
+  const tr = /^  (\w+): \{\n    give: '[^']+',\n    accept: [\s\S]*?name: '((?:[^'\\]|\\.)*)'/gm;
   let r;
   while ((r = tr.exec(gm)) !== null) { tools.push(r[2].replace(/\\'/g, '\'')); }
-  yes('the gamemode hands out ' + tools.length + ' tools (' + tools.join(', ') + ')', tools.length === 3);
+  yes('the gamemode hands out ' + tools.length + ' tools (' + tools.join(', ') + ')', tools.length >= 4);
   const lostTool = tools.filter(function (x) { return item('Character', 'The tools come with the pick').indexOf(x) === -1; });
   yes('and the page names every one' + (lostTool.length ? ' (not: ' + lostTool.join(', ') + ')' : ''), lostTool.length === 0);
   /*
@@ -440,11 +454,20 @@ function tableNames(src, name) {
   const toolsAt = gm.indexOf('const TOOLS = {');
   const toolsBlock = toolsAt < 0 ? '' : gm.slice(toolsAt, gm.indexOf('\n};\n', toolsAt));
   const wheres = toolsBlock.match(/where: '[^']*/g) || [];
-  yes('every refusal names a smith as the way to another (' + wheres.length + ' of 3)',
-      wheres.length === 3 && wheres.every(function (w) { return /a smith forges them/i.test(w); }));
+  // Four tools since the fisher's pole (#1379): a smith forges the pickaxe,
+  // the axe and the shovel, and a woodwright makes the pole.
+  const names = (toolsBlock.match(/name: '(?:[^'\\]|\\.)*'/g) || []).map(function (n) {
+    return n.slice(7, -1).replace(/\\'/g, "'");
+  });
+  yes('every refusal names who makes another, a smith or for the pole a woodwright (' + wheres.length + ' tools)',
+      wheres.length >= 4 && wheres.length === names.length &&
+      wheres.every(function (w) { return /a smith forges them|a woodwright makes them/i.test(w); }));
   const toolItem = item('Character', 'The tools come with the pick');
-  yes('and the page says a smith forges the next one and nothing hands one out',
-      /a smith forges the next one/.test(toolItem) && /nothing in the world hands one out/.test(toolItem) &&
+  yes('and the page names every tool the gamemode asks for (' + names.join(', ') + ')',
+      names.length >= 4 && names.every(function (n) { return toolItem.indexOf(n) >= 0; }));
+  yes('and says a smith forges the next one, a woodwright the next pole, and nothing hands one out',
+      /a smith forges the next one/.test(toolItem) && /a woodwright makes the next pole/.test(toolItem) &&
+      /nothing in the world hands one out/.test(toolItem) &&
       !/once every \d+ hours|hands you one/.test(toolItem));
 
   const remind = num(gm, /const CHOOSE_REMIND_MS = (\d+);/) / 1000;
@@ -570,6 +593,25 @@ const site    = read('site', 'server.js');
       /staff in the world is told/.test(staff) && /staff channel in the Discord/.test(staff));
   yes('and when it cannot get through the game says to open a ticket, as the page does',
       /Open a ticket in the Discord/.test(gm) && /open a ticket in the Discord/.test(staff));
+
+  // /stuck (#414, #1006): the page says what the stuck block does, with its
+  // numbers read out of the block rather than typed here.
+  const sa = gm.indexOf('// ==== thornswood stuck ====');
+  const sz = sa < 0 ? -1 : gm.indexOf('// ==== end thornswood stuck ====', sa);
+  const stuckBlock = (sa >= 0 && sz > sa) ? gm.slice(sa, sz) : '';
+  const again = num(stuckBlock, /var AGAIN_MS = (\d+) \* 60 \* 1000;/);
+  const wait = num(stuckBlock, /var WAIT_MS = (\d+);/) / 1000;
+  const stuckItem = item('Chat and commands', 'Stuck in the world: /stuck');
+  yes('the gamemode answers /stuck for everybody, and the page has an item for it',
+      /if \(word === '\/stuck'\)/.test(gm) && (everybody || []).indexOf('/stuck') !== -1 && stuckItem.length > 0);
+  yes('it says /stuck takes you back a few steps, or to the nearest temple',
+      /back a few steps/.test(stuckItem) && /nearest temple/.test(stuckItem));
+  yes('once every ' + again + ' minutes and a ' + wait + ' second wait in a fight, as the stuck block has them',
+      again > 0 && wait > 0 && stuckItem.indexOf('once every ' + again + ' minutes') !== -1 &&
+      stuckItem.indexOf('waits ' + wait + ' seconds') !== -1);
+  yes('not while dead, and every use is logged for staff, as the stuck block does',
+      /refused outright while you are dead/.test(stuckBlock) && /not while you are dead/.test(stuckItem) &&
+      /every use is logged for staff/.test(stuckItem));
 }
 
 // -------------------------------------------------------- Scan, Fix, logs

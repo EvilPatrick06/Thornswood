@@ -393,9 +393,10 @@ chatPrune();
  *
  * THORNSWOOD_CHAT_RANGE decides who a PLAIN line in the box reaches:
  *
- *   unset, off, 0   a plain line goes to every socket. The dev voice service
- *                   is installed with on. Live is left unset, so a later
- *                   install of live does not make plain speech local there.
+ *   unset, off, 0   a plain line goes to every socket. Install-Voice.ps1
+ *                   installs live and dev with on since 4 Oct (Patrick:
+ *                   local chat should have gone to live with the rest), so
+ *                   this is only a service started by hand without it.
  *   on              the same cell and 4000 units
  *   a number        the same cell and that many units
  *

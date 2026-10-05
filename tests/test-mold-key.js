@@ -264,7 +264,38 @@ function client(opt) {
     // on J. What they do is test-journal-key.js's business, not this one's.
     'function journalKeyDown() {}',
     'function journalKeyPressed() {}',
+    // The board, ride and merchant presses, which the key handler asks
+    // before anything else since #1430 and #1394. Each answers only the
+    // game's Activate event (E on something), and no press here is one.
+    // What they do is test-1374-letters.js's, test-1394-fares.js's and
+    // test-merchant-traders.js's business.
+    // Hand over the letter (#1595), Activate on somebody you carry a letter
+    // for, asked first. test-1595-deliver.js has what it does.
+    'function deliverPress() { return false; }',
+    'function boardPress() { return false; }',
+    'function driverPress() { return false; }',
+    'function merchantPress() { return false; }',
+    // The lock key, X, since #1472. It is asked only for its own scan code,
+    // and what it does is test-lock-keypress.js's business.
+    'const LOCK_KEY = iniNumber(iniText, "LockKey", 45);',
+    'function lockPress() { return false; }',
     PIECES_FRONT.mold,
+    // The same key after the mold says no: sleeping on a person inside a
+    // building you hold (#1603, SLEEP_KEY is MOLD_KEY in the plugin) and a
+    // repair kit in the inventory (#1384). Nobody is looked at and no
+    // inventory is open here; test-1603-beds.js and test-1384-condition.js
+    // have what they do.
+    'const SLEEP_KEY = MOLD_KEY;',
+    'function sleepPress() { return false; }',
+    'function repairPress() { return false; }',
+    // A warrior's maneuver key (#1386), 9, scan code 10, asked ahead of K.
+    // No press here is 9; test-1386-warrior.js has what it does.
+    'const MANEUVER_KEY = iniNumber(iniText, "ManeuverKey", 10);',
+    'function maneuverKeyPressed() {}',
+    // K on a person a Master could take on (#1634), asked ahead of K. Nobody
+    // is looked at here; test-1634-apprentice-gui.js has what it does.
+    'const APPRENTICE_KEY = SKILLS_KEY;',
+    'function apprenticePress() { return false; }',
     PIECES_FRONT.keys,
     'return { MOLD_KEY: MOLD_KEY, MOLD_NAME: MOLD_NAME, moldPress: moldPress };'
   ].join('\n');
@@ -757,9 +788,10 @@ if (missingGm.length === 0 && KEY_DESC && MOLD_DESC && DEED_DESC && RECIPE_DESC 
     E.person(ALICE, TAMRIEL, [1050, 1000, 0], [E.blank()]);
     const s = boot(E, held());
     const told = s.say(ALICE, '/moldhere', HEX);
-    yes('S5 with no blank mold recipe on the server it says so and points at /mold: "' +
+    // And names nothing to type: no chat commands for what people do (#1637).
+    yes('S5 with no blank mold recipe on the server it says so, with nothing to type: "' +
         first(told, ALICE) + '"', /no blank key molds/.test(first(told, ALICE)) &&
-        /\/mold/.test(first(told, ALICE)));
+        !/\/\w/.test(first(told, ALICE)));
     yes('S5 and makes nothing', E.molds(ALICE, LABEL) === 0);
   }
 

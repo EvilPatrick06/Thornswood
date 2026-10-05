@@ -6,16 +6,23 @@ friend does not grant the work bonus. That bonus is
 
 ## How it is made
 
-Look at them and press Y, or `/friend` and their name. A prompt
-appears on their screen with Accept and Refuse. They do not type a
-command to answer. The offer stands for 45 seconds. Both sides are
-written. A list with one name in it is not a friendship.
+Look at them and press Y, or press Add friend beside them under Near
+you on the P panel. A prompt appears on their screen with Accept and
+Refuse. Nobody types a command to ask or to answer. The offer stands
+for 45 seconds. Both sides are written. A list with one name in it is
+not a friendship.
 
-`/friend` with nothing after it lists them, and says who is away.
-`/friend remove` and the name takes one off. P opens the same list.
+P lists them by the name they are online under, and says who is
+away. While a friend is away, the list shows the name they had when
+you became friends. Remove beside a name takes one off.
 
-Two people with the same name are an ambiguity. The key while you are
-looking at them is exact. A typed name is a prefix.
+Near you on P is everybody close enough to look at, the same people
+the look prompt names. Two people with the same name are not mixed
+up: the key while you are looking at them, and Add friend beside
+them, each send that person and not a name. A friend's row on P is
+the same: Ask to party, Remove, and the three switches send that
+friend, so a friend whose character ended and who came back on a new
+one is still the one they reach.
 
 ## How many
 
@@ -37,6 +44,10 @@ see your name.
 
 ## Where this is
 
-Y, `/friend`, the prompt, the 45 seconds, the list, the remove, and
-the cap of 120 are in the server. Accept and Refuse on that prompt
-are what a person presses. The list survives a restart.
+Y, Add friend under Near you, the prompt, the 45 seconds, the list,
+Remove, and the cap of 120 are in the server. Accept and Refuse on
+that prompt are what a person presses. The list survives a restart.
+The panel and the key send the server the line `/friend` once was,
+and nobody is told to type it. The buttons on a friend's row send the
+profile id the list is kept by, and the server finds whoever that
+profile is playing now.

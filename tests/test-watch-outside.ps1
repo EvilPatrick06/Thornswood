@@ -80,6 +80,7 @@ function Reset-World {
   $script:dns = @('192.0.2.10')
   $script:rdapEnd = '2027-09-15T01:11:45Z'
   $script:runner = 'online'
+  $script:runner2 = ''
   $script:token = 'eyFAKE'
   $script:sign = 200
   $script:signBody = '["1.3.6.1.4.1.311.97.1.2.3.4"]'
@@ -106,7 +107,11 @@ function Get-Cert([string]$hostName) { return @{ NotAfter = $script:certEnd; Pro
 function Get-Dns([string]$name) { return @{ Addresses = @($script:dns); Error = $(if (@($script:dns).Count) { '' } else { 'does not resolve' }) } }
 function Get-Runners([string]$repo) {
   if ($script:runner -eq 'gh-fails') { return @{ Runners = @(); Error = 'gh could not ask GitHub: HTTP 401' } }
-  return @{ Runners = @(@{ Name = 'thornswood-vps'; Status = $script:runner; Busy = $false }); Error = '' }
+  $list = @(@{ Name = 'thornswood-vps'; Status = $script:runner; Busy = $false })
+  # A numbered runner beside it (Install-Runner.ps1 -Number), and one whose
+  # name only starts the same, which is not one of them.
+  if ($script:runner2) { $list += @{ Name = 'thornswood-vps-2'; Status = $script:runner2; Busy = $true }; $list += @{ Name = 'thornswood-vpsx'; Status = 'offline'; Busy = $false } }
+  return @{ Runners = $list; Error = '' }
 }
 function Get-AzureToken { if ($script:token) { return @{ Token = $script:token; Error = '' } } else { return @{ Token = ''; Error = 'az on this machine has no Azure sign in (az account get-access-token failed)' } } }
 function Send-Webhook([string]$url, [string]$text) {
@@ -216,14 +221,28 @@ try {
   $null = Pass-Once; $null = Pass-Once
   Yes 'runner offline for two runs: nothing yet, it restarts itself on updates' ((Posted '*build runner*') -eq 0)
   $null = Pass-Once
-  Yes 'runner offline for three runs: one message' ((Posted '*build runner, thornswood-vps, is offline on GitHub*') -eq 1)
+  Yes 'runner offline for three runs: one message' ((Posted '*build runners, thornswood-vps and the numbered ones, are not all online on GitHub*') -eq 1)
   Yes 'it says what that stops' ((Posted '*Launcher builds*') -eq 1)
   $null = Pass-Once
   $script:runner = 'online'
   $null = Pass-Once; $null = Pass-Once
-  Yes 'runner online two runs in a row: one message saying so' ((Posted '*build runner, thornswood-vps, is online again*') -eq 1)
+  Yes 'runner online two runs in a row: one message saying so' ((Posted '*build runners, thornswood-vps and the numbered ones, are all online again*') -eq 1)
   Yes 'two messages in all for the runner' ((Posted '*build runner*') -eq 2)
   Clear-Posted
+
+  # ---- a numbered runner offline while the first is online (4 October) ------
+  Reset-World
+  $script:runner2 = 'online'
+  Yes 'two runners online: both counted, and one that only starts with the name is not' ((Check-Runner $S).Line -eq 'all 2 online, 1 running a job' -and -not (Check-Runner $S).Bad)
+  $script:runner2 = 'offline'
+  Yes 'the second offline is wrong too, and named' ((Check-Runner $S).Bad -and (Check-Runner $S).Why -eq 'GitHub shows thornswood-vps-2 offline, of 2')
+  $null = Pass-Once; $null = Pass-Once; $null = Pass-Once
+  Yes '  told once, after three runs, naming it' ((Posted '*are not all online on GitHub*thornswood-vps-2 offline*') -eq 1)
+  $script:runner2 = 'online'
+  $null = Pass-Once; $null = Pass-Once
+  Yes '  and back once' ((Posted '*are all online again*') -eq 1)
+  Clear-Posted
+  Reset-World
   $script:runner = 'gh-fails'
   Yes 'GitHub not answering gh is told as One''s side' ((Check-Runner $S).Bad -and (Check-Runner $S).Why -match 'One could not ask GitHub')
   Reset-World

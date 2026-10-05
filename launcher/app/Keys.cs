@@ -510,7 +510,7 @@ namespace Thornswood
 
 
             l.Add(Dx("skills", "ThornsWood", "Profession, class and skill tree",
-                     "Your profession and which half of it you work, your class, and the fifteen sub-skills under Health, Magicka and Stamina. Opens over the world without pausing it. Escape closes it too.",
+                     "Your profession and which half of it you work, your class, and the fifteen sub-skills under Health, Magicka and Stamina. Opens over the world without pausing it. Escape closes it too. A Master looking at somebody they could take on as an apprentice sees this key named under the crosshair, and it opens on that person.",
                      ThornIni, "SkillsKey", 37));
 
             // ------------------------------------------------ the people keys
@@ -539,8 +539,8 @@ namespace Thornswood
             l.Add(Dx("moldkey", "ThornsWood", "Press a key mold into a lock",
                      "While you are looking at a building's door with a blank key mold in your pack, presses it into the lock so it becomes that building's mold. The holder has to be you or be standing there. The same key, while you are looking at somebody inside a building you hold, lets them sleep there for a night, or ends their night. In your inventory, with a repair kit in your pack, the same key opens the repair panel.",
                      ThornIni, "MoldKey", 22));
-            l.Add(Dx("lockkey", "ThornsWood", "Lock the door",
-                     "Locks the door you last opened, the same door /claim and /lock use. Logged to the server as /lock. Unlock is still /unlock.",
+            l.Add(Dx("lockkey", "ThornsWood", "Claim, lock or unlock a door",
+                     "While you are looking at a door of the building you just opened, a line names what this key does there: claims the building when nobody holds it, and locks or unlocks it when it is yours. At a forge, carrying a key mold that has been pressed into a door, it cuts a key from the mold. At a crop, it claims the farm around it when the line says so.",
                      ThornIni, "LockKey", 45));
             l.Add(Dx("maneuvers", "ThornsWood", "A warrior's maneuvers",
                      "Opens a small panel with the maneuvers you hold. Press a number or click one to start it. This key or Escape closes the panel.",

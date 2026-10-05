@@ -497,11 +497,11 @@ for (const at of Object.keys(WRITERS)) {
       /\bvar fee = isJob \? JOB_FEE : NOTICE_FEE;/.test(code) &&
       /\bvar cost = LETTER_FEE \+ LETTER_PAY;/.test(code) &&
       /\bvar cost = JOB_FEE \+ pay;/.test(code));
-  const fares = ['FARE_FERRY', 'FARE_CARRIAGE', 'FARE_RAVEN_ROCK'].map(function (n) {
+  const fares = ['FARE_FERRY', 'FARE_CARRIAGE_IN_HOLD', 'FARE_CARRIAGE', 'FARE_CROSSING'].map(function (n) {
     const m = new RegExp('\\bvar ' + n + ' = (\\d+);').exec(code);
     return m ? Number(m[1]) : 0;
   });
-  yes('the fare is fare(), refused at 0 or less, and all three fares are more than nothing',
+  yes('the fare is fare(), refused at 0 or less, and all four fares are more than nothing',
       /\bvar price = fare\(from, to\);\s*\n(\s*\/\/[^\n]*\n)*\s*if \(!\(price > 0\)\) \{ return /.test(code) &&
       fares.every(function (n) { return n > 0; }));
   yes('and every one of those is more than nothing',
@@ -766,7 +766,8 @@ function goldDescriptors(text) {
     'GOLD_DESC': 'scene finish gold, the same named GOLD_DESC row the checked dungeon reward uses',
     'open.itemDesc': 'puts back the retrieval good the place row already handed over; not a coin',
     'place.item': 'the unbound scene container good on the place row; not a coin',
-    'row.out': 'Grand Chef\'s second batch, the output of a Cook row of RECIPES_BY_ID (#1398), and section 5 says no recipe makes gold'
+    'row.out': 'Grand Chef\'s second batch, the output of a Cook row of RECIPES_BY_ID (#1398), and section 5 says no recipe makes gold',
+    'KEY_INGOT': 'puts back the iron ingot a key at a forge took a line before, when the key could not be handed over (#1637); an iron ingot, not a coin'
   };
   const re = /\baddItem\(\s*[^,()]+,\s*([^,]+?),/g;
   const unknown = [];
