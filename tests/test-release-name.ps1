@@ -216,16 +216,33 @@ try {
         [IO.File]::WriteAllBytes((Join-Path $inst "Game\Data\$plugin"), $pluginHeader)
     }
     Put (Join-Path $inst 'Profile\OwnGame\loadorder.txt') "ours.esp`r`n"
-    $port = Get-Random -Minimum 20000 -Maximum 40000
-    Put (Join-Path $inst 'config.json') ('{"ServerAddress":"127.0.0.1","ServerPort":' + ($port - 1) + '}')
     $node = Get-Command node -ErrorAction SilentlyContinue
     Yes 'node is on PATH, for the stand-in game server' ($null -ne $node)
     if ($null -eq $node) { Done }
+    # The stand-in takes a port from the system, holds it, and says which on
+    # its first line; config.json names the game port one below it, the rule
+    # LoadOrder.ps1 reads the resources port by. It used to be given a random
+    # number nothing checked was free, and 800 ms to be up (#1728).
     $serverJs = Join-Path $Scratch 'server.js'
-    Put $serverJs ("require('http').createServer(function (q, s) { s.setHeader('Content-Type', 'application/json'); " +
-                   "s.end(JSON.stringify({ mods: ['Skyrim.esm','Update.esm','Dawnguard.esm','HearthFires.esm','Dragonborn.esm','ours.esp'].map(filename => ({ filename, size: 24, crc32: 1 })) })); }).listen($port, '127.0.0.1');")
-    $script:gameServer = Start-Process -FilePath $node.Source -ArgumentList @($serverJs) -PassThru -WindowStyle Hidden
-    Start-Sleep -Milliseconds 800
+    Put $serverJs ("const srv = require('http').createServer(function (q, s) { s.setHeader('Content-Type', 'application/json'); " +
+                   "s.end(JSON.stringify({ mods: ['Skyrim.esm','Update.esm','Dawnguard.esm','HearthFires.esm','Dragonborn.esm','ours.esp'].map(filename => ({ filename, size: 24, crc32: 1 })) })); }); " +
+                   "srv.listen(0, '127.0.0.1', function () { console.log('listening on 127.0.0.1:' + srv.address().port); });")
+    $gpsi = New-Object Diagnostics.ProcessStartInfo
+    $gpsi.FileName = $node.Source; $gpsi.Arguments = '"' + $serverJs + '"'
+    $gpsi.UseShellExecute = $false; $gpsi.CreateNoWindow = $true; $gpsi.RedirectStandardOutput = $true; $gpsi.RedirectStandardError = $true
+    $script:gameServer = [Diagnostics.Process]::Start($gpsi)
+    $gameErr = $script:gameServer.StandardError.ReadToEndAsync()
+    $first = $script:gameServer.StandardOutput.ReadLineAsync()
+    $heard = if ($first.Wait(15000)) { [string]$first.Result } else { '' }
+    $m = [regex]::Match($heard, '^listening on 127\.0\.0\.1:(\d+)$')
+    $port = if ($m.Success) { [int]$m.Groups[1].Value } else { 0 }
+    Yes "the stand-in game server says it is listening, on a port the system gave it ($port)" ($port -gt 0)
+    if (-not $port) {
+        if ($script:gameServer.HasExited -and $gameErr.Wait(2000)) { Write-Host $gameErr.Result -ForegroundColor DarkGray }
+        Done
+    }
+    $null = $script:gameServer.StandardOutput.ReadToEndAsync()
+    Put (Join-Path $inst 'config.json') ('{"ServerAddress":"127.0.0.1","ServerPort":' + ($port - 1) + '}')
     Put (Join-Path $inst 'Game\Data\Platform\UI\ours.bsa') ('x' * 4096)
     # What the last release published, on the stand-in store: the plugin as it
     # was, so this build has something to send. The feed names no baseline
