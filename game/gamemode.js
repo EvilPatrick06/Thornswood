@@ -46492,8 +46492,10 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // Everybody's: the way between holds is a driver (#1394).
                       '/ride',
                       // Everybody's, and they have to be findable: a key
-                      // prompt nobody sees is a feature nobody has.
-                      '/friend', '/party', '/mute', '/hidename', '/trade', '/journal', '/book', '/merchant',
+                      // prompt nobody sees is a feature nobody has. Not
+                      // /party: P on somebody asks and the P panel runs the
+                      // party, and nobody is told to type it (#1629).
+                      '/friend', '/mute', '/hidename', '/trade', '/journal', '/book', '/merchant',
                       // Everybody's: a Master takes somebody on with it, and
                       // anybody can ask who took them on (#1388).
                       '/apprentice',
@@ -47680,7 +47682,11 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       }
 
       /* /party with nothing after it is about your own party rather than
-         about somebody else, so those two go first. */
+         about somebody else, so those two go first.
+
+         Every /party line is sent by P on somebody (an ask with their form
+         id) or by a button on the P panel (leave, disband, kick, lead, and an
+         ask beside a friend). Nobody is told to type one (#1629). */
       // Opening or mounting a panel requests its owner's current view (#1275).
       if (word === '/party' && rest === 'refresh') {
         soc.push(actorId, true);
@@ -47688,7 +47694,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       }
       if (word === '/party' && (rest === '' || rest === 'list')) {
         var pp = soc.partyOf(mine);
-        if (!pp) { toProfile(profileId, 'You are not in a party. Look at somebody and press the party key, or /party <name>.'); return true; }
+        if (!pp) { toProfile(profileId, 'You are not in a party. Look at somebody and press the party key to ask them.'); return true; }
         var names = [];
         for (var pi = 0; pi < pp.members.length; pi++) {
           var pa = soc.actorForProfile(pp.members[pi]);
@@ -47871,6 +47877,15 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         soc.dropFriend(actorId, theirPid);
         toProfile(profileId, theirName + ' is no longer on your list.');
         soc.push(actorId);
+        return true;
+      }
+
+      /* Somebody already in your party is not asked again. P draws "Party
+         menu" over them rather than an ask, and this is the server's own
+         check of the same thing, for an ask that left as they joined. */
+      var askerParty = word === '/party' ? soc.partyOf(mine) : null;
+      if (askerParty && askerParty.members.indexOf(theirPid) !== -1) {
+        toProfile(profileId, theirName + ' is already in your party.');
         return true;
       }
 
@@ -48531,7 +48546,8 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
       if (topic === 'people' || topic === 'friends' || topic === 'party') {
         toProfile(profileId,
           'Look at somebody and press Y to ask them to be friends, H to offer a ' +
-          'trade, L to stop hearing them. P opens your friends and your party; ' +
+          'trade, L to stop hearing them, P to ask them to party. P opens your ' +
+          'friends and party; ' +
           'J opens your journals, and a group book beside them when this character ' +
           'is in one or the Discord account may found one. A Dev may found one of each. ' +
           '/book new business <name> and /book new faction <name> start one. ' +
