@@ -71,7 +71,10 @@ that trigger is gone and `scripts\deploy\Setup-Domain.ps1 -TaskOnly` puts it bac
 .\scripts\mods\Check-Manifest.ps1
 ```
 
-If the manifest does not answer, the server process is not running.
+If the manifest does not answer, the server process is not running, or it
+is running and could not publish the manifest. In that case its log has one
+line saying `the load order manifest was NOT published` and why. Nothing
+tries again: put that cause right, then restart the server below.
 
 ```powershell
 .\scripts\vps\Restart-Server.ps1 -Service game

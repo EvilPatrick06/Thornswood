@@ -7,6 +7,10 @@
 // gamemode.js named respawn-holds.json; that file never lived in this
 // repository. game\data\data.json is the source for const DATA.
 //
+// Except DATA.worldspaces, which scripts\dev\Build-WorldspaceTable.js reads
+// out of the WRLD records of the load order and writes into data.json and the
+// DATA line (#1896). Do not edit that list by hand.
+//
 // Does not invent content. Edit the JSON, then run this to write the const
 // lines. --check verifies the gamemode matches the JSON (by value) and writes
 // nothing.

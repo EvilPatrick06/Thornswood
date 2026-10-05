@@ -83,7 +83,11 @@ person.
 ## Where this is
 
 The wake is in the server. At the moment of death it writes the
-nearest temple, and a death on Solstheim writes Raven Rock. The public
+nearest temple, and a death on Solstheim writes Raven Rock. A death in
+any worldspace of the load order counts as out of doors for that, the
+Soul Cairn and the Forgotten Vale too: the list is read out of the
+plugins (#1896). A worldspace with coordinates of its own, like those
+two, is still measured against the mainland's doors (#1909). The public
 rules on the site are the yes and the no above, and this page does not
 replace that page.
 

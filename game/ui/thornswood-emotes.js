@@ -235,15 +235,41 @@
     e.preventDefault();
   });
 
+  // The wheel key's letter, G unless it is bound elsewhere, and CloseKey's
+  // letter when CloseKey is bound to one. Escape closes the wheel whatever
+  // CloseKey is, the way it closes every panel here.
   var closeChar = 'g';
+  var closeKeyLetter = '';
 
+  /*
+    G and Escape close the wheel here, and the page says so with __close.
+    The plugin decides, the same as for a click outside the wheel (#1852).
+
+    While the wheel is up it holds the keyboard and only this page hears a
+    key: the fork hands the game, and so every plugin's buttonEvent, no key
+    down while the browser has focus (the note over LETTERS in
+    game/plugins/thornswood-emotes.js has the code path). The plugin's own G
+    and Escape wait for a press that does not come while the wheel is up,
+    and every other panel here answers its own Escape for the same reason.
+
+    The tap that opens the wheel cannot also close it. The fork reads the
+    whole keyboard on every input read, whoever has focus, and hands this
+    page a change only, and only while the browser has focus
+    (ProcessKeyboardData in DInputHook.cpp, OnKeyStateChange in main.cpp).
+    That read is made in the same call that hands the game G going down, or
+    an earlier one, so before the plugin hears G and the wheel takes the
+    keyboard, G is already down in it (or a tap that quick was missed by it
+    altogether). This page hears at most G coming up.
+    tests/test-1852-wheel-keys.js plays it through. In the search, G is a
+    letter of the name and Escape still closes.
+  */
   document.addEventListener('keydown', function (e) {
     if (!open()) return;
     if (e.repeat) return;
     if (e.repeat) { e.preventDefault(); return; }
     var k = e.key || '';
     if (searching() && k !== 'Escape' && k !== 'Tab') { return; }
-    if (k === 'Escape' || e.keyCode === 27) { e.preventDefault(); return; }
+    if (k === 'Escape' || e.keyCode === 27) { e.preventDefault(); say('__close'); return; }
     if (k === 'Tab' || e.keyCode === 9) {
       e.preventDefault();
       try { find.focus(); } catch (err) { }
@@ -254,8 +280,10 @@
       say('__stand');
       return;
     }
-    if (closeChar && k.toLowerCase() === closeChar) {
+    if ((closeChar && k.toLowerCase() === closeChar) ||
+        (closeKeyLetter && k.toLowerCase() === closeKeyLetter)) {
       e.preventDefault();
+      say('__close');
       return;
     }
     if (k >= '1' && k <= '8') {
@@ -264,14 +292,20 @@
     }
   }, true);
 
-  window.thornswoodSetWheel = function (list, slotNames, closeKeyChar, stopKeyChar) {
+  window.thornswoodSetWheel = function (list, slotNames, closeKeyChar, stopKeyChar, closeLetter) {
     items = (list || []).slice().sort(function (a, b) {
       return String(a.name).toLowerCase() < String(b.name).toLowerCase() ? -1 : 1;
     });
     slots = (slotNames || []).slice();
     while (slots.length < 8) { slots.push(''); }
-    if (typeof closeKeyChar === 'string' && closeKeyChar) {
+    // An empty letter is a wheel key that is not a letter. It leaves no
+    // letter to close on, rather than a G that would close a wheel G does
+    // not open.
+    if (typeof closeKeyChar === 'string') {
       closeChar = closeKeyChar.toLowerCase();
+    }
+    if (typeof closeLetter === 'string') {
+      closeKeyLetter = closeLetter.toLowerCase();
     }
     if (typeof stopKeyChar === 'string' && stopKeyChar) {
       standChar = stopKeyChar.toLowerCase();
