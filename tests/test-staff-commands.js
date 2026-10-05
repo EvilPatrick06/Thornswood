@@ -446,7 +446,7 @@ async function startVoice() {
   srv = spawn(process.execPath, ['voice-server.js'], {
     cwd: dir,
     env: Object.assign({}, process.env, {
-      THORNSWOOD_VOICE_PORT: String(PORT), THORNSWOOD_VOICE_AUTH: 'log', THORNSWOOD_SITE: '',
+      THORNSWOOD_VOICE_PORT: String(PORT), THORNSWOOD_SITE: '',
       THORNSWOOD_CHAT_DIR: path.join(dir, 'chat'), THORNSWOOD_CHAT_RANGE: 'off'
     })
   });
@@ -481,6 +481,8 @@ function join(pid, name, tok) {
       if (m.t === 'welcome') {
         done({ heard: heard, hush: hush, who: who, say: (text) => ws.send(JSON.stringify({ t: 'chat', text: text })) });
       }
+      // Refused at the join (#1303): what the service said, and nothing else.
+      if (m.t === 'denied') { done({ denied: String(m.why || '') }); }
       if (m.t === 'chat') { heard.push(m); }
       if (m.t === 'hush') { hush.push(m); }
       if (m.t === 'pos') {
@@ -531,13 +533,13 @@ function python(args) {
 
   aela.say('/kick Bjorn');
   await until(async () => (h = await health()) && h.queuedCommands === 1);
-  liar.say('/kick Bjorn');
-  await until(async () => (h = await health()) && h.queuedCommands === 2);
   const got = await commands();
   yes('a command from a connection with a good token is queued as proven',
-      got.length === 2 && got[0].proven === true && got[0].profileId === STAFFER);
-  yes('the same profile number with no token is queued as not proven',
-      got.length === 2 && got[1].proven === false && got[1].profileId === STAFFER);
+      got.length === 1 && got[0].proven === true && got[0].profileId === STAFFER);
+  // It used to be let in and its commands queued as not proven, for the
+  // gamemode to refuse; since #1303 it never gets a connection to send one.
+  yes('the same profile number with no token is refused at the join, so nothing it says reaches the queue',
+      liar.denied === 'no token' && !liar.say);
 
   const r = await fetch(base + '/silenced', { method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ profiles: { [BJORN]: Date.now() + 120000 } }) });

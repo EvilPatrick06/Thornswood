@@ -320,9 +320,10 @@ Yes 'the bot is installed whole, never -CodeOnly, and asks for no token (-NoToke
     @($moving + $gone | Where-Object { $_.Leaf -eq 'Install-Bot.ps1' }).Count -ge 2 -and
     @($moving + $gone | Where-Object { $_.Leaf -eq 'Install-Bot.ps1' -and ((Has $_ 'CodeOnly') -or -not (Has $_ 'NoToken')) }).Count -eq 0)
 Yes 'the site is never deployed with -SeedDocs' (@($moving + $gone | Where-Object { $_.Leaf -eq 'Deploy-Docs.ps1' -and (Has $_ 'SeedDocs') }).Count -eq 0)
-Yes 'voice goes on with auth on and loopback, as live and dev run it' (
+# Auth has no flag since #1303: the service refuses every unproven join.
+Yes 'voice goes on with loopback, as live and dev run it, and passes no -Auth, which Install-Voice no longer has' (
     @($moving | Where-Object { $_.Leaf -eq 'Install-Voice.ps1' }).Count -eq 2 -and
-    @($moving | Where-Object { $_.Leaf -eq 'Install-Voice.ps1' -and $_.Text -notmatch '-Auth on' }).Count -eq 0)
+    @($moving | Where-Object { $_.Leaf -eq 'Install-Voice.ps1' -and ($_.Text -notmatch '-Bind 127\.0\.0\.1' -or $_.Text -match '-Auth') }).Count -eq 0)
 Yes 'the hand-run Backup-Server.ps1, whose zip Restore-Server cannot read, is not the backup a move uses' (
     @($moving + $gone | Where-Object { $_.Leaf -eq 'Backup-Server.ps1' }).Count -eq 0)
 $gCheck = First $gone 'Restore-Box.ps1' { param($r) Has $r 'Check' }
