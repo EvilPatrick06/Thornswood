@@ -155,7 +155,10 @@ rehearsal, or a real move, that loses it is acceptable. In short:
    the backup, because `C:\thornswood-server.zip` is whichever channel was
    published last and a live restore on a dev payload would otherwise come
    back on the dev port under the dev name: read the `from the backup, was`
-   lines it prints. Then `vps-restore-services.ps1` puts the rest back, and
+   lines it prints. The join pass switch and the written role lists
+   (`thornswoodRequirePass`, `thornswoodDevs`, `thornswoodPlaytesters`) come
+   from the backup too, since no build carries them (issue #1845); those
+   lines name each one and never its value. Then `vps-restore-services.ps1` puts the rest back, and
    the copy on the box is deleted. By hand, from an unpacked backup, it is:
    - `game\world` -> `C:\Thornswood-Server\world`
    - `game\private` -> `C:\Thornswood-Server\private`
