@@ -37,7 +37,8 @@ const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
   list of paragraphs made from the key names.
 */
 function helpTopic(id) {
-  const page = fs.readFileSync(path.join(REPO, 'game', 'ui', 'thornswood-help.js'), 'utf8');
+  const page = fs.readFileSync(path.join(REPO, 'game', 'ui', 'thornswood-help.js'), 'utf8')
+    .split(String.fromCharCode(13)).join('');
   const a = page.indexOf('  var TOPICS = [');
   const b = a < 0 ? -1 : page.indexOf('\n  ];\n', a);
   const k = /var keys = (\{[\s\S]*?\});/.exec(page);
