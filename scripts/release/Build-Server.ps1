@@ -57,6 +57,12 @@
   game folder. It installs the server's packages, compiles and, unless told
   not to, updates the build record.
 
+  HOW MANY AT ONCE (#1203). MSBuild compiles as many projects at once as the
+  memory free allows, two compilers each, the same as Build-Engine.ps1
+  (EngineJobs.ps1 says how many and why), or -Jobs of them. A bare /m started
+  one per core and ran a busy machine out of memory. A compile that runs out
+  anyway says so and gives the line to build with fewer.
+
   A fork under a path with an & in it (every worktree here) is built through
   the drive letter it was configured through, the way Build-Engine.ps1 does
   it: -Fork K:\<fork>. MSBuild refuses a cache configured through another path.
@@ -65,6 +71,7 @@
     .\scripts\release\Build-Server.ps1
     .\scripts\release\Build-Server.ps1 -Configuration Debug
     .\scripts\release\Build-Server.ps1 -NoRecord      compile only, leave the record alone
+    .\scripts\release\Build-Server.ps1 -Jobs 2        two projects at a time, whatever is free
 
   Exit code 1 if Visual Studio or yarn is not installed, if the build folder
   has not been configured, if the packages or the compile fail, or if a file
@@ -81,6 +88,10 @@ param(
     # Compile and stop. Without this, scripts\release\New-ServerBuildRecord.ps1 runs
     # afterwards so the deploy will accept what was just built.
     [switch]$NoRecord,
+    # Projects compiled at once, two compilers each. 0, the default, works
+    # it out from the memory free when the build starts (EngineJobs.ps1).
+    [ValidateRange(0, 64)]
+    [int]$Jobs = 0,
     [switch]$NoPause
 )
 
@@ -88,6 +99,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\deploy\ServerBuild.ps1')
+. (Join-Path $Here 'EngineJobs.ps1')
 
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
@@ -200,12 +212,29 @@ foreach ($n in 'dist_back\skymp5-server.js', 'dist_back\skymp5-server.js.map') {
     if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Force }
 }
 
+# Projects at once from the memory free, not a bare /m (#1203, EngineJobs.ps1).
+$free = Get-EngineFreeBytes
+$atOnce = $Jobs
+if ($atOnce -lt 1) { $atOnce = Get-EngineJobs $free ([Environment]::ProcessorCount) }
+$jobArgs = Get-EngineMSBuildArgs $atOnce
 foreach ($project in $projects) {
-    Say ("  " + $Configuration + ', ' + [IO.Path]::GetFileNameWithoutExtension($project) + ', parallel')
+    Say ('  {0}, {1}, {2} project(s) at once, {3} compilers each, {4:N1} GB free' -f $Configuration, [IO.Path]::GetFileNameWithoutExtension($project), $atOnce, $EngineCompilersPerJob, ($free / 1GB))
     Say ''
-    & $msbuild $project "/p:Configuration=$Configuration" /m /v:minimal /nologo
+    # Each line goes to the screen as MSBuild writes it, and an out of memory
+    # error is noted so the stop below can say the machine ran out.
+    $oom = ''
+    $ErrorActionPreference = 'Continue'
+    & $msbuild $project "/p:Configuration=$Configuration" @jobArgs /v:minimal /nologo 2>&1 | ForEach-Object {
+        $c = Get-EngineOutOfMemoryCode ([string]$_)
+        if ($c -and -not $oom) { $oom = $c }
+        Write-Host $_
+    }
     $code = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
     Say ''
+    if ($code -ne 0 -and $oom) {
+        Die (Get-EngineOutOfMemoryAdvice $oom $atOnce $free (Get-EngineAgainLine '.\scripts\release\Build-Server.ps1' $PSBoundParameters))
+    }
     if ($code -ne 0) {
         Die "MSBuild exited with $code. The errors are above, in the order the compiler found them; the first one is usually the only real one."
     }
