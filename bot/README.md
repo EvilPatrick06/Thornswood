@@ -229,6 +229,11 @@ count as staff there, and it no longer does (#1342). `test-staff-gate.py`
 runs every staff and admin command and button as somebody who is not staff
 for it, and fails on any new one whose gate is not written down in it.
 
+Both close a ticket and nothing else: a thread off a `TICKET_CHANNEL`
+channel, where the panel opens them. In any other thread, a Live smoke
+session or a `#tales` post, they answer that they only work inside a ticket
+and archive and write down nothing (#1776, `test-1776-close-tickets-only.py`).
+
 Staff roles are job titles on purpose. Thane, Steward, Warden and Housecarl are
 all things somebody should be able to play, and a moderator wearing one makes
 every in-world use of the word ambiguous.

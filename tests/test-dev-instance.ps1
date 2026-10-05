@@ -131,8 +131,9 @@ try {
 
     # ---- voice ----------------------------------------------------------------
     $v = @(Get-ChildItem -LiteralPath $dv -Recurse -File -Force | ForEach-Object { $_.FullName.Substring($dv.Length + 1) } | Sort-Object)
-    Yes ('dev voice has the program, its page, the roller and its run file, and nothing else (' + ($v -join ', ') + ')') (
-        ($v -join ',') -eq 'public\index.html,roll-log.ps1,run-dev-voice.cmd,voice-server.js')
+    # Not the page live may still keep in public: the service serves none (#1822).
+    Yes ('dev voice has the program, the roller and its run file, and nothing else (' + ($v -join ', ') + ')') (
+        ($v -join ',') -eq 'roll-log.ps1,run-dev-voice.cmd,voice-server.js')
     Yes 'none of live''s chat logs, keys or old secret' (
         -not (Test-Path -LiteralPath (Join-Path $dv 'chat')) -and -not (Test-Path -LiteralPath (Join-Path $dv 'token-key.txt')) -and
         -not (Test-Path -LiteralPath (Join-Path $dv 'turn-key.txt')) -and -not (Test-Path -LiteralPath (Join-Path $dv 'secret.txt')))

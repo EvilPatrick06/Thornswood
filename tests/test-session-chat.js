@@ -181,8 +181,10 @@ yes('and reads the server log beside it by the same channel', /serverLogSlice\(\
 const readTool = (f) => { try { return fs.readFileSync(path.join(REPO_DIR, f), 'utf8'); } catch (e) { return ''; } };
 const vpsDev = readTool('scripts/vps/vps-dev-instance.ps1');
 const getLogs = readTool('scripts/vps/Get-Logs.ps1');
-const liveRoot = (vpsDev.match(/\$liveVoice\s*=\s*'([^']+)'/) || [])[1] || '';
-const devRoot = (vpsDev.match(/\$devVoice\s*=\s*'([^']+)'/) || [])[1] || '';
+// Since ae7b0e0 (29 September) the two folders are the script's parameters,
+// -LiveVoice and -DevVoice, and these are their defaults.
+const liveRoot = (vpsDev.match(/\[string\]\$LiveVoice\s*=\s*'([^']+)'/) || [])[1] || '';
+const devRoot = (vpsDev.match(/\[string\]\$DevVoice\s*=\s*'([^']+)'/) || [])[1] || '';
 const dirsAt = src.indexOf('const CHAT_DIRS');
 const dirsSrc = dirsAt >= 0 ? src.slice(dirsAt, src.indexOf('};', dirsAt)) : '';
 function fallback(key) {

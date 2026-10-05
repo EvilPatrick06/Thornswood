@@ -340,6 +340,7 @@ jobs:
                  'test-1712-builders-skip-off.js',
                  'test-1787-ore-eol.js',
                  'test-1828-harvest-spell-eol.js',
+                 'test-1808-hunt-not-a-body.js',
                  'test-1628-social-gui.js',
                  'test-1630-journal-gui.js',
                  'test-1629-party-gui.js',
@@ -355,8 +356,10 @@ jobs:
                  'test-1721-social-tick.js',
                  'test-1307-ice-relay.js',
                  'test-1821-ice-on-socket.js',
+                 'test-1822-voice-page-gone.js',
                  'test-1336-missing-stops.ps1',
                  'test-1223-live-pass-asked.ps1',
+                 'test-1814-loadorder-missing.ps1',
                  'test-1367-cross-site.js',
                  'test-1326-engine-secrets.ps1',
                  'test-1203-engine-jobs.ps1',
@@ -453,7 +456,7 @@ jobs:
           # the plugins and the overlays.
           $files = @(Get-ChildItem -Path scripts -Filter *.js -File -Recurse) + @(Get-ChildItem -Path game -Filter *.js -File) +
                    @(Get-ChildItem -Path game\plugins, game\ui -Filter *.js -File -ErrorAction SilentlyContinue) +
-                   @(Get-ChildItem -Path site\server.js, voice\voice-server.js, voice\public\voice.js -File)
+                   @(Get-ChildItem -Path site\server.js, voice\voice-server.js -File)
           foreach ($f in $files) {
             & node --check $f.FullName 2>&1 | Out-Null
             if ($LASTEXITCODE -ne 0) {

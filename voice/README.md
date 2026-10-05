@@ -8,9 +8,12 @@ five times a second over loopback (`POST /positions`). Every client holds a
 WebSocket to it for those positions, for the WebRTC signalling that sets up
 voice between two people, and for text chat, which it relays to the room and
 writes to `chat\`, one file a day. The audio goes straight between people and
-never passes through it. `public\` is the plain browser page it serves, and
-the `test-*.js` files beside it are its harnesses. `gamemode-voice.js` is the
-gamemode's half of the position feed as `Add-VoiceFeed.ps1` first added it.
+never passes through it. The `test-*.js` files beside it are its harnesses.
+It serves no page of its own: its two clients are the launcher's voice page
+and the game's overlay, both loaded off disk. The plain browser page it used
+to serve at `/` went in #1822, because it had no way to get a join token and
+so could never get in. `gamemode-voice.js` is the gamemode's half of the
+position feed as `Add-VoiceFeed.ps1` first added it.
 The copy between the voice feed markers in `game\gamemode.js` has moved on
 since: it reads its port from `server-settings.json`, so the dev server feeds
 the dev service, where this file still has 7778 written in.
@@ -18,11 +21,10 @@ the dev service, where this file still has 7778 written in.
 live gamemode, undoing that, so it stops when the two differ; `-Force` is the
 only way past.
 
-A socket opened by a browser has to come from the page this service serves
-(its Origin names the host the socket was asked for, straight or through
-Caddy) or from a page loaded off disk, which says `null` or `file://`: the
-game's pages and the launcher's voice page. A page on any other website is
-refused with 403 before the handshake (#1321). A client that sends no Origin
+A socket opened by a browser has to come from a page loaded off disk, which
+says `null` or `file://`: the game's pages and the launcher's voice page. A
+page on any website is refused with 403 before the handshake (#1321), this
+host included since its own page went (#1822). A client that sends no Origin
 is not a browser and is let in.
 
 ## On your machine
@@ -101,7 +103,7 @@ from loopback as the gamemode does, so the gamemode's routes (`/positions`,
 forwarding header on it, which Caddy always sets (#1797). Its clients are the
 launcher's hidden voice page (`launcher`), the in-game overlays
 (`game\ui`) and the two gamemodes. `.\scripts\deploy\Install-Voice.ps1` copies
-`voice-server.js` and the two files in `public\`, restarts the task and waits
+`voice-server.js` and `headlines.js`, restarts the task and waits
 for `/health`; the dev service is the same script with
 `-Root C:\Thornswood-Voice-Dev -Port 7789 -TaskName 'Thornswood Dev Voice'`.
 `Go.ps1` without `-SkipServer` also copies this file over the live one and
