@@ -36,11 +36,43 @@ let PORT = 0;
 const TICK_MS = 200;
 
 let pass = 0, fail = 0;
-function yes(what, cond) {
+function yes(what, cond, why) {
   if (cond) { pass++; console.log('PASS  ' + what); }
-  else { fail++; console.log('FAIL  ' + what); }
+  else { fail++; console.log('FAIL  ' + what + (why ? '\n      ' + why : '')); }
 }
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/*
+  How long any one answer is waited for before the wait gives up and says
+  what did not come. Each check waits for the thing it reads (#1926), so this
+  only ends a wait on a service that is stuck, as listening() does.
+*/
+const BOUND_MS = 15000;
+
+/*
+  Waits on what the sockets have been sent. until(test, what) resolves ''
+  once test() holds, checked again as each message comes in on any socket,
+  or after BOUND_MS with what did not come. Every check here used to read
+  after a fixed number of ticks' worth of time (two to fifteen), and on a
+  busy machine the service can tick fewer times than that, or the messages
+  can still be on their way (#1926).
+*/
+const waits = [];
+function heard() { for (const w of waits.slice()) { w(); } }
+function until(test, what) {
+  return new Promise((ok) => {
+    let bound = null;
+    const check = () => { if (test()) { end(''); } };
+    const end = (why) => {
+      clearTimeout(bound);
+      const i = waits.indexOf(check);
+      if (i >= 0) { waits.splice(i, 1); }
+      ok(why);
+    };
+    bound = setTimeout(() => end('no ' + what + ' within ' + BOUND_MS / 1000 + ' s'), BOUND_MS);
+    waits.push(check);
+    check();
+  });
+}
 
 // ------------------------------------------------------------- the people
 const CELLS = ['3c:Skyrim.esm', '1605e:Skyrim.esm', '16a0b:Skyrim.esm', '16bd9:Skyrim.esm',
@@ -71,7 +103,16 @@ byPid[5010].pos = [200000.123456, 200000.654321, 0.5];
 byPid[5011].pos = [200000.123456 + 50 * 70, 200000.654321, 0.5];
 // Somebody who logs off part way through.
 const LEAVER = 5030;
-let present = people.slice();
+/*
+  The clock: one more person, alone in a cell nobody else is in and in no
+  party, who takes a step on every feed. Nobody else's view holds them, so
+  they change nothing that is measured, and their own socket is sent a
+  moved on every tick that carries a new feed. That is how this counts the
+  service's ticks, rather than reading after so many ms of its own (#1926).
+*/
+const CLOCK = { profileId: 9990, cell: 'f00d:Thornswood-Test.esp', name: 'The clock', party: '',
+                pos: [1000, 1000, 0], angleZ: 0 };
+let present = people.concat([CLOCK]);
 
 // Forty walkers, two from every cell, a step of about a metre a second.
 const walkers = people.filter((p, i) => i % 5 === 0 && p.profileId !== 5010 && p.profileId !== 5011);
@@ -178,6 +219,7 @@ function feed() {
   if (walking) {
     for (const w of walkers) { w.pos = [w.pos[0] + 14.3, w.pos[1] + 7.7, w.pos[2]]; w.angleZ = (w.angleZ + 3.3) % 360; }
   }
+  CLOCK.pos = [CLOCK.pos[0] + 10, CLOCK.pos[1], CLOCK.pos[2]];
   return fetch('http://127.0.0.1:' + PORT + '/positions', {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: body()
   }).then((r) => r.status).catch(() => 0);
@@ -193,7 +235,10 @@ function frameBytes(text) {
 function join(pid) {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket('ws://127.0.0.1:' + PORT + '/', ['thornswood', tokenFor(pid)]);
-    const me = { pid: pid, ws: ws, table: null, bytes: 0, msgs: 0, moved: 0, firstAt: 0, at: 0 };
+    // wire is every position message as { at, bytes }, at being the tick
+    // that sent it by the service's clock, so a stretch of ticks can be
+    // counted however late its messages arrive.
+    const me = { pid: pid, ws: ws, table: null, bytes: 0, msgs: 0, moved: 0, firstAt: 0, at: 0, wire: [], pongs: [] };
     sockets.push(ws);
     const late = setTimeout(() => reject(new Error('no welcome for ' + pid)), 20000);
     ws.onopen = () => { ws.send(JSON.stringify({ t: 'join', profileId: pid, name: 'Person ' + pid })); };
@@ -203,15 +248,17 @@ function join(pid) {
       let m = null;
       try { m = JSON.parse(text); } catch (e) { return; }
       if (m.t === 'welcome') { clearTimeout(late); resolve(me); return; }
+      if (m.t === 'pong') { const p = me.pongs.shift(); if (p) { p(); } return; }
       if (m.t === 'pos') {
         me.table = m.who || {}; me.at = m.at; if (!me.firstAt) { me.firstAt = m.at; }
-        me.bytes += frameBytes(text); me.msgs++;
+        me.bytes += frameBytes(text); me.msgs++; me.wire.push({ at: m.at, bytes: frameBytes(text) });
       }
       if (m.t === 'moved' && me.table) {
         for (const k of Object.keys(m.who || {})) { me.table[k] = m.who[k]; }
         for (const id of (m.gone || [])) { delete me.table[id]; }
-        me.at = m.at; me.bytes += frameBytes(text); me.msgs++; me.moved++;
+        me.at = m.at; me.bytes += frameBytes(text); me.msgs++; me.moved++; me.wire.push({ at: m.at, bytes: frameBytes(text) });
       }
+      heard();
     };
     ws.onerror = () => { clearTimeout(late); reject(new Error('socket for ' + pid + ' failed')); };
   });
@@ -231,7 +278,39 @@ function wholeTick(joined) {
   return b;
 }
 
-function counters(joined) { return joined.reduce((a, j) => ({ bytes: a.bytes + j.bytes, msgs: a.msgs + j.msgs }), { bytes: 0, msgs: 0 }); }
+/* What the sockets were sent by ticks after the one at from, up to and with
+   the one at to, by the service's clock. */
+function sentIn(joined, from, to) {
+  let bytes = 0, msgs = 0;
+  for (const j of joined) {
+    for (const w of j.wire) { if (w.at > from && w.at <= to) { bytes += w.bytes; msgs++; } }
+  }
+  return { bytes: bytes, msgs: msgs };
+}
+
+/*
+  A page's own ping, answered after everything the service sent that socket
+  before it (#519). The tick writes to every socket in one go, so once each
+  socket's pong is in, everything every tick sent so far has come.
+*/
+function settle(j) {
+  return new Promise((ok, bad) => {
+    const late = setTimeout(() => bad(new Error('no pong to a ping from ' + j.pid + ' within ' + BOUND_MS / 1000 + ' s')), BOUND_MS);
+    j.pongs.push(() => { clearTimeout(late); ok(); });
+    j.ws.send(JSON.stringify({ t: 'ping' }));
+  });
+}
+const settleAll = (list) => Promise.all(list.map(settle));
+
+/* The clock's socket, set once it has joined. ticks(n) waits for n more
+   ticks of the service that carried a feed, and says when the last was. */
+let clock = null;
+async function ticks(n) {
+  const from = clock.wire.length;
+  const why = await until(() => clock.wire.length >= from + n, n + ' ticks of the service');
+  if (why) { throw new Error(why); }
+  return clock.wire[from + n - 1].at;
+}
 
 (async () => {
   const h = await ready();
@@ -239,6 +318,7 @@ function counters(joined) { return joined.reduce((a, j) => ({ bytes: a.bytes + j
   yes('the service takes the feed', await feed() === 204);
   feeder = setInterval(() => { feed(); }, TICK_MS);
 
+  clock = await join(CLOCK.profileId);
   const joined = [];
   for (let i = 0; i < people.length; i += 50) {
     joined.push(...await Promise.all(people.slice(i, i + 50).map((p) => join(p.profileId))));
@@ -246,68 +326,77 @@ function counters(joined) { return joined.reduce((a, j) => ({ bytes: a.bytes + j
   }
   const of = {};
   for (const j of joined) { of[j.pid] = j; }
-  for (let i = 0; i < 50 && !joined.every((j) => j.table); i++) { await wait(100); }
-  yes('every one of them was sent their whole view', joined.every((j) => j.table));
-  await wait(600);
+  let why = await until(() => joined.every((j) => j.table), 'whole view for every one of them');
+  yes('every one of them was sent their whole view', joined.every((j) => j.table), why);
 
   yes('rows are sent in whole units and whole degrees',
-      joined.every((j) => Object.keys(j.table).every((k) => {
+      joined.every((j) => Object.keys(j.table || {}).every((k) => {
         const r = j.table[k];
         return Array.isArray(r.pos) && r.pos.every(Number.isInteger) && Number.isInteger(r.angleZ);
       })));
 
+  /*
+    Each stretch below is so many ticks of the service, counted on the
+    clock's socket, and what the others were sent in it is counted by the
+    tick that sent it once every socket's pong is in. It used to be so many
+    seconds here, read as they ended, which on a busy machine can be fewer
+    ticks and messages still on the way (#1926).
+  */
   // ------------------------------------------------------------ standing
-  const s0 = counters(joined);
-  await wait(3000);
-  const s1 = counters(joined);
-  const standTicks = 3000 / TICK_MS;
-  const standAfter = (s1.bytes - s0.bytes) / standTicks;
+  const STAND_TICKS = 15;
+  const sFrom = await ticks(1);
+  const sTo = await ticks(STAND_TICKS);
+  await settleAll(joined);
+  const s = sentIn(joined, sFrom, sTo);
+  const standAfter = s.bytes / STAND_TICKS;
   const standBefore = wholeTick(joined);
-  console.log('      standing: ' + (s1.msgs - s0.msgs) + ' messages in 3 s');
-  yes('two hundred people standing still are sent nothing after their first view',
-      s1.msgs - s0.msgs === 0);
+  console.log('      standing: ' + s.msgs + ' messages in ' + STAND_TICKS + ' ticks');
+  yes('two hundred people standing still are sent nothing after their first view', s.msgs === 0);
 
   // ------------------------------------------------------------- walking
+  const WALK_TICKS = 20;
   walking = true;
-  await wait(TICK_MS * 2);
-  const w0 = counters(joined);
-  await wait(4000);
-  const w1 = counters(joined);
+  const wFrom = await ticks(2);
+  const wTo = await ticks(WALK_TICKS);
   walking = false;
-  const walkTicks = 4000 / TICK_MS;
-  const walkAfter = (w1.bytes - w0.bytes) / walkTicks;
+  await settleAll(joined);
+  const w = sentIn(joined, wFrom, wTo);
+  const walkAfter = w.bytes / WALK_TICKS;
   const walkBefore = wholeTick(joined);
   yes('people who can hear a walker are told they moved',
       joined.filter((j) => j.moved > 0).length > walkers.length);
-  await wait(TICK_MS * 3);
+  // Two ticks more, so the last feed with anybody walking has been sent on.
+  await ticks(2);
+  await settleAll(joined);
 
   // ------------------------------------------- walking away, logging off
   const a = of[5010], b = of[5011];
   yes('two in the open world 50 m apart see each other', !!(a.table[5011] && b.table[5010]));
   byPid[5011].pos = [200000 + 400 * 70, 200000, 0];
-  await wait(TICK_MS * 4);
-  yes('walking 400 m away takes them out of each other\'s view', !a.table[5011] && !b.table[5010]);
+  why = await until(() => !a.table[5011] && !b.table[5010], 'tick taking 5010 and 5011 out of each other\'s view');
+  yes('walking 400 m away takes them out of each other\'s view', !a.table[5011] && !b.table[5010], why);
   yes('and each still has their own row', !!(a.table[5010] && b.table[5011]));
 
   const hadLeaver = joined.filter((j) => j.pid !== LEAVER && j.table[LEAVER]);
   present = present.filter((p) => p.profileId !== LEAVER);
-  await wait(TICK_MS * 4);
+  why = await until(() => hadLeaver.every((j) => !j.table[LEAVER]), 'tick taking ' + LEAVER + ' out of every view');
   yes('somebody who logs off leaves the view of everybody who had them (' + hadLeaver.length + ')',
-      hadLeaver.length > 0 && hadLeaver.every((j) => !j.table[LEAVER]));
+      hadLeaver.length > 0 && hadLeaver.every((j) => !j.table[LEAVER]), why);
 
   // ------------------------------------ the tables are exactly the views
   /*
     A second socket for the same person is sent the whole view on its first
     tick. With nobody moving, it has to match the table the first socket
-    built up out of a whole view and every change since.
+    built up out of a whole view and every change since: read once each
+    first socket's pong is in, after its second's whole view has come.
   */
-  await wait(TICK_MS * 3);
   const sample = joined.filter((j, i) => i % 10 === 0 && j.pid !== LEAVER);
   const fresh = await Promise.all(sample.map((j) => join(j.pid)));
-  for (let i = 0; i < 30 && !fresh.every((f) => f.table); i++) { await wait(100); }
+  why = await until(() => fresh.every((f) => f.table), 'whole view for every second socket');
+  await settleAll(sample);
   const mismatched = sample.filter((j, i) => canon(j.table) !== canon(fresh[i].table));
   yes('what each socket holds after the changes is exactly its whole view (' +
-      mismatched.length + ' of ' + sample.length + ' differ)', mismatched.length === 0);
+      mismatched.length + ' of ' + sample.length + ' differ)', !why && mismatched.length === 0, why);
   yes('the party strip still gets the party across cells',
       !!(of[5000].table[5080] && of[5000].table[5160] && of[5160].table[5000]));
 
