@@ -132,6 +132,9 @@ namespace Thornswood
             new HelpItem("Chat and commands", "Getting staff: /helpme and /report",
                 "/helpme and a few words about what is wrong reaches staff: anybody from staff in the world is told at once, with where you are, and it goes to the staff channel in the Discord. /report, the person's name and what they did, reaches staff and nobody else. The game tells you whether it got through. If it did not, open a ticket in the Discord."),
 
+            new HelpItem("Chat and commands", "Stuck in the world: /stuck",
+                "Wedged in a wall or a rock and cannot walk out? /stuck takes you back a few steps to where you last stood safely, or to the nearest temple when there is no such spot. It works once every 5 minutes and not while you are dead, and in a fight it waits 15 seconds first, which moving or being hit cancels. It is only for being truly stuck: every use is logged for staff."),
+
             new HelpItem("Chat and commands", "Everything else is on /help",
                 "Type /help in the chat for a short menu, then /help talking, /help people, /help living, /help work, /help land or /help staff for one topic each. A word the server does not know is answered with the list of words it does."),
 
