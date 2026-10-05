@@ -536,6 +536,42 @@ const T = rules(trade.css);
       trade.told.indexOf('thornswood-front trade:closed') >= 0);
 }
 
+// #1718: each line is one piece, and its buttons ask for that piece by the
+// number the server gave it, never by a name two pieces can share.
+{
+  const pieces = load('trade');
+  const pr = pieces.root;
+  function sent() { return pieces.sent[pieces.sent.length - 1]; }
+  pieces.win.thornswoodTrade.setData({
+    open: true, them: 'Ingrid',
+    pack: [{ p: 1, n: 'Key to Breezehome', c: 1, k: 'Keys' }, { p: 2, n: 'Key to Honeyside', c: 1, k: 'Keys' },
+           { p: 3, n: 'Steel Dagger (enchanted)', c: 2, k: 'Weapons' }, { p: 4, n: 'Steel Dagger (enchanted)', c: 3, k: 'Weapons' }],
+    mine: [{ p: 2, n: 'Key to Honeyside', c: 1 }], myGold: 0, iAgreed: false,
+    theirs: [{ p: 7, n: 'Iron Sword (85%)', c: 1 }], theirGold: 0, theyAgreed: false
+  });
+  const packCol = pr.querySelector('#ts-trade-pack');
+  const add1 = packCol.querySelectorAll('button[data-add]').filter(function (b) { return b.textContent === 'Add 1'; });
+  yes('#1718 each piece is its own line with its own Add 1', add1.length === 4 &&
+      /Key to Breezehome/.test(packCol.innerHTML) && /Key to Honeyside/.test(packCol.innerHTML));
+  add1[1].onclick.call(add1[1]);
+  yes('#1718 Add 1 on the Honeyside line asks for that piece by its number', sent() === '/trade add #2 1');
+  const boxes = packCol.querySelectorAll('input').filter(function (el) { return el.getAttribute('data-side') === 'add'; });
+  boxes[3].value = '2';
+  if (boxes[3].oninput) { boxes[3].oninput.call(boxes[3]); }
+  const adds = packCol.querySelectorAll('button[data-qty]');
+  adds[3].onclick.call(adds[3]);
+  yes('#1718 two lines that read the same each read their own box and send their own piece',
+      sent() === '/trade add #4 2');
+  adds[2].onclick.call(adds[2]);
+  yes('#1718 and the other line\'s box is its own', sent() === '/trade add #3 1');
+  const takeBack = pr.querySelector('#ts-trade-mine').querySelectorAll('button[data-rem]')
+    .filter(function (b) { return b.textContent === 'Take back'; })[0];
+  takeBack.onclick.call(takeBack);
+  yes('#1718 Take back asks for the piece on that line', sent() === '/trade remove #2');
+  yes('#1718 the other side\'s piece is drawn under its own name',
+      /Iron Sword \(85%\)/.test(pr.querySelector('#ts-trade-theirs').innerHTML));
+}
+
 
 // Owner state arrives before the async overlay script in a cold browser (#1275).
 {

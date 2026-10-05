@@ -57559,8 +57559,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   BOTH CONFIRMATIONS BACK, which is the one rule that makes a trade safe: the
   thing you agreed to is the thing you get.
 
-  THE SERVER OWNS THE PILES AND NEVER THE CLIENT. An offer is a list of base
-  ids and counts held here, checked against the real inventory at the moment
+  THE SERVER OWNS THE PILES AND NEVER THE CLIENT. An offer is a list of
+  pieces (a base id and everything its entry carries beside it, #1718) and
+  counts held here, checked against the real inventory at the moment
   of the swap rather than at the moment of the offer, so somebody who drops
   the sword they offered simply fails the check. The client draws what the
   server says the piles are.
@@ -57638,7 +57639,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       offerA: [], offerB: [], goldA: 0, goldB: 0,
       okA: false, okB: false, at: Date.now(),
       // The company worker buying, when it is a sale out of Skyrim (#1393).
-      sale: 0
+      sale: 0,
+      // The number the panel names each piece by, for this trade (#1718).
+      keys: {}, pieces: []
     };
     open[aActor] = t; open[bActor] = t;
     trades.push(t);
@@ -57686,9 +57689,22 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     } catch (e) { return 0; }
   }
 
+  /** How many of one piece (pieceOf, below) somebody is actually holding (#1718). */
+  function holdingPiece(actorId, piece) {
+    try {
+      var inv = mp.get(actorId, 'inventory');
+      var entries = (inv && inv.entries) || [];
+      var n = 0;
+      for (var i = 0; i < entries.length; i++) {
+        if (entries[i] && pieceOf(entries[i]) === piece) { n += (entries[i].count || 1); }
+      }
+      return n;
+    } catch (e) { return 0; }
+  }
+
   /*
-    What somebody is carrying, as the panel needs it: one line per base, with
-    a name off the espm record.
+    What somebody is carrying, as the panel needs it: one line per piece
+    (below, #1718), under the piece's own name or the espm record's.
 
     NOT A CACHE. An inventory changes constantly and a stale list in a trade
     panel is how somebody offers a thing they no longer have.
@@ -57772,42 +57788,112 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     return KIND_NAMES[type] || 'Other';
   }
 
+  /*
+    ONE LINE A PIECE (#1718). Two entries of one record that differ in any
+    extra the engine keeps (EXTRA, further down) are two things: a key to
+    Breezehome and a key to Honeyside, a sword at 85% and a plain one, an
+    enchanted dagger and a plain one. This used to add every entry of a base
+    into one line under the record's name, so nobody could choose which of
+    them went, the person agreeing saw "Key" or "Iron Sword", and the swap
+    took whichever came first in the pack. A line is a piece now: the record
+    and every extra, under the entry's own name, and the piece rides on the
+    offer to the swap, which moves exactly that piece. Being worn is not part
+    of a piece; it belongs to whoever wears it (withCount).
+  */
+  function pieceOf(entry) {
+    var key = [Number(entry.baseId)];
+    for (var i = 0; i < EXTRA.length; i++) {
+      var v = entry[EXTRA[i]];
+      key.push(v === undefined ? null : v);
+    }
+    return JSON.stringify(key);
+  }
+
+  /*
+    A piece's name: its own (the house on a key, the condition on a piece, a
+    Master-Woven garment's), or the record's. An enchantment, a poison, a
+    soul or a temper is not written on a name, so it is said after it in
+    brackets, or an enchanted dagger and a plain one would read the same to
+    the person agreeing to one of them.
+  */
+  var SOULS = ['', 'Petty', 'Lesser', 'Common', 'Greater', 'Grand'];
+  function pieceName(entry) {
+    var n = fieldText(typeof entry.name === 'string' ? entry.name : '') || labelOf(Number(entry.baseId));
+    var also = [];
+    if (entry.enchantmentId) { also.push('enchanted'); }
+    if (entry.poisonId) { also.push('poisoned'); }
+    if (SOULS[entry.soul]) { also.push(SOULS[entry.soul] + ' soul'); }
+    if (entry.health > 1) { also.push('tempered'); }
+    return also.length ? n + ' (' + also.join(', ') + ')' : n;
+  }
+
   function carrying(actorId) {
     var out = [];
     try {
       var inv = mp.get(actorId, 'inventory');
       var entries = (inv && inv.entries) || [];
-      var byBase = {};
+      var GOLD = (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F;
+      var byPiece = {};
       for (var i = 0; i < entries.length; i++) {
         var e = entries[i];
-        if (!e || !e.baseId) { continue; }
-        byBase[e.baseId] = (byBase[e.baseId] || 0) + (e.count || 1);
+        if (!e || !e.baseId || Number(e.baseId) === GOLD) { continue; }
+        var piece = pieceOf(e);
+        if (Object.prototype.hasOwnProperty.call(byPiece, piece)) {
+          byPiece[piece].c += (e.count || 1);
+          continue;
+        }
+        byPiece[piece] = { id: Number(e.baseId), x: piece, n: pieceName(e), c: e.count || 1,
+                           k: categoryOf(Number(e.baseId)) };
+        out.push(byPiece[piece]);
       }
-      var GOLD = (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F;
-      for (var b in byBase) {
-        if (!Object.prototype.hasOwnProperty.call(byBase, b)) { continue; }
-        if (Number(b) === GOLD) { continue; }
-        out.push({ id: Number(b), n: labelOf(Number(b)), c: byBase[b], k: categoryOf(Number(b)) });
-      }
-      out.sort(function (x, y) { return x.n.toLowerCase() < y.n.toLowerCase() ? -1 : 1; });
+      out.sort(function (l, r) { return l.n.toLowerCase() < r.n.toLowerCase() ? -1 : 1; });
     } catch (e) { }
     return out;
   }
 
-  /** Put something on your side, by name or by hex base id. */
+  /*
+    The panel names a piece by the number this trade gives it (#1718), never
+    by its name: two pieces can read the same, and a name is split on its
+    spaces on the way through a line. A piece keeps its number for the whole
+    trade and no other piece is ever given it, so a button pressed while a
+    pack changes under it still means the piece it was drawn for.
+  */
+  function keyOf(t, piece) {
+    if (!Object.prototype.hasOwnProperty.call(t.keys, piece)) {
+      t.pieces.push(piece);
+      t.keys[piece] = t.pieces.length;
+    }
+    return t.keys[piece];
+  }
+
+  /* The piece a panel button names, '#' and its number, or '' for none. */
+  function pieceAt(t, want) {
+    var m = /^#(\d+)$/.exec(String(want));
+    var n = m ? Number(m[1]) : 0;
+    return n >= 1 && n <= t.pieces.length ? t.pieces[n - 1] : '';
+  }
+
+  /*
+    Put something on your side: the piece a panel button names (pieceAt), or
+    by name or by hex base id.
+  */
   function add(actorId, what, count) {
     var t = tradeOf(actorId);
     if (!t) { return 'You are not trading.'; }
     var want = String(what || '').trim().toLowerCase();
     if (!want) { return 'Add what?'; }
     var have = carrying(actorId);
+    var byKey = want.charAt(0) === '#';
+    var piece = byKey ? pieceAt(t, want) : '';
     var asId = parseInt(want, 16);
     var hit = null;
     for (var i = 0; i < have.length; i++) {
-      if ((isFinite(asId) && have[i].id === asId) ||
-          have[i].n.toLowerCase() === want) { hit = have[i]; break; }
+      if (byKey ? have[i].x === piece
+                : ((isFinite(asId) && have[i].id === asId) || have[i].n.toLowerCase() === want)) {
+        hit = have[i]; break;
+      }
     }
-    if (!hit) {
+    if (!hit && !byKey) {
       for (var j = 0; j < have.length; j++) {
         if (have[j].n.toLowerCase().indexOf(want) !== -1) { hit = have[j]; break; }
       }
@@ -57820,7 +57906,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
     var side = sideOf(t, actorId);
     for (var k = 0; k < side.length; k++) {
-      if (side[k].id === hit.id) {
+      if (side[k].x === hit.x) {
         var room = hit.c - side[k].c;
         if (room <= 0) { return 'That is all of them already.'; }
         side[k].c += Math.min(n, room);
@@ -57829,7 +57915,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       }
     }
     if (side.length >= TRADE.mostLines) { return 'That is as much as one side can offer.'; }
-    side.push({ id: hit.id, n: hit.n, c: n });
+    side.push({ id: hit.id, x: hit.x, n: hit.n, c: n });
     unconfirm(t); push(t);
     return '';
   }
@@ -57841,8 +57927,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var side = sideOf(t, actorId);
     var n = Math.floor(Number(count) || 0);
     for (var i = 0; i < side.length; i++) {
-      if (side[i].n.toLowerCase().indexOf(want) !== -1 ||
-          String(side[i].id) === want || side[i].id.toString(16) === want) {
+      if (want.charAt(0) === '#' ? side[i].x === pieceAt(t, want)
+          : (side[i].n.toLowerCase().indexOf(want) !== -1 ||
+             String(side[i].id) === want || side[i].id.toString(16) === want)) {
         if (n > 0 && side[i].c > n) { side[i].c -= n; }
         else { side.splice(i, 1); }
         unconfirm(t); push(t);
@@ -57962,7 +58049,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         return nameOf(s.from) + ' does not have that gold any more.';
       }
       for (j = 0; j < s.items.length; j++) {
-        if (s.items[j].c > holding(s.from, s.items[j].id)) {
+        if (s.items[j].c > holdingPiece(s.from, s.items[j].x)) {
           unconfirm(t); push(t);
           return nameOf(s.from) + ' does not have the ' + s.items[j].n + ' any more.';
         }
@@ -57980,7 +58067,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       var side = sides[i];
       var pairs = [];
       for (j = 0; j < side.items.length; j++) {
-        pairs.push([side.items[j].id, side.items[j].c]);
+        pairs.push([side.items[j].id, side.items[j].c, side.items[j].x]);
       }
       if (side.gold > 0) { pairs.push([GOLD, side.gold]); }
       if (!pairs.length) { continue; }
@@ -58030,7 +58117,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (!(price > 0)) { return refuse(nameOf(worker) + ' has put up no gold for it.'); }
     if (price > holding(worker, GOLD)) { return refuse(nameOf(worker) + ' does not have that gold any more.'); }
     for (var i = 0; i < things.length; i++) {
-      if (things[i].c > holding(seller, things[i].id)) {
+      if (things[i].c > holdingPiece(seller, things[i].x)) {
         return refuse(nameOf(seller) + ' does not have the ' + things[i].n + ' any more.');
       }
     }
@@ -58060,15 +58147,17 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
   /*
     A pack's entries less [baseId, count] pairs, or null when they are not
-    all there. An entry that is only partly taken keeps everything else it
-    had.
+    all there. A pair with a piece, [baseId, count, piece], takes only that
+    piece (#1718). An entry that is only partly taken keeps everything else
+    it had.
   */
   function withoutPairs(entries, pairs) {
     var out = entries.slice();
     for (var i = 0; i < pairs.length; i++) {
-      var baseId = pairs[i][0], left = pairs[i][1];
+      var baseId = pairs[i][0], left = pairs[i][1], piece = pairs[i][2];
       for (var k = 0; k < out.length && left > 0; k++) {
         if (!out[k] || out[k].baseId !== baseId) { continue; }
+        if (piece && pieceOf(out[k]) !== piece) { continue; }
         var had = out[k].count || 1;
         var take = Math.min(left, had);
         var rest = {};
@@ -58101,7 +58190,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       workerInv = mp.get(workerActor, 'inventory') || { entries: [] };
     } catch (e) { return false; }
     var pairs = [];
-    for (var i = 0; i < things.length; i++) { pairs.push([things[i].id, things[i].c]); }
+    for (var i = 0; i < things.length; i++) { pairs.push([things[i].id, things[i].c, things[i].x]); }
     var gone = withoutPairs((sellerInv.entries || []).slice(), pairs);
     var paid = withoutPairs((workerInv.entries || []).slice(), [[GOLD, cost]]);
     if (!gone || !paid || !(share > 0) || !(cost >= share)) { return false; }
@@ -58184,7 +58273,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
   /*
     Move [baseId, count] pairs from one pack to another, or nothing at all,
-    each piece with everything it carries (above).
+    each piece with everything it carries (above). A pair with a piece,
+    [baseId, count, piece], moves only that piece: the one the trade put up
+    (#1718). Gold is a pair without one.
   */
   function moveById(fromActor, toActor, pairs) {
     var fromInv, toInv;
@@ -58197,10 +58288,11 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
     var i, k;
     for (i = 0; i < pairs.length; i++) {
-      var baseId = pairs[i][0], left = pairs[i][1];
+      var baseId = pairs[i][0], left = pairs[i][1], piece = pairs[i][2];
       var moving = [];
       for (k = 0; k < out.length && left > 0; k++) {
         if (!out[k] || out[k].baseId !== baseId) { continue; }
+        if (piece && pieceOf(out[k]) !== piece) { continue; }
         var had = out[k].count || 1;
         var take = Math.min(left, had);
         moving.push(withCount(out[k], take, true));
@@ -58230,18 +58322,27 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
   // ------------------------------------------------------------ the panel --
 
+  /* Lines as the panel draws them: each piece by its number (keyOf), not the piece itself. */
+  function shown(t, lines) {
+    var out = [];
+    for (var i = 0; i < lines.length; i++) {
+      out.push({ id: lines[i].id, p: keyOf(t, lines[i].x), n: lines[i].n, c: lines[i].c, k: lines[i].k });
+    }
+    return out;
+  }
+
   function view(t, actorId) {
     var meA = t.a === actorId;
     return {
       open: true,
       them: nameOf(other(t, actorId)),
-      mine: meA ? t.offerA : t.offerB,
-      theirs: meA ? t.offerB : t.offerA,
+      mine: shown(t, meA ? t.offerA : t.offerB),
+      theirs: shown(t, meA ? t.offerB : t.offerA),
       myGold: meA ? t.goldA : t.goldB,
       theirGold: meA ? t.goldB : t.goldA,
       iAgreed: meA ? t.okA : t.okB,
       theyAgreed: meA ? t.okB : t.okA,
-      pack: carrying(actorId),
+      pack: shown(t, carrying(actorId)),
       heldGold: holding(actorId, (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F),
       // A sale out of Skyrim (#1393): the split, and whether this side may
       // press Buy for the company.
