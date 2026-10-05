@@ -33,13 +33,17 @@ function yes(what, cond) {
 }
 
 // The body of cutKey, so the order of its gates can be read.
-const at = code.indexOf('function cutKey(actorId, profileId, toProfile)');
+// It takes the line's words since #1637: the lock key at a forge sends /key
+// and the forge's id, and forgeHere checks that forge.
+const at = code.indexOf('function cutKey(actorId, profileId, toProfile, parts)');
 const body = at >= 0 ? code.slice(at, at + 2600) : '';
 yes('cutKey is in the file', at >= 0);
 
 // ------------------------------------------------------- the gates that stay
 yes('it is still a smith’s work', /if \(!isSmith\(actorId\)\)/.test(body));
-yes('and still wants a forge', /if \(!atForge\(actorId\)\)/.test(body));
+yes('and still wants a forge, the one under the crosshair or the one last pressed',
+    /if \(!forgeHere\(parts, actorId\)\)/.test(body) &&
+    /if \(!raw\) \{ return atForge\(actorId\); \}/.test(code));
 yes('and the mold is still asked for first, so a mold in hand always decides',
     body.indexOf('moldInHand(actorId)') > 0 &&
     body.indexOf('moldInHand(actorId)') < body.indexOf('heldBy(profileId)'));
@@ -53,8 +57,9 @@ yes('and one held building is unambiguous on its own',
     /mine\.length === 1/.test(body));
 yes('several, with nothing to choose between them, names them rather than refusing blankly',
     /mine\.length > 1/.test(body) && /names\.join\(', '\)/.test(body));
-yes('and holding nothing says how to get there, both ways',
-    /\/claim/.test(body) && /\/mold/.test(body));
+// With nothing to type (#1637): a blank pressed into the lock, by the mold key.
+yes('and holding nothing says how to get there, with nothing to type',
+    /Press a blank one into the lock you mean/.test(body) && !/\/claim|\/mold|\/key/.test(body));
 
 // heldBy itself
 {
