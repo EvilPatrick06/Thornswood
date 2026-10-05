@@ -70,8 +70,9 @@ try {
   yes("it says it started from the cut file", /already cut, so the list is the one docs\/systems\/cut-items\.json has/.test(r.out));
   yes("cut-items.json is written back byte for byte", readOut(today, "cut-items.json") === CUT_JSON);
   yes("cut-items.md is written back byte for byte", readOut(today, "cut-items.md") === CUT_MD);
-  yes("the counts are the file's: cut 3318, embassy 15, thalmor 9, kept 596",
-    /cut 3318 embassy 15 thalmor 9 kept 596/.test(r.out) && cut.counts.cut === 3318);
+  yes("the counts are the file's: cut " + cut.counts.cut + ", embassy " + cut.counts.embassy + ", thalmor " + cut.counts.thalmor + ", kept " + cut.counts.kept,
+    r.out.indexOf("cut " + cut.counts.cut + " embassy " + cut.counts.embassy + " thalmor " + cut.counts.thalmor + " kept " + cut.counts.kept) >= 0 &&
+    cut.counts.cut === cut.items.filter(function (i) { return i.disposition === "cut"; }).length);
   const r2 = run(today);
   yes("a second run changes nothing", r2.code === 0 && readOut(today, "cut-items.json") === CUT_JSON && readOut(today, "cut-items.md") === CUT_MD);
 

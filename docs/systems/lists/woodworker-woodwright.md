@@ -1,8 +1,8 @@
 # Woodworker/Woodwright
 
-Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 36 recipes, 36 of them reach the server. A row the server is not asked about is tempering: the armour table and the grindstone never call the server.
+Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 33 recipes, 33 of them reach the server. A row the server is not asked about is tempering: the armour table and the grindstone never call the server.
 
-By rank: novice 10, advanced 11, expert 9, master 6.
+By rank: novice 9, advanced 11, expert 8, master 5.
 
 | Item | Makes | Rank | Kind | Bench | Asks for | Race | Server asked | Id |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -11,7 +11,6 @@ By rank: novice 10, advanced 11, expert 9, master 6.
 | Iron Arrow | 24 | novice | Arrows and bolts | SmithingForge | 1 Firewood, 1 Iron Ingot |  | yes | `b64f:Dawnguard.esm` |
 | Crude Fishing Pole | 1 | novice | Other goods | SmithingForge | 2 Firewood, 1 Leather Strips, 2 Tundra Cotton |  | yes | `1549c:Thornswood-Content.esp` |
 | Fish Trap | 1 | novice | Other goods | SmithingForge | 3 Firewood, 2 Leather Strips, 1 Iron Ingot |  | yes | `1549f:Thornswood-Content.esp` |
-| Fishing Pole - Crude | 1 | novice | Other goods | SmithingForge | 1 Leather Strips, 1 Firewood, 5 Tundra Cotton, 1 Iron Ingot |  | yes | `1f24f:FishingInSkyrim.esp` |
 | Splint | 1 | novice | Other goods | ThornswoodCraftingCharcoalKiln | 1 Firewood, 1 Leather Strips |  | yes | `154c5:Thornswood-Content.esp` |
 | Drum | 1 | novice | Other weapons | SmithingForge | 1 Drum |  | yes | `2de5:PlayFluteLuteDrum.esp` |
 | Flute | 1 | novice | Other weapons | SmithingForge | 1 Flute |  | yes | `1838:PlayFluteLuteDrum.esp` |
@@ -35,10 +34,8 @@ By rank: novice 10, advanced 11, expert 9, master 6.
 | Falmer Bow | 1 | expert | Bows | SmithingForge | 1 Iron Ingot, 1 Chaurus Chitin |  | yes | `8f7:MoreCraftableEquipment.esp` |
 | Glass Bow | 1 | expert | Bows | SmithingForge | 1 Refined Moonstone, 2 Refined Malachite |  | yes | `108cfb:Skyrim.esm` |
 | Fine Fishing Pole | 1 | expert | Other goods | SmithingForge | 2 Firewood, 1 Leather Strips, 1 Steel Ingot, 3 Tundra Cotton |  | yes | `1549d:Thornswood-Content.esp` |
-| Fishing Pole - Fine | 1 | expert | Other goods | SmithingForge | 1 Leather Strips, 5 Tundra Cotton, 1 Steel Ingot, 3 Long Bow |  | yes | `2180d:FishingInSkyrim.esp` |
 | Ebony Arrow | 24 | master | Arrows and bolts | SmithingForge | 1 Firewood, 1 Ebony Ingot |  | yes | `b651:Dawnguard.esm` |
 | Stalhrim Arrow | 24 | master | Arrows and bolts | SmithingForge | 1 Firewood, 1 Stalhrim |  | yes | `3cf54:Dragonborn.esm` |
 | Ebony Bow | 1 | master | Bows | SmithingForge | 3 Ebony Ingot |  | yes | `108cf9:Skyrim.esm` |
 | Stalhrim Bow | 1 | master | Bows | SmithingForge | 3 Stalhrim |  | yes | `2b077:Dragonborn.esm` |
-| Fishing Pole - Master | 1 | master | Other goods | SmithingForge | 1 Leather Strips, 5 Tundra Cotton, 1 Dwarven Metal Ingot, 6 Silver Ring, 1 Dragon Bone, 1 Ebony Ingot |  | yes | `1f252:FishingInSkyrim.esp` |
 | Master Fishing Pole | 1 | master | Other goods | SmithingForge | 3 Firewood, 2 Leather Strips, 1 Steel Ingot, 1 Refined Moonstone |  | yes | `1549e:Thornswood-Content.esp` |
