@@ -73,6 +73,22 @@ const gmEndMark = '  }), 5000);\n})();\n';
 const gmEnd = gmStart < 0 ? -1 : gm.indexOf(gmEndMark, gmStart);
 const gmBlock = gmStart < 0 || gmEnd < 0 ? null : gm.slice(gmStart, gmEnd + gmEndMark.length);
 yes('the BODY SHAPE block is in the gamemode', gmBlock !== null);
+/*
+  What the handler reaches outside the block since #1573: the face arriving
+  moves a person in the creation hall on (hasStoredAppearance, chargenOf).
+  Lifted from the gamemode as they are, so the handler here runs what the
+  server runs. Nobody here is in the hall: chargenOf reads no chargen
+  property off this mp. test-unpublished-until-appearance.js has the rest.
+*/
+function topFn(sig) {
+  const a = gm.indexOf('\n' + sig);
+  const b = a < 0 ? -1 : gm.indexOf('\n}\n', a + 1);
+  return a < 0 || b < 0 ? null : gm.slice(a + 1, b + 3);
+}
+const storedFn = topFn('function hasStoredAppearance(a) {');
+const chargenOfFn = topFn('function chargenOf(actorId) {');
+const chargenProp = (/^const CHARGEN_PROPERTY = '[^']+';$/m.exec(gm) || [])[0] || null;
+yes('hasStoredAppearance, chargenOf and CHARGEN_PROPERTY are in the gamemode', !!(storedFn && chargenOfFn && chargenProp));
 
 function server(settings, stored) {
   const sets = [];
@@ -99,7 +115,8 @@ function server(settings, stored) {
   };
   ctx.globalThis = ctx;
   vm.createContext(ctx);
-  vm.runInContext(gmBlock + '\n;this.__g = bodyShapeGuard; this.__h = mp.onUpdateAppearanceAttempt;', ctx);
+  vm.runInContext([chargenProp, storedFn, chargenOfFn].join('\n') + '\n' + gmBlock +
+    '\n;this.__g = bodyShapeGuard; this.__h = mp.onUpdateAppearanceAttempt;', ctx);
   return { ctx: ctx, mp: mp, sets: sets, logs: logs, timers: timers, guard: ctx.__g, handler: ctx.__h };
 }
 
