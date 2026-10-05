@@ -59,7 +59,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-forwarded-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -1202,9 +1202,29 @@ setInterval(() => {
   }
 }, 200);
 
+/*
+  THIS MACHINE, AND NOT CADDY CARRYING SOMEBODY ELSE (#1779).
+
+  The routes only the gamemode uses (/positions, /commands, /commands/ack,
+  /silenced, /textmute, /say) are for this machine, and this used to decide
+  that by the socket's address alone. Caddy carries
+  https://thornswood.net/voice/ and /voice-dev/ to this service from
+  127.0.0.1 (scripts\deploy\Caddyfile, every path under them), so every
+  request from the internet that came through the site passed as the
+  gamemode: anybody could read the queue of typed commands, join passes
+  included, say a line to everybody under any name, and silence anybody.
+
+  Caddy's reverse_proxy always adds X-Forwarded-For, and the gamemode's own
+  requests (http.request straight to 127.0.0.1) never carry one, so a
+  request with a forwarding header was carried here by a proxy and is not
+  this machine, whatever its socket says. Forwarded and X-Real-IP are the
+  other two names a proxy writes it under.
+*/
 function isLoopback(req) {
   const ra = req.socket.remoteAddress || '';
-  return ra === '127.0.0.1' || ra === '::1' || ra === '::ffff:127.0.0.1';
+  if (!(ra === '127.0.0.1' || ra === '::1' || ra === '::ffff:127.0.0.1')) return false;
+  const h = req.headers || {};
+  return !(h['x-forwarded-for'] || h['forwarded'] || h['x-real-ip']);
 }
 
 /*
@@ -1487,10 +1507,10 @@ function iceServers() {
 */
 const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/positions') {
-    // Loopback only. This is the gamemode talking to the service on the same
-    // machine, and nothing outside has any business writing where people are.
-    const ra = req.socket.remoteAddress || '';
-    if (!(ra === '127.0.0.1' || ra === '::1' || ra === '::ffff:127.0.0.1')) {
+    // This machine only. This is the gamemode talking to the service on the
+    // same machine, and nothing outside has any business writing where people
+    // are. Through Caddy is outside; see isLoopback.
+    if (!isLoopback(req)) {
       res.writeHead(403).end('no');
       return;
     }

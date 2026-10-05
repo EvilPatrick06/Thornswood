@@ -18,6 +18,12 @@ the dev service, where this file still has 7778 written in.
 live gamemode, undoing that, so it stops when the two differ; `-Force` is the
 only way past.
 
+The routes only the gamemode uses (`/positions`, `/commands`,
+`/commands/ack`, `/silenced`, `/textmute` and `/say`) answer only this
+machine, and a request a proxy carried is not this machine: Caddy reaches the
+service from 127.0.0.1 as well, so one that carries `X-Forwarded-For`,
+`Forwarded` or `X-Real-IP` is refused with 403 (#1779).
+
 ## On your machine
 
 Run it from a scratch copy, as its harnesses do, not from the checkout: on its
