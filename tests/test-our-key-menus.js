@@ -172,6 +172,10 @@ function rig(opts) {
     // The sleep key is the mold's, on a person (#1603). Nobody is looked at here.
     'const SLEEP_KEY = 22;\n' +
     'function sleepPress() { return false; }\n' +
+    // P on somebody not in your party asks them in (#1629). opts.asks puts
+    // such a person under the crosshair; test-1629-party-gui.js has the ask.
+    'function partyPress() { ' +
+    (opts.asks ? 'say("asked the person looked at"); return true;' : 'return false;') + ' }\n' +
     // The same key in the inventory (#1384); no inventory is open here.
     'function repairPress() { return false; }\n' +
     // The lock key, X, since #1472, asked only for its own scan code. What it
@@ -342,6 +346,38 @@ if (arbiter !== null && middle !== null && keys !== null) {
     h.press(K);
     h.run(60);
     yes('P4 a key pressed with P in the same frame ends P\'s claim: nothing is shut', h.game.shut.length === 0);
+  }
+
+  // ------------- P5: P on somebody not in the party asks, the menu still goes
+  /*
+    #1629. P on somebody who is not in your party sends the ask instead of
+    opening the panel. The game took the same press as Quick Magic, and the
+    ask must not leave that menu open.
+  */
+  {
+    const bad = { asked: [], panel: [], magic: [], refused: [], threw: [] };
+    const all = orders();
+    all.forEach(function (o) {
+      const h = rig(Object.assign({ asks: true }, o));
+      const name = JSON.stringify(o);
+      h.press(P);
+      h.run(120);
+      if (!h.said(/asked the person looked at/)) { bad.asked.push(name); }
+      if (h.page.shown.party || h.game.focus) { bad.panel.push(name); }
+      const m = h.was(MAGIC);
+      if (h.game.open[MAGIC] || !m.length || m[0].closedAt < 0 || m[0].closedAt - m[0].openedAt > 3) {
+        bad.magic.push(name + ' ' + JSON.stringify(m));
+      }
+      if (h.said(/MagicMenu is open/)) { bad.refused.push(name); }
+      if (h.threw.length) { bad.threw.push(name + ' ' + h.threw[0]); }
+    });
+    function show(list) { list.slice(0, 3).forEach(function (n) { console.log('      ' + n); }); }
+    yes('P5 P on somebody not in the party asks them, in all ' + all.length + ' orders', bad.asked.length === 0); show(bad.asked);
+    yes('P5 and opens no panel and takes no keyboard', bad.panel.length === 0); show(bad.panel);
+    yes('P5 and the magic menu the same press opened is gone two frames after the key is heard',
+        bad.magic.length === 0); show(bad.magic);
+    yes('P5 the log never says the magic menu was in the way', bad.refused.length === 0); show(bad.refused);
+    yes('P5 nothing threw', bad.threw.length === 0); show(bad.threw);
   }
 
   // ------------------------------------------ S1: / in the same fork order

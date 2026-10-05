@@ -4610,7 +4610,8 @@
 
     P and J are Patrick's own choices and are the exception: those two open
     their panels whether or not anybody is being looked at, because a party
-    menu you can only open by staring at a friend is not a menu.
+    menu you can only open by staring at a friend is not a menu. P on
+    somebody who is not in your party asks them in instead (partyPress).
   */
   function lookVerb(cmd) {
     if (!lookingAt) { return false; }
@@ -4666,6 +4667,47 @@
     say('take on as apprentice: ' + lookingAt);
     return true;
   }
+
+  /*
+    P on somebody who is not in your party asks them in (#1629), the way Y
+    sends /friend: the prompt says "Ask to party" for exactly them, from the
+    near list's y flag. On a party member the prompt says "Party menu", and
+    with nobody looked at there is no prompt; either way this answers false
+    and the key opens the panel. Nobody types /party any more (Patrick,
+    4 Oct: buttons, not commands); this and the P panel are what send it,
+    and the server checks the ask again when it arrives.
+
+    No menu check here. The key handler has already made it for P, and the
+    game's Quick Magic, which this same press opened, is let through there
+    and shut by magicOnP; asking busyMenuOpenNow would refuse every press.
+  */
+  function partyPress() {
+    if (!lookingAt) { return false; }
+    const near = nearList();
+    const row = (near && Object.prototype.hasOwnProperty.call(near, lookingAt)) ? near[lookingAt] : null;
+    if (!row || row.y) { return false; }
+    return lookVerb('party');
+  }
+
+  /*
+    Who is in front of you, for the group book on J (#1630). factions.md: "You
+    invite the character in front of you, or by name". The J panel cannot see
+    the crosshair, so as it opens it is told who the look prompt is drawn
+    for: the same form id Y, H and L send, and the name the server put on the
+    near list. Its group tab then offers Invite with that name, and the line
+    it sends is /book invite with the id, which the server checks again.
+    Nobody in front clears it, so the button is there only while it applies.
+    A listener of its own, so the J key handling (#1016) is left alone.
+  */
+  sp.on('browserMessage', guard('journal facing', (event) => {
+    const a = event && event.arguments;
+    if (!a || a[0] !== 'thornswood-front' || a[1] !== 'journal:opened') { return; }
+    const near = nearList();
+    const row = (lookingAt && near && Object.prototype.hasOwnProperty.call(near, lookingAt)) ? near[lookingAt] : null;
+    const facing = row ? { id: lookingAt, name: String(row.n || '') } : null;
+    T.js('try{if(window.thornswoodJournal&&window.thornswoodJournal.setFacing){' +
+         'window.thornswoodJournal.setFacing(' + JSON.stringify(facing) + ');}}catch(e){}');
+  }));
 
   /*
     ------------------------------------------ a key mold, into a door's lock
@@ -7268,7 +7310,8 @@
     */
     /*
       The social keys. The three verbs need somebody under the crosshair and
-      say nothing when there is not; P and J open their panels regardless.
+      say nothing when there is not; P and J open their panels regardless,
+      except that P on somebody not in your party asks them in.
     */
     // The mold key, and only while a door is under the crosshair and a Key
     // Mold is in the pack. Otherwise it is not used and goes on down the list.
@@ -7315,8 +7358,13 @@
     if (e.code === TRADE_KEY) { lookVerb('trade'); return; }
     if (e.code === MUTE_KEY) { lookVerb('mute'); return; }
     if (e.code === PARTY_KEY) {
-      T.js('try{window.thornswoodParty&&window.thornswoodParty.toggle();}catch(e){}');
-      // The game took this same press as its Quick Magic: shut that menu.
+      // On somebody not in your party it asks them (#1629); otherwise, or
+      // while the panel is up and P is closing it, it is the panel.
+      if (T.hasFocus('party') || !partyPress()) {
+        T.js('try{window.thornswoodParty&&window.thornswoodParty.toggle();}catch(e){}');
+      }
+      // The game took this same press as its Quick Magic: shut that menu,
+      // whichever of the two P did.
       magicOnP.shutFor(e);
       return;
     }
