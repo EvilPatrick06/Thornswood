@@ -6,6 +6,14 @@
       .\scripts\release\Check-ShipReady.ps1              the main channel
       .\scripts\release\Check-ShipReady.ps1 -Channel dev the dev channel
       .\scripts\release\Check-ShipReady.ps1 -NoVps       skip the two checks that ask the VPS
+      .\scripts\release\Check-ShipReady.ps1 -Channel dev -Root C:\Thornswood-Release-DevBuild
+                                                    a folder this machine has not recorded
+
+  WHICH FOLDER (#1692). The one this machine builds the channel's release
+  from, as Ship takes it: -Root, or else what Where.ps1 ShipRoot or ShipRootDev
+  answers (the folder Setup-ShipMachine.ps1 -Root recorded, or the launcher
+  install, and for dev that with -DevBuild on the end). A folder Vortex
+  deploys into is a gap, because Ship refuses it before anything is built.
 
   WHY IT EXISTS. Ship.ps1 has fourteen ways to refuse, and every one of them is
   found by running Ship and being stopped, usually after the launcher has
@@ -36,6 +44,9 @@ param(
   [ValidateSet('main','dev')]
   [string]$Channel = 'main',
   [switch]$NoVps,
+  # The folder the release is built from, as Ship.ps1 -Root takes it (#1692).
+  # Left out, Where.ps1 ShipRoot or ShipRootDev: see WHICH FOLDER above.
+  [string]$Root = '',
   [switch]$NoPause
 )
 
@@ -275,22 +286,23 @@ Ready 'signed in to GitHub' $ghOk $ghWho 'gh auth login'
 
 # --------------------------------------------------------- the install root --
 Head 'The launcher install'
-function Find-Root {
-  $first = 'C:\Thornswood'
-  if (Test-Path -LiteralPath (Join-Path $first 'Launcher\Thornswood.exe')) { return $first }
-  foreach ($d in @(Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Root -match '^[A-Za-z]:\\$' })) {
-    $cand = Join-Path $d.Root 'Thornswood'
-    if (Test-Path -LiteralPath (Join-Path $cand 'Launcher\Thornswood.exe')) { return $cand }
-  }
-  return $first
+# The folder Ship would build from (#1692): -Root, or what Where.ps1 answers.
+$rootSaid = ''
+if (-not $Root) {
+  try { $Root = [string](& (Join-Path $Here 'Where.ps1') $(if ($Dev) { 'ShipRootDev' } else { 'ShipRoot' })) }
+  catch { $rootSaid = $_.Exception.Message; $Root = '' }
 }
-$PlayRoot = Find-Root
-$Root = if ($Dev) { $PlayRoot + '-DevBuild' } else { $PlayRoot }
-Ready 'a launcher is installed' (Test-Path (Join-Path $Root 'Launcher\Thornswood.exe')) $Root `
-  $(if ($Dev) { 'In the main launcher: Settings, The dev build, Install it' } else { 'Install Thornswood from thornswood.net' })
+Ready 'which folder the release is built from is known' (-not $rootSaid) $(if ($rootSaid) { $rootSaid } else { $Root }) `
+  ('.\scripts\release\Setup-ShipMachine.ps1 -Channel ' + $Channel + ' -Root <the release folder>   (writes the file Where.ps1 ShipRoots names)')
+Ready 'a launcher is installed' ($Root -and (Test-Path (Join-Path $Root 'Launcher\Thornswood.exe'))) $Root `
+  $(if ($Dev) { 'In the main launcher: Settings, The dev build, Install it; or, for a release folder that is not the dev build, .\scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root <it>' } else { 'Install Thornswood from thornswood.net' })
+# Ship refuses a folder Vortex deploys into before anything is built (#1692).
+$vortexHere = [bool]($Root -and (Test-Path -LiteralPath (Join-Path $Root 'Game\Data\vortex.deployment.json')))
+Ready 'it is not a folder Vortex deploys into' (-not $vortexHere) $(if ($vortexHere) { 'Game\Data\vortex.deployment.json is there' } else { '' }) `
+  ('.\scripts\release\Setup-ShipMachine.ps1 -Channel ' + $Channel + ' -Root <the release folder, not Vortex''s>   (docs\COLLECTION-REVISION-2.md step 8)')
 
-$GameDir = Join-Path $Root 'Game'
-$hasGame = Test-Path $GameDir
+$GameDir = $(if ($Root) { Join-Path $Root 'Game' } else { '' })
+$hasGame = [bool]($GameDir -and (Test-Path $GameDir))
 
 # The collection this machine would build a release from.
 #

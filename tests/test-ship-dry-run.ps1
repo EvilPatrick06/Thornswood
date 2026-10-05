@@ -30,6 +30,13 @@
     R  a real Ship -Package on main, which builds the installer in the one
        file shape the site carries (-OneFile, #1213)
     E  -DryRun on dev, numbered from what the store says dev has published
+    G  -DryRun on dev with no -Root, on a machine that recorded its dev
+       release folder (Where.ps1 ShipRootDev, #1692): that folder is built,
+       installed and published
+    H  -Root naming a folder Vortex deploys into: refused before anything is
+       built, installed or published (#1692)
+    I  a folder whose generated files are out of date: refused before the
+       launcher is built or installed (#1692)
 
   R is there so D and V prove something: the same stand-ins, on a real Ship,
   do write down the installer going to the site, the feed and baseline going to
@@ -553,6 +560,59 @@ if ($dir) {
     }
     $pushes = @(Away $f | Where-Object { $_ -match '^git .*\b(push|tag)\b' })
     Yes ('F and no release tag is made' + $(if ($pushes.Count) { ' (' + ($pushes -join '; ') + ')' } else { '' })) ($pushes.Count -eq 0)
+
+    # ---- G: no -Root, on a machine that recorded its dev release folder (#1692) --------
+    # Setup-ShipMachine.ps1 -Root writes the file Where.ps1 ShipRoots names, in
+    # this machine's own data; Ship takes the folder from it with no -Root.
+    $relDevRoot = Join-Path $T 'Release-DevBuild'
+    New-Item -ItemType Directory -Force -Path (Join-Path $relDevRoot 'Launcher') | Out-Null
+    $relExe = Join-Path $relDevRoot 'Launcher\Thornswood.exe'
+    [IO.File]::WriteAllText($relExe, 'the launcher as installed')
+    (Get-Item -LiteralPath $relExe).LastWriteTimeUtc = [DateTime]::UtcNow.AddHours(-1)
+    $shipRoots = Join-Path $appdata 'Thornswood\ship-roots.json'
+    [IO.File]::WriteAllText($shipRoots, (ConvertTo-Json -InputObject ([ordered]@{ dev = $relDevRoot })))
+    try {
+        $g = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Channel', 'dev', '-DryRun', '-DistRoot', $dist, '-NoPause')
+    } finally { Remove-Item -LiteralPath $shipRoots -Force -ErrorAction SilentlyContinue }
+    Yes ("G a dev dry run with no -Root runs to the end (exit {0})" -f $g.Code) ($g.Code -eq 0 -and $g.Out -match 'Dry run finished')
+    $built = Called $g 'Build-Launcher'
+    $inst = Called $g 'Install-Launcher'
+    $pub = Called $g 'Publish-Update'
+    Yes '  building, installing and publishing the folder this machine recorded for dev, not <root>-DevBuild' (
+        $built.Count -eq 1 -and $built[0].Contains(' -Root ' + $relDevRoot) -and
+        $inst.Count -eq 1 -and $inst[0].Contains(' -Root ' + $relDevRoot) -and
+        $pub.Count -eq 1 -and $pub[0].Contains(' -Root ' + $relDevRoot))
+
+    # ---- H: a folder Vortex deploys into (#1692) ---------------------------------------
+    $vortexRoot = Join-Path $T 'Vortex-DevBuild'
+    New-Item -ItemType Directory -Force -Path (Join-Path $vortexRoot 'Launcher'), (Join-Path $vortexRoot 'Game\Data') | Out-Null
+    [IO.File]::WriteAllText((Join-Path $vortexRoot 'Launcher\Thornswood.exe'), 'the launcher as installed')
+    [IO.File]::WriteAllText((Join-Path $vortexRoot 'Game\Data\vortex.deployment.json'), '{}')
+    $h = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Channel', 'dev', '-DryRun', '-Root', $vortexRoot, '-DistRoot', $dist, '-NoPause')
+    Yes ("H a Ship from a folder Vortex deploys into is refused (exit {0})" -f $h.Code) (
+        $h.Code -eq 1 -and $h.Out -match 'is a folder Vortex deploys into' -and $h.Out -match 'Nothing was built')
+    Yes '  before anything is built, installed or published' (
+        (Called $h 'Build-Launcher').Count -eq 0 -and (Called $h 'Install-Launcher').Count -eq 0 -and (Called $h 'Publish-Update').Count -eq 0)
+    Yes '  and Updater.cs is on the version it had' ((Read-Version $updaterCs) -eq '1.1.93')
+
+    # ---- I: generated files out of date (#1692) ------------------------------------------
+    # Generated.ps1 stood in for: this folder's files are stale. The real one
+    # is held to the folder by tests\test-build-generated.ps1.
+    $genRoot = Join-Path $T 'Gen-DevBuild'
+    New-Item -ItemType Directory -Force -Path (Join-Path $genRoot 'Launcher'), (Join-Path $genRoot 'Game') | Out-Null
+    [IO.File]::WriteAllText((Join-Path $genRoot 'Launcher\Thornswood.exe'), 'the launcher as installed')
+    [IO.File]::WriteAllText((Join-Path $genRoot 'Game\SkyrimSE.exe'), 'skyrim')
+    [IO.File]::WriteAllText((Join-Path $repo 'scripts\mods\Generated.ps1'), @'
+function Get-GeneratedState($Root, $ListPath) { return [pscustomobject]@{ Current = $false; Record = $null } }
+function Get-GeneratedStaleSays($State, [string]$Channel) { return 'The generated files here are out of date (stand-in).' }
+'@)
+    try {
+        $i = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Channel', 'dev', '-DryRun', '-Root', $genRoot, '-DistRoot', $dist, '-NoPause')
+    } finally { Remove-Item -LiteralPath (Join-Path $repo 'scripts\mods\Generated.ps1') -Force -ErrorAction SilentlyContinue }
+    Yes ("I a Ship whose generated files are out of date stops (exit {0})" -f $i.Code) ($i.Code -eq 1 -and $i.Out -match 'out of date \(stand-in\)')
+    Yes '  before the launcher is built or installed, and before anything is published' (
+        (Called $i 'Build-Launcher').Count -eq 0 -and (Called $i 'Install-Launcher').Count -eq 0 -and (Called $i 'Publish-Update').Count -eq 0)
+    Yes '  and the installed launcher is the one it had' ([IO.File]::ReadAllText((Join-Path $genRoot 'Launcher\Thornswood.exe')) -eq 'the launcher as installed')
 }
 finally {
     $env:PATH = $oldPath

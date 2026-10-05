@@ -228,7 +228,7 @@ yes('picking on the way back connects again as that character: authGameData then
 yes('the menu shows the choice again even though a choice is on disk for this session',
     /if \(!menuAgain && chosenOnDisk\(\)\)/.test(front));
 yes('the page is given the character they were, with no scroll and no theme',
-    /if \(menuAgain\) \{ list\.intro = false; list\.music = ''; list\.away = menuAgain; \}/.test(front));
+    /if \(menuAgain\) \{\s*list\.intro = false; list\.music = '';\s*if \(menuAgain\.ended\) \{ list\.ended = String\(menuAgain\.ended\); \} else \{ list\.away = menuAgain; \}\s*\}/.test(front));
 yes('arriving in the world ends it', /menuChosenId = 0;\s*menuAgain = null;/.test(front));
 yes('another character takes the place with "/line hand" before the connection becomes theirs',
     /if \(lineId\) \{ lineHand\(id\); return; \}/.test(front) &&

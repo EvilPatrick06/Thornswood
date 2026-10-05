@@ -87,7 +87,7 @@ const box = {
 let ran = false;
 if (toolsSrc && fns.every(function (f) { return !!f; })) {
   const src = [usesM ? usesM[0] : "", poleM ? poleM[0] : "", warnM ? warnM[0] : "",
-    "const TOOL_AGAIN_HOURS = 12;", "const TOOL_PROPERTY = 'thornswoodTools';",
+    "const TOOL_PROPERTY = 'thornswoodTools';",
     toolsSrc].concat(fns).join("\n") +
     "\nthis.TOOLS = TOOLS; this.handTool = handTool; this.giveTool = giveTool; this.wearTool = wearTool;";
   try { vm.runInNewContext(src, box); ran = true; } catch (e) { console.log("could not run: " + e); }
@@ -123,7 +123,8 @@ KINDS.forEach(function (key) {
     !!said[0] && said[0][0] === 35 && /is worn thin/.test(said[0][1]));
   yes(key + ": the break says so and names who makes the next (" + (said[1] ? said[1][1] : "none") + ")",
     !!said[1] && said[1][0] === 50 && said[1][1] === "Your " + tool.name + " breaks. " + tool.broken);
-  yes(key + ": the count starts again and the handout clock is set", stamps(a)["wear:" + key] === 0 && Number(stamps(a)[key]) > 0);
+  // #1038: no handout clock is set, because nothing hands a replacement over
+  yes(key + ": the count starts again and no handout clock is set", stamps(a)["wear:" + key] === 0 && !Object.prototype.hasOwnProperty.call(stamps(a), key));
   yes(key + ": the log says 50 uses", logs.some(function (l) { return l.indexOf("broke a " + tool.name + " after 50 uses") >= 0; }));
 });
 

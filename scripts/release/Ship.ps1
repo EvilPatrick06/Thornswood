@@ -152,10 +152,14 @@
 
 .PARAMETER Root
   The Thornswood install whose launcher is built and whose files are
-  published. Left out, it is the first of C:\Thornswood and Thornswood on any
-  other fixed drive that has Launcher\Thornswood.exe in it, and for a dev
-  release that folder with -DevBuild on the end, where the main launcher's
-  Settings page installs the dev build.
+  published. Left out, it is the folder this machine builds the channel's
+  release from, which Where.ps1 ShipRoot and ShipRootDev answer (#1692): the
+  one Setup-ShipMachine.ps1 -Root recorded, or else the first of
+  C:\Thornswood and Thornswood on any other fixed drive that has
+  Launcher\Thornswood.exe in it, and for a dev release that folder with
+  -DevBuild on the end, where the main launcher's Settings page installs the
+  dev build. A folder Vortex deploys into is refused either way, before
+  anything is built.
 
 .PARAMETER DistRoot
   Where releases are staged and zipped, passed straight through to
@@ -606,33 +610,38 @@ $Dev = ($Channel -eq 'dev')
 $ReleaseDir = Get-FeedStoreDir $Channel
 $MainReleaseDir = Get-FeedStoreDir 'main'
 
-# ---- where the launcher is installed ----------------------------------------
+# ---- where the release is built from ----------------------------------------
 #
-# C:\Thornswood on most machines. A second developer may have put it on
-# another drive, so when C: has no launcher every fixed drive is tried for
-# <drive>:\Thornswood\Launcher\Thornswood.exe. The dev build is always the
-# main root plus -DevBuild, on the same drive; that is where the main
-# launcher's Settings page installs it (DevBuild.cs). -Root still wins.
-function Find-Root {
-    $first = 'C:\Thornswood'
-    if (Test-Path -LiteralPath (Join-Path $first 'Launcher\Thornswood.exe')) { return $first }
-    foreach ($d in @(Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Root -match '^[A-Za-z]:\\$' })) {
-        $cand = Join-Path $d.Root 'Thornswood'
-        if (Test-Path -LiteralPath (Join-Path $cand 'Launcher\Thornswood.exe')) { return $cand }
-    }
-    return $first
+# The folder this machine builds the channel's release from, which Where.ps1
+# answers for Ship, Check-ShipReady, Setup-ShipMachine and Build-Generated
+# alike (#1692): the one Setup-ShipMachine.ps1 -Root recorded, or else the
+# launcher install, C:\Thornswood or Thornswood on another fixed drive, and for
+# dev that plus -DevBuild, where the main launcher's Settings page installs it
+# (DevBuild.cs). -Root still wins.
+if (-not $PSBoundParameters.ContainsKey('Root')) {
+    try { $Root = [string](& (Join-Path $Here 'Where.ps1') $(if ($Dev) { 'ShipRootDev' } else { 'ShipRoot' })) }
+    catch { Die ($_.Exception.Message + ' Nothing was built.') }
 }
-if (-not $PSBoundParameters.ContainsKey('Root')) { $Root = Find-Root }
 
 # ------------------------------------------------------------ dev channel
 # The dev build has its own feed and baseline on the VPS (feed-dev), and its
 # own working folder here. Until #907 it was a git worktree of the dev branch
 # of Thornswood-Releases, made on first use.
 if ($Dev) {
-    if (-not $PSBoundParameters.ContainsKey('Root')) { $Root = (Find-Root) + '-DevBuild' }
     if (-not (Test-Path (Join-Path $Root 'Launcher'))) {
-        Die "No dev build at $Root. Install it from the main launcher's Settings page (The dev build) first."
+        Die "No dev build at $Root. Install it from the main launcher's Settings page (The dev build) first, or record the folder this machine builds dev from: .\scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root <folder>."
     }
+}
+
+# A folder Vortex deploys into is the collection's source, not a release
+# folder (#1692, docs\COLLECTION-REVISION-2.md step 8): Vortex writes its own
+# record, Data\vortex.deployment.json, into it, Build-Generated never builds
+# there, so a Ship from it could only stop at the generated files, and on
+# 4 October one did, after it had built and installed the launcher there.
+# Refused here, before anything is built, whichever way the folder was named.
+if (Test-Path -LiteralPath (Join-Path $Root 'Game\Data\vortex.deployment.json')) {
+    Die ("$Root is a folder Vortex deploys into (Game\Data\vortex.deployment.json is there), so a release is never built from it. Nothing was built. " +
+         "Ship with -Root <the release folder>, or record it once: .\scripts\release\Setup-ShipMachine.ps1 -Channel $Channel -Root <the release folder>.")
 }
 
 Write-Host ''
@@ -1080,6 +1089,38 @@ if ($Package -and -not $Dev -and -not $DryRun) {
     Say ("  verified against SHA256SUMS, {0:n0} KB" -f ((Get-Item -LiteralPath $ciStub).Length / 1KB)) 'Green'
 }
 
+# ------------------------------------------------------------ generated files
+# Issue #1247, Patrick 29 Sep: the behavior files (Pandora) and BodySlide's bodies
+# are made in Thornswood's own folder on this machine, by
+# scripts\mods\Build-Generated.ps1, as a step before a Ship; the Steam copy is
+# the person's own. A release carries what is in the folder, so a folder whose
+# files were built for another mod list, from other files, or never, would
+# send everybody animations and bodies that do not match the collection.
+# Get-GeneratedState reads the record Build-Generated wrote against this
+# machine now (scripts\mods\Generated.ps1). Both channels stop: the files ship
+# on both. Before the launcher is built and installed (#1692): on 4 October a
+# dev Ship built and installed it, closing the running launcher, and only
+# then stopped here. And before the covered bodies, which read what it built.
+$GameDir = Join-Path $Root 'Game'
+if (-not (Test-Path -LiteralPath (Join-Path $GameDir 'SkyrimSE.exe'))) { $GameDir = '' }
+Head 'Generated files'
+if ($GameDir) {
+    . (Join-Path $Here '..\mods\Generated.ps1')
+    $genState = $null
+    try { $genState = Get-GeneratedState $Root (Join-Path $RepoDir 'records\generated.json') }
+    catch {
+        Unbump 'the generated files could not be checked'
+        Die ($_.Exception.Message + ' Nothing was built or published.')
+    }
+    if (-not $genState.Current) {
+        Unbump 'the generated files are out of date'
+        Die (Get-GeneratedStaleSays $genState $Channel)
+    }
+    Say ("  {0} file(s) Build-Generated made for this mod list, as it made them" -f $genState.Record.Files.Count) 'Green'
+} else {
+    Say '  no own game folder here, so there are none to check' 'DarkGray'
+}
+
 # ------------------------------------------------------------ build
 if (-not $ModsOnly) {
     # The exe's time going in, so a build that put nothing in place is told
@@ -1209,9 +1250,8 @@ if (-not $ModsOnly) {
 #
 # So it happens here, before anything is scanned, into the same folder the
 # client patch and the publisher use. SkipServer because this is a build step
-# and has no business talking to the VPS.
-$GameDir = Join-Path $Root 'Game'
-if (-not (Test-Path -LiteralPath (Join-Path $GameDir 'SkyrimSE.exe'))) { $GameDir = '' }
+# and has no business talking to the VPS. $GameDir is the game folder the
+# generated files were checked in, above, or '' when there is none.
 
 Head 'The in game plugins'
 $goArgs = @{ SkipServer = $true }
@@ -1318,34 +1358,6 @@ if ($LASTEXITCODE -eq 2) {
 if ($LASTEXITCODE -ne 0) {
     Unbump 'the client build could not be checked'
     Die 'Sync-Client.ps1 refused. Rebuild the client, run .\scripts\release\New-ClientBuildRecord.ps1, and Ship again.'
-}
-
-# ------------------------------------------------------------ generated files
-# Issue #1247, Patrick 29 Sep: the behavior files (Pandora) and BodySlide's bodies
-# are made in Thornswood's own folder on this machine, by
-# scripts\mods\Build-Generated.ps1, as a step before a Ship; the Steam copy is
-# the person's own. A release carries what is in the folder, so a folder whose
-# files were built for another mod list, from other files, or never, would
-# send everybody animations and bodies that do not match the collection.
-# Get-GeneratedState reads the record Build-Generated wrote against this
-# machine now (scripts\mods\Generated.ps1). Both channels stop: the files ship
-# on both. Before the covered bodies, which read what it built.
-Head 'Generated files'
-if ($GameDir) {
-    . (Join-Path $Here '..\mods\Generated.ps1')
-    $genState = $null
-    try { $genState = Get-GeneratedState $Root (Join-Path $RepoDir 'records\generated.json') }
-    catch {
-        Unbump 'the generated files could not be checked'
-        Die ($_.Exception.Message + ' Nothing was published.')
-    }
-    if (-not $genState.Current) {
-        Unbump 'the generated files are out of date'
-        Die (Get-GeneratedStaleSays $genState $Channel)
-    }
-    Say ("  {0} file(s) Build-Generated made for this mod list, as it made them" -f $genState.Record.Files.Count) 'Green'
-} else {
-    Say '  no own game folder here, so there are none to check' 'DarkGray'
 }
 
 # ------------------------------------------------------------ covered bodies
