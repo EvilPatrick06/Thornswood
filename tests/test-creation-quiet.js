@@ -62,11 +62,16 @@ const NEEDS_BLOCK = between(GM, '// ==== thornswood needs: hunger, thirst and ex
                             '// ==== end thornswood needs ====');
 const CHARGEN_GLOBAL = between(GM, 'globalThis.__thornswoodChargen = {', '\n};\n');
 const CHARGEN_OF = between(GM, 'function chargenOf(actorId) {', '\n}\n');
+// The chargen global hands out the gamemode's own test of a stored face and
+// whether a person is in the world for others (#1573), so both are lifted
+// with it.
+const HAS_STORED = between(GM, '\nfunction hasStoredAppearance(a) {', '\n}\n');
+const PUBLISHED = between(GM, '\nfunction publishedForOthers(actorId) {', '\n}\n');
 const HALL_SRC = (/\nconst HALL = (\{[\s\S]*?\n\});/.exec(GM) || [])[1] || null;
 const CHARGEN_PROPERTY = (/const CHARGEN_PROPERTY = '([^']+)';/.exec(GM) || [])[1] || null;
 
-yes('the needs block, the chargen global, chargenOf, HALL and the property name are all in gamemode.js',
-    !!(NEEDS_BLOCK && CHARGEN_GLOBAL && CHARGEN_OF && HALL_SRC && CHARGEN_PROPERTY));
+yes('the needs block, the chargen global, chargenOf, hasStoredAppearance, publishedForOthers, HALL and the property name are all in gamemode.js',
+    !!(NEEDS_BLOCK && CHARGEN_GLOBAL && CHARGEN_OF && HAS_STORED && PUBLISHED && HALL_SRC && CHARGEN_PROPERTY));
 
 const HALL = HALL_SRC ? new Function('return ' + HALL_SRC)() : { desc: '' };
 const HOUR = 3600000;
@@ -107,7 +112,7 @@ function world(opts) {
       mp, CHARGEN_PROPERTY);
     new Function('globalThis', 'mp', 'Date', 'chargenOf', 'setChargen', 'log', 'townsForPanel',
                  'TOWN_BY_KEY', 'CHOOSE_LATER_MS', 'arriveAt', 'HALL', 'CHARGEN_ENABLED',
-                 CHARGEN_GLOBAL)(
+                 HAS_STORED + PUBLISHED + '\n' + CHARGEN_GLOBAL)(
       g, mp, FakeDate, chargenOf,
       function (id, st) { mp.set(id, CHARGEN_PROPERTY, st); },
       function () { }, function () { return []; }, {}, 600000, function () { return false; },
