@@ -1,0 +1,141 @@
+'use strict';
+const assert = require('node:assert/strict');
+const {createSettlement} = require('../game/merchant-settlement');
+const copy = x => JSON.parse(JSON.stringify(x));
+
+function fixture() {
+  const states = new Map([[1, {reference:'1:Skyrim.esm', base:'a:Skyrim.esm', revision:0, purse:250, stock:[], supply:{}}]]);
+  const inv = {entries:[{baseId:15,count:40},{baseId:100,count:8,name:'Tempered iron',health:0.7}]};
+  let live='null', saved='null', profile=7, available=true;
+  const calls=[];
+  const purses={
+    read: id => copy(states.get(id)),
+    pendingRecords: () => Array.from(states, ([merchantId,state]) => ({merchantId,reference:state.reference,state:copy(state)})).filter(x=>x.state.pending),
+    compareAndCommit(id,rev,next) {
+      if (states.get(id).revision!==rev) return null;
+      states.set(id,copy({...next,revision:rev+1}));
+      return copy(states.get(id));
+    }
+  };
+  const transfer={
+    available: () => available, validate: () => true,
+    identity: id => id===10 && profile>0 ? {desc:'ff000010:Skyrim.esm',profileId:profile} : null,
+    resolve: desc => desc==='ff000010:Skyrim.esm' ? 10 : 0,
+    inventory: () => copy(inv), receipt: () => live, saved: () => saved,
+    cas(id,expected,receipt,next,sequence,expectedProfile) {
+      assert.equal(id,10); assert.equal(expectedProfile,profile);
+      calls.push(sequence);
+      if (live!==receipt || JSON.stringify(inv)!==JSON.stringify(expected)) return false;
+      inv.entries=copy(next.entries);
+      live=JSON.stringify({actor:'ff000010:Skyrim.esm',profile,sequence});
+      return true;
+    }
+  };
+  const make=()=>createSettlement({purses,transfer,world:'dev:test-ledger'});
+  return {states,purses,transfer,inv,calls,make,
+    save:()=>{saved=live;}, live:()=>live,
+    profile:n=>{profile=n;}, off:()=>{available=false;},
+    offer:()=>({merchantId:1,humanId:10,profileId:7,previous:purses.read(1),
+      next:{purse:247,stock:[{baseId:100,count:1,name:'Iron Ingot',entry:{baseId:100,count:1,name:'Tempered iron',health:0.7}}],supply:{}},
+      debit:{entries:[{baseId:15,count:40},{baseId:100,count:7,name:'Tempered iron',health:0.7}]},
+      credit:[{baseId:15,count:3}],expected:copy(inv),kind:'sell'})};
+}
+
+let f=fixture(), s=f.make();
+let result=s.begin(f.offer());
+assert.equal(result.done,false);
+assert.equal(f.inv.entries[1].count,7,'debit removes only the outgoing goods');
+assert.equal(f.inv.entries[0].count,40,'incoming payment is quarantined before saved debit');
+assert.equal(f.states.get(1).purse,250);
+assert.equal(s.begin(f.offer()).accepted,false,'one person cannot have two unsettled trades');
+f.save(); s.tick();
+assert.equal(f.states.get(1).purse,247);
+assert.equal(f.inv.entries[0].count,43);
+assert.ok(f.states.get(1).pending,'final credit must also be saved');
+f.save(); s.tick();
+assert.equal(f.states.get(1).pending,null);
+s.tick(); assert.deepEqual(f.calls,[1,2],'reconciliation never repeats a settled transfer');
+
+// Restart at every durable boundary, retaining ordinary inventory changes.
+f=fixture(); s=f.make(); s.begin(f.offer()); s.shutdown();
+s=f.make(); s.tick(); assert.deepEqual(f.calls,[1]);
+f.save(); f.inv.entries.push({baseId:200,count:4,chargePercent:0.17});
+s.tick(); assert.equal(f.inv.entries[2].count,4,'credit preserves intervening earnings');
+s.shutdown(); s=f.make(); s.tick(); assert.deepEqual(f.calls,[1,2]);
+f.save(); s.tick(); assert.equal(f.states.get(1).pending,null);
+
+// An exception after native mutation cannot clear or repeat the debit.
+f=fixture(); const cas=f.transfer.cas;
+f.transfer.cas=(...args)=>{cas(...args);throw new Error('notification failed after mutation');};
+s=f.make(); s.begin(f.offer()); assert.ok(f.states.get(1).pending);
+f.transfer.cas=cas; f.save(); s.tick(); f.save(); s.tick();
+assert.deepEqual(f.calls,[1,2]); assert.equal(f.inv.entries[0].count,43);
+
+// Ambiguous ledger persistence revokes the service before any native mutation.
+f=fixture(); const commit=f.purses.compareAndCommit;
+f.purses.compareAndCommit=(...args)=>{commit(...args);throw new Error('ack lost');};
+s=f.make(); assert.throws(()=>s.begin(f.offer()),/ack lost/);
+assert.deepEqual(f.calls,[]); assert.equal(s.available(),false);
+f.purses.compareAndCommit=commit; s=f.make(); s.tick();
+assert.deepEqual(f.calls,[1]);
+
+// Profile replacement and cross-world replay stay reserved and do not pay.
+f=fixture(); s=f.make(); s.begin(f.offer()); f.save(); f.profile(9); s.tick();
+assert.equal(f.inv.entries[0].count,40); assert.ok(f.states.get(1).pending);
+s.shutdown(); s=createSettlement({purses:f.purses,transfer:f.transfer,world:'main:test-ledger'});
+f.profile(7); s.tick(); assert.equal(f.inv.entries[0].count,40);
+
+// Definitive refusal releases capacity without requiring the old inventory.
+f=fixture(); f.transfer.cas=()=>false; s=f.make();
+assert.equal(s.begin(f.offer()).accepted,false); assert.equal(f.states.get(1).pending,null);
+f=fixture(); f.transfer.cas=()=>{throw new Error('unknown outcome');}; s=f.make(); s.begin(f.offer());
+assert.ok(f.states.get(1).pending,'ambiguous call stays reserved');
+f.inv.entries[1].count=6; s.tick();
+assert.equal(f.states.get(1).pending,null,'original receipt proves no debit even when inventory changed');
+
+f=fixture(); for(let id=2;id<=26;id++) f.states.set(id,{reference:id+':Skyrim.esm',revision:1,purse:250,stock:[],
+  pending:{id:'offline-'+id,human:{desc:'ff'+id+':Skyrim.esm',profileId:id}}});
+s=f.make(); assert.equal(s.begin(f.offer()).accepted,false,'25 identifiable offline intents fill global capacity');
+f.states.delete(26); assert.equal(s.begin(f.offer()).accepted,true,'the twenty-fifth slot can be used');
+
+// Legacy and offline records count toward admission. No hidden human lock is guessed.
+f=fixture(); for(let id=2;id<=26;id++) f.states.set(id,{reference:id+':Skyrim.esm',revision:1,purse:250,stock:[],pending:{id:'legacy-'+id}});
+s=f.make(); assert.equal(s.begin(f.offer()).accepted,false); assert.deepEqual(f.calls,[]);
+f=fixture(); f.states.set(2,{reference:'2:Skyrim.esm',revision:1,purse:250,stock:[],pending:{id:'legacy'}});
+s=f.make(); assert.equal(s.begin(f.offer()).accepted,false,'unknown legacy identity blocks admission');
+
+// Stale closures and reentrant reloads cannot mutate native state after saving.
+f=fixture(); s=f.make(); s.shutdown(); assert.equal(s.begin(f.offer()).accepted,false);
+f=fixture(); s=f.make(); const save=f.purses.compareAndCommit;
+f.purses.compareAndCommit=(...args)=>{const out=save(...args);s.shutdown();return out;};
+s.begin(f.offer()); assert.deepEqual(f.calls,[]);
+
+// Native serialization validation must happen before any durable reservation.
+f=fixture();f.transfer.validate=()=>{throw new Error('native byte bound');};s=f.make();
+assert.throws(()=>s.begin(f.offer()),/native byte bound/);assert.deepEqual(f.calls,[]);assert.equal(f.states.get(1).pending,undefined);
+
+// Native inventory bounds apply to the aggregate, not just each stack.
+f=fixture();f.inv.entries.push({baseId:200,count:2147483647},{baseId:201,count:2147483600});
+s=f.make();const overfull=f.offer();overfull.debit=require('../game/merchant-settlement').takeEntries(f.inv,100,1).inventory;assert.throws(()=>s.begin(overfull),/total/);assert.deepEqual(f.calls,[]);assert.equal(f.states.get(1).pending,undefined);
+
+// A concurrent ordinary gain refuses the credit snapshot, then is preserved.
+f=fixture(); s=f.make(); s.begin(f.offer()); f.save();
+const ordinaryCas=f.transfer.cas; let raced=false;
+f.transfer.cas=(...args)=>{if(args[4]===2 && !raced){raced=true;f.inv.entries.push({baseId:201,count:2});}return ordinaryCas(...args);};
+s.tick(); assert.equal(f.inv.entries[0].count,40); assert.ok(f.states.get(1).pending);
+s.tick(); assert.equal(f.inv.entries[0].count,43);assert.equal(f.inv.entries.at(-1).baseId,201);
+f.save();s.tick();assert.equal(f.states.get(1).pending,null);
+
+// Lost acknowledgements at merchant commit and final clear revoke the writer;
+// a new controller uses durable state and never repeats the payment.
+for(const phase of ['merchant','clear']) {
+  f=fixture();s=f.make();s.begin(f.offer());f.save();
+  const write=f.purses.compareAndCommit;let failed=false;
+  f.purses.compareAndCommit=(...args)=>{const result=write(...args);if(!failed && (phase==='merchant'?args[2].pending?.phase==='credit':args[2].pending===null)){failed=true;throw new Error('lost '+phase+' acknowledgement');}return result;};
+  if(phase==='clear'){s.tick();f.save();}
+  assert.throws(()=>s.tick(),/acknowledgement/);assert.equal(s.available(),false);
+  f.purses.compareAndCommit=write;s=f.make();s.tick();f.save();s.tick();
+  assert.equal(f.inv.entries[0].count,43);assert.equal(f.states.get(1).pending,null);assert.deepEqual(f.calls,[1,2]);
+}
+
+console.log('PASS merchant debit quarantine, exact saved receipts, restart, identity, cap, ledger failure and reload');

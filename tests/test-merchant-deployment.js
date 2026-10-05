@@ -8,7 +8,7 @@ const source = fs.readFileSync(path.join(__dirname, '../game/gamemode.js'), 'utf
 const start = source.indexOf('// MERCHANT TRADING BUNDLE BEGIN');
 const end = source.indexOf('// MERCHANT TRADING BUNDLE END');
 assert.ok(start >= 0 && end > start, 'Native hot reload must receive the merchant module and catalogues inside gamemode.js');
-assert.ok(end < source.lastIndexOf('try {\n  const cfgNpc = mp.getServerSettings();'), 'Bundle must initialize before native startup uses it');
+assert.ok(end < source.lastIndexOf('// NPC SERVER STARTUP BEGIN'), 'Bundle must initialize before native startup uses it');
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-merchant-'));
 try {
   const deployed = path.join(temp, 'gamemode.js');

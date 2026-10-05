@@ -22,9 +22,9 @@ const page = fs.readFileSync(path.join(root, 'docs/systems/merchant-traders.md')
 assert.match(page, /Total: 249/);
 const src = fs.readFileSync(path.join(root, 'game/merchant-trading.js'), 'utf8');
 assert.equal(src.includes('addItem'), false);
-assert.equal(src.includes('SetInventory'), false);
-assert.match(src, /beginMerchantTransfer/);
-assert.match(src, /Native merchant transfer is not on this server/);
+assert.doesNotMatch(src, /\.set\([^\n]*['"]inventory['"]/);
+assert.match(src, /compareAndSetInventory\(id, expected, receipt, next, sequence, profile\)/);
+assert.match(src, /getSavedInventoryReceipt/);
 const mode = fs.readFileSync(path.join(root, 'game/gamemode.js'), 'utf8');
 assert.match(mode, /installMerchantTrading/);
 assert.match(mode, /native transfer absent/);

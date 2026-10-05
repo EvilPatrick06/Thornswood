@@ -34,16 +34,17 @@ the branch `thornswood/engine-changes`. Anybody can read it or download it,
 with no account.
 
 The server's engine, `scam_native.node`, is built from one commit,
-[`0dd0590b`](https://github.com/EvilPatrick06/skymp/tree/0dd0590bb7703c467c1a8adaffbfaabcdde75046).
+[`5328e5c1`](https://github.com/EvilPatrick06/skymp/tree/5328e5c11618647f664e2cf3a4f439fa370e1725).
 That commit starts from
 [SkyMP](https://github.com/skyrim-multiplayer/skymp) at `f926944b`, and
-[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/f926944b...0dd0590b)
+[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/f926944b...5328e5c1)
 is the difference between the two.
 
 The server's engine goes to our test server first. Main remains on
-`6a64b0f0` until its next release. The current Dev change is to the server:
-it reads every plugin into memory when it starts. The six client files keep
-the bytes they had.
+`6a64b0f0` until its next release. The current Dev engine adds durable
+merchant settlement and keeps unfinished characters hidden from other people.
+The six client files reuse the published build because their source is unchanged.
+The build evidence is in [the runtime provenance record](https://github.com/EvilPatrick06/Thornswood/blob/main/records/merchant-runtime-provenance.md).
 
 The six client files are built from the commit named by the feed a person
 got them from (`clientRuntime.forkCommit` in that channel's `version.json`).
@@ -54,7 +55,7 @@ the same public branch:
 | Channel | Feed | The six client files are built from |
 |---|---|---|
 | Public | `feed/version.json` | [`6a64b0f0`](https://github.com/EvilPatrick06/skymp/tree/6a64b0f0) |
-| Dev | `feed-dev/version.json` | [`e6306511`](https://github.com/EvilPatrick06/skymp/tree/e6306511) |
+| Dev | `feed-dev/version.json` | [`5328e5c1`](https://github.com/EvilPatrick06/skymp/tree/5328e5c1) |
 
 | File | Built from | Licence |
 |---|---|---|

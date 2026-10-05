@@ -94,16 +94,18 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `47da3f34` (in full, `47da3f34973828e46fad1aaf10616bb7ef2df8ad`). That
+commit `5328e5c1` (in full, `5328e5c11618647f664e2cf3a4f439fa370e1725`). That
 is upstream skyrim-multiplayer/skymp at `f926944b` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
 recorded build.
 
-For this pin, only `skymp5-client.js` was rebuilt (skymp #10 / Thornswood #1268:
-when the server never answers, say so; do not shout LOAD ORDER WARNING). The
-other five runtime files keep the `51faac39` hashes. Evidence is in
-`records\client-provenance-47da3f34.md`.
+The six files retain the published 0dd0590b bytes: their client, platform
+and serialization sources are unchanged. This is reuse of source-equivalent
+artifacts, not a claim that they were recompiled. The server addon was built
+with the new private economy writer and shared inventory validator, together
+with the merged appearance-publication change. Exact build and regression
+evidence is in `records\merchant-runtime-provenance.md`.
 
 | File | Built from, in the fork | Licence |
 |---|---|---|
