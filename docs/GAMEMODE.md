@@ -86,7 +86,7 @@ working directory (`gamemode.js:125-127`). The gamemode reads `dataDir`
 (`gamemode.js:253`), `thornswoodChargen` (`gamemode.js:3652`),
 `thornswoodAdmins` (`gamemode.js:20300`) and `loadOrder`
 (`gamemode.js:11623`). `Deploy-Gamemode.ps1` writes that file on every deploy
-(`scripts\deploy\Deploy-Gamemode.ps1:491` sets `dataDir`).
+(`scripts\deploy\Deploy-Gamemode.ps1:-NotePropertyName dataDir -NotePropertyValue 'data'`).
 
 ## Character creation
 
@@ -230,7 +230,7 @@ In the server's folder, `C:\Thornswood-Server` live and
 |---|---|---|
 | `data` | `online.json`, `manifest.json`, `server-bases.json`, `thornswood-log.json`, `restart.json` | Yes: the resources port (3000 live, 7788 dev) hands out anything under it over plain HTTP (`gamemode.js:55-58`) |
 | `private` | `characters.json`, `allowed.json`, `door.json`, `door.log`, `property.json`, `farm-claims.json`, `mod-settings.json` (the first six moved from `data` on 25 September, issue #541, because they carry profile ids; the gamemode carries an old copy across on first load) | No |
-| `world` | Not the gamemode's: SkyMP's changeform database, every reference the server has written to (`scripts\ops\Wipe-Saves.ps1:19-24`, `scripts\release\Where.ps1:77`) | No |
+| `world` | Not the gamemode's: SkyMP's changeform database, every reference the server has written to (`scripts\ops\Wipe-Saves.ps1:the changeform database. Every reference the server has ever written to`; `scripts\release\Where.ps1 ChangeForms` names its folder in the server build) | No |
 | the folder itself | `thornswood.log`, rolled at 4 MB with five kept (`gamemode.js:74-108`) | No |
 
 `scripts\ops\Wipe-Saves.ps1` starts the world over by moving `world`,
@@ -250,14 +250,14 @@ because each reads the one before.
 | `WARMTH` line 28 | `Build-WarmthTable.js` | `warmth.json` | `Build-WarmthTable.js:398-399` |
 | `FOODS` line 29 | `Build-FoodTable.js` | `food.json` | `Build-FoodTable.js:324-335` |
 | `RACES` line 30 | `Build-RaceTable.js` | `races.json` | `Build-RaceTable.js:274-289` |
-| `ORES_BY_BASE` 686-1271 | `Build-OreTable.ps1` | `ores.json` | `Build-OreTable.ps1:884-888` |
-| `HARVESTS_BY_BASE` 5341-5454, `FISH_BY_BASE` 5509-5528, `GAME_BY_BASE` 5644-5655, `CROPS_BY_BASE` 5901-5920 | `Build-HarvestTable.ps1` | `harvests.json` | `Build-HarvestTable.ps1:2302-2479` |
-| `HUNTS_BY_BASE` 6491-6857 | `Build-HuntTable.ps1` | `hunts.json` | `Build-HuntTable.ps1:1603-1619` |
-| `RECIPES_BY_ID` 7549-9499 | `Build-RecipeTable.ps1`, which also reads `docs/systems/cut-items.json` for what leaves the open book | `recipes.json` | `Build-RecipeTable.ps1:5093-5095` |
+| `ORES_BY_BASE` 686-1271 | `Build-OreTable.ps1` | `ores.json` | `Build-OreTable.ps1:// ==== end ORES_BY_BASE ====` |
+| `HARVESTS_BY_BASE` 5341-5454, `FISH_BY_BASE` 5509-5528, `GAME_BY_BASE` 5644-5655, `CROPS_BY_BASE` 5901-5920 | `Build-HarvestTable.ps1` | `harvests.json` | `Build-HarvestTable.ps1:All four installs work on the text of gamemode.js` |
+| `HUNTS_BY_BASE` 6491-6857 | `Build-HuntTable.ps1` | `hunts.json` | `Build-HuntTable.ps1:// ==== end HUNTS_BY_BASE ====` |
+| `RECIPES_BY_ID` 7549-9499 | `Build-RecipeTable.ps1`, which also reads `docs/systems/cut-items.json` for what leaves the open book | `recipes.json` | `Build-RecipeTable.ps1:// ==== end RECIPES_BY_ID ====` |
 | `STAFF_SPELLS` (staff spells block) | `Build-RecipeTable.ps1`, with each spell's school and rank | none | the STAFF_SPELLS markers |
 | `BUILDING_BY_DOOR` 9575-9582, `BUILDING_NAME` 9584-9590, `WAY_OUT` 9592-9599 | `Build-DoorTable.py` | `doors.json` | `Build-DoorTable.py:450-483` |
 | `BENCH_BY_BASE` 9627-9633, `BENCH_ACCESS` 9635-9736 | `Build-BenchTable.py`, from `recipes.json` | none | `Build-BenchTable.py:362-376` |
-| `SPELL_IDS` 11826-11930 | `Build-SpellTable.ps1` | `spells.json` | `Build-SpellTable.ps1:622-628` |
+| `SPELL_IDS` 11826-11930 | `Build-SpellTable.ps1` | `spells.json` | `Build-SpellTable.ps1:// ==== end SPELL_IDS ====` |
 | `DATA` 23 | `Install-GamemodeConsts.js` | `data.json` | `Install-GamemodeConsts.js` |
 | `STATIONS` 24 | `Install-GamemodeConsts.js` | `stations.json` | `Install-GamemodeConsts.js` |
 | `ITEMS` 25 | `Install-GamemodeConsts.js` | `items.json` | `Install-GamemodeConsts.js` |
@@ -277,17 +277,19 @@ installer. `--check` proves the gamemode matches. Older comments named
 Everything goes to the dev server first.
 
 - **Dev:** `.\scripts\deploy\Deploy-DevGamemode.ps1`. It checks the file parses with
-  `node --check` (`scripts\deploy\Deploy-DevGamemode.ps1:192-199`), reads how many are
+  `node --check` (`scripts\deploy\Deploy-DevGamemode.ps1:& node --check $Gamemode`),
+  and on a machine without node it skips that check with a warning
+  (`scripts\deploy\Deploy-DevGamemode.ps1:so the syntax check was skipped`), reads how many are
   on, warns them, sends `gamemode.js` alone to `C:\Thornswood-Server-Dev` and
   restarts only the process on the dev port. `-LoadOrder` brings the dev load
   order up to the built server's; a change to the CHARGEN records needs
-  `Deploy-Gamemode.ps1 -Vortex` first (`scripts\deploy\Deploy-DevGamemode.ps1:33`).
+  `Deploy-Gamemode.ps1 -Vortex` first (`scripts\deploy\Deploy-DevGamemode.ps1:changes the CHARGEN records needs Deploy-Gamemode.ps1 -Vortex first`).
 - **Live:** `.\scripts\deploy\Deploy-Gamemode.ps1` copies `gamemode.js` into the local
-  server build (`scripts\release\Where.ps1 ServerDist`, `scripts\deploy\Deploy-Gamemode.ps1:226`)
+  server build (`scripts\release\Where.ps1 ServerDist`, `scripts\deploy\Deploy-Gamemode.ps1:Copy-Item -LiteralPath $Gamemode -Destination (Join-Path $Dist 'gamemode.js')`)
   and writes `server-settings.json` and the load order; it does not talk to
-  the VPS (`scripts\deploy\Deploy-Gamemode.ps1:208`). Then `.\scripts\deploy\Deploy-Server.ps1`
+  the VPS (`scripts\deploy\Deploy-Gamemode.ps1:This script does not stop the live server and does not talk to the VPS`). Then `.\scripts\deploy\Deploy-Server.ps1`
   stages the build on the VPS, warns, swaps and restarts
-  (`scripts\deploy\Deploy-Server.ps1:410-422` takes `gamemode.js` from `game`).
+  (`scripts\deploy\Deploy-Server.ps1:game\gamemode.js as the commit holds it`: it takes `gamemode.js` from `game` as committed, not the copy in the build).
 
 Ship does not carry `gamemode.js`. `.\scripts\vps\Check-LiveGamemode.ps1` says
 whether the live server runs the file in this repository, by hash.

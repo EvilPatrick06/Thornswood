@@ -281,6 +281,52 @@ yes('and a ' + (T.professions.mage.mastered === 3 ? 'third' : '?') + ' school at
 yes('a trade outside your own can be taught ' + (T.limits.secondaries === 2 ? 'twice' : '?'),
     T.limits.secondaries === 2 && /you may only ever do this twice/i.test(text));
 
+// Taking an apprentice (#1592). docs/systems/apprenticeship.md has two
+// arrangements, the sister half and an outside trade. The page used to promise
+// a third, a faster climb under a Master of your own half, which neither the
+// design nor the rules have.
+{
+  const appr = section(page, '### Taking an apprentice');
+  const atext = appr ? flat(appr) : '';
+  const mPlate = { prof: 'smith', half: 'platewright', ranks: { platewright: 'master', edgewright: 'novice' } };
+  const who = { id: 7, name: 'Eorlund', at: 1 };
+  const plateOwn = P.pickProfession(P.fresh(), 'smith', 'platewright').state;
+  const ownTake = P.takeOn(plateOwn, mPlate, 'platewright', who);
+  yes('a Master of your own half cannot take you on in it (' + (ownTake.why || '?') + ')', !ownTake.ok);
+  let alone = plateOwn, under = plateOwn;
+  for (let i = 0; i < 40; i++) {
+    alone = P.creditWork(alone, 'platewright', null).state;
+    under = P.creditWork(under, 'platewright', mPlate).state;
+  }
+  yes('work in your own half counts the same with a Master handed in or without (' +
+      P.workDone(alone, 'platewright') + ' and ' + P.workDone(under, 'platewright') + ')',
+      P.workDone(alone, 'platewright') === 40 && P.workDone(under, 'platewright') === 40);
+  yes('the page promises no faster climb under a Master',
+      !!appr && !/climbs? faster|worth more than|counts? for more/i.test(text));
+  yes('it says your own half climbs at the same pace with a Master or without, and a Master of it cannot take you on',
+      /Your own half needs nobody/.test(atext) &&
+      /same pace with a Master beside you or without one/.test(atext) &&
+      /a Master of your own half cannot take you on in it/.test(atext));
+
+  const edge = P.pickProfession(P.fresh(), 'smith', 'edgewright').state;
+  const need = P.workNeeded(edge, 'platewright');
+  let waiting = edge;
+  for (let i = 0; i < need + 40; i++) { waiting = P.creditWork(waiting, 'platewright', null).state; }
+  const taken = P.takeOn(waiting, mPlate, 'platewright', who);
+  const up = taken.ok ? P.creditWork(taken.state, 'platewright', mPlate) : { ok: false };
+  yes('without a Master the sister half stays novice and its count waits at the threshold (' +
+      P.workDone(waiting, 'platewright') + ' of ' + need + ')',
+      need > 0 && P.rankOf(waiting, 'platewright') === 'novice' && P.workDone(waiting, 'platewright') === need);
+  yes('a Master of it takes you on and the next piece raises it',
+      taken.ok && up.ok && !!up.raised && up.raised.to === 'advanced');
+  yes('the page names the sister half as the first arrangement, waiting at novice until a Master of it takes you on',
+      /\*\*The other half of your own profession\.\*\*/.test(atext) &&
+      /Without a Master of that half it never leaves novice/.test(atext) &&
+      /the next piece raises you, and from there it climbs the whole ladder/.test(atext));
+  yes('and an outside trade as the second, and nothing else',
+      /\*\*Outside your profession entirely\.\*\*/.test(atext) && !/Inside the same half/i.test(atext));
+}
+
 // ---------------------------------------------------- what a half makes
 
 const ironCuirass = row('Iron Armor', 'Platewright');
