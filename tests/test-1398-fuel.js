@@ -8,6 +8,11 @@
 // Master Carver's fire is 48 at your feet. Temper rows stay unscored and
 // Mastercraft is not a temper bonus.
 //
+// And Patrick's answer on Master Weaver, 4 October: the tailor picks one per
+// garment, warmth or armour. A garment made on Warmth is named Master-Woven
+// and one made on Armour Master-Lined, never both, and the warmth reads only
+// its own. tests/test-1398-weaver.js holds the pick and the 10%.
+//
 // It reads the page and recipes.json, drives the real mp.onCraft and the
 // real needs block out of gamemode.js over a fake mp, and prints PASS and
 // FAIL lines. Exit 1 when anything fails.
@@ -127,6 +132,13 @@ function person(prof, half, rank) {
   if (r.ok && rank) { r.state.ranks[half] = rank; }
   return r.ok ? r.state : null;
 }
+// The character block's weaveOf and the maneuvers block's armour mark, as
+// the gamemode has them, for the craft to read the tailor's pick.
+const weaveOfSrc = slice(gm, '  function weaveOf(s) {', '\n  }\n');
+const weaveOf = weaveOfSrc ? new Function('P', weaveOfSrc + '\nreturn weaveOf;')(P) : null;
+const wovenArmourLine = /var WOVEN = (\{ mark: '[^']+', less: [0-9.]+ \});/.exec(gm);
+const WOVEN = wovenArmourLine ? new Function('return ' + wovenArmourLine[1])() : null;
+yes('the character block\'s weaveOf and the maneuvers block\'s armour mark are in the gamemode', !!weaveOf && !!WOVEN);
 
 const ITEMS = JSON.parse(/^const ITEMS = (\{.*\});$/m.exec(gm)[1]);
 const pieces = {
@@ -140,7 +152,7 @@ const pieces = {
   fns: ['function idOf(descriptor)', 'function takeItem(actorId, itemDesc, count)', 'function addItem(actorId, itemDesc, count)',
         'function craftRow(recipeDesc)', 'function fuelFor(recipeDesc)', 'function packCount(actorId, itemDesc)',
         'function charcoalHeld(actorId, grade)', 'function fuelRefusal(fuel)', 'function wantsAHandle(row)',
-        'function holdsPerk(actorId, key)', 'function markWoven(actorId, outDesc, name, n)',
+        'function holdsPerk(actorId, key)', 'function wovenMark(actorId)', 'function markWoven(actorId, outDesc, name, n)',
         'function masterCraft(actorId, row, count)'].map(cut),
   onCraft: slice(gm, "mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {", '\n});\n')
 };
@@ -170,8 +182,9 @@ function craftRig(state) {
   };
   const g = {
     __thornswoodProgression: P,
-    __thornswoodCharacter: { stateOf: function () { return state; } },
-    __thornswoodNeeds: { NEEDS: { wear: { woven: { degrees: 4, mark: 'Master-Woven ' } } } }
+    __thornswoodCharacter: { stateOf: function () { return state; }, weaveOf: weaveOf },
+    __thornswoodNeeds: { NEEDS: { wear: { woven: { degrees: 4, mark: 'Master-Woven ' } } } },
+    __thornswoodManeuvers: { WOVEN: WOVEN }
   };
   const body = [pieces.grades, fuelLine[0], pieces.hafted, pieces.handle, pieces.tools, pieces.key, pieces.delay, pieces.after]
     .concat(pieces.fns).join('\n') + '\n' + pieces.onCraft + '\nreturn mp.onCraft;';
@@ -349,6 +362,41 @@ if (RECIPES && KEPT && pieces.onCraft && P) {
     refused.later();
     yes('a craft the engine refuses does not name a hood the master already had',
         refused.entries(RECIPES[hood].out).every(function (e) { return !e.name; }) && refused.count(RECIPES[hood].out) === 1);
+    const armour = P.clone(weaver);
+    armour.weave = 'armour';
+    const lined = craftRig(armour);
+    lined.give(T1, 1);
+    lined.craft(hood, 1);
+    lined.later();
+    const names = lined.entries(RECIPES[hood].out).map(function (e) { return e.name || ''; });
+    yes('a master tailor on Armour makes a hood named Master-Lined (' + names.join(', ') + ')',
+        names.length === 1 && names[0] === 'Master-Lined Fur Hood');
+    yes('the two marks are told apart from the front of the name, so one garment never carries both',
+        WOVEN.mark === 'Master-Lined ' && 'Master-Lined Fur Hood'.indexOf('Master-Woven ') !== 0 &&
+        'Master-Woven Fur Hood'.indexOf(WOVEN.mark) !== 0);
+    const warm = P.clone(weaver);
+    warm.weave = 'warmth';
+    const woven2 = craftRig(warm);
+    woven2.give(T1, 1);
+    woven2.craft(hood, 1);
+    woven2.later();
+    yes('on Warmth it is Master-Woven, as every woven garment was before there was a pick',
+        woven2.entries(RECIPES[hood].out).map(function (e) { return e.name; }).join() === 'Master-Woven Fur Hood');
+    const forged = person('tailor', 'haberdasher', 'expert');
+    forged.weave = 'armour';
+    const notWeaver = craftRig(forged);
+    notWeaver.give(T1, 1);
+    notWeaver.craft(hood, 1);
+    notWeaver.later();
+    yes('an expert tailor with armour written on the character still makes a plain hood',
+        notWeaver.entries(RECIPES[hood].out).every(function (e) { return !e.name; }));
+    const already = craftRig(armour);
+    already.give(T1, 1);
+    already.give(RECIPES[hood].out, 1, { name: 'Master-Woven Fur Hood' });
+    already.craft(hood, 1);
+    already.later();
+    yes('a hood already woven for warmth is not marked again: the new one is the one named Master-Lined',
+        already.entries(RECIPES[hood].out).map(function (e) { return e.name; }).sort().join() === 'Master-Lined Fur Hood,Master-Woven Fur Hood');
     yes('Mastercraft is read nowhere outside the rules: a smith\'s master perk is not a temper bonus',
         (gm.match(/'mastercraft'/g) || []).length === 1 && /key: 'mastercraft'/.test(gm));
   });
@@ -460,6 +508,10 @@ if (needsSrc && P) {
     yes('a piece named that at the enchanting table is not woven', N.view(A).exposure === -6);
     N.wear(A, [{ desc: cloth[0], name: 'Master-Woven Shirt (85%)' }]);
     yes('a woven piece below 100% is still woven', N.view(A).exposure === -2);
+    N.wear(A, [{ desc: cloth[0], name: 'Master-Lined Shirt' }]);
+    yes('a garment woven for armour keeps no weather off: 6 colder', N.view(A).exposure === -6);
+    N.wear(A, [{ desc: cloth[0], name: 'Master-Lined Shirt' }, { desc: cloth[1], name: 'Master-Woven Hat' }]);
+    yes('one of each worn: the warm one still counts, 2 colder', N.view(A).exposure === -2);
     N.place(A, 'outdoors', '-', '1', '0', '20000', '-');
     N.wear(A, [{ desc: cloth[0], name: 'Master-Woven Shirt' }]);
     yes('at night up a mountain, 20 colder becomes 16', N.view(A).exposure === -16);

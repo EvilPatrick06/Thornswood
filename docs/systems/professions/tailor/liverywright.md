@@ -41,7 +41,9 @@ A Haberdasher may make your novice 82 as their sister half.
 ## Master Weaver on this half
 
 Faction dress is the clothing most likely to be asked to carry hidden
-armour. The plan is the perk, not a second recipe. It is not applied.
+armour. It is the perk, not a second recipe: a Master Weaver picks
+Armour on K, and what they make after that comes out Master-Lined and
+gives back 10% of each hit. See [Tailor](../tailor.md).
 
 <!-- detail:begin -->
 
