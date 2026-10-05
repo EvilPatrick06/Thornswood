@@ -33,8 +33,11 @@ nothing for someone who holds no school. They spread across the schools
 that character has, under that school's own power and skill, because the
 game has no single "spell damage" value.
 
-Critical chance is promised by Precision. The game has no clean actor
-value for it. The point is still recorded.
+Critical chance is promised by Precision. The point is recorded and put
+on your character, and the game ignores it. The server works out what
+every blow deals, and there is no critical hit in that sum. Spending a
+point in Precision says so, and so does the K panel. No hit is ever called
+a critical one.
 
 ## Where the points come from
 
@@ -83,7 +86,35 @@ a long time. See [Professions](professions.md) for how a rank is earned.
 
 The fifteen sub-skills, the cap of 5, the per-point numbers, the placed
 points and the free point per rank are in the server and on the K panel.
-Cheat Death, Troll's Blood and the other filled perks are named. The ones
-that are a once-a-day effect are not all wired as a daily power yet. The
-bottom of a later pass should tick each perk when it actually fires.
-Precision's critical chance is recorded and the game may ignore it.
+
+A perk is ticked here when the server makes it fire. Each time one fires,
+the server writes `perks: <name> fired` to its log, so a tester can see
+it happen. Troll's Blood and Leyline Attunement write one line a fight
+and one a cast, not one a second.
+
+Nothing here is a command. Font of Magic, the one perk a person starts,
+is the Use button beside it on the K panel. The K panel also says, beside
+Archmage's Vessel, Font of Magic and Second Wind, whether each is ready or
+how long until it is back.
+
+A day, for the three once-a-day perks, is 24 real hours from when it
+fired. The clock is kept on the character and written before the perk
+fires, so a restart or a relog cannot fire it twice.
+
+| Perk | Fires | What is not in the game yet |
+| --- | --- | --- |
+| Cheat Death | No | All of it. The engine ends you the moment health reaches nothing, and sends the death before the server is asked. The engine has to ask first (issue #1626). The once-a-day clock is in the server, waiting for that |
+| Troll's Blood | Yes. A fight is a hit landed or taken, or health falling, in the last 15 seconds | |
+| Devastating Blow | Yes. With a warrior's Heavy on the same blow, each adds its share to what the blow took before it | |
+| Unshakeable | No | All of it. The stagger is played on your own machine, where the server cannot stop it |
+| Purified Blood | Yes. The tree's disease resistance comes to 100 and its poison resistance to 75. What your race resists comes on top, as far as the game allows | |
+| Archmage's Vessel | Yes | |
+| Leyline Attunement | Yes. The server sees a cast as magicka falling. The usual rate is your race's own, raised by your Clarity | |
+| Overcharge | Yes, the damage. Every fifth spell of yours that takes health takes double | Holding twice as long |
+| Spellbreaker | Yes. A spell you hold up, like Flames, counts once a second | |
+| Font of Magic | Yes, from the Use button on the K panel. For 15 seconds each school's cost is taken off in full, the way the game's own Fortify enchantments take it off, so the game takes no magicka at all | |
+| Tireless | No | All of it. What running and a swing cost is worked out on your own machine |
+| Second Wind | Yes | |
+| Windwalker | Yes, the speed | A fall still hurts. It is taken on your own machine |
+| Pack Mule | No | All of it. The slowing is the game's own, on your own machine |
+| Lethal Aim | Yes. An arrow or a bolt is worked out again against half the armour, by the same sum the server uses for every blow | |

@@ -82,7 +82,8 @@
   const UI_PATH = 'Data/Platform/UI/index.html';
   const OVERLAYS = ['thornswood-chat.js', 'thornswood-emotes.js', 'thornswood-voice.js',
                     'thornswood-skills.js', 'thornswood-party.js',
-                    'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js', 'thornswood-afk.js'];
+                    'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js',
+                    'thornswood-repair.js', 'thornswood-maneuvers.js', 'thornswood-afk.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -349,6 +350,22 @@
   */
   const MOLD_KEY    = iniNumber(ini, 'MoldKey', 22);       // U
   const LOCK_KEY    = iniNumber(ini, 'LockKey', 45);       // X
+  /*
+    The holder's sleep key on the look prompt (#1603). Patrick: the holder
+    names who may sleep there "with buttons and GUI, not commands". THE MOLD'S
+    KEY, U, and not a new one: every letter is already Skyrim's or ours, and
+    test-thornswood-keys.js holds no two of ours on one default. The two never
+    meet: the mold is armed only while a door is under the crosshair, and this
+    only while a person is, inside a building you hold. Rebinding MoldKey moves
+    both, and its Controls row says so.
+  */
+  const SLEEP_KEY   = MOLD_KEY;
+  /*
+    A warrior's maneuvers (#1386): opens the maneuver panel. 9, scan code 10:
+    1 to 8 are the emote slots and the game's own hotkeys, and every letter is
+    already one of ours or the game's.
+  */
+  const MANEUVER_KEY = iniNumber(ini, 'ManeuverKey', 10);  // 9
   /* What the prompt calls them. Read off the scan code so a rebind in the ini
      changes the letter on the screen as well as the key that works. */
   function keyName(code) {
@@ -356,7 +373,8 @@
       16: 'Q', 17: 'W', 18: 'E', 19: 'R', 20: 'T', 21: 'Y', 22: 'U', 23: 'I',
       24: 'O', 25: 'P', 30: 'A', 31: 'S', 32: 'D', 33: 'F', 34: 'G', 35: 'H',
       36: 'J', 37: 'K', 38: 'L', 44: 'Z', 45: 'X', 46: 'C', 47: 'V', 48: 'B',
-      49: 'N', 50: 'M'
+      49: 'N', 50: 'M',
+      2: '1', 3: '2', 4: '3', 5: '4', 6: '5', 7: '6', 8: '7', 9: '8', 10: '9', 11: '0'
     };
     return letters[code] || ('#' + code);
   }
@@ -365,7 +383,9 @@
   const TRADE_NAME = keyName(TRADE_KEY);
   const MUTE_NAME = keyName(MUTE_KEY);
   const MOLD_NAME = keyName(MOLD_KEY);
+  const SLEEP_NAME = keyName(SLEEP_KEY);
   const LOCK_NAME = keyName(LOCK_KEY);
+  const MANEUVER_NAME = keyName(MANEUVER_KEY);
 
   const ESC = 1;
 
@@ -529,132 +549,56 @@
   }
 
   /*
-    RIEKLING / GOBLIN CLOTHES REMOUNT (#614)
+    ------------------------------------------- which race the body is (#614)
 
-    Patrick via Smeagle: any clothes a Goblin/Riekling wears break on
-    rejoin or leaving a building. Neck placement and transparency. Not
-    race-default gear only, and not a list of clothing form ids.
+    Patrick via Smeagle: any clothes a Goblin or Riekling wears break on rejoin
+    or leaving a building, the neck sits wrong and the body shows through. What
+    answered it took every worn piece off and put it back on at each cell
+    change, and that is what left people undressed at a door and on arriving
+    in their home town (4 October), so it is gone and the cause is measured
+    here instead.
 
-    Equipment still reads as equipped. The 3D remount is what fails:
-    after appearance queueNiNodeUpdate on spawn, or after a cell load
-    rebuilds the body, armor addons for these races sit on the wrong
-    neck and show through. Human races do not show it the same way.
+    The lead: skymp5-client sets the race on the character's base record
+    (TESModPlatform.setNpcRace in applyAppearanceCommon) and never on the
+    character itself, so after the body is rebuilt the body and the clothes can
+    be built for two different races. This writes both down each time the cell
+    changes, for everybody, and changes nothing: the character's own race
+    (Actor.GetRace) and its base record's (ActorBase.GetRace). One line a cell.
 
-    So this remounts what is ALREADY worn: silent unequip+equip of each
-    equipped Armor, then queueNiNodeUpdate. Race is matched by name
-    (Riekling / Goblin), never by inventing outfit form ids.
-
-    Race-table confirm (game/data/races.json from Playable Rieklings.esp):
-    playable FULL NAMEs are only "Riekling Blue" and "Riekling Purple".
-    No playable race uses a bare Goblin FULL NAME. /riekling|goblin/i
-    covers both; no matcher widen.
+    Four times a second, not every frame (#963): the old remount check was the
+    costliest handler in the frame when it read the race on every one.
   */
-  function raceNeedsClothesRemount(ac) {
-    if (!ac) { return false; }
-    let race = null;
-    try { race = ac.getRace(); } catch (e) { return false; }
-    if (!race) { return false; }
-    let name = "";
-    try { name = String(race.getName() || ""); } catch (e) { name = ""; }
-    return /riekling|goblin/i.test(name);
+  let raceReadCell = -1;
+  let raceReadAt = 0;
+  function raceName(race) {
+    if (!race) { return 'none'; }
+    let name = '';
+    try { name = String(race.getName() || ''); } catch (e) { name = ''; }
+    let id = 0;
+    try { id = race.getFormID(); } catch (e) { id = 0; }
+    return (name || '(no name)') + ' ' + id.toString(16);
   }
-
-  function remountWornClothes(why) {
-    let pc = null;
-    try { pc = sp.Game.getPlayer(); } catch (e) { return 0; }
-    if (!pc) { return 0; }
-    const ac = sp.Actor.from(pc);
-    if (!ac) { return 0; }
-    if (!raceNeedsClothesRemount(ac)) { return 0; }
-    let nItems = 0;
-    try { nItems = pc.getNumItems(); } catch (e) { return 0; }
-    let put = 0;
-    for (let i = 0; i < nItems; i++) {
-      let form = null;
-      try { form = pc.getNthForm(i); } catch (e) { continue; }
-      if (!form) { continue; }
-      let armo = null;
-      try { armo = sp.Armor.from(form); } catch (e) { armo = null; }
-      if (!armo) { continue; }
-      let on = false;
-      try { on = ac.isEquipped(form); } catch (e) { on = false; }
-      if (!on) { continue; }
-      try {
-        ac.unequipItem(form, false, true);
-        ac.equipItem(form, false, true);
-        put++;
-      } catch (e) {
-        log("could not remount clothes item: " + e);
-      }
-    }
-    try { ac.queueNiNodeUpdate(); } catch (e) {
-      log("could not queueNiNodeUpdate after clothes remount: " + e);
-    }
-    if (put) { log("remounted " + put + " worn armour for " + (why || "race")); }
-    return put;
-  }
-
-  let clothesRemountCell = -1;
-  let clothesRemountLast = 0;
-  const CLOTHES_REMOUNT_CELL_GAP = 1200;
-  /*
-    FOUR TIMES A SECOND, NOT EVERY FRAME (#963). The dev front log of
-    28 September had this as the costliest handler in the frame: 599 ms in
-    30 s over 1274 frames, getPlayer, Actor.from, getRace and the race's name
-    on every one of them, for everybody, goblin or not. A cell change is
-    still seen within a quarter of a second, and the remount itself waits
-    0.4 s for the cell to settle anyway.
-  */
-  const CLOTHES_REMOUNT_TICK_MS = 250;
-  let clothesRemountTickAt = 0;
-  function clothesRemountTick() {
+  function raceReadTick() {
     const at = Date.now();
-    if (at - clothesRemountTickAt < CLOTHES_REMOUNT_TICK_MS) { return; }
-    clothesRemountTickAt = at;
+    if (at - raceReadAt < 250) { return; }
+    raceReadAt = at;
     let pc = null;
     try { pc = sp.Game.getPlayer(); } catch (e) { return; }
     if (!pc) { return; }
-    const ac = sp.Actor.from(pc);
-    if (!raceNeedsClothesRemount(ac)) { return; }
     let cellId = 0;
     try {
       const cell = pc.getParentCell();
       cellId = cell ? cell.getFormID() : 0;
     } catch (e) { cellId = 0; }
-    if (!cellId) { return; }
-    if (cellId === clothesRemountCell) { return; }
-    const now = Date.now();
-    // First sighting of a cell: remember it. Remount on the *change*.
-    if (clothesRemountCell === -1) {
-      clothesRemountCell = cellId;
-      return;
-    }
-    if (now - clothesRemountLast < CLOTHES_REMOUNT_CELL_GAP) { return; }
-    clothesRemountCell = cellId;
-    clothesRemountLast = now;
-    // Cell loads finish a beat after getParentCell moves. Wait, then remount.
-    try {
-      sp.Utility.wait(0.4).then(guard("clothes remount cell", function () {
-        remountWornClothes("cell");
-      }));
-    } catch (e) {
-      remountWornClothes("cell-now");
-    }
-  }
-
-  function scheduleSpawnClothesRemount() {
-    // Spawn/rejoin: appearance and equipment settle on different clocks.
-    // A few remounts cover slow loads without inventing outfit form ids.
-    const delays = [0.8, 2.5, 6.0];
-    for (let i = 0; i < delays.length; i++) {
-      (function (ms) {
-        try {
-          sp.Utility.wait(ms).then(guard("clothes remount spawn", function () {
-            remountWornClothes("spawn+" + Math.round(ms * 1000));
-          }));
-        } catch (e) { }
-      })(delays[i]);
-    }
+    if (!cellId || cellId === raceReadCell) { return; }
+    raceReadCell = cellId;
+    let own = null, base = null;
+    try { own = sp.Actor.from(pc).getRace(); } catch (e) { own = null; }
+    try { base = sp.ActorBase.from(pc.getBaseObject()).getRace(); } catch (e) { base = null; }
+    let same = false;
+    try { same = !!own && !!base && own.getFormID() === base.getFormID(); } catch (e) { same = false; }
+    log('race at cell ' + cellId.toString(16) + ': the character ' + raceName(own) +
+        ', its base record ' + raceName(base) + (same ? '' : ', NOT THE SAME'));
   }
 
   /*
@@ -1941,9 +1885,9 @@
   */
   const CAP_CLOSES = {
     skills: 'thornswoodSkills', party: 'thornswoodParty', journal: 'thornswoodJournal',
-    board: 'thornswoodBoard',
+    board: 'thornswoodBoard', repair: 'thornswoodRepair',
     trade: 'thornswoodTrade', merchant: 'thornswoodMerchant', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
-    afk: 'thornswoodAfk'
+    afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers'
   };
 
   T.claimFocus = function (who, on) {
@@ -2664,11 +2608,14 @@
     ------------------------------------------------- lying down in a bed (#839)
 
     Ownership clear on activate makes Sleep/Wait open. This half tells the
-    exhaustion meter: furnitureEnter on a bed is /rest bed, furnitureExit is
-    /rest up. Chairs and chopping blocks are not beds, so they leave the
-    meter alone (chopping has its own watcher below).
+    exhaustion meter: furnitureEnter on a bed is /rest bed, on any other
+    furniture /rest sit, and furnitureExit is /rest up. Nobody types them
+    (#1603). The server answers by the furniture it saw pressed, so a chair
+    is a seat, a chair by a fire is a campfire, and a forge or a chopping
+    block is nothing and is answered with nothing (chopping has its own
+    watcher below). This side only says which of the two it saw.
   */
-  let restingInBed = false;
+  let restSent = false;
   /* #843: chairs/benches leave controls off with no menu. The controls
      watchdog, stuck rescue and ownTheCharacter all refuse to fight that
      state when notOurs() says so. getFurnitureReference alone can flicker
@@ -2686,20 +2633,19 @@
       try { clearBedOwnership(ref); } catch (err) { }
       let bed = false;
       try { bed = isBedRef(ref); } catch (err) { }
-      if (!bed) { return; }
-      restingInBed = true;
-      tellServer('/rest bed');
-      say('resting in a bed');
+      restSent = true;
+      tellServer(bed ? '/rest bed' : '/rest sit');
+      say(bed ? 'resting in a bed' : 'sitting down');
     }));
     sp.on('furnitureExit', guard('bedexit', (e) => {
       let actorId = 0;
       try { actorId = e.actor ? e.actor.getFormID() : 0; } catch (err) { }
       if (actorId !== 0x14) { return; }
       seatedInFurniture = false;
-      if (!restingInBed) { return; }
-      restingInBed = false;
+      if (!restSent) { return; }
+      restSent = false;
       tellServer('/rest up');
-      say('left the bed');
+      say('got up');
     }));
     say('watching for beds');
   } catch (e) {
@@ -3834,7 +3780,9 @@
   // is the engine's own "this thing is burning", the one fire damage uses.
   const FIRE_SHADER = 0x1b212;
   // Per second in the coals. Survivable for a few seconds, fatal if somebody
-  // walks in and makes a cup of tea, which is the point.
+  // walks in and makes a cup of tea, which is the point. The server times each
+  // fire by the /burn reports and multiplies by this same number to tell a bad
+  // burn (HURT.burn.perSecond in gamemode.js, #1383): change both together.
   const BURN_PER_SECOND = 7;
 
   let placeAt = 0;
@@ -4186,7 +4134,7 @@
     } catch (err) { }
   });
 
-  sp.on('update', guard('clothes remount', clothesRemountTick));
+  sp.on('update', guard('race read', raceReadTick));
 
   // The fire probe's cell walk, a slice a frame (#976). See walkCellSlice.
   sp.on('update', guard('fire walk', fireWalkTick));
@@ -4543,7 +4491,7 @@
 
   /** Draw or clear the little panel that names them and the three keys. */
   function drawPrompt(row) {
-    const sig = row ? (row.n + '|' + row.f + '|' + row.m + '|' + row.y) : '';
+    const sig = row ? (row.n + '|' + row.f + '|' + row.m + '|' + row.y + '|' + (row.s || 0) + '|' + (row.c || '')) : '';
     if (sig === lookingSig) { return; }
     lookingSig = sig;
     if (!row) {
@@ -4566,10 +4514,21 @@
       '<div style="font-size:26px;color:#efe4cc;margin-bottom:4px">' + row.n +
       (row.y ? '<span style="color:#8fb85e;font-size:18px"> &middot; your party</span>' : '') +
       '</div>' +
+      /*
+        A scar they agreed to (#1383): injury.md, "a line other people can be
+        told when they look at you". The server writes it with no markup in
+        it, and nothing that could be markup is let through here either.
+      */
+      (row.c ? '<div style="font-size:16px;font-style:italic;color:#c9b99a;margin-bottom:4px;' +
+               'max-width:420px;white-space:normal">' + String(row.c).replace(/[<>&"]/g, '') + '</div>' : '') +
       keyRow(FRIEND_NAME, row.f ? 'Remove friend' : 'Add friend', !!row.f) +
       keyRow(TRADE_NAME, 'Trade', false) +
       keyRow(MUTE_NAME, row.m ? 'Unmute' : 'Mute', !!row.m) +
-      keyRow(PARTY_NAME, row.y ? 'Party menu' : 'Ask to party', !!row.y);
+      keyRow(PARTY_NAME, row.y ? 'Party menu' : 'Ask to party', !!row.y) +
+      // Only for a holder looking at somebody inside a building they hold:
+      // the server's near list says so (#1603). See sleepPress.
+      (row.s ? keyRow(SLEEP_NAME, row.s === 2 ? 'Stop letting sleep here' : 'Let sleep here',
+                      row.s === 2) : '');
 
     T.js('(function(){try{' +
          'var d=document.getElementById("ts-look");' +
@@ -4648,6 +4607,23 @@
     if (!sent) { note('Could not send the social request. Try again in a moment.'); }
     say(cmd + ' on ' + lookingAt);
     return true;
+  }
+
+  /*
+    Let the person under the crosshair sleep in the building you hold, or end
+    their night (#1603). Only while the prompt offers it, which is the server
+    saying so on the near list, and the server measures all of it again when
+    the line arrives. Answers whether it was used, so the key falls through
+    when it was not.
+  */
+  function sleepPress() {
+    if (!lookingAt) { return false; }
+    if (claims.chat) { return false; }
+    if (busyMenuOpenNow()) { return false; }
+    const near = nearList();
+    const row = (near && Object.prototype.hasOwnProperty.call(near, lookingAt)) ? near[lookingAt] : null;
+    if (!row || !row.s) { return false; }
+    return lookVerb('sleephere');
   }
 
   /*
@@ -4883,6 +4859,139 @@
     moldDoor = '';
     drawMold(false);
   }));
+
+  /*
+    ------------------------------------- a repair kit, used from the inventory
+
+    #1384, and Patrick's rule of 4 October: commands only for dev and staff,
+    and everything people do takes buttons and GUI. A kit mends a
+    piece (docs/systems/durability.md), and a kit is a MISC, which Skyrim's
+    inventory cannot use: E on one does nothing and tells nobody. So while
+    the inventory is open and a repair kit is in the pack, one line at the
+    bottom names a key, and that key shuts the inventory and asks the server
+    for the repair panel (game/ui/thornswood-repair.js). The server answers
+    with the rows on the panel's own property, and the panel's buttons send
+    the rest. /repair is that ask; nobody is told to type it.
+
+    THE KEY IS THE MOLD KEY, U. Every letter is taken by Skyrim or by us, and
+    U only means anything while its own line is up. The mold's line needs
+    the world with no menu open and a door under the crosshair, and the
+    sleep key's (SLEEP_KEY, the same U) a person under it with no menu open;
+    this one needs the inventory open. None of them is up with another, and
+    moldPress and sleepPress have already said no before this is asked.
+
+    ONLY WITH THE PLUGIN THAT HAS KITS. The three kits are 0x154b0, 0x154b1
+    and 0x154b2 in Thornswood-Content.esp (scripts/mods/Add-ContentRecords.py).
+    A build without them has no kit to carry, so nothing is drawn and nothing
+    is sent. Asked once, when the world is up, and remembered as runtime ids,
+    for the reason under THE IDS, RESOLVED ONCE.
+  */
+  const KIT_FILE = 'Thornswood-Content.esp';
+  const KIT_ITEMS = [0x154b0, 0x154b1, 0x154b2];   // MISC Weapon Kit, Armor Kit, Sewing Kit
+  const INVENTORY_MENU = 'InventoryMenu';
+  let kitBases = null;     // null not asked yet, [] none in this build, else runtime ids
+  let repairShown = false;
+
+  /** Whether this build has repair kits, found out once the world is up. */
+  function kitsReady() {
+    if (kitBases) { return kitBases.length > 0; }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    if (!pc) { return false; }
+    const found = [];
+    try {
+      for (const local of KIT_ITEMS) {
+        const form = sp.Game.getFormFromFile(local, KIT_FILE);
+        const id = form ? (form.getFormID() >>> 0) : 0;
+        if (id) { found.push(id); }
+      }
+    } catch (e) {
+      // Not remembered. A throw is not an answer, so it is asked again.
+      return false;
+    }
+    kitBases = found;
+    log(found.length ? 'repair kits: this build has them, so the inventory offers ' + MOLD_NAME
+                     : 'repair kits: no kit records in ' + KIT_FILE + ', so no line in the inventory');
+    return found.length > 0;
+  }
+
+  /** How many repair kits the pack holds, of the three. */
+  function kitsCarried() {
+    if (!kitsReady()) { return 0; }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    if (!pc) { return 0; }
+    let n = 0;
+    for (const id of kitBases) {
+      try {
+        const form = sp.Game.getFormEx(id);
+        n += form ? (Number(pc.getItemCount(form)) || 0) : 0;
+      } catch (e) { }
+    }
+    return n;
+  }
+
+  // At the bottom of the inventory, in the mold line's colours.
+  const REPAIR_CSS =
+    'position:fixed;left:50%;bottom:12%;transform:translateX(-50%);z-index:2147482900;' +
+    'pointer-events:none;white-space:nowrap;' +
+    'font-family:"Palatino Linotype",Palatino,Georgia,serif;font-size:19px;letter-spacing:.03em;' +
+    'color:#d9cfb4;background:rgba(11,10,8,.72);border:1px solid rgba(198,170,109,.42);' +
+    'padding:8px 16px 9px;text-shadow:0 2px 4px rgba(0,0,0,.95)';
+
+  /** The line up or down. Only remembered once the page has taken it. */
+  function drawRepairLine(on) {
+    if (on === repairShown) { return; }
+    if (!on) {
+      if (T.js('try{var d=document.getElementById("ts-repair-line");if(d){d.style.display="none";}}catch(e){}')) {
+        repairShown = false;
+      }
+      return;
+    }
+    const html =
+      '<span style="display:inline-block;min-width:26px;text-align:center;margin-right:12px;' +
+      'padding:1px 7px;border:1px solid rgba(233,209,155,.55);border-bottom-width:2px;' +
+      'border-radius:3px;background:rgba(0,0,0,.35);color:#e9d19b">' + MOLD_NAME + '</span>' +
+      'Mend a piece with your repair kit';
+    if (T.js('(function(){try{' +
+             'var d=document.getElementById("ts-repair-line");' +
+             'if(!d){d=document.createElement("div");d.id="ts-repair-line";' +
+             'd.style.cssText=' + JSON.stringify(REPAIR_CSS) + ';' +
+             'document.body.appendChild(d);}' +
+             'd.innerHTML=' + JSON.stringify(html) + ';' +
+             'd.style.display="";' +
+             '}catch(e){}})();')) {
+      repairShown = true;
+    }
+  }
+
+  sp.on('menuOpen', guard('repair line up', (e) => {
+    if (!e || e.name !== INVENTORY_MENU) { return; }
+    drawRepairLine(!!T.ready && kitsCarried() > 0);
+  }));
+  sp.on('menuClose', guard('repair line down', (e) => {
+    if (!e || e.name !== INVENTORY_MENU) { return; }
+    drawRepairLine(false);
+  }));
+
+  /*
+    The key, in the inventory. Asked again at the press: the inventory open,
+    nothing typing, a kit in the pack. Answers whether it was used, so the
+    key falls through when it was not.
+  */
+  function repairPress() {
+    if (!T.ready || claims.chat) { return false; }
+    let open = false;
+    try { open = !!sp.Ui.isMenuOpen(INVENTORY_MENU); } catch (e) { open = false; }
+    if (!open) { return false; }
+    if (!(kitsCarried() > 0)) { drawRepairLine(false); return false; }
+    drawRepairLine(false);
+    try { sp.TESModPlatform.closeMenu(INVENTORY_MENU); }
+    catch (err) { say('repair: closeMenu threw on the inventory: ' + err); }
+    tellServer('/repair');
+    say('pressed ' + MOLD_NAME + ' in the inventory with a repair kit, asked the server for the repair panel');
+    return true;
+  }
 
   /*
     ------------------------------------- your party: the name, the map, the way
@@ -7123,6 +7232,10 @@
     // The mold key, and only while a door is under the crosshair and a Key
     // Mold is in the pack. Otherwise it is not used and goes on down the list.
     if (e.code === MOLD_KEY && moldPress()) { return; }
+    // The same key on a person inside a building you hold. See SLEEP_KEY.
+    if (e.code === SLEEP_KEY && sleepPress()) { return; }
+    // The same key in the inventory, with a repair kit in the pack (#1384).
+    if (e.code === MOLD_KEY && repairPress()) { return; }
     if (e.code === LOCK_KEY && lockPress()) { return; }
     /*
       The five social keys work in the open world, and P and J can always
@@ -7173,6 +7286,8 @@
       journalKeyPressed(e);
       return;
     }
+
+    if (e.code === MANEUVER_KEY) { maneuverKeyPressed(); return; }
 
     if (e.code === SKILLS_KEY) {
       if (claims.chat) { return; }
@@ -7269,7 +7384,6 @@
         is the same reason the flag above is set here.
       */
       wearTheShift();
-      scheduleSpawnClothesRemount();
       // Cleared again on the way out, below. Nothing in the shipped client
       // bundle reads this today, so it costs nothing either way, but a flag
       // that is only ever set true is a flag that lies the moment anything
@@ -8057,8 +8171,14 @@
       }
       return;
     }
+    if (what === 'maneuvers:opened') { T.claimFocus('maneuvers', true); return; }
+    if (what === 'maneuvers:closed') { T.claimFocus('maneuvers', false); return; }
+    if (what === 'maneuvers:ready') { log('the maneuver panel is in'); maneuversToPage(); return; }
     if (what === 'trade:opened') { T.claimFocus('trade', true); return; }
     if (what === 'trade:closed') { T.claimFocus('trade', false); return; }
+    if (what === 'repair:opened') { T.claimFocus('repair', true); return; }
+    if (what === 'repair:closed') { T.claimFocus('repair', false); return; }
+    if (what === 'repair:ready') { log('the repair panel is in'); return; }
     if (what === 'merchant:opened') { T.claimFocus('merchant', true); return; }
     if (what === 'merchant:closed') { T.claimFocus('merchant', false); return; }
     if (what === 'merchant:ready') {
@@ -8125,7 +8245,12 @@
       own can send the map by itself. The same numbers arriving twice cost
       nothing; an unchanged map is never applied twice.
     */
-    if (what.indexOf('skills:view ') === 0) { skillsCreatingFrom(what.slice(12)); treeFromView(what.slice(12)); return; }
+    if (what.indexOf('skills:view ') === 0) {
+      skillsCreatingFrom(what.slice(12));
+      treeFromView(what.slice(12));
+      maneuversFromView(what.slice(12));
+      return;
+    }
     if (what.indexOf('skills:effects ') === 0) { treeFromMap(what.slice(15)); return; }
 
     if (what === 'typing') { beat = Date.now(); return; }
@@ -8405,6 +8530,72 @@
   }));
 
   // <<< tree apply: end <<<
+
+  // ------------------------------------------------- a warrior's maneuvers --
+  /*
+    #1386. Patrick, 4 October: no chat commands for anything people do. So a
+    warrior's maneuver is a key and a panel, not /maneuver typed into the
+    chat. The maneuver key (ManeuverKey in Thornswood.ini, 9 by default,
+    because 1 to 8 are the emote slots and every letter is somebody's) opens
+    game/ui/thornswood-maneuvers.js, which lists the rows this character
+    holds; a number or a click there sends /maneuver <name> to the server
+    through the chat's socket, the way the trade and party keys do, and the
+    server's answer comes back in the chat. The relay is collected every one
+    and a half seconds (the chat commands block in the gamemode), so a
+    maneuver starts within a second or two of the press.
+
+    THE ROWS come off the character panel's view, the same view the tree
+    hand reads (skills:view, see treeFromView), as v.panel.maneuvers: the
+    name, the stamina and whether its wait is over. The server redraws that
+    view when one starts and when its wait ends, so nothing here keeps a
+    clock. A character who holds none has no rows, and the key says so.
+
+    The panel holds the keyboard while it is up, under the 'maneuvers' claim,
+    so 1 to 8 reach the panel and not the emote slots or the game's own
+    hotkeys. It says when it opens and closes, the same as every other panel,
+    and the cap closes it like the rest (CAP_CLOSES).
+  */
+  let maneuverRows = [];
+
+  function maneuversToPage() {
+    T.js('try{window.thornswoodManeuvers&&window.thornswoodManeuvers.setRows(' +
+         JSON.stringify(maneuverRows) + ',' + JSON.stringify(MANEUVER_NAME) + ');}catch(e){}');
+  }
+
+  /* The whole panel view, as treeFromView takes it. Only v.panel.maneuvers
+     is read. */
+  function maneuversFromView(json) {
+    let v = null;
+    try { v = JSON.parse(String(json)); } catch (e) { return; }
+    if (!v || typeof v !== 'object') { return; }
+    const view = (v.panel && typeof v.panel === 'object') ? v.panel : v;
+    const list = Array.isArray(view.maneuvers) ? view.maneuvers : [];
+    const rows = [];
+    for (let i = 0; i < list.length; i++) {
+      const r = list[i];
+      if (!r || typeof r.key !== 'string' || !/^[a-z]+$/.test(r.key)) { continue; }
+      rows.push({ key: r.key, name: String(r.name || r.key), stamina: Number(r.stamina) || 0,
+                  cooldown: Number(r.cooldown) || 0, ready: !!r.ready });
+    }
+    const was = JSON.stringify(maneuverRows);
+    maneuverRows = rows;
+    if (JSON.stringify(rows) !== was) { maneuversToPage(); }
+  }
+
+  /* The maneuver key, with the panel shut: a panel up holds the keyboard, and
+     then the page hears the key and closes itself. */
+  function maneuverKeyPressed() {
+    if (claims.chat) { return; }
+    const busyNow = busyMenuOpen();
+    if (busyNow) { say('maneuver key seen, but ' + busyNow + ' is open'); return; }
+    if (skillsCreating) { return; }
+    if (!maneuverRows.length) {
+      note('You have no maneuvers. They are a warrior\'s, on the half you picked.');
+      return;
+    }
+    maneuversToPage();
+    T.js('try{window.thornswoodManeuvers&&window.thornswoodManeuvers.open();}catch(e){}');
+  }
 
   /*
     Write the game's real load order to disk, once, on the first update.

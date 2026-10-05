@@ -238,5 +238,6 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 
 ## Where this is
 
-227 rows are gated. 4 tempers are not. Master Weaver is not read.
+227 rows are gated. 4 tempers are not. Master Weaver's weather half
+is read. Its hidden armour is not.
 The race locks on rows that reach the server are enforced.

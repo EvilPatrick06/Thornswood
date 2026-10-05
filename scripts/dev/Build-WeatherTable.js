@@ -219,7 +219,13 @@ function install() {
   const next = re.test(src)
     ? src.replace(re, line)
     : src.replace(/^(const ITEMS = .*;)$/m, '$1\n' + line);
-  if (next === src) { fail('could not find anywhere in gamemode.js to put the table'); return; }
+  if (next === src) {
+    // Run on a load order that has not changed, the line is already there and
+    // is the same line. That is the table being current, not a failure to
+    // find a place for it, and it used to say FAIL and exit 1 (#1138).
+    if (re.test(src)) { console.log('game\\gamemode.js already holds this table'); return; }
+    fail('could not find anywhere in gamemode.js to put the table'); return;
+  }
   fs.writeFileSync(gm, next);
   console.log('installed ' + Object.keys(thin).length + ' rows into game\\gamemode.js');
 }

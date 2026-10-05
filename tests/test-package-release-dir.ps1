@@ -56,9 +56,15 @@ Yes 'there is a -ReleaseDir parameter' ($rel.Count -eq 1)
 if ($rel.Count -eq 1) {
     Yes 'it takes a string' ($rel[0].StaticType -eq [string])
     # Nothing in this param block says Position, so PowerShell numbers the
-    # non-switch ones in the order they are written. Put anywhere but last it
-    # would move somebody's positional argument onto the wrong parameter.
-    Yes 'it is the last parameter, so no positional argument moves' ($params[-1].Name.VariablePath.UserPath -eq 'ReleaseDir')
+    # non-switch ones in the order they are written. -ReleaseDir went in after
+    # the four that were there, so none of theirs moved. A later one goes after
+    # it (-Stub did, #1192): what matters is that the positions already handed
+    # out stay where they are, not that -ReleaseDir is last for ever.
+    $positional = @($params | Where-Object { $_.StaticType -ne [switch] } | ForEach-Object { $_.Name.VariablePath.UserPath })
+    $before = @('Root', 'OutDir', 'Level', 'VortexManifest', 'ReleaseDir')
+    $kept = ($positional.Count -ge $before.Count) -and
+            (@(0..($before.Count - 1) | Where-Object { $positional[$_] -ne $before[$_] }).Count -eq 0)
+    Yes ('it comes after the four that were there and nothing went in ahead of it, so no positional argument moves (' + ($positional -join ', ') + ')') $kept
 }
 
 # ---- no path into anybody's home folder ------------------------------------

@@ -9,14 +9,16 @@
 // is up also", and then the line itself: "The world is open, apply to be an
 // alpha playtester in the discord!" So it keeps saying open, and says how in.
 //
-// This cuts the status branch out of home.html and runs it with a stand-in
-// document for nobody on, one on, three on, and the server down.
+// This cuts the status branch out of the home page's script and runs it with a
+// stand-in document for nobody on, one on, three on, and the server down. The
+// script moved out of home.html into home.js in #1479 (no inline script under
+// the site's content security policy), so that is the file it reads.
 //
 // Read only.
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const SRC = path.join(__dirname, '..', 'site', 'public', 'home.html');
+const SRC = path.join(__dirname, '..', 'site', 'public', 'home.js');
 const src = fs.readFileSync(SRC, 'utf8').split(String.fromCharCode(13)).join('');
 
 let pass = 0, fail = 0;
@@ -30,7 +32,7 @@ const END = "        t.textContent = 'Server offline';\n      }\n    }\n";
 const a = src.indexOf(START);
 const b = a < 0 ? -1 : src.indexOf(END, a);
 const block = (a >= 0 && b >= 0) ? src.slice(a, b + END.length) : null;
-yes('home.html still has its status line', block !== null);
+yes('home.js still has its status line', block !== null);
 if (!block) { console.log('\n' + pass + ' passed, ' + fail + ' failed'); process.exit(1); }
 
 // A node that keeps its text and its children, enough to read back what a

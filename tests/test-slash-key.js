@@ -31,10 +31,14 @@ function yes(what, cond) {
   else { fail++; console.log('FAIL  ' + what); }
 }
 
-// From the shared watcher (ourKeyMenu, which P uses too) to the key handler.
+// From the shared watcher (ourKeyMenu, which P uses too) to the end of the
+// / press, commandKeyPressed. It used to run on to the key handler; since
+// #1430 the message board, ride and merchant blocks sit between the two, with
+// update handlers of their own that are not this file's business.
 const a = front.indexOf("  // ------------------------------------ the game's menu on one of our keys --");
-const b = front.indexOf("  sp.on('buttonEvent', guard('keys', (e) => {");
-const block = a >= 0 && b > a ? front.slice(a, b) : null;
+const c = a < 0 ? -1 : front.indexOf('  function commandKeyPressed(e) {', a);
+const b = c < 0 ? -1 : front.indexOf('\n  }\n', c) + 4;
+const block = a >= 0 && c > a && b > c ? front.slice(a, b) : null;
 yes('the / block is in the plugin', block !== null);
 yes('the plugin reads CommandKey, / by default',
     /const COMMAND_KEY = iniNumber\(ini, 'CommandKey', 53\);/.test(front));
@@ -44,7 +48,8 @@ yes('the menu check takes the one menu a key of ours just opened', busyFn !== nu
 
 // ------------------------------------------------------------ the handler
 {
-  const k = front.slice(b, front.indexOf('\n  }));\n', b));
+  const kh = front.indexOf("  sp.on('buttonEvent', guard('keys', (e) => {");
+  const k = kh < 0 ? '' : front.slice(kh, front.indexOf('\n  }));\n', kh));
   yes('the key handler sends / to the block, before the chat key',
       /if \(e\.code === COMMAND_KEY\) \{ commandKeyPressed\(e\); return; \}\s*\n\s*if \(e\.code !== CHAT_KEY\) return;/.test(k));
   yes('and every key going down ends a / press\'s claim on the next tree',

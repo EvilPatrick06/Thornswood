@@ -221,9 +221,15 @@ function New-Zip([string]$path, [string[]]$entries) {
     } finally { $z.Dispose() }
 }
 $ps = (Get-Process -Id $PID).Path
+# Check-Secrets writes a hit as a GitHub annotation when GITHUB_ACTIONS is
+# true, which it is under the nightly on the VPS, and these checks read the
+# form a person sees. test-check-secrets.ps1 checks the annotation form.
 function Invoke-Secrets([string[]]$argv) {
-    $out = & $ps -NoProfile -File $SecretsPath @argv 2>&1 | Out-String
-    return [pscustomobject]@{ Code = $LASTEXITCODE; Out = $out }
+    $savedActions = $env:GITHUB_ACTIONS
+    $env:GITHUB_ACTIONS = ''
+    try { $out = & $ps -NoProfile -File $SecretsPath @argv 2>&1 | Out-String; $code = $LASTEXITCODE }
+    finally { $env:GITHUB_ACTIONS = $savedActions }
+    return [pscustomobject]@{ Code = $code; Out = $out }
 }
 try {
     $bad = Join-Path $tmp 'pack-bad.zip'

@@ -189,7 +189,10 @@ $srv = [IO.File]::ReadAllText((Join-Path $Root 'site\server.js'))
 $md = [regex]::Match($srv, "const MD_PAGES = \[([^\]]+)\]")
 Yes 'the site serves all three as written pages' ($md.Success -and $md.Groups[1].Value.Contains("'/terms'") -and
     $md.Groups[1].Value.Contains("'/privacy'") -and $md.Groups[1].Value.Contains("'/rules'"))
-Yes 'and answers /api/page/<name> with the text' ($srv.Contains('/^\/api\/page\/([a-z-]+)$/') -and $srv.Contains('sendJson(res, 200, { md: md, html: pageHtml(md) })'))
+# Since #1020 the answer also carries the text's sha256 and the day it last
+# changed, after the md and the html this reads.
+Yes 'and answers /api/page/<name> with the text' ($srv.Contains('/^\/api\/page\/([a-z-]+)$/') -and
+    ($srv -match 'sendJson\(res, 200, \{\s*md: md, html: pageHtml\(md\)'))
 
 # ---- 3. Install is locked until all four are ticked -------------------------
 $all = @($age) + @($found)

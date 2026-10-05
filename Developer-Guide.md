@@ -42,6 +42,7 @@ The outline nests, and the table of contents follows it. A part is a numbered se
     - [What this is](#what-this-is)
     - [Words](#words)
     - [Fix the cause, no band-aids](#fix-the-cause-no-band-aids)
+    - [Buttons, not chat commands](#buttons-not-chat-commands)
     - [Everything we need to do goes on the board](#everything-we-need-to-do-goes-on-the-board)
     - [Settled design, not up for a quiet rewrite](#settled-design-not-up-for-a-quiet-rewrite)
     - [How work moves](#how-work-moves)
@@ -299,6 +300,22 @@ git clone https://github.com/EvilPatrick06/Thornswood.git Thornswood-Repo
 gh auth login
 gh auth status
 ```
+
+The bot's libraries go into the Python that `py` starts by default, because
+that is the one the bot harnesses run on: `bot\test-*.py`, and
+`tests\test-staff-commands.js`, which imports bot.py. On the shipping machine
+the default was 3.12 with no discord.py, so every bot harness stopped on its
+first import with nothing to do with the change being tested (#1008). From
+`Thornswood-Repo`:
+
+```
+py -m pip install -r bot\requirements.txt
+py -c "import discord, PIL; print('discord.py ' + discord.__version__)"
+```
+
+The second line prints the discord.py version `bot\requirements.txt` pins when
+the first worked. The nightly does the same into a venv of its own on the VPS,
+because the live bot runs on that box's Python.
 
 Every change goes to the dev channel first, and the dev channel needs the dev
 build on this machine too: in the main launcher, on the Play page, the Server
@@ -700,6 +717,22 @@ written beside it, and it stops and says so instead of looping.
 Every pull request says, under What changed, what the cause was and how it
 was found. One that cannot say it is not merged.
 
+#### Buttons, not chat commands
+
+Decided by Patrick on 4 Oct: "no more commands for things [people] do,
+only for dev and staff commands; everything else takes buttons and GUI".
+Anything a person does in the world is a key, a prompt, a panel or the
+thing itself activated, never a line typed in the chat. Staff and dev
+commands stay commands. So do `/stuck` and the lines that reach staff,
+`/helpme` and `/report`, and help text names them (Patrick, later on
+4 Oct: "change it to except the /stuck and the ones for getting help
+from GMs"). Never add another chat command for people. A panel may send
+the server a line, but no person is told to type it and help text never
+lists it. [docs/SYSTEMS.md](docs/SYSTEMS.md), "Buttons, not
+commands", is the rule and what counts as a button;
+[docs/systems/commands.md](docs/systems/commands.md) lists every command
+there is today and the issue that converts each one that does not stay.
+
 #### Everything we need to do goes on the board
 
 The one record of outstanding work is the Thornswood To Do board:
@@ -987,10 +1020,13 @@ The short form of the rules. The same decisions, with the dates they were made, 
   ~410 of them (tests/, bot, and voice), and a look for stray pull requests
   and branches run every night on the VPS (.github/workflows/nightly.yml,
   03:00 Mountain); a failure there opens an issue on the board, "Nightly
-  checks failed", and whoever broke it fixes it next. It runs on the VPS, on a runner
+  checks failed", and whoever broke it fixes it next. It runs on the VPS, on the runners
   `.\scripts\deploy\Install-Runner.ps1` puts there (issue #437), because
-  GitHub's own runners were blocked on billing from 25 Sep.
-  `.\scripts\deploy\Install-Runner.ps1 -Status` says whether GitHub sees it.
+  GitHub's own runners were blocked on billing from 25 Sep. Several since
+  4 Oct, so checks run side by side: `-Number 2` and up puts each one after
+  the first beside it. `.\scripts\deploy\Install-Runner.ps1 -Status` (with
+  `-Number` for the others) says whether GitHub sees one, and `-Lock` locks
+  every runner's folder again without stopping a job.
 - Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or
   Publish-Update.ps1 without a line in #staff-general first; every machine touches those.
 

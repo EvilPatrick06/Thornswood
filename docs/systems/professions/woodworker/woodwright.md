@@ -116,5 +116,5 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 ## Where this is
 
 The 86 rows that are not the wheel are gated. The wheel's 70 are not
-scored. Master Carver's fire is not applied. The axe wear is in the
+scored. Master Carver's fire is in the server. The axe wear is in the
 server.

@@ -124,8 +124,27 @@ let recipes = null;
 try { recipes = JSON.parse(fs.readFileSync(path.join(REPO_DIR, 'game', 'data', 'recipes.json'), 'utf8')); }
 catch (e) { recipes = null; }
 if (recipes) {
-  yes('recipes.json carries the refused rows with their reason',
-      recipes.refusedCount === 4 && Object.keys(recipes.refused || {}).length === 4);
+  /*
+    THE FOUR HOUSE PARTS ARE STILL REFUSED, BY NAME, AND EVERY REFUSED ROW SAYS
+    WHY. This used to be a fixed total of four. cc3d904 ("Gate smelting to the
+    smith and tanning to the Platewright", 2 October) moved the duplicate
+    smelts and tans into the refused bucket too, 235 rows in all, every one
+    with its reason, so the total is the table's to set and not this file's.
+  */
+  const refused = recipes.refused || {};
+  const refusedKeys = Object.keys(refused);
+  const parts = refusedKeys.filter(function (k) {
+    return /^(Nails|Hinge|Lock|Iron Fittings)$/.test(String(refused[k].name || '')) &&
+           refused[k].benchName === 'CraftingSmithingForge';
+  });
+  const partNames = parts.map(function (k) { return refused[k].name; }).sort();
+  yes('recipes.json refuses the four house parts at the forge (' + partNames.join(', ') + ')',
+      ['Hinge', 'Iron Fittings', 'Lock', 'Nails'].every(function (n) { return partNames.indexOf(n) >= 0; }));
+  yes('  and each with its reason', parts.every(function (k) { return /mold|deed|house/i.test(String(refused[k].why || '')); }));
+  const noWhy = refusedKeys.filter(function (k) { return !String(refused[k].why || '').trim(); });
+  yes('recipes.json carries every refused row with its reason (' + refusedKeys.length + ' rows, ' + noWhy.length + ' without)',
+      refusedKeys.length > 0 && noWhy.length === 0);
+  yes('and its refused count is the rows it carries', recipes.refusedCount === refusedKeys.length);
   yes('and its own count adds up across all three buckets',
       recipes.count === recipes.owned + recipes.unownedCount + recipes.refusedCount);
   const poles = Object.keys(recipes.recipes).filter(function (k) {

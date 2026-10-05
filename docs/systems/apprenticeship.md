@@ -94,8 +94,9 @@ those 2, the spell is novice, and a novice spell needs nothing below
 it. They do not earn the mage's stored spell points. They do not pick
 schools on K. They do not receive the school's placed point.
 
-At the College, `/study` hands them 1 spell point in a semester, and
-it can only be spent on a novice spell of the school they were taught.
+At the College, Study on the K panel hands them 1 spell point in a
+semester, and it can only be spent on a novice spell of the school they
+were taught.
 A mage's semester is a different number, on that page.
 
 The third school a master mage picks for themselves is not this. That
@@ -132,10 +133,11 @@ See [Enchanter](professions/enchanter.md).
 
 Repair kits follow the same halves. A Platewright's kit, an
 Edgewright's kit, and a Haberdasher's kit are the three repairs on
-[Durability](durability.md). The 120% repair is the correct half
-doing the work, which includes a master who has taken the sister half
-on far enough to be that half, and does not include an outside trade
-that is still only novice of the wrong half.
+[Durability](durability.md). The 120% repair is the half the person
+picked doing the work. The sister half never gives it, at any rank,
+even once a master has taken that half past novice, and neither does
+an outside trade (Patrick, 4 October). Everybody else repairs to
+100%.
 
 ## What teaching does not do
 
@@ -176,4 +178,9 @@ An outside trade that was ended stays counted, so it does not open a
 third.
 
 The two-spell cap, the two staff-spell cap, and the three gates on a
-tome are in the server. `/study` is not.
+tome are in the server. So is the semester: Study on the K panel's
+College page, in one of the College's rooms, hands a person a master
+has taught 1 point once in 24 hours. The server asks for that point as
+well as a place before a tome teaches them, because the semester is the
+only thing that hands them one; whether the places alone should be
+enough is asked on issue 1387. See [Magic and the College](magic.md).

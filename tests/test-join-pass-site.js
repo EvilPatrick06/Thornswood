@@ -63,7 +63,9 @@ const HELPERS = [
   // Play's doors answer inside PLAY_ANSWER_MS (#1094).
   src.slice(src.indexOf('const PLAY_ANSWER_MS'), src.indexOf('\n', src.indexOf('const PLAY_ANSWER_MS'))),
   src.slice(src.indexOf('const PLAY_BODY_MS'), src.indexOf('\n', src.indexOf('const PLAY_BODY_MS'))),
-  grab('class BodyFailed'), grab('function passBodyFailure('), grab('function within('), grab('function standingLate(')
+  grab('class BodyFailed'), grab('function passBodyFailure('), grab('function within('), grab('function standingLate('),
+  // The one 503 body every launcher door sends when Discord did not answer (#1164).
+  grab('function discordUnasked(')
 ];
 yes('the pass helpers are in server.js where this expects them', HELPERS.every(function (h) { return h.length > 10; }));
 const ROUTE = grab("  if (p === '/api/play/pass' && req.method === 'POST') {");

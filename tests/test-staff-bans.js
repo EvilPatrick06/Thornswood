@@ -46,7 +46,9 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const GM = process.env.GM || path.join(ROOT, 'game', 'gamemode.js');
 const SITE = path.join(ROOT, 'site', 'server.js');
-const PAGE = path.join(ROOT, 'site', 'public', 'index.html');
+// The hub's script moved out of index.html into hub.js in #1479 (no inline
+// script under the content security policy), so its functions are read there.
+const PAGE = path.join(ROOT, 'site', 'public', 'hub.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(GM, 'utf8').split(CR).join('');
 
