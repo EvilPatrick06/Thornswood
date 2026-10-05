@@ -2386,6 +2386,24 @@ namespace Thornswood
         }
 
         /// <summary>
+        /// The mod in Vortex that a plugin comes from, by Vortex's own record
+        /// in the folder it deploys into: the plugin sits at the top of its
+        /// mod's folder in Vortex's mods folder, and that folder carries the
+        /// mod's name. Null when there is no record or it does not list the
+        /// plugin. Scan and Fix name it for another author's plugin whose
+        /// bytes are not the server's, which the server does not hand out
+        /// (#1180).
+        /// </summary>
+        public static string VortexModOf(Config cfg, string plugin)
+        {
+            string src = DeploysInto(cfg);
+            if (src.Length == 0) return null;
+            string from;
+            if (!Staged(src).From.TryGetValue("Data\\" + plugin, out from) || string.IsNullOrEmpty(from)) return null;
+            return Path.GetFileName(Path.GetDirectoryName(from));
+        }
+
+        /// <summary>
         /// stagingPath\source\ with a closing separator, or null when the mod's
         /// name would put it anywhere but directly inside staging. A file under
         /// it stays inside it as long as its own path is Tidy.
