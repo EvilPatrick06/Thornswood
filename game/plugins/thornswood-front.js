@@ -1010,7 +1010,12 @@
     try { if (readText(INTRO_FILE).trim() === 'off') { list.intro = false; } } catch (e) { }
     // Back from being idle (#1142): no scroll and no theme, and the page
     // starts in the place in line this game holds for the character it was.
-    if (menuAgain) { list.intro = false; list.music = ''; list.away = menuAgain; }
+    // Ended by the server (#1157): the slots, with the server's sentence over
+    // them, and no place in line.
+    if (menuAgain) {
+      list.intro = false; list.music = '';
+      if (menuAgain.ended) { list.ended = String(menuAgain.ended); } else { list.away = menuAgain; }
+    }
     if (has !== 'list' || menuAgain) { T.js('window.THORNSWOOD_SELECT=' + JSON.stringify(list) + ';'); }
     inject('thornswood-select.js');
     menuPhase = 2; menuAt = Date.now(); menuBeatAt = Date.now();
@@ -1360,6 +1365,7 @@
   let afkHere = false;        // in the world at the last sample
   let afkGone = false;        // taken out, until the world is up again
   let afkOutAsked = '';       // afkOut wanted from outside update (the relay), done on the next one
+  let sessionEndAsked = '';   // sessionEnded wanted from the relay (#1157), with the server's sentence
 
   function afkTouch() { afkTouched = true; }
   try { sp.on('buttonEvent', afkTouch); } catch (e) { log('idle: no buttonEvent:', e); }
@@ -1438,19 +1444,66 @@
       log('idle: this game does not choose its character at the menu, so it stays at the main menu');
       return;
     }
+    backToChoice({ id: me, name: name });
+    // The place the server keeps for them: this game waits in line as the
+    // character it was, and says "/line" as that one from now on.
+    lineStart(me, null);
+  }
+
+  /* The character choice again, after the world (afkOut, sessionEnded). again is menuAgain. */
+  function backToChoice(again) {
     // The choice the world left behind goes, so the page asks for a fresh one
     // (menuWhere) and the choice comes up again with the list the launcher wrote.
     T.js('try{var o=window.thornswoodSelect;if(o&&o.close){o.close();}' +
          'var ids=["ts-select","ts-select-css","ts-thornswood-select-js"];' +
          'for(var i=0;i<ids.length;i++){var n=document.getElementById(ids[i]);if(n&&n.parentNode){n.parentNode.removeChild(n);}}' +
          'window.thornswoodSelect=undefined;window.THORNSWOOD_SELECT=undefined;}catch(e){}');
-    menuAgain = { id: me, name: name };
+    menuAgain = again;
     menuPhase = 0; menuAt = Date.now(); menuAsked = 0; menuLoaded = false;
     menuBeatAt = 0; menuReloads = 0; menuGaveUp = false; menuChosenId = 0;
     relogAt = 0;
-    // The place the server keeps for them: this game waits in line as the
-    // character it was, and says "/line" as that one from now on.
-    lineStart(me, null);
+  }
+
+  /*
+    THE SERVER ENDED THIS SESSION ON PURPOSE (#1157).
+
+    A refusal at the door, a missing join pass or load order report, a ban, a
+    character dead for good, a staff /kick. The server says the sentence, then
+    says { end: <that sentence> } on the line (chat.js hands it here as
+    'session:end'), and kicks a few seconds later. skymp5-client connects
+    again after every disconnect and logs in as the same character
+    (networkingService.ts and AuthService.handleConnectionAccepted in the
+    fork), so the kick alone brought the same session straight back, to be
+    told the same sentence and ended again, for as long as the game stayed open.
+
+    So the game ends its own side first, the way afkOut does: the connection
+    closes (destroyClient, so the client has no disconnect to answer and
+    nothing to connect again), the game goes to the main menu, and the
+    character choice comes back with the sentence on it and no place in line.
+    Nothing connects again until the person picks a character (relogAs). In
+    update only (quitToMainMenu is Papyrus).
+
+    What it ends is the connection, so that is what it asks about: a game that
+    has already closed its own (moved out, or ended once already) has nothing
+    to end, and one that picked again and is still loading into the world has.
+  */
+  function sessionEnded(sentence) {
+    let up = false;
+    try { up = !!sp.mpClientPlugin.isConnected(); } catch (e) { up = false; }
+    if (!up) { log('session: the server ended a session this game had already closed'); return; }
+    afkGone = true;
+    const me = PROFILE;
+    log('session: the server ended it ("' + sentence + '"), so the connection is closed and the game goes ' +
+        'to the character choice as profile', me + '; nothing connects again until a character is picked');
+    afkClose();
+    try { globalThis.__thornswoodInWorld = false; } catch (e) { }
+    try { sp.mpClientPlugin.destroyClient(); } catch (e) { log('session: could not close the connection to the game server:', e); }
+    try { sp.Game.quitToMainMenu(); } catch (e) { log('session: could not go to the main menu:', e); }
+    if (!chooseAtMenu || !(me > 0)) {
+      log('session: this game does not choose its character at the menu, so it stays at the main menu');
+      return;
+    }
+    backToChoice({ id: me, name: myName(), ended: sentence });
   }
 
   sp.on('update', guard('idle check', () => {
@@ -1459,6 +1512,12 @@
       const why = afkOutAsked;
       afkOutAsked = '';
       afkOut(why);
+      return;
+    }
+    if (sessionEndAsked) {
+      const sentence = sessionEndAsked;
+      sessionEndAsked = '';
+      sessionEnded(sentence);
       return;
     }
     if (now - afkSampleAt < AFK_SAMPLE_MS) { return; }
@@ -8727,6 +8786,12 @@
       return;
     }
     if (what.indexOf('afk:') === 0) { log('idle window:', what.slice(4)); return; }
+    // The server is ending this session (#1157), from the relay; the move
+    // itself needs update, where quitToMainMenu can run. See sessionEnded.
+    if (what === 'session:end') {
+      if (!sessionEndAsked) { sessionEndAsked = String(a[2] || 'The server ended this session.'); }
+      return;
+    }
     // The pick, asking for a seat first (#481); see the line block.
     if (what.indexOf('select:want ') === 0) {
       menuBeatAt = Date.now();

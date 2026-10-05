@@ -163,6 +163,8 @@
     // Back from being idle (#1142): why they are here, and a way to the slots.
     '#ts-select .line .away{font-size:16px;line-height:1.55;color:#c6aa6d;margin:0 auto 16px;max-width:680px}',
     '#ts-select .line .otherrow{justify-content:center;margin-top:18px}',
+    // The server ended the last session (#1157): its sentence, over the slots, until a pick.
+    '#ts-select .ended{display:none;font-size:16px;line-height:1.55;color:#c6aa6d;text-align:center;margin:0 auto;padding:22px 44px 0;max-width:760px}',
     '#ts-select.waiting .list,#ts-select.waiting .hint{display:none}',
     // Well below the hint and centred, so it is nowhere near the characters.
     '#ts-select .quitrow{display:flex;justify-content:center;margin-top:18px}',
@@ -262,6 +264,7 @@
     '<div class="panel">' +
       '<div class="head"><div><div class="eyebrow">Thornswood</div><div class="title">Who are you today?</div></div>' +
       '<div class="count"></div></div>' +
+      '<div class="ended"></div>' +
       '<div class="list"></div>' +
       '<div class="line"><div class="away" style="display:none"></div><div class="place"></div><div class="why"></div>' +
         '<div class="turnrow"><button class="btn2 turn" type="button">Join now</button></div>' +
@@ -853,6 +856,15 @@
     (the front hands it on).
   */
   var away = (LIST.away && Number(LIST.away.id) > 0) ? LIST.away : null;
+  /*
+    ENDED BY THE SERVER (#1157). A refusal, a ban, a character dead for good
+    or a staff /kick: the front took the game out of the world before the
+    kick, so the client did not connect again by itself, and LIST.ended is the
+    sentence the server said. It stays over the slots until a character is
+    picked, which is the only thing that connects again.
+  */
+  var ended = (typeof LIST.ended === 'string' && LIST.ended) ? LIST.ended : '';
+  var elEnded = root.querySelector('.ended');
   var AWAY_WORDS = 'You were taken out of the world after 15 minutes with nothing from your keyboard, mouse or character. ' +
                    'You have a place in line to come back in, as this character or any of your others.';
   var elAway = root.querySelector('.line .away');
@@ -914,6 +926,7 @@
     }
     sent = true;
     picked = e.id;
+    if (elEnded) elEnded.style.display = 'none';
     joinWords = e.c && !e.c.gone ? 'Joining as ' + (e.c.name || 'your character') + '. The world is loading.' : 'Off to the creation hall. The world is loading.';
     elStatus.textContent = 'Checking for a seat.';
     draw();
@@ -1095,6 +1108,12 @@
   };
   fit();
   draw();
+  // The server ended the last session (#1157): what it said, over the slots.
+  if (ended && elEnded) {
+    elEnded.textContent = ended;
+    elEnded.style.display = 'block';
+    tell('ended: back at the choice after the server ended the session');
+  }
   // Back from being away: straight into the place the server keeps (see chooseOther).
   if (away) {
     picked = Number(away.id);
