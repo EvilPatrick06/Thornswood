@@ -284,6 +284,7 @@ jobs:
                  'test-special-edition-only.js',
                  'test-1374-letters.js',
                  'test-1380-rare-mines.js',
+                 'test-1621-quest-state.js',
                  'test-unpin.js', 'test-coffers.js',
                  'test-1383-injury.js',
                  'test-1384-condition.js',
