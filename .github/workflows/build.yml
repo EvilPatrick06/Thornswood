@@ -344,6 +344,7 @@ jobs:
                  'test-1721-social-tick.js',
                  'test-1326-engine-secrets.ps1',
                  'test-1330-webview2-signature.js',
+                 'test-1352-site-answer-limit.js',
                  'test-table-install.js',
                  'test-secrets-fail-closed.js',
                  'test-our-key-menus.js', 'test-slash-key.js', 'test-social-keys.js',
