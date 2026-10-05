@@ -22,6 +22,12 @@
 // its hash and the commit it was built from, and that must be the server's one
 // commit. Red when a file is left out or was built from another commit.
 //
+// And engine/README.md names no commit or hash in full (issue #1346). The page
+// used to state the pin and the server's SHA256, and every engine change
+// moved both: on 1 October it named 1ed42585 with the records on 663686af,
+// and on 5 October ac044a49 with the records on 0460584e. It now says where
+// to read them; red when a 40 or 64 character hex value is back on it.
+//
 // It runs in the build check on every pull request (.github/workflows/build.yml,
 // "Check the engine is one commit") and in the nightly run. It reads only the
 // checkout: the pin is the gitlink in HEAD's tree, so the fork itself does not
@@ -95,6 +101,13 @@ function oneEngineProblems(pin, client, server, submodule) {
     out.push('records/server-build.json names the fork ' + (src.repo || 'nothing') + ', and .gitmodules names ' + submodule.url);
   }
   return out.concat(serverFileProblems(server));
+}
+
+// Every commit or hash engine/README.md writes out in full (issue #1346): a
+// 40 character hex value is a commit, a 64 character one a SHA256. Short ones
+// in the page's history (`1ed42585`, `ecb029cb...`) are not current values.
+function namedInFull(text) {
+  return String(text || '').match(/\b(?:[0-9a-f]{64}|[0-9a-f]{40})\b/gi) || [];
 }
 
 // Every server file the fork builds, as scripts/deploy/ServerBuild.ps1 names
@@ -200,6 +213,14 @@ caught('a record that leaves out the JavaScript half', oneEngineProblems(P, C(P.
   yes('the server files held here are the ones scripts/deploy/ServerBuild.ps1 names (' + theirs.length + ')', theirs.join('|') === SERVER_FILES.join('|'));
 })();
 
+// The page check catches a pin or a hash written out, and passes history.
+(function () {
+  const P = 'ac044a49760cf7ee85f6ac1547cc244657509e78';
+  yes('engine/README.md check: a pin written out in full is caught', namedInFull('`git submodule status` prints `' + P + '`').length === 1);
+  yes('engine/README.md check: a SHA256 written out in full is caught', namedInFull('its SHA256 is `' + 'e'.repeat(64) + '`').length === 1);
+  yes('engine/README.md check: short commits and cut hashes in its history pass', namedInFull('records name `1ed42585`; hashed `ecb029cb...`').length === 0);
+})();
+
 // ------------------------------------------------------------------ this tree
 function git(args) {
   return execFileSync('git', ['-C', REPO].concat(args), { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -237,6 +258,13 @@ if (problems.length) {
   console.log('  (engine/README.md, "One engine"): Build-Engine.ps1, then New-ClientBuildRecord.ps1');
   console.log('  and Build-Server.ps1 (every server file, recorded) in the same pull request.');
 }
+
+let readme = null;
+try { readme = fs.readFileSync(path.join(REPO, 'engine', 'README.md'), 'utf8'); } catch (e) { readme = null; }
+const inFull = namedInFull(readme);
+inFull.forEach(function (h) { console.log('      engine/README.md names ' + h); });
+yes('engine/README.md names no commit or hash in full; the pin and the records are where they are written',
+    readme !== null && inFull.length === 0);
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

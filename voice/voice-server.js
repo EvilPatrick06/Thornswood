@@ -35,11 +35,11 @@ const PORT = Number(process.env.THORNSWOOD_VOICE_PORT || 7778);
   server takes the picks off the command queue below under the profile id the
   join token proves. The check stays for the join itself and for the roster.
 
-  THORNSWOOD_SITE off means no checking, which is how this behaved before and
-  is still the behaviour when the site cannot be reached. That is deliberate:
-  being unable to create a character is loud and total, and the thing being
-  prevented is griefing rather than a breach. Every unverified choice is logged
-  so it is visible rather than silent.
+  Without THORNSWOOD_SITE, or while the site cannot be reached, nobody can
+  say whose a profile is, so /token mints nothing (#1315). It used to mint
+  anyway and log the token as unchecked, which meant any ticket at all, or
+  none, got a token during a site outage or on a box with the setting left
+  off.
 */
 const SITE = String(process.env.THORNSWOOD_SITE || '').replace(/\/+$/, '');
 const HERE = __dirname;
@@ -59,7 +59,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-owns-limit-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -86,17 +86,6 @@ let nextPeer = 1;
 const peers = new Map();     // peerId -> {ws, profileId, name}
 
 /*
-  THE GAME SERVER'S JOIN PASS SWITCH, FOLLOWED HERE (#410). The gamemode says
-  on every /positions whether thornswoodRequirePass is on. While it is, a
-  connection that cannot prove its profile with a join token is refused
-  whatever THORNSWOOD_VOICE_AUTH says, and any such connection already open is
-  closed the moment it turns on, so chat and voice never run under a profile
-  number the game server would not trust. One switch for both, so the two can
-  never disagree about who somebody is.
-*/
-let gameRequiresPass = false;
-
-/*
   The name a line or the roster shows (#410): for a proven connection, the
   character name the game server has for that profile (the /positions feed),
   so nobody chooses the name their words go out under; the name the page sent
@@ -111,24 +100,13 @@ function peerName(p) {
   return (p && p.name) || '';
 }
 
-function closeUnproven(why) {
-  let n = 0;
-  for (const [, p] of peers) {
-    if (p.proven) continue;
-    try { p.ws.send({ t: 'denied', why: why }); } catch (e) { }
-    try { p.ws.close(); } catch (e) { }
-    n++;
-  }
-  if (n) console.log('[voice] closed ' + n + ' connection(s) that did not prove their profile: ' + why);
-}
-
 /*
   Ask the site whether this ticket owns this profile.
 
-  Answers 'yes', 'no', or 'unchecked' when there is nobody to ask. Never throws
-  and never hangs: a three second timeout, and anything unexpected counts as
-  unchecked rather than as a refusal, because refusing on a hiccup would stop
-  somebody creating a character for no reason they could understand.
+  Answers 'yes', 'no', or 'unchecked' when there is nobody to ask or no
+  answer came. Never throws and never hangs: a three second timeout. Only
+  'yes' gets a token (#1315); 'unchecked' is not a refusal, so /token says
+  the question went unanswered rather than that the profile is not theirs.
 
   AND THE ANSWER IS READ TO A LIMIT, IN SIZE AND IN TIME (#1352). The site
   answers about thirty bytes ({"ok":true,"why":"theirs"}), and its own limit
@@ -557,9 +535,10 @@ function hearers(myId, me, reach) {
  * flood of its own. A dropped line is not in the chat log as said, because
  * it never reached the room; the service log says who was slowed.
  *
- * PER CONNECTION, NOT PER ACCOUNT, on purpose while THORNSWOOD_VOICE_AUTH is
- * log. Until it is on, the profile id on a join is whatever the message
- * claimed, and a bucket keyed on it would let anybody empty somebody else's.
+ * PER CONNECTION, NOT PER ACCOUNT. This was on purpose while
+ * THORNSWOOD_VOICE_AUTH could be log, when the profile id on a join was
+ * whatever the message claimed and a bucket keyed on it would have let
+ * anybody empty somebody else's; since #1303 every join is proven.
  * A reconnect starts with a full bucket; it costs a join and a roster to
  * everybody, so it slows a flood rather than stopping a determined one.
  *
@@ -984,7 +963,6 @@ function onJoin(ws, msg) {
   const claimed = Number(msg.profileId) || 0;
   const tok = readToken(msg.token);
   let profileId = 0;
-  let why = '';
 
   if (tok && !tok.expired) {
     // The only line here that decides who somebody is. Note that it reads the
@@ -995,23 +973,21 @@ function onJoin(ws, msg) {
                   profileId + '. The token wins.');
     }
   } else {
-    why = !msg.token ? 'no token' : (tok && tok.expired ? 'an expired token' : 'a token that does not check out');
-    if (AUTH === 'on' || gameRequiresPass) {
-      console.log('[voice] REFUSED a join for profile ' + claimed + ': ' + why);
-      ws.send({ t: 'denied', why: why });
-      try { ws.close(); } catch (e) { }
-      return 0;
-    }
-    if (AUTH === 'log') {
-      console.log('[voice] UNPROVEN join as profile ' + claimed + ': ' + why +
-                  '. Allowed because THORNSWOOD_VOICE_AUTH is log.');
-    }
-    profileId = claimed;
+    // Refused, whatever any setting says (#1303). THORNSWOOD_VOICE_AUTH log,
+    // which let this in as whatever profile it claimed, was for the one
+    // release the tokens took to go out, and stayed the default after it:
+    // a service started by hand or installed on a new box took anybody's
+    // word for who they were.
+    const why = !msg.token ? 'no token' : (tok && tok.expired ? 'an expired token' : 'a token that does not check out');
+    console.log('[voice] REFUSED a join for profile ' + claimed + ': ' + why);
+    ws.send({ t: 'denied', why: why });
+    try { ws.close(); } catch (e) { }
+    return 0;
   }
 
   const id = nextPeer++;
   const name = String(msg.name || '').slice(0, 40);
-  peers.set(id, { ws, profileId, name, mode: cleanMode(msg.mode), proven: !!profileId && !why,
+  peers.set(id, { ws, profileId, name, mode: cleanMode(msg.mode), proven: true,
                   chatTokens: CHAT_BURST, chatAt: Date.now(), chatSlowed: false });
 
   ws.send({ t: 'welcome', peer: id, profileId: profileId });
@@ -1290,20 +1266,14 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
   socket opening, and a connection that is already up is not rechecked. It is
   not a session, and nothing renews it.
 
-  THORNSWOOD_VOICE_AUTH says what to do with a connection that cannot prove
-  itself:
-
-    on     refuse it
-    log    let it in and write down that it could not, which is how to find
-           out who would be locked out before locking anybody out
-    off    the old behaviour, for working out what is broken
-
-  It ships as log for one release. Read the UNPROVEN lines out of the service
-  log, confirm the only ones left are yours, then set it to on. Turning it on
-  while an older launcher is still out there takes voice away from whoever is
-  running it, and they will not know why.
+  A connection that cannot prove itself is refused, always (#1303).
+  THORNSWOOD_VOICE_AUTH used to choose: on refused it, log let it in and
+  wrote a line, off was the old behaviour. log was meant for the one release
+  the tokens took to go out and stayed the default for every service started
+  without the setting. Live and dev were already on; nothing reads the
+  setting now, and /health says auth on so the scripts that read it still
+  can.
 */
-const AUTH = String(process.env.THORNSWOOD_VOICE_AUTH || 'log').toLowerCase();
 /*
   How long a token is good for.
 
@@ -1552,11 +1522,9 @@ const server = http.createServer((req, res) => {
           });
         }
         for (const pid of Array.from(positions.keys())) if (!seen.has(pid)) positions.delete(pid);
-        // The game server's join pass switch (#410), above.
-        const wants = doc.requirePass === true;
-        if (wants && !gameRequiresPass) closeUnproven('the game server now requires the launcher\'s pass');
-        if (wants !== gameRequiresPass) console.log('[voice] the game server ' + (wants ? 'requires' : 'no longer requires') + ' the join pass, so unproven connections are ' + (wants ? 'refused' : 'left to THORNSWOOD_VOICE_AUTH'));
-        gameRequiresPass = wants;
+        // doc.requirePass, the game server's join pass switch (#410), is not
+        // read here any more: it refused unproven joins while it was on, and
+        // since #1303 every unproven join is refused whatever it says.
         res.writeHead(204).end();
       } catch (e) {
         res.writeHead(400).end('bad json');
@@ -1583,24 +1551,31 @@ const server = http.createServer((req, res) => {
     readBody(req, res, 4000, (doc) => {
       const pid = Number(doc.profileId) || 0;
       if (pid <= 0) { res.writeHead(400).end('no profileId'); return; }
-      owns(String(doc.ticket || ''), pid, (verdict) => {
+      const ticket = String(doc.ticket || '');
+      if (!ticket) { res.writeHead(400).end('no ticket'); return; }
+      owns(ticket, pid, (verdict) => {
         if (verdict === 'no') {
           console.log('[voice] REFUSED a token for profile ' + pid +
                       ': the ticket does not own it');
           res.writeHead(403).end('not your profile');
           return;
         }
-        if (verdict === 'unchecked') {
-          // The site is the only thing that can answer this. Minting anyway
-          // keeps a site outage from taking voice down with it, and the line
-          // below is what says the check did not really happen.
-          console.log('[voice] UNCHECKED token for profile ' + pid +
-                      (SITE ? ' (could not reach ' + SITE + ')' : ' (THORNSWOOD_SITE not set)'));
+        /*
+          A token only when the site said yes (#1315). Unchecked used to mint
+          one anyway, so that a site outage did not take voice down with it,
+          and a token minted that way proved nothing about who asked. 503
+          rather than 403: nothing was refused, the question went unanswered,
+          and the launcher asks again on its next try.
+        */
+        if (verdict !== 'yes') {
+          console.log('[voice] NO TOKEN for profile ' + pid + ': ' +
+                      (SITE ? 'no answer from ' + SITE : 'THORNSWOOD_SITE is not set, so nobody can be asked'));
+          res.writeHead(503, { 'content-type': 'text/plain' }).end('nobody could check this profile, so no token');
+          return;
         }
         const until = Date.now() + TOKEN_LIFETIME_MS;
         res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ token: signToken(pid, until), until: until,
-                                 profileId: pid, checked: verdict === 'yes' }));
+        res.end(JSON.stringify({ token: signToken(pid, until), until: until, profileId: pid }));
       });
     });
     return;
@@ -1777,7 +1752,7 @@ const server = http.createServer((req, res) => {
       if (s.socket.writableLength > largestQueue) largestQueue = s.socket.writableLength;
     }
     res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, build: BUILD, deploy: deployRecord(HERE), auth: AUTH,
+    res.end(JSON.stringify({ ok: true, build: BUILD, deploy: deployRecord(HERE), auth: 'on',
                             uptimeSeconds: Math.round(process.uptime()),
                             startedAt: new Date(Date.now() - process.uptime() * 1000).toISOString(),
                             bind: BIND,
