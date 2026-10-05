@@ -60,7 +60,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-token-once-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -1258,9 +1258,29 @@ setInterval(() => {
   }
 }, 200);
 
+/*
+  THIS MACHINE, AND NOT SOMETHING CADDY CARRIED IN (#1797).
+
+  The gamemode's routes (/positions, /commands, /commands/ack, /silenced,
+  /textmute, /say) are kept to the gamemode by asking whether the socket
+  came from loopback. Caddy carries https://thornswood.net/voice/ and
+  /voice-dev/ to this service from 127.0.0.1, so everything it forwarded
+  passed that test too: on 5 Oct a POST from outside to
+  /voice-dev/positions got "bad json", not "no". Caddy sets
+  X-Forwarded-For, X-Forwarded-Proto and X-Forwarded-Host on every request
+  it forwards, whatever the client sent, and the gamemode's own requests
+  to 127.0.0.1 carry none of them, so a request with any of these headers
+  came from somewhere else, whatever its socket says.
+*/
+function proxied(req) {
+  const h = req.headers || {};
+  return h['x-forwarded-for'] !== undefined || h['x-forwarded-proto'] !== undefined ||
+         h['x-forwarded-host'] !== undefined || h['forwarded'] !== undefined;
+}
+
 function isLoopback(req) {
   const ra = req.socket.remoteAddress || '';
-  return ra === '127.0.0.1' || ra === '::1' || ra === '::ffff:127.0.0.1';
+  return (ra === '127.0.0.1' || ra === '::1' || ra === '::ffff:127.0.0.1') && !proxied(req);
 }
 
 /*
@@ -1672,8 +1692,9 @@ const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/positions') {
     // Loopback only. This is the gamemode talking to the service on the same
     // machine, and nothing outside has any business writing where people are.
-    const ra = req.socket.remoteAddress || '';
-    if (!(ra === '127.0.0.1' || ra === '::1' || ra === '::ffff:127.0.0.1')) {
+    // The same test as the other gamemode routes, so a request Caddy carried
+    // in is refused here too (#1797).
+    if (!isLoopback(req)) {
       res.writeHead(403).end('no');
       return;
     }
