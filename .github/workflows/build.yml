@@ -300,6 +300,7 @@ jobs:
                  'test-1388-apprentice.js',
                  'test-launcher-help.js', 'test-classes-page.js',
                  'test-1389-lists.js',
+                 'test-1590-hunter-lists.js',
                  'test-1390-embassy.js',
                  'test-1603-beds.js',
                  'test-1606-logout-fill.js',
