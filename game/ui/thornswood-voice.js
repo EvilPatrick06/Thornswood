@@ -689,49 +689,34 @@
   // the same pass and neither can rely on running first, so this waits rather
   // than assuming.
   /*
-    Where to look for each other, asked for rather than typed in.
+    Where to look for each other, handed over rather than typed in.
 
     This was a Google STUN server written into three separate pages. STUN
     alone only works when both ends can be reached once they know where to
     look; behind a symmetric NAT, some mobile networks and a lot of corporate
     ones, they cannot, and that pair of people never hear each other while
     everybody else sounds fine. TURN fixes it and needs a relay, which cannot
-    be typed into a page, so the service hands the list out at /ice.
+    be typed into a page, so the service hands the list out.
 
-    The old value stays here as the fallback, so a service that has not been
-    told about a relay, or one that cannot be reached for a moment, behaves
-    exactly as this did before.
+    It comes on every roster (#1821), the moment this page builds its
+    connections, over the socket its join token proved, so the relay comes
+    with it when one is set. It used to be a POST to /ice with the token the
+    connection was opened with, and that token is good for two minutes: for
+    the rest of a session this page was handed STUN only. Nothing here holds
+    a token now.
+
+    The old value stays here until the first roster, so a service that has
+    not been told about a relay behaves exactly as this did before.
   */
   var ICE = [{ urls: 'stun:stun.l.google.com:19302' }];
-  function refreshIce() {
-    if (!cfg || !cfg.host) { return; }
-    try {
-      /*
-        With the join token, because the service hands the relay only to
-        somebody whose token checks out (#1307), and everybody else the STUN
-        list. In the body, so it is never in an address; plain text, so the
-        fetch needs no preflight from this page's null origin.
-      */
-      var n = net();
-      var tok = (n && typeof n.token === 'function') ? n.token() : String((window.THORNSWOOD || {}).token || '');
-      // The https address only (#1304): the token rides this POST.
-      var base = String((window.THORNSWOOD || {}).base || '').replace(/\/+$/, '');
-      if (base.indexOf('https://') !== 0) { return; }
-      fetch(base + '/ice', { method: 'POST', body: JSON.stringify({ token: tok }) })
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-          if (d && d.iceServers && d.iceServers.length) {
-            ICE = d.iceServers;
-            report('ice', ICE.length + ' server(s), relay ' +
-                   (ICE.some(function (s) { return /^turns?:/.test([].concat(s.urls)[0]); }) ? 'yes' : 'no'));
-          }
-        })
-        .catch(function () { });
-    } catch (e) { }
+  function takeIce(list) {
+    if (!list || !list.length) { return; }
+    ICE = list;
+    report('ice', ICE.length + ' server(s), relay ' +
+           (ICE.some(function (s) { return /^turns?:/.test([].concat(s.urls)[0]); }) ? 'yes' : 'no'));
   }
 
   function connect() {
-    refreshIce();
     if (wired) { return; }
     var n = net();
     if (!n) {
@@ -793,7 +778,7 @@
         page does all of this in WebView2, so this page has no reason to.
       */
       if (inRelay() && (m.t === 'sdp' || m.t === 'ice' || m.t === 'peers')) { return; }
-      if (m.t === 'peers') { reconcile(m.peers); return; }
+      if (m.t === 'peers') { takeIce(m.iceServers); reconcile(m.peers); return; }
       // The whole view on the first tick after a join, then only what moved
       // and who left it (issue #482; the note over the tick in
       // voice/voice-server.js). The party strip reads the same table.

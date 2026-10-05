@@ -197,18 +197,17 @@ function send(o) {
 }
 
 /*
-Where to look for each other, asked for rather than typed in.
+Where to look for each other, handed over rather than typed in.
 
 This was a Google STUN server written into three separate pages. STUN
 alone only works when both ends can be reached once they know where to
 look; behind a symmetric NAT, some mobile networks and a lot of corporate
 ones, they cannot, and that pair of people never hear each other while
 everybody else sounds fine. TURN fixes it and needs a relay, which cannot
-be typed into a page, so the service hands the list out at /ice.
+be typed into a page, so the service hands the list out (takeIce, below).
 
 The old value stays here as the fallback, so a service that has not been
-told about a relay, or one that cannot be reached for a moment, behaves
-exactly as this did before.
+told about a relay behaves exactly as this did before.
 */
 /*
   Where the voice service is, for this page.
@@ -305,28 +304,28 @@ function lost() {
   later(retryIn());
 }
 
+/*
+  Where to look for each other. The service hands the list over on every
+  roster (#1821), which is when this page builds its connections, over the
+  socket its join token proved, so the relay comes with it when one is set.
+  It used to be a POST to /ice carrying the token before it was spent, a
+  second request whose answer nothing waited for, and the only way the
+  game's overlay could ask was with a token two minutes old or older.
+  STUN until the first roster.
+*/
 var ICE = [{ urls: 'stun:stun.l.google.com:19302' }];
-function refreshIce() {
-  if (!cfg || !voiceBase()) { return; }
-  try {
-    // With the join token, in the body: the service hands the relay only to
-    // somebody whose token checks out (#1307), and everybody else STUN.
-    fetch(voiceBase() + '/ice', { method: 'POST', body: JSON.stringify({ token: (cfg && cfg.token) || '' }) })
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        if (d && d.iceServers && d.iceServers.length) {
-          ICE = d.iceServers;
-          say('ice: ' + ICE.length + ' server(s), relay ' +
-              (ICE.some(function (s) { return /^turns?:/.test([].concat(s.urls)[0]); }) ? 'yes' : 'no'));
-        }
-      })
-      .catch(function () { });
-  } catch (e) { }
+var iceSaid = '';
+function takeIce(list) {
+  if (!list || !list.length) { return; }
+  ICE = list;
+  // Said when it changes, not on every roster.
+  var line = 'ice: ' + ICE.length + ' server(s), relay ' +
+             (ICE.some(function (s) { return /^turns?:/.test([].concat(s.urls)[0]); }) ? 'yes' : 'no');
+  if (line !== iceSaid) { iceSaid = line; say(line); }
 }
 
 function connect() {
   if (retry) { clearTimeout(retry); retry = null; }
-  refreshIce();
   if (!cfg) return;
 
   // A second config (a new character on Play) calls this with the first
@@ -384,7 +383,7 @@ function connect() {
       send({ t: 'talk', on: talking });
       return;
     }
-    if (m.t === 'peers') { onPeers(m.peers || []); return; }
+    if (m.t === 'peers') { takeIce(m.iceServers); onPeers(m.peers || []); return; }
     // The whole view on the first tick after a join, then only what moved
     // and who left it (issue #482; the note over the tick in voice-server.js).
     if (m.t === 'pos') { places = m.who || {}; noteRows(places); place(); applyMicTrack(); return; }
