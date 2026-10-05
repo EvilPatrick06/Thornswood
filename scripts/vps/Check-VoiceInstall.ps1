@@ -12,7 +12,6 @@ $Site = 'https://thornswood.net'
 # nothing, which is the whole failure this script exists to catch, so a
 # missing one here would hide the very thing being looked for.
 $Bind = '0.0.0.0'
-$Auth = 'log'
 $ChatRange = 'on'
 # The relay line, built before the here-string and empty when there is no
 # relay, which is every box today. Empty is right here and not a missing

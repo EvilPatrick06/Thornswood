@@ -211,12 +211,13 @@ typed on a command line or written on this page.
    gamemode changes that have not been tried on dev, tell Patrick before
    step 16. Restore-Box says so too (step 13).
 7. **Live voice, set the way the old box runs it:**
-   `.\scripts\deploy\Install-Voice.ps1 -Auth on -Bind 127.0.0.1`. On
+   `.\scripts\deploy\Install-Voice.ps1 -Bind 127.0.0.1`. On
    29 September `https://thornswood.net/voice/health` said auth on, bind
    127.0.0.1, no relay and chat range off; read it again on the day and pass
    what it says. On a new box there is nothing running for Install-Voice to
-   keep, so without those two it falls back to letting unproven joins in, on
-   every address.
+   keep, so without -Bind it falls back to every address. Auth needs no
+   flag: since #1303 the service refuses every join that cannot prove
+   itself.
 8. **The dev game server and dev voice**, copied from the live ones onto their
    own ports, tasks and firewall rules, with nothing of live's private folder,
    chat logs or keys, and dev voice starting with auth on, on 127.0.0.1 only
@@ -225,7 +226,7 @@ typed on a command line or written on this page.
    voice set the way `https://thornswood.net/voice-dev/health` says it runs
    (auth on, bind 127.0.0.1 on 29 September), which is what the dev instance
    already starts it with:
-   `.\scripts\deploy\Install-Voice.ps1 -Root C:\Thornswood-Voice-Dev -Port 7789 -TaskName 'Thornswood Dev Voice' -Auth on -Bind 127.0.0.1`.
+   `.\scripts\deploy\Install-Voice.ps1 -Root C:\Thornswood-Voice-Dev -Port 7789 -TaskName 'Thornswood Dev Voice' -Bind 127.0.0.1`.
    The dev server is not started.
 9. **Is it ready for the restore:**
    `.\scripts\vps\Restore-Box.ps1 -Backup <newest backup> -Check`. It opens the
