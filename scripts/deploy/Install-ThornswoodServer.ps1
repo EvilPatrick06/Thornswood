@@ -396,9 +396,13 @@ if (-not $PutBack) {
     if (-not $NoTask -and -not (Test-Path -LiteralPath (Join-Path $stageDir 'dist_back\skymp5-server.js'))) {
         $bad += 'the payload has no dist_back\skymp5-server.js, which is what the task starts'
     }
-    # The gamemode parses, here, before anything is stopped.
+    # The gamemode is there and parses, here, before anything is stopped. A
+    # payload with none used to pass this without a word and start a server
+    # with no gamemode at all: no door, no join pass (#1336).
     $gm = Join-Path $stageDir 'gamemode.js'
-    if (Test-Path -LiteralPath $gm) {
+    if (-not (Test-Path -LiteralPath $gm)) {
+        $bad += 'the payload has no gamemode.js, so the server would start with no gamemode: no door and no join pass'
+    } else {
         # Continue for the call: under Stop, Windows PowerShell turns the first
         # line node writes to stderr into an error that ends this script.
         $eap = $ErrorActionPreference
@@ -455,6 +459,11 @@ if (-not $PutBack) {
         } catch {
             Say "the settings could not be read ($($_.Exception.Message)), so $candidate goes back with its own" 'Yellow'
         }
+    } else {
+        # Said, the same as a file that will not read (#1336): with either
+        # missing nothing is carried and nothing is read back afterwards.
+        $gone = @(@($runPath, $backPath) | Where-Object { -not (Test-Path -LiteralPath $_) })
+        Say ("there is no " + ($gone -join ' and no ') + ", so no settings are carried and $candidate goes back with its own") 'Yellow'
     }
 }
 
