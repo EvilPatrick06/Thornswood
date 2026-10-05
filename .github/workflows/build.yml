@@ -353,6 +353,7 @@ jobs:
                  'test-1721-social-tick.js',
                  'test-1307-ice-relay.js',
                  'test-1336-missing-stops.ps1',
+                 'test-1223-live-pass-asked.ps1',
                  'test-1367-cross-site.js',
                  'test-1326-engine-secrets.ps1',
                  'test-1203-engine-jobs.ps1',
