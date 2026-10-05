@@ -175,7 +175,7 @@ Generated from the work tables by `scripts/dev/Write-SystemLists.js`. The same r
 ## Where this is
 
 Empty plots, the claim circle, the 14 days, the waits, the yields,
-and a shovel of 100 uses are in the server. The plan's shovel is 50.
+and a shovel of 50 uses are in the server.
 A farmer is handed 3 cabbage, 3 leek and 3 potato as seed. A cook
 is not handed a pack, in the plan or on the server. The season is
 in the server: four of them, 7 real days each, starting in spring.

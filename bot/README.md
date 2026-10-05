@@ -128,9 +128,12 @@ each with Pass, Fail, Skip and Fail-known on it, in a thread off the opener:
 
 Those four are **Owner, Dev and Lead Gamemaster**, which is wider than Owner
 and Dev and narrower than the staff roles: a Moderator alone does not open or
-reset a session. They are matched by role name, never by id, so a renamed role
-is fixed by setting `LIVE_SMOKE_ADMIN_ROLES` in `bot.env.json` rather than by a
-deploy. Testers and staff mark their own rows. Agents do not.
+reset a session. They are the `LIVE_SMOKE_ADMIN_ROLES` roles in `bot.env.json`
+(Owner, Dev, Lead Gamemaster and Lead GM by default), matched by id or name.
+Role ids are preferred, because an id survives a rename, so renaming a role
+changes nothing; a role given by its name has to be renamed in
+`LIVE_SMOKE_ADMIN_ROLES` too. Testers and staff mark their own rows. Agents do
+not.
 
 A mark is an edit to the Discord message it was pressed on, and it is one line
 per person: the row grows a `Marks:` block with a line for each display name,

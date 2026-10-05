@@ -51,7 +51,8 @@ is also handed seed. See [Creation](creation.md).
 ## Where this is
 
 The five verbs, the pick, the shovel, the axe, the rank gates and
-the lists are in the server. A fishing pole is not required, and the
-new water is not placed. The numbers for how long a seam, a plant, a
-fish and a crop take are on each class page. They are the plan's
-numbers. The tools in the server have 100 uses. The plan is 50.
+the lists are in the server. The fishing verb refuses without a
+pole, and the new water is not placed. The numbers for how long a
+seam, a plant, a fish and a crop take are on each class page. They
+are the plan's numbers. Every tool in the server has 50 uses: the
+pick, the shovel, the axe, the pole, and the one handed at the pick.

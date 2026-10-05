@@ -208,7 +208,9 @@ for (const list of Object.values(os.networkInterfaces())) {
   yes('and wss with an https one', cu({ base: 'https://thornswood.net/voice-dev' }) === 'wss://thornswood.net/voice-dev/');
   yes('and it says so rather than trying', /if \(!url\(\)\) \{ note\('No secure address for the chat from the launcher/.test(chat));
   const overlay = read('game/ui/thornswood-voice.js');
-  yes('the game\'s voice overlay asks /ice only at the https address', /if \(base\.indexOf\('https:\/\/'\) !== 0\) \{ return; \}/.test(overlay) &&
+  // It asked /ice at the https address only; since #1821 it asks /ice
+  // nothing, because the list comes on the roster over the wss socket.
+  yes('the game\'s voice overlay asks the voice service nothing over http', !/\/ice'/.test(overlay) &&
       !/'http:\/\/' \+ cfg\.host/.test(overlay));
   const conf = read('launcher/app/Config.cs');
   const vb = lift(conf.replace(/public string VoiceBase\(\)/, 'function VoiceBase()'), 'VoiceBase') || '';

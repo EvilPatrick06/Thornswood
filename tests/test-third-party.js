@@ -366,6 +366,37 @@ if (sb && sb.source) {
       String(sb.source.repo).replace(/\.git$/, '') === forkUrl);
 }
 
+// #1782. The commit above was found anywhere in the file, so when #1689 moved
+// the pin to 0460584e and wrote it into the fork section, "On our servers" and
+// the source offer in "Where the source is" kept naming #1617's ac044a49 and
+// this stayed green. Each of the three is held to the record on its own now.
+// The offer is what section 13 of the AGPL asks for: the source of the server
+// people connect to.
+if (sb && sb.source) {
+  const sc = String(sb.source.commit);
+  const forkSec = section('The SkyMP client runtime, built from the fork');
+  yes('the fork section names the server record\'s commit, ' + sc.slice(0, 12), forkSec.indexOf(sc) >= 0);
+  const ours = section('On our servers');
+  yes('"On our servers" names the server record\'s commit, ' + sc.slice(0, 12), ours.indexOf(sc) >= 0);
+  yes('"On our servers" gives the server record\'s SHA256, ' + String(sb.sha256).slice(0, 12),
+      !!sb.sha256 && ours.indexOf(String(sb.sha256)) >= 0);
+  const otherSums = (ours.match(/\b[0-9a-f]{64}\b/g) || []).filter(function (h) { return h !== sb.sha256; });
+  yes('"On our servers" gives no other SHA256 (' + (otherSums.join(', ') || 'none') + ')', otherSums.length === 0);
+  yes('"On our servers" gives when it was built, ' + sb.builtUtc,
+      !!sb.builtUtc && ours.indexOf(String(sb.builtUtc)) >= 0);
+  const mainAt = /Main remains on `([0-9a-f]{40})`/.exec(ours);
+  const offer = section('Where the source is');
+  const trees = [];
+  const treeRe = new RegExp(reEscape(forkUrl) + '/tree/([0-9a-f]{7,40})(?=\\s)', 'g');
+  let tm;
+  while ((tm = treeRe.exec(offer)) !== null) { trees.push(tm[1]); }
+  yes('"Where the source is" links the fork at the server record\'s commit first (' + (trees[0] || 'none') + ')',
+      trees[0] === sc);
+  const stray = trees.filter(function (c) { return c !== sc && !(mainAt && c === mainAt[1]); });
+  yes('and at no commit but that one and the one "On our servers" says main is on (' +
+      (stray.join(', ') || 'none other') + ')', stray.length === 0);
+}
+
 // ---------------------------------------------------------------- the fork
 //
 // Only where the fork is cloned here and holds the recorded commit. This is

@@ -7,11 +7,13 @@
   or is said, never skipped without a word.
 
   1. ServerSettings.ps1. A release key the release does not carry at all
-     (thornswoodRequirePass, the role lists) is left as the running server
-     has it, and the lines a deploy prints now name it. Before, they named
-     only the keys that moved, so a deploy whose build had no join pass
-     switch read the same as one that set it. The carry Deploy-Server sends
-     to the box says the same.
+     (the voice port, the NPC switch) is left as the running server has it,
+     and the lines a deploy prints now name it. Before, they named only the
+     keys that moved, so a deploy whose build had no join pass switch read
+     the same as one that set it. The carry Deploy-Server sends to the box
+     says the same. Since #1223 the join pass and the role lists are no
+     release's at all: they are carried as the server has them and not
+     called absent.
   2. The dev door's keys (Publish-Server.ps1's roster script, lifted out and
      run the way the box runs it). The live key and join pass key reach dev
      with DOOR CARRIED. A live root with no private folder, no door.json, one
@@ -62,17 +64,21 @@ try {
     # ---- 1. ServerSettings.ps1 -------------------------------------------------
     Write-Host 'ServerSettings.ps1'
     . (Join-Path $repo 'scripts\deploy\ServerSettings.ps1')
-    $running = [pscustomobject][ordered]@{ port = 7777; loadOrder = @('a.esm'); thornswoodRequirePass = $true; thornswoodDevs = @(1) }
+    $running = [pscustomobject][ordered]@{ port = 7777; loadOrder = @('a.esm'); thornswoodVoicePort = 7778; npcEnabled = $true
+                                           thornswoodRequirePass = $true; thornswoodDevs = @(1) }
     $release = [pscustomobject][ordered]@{ port = 7787; loadOrder = @('a.esm', 'b.esp') }
     $m = Join-ThornswoodServerSettings $running $release $ThornswoodGamemodeKeys
     # Read without strict mode tripping, so a copy from before #1336 fails here rather than stops.
     $absent = @(if ($m.PSObject.Properties['Absent']) { $m.Absent })
     Yes 'a release key the release does not carry is left as the running server has it' (
-        $m.Settings.thornswoodRequirePass -eq $true -and @($m.Settings.thornswoodDevs) -contains 1)
-    Yes '  and is named as not in the release' ($absent -contains 'thornswoodRequirePass' -and $absent -contains 'thornswoodDevs')
+        $m.Settings.thornswoodVoicePort -eq 7778 -and $m.Settings.npcEnabled -eq $true)
+    Yes '  and is named as not in the release' ($absent -contains 'thornswoodVoicePort' -and $absent -contains 'npcEnabled')
     $line = @($m.Said | Where-Object { $_ -like 'not in the release*' })
-    Yes '  in a line the deploy prints' ($line.Count -eq 1 -and $line[0] -match 'thornswoodRequirePass' -and $line[0] -match 'thornswoodDevs')
-    Yes '  which names keys and no value' ($line.Count -eq 1 -and $line[0] -notmatch 'True|\[1\]')
+    Yes '  in a line the deploy prints' ($line.Count -eq 1 -and $line[0] -match 'thornswoodVoicePort' -and $line[0] -match 'npcEnabled')
+    Yes '  which names keys and no value' ($line.Count -eq 1 -and $line[0] -notmatch 'True|7778')
+    Yes 'the join pass and the role lists are no release key (#1223): carried as the server has them, not called absent' (
+        $m.Settings.thornswoodRequirePass -eq $true -and @($m.Settings.thornswoodDevs) -contains 1 -and
+        $absent -notcontains 'thornswoodRequirePass' -and $absent -notcontains 'thornswoodDevs')
     Yes 'a key it does carry moves, and is not called absent' ($m.Changed -contains 'loadOrder' -and $absent -notcontains 'loadOrder')
     Yes 'a release key outside the list is still kept and said' ($m.Kept -contains 'port' -and $m.Settings.port -eq 7777)
     $full = [pscustomobject][ordered]@{ loadOrder = @('a.esm'); startPoints = @(); thornswoodMostOnline = 10; maxPlayers = 14 }
@@ -88,7 +94,7 @@ try {
              "`$Root = '$root'; `$Stage = 'stage'; `$ReleaseKeys = @('" + ($ThornswoodGamemodeKeys -join "','") + "')`r`n" + $settingsCarryBlock
     $out = @(& ([scriptblock]::Create($carry)) | ForEach-Object { [string]$_ })
     Yes 'the carry on the box ends CARRIED' (@($out | Where-Object { $_ -like 'CARRIED *' }).Count -eq 1)
-    Yes '  and says what the release did not carry' (@($out | Where-Object { $_ -like 'not in the release*thornswoodRequirePass*' }).Count -eq 1)
+    Yes '  and says what the release did not carry' (@($out | Where-Object { $_ -like 'not in the release*npcEnabled*' }).Count -eq 1)
 
     # ---- 2. the dev door's keys --------------------------------------------------
     Write-Host ''; Write-Host 'the dev door, from Publish-Server.ps1'
