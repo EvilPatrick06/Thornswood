@@ -4,9 +4,11 @@
 // refused, a steward of Haafingar cannot evict it, and a deed presented at its
 // door is paper. The embassy roll is 20, of whom 6 may be marked armed; the
 // 21st and the 7th armed are refused. The remnant roll is an application an
-// admin writes. Only those two rolls make the embassy and remnant rows; a
-// public forge makes none of them. A character in Thalmor gear reads Thalmor.
-// The patrols wait on the NPC lane, so this block stands up no actor.
+// admin writes. /embassy and /remnant are staff commands only, and the person
+// a change is about is told in their own chat. Only those two rolls make the
+// embassy and remnant rows; a public forge makes none of them. A character in
+// Thalmor gear reads Thalmor. The patrols wait on the NPC lane, so this block
+// stands up no actor.
 //
 // Read only.
 'use strict';
@@ -44,7 +46,7 @@ yes('the /give table reads', !!ADMIN_ITEMS && !!ADMIN_ITEMS['thalmor robes']);
 // ------------------------------------------------------------- the world --
 
 const ADMIN = 1, STEWARD = 2, NOBODY = 3;
-const EMBASSY = '8ed5:The Great City of Solitude.esp';
+const EMBASSY = 'e48e:The Great City of Solitude.esp';   // the Abandoned Warehouse, suggested on #1390
 const HOUSE = '1b262:The Great City of Solitude.esp';
 
 // A stable number for a descriptor, the way mp.getIdFromDesc would give one.
@@ -111,7 +113,7 @@ function load(opts) {
   const claims = opts.claims || {};
   box.__thornswoodProperty = {
     here: function (actor) { return (opts.door && opts.door[actor]) || null; },
-    nameOf: function (b) { return b === EMBASSY ? 'Penitus Oculatus Outpost Solitude' : b; },
+    nameOf: function (b) { return b === EMBASSY ? 'Abandoned Warehouse' : b; },
     holderOf: function (b) { return claims[b] || null; },
     pushAll: function () { }
   };
@@ -166,6 +168,10 @@ if (block && RECIPES && ADMIN_ITEMS) {
     const again = run(env, ADMIN, 0x14, '/embassy add Person2');
     yes('R2 nobody is on the roll twice', /already on/.test(again) && env.E.rolls().embassy.length === 7);
     yes('R2 the person named is told, in their own chat', env.said.some(function (s) { return s[0] === 0xff001001 && /embassy roll, marked armed/.test(s[1]); }));
+    yes('R2 and told when they are disarmed', env.said.some(function (s) { return s[0] === 0xff001001 && /no longer marked armed/.test(s[1]); }));
+    yes('R2 and when they are marked armed', env.said.some(function (s) { return s[0] === 0xff001007 && /You are marked armed on the embassy roll/.test(s[1]); }));
+    yes('R2 a refusal tells the person nothing', !env.said.some(function (s) { return s[0] === 0xff001002 && /already/.test(s[1]); }) &&
+        env.said.filter(function (s) { return s[0] === 0xff001007; }).length === 2);
   }
   {
     const env = load({ people: crowd(3) });
@@ -174,12 +180,15 @@ if (block && RECIPES && ADMIN_ITEMS) {
     const remRefused = run(env, STEWARD, 0x16, '/remnant add Person1');
     yes('R3 nor the remnant roll, which is an application', env.E.rolls().remnant.length === 0 && /application/.test(remRefused));
     run(env, ADMIN, 0x14, '/embassy add Person1 armed');
+    // docs/SYSTEMS.md, "Buttons, not commands": nothing here is for people to type.
     const own = run(env, NOBODY, 0xff001001, '/embassy');
-    yes('R3 a person on the roll can ask where they stand', /You are on the embassy roll, marked armed/.test(own));
-    const notOn = run(env, NOBODY, 0xff001002, '/embassy');
-    yes('R3 and somebody not on it is told so', /You are not on the embassy roll/.test(notOn));
+    yes('R3 /embassy is a staff command: somebody on the roll who types it is told only that an admin writes it',
+        own === 'Only an admin writes the embassy roll.');
+    const ownRemnant = run(env, NOBODY, 0xff001001, '/remnant');
+    yes('R3 and so is /remnant', ownRemnant === 'The remnant roll is an application. Only an admin writes it.');
     const list = run(env, ADMIN, 0x14, '/embassy');
-    yes('R3 an admin sees the roll and the count', /1 of 20 on the roll, 1 of 6 marked armed/.test(list) && /Person1 \(armed\)/.test(list));
+    yes('R3 an admin sees the roll, the count and the building', /1 of 20 on the roll, 1 of 6 marked armed/.test(list) &&
+        /Person1 \(armed\)/.test(list) && /The embassy is Abandoned Warehouse/.test(list));
   }
   {
     // Off the roll while not in the world.
@@ -189,6 +198,7 @@ if (block && RECIPES && ADMIN_ITEMS) {
     delete people.Person2;
     const off = run(env, ADMIN, 0x14, '/embassy remove person2');
     yes('R4 somebody who is not in the world can still be taken off by the name on the roll', !env.R.has(0xff001002, 'embassy') && /is off the embassy roll/.test(off));
+    yes('R4 and the line to them goes out the same way', env.said.some(function (s) { return s[0] === 0xff001002 && /You are off the embassy roll/.test(s[1]); }));
   }
   {
     // Kept across a restart, and a hand edit is not a way round the Accord.
@@ -200,7 +210,7 @@ if (block && RECIPES && ADMIN_ITEMS) {
         again.E.rolls().embassy[0].armed === true);
     const file = Object.keys(env.files).filter(function (k) { return /embassy\.json$/.test(k); })[0];
     yes('R5 the roll file is in the private folder', /^private[\\/]embassy\.json$/.test(file || ''));
-    const big = { buildings: [EMBASSY, '__proto__'], embassy: [], remnant: [{ actor: 'x' }] };
+    const big = { embassy: [], remnant: [{ actor: 'x' }] };
     for (let i = 1; i <= 25; i++) { big.embassy.push({ actor: 0xff002000 + i, name: 'P' + i, armed: i <= 9 }); }
     big.embassy.push({ actor: 0xff002001, name: 'P1 twice', armed: false });
     const files = {}; files[file] = JSON.stringify(big);
@@ -208,7 +218,7 @@ if (block && RECIPES && ADMIN_ITEMS) {
     const rolls = edited.E.rolls();
     yes('R5 a file with 25 on the roll loads 20', rolls.embassy.length === 20);
     yes('R5 and with 9 marked armed loads 6', rolls.embassy.filter(function (r) { return r.armed; }).length === 6);
-    yes('R5 and a row that is not a person is dropped', rolls.remnant.length === 0 && rolls.buildings.length === 1);
+    yes('R5 and a row that is not a person is dropped', rolls.remnant.length === 0);
   }
   {
     // A write that fails changes nothing.
@@ -217,6 +227,30 @@ if (block && RECIPES && ADMIN_ITEMS) {
     files.__refuse = true;
     const line = run(env, ADMIN, 0x14, '/embassy add Person1');
     yes('R6 a roll that cannot be written refuses and keeps nobody', !env.R.has(0xff001001, 'embassy') && /could not be written/.test(line));
+    yes('R6 and tells the person nothing', env.said.length === 0);
+    delete files.__refuse;
+    run(env, ADMIN, 0x14, '/embassy add Person1 armed');
+    files.__refuse = true;
+    const disarm = run(env, ADMIN, 0x14, '/embassy disarm Person1');
+    const gone = run(env, ADMIN, 0x14, '/embassy remove Person1');
+    yes('R6 a disarm or a removal that cannot be written changes nothing either',
+        env.R.has(0xff001001, 'embassy') && env.E.rolls().embassy[0].armed === true &&
+        /could not be written/.test(disarm) && /could not be written/.test(gone));
+  }
+  {
+    // A roll file that is there and cannot be read is not written over.
+    const files = {};
+    files[require('path').join('private', 'embassy.json')] = '{"embassy": [{"actor": 4278194177, "na';
+    const env = load({ people: crowd(1), files: files });
+    yes('R8 an unreadable roll file loads as empty rolls', env.E.rolls().embassy.length === 0 && env.E.rolls().remnant.length === 0);
+    const before = files[require('path').join('private', 'embassy.json')];
+    const line = run(env, ADMIN, 0x14, '/embassy add Person1');
+    yes('R8 and nothing is written over it', files[require('path').join('private', 'embassy.json')] === before &&
+        !env.R.has(0xff001001, 'embassy') && /could not be read/.test(line));
+    yes('R8 an admin sees why in the roll', /could not be read/.test(run(env, ADMIN, 0x14, '/embassy')));
+    const fresh = load({ people: crowd(1) });
+    run(fresh, ADMIN, 0x14, '/embassy add Person1');
+    yes('R8 no roll file yet is two empty rolls that can be written', fresh.R.has(0xff001001, 'embassy'));
   }
   {
     const env = load({ people: crowd(2) });
@@ -231,28 +265,21 @@ if (block && RECIPES && ADMIN_ITEMS) {
 
   // ------------------------------------------------------- the building --
   {
-    const claims = {};
-    claims[HOUSE] = { by: 77, name: 'Hjoldan' };
-    const env = load({ door: { 0x14: EMBASSY, 0x15: HOUSE }, claims: claims });
-    const notAdmin = run(env, NOBODY, 0x14, '/embassy here');
-    yes('B1 only an admin says which building is the embassy', !env.E.holds(EMBASSY) && /Only an admin/.test(notAdmin));
-    const set = run(env, ADMIN, 0x14, '/embassy here');
-    yes('B1 an admin at its door makes that building the embassy', env.E.holds(EMBASSY) && /is the embassy/.test(set));
-    const held = run(env, ADMIN, 0x15, '/embassy here');
-    yes('B1 a building somebody holds is not taken by the Accord: the steward ends that claim first',
-        !env.E.holds(HOUSE) && /held by Hjoldan/.test(held) && /\/evict/.test(held));
-    const nowhere = run(load({}), ADMIN, 0x16, '/embassy here');
-    yes('B1 an admin who has not opened a door is asked to', /Open the embassy/.test(nowhere));
-    const again = load({ files: env.files });
-    yes('B1 the building is still the embassy after a restart', again.E.holds(EMBASSY));
-    run(env, ADMIN, 0x14, '/embassy here off');
-    yes('B1 and an admin can say it is not', !env.E.holds(EMBASSY));
+    const env = load({});
+    const doors = JSON.parse(fs.readFileSync(path.join(REPO_DIR, 'game', 'data', 'doors.json'), 'utf8'));
+    const nameM = /^const BUILDING_NAME = (\{.*\});$/m.exec(gm);
+    const NAMES = nameM ? JSON.parse(nameM[1]) : {};
+    yes('B1 the embassy is a building of the door table', env.E.EMBASSY_BUILDING === EMBASSY &&
+        Array.isArray(doors.buildings[EMBASSY]) && doors.buildings[EMBASSY].length > 0);
+    yes('B1 and it is the Abandoned Warehouse in Solitude, the answer suggested on #1390',
+        NAMES[EMBASSY] === 'Abandoned Warehouse' && /^Solitude/.test(doors.cells[EMBASSY].edid));
+    yes('B1 its doors start held, with no command', env.E.holds(EMBASSY) && !env.E.holds(HOUSE) && !env.E.holds(''));
+    yes('B1 there is no command that moves it', !/'here'/.test(block) && !/designate/.test(block));
   }
 
   // The property block's own words, driven with the embassy in place.
   {
-    const env = load({ door: { 0x14: EMBASSY } });
-    run(env, ADMIN, 0x14, '/embassy here');
+    const env = load({});
     const E = env.E;
     const claimSrc = slice(gm, '  function claim(actorId, profileId, toProfile) {\n    var building = here(actorId);', '\n  }\n');
     const evictSrc = slice(gm, '  function evict(actorId, profileId, toProfile) {', '\n  }\n');
@@ -287,9 +314,12 @@ if (block && RECIPES && ADMIN_ITEMS) {
       evict(0x14, STEWARD, function (p, line) { told.push(line); });
       return { told: told.join(' '), claims: claims };
     }
-    const ev = evictAt(EMBASSY, { by: 9, name: 'Somebody' });
-    yes('B3 a steward of Haafingar cannot evict the embassy', !!ev.claims[EMBASSY] && ev.told === E.EVICT_REFUSED &&
+    const ev = evictAt(EMBASSY, null);
+    yes('B3 a steward of Haafingar cannot evict the embassy', ev.told === E.EVICT_REFUSED &&
         /does not evict the Accord/.test(ev.told));
+    const leftover = evictAt(EMBASSY, { by: 9, name: 'Somebody' });
+    yes('B3 a claim somebody made there before the embassy held it is still theirs, and a steward still ends it',
+        !leftover.claims[EMBASSY] && /You end Somebody's claim/.test(leftover.told) && E.holds(EMBASSY));
     const evHouse = evictAt(HOUSE, { by: 9, name: 'Somebody' });
     yes('B3 and still ends a claim anywhere else', !evHouse.claims[HOUSE]);
 
@@ -389,11 +419,8 @@ if (block && RECIPES && ADMIN_ITEMS) {
     yes('M2 and carrying a Justiciar Saber', env.T.marked(0xa4) === true);
     yes('M2 and in iron armour does not', env.T.marked(0xa3) === false);
     yes('M2 and nothing worn is no marker', env.T.marked(0xa9) === false);
-    const wearer = run(env, NOBODY, 0xa1, '/remnant');
-    yes('M3 /remnant tells somebody in Thalmor robes that what they have on reads Thalmor',
-        /You are not on the Thalmor remnant roll/.test(wearer) && /reads Thalmor/.test(wearer) && /hostile marker/.test(wearer));
-    yes('M3 and says nothing of it to somebody in iron', !/reads Thalmor/.test(run(env, NOBODY, 0xa3, '/remnant')));
-    yes('M3 the embassy question never reads the marker', !/reads Thalmor/.test(run(env, NOBODY, 0xa1, '/embassy')));
+    yes('M3 nothing is typed to read the marker: /remnant is a staff command', !/reads Thalmor/.test(run(env, NOBODY, 0xa1, '/remnant')) &&
+        !/What you have on reads Thalmor/.test(block));
   }
 
   // ------------------------------------------- what the block does not do --
@@ -426,7 +453,12 @@ if (block && RECIPES && ADMIN_ITEMS) {
     const playerWords = PW ? new Function('return ' + PW[1])() : [];
     yes('W1 the server answers /embassy and /remnant', words.indexOf('/embassy') !== -1 && words.indexOf('/remnant') !== -1);
     yes('W1 and /help does not offer them to everybody', playerWords.indexOf('/embassy') === -1 && playerWords.indexOf('/remnant') === -1);
-    yes('W1 the chat dispatcher hands both to the block', /if \(word === '\/embassy' \|\| word === '\/remnant'\) \{[\s\S]{0,200}__thornswoodEmbassy/.test(gm));
+    yes('W1 the chat dispatcher hands both to the block', /if \(word === '\/embassy' \|\| word === '\/remnant'\) \{[\s\S]{0,300}__thornswoodEmbassy/.test(gm));
+    const cmds = fs.readFileSync(path.join(REPO_DIR, 'docs', 'systems', 'commands.md'), 'utf8');
+    const staff = cmds.slice(cmds.indexOf('## Staff and dev commands'), cmds.indexOf('## Lines the game sends itself'));
+    const people = cmds.slice(cmds.indexOf('## Commands for people'), cmds.indexOf('## Staff and dev commands'));
+    yes('W1 the command list has both among the staff commands, and not among the commands for people',
+        /`\/embassy/.test(staff) && /`\/remnant/.test(staff) && !/`\/embassy/.test(people) && !/`\/remnant/.test(people));
     const EM = String.fromCharCode(0x2014);
     const lines = (block.match(/'[^'\n]*'/g) || []).join(' ');
     yes('W2 nothing the block says has an em dash', lines.indexOf(EM) === -1 && block.indexOf(EM) === -1);
