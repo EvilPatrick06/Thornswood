@@ -90,9 +90,12 @@ function Expand([string]$range) {
     return $ExecutionContext.InvokeCommand.ExpandString($remote.Groups[1].Value)
 }
 
+# The line that sets the settings, found by one only it carries. It was found
+# by THORNSWOOD_VOICE_AUTH=, until #1303 put a comment above it that names that
+# setting, and the comment was taken for the line.
 function StartLine([string]$expanded) {
     foreach ($l in ($expanded -split "`n")) {
-        if ($l -match 'THORNSWOOD_VOICE_AUTH=') { return $l.Trim() }
+        if ($l -match 'set THORNSWOOD_VOICE_PORT=') { return $l.Trim() }
     }
     return ''
 }
@@ -121,7 +124,8 @@ Yes 'and the question asks for the range' ($src.Contains('+ '';chat='' + `$h.cha
 $keepAt = [regex]::Match($src, '\$chatExplicit -and "\$current" -match ''([^'']+)''')
 $bindAt = [regex]::Match($src, '"\$current" -match ''(bind=[^'']+)''')
 Yes 'the answer is read for a range' $keepAt.Success
-Yes 'and still read for the bind and the auth' $bindAt.Success
+# Auth is not kept since #1303: there is no -Auth, the service always refuses.
+Yes 'and still read for the bind' $bindAt.Success
 
 if ($keepAt.Success -and $bindAt.Success) {
     $keep = $keepAt.Groups[1].Value
@@ -139,7 +143,7 @@ if ($keepAt.Success -and $bindAt.Success) {
     Yes 'a service older than the setting, which answers with nothing, gets the default, on' ((Kept 'bind=0.0.0.0;auth=log;chat=') -eq 'on')
     Yes 'a first install, with no service to answer, gets the default, on' ((Kept 'none') -eq 'on')
     $ok = 'bind=127.0.0.1;auth=on;chat=4000' -match $both
-    Yes 'the longer answer still gives up the bind and the auth' ($ok -and $Matches[1] -eq '127.0.0.1' -and $Matches[2] -eq 'on')
+    Yes 'the longer answer still gives up the bind' ($ok -and $Matches[1] -eq '127.0.0.1')
 }
 
 Write-Host ''

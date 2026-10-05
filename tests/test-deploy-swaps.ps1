@@ -513,10 +513,10 @@ try {
            Args = $docs.Clone() },
         @{ Name = 'Install-Voice.ps1'; File = 'voice/public/extra.js'; How = 'new'
            Args = @{ VpsHost = '127.0.0.1'; VpsUser = 'nobody'; Root = (Join-Path $box 'Thornswood-Voice'); Port = (PickPort); Site = ''; Bind = '0.0.0.0'
-                     Auth = 'log'; ChatRange = 'off'; TurnUrl = ''; TaskName = 'Thornswood Test Voice'; NoPause = $true; Wait = 10 } },
+                     ChatRange = 'off'; TurnUrl = ''; TaskName = 'Thornswood Test Voice'; NoPause = $true; Wait = 10 } },
         @{ Name = 'Install-Voice.ps1'; File = 'scripts/vps/Roll-Log.ps1'; How = 'changed'
            Args = @{ VpsHost = '127.0.0.1'; VpsUser = 'nobody'; Root = (Join-Path $box 'Thornswood-Voice'); Port = (PickPort); Site = ''; Bind = '0.0.0.0'
-                     Auth = 'log'; ChatRange = 'off'; TurnUrl = ''; TaskName = 'Thornswood Test Voice'; NoPause = $true; Wait = 10 } },
+                     ChatRange = 'off'; TurnUrl = ''; TaskName = 'Thornswood Test Voice'; NoPause = $true; Wait = 10 } },
         @{ Name = 'Install-Bot.ps1'; File = 'bot/card.py'; How = 'staged'
            Args = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = (Join-Path $box 'Thornswood-Bot'); Service = 'ThornswoodTestBot'; CodeOnly = $true; NoPause = $true; Wait = 20 } },
         @{ Name = 'Deploy-DevGamemode.ps1'; File = 'game/gamemode.js'; How = 'changed'
@@ -668,7 +668,7 @@ try {
     $voiceRoot = Join-Path $box 'Thornswood-Voice'
     $voicePort = PickPort
     $voice = @{ VpsHost = '127.0.0.1'; VpsUser = 'nobody'; Root = $voiceRoot; Port = $voicePort; Site = ''; Bind = '0.0.0.0'
-                Auth = 'log'; ChatRange = 'off'; TurnUrl = ''; TaskName = 'Thornswood Test Voice'; NoPause = $true; Wait = 10 }
+                ChatRange = 'off'; TurnUrl = ''; TaskName = 'Thornswood Test Voice'; NoPause = $true; Wait = 10 }
     function Build { $h = Http $voicePort '/health'; if ($h) { try { return [string]($h | ConvertFrom-Json).build } catch { } }; return '' }
 
     Voice 'voice-v1'
@@ -705,13 +705,15 @@ try {
     if ($script:fail -gt $failed) { Show }
 
     Voice 'voice-v4, will-not-start'
-    $a = $voice.Clone(); $a['Auth'] = 'on'
+    # Another chat range, so the task this install makes differs from the one it
+    # replaces. It was -Auth until #1303 took that away: the service always refuses.
+    $a = $voice.Clone(); $a['ChatRange'] = '2500'
     $r = Deploy 'Install-Voice.ps1' $a
     $failed = $script:fail
     Yes 'Install-Voice: a build that does not start is SWAP ROLLED BACK, and the install fails' ((-not $r.Ok) -and $r.Said -match 'SWAP ROLLED BACK')
     Yes '  and says why from voice.log' ($r.Said -match 'this voice will not start')
     Yes '  and the old files are back and the old build answers again' (((Live $voiceRoot) -eq $live) -and (WaitFor { (Build) -eq 'voice-v2' }))
-    Yes '  and the task is back exactly as it was, auth and all, not the one this install made' ((TaskArg 'Thornswood Test Voice') -eq $taskBefore -and $taskBefore -match 'THORNSWOOD_VOICE_AUTH=log')
+    Yes '  and the task is back exactly as it was, chat range and all, not the one this install made' ((TaskArg 'Thornswood Test Voice') -eq $taskBefore -and $taskBefore -match 'THORNSWOOD_CHAT_RANGE=off&&')
     if ($script:fail -gt $failed) { Show }
 
     $a = $voice.Clone(); $a['PutBack'] = $true
