@@ -52,9 +52,9 @@ const propBox = {
   mp: { makeProperty: function (name, opts) { made[name] = opts; } },
   CHARGEN_PROPERTY: 'thornswoodChargen', TOOL_PROPERTY: 'thornswoodTools',
   DEPOSIT_PROPERTY: 'thornswoodDeposit', SWING_PROPERTY: 'thornswoodSwing',
-  WEAR_PROPERTY: 'thornswoodWear', PUTBACK_PROPERTY: 'thornswoodPutBack',
+  PUTBACK_PROPERTY: 'thornswoodPutBack',
   ALERT_PROPERTY: 'thornswoodAlert',
-  swingScript: function () { return ''; }, wearScript: function () { return ''; },
+  swingScript: function () { return ''; },
   putBackScript: function () { return ''; }, alertScript: function () { return ''; }
 };
 vm.runInNewContext(ensure + '\nensureProperties();', propBox,
@@ -106,8 +106,6 @@ const box = {
   log: function () { logged.push(Array.prototype.slice.call(arguments).join(' ')); },
   say: function () { },
   notify: function (actorId, text) { said.push({ id: actorId, text: text }); },
-  wearWhatIsWorn: function () { return 0; },
-  dressIfBare: function () { return ''; },
   resolveArrival: function () { return null; }
 };
 box.globalThis = box;

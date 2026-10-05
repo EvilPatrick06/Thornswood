@@ -45,7 +45,10 @@ const TOMES = between(gm, '// ==== thornswood spell tomes ====', '// ==== end th
 const COLLEGE = between(gm, '// ==== thornswood college ====', '// ==== end thornswood college ====');
 const SPELLON = between(gm, 'function spellOn(actorId, spellDesc, on) {', '\n}\n');
 const TREE = between(front, '// >>> tree apply: begin >>>', '// <<< tree apply: end <<<');
-const FIRST_SIGHT = between(gm, '    if (!firstSeen.has(actorId)) {', '      const said = dressIfBare(actorId);');
+// Ends at the settle wait. It used to end at the dressIfBare watch, which came
+// out with the other dress asks when a new character began to be dressed where
+// it is made (#1560, #1604).
+const FIRST_SIGHT = between(gm, '    if (!firstSeen.has(actorId)) {', '    if (now - firstSeen.get(actorId) < SETTLE_MS) {');
 const ok = RULES && CHARACTER && PERKS && MANEUVERS && TOMES && COLLEGE && SPELLON && TREE && FIRST_SIGHT;
 yes('the rules, character, skill perks, maneuvers, tomes and college blocks, the chargen tick\'s first sight ' +
     'and the client\'s skill tree hand are where this reads them', !!ok);
@@ -400,8 +403,10 @@ delete srv.ctx.__thornswoodChargen;
 // ------------------------------------------------------------ the wiring --
 {
   const at = FIRST_SIGHT.indexOf('c.arrival(actorId)');
-  yes('F1 the chargen tick\'s first sight of somebody calls arrival, after the spells and the clothes',
-    at > 0 && at > FIRST_SIGHT.indexOf('c.grantKnown(actorId)') && at > FIRST_SIGHT.indexOf('wearWhatIsWorn(actorId)'));
+  // The login ask that put worn clothes back on is gone (#1560), so arrival
+  // comes after the spells, and no clothes ask is left in front of it.
+  yes('F1 the chargen tick\'s first sight of somebody calls arrival, after the spells',
+    at > 0 && at > FIRST_SIGHT.indexOf('c.grantKnown(actorId)') && FIRST_SIGHT.indexOf('wearWhatIsWorn') < 0);
   yes('F2 the character block hands arrival out', /beginCreation: beginCreation, arrival: arrival,/.test(CHARACTER));
   yes('F3 the refresh answers as a redraw, and a redraw, and nothing else, adds the time (#1730)',
     /if \(what === 'refresh'\) \{[\s\S]{0,300}writeState\(actorId, s, true\);/.test(CHARACTER) &&
