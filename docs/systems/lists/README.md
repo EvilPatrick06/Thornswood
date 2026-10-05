@@ -11,7 +11,7 @@ Every row the recipe, harvest, ore and hunt tables currently hold. The pages tha
 - [Tailor/Haberdasher](tailor-haberdasher.md) (168, 168 reach the server)
 - [Tailor/Liverywright](tailor-liverywright.md) (81, 81 reach the server)
 - [Woodworker/Charburner](woodworker-charburner.md) (5, 5 reach the server)
-- [Woodworker/Woodwright](woodworker-woodwright.md) (36, 36 reach the server)
+- [Woodworker/Woodwright](woodworker-woodwright.md) (33, 33 reach the server)
 - [Embassy and remnant rolls](roll-gates.md) (24)
 - [Anybody](anybody.md) (588)
 - [Refused](refused.md) (235)
