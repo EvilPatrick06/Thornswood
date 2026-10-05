@@ -351,7 +351,8 @@ try {
     foreach ($f in 'scripts\release\Publish-Update.ps1', 'scripts\release\Ship-Rules.ps1', 'scripts\mods\LoadOrder.ps1',
                    'scripts\release\Feed-Store.ps1', 'scripts\release\Release-Baseline.ps1', 'scripts\release\Release-Name.ps1', 'scripts\release\Source-Notice.ps1',
                    'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt',
-                   'scripts\release\Where.ps1', 'records\client-build.json') {
+                   'scripts\release\Where.ps1', 'records\client-build.json',
+                   'scripts\mods\Generated.ps1', 'records\generated.json') {
         $to = Join-Path $fake $f
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $to) | Out-Null
         if (Test-Path -LiteralPath (Join-Path $repo $f)) { Copy-Item -LiteralPath (Join-Path $repo $f) -Destination $to -Force }
@@ -372,6 +373,9 @@ try {
     Put (Join-Path $inst 'Game\Data\Platform\UI\ours.esp') 'plugin'
     Put (Join-Path $inst 'Profile\OwnGame\plugins.txt') "# This fixture enables no additional plugins.`r`n"
     Put (Join-Path $inst 'Profile\OwnGame\loadorder.txt') ''
+    # The covered bodies a publish needs since d2519bb, as a build leaves them.
+    . (Join-Path $repo 'tests\fixtures\generated-bodies.ps1')
+    New-GeneratedBodies $inst $fake
     $rel6 = Join-Path $inst 'rel'
     function Publish([string[]]$extra) {
         $oldA = $env:LOCALAPPDATA; $oldE = $ErrorActionPreference

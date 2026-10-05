@@ -234,7 +234,7 @@ if ($why) { Write-Host "      $why"; Done }
 $fake = Join-Path $T 'repo'
 New-Item -ItemType Directory -Force -Path $fake | Out-Null
 Copy-Item -LiteralPath (Join-Path $repo 'scripts') -Destination $fake -Recurse -Force
-foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt') {
+foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\generated.json') {
     $from = Join-Path $repo $f
     if (Test-Path -LiteralPath $from) { New-Item -ItemType Directory -Force -Path (Split-Path -Parent (Join-Path $fake $f)) | Out-Null; Copy-Item -LiteralPath $from -Destination (Join-Path $fake $f) -Force }
 }
@@ -253,6 +253,10 @@ New-Item -ItemType Directory -Force -Path $rel | Out-Null
 [IO.File]::WriteAllLines((Join-Path $pub 'Profile\OwnGame\files.txt'), @('F|V|1024|638000000000000000|Data\collection.esp'))
 Put (Join-Path $pub 'Profile\OwnGame\plugins.txt') "*ours.esp`r`n"
 Put (Join-Path $pub 'Profile\OwnGame\loadorder.txt') "ours.esp`r`n"
+# The covered bodies a publish needs since d2519bb, as a build leaves them.
+# They are ours, so every release and the installer carry them too.
+. (Join-Path $repo 'tests\fixtures\generated-bodies.ps1')
+New-GeneratedBodies $pub $fake
 Put (Join-Path $pub 'config.json') ('{"ServerAddress":"127.0.0.1","ServerPort":' + ($gamePort - 1) + '}')
 
 # What the build holds, relative to the game folder, and how to change it.
