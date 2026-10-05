@@ -216,7 +216,7 @@ $at = "$siteUrl/feed/assets/"
 $gamePort = Free-Port
 $gameJs = Join-Path $T 'game-server.js'
 Put $gameJs ("require('http').createServer(function (q, s) { s.setHeader('Content-Type', 'application/json'); " +
-             "s.end(JSON.stringify({ mods: [{ filename: 'ours.esp', size: 1, crc32: 1 }] })); })" +
+             "s.end(JSON.stringify({ mods: [{ filename: 'collection.esp', size: 1, crc32: 1 }] })); })" +
              ".listen($gamePort, '127.0.0.1', function () { console.log('[game] listening on 127.0.0.1:$gamePort'); });")
 $gpsi = New-Object Diagnostics.ProcessStartInfo
 $gpsi.FileName = $node.Source; $gpsi.Arguments = '"' + $gameJs + '"'
@@ -234,7 +234,10 @@ if ($why) { Write-Host "      $why"; Done }
 $fake = Join-Path $T 'repo'
 New-Item -ItemType Directory -Force -Path $fake | Out-Null
 Copy-Item -LiteralPath (Join-Path $repo 'scripts') -Destination $fake -Recurse -Force
-foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\generated.json') {
+# launcher\app\VortexProfileState.cs: LoadOrder.ps1 compiles the Vortex state
+# reader from the launcher's source since #1416, and the publish reads the
+# collection revision through it (#1878).
+foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\generated.json', 'launcher\app\VortexProfileState.cs') {
     $from = Join-Path $repo $f
     if (Test-Path -LiteralPath $from) { New-Item -ItemType Directory -Force -Path (Split-Path -Parent (Join-Path $fake $f)) | Out-Null; Copy-Item -LiteralPath $from -Destination (Join-Path $fake $f) -Force }
 }
@@ -251,8 +254,11 @@ $rel = Join-Path $T 'rel'
 foreach ($dd in 'Game\Data', 'Profile\OwnGame', 'appdata', 'dist') { New-Item -ItemType Directory -Force -Path (Join-Path $pub $dd) | Out-Null }
 New-Item -ItemType Directory -Force -Path $rel | Out-Null
 [IO.File]::WriteAllLines((Join-Path $pub 'Profile\OwnGame\files.txt'), @('F|V|1024|638000000000000000|Data\collection.esp'))
-Put (Join-Path $pub 'Profile\OwnGame\plugins.txt') "*ours.esp`r`n"
-Put (Join-Path $pub 'Profile\OwnGame\loadorder.txt') "ours.esp`r`n"
+# The reference plugin list enables the plugin Vortex deployed into Data. Since
+# 6e4488e4 a publish refuses a list that enables a file Data does not have, and
+# ours.esp is under Data\Platform\UI, so naming it stopped every release (#1878).
+Put (Join-Path $pub 'Profile\OwnGame\plugins.txt') "*collection.esp`r`n"
+Put (Join-Path $pub 'Profile\OwnGame\loadorder.txt') "collection.esp`r`n"
 # The covered bodies a publish needs since d2519bb, as a build leaves them.
 # They are ours, so every release and the installer carry them too.
 . (Join-Path $repo 'tests\fixtures\generated-bodies.ps1')
