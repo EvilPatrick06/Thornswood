@@ -321,22 +321,25 @@ author's plugin, #1180), and other servers' files moved into
 `Verify.cs:1019 DeployPersonal()` copies `<Root>\Your Mods` into `Game\Data`.
 
 **Vortex profile state** (VortexProfileState.cs). Checks and the PowerShell
-load-order scripts share this reader for the named Skyrim profile and for the
-collection: the revision installed, the newest revision Vortex knows of, and
-the mod ids that name its staging folder (#1582, #1902). It reads
+load-order scripts share this reader for the named Skyrim profile and the
+collection revision installed (#1582). The newest revision Vortex knows of
+and the mod ids that name the collection's staging folder are read only by
+the scripts, `Get-CollectionNewest` and `Get-CollectionModIds` in
+`scripts\mods\LoadOrder.ps1` (#1902); the launcher's copies had no caller
+and were removed (#1957). It reads
 the current LevelDB manifest, compressed tables and sequenced log records
 without opening or writing the database. Deleted, ambiguous, corrupt or
 incomplete profile metadata is refused. Finish deployment and close Vortex
 before a bake or Ship so its exclusively held database can be read.
 
-**Checks** (Checks.cs). The rows on the Play page (`Checks.cs:974 All()`):
+**Checks** (Checks.cs). The rows on the Play page (`Checks.cs:796 All()`):
 game build, script extender, Address Library, multiplayer, client, mods, mod
 list, other servers, auto load, Steam. A failed row shuts Play unless it is
 advisory, which is drawn amber and leaves Play alone. Address Library
 (`Checks.cs:51 AddressLibraryRow()`) is advisory, because a new row that
 blocks and is wrong on somebody's machine locks them out with nothing they
 can press. Finding and closing the game's processes
-(`Checks.cs:1153 GameRunning()`, `Checks.cs:1302 CloseGame()`). Writes nothing
+(`Checks.cs:975 GameRunning()`, `Checks.cs:1124 CloseGame()`). Writes nothing
 except when Fix moves a file aside.
 
 **Door and Discord** (Door.cs, Discord.cs). Who is allowed in. The Discord
@@ -537,7 +540,7 @@ appearing".
 ### The gate
 
 `Shell.cs:2813 DrawStatus()` runs on every page change, scan and recheck. It
-draws a row for each check in `Checks.cs:974 All()`, and a failed row counts
+draws a row for each check in `Checks.cs:796 All()`, and a failed row counts
 against Play unless it is advisory (`Shell.cs:2832 c.Blocks`); an advisory row
 that fails is drawn amber instead. The rows live in `StatusList` on the
 Diagnostics page now (#607); the Play page shows a one line summary of them
