@@ -57,14 +57,16 @@ does not change which key a door wants.
 
 ## Stewards and rent
 
-A jarl names stewards. Only a steward can `/evict`, and only at the
-door. Eviction ends the claim. It does not empty the house. It does not
+A jarl names stewards. Only a steward can evict, and only at the
+door: open it, then press Evict on the Office page of the K panel
+within a minute. Eviction ends the claim. It does not empty the house. It does not
 take a key back, so a tenant who kept one can still walk in. That is a
 person's problem, handled like a person.
 
-Rent is optional. A steward at the door says `/rent 50` and the place
-owes 50 gold every 7 real days, or `/rent -` and it owes nothing.
-`/rent` with no amount says what is owed.
+Rent is optional. A steward opens the door, then on the Office page
+sets 50 and the place owes 50 gold every 7 real days, or presses No
+rent and it owes nothing. The page shows the steward what is owed
+there.
 
 The server counts the debt. It does not take the gold out of a pack.
 Rent is handed to a steward, or put in the hold's box. Gold put in the
@@ -84,11 +86,13 @@ submits the list. The guild of that hold keeps the copy. The rules
 are on [Factions and businesses](factions.md) and
 [Merchant's Guild](merchants-guild.md).
 
-A steward can still mark a container with `/box whiterun`. Only gold
-goes in that chest. Anything else is handed back, still in the hand.
+A steward can still make a container a hold's box: open it, then
+press the hold on the Office page of the K panel within a minute. Only
+gold goes in that chest. Anything else is handed back, still in the hand.
 The board itself is enough to submit a list.
 
-The number `/box` reports is a ledger of what has been paid in. Gold
+The number the board panel shows as paid in is a ledger of what has
+been paid in. Gold
 dropped in the chest is also in the chest. A fee taken for a notice is
 counted on the ledger and is not sitting in the chest. Nothing
 withdraws from the ledger except the payouts named on
@@ -159,7 +163,11 @@ not company wares.
 
 Claims, deeds, the 14 day lapse, locks, molds, keys, stewards,
 eviction, rent, and the gold-only box are in the server. The register
-is `private/property.json`.
+is `private/property.json`. Eviction, the rent and marking a box are
+the Office page of the K panel, for a steward or a Jarl; see
+[Offices](offices.md). A container is made one of the ten holds' boxes
+and no other. The rent owed is on that page for the steward at the
+door; a holder does not see it on a panel yet.
 
 A bed counts only when the server saw the person press it and they
 are still beside it, and the rest stops when they leave it, the night
