@@ -366,6 +366,7 @@ jobs:
                  'test-1170-addons-on-rail.js',
                  'test-1351-unmasked-frames.js',
                  'test-1349-relay-shapes.js',
+                 'test-1075-script-citations.js',
                  'test-table-install.js',
                  'test-secrets-fail-closed.js',
                  'test-our-key-menus.js', 'test-slash-key.js', 'test-social-keys.js',
