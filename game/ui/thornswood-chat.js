@@ -241,6 +241,12 @@
           if (said.afk === 'out') {
             try { window.skyrimPlatform.sendMessage('thornswood-front', 'afk:out server'); } catch (e) { }
           }
+          // The server is ending this session on purpose (#1157): the front
+          // closes the game's connection before the kick, so the client does
+          // not connect again by itself, and shows the sentence at the choice.
+          if (typeof said.end === 'string' && said.end) {
+            try { window.skyrimPlatform.sendMessage('thornswood-front', 'session:end', said.end); } catch (e) { }
+          }
           said.t = 'line';
           fanout(said);
         }

@@ -29690,8 +29690,12 @@ log('gamemode loaded:',
     return 0;
   }
 
-  // After the sentence, so it is on screen before the connection goes.
-  function refuseLater(profileId, actorId) {
+  // After the sentence, so it is on screen before the connection goes. Their
+  // game is told the session ends (#1157), so it closes its side and does not
+  // connect again by itself; the kick is for a game that does not.
+  function refuseLater(profileId, actorId, sentence) {
+    var line = g.__thornswoodSayLine;
+    if (typeof line === 'function') { line(profileId, { end: sentence }); }
     setTimeout(function () {
       var actor = actorId || actorOfProfile(profileId);
       var userId = -1;
@@ -29769,10 +29773,11 @@ log('gamemode loaded:',
       return verdict;
     }
     seen.last[profileId] = { key: 'at ' + verdict.at, at: now };
-    tell(loadOrderSentence(verdict, true));
+    var told = loadOrderSentence(verdict, true);
+    tell(told);
     console.log('[thornswood] refusing profile ' + profileId + ': load order differs at ' +
                 verdict.at + ', where the server has ' + verdict.theirs);
-    refuseLater(profileId, actorId);
+    refuseLater(profileId, actorId, told);
     return verdict;
   }
 
@@ -29824,7 +29829,7 @@ log('gamemode loaded:',
       }
       console.log('[thornswood] refusing profile ' + pid + ': no load order report in ' +
                   Math.round((now - e.clock) / 1000) + 's online');
-      refuseLater(pid, e.actorId);
+      refuseLater(pid, e.actorId, noReportSentence(refuse));
     }
     for (var k in seen.online) {
       if (Object.prototype.hasOwnProperty.call(seen.online, k) && !here[k]) { delete seen.online[k]; }
@@ -30108,8 +30113,12 @@ log('gamemode loaded:',
     return r;
   }
 
-  // After the sentence, so it is on screen before the connection goes.
+  // After the sentence, so it is on screen before the connection goes. Their
+  // game is told the session ends (#1157), so it closes its side and does not
+  // connect again by itself; the kick is for a game that does not.
   function refuseLater(profileId, actorId) {
+    var line = g.__thornswoodSayLine;
+    if (typeof line === 'function') { line(profileId, { end: SENTENCE }); }
     setTimeout(function () {
       var userId = -1;
       try { userId = mp.getUserByActor(actorId); } catch (e) { userId = -1; }
@@ -30586,6 +30595,8 @@ log('gamemode loaded:',
               ' already in the world' + (state.line.length ? ', ' + state.line.length + ' waiting in line' : '') +
               reason);
       how.tell(pid, sentence(cap));
+      // Their game closes its side and goes back to the choice (#1157).
+      how.line(pid, { end: sentence(cap) });
       how.end(pid, online[j].actorId);
     }
 
@@ -48485,6 +48496,14 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
     for the menu page to show. Data rather than words, under a name no person
     can send from (the service puts from 0 on it), and the page takes it out
     of the chat; see thornswood-chat.js.
+
+    And a session the server is ending on purpose (#1157), { end: <the
+    sentence they were told> }, said before the kick: their game closes its
+    own connection and goes back to the character choice with the sentence on
+    it. skymp5-client connects again after every disconnect, so a kick alone
+    brought the same session straight back, refused again, for as long as the
+    game stayed open. A restart's kick does not say it, because that
+    reconnect is wanted.
   */
   var LINE_NAME = 'Thornswood line';
   g.__thornswoodSayLine = function (profileId, what) {
@@ -60557,19 +60576,33 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   function endBanned(pid, actorId, ban, now) {
     if (state.ending[pid] && now - state.ending[pid] < 60000) { return; }
     state.ending[pid] = now;
+    var told;
     if (ban.scope === 'character') {
-      tell(pid, 'Staff have banned this character ' + untilText(ban.until) +
-                (ban.why ? ': ' + ban.why : '') + '. Your session is being ended. ' +
-                'You can still play your other characters.');
+      told = 'Staff have banned this character ' + untilText(ban.until) +
+             (ban.why ? ': ' + ban.why : '') + '. Your session is being ended. ' +
+             'You can still play your other characters.';
     } else {
-      tell(pid, 'You are banned from Thornswood ' + untilText(ban.until) +
-                (ban.why ? ': ' + ban.why : '') + '. Your session is being ended.');
+      told = 'You are banned from Thornswood ' + untilText(ban.until) +
+             (ban.why ? ': ' + ban.why : '') + '. Your session is being ended.';
     }
+    tell(pid, told);
     log('staff: ending the session of profile ' + pid + ', ' +
         (ban.scope === 'character' ? 'character ' : '') + 'banned ' + untilText(ban.until));
-    endLater(pid, actorId);
+    endLater(pid, actorId, told);
   }
-  function endLater(pid, actorId) {
+  /*
+    Their game is told the session ends (#1157), on the line its character
+    choice reads, so it closes its side and goes back to the choice with the
+    sentence. skymp5-client connects again after every disconnect, so the kick
+    alone brought the same session straight back. The kick is for a game that
+    does not close.
+  */
+  function sessionEnds(pid, sentence) {
+    var line = g.__thornswoodSayLine;
+    if (typeof line === 'function' && pid) { line(pid, { end: sentence }); }
+  }
+  function endLater(pid, actorId, sentence) {
+    sessionEnds(pid, sentence);
     setTimeout(function () {
       var userId = -1;
       try { userId = mp.getUserByActor(actorId); } catch (e) { userId = -1; }
@@ -60583,10 +60616,11 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   function endPk(pid, actorId, now) {
     if (state.ending[pid] && now - state.ending[pid] < 60000) { return; }
     state.ending[pid] = now;
-    tell(pid, 'This character has died for good and cannot be played again. Your session is ' +
-              'being ended. Press Play in the launcher to pick another character or make a new one.');
+    var told = 'This character has died for good and cannot be played again. Your session is ' +
+               'being ended. Press Play in the launcher to pick another character or make a new one.';
+    tell(pid, told);
     log('staff: ending the session of profile ' + pid + ', whose character is dead for good');
-    endLater(pid, actorId);
+    endLater(pid, actorId, told);
   }
 
   /* Anybody banned or dead for good who is online, whoever did it and wherever. */
@@ -60890,8 +60924,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     }
     if (word === '/kick') {
       if (them.pid === pid) { tell(pid, 'That is you.'); return true; }
-      tell(them.pid, 'Staff have ended your session' + (reason ? ': ' + reason + '.' : '.') +
-                     ' Read the rules on thornswood.net before you come back.');
+      var kicked = 'Staff have ended your session' + (reason ? ': ' + reason + '.' : '.') +
+                   ' Read the rules on thornswood.net before you come back.';
+      tell(them.pid, kicked);
+      sessionEnds(them.pid, kicked);
       tell(pid, 'Removing ' + them.name + ' from the world.');
       record('kick', pid, me, them.pid, them.name, reason, 0);
       var gone = them.actorId;
