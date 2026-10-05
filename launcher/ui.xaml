@@ -1188,6 +1188,12 @@
                      missing named control cannot take the page with it. -->
                 <StackPanel x:Name="DiagCollection" Margin="0,8,0,0"/>
 
+                <!-- The optional packs (#1170), under the collection line. Their
+                     Add-ons tab is on the Mods page, which #599 took off the
+                     rail. Built in C# like the collection line, and empty until
+                     the update feed lists a pack. -->
+                <StackPanel x:Name="DiagAddons"/>
+
                 <Border Style="{StaticResource Slab}" Padding="20,18" Margin="0,16,0,0">
                   <StackPanel>
                     <TextBlock Style="{StaticResource H2}" Text="Bring it up to date from Vortex"/>

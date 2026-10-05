@@ -5,7 +5,9 @@
   dev server's settings, leaving the switch off keeps what the box has, and
   every run leaves thornswoodServer at dev, so a join pass the site issued for
   the live server is refused on the dev one (#937). Deploy-Gamemode.ps1 writes
-  thornswoodServer main for live and takes the same -RequirePass.
+  thornswoodServer main for live; since #1223 it writes no join pass switch
+  into the build, and Deploy-Server.ps1 takes the same -RequirePass and sets
+  live's on the box.
 
   HOW. The same as test-dev-deploy-refuse.ps1: the settings block is lifted out
   of the script, expanded here with the values the script would have, and run
@@ -23,6 +25,7 @@ if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 $repo = Split-Path -Parent $here
 $script = Join-Path $repo 'scripts\deploy\Deploy-DevGamemode.ps1'
 $live = Join-Path $repo 'scripts\deploy\Deploy-Gamemode.ps1'
+$liveServer = Join-Path $repo 'scripts\deploy\Deploy-Server.ps1'
 
 $script:pass = 0
 $script:fail = 0
@@ -40,11 +43,13 @@ function SetOf([string]$path, [string]$name) {
     return ((@($vs.PositionalArguments | ForEach-Object { $_.Value }) | Sort-Object) -join ',')
 }
 Yes 'Deploy-DevGamemode.ps1 takes -RequirePass on, off, or nothing' ((SetOf $script 'RequirePass') -eq ',off,on')
-Yes 'Deploy-Gamemode.ps1 takes -RequirePass on, off, or nothing' ((SetOf $live 'RequirePass') -eq ',off,on')
+Yes 'Deploy-Server.ps1 takes -RequirePass on, off, or nothing (#1223)' ((SetOf $liveServer 'RequirePass') -eq ',off,on')
+Yes 'Deploy-Gamemode.ps1 takes no -RequirePass, so a build never carries one (#1223)' ($null -eq (SetOf $live 'RequirePass'))
 
 $liveText = [IO.File]::ReadAllText($live)
 Yes 'the live deploy always writes thornswoodServer main' ($liveText -match "NotePropertyName thornswoodServer -NotePropertyValue 'main' -Force")
-Yes 'and writes thornswoodRequirePass only when the switch was given' ($liveText -match "if \(\`$RequirePass\) \{\s*\r?\n\s*\`$s \| Add-Member -NotePropertyName thornswoodRequirePass -NotePropertyValue \(\`$RequirePass -eq 'on'\) -Force")
+Yes 'and writes no thornswoodRequirePass into the build, taking an old one out' (
+    $liveText -notmatch 'NotePropertyName thornswoodRequirePass' -and $liveText -match "'thornswoodRequirePass', 'thornswoodDevs', 'thornswoodPlaytesters'")
 
 $text = [IO.File]::ReadAllText($script)
 $start = $text.IndexOf("Write-Host 'Pointing the dev server at the dev voice service...'")

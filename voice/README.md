@@ -12,8 +12,8 @@ never passes through it. The `test-*.js` files beside it are its harnesses.
 It serves no page of its own: its two clients are the launcher's voice page
 and the game's overlay, both loaded off disk. The plain browser page it used
 to serve at `/` went in #1822, because it had no way to get a join token and
-so could never get in. `gamemode-voice.js` is the
-gamemode's half of the position feed as `Add-VoiceFeed.ps1` first added it.
+so could never get in. `gamemode-voice.js` is the gamemode's half of the
+position feed as `Add-VoiceFeed.ps1` first added it.
 The copy between the voice feed markers in `game\gamemode.js` has moved on
 since: it reads its port from `server-settings.json`, so the dev server feeds
 the dev service, where this file still has 7778 written in.
@@ -85,11 +85,12 @@ off the command line `Install-Voice.ps1` builds, `turn-key.txt` beside the
 service, put there by hand. Unless both are there, `/ice` offers STUN only; with
 neither, `/health` says `turn: none`, which is how every box runs today.
 `Install-Voice.ps1 -TurnUrl` sets the address. `test-turn-key.js` covers it.
-With a relay set, `/ice` hands its entry only to a page that POSTs the join
-token it holds (`{"token": ...}`, which the game's voice overlay and the
-launcher's voice page do) and to this machine itself, which is how
-`Install-Voice.ps1` reads the running relay; anybody else gets the STUN list
-(#1307).
+The pages in the room get the list on every roster (`{ t: 'peers', peers,
+iceServers }`), over the socket their join token proved, which is when they
+build their connections, so the relay comes with it however long they have
+been in (#1821). `/ice` hands the relay only to this machine itself, which is
+how `Install-Voice.ps1` reads the running relay; anybody else, token or none,
+gets the STUN list (#1307).
 
 ## Where it runs
 

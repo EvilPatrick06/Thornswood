@@ -1476,21 +1476,27 @@ const lastUse = new Map();   // "actorId:refrId" -> timestamp
   From the To Do List: "Any cache keyed by something unbounded gets an eviction
   rule: a size cap, an age sweep, or removal when the session ends." Every press
   that gives something adds a row here, one per character and per reference:
-  the quarry, the kiln, every plant, every river, the hanging game and every
-  carcass. Nothing ever took one out, so the map was bounded only by how long
-  the server had been up. Measured on 24 September: about 140 bytes a row.
+  the quarry, the kiln, every plant, every churn, nest, hive and cow. Nothing
+  ever took one out, so the map was bounded only by how long the server had
+  been up. Measured on 24 September: about 140 bytes a row.
+
+  The rivers, the hanging game and the carcasses kept their rows here until
+  #1413. Since then they wait on the shared resource stock, on the record and
+  for everybody (createSharedResourceStock), and the seams are deposits, so no
+  row here is asked about against MINE_COOLDOWN_MS or the fish, game or hunt
+  tables any more (#1641).
 
   A row older than the longest wait anybody asks about gives the answer a
   missing row gives, which is ready, because cooldownLeft reads a missing row
   as a stamp at time zero. So dropping those rows changes no answer anybody
   gets, and that is the whole rule. It is not removal when somebody leaves: a
-  four hour wait on a master fishing spot has to outlast logging out and back.
+  ten minute wait on a picked plant has to outlast logging out and back.
 
-  The longest wait is read off the tables rather than typed here. A number
-  typed here that ever fell below one of them would hand a spot back early,
-  and those four hours are the only limit on it. A new table of waits that
-  stamps this map goes in longestWaitMs, and test-cooldown-sweep.js fails
-  until it does.
+  The longest wait is read off the constants rather than typed here. A number
+  typed here that ever fell below one of them would hand a source back early.
+  A new wait that stamps this map goes in longestWaitMs, and
+  test-cooldown-sweep.js fails until it does. A table that no row here is read
+  against stays out of it, or rows are kept for hours nothing asks about.
 
   The sweep runs when a stamp takes the map past a mark, not on a timer. A
   stamp is the only way a row gets in, so this bounds the map without another
@@ -1502,13 +1508,7 @@ const LAST_USE_SWEEP_FROM = 5000;
 let lastUseSweepAt = LAST_USE_SWEEP_FROM;
 
 function longestWaitMs() {
-  let most = Math.max(COOLDOWN_MS, HARVEST_COOLDOWN_MS);
-  const tables = [MINE_COOLDOWN_MS, FISH_TUNING.cooldownMs,
-                  GAME_TUNING.cooldownMs, HUNT_TUNING.cooldownMs];
-  for (const t of tables) {
-    for (const k of Object.keys(t)) most = Math.max(most, Number(t[k]) || 0);
-  }
-  return most;
+  return Math.max(COOLDOWN_MS, HARVEST_COOLDOWN_MS);
 }
 
 /** Drops every row older than the longest wait, and moves the mark. */
@@ -2021,17 +2021,21 @@ const TOOL_AGAIN_HOURS = 12;
   you have to get a new one from a smith making them". So a tool stops being a
   thing somebody owns once and becomes stock, which somebody has to make.
 
-  A hundred uses, measured against the ladder rather than picked out of the air.
-  TUNING.workPerRank added up to 20 + 50 + 120 = 190 yields from novice to
-  Master when this was written, so one tool carried somebody a little over half
-  the way: two tools to the top, and a Master who keeps working keeps ordering.
-  That was a standing order book for the smiths without being a chore.
+  FIFTY USES, the plan's number: classes.md "It has 50 uses", and the miner,
+  farmer, woodworker and fisher pages say the same (#1381). The pull request
+  that closed #1381 changed only README.md, so the server kept 100 until
+  #1588. The pick, the axe, the shovel and the pole all have 50, and so does
+  the tool handed at creation, because handTool starts no count of its own:
+  wearTool counts every one of them against this. A tool that was already
+  past 49 uses under the old hundred breaks at its next one, because it has
+  done its 50.
 
-  IT IS 100 + 250 + 600 = 950 NOW, changed on 21 September when a rank stopped
-  meaning twenty seams and started meaning one. So the climb costs about ten
-  tools rather than two, which is five times the order book and may well be too
-  much of one. If the tool starts feeling like a toll rather than stock, this
-  is the number to move and not the ladder.
+  It was a hundred first, measured against the ladder when TUNING.workPerRank
+  added up to 20 + 50 + 120 = 190 yields from novice to Master: two tools to
+  the top. The ladder is 100 + 250 + 600 = 950 now, changed on 21 September
+  when a rank stopped meaning twenty seams and started meaning one, so the
+  climb costs about nineteen tools. If the tool starts feeling like a toll
+  rather than stock, that is a question for the plan pages, not this line.
 
   The warning comes at fifteen left. Far enough out to finish what you are doing
   and walk to a town, short enough to mean something.
@@ -2041,9 +2045,9 @@ const TOOL_AGAIN_HOURS = 12;
   cannot be read, or the tool is not in it, the swing wears nothing rather than
   breaking something at random.
 */
-const TOOL_USES = 100;
+const TOOL_USES = 50;
 const TOOL_WARN_AT = 15;
-// Poles are 50. fisher.md. The pick, the axe and the shovel stay on TOOL_USES.
+// Poles are 50 too. fisher.md: "50 uses, the same as the pick, the axe, and the shovel".
 const POLE_USES = 50;
 const FISH_TRAP_MAX = 3;
 
@@ -6475,10 +6479,9 @@ var FISH_BY_BASE = {
     master    four hours. The one slaughterfish egg nest record, which sits
               underwater in water slaughterfish are in.
 
-  This map is kept in memory, in the same lastUse map the quarry and the plants
-  use, so a server restart or a hot reload of this file clears every wait in it.
-  That is true of the ten minutes on a plant as well and it is the first thing
-  to know before these numbers are argued about.
+  Since #1413 the wait is kept on the record itself, in the shared resource
+  stock (createSharedResourceStock), for everybody at once, and not in the
+  lastUse map the quarry and the plants use.
 
   yieldByStep, the least and the most one press gives, novice first. The records
   hand over exactly one of their produce when the engine picks them, so the
@@ -6602,9 +6605,8 @@ var GAME_BY_BASE = {
               so that a record added to it later is not also a record with no
               wait at all.
 
-  This map is kept in memory, in the same lastUse map the quarry, the plants and
-  the rivers use, so a server restart or a hot reload of this file clears every
-  wait in it.
+  Since #1413 the wait is kept on the record itself, in the shared resource
+  stock, the same as the rivers', and not in the lastUse map.
 
   yieldByStep, the least and the most one press gives, novice first. The records
   hand over exactly one of their produce when the engine picks them, so the
@@ -8260,12 +8262,10 @@ var HUNTS_BY_BASE = {
   rivers do: a row carrying a rank nobody knows must not be the cheapest tap in
   the game.
 
-  Kept in memory, in the same lastUse map the seams, the plants and the rivers
-  use, so a server restart or a hot reload of this file clears it. That is worth
-  knowing before the numbers are argued about: a four hour wait a restart wipes
-  is not four hours. bodySeconds is not kept there. It is written into the
-  actor's change form by the engine, so it outlives a reload and is re-set on
-  every death anyway.
+  Since #1413 a carcass is dressed once a life on the shared resource stock
+  (stock.dress), so these waits are not kept in the lastUse map. bodySeconds is
+  written into the actor's change form by the engine, so it outlives a reload
+  and is re-set on every death anyway.
 */
 const HUNT_TUNING = {
   bodySeconds: 300,
@@ -29933,8 +29933,8 @@ log('gamemode loaded:',
   launcher, so that session is the same refusal. The setting still decides
   the hold (#410): with it on, nothing the session does counts until the pass
   arrives. Deploy-DevGamemode.ps1 -RequirePass on|off sets the hold on the
-  dev box, and Deploy-Gamemode.ps1 -RequirePass on|off with Deploy-Server.ps1
-  on live. No older launcher or plugin is kept working (Patrick, 28 Sep).
+  dev box, and Deploy-Server.ps1 -RequirePass on|off on live (#1223). No
+  older launcher or plugin is kept working (Patrick, 28 Sep).
 
   THE HOLD FAILS CLOSED (#1319). false is the one way to turn it off. true
   holds, and so does anything else: absent, null, empty, "true" as text, 1.
@@ -31385,11 +31385,11 @@ log('gamemode loaded:',
       number, it is the absence of anything like a vein on the gathering side,
       and it wants watching before it wants another guess.
 
-      AND IT IS TOOLS. TOOL_USES is 100, so the whole climb now costs about ten
-      tools rather than two. That is a far bigger standing order for the smiths
-      than the comment on TOOL_USES describes, and it is the next number to
-      look at if the tool stops feeling like stock and starts feeling like a
-      toll.
+      AND IT IS TOOLS. TOOL_USES is 50 (the plan's number, #1381), so the
+      whole climb now costs about nineteen tools rather than two. That is a
+      far bigger standing order for the smiths than the ladder had when the
+      tool was first counted, and it is the next number to look at if the
+      tool stops feeling like stock and starts feeling like a toll.
     */
     workPerRank: { advanced: 100, expert: 250, master: 600 },
     /*
@@ -32490,9 +32490,10 @@ log('gamemode loaded:',
     spells anyone can learn that way'. So what they can spend is the smaller
     of the points they hold and the places left under the cap, and the cap
     cannot be got round by holding points. Until #1387 applied the semester
-    nothing gave them a point, and the places alone were what they spent;
-    whether the places alone should still be enough is asked on #1387, and
-    placesLeft(s) on its own in the line below is that answer.
+    nothing gave them a point, and the places alone were what they spent.
+    Patrick decided on 4 October that they need both (#1387, "Patrick's
+    answers"): that is the Math.min below, and placesLeft(s) on its own
+    would be the answer he did not choose.
   */
   function placesLeft(s) {
     var known = (s.spells && s.spells.known) || [];
@@ -32560,6 +32561,19 @@ log('gamemode loaded:',
       return no(s.prof === 'mage'
         ? 'pick your schools first'
         : 'magic is not yours yet: a Master mage has to take you on first');
+    }
+    /*
+      Somebody a Master mage taught learns a spell only from its tome (#1149):
+      "needs the spellbook AND a Master Mage willing to apprentice them" (the
+      rulebook, #391), "learned from the tome" (magic.md, apprenticeship.md).
+      The K panel draws the book for a mage only, but this is the line it
+      sends, and typed by hand it took the spell with no tome at all. The
+      tome is read through learnFromTome, which asks the same gates and a
+      place under the cap.
+    */
+    if (s.prof !== 'mage') {
+      return no('read the tome of ' + spell.name + ' to learn it, because somebody a Master mage taught ' +
+                'learns spells from their tomes and only a Mage picks them on K');
     }
     if (mine.indexOf(spell.school) === -1) {
       return no(spell.school + ' is not one of your schools');
@@ -40990,15 +41004,15 @@ log('gamemode loaded:',
       if (typeof putBack === 'function') {
         try { putBack(actorId, refrId); } catch (e) { slog('could not put purse', refrId.toString(16), 'back:', e); }
       }
-      // #627: say plainly it was not left by a player (the old 'by nobody'
-      // line was read as flavour rather than as the rule).
-      return 'That coin purse was not left here by a player. Coin comes from ' +
+      // #627: say plainly the world put it there and no person left it (the
+      // old 'by nobody' line was read as flavour rather than as the rule).
+      return 'That coin purse was put here by the world, not left by a person. Coin comes from ' +
              'people in this world, not off the ground.';
     }
     // Made at runtime rather than placed by a plugin, so somebody put it there.
     if (refrId >= 0xff000000) { return null; }
     if (!isSpoil(baseId)) { return null; }
-    return 'That was not left here by a player. Weapons, armour and coin come ' +
+    return 'That was put here by the world, not left by a person. Weapons, armour and coin come ' +
            'from people in this world, not off the ground.';
   }
 
@@ -45922,15 +45936,29 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
   MEASURED 29 September, this block run against the 57 plugins of the server
   load order read off disk: 497 books teach a spell, 84 of them a spell
   SPELLS lists, and 492 give a school and rank. The five that do not are the
-  Oghma Infinium (a mod makes it teach Dragon Knowledge) and the four Fishing
-  in Skyrim cheat books, and refusing all five is right. For the 85 spells
-  SPELLS lists, the records alone agree with the book on 83; Odin moves
-  Invisibility to Expert and Call to Arms to Master, and the book wins.
+  Oghma Infinium (1a332:Skyrim.esm, which ZIA_Complete Pack.esp makes teach
+  d788c, Dragon Knowledge) and the four Fishing in Skyrim cheat books
+  (27a95, 27a96, 27a97 and 27a9b:FishingInSkyrim.esp, the rod, net,
+  dynamite and depth charge spells). For the 85 spells SPELLS lists, the
+  records alone agree with the book on 83; Odin moves Invisibility to Expert
+  and Call to Arms to Master, and the book wins.
 
-  A tome whose spell has no school or rank that can be read is refused and
-  logged: handing out a spell nobody could check would be the hole this
-  closes. A missing character block is a build fault and lets the book read
-  as Skyrim reads it, the same choice every gate in this file makes.
+  WHAT READING THOSE FIVE DOES (#1127): it is refused as off the book, with
+  the same line as every other tome the book does not list, and the tome is
+  kept. None of the five spells is on a school's page, and magic.md grants
+  only the book's ("A mod that adds a spell ... is not in the book. It is
+  not a college spell and it is not granted"), so none is given a school and
+  rank here. A spell the book lists always has its school and rank from
+  SPELLS, so a spell whose school or rank cannot be read is never the
+  book's, and its refusal is the off-book one. It used to say the school
+  and rank could not be read and to tell staff, which asked for reports
+  about books nothing was wrong with. Nothing here keeps the five out of
+  the world: the dungeon loot block hands out only the Skyrim tomes it
+  lists, and whether the four cheat books should leave world containers as
+  well is asked on #1127.
+
+  A missing character block is a build fault and lets the book read as
+  Skyrim reads it, the same choice every gate in this file makes.
 */
 (function () {
   'use strict';
@@ -46102,10 +46130,11 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
     }
     var s = C.stateOf(actorId);
     if (!spell.school || !spell.rank) {
-      tlog('no school and rank readable for', spell.desc, '(' + spell.name + '), so the tome is refused to',
+      // Not the book's, since the book gives every spell it lists a school
+      // and rank: refused as off the book, like any other (#1127).
+      tlog('no school and rank readable for', spell.desc, '(' + spell.name + '), so it is off the book and the tome is refused to',
            Number(actorId).toString(16));
-      return { refused: true, line: 'Nobody can learn ' + spell.name + ' from a tome here yet, because ' +
-               'its school and rank cannot be read. You keep the tome; tell staff with /helpme.' };
+      return { refused: true, line: 'You cannot learn ' + spell.name + ' from this tome: ' + P.OFF_BOOK + '. You keep the tome.' };
     }
 
     var staffDesc = (S && S.isStaffSpell && spell.desc && S.isStaffSpell(spell.desc)) ? spell.desc : null;

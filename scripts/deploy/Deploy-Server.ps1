@@ -38,6 +38,12 @@
     .\Deploy-Server.ps1 -Now             no warning at all
     .\Deploy-Server.ps1 -PutBack         the files the last deploy replaced go
                                          back in, checked the same way
+    .\Deploy-Server.ps1 -RequirePass on  the same deploy, and the live join
+                                         pass hold set on (off lets a session
+                                         act until its pass arrives)
+    .\Deploy-Server.ps1 -Devs 123,456 -Playtesters 789
+                                         the same deploy, and the live
+                                         server's written role lists set
 
   THE LIVE SERVER KEEPS ITS OWN SETTINGS (#1221, #1222). A build whose
   server-settings.json is not the live server's (port 7777, not the dev voice
@@ -47,6 +53,15 @@
   Deploy-Gamemode.ps1 writes for live on purpose (ServerSettings.ps1 says
   which and why), and the swap reads it back before the start: any other key
   that is not what the server had puts the old files back.
+
+  THE JOIN PASS AND THE ROLE LISTS CHANGE ONLY WHEN THIS RUN SAYS SO (#1223).
+  thornswoodRequirePass, thornswoodDevs and thornswoodPlaytesters are never
+  taken from the build, which kept whatever one machine was once given and
+  sent it again on every deploy from there. -RequirePass on|off, -Devs and
+  -Playtesters set them on the box, in the carry, the way
+  Deploy-DevGamemode.ps1 -RequirePass sets dev's; without them the live
+  server keeps its own. A live server whose join pass switch is neither true
+  nor false is refused until -RequirePass says which (#1319).
 
   EVERY SERVER FILE GOES, AND ONLY THE RECORDED BUILD (#1214). The binary,
   the JavaScript half the server runs and the rest the fork builds
@@ -84,7 +99,44 @@ param(
   [int]$Wait       = 60,
   # Put the files the last deploy replaced back in, and nothing else. Needs no
   # build on this machine. See the header.
-  [switch]$PutBack
+  [switch]$PutBack,
+  # thornswoodRequirePass on the live server (#937, #410, #1223): on holds a
+  # session until its join pass arrives, off lets it act meanwhile, and a
+  # session with no pass is ended at three minutes either way. Set on the box
+  # in this run only; left off, the live server keeps its own, and one with
+  # neither true nor false is refused, because the gamemode reads that as on
+  # (#1319). Live goes on only when Patrick says Main.
+  [ValidateSet('', 'on', 'off')]
+  [string]$RequirePass = '',
+  <#
+    Who may run /tp, /goto, /restart and the rest, written down. Each
+    replaces that list on the live box in this run; left off, the live server
+    keeps its own (#1223). Until then these were Deploy-Gamemode.ps1's, written
+    into the build.
+
+    Patrick, 21 September, on the dev server: "Dev has no playtetser list so
+    I can't tp like I can on main", and after the roster copy went in, "still
+    can't tp says no list".
+
+    THERE ARE TWO ROLE SOURCES AND THE WRITTEN ONE WINS FIRST. rolelist reads
+    thornswoodDevs and thornswoodPlaytesters straight out of
+    server-settings.json, and only if neither names anybody does it fall
+    through to the Discord roster in private\door.json. The roster is the
+    better source, because a playtester added in Discord is a playtester
+    without anybody editing a file. It is also the one that depends on a
+    folder existing on the VPS, on the door having fetched, and on an install
+    not having deleted it, and every one of those has failed.
+
+    So the owner gets a written line that depends on none of it. The refusal
+    itself prints the number to put here: "Ask Patrick to add profile
+    <id>". Neither list is a secret and neither has a default, so a server
+    told nobody still has nobody.
+
+      -Devs 123456789
+      -Devs 123456789,987654321 -Playtesters 555,666
+  #>
+  [long[]]$Devs        = @(),
+  [long[]]$Playtesters = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -322,6 +374,16 @@ function Invoke-PutBack {
   Write-Host ''
   Write-Host '  PASS. The previous files are back and the server is answering.' -ForegroundColor Green
   exit 0
+}
+# What this run asks the live server's settings to become, set on the box in
+# the carry (#1223). A put-back sends no settings and carries none, so asking
+# with it would be a switch that does nothing; it is refused instead.
+$asked = New-ThornswoodAsked $RequirePass $Devs $Playtesters
+if ($PutBack -and $asked.Count) {
+  Write-Host ''
+  Write-Host '  -PutBack sets no setting: it puts the previous files back with the live server''s own settings.' -ForegroundColor Red
+  Write-Host '  Run it without -RequirePass, -Devs and -Playtesters, then a deploy with them.' -ForegroundColor Yellow
+  throw '-PutBack was given -RequirePass, -Devs or -Playtesters. Nothing was sent and the server was not touched.'
 }
 if ($PutBack) { Invoke-PutBack }
 
@@ -625,12 +687,15 @@ foreach ($rel in $send.Keys) {
 
 # The running server's own settings, carried into the staged file on the box,
 # with only the keys Deploy-Gamemode writes for live taken from the build
-# (#1222, ServerSettings.ps1). The file this rewrites is hashed there, so the
-# check below holds the stage to it like every file sent from here.
+# (#1222, ServerSettings.ps1), and what this run asked for set over them
+# (#1223). The file this rewrites is hashed there, so the check below holds
+# the stage to it like every file sent from here. The swap's read-back lets
+# exactly those keys differ from what the server had.
 Write-Host ''
 Write-Host 'Keeping the live server''s own settings...'
+$liveKeys = @($ThornswoodGamemodeKeys + @($asked.Keys))
 $carryScript = [IO.File]::ReadAllText((Join-Path $Here 'ServerSettings.ps1')) + "`r`n" +
-               (SwapVars $Root $Task $stageName $prevName $Wait $hashes $ThornswoodGamemodeKeys) + $settingsCarryBlock
+               (SwapVars $Root $Task $stageName $prevName $Wait $hashes $liveKeys) + (Get-ThornswoodAskedLine $asked) + $settingsCarryBlock
 $carryOut = @(Remote $carryScript | ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
 $carried = @($carryOut | Where-Object { $_ -match '^CARRIED [0-9a-f]{64}$' })
 if (-not $carried.Count) {
@@ -641,7 +706,7 @@ if (-not $carried.Count) {
 }
 $hashes['server-settings.json'] = $carried[0].Substring(8)
 
-$checkOut = @(Remote ((SwapVars $Root $Task $stageName $prevName $Wait $hashes $ThornswoodGamemodeKeys) + $checkBlock) |
+$checkOut = @(Remote ((SwapVars $Root $Task $stageName $prevName $Wait $hashes $liveKeys) + $checkBlock) |
               ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
 if ($checkOut -notcontains 'STAGE OK') {
   Write-Host ''
@@ -662,7 +727,7 @@ Write-Host 'Stopping, swapping in and starting...'
 $eap = $ErrorActionPreference
 $ErrorActionPreference = 'Continue'
 try {
-  $swapOut = @(Remote ((SwapVars $Root $Task $stageName $prevName $Wait $hashes $ThornswoodGamemodeKeys) + $swapBlock) |
+  $swapOut = @(Remote ((SwapVars $Root $Task $stageName $prevName $Wait $hashes $liveKeys) + $swapBlock) |
                ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
 } finally { $ErrorActionPreference = $eap }
 

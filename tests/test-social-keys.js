@@ -1,6 +1,7 @@
 // test-social-keys.js
 //
-// G, H, L, P and J work in the open world and stay out of the game's menus.
+// Y, H, L, P and J work in the open world and stay out of the game's menus.
+// The friend key was G until #529 moved it to Y.
 //
 // Djinn on dev, 24 September: "The party menu actually opens when hitting
 // shift P during character creation while naming your character." The five
@@ -9,8 +10,8 @@
 // the inventory or the map, opened one of our panels on top of the game's
 // menu.
 //
-// WHAT THIS RUNS. The real text of the key handler and of KEYBOARD_MENUS,
-// lifted out of thornswood-front.js, over a pretend game that says which
+// WHAT THIS RUNS. The real text of the key handler, of KEYBOARD_MENUS and of
+// the key declarations, lifted out of thornswood-front.js, over a pretend game that says which
 // menus are up. The handler's other neighbours (the J block's two hooks, the
 // mold key, the verbs, the page) are stand-ins that only record what they
 // were asked to do.
@@ -53,7 +54,30 @@ yes('the character creation screen is on that list', !!menus && menus.indexOf("'
 yes('and the plugin names the game\'s journal the way this does',
     src.indexOf("const JOURNAL_MENU = 'Journal Menu';") >= 0);
 
-const G = 34, H = 35, L = 38, P = 25, J = 36, K = 37;
+/*
+  The keys as the plugin declares them: every `const ..._KEY` and ESC at the
+  top of its scope, in its order, read through the plugin's own iniNumber from
+  a Thornswood.ini that is empty unless a case gives it lines. Read from the
+  plugin rather than typed here (#1652): a typed copy kept the friend key on G
+  after #529 moved it to Y, so the harness pressed a key the plugin no longer
+  reads.
+*/
+const KEY_DECLS = (src.match(/^  const (?:[A-Z]+_)*KEY\b[^;\n]*;|^  const ESC = \d+;/gm) || []).join('\n');
+const INI_AT = src.indexOf('  function iniNumber(text, key, fallback) {');
+const INI_NUMBER = INI_AT < 0 ? '' : src.slice(INI_AT, src.indexOf('\n  }\n', INI_AT) + 4);
+function keyPrelude(iniText) {
+  return 'const ini = ' + JSON.stringify(iniText || '') + ';\n' + INI_NUMBER + KEY_DECLS + '\n';
+}
+yes('the plugin reads its keys through iniNumber', INI_NUMBER !== '' && KEY_DECLS !== '');
+const KEY = INI_NUMBER === '' ? {} : new Function(keyPrelude('') + 'return { ' +
+  (KEY_DECLS.match(/const \w+/g) || []).map(function (d) { return d.slice(6) + ': ' + d.slice(6); }).join(', ') + ' };')();
+
+const Y = KEY.FRIEND_KEY, H = KEY.TRADE_KEY, L = KEY.MUTE_KEY, P = KEY.PARTY_KEY,
+      J = KEY.JOURNAL_KEY, K = KEY.SKILLS_KEY;
+yes('the plugin declares every key the handler reads', !!keys &&
+    (keys.match(/\b(?:[A-Z]+_)*KEY\b|\bESC\b/g) || []).every(function (k) { return typeof KEY[k] === 'number'; }));
+yes('and the five social keys are five different keys',
+    [Y, H, L, P, J].filter(function (k, i, a) { return typeof k === 'number' && a.indexOf(k) === i; }).length === 5);
 
 function rig(opts) {
   opts = opts || {};
@@ -80,8 +104,7 @@ function rig(opts) {
     // between() keeps its start marker, so this is the declaration itself.
     menus + '\n  ];\n' +
     "const JOURNAL_MENU = 'Journal Menu';\n" +
-    'const ESC = 1, CHAT_KEY = 28, SKILLS_KEY = 37, PARTY_KEY = 25, JOURNAL_KEY = 36,\n' +
-    '      FRIEND_KEY = 34, TRADE_KEY = 35, MUTE_KEY = 38, MOLD_KEY = 22;\n' +
+    keyPrelude('') +
     'function rememberKey() { }\n' +
     'function wantTyping() { }\n' +
     'function journalKeyDown() { }\n' +
@@ -89,7 +112,7 @@ function rig(opts) {
     'function moldPress() { return false; }\n' +
     // The sleep key is the mold's, on a person inside a building you hold
     // (#1603), and nobody here holds one.
-    'const SLEEP_KEY = 22; function sleepPress() { return false; }\n' +
+    'function sleepPress() { return false; }\n' +
     // The same key in the inventory (#1384); no inventory is open here.
     'function repairPress() { return false; }\n' +
     // The board, ride and merchant presses (#1430, #1394) answer only the
@@ -101,21 +124,20 @@ function rig(opts) {
     'function boardPress() { return false; }\n' +
     'function driverPress() { return false; }\n' +
     'function merchantPress() { return false; }\n' +
-    'const LOCK_KEY = 45; function lockPress() { return false; }\n' +
+    'function lockPress() { return false; }\n' +
     // Tend their wounds (#1383), X on a hurt person, and Tend your wounds,
     // H in the inventory. Nobody is looked at and no inventory is open
     // here; test-1383-treatments.js has what they do.
-    'const TREAT_KEY = 45, TREAT_SELF_KEY = 35;\n' +
     'function treatPress() { return false; }\nfunction treatSelfPress() { return false; }\n' +
     // A warrior's maneuver key (#1386), 9, which nothing here presses.
-    'const MANEUVER_KEY = 10; function maneuverKeyPressed() { }\n' +
+    'function maneuverKeyPressed() { }\n' +
     // The help key (#1633), F7, which nothing here presses.
     // test-1633-help-panel.js has what it does.
-    'const HELP_KEY = 65; function helpKeyPressed() { }\n' +
+    'function helpKeyPressed() { }\n' +
     // K on a person a Master could take on (#1634), asked ahead of K; nobody
     // is looked at here. test-1634-apprentice-gui.js has what it does.
-    'const APPRENTICE_KEY = 37; function apprenticePress() { return false; }\n' +
-    'const COMMAND_KEY = 53; function commandKeyPressed() { }\n' +
+    'function apprenticePress() { return false; }\n' +
+    'function commandKeyPressed() { }\n' +
     // The / and P watchers on the game's own menus are test-our-key-menus.js's.
     'const OFF_MENU = { openedBy: function () { return ""; }, shutFor: function () { }, keyDown: function () { } };\n' +
     'const statsOnSlash = OFF_MENU, magicOnP = OFF_MENU;\n' +
@@ -143,18 +165,19 @@ if (keys !== null && menus !== null) {
     yes('S1 THE BUG: P in the character creation name box does not open the party panel', w.opened('Party') === 0);
     w.press(J);
     yes('S1 nor does J open the journal', w.opened('Journal') === 0);
-    w.press(G); w.press(H); w.press(L);
-    yes('S1 and G, H and L ask nothing of the server', w.verbs.length === 0);
+    w.press(Y); w.press(H); w.press(L);
+    yes('S1 and Y, H and L ask nothing of the server', w.verbs.length === 0);
     yes('S1 the log says which menu held them', w.logs.some(function (l) { return /RaceSex Menu is open/.test(l); }));
-    yes('S1 nothing threw', w.threw.length === 0);
+    yes('S1 nothing threw' + (w.threw.length ? ' (' + w.threw[0] + ')' : ''), w.threw.length === 0);
   }
   // Over the inventory, the map and the rest of the game's own menus.
   {
     ['InventoryMenu', 'MapMenu', 'ContainerMenu', 'Dialogue Menu', 'Console'].forEach(function (m) {
       const w = rig({ menus: [m] });
-      w.press(P); w.press(J); w.press(G); w.press(H); w.press(L);
+      w.press(P); w.press(J); w.press(Y); w.press(H); w.press(L);
       yes('S2 over ' + m + ' none of the five opens a panel or asks the server',
           w.opened('Party') === 0 && w.opened('Journal') === 0 && w.verbs.length === 0 && w.threw.length === 0);
+      if (w.threw.length) { console.log('      ' + w.threw[0]); }
     });
   }
   // The open world, which is where they are for.
@@ -164,9 +187,9 @@ if (keys !== null && menus !== null) {
     yes('S3 P in the world opens the party panel', w.opened('Party') === 1);
     w.press(J);
     yes('S3 J in the world opens the journal', w.opened('Journal') === 1);
-    w.press(G); w.press(H); w.press(L);
-    yes('S3 G, H and L ask for friend, trade and mute', w.verbs.join(',') === 'friend,trade,mute');
-    yes('S3 nothing threw', w.threw.length === 0);
+    w.press(Y); w.press(H); w.press(L);
+    yes('S3 Y, H and L ask for friend, trade and mute', w.verbs.join(',') === 'friend,trade,mute');
+    yes('S3 nothing threw' + (w.threw.length ? ' (' + w.threw[0] + ')' : ''), w.threw.length === 0);
   }
   // J and the game's own book. J is the game's journal key too, and the book
   // may be up before the plugin sees the press.
@@ -184,13 +207,13 @@ if (keys !== null && menus !== null) {
     yes('S5 P closes the party panel it opened, whatever else is up', w.opened('Party') === 1);
     w.press(J);
     yes('S5 and J closes the journal', w.opened('Journal') === 1);
-    w.press(G);
-    yes('S5 but G still waits for the world', w.verbs.length === 0);
+    w.press(Y);
+    yes('S5 but Y still waits for the world', w.verbs.length === 0);
   }
   // The chat box has the keyboard: every letter is typing.
   {
     const w = rig({ claims: { chat: true } });
-    w.press(P); w.press(J); w.press(G);
+    w.press(P); w.press(J); w.press(Y);
     yes('S6 while chat has the keyboard none of them fires', w.opened('Party') === 0 && w.opened('Journal') === 0 && w.verbs.length === 0);
   }
   // K keeps the guard it always had.

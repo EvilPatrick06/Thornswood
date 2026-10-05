@@ -336,8 +336,9 @@ function points(actor) { const s = srv.C.stateOf(actor); return (s.spells && s.s
 
   const b3 = srv.read(M, 't-strange:Odin.esp');
   const l3 = (srv.chat(M)[0] || {}).text || '';
-  yes('E a spell with no school that can be read is refused, kept, and the line says so (' + l3 + ')',
-      b3 === false && /cannot be read/.test(l3) && /You keep the tome/.test(l3) && clean(l3));
+  yes('E a spell with no school that can be read is not the book\'s: refused as off the book, kept, and nobody is sent to staff (#1127) (' + l3 + ')',
+      b3 === false && /You cannot learn Strange Light from this tome: it is not in the College's book/.test(l3) &&
+      /You keep the tome/.test(l3) && !/staff|helpme/i.test(l3) && clean(l3));
   yes('E  and the log names it', srv.logs.some(function (l) { return /no school and rank readable/.test(l) && /s-strange/.test(l); }));
   yes('E Skyrim levels to ranks: 0 Novice, 25 and 50 Advanced, 75 Expert, 100 Master',
       P.rankForLevel(0) === 'novice' && P.rankForLevel(25) === 'advanced' && P.rankForLevel(50) === 'advanced' &&

@@ -60,7 +60,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-no-page-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -1000,9 +1000,27 @@ function roster() {
   return list;
 }
 
+/*
+  THE ICE LIST RIDES THE ROSTER (#1821).
+
+  A page builds its peer connections when a roster arrives, and at no other
+  time, so the roster is when it needs the list. Every roster carries a fresh
+  one, relay included when one is set: whoever is sent a roster has a socket
+  its join token proved at the handshake, which is who #1307 says may have
+  the relay. So the relay is handed over the proven socket, minted at the
+  moment each connection is built, and a page that has been in the room for
+  an hour gets a credential as fresh as one that joined a second ago.
+
+  It used to come from POST /ice with the page's join token in the body. A
+  token is good for two minutes and opens one connection (#1322), so a page
+  held a valid one only around the moment it connected: the game's overlay
+  sent the one its connection was opened with, which had run out for most of
+  a session, and from then on was handed STUN only. /ice now reads no token.
+*/
 function announce() {
   const list = roster();
-  for (const [, p] of peers) p.ws.sendLatest({ t: 'peers', peers: list });
+  const ice = iceServers();
+  for (const [, p] of peers) p.ws.sendLatest({ t: 'peers', peers: list, iceServers: ice });
 }
 
 /*
@@ -1568,8 +1586,9 @@ function spendToken(raw, now) {
 
   TURN is the answer to that, and TURN needs a server to relay through, which is
   not something that can be typed into a web page. So the list lives here and
-  the pages ask for it. Adding TURN later is then a setting on the VPS and a
-  restart, rather than editing three files and shipping a release.
+  the pages are handed it, on the roster (announce). Adding TURN later is then
+  a setting on the VPS and a restart, rather than editing three files and
+  shipping a release.
 
   THORNSWOOD_TURN_URL     turn:voice.thornswood.net:3478 or similar
   THORNSWOOD_TURN_SECRET  the static-auth-secret from the TURN server
@@ -1612,7 +1631,8 @@ const TURN_URL = String(process.env.THORNSWOOD_TURN_URL || '').trim();
   each other.
 
   Not settled by this: which relay. Who may have its credential is settled
-  at /ice (#1307): somebody whose join token checks out, and this machine.
+  (#1307, #1821): somebody in the room, on the roster their proven socket is
+  sent, and this machine at /ice.
 */
 const TURN_KEY_FILE = path.join(HERE, 'turn-key.txt');
 function readTurnKey(file) {
@@ -1924,18 +1944,18 @@ const server = http.createServer((req, res) => {
   }
 
   /*
-    The ICE list, for whichever page is about to build a peer connection.
+    The ICE list over HTTP.
 
     THE RELAY ONLY TO SOMEBODY WHO HAS PROVED WHO THEY ARE (#1307). This was
     answered whole to anyone who asked, relay credential included: measured
     on 5 October, a stranger with no token was handed a working username and
     password for the relay, and a relay carries its bandwidth bill for
-    whoever holds one. Now the STUN list goes to anybody, as it always did,
-    and the relay entry only to a page that sends the join token it already
-    holds (POST, {"token": ...}, in the body so it is never in an address),
-    or to this machine itself, which is how Install-Voice.ps1 reads the relay
-    that is running before it reinstalls. A plain GET from anywhere else is
-    the STUN list, which is what every box has served while no relay is set.
+    whoever holds one. The pages in the room are handed the list, relay
+    included, on every roster their proven socket is sent (announce, #1821),
+    so this route hands the relay only to this machine itself, which is how
+    Install-Voice.ps1 reads the relay that is running before it reinstalls.
+    Anybody else, GET or POST, token or none, is handed the STUN list, which
+    is what every box has served while no relay is set.
   */
   if (route === '/ice') {
     /*
@@ -1951,9 +1971,8 @@ const server = http.createServer((req, res) => {
       This gives away nothing that was not already public. CORS is a rule about
       what a PAGE may read, not about who may ask: anything that can make an
       HTTP request to this service could already read this route, header or no
-      header. What decides whether the answer holds a relay credential is the
-      token, above, not the page. A POST whose body is plain text is a simple
-      request, so the page's fetch needs no preflight either.
+      header. What decides whether the answer holds a relay credential is
+      where the request came from, above, not the page.
     */
     const answer = (relay) => {
       res.writeHead(200, { 'content-type': 'application/json',
@@ -1961,13 +1980,8 @@ const server = http.createServer((req, res) => {
                            'access-control-allow-origin': '*' });
       res.end(JSON.stringify({ iceServers: relay ? iceServers() : STUN.slice() }));
     };
-    if (req.method === 'POST') {
-      readBody(req, res, 4000, (doc) => {
-        const tok = readToken(doc && doc.token);
-        answer(fromHere(req) || !!(tok && !tok.expired));
-      });
-      return;
-    }
+    // Any method, and nothing in the body is read: a page that POSTs a token
+    // the way it did before #1821 is answered the same as a GET.
     answer(fromHere(req));
     return;
   }
