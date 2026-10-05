@@ -37,6 +37,13 @@
        built, installed or published (#1692)
     I  a folder whose generated files are out of date: refused before the
        launcher is built or installed (#1692)
+    J  a game folder on a machine with no node: refused before anything is
+       built, installed or published, saying why (#1913)
+    K  SkyUI's menus could not be read (Check-SkyUIMenus.js exit 1): refused,
+       nothing published (#1913)
+    L  the same folder with a check that passes runs to the end, so J and K
+       stop on node and on the check, not on the folder; and a mismatch
+       (exit 2) still refuses (#960)
 
   R is there so D and V prove something: the same stand-ins, on a real Ship,
   do write down the installer going to the site, the feed and baseline going to
@@ -613,6 +620,83 @@ function Get-GeneratedStaleSays($State, [string]$Channel) { return 'The generate
     Yes '  before the launcher is built or installed, and before anything is published' (
         (Called $i 'Build-Launcher').Count -eq 0 -and (Called $i 'Install-Launcher').Count -eq 0 -and (Called $i 'Publish-Update').Count -eq 0)
     Yes '  and the installed launcher is the one it had' ([IO.File]::ReadAllText((Join-Path $genRoot 'Launcher\Thornswood.exe')) -eq 'the launcher as installed')
+
+    # ---- J, K, L: SkyUI's menus need node (#1913) ---------------------------------------
+    # A game folder that gets as far as the SkyUI menus step: generated files
+    # current, the in game plugin in place, the bodies covered (all stood in
+    # for; each has its own harness). node is a stand-in on PATH that writes
+    # down what it was asked and exits with TS_NODE_EXIT, so these run the
+    # same on a machine with node and on one without.
+    $skyRoot = Join-Path $T 'Sky-DevBuild'
+    New-Item -ItemType Directory -Force -Path (Join-Path $skyRoot 'Launcher'), (Join-Path $skyRoot 'Game\Data\Platform\Plugins'),
+        (Join-Path $repo 'game\plugins') | Out-Null
+    $skyExe = Join-Path $skyRoot 'Launcher\Thornswood.exe'
+    [IO.File]::WriteAllText($skyExe, 'the launcher as installed')
+    (Get-Item -LiteralPath $skyExe).LastWriteTimeUtc = [DateTime]::UtcNow.AddHours(-1)
+    [IO.File]::WriteAllText((Join-Path $skyRoot 'Game\SkyrimSE.exe'), 'skyrim')
+    foreach ($p in (Join-Path $repo 'game\plugins\stand-in.js'), (Join-Path $skyRoot 'Game\Data\Platform\Plugins\stand-in.js')) {
+        [IO.File]::WriteAllText($p, '// the in game plugin, as the source has it')
+    }
+    [IO.File]::WriteAllText((Join-Path $repo 'scripts\mods\Generated.ps1'), @'
+function Get-GeneratedState($Root, $ListPath) { return [pscustomobject]@{ Current = $true; Record = [pscustomobject]@{ Files = @('stand-in') } } }
+function Get-GeneratedStaleSays($State, [string]$Channel) { return '' }
+'@)
+    [IO.File]::WriteAllText((Join-Path $repo 'scripts\mods\Check-CoveredBodies.ps1'), "param([string]`$Game, [switch]`$Quiet)`r`nexit 0`r`n")
+    $nodeStandIn = Join-Path $bin 'node.ps1'
+    $nodeLine = '[IO.File]::AppendAllText($env:TS_DRY_CALLS, ((@(''node'') + @($args | ForEach-Object { [string]$_ })) -join '' '') + "`r`n")'
+    # PATH without any folder that holds a real node, for J.
+    $noNodePath = (@($bin) + @($oldPath -split ';' | Where-Object {
+        $_ -and -not (Test-Path -LiteralPath (Join-Path $_ 'node.exe')) -and -not (Test-Path -LiteralPath (Join-Path $_ 'node.cmd'))
+    })) -join ';'
+    $skyNote = "The map marker points at the right door`n- The marker over a house now sits on the door you walk through"
+    $skyArgs = @($skyNote, '-Channel', 'dev', '-DryRun', '-Root', $skyRoot, '-DistRoot', $dist, '-NoPause')
+    $oldNodeExit = $env:TS_NODE_EXIT
+    try {
+        # J: no node at all.
+        $env:PATH = $noNodePath
+        $j = Invoke-Ship $skyArgs
+        $env:PATH = $bin + ';' + $oldPath
+        Yes ("J a Ship with a game folder and no node is refused (exit {0})" -f $j.Code) ($j.Code -eq 1 -and $j.Out -match 'STOP\. node is not on this machine')
+        Yes '  and says why: SkyUI''s menus are read with it, and how to install it' (
+            $j.Out -match 'Check-SkyUIMenus\.js' -and $j.Out -match 'SkyUI error box' -and $j.Out -match 'winget install --id OpenJS\.NodeJS\.LTS')
+        Yes '  before anything is built, installed, copied into the game or published' (
+            (Called $j 'Build-Launcher').Count -eq 0 -and (Called $j 'Install-Launcher').Count -eq 0 -and
+            (Called $j 'Go').Count -eq 0 -and (Called $j 'Publish-Update').Count -eq 0)
+        Yes '  and it no longer says it in yellow and carries on' ($j.Out -notmatch 'so SkyUI''s menus were not read' -and $j.Out -notmatch 'Dry run finished')
+        Yes '  and Updater.cs is on the version it had' ((Read-Version $updaterCs) -eq '1.1.93')
+        Yes '  and the installed launcher is the one it had' ([IO.File]::ReadAllText($skyExe) -eq 'the launcher as installed')
+
+        [IO.File]::WriteAllText($nodeStandIn, $nodeLine + "`r`nexit ([int]`$env:TS_NODE_EXIT)`r`n")
+
+        # K: the check could not read something.
+        $env:TS_NODE_EXIT = '1'
+        $k = Invoke-Ship $skyArgs
+        $ran = Called $k 'node'
+        Yes ("K a Ship whose SkyUI menus could not be read is refused (exit {0})" -f $k.Code) (
+            $k.Code -eq 1 -and $k.Out -match 'STOP\. SkyUI''s menus could not all be read \(Check-SkyUIMenus\.js exit 1\)')
+        Yes '  after the check really ran on the game folder' ($ran.Count -eq 1 -and $ran[0] -match 'Check-SkyUIMenus\.js' -and $ran[0].Contains((Join-Path $skyRoot 'Game\Data')))
+        Yes '  and nothing is published' ((Called $k 'Publish-Update').Count -eq 0 -and (Away $k).Count -eq 0)
+        Yes '  and Updater.cs is on the version it had' ((Read-Version $updaterCs) -eq '1.1.93')
+
+        # L: the same folder, a check that passes, runs to the end.
+        $env:TS_NODE_EXIT = '0'
+        $l = Invoke-Ship $skyArgs
+        Yes ("L the same folder with node and a check that passes runs to the end (exit {0})" -f $l.Code) ($l.Code -eq 0 -and $l.Out -match 'Dry run finished')
+        if ($l.Code -ne 0) { $l.Out -split "`r?`n" | Select-Object -Last 15 | ForEach-Object { Write-Host ("      " + $_) } }
+        Yes '  and the check ran once' ((Called $l 'node').Count -eq 1)
+        Yes '  and the release was built and published, told not to upload or push' (
+            (Called $l 'Build-Launcher').Count -eq 1 -and @(Called $l 'Publish-Update' | Where-Object { $_ -match ' -NoPush\b' }).Count -eq 1)
+
+        # And a mismatch, exit 2, refuses as it did (#960).
+        $env:TS_NODE_EXIT = '2'
+        $m = Invoke-Ship $skyArgs
+        Yes ("L a mismatch, exit 2, is still refused (exit {0})" -f $m.Code) (
+            $m.Code -eq 1 -and $m.Out -match 'not the version its script wants' -and (Called $m 'Publish-Update').Count -eq 0)
+    } finally {
+        $env:PATH = $bin + ';' + $oldPath
+        $env:TS_NODE_EXIT = $oldNodeExit
+        Remove-Item -LiteralPath $nodeStandIn -Force -ErrorAction SilentlyContinue
+    }
 }
 finally {
     $env:PATH = $oldPath
