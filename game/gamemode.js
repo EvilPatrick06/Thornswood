@@ -38695,8 +38695,11 @@ log('gamemode loaded:',
   CARRIAGES AND FERRIES: THE ROUTE LIST, THE FARE, AND THE ONE MOVE (#1394).
 
   docs/systems/carriages.md is the design and every number here is from it.
-  You stand within 400 of the driver and name the stop. A ferry is 10 gold, a
-  carriage 20, and either one is 40 when Raven Rock is at either end. The fare
+  You stand within 400 of the driver and name the stop. A ferry is 10 gold,
+  Solstheim's own ferry included. A carriage is 10 to a stop in the same hold
+  and 20 to another hold. 40 is only the crossing between the mainland and
+  Solstheim, the Northern Maiden between Windhelm and Raven Rock (Patrick,
+  4 Oct, on #1394). The fare
   goes onto the ledger of the hold the stop you leave from is in, counted the
   way a notice fee is counted (deposit, in the property block). A pack that is
   short does not move and loses nothing. Fast travel stays off: nothing here
@@ -38750,9 +38753,18 @@ log('gamemode loaded:',
     console.log(a.join(' '));
   }
 
+  /*
+    The fares, Patrick's answers on #1394 (4 Oct). A ferry is 10, Solstheim's
+    own ferry between Raven Rock, Skaal Village and Tel Mithryn included. A
+    carriage is 10 to a stop in the same hold and 20 to another hold. 40 is
+    only the crossing between the mainland and Solstheim.
+  */
   var FARE_FERRY = 10;
+  var FARE_CARRIAGE_IN_HOLD = 10;
   var FARE_CARRIAGE = 20;
-  var FARE_RAVEN_ROCK = 40;
+  var FARE_CROSSING = 40;
+  /* Solstheim's world. A ride with one end in it and the other not is the crossing. */
+  var SOLSTHEIM = '800:Dragonborn.esm';
 
   /* The same reach as a notice board. */
   var RIDE_REACH = 400;
@@ -38846,7 +38858,7 @@ log('gamemode loaded:',
       ref: '332ef:CFTO.esp', base: '332ed:CFTO.esp', world: '3c:Skyrim.esm',
       pos: [-40803.1, -57902.2, 814.6], rot: 97.4 },
     // The Solstheim ferry.
-    { key: 'solstheim:ravenrock', line: 'solstheim', name: 'Raven Rock', hold: 'ravenrock', driver: 'Maslyn', ravenRock: true,
+    { key: 'solstheim:ravenrock', line: 'solstheim', name: 'Raven Rock', hold: 'ravenrock', driver: 'Maslyn',
       ref: '14c6f:CFTO.esp', base: '14c6e:CFTO.esp', world: '800:Dragonborn.esm',
       pos: [28344.6, 34630.7, 306.5], rot: 122.2 },
     { key: 'solstheim:telmithryn', line: 'solstheim', name: 'Tel Mithryn', hold: 'ravenrock', driver: 'Bildul',
@@ -38859,7 +38871,7 @@ log('gamemode loaded:',
     { key: 'maiden:windhelm', line: 'maiden', name: 'Windhelm', hold: 'windhelm', driver: 'Gjalund Salt-Sage',
       ref: '182af:Dragonborn.esm', base: '182ae:Dragonborn.esm', world: '3c:Skyrim.esm',
       pos: [141310, 34083.7, -13995.5], rot: 353.4 },
-    { key: 'maiden:ravenrock', line: 'maiden', name: 'Raven Rock', hold: 'ravenrock', driver: 'Gjalund Salt-Sage', ravenRock: true,
+    { key: 'maiden:ravenrock', line: 'maiden', name: 'Raven Rock', hold: 'ravenrock', driver: 'Gjalund Salt-Sage',
       ref: '2582c:Dragonborn.esm', base: '2582b:Dragonborn.esm', world: '800:Dragonborn.esm',
       pos: [28928.7, 33144.2, 309.9], rot: 73.1 }
   ];
@@ -38893,8 +38905,9 @@ log('gamemode loaded:',
     if (!from.driver) { return 0; }
     var line = Object.prototype.hasOwnProperty.call(RIDE_LINES, from.line) ? RIDE_LINES[from.line] : null;
     if (!line) { return 0; }
-    if (from.ravenRock || to.ravenRock) { return FARE_RAVEN_ROCK; }
-    return line.kind === 'ferry' ? FARE_FERRY : FARE_CARRIAGE;
+    if ((from.world === SOLSTHEIM) !== (to.world === SOLSTHEIM)) { return FARE_CROSSING; }
+    if (line.kind === 'ferry') { return FARE_FERRY; }
+    return from.hold === to.hold ? FARE_CARRIAGE_IN_HOLD : FARE_CARRIAGE;
   }
 
   /** Every stop this one's driver goes to. */
@@ -39106,8 +39119,9 @@ log('gamemode loaded:',
   }
 
   g.__thornswoodCarriages = {
-    STOPS: RIDE_STOPS, LINES: RIDE_LINES, REACH: RIDE_REACH,
-    FARE_FERRY: FARE_FERRY, FARE_CARRIAGE: FARE_CARRIAGE, FARE_RAVEN_ROCK: FARE_RAVEN_ROCK,
+    STOPS: RIDE_STOPS, LINES: RIDE_LINES, REACH: RIDE_REACH, SOLSTHEIM: SOLSTHEIM,
+    FARE_FERRY: FARE_FERRY, FARE_CARRIAGE_IN_HOLD: FARE_CARRIAGE_IN_HOLD, FARE_CARRIAGE: FARE_CARRIAGE,
+    FARE_CROSSING: FARE_CROSSING,
     DRIVER_MEMORY_MS: DRIVER_MEMORY_MS,
     stopByKey: stopByKey, stopByBase: stopByBase, fare: fare, destinations: destinations,
     stopHere: stopHere, pressDriver: pressDriver, ride: ride, command: command

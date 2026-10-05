@@ -6,6 +6,7 @@
 // driver's purse. The route list is the collection's own drivers, and there
 // is no word that skips standing at one. Fast travel stays off. Solitude's
 // carriage is Solitude's, a ride that started at the embassy included.
+// The fares are Patrick's answers on #1394 (4 Oct).
 //
 // Read only.
 const REPO_DIR = require('path').join(__dirname, '..');
@@ -140,9 +141,11 @@ if (C0) {
   const nine = ['whiterun', 'solitude', 'riften', 'markarth', 'windhelm', 'falkreath', 'morthal', 'dawnstar', 'winterhold'];
   yes('a carriage in every hold: nine, one in each mainland hold',
     carriages.length === 9 && nine.every(function (h) { return carriages.filter(function (s) { return s.hold === h; }).length === 1; }));
-  yes('only the stops at Raven Rock are marked as Raven Rock',
-    S.every(function (s) { return !!s.ravenRock === (s.name === 'Raven Rock' && s.hold === 'ravenrock'); }) &&
-    S.filter(function (s) { return s.ravenRock; }).length === 2);
+  const isle = S.filter(function (s) { return s.world === C0.SOLSTHEIM; });
+  yes('the stops on Solstheim are the island ferry\'s three and the Northern Maiden\'s Raven Rock, all Raven Rock\'s',
+    isle.length === 4 && isle.every(function (s) { return s.hold === 'ravenrock'; }) &&
+    isle.filter(function (s) { return s.line === 'solstheim'; }).length === 3 && !!by('maiden:ravenrock') &&
+    isle.indexOf(by('maiden:ravenrock')) >= 0);
   yes('Solitude\'s carriage, ferry and lighthouse are all Solitude\'s',
     by('carriage:solitude').hold === 'solitude' && by('coast:solitude').hold === 'solitude' &&
     by('coast:solitudelighthouse').hold === 'solitude');
@@ -155,18 +158,22 @@ if (C0) {
   yes('a ferry is 10', C0.fare(by('coast:solitude'), by('coast:windhelm')) === 10 &&
     C0.fare(by('honrich:riften'), by('honrich:ivarstead')) === 10 &&
     C0.fare(by('ilinalta:halfmoonmill'), by('ilinalta:guardianstones')) === 10);
-  yes('the Northern Maiden is 40 each way, because Raven Rock is an end',
+  yes('the Northern Maiden is 40 each way: the crossing between the mainland and Solstheim',
     C0.fare(by('maiden:windhelm'), by('maiden:ravenrock')) === 40 &&
     C0.fare(by('maiden:ravenrock'), by('maiden:windhelm')) === 40);
-  yes('the Solstheim ferry is 40 with Raven Rock at either end and 10 without',
-    C0.fare(by('solstheim:ravenrock'), by('solstheim:skaalvillage')) === 40 &&
-    C0.fare(by('solstheim:telmithryn'), by('solstheim:ravenrock')) === 40 &&
+  yes('the Solstheim ferry is 10 between any two of its stops, Raven Rock included (Patrick, 4 Oct)',
+    C0.fare(by('solstheim:ravenrock'), by('solstheim:skaalvillage')) === 10 &&
+    C0.fare(by('solstheim:telmithryn'), by('solstheim:ravenrock')) === 10 &&
     C0.fare(by('solstheim:skaalvillage'), by('solstheim:telmithryn')) === 10);
+  yes('a carriage to a stop in the same hold is 10, and between holds 20', (function () {
+    const v = Object.assign({}, by('carriage:whiterun'), { key: 'carriage:riverwood', name: 'Riverwood', driver: '' });
+    return C0.fare(by('carriage:whiterun'), v) === 10 && C0.fare(by('carriage:whiterun'), by('carriage:riften')) === 20;
+  })());
   yes('a ride off its own line is not on the list',
     C0.fare(by('carriage:whiterun'), by('coast:solitude')) === 0 &&
     C0.fare(by('coast:windhelm'), by('maiden:ravenrock')) === 0);
-  yes('no carriage goes to Raven Rock', carriages.every(function (c) {
-    return C0.destinations(c).every(function (d) { return !d.ravenRock; });
+  yes('no carriage goes to Solstheim', carriages.every(function (c) {
+    return C0.destinations(c).every(function (d) { return d.world !== C0.SOLSTHEIM; });
   }));
   yes('a ferryman goes to every other stop on his water',
     C0.destinations(by('coast:dawnstar')).length === 6 && C0.destinations(by('honrich:riften')).length === 2);
