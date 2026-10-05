@@ -148,7 +148,12 @@ after. Its place on the roster is marked, and both clients connect to
 nobody marked and close a connection they had, so a launcher holds
 one connection for each other person with voice and reports that
 many (#1925). `tests/test-1925-voice-relay-peers.js` runs it through
-the real service.
+the real service. The overlay still reads that connection for where
+everybody is, the voice modes and staff silences, which the speaking
+marks and the party strip are drawn from, and drops only the offers
+and the roster. That holds whether the launcher took the audio before
+or after the overlay was set up (#1959);
+`tests/test-1959-relay-keeps-reading.js` runs both orders.
 
 Both clients connect to everybody the service names on its roster,
 and both offer again whenever their own side changes, as when the

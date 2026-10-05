@@ -76,11 +76,6 @@ function page(withAudio) {
     on: function (fn) { listeners.push(fn); },
     // How the overlay gets on since #1869. Nothing was kept for it here.
     board: function (fn) { listeners.push(fn); },
-    off: function (fn) {
-      for (let i = listeners.length - 1; i >= 0; i--) {
-        if (listeners[i] === fn) { listeners.splice(i, 1); }
-      }
-    },
     peer: function () { return 1; },
     // How the overlay tells the room its socket carries no voice (#1925).
     noVoice: function () { told.push('no voice'); }
@@ -187,6 +182,9 @@ const OFFER = { t: 'sdp', from: 2, sdp: { type: 'offer', sdp: 'v=0' } };
   const first = p.made[0];
   p.V.setLauncherPort(47780);
   yes('the handover closes what it had', first.closed === true);
+  // Still listening, for the positions (#1959), so what follows reaches
+  // the page and the guard is what keeps it from building anything.
+  yes('and stays on the socket', p.listeners.length === 1);
   p.serve(SOMEBODY);
   p.serve(OFFER);
   yes('and builds nothing afterwards', p.made.length === 1);

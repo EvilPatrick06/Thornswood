@@ -118,7 +118,8 @@
     names goes, because they left and their peer id is never handed out
     again. A new connection starts with nothing kept: the room offers to its
     new peer id. Once voice is on, nothing is kept: it hears everything from
-    then on, across reconnects, and in relay mode it has stepped off for good.
+    then on, across reconnects, relay mode included, where it reads the
+    positions and drops the signalling (#1959).
 
     A connection gathers a handful of candidates and sends one offer before
     it hears an answer, so a hundred from one peer is not a connection
@@ -622,22 +623,6 @@
         try { fn(missed[i]); } catch (e) {
           try { console.log('[chat] listener threw: ' + e); } catch (e2) { }
         }
-      }
-    },
-
-    /*
-      And how to stop wanting it.
-
-      There was no way off this bus, which is half of why the voice page could
-      not hand over to the launcher cleanly: it dropped its connections, set
-      its own flags and then carried on being handed every sdp and ice message
-      on the socket, answering them and building the peer connections back.
-      A handoff between two audio paths has to tear the old one down
-      verifiably, and a listener you cannot remove is not a teardown.
-    */
-    off: function (fn) {
-      for (var i = listeners.length - 1; i >= 0; i--) {
-        if (listeners[i] === fn) { listeners.splice(i, 1); }
       }
     },
 
