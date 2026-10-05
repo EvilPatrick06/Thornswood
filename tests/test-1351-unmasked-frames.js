@@ -137,14 +137,27 @@ const closeCode = (c) => {
   return f && f.body.length >= 2 ? f.body.readUInt16BE(0) : 0;
 };
 
+/*
+  Every join proves itself with a token (#1303), so this signs its own with
+  a key it puts beside its copy of the service, the way voice-server.js
+  signs them.
+*/
+const KEY = crypto.randomBytes(32).toString('hex');
+function tokenFor(pid) {
+  const body = String(pid) + '.' + String(Date.now() + 3600000);
+  return 'v1.' + body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 (async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-1351-'));
   fs.copyFileSync(VOICE, path.join(dir, 'voice-server.js'));
   fs.copyFileSync(path.join(path.dirname(VOICE), 'headlines.js'), path.join(dir, 'headlines.js'));
+  fs.writeFileSync(path.join(dir, 'token-key.txt'), KEY);
   const PORT = await freePort('127.0.0.1');
   const srv = spawn(process.execPath, ['voice-server.js'], { cwd: dir,
     env: Object.assign({}, process.env, { THORNSWOOD_VOICE_PORT: String(PORT), THORNSWOOD_VOICE_BIND: '127.0.0.1',
-                                          THORNSWOOD_VOICE_AUTH: 'off', THORNSWOOD_SITE: '',
+                                          THORNSWOOD_SITE: '',
                                           THORNSWOOD_CHAT_DIR: path.join(dir, 'chat') }) });
   let srvLog = '';
   srv.stdout.on('data', (d) => { srvLog += d; });
@@ -153,13 +166,13 @@ const closeCode = (c) => {
 
   console.log('masked, as a browser sends it:');
   const a = await raw(PORT);
-  a.sock.write(textFrame({ t: 'join', profileId: 1, name: 'Alva' }, true));
+  a.sock.write(textFrame({ t: 'join', profileId: 1, name: 'Alva', token: tokenFor(1) }, true));
   await wait(200);
   yes('a masked join is welcomed', a.msgs.some((m) => m.t === 'welcome'));
 
   console.log('\nunmasked:');
   const b = await raw(PORT);
-  b.sock.write(textFrame({ t: 'join', profileId: 2, name: 'Brand' }, false));
+  b.sock.write(textFrame({ t: 'join', profileId: 2, name: 'Brand', token: tokenFor(2) }, false));
   await wait(300);
   yes('an unmasked join is not welcomed', !b.msgs.some((m) => m.t === 'welcome'));
   yes('it is answered with a close frame carrying 1002, a protocol error (' + closeCode(b) + ')', closeCode(b) === 1002);
@@ -170,7 +183,7 @@ const closeCode = (c) => {
 
   console.log('\nsomebody already in the room who sends one unmasked frame:');
   const c = await raw(PORT);
-  c.sock.write(textFrame({ t: 'join', profileId: 3, name: 'Cyra' }, true));
+  c.sock.write(textFrame({ t: 'join', profileId: 3, name: 'Cyra', token: tokenFor(3) }, true));
   await wait(200);
   yes('joins masked and is in the room', c.msgs.some((m) => m.t === 'welcome') &&
       a.msgs.some((m) => m.t === 'peers' && m.peers.some((p) => p.profileId === 3)));
@@ -194,7 +207,7 @@ const closeCode = (c) => {
   const ws = new WebSocket('ws://127.0.0.1:' + PORT + '/');
   ws.onmessage = (e) => { try { got.push(JSON.parse(e.data)); } catch (x) { } };
   await new Promise((ok) => { ws.onopen = ok; ws.onerror = ok; });
-  ws.send(JSON.stringify({ t: 'join', profileId: 4, name: 'Dagny' }));
+  ws.send(JSON.stringify({ t: 'join', profileId: 4, name: 'Dagny', token: tokenFor(4) }));
   await wait(200);
   ws.send(JSON.stringify({ t: 'chat', text: 'masked words' }));
   await wait(300);
