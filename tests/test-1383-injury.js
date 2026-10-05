@@ -629,8 +629,11 @@ if (NEEDS_SRC && HURT_SRC && P) {
   {
     const craft = src.indexOf("mp.onCraft = guard('onCraft'");
     const craftBody = craft >= 0 ? src.slice(craft, src.indexOf('NO RECIPE AT ALL', craft)) : '';
-    yes('mp.onCraft asks the injury block before anything else and refuses with false',
-      /hurt\.craftRefusal\(actorId, workbenchId\)/.test(craftBody) && /return false;/.test(craftBody));
+    const gate = src.indexOf('function unfitToMake(actorId, workbenchId) {');
+    const gateBody = gate >= 0 ? src.slice(gate, src.indexOf('\n}\n', gate)) : '';
+    yes('mp.onCraft asks the injury block before anything else, through the one craft gate (#1733), and refuses with false',
+      /hurt\.craftRefusal\(actorId, workbenchId\)/.test(gateBody) &&
+      /const unfit = unfitToMake\(actorId, workbenchId\);/.test(craftBody) && /return false;/.test(craftBody));
     yes('a potion of cure disease is heard from the engine\'s own drink, never from the /ate line',
       (src.match(/^  mp\.onEatItem = guard\('onEatItem'/gm) || []).length === 1 &&
       /swallowed\(actorId, Number\(baseId\) \|\| 0\)/.test(HURT_SRC) &&
