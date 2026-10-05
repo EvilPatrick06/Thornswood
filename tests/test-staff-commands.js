@@ -27,6 +27,7 @@ const os = require('os');
 const path = require('path');
 const vm = require('vm');
 const crypto = require('crypto');
+const net = require('net');
 const { spawn } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
@@ -386,23 +387,73 @@ if (COMMANDS && STAFF) {
 }
 
 // ------------------------------------------------------------------ B --
-const PORT = 7931;
+// It was a fixed 7931, the same as test-deploy-records.js, so a build beside
+// this one on the VPS could answer it (#1703). startVoice() below.
+let PORT = 0;
+let base = '';
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-staff-'));
 const KEY = crypto.randomBytes(32).toString('hex');
 fs.writeFileSync(path.join(dir, 'token-key.txt'), KEY);
 fs.copyFileSync(VOICE, path.join(dir, 'voice-server.js'));
 fs.copyFileSync(path.join(path.dirname(VOICE), 'headlines.js'), path.join(dir, 'headlines.js'));
-const srv = spawn(process.execPath, ['voice-server.js'], {
-  cwd: dir,
-  env: Object.assign({}, process.env, {
-    THORNSWOOD_VOICE_PORT: String(PORT), THORNSWOOD_VOICE_AUTH: 'log', THORNSWOOD_SITE: '',
-    THORNSWOOD_CHAT_DIR: path.join(dir, 'chat'), THORNSWOOD_CHAT_RANGE: 'off'
-  })
-});
+/*
+  A port of this run's own (#1703). Builds run side by side on the VPS, and
+  with a fixed number one run's requests can be answered by another run's
+  service. The system names a port nothing holds, the service is started on
+  it, and nothing is asked of the port until this service has said it is
+  listening there.
+*/
+function freePort(host) {
+  return new Promise((ok, bad) => {
+    const s = net.createServer();
+    s.on('error', bad);
+    s.listen(0, host, () => { const p = s.address().port; s.close(() => ok(p)); });
+  });
+}
+/* Waits for srv's own "listening on ...:port" line. If it stops first,
+   something took the port in between or it could not start, and the error
+   says which, with what it printed. */
+function listening(srv, port) {
+  return new Promise((ok, bad) => {
+    let out = '';
+    const said = (d) => {
+      out += d;
+      const m = /\[voice\] listening on \S+:(\d+)/.exec(out);
+      if (m && Number(m[1]) === port) { end(null); }
+    };
+    const more = (d) => { out += d; };
+    const gone = (code) => end(new Error((/EADDRINUSE/.test(out) ? 'something else already holds port ' + port + ', so ' : '') +
+                                         'the voice service stopped (exit ' + code + ') before it was listening. It printed:\n' + out));
+    const late = setTimeout(() => end(new Error('the voice service did not say it was listening on ' + port +
+                                                ' within fifteen seconds. It printed:\n' + out)), 15000);
+    function end(err) {
+      clearTimeout(late);
+      srv.stdout.removeListener('data', said);
+      srv.stderr.removeListener('data', more);
+      srv.removeListener('exit', gone);
+      if (err) { bad(err); } else { ok(); }
+    }
+    srv.stdout.on('data', said);
+    srv.stderr.on('data', more);
+    srv.on('exit', gone);
+  });
+}
+let srv = null;
 let srvLog = '';
-srv.stdout.on('data', (d) => { srvLog += d; });
-srv.stderr.on('data', (d) => { srvLog += d; });
-const base = 'http://127.0.0.1:' + PORT;
+async function startVoice() {
+  PORT = await freePort('0.0.0.0');
+  base = 'http://127.0.0.1:' + PORT;
+  srv = spawn(process.execPath, ['voice-server.js'], {
+    cwd: dir,
+    env: Object.assign({}, process.env, {
+      THORNSWOOD_VOICE_PORT: String(PORT), THORNSWOOD_VOICE_AUTH: 'log', THORNSWOOD_SITE: '',
+      THORNSWOOD_CHAT_DIR: path.join(dir, 'chat'), THORNSWOOD_CHAT_RANGE: 'off'
+    })
+  });
+  srv.stdout.on('data', (d) => { srvLog += d; });
+  srv.stderr.on('data', (d) => { srvLog += d; });
+  await listening(srv, PORT);
+}
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(cond, ms) {
   const end = Date.now() + (ms || 3000);
@@ -469,9 +520,9 @@ function python(args) {
 }
 
 (async () => {
-  let h = null;
-  for (let i = 0; i < 60 && !h; i++) { h = await health(); if (!h) { await wait(150); } }
-  if (!h) { yes('the voice service came up', false); console.log(srvLog); return; }
+  try { await startVoice(); } catch (e) { yes('the voice service came up', false); console.log(e.message); return; }
+  let h = await health();
+  if (!h) { yes('the voice service answers /health', false); console.log(srvLog); return; }
   console.log('\nthe voice service:');
   const aela = await join(STAFFER, 'Aela', token(STAFFER));
   const liar = await join(STAFFER, 'Not Aela', '');
