@@ -30,9 +30,11 @@
 
   LevelDB writes the key, then ONE length byte, then that many bytes of JSON.
 
-  These build a state.v2 of their own out of those exact bytes and point the
-  real function at it through APPDATA, so what is under test is the shipped
-  function rather than a copy of it.
+  The newest half builds a state.v2 of its own out of those exact bytes and
+  points the real function at it through APPDATA, so what is under test is the
+  shipped function rather than a copy of it. The installed half reads state
+  as LevelDB since #1582, so its cases are LevelDB, written by the same writer
+  as the reader's own fixtures (see Case below).
 
   Read only apart from files under its own temp folder.
 #>
@@ -72,23 +74,53 @@ function Transition([int]$from, [int]$to) {
   return [Text.Encoding]::ASCII.GetBytes(
     'persistent###mods###skyrimse###"newestVersion","from":"' + $from + '","to":"' + $to + '"')
 }
-# One flattened mod attribute, byte for byte as Vortex writes it: the key
-# joined by ###, one length byte, then the value's JSON. This is how the
-# installed revision (Have) is recorded, tied to the collection by its slug.
+# The installed half (Have). Since #1582 the installed revision is read by
+# launcher\app\VortexProfileState.cs, which reads state.v2 as LevelDB: CURRENT,
+# the manifest it names, the tables and the log, with sequences, deletions and
+# checksums. Bytes with no CURRENT read as nothing there. So each case here is
+# a LevelDB folder written by tests\fixtures\vortex-state-rows.py, the writer
+# the reader's own fixtures use, and is its own APPDATA under $cases.
+#
+# One row is one flattened key, joined by ###, and the JSON Vortex stores for
+# it. The installed revision is recorded against the mod, tied to the
+# collection by the slug recorded against the same mod id.
+$cases = Join-Path $root 'cases'
+$spec = [ordered]@{}
+function Row([string]$key, [string]$json) { [pscustomobject]@{ key = $key; value = $json } }
 function Attr([string]$modId, [string]$name, [string]$valueJson) {
-  $b = [Collections.Generic.List[byte]]::new()
-  $b.AddRange([Text.Encoding]::ASCII.GetBytes("persistent###mods###skyrimse###$modId###attributes###$name"))
-  $b.Add([byte]$valueJson.Length)
-  $b.AddRange([Text.Encoding]::ASCII.GetBytes($valueJson))
-  $b.AddRange([Text.Encoding]::ASCII.GetBytes([char]1 + 'persistent###mods###skyrimse'))
-  return $b.ToArray()
+  Row "persistent###mods###skyrimse###$modId###attributes###$name" $valueJson
+}
+function RevInfo([string]$revId, [string]$slug, [int]$num) {
+  Row "persistent###collections###revisions###$revId###info###collection###slug" ('"' + $slug + '"')
+  Row "persistent###collections###revisions###$revId###info###revisionNumber" ([string]$num)
+}
+# Rows in the compressed table are state as Vortex leaves it after compaction;
+# rows in the log are a change as Vortex writes it before compaction. Newest
+# and the mod ids still read state as text, which only the log keeps whole
+# (#1902), so a case those readers also look at keeps its rows in the log.
+function Case([string]$name, [object[]]$table, [object[]]$log) {
+  $spec[$name] = [ordered]@{ table = $table; log = $log }
 }
 function Put([string]$name, [byte[]]$bytes) {
   [IO.File]::WriteAllBytes((Join-Path $state $name), $bytes)
 }
 function Clear-State { Get-ChildItem $state -File | Remove-Item -Force }
 
+$z = 'vortex_collection_ZRT7NjhN_'
+Case 'installed' @((Attr $z 'collectionSlug' '"ombo2a"'), (Attr $z 'revisionNumber' '5')) @()
+Case 'installed-two' @((Attr $z 'collectionSlug' '"ombo2a"'), (Attr $z 'revisionNumber' '5'),
+  (Attr 'vortex_collection_AAbb99xx_' 'collectionSlug' '"7essxf"'), (Attr 'vortex_collection_AAbb99xx_' 'revisionNumber' '12')) @()
+Case 'ready' @() @((Attr $z 'collectionSlug' '"ombo2a"'), (Attr $z 'revisionNumber' '5'), (Attr $z 'newestVersion' '"5"'))
+Case 'draft' @() (@((Attr $z 'collectionSlug' '"7essxf"'), (Attr $z 'revisionNumber' '1')) + @(RevInfo '796316' '7essxf' 1))
+Case 'authoring' @() (@((Attr $z 'newestFileId' '796316'), (Attr $z 'newestVersion' '"1"')) + @(RevInfo '796316' '7essxf' 1))
+Case 'slug-only' @() @(Attr $z 'collectionSlug' '"7essxf"')
+
 try {
+  $specPath = Join-Path $root 'cases.json'
+  [IO.File]::WriteAllText($specPath, (ConvertTo-Json -InputObject $spec -Depth 6), (New-Object Text.UTF8Encoding($false)))
+  & python (Join-Path $Here 'tests\fixtures\vortex-state-rows.py') $cases $specPath
+  if ($LASTEXITCODE) { throw 'tests\fixtures\vortex-state-rows.py could not write the installed cases' }
+
   $env:APPDATA = $root
 
   # ---- the shape that broke it ---------------------------------------------
@@ -161,32 +193,23 @@ try {
   # ---- the installed revision (Have), read from state under the new naming --
   # Vortex stopped naming the mod folder for the collection (it is
   # vortex_collection_<opaque id>_ now), so the installed revision NUMBER is
-  # read from state.v2, tied to the collection by its slug. These build that
-  # state and point the shipped Get-CollectionRevision at it through APPDATA,
+  # read from state.v2, tied to the collection by its slug. These point the
+  # shipped Get-CollectionRevision at the cases built above through APPDATA,
   # so what is under test is the shipped reader, not a copy of it.
   $ombo = 'https://www.nexusmods.com/games/skyrimspecialedition/collections/ombo2a'
 
-  Clear-State
-  $inst = [Collections.Generic.List[byte]]::new()
-  $inst.AddRange([byte[]](Attr 'vortex_collection_ZRT7NjhN_' 'collectionSlug' '"ombo2a"'))
-  $inst.AddRange([byte[]](Attr 'vortex_collection_ZRT7NjhN_' 'revisionNumber' '5'))
-  Put '000200.log' $inst.ToArray()
+  $env:APPDATA = Join-Path $cases 'installed'
   Yes 'the installed revision is read from state under vortex_collection_* naming' ((Get-CollectionRevision 'ombo2a') -eq 5)
 
   # Two collections installed at once, ombo2a on main and 7essxf on dev: each
   # answers about its own, tied by the mod id, never the other's number.
-  Clear-State
-  $both = [Collections.Generic.List[byte]]::new()
-  $both.AddRange([byte[]](Attr 'vortex_collection_ZRT7NjhN_' 'collectionSlug' '"ombo2a"'))
-  $both.AddRange([byte[]](Attr 'vortex_collection_ZRT7NjhN_' 'revisionNumber' '5'))
-  $both.AddRange([byte[]](Attr 'vortex_collection_AAbb99xx_' 'collectionSlug' '"7essxf"'))
-  $both.AddRange([byte[]](Attr 'vortex_collection_AAbb99xx_' 'revisionNumber' '12'))
-  Put '000200.log' $both.ToArray()
+  $env:APPDATA = Join-Path $cases 'installed-two'
   Yes 'ombo2a reads its own 5, not the other collection''s 12' ((Get-CollectionRevision 'ombo2a') -eq 5)
   Yes 'and 7essxf reads its own 12' ((Get-CollectionRevision '7essxf') -eq 12)
 
   # The legacy folder is still read when there is no state to read: a machine
   # that only ever had the old collection_<slug>_<rev>_* folders.
+  $env:APPDATA = $root
   Clear-State
   $legacyMods = Join-Path $root 'Vortex\skyrimse\mods'
   $null = New-Item -ItemType Directory -Force -Path (Join-Path $legacyMods 'collection_ombo2a_4_2026-09-20T10-00-00Z')
@@ -197,37 +220,14 @@ try {
   # Have and Newest together, the two numbers Deploy-Gamemode stands on: with
   # the collection installed at 5 and Vortex knowing 5 is newest, the state is
   # Known and not Behind, which is a deploy that no longer needs -IgnoreRevision.
-  Clear-State
-  $ready = [Collections.Generic.List[byte]]::new()
-  $ready.AddRange([byte[]](Attr 'vortex_collection_ZRT7NjhN_' 'collectionSlug' '"ombo2a"'))
-  $ready.AddRange([byte[]](Attr 'vortex_collection_ZRT7NjhN_' 'revisionNumber' '5'))
-  $ready.AddRange([byte[]](Plain 5))
-  Put '000200.log' $ready.ToArray()
+  $env:APPDATA = Join-Path $cases 'ready'
   $csReady = Get-CollectionState $ombo
   Yes 'Get-CollectionState reads Have from state now' ($csReady.Have -eq 5)
   Yes 'and Known is true, so the deploy gate reads a real revision without -IgnoreRevision' ($csReady.Known)
   Yes 'and Behind is false when Have matches Newest' (-not $csReady.Behind)
 
   # ---- Known without newestVersion (draft / first revision) ----------------
-  Clear-State
-  $draft = [Collections.Generic.List[byte]]::new()
-  $draft.AddRange([byte[]](Attr 'vortex_collection_ZRT7NjhN_' 'collectionSlug' '"7essxf"'))
-  $draft.AddRange([byte[]](Attr 'vortex_collection_ZRT7NjhN_' 'revisionNumber' '1'))
-  function RevInfo([string]$revId, [string]$slug, [int]$num) {
-    $b = [Collections.Generic.List[byte]]::new()
-    $b.AddRange([Text.Encoding]::ASCII.GetBytes("persistent###collections###revisions###$revId###info###collection###slug"))
-    $sj = '"' + $slug + '"'
-    $b.Add([byte]$sj.Length)
-    $b.AddRange([Text.Encoding]::ASCII.GetBytes($sj))
-    $b.AddRange([Text.Encoding]::ASCII.GetBytes([char]1 + "persistent###collections###revisions###$revId###info###revisionNumber"))
-    $nj = "$num"
-    $b.Add([byte]$nj.Length)
-    $b.AddRange([Text.Encoding]::ASCII.GetBytes($nj))
-    $b.AddRange([Text.Encoding]::ASCII.GetBytes([char]1 + 'persistent###mods###skyrimse'))
-    return $b.ToArray()
-  }
-  $draft.AddRange([byte[]](RevInfo '796316' '7essxf' 1))
-  Put '000200.log' $draft.ToArray()
+  $env:APPDATA = Join-Path $cases 'draft'
   $csDraft = Get-CollectionState 'https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf'
   Yes 'without newestVersion, Have still reads 1 from state' ($csDraft.Have -eq 1)
   Yes 'and Newest is 1 from collections revisions / installed floor' ($csDraft.Newest -eq 1)
@@ -235,20 +235,7 @@ try {
 
 
   # ---- authoring shape: newestFileId, no collectionSlug (live ship PC) ------
-  Clear-State
-  function FileIdAttr([string]$modId, [string]$fileId) {
-    $b = [Collections.Generic.List[byte]]::new()
-    $b.AddRange([Text.Encoding]::ASCII.GetBytes("persistent###mods###skyrimse###$modId###attributes###newestFileId"))
-    $b.Add([byte]$fileId.Length)
-    $b.AddRange([Text.Encoding]::ASCII.GetBytes($fileId))
-    $b.AddRange([Text.Encoding]::ASCII.GetBytes([char]1 + 'persistent###mods###skyrimse'))
-    return $b.ToArray()
-  }
-  $author = [Collections.Generic.List[byte]]::new()
-  $author.AddRange([byte[]](FileIdAttr 'vortex_collection_ZRT7NjhN_' '796316'))
-  $author.AddRange([byte[]](Attr 'vortex_collection_ZRT7NjhN_' 'newestVersion' '"1"'))
-  $author.AddRange([byte[]](RevInfo '796316' '7essxf' 1))
-  Put '000200.log' $author.ToArray()
+  $env:APPDATA = Join-Path $cases 'authoring'
   $csAuthor = Get-CollectionState 'https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf'
   Yes 'without collectionSlug, Have still reads 1 via newestFileId + revisions table' ($csAuthor.Have -eq 1)
   Yes 'and Newest is 1 so Known is true on the authoring shape' ($csAuthor.Known)
@@ -256,7 +243,7 @@ try {
   $modsAuthor = @((Get-CollectionModIds '7essxf') | ForEach-Object { $_ })
   Yes 'ModIds finds vortex_collection_* via newestFileId when collectionSlug is absent' `
     ($modsAuthor -contains 'vortex_collection_ZRT7NjhN_')
-  $modsDirA = Join-Path $root 'Vortex\skyrimse\mods'
+  $modsDirA = Join-Path $env:APPDATA 'Vortex\skyrimse\mods'
   $opaqueA = Join-Path $modsDirA 'vortex_collection_ZRT7NjhN_'
   $null = New-Item -ItemType Directory -Force -Path $opaqueA
   $foundA = Get-CollectionInstalledFolder '7essxf'
@@ -265,11 +252,8 @@ try {
   Remove-Item -LiteralPath $modsDirA -Recurse -Force -EA SilentlyContinue
 
   # ---- InstalledFolder via state, with or without collection.json ----------
-  Clear-State
-  $instFolder = [Collections.Generic.List[byte]]::new()
-  $instFolder.AddRange([byte[]](Attr 'vortex_collection_ZRT7NjhN_' 'collectionSlug' '"7essxf"'))
-  Put '000200.log' $instFolder.ToArray()
-  $modsDir = Join-Path $root 'Vortex\skyrimse\mods'
+  $env:APPDATA = Join-Path $cases 'slug-only'
+  $modsDir = Join-Path $env:APPDATA 'Vortex\skyrimse\mods'
   $opaque = Join-Path $modsDir 'vortex_collection_ZRT7NjhN_'
   $null = New-Item -ItemType Directory -Force -Path $opaque
   $found = Get-CollectionInstalledFolder '7essxf'
@@ -282,6 +266,7 @@ try {
   Remove-Item -LiteralPath $modsDir -Recurse -Force -EA SilentlyContinue
 
   # ---- Thornswood profile lock helper --------------------------------------
+  $env:APPDATA = $root
   Clear-State
   $profLog = [Text.Encoding]::ASCII.GetBytes(
     '{"type":"mod-enabled","data":{"profileId":"ZRT7NjhN_","profileName":"Thornswood"}}')
