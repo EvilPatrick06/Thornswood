@@ -35,7 +35,8 @@
       reply says it is logged;
     - the temple table agrees with DATA (the death respawn's own points) and
       every cell is a temple in the load order;
-    - /stuck is in WORDS, in what everybody is told about, and in /help staff;
+    - /stuck is in WORDS, in what everybody is told about, and in the help
+      panel's Getting help (#1633), with the stuck block's own numbers;
     - frozen by staff, or still making the character: refused with a line.
 
   Read only. Nothing leaves the process.
@@ -49,6 +50,24 @@ const ROOT = path.join(__dirname, '..');
 const GM = process.env.GM || path.join(ROOT, 'game', 'gamemode.js');
 const CR = String.fromCharCode(13);
 const src = fs.readFileSync(GM, 'utf8').split(CR).join('');
+/*
+  One topic of the help panel (#1633), as a fresh install reads it: /help's
+  topics moved out of the gamemode into game/ui/thornswood-help.js, each a
+  list of paragraphs made from the key names.
+*/
+function helpTopic(id) {
+  const page = fs.readFileSync(path.join(ROOT, 'game', 'ui', 'thornswood-help.js'), 'utf8')
+    .split(String.fromCharCode(13)).join('');
+  const a = page.indexOf('  var TOPICS = [');
+  const b = a < 0 ? -1 : page.indexOf('\n  ];\n', a);
+  const k = /var keys = (\{[\s\S]*?\});/.exec(page);
+  if (a < 0 || b < 0 || !k) { return ''; }
+  try {
+    const topics = new Function('return ' + page.slice(page.indexOf('[', a), b + 4))();
+    const t = topics.filter(function (x) { return x.id === id; })[0];
+    return t ? t.text(new Function('return ' + k[1])()).join(' ') : '';
+  } catch (e) { return ''; }
+}
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -284,10 +303,18 @@ console.log('\nfindable:');
 {
   yes('/stuck is a word the server answers', w.box.WORDS.indexOf('/stuck') >= 0);
   yes('and one everybody is told about', w.box.PLAYER_WORDS.indexOf('/stuck') >= 0);
-  const help = run(w, SERA, '/help staff');
-  yes('/help staff says what /stuck does, the 5 minutes, the wait and that it is logged',
-      help.length === 1 && /\/stuck/.test(help[0]) && /5 minutes/.test(help[0]) &&
-      /15 second wait/.test(help[0]) && /logged for staff/.test(help[0]));
+  // The help is a panel since #1633: its Getting help, as a fresh install
+  // reads it, with the minutes and the seconds read out of the stuck block.
+  const help = helpTopic('help');
+  const block = slice('// ==== thornswood stuck ====', '// ==== end thornswood stuck ====') || '';
+  const again = Number((/var AGAIN_MS = (\d+) \* 60 \* 1000;/.exec(block) || [])[1]);
+  const wait = Number((/var WAIT_MS = (\d+);/.exec(block) || [])[1]) / 1000;
+  yes('the help panel says what /stuck does, the ' + again + ' minutes, the ' + wait + ' second wait and that it is logged',
+      again > 0 && wait > 0 && /\/stuck/.test(help) && help.indexOf('once every ' + again + ' minutes') !== -1 &&
+      help.indexOf('a ' + wait + ' second wait in a fight') !== -1 && /logged for staff/.test(help));
+  const said = run(w, SERA, '/help');
+  yes('and /help typed out of habit says where the panel is, and names /stuck',
+      said.length === 1 && /^Help is a panel/.test(said[0]) && /\/stuck/.test(said[0]));
 }
 
 // ---------------------------------------------------------------- dead --

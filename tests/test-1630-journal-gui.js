@@ -24,6 +24,24 @@ function read(...bits) {
   return fs.readFileSync(path.join(REPO_DIR, ...bits), 'utf8').split(CR).join('');
 }
 const gm = read('game', 'gamemode.js');
+/*
+  One topic of the help panel (#1633), as a fresh install reads it: /help's
+  topics moved out of the gamemode into game/ui/thornswood-help.js, each a
+  list of paragraphs made from the key names.
+*/
+function helpTopic(id) {
+  const page = fs.readFileSync(path.join(REPO_DIR, 'game', 'ui', 'thornswood-help.js'), 'utf8')
+    .split(String.fromCharCode(13)).join('');
+  const a = page.indexOf('  var TOPICS = [');
+  const b = a < 0 ? -1 : page.indexOf('\n  ];\n', a);
+  const k = /var keys = (\{[\s\S]*?\});/.exec(page);
+  if (a < 0 || b < 0 || !k) { return ''; }
+  try {
+    const topics = new Function('return ' + page.slice(page.indexOf('[', a), b + 4))();
+    const t = topics.filter(function (x) { return x.id === id; })[0];
+    return t ? t.text(new Function('return ' + k[1])()).join(' ') : '';
+  } catch (e) { return ''; }
+}
 const journalSrc = read('game', 'ui', 'thornswood-journal.js');
 const front = read('game', 'plugins', 'thornswood-front.js');
 
@@ -56,8 +74,9 @@ function list(name) {
   yes('A2: neither is on the list of words named to everybody (/help, the unknown word reply)',
       PW.indexOf('/helpme') !== -1 && PW.indexOf('/journal') === -1 && PW.indexOf('/book') === -1);
 
-  const people = slice(gm, "      if (topic === 'people' || topic === 'friends' || topic === 'party') {", '        return;');
-  yes('A3: /help people names J and its buttons for a group book, and no /book line',
+  // The help is a panel since #1633: its People topic, as a fresh install reads it.
+  const people = helpTopic('people');
+  yes('A3: the help panel\'s People names J and its buttons for a group book, and no /book line',
       !!people && /J opens your journals/.test(people) && /New business and New faction/.test(people) &&
       /Leave there/.test(people) && !/\/book/.test(people) && !/\/journal/.test(people));
 

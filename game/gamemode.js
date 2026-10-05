@@ -48107,7 +48107,15 @@ function thornswoodBooks(env) {
   server answers' would make that list wrong in the one place somebody would go
   to check.
 */
-const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
+const WORDS = ['/ooc', '/o',
+               // A dev's and a tester's tool: the cell, the position and the
+               // angle you stand at. Answered for them alone, the way /tp is,
+               // and not in PLAYER_WORDS (#1633).
+               '/where',
+               // The help is a panel, on its own key and on Help on the K, P
+               // and J panels (#1633). Typed out of habit, these two answer
+               // where it is (helpLine), and nothing tells anybody to type them.
+               '/help', '/commands',
                // Asking staff for help and reporting somebody; see the asking
                // staff block at the end of this file.
                '/helpme', '/help-me', '/report',
@@ -48238,34 +48246,33 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
   The ones a person who is not a playtester is told about. /tp, /goto, /face,
   /restart, /shutdown and /tspicks are theirs, and naming them to everybody is
   an invitation rather than a help.
+
+  Since #1633, exactly the commands people still type, and nothing else:
+  /stuck and the lines that reach staff, /helpme and /report (Patrick,
+  4 October, #1682), and the ways of saying a line, /me, /do, /w, /s, /y and
+  /ooc, with /roll (#1639). Everything else anybody does is a key, a prompt
+  or a panel, and the help panel names those. /me, /do, /w, /s and /y are
+  said by the voice service and never reach this server, so they are named
+  here and are not in WORDS. docs/systems/commands.md has the same list.
 */
 // Not /plot, /plant or /claim: a farm is worked and claimed at the plot, and
 // a building at its door, with the line under the crosshair (#1636, #1637).
-const PLAYER_WORDS = ['/ooc', '/where',
-                      // Not /jarl, /steward, /evict, /box or /rent: the
-                      // offices' powers are buttons on the Office page of K
-                      // (#1638), and the board panel says what the box holds.
-                      '/help',
-                      // Not /rest: sitting or lying down is how you rest
-                      // (#1603). Not /needs, /eat, /drink or /bard (#1631):
-                      // the four bars and the Body page on K show the meters,
-                      // eating or drinking the item is the meal, and playing
-                      // an instrument or Sing on the emote wheel is the bard.
-                      // Everybody's, and the one thing a person in trouble
-                      // must be able to find: asking staff, and getting
-                      // out of a wedged spot (#414).
-                      '/helpme', '/report', '/stuck',
-                      // Everybody's, and they have to be findable: a key
-                      // prompt nobody sees is a feature nobody has. Not
-                      // /party: P on somebody asks and the P panel runs the
-                      // party, and nobody is told to type it (#1629). Not
-                      // /journal or /book: J sends those lines and nobody is
-                      // told to type them (#1630). Not /friend, /mute,
-                      // /hidename, /trade, /yes and /no: Y, H and L on the look
-                      // prompt, the P panel, the trade window and the prompt's
-                      // Accept and Refuse send them, and nobody types them (#1628).
-                      '/merchant',
-                      '/roll'];
+// Not /jarl, /steward, /evict, /box or /rent: the offices' powers are buttons
+// on the Office page of K (#1638), and the board panel says what the box
+// holds. Not /rest: sitting or lying down is how you rest (#1603). Not /needs,
+// /eat, /drink or /bard (#1631): the four bars and the Body page on K show the
+// meters, eating or drinking the item is the meal, and playing an instrument
+// or Sing on the emote wheel is the bard. Not /party: P on somebody asks and
+// the P panel runs the party (#1629). Not /journal or /book: J sends those
+// lines (#1630). Not /friend, /mute, /hidename, /trade, /yes and /no: Y, H and
+// L on the look prompt, the P panel, the trade window and the prompt's Accept
+// and Refuse send them (#1628). Not /merchant: E on a trader opens its panel.
+// Not /help: the help is a panel (#1633). Not /where: a dev's and a tester's
+// tool, answered for them alone (#1633).
+// /stuck, /helpme and /report are the one thing a person in trouble must be
+// able to find (#414).
+const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
+                      '/me', '/do', '/w', '/s', '/y', '/ooc', '/roll'];
 
 // ---------------------------------------------------------------------------
 // A teleport that actually teleports.
@@ -49129,7 +49136,28 @@ const PLAYER_WORDS = ['/ooc', '/where',
     return 'journal: new, title, page, share, unshare, drop, list.';
   }
 
+  /*
+    WHERE THE HELP IS, and the commands people still type (#1633). The answer
+    to /help and /commands, and the end of the answer to a word nobody has.
 
+    The help panel's key is HelpKey in Thornswood.ini, 65 by default, which is
+    F7; the server cannot see a rebind, so it names the default and says where
+    it moves. tests/test-1633-help-panel.js holds the F7 here to the ini, the
+    Controls page and the plugin. The commands are PLAYER_WORDS, the one list,
+    and nothing else. A tester or dev is told their own as well, and nobody
+    else is: naming /tp to somebody it then refuses was the first thing a new
+    person learned about this server.
+  */
+  function helpLine(profileId) {
+    return 'Help is a panel: F7 opens it, unless you moved it on the launcher\'s ' +
+           'Controls page, and so does Help on the K, P or J panel. Typed in the ' +
+           'chat: ' + PLAYER_WORDS.join(', ') + '.' +
+           (isPlaytester(profileId)
+             ? ' You are ' + roleOf(profileId) + ': /tp <place> moves you and /tp on ' +
+               'its own lists the places, /give and /spawn make things, and /where ' +
+               'says where you stand.'
+             : '');
+  }
 
   function handle(cmd) {
     var profileId = Number(cmd.profileId) || 0;
@@ -49821,6 +49849,12 @@ const PLAYER_WORDS = ['/ooc', '/where',
     }
 
     if (word === '/where') {
+      // A dev's and a tester's tool, refused to everybody else the way
+      // /give and /spawn are (#1633).
+      if (!isPlaytester(profileId)) {
+        toProfile(profileId, word + ' is not yours to run. Ask Patrick to add profile ' + profileId + '.');
+        return;
+      }
       if (!needCharacter()) { return; }
       var pos = [0, 0, 0], ang = [0, 0, 0], cell = '';
       try {
@@ -50235,28 +50269,6 @@ const PLAYER_WORDS = ['/ooc', '/where',
       return;
     }
 
-    /*
-      ------------------------------------------------------------- /help
-
-      A SHORT MENU, NOT A COMMAND LIST. From the To Do List: "/help is a
-      developer's command list, and the unknown-command reply advertises a
-      command everybody is then refused... /help opens a short menu: controls,
-      how to talk, the rules, how to reach staff, what to do first."
-
-      What stood here was one paragraph of every verb in the property system,
-      in the order they happened to be written, with the keys people actually
-      press missing entirely. Somebody's first question is not "how do I take
-      the deed to a building", it is "how do I talk to anybody".
-
-      SO IT IS TOPICS. /help on its own says what there is; /help talking, or
-      /help land, or whichever, answers that one. Six short answers somebody
-      can read in the chat window instead of one wall they will scroll past.
-
-      AND IT IS FILTERED THE SAME WAY EVERY TIME. The playtester commands are
-      named only to a playtester here, which this always did correctly, and
-      the unknown-command reply below did not: it advertised /tp to
-      everybody and then refused them. Both read the same list now.
-    */
     // The repair panel (#1384), from the inventory key or a button on the
     // panel. The work is in the durability block; this only hands it the
     // character and the words after /repair.
@@ -50311,91 +50323,23 @@ const PLAYER_WORDS = ['/ooc', '/where',
       return;
     }
 
+    /*
+      ------------------------------------------------------------- /help
+
+      THE HELP IS A PANEL (#1633). Patrick, 4 October: no chat commands for
+      anything people do. It was a menu and six topics typed into the chat,
+      each written as commands; it is the help panel now,
+      game/ui/thornswood-help.js, on its own key (HelpKey in Thornswood.ini,
+      F7 unless it was moved on the launcher's Controls page) and on Help on
+      the K, P and J panels, which opens without the chat and names every key
+      as that machine has it bound. Nothing tells anybody to type /help.
+
+      Somebody who types it anyway, out of habit, is told where the panel is
+      and the commands that are still typed, the same line a word nobody has
+      ends with (helpLine), so the two cannot drift apart.
+    */
     if (word === '/help' || word === '/commands') {
-      var topic = String(parts[1] || '').toLowerCase();
-      var extra = isPlaytester(profileId)
-        ? ' You are ' + roleOf(profileId) + ': /tp <place> moves you and /tp on ' +
-          'its own lists the places, /give and /spawn make things.'
-        : '';
-
-      if (topic === 'talking' || topic === 'talk' || topic === 'chat') {
-        toProfile(profileId,
-          'Enter opens the chat box and Escape gives the keyboard back. Hold V ' +
-          'to talk out loud: voice carries as far as you are speaking, and a ' +
-          'whisper, a normal voice and a yell all reach different distances. ' +
-          '/ooc <what you meant> is out of character to whoever is near you. ' +
-          '/roll 20, or /roll 6x3 for three dice; the server rolls it, so ' +
-          'nobody can make a number up.');
-        return;
-      }
-      if (topic === 'people' || topic === 'friends' || topic === 'party') {
-        toProfile(profileId,
-          'Look at somebody and press Y to ask them to be friends, H to offer a ' +
-          'trade, L to stop hearing them, P to ask them to party. P opens your ' +
-          'friends and party; ' +
-          'J opens your journals, and a group book beside them when this character ' +
-          'is in one or the Discord account may found one. A Dev may found one of each. ' +
-          'New business and New faction on that tab start one, and Leave there ' +
-          'drops this character. ' +
-          'Work done with your party in the same place ' +
-          'counts for more. Answer a request with Accept or Refuse on its prompt.');
-        return;
-      }
-      if (topic === 'living' || topic === 'needs' || topic === 'food') {
-        toProfile(profileId,
-          'The four bars are food, water, rest and how warm you are, and the Body ' +
-          'page on K says why. Eat or drink from your pack. Sit or lie down to rest: ' +
-          'on a seat, on the ground with Sit on the emote wheel, or in a bed. By a ' +
-          'fire is better, and your own bed is best. Somebody else\'s bed counts when ' +
-          'they let you sleep there or you carry its key. A lute, flute or drum ' +
-          'played on the wheel, or Sing, helps everybody resting there. Fires warm ' +
-          'you and standing in one burns you. Fur is the warmest to wear, metal ' +
-          'the worst.');
-        return;
-      }
-      if (topic === 'work' || topic === 'trade' || topic === 'class') {
-        toProfile(profileId,
-          'K opens your profession, your class and your skill tree. Work at what ' +
-          'you chose and the rank climbs on its own. Your sister half stops at ' +
-          'novice until a Master of it takes you on: a Master looks at you and ' +
-          'presses the key the prompt names. K lists who took you on and who you ' +
-          'took on, and either of you can end it there. At a crop, a line says ' +
-          'what is sown and whose farm it is. A ' +
-          'warrior\'s maneuvers open on the maneuver key, which the ' +
-          'launcher\'s Controls page names. ' +
-          'A repair kit is used from your inventory.');
-        return;
-      }
-      if (topic === 'land' || topic === 'home' || topic === 'deed') {
-        toProfile(profileId,
-          'At a door you just opened, a line names a key, X unless you changed ' +
-          'it: it claims a building nobody holds, and locks or unlocks one you ' +
-          'hold. At a crop the same key claims the farm around it. K lists what you ' +
-          'hold and the rent owed. A Jarl or a steward has an Office page on K. ' +
-          'To let somebody sleep in a building you hold, look at them inside ' +
-          'it and press the key the prompt shows. A blank key mold goes into a ' +
-          'lock on the key its line names, and a smith carrying that mold cuts ' +
-          'a key at a forge the same way.');
-        return;
-      }
-      if (topic === 'staff' || topic === 'rules' || topic === 'help') {
-        toProfile(profileId,
-          '/helpme <what is wrong> reaches staff from here, stuck or otherwise. ' +
-          '/report <name> <what they did> reports somebody to staff and nobody ' +
-          'else. /stuck, when you are wedged in the world, takes you back a few ' +
-          'steps or to the nearest temple; once every 5 minutes, a 15 second wait ' +
-          'in a fight, and every use is logged for staff. The rules are on thornswood.net and in the Discord, and a ticket ' +
-          'there reaches staff too. Ordinary chat reaches whoever is standing ' +
-          'near you and nobody else.');
-        return;
-      }
-
-      toProfile(profileId,
-        'Ask for one of these: /help talking, /help people, /help living, ' +
-        '/help work, /help land, /help staff, and /helpme reaches staff. Press K for your profession and ' +
-        'skills, P for friends and party, J for journals and every town\'s notice ' +
-        'board, Enter to talk and ' +
-        'hold V to speak.' + extra);
+      toProfile(profileId, helpLine(profileId));
       return;
     }
 
@@ -50419,11 +50363,11 @@ const PLAYER_WORDS = ['/ooc', '/where',
       This used to end "and /tp <place> for a playtester" to everybody,
       including everybody who is not one, so the first thing a new person
       learned about this server was a command that answers "no". /help two
-      lines up has always filtered correctly; this simply forgot to.
+      lines up has always filtered correctly; this simply forgot to. Since
+      #1633 both are helpLine: where the help panel is, and the commands
+      people still type, with a tester's own named to a tester alone.
     */
-    toProfile(profileId, 'No command called ' + word + '. ' +
-              'Try /help. There is ' + PLAYER_WORDS.join(', ') +
-              (isPlaytester(profileId) ? ', and /tp <place>.' : '.'));
+    toProfile(profileId, 'No command called ' + word + '. ' + helpLine(profileId));
   }
 
   /*

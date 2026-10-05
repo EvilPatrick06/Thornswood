@@ -209,19 +209,23 @@ yes('the gamemode\'s list of everybody\'s commands can be read', Array.isArray(e
     yes('it does not name the playtester command ' + w, !named[w]);
   });
 
-  const a = gm.indexOf("if (word === '/help' || word === '/commands') {");
-  const b = a < 0 ? -1 : gm.indexOf('// Anything else beginning with a slash', a);
-  const helpBlock = (a >= 0 && b > a) ? gm.slice(a, b) : '';
-  const topics = [];
-  // A topic is the word after /help in a list: "/help talking, /help land or
-  // /help staff for one topic each". Not "/help in the chat".
-  const tr = /\/help ([a-z]+)(?=[,.]| or | for )/g;
+  /*
+    The help in the game is a panel since #1633, and the page sends people to
+    it rather than to /help. Its topics are the panel's own titles, read out
+    of game/ui/thornswood-help.js; its key is HelpKey, held below with the
+    others.
+  */
+  yes('the page tells nobody to type /help', !/\/help\b(?!me)/.test(page));
+  const helpPanel = read('game', 'ui', 'thornswood-help.js');
+  const titles = [];
+  const tr = /\{ id: '[a-z]+', title: '([^']+)'/g;
   let t;
-  while ((t = tr.exec(page)) !== null) { if (topics.indexOf(t[1]) === -1) { topics.push(t[1]); } }
-  yes('the page points at /help topics, ' + topics.length + ' of them', topics.length >= 6);
-  const missing = topics.filter(function (x) { return helpBlock.indexOf("topic === '" + x + "'") === -1; });
-  yes('and /help answers every one' + (missing.length ? ' (not: ' + missing.join(', ') + ')' : ''),
-      helpBlock && missing.length === 0);
+  while ((t = tr.exec(helpPanel)) !== null) { titles.push(t[1].toLowerCase()); }
+  yes('the help panel has its six topics (' + titles.join(', ') + ')', titles.length === 6);
+  const panelItem = item('Chat and commands', 'Everything else is on the help panel');
+  const missing = titles.filter(function (x) { return panelItem.indexOf(x) === -1; });
+  yes('and the page names every one' + (missing.length ? ' (not: ' + missing.join(', ') + ')' : ''),
+      titles.length === 6 && missing.length === 0);
 }
 
 // ---------------------------------------------------------- the chat box
@@ -315,7 +319,8 @@ yes('the voice page says how many units are a metre (' + UPM + ')', UPM > 0);
 const LETTER = {
   30: 'A', 48: 'B', 46: 'C', 32: 'D', 18: 'E', 33: 'F', 34: 'G', 35: 'H', 23: 'I',
   36: 'J', 37: 'K', 38: 'L', 50: 'M', 49: 'N', 24: 'O', 25: 'P', 16: 'Q', 19: 'R',
-  31: 'S', 20: 'T', 22: 'U', 47: 'V', 17: 'W', 45: 'X', 21: 'Y', 44: 'Z', 28: 'Enter', 53: '/'
+  31: 'S', 20: 'T', 22: 'U', 47: 'V', 17: 'W', 45: 'X', 21: 'Y', 44: 'Z', 28: 'Enter', 53: '/',
+  65: 'F7'
 };
 function templateKey(name) {
   const r = new RegExp('^\\s*' + name + '\\s*=\\s*(\\d+)', 'm').exec(ini);
@@ -342,7 +347,9 @@ function freshKey(name) {
   ['StopKey', 'Emotes', 'Getting out of one', function (k) { return k + ' stands you up'; }],
   ['PushToTalk', 'Chat and commands', 'Voice', function (k) { return 'Hold ' + k + ' to talk'; }],
   ['VoiceLockKey', 'Chat and commands', 'Voice', function (k) { return 'press ' + k + ' to keep the microphone open until you press ' + k + ' again'; }],
-  ['CommandKey', 'Chat and commands', 'The chat box', function (k) { return k + ' opens it with the slash already typed'; }]
+  ['CommandKey', 'Chat and commands', 'The chat box', function (k) { return k + ' opens it with the slash already typed'; }],
+  // The help panel's own key (#1633).
+  ['HelpKey', 'Chat and commands', 'Everything else is on the help panel', function (k) { return k + ', unless you have moved it on the Controls page, opens the help in the game'; }]
 ].forEach(function (row) {
   const code = freshKey(row[0]);
   const t = templateKey(row[0]);
@@ -567,7 +574,8 @@ const site    = read('site', 'server.js');
     ['VoiceModeKey', function (k) { return k + ' steps between a whisper'; }],
     ['WheelKey', function (k) { return k + ' opens the emote wheel'; }],
     ['StopKey', function (k) { return k + ' stands you up'; }],
-    ['MoldKey', function (k) { return k + ' presses a blank key mold into the lock'; }]
+    ['MoldKey', function (k) { return k + ' presses a blank key mold into the lock'; }],
+    ['HelpKey', function (k) { return k + ' opens the help in the game'; }]
   ].forEach(function (row) {
     const t = templateKey(row[0]);
     const f = keysFallback(row[0]);
@@ -692,11 +700,12 @@ function between(src, from, to) {
   yes('help.md sends nobody to a page the rail no longer shows' + (logsPage ? ' (says "' + logsPage[0] + '")' : ''), !logsPage);
   const keysMd = /## Keys\n([\s\S]*?)\n## /.exec(md);
   const k = keysMd ? keysMd[1].replace(/\s+/g, ' ') : '';
-  yes('help.md lists the same keys: / chat, K, P, J, Y, H, L, V, O, B, G, N, U',
+  yes('help.md lists the same keys: / chat, K, P, J, Y, H, L, V, O, B, G, N, U, F7',
       ['/ opens it with the slash', 'K your character panel', 'P your friends and party', 'J your journals',
        'Y asks them to be friends', 'H offers a trade', 'L stops you hearing them', 'V held to talk',
        'O keeps the microphone open', 'B steps between a whisper', 'G opens the emote wheel',
-       'N stands you up', 'U presses a blank key mold'].every(function (p) { return k.indexOf(p) !== -1; }));
+       'N stands you up', 'U presses a blank key mold',
+       'F7 opens the help in the game'].every(function (p) { return k.indexOf(p) !== -1; }));
 }
 
 console.log('');
