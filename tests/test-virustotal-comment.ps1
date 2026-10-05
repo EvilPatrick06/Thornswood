@@ -5,11 +5,11 @@
 
   Add-VirusTotalComment.ps1 keeps its contract and never stops a release.
 
-  WHY THIS EXISTS. The setup program is not signed, issue #390, and the engines
-  that flag it are machine learning scores and hash intelligence rather than
-  signatures for anything known. A comment on the report saying what the file
-  is, who publishes it and where from is the one signal that can be added
-  without a certificate (docs\VIRUSTOTAL-FALSE-POSITIVE.md). That makes it a
+  WHY THIS EXISTS. The engines that flag the setup program are machine
+  learning scores and hash intelligence rather than signatures for anything
+  known. A comment on the report saying what the file is, who publishes it and
+  where from is signal added beside the certificate (issue #390) while the
+  signed publisher has little reputation (docs\VIRUSTOTAL-FALSE-POSITIVE.md). That makes it a
   script that runs at the end of a release, and the failure worth guarding
   against is not a missing comment: it is a missing comment that stops a
   release which has already been published. So every way out has to be exit 0.
@@ -173,7 +173,8 @@ if ($iText -gt 0) {
     Yes 'it names thornswood.net' ($text -match 'thornswood\.net')
     Yes 'it says this is the first-run installer' ($text -match '(?i)first-run installer')
     Yes 'it says it asks before closing a running Skyrim' ($text -match '(?i)asks first')
-    Yes 'and that it is not signed yet' ($text -match '(?i)not Authenticode signed yet')
+    Yes 'and that it is signed, as every published build is since 27 September' (
+        $text -match '(?i)Authenticode signed' -and $text -notmatch '(?i)not (Authenticode |code )?signed')
 }
 Yes 'the script has no em dash in it' (-not $src.Contains([string][char]0x2014))
 

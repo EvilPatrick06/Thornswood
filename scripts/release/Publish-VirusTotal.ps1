@@ -4,12 +4,14 @@
   not sending and carries on. Not called from publish.
 
 .DESCRIPTION
-  The Downloads page prints the installer's SHA-256 with a link to VirusTotal's
-  report on that hash, so somebody who wants to know what they are about to run
-  can read a report rather than upload 700 MB themselves (entry 176 on the To Do
-  List). Publish-Installer.ps1 has written that hash and printed that address
-  since 24 September, and nothing ever sent the file, so the link has always
-  landed on VirusTotal's "item not found" page. This is the missing half.
+  The Downloads page prints the installer's SHA-256 and no VirusTotal link
+  (site\public\home.js, sum). From 24 September it printed a link to
+  VirusTotal's report on that hash as well (entry 176 on the To Do List), and
+  nothing ever sent the file, so the link always landed on VirusTotal's "item
+  not found" page. That link is gone: the setup program is signed (#390), and
+  publish sends nothing to VirusTotal (#802). This script stays for sending a
+  build by hand, so there is a report to comment on and to point a vendor at
+  when a scanner flags it (docs\VIRUSTOTAL-FALSE-POSITIVE.md).
 
   NOTHING HERE CAN STOP A RELEASE. Every way out of this script is exit 0 with
   one line saying what happened: no key, no file, a key VirusTotal refuses, a
@@ -49,8 +51,8 @@
   plain endpoint, 650 MB through an upload URL, and nothing above that. The
   one-file installer has been over 650 MB, so that refusal is the expected
   outcome on some builds rather than a fault, and it is said as plainly as the
-  rest. When it happens the page's link stays a not-found page until the file
-  is under the cap or somebody sends it by hand.
+  rest. When it happens there is no report for that hash until the file is
+  under the cap or somebody sends it by hand.
 
   WHAT HAS BEEN MEASURED, and what has not. The paths that end in a line and
   exit 0 without a key, without a file, and with nothing answering, are what
