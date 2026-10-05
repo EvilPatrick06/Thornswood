@@ -337,6 +337,7 @@ jobs:
                  'test-1826-stock-wait-seconds.js',
                  'test-1622-recipe-generator.js',
                  'test-1007-worldspaces.js',
+                 'test-1896-worldspaces.js',
                  'test-1714-cut-file.js',
                  'test-1713-bench-table.js',
                  'test-1712-builders-skip-off.js',
