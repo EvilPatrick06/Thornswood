@@ -42,7 +42,7 @@ yes('cutKey is in the file', at >= 0);
 // ------------------------------------------------------- the gates that stay
 yes('it is still a smith’s work', /if \(!isSmith\(actorId\)\)/.test(body));
 yes('and still wants a forge, the one under the crosshair or the one last pressed',
-    /if \(!forgeHere\(parts, actorId\)\)/.test(body) &&
+    /var forge = forgeHere\(parts, actorId\);\s*if \(!forge\)/.test(body) &&
     /if \(!raw\) \{ return atForge\(actorId\); \}/.test(code));
 yes('and the mold is still asked for first, so a mold in hand always decides',
     body.indexOf('moldInHand(actorId)') > 0 &&

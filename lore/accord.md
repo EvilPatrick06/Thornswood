@@ -35,8 +35,8 @@ itself.
 The Empire may maintain one embassy within Skyrim, at Solitude, and no other
 house, fort, or station anywhere in the province.
 
-The embassy may hold no more than forty persons in service, of whom no more
-than twelve may bear arms, and those twelve within its walls only.
+The embassy may hold no more than twenty persons in service, of whom no more
+than six may bear arms, and those six within its walls only.
 
 No Legion soldier may set foot in Skyrim under arms. The embassy guard are not
 Legion and are not to be called so.

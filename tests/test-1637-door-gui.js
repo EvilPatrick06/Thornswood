@@ -102,9 +102,11 @@ const charBlock = slice(gm, '// ==== thornswood character ====', '// ==== end th
 const farmBlock = slice(gm, '// ==== thornswood farming ====', '// ==== end thornswood farming ====');
 const addItemSrc = liftFrom(gm, 'function addItem(actorId, itemDesc, count) {', '');
 const takeItemSrc = liftFrom(gm, 'function takeItem(actorId, itemDesc, count) {', '');
+// The craft gate a key cut at a forge asks (#1733); nobody here is hurt or tired.
+const unfitSrc = liftFrom(gm, 'function unfitToMake(actorId, workbenchId) {', '');
 yes('the property, character and farming blocks and the pack helpers are in the gamemode',
-    !!propBlock && !!charBlock && !!farmBlock && !!addItemSrc && !!takeItemSrc);
-if (!propBlock || !charBlock || !farmBlock || !addItemSrc || !takeItemSrc) { done(); }
+    !!propBlock && !!charBlock && !!farmBlock && !!addItemSrc && !!takeItemSrc && !!unfitSrc);
+if (!propBlock || !charBlock || !farmBlock || !addItemSrc || !takeItemSrc || !unfitSrc) { done(); }
 
 // ================================================================ the server
 const clock = { t: Date.UTC(2026, 9, 4, 20, 0, 0) };
@@ -211,7 +213,7 @@ const box = {
 };
 box.globalThis = box;
 inDir(function () {
-  vm.runInNewContext(addItemSrc + '\n' + takeItemSrc + '\n' + propBlock, box,
+  vm.runInNewContext(addItemSrc + '\n' + takeItemSrc + '\n' + unfitSrc + '\n' + propBlock, box,
                      { filename: 'gamemode.js property' });
 });
 const W = box.__thornswoodProperty;

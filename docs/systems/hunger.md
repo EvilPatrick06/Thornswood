@@ -46,5 +46,13 @@ The bed has to be a bed. See [Property](property.md) and
 The clock, the four bands, the 15, the ale cost and the 25 from a bed
 are in the server. The cold multipliers are not. Hunger does not yet
 speed up in the snow. Food states are not on the meal. "Full" does not
-yet sicken you. The bed is the one the server saw them lie down in, by
-whose it is, the same as for rest. See [Exhaustion](exhaustion.md).
+yet sicken you.
+
+A bed counts only when the server saw the person press it and they are
+still beside it. Lying down tells the server by itself, and nobody
+types anything. The 25 comes with the logout fill: log out lying in
+your own bed or one you are allowed in, stay away at least 24 minutes,
+and the time away is settled first, then 25 goes back on hunger and on
+thirst and rest is full. A bed or bedroll nobody can lend you gives no
+fill. Which beds give it and the 24 minutes are the suggested answers
+on #1606. See [Exhaustion](exhaustion.md) and [Property](property.md).

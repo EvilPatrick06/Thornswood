@@ -66,6 +66,7 @@ function sequenceOf(receipt, human) {
 // synchronous durable replacements. Neither is inferred from elapsed time.
 function createSettlement(deps) {
   var purses = deps.purses, transfer = deps.transfer, world = deps.world;
+  var now = deps.now || function () { return Date.now(); };
   var active = true, cursor = 0, busy = false;
   var errors = new Map();
   function report(id, error) {
@@ -118,9 +119,50 @@ function createSettlement(deps) {
   function commitMerchant(id, state) {
     var pending = state.pending;
     if (!equal({purse:state.purse,stock:state.stock,supply:state.supply || {}}, pending.previous)) return null;
-    var next = Object.assign({}, copy(state), copy(pending.next));
+    return save(id, state, creditState(state), pending.id);
+  }
+  function creditState(state) {
+    var next = Object.assign({}, copy(state), copy(state.pending.next));
     next.pending.phase = 'credit';
-    return save(id, state, next, pending.id);
+    // Saved debit is conclusive. Its original snapshots are no longer read
+    // in this phase; retaining them would crowd out the recovery snapshots.
+    delete next.pending.expected;
+    delete next.pending.debit;
+    delete next.pending.expectedReceipt;
+    next.pending.previous = {supply:copy(next.pending.previous.supply || {})};
+    return next;
+  }
+  function pruneSupplyHistory(id, state, wait) {
+    if (!available() || busy) return null;
+    busy = true;
+    try {
+      var current = purses.read(id);
+      if (!current || current.pending || !equal(current, state)) return null;
+      var next = copy(current), changed = false, at = now();
+      Object.keys(next.supply || {}).forEach(function (key) {
+        var stamp = next.supply[key];
+        if (Number.isSafeInteger(stamp) && stamp > 0 && at - stamp >= wait) {
+          delete next.supply[key]; changed = true;
+        }
+      });
+      return changed ? save(id, current, next) : current;
+    } finally { busy = false; }
+  }
+  function changedSupplyKey(previous, next) {
+    var before = previous.supply || {}, after = next.supply || {};
+    var keys = Object.keys(after).filter(function (key) { return before[key] !== after[key]; });
+    return keys.length === 1 && Number.isSafeInteger(after[keys[0]]) && after[keys[0]] > 0 ? keys[0] : null;
+  }
+  function complete(id, state) {
+    var pending = state.pending, next = Object.assign({}, copy(state), {pending:null});
+    if (pending.kind === 'supply') {
+      // Completion, including legacy intents, follows the exact saved final
+      // receipt. A disconnect cannot consume the six-hour window in advance.
+      var key = changedSupplyKey(pending.previous, pending.next), at = now();
+      if (!key || !Number.isSafeInteger(at) || at <= 0) throw new Error('Supply completion cannot be verified.');
+      next.supply[key] = at;
+    }
+    return !!save(id, state, next, pending.id);
   }
   function reconcile(id) {
     if (!available()) return false;
@@ -136,7 +178,7 @@ function createSettlement(deps) {
     if (live === pending.finalReceipt) {
       if (pending.phase !== 'credit' || saved !== pending.finalReceipt ||
           !equal({purse:state.purse,stock:state.stock,supply:state.supply || {}}, pending.next)) return false;
-      return !!save(id, state, Object.assign({}, copy(state), {pending:null}), pending.id);
+      return complete(id, state);
     }
     if (pending.phase === 'debit') {
       if (live === pending.expectedReceipt) {
@@ -162,6 +204,14 @@ function createSettlement(deps) {
       pending = state.pending;
     }
     if (live !== pending.debitReceipt || saved !== pending.debitReceipt || !active) return false;
+    // A pre-upgrade credit intent may still contain the saved debit snapshots.
+    // Compact it durably before building or replacing a recovery attempt.
+    var compact = creditState(state);
+    if (!equal(compact, state)) {
+      state = save(id, state, bounded(compact, MAX_INTENT_BYTES), pending.id);
+      if (!state || !active) return false;
+      pending = state.pending;
+    }
     var current = inventory(transfer.inventory(humanId));
     if (!pending.creditAttempt || !equal(pending.creditAttempt.expected, current)) {
       var next = copy(state);
@@ -177,7 +227,7 @@ function createSettlement(deps) {
     // A notification may throw after CAS changed inventory. The saved intent
     // and final receipt, rather than this return value, determine completion.
     if (!active || transfer.receipt(humanId) !== pending.finalReceipt || transfer.saved(humanId) !== pending.finalReceipt) return false;
-    return !!save(id, state, Object.assign({}, copy(state), {pending:null}), pending.id);
+    return complete(id, state);
   }
   function begin(offer) {
     if (!available() || busy) return {accepted:false,done:false,reason:'Trading is unavailable.'};
@@ -187,6 +237,13 @@ function createSettlement(deps) {
       if (!human || human.profileId !== offer.profileId || !state || state.pending ||
           !equal(state, offer.previous) || !admitted(human, state.reference))
         return {accepted:false,done:false,reason:'A transfer is waiting.'};
+      if (offer.kind === 'supply') {
+        var key = changedSupplyKey(state, offer.next), owner;
+        try { owner = JSON.parse(key); } catch (error) { owner = null; }
+        if (!Array.isArray(owner) || owner.length !== 3 || owner[0] !== human.desc ||
+            owner[1] !== human.profileId || typeof owner[2] !== 'string' || !owner[2])
+          throw new Error('Supply cooldown cannot be verified.');
+      }
       var expected = inventory(transfer.inventory(offer.humanId));
       if (!equal(expected, offer.expected)) return {accepted:false,done:false,reason:'Your inventory changed. Choose the trade again.'};
       var receipt = transfer.receipt(offer.humanId), sequence = sequenceOf(receipt, human) + 1;
@@ -202,6 +259,12 @@ function createSettlement(deps) {
         if(transfer.validate(snapshot)!==true) throw new Error('Native inventory validation failed.');
       });
       var armed = Object.assign({}, copy(state), {pending:pending});
+      // Either recovery inventory can reach the native/JS inventory limit.
+      // Reserve both plus the JSON envelope before charging, including later
+      // inventory growth. The 512 KiB intent bound stays unchanged.
+      var recovery = creditState(armed);
+      if (Buffer.byteLength(JSON.stringify(recovery), 'utf8') + 2 * MAX_INVENTORY_BYTES + 64 > MAX_INTENT_BYTES)
+        throw new Error('The trade is too large to recover.');
       if (!save(offer.merchantId, state, bounded(armed, MAX_INTENT_BYTES))) return {accepted:false,done:false,reason:'The offer changed.'};
       var done = false;
       if (active) {
@@ -227,7 +290,7 @@ function createSettlement(deps) {
       return changed;
     } finally { busy = false; }
   }
-  return {begin:begin,tick:tick,available:available,shutdown:function () { active=false; }};
+  return {begin:begin,tick:tick,available:available,pruneSupplyHistory:pruneSupplyHistory,shutdown:function () { active=false; }};
 }
 
 module.exports = {createSettlement:createSettlement,inventory:inventory,takeEntries:takeEntries,

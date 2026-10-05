@@ -4026,10 +4026,10 @@ function burnCharcoal(actorId, refrId) {
   const tool = toolGate(actorId, 'woodworker');
   if (tool) return tool;
 
-  // Too tired to burn anything (#1676), the gate every bench asks.
-  const needs = globalThis.__thornswoodNeeds;
-  const tired = (needs && needs.craftRefusal) ? needs.craftRefusal(actorId) : '';
-  if (tired) return tired;
+  // Too sick, too hurt or too tired to burn anything: the gate every way of
+  // making something asks (unfitToMake, #1733), at the kiln pressed.
+  const unfit = unfitToMake(actorId, refrId);
+  if (unfit) return unfit;
 
   const wait = cooldownLeft(actorId, refrId);
   if (wait > 0) return 'The kiln is still burning. ' + wait + ' seconds.';
@@ -8648,7 +8648,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   if (prop && prop.touchedBench) {
     // Which bench they just pressed, for /key. Costs one hash lookup and is
     // passed over inside touchedBench for anything that is not a bench.
-    try { prop.touchedBench(casterRefrId, baseDesc); } catch (e) { }
+    try { prop.touchedBench(casterRefrId, baseDesc, refrId); } catch (e) { }
   }
 
   /*
@@ -26844,12 +26844,15 @@ function wantsAHandle(row) {
   is credited once, by the caller, as before.
 
   Master Weaver, docs/systems/professions/tailor.md: clothing a master tailor
-  makes keeps the weather off. Which garment is one is written on it, the way
-  durability writes a condition and a key its house: the fresh garment is
-  named with the needs block's mark in front, and the needs block reads the
-  mark off what is worn. The hidden armour half is not here: the page gives
-  it no rating, and the server cannot reach a garment's armour (see the note
-  over the durability block).
+  makes carries hidden armour or keeps the weather off, and Patrick's answer
+  on #1398 is that the tailor picks one per garment. The pick is on the K
+  panel's profession card and stays until they change it (weaveOf in the
+  character block), so a garment is woven for what was lit when it was made.
+  Which garment is one is written on it, the way durability writes a
+  condition and a key its house: the fresh garment is named with the mark of
+  the half it carries in front, the needs block's for the weather and the
+  maneuvers block's for the armour, and each block reads its own mark off
+  what is worn.
 
   The perk is the progression block's own answer (perks), so it is held at
   master in the half somebody picked and nowhere else.
@@ -26861,10 +26864,22 @@ function holdsPerk(actorId, key) {
   try { return P.perks(C.stateOf(actorId)).indexOf(key) !== -1; } catch (e) { return false; }
 }
 
+/** The mark a master weaver's garment carries now: the armour's when that is their pick, else the weather's. */
+function wovenMark(actorId) {
+  const C = globalThis.__thornswoodCharacter;
+  let weave = '';
+  try { weave = C && C.weaveOf ? C.weaveOf(C.stateOf(actorId)) : ''; } catch (e) { weave = ''; }
+  if (weave === 'armour') {
+    const M = globalThis.__thornswoodManeuvers;
+    return M && M.WOVEN ? M.WOVEN.mark : '';
+  }
+  const N = globalThis.__thornswoodNeeds;
+  return N && N.NEEDS && N.NEEDS.wear && N.NEEDS.wear.woven ? N.NEEDS.wear.woven.mark : '';
+}
+
 /** Name n plain units of a garment just made as a master weaver's. Answers how many. */
 function markWoven(actorId, outDesc, name, n) {
-  const N = globalThis.__thornswoodNeeds;
-  const mark = N && N.NEEDS && N.NEEDS.wear && N.NEEDS.wear.woven ? N.NEEDS.wear.woven.mark : '';
+  const mark = wovenMark(actorId);
   const baseId = idOf(outDesc);
   if (!mark || !baseId || !(n > 0)) { return 0; }
   let inv = null;
@@ -27779,37 +27794,51 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects) {
 const KEY_RECIPE = '15497:Thornswood-Content.esp';
 const KEY_NAME_DELAY = 250;
 
+/*
+  FIT TO MAKE ANYTHING (#1733): the one gate every way of making something
+  asks, before anything is taken. Today that is a bench's own menu
+  (mp.onCraft, brews, enchanting and tempering included), a kiln burned by
+  pressing it (burnCharcoal) and a key cut at a forge (cutKey in the
+  property block). It asks two blocks, in this order:
+
+    too sick or too hurt (#1383)  the injury and disease block: a disease
+                                  gone bad refuses every craft, and a broken
+                                  arm or a missing hand refuses a bench that
+                                  takes two hands;
+    too tired (#1676)             the needs block: exhaustion.md, "Under 15,
+                                  crafting is refused".
+
+  WHY ONE FUNCTION. Each road used to ask the gates itself. #1676 put the
+  rest gate in all three, and the injury gate stayed in mp.onCraft alone, so
+  somebody with a broken arm was refused the forge's own Key row and cut the
+  same key with the lock key at the same forge. A road that asks this asks
+  both, and a gate added later goes here and reaches every road at once.
+  tests/test-1733-injury-gate.js holds every road, and the rest of the file,
+  to it.
+
+  workbenchId is the bench reference the work is done at, because the injury
+  gate reads which bench it is. Answers the line to say, or ''.
+*/
+function unfitToMake(actorId, workbenchId) {
+  const hurt = globalThis.__thornswoodHurt;
+  const unfit = (hurt && hurt.craftRefusal) ? hurt.craftRefusal(actorId, workbenchId) : '';
+  if (unfit) { return unfit; }
+  const needs = globalThis.__thornswoodNeeds;
+  return (needs && needs.craftRefusal) ? needs.craftRefusal(actorId) : '';
+}
+
 mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {
   /*
-    TOO SICK OR TOO HURT TO WORK (#1383), asked before anything else, brews
-    and tempering included: a disease that has turned bad refuses every
-    craft, and a broken arm or a missing hand refuses a bench that takes two.
-    The injury and disease block answers. The materials stay in the pack.
-  */
-  const hurt = globalThis.__thornswoodHurt;
-  if (hurt && hurt.craftRefusal) {
-    let unfit = '';
-    try { unfit = hurt.craftRefusal(actorId, workbenchId); } catch (e) { log('injury: the craft check threw:', e); }
-    if (unfit) {
-      notify(actorId, unfit);
-      say(actorId, unfit);
-      return false;
-    }
-  }
-
-  /*
-    TOO TIRED TO MAKE ANYTHING (#1676), asked here for the same reason, every
-    bench, brews, enchanting and tempering included: exhaustion.md, "Under
-    15, crafting is refused". The needs block has had the gate since the
-    first commit of this repository and nothing asked it. It answers the
+    TOO SICK, TOO HURT OR TOO TIRED TO MAKE ANYTHING (#1383, #1676), asked
+    before anything else, brews, enchanting and tempering included. The gate
+    every way of making something asks (unfitToMake, #1733) answers the
     line. The materials stay in the pack.
   */
-  const needs = globalThis.__thornswoodNeeds;
-  const tired = (needs && needs.craftRefusal) ? needs.craftRefusal(actorId) : '';
-  if (tired) {
-    notify(actorId, tired);
-    say(actorId, tired);
-    log(actorId.toString(16), 'was refused a craft at bench', (workbenchId || 0).toString(16) + ':', tired);
+  const unfit = unfitToMake(actorId, workbenchId);
+  if (unfit) {
+    notify(actorId, unfit);
+    say(actorId, unfit);
+    log(actorId.toString(16), 'was refused a craft at bench', (workbenchId || 0).toString(16) + ':', unfit);
     return false;
   }
 
@@ -28532,7 +28561,7 @@ log('gamemode loaded:',
     }
     var ids = [];
     try {
-      var doc = JSON.parse(fs.readFileSync(path.join(privDir, 'allowed.json'), 'utf8').replace(/^ï»¿/, ''));
+      var doc = JSON.parse(fs.readFileSync(path.join(privDir, 'allowed.json'), 'utf8').replace(/^\uFEFF/, ''));
       var list = (doc && Array.isArray(doc.profiles)) ? doc.profiles : [];
       for (var i = 0; i < list.length; i++) {
         var n = Number(list[i]);
@@ -28553,7 +28582,7 @@ log('gamemode loaded:',
   function push() {
     var conf;
     try {
-      conf = JSON.parse(fs.readFileSync(path.join(privDir, 'door.json'), 'utf8').replace(/^ï»¿/, ''));
+      conf = JSON.parse(fs.readFileSync(path.join(privDir, 'door.json'), 'utf8').replace(/^\uFEFF/, ''));
     } catch (e) { return; }
     if (!conf || !conf.site || !conf.key) return;
     var https;
@@ -28732,7 +28761,7 @@ log('gamemode loaded:',
     if (now - readAt < 30000) return list;
     readAt = now;
     try {
-      var doc = JSON.parse(fs.readFileSync(FILE, 'utf8').replace(/^ï»¿/, ''));
+      var doc = JSON.parse(fs.readFileSync(FILE, 'utf8').replace(/^\uFEFF/, ''));
       var ids = {};
       if (Array.isArray(doc.profiles)) {
         for (var i = 0; i < doc.profiles.length; i++) {
@@ -29896,7 +29925,7 @@ log('gamemode loaded:',
     var k = '';
     try {
       var dir = String(settings().privDir || 'private');
-      var doc = JSON.parse(String(fs.readFileSync(path.join(dir, 'door.json'), 'utf8')).replace(/^ï»¿/, ''));
+      var doc = JSON.parse(String(fs.readFileSync(path.join(dir, 'door.json'), 'utf8')).replace(/^\uFEFF/, ''));
       k = String((doc && doc.passKey) || '');
     } catch (e) { k = ''; }
     if (!k && fresh('no key', now)) {
@@ -36166,16 +36195,17 @@ log('gamemode loaded:',
       toProfile(profileId, 'Cutting a key is a smith\'s work. Hand the mold to a smith.');
       return true;
     }
-    if (!forgeHere(parts, actorId)) {
+    var forge = forgeHere(parts, actorId);
+    if (!forge) {
       toProfile(profileId, 'Stand at a forge and look at it, then press the key the line ' +
                            'under the crosshair names.');
       return true;
     }
-    // Too tired to cut it (#1676), the gate every bench asks.
-    var needs = g.__thornswoodNeeds;
-    var tired = (needs && needs.craftRefusal) ? needs.craftRefusal(actorId) : '';
-    if (tired) {
-      toProfile(profileId, tired);
+    // Too sick, too hurt or too tired to cut it: the gate every way of making
+    // something asks (unfitToMake, #1733), at this forge.
+    var unfit = unfitToMake(actorId, forge);
+    if (unfit) {
+      toProfile(profileId, unfit);
       return true;
     }
     var building = moldInHand(actorId);
@@ -36376,39 +36406,41 @@ log('gamemode loaded:',
     hint and this is the gate: a forge the bench table knows, and the person
     standing at it by the server's own reckoning, MOLD_REACH, for the reasons
     given over it. With no id, the forge they last pressed, as before.
+    Answers that forge's reference, or 0: the craft gate reads which bench
+    it is (unfitToMake, #1733).
   */
   var KEY_INGOT = '5ace4:Skyrim.esm';   // Iron Ingot, the Key's input at a forge
 
   function forgeHere(parts, actorId) {
     var raw = String((parts && parts[1]) || '');
     if (!raw) { return atForge(actorId); }
-    if (!/^[0-9a-f]{1,8}$/i.test(raw)) { return false; }
+    if (!/^[0-9a-f]{1,8}$/i.test(raw)) { return 0; }
     var refrId = parseInt(raw, 16);
     var base = '';
-    try { base = String(mp.get(refrId, 'baseDesc') || ''); } catch (e) { return false; }
+    try { base = String(mp.get(refrId, 'baseDesc') || ''); } catch (e) { return 0; }
     if (!Object.prototype.hasOwnProperty.call(BENCH_BY_BASE, base) ||
-        BENCH_BY_BASE[base] !== FORGE) { return false; }
+        BENCH_BY_BASE[base] !== FORGE) { return 0; }
     var far = distanceTo(actorId, refrId);
-    return far >= 0 && far <= MOLD_REACH;
+    return (far >= 0 && far <= MOLD_REACH) ? refrId : 0;
   }
 
-  /** Are they standing at a forge. The bench tables already know which is one. */
+  /** The forge they just pressed, or 0. The bench tables already know which is one. */
   function atForge(actorId) {
     var v = null;
     try { v = mp.get(actorId, DOOR_PROPERTY); } catch (e) { v = null; }
     // The forge is remembered the same way a door is; see touchedBench.
     var w = null;
     try { w = mp.get(actorId, BENCH_PROPERTY); } catch (e) { w = null; }
-    if (!w || typeof w !== 'object') { return false; }
-    if ((Date.now() - (Number(w.at) || 0)) > DOOR_MEMORY_MS) { return false; }
-    return String(w.bench || '') === FORGE;
+    if (!w || typeof w !== 'object') { return 0; }
+    if ((Date.now() - (Number(w.at) || 0)) > DOOR_MEMORY_MS) { return 0; }
+    return String(w.bench || '') === FORGE ? (Number(w.ref) || 0) : 0;
   }
 
-  /** The forge they just pressed, written down the way a door is. */
-  function touchedBench(actorId, baseDesc) {
+  /** The bench they just pressed, which and what kind, written down the way a door is. */
+  function touchedBench(actorId, baseDesc, refrId) {
     if (!Object.prototype.hasOwnProperty.call(BENCH_BY_BASE, baseDesc)) { return; }
     try {
-      mp.set(actorId, BENCH_PROPERTY, { bench: BENCH_BY_BASE[baseDesc], at: Date.now() });
+      mp.set(actorId, BENCH_PROPERTY, { bench: BENCH_BY_BASE[baseDesc], ref: Number(refrId) || 0, at: Date.now() });
     } catch (e) { }
   }
 
@@ -36994,8 +37026,26 @@ log('gamemode loaded:',
     in are measured again: walk away, lose the key, let the night run out,
     move off from the fire, and the rest stops or changes rate. Somebody who
     comes into the world already resting in a place the server did not see
-    them take stops too, and sits or lies down again. A restart forgets who
-    lay down where, and that is the case it catches.
+    them take stops too, and sits or lies down again.
+
+    THE PLACE ENDS WITH THE SESSION (#1734). Nobody comes back into the world
+    sitting or lying down, so the beds let go of where somebody sat or lay on
+    the first tick that finds them gone, with who was seen and what they
+    pressed. Coming back is then the same first sight as after a restart: up,
+    once the needs block has counted a night in a bed (#1606, settle's
+    arrival). Measured in the fork (engine/skymp at 0460584): the
+    only thing that puts a client's own character into furniture is the
+    server's answer to a press (MpObjectReference::ProcessActivateNormal,
+    FURN, SendOpenContainer, and the client's onOpenContainerMessage
+    activating it). Who occupies a piece of furniture is held in memory and
+    is not saved. PartOne::SetUserActor, which hands a reconnecting client its
+    character, clears the last animation as well. On the client,
+    thornswood-front.js's restSent starts false. Until #1734 the beds kept
+    the record for 48 hours offline (LYING_FORGET_MS) and the first sight
+    passed over anybody still in it. So somebody who logged out on a seat
+    and came back without a restart was counted resting at the seat's rate
+    while standing beside it, and was told they had left it when they walked
+    off.
 
     NO GOLD MOVES FOR A NIGHT. It is paid in a trade between two people, and
     the server keeps no price. The book is beds.json beside the register
@@ -37012,7 +37062,6 @@ log('gamemode loaded:',
   // Patrick, #1603: a night is 8 hours, the time the Rest clock takes to empty.
   var NIGHT_MS = 8 * 3600000;
   var BED_EVERY_MS = 5000;
-  var LYING_FORGET_MS = 48 * 3600000;
   var GUEST_NAME_MAX = 64;
   /* A bed by its editor id. Bedrolls first, since they say bed too. The
      others are words that hold the letters and are not beds. */
@@ -37415,15 +37464,20 @@ log('gamemode loaded:',
     try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
     var on = {};
     for (var i = 0; i < online.length; i++) { on[online[i]] = true; }
+    // Gone from the world, and off whatever they pressed or rested on with
+    // it (#1734): THE PLACE ENDS WITH THE SESSION, in the block.
     for (var s in bedState.seen) {
       if (bedHas(bedState.seen, s) && !on[s]) { delete bedState.seen[s]; }
     }
     for (var p in bedState.pressed) {
-      if (bedHas(bedState.pressed, p) && !on[p] && !bedHas(bedState.lying, p)) {
-        delete bedState.pressed[p];
-      }
+      if (bedHas(bedState.pressed, p) && !on[p]) { delete bedState.pressed[p]; }
     }
-    // Come into the world resting in a place nobody saw them take.
+    for (var l in bedState.lying) {
+      if (bedHas(bedState.lying, l) && !on[l]) { delete bedState.lying[l]; }
+    }
+    // Come into the world resting in a place nobody saw them take: after a
+    // restart, or back from a logout. A place they took this session, before
+    // this first sight of them, stays.
     for (var j = 0; j < online.length; j++) {
       var id = online[j];
       if (bedState.seen[id]) { continue; }
@@ -37446,10 +37500,6 @@ log('gamemode loaded:',
       if (!bedHas(bedState.lying, k)) { continue; }
       var e = bedState.lying[k];
       var who = Number(k);
-      if (!on[k]) {
-        if ((now - e.at) > LYING_FORGET_MS) { delete bedState.lying[k]; }
-        continue;
-      }
       // Up off the ground, which is no news, the way getting off a chair is not.
       if (e.ground && !sitsOnGround(who)) { getUp(who, needs); continue; }
       var why = stillLying(who, e, needs);
@@ -42489,6 +42539,36 @@ log('gamemode loaded:',
     }
   }
 
+  /*
+    WHAT A MASTER WEAVER'S GARMENTS CARRY (#1398). Patrick's answer on #1398:
+    the tailor picks one per garment, warmth or armour. The pick is on the
+    profession card on K, whose two buttons send /pick weave warmth and
+    /pick weave armour (nobody types either), and it is kept on the character
+    as weave until they press the other. markWoven reads it at the craft.
+    Warmth until they pick armour, which is what every garment woven before
+    there was a pick carries. null for anybody who does not hold the perk.
+  */
+  function weaveOf(s) {
+    if (!s || P.perks(s).indexOf('masterweaver') === -1) { return null; }
+    return s.weave === 'armour' ? 'armour' : 'warmth';
+  }
+
+  /** What a Master Weaver is told when the pick is taken. */
+  function weaveLine(weave) {
+    if (weave === 'armour') {
+      var M = g.__thornswoodManeuvers;
+      var back = (M && M.WOVEN) ? Math.round(M.WOVEN.less * 100) : 0;
+      return 'The garments you make now carry hidden armour' +
+             (back ? ': one worn gives back ' + back + '% of each hit' : '') +
+             '. They do not keep the weather off.';
+    }
+    var N = g.__thornswoodNeeds;
+    var degrees = (N && N.NEEDS && N.NEEDS.wear && N.NEEDS.wear.woven) ? N.NEEDS.wear.woven.degrees : 0;
+    return 'The garments you make now keep the weather off' +
+           (degrees ? ': one worn ignores ' + degrees + ' degrees of exposure' : '') +
+           '. They carry no hidden armour.';
+  }
+
   function needsView(actorId) {
     var n = g.__thornswoodNeeds;
     if (!n || !actorId) { return null; }
@@ -42594,6 +42674,9 @@ log('gamemode loaded:',
       // Masters and apprentices (#1634): see apprenticeView.
       var taughtView = apprenticeView(actorId, s);
       if (taughtView) { view.apprentice = taughtView; }
+      // What a Master Weaver's next garments carry (#1398): see weaveOf.
+      var weave = weaveOf(s);
+      if (weave) { view.weave = weave; }
     }
     // Left out entirely when there is nothing to say, per the contract.
     var climbing = progressView(s);
@@ -42704,20 +42787,34 @@ log('gamemode loaded:',
   }
 
   /*
-    THE PANEL'S OWN ASK, as writeState's redraw (#1642). The panel sends
-    /pick refresh once it is in and each time it opens, and the answer is sent
-    whether anything changed or not. It also carries when it was asked
-    (view.asked), because the client's script draws nothing when the value
-    matches the one it last handed the page (updateOwnerScript), and it
-    counts a value as handed even while the page has no panel to take it.
-    The view sent when somebody arrives (arrival, below) goes before the
-    page is up, and the refresh a few seconds later often answers the same
-    view. Without the time the script would drop that answer as drawn
-    already, and the panel would stay empty with the skill tree's totals off
-    the character. drawn() is worked out before the time is added, so the
-    signature that holds back an unchanged write does not count it.
+    A REDRAW REACHES THE PAGE (#1730). writeState's redraw is a write the
+    page has to take whether anything on the panel changed or not: the
+    panel's own ask (/pick refresh, sent once it is in and each time it
+    opens), a refusal, the creation hall's reminder (beginCreation), an
+    effect starting or ending. Measured along the way: the engine sends
+    every write (CustomPropertyBinding::Set in the fork has no comparison),
+    and the page draws whatever setData is handed and opens when open() is
+    called. What held a repeated one back is the client's script
+    (updateOwnerScript): it runs every frame, so it cannot tell a second
+    write of the same value from the next frame, and it draws only a value
+    unlike the one it last handed the page. A reminder is the same value as
+    the reminder before it, so the panel stayed shut for somebody who closed
+    it while choosing until something else on it moved. The same held back a
+    refresh answering the view sent before the page was in (#1642).
+
+    So a redraw carries asked, a number later than any redraw before it on
+    this server, and the script draws it once. It sits on the value beside
+    the panel and not inside it, because it is about the write and not about
+    the panel: the page draws from the panel (viewKey in thornswood-skills.js),
+    and a refusal or a reminder must not tear its cards down. drawn() never
+    sees it, so the signature that holds back an unchanged write does not
+    count it, and every other write leaves it off.
   */
-  var ASKED = 'asked';
+  var lastAsked = 0;
+  function askedNow() {
+    lastAsked = Math.max(Date.now(), lastAsked + 1);
+    return lastAsked;
+  }
 
   function writeState(actorId, s, redraw) {
     s.v = 1;
@@ -42748,6 +42845,7 @@ log('gamemode loaded:',
     }
     var sig = drawn(view);
     var sending = !!redraw || lastDrawn[actorId] !== sig;
+    delete s.asked;   // only the redraw below carries one (#1730)
     if (sending) {
       /*
         The Body page (#1631): the meters, the warmth with its working out
@@ -42759,7 +42857,7 @@ log('gamemode loaded:',
       */
       var N = g.__thornswoodNeeds;
       if (view && !view.creating && N && N.view) { view.body = N.view(actorId); }
-      if (redraw === ASKED) { view.asked = Date.now(); }
+      if (redraw) { s.asked = askedNow(); }
       s.panel = view;
     } else {
       // A counter and nothing else. The record is written; the panel is not
@@ -43614,8 +43712,8 @@ log('gamemode loaded:',
       if (what === 'refresh') {
         // A refresh asks for the panel outright, so it is sent whether
         // anything changed or not: that is the whole point of the command.
-        // And drawn whether anything changed or not: see ASKED.
-        writeState(actorId, s, ASKED);   // the write is what fires updateOwner
+        // And drawn whether anything changed or not: see askedNow.
+        writeState(actorId, s, true);   // the write is what fires updateOwner
         return true;
       }
       /*
@@ -43748,6 +43846,19 @@ log('gamemode loaded:',
         var CO = g.__thornswoodCollege;
         r = (CO && CO.study) ? CO.study(actorId, s)
           : { ok: false, why: 'the College is not running on this server right now' };
+      } else if (what === 'weave') {
+        // A Master Weaver's pick on the profession card (#1398): see weaveOf.
+        about = 'weave';
+        var weave = String(parts[2] || '').toLowerCase();
+        if (!weaveOf(s)) {
+          r = { ok: false, why: 'only a Master Weaver picks what a garment carries' };
+        } else if (weave !== 'warmth' && weave !== 'armour') {
+          r = { ok: false, why: 'a garment carries warmth or armour' };
+        } else {
+          var woven = P.clone(s);
+          woven.weave = weave;
+          r = { ok: true, state: woven, line: weaveLine(weave) };
+        }
       } else if (what === 'spend') {
         about = 'spend';
         r = P.spendPoint(s, String(parts[2] || '').toLowerCase(), parts[3]);
@@ -43867,6 +43978,7 @@ log('gamemode loaded:',
       grantSpell says in the log and nothing else notices.
     */
     if (about === 'study' && r.line) { toProfile(profileId, r.line); }
+    if (about === 'weave' && r.line) { toProfile(profileId, r.line); }
 
     if (spellPicked) {
       grantSpell(actorId, spellPicked, true);
@@ -43918,7 +44030,8 @@ log('gamemode loaded:',
     // Always a redraw. A reminder is the same state as the reminder before it,
     // so a write that only goes out when something changed would send the
     // first one and none of the others, and the panel would never re-open for
-    // somebody who closed it while they were still choosing.
+    // somebody who closed it while they were still choosing. A redraw carries
+    // asked, so the client's script draws it and opens the panel (#1730).
     writeState(actorId, stateOf(actorId), true);
   }
 
@@ -43956,7 +44069,7 @@ log('gamemode loaded:',
     gate: gate, gateHalf: gateHalf, credit: credit,
     grantSpell: grantSpell, grantKnown: grantKnown, nameOf: nameOf, raiseLines: raiseLines,
     acceptApprentice: acceptApprentice, masterFor: masterFor, effectsOf: effectsOf,
-    masterRecord: masterRecord, takeOnMark: takeOnMark,
+    masterRecord: masterRecord, takeOnMark: takeOnMark, weaveOf: weaveOf,
     rankOf: function (actorId, key) { return P.rankOf(stateOf(actorId), key); }
   };
   clog('ready');
@@ -45363,6 +45476,50 @@ log('gamemode loaded:',
     return 0;
   }
 
+  /*
+    MASTER WEAVER'S HIDDEN ARMOUR (#1398). docs/systems/professions/tailor.md:
+    a master tailor's garment carries hidden armour or keeps the weather off.
+    Patrick's answer on #1398, 4 October: the tailor picks one per garment,
+    and armour "gives back 10% of each hit, the way the warrior's Wall does
+    it". So it is this path: the hit is measured like a Wall's, and less is
+    what flush() gives back. The gamemode cannot reach a garment's armour
+    rating (the server's damage is the fork's TES5DamageFormula), and this
+    adds no weight, which is the page's "still weighs what clothing weighs".
+
+    mark is what the craft writes in front of the garment's name (markWoven,
+    beside mp.onCraft), the way the weather half writes NEEDS.wear.woven.mark.
+    The two marks differ, so a garment carries one half and never both: the
+    needs block reads only its own. One worn is enough and two do not give
+    back 20%. A piece with an enchantment on it is not one, for the reason
+    the needs block gives: anybody can name a piece at the enchanting table,
+    and the engine only enchants a plain one, which a woven garment is not.
+    Only a person's clothes count, the way only a person's gear wears.
+  */
+  var WOVEN = { mark: 'Master-Lined ', less: 0.1 };
+
+  function wornBy(id) {
+    try {
+      var eq = mp.get(id, 'equipment');
+      var ee = eq && ((eq.inv && eq.inv.entries) || eq.entries);
+      if (ee) { return ee; }
+    } catch (e) { }
+    try {
+      var inv = mp.get(id, 'inventory');
+      return (inv && inv.entries) || [];
+    } catch (e2) { return []; }
+  }
+
+  function wovenArmour(target) {
+    if (!personOf(target)) { return 0; }
+    var worn = wornBy(target);
+    for (var i = 0; i < worn.length; i++) {
+      var e = worn[i];
+      if (!e || !e.worn || e.enchantmentId) { continue; }
+      if (typeof e.name === 'string' && e.name.indexOf(WOVEN.mark) === 0) { return WOVEN.less; }
+    }
+    return 0;
+  }
+
   function anyOn() {
     for (var k in ST.on) { if (has(ST.on, k)) { return true; } }
     return false;
@@ -45376,7 +45533,8 @@ log('gamemode loaded:',
     if (open && open.length && open[open.length - 1].after === null) {
       open[open.length - 1].after = share(target, 'health');
     }
-    if (!anyOn()) { return; }
+    var lined = wovenArmour(target);
+    if (!lined && !anyOn()) { return; }
     var t = now();
     var by = idOfForm(aggressor);
     // A bulwark's own blocked hit is a block seen.
@@ -45397,7 +45555,9 @@ log('gamemode loaded:',
         e.used.push({ key: 'break', v: a['break'] }); delete a['break'];
       }
     }
-    e.less = shielded(target, t);
+    // A woven garment's 10% is on top of a Wall's or a Cover's 20%: the two
+    // add, 30% back (the question to Patrick on #1398).
+    e.less = shielded(target, t) + lined;
     if (!e.more && !e.less && !e.stagger) { return; }
     e.before = share(target, 'health');
     if (!(e.before > 0)) { rearm(e); return; }
@@ -45528,7 +45688,7 @@ log('gamemode loaded:',
   g.__thornswoodManeuverTimer = setInterval(guard('maneuverTick', tick), 100);
 
   g.__thornswoodManeuvers = {
-    MANEUVERS: MANEUVERS, ORDER: ORDER,
+    MANEUVERS: MANEUVERS, ORDER: ORDER, WOVEN: WOVEN, wovenArmour: wovenArmour,
     held: held, takenOn: takenOn, whyNot: whyNot, mostStamina: mostStamina,
     use: use, effects: effects, view: view, hit: hit, flush: flush, killerOf: killerOf, tick: tick,
     state: ST
@@ -54332,7 +54492,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       Patrick: "why is temp a water drop and the food icon seems weird too".
       He was looking at a real bug. The old flame was
       "M10 18a5 5 0 0 0 5-5c0-4-5-11-5-11S5 9 5 13a5 5 0 0 0 5 5z" and the old
-      droplet was "M10 2C10 2 4 9 4 12.5A6 6 0 0 0 16 12.5C16 9 10 2 10 2z" â€”
+      droplet was "M10 2C10 2 4 9 4 12.5A6 6 0 0 0 16 12.5C16 9 10 2 10 2z":
       the same teardrop, one of them upside down. At fourteen pixels they were
       indistinguishable, so Temp genuinely did look like a second water drop.
       The drumstick was three disconnected strokes and read as nothing at all.
@@ -55659,7 +55819,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     THE BENCH. disease.md: while a disease is bad, crafting is refused.
     injury.md: a broken arm, and a missing hand for good, refuse crafting that
     needs both hands. Answers the refusal, or ''. workbenchId is the bench
-    reference the craft was made at.
+    reference the craft was made at. Asked only through unfitToMake (#1733),
+    the gate every way of making something asks: a bench's own menu, a key
+    cut at a forge and a kiln burned by pressing it.
   */
   function craftRefusal(actorId, workbenchId) {
     var rec = read(actorId);
@@ -56415,14 +56577,27 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     });
   }
 
+  /*
+    A PERSON'S APPEARANCE, ONCE A PASS (#1721). Two things in a pass need
+    it: whether they are published for others (online, below) and their name.
+    The publish test used to ask the chargen block's publishedForOthers, which
+    reads the engine itself, outside this memo, so twenty people cost forty
+    appearance reads a pass, every 1.5 seconds. So the read is made here, once,
+    and the chargen block's own test of a stored face (hasStoredAppearance) is
+    asked of what came back. A read that throws is kept as that, and each
+    reader answers it the way it always has.
+  */
+  function appearanceOf(actorId) {
+    return memo('a' + actorId, function () {
+      try { return { ap: mp.get(actorId, 'appearance') }; } catch (e) { return { threw: true }; }
+    });
+  }
+
   function nameOfPerson(actorId) {
     return memo('n' + actorId, function () {
-      try {
-        var ap = mp.get(actorId, 'appearance');
-        var n = String((ap && ap.name) || '');
-        if (n) { return n; }
-      } catch (e) { }
-      return 'somebody';
+      var seen = appearanceOf(actorId);
+      var n = String((seen.ap && seen.ap.name) || '');
+      return n || 'somebody';
     });
   }
 
@@ -56431,10 +56606,13 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       var all = [];
       try { all = mp.get(0, 'onlinePlayers') || []; } catch (e) { return []; }
       var chargen = g.__thornswoodChargen;
-      if (!chargen || !chargen.publishedForOthers) { return all; }
+      if (!chargen || !chargen.hasStoredAppearance) { return all; }
       var out = [];
       for (var i = 0; i < all.length; i++) {
-        if (chargen.publishedForOthers(all[i])) { out.push(all[i]); }
+        // Published as publishedForOthers says: a face is stored, or the read
+        // threw, because hiding a returning character is the worse mistake.
+        var seen = appearanceOf(all[i]);
+        if (seen.threw || chargen.hasStoredAppearance(seen.ap)) { out.push(all[i]); }
       }
       return out;
     });
@@ -57503,8 +57681,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   BOTH CONFIRMATIONS BACK, which is the one rule that makes a trade safe: the
   thing you agreed to is the thing you get.
 
-  THE SERVER OWNS THE PILES AND NEVER THE CLIENT. An offer is a list of base
-  ids and counts held here, checked against the real inventory at the moment
+  THE SERVER OWNS THE PILES AND NEVER THE CLIENT. An offer is a list of
+  pieces (a base id and everything its entry carries beside it, #1718) and
+  counts held here, checked against the real inventory at the moment
   of the swap rather than at the moment of the offer, so somebody who drops
   the sword they offered simply fails the check. The client draws what the
   server says the piles are.
@@ -57582,7 +57761,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       offerA: [], offerB: [], goldA: 0, goldB: 0,
       okA: false, okB: false, at: Date.now(),
       // The company worker buying, when it is a sale out of Skyrim (#1393).
-      sale: 0
+      sale: 0,
+      // The number the panel names each piece by, for this trade (#1718).
+      keys: {}, pieces: []
     };
     open[aActor] = t; open[bActor] = t;
     trades.push(t);
@@ -57630,9 +57811,22 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     } catch (e) { return 0; }
   }
 
+  /** How many of one piece (pieceOf, below) somebody is actually holding (#1718). */
+  function holdingPiece(actorId, piece) {
+    try {
+      var inv = mp.get(actorId, 'inventory');
+      var entries = (inv && inv.entries) || [];
+      var n = 0;
+      for (var i = 0; i < entries.length; i++) {
+        if (entries[i] && pieceOf(entries[i]) === piece) { n += (entries[i].count || 1); }
+      }
+      return n;
+    } catch (e) { return 0; }
+  }
+
   /*
-    What somebody is carrying, as the panel needs it: one line per base, with
-    a name off the espm record.
+    What somebody is carrying, as the panel needs it: one line per piece
+    (below, #1718), under the piece's own name or the espm record's.
 
     NOT A CACHE. An inventory changes constantly and a stale list in a trade
     panel is how somebody offers a thing they no longer have.
@@ -57716,42 +57910,112 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     return KIND_NAMES[type] || 'Other';
   }
 
+  /*
+    ONE LINE A PIECE (#1718). Two entries of one record that differ in any
+    extra the engine keeps (EXTRA, further down) are two things: a key to
+    Breezehome and a key to Honeyside, a sword at 85% and a plain one, an
+    enchanted dagger and a plain one. This used to add every entry of a base
+    into one line under the record's name, so nobody could choose which of
+    them went, the person agreeing saw "Key" or "Iron Sword", and the swap
+    took whichever came first in the pack. A line is a piece now: the record
+    and every extra, under the entry's own name, and the piece rides on the
+    offer to the swap, which moves exactly that piece. Being worn is not part
+    of a piece; it belongs to whoever wears it (withCount).
+  */
+  function pieceOf(entry) {
+    var key = [Number(entry.baseId)];
+    for (var i = 0; i < EXTRA.length; i++) {
+      var v = entry[EXTRA[i]];
+      key.push(v === undefined ? null : v);
+    }
+    return JSON.stringify(key);
+  }
+
+  /*
+    A piece's name: its own (the house on a key, the condition on a piece, a
+    Master-Woven garment's), or the record's. An enchantment, a poison, a
+    soul or a temper is not written on a name, so it is said after it in
+    brackets, or an enchanted dagger and a plain one would read the same to
+    the person agreeing to one of them.
+  */
+  var SOULS = ['', 'Petty', 'Lesser', 'Common', 'Greater', 'Grand'];
+  function pieceName(entry) {
+    var n = fieldText(typeof entry.name === 'string' ? entry.name : '') || labelOf(Number(entry.baseId));
+    var also = [];
+    if (entry.enchantmentId) { also.push('enchanted'); }
+    if (entry.poisonId) { also.push('poisoned'); }
+    if (SOULS[entry.soul]) { also.push(SOULS[entry.soul] + ' soul'); }
+    if (entry.health > 1) { also.push('tempered'); }
+    return also.length ? n + ' (' + also.join(', ') + ')' : n;
+  }
+
   function carrying(actorId) {
     var out = [];
     try {
       var inv = mp.get(actorId, 'inventory');
       var entries = (inv && inv.entries) || [];
-      var byBase = {};
+      var GOLD = (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F;
+      var byPiece = {};
       for (var i = 0; i < entries.length; i++) {
         var e = entries[i];
-        if (!e || !e.baseId) { continue; }
-        byBase[e.baseId] = (byBase[e.baseId] || 0) + (e.count || 1);
+        if (!e || !e.baseId || Number(e.baseId) === GOLD) { continue; }
+        var piece = pieceOf(e);
+        if (Object.prototype.hasOwnProperty.call(byPiece, piece)) {
+          byPiece[piece].c += (e.count || 1);
+          continue;
+        }
+        byPiece[piece] = { id: Number(e.baseId), x: piece, n: pieceName(e), c: e.count || 1,
+                           k: categoryOf(Number(e.baseId)) };
+        out.push(byPiece[piece]);
       }
-      var GOLD = (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F;
-      for (var b in byBase) {
-        if (!Object.prototype.hasOwnProperty.call(byBase, b)) { continue; }
-        if (Number(b) === GOLD) { continue; }
-        out.push({ id: Number(b), n: labelOf(Number(b)), c: byBase[b], k: categoryOf(Number(b)) });
-      }
-      out.sort(function (x, y) { return x.n.toLowerCase() < y.n.toLowerCase() ? -1 : 1; });
+      out.sort(function (l, r) { return l.n.toLowerCase() < r.n.toLowerCase() ? -1 : 1; });
     } catch (e) { }
     return out;
   }
 
-  /** Put something on your side, by name or by hex base id. */
+  /*
+    The panel names a piece by the number this trade gives it (#1718), never
+    by its name: two pieces can read the same, and a name is split on its
+    spaces on the way through a line. A piece keeps its number for the whole
+    trade and no other piece is ever given it, so a button pressed while a
+    pack changes under it still means the piece it was drawn for.
+  */
+  function keyOf(t, piece) {
+    if (!Object.prototype.hasOwnProperty.call(t.keys, piece)) {
+      t.pieces.push(piece);
+      t.keys[piece] = t.pieces.length;
+    }
+    return t.keys[piece];
+  }
+
+  /* The piece a panel button names, '#' and its number, or '' for none. */
+  function pieceAt(t, want) {
+    var m = /^#(\d+)$/.exec(String(want));
+    var n = m ? Number(m[1]) : 0;
+    return n >= 1 && n <= t.pieces.length ? t.pieces[n - 1] : '';
+  }
+
+  /*
+    Put something on your side: the piece a panel button names (pieceAt), or
+    by name or by hex base id.
+  */
   function add(actorId, what, count) {
     var t = tradeOf(actorId);
     if (!t) { return 'You are not trading.'; }
     var want = String(what || '').trim().toLowerCase();
     if (!want) { return 'Add what?'; }
     var have = carrying(actorId);
+    var byKey = want.charAt(0) === '#';
+    var piece = byKey ? pieceAt(t, want) : '';
     var asId = parseInt(want, 16);
     var hit = null;
     for (var i = 0; i < have.length; i++) {
-      if ((isFinite(asId) && have[i].id === asId) ||
-          have[i].n.toLowerCase() === want) { hit = have[i]; break; }
+      if (byKey ? have[i].x === piece
+                : ((isFinite(asId) && have[i].id === asId) || have[i].n.toLowerCase() === want)) {
+        hit = have[i]; break;
+      }
     }
-    if (!hit) {
+    if (!hit && !byKey) {
       for (var j = 0; j < have.length; j++) {
         if (have[j].n.toLowerCase().indexOf(want) !== -1) { hit = have[j]; break; }
       }
@@ -57764,7 +58028,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
     var side = sideOf(t, actorId);
     for (var k = 0; k < side.length; k++) {
-      if (side[k].id === hit.id) {
+      if (side[k].x === hit.x) {
         var room = hit.c - side[k].c;
         if (room <= 0) { return 'That is all of them already.'; }
         side[k].c += Math.min(n, room);
@@ -57773,7 +58037,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       }
     }
     if (side.length >= TRADE.mostLines) { return 'That is as much as one side can offer.'; }
-    side.push({ id: hit.id, n: hit.n, c: n });
+    side.push({ id: hit.id, x: hit.x, n: hit.n, c: n });
     unconfirm(t); push(t);
     return '';
   }
@@ -57785,8 +58049,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var side = sideOf(t, actorId);
     var n = Math.floor(Number(count) || 0);
     for (var i = 0; i < side.length; i++) {
-      if (side[i].n.toLowerCase().indexOf(want) !== -1 ||
-          String(side[i].id) === want || side[i].id.toString(16) === want) {
+      if (want.charAt(0) === '#' ? side[i].x === pieceAt(t, want)
+          : (side[i].n.toLowerCase().indexOf(want) !== -1 ||
+             String(side[i].id) === want || side[i].id.toString(16) === want)) {
         if (n > 0 && side[i].c > n) { side[i].c -= n; }
         else { side.splice(i, 1); }
         unconfirm(t); push(t);
@@ -57906,7 +58171,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         return nameOf(s.from) + ' does not have that gold any more.';
       }
       for (j = 0; j < s.items.length; j++) {
-        if (s.items[j].c > holding(s.from, s.items[j].id)) {
+        if (s.items[j].c > holdingPiece(s.from, s.items[j].x)) {
           unconfirm(t); push(t);
           return nameOf(s.from) + ' does not have the ' + s.items[j].n + ' any more.';
         }
@@ -57924,7 +58189,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       var side = sides[i];
       var pairs = [];
       for (j = 0; j < side.items.length; j++) {
-        pairs.push([side.items[j].id, side.items[j].c]);
+        pairs.push([side.items[j].id, side.items[j].c, side.items[j].x]);
       }
       if (side.gold > 0) { pairs.push([GOLD, side.gold]); }
       if (!pairs.length) { continue; }
@@ -57974,7 +58239,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (!(price > 0)) { return refuse(nameOf(worker) + ' has put up no gold for it.'); }
     if (price > holding(worker, GOLD)) { return refuse(nameOf(worker) + ' does not have that gold any more.'); }
     for (var i = 0; i < things.length; i++) {
-      if (things[i].c > holding(seller, things[i].id)) {
+      if (things[i].c > holdingPiece(seller, things[i].x)) {
         return refuse(nameOf(seller) + ' does not have the ' + things[i].n + ' any more.');
       }
     }
@@ -58004,15 +58269,17 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
   /*
     A pack's entries less [baseId, count] pairs, or null when they are not
-    all there. An entry that is only partly taken keeps everything else it
-    had.
+    all there. A pair with a piece, [baseId, count, piece], takes only that
+    piece (#1718). An entry that is only partly taken keeps everything else
+    it had.
   */
   function withoutPairs(entries, pairs) {
     var out = entries.slice();
     for (var i = 0; i < pairs.length; i++) {
-      var baseId = pairs[i][0], left = pairs[i][1];
+      var baseId = pairs[i][0], left = pairs[i][1], piece = pairs[i][2];
       for (var k = 0; k < out.length && left > 0; k++) {
         if (!out[k] || out[k].baseId !== baseId) { continue; }
+        if (piece && pieceOf(out[k]) !== piece) { continue; }
         var had = out[k].count || 1;
         var take = Math.min(left, had);
         var rest = {};
@@ -58045,7 +58312,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       workerInv = mp.get(workerActor, 'inventory') || { entries: [] };
     } catch (e) { return false; }
     var pairs = [];
-    for (var i = 0; i < things.length; i++) { pairs.push([things[i].id, things[i].c]); }
+    for (var i = 0; i < things.length; i++) { pairs.push([things[i].id, things[i].c, things[i].x]); }
     var gone = withoutPairs((sellerInv.entries || []).slice(), pairs);
     var paid = withoutPairs((workerInv.entries || []).slice(), [[GOLD, cost]]);
     if (!gone || !paid || !(share > 0) || !(cost >= share)) { return false; }
@@ -58128,7 +58395,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
   /*
     Move [baseId, count] pairs from one pack to another, or nothing at all,
-    each piece with everything it carries (above).
+    each piece with everything it carries (above). A pair with a piece,
+    [baseId, count, piece], moves only that piece: the one the trade put up
+    (#1718). Gold is a pair without one.
   */
   function moveById(fromActor, toActor, pairs) {
     var fromInv, toInv;
@@ -58141,10 +58410,11 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
     var i, k;
     for (i = 0; i < pairs.length; i++) {
-      var baseId = pairs[i][0], left = pairs[i][1];
+      var baseId = pairs[i][0], left = pairs[i][1], piece = pairs[i][2];
       var moving = [];
       for (k = 0; k < out.length && left > 0; k++) {
         if (!out[k] || out[k].baseId !== baseId) { continue; }
+        if (piece && pieceOf(out[k]) !== piece) { continue; }
         var had = out[k].count || 1;
         var take = Math.min(left, had);
         moving.push(withCount(out[k], take, true));
@@ -58174,18 +58444,27 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
   // ------------------------------------------------------------ the panel --
 
+  /* Lines as the panel draws them: each piece by its number (keyOf), not the piece itself. */
+  function shown(t, lines) {
+    var out = [];
+    for (var i = 0; i < lines.length; i++) {
+      out.push({ id: lines[i].id, p: keyOf(t, lines[i].x), n: lines[i].n, c: lines[i].c, k: lines[i].k });
+    }
+    return out;
+  }
+
   function view(t, actorId) {
     var meA = t.a === actorId;
     return {
       open: true,
       them: nameOf(other(t, actorId)),
-      mine: meA ? t.offerA : t.offerB,
-      theirs: meA ? t.offerB : t.offerA,
+      mine: shown(t, meA ? t.offerA : t.offerB),
+      theirs: shown(t, meA ? t.offerB : t.offerA),
       myGold: meA ? t.goldA : t.goldB,
       theirGold: meA ? t.goldB : t.goldA,
       iAgreed: meA ? t.okA : t.okB,
       theyAgreed: meA ? t.okB : t.okA,
-      pack: carrying(actorId),
+      pack: shown(t, carrying(actorId)),
       heldGold: holding(actorId, (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F),
       // A sale out of Skyrim (#1393): the split, and whether this side may
       // press Buy for the company.
@@ -58873,7 +59152,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     } catch (e) { }
     try {
       var conf = JSON.parse(fs.readFileSync(path.join(privDir, 'door.json'), 'utf8')
-                              .replace(/^ï»¿/, ''));
+                              .replace(/^\uFEFF/, ''));
       if (conf && conf.site && conf.key) { return { site: String(conf.site), key: String(conf.key) }; }
     } catch (e) { }
     return null;
@@ -60000,7 +60279,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var conf = null;
     try {
       conf = JSON.parse(fs.readFileSync(path.join(String(settings().privDir || 'private'), 'door.json'), 'utf8')
-                          .replace(/^ï»¿/, ''));
+                          .replace(/^\uFEFF/, ''));
     } catch (e) { conf = null; }
     if (!conf || !conf.site || !conf.key) { end(false, 'this server has no door.json naming the site'); return; }
     var url;
@@ -60054,7 +60333,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var list = [], pk = [], written = 0;
     try {
       var doc = JSON.parse(fs.readFileSync(path.join(String(settings().privDir || 'private'), 'allowed.json'), 'utf8')
-                             .replace(/^ï»¿/, ''));
+                             .replace(/^\uFEFF/, ''));
       if (doc && Array.isArray(doc.bans)) { list = doc.bans; }
       if (doc && Array.isArray(doc.pk)) { pk = doc.pk; }
       written = Date.parse(String((doc && doc.at) || '')) || 0;
@@ -61690,6 +61969,7 @@ function sequenceOf(receipt, human) {
 // synchronous durable replacements. Neither is inferred from elapsed time.
 function createSettlement(deps) {
   var purses = deps.purses, transfer = deps.transfer, world = deps.world;
+  var now = deps.now || function () { return Date.now(); };
   var active = true, cursor = 0, busy = false;
   var errors = new Map();
   function report(id, error) {
@@ -61742,9 +62022,50 @@ function createSettlement(deps) {
   function commitMerchant(id, state) {
     var pending = state.pending;
     if (!equal({purse:state.purse,stock:state.stock,supply:state.supply || {}}, pending.previous)) return null;
-    var next = Object.assign({}, copy(state), copy(pending.next));
+    return save(id, state, creditState(state), pending.id);
+  }
+  function creditState(state) {
+    var next = Object.assign({}, copy(state), copy(state.pending.next));
     next.pending.phase = 'credit';
-    return save(id, state, next, pending.id);
+    // Saved debit is conclusive. Its original snapshots are no longer read
+    // in this phase; retaining them would crowd out the recovery snapshots.
+    delete next.pending.expected;
+    delete next.pending.debit;
+    delete next.pending.expectedReceipt;
+    next.pending.previous = {supply:copy(next.pending.previous.supply || {})};
+    return next;
+  }
+  function pruneSupplyHistory(id, state, wait) {
+    if (!available() || busy) return null;
+    busy = true;
+    try {
+      var current = purses.read(id);
+      if (!current || current.pending || !equal(current, state)) return null;
+      var next = copy(current), changed = false, at = now();
+      Object.keys(next.supply || {}).forEach(function (key) {
+        var stamp = next.supply[key];
+        if (Number.isSafeInteger(stamp) && stamp > 0 && at - stamp >= wait) {
+          delete next.supply[key]; changed = true;
+        }
+      });
+      return changed ? save(id, current, next) : current;
+    } finally { busy = false; }
+  }
+  function changedSupplyKey(previous, next) {
+    var before = previous.supply || {}, after = next.supply || {};
+    var keys = Object.keys(after).filter(function (key) { return before[key] !== after[key]; });
+    return keys.length === 1 && Number.isSafeInteger(after[keys[0]]) && after[keys[0]] > 0 ? keys[0] : null;
+  }
+  function complete(id, state) {
+    var pending = state.pending, next = Object.assign({}, copy(state), {pending:null});
+    if (pending.kind === 'supply') {
+      // Completion, including legacy intents, follows the exact saved final
+      // receipt. A disconnect cannot consume the six-hour window in advance.
+      var key = changedSupplyKey(pending.previous, pending.next), at = now();
+      if (!key || !Number.isSafeInteger(at) || at <= 0) throw new Error('Supply completion cannot be verified.');
+      next.supply[key] = at;
+    }
+    return !!save(id, state, next, pending.id);
   }
   function reconcile(id) {
     if (!available()) return false;
@@ -61760,7 +62081,7 @@ function createSettlement(deps) {
     if (live === pending.finalReceipt) {
       if (pending.phase !== 'credit' || saved !== pending.finalReceipt ||
           !equal({purse:state.purse,stock:state.stock,supply:state.supply || {}}, pending.next)) return false;
-      return !!save(id, state, Object.assign({}, copy(state), {pending:null}), pending.id);
+      return complete(id, state);
     }
     if (pending.phase === 'debit') {
       if (live === pending.expectedReceipt) {
@@ -61786,6 +62107,14 @@ function createSettlement(deps) {
       pending = state.pending;
     }
     if (live !== pending.debitReceipt || saved !== pending.debitReceipt || !active) return false;
+    // A pre-upgrade credit intent may still contain the saved debit snapshots.
+    // Compact it durably before building or replacing a recovery attempt.
+    var compact = creditState(state);
+    if (!equal(compact, state)) {
+      state = save(id, state, bounded(compact, MAX_INTENT_BYTES), pending.id);
+      if (!state || !active) return false;
+      pending = state.pending;
+    }
     var current = inventory(transfer.inventory(humanId));
     if (!pending.creditAttempt || !equal(pending.creditAttempt.expected, current)) {
       var next = copy(state);
@@ -61801,7 +62130,7 @@ function createSettlement(deps) {
     // A notification may throw after CAS changed inventory. The saved intent
     // and final receipt, rather than this return value, determine completion.
     if (!active || transfer.receipt(humanId) !== pending.finalReceipt || transfer.saved(humanId) !== pending.finalReceipt) return false;
-    return !!save(id, state, Object.assign({}, copy(state), {pending:null}), pending.id);
+    return complete(id, state);
   }
   function begin(offer) {
     if (!available() || busy) return {accepted:false,done:false,reason:'Trading is unavailable.'};
@@ -61811,6 +62140,13 @@ function createSettlement(deps) {
       if (!human || human.profileId !== offer.profileId || !state || state.pending ||
           !equal(state, offer.previous) || !admitted(human, state.reference))
         return {accepted:false,done:false,reason:'A transfer is waiting.'};
+      if (offer.kind === 'supply') {
+        var key = changedSupplyKey(state, offer.next), owner;
+        try { owner = JSON.parse(key); } catch (error) { owner = null; }
+        if (!Array.isArray(owner) || owner.length !== 3 || owner[0] !== human.desc ||
+            owner[1] !== human.profileId || typeof owner[2] !== 'string' || !owner[2])
+          throw new Error('Supply cooldown cannot be verified.');
+      }
       var expected = inventory(transfer.inventory(offer.humanId));
       if (!equal(expected, offer.expected)) return {accepted:false,done:false,reason:'Your inventory changed. Choose the trade again.'};
       var receipt = transfer.receipt(offer.humanId), sequence = sequenceOf(receipt, human) + 1;
@@ -61826,6 +62162,12 @@ function createSettlement(deps) {
         if(transfer.validate(snapshot)!==true) throw new Error('Native inventory validation failed.');
       });
       var armed = Object.assign({}, copy(state), {pending:pending});
+      // Either recovery inventory can reach the native/JS inventory limit.
+      // Reserve both plus the JSON envelope before charging, including later
+      // inventory growth. The 512 KiB intent bound stays unchanged.
+      var recovery = creditState(armed);
+      if (Buffer.byteLength(JSON.stringify(recovery), 'utf8') + 2 * MAX_INVENTORY_BYTES + 64 > MAX_INTENT_BYTES)
+        throw new Error('The trade is too large to recover.');
       if (!save(offer.merchantId, state, bounded(armed, MAX_INTENT_BYTES))) return {accepted:false,done:false,reason:'The offer changed.'};
       var done = false;
       if (active) {
@@ -61851,7 +62193,7 @@ function createSettlement(deps) {
       return changed;
     } finally { busy = false; }
   }
-  return {begin:begin,tick:tick,available:available,shutdown:function () { active=false; }};
+  return {begin:begin,tick:tick,available:available,pruneSupplyHistory:pruneSupplyHistory,shutdown:function () { active=false; }};
 }
 
 module.exports = {createSettlement:createSettlement,inventory:inventory,takeEntries:takeEntries,
@@ -61938,7 +62280,7 @@ function createMerchantTrading(deps) {
   var now = deps.now || function () { return Date.now(); };
   var reach = deps.reach == null ? REACH : deps.reach;
   var sessions = new Map();
-  var settlement = SETTLEMENT.createSettlement({purses:purses,transfer:transfer,world:deps.namespace || purses.namespace,log:deps.log});
+  var settlement = SETTLEMENT.createSettlement({purses:purses,transfer:transfer,world:deps.namespace || purses.namespace,log:deps.log,now:now});
   var active = true;
 
   function placeOf(reference) {
@@ -62006,7 +62348,17 @@ function createMerchantTrading(deps) {
     return Number(profileId) > 0 && Number(profileId) === Number(human.profileId);
   }
 
-  function viewFor(merchantId, state, place, note) {
+  function supplyKey(human, itemName) {
+    return JSON.stringify([human.desc, human.profileId, itemName.toLowerCase()]);
+  }
+  function lastSupply(state, key, itemName) {
+    var stamps = state.supply || {};
+    // Old item-only stamps cannot be assigned to a character. Keep their
+    // original window rather than resetting an unidentified completed supply.
+    return Math.max(stamps[key] || 0, stamps[itemName.toLowerCase()] || 0);
+  }
+
+  function viewFor(merchantId, state, place, actorId, profileId, note) {
     var catalog = prices.catalog ? prices.catalog(place.bookHold) : [];
     var offers = [];
     for (var i = 0; i < catalog.length; i++) {
@@ -62026,13 +62378,14 @@ function createMerchantTrading(deps) {
       });
     }
     var supply = [];
-    var stamp = state.supply || {};
+    var human = settlement.available() ? transfer.identity(actorId) : null;
+    var owns = human && human.desc && human.profileId === profileId;
     var at = now();
     for (var k = 0; k < offers.length; k++) {
       if (offers[k].buy == null) continue;
       var pay = offers[k].buy * SUPPLY_COUNT;
-      var last = stamp[offers[k].name.toLowerCase()] || 0;
-      var ready = state.purse >= pay && (!last || at - last >= SUPPLY_WAIT);
+      var last = owns ? lastSupply(state, supplyKey(human, offers[k].name), offers[k].name) : 0;
+      var ready = !!owns && !state.pending && state.purse >= pay && (!last || at - last >= SUPPLY_WAIT);
       supply.push({ name: offers[k].name, pay: pay, count: SUPPLY_COUNT, ready: ready });
     }
     return {
@@ -62058,7 +62411,7 @@ function createMerchantTrading(deps) {
       var human = transfer.identity(session.actorId);
       if (!human || human.profileId !== profileId) {sessions.delete(profileId); return;}
       var state = purses.read(session.merchantId), place = state && placeOf(state.reference);
-      if (state && place) views.push({actorId:session.actorId,view:viewFor(session.merchantId,state,place)});
+      if (state && place) views.push({actorId:session.actorId,view:viewFor(session.merchantId,state,place,session.actorId,profileId)});
     });
     return views;
   }
@@ -62116,7 +62469,7 @@ function createMerchantTrading(deps) {
       var prior = sessions.get(profileId);
       var repeat = prior && prior.merchantId === merchantId && (now() - prior.at) < 3000;
       sessions.set(profileId, { merchantId: merchantId, actorId:actorId, at: now() });
-      var opened = viewFor(merchantId, state, place);
+      var opened = viewFor(merchantId, state, place, actorId, profileId);
       return {
         text: repeat ? '' : (opened.transfer
           ? ('Trading with ' + opened.trader + ' in ' + opened.place + '. Purse ' + opened.purse + '.')
@@ -62169,20 +62522,39 @@ function createMerchantTrading(deps) {
     var gold = unit * asked.count;
     if (!Number.isInteger(gold) || gold < 0 || gold > MAX_GOLD) return fail('That price cannot be verified.');
     var npcBuys = verb !== 'buy';
+    var completedSupplyKey = null;
     if (verb === 'supply') {
-      var last = (state.supply && state.supply[itemName.toLowerCase()]) || 0;
+      if (!settlement.available()) return fail('Buying and selling wait on the native transfer. Nothing was taken.', viewFor(merchantId, state, place, actorId, profileId));
+      var human = transfer.identity(actorId);
+      if (!human || !human.desc || human.profileId !== profileId) return fail('That request is not yours.');
+      completedSupplyKey = supplyKey(human, itemName);
+      var last = lastSupply(state, completedSupplyKey, itemName);
       if (last && now() - last < SUPPLY_WAIT) return fail('That supply is not due.');
     }
     if (npcBuys && state.purse < gold) return fail('The trader cannot pay.');
     if (!npcBuys && gold > 0 && world.carry(actorId, GOLD_BASE) < gold) return fail('You cannot pay.');
     if (npcBuys && world.carry(actorId, resolved.baseId) < asked.count) return fail('You are not carrying that.');
     if (!settlement.available()) {
-      return fail('Buying and selling wait on the native transfer. Nothing was taken.', viewFor(merchantId, state, place));
+      return fail('Buying and selling wait on the native transfer. Nothing was taken.', viewFor(merchantId, state, place, actorId, profileId));
     }
     var nextPurse = npcBuys ? state.purse - gold : state.purse + gold;
     if (nextPurse < 0 || nextPurse > MAX_GOLD) return fail('That price cannot be verified.');
     var moved;
     try {
+      // Capture every trade's authenticated native character before a save
+      // can publish a projection or reenter another request.
+      var tradingHuman = transfer.identity(actorId);
+      if (!tradingHuman || tradingHuman.profileId !== profileId) return fail('That request is not yours.');
+      try {
+        state = settlement.pruneSupplyHistory(merchantId, state, SUPPLY_WAIT);
+      } catch (error) {
+        active = false; sessions.clear(); settlement.shutdown();
+        throw error;
+      }
+      if (!state || !active) return fail('The offer changed. Choose the trade again.');
+      var currentHuman = transfer.identity(actorId);
+      if (!currentHuman || currentHuman.desc !== tradingHuman.desc || currentHuman.profileId !== tradingHuman.profileId)
+        return fail('That request is not yours.');
       var expected = SETTLEMENT.inventory(transfer.inventory(actorId));
       var outgoing = SETTLEMENT.takeEntries(expected, npcBuys ? resolved.baseId : GOLD_BASE, npcBuys ? asked.count : gold);
       var stock = stockCopy(state.stock), credit;
@@ -62194,7 +62566,7 @@ function createMerchantTrading(deps) {
         stock = picked.stock; credit = picked.entries;
       }
       var nextSupply = JSON.parse(JSON.stringify(state.supply || {}));
-      if (verb === 'supply') nextSupply[itemName.toLowerCase()] = now();
+      if (verb === 'supply') nextSupply[completedSupplyKey] = now();
       moved = settlement.begin({merchantId:merchantId,humanId:actorId,profileId:profileId,
         previous:state,expected:expected,debit:outgoing.inventory,credit:credit,kind:verb,
         next:{purse:nextPurse,stock:stock,supply:nextSupply}});
@@ -62202,11 +62574,11 @@ function createMerchantTrading(deps) {
       return fail(settlement.available() ? String(error.message || error) : 'Trading is unavailable. The saved transfer is retained.');
     }
     var current = purses.prepare(merchantId);
-    if (!moved.done) return fail(moved.reason, viewFor(merchantId, current, place, moved.reason));
+    if (!moved.done) return fail(moved.reason, viewFor(merchantId, current, place, actorId, profileId, moved.reason));
     var said = npcBuys
       ? ('Sold ' + asked.count + ' ' + itemName + ' for ' + gold + '. Purse ' + current.purse + '.')
       : ('Bought ' + asked.count + ' ' + itemName + ' for ' + gold + '. Purse ' + current.purse + '.');
-    return {text:said,view:viewFor(merchantId, current, place)};
+    return {text:said,view:viewFor(merchantId, current, place, actorId, profileId)};
   }
 
   function activate(actorId, merchantId) {

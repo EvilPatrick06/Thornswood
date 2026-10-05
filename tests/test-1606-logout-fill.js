@@ -423,15 +423,18 @@ bedTick();
 
 {
   // Alice lies down in her own bed, logs out, and comes back a night later
-  // with no restart: the beds still have her lying there.
+  // with no restart. Nobody comes back lying down, so the beds forget her bed
+  // as she leaves (#1734), and their first sight of her is her arrival, the
+  // same as after a restart.
   lieDown(ALICE, HOME_BED);
   yes('B1 Alice lying in her own bed rests at the own bed rate', needs.read(ALICE.a).resting === 'bed');
   leave(ALICE);
+  yes('B1 gone from the world, the beds no longer have her lying there (#1734)', !lyingIn(ALICE));
   clock.t += 9 * HOUR;
   back(ALICE);
-  bedTick();
-  yes('B1 back with no restart, the beds still have her lying there until her first settle',
-      lyingIn(ALICE) && needs.read(ALICE.a).resting === 'bed');
+  yes('B1 back with no restart, her meters still say where she lay until her first settle',
+      needs.read(ALICE.a).resting === 'bed');
+  bedTick();                    // first sight: her arrival
   needs.place(ALICE.a, 'indoors', '-', '0', '1', '0', '-');   // her client's first report
   const n = needs.read(ALICE.a);
   yes('B1 she comes back rested, with 25 on hunger and thirst, and up',
