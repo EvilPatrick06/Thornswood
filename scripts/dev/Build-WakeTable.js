@@ -45,6 +45,14 @@
 // the Raven Rock temple and the Retching Netch, and no other worldspace with
 // coordinates of its own has any.
 //
+// THE DOORS IN. DATA.ownWorldDoors is every door, by its reference, that
+// stands outside one of those worldspaces and leads into it, leaving out the
+// doors of a room whose only ways out lead back into it (Blackreach's side
+// rooms). onActivate writes the one a person presses, and the hold they
+// pressed it from, on the character; a worldspace with nowhere to wake wakes
+// them where a death in that hold would (Patrick, 5 Oct, #1909). Measured on
+// 5 Oct: 92 doors, 12 of them into Blackreach and 2 into the Pit.
+//
 // Usage:
 //   node scripts\dev\Build-WakeTable.js
 //   node scripts\dev\Build-WakeTable.js --check
@@ -226,7 +234,31 @@ function buildTable(t, worlds, destinations, cellToHold) {
   for (const w in table) {
     table[w].sort(function (x, y) { return (x.desc + x.door.join()).localeCompare(y.desc + y.door.join()); });
   }
-  return { table: table, frame: frame };
+  // The doors into each of those worldspaces from anywhere else: a room, a
+  // worldspace in Tamriel's coordinates or another of its own. A person who
+  // presses one has come in by it, and onActivate writes down the hold they
+  // pressed it from (#1909): a worldspace of its own with nowhere to wake
+  // wakes them where a death in that hold would. A room whose every door
+  // leads into the same worldspace (Blackreach's side rooms, Sovngarde's
+  // hall) is part of it: nobody comes in from there, so its doors are left out
+  // and going in and out of one does not move what was written.
+  const leadsTo = {};
+  for (const d in t.doors) {
+    const a = t.doors[d];
+    if (a.deleted || a.world || !a.cell) { continue; }
+    const b = t.doors[a.to];
+    (leadsTo[a.cell] = leadsTo[a.cell] || new Set()).add(b && !b.deleted ? (b.world || 'room') : 'nowhere');
+  }
+  const doors = {};
+  Object.keys(t.doors).sort().forEach(function (d) {
+    const a = t.doors[d];
+    if (a.deleted) { return; }
+    const b = t.doors[a.to];
+    if (!b || b.deleted || !b.world || a.world === b.world || !Object.prototype.hasOwnProperty.call(table, b.world)) { return; }
+    if (!a.world && leadsTo[a.cell] && leadsTo[a.cell].size === 1) { return; }
+    doors[d] = b.world;
+  });
+  return { table: table, frame: frame, doors: doors };
 }
 
 function readLoadOrder(dataDir, pluginsTxt) {
@@ -242,34 +274,46 @@ function readLoadOrder(dataDir, pluginsTxt) {
   return { order: order, tables: t, problems: problems };
 }
 
-// "ownWorlds" written into data.json's text as its last key, laid out the way
-// the rest of the file is (one space a level), and into the DATA line. Nothing
-// else in either moves.
+// "ownWorlds" and "ownWorldDoors" written into data.json's text as its last
+// keys, laid out the way the rest of the file is (one space a level), and
+// into the DATA line. Nothing else in either moves.
 const DATA_RE = /^const DATA = (.*);\r?$/m;
-function install(table, jsonText, gmText) {
+const KEYS = ['ownWorlds', 'ownWorldDoors'];
+function install(tables, jsonText, gmText) {
   const nl = jsonText.indexOf('\r\n') >= 0 ? '\r\n' : '\n';
-  const block = JSON.stringify(table, null, 1).split('\n').join(nl + ' ');
-  const at = jsonText.indexOf(',' + nl + ' "ownWorlds": ');
   const end = jsonText.lastIndexOf(nl + '}');
   if (end < 0) { return { error: 'data.json does not end in a closing brace' }; }
-  const json = (at >= 0 ? jsonText.slice(0, at) : jsonText.slice(0, end)) + ',' + nl + ' "ownWorlds": ' + block + jsonText.slice(end);
+  // Ours are the last keys, so everything from the first of them is rewritten.
+  function firstOf(text, shape) {
+    let at = -1;
+    for (const k of KEYS) { const i = text.indexOf(shape(k)); if (i >= 0 && (at < 0 || i < at)) { at = i; } }
+    return at;
+  }
+  const at = firstOf(jsonText, function (k) { return ',' + nl + ' "' + k + '": '; });
+  let json = at >= 0 ? jsonText.slice(0, at) : jsonText.slice(0, end);
+  for (const k of KEYS) { json += ',' + nl + ' "' + k + '": ' + JSON.stringify(tables[k], null, 1).split('\n').join(nl + ' '); }
+  json += jsonText.slice(end);
   const m = DATA_RE.exec(gmText);
   if (!m || m[1][m[1].length - 1] !== '}') { return { error: 'gamemode.js has no "const DATA = {...};" line' }; }
   // As text, the same as data.json: the line keeps 0.0 where JSON.stringify
-  // would write 0, and only the table is to move.
-  const was = m[1].indexOf(',"ownWorlds":');
-  const obj = (was >= 0 ? m[1].slice(0, was) : m[1].slice(0, -1)) + ',"ownWorlds":' + JSON.stringify(table) + '}';
+  // would write 0, and only these tables are to move.
+  const was = firstOf(m[1], function (k) { return ',"' + k + '":'; });
+  let obj = was >= 0 ? m[1].slice(0, was) : m[1].slice(0, -1);
+  for (const k of KEYS) { obj += ',"' + k + '":' + JSON.stringify(tables[k]); }
+  obj += '}';
   const line = 'const DATA = ' + obj + ';' + (m[0][m[0].length - 1] === '\r' ? '\r' : '');
   const gm = gmText.slice(0, m.index) + line + gmText.slice(m.index + m[0].length);
   let a, b, c, d;
   try { a = JSON.parse(jsonText); b = JSON.parse(json); c = JSON.parse(m[1]); d = JSON.parse(DATA_RE.exec(gm)[1]); }
-  catch (e) { return { error: 'the table did not land as JSON (' + e.message + ')' }; }
-  if (JSON.stringify(b.ownWorlds) !== JSON.stringify(table) || JSON.stringify(d.ownWorlds) !== JSON.stringify(table)) {
-    return { error: 'the table did not land as built' };
+  catch (e) { return { error: 'the tables did not land as JSON (' + e.message + ')' }; }
+  for (const k of KEYS) {
+    if (JSON.stringify(b[k]) !== JSON.stringify(tables[k]) || JSON.stringify(d[k]) !== JSON.stringify(tables[k])) {
+      return { error: k + ' did not land as built' };
+    }
+    delete a[k]; delete b[k]; delete c[k]; delete d[k];
   }
-  delete a.ownWorlds; delete b.ownWorlds; delete c.ownWorlds; delete d.ownWorlds;
   if (JSON.stringify(a) !== JSON.stringify(b) || JSON.stringify(c) !== JSON.stringify(d)) {
-    return { error: 'something besides the table changed' };
+    return { error: 'something besides the tables changed' };
   }
   return { json: json, gm: gm };
 }
@@ -300,14 +344,16 @@ function main(args) {
   const own = Object.keys(built.table);
   const places = own.reduce(function (n, w) { return n + built.table[w].length; }, 0);
   console.log(got.order.length + ' plugins read, ' + Object.keys(ws.worlds).length + ' worldspaces, ' +
-              built.frame.size + ' in Tamriel\'s coordinates, ' + own.length + ' with their own, ' + places + ' places to wake in those');
+              built.frame.size + ' in Tamriel\'s coordinates, ' + own.length + ' with their own, ' + places + ' places to wake in those, ' +
+              Object.keys(built.doors).length + ' doors into them');
   if (args.indexOf('--print') !== -1) {
     Object.keys(ws.worlds).sort().forEach(function (w) {
       const p = built.table[w];
-      console.log('  ' + w.padEnd(28) + ws.worlds[w].padEnd(34) + (p ? 'own: ' + (p.length ? p.map(function (x) { return x.kind + ' ' + x.cell; }).join(', ') : 'nowhere to wake') : 'Tamriel'));
+      const ins = Object.keys(built.doors).filter(function (d) { return built.doors[d] === w; }).length;
+      console.log('  ' + w.padEnd(28) + ws.worlds[w].padEnd(34) + (p ? 'own: ' + (p.length ? p.map(function (x) { return x.kind + ' ' + x.cell; }).join(', ') : 'nowhere to wake') + ', ' + ins + ' door(s) in' : 'Tamriel'));
     });
   }
-  const out = install(built.table, jsonText, gmText);
+  const out = install({ ownWorlds: built.table, ownWorldDoors: built.doors }, jsonText, gmText);
   if (out.error) { console.error('FAIL  ' + out.error + '; nothing written'); return 1; }
   const same = out.json === jsonText && out.gm === gmText;
   if (check) {

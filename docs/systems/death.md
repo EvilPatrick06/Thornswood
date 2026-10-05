@@ -21,8 +21,14 @@ wakes in the nearest Hall of the Dead, temple or inn in that same
 worldspace (Patrick, 5 Oct, #1909). On Solstheim that is the temple
 or the Retching Netch in Raven Rock, whichever door is nearer. No
 other worldspace of its own has any of the three, so a death in one
-wakes in the Temple of Kynareth in Whiterun, the fallback, and the
-death log says `own-world-none`.
+wakes where a death in the hold of the door you came in by would
+(Patrick, 5 Oct): Blackreach come into from the Reach wakes at
+Markarth's temple, the Pit under Windhelm at Windhelm's. The server
+writes that door on your character when you press it, so a relog keeps
+it. Only somebody with no door into that worldspace written down wakes
+in the Temple of Kynareth in Whiterun, the fallback, and the death log
+says why (`own-world-no-door`, or `own-world-no-hold` when no hold was
+known behind the door).
 
 The wounds you already had come with you. A disease you already had
 comes with you. The temple stopped the death. It did not wash a cut,

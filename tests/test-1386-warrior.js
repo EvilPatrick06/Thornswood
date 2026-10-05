@@ -279,6 +279,7 @@ function deathBox(opts) {
     isCarcass: function () { return false; },
     creditWork: function (id, half, n) { credits.push({ id: id, half: half, n: n }); return null; },
     notify: function () {}, say: function () {}, log: function () {},
+    cameInOf: function () { return null; },
     resolveArrival: function () { return null; },
     setTimeout: function () {},
     __thornswoodCharacter: { stateOf: function (id) { return id === HUMAN ? { prof: 'warrior', half: 'berserker' } : { prof: 'cook', half: 'hearthcook' }; } },

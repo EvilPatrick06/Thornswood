@@ -170,7 +170,7 @@ if (arrivalSrc && DATA) {
   for (const s of spots) {
     const a = now(s), b = without(s);
     yes('a death in ' + MEASURED[s.desc] + ' wakes by its own worldspace (' + a.via + '), in the set or out of it',
-      a.via === 'own-world-none' && b.via === a.via && a.desc === b.desc);
+      a.via === 'own-world-no-door' && b.via === a.via && a.desc === b.desc);
   }
   // In Tamriel's coordinates the set still decides. LabyrinthianWorld is laid
   // out in them (its doors land beside Tamriel's) and stands in Hjaalmarch,

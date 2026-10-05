@@ -271,7 +271,7 @@ because each reads the one before.
 | `SPELL_IDS` 11826-11930 | `Build-SpellTable.ps1` | `spells.json` | `Build-SpellTable.ps1:// ==== end SPELL_IDS ====` |
 | `DATA` 23 | `Install-GamemodeConsts.js` | `data.json` | `Install-GamemodeConsts.js` |
 | `DATA.worldspaces`, inside line 23 | `Build-WorldspaceTable.js`, from the WRLD records of the load order | `data.json` (`worldspaces`) | `Build-WorldspaceTable.js:install`, the list and nothing else of the line |
-| `DATA.ownWorlds`, inside line 23 | `Build-WakeTable.js`, from the doors, rooms and locations of the load order | `data.json` (`ownWorlds`) | `Build-WakeTable.js:install`, the table and nothing else of the line |
+| `DATA.ownWorlds` and `DATA.ownWorldDoors`, inside line 23 | `Build-WakeTable.js`, from the doors, rooms and locations of the load order | `data.json` (`ownWorlds`, `ownWorldDoors`) | `Build-WakeTable.js:install`, the two tables and nothing else of the line |
 | `STATIONS` 24 | `Install-GamemodeConsts.js` | `stations.json` | `Install-GamemodeConsts.js` |
 | `ITEMS` 25 | `Install-GamemodeConsts.js` | `items.json` | `Install-GamemodeConsts.js` |
 | `CHARGEN` ~3878 | `Install-GamemodeConsts.js` | `chargen.json` | `Install-GamemodeConsts.js` |
@@ -300,8 +300,14 @@ person fell rather than from the hold's capital.
 own (one whose doors do not land within a cell of the doors they lead to in
 Tamriel's coordinates) to the Halls of the Dead, temples and inns whose front
 door stands in it. `resolveArrival` wakes a death in one of those at the
-nearest of them, and never measures it against the mainland; one with none
-wakes at the fallback temple, logged `own-world-none`. `climateOf` still
+nearest of them, and never measures it against the mainland. It also writes
+`DATA.ownWorldDoors`, every door into such a worldspace from outside it (the
+doors of a room whose only ways out lead back into it are left out).
+`onActivate` writes the one a person presses on the character
+(`CAME_IN_PROPERTY`, `nextCameIn`) with the hold they pressed it from, and a
+worldspace with no place of its own wakes them where a death in that hold
+would (`came-in-by`); with no door written down it wakes at the fallback
+temple, logged `own-world-no-door` or `own-world-no-hold`. `climateOf` still
 measures such a worldspace against the mainland's map. Run it with
 Build-WorldspaceTable.js, and `--check` says whether both places hold what the
 load order says. Older comments named
