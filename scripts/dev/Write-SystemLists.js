@@ -365,6 +365,17 @@ function namesByRank(rows, onlyAsked) {
   return lines.join('\n\n');
 }
 
+// What sets the rank on a half's rows, said on its page. The dearest
+// ingredient a class produces, except the Bladebinder's staves: Patrick,
+// 4 October (#1622), each college book staff at its spell's rank, below the
+// master heart stone every staff asks for (RECIPE_RANK in Build-RecipeTable.ps1).
+function rankSentence(key) {
+  if (key === 'Enchanter/Bladebinder') {
+    return 'The rank on the row is the rank. It is the rank of the staff\'s spell in the college book, not the dearest ingredient: every staff asks for heart stone, which is master mining, so a Bladebinder below master buys it. An item has no gold price.\n\n';
+  }
+  return 'The rank on the row is the rank. It is the dearest ingredient a class produces. An item has no gold price.\n\n';
+}
+
 function spliceDetail(rel, markdown) {
   const file = path.join(ROOT, rel);
   if (!fs.existsSync(file)) {
@@ -405,7 +416,7 @@ Object.keys(byHalf).sort().forEach(function (key) {
     rows.length + ' recipes. ' + asked.length + ' reach the server. ' +
     temperSentence + ' The same rows, with ids, are in [' +
     file.replace('.md', '') + '](' + link + ').\n\n' +
-    'The rank on the row is the rank. It is the dearest ingredient a class produces. An item has no gold price.\n\n' +
+    rankSentence(key) +
     '### Names that reach the server\n\n' +
     namesByRank(rows, true) + '\n\n';
   if (key === 'Enchanter/Bladebinder') {

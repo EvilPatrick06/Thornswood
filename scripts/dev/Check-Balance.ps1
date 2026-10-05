@@ -36,8 +36,11 @@
   is now checked for whether anybody standing on it could gather for even one
   row of it, and a half where that fails and is not written down in the table
   with a measured reason fails this script. (Patrick settled the Bladebinder on
-  28 September, issue #398: Heart Stone deposits are advanced mining now, set by
-  RANK_BY_ORE in Build-OreTable.ps1, so the staves line up with their stone.)
+  28 September, issue #398, by making Heart Stone deposits advanced mining. The
+  miner page put heart stone back on master (#1380, #1586), and on 4 October,
+  issue #1622, Patrick answered: each college book staff at its spell's rank.
+  So the thirteen staves sit on novice, advanced and expert below a master
+  stone, named in RECIPE_RANK and in the table's own rungsNobodyCanGatherFor.)
 
   It also follows a recipe to the class that produces its inputs, which it
   could not do until 21 September. game\data\recipes.json records WHICH items each
@@ -379,15 +382,20 @@ Head 'The chain: what a recipe asks for against what it is ranked at'
 # has looked at and this script fails on it:
 #   kept         its rank is named outright in RECIPE_RANK, with the reason on
 #                the row. The four charcoal grades: burnCharcoal hands coke to a
-#                master charburner alone, so the menu has to say the same.
+#                master charburner alone, so the menu has to say the same. The
+#                kept smelt rows, novice smith work whatever the ore costs
+#                (#1391, #1400). And the thirteen college book staves, each at
+#                its spell's rank below a master miner's Heart Stone (#1622).
 #   unproduced   ranked ABOVE what its inputs cost because something on its list
 #                is produced by no class (Dragon Bone, Linen Wrap and the like),
 #                so the price holds it up, and the row says it is kept on
 #                purpose: Patrick decided on 28 September that those stay dear.
 # There is no third. The Bladebinder's staves were one until 28 September,
-# ranked by the second rule below what a master miner's Heart Stone cost; Patrick
-# made the stone advanced mining (RANK_BY_ORE in Build-OreTable.ps1) and they
-# line up with it now, so a second rule row out of step is a new imbalance.
+# ranked by the second rule below what a master miner's Heart Stone cost.
+# Patrick made the stone advanced mining that day, and when the miner page put
+# it back on master he answered #1622 on 4 October: each college book staff at
+# its spell's rank. That is a decision written in RECIPE_RANK, so those rows are
+# kept, and a second rule row out of step is still a new imbalance.
 function FarReason($row, [int]$gap) {
     $rf = [string]$row.rankFrom
     if ($rf.StartsWith('named outright in RECIPE_RANK')) { return 'kept' }
@@ -478,7 +486,7 @@ if ($recipes) {
         if ($far.Count -gt 10) { Note ("  ... and {0} more, every one of them in game\data\recipes.json with its inputItems" -f ($far.Count - 10)) }
         Say ''
         Say '  Why each of them is out, read off the row (FarReason, issue #398):'
-        Say ('    {0,4}  kept on purpose: a rank named in RECIPE_RANK with its reason, the charcoal grades' -f $farWhy.kept)
+        Say ('    {0,4}  kept on purpose: a rank named in RECIPE_RANK with its reason, the charcoal grades, the kept smelt rows and the college book staves' -f $farWhy.kept)
         Say ('    {0,4}  kept on purpose: held above its inputs because something on its list nobody gathers, Patrick 28 September' -f $farWhy.unproduced)
         if ($farWhy.nobody -gt 0) {
             Bad ("{0} recipe(s) are more than one rung out for none of those reasons, so nobody has looked at them:" -f $farWhy.nobody)

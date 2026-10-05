@@ -9,6 +9,11 @@
 // it wrote to the same answers, so the next rebuild changes nothing it was not
 // meant to. It also holds the load order to the plugins Vortex switched on.
 //
+// The rebuild itself (4 October): the poles and the trap moved into the block,
+// the kits (#1384) and the treatments (#1383) are owned at the halves and ranks
+// their pages give, and the thirteen college book staves sit at their spell's
+// rank, Patrick's answer B on #1622, with heart stone on master.
+//
 // The build itself reads the game's plugins and is not run here. Read only.
 const REPO_DIR = require("path").join(__dirname, "..");
 const fs = require("fs");
@@ -70,6 +75,15 @@ yes("the plugins.txt loop is in the build", loadOrder !== null);
 yes("a line Vortex switched off (no '*') is left out of the load order",
   !!loadOrder && loadOrder.indexOf("if (-not $t.StartsWith('*')) { $offCount++; continue }") >= 0);
 yes("and the run says how many were left out", ps.indexOf("line(s) in that list are switched off and were left out") >= 0);
+
+// ---- the line ending the files already have (#1622) ---------------------
+// A checkout that keeps LF got CRLF lines in the table and the blocks, and the
+// fuel and name builders then turned the whole gamemode.js to CRLF.
+yes("the build writes recipes.json with the line ending it already has",
+  ps.indexOf("if (Test-Path -LiteralPath $Out) { $jsonEol = EolOf ([System.IO.File]::ReadAllText($Out)) }") >= 0 &&
+  ps.indexOf("$json = ($doc -join $jsonEol) + $jsonEol") >= 0);
+yes("and both gamemode blocks with the gamemode's own", ps.split("$eol = EolOf $text").length === 3 &&
+  ps.indexOf('(($body -join "`r`n"))') < 0);
 
 // ---- the cut file (#1391) ------------------------------------------------
 yes("the build reads docs/systems/cut-items.json",
@@ -202,6 +216,97 @@ const KITS = { ThornswoodRecipeWeaponKit: ["Smith", "Edgewright"], ThornswoodRec
 yes("the three kits are named to the halves #1384 picked", Object.keys(KITS).every(function (e) {
   return OWNER[e] && OWNER[e].Owner === KITS[e][0] && OWNER[e].Half === KITS[e][1];
 }));
+
+// ---- the rebuild of 4 October: what the tables say now (#1622) ----------
+// Every row a Thornswood-Content.esp recipe makes, in recipes.json and in the
+// block, by editor id.
+function rowOf(edid) {
+  const k = Object.keys(recipes.recipes).filter(function (d) { return recipes.recipes[d].editorId === edid; })[0];
+  return k ? { desc: k, row: recipes.recipes[k], gate: BLOCK && BLOCK[k] } : null;
+}
+yes("the poles and the trap are in the block now, and the four lines after it are gone",
+  Object.keys(ids).every(function (e) { return BLOCK && BLOCK[ids[e]] && BLOCK[ids[e]].half === "Woodwright"; }) &&
+  !/^RECIPES_BY_ID\[/m.test(gm));
+
+// The kits at the halves and the rank docs/systems/durability.md gives them:
+// "All three are novice", with the bench in its table.
+const durability = read("docs/systems/durability.md");
+yes("the durability page says all three kits are novice", durability.indexOf("All three are novice.") >= 0);
+const KIT_BENCH = { ThornswoodRecipeWeaponKit: "CraftingSmithingForge", ThornswoodRecipeArmorKit: "CraftingSmithingForge",
+                    ThornswoodRecipeSewingKit: "CraftingTanningRack" };
+Object.keys(KITS).forEach(function (e) {
+  const r = rowOf(e);
+  yes(e + " is " + KITS[e].join("/") + " novice at the " + KIT_BENCH[e] + ", in recipes.json and in the block",
+    !!r && r.row.owner === KITS[e][0] && r.row.half === KITS[e][1] && r.row.rank === "novice" && r.row.benchName === KIT_BENCH[e] &&
+    r.row.fires === true && !!r.gate && r.gate.owner === KITS[e][0] && r.gate.half === KITS[e][1] && r.gate.rank === "novice");
+});
+
+// The four treatments of #1383 at the half and rank docs/systems/injury.md
+// gives them, in its table of what each asks for: "Tailor, Haberdasher, novice".
+const injury = read("docs/systems/injury.md");
+const TREAT = { "Bandage": "ThornswoodRecipeBandage", "Splint": "ThornswoodRecipeSplint",
+                "Poultice": "ThornswoodRecipePoultice", "Physicker's Remedy": "ThornswoodRecipeRemedy" };
+Object.keys(TREAT).forEach(function (name) {
+  const m = new RegExp("^\\| " + name.replace(/[.']/g, "\\$&") + " \\| [^|]+ \\| [^|]+ \\| (\\w+), (\\w+), (novice|advanced|expert|master) \\|$", "m").exec(injury);
+  const r = rowOf(TREAT[name]);
+  yes(name + " is " + (m ? m[1] + "/" + m[2] + " " + m[3] : "?") + " as the injury page says, in recipes.json and in the block",
+    !!m && !!r && r.row.owner === m[1] && r.row.half === m[2] && r.row.rank === m[3] && r.row.fires === true &&
+    !!r.gate && r.gate.owner === m[1] && r.gate.half === m[2] && r.gate.rank === m[3]);
+});
+
+// Patrick, 4 October, on #1622: "B, each college book staff at its spell's
+// rank". The college book is the mage school pages; each staff's spell is the
+// HasSpell its recipe carries.
+const bookRank = {};
+["destruction", "restoration", "alteration", "conjuration", "illusion"].forEach(function (school) {
+  read("docs/systems/professions/mage/" + school + ".md").split("\n").forEach(function (line) {
+    const m = /^\| ([^|]+?) \| (novice|advanced|expert|master) \| `([^`]+)` \|$/.exec(line);
+    if (m) { bookRank[m[3]] = { name: m[1], rank: m[2] }; }
+  });
+});
+const spellSrc = slice(gm, "var STAFF_SPELLS = {", "\n  };");
+let STAFF = null;
+try { STAFF = spellSrc ? new Function("return " + spellSrc.slice("var STAFF_SPELLS = ".length).replace(/;$/, ""))() : null; } catch (e) { STAFF = null; }
+const staves = Object.keys(recipes.recipes).filter(function (k) {
+  const r = recipes.recipes[k];
+  return r.owner === "Enchanter" && r.half === "Bladebinder";
+});
+const kept = staves.filter(function (k) { return recipes.recipes[k].book !== "cut"; });
+yes("the Bladebinder keeps thirteen staves out of 161 (" + kept.length + " of " + staves.length + ")", kept.length === 13 && staves.length === 161);
+const spellOf = function (k) {
+  const n = (recipes.recipes[k].needs || []).filter(function (x) { return x.function === 264; })[0];
+  return n ? n.ofDesc : null;
+};
+const offRank = kept.filter(function (k) {
+  const r = recipes.recipes[k], sp = spellOf(k), b = sp && bookRank[sp], named = RANK[r.editorId];
+  return !b || !named || named.Rank !== b.rank || r.rank !== b.rank || r.rankFrom !== "named outright in RECIPE_RANK" ||
+    !BLOCK || !BLOCK[k] || BLOCK[k].rank !== b.rank || !STAFF || !STAFF[sp] || STAFF[sp].rank !== b.rank;
+});
+offRank.forEach(function (k) { console.log("      not at its spell's rank: " + recipes.recipes[k].name); });
+yes("each of the thirteen is named in RECIPE_RANK at its spell's rank in the college book, and recipes.json, the block and STAFF_SPELLS agree",
+  kept.length === 13 && offRank.length === 0);
+const byRank = { novice: 0, advanced: 0, expert: 0, master: 0 };
+kept.forEach(function (k) { byRank[recipes.recipes[k].rank]++; });
+yes("so the book's staves sit novice 3, advanced 6, expert 4 (" + JSON.stringify(byRank) + ")",
+  byRank.novice === 3 && byRank.advanced === 6 && byRank.expert === 4 && byRank.master === 0);
+const namedStaves = Object.keys(RANK).filter(function (e) { return /^DLC2RecipeStaff/.test(e); });
+yes("RECIPE_RANK names no staff the Bladebinder page cuts", namedStaves.length === 13 &&
+  namedStaves.every(function (e) { const r = rowOf(e); return r && r.row.book !== "cut"; }));
+const cutStaves = staves.filter(function (k) { return recipes.recipes[k].book === "cut"; });
+yes("the 148 cut staves stay where their stone puts them, master by input cost",
+  cutStaves.length === 148 && cutStaves.every(function (k) {
+    const r = recipes.recipes[k];
+    return r.rank === "master" && r.rankFrom === "what its inputs cost a producer";
+  }));
+yes("no half needs the second rule or the one rung fill for the staves",
+  !recipes.halves["Enchanter/Bladebinder"].secondRule && !recipes.halves["Enchanter/Bladebinder"].movedOneRung &&
+  Object.keys(recipes.halves).every(function (h) { return !recipes.halves[h].secondRule; }));
+const unstand = (knob("HALVES_WITH_AN_UNSTANDABLE_RUNG") || {})["Enchanter/Bladebinder"] || "";
+yes("the Bladebinder's unstandable rung reason says master mining and the answer, and recipes.json carries it",
+  unstand.indexOf("which is master mining") >= 0 && unstand.indexOf("each college book staff at its spell's rank") >= 0 &&
+  recipes.halves["Enchanter/Bladebinder"].andThatIsAllowedBecause === unstand);
+yes("and nothing in the build or recipes.json still says the stone is advanced mining",
+  ps.indexOf("which Patrick made advanced mining") < 0 && JSON.stringify(recipes).indexOf("advanced mining") < 0);
 
 console.log(pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);
