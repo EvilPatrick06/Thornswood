@@ -67,8 +67,9 @@ namespace Thornswood
         /// <summary>
         /// The voice service behind Caddy, for a config whose VoiceUrl is
         /// empty or not https: a new install before its first update check,
-        /// or a feed that sends voiceUrl empty. The dev build adds -dev
-        /// (DevBuild.DevVoiceUrl).
+        /// or a feed that sends voiceUrl empty. The dev build adds -dev, the
+        /// same as DevBuild.DevVoiceUrl, written out here because several
+        /// harnesses compile this file without DevBuild.cs.
         /// </summary>
         public const string Voice = "https://thornswood.net/voice";
 
@@ -80,7 +81,7 @@ namespace Thornswood
             string u = VoiceUrl == null ? "" : VoiceUrl.Trim();
             while (u.EndsWith("/")) { u = u.Substring(0, u.Length - 1); }
             if (u.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) { return u; }
-            return IsDev ? DevBuild.DevVoiceUrl(Voice) : Voice;
+            return IsDev ? Voice + "-dev" : Voice;
         }
 
         /// <summary>

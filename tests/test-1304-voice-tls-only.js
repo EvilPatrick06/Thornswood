@@ -213,7 +213,7 @@ for (const list of Object.values(os.networkInterfaces())) {
   const conf = read('launcher/app/Config.cs');
   const vb = lift(conf.replace(/public string VoiceBase\(\)/, 'function VoiceBase()'), 'VoiceBase') || '';
   yes('Config.VoiceBase gives an https VoiceUrl, else the built-in address, never the raw port',
-      /StartsWith\("https:\/\/"/.test(vb) && /IsDev \? DevBuild\.DevVoiceUrl\(Voice\) : Voice/.test(vb) && !/"http:\/\/"/.test(vb) &&
+      /StartsWith\("https:\/\/"/.test(vb) && /IsDev \? Voice \+ "-dev" : Voice/.test(vb) && !/"http:\/\/"/.test(vb) &&
       /public const string Voice = "https:\/\/thornswood\.net\/voice";/.test(conf));
   yes('Config.VoiceSocket is always wss', /return "wss:\/\/" \+ VoiceBase\(\)\.Substring\(8\) \+ "\/";/.test(conf) && !/"ws:\/\/"/.test(conf));
   const vcs = read('launcher/app/Voice.cs');
