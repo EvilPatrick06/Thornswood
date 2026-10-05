@@ -176,6 +176,18 @@
   }
 
   /*
+    WHAT A BUTTON ASKS FOR, #1718. Each line is one piece (a key to one
+    house, a sword at its own condition, an enchanted dagger), and the
+    server numbers each piece for the trade, so a button sends '#' and that
+    number: the piece the line was drawn for, never the first one that has
+    its name. A server from before #1718 sends no number and is asked by
+    the name.
+  */
+  function ref(line) {
+    return line.p ? '#' + line.p : String(line.n);
+  }
+
+  /*
     A SALE OUT OF SKYRIM (#1393). When a company worker has pressed Buy for
     the company, both sides read what happens before they agree: the things
     leave Skyrim, and the gold is split as the server says.
@@ -247,15 +259,16 @@
         var rows = grouped[order[g]];
         for (var r = 0; r < rows.length; r++) {
           var it = rows[r];
-          var addKey = 'add:' + it.n;
+          var itRef = esc(ref(it));
+          var addKey = 'add:' + ref(it);
           ph += '<div class="line"><div class="top"><span class="nm">' + esc(it.n) + '</span>' +
                 '<span class="c">' + it.c + '</span></div><div class="acts">' +
-                '<input class="qty" data-side="add" data-for="' + esc(it.n) + '" placeholder="How many" value="' + esc(typed[addKey] || '') + '">' +
-                '<button data-qty="' + esc(it.n) + '">Add</button>' +
-                '<button data-add="' + esc(it.n) + '" data-n="1">Add 1</button>' +
-                (it.c >= 5 ? '<button data-add="' + esc(it.n) + '" data-n="5">Add 5</button>' : '') +
-                (it.c >= 10 ? '<button data-add="' + esc(it.n) + '" data-n="10">Add 10</button>' : '') +
-                (it.c > 1 ? '<button data-add="' + esc(it.n) + '" data-n="' + it.c + '">All</button>' : '') +
+                '<input class="qty" data-side="add" data-for="' + itRef + '" placeholder="How many" value="' + esc(typed[addKey] || '') + '">' +
+                '<button data-qty="' + itRef + '">Add</button>' +
+                '<button data-add="' + itRef + '" data-n="1">Add 1</button>' +
+                (it.c >= 5 ? '<button data-add="' + itRef + '" data-n="5">Add 5</button>' : '') +
+                (it.c >= 10 ? '<button data-add="' + itRef + '" data-n="10">Add 10</button>' : '') +
+                (it.c > 1 ? '<button data-add="' + itRef + '" data-n="' + it.c + '">All</button>' : '') +
                 '</div></div>';
         }
       }
@@ -268,13 +281,14 @@
     if (!(data.mine || []).length) { mh += '<div class="none">Nothing yet.</div>'; }
     for (var j = 0; j < (data.mine || []).length; j++) {
       var mineRow = data.mine[j];
-      var remKey = 'rem:' + mineRow.n;
+      var mineRef = esc(ref(mineRow));
+      var remKey = 'rem:' + ref(mineRow);
       mh += '<div class="line"><div class="top"><span class="nm">' + esc(mineRow.n) + '</span>' +
             '<span class="c">' + mineRow.c + '</span></div><div class="acts">' +
-            '<input class="qty" data-side="rem" data-for="' + esc(mineRow.n) + '" placeholder="How many" value="' + esc(typed[remKey] || '') + '">' +
-            '<button data-take="' + esc(mineRow.n) + '">Take</button>' +
-            (mineRow.c > 1 ? '<button data-rem="' + esc(mineRow.n) + '" data-n="1">Take 1</button>' : '') +
-            '<button data-rem="' + esc(mineRow.n) + '">Take back</button></div></div>';
+            '<input class="qty" data-side="rem" data-for="' + mineRef + '" placeholder="How many" value="' + esc(typed[remKey] || '') + '">' +
+            '<button data-take="' + mineRef + '">Take</button>' +
+            (mineRow.c > 1 ? '<button data-rem="' + mineRef + '" data-n="1">Take 1</button>' : '') +
+            '<button data-rem="' + mineRef + '">Take back</button></div></div>';
     }
     mh += '<div class="gold"><span>Gold</span>' +
           '<input id="' + ID + '-gold" value="' + (data.myGold || 0) + '">' +
