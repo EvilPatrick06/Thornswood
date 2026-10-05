@@ -33,6 +33,14 @@
       .\scripts\release\Publish-Server.ps1 -PutBack
   puts the newest back the same checked way (-Channel dev for the dev server).
 
+  THE JOIN PASS SWITCH (#1804). The installer refuses, before anything is
+  stopped, a server whose thornswoodRequirePass is neither true nor false,
+  because the gamemode reads that as on (#1319), and says so. A first
+  install always is such a server, since no build carries the switch (#1223).
+      .\scripts\release\Publish-Server.ps1 -RequirePass on
+  sets it on the server in that publish (off lets a session act until its
+  pass arrives); without it the running server keeps its own.
+
   It also writes a line into the launcher's News page and pushes it.
 
   A server change ships nothing. The gamemode runs on the VPS, so there is no
@@ -102,7 +110,12 @@ param(
       -SkipBuild zip made for that port; any other zip is refused as before.
     #>
     [ValidateRange(0, 65535)][int]$GamePort = 0,
-    [ValidateRange(0, 65535)][int]$ResourcesPort = 0
+    [ValidateRange(0, 65535)][int]$ResourcesPort = 0,
+    # thornswoodRequirePass for the server this publishes to, set there by the
+    # installer (#1804, see the header). Left off, the running server keeps
+    # its own, and one with neither true nor false is refused. Live goes on
+    # only when Patrick says Main.
+    [ValidateSet('', 'on', 'off')][string]$RequirePass = ''
 )
 if (-not $Record) { $Record = Join-Path $PSScriptRoot '..\..\records\server-build.json' }
 
@@ -132,6 +145,13 @@ if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
+
+# A put-back sets no setting: the installer puts the previous folder back
+# with the running server's own (#1804). Refused before anything is built,
+# sent or asked, the way Deploy-Server.ps1 refuses -PutBack with -RequirePass.
+if ($PutBack -and $RequirePass) {
+    Die '-PutBack sets no setting: it puts the previous server back with the running server''s own settings. Run it without -RequirePass, then a publish with it. Nothing was sent.'
+}
 
 $target = "$VpsUser@$VpsHost"
 # Host key checking on (issue #450): ssh talks only to the box whose key
@@ -452,6 +472,10 @@ Head 'Installing'
 # The zip's hash as it left here, for the installer to hold the copy up there to.
 $zipSum = (Get-FileHash -LiteralPath $Zip -Algorithm SHA256).Hash
 $instArgs = "-Zip C:\thornswood-server.zip -Root '$VpsRoot' -TaskName '$TaskName' -StartNow -ZipSha256 $zipSum -Wait $Wait"
+if ($RequirePass) {
+    Say "the installer sets the join pass hold $RequirePass, as asked" 'Yellow'
+    $instArgs += " -RequirePass $RequirePass"
+}
 if ($FreshWorld) {
     # Not deleted any more: the installer starts the new server with no world
     # and leaves the old one in the previous folder beside the root.
