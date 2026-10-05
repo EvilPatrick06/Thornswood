@@ -8,7 +8,7 @@
   One run that installs everything waiting, checks each piece actually landed,
   and publishes once at the end instead of once per mod.
 
-  Launched by "Run Everything.cmd" so it can be double clicked. Every step
+  Launched by Run-Everything.cmd so it can be double clicked. Every step
   runs with -NoShip, so the launcher gets built and the release goes out a
   single time, with one version bump and one news post.
 
