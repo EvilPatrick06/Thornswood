@@ -59,7 +59,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-origin-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -960,6 +960,37 @@ function cleanMode(v) {
   return MODES.indexOf(m) === -1 ? 'local' : m;
 }
 
+/*
+  WHAT A PAGE'S SIGNALLING MAY CARRY TO ANOTHER PAGE (#1350).
+
+  It used to be passed on as it came, with only from set here, so any field
+  a page added reached the other page, and an sdp message with no
+  description reached the handlers in thornswood-voice.js, voice-host.html
+  and voice.js, which read m.sdp.type and threw. Every page sends
+  { t: 'sdp', to, sdp: pc.localDescription } and
+  { t: 'ice', to, candidate: e.candidate }, which arrive as an offer or answer
+  ({ type, sdp }) and as RTCIceCandidate's own fields, and every page reads
+  only from, sdp and candidate. So that is what goes on, rebuilt here, and a
+  message that is not that shape goes nowhere. Who may signal whom stays the
+  room: every page builds a connection to everybody on the roster.
+*/
+const SDP_TYPES = ['offer', 'answer', 'pranswer'];
+function signal(msg) {
+  const to = Number(msg.to);
+  if (msg.t === 'sdp') {
+    const d = msg.sdp;
+    if (!d || typeof d !== 'object' || SDP_TYPES.indexOf(d.type) === -1 || typeof d.sdp !== 'string') return null;
+    return { t: 'sdp', to: to, sdp: { type: d.type, sdp: d.sdp } };
+  }
+  const c = msg.candidate;
+  if (!c || typeof c !== 'object' || typeof c.candidate !== 'string') return null;
+  const out = { candidate: c.candidate };
+  if (typeof c.sdpMid === 'string' || c.sdpMid === null) out.sdpMid = c.sdpMid;
+  if (Number.isInteger(c.sdpMLineIndex) || c.sdpMLineIndex === null) out.sdpMLineIndex = c.sdpMLineIndex;
+  if (typeof c.usernameFragment === 'string' || c.usernameFragment === null) out.usernameFragment = c.usernameFragment;
+  return { t: 'ice', to: to, candidate: out };
+}
+
 function roster() {
   const list = [];
   for (const [id, p] of peers) {
@@ -971,6 +1002,26 @@ function roster() {
 function announce() {
   const list = roster();
   for (const [, p] of peers) p.ws.sendLatest({ t: 'peers', peers: list });
+}
+
+/*
+  A NAME AS A PAGE SENT IT, CLEANED ONCE WHERE IT COMES IN (#1349).
+
+  It was kept as sent, cut to forty characters, and from here it goes out in
+  the roster and on chat lines other people's pages draw, beside each command
+  to the gamemode, and into the chat limit's log line. Measured on 5 October:
+  a name holding a line break and "[voice] REFUSED a join for profile 1"
+  printed a log line this service never wrote. No character name holds a
+  control character, a line or paragraph separator, or a mark that turns the
+  direction of the text round, so those go before the cap. The gamemode never
+  reads the name off a command (dispatch reads the text, the profile and the
+  proven and relay marks), so no name can change the command it rides with.
+*/
+function cleanName(v) {
+  return String(v == null ? '' : v)
+    .replace(/[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g, '')
+    .trim()
+    .slice(0, 40);
 }
 
 function onJoin(ws, msg) {
@@ -1000,7 +1051,7 @@ function onJoin(ws, msg) {
   }
 
   const id = nextPeer++;
-  const name = String(msg.name || '').slice(0, 40);
+  const name = cleanName(msg.name);
   peers.set(id, { ws, profileId, name, mode: cleanMode(msg.mode), proven: true,
                   chatTokens: CHAT_BURST, chatAt: Date.now(), chatSlowed: false });
 
@@ -1873,12 +1924,16 @@ server.on('upgrade', (req, socket, head) => {
     */
     if (msg.t === 'ping') { ws.send({ t: 'pong' }); return; }
 
-    // Signalling is passed through untouched. The server never inspects an
-    // offer or a candidate, it only decides who is allowed to hear it.
+    // Signalling is passed on as signalling and nothing else (#1350). The
+    // server never inspects what an offer or a candidate says, it only
+    // decides who is allowed to hear it; see signal for the shape.
     if (msg.t === 'sdp' || msg.t === 'ice') {
       const to = peers.get(Number(msg.to));
       if (!to) return;
-      to.ws.send(Object.assign({}, msg, { from: myId }));
+      const out = signal(msg);
+      if (!out) return;
+      out.from = myId;
+      to.ws.send(out);
       return;
     }
 
