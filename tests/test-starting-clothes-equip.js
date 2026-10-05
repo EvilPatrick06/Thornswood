@@ -1,46 +1,24 @@
 'use strict';
-const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-const gm=fs.readFileSync(path.join(__dirname,'../game/gamemode.js'),'utf8');
-const start=gm.indexOf('function wearScript() {'),end=gm.indexOf('\n}',start)+2;
-const script=new Function(gm.slice(start,end)+'; return wearScript();')();
-function fixture(failEquipCalls=0){
-  let now=1000,loaded=false,menu=false,race=1;const items=new Map(),worn=new Set(),equips=[];
-  const pc={is3DLoaded:()=>loaded,getItemCount:f=>items.get(f.id)||0,isEquipped:f=>worn.has(f.id),
-    getRace:()=>({getFormID:()=>race}),
-    equipItem(f){equips.push(f.id);if(equips.length>failEquipCalls)worn.add(f.id);},queueNiNodeUpdate(){}};
-  const ctx={value:{ids:[0x1be1a,0x1be1b],at:1000},state:{},sp:{Game:{getPlayer:()=>pc,getFormEx:id=>({id})},
-    Form:{from:f=>f},Actor:{from:f=>f},Ui:{isMenuOpen:()=>menu}}};
-  const sandbox={ctx,Date:{now:()=>now}};vm.createContext(sandbox);
-  return{ctx,equips,worn,items,tick(){now+=250;vm.runInContext(script,sandbox);},load(){loaded=true;},menu(value){menu=value;},race(value){race=value;worn.clear();}};
-}
-const delayed=fixture();delayed.tick();
-assert.equal(delayed.ctx.state.thornswoodWearAt,undefined,'do not consume the equip request before the body and inventory arrive');
-delayed.load();delayed.items.set(0x1be1a,1);delayed.tick();
-assert.deepEqual(delayed.equips,[0x1be1a],'equip only the requested item that has arrived');
-delayed.items.set(0x1be1b,1);delayed.tick();
-assert.deepEqual(delayed.equips,[0x1be1a,0x1be1b],'late boots are also equipped automatically');
-assert.equal(delayed.ctx.state.thornswoodWearAt,1000,'consume the request only after both pieces are equipped');
-delayed.worn.clear();delayed.tick();
-assert.equal(delayed.equips.length,2,'a completed request must respect later deliberate unequipping');
-const raceMenu=fixture();raceMenu.load();raceMenu.menu(true);
-raceMenu.items.set(0x1be1a,1);raceMenu.items.set(0x1be1b,1);raceMenu.tick();
-raceMenu.ctx.value.creation=true;raceMenu.tick();
-assert.equal(raceMenu.equips.length,2,'the outfit must be worn while the face menu is open');
-raceMenu.race(2);raceMenu.tick();
-assert.equal(raceMenu.equips.length,4,'a race change must automatically put the same owned clothes back on');
-const transient=fixture(6);transient.ctx.value.creation=true;transient.load();
-transient.items.set(0x1be1a,1);transient.items.set(0x1be1b,1);
-for(let i=0;i<40;i++)transient.tick();
-assert.equal(transient.worn.size,2,'creation must recover when the first three calls per item cannot equip');
-transient.worn.clear();for(let i=0;i<8;i++)transient.tick();
-assert.equal(transient.worn.size,2,'a same-race body reset must restore the original clothes');
-const expired=fixture();for(let i=0;i<85;i++)expired.tick();expired.load();expired.items.set(0x1be1a,1);expired.tick();
-assert.equal(expired.equips.length,0,'a stale request cannot dress somebody later');
+// A new character's creation stage is written before the shift goes in its
+// pack, so the clothes cannot make it look like a returning character on the
+// next creation tick.
+//
+// This harness used to drive the wear script (thornswoodWear), the owner
+// script that kept asking the client to equip the shift. That script was a
+// band-aid for an equipment record the server could not write, and it came out
+// when the engine gained the write and created() began to dress a new
+// character before the hand-over (#1560). Its checks went with it; that
+// dressing is held by test-dressed-at-creation.js. The order check below is
+// about beginAppearance and still holds.
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const gm=fs.readFileSync(path.join(__dirname,'../game/gamemode.js'),'utf8').split('\r').join('');
+assert.equal(gm.indexOf('function wearScript() {'),-1,'the wear script is gone (#1560)');
 const appearanceStart=gm.indexOf('function beginAppearance(actorId) {'),appearanceEnd=gm.indexOf('\n}',appearanceStart)+2;
+assert.ok(appearanceStart>=0,'beginAppearance is in the file');
 const actions=[];
 let savedStage;
 const begin=new Function('mp','faceMark','firstSeen','HALL','setChargen','log','tellOnce','sendToHall','giveShift','chargenOf',
   gm.slice(appearanceStart,appearanceEnd)+';return beginAppearance;')(
   {get:()=>null},()=>'',new Map(),{desc:'hall'},(id,state)=>{savedStage=state;actions.push('stage');},()=>{},()=>{},()=>false,()=>actions.push('clothes'),()=>savedStage);
-begin(1);assert.deepEqual(actions,['stage','clothes'],'persist the new creation stage, then dress before the face is chosen');
-console.log('PASS delayed starting clothes, race-menu deferral, single equip and stale request refusal');
+begin(1);assert.deepEqual(actions,['stage','clothes'],'persist the new creation stage, then put the shift in the pack');
+console.log('PASS creation stage persisted before the shift goes in the pack; no wear script left');

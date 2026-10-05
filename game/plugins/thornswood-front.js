@@ -589,63 +589,6 @@
 
 
   /*
-    ------------------------------------------------- putting the shift on
-
-    Patrick, twice, from playing it: "We keep spawning in with our clothes off
-    still".
-
-    THE SERVER CANNOT DRESS ANYBODY, and that is the whole of it. giveShift
-    pushes the two shift records into the pack with worn: true, and in the
-    engine the worn flag on an inventory entry and the equipment the client
-    actually wears are two different things. There is no 'equipment' property
-    binding for a gamemode at all: the client owns what is equipped and only
-    ever reports it upward. So the shift arrived in the pack and stayed there,
-    folded, and the person stood in the creation hall with nothing on.
-
-    So the only place this can be done is here.
-
-    THE TWO IDS ARE VANILLA AND THEY MUST MATCH CHARGEN.shift IN gamemode.js,
-    which is 1be1a and 1be1b out of Skyrim.esm. They are written here rather
-    than fetched because they are Bethesda's own records and cannot move, and
-    because a fetch that fails would leave somebody naked, which is the thing
-    being fixed. If the shift ever changes, both places change.
-
-    ONCE, AND ONLY WHAT IS NOT ALREADY WORN. Equipping something already worn
-    is how a person ends up dressed twice, and equipping every armour in the
-    pack would take somebody's own clothes off to put rags on. Each id is tried
-    once per session and never again.
-  */
-  const SHIFT_IDS = [0x1be1a, 0x1be1b];
-  let shiftDone = false;
-
-  function wearTheShift() {
-    if (shiftDone) { return; }
-    shiftDone = true;
-    let pc = null;
-    try { pc = sp.Game.getPlayer(); } catch (e) { return; }
-    if (!pc) { return; }
-    const ac = sp.Actor.from(pc);
-    if (!ac) { return; }
-
-    let put = 0;
-    for (let i = 0; i < SHIFT_IDS.length; i++) {
-      const id = SHIFT_IDS[i];
-      try {
-        const form = sp.Game.getFormEx(id);
-        if (!form) { continue; }
-        // Only what they are actually carrying, and only if it is not on.
-        if (pc.getItemCount(form) <= 0) { continue; }
-        if (ac.isEquipped(form)) { continue; }
-        ac.equipItem(form, false, true);   // not preventRemoval, silent
-        put++;
-      } catch (e) {
-        log('could not put on shift item ' + id.toString(16) + ': ' + e);
-      }
-    }
-    if (put) { log('put on ' + put + ' piece(s) of the shift'); }
-  }
-
-  /*
     ------------------------------------------- which race the body is (#614)
 
     Patrick via Smeagle: any clothes a Goblin or Riekling wears break on rejoin
@@ -8118,12 +8061,6 @@
       */
       try { globalThis.__thornswoodInWorld = true; } catch (e) { }
 
-      /*
-        AND PUT THE SHIFT ON. Here rather than on a tick, because this is the
-        moment the world is known to be up and calls into the game work, which
-        is the same reason the flag above is set here.
-      */
-      wearTheShift();
       // Cleared again on the way out, below. Nothing in the shipped client
       // bundle reads this today, so it costs nothing either way, but a flag
       // that is only ever set true is a flag that lies the moment anything

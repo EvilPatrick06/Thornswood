@@ -827,10 +827,14 @@ it in the meantime. A cause in the engine is fixed in the fork
 
 The band-aids already in the tree are defects, and each one goes on the
 board. Taking one out means finding the cause it covered and fixing that in
-the same pull request. Known on 4 Oct: the Riekling and Goblin clothes remount
-in `game\plugins\thornswood-front.js` (#614), and in `game\gamemode.js` the
-`dressIfBare` watch (#1604), the `wearWhatIsWorn` ask at login and the wear
-script's retries.
+the same pull request. The dress asks came out with their cause, an
+equipment record the server could not write (#1560): in `game\gamemode.js`
+the wear script's retries, the `wearWhatIsWorn` ask at login and the
+`dressIfBare` watch (#1604), and in `game\plugins\thornswood-front.js` the
+front putting the shift on by itself. The Riekling and Goblin clothes remount
+(#614) came out on 4 Oct (#1681) before its cause was found, decided by
+Patrick because it was taking clothes off at every door; the front plugin's
+race read is measuring that cause, and #614 stays open until it is fixed.
 
 A retry is allowed only where failing is outside our control and expected:
 a request over the network, a file another program has open. The reason is

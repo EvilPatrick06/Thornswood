@@ -147,11 +147,8 @@ function server(opts) {
       if (!ids[desc]) { ids[desc] = 0x1000 + Object.keys(ids).length; }
       return ids[desc];
     },
-    wearThese: function () { },
     closeRaceMenu: function () { },
     resolveArrival: function () { return null; },
-    wearWhatIsWorn: function () { return 0; },
-    dressIfBare: function () { return ''; },
     say: function (id, text) { S.said.push({ id: id, text: String(text), at: S.clock.now }); },
     notify: function (id, text) { S.notified.push({ id: id, text: String(text) }); },
     log: function () { S.logs.push(Array.prototype.slice.call(arguments).join(' ')); },

@@ -715,14 +715,6 @@ function ensureProperties() {
       updateOwner: swingScript(),
       updateNeighbor: '',
     });
-    // The clothes somebody has been handed, which nothing else can put on
-    // them. See the note over WEAR_PROPERTY.
-    mp.makeProperty(WEAR_PROPERTY, {
-      isVisibleByOwner: true,
-      isVisibleByNeighbors: false,
-      updateOwner: wearScript(),
-      updateNeighbor: '',
-    });
     // A plant picked by somebody who was then refused it. See PUTBACK_PROPERTY.
     mp.makeProperty(PUTBACK_PROPERTY, {
       isVisibleByOwner: true,
@@ -2403,33 +2395,6 @@ const DEPOSIT_SIZE = 20;
 const SWING_PROPERTY = 'thornswoodSwing';
 
 /*
-  ===================== PUT YOUR CLOTHES ON =================================
-
-  Patrick, 23 September, and it has been reported since the 21st: "Still
-  spawned in with no clothes on".
-
-  THE SERVER CANNOT DRESS ANYBODY, and that is the whole of it. giveShift
-  puts a Roughspun Tunic and Footwraps in the pack with worn set on the
-  INVENTORY entry, which is the only thing a gamemode can write: the
-  equipment record is a separate field and its property binding has a Get
-  and no Set. So the items arrive and nothing on the client ever equips
-  them. The client dresses itself from the EQUIPMENT record, which for a
-  new character is empty, so the character stands there in their skin with
-  a tunic in the pack.
-
-  That is one half of why clothes never changed the temperature either: the
-  equipment update the client sends is what fills the server's record, and a
-  client that was never asked to wear anything sends nothing to record.
-
-  So the server asks, the same way it asks for a swing: an updateOwner
-  script, edge triggered on a stamp through ctx.state, that equips the base
-  ids it is given. Silently and without preventing removal, so nothing here
-  can trap anything on anybody, and they can take it off the moment they
-  find something better.
-*/
-const WEAR_PROPERTY = 'thornswoodWear';
-
-/*
   ==================== PUT THAT PLANT BACK ================================
 
   Patrick, 23 September: "all of the harvestable ones correctly don't give
@@ -2492,130 +2457,13 @@ function putBack(actorId, refrId) {
   }, 4000);
 }
 
-function wearScript() {
-  return [
-    '(function(){',
-    '  try {',
-    '    var v = ctx.value;',
-    '    if (!v || !v.at || !v.ids || !v.ids.length) { return; }',
-    '    var st = ctx.state;',
-    '    if (!st) { return; }',
-    '    if (st.thornswoodWearAt === v.at && !v.creation) { return; }',
-    '    var now = Date.now();',
-    '    var pending = st.thornswoodWearPending;',
-    '    if (!pending || pending.at !== v.at) {',
-    '      pending = st.thornswoodWearPending = { at: v.at, until: now + 15000, next: 0, done: {}, tries: {} };',
-    '    }',
-    '    if (!v.creation && now >= pending.until) { st.thornswoodWearAt = v.at; return; }',
-    '    if (now < pending.next) { return; }',
-    '    pending.next = now + 250;',
-    '    var sp = ctx.sp;',
-    '    var pc = sp.Game.getPlayer();',
-    '    if (!pc || !pc.is3DLoaded()) { return; }',
-    '    if (!v.creation && sp.Ui.isMenuOpen("RaceSex Menu")) { return; }',
-    '    if (v.creation) {',
-    '      var race = pc.getRace();',
-    '      var raceId = race ? race.getFormID() : 0;',
-    '      if (raceId !== pending.race) { pending.race = raceId; pending.done = {}; pending.tries = {}; }',
-    '    }',
-    '    var complete = true, changed = false;',
-    '    for (var i = 0; i < v.ids.length; i++) {',
-    '      var id = v.ids[i];',
-    '      if (pending.done[id] && !v.creation) { continue; }',
-    '      try {',
-    '        var it = sp.Form.from(sp.Game.getFormEx(id));',
-    '        if (!it || pc.getItemCount(it) <= 0) { complete = false; continue; }',
-    '        if (pc.isEquipped(it)) { pending.done[id] = true; continue; }',
-    '        if (!v.creation && (pending.tries[id] || 0) >= 3) { complete = false; continue; }',
-    '        pending.tries[id] = (pending.tries[id] || 0) + 1;',
-    '        pc.equipItem(it, false, true);',
-    '        changed = true;',
-    '        if (pc.isEquipped(it)) { pending.done[id] = true; }',
-    '        else { complete = false; }',
-    '      } catch (e) { complete = false; }',
-    '    }',
-    '    if (complete) { st.thornswoodWearAt = v.at; }',
-    '    else if (v.creation) { pending.next = now + 1000; }',
-    '    try {',
-    '      var ac = sp.Actor.from(pc);',
-    '      if (changed && ac) { ac.queueNiNodeUpdate(); }',
-    '    } catch (e) { }',
-    '  } catch (e) { }',
-    '})();'
-  ].join('\n');
-}
-
 /*
-  PUT BACK ON WHATEVER THE SERVER BELIEVES IS WORN.
-
-  Dressing at creation is not enough, and that is its own entry on the list:
-  "You come back undressed from a session you left dressed". The server's
-  inventory keeps the worn flags across a session; the client rebuilds
-  itself from the equipment record, and anything that empties or misses that
-  record leaves somebody standing in their skin with a full pack.
-
-  So on arrival, every worn thing in the server's own inventory is sent back
-  as an ask. Somebody already wearing them is asked to equip what they are
-  already wearing, which the engine does nothing with, so the cost of being
-  wrong here is nothing at all.
-
-  ONLY WHAT THE SERVER ALREADY HAS. Nothing is granted and nothing is
-  invented: an item the server has no record of cannot be worn by this, the
-  same way it cannot be counted for warmth.
+  What the client actually has on, by base id, or null when it cannot be read.
+  The equipment record is what the owner's game reports it wears; the
+  embassy reads it to see Thalmor gear (#1390). Nothing here acts on it to
+  dress anybody: a new character is dressed once, by dressNewCharacter, and
+  after that what is worn is the person's own doing (#1560).
 */
-/*
-  ================== AND IT FIXES ITSELF WHERE YOU STAND =================
-
-  Patrick, 23 September, on being told to relog to see the clothes come
-  back: "this a shitty solutiuon it shopuld do it automatically". He is
-  right. Dressing somebody at the door only helps the person who walks
-  through it afterwards, and anybody already standing in the world in their
-  skin stays that way until they quit the game, which is a workaround
-  wearing a fix's clothes.
-
-  So the server watches instead. It can READ the equipment record even
-  though it cannot write one, so it can see the difference between what
-  somebody is wearing and what their pack says they are wearing, and that
-  difference is the whole bug.
-
-  ONLY WHEN THEY ARE WEARING NOTHING AT ALL, which is the line between
-  fixing this and fighting the person. Taking your boots off is a decision.
-  Standing in an inn with a full pack and no clothes on is not a decision
-  anybody made, and it is the only state this acts on: an empty equipment
-  record beside a pack that says something is worn.
-
-  NOTHING IS ASKED OF THE PERSON. There is no prompt and nothing appears on
-  screen: the server tells the client to equip what the pack already says is
-  worn, silently, and it is on. If you left your clothes on, your clothes
-  are on.
-
-  AND IT GIVES UP. Three goes, a quarter of a minute apart, and then it
-  stops for the session and says so once. A client that will not equip what
-  it is handed is a different fault, and a server that keeps at it forever
-  is a server nobody can read the log of.
-*/
-/*
-  ONCE, AND NOT AGAIN FOR TEN MINUTES.
-
-  This was three goes a quarter of a minute apart, and Patrick found what
-  that costs the moment the client would not take the clothes: "I heard the
-  noise of things equipping and the right hand side of my screen showed
-  things going into my inventory that already were". An equip ask the client
-  cannot satisfy is an ask that will not be satisfied by being repeated, and
-  repeating it is noise on somebody's screen while they are trying to play.
-
-  So it is one ask, and then nothing for ten minutes. The arrival ask is
-  still there for the case this exists for, and if the client genuinely
-  cannot equip what the server believes it is wearing, that is a different
-  fault and a quiet log line is the right way to find it rather than an
-  equip storm.
-*/
-const DRESS_EVERY = 600000;   // ten minutes between looks
-const DRESS_TRIES = 1;        // and one ask, then it stops for the session
-const dressAt = {};           // actorId -> when they were last asked
-const dressTried = {};        // actorId -> how many times
-
-/** What the client actually has on, by base id, or null when it cannot be read. */
 function wornNow(actorId) {
   let eq = null;
   try { eq = mp.get(actorId, 'equipment'); } catch (e) { return null; }
@@ -2627,78 +2475,6 @@ function wornNow(actorId) {
     if (e && e.worn && e.baseId) { out.push(e.baseId); }
   }
   return out;
-}
-
-/*
-  Somebody standing there with nothing on and clothes in the pack, put right.
-  Answers what it did, for the log.
-*/
-function dressIfBare(actorId) {
-  const now = Date.now();
-  if (dressAt[actorId] && now - dressAt[actorId] < DRESS_EVERY) { return ''; }
-  if ((dressTried[actorId] || 0) >= DRESS_TRIES) { return ''; }
-
-  const on = wornNow(actorId);
-  // Unreadable is not empty. A record that cannot be read is left alone.
-  if (on === null) { return ''; }
-  if (on.length) {
-    // Dressed. Whatever went wrong earlier is over, so the counter goes back.
-    delete dressTried[actorId];
-    return '';
-  }
-
-  dressAt[actorId] = now;
-  const put = wearWhatIsWorn(actorId);
-  if (!put) { return ''; }
-  dressTried[actorId] = (dressTried[actorId] || 0) + 1;
-  if (dressTried[actorId] >= DRESS_TRIES) {
-    return 'put ' + put + ' thing(s) back on for the last time this session; ' +
-           'the client is not taking them';
-  }
-  return 'wearing nothing with ' + put + ' worn thing(s) in the pack, put back on';
-}
-
-function wearWhatIsWorn(actorId) {
-  let inv = null;
-  try { inv = mp.get(actorId, 'inventory'); } catch (e) { return 0; }
-  const entries = (inv && inv.entries) || [];
-  const ids = [];
-  for (let i = 0; i < entries.length; i++) {
-    const e = entries[i];
-    if (e && e.worn && e.baseId) { ids.push(e.baseId); }
-  }
-  if (!ids.length) { return 0; }
-  wearThese(actorId, ids);
-  return ids.length;
-}
-
-/*
-  Ask somebody to put something on, and take the ask back afterwards.
-
-  Cleared for the same reason the swing is: a property left on a character is
-  stored, handed to the owner again at the next login, and played again by a
-  client that has never seen it. A stale one would re-dress somebody in
-  clothes they had deliberately taken off.
-*/
-function wearThese(actorId, baseIds) {
-  const ids = [];
-  for (let i = 0; i < (baseIds || []).length; i++) {
-    const id = Number(baseIds[i]) || 0;
-    if (id) { ids.push(id); }
-  }
-  if (!ids.length) { return; }
-  const request = { ids: ids, at: Date.now() };
-  const creation = chargenOf(actorId);
-  if (creation && creation.stage === 'appearance') { request.creation = true; }
-  try { mp.set(actorId, WEAR_PROPERTY, request); } catch (e) { return; }
-  setTimeout(function () {
-    try { if (mp.get(actorId, WEAR_PROPERTY).at !== request.at) { return; } } catch (e) { return; }
-    if (request.creation) {
-      const state = chargenOf(actorId);
-      if (state && state.stage === 'appearance') { return; }
-    }
-    try { mp.set(actorId, WEAR_PROPERTY, { ids: [], at: 0 }); } catch (e) { }
-  }, 16000);
 }
 
 /*
@@ -4289,9 +4065,9 @@ function townsForPanel() {
 }
 
 /**
- * The shift is supplied at the beginning of appearance creation and reused
- * when choosing a home. The owner script waits for the body and owned items
- * before equipping, including while the face menu is open.
+ * The shift goes in the pack at the beginning of appearance creation, and is
+ * topped up if it went missing by the time a home is chosen. What is worn is
+ * the equipment record, written once by dressNewCharacter below (#1560).
  */
 function giveShift(actorId) {
   let inv = { entries: [] };
@@ -4304,35 +4080,20 @@ function giveShift(actorId) {
     let have = false;
     for (const e of entries) { if (e.baseId === baseId) { have = true; break; } }
     if (have) { continue; }
+    // Worn on the entry too, so the pack and the record say the same thing at
+    // the moment a character is made: the client builds the creation save it
+    // loads from the pack, and the record is what it dresses from after that
+    // (#1560).
     entries.push({ baseId: baseId, count: pair[1], worn: true });
     added++;
   }
   if (added) { mp.set(actorId, 'inventory', { entries: entries }); }
 
   /*
-    AND PUT IT ON, which nothing has ever done.
-
-    The worn flag above is on the inventory entry, and the client dresses
-    itself out of the equipment record, which is a different field the
-    gamemode cannot write. So the shift arrived in the pack and stayed there,
-    which is "I came in with no clothes on" as reported on 21 and 23
-    September. Asked for whether anything was added or not: somebody who
-    already had the shift in their pack and was not wearing it is the same
-    person with the same problem.
-  */
-  const toWear = [];
-  for (const pair of SHIFT) {
-    const baseId = idOf(pair[0]);
-    if (baseId) { toWear.push(baseId); }
-  }
-  wearThese(actorId, toWear);
-
-  /*
     SAID OUT LOUD, because "people are not loading in with their clothes on"
     was reported on 21 September and nothing anywhere could answer it.
 
-    This is the only thing that dresses anybody, and it ran silently, so there
-    was no way to tell apart: the shift was never handed over, the shift was
+    This ran silently, so there was no way to tell apart: the shift was never handed over, the shift was
     handed over and something took it off afterwards, or the shift is in the
     pack and the client is not wearing it. Three different faults, one symptom,
     no evidence.
@@ -4347,6 +4108,47 @@ function giveShift(actorId) {
   log('chargen', actorId.toString(16), 'shift:', added, 'handed over,',
       (SHIFT.length - added), 'already there,', entries.length,
       'thing(s) in the pack,', wearing, 'worn');
+}
+
+/*
+  ============== DRESSED FROM THE MOMENT THE CHARACTER IS MADE ==============
+
+  Patrick, 4 October: "my clothes should just stay on from the moment someone
+  creates a new character until they take them off", and "as soon as they
+  click the new character button in the main menu clothes and gear and gold".
+
+  What a character wears is the engine's equipment record, and the client
+  dresses the character it owns from that record. Until #1560 the server could
+  read it and not write it, so creation put the shift in the pack marked worn,
+  the record stayed empty, and four things grew up to make the client wear it
+  anyway: an owner script that kept equipping for fifteen seconds, an ask at
+  every login, a watch that asked again when it saw somebody wearing nothing
+  (#1604), and the front plugin putting the shift on by itself. The ask at
+  login also put back on clothes somebody had taken off. All four are gone.
+
+  Now the server writes the record, once, when the character is made. The
+  engine's spawn calls created() below before it hands the new character to
+  the person who made it, and that is the one moment the server may write it:
+  the engine refuses the write for a character somebody's game owns, because
+  from then on that game is where things go on and come off, and it reports
+  every change. So the first packet their game gets already has the shift in
+  the pack and on the body and the purse in the pack, and nothing afterwards
+  has to ask for anything.
+
+  Every entry is worn and in the pack, because the engine refuses anything
+  else: this dresses a character in what it has and never hands it anything.
+  The class's tool comes when the class is picked, later in creation, because
+  it is not known before then.
+*/
+function dressNewCharacter(actorId) {
+  const worn = [];
+  for (const pair of SHIFT) {
+    const baseId = idOf(pair[0]);
+    if (baseId) { worn.push({ baseId: baseId, count: pair[1], worn: true }); }
+  }
+  if (!worn.length) { return 0; }
+  mp.set(actorId, 'equipment', { inv: { entries: worn } });
+  return worn.length;
 }
 
 /**
@@ -4477,6 +4279,22 @@ globalThis.__thornswoodChargen = {
     if (!CHARGEN_ENABLED || chargenOf(actorId)) { return; }
     firstSeen.set(actorId, Date.now());
     beginAppearance(actorId);
+    // Packed, paid and dressed before the engine hands the character over
+    // (#1560). See the note over dressNewCharacter. The purse goes in before
+    // the record is written, so the pack is whole when the record names what
+    // in it is worn. The purse cannot make a new character read as a returning
+    // one: the stage is already persisted above, and gold does not count in
+    // that decision (see chargenTick). The tick's purse loop finds it marked.
+    const spoils = globalThis.__thornswoodSpoils;
+    if (spoils && spoils.purse) {
+      try { spoils.purse(actorId); } catch (e) { /* said in the spoils log */ }
+    }
+    try {
+      log('chargen', actorId.toString(16), 'dressed in', dressNewCharacter(actorId),
+          'thing(s) before it was handed over');
+    } catch (e) {
+      log('chargen', actorId.toString(16), 'could not be dressed:', e);
+    }
   },
   towns: townsForPanel,
   hasTown: function (key) { return !!TOWN_BY_KEY[String(key || '').toLowerCase()]; },
@@ -4988,24 +4806,6 @@ function chargenTick() {
       }
 
       /*
-        AND PUT THEIR CLOTHES BACK ON. See wearWhatIsWorn: the pack survives
-        a session and the equipment record does not always, which is how
-        somebody comes back from an evening fully packed and undressed.
-        Said in the log with a count, because "nobody is wearing anything"
-        and "the server thinks nobody is wearing anything" are different
-        faults and this is the line that tells them apart.
-
-        This is the ask at the door. The watch that notices somebody already
-        standing there undressed is dressIfBare, below, on the same tick.
-      */
-      try {
-        const put = wearWhatIsWorn(actorId);
-        log('login', actorId.toString(16), 'put', put, 'worn thing(s) back on');
-      } catch (e) {
-        log('login', actorId.toString(16), 'could not put the clothes back on:', e);
-      }
-
-      /*
         AND THE K PANEL'S VIEW, WORKED OUT NOW (#1642), so a Rush, a Font of
         Magic or restoration strain that ran into a restart is not on them
         once they are back. See arrival() in the character block. Last, so
@@ -5018,23 +4818,6 @@ function chargenTick() {
         log('login', actorId.toString(16), 'could not send the panel worked out now:', e);
       }
     }
-    /*
-      NOBODY STANDS ABOUT UNDRESSED WAITING FOR A DOOR.
-
-      The block above puts somebody's clothes back on as they arrive. This
-      one is for anybody already in the world with nothing on, who would
-      otherwise stay that way until they quit the game. Nothing is asked of
-      the person and nothing appears on their screen: the server tells their
-      client to equip what their own pack says they are wearing, and it
-      happens.
-
-      dressIfBare does nothing at all unless somebody is wearing NOTHING,
-      and gives up after three goes. See the note over it.
-    */
-    try {
-      const said = dressIfBare(actorId);
-      if (said) { log('dress', actorId.toString(16), said); }
-    } catch (e) { }
 
     if (now - firstSeen.get(actorId) < SETTLE_MS) {
       continue;
