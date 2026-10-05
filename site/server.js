@@ -1871,6 +1871,61 @@ const setCookie = (req, name, value, days) =>
   '; HttpOnly; SameSite=Lax' + (secureHere(req) ? '; Secure' : '');
 
 /*
+  A request that changes something comes from a page of this site, or from
+  something that is not a browser at all (#1367).
+
+  The sign in cookies are SameSite=Lax, and until this that attribute was all
+  that stood between another site and every write here. Lax keeps the cookies
+  off a POST, PUT or DELETE that another site starts, in a browser that knows
+  the attribute. A browser too old to know it sends them, and every route
+  reads its body as JSON whatever the Content-Type says, so a plain form with
+  enctype="text/plain" on any page could send a signed in admin to
+  /api/staff/pk with a body that parses. Lax also counts every name under
+  thornswood.net as the same site, so a page on any other name under it would
+  carry the cookies as well.
+
+  So anything but GET (a HEAD is a GET by the time this is asked) is held to
+  where it came from. A browser names the page that sent it in Origin on every
+  such request, and an old one that leaves Origin off still sends Referer.
+  Either naming another origin is refused, and Origin "null" is another origin
+  (a sandboxed frame, a page that turned the referrer off). With neither, it
+  is the launcher, a game server, the bot or the voice service: none of them
+  holds a sign in cookie, and each proves itself another way (a ticket, the
+  bot's key). A request with neither that does carry one of the sign in
+  cookies is a browser with both taken off, and is refused too.
+
+  This site's origin is the one the request was sent to, read the way the
+  Discord callback builds its redirect address (origin above). A page on
+  another site cannot make a browser send this site's Origin, so it cannot
+  match.
+
+  GET changes nothing here that a page elsewhere can choose: /auth/discord
+  starts a sign in tied to this browser, its callback finishes only the
+  attempt this browser began (ATTEMPT below), and /api/signins drops rows
+  past their age. tests/test-1367-cross-site.js holds every write route to
+  this.
+
+  Answers '' when the request may go on, or which of the three it failed:
+  'origin', 'referer', or 'neither' (a sign in cookie and no page named).
+*/
+function crossSite(req) {
+  if (req.method === 'GET') return '';
+  const own = origin(req).toLowerCase();
+  const said = req.headers.origin;
+  if (said !== undefined) {
+    return String(said).toLowerCase() === own ? '' : 'origin';
+  }
+  const ref = req.headers.referer;
+  if (ref !== undefined) {
+    let from = '';
+    try { from = new URL(String(ref)).origin.toLowerCase(); } catch (e) { from = ''; }
+    return from === own ? '' : 'referer';
+  }
+  const c = cookies(req);
+  return (c[COOKIE] || c[ADMIN]) ? 'neither' : '';
+}
+
+/*
   One Discord sign in attempt, tied to the browser that started it. Entry 248.
 
   The OAuth state was the same string for every attempt that asked for the
@@ -3752,6 +3807,19 @@ async function handle(req, res) {
     const retry = publicApiWait(req, Date.now());
     if (retry) return send(res, 429, JSON.stringify({error:'Too many requests. Try again shortly.'}),
       'application/json; charset=utf-8', {'Retry-After':String(retry)});
+  }
+
+  // Nothing is changed for a page on another site (#1367, crossSite above).
+  // Asked before anything else is, Discord included, so a refused request
+  // costs nothing and every route below it is covered.
+  const foreign = crossSite(req);
+  if (foreign) {
+    const named = String(req.headers.origin || req.headers.referer || 'no page named');
+    console.log('[thornswood-docs] refused a ' + req.method + ' to ' + route.slice(0, 80) +
+                ' from another site (' + foreign + ': ' + named.replace(/[^\x20-\x7e]/g, '?').slice(0, 120) + ')');
+    return sendJson(res, 403, { ok: false, why: 'cross-site', error: foreign === 'neither'
+      ? 'Your browser did not say which page sent that, so it was not done. Do it from a page on this site, in a browser that says so.'
+      : 'That was sent from a page on another site, so it was not done. Do it from a page on this site.' });
   }
 
   // A page load (GET, HEAD was made GET above) waits SUBMIT_WAIT_MS and may
