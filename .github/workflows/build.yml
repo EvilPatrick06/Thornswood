@@ -379,6 +379,7 @@ jobs:
                  'test-1033-pulse-cost.js',
                  'test-1157-session-ends.js',
                  'test-1180-own-plugins.js',
+                 'test-1885-manifest-order.js',
                  'test-1075-script-citations.js',
                  'test-table-install.js',
                  'test-secrets-fail-closed.js',
