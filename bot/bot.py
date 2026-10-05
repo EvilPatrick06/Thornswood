@@ -1958,9 +1958,10 @@ async def ensure_hold_panel(guild):
 # WHO MAY START ONE. Owner, Dev and Lead Gamemaster, which is wider than
 # Owner and Dev and narrower than STAFF: a Moderator alone does not start,
 # reset, refresh or report on a session. Roles were deleted and renamed in
-# the cleanup, so these are matched by name against whatever the server
-# carries today, and LIVE_SMOKE_ADMIN_ROLES in bot.env.json moves them
-# without a deploy. No snowflake is written down anywhere here.
+# the cleanup, so LIVE_SMOKE_ADMIN_ROLES in bot.env.json carries them, as
+# role ids (preferred, since an id survives a rename) or names, matched the
+# way STAFF_ROLES is (#1355). The defaults are names, so no snowflake is
+# written down anywhere here.
 #
 # The default is in this file and not read out of the export, so content that
 # moves when Cynthia refreshes the Live set can never widen who may start a
@@ -1972,10 +1973,10 @@ LIVE_SMOKE_CHANNEL = [n.strip().lower() for n in
                       os.environ.get('LIVE_SMOKE_CHANNEL', 'test-tasks').split(',')
                       if n.strip()]
 # Lead Gamemaster and Lead GM are both here because the role has been written
-# both ways and the scrub is not finished. Matching is by name and ignores
-# case, the way STAFF_ROLES already works, so the order is only what a refusal
-# names first: Lead Gamemaster, which is the canonical spelling the export
-# carries, and Lead GM after it as the alias.
+# both ways and the scrub is not finished. A name matches ignoring case and a
+# digit token matches the role id, the way STAFF_ROLES works, so the order is
+# only what a refusal names first: Lead Gamemaster, which is the canonical
+# spelling the export carries, and Lead GM after it as the alias.
 LIVE_SMOKE_ADMIN_NAMES = [r.strip() for r in
                           os.environ.get('LIVE_SMOKE_ADMIN_ROLES',
                                          'Owner,Dev,Lead Gamemaster,Lead GM').split(',')
