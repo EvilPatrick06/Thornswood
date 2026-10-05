@@ -89,6 +89,19 @@ again. When it says the build is not the recorded one and you did not change
 the engine, the fork is not at the pinned commit; when you did, run
 `New-ClientBuildRecord.ps1` and put the record in your pull request.
 
+How many projects it compiles at once (issue #1203). The fork compiles every
+C++ project with `/MP`, one compiler per core, and a bare `/m` started one
+project per core on top of that: on 29 September a build with 7.5 GB free on
+22 cores failed in every `skyrim_platform` source with C3859 and C1076,
+nothing wrong with the code. So `Build-Engine.ps1` and `Build-Server.ps1` give
+MSBuild `/m:N /p:CL_MPCount=2`: two compilers in each project, and N from the
+memory free when the build starts, 4 GB to each project, never more compilers
+than cores (`scripts\release\EngineJobs.ps1` says how the numbers were
+measured). `-Jobs N` on either script sets N by hand. A compile that runs the
+machine out of memory anyway (C3859, C1076, C1060, LNK1102) stops saying so,
+with the line to run again with fewer at once, instead of pointing at the
+first error.
+
 A fork in a folder whose path has an `&` in it (every worktree under
 `C:\ThornswoodTemps&Worktrees`, for one) builds too (issue #1025). vcpkg sets
 itself up through `bootstrap-vcpkg.bat`, and cmd.exe cuts a path at a bare
@@ -170,6 +183,9 @@ which is why the move to `engine\skymp` needed this configure again.
   so the bundle is always written again; esbuild writes the same bytes for the
   same sources (issue #1214). Everything else builds as a dependency; the
   client is not built here.
+- Compiles as many projects at once as the memory free allows, two
+  compilers each, or `-Jobs N` of them, the same as `Build-Engine.ps1`
+  (issue #1203).
 - Lists every server file that came out, with its hash, and says which changed.
 - Without `-NoRecord` it runs `New-ServerBuildRecord.ps1` on the build and the
   fork it just built. With it, `records\server-build.json` is left alone, and

@@ -54,15 +54,19 @@ $runAst = [System.Management.Automation.Language.Parser]::ParseInput($text, [ref
         param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Run' }, $true)
 Yes 'it has a Run function' ($null -ne $runAst)
 if ($runAst) {
-    $runOk = & ([scriptblock]::Create($runAst.Extent.Text + '; Run cmd /c "echo printed & echo also 1>&2"')) 6>$null
+    # Run notes out of memory errors with EngineJobs.ps1, which the script
+    # dot-sources (#1203; tests\test-1203-engine-jobs.ps1 holds that half).
+    $withJobs = ". '" + (Join-Path $root 'scripts\release\EngineJobs.ps1') + "'; " + $runAst.Extent.Text
+    $runOk = & ([scriptblock]::Create($withJobs + '; Run cmd /c "echo printed & echo also 1>&2"')) 6>$null
     Yes 'Run returns 0, and only 0, for a tool that prints and succeeds' ((@($runOk).Count -eq 1) -and ($runOk -eq 0))
-    $runBad = & ([scriptblock]::Create($runAst.Extent.Text + '; Run cmd /c "echo printed & exit 3"')) 6>$null
+    $runBad = & ([scriptblock]::Create($withJobs + '; Run cmd /c "echo printed & exit 3"')) 6>$null
     Yes 'Run returns 3, and only 3, for a tool that prints and fails with 3' ((@($runBad).Count -eq 1) -and ($runBad -eq 3))
 }
 # A bare -- in a call to Run is eaten by PowerShell, so cmake got /m as its
-# own argument and refused it. The build line quotes it.
+# own argument and refused it. The build line quotes it, and what follows is
+# the bounded /m:N of #1203.
 $buildLine = @($text -split "`n" | Where-Object { $_ -match '^\s*\$code = Run \$cmake --build' })
-Yes 'the build passes -- through to MSBuild quoted' ($buildLine.Count -eq 1 -and $buildLine[0] -match "'--' /m")
+Yes 'the build passes -- through to MSBuild quoted' ($buildLine.Count -eq 1 -and $buildLine[0] -match "'--' @jobArgs")
 
 # Against the fork, when it is checked out here.
 $cm = Join-Path $root 'engine\skymp\CMakeLists.txt'
