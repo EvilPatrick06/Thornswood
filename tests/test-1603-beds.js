@@ -67,7 +67,9 @@ function liftFrom(src, first, indent) {
 const propBlock = slice('// ==== thornswood property ====', '// ==== end thornswood property ====');
 const needsA = '// ==== thornswood needs: hunger, thirst and exhaustion ====';
 const needsBlock = slice(needsA, '// ==== end thornswood needs ====');
-const restBranch = slice("      if (word === '/rest') {\n", "\n      }\n");
+// The whole /rest branch of handle() since #1631 took /needs, /eat, /drink
+// and /bard out of it: /rest is the only word it answers now.
+const restBranch = slice("    if (word === '/rest') {\n", "\n    }\n");
 const charBlock = slice('// ==== thornswood character ====', '// ==== end thornswood character ====');
 const socialBlock = slice('// ==== thornswood social', '// ==== end thornswood social ====');
 yes('the property, needs, character and social blocks and the /rest branch are in the gamemode',
@@ -326,7 +328,7 @@ function heard(s) { every.push(s); return s; }
 function rest(p, word) {
   const out = [];
   const run = new Function('globalThis', 'needs', 'parts', 'actorId', 'profileId', 'toProfile',
-    'var word = "/rest";\n' + restBranch + '\nreturn false;');
+    'var word = "/rest";\nfunction needCharacter() { return true; }\n' + restBranch + '\nreturn false;');
   inDir(function () {
     run(box, needs, ['/rest'].concat(word ? [word] : []), p.a, p.pid, function (pid, m) { out.push(m); });
   });

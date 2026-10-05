@@ -37,26 +37,31 @@ and the person cannot lift it.
 
 ## Bard
 
-`/bard` in a cell. For 5 minutes, anyone resting in that cell recovers
-rest faster: +25 on top of the place, if the bard is still the one
-who said it and the 5 minutes have not gone. The places themselves
-are on [Exhaustion](exhaustion.md). Sit 20, campfire 35, inn 50, bed
-80, per real hour, and the bard adds 25 to whichever of those is
-running.
+Play the lute, the flute or the drum on the [emote wheel](emotes.md),
+with that instrument in your pack, or Sing on the wheel, which needs
+nothing. While you play, and for 5 minutes after, anyone resting in
+that cell recovers rest faster: +25 on top of the place, while you
+are still in the cell. The places themselves are on
+[Exhaustion](exhaustion.md). A seat 20, a seat by a fire 35, a bed
+you may use 50, your own bed 80, per real hour, and the bard adds 25
+to whichever of those is running. Patrick, 4 Oct: "instrument emotes
+require the instrument, so if they do an emote with an instrument
+have that count as /bard, and also add a singing emote for people
+that are only singing".
 
-Bard is not a profession. The lute, flute, and drum on the
-[emote wheel](emotes.md) are animations. They do not count as `/bard`
-unless you also say the word. `/bard` stays in the box. It does not
-float.
+Bard is not a profession. Nothing is typed. The server sees the
+playing: the last animation the game sent for you, and the
+instrument in your pack.
 
 ## Where this is
 
 The systems in the table are in the server, with the gaps named at
 the bottom of each page. A faction or a business is the group book
-on J. `/bard` for 5 minutes is in the server.
+on J. The bard, from the wheel's lute, flute, drum and Sing, is in the
+server.
 The party cap of 6 is in the server. A friend request, a party
 invite, and a trade offer are answered on the prompt. The wheel's
-eight quick slots, the search, and the fifty nine emotes are in the
+eight quick slots, the search, and the sixty emotes are in the
 server. Plain speech in the box is local on the dev voice service,
 same cell, about 57 metres. Left unset, a plain line still goes to
 everybody, which is how the live voice service is left. Text mute,

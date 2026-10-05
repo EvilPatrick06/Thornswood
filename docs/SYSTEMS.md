@@ -32,11 +32,13 @@ of these:
   just opened, cuts a key at a forge and claims a farm at a crop;
 - the prompt that answers an offer with Accept and Refuse, and the P
   panel of friends and the party;
-- a panel: K for the profession, the class and the skill tree, J for
-  journals, group books and every town's notice board, the notice
-  board itself, the trade window, a trader's wares;
+- a panel: K for the profession, the class, the skill tree and the
+  body, J for journals, group books and every town's notice board, the
+  notice board itself, the trade window, a trader's wares;
 - activating the thing itself in the world: E on a board, a driver or
-  a trader, lying down in a bed.
+  a trader, lying down in a bed, sitting on a seat;
+- the emote wheel: Sit is a seat on the ground, and a lute, a flute,
+  a drum or Sing is the bard.
 
 Staff and dev commands stay commands: moderation (`/kick`,
 `/silence`, `/ban` and the rest), and the testers' `/tp`, `/give`

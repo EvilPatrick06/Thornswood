@@ -229,7 +229,7 @@ privilege.
 
 | Name | What that means |
 |---|---|
-| **Bard** | Play and perform; rest music is `/bard`, not a class ability |
+| **Bard** | Play and perform; a lute, flute or drum played from the emote wheel, or Sing there, helps people resting nearby, and is not a class ability |
 | **Merchant** | Trade and keep shop in character |
 | **Priest** | Faith and rites in character |
 | **Scholar** | Study and lore in character |

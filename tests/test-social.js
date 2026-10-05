@@ -546,7 +546,7 @@ if (social && trade) {
 // Run the property's real updateOwner script and the real command branch.
 if (social && trade) {
   const a = src.indexOf("    if (word === '/friend' || word === '/party' || word === '/mute' ||");
-  const b = src.indexOf("    if (word === '/needs' || word === '/rest'", a);
+  const b = src.indexOf("    if (word === '/rest') {", a);
   const commands = src.slice(a, b);
   function command(w, actor, text) {
     const parts = text.split(/\s+/);

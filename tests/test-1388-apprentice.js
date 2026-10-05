@@ -51,7 +51,7 @@ const RULES = between('// ==== thornswood progression ====', '// ==== end thorns
 const CHARACTER = between('// ==== thornswood character ====', '// ==== end thornswood character ====');
 const SOCIAL = between('// ==== thornswood social:', '// ==== end thornswood social ====');
 const SOCIAL_CMDS = between("    if (word === '/friend' || word === '/party' || word === '/mute' ||",
-                            "    if (word === '/needs' || word === '/rest'");
+                            "    if (word === '/rest') {");
 const GATE_PARTS = [
   take('function craftAnswer(actorId, row) {'),
   take('function raceGate(actorId, row) {'),
@@ -450,7 +450,7 @@ yes('C8: an offer that no longer holds when it is answered writes nothing, and t
   const PW = pwords ? new Function('return ' + pwords[1])() : [];
   // #1634: the look prompt and K send it, and nobody is told to type it.
   yes('D1: the server answers /apprentice, and it is not in the list named to everybody (#1634)',
-      W.indexOf('/apprentice') !== -1 && PW.length > 10 && PW.indexOf('/apprentice') === -1);
+      W.indexOf('/apprentice') !== -1 && PW.indexOf('/helpme') !== -1 && PW.indexOf('/apprentice') === -1);
   const h = between("      if (topic === 'work' || topic === 'trade' || topic === 'class') {", '        return;');
   yes('D1: /help work says a Master takes you on from the prompt and K lists it, and names no /apprentice (#1634)',
       !!h && !/\/apprentice/.test(h) && /presses the key the prompt names/.test(h) && /K lists who took you on/.test(h));

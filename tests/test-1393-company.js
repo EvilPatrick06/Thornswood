@@ -65,7 +65,7 @@ const SOCIAL = slice(gm, '// ==== thornswood social:', '// ==== end thornswood s
 const TRADE = slice(gm, '// ==== thornswood trade ====', '// ==== end thornswood trade ====');
 const YES_BRANCH = (function () {
   const a = gm.indexOf("    if (word === '/friend' || word === '/party' || word === '/mute' ||");
-  const b = a < 0 ? -1 : gm.indexOf("    if (word === '/needs' || word === '/rest'", a);
+  const b = a < 0 ? -1 : gm.indexOf("    if (word === '/rest') {", a);
   return (a < 0 || b < 0) ? null : gm.slice(a, b);
 })();
 yes('the property, social and trade blocks and the /yes branch are in the gamemode',

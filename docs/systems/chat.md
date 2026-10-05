@@ -46,10 +46,10 @@ What floats:
 - `/w` or `/whisper`, for people inside the whisper reach.
 - `/s`, `/shout`, `/y`, or `/yell`, for people inside the shout reach.
 
-What does not float: every other command. `/bard`, and
-the rest stay in the box. `/bard` still pays
-the rest on [People beside you](people.md). A lyric above the head
-is a plain line or a `/me`.
+What does not float: every other command. Those stay in the box. A
+bard plays from the [emote wheel](emotes.md), which is what pays the
+rest on [People beside you](people.md). A lyric above the head is a
+plain line or a `/me`.
 
 A friend request, a party invite, and a trade offer are not answered
 in the box. A prompt appears with Accept and Refuse. See

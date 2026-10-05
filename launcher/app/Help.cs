@@ -144,7 +144,7 @@ namespace Thornswood
 
             // ====================================================== emotes
             new HelpItem("Emotes", "The wheel",
-                "G opens a wheel of 59 emotes. Eight quick slots sit in the middle: click one, or press 1 to 8 with the wheel shut. The rest of the list is on the right, in alphabetical order, with a search. Tab moves to that search. The middle stands you up, and Escape closes the wheel. Everybody else sees what you play."),
+                "G opens a wheel of 60 emotes. Eight quick slots sit in the middle: click one, or press 1 to 8 with the wheel shut. The rest of the list is on the right, in alphabetical order, with a search. Tab moves to that search. The middle stands you up, and Escape closes the wheel. Everybody else sees what you play."),
 
             new HelpItem("Emotes", "Getting out of one",
                 "Some have no natural end, particularly the kneeling and leaning ones. N stands you up out of whatever you are stuck in, with the wheel shut. With the wheel open, the middle of it stands you up as well."),
@@ -172,7 +172,7 @@ namespace Thornswood
             // The needs run on the server. tools\test-sunhelm-gone.js checks
             // every bar, command and source of warmth here against the gamemode.
             new HelpItem("In game", "You will get hungry, thirsty and cold",
-                "Eat, drink, rest and stay warm. Cold bites hardest in the north, up high and at night. A fire warms you and standing in one burns you, a roof keeps the weather off, and what you wear counts: fur is the warmest thing there is and metal the worst. The four bars in the bottom left corner are Hunger, Thirst, Rest and Temp, and /needs gives the numbers. /eat and /drink when you have something. Sit down or lie down and the rest counts by itself: a seat by a fire beats a bare one, a bedroll by a fire beats both, and your own bed is best. A bed in somebody else's building counts when they let you sleep there or you carry its key."),
+                "Eat, drink, rest and stay warm. Cold bites hardest in the north, up high and at night. A fire warms you and standing in one burns you, a roof keeps the weather off, and what you wear counts: fur is the warmest thing there is and metal the worst. The four bars in the bottom left corner are Hunger, Thirst, Rest and Temp, and the Body page on K says what is behind them. Eat or drink something from your pack. Sit down or lie down and the rest counts by itself, on a seat, on the ground with Sit on the emote wheel, or in a bed: a seat by a fire beats a bare one, a bedroll by a fire beats both, and your own bed is best. A bed in somebody else's building counts when they let you sleep there or you carry its key. A lute, flute or drum played from the wheel, with it in your pack, or Sing there, helps everybody resting in the same place."),
 
             new HelpItem("In game", "When you die",
                 "You wake at the temple of the hold you died in. A hold with no temple of its own sends you to the nearest temple or Hall of the Dead, and anywhere on Solstheim sends you to Raven Rock."),
