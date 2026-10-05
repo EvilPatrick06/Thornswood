@@ -319,6 +319,7 @@ jobs:
                  'test-1627-board-panel.js',
                  'test-1595-deliver.js',
                  'test-1303-voice-auth.js',
+                 'test-voice-reconnect.js',
                  'test-1398-fuel.js',
                  'test-1398-weaver.js',
                  'test-1622-recipe-generator.js',

@@ -361,13 +361,17 @@ site for this account's character names and keeps them in memory.
 a WebView2 window that is never shown, loading `voice-host.html`. At start it
 writes `WebView2Loader.dll` and `voice-host.html` beside the exe and keeps the
 browser's data in `Profile\VoiceBrowser`. It talks to the game through small
-files in both `Game\Data\Platform` and Profile (`voice-token.txt`,
-`voice-status.txt`, and push to talk and `voice-muted.txt` written by the
-game, the second passed on to the voice page by
-`Voice.cs:1111 PassMuted()`). `Voice.cs:915 Reconfigure()` tells it which
-character is being played. The join token is only asked for over https,
-because the request carries the Discord ticket; with a voice address that is
-not https there is no token. With no WebView2 runtime on the machine,
+files in both `Game\Data\Platform` and Profile (`voice-status.txt`, and push
+to talk and `voice-muted.txt` written by the game, the second passed on to the
+voice page by `Voice.cs:1116 PassMuted()`). `Voice.cs:922 Reconfigure()` tells
+it which character is being played. A join token opens one connection and is
+good for two minutes (#1322), so nothing keeps one: the voice page asks for a
+token before every try (`PageToken()`), and the game's chat asks by writing
+`voice-token-ask.txt`, which `PassTokenAsk()` answers by writing a token for
+that character to `voice-token.txt`. Both files are emptied when the file
+channel starts. The join token is only asked for over https, because the
+request carries the Discord ticket; with a voice address that is not https
+there is no token. With no WebView2 runtime on the machine,
 `Voice.cs:445 Bootstrap()` downloads Microsoft's installer and runs it only
 when `Signature.MicrosoftRefusal` says Microsoft signed it (#1330).
 
@@ -596,7 +600,7 @@ box.
 | `Chars.cs:918 EnsureSpare` | Mints the spare id for New character when there is none. | `Profile\Characters\profiles.txt` |
 | `Chars.cs:935 AutoJoin.SetChooseAtMenu` | `AutoJoin.cs:295 SetChooseAtMenu()`: the id played last and `chooseAtMenu` inside `gameData`, read back, and a throw if the file does not say what was written. | `skymp5-client-settings.txt` |
 | `Chars.cs:937 WriteBrowserBackend` | Which in-game browser SkyrimPlatform uses (its log level and text window are Enforce's, step 15). Edited, never rewritten, and only when a value changes. | `Game\Data\SKSE\Plugins\SkyrimPlatform.ini` |
-| `Chars.cs:944 Voice.Reconfigure` | Voice fetches a token for that id, when the voice address is https. | `voice-token.txt` in `Game\Data\Platform` and Profile |
+| `Chars.cs:944 Voice.Reconfigure` | Voice fetches a token for that id for its page, when the voice address is https. The game's chat asks for its own (`voice-token-ask.txt`). | |
 | `Chars.cs:966 TidySlots` | Only on the site's own answer about how many slots this account has. | `profiles.txt` when a slot moves |
 | `Chars.cs:968 WriteCharacters` | Names from the site's roster, then the list the menu draws. Throws when it cannot be written. | `Game\Data\Platform\thornswood-characters.json`, `Game\Data\Platform\UI\thornswood-characters.js` |
 | `Chars.cs:972 ChoiceFile` | Last session's choice and forget files deleted, so neither is read as this session's. | |
@@ -608,11 +612,11 @@ Written or rewritten, when anything needed changing:
 - `Profile`: `door.txt`, `Characters\profiles.txt`, `Characters\saves`,
   `MyGames\Saves` (a junction), `MyGames\SkyrimPrefs.ini`, `Parked\` and
   `parked.txt`, `swap.json`, `logs-pending.txt`, `played.flag`, `stats.txt`,
-  `voice-token.txt`, `launcher.log`, and with a local server `server.pid` and
+  `launcher.log`, and with a local server `server.pid` and
   `server.log`.
 - `Game\Data\Platform`: `Plugins\skymp5-client-settings.txt`, any kept file
   put back, `thornswood-session.txt`, `thornswood-characters.json`,
-  `UI\thornswood-characters.js`, `voice-token.txt`.
+  `UI\thornswood-characters.js`.
 - `Game\Data\SKSE\Plugins`: `SkyrimPlatform.ini`,
   `SSEDisplayTweaks.ini`, `SkyrimSoulsRE.ini`, `OpenAnimationReplacer.ini`,
   `Thornswood.ini`.

@@ -1344,10 +1344,8 @@ function spendToken(raw, now) {
   if (tok.minted < STARTED_AT) return { why: 'a token from before this service started', profileId: tok.profileId };
   for (const [n, s] of spent) { if (now > s.until) spent.delete(n); }
   const was = spent.get(tok.nonce);
-  if (was) {
-    return { why: 'a token another connection already used, at ' + new Date(was.at).toISOString() +
-                  ', so it was copied', profileId: tok.profileId, copied: true };
-  }
+  // When it was first used is for the log, not for whoever presented it now.
+  if (was) return { why: 'a token that was already used', profileId: tok.profileId, copiedAt: was.at };
   spent.set(tok.nonce, { until: tok.minted + TOKEN_LIFETIME_MS, profileId: tok.profileId, at: now });
   return { profileId: tok.profileId };
 }
@@ -1820,7 +1818,8 @@ server.on('upgrade', (req, socket, head) => {
   if (!pass.profileId || pass.why) {
     // The profile only when the token named one, and never the token itself.
     console.log('[voice] REFUSED a connection' + (pass.profileId ? ' for profile ' + pass.profileId : '') +
-                ': ' + pass.why + (pass.copied ? '. A token opens one connection (#1322).' : ''));
+                ': ' + pass.why + (pass.copiedAt ? ', by another connection at ' + new Date(pass.copiedAt).toISOString() +
+                ', so it was copied. A token opens one connection (#1322).' : ''));
     refuseUpgrade(socket, pass.why);
     return;
   }

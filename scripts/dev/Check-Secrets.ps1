@@ -79,9 +79,11 @@ $ContentRules = @(
     # The key that signs in to the VPS, or any other private key.
     @{ Name = 'private-key';       Rx = '-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----' },
     # A voice join token, the shape signToken in voice\voice-server.js
-    # makes: v1.<profile id>.<expiry in ms>.<43 character signature>. This is
-    # what nine published packs carried in voice-token.txt.
-    @{ Name = 'voice-join-token';  Rx = '(?<![A-Za-z0-9_.-])v1\.[0-9]{1,12}\.[0-9]{12,14}\.[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])' },
+    # makes: v2.<profile id>.<minted, ms>.<22 character nonce>.<43 character
+    # signature> since #1322, and before it v1.<profile id>.<expiry in
+    # ms>.<43 character signature>, which is what nine published packs
+    # carried in voice-token.txt.
+    @{ Name = 'voice-join-token';  Rx = '(?<![A-Za-z0-9_.-])(?:v1\.[0-9]{1,12}\.[0-9]{12,14}\.[A-Za-z0-9_-]{43}|v2\.[0-9]{1,12}\.[0-9]{12,14}\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43})(?![A-Za-z0-9_-])' },
     @{ Name = 'aws-access-key';    Rx = '(?<![A-Z0-9])(?:AKIA|ASIA)[A-Z0-9]{16}(?![A-Z0-9])' },
     @{ Name = 'slack-token';       Rx = '(?<![A-Za-z0-9])xox[abposr]-[A-Za-z0-9-]{10,}' },
     @{ Name = 'google-api-key';    Rx = '(?<![A-Za-z0-9_-])AIza[0-9A-Za-z_-]{35}(?![A-Za-z0-9_-])' }

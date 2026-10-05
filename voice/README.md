@@ -39,9 +39,16 @@ and 4000 units, a number sets the units, and /me, /do, /w and /s work),
 unset: how many said lines one connection gets out at once, and how often it
 earns another; slash lines are never counted) and `THORNSWOOD_SITE`, the
 site `/token` asks whether a Discord ticket owns the profile it wants a join
-token for. A join that cannot prove itself with a token is refused, and
-`/token` mints one only when the site says yes: with the site unset, down or
-answering anything else, it answers 503 and mints nothing (#1303, #1315).
+token for. A connection that cannot prove itself with a token is refused,
+and `/token` mints one only when the site says yes: with the site unset, down
+or answering anything else, it answers 503 and mints nothing (#1303, #1315).
+The token goes with the WebSocket handshake, as the protocol offered after
+`thornswood`, and a handshake without one is answered 403 before it is a
+socket (#1337). A token opens that one connection and no other and is good
+for two minutes (`THORNSWOOD_TOKEN_SECONDS`, 120 when unset), so the
+launcher's voice page and the game's chat each ask the launcher for a fresh
+one whenever they connect; a token presented twice is refused and written
+down as copied (#1322).
 `THORNSWOOD_VOICE_AUTH`, which once let unproven joins in, is not read any
 more. `/health`
 reports

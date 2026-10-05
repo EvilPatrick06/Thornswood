@@ -250,7 +250,8 @@ try {
     # --------------------------------------------- 7. #977 voice channel
     $voice = Read 'launcher\app\Voice.cs'
     $fc = [regex]::Match($voice, '(?s)static void StartFileChannel\(Action<string> log\)(.*?)\n        \}')
-    Yes '#977 the file channel waits on ChannelWait, not a 100 ms sleep' ($fc.Success -and $fc.Groups[1].Value -match 'new ChannelWait\(dirs, "voice-ptt\.txt", "voice-muted\.txt"\)' -and $fc.Groups[1].Value -notmatch 'Thread\.Sleep\(100\)')
+    # voice-token-ask.txt joined the two in #1322: the game asking for a join token.
+    Yes '#977 the file channel waits on ChannelWait, not a 100 ms sleep' ($fc.Success -and $fc.Groups[1].Value -match 'new ChannelWait\(dirs, "voice-ptt\.txt", "voice-muted\.txt", "voice-token-ask\.txt"\)' -and $fc.Groups[1].Value -notmatch 'Thread\.Sleep\(100\)')
     Yes '#977 the slow tick rewrites voice-status.txt only when a copy is missing or wrong' ($fc.Success -and $fc.Groups[1].Value -match 'RepublishIfLost\(\);' -and $fc.Groups[1].Value -notmatch 'lastStatusLine = "";\s*// On the same slow tick')
 
     $chan = Join-Path $tmp 'Channel'

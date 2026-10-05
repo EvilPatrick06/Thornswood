@@ -521,8 +521,8 @@ yes('dispatch() hands "/afk <word>" to the idle block, with no character needed'
   const box = { window: win, console: console, JSON: JSON, Number: Number, String: String, Math: Math, Date: Date,
                 setTimeout: function (fn) { timers.push(fn); return timers.length; },
                 setInterval: function () { return 0; }, clearTimeout: function () { },
-                WebSocket: function () {
-                  const me = this; me.readyState = 1; me.out = []; sockets.push(me);
+                WebSocket: function (url, protocols) {
+                  const me = this; me.readyState = 1; me.out = []; me.protocols = protocols || []; sockets.push(me);
                   me.send = function (s) { me.out.push(JSON.parse(s)); };
                   me.close = function () { me.readyState = 3; if (me.onclose) { me.onclose(); } };
                 } };
@@ -546,7 +546,9 @@ yes('dispatch() hands "/afk <word>" to the idle block, with no character needed'
   if (second) {
     second.onopen();
     const join = second.out.filter(function (m) { return m.t === 'join'; })[0];
-    yes('as that character, with that character own token', join && join.profileId === 5151 && join.token === 'v1.5151.10.z');
+    // The token goes with the handshake since #1337, not in the join.
+    yes('as that character, with that character own token', join && join.profileId === 5151 &&
+        second.protocols[0] === 'thornswood' && second.protocols[1] === 'v1.5151.10.z');
   }
 })();
 

@@ -591,11 +591,13 @@ namespace Thornswood
         /// the site whether that ticket owns this profile and signs the answer,
         /// and the page sends what comes back instead of a bare number.
         ///
-        /// Empty on any failure, deliberately. While the service is set to log
-        /// rather than refuse, a token that could not be fetched means voice
-        /// still works and a line lands in the service log. When it is set to
-        /// refuse, this is the difference between voice and no voice, and the
-        /// person needs to be told which, so the caller says so.
+        /// Empty on any failure, deliberately. The service refuses a
+        /// connection without one (#1303, #1337), so this is the difference
+        /// between voice and no voice, and the caller says which.
+        ///
+        /// One token opens one connection and is good for two minutes
+        /// (#1322), so this is called for each connection, just before it
+        /// opens: PageToken for the voice page, PassTokenAsk for the game.
         /// </remarks>
         static string FetchToken(string host, string port, long profile, Action<string> log)
         {
@@ -619,11 +621,10 @@ namespace Thornswood
             // whenever VoiceUrl is empty: a new install until its first
             // update check has filled it in, and the rollback the feed can
             // order by sending voiceUrl empty. Both posted the ticket here in
-            // the clear. No token means an unproven join, which the service
-            // lets through while THORNSWOOD_VOICE_AUTH is log and refuses
-            // when it is on. A failed fetch is retried by the renewal five minutes later, so
-            // a session that started before the update check gets its token
-            // once the feed has filled the https address in.
+            // the clear. No token means no connection: the service refuses it
+            // (#1303). The page asks again before its next try, so a session
+            // that started before the update check gets its token once the
+            // feed has filled the https address in.
             if (!url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             {
                 if (log != null) log("Voice: no join token, because the voice address is not https and the Discord ticket only goes over https. Voice may be refused.");
@@ -697,89 +698,102 @@ namespace Thornswood
         }
 
         /*
-          When the join token was last fetched, and what it was for.
-
-          A token expires; the host, port and profile it was fetched for do not.
-          Configure() returns early when those three are unchanged, which is
-          almost always, so without this the token was minted once when the
-          voice page loaded and never again. The first real join after shipping
-          was refused as expired for exactly that reason.
+          Who the voice page's tokens are for: the host, port and profile of
+          the last config sent. Written when a config goes out and read when
+          the page asks for a token, on different threads, hence the lock.
         */
-        static DateTime tokenGot = DateTime.MinValue;
         static string tokenHost = "";
         static string tokenPort = "";
         static long tokenProfile = 0;
-
-        /// <summary>
-        /// Fetch a fresh join token and hand it to both ends, if the last one
-        /// is old enough to be worth replacing.
-        /// </summary>
-        /// <remarks>
-        /// Renewed at half its life rather than at the end of it, so a token is
-        /// never nearly expired when somebody needs it. The service issues them
-        /// for an hour, so this is every thirty minutes, and it costs one small
-        /// request to a service already on the other end of the voice socket.
-        ///
-        /// Quiet on failure. The old token is still in the file and is still
-        /// good for another half hour, which is far better than clearing it.
-        /// </remarks>
-        static void RenewToken()
-        {
-            RenewToken(false);
-        }
-
-        /*
-          The token fields are read and written from three threads now: the
-          file channel's tick, the config sent when the page loads, and a
-          refusal passed up by the page. One at a time, and a caller that finds
-          another already fetching goes away rather than queueing a second
-          request behind it.
-        */
         static readonly object tokenLock = new object();
-        static DateTime forcedAt = DateTime.MinValue;
 
         /// <summary>
-        /// As above, or at once when the voice service has just refused the
-        /// page's token (force), at most every thirty seconds.
+        /// A join token for the voice page, which is about to connect.
         /// </summary>
         /// <remarks>
-        /// Issue #409. On 21 September the machine woke at 20:06 with a token
-        /// from 19:02, an hour old and expired. The tick tried to renew it at
-        /// once, while the Wi-Fi was still coming back, failed, and dated
-        /// itself five minutes on, so for five minutes the page offered the
-        /// dead token every two seconds and was refused 134 times. A refusal
-        /// is now what asks for the new token, and the page waits for it.
+        /// Issue #1322. A token opens one connection and is good for two
+        /// minutes, so the page asks for one before every try instead of
+        /// keeping one. The renewal every half hour and the fetch after a
+        /// refusal (#409) went with the hour long token they kept alive. The
+        /// page always gets an answer, an empty token and why when the fetch
+        /// failed, so it never waits on one that is not coming, and its own
+        /// backoff decides when to ask again.
         /// </remarks>
-        static void RenewToken(bool force)
+        static void PageToken()
         {
-            if (!Monitor.TryEnter(tokenLock)) return;
+            string token = "";
+            string why = "";
             try
             {
-                if (tokenProfile <= 0 || tokenHost.Length == 0) return;
-                if (force)
-                {
-                    if ((DateTime.UtcNow - forcedAt).TotalSeconds < 30) return;
-                    forcedAt = DateTime.UtcNow;
-                }
+                string host, port;
+                long profile;
+                lock (tokenLock) { host = tokenHost; port = tokenPort; profile = tokenProfile; }
+                if (profile <= 0 || host.Length == 0) { why = "no character yet"; }
                 else
                 {
-                    if (tokenGot == DateTime.MinValue) return;
-                    if ((DateTime.UtcNow - tokenGot).TotalMinutes < 30) return;
+                    token = FetchToken(host, port, profile, Quiet);
+                    if (token.Length == 0) { why = "the launcher could not get one, launcher.log says why"; }
                 }
-
-                string fresh = FetchToken(tokenHost, tokenPort, tokenProfile, null);
-                if (fresh.Length == 0)
-                {
-                    // Try again on the next pass rather than every 100ms.
-                    tokenGot = DateTime.UtcNow.AddMinutes(-25);
-                    return;
-                }
-                tokenGot = DateTime.UtcNow;
-                try { WriteChannel("voice-token.txt", fresh); } catch (Exception ex) { Swallow.Note("Voice.RenewToken, write channel", ex); }
-                Post("{\"t\":\"token\",\"token\":\"" + JsonEscape(fresh) + "\"}");
-                Say("Voice: join token renewed");
             }
-            finally { Monitor.Exit(tokenLock); }
+            finally
+            {
+                Post("{\"t\":\"token\",\"token\":\"" + JsonEscape(token) + "\",\"why\":\"" + JsonEscape(why) + "\"}");
+            }
+        }
+
+        /// <summary>
+        /// A join token for the game, which asked for one by writing
+        /// voice-token-ask.txt, "&lt;profile id&gt; &lt;stamp&gt;", and reads it
+        /// back out of voice-token.txt.
+        /// </summary>
+        /// <remarks>
+        /// Issue #1322. The game's chat holds its own connection to the voice
+        /// service and has no Discord ticket. It used to be handed this
+        /// launcher's own hour long token in voice-token.txt and present it on
+        /// every reconnect. Now it asks, through the folder push to talk
+        /// already uses, at the moment it is about to connect. The profile is
+        /// the game's word, and that is enough: the service asks the site
+        /// whether this Discord account owns it, so asking for somebody else's
+        /// gets nothing. Fetched off the channel's thread, because the fetch
+        /// can take seconds and push to talk cannot wait behind it. A failed
+        /// fetch writes nothing; the game asks again on its own next try.
+        /// </remarks>
+        static volatile string askSeen;
+
+        static void PassTokenAsk(string[] dirs)
+        {
+            string now = null;
+            foreach (string d in dirs)
+            {
+                string f = Path.Combine(d, "voice-token-ask.txt");
+                if (!File.Exists(f)) continue;
+                try { now = File.ReadAllText(f).Trim(); }
+                catch { now = null; readAgain = true; }   // mid-write, try again in 100ms
+                if (now != null) break;
+            }
+            if (string.IsNullOrEmpty(now) || now == askSeen) return;
+            askSeen = now;
+
+            long profile = 0;
+            Match m = Regex.Match(now, "^([0-9]+)");
+            if (m.Success) { long.TryParse(m.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out profile); }
+            if (profile <= 0)
+            {
+                Quiet("Voice: the game asked for a join token without saying for whom");
+                return;
+            }
+            string host = conf == null ? "" : conf.ServerAddress;
+            string port = conf == null ? "" : conf.VoicePort;
+            if (string.IsNullOrEmpty(port)) port = "7778";
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                try
+                {
+                    string token = FetchToken(host, port, profile, Quiet);
+                    if (token.Length > 0) { WriteChannel("voice-token.txt", token); }
+                }
+                catch (Exception ex) { Swallow.Note("Voice.PassTokenAsk", ex); }
+            });
         }
 
         // The last config the page was given, as host, port and profile.
@@ -853,26 +867,19 @@ namespace Thornswood
             string token = FetchToken(host, port, profile, Say);
             if (seq != Thread.VolatileRead(ref configSeq)) return;
 
-            // What the renewal fetches for, whether or not this fetch worked.
-            // These used to move only on success, so a config for a new id
-            // whose first fetch failed left the renewal minting tokens for the
-            // previous id, and voice-token.txt with them. A failed fetch is
-            // dated so the renewal tries again in five minutes rather than
-            // thirty.
+            // Who the page's next tokens are for, whether or not this fetch
+            // worked. These used to move only on success, so a config for a
+            // new id whose first fetch failed went on minting for the
+            // previous id.
             lock (tokenLock)
             {
                 tokenHost = host;
                 tokenPort = port;
                 tokenProfile = profile;
-                tokenGot = token.Length > 0 ? DateTime.UtcNow : DateTime.UtcNow.AddMinutes(-25);
             }
 
-            // The game's overlay joins the same room on its own socket and holds
-            // no ticket, so it reads the token out of the folder the two already
-            // share for push to talk. Short lived on purpose: five minutes, for
-            // one profile, and worth nothing to anybody who is not already on
-            // this machine as this person.
-            try { WriteChannel("voice-token.txt", token); } catch (Exception ex) { Swallow.Note("Voice.Configure, write token", ex); }
+            // This token is the page's alone (#1322). The game's chat asks for
+            // its own when it connects: PassTokenAsk.
 
             // base and socket are what the page should use. host and port stay on
             // the message so an older page, or one that has not been rebuilt,
@@ -932,15 +939,13 @@ namespace Thornswood
 
             if (kind == "debug") { Quiet("Voice: " + text); return; }
 
-            // The service refused the page's token. A fresh one, now and off
-            // this thread, which the page waits for before trying again. The
-            // page says what happened on the status line; this is the file.
-            if (kind == "denied")
+            // The page is about to connect and needs a token of its own
+            // (#1322). Fetched off this thread, and always answered.
+            if (kind == "token")
             {
-                Quiet("Voice: the voice server refused the join token (" + text + "), fetching a fresh one");
                 ThreadPool.QueueUserWorkItem(delegate
                 {
-                    try { RenewToken(true); } catch (Exception ex) { Swallow.Note("Voice.OnPageMessage, renew", ex); }
+                    try { PageToken(); } catch (Exception ex) { Swallow.Note("Voice.OnPageMessage, token", ex); }
                 });
                 return;
             }
@@ -1142,13 +1147,17 @@ namespace Thornswood
                 // Clear anything left behind by the last session, or a key held
                 // down when the game was closed would be read back as held.
                 WriteChannel("voice-ptt.txt", "0 local");
+                // And the game's last token and ask: the token is spent or past
+                // its two minutes, and the ask was for a game that has gone.
+                WriteChannel("voice-token.txt", "");
+                WriteChannel("voice-token-ask.txt", "");
 
                 lastStatusLine = "";
                 PublishStatus();
 
                 // Woken by the game writing push to talk or the mute list,
                 // not by a 100 ms poll (#977). See ChannelWait.
-                ChannelWait wake = new ChannelWait(dirs, "voice-ptt.txt", "voice-muted.txt");
+                ChannelWait wake = new ChannelWait(dirs, "voice-ptt.txt", "voice-muted.txt", "voice-token-ask.txt");
                 Say("Voice: talking to the game through " + string.Join(" and ", dirs) +
                     (wake.Watching ? ", woken when the game writes" : ", read every " + ChannelWait.Poll + " ms"));
 
@@ -1177,14 +1186,13 @@ namespace Thornswood
                         {
                             republished = DateTime.UtcNow;
                             RepublishIfLost();
-                            // On the same slow tick, not on every wake.
-                            RenewToken();
                         }
                         PublishStatus();
 
                         // Before push to talk, whose unchanged line ends the
                         // pass with a continue.
                         PassMuted(dirs);
+                        PassTokenAsk(dirs);
 
                         // The game folder copy is read first: it is the one a
                         // plugin on a collection install can write.

@@ -490,11 +490,10 @@
 
     Fetched by the launcher, which is the only thing here holding a Discord
     ticket, and left in the same folder it already uses for the push to talk
-    state. Read at every injection rather than once, because a token is good
-    for five minutes and this page can be rebuilt later in a session.
+    state: the last one it minted for this game, or nothing.
 
-    Empty is not an error to report here. The service decides what to do
-    with a join it cannot check, and says so in its own log.
+    Empty is not an error to report here. The service refuses a handshake
+    without one, and says so in its own log.
   */
   function joinToken() {
     for (const d of ['Data/Platform/', '../Profile/']) {
@@ -502,6 +501,31 @@
       if (raw) { return raw; }
     }
     return '';
+  }
+  // v2.<profile>.<minted>.<nonce>.<mac>: whose a token is, or 0.
+  function tokenProfile(tok) { return Number(String(tok || '').split('.')[1]) || 0; }
+
+  /*
+    ASKING FOR ONE (#1322). A token opens one connection and is good for two
+    minutes, so nothing here keeps one. When the chat is about to connect and
+    has none it says 'token? <profile>', and this writes the ask into
+    voice-token-ask.txt, "<profile> <time>", in the two folders the voice
+    plugin uses for push to talk, so every ask is a change the launcher's
+    watch on that folder wakes for. The launcher mints a token for that
+    character and writes it to voice-token.txt, and the tick hands it to the
+    chat (tokenWant, below; lineTick at the menu).
+  */
+  let tokenWant = 0;           // the profile an ask is out for, 0 for none
+  function askToken(id) {
+    id = Number(id) || 0;
+    if (id <= 0) { return; }
+    tokenWant = id;
+    let wrote = false;
+    for (const d of ['Data/Platform/', '../Profile/']) {
+      try { require('fs').writeFileSync(d + 'voice-token-ask.txt', id + ' ' + Date.now() + '\n'); wrote = true; }
+      catch (e) { }
+    }
+    if (!wrote) { log('could not write voice-token-ask.txt, so the launcher was not asked for a join token'); }
   }
   // Whose session this is. From the settings file until 20 September; now the
   // settings hold the last one played and the real answer comes from the main
@@ -1132,6 +1156,13 @@
   let lineToken = '';
   let lineTokenAt = 0;
   let lineToldLauncher = false;
+  let lineAskedAt = 0;
+  /* How often the line asks the launcher for this character's token again
+     while it has none. The launcher's fetch is a request over the network,
+     and one that fails writes nothing, so the ask is repeated rather than
+     waited on for ever; the page already says the line waits for the
+     launcher (#1322). */
+  const LINE_TOKEN_ASK_MS = 15000;
 
   /* The page picked. A seat, or the line. */
   function lineWant(id) {
@@ -1175,7 +1206,7 @@
     lineId = id;
     lineSince = Date.now();
     lineTickAt = 0; lineSaidAt = 0; lineStayAt = 0; linePassAt = 0;
-    linePassSent = ''; lineToken = ''; lineTokenAt = 0; lineToldLauncher = false;
+    linePassSent = ''; lineToken = ''; lineTokenAt = 0; lineToldLauncher = false; lineAskedAt = 0;
     PROFILE = id;
     try { require('fs').writeFileSync(CHOICE_FILE, id + ' ' + Date.now() + '\n'); }
     catch (e) { log('menu: could not write the choice for the launcher:', e); }
@@ -1222,9 +1253,10 @@
     }
 
     // The relay needs this character's own voice join token, which the
-    // launcher fetches a moment after the choice file appears. v1.<profile>.<until>.<mac>.
+    // launcher mints when asked (#1322).
     const tok = joinToken();
-    if (!tok || (Number(String(tok).split('.')[1]) || 0) !== lineId) {
+    if (!tok || tokenProfile(tok) !== lineId) {
+      if (now - lineAskedAt >= LINE_TOKEN_ASK_MS) { lineAskedAt = now; askToken(lineId); }
       if (!lineToldLauncher && now - lineSince > 5000) {
         lineToldLauncher = true;
         T.js('try{window.thornswoodSelect&&window.thornswoodSelect.line(' +
@@ -1235,6 +1267,7 @@
     }
     if (tok !== lineToken) {
       if (!lineToken) { log('menu: joining the relay as profile', lineId, 'to wait in line'); }
+      if (tokenWant === lineId) { tokenWant = 0; }
       lineToken = tok;
       lineTokenAt = now;
       lineSaidAt = 0;
@@ -7978,10 +8011,8 @@
   let phase = 0;
   let at = 0;
   let sentName = '';
-  // What the browser was last told its join token is, and when that was last
-  // checked. Voice.cs refreshes voice-token.txt on its own clock; this is what
-  // notices and passes the new one along, on the same 5 minute rhythm as the
-  // name check below, well inside the token's own half-life.
+  // The last join token handed to the browser, or on disk when it was
+  // injected, and when the file was last read for an ask (see tokenWant).
   let lastToken = '';
   let tokenAt = 0;
 
@@ -8070,17 +8101,19 @@
     if (phase === 1 && now - at > 1200) {
       phase = 2; at = now;
       sentName = myName() || 'Traveller';
+      // No token: whatever is on disk was minted for an earlier try and may
+      // be spent, so the chat asks for its own when it connects (#1322).
       lastToken = joinToken();
       T.js('window.THORNSWOOD=' + JSON.stringify({
         host: HOST, port: VOICE_PORT, profileId: PROFILE, name: sentName,
-        token: lastToken, base: VOICE_URL,
+        token: '', base: VOICE_URL,
         chatFade: CHAT_FADE, needsBars: NEEDS_BARS
       }) + ';');
       OVERLAYS.forEach(inject);
       // The token itself is never logged. It is what somebody would need to
       // join as this person, and this log is a file on disk.
       log('overlays injected. host', HOST + ':' + VOICE_PORT, 'profile', PROFILE,
-          'as', sentName, 'join token', joinToken() ? 'yes' : 'NONE');
+          'as', sentName, '; the chat asks the launcher for its join token');
       return;
     }
 
@@ -8309,28 +8342,27 @@
     }
 
     /*
-      The join token goes stale, and nothing else in this file notices.
+      The token the chat asked for (#1322). The chat says 'token? <profile>'
+      when it is about to connect and has none, askToken writes the ask, the
+      launcher writes its answer to voice-token.txt, and this hands it over:
+      the file is read once a second while an ask is out, and not at all
+      otherwise. setToken sends a try that is waiting on it at once.
 
-      It is read once, at injection, and this browser page is not reloaded for
-      the length of a normal session. Voice.cs on this machine rewrites
-      voice-token.txt at half the token's life, so a five minute check here is
-      well inside that and never the thing standing between a fresh token and
-      an expired one.
-
-      setToken only updates the value the page holds; it does not reconnect.
-      The socket already open was let in and is never rechecked, so this only
-      matters the next time it has to open on its own, which a long session,
-      a network blip or the voice service restarting all eventually ask for.
+      It used to read the file every five minutes and pass on whatever the
+      launcher had renewed there, the same hour long token the launcher's own
+      page held. A token opens one connection now, so one nobody asked for is
+      no use to anybody.
     */
-    if (now - tokenAt > 300000) {
+    if (tokenWant && now - tokenAt > 1000) {
       tokenAt = now;
       const tok = joinToken();
-      if (tok && tok !== lastToken) {
+      if (tok && tok !== lastToken && tokenProfile(tok) === tokenWant) {
         lastToken = tok;
+        tokenWant = 0;
         T.js('try{window.thornswoodNet&&window.thornswoodNet.setToken(' +
              JSON.stringify(tok) + ');}catch(e){}');
         // Never the token itself, same as at injection.
-        log('join token refreshed in the browser');
+        log('join token handed to the chat');
       }
     }
   }));
@@ -8605,6 +8637,12 @@
     }
     if (a[0] !== 'thornswood-front') return;
     const what = String(a[1]);
+
+    // The chat is about to connect and has no join token (#1322).
+    if (what.indexOf('token? ') === 0) {
+      askToken(what.slice(7));
+      return;
+    }
 
     // The delete icon at the menu: one id, for the launcher, which drops the
     // character from its list on its next poll. The character stays on the

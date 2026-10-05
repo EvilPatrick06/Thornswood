@@ -263,7 +263,9 @@ async function ready() {
   const again = await handshake('thornswood, ' + t2);
   check('the same token again, while its connection is still open, is refused: it was copied',
         [again.status, /already used/.test(again.body)], [403, true]);
-  check('  and the service writes that down as a copied token', /REFUSED a connection for profile 4242: a token another connection already used.*copied\. A token opens one connection/.test(log), true);
+  check('  and the service writes that down as a copied token, with when the first use was',
+        /REFUSED a connection for profile 4242: a token that was already used, by another connection at \d{4}-\d\d-\d\dT[\d:.]+Z, so it was copied\. A token opens one connection/.test(log), true);
+  check('  and tells whoever presented it nothing about when', /\d{4}-\d\d-\d\dT/.test(again.body), false);
   first.ws.send(JSON.stringify({ t: 'join', profileId: 4242, name: 'a second join on the same socket' }));
   await new Promise((r) => setTimeout(r, 300));
   const h1 = await (await fetch('http://127.0.0.1:' + PORT + '/health')).json();

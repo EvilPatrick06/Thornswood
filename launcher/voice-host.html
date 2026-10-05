@@ -23,7 +23,7 @@
 'use strict';
 
 var S = document.getElementById('s');
-var cfg = null;          // {host, port, profileId, name, token}
+var cfg = null;          // {host, port, profileId, name, token}: token is unspent, or ''
 var ws = null, myPeer = 0, myProfile = 0;
 var ctx = null, mic = null, micTrack = null;
 var talking = false, mode = 'local';
@@ -251,9 +251,14 @@ function voiceSocket() {
   So each try waits longer than the one before, from two seconds to a minute,
   and never exactly as long as anybody else's, so a service restart does not
   bring every launcher back in the same instant. It goes back to two seconds
-  only once the service has let us in. A refusal is passed to the launcher,
-  which fetches a fresh token and hands it over (the 'token' message below),
-  and that is what the next try waits for rather than the clock.
+  only once the service has let us in.
+
+  And every try has a token of its own (#1322). A token opens one connection
+  and the service refuses a handshake without one (#1337), so the page asks
+  the launcher for a fresh one before each try (the 'token' message below)
+  and spends it on that try, whatever comes of it. A refused handshake looks
+  here like any other lost connection, so the backoff is what holds it down;
+  the launcher always answers, and an empty answer waits for the clock.
 
   And the page listens for the server. The service's own pings are answered
   by the browser without this page seeing them, so a socket that went half
@@ -264,7 +269,7 @@ function voiceSocket() {
 */
 var RETRY_FIRST = 2000, RETRY_MOST = 60000;
 var PING_EVERY = 25000, SILENT_AFTER = 70000;
-var tries = 0, retry = null, heard = 0, deniedWhy = '';
+var tries = 0, retry = null, heard = 0, asking = false;
 
 function retryIn() {
   var cap = Math.min(RETRY_MOST, RETRY_FIRST * Math.pow(2, Math.min(tries, 10)));
@@ -297,12 +302,7 @@ function lost() {
   host('status', 'disconnected');
   conns.forEach(function (rec, id) { drop(id); });
   myPeer = 0;
-  var wait = retryIn();
-  if (deniedWhy) {
-    say('the voice server would not let this launcher in (' + deniedWhy +
-        '), so it is asking for a fresh token and trying again in ' + Math.round(wait / 1000) + ' s');
-  }
-  later(wait);
+  later(retryIn());
 }
 
 var ICE = [{ urls: 'stun:stun.l.google.com:19302' }];
@@ -341,17 +341,26 @@ function connect() {
     myPeer = 0;
   }
 
+  // No token of its own yet: ask, and the answer calls this again.
+  if (!cfg.token) {
+    if (!asking) { asking = true; host('token', 'need'); }
+    return;
+  }
+  var token = cfg.token;
+  cfg.token = '';
+
   var url = voiceSocket();
   say('connecting to ' + url + (tries ? ' (try ' + (tries + 1) + ')' : ''));
-  try { ws = new WebSocket(url); } catch (e) { say('socket refused: ' + e); later(retryIn()); return; }
+  // The token goes with the handshake, as the protocol after 'thornswood',
+  // and is what says who we are (#1337). It is never in the url, which this
+  // page writes to the launcher's log.
+  try { ws = new WebSocket(url, ['thornswood', token]); } catch (e) { say('socket refused: ' + e); later(retryIn()); return; }
 
   ws.onopen = function () {
     heard = Date.now();
-    // The token is what says who we are. profileId goes with it only so an
-    // older service that has never heard of tokens still works; the new one
-    // reads the token and ignores the number.
-    send({ t: 'join', profileId: cfg.profileId, name: cfg.name, mode: mode,
-           token: cfg.token || '' });
+    // profileId and name are the page's word; the service takes who this is
+    // from the token and only writes down a profileId that disagrees.
+    send({ t: 'join', profileId: cfg.profileId, name: cfg.name, mode: mode });
     host('status', 'connected');
   };
   ws.onclose = function () { ws = null; lost(); };
@@ -362,13 +371,10 @@ function connect() {
     if (m.t === 'pong') { return; }
     // In, so the next loss starts again from two seconds.
     if (m.t === 'welcome') {
-      myPeer = m.peer; myProfile = cfg.profileId; tries = 0; deniedWhy = '';
+      myPeer = m.peer; myProfile = cfg.profileId; tries = 0;
       send({ t: 'talk', on: talking });
       return;
     }
-    // Refused, and the service closes the socket next. The launcher fetches
-    // a fresh token; see the note over RETRY_FIRST.
-    if (m.t === 'denied') { deniedWhy = String(m.why || 'it did not say why'); host('denied', deniedWhy); return; }
     if (m.t === 'peers') { onPeers(m.peers || []); return; }
     // The whole view on the first tick after a join, then only what moved
     // and who left it (issue #482; the note over the tick in voice-server.js).
@@ -597,19 +603,22 @@ window.chrome.webview.addEventListener('message', function (e) {
   }
 
   /*
-    A fresh join token, sent by the launcher part way through a session.
-
-    The one handed over at config expires, and the launcher renews it at half
-    its life. Kept for the next socket rather than acted on: the connection
-    that is already up was let in with the old one and is not rechecked, so
-    there is nothing to do until we reconnect.
+    The launcher's answer to 'token': a fresh join token for the try that is
+    waiting on it, or none and why. None waits for the backoff, and the next
+    try asks again (#1322).
   */
   if (m.t === 'token') {
-    if (cfg) { cfg.token = String(m.token || ''); }
-    // Unless the last try was refused and the next is only waiting on the
-    // clock: a fresh token is what it was waiting for, so it goes now. The
-    // backoff is not reset, so a token that is refused too waits longer.
-    if (cfg && deniedWhy && retry && cfg.token) { later(0); }
+    asking = false;
+    if (!cfg) { return; }
+    cfg.token = String(m.token || '');
+    if (cfg.token) {
+      if (!ws) { connect(); }
+    } else {
+      var wait = retryIn();
+      say('no join token from the launcher (' + String(m.why || 'it did not say why') +
+          '), so trying again in ' + Math.round(wait / 1000) + ' s');
+      later(wait);
+    }
     return;
   }
 
