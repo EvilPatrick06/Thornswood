@@ -259,6 +259,7 @@ because each reads the one before.
 | `BENCH_BY_BASE` 9627-9633, `BENCH_ACCESS` 9635-9736 | `Build-BenchTable.py`, from `recipes.json` | none | `Build-BenchTable.py:362-376` |
 | `SPELL_IDS` 11826-11930 | `Build-SpellTable.ps1` | `spells.json` | `Build-SpellTable.ps1:// ==== end SPELL_IDS ====` |
 | `DATA` 23 | `Install-GamemodeConsts.js` | `data.json` | `Install-GamemodeConsts.js` |
+| `DATA.worldspaces`, inside line 23 | `Build-WorldspaceTable.js`, from the WRLD records of the load order | `data.json` (`worldspaces`) | `Build-WorldspaceTable.js:install`, the list and nothing else of the line |
 | `STATIONS` 24 | `Install-GamemodeConsts.js` | `stations.json` | `Install-GamemodeConsts.js` |
 | `ITEMS` 25 | `Install-GamemodeConsts.js` | `items.json` | `Install-GamemodeConsts.js` |
 | `CHARGEN` ~3878 | `Install-GamemodeConsts.js` | `chargen.json` | `Install-GamemodeConsts.js` |
@@ -268,7 +269,21 @@ are installed from checked-in JSON by `scripts\dev\Install-GamemodeConsts.js`
 (`data.json`, `stations.json`, `items.json`, `chargen.json` under `game\data`).
 They are not read out of the plugins: the values were recovered into JSON when
 `tools\thornswood-src` was retired (5d1f3f0). Edit the JSON, then run the
-installer. `--check` proves the gamemode matches. Older comments named
+installer. `--check` proves the gamemode matches.
+
+The one part of them that is read out of the plugins is `DATA.worldspaces`,
+the set `WORLDSPACES` reads as a worldspace rather than a room (#1896): every
+WRLD record of the load order, overrides counted as the record they override.
+`scripts\dev\Build-WorldspaceTable.js` writes it into `data.json` and the DATA
+line, and `--check` says whether both hold the load order's list. Run it when
+a plugin that adds a worldspace comes into the load order. Its two readers,
+`resolveArrival` and `climateOf`, pick the same hold for a worldspace in the
+set or out of it, because `cellToHold` names no worldspace; what the set
+changes is the death log's `nearest-capital` for `unmapped-interior`, and,
+for a hold with no temple of its own, a borrowed door measured from where the
+person fell rather than from the hold's capital. Both readers measure a
+worldspace with coordinates of its own against the mainland's map, in the
+set or out of it (#1909). Older comments named
 `respawn-holds.json`; that file never lived in this repository.
 `fires.json` is not in the gamemode: it goes into `thornswood-front.js`.
 
