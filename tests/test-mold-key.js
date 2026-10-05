@@ -269,6 +269,9 @@ function client(opt) {
     // game's Activate event (E on something), and no press here is one.
     // What they do is test-1374-letters.js's, test-1394-fares.js's and
     // test-merchant-traders.js's business.
+    // Hand over the letter (#1595), Activate on somebody you carry a letter
+    // for, asked first. test-1595-deliver.js has what it does.
+    'function deliverPress() { return false; }',
     'function boardPress() { return false; }',
     'function driverPress() { return false; }',
     'function merchantPress() { return false; }',

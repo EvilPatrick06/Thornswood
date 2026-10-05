@@ -37768,8 +37768,8 @@ log('gamemode loaded:',
     if (n.letter) {
       plog(who, 'took a letter for', n.to, 'in', hold);
       toProfile(profileId, 'You take the letter for ' + n.to + ', from ' + n.name + '. It is sealed. ' +
-                'Find ' + n.to + ' and /deliver it within about 10 metres, and the ' +
-                (Number(n.pay) || 0) + ' gold is yours.');
+                'Find ' + n.to + ', look at them within about 10 metres, and hand it over with the key ' +
+                'the prompt shows. The ' + (Number(n.pay) || 0) + ' gold is yours.');
       refreshPanel(actorId);
       return true;
     }
@@ -37951,15 +37951,19 @@ log('gamemode loaded:',
         /letter Lydia Meet me at the Drunken Huntsman at dusk.
         /letter "Lydia Stormblade" Meet me at the Drunken Huntsman at dusk.
 
+    NOBODY TYPES THESE (#1595). Patrick, 4 Oct: nothing people do is a chat
+    command. The board panel's Write a letter sends the second form, the name
+    always in double quotes, and nothing a person reads names /letter.
+
     #1374, as docs/systems/noticeboards.md has it. A letter is a job with a
     named person at the other end, written standing at the board. The words
     are up to 300 characters, the same cap as /ooc; a longer one is refused
     before any gold is taken rather than cut, because the sender paid for the
     whole letter. The name is one word, or several in double quotes.
 
-    THE WORDS ARE SEALED. Only /deliver hands them to anybody. The wall, the
-    panel, /jobs and the taking line say who it is for and from whom, and the
-    log does not record them either.
+    THE WORDS ARE SEALED. Only deliver hands them to anybody. The wall, the
+    panels, Your jobs and the taking line say who it is for and from whom, and
+    the log does not record them either.
   */
   function postLetter(parts, actorId, profileId, toProfile) {
     var hold = boardHere(actorId);
@@ -37978,7 +37982,7 @@ log('gamemode loaded:',
       words = gap < 0 ? '' : rest.slice(gap + 1).trim();
     }
     if (!to) {
-      toProfile(profileId, 'Say who it is for, then what it says: /letter <name> <words>.');
+      toProfile(profileId, 'Say who the letter is for.');
       return true;
     }
     if (!words) {
@@ -38014,7 +38018,13 @@ log('gamemode loaded:',
   }
 
   /*
-        /deliver Lydia      or the form id the crosshair gives, as /trade takes
+        /deliver ff000103    the form id the crosshair gives, as /trade takes
+
+    NOBODY TYPES THIS (#1595). The look prompt shows Hand over the letter
+    while you carry one for the person under the crosshair (lettersCarried,
+    below, through the near list's `d`), and its key sends this line with
+    their form id. A name still finds them, the way findPerson always has,
+    but nothing a person reads names /deliver.
 
     Every letter the courier carries for that person goes over at once,
     within the trade reach. The name is what is checked and nothing else: the
@@ -38022,7 +38032,7 @@ log('gamemode loaded:',
     with the letter still in the courier's hands. The person it is for is told
     the words, who wrote them and who brought them. The courier is paid each
     letter's held 15 out of the ledger it was counted on, and the letter comes
-    off the wall the way an /unpin does, keeping its number.
+    off the wall the way a take down does, keeping its number.
   */
   function deliver(parts, actorId, profileId, toProfile) {
     var carried = [];
@@ -38042,7 +38052,7 @@ log('gamemode loaded:',
     }
     var want = (parts && parts.length > 1) ? parts.slice(1).join(' ').trim() : '';
     if (!want) {
-      toProfile(profileId, 'Say who you are handing it to: /deliver and their name, standing with them.');
+      toProfile(profileId, 'Look at the person the letter is for, and use the key the prompt shows.');
       return true;
     }
     var soc = g.__thornswoodSocial;
@@ -38122,6 +38132,41 @@ log('gamemode loaded:',
       var dx = pa[0] - pb[0], dy = pa[1] - pb[1], dz = pa[2] - pb[2];
       return (dx * dx + dy * dy + dz * dz) <= reach * reach;
     } catch (e2) { return false; }
+  }
+
+  /*
+    WHO CARRIES A LETTER FOR WHOM, for the look prompt (#1595). The prompt
+    shows Hand over the letter only while you carry a letter for the person
+    under the crosshair, and only the server knows what anybody carries, so
+    the social block's near list marks that person with `d`. deliver checks
+    everything again when the line arrives: this decides what is drawn, never
+    what is paid.
+
+    One pass over every board, so the near list asks once a tick rather than
+    once for every two people standing together. carries matches the names
+    the way deliver does, with nameIs.
+  */
+  function lettersCarried() {
+    var byCourier = {};
+    for (var h in notices) {
+      if (!Object.prototype.hasOwnProperty.call(notices, h)) { continue; }
+      var list = notices[h] || [];
+      for (var i = 0; i < list.length; i++) {
+        var n = list[i];
+        if (!n || !n.letter || n.down || !n.taken) { continue; }
+        var who = String(Number(n.taken));
+        (byCourier[who] = byCourier[who] || []).push(n.to);
+      }
+    }
+    return {
+      carries: function (courierPid, name) {
+        var key = String(Number(courierPid));
+        var tos = Object.prototype.hasOwnProperty.call(byCourier, key) ? byCourier[key] : null;
+        if (!tos) { return false; }
+        for (var k = 0; k < tos.length; k++) { if (nameIs(tos[k], name)) { return true; } }
+        return false;
+      }
+    };
   }
 
   /*
@@ -38704,7 +38749,7 @@ log('gamemode loaded:',
     boxes: function () { return boxes; },
     notices: function () { return notices; }, takedown: takedown,
     boards: function () { return boards; }, boardHere: boardHere, boardPanel: boardPanel,
-    boardsView: boardsView,
+    boardsView: boardsView, lettersCarried: lettersCarried,
     stewards: function () { return stewards.slice(); }
   };
   plog('ready,', Object.keys(BUILDING_BY_DOOR).length, 'doors across',
@@ -46429,6 +46474,9 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                // Patrick, 4 October, nothing people do is a chat command. A
                // steward's /board move and /board here are #1638's.
                '/notice', '/job', '/board', '/take', '/dropjob', '/unpin',
+               // A letter (#1595): Write a letter on the board panel sends
+               // /letter, and the look prompt's Hand over the letter sends
+               // /deliver. Never typed, and not in PLAYER_WORDS either.
                '/letter', '/deliver',
                // A haul (#1393). Sent by the board panel's Send a haul and
                // Confirm buttons, never typed, and so deliberately NOT in
@@ -46519,7 +46567,7 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // the steward half answers "only a steward sets rent"
                       // to everybody else.
                       '/box', '/rent',
-                      '/letter', '/deliver', '/help',
+                      '/help',
                       // Everybody's, and they need to be findable: a meter
                       // nobody knows how to act on is only a penalty. Not
                       // /rest: sitting or lying down is how you rest (#1603).
@@ -54339,6 +54387,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     // Whether the look prompt offers "Let sleep here" (#1603). See sleepMark
     // in the beds, in the property block.
     var beds = g.__thornswoodBeds;
+    // Whether it offers "Hand over the letter" (#1595): who carries a letter
+    // for whom, read once a tick. See lettersCarried in the property block.
+    var props = g.__thornswoodProperty;
+    var letters = (props && props.lettersCarried) ? props.lettersCarried() : null;
     for (var a = 0; a < at.length; a++) {
       var me = at[a];
       var s = read(me.id) || fresh();
@@ -54363,6 +54415,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         };
         // c, not s: s is the holder's sleep key (#1603).
         if (them.scar) { w[them.id.toString(16)].c = them.scar; }
+        // d: you carry a letter for them, and the prompt offers to hand it over (#1595).
+        if (letters && letters.carries(me.pid, them.name)) { w[them.id.toString(16)].d = 1; }
       }
       var sig = JSON.stringify(w) + (s.namesAll ? ':all' : '');
       if (nearWas[me.id] === sig) { continue; }

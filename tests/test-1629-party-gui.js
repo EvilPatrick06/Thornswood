@@ -106,6 +106,7 @@ function rig(opts) {
     'function moldPress() { return false; }\n' +
     'const SLEEP_KEY = 22; function sleepPress() { return false; }\n' +
     'function repairPress() { return false; }\n' +
+    'function deliverPress() { return false; }\n' +
     'function boardPress() { return false; }\n' +
     'function driverPress() { return false; }\n' +
     'function merchantPress() { return false; }\n' +
