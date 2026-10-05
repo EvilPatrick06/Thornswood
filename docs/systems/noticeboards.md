@@ -39,8 +39,9 @@ this fee. The pay is extra. See
 [Free Skyrim Trading Company](trading-company.md).
 
 A letter is a job with a named person at the other end. You post it
-from the board. `/letter <name> <words>`. The words are the letter,
-up to 300 characters, the same cap as `/ooc`.
+from the board's panel: Write a letter, with who it is for and the
+words. The words are the letter, up to 300 characters, the same cap
+as `/ooc`.
 
 It costs 35 gold up front. 20 is the board fee and stays with the hold.
 15 is the courier's pay, and it is held
@@ -48,11 +49,13 @@ the way a haul's pay is held. If the gold is not there, nothing is
 posted.
 
 The courier does not read it. The wall shows who it is for, not the
-words. Take takes it the way it takes a job. One taker. `/deliver`,
-within the trade reach, about 10 metres, while you are looking at
-the named person, hands them the words and pays the courier the 15.
-A wrong person is refused. The server does not judge what the letter
-says. It checks the name.
+words. Take takes it the way it takes a job. One taker. Looking at
+the named person, within the trade reach, about 10 metres, the
+courier's look prompt shows E, Hand over the letter. E hands them the
+words and pays the courier the 15. The row is there only while you
+carry a letter for the person you are looking at. A wrong person is
+refused. The server does not judge what the letter says. It checks
+the name.
 
 Put it back puts the letter back on the board. Take down, by the
 sender, before it is delivered, returns the 15 and keeps the board fee. A
@@ -120,15 +123,21 @@ older count, Take, Put it back, Take down, Your jobs, and a steward
 moving a board are in the server. The fee lands on the hold's ledger.
 A steward moves one of the ten boards; any other name is refused.
 
-Letters are in the server: `/letter`, the 35, the 300 characters, the
-sealed line on the wall and the panel, Take, Put it back, the 15
-back on Take down, and `/deliver`, which pays the courier the 15 out of
-the ledger it was held on. The name on a letter is one word, or
-several in double quotes, and it matches the whole of a character's
-name or its first words. `/deliver` takes the person's name, or the
-id the crosshair gives, the same as `/trade`. There is no key for it
-on the prompt that appears when you look at somebody. A letter is
-written with `/letter`, not on the panel.
+Letters are in the server and on the panels (#1595): Write a letter
+on the board's panel, the 35, the 300 characters, the sealed line on
+the wall and the panels, Take, Put it back, the 15 back on Take
+down, and Hand over the letter on the look prompt, which pays the
+courier the 15 out of the ledger it was held on. The name on a letter
+matches the whole of a character's name or its first words. The
+prompt's row comes from the server's list of who is near you, which
+marks a person you carry a letter for; the key sends the id the
+crosshair gives, the same as Trade, and the server checks the name,
+the reach and the place again. The key is E, Skyrim's own Activate,
+wherever it is bound: which key was asked on #1595, and E is the
+suggested answer, because every letter is already taken and U, the
+other key on a person, is Let sleep here, which can be up at the same
+time. Nothing is typed for a letter, and no help text names a line
+for one.
 
 Hauls are in the server, on the panel: Send a haul, the 30 fee and
 the pay on the ledger, the pay and the destination on the wall, and

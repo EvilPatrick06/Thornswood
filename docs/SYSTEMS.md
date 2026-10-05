@@ -26,7 +26,8 @@ of these:
 
 - a key named on the look prompt, the panel that names who or what is
   under the crosshair: Y for a friend, H to trade, L to mute, U to
-  press a key mold into a door;
+  press a key mold into a door, E to hand over a letter you carry for
+  them;
 - a key of its own, the way X claims, locks or unlocks the door you
   just opened and cuts a key at a forge;
 - the prompt that answers an offer with Accept and Refuse, and the P

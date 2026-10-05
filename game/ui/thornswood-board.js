@@ -13,7 +13,8 @@
   words. The lines are how the panel talks to the server, and nobody is told
   to type one (Patrick, 4 Oct: no chat commands for anything people do).
   Posting, Take, Take down and Put it back send /notice, /job, /take, /unpin
-  and /dropjob (#1627); Send a haul and Confirm send /haul (#1393).
+  and /dropjob (#1627); Send a haul and Confirm send /haul (#1393); Write a
+  letter sends /letter (#1595).
 
   setData never opens the panel. The click does. A later setData redraws
   what is already open, and the plugin closes it once you walk away.
@@ -123,6 +124,8 @@
     var keptPay = field(ID + '-pay');
     var keptDest = field(ID + '-dest');
     var keptHaul = field(ID + '-haul');
+    var keptTo = field(ID + '-to');
+    var keptLetter = field(ID + '-letter');
     var title = root.querySelector('h2');
     var body = root.querySelector('.body');
     var b = data && data.board;
@@ -188,6 +191,20 @@
       '<button class="go" data-do="job">Post a job</button></div>';
     out += '<div class="note">A notice is 20 gold. A job is 30 gold. The gold stays with the hold.</div>';
     /*
+      A LETTER (#1595, docs/systems/noticeboards.md): who it is for and the
+      words, up to 300 characters, which was /letter. The name goes over in
+      double quotes so a name of several words stays one name. The chat
+      socket carries a line of up to 400 characters (voice/voice-server.js),
+      so the name is held to 60: /letter, the quotes, 60 and 300 fit whole.
+    */
+    out += '<h3>Write a letter</h3>';
+    out += '<div class="line"><input id="' + ID + '-to" maxlength="60" placeholder="who it is for"></div>';
+    out += '<div class="line"><input id="' + ID + '-letter" maxlength="300" placeholder="the letter">' +
+      '<button class="go" data-do="letter">Post the letter</button></div>';
+    out += '<div class="note">35 gold: 20 for the board, and 15 held for whoever carries it, paid to them ' +
+      'when they hand it over. Up to 300 characters. Only the person it is for reads it. ' +
+      'Taken down before then, the 15 comes back to you.</div>';
+    /*
       A HAUL (#1393, docs/systems/trading-company.md): a job with a pay and a
       town it goes to. The towns are every board but this one, from the
       server.
@@ -239,6 +256,10 @@
     if (payBox && keptPay) { payBox.value = keptPay; }
     if (destBox && keptDest) { destBox.value = keptDest; }
     if (haulBox && keptHaul) { haulBox.value = keptHaul; }
+    var toBox = document.getElementById(ID + '-to');
+    var letterBox = document.getElementById(ID + '-letter');
+    if (toBox && keptTo) { toBox.value = keptTo; }
+    if (letterBox && keptLetter) { letterBox.value = keptLetter; }
     var buttons = body.querySelectorAll('button[data-do]');
     for (var k = 0; k < buttons.length; k++) { buttons[k].onclick = onDo; }
   }
@@ -254,6 +275,12 @@
     if (verb === 'job') {
       var job = field(ID + '-job');
       if (job) { net('/job ' + job); }
+      return;
+    }
+    if (verb === 'letter') {
+      var to = field(ID + '-to').replace(/"/g, '').replace(/\s+/g, ' ').trim();
+      var words = field(ID + '-letter');
+      if (to && words) { net('/letter "' + to + '" ' + words); }
       return;
     }
     if (verb === 'haul') {
