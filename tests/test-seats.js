@@ -484,8 +484,11 @@ yes('the front answers select:want by asking online.json, and waits in line only
 yes('the front asks the server the page belongs to: 3000 for main, the port plus one for dev',
     /const RESOURCE_PORT = SERVER_PORT === 7777 \? 3000 : SERVER_PORT \+ 1;/.test(front) &&
     /lineHttp = RESOURCE_URL \? new sp\.HttpClient\(RESOURCE_URL\) : null;/.test(front));
-yes('the front joins the relay only with this character own voice token',
-    /\(Number\(String\(tok\)\.split\('\.'\)\[1\]\) \|\| 0\) !== lineId/.test(front));
+// Since #1322 the launcher mints that token when the front asks for it.
+yes('the front joins the relay only with this character own voice token, and asks the launcher for one',
+    /if \(!tok \|\| tokenProfile\(tok\) !== lineId\) \{/.test(front) &&
+    /function tokenProfile\(tok\) \{ return Number\(String\(tok \|\| ''\)\.split\('\.'\)\[1\]\) \|\| 0; \}/.test(front) &&
+    /askToken\(lineId\)/.test(front));
 yes('the front says /line every ten seconds, sends the pass, and tells the client to stay',
     /const LINE_EVERY_MS = 10000;/.test(front) && /thornswoodNet\.say\("\/line",true\)/.test(front) &&
     /'\/joinpass ' \+ pass/.test(front) && /sendMessage\("thornswood","stay"\)/.test(front));

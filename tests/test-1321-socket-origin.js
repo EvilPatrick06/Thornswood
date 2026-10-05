@@ -96,12 +96,14 @@ function listening(srv, port) {
 /*
   Every join proves itself with a token (#1303), so this signs its own with
   a key it puts beside its copy of the service, the way voice-server.js
-  signs them.
+  signs them. One token opens one connection and goes with the handshake,
+  after 'thornswood' (#1337, #1322).
 */
 const KEY = crypto.randomBytes(32).toString('hex');
 function tokenFor(pid) {
-  const body = String(pid) + '.' + String(Date.now() + 3600000);
-  return 'v1.' + body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
+  const body = 'v2.' + pid + '.' + Date.now() + '.' + crypto.randomBytes(16).toString('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
@@ -124,7 +126,8 @@ function knock(port, headers, pid) {
     let buf = Buffer.alloc(0);
     s.on('connect', () => {
       let h = 'GET / HTTP/1.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\n' +
-              'Sec-WebSocket-Key: ' + crypto.randomBytes(16).toString('base64') + '\r\n';
+              'Sec-WebSocket-Key: ' + crypto.randomBytes(16).toString('base64') + '\r\n' +
+              'Sec-WebSocket-Protocol: thornswood, ' + tokenFor(pid) + '\r\n';
       for (const k of Object.keys(headers)) { h += k + ': ' + headers[k] + '\r\n'; }
       s.write(h + '\r\n');
     });
@@ -135,7 +138,7 @@ function knock(port, headers, pid) {
         if (i < 0) { return; }
         me.status = Number((/^HTTP\/1\.1 (\d+)/.exec(buf.slice(0, i).toString()) || [])[1] || 0);
         buf = buf.slice(i + 4);
-        if (me.status === 101) { s.write(textFrame({ t: 'join', profileId: pid, name: 'P' + pid, token: tokenFor(pid) })); }
+        if (me.status === 101) { s.write(textFrame({ t: 'join', profileId: pid, name: 'P' + pid })); }
       }
       if (buf.indexOf('"welcome"') >= 0) { me.joined = true; }
     });
@@ -213,11 +216,12 @@ function knock(port, headers, pid) {
   }
   const bare = await knock(PORT, { Host: HOST }, ++pid);
   yes('no Origin at all, which is not a browser, is let in and joins (' + bare.status + ')', bare.status === 101 && bare.joined);
-  const node = new WebSocket('ws://' + HOST + '/');
+  const nodePid = ++pid;
+  const node = new WebSocket('ws://' + HOST + '/', ['thornswood', tokenFor(nodePid)]);
   let welcomed = false;
   node.onmessage = (e) => { if (/"welcome"/.test(String(e.data))) { welcomed = true; } };
   await new Promise((ok) => { node.onopen = ok; node.onerror = ok; });
-  node.send(JSON.stringify({ t: 'join', profileId: ++pid, name: 'Harness', token: tokenFor(pid) }));
+  node.send(JSON.stringify({ t: 'join', profileId: nodePid, name: 'Harness' }));
   await wait(200);
   yes('and so is node\'s own WebSocket, as every harness uses', welcomed);
   try { node.close(); } catch (e) { }

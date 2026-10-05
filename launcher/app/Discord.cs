@@ -951,13 +951,15 @@ namespace Thornswood
         /// take care never to log it. Matched by shape rather than by the
         /// current value, because the token is renewed every few minutes and
         /// the one in a crash is whichever was live then:
-        /// "v1.profile.until.signature" from voice-server.js signToken, and
+        /// "v2.profile.minted.nonce.signature" from voice-server.js
+        /// signToken (#1322), the older "v1.profile.until.signature", and
         /// "tk1.body.signature" from the site.
         /// </summary>
         static string Scrub(string text)
         {
             if (string.IsNullOrEmpty(text)) return "";
             string s = Regex.Replace(text, @"\bv1\.[0-9]+\.[0-9]+\.[A-Za-z0-9_-]{16,}", "v1.[join token removed]");
+            s = Regex.Replace(s, @"\bv2\.[0-9]+\.[0-9]+\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}", "v2.[join token removed]");
             s = Regex.Replace(s, @"\btk1\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}", "tk1.[ticket removed]");
             // The join pass (#937), "jp1.body.signature" from the site's makePass.
             s = Regex.Replace(s, @"\bjp1\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}", "jp1.[join pass removed]");

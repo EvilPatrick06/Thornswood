@@ -460,29 +460,32 @@ async function until(cond, ms) {
   while (Date.now() < end) { if (await cond()) { return true; } await wait(25); }
   return false;
 }
+// A join token as the service makes them since #1322: one per connection.
 function token(pid) {
-  const until = Date.now() + 3600000;
-  const body = String(pid) + '.' + String(until);
+  const body = 'v2.' + pid + '.' + Date.now() + '.' + crypto.randomBytes(16).toString('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   const mac = crypto.createHmac('sha256', KEY).update(body).digest('base64')
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  return 'v1.' + body + '.' + mac;
+  return body + '.' + mac;
 }
 const sockets = [];
 function join(pid, name, tok) {
   return new Promise((done, bad) => {
-    const ws = new WebSocket('ws://127.0.0.1:' + PORT + '/');
+    // The token goes with the handshake (#1337); with none, there is no socket.
+    const ws = tok ? new WebSocket('ws://127.0.0.1:' + PORT + '/', ['thornswood', tok])
+                   : new WebSocket('ws://127.0.0.1:' + PORT + '/');
+    let welcomed = false;
     const heard = [];
     const hush = [];
     const who = {};
     sockets.push(ws);
-    ws.onopen = () => ws.send(JSON.stringify({ t: 'join', profileId: pid, name: name, token: tok || '' }));
+    ws.onopen = () => ws.send(JSON.stringify({ t: 'join', profileId: pid, name: name }));
     ws.onmessage = (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
       if (m.t === 'welcome') {
+        welcomed = true;
         done({ heard: heard, hush: hush, who: who, say: (text) => ws.send(JSON.stringify({ t: 'chat', text: text })) });
       }
-      // Refused at the join (#1303): what the service said, and nothing else.
-      if (m.t === 'denied') { done({ denied: String(m.why || '') }); }
       if (m.t === 'chat') { heard.push(m); }
       if (m.t === 'hush') { hush.push(m); }
       if (m.t === 'pos') {
@@ -494,7 +497,9 @@ function join(pid, name, tok) {
         for (const id of (m.gone || [])) delete who[id];
       }
     };
-    ws.onerror = () => bad(new Error('could not join'));
+    // Refused at the handshake (#1303, #1337): no socket, so nothing to say on.
+    ws.onerror = () => { if (!welcomed) { done({ refused: true }); } };
+    ws.onclose = () => { if (!welcomed) { done({ refused: true }); } };
     setTimeout(() => bad(new Error('no welcome')), 4000);
   });
 }
@@ -537,9 +542,10 @@ function python(args) {
   yes('a command from a connection with a good token is queued as proven',
       got.length === 1 && got[0].proven === true && got[0].profileId === STAFFER);
   // It used to be let in and its commands queued as not proven, for the
-  // gamemode to refuse; since #1303 it never gets a connection to send one.
-  yes('the same profile number with no token is refused at the join, so nothing it says reaches the queue',
-      liar.denied === 'no token' && !liar.say);
+  // gamemode to refuse; since #1303 and #1337 it never gets a connection to
+  // send one on.
+  yes('the same profile number with no token gets no connection, so nothing it says reaches the queue',
+      liar.refused === true && !liar.say);
 
   const r = await fetch(base + '/silenced', { method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ profiles: { [BJORN]: Date.now() + 120000 } }) });

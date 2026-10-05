@@ -92,9 +92,11 @@ function listening(srv, port) {
 }
 
 const KEY = crypto.randomBytes(32).toString('hex');
-function tokenFor(pid, until) {
-  const body = String(pid) + '.' + String(until || Date.now() + 3600000);
-  return 'v1.' + body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
+// A join token as the service makes them since #1322, minted now or when told.
+function tokenFor(pid, minted) {
+  const body = 'v2.' + pid + '.' + (minted || Date.now()) + '.' + crypto.randomBytes(16).toString('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
@@ -146,7 +148,7 @@ const relayOf = (r) => (r.list || []).find((s) => [].concat(s.urls)[0] === 'turn
   yes('a POST with no token is handed the STUN list', stunOnly(r));
   r = await ice('POST', JSON.stringify({ token: 'v1.41.' + (Date.now() + 3600000) + '.madeup' }), true);
   yes('a made up token is handed the STUN list', stunOnly(r));
-  r = await ice('POST', JSON.stringify({ token: tokenFor(41, Date.now() - 1000) }), true);
+  r = await ice('POST', JSON.stringify({ token: tokenFor(41, Date.now() - 121000) }), true);
   yes('an expired token is handed the STUN list', stunOnly(r));
   r = await ice('GET', null, true);
   yes('and every one of those may be read from a null origin', r.cors === '*');
@@ -172,8 +174,8 @@ const relayOf = (r) => (r.list || []).find((s) => [].concat(s.urls)[0] === 'turn
   const overlay = fs.readFileSync(path.join(REPO_DIR, 'game', 'ui', 'thornswood-voice.js'), 'utf8').split(CR).join('');
   const chat = fs.readFileSync(path.join(REPO_DIR, 'game', 'ui', 'thornswood-chat.js'), 'utf8').split(CR).join('');
   const host = fs.readFileSync(path.join(REPO_DIR, 'launcher', 'voice-host.html'), 'utf8').split(CR).join('');
-  yes('the chat socket hands out the token it holds now',
-      /token: function \(\) \{ return TOKEN; \}/.test(chat));
+  yes('the chat socket hands out the token it holds now, or the one its connection opened with (#1322)',
+      /token: function \(\) \{ return TOKEN \|\| SPENT; \}/.test(chat));
   yes('the game\'s voice overlay takes it from there and POSTs it to /ice',
       /n\.token\(\)/.test(overlay) && /'\/ice',\s*\{ method: 'POST', body: JSON\.stringify\(\{ token: tok \}\) \}/.test(overlay));
   yes('the launcher\'s voice page POSTs its own',

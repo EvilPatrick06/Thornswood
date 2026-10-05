@@ -110,6 +110,8 @@ foreach ($rel in @(
     'Data\Platform\voice-ptt.txt',
     # Who this person has muted in voice, by profile id (entry 151).
     'Data\Platform\voice-muted.txt',
+    # The game asking the launcher for a join token (#1322).
+    'Data\Platform\voice-token-ask.txt',
     # Every profile id the install owns.
     'Data\Platform\thornswood-characters.json',
     'Data\Platform\thornswood-choice.txt',

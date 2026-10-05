@@ -217,13 +217,15 @@ yes('and somebody in no party carries none',
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-cull-'));
 fs.copyFileSync(SERVER, path.join(dir, 'voice-server.js'));
 fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
-// Every join proves itself since #1303, so this harness signs its own join
-// tokens with a key it puts beside its copy of the service.
+// Every connection proves itself since #1303, so this harness signs its own
+// join tokens with a key it puts beside its copy of the service. One token
+// opens one connection and goes with the handshake since #1337 and #1322.
 const KEY = crypto.randomBytes(32).toString('hex');
 fs.writeFileSync(path.join(dir, 'token-key.txt'), KEY);
 function tokenFor(pid) {
-  const body = String(pid) + '.' + String(Date.now() + 3600000);
-  return 'v1.' + body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
+  const body = 'v2.' + pid + '.' + Date.now() + '.' + crypto.randomBytes(16).toString('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return body + '.' + crypto.createHmac('sha256', KEY).update(body).digest('base64')
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 let srv = null;
@@ -318,11 +320,11 @@ async function feedPositions() {
 */
 function join(pid, name) {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket('ws://127.0.0.1:' + PORT + '/');
+    const ws = new WebSocket('ws://127.0.0.1:' + PORT + '/', ['thornswood', tokenFor(pid)]);
     const me = { pid: pid, ws: ws, welcome: false, last: null, lastText: '' };
     sockets.push(ws);
     const late = setTimeout(() => reject(new Error('no welcome for ' + pid + ' in twenty seconds')), 20000);
-    ws.onopen = () => { ws.send(JSON.stringify({ t: 'join', profileId: pid, name: name, token: tokenFor(pid) })); };
+    ws.onopen = () => { ws.send(JSON.stringify({ t: 'join', profileId: pid, name: name })); };
     ws.onmessage = (ev) => {
       const text = String(ev.data);
       if (text.startsWith('{"t":"peers"')) { return; }
