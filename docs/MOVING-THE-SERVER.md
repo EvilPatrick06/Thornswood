@@ -197,11 +197,15 @@ typed on a command line or written on this page.
    .\scripts\release\Export-ServerPayload.ps1
    scp (.\scripts\release\Where.ps1 ServerZip) Administrator@<new address>:C:/thornswood-server.zip
    scp .\scripts\deploy\Install-ThornswoodServer.ps1 .\scripts\deploy\ServerSettings.ps1 .\scripts\vps\Roll-Log.ps1 Administrator@<new address>:C:/
-   ssh Administrator@<new address> "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Install-ThornswoodServer.ps1"
+   ssh Administrator@<new address> "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Install-ThornswoodServer.ps1 -RequirePass on"
    ```
    The last one prints `load order: all <n> plugins present` and registers the
    `Thornswood Server` task, which starts at boot; without `-StartNow` it does
    not start now. If the box restarts before step 13, stop that task first.
+   `-RequirePass on` is there because no build carries the join pass switch
+   (issue #1223) and the installer refuses a server without one (issue
+   #1804); step 13 puts the old server's own switch back from the backup
+   (issue #1845), so on holds only until then.
    The installer unpacks beside `C:\Thornswood-Server` and checks the payload
    there before it touches anything (issue #446); on a box that already has a
    server it keeps the one it replaces as `C:\Thornswood-Server.prev-<stamp>`,

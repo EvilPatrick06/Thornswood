@@ -275,6 +275,11 @@ Remove-Item -LiteralPath C:\Thornswood-RestoreTest -Recurse -Force
 | `Restore-Server.ps1`, live | 2.7 to 3.3 s |
 | delete the folder | 0.1 s |
 
+Typed now, the install line needs `-RequirePass on` at its end: no
+build carries the join pass switch (issue #1223), and the installer refuses a
+server without one (issue #1804). Restore-Server then puts the backup's own
+switch back (issue #1845).
+
 The whole thing, typing included, is well under the hour this section used to
 guess. `Install-ThornswoodServer`'s own load order check resolves against the
 live server's plugins, because the payload's settings name
