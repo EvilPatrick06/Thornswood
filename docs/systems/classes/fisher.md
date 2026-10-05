@@ -75,9 +75,11 @@ The master pole does not take dragon bone. Dragon bone is cut.
 
 ## How much, and how often
 
-The wait is the spot's rank, not yours. A restart clears it. The
-new water is fished for everyone. The water that stands today is
-still kept per person.
+The wait is the spot's rank, not yours. It is kept on the water,
+not on you: once a spot is fished, it is fished for everyone until
+the wait is over. That holds for the water that stands today and for
+the new water. A restart does not clear it, because return times and
+shared stock survive a restart ([People who are not people](../npcs.md)).
 
 | Spot's rank | Wait |
 | --- | --- |
@@ -143,9 +145,11 @@ Generated from the work tables by `scripts/dev/Write-SystemLists.js`. The same r
 ## Where this is
 
 The fifteen records, the waits and the yields are in the server. The
-wait is kept on the water and shared by everyone who fishes it (#1413),
-and a fished-out water says how long is left in minutes and hours
-(#1826). A pole is required, and a new fisher is
+wait is kept on the water, shared by everyone who fishes it and kept
+through a restart (#1413), and a fished-out water says how long is left
+in minutes and hours (#1826). Until 5 October this page said the wait
+was kept per person and cleared by a restart, which it was before #1413
+(#1887). A pole is required, and a new fisher is
 handed a crude pole. The fishing mod's rods are in the collection and
 do nothing, and its three pole recipes are cut (the cut file, #1766),
 so the Woodwright's book holds only our three poles and the trap. None
