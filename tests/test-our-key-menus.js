@@ -172,6 +172,9 @@ function rig(opts) {
     // The sleep key is the mold's, on a person (#1603). Nobody is looked at here.
     'const SLEEP_KEY = 22;\n' +
     'function sleepPress() { return false; }\n' +
+    // Hand over the letter (#1595), Activate on somebody you carry a letter
+    // for. Nobody is looked at here; test-1595-deliver.js has the press.
+    'function deliverPress() { return false; }\n' +
     // P on somebody not in your party asks them in (#1629). opts.asks puts
     // such a person under the crosshair; test-1629-party-gui.js has the ask.
     'function partyPress() { ' +

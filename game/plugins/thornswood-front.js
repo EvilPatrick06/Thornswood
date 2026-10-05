@@ -397,6 +397,25 @@
   const APPRENTICE_NAME = keyName(APPRENTICE_KEY);
   const LOCK_NAME = keyName(LOCK_KEY);
   const MANEUVER_NAME = keyName(MANEUVER_KEY);
+  /*
+    HANDING OVER A LETTER (#1595). Patrick, 4 Oct: /deliver becomes a key on
+    the look prompt, shown while you carry a letter for the person under the
+    crosshair. Which key was not said; the question is on #1595 and this is
+    its suggested answer: E, Skyrim's own Activate, on that person, the way E
+    works on a board, a driver or a trader. Every letter is already Skyrim's
+    or ours, and U, the one other key a person under the crosshair can have,
+    is the holder's Let sleep here (#1603), which can be up at the same time.
+    0 means the Activate control, wherever the person has bound it; a scan
+    code here (MOLD_KEY, say) puts it on that key instead.
+  */
+  const DELIVER_KEY = 0;
+  function deliverName() {
+    if (DELIVER_KEY) { return keyName(DELIVER_KEY); }
+    let code = 0;
+    try { code = sp.Input.getMappedKey('Activate', 0); } catch (e) { code = 0; }
+    // 18 is E, Skyrim's own default for Activate, when the game does not say.
+    return keyName(code > 0 && code < 256 ? code : 18);
+  }
 
   const ESC = 1;
 
@@ -4509,7 +4528,7 @@
   /** Draw or clear the little panel that names them and the three keys. */
   function drawPrompt(row) {
     const sig = row ? (row.n + '|' + row.f + '|' + row.m + '|' + row.y + '|' + (row.s || 0) + '|' + (row.c || '') +
-                       '|' + (row.a ? JSON.stringify(row.a) : '')) : '';
+                       '|' + (row.d || 0) + '|' + (row.a ? JSON.stringify(row.a) : '')) : '';
     if (sig === lookingSig) { return; }
     lookingSig = sig;
     if (!row) {
@@ -4547,6 +4566,9 @@
       // the server's near list says so (#1603). See sleepPress.
       (row.s ? keyRow(SLEEP_NAME, row.s === 2 ? 'Stop letting sleep here' : 'Let sleep here',
                       row.s === 2) : '') +
+      // Only while you carry a letter for them: the near list's d (#1595).
+      // See deliverPress.
+      (row.d ? keyRow(deliverName(), 'Hand over the letter', false) : '') +
       // Only for a Master looking at somebody they could take on: the
       // server's near list says so, with the halves (#1634). See
       // apprenticePress.
@@ -4639,6 +4661,24 @@
     the line arrives. Answers whether it was used, so the key falls through
     when it was not.
   */
+  /*
+    Hand the person under the crosshair the letters you carry for them
+    (#1595). Only while the prompt offers it, which is the server's near list
+    saying you carry one for them, and deliver measures the name, the reach
+    and the cell again when the line arrives. Answers whether it was used,
+    so an E on anybody else goes on to the board, the driver or the trader.
+  */
+  function deliverPress(e) {
+    if (!e || !lookingAt) { return false; }
+    if (DELIVER_KEY ? e.code !== DELIVER_KEY : e.userEventName !== 'Activate') { return false; }
+    if (claims.chat) { return false; }
+    if (busyMenuOpenNow()) { return false; }
+    const near = nearList();
+    const row = (near && Object.prototype.hasOwnProperty.call(near, lookingAt)) ? near[lookingAt] : null;
+    if (!row || !row.d) { return false; }
+    return lookVerb('deliver');
+  }
+
   function sleepPress() {
     if (!lookingAt) { return false; }
     if (claims.chat) { return false; }
@@ -7557,6 +7597,9 @@
 
     if (!T.ready) return;
 
+    // E on somebody you carry a letter for hands it over (#1595), before the
+    // trader's E below takes any press on a person.
+    if (deliverPress(e)) return;
     if (boardPress(e)) return;
     if (driverPress(e)) return;
     if (merchantPress(e)) return;
