@@ -183,8 +183,15 @@ yes('the staff spells block exports its table (' + spellKeys.length + ' spells)'
 
 const staffRows = Object.keys(TABLE).filter(function (k) { return TABLE[k].half === 'Bladebinder'; });
 const withSpell = staffRows.filter(function (k) { return !!TABLE[k].spell; });
-yes('160 of the Bladebinder rows name the spell they bind (' + withSpell.length + ' of ' + staffRows.length + ')',
-    withSpell.length === 160);
+// The craft book was cut on 2 October (#1511): thirteen staves stay Bladebinder
+// work and the rest became nobody's, so the count is the table's, not a fixed
+// number. Each staff that stays names the spell it binds. Before the cut the one
+// row that named none was the Aetherial Staff (575e:Dawnguard.esm), which the
+// table builder finds no spell for; it is allowed to name none if it comes back.
+const NO_SPELL = { '575e:Dawnguard.esm': true };
+const needSpell = staffRows.filter(function (k) { return !NO_SPELL[TABLE[k].out]; });
+yes('every Bladebinder staff names the spell it binds (' + withSpell.length + ' of ' + staffRows.length + ')',
+    staffRows.length > 0 && needSpell.every(function (k) { return !!TABLE[k].spell; }));
 yes('every spell a staff row names is in STAFF_SPELLS',
     withSpell.every(function (k) { return Object.prototype.hasOwnProperty.call(SPELLS, TABLE[k].spell); }));
 const taughtSpells = spellKeys.filter(function (k) { return (SPELLS[k].tomes || []).length > 0; });

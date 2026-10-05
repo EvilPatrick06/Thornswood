@@ -302,7 +302,8 @@ section(function () {
   yes('the door is in gamemode.js between its markers', d0 >= 0 && d1 > d0);
   const files = {};
   files[path.join('private', 'allowed.json')] = JSON.stringify({ enforce: false, profiles: [500, 501], devProfiles: [500],
-    adminProfiles: [500], staffRoleProfiles: [500], jarlProfiles: [500] });
+    adminProfiles: [500], staffRoleProfiles: [500], jarlProfiles: [500],
+    devRoleProfiles: [500], businessOwnerProfiles: [500], factionOwnerProfiles: [500] });
   const fakeFs = {
     readFileSync: function (p) { if (!Object.prototype.hasOwnProperty.call(files, p)) { const e = new Error('ENOENT'); e.code = 'ENOENT'; throw e; } return files[p]; },
     writeFileSync: function (p, s) { files[p] = String(s); }, appendFileSync: function () { }, existsSync: function () { return true; },
@@ -332,9 +333,33 @@ section(function () {
     trusted[501] = true;
     yes('and a proved profile still needs the role itself', box.__thornswoodIsAdmin(501) === false && box.__thornswoodIsAllowed(501) === true);
   }
+  /*
+    The book roles (#1417): staff, Dev, Business Owner and Faction Owner, which
+    decide who may found or open a group book. The same rule as the five above:
+    nothing for a profile the pass has not proved.
+  */
+  if (ran && typeof box.__thornswoodBookRoles === 'function') {
+    const roles = ['staff', 'dev', 'business', 'faction'];
+    delete trusted[500];
+    const before = box.__thornswoodBookRoles(500);
+    yes('the book roles are all no for a profile the pass has not proved', roles.every(function (r) { return before[r] === false; }));
+    trusted[500] = true;
+    const after = box.__thornswoodBookRoles(500);
+    yes('and all yes once proved, for a profile that holds them', roles.every(function (r) { return after[r] === true; }));
+    yes('and a proved profile with none of them holds none', roles.every(function (r) { return box.__thornswoodBookRoles(501)[r] === false; }));
+  } else {
+    yes('the book roles answer is in the door (#1417)', false);
+  }
   const door = src.slice(d0, d1);
+  // The door's own check is tick(): it reads the list straight, because it
+  // runs before any pass can have arrived.
+  const tickAt = door.indexOf('function tick() {');
+  const tickEnd = tickAt < 0 ? -1 : door.indexOf('\n  function ', tickAt + 1);
+  const tickBody = tickAt < 0 ? '' : door.slice(tickAt, tickEnd < 0 ? door.length : tickEnd);
   yes('the door\'s own check of who may connect does not go through the pass (it runs before one can arrive)',
-      !/function (judge|check|sweep|decide)[\s\S]{0,400}__thornswoodPassTrusts/.test(door) && (door.match(/passProved\(/g) || []).length === 6);
+      tickAt >= 0 && /conf\.ids\[pid\]/.test(tickBody) &&
+      !/__thornswoodPassTrusts|passProved\(/.test(tickBody) &&
+      (door.match(/function passProved\(/g) || []).length === 1);
 });
 
 // ---------------------------------------------------------------- 6. voice and the feed
