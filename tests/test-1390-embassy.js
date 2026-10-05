@@ -219,6 +219,8 @@ if (block && RECIPES && ADMIN_ITEMS) {
     yes('R5 a file with 25 on the roll loads 20', rolls.embassy.length === 20);
     yes('R5 and with 9 marked armed loads 6', rolls.embassy.filter(function (r) { return r.armed; }).length === 6);
     yes('R5 and a row that is not a person is dropped', rolls.remnant.length === 0);
+    const bomFiles = {}; bomFiles[file] = String.fromCharCode(0xFEFF) + env.files[file];
+    yes('R5 a roll file saved with a byte order mark still reads', load({ files: bomFiles }).R.has(0xff001001, 'embassy'));
   }
   {
     // A write that fails changes nothing.

@@ -38839,7 +38839,7 @@ log('gamemode loaded:',
     var file = privatePath(ROLL_FILE);
     var text = null;
     try {
-      text = String(require('fs').readFileSync(file, 'utf8')).replace(/^﻿/, '');
+      text = String(require('fs').readFileSync(file, 'utf8')).replace(/^\uFEFF/, '');
     } catch (e) {
       if (e && e.code === 'ENOENT') { return out; }
       unreadable = String(e && e.message ? e.message : e);
