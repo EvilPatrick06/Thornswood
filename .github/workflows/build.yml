@@ -341,6 +341,7 @@ jobs:
                  'test-1717-property-page.js',
                  'test-1703-test-ports.js',
                  'test-1721-social-tick.js',
+                 'test-1323-door-limits.js',
                  'test-1330-webview2-signature.js',
                  'test-table-install.js',
                  'test-secrets-fail-closed.js',
