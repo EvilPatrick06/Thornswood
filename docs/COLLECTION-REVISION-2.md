@@ -160,7 +160,11 @@ setting so the stale Steam deployment cannot win discovery.
 Refresh Main's own folder and a separate Dev own folder from that deployment.
 Never generate directly inside a folder containing vortex.deployment.json.
 The release's Dev own folder is C:\Thornswood-Release-DevBuild; its launcher
-and server still use Dev's channel and ports.
+and server still use Dev's channel and ports. Record it once with
+scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root C:\Thornswood-Release-DevBuild,
+so Ship, Check-ShipReady and Build-Generated take it without -Root; Ship
+refuses C:\Thornswood-DevBuild, Vortex's folder, before anything is built
+(issue #1692).
 
 Check: each release folder has Profile\OwnGame\files.txt, records the
 actual Vortex source in made.txt, and has no Vortex deployment manifest.
