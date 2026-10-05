@@ -111,8 +111,8 @@ has never left yet has no time on the row.
 Online is the same fact a friend list already uses: they are in the
 world right now. Last played is new. It is a time, not a place.
 
-You invite the character in front of you, or by name the way
-`/friend` does. The offer stands for 45 seconds. They accept. Until
+You invite the character in front of you, or by name. The offer
+stands for 45 seconds. They accept. Until
 they accept, they do not see the tab.
 
 `/book invite` and the name. `/book leave` drops this character. If

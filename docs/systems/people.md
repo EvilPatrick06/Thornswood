@@ -30,8 +30,9 @@ is what you type. A plain line, a `/me`, a `/do`, a whisper, a shout,
 and an `/ooc` also sit above the head for whoever is close enough to
 read them. Out of character stays in brackets, including there, so a
 scene can see that it stepped out. You can stop hearing one person,
-stop reading them, or hide their name, and only for yourself.
-`/hidename all` hides every name. A staff silence is everybody's,
+stop reading them, or hide their name, and only for yourself, from
+P, for a friend or anybody near you. Hide every name, on P, hides
+every name. A staff silence is everybody's,
 and the person cannot lift it.
 
 ## Bard

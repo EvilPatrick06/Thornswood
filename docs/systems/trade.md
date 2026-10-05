@@ -8,16 +8,17 @@ not a haul and it is not the Merchant's Guild. Those are
 
 ## How it starts
 
-Look at them and press H, or `/trade` and their name. A prompt
-appears on their screen with Accept and Refuse, the same prompt a
-friend request uses. They do not type a command to answer. The offer
-stands for 45 seconds.
+Look at them and press H, or press Trade beside them under Near you
+on the P panel. A prompt appears on their screen with Accept and
+Refuse, the same prompt a friend request uses. Nobody types a command
+to offer or to answer. The offer stands for 45 seconds.
 
 You have to be within about 10 metres. 700 units. A trade that
 carries on across Skyrim is a post office, and it is refused.
 
 One trade at a time. If either of you is already in one, the new one
-does not start.
+does not start. Asking while you are in one brings its window back
+up, in case it was closed.
 
 ## The panel
 
@@ -44,16 +45,17 @@ and None.
 
 ## What goes on the table
 
-`/trade add` and the thing, and a count if it is more than one.
-`/trade gold` and the amount. You cannot put up more gold than you
-are holding. Each side can put up 24 lines. The buttons on the panel
-send those same words. A person uses the buttons.
+The buttons on the panel put a thing up, with a count, and Set puts
+up gold. You cannot put up more gold than you are holding. Each side
+can put up 24 lines. A person uses the buttons; nobody types a
+command for any of it.
 
-Both confirm with `/trade ok`. Any change to either pile clears both
+Both press Agree. Any change to either pile clears both
 confirmations. One side does not get to swap a sword for a worse one
 after the other has already agreed.
 
-`/trade cancel` ends it. Nothing has moved until both have confirmed.
+Walk away, or Escape, ends it. Nothing has moved until both have
+confirmed.
 
 If nobody touches it for 3 minutes, it ends. The check is every 2
 seconds.
@@ -74,5 +76,8 @@ it an ordinary trade. Either way both confirmations are cleared.
 
 The offer, the prompt, the names, the groups, the buttons, the
 distance, the two confirmations, the 24 lines, the 3 minutes, and
-the gold check are in the server. Accept and Refuse on that prompt
-are what a person presses. So is Buy for the company.
+the gold check are in the server. H and Trade under Near you on P
+offer it. Accept and Refuse on that prompt are what a person presses.
+So are Agree, Walk away and Buy for the company. The key and the
+buttons send the server the lines `/trade` and its verbs once were,
+and nobody is told to type them.
