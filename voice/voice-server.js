@@ -60,7 +60,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-doors-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-doors-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -854,6 +854,20 @@ class Sock {
       const b0 = this.buf[0], b1 = this.buf[1];
       const op = b0 & 0x0f;
       const masked = (b1 & 0x80) !== 0;
+      /*
+        A frame from the client that is not masked ends the connection
+        (#1351). RFC 6455 section 5.1: "The server MUST close the connection
+        upon receiving a frame that is not masked", and it may say why with
+        1002, a protocol error. This used to read such a frame as it was.
+        Every browser masks every frame, and so do the harnesses that write
+        their own (voice/test-backpressure.js, voice/test-keepalive.js), so
+        nothing that talks to this service sends one.
+      */
+      if (!masked) {
+        try { this.socket.write(Buffer.from([0x88, 2, 0x03, 0xea])); } catch (e) { }   // FIN+close, len 2, 1002
+        this.close();
+        return;
+      }
       let len = b1 & 0x7f;
       let off = 2;
 
