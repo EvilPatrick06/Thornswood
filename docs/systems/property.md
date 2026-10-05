@@ -182,7 +182,7 @@ is `private/property.json`. Eviction, the rent and marking a box are
 the Office page of the K panel, for a steward or a Jarl; see
 [Offices](offices.md). A container is made one of the ten holds' boxes
 and no other. The rent owed is on that page for the steward at the
-door; a holder does not see it on a panel yet.
+door, and on the property page of K for the holder.
 
 Claiming, locking, unlocking and cutting a key are the lock key, with
 nothing typed (#1637). The server writes the door's word, Claim, Lock or
@@ -194,7 +194,9 @@ sends the forge's id, and the server checks that it is one of the
 forges the bench table knows and that the smith is standing at it, as
 it checks a door for the mold key. The lines it sends are in
 [Chat commands](commands.md), and no help names them. The property page
-on K lists each building with the rent owed on it, and the farm. The
+on K lists each building with the rent owed on it, and the farm. Until
+#1717 the page looked for that list in its own table instead of on the
+panel view the server sends, so it never appeared for anybody. The
 suggested answers on #1637 are what is built until Patrick answers
 there: one key that locks and unlocks and says which, what you hold on
 K, the same key to claim at a door and to cut at a forge, and one iron
