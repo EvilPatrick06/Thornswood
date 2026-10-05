@@ -1475,7 +1475,7 @@ if (-not $Dev -and -not $hotfix -and -not $DryRun -and -not $Package) {
         Die (("Thornswood-Setup.zip is {0} release{1} behind, built {2:d MMM HH:mm}, and a main release would leave it further behind. " -f `
                  $ins.Behind, $(if ($ins.Behind -eq 1) { '' } else { 's' }), $ins.ZipTime) +
              'Anyone installing from it would sit through all of those on first launch. Rebuild it as part of this ' +
-             'release by adding -Package, or run .\scripts\release\Package-Thornswood.ps1 first, then Ship.')
+             'release by adding -Package, or run .\scripts\release\Package-Thornswood.ps1 -OneFile first, then Ship.')
     }
 }
 
@@ -1660,7 +1660,7 @@ function Show-Installer {
     if (-not $haveZip) {
         Head 'The installer'
         Say '  there is no Thornswood-Setup.zip yet, so nobody new can install.' 'Yellow'
-        Say '  .\scripts\release\Package-Thornswood.ps1   builds it' 'Yellow'
+        Say '  .\scripts\release\Package-Thornswood.ps1 -OneFile   builds it' 'Yellow'
         return
     }
     if ($behind -le 0) {
@@ -1673,7 +1673,7 @@ function Show-Installer {
          $behind, $(if ($behind -eq 1) { '' } else { 's' }), $zipTime) 'Yellow'
     Say '  Anyone installing from it sits through all of those on first launch.' 'Yellow'
     Say '  Nobody who already has the game is affected.' 'DarkGray'
-    Say '  .\scripts\release\Package-Thornswood.ps1   to rebuild it, twenty minutes or so' 'Yellow'
+    Say '  .\scripts\release\Package-Thornswood.ps1 -OneFile   to rebuild it, twenty minutes or so' 'Yellow'
 }
 
 # Anything other than 0 or 2 means the publisher stopped on an error. It used
@@ -1732,11 +1732,18 @@ elseif ($Package -and $DryRun) {
     # that changes what the next release says; see the Publishing section.
     Show-Installer
     Say '  dry run, so not rebuilt: Package-Thornswood.ps1 puts what it builds on the site' 'Yellow'
-    Say ('  .\scripts\release\Package-Thornswood.ps1 -NoPublish -OutDir "' + $DistDir + '"   builds it and publishes nothing') 'DarkGray'
+    Say ('  .\scripts\release\Package-Thornswood.ps1 -OneFile -NoPublish -OutDir "' + $DistDir + '"   builds it and publishes nothing') 'DarkGray'
 }
 elseif ($Package) {
     Head 'Rebuilding the installer'
-    $pkgArgs = @{ Root = $Root; OutDir = $DistDir; NoPause = $true }
+    # THE ONE FILE SHAPE, issue #1213: the payload attached to
+    # Thornswood-Setup.exe, which is what the site has carried since the
+    # payload came under a gigabyte (Package-Thornswood.ps1 -OneFile says why).
+    # Without it Package-Thornswood builds the two file shape, a small exe that
+    # downloads Thornswood-Setup.zip, and a main Ship would put that on the
+    # site under the same name. Which shape the site carries is Patrick's, asked
+    # on #1213; this keeps the one it has.
+    $pkgArgs = @{ Root = $Root; OutDir = $DistDir; NoPause = $true; OneFile = $true }
     if ($ciStub) { $pkgArgs['Stub'] = $ciStub }
     & (Join-Path $Here 'Package-Thornswood.ps1') @pkgArgs
 
@@ -1762,9 +1769,9 @@ elseif ($Package) {
         $script:InstallerFailed = $LASTEXITCODE
         Say "  THE INSTALLER DID NOT BUILD. Package-Thornswood.ps1 exited with $LASTEXITCODE." 'Red'
         Say '  The release itself is already published and is fine. What is not' 'Red'
-        Say '  rebuilt is Thornswood-Setup.zip, so anybody installing from scratch' 'Red'
+        Say '  rebuilt is Thornswood-Setup.exe, so anybody installing from scratch' 'Red'
         Say '  sits through this release on first launch.' 'Red'
-        Say '  .\scripts\release\Package-Thornswood.ps1   to put that right' 'Yellow'
+        Say '  .\scripts\release\Package-Thornswood.ps1 -OneFile   to put that right' 'Yellow'
     }
 }
 else {
@@ -1972,7 +1979,7 @@ Head 'Done'
 if ($script:InstallerFailed) {
     Say ("The installer did NOT rebuild (exit $script:InstallerFailed). The release went out " +
          'without it.') 'Red'
-    Say '  .\scripts\release\Package-Thornswood.ps1' 'Yellow'
+    Say '  .\scripts\release\Package-Thornswood.ps1 -OneFile' 'Yellow'
     Write-Host ''
 }
 # The release is out either way, and the people who would have read the post

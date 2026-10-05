@@ -27,7 +27,8 @@
 
     D  -DryRun -Package on main
     V  -DryRun -Package on dev
-    R  a real Ship -Package on main
+    R  a real Ship -Package on main, which builds the installer in the one
+       file shape the site carries (-OneFile, #1213)
     E  -DryRun on dev, numbered from what the store says dev has published
 
   R is there so D and V prove something: the same stand-ins, on a real Ship,
@@ -337,7 +338,7 @@ if (-not $NoPush) {
 }
 '@
     # The real one's last step, which the static check above holds it to.
-    Stub 'Package-Thornswood' '[string]$Root, [string]$OutDir, [switch]$NoPause, [switch]$NoPublish, [string]$ReleaseDir, [string]$Stub' @'
+    Stub 'Package-Thornswood' '[string]$Root, [string]$OutDir, [switch]$NoPause, [switch]$NoPublish, [string]$ReleaseDir, [string]$Stub, [switch]$OneFile' @'
 if (-not $NoPublish) { & (Join-Path $PSScriptRoot 'Publish-Installer.ps1') -OutDir $OutDir }
 '@
     Stub 'Publish-Installer' '[string]$OutDir, [switch]$OneFile' ''
@@ -437,7 +438,7 @@ if ($dir) {
     $go = Called $d 'Go'
     Yes 'D Go.ps1 is told to leave the server alone' ($go.Count -eq 1 -and $go[0] -match ' -SkipServer\b')
     Yes 'D it says the installer was not rebuilt' ($d.Out -match 'not rebuilt')
-    Yes '  and gives the command that builds it and publishes nothing' ($d.Out -match [regex]::Escape('Package-Thornswood.ps1 -NoPublish -OutDir "' + $distDir + '"'))
+    Yes '  and gives the command that builds it and publishes nothing, in the one file shape the site carries (#1213)' ($d.Out -match [regex]::Escape('Package-Thornswood.ps1 -OneFile -NoPublish -OutDir "' + $distDir + '"'))
     Yes 'D version.json is byte for byte what it was' ((Hash $feed) -eq $was.feed)
     Yes '  and so is the baseline' ((Hash $base) -eq $was.base)
     Yes '  and the dev feed is not reset to match' ((Hash $devFeed) -eq $was.dev)
@@ -473,6 +474,7 @@ if ($dir) {
     Yes ('R the installer is built, without -NoPublish, into the staging folder' + $(if ($pk.Count) { ' (' + ($pk -join '; ') + ')' } else { '' })) (
         $pk.Count -eq 1 -and $pk[0] -notmatch ' -NoPublish\b' -and $pk[0].Contains(' -OutDir ' + $distDir))
     Yes '  around the setup program CI built for the tag, not one from out\ (#932)' ($pk.Count -eq 1 -and $pk[0] -match ' -Stub \S*setup-stub\.exe')
+    Yes '  in the one file shape the site carries, -OneFile (#1213)' ($pk.Count -eq 1 -and $pk[0] -match ' -OneFile\b')
     Yes '  and so it goes on the site: Publish-Installer.ps1 is called' ((Called $r 'Publish-Installer').Count -eq 1)
     foreach ($n in 'Publish-News', 'Publish-Discord', 'Request-Restart') {
         Yes "R $n.ps1 is called" ((Called $r $n).Count -eq 1)
