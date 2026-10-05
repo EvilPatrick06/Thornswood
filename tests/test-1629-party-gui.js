@@ -70,7 +70,27 @@ const lookVerb = slice(front, '  function lookVerb(cmd) {', '\n  }\n');
 yes('the key handler, partyPress and lookVerb are in the plugin',
     keys !== null && menus !== null && partyPress !== null && lookVerb !== null);
 
-const G = 34, P = 25;
+/*
+  The keys as the plugin declares them: every `const ..._KEY` and ESC at the
+  top of its scope, in its order, read through the plugin's own iniNumber from
+  a Thornswood.ini that is empty unless a case gives it lines. Read from the
+  plugin rather than typed here (#1652): a typed copy kept the friend key on G
+  after #529 moved it to Y, so the harness pressed a key the plugin no longer
+  reads.
+*/
+const KEY_DECLS = (front.match(/^  const (?:[A-Z]+_)*KEY\b[^;\n]*;|^  const ESC = \d+;/gm) || []).join('\n');
+const INI_AT = front.indexOf('  function iniNumber(text, key, fallback) {');
+const INI_NUMBER = INI_AT < 0 ? '' : front.slice(INI_AT, front.indexOf('\n  }\n', INI_AT) + 4);
+function keyPrelude(iniText) {
+  return 'const ini = ' + JSON.stringify(iniText || '') + ';\n' + INI_NUMBER + KEY_DECLS + '\n';
+}
+yes('the plugin reads its keys through iniNumber', INI_NUMBER !== '' && KEY_DECLS !== '');
+const KEY = INI_NUMBER === '' ? {} : new Function(keyPrelude('') + 'return { ' +
+  (KEY_DECLS.match(/const \w+/g) || []).map(function (d) { return d.slice(6) + ': ' + d.slice(6); }).join(', ') + ' };')();
+
+const Y = KEY.FRIEND_KEY, P = KEY.PARTY_KEY;
+yes('the plugin declares every key the handler reads', !!keys &&
+    (keys.match(/\b(?:[A-Z]+_)*KEY\b|\bESC\b/g) || []).every(function (k) { return typeof KEY[k] === 'number'; }));
 const HEX = 'ff000004';
 
 function rig(opts) {
@@ -114,28 +134,26 @@ function rig(opts) {
     'let keysSeen = 0, stuckKeys = 0, stuckMoveKeys = 0, sawAnyKey = true;\n' +
     menus + '\n' +
     "const JOURNAL_MENU = 'Journal Menu';\n" +
-    'const ESC = 1, CHAT_KEY = 28, SKILLS_KEY = 37, PARTY_KEY = 25, JOURNAL_KEY = 36,\n' +
-    '      FRIEND_KEY = 34, TRADE_KEY = 35, MUTE_KEY = 38, MOLD_KEY = 22;\n' +
+    keyPrelude('') +
     'function rememberKey() { }\n' +
     'function wantTyping() { }\n' +
     'function journalKeyDown() { }\n' +
     'function journalKeyPressed() { }\n' +
     'function moldPress() { return false; }\n' +
-    'const SLEEP_KEY = 22; function sleepPress() { return false; }\n' +
+    'function sleepPress() { return false; }\n' +
     'function repairPress() { return false; }\n' +
     'function deliverPress() { return false; }\n' +
     'function boardPress() { return false; }\n' +
     'function driverPress() { return false; }\n' +
     'function merchantPress() { return false; }\n' +
-    'const LOCK_KEY = 45; function lockPress() { return false; }\n' +
+    'function lockPress() { return false; }\n' +
     // Tend their wounds (#1383), X on a hurt person, and Tend your wounds,
     // H in the inventory. Nobody hurt is looked at and no inventory is open
     // here; test-1383-treatments.js has what they do.
-    'const TREAT_KEY = 45, TREAT_SELF_KEY = 35;\n' +
     'function treatPress() { return false; }\nfunction treatSelfPress() { return false; }\n' +
-    'const MANEUVER_KEY = 10; function maneuverKeyPressed() { }\n' +
-    'const HELP_KEY = 65; function helpKeyPressed() { }\n' +
-    'const COMMAND_KEY = 53; function commandKeyPressed() { }\n' +
+    'function maneuverKeyPressed() { }\n' +
+    'function helpKeyPressed() { }\n' +
+    'function commandKeyPressed() { }\n' +
     'const statsOnSlash = { openedBy: function () { return ""; }, shutFor: function () { }, keyDown: function () { } };\n' +
     'function busyMenuOpen() { for (const n of KEYBOARD_MENUS) { if (sp.Ui.isMenuOpen(n)) { return n; } } return ""; }\n' +
     'let lookingAt = ' + JSON.stringify(opts.looking || '') + ';\n' +
@@ -209,7 +227,7 @@ if (keys && menus && partyPress && lookVerb) {
   }
   {
     const w = rig({ looking: HEX, near: stranger });
-    w.press(G);
+    w.press(Y);
     yes('K10 Y on the same person still asks to be friends', w.lines.length === 1 && w.lines[0] === '/friend ' + HEX);
   }
   yes('K11 the look prompt says Ask to party for one and Party menu for the other',

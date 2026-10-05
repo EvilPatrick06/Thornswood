@@ -35,17 +35,28 @@
     ($ThornswoodGamemodeKeys): those, and what Deploy-Gamemode.ps1 writes for
     the live server on purpose, because Deploy-Gamemode then Deploy-Server is
     the one route that changes them on live: offlineMode, the live voice
-    port, thornswoodServer main, the NPC, gear, reloot and damage settings,
-    and the join pass and the written role lists once Deploy-Gamemode has been
-    given them.
+    port, thornswoodServer main, and the NPC, gear, reloot and damage settings.
+
+  THE JOIN PASS AND THE WRITTEN ROLE LISTS ARE NEVER TAKEN FROM A BUILD
+  (#1223). thornswoodRequirePass, thornswoodDevs and thornswoodPlaytesters
+  used to be release keys, written into a machine's build by
+  Deploy-Gamemode.ps1 -RequirePass, -Devs and -Playtesters and kept in that
+  build for good, so every later Deploy-Server from that machine sent them
+  again: a second machine given -RequirePass off a week before would turn the
+  live hold off with nothing said but the key's name. Now they are the
+  server's own, like every switch, and change on live only when the person
+  deploying asks in that run: Deploy-Server.ps1 -RequirePass on|off, -Devs,
+  -Playtesters, set on the box by the carry ($Asked, below), the way
+  Deploy-DevGamemode.ps1 -RequirePass sets dev's.
 
   Everything else stays as the running server has it: every other thornswood
-  switch (the load order refusal, and the join pass on a publish), npcSettings,
+  switch (the load order refusal, the join pass), npcSettings, the role lists,
   the ports, the name, dataDir, and anything the release does not name. A key
   the release has and the server does not is not added, and a release key the
   release does not have stays as the server has it. On dev,
   Deploy-DevGamemode.ps1 is what changes the switches; on live, Deploy-Gamemode
-  then Deploy-Server. The two boxes keep their own, on their own folders.
+  then Deploy-Server, and Deploy-Server's own switches for the join pass and
+  the role lists. The two boxes keep their own, on their own folders.
 
   Values are compared as compact JSON, so an array and an object compare by
   what they hold. Nothing here prints a value: server-settings.json is the
@@ -56,10 +67,29 @@
 
 $ThornswoodInstallKeys = @('loadOrder', 'startPoints', 'thornswoodMostOnline', 'maxPlayers')
 $ThornswoodGamemodeKeys = @($ThornswoodInstallKeys + @(
-    'offlineMode', 'thornswoodVoicePort', 'thornswoodServer', 'thornswoodRequirePass',
-    'thornswoodDevs', 'thornswoodPlaytesters', 'npcEnabled', 'npcAllowCrimeFaction',
+    'offlineMode', 'thornswoodVoicePort', 'thornswoodServer', 'npcEnabled', 'npcAllowCrimeFaction',
     'npcAllowEssential', 'npcSettings', 'forbiddenReloot', 'equipmentSlotCheckEnabled',
     'equipmentSpellCheckEnabled', 'equipmentInventoryCheckEnabled', 'damageMultFormulaSettings'))
+# The keys only the person deploying sets, in that run, never a build (#1223):
+# Deploy-Server.ps1 -RequirePass, -Devs and -Playtesters.
+$ThornswoodAskedKeys = @('thornswoodRequirePass', 'thornswoodDevs', 'thornswoodPlaytesters')
+
+# What a Deploy-Server run asked for (#1223), as the $Asked that
+# Join-ThornswoodServerSettings takes: only the switches that were given.
+function New-ThornswoodAsked([string]$RequirePass = '', [long[]]$Devs = @(), [long[]]$Playtesters = @()) {
+    $a = [ordered]@{}
+    if ($RequirePass) { $a['thornswoodRequirePass'] = ($RequirePass -eq 'on') }
+    if (@($Devs).Count) { $a['thornswoodDevs'] = @($Devs) }
+    if (@($Playtesters).Count) { $a['thornswoodPlaytesters'] = @($Playtesters) }
+    return $a
+}
+
+# The line Deploy-Server puts in front of $settingsCarryBlock, so the box has
+# $Asked: booleans and profile numbers only, as JSON in one quoted string.
+function Get-ThornswoodAskedLine($Asked) {
+    $json = ConvertTo-Json -InputObject $Asked -Compress -Depth 5
+    return ('$Asked = ''' + $json.Replace("'", "''") + ''' | ConvertFrom-Json' + "`r`n")
+}
 
 function Get-ThornswoodSettingText($Value) {
     if ($null -eq $Value) { return 'null' }
@@ -82,31 +112,47 @@ function Get-ThornswoodSettingNames($Settings) {
   thornswoodRequirePass, or no role lists, kept the running server's and the
   run said only which keys moved, so it read the same as one that had set
   them. Now each is named. Names only, never a value.
+
+  $Asked (#1223) is what the person deploying asked for in this run, as an
+  object of key and value: Deploy-Server.ps1 -RequirePass, -Devs and
+  -Playtesters. Each is put in over the running server's, whatever the
+  release has, and comes back as Set (the asked keys that move) and in Said.
+  A key asked for is never taken from the release and never called kept or
+  absent, even when $Keys names it (Deploy-Server's read-back list does).
 #>
-function Join-ThornswoodServerSettings($Running, $Release, [string[]]$Keys) {
+function Join-ThornswoodServerSettings($Running, $Release, [string[]]$Keys, $Asked = $null) {
     $runNames = Get-ThornswoodSettingNames $Running
     $relNames = Get-ThornswoodSettingNames $Release
+    $askNames = Get-ThornswoodSettingNames $Asked
     $out = [ordered]@{}
     foreach ($n in $runNames) { $out[$n] = $Running.$n }
     $changed = @()
     foreach ($k in $Keys) {
-        if ($relNames -notcontains $k) { continue }
+        if ($relNames -notcontains $k -or $askNames -contains $k) { continue }
         if ($runNames -notcontains $k -or (Get-ThornswoodSettingText $Running.$k) -ne (Get-ThornswoodSettingText $Release.$k)) { $changed += $k }
         $out[$k] = $Release.$k
     }
+    $set = @()
+    foreach ($k in $askNames) {
+        if ($runNames -notcontains $k -or (Get-ThornswoodSettingText $Running.$k) -ne (Get-ThornswoodSettingText $Asked.$k)) { $set += $k }
+        $out[$k] = $Asked.$k
+    }
     $kept = @()
     foreach ($k in $relNames) {
-        if ($Keys -contains $k) { continue }
+        if ($Keys -contains $k -or $askNames -contains $k) { continue }
         if ($runNames -notcontains $k -or (Get-ThornswoodSettingText $Running.$k) -ne (Get-ThornswoodSettingText $Release.$k)) { $kept += $k }
     }
-    $absent = @($Keys | Where-Object { $relNames -notcontains $_ })
+    $absent = @($Keys | Where-Object { $relNames -notcontains $_ -and $askNames -notcontains $_ })
     $said = @()
     if ($changed.Count) { $said += ('the settings this release changes: ' + ($changed -join ', ')) }
     else { $said += 'this release changes none of the settings' }
+    if ($set.Count) { $said += ('set as this run asked: ' + ($set -join ', ')) }
+    $same = @($askNames | Where-Object { $set -notcontains $_ })
+    if ($same.Count) { $said += ('already as this run asked, so unchanged: ' + ($same -join ', ')) }
     if ($absent.Count) { $said += ('not in the release, so left as the running server has them: ' + ($absent -join ', ')) }
     if ($kept.Count) { $said += ('kept as the running server has them, not as the release had them: ' + ($kept -join ', ')) }
     $said += ('every other setting of the ' + $runNames.Count + ' the running server has is carried across as it is')
-    return [pscustomobject]@{ Settings = [pscustomobject]$out; Changed = $changed; Kept = $kept; Absent = $absent; Said = $said }
+    return [pscustomobject]@{ Settings = [pscustomobject]$out; Changed = $changed; Set = $set; Kept = $kept; Absent = $absent; Said = $said }
 }
 
 # The keys outside -Keys whose values differ between two settings objects, or
@@ -129,8 +175,8 @@ function Compare-ThornswoodCarried($Before, $After, [string[]]$Keys) {
   one way to turn it off, and anything that is neither true nor false holds.
   A server whose settings hold neither would change what it does the moment a
   new gamemode reached it, with nobody having asked, so Deploy-Server's carry
-  refuses one until Deploy-Gamemode.ps1 -RequirePass says which. Returns ''
-  for true or false, otherwise the reason, which names the key and not its
+  refuses one until Deploy-Server.ps1 -RequirePass says which (#1223). Returns
+  '' for true or false, otherwise the reason, which names the key and not its
   value.
 #>
 function Get-ThornswoodPassSwitchProblem($Settings) {
@@ -138,8 +184,8 @@ function Get-ThornswoodPassSwitchProblem($Settings) {
     if ($names -contains 'thornswoodRequirePass' -and $Settings.thornswoodRequirePass -is [bool]) { return '' }
     $had = 'missing'
     if ($names -contains 'thornswoodRequirePass') { $had = 'neither true nor false' }
-    return ('thornswoodRequirePass is ' + $had + ' on this server and in the release, and the gamemode reads ' +
-            'that as on (#1319). Say which with .\scripts\deploy\Deploy-Gamemode.ps1 -RequirePass on, or off, then deploy again.')
+    return ('thornswoodRequirePass is ' + $had + ' on this server and this run did not say which, and the gamemode reads ' +
+            'that as on (#1319). Say which with .\scripts\deploy\Deploy-Server.ps1 -RequirePass on, or off.')
 }
 
 <#
@@ -170,12 +216,14 @@ function Get-ThornswoodServerSettingsProblems($Settings, [string]$Channel = '') 
 <#
   Deploy-Server.ps1's carry, run on the box against its stage, after the files
   are up and before the stage is checked. It takes $Root, $Stage and
-  $ReleaseKeys from the lines SwapVars puts in front of it, and this file's
-  functions from the text Deploy-Server puts in front of those. Ends with
-  CARRIED <sha256 of the settings it wrote> or CARRY REFUSED.
+  $ReleaseKeys from the lines SwapVars puts in front of it, $Asked (what this
+  run asked for, #1223; absent is nothing) from the line Deploy-Server puts
+  after those, and this file's functions from the text in front of them all.
+  Ends with CARRIED <sha256 of the settings it wrote> or CARRY REFUSED.
 #>
 $settingsCarryBlock = @'
 $ProgressPreference = 'SilentlyContinue'
+if (-not (Test-Path -LiteralPath variable:Asked)) { $Asked = $null }
 $stageDir = Join-Path $Root $Stage
 $sp = Join-Path $stageDir 'server-settings.json'
 $run = $null
@@ -188,7 +236,7 @@ if ($null -eq $run -or $null -eq $rel) {
   'the stage is cleared and the server was not touched'
   'CARRY REFUSED'
 } else {
-  $m = Join-ThornswoodServerSettings $run $rel $ReleaseKeys
+  $m = Join-ThornswoodServerSettings $run $rel $ReleaseKeys $Asked
   foreach ($l in $m.Said) { $l }
   $passWhy = Get-ThornswoodPassSwitchProblem $m.Settings
   if ($passWhy) {

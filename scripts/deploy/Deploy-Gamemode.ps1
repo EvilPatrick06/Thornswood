@@ -113,39 +113,14 @@ param(
     [double]$HitsOnNpcs   = 2.0,
 
     <#
-      Who may run /tp, /goto, /restart and the rest, written down.
-
-      Patrick, 21 September, on the dev server: "Dev has no playtetser list so
-      I can't tp like I can on main", and after the roster copy went in, "still
-      can't tp says no list".
-
-      THERE ARE TWO ROLE SOURCES AND THE WRITTEN ONE WINS FIRST. rolelist reads
-      thornswoodDevs and thornswoodPlaytesters straight out of
-      server-settings.json, and only if neither names anybody does it fall
-      through to the Discord roster in private\door.json. The roster is the
-      better source, because a playtester added in Discord is a playtester
-      without anybody editing a file. It is also the one that depends on a
-      folder existing on the VPS, on the door having fetched, and on an install
-      not having deleted it, and every one of those has failed this week.
-
-      So the owner gets a written line that depends on none of it. The refusal
-      itself prints the number to put here: "Ask Patrick to add profile
-      <id>". Neither list is a secret and neither has a default, so a server
-      told nobody still has nobody, exactly as before.
-
-        -Devs 123456789
-        -Devs 123456789,987654321 -Playtesters 555,666
+      Who may run /tp, /goto, /restart and the rest, and whether a session is
+      held until its join pass arrives, are the live server's own, and this
+      script does not write them (#1223). They used to be -Devs,
+      -Playtesters and -RequirePass here, written into this machine's build
+      and kept there for good, so every later Deploy-Server from this machine
+      sent them to live again. Deploy-Server.ps1 -Devs, -Playtesters and
+      -RequirePass set them on the box, in the run that asks.
     #>
-    [long[]]$Devs        = @(),
-    [long[]]$Playtesters = @(),
-    # thornswoodRequirePass for the live server (#937, #410): on holds a
-    # session until its join pass arrives, off lets it act meanwhile, and a
-    # session with no pass is ended at three minutes either way. Left off, the
-    # built settings keep what they have, and Deploy-Server.ps1 refuses a
-    # server left with neither true nor false, because the gamemode reads that
-    # as on (#1319). Live goes on only when Patrick says Main.
-    [ValidateSet('', 'on', 'off')]
-    [string]$RequirePass = '',
     # Deploy even though the collection installed here is behind the one
     # Vortex knows is out. For the case where that is deliberate; it is a
     # refusal rather than a warning because a warning in a long run is a line
@@ -604,18 +579,19 @@ $s | Add-Member -NotePropertyName thornswoodVoicePort -NotePropertyValue $VoiceP
 # the voice port: a dev deploy pointed at this folder writes dev here, and the
 # live server would then refuse every pass the site issues for it.
 $s | Add-Member -NotePropertyName thornswoodServer -NotePropertyValue 'main' -Force
-if ($RequirePass) {
-    $s | Add-Member -NotePropertyName thornswoodRequirePass -NotePropertyValue ($RequirePass -eq 'on') -Force
+# The join pass hold and the written role lists are the live server's own and
+# never come from a build (#1223): Deploy-Server.ps1 -RequirePass, -Devs and
+# -Playtesters set them on the box. A build an older run of this script gave
+# them keeps them for good, because this file is read back and added to, so
+# they are taken out here and the build stops carrying a value nobody asked
+# this run for.
+$fromBuild = @('thornswoodRequirePass', 'thornswoodDevs', 'thornswoodPlaytesters' |
+               Where-Object { $s.PSObject.Properties.Name -contains $_ })
+foreach ($k in $fromBuild) { $s.PSObject.Properties.Remove($k) }
+if ($fromBuild.Count) {
+    Write-Host ('  taken out of this build, because the live server keeps its own: ' + ($fromBuild -join ', ')) -ForegroundColor Yellow
 }
-# The hold as the gamemode reads it: off only for false (#1319). Every session
-# needs a pass either way (#937).
-if ($s.PSObject.Properties.Name -contains 'thornswoodRequirePass' -and $s.thornswoodRequirePass -is [bool]) {
-    Write-Host ("  join pass: the hold is {0}" -f $(if ($s.thornswoodRequirePass) { 'on' } else { 'off' })) -ForegroundColor DarkGray
-} elseif ($s.PSObject.Properties.Name -contains 'thornswoodRequirePass') {
-    Write-Host '  join pass: thornswoodRequirePass in this build is neither true nor false, which Deploy-Server.ps1 refuses (#1319). -RequirePass on or off writes one.' -ForegroundColor Yellow
-} else {
-    Write-Host '  join pass: not in this build, so Deploy-Server.ps1 keeps the live server''s own, and refuses one with neither true nor false (#1319).' -ForegroundColor DarkGray
-}
+Write-Host '  join pass and role lists: the live server keeps its own; Deploy-Server.ps1 -RequirePass on|off, -Devs and -Playtesters change them (#1223).' -ForegroundColor DarkGray
 # Server-simulated NPCs. Off is SkyMP's default and it is the old multiplayer
 # mod's behaviour we are leaving behind: everyone gets their own private copy of every
 # bandit. On means one shared world. npcSettings stays empty, which is "no
@@ -763,28 +739,6 @@ $s | Add-Member -NotePropertyName damageMultFormulaSettings -NotePropertyValue (
     playerMultiplier = $HitsOnNpcs
 }) -Force
 
-<#
-  The written role lists. See -Devs and -Playtesters above.
-
-  Only written when something was passed. Writing an empty array would be
-  worse than leaving the key alone: rolelist treats an empty list as "nothing
-  written here" and falls through to the roster, but a key that is present and
-  empty is still a key somebody reading this file has to reason about, and the
-  last thing this needs is a second place that looks like it might be the
-  answer.
-#>
-if ($Devs.Count) {
-    $s | Add-Member -NotePropertyName thornswoodDevs -NotePropertyValue $Devs -Force
-    Write-Host ("  devs: {0} profile(s) written, so /tp works without the Discord roster" -f $Devs.Count) -ForegroundColor DarkGray
-} elseif ($s.PSObject.Properties.Name -contains 'thornswoodDevs') {
-    Write-Host ("  devs: {0} profile(s) kept from the server's own list" -f @($s.thornswoodDevs).Count) -ForegroundColor DarkGray
-}
-if ($Playtesters.Count) {
-    $s | Add-Member -NotePropertyName thornswoodPlaytesters -NotePropertyValue $Playtesters -Force
-    Write-Host ("  playtesters: {0} profile(s) written" -f $Playtesters.Count) -ForegroundColor DarkGray
-} elseif ($s.PSObject.Properties.Name -contains 'thornswoodPlaytesters') {
-    Write-Host ("  playtesters: {0} profile(s) kept from the server's own list" -f @($s.thornswoodPlaytesters).Count) -ForegroundColor DarkGray
-}
 Write-Host ("  damage: an NPC hitting a person x{0}, a person hitting an NPC x{1}" -f $HitsOnPeople, $HitsOnNpcs) -ForegroundColor DarkGray
 # Where a brand new character first appears, which is also where the gamemode
 # runs character creation. Skyrim Unbound's own creation room is the right
