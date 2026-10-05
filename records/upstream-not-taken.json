@@ -1,0 +1,4 @@
+{
+  "_note": "Upstream SkyMP commits the fork is not taking, each with why (issue #1791). tests\\test-fork-upstream.js goes red every night upstream skyrim-multiplayer/skymp main has a commit that thornswood/engine-changes does not, unless that commit is merged into the fork or is listed here. sha is the upstream commit in full, subject its first line, why the reason it is not taken, decided who said so and when. Changed by hand in a pull request; take an entry out if the commit is taken after all.",
+  "commits": []
+}
