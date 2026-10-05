@@ -32,13 +32,14 @@
 
   GM and VOICE point it at other copies of the two files, which is how it was
   shown to fail on the code before the change. Read only apart from its own
-  temp folder and two loopback ports.
+  temp folder and two loopback ports the system hands out.
 */
 const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const http = require('http');
+const net = require('net');
 const { spawn } = require('child_process');
 
 const CR = String.fromCharCode(13);
@@ -47,8 +48,10 @@ const VOICE = process.env.VOICE || path.join(REPO_DIR, 'voice', 'voice-server.js
 const gm = fs.readFileSync(GM, 'utf8').split(CR).join('');
 const voiceSrc = fs.readFileSync(VOICE, 'utf8').split(CR).join('');
 
-const PORT = 7911;        // the real service
-const FAKE = 7912;        // a stand-in service whose answers the test chooses
+// Both were fixed (7911 and 7912), so a build beside this one on the VPS could
+// answer it (#1703). They are set when the two start, below.
+let PORT = 0;             // the real service
+let FAKE = 0;             // a stand-in service whose answers the test chooses
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -70,20 +73,67 @@ async function until(cond, ms) {
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-command-ack-'));
 fs.copyFileSync(VOICE, path.join(dir, 'voice-server.js'));
 fs.copyFileSync(path.join(path.dirname(VOICE), 'headlines.js'), path.join(dir, 'headlines.js'));
-const srv = spawn(process.execPath, ['voice-server.js'], {
-  cwd: dir,
-  env: Object.assign({}, process.env, {
-    THORNSWOOD_VOICE_PORT: String(PORT),
-    THORNSWOOD_VOICE_AUTH: 'off',
-    THORNSWOOD_SITE: '',
-    THORNSWOOD_CHAT_DIR: path.join(dir, 'chat'),
-  }),
-});
+/*
+  A port of this run's own (#1703). Builds run side by side on the VPS, and
+  with a fixed number one run's requests can be answered by another run's
+  service. The system names a port nothing holds, the service is started on
+  it, and nothing is asked of the port until this service has said it is
+  listening there.
+*/
+function freePort(host) {
+  return new Promise((ok, bad) => {
+    const s = net.createServer();
+    s.on('error', bad);
+    s.listen(0, host, () => { const p = s.address().port; s.close(() => ok(p)); });
+  });
+}
+/* Waits for srv's own "listening on ...:port" line. If it stops first,
+   something took the port in between or it could not start, and the error
+   says which, with what it printed. */
+function listening(srv, port) {
+  return new Promise((ok, bad) => {
+    let out = '';
+    const said = (d) => {
+      out += d;
+      const m = /\[voice\] listening on \S+:(\d+)/.exec(out);
+      if (m && Number(m[1]) === port) { end(null); }
+    };
+    const more = (d) => { out += d; };
+    const gone = (code) => end(new Error((/EADDRINUSE/.test(out) ? 'something else already holds port ' + port + ', so ' : '') +
+                                         'the voice service stopped (exit ' + code + ') before it was listening. It printed:\n' + out));
+    const late = setTimeout(() => end(new Error('the voice service did not say it was listening on ' + port +
+                                                ' within fifteen seconds. It printed:\n' + out)), 15000);
+    function end(err) {
+      clearTimeout(late);
+      srv.stdout.removeListener('data', said);
+      srv.stderr.removeListener('data', more);
+      srv.removeListener('exit', gone);
+      if (err) { bad(err); } else { ok(); }
+    }
+    srv.stdout.on('data', said);
+    srv.stderr.on('data', more);
+    srv.on('exit', gone);
+  });
+}
+let srv = null;
 let srvLog = '';
-srv.stdout.on('data', (d) => { srvLog += d; });
-srv.stderr.on('data', (d) => { srvLog += d; });
-
-const base = 'http://127.0.0.1:' + PORT;
+let base = '';
+async function startVoice() {
+  PORT = await freePort('0.0.0.0');
+  base = 'http://127.0.0.1:' + PORT;
+  srv = spawn(process.execPath, ['voice-server.js'], {
+    cwd: dir,
+    env: Object.assign({}, process.env, {
+      THORNSWOOD_VOICE_PORT: String(PORT),
+      THORNSWOOD_VOICE_AUTH: 'off',
+      THORNSWOOD_SITE: '',
+      THORNSWOOD_CHAT_DIR: path.join(dir, 'chat'),
+    }),
+  });
+  srv.stdout.on('data', (d) => { srvLog += d; });
+  srv.stderr.on('data', (d) => { srvLog += d; });
+  await listening(srv, PORT);
+}
 async function health() {
   try { const r = await fetch(base + '/health'); if (r.ok) { return await r.json(); } } catch (e) { }
   return null;
@@ -196,10 +246,13 @@ function done() {
 }
 
 (async () => {
-  await new Promise((r) => fakeServer.listen(FAKE, '127.0.0.1', r));
-  let h = null;
-  for (let i = 0; i < 60 && !h; i++) { h = await health(); if (!h) { await wait(150); } }
-  if (!h) { console.log('the service never came up. log:\n' + srvLog); fail++; return; }
+  // The stand-in is in this process, so it listens on a port the system picks
+  // and is asked on the one it got.
+  await new Promise((r) => fakeServer.listen(0, '127.0.0.1', r));
+  FAKE = fakeServer.address().port;
+  try { await startVoice(); } catch (e) { console.log('the service never came up: ' + e.message); fail++; return; }
+  const h = await health();
+  if (!h) { console.log('the service did not answer /health. log:\n' + srvLog); fail++; return; }
 
   const offersMatch = /const COMMAND_OFFERS = (\d+);/.exec(voiceSrc);
   const OFFERS = offersMatch ? Number(offersMatch[1]) : 0;

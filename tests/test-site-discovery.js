@@ -46,6 +46,7 @@ async function main() {
     assert(desc && !descriptions.has(desc), 'unique description '+route); descriptions.add(desc);
     assert(r.body.includes('<link rel="canonical" href="https://thornswood.net'+route+'">'), 'canonical '+route);
     assert.equal((r.body.match(/<h1\b/g)||[]).length,1,'one source heading '+route);
+    assert(r.body.includes('<main id="main" tabindex="-1">'), 'keyboard skip target accepts focus '+route);
     assert(r.body.includes('property="og:url" content="https://thornswood.net'+route+'"'), 'share URL '+route);
     const ld = (r.body.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)||[])[1];
     const graph = JSON.parse(ld)['@graph'];

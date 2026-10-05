@@ -327,9 +327,13 @@ if (lifted && ORES) {
     vm.runInContext(qBlock, ctx);
     const inv = {};
     const ranks = { '1:miner': 'master', '2:miner': 'expert', '3:miner': 'master' };
+    const kept = {};
     const svc = ctx.__thornswoodCustomQuestsCreate({
       now: function () { return 5000; },
       goldDesc: 'f:Skyrim.esm',
+      // Each person's quests are kept on the character (#1621).
+      load: function (a) { return kept[a] ? JSON.parse(kept[a]) : undefined; },
+      save: function (a, rec) { kept[a] = JSON.stringify(rec); },
       addItem: function (a, item, n) { inv[a + '|' + item] = (inv[a + '|' + item] || 0) + n; return true; },
       takeItem: function (a, item, n) {
         if ((inv[a + '|' + item] || 0) < n) { return false; }
@@ -404,11 +408,22 @@ if (ORES && qBlock2) {
   const veinCell = {};
   const ranks = {};
   const logged = [];
+  // The custom properties on each character, as the server keeps them (#1621).
+  const made = {};
+  const props = {};
   const ctx = { console: console, Map: Map, Set: Set, Math: Math, Number: Number, String: String,
     Buffer: Buffer, JSON: JSON, Object: Object, Array: Array, RegExp: RegExp, Error: Error,
     Date: { now: function () { return clock.now; } },
     mp: {
-      get: function (id, key) { return key === 'locationalData' && veinCell[id] ? { cellOrWorldDesc: veinCell[id], pos: [0, 0, 0] } : undefined; },
+      makeProperty: function (name) { made[name] = true; },
+      get: function (id, key) {
+        if (key === 'locationalData') { return veinCell[id] ? { cellOrWorldDesc: veinCell[id], pos: [0, 0, 0] } : undefined; }
+        return props[id + '|' + key] ? JSON.parse(props[id + '|' + key]) : undefined;
+      },
+      set: function (id, key, v) {
+        if (!made[key]) { throw new Error('Property \'' + key + '\' doesn\'t exist'); }
+        props[id + '|' + key] = JSON.stringify(v);
+      },
       getDescFromId: function () { return ''; }
     },
     log: function () { logged.push([].slice.call(arguments).join(' ')); },

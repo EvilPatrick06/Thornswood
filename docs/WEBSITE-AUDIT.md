@@ -71,14 +71,19 @@ with a specific local law. This audit does not certify legal compliance.
 
 ## Remaining operational risks
 
-- Confirm the public operator details, jurisdiction and applicable adult-content
-  requirements before treating the existing policies as legally complete.
-- Keep copyright permission evidence for published graphics and community media.
-- Existing nightly backup policy changes behavior when total uploads exceed
-  300 MB: larger individual uploads can be omitted. The observed 3 October
-  upload set was about 18.8 MB and below that threshold. Review this policy
-  before the gallery grows; fixture restoration does not prove every future
-  production recording is backed up.
+- Operator details are confirmed: primarily Colorado, with an adult audience
+  in North and South America and Discord-only contact. UK/EU audiences are
+  not knowingly targeted. The [operational review](WEBSITE-OPERATIONS.md)
+  records the legal applicability questions that still require a decision;
+  geography and an eighteen-and-over notice do not establish compliance.
+- Keep copyright permission evidence for published graphics and community
+  media. The operational review inventories current assets without inventing
+  a licence or treating repository history as proof of ownership.
+- Nightly backups now take every upload regardless of the old thresholds,
+  with bounded-memory encryption and restore compatible with old archives.
+  Fault and collision regressions verify cleanup and preservation of earlier
+  archives. Free disk space and successful off-box recovery still need
+  monitoring as the gallery grows.
 - Browser and contrast checks cover the changed flows, not every assistive
   technology, device or public/private workflow.
 

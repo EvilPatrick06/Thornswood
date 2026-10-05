@@ -36,7 +36,10 @@ is the price: the second costs 25% more, the third 25% more again, and
 after the fourth the price is past any magicka for 20 seconds, with
 stamina and health recovery at -20%. The price moves through the value
 the game's own Fortify Restoration moves. Nobody has yet cast five in a
-row in the game to read the magicka each one asked for.
+row in the game to read the magicka each one asked for. The strain is
+kept in memory, so a restart ends it, and when you come back into the
+world the server sends your K panel as it stands at that moment, so
+none of it is left on you (issue #1642).
 
 The diminishing potions and withered are not in the server. Potions
 currently stack as the game allows, plus thirst. Withered waits for
