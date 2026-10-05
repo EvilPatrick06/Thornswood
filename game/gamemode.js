@@ -56471,14 +56471,27 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     });
   }
 
+  /*
+    A PERSON'S APPEARANCE, ONCE A PASS (#1721). Two things in a pass need
+    it: whether they are published for others (online, below) and their name.
+    The publish test used to ask the chargen block's publishedForOthers, which
+    reads the engine itself, outside this memo, so twenty people cost forty
+    appearance reads a pass, every 1.5 seconds. So the read is made here, once,
+    and the chargen block's own test of a stored face (hasStoredAppearance) is
+    asked of what came back. A read that throws is kept as that, and each
+    reader answers it the way it always has.
+  */
+  function appearanceOf(actorId) {
+    return memo('a' + actorId, function () {
+      try { return { ap: mp.get(actorId, 'appearance') }; } catch (e) { return { threw: true }; }
+    });
+  }
+
   function nameOfPerson(actorId) {
     return memo('n' + actorId, function () {
-      try {
-        var ap = mp.get(actorId, 'appearance');
-        var n = String((ap && ap.name) || '');
-        if (n) { return n; }
-      } catch (e) { }
-      return 'somebody';
+      var seen = appearanceOf(actorId);
+      var n = String((seen.ap && seen.ap.name) || '');
+      return n || 'somebody';
     });
   }
 
@@ -56487,10 +56500,13 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       var all = [];
       try { all = mp.get(0, 'onlinePlayers') || []; } catch (e) { return []; }
       var chargen = g.__thornswoodChargen;
-      if (!chargen || !chargen.publishedForOthers) { return all; }
+      if (!chargen || !chargen.hasStoredAppearance) { return all; }
       var out = [];
       for (var i = 0; i < all.length; i++) {
-        if (chargen.publishedForOthers(all[i])) { out.push(all[i]); }
+        // Published as publishedForOthers says: a face is stored, or the read
+        // threw, because hiding a returning character is the worse mistake.
+        var seen = appearanceOf(all[i]);
+        if (seen.threw || chargen.hasStoredAppearance(seen.ap)) { out.push(all[i]); }
       }
       return out;
     });
