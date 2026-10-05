@@ -35,8 +35,8 @@ Other places that tell people to type a command: the `/help` topics in
 the game (45550, topics talking, people, living, work, land and staff),
 the launcher's Help page (`launcher/app/Help.cs`, "Chat and commands"
 and "In game"), the system pages in this folder, the site's pages in
-`site/data/site`, and the server's own answers ("Say /ride and the
-stop"). Each conversion issue takes its commands out of all of them.
+`site/data/site`, and the server's own answers. Each conversion issue
+takes its commands out of all of them.
 
 ## Commands for people
 
@@ -73,7 +73,7 @@ and help text never lists it.
 | `/where` | Anybody today; a dev's tool | The cell, position and angle you stand at | `gamemode.js:45073` | The list | Stays a command, for dev and testers only. | #1633 |
 | `/apprentice <name> [half]`, `/apprentice end <name>`, `/apprentice` | A Master; anybody asks who is whose | Takes somebody on, ends it, says who is whose | `gamemode.js:40758`, `apprenticeCommand` (40656) | The list; `/help work`; [Masters and apprentices](apprenticeship.md), [Professions](professions.md), [Warrior](professions/warrior.md); the server's lines | Accept and Refuse for the learner. To come: a look prompt row for a Master, and the list on K. | #1634 |
 | `/study` | Anybody in the College rooms | A spell point in a semester | Never a word. Study on the K panel's College page sends `/pick study`, below | [Magic](magic.md), [Masters and apprentices](apprenticeship.md) | Study on K, which the server answers only in the College's rooms. | #1387 |
-| `/ride`, `/ride <stop>` | Anybody at a driver | Where the driver goes and the fares; pay and go | `gamemode.js:44593`, the carriages block's `command` (37864) | The list; [Carriages and ferries](carriages.md); the server's lines at 37782 and 37811 | E on a driver lists the stops in the chat. To come: a panel of stops. | #1635 |
+| `/ride`, `/ride <stop>` | Anybody at a driver | Where the driver goes and the fares; pay and go | The `/ride` branch of `handle`, then the carriages block's `command` | Nowhere. [Carriages and ferries](carriages.md) names E and the panel | E on a driver opens the panel of his stops and fares, and its Ride button sends `/ride` and the stop. Never in the list or the help. | #1635 |
 | `/plant`, `/plot`, `/claim` at a plot | Anybody with the class | Sows a plot, says what is in it, claims the farm | `gamemode.js:40701`, then the farming block's `command` (33866) | The list; `/help work`, `/help land`; [Farmer](classes/farmer.md) | Bringing a crop in is the press. To come: a line and keys at the plot. | #1636 |
 | `/claim` at a door, `/deed`, `/deeds` | Anybody | Claims a building and hands the deed; lists what you hold | `gamemode.js:40701`, then the property block's `command` (37264) | The list; `/help land`; [Property](property.md), [Embassy](embassy.md), [Thalmor](thalmor.md) | None. To come: a line and a key at the door, and a list on a panel. | #1637 |
 | `/lock`, `/unlock` | The holder, or whoever carries the deed, at the door | Locks and unlocks the building | `gamemode.js:37268`, `37269` | The list; `/help land`; [Property](property.md) | X sends `/lock`. To come: unlocking by key. | #1637 |

@@ -38695,15 +38695,23 @@ log('gamemode loaded:',
   CARRIAGES AND FERRIES: THE ROUTE LIST, THE FARE, AND THE ONE MOVE (#1394).
 
   docs/systems/carriages.md is the design and every number here is from it.
-  You stand within 400 of the driver and name the stop. A ferry is 10 gold,
-  Solstheim's own ferry included. A carriage is 10 to a stop in the same hold
-  and 20 to another hold. 40 is only the crossing between the mainland and
-  Solstheim, the Northern Maiden between Windhelm and Raven Rock (Patrick,
-  4 Oct, on #1394). The fare
+  You stand within 400 of the driver and press E on him, and a panel of his
+  stops and fares opens. A ferry is 10 gold, Solstheim's own ferry included.
+  A carriage is 10 to a stop in the same hold and 20 to another hold. 40 is
+  only the crossing between the mainland and Solstheim, the Northern Maiden
+  between Windhelm and Raven Rock (Patrick, 4 Oct, on #1394). The fare
   goes onto the ledger of the hold the stop you leave from is in, counted the
   way a notice fee is counted (deposit, in the property block). A pack that is
   short does not move and loses nothing. Fast travel stays off: nothing here
   offers the map, and there is no word that skips the driver.
+
+  THE PANEL, NOT A COMMAND (#1635; Patrick, 4 Oct: no chat commands for
+  what people do). E on a driver sends /ride e <id> from the front plugin.
+  The server answers by publishing that driver's stops and fares on
+  PANEL_PROPERTY, which game/ui/thornswood-ride.js draws, and each stop's
+  Ride button sends /ride and the stop. Nobody is told to type either line,
+  and no help names /ride. A refusal is said in the chat and drawn on the
+  panel, which stays up. A ride that goes closes it.
 
   THE MOD'S OWN RIDE DOES NOT LAND, READ IN THE FORK. MovementValidation
   in skymp5-server refuses any move a client reports that changes the cell or
@@ -38768,14 +38776,6 @@ log('gamemode loaded:',
 
   /* The same reach as a notice board. */
   var RIDE_REACH = 400;
-
-  /*
-    How long after pressing E on a driver /ride still means that driver. A
-    minute, the same as a door for /claim (DOOR_MEMORY_MS). It only matters
-    for a driver who has wandered off his spot, because a person within reach
-    of the spot itself is at the stop whether they pressed anything or not.
-  */
-  var DRIVER_MEMORY_MS = 60000;
 
   var RIDE_LINES = {
     carriage: { kind: 'carriage', what: 'the carriage' },
@@ -38940,6 +38940,12 @@ log('gamemode loaded:',
     Believed only as far as the server can check it: the actor has to be one
     of the drivers on the list, by its base, and the person has to be within
     reach of where that actor is now. Null when it is not a driver at all.
+
+    A press lasts for as long as that driver is within reach. The panel it
+    opens stays up that long (the front plugin closes it when you walk off),
+    so its Ride has to mean him for as long, even for a driver who has
+    wandered off his spot. Out of his reach, or with him gone, it is
+    forgotten.
   */
   var pressedBy = {};
 
@@ -38961,7 +38967,7 @@ log('gamemode loaded:',
     var me = placeOf(actorId);
     if (!me) { return null; }
     var p = Object.prototype.hasOwnProperty.call(pressedBy, actorId) ? pressedBy[actorId] : null;
-    if (p && Date.now() - p.at <= DRIVER_MEMORY_MS) {
+    if (p) {
       var s = stopByKey(p.stop);
       var them = placeOf(p.driver);
       var base = '';
@@ -38970,6 +38976,7 @@ log('gamemode loaded:',
           apart(me.pos, them.pos) <= RIDE_REACH) {
         return s;
       }
+      delete pressedBy[actorId];
     }
     /*
       Otherwise the driver himself, or his spot. The population block keeps a
@@ -39014,13 +39021,59 @@ log('gamemode loaded:',
     return hits.length === 1 ? hits[0] : null;
   }
 
-  function offer(from) {
+  /*
+    THE PANEL'S VIEW, seen by its owner only, the way the repair and the
+    merchant panels' are. The owner's script hands it to the page, and
+    game/ui/thornswood-ride.js draws it. A view with open set asks for the
+    panel (the front plugin opens it once the mod's own conversation has
+    closed), and open false closes it. at moves on every send, so a second
+    press draws it again even when nothing in it changed.
+  */
+  var PANEL_PROPERTY = 'thornswoodRideView';
+  var panelScript = [
+    '(function(){',
+    '  try {',
+    '    var v = ctx.value;',
+    '    if (!v || typeof v !== "object") { return; }',
+    '    var st = ctx.state;',
+    '    if (!st) { return; }',
+    '    if (st.thornswoodRideAt === v.at) { return; }',
+    '    st.thornswoodRideAt = v.at;',
+    '    var body = JSON.stringify(v);',
+    '    var src = "(function(){try{" +',
+    '      "var d=" + body + ";window.thornswoodRideView=d;" +',
+    '      "if(window.thornswoodRide&&window.thornswoodRide.setData){window.thornswoodRide.setData(d);}" +',
+    '      "}catch(e){}})();";',
+    '    try { ctx.sp.browser.executeJavaScript(src); } catch (e) { }',
+    '  } catch (e) { }',
+    '})();'
+  ].join('\n');
+  try {
+    mp.makeProperty(PANEL_PROPERTY, {
+      isVisibleByOwner: true, isVisibleByNeighbors: false,
+      updateOwner: panelScript, updateNeighbor: ''
+    });
+  } catch (e) { /* made by an earlier load. harmless. */ }
+
+  /** What the panel shows at this stop: the driver, his stops and their fares. */
+  function panelView(from, note) {
     var list = destinations(from);
-    var bits = [];
-    for (var i = 0; i < list.length; i++) { bits.push(list[i].name + ' ' + fare(from, list[i])); }
-    return from.driver + ' runs ' + RIDE_LINES[from.line].what + ' from ' + from.name +
-      '. Say /ride and the stop: ' + bits.join(', ') + ' gold. The fare goes to ' +
-      (HOLD_NAMES[from.hold] || from.hold) + '\'s ledger.';
+    var stops = [];
+    for (var i = 0; i < list.length; i++) { stops.push({ name: list[i].name, fare: fare(from, list[i]) }); }
+    return {
+      open: true, driver: from.driver, what: RIDE_LINES[from.line].what, from: from.name,
+      ledger: HOLD_NAMES[from.hold] || from.hold, stops: stops, note: note || ''
+    };
+  }
+
+  var shownAt = 0;
+  function show(actorId, view) {
+    var payload = JSON.parse(JSON.stringify(view));
+    shownAt = Math.max(Date.now(), shownAt + 1);
+    payload.at = shownAt;
+    try { mp.set(actorId, PANEL_PROPERTY, payload); } catch (e) {
+      plog('could not send the ride panel to', Number(actorId).toString(16) + ':', e);
+    }
   }
 
   /* Whether the pack can pay, by the same test takeGold makes: one stack of
@@ -39044,27 +39097,29 @@ log('gamemode loaded:',
     });
   }
 
-  /** A ride: the line to say back, and the move when it goes. */
+  function answer(line, from, went) {
+    return { line: line, from: from, went: !!went };
+  }
+
+  /** A ride, and the move when it goes: the line to say back, the stop it was asked at, and whether it went. */
   function ride(actorId, profileId, wanted) {
     var from = stopHere(actorId);
-    if (!from) {
-      return 'Stand at a carriage or ferry driver, then say /ride and where you are going.';
-    }
-    if (!wanted) { return offer(from); }
+    if (!from) { return answer('Walk up to a carriage or ferry driver first.', null); }
+    if (!wanted) { return answer('', from); }
     var to = pick(destinations(from), wanted);
-    if (!to) { return 'No ride to ' + wanted + ' from here. ' + offer(from); }
+    if (!to) { return answer('No ride to ' + wanted + ' from here.', from); }
     var price = fare(from, to);
     // Never 0 or less: destinations() offers only rides with a fare, and an
     // amount below 1 would make takeGold add rather than take.
-    if (!(price > 0)) { return 'No ride to ' + wanted + ' from here. ' + offer(from); }
+    if (!(price > 0)) { return answer('No ride to ' + wanted + ' from here.', from); }
     var prop = g.__thornswoodProperty;
     if (!prop || typeof prop.takeGold !== 'function' || typeof prop.deposit !== 'function') {
       plog('a ride was asked for and the hold ledger is not loaded');
-      return 'The hold\'s ledger is not running on this server, so nobody rides. Say so in the dev channel.';
+      return answer('The hold\'s ledger is not running on this server, so nobody rides. Say so in the dev channel.', from);
     }
     // A pack that is short keeps all of it and stays where it is.
     if (!canPay(actorId, price)) {
-      return 'The ride to ' + to.name + ' is ' + price + ' gold and you do not have it. Nothing was taken.';
+      return answer('The ride to ' + to.name + ' is ' + price + ' gold and you do not have it. Nothing was taken.', from);
     }
     /*
       THE MOVE, THEN THE FARE, so a move the server could not make costs
@@ -39077,13 +39132,13 @@ log('gamemode loaded:',
       moveTo(actorId, to);
     } catch (e) {
       plog('profile', profileId, 'could not be moved from', from.key, 'to', to.key + ':', e);
-      return 'The ride did not go, and nothing was taken. Say so in the dev channel.';
+      return answer('The ride did not go, and nothing was taken. Say so in the dev channel.', from);
     }
     if (!prop.takeGold(actorId, price)) {
       try { moveTo(actorId, from); } catch (e2) { }
       plog('profile', profileId, 'rode from', from.key, 'to', to.key,
            'and the fare could not be taken, so they were put back');
-      return 'The fare could not be taken, so the ride did not go. Nothing was taken.';
+      return answer('The fare could not be taken, so the ride did not go. Nothing was taken.', from);
     }
     delete pressedBy[actorId];
     var what = RIDE_LINES[from.line].what;
@@ -39093,13 +39148,15 @@ log('gamemode loaded:',
     }
     plog('profile', profileId, 'rode', what, 'from', from.name, 'to', to.name, 'for', price,
          'gold, onto', from.hold + '\'s ledger');
-    return 'You pay the ' + price + ' gold fare and ride to ' + to.name + '.';
+    return answer('You pay the ' + price + ' gold fare and ride to ' + to.name + '.', from, true);
   }
 
   /*
-    /ride                 at a driver: where this driver goes, and the fares
-    /ride <stop>          at a driver: pay and go
-    /ride e <id>          the front plugin, when somebody presses E on a driver
+    /ride e <id>          the front plugin, when somebody presses E on a
+                          driver: his panel opens
+    /ride <stop>          the panel's Ride button: pay and go
+    /ride                 the panel of the driver you are at
+    Nobody is told to type any of them (#1635).
   */
   function command(parts, actorId, profileId, toProfile) {
     if (!actorId) {
@@ -39111,20 +39168,27 @@ log('gamemode loaded:',
       var pressed = pressDriver(actorId, parseInt(parts[2], 16) >>> 0);
       // Not a driver: the press was for something else, so nothing to say.
       if (!pressed) { return true; }
-      toProfile(profileId, pressed.far ? 'Walk up to ' + pressed.stop.driver + ' first.' : offer(pressed.stop));
+      if (pressed.far) {
+        toProfile(profileId, 'Walk up to ' + pressed.stop.driver + ' first.');
+        return true;
+      }
+      show(actorId, panelView(pressed.stop, ''));
       return true;
     }
-    toProfile(profileId, ride(actorId, profileId, (parts || []).slice(1).join(' ').trim()));
+    var done = ride(actorId, profileId, (parts || []).slice(1).join(' ').trim());
+    if (done.line) { toProfile(profileId, done.line); }
+    // A ride that went, or no driver here, closes the panel. A refusal is
+    // drawn on it, and it stays up.
+    show(actorId, done.went || !done.from ? { open: false } : panelView(done.from, done.line));
     return true;
   }
 
   g.__thornswoodCarriages = {
     STOPS: RIDE_STOPS, LINES: RIDE_LINES, REACH: RIDE_REACH, SOLSTHEIM: SOLSTHEIM,
     FARE_FERRY: FARE_FERRY, FARE_CARRIAGE_IN_HOLD: FARE_CARRIAGE_IN_HOLD, FARE_CARRIAGE: FARE_CARRIAGE,
-    FARE_CROSSING: FARE_CROSSING,
-    DRIVER_MEMORY_MS: DRIVER_MEMORY_MS,
+    FARE_CROSSING: FARE_CROSSING, PANEL_PROPERTY: PANEL_PROPERTY,
     stopByKey: stopByKey, stopByBase: stopByBase, fare: fare, destinations: destinations,
-    stopHere: stopHere, pressDriver: pressDriver, ride: ride, command: command
+    stopHere: stopHere, pressDriver: pressDriver, panelView: panelView, ride: ride, command: command
   };
   plog('ready,', RIDE_STOPS.length, 'stops on', Object.keys(RIDE_LINES).length, 'lines');
 })();
@@ -46390,7 +46454,10 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/helpme', '/help-me', '/report',
                // Out of a wedged spot; see the stuck block after it.
                '/stuck',
-               // A carriage or ferry, at the driver (#1394). See the carriages block.
+               // A carriage or ferry (#1394). E on a driver sends /ride e <id>,
+               // and the ride panel's buttons send /ride and the stop (#1635).
+               // Never typed, and so deliberately NOT in PLAYER_WORDS. See the
+               // carriages block.
                '/ride',
                '/pick', '/spend',
                // A warrior's maneuver, sent by the panel the maneuver key
@@ -46503,8 +46570,6 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       // must be able to find: asking staff, and getting
                       // out of a wedged spot (#414).
                       '/helpme', '/report', '/stuck',
-                      // Everybody's: the way between holds is a driver (#1394).
-                      '/ride',
                       // Everybody's, and they have to be findable: a key
                       // prompt nobody sees is a feature nobody has.
                       '/friend', '/party', '/mute', '/hidename', '/trade', '/journal', '/book', '/merchant',
@@ -47563,9 +47628,10 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
     }
 
     /*
-      A carriage or ferry (#1394), said at the driver, or sent by the front
-      plugin as /ride e <id> when somebody presses E on one. The carriages
-      block answers it, and takes the fare onto the hold's ledger.
+      A carriage or ferry (#1394). Sent by the front plugin as /ride e <id>
+      when somebody presses E on a driver, and as /ride and the stop by the
+      ride panel's buttons (#1635); nobody types it. The carriages block
+      answers it, and takes the fare onto the hold's ledger.
     */
     if (word === '/ride') {
       var rides = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodCarriages;
