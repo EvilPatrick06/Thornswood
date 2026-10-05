@@ -1004,10 +1004,13 @@ The short form of the rules. The same decisions, with the dates they were made, 
   ~410 of them (tests/, bot, and voice), and a look for stray pull requests
   and branches run every night on the VPS (.github/workflows/nightly.yml,
   03:00 Mountain); a failure there opens an issue on the board, "Nightly
-  checks failed", and whoever broke it fixes it next. It runs on the VPS, on a runner
+  checks failed", and whoever broke it fixes it next. It runs on the VPS, on the runners
   `.\scripts\deploy\Install-Runner.ps1` puts there (issue #437), because
-  GitHub's own runners were blocked on billing from 25 Sep.
-  `.\scripts\deploy\Install-Runner.ps1 -Status` says whether GitHub sees it.
+  GitHub's own runners were blocked on billing from 25 Sep. Several since
+  4 Oct, so checks run side by side: `-Number 2` and up puts each one after
+  the first beside it. `.\scripts\deploy\Install-Runner.ps1 -Status` (with
+  `-Number` for the others) says whether GitHub sees one, and `-Lock` locks
+  every runner's folder again without stopping a job.
 - Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or
   Publish-Update.ps1 without a line in #staff-general first; every machine touches those.
 
