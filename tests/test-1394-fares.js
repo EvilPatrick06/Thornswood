@@ -6,6 +6,9 @@
 // driver's purse. The route list is the collection's own drivers, and there
 // is no word that skips standing at one. Fast travel stays off. Solitude's
 // carriage is Solitude's, a ride that started at the embassy included.
+// The fares are Patrick's answers on #1394 (4 Oct), and E on a driver opens
+// a panel of his stops rather than an answer in the chat (#1635,
+// tests/test-1635-ride-panel.js).
 //
 // Read only.
 const REPO_DIR = require('path').join(__dirname, '..');
@@ -75,6 +78,8 @@ function world() {
         f.pos = value.pos.slice();
         return;
       }
+      // The ride panel's view, its owner's only (#1635).
+      if (key === 'thornswoodRideView') { f.view = JSON.parse(JSON.stringify(value)); return; }
       throw new Error('set ' + key);
     }
   };
@@ -140,9 +145,11 @@ if (C0) {
   const nine = ['whiterun', 'solitude', 'riften', 'markarth', 'windhelm', 'falkreath', 'morthal', 'dawnstar', 'winterhold'];
   yes('a carriage in every hold: nine, one in each mainland hold',
     carriages.length === 9 && nine.every(function (h) { return carriages.filter(function (s) { return s.hold === h; }).length === 1; }));
-  yes('only the stops at Raven Rock are marked as Raven Rock',
-    S.every(function (s) { return !!s.ravenRock === (s.name === 'Raven Rock' && s.hold === 'ravenrock'); }) &&
-    S.filter(function (s) { return s.ravenRock; }).length === 2);
+  const isle = S.filter(function (s) { return s.world === C0.SOLSTHEIM; });
+  yes('the stops on Solstheim are the island ferry\'s three and the Northern Maiden\'s Raven Rock, all Raven Rock\'s',
+    isle.length === 4 && isle.every(function (s) { return s.hold === 'ravenrock'; }) &&
+    isle.filter(function (s) { return s.line === 'solstheim'; }).length === 3 && !!by('maiden:ravenrock') &&
+    isle.indexOf(by('maiden:ravenrock')) >= 0);
   yes('Solitude\'s carriage, ferry and lighthouse are all Solitude\'s',
     by('carriage:solitude').hold === 'solitude' && by('coast:solitude').hold === 'solitude' &&
     by('coast:solitudelighthouse').hold === 'solitude');
@@ -155,18 +162,22 @@ if (C0) {
   yes('a ferry is 10', C0.fare(by('coast:solitude'), by('coast:windhelm')) === 10 &&
     C0.fare(by('honrich:riften'), by('honrich:ivarstead')) === 10 &&
     C0.fare(by('ilinalta:halfmoonmill'), by('ilinalta:guardianstones')) === 10);
-  yes('the Northern Maiden is 40 each way, because Raven Rock is an end',
+  yes('the Northern Maiden is 40 each way: the crossing between the mainland and Solstheim',
     C0.fare(by('maiden:windhelm'), by('maiden:ravenrock')) === 40 &&
     C0.fare(by('maiden:ravenrock'), by('maiden:windhelm')) === 40);
-  yes('the Solstheim ferry is 40 with Raven Rock at either end and 10 without',
-    C0.fare(by('solstheim:ravenrock'), by('solstheim:skaalvillage')) === 40 &&
-    C0.fare(by('solstheim:telmithryn'), by('solstheim:ravenrock')) === 40 &&
+  yes('the Solstheim ferry is 10 between any two of its stops, Raven Rock included (Patrick, 4 Oct)',
+    C0.fare(by('solstheim:ravenrock'), by('solstheim:skaalvillage')) === 10 &&
+    C0.fare(by('solstheim:telmithryn'), by('solstheim:ravenrock')) === 10 &&
     C0.fare(by('solstheim:skaalvillage'), by('solstheim:telmithryn')) === 10);
+  yes('a carriage to a stop in the same hold is 10, and between holds 20', (function () {
+    const v = Object.assign({}, by('carriage:whiterun'), { key: 'carriage:riverwood', name: 'Riverwood', driver: '' });
+    return C0.fare(by('carriage:whiterun'), v) === 10 && C0.fare(by('carriage:whiterun'), by('carriage:riften')) === 20;
+  })());
   yes('a ride off its own line is not on the list',
     C0.fare(by('carriage:whiterun'), by('coast:solitude')) === 0 &&
     C0.fare(by('coast:windhelm'), by('maiden:ravenrock')) === 0);
-  yes('no carriage goes to Raven Rock', carriages.every(function (c) {
-    return C0.destinations(c).every(function (d) { return !d.ravenRock; });
+  yes('no carriage goes to Solstheim', carriages.every(function (c) {
+    return C0.destinations(c).every(function (d) { return d.world !== C0.SOLSTHEIM; });
   }));
   yes('a ferryman goes to every other stop on his water',
     C0.destinations(by('coast:dawnstar')).length === 6 && C0.destinations(by('honrich:riften')).length === 2);
@@ -239,18 +250,18 @@ if (C0) {
     const r = rig();
     const me = person(r, by('carriage:whiterun'), 100, 5000);
     const line = say(r, '/ride solitude');
-    yes('away from any driver, /ride refuses', /Stand at a carriage or ferry driver/.test(line));
+    yes('away from any driver, /ride refuses', /Walk up to a carriage or ferry driver first/.test(line));
     yes('and takes nothing and moves nobody', gold(me) === 100 && moves(r).length === 0 && !r.L.funds.whiterun);
     const r2 = rig();
     person(r2, by('carriage:whiterun'), 100, 401);
-    yes('401 from the driver\'s spot is out of reach', /Stand at a carriage/.test(say(r2, '/ride solitude')) && moves(r2).length === 0);
+    yes('401 from the driver\'s spot is out of reach', /Walk up to a carriage/.test(say(r2, '/ride solitude')) && moves(r2).length === 0);
     const r3 = rig();
     person(r3, by('carriage:whiterun'), 100, 399);
     yes('399 is in reach', /ride to Solitude/.test(say(r3, '/ride solitude')));
     const r4 = rig();
     const there = person(r4, by('carriage:whiterun'), 100, 0);
     there.cell = 'somewhere:Else.esp';
-    yes('the right numbers in another cell are not the stop', /Stand at a carriage/.test(say(r4, '/ride solitude')));
+    yes('the right numbers in another cell are not the stop', /Walk up to a carriage/.test(say(r4, '/ride solitude')));
   }
 
   // What the driver offers, and what is not on the list.
@@ -258,8 +269,12 @@ if (C0) {
     const r = rig();
     const me = person(r, by('carriage:whiterun'), 100, 10);
     const offer = say(r, '/ride');
-    yes('/ride alone at a driver lists his stops and fares', /Bjorlam runs the carriage from Whiterun/.test(offer) &&
-      /Solitude 20/.test(offer) && /Winterhold 20/.test(offer) && !/Whiterun 20/.test(offer) && /Whiterun's ledger/.test(offer));
+    const v = me.view || {};
+    const fares = (v.stops || []).map(function (s) { return s.name + ' ' + s.fare; });
+    yes('/ride alone at a driver opens his panel of stops and fares, and says nothing in the chat', offer === '' &&
+      v.open === true && v.driver === 'Bjorlam' && v.what === 'the carriage' && v.from === 'Whiterun' &&
+      fares.indexOf('Solitude 20') >= 0 && fares.indexOf('Winterhold 20') >= 0 && fares.length === 8 &&
+      !fares.some(function (f) { return /^Whiterun/.test(f); }) && v.ledger === 'Whiterun');
     yes('a stop on another line is refused', /No ride to raven rock/.test(say(r, '/ride raven rock')) &&
       /No ride to heartwood/.test(say(r, '/ride heartwood')));
     yes('a stop the list does not have is refused', /No ride to/.test(say(r, '/ride riverwood')) &&
@@ -305,24 +320,40 @@ if (C0) {
     r.w.forms[DRIVER] = { cell: t.world, pos: [t.pos[0] + 450, t.pos[1], t.pos[2]], base: t.base, inv: [] };
     r.w.forms[OTHER] = { cell: t.world, pos: [t.pos[0] + 700, t.pos[1], t.pos[2]], base: '13bbf:Skyrim.esm', inv: [] };
     const me = person(r, t, 60, 700);
-    yes('700 from the spot and no press is not a stop', /Stand at a carriage/.test(say(r, '/ride solitude')));
+    yes('700 from the spot and no press is not a stop', /Walk up to a carriage/.test(say(r, '/ride solitude')));
     yes('a press on somebody who is not a driver says nothing', say(r, '/ride e ' + OTHER.toString(16)) === '');
     const offer = say(r, '/ride e ' + DRIVER.toString(16));
-    yes('a press on the driver answers with his stops', /Bjorlam runs the carriage/.test(offer));
+    yes('a press on the driver opens his panel', offer === '' && !!me.view && me.view.open === true &&
+      me.view.driver === 'Bjorlam' && me.view.stops.length === 8);
     yes('and then the ride goes from him', /ride to Solitude/.test(say(r, '/ride solitude')) && r.L.funds.whiterun === 20 && gold(me) === 40);
 
     const r2 = rig();
     r2.w.forms[DRIVER] = { cell: t.world, pos: [t.pos[0] + 450, t.pos[1], t.pos[2]], base: t.base, inv: [] };
     person(r2, t, 60, 1100);
     yes('a press from 650 away is told to walk up', /Walk up to Bjorlam/.test(say(r2, '/ride e ' + DRIVER.toString(16))) &&
-      /Stand at a carriage/.test(say(r2, '/ride solitude')));
+      /Walk up to a carriage/.test(say(r2, '/ride solitude')));
 
+    /*
+      A press lasts while that driver is in reach, however long the panel
+      has been open (#1635), and is forgotten once he is out of it.
+    */
     const r3 = rig();
     r3.w.forms[DRIVER] = { cell: t.world, pos: [t.pos[0] + 450, t.pos[1], t.pos[2]], base: t.base, inv: [] };
-    person(r3, t, 60, 700);
+    const me3 = person(r3, t, 60, 700);
     say(r3, '/ride e ' + DRIVER.toString(16));
-    clock += r3.C.DRIVER_MEMORY_MS + 1;
-    yes('a press over a minute old no longer counts', /Stand at a carriage/.test(say(r3, '/ride solitude')) && moves(r3).length === 0);
+    clock += 10 * 60 * 1000;
+    me3.pos[0] = t.pos[0] + 5000;
+    yes('a press is forgotten once you are out of his reach', /Walk up to a carriage/.test(say(r3, '/ride solitude')) && moves(r3).length === 0);
+    me3.pos[0] = t.pos[0] + 700;
+    yes('and walking back to him without a new press does not bring the old one back',
+      /Walk up to a carriage/.test(say(r3, '/ride solitude')) && moves(r3).length === 0);
+    const r4 = rig();
+    r4.w.forms[DRIVER] = { cell: t.world, pos: [t.pos[0] + 450, t.pos[1], t.pos[2]], base: t.base, inv: [] };
+    const me4 = person(r4, t, 60, 700);
+    say(r4, '/ride e ' + DRIVER.toString(16));
+    clock += 10 * 60 * 1000;
+    yes('a press ten minutes old still counts while he is in reach, so a panel left open still rides',
+      /ride to Solitude/.test(say(r4, '/ride solitude')) && r4.L.funds.whiterun === 20 && gold(me4) === 40);
   }
 
   // A driver standing off his spot, on his own placed reference.
@@ -339,7 +370,7 @@ if (C0) {
     r2.w.refs[t.ref] = REF;
     r2.w.forms[REF] = { cell: t.world, pos: [t.pos[0] + 450, t.pos[1], t.pos[2]], base: t.base, inv: [] };
     person(r2, t, 60, 900);
-    yes('and 450 from him is still too far', /Stand at a carriage/.test(say(r2, '/ride solitude')) && moves(r2).length === 0);
+    yes('and 450 from him is still too far', /Walk up to a carriage/.test(say(r2, '/ride solitude')) && moves(r2).length === 0);
   }
 
   // The move fails.
@@ -390,7 +421,7 @@ if (C0) {
   const pm = /^const PLAYER_WORDS = (\[[\s\S]*?\]);$/m.exec(gm);
   const W = wm ? new Function('return ' + wm[1])() : [];
   const PW = pm ? new Function('return ' + pm[1])() : [];
-  yes('/ride is a word the server answers, and one everybody is told about', W.indexOf('/ride') >= 0 && PW.indexOf('/ride') >= 0);
+  yes('/ride is a word the server answers, and nobody is told about it (#1635)', W.indexOf('/ride') >= 0 && PW.indexOf('/ride') < 0);
   const branch = slice(gm, "    if (word === '/ride') {", '\n    }\n');
   yes('the chat hands /ride to the carriages block', !!branch && /__thornswoodCarriages/.test(branch) && /\.command\(parts, actorId, profileId, toProfile\)/.test(branch));
   const exp = slice(gm, '  g.__thornswoodProperty = {', '\n  };');
