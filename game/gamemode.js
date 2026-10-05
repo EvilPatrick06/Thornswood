@@ -36110,7 +36110,11 @@ log('gamemode loaded:',
     /box whiterun      make the container you are at the hold's box
     /box               say which hold's box you are standing at
 
-    A steward's word, because designating the city's treasury is city business.
+    A steward's, because designating the city's treasury is city business.
+    Sent by the Office page of the K panel (#1638), which offers the ten
+    holds for the container the steward just opened, never typed. Only one of
+    the ten is taken, the same as a board: any other word would start a box
+    no hold's ledger knows about.
   */
   function boxCmd(parts, actorId, profileId, toProfile) {
     var at = boxAt(actorId);
@@ -36154,7 +36158,11 @@ log('gamemode loaded:',
       return true;
     }
     if (!at) {
-      toProfile(profileId, 'Open the container you mean, then say that again.');
+      toProfile(profileId, 'Open the container, then press the hold on the Office page of K within a minute.');
+      return true;
+    }
+    if (LEDGER_HOLDS.indexOf(arg) < 0) {
+      toProfile(profileId, 'No hold called ' + arg + '. The holds are ' + LEDGER_HOLDS.join(', ') + '.');
       return true;
     }
     boxes[arg] = at;
@@ -36162,6 +36170,7 @@ log('gamemode loaded:',
     save();
     plog('a steward made', at.toString(16), 'the box for', arg);
     toProfile(profileId, 'That container is ' + arg + '\'s box now. Rent and fees go in it.');
+    redrawPanel(actorId);
     return true;
   }
 
@@ -36353,11 +36362,17 @@ log('gamemode loaded:',
     /rent            what this place costs, and what is owed on it
     /rent 50         a steward sets it, per week
     /rent -          a steward waives it
+
+    Sent by Set rent and No rent on the Office page of the K panel (#1638),
+    never typed; the page shows a steward what is owed at the door they just
+    opened. See officeView.
   */
+  var OFFICE_AT_DOOR = 'Open the door of the building, then press the button on the Office page of K within a minute.';
+
   function rentCmd(parts, actorId, profileId, toProfile) {
     var building = here(actorId);
     if (!building) {
-      toProfile(profileId, 'Stand at the door and open it, then say that again.');
+      toProfile(profileId, OFFICE_AT_DOOR);
       return true;
     }
     var held = holderOf(building);
@@ -36375,7 +36390,7 @@ log('gamemode loaded:',
       return true;
     }
 
-    if (!isSteward(profileId)) {
+    if (!isSteward(profileId, actorId)) {
       toProfile(profileId, 'Only a steward sets rent.');
       return true;
     }
@@ -36388,17 +36403,19 @@ log('gamemode loaded:',
       save();
       plog('a steward waived the rent on', nameOf(building));
       toProfile(profileId, 'No rent on ' + nameOf(building) + ' now.');
+      redrawPanel(actorId);
       return true;
     }
     var amount = Number(arg) || 0;
     if (amount <= 0) {
-      toProfile(profileId, 'Give an amount in gold, or - to waive it.');
+      toProfile(profileId, 'The rent is a number of gold above 0.');
       return true;
     }
     held.rent = { amount: amount, everyDays: 7, owed: 0, since: Date.now() };
     save();
     plog('a steward set the rent on', nameOf(building), 'to', amount);
     toProfile(profileId, nameOf(building) + ' pays ' + amount + ' gold every 7 days now.');
+    redrawPanel(actorId);
     return true;
   }
 
@@ -37431,9 +37448,13 @@ log('gamemode loaded:',
     };
   }
 
-  /** A steward moves a hold's board to where they stand. */
+  /*
+    A steward moves a hold's board to where they stand. Move it here, beside
+    each board on the Office page of the K panel, sends /board move <hold>
+    (#1638); nobody types it.
+  */
   function moveBoard(hold, actorId, profileId, toProfile) {
-    if (!isSteward(profileId)) {
+    if (!isSteward(profileId, actorId)) {
       toProfile(profileId, 'Only a steward moves a board.');
       return true;
     }
@@ -37608,7 +37629,7 @@ log('gamemode loaded:',
     // /board here moves it, and only a steward may.
     if (arg === 'here') {
       if (!standing) {
-        toProfile(profileId, 'Say which hold: /board here needs you at the board you are moving.');
+        toProfile(profileId, 'Stand at the board you are moving.');
         return true;
       }
       return moveBoard(standing, actorId, profileId, toProfile);
@@ -37631,7 +37652,7 @@ log('gamemode loaded:',
       var which = (parts && parts.length > 2)
         ? String(parts[2]).trim().toLowerCase() : standing;
       if (!which) {
-        toProfile(profileId, 'Say which board: /board move <hold>, standing where you want it.');
+        toProfile(profileId, 'Pick the board to move on the Office page of K, standing where you want it.');
         return true;
       }
       return moveBoard(which, actorId, profileId, toProfile);
@@ -38527,17 +38548,22 @@ log('gamemode loaded:',
         /steward 1893288986      name one
         /steward -1893288986     take it back
 
+    Sent by the Office page of the K panel (#1638), never typed: Name steward
+    beside a person in the world, Remove beside a steward. See officeView.
+
     A PROFILE ID AND NOT A NAME, and that is a limit rather than a choice: two
     characters can carry the same name and this block has no way to tell them
-    apart. The id is what the register keys on everywhere else. It is on the
-    person's own K panel, so asking somebody for theirs is a sentence.
+    apart. The id is what the register keys on everywhere else, and the page
+    sends the id of the person picked, so picking somebody by name on the page
+    still names exactly that person.
   */
   /*
     Seat the Jarl office on THIS character.
 
         /jarl
 
-    Discord Jarl (or admin) eligibility is required. The office is the
+    Sent by Take the office on the Office page of the K panel (#1638), never
+    typed. Discord Jarl (or admin) eligibility is required. The office is the
     character property, so a second character on the same account stays
     ordinary. Admins may seat without the Discord role so the first
     office can be placed out of character (#397).
@@ -38582,7 +38608,7 @@ log('gamemode loaded:',
     if (!arg) {
       toProfile(profileId, who.length
         ? 'Stewards: ' + who.join(', ') + '.'
-        : 'No stewards. A jarl names one with /steward and their profile id.');
+        : 'No stewards. A Jarl names one on the Office page of K.');
       return true;
     }
 
@@ -38594,26 +38620,42 @@ log('gamemode loaded:',
     var drop = arg.charAt(0) === '-';
     var pid = Number(drop ? arg.slice(1) : arg) || 0;
     if (!pid) {
-      toProfile(profileId, 'That is not a profile id. It is the number on the K panel.');
+      toProfile(profileId, 'That is not a profile id.');
       return true;
     }
 
     var at = stewards.indexOf(pid);
+    // The person picked on the page, by name when they are in the world.
+    var them = onlineActorOf(pid);
+    var who = them ? personName(them) : 'Profile ' + pid;
     if (drop) {
-      if (at === -1) { toProfile(profileId, pid + ' is not a steward.'); return true; }
+      if (at === -1) { toProfile(profileId, who + ' is not a steward.'); return true; }
       stewards.splice(at, 1);
       save();
       plog('a jarl took the stewardship back from', pid);
-      toProfile(profileId, pid + ' is no longer a steward.');
+      toProfile(profileId, who + ' is no longer a steward.');
+      officeRedraw(actorId, pid);
       return true;
     }
 
-    if (at !== -1) { toProfile(profileId, pid + ' is already a steward.'); return true; }
+    if (at !== -1) { toProfile(profileId, who + ' is already a steward.'); return true; }
     stewards.push(pid);
     save();
     plog('a jarl named', pid, 'steward');
-    toProfile(profileId, pid + ' is a steward now.');
+    toProfile(profileId, who + ' is a steward now.');
+    officeRedraw(actorId, pid);
     return true;
+  }
+
+  /*
+    The Office page again (#1638): the K panel of whoever pressed, and of the
+    person a steward was named or removed, when they are in the world, so the
+    page in front of each of them says what is true now.
+  */
+  function officeRedraw(actorId, pid) {
+    redrawPanel(actorId);
+    var them = pid ? onlineActorOf(pid) : 0;
+    if (them && them !== actorId) { redrawPanel(them); }
   }
 
   /*
@@ -38630,13 +38672,13 @@ log('gamemode loaded:',
     rather than being written.
   */
   function evict(actorId, profileId, toProfile) {
-    if (!isSteward(profileId)) {
+    if (!isSteward(profileId, actorId)) {
       toProfile(profileId, 'Only a steward ends a claim.');
       return true;
     }
     var building = here(actorId);
     if (!building) {
-      toProfile(profileId, 'Stand at the door and open it, then say that again.');
+      toProfile(profileId, OFFICE_AT_DOOR);
       return true;
     }
     var held = holderOf(building);
@@ -38651,7 +38693,107 @@ log('gamemode loaded:',
     plog('a steward ended', was + '\'s claim on', nameOf(building));
     toProfile(profileId, 'You end ' + was + '\'s claim on ' + nameOf(building) +
               '. What is inside is untouched, and any key they hold still works.');
+    redrawPanel(actorId);
     return true;
+  }
+
+  /*
+    THE OFFICE PAGE ON K (#1638).
+
+    Patrick, 4 Oct: no commands for things people do, and a Jarl and a
+    steward are people in the world (offices.md: "A steward is not staff").
+    So the offices' powers are buttons on a page of the K panel, for the
+    character that may hold one: Take the office; name a steward by picking
+    a person in the world, and remove one; evict and set or clear the rent at
+    the door the steward just opened, with what is owed there; make the
+    container they just opened a hold's box; and move any of the ten boards
+    to where they stand. Each button sends the line the command was (/jarl,
+    /steward, /evict, /rent, /box, /board move), and every rule is checked
+    again when it arrives. This only says what is true, so the page can draw
+    it.
+
+    "Just opened" is the same minute the lines have always used (here and
+    boxAt): the door or container is read when the panel is written, and K
+    asks for that the moment it opens.
+
+    THE STATE IS HANDED IN, NEVER READ. This is called from the character
+    block's writeState, and that block's stateOf writes a character it has
+    not seen through writeState, so reading it from here would ask for
+    itself. So the office is worked out from s, the way isJarl and isSteward
+    work it out, and the two are held together by tests/test-1638-office.js.
+
+    Null for anybody who holds no office and could not take one, and then the
+    page is not drawn at all.
+  */
+  var OFFICE_PEOPLE_MAX = 40;
+
+  function officeView(actorId, profileId, s) {
+    var pid = Number(profileId) || 0;
+    if (!pid || !actorId) { return null; }
+    var adm = g['__thornswoodIsAdmin'];
+    var fn = g['__thornswoodIsJarl'];
+    var admin = false, role = false;
+    try { admin = typeof adm === 'function' && !!adm(pid); } catch (e) { admin = false; }
+    try { role = typeof fn === 'function' && !!fn(pid); } catch (e2) { role = false; }
+    var holds = !!(s && s.office === 'jarl');
+    var jarl = admin || (role && holds);                     // isJarl
+    var steward = jarl || stewards.indexOf(pid) !== -1;      // isSteward
+    if (!admin && !role && !steward) { return null; }
+
+    // Who is in the world, by profile, named the way a guest is named.
+    var names = {};
+    var order = [];
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e3) { online = []; }
+    for (var i = 0; i < online.length; i++) {
+      var op = profileOf(online[i]);
+      var nm = '';
+      try {
+        var ap = mp.get(online[i], 'appearance');
+        if (ap && ap.name) { nm = String(ap.name); }
+      } catch (e4) { nm = ''; }
+      if (!op || !nm || Object.prototype.hasOwnProperty.call(names, op)) { continue; }
+      names[op] = nm;
+      order.push(op);
+    }
+
+    var view = { jarl: holds, may: (admin || role) && !holds, name: jarl, steward: steward,
+                 stewards: [], people: [], door: null, box: null, boards: [] };
+    for (var k = 0; k < stewards.length; k++) {
+      view.stewards.push({ pid: stewards[k],
+                           name: Object.prototype.hasOwnProperty.call(names, stewards[k]) ? names[stewards[k]] : '' });
+    }
+    if (jarl) {
+      // Anybody in the world who is not a steward already, by name. The id
+      // goes with the name, because the id is what the button sends.
+      for (var j = 0; j < order.length; j++) {
+        if (order[j] === pid || stewards.indexOf(order[j]) !== -1) { continue; }
+        view.people.push({ pid: order[j], name: names[order[j]] });
+      }
+      view.people.sort(function (a, b) {
+        return a.name < b.name ? -1 : (a.name > b.name ? 1 : a.pid - b.pid);
+      });
+      view.people = view.people.slice(0, OFFICE_PEOPLE_MAX);
+    }
+    if (!steward) { return view; }
+
+    var building = here(actorId);
+    if (building) {
+      var held = holderOf(building);
+      if (held && held.rent) { rentDue(); }
+      view.door = { name: nameOf(building), by: held ? held.name : null,
+                    rent: (held && held.rent) ? { amount: Number(held.rent.amount) || 0,
+                                                  every: Number(held.rent.everyDays) || 7,
+                                                  owed: Number(held.rent.owed) || 0 } : null };
+    }
+    var at = boxAt(actorId);
+    if (at) { view.box = { hold: holdOfBox(at) || null }; }
+    for (var h = 0; h < LEDGER_HOLDS.length; h++) {
+      var bh = LEDGER_HOLDS[h];
+      if (!Object.prototype.hasOwnProperty.call(boards, bh)) { continue; }
+      view.boards.push({ hold: bh, where: (boards[bh] && boards[bh].where) || bh });
+    }
+    return view;
   }
 
   ready();
@@ -38671,7 +38813,7 @@ log('gamemode loaded:',
     coversGround: coversGround, groundHere: groundHere,
     DOOR_PROPERTY: DOOR_PROPERTY,
     claims: function () { return claims; },
-    isJarl: isJarl, isSteward: isSteward,
+    isJarl: isJarl, isSteward: isSteward, officeView: officeView,
     touchedBox: touchedBox, putIn: putIn, holdOfBox: holdOfBox,
     deposit: deposit, takeGold: takeGold, LEDGER_HOLDS: LEDGER_HOLDS,
     withdraw: withdraw, mayWithdraw: mayWithdraw, heldOn: heldOn,
@@ -41390,6 +41532,15 @@ log('gamemode loaded:',
       try { pid = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pid = 0; }
       var held = propertyView(actorId, pid);
       if (held) { view.property = held; }
+      /*
+        The Office page (#1638), for a character that holds an office or may
+        take one, and left off for everybody else. The property block owns
+        the offices; it is handed s, because asking stateOf from inside
+        writeState would ask for itself. See officeView.
+      */
+      var W = g.__thornswoodProperty;
+      var desk = (W && W.officeView) ? W.officeView(actorId, pid, s) : null;
+      if (desk) { view.officePage = desk; }
     }
     var sig = drawn(view);
     var sending = !!redraw || lastDrawn[actorId] !== sig;
@@ -46389,6 +46540,10 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
                '/apprentice',
                '/plant', '/claim', '/plot',
                '/deed', '/deeds', '/lock', '/unlock', '/mold', '/key',
+               // The offices' powers (#1638). Sent by the Office page of the
+               // K panel, never typed, and so deliberately NOT in
+               // PLAYER_WORDS: Patrick, 4 October, no chat commands for
+               // anything people do, and a Jarl and a steward are people.
                '/jarl', '/steward', '/evict', '/box', '/rent',
                '/notice', '/job', '/board', '/take', '/jobs', '/dropjob', '/unpin',
                '/letter', '/deliver',
@@ -46467,19 +46622,10 @@ const WORDS = ['/ooc', '/o', '/where', '/help', '/commands',
 */
 const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
                       '/deed', '/lock', '/unlock', '/mold', '/key',
-                      // Named to everybody on purpose. /steward with no
-                      // argument says who holds the office, which is a thing
-                      // anybody in a hold should be able to find out, and
-                      // /evict answers "only a steward ends a claim" to
-                      // everybody else, which is the rule stated rather than
-                      // a power hidden.
-                      '/jarl', '/steward', '/evict',
-                      // The board and the box are everybody's. /rent with no
-                      // argument says what a place costs, which is the first
-                      // thing somebody standing at a door wants to know, and
-                      // the steward half answers "only a steward sets rent"
-                      // to everybody else.
-                      '/box', '/rent', '/notice', '/job', '/board',
+                      // Not /jarl, /steward, /evict, /box or /rent: the
+                      // offices' powers are buttons on the Office page of K
+                      // (#1638), and the board panel says what the box holds.
+                      '/notice', '/job', '/board',
                       '/take', '/jobs', '/dropjob', '/unpin', '/letter', '/deliver', '/help',
                       // Everybody's, and they need to be findable: a meter
                       // nobody knows how to act on is only a penalty. Not
@@ -48568,8 +48714,8 @@ const PLAYER_WORDS = ['/ooc', '/where', '/plot', '/plant', '/claim',
         toProfile(profileId,
           '/claim at a plot takes the farm around it; /claim at a door you have ' +
           'just opened takes the building and hands you the deed. /deed lists ' +
-          'what you hold, /lock and /unlock turn the lock, /rent says what a ' +
-          'place costs. To let somebody sleep in a building you hold, look at ' +
+          'what you hold, /lock and /unlock turn the lock. A Jarl or a steward ' +
+          'has an Office page on K. To let somebody sleep in a building you hold, look at ' +
           'them inside it and press the key the prompt shows. ' +
           'A smith says /mold at a door with the holder standing ' +
           'there, and /key at a forge with the mold in hand.');
