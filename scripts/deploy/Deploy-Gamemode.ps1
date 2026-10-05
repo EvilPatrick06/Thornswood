@@ -27,6 +27,17 @@
   0x200. The second case is the one that surprises people: TheNewGentleman.esp
   was a plain .esp carrying both the ESM and ESL flags.
 
+  AN ENGINE THAT LOADS LIGHT PLUGINS (#1715) gives each one the game's own
+  0xFE slot, its light index, instead of a full index, so nothing shifts and
+  nothing is dropped or pruned. records\server-build.json says which engine
+  this is ("lightPlugins": true, written by New-ServerBuildRecord.ps1 when the
+  recorded fork can tell a light plugin from a full one). Then the list is
+  every plugin the game loads, in the game's order: the five masters, the
+  Skyrim.ccc plugins in Data (_ResourcePack.esl is light index 0), then the
+  plugin list, and the order the server already runs is kept for each kind
+  apart (ServerOrder.ps1 says how). A form id is then computed from a
+  plugin's place among the full plugins, never its place in the list.
+
   -FullLoadOrder disables all of this and lists everything. The server will
   start, and form ids will be wrong for every plugin after the first ESL. It is
   here for narrowing down a load failure, not for playing on.
@@ -248,6 +259,15 @@ if (-not (Test-Path -LiteralPath $lo) -and -not $IgnoreRevision) {
     throw "$lo is missing, so the collection revision was not checked. Nothing was written."
 }
 
+# Whether the engine this build is loads light plugins (#1715), read before
+# anything is written, from the record of the server build that goes out
+# with this gamemode. A record that is missing or does not read stops here.
+$serverOrderLib = Join-Path $Here 'ServerOrder.ps1'
+if (-not (Test-Path -LiteralPath $serverOrderLib)) { throw "$serverOrderLib is missing, so the server's load order cannot be written. Nothing was written." }
+. $serverOrderLib
+$serverRecord = [IO.Path]::GetFullPath((Join-Path $Here '..\..\records\server-build.json'))
+$loadsLight = (-not $FullLoadOrder) -and (-not $MinimalLoadOrder) -and (Test-ThornswoodEngineLoadsLight $serverRecord)
+
 # How many the server holds at once, read before anything is written, so a
 # number the engine would refuse stops this with the build untouched.
 # MaxOnline.ps1 says where the number lives (records\most-online.json) and why.
@@ -422,9 +442,28 @@ foreach ($p in $wanted) {
     if (Test-Path -LiteralPath $full) { $info[$p] = Read-PluginHeader $full } else { $missing += $p }
 }
 
+# The Skyrim.ccc plugins in Data, which the game loads straight after the five
+# masters whatever the list says. Only an engine that loads light plugins
+# lists them: the ones Thornswood's own folder has are light
+# (_ResourcePack.esl), and they take light index 0 and up on every machine.
+$ccc = @()
+if ($loadsLight) {
+    $cccPath = Join-Path (Split-Path -Parent $Data) 'Skyrim.ccc'
+    if (Test-Path -LiteralPath $cccPath) {
+        $ccc = @(Get-Content -LiteralPath $cccPath | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
+    }
+    foreach ($c in $ccc) {
+        $full = Join-Path $Data $c
+        if (-not $info.ContainsKey($c) -and (Test-Path -LiteralPath $full)) { $info[$c] = Read-PluginHeader $full }
+    }
+}
+
 $drop = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 $pruned = @{}
-if (-not $FullLoadOrder) {
+if ($loadsLight) {
+    # Nothing is dropped: every light plugin has its own slot.
+    $lightCount = 0
+} elseif (-not $FullLoadOrder) {
     foreach ($p in $wanted) { if ($info[$p] -and $info[$p].Light) { [void]$drop.Add($p) } }
     $lightCount = $drop.Count
     do {
@@ -475,7 +514,39 @@ if (-not $NewOrder -and -not $FullLoadOrder -and -not $MinimalLoadOrder -and (Te
                    Where-Object { $_ })
     } catch { $prior = @() }
 }
-if ($prior.Count) {
+if ($loadsLight) {
+    # The same rule for an engine that loads light plugins, kept for each
+    # kind apart, because a full index and a light index count only their own
+    # kind (ServerOrder.ps1). The first deploy that lists light plugins has no
+    # light order to keep, so the light order is the game's for this list,
+    # which is the order a machine that takes the pack's list gets.
+    $so = Get-ThornswoodServerOrder ([string[]]$wanted) ([string[]]$ccc) $info ([string[]]$prior)
+    $keep = @($so.Order)
+    if ($prior.Count) {
+        Write-Host ("  order kept from the server's own list, full and light apart: {0} full and {1} light, {2} full and {3} light new on the end of their own kind, {4} gone" -f `
+            ($so.Full.Count - $so.AddedFull.Count), ($so.Light.Count - $so.AddedLight.Count), $so.AddedFull.Count, $so.AddedLight.Count, $so.Removed.Count) -ForegroundColor Cyan
+    } else {
+        if ($NewOrder) { Write-Host "  -NewOrder: the plugin list's order is taken as it is" -ForegroundColor Yellow }
+        Write-Host ("  the game's order for this list: {0} full and {1} light plugins" -f $so.Full.Count, $so.Light.Count) -ForegroundColor Cyan
+    }
+    if (-not $so.LightKept -and $so.Light.Count) {
+        Write-Host ("  light order taken from the plugin list, as the game takes it: {0} first at light index 0" -f $so.Light[0]) -ForegroundColor Cyan
+    }
+    foreach ($a in $so.AddedFull)  { Write-Host "    + $a" -ForegroundColor Green }
+    foreach ($a in $so.AddedLight) { Write-Host "    + $a (light)" -ForegroundColor Green }
+    foreach ($r in $so.Removed)    { Write-Host "    - $r   every plugin of its kind after it moves up one; the world's saved forms from those plugins are re-keyed (scripts\oneoff\Move-LightFormIds.ps1 for light ones)" -ForegroundColor Yellow }
+    if ($so.NewFullMasters.Count -or $so.LightOutOfPlace.Count) {
+        Write-Host ''
+        Write-Host ("  STOP. {0} new plugin(s) the game loads ahead of where the kept order would put them:" -f ($so.NewFullMasters.Count + $so.LightOutOfPlace.Count)) -ForegroundColor Red
+        foreach ($m in $so.NewFullMasters)  { Write-Host "    $m" -ForegroundColor Red }
+        foreach ($m in $so.LightOutOfPlace) { Write-Host "    $m (light)" -ForegroundColor Red }
+        Write-Host '  The game loads a master, and a Skyrim.ccc plugin, ahead of the rest of its kind whatever the' -ForegroundColor Red
+        Write-Host '  list says, so it cannot go on the end of an order the world is already keyed to.' -ForegroundColor Red
+        Write-Host '  Either take it out of the collection, or wipe the world and rebuild the' -ForegroundColor Red
+        Write-Host '  order with -NewOrder, which re-keys everything on purpose.' -ForegroundColor Red
+        throw 'a plugin the game loads ahead of its kind cannot be appended to the live order'
+    }
+} elseif ($prior.Count) {
     $keepBy = @{}
     foreach ($k in $keep) { $keepBy[$k.ToLowerInvariant()] = $k }
     $ordered = @(); $placed = @{}
@@ -750,14 +821,15 @@ Write-Host ("  damage: an NPC hitting a person x{0}, a person hitting an NPC x{1
 # client actually starts.
 #
 # The form id is computed rather than written down. SkyMP resolves
-# fileIdx * 0x01000000 + shortFormId and fileIdx is this array's own index, so a
-# literal would rot the moment the load order moved.
+# fileIdx * 0x01000000 + shortFormId, so a literal would rot the moment the
+# load order moved. fileIdx is the plugin's place among the full plugins of
+# this array: every plugin in it, until an engine that loads light plugins
+# lists them too, and they take no full index (#1715).
 $hallPlugin = 'Skyrim Unbound.esp'
 $hallLocal  = 0x19BAD4                      # SkyrimUnboundRoom01
-$hallIdx = -1
-for ($i = 0; $i -lt $paths.Count; $i++) {
-    if ([IO.Path]::GetFileName($paths[$i]) -ieq $hallPlugin) { $hallIdx = $i; break }
-}
+$lightName = $null
+if ($loadsLight) { $lightName = { param($n) [bool]($info[$n] -and $info[$n].Light) } }
+$hallIdx = Get-ThornswoodFullIndex ([string[]]$paths) $lightName $hallPlugin
 if ($hallIdx -ge 0) {
     $hallId = ($hallIdx * 0x01000000) + $hallLocal
     $start = [pscustomobject]@{
@@ -786,14 +858,15 @@ Write-Host ("  new characters start at {0}" -f $startNote) -ForegroundColor Dark
 
 if ($FullLoadOrder) {
     Write-Host '  -FullLoadOrder: indices will NOT match the game. Diagnostic use only.' -ForegroundColor Yellow
+} elseif ($loadsLight) {
+    Write-Host ("  {0} light plugin(s) listed, light index 0 to {1}: the engine this build records loads them (lightPlugins in {2})" -f $so.Light.Count, ($so.Light.Count - 1), $serverRecord) -ForegroundColor DarkGray
 } elseif ($lightCount) {
     Write-Host ("  {0} light plugin(s) left out so the indices match the game exactly" -f $lightCount) -ForegroundColor DarkGray
     foreach ($k in ($pruned.Keys | Sort-Object)) {
         Write-Host ("      also {0}, which masters to {1}" -f $k, $pruned[$k]) -ForegroundColor DarkGray
     }
 }
-$tw = ($Data -replace '\\','/') + '/Thornswood-Content.esp'
-$i = [Array]::IndexOf($paths, $tw)
+$i = Get-ThornswoodFullIndex ([string[]]$paths) $lightName 'Thornswood-Content.esp'
 if ($i -lt 0) {
     Write-Host '  WARNING: Thornswood-Content.esp is not in the load order. The stations will not resolve.' -ForegroundColor Red
 } else {

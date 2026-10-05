@@ -79,8 +79,13 @@ $order = @($s.loadOrder | ForEach-Object { [IO.Path]::GetFileName($_) })
 
 Write-Host ''
 Write-Host 'load order' -ForegroundColor Cyan
-$idxContent = [Array]::FindIndex($order, [Predicate[string]]{ param($x) $x -ieq 'Thornswood-Content.esp' })
-$idxUnbound = [Array]::FindIndex($order, [Predicate[string]]{ param($x) $x -ieq 'Skyrim Unbound.esp' })
+# Full indices: an engine that loads light plugins lists them and gives them
+# none (#1715). Which engine is this machine's record, and which plugins are
+# light is read from this machine's Data, like the checks below.
+. (Join-Path $Here '..\deploy\ServerOrder.ps1')
+$lightTest = Get-ThornswoodLightTest ([string[]]@($order | ForEach-Object { Join-Path $Data $_ })) (Join-Path $Here '..\..\records\server-build.json')
+$idxContent = Get-ThornswoodFullIndex ([string[]]$order) $lightTest 'Thornswood-Content.esp'
+$idxUnbound = Get-ThornswoodFullIndex ([string[]]$order) $lightTest 'Skyrim Unbound.esp'
 
 if ($idxContent -lt 0) { Bad 'Thornswood-Content.esp is not in the server load order' }
 else { Ok ("Thornswood-Content.esp at index {0} (0x{0:X2})" -f $idxContent) }

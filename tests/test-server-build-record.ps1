@@ -161,6 +161,7 @@ try {
     Yes '  and sha256 at the top is still the binary''s' ($rec -and $rec.sha256 -eq $rec.files.'scam_native.node'.sha256 -and $rec.source.commit -eq $commit)
     Yes '  and ServerBuild.ps1 holds the build to it' ($rec -and @(Get-ThornswoodServerBuildProblems $rec (Get-ThornswoodServerFolderSums $dist)).Count -eq 0)
     Yes '  with no byte order mark in front of it' ($r.Written -and [IO.File]::ReadAllBytes($out)[0] -eq 0x7B)
+    Yes '  and, for a fork that cannot tell a light plugin, no lightPlugins (#1715)' ($rec -and -not ($rec.PSObject.Properties.Name -contains 'lightPlugins'))
     $good = if ($r.Written) { [IO.File]::ReadAllText($out) } else { '' }
 
     # ---- 3. and what it refuses -------------------------------------------------
@@ -216,6 +217,25 @@ try {
         Yes 'a record saying one file was built from another commit is a problem' ($p.Count -eq 1 -and $p[0] -match 'dist_back/skymp5-server\.js was built from 01234567')
         Yes 'and the good build against its own record has none' (@(Get-ThornswoodServerBuildProblems $rec (Get-ThornswoodServerFolderSums $dist)).Count -eq 0)
     }
+
+    # ---- 5. an engine that loads light plugins (#1715) -------------------------
+    # Deploy-Gamemode.ps1 lists light plugins in the server's load order only
+    # when the record says the engine loads them, and the record says so when
+    # the commit it names has espm::IsLightPlugin. From the commit, not the
+    # disk: a header that is only on disk says nothing.
+    Write-Host ''; Write-Host 'lightPlugins'
+    $lo = Join-Path $fork 'libespm\include\libespm\LoadOrder.h'
+    Put $lo "namespace espm {`nbool IsLightPlugin(std::string_view fileName, uint32_t tes4Flags) noexcept;`n}`n"
+    Write-GoodBuild
+    $r = Record
+    $rec = if ($r.Written) { [IO.File]::ReadAllText($out) | ConvertFrom-Json } else { $null }
+    Yes 'a header on disk that the recorded commit does not have: no lightPlugins' ($rec -and -not ($rec.PSObject.Properties.Name -contains 'lightPlugins'))
+    [void](Run-Native { git -C $fork -c user.email=t@t -c user.name=t add -A })
+    [void](Run-Native { git -C $fork -c user.email=t@t -c user.name=t commit -q -m 'light plugins' })
+    $r = Record
+    $rec = if ($r.Written) { [IO.File]::ReadAllText($out) | ConvertFrom-Json } else { $null }
+    Yes ('a recorded commit with IsLightPlugin: "lightPlugins": true (exit {0})' -f $r.Code) ($rec -and $rec.lightPlugins -eq $true)
+    Yes '  and it says so' ($r.Out -match 'light\s+loads light plugins')
 }
 finally {
     Remove-Item -LiteralPath $T -Recurse -Force -ErrorAction SilentlyContinue

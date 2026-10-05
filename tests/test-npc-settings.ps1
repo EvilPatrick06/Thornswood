@@ -64,6 +64,11 @@ $helper = Join-Path $RepoDir 'scripts\deploy\MaxOnline.ps1'
 Yes 'MaxOnline.ps1 is there for the settings section' (Test-Path -LiteralPath $helper)
 if (-not (Test-Path -LiteralPath $helper)) { Done }
 . $helper
+# The section counts the start point's full index with ServerOrder.ps1 (#1715).
+$orderLib = Join-Path $RepoDir 'scripts\deploy\ServerOrder.ps1'
+Yes 'ServerOrder.ps1 is there for the settings section' (Test-Path -LiteralPath $orderLib)
+if (-not (Test-Path -LiteralPath $orderLib)) { Done }
+. $orderLib
 
 # ---- 1 to 3. Deploy-Gamemode.ps1's settings section --------------------------
 $dg = Get-Content -LiteralPath (Join-Path $RepoDir 'scripts\deploy\Deploy-Gamemode.ps1') -Raw
