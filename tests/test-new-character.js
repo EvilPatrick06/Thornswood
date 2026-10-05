@@ -114,69 +114,34 @@ if (block !== null) {
       (code.match(/spoilsBlock\.purse\(who\)/g) || []).length === 1);
 }
 
-// --------------------------------------------------- and somebody puts it on
+// ------------------------------------------- dressed when made, never asked
 /*
-  THE SHIFT ARRIVED AND NOBODY EVER PUT IT ON.
+  THE SHIFT ARRIVED AND NOBODY EVER PUT IT ON (21 and 23 September). The
+  engine could not write the equipment record the client dresses from, so four
+  asks grew up to make the client wear it, and the one at every login put back
+  on clothes somebody had taken off. Patrick, 4 October: "my clothes should
+  just stay on from the moment someone creates a new character until they
+  take them off".
 
-  Reported 21 September and again on the 23rd: "Still spawned in with no
-  clothes on". giveShift has always written the worn flag onto the INVENTORY
-  entry, which is the only field a gamemode can write; the client dresses
-  itself out of the EQUIPMENT record, whose property binding in the fork has a
-  Get and no Set. So the clothes sat in the pack.
-
-  That is also half of why clothes never moved the temperature: the equipment
-  update the client sends is what fills the server's record, and a client that
-  was never asked to wear anything sends nothing to record.
-
-  These hold the ask: that it exists, that the shift uses it, that arrival
-  uses it, and that it is taken back afterwards, because a property left on a
-  character is handed to the owner again at the next login and would re-dress
-  somebody in clothes they had deliberately taken off.
+  These checks used to hold those asks in place. Since #1560 the engine writes
+  the record for an actor no client owns, and the gamemode does it once in
+  created(), before the hand-over; that is run for real in
+  test-dressed-at-creation.js. What this holds now is the other half: none of
+  the asks is left.
 */
 {
   const code = src
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .replace(/\/\/[^\n]*/g, ' ');
-  yes('there is a way to ask somebody to put something on',
-      /function wearThese\(actorId, baseIds\)/.test(code) &&
-      /mp\.makeProperty\(WEAR_PROPERTY/.test(code));
-  yes('the ask is edge triggered like the swing, through ctx.state',
-      /st\.thornswoodWearAt === v\.at/.test(code));
-  yes('and it equips rather than granting anything',
-      /pc\.equipItem\(it, false, true\)/.test(code));
-  yes('the shift asks for itself to be worn', /wearThese\(actorId, toWear\)/.test(code));
-  yes('arriving puts back whatever the server believes is worn',
-      /function wearWhatIsWorn\(actorId\)/.test(code) &&
-      /wearWhatIsWorn\(actorId\)/.test(code.slice(code.indexOf('grantKnown(actorId)'))));
-  yes('nothing is invented: only worn things already in the pack',
-      /if \(e && e\.worn && e\.baseId\) \{ ids\.push\(e\.baseId\); \}/.test(code));
-  yes('and the ask is taken back, so it cannot fire again at the next login',
-      /mp\.set\(actorId, WEAR_PROPERTY, \{ ids: \[\], at: 0 \}\)/.test(code));
-
-  /*
-    AND NOBODY HAS TO WALK THROUGH A DOOR TO GET DRESSED.
-
-    Patrick, on being told a relog would show it: "your clothes should be
-    fucking on if you left them". Dressing at the door only helps the person
-    who arrives afterwards; anybody already standing in the world in their
-    skin stayed that way until they quit.
-
-    The server can READ the equipment record even though it cannot write one,
-    so it can see somebody wearing nothing beside a pack that says otherwise.
-    That is the only state it acts on: taking your boots off is a decision,
-    and this must never argue with one.
-  */
-  yes('somebody already standing there undressed is put right where they are',
-      /function dressIfBare\(actorId\)/.test(code) && /dressIfBare\(actorId\)/.test(
-        code.slice(code.indexOf('function dressIfBare'))));
-  yes('it reads what they actually have on rather than assuming',
-      /function wornNow\(actorId\)/.test(code) && /mp\.get\(actorId, 'equipment'\)/.test(code));
-  yes('an equipment record it cannot read is left alone, because unreadable is not empty',
-      /if \(on === null\) \{ return ''; \}/.test(code));
-  yes('and it only ever acts on somebody wearing nothing at all',
-      /if \(on\.length\) \{/.test(code));
-  yes('it gives up rather than arguing forever',
-      /DRESS_TRIES/.test(code) && /if \(\(dressTried\[actorId\] \|\| 0\) >= DRESS_TRIES\) \{ return ''; \}/.test(code));
+  yes('a new character is dressed where it is made',
+      /function dressNewCharacter\(actorId\)/.test(code) &&
+      /dressNewCharacter\(actorId\)/.test(code.slice(code.indexOf('created: function (actorId)'))));
+  yes('there is no ask to put something on any more',
+      !/\bwearThese\b|\bWEAR_PROPERTY\b|\bwearScript\b/.test(code));
+  yes('arriving does not put anything back on',
+      !/\bwearWhatIsWorn\b/.test(code));
+  yes('and nobody is watched for wearing nothing',
+      !/\bdressIfBare\b|\bDRESS_TRIES\b|\bDRESS_EVERY\b/.test(code));
 }
 
 
