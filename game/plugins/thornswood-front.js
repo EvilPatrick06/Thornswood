@@ -2045,8 +2045,10 @@
 
     The trade window's close hides it and leaves the trade to the server: the
     next change to either pile draws it again, and so does H, or Trade on the
-    P panel, while the trade stands (#1628), which puts Walk away back. The wheel's name is the one it has always had here. The
-    select window is only ever capped once its choice is no longer up.
+    P panel, while the trade stands (#1628), which puts Walk away back. The
+    wheel's name is thornswoodEmotes, and the page's close sends __close so
+    the plugin's open follows (#1918). The select window is only ever capped
+    once its choice is no longer up.
   */
   const CAP_CLOSES = {
     skills: 'thornswoodSkills', party: 'thornswoodParty', journal: 'thornswoodJournal',
