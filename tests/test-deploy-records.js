@@ -82,12 +82,19 @@ function listening(srv, port) {
     srv.on('exit', gone);
   });
 }
-// Ends a service and waits until it has gone, rather than for a guessed time.
+/*
+  Ends a service and waits until it has gone and its streams have ended
+  ('close', which comes after 'exit'), rather than for a guessed time, so
+  each service is let go before the next part starts (#1960). Node frees
+  the process and pipe handles a moment after even that, which is why the
+  harness ends by setting process.exitCode and not by process.exit().
+*/
 function stopped(srv) {
   return new Promise((ok) => {
-    if (srv.exitCode !== null || srv.signalCode !== null) { ok(); return; }
-    srv.once('exit', () => ok());
-    srv.kill();
+    const ended = srv.exitCode !== null || srv.signalCode !== null;
+    if (ended && [srv.stdin, srv.stdout, srv.stderr].every((s) => !s || s.destroyed)) { ok(); return; }
+    srv.once('close', () => ok());
+    if (!ended) { srv.kill(); }
   });
 }
 // One GET against the scratch site, with whatever cookie the caller offers.
@@ -243,8 +250,9 @@ async function main() {
       yes('and /api/public still answers anybody, carrying no deploy record',
         pub.status === 200 && !leaks(pub) && !!pub.json && !('parts' in pub.json));
     } finally {
-      srv.kill();
-      await wait(300);
+      // It was killed and left 300 ms, and was often still there when the
+      // harness ended (#1960); now it is waited for until it has gone.
+      await stopped(srv);
     }
   } finally {
     try { fs.rmSync(site, { recursive: true, force: true }); } catch (e) { }
@@ -290,6 +298,17 @@ async function main() {
   yes('and not where it runs or who sent it', !!some && !!some.deploy && !('root' in some.deploy) && !('from' in some.deploy));
 
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
-  process.exit(fail ? 1 : 0);
+  /*
+    Ended rather than exited (#1960). Measured with process._getActiveHandles()
+    at this line: the last voice service's ChildProcess (killed, SIGTERM) and
+    a destroyed pipe were still listed, node still letting go of them, gone
+    1 to 2 ms later. process.exit() in that moment tripped libuv's
+    "!(handle->flags & UV_HANDLE_CLOSING)" (src\win\async.c:76, exit 127) on
+    node 24 on Windows in 5 of 5 runs after all checks had passed, and so
+    test-1703-test-ports.js, which runs three copies, failed all three. So
+    the code is set and node leaves once everything is let go. The catch
+    below still exits, because after a throw a service may be left running.
+  */
+  process.exitCode = fail ? 1 : 0;
 }
 main().catch((e) => { console.log('FAIL  ' + (e && e.stack || e)); process.exit(1); });
