@@ -67,7 +67,21 @@ const signV1 = (profileId, until) => {
   return 'v1.' + body + '.' + mac(KEY, body);
 };
 
-const post = (route, body, port) => fetch('http://127.0.0.1:' + (port || PORT) + route, {
+/*
+  Every HTTP request here goes through ask(), which tells the service to
+  close the connection once it has answered (#1962). fetch() keeps a
+  connection open for the next request, and the service closes an idle one
+  on its own keep-alive timer (node's five seconds). On 5 Oct, under load,
+  post('/token') went down the connection /health had left open just as the
+  service closed it, and stopped on "fetch failed: read ECONNRESET" before
+  any check ran. fetch sends a request over any connection it holds, even
+  with Connection: close (measured: it does), but a connection whose answer
+  carried that is never kept; with every request here sending it, fetch
+  holds none, and each request opens its own.
+*/
+const ask = (url, init) => fetch(url, Object.assign({}, init,
+  { headers: Object.assign({}, (init && init.headers) || {}, { connection: 'close' }) }));
+const post = (route, body, port) => ask('http://127.0.0.1:' + (port || PORT) + route, {
   method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
 });
 
@@ -224,7 +238,7 @@ async function ready() {
   bare.stdout.on('data', (d) => { bareLog += d; });
   bare.stderr.on('data', (d) => { bareLog += d; });
   await listening(bare, BARE);
-  const r = await fetch('http://127.0.0.1:' + PORT + '/health');
+  const r = await ask('http://127.0.0.1:' + PORT + '/health');
   if (!r.ok) throw new Error('the service answered /health with ' + r.status + '. log:\n' + log);
   return await r.json();
 }
@@ -287,7 +301,7 @@ async function ready() {
       if (m && m.t === 'pong') { clearTimeout(late); ok(''); }
     });
   });
-  const h1 = await (await fetch('http://127.0.0.1:' + PORT + '/health')).json();
+  const h1 = await (await ask('http://127.0.0.1:' + PORT + '/health')).json();
   check('a second join on that connection is not a second person in the room', ponged || h1.peers, 1);
   const shut = await new Promise((ok) => {
     const late = setTimeout(() => ok('the socket not closed within ' + BOUND_MS / 1000 + ' s'), BOUND_MS);
