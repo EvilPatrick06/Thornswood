@@ -115,6 +115,20 @@ foreach ($fn in 'Test-CmdSplitsPath', 'Get-SubstMap', 'Mount-EngineFork', 'Dismo
     if ($d) { $lift += $d.Extent.Text }
 }
 Yes 'configure and build run inside a try whose finally removes the letter' ($text -match '(?s)\$mount = Mount-EngineFork \$Fork.*\} finally \{ Dismount-EngineFork \$mount \}\s*$')
+
+# Runs one .bat through cmd.exe and returns everything it printed as text.
+# Given the bare path, cmd.exe prints "is not recognized" on its own stderr,
+# and under Stop Windows PowerShell 5.1 turns a native stderr line into a
+# terminating NativeCommandError, so the harness ended at that call (#1954;
+# 7 does not). Continue, for this one call, lets the line arrive as output to
+# be read, as Invoke-ThornswoodNative in scripts\vps\Vps.ps1 does for ssh;
+# "$_" makes 5.1's error records plain text.
+function Read-CmdBat([string]$Bat) {
+    $ErrorActionPreference = 'Continue'
+    $cmdExe = Join-Path $env:SystemRoot 'System32\cmd.exe'
+    return (& $cmdExe /d /c ($Bat + ' 2>&1') 2>&1 | ForEach-Object { "$_" } | Out-String)
+}
+
 if ($lift.Count -eq 4) {
     . ([scriptblock]::Create($lift -join "`n"))
     $amp = Join-Path ([IO.Path]::GetTempPath()) ('ts-engine-' + [Guid]::NewGuid().ToString('N').Substring(0, 8) + '\wt&x')
@@ -127,8 +141,7 @@ if ($lift.Count -eq 4) {
         $plain = Mount-EngineFork 'C:\plain\fork'
         Yes 'a fork with no & in its path is built where it is' ($plain.Fork -eq 'C:\plain\fork' -and -not $plain.Drive -and -not $plain.Why)
 
-        $cmdExe = Join-Path $env:SystemRoot 'System32\cmd.exe'
-        $bare = & $cmdExe /d /c ((Join-Path $forkA 'bootstrap.bat') + ' 2>&1') 2>&1 | Out-String
+        $bare = Read-CmdBat (Join-Path $forkA 'bootstrap.bat')
         Yes 'the stand-in bootstrap, given the path with the & bare, is cut at the & (as vcpkg''s was)' ($bare -notmatch 'bootstrapped from')
 
         $m = Mount-EngineFork $forkA
@@ -136,7 +149,7 @@ if ($lift.Count -eq 4) {
         Yes ('a fork under a path with an & is reached through a drive letter of its own (' + $m.Drive + ' ' + $m.Why + ')') (
             $m.Drive -match '^[A-Z]:$' -and $m.Made -and $m.Fork -eq ($m.Drive + '\fork') -and (Test-Path -LiteralPath (Join-Path $m.Fork 'CMakeLists.txt')))
         Yes '  standing for the fork''s parent, not the fork, so its build folder is not J://build' ((Get-SubstMap)[$m.Drive.Substring(0, 1)] -eq $amp)
-        $through = & $cmdExe /d /c ((Join-Path $m.Fork 'bootstrap.bat') + ' 2>&1') 2>&1 | Out-String
+        $through = Read-CmdBat (Join-Path $m.Fork 'bootstrap.bat')
         Yes '  and the same bootstrap, given that path, runs' ($through -match ('bootstrapped from ' + [regex]::Escape($m.Fork + '\')))
         $again = Mount-EngineFork $forkA
         Yes '  a second run while it stands reuses it and leaves it for the first to remove' ($again.Drive -eq $m.Drive -and -not $again.Made)
