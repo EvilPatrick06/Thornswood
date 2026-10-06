@@ -390,8 +390,8 @@
   const TREAT_SELF_KEY = TRADE_KEY;
   /*
     A warrior's maneuvers (#1386): opens the maneuver panel. 9, scan code 10:
-    1 to 8 are the emote slots and the game's own hotkeys, and every letter is
-    already one of ours or the game's.
+    1 to 8 are the game's own favourites hotkeys (and the emote slots while
+    the wheel is open), and every letter is already one of ours or the game's.
   */
   const MANEUVER_KEY = iniNumber(ini, 'ManeuverKey', 10);  // 9
   /*
@@ -9253,7 +9253,8 @@
     #1386. Patrick, 4 October: no chat commands for anything people do. So a
     warrior's maneuver is a key and a panel, not /maneuver typed into the
     chat. The maneuver key (ManeuverKey in Thornswood.ini, 9 by default,
-    because 1 to 8 are the emote slots and every letter is somebody's) opens
+    because 1 to 8 are the game's favourites hotkeys and every letter is
+    somebody's) opens
     game/ui/thornswood-maneuvers.js, which lists the rows this character
     holds; a number or a click there sends /maneuver <name> to the server
     through the chat's socket, the way the trade and party keys do, and the
@@ -9268,8 +9269,7 @@
     clock. A character who holds none has no rows, and the key says so.
 
     The panel holds the keyboard while it is up, under the 'maneuvers' claim,
-    so 1 to 8 reach the panel and not the emote slots or the game's own
-    hotkeys. It says when it opens and closes, the same as every other panel,
+    so 1 to 8 reach the panel and not the game's own hotkeys. It says when it opens and closes, the same as every other panel,
     and the cap closes it like the rest (CAP_CLOSES).
   */
   let maneuverRows = [];

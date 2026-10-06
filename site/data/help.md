@@ -134,8 +134,8 @@ closed.
   **B** steps between a whisper, your normal voice and a yell.
 - **G** opens the emote wheel. Eight quick slots sit in the middle, and the
   rest of the emotes are a list you can search. **Tab** moves to that search.
-  **N** stands you up out of an emote. The number keys **1** to **8** play a
-  slot with the wheel shut.
+  **N** stands you up out of an emote. While the wheel is open, **1** to **8**
+  play a slot. With it shut they are Skyrim's own favourites hotkeys.
 - **U** presses a blank key mold into the lock of the door you are looking at.
 - **F7** opens the help in the game, without the chat: talking, people, living,
   work, land and getting help, with the keys as you have them set. Help on the

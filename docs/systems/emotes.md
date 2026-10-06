@@ -4,8 +4,11 @@ The wheel of animations. G opens it and G closes it. It does not open
 in the creation hall. You are picking a face, not waving.
 
 The middle of the wheel is eight quick slots. Click a slot to play
-it. The same eight are the number keys 1 to 8, and those play with
-the wheel shut, so the wheel does not have to come up at all. To put
+it, or press its number, 1 to 8, while the wheel is open. With the
+wheel shut, 1 to 8 are Skyrim's own favourites hotkeys, the ones
+the Q menu sets, and they play no emote. Djinn, 6 Oct: a slot on
+the same keys equipped the favourite and played the emote on one
+press. To put
 an emote on a slot, open the wheel, click that slot's number beside
 the list, then click the name. The eight are remembered on the
 machine. A fresh install starts as Wave, Bow, Laugh, Point, Pray,
@@ -66,7 +69,8 @@ a drink, or a meal.
 ## Where this is
 
 The wheel, the sixty emotes, the eight quick slots, the search,
-the alphabetical list, and the number keys are in the server. The
+the alphabetical list, and the number keys inside the open wheel
+are in the server. The
 lute, the flute, and the drum play only with that instrument in the
 inventory. The server counts the lute, the flute and the drum with the
 instrument in the pack, and Sing, as the bard, and Sit as a seat, from

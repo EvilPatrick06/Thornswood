@@ -489,7 +489,7 @@ namespace Thornswood
             // of the same file, in the same DirectInput numbering, so a rebind
             // here is a rebind in game with nothing to regenerate.
             l.Add(Dx("emotewheel", "ThornsWood", "The emote wheel",
-                     "Eight quick slots in the middle, and every emote in a list you can search. Everyone else sees what you play. The number keys 1 to 8 play a slot with the wheel shut.",
+                     "Eight quick slots in the middle, and every emote in a list you can search. Everyone else sees what you play. While the wheel is open, 1 to 8 play a slot; with it shut they are Skyrim's favourites hotkeys.",
                      ThornIni, "WheelKey", 34));
             l.Add(Dx("emotepage", "ThornsWood", "Search the wheel",
                      "With the wheel open, moves to the search so you can type a name.",

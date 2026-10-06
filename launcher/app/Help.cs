@@ -153,7 +153,7 @@ namespace Thornswood
 
             // ====================================================== emotes
             new HelpItem("Emotes", "The wheel",
-                "G opens a wheel of 60 emotes. Eight quick slots sit in the middle: click one, or press 1 to 8 with the wheel shut. The rest of the list is on the right, in alphabetical order, with a search. Tab moves to that search. The middle stands you up, and Escape closes the wheel. Everybody else sees what you play."),
+                "G opens a wheel of 60 emotes. Eight quick slots sit in the middle: click one, or press 1 to 8 while the wheel is open. With the wheel shut, 1 to 8 are Skyrim's own favourites hotkeys. The rest of the list is on the right, in alphabetical order, with a search. Tab moves to that search. The middle stands you up, and Escape closes the wheel. Everybody else sees what you play."),
 
             new HelpItem("Emotes", "Getting out of one",
                 "Some have no natural end, particularly the kneeling and leaning ones. N stands you up out of whatever you are stuck in, with the wheel shut. With the wheel open, the middle of it stands you up as well."),
