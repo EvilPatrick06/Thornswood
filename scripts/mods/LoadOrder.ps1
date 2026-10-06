@@ -15,6 +15,13 @@
   no normal index and are skipped throughout. The client compares that list
   with the server's manifest position by position, and one name out of place
   is LOAD ORDER ERROR for the session.
+
+  Light plugins have an order of their own (#1715): a light index is a
+  plugin's place among the light plugins the game loads, and every form in it
+  is 0xFE000000 | (index << 12) | local id. Get-LoadOrderLight is that order,
+  and Get-LoadOrderReordered with the names the game loads first puts a list
+  into the server's whole order, light plugins included, the way
+  LoadOrder.LightOrder and LoadOrder.Reorder do in the launcher.
 #>
 
 $script:LoadOrderMasters = 'Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm'
@@ -536,6 +543,26 @@ function Get-LoadOrderGame([string[]]$Enabled, [scriptblock]$IsLightOrMissing, [
     return ,[string[]]$order.ToArray()
 }
 
+# The light plugin order the game will use: the Skyrim.ccc entries that are in
+# Data and light, then the enabled entries that are in Data and light, each
+# once. LoadOrder.LightOrder. $IsLight and $ExistsInData take the plugin name.
+function Get-LoadOrderLight([string[]]$Enabled, [scriptblock]$IsLight, [string[]]$Ccc, [scriptblock]$ExistsInData) {
+    $order = New-Object Collections.Generic.List[string]
+    $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($m in $script:LoadOrderMasters) { [void]$seen.Add($m) }
+    foreach ($names in @($Ccc, $Enabled)) {
+        foreach ($raw in @($names)) {
+            $n = "$raw".Trim()
+            if ($n.Length -eq 0 -or $seen.Contains($n)) { continue }
+            if ($null -ne $ExistsInData -and -not (& $ExistsInData $n)) { continue }
+            if ($null -ne $IsLight -and -not (& $IsLight $n)) { continue }
+            [void]$seen.Add($n)
+            [void]$order.Add($n)
+        }
+    }
+    return ,[string[]]$order.ToArray()
+}
+
 # An official Creation Club plugin, by its name: cc, three letters for who made
 # it, SSE and three digits (ccBGSSSE001-Fish.esm, ccQDRSSE001-SurvivalMode.esl).
 # LoadOrder.IsCreation in the launcher. #479: Special Edition is all Thornswood
@@ -583,8 +610,16 @@ function Get-LoadOrderFirstMismatch([string[]]$Game, [string[]]$Manifest) {
 # on the server's side. A light plugin the server names holds its place. A
 # plugin the server names that no line enables is not this function's to
 # switch on: $null comes back and the list is left as it was.
-function Get-LoadOrderReordered([string[]]$Lines, [string[]]$Manifest, [scriptblock]$IsLight) {
+#
+# $LoadedFirst is the names the game loads before any list (Skyrim.ccc), which
+# are skipped on the server's side the way the masters are: a server that
+# loads light plugins names _ResourcePack.esl and no plugin list carries it.
+# With $IsLight $null and the server's whole order, every line the server
+# names moves into that order, light plugins included (LoadOrder.Reorder).
+function Get-LoadOrderReordered([string[]]$Lines, [string[]]$Manifest, [scriptblock]$IsLight, [string[]]$LoadedFirst = @()) {
     if ($null -eq $Lines -or $null -eq $Manifest) { return $null }
+    $first = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($f in @($LoadedFirst)) { $t = "$f".Trim(); if ($t.Length) { [void]$first.Add($t) } }
     $at = [Collections.Generic.Dictionary[string, int]]::new([StringComparer]::OrdinalIgnoreCase)
     for ($i = 0; $i -lt $Lines.Count; $i++) {
         $name = Get-LoadOrderEnabledName $Lines[$i]
@@ -597,7 +632,7 @@ function Get-LoadOrderReordered([string[]]$Lines, [string[]]$Manifest, [scriptbl
     $placed = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach ($raw in $Manifest) {
         $n = "$raw".Trim()
-        if ($n.Length -eq 0 -or (Test-LoadOrderMaster $n) -or $placed.Contains($n)) { continue }
+        if ($n.Length -eq 0 -or (Test-LoadOrderMaster $n) -or $first.Contains($n) -or $placed.Contains($n)) { continue }
         [void]$placed.Add($n)
         if (-not $at.ContainsKey($n)) { return $null }
         $line = $at[$n]
@@ -629,10 +664,13 @@ function Get-LoadOrderMoved([string[]]$Before, [string[]]$After) {
     return [pscustomobject]@{ Count = $n; First = $first }
 }
 
-# The manifest's plugin names that no line enables, for saying which ones.
-function Get-LoadOrderNotEnabled([string[]]$Lines, [string[]]$Manifest) {
+# The manifest's plugin names that no line enables, for saying which ones,
+# skipping the names the game loads first as Get-LoadOrderReordered does.
+function Get-LoadOrderNotEnabled([string[]]$Lines, [string[]]$Manifest, [string[]]$LoadedFirst = @()) {
     $missing = New-Object Collections.Generic.List[string]
     if ($null -eq $Lines -or $null -eq $Manifest) { return ,[string[]]$missing.ToArray() }
+    $first = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($f in @($LoadedFirst)) { $t = "$f".Trim(); if ($t.Length) { [void]$first.Add($t) } }
     $have = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach ($l in $Lines) {
         $name = Get-LoadOrderEnabledName $l
@@ -640,7 +678,7 @@ function Get-LoadOrderNotEnabled([string[]]$Lines, [string[]]$Manifest) {
     }
     foreach ($raw in $Manifest) {
         $n = "$raw".Trim()
-        if ($n.Length -eq 0 -or (Test-LoadOrderMaster $n) -or $have.Contains($n)) { continue }
+        if ($n.Length -eq 0 -or (Test-LoadOrderMaster $n) -or $first.Contains($n) -or $have.Contains($n)) { continue }
         if (-not $missing.Contains($n)) { [void]$missing.Add($n) }
     }
     return ,[string[]]$missing.ToArray()
@@ -708,8 +746,36 @@ function ConvertFrom-LoadOrderManifest([string]$Json) {
     return ,[string[]]$names.ToArray()
 }
 
-# The server's manifest, fetched, or $null when the server does not answer.
-function Get-LoadOrderManifest([string]$Url, [int]$TimeoutMs = 4000) {
+# The whole of a manifest: Full, the plugin names that take a normal index
+# (its mods, as ConvertFrom-LoadOrderManifest reads them); Light, the light
+# plugins in light index order, which a server that loads them publishes as
+# "light" (#1715) and an older one does not, so it is empty then; and All,
+# the server's whole order, full and light together ("loadOrder"), or Full
+# when there is no light list. $null when it is not a manifest.
+function ConvertFrom-LoadOrderManifestDoc([string]$Json) {
+    $full = ConvertFrom-LoadOrderManifest $Json
+    if ($null -eq $full) { return $null }
+    $doc = $Json | ConvertFrom-Json
+    $light = New-Object Collections.Generic.List[string]
+    if ($doc.PSObject.Properties.Name -contains 'light' -and $null -ne $doc.light) {
+        foreach ($m in @($doc.light)) {
+            if ($null -eq $m -or -not ($m.PSObject.Properties.Name -contains 'filename')) { continue }
+            $f = "$($m.filename)"
+            if ($f.Length) { [void]$light.Add($f) }
+        }
+    }
+    $all = New-Object Collections.Generic.List[string]
+    if ($light.Count -and $doc.PSObject.Properties.Name -contains 'loadOrder' -and $null -ne $doc.loadOrder) {
+        foreach ($p in @($doc.loadOrder)) { $f = @("$p".Trim() -split '[\\/]')[-1]; if ($f.Length) { [void]$all.Add($f) } }
+    }
+    if ($all.Count -eq 0) { foreach ($f in $full) { [void]$all.Add($f) } }
+    return [pscustomobject]@{ Full = $full; Light = [string[]]$light.ToArray(); All = [string[]]$all.ToArray() }
+}
+
+# The server's whole manifest (ConvertFrom-LoadOrderManifestDoc), fetched, or
+# $null when the server does not answer. The same fetch as
+# Get-LoadOrderManifest, read once into both shapes.
+function Get-LoadOrderManifestDoc([string]$Url, [int]$TimeoutMs = 4000) {
     try {
         $req = [Net.WebRequest]::Create($Url)
         $req.Timeout = $TimeoutMs
@@ -720,6 +786,13 @@ function Get-LoadOrderManifest([string]$Url, [int]$TimeoutMs = 4000) {
             $sr = New-Object IO.StreamReader($res.GetResponseStream())
             try { $json = $sr.ReadToEnd() } finally { $sr.Close() }
         } finally { $res.Close() }
-        return ConvertFrom-LoadOrderManifest $json
     } catch { return $null }
+    return ConvertFrom-LoadOrderManifestDoc $json
+}
+
+# The server's manifest, fetched, or $null when the server does not answer.
+function Get-LoadOrderManifest([string]$Url, [int]$TimeoutMs = 4000) {
+    $doc = Get-LoadOrderManifestDoc $Url $TimeoutMs
+    if ($null -eq $doc) { return $null }
+    return ,$doc.Full
 }

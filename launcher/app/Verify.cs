@@ -260,6 +260,32 @@ namespace Thornswood
                             " there, the server has " + theirs + ". The game shows that as LOAD ORDER ERROR. " +
                             "Fix puts the server's order into this build's plugin list; nothing is downloaded.", true));
                     }
+                    else
+                    {
+                        // The light order, the same walk over the light
+                        // plugins (#1715). When it differs every light form id
+                        // the server stores names another plugin's form, a
+                        // beard turns into nothing, and the person sees a face
+                        // that is wrong. The client built from the fork since
+                        // #1715 compares the light list too and shows LOAD
+                        // ORDER ERROR, and the server ends the session when
+                        // refusing is on; this says it before Play.
+                        List<string> serverLight = Names(manifestLight);
+                        if (serverLight.Count > 0)
+                        {
+                            List<string> mine = LoadOrder.LightOrder(have, Light, Ccc(), InData);
+                            int li = LoadOrder.FirstMismatch(mine, serverLight);
+                            if (li >= 0)
+                            {
+                                string yours = li < mine.Count ? mine[li] : "nothing";
+                                string theirs = li < serverLight.Count ? serverLight[li] : "nothing";
+                                issues.Add(new Issue(
+                                    "Your light plugins are not in the server's order from light position " + li + ": you have " + yours +
+                                    " there, the server has " + theirs + ". Hair, beards and other parts from light plugins would show as the wrong ones. " +
+                                    "Fix puts the server's order into this build's plugin list; nothing is downloaded.", true));
+                            }
+                        }
+                    }
                 }
                 else if (want.Count == have.Count)
                 {
@@ -280,11 +306,17 @@ namespace Thornswood
             // same as the light plugins in the list (Checks.StrayCreations
             // says why). After the positional pass on purpose: that pass only
             // runs when nothing else was found.
-            foreach (string p in Checks.StrayCreations(wantSet))
+            foreach (string p in Checks.StrayCreations(wantSet, LightNames(cfg)))
             {
+                // A light one is stray only against a server that publishes
+                // its light order (Checks.StrayCreations), and it moves the
+                // light plugins rather than the full ones.
+                bool lightStray = Checks.TakesNoPlace(p);
                 issues.Add(new Issue(
                     p + " is loaded by the game on its own, because Skyrim.ccc names it, and the server does not have it, " +
-                    "so every plugin after it is out of place and the game shows LOAD ORDER ERROR. " +
+                    (lightStray
+                        ? "so every light plugin after it is one place off the server's, and hair, beards and other parts from light plugins show as the wrong ones. "
+                        : "so every plugin after it is out of place and the game shows LOAD ORDER ERROR. ") +
                     "Fix moves it aside into Thornswood's Isolated folder and nothing is deleted.",
                     true));
             }
@@ -388,6 +420,13 @@ namespace Thornswood
             // The plugins the server hands out at /plugins/<index>.bin:
             // Thornswood's own, by the gamemode's server manifest block (#1180).
             [DataMember] public string[] served;
+            // A server that loads light plugins publishes them apart from
+            // mods, in light index order (#1715): mods stays the full plugins
+            // the client's own check compares with Game.getModName. loadOrder
+            // is the server's whole order, full and light together. Both are
+            // absent on a server that loads no light plugin.
+            [DataMember] public ServerMod[] light;
+            [DataMember] public string[] loadOrder;
         }
 
         [DataContract]
@@ -404,6 +443,10 @@ namespace Thornswood
         public static bool BytesChecked;
 
         static ServerMod[] manifestCache;
+        // The light half and the whole order of the same manifest, set with
+        // manifestCache so the three always describe one answer.
+        static ServerMod[] manifestLight;
+        static string[] manifestAll;
         static DateTime manifestAt = DateTime.MinValue;
         static string manifestFrom = "";
         // A fetch that failed is remembered for the same minute a good one is
@@ -438,6 +481,8 @@ namespace Thornswood
                 var served = new HashSet<string>(doc.served ?? new string[0], StringComparer.OrdinalIgnoreCase);
                 foreach (ServerMod m in doc.mods)
                     if (m != null && m.filename != null) m.Served = served.Contains(m.filename);
+                manifestLight = doc.light ?? new ServerMod[0];
+                manifestAll = doc.loadOrder ?? new string[0];
                 manifestCache = doc.mods;
                 manifestAt = DateTime.UtcNow;
                 manifestFrom = url;
@@ -457,14 +502,21 @@ namespace Thornswood
             if (mods == null) return issues;
             BytesChecked = true;
 
+            // The light plugins a server publishes (#1715) after its full
+            // ones: a light plugin with other bytes holds other forms under
+            // the same light index, which is the same fault as a full one.
+            // None of them is served, so Fix sends the person to Vortex.
+            ServerMod[] light = manifestLight ?? new ServerMod[0];
+            int all = mods.Length + light.Length;
             string data = Path.Combine(Paths.Game, "Data");
-            for (int idx = 0; idx < mods.Length; idx++)
+            for (int idx = 0; idx < all; idx++)
             {
                 // On the Play button only while it is waiting on this, after
                 // the game folder is prepared (#1145); PlayProgress drops it
                 // otherwise.
-                PlayProgress.Files("Checking files", idx + 1, mods.Length);
-                ServerMod m = mods[idx];
+                PlayProgress.Files("Checking files", idx + 1, all);
+                bool isLight = idx >= mods.Length;
+                ServerMod m = isLight ? light[idx - mods.Length] : mods[idx];
                 if (m == null || string.IsNullOrEmpty(m.filename) || Storefront.Contains(m.filename)) continue;
                 string p = Path.Combine(data, m.filename);
                 long size;
@@ -492,7 +544,11 @@ namespace Thornswood
                 i.Plugin = m.filename;
                 i.WantSize = m.size;
                 i.WantCrc = (int)m.crc32;
-                i.WantIndex = idx;
+                // Where the file is served, /plugins/<index>.bin, which only a
+                // full plugin of ours ever is. Manifest marks served on mods
+                // alone, so a light entry is never served and Fix sends the
+                // person to Vortex for it.
+                i.WantIndex = isLight ? -1 : idx;
                 i.Served = m.Served;
                 issues.Add(i);
             }
@@ -515,6 +571,39 @@ namespace Thornswood
                    "In Vortex, update the Thornswood collection, or reinstall " +
                    (string.IsNullOrEmpty(mod) ? "the mod that has " + plugin : mod) +
                    " (right click it on the Mods page, Reinstall), then press Scan.";
+        }
+
+        /// <summary>
+        /// The server's light plugins in light index order, or an empty list
+        /// when it publishes none: a server that loads no light plugin, or one
+        /// that cannot be asked. #1715.
+        /// </summary>
+        static List<string> LightNames(Config cfg)
+        {
+            ServerMod[] mods = null;
+            try { mods = Manifest(cfg); } catch (Exception ex) { Swallow.Note("Verify.LightNames, asking the server for its manifest", ex); }
+            if (mods == null) return new List<string>();
+            return Names(manifestLight);
+        }
+
+        /// <summary>
+        /// The server's whole order, full and light plugins together, by name,
+        /// when it publishes a light order; otherwise null, and the order to
+        /// put a list into is the full one alone.
+        /// </summary>
+        static List<string> WholeOrder()
+        {
+            if (manifestLight == null || manifestLight.Length == 0 || manifestAll == null || manifestAll.Length == 0) return null;
+            var l = new List<string>();
+            foreach (string p in manifestAll)
+            {
+                if (string.IsNullOrEmpty(p)) continue;
+                string n = p.Trim();
+                int cut = Math.Max(n.LastIndexOf('/'), n.LastIndexOf('\\'));
+                if (cut >= 0) n = n.Substring(cut + 1);
+                if (n.Length > 0) l.Add(n);
+            }
+            return l;
         }
 
         /// <summary>The manifest's plugin names in its order, which is the server's load order.</summary>
@@ -620,7 +709,10 @@ namespace Thornswood
         /// answers and the order is not already its own. LoadOrder.Reorder
         /// moves only the full plugins the server names and leaves every
         /// other line where it was, so the file keeps its header, its
-        /// comments, its disabled entries and its light plugins. Written
+        /// comments, its disabled entries and its light plugins. A server
+        /// that publishes a light order (#1715) has its light plugins moved
+        /// too, by LoadOrder.ReorderWhole, and the list is rewritten when
+        /// either order is not the server's. Written
         /// back with the encoding and line endings it had: a byte order mark
         /// or a changed newline is enough for the game to read the list as
         /// something else. Returns 1 when the file was rewritten.
@@ -631,12 +723,19 @@ namespace Thornswood
             try { mods = Manifest(cfg); } catch (Exception ex) { Swallow.Note("Verify.PutInServerOrder, asking the server for its manifest", ex); }
             if (mods == null) return 0;
             List<string> manifest = Names(mods);
+            List<string> serverLight = Names(manifestLight);
+            List<string> whole = WholeOrder();
+            List<string> ccc = Ccc();
 
             // OrderFolder, not Paths.Live. Before the own folder exists
             // Live is Windows' own Skyrim folder (#1234).
             string live = Path.Combine(OrderFolder, "plugins.txt");
             if (!File.Exists(live)) return 0;
-            if (LoadOrder.FirstMismatch(LoadOrder.GameOrder(Enabled(live), LightOrMissing, Ccc(), InData), manifest) < 0) return 0;
+            List<string> enabledNow = Enabled(live);
+            bool fullRight = LoadOrder.FirstMismatch(LoadOrder.GameOrder(enabledNow, LightOrMissing, ccc, InData), manifest) < 0;
+            bool lightRight = serverLight.Count == 0 ||
+                LoadOrder.FirstMismatch(LoadOrder.LightOrder(enabledNow, Light, ccc, InData), serverLight) < 0;
+            if (fullRight && lightRight) return 0;
 
             byte[] raw;
             try { raw = File.ReadAllBytes(live); }
@@ -649,10 +748,15 @@ namespace Thornswood
             var lines = new List<string>(text.Split(new string[] { "\r\n", "\n" }, StringSplitOptions.None));
             if (trailing && lines.Count > 0) lines.RemoveAt(lines.Count - 1);
 
-            List<string> ordered = LoadOrder.Reorder(lines, manifest, Light);
+            // A server with a light order: every line it names, full and
+            // light, into its whole order (#1715), so the light plugins take
+            // the server's light indices and sit among the full ones where the
+            // server has them. The Skyrim.ccc names are the game's to load
+            // first and are skipped, as the masters are.
+            List<string> ordered = whole != null ? LoadOrder.ReorderWhole(lines, whole, ccc) : LoadOrder.Reorder(lines, manifest, Light);
             if (ordered == null)
             {
-                List<string> off = LoadOrder.NotEnabled(lines, manifest);
+                List<string> off = whole != null ? LoadOrder.NotEnabledWhole(lines, whole, ccc) : LoadOrder.NotEnabled(lines, manifest);
                 say(off.Count > 0
                     ? "The server's order names " + string.Join(", ", off.ToArray()) + ", which this build's plugin list does not enable, so the order was left alone."
                     : "This build's plugin list enables the same plugin twice, so the order was left alone.");
@@ -941,7 +1045,8 @@ namespace Thornswood
             // names them. Moved aside the same way, and said, because these are
             // Steam's files and somebody may go looking for them.
             var wanted = new HashSet<string>(Enabled(Path.Combine(Paths.Golden, "plugins.txt")), StringComparer.OrdinalIgnoreCase);
-            n += Checks.IsolateCreations(wanted, say);
+            List<string> theirLight = cfg != null ? LightNames(cfg) : new List<string>();
+            n += Checks.IsolateCreations(wanted, theirLight, say);
 
             // The server's order, into this build's own list. After the
             // reference copy, which settles what is on and off, and after the

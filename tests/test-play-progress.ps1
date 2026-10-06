@@ -377,7 +377,11 @@ Yes 'OwnGame.Make counts every file it brings over' ((Body $og 'static string Ma
 Yes 'OwnGame.Refresh counts every file it compares' ((Body $og 'static string RefreshNow(') -match 'PlayProgress\.Files\(Phase, looked\+\+, all\.Count\)')
 
 $ver = Read-Text (Join-Path $AppDir 'Verify.cs')
-Yes 'Verify.Bytes counts the plugins it checks' ((Body $ver 'public static List<Issue> Bytes(') -match 'PlayProgress\.Files\("Checking files", idx \+ 1, mods\.Length\)')
+# Full and light (#1715): the light plugins a server publishes are checked
+# after its full ones, and counted with them.
+$bytesBody = Body $ver 'public static List<Issue> Bytes('
+Yes 'Verify.Bytes counts the plugins it checks, full and light' (
+    $bytesBody -match 'int all = mods\.Length \+ light\.Length;' -and $bytesBody -match 'PlayProgress\.Files\("Checking files", idx \+ 1, all\)')
 
 # C# 5 and the words, in the two new files.
 foreach ($n in @('Progress.cs', 'ShellProgress.cs')) {
