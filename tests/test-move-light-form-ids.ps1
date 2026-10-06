@@ -92,8 +92,11 @@ try {
         '7.json' = (Record 7 @(0x51621, 0x1C0D6, 0x1BB2B, 0x1C0E4, 0x2E46F, 0x1C0F7, 0x1C107, 4261546023, 4261546040) 'Seven 4261546023')
         # Live's, stored under the order the server keeps.
         'a.json' = (Record 10 @(0x51621, 4261574695) 'Ten')
-        # A world object with no light id, which is most of a world.
-        '1059ac_Skyrim.esm.json' = '{"recType":2,"formDesc":"1059ac:Skyrim.esm","position":[1.0,2.0,3.0],"appearanceDump":null}'
+        # A world object with no light id, which is most of a world. Some
+        # hold the largest float there is (3.4028234663852886e+38, a limit
+        # that means none), which is no id and is too big for a decimal: the
+        # dev world of 5 Oct has one, and the first run stopped on it.
+        '1059ac_Skyrim.esm.json' = '{"recType":2,"formDesc":"1059ac:Skyrim.esm","position":[1.0,2.0,3.0],"appearanceDump":null,"dynamicFields":{"limit":3.4028234663852886e+38,"floor":-3.4028234663852886e+38}}'
     }
     foreach ($k in $records.Keys) { Put (Join-Path $world $k) $records[$k] }
     $planPath = Join-Path $T 'plan.json'
