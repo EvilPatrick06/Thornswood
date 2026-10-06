@@ -84,6 +84,17 @@ if (-not $SkipDnsCheck -and -not $TaskOnly) {
 $caddyWin = $CaddyDir.Replace('/','\')
 $rootWin  = $Root.Replace('/','\')
 
+# What both halves need to reach the box: the shared Remote, and the box's
+# address and account. Above the one time setup, not inside it: until 5 Oct
+# they were loaded there, so -TaskOnly (#1968) stopped at its first Remote on
+# "Invoke-ThornswoodRemote is not recognized" with nothing sent.
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path $Here '..\vps\Vps.ps1')
+. (Join-Path $Here '..\vps\Send-Script.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
+if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
+
 # Everything from here to the task block is the one time setup: fetching caddy,
 # writing the Caddyfile, opening 80 and 443, and moving the docs site onto
 # loopback. None of it needs doing again to change how the task is registered,
@@ -100,12 +111,6 @@ Write-Host 'Setting up Caddy on the VPS...'
 # routes off the site and voice from everybody (issue #543). -Domain and
 # -Email still apply: the tracked file names thornswood.net and its own
 # address, and those two are swapped for what was asked.
-$Here = $PSScriptRoot
-if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-. (Join-Path $Here '..\vps\Vps.ps1')
-. (Join-Path $Here '..\vps\Send-Script.ps1')
-if (-not $User) { $User = Get-ThornswoodVpsUser }
-if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $tracked = Join-Path $Here 'Caddyfile'
 if (-not (Test-Path -LiteralPath $tracked)) { throw "not found: $tracked. The site's Caddyfile is kept in the repository, and nothing is sent without it." }
 $caddyfile = [IO.File]::ReadAllText($tracked, [Text.Encoding]::UTF8)
