@@ -835,10 +835,13 @@ class Message(object):
         self.channel = channel
         self.content = content
         self.author = Who(uid=BOT_ID)
-        # A thread made from a message opens with a system message Discord
-        # gives the bot as its author, and refuses to let anybody edit it
-        # (#2018: 403, error 50021, on 6 Oct).
+        # A thread made from a message opens with a thread starter message
+        # Discord gives the bot as its author, and refuses to let anybody
+        # edit it (#2018: 403, error 50021, on 6 Oct). discord.py's
+        # is_system() answers False for that type, so this answers as it does.
         self.system = system
+        self.type = (bot.discord.MessageType.thread_starter_message if system
+                     else bot.discord.MessageType.default)
         self.thread = None
         # What Discord has, next to what the message in hand remembers. An
         # archived thread drops out of the cache behind Message.thread and is
@@ -865,7 +868,9 @@ class Message(object):
         return self.threaded
 
     def is_system(self):
-        return self.system
+        # As discord.py 2.7.1 has it: a thread starter message is not one.
+        return self.type not in (bot.discord.MessageType.default,
+                                 bot.discord.MessageType.thread_starter_message)
 
     async def edit(self, content=None, view=None):
         if self.system:
@@ -1125,9 +1130,10 @@ yes('  AND THE ROWS UNDER IT, each one the whole of what a tester does rather '
     standing is not None and len(standing.sent) == N
     and all(i['discord_line'] in standing.sent[n][0].content
             for n, i in enumerate(items)))
-yes('  and the system message Discord opens the thread with is left as it '
-    'is, not taken for row 1 (#2018)',
-    standing.opened.content == '' and standing.opened.is_system())
+yes('  and the thread starter message Discord opens the thread with is left '
+    'as it is, not taken for row 1 (#2018)',
+    standing.opened.content == ''
+    and standing.opened.type == bot.discord.MessageType.thread_starter_message)
 yes('  worded the way a session words them',
     [m.content for m, _ in standing.sent] ==
     [bot.live_smoke_item_text(i, N) for i in items])

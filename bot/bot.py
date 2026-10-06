@@ -2610,6 +2610,26 @@ live_smoke = discord.app_commands.Group(
 tree.add_command(live_smoke)
 
 
+def live_smoke_failed(error, ch, needs):
+    """
+    What a person is told when posting the checklist or a session failed.
+
+    Permissions only when Discord said it was permissions (50001 Missing
+    Access, 50013 Missing Permissions). Every failure used to be put down to
+    them, so a refusal of something else entirely, an edit of a thread's
+    starter message on 6 Oct (#2018), told an administrator bot to check its
+    permissions twice. Anything else is said as Discord said it, and the log
+    has the rest.
+    """
+    code = getattr(error, 'code', None)
+    if code in (50001, 50013):
+        return ('That did not go through. In #%s the bot needs %s.'
+                % (ch.name, needs))
+    text = str(getattr(error, 'text', '') or error).strip() or type(error).__name__
+    return ('That did not go through: Discord said %s%s. The bot log has the '
+            'rest.' % (text, ' (error %s)' % code if code else ''))
+
+
 async def _live_smoke_ready(interaction):
     """
     The channel and the export, or None once the person has been told what is
@@ -2679,14 +2699,14 @@ async def live_smoke_open(interaction, settings_version, live_channel, close_old
         for item in items:
             await thread.send(live_smoke_item_text(item, len(items), tickets),
                               view=LiveSmokeItem(item['id']))
-    except Exception:
+    except Exception as e:
         # Nothing is marked yet, so there is nothing here to keep off the log.
         log('live smoke: the session could not be posted:\n'
             + traceback.format_exc())
         await interaction.followup.send(
-            'That did not go through. In #%s the bot needs View Channel, Send '
-            'Messages, Create Public Threads and Send Messages in Threads.'
-            % ch.name, ephemeral=True)
+            live_smoke_failed(e, ch, 'View Channel, Send Messages, Create Public '
+                                     'Threads and Send Messages in Threads'),
+            ephemeral=True)
         return
     log('live smoke: a session is open in #%s, %d row(s)' % (ch.name, len(items)))
     said = 'Session open: %s' % thread.mention
@@ -2758,13 +2778,16 @@ async def live_smoke_write_rows(thread, rows):
     the whole set every time Cynthia refreshes it. A message the bot posted is
     its own to take down, which Discord allows without Manage Messages.
 
-    Not the thread's own first message: a thread made from a message opens
-    with a system message Discord gives the bot as author and lets nobody
-    edit, so counted as row 1 it took the whole refresh down (#2018: 403,
-    error 50021, 6 Oct).
+    Only the bot's plain messages are rows. A thread made from a message
+    opens with a thread starter message that Discord gives the bot as author
+    and lets nobody edit, so counted as row 1 it took the whole refresh down
+    (#2018: 403, error 50021, 6 Oct). It is no use asking is_system():
+    discord.py counts a thread starter message as not a system message, so
+    that check let it through at 11:45 AM. The type says it plainly.
     """
     had = [m async for m in thread.history(limit=None, oldest_first=True)
-           if m.author.id == client.user.id and not m.is_system()]
+           if m.author.id == client.user.id
+           and m.type == discord.MessageType.default]
     for n, said in enumerate(rows):
         if n >= len(had):
             await thread.send(said)
@@ -2818,13 +2841,13 @@ async def live_smoke_refresh(interaction: discord.Interaction):
         elif head.content != said[0]:
             await head.edit(content=said[0])
         await live_smoke_write_rows(await live_smoke_rows_thread(head), said[1:])
-    except Exception:
+    except Exception as e:
         log('live smoke: the checklist could not be written:\n'
             + traceback.format_exc())
         await interaction.followup.send(
-            'That did not go through. In #%s the bot needs View Channel, Send '
-            'Messages, Read Message History, Create Public Threads and Send '
-            'Messages in Threads.' % ch.name, ephemeral=True)
+            live_smoke_failed(e, ch, 'View Channel, Send Messages, Read Message '
+                                     'History, Create Public Threads and Send '
+                                     'Messages in Threads'), ephemeral=True)
         return
     await interaction.followup.send(
         'The checklist in #%s now says what the export says: %d row(s), each '
