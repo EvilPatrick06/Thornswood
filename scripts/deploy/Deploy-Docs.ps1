@@ -571,9 +571,17 @@ if (-not `$node) { 'NODE NOT FOUND ON THIS MACHINE'; return }
 # back, which also took the launcher's login with it. The handler answers 400
 # now so this should never be reached, but a service that stops trying to
 # come back is not a thing to leave lying around.
+#
+# Priority 4, normal, not Task Scheduler's default of 7 (#1968). A task
+# registered without -Priority starts node below normal, with I/O priority 1
+# (low) and memory priority 2: measured on the VPS on 5 October for this
+# site and for Caddy, while the build runners, the bot and lsass ran Normal,
+# 2 and 5. Low I/O priority is what held the game server's reads back
+# (#1931, Install-ThornswoodServer.ps1). 4 gives I/O priority 2 and memory
+# priority 5 as well. tests\test-service-task-priority.ps1 measures all three.
 `$s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries ``
       -DontStopIfGoingOnBatteries -RestartCount 10 -RestartInterval (New-TimeSpan -Minutes 1) ``
-      -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable
+      -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable -Priority 4
 `$have = Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue
 if (-not `$have) {
   `$t = New-ScheduledTaskTrigger -AtStartup
@@ -617,7 +625,8 @@ if (-not `$have) {
 `$chk = (Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue).Settings
 if (`$chk) {
   'task settings: restart count ' + `$chk.RestartCount +
-  ', execution time limit ' + (`$(if (`$chk.ExecutionTimeLimit -eq 'PT0S') { 'none' } else { `$chk.ExecutionTimeLimit }))
+  ', execution time limit ' + (`$(if (`$chk.ExecutionTimeLimit -eq 'PT0S') { 'none' } else { `$chk.ExecutionTimeLimit })) +
+  ', priority ' + `$chk.Priority
 }
 # And the account, compared by SID, because the task says SYSTEM or LOCAL
 # SERVICE where -RunAs may have said it with NT AUTHORITY in front.
