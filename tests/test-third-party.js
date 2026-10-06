@@ -443,6 +443,109 @@ if (!haveFork) {
   });
 }
 
+// ---------------------------------------------------------------- the LGPL
+//
+// #1332. Two of the libraries the fork's build links are not permissive:
+// antigo (LGPL-3.0) and frida-gum (the wxWindows Library Licence 3.1). The
+// issue said antigo goes to every client inside MpClientPlugin.dll and asked
+// for the LGPL text and a notice to go with it. Measured on 5 October: the
+// build links antigo into MpClientPlugin.dll, but nothing in the client calls
+// it, so its code is only in scam_native.node, which nobody receives, and the
+// LGPL asks nothing of what ships. frida-gum is in SkyrimPlatformImpl.dll,
+// under an exception that asks nothing more of a binary. THIRD-PARTY.md says
+// so, and this holds it there: the day a client file calls antigo, the fork
+// files that use it stop being the three server ones and this fails, because
+// then its notice and the LGPL text have to go with that file.
+const libRows = N.split('\n').filter(function (l) { return l.charAt(0) === '|'; });
+const antigoRow = libRows.filter(function (l) { return /^\| antigo, https:\/\/github\.com\/nic11\/antigo /.test(l); })[0] || '';
+const fridaRow = libRows.filter(function (l) { return /^\| frida-gum \d/.test(l); })[0] || '';
+const antigoAt = (/`([0-9a-f]{40})`/.exec(antigoRow) || [])[1] || '';
+const fridaAt = (/`([0-9a-f]{40})`/.exec(fridaRow) || [])[1] || '';
+const fridaVer = (/^\| frida-gum (\d+\.\d+\.\d+)/.exec(fridaRow) || [])[1] || '';
+yes('THIRD-PARTY.md has a row for antigo naming its commit (' + (antigoAt.slice(0, 8) || 'none') + ')', antigoAt.length === 40);
+yes('the antigo row gives LGPL-3.0', /\| LGPL-3\.0\b/.test(antigoRow));
+yes('the antigo row says its code is only in scam_native.node', /\| Only in `scam_native\.node`/.test(antigoRow));
+yes('THIRD-PARTY.md has a row for frida-gum naming its version and commit (' + (fridaVer || 'none') + ')',
+    fridaVer.length > 0 && fridaAt.length === 40);
+yes('the frida-gum row gives the wxWindows Library Licence 3.1 and SkyrimPlatformImpl.dll',
+    fridaRow.indexOf('wxWindows Library Licence 3.1') >= 0 && fridaRow.indexOf('`SkyrimPlatformImpl.dll`') >= 0);
+yes('THIRD-PARTY.md no longer says this repository has an LGPL-3.0.txt to ship',
+    !fs.existsSync(path.join(ROOT, 'LGPL-3.0.txt')) && /It has none, and none is owed/.test(flat(N)));
+// The fork files that use antigo, other than its port and the build files
+// that link it. MpClientPlugin.dll takes server_guest_lib for Inventory.cpp
+// only, so these three put nothing of antigo into it.
+const ANTIGO_USERS = [
+  'skymp5-server/cpp/addon/ScampServer.cpp',
+  'skymp5-server/cpp/server_guest_lib/MpObjectReference.cpp',
+  'skymp5-server/cpp/server_guest_lib/WorldState.cpp'
+];
+const ANTIGO_LINKS = ['vcpkg.json', 'skymp5-server/cpp/CMakeLists.txt'];
+if (!haveFork) {
+  skip('no fork here, so the antigo and frida-gum ports and antigo\'s users were not read');
+} else {
+  let port = '', portJson = null, frida = '';
+  try { port = git(['show', commit + ':overlay_ports/antigo/portfile.cmake']); } catch (e) { port = ''; }
+  try { portJson = JSON.parse(git(['show', commit + ':overlay_ports/antigo/vcpkg.json'])); } catch (e) { portJson = null; }
+  try { frida = git(['show', commit + ':overlay_ports/frida-gum/portfile.cmake']); } catch (e) { frida = ''; }
+  yes('overlay_ports/antigo at ' + commit.slice(0, 8) + ' fetches antigo at the commit THIRD-PARTY.md names',
+      !!antigoAt && new RegExp('REF ' + antigoAt + '\\b').test(port));
+  yes('overlay_ports/antigo/vcpkg.json at ' + commit.slice(0, 8) + ' declares LGPL-3.0', !!portJson && portJson.license === 'LGPL-3.0');
+  yes('overlay_ports/frida-gum at ' + commit.slice(0, 8) + ' fetches the ' + fridaVer + ' devkit and the licence at the commit THIRD-PARTY.md names',
+      !!fridaVer && frida.indexOf('/' + fridaVer + '/frida-gum-devkit-' + fridaVer + '-') >= 0 &&
+      !!fridaAt && frida.indexOf('frida/frida-gum/' + fridaAt + '/COPYING') >= 0);
+  let users = [];
+  try {
+    users = git(['grep', '-l', '-i', '-e', 'antigo', commit, '--']).split('\n')
+      .map(function (l) { return l.slice(commit.length + 1).trim(); })
+      .filter(function (p) { return p && p.indexOf('overlay_ports/') !== 0 && ANTIGO_LINKS.indexOf(p) < 0; });
+  } catch (e) { users = []; }
+  const newUsers = users.filter(function (p) { return ANTIGO_USERS.indexOf(p) < 0; });
+  newUsers.forEach(function (p) { console.log('      uses antigo, and may put it into a client file: ' + p); });
+  yes('the only fork files that use antigo are the three server ones THIRD-PARTY.md names (' + users.length + ')',
+      users.length > 0 && newUsers.length === 0);
+  ANTIGO_USERS.forEach(function (p) {
+    yes('THIRD-PARTY.md names ' + p.split('/').slice(-2).join('\\') + ' as a user of antigo',
+        N.indexOf(p.split('/').pop()) >= 0);
+  });
+}
+// The recorded client files themselves, where the game folder holds them. A
+// string of antigo's own (from its ResolvedContext.cpp at that commit) is in
+// its library and in the recorded scam_native.node, and must not be in the
+// recorded MpClientPlugin.dll. GumInterceptor is frida-gum's.
+const GAME = process.env.THORNSWOOD_GAME || 'C:\\Thornswood\\Game';
+function recordedCopy(rel) {
+  const p = path.join(GAME, rel);
+  let buf = null;
+  try { buf = fs.readFileSync(p); } catch (e) { return null; }
+  const want = cb && cb.files && cb.files[rel] ? String(cb.files[rel].sha256) : '';
+  return crypto.createHash('sha256').update(buf).digest('hex') === want ? buf : null;
+}
+const ANTIGO_SAYS = ['resolved context with ', 'stringstream error!'];
+const mpc = recordedCopy('Data\\SKSE\\Plugins\\MpClientPlugin.dll');
+if (!mpc) {
+  skip('no recorded MpClientPlugin.dll in ' + GAME + ', so it was not read for antigo');
+} else {
+  ANTIGO_SAYS.forEach(function (s) {
+    yes('the recorded MpClientPlugin.dll carries none of antigo\'s code ("' + s.trim() + '" is not in it)',
+        mpc.indexOf(Buffer.from(s, 'latin1')) < 0);
+  });
+}
+const lib = path.join(FORK, 'build', 'vcpkg_installed', 'x64-windows-sp', 'lib', 'antigo.lib');
+if (fs.existsSync(lib)) {
+  const lb = fs.readFileSync(lib);
+  yes('those strings are antigo\'s: its built library has them',
+      ANTIGO_SAYS.every(function (s) { return lb.indexOf(Buffer.from(s, 'latin1')) >= 0; }));
+} else {
+  skip('no built antigo.lib under ' + FORK + ', so the strings were not checked against it');
+}
+const spi = recordedCopy('Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll');
+if (!spi) {
+  skip('no recorded SkyrimPlatformImpl.dll in ' + GAME + ', so it was not read for frida-gum');
+} else {
+  yes('the recorded SkyrimPlatformImpl.dll carries frida-gum (GumInterceptor), as the row says',
+      spi.indexOf(Buffer.from('GumInterceptor', 'latin1')) >= 0);
+}
+
 // ---------------------------------------------------------------- Nexus Mods
 //
 // Two of the collection's mods are Thornswood's own uploads. One of them, the
