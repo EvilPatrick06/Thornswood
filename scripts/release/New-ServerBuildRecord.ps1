@@ -147,17 +147,19 @@ if ($dirty) {
 # evidence on its own, which is the whole reason this file exists, but a binary
 # OLDER than its sources is a definite problem worth stopping for.
 #
-# Only cpp\ and ts\, never the whole of skymp5-server: node_modules holds 7,300
-# of that folder's 7,746 files and walking it turned a one second check into
-# minutes. The 403 files that matter are all under these two.
+# Only cpp\, never the whole of skymp5-server: node_modules holds 7,300 of that
+# folder's 7,746 files and walking it turned a one second check into minutes.
+# Not ts\ either: the TypeScript is built into dist_back\skymp5-server.js, never
+# into scam_native.node, so a change to it alone leaves the binary as it was
+# and this said "rebuild" about a build that was whole (the #1972 change to
+# index.ts, 5 Oct). The JavaScript half is held to the fork's sources by its
+# map, below, which is stronger than any timestamp.
 $newest = $null
-foreach ($sub in @('cpp', 'ts')) {
-  $d = Join-Path $Clone (Join-Path 'skymp5-server' $sub)
-  if (-not (Test-Path -LiteralPath $d)) { continue }
-  $f = Get-ChildItem -LiteralPath $d -Recurse -File -EA SilentlyContinue |
-       Where-Object { $_.Extension -in '.cpp', '.h', '.ts' -and $_.FullName -notlike '*\node_modules\*' } |
+$d = Join-Path $Clone 'skymp5-server\cpp'
+if (Test-Path -LiteralPath $d) {
+  $newest = Get-ChildItem -LiteralPath $d -Recurse -File -EA SilentlyContinue |
+       Where-Object { $_.Extension -in '.cpp', '.h' -and $_.FullName -notlike '*\node_modules\*' } |
        Sort-Object LastWriteTime -Descending | Select-Object -First 1
-  if ($f -and ((-not $newest) -or ($f.LastWriteTime -gt $newest.LastWriteTime))) { $newest = $f }
 }
 if ($newest -and $newest.LastWriteTime -gt $item.LastWriteTime) {
   Write-Host ''
