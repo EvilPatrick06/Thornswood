@@ -14,8 +14,9 @@ of its own, and choosing one is Patrick's decision.
 resource Build-Launcher.ps1 compiles into the launcher, every file under
 `launcher\lib`, every font and minified script the site serves from
 `site\public`, the six client files and the commits in
-`records\client-build.json` and `records\server-build.json`, and the source
-paragraph on the public credits page. Where Vortex's copy of the Thornswood
+`records\client-build.json` and `records\server-build.json`, the two
+libraries the fork links that are not permissive, and the source paragraph on
+the public credits page. Where Vortex's copy of the Thornswood
 Client Runtime and the launcher's `Profile\OwnGame\files.txt` are on the
 machine, it also holds the section on that mod to every file in it. When a
 rebuild records a new commit, this file and
@@ -142,11 +143,47 @@ What is compiled into them:
   files do not go out with these six: they are the Thornswood Client Runtime
   mod on Nexus Mods, below. vcpkg copies each
   port's licence text to `build\vcpkg_installed\x64-windows-sp\share\<port>\copyright`
-  in the fork's build folder. Read on 24 September, two of them are worth
-  knowing about: antigo's is the GNU Lesser General Public License version 3,
-  and frida-gum's is the wxWindows Library Licence 3.1. The others are
-  permissive texts such as MIT, BSD, Boost, Apache 2.0 and zlib.
-  None of those texts travels with the client runtime today.
+  in the fork's build folder. Read on 24 September, two of them are not
+  permissive, antigo and frida-gum, below. The others are permissive texts
+  such as MIT, BSD, Boost, Apache 2.0 and zlib. None of those texts travels
+  with the client runtime today.
+
+The two libraries whose licences are not permissive, measured on 5 October
+against the fork at `a247ef27` and the recorded files (#1332). The fork's
+triplet links every vcpkg library statically
+(`overlay_triplets\x64-windows-sp.cmake`), so a library's code is inside a
+file or it is not there at all.
+
+| Library | Licence | Where its code is |
+|---|---|---|
+| antigo, https://github.com/nic11/antigo at `da15297955935da32e455fc1ca2a12faf564caae` (`overlay_ports\antigo`) | LGPL-3.0, by its `LICENSE` and the port's `vcpkg.json` | Only in `scam_native.node`, the game server's module |
+| frida-gum 16.0.19 (`overlay_ports\frida-gum`), Frida's own built devkit, from https://github.com/frida/frida-gum at `698b356fef0ecfc3ac2818f0b387be90e93deeda`, the commit Frida 16.0.19 names for it | wxWindows Library Licence 3.1 | In `SkyrimPlatformImpl.dll` |
+
+antigo is a trace logging library. The build links it into
+`MpClientPlugin.dll` as well (`skymp5-server\cpp\CMakeLists.txt` adds it to
+every target in `VCPKG_DEPENDENT`), but nothing in the client calls it, so the
+linker leaves it out. The only fork files that use it are the server's
+`addon\ScampServer.cpp` and `server_guest_lib\MpObjectReference.cpp` and
+`WorldState.cpp`. `MpClientPlugin.dll` takes `server_guest_lib` for its
+inventory code only, and none of the messages in those two files is in the
+recorded `MpClientPlugin.dll`. Nor is any of antigo's own (`resolved context
+with`, `stringstream error!`), while the recorded `scam_native.node` has every
+one of them. So no file anybody receives carries antigo. The LGPL asks for its
+notice, its text and a way to relink only where a copy is handed to somebody,
+and running the server hands nobody a copy: it asks nothing of Thornswood
+today. #1332 said this repository holds an `LGPL-3.0.txt`. It has none, and
+none is owed. The day a client file calls antigo, the LGPL's notice and text
+have to go with that file, and `tests\test-third-party.js` fails when a fork
+file outside those three starts using it.
+
+frida-gum is Skyrim Platform's function hooking (`FridaHooks.cpp`,
+`FridaHookHandler.cpp`), and `GumInterceptor` is in the recorded
+`SkyrimPlatformImpl.dll`, so it goes to everybody. Its licence, the `COPYING`
+file at that commit, which the port fetches as its copyright file, is the GNU
+Library General Public Licence with an exception that lets a binary built with
+it go out under the distributor's own terms. So it asks nothing more of
+`SkyrimPlatformImpl.dll`, which goes out under the GPL with its source offered
+below.
 
 ## From upstream SkyMP, not built here
 
@@ -408,6 +445,9 @@ with.
   this build reaches it).
   Section 13 of the AGPL asks that everybody who connects to a modified server
   over a network be offered its source. The next section is that offer.
+  `scam_native.node` is also the one file that carries antigo, under the
+  LGPL-3.0 (above). The fork at that commit names antigo's source by commit
+  and SHA512 in `overlay_ports\antigo\portfile.cmake`.
 
 ## The Discord bot, on the VPS
 
@@ -506,7 +546,10 @@ branch any more.
   and this file names none.
 - The `ICU-LICENSE.txt` in the Client Runtime is a later ICU's text than the
   ICU 71 data it sits beside.
-- The vcpkg licence texts do not travel with the client runtime.
+- The permissive vcpkg licence texts do not travel with the client runtime,
+  and the MIT and BSD ones ask for their notice to go with a binary. The two
+  that are not permissive ask nothing of what ships today (antigo and
+  frida-gum, under "The SkyMP client runtime, built from the fork").
 - The MIT and OFL texts are not on the site beside marked and the fonts. The
   files keep their copyright lines and name their licences, as the copies
   from npm and Google Fonts did.
