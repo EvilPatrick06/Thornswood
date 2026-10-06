@@ -3,7 +3,7 @@
 Generated from the winning records in the 48-plugin dev load order.
 This is the authored policy prepared for the next dev release; release proof is recorded separately.
 
-14,641 placements inspected; 5,072 retained; 9,569 excluded.
+14,668 placements inspected; 5,075 retained; 9,593 excluded.
 
 Named pets and named enemies are excluded even when their source record lacks the Unique flag.
 Merchant traders and exterior transport services remain available.
@@ -22,10 +22,10 @@ listed interval; the deadline persists through restart. A corpse yields one shar
 | Solstheim | 462 |
 | Whiterun | 545 |
 | Winterhold | 504 |
-| no hold | 359 |
+| no hold | 360 |
 | the Pale | 381 |
-| the Reach | 538 |
-| the Rift | 607 |
+| the Reach | 539 |
+| the Rift | 608 |
 
 City animals: at most six per location. Farm livestock: at most eight per location.
 Bandit camps: at most seven enemies, 45-minute returns. Giant camps: at most two giants
@@ -114,8 +114,9 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | Whiterun | Whiterun | city |  | 20 | 20, 45, 360 |
 | Windhelm | Eastmarch | city |  | 36 | 45, 360 |
 | Riften | the Rift | city |  | 28 | 20, 45, 360 |
-| Markarth | the Reach | city |  | 22 | 20, 45, 360 |
+| Markarth | the Reach | city |  | 23 | 20, 45, 360 |
 | Solitude | Haafingar | city |  | 21 | 45, 360 |
+| open ground in Tamriel | no hold | wilderness |  | 1 | 45 |
 | Anga's Mill | the Pale | wilderness |  | 9 | 20 |
 | Barleydark Farm | Whiterun | wilderness |  | 2 | 20 |
 | Battle-Born Farm | Whiterun | farm |  | 4 | 20 |
@@ -128,15 +129,14 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | Hollyfrost Farm | Eastmarch | farm |  | 5 | 20 |
 | Katla's Farm | Haafingar | farm |  | 6 | 20 |
 | Kolskeggr Mine | the Reach | wilderness |  | 7 | 20, 45 |
-| Left Hand Mine | the Reach | wilderness |  | 3 | 20 |
 | Loreius Farm | the Pale | farm |  | 6 | 20 |
-| Merryfair Farm | the Rift | farm |  | 4 | 20 |
+| Merryfair Farm | the Rift | farm |  | 5 | 20 |
 | Mixwater Mill | Eastmarch | wilderness |  | 4 | 20 |
 | Half-moon Mill | Falkreath | wilderness |  | 4 | 20 |
 | Pelagia Farm | Whiterun | farm |  | 1 | 20 |
-| Salvius Farm | the Reach | farm |  | 1 | 20 |
+| Salvius Farm | the Reach | farm |  | 4 | 20 |
 | Sarethi Farm | the Rift | farm |  | 3 | 20 |
-| Snow-Shod Farm | the Rift | farm |  | 5 | 20 |
+| Snow-Shod Farm | the Rift | farm |  | 6 | 20 |
 | Solitude Sawmill | Haafingar | wilderness |  | 2 | 20 |
 | Whistling Mine | Winterhold | wilderness |  | 2 | 30 |
 | Alftand | Winterhold | dungeon | 2 | 12 | 45 |
@@ -1797,7 +1797,6 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | open ground in Tamriel | the Rift | wilderness |  | 2 | 20 |
 | open ground in Tamriel | the Rift | wilderness |  | 1 | 20 |
 | POIFallForest19 | the Rift | wilderness |  | 2 | 45 |
-| open ground in Tamriel | the Rift | wilderness |  | 1 | 20 |
 | open ground in Tamriel | the Rift | wilderness |  | 1 | 20 |
 | open ground in Tamriel | the Rift | wilderness |  | 1 | 20 |
 | open ground in Tamriel | the Rift | wilderness |  | 1 | 20 |

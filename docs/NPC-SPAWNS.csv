@@ -316,8 +316,8 @@ ref,name,base,hold,locationName,location,habitat,role,species,tier,cap,returnMin
 1066f2:Skyrim.esm,Chicken,a91a0:Skyrim.esm,the Rift,Shor's Stone,18a4c:Skyrim.esm,city,animal,chicken,,6,20,512,bbcb:Skyrim.esm,3c:Skyrim.esm,163423.5625,-61574.98046875,7264.1728515625
 1066fa:Skyrim.esm,Chicken,a91a0:Skyrim.esm,Winterhold,Winterhold,18a51:Skyrim.esm,city,animal,chicken,,6,20,512,8ec1:Skyrim.esm,3c:Skyrim.esm,109419.5546875,101834.90625,-9028.8271484375
 1066fb:Skyrim.esm,Chicken,a91a0:Skyrim.esm,Winterhold,Winterhold,18a51:Skyrim.esm,city,animal,chicken,,6,20,512,8ec1:Skyrim.esm,3c:Skyrim.esm,108157.40625,102073.921875,-9024.0
-106703:Skyrim.esm,Chicken,a91a0:Skyrim.esm,the Reach,Left Hand Mine,18e3a:Skyrim.esm,wilderness,animal,chicken,,6,20,1536,75ab:Skyrim.esm,3c:Skyrim.esm,-165702.1875,1092.06201171875,-4442.60009765625
-106704:Skyrim.esm,Chicken,a91a0:Skyrim.esm,the Reach,Left Hand Mine,18e3a:Skyrim.esm,wilderness,animal,chicken,,6,20,1536,75ca:Skyrim.esm,3c:Skyrim.esm,-166105.484375,-521.7393798828125,-4353.77001953125
+106703:Skyrim.esm,Chicken,a91a0:Skyrim.esm,the Reach,Markarth,18a59:Skyrim.esm,city,animal,chicken,,6,20,512,75ab:Skyrim.esm,3c:Skyrim.esm,-165753.484375,1090.525634765625,-4459.59326171875
+106704:Skyrim.esm,Chicken,a91a0:Skyrim.esm,the Reach,Markarth,18a59:Skyrim.esm,city,animal,chicken,,6,20,512,75ca:Skyrim.esm,3c:Skyrim.esm,-164907.8125,-545.744873046875,-4370.73828125
 10670d:Skyrim.esm,Chicken,a91a0:Skyrim.esm,the Pale,Anga's Mill,18c8b:Skyrim.esm,wilderness,animal,chicken,,6,20,1536,90d0:Skyrim.esm,3c:Skyrim.esm,110006.1640625,32586.41015625,-11598.7705078125
 10670e:Skyrim.esm,Chicken,a91a0:Skyrim.esm,the Pale,Anga's Mill,18c8b:Skyrim.esm,wilderness,animal,chicken,,6,20,1536,90cf:Skyrim.esm,3c:Skyrim.esm,110909.15625,32319.83984375,-11775.2900390625
 10670f:Skyrim.esm,Chicken,a91a0:Skyrim.esm,the Pale,Anga's Mill,18c8b:Skyrim.esm,wilderness,animal,chicken,,6,20,1536,90d0:Skyrim.esm,3c:Skyrim.esm,109020.0703125,32104.994140625,-11441.505859375
@@ -355,10 +355,10 @@ ref,name,base,hold,locationName,location,habitat,role,species,tier,cap,returnMin
 106c1c:Skyrim.esm,Chicken,a91a0:Skyrim.esm,Eastmarch,Mixwater Mill,18e3d:Skyrim.esm,wilderness,animal,chicken,,6,20,1536,95e6:Skyrim.esm,3c:Skyrim.esm,109548.3046875,-5541.0107421875,-13244.4560546875
 106c22:Skyrim.esm,Chicken,a91a0:Skyrim.esm,Whiterun,Whiterun,18a56:Skyrim.esm,city,animal,chicken,,6,20,512,9659:Skyrim.esm,3c:Skyrim.esm,17630.037109375,-17429.77734375,-4535.400390625
 106c23:Skyrim.esm,Chicken,a91a0:Skyrim.esm,Whiterun,Whiterun,18a56:Skyrim.esm,city,animal,chicken,,6,20,512,9659:Skyrim.esm,3c:Skyrim.esm,17919.720703125,-17174.775390625,-4542.57666015625
-106c2f:Skyrim.esm,Chicken,a91a0:Skyrim.esm,the Reach,Salvius Farm,18e40:Skyrim.esm,farm,animal,chicken,,8,20,512,7178:Skyrim.esm,3c:Skyrim.esm,-163782.1875,5849.2705078125,-4526.03369140625
+106c2f:Skyrim.esm,Chicken,a91a0:Skyrim.esm,the Reach,Markarth,18a59:Skyrim.esm,city,animal,chicken,,6,20,512,7179:Skyrim.esm,3c:Skyrim.esm,-164161.03125,5570.0703125,-4520.0
 106c30:Skyrim.esm,Chicken,a91a0:Skyrim.esm,the Reach,Markarth,18a59:Skyrim.esm,city,animal,chicken,,6,20,512,7179:Skyrim.esm,3c:Skyrim.esm,-164132.5625,4961.90234375,-4520.0
-106c31:Skyrim.esm,Chicken,a91a0:Skyrim.esm,the Reach,Markarth,18a59:Skyrim.esm,city,animal,chicken,,6,20,512,7179:Skyrim.esm,3c:Skyrim.esm,-164737.921875,5619.1591796875,-4503.07763671875
-106c32:Skyrim.esm,Chicken,a91a0:Skyrim.esm,the Reach,Markarth,18a59:Skyrim.esm,city,animal,chicken,,6,20,512,7179:Skyrim.esm,3c:Skyrim.esm,-164588.546875,5807.51904296875,-4517.0302734375
+106c31:Skyrim.esm,Chicken,a91a0:Skyrim.esm,the Reach,Markarth,18a59:Skyrim.esm,city,animal,chicken,,6,20,512,7179:Skyrim.esm,3c:Skyrim.esm,-164690.046875,5561.9619140625,-4503.07763671875
+106c32:Skyrim.esm,Chicken,a91a0:Skyrim.esm,the Reach,Markarth,18a59:Skyrim.esm,city,animal,chicken,,6,20,512,7179:Skyrim.esm,3c:Skyrim.esm,-164758.9375,5541.2265625,-4510.171875
 106c37:Skyrim.esm,Chicken,a91a0:Skyrim.esm,the Rift,Sarethi Farm,18e41:Skyrim.esm,farm,animal,chicken,,8,20,512,97d5:Skyrim.esm,3c:Skyrim.esm,111738.4140625,-70988.234375,11477.1640625
 106c38:Skyrim.esm,Chicken,a91a0:Skyrim.esm,the Rift,Sarethi Farm,18e41:Skyrim.esm,farm,animal,chicken,,8,20,512,97d5:Skyrim.esm,3c:Skyrim.esm,112118.78125,-70929.0390625,11480.0
 106c40:Skyrim.esm,Chicken,a91a0:Skyrim.esm,Haafingar,Solitude Sawmill,18e44:Skyrim.esm,wilderness,animal,chicken,,6,20,1536,92e1:Skyrim.esm,3c:Skyrim.esm,-79079.3671875,91312.2109375,-13700.9873046875
@@ -752,7 +752,6 @@ ref,name,base,hold,locationName,location,habitat,role,species,tier,cap,returnMin
 107d3d:Skyrim.esm,Fox,ec968:Skyrim.esm,the Rift,open ground in Tamriel,bcf9:Skyrim.esm,wilderness,animal,fox,,6,20,1536,bcf9:Skyrim.esm,3c:Skyrim.esm,140029.015625,-100668.4296875,10714.958984375
 107d3e:Skyrim.esm,Fox,ec968:Skyrim.esm,the Rift,open ground in Tamriel,bcf8:Skyrim.esm,wilderness,animal,fox,,6,20,1536,bcf8:Skyrim.esm,3c:Skyrim.esm,145435.875,-100963.9609375,10649.01953125
 107d40:Skyrim.esm,Fox,ec968:Skyrim.esm,the Rift,SnowShodFarmExterior,bd14:Skyrim.esm,wilderness,animal,fox,,6,20,1536,bd14:Skyrim.esm,3c:Skyrim.esm,167510.4375,-105759.1640625,11034.595703125
-107d41:Skyrim.esm,Fox,ec968:Skyrim.esm,the Rift,open ground in Tamriel,bcf0:Skyrim.esm,wilderness,animal,fox,,6,20,1536,bcf0:Skyrim.esm,3c:Skyrim.esm,178545.53125,-100056.5234375,10972.97265625
 107d42:Skyrim.esm,Fox,ec968:Skyrim.esm,the Rift,open ground in Tamriel,bcee:Skyrim.esm,wilderness,animal,fox,,6,20,1536,bcee:Skyrim.esm,3c:Skyrim.esm,186869.234375,-98833.1484375,9133.505859375
 107d43:Skyrim.esm,Fox,ec968:Skyrim.esm,the Rift,open ground in Tamriel,bcec:Skyrim.esm,wilderness,animal,fox,,6,20,1536,bcec:Skyrim.esm,3c:Skyrim.esm,195756.671875,-100785.7578125,8397.939453125
 107d44:Skyrim.esm,Fox,ec968:Skyrim.esm,the Rift,DLC1DawnguardHQExt01,bd2d:Skyrim.esm,wilderness,animal,fox,,6,20,1536,bd2d:Skyrim.esm,3c:Skyrim.esm,199430.453125,-107211.7421875,7735.298828125
@@ -1111,7 +1110,7 @@ ref,name,base,hold,locationName,location,habitat,role,species,tier,cap,returnMin
 13c008:Arena - Markarth Side.esp,Hild,13c004:Arena - Markarth Side.esp,Hjaalmarch,Markarth Side,122a30:Arena - Markarth Side.esp,city,trader,nord,,,360,512,f9a47:Arena - Markarth Side.esp,,-56.0,0.0,0.0
 13cbf:Dawnguard.esm,Skeleton,17e95:Dawnguard.esm,no hold,Castle Volkihar,4c20:Dawnguard.esm,wilderness,enemy,skeletonarmor,,4,45,1536,18de:Skyrim.esm,3c:Skyrim.esm,-172967.1875,153853.578125,-13939.0791015625
 13cc0:Dawnguard.esm,Skeleton,17e92:Dawnguard.esm,no hold,Castle Volkihar,4c20:Dawnguard.esm,wilderness,enemy,skeletonarmor,,4,45,1536,18de:Skyrim.esm,3c:Skyrim.esm,-173260.234375,153695.84375,-13171.1005859375
-13cc1:Dawnguard.esm,Skeleton,17e96:Dawnguard.esm,no hold,Castle Volkihar,4c20:Dawnguard.esm,wilderness,enemy,skeletonarmor,,4,45,1536,18de:Skyrim.esm,3c:Skyrim.esm,-174718.875,153649.53125,-13426.2431640625
+13cc1:Dawnguard.esm,Skeleton,17e96:Dawnguard.esm,no hold,Castle Volkihar,4c20:Dawnguard.esm,wilderness,enemy,skeletonarmor,,4,45,1536,18de:Skyrim.esm,3c:Skyrim.esm,-174640.59375,153705.578125,-13426.2431640625
 13cc2:Dawnguard.esm,Skeleton,cadb:Dawnguard.esm,no hold,Castle Volkihar,4c20:Dawnguard.esm,wilderness,enemy,skeletonarmor,,4,45,1536,18de:Skyrim.esm,3c:Skyrim.esm,-172936.453125,155170.5625,-13442.8134765625
 13e2f:Dawnguard.esm,Ice Wraith,84095:Skyrim.esm,no hold,DLC1FalmerValleyPOI06,d0e:Dawnguard.esm,wilderness,enemy,icewraith,,4,45,1536,d0e:Dawnguard.esm,bb5:Dawnguard.esm,2243.875244140625,-3507.732421875,133.0792694091797
 13e40:Dawnguard.esm,Giant Frostbite Spider,424f6:Skyrim.esm,no hold,DLC1FalmerValleyPOI07,d07:Dawnguard.esm,wilderness,enemy,giant,,4,45,1536,d07:Dawnguard.esm,bb5:Dawnguard.esm,5169.875,9901.724609375,2883.53125
@@ -1129,12 +1128,12 @@ ref,name,base,hold,locationName,location,habitat,role,species,tier,cap,returnMin
 14985:Dawnguard.esm,Vampire Fledgling,2f9e1:Skyrim.esm,the Rift,Redwater Den,4d6f:Dawnguard.esm,dungeon,enemy,bretonracevampire,1,8,30,1536,5eaa:Dawnguard.esm,,3716.237060546875,-5392.45361328125,5678.880859375
 14986:Dawnguard.esm,Vampire's Thrall,183a4:Dawnguard.esm,the Rift,Redwater Den,4d6f:Dawnguard.esm,dungeon,enemy,nord,1,8,30,1536,5eaa:Dawnguard.esm,,3550.834228515625,-5231.72119140625,5683.208984375
 149aca:WindhelmSSE.esp,Hellte,10682d:WindhelmSSE.esp,Eastmarch,Windhelm,18a57:Skyrim.esm,city,trader,nord,,,360,512,12fba4:WindhelmSSE.esp,,-2132.254638671875,1259.0950927734375,-40.11399459838867
-14c53:CFTO.esp,Haennr,14c52:CFTO.esp,the Rift,Ivarstead,18a4b:Skyrim.esm,city,transport,imperial,,,45,512,d74:Skyrim.esm,3c:Skyrim.esm,78620.3203125,-68798.5625,10638.900390625
+14c53:CFTO.esp,Haennr,14c52:CFTO.esp,the Rift,Ivarstead,18a4b:Skyrim.esm,city,transport,imperial,,,45,512,97bf:Skyrim.esm,3c:Skyrim.esm,77503.75,-68732.046875,10655.919921875
 14c5b:CFTO.esp,Perius,14c5a:CFTO.esp,Haafingar,Brinewater Grotto,5f428:Skyrim.esm,wilderness,transport,imperial,,,45,1536,d74:Skyrim.esm,3c:Skyrim.esm,-48717.7109375,126815.6875,-13954.853515625
 14c6d:CFTO.esp,Gauldis,14c6c:CFTO.esp,Solstheim,open ground in DLC2SolstheimWorld,142ec:Dragonborn.esm,wilderness,transport,nord,,,45,1536,142ec:Dragonborn.esm,800:Dragonborn.esm,79945.359375,70832.296875,308.02374267578125
 14c6f:CFTO.esp,Maslyn,14c6e:CFTO.esp,Solstheim,Raven Rock,143b9:Dragonborn.esm,city,transport,darkelf,,,45,512,142ec:Dragonborn.esm,800:Dragonborn.esm,28344.626953125,34630.67578125,306.4734191894531
 14c79:CFTO.esp,Bildul,14c78:CFTO.esp,Solstheim,open ground in DLC2SolstheimWorld,142ec:Dragonborn.esm,wilderness,transport,darkelf,,,45,1536,142ec:Dragonborn.esm,800:Dragonborn.esm,72037.3359375,20210.9296875,305.746337890625
-14ca2:CFTO.esp,Harlaug,aa07:CFTO.esp,the Pale,Dawnstar,18a50:Skyrim.esm,city,transport,nord,,,45,512,d74:Skyrim.esm,3c:Skyrim.esm,31426.51171875,105934.4609375,-13955.6201171875
+14ca2:CFTO.esp,Harlaug,aa07:CFTO.esp,the Pale,Dawnstar,18a50:Skyrim.esm,city,transport,nord,,,45,512,8eb5:Skyrim.esm,3c:Skyrim.esm,31548.201171875,105974.5078125,-13913.5068359375
 153f0c:CFTO.esp,Jollsen,158ffc:CFTO.esp,Winterhold,open ground in Tamriel,d74:Skyrim.esm,wilderness,transport,nord,,,45,1536,d74:Skyrim.esm,3c:Skyrim.esm,102132.828125,113493.953125,-13955.0478515625
 156cb5:aaaGraniteHill.esp,Draugr,567c8:Skyrim.esm,Falkreath,Granite Hill Crawl Space,4efe5:aaaGraniteHill.esp,dungeon,enemy,draugr,2,12,45,1536,da07:aaaGraniteHill.esp,,-1760.0,-3376.0,-608.0
 156cb9:aaaGraniteHill.esp,Draugr,567c8:Skyrim.esm,Falkreath,Granite Hill Crawl Space,4efe5:aaaGraniteHill.esp,dungeon,enemy,draugr,2,12,45,1536,da07:aaaGraniteHill.esp,,803.2228393554688,-5986.20458984375,-2706.310546875
@@ -2422,11 +2421,10 @@ ref,name,base,hold,locationName,location,habitat,role,species,tier,cap,returnMin
 41503:Skyrim.esm,Goat,4359c:Skyrim.esm,Eastmarch,Hlaalu Farm,18e35:Skyrim.esm,farm,animal,goat,,8,20,512,b4b8:Skyrim.esm,3c:Skyrim.esm,146950.390625,36391.859375,-13757.8759765625
 41506:Skyrim.esm,Goat,4359c:Skyrim.esm,Haafingar,Katla's Farm,18e38:Skyrim.esm,farm,animal,goat,,8,20,512,92bf:Skyrim.esm,3c:Skyrim.esm,-74406.84375,97517.5546875,-11491.640625
 41507:Skyrim.esm,Cow,23a90:Skyrim.esm,the Pale,Loreius Farm,18e3b:Skyrim.esm,farm,animal,cow,,8,20,512,9102:Skyrim.esm,3c:Skyrim.esm,31926.91015625,27487.052734375,-6656.0
-41508:Skyrim.esm,Cow,23a90:Skyrim.esm,the Rift,Merryfair Farm,18e3c:Skyrim.esm,farm,animal,cow,,8,20,512,bc90:Skyrim.esm,3c:Skyrim.esm,165831.921875,-88580.828125,11058.9013671875
+41508:Skyrim.esm,Cow,23a90:Skyrim.esm,the Rift,Merryfair Farm,18e3c:Skyrim.esm,farm,animal,cow,,8,20,512,bc90:Skyrim.esm,3c:Skyrim.esm,165776.5,-88663.1328125,11027.3427734375
 4150a:Skyrim.esm,Cow,23a90:Skyrim.esm,Whiterun,Pelagia Farm,18e3f:Skyrim.esm,farm,animal,cow,,8,20,512,9659:Skyrim.esm,3c:Skyrim.esm,17311.060546875,-17845.27734375,-4505.34033203125
-4150c:Skyrim.esm,Goat,4359c:Skyrim.esm,the Reach,Left Hand Mine,18e3a:Skyrim.esm,wilderness,animal,goat,,6,20,1536,75ca:Skyrim.esm,3c:Skyrim.esm,-165151.890625,-260.01324462890625,-4387.23388671875
 4150d:Skyrim.esm,Goat,4359c:Skyrim.esm,the Rift,Sarethi Farm,18e41:Skyrim.esm,farm,animal,goat,,8,20,512,97d5:Skyrim.esm,3c:Skyrim.esm,112280.8203125,-71150.4765625,11542.8740234375
-4150e:Skyrim.esm,Cow,23a90:Skyrim.esm,the Rift,Snow-Shod Farm,18e43:Skyrim.esm,farm,animal,cow,,8,20,512,bd35:Skyrim.esm,3c:Skyrim.esm,166806.421875,-108796.4765625,11190.83984375
+4150e:Skyrim.esm,Cow,23a90:Skyrim.esm,the Rift,Snow-Shod Farm,18e43:Skyrim.esm,farm,animal,cow,,8,20,512,bd35:Skyrim.esm,3c:Skyrim.esm,166773.28125,-108805.9140625,11184.0
 418a:JKs Skyrim.esp,Cedric,4189:JKs Skyrim.esp,Whiterun,Rorikstead,18a47:Skyrim.esm,city,trader,nord,,,360,512,3f78:JKs Skyrim.esp,,2187.60546875,2131.94580078125,318.93792724609375
 418f9:Skyrim.esm,Bandit,26372:Skyrim.esm,Haafingar,Volskygge,192c2:Skyrim.esm,dungeon,enemy,imperial,3,16,60,1536,92ed:Skyrim.esm,3c:Skyrim.esm,-130474.5390625,91930.921875,-6544.95361328125
 41916:Skyrim.esm,Bandit,1e79c:Skyrim.esm,Haafingar,Volskygge,192c2:Skyrim.esm,dungeon,enemy,imperial,3,16,60,1536,151fc:Skyrim.esm,,-3575.33984375,3153.6572265625,768.0
@@ -2451,6 +2449,10 @@ ref,name,base,hold,locationName,location,habitat,role,species,tier,cap,returnMin
 42577:Skyrim.esm,Pit Wolf,10f2a4:Skyrim.esm,the Rift,Faldar's Tooth,19175:Skyrim.esm,bandit-camp,animal,wolf,,,45,2048,d74:Skyrim.esm,3c:Skyrim.esm,147124.4375,-92853.046875,11212.685546875
 4261e:Skyrim.esm,Pit Wolf,10f2a4:Skyrim.esm,the Rift,Faldar's Tooth,19175:Skyrim.esm,bandit-camp,animal,wolf,,,45,2048,d74:Skyrim.esm,3c:Skyrim.esm,147280.40625,-92982.25,11169.21875
 42b83:Skyrim.esm,Restless Draugr,1e7ac:Skyrim.esm,Haafingar,Volskygge,192c2:Skyrim.esm,dungeon,enemy,draugr,3,16,60,1536,2471a:Skyrim.esm,,-7342.5,3574.32470703125,-576.0
+42e:JK's Markarth Outskirts.esp,Cow,23a90:Skyrim.esm,the Reach,Salvius Farm,18e40:Skyrim.esm,farm,animal,cow,,8,20,512,7178:Skyrim.esm,3c:Skyrim.esm,-163047.359375,6591.72607421875,-4525.1572265625
+42f:JK's Markarth Outskirts.esp,Goat,4359c:Skyrim.esm,the Reach,Salvius Farm,18e40:Skyrim.esm,farm,animal,goat,,8,20,512,7178:Skyrim.esm,3c:Skyrim.esm,-163072.703125,6787.11962890625,-4544.15087890625
+430:JK's Markarth Outskirts.esp,Goat,4359c:Skyrim.esm,the Reach,Salvius Farm,18e40:Skyrim.esm,farm,animal,goat,,8,20,512,7178:Skyrim.esm,3c:Skyrim.esm,-163016.8125,6901.140625,-4551.54052734375
+431:JK's Markarth Outskirts.esp,Goat,4359c:Skyrim.esm,the Reach,Salvius Farm,18e40:Skyrim.esm,farm,animal,goat,,8,20,512,7178:Skyrim.esm,3c:Skyrim.esm,-163197.921875,6589.69921875,-4535.8701171875
 431bd:Skyrim.esm,Pit Wolf,ddcd0:Skyrim.esm,the Rift,Faldar's Tooth,19175:Skyrim.esm,bandit-camp,animal,wolf,,,45,2048,15286:Skyrim.esm,,1585.29248046875,-367.9466247558594,-753.0
 43526:Skyrim.esm,Troll,23aba:Skyrim.esm,Falkreath,Darkshade Copse,1915e:Skyrim.esm,dungeon,animal,troll,1,8,30,1536,15296:Skyrim.esm,,-2391.37353515625,-1295.5875244140625,-1924.4927978515625
 435ef:Skyrim.esm,Wolf,10f2a2:Skyrim.esm,the Rift,Faldar's Tooth,19175:Skyrim.esm,bandit-camp,animal,wolf,,,45,2048,15286:Skyrim.esm,,1831.07470703125,43.497344970703125,-753.0
@@ -4286,6 +4288,7 @@ ref,name,base,hold,locationName,location,habitat,role,species,tier,cap,returnMin
 9ff8c:Skyrim.esm,Forsworn,9ff83:Skyrim.esm,the Reach,open ground in Tamriel,94da:Skyrim.esm,wilderness,enemy,breton,,4,45,1536,94da:Skyrim.esm,3c:Skyrim.esm,-121635.140625,28913.5859375,528.041748046875
 a0d32:Skyrim.esm,Forsworn,1e7b7:Skyrim.esm,the Reach,Dead Crone Rock,19160:Skyrim.esm,dungeon,enemy,breton,1,8,30,1536,15295:Skyrim.esm,,-796.1345825195312,-1699.4368896484375,-1727.446533203125
 a0d53:Skyrim.esm,Forsworn Shaman,1e7b8:Skyrim.esm,the Reach,Dead Crone Rock,19160:Skyrim.esm,dungeon,enemy,breton,1,8,30,1536,15295:Skyrim.esm,,-1806.5582275390625,25.610538482666016,-1298.38525390625
+a12:JK's Riften Outskirts.esp,Horse,68d5b:Skyrim.esm,the Rift,Merryfair Farm,18e3c:Skyrim.esm,farm,animal,horse,,8,20,512,bc90:Skyrim.esm,3c:Skyrim.esm,165753.046875,-88486.078125,11036.94140625
 a1e51:Skyrim.esm,Skeleton,2d1fd:Skyrim.esm,Falkreath,Shriekwind Bastion,a0e30:Skyrim.esm,dungeon,enemy,skeleton,1,8,30,1536,a1a61:Skyrim.esm,,-1959.05224609375,-990.7409057617188,119.42129516601562
 a1e52:Skyrim.esm,Skeleton,2d1e0:Skyrim.esm,Falkreath,Shriekwind Bastion,a0e30:Skyrim.esm,dungeon,enemy,skeleton,1,8,30,1536,a1a61:Skyrim.esm,,-1912.7958984375,-797.8720703125,127.42129516601562
 a1e53:Skyrim.esm,Skeever,23ab7:Skyrim.esm,Falkreath,Shriekwind Bastion,a0e30:Skyrim.esm,dungeon,animal,skeever,1,8,30,1536,a1a61:Skyrim.esm,,-181.27365112304688,-1079.1375732421875,-631.8077392578125
@@ -4344,7 +4347,7 @@ a989:Dawnguard.esm,Troll,23aba:Skyrim.esm,no hold,Darkfall Cave,4346:Dawnguard.e
 a9c0:Dawnguard.esm,Giant Frostbite Spider,23aab:Skyrim.esm,no hold,Darkfall Cave,4346:Dawnguard.esm,cave,enemy,giant,2,12,45,1536,4346:Dawnguard.esm,,5953.86083984375,-7234.87255859375,-3703.703369140625
 a9ef9:Skyrim.esm,Deer,42478:Skyrim.esm,Hjaalmarch,Folgunthur,19179:Skyrim.esm,dungeon,animal,deer,1,8,30,1536,92fa:Skyrim.esm,3c:Skyrim.esm,-47519.01171875,88501.7265625,-13726.8271484375
 a9f60:Skyrim.esm,Goat,4359c:Skyrim.esm,Haafingar,Katla's Farm,18e38:Skyrim.esm,farm,animal,goat,,8,20,512,92bf:Skyrim.esm,3c:Skyrim.esm,-74250.9453125,97584.46875,-11466.6865234375
-aa0c:CFTO.esp,Radding,aa0b:CFTO.esp,Hjaalmarch,Morthal,18a53:Skyrim.esm,city,transport,nord,,,45,512,d74:Skyrim.esm,3c:Skyrim.esm,-36760.296875,65864.8671875,-13940.7353515625
+aa0c:CFTO.esp,Radding,aa0b:CFTO.esp,Hjaalmarch,Morthal,18a53:Skyrim.esm,city,transport,nord,,,45,512,939d:Skyrim.esm,3c:Skyrim.esm,-36995.05859375,65794.9140625,-13940.7353515625
 aa2d8:Skyrim.esm,Bandit,1b0ef:Skyrim.esm,the Reach,Liar's Retreat,19264:Skyrim.esm,dungeon,enemy,orc,2,12,45,1536,aa20c:Skyrim.esm,,-619.8062133789062,-1787.3558349609375,-361.0
 aa2fd:Skyrim.esm,Frostbite Spider,41fb5:Skyrim.esm,the Reach,Liar's Retreat,19264:Skyrim.esm,dungeon,animal,spider,2,12,45,1536,aa20c:Skyrim.esm,,-176.91590881347656,2235.516845703125,-488.7293701171875
 aa407:Skyrim.esm,Falmer,1e7b3:Skyrim.esm,the Reach,Liar's Retreat,19264:Skyrim.esm,dungeon,enemy,falmer,2,12,45,1536,aa20c:Skyrim.esm,,1163.1083984375,-804.205322265625,-360.76953125
@@ -4376,6 +4379,8 @@ ae018:Skyrim.esm,Giant,3053f:Skyrim.esm,Whiterun,Sleeping Tree Camp,192ad:Skyrim
 ae01f:Skyrim.esm,Mammoth,dd641:Skyrim.esm,Whiterun,Sleeping Tree Camp,192ad:Skyrim.esm,giant-camp,animal,mammoth,,4,240,2048,9a51:Skyrim.esm,3c:Skyrim.esm,-39096.39453125,-19435.013671875,-5867.755859375
 ae020:Skyrim.esm,Mammoth,dd641:Skyrim.esm,Whiterun,Sleeping Tree Camp,192ad:Skyrim.esm,giant-camp,animal,mammoth,,4,240,2048,d74:Skyrim.esm,3c:Skyrim.esm,-38551.203125,-19588.076171875,-5745.1953125
 aedc7:Skyrim.esm,Giant,3053f:Skyrim.esm,Whiterun,Sleeping Tree Camp,192ad:Skyrim.esm,cave,enemy,giant,1,8,30,1536,1520a:Skyrim.esm,,445.8123779296875,443.8883056640625,-145.95083618164062
+af8:JK's Riften Outskirts.esp,Horse,68d07:Skyrim.esm,the Rift,Snow-Shod Farm,18e43:Skyrim.esm,farm,animal,horse,,8,20,512,bd35:Skyrim.esm,3c:Skyrim.esm,163853.515625,-107739.4765625,11007.869140625
+b0a:JK's Castle Volkihar.esp,Skeleton,cadb:Dawnguard.esm,no hold,open ground in Tamriel,18bf:Skyrim.esm,wilderness,enemy,skeletonarmor,,4,45,1536,18bf:Skyrim.esm,3c:Skyrim.esm,-174466.203125,156101.015625,-12349.0
 b10cf:Skyrim.esm,Goat,4359c:Skyrim.esm,Eastmarch,Narzulbur,19282:Skyrim.esm,wilderness,animal,goat,,6,20,1536,b57b:Skyrim.esm,3c:Skyrim.esm,156789.453125,10496.302734375,-4497.6640625
 b10d0:Skyrim.esm,Goat,4359c:Skyrim.esm,Eastmarch,Narzulbur,19282:Skyrim.esm,wilderness,animal,goat,,6,20,1536,b57b:Skyrim.esm,3c:Skyrim.esm,156996.984375,10432.333984375,-4488.6337890625
 b20dd:Skyrim.esm,Skeleton,bccc7:Skyrim.esm,Winterhold,The Midden Dark,ae783:Skyrim.esm,dungeon,enemy,skeleton,1,8,30,1536,ae783:Skyrim.esm,,1243.031982421875,898.5422973632812,-579.1405029296875
@@ -4424,7 +4429,7 @@ bbf76:CFTO.esp,Thaer,6ae97:CFTO.esp,Haafingar,Solitude,18a5a:Skyrim.esm,city,tra
 bbf7f:CFTO.esp,Sigaar,6ae96:CFTO.esp,the Rift,Riften,18a58:Skyrim.esm,city,transport,nord,,,45,512,d74:Skyrim.esm,3c:Skyrim.esm,173633.84375,-91556.7890625,11131.65625
 bbf8e:CFTO.esp,Wilhod,bbf8c:CFTO.esp,Hjaalmarch,Morthal,18a53:Skyrim.esm,city,transport,nord,,,45,512,d74:Skyrim.esm,3c:Skyrim.esm,-39903.38671875,71131.2890625,-13872.0
 bbf90:CFTO.esp,Tulinn,bbf8f:CFTO.esp,Falkreath,Falkreath,18a49:Skyrim.esm,city,transport,nord,,,45,512,d74:Skyrim.esm,3c:Skyrim.esm,-34632.9609375,-90052.9921875,-2987.080810546875
-bbf91:CFTO.esp,Berud,bbf8d:CFTO.esp,the Pale,Dawnstar,18a50:Skyrim.esm,city,transport,nord,,,45,512,d74:Skyrim.esm,3c:Skyrim.esm,26826.990234375,101305.6484375,-13255.7080078125
+bbf91:CFTO.esp,Berud,bbf8d:CFTO.esp,the Pale,Dawnstar,18a50:Skyrim.esm,city,transport,nord,,,45,512,d74:Skyrim.esm,3c:Skyrim.esm,26606.65625,100962.1484375,-13255.7080078125
 bc9b0:Arena - Markarth Side.esp,Chicken,a91a0:Skyrim.esm,Hjaalmarch,Markarth Side,122a30:Arena - Markarth Side.esp,city,animal,chicken,,6,20,512,940c:Skyrim.esm,3c:Skyrim.esm,-86894.0546875,57023.23046875,-11565.552734375
 bc9b1:Arena - Markarth Side.esp,Chicken,a91a0:Skyrim.esm,Hjaalmarch,Markarth Side,122a30:Arena - Markarth Side.esp,city,animal,chicken,,6,20,512,940c:Skyrim.esm,3c:Skyrim.esm,-86958.1875,56991.13671875,-11564.7568359375
 bd300:Arena - Markarth Side.esp,Olivia,b8195:Arena - Markarth Side.esp,Hjaalmarch,Markarth Side,122a30:Arena - Markarth Side.esp,city,trader,imperial,,,360,512,5c591:Arena - Markarth Side.esp,,464.0,-40.0,266.36419677734375
@@ -4539,8 +4544,6 @@ ced36:Skyrim.esm,Troll,23aba:Skyrim.esm,the Rift,POIFallForest11,9741:Skyrim.esm
 cef6:Dawnguard.esm,Husky,cef3:Dawnguard.esm,the Rift,Ruunvald Excavation,7b21:Dawnguard.esm,dungeon,animal,dog,2,12,45,1536,3bf0:Dawnguard.esm,,-1832.7012939453125,-453.66387939453125,-1021.01318359375
 cef9:Dawnguard.esm,Husky,cef3:Dawnguard.esm,the Rift,Ruunvald Excavation,7b21:Dawnguard.esm,dungeon,animal,dog,2,12,45,1536,3bf0:Dawnguard.esm,,962.2280883789062,-312.2853088378906,-1475.2652587890625
 cefb:Dawnguard.esm,Husky,cef3:Dawnguard.esm,the Rift,Ruunvald Excavation,7b21:Dawnguard.esm,dungeon,animal,dog,2,12,45,1536,3bf0:Dawnguard.esm,,10.354751586914062,-706.3710327148438,-3454.49658203125
-cf468:Skyrim.esm,Dog,23a92:Skyrim.esm,the Reach,Markarth,18a59:Skyrim.esm,city,animal,dog,,6,20,512,16df2:Skyrim.esm,,-3036.963623046875,2662.730224609375,6882.263671875
-cf469:Skyrim.esm,Dog,23a92:Skyrim.esm,the Reach,Markarth,18a59:Skyrim.esm,city,animal,dog,,6,20,512,16df2:Skyrim.esm,,-3434.47412109375,2669.7890625,6883.15087890625
 cf93f:Skyrim.esm,Bandit,d0018:Skyrim.esm,the Pale,Frostmere Crypt,192b8:Skyrim.esm,dungeon,enemy,redguard,1,8,30,1536,abd31:Skyrim.esm,,1774.0,773.0,0.0
 cf940:Skyrim.esm,Bandit,d0017:Skyrim.esm,the Pale,Frostmere Crypt,192b8:Skyrim.esm,dungeon,enemy,redguard,1,8,30,1536,abd31:Skyrim.esm,,1897.0,751.0,0.0
 cf941:Skyrim.esm,Bandit,8e19d:Skyrim.esm,the Pale,Frostmere Crypt,192b8:Skyrim.esm,dungeon,enemy,breton,1,8,30,1536,abd31:Skyrim.esm,,2013.0,1178.0,0.0
@@ -5031,12 +5034,12 @@ fa370:Skyrim.esm,Skeever,1e7a0:Skyrim.esm,the Rift,open ground in Tamriel,bcfb:S
 fa39c:Skyrim.esm,Skeever,1e7a0:Skyrim.esm,the Rift,open ground in Tamriel,981a:Skyrim.esm,wilderness,animal,skeever,,6,20,1536,981a:Skyrim.esm,3c:Skyrim.esm,82273.34375,-80852.171875,10610.251953125
 fa3a1:Skyrim.esm,Skeever,1e7a0:Skyrim.esm,the Rift,open ground in Tamriel,d74:Skyrim.esm,wilderness,animal,skeever,,6,20,1536,d74:Skyrim.esm,3c:Skyrim.esm,97544.5625,-76132.5,12167.58984375
 fa407:Skyrim.esm,Skeever,1e7a1:Skyrim.esm,Hjaalmarch,open ground in Tamriel,94af:Skyrim.esm,wilderness,animal,skeever,,6,20,1536,94af:Skyrim.esm,3c:Skyrim.esm,-80861.6015625,33114.8984375,-10776.537109375
-fa6d6:Skyrim.esm,Chicken,fa6d9:Skyrim.esm,the Rift,Snow-Shod Farm,18e43:Skyrim.esm,farm,animal,chicken,,8,20,512,bd35:Skyrim.esm,3c:Skyrim.esm,166625.921875,-107686.609375,11189.20703125
-fa6d7:Skyrim.esm,Chicken,fa6d9:Skyrim.esm,the Rift,Snow-Shod Farm,18e43:Skyrim.esm,farm,animal,chicken,,8,20,512,bd35:Skyrim.esm,3c:Skyrim.esm,166736.875,-107742.21875,11186.9453125
-fa6d8:Skyrim.esm,Chicken,fa6d9:Skyrim.esm,the Rift,Snow-Shod Farm,18e43:Skyrim.esm,farm,animal,chicken,,8,20,512,bd35:Skyrim.esm,3c:Skyrim.esm,166589.046875,-107781.6796875,11190.4404296875
-fa6db:Skyrim.esm,Chicken,fa6d9:Skyrim.esm,the Rift,Snow-Shod Farm,18e43:Skyrim.esm,farm,animal,chicken,,8,20,512,bd35:Skyrim.esm,3c:Skyrim.esm,166692.515625,-107817.21875,11192.0
-fa6ea:Skyrim.esm,Chicken,a91a0:Skyrim.esm,the Rift,Merryfair Farm,18e3c:Skyrim.esm,farm,animal,chicken,,8,20,512,bc90:Skyrim.esm,3c:Skyrim.esm,165749.84375,-89049.015625,11012.23828125
-fa6eb:Skyrim.esm,Chicken,a91a0:Skyrim.esm,the Rift,Merryfair Farm,18e3c:Skyrim.esm,farm,animal,chicken,,8,20,512,bc90:Skyrim.esm,3c:Skyrim.esm,165851.515625,-88991.53125,11014.3388671875
+fa6d6:Skyrim.esm,Chicken,fa6d9:Skyrim.esm,the Rift,Snow-Shod Farm,18e43:Skyrim.esm,farm,animal,chicken,,8,20,512,bd35:Skyrim.esm,3c:Skyrim.esm,166933.046875,-108670.046875,11192.0
+fa6d7:Skyrim.esm,Chicken,fa6d9:Skyrim.esm,the Rift,Snow-Shod Farm,18e43:Skyrim.esm,farm,animal,chicken,,8,20,512,bd35:Skyrim.esm,3c:Skyrim.esm,166858.0,-108729.59375,11185.025390625
+fa6d8:Skyrim.esm,Chicken,fa6d9:Skyrim.esm,the Rift,Snow-Shod Farm,18e43:Skyrim.esm,farm,animal,chicken,,8,20,512,bd35:Skyrim.esm,3c:Skyrim.esm,166799.75,-108617.5703125,11187.40234375
+fa6db:Skyrim.esm,Chicken,fa6d9:Skyrim.esm,the Rift,Snow-Shod Farm,18e43:Skyrim.esm,farm,animal,chicken,,8,20,512,bd35:Skyrim.esm,3c:Skyrim.esm,166740.9375,-108693.671875,11184.0
+fa6ea:Skyrim.esm,Chicken,a91a0:Skyrim.esm,the Rift,Merryfair Farm,18e3c:Skyrim.esm,farm,animal,chicken,,8,20,512,bc90:Skyrim.esm,3c:Skyrim.esm,165749.84375,-89049.015625,11031.232421875
+fa6eb:Skyrim.esm,Chicken,a91a0:Skyrim.esm,the Rift,Merryfair Farm,18e3c:Skyrim.esm,farm,animal,chicken,,8,20,512,bc90:Skyrim.esm,3c:Skyrim.esm,165851.515625,-88991.53125,11022.7998046875
 fa6ec:Skyrim.esm,Chicken,a91a0:Skyrim.esm,the Rift,Merryfair Farm,18e3c:Skyrim.esm,farm,animal,chicken,,8,20,512,bc90:Skyrim.esm,3c:Skyrim.esm,165876.15625,-89101.8125,10998.2734375
 fb18:CFTO.esp,Jolf,aa08:CFTO.esp,Haafingar,Solitude,18a5a:Skyrim.esm,city,transport,nord,,,45,512,d74:Skyrim.esm,3c:Skyrim.esm,-63395.92578125,94449.75,-13886.0
 fb192:Skyrim.esm,Wolf,422b5:Skyrim.esm,Haafingar,open ground in Tamriel,91c0:Skyrim.esm,wilderness,animal,wolf,,3,30,1536,91c0:Skyrim.esm,3c:Skyrim.esm,-111553.8125,127909.3046875,-13778.0078125
