@@ -20,7 +20,10 @@
   stop, the port checks, the renames and the health check are the real ones.
   Only the task scheduler is not: Start-ScheduledTask and Stop-ScheduledTask
   are replaced by functions that start the stub, so nothing here registers or
-  touches a real task.
+  touches a real task. Get-ScheduledTask and Set-ScheduledTask are replaced
+  too, by ones that find no task (#2015): the real ones would load the
+  ScheduledTasks module, whose commands are functions, and that load puts the
+  real Start-ScheduledTask back over the stand-in.
 
   It proves:
     - a load order naming a plugin that is nowhere leaves the live files as
@@ -302,6 +305,8 @@ function MakeStage {
 # task cmdlets are replaced in between, and nothing else is.
 function RunFar([string]$block, [string]$stageName, [string]$prevName, [int]$wait, $want, [string[]]$keys = $null) {
     $mock = @"
+function Get-ScheduledTask { [CmdletBinding()] param([string]`$TaskName) }
+function Set-ScheduledTask { [CmdletBinding()] param([Parameter(ValueFromPipeline = `$true)]`$InputObject) }
 function Stop-ScheduledTask { [CmdletBinding()] param([string]`$TaskName) }
 function Start-ScheduledTask { [CmdletBinding()] param([string]`$TaskName)
   Start-Process -FilePath '$($node.Source)' -WindowStyle Hidden -ArgumentList '"$stub" "$root" "$pidLog"'
@@ -715,6 +720,8 @@ try {
     Put (Join-Path $gmRepo 'game\content\Thornswood-Content.esp') 'our plugin, two, longer'
     Put (Join-Path $gmRepo 'records\server-build.json') $gmRecordLf
     $gmPrelude = @"
+function Get-ScheduledTask { [CmdletBinding()] param([string]`$TaskName) }
+function Set-ScheduledTask { [CmdletBinding()] param([Parameter(ValueFromPipeline = `$true)]`$InputObject) }
 function Stop-ScheduledTask { [CmdletBinding()] param([string]`$TaskName) }
 function Start-ScheduledTask { [CmdletBinding()] param([string]`$TaskName)
   Start-Process -FilePath '$($node.Source)' -WindowStyle Hidden -ArgumentList '"$stub" "$root" "$pidLog"'

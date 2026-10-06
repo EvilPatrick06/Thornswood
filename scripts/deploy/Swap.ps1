@@ -172,6 +172,20 @@ $ProgressPreference = 'SilentlyContinue'
 $stageDir = Join-Path $Root $Stage
 $prevDir  = Join-Path $Root $Prev
 $log      = Join-Path $Root 'server.log'
+# The task starts the server at priority 4, normal, before every start here
+# (#1931, #2015). Only the installer registered it so, and a server put up by
+# Deploy-Server or Deploy-DevGamemode kept Task Scheduler's default of 7: on
+# 5 Oct 11:47 PM the live server's node ran BelowNormal, with I/O priority 1
+# and memory priority 2, after a deploy of the release that fixed it. Only
+# the priority changes; the task keeps everything else it has.
+function NormalTask {
+  $t = Get-ScheduledTask -TaskName $Task -EA SilentlyContinue
+  if (-not $t -or $t.Settings.Priority -eq 4) { return }
+  $was = $t.Settings.Priority
+  $t.Settings.Priority = 4
+  try { $t | Set-ScheduledTask -EA Stop | Out-Null; 'the task starts the server at priority 4 now, not ' + $was }
+  catch { 'could not set the task to priority 4: ' + $_.Exception.Message }
+}
 $new      = [IO.File]::ReadAllText((Join-Path $stageDir 'server-settings.json')) | ConvertFrom-Json
 # The check has already refused a port that moves, so this is the port the
 # running server is on and the one the new one will be on.
@@ -330,6 +344,7 @@ if ($moved -and $null -ne $ReleaseKeys -and $placed -contains 'server-settings.j
 
 if ($moved) {
   'swapped in ' + $placed.Count + ' file(s), the ones they replaced are in ' + $prevDir
+  NormalTask
   Start-ScheduledTask -TaskName $Task -EA SilentlyContinue
   'started, giving it ' + $Wait + ' seconds to answer on UDP ' + $port + ' and on ' + $resPort
   if (Answering) {
@@ -352,6 +367,7 @@ if ($moved) {
 
 'putting the previous files back'
 PutBack
+NormalTask
 Start-ScheduledTask -TaskName $Task -EA SilentlyContinue
 if (Answering) { 'the previous files are back and the server is answering on ' + $resPort + ' again' }
 else { 'THE PREVIOUS FILES ARE BACK AND THE SERVER STILL IS NOT ANSWERING on ' + $resPort }
