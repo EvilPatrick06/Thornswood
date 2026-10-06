@@ -56,7 +56,8 @@ function getPlace(layout, name) {
 
 const PLACE_NAMES = [
   'Repo', 'Engine', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms',
-  'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Releases', 'ReleasesDev'
+  'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Local', 'Backups',
+  'Releases', 'ReleasesDev'
 ];
 
 /**

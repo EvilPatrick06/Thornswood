@@ -13,6 +13,13 @@
   it would otherwise. The passphrase is the thing to keep carefully, and it is
   not in here.
 
+  WHERE THEY LAND: local\backups in the repository (Where.ps1 Backups), or
+  the folder -To names. Until 5 October it was Downloads\Thornswood-Backups;
+  Patrick's rule that day is that Thornswood work on One lives only in the
+  repository, the vault and C:\ThornswoodTemps&Worktrees. A worktree's local
+  folder goes when the worktree is removed, so run from a worktree it stops
+  and asks for -To rather than land there.
+
   ON ITS OWN, since issue #401:
 
       .\scripts\vps\Fetch-Backups.ps1 -Schedule      every day at 04:15, an hour after the box takes one
@@ -22,9 +29,12 @@
   -Schedule copies this script, Restore-Backup.ps1, Vps.ps1 and vps.json to
   %LOCALAPPDATA%\Thornswood\Backups-Fetch and points a task on this machine at
   that copy, so the task does not break when a repo folder or worktree is
-  moved or removed. It runs as you, while you are signed in, and a run missed
-  because the machine was off happens at the next sign in. Run -Schedule
-  again after this script changes to refresh the copy.
+  moved or removed. The task is given -To as a whole path, the folder this run
+  would use, because the copy has no Where.ps1 beside it to ask. It runs as
+  you, while you are signed in, and a run missed because the machine was off
+  happens at the next sign in. Run -Schedule again after this script changes
+  to refresh the copy, and after the backups folder moves so the task writes
+  to the new one.
 
   The copy off the box goes over ssh (scp), with the key already used for the
   VPS. Nothing is ever served over HTTPS for this.
@@ -42,7 +52,7 @@ param(
   [string]$VpsHost = '',
   [string]$VpsUser = '',
   [string]$Remote  = 'C:/Thornswood-Backup',
-  [string]$To      = "$env:USERPROFILE\Downloads\Thornswood-Backups",
+  [string]$To      = '',
   [string]$KeyFile = "$env:USERPROFILE\Documents\thornswood-backup-key.txt",
   [int]$KeepDays   = 30,
   [string]$At      = '04:15',
@@ -91,7 +101,19 @@ function Prune {
   Say ("  kept {0} backup(s) here" -f ($mine.Count - $dropped)) 'DarkGray'
 }
 
-if (-not (Test-Path -LiteralPath $To)) { [void](New-Item -ItemType Directory -Path $To -Force) }
+# Where they land when -To is not given (WHERE THEY LAND above, 5 October).
+# The copy -Schedule makes has no Where.ps1 beside it and its task always
+# passes -To, so only a hand run of that copy without -To stops here.
+if (-not $To -and -not $Unschedule) {
+  $where = Join-Path $Here '..\release\Where.ps1'
+  if (-not (Test-Path -LiteralPath $where)) { Die "There is no Where.ps1 at $where to say where the backups go, so pass -To <folder>." }
+  $To = [string](& $where Backups)
+  $repoDir = [string](& $where Repo)
+  if (Test-Path -LiteralPath (Join-Path $repoDir '.git') -PathType Leaf) {
+    Die "$repoDir is a git worktree, and its local folder goes when the worktree is removed. Run this from the repository folder itself, or pass -To <folder>."
+  }
+}
+if ($To -and -not (Test-Path -LiteralPath $To)) { [void](New-Item -ItemType Directory -Path $To -Force) }
 
 # ---------------------------------------------------------- the schedule ----
 if ($Unschedule) {

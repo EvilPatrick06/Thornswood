@@ -30,6 +30,17 @@
   LAYOUT. layout.json at the repository root holds the places; where.js
   beside this reads the same file.
 
+  LOCAL AND BACKUPS, 5 October. Local is the repository's local folder,
+  ignored by git, the settled design's home for anything a machine keeps that
+  never goes to GitHub. Backups is local\backups, where Backup-Server.ps1 and
+  Fetch-Backups.ps1 put what they bring off the VPS and Clean-Everything.ps1
+  looks for old ones. Patrick's rule that day: Thornswood work on One lives
+  only in the repository, the vault and C:\ThornswoodTemps&Worktrees, and the
+  backups were the last of it in Downloads\Thornswood-Backups. A worktree has
+  a local folder of its own that goes with it, so the scripts that write
+  backups stop when this answer is inside a worktree rather than leave the
+  only copy there.
+
   THE FOLDER A RELEASE IS BUILT FROM, issue #1692. ShipRoot and ShipRootDev
   are the Thornswood install a main and a dev release are built from on this
   machine, which Ship.ps1, Check-ShipReady.ps1, Setup-ShipMachine.ps1 and
@@ -44,18 +55,19 @@
   launcher there and then stopped at its generated files. ShipRoots is the
   file in this machine's own data (not in the repository, so every clone and
   worktree reads it) that names the folder for a channel, as
-  {"dev": "C:\\Thornswood-Release-DevBuild"}; Setup-ShipMachine.ps1 -Root
-  writes it. A channel it does not name is the rule above. These three are
-  this machine's, and only the PowerShell release scripts ask, so where.js
-  does not answer them.
+  {"dev": "C:\\Users\\evilp\\Downloads\\Thornswood-Repo\\local\\release-devbuild"}
+  on One since 5 October; Setup-ShipMachine.ps1 -Root writes it. A channel
+  it does not name is the rule above. These three are this machine's, and
+  only the PowerShell release scripts ask, so where.js does not answer them.
 
   Read only. It creates nothing and prints nothing but the one path.
 
 .PARAMETER What
   Which place: Repo, Engine, ServerDist, ClientDist, ServerSettings,
-  ChangeForms, Out, Dist, Package, Payload, ServerZip, Releases, ReleasesDev,
-  ShipRoot, ShipRootDev or ShipRoots; or a top folder from layout.json (docs,
-  bot, voice, site, tests, game, launcher, installer, records, scripts).
+  ChangeForms, Out, Dist, Package, Payload, ServerZip, Local, Backups,
+  Releases, ReleasesDev, ShipRoot, ShipRootDev or ShipRoots; or a top folder
+  from layout.json (docs, bot, voice, site, tests, game, launcher,
+  installer, records, scripts).
 #>
 [CmdletBinding()]
 param(
@@ -146,7 +158,7 @@ function Get-Place([string]$name) {
 }
 
 $placeNames = @('Repo', 'Engine', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms',
-                'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Releases', 'ReleasesDev',
+                'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Local', 'Backups', 'Releases', 'ReleasesDev',
                 'ShipRoot', 'ShipRootDev', 'ShipRoots')
 $folderNames = @($layout.folders.PSObject.Properties.Name)
 

@@ -77,8 +77,11 @@ function Remote($script) {
 function Mb($b) { return [math]::Round($b / 1MB, 1) }
 function Gb($b) { return [math]::Round($b / 1GB, 2) }
 
+# The repository's local\backups since 5 October, where Backup-Server.ps1
+# puts its zips (Patrick: Thornswood work on One lives only in the
+# repository, the vault and C:\ThornswoodTemps&Worktrees).
 if (-not $BackupDir) {
-  $BackupDir = Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads\Thornswood-Backups'
+  $BackupDir = [string](& (Join-Path $Here '..\release\Where.ps1') Backups)
 }
 
 $pickedAny = $Installers -or $Packs -or $Stage -or $Backups -or $Temp -or $Github -or $ServerSaves

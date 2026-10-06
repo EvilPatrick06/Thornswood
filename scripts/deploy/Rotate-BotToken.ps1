@@ -40,7 +40,8 @@
 
   The old token is still inside every backup made before the rotation: the
   nightly ones in C:\Thornswood-Backup on the VPS, and any zip Fetch-Backups.ps1
-  or Backup-Server.ps1 brought down to Downloads\Thornswood-Backups. Discord
+  or Backup-Server.ps1 brought down to local\backups in the repository
+  (Where.ps1 Backups; Downloads\Thornswood-Backups until 5 October). Discord
   stopped accepting it at the reset, but the same zips hold the client secret,
   which is still live, so they stay where the rest of that is kept.
 #>
@@ -203,7 +204,9 @@ Say "  $cfgFile  discord.botToken, read by the site ($SiteTask)" 'Green'
 Write-Host ''
 Say '  The old token is still inside every backup made before now:' 'Yellow'
 Say '    C:\Thornswood-Backup on the VPS, the nightly ones' 'Yellow'
-Say ('    ' + (Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads\Thornswood-Backups') + ' here, whatever Fetch-Backups.ps1 or Backup-Server.ps1 brought down') 'Yellow'
+# Where.ps1 Backups since 5 October, the repository's local\backups, where
+# those two scripts now put them.
+Say ('    ' + [string](& (Join-Path $Here '..\release\Where.ps1') Backups) + ' here, whatever Fetch-Backups.ps1 or Backup-Server.ps1 brought down') 'Yellow'
 Say '  Discord stopped taking it at the reset, but those zips hold the live client' 'DarkGray'
 Say '  secret too, so they stay where the rest of that is kept.' 'DarkGray'
 Write-Host ''

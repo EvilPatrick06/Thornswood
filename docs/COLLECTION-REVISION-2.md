@@ -159,12 +159,17 @@ source. Select that source explicitly in the launcher's Vortex folder
 setting so the stale Steam deployment cannot win discovery.
 Refresh Main's own folder and a separate Dev own folder from that deployment.
 Never generate directly inside a folder containing vortex.deployment.json.
-The release's Dev own folder is C:\Thornswood-Release-DevBuild; its launcher
+The release's Dev own folder is local\release-devbuild in the repository
+folder, C:\Users\evilp\Downloads\Thornswood-Repo\local\release-devbuild on
+One since 5 October (C:\Thornswood-Release-DevBuild before); its launcher
 and server still use Dev's channel and ports. Record it once with
-scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root C:\Thornswood-Release-DevBuild,
+scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root C:\Users\evilp\Downloads\Thornswood-Repo\local\release-devbuild,
 so Ship, Check-ShipReady and Build-Generated take it without -Root; Ship
 refuses C:\Thornswood-DevBuild, Vortex's folder, before anything is built
-(issue #1692).
+(issue #1692). After the folder moves, run
+scripts\mods\Build-Generated.ps1 -Channel dev once: generated.txt records
+the game folder the generated files were built for, and they count as not
+built in any other.
 
 Check: each release folder has Profile\OwnGame\files.txt, records the
 actual Vortex source in made.txt, and has no Vortex deployment manifest.
