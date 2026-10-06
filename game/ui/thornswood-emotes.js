@@ -3,8 +3,9 @@
   The emote wheel, as an overlay inside the front rather than a page of its own.
 
   The wheel stays in the dead middle of the screen. The middle of it is
-  eight quick slots. Click one to play it. The same eight are the number
-  keys 1 to 8, and those play with the wheel shut. On the right, beside
+  eight quick slots. Click one to play it, or press its number, 1 to 8,
+  while the wheel is open. With the wheel shut the number keys are Skyrim's
+  own favourites hotkeys and play no emote. On the right, beside
   it, is a search and every emote, in alphabetical order. Click a name to
   play it. Click a slot number under the search, then a name, to put that
   emote on the slot.
@@ -346,7 +347,8 @@
   // The front's cap looks up this name in CAP_CLOSES and calls close().
   // Sending __close is the close: the plugin sets open false, hides the
   // wheel, and gives the keyboard back. Calling HideWheel here would leave
-  // the plugin thinking the wheel is still up, so 1 to 8 would stay dead.
+  // the plugin thinking the wheel is still up, so the next G would shut a
+  // wheel nobody can see and the stop key would not stand you up.
   window.thornswoodEmotes = {
     close: function () { say('__close'); }
   };
