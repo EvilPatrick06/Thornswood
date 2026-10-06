@@ -5,8 +5,9 @@ const path = require('node:path');
 const vm = require('node:vm');
 const addon = require(path.resolve(process.argv[2]));
 const installed = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
-// Acceptance fixture: the installed 48-plugin cast, never a saved live world.
-const originalExpectedLoaded = 11253, completionLimitMs = 300000;
+// Acceptance fixture: the installed 102-plugin cast (48 full, 54 light since the
+// engine loads light plugins, #1715), never a saved live world.
+const originalExpectedLoaded = 11273, completionLimitMs = 300000;
 let expectedLoaded = originalExpectedLoaded;
 const populationMode = process.argv[5] === '--population';
 const enumerationMode = process.argv[5] === '--enumerate-native-eligible';
@@ -15,7 +16,7 @@ assert.ok(!process.argv[5] || populationMode || enumerationMode || populationEnu
 // One cold native placed-form load cannot yield midway through construction.
 // Keep it separate from steady activity and do not accumulate a loading batch.
 const maxCallbackMs = 50, maxColdLoadMs = 100, maxRssBytes = 2 * 1024 ** 3;
-assert.equal(installed.loadOrder.length, 48, 'Use the actual installed 48-plugin fixture');
+assert.equal(installed.loadOrder.length, 102, 'Use the actual installed 102-plugin fixture');
 const server = new addon.ScampServer(JSON.stringify({port:0,maxPlayers:2,offlineMode:true,
   name:'npc-shared-native-check',dataDir:path.dirname(installed.loadOrder[0]),
   loadOrder:installed.loadOrder,npcEnabled:true,npcAllowEssential:true,npcAllowCrimeFaction:true,
