@@ -34,10 +34,10 @@ the branch `thornswood/engine-changes`. Anybody can read it or download it,
 with no account.
 
 The server's engine, `scam_native.node`, is built from one commit,
-[`0a505323`](https://github.com/EvilPatrick06/skymp/tree/0a5053239b683c7bec5aed5805c2ab5c2c402e3b).
+[`0f54ad45`](https://github.com/EvilPatrick06/skymp/tree/0f54ad4541fff9bf75c8d8107fc767e47037a2d6).
 That commit starts from
-[SkyMP](https://github.com/skyrim-multiplayer/skymp) at `f926944b`, and
-[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/f926944b...0a505323)
+[SkyMP](https://github.com/skyrim-multiplayer/skymp) at `2849e676`, and
+[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/2849e676...0f54ad45)
 is the difference between the two.
 
 The server's engine goes to our test server first, then to the main server.
@@ -53,7 +53,7 @@ the same public branch:
 | Channel | Feed | The six client files are built from |
 |---|---|---|
 | Public | `feed/version.json` | [`5328e5c1`](https://github.com/EvilPatrick06/skymp/tree/5328e5c1) |
-| Dev | `feed-dev/version.json` | [`0a505323`](https://github.com/EvilPatrick06/skymp/tree/0a505323) |
+| Dev | `feed-dev/version.json` | [`0f54ad45`](https://github.com/EvilPatrick06/skymp/tree/0f54ad45) |
 
 | File | Built from | Licence |
 |---|---|---|
