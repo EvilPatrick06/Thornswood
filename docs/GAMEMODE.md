@@ -333,6 +333,13 @@ Everything goes to the dev server first.
   the VPS (`scripts\deploy\Deploy-Gamemode.ps1:This script does not stop the live server and does not talk to the VPS`). Then `.\scripts\deploy\Deploy-Server.ps1`
   stages the build on the VPS, warns, swaps and restarts
   (`scripts\deploy\Deploy-Server.ps1:game\gamemode.js as the commit holds it`: it takes `gamemode.js` from `game` as committed, not the copy in the build).
+  That pair needs the fork built on the machine running it. A gamemode
+  change alone needs no build: `.\scripts\deploy\Deploy-Server.ps1 -GamemodeOnly`,
+  from any machine, sends the committed `gamemode.js`, its build stamp and
+  `Thornswood-Content.esp` when its size changed, and keeps the live server's
+  own settings with no key allowed to move. It refuses before anything is sent
+  unless the live server runs the server build the commit records
+  (`scripts\deploy\Deploy-Server.ps1:refuses unless the box's server-build.json is the record the commit holds`, issue #1089).
 
 Ship does not carry `gamemode.js`. `.\scripts\vps\Check-LiveGamemode.ps1` says
 whether the live server runs the file in this repository, by hash.
