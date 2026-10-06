@@ -150,7 +150,7 @@ typed on a command line or written on this page.
    changes, and Windows Server 2022 like the old one: the `windows` line of
    the backup's NOTES.txt (10.0.20348 is Windows Server 2022), which
    `.\scripts\vps\Restore-Backup.ps1 -Backup <newest backup> -CheckOnly -NoPause`
-   prints (the newest is in `Downloads\Thornswood-Backups`). Note the new
+   prints (the newest is in `local\backups` in the repository folder). Note the new
    address, and leave the Administrator password in the panel.
 2. **Turn on its ssh server**, in the new box's own console, which the
    provider's panel opens. A fresh Windows Server 2022 does not have one, and
@@ -243,8 +243,8 @@ typed on a command line or written on this page.
 
 The old box stops serving at step 11. Pick a quiet hour: nothing anybody does
 on the old box after that is carried across. If the old box is already gone,
-skip steps 10 to 12 and use the newest backup in `Downloads\Thornswood-Backups`,
-as docs\RESTORING.md "The box is gone" says.
+skip steps 10 to 12 and use the newest backup in `local\backups` in the
+repository folder, as docs\RESTORING.md "The box is gone" says.
 
 10. **Tell people** in Discord that the server is going down to move, and for
     about how long.
@@ -255,8 +255,9 @@ as docs\RESTORING.md "The box is gone" says.
     says which account the site ran as. It should end `FROZEN`. If the move is
     called off, the same line with `-Arguments '-Undo'` puts the old box back.
 12. **Bring that backup here:**
-    `.\scripts\vps\Fetch-Backups.ps1 -VpsHost <old address>`. It lands in
-    `Downloads\Thornswood-Backups` and is opened to check it.
+    `.\scripts\vps\Fetch-Backups.ps1 -VpsHost <old address>`, from the
+    repository folder itself, not a worktree (it stops in one). It lands in
+    `local\backups` there and is opened to check it.
 13. **Put it back:** `.\scripts\vps\Restore-Box.ps1 -Backup <the backup from step 12>`,
     with `-Expect <a profile id>` for somebody known to have a character. It
     carries the backup, the passphrase file and the restore scripts to the new
@@ -406,7 +407,7 @@ The steps, in order:
    nothing else deploys from.)
 3. **Follow "If it is a new machine, new address" from start to finish** in
    that window, including step 13, the restore from the newest backup in
-   `Downloads\Thornswood-Backups`. Skip only what would reach the real box or
+   `local\backups` in the repository folder. Skip only what would reach the real box or
    the people on it: step 3 (the override stands in for it), steps 10 to 12
    (they freeze the real box), step 18 (the name stays on the real box),
    steps 20 to 22 and 24 (a second watchdog, alert poster and build runner

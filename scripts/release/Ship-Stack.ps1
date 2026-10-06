@@ -11,9 +11,10 @@
 
   ORDER, AND WHAT EACH STEP IS.
 
-      1  gamemode   Channel=dev runs Deploy-DevGamemode.ps1 (sends
-                    game\gamemode.js to the VPS dev server and restarts only
-                    that one). Channel=main runs Deploy-Gamemode.ps1 (writes
+      1  gamemode   Channel=dev runs Deploy-DevGamemode.ps1 -Note (sends
+                    game\gamemode.js to the VPS dev server, restarts only
+                    that one and posts the note to the dev updates channel).
+                    Channel=main runs Deploy-Gamemode.ps1 (writes
                     gamemode.js and the load order into the built server)
                     then Deploy-Server.ps1 (sends that build to the live VPS
                     and restarts it). That is the existing Main path in
@@ -35,8 +36,8 @@
   only want to parse the script; do not run this against Main until Patrick
   says Main.
 
-    .\scripts\release\Ship-Stack.ps1
-    .\scripts\release\Ship-Stack.ps1 -Channel dev
+    .\scripts\release\Ship-Stack.ps1 -Note "The door answers on the first knock
+    - The door no longer needs a second try before it opens."
     .\scripts\release\Ship-Stack.ps1 -Channel main -SkipInstaller
     .\scripts\release\Ship-Stack.ps1 -SkipGameMode -NoPause
 
@@ -45,6 +46,15 @@
   VPS Dev server and remirrors this machine's working copy of the dev feed to
   /feed-dev. Main builds the live gamemode into the server dist, pushes it
   with Deploy-Server.ps1, and remirrors the main tip to /feed.
+
+.PARAMETER Note
+  What the dev gamemode step posts to the dev updates channel, passed to
+  Deploy-DevGamemode.ps1 as its -Note: a title, then "- " lines. Required when
+  that step runs (Channel=dev without -SkipGameMode), because
+  Deploy-DevGamemode refuses a deploy without one (#594). Until #1955 this
+  passed it nothing, so every dev run stopped there. Refused when no step
+  would carry it: Main's gamemode deploys post no note. The one parameter
+  taken without its name, as in Deploy-DevGamemode (#1929).
 
 .PARAMETER SkipInstaller
   Leaves Package-Thornswood.ps1 out. Use when the installer was already built
@@ -72,7 +82,8 @@
   MyInvocation / PSScriptRoot, so an empty PSScriptRoot does not fail the default.
 
 .EXAMPLE
-  .\scripts\release\Ship-Stack.ps1 -Channel dev -NoPause
+  .\scripts\release\Ship-Stack.ps1 -Channel dev -NoPause -Note "The door answers on the first knock
+  - The door no longer needs a second try before it opens."
 
   Deploys the gamemode to the Dev server, builds the installer, remirrors
   /feed-dev, and exits without waiting for Enter.
@@ -92,7 +103,10 @@ param(
     # Empty until after $Here is resolved. $PSScriptRoot can be empty when this
     # script is invoked certain ways (dot-source, some hosts), which made the
     # old Join-Path $PSScriptRoot default fail the first Dev Ship-Stack run.
-    [string]$DistRoot = ''
+    [string]$DistRoot = '',
+    # Position 0, and the only parameter with one, so a bare string is the
+    # note and never binds to -Channel (#1929, #1955).
+    [Parameter(Position = 0)][string]$Note = ''
 )
 
 Set-StrictMode -Version Latest
@@ -130,6 +144,21 @@ if ([string]::IsNullOrWhiteSpace($DistRoot)) {
     }
 }
 
+# The note goes to the dev gamemode step and nowhere else (#1955). Asked for
+# here, before any step runs, so a run without one stops before anything is
+# sent instead of at Deploy-DevGamemode's own refusal.
+$devGamemode = ($Channel -eq 'dev' -and -not $SkipGameMode)
+if ($devGamemode -and -not $Note.Trim()) {
+    Die ('the dev gamemode step posts a note to the dev updates channel, and none was given. Give it as -Note, a title then "- " lines:' + "`n" +
+        '  .\scripts\release\Ship-Stack.ps1 -Note "The door answers on the first knock' + "`n" +
+        '  - The door no longer needs a second try before it opens."' + "`n" +
+        'or leave the gamemode out with -SkipGameMode.')
+}
+if (-not $devGamemode -and $Note.Trim()) {
+    $why = if ($SkipGameMode) { '-SkipGameMode leaves it out' } else { 'Main''s gamemode deploys post none' }
+    Die ("-Note was given and no step would post it: only the dev gamemode step takes a note, and $why. Run it again without -Note.")
+}
+
 $Deploy = Join-Path $Here '..\deploy'
 $script:RemirrorWarned = $false
 
@@ -157,7 +186,7 @@ Say ("  SkipGameMode=$SkipGameMode  SkipInstaller=$SkipInstaller  NoPause=$NoPau
 if (-not $SkipGameMode) {
     if ($Channel -eq 'dev') {
         Head 'Gamemode (dev)'
-        Invoke-Step 'Deploy-DevGamemode' (Join-Path $Deploy 'Deploy-DevGamemode.ps1') @{}
+        Invoke-Step 'Deploy-DevGamemode' (Join-Path $Deploy 'Deploy-DevGamemode.ps1') @{ Note = $Note }
     }
     else {
         Head 'Gamemode (main): build into server dist'
