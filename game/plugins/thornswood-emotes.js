@@ -135,8 +135,14 @@ const STOP = 'IdleForceDefaultState';
  * One list, not categories.
  *
  * The wheel's middle is eight quick slots. Click a slot, or press 1 to 8
- * with the wheel shut. The full list sits on the right of the wheel, with a
- * search, in alphabetical order. Tab moves to that search.
+ * while the wheel is open. The full list sits on the right of the wheel, with
+ * a search, in alphabetical order. Tab moves to that search.
+ *
+ * With the wheel shut, 1 to 8 are Skyrim's own favourites hotkeys (the Q
+ * menu) and nothing here listens to them. Until 6 October they also played
+ * a slot, so a favourite on 1 was equipped and the first slot played on the
+ * same press: two actions on one key, and an equip on top of an idle is the
+ * road to the weapon-drawn pin described in standUp below.
  *
  * Every event below but Sing's is an IDLE record's ENAM from Skyrim.esm or
  * Dragonborn.esm, an animation under Actors\Character\Behaviors. The name on
@@ -723,15 +729,11 @@ sp.on('buttonEvent', guard('keys', (e) => {
     setOpen(true);
     return;
   }
-  // 1 to 8 play the quick slots with the wheel shut. While it is open the
-  // page owns those keys, so a digit typed into the search is not also an emote.
-  const digits = [2, 3, 4, 5, 6, 7, 8, 9];
-  const pick = digits.indexOf(e.code);
-  if (!open && pick >= 0) {
-    if (inCreationRoom()) { return; }
-    playSlot(pick + 1);
-    return;
-  }
+  // 1 to 8 with the wheel shut belong to the game: they are Skyrim's
+  // favourites hotkeys, and playing a slot on them as well equipped the
+  // favourite and played the emote on one press. While the wheel is open the
+  // page holds the keyboard and hears 1 to 8 itself (it sends __slot), and
+  // the game hears none of them.
   if (!open) { return; }
   if (e.code === CLOSE_KEY) { setOpen(false); return; }
 }));

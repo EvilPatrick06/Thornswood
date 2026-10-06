@@ -7,7 +7,7 @@
 // thornswoodSetWheel, thornswoodSetRing and thornswoodHideWheel, and never
 // that name. The cap's T.js call was a no-op, then it dropped the wheel
 // claim. The overlay could stay drawn or the plugin's open stayed true, so
-// 1 to 8 stayed dead: those keys play a slot only while the wheel is shut.
+// the next G shut a wheel nobody could see instead of opening it.
 //
 // THE FIX. The page exposes window.thornswoodEmotes.close, and close sends
 // __close. The plugin already answers that with setOpen(false). Hide-only
@@ -20,7 +20,7 @@
 //   B. The cap calls that name's close, the same T.js line it uses for
 //      every other panel.
 //   C. The emote page's close sends __close, and the plugin sets open
-//      false. After that, 1 to 8 play a slot again.
+//      false. After that, a tap of G opens the wheel again.
 //
 // The pretend game in C is the same order as tests/test-1852-wheel-keys.js:
 // the real page and the real plugin, wired so executeJavaScript runs in the
@@ -336,11 +336,11 @@ function world() {
   w.tap(G, 5);
   w.T.claimFocus('wheel', false);
   w.frames(2);
-  const stuck = w.played.slice();
-  w.tap(ONE, 4);
-  w.frames(6);
-  yes('C2 dropping the claim and leaving open true is the old cap: 1 does not play',
-      w.page.shown() && w.played.length === stuck.length);
+  yes('C2 dropping the claim and leaving open true is the old cap: the wheel is still drawn',
+      w.page.shown());
+  w.tap(G, 5);
+  yes('C2 and the next G shuts it instead of opening it, because the plugin\'s open stayed true',
+      !w.open());
 
   const w2 = world();
   w2.frames(2);
@@ -348,17 +348,35 @@ function world() {
   w2.cap();
   w2.frames(4);
   yes('C2 after the real cap the wheel is shut', w2.shut());
-  w2.tap(ONE, 4);
-  w2.frames(6);
-  yes('C2 and 1 plays Wave, the first slot, because the plugin\'s open followed',
-      w2.played.indexOf('IdleWave') >= 0);
+  w2.tap(G, 5);
+  yes('C2 and the next G opens it again, because the plugin\'s open followed',
+      w2.open());
 }
 
 {
   yes('C3 the plugin still answers __close by setting open false',
       /if \(what === '__close'\) \{[^}]*setOpen\(false\); return; \}/.test(plugin));
-  yes('C3 and 1 to 8 play a slot only while the wheel is shut',
-      /if \(!open && pick >= 0\) \{[\s\S]*?playSlot\(pick \+ 1\);/.test(plugin));
+  yes('C3 and with the wheel shut 1 to 8 are left to the game: the plugin plays no slot on a key',
+      !/digits\s*=\s*\[2, 3, 4, 5, 6, 7, 8, 9\]/.test(plugin) && !/playSlot\(pick/.test(plugin));
+}
+
+{
+  // Djinn, 6 Oct: with the wheel shut, 1 to 8 are Skyrim's favourites
+  // hotkeys. Pressing one equipped the favourite and played a slot as well.
+  const w = world();
+  w.frames(2);
+  const before = w.played.slice();
+  for (let code = ONE; code <= ONE + 7; code++) { w.tap(code, 4); }
+  w.frames(4);
+  yes('C4 with the wheel shut, 1 to 8 play no emote',
+      w.played.length === before.length && w.shut());
+
+  w.tap(G, 5);
+  yes('C4 a tap of G opens the wheel', w.open());
+  w.tap(ONE, 4);
+  w.frames(6);
+  yes('C4 and with the wheel open, 1 plays Wave, the first slot, and shuts the wheel',
+      w.played.indexOf('IdleWave') >= 0 && w.shut());
 }
 
 console.log('');

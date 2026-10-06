@@ -30,7 +30,10 @@ function fixture() {
   function emit(name,event){inUpdate=name==='update'||name==='buttonEvent';if(name==='update'&&waiting&&delay>0&&!--delay){drawn=false;waiting=false;}for(const fn of handlers[name]||[])fn(event);if(name==='update')while(nativeTasks.length)nativeTasks.shift()();inUpdate=false;}
   return {sent,pins,labels,emit,reject(){accepted=false;},
     focus(){focused=true;},delaySheathe(){delay=5;},interruptSheatheOnReset(){resetInterrupts=true;delay=5;},noAcknowledgement(){ack=false;},elapse(ms){time+=ms;},
-    labelsOnly:()=>labels.filter(s=>s.includes('t:"emote"'))};
+    labelsOnly:()=>labels.filter(s=>s.includes('t:"emote"')),
+    // The eighth slot (Drink) chosen on the wheel: G opens it, the page sends __slot 8.
+    pick8(){emit('buttonEvent',{device:0,code:34,isDown:true,isUp:false,isRepeating:false,heldDuration:0});
+      emit('browserMessage',{arguments:['thornswood-emote','__slot 8']});}};
 }
 const mouse=fixture();
 mouse.emit('buttonEvent',{device:1,code:9,isDown:true,isUp:false});
@@ -41,15 +44,21 @@ const held=fixture();
 held.emit('buttonEvent',{device:0,code:9,isDown:true,isUp:false,isRepeating:true,heldDuration:1});
 assert.equal(held.labelsOnly().length,0,'held repeats cannot select a new emote');
 held.emit('update');assert.equal(held.sent.length,0);
+// With the wheel shut, 8 is Skyrim's favourites hotkey and plays no slot (Djinn, 6 Oct).
+const shutKey=fixture();
+shutKey.emit('buttonEvent',{device:0,code:9,isDown:true,isUp:false,isRepeating:false,heldDuration:0});
+for(let i=0;i<4;i++)shutKey.emit('update');
+assert.equal(shutKey.sent.length,0,'with the wheel shut, the number keys are the game\'s favourites hotkeys and play no emote');
+assert.equal(shutKey.labelsOnly().length,0);
 const explicit=fixture();
-explicit.emit('buttonEvent',{device:0,code:9,isDown:true,isUp:false,isRepeating:false,heldDuration:0});
+explicit.pick8();
 assert.equal(explicit.labelsOnly().length,0,'the label waits for an accepted animation');
 for(let i=0;i<4;i++)explicit.emit('update');
 assert.ok(explicit.pins.includes(-1),'clear the persistent weapon stance override');
 assert.ok(explicit.sent.includes('idleDrinkingStandingStart'),'a drawn stance must not loop forever on Stop');
 assert.equal(explicit.labelsOnly().length,1,'one accepted explicit selection produces one label');
 const rejected=fixture();rejected.reject();
-rejected.emit('buttonEvent',{device:0,code:9,isDown:true,isUp:false,isRepeating:false,heldDuration:0});
+rejected.pick8();
 for(let i=0;i<4;i++)rejected.emit('update');
 assert(rejected.sent.includes('idleDrinkingStandingStart'),'exercise rejection of the requested idle itself');
 assert.equal(rejected.labelsOnly().length,0,'a rejected animation cannot claim the emote happened');
@@ -57,7 +66,7 @@ const panel=fixture();panel.focus();
 panel.emit('buttonEvent',{device:0,code:9,isDown:true,isUp:false});panel.emit('update');
 assert.equal(panel.sent.length,0,'numbers typed into another panel cannot select emotes');
 const slow=fixture();slow.delaySheathe();
-slow.emit('buttonEvent',{device:0,code:9,isDown:true,isUp:false});
+slow.pick8();
 slow.emit('update');slow.emit('update');
 assert.equal(slow.labelsOnly().length,0,'wait until the sheathing animation has finished');
 for(let i=0;i<6;i++)slow.emit('update');
@@ -74,11 +83,11 @@ wheel.emit('browserMessage',{arguments:['thornswood-emote','__stand']});
 const previous=wheel.sent.length;wheel.emit('update');wheel.emit('update');
 assert.equal(wheel.sent[previous],'IdleForceDefaultState','wheel Stop also reaches the update queue');
 const interrupted=fixture();interrupted.interruptSheatheOnReset();
-interrupted.emit('buttonEvent',{device:0,code:9,isDown:true,isUp:false});
+interrupted.pick8();
 for(let i=0;i<10;i++)interrupted.emit('update');
 assert.equal(interrupted.labelsOnly().length,1,'resetting the graph must not interrupt the requested sheathe');
 const unacknowledged=fixture();unacknowledged.noAcknowledgement();
-unacknowledged.emit('buttonEvent',{device:0,code:9,isDown:true,isUp:false});
+unacknowledged.pick8();
 for(let i=0;i<4;i++)unacknowledged.emit('update');
 unacknowledged.elapse(2100);unacknowledged.emit('update');
 assert.equal(unacknowledged.labelsOnly().length,0,'an unacknowledged gesture cannot produce a label');
