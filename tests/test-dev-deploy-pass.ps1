@@ -24,6 +24,9 @@ $here = $PSScriptRoot
 if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $repo = Split-Path -Parent $here
 $script = Join-Path $repo 'scripts\deploy\Deploy-DevGamemode.ps1'
+# The counting function Deploy-DevGamemode sends up with the block (#2011).
+. (Join-Path $repo 'scripts\deploy\ServerOrder.ps1')
+$script:fullIndexDef = 'function Get-ThornswoodFullIndex {' + "`n" + (Get-Command Get-ThornswoodFullIndex).Definition + "`n}"
 $live = Join-Path $repo 'scripts\deploy\Deploy-Gamemode.ps1'
 $liveServer = Join-Path $repo 'scripts\deploy\Deploy-Server.ps1'
 
@@ -67,6 +70,9 @@ function Run-Block([string]$value, $settings) {
     $rootWin = $tmp
     $farOrder = ''
     $remotePlugins = 'C:/nowhere'
+    $fullIndexDef = $script:fullIndexDef
+    $lightTable = ''
+    $boxRecord = Join-Path $tmp 'server-build.json'
     $VoicePort = 7789
     $maxOnline = 0
     $seats = 0
