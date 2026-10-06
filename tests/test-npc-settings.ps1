@@ -40,6 +40,9 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # The tests are in tests\, the repository is one folder up.
 $Here = Split-Path -Parent $Here
 if (-not $RepoDir) { $RepoDir = $Here }
+# The counting function Deploy-DevGamemode sends up with the block (#2011).
+. (Join-Path $RepoDir 'scripts\deploy\ServerOrder.ps1')
+$script:fullIndexDef = 'function Get-ThornswoodFullIndex {' + "`n" + (Get-Command Get-ThornswoodFullIndex).Definition + "`n}"
 
 $script:pass = 0
 $script:fail = 0
@@ -157,6 +160,9 @@ if ($dStart -ge 0 -and $dOpen -gt $dStart -and $dClose -gt $dOpen) {
     New-Item -ItemType Directory -Force -Path $box | Out-Null
     function Run-DevBlock {
         $rootWin = $box; $farOrder = ''; $remotePlugins = 'C:/nowhere'; $VoicePort = 7789
+        $fullIndexDef = $script:fullIndexDef
+        $lightTable = ''
+        $boxRecord = Join-Path $box 'server-build.json'
         $maxOnline = 0; $LoadOrderRefuse = ''; $RequirePass = ''; $Npcs = ''
         $file = Join-Path $tmp 'dev-block.ps1'
         [IO.File]::WriteAllText($file, $ExecutionContext.InvokeCommand.ExpandString($devBody), (New-Object Text.UTF8Encoding $true))

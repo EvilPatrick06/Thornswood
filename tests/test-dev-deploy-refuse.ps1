@@ -21,6 +21,9 @@ $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
 if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $script = Join-Path (Split-Path -Parent $here) 'scripts\deploy\Deploy-DevGamemode.ps1'
+# The counting function Deploy-DevGamemode sends up with the block (#2011).
+. (Join-Path (Split-Path -Parent $here) 'scripts\deploy\ServerOrder.ps1')
+$script:fullIndexDef = 'function Get-ThornswoodFullIndex {' + "`n" + (Get-Command Get-ThornswoodFullIndex).Definition + "`n}"
 
 $script:pass = 0
 $script:fail = 0
@@ -59,6 +62,9 @@ function Run-Block([string]$value, $settings, [string]$npcValue = '') {
     $rootWin = $tmp
     $farOrder = ''
     $remotePlugins = 'C:/nowhere'
+    $fullIndexDef = $script:fullIndexDef
+    $lightTable = ''
+    $boxRecord = Join-Path $tmp 'server-build.json'
     $VoicePort = 7789
     $maxOnline = 0
     $seats = 0

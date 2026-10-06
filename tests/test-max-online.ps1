@@ -40,6 +40,9 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # The tests are in tests\, the repository is one folder up.
 $Here = Split-Path -Parent $Here
 if (-not $RepoDir) { $RepoDir = $Here }
+# The counting function Deploy-DevGamemode sends up with the block (#2011).
+. (Join-Path $RepoDir 'scripts\deploy\ServerOrder.ps1')
+$script:fullIndexDef = 'function Get-ThornswoodFullIndex {' + "`n" + (Get-Command Get-ThornswoodFullIndex).Definition + "`n}"
 
 $script:pass = 0
 $script:fail = 0
@@ -234,6 +237,9 @@ if ($open -ge 0 -and $close -gt $marker) {
     function Expand-Remote([string]$rootWin, $maxOnline, $seats) {
         $farOrder = ''
         $remotePlugins = 'C:/Thornswood-Server-Dev/plugins'
+        $fullIndexDef = $script:fullIndexDef
+        $lightTable = ''
+        $boxRecord = Join-Path $rootWin 'server-build.json'
         $VoicePort = 7789
         return & ([scriptblock]::Create('@"' + "`n" + $body + "`n" + '"@'))
     }

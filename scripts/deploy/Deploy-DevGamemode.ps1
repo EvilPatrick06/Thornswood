@@ -688,6 +688,21 @@ Copy-Item -LiteralPath '$rootWin\server-settings.json' -Destination '$stageWin\s
   # Deploy-Gamemode.ps1 computes the same thing the same way for the live
   # server, which is why live was right and dev was not.
   #
+  # AND THE INDEX COUNTS FULL PLUGINS ONLY, added 5 October for #2011. With an
+  # engine that loads light plugins (#1715) the list holds them too, and a form
+  # id's top byte is a plugin's place among the full plugins, never its place
+  # in the list. This counted the list, so the 10:01 PM deploy of 5 October put
+  # the start point at 0x5E19BAD4 (Unbound 94th in the list, 45th among full
+  # plugins) and every new character died at login with
+  #   Error: FromFormId failed due to invalid file index 94 (5e19bad4)
+  # It counts with Get-ThornswoodFullIndex now, the one Deploy-Gamemode,
+  # Publish-Server and Check-Chargen use, sent up with the block. Which
+  # plugins are light is read here, from each header in $Data by the same
+  # Test-ThornswoodPluginLight, and goes up as a table; light ones count as
+  # unnumbered only when the box's own server-build.json says its engine loads
+  # them. A plugin in the box's order that this machine cannot read leaves the
+  # start point alone and says so, rather than guessing its index.
+  #
   # AND HOW MANY IT HOLDS AT ONCE, #481. thornswoodMostOnline is the number the
   # gamemode turns people away past, and maxPlayers, the engine's own slot
   # count, is set that plus the staff seats, both from records\most-online.json
@@ -751,6 +766,16 @@ Copy-Item -LiteralPath '$rootWin\server-settings.json' -Destination '$stageWin\s
     'equipmentSlotCheckEnabled', 'equipmentSpellCheckEnabled', 'equipmentInventoryCheckEnabled',
     'forbiddenReloot'
   )
+  # The light table and the counting function the block below takes up (#2011).
+  . (Join-Path $Here 'ServerOrder.ps1')
+  $lightRows = @()
+  foreach ($f in @(Get-ChildItem -LiteralPath $Data -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in '.esp', '.esm', '.esl' })) {
+    try { $isLightPlugin = Test-ThornswoodPluginLight $f.FullName } catch { continue }
+    $lightRows += ("'{0}' = {1}" -f $f.Name.ToLowerInvariant().Replace("'", "''"), $(if ($isLightPlugin) { '$true' } else { '$false' }))
+  }
+  $lightTable = $lightRows -join '; '
+  $fullIndexDef = 'function Get-ThornswoodFullIndex {' + "`n" + (Get-Command Get-ThornswoodFullIndex).Definition + "`n}"
+  $boxRecord = $Root.Replace('/', '\') + '\server-build.json'
   & {
     # The block below edits the staged copy, never the running one: $rootWin
     # is the stage folder for as long as it runs (issue #446).
@@ -794,18 +819,27 @@ if (`$orderPath -and (Test-Path `$orderPath)) {
 `$startWas = 0
 `$startWant = 0
 `$order2 = @(`$(if (`$wantOrder) { `$newOrder } else { @(`$s.loadOrder) }))
-`$unb = -1
-for (`$i = 0; `$i -lt `$order2.Count; `$i++) {
-  if ((Split-Path `$order2[`$i] -Leaf) -eq 'Skyrim Unbound.esp') { `$unb = `$i; break }
+$fullIndexDef
+`$loadsLight = `$false
+try { `$loadsLight = ((Get-Content -LiteralPath '$boxRecord' -Raw | ConvertFrom-Json).lightPlugins -eq `$true) } catch { }
+`$lightOf = @{ $lightTable }
+`$unread = @()
+`$isLight = `$null
+if (`$loadsLight) {
+  foreach (`$o in `$order2) { `$leaf = (Split-Path `$o -Leaf).ToLowerInvariant(); if (`$leaf -notmatch '\.esl`$' -and -not `$lightOf.ContainsKey(`$leaf)) { `$unread += `$leaf } }
+  `$isLight = { param(`$n) (`$n -match '\.esl`$') -or [bool]`$lightOf[`$n.ToLowerInvariant()] }.GetNewClosure()
 }
+`$unb = Get-ThornswoodFullIndex ([string[]]`$order2) `$isLight 'Skyrim Unbound.esp'
 `$pt = @(`$s.startPoints)[0]
-if (`$pt -and `$unb -ge 0) {
+if (`$unread.Count) {
+  'cannot tell whether ' + (`$unread -join ', ') + ' is light, so the start point is left alone'
+} elseif (`$pt -and `$unb -ge 0) {
   `$startWas = [int64]`$pt.worldOrCell
   `$startWant = (`$unb * 0x01000000) + (`$startWas -band 0x00FFFFFF)
   if (`$startWas -ne `$startWant) {
     `$wantStart = `$true
     'the start point names file index ' + [int](`$startWas -shr 24) +
-      ', and Skyrim Unbound.esp is at ' + `$unb + ' in this load order. A new character cannot spawn.'
+      ', and Skyrim Unbound.esp is full plugin ' + `$unb + ' in this load order. A new character cannot spawn.'
   }
 } elseif (-not `$pt) { 'no startPoints in the dev settings, leaving that alone' }
 elseif (`$unb -lt 0) { 'Skyrim Unbound.esp is not in this load order, leaving the start point alone' }
