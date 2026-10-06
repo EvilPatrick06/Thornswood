@@ -312,6 +312,36 @@ function swapped(guids, user2, guid2) {
   yes('and not once ISSUED_MS has gone', r2.jp.take(700, mint({ p: 700, i: T0, x: T0 + 600000 }), T0 + 201000).ok !== true);
 }
 
+// ------------------------------------------------------------ a game relaunched before the last connection timed out (#2013)
+// Measured on dev on 5 Oct: the game closed at 11:29:22 PM, the new one logged
+// in at 11:29:54 while the old connection lived on until its timeout at
+// 11:30:19, the launcher's new pass came at 11:29:55 and the sweep that saw the
+// new connection ran at 11:29:58. The pass was spent on the old session and the
+// sweep threw it away, so the new session was held until the next pass.
+{
+  const r = rig();
+  r.at([[A1, 700, 1, 'g-old']]);
+  r.sweep(T0);
+  const p = mint({ p: 700, i: T0, x: T0 + 600000 });
+  r.jp.take(700, p, T0 + 1000);
+  r.sweep(T0 + 5000);
+  // The game is closed and started again; the engine hands the character to
+  // the new connection while the old one has not yet timed out.
+  r.at([[A1, 700, 2, 'g-new']]);
+  const p2 = mint({ p: 700, i: T0 + 31000, x: T0 + 631000 });
+  const took = r.jp.take(700, p2, T0 + 32000);
+  yes('the relaunched game\'s pass, sent before the next sweep, is taken', took.ok === true);
+  r.sweep(T0 + 35000);
+  yes('and proves the new connection\'s session', r.jp.held(700, T0 + 35000) === false && r.jp.trusts(700, T0 + 35000) === true);
+  yes('the log says once that the character is on another connection',
+      r.lines(/profile 700 is on another connection now/).length === 1);
+  yes('and names the pass taken for the new session', r.lines(/join pass for profile 700, launcher/).length === 2);
+  yes('the old session\'s pass still proves nothing for it', r.jp.take(700, p, T0 + 36000).ok !== true);
+  r.sweep(T0 + 35000 + 181000);
+  r.fire();
+  yes('and the new session is not ended at the grace', r.kicked.length === 0);
+}
+
 // ------------------------------------------------------------ nothing grows
 {
   const r = rig();

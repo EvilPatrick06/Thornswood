@@ -30099,10 +30099,49 @@ log('gamemode loaded:',
     return guid ? 'guid ' + guid : '';
   }
 
+  /*
+    Another connection behind this character (#1320): a session of its own,
+    which the pass the last one showed does not prove. True when the session
+    on record for pid was on another connection than conn, which is then let
+    go with its pass.
+  */
+  function moved(pid, conn) {
+    var e = seen.online[pid];
+    if (!(e && conn && e.conn && conn !== e.conn)) { return false; }
+    console.log('[thornswood] profile ' + pid + ' is on another connection now, so that session needs a join pass of its own');
+    delete seen.passes[pid];
+    delete seen.online[pid];
+    return true;
+  }
+
+  /* A new session for pid on conn, from now. */
+  function begin(pid, conn, now) {
+    var e = seen.online[pid] = { joined: now, judged: false, actorId: 0, sid: ++seen.serial, conn: conn };
+    // A pass that came at the menu is this session's, when it was issued
+    // close enough before it and nothing else has used it.
+    var menu = seen.passes[pid];
+    if (menu && !menu.s && menu.i >= now - ISSUED_MS && !(seen.used[menu.id] && seen.used[menu.id].s)) {
+      menu.s = e.sid;
+      seen.used[menu.id] = { s: e.sid, x: menu.x };
+    }
+    return e;
+  }
+
   /* One "/joinpass <pass>" from the relay, sent under profileId. */
   function take(profileId, raw, now) {
     var r = readPass(raw, passKey(now), now, serverName());
     if (r.ok && r.p !== profileId) { r = { why: 'a pass for profile ' + r.p, p: r.p }; }
+    // The character may be on a new connection the sweep has not seen yet
+    // (#2013). A game started again within the engine's timeout logs in while
+    // the last connection still looks alive, and its pass comes before the
+    // next sweep: bound to the session on record it was spent on the dead
+    // one, the sweep then let it go, and the new session was held until the
+    // launcher's next pass. So that is settled first, the way the sweep does.
+    var rec = r.ok ? seen.online[profileId] : null;
+    if (rec && rec.actorId) {
+      var connNow = connOf(rec.actorId);
+      if (moved(profileId, connNow)) { begin(profileId, connNow, now).actorId = rec.actorId; }
+    }
     if (r.ok) { r = bind(profileId, r); }
     if (!r.ok) {
       if (fresh('bad ' + profileId + ' ' + r.why, now)) {
@@ -30146,24 +30185,8 @@ log('gamemode loaded:',
       if (!pid) { continue; }
       here[pid] = true;
       var conn = connOf(online[i].actorId);
-      var e = seen.online[pid];
-      // Another connection behind this character (#1320): a session of its
-      // own, which the pass the last one showed does not prove.
-      if (e && conn && e.conn && conn !== e.conn) {
-        console.log('[thornswood] profile ' + pid + ' is on another connection now, so that session needs a join pass of its own');
-        delete seen.passes[pid];
-        e = null;
-      }
-      if (!e) {
-        e = seen.online[pid] = { joined: now, judged: false, actorId: 0, sid: ++seen.serial, conn: conn };
-        // A pass that came at the menu is this session's, when it was issued
-        // close enough before it and nothing else has used it.
-        var menu = seen.passes[pid];
-        if (menu && !menu.s && menu.i >= now - ISSUED_MS && !(seen.used[menu.id] && seen.used[menu.id].s)) {
-          menu.s = e.sid;
-          seen.used[menu.id] = { s: e.sid, x: menu.x };
-        }
-      }
+      var e = moved(pid, conn) ? null : seen.online[pid];
+      if (!e) { e = begin(pid, conn, now); }
       if (!e.conn && conn) { e.conn = conn; }
       e.actorId = online[i].actorId;
       if (e.judged) { continue; }
