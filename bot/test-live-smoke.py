@@ -1286,6 +1286,26 @@ yes('test-these is retired rather than renamed into it',
 yes('and test-results is left where it was',
     [s['mode'] for s in plan if s['name'] == 'test-results'] == ['pathfind'])
 
+# What a failed post says (#2018). Permissions only when Discord said so.
+class Refused(Exception):
+    def __init__(self, code, text):
+        Exception.__init__(self, text)
+        self.code = code
+        self.text = text
+
+
+tasks = Posted('test-tasks')
+said = bot.live_smoke_failed(Refused(50021, 'Cannot execute action on a system message'),
+                             tasks, 'View Channel and Send Messages')
+yes('a refusal that is not about permissions is said as Discord said it, '
+    'not put down to permissions',
+    'Cannot execute action on a system message' in said and '50021' in said
+    and 'needs' not in said)
+said = bot.live_smoke_failed(Refused(50013, 'Missing Permissions'), tasks,
+                             'View Channel and Send Messages')
+yes('  and a refusal for permissions names the ones the bot needs',
+    'needs View Channel and Send Messages' in said and '#test-tasks' in said)
+
 print('')
 print('%d passed, %d failed' % (len(PASS), len(FAIL)))
 sys.exit(1 if FAIL else 0)
