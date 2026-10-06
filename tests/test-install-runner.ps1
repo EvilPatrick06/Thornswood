@@ -11,8 +11,10 @@
   gives it, and Install-Runner.ps1 makes the account the jobs run as. This
   holds the parts that matter: the label, an account with no admin rights that
   is shut out of the live folders, a download checked against GitHub's own
-  SHA-256, a registration token that is never printed, below normal priority,
-  and a bot step that never installs into the machine's Python.
+  SHA-256, a registration token that is never printed, no priority set above
+  the normal a service starts at (tests\test-runner-priority.ps1 holds the
+  rest of priority, #1969), and a bot step that never installs into the
+  machine's Python.
 
   HOW. Reads both files as text, and parses the script.
 #>
@@ -83,9 +85,10 @@ Yes 'the registration token is never printed' ($sayToken.Count -eq 0)
 Yes '  and is dropped once used' ($text -match '(?m)^\$token = \$null')
 
 # ---- priority ----------------------------------------------------------------------
-Yes 'the runner is held at normal priority, not above' ($text -match "PriorityClass = ''Normal''" -and $text -notmatch "PriorityClass = ''(High|AboveNormal|RealTime)''")
+# The runner runs at the Normal its service starts it at, and nothing raises
+# it above the game server, the site, voice and the bot (#1969).
+Yes 'nothing sets the runner''s priority class, above normal or otherwise' ($text -notmatch 'PriorityClass\s*=' -and $text -match '--runasservice')
 Yes 'Defender skips the runner''s own folder and nothing else' ($text -match 'Add-MpPreference -ExclusionPath `\$root' -and ([regex]::Matches($text, 'Add-MpPreference')).Count -eq 1)
-Yes '  by a task that runs at start and every five minutes' ($text -match 'AtStartup' -and $text -match 'RepetitionInterval \(New-TimeSpan -Minutes 5\)')
 
 # ---- ssh ---------------------------------------------------------------------------
 Yes 'it checks the VPS host key' ($text -match 'StrictHostKeyChecking=yes')

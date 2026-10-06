@@ -10,7 +10,8 @@
       .\scripts\deploy\Install-Runner.ps1 -Status      what is there and whether GitHub sees it
       .\scripts\deploy\Install-Runner.ps1 -Remove      take it off the box and off GitHub
       .\scripts\deploy\Install-Runner.ps1 -Lock        lock every runner on the box again,
-                                                    touching no runner and no job
+                                                    touching no runner and no job, and
+                                                    take off the old priority watchers
 
   WHY. Every run of .github\workflows\build.yml has failed in seconds since
   02:10 on 25 September, because GitHub's own runners are blocked on billing.
@@ -23,12 +24,11 @@
   open pull requests in bursts (five in seven seconds at 17:46) and every
   merge to main runs the check again. Patrick added a second runner that
   evening and asked for more. -Number n puts the nth beside the others: its
-  own folder, account, runner name and priority task, each with the number
-  on the end (C:\Thornswood-Runner3, thornswood-runner3, thornswood-vps-3,
-  Thornswood Runner 3 Priority), and the same label, so GitHub hands a
-  waiting job to whichever is free. 1 is the first, with the names it has
-  always had. -Status and -Remove take -Number the same way; -Lock does
-  every runner on the box.
+  own folder, account and runner name, each with the number on the end
+  (C:\Thornswood-Runner3, thornswood-runner3, thornswood-vps-3), and the
+  same label, so GitHub hands a waiting job to whichever is free. 1 is the
+  first, with the names it has always had. -Status and -Remove take -Number
+  the same way; -Lock does every runner on the box.
 
   WHAT IT DOES ON THE BOX, in order:
     1. Checks what the build check needs is there: pwsh, node, python and git
@@ -44,10 +44,8 @@
     4. Downloads a pinned actions/runner win-x64 zip (version + SHA-256
        hardcoded below, #1372), checked against that pin, and registers it as a
        service that runs as that account.
-    5. Registers a task that keeps the runner at normal priority, never
-       above it, so a build shares the five cores with the game server, the
-       site, voice and the bot rather than taking them. Below normal until
-       25 September, when Patrick wanted a check in about five minutes.
+    5. Takes off the priority watcher task an older install left (NO
+       PRIORITY TASK, below).
     6. Tells Windows Defender to skip the runner's own folder, so the few
        hundred processes a check starts are not each scanned on the way in.
 
@@ -70,9 +68,29 @@
   -LOCK puts that right on a box as it is, without replacing anything: for
   every runner service there, it locks the runner's folder, and shuts its
   account out of every C:\Thornswood-* folder but its own, saying which it
-  had to close. No service is stopped and no job is touched. An install ends
-  by doing the same for every runner, so adding one leaves all of them
-  locked.
+  had to close, and it takes off every priority watcher task left on the
+  box. No service is stopped and no job is touched. An install ends by doing
+  the same for every runner, so adding one leaves all of them locked.
+
+  NO PRIORITY TASK (#1969). Until 5 October each install registered a task,
+  Thornswood Runner Priority (Thornswood Runner N Priority from the second
+  on), that set Runner.Listener and Runner.Worker to Normal at start and
+  every five minutes: a timer that repairs state, which Developer-Guide.md
+  "Fix the cause, no band-aids" does not allow. Until 25 September it set
+  them to BelowNormal, which is where they ran then; since then it had nothing
+  to repair. The runner is a Windows service (config.cmd --runasservice),
+  and the service control manager starts a service at Normal, I/O priority 2
+  and memory priority 5; the runner sets no priority of its own on Windows
+  (actions/runner lowers a job's processes only on Linux, through
+  oom_score_adj, in ProcessInvoker.cs). On the VPS on 5 October the runners
+  measured Normal, 2 and 5 (PR #1967), and the watcher could not have given
+  them the 2 and the 5: its line changes the class only, so a program a
+  priority 7 task started went from BelowNormal, I/O 1, memory 2 to Normal,
+  1 and 2, measured the same day (tests\test-runner-priority.ps1). The
+  install, -Lock and -Remove take every such task off the box and name it;
+  -Status says when one is still there. A build still shares the five cores
+  with the game server, the site, voice and the bot at the same priority as
+  them, never above.
 
   Safe to run again. An existing runner is replaced, the account keeps its
   name and gets a new password, and the folder denials are made again.
@@ -83,7 +101,7 @@ param(
   [string]$VpsHost    = '',
   [string]$VpsUser    = '',
   [string]$Repo       = 'EvilPatrick06/Thornswood',
-  # Which runner. 1 is the first, with the names below; from 2 up, the four
+  # Which runner. 1 is the first, with the names below; from 2 up, the three
   # names after it get the number on the end unless they are given.
   [ValidateRange(1, 99)][int]$Number = 1,
   [string]$Root       = 'C:\Thornswood-Runner',
@@ -91,7 +109,6 @@ param(
   [string]$RunnerName = 'thornswood-vps',
   # The label build.yml asks for. Change the two together.
   [string]$Label      = 'thornswood-vps',
-  [string]$TaskName   = 'Thornswood Runner Priority',
   [switch]$Status,
   [switch]$Remove,
   [switch]$Lock,
@@ -114,7 +131,6 @@ if ($Number -gt 1) {
   if (-not $PSBoundParameters.ContainsKey('Root'))       { $Root = 'C:\Thornswood-Runner' + $Number }
   if (-not $PSBoundParameters.ContainsKey('Account'))    { $Account = 'thornswood-runner' + $Number }
   if (-not $PSBoundParameters.ContainsKey('RunnerName')) { $RunnerName = 'thornswood-vps-' + $Number }
-  if (-not $PSBoundParameters.ContainsKey('TaskName'))   { $TaskName = 'Thornswood Runner ' + $Number + ' Priority' }
 }
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
@@ -206,12 +222,37 @@ function Close-RunnerAccount([string]$acct, [string]$own, [string]$parent = 'C:\
 }
 '@
 
+# ------------------------------------------------------ the old watchers --
+# The header's NO PRIORITY TASK. Sent with the install, -Lock, -Remove and
+# -Status. A watcher is a task named the way installs before #1969 named
+# theirs: '<prefix> Priority' or '<prefix> <n> Priority'. $prefix is
+# 'Thornswood Runner' except in tests\test-runner-priority.ps1, which runs
+# these on scratch tasks of its own.
+$watcherLib = @'
+function Get-RunnerWatchers([string]$prefix = 'Thornswood Runner') {
+  $like = '^' + [regex]::Escape($prefix) + '( \d+)? Priority$'
+  @(Get-ScheduledTask -EA SilentlyContinue | Where-Object { $_.TaskName -match $like })
+}
+function Remove-RunnerWatchers([string]$prefix = 'Thornswood Runner') {
+  $found = @(Get-RunnerWatchers $prefix)
+  if (-not $found.Count) { 'no priority watcher task on this box'; return }
+  foreach ($w in $found) {
+    try {
+      Unregister-ScheduledTask -TaskName $w.TaskName -TaskPath $w.TaskPath -Confirm:$false -ErrorAction Stop
+      'took off the priority watcher task ' + $w.TaskName + ' (#1969)'
+    } catch { 'COULD NOT TAKE OFF the priority watcher task ' + $w.TaskName + ': ' + $_.Exception.Message }
+  }
+}
+'@
+
 # Every runner service on the box, by what Windows says it is: its folder is
-# the one its RunnerService.exe is in, its account the one it runs as.
-$lockAll = $lockLib + @'
+# the one its RunnerService.exe is in, its account the one it runs as. Then
+# the old priority watchers, which belong to no one runner.
+$lockAll = $lockLib + $watcherLib + @'
 
 $ErrorActionPreference = 'Continue'
 $bad = 0
+foreach ($line in @(Remove-RunnerWatchers)) { $line; if ($line -like 'COULD NOT*') { $bad++ } }
 $services = @(Get-CimInstance Win32_Service -Filter "Name LIKE 'actions.runner.%'" -EA SilentlyContinue)
 if (-not $services.Count) { 'no runner service on this box' }
 foreach ($svc in $services) {
@@ -231,7 +272,7 @@ if ($bad) { exit 1 }
 # ------------------------------------------------------------------ status --
 if ($Status) {
   Head 'On the VPS'
-  Remote @"
+  Remote ($watcherLib + @"
 `$ErrorActionPreference = 'SilentlyContinue'
 if (Test-Path '$Root\config.cmd') { 'runner    in $Root' } else { 'runner    NOT THERE' }
 `$s = Get-Service -Name '$service'
@@ -245,8 +286,10 @@ if (Test-Path '$Root') {
   `$wide = @(`$a.GetAccessRules(`$true, `$true, [Security.Principal.SecurityIdentifier]) | Where-Object { "`$(`$_.AccessControlType)" -eq 'Allow' -and @('S-1-5-32-545', 'S-1-1-0', 'S-1-5-11', 'S-1-3-0') -contains `$_.IdentityReference.Value })
   if (`$a.AreAccessRulesProtected -and -not `$wide.Count) { 'folder    locked: takes nothing from C:\' } else { 'folder    OPEN to every account on the box: -Lock locks it' }
 }
-if (Get-ScheduledTask -TaskName '$TaskName') { 'priority  task registered' } else { 'priority  task NOT REGISTERED' }
-"@ | ForEach-Object { Say "  $_" }
+`$old = @(Get-RunnerWatchers)
+if (`$old.Count) { 'priority  OLD WATCHER TASK still here: ' + ((`$old | ForEach-Object { `$_.TaskName }) -join ', ') + '. -Lock takes it off' }
+else { 'priority  no watcher task; the service starts the runner at normal' }
+"@) | ForEach-Object { Say "  $_" }
   Head 'On GitHub'
   try {
     $r = (Invoke-Gh api "repos/$Repo/actions/runners" | Out-String) | ConvertFrom-Json
@@ -265,7 +308,7 @@ if ($Remove) {
   try { $tok = (Invoke-Gh api -X POST "repos/$Repo/actions/runners/remove-token" --jq .token | Out-String).Trim() } catch { Say '  could not get a removal token; the box is cleaned and GitHub is left to forget it' 'Yellow' }
   # The removal token goes on ssh's standard input and reaches config.cmd in
   # its environment, never on a command line (Send-Secret.ps1, issue #451).
-  Invoke-ThornswoodSecretRemote -Target $target -SshArgs $ssh -Secret ([string]$tok) -Script @"
+  Invoke-ThornswoodSecretRemote -Target $target -SshArgs $ssh -Secret ([string]$tok) -Script ($watcherLib + "`n" + @"
 `$ErrorActionPreference = 'Continue'
 `$t = `$ThornswoodSecret; `$ThornswoodSecret = `$null
 if ((Test-Path '$Root\config.cmd') -and `$t) {
@@ -277,14 +320,14 @@ if ((Test-Path '$Root\config.cmd') -and `$t) {
 }
 Stop-Service -Name '$service' -Force -EA SilentlyContinue
 & sc.exe delete '$service' 2>&1 | Out-Null
-Unregister-ScheduledTask -TaskName '$TaskName' -Confirm:`$false -EA SilentlyContinue
+Remove-RunnerWatchers
 foreach (`$d in (Get-ChildItem 'C:\' -Directory -Filter 'Thornswood-*' -EA SilentlyContinue)) {
   & icacls.exe `$d.FullName /remove:d '$Account' /T /C /Q 2>&1 | Out-Null
 }
 Remove-LocalUser -Name '$Account' -EA SilentlyContinue
 Remove-Item -LiteralPath '$Root' -Recurse -Force -EA SilentlyContinue
-if (Test-Path '$Root') { 'the folder is still there, something holds a file in it' } else { 'runner, account, task and folder removed' }
-"@ | ForEach-Object { Say "  $_" }
+if (Test-Path '$Root') { 'the folder is still there, something holds a file in it' } else { 'runner, account and folder removed' }
+"@) | ForEach-Object { Say "  $_" }
   Done
 }
 
@@ -342,7 +385,7 @@ Head 'Installing it on the VPS'
 # command line and in no file on either machine. Until then it was written
 # into this script, which is long enough to go up as a file, so it sat in
 # C:\Windows\Temp on the VPS while the install ran.
-$out = Invoke-ThornswoodSecretRemote -Target $target -SshArgs $ssh -Secret $token -Script ($lockLib + "`n" + @"
+$out = Invoke-ThornswoodSecretRemote -Target $target -SshArgs $ssh -Secret $token -Script ($lockLib + $watcherLib + "`n" + @"
 `$ErrorActionPreference = 'Stop'
 `$regToken = `$ThornswoodSecret; `$ThornswoodSecret = `$null
 if (-not `$regToken) { throw 'NOTHING ARRIVED on standard input, so there is no registration token. Nothing was installed.' }
@@ -441,17 +484,12 @@ Pop-Location
 `$cfg | Where-Object { "`$_" -match 'Runner successfully|Settings Saved|Service .* started|error|Error|failed' } | ForEach-Object { '  config: ' + "`$_".Trim() }
 if (`$code -ne 0) { throw ('config.cmd stopped with ' + `$code) }
 
-# Normal priority since 25 September (below normal until then). Patrick
-# wanted a check in about five minutes, and at below normal every test
-# waited behind whatever the box was doing. Jobs are started by
-# Runner.Listener and inherit its priority. At start and every five
-# minutes, in case the service restarts.
-`$fix = 'Get-Process Runner.Listener, Runner.Worker -EA SilentlyContinue | ForEach-Object { `$_.PriorityClass = ''Normal'' }'
-`$act = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -WindowStyle Hidden -Command "' + `$fix + '"')
-`$t1 = New-ScheduledTaskTrigger -AtStartup
-`$t2 = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5)
-Register-ScheduledTask -TaskName '$TaskName' -Action `$act -Trigger `$t1, `$t2 -User 'SYSTEM' -RunLevel Highest -Force | Out-Null
-Start-ScheduledTask -TaskName '$TaskName'
+# Normal priority, from the service: the service control manager starts
+# RunnerService.exe at Normal, I/O priority 2 and memory priority 5, and
+# Runner.Listener, Runner.Worker and every job inherit it. The task an
+# older install registered to set it every five minutes goes (the header's
+# NO PRIORITY TASK, #1969).
+Remove-RunnerWatchers
 Start-Sleep -Seconds 5
 `$s = Get-Service -Name `$svc -EA SilentlyContinue
 if (`$s) { 'service ' + `$s.Status } else { 'SERVICE NOT FOUND' }
