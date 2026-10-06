@@ -15,7 +15,7 @@ set up today. Read the header before running anything.
 | --- | --- | --- |
 | `Add-SkyrimUnbound.ps1` | Installed Skyrim Unbound Reborn into the old build and published. | The collection installs Unbound now. **It refuses to run** (#1179). |
 | `Run-Everything.ps1` | Ran the old Add-* installers in one go and published once. | The collection installs the mods now. **It refuses to run** (#1179). |
-| `Fix-Voice.ps1` | Got the voice service running on the VPS on 13 September. | `Install-Voice.ps1` does that job. |
+| `Fix-Voice.ps1` | Got the voice service running on the VPS on 13 September. | `Install-Voice.ps1` does that job, and takes off the boot task this one left, which started voice with no auth. **It refuses to run** (#2008). |
 | `Check-RosterScript.ps1` | Parsed the roster script before it was sent. | Named a path on one machine; `Check-Roster.ps1` is the live one. |
 | `Add-TempleRespawn.ps1` | Installed Respawn - Death Overhaul. | That mod is out (the known issues page). **It refuses to run.** It throws at the top rather than putting a plugin back that no live load order carries. |
 | `Add-JContainers.ps1` | Installed JContainers for SunHelm's meters. | SunHelm is out. |

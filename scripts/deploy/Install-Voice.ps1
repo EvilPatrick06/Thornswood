@@ -417,6 +417,29 @@ function StopIt {
     if (-not `$free) { 'something is still holding port $Port up here and would not let go' }
 }
 
+# Any other task that starts voice-server.js from this root (#2008). The
+# one-off Fix-Voice.ps1 registered ThornswoodVoice on 13 September, to start
+# C:\Thornswood-Voice\voice-server.js at boot with none of this task's
+# environment, so no auth and no loopback bind, and no install took it off:
+# after a reboot, whichever of the two got the port first was live voice.
+# Another root's task is not ours: live's and dev's leave each other alone.
+function RemoveStrayTasks {
+    `$rootDir = '$Root'.TrimEnd('\')
+    foreach (`$t in @(Get-ScheduledTask -EA SilentlyContinue)) {
+        if (`$t.TaskName -eq '$TaskName') { continue }
+        foreach (`$a in @(`$t.Actions)) {
+            `$line = [string]`$a.Execute + ' ' + [string]`$a.Arguments
+            if (`$line -notlike '*voice-server.js*') { continue }
+            `$here = ([string]`$a.WorkingDirectory).TrimEnd('\') -ieq `$rootDir -or `$line.ToLowerInvariant().Contains((`$rootDir + '\voice-server.js').ToLowerInvariant())
+            if (-not `$here) { continue }
+            Stop-ScheduledTask -TaskName `$t.TaskName -TaskPath `$t.TaskPath -EA SilentlyContinue
+            Unregister-ScheduledTask -TaskName `$t.TaskName -TaskPath `$t.TaskPath -Confirm:`$false
+            'took off the task ' + `$t.TaskName + ', which also started voice-server.js from ' + `$rootDir
+            break
+        }
+    }
+}
+
 # This install's task, or on the way back the one there was before it.
 # -PutBack leaves the task as it is and only starts it.
 function StartIt {
@@ -436,6 +459,7 @@ function StartIt {
             `$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -Priority 4
             `$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
             Register-ScheduledTask -TaskName '$TaskName' -Action `$action -Trigger (New-ScheduledTaskTrigger -AtStartup) -Settings `$settings -Principal `$principal | Out-Null
+            RemoveStrayTasks
         }
     }
     # Rolled whatever its size rather than deleted, so the run before this
