@@ -4,7 +4,8 @@
   "note": "Where each place is in the repository, read by scripts/release/Where.ps1 and where.js. Version 1 also carried the old C:/Thornswood-Dev folder and the old tools paths as fallbacks for the reorganisation; those went on 28 September, when no machine had the old layout any more.",
   "places": {
     "Engine": "engine/skymp",
-    "Out": "out"
+    "Out": "out",
+    "Local": "local"
   },
   "derived": {
     "ServerDist": { "from": "Engine", "join": "build/dist/server" },
@@ -14,7 +15,8 @@
     "Dist": { "from": "Out", "join": "dist" },
     "Package": { "from": "Out", "join": "dist/Thornswood/_dist" },
     "Payload": { "from": "Out", "join": "_payload" },
-    "ServerZip": { "from": "Out", "join": "thornswood-server.zip" }
+    "ServerZip": { "from": "Out", "join": "thornswood-server.zip" },
+    "Backups": { "from": "Local", "join": "backups" }
   },
   "folders": {
     "docs": "docs",

@@ -107,9 +107,13 @@
   Prepares what it can for a dev Ship, then runs Check-ShipReady -Channel dev.
 
 .EXAMPLE
-  .\scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root C:\Thornswood-Release-DevBuild
+  .\scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root C:\Users\you\Downloads\Thornswood-Repo\local\release-devbuild
   The same, and records that a dev release on this machine is built from
-  C:\Thornswood-Release-DevBuild.
+  local\release-devbuild in the repository, One's dev release folder since
+  5 October. Give the whole path: it is recorded for every clone and
+  worktree. After moving a release folder, run
+  .\scripts\mods\Build-Generated.ps1 -Channel dev once, because the
+  generated files record the game folder they were built for.
 #>
 [CmdletBinding()]
 param(

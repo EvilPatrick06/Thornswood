@@ -466,9 +466,11 @@ foreach ($caller in @('scripts\ops\Set-DevNews.ps1', 'scripts\deploy\Setup-Disco
 $remoteText = [IO.File]::ReadAllText((Join-Path $repo 'scripts\vps\Remote.ps1'))
 Yes 'Remote.ps1 -Secret is a SecureString' ($remoteText -match '\[System\.Security\.SecureString\]\$Secret')
 
-# Docs: no page shows a secret typed after one of these.
+# Docs: no page shows a secret typed after one of these. local and out are
+# what one machine keeps and builds, not pages: since 5 October One's dev
+# release folder, a whole game with its mods' read me files, is in local.
 $docHits = @()
-foreach ($d in @(Get-ChildItem -LiteralPath $repo -Recurse -File -Filter *.md -ErrorAction SilentlyContinue | Where-Object { $_.FullName.Substring($repo.Length) -notmatch '(?i)[\\/](docs[\\/]archive|engine|node_modules|\.git)[\\/]' })) {
+foreach ($d in @(Get-ChildItem -LiteralPath $repo -Recurse -File -Filter *.md -ErrorAction SilentlyContinue | Where-Object { $_.FullName.Substring($repo.Length) -notmatch '(?i)[\\/](docs[\\/]archive|engine|node_modules|\.git|local|out)[\\/]' })) {
     $i = 0
     foreach ($l in [IO.File]::ReadAllLines($d.FullName)) {
         $i++

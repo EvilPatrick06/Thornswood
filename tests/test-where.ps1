@@ -74,6 +74,10 @@ try {
     Yes 'and the output is out' (Same (Ask 'Out') $newOut)
     Yes 'and ServerDist is under the engine''s build' (Same (Ask 'ServerDist') (Join-Path $newEngine 'build\dist\server'))
     Yes 'and Package is out\dist\Thornswood\_dist' (Same (Ask 'Package') (Join-Path $newOut 'dist\Thornswood\_dist'))
+    # 5 October: the backups moved into the repository's local folder
+    # (tests\test-local-places.ps1 holds the rest).
+    Yes 'Local is local' (Same (Ask 'Local') (Join-Path $repo 'local'))
+    Yes 'and Backups is local\backups' (Same (Ask 'Backups') (Join-Path $repo 'local\backups'))
 
     # Ship.ps1 runs with Set-StrictMode -Version Latest and so does every
     # script it calls. Where.ps1 once read a property that was not there,
@@ -82,7 +86,7 @@ try {
     $strictSaid = @{}
     & {
         Set-StrictMode -Version Latest
-        foreach ($p in 'ClientDist', 'ServerDist', 'ServerSettings', 'ChangeForms', 'Dist', 'Payload', 'ServerZip', 'Releases', 'ReleasesDev', 'ShipRoot', 'ShipRootDev', 'ShipRoots', 'Engine', 'Out', 'bot') {
+        foreach ($p in 'ClientDist', 'ServerDist', 'ServerSettings', 'ChangeForms', 'Dist', 'Payload', 'ServerZip', 'Backups', 'Releases', 'ReleasesDev', 'ShipRoot', 'ShipRootDev', 'ShipRoots', 'Engine', 'Out', 'bot') {
             try { $strictSaid[$p] = [string](& $w $p) } catch { $strictSaid[$p] = 'THREW ' + $_.Exception.Message }
         }
     }
@@ -137,7 +141,7 @@ try {
     if ($node) {
         $wj = Join-Path $repo 'scripts\release\where.js'
         function AskJs([string]$what) { return [string](& node $wj $what).Trim() }
-        foreach ($p in 'Repo', 'Engine', 'Out', 'ServerDist', 'ClientDist', 'Package', 'ServerZip', 'bot', 'voice') {
+        foreach ($p in 'Repo', 'Engine', 'Out', 'ServerDist', 'ClientDist', 'Package', 'ServerZip', 'Local', 'Backups', 'bot', 'voice') {
             Yes ('where.js ' + $p + ' matches Where.ps1') (Same (AskJs $p) (Ask $p))
         }
     } else {
@@ -147,7 +151,7 @@ try {
     # ---- the scripts --------------------------------------------------------
     # A string naming C:\Thornswood-Dev: scripts\oneoff is parked history.
     $named = @()
-    $keys = @('Repo', 'Engine', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms', 'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Releases', 'ReleasesDev', 'ShipRoot', 'ShipRootDev', 'ShipRoots')
+    $keys = @('Repo', 'Engine', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms', 'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Local', 'Backups', 'Releases', 'ReleasesDev', 'ShipRoot', 'ShipRootDev', 'ShipRoots')
     $badKeys = @()
     $callers = 0
     $scriptsDir = Join-Path $realRepo 'scripts'
