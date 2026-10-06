@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const addon=require(path.resolve(process.argv[2]));
 const installed=JSON.parse(fs.readFileSync(process.argv[3],'utf8'));
-assert.equal(installed.loadOrder.length,48,'Use the verified installed plugin cast');
+assert.equal(installed.loadOrder.length,102,'Use the verified installed plugin cast');
 const fixture=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'thornswood-merchant-native-'));
 process.chdir(fixture);
 const dataDir=path.join(fixture,'data');fs.mkdirSync(path.join(dataDir,'scripts'),{recursive:true});
@@ -38,7 +38,7 @@ while(cursor<total) {
     if(purse) {assert.equal(purse.purse,250);assert.equal(purse.stock.length,0);merchantIds.push(id);}
   }
 }
-assert.equal(loaded,5072);assert.equal(merchantIds.length,249);
+assert.equal(loaded,5075);assert.equal(merchantIds.length,249);
 assert.equal(merchants.stats().verified,249);assert.equal(merchants.stats().initialized,249);
 const chosen=merchantIds[0],reference=server.getDescFromId(chosen),doc=storage.load();
 doc.entries[reference].purse=0;doc.entries[reference].stock=[{baseId:0x12eb7,count:5}];storage.save(doc);
