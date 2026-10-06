@@ -44,6 +44,7 @@ function fixture(options = {}) {
   killPieces() { return 1; },
   notify(id,message) { notices.push({id,message}); },
   say() {},log(...args) { logs.push(args); },
+  cameInOf() { return null; },
   resolveArrival(site) { arrivals.push(plain(site));return options.noArrival ? null : plain(temple); },
   setTimeout(fn,delay) { pending.push({fn,delay});return pending.length; },
   __thornswoodCharacter:{stateOf(id) { return {prof:'warrior',half:'bulwark'}; }},
@@ -107,7 +108,7 @@ test('Hunt delay remains available before population initialization',() => {
 test('Positive human death retains temple arrival and receives no NPC stock or population policy',() => {
   const f = fixture();
   f.death(HUMAN,OTHER_NPC);
-  assert.deepEqual(f.arrivals,[{desc:'3c:Skyrim.esm',pos:[5,6,7]}]);
+  assert.deepEqual(f.arrivals,[{desc:'3c:Skyrim.esm',pos:[5,6,7],cameIn:null}]);
   assert.deepEqual(f.states.get(HUMAN).spawnPoint,
     {cellOrWorldDesc:temple.desc,pos:temple.pos,rot:temple.rot});
   assert.equal(f.states.get(HUMAN).spawnDelay,25);

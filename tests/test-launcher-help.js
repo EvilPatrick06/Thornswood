@@ -500,8 +500,15 @@ function tableNames(src, name) {
 {
   yes('a death sends a person to a temple, as the page says',
       /const PREFER_SLOT = 'temple';/.test(gm) && /temple of the hold you died in/.test(item('In game', 'When you die')));
+  // Since #1909 Solstheim wakes at the nearest of its own places in
+  // DATA.ownWorlds, the temple or the Retching Netch, and both are in Raven
+  // Rock (their rooms are DLC2RR...), so the page's line still holds.
+  let ownSol = null;
+  try { ownSol = JSON.parse(/^const DATA = (.*);$/m.exec(gm)[1]).ownWorlds['800:Dragonborn.esm']; } catch (e) { ownSol = null; }
   yes('and Solstheim to Raven Rock',
-      /return arrive\('ravenrock'/.test(gm) && /Solstheim sends you to Raven Rock/.test(item('In game', 'When you die')));
+      /const own = ownWorldOf\(site\.desc\);/.test(gm) && Array.isArray(ownSol) && ownSol.length > 0 &&
+      ownSol.every(function (p) { return /^DLC2RR/.test(p.cell); }) &&
+      /Solstheim sends you to Raven Rock/.test(item('In game', 'When you die')));
   yes('the address arrives with the update, which is what the page says',
       /v\.serverAddress != cfg\.ServerAddress\) \{ cfg\.ServerAddress = v\.serverAddress;/.test(shell) &&
       /address arrives with the launcher's updates/.test(item('Joining', 'There is nothing to type')));
