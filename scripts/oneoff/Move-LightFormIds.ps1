@@ -81,6 +81,10 @@ $LightHigh = 0xFEFFFFFFL
 function Test-LightId($v) {
     if ($null -eq $v) { return $false }
     if (-not ($v -is [int] -or $v -is [long] -or $v -is [decimal] -or $v -is [double])) { return $false }
+    # Out of the light range before it is made a decimal: a record can hold
+    # the largest float (3.4e+38, a limit that means none), which no decimal
+    # holds, and the dev world of 5 Oct has one.
+    if ($v -lt $LightLow -or $v -gt $LightHigh) { return $false }
     $d = [decimal]$v
     if ($d -ne [decimal]::Truncate($d)) { return $false }
     return ($d -ge $LightLow -and $d -le $LightHigh)
