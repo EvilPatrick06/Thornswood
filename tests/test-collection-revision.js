@@ -22,12 +22,27 @@
   <opaque id>_, with no slug and no number in it, so the folder name could no
   longer answer and Have went to 0 on every up to date machine. The honest
   source is Vortex's own state.v2, which records the slug and the revision
-  NUMBER against the collection's mod, independent of the folder name. This
-  checks both readers: the state scan (the source of truth now) and the old
-  folder-name parse (the legacy fallback), plus that the C# and PowerShell
-  copies still carry both.
+  NUMBER against the collection's mod, independent of the folder name.
 
-  Read only. It builds strings in memory and reads the two source files.
+  WHERE THE STATE READER IS TESTED, since 5 October (#1958). This file used to
+  carry its own copy of the state rule, a regular expression over raw LevelDB
+  bytes, and test that copy. #1582 moved the launcher and the publisher to the
+  LevelDB reader in launcher\app\VortexProfileState.cs (#1902 added the newest
+  revision and the mod ids to it), which decompresses the tables and reads
+  the values as JSON. From then on the copy proved nothing about the reader
+  either of them runs, so it went. tests\test-vortex-collection-state.ps1
+  tests the real reader, compiled from that file and through LoadOrder.ps1,
+  on real compressed LevelDB folders built by
+  tests\fixtures\vortex-collection-state.py: an upgrade in place, two
+  collections at once, another slug, a deleted revision, the authoring shape,
+  and the broken values.
+
+  This keeps the address-to-slug rule and the legacy folder-name parse (the
+  fallback for a machine with no readable state), and checks that the
+  launcher and the publisher still go to the shared reader and keep the
+  fallback.
+
+  Read only. It builds strings in memory and reads the source files.
 */
 const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
@@ -35,10 +50,8 @@ const path = require('path');
 const os = require('os');
 
 /*
-  The same rule as Checks.CollectionRevision in the launcher and
-  Get-CollectionRevision in LoadOrder.ps1. Three copies is two too many, and
-  they cannot share code across C#, PowerShell and this, so this is the one
-  that fails loudly when they drift: it reads the C# and asserts the shape.
+  The launcher's and the publisher's source, read to check that both go to
+  the shared reader and keep the legacy folder fallback.
 */
 const CS = fs.readFileSync(path.join(REPO_DIR, 'launcher', 'app', 'Checks.cs'), 'utf8');
 const PS = fs.readFileSync(path.join(REPO_DIR, 'scripts', 'mods', 'LoadOrder.ps1'), 'utf8');
@@ -67,84 +80,6 @@ function revisionFrom(names, slug) {
   return best;
 }
 
-/* The state.v2 rule, the source of truth now. Vortex flattens its state into
-   LevelDB keys joined by ###, each key then a length byte (a control char)
-   then the value's JSON. The slug and the revision number are separate keys
-   tied together only by the mod id both carry, so this matches the slug to
-   its mod id and takes the highest revision recorded against a mod id whose
-   slug is the one asked for. The same rule as Get-CollectionRevisionFromState
-   in LoadOrder.ps1 and CollectionRevisionFromState in Checks.cs. */
-function revisionFromState(text, slug) {
-  const esc = slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const slugRe = new RegExp('mods###skyrimse###([^#]+)###attributes###collectionSlug[\\x00-\\x1F]{1,4}"' + esc + '"', 'g');
-  const revRe = /mods###skyrimse###([^#]+)###attributes###revisionNumber[\x00-\x1F]{1,4}(\d+)/g;
-  const mine = new Set();
-  const rev = new Map();
-  let m;
-  while ((m = slugRe.exec(text)) !== null) mine.add(m[1]);
-  while ((m = revRe.exec(text)) !== null) {
-    const id = m[1];
-    const n = Number(m[2]);
-    if (!Number.isInteger(n)) continue;
-    if (!rev.has(id) || n > rev.get(id)) rev.set(id, n);
-  }
-  let best = 0;
-  for (const id of mine) if (rev.has(id) && rev.get(id) > best) best = rev.get(id);
-  if (best > 0) return best;
-
-  // Authoring shape: newestFileId on the collection mod -> collections###revisions.
-  const revSlugRe = new RegExp(
-    'collections###revisions###([^#]+)###info###collection###slug[\\x00-\\x1F]{1,4}"' + esc + '"', 'g');
-  const fileIdRe = /mods###skyrimse###([^#]+)###attributes###newestFileId[\x00-\x1F]{1,4}(\d+)/g;
-  const verRe = /mods###skyrimse###([^#]+)###attributes###newestVersion[\x00-\x1F]{1,4}"(\d+)"/g;
-  const revIds = new Set();
-  const fileIdMods = new Map();
-  const modVer = new Map();
-  while ((m = revSlugRe.exec(text)) !== null) revIds.add(m[1]);
-  while ((m = fileIdRe.exec(text)) !== null) {
-    const fid = m[2];
-    if (!fileIdMods.has(fid)) fileIdMods.set(fid, []);
-    if (!fileIdMods.get(fid).includes(m[1])) fileIdMods.get(fid).push(m[1]);
-  }
-  while ((m = verRe.exec(text)) !== null) {
-    const n = Number(m[2]);
-    if (!Number.isInteger(n)) continue;
-    if (!modVer.has(m[1]) || n > modVer.get(m[1])) modVer.set(m[1], n);
-  }
-  if (revIds.size === 0) return 0;
-  const revNum = new Map();
-  for (const rid of revIds) {
-    const numRe = new RegExp(
-      'collections###revisions###' + rid.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
-      '###info###revisionNumber[\\x00-\\x1F]{1,4}(\\d+)', 'g');
-    while ((m = numRe.exec(text)) !== null) {
-      const n = Number(m[1]);
-      if (!Number.isInteger(n)) continue;
-      if (!revNum.has(rid) || n > revNum.get(rid)) revNum.set(rid, n);
-    }
-  }
-  for (const rid of revIds) {
-    if (!fileIdMods.has(rid)) continue;
-    let n = revNum.has(rid) ? revNum.get(rid) : 0;
-    if (n <= 0) {
-      for (const mid of fileIdMods.get(rid)) {
-        if (modVer.has(mid) && modVer.get(mid) > n) n = modVer.get(mid);
-      }
-    }
-    if (n > best) best = n;
-  }
-  return best;
-}
-
-/* One flattened key and its value, byte for byte as Vortex writes it into
-   the LevelDB log: the key, one length byte, the value's JSON, then the start
-   of the next key so the value is bounded. */
-function attr(modId, name, valueJson) {
-  return 'persistent###mods###skyrimse###' + modId + '###attributes###' + name +
-    String.fromCharCode(valueJson.length) + valueJson +
-    '\x01persistent###mods###skyrimse';
-}
-
 function slugFrom(url) {
   if (!url) return '';
   const at = url.toLowerCase().lastIndexOf('/collections/');
@@ -168,60 +103,6 @@ yes('an empty address gives nothing', slugFrom('') === '');
 /* A slug is used to build a folder search pattern, so anything that is not
    letters and digits is refused rather than passed through. */
 yes('a slug with punctuation in it is refused', slugFrom('https://x/collections/../../evil') === '');
-
-// ---- the revision from state, the source of truth now ----------------------
-/* The folder Vortex writes today carries no number, so the number lives in
-   state and this is where it is read. */
-const newState = attr('vortex_collection_ZRT7NjhN_', 'collectionSlug', '"7essxf"') +
-                 attr('vortex_collection_ZRT7NjhN_', 'revisionNumber', '5');
-yes('the installed revision is read from Vortex state under the new folder naming',
-    revisionFromState(newState, '7essxf') === 5);
-
-yes('an upgrade in place, the same mod on a newer revision, reads the newer one',
-    revisionFromState(
-      attr('vortex_collection_ZRT7NjhN_', 'collectionSlug', '"7essxf"') +
-      attr('vortex_collection_ZRT7NjhN_', 'revisionNumber', '5') +
-      attr('vortex_collection_ZRT7NjhN_', 'revisionNumber', '6'), '7essxf') === 6);
-
-yes('two digit revisions read whole, not truncated',
-    revisionFromState(
-      attr('vortex_collection_ZRT7NjhN_', 'collectionSlug', '"7essxf"') +
-      attr('vortex_collection_ZRT7NjhN_', 'revisionNumber', '12'), '7essxf') === 12);
-
-/* Two collections installed at once, this machine on 7essxf and another on
-   ombo2a: each answers about its own, tied by the mod id, never mixed up. This
-   is the whole reason the slug and the number are correlated rather than taking
-   the highest number in the file. */
-const two = attr('vortex_collection_ZRT7NjhN_', 'collectionSlug', '"7essxf"') +
-            attr('vortex_collection_ZRT7NjhN_', 'revisionNumber', '5') +
-            attr('vortex_collection_AAbb99xx_', 'collectionSlug', '"ombo2a"') +
-            attr('vortex_collection_AAbb99xx_', 'revisionNumber', '12');
-yes('with two collections installed, 7essxf reads its own 5, not the other 12',
-    revisionFromState(two, '7essxf') === 5);
-yes('and ombo2a reads its own 12', revisionFromState(two, 'ombo2a') === 12);
-
-yes('nothing installed reads as 0, which means say nothing', revisionFromState('', '7essxf') === 0);
-yes('a slug with no revision recorded reads as 0',
-    revisionFromState(attr('vortex_collection_ZRT7NjhN_', 'collectionSlug', '"7essxf"'), '7essxf') === 0);
-yes('a revision recorded against another slug is not read as ours',
-    revisionFromState(
-      attr('vortex_collection_AAbb99xx_', 'collectionSlug', '"ombo2a"') +
-      attr('vortex_collection_AAbb99xx_', 'revisionNumber', '12'), '7essxf') === 0);
-// Authoring shape on the ship PC: no collectionSlug / revisionNumber attrs.
-function revInfo(revId, slug, num) {
-  return 'persistent###collections###revisions###' + revId + '###info###collection###slug' +
-    String.fromCharCode(('"' + slug + '"').length) + '"' + slug + '"' +
-    '\x01persistent###collections###revisions###' + revId + '###info###revisionNumber' +
-    String.fromCharCode(String(num).length) + String(num) +
-    '\x01persistent###mods###skyrimse';
-}
-const authored = attr('vortex_collection_ZRT7NjhN_', 'newestFileId', '796316') +
-  attr('vortex_collection_ZRT7NjhN_', 'newestVersion', '"1"') +
-  revInfo('796316', '7essxf', 1);
-yes('authoring shape (newestFileId, no collectionSlug) still reads Have 1',
-  revisionFromState(authored, '7essxf') === 1);
-yes('and does not cross to ombo2a', revisionFromState(authored, 'ombo2a') === 0);
-
 
 // ---- the revision from the legacy folder name, the fallback ----------------
 const real = ['collection_7essxf_2_2026-09-15T21-08-00Z'];
