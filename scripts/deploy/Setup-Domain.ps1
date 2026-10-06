@@ -241,10 +241,18 @@ Get-Process caddy -EA SilentlyContinue | Stop-Process -Force -EA SilentlyContinu
 # task the scheduler ends looks exactly like what was found, Ready with no
 # process and nothing in any crash log. Ten restarts rather than three for the
 # same reason the docs task has ten.
+#
+# Priority 4, normal, not Task Scheduler's default of 7 (#1968). Without it
+# caddy.exe ran below normal, with I/O priority 1 (low) and memory priority
+# 2, measured on the VPS on 5 October, and in the kernel trace of 4 October
+# 17:18 its reads took a median of 47 ms, held back the way the game
+# server's were (#1931). 4 gives Normal, I/O priority 2 and memory priority
+# 5, what the services on the box run at. tests\test-service-task-priority.ps1
+# measures all three.
 `$s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries ``
       -DontStopIfGoingOnBatteries -RestartCount 10 -RestartInterval (New-TimeSpan -Minutes 1) ``
       -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable ``
-      -MultipleInstances IgnoreNew
+      -MultipleInstances IgnoreNew -Priority 4
 
 if (-not (Get-ScheduledTask -TaskName 'Thornswood Web' -EA SilentlyContinue)) {
   Register-ScheduledTask -TaskName 'Thornswood Web' -Action `$a -Trigger @(`$boot, `$again) ``
@@ -266,7 +274,8 @@ if (-not (Get-ScheduledTask -TaskName 'Thornswood Web' -EA SilentlyContinue)) {
 if (`$chk) {
   'task settings: restart count ' + `$chk.Settings.RestartCount +
   ', execution time limit ' + (`$(if (`$chk.Settings.ExecutionTimeLimit -eq 'PT0S') { 'none' } else { `$chk.Settings.ExecutionTimeLimit })) +
-  ', multiple instances ' + `$chk.Settings.MultipleInstances
+  ', multiple instances ' + `$chk.Settings.MultipleInstances +
+  ', priority ' + `$chk.Settings.Priority
   # The startup trigger has no repetition, so its slot comes back empty and
   # joining the lot printed a leading space. Only the triggers that actually
   # repeat are worth naming here.
