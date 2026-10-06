@@ -58,7 +58,7 @@ $settingsText = '{"port":7777,"name":"Thornswood"}'
 # LoadOrder.ps1 to put in scripts\mods: 'real', a stub's text, or '' for none.
 function New-Tree([string]$name, [string]$lo) {
     $t = Join-Path $T $name
-    foreach ($rel in 'scripts\deploy\Deploy-Gamemode.ps1', 'scripts\deploy\MaxOnline.ps1',
+    foreach ($rel in 'scripts\deploy\Deploy-Gamemode.ps1', 'scripts\deploy\MaxOnline.ps1', 'scripts\deploy\ServerOrder.ps1',
                      'scripts\release\BuildStamp.ps1', 'records\most-online.json') {
         $to = Join-Path $t $rel
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $to) | Out-Null

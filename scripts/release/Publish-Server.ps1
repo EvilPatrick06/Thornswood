@@ -331,12 +331,12 @@ if (Test-Path -LiteralPath $settingsPath) {
     $hallLocal = 0x19BAD4                     # SkyrimUnboundRoom01
     $gate = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
 
-    $order = @($gate.loadOrder)
-    $hallIdx = -1
-    for ($i = 0; $i -lt $order.Count; $i++) {
-        $leaf = [IO.Path]::GetFileName(([string]$order[$i]).Replace('/', '\'))
-        if ($leaf -ieq $hallPlugin) { $hallIdx = $i; break }
-    }
+    # The index a form id is computed from is the plugin's place among the
+    # full plugins, which is every entry until the engine the record names
+    # loads light plugins and they are listed too (#1715, ServerOrder.ps1).
+    . (Join-Path $Here '..\deploy\ServerOrder.ps1')
+    $order = [string[]]@($gate.loadOrder)
+    $hallIdx = Get-ThornswoodFullIndex $order (Get-ThornswoodLightTest $order $Record) $hallPlugin
 
     # Written as '0x3A19BAD4' by Deploy-Gamemode, but a hand edit could leave a
     # bare number or bare hex, and reading it wrong would fail this for the

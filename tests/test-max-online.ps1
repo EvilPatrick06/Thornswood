@@ -89,6 +89,9 @@ $helper = Join-Path $RepoDir 'scripts\deploy\MaxOnline.ps1'
 Yes 'MaxOnline.ps1 is in scripts\deploy' (Test-Path -LiteralPath $helper)
 if (-not (Test-Path -LiteralPath $helper)) { Done }
 . $helper
+# Deploy-Gamemode's settings section, lifted below, counts the start point's
+# full index with ServerOrder.ps1 (#1715).
+. (Join-Path $RepoDir 'scripts\deploy\ServerOrder.ps1')
 Yes 'it gives Get-MostOnline and Set-MaxPlayers' (
     [bool](Get-Command Get-MostOnline -ErrorAction SilentlyContinue) -and
     [bool](Get-Command Set-MaxPlayers -ErrorAction SilentlyContinue))
