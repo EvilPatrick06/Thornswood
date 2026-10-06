@@ -228,6 +228,10 @@ function page(port, token, pid) {
   const waits = [];
   const ws = new WebSocket('ws://127.0.0.1:' + port + '/', ['thornswood', token]);
   const p = { ws: ws, got: got, ended: '', rosters: () => got.filter((m) => m.t === 'peers') };
+  // Resolved once the socket has closed, so a part can let it go before it
+  // stops the service under it (#1960).
+  let shut = null;
+  p.closed = new Promise((ok) => { shut = ok; });
   let opened = false;
   function settle() {
     const have = p.rosters();
@@ -254,7 +258,7 @@ function page(port, token, pid) {
     settle();
   };
   ws.onerror = () => end(opened ? 'the socket failed' : 'the handshake was refused');
-  ws.onclose = (ev) => end((opened ? 'the socket closed' : 'the handshake was refused') + ' (' + ev.code + ')');
+  ws.onclose = (ev) => { end((opened ? 'the socket closed' : 'the handshake was refused') + ' (' + ev.code + ')'); shut(); };
   return p.roster(1).then(() => p);
 }
 /* What a page's roster check found, for a FAIL line: the list it got, or
@@ -347,6 +351,7 @@ function lift(src, name) {
   yes('by POST too, whatever the body says', !!relayOf(r.list));
   try { a.ws.close(); } catch (e) { }
   try { b.ws.close(); } catch (e) { }
+  await Promise.all([a.closed, b.closed]);
   await stop(svc);
   yes('the service wrote down the expired token it refused, by profile',
       /REFUSED a connection for profile 41: an expired token/.test(svc.log));
@@ -357,6 +362,7 @@ function lift(src, name) {
   const c = await page(bare.port, await joinToken(bare, 43), 43);
   const cr = c.rosters()[0];
   try { c.ws.close(); } catch (e) { }
+  await c.closed;
   await stop(bare);
   yes('the roster carries the STUN list and nothing else', !!cr && JSON.stringify(cr.iceServers) === STUN, found(c, cr, bare));
 
@@ -416,5 +422,16 @@ function lift(src, name) {
   yes('every peer connection is built from that list', /new RTCPeerConnection\(\{ iceServers: ICE \}\)/.test(host));
 
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
-  process.exit(fail ? 1 : 0);
+  /*
+    Ended rather than exited (#1960). The last service's 'close' has come,
+    but node is still letting go of its process and pipe handles then:
+    measured with process._getActiveHandles() at this line, its
+    ChildProcess (killed, SIGTERM) and a destroyed pipe were still listed,
+    and gone 1 to 2 ms later. process.exit() in that moment tripped libuv's
+    "!(handle->flags & UV_HANDLE_CLOSING)" (src\win\async.c:76, exit 127) on
+    node 24 on Windows in 2 of 3 runs after all checks had passed. So the
+    code is set and node leaves once everything is let go. The catch below
+    still exits, because after a throw a service may be left running.
+  */
+  process.exitCode = fail ? 1 : 0;
 })().catch((e) => { console.log('FAIL  the harness itself: ' + (e && e.stack || e)); process.exit(1); });
