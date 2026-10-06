@@ -44,6 +44,32 @@
     .\Deploy-Server.ps1 -Devs 123,456 -Playtesters 789
                                          the same deploy, and the live
                                          server's written role lists set
+    .\Deploy-Server.ps1 -GamemodeOnly    the committed gamemode alone, from
+                                         any machine, with no server build
+                                         here (see GAMEMODE ONLY below)
+
+  GAMEMODE ONLY (#1089). Every run above needs this machine's fork build: the
+  server files, the build's settings and the load order are all read from
+  -Dist. A gamemode is not part of that build. It is a versioned artifact
+  any machine makes byte for byte from a commit (#459). -GamemodeOnly sends
+  that, from any machine, and reads nothing out of -Dist:
+    - gamemode.js from the gamemode artifact, the build stamp made from that
+      artifact (channel main), and Thornswood-Content.esp into plugins when
+      its size is not the box's copy's (the rule the full deploy uses);
+    - server-settings.json made on the box: the running server's own file,
+      copied into the stage unchanged, and the swap reads it back with no key
+      allowed to move.
+  Before anything is sent it asks the box which server build it runs, and
+  refuses unless the box's server-build.json is the record the commit holds
+  (ServerBuild.ps1 says how the two are compared), so the gamemode comes from
+  a commit whose recorded server build is the one running. A gamemode that
+  needs a newer server build goes the full way, from a machine with the
+  build. It sets no setting, so it takes none of -RequirePass, -Devs and
+  -Playtesters, and a change to what Deploy-Gamemode.ps1 writes for live (the
+  load order, the NPC, gear, reloot and damage settings, ServerSettings.ps1
+  names them) goes the full way too. The notice, the stage, the check, the
+  swap and -PutBack are the same as every other run. Patrick, 5 Oct: any
+  machine may do it.
 
   THE LIVE SERVER KEEPS ITS OWN SETTINGS (#1221, #1222). A build whose
   server-settings.json is not the live server's (port 7777, not the dev voice
@@ -136,7 +162,10 @@ param(
       -Devs 123456789,987654321 -Playtesters 555,666
   #>
   [long[]]$Devs        = @(),
-  [long[]]$Playtesters = @()
+  [long[]]$Playtesters = @(),
+  # The committed gamemode alone, with no server build on this machine
+  # (#1089). See GAMEMODE ONLY in the header.
+  [switch]$GamemodeOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -385,6 +414,19 @@ if ($PutBack -and $asked.Count) {
   Write-Host '  Run it without -RequirePass, -Devs and -Playtesters, then a deploy with them.' -ForegroundColor Yellow
   throw '-PutBack was given -RequirePass, -Devs or -Playtesters. Nothing was sent and the server was not touched.'
 }
+# A gamemode-only deploy lets no setting move (#1089), so the switches that set
+# one are a full deploy's. And -PutBack puts back whatever the last deploy
+# replaced, a gamemode-only one or a full one, so it takes no -GamemodeOnly to
+# say which.
+if ($GamemodeOnly -and $PutBack) {
+  throw '-PutBack puts back what the last deploy replaced, whichever kind it was. Run it without -GamemodeOnly. Nothing was sent and the server was not touched.'
+}
+if ($GamemodeOnly -and $asked.Count) {
+  Write-Host ''
+  Write-Host '  -GamemodeOnly sets no setting: the live server keeps its own, and no key may move.' -ForegroundColor Red
+  Write-Host '  -RequirePass, -Devs and -Playtesters go with a full deploy, from a machine with the server build.' -ForegroundColor Yellow
+  throw '-GamemodeOnly was given -RequirePass, -Devs or -Playtesters. Nothing was sent and the server was not touched.'
+}
 if ($PutBack) { Invoke-PutBack }
 
 # game\gamemode.js is the source. The build output has a copy of it that cmake
@@ -395,7 +437,9 @@ if ($PutBack) { Invoke-PutBack }
 # machine without the fork built hits this one first if it skips that step.
 # Unlike that script this one DOES reach the VPS, so it stops before anything
 # leaves the machine rather than part way through a copy.
-if (-not (Test-Path -LiteralPath $Dist)) {
+#
+# -GamemodeOnly reads nothing out of -Dist (#1089), so it does not ask for it.
+if (-not $GamemodeOnly -and -not (Test-Path -LiteralPath $Dist)) {
   throw (
     "No skymp server build at $Dist, so there is nothing to send." + [Environment]::NewLine +
     [Environment]::NewLine +
@@ -405,8 +449,12 @@ if (-not (Test-Path -LiteralPath $Dist)) {
     "If you have the fork built somewhere else, point at it:" + [Environment]::NewLine +
     "    .\scripts\deploy\Deploy-Server.ps1 -Dist <path to skymp\build\dist\server>" + [Environment]::NewLine +
     [Environment]::NewLine +
-    "If you have not built the fork, this deploy is not yours to run. The build tree lives on" + [Environment]::NewLine +
-    "Patrick's machine, and .\scripts\release\Check-ShipReady.ps1 says what this machine is missing."
+    "If only the gamemode changed, this machine needs no build: the committed gamemode goes" + [Environment]::NewLine +
+    "live on its own, onto the server build that is running, with" + [Environment]::NewLine +
+    "    .\scripts\deploy\Deploy-Server.ps1 -GamemodeOnly" + [Environment]::NewLine +
+    [Environment]::NewLine +
+    "A new server build needs the fork built. .\scripts\release\Build-Engine.ps1 builds it, and" + [Environment]::NewLine +
+    ".\scripts\release\Check-ShipReady.ps1 says what this machine is missing."
   )
 }
 
@@ -423,11 +471,15 @@ $artifact = New-ThornswoodArtifact -Component gamemode -RepoDir (Join-Path $Here
   -AlsoSends 'game/content/Thornswood-Content.esp', 'records/server-build.json'
 '{0,-22} {1}' -f 'artifact', (Format-ThornswoodArtifact $artifact) | Write-Host
 $src = Join-Path $artifact.Folder 'game\gamemode.js'
-$built = Join-Path $Dist 'gamemode.js'
-if (-not (Test-Path -LiteralPath $built) -or
-    (Get-FileHash -LiteralPath $src).Hash -ne (Get-FileHash -LiteralPath $built).Hash) {
-  Copy-Item -LiteralPath $src -Destination $built -Force
-  Write-Host ("  gamemode.js taken from the artifact ({0:N0} bytes)" -f (Get-Item -LiteralPath $built).Length) -ForegroundColor DarkGray
+# -GamemodeOnly has no build to copy it into, and sends the artifact's own.
+$built = $src
+if (-not $GamemodeOnly) {
+  $built = Join-Path $Dist 'gamemode.js'
+  if (-not (Test-Path -LiteralPath $built) -or
+      (Get-FileHash -LiteralPath $src).Hash -ne (Get-FileHash -LiteralPath $built).Hash) {
+    Copy-Item -LiteralPath $src -Destination $built -Force
+    Write-Host ("  gamemode.js taken from the artifact ({0:N0} bytes)" -f (Get-Item -LiteralPath $built).Length) -ForegroundColor DarkGray
+  }
 }
 
 # The file about to go up must parse, or the live server stops at start. The
@@ -440,25 +492,27 @@ if (Test-Path -LiteralPath $built) {
   Write-Host '  gamemode.js parses'
 }
 
-foreach ($f in 'gamemode.js', 'server-settings.json') {
-  if (-not (Test-Path -LiteralPath (Join-Path $Dist $f))) { throw "not built: $(Join-Path $Dist $f)" }
-}
+if (-not $GamemodeOnly) {
+  foreach ($f in 'gamemode.js', 'server-settings.json') {
+    if (-not (Test-Path -LiteralPath (Join-Path $Dist $f))) { throw "not built: $(Join-Path $Dist $f)" }
+  }
 
-# THE BUILD'S SETTINGS ARE THE LIVE SERVER'S, OR NOTHING GOES (#1221). This
-# sends server-settings.json from the build, and on 29 Sep the shared clone's
-# build held the dev server's (port 7787, the name Thornswood Dev), left by an
-# older dev publish. Sent, live would have come up where no launcher looks for
-# it. The same test Export-ServerPayload.ps1 makes for a live payload, and an
-# npcSettings "default" key, which refuses every NPC. Before the stamp is
-# written, the box is asked anything or the artifact is sent.
-$buildSettings = Get-Content -LiteralPath (Join-Path $Dist 'server-settings.json') -Raw | ConvertFrom-Json
-$notLive = @(Get-ThornswoodServerSettingsProblems $buildSettings 'main')
-if ($notLive.Count) {
-  Write-Host ''
-  Write-Host ("  server-settings.json in $Dist is not the live server's:") -ForegroundColor Red
-  foreach ($w in $notLive) { Write-Host ('    ' + $w) -ForegroundColor Red }
-  Write-Host '  Run .\scripts\deploy\Deploy-Gamemode.ps1, which writes the live ones, then deploy again.' -ForegroundColor Yellow
-  throw "server-settings.json in $Dist is not the live server's. Nothing was sent and the server was not touched."
+  # THE BUILD'S SETTINGS ARE THE LIVE SERVER'S, OR NOTHING GOES (#1221). This
+  # sends server-settings.json from the build, and on 29 Sep the shared clone's
+  # build held the dev server's (port 7787, the name Thornswood Dev), left by an
+  # older dev publish. Sent, live would have come up where no launcher looks for
+  # it. The same test Export-ServerPayload.ps1 makes for a live payload, and an
+  # npcSettings "default" key, which refuses every NPC. Before the stamp is
+  # written, the box is asked anything or the artifact is sent.
+  $buildSettings = Get-Content -LiteralPath (Join-Path $Dist 'server-settings.json') -Raw | ConvertFrom-Json
+  $notLive = @(Get-ThornswoodServerSettingsProblems $buildSettings 'main')
+  if ($notLive.Count) {
+    Write-Host ''
+    Write-Host ("  server-settings.json in $Dist is not the live server's:") -ForegroundColor Red
+    foreach ($w in $notLive) { Write-Host ('    ' + $w) -ForegroundColor Red }
+    Write-Host '  Run .\scripts\deploy\Deploy-Gamemode.ps1, which writes the live ones, then deploy again.' -ForegroundColor Yellow
+    throw "server-settings.json in $Dist is not the live server's. Nothing was sent and the server was not touched."
+  }
 }
 
 # The build stamp Deploy-Gamemode.ps1 left beside gamemode.js goes up with it,
@@ -469,6 +523,12 @@ if ($notLive.Count) {
 # file, use it so git can say whether the commit holds it. See BuildStamp.ps1.
 . (Join-Path $Here '..\release\BuildStamp.ps1')
 $stampPath = Join-Path $Dist 'thornswood-build.json'
+if ($GamemodeOnly) {
+  # No build to leave one in, so it is made every run from the artifact,
+  # beside the artifact's zip, and never taken from an earlier run (#1089).
+  $stampPath = [IO.Path]::ChangeExtension($artifact.Zip, '.main-build.json')
+  Remove-Item -LiteralPath $stampPath -Force -ErrorAction SilentlyContinue
+}
 if (-not (Test-ThornswoodBuildStamp -Path $stampPath -Gamemode $built)) {
   $stampFrom = $built
   if ((Test-Path -LiteralPath $src) -and
@@ -500,123 +560,234 @@ if (-not (Test-Path -LiteralPath $recordPath)) {
   throw 'there is no records\server-build.json, so nothing says which build these server files are. Nothing was sent and the server was not touched.'
 }
 $rec = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
-$notBuild = @(Get-ThornswoodServerBuildProblems $rec (Get-ThornswoodServerFolderSums $Dist) $Dist 'records\server-build.json')
-if ($notBuild.Count) {
-  Write-Host ''
-  Write-Host '  The server files are not the build this release recorded:' -ForegroundColor Red
-  foreach ($w in $notBuild) { Write-Host ('    ' + $w) -ForegroundColor Red }
-  Write-Host ("    recorded build came from commit {0}" -f $rec.source.commit) -ForegroundColor Yellow
-  Write-Host ''
-  Write-Host '  If you rebuilt on purpose, record the new build and deploy again:' -ForegroundColor Yellow
-  Write-Host '    .\scripts\release\New-ServerBuildRecord.ps1' -ForegroundColor Yellow
-  Write-Host '  If you did not, find out what changed before this reaches the VPS.' -ForegroundColor Yellow
-  throw 'server files do not match records\server-build.json'
+$serverFiles = @()
+if ($GamemodeOnly) {
+  # No server file goes, so there is none here to hold to the record. The
+  # record is held to the box instead, below, before anything is sent: the
+  # server running there must be the build this commit records (#1089).
+  $recordSum = Get-ThornswoodRecordSum ([IO.File]::ReadAllBytes($recordPath))
+} else {
+  $notBuild = @(Get-ThornswoodServerBuildProblems $rec (Get-ThornswoodServerFolderSums $Dist) $Dist 'records\server-build.json')
+  if ($notBuild.Count) {
+    Write-Host ''
+    Write-Host '  The server files are not the build this release recorded:' -ForegroundColor Red
+    foreach ($w in $notBuild) { Write-Host ('    ' + $w) -ForegroundColor Red }
+    Write-Host ("    recorded build came from commit {0}" -f $rec.source.commit) -ForegroundColor Yellow
+    Write-Host ''
+    Write-Host '  If you rebuilt on purpose, record the new build and deploy again:' -ForegroundColor Yellow
+    Write-Host '    .\scripts\release\New-ServerBuildRecord.ps1' -ForegroundColor Yellow
+    Write-Host '  If you did not, find out what changed before this reaches the VPS.' -ForegroundColor Yellow
+    throw 'server files do not match records\server-build.json'
+  }
+  $serverFiles = @((Get-ThornswoodServerRecordFiles $rec).Keys)
+  Write-Host ('{0,-22} every server file is the recorded build, commit {1}' -f 'build', $rec.source.commit.Substring(0, 8)) -ForegroundColor DarkGray
 }
-$serverFiles = @((Get-ThornswoodServerRecordFiles $rec).Keys)
-Write-Host ('{0,-22} every server file is the recorded build, commit {1}' -f 'build', $rec.source.commit.Substring(0, 8)) -ForegroundColor DarkGray
 
 $files = @($serverFiles) + @('gamemode.js', 'server-settings.json')
+# -GamemodeOnly's settings are the box's own, made there (#1089).
+if ($GamemodeOnly) { $files = @('gamemode.js') }
 foreach ($f in $files) {
   $p = Join-Path $Dist ($f -replace '/', '\')
+  if ($f -eq 'gamemode.js') { $p = $built }
   if (-not (Test-Path -LiteralPath $p)) { throw "not built: $p" }
   '{0,-22} {1:N0} bytes' -f $f, (Get-Item $p).Length | Write-Host
 }
 
-# ------------------------------------------------------------- load order
-#
-# server-settings.json comes out of Deploy-Gamemode with this machine's paths in
-# its loadOrder, c:/program files (x86)/steam/... The VPS keeps its plugins at
-# $Root/plugins and has no Steam. Sending the file as it is took the server down
-# on 2026-09-16 03:09: every plugin "not on disk", then file_size on Skyrim.esm,
-# then exit. Export-ServerPayload rewrites the paths for a full install and this
-# never did for an update, so it does now, into a copy, leaving the local file
-# alone. The order is untouched: those indices are what form ids resolve
-# against on both sides.
-#
-# It also asks the box what it has in $Root/plugins and sends whatever the new
-# list names that is not there yet, before the restart, so a plugin added to the
-# build cannot leave the server unable to start.
-$settingsSrc = Join-Path $Dist 'server-settings.json'
-$settings = Get-Content -LiteralPath $settingsSrc -Raw | ConvertFrom-Json
-if (-not $settings.loadOrder) { throw 'server-settings.json has no loadOrder' }
-$pluginNames = @($settings.loadOrder | ForEach-Object { [IO.Path]::GetFileName($_) })
-$remotePlugins = ($Root -replace '\\', '/') + '/plugins'
-$settings.loadOrder = @($pluginNames | ForEach-Object { "$remotePlugins/$_" })
-$settingsForVps = Join-Path $env:TEMP 'thornswood-server-settings-vps.json'
-# WriteAllText with an explicit encoding: Set-Content -Encoding UTF8 writes a
-# byte order mark under Windows PowerShell 5.1, and a BOM is not JSON to node.
-[IO.File]::WriteAllText($settingsForVps, ($settings | ConvertTo-Json -Depth 10), (New-Object Text.UTF8Encoding($false)))
-
-# A PLUGIN THAT CHANGED IS A PLUGIN THAT HAS TO GO UP, AND THIS ASKED THE WRONG
-# QUESTION UNTIL 21 SEPTEMBER.
-#
-# It compared NAMES. A plugin the VPS already had by name was never sent again,
-# however much its contents had moved. Thornswood-Content.esp is on that list
-# and it is the one plugin in the load order that this repo edits: on
-# 21 September alone it was renamed off another server's prefix, had sixteen
-# dead books taken out, and gained the handle, the deed, the key and the mold.
-# None of it could reach the server, and the launcher downloads the plugins from
-# the server, so none of it could reach anybody's game either. The gamemode was
-# live and calling for records that were not in the file any client had.
-#
-# So the size is asked for as well as the name. Size and not a hash because this
-# is one remote call over ssh for the whole folder either way, and a hash of 60
-# plugins is 28MB of reading on a box that is also running the server; a plugin
-# whose contents changed and whose size did not is a case this can live with,
-# and a deploy that reads every plugin twice is not.
-$thereRaw = @(Remote ("Get-ChildItem -LiteralPath '" + $remotePlugins.Replace('/','\') +
-                      "' -File | ForEach-Object { `$_.Name + '|' + `$_.Length }"))
-$thereSize = @{}
-foreach ($row in $thereRaw) {
-  $bits = "$row".Trim() -split '\|'
-  if ($bits.Count -eq 2 -and $bits[0] -match '\.es[pml]$') { $thereSize[$bits[0]] = [int64]$bits[1] }
+if ($GamemodeOnly) {
+  # ------------------------------------------ which build the live server runs
+  #
+  # -GamemodeOnly (#1089). Asked of the box before anything is sent, and only
+  # asked: this writes nothing there, and it is short enough to go on the
+  # command line, so not even a script file goes up before every answer is in.
+  # The box says its port, whether its join pass switch is true or false, the
+  # record of the server build it runs, and the size of its
+  # Thornswood-Content.esp. No load order is read, here or there: the box
+  # keeps its own settings, and the stage check holds its own load order to
+  # the plugins on its disk, as it does for every deploy.
+  $boxRead = @'
+$s = $null
+try { $s = [IO.File]::ReadAllText((Join-Path $root 'server-settings.json')) | ConvertFrom-Json } catch { }
+if ($null -eq $s) { 'SETTINGS unreadable' }
+else {
+  'PORT ' + [int]$s.port
+  if (@($s.PSObject.Properties | ForEach-Object { $_.Name }) -notcontains 'thornswoodRequirePass') { 'PASS missing' }
+  elseif ($s.thornswoodRequirePass -is [bool]) { 'PASS set' }
+  else { 'PASS neither' }
 }
-$there = @($thereSize.Keys)
-
-# OUR OWN PLUGIN COMES FROM THE REPO, NOT FROM A GAME FOLDER.
-#
-# $Data is the Steam copy, which is right for the other 59: Vortex deploys them
-# there and that is where they live. Thornswood-Content.esp is not one of those.
-# It is built by scripts in this repo and installed into a game folder by
-# Install-ThornswoodContent.ps1, whose default target is C:\Thornswood\Game and
-# not the Steam copy at all.
-#
-# So on 21 September there were four copies of it on this machine at three
-# different sizes, and a deploy sent whichever one the Steam folder happened to
-# hold: 151,288 bytes, which was that morning's, while the repo was on 141,234
-# with the deed, the key and the mold in it. Chasing that around by hand is how
-# an evening goes missing, so the question is settled here instead. The repo is
-# where this plugin is made and the repo is what goes up.
-$ours = Join-Path $Here '..\..\game\content\Thornswood-Content.esp'
-
-$sendPlugins = @()
-$changed = @()
-foreach ($n in $pluginNames) {
-  $local = Join-Path $Data $n
-  if ($n -eq 'Thornswood-Content.esp' -and (Test-Path -LiteralPath $ours)) { $local = $ours }
-  if ($there -notcontains $n) {
-    if (Test-Path -LiteralPath $local) { $sendPlugins += $local }
-    else { throw "the load order names $n, the VPS does not have it, and it is not at $local either" }
-    continue
+$rp = Join-Path $root 'server-build.json'
+if (Test-Path -LiteralPath $rp) {
+  'RECORD ' + (Get-ThornswoodRecordSum ([IO.File]::ReadAllBytes($rp)))
+  try { 'RECORDCOMMIT ' + [string](([IO.File]::ReadAllText($rp) | ConvertFrom-Json).source.commit) } catch { }
+} else { 'RECORD none' }
+$ep = Join-Path $root 'plugins\Thornswood-Content.esp'
+if (Test-Path -LiteralPath $ep) { 'ESP ' + (Get-Item -LiteralPath $ep).Length } else { 'ESP none' }
+'@
+  $boxSaid = @(Remote ($ThornswoodRecordSumText + "`r`n`$root = '" + $Root.Replace('/', '\').Replace("'", "''") + "'`r`n" + $boxRead) |
+               ForEach-Object { "$_".Trim() })
+  $livePort = 0
+  $boxPass = ''
+  $boxRecord = ''
+  $boxRecordCommit = ''
+  $boxEsp = ''
+  foreach ($l in $boxSaid) {
+    if ($l -match '^PORT (\d+)$') { $livePort = [int]$Matches[1] }
+    elseif ($l -match '^PASS (set|missing|neither)$') { $boxPass = $Matches[1] }
+    elseif ($l -match '^RECORD ([0-9a-f]{64}|none)$') { $boxRecord = $Matches[1] }
+    elseif ($l -match '^RECORDCOMMIT ([0-9a-f]*)$') { $boxRecordCommit = $Matches[1] }
+    elseif ($l -match '^ESP (\d+|none)$') { $boxEsp = $Matches[1] }
   }
-  # It is there. Is it the same one? A plugin this machine does not have is left
-  # alone: the VPS's copy is then the only copy and overwriting it with nothing
-  # is the one outcome worse than it being stale.
-  if (-not (Test-Path -LiteralPath $local)) { continue }
-  $localLen = (Get-Item -LiteralPath $local).Length
-  if ($localLen -ne $thereSize[$n]) {
-    $sendPlugins += $local
-    $changed += ('{0}  {1:N0} -> {2:N0} bytes' -f $n, $thereSize[$n], $localLen)
+  $refusals = @()
+  if (-not $boxRecord -or -not $boxEsp -or ($boxSaid -notcontains 'SETTINGS unreadable' -and -not $boxPass)) {
+    $refusals += ('the box did not answer what it runs: ' + (($boxSaid | Where-Object { $_ }) -join ' | '))
+  } else {
+    if ($boxSaid -contains 'SETTINGS unreadable') { $refusals += ('the settings in ' + $Root + ' cannot be read, so there is no telling which process is this server') }
+    elseif ($livePort -le 0) { $refusals += 'the live server''s settings name no port' }
+    # The join pass hold fails closed (#1319): a switch that is neither true
+    # nor false holds, and would start doing so the moment this gamemode
+    # reached it, with nobody having asked. The full deploy refuses it in
+    # the carry; this run sets no setting, so it refuses it here.
+    if ($boxPass -eq 'missing') { $refusals += (Get-ThornswoodPassSwitchProblem ([pscustomobject]@{})) }
+    elseif ($boxPass -eq 'neither') { $refusals += (Get-ThornswoodPassSwitchProblem ([pscustomobject]@{ thornswoodRequirePass = $null })) }
+    $ours8 = ([string]$rec.source.commit)
+    if ($ours8.Length -gt 8) { $ours8 = $ours8.Substring(0, 8) }
+    if ($boxRecord -eq 'none') {
+      $refusals += 'the live server has no server-build.json, so nothing says which server build it runs. A full deploy, from a machine with the build, puts one there.'
+    } elseif ($boxRecord -ne $recordSum) {
+      $theirs8 = 'an unreadable one'
+      if ($boxRecordCommit) { $theirs8 = 'commit ' + $boxRecordCommit.Substring(0, [Math]::Min(8, $boxRecordCommit.Length)) }
+      $refusals += ('the live server runs another server build (' + $theirs8 + ') than the one records\server-build.json holds at this commit (commit ' +
+               $ours8 + '). A gamemode goes live onto the server build its commit records; one that needs another goes the full way, from a machine with the build.')
+    }
   }
-}
-Write-Host ''
-Write-Host ('  load order: {0} plugins, paths rewritten to {1}' -f $pluginNames.Count, $remotePlugins) -ForegroundColor DarkGray
-if ($sendPlugins.Count) {
-  Write-Host ('  {0} plugin(s) will go up before the restart:' -f $sendPlugins.Count) -ForegroundColor Yellow
-  foreach ($p in $sendPlugins) { Write-Host ('    ' + (Split-Path $p -Leaf)) -ForegroundColor Yellow }
-  foreach ($c in $changed) { Write-Host ('    changed: ' + $c) -ForegroundColor Yellow }
+  if ($refusals.Count) {
+    Write-Host ''
+    Write-Host '  -GamemodeOnly is refused:' -ForegroundColor Red
+    foreach ($w in $refusals) { Write-Host ('    ' + $w) -ForegroundColor Red }
+    throw '-GamemodeOnly was refused. Nothing was sent and the server was not touched.'
+  }
+  Write-Host ('{0,-22} the live server runs the build this commit records, commit {1}, so only the gamemode goes' -f 'build', $ours8) -ForegroundColor DarkGray
+
+  # OUR PLUGIN GOES WITH IT WHEN IT CHANGED. Patrick, 5 Oct: a gamemode change
+  # often calls for new records in it. It comes from the repository, not the
+  # build (OUR OWN PLUGIN below says why), and by the rule the full deploy
+  # uses: sent when the box has none, or one of another size.
+  $ours = Join-Path $Here '..\..\game\content\Thornswood-Content.esp'
+  $sendPlugins = @()
+  $changed = @()
+  if (Test-Path -LiteralPath $ours) {
+    $ourLen = (Get-Item -LiteralPath $ours).Length
+    if ($boxEsp -eq 'none') {
+      $sendPlugins += $ours
+      $changed += ('Thornswood-Content.esp  not on the box -> {0:N0} bytes' -f $ourLen)
+    } elseif ([int64]$boxEsp -ne $ourLen) {
+      $sendPlugins += $ours
+      $changed += ('Thornswood-Content.esp  {0:N0} -> {1:N0} bytes' -f [int64]$boxEsp, $ourLen)
+    }
+  }
+  Write-Host ''
+  if ($sendPlugins.Count) {
+    Write-Host '  Thornswood-Content.esp will go up before the restart:' -ForegroundColor Yellow
+    foreach ($c in $changed) { Write-Host ('    changed: ' + $c) -ForegroundColor Yellow }
+  } else {
+    Write-Host '  Thornswood-Content.esp is on the VPS at the same size' -ForegroundColor DarkGray
+  }
 } else {
-  Write-Host '  every plugin the load order names is on the VPS at the same size' -ForegroundColor DarkGray
+  # ------------------------------------------------------------- load order
+  #
+  # server-settings.json comes out of Deploy-Gamemode with this machine's paths in
+  # its loadOrder, c:/program files (x86)/steam/... The VPS keeps its plugins at
+  # $Root/plugins and has no Steam. Sending the file as it is took the server down
+  # on 2026-09-16 03:09: every plugin "not on disk", then file_size on Skyrim.esm,
+  # then exit. Export-ServerPayload rewrites the paths for a full install and this
+  # never did for an update, so it does now, into a copy, leaving the local file
+  # alone. The order is untouched: those indices are what form ids resolve
+  # against on both sides.
+  #
+  # It also asks the box what it has in $Root/plugins and sends whatever the new
+  # list names that is not there yet, before the restart, so a plugin added to the
+  # build cannot leave the server unable to start.
+  $settingsSrc = Join-Path $Dist 'server-settings.json'
+  $settings = Get-Content -LiteralPath $settingsSrc -Raw | ConvertFrom-Json
+  if (-not $settings.loadOrder) { throw 'server-settings.json has no loadOrder' }
+  $pluginNames = @($settings.loadOrder | ForEach-Object { [IO.Path]::GetFileName($_) })
+  $remotePlugins = ($Root -replace '\\', '/') + '/plugins'
+  $settings.loadOrder = @($pluginNames | ForEach-Object { "$remotePlugins/$_" })
+  $settingsForVps = Join-Path $env:TEMP 'thornswood-server-settings-vps.json'
+  # WriteAllText with an explicit encoding: Set-Content -Encoding UTF8 writes a
+  # byte order mark under Windows PowerShell 5.1, and a BOM is not JSON to node.
+  [IO.File]::WriteAllText($settingsForVps, ($settings | ConvertTo-Json -Depth 10), (New-Object Text.UTF8Encoding($false)))
+
+  # A PLUGIN THAT CHANGED IS A PLUGIN THAT HAS TO GO UP, AND THIS ASKED THE WRONG
+  # QUESTION UNTIL 21 SEPTEMBER.
+  #
+  # It compared NAMES. A plugin the VPS already had by name was never sent again,
+  # however much its contents had moved. Thornswood-Content.esp is on that list
+  # and it is the one plugin in the load order that this repo edits: on
+  # 21 September alone it was renamed off another server's prefix, had sixteen
+  # dead books taken out, and gained the handle, the deed, the key and the mold.
+  # None of it could reach the server, and the launcher downloads the plugins from
+  # the server, so none of it could reach anybody's game either. The gamemode was
+  # live and calling for records that were not in the file any client had.
+  #
+  # So the size is asked for as well as the name. Size and not a hash because this
+  # is one remote call over ssh for the whole folder either way, and a hash of 60
+  # plugins is 28MB of reading on a box that is also running the server; a plugin
+  # whose contents changed and whose size did not is a case this can live with,
+  # and a deploy that reads every plugin twice is not.
+  $thereRaw = @(Remote ("Get-ChildItem -LiteralPath '" + $remotePlugins.Replace('/','\') +
+                        "' -File | ForEach-Object { `$_.Name + '|' + `$_.Length }"))
+  $thereSize = @{}
+  foreach ($row in $thereRaw) {
+    $bits = "$row".Trim() -split '\|'
+    if ($bits.Count -eq 2 -and $bits[0] -match '\.es[pml]$') { $thereSize[$bits[0]] = [int64]$bits[1] }
+  }
+  $there = @($thereSize.Keys)
+
+  # OUR OWN PLUGIN COMES FROM THE REPO, NOT FROM A GAME FOLDER.
+  #
+  # $Data is the Steam copy, which is right for the other 59: Vortex deploys them
+  # there and that is where they live. Thornswood-Content.esp is not one of those.
+  # It is built by scripts in this repo and installed into a game folder by
+  # Install-ThornswoodContent.ps1, whose default target is C:\Thornswood\Game and
+  # not the Steam copy at all.
+  #
+  # So on 21 September there were four copies of it on this machine at three
+  # different sizes, and a deploy sent whichever one the Steam folder happened to
+  # hold: 151,288 bytes, which was that morning's, while the repo was on 141,234
+  # with the deed, the key and the mold in it. Chasing that around by hand is how
+  # an evening goes missing, so the question is settled here instead. The repo is
+  # where this plugin is made and the repo is what goes up.
+  $ours = Join-Path $Here '..\..\game\content\Thornswood-Content.esp'
+
+  $sendPlugins = @()
+  $changed = @()
+  foreach ($n in $pluginNames) {
+    $local = Join-Path $Data $n
+    if ($n -eq 'Thornswood-Content.esp' -and (Test-Path -LiteralPath $ours)) { $local = $ours }
+    if ($there -notcontains $n) {
+      if (Test-Path -LiteralPath $local) { $sendPlugins += $local }
+      else { throw "the load order names $n, the VPS does not have it, and it is not at $local either" }
+      continue
+    }
+    # It is there. Is it the same one? A plugin this machine does not have is left
+    # alone: the VPS's copy is then the only copy and overwriting it with nothing
+    # is the one outcome worse than it being stale.
+    if (-not (Test-Path -LiteralPath $local)) { continue }
+    $localLen = (Get-Item -LiteralPath $local).Length
+    if ($localLen -ne $thereSize[$n]) {
+      $sendPlugins += $local
+      $changed += ('{0}  {1:N0} -> {2:N0} bytes' -f $n, $thereSize[$n], $localLen)
+    }
+  }
+  Write-Host ''
+  Write-Host ('  load order: {0} plugins, paths rewritten to {1}' -f $pluginNames.Count, $remotePlugins) -ForegroundColor DarkGray
+  if ($sendPlugins.Count) {
+    Write-Host ('  {0} plugin(s) will go up before the restart:' -f $sendPlugins.Count) -ForegroundColor Yellow
+    foreach ($p in $sendPlugins) { Write-Host ('    ' + (Split-Path $p -Leaf)) -ForegroundColor Yellow }
+    foreach ($c in $changed) { Write-Host ('    changed: ' + $c) -ForegroundColor Yellow }
+  } else {
+    Write-Host '  every plugin the load order names is on the VPS at the same size' -ForegroundColor DarkGray
+  }
 }
 
 # ------------------------------------------------------------- the stage
@@ -635,6 +806,7 @@ $send = [ordered]@{}
 foreach ($p in $sendPlugins) { $send['plugins/' + (Split-Path $p -Leaf)] = $p }
 foreach ($f in $files) {
   $src = Join-Path $Dist ($f -replace '/', '\')
+  if ($f -eq 'gamemode.js') { $src = $built }
   if ($f -eq 'server-settings.json') { $src = $settingsForVps }
   $send[$f] = $src
 }
@@ -643,7 +815,9 @@ foreach ($f in $files) {
 # file it lists, by hash (ServerBuild.ps1, part of Swap.ps1's check). The
 # two halves of the question, what source and what files, both have an answer
 # on the machine serving people rather than only on a developer's disk.
-$send['server-build.json'] = $recordPath
+# -GamemodeOnly sends no server file, so the box keeps the record it has,
+# which is this commit's (#1089).
+if (-not $GamemodeOnly) { $send['server-build.json'] = $recordPath }
 # The build stamp goes up in the stage with the gamemode it describes, so it
 # is hashed and checked with the rest, swapped in beside gamemode.js, and put
 # back with it on a rollback. Sent on its own straight into the live folder,
@@ -693,9 +867,18 @@ foreach ($rel in $send.Keys) {
 # exactly those keys differ from what the server had.
 Write-Host ''
 Write-Host 'Keeping the live server''s own settings...'
-$liveKeys = @($ThornswoodGamemodeKeys + @($asked.Keys))
-$carryScript = [IO.File]::ReadAllText((Join-Path $Here 'ServerSettings.ps1')) + "`r`n" +
-               (SwapVars $Root $Task $stageName $prevName $Wait $hashes $liveKeys) + (Get-ThornswoodAskedLine $asked) + $settingsCarryBlock
+if ($GamemodeOnly) {
+  # The running server's own file, copied into the stage unchanged, after the
+  # box's record and join pass switch are read again; no key may move at the
+  # swap (#1089, ServerSettings.ps1's $settingsKeepBlock).
+  $liveKeys = @()
+  $carryScript = [IO.File]::ReadAllText((Join-Path $Here 'ServerSettings.ps1')) + "`r`n" + $ThornswoodRecordSumText + "`r`n" +
+                 (SwapVars $Root $Task $stageName $prevName $Wait $hashes $liveKeys) + ('$WantRecord = ''' + $recordSum + '''' + "`r`n") + $settingsKeepBlock
+} else {
+  $liveKeys = @($ThornswoodGamemodeKeys + @($asked.Keys))
+  $carryScript = [IO.File]::ReadAllText((Join-Path $Here 'ServerSettings.ps1')) + "`r`n" +
+                 (SwapVars $Root $Task $stageName $prevName $Wait $hashes $liveKeys) + (Get-ThornswoodAskedLine $asked) + $settingsCarryBlock
+}
 $carryOut = @(Remote $carryScript | ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
 $carried = @($carryOut | Where-Object { $_ -match '^CARRIED [0-9a-f]{64}$' })
 if (-not $carried.Count) {
@@ -756,7 +939,7 @@ $null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -
 # And from here, the shape Publish-Server.ps1 uses. The box answering itself
 # on 127.0.0.1 is not the same as it answering the rest of the world; this is
 # the one a firewall rule shows up in.
-$port = [int]$settings.port
+$port = if ($GamemodeOnly) { $livePort } else { [int]$settings.port }
 $resPort = if ($port -eq 7777) { 3000 } else { $port + 1 }
 $seen = $false
 for ($i = 0; $i -lt 10; $i++) {
