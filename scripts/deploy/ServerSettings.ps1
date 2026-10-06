@@ -61,6 +61,12 @@
   then Deploy-Server, and Deploy-Server's own switches for the join pass and
   the role lists. The two boxes keep their own, on their own folders.
 
+  A GAMEMODE-ONLY DEPLOY TAKES NO KEY AT ALL (#1089). Deploy-Server.ps1
+  -GamemodeOnly sends no settings and has no build to take any from, so the
+  stage gets the running server's own file, copied unchanged on the box
+  ($settingsKeepBlock), and the swap lets no key move. It takes none of
+  -RequirePass, -Devs and -Playtesters; those are a full deploy.
+
   Values are compared as compact JSON, so an array and an object compare by
   what they hold. Nothing here prints a value: server-settings.json is the
   server's config, and only key names are said.
@@ -253,5 +259,53 @@ if ($null -eq $run -or $null -eq $rel) {
     [IO.File]::WriteAllText($sp, (ConvertTo-Json -InputObject $m.Settings -Depth 30), (New-Object Text.UTF8Encoding($false)))
     'CARRIED ' + (Get-FileHash -LiteralPath $sp -Algorithm SHA256).Hash.ToLowerInvariant()
   }
+}
+'@
+
+<#
+  Deploy-Server.ps1 -GamemodeOnly's settings (#1089), in place of the carry:
+  the running server's own server-settings.json copied into the stage as it
+  is, with no key taken from anywhere, because a gamemode-only deploy sends
+  no settings and has no build to take any from. The swap reads it back with
+  no key allowed to move (SwapVars with release keys @()).
+
+  It holds the stage to the two things the run checked before it sent
+  anything, read again here because a full deploy or a hand edit could have
+  moved them since: the box's server-build.json is still the record the
+  commit holds ($WantRecord, Get-ThornswoodRecordSum from ServerBuild.ps1),
+  and the join pass switch is true or false (#1319), which this run cannot
+  set. Takes $Root and $Stage from SwapVars, $WantRecord from the line
+  Deploy-Server puts after it, this file's functions and the record sum from
+  the text in front. Ends with CARRIED <sha256 of the copy> or CARRY REFUSED,
+  the same last line as the carry, so Deploy-Server reads both one way.
+#>
+$settingsKeepBlock = @'
+$ProgressPreference = 'SilentlyContinue'
+$stageDir = Join-Path $Root $Stage
+$sp = Join-Path $stageDir 'server-settings.json'
+$why = @()
+$rp = Join-Path $Root 'server-build.json'
+$has = 'none'
+if (Test-Path -LiteralPath $rp) { $has = Get-ThornswoodRecordSum ([IO.File]::ReadAllBytes($rp)) }
+if ($has -ne $WantRecord) {
+  $why += ('server-build.json on this server is not the record the commit holds any more (' + $has.Substring(0, [Math]::Min(12, $has.Length)) +
+           ', the commit ' + $WantRecord.Substring(0, 12) + '), so the server build running here is not the one this gamemode was committed with')
+}
+$run = $null
+try { $run = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { }
+if ($null -eq $run) { $why += 'the settings the server runs on cannot be read' }
+else {
+  $passWhy = Get-ThornswoodPassSwitchProblem $run
+  if ($passWhy) { $why += $passWhy }
+}
+if ($why.Count) {
+  foreach ($w in $why) { $w }
+  Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
+  'the stage is cleared and the server was not touched'
+  'CARRY REFUSED'
+} else {
+  Copy-Item -LiteralPath (Join-Path $Root 'server-settings.json') -Destination $sp -Force
+  'the server keeps its own settings as they are: a gamemode-only deploy changes none of them'
+  'CARRIED ' + (Get-FileHash -LiteralPath $sp -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 '@

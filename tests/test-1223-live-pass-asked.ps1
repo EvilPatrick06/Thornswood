@@ -212,8 +212,10 @@ Yes 'it turns them into what the box is asked, with the shared function' ($ds -m
 Yes 'the carry gets the $Asked line, after SwapVars and before the block' (
     $ds -match '\(SwapVars \$Root \$Task \$stageName \$prevName \$Wait \$hashes \$liveKeys\) \+ \(Get-ThornswoodAskedLine \$asked\) \+ \$settingsCarryBlock')
 Yes 'the keys handed over are the build''s plus only what was asked' ($ds -match '\$liveKeys = @\(\$ThornswoodGamemodeKeys \+ @\(\$asked\.Keys\)\)')
+# Four: the carry, -GamemodeOnly's keep in its place (#1089, where $liveKeys
+# is none), the check and the swap.
 Yes 'the carry, the check and the swap are all handed those keys' (
-    ([regex]::Matches($ds, 'SwapVars \$Root \$Task \$stageName \$prevName \$Wait \$hashes \$liveKeys\)')).Count -eq 3 -and
+    ([regex]::Matches($ds, 'SwapVars \$Root \$Task \$stageName \$prevName \$Wait \$hashes \$liveKeys\)')).Count -eq 4 -and
     $ds -notmatch 'SwapVars \$Root \$Task \$stageName \$prevName \$Wait \$hashes \$ThornswoodGamemodeKeys\)')
 
 # Run whole: -PutBack with a switch is refused before anything goes to the box.

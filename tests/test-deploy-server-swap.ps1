@@ -34,6 +34,13 @@
       keeps the newest two .prev folders, and never touches the other server
     - the build stamp is one of the staged files, so it goes in beside
       gamemode.js on a good deploy and goes back with it on a rollback
+    - Deploy-Server.ps1 -GamemodeOnly (#1089), run whole with ssh and scp
+      stand-ins against the scratch root: only gamemode.js, the stamp and the
+      box's own settings are swapped, and our plugin only when its size is
+      not the box's; a box running another server build, or with a join pass
+      switch that is neither true nor false, is refused after one read with
+      nothing sent; a settings key that moves after the copy puts the old
+      files back; and -PutBack brings the old gamemode back
 
   Connects to nothing but 127.0.0.1.
 #>
@@ -93,9 +100,46 @@ $settingsCarryBlock = $null
 . $settingsLibPath
 Yes 'ServerSettings.ps1 has the carry block and the live keys, in plain ASCII' (
     [bool]$settingsCarryBlock -and @($ThornswoodGamemodeKeys).Count -gt 4 -and $settingsLibText -notmatch '[^\x00-\x7F]')
+# The keys it checks and swaps with are $liveKeys: the live keys and what the
+# run asked for (#1223), or none at all on -GamemodeOnly (#1089).
 Yes 'Deploy-Server.ps1 loads it, sends it with the carry, and checks and swaps with the live keys' (
     $src -match "\. \(Join-Path \`$Here 'ServerSettings\.ps1'\)" -and $src.Contains('$settingsCarryBlock') -and
-    ([regex]::Matches($src, '\$hashes \$ThornswoodGamemodeKeys\) \+ \$(checkBlock|swapBlock)')).Count -eq 2)
+    $src.Contains('$liveKeys = @($ThornswoodGamemodeKeys + @($asked.Keys))') -and
+    ([regex]::Matches($src, '\$hashes \$liveKeys\) \+ \$(checkBlock|swapBlock)')).Count -eq 2)
+
+# ---- -GamemodeOnly, read (#1089) ---------------------------------------------
+# A machine other than One puts a gamemode live with no server build: the
+# artifact's gamemode.js, the stamp made from it, and the box's own settings
+# copied on the box, with no key allowed to move.
+$dsCmd = $null
+try { $dsCmd = Get-Command -Name (Join-Path $Here 'scripts\deploy\Deploy-Server.ps1') -EA Stop } catch { }
+Yes 'Deploy-Server.ps1 takes -GamemodeOnly (#1089)' ($null -ne $dsCmd -and $dsCmd.Parameters.ContainsKey('GamemodeOnly'))
+Yes '  and on it the box''s own settings are copied in the stage and no key may move at the check or the swap' (
+    [bool]$settingsKeepBlock -and $src.Contains('$settingsKeepBlock') -and
+    $src -match '(?s)if \(\$GamemodeOnly\) \{\s*(#[^\r\n]*\s*)*\$liveKeys = @\(\)')
+$serverBuildText = [IO.File]::ReadAllText($serverBuildPath)
+. $serverBuildPath
+Yes '  and the record the box runs is compared by Get-ThornswoodRecordSum, kept as text for the box, in plain ASCII' (
+    [bool]$ThornswoodRecordSumText -and [bool](Get-Command Get-ThornswoodRecordSum -EA SilentlyContinue) -and
+    $serverBuildText -notmatch '[^\x00-\x7F]' -and $src.Contains('$ThornswoodRecordSumText'))
+if (Get-Command Get-ThornswoodRecordSum -EA SilentlyContinue) {
+    $lf = [Text.Encoding]::ASCII.GetBytes("{`n  `"a`": 1`n}`n")
+    $crlf = [Text.Encoding]::ASCII.GetBytes("{`r`n  `"a`": 1`r`n}`r`n")
+    $other = [Text.Encoding]::ASCII.GetBytes("{`n  `"a`": 2`n}`n")
+    Yes '  which reads a record checked out with CR LF as the same record, and any other byte as another' (
+        (Get-ThornswoodRecordSum $lf) -eq (Get-ThornswoodRecordSum $crlf) -and (Get-ThornswoodRecordSum $lf) -ne (Get-ThornswoodRecordSum $other) -and
+        (Get-ThornswoodRecordSum $lf) -match '^[0-9a-f]{64}$')
+}
+$noKeys = SwapVars 'C:/Thornswood-Server' 'Thornswood Server' '.stage-x' '.prev-x' 7 ([ordered]@{}) @()
+Yes '  and SwapVars given no keys sends $ReleaseKeys = @(), a read-back that lets nothing move, not $null, which is none' (
+    $noKeys.Contains('$ReleaseKeys = @()') -and -not $noKeys.Contains('$ReleaseKeys = $null'))
+$keepParses = $false
+if ($settingsKeepBlock) {
+    $tokens = $null; $errors = $null
+    [void][System.Management.Automation.Language.Parser]::ParseInput($settingsKeepBlock, [ref]$tokens, [ref]$errors)
+    $keepParses = ($errors.Count -eq 0 -and $settingsKeepBlock -notmatch '[^\x00-\x7F]')
+}
+Yes '  and the keep block parses, in plain ASCII' $keepParses
 
 # ---- read, not run ----------------------------------------------------------
 Yes 'the blocks are plain ASCII, which the far end reads right with or without a byte order mark' (
@@ -596,6 +640,288 @@ try {
     } finally {
         $env:PATH = $oldPath
         Remove-Item Env:\TS_DS_CALLS -ErrorAction SilentlyContinue
+    }
+
+    # ---- -GamemodeOnly on the box: the blocks (#1089) ------------------------
+    # The box's own settings, copied into the stage unchanged by the keep
+    # block, check out; and a key that moves on the running server between the
+    # copy and the swap puts the old files back, because no key may move.
+    $gmRecordLf = "{`n  `"binary`": `"scam_native.node`",`n  `"source`": { `"commit`": `"1234567890abcdef1234567890abcdef12345678`" }`n}`n"
+    $gmRecordSum = Get-ThornswoodRecordSum ([Text.Encoding]::ASCII.GetBytes($gmRecordLf))
+    Put (Join-Path $root 'server-build.json') $gmRecordLf.Replace("`n", "`r`n")
+    $ownSettings = [IO.File]::ReadAllBytes((Join-Path $root 'server-settings.json'))
+    $keepFor = { param([string]$sum) $settingsLibText + "`r`n" + $ThornswoodRecordSumText + "`r`n" + "`$WantRecord = '" + $sum + "'`r`n" + $settingsKeepBlock }
+    $gmStage = '.stage-20261005-000801'
+    $w = [ordered]@{}
+    foreach ($k in 'gamemode.js', 'thornswood-build.json') {
+        $t = '// gamemode only, staged'
+        if ($k -ne 'gamemode.js') { $t = '{ "gamemode": "' + (Sha '// gamemode only, staged') + '" }' }
+        Put (Join-Path $root ($gmStage + '\' + $k)) $t
+        $w[$k] = Sha $t
+    }
+    $failed = $script:fail
+    $out = RunFar (& $keepFor $gmRecordSum) $gmStage '.prev-20261005-000801' 30 $w @()
+    $c = @($out | Where-Object { $_ -match '^CARRIED [0-9a-f]{64}$' })
+    $staged = Join-Path $root ($gmStage + '\server-settings.json')
+    Yes '-GamemodeOnly: the keep block copies the running server''s settings into the stage byte for byte, and hashes the copy' (
+        $c.Count -eq 1 -and (Test-Path -LiteralPath $staged) -and
+        [Convert]::ToBase64String([IO.File]::ReadAllBytes($staged)) -eq [Convert]::ToBase64String($ownSettings) -and
+        (($out -join "`n") -match 'keeps its own settings as they are'))
+    if ($c.Count) { $w['server-settings.json'] = $c[0].Substring(8) }
+    $out = RunFar $checkBlock $gmStage '.prev-20261005-000801' 30 $w @()
+    Yes '  and a stage of gamemode.js, the stamp and those settings checks out' ($out -contains 'STAGE OK')
+    if ($script:fail -gt $failed) { Show }
+    $moved = [IO.File]::ReadAllText((Join-Path $root 'server-settings.json')) | ConvertFrom-Json
+    $moved.thornswoodLoadOrderRefuse = $false
+    Put (Join-Path $root 'server-settings.json') ($moved | ConvertTo-Json -Depth 8)
+    # As it is, leaving out the stage, which the rollback clears.
+    $before = ((Tree $root) -split "`n" | Where-Object { $_ -notmatch ('^\\' + [regex]::Escape($gmStage)) }) -join "`n"
+    $running = Owner $P
+    $failed = $script:fail
+    $out = RunFar $swapBlock $gmStage '.prev-20261005-000801' 30 $w @()
+    $said = $out -join "`n"
+    Yes '  and when a key of the running settings moved after the copy, the swap is SWAP ROLLED BACK' ($out -contains 'SWAP ROLLED BACK')
+    Yes '  naming the key, with nothing new started' (
+        $said -match 'read back: thornswoodLoadOrderRefuse would not be what the server had' -and $said -notmatch 'started, giving it')
+    Yes '  and every live file is back as it was, the server answering again' ((Tree $root) -eq $before -and (WaitUp $P) -and ((Owner $P) -ne $running))
+    if ($script:fail -gt $failed) { Show }
+    [IO.File]::WriteAllBytes((Join-Path $root 'server-settings.json'), $ownSettings)
+
+    $before = Tree $root
+    $w = [ordered]@{ 'gamemode.js' = (Sha '// gamemode only, staged') }
+    Put (Join-Path $root '.stage-20261005-000901\gamemode.js') '// gamemode only, staged'
+    $out = RunFar (& $keepFor ('ab' * 32)) '.stage-20261005-000901' '.prev-20261005-000901' 30 $w @()
+    $failed = $script:fail
+    Yes '  and a box whose server-build.json is not the commit''s record is CARRY REFUSED, the stage cleared' (
+        ($out -contains 'CARRY REFUSED') -and (($out -join "`n") -match 'not the record the commit holds') -and (Tree $root) -eq $before)
+    if ($script:fail -gt $failed) { Show }
+
+    # ---- -GamemodeOnly, the whole script (#1089) -----------------------------
+    # Deploy-Server.ps1 run in this shell, from a scratch repository, with ssh
+    # and scp stand-ins that run what it sends against this scratch root in
+    # Windows PowerShell 5.1, the way the box would, with the box's fixed
+    # places (the script folder, the deploy store) mapped into the scratch
+    # folder. No -Dist: nothing is read out of a build on this machine.
+    $gmRepo = Join-Path $work 'gm-repo'
+    $gmFarTemp = Join-Path $work 'gm-far-temp'
+    $gmStore = Join-Path $work 'gm-deploys'
+    $null = [IO.Directory]::CreateDirectory($gmFarTemp)
+    $null = [IO.Directory]::CreateDirectory($gmRepo)
+    Copy-Item -LiteralPath (Join-Path $Here 'scripts') -Destination (Join-Path $gmRepo 'scripts') -Recurse
+    Copy-Item -LiteralPath (Join-Path $Here 'layout.json') -Destination (Join-Path $gmRepo 'layout.json')
+    Put (Join-Path $gmRepo 'scripts\vps\vps.json') '{ "address": "127.0.0.1" }'
+    Put (Join-Path $gmRepo '.gitignore') "out/`n"
+    Put (Join-Path $gmRepo 'game\gamemode.js') '// gamemode only, one'
+    Put (Join-Path $gmRepo 'game\content\Thornswood-Content.esp') 'our plugin, two, longer'
+    Put (Join-Path $gmRepo 'records\server-build.json') $gmRecordLf
+    $gmPrelude = @"
+function Stop-ScheduledTask { [CmdletBinding()] param([string]`$TaskName) }
+function Start-ScheduledTask { [CmdletBinding()] param([string]`$TaskName)
+  Start-Process -FilePath '$($node.Source)' -WindowStyle Hidden -ArgumentList '"$stub" "$root" "$pidLog"'
+}
+
+"@
+    $global:TsGm = [pscustomobject]@{ Ps51 = $ps51; FarTemp = $gmFarTemp; Store = $gmStore; Work = $work; Prelude = $gmPrelude
+                                      Ssh = (New-Object Collections.Generic.List[string]); Scp = (New-Object Collections.Generic.List[string]) }
+    function global:TsGmMap([string]$s) {
+        return $s.Replace('C:/Windows/Temp/', ($global:TsGm.FarTemp + '\')).Replace('C:\Windows\Temp\', ($global:TsGm.FarTemp + '\')).
+                  Replace('C:/Thornswood-Deploys', $global:TsGm.Store.Replace('\', '/')).Replace('C:\Thornswood-Deploys', $global:TsGm.Store)
+    }
+    function global:ssh {
+        $cmd = [string]@($args)[-1]
+        $body = ''
+        $m = [regex]::Match($cmd, 'EncodedCommand\s+(\S+)')
+        if ($m.Success) { $body = TsGmMap ([Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[1].Value))) }
+        else {
+            $m = [regex]::Match($cmd, '-File\s+(\S+)\s*$')
+            if ($m.Success) { $body = TsGmMap ([IO.File]::ReadAllText((TsGmMap $m.Groups[1].Value))) }
+            else {
+                $m = [regex]::Match($cmd, '-Command\s+(.*)$')
+                if ($m.Success) { $body = TsGmMap $m.Groups[1].Value }
+            }
+        }
+        [void]$global:TsGm.Ssh.Add($body)
+        $f = Join-Path $global:TsGm.Work ('gm-far-' + [Guid]::NewGuid().ToString('N') + '.ps1')
+        [IO.File]::WriteAllText($f, ($global:TsGm.Prelude + $body), (New-Object Text.UTF8Encoding($true)))
+        $eap = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try { $o = @(& $global:TsGm.Ps51 -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $f 2>&1 | ForEach-Object { "$_".TrimEnd() }) }
+        finally { $ErrorActionPreference = $eap }
+        $code = $LASTEXITCODE
+        Remove-Item -LiteralPath $f -Force -EA SilentlyContinue
+        foreach ($l in $o) { $l }
+        $global:LASTEXITCODE = $code
+    }
+    function global:scp {
+        $all = @($args | ForEach-Object { [string]$_ })
+        $global:LASTEXITCODE = 1
+        $m = [regex]::Match($all[-1], '^[^@\s]+@[^:\s]+:(.+)$')
+        if (-not $m.Success) { return }
+        $to = TsGmMap $m.Groups[1].Value
+        [void]$global:TsGm.Scp.Add($to)
+        if (-not (Test-Path -LiteralPath (Split-Path -Parent $to))) { return }
+        Copy-Item -LiteralPath $all[-2] -Destination $to -Force
+        $global:LASTEXITCODE = 0
+    }
+    function GmCommit {
+        $eap = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            if (-not (Test-Path -LiteralPath (Join-Path $gmRepo '.git'))) { & git -C $gmRepo init -q 2>&1 | Out-Null }
+            & git -C $gmRepo add -A 2>&1 | Out-Null
+            & git -C $gmRepo -c user.name=harness -c user.email=harness@invalid -c commit.gpgsign=false commit -q -m step 2>&1 | Out-Null
+        } finally { $ErrorActionPreference = $eap }
+    }
+    function GmDeploy([hashtable]$more = @{}) {
+        $a = @{ Vps = '127.0.0.1'; User = 'test'; Root = $root; Task = 'Thornswood Test Swap'; Wait = 30; Now = $true; GamemodeOnly = $true }
+        foreach ($k in $more.Keys) { $a[$k] = $more[$k] }
+        foreach ($k in @($a.Keys)) { if ($null -eq $a[$k]) { $a.Remove($k) } }
+        $script:gmSshBefore = $global:TsGm.Ssh.Count
+        $script:gmScpBefore = $global:TsGm.Scp.Count
+        $global:LASTEXITCODE = 0
+        $threw = ''
+        $lines = New-Object Collections.Generic.List[string]
+        try { & (Join-Path $gmRepo 'scripts\deploy\Deploy-Server.ps1') @a *>&1 | ForEach-Object { [void]$lines.Add("$_") } }
+        catch { $threw = $_.Exception.Message }
+        $script:lastFar = @($lines) + @($threw)
+        return [pscustomobject]@{ Ok = ((-not $threw) -and $global:LASTEXITCODE -eq 0); Said = ($script:lastFar -join "`n"); Threw = $threw
+                                  Ssh = ($global:TsGm.Ssh.Count - $script:gmSshBefore); Scp = ($global:TsGm.Scp.Count - $script:gmScpBefore) }
+    }
+    function Text([string]$path) { if (Test-Path -LiteralPath $path) { return [IO.File]::ReadAllText($path) }; return $null }
+    function Prevs { return @(Get-ChildItem -LiteralPath $root -Directory -Force | Where-Object { $_.Name -like '.prev-*' } | Sort-Object Name | ForEach-Object { $_.FullName }) }
+    # What a gamemode-only deploy may change in the live folder: the three
+    # files it swaps, our plugin, the record the box writes of what it runs,
+    # and the .prev and .stage folders. Everything else must stay byte for byte.
+    function Untouched([string]$dir) {
+        $rows = @()
+        foreach ($l in ((Tree $dir) -split "`n")) {
+            if ($l -match '^\\(gamemode\.js|thornswood-build\.json|server-settings\.json|plugins\\Thornswood-Content\.esp|data\\thornswood-deploy\.json)\|' -or
+                $l -match '^\\\.(prev|stage|undone)-') { continue }
+            $rows += $l
+        }
+        return ($rows -join "`n")
+    }
+
+    try {
+        Yes '-GamemodeOnly, whole: ssh and scp are the stand-ins here, so nothing can reach a server' (
+            (Get-Command ssh).CommandType -eq 'Function' -and (Get-Command scp).CommandType -eq 'Function')
+        GmCommit
+        Put (Join-Path $root 'plugins\Thornswood-Content.esp') 'our plugin, one'
+        # The kept .prev an earlier case left, dated 2099 so it is the newest,
+        # goes, so the put-backs below take the folders these runs made.
+        Get-ChildItem -LiteralPath $root -Directory -Force | Where-Object { $_.Name -like '.prev-2099*' } |
+            ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force }
+        $origGamemode = Text (Join-Path $root 'gamemode.js')
+        $origStamp = Text (Join-Path $root 'thornswood-build.json')
+
+        # Refused with nothing asked of the box: the switches that set a setting.
+        foreach ($case in @(@{ Label = '-RequirePass on'; More = @{ RequirePass = 'on' }; Why = 'sets no setting' },
+                            @{ Label = '-Devs'; More = @{ Devs = [long[]]@(123) }; Why = 'sets no setting' },
+                            @{ Label = '-PutBack'; More = @{ PutBack = $true }; Why = 'Run it without -GamemodeOnly' })) {
+            $before = Tree $root
+            $r = GmDeploy $case.More
+            $failed = $script:fail
+            Yes ('-GamemodeOnly with ' + $case.Label + ' is refused before the box is asked anything: no ssh, no scp') (
+                (-not $r.Ok) -and $r.Said -match $case.Why -and $r.Ssh -eq 0 -and $r.Scp -eq 0 -and (Tree $root) -eq $before)
+            if ($script:fail -gt $failed) { Show }
+        }
+
+        # Refused after one read of the box, with nothing sent: a box that runs
+        # another server build, and one whose join pass switch is neither.
+        Put (Join-Path $root 'server-build.json') $gmRecordLf.Replace('1234567890abcdef', 'fedcba0987654321')
+        $before = Tree $root
+        $running = Owner $P
+        $r = GmDeploy
+        $failed = $script:fail
+        Yes '-GamemodeOnly onto a box whose server-build.json is not the commit''s record is refused, naming both builds' (
+            (-not $r.Ok) -and $r.Said -match 'runs another server build \(commit fedcba09\)' -and $r.Said -match 'commit 12345678' -and
+            $r.Said -match 'Nothing was sent and the server was not touched')
+        Yes '  after one read of the box and nothing sent: one ssh, no scp, no store, the live folder and the server as they were' (
+            $r.Ssh -eq 1 -and $r.Scp -eq 0 -and -not (Test-Path -LiteralPath $gmStore) -and (Tree $root) -eq $before -and (Owner $P) -eq $running)
+        if ($script:fail -gt $failed) { Show }
+        Put (Join-Path $root 'server-build.json') $gmRecordLf.Replace("`n", "`r`n")
+        $passOff = [IO.File]::ReadAllText((Join-Path $root 'server-settings.json')) | ConvertFrom-Json
+        $passOff.thornswoodRequirePass = 'yes'
+        Put (Join-Path $root 'server-settings.json') ($passOff | ConvertTo-Json -Depth 8)
+        $before = Tree $root
+        $r = GmDeploy
+        $failed = $script:fail
+        Yes '-GamemodeOnly onto a box whose join pass switch is neither true nor false is refused the same way (#1319)' (
+            (-not $r.Ok) -and $r.Said -match 'thornswoodRequirePass is neither true nor false' -and
+            $r.Ssh -eq 1 -and $r.Scp -eq 0 -and -not (Test-Path -LiteralPath $gmStore) -and (Tree $root) -eq $before)
+        if ($script:fail -gt $failed) { Show }
+        [IO.File]::WriteAllBytes((Join-Path $root 'server-settings.json'), $ownSettings)
+
+        # A good one, with our plugin of another size on the box. The box's
+        # record has CR LF where the commit's has LF: the same record.
+        $before = Untouched $root
+        $prevsBefore = Prevs
+        $running = Owner $P
+        $r = GmDeploy
+        $said = $r.Said
+        $failed = $script:fail
+        Yes '-GamemodeOnly onto the build the commit records, its record checked out with CR LF, is SWAP OK and PASS' (
+            $r.Ok -and $said -match 'SWAP OK' -and $said -match 'PASS\. The server is up at 127\.0\.0\.1')
+        if ($script:fail -gt $failed) { Show }
+        $new = @(Prevs | Where-Object { $prevsBefore -notcontains $_ })
+        $kept = @()
+        if ($new.Count -eq 1) { $kept = @(Get-ChildItem -LiteralPath $new[0] -Recurse -File -Force | ForEach-Object { $_.FullName.Substring($new[0].Length + 1) } | Sort-Object) }
+        Yes '  and swapped only gamemode.js, the stamp, the box''s own settings and our plugin, which had another size' (
+            ($kept -join ',') -eq 'gamemode.js,plugins\Thornswood-Content.esp,server-settings.json,thornswood-build.json' -and
+            $said -match 'swapped in 4 file\(s\)')
+        Yes '  and the settings live are the server''s own, byte for byte, read back with no key allowed to move' (
+            [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $root 'server-settings.json'))) -eq [Convert]::ToBase64String($ownSettings) -and
+            $said -match 'read back: every setting outside this release is the one the server had')
+        $stampNow = (Text (Join-Path $root 'thornswood-build.json')) | ConvertFrom-Json
+        Yes '  and the gamemode live is the commit''s, with a main stamp naming it' (
+            (Text (Join-Path $root 'gamemode.js')) -eq '// gamemode only, one' -and $stampNow.channel -eq 'main' -and
+            $stampNow.gamemodeSha256 -eq (Sha '// gamemode only, one'))
+        Yes '  and our plugin is the repository''s, the old one kept in .prev' (
+            (Text (Join-Path $root 'plugins\Thornswood-Content.esp')) -eq 'our plugin, two, longer' -and
+            $new.Count -eq 1 -and (Text (Join-Path $new[0] 'plugins\Thornswood-Content.esp')) -eq 'our plugin, one')
+        Yes '  and nothing else in the live folder moved: no server file, no record, no other plugin' ((Untouched $root) -eq $before)
+        Yes '  and the box records the gamemode artifact, the server answering as a new process, the other untouched' (
+            (Text (Join-Path $root 'data\thornswood-deploy.json')) -match 'gamemode-' -and
+            @(Get-ChildItem -LiteralPath (Join-Path $gmStore 'gamemode') -Filter 'gamemode-*.zip' -EA SilentlyContinue).Count -eq 1 -and
+            (WaitUp $P) -and ((Owner $P) -ne $running) -and ((Owner $Q) -eq $otherPid))
+        if ($script:fail -gt $failed) { Show }
+
+        # Our plugin now the same size: only the gamemode, the stamp and the
+        # settings go, and the record the box had goes into .prev with them.
+        Put (Join-Path $gmRepo 'game\gamemode.js') '// gamemode only, two'
+        GmCommit
+        $prevsBefore = Prevs
+        $r = GmDeploy
+        $said = $r.Said
+        $failed = $script:fail
+        $new = @(Prevs | Where-Object { $prevsBefore -notcontains $_ })
+        $kept = @()
+        if ($new.Count -eq 1) { $kept = @(Get-ChildItem -LiteralPath $new[0] -Recurse -File -Force | ForEach-Object { $_.FullName.Substring($new[0].Length + 1) } | Sort-Object) }
+        Yes '-GamemodeOnly with our plugin the same size as the box''s sends it not, and swaps only the three' (
+            $r.Ok -and $said -match 'Thornswood-Content\.esp is on the VPS at the same size' -and $said -match 'swapped in 3 file\(s\)' -and
+            ($kept -join ',') -eq 'data\thornswood-deploy.json,gamemode.js,server-settings.json,thornswood-build.json' -and
+            (Text (Join-Path $root 'gamemode.js')) -eq '// gamemode only, two')
+        if ($script:fail -gt $failed) { Show }
+
+        # -PutBack, twice: the gamemode before, then the one before that and
+        # the plugin it replaced.
+        $r = GmDeploy @{ GamemodeOnly = $null; PutBack = $true }
+        $failed = $script:fail
+        Yes 'Deploy-Server -PutBack after it brings the previous gamemode and its stamp back, the server answering' (
+            $r.Ok -and (Text (Join-Path $root 'gamemode.js')) -eq '// gamemode only, one' -and
+            ((Text (Join-Path $root 'thornswood-build.json')) | ConvertFrom-Json).gamemodeSha256 -eq (Sha '// gamemode only, one') -and (WaitUp $P))
+        if ($script:fail -gt $failed) { Show }
+        $r = GmDeploy @{ GamemodeOnly = $null; PutBack = $true }
+        $failed = $script:fail
+        Yes '  and once more brings back the gamemode and plugin from before the first, the settings unchanged throughout' (
+            $r.Ok -and (Text (Join-Path $root 'gamemode.js')) -eq $origGamemode -and (Text (Join-Path $root 'thornswood-build.json')) -eq $origStamp -and
+            (Text (Join-Path $root 'plugins\Thornswood-Content.esp')) -eq 'our plugin, one' -and
+            [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $root 'server-settings.json'))) -eq [Convert]::ToBase64String($ownSettings) -and
+            (WaitUp $P) -and ((Owner $Q) -eq $otherPid))
+        if ($script:fail -gt $failed) { Show }
+    } finally {
+        Remove-Item -Path function:global:ssh, function:global:scp, function:global:TsGmMap -ErrorAction SilentlyContinue
+        Remove-Variable -Name TsGm -Scope Global -ErrorAction SilentlyContinue
     }
 
     # ---- nothing to put back --------------------------------------------------
