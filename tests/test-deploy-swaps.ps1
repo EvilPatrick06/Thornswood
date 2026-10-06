@@ -758,10 +758,12 @@ try {
     $failed = $script:fail
     Yes 'Install-Bot -CodeOnly: good code is SWAP OK and the new bot says it is watching' ($r.Ok -and $r.Said -match 'SWAP OK' -and (BotSays 'bot v2'))
     Yes '  and only then the box records the bot artifact' ((Current 'thornswood-bot').name -like 'bot-*')
-    # The live smoke export is not part of the installed bot, so this run
-    # does not copy it up beside bot.py.
-    Yes '  and the live smoke export was not copied up beside bot.py' (
-        -not (Test-Path -LiteralPath (Join-Path $botRoot 'live-smoke-discord-export.json')))
+    # The live smoke export goes up beside bot.py, the one place the bot reads
+    # it (#2018). From #1537 to #2018 it was left out, and the box kept the
+    # export of 2 Oct while main moved on.
+    Yes '  and the live smoke export is copied up beside bot.py' (
+        (Test-Path -LiteralPath (Join-Path $botRoot 'live-smoke-discord-export.json')) -and
+        ([IO.File]::ReadAllText((Join-Path $botRoot 'live-smoke-discord-export.json')) -eq [IO.File]::ReadAllText((Join-Path $repo 'bot\live-smoke-discord-export.json'))))
     # And the run says so itself, asking the box for the full path under the
     # root the swap moved the files to. A green run once left the export and
     # data\bot.log reported missing from the install root with nothing in the

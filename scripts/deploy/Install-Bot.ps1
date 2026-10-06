@@ -136,7 +136,7 @@ $docsWin = $DocsRoot.Replace('/','\')
 . (Join-Path $Here 'Artifact.ps1')
 $artifact = $null
 if (-not $PutBack -and -not $SetPing) {
-$artifact = New-ThornswoodArtifact -Component bot -RepoDir $Repo -Paths 'bot/bot.py', 'bot/card.py', 'bot/dev-channel.txt', 'bot/requirements.txt', 'bot/staff-channel.txt', 'bot/assets/join-card.png', 'scripts/vps/BotService.cs'
+$artifact = New-ThornswoodArtifact -Component bot -RepoDir $Repo -Paths 'bot/bot.py', 'bot/card.py', 'bot/dev-channel.txt', 'bot/requirements.txt', 'bot/live-smoke-discord-export.json', 'bot/staff-channel.txt', 'bot/assets/join-card.png', 'scripts/vps/BotService.cs'
 Write-Host ('artifact ' + (Format-ThornswoodArtifact $artifact)) -ForegroundColor DarkGray
 Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
 $Repo = $artifact.Folder
@@ -352,11 +352,14 @@ Head 'Staging it'
 #
 # requirements.txt too, because the full run installs the libraries from it.
 #
-# live-smoke-discord-export.json is a smoke export, not part of the installed
-# bot, so it is not in this list and it is not in the artifact. The bot can
-# still read one that is already beside it; this run does not copy it up.
+# live-smoke-discord-export.json too: the Live smoke rows, which bot.py reads
+# from beside itself and nowhere else. From 2 Oct (#1537) to 6 Oct (#2018) it
+# was left out to make the join-card harness's exact list pass, and nothing
+# else sends it, so the box kept the export of 2 Oct while main moved on and
+# /live-smoke refresh posted rows that were days old. The harness's point is
+# that joins.json, the bot's own record, is never sent; it still checks that.
 $send = [ordered]@{}
-foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt', 'requirements.txt') {
+foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt', 'requirements.txt', 'live-smoke-discord-export.json') {
   $src = Join-Path $Repo "bot\$f"
   if (-not (Test-Path $src)) { Die "missing: $src" }
   $send[$f] = $src
