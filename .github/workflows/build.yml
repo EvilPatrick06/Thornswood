@@ -378,6 +378,7 @@ jobs:
                  'test-live-parse-check.ps1',
                  'test-dev-instance.ps1',
                  'test-1692-release-root.ps1',
+                 'test-local-places.ps1',
                  'test-1367-cross-site.js',
                  'test-1326-engine-secrets.ps1',
                  'test-1203-engine-jobs.ps1',

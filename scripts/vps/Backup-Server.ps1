@@ -2,7 +2,8 @@
   Backup-Server.ps1
 
   Pulls everything off the server that could not be rebuilt from the repo, and
-  puts it in a dated folder on this machine.
+  puts it in a dated zip on this machine: in local\backups in the repository
+  (Where.ps1 Backups), or the folder -Out names.
 
       .\scripts\vps\Backup-Server.ps1
 
@@ -79,8 +80,19 @@ function Remote($script) {
   return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script
 }
 
+# The repository's local\backups since 5 October, asked of Where.ps1, not
+# Downloads\Thornswood-Backups: Patrick's rule that Thornswood work on One
+# lives only in the repository, the vault and C:\ThornswoodTemps&Worktrees.
+# A worktree's local folder goes when the worktree is removed, and this zip is
+# the only copy (the one on the VPS is deleted unless -KeepOnVps), so a
+# worktree is refused rather than written into.
 if (-not $Out) {
-  $Out = Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads\Thornswood-Backups'
+  $where = Join-Path $Here '..\release\Where.ps1'
+  $Out = [string](& $where Backups)
+  $repoDir = [string](& $where Repo)
+  if (Test-Path -LiteralPath (Join-Path $repoDir '.git') -PathType Leaf) {
+    Die "$repoDir is a git worktree, and its local folder goes when the worktree is removed. Run this from the repository folder itself, or pass -Out <folder>."
+  }
 }
 if (-not (Test-Path -LiteralPath $Out)) { [void](New-Item -ItemType Directory -Path $Out -Force) }
 
