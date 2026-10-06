@@ -2,7 +2,7 @@
   "schema": "thornswood.live-smoke.v1",
   "source": "wiki/quality/playtest-acceptance.md",
   "slice": "In smoke: Live",
-  "updated": "2026-10-02r7",
+  "updated": "2026-10-06r1",
   "owner": "Cynthia",
   "surface": "Discord Test-Tasks",
   "rules": {
@@ -132,12 +132,12 @@
     {
       "id": "live-7",
       "order": 7,
-      "label": "Needs bars and the needs command",
+      "label": "Needs bars and the Body page",
       "tickets": [
         381
       ],
       "skip_rule": null,
-      "discord_line": "Find Show the needs bars on screen in Settings. Turn the bars off, then on. Type /needs in chat. Pass when the bars follow Settings and /needs shows useful needs info. If bars or /needs do nothing, mark Fail."
+      "discord_line": "Find Show the needs bars on screen in Settings. Turn the bars off, then on. Open K and the Body page. Pass when the bars follow Settings and the Body page shows your needs. If the bars or the Body page do nothing, mark Fail."
     },
     {
       "id": "live-8",
@@ -320,7 +320,7 @@
         1396
       ],
       "skip_rule": null,
-      "discord_line": "Mute yourself the documented way (/mute or look-at mute), then unmute. Pass when your voice follows that mute. Do not mark Pass on text mute, /silence, colored head marks, or launcher speaking lights on this row."
+      "discord_line": "Mute somebody with L while you look at them, or with Mute beside them on P, then unmute them the same way. Pass when their voice follows that mute. Do not mark Pass on text mute, /silence, colored head marks, or launcher speaking lights on this row."
     },
     {
       "id": "live-26",

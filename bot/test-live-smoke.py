@@ -207,7 +207,7 @@ yes('the launcher speaking light is off the Live set and stays off it',
     and not any('speaking light' in i['label'].lower() for i in items))
 # The voice mute row is the one place a tester reads those words, and it reads
 # them as something that does not count: a launcher light is not the game
-# following /mute, and Pass on this row is the game following it.
+# following the mute, and Pass on this row is the game following it.
 light = [i for i in items if 'speaking light' in i['discord_line'].lower()]
 yes('  and the one row that names it tells a tester it is not what they are '
     'marking, rather than handing the row back to them',
