@@ -250,6 +250,16 @@ if ($why.Count) {
   throw 'the server build does not match the clone; nothing was recorded'
 }
 
+# Whether this engine loads light plugins (#1715): the fork that can tell a
+# light plugin from a full one has espm::IsLightPlugin in
+# libespm\include\libespm\LoadOrder.h. Read from the commit recorded, not from
+# the files on disk, so an uncommitted edit cannot say it does.
+# Deploy-Gamemode.ps1 lists light plugins in the server's load order only
+# when the record says so (ServerOrder.ps1); an engine without it would give
+# each a full index and move every full plugin after the first one.
+$lightHeader = Read-Git @('show', "${commit}:libespm/include/libespm/LoadOrder.h")
+$lightPlugins = [bool]($lightHeader -match '\bIsLightPlugin\s*\(')
+
 $files = [ordered]@{}
 $sums = Get-ThornswoodServerFolderSums $Dist
 foreach ($rel in @($sums.Keys | Sort-Object)) {
@@ -272,6 +282,7 @@ $rec = [ordered]@{
   'files'    = $files
   'recorded' = (Get-Date).ToString('yyyy-MM-dd')
 }
+if ($lightPlugins) { $rec['lightPlugins'] = $true }
 
 # Written the way New-ClientBuildRecord.ps1 writes its record: UTF-8 with no
 # byte order mark. Windows PowerShell's -Encoding UTF8 puts one in, and the
@@ -288,6 +299,7 @@ Write-Host ('  bytes   {0:N0}' -f $item.Length)
 Write-Host ('  built   {0}' -f $item.LastWriteTime)
 Write-Host ('  commit  {0}' -f $commit)
 Write-Host ('  branch  {0}' -f $branch)
+Write-Host ('  light   {0}' -f $(if ($lightPlugins) { 'loads light plugins (lightPlugins true)' } else { 'loads no light plugin' }))
 foreach ($rel in @($files.Keys)) { Write-Host ('  {0}  {1}' -f $files[$rel].sha256.Substring(0, 12), $rel) }
 Write-Host ('  written {0}' -f $Out)
 Write-Host ''

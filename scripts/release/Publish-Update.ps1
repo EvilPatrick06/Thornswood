@@ -264,13 +264,23 @@ $sourceLicences = Join-Path $Here '..\..\installer\licences'
 # error and the launcher, comparing with the reference, said everything
 # checked out. The rule is in LoadOrder.ps1, the same one the launcher's
 # LoadOrder.cs applies to a machine's own list: only the full plugins the
-# server names move, every other line keeps its place. Nothing on this machine is written: the copy that goes
+# server names move, every other line keeps its place, and against a server
+# that publishes its light order (#1715) its light plugins move too, into that
+# order. Nothing on this machine is written: the copy that goes
 # into the pack is made under _dist and removed once it is zipped.
 . (Join-Path $Here '..\mods\LoadOrder.ps1')
 
+# The server's light plugins in light index order (#1715), empty until
+# Get-ReferenceInServerOrder reads a manifest that has them.
+$script:serverLight = [string[]]@()
 function Get-ReferenceInServerOrder([string]$src) {
     $url = Get-LoadOrderManifestUrl $Root
-    $manifest = Get-LoadOrderManifest $url
+    $doc = Get-LoadOrderManifestDoc $url
+    # Assigned straight from the property, never through an if expression,
+    # which would hand a manifest of one plugin back as a bare name.
+    $manifest = $null
+    $script:serverLight = [string[]]@()
+    if ($null -ne $doc) { $manifest = $doc.Full; $script:serverLight = $doc.Light }
     $script:serverManifest = $manifest
     $script:referenceList = $src
     if ($null -eq $manifest) {
@@ -288,11 +298,27 @@ function Get-ReferenceInServerOrder([string]$src) {
              '. Deploy the required mods, or switch off excluded plugins, before publishing either channel.')
     }
     $isLight = { param($n) Test-LoadOrderLight (Join-Path $refData $n) }
-    $ordered = Get-LoadOrderReordered $file.Lines $manifest $isLight
+    # A server that loads light plugins publishes their order (#1715), and
+    # then the pack's list goes out in the server's whole order, light
+    # plugins included, so every machine that takes the pack has the light
+    # indices the server stores light form ids under. Before this the light
+    # lines kept whatever place Vortex or LOOT gave them: on 5 Oct the game
+    # gave KhisartinBeards.esp light index 0x29 in the main sessions and 0x27
+    # in the last dev one. Skyrim.ccc's names are the game's to load first
+    # and are skipped, as the masters are; _ResourcePack.esl is light index 0.
+    $ccc = @()
+    $cccPath = Join-Path $GameDir 'Skyrim.ccc'
+    if (Test-Path -LiteralPath $cccPath) { $ccc = @(Get-Content -LiteralPath $cccPath | ForEach-Object { "$_".Trim() } | Where-Object { $_ }) }
+    $whole = $doc.Light.Count -gt 0
+    if ($whole) {
+        $ordered = Get-LoadOrderReordered $file.Lines $doc.All $null $ccc
+    } else {
+        $ordered = Get-LoadOrderReordered $file.Lines $manifest $isLight
+    }
     if ($null -eq $ordered) {
         # Assigned, not wrapped in @(): the function hands back one array,
         # and @() around it would nest that array inside another.
-        $off = Get-LoadOrderNotEnabled $file.Lines $manifest
+        if ($whole) { $off = Get-LoadOrderNotEnabled $file.Lines $doc.All $ccc } else { $off = Get-LoadOrderNotEnabled $file.Lines $manifest }
         if ($off.Count) {
             Die ("The server's load order names " + ($off -join ', ') + ", which the reference plugin list at $src does not enable. Enable it there, or deploy the server without it, then publish again.")
         }
@@ -300,7 +326,7 @@ function Get-ReferenceInServerOrder([string]$src) {
     }
     $moved = Get-LoadOrderMoved $file.Lines $ordered
     if ($moved.Count -eq 0) {
-        Say ("  reference plugin list is already in the server's order ({0} plugins)" -f $manifest.Count) 'DarkGray'
+        Say ("  reference plugin list is already in the server's order ({0} plugins{1})" -f $manifest.Count, $(if ($whole) { ', ' + $doc.Light.Count + ' light' } else { '' })) 'DarkGray'
         return $src
     }
     $tmp = Join-Path $DistDir 'reference-plugins.txt'
@@ -2167,6 +2193,16 @@ if ($profileChanged.Count) {
         $lower = @{}
         foreach ($m in $manifest) { $lower[$m.ToLowerInvariant()] = $true }
         $missing = @($game | Where-Object { -not $lower.ContainsKey($_.ToLowerInvariant()) })
+        # A server that publishes its light order (#1715) counts the light
+        # plugins too: one the list enables that the server does not load
+        # takes a light index there and moves every light plugin after it.
+        if (@($script:serverLight).Count) {
+            $isLightHere = { param($n) Test-LoadOrderLight (Join-Path $refData $n) }
+            $lightLower = @{}
+            foreach ($m in @($script:serverLight)) { $lightLower[$m.ToLowerInvariant()] = $true }
+            $lightGame = Get-LoadOrderLight $enabled $isLightHere @() $exists
+            $missing += @($lightGame | Where-Object { -not $lightLower.ContainsKey($_.ToLowerInvariant()) })
+        }
         if ($missing.Count) {
             Say ("  The server does not have {0} plugin(s) this list enables:" -f $missing.Count) 'Yellow'
             foreach ($m in $missing | Select-Object -First 8) { Say "    $m" 'Yellow' }

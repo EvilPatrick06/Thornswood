@@ -376,6 +376,83 @@ try {
     # the answer that makes Publish-Update die rather than ship a list it could
     # not put in order.
     Same 'a server that does not answer gives no manifest' (Get-LoadOrderManifest 'http://127.0.0.1:1/api/servers/thornswood/manifest.json' 1500) $null
+    Same 'nor a whole one' (Get-LoadOrderManifestDoc 'http://127.0.0.1:1/api/servers/thornswood/manifest.json' 1500) $null
+
+    # ---- the light order (#1715) ------------------------------------------------
+    #
+    # A light index is a plugin's place among the light plugins the game
+    # loads. Measured on 5 Oct over the 133 session logs on the VPS since
+    # 24 Sep: ten different light orders, KhisartinBeards.esp anywhere from
+    # light index 0x1E to 0x29. So a server that loads light plugins publishes
+    # their order ("light" beside "mods", and its whole order in "loadOrder"),
+    # and the list is put into that whole order, light plugins included.
+    foreach ($n in @('_ResourcePack.esl', 'Beards.esp', 'Hair.esp', 'Spare Light.esp')) { [void]$script:inData.Add($n); [void]$script:light.Add($n) }
+    $lccc = [string[]]@('_ResourcePack.esl', 'ccNotInstalled.esl', 'ccBGSSSE025-AdvDSGS.esm')
+    $lightEnabled = [string[]]@('Water for ENB.esm', 'Hair.esp', 'Light Patch.esp', 'Gone Light.esl', 'Cutting Room Floor.esp', 'Beards.esp', 'hair.ESP')
+    Same 'the light order is Skyrim.ccc''s light plugins in Data, then the list''s, each once, full and missing ones left out' (
+        Get-LoadOrderLight $lightEnabled $isLight $lccc $exists) ([string[]]@('_ResourcePack.esl', 'Hair.esp', 'Light Patch.esp', 'Beards.esp'))
+    Same 'an empty list still has the Skyrim.ccc light plugin at light index 0' (Get-LoadOrderLight @() $isLight $lccc $exists) ([string[]]@('_ResourcePack.esl'))
+    Same 'and with no Skyrim.ccc the list''s first light plugin is light index 0' (Get-LoadOrderLight $lightEnabled $isLight @() $exists) ([string[]]@('Hair.esp', 'Light Patch.esp', 'Beards.esp'))
+
+    # The server's whole order, as Deploy-Gamemode writes it for an engine
+    # that loads light plugins, and its light plugins in their order.
+    $wholeOrder = [string[]]@('Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm', '_ResourcePack.esl',
+        'Water for ENB.esm', 'Embers XD.esm', 'Beards.esp', 'Cutting Room Floor.esp', 'Thornswood-Content.esp', 'Hair.esp',
+        'Populated Cities Towns Villages Legendary.esp', 'Immersive Armors.esp', 'Light Patch.esp', 'SkyUI_SE.esp')
+    $serverLight = [string[]]@('_ResourcePack.esl', 'Beards.esp', 'Hair.esp', 'Light Patch.esp')
+    # A machine's list with the full plugins in the server's order and the
+    # light ones in Vortex's: what every machine had until now.
+    $lightDrift = [string[]]@(
+        '# This file is used by Skyrim to keep track of your downloaded content.',
+        '*Water for ENB.esm',
+        '*Embers XD.esm',
+        '*Light Patch.esp',
+        '*Cutting Room Floor.esp',
+        '*Hair.esp',
+        'Disabled Thing.esp',
+        '*Thornswood-Content.esp',
+        '*Beards.esp',
+        '*Populated Cities Towns Villages Legendary.esp',
+        '*Immersive Armors.esp',
+        '*SkyUI_SE.esp')
+    function LightOf([string[]]$lines) {
+        $en = New-Object Collections.Generic.List[string]
+        foreach ($l in $lines) { $n = Get-LoadOrderEnabledName $l; if ($n) { [void]$en.Add($n) } }
+        return ,(Get-LoadOrderLight ([string[]]$en.ToArray()) $isLight $lccc $exists)
+    }
+    Same 'the full order already agrees with the server''s' (Get-LoadOrderFirstMismatch (GameOf $lightDrift) $server) (-1)
+    Same 'and the light order is off from light index 1, Light Patch.esp where the server has Beards.esp' (
+        "{0} {1}" -f (Get-LoadOrderFirstMismatch (LightOf $lightDrift) $serverLight), (LightOf $lightDrift)[1]) '1 Light Patch.esp'
+    Same 'the full-only rule leaves the light lines where they are, so it stays off' (
+        Get-LoadOrderFirstMismatch (LightOf (Get-LoadOrderReordered $lightDrift $server $isLight)) $serverLight) 1
+    $lw = Get-LoadOrderReordered $lightDrift $wholeOrder $null $lccc
+    Yes 'put into the whole order it comes back as one list' ($lw -is [string[]])
+    Same 'and its light plugins are in the server''s light order' (Get-LoadOrderFirstMismatch (LightOf $lw) $serverLight) (-1)
+    Same 'its full plugins still in the server''s order' (Get-LoadOrderFirstMismatch (GameOf $lw) $server) (-1)
+    Same 'the comment and the disabled line keep their lines' ("{0}|{1}" -f $lw[0], $lw[6]) ('# This file is used by Skyrim to keep track of your downloaded content.|Disabled Thing.esp')
+    Same 'the lines are the same lines, only moved' (@($lw | Sort-Object) -join '|') (@($lightDrift | Sort-Object) -join '|')
+    Same 'put through again, nothing moves' (Get-LoadOrderMoved $lw (Get-LoadOrderReordered $lw $wholeOrder $null $lccc)).Count 0
+    Same 'without Skyrim.ccc''s names the server''s _ResourcePack.esl is one no line enables, so there is no order' (Get-LoadOrderReordered $lightDrift $wholeOrder $null @()) $null
+    Same 'and that is the name said' (Get-LoadOrderNotEnabled $lightDrift $wholeOrder @()) ([string[]]@('_ResourcePack.esl'))
+    Same 'with them, nothing is not enabled' (Get-LoadOrderNotEnabled $lightDrift $wholeOrder $lccc) ([string[]]@())
+    $noBeards = [string[]]@($lightDrift | Where-Object { $_ -ne '*Beards.esp' })
+    Same 'a list that lacks a light plugin the server loads gives no order, and names it' (
+        "{0} {1}" -f (Show (Get-LoadOrderReordered $noBeards $wholeOrder $null $lccc)), ((Get-LoadOrderNotEnabled $noBeards $wholeOrder $lccc) -join ',')) '<null> Beards.esp'
+    $spare = New-Object Collections.Generic.List[string]; $spare.AddRange($lw); $spare.Insert(2, '*Spare Light.esp')
+    $spare = [string[]]$spare.ToArray()
+    Same 'a light plugin the server does not load is not the rule''s to move, and the light order is off from it' (
+        Get-LoadOrderFirstMismatch (LightOf (Get-LoadOrderReordered $spare $wholeOrder $null $lccc)) $serverLight) 1
+
+    $mj = '{"versionMajor":1,"mods":[' + (($server | ForEach-Object { '{"filename":"' + $_ + '","size":10,"crc32":20}' }) -join ',') + '],' +
+          '"light":[' + (($serverLight | ForEach-Object { '{"filename":"' + $_ + '","size":1,"crc32":2}' }) -join ',') + '],' +
+          '"loadOrder":[' + (($wholeOrder | ForEach-Object { '"C:/s/Data/' + $_ + '"' }) -join ',') + ']}'
+    $md = ConvertFrom-LoadOrderManifestDoc $mj
+    Same 'a manifest with a light list: the full plugins from mods' $md.Full $server
+    Same '  the light plugins in light index order' $md.Light $serverLight
+    Same '  and the whole order from loadOrder, by file name' $md.All $wholeOrder
+    $od = ConvertFrom-LoadOrderManifestDoc $json
+    Same 'a manifest with no light list: no light plugins, and the whole order is the full one' ("{0}|{1}" -f $od.Light.Count, ($od.All -join ',')) ("0|" + ($server -join ','))
+    Same 'text that is not a manifest gives nothing' (ConvertFrom-LoadOrderManifestDoc 'not json') $null
 
     # ---- where the manifest is read from ----------------------------------------
     function Cfg([string]$text, [bool]$bom) {
@@ -569,6 +646,33 @@ try {
             $argv = New-Object object[] 3
             $argv[0] = $nib[$k]; $argv[1] = $refList; $argv[2] = $fLom
             Both ("what is not part of this build, " + $k) (Cs 'NotInBuild' $argv) (Get-LoadOrderNotInBuild $nib[$k] $refList $isLightOrMissing)
+        }
+
+        # The light order (#1715), the launcher against the publisher.
+        $lightCases = [ordered]@{
+            'a list with Skyrim.ccc'    = @($lightEnabled, $lccc)
+            'a list with no Skyrim.ccc' = @($lightEnabled, [string[]]@())
+            'an empty list'             = @([string[]]@(), $lccc)
+        }
+        foreach ($k in $lightCases.Keys) {
+            $argv = New-Object object[] 4
+            $argv[0] = $lightCases[$k][0]; $argv[1] = $fLight; $argv[2] = $lightCases[$k][1]; $argv[3] = $fExists
+            Both ("the light order, " + $k) (Cs 'LightOrder' $argv) (Get-LoadOrderLight $lightCases[$k][0] $isLight $lightCases[$k][1] $exists)
+        }
+        $wholeCases = [ordered]@{
+            'the light drift'                 = @($lightDrift, $lccc)
+            'already in the whole order'      = @($lw, $lccc)
+            'no Skyrim.ccc names'             = @($lightDrift, [string[]]@())
+            'a light plugin the list lacks'   = @($noBeards, $lccc)
+            'a light plugin the server lacks' = @($spare, $lccc)
+            'a plugin enabled twice'          = @([string[]]($lightDrift + '*beards.ESP'), $lccc)
+        }
+        foreach ($k in $wholeCases.Keys) {
+            $l = $wholeCases[$k][0]; $c = $wholeCases[$k][1]
+            $argv = New-Object object[] 3
+            $argv[0] = $l; $argv[1] = $wholeOrder; $argv[2] = $c
+            Both ("the whole order, " + $k) (Cs 'ReorderWhole' $argv) (Get-LoadOrderReordered $l $wholeOrder $null $c)
+            Both ("the plugins not enabled for the whole order, " + $k) (Cs 'NotEnabledWhole' $argv) (Get-LoadOrderNotEnabled $l $wholeOrder $c)
         }
 
         foreach ($k in @('the measured drift', 'LOOT''s re-sort', 'already in order')) {

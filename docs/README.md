@@ -24,6 +24,7 @@ Developer-Guide.md at the root; the long form is Developer-Guide.md.
 | [COLLECTION-METHOD.md](COLLECTION-METHOD.md) | Why the mods come from a Nexus collection (half of the 15 September plan was reversed; it says which). |
 | [VIRUSTOTAL-FALSE-POSITIVE.md](VIRUSTOTAL-FALSE-POSITIVE.md) | Historical notes on scanner flags and vendor reports. Publish no longer uploads to VirusTotal; signing (#390) is the trust path. |
 | [JKS-SKYRIM.md](JKS-SKYRIM.md), [GOURMET-FISHING-PATCH.md](GOURMET-FISHING-PATCH.md) | Records of two mod decisions and the patch made for one. |
+| [LIGHT-ORDER-DRIFT.md](LIGHT-ORDER-DRIFT.md) | Every light plugin form id the live and the dev world stored, which plugin each was for, which have drifted with the light order, and the one-time move (#1715). |
 | [NPC-POPULATION.md](NPC-POPULATION.md) | NPC population catalogue from the winning records in the load order. |
 | [NPC-SERVER-ACTIVITY.md](NPC-SERVER-ACTIVITY.md) | Shared NPC activity on dev: who owns placed identities, movement, combat and return. |
 | [npc-server-runtime.md](npc-server-runtime.md) | Dev NPC loading and first unattended activity. |

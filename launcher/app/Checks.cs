@@ -657,8 +657,26 @@ namespace Thornswood
         /// </summary>
         public static List<string> StrayCreations(ICollection<string> wanted)
         {
+            return StrayCreations(wanted, null);
+        }
+
+        /// <summary>
+        /// StrayCreations, against a server that loads light plugins and
+        /// publishes their order (<paramref name="serverLight"/>, #1715). Then
+        /// a light one counts too: the game loads it straight after the five
+        /// masters, so it takes light index 0 or 1 and every light plugin after
+        /// it is one light index off the server's, which moves every stored
+        /// light form id. One the server's light order names (_ResourcePack.esl,
+        /// its light index 0) is not stray. Null or empty is a server that
+        /// counts no light plugin, and the answer is the old one.
+        /// </summary>
+        public static List<string> StrayCreations(ICollection<string> wanted, ICollection<string> serverLight)
+        {
             var l = new List<string>();
             if (wanted == null || wanted.Count == 0) return l;
+            bool lightCounts = serverLight != null && serverLight.Count > 0;
+            var theirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (lightCounts) foreach (string s in serverLight) if (s != null) theirs.Add(s.Trim());
             try
             {
                 string ccc = Path.Combine(Paths.Game, "Skyrim.ccc");
@@ -682,7 +700,7 @@ namespace Thornswood
                     if (n.Length == 0 || n.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) continue;
                     if (wanted.Contains(n) || l.Contains(n)) continue;
                     if (!File.Exists(Path.Combine(data, n))) continue;
-                    if (TakesNoPlace(n)) continue;
+                    if (TakesNoPlace(n) && (!lightCounts || theirs.Contains(n))) continue;
                     l.Add(n);
                 }
             }
@@ -706,12 +724,18 @@ namespace Thornswood
         /// </summary>
         public static int IsolateCreations(ICollection<string> wanted, Action<string> say)
         {
+            return IsolateCreations(wanted, null, say);
+        }
+
+        /// <summary>IsolateCreations against a server's light order (StrayCreations).</summary>
+        public static int IsolateCreations(ICollection<string> wanted, ICollection<string> serverLight, Action<string> say)
+        {
             int n = 0;
             string stamp = DateTime.Now.ToString("yyyyMMdd-HHmm");
             string bin = Path.Combine(Paths.Isolated, stamp);
             string data = Path.Combine(Paths.Game, "Data");
 
-            foreach (string name in StrayCreations(wanted))
+            foreach (string name in StrayCreations(wanted, serverLight))
             {
                 try
                 {

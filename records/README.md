@@ -12,7 +12,9 @@ read it (issue #440, phase 8):
   `scripts\deploy\ServerBuild.ps1` names), and the one fork commit.
   `scripts\release\New-ServerBuildRecord.ps1` writes it (Build-Server runs it),
   and Export-ServerPayload, Publish-Server, Deploy-Server and the installer on
-  the box refuse any server file that is not this build.
+  the box refuse any server file that is not this build. `"lightPlugins": true`
+  says the recorded fork loads light plugins (it has espm::IsLightPlugin), and
+  only then does Deploy-Gamemode list them in the server's load order (#1715).
 - `steam-build.json`: the public Steam build of Skyrim last looked at and
   accepted. `scripts\dev\Check-Outside.ps1` goes red when Steam moves past it,
   which is the day to try the downgrade on one machine.
