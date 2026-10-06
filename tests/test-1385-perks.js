@@ -283,6 +283,7 @@ later(DAY + 1000);
     log: function () {}, notify: function () {}, say: function () {},
     HUNT_TUNING: { bodySeconds: 300 }, isCarcass: function () { return false; },
     creditWork: function () { return null; },
+    cameInOf: function () { return null; },
     resolveArrival: function () { deaths.push('wake'); return { desc: 'temple', pos: [0, 0, 0], rot: [0, 0, 0], cell: 't', slot: 's', hold: 'h', via: 'v', reason: 'r' }; },
     __thornswoodPerks: { cheatDeath: function (id) { deaths.push('asked ' + id.toString(16)); return true; }, killerOf: function () { return 0; } }
   };
