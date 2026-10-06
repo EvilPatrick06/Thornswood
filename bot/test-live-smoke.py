@@ -831,10 +831,14 @@ yes('  and it posts nothing anywhere: every word of it is said to the one '
 
 
 class Message(object):
-    def __init__(self, channel, content):
+    def __init__(self, channel, content, system=False):
         self.channel = channel
         self.content = content
         self.author = Who(uid=BOT_ID)
+        # A thread made from a message opens with a system message Discord
+        # gives the bot as its author, and refuses to let anybody edit it
+        # (#2018: 403, error 50021, on 6 Oct).
+        self.system = system
         self.thread = None
         # What Discord has, next to what the message in hand remembers. An
         # archived thread drops out of the cache behind Message.thread and is
@@ -860,7 +864,13 @@ class Message(object):
                                'answers as not found')
         return self.threaded
 
+    def is_system(self):
+        return self.system
+
     async def edit(self, content=None, view=None):
+        if self.system:
+            raise RuntimeError('403 Forbidden (error code: 50021): Cannot '
+                               'execute action on a system message')
         self.content = content
 
     async def delete(self):
@@ -901,6 +911,15 @@ class Session(Posted):
         self.archived = False
         self.locked = False
         self.mention = '<#%s>' % name
+        # What Discord puts first in a thread made from a message: a system
+        # message it gives the bot as author. History hands it back with the
+        # rest; sent keeps only what the bot posted.
+        self.opened = Message(self, '', system=True)
+
+    async def history(self, limit=50, oldest_first=False):
+        order = [self.opened] + [m for m, _ in self.sent]
+        for m in (order if oldest_first else list(reversed(order))):
+            yield m
 
     async def edit(self, archived=None, locked=None):
         self.archived = bool(archived)
@@ -1106,6 +1125,9 @@ yes('  AND THE ROWS UNDER IT, each one the whole of what a tester does rather '
     standing is not None and len(standing.sent) == N
     and all(i['discord_line'] in standing.sent[n][0].content
             for n, i in enumerate(items)))
+yes('  and the system message Discord opens the thread with is left as it '
+    'is, not taken for row 1 (#2018)',
+    standing.opened.content == '' and standing.opened.is_system())
 yes('  worded the way a session words them',
     [m.content for m, _ in standing.sent] ==
     [bot.live_smoke_item_text(i, N) for i in items])

@@ -290,7 +290,9 @@ sends = re.search(r"foreach \(\$f in ([^)]*)\)", install)
 listed = re.findall(r"'([^']+)'", sends.group(1)) if sends else None
 yes('I1 the code Install-Bot sends is a fixed list, and the record is not '
     'on it (got %r)' % (listed,),
-    listed == ['bot.py', 'card.py', 'dev-channel.txt', 'requirements.txt'])
+    listed == ['bot.py', 'card.py', 'dev-channel.txt', 'requirements.txt',
+               'live-smoke-discord-export.json']
+    and 'joins.json' not in (listed or []))
 
 dests = []
 for ln in lines:

@@ -2757,9 +2757,14 @@ async def live_smoke_write_rows(thread, rows):
     Edited rather than posted again, so a thread does not collect a copy of
     the whole set every time Cynthia refreshes it. A message the bot posted is
     its own to take down, which Discord allows without Manage Messages.
+
+    Not the thread's own first message: a thread made from a message opens
+    with a system message Discord gives the bot as author and lets nobody
+    edit, so counted as row 1 it took the whole refresh down (#2018: 403,
+    error 50021, 6 Oct).
     """
     had = [m async for m in thread.history(limit=None, oldest_first=True)
-           if m.author.id == client.user.id]
+           if m.author.id == client.user.id and not m.is_system()]
     for n, said in enumerate(rows):
         if n >= len(had):
             await thread.send(said)
