@@ -95,8 +95,8 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `fd5ac8a4` (in full, `fd5ac8a48b30ee60e525e7ae072ed4b8cc5edcad`). That
-is upstream skyrim-multiplayer/skymp at `f926944b` with Thornswood's changes on
+commit `3a32e961` (in full, `3a32e9615d4eae43cc6995cdf2c09c528bc80da6`). That
+is upstream skyrim-multiplayer/skymp at `2849e676` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
 recorded build.
@@ -280,7 +280,7 @@ Platform used to run before a plugin's `index.js`. Line endings aside, it is
 upstream's `skyrim-platform/tools/system_polyfill/dist/___systemPolyfill.js`,
 which did not change from 28 June 2023 until upstream removed that folder on
 1 June 2026 (commit `ceba28bc`, "drop system-polyfill, multifile plugins &
-other deprecated features", #2711). That removal comes before `f926944b`, the
+other deprecated features", #2711). That removal comes before `2849e676`, the
 upstream commit the fork starts from. So the fork at the recorded commit has
 no such file, no file there names it, its build does not make it, and nothing
 in the client Thornswood ships asks for it. It reaches everybody who installs
@@ -432,14 +432,17 @@ with.
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `fd5ac8a48b30ee60e525e7ae072ed4b8cc5edcad` on the public fork. The
+  name `3a32e9615d4eae43cc6995cdf2c09c528bc80da6` on the public fork. The
   server module and the six client files were built from that commit, which
   adds the 5 October security fixes (the RPC route, request bodies, metrics,
   the login line, the settings files), the server's equipment write for a new
   character, a saved character whose race cannot be read kept under its own
-  id, and the build fixes; the server module's SHA256 is
-  `cc2b61307b35cade42d5c81019473d64c2644e0c5d628c568b9615760555f98e`, built
-  2026-10-05T20:52:40Z. It goes to the dev server first.
+  id, and the build fixes, and on top of those upstream's fixes of 5 October,
+  light plugins on the server and in the save the client loads, numbered
+  teleports so an old one is never carried out after a newer one, and the
+  server reading its source map while it starts; the server module's SHA256 is
+  `8d95ae59af3cac1d617e13709a8b0683de01e110b8910843b6722d3083ebffc5`, built
+  2026-10-06T02:32:14Z. It goes to the dev server first.
   Main remains on `0460584efc0545c3402a671dd37105bec6d1bb10` until its next release
   (read from each server's own record on 5 October; dev runs it too until
   this build reaches it).
@@ -473,7 +476,7 @@ For the six client files and for the game server module running on the VPS, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
 
-https://github.com/EvilPatrick06/skymp/tree/fd5ac8a48b30ee60e525e7ae072ed4b8cc5edcad
+https://github.com/EvilPatrick06/skymp/tree/3a32e9615d4eae43cc6995cdf2c09c528bc80da6
 
 The game server module the live server runs until its next server release:
 
