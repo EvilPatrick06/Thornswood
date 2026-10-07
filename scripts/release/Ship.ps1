@@ -836,6 +836,15 @@ if (-not $DryRun -and (Test-Path (Join-Path $RepoDir '.git'))) {
 $updaterCs = Join-Path $Here '..\..\launcher\app\Updater.cs'
 if (-not (Test-Path $updaterCs)) { Die "Could not find $updaterCs" }
 
+# Every write of Updater.cs goes through here, with no byte order mark, the
+# way Bump-Version.ps1 writes it and the way it is committed. Set-Content
+# -Encoding UTF8 adds a mark in Windows PowerShell 5.1 and none in
+# PowerShell 7, so a Ship run from 5.1 left Updater.cs changed in git with
+# nothing changed but those three bytes (#2035).
+function Write-UpdaterCs([string]$text) {
+    [IO.File]::WriteAllText($updaterCs, $text, (New-Object Text.UTF8Encoding $false))
+}
+
 $src = Get-Content $updaterCs -Raw
 $m = [regex]::Match($src, 'Version\s*=\s*"([^"]+)"')
 if (-not $m.Success) { Die 'Could not read the version out of app\Updater.cs' }
@@ -1044,7 +1053,7 @@ if ($target -ne $current) {
     Head 'Version'
     Say "  $current  ->  $target" 'Green'
     $src = $src -replace 'Version\s*=\s*"[^"]+"', ('Version = "' + $target + '"')
-    Set-Content $updaterCs $src -Encoding UTF8 -NoNewline
+    Write-UpdaterCs $src
 }
 else {
     Head 'Version'
@@ -1075,7 +1084,7 @@ function Unbump([string]$why) {
     if ($target -eq $current) { return }
     $back = Get-Content $updaterCs -Raw
     $back = $back -replace 'Version\s*=\s*"[^"]+"', ('Version = "' + $current + '"')
-    Set-Content $updaterCs $back -Encoding UTF8 -NoNewline
+    Write-UpdaterCs $back
     Head 'Version'
     Say "  put back to $current, $why" 'Yellow'
 }
@@ -1259,7 +1268,7 @@ if (-not $ModsOnly) {
     if ($Dev -and $target -ne $current) {
         $back = Get-Content $updaterCs -Raw
         $back = $back -replace 'Version\s*=\s*"[^"]+"', ('Version = "' + $current + '"')
-        Set-Content $updaterCs $back -Encoding UTF8 -NoNewline
+        Write-UpdaterCs $back
         Say "  source put back to $current, the exe carries $target" 'DarkGray'
         $current = $target   # so nothing below tries to unbump a version the source no longer has
     }
