@@ -106,7 +106,9 @@ if ($fn) {
 }
 $text = [IO.File]::ReadAllText($pu)
 Yes 'the warning line follows the order key, not the file hash' ($text -match 'if \(\$orderMoved\) \{ \$details \+= ''The load order moved' -and $text -notmatch 'if \(\$profileChanged\.Count\) \{ \$details \+= ''The load order moved')
-Yes 'and only when the last release recorded an installed-plugin key to compare with' ($text -match '\$orderMoved\s*=\s*\$prev\.ContainsKey\('':order:installedPlugins''\)')
+# #2031: the key is taken from the list in the server's order, under a new
+# name, so the first release after that change has nothing to compare with.
+Yes 'and only when the last release recorded a shipped-order key to compare with' ($text -match '\$orderMoved\s*=\s*\$prev\.ContainsKey\('':order:shippedPlugins''\)')
 # Since #1050 the filter takes out every key that starts with ':', the order key among them.
 Yes 'the order key is never shipped or listed as removed' (
     ([regex]::Matches($text, "-notlike ':order:\*'")).Count -ge 2 -or
