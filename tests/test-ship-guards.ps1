@@ -84,20 +84,24 @@ $script:dryBefore = Find-If '$DryRun' $src.IndexOf('$dryKeep = @()') '$dryKeep +
 $script:dryAfter  = Find-If '$DryRun' $src.IndexOf("& (Join-Path `$Here 'Publish-Update.ps1') @pubArgs") 'foreach ($k in $dryKeep)'
 $script:guard     = Find-If '$GameDir' 0 "Join-Path `$Here '..\..\game\plugins'"
 $unbump = ''
+$writeUpdater = ''   # Unbump writes Updater.cs through Write-UpdaterCs (#2035)
 foreach ($fn in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true)) {
-    if ($fn.Name -eq 'Unbump') { $unbump = $fn.Extent.Text; break }
+    if ($fn.Name -eq 'Unbump') { $unbump = $fn.Extent.Text }
+    if ($fn.Name -eq 'Write-UpdaterCs') { $writeUpdater = $fn.Extent.Text }
 }
 
 Yes 'the dry run keeps its copies before the publisher runs' ($script:dryBefore -ne '')
 Yes 'and puts them back after it' ($script:dryAfter -ne '')
 Yes 'Ship.ps1 has Unbump' ($unbump -ne '')
+Yes 'and the Write-UpdaterCs it writes with' ($writeUpdater -ne '')
 Yes 'the plugin check is in Ship.ps1' ($script:guard -ne '')
-if (-not ($script:dryBefore -and $script:dryAfter -and $unbump -and $script:guard)) { Done }
+if (-not ($script:dryBefore -and $script:dryAfter -and $unbump -and $writeUpdater -and $script:guard)) { Done }
 
 # What the blocks call. Say and Head only print; Die stops, as it does in Ship.
 function Say($m, $c = 'Gray') { }
 function Head($m) { }
 function Die($m) { throw ('STOP. ' + $m) }
+Invoke-Expression $writeUpdater
 Invoke-Expression $unbump
 
 function Hash([string]$path) {
