@@ -41,6 +41,28 @@ $key = Get-ActiveOrderKey $list (Join-Path $GameDir 'Data')
 Assert ((Get-ActiveOrderKey $list (Join-Path $GameDir 'Data')) -eq $key) 'Removing an absent plugin reference cannot require a new character'
 [IO.File]::WriteAllLines($list, @('*FNIS.esp', '*Thornswood-Content.esp'))
 Assert ((Get-ActiveOrderKey $list (Join-Path $GameDir 'Data')) -ne $key) 'Changing the installed plugin order still changes the save warning key'
+# #2031: the key is taken from the list in the server's order, so two machines
+# whose own lists order the server's plugins differently ship the same order
+# and get the same key. Alpha.esp and Beta.esp are full plugins the fixture
+# server names in that order.
+$fixtureManifest = ${function:Get-LoadOrderManifest}
+function Get-LoadOrderManifest($url) { return ,@('Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm', 'Alpha.esp', 'Beta.esp', 'Thornswood-Content.esp') }
+foreach ($name in 'Alpha.esp', 'Beta.esp') {
+    $b = [byte[]]::new(24); [Text.Encoding]::ASCII.GetBytes('TES4').CopyTo($b, 0)
+    [IO.File]::WriteAllBytes((Join-Path $GameDir "Data\$name"), $b)
+}
+$keyOut = Join-Path $DistDir 'order-key.txt'
+function Get-ShippedKey([string[]]$lines) {
+    [IO.File]::WriteAllLines($list, $lines)
+    $shipped = Get-ReferenceInServerOrder $list $keyOut -Quiet
+    return (Get-ActiveOrderKey $shipped (Join-Path $GameDir 'Data'))
+}
+$machineA = Get-ShippedKey @('*Alpha.esp', '*Beta.esp', '*Thornswood-Content.esp', '*FNIS.esp')
+$machineB = Get-ShippedKey @('*Thornswood-Content.esp', '*Beta.esp', '*Alpha.esp', '*FNIS.esp')
+Assert ($machineA -eq $machineB) 'Two machines whose own orders differ ship the server order and get the same key (#2031)'
+$lightMoved = Get-ShippedKey @('*FNIS.esp', '*Alpha.esp', '*Beta.esp', '*Thornswood-Content.esp')
+Assert ($lightMoved -ne $machineA) 'A plugin the server does not place moving among the shipped plugins still changes the key'
+Set-Item function:Get-LoadOrderManifest $fixtureManifest
 foreach ($channel in 'main', 'dev') {
     foreach ($missing in 'CBBE 3BA Vanilla Outfits.esp', 'Thornswood-Content.esp') {
         $file = Join-Path $GameDir "Data\$missing"
