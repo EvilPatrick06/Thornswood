@@ -324,10 +324,13 @@ try {
         $rule.Count -gt 0 -and @($rule | Where-Object { $del -notcontains $_ }).Count -eq 0)
 
     # e. The same build again, nothing of ours changed (#1012): the rule paths
-    #    alone are no reason for a release, so it stops with Nothing to do.
+    #    alone are no reason for a release, so it stops with Nothing to do,
+    #    and says so with exit code 2, the code Ship reads as nothing
+    #    released. It was 0 without -Launcher until 6 Oct, which Ship read as
+    #    a release and announced.
     $packsBefore = @((Read-Json (Join-Path $site 'feed\version.json')).packs).Count
     $r = Publish @('-Notes', "'Test release`n- the same again'")
-    YesR ("the same build again says Nothing to do (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Out -match 'Nothing to do' -and $r.Published -eq '') $r
+    YesR ("the same build again says Nothing to do (exit {0})" -f $r.Code) ($r.Code -eq 2 -and $r.Out -match 'Nothing to do' -and $r.Published -eq '') $r
     Yes '  and the feed gained no pack' (@((Read-Json (Join-Path $site 'feed\version.json')).packs).Count -eq $packsBefore)
 
     # d. A second real release straight after the first (#1057): its own id,
