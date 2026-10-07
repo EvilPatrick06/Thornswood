@@ -275,7 +275,9 @@ $sourceLicences = Join-Path $Here '..\..\installer\licences'
 # The server's light plugins in light index order (#1715), empty until
 # Get-ReferenceInServerOrder reads a manifest that has them.
 $script:serverLight = [string[]]@()
-function Get-ReferenceInServerOrder([string]$src) {
+# -Out and -Quiet are for the order key (#2031), which reads the list in the
+# server's order before anything is packed: its own file, and no second report.
+function Get-ReferenceInServerOrder([string]$src, [string]$Out = '', [switch]$Quiet) {
     $url = Get-LoadOrderManifestUrl $Root
     $doc = Get-LoadOrderManifestDoc $url
     # Assigned straight from the property, never through an if expression,
@@ -328,12 +330,12 @@ function Get-ReferenceInServerOrder([string]$src) {
     }
     $moved = Get-LoadOrderMoved $file.Lines $ordered
     if ($moved.Count -eq 0) {
-        Say ("  reference plugin list is already in the server's order ({0} plugins{1})" -f $manifest.Count, $(if ($whole) { ', ' + $doc.Light.Count + ' light' } else { '' })) 'DarkGray'
+        if (-not $Quiet) { Say ("  reference plugin list is already in the server's order ({0} plugins{1})" -f $manifest.Count, $(if ($whole) { ', ' + $doc.Light.Count + ' light' } else { '' })) 'DarkGray' }
         return $src
     }
-    $tmp = Join-Path $DistDir 'reference-plugins.txt'
+    $tmp = if ($Out) { $Out } else { Join-Path $DistDir 'reference-plugins.txt' }
     Write-LoadOrderFile $tmp $ordered $file
-    Say ("  reference plugin list put into the server's order: {0} moved, the first {1}" -f $moved.Count, $moved.First) 'Yellow'
+    if (-not $Quiet) { Say ("  reference plugin list put into the server's order: {0} moved, the first {1}" -f $moved.Count, $moved.First) 'Yellow' }
     return $tmp
 }
 
@@ -553,10 +555,26 @@ function Get-ActiveOrderKey([string]$path, [string]$data = '') {
     try { return -join ($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($on -join "`n")) | ForEach-Object { $_.ToString('x2') }) }
     finally { $sha.Dispose() }
 }
+# THE ORDER THAT SHIPS, NOT THIS MACHINE'S (#2031). Until 7 October the key was
+# read from $orderSrc, the order Vortex or LOOT left on whichever machine
+# shipped. The pack never carries that order: Get-ReferenceInServerOrder puts
+# the list into the server's order first. So two releases from two machines
+# disagreed even when they shipped the same list, and dev 20261006-141047-dev
+# told testers to start a new character over a list whose 96 enabled plugins
+# were the same, in the same order, as the release before (78 lines had moved
+# into the server's order on the shipping machine). The key is taken from the
+# list as it will be packed. A new key name for the 27 September reason: the
+# first release after this has no key of the new kind to compare with, so it
+# says nothing rather than comparing against a machine's own order.
 $orderSrc = Join-Path $shipReferenceDir 'plugins.txt'
 if (Test-Path $orderSrc) {
-    try { $now[':order:installedPlugins'] = Get-ActiveOrderKey $orderSrc (Join-Path $GameDir 'Data') }
+    $orderTmp = Join-Path $DistDir 'reference-plugins-order-key.txt'
+    try {
+        $shippedList = Get-ReferenceInServerOrder $orderSrc $orderTmp -Quiet
+        $now[':order:shippedPlugins'] = Get-ActiveOrderKey $shippedList (Join-Path $GameDir 'Data')
+    }
     catch { Say "  could not read the active plugin order from $orderSrc`: $($_.Exception.Message)" 'Yellow' }
+    finally { Remove-Item -LiteralPath $orderTmp -Force -ErrorAction SilentlyContinue }
 }
 
 # The launcher's own source. Nothing here ships as a file, it all ends up
@@ -735,7 +753,7 @@ $srcChanged     = @($changed | Where-Object { $_ -like ':src:*' })
 # last release recorded one to compare with: the first Ship after this key
 # arrived has nothing to compare, and saying "start over" then would be the
 # same false alarm this exists to stop. See Get-ActiveOrderKey.
-$orderMoved     = $prev.ContainsKey(':order:installedPlugins') -and $now.ContainsKey(':order:installedPlugins') -and ($prev[':order:installedPlugins'] -ne $now[':order:installedPlugins'])
+$orderMoved     = $prev.ContainsKey(':order:shippedPlugins') -and $now.ContainsKey(':order:shippedPlugins') -and ($prev[':order:shippedPlugins'] -ne $now[':order:shippedPlugins'])
 # Every key that starts with ':' is about the release, not a file in the game
 # folder: the plugin list, the launcher's source, and since #1050 what the
 # record says about itself (:record:), the plugin list as shipped (:golden:)
