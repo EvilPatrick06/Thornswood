@@ -442,10 +442,9 @@ with.
   teleports so an old one is never carried out after a newer one, and the
   server reading its source map while it starts; the server module's SHA256 is
   `8d95ae59af3cac1d617e13709a8b0683de01e110b8910843b6722d3083ebffc5`, built
-  2026-10-06T02:32:14Z. It goes to the dev server first.
-  Main remains on `a247ef27b9915bdfcdad7a8ba70d78acbd8f7beb` until its next release
-  (read from each server's own record on 5 October; dev runs it too until
-  this build reaches it).
+  2026-10-06T02:32:14Z. Both servers run it: the dev server since
+  5 October 9:56 PM MT and the main server since 5 October 11:47 PM MT, with
+  release 1.2.0.
   Section 13 of the AGPL asks that everybody who connects to a modified server
   over a network be offered its source. The next section is that offer.
   `scam_native.node` is also the one file that carries antigo, under the
@@ -477,10 +476,6 @@ Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
 
 https://github.com/EvilPatrick06/skymp/tree/720a5f7cad1f5f669fb7d0a12e2ff33685eeaf0e
-
-The game server module the live server runs until its next server release:
-
-https://github.com/EvilPatrick06/skymp/tree/a247ef27b9915bdfcdad7a8ba70d78acbd8f7beb
 
 It is on the branch `thornswood/engine-changes`, it is public, and the branch
 answered an anonymous request on 24 September. It builds with CMake and

@@ -41,8 +41,7 @@ That commit starts from
 is the difference between the two.
 
 The server's engine goes to our test server first, then to the main server.
-Until it reaches them, both run
-[`a247ef27`](https://github.com/EvilPatrick06/skymp/tree/a247ef27b9915bdfcdad7a8ba70d78acbd8f7beb).
+Both run that commit since release 1.2.0 on 5 October.
 
 The six client files are built from the commit named by the feed a person
 got them from (`clientRuntime.forkCommit` in that channel's `version.json`).
@@ -52,7 +51,7 @@ the same public branch:
 
 | Channel | Feed | The six client files are built from |
 |---|---|---|
-| Public | `feed/version.json` | [`a247ef27`](https://github.com/EvilPatrick06/skymp/tree/a247ef27) |
+| Public | `feed/version.json` | [`720a5f7c`](https://github.com/EvilPatrick06/skymp/tree/720a5f7c) |
 | Dev | `feed-dev/version.json` | [`720a5f7c`](https://github.com/EvilPatrick06/skymp/tree/720a5f7c) |
 
 | File | Built from | Licence |
