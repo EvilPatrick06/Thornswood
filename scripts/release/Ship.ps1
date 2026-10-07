@@ -58,6 +58,15 @@
   The feed is mirrored before the news steps tell people to update, because
   they send everybody to fetch a release the feed has to be serving.
 
+  A MAIN SHIP ALSO MOVES THE DEV FEED'S DEV MARKS, right after the remirror:
+  Refresh-DevNews.ps1 marks DEV only the dev notes main still does not have
+  and sets the dev feed's mainVersion, and sends nothing else (Dev-News.ps1).
+
+  NOTHING NEW IS NOT ANNOUNCED. When the publisher released nothing (exit
+  code 2) Ship says so and stops: no remirror, no news, no Discord post, no
+  server countdown, no tag. A dev Ship with nothing new still brings the dev
+  feed's DEV marks up to date with main, and says whether it did.
+
   LAST, THE TAG (#444). A release goes by one name, the id its packs carry
   (20260928-1630, or 20260928-2324-dev on dev), and the feed records its
   launcher, packs, baseline and commit against it (Release-Name.ps1). Once the
@@ -1608,6 +1617,9 @@ $global:LASTEXITCODE = 0
 # that; the release tag below goes on only then (#444). Cleared first, so a
 # run earlier in this same window can never be tagged by this one.
 $global:ThornswoodPublishedRelease = ''
+# What a dev publish with nothing new did with the dev feed's DEV marks
+# (Dev-News.ps1), said in Done below. Cleared for the same reason.
+$global:ThornswoodDevMarks = $null
 & (Join-Path $Here 'Publish-Update.ps1') @pubArgs
 $published = $LASTEXITCODE
 
@@ -1658,9 +1670,17 @@ if ($DryRun) {
 # upload has landed. If it does not name the version just built, nothing was
 # published, whatever any exit code says.
 # A mods only release leaves the launcher version where it was, so the
-# version check below has nothing to say about it; the exit code check
-# further down still catches a publisher that stopped.
-if (-not $DryRun -and -not $ModsOnly) {
+# version check has nothing to say about it. What it does have is the id the
+# publisher sets only once the feed is on the VPS ($global:ThornswoodPublishedRelease,
+# #444), so a publisher that says 0 without naming a release sent nothing,
+# launcher or not. Until 6 Oct a mods only Ship had no witness here at all, and
+# a publish with nothing new that said 0 went on to the Discord and the server.
+#
+# Only for a publisher that said 0. Exit code 2 is the publisher saying nothing
+# was released, and the block for it below says so and tells nobody; this
+# check used to stand in front of it for any Ship with a launcher, so that
+# block never ran for one. Anything else is a publisher that stopped, below too.
+if (-not $DryRun -and $published -eq 0) {
     $landed = ''
     try {
         $vf = Join-Path $ReleaseDir 'version.json'
@@ -1668,10 +1688,14 @@ if (-not $DryRun -and -not $ModsOnly) {
             $landed = [string]((Get-Content $vf -Raw | ConvertFrom-Json).launcherVersion)
         }
     } catch { }
-    if ($landed -ne $target) {
-        $said = if ($landed) { $landed } else { 'nothing at all' }
+    $notOut = ''
+    if (-not $global:ThornswoodPublishedRelease) { $notOut = 'The publisher named no release it sent to the VPS.' }
+    elseif (-not $ModsOnly -and $landed -ne $target) {
+        $notOut = "version.json still says $(if ($landed) { $landed } else { 'nothing at all' }), not $target."
+    }
+    if ($notOut) {
         Write-Host ''
-        Say "NOTHING WAS PUBLISHED. version.json still says $said, not $target." 'Red'
+        Say "NOTHING WAS PUBLISHED. $notOut" 'Red'
         Say 'Read the publisher output above for the reason. The Discord has not' 'Red'
         Say 'been told, the server has not been touched, and nobody has been sent' 'Red'
         Say 'an update that does not exist.' 'Red'
@@ -1745,6 +1769,13 @@ if ($published -ne 0 -and $published -ne 2) {
 # Exit code 2 means the publisher found nothing worth a release. The version
 # was already bumped and written into Updater.cs before the build, so put it
 # back rather than leaving a number that was never published.
+#
+# AND NOBODY IS TOLD. Everything after this block announces a release: the
+# remirror, the site news, the Discord post, the server's countdown and the
+# tag. A run that released nothing has nothing for any of them, so it stops
+# here and says what it did and did not do. A dev publish with nothing new
+# still brings the dev feed's DEV marks up to date with main (Dev-News.ps1);
+# it says how that went in $global:ThornswoodDevMarks, read back here.
 if ($published -eq 2) {
     if ($target -ne $current) {
         Unbump 'nothing was published'
@@ -1752,7 +1783,23 @@ if ($published -eq 2) {
     }
     Show-Installer
     Head 'Done'
-    Say 'Nothing shipped. The build already matches the last release.' 'Yellow'
+    Say 'Nothing was released. The build already matches the last release.' 'Yellow'
+    Say ('  No news entry was added, ' + $(if ($Dev) { 'the dev updates channel' } else { '#news' }) +
+         ' was not posted to, and no server was told.') 'Yellow'
+    $devMarks = $global:ThornswoodDevMarks
+    if (-not $Dev) {
+        Say "  The dev feed's DEV marks were not touched: main's feed did not move." 'DarkGray'
+    } elseif ($DryRun) {
+        Say "  Dry run: the dev feed's DEV marks were worked out and not sent." 'DarkGray'
+        if ($null -ne $devMarks) { foreach ($l in @($devMarks.Lines)) { Say "    $l" 'DarkGray' } }
+    } elseif ($null -ne $devMarks -and $devMarks.Done) {
+        Say "  The dev feed's DEV marks were refreshed against main:" 'Green'
+        foreach ($l in @($devMarks.Lines)) { Say "    $l" 'DarkGray' }
+    } else {
+        Say "  The dev feed's DEV marks were NOT refreshed." 'Red'
+        if ($null -ne $devMarks) { foreach ($l in @($devMarks.Lines)) { Say "    $l" 'Red' } }
+        Say '    .\scripts\release\Refresh-DevNews.ps1   does it on its own' 'Yellow'
+    }
     Write-Host ''
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
     exit 0
@@ -1902,6 +1949,20 @@ if (-not $DryRun) {
     Invoke-PostShip 'the host feed remirror' 'Publish-PostShip.ps1' ($postArgs + @{ Only = 'Remirror' }) `
         ".\scripts\release\Publish-PostShip.ps1$chanArg -Only Remirror"
 
+    # THE DEV FEED'S DEV MARKS FOLLOW MAIN AT ONCE (Dev-News.ps1). Main's feed
+    # is on the VPS by now, so the dev News tab can stop marking DEV what this
+    # release just gave everybody. Until 6 Oct the marks moved only on the next
+    # dev Ship, so after every main release finished work read as DEV until
+    # somebody shipped dev, and on 5 Oct somebody did, only for that.
+    # Refresh-DevNews.ps1 sends the dev feed's version.json alone, and only when
+    # a mark or mainVersion moved: no dev release, no pack, no post, no server.
+    # Like the remirror it cannot fail this release; a refusal is a line in Done
+    # with the command that does it again.
+    if (-not $Dev) {
+        Head "The dev feed's DEV marks"
+        Invoke-PostShip "the dev feed's DEV marks" 'Refresh-DevNews.ps1' @{ RepoDir = $RepoDir; NoPause = $true } `
+            '.\scripts\release\Refresh-DevNews.ps1'
+    }
 }
 
 # ------------------------------------------------------------------- news
@@ -1975,6 +2036,8 @@ if (-not $DryRun -and -not $NoAnnounce) {
 
 # Main and Dev are independent releases. Publishing Main must preserve Dev's
 # feed, baseline, release identity and history. Advance Dev with its own Ship.
+# The one thing a main Ship changes on the dev feed is which notes are marked
+# DEV, and mainVersion, after the remirror above (Refresh-DevNews.ps1).
 
 # SHIP NO LONGER COMMITS OR PUSHES ANYTHING.
 #

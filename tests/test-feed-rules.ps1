@@ -465,9 +465,11 @@ if ($syncFind -ne '') {
 # A Dev Ship reads main's feed as the site serves it before it writes
 # mainVersion, so the Dev News tab cannot keep showing a stale main (1.1.37
 # while main had moved on; #546). Until #907 that was main's releases clone,
-# pulled first.
+# pulled first. Since 6 Oct the marks and mainVersion are written by
+# Set-DevFeedMarks in Dev-News.ps1, which a dev publish calls here and a
+# publish with nothing new and a main Ship reach through Update-DevFeedMarks.
 $puSrc = [IO.File]::ReadAllText((Resolve-Path -LiteralPath $pubUpd).Path)
-$mainPull = [regex]::Match($puSrc, '(?s)if \(\$Dev\) \{.*?Set-Prop \$doc ''mainVersion''')
+$mainPull = [regex]::Match($puSrc, '(?s)\$mainDoc = \$null\s+try \{ \$mainDoc = Read-SiteFeed.*?Set-DevFeedMarks \$doc \$mainDoc \$RepoDir.*?\r?\n\}')
 Yes 'the Dev mainVersion block is still in Publish-Update' $mainPull.Success
 if ($mainPull.Success) {
     $block = $mainPull.Value
@@ -476,6 +478,14 @@ if ($mainPull.Success) {
     Yes 'a feed that cannot be read leaves the dev marks alone rather than shipping a stale mainVersion' (
         $block -match "could not read main's feed, so the dev marks were left alone")
 }
+$devNewsSrc = [IO.File]::ReadAllText((Join-Path (Split-Path -Parent $pubUpd) 'Dev-News.ps1'))
+$setMarks = [regex]::Match($devNewsSrc, '(?s)function Set-DevFeedMarks.*?\r?\n\}')
+Yes 'Set-DevFeedMarks writes mainVersion from main''s launcherVersion' (
+    $setMarks.Success -and $setMarks.Value -match [regex]::Escape("`$mainVer = Get-DevNewsVal `$mainDoc 'launcherVersion'") -and
+    $setMarks.Value -match [regex]::Escape("Set-DevNewsProp `$doc 'mainVersion' `$mainVer"))
+$updMarks = [regex]::Match($devNewsSrc, '(?s)function Update-DevFeedMarks.*?\r?\n\}')
+Yes 'and a refresh with nothing new reads main''s feed from the site too' (
+    $updMarks.Success -and $updMarks.Value.Contains("Read-SiteFeed 'main'") -and -not $updMarks.Value.Contains('git -C'))
 
 Write-Host ''
 Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
