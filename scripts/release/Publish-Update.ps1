@@ -568,7 +568,7 @@ function Get-ActiveOrderKey([string]$path, [string]$data = '') {
 # says nothing rather than comparing against a machine's own order.
 $orderSrc = Join-Path $shipReferenceDir 'plugins.txt'
 if (Test-Path $orderSrc) {
-    $orderTmp = Join-Path $DistDir 'reference-plugins-order-key.txt'
+    $orderTmp = Join-Path $DistDir 'reference-plugins-ordered.txt'
     try {
         $shippedList = Get-ReferenceInServerOrder $orderSrc $orderTmp -Quiet
         $now[':order:shippedPlugins'] = Get-ActiveOrderKey $shippedList (Join-Path $GameDir 'Data')
