@@ -202,6 +202,23 @@ try {
         $hist = @(Get-ChildItem -LiteralPath (Join-Path $site 'feed-dev\history') -File -ErrorAction SilentlyContinue)
         Yes ("  the feed it replaced is kept in the store's history, and only that ({0})" -f (($hist | ForEach-Object { $_.Name }) -join ', ')) (
             $hist.Count -eq 1 -and $hist[0].Name -like '*-version.json')
+        # A dev release from a dirty tree proves nothing about the notes from
+        # before sourceCommit, so they keep the marks a clean release gave
+        # them (6 Oct 2:10 PM: 20261006-141047-dev, uncommitted 1).
+        $dirty = Stale-DevFeed
+        $dirty.release.uncommitted = 1
+        foreach ($n in @($dirty.news)) { if (-not $n.PSObject.Properties['sourceCommit']) { $n.channel = '' } }
+        $d = Set-DevFeedMarks $dirty $mainFeed $git
+        Yes ("a dirty dev release leaves the old notes as a clean one marked them, none gaining DEV ({0} gained)" -f @($d.Gained).Count) (
+            @($d.Gained | Where-Object { $_ -like 'Note from before sourceCommit*' }).Count -eq 0 -and
+            @($dirty.news | Where-Object { -not $_.PSObject.Properties['sourceCommit'] -and $_.channel -eq 'dev' }).Count -eq 0)
+        $dirty2 = Stale-DevFeed
+        $dirty2.release.uncommitted = 1
+        $d2 = Set-DevFeedMarks $dirty2 $mainFeed $git
+        Yes '  and old notes still marked DEV stay marked, since nothing proves them on main' (
+            @($dirty2.news | Where-Object { -not $_.PSObject.Properties['sourceCommit'] -and $_.channel -eq 'dev' }).Count -eq 24)
+        Yes '  while notes with a sourceCommit are judged by it as before' (
+            @($d2.Cleared) -contains 'Squash merged work' -and @($d2.Kept) -contains 'Work main never took')
         $raw = [IO.File]::ReadAllBytes($devJson)
         Yes '  written with no byte order mark' (-not ($raw.Length -ge 3 -and $raw[0] -eq 0xEF -and $raw[1] -eq 0xBB -and $raw[2] -eq 0xBF))
         Yes '  and no release line was added to the store''s releases.txt' (-not (Test-Path -LiteralPath (Join-Path $site 'feed-dev\releases.txt')) -or
