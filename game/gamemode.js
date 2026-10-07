@@ -61608,14 +61608,22 @@ function startNpcServerRuntime(api, timers, now, report) {
 }
 // Shared navigation keeps a spatial index and verifies each reciprocal edge.
 // External links are resolved through the winning record's master mapping.
+// Each NAVM is kept as its NVNM vertex and triangle bytes. A triangle becomes
+// an object only when locating, linking or routing reaches it, and the tile
+// index holds packed numbers, so the cast's navigation costs bytes per
+// triangle instead of an object each (#2005).
+function npcTriangleFlags(geometry, index) {
+  return geometry.bytes.readUInt16LE(geometry.triangles+index*16+12);
+}
+function npcTrianglePoints(geometry, index) {
+  const b=geometry.bytes,off=geometry.triangles+index*16;
+  return [0,2,4].map(j=>{const v=b.readUInt16LE(off+j);return [0,4,8].map(k=>b.readFloatLE(20+v*12+k));});
+}
 const npcTriangle = {
   get links() {return this.geometry.linksFor(this);},
-  get flags() {return this.geometry.bytes.readUInt16LE(this.geometry.triangles+this.index*16+12);},
+  get flags() {return npcTriangleFlags(this.geometry,this.index);},
   get edges() {return [6,8,10].map(j=>this.geometry.bytes.readInt16LE(this.geometry.triangles+this.index*16+j));},
-  get points() {
-    const b=this.geometry.bytes,off=this.geometry.triangles+this.index*16;
-    return [0,2,4].map(j=>{const v=b.readUInt16LE(off+j);return [0,4,8].map(k=>b.readFloatLE(20+v*12+k));});
-  },
+  get points() {return npcTrianglePoints(this.geometry,this.index);},
   get center() {const p=this.points;return [0,1,2].map(j=>(p[0][j]+p[1][j]+p[2][j])/3);}
 };
 const npcPortal = {
@@ -61636,32 +61644,50 @@ function* npcReadMeshWork(id, lookup, linksFor) {
     if(i%128===127) yield {cost:128};
   }
   yield {cost:nv%128};
-  const nodes=[],geometry={bytes:b,triangles:at+4,linksFor};
   for(let index=0;index<nt;index++) {
     const off = at+4+index*16;
-    const ids = [0,2,4].map(j=>b.readUInt16LE(off+j));
-    if (ids.some(v=>v >= nv)) throw new Error('Invalid triangle vertex');
-    // Keep one compact raw mesh; materialize coordinates only while using them.
-    const node=Object.assign(Object.create(npcTriangle),{mesh:id,index,geometry});
-    nodes.push(node);
-    yield {cost:1,node};
+    if ([0,2,4].some(j=>b.readUInt16LE(off+j) >= nv)) throw new Error('Invalid triangle vertex');
+    yield {cost:1};
   }
   let off = at+4+nt*16;
+  // Three numbers per external edge: type, global mesh and triangle.
   const externals = [];
   if (off+4 <= b.length) {
     const count = b.readUInt32LE(off); off += 4;
     if (count > 100000 || off+count*10 > b.length) throw new Error('Invalid edge links');
     for (let i=0;i<count;i++,off+=10) {
-      externals.push({type:b.readUInt32LE(off),
-        mesh:lookup.toGlobalRecordId ? lookup.toGlobalRecordId(b.readUInt32LE(off+4)) : b.readUInt32LE(off+4),
-        index:b.readInt16LE(off+8)});
+      externals.push(b.readUInt32LE(off),
+        lookup.toGlobalRecordId ? lookup.toGlobalRecordId(b.readUInt32LE(off+4)) : b.readUInt32LE(off+4),
+        b.readInt16LE(off+8));
       if(i%128===127) yield {cost:128};
     }
   }
-  return {id,nodes,externals};
+  // Keep only the vertices and triangles; the rest of the record is not read
+  // again. Its own allocation, so a small mesh cannot hold a shared Buffer
+  // pool block that also holds the discarded record copies.
+  const kept = Buffer.allocUnsafeSlow(at+4+nt*16);
+  b.copy(kept,0,0,at+4+nt*16);
+  const geometry = {bytes:kept,triangles:at+4,linksFor};
+  return {id,count:nt,geometry,externals,nodes:new Map()};
 }
-function npcSurface(node, pos) {
-  const [a,b,c] = node.points;
+function npcExternal(mesh, edge) {
+  if (!(edge>=0 && edge*3<mesh.externals.length)) return undefined;
+  const e=mesh.externals;
+  return {type:e[edge*3],mesh:e[edge*3+1],index:e[edge*3+2]};
+}
+// The triangle object for one index, made once and then reused, so the same
+// triangle is always the same object for routes, links and actors.
+function npcTriangleAt(mesh, index) {
+  if (!(index>=0 && index<mesh.count)) return undefined;
+  let node = mesh.nodes.get(index);
+  if (!node) {
+    node = Object.assign(Object.create(npcTriangle),{mesh:mesh.id,index,geometry:mesh.geometry});
+    mesh.nodes.set(index,node);
+  }
+  return node;
+}
+function npcSurfaceOf(points, pos) {
+  const [a,b,c] = points;
   const area = (b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
   if (Math.abs(area)<0.01) return null;
   const u = ((pos[0]-a[0])*(c[1]-a[1])-(pos[1]-a[1])*(c[0]-a[0]))/area;
@@ -61669,14 +61695,170 @@ function npcSurface(node, pos) {
   if (u < -0.00001 || v < -0.00001 || u+v > 1.00001) return null;
   return a[2]+u*(b[2]-a[2])+v*(c[2]-a[2]);
 }
+function npcSurface(node, pos) { return npcSurfaceOf(node.points,pos); }
+function npcWalkable(flags, s) { return !(flags&(8|32)) && (!(flags&512) || s.canSwim); }
+// The 512-unit tile index. Each tile lists triangle references (mesh slot
+// times 32768 plus triangle) in insertion order, in chunks of seven
+// references and a link to the next chunk, inside shared blocks of words.
+function createNpcNavTiles() {
+  const blockWords = 1<<18, blocks = [];
+  let chunks = 0, tiles = 0;
+  let head = new Uint32Array(1024), tail = new Uint32Array(1024), count = new Uint32Array(1024);
+  const key = (x,y) => x>-16384 && x<16384 && y>-16384 && y<16384 ? (x+16384)*32768+(y+16384) : x+':'+y;
+  const read = word => blocks[Math.floor(word/blockWords)][word%blockWords];
+  const write = (word,value) => { blocks[Math.floor(word/blockWords)][word%blockWords] = value; };
+  function chunk() {
+    const c = chunks++;
+    if (Math.floor(c*8/blockWords) >= blocks.length) blocks.push(new Uint32Array(blockWords));
+    return c;
+  }
+  function grow() {
+    if (tiles < head.length) return;
+    const larger = old => { const next = new Uint32Array(old.length*2); next.set(old); return next; };
+    head = larger(head); tail = larger(tail); count = larger(count);
+  }
+  function add(cell, x, y, ref) {
+    const k = key(x,y);
+    let t = cell.get(k);
+    if (t === undefined) { grow(); t = tiles++; cell.set(k,t); count[t] = 0; }
+    const n = count[t];
+    let c;
+    if (n === 0) { c = chunk(); head[t] = c; tail[t] = c; }
+    else if (n%7 === 0) { c = chunk(); write(tail[t]*8+7,c+1); tail[t] = c; }
+    else c = tail[t];
+    write(c*8+n%7,ref); count[t] = n+1;
+  }
+  function refs(cell, x, y) {
+    const t = cell.get(key(x,y)), out = [];
+    if (t === undefined) return out;
+    for (let c = head[t], i = 0, n = count[t]; i < n; i++) {
+      if (i && i%7 === 0) c = read(c*8+7)-1;
+      out.push(read(c*8+i%7));
+    }
+    return out;
+  }
+  function keys(cell) {
+    return Array.from(cell.keys(), k => typeof k === 'number' ?
+      [Math.floor(k/32768)-16384, k%32768-16384] : k.split(':').map(Number));
+  }
+  return {cell:() => new Map(), add, refs, keys, stats:() => ({tiles, chunks, blocks:blocks.length})};
+}
+// Navigation for one runtime: banks of nearby meshes, the sliced mesh work,
+// the tile index, reciprocal links and floor lookup. ready(bank) runs when a
+// bank's last mesh is finished.
+function createNpcNavigation(api, now, report, ready) {
+  const banks = new Map(), meshWork = [], sharedMeshes = new Map(), meshEntries = new Map(), cellTiles = new Map();
+  const slots = [], tiles = createNpcNavTiles();
+  let geometryVersion = 0;
+  const distance=(a,b)=>Math.hypot(...a.map((v,i)=>v-b[i]));
+  function locate(bank,pos,s,lift) {
+    let selected=null,best=Infinity;
+    for(const ref of tiles.refs(bank.tiles,Math.floor(pos[0]/512),Math.floor(pos[1]/512))) {
+      const mesh=slots[Math.floor(ref/32768)],index=ref%32768;
+      if(!bank.meshes.has(mesh.id) || !npcWalkable(npcTriangleFlags(mesh.geometry,index),s)) continue;
+      const z=npcSurfaceOf(npcTrianglePoints(mesh.geometry,index),pos);
+      if(z===null) continue;
+      const gap=Math.abs(pos[2]-z-(lift || 0));
+      if(gap < (lift===undefined ? 96 : 2) && gap<best) { selected=ref;best=gap; }
+    }
+    return selected===null ? null : npcTriangleAt(slots[Math.floor(selected/32768)],selected%32768);
+  }
+  function ensureBank(cell,pos) {
+    const key=cell+':'+Math.floor(pos[0]/4096)+':'+Math.floor(pos[1]/4096);
+    if(banks.has(key)) return banks.get(key);
+    const ids=api.getNavmeshRecords(cell,pos);
+    if(!cellTiles.has(cell)) cellTiles.set(cell,tiles.cell());
+    const bank={cell,ids,meshes:new Map(),tiles:cellTiles.get(cell),remaining:ids.length,ready:!ids.length,waiting:[]};
+    banks.set(key,bank);
+    for(const id of ids) {
+      let entry=meshEntries.get(id);
+      if(!entry) {entry={id,cell,banks:[],complete:false};meshEntries.set(id,entry);meshWork.push(entry);}
+      if(entry.complete) finishMesh(bank,id);
+      else entry.banks.push(bank);
+    }
+    return bank;
+  }
+  function finishMesh(bank,id) {
+    const mesh=sharedMeshes.get(id);
+    if(mesh) bank.meshes.set(id,mesh);
+    if(--bank.remaining!==0) return;
+    bank.ready=true;ready(bank);
+  }
+  function nodeLinks(n) {
+    if(n.linksVersion===geometryVersion) return n.cachedLinks;
+    const bank={meshes:sharedMeshes},links=[];
+    if(!bank.meshes.has(n.mesh)) return links;
+    for(let e=0;e<3;e++) {
+      const mesh=bank.meshes.get(n.mesh);
+      const external=!!(n.flags&(1<<e));
+      const edge=n.edges[e];
+      const ext=external && npcExternal(mesh,edge);
+      if(external && (!ext || ext.type!==0)) continue;
+      const targetMesh=external ? bank.meshes.get(ext.mesh) : mesh;
+      const other=targetMesh && npcTriangleAt(targetMesh,external ? ext.index : edge);
+      if(!other || other===n || other.flags&(8|32)) continue;
+      const p=n.points[e],q=n.points[(e+1)%3];
+      const oe=other.points.findIndex((v,j)=>
+        (distance(v,p)<0.1 && distance(other.points[(j+1)%3],q)<0.1) ||
+        (distance(v,q)<0.1 && distance(other.points[(j+1)%3],p)<0.1));
+      if(oe<0) continue;
+      const oext=!!(other.flags&(1<<oe));
+      const om=bank.meshes.get(other.mesh),olink=oext && npcExternal(om,other.edges[oe]);
+      const reciprocal=oext ? olink && olink.type===0 && olink.mesh===n.mesh && olink.index===n.index :
+        other.mesh===n.mesh && other.edges[oe]===n.index;
+      if(!reciprocal) continue;
+      if(!links.some(l=>l.node===other)) links.push(Object.assign(Object.create(npcPortal),{node:other,source:n,edge:e}));
+    }
+    n.linksVersion=geometryVersion;n.cachedLinks=links;return links;
+  }
+  // One slice of mesh work, inside the same cost, insertion and time budget.
+  function work() {
+    const job=meshWork.shift(),begin=now();
+    if(!job) return;
+    const {id}=job;
+    try {
+      if(!job.work) job.work=npcReadMeshWork(id,api.lookupEspmRecordById(id),nodeLinks);
+      let cost=0,insertions=0,done=false;
+      while(cost<512 && insertions<512 && now()-begin<4) {
+        if(!job.mesh) {
+          const step=job.work.next();
+          if(step.done) {
+            // A reference packs the slot with a 15-bit triangle into 32 bits.
+            if(slots.length>=131072) throw new Error('More than 131072 navigation meshes');
+            job.mesh=step.value;job.mesh.slot=slots.length;slots.push(job.mesh);job.at=0;continue;
+          }
+          cost+=step.value.cost;continue;
+        }
+        if(job.at===job.mesh.count) {sharedMeshes.set(id,job.mesh);geometryVersion++;done=true;break;}
+        const index=job.at++,geometry=job.mesh.geometry;cost++;
+        if(npcTriangleFlags(geometry,index)&(8|32)) continue;
+        const points=npcTrianglePoints(geometry,index);
+        const xs=points.map(p=>Math.floor(p[0]/512)),ys=points.map(p=>Math.floor(p[1]/512));
+        if((Math.max(...xs)-Math.min(...xs)+1)*(Math.max(...ys)-Math.min(...ys)+1)>256) continue;
+        const ref=job.mesh.slot*32768+index;
+        for(let x=Math.min(...xs);x<=Math.max(...xs);x++) for(let y=Math.min(...ys);y<=Math.max(...ys);y++) {
+          tiles.add(cellTiles.get(job.cell),x,y,ref);insertions++;
+        }
+      }
+      if(!done) {meshWork.unshift(job);return;}
+    } catch(e) { report('NPC mesh '+id.toString(16)+' rejected: '+e); }
+    job.complete=true;job.work=null;job.mesh=null;
+    for(const bank of job.banks) finishMesh(bank,id);
+    job.banks=[];
+  }
+  return {banks,ensureBank,locate,nodeLinks,work,pending:()=>meshWork.length,
+    meshes:sharedMeshes,cellTiles,tiles,slots,version:()=>geometryVersion};
+}
 function startSharedNpcServerRuntime(api, timers, now, report, population) {
   const property = 'thornswoodNpcActivity';
   api.makeProperty(property, {isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
   const handles = new Set(), actors = new Map(), order = [], preparing = [], owned = new Set(), unavailable = new Set();
-  const banks = new Map(), meshWork = [], sharedMeshes = new Map(), meshEntries = new Map(), cellTiles = new Map(), reactions = new Map(), knownFactions = new Set();
+  const reactions = new Map(), knownFactions = new Set();
+  const navigation = createNpcNavigation(api, now, report, bank => {preparing.push(...bank.waiting);bank.waiting=[];});
+  const {banks, ensureBank, locate} = navigation;
   const npcTiles = new Map();
   const enrolled = new Set(), excluded = new Set(), policies = new Map();
-  let stopped=false,cursor=0,total=0,loaded=0,backgroundCursor=0,nearCursor=0,geometryVersion=0;
+  let stopped=false,cursor=0,total=0,loaded=0,backgroundCursor=0,nearCursor=0;
   let humans=new Map(),near=new Set(),nearOrder=[],moved=0,attacks=0,failed=0,lastReport=now();
   function schedule(fn, delay) {
     if (stopped) return;
@@ -61727,97 +61909,9 @@ function startSharedNpcServerRuntime(api, timers, now, report, population) {
       Number.isFinite(s.meleeReach) && s.meleeReach>=0 && Number.isFinite(s.meleeAllowance) &&
       s.meleeAllowance>=16 && s.meleeAllowance<=96;
   }
-  function walkable(n,s) { return !(n.flags&(8|32)) && (!(n.flags&512) || s.canSwim); }
-  function locate(bank,pos,s,lift) {
-    let selected=null,best=Infinity;
-    for(const node of bank.tiles.get(tile(bank.cell,pos)) || []) {
-      if(!bank.meshes.has(node.mesh) || !walkable(node,s)) continue;
-      const z=npcSurface(node,pos);
-      if(z===null) continue;
-      const gap=Math.abs(pos[2]-z-(lift || 0));
-      if(gap < (lift===undefined ? 96 : 2) && gap<best) { selected=node;best=gap; }
-    }
-    return selected;
-  }
-  function ensureBank(cell,pos) {
-    const key=cell+':'+Math.floor(pos[0]/4096)+':'+Math.floor(pos[1]/4096);
-    if(banks.has(key)) return banks.get(key);
-    const ids=api.getNavmeshRecords(cell,pos);
-    if(!cellTiles.has(cell)) cellTiles.set(cell,new Map());
-    const bank={cell,ids,meshes:new Map(),tiles:cellTiles.get(cell),remaining:ids.length,ready:!ids.length,waiting:[]};
-    banks.set(key,bank);
-    for(const id of ids) {
-      let entry=meshEntries.get(id);
-      if(!entry) {entry={id,cell,banks:[],complete:false};meshEntries.set(id,entry);meshWork.push(entry);}
-      if(entry.complete) finishMesh(bank,id);
-      else entry.banks.push(bank);
-    }
-    return bank;
-  }
-  function finishMesh(bank,id) {
-    const mesh=sharedMeshes.get(id);
-    if(mesh) bank.meshes.set(id,mesh);
-    if(--bank.remaining!==0) return;
-    bank.ready=true;preparing.push(...bank.waiting);bank.waiting=[];
-  }
-  function nodeLinks(n) {
-    if(n.linksVersion===geometryVersion) return n.cachedLinks;
-    const bank={meshes:sharedMeshes},links=[];
-    if(!bank.meshes.has(n.mesh)) return links;
-    for(let e=0;e<3;e++) {
-      const mesh=bank.meshes.get(n.mesh);
-      const external=!!(n.flags&(1<<e));
-      const edge=n.edges[e];
-      const ext=external && mesh.externals[edge];
-      if(external && (!ext || ext.type!==0)) continue;
-      const targetMesh=external ? bank.meshes.get(ext.mesh) : mesh;
-      const other=targetMesh && targetMesh.nodes[external ? ext.index : edge];
-      if(!other || other===n || other.flags&(8|32)) continue;
-      const p=n.points[e],q=n.points[(e+1)%3];
-      const oe=other.points.findIndex((v,j)=>
-        (distance(v,p)<0.1 && distance(other.points[(j+1)%3],q)<0.1) ||
-        (distance(v,q)<0.1 && distance(other.points[(j+1)%3],p)<0.1));
-      if(oe<0) continue;
-      const oext=!!(other.flags&(1<<oe));
-      const om=bank.meshes.get(other.mesh),olink=oext && om.externals[other.edges[oe]];
-      const reciprocal=oext ? olink && olink.type===0 && olink.mesh===n.mesh && olink.index===n.index :
-        other.mesh===n.mesh && other.edges[oe]===n.index;
-      if(!reciprocal) continue;
-      if(!links.some(l=>l.node===other)) links.push(Object.assign(Object.create(npcPortal),{node:other,source:n,edge:e}));
-    }
-    n.linksVersion=geometryVersion;n.cachedLinks=links;return links;
-  }
+  function walkable(n,s) { return npcWalkable(n.flags,s); }
   function meshTick() {
-    const job=meshWork.shift(),begin=now();
-    if(job) {
-      const {id}=job;
-      try {
-        if(!job.work) job.work=npcReadMeshWork(id,api.lookupEspmRecordById(id),nodeLinks);
-        let cost=0,insertions=0,done=false;
-        while(cost<512 && insertions<512 && now()-begin<4) {
-          if(!job.mesh) {
-            const step=job.work.next();
-            if(step.done) {job.mesh=step.value;job.at=0;continue;}
-            cost+=step.value.cost;continue;
-          }
-          if(job.at===job.mesh.nodes.length) {sharedMeshes.set(id,job.mesh);geometryVersion++;done=true;break;}
-          const n=job.mesh.nodes[job.at++];cost++;
-          if(!n) continue;
-          if(n.flags&(8|32)) continue;
-          const xs=n.points.map(p=>Math.floor(p[0]/512)),ys=n.points.map(p=>Math.floor(p[1]/512));
-          if((Math.max(...xs)-Math.min(...xs)+1)*(Math.max(...ys)-Math.min(...ys)+1)>256) continue;
-          for(let x=Math.min(...xs);x<=Math.max(...xs);x++) for(let y=Math.min(...ys);y<=Math.max(...ys);y++) {
-            const key=job.cell+':'+x+':'+y,tiles=cellTiles.get(job.cell);
-            if(!tiles.has(key)) tiles.set(key,[]);
-            tiles.get(key).push(n);insertions++;
-          }
-        }
-        if(!done) {meshWork.unshift(job);schedule(meshTick,2);return;}
-      } catch(e) { report('NPC mesh '+id.toString(16)+' rejected: '+e); }
-      job.complete=true;job.work=null;job.mesh=null;
-      for(const bank of job.banks) finishMesh(bank,id);
-      job.banks=[];
-    }
+    navigation.work();
     schedule(meshTick,2);
   }
   function reject(id,error) {
@@ -62118,7 +62212,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population) {
     }
     if(now()-lastReport>=60000) {
       report('Shared NPC activity: '+owned.size+' server owned, '+actors.size+' active, '+loaded+' loaded, '+failed+' stationary; '+
-        moved+' movement steps, '+attacks+' accepted attacks, '+meshWork.length+' mesh jobs pending; '+
+        moved+' movement steps, '+attacks+' accepted attacks, '+navigation.pending()+' mesh jobs pending; '+
         'background work continues without connections');
       const merchantStatus=population && population.merchantStats && population.merchantStats();
       if(merchantStatus) report('NPC merchant purses: '+merchantStatus.verified+'/'+merchantStatus.catalogue+
@@ -62140,7 +62234,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population) {
     triangle:a.node.index,mesh:a.node.mesh,lastUpdate:a.last,paused:!!a.paused};},
     getStatus:()=>({loaded,controlled:owned.size,active:actors.size,unavailable:failed,
     preparing:preparing.length+Array.from(banks.values()).reduce((n,b)=>n+b.waiting.length,0),
-    pendingMeshes:meshWork.length,loadingComplete:cursor===total && total>0})};
+    pendingMeshes:navigation.pending(),loadingComplete:cursor===total && total>0})};
 }
 // NPC SERVER RUNTIME END
 
