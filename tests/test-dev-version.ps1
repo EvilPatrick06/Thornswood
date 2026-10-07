@@ -213,6 +213,30 @@ finally {
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+# ---- #2035: Updater.cs is written back with no byte order mark ------------
+# Ship writes Updater.cs for the bump, Unbump and the dev put-back. With
+# Set-Content -Encoding UTF8 that added a mark in Windows PowerShell 5.1 and
+# none in PowerShell 7, so a 5.1 Ship left the file changed in git by three
+# bytes. CI runs PowerShell 7, where Set-Content would pass a byte check, so
+# the script's own text is checked as well as the write.
+Yes 'Ship.ps1 never writes Updater.cs with Set-Content (#2035)' (-not ($src -match 'Set-Content\s+\$updaterCs'))
+$wm = [regex]::Match($src, '(?s)function Write-UpdaterCs\(\[string\]\$text\) \{.*?\r?\n\}')
+Yes 'Ship.ps1 has one writer for Updater.cs, Write-UpdaterCs' $wm.Success
+Yes 'and the bump, Unbump and the dev put-back all go through it' (([regex]::Matches($src, 'Write-UpdaterCs \$(src|back)')).Count -eq 3)
+if ($wm.Success) {
+    $bomTmp = Join-Path ([IO.Path]::GetTempPath()) ('tw-2035-' + [Guid]::NewGuid().ToString('N') + '.cs')
+    try {
+        $updaterCs = $bomTmp
+        . ([ScriptBlock]::Create($wm.Value))
+        $text = "using System;`r`n    public const string Version = `"1.2.0.1`";`r`n"
+        Write-UpdaterCs $text
+        $bytes = [IO.File]::ReadAllBytes($bomTmp)
+        Yes 'the file it writes starts with no byte order mark' (-not ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF))
+        Yes 'and holds exactly the text given, with no newline added' ([Text.Encoding]::UTF8.GetString($bytes) -ceq $text)
+    }
+    finally { Remove-Item -LiteralPath $bomTmp -Force -ErrorAction SilentlyContinue }
+}
+
 Write-Host ''
 Write-Host "$script:pass passed, $script:fail failed"
 exit $(if ($script:fail) { 1 } else { 0 })
