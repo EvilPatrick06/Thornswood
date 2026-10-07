@@ -138,6 +138,8 @@ if ($Dev -and -not (Test-Path (Join-Path $Root 'Launcher'))) {
 . (Join-Path $Here 'Release-Baseline.ps1')
 # The one name a release goes by, and what else it is known by (#444).
 . (Join-Path $Here 'Release-Name.ps1')
+# Which dev notes main has not had: the DEV marks and mainVersion (Dev-News.ps1).
+. (Join-Path $Here 'Dev-News.ps1')
 if (-not $ReleaseDir) { $ReleaseDir = Get-FeedStoreDir $Channel }
 if (-not (Test-Path -LiteralPath $ReleaseDir)) { New-Item -ItemType Directory -Path $ReleaseDir -Force | Out-Null }
 $haveLocal = (Test-Path -LiteralPath (Join-Path $ReleaseDir 'version.json')) -and (Test-Path -LiteralPath (Join-Path $ReleaseDir 'published.json'))
@@ -877,21 +879,50 @@ if ($removed.Count -gt $MaxRemovals -and -not $AcceptRemovals) {
 
 
 
-if (-not $changed.Count -and -not $realRemoved -and -not $profileChanged.Count -and -not $Launcher) {
-    Head 'Nothing to do'
-    Say 'The build matches what is already published.' 'Gray'
-    Write-Host ''
-    if (-not $NoPause) { [void](Read-Host 'Enter to close') }; exit 0
-}
-
+# NOTHING NEW IS NO RELEASE, AND EXIT CODE 2 SAYS SO, whichever way it is run.
+#
 # Running Ship twice in a row used to cut a second release that carried
 # nothing: no mod files, no removals, no launcher source, just a higher
 # version number that everyone still had to download. Exit code 2 tells Ship
-# that happened so it can put the version number back.
-if (-not $changed.Count -and -not $realRemoved -and -not $profileChanged.Count -and -not $srcChanged.Count) {
+# that happened so it can put the version number back, and so it tells nobody.
+#
+# Without -Launcher this used to exit 0. Since #921 a Ship whose launcher
+# sources are unchanged runs this without -Launcher, and 0 is what a release
+# that went out returns, so Ship went on to its after-release steps. Measured
+# 6 Oct: a dev Ship from main 2a8ebc9b printed "Nothing to do", then posted
+# the previous night's note to the dev updates channel a second time and told
+# the dev server "update in 5 min" for a release that did not exist.
+#
+# A DEV PUBLISH WITH NOTHING NEW STILL MARKS THE DEV FEED (Dev-News.ps1). Its
+# DEV marks and mainVersion follow main's feed, and they used to be worked out
+# only further down, on the way to a release, so a dev Ship made to bring them
+# up to date stopped here and left them as they were. The marks are sent alone,
+# version.json only and only when one moved, with no release.
+#
+# THE NOTE IS NOT ADDED. A note goes out with the release it describes: its
+# sourceCommit, its download size and the Discord post all belong to one, and
+# this run has none. Nothing on the dev feed writes a note without a release.
+if (-not $changed.Count -and -not $realRemoved -and -not $profileChanged.Count -and (-not $Launcher -or -not $srcChanged.Count)) {
     Head 'Nothing to do'
-    Say 'No mod files changed and no launcher source changed since the last release.' 'Gray'
-    Say 'Publishing now would hand everyone a new launcher that does nothing.' 'Gray'
+    if ($Launcher) {
+        Say 'No mod files changed and no launcher source changed since the last release.' 'Gray'
+        Say 'Publishing now would hand everyone a new launcher that does nothing.' 'Gray'
+    } else {
+        Say 'The build matches what is already published.' 'Gray'
+    }
+    Say 'Nothing was released, so nothing was added to the news.' 'Gray'
+    if ($Dev) {
+        Head "The dev feed's DEV marks"
+        try {
+            $marks = Update-DevFeedMarks -SourceRepo $RepoDir -Dir $ReleaseDir -Received -NoSend:$NoPush -SiteDir $SiteDir -SiteUrl $SiteUrl
+            $markLines = @(Get-DevFeedMarksLines $marks -NoSend:$NoPush)
+            foreach ($l in $markLines) { Say "  $l" 'DarkGray' }
+            $global:ThornswoodDevMarks = [pscustomobject]@{ Done = $true; Lines = $markLines }
+        } catch {
+            Say "  the dev marks were NOT refreshed: $($_.Exception.Message)" 'Yellow'
+            $global:ThornswoodDevMarks = [pscustomobject]@{ Done = $false; Lines = @($_.Exception.Message) }
+        }
+    }
     Write-Host ''
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }; exit 2
 }
@@ -1963,90 +1994,6 @@ if ($repeat) {
 }
 
 # ------------------------------------------------------- dev or main
-function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
-    if ($null -eq $mainDoc) { return }
-    $mainRelease = $mainDoc.PSObject.Properties['release']
-    $mainCommit = if ($mainRelease) { Val $mainDoc.release 'commit' } else { '' }
-    $mainClean = $mainRelease -and $mainDoc.release.PSObject.Properties['uncommitted'] -and $mainDoc.release.uncommitted -eq 0
-    # Main has a Dev source when the commit is an ancestor of Main's, or when
-    # Main took everything in it as a commit of its own.
-    #
-    # The second half is for squash merges, which is how pull requests merge
-    # here. A Dev release is often built from a branch; the branch is squashed
-    # onto main as one new commit and deleted, so the commit the Dev release
-    # recorded never becomes an ancestor of main, and its note stayed marked
-    # DEV after Main shipped the same work. Measured 5 Oct: 39 of the Dev
-    # feed's 40 notes were marked, the 1 and 2 Oct ones included, which went
-    # out on Main 1.1.105 on 3 Oct.
-    #
-    # The proof is by content, never by a headline: some commit on Main's own
-    # line since the two parted, one that touched the files the Dev commit
-    # changed, already held all of it, because merging the Dev commit into
-    # that commit gives that commit's own tree back. That is the squash commit
-    # itself. Main is not compared at its tip, because later work on the same
-    # lines (a newer engine pin, the next gamemode change) makes the merge
-    # conflict there although the work went in. Against main at c63e9fab this
-    # reads 3 of the 39 as still Dev, the three whose Dev release was built
-    # with uncommitted files: no commit records what those carried, so
-    # nothing can prove them.
-    #
-    # The release tags Ship pushes (release/dev/<id>) keep those commits
-    # fetchable after the branch is gone. A git too old for
-    # merge-tree --write-tree (before 2.38), or a commit this clone does not
-    # have, proves nothing, and the note stays marked.
-    $script:publishedSeen = @{}
-    function Is-Published([string]$commit) {
-        if (-not $mainClean -or $commit -notmatch '^[0-9a-f]{40}$' -or $mainCommit -notmatch '^[0-9a-f]{40}$') { return $false }
-        if ($script:publishedSeen.ContainsKey($commit)) { return $script:publishedSeen[$commit] }
-        $was = $global:LASTEXITCODE
-        $yes = $false
-        try {
-            if ((Invoke-ReleaseGit $sourceRepo @('merge-base', '--is-ancestor', $commit, $mainCommit)).Code -eq 0) { $yes = $true }
-            else {
-                $base = Invoke-ReleaseGit $sourceRepo @('merge-base', $commit, $mainCommit)
-                if ($base.Code -eq 0 -and $base.First -match '^[0-9a-f]{40}$') {
-                    $files = @((Invoke-ReleaseGit $sourceRepo @('diff', '--name-only', $base.First, $commit)).Lines |
-                        Where-Object { $_ } | ForEach-Object { ([string]$_).Trim() })
-                    # Every Main commit since they parted that touched those
-                    # files, oldest first, each with its tree. Past 200 files
-                    # the list would not fit on a Windows command line, so
-                    # every Main commit since they parted is tried instead.
-                    $walk = @('rev-list', '--first-parent', '--reverse', '--format=%T', ($base.First + '..' + $mainCommit))
-                    if ($files.Count -gt 0 -and $files.Count -le 200) { $walk += @('--') + $files }
-                    $lines = @((Invoke-ReleaseGit $sourceRepo $walk).Lines | ForEach-Object { ([string]$_).Trim() })
-                    for ($i = 0; $i + 1 -lt $lines.Count -and -not $yes; $i += 2) {
-                        if ($lines[$i] -notmatch '^commit ([0-9a-f]{40})$') { $i--; continue }
-                        $at = $Matches[1]
-                        $tree = $lines[$i + 1]
-                        $merged = Invoke-ReleaseGit $sourceRepo @('merge-tree', '--write-tree', $at, $commit)
-                        if ($merged.Code -eq 0 -and $merged.First -eq $tree) { $yes = $true }
-                        elseif ($merged.Code -gt 1) { break }   # this git has no merge-tree --write-tree
-                    }
-                }
-            }
-        }
-        finally { $global:LASTEXITCODE = $was }
-        $script:publishedSeen[$commit] = $yes
-        return $yes
-    }
-    # Before sourceCommit existed, the preceding Dev release is the only
-    # recorded source covering its historical notes. Dirty releases provide
-    # no such proof; matching a headline alone is never proof of promotion.
-    $legacyPublished = $false
-    if ($doc.PSObject.Properties['release'] -and $doc.release.PSObject.Properties['uncommitted'] -and $doc.release.uncommitted -eq 0) {
-        $legacyPublished = Is-Published (Val $doc.release 'commit')
-    }
-    $marked = 0
-    foreach ($n in @($news)) {
-        $commit = Val $n 'sourceCommit'
-        $published = if ($n.PSObject.Properties['sourceCommit']) { Is-Published $commit } else { $legacyPublished }
-        $want = if ($published) { '' } else { 'dev' }
-        Set-Prop $n 'channel' $want
-        if ($want -eq 'dev') { $marked++ }
-    }
-    Set-Prop $doc 'news' $news
-    return $marked
-}
 # Which of these notes the dev build has and main does not.
 #
 # The dev feed is a copy of main's, so it carries main's whole news list
@@ -2055,11 +2002,13 @@ function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
 # difference between the dev build and the build everybody plays, which is
 # the list of what wants testing before the two are made the same.
 #
-# Main's fresh release record proves which source commits have shipped.
-# Historical notes use the preceding clean Dev release as their source.
-# Headline changes therefore cannot leave completed work marked Dev-only.
+# The rule is Update-DevNewsChannels in Dev-News.ps1, the one place it lives
+# since 6 Oct, because a dev publish with nothing new and a main Ship mark the
+# dev feed by it too (Set-DevFeedMarks, Update-DevFeedMarks). Main's fresh
+# release record proves which source commits have shipped; historical notes
+# use the preceding clean Dev release as their source; headline changes
+# therefore cannot leave completed work marked Dev-only.
 if ($Dev) {
-    $mainVer = ''
     # Main's feed as the site serves it, read fresh on every dev publish, so
     # mainVersion and the news marks are what main has published, not whatever
     # this machine last saw. A stale copy is how the Dev News tab kept showing
@@ -2072,11 +2021,9 @@ if ($Dev) {
         Say "  could not read main's feed, so the dev marks were left alone: $($_.Exception.Message)" 'Yellow'
     }
     if ($null -ne $mainDoc) {
-        $mainVer = Val $mainDoc 'launcherVersion'
-        $marked = Update-DevNewsChannels $doc $news $mainDoc $RepoDir
-        Say ("  {0} note{1} marked dev, the ones main has not had" -f $marked, $(if ($marked -eq 1) { '' } else { 's' })) 'DarkGray'
-        Set-Prop $doc 'mainVersion' $mainVer
-        if ($mainVer) { Say "  main is on $mainVer, this one is on $launcherVersion" 'DarkGray' }
+        $marks = Set-DevFeedMarks $doc $mainDoc $RepoDir
+        Say ("  {0} note{1} marked dev, the ones main has not had" -f $marks.Marked, $(if ($marks.Marked -eq 1) { '' } else { 's' })) 'DarkGray'
+        if ($marks.MainVersion) { Say "  main is on $($marks.MainVersion), this one is on $launcherVersion" 'DarkGray' }
     } else {
         Say '  the site has no main feed, so the dev marks were left alone' 'Yellow'
     }
