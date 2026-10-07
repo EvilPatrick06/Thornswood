@@ -59,6 +59,7 @@ The outline nests, and the table of contents follows it. A part is a numbered se
     - [How work moves, the long form](#how-work-moves-the-long-form)
 - [3. How to release to dev](#3-how-to-release-to-dev)
   - [Say so, then write the note](#say-so-then-write-the-note)
+  - [Mark the dev notes again](#mark-the-dev-notes-again)
   - [Put the gamemode on the dev server](#put-the-gamemode-on-the-dev-server)
   - [Look before you post the news again](#look-before-you-post-the-news-again)
   - [What any developer may do](#what-any-developer-may-do)
@@ -1085,7 +1086,8 @@ The short form of the rules. The same decisions, with the dates they were made, 
 - The dev channel (`.\scripts\release\Ship.ps1 -Channel dev "what changed"`) may be
   run from any branch, from any developer's machine, to try work on the dev server.
   Say in #staff-general when you take it, because there is one dev feed and the last
-  dev Ship wins. A main Ship leaves the Dev feed and baseline unchanged.
+  dev Ship wins. A main Ship leaves the Dev feed and baseline unchanged, apart
+  from which dev notes are marked DEV (see Mark the dev notes again).
 - Every release note has a title and details, dev included. Patrick, 25 Sep,
   after two dev posts went out as "The scroll glows" and "Dev build: ...":
   they must have details and be as good as the ones before them. The notes
@@ -1295,6 +1297,19 @@ The note is what people read. The first line is a title of three words or more, 
 
 That publishes the dev feed, the dev launcher News tab, and the dev updates channel in Discord. It leaves the live feed alone.
 
+When the build matches what dev already has, Ship releases nothing and says so. It posts nothing to Discord, tells no server, and adds no news entry, because a note goes out with the release it describes. It still marks the dev notes again, below.
+
+### Mark the dev notes again
+
+The dev launcher's News tab marks a note DEV when the dev build has it and main does not. The marks follow main's feed. Every dev Ship works them out, a dev Ship with nothing new included, and every main Ship works them out for the dev feed as soon as main's feed is out. To do it on its own, with no release:
+
+```powershell
+.\scripts\release\Refresh-DevNews.ps1 -Check
+.\scripts\release\Refresh-DevNews.ps1
+```
+
+`-Check` says which notes would lose or gain the mark and sends nothing. Without it, the dev feed's `version.json` is sent, and only when a mark or `mainVersion` moved. No pack, no launcher, no Discord post, no server notice. Run it from a clone that has main's release commit (`git fetch` first), because git proves which notes main has.
+
 ### Put the gamemode on the dev server
 
 When the pull request changed `game\gamemode.js` or the dev server should run that release's gamemode:
@@ -1367,7 +1382,7 @@ git pull
 .\scripts\release\Ship.ps1 "what changed, in plain words"
 ```
 
-Ship writes nothing to this repository. The note has the same shape as a dev note. This publish goes to the live feed, the launcher News tab, the site news page, and Discord #news. It leaves the dev feed unchanged.
+Ship writes nothing to this repository. The note has the same shape as a dev note. This publish goes to the live feed, the launcher News tab, the site news page, and Discord #news. On the dev feed it changes only which notes are marked DEV, and `mainVersion`, so the dev News tab stops marking what main now has (see [Mark the dev notes again](#mark-the-dev-notes-again)).
 
 ### Deploy the live pieces the pull request touched
 
@@ -1408,7 +1423,11 @@ any branch on any developer's machine. There is no installer for it, and it
 posts to the dev updates channel in Discord and the dev launcher's News tab,
 never #news. There is one dev feed and the last dev Ship wins, so say in #staff-general
 when you take it. Main and Dev have independent feeds and baselines. A Main
-Ship leaves Dev unchanged; advance Dev through its own Ship.
+Ship leaves Dev's release unchanged; advance Dev through its own Ship. What a
+Main Ship does change on the dev feed is which notes are marked DEV and its
+`mainVersion`, right after main's feed is out (`Refresh-DevNews.ps1`, which
+sends the dev `version.json` alone and only when a mark moved). A Ship that
+releases nothing, either channel, posts nothing and tells no server.
 
 A main release, from your clone, on a machine that can sign:
 

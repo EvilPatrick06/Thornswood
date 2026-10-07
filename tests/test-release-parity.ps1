@@ -4,7 +4,10 @@ $repo = Split-Path -Parent $PSScriptRoot
 . (Join-Path $repo 'scripts\release\Release-Name.ps1')
 $publisher = Join-Path $repo 'scripts\release\Publish-Update.ps1'
 $ast = [Management.Automation.Language.Parser]::ParseFile($publisher, [ref]$null, [ref]$null)
-foreach ($name in 'Val', 'Set-Prop', 'Get-ReferenceInServerOrder', 'Get-ActiveOrderKey', 'Update-DevNewsChannels') {
+# The DEV marks rule lives in Dev-News.ps1 since 6 Oct, shared by a dev publish,
+# a dev publish with nothing new and a main Ship (Refresh-DevNews.ps1).
+. (Join-Path $repo 'scripts\release\Dev-News.ps1')
+foreach ($name in 'Val', 'Set-Prop', 'Get-ReferenceInServerOrder', 'Get-ActiveOrderKey') {
     $fn = $ast.Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name }, $true)
     if ($null -eq $fn) { throw "Publisher lacks $name" }
     Invoke-Expression $fn.Extent.Text

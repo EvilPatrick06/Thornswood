@@ -184,8 +184,16 @@ foreach ($sw in 'SkipRemirror', 'SkipVirusTotal', 'SkipPostShip', 'SkipLauncherU
 # Two post-publish calls, both through Invoke-PostShip, which is what reads an
 # exit code and remembers a failure. Named in a Say line is not running it, so
 # the AST is read for the calls rather than the file for the name.
-$calls = @($ship.Ast.FindAll({ param($n) $n -is $CmdAst -and $n.GetCommandName() -eq 'Invoke-PostShip' }, $true))
+$allCalls = @($ship.Ast.FindAll({ param($n) $n -is $CmdAst -and $n.GetCommandName() -eq 'Invoke-PostShip' }, $true))
+# Since 6 Oct a second one, on main only, moves the dev feed's DEV marks after
+# the remirror (Refresh-DevNews.ps1, tests\test-dev-news-refresh.ps1). It is
+# not a remirror and not a launcher step; anything else is a third call.
+$marksCall = @($allCalls | Where-Object { $_.Extent.Text -match "'Refresh-DevNews\.ps1'" })
+$calls = @($allCalls | Where-Object { $_.Extent.Text -notmatch "'Refresh-DevNews\.ps1'" })
 Yes ("  Ship has one Invoke-PostShip call for the remirror ({0})" -f $calls.Count) ($calls.Count -eq 1)
+Yes ("  and one for the dev feed's DEV marks, main only, never on a dry run ({0})" -f $marksCall.Count) (
+    $marksCall.Count -eq 1 -and @(Conditions $marksCall[0] | Where-Object { $_ -match '-not \$Dev\b' }).Count -gt 0 -and
+    @(Conditions $marksCall[0] | Where-Object { $_ -match '-not \$DryRun\b' }).Count -gt 0)
 $atPublish = $shipSrc.IndexOf("& (Join-Path `$Here 'Publish-Update.ps1') @pubArgs")
 $atNews = $shipSrc.IndexOf("'..\ops\Publish-News.ps1'")
 $atAnnounce = $shipSrc.IndexOf("'..\vps\Request-Restart.ps1'")
