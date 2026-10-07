@@ -134,14 +134,24 @@ function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
     # Before sourceCommit existed, the preceding Dev release is the only
     # recorded source covering its historical notes. Dirty releases provide
     # no such proof; matching a headline alone is never proof of promotion.
+    #
+    # No proof is not proof of the opposite. With a dirty release, or none,
+    # the feed says nothing new about those notes, so each keeps the mark it
+    # was last given while a clean release could speak for it. Marking them
+    # all DEV instead turned a dev Ship from a dirty tree (20261006-141047-dev,
+    # 6 Oct 2:10 PM) into 23 completed notes tagged DEV on the next refresh.
+    $legacyKnown = $false
     $legacyPublished = $false
     if ($doc.PSObject.Properties['release'] -and $doc.release.PSObject.Properties['uncommitted'] -and $doc.release.uncommitted -eq 0) {
+        $legacyKnown = $true
         $legacyPublished = Is-Published (Get-DevNewsVal $doc.release 'commit')
     }
     $marked = 0
     foreach ($n in @($news)) {
         $commit = Get-DevNewsVal $n 'sourceCommit'
-        $published = if ($n.PSObject.Properties['sourceCommit']) { Is-Published $commit } else { $legacyPublished }
+        if ($n.PSObject.Properties['sourceCommit']) { $published = Is-Published $commit }
+        elseif ($legacyKnown) { $published = $legacyPublished }
+        else { $published = ((Get-DevNewsVal $n 'channel') -ne 'dev') }
         $want = if ($published) { '' } else { 'dev' }
         Set-DevNewsProp $n 'channel' $want
         if ($want -eq 'dev') { $marked++ }
