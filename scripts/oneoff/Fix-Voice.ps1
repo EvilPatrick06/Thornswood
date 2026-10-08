@@ -21,7 +21,7 @@ param(
 
 # The refusal comes before anything else, so no part of it can run by accident.
 throw ('STOP. Fix-Voice.ps1 is retired and registers nothing (#2008). ' +
-       'The task it made, ThornswoodVoice, started C:\Thornswood-Voiceoice-server.js at boot ' +
+       'The task it made, ThornswoodVoice, started C:\Thornswood-Voice\voice-server.js at boot ' +
        'with none of the environment Install-Voice.ps1 gives voice, so no auth and no loopback ' +
        'bind, and it raced the real task for the port after every reboot. ' +
        'Install-Voice.ps1 does this job and takes that task off. The file is kept for the history.')
