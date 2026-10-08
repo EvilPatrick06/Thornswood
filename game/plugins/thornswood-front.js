@@ -2894,6 +2894,82 @@
     say('could not watch for the axe, so wood comes per press only: ' + e);
   }
 
+  /*
+    WHAT THE GAME SAYS IS IN EACH HAND WHEN A WEAPON IS DRAWN (#2039).
+
+    A measurement, not a fix. With nothing equipped, M1 sometimes draws with
+    the one-handed weapon ready pose and swing instead of raising the fists,
+    and only in some sessions: a later login on the same character raises the
+    fists. The server's saved record is the same either way (both hands empty,
+    every spell slot 0; read on dev on 8 Oct for ff000033 and ff000036), so
+    the difference is in the game's own state, and nothing logged it.
+
+    So this writes one line when the character's draw or attack starts: the
+    animation event, what is equipped in each hand, the item type the game
+    reports for each hand, and the hand types the behaviour graph is using
+    (iLeftHandType, iRightHandType), which is what picks the pose. At most one
+    line every two seconds. It changes nothing in play.
+
+    The hook only notes the event; the reads happen on the next frame, outside
+    the hook, and the frame handler returns at once while nothing is noted.
+  */
+  const HANDS_EVENT = /^(WeaponDraw|weaponDraw|AttackStart|attackStart|BowDraw|bowDraw)/;
+  const HANDS_EVERY_MS = 2000;
+  let handsAsked = '';
+  let handsSaidAt = 0;
+
+  function handsLine(eventName) {
+    const pc = sp.Game.getPlayer();
+    if (!pc) { return; }
+    const part = (label, read) => {
+      let v;
+      try { v = read(); } catch (e) { v = 'threw'; }
+      return label + ' ' + v;
+    };
+    const formOf = (f) => {
+      if (!f) { return 'none'; }
+      let id = 0, name = '';
+      try { id = f.getFormID() >>> 0; } catch (e) { id = 0; }
+      try { name = f.getName() || ''; } catch (e) { name = ''; }
+      return id.toString(16) + (name ? ' (' + name + ')' : '');
+    };
+    say('hands at ' + eventName + ': ' + [
+      part('right weapon', () => formOf(pc.getEquippedWeapon(false))),
+      part('left weapon', () => formOf(pc.getEquippedWeapon(true))),
+      part('right object', () => formOf(pc.getEquippedObject(1))),
+      part('left object', () => formOf(pc.getEquippedObject(0))),
+      part('right type', () => pc.getEquippedItemType(1)),
+      part('left type', () => pc.getEquippedItemType(0)),
+      part('iRightHandType', () => pc.getAnimationVariableInt('iRightHandType')),
+      part('iLeftHandType', () => pc.getAnimationVariableInt('iLeftHandType')),
+      part('weapon out', () => (pc.isWeaponDrawn() ? 'yes' : 'no'))
+    ].join(', '));
+  }
+
+  try {
+    sp.hooks.sendAnimationEvent.add({
+      enter: (ctx) => {
+        try {
+          const name = String(ctx.animEventName || '');
+          if (!handsAsked && HANDS_EVENT.test(name)) { handsAsked = name; }
+        } catch (err) { /* a hook must not throw into the game; this only notes a name */ }
+      },
+      leave() { }
+    }, 0x14, 0x14);
+  } catch (e) {
+    say('could not watch the hands at a draw: ' + e);
+  }
+
+  sp.on('update', guard('hands', () => {
+    if (!handsAsked) { return; }
+    const name = handsAsked;
+    handsAsked = '';
+    const now = Date.now();
+    if (now - handsSaidAt < HANDS_EVERY_MS) { return; }
+    handsSaidAt = now;
+    handsLine(name);
+  }));
+
   sp.on('containerChanged', guard('picks', (e) => {
     if (!e) { return; }
 
