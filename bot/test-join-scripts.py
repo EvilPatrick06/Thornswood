@@ -381,6 +381,9 @@ else:
         args = [PS, '-NoProfile', '-NonInteractive', '-ExecutionPolicy',
                 'Bypass', '-File', NIGHTLY,
                 '-GameRoot', os.path.join(box, 'game'),
+                # The dev server's root too, or the script reads the real
+                # C:\Thornswood-Server-Dev on the runner (#2043).
+                '-DevGameRoot', os.path.join(box, 'game-dev'),
                 '-SiteRoot', os.path.join(box, 'site'),
                 '-BotRoot', botroot,
                 '-CaddyRoot', os.path.join(box, 'caddy'),
