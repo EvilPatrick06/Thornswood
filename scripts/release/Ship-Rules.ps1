@@ -437,7 +437,7 @@ function Get-ShipUiBuildJsPath {
         $game = Get-Variable -Name GameDir -ValueOnly -ErrorAction SilentlyContinue
     }
     if (-not $game) { return '' }
-    return [IO.Path]::Combine([string]$game, 'Data\Platform\UI\build.js')
+    return Join-Path ([string]$game) 'Data\Platform\UI\build.js'
 }
 
 # The hashed asset names build.js names, parsed at ship time. Empty when there
@@ -477,7 +477,7 @@ function Test-ShipUiOurs([string]$rel, [string]$leaf) {
 function Test-ShipUiGoneByHash([string]$rel) {
     $game = Get-Variable -Name GameDir -ValueOnly -ErrorAction SilentlyContinue
     if (-not $game) { return $false }
-    $full = [IO.Path]::Combine([string]$game, $rel)
+    $full = Join-Path ([string]$game) $rel
     $have = Get-ShipFileSha256 $full
     if (-not $have) { return $false }
     return $ShipDaedricMenuHashes.Contains($have)
@@ -1585,7 +1585,7 @@ function Get-ShipDeleteAlways {
     foreach ($p in $ShipDeleteAlways) { $list.Add($p) }
     $game = Get-Variable -Name GameDir -ValueOnly -ErrorAction SilentlyContinue
     if ($game) {
-        $ui = [IO.Path]::Combine([string]$game, 'Data\Platform\UI')
+        $ui = Join-Path ([string]$game) 'Data\Platform\UI'
         if (Test-Path -LiteralPath $ui -PathType Container) {
             $have = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
             foreach ($p in $list) { [void]$have.Add($p) }

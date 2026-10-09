@@ -283,8 +283,8 @@ $lifted = [ordered]@{
     'OwnGame.ClientFile'       = Get-CsMember $og 'public static bool ClientFile(string rel)'
     'OwnGame.UiAssetsRel'      = Get-CsLine $og '(?m)^\s*const string UiAssetsRel = [^\r\n]*;'
     'OwnGame.UiHashedName'     = Get-CsLine $og '(?m)^\s*static readonly Regex UiHashedName = [^\r\n]*;'
-    'OwnGame.uiHashedOurs'     = Get-CsLine $og '(?m)^\s*static HashSet<string> uiHashedOurs;'
-    'OwnGame.uiHashedWalkRoot' = Get-CsLine $og '(?m)^\s*static string uiHashedWalkRoot;'
+    'OwnGame.uiHashedOursField' = Get-CsLine $og '(?m)^\s*static HashSet<string> uiHashedOurs;'
+    'OwnGame.uiHashedWalkRoot' = Get-CsLine $og '(?m)^\s*static string uiHashedWalkRoot = [^\r\n]*;'
     'OwnGame.UiHashedAssetName' = Get-CsMember $og 'static bool UiHashedAssetName(string leaf)'
     'OwnGame.ResetUiHashedOurs' = Get-CsMember $og 'static void ResetUiHashedOurs()'
     'OwnGame.LoadUiHashedList' = Get-CsMember $og 'static void LoadUiHashedList(HashSet<string> set, string path)'
@@ -339,7 +339,7 @@ namespace $ns
         $($lifted['OwnGame.ClientFile'])
         $($lifted['OwnGame.UiAssetsRel'])
         $($lifted['OwnGame.UiHashedName'])
-        $($lifted['OwnGame.uiHashedOurs'])
+        $($lifted['OwnGame.uiHashedOursField'])
         $($lifted['OwnGame.uiHashedWalkRoot'])
         $($lifted['OwnGame.UiHashedAssetName'])
         $($lifted['OwnGame.ResetUiHashedOurs'])

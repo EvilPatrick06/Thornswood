@@ -1900,7 +1900,7 @@ namespace Thornswood
         const string UiAssetsRel = "Data\\Platform\\UI\\thornswood-ui-assets.txt";
         static readonly Regex UiHashedName = new Regex("^[0-9a-f]{8,32}\\.(ttf|woff2?|eot|otf|svg|png|jpe?g|gif|wav|mp3|ogg|webp)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         static HashSet<string> uiHashedOurs;
-        static string uiHashedWalkRoot;
+        static string uiHashedWalkRoot = null;
 
         static bool UiHashedAssetName(string leaf)
         {
