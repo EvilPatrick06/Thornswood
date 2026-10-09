@@ -38,7 +38,13 @@
   scratch folder (tests\test-deploy-server-swap.ps1, tests\test-deploy-swaps.ps1).
   Keep it ASCII: a laptop on PowerShell 7 writes the file Remote sends without
   a byte order mark, and Windows PowerShell 5.1 at the far end reads it as ANSI.
+
+  $Wait in the swap is how long both ports may take. Left off on the caller,
+  it is the shared ceiling in ServerReadyWait.ps1, derived from measured Live
+  and Dev starts (#1938).
 #>
+
+. (Join-Path $PSScriptRoot 'ServerReadyWait.ps1')
 
 # ==== deploy-server remote blocks ====
 #
@@ -237,7 +243,8 @@ function StopOurs {
 
 # Both ports, from the box itself. UDP alone is not enough: the resources port
 # is what the launcher and the client fetch from, and it only opens once the
-# native server has been built without throwing.
+# native server has been built without throwing. $Wait is the shared ceiling
+# unless the caller passed -Wait (ServerReadyWait.ps1, #1938).
 function Answering {
   $until = (Get-Date).AddSeconds($Wait)
   while ($true) {
