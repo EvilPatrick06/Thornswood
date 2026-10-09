@@ -203,20 +203,247 @@ Yes 'a backup file in Data\Platform does not' (Test-ShipOtherServer 'Data\Platfo
 Yes 'another menu''s assets folder does not ship' (Test-ShipOtherServer 'Data\Platform\UI\assets\index-4f2a.js')
 Yes '  nor its app.js' (Test-ShipOtherServer 'Data\Platform\UI\app.js')
 Yes '  nor its vite.svg' (Test-ShipOtherServer 'Data\Platform\UI\vite.svg')
-# 20 September, 13:02: the first version of the UI rule called the front's own
-# 147 hashed fonts, icons and sounds foreign and the dev Ship left them out.
+
+# ---- Data\Platform\UI: only what build.js names, #1318 --------------------------
+#
+# Font names come from the real shipped build.js fixture, not a hand-kept pair.
+. (Join-Path $Here 'tests\fixtures\ui-front.ps1')
+function Get-UiNameSet($items) {
+    $s = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    foreach ($x in @($items)) {
+        $n = ([string]$x).Trim()
+        if ($n.Length -eq 0 -or $n[0] -eq '#') { continue }
+        [void]$s.Add($n)
+    }
+    return $s
+}
+function Test-UiNameSetsEqual($a, $b) {
+    $sa = Get-UiNameSet $a
+    $sb = Get-UiNameSet $b
+    if ($sa.Count -ne $sb.Count) { return $false }
+    foreach ($x in $sa) { if (-not $sb.Contains($x)) { return $false } }
+    return $true
+}
+function Test-UiParseRefuses([string]$js, [string]$named) {
+    $threw = $false
+    $namedIt = $false
+    try { $null = Read-ShipUiHashedAssetsFromText $js }
+    catch {
+        $threw = $true
+        $namedIt = $_.Exception.Message -match [regex]::Escape($named)
+    }
+    return ($threw -and $namedIt)
+}
+
+$uiFixtureJs = Get-UiFrontFixtureBuildJs
+# The Daedric set and unused fork assets live in one record. Ship-Rules and
+# OwnGame both load it; neither file may keep a second hand-copied list.
+$uiGoneRecord = Join-Path $Here 'records\ui-gone.json'
+Yes 'records\ui-gone.json is the one list of the Daedric set and unused fork assets' (Test-Path -LiteralPath $uiGoneRecord)
+$uiGoneDoc = Get-Content -LiteralPath $uiGoneRecord -Raw -Encoding UTF8 | ConvertFrom-Json
+$fromRecordDaedric = @($uiGoneDoc.daedric.PSObject.Properties | ForEach-Object { $_.Name })
+$fromRecordHashes = @($uiGoneDoc.daedric.PSObject.Properties | ForEach-Object { ([string]$_.Value).ToLowerInvariant() })
+$fromRecordUnused = @($uiGoneDoc.unused | ForEach-Object { [string]$_ })
+Yes 'Ship-Rules loaded every Daedric name from that record' (Test-UiNameSetsEqual @($ShipDaedricMenu.Keys) $fromRecordDaedric)
+Yes '  and every Daedric sha256' (Test-UiNameSetsEqual @($ShipDaedricMenu.Values) $fromRecordHashes)
+Yes '  and every unused fork name' (Test-UiNameSetsEqual $ShipUnusedFrontAssets $fromRecordUnused)
+$rulesText = [IO.File]::ReadAllText($RulesPath)
+$ogText = [IO.File]::ReadAllText((Join-Path $Here 'launcher\app\OwnGame.cs'))
+$sampleGone = [string](@($fromRecordDaedric)[0])
+Yes 'Ship-Rules.ps1 has no second hand-copied Daedric list' (
+    $rulesText.Contains('ui-gone.json') -and ($rulesText.IndexOf($sampleGone, [StringComparison]::OrdinalIgnoreCase) -lt 0))
+Yes 'OwnGame.cs has no second hand-copied Daedric list' (
+    $ogText.Contains('ui-gone.json') -and ($ogText.IndexOf($sampleGone, [StringComparison]::OrdinalIgnoreCase) -lt 0))
+Yes 'Build-Launcher.ps1 embeds that record' (
+    ([IO.File]::ReadAllText((Join-Path $Here 'scripts\release\Build-Launcher.ps1'))).Contains('ui-gone.json'))
+
+Yes 'the real shipped build.js is committed as a test fixture' (Test-Path -LiteralPath $uiFixtureJs)
+$uiExpected = Get-UiFrontFixtureExpectedNames
+$uiRealParsed = $null
+$uiRealThrew = $false
+try { $uiRealParsed = Read-ShipUiHashedAssetsFromText ([IO.File]::ReadAllText($uiFixtureJs)) }
+catch { $uiRealThrew = $true; Write-Host ('      ' + $_.Exception.Message) }
+Yes 'the real shipped build.js parses without throwing' (-not $uiRealThrew -and $null -ne $uiRealParsed)
+Yes '  and the parsed names are exactly the emitted hashed set from that file' (
+    -not $uiRealThrew -and (Test-UiNameSetsEqual $uiRealParsed $uiExpected))
+$uiFonts = @(Get-UiFrontFixtureFontNames)
+$uiFontA = [string]$uiFonts[0]
+$uiFontB = [string]$uiFonts[1]
+Yes '  and that set names the Futura PT Cond Book font the fixture emits' ($uiExpected.Contains($uiFontA))
+Yes '  and names the Futura PT Cond Medium font' ($uiExpected.Contains($uiFontB))
+
+$uiWork = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-ui-front-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+$uiDir = Join-Path $uiWork 'Data\Platform\UI'
+New-Item -ItemType Directory -Force -Path $uiDir | Out-Null
+# Webpack file-loader form: __webpack_require__.p + "hash.ext" / n.p+"hash.ext"
+$uiExcerpt = @"
+!function(e){var t={};function n(r){if(t[r])return t[r].exports;var o=t[r]={i:r,l:!1,exports:{}};return e[r].call(o.exports,o,o.exports,n),o.l=!0,o.exports}n.p="";n(0)}([
+function(e,t,n){e.exports=n.p+"$uiFontA";},
+function(e,t,n){e.exports=n.p+"$uiFontB";}
+]);
+"@
+[IO.File]::WriteAllText((Join-Path $uiDir 'build.js'), $uiExcerpt)
+[IO.File]::WriteAllText((Join-Path $uiDir $uiFontA), 'font-a')
+[IO.File]::WriteAllText((Join-Path $uiDir $uiFontB), 'font-b')
+[IO.File]::WriteAllText((Join-Path $uiDir 'index.html'), '<html></html>')
+[IO.File]::WriteAllText((Join-Path $uiDir 'thornswood-bridge.js'), 'overlay')
+[IO.File]::WriteAllText((Join-Path $uiDir 'thornswood-menu.jpg'), 'menu')
+[IO.File]::WriteAllText((Join-Path $uiDir 'thornswood-theme.mp3'), 'theme')
+$GameDir = $uiWork
+$script:ShipUiHashedCacheKey = ''
+$script:ShipUiHashedCache = $null
+$parsed = @(Get-ShipUiHashedAssets)
+Yes 'a webpack excerpt parses hashed names derived from the real file' (
+    $parsed.Count -gt 0 -and ($parsed -icontains $uiFontA) -and ($parsed -icontains $uiFontB))
+
 foreach ($rel in @(
     'Data\Platform\UI\index.html',
     'Data\Platform\UI\build.js',
     'Data\Platform\UI\thornswood-bridge.js',
-    'Data\Platform\UI\3f9c2a71d0.ttf',
-    'Data\Platform\UI\a81be0c4.svg',
-    'Data\Platform\UI\5d1e77aa.wav',
-    'Data\Platform\UI\menu_theme.mp3',
+    ('Data\Platform\UI\' + $uiFontA),
+    ('Data\Platform\UI\' + $uiFontB),
+    'Data\Platform\UI\thornswood-menu.jpg',
     'Data\Platform\UI\thornswood-theme.mp3'
 )) {
     Yes "$rel is the front's own and ships" (-not (Test-ShipOtherServer $rel) -and -not (Test-ShipMachine $rel) -and -not (Test-ShipRuntime $rel))
 }
+Yes 'an unnamed flat UI file does not ship' (Test-ShipOtherServer 'Data\Platform\UI\0123456789abcdef0123456789abcdef.png')
+Yes 'a non-hash bare name like logo.png is not counted as ours' (
+    -not ((Read-ShipUiHashedAssetsFromText 'e.exports=n.p+"logo.png";') -icontains 'logo.png') -and
+    (Test-ShipOtherServer 'Data\Platform\UI\logo.png'))
+
+# A renamed hashed asset in build.js is picked up with no list edit.
+$renamedExcerpt = $uiExcerpt.Replace($uiFontB, 'cafebabeface0123.png')
+[IO.File]::WriteAllText((Join-Path $uiDir 'build.js'), $renamedExcerpt)
+[IO.File]::WriteAllText((Join-Path $uiDir 'cafebabeface0123.png'), 'renamed-asset')
+$script:ShipUiHashedCacheKey = ''
+$script:ShipUiHashedCache = $null
+Yes 'a renamed hashed asset build.js names ships with no list edit' (
+    ((Get-ShipUiHashedAssets) -icontains 'cafebabeface0123.png') -and
+    -not (Test-ShipOtherServer 'Data\Platform\UI\cafebabeface0123.png'))
+# Put the excerpt back so later Save-ShipUiHashedAssets still finds both fonts.
+[IO.File]::WriteAllText((Join-Path $uiDir 'build.js'), $uiExcerpt)
+Remove-Item -LiteralPath (Join-Path $uiDir 'cafebabeface0123.png') -Force
+$script:ShipUiHashedCacheKey = ''
+$script:ShipUiHashedCache = $null
+
+# The 37 Daedric files never ship and every pack deletes them.
+foreach ($n in @($ShipDaedricMenu.Keys)) {
+    $rel = 'Data\Platform\UI\' + $n
+    Yes "$rel is never shipped" (Test-ShipOtherServer $rel)
+    Yes '  and every pack deletes it from every install' ($always -contains $rel)
+}
+# The unused fork svgs and bg.png, same treatment.
+foreach ($n in $ShipUnusedFrontAssets) {
+    $rel = 'Data\Platform\UI\' + $n
+    Yes "$rel is never shipped" (Test-ShipOtherServer $rel)
+    Yes '  and every pack deletes it from every install' ($always -contains $rel)
+}
+
+# A renamed copy of a Daedric file still counts, by sha256.
+$daedricName = @($ShipDaedricMenu.Keys)[0]
+$daedricHash = $ShipDaedricMenu[$daedricName]
+$renamedGone = Join-Path $uiDir 'not-the-original-name.jpg'
+[IO.File]::WriteAllText($renamedGone, 'daedric-renamed-copy')
+$renamedSha = Get-ShipFileSha256 $renamedGone
+[void]$ShipDaedricMenuHashes.Add($renamedSha)
+Yes 'a renamed copy whose sha256 is a Daedric hash does not ship' (Test-ShipOtherServer 'Data\Platform\UI\not-the-original-name.jpg')
+$goneAlways = @(Get-ShipDeleteAlways)
+Yes '  and every pack deletes that renamed copy too' ($goneAlways -contains 'Data\Platform\UI\not-the-original-name.jpg')
+[void]$ShipDaedricMenuHashes.Remove($renamedSha)
+Remove-Item -LiteralPath $renamedGone -Force
+
+# Guards: zero names, a missing named file, emitted non-bare URLs.
+$zeroJs = Join-Path $uiDir 'build.js'
+$savedJs = [IO.File]::ReadAllText($zeroJs)
+[IO.File]::WriteAllText($zeroJs, 'var k="./src/img/button_middle.svg"; function(){ return "no assets here"; }')
+$script:ShipUiHashedCacheKey = ''
+$script:ShipUiHashedCache = $null
+$srcIgnored = @(Read-ShipUiHashedAssetsFromText ([IO.File]::ReadAllText($zeroJs)))
+Yes 'source module ids with slashes are ignored, not a refuse' ($srcIgnored.Count -eq 0)
+$zeroThrew = $false
+try { $null = Save-ShipUiHashedAssets $uiWork } catch { $zeroThrew = $_.Exception.Message -match 'named no hashed assets' }
+Yes 'zero names parsed refuses to ship' $zeroThrew
+
+[IO.File]::WriteAllText($zeroJs, $uiExcerpt.Replace($uiFontB, 'abcdef0123456789.ttf'))
+$script:ShipUiHashedCacheKey = ''
+$script:ShipUiHashedCache = $null
+$missThrew = $false
+try { $null = Save-ShipUiHashedAssets $uiWork } catch { $missThrew = ($_.Exception.Message -like '*abcdef0123456789.ttf*' -and $_.Exception.Message -like '*not in Data\Platform\UI*') }
+Yes 'build.js naming a missing file refuses to ship' $missThrew
+
+Yes "an emitted 'img/x.png' refuses, naming the entry" (Test-UiParseRefuses 'e.exports=n.p+"img/x.png";' 'img/x.png')
+Yes "an emitted 'C:\x.png' refuses, naming the entry" (Test-UiParseRefuses 'e.exports=n.p+"C:\x.png";' 'C:\x.png')
+Yes "an emitted '/x.png' refuses, naming the entry" (Test-UiParseRefuses 'e.exports=n.p+"/x.png";' '/x.png')
+Yes "an emitted '../x.png' refuses, naming the entry" (Test-UiParseRefuses 'e.exports=n.p+"../x.png";' '../x.png')
+
+[IO.File]::WriteAllText($zeroJs, $savedJs)
+$script:ShipUiHashedCacheKey = ''
+$script:ShipUiHashedCache = $null
+$savedNames = @(Save-ShipUiHashedAssets $uiWork)
+$gameList = Get-Content -LiteralPath (Join-Path $uiWork $ShipUiAssetsRel)
+Yes 'Ship writes the parsed names into thornswood-ui-assets.txt' (
+    (Test-Path -LiteralPath (Join-Path $uiWork $ShipUiAssetsRel)) -and
+    (Test-UiNameSetsEqual $savedNames $parsed) -and
+    (Test-UiNameSetsEqual $gameList $parsed))
+
+# Pack ui-assets.txt and the release record must carry the same names by
+# content, not just a count. Publish-Update writes the zip entry from
+# $script:ShipUiHashedWritten; this reads that entry back from a zip built
+# the same way. New-ReleaseRecord takes the same list.
+function Read-PackUiAssetsFromZip([string]$zipPath, [string[]]$names) {
+    Add-Type -AssemblyName System.IO.Compression
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
+    $z = [IO.Compression.ZipFile]::Open($zipPath, 'Create')
+    try {
+        $ue = $z.CreateEntry('ui-assets.txt')
+        $uw = New-Object IO.StreamWriter ($ue.Open())
+        $uw.WriteLine('# hashed assets build.js named, #1318')
+        foreach ($n in $names) { $uw.WriteLine($n) }
+        $uw.Flush(); $uw.Dispose()
+    } finally { $z.Dispose() }
+    $z = [IO.Compression.ZipFile]::OpenRead($zipPath)
+    try {
+        $e = $z.GetEntry('ui-assets.txt')
+        if (-not $e) { return @() }
+        $sr = New-Object IO.StreamReader ($e.Open())
+        try { return @($sr.ReadToEnd() -split '\r?\n') }
+        finally { $sr.Dispose() }
+    } finally { $z.Dispose() }
+}
+. (Join-Path $Here 'scripts\release\Release-Name.ps1')
+$packUiLines = Read-PackUiAssetsFromZip (Join-Path $uiWork 'pack.zip') @($script:ShipUiHashedWritten)
+$uiRelease = New-ReleaseRecord 't' 'dev' '0' @('t') 't' '' '' 0 @($script:ShipUiHashedWritten)
+Yes 'pack zip ui-assets.txt names match the parse of build.js by content' (Test-UiNameSetsEqual $packUiLines $parsed)
+Yes 'the release record uiAssets match the parse of build.js by content' (Test-UiNameSetsEqual $uiRelease.uiAssets $parsed)
+
+# Same content check against the real shipped file, not the two-font excerpt.
+$uiRealWork = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-ui-real-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+$uiRealDir = Join-Path $uiRealWork 'Data\Platform\UI'
+New-Item -ItemType Directory -Force -Path $uiRealDir | Out-Null
+Copy-Item -LiteralPath $uiFixtureJs -Destination (Join-Path $uiRealDir 'build.js')
+[IO.File]::WriteAllText((Join-Path $uiRealDir 'index.html'), '<html></html>')
+foreach ($n in $uiExpected) {
+    [IO.File]::WriteAllText((Join-Path $uiRealDir $n), 'asset')
+}
+$script:ShipUiHashedCacheKey = ''
+$script:ShipUiHashedCache = $null
+$realSaved = @(Save-ShipUiHashedAssets $uiRealWork)
+$realGameList = Get-Content -LiteralPath (Join-Path $uiRealWork $ShipUiAssetsRel)
+$realPack = Read-PackUiAssetsFromZip (Join-Path $uiRealWork 'pack.zip') @($script:ShipUiHashedWritten)
+$realRelease = New-ReleaseRecord 't' 'dev' '0' @('t') 't' '' '' 0 @($script:ShipUiHashedWritten)
+Yes 'the ship record of the real build.js matches that parse by content' (Test-UiNameSetsEqual $realSaved $uiRealParsed)
+Yes '  and so does pack zip ui-assets.txt' (Test-UiNameSetsEqual $realPack $uiRealParsed)
+Yes '  and so does the release record uiAssets' (Test-UiNameSetsEqual $realRelease.uiAssets $uiRealParsed)
+Yes '  and so does the game file thornswood-ui-assets.txt' (Test-UiNameSetsEqual $realGameList $uiRealParsed)
+Remove-Item -LiteralPath $uiRealWork -Recurse -Force -ErrorAction SilentlyContinue
+
+Remove-Item -LiteralPath $uiWork -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Variable -Name GameDir -ErrorAction SilentlyContinue
+$script:ShipUiHashedCacheKey = ''
+$script:ShipUiHashedCache = $null
+
 # Held on dev until 22 September, then given to main by Patrick.
 Yes 'the theme is not held back from main any more' (-not (Test-ShipDevOnly 'Data\Platform\UI\thornswood-theme.mp3'))
 

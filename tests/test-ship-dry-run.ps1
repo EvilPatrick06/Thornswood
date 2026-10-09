@@ -264,6 +264,8 @@ try {
         Copy-Item -LiteralPath (Join-Path $realRel $n) -Destination (Join-Path $repo ('scripts\release\' + $n)) -Force
     }
     Copy-Item -LiteralPath (Join-Path $realRel '..\..\layout.json') -Destination (Join-Path $repo 'layout.json') -Force
+    New-Item -ItemType Directory -Force -Path (Join-Path $repo 'records') | Out-Null
+    Copy-Item -LiteralPath (Join-Path $realRel '..\..\records\ui-gone.json') -Destination (Join-Path $repo 'records\ui-gone.json') -Force
     New-Item -ItemType Directory -Force -Path (Join-Path $repo 'scripts\mods') | Out-Null
     Copy-Item -LiteralPath (Join-Path $realRel '..\mods\LoadOrder.ps1') -Destination (Join-Path $repo 'scripts\mods\LoadOrder.ps1') -Force
     # What Ship.ps1 dot-sources, which a stand-in cannot write down because it

@@ -45,6 +45,7 @@ $Here = Split-Path -Parent $Here
 if (-not $PublishPath) { $PublishPath = Join-Path $Here 'scripts\release\Publish-Update.ps1' }
 $ToolsDir = Split-Path -Parent $PublishPath
 . (Join-Path $Here 'tests\fixtures\generated-bodies.ps1')
+. (Join-Path $Here 'tests\fixtures\ui-front.ps1')
 
 $script:pass = 0
 $script:fail = 0
@@ -84,9 +85,11 @@ function New-Install([string]$name, [string[]]$record, [int64]$bytes) {
         New-GeneratedBodies $root (Split-Path -Parent $tools)
     }
     # One file of ours, the size the case asks for. Under Data\Platform\UI, since
-    # outside it only what Ship-Rules names is ours (#1178).
-    $fs = [IO.File]::Create((Join-Path $root 'Game\Data\Platform\UI\ours.bsa'))
+    # outside it only what Ship-Rules names is ours (#1178), and under UI only
+    # index.html, build.js, thornswood-* and hashed assets build.js names (#1318).
+    $fs = [IO.File]::Create((Join-Path $root 'Game\Data\Platform\UI\thornswood-ours.bsa'))
     try { $fs.SetLength($bytes) } finally { $fs.Dispose() }
+    Install-UiFrontFixture (Join-Path $root 'Game')
     return $root
 }
 
@@ -140,7 +143,7 @@ try {
                    'scripts\release\Feed-Store.ps1', 'scripts\release\Source-Notice.ps1',
                    'scripts\release\Release-Baseline.ps1', 'scripts\release\Release-Name.ps1', 'scripts\release\Dev-News.ps1',
                    'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt',
-                   'scripts\release\Where.ps1', 'records\client-build.json',
+                   'scripts\release\Where.ps1', 'records\client-build.json', 'records\ui-gone.json',
                    'scripts\mods\Generated.ps1', 'records\generated.json',
                    # LoadOrder.ps1 compiles the Vortex state reader from the
                    # launcher's source since #1416, and the publish reads the
@@ -178,7 +181,7 @@ try {
     Unchanged $r
 
     # ---- a record that names nothing from Vortex is no record ------------------
-    $r = Invoke-Publish (New-Install 'empty-record' @('F|O|4096|638000000000000000|Data\Platform\UI\ours.bsa') $small) @()
+    $r = Invoke-Publish (New-Install 'empty-record' @('F|O|4096|638000000000000000|Data\Platform\UI\thornswood-ours.bsa') $small) @()
     Yes 'with a files.txt that names nothing from Vortex the publisher stops' ($r.Code -eq 1)
     Yes '  and says the record lists nothing' ($r.Out -match 'lists nothing')
     Unchanged $r
@@ -191,7 +194,7 @@ try {
     $r = Invoke-Publish (New-Install 'over-cap' $vortex $big) @('-MaxReleaseMB', '1')
     Yes 'a release over -MaxReleaseMB is refused' ($r.Code -eq 1)
     Yes '  by the size gate, which names the cap' ($r.Out -match 'the cap is 1 MB')
-    Yes '  and lists what made it big' ($r.Out -match 'ours\.bsa')
+    Yes '  and lists what made it big' ($r.Out -match 'thornswood-ours\.bsa')
     Yes '  and says nothing was published' ($r.Out -match 'Nothing was published')
     Yes '  after the record check let it through' ($r.StoppedGame)
     Unchanged $r

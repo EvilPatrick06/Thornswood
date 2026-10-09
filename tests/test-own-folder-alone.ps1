@@ -122,7 +122,13 @@ namespace Thornswood
         public static string VortexProfileDir(string name) { return null; }
         public static bool GameRunning() { return false; }
     }
-    static class Keep { public static List<string> Held() { return new List<string>(); } }
+    static class Keep
+    {
+        public static List<string> Held() { return new List<string>(); }
+        // OwnGame.Foreign reads the hashed UI asset list Ship wrote, from Keep
+        // among other roots (#1318).
+        public static string Dir { get { return System.IO.Path.Combine(Paths.ProfileDir, "Keep"); } }
+    }
     // An install that never synced to a release record (Sync.cs): every record
     // of Thornswood's own files is its packs', Keep's and the installer's.
     static class Updater
@@ -483,6 +489,7 @@ namespace Thornswood
             T = args[0];
             try
             {
+                UiGoneCompiledIn();
                 OneGap();
                 SteamMovesOn();
                 FirstFromNewer();
@@ -499,6 +506,30 @@ namespace Thornswood
             }
             Console.WriteLine("driver: " + pass + " passed, " + fail + " failed");
             return fail > 0 ? 1 : 0;
+        }
+
+        // records\ui-gone.json is compiled in. OwnGame.Foreign reads that
+        // copy, not a test override. 37 Daedric names and hashes, 42 unused.
+        static void UiGoneCompiledIn()
+        {
+            Yes("a Daedric jpg from the compiled-in gone record is not ours",
+                OwnGame.Foreign("Data\\Platform\\UI\\0d38fd98ca293be5d0c8270fef9dedef.jpg"));
+            var flags = BindingFlags.NonPublic | BindingFlags.Static;
+            var leaves = typeof(OwnGame).GetField("uiGoneLeaves", flags).GetValue(null) as HashSet<string>;
+            var hashes = typeof(OwnGame).GetField("uiGoneHashes", flags).GetValue(null) as HashSet<string>;
+            int daedric = 0, unused = 0;
+            if (leaves != null)
+            {
+                foreach (string n in leaves)
+                {
+                    string x = (n ?? "").ToLowerInvariant();
+                    if (x.EndsWith(".svg") || x == "bg.png") unused++;
+                    else daedric++;
+                }
+            }
+            Yes("the compiled-in gone record has 37 Daedric names", daedric == 37);
+            Yes("  and 37 Daedric hashes", hashes != null && hashes.Count == 37);
+            Yes("  and 42 unused names", unused == 42);
         }
 
         // One plugin the published collection does not ship must not read as
@@ -938,7 +969,8 @@ try {
         '    "Data\\Video\\BGS_Logo.bik": { "bytes": 10, "sha1": "b5c2432d19146126a033d65dcb4e3ce01d88cfff", "depot": "1" }'
     )
     [IO.File]::WriteAllText($skyrimList, "{`n  ""build"": ""1.6.1170"",`n  ""files"": {`n" + ($listed -join ",`n") + "`n  }`n}`n", $utf8)
-    $cscArgs = @('/noconfig', '/nologo', '/target:exe', '/warn:0', "/out:$exe", "/resource:$skyrimList,skyrim-files.json")
+    $uiGoneList = Join-Path $Here 'records\ui-gone.json'
+    $cscArgs = @('/noconfig', '/nologo', '/target:exe', '/warn:0', "/out:$exe", "/resource:$skyrimList,skyrim-files.json", "/resource:$uiGoneList,ui-gone.json")
     foreach ($r in $refs) { $cscArgs += "/reference:$r" }
     foreach ($f in $real) { $cscArgs += (Resolve-Path -LiteralPath $f).Path }
     $cscArgs += $stubFile

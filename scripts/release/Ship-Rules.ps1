@@ -41,6 +41,8 @@
       Ensure-ShipRequiredData      place those files into Data\ before a pack or installer scan
       Get-ShipSymbolDir            where this machine keeps launcher/setup .pdb per version (#462)
       Save-ShipSymbols             copy .pdb from a build folder into Get-ShipSymbolDir
+      Get-ShipUiHashedAssets       hashed asset names parsed from Data\Platform\UI\build.js
+      Save-ShipUiHashedAssets      parse, refuse a bad front, write thornswood-ui-assets.txt
 
   Paths are relative to the game folder, with backslashes.
 #>
@@ -283,6 +285,189 @@ $ShipOldSkyUIScripts = @(
     'Data\Scripts\ski_widgetmanager.pex'
 )
 
+# ANOTHER SERVER'S MENU UNDER Data\Platform\UI, issue #1318.
+#
+# 37 files from Daedric Online's menu (11 jpg, 22 png, 3 EB Garamond ttf,
+# menu_theme.mp3) sat on the shipping machine and went out in every installer
+# and pack with no licence. Nothing in this repository names them: build.js
+# names none, and nothing else under Data\Platform does. Djinn, 9 Oct: remove
+# them for good. They never ship, and every pack deletes them from installs.
+# Matched by sha256 as well as by name, so a renamed copy still counts.
+#
+# The 41 unused skymp5-front svgs and bg.png beside them (the old "42 more
+# files" row in THIRD-PARTY.md) are dead weight too: build.js names none of
+# them. They stop shipping and every pack deletes them from installs as well.
+#
+# WHAT IS OURS UNDER UI. Only index.html, build.js, thornswood-* files, and
+# the hashed assets build.js actually names. That last list is parsed from
+# build.js at ship time, never kept by hand. OwnGame.Foreign reads the list
+# Ship wrote into the pack rather than parsing build.js itself.
+$ShipUiAssetsRel = 'Data\Platform\UI\thornswood-ui-assets.txt'
+$ShipUiHashedPattern = '^[0-9a-f]{8,32}\.(ttf|woff2?|eot|otf|svg|png|jpe?g|gif|wav|mp3|ogg|webp)$'
+# One record, records\ui-gone.json: the 37 Daedric names and sha256 values,
+# and the 42 unused fork names. OwnGame.Foreign reads the same file (Build-Launcher
+# embeds it). A second hand-copied list here would drift.
+$ShipUiGoneRecord = Join-Path $PSScriptRoot '..\..\records\ui-gone.json'
+if (-not (Test-Path -LiteralPath $ShipUiGoneRecord -PathType Leaf)) {
+    throw 'records\ui-gone.json is missing, so the Daedric menu set and unused fork assets cannot be kept out.'
+}
+$script:ShipUiGoneDoc = Get-Content -LiteralPath $ShipUiGoneRecord -Raw -Encoding UTF8 | ConvertFrom-Json
+$ShipDaedricMenu = [ordered]@{}
+foreach ($p in @($script:ShipUiGoneDoc.daedric.PSObject.Properties)) {
+    $ShipDaedricMenu[$p.Name] = ([string]$p.Value).ToLowerInvariant()
+}
+$ShipUnusedFrontAssets = @($script:ShipUiGoneDoc.unused | ForEach-Object { [string]$_ })
+$ShipDaedricMenuHashes = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+foreach ($h in $ShipDaedricMenu.Values) { [void]$ShipDaedricMenuHashes.Add($h) }
+$ShipUiGoneLeaves = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+foreach ($n in $ShipDaedricMenu.Keys) { [void]$ShipUiGoneLeaves.Add($n) }
+foreach ($n in $ShipUnusedFrontAssets) { [void]$ShipUiGoneLeaves.Add($n) }
+
+function Get-ShipFileSha256([string]$full) {
+    if (-not $full -or -not (Test-Path -LiteralPath $full -PathType Leaf)) { return '' }
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        $fs = New-Object IO.FileStream($full, [IO.FileMode]::Open, [IO.FileAccess]::Read, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+        try { return ([BitConverter]::ToString($sha.ComputeHash($fs))).Replace('-', '').ToLowerInvariant() }
+        finally { $fs.Dispose() }
+    }
+    finally { $sha.Dispose() }
+}
+
+# Webpack file-loader (and asset modules) emit the publicPath concatenated
+# with the output file name:
+#   module.exports = __webpack_require__.p + "hash.ext";
+#   e.exports=n.p+"hash.ext";
+# A webpack *dev* eval build wraps that in a string, so the quotes are
+# escaped:
+#   eval("module.exports = __webpack_require__.p + \"hash.ext\";")
+# Quoted source module ids ("./src/img/foo.svg") are webpack keys, not
+# concatenations, and are ignored. A concatenation whose URL is not a bare
+# name (slash, '..', drive, or rooted) refuses the ship, naming the entry.
+# A bare name that is not a hashed asset is ignored, not counted as ours.
+function Read-ShipUiHashedAssetsFromText([string]$text) {
+    $names = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    $concatRe = '(?:__webpack_require__|n)\.p\s*\+\s*(?:\\"([^"]*)\\"|\"([^"]*)\")'
+    foreach ($m in [regex]::Matches($text, $concatRe)) {
+        $s = $m.Groups[1].Value
+        if ([string]::IsNullOrEmpty($s)) { $s = $m.Groups[2].Value }
+        $s = $s.Replace('\/', '/').Replace('\\', '\')
+        $q = $s.IndexOf('?')
+        if ($q -ge 0) { $s = $s.Substring(0, $q) }
+        if ([string]::IsNullOrEmpty($s)) { continue }
+        $rooted = $s.StartsWith('/') -or $s.StartsWith('\') -or ($s.Length -ge 2 -and $s[1] -eq [char]':')
+        $dots = $s -match '(^|[\\/])\.\.($|[\\/])'
+        if ($rooted -or $dots -or $s.Contains('/') -or $s.Contains('\')) {
+            throw ("build.js names '{0}', which is not a bare hashed asset (slash, '..', or a rooted path). Nothing was packed." -f $s)
+        }
+        if ($s -notmatch $ShipUiHashedPattern) { continue }
+        [void]$names.Add($s)
+    }
+    return $names
+}
+
+$script:ShipUiHashedCacheKey = ''
+$script:ShipUiHashedCache = $null
+$script:ShipUiHashedGameDir = $null
+$script:ShipUiHashedWritten = @()
+
+function Get-ShipUiBuildJsPath {
+    $game = $script:ShipUiHashedGameDir
+    if (-not $game) {
+        $game = Get-Variable -Name GameDir -ValueOnly -ErrorAction SilentlyContinue
+    }
+    if (-not $game) { return '' }
+    return Join-Path ([string]$game) 'Data\Platform\UI\build.js'
+}
+
+# The hashed asset names build.js names, parsed at ship time. Empty when there
+# is no GameDir or no build.js, so a unit test that only asks a path still
+# runs. A bad path in build.js throws, which is how a ship is refused.
+function Get-ShipUiHashedAssets {
+    $build = Get-ShipUiBuildJsPath
+    if (-not $build -or -not (Test-Path -LiteralPath $build -PathType Leaf)) {
+        return @()
+    }
+    $item = Get-Item -LiteralPath $build
+    $key = '{0}|{1}|{2}' -f $item.FullName, $item.Length, $item.LastWriteTimeUtc.Ticks
+    if ($script:ShipUiHashedCacheKey -eq $key -and $null -ne $script:ShipUiHashedCache) {
+        return $script:ShipUiHashedCache
+    }
+    $set = Read-ShipUiHashedAssetsFromText ([IO.File]::ReadAllText($build))
+    $script:ShipUiHashedCache = @($set)
+    $script:ShipUiHashedCacheKey = $key
+    return $script:ShipUiHashedCache
+}
+
+function Test-ShipUiHashedAssetName([string]$leaf) {
+    return [bool]($leaf -and ($leaf -match $ShipUiHashedPattern))
+}
+
+# Ours under Data\Platform\UI: index.html, build.js, thornswood-* files, and
+# hashed assets build.js named. Everything else flat or nested is not ours.
+function Test-ShipUiOurs([string]$rel, [string]$leaf) {
+    if ($leaf -ieq 'index.html' -or $leaf -ieq 'build.js') { return $true }
+    if ($leaf -like 'thornswood-*') { return $true }
+    if (Test-ShipUiHashedAssetName $leaf) {
+        foreach ($n in @(Get-ShipUiHashedAssets)) { if ($n -ieq $leaf) { return $true } }
+    }
+    return $false
+}
+
+function Test-ShipUiGoneByHash([string]$rel) {
+    $game = Get-Variable -Name GameDir -ValueOnly -ErrorAction SilentlyContinue
+    if (-not $game) { return $false }
+    $full = Join-Path ([string]$game) $rel
+    $have = Get-ShipFileSha256 $full
+    if (-not $have) { return $false }
+    return $ShipDaedricMenuHashes.Contains($have)
+}
+
+# Ship-time guard: parse build.js, refuse on zero names, refuse if a named
+# file is missing, refuse a bad path (Read-ShipUiHashedAssetsFromText throws).
+# Writes the parsed names into Data\Platform\UI\thornswood-ui-assets.txt so
+# the pack carries them and OwnGame.Foreign can read them.
+function Save-ShipUiHashedAssets([string]$GameFolder) {
+    if (-not $GameFolder) { throw 'Save-ShipUiHashedAssets needs the game folder.' }
+    $savedParse = $script:ShipUiHashedGameDir
+    $script:ShipUiHashedGameDir = $GameFolder
+    $savedGame = Get-Variable -Name GameDir -ValueOnly -ErrorAction SilentlyContinue
+    $GameDir = $GameFolder
+    try {
+        $build = Join-Path $GameFolder 'Data\Platform\UI\build.js'
+        if (-not (Test-Path -LiteralPath $build -PathType Leaf)) {
+            throw 'Data\Platform\UI\build.js is missing, so the front''s hashed assets cannot be derived. Nothing was packed.'
+        }
+        $script:ShipUiHashedCacheKey = ''
+        $script:ShipUiHashedCache = $null
+        $names = @(Get-ShipUiHashedAssets)
+        if ($names.Count -eq 0) {
+            throw 'build.js named no hashed assets, so the parse is wrong or the front is empty. Nothing was packed.'
+        }
+        $ui = Join-Path $GameFolder 'Data\Platform\UI'
+        foreach ($n in $names) {
+            $at = Join-Path $ui $n
+            if (-not (Test-Path -LiteralPath $at -PathType Leaf)) {
+                throw ("build.js names '{0}', which is not in Data\Platform\UI. Nothing was packed." -f $n)
+            }
+        }
+        $sorted = @($names | Sort-Object { $_.ToLowerInvariant() })
+        $lines = New-Object 'System.Collections.Generic.List[string]'
+        [void]$lines.Add('# Hashed assets Data\Platform\UI\build.js named. Written by Ship at pack time (#1318).')
+        [void]$lines.Add('# One bare file name per line. OwnGame.Foreign reads this rather than parsing build.js.')
+        foreach ($n in $sorted) { [void]$lines.Add($n) }
+        $out = Join-Path $GameFolder $ShipUiAssetsRel
+        [IO.File]::WriteAllLines($out, $lines)
+        $script:ShipUiHashedWritten = $sorted
+        return $sorted
+    }
+    finally {
+        $script:ShipUiHashedGameDir = $savedParse
+        if ($null -ne $savedGame) { $GameDir = $savedGame }
+        else { Remove-Variable -Name GameDir -ErrorAction SilentlyContinue }
+    }
+}
+
 function Test-ShipOtherServer([string]$rel) {
     # The client runtime, before anything else is asked: ours when it is the
     # recorded build, and not ours when it is anything else or is not there.
@@ -333,18 +518,23 @@ function Test-ShipOtherServer([string]$rel) {
         if ($leaf -like 'thornswood-*.js') { return $false }
         return $true
     }
-    # Under UI, ours is flat: index.html, build.js, our thornswood-*.js
-    # overlays, and the front's own hashed fonts, icons and sounds beside
-    # build.js (a .ttf, .svg, .png, .wav or .mp3 named by its hash, and
-    # menu_theme.mp3). Somebody else's menu is a Vite build, which has an
-    # assets folder, an app.js and a vite.svg. The first version of this rule
-    # on 20 September whitelisted three names and called the front's own 147
-    # asset files foreign, which the dev Ship of 13:02 duly left out of the
-    # pack; a fresh installer would have shipped a front with no fonts.
+    # Under UI, ours is only index.html, build.js, thornswood-* files, and
+    # the hashed assets build.js names (parsed at ship time, #1318). Nested
+    # paths, another menu's Vite files, the Daedric set, the unused fork
+    # svgs and bg.png, and any unnamed flat file are not ours. A renamed
+    # copy of the Daedric set still counts, by sha256. The first version of
+    # this rule on 20 September whitelisted three names and called the
+    # front's own hashed files foreign; the 13:02 dev Ship left them out.
+    # The next version treated every flat file as ours, which is how the 37
+    # slipped through.
     if ($rel -like 'Data\Platform\UI\*') {
-        if ($rel -like 'Data\Platform\UI\assets\*') { return $true }
+        $rest = $rel.Substring('Data\Platform\UI\'.Length)
+        if ($rest.Contains('\') -or $rest.Contains('/')) { return $true }
         if ($leaf -ieq 'app.js' -or $leaf -ieq 'vite.svg') { return $true }
-        return $false
+        if ($ShipUiGoneLeaves.Contains($leaf)) { return $true }
+        if (Test-ShipUiGoneByHash $rel) { return $true }
+        if (Test-ShipUiOurs $rel $leaf) { return $false }
+        return $true
     }
     return $false
 }
@@ -1322,8 +1512,36 @@ $ShipDeleteAlways = @(
 # error box. The collection's SkyUI keeps its scripts inside SkyUI_SE.bsa, so
 # nothing it installs is lost. See $ShipOldSkyUIScripts above.
 $ShipDeleteAlways += $ShipOldSkyUIScripts
+# The Daedric menu set and the unused fork svgs plus bg.png, issue #1318:
+# leaving them out of new packs does nothing for the machines that already
+# have them. Every pack deletes these names. Get-ShipDeleteAlways also adds
+# a renamed copy whose bytes still match a Daedric sha256.
+$ShipUiGonePaths = @($ShipDaedricMenu.Keys | ForEach-Object { 'Data\Platform\UI\' + $_ })
+$ShipUiGonePaths += @($ShipUnusedFrontAssets | ForEach-Object { 'Data\Platform\UI\' + $_ })
+$ShipDeleteAlways += $ShipUiGonePaths
 
-function Get-ShipDeleteAlways { return $ShipDeleteAlways }
+function Get-ShipDeleteAlways {
+    $list = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($p in $ShipDeleteAlways) { $list.Add($p) }
+    $game = Get-Variable -Name GameDir -ValueOnly -ErrorAction SilentlyContinue
+    if ($game) {
+        $ui = Join-Path ([string]$game) 'Data\Platform\UI'
+        if (Test-Path -LiteralPath $ui -PathType Container) {
+            $have = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+            foreach ($p in $list) { [void]$have.Add($p) }
+            foreach ($f in @(Get-ChildItem -LiteralPath $ui -File)) {
+                $rel = 'Data\Platform\UI\' + $f.Name
+                if ($have.Contains($rel)) { continue }
+                $h = Get-ShipFileSha256 $f.FullName
+                if ($h -and $ShipDaedricMenuHashes.Contains($h)) {
+                    $list.Add($rel)
+                    [void]$have.Add($rel)
+                }
+            }
+        }
+    }
+    return @($list)
+}
 
 # FILES THAT TRAVEL WITH A PAGE, issue #883.
 #

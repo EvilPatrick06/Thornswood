@@ -812,6 +812,21 @@ namespace Thornswood
                         }
                         else if (rel.Equals("delete.txt", StringComparison.OrdinalIgnoreCase))
                             continue;
+                        else if (rel.Equals("ui-assets.txt", StringComparison.OrdinalIgnoreCase))
+                        {
+                            // Hashed assets build.js named, written by Ship
+                            // (#1318). OwnGame.Foreign reads this rather than
+                            // parsing build.js.
+                            try
+                            {
+                                string dir = Path.Combine(Paths.ProfileDir, "OwnGame");
+                                Directory.CreateDirectory(dir);
+                                dest = Path.Combine(dir, "ui-front-assets.txt");
+                                e.ExtractToFile(dest, true);
+                            }
+                            catch (Exception ex) { Swallow.Note("Updater.Install, ui-assets", ex); }
+                            continue;
+                        }
                         else
                             continue;
 
