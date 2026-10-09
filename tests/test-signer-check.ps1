@@ -20,7 +20,8 @@
     refused   an unsigned exe; the same exe signed with a self-made
               certificate named as the signer, and with one that also copies
               every usage Thornswood's real certificate carries; a program
-              validly signed by another publisher (csc.exe); a program signed
+              validly signed by another publisher (csc.exe: Refusal refuses
+              it, it is not Thornswood's identity); a program signed
               through Artifact Signing by another publisher (Git for
               Windows), even asked for its own name; the real launcher with one
               byte changed; the real launcher asked for another identity or
@@ -33,9 +34,15 @@
   the WebView2 installer it downloads, is pointed at the same files. It
   refuses all of them, and an installer signed with a self-made certificate
   named Microsoft Corporation. A program on this machine that Microsoft
-  signed (Edge, its updater, the WebView2 runtime, csc.exe) is accepted when
-  the chain Windows builds for it ends at Microsoft's own root and names
-  Microsoft Corporation, and refused otherwise.
+  signed (Edge, its updater, the WebView2 runtime) is accepted when the
+  chain Windows built from the signature embedded in the file ends at
+  Microsoft's own root and names Microsoft Corporation, and refused
+  otherwise. MicrosoftRefusal accepts the same csc.exe Refusal refused:
+  the signature in the file is Microsoft Corporation under Microsoft Root
+  Certificate Authority 2011. A Windows file signed only in a catalog,
+  with nothing in the file, is refused as not signed. Trust asks
+  WinVerifyTrust with WTD_CHOICE_FILE, so catalogs are never honoured
+  (#2046).
 
   The self-made certificates are made with New-SelfSignedCertificate in the
   CurrentUser store, used once, and removed from every CurrentUser store
@@ -104,6 +111,9 @@ $upd = [IO.File]::ReadAllText((Join-Path $App 'Updater.cs'))
 Yes 'Signature.cs has no C# 6: no $", no ?., no nameof' (-not ($sigSrc -match '\$"|\?\.|nameof\('))
 Yes 'Signature.cs asks WinVerifyTrust with WINTRUST_ACTION_GENERIC_VERIFY_V2' (
     $sigSrc -match 'WinVerifyTrust' -and $sigSrc -match '00AAC56B-CD44-11d0-8CC2-00C04FC295EE')
+Yes 'Signature.Trust asks WinVerifyTrust with WTD_CHOICE_FILE, never a catalog' (
+    $sigSrc -match 'WTD_CHOICE_FILE = 1' -and $sigSrc -match 'dwUnionChoice = WTD_CHOICE_FILE' -and
+    $sigSrc -notmatch 'WTD_CHOICE_CATALOG')
 Yes 'Updater.CheckSigner goes through Signature.Refusal' ($upd -match 'Signature\.Refusal\(path, ExpectedSigner, out said\)')
 Yes 'nothing in the launcher decides a signer from CreateFromSignedFile any more' (
     -not (@(Get-ChildItem (Join-Path $App '*.cs') | Where-Object {
@@ -169,6 +179,15 @@ try {
             $c = [Security.Cryptography.X509Certificates.X509Certificate]::CreateFromSignedFile($path)
             return ($c.Subject.IndexOf($who, [StringComparison]::OrdinalIgnoreCase) -ge 0)
         } catch { return $false }
+    }
+    # The certificate embedded in the file, which WinVerifyTrust with
+    # WTD_CHOICE_FILE checks. Get-AuthenticodeSignature on a dual-signed
+    # Windows file such as csc.exe returns the catalog signer instead.
+    function Get-EmbeddedCert([string]$path) {
+        try {
+            $raw = [Security.Cryptography.X509Certificates.X509Certificate]::CreateFromSignedFile($path)
+            return New-Object Security.Cryptography.X509Certificates.X509Certificate2 -ArgumentList $raw
+        } catch { return $null }
     }
 
     . (Join-Path $Repo 'scripts\release\Assert-PublishSigned.ps1')
@@ -271,10 +290,8 @@ try {
         # $sig, not $s: PowerShell names are not case sensitive, and $s is $S,
         # the Signature type that MicrosoftRefusal is read from further down.
         $sig = Get-AuthenticodeSignature -LiteralPath $c
-        # Embedded, not from a catalog: a catalog signature is not in the file.
-        $embedded = $false
-        try { $null = [Security.Cryptography.X509Certificates.X509Certificate]::CreateFromSignedFile($c); $embedded = $true } catch { $embedded = $false }
-        if ($sig.Status -eq 'Valid' -and $embedded) { $other = $c; break }
+        # The signature in the file, not a catalog: Trust never honours catalogs.
+        if ($sig.Status -eq 'Valid' -and $null -ne (Get-EmbeddedCert $c)) { $other = $c; break }
     }
     if ($other) {
         $r = Check $other $Signer
@@ -314,9 +331,10 @@ try {
     # ---- Microsoft's own programs (issue #1330) --------------------------------
     # Signature.MicrosoftRefusal, which Voice asks before it runs the WebView2
     # installer it downloads. Everything above that is not a program Microsoft
-    # signed under its own root is refused by it too, and a program on this
-    # machine that Microsoft did sign is accepted or refused by where the chain
-    # Windows builds for it ends.
+    # signed under its own root is refused by it too. A program on this
+    # machine that Microsoft did sign is accepted or refused by the chain
+    # Windows built from the signature embedded in the file, never from a
+    # catalog.
     $ms = $S.GetMethod('MicrosoftRefusal', $flags, $null, [Type[]]@([string], [string].MakeByRefType()), $null)
     Yes 'Signature.MicrosoftRefusal is there' ($null -ne $ms)
     if ($ms) {
@@ -369,11 +387,15 @@ try {
         if ($wv.Count) { $mine += $wv[0].FullName }
         $accepted = 0
         foreach ($c in $mine) {
-            $sc = (Get-AuthenticodeSignature -LiteralPath $c).SignerCertificate
-            # Embedded, not from a catalog: a catalog signature is not in the file.
-            $embedded = $false
-            try { $null = [Security.Cryptography.X509Certificates.X509Certificate]::CreateFromSignedFile($c); $embedded = $true } catch { $embedded = $false }
-            if (-not $sc -or -not $embedded) { continue }
+            # Expected cert from the signature in the file, not from
+            # Get-AuthenticodeSignature. On csc.exe that cmdlet returns the
+            # catalog signer (Microsoft Windows, Root 2010) even though the
+            # file also carries Microsoft Corporation under Root 2011, which
+            # is what MicrosoftRefusal sees. Requiring SignatureType
+            # Authenticode would skip csc.exe entirely, because that cmdlet
+            # reports Catalog on a dual-signed file (#2046).
+            $sc = Get-EmbeddedCert $c
+            if (-not $sc) { continue }
             $ch = New-Object Security.Cryptography.X509Certificates.X509Chain
             $ch.ChainPolicy.RevocationMode = 'NoCheck'
             $null = $ch.Build($sc)
@@ -388,6 +410,37 @@ try {
             }
         }
         if (-not $accepted) { Skip 'no program Microsoft signed under its own root on this machine (Edge, its updater and the WebView2 runtime are): accepted not run' }
+
+        # A catalog-only Windows file: Get-AuthenticodeSignature says Valid
+        # from a catalog, CreateFromSignedFile finds nothing in the file.
+        # Trust uses WTD_CHOICE_FILE, so catalogs are never honoured.
+        $catalogOnly = $null
+        foreach ($c in @(
+            (Join-Path $env:WINDIR 'System32\notepad.exe'),
+            (Join-Path $env:WINDIR 'System32\cmd.exe'),
+            (Join-Path $env:WINDIR 'System32\conhost.exe'),
+            (Join-Path $env:WINDIR 'System32\svchost.exe'),
+            (Join-Path $env:WINDIR 'explorer.exe'),
+            (Join-Path $env:WINDIR 'System32\ntdll.dll'),
+            (Join-Path $env:WINDIR 'System32\kernel32.dll'),
+            (Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe')
+        )) {
+            if (-not (Test-Path -LiteralPath $c)) { continue }
+            $catSig = Get-AuthenticodeSignature -LiteralPath $c
+            if ($catSig.Status -eq 'Valid' -and $catSig.SignatureType -eq 'Catalog' -and $null -eq (Get-EmbeddedCert $c)) {
+                $catalogOnly = $c
+                break
+            }
+        }
+        if ($catalogOnly) {
+            $r = MsCheck $catalogOnly
+            Yes ('a catalog-only Windows file (' + (Split-Path -Leaf $catalogOnly) + ') is refused as not signed: ' + $r.Why) (
+                $r.Why -eq 'is not signed.')
+            $r = Check $catalogOnly $Signer
+            Yes ('Refusal also treats a catalog as no signature: ' + $r.Why) ($r.Why -eq 'is not signed.')
+        } else {
+            Skip 'no catalog-only Windows file on this machine (notepad.exe, cmd.exe, powershell.exe are): catalogs-not-honoured not run'
+        }
     }
 }
 finally {
