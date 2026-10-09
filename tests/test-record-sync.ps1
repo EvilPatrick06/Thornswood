@@ -237,7 +237,7 @@ Copy-Item -LiteralPath (Join-Path $repo 'scripts') -Destination $fake -Recurse -
 # launcher\app\VortexProfileState.cs: LoadOrder.ps1 compiles the Vortex state
 # reader from the launcher's source since #1416, and the publish reads the
 # collection revision through it (#1878).
-foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\generated.json', 'launcher\app\VortexProfileState.cs') {
+foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\generated.json', 'records\ui-gone.json', 'launcher\app\VortexProfileState.cs') {
     $from = Join-Path $repo $f
     if (Test-Path -LiteralPath $from) { New-Item -ItemType Directory -Force -Path (Split-Path -Parent (Join-Path $fake $f)) | Out-Null; Copy-Item -LiteralPath $from -Destination (Join-Path $fake $f) -Force }
 }

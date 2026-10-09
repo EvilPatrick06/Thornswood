@@ -143,7 +143,7 @@ try {
                    'scripts\release\Feed-Store.ps1', 'scripts\release\Source-Notice.ps1',
                    'scripts\release\Release-Baseline.ps1', 'scripts\release\Release-Name.ps1', 'scripts\release\Dev-News.ps1',
                    'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt',
-                   'scripts\release\Where.ps1', 'records\client-build.json',
+                   'scripts\release\Where.ps1', 'records\client-build.json', 'records\ui-gone.json',
                    'scripts\mods\Generated.ps1', 'records\generated.json',
                    # LoadOrder.ps1 compiles the Vortex state reader from the
                    # launcher's source since #1416, and the publish reads the
