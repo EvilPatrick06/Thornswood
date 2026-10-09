@@ -466,7 +466,20 @@ try {
     $OwnGameT::ResetUiHashedOursForTest()
     Yes '  and a renamed Daedric file is caught by hash, even with no list' ($OwnGameT::Foreign($renamedRel))
 
+    # Unreadable hashed file, still no list. The old fail-open treated a
+    # hashed name as ours when the list was missing, so this case would
+    # pass that code. With a list, a hashed name not on it is already
+    # not ours even without the unreadable check.
     $OwnGameT::SetUiGoneRecordForTest($goneText)
+    $lockedRel = 'Data\Platform\UI\fedcba9876543210.jpg'
+    $lockedFull = Join-Path $uiGame $lockedRel
+    [IO.File]::WriteAllText($lockedFull, 'hashed-but-unreadable')
+    $lock = [IO.File]::Open($lockedFull, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
+    try {
+        $OwnGameT::ResetUiHashedOursForTest()
+        Yes '  and an unreadable hashed UI file is not ours, even with no list' ($OwnGameT::Foreign($lockedRel))
+    } finally { $lock.Dispose() }
+
     $listPath = Join-Path $uiGame 'Data\Platform\UI\thornswood-ui-assets.txt'
     [IO.File]::WriteAllLines($listPath, @('# hashed assets build.js named, #1318', $listed))
     $OwnGameT::ResetUiHashedOursForTest()
@@ -474,9 +487,6 @@ try {
     Yes '  and a hashed name the list does not carry is not ours' ($OwnGameT::Foreign($otherRel))
     Yes '  and a Daedric jpg is still not ours when a ui-assets list is present' ($OwnGameT::Foreign('Data\Platform\UI\' + $daedricJpg))
 
-    $lockedRel = 'Data\Platform\UI\fedcba9876543210.jpg'
-    $lockedFull = Join-Path $uiGame $lockedRel
-    [IO.File]::WriteAllText($lockedFull, 'hashed-but-unreadable')
     $lock = [IO.File]::Open($lockedFull, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
     try {
         $OwnGameT::ResetUiHashedOursForTest()
@@ -494,6 +504,67 @@ try {
     $corruptSaid = ''
     try { [void]$OwnGameT::Foreign($fontRel) } catch { $corruptThrew = $true; $corruptSaid = $_.Exception.Message }
     Yes '  and refuses when the gone record is corrupt' ($corruptThrew -and ($corruptSaid -match 'ui-gone\.json'))
+
+    # Empty embedded record. SetUiGoneRecordForTest('') is IsNullOrEmpty, so
+    # ReadUiGoneRecord falls through to the missing-resource path. A second
+    # compile of the lifted OwnGame with a 0-byte ui-gone.json is the empty
+    # ReadToEnd branch.
+    $emptyNs = $ns + 'Empty'
+    $csEmpty = $cs.Replace("namespace $ns", "namespace $emptyNs")
+    $emptyDir = Join-Path $uiOwn 'empty-gone'
+    New-Item -ItemType Directory -Force -Path $emptyDir | Out-Null
+    $emptyRes = Join-Path $emptyDir 'ui-gone.json'
+    [IO.File]::WriteAllBytes($emptyRes, [byte[]]@())
+    $csFile = Join-Path $emptyDir 'lifted.cs'
+    $driverFile = Join-Path $emptyDir 'driver.cs'
+    $emptyExe = Join-Path $emptyDir 'empty-gone.exe'
+    [IO.File]::WriteAllText($csFile, $csEmpty)
+    [IO.File]::WriteAllText($driverFile, @"
+using System;
+namespace $emptyNs {
+    static class EmptyGoneProgram {
+        static int Main() {
+            try {
+                Console.Write(OwnGame.Foreign("Data\\Platform\\UI\\cafebabeface0123.png"));
+                return 2;
+            } catch (Exception ex) {
+                Console.Write(ex.Message ?? "");
+                return 0;
+            }
+        }
+    }
+}
+"@)
+    $csc = $null
+    if ($env:WINDIR) {
+        $csc = @(
+            (Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'),
+            (Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe')
+        ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    }
+    Yes 'the .NET Framework csc the launcher builds with is on this machine' ([bool]$csc)
+    $emptyBuilt = $false
+    if ($csc) {
+        $fw = Split-Path -Parent $csc
+        $cscArgs = @(
+            '/noconfig', '/nologo', '/target:exe', '/warn:0',
+            "/out:$emptyExe",
+            "/resource:$emptyRes,ui-gone.json",
+            "/reference:$(Join-Path $fw 'System.dll')",
+            "/reference:$(Join-Path $fw 'System.Core.dll')",
+            $csFile,
+            $driverFile
+        )
+        $cscOut = & $csc @cscArgs 2>&1
+        $emptyBuilt = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $emptyExe)
+        if (-not $emptyBuilt) { Write-Host ('      ' + ($cscOut | Out-String).Trim()) }
+    }
+    $emptySaid = ''
+    if ($emptyBuilt) {
+        $emptySaid = & $emptyExe 2>&1 | Out-String
+    }
+    Yes 'OwnGame refuses when the embedded gone record is empty' (
+        $emptySaid -match 'is empty' -and $emptySaid -match 'ui-gone\.json')
 
     $OwnGameT::SetUiGoneRecordForTest($goneText)
     $PathsT::Game = $savedGame
